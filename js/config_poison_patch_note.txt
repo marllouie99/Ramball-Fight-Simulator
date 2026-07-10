@@ -1,0 +1,7 @@
+Add/adjust Green poison settings under CONFIG.grenadier in js/config.js:
+grenadier: {
+  poisonTicks: number,
+  poisonIntervalFrames: number,
+  poisonDamagePerTick: number,
+}
+

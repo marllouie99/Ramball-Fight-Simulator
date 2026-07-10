@@ -1,0 +1,215 @@
+// ─────────────────────────────────────────────
+// FIRE
+// ─────────────────────────────────────────────
+
+/**
+ * Spawns a projectile from the fighter's gun barrel tip,
+ * travelling in the direction of fighter.gunAngle.
+ */
+function fireProjectileEngine(fighter, ownerIndex, damage, isFollowUp = false, speedOverride) {
+  const { radius, life } = CONFIG.projectile;
+  const speed = speedOverride ?? CONFIG.projectile.speed;
+  const tipDist = GUN_TIP_DIST(fighter.r);
+  const dirX    = Math.cos(fighter.gunAngle);
+  const dirY    = Math.sin(fighter.gunAngle);
+
+  projectiles.push({
+    x:     fighter.x + dirX * tipDist,
+    y:     fighter.y + dirY * tipDist,
+    vx:    dirX * speed,
+    vy:    dirY * speed,
+    r:     radius,
+    life,
+    color: fighter.color,
+    owner: ownerIndex,
+    damage: damage, // custom damage per fighter projectile
+    isFollowUp: isFollowUp,
+  });
+}
+
+function fireProjectile(fighter, ownerIndex, damage, isFollowUp = false, speedOverride) {
+  return fireProjectileEngine(fighter, ownerIndex, damage, isFollowUp, speedOverride);
+}
+
+function fireGrenadeEngine(fighter, ownerIndex, damage, opponent) {
+  if (!fighter || !opponent) return;
+
+  const { speed, radius } = CONFIG.projectile;
+  const tipDist = GUN_TIP_DIST(fighter.r);
+
+  const targetX = opponent.x;
+  const targetY = opponent.y;
+  const dist = Math.hypot(targetX - fighter.x, targetY - fighter.y);
+
+  const dirX = (targetX - fighter.x) / (dist || 1);
+  const dirY = (targetY - fighter.y) / (dist || 1);
+
+  const startX = fighter.x + dirX * tipDist;
+  const startY = fighter.y + dirY * tipDist;
+
+  const projSpeed = speed * 1.6;
+  const life = Math.max(8, Math.floor(dist / projSpeed));
+
+  // Prevent division by zero
+  if (life <= 0) return;
+
+  const vx = (targetX - startX) / life;
+  const vy = (targetY - startY) / life;
+
+  const g = 0.5;
+  const vz = (g * life) / 2;
+
+  projectiles.push({
+    x: startX,
+    y: startY,
+    z: 15,
+    vx: vx,
+    vy: vy,
+    vz: vz,
+    g: g,
+    r: radius * 1.2,
+    life,
+    maxLife: life,
+    color: fighter.color,
+    owner: ownerIndex,
+    damage,
+    isGrenade: true,
+    aoeRadius: 60,
+    history: [],
+  });
+}
+
+function fireGrenade(fighter, ownerIndex, damage, opponent) {
+  return fireGrenadeEngine(fighter, ownerIndex, damage, opponent);
+}
+
+// ─────────────────────────────────────────────
+// HIT DETECTION
+// ─────────────────────────────────────────────
+
+/**
+ * Tests a projectile against all fighters except its owner.
+ * Applies damage and sets game-over on kill.
+ * @returns {boolean} true if the projectile hit a target.
+ */
+function checkProjectileHits(projectile) {
+  if (projectile.isExplosion) return false;
+
+  for (let fi = 0; fi < fighters.length; fi++) {
+    if (projectile.owner === fi) continue;
+
+    const fighter = fighters[fi];
+    const dist    = Math.hypot(fighter.x - projectile.x, fighter.y - projectile.y);
+
+    if (dist < fighter.r + projectile.r) {
+      if (!projectile.isGrenade) {
+        const attacker = fighters[projectile.owner];
+        fighter.takeDamage(projectile.damage, attacker);
+        if (typeof attacker.onDamageDealt === 'function') {
+          attacker.onDamageDealt(fighter, projectile, projectile.owner);
+        }
+      }
+      return true; // hit confirmed — remove projectile
+    }
+  }
+  return false;
+}
+
+function detonateGrenade(p) {
+  const attacker = fighters[p.owner];
+  if (!attacker) return; // Safety check
+  const radius = p.aoeRadius || 60;
+
+  for (let fi = 0; fi < fighters.length; fi++) {
+    if (p.owner === fi) continue;
+    const fighter = fighters[fi];
+    if (!fighter) continue; // Safety check
+    const dist = Math.hypot(fighter.x - p.x, fighter.y - p.y);
+    if (dist <= radius + fighter.r) {
+      try {
+        fighter.takeDamage(p.damage, attacker);
+        if (typeof attacker.onDamageDealt === 'function') {
+          attacker.onDamageDealt(fighter, p, p.owner);
+        }
+        if (fighter.applyPoison) {
+          fighter.applyPoison(attacker);
+        }
+      } catch (e) {
+        console.error('Grenade detonation error:', e);
+      }
+    }
+  }
+
+  projectiles.push({
+    x: p.x,
+    y: p.y,
+    vx: 0,
+    vy: 0,
+    r: p.aoeRadius,
+    life: 15,
+    color: 'rgba(77, 255, 77, 0.5)',
+    owner: p.owner,
+    isExplosion: true,
+  });
+}
+
+/**
+ * Returns true if the projectile has expired or left the arena.
+ */
+function isProjectileExpired(p) {
+  return (
+    p.life <= 0                          ||
+    p.x - p.r < arena.x                 ||
+    p.x + p.r > arena.x + arena.width   ||
+    p.y - p.r < arena.y                 ||
+    p.y + p.r > arena.y + arena.height
+  );
+}
+
+// ─────────────────────────────────────────────
+// PROJECTILE UPDATE (main loop step)
+// ─────────────────────────────────────────────
+
+function updateProjectiles() {
+  for (let i = projectiles.length - 1; i >= 0; i--) {
+    const p = projectiles[i];
+
+    if (p.isExplosion) {
+      p.life -= 1;
+      if (p.life <= 0) projectiles.splice(i, 1);
+      continue;
+    }
+
+    if (p.isGrenade) {
+      if (!p.history) p.history = [];
+      p.history.push({ x: p.x, y: p.y, z: p.z });
+      if (p.history.length > 12) p.history.shift();
+
+      p.x += p.vx;
+      p.y += p.vy;
+      p.z += p.vz;
+      p.vz -= p.g;
+      
+      p.life -= 1;
+
+      if (p.z < 0) p.z = 0;
+
+      if (p.life <= 0) {
+        detonateGrenade(p);
+        projectiles.splice(i, 1);
+      }
+      continue;
+    }
+
+    p.x += p.vx;
+    p.y += p.vy;
+    p.life -= 1;
+
+    const hit = checkProjectileHits(p);
+    const expired = isProjectileExpired(p);
+
+    if (hit || expired) {
+      projectiles.splice(i, 1);
+    }
+  }
+}

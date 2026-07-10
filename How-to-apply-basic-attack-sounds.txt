@@ -1,0 +1,142 @@
+═══════════════════════════════════════════════════════════════════════════════
+        GUIDE: Adding Basic Attack Sounds for Fighters
+═══════════════════════════════════════════════════════════════════════════════
+
+This guide explains how to add or modify sound effects for a fighter's basic
+attack. The sound system uses a configurable delay so the sound can sync with
+the attack animation or projectile travel.
+
+───────────────────────────────────────────────────────────────────────────────
+STEP 1 — Add the sound file to the project
+───────────────────────────────────────────────────────────────────────────────
+
+Place your audio file in:
+  Assets/Sound Effects/Attacks/
+
+Supported formats: .mp3, .wav, .ogg (mp3 recommended for cross-browser support)
+
+───────────────────────────────────────────────────────────────────────────────
+STEP 2 — Register the sound in basicAttackSounds.js
+───────────────────────────────────────────────────────────────────────────────
+
+Open: js/soundEffects/basicAttackSounds.js
+
+Find the BASIC_ATTACK_SOUNDS object and add a new entry for your fighter:
+
+  // ── FighterName ────────────────────────────
+  // Short description of the attack.
+  fighterName: {
+    src: 'Assets/Sound Effects/Attacks/yourfile.mp3',
+    volume: 0.7,   // 0.0 (silent) to 1.0 (full volume)
+    delay: 0,       // frames delay (see Step 3)
+  },
+
+IMPORTANT: The key (e.g. 'fighterName') must match the fighter's name exactly
+as it appears in the fighter definition's 'type' field in config.js, OR match
+the fighter's display name (case-insensitive, spaces ignored).
+
+Example — if config.js has:  type: 'berserker'
+Then use:                     berserker: { ... }
+
+───────────────────────────────────────────────────────────────────────────────
+STEP 3 — Tune the delay for proper sync
+───────────────────────────────────────────────────────────────────────────────
+
+The 'delay' value controls when the sound plays relative to the attack:
+
+  delay = -5  →  sound plays 5 frames BEFORE the attack fires
+  delay = 0   →  sound plays immediately when the attack fires
+  delay = 3   →  sound plays 3 frames AFTER the attack fires
+  delay = 10  →  sound plays 10 frames after (good for projectile travel)
+
+Use negative values for melee attacks or fast projectiles.
+Use positive values when the sound should sync with impact or travel.
+
+Recommended starting points:
+  • Melee attacks:        delay = 0
+  • Fast projectiles:     delay = -2 to -4
+  • Slow projectiles:     delay = 5 to 15
+  • Continuous beams:    delay = 0
+
+───────────────────────────────────────────────────────────────────────────────
+STEP 4 — Ensure the fighter calls _tickAttackSound()
+───────────────────────────────────────────────────────────────────────────────
+
+The sound system works by setting a timer when an attack fires, then ticking
+that timer down each frame until it reaches 0, at which point the sound plays.
+
+For the sound to work, the fighter's update() method must call _tickAttackSound().
+
+CHECK: Open js/fighter.js and look at the shoot() method. The sound trigger
+should be called for ALL fighter types, not just 'aimbot':
+
+  shoot(ownerIndex) {
+    if (projectileSystem) {
+      projectileSystem.fireProjectile(this, ownerIndex, this.damage);
+    }
+    // Play attack sound for all fighter types
+    const sound = getBasicAttackSound(this.name, this._def.type);
+    this._attackSoundTimer = sound.delay;
+    this._attackSoundConfig = sound;
+  }
+
+If a fighter uses a custom attack method (like Berserker's _tryAxeSwing),
+you must manually add the sound trigger there:
+
+  _tryAxeSwing(opponent, ownerIndex) {
+    // ... existing attack code ...
+
+    // Play attack sound
+    const sound = getBasicAttackSound(this.name, this._def.type);
+    this._attackSoundTimer = sound.delay;
+    this._attackSoundConfig = sound;
+  }
+
+This is especially important for fighters like Cronos and Bomber, which bypass
+Fighter.shoot() and fire attacks directly from their custom update logic.
+
+And ensure the fighter's update() calls _tickAttackSound():
+
+  update(opponent, ownerIndex, arena) {
+    this.handlePoison();
+    this.handleBurn();
+    this._tickCooldowns();
+    this._tickAttackSound();   // ← THIS LINE IS REQUIRED
+    // ... rest of update ...
+  }
+
+───────────────────────────────────────────────────────────────────────────────
+STEP 5 — Test the sound
+───────────────────────────────────────────────────────────────────────────────
+
+1. Open the game in a browser
+2. Select or spawn the fighter you added the sound for
+3. Attack and listen for the sound
+4. Adjust 'delay' in basicAttackSounds.js if it feels out of sync
+5. Adjust 'volume' if it's too loud or too quiet
+
+No code reload needed — just save the file and attack again.
+
+───────────────────────────────────────────────────────────────────────────────
+TROUBLESHOOTING
+───────────────────────────────────────────────────────────────────────────────
+
+Q: Sound doesn't play at all
+A: Check that:
+   • The fighter's update() calls _tickAttackSound()
+   • The fighter's attack method sets _attackSoundTimer and _attackSoundConfig
+   • The key in BASIC_ATTACK_SOUNDS matches the fighter's type or name
+   • The file path in 'src' is correct and the file exists
+
+Q: Sound plays for wrong fighter
+A: The key in BASIC_ATTACK_SOUNDS is matching a different fighter. Make sure
+   the key matches the fighter's 'type' in config.js exactly.
+
+Q: Sound is out of sync
+A: Adjust the 'delay' value. Negative = earlier, positive = later.
+
+Q: Sound only plays once
+A: The sound system uses a one-shot timer. Make sure _attackSoundTimer is set
+   to null after playing (handled automatically by _tickAttackSound).
+
+═══════════════════════════════════════════════════════════════════════════════

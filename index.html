@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circle Mini-Battle</title>
+  <link rel="stylesheet" href="css/style.css?v=3" />
+</head>
+
+<body>
+  <div class="game-container">
+    <div id="healthHudLeft" class="health-hud-side" aria-live="polite"></div>
+    <div class="game-box">
+      <canvas id="arena" width="540" height="960"></canvas>
+      <div id="healthHud" class="health-hud" aria-live="polite"></div>
+    </div>
+    <div id="healthHudRight" class="health-hud-side" aria-live="polite"></div>
+  </div>
+
+  <!-- ES6 module entry point — all imports are resolved via import/export -->
+  <script>
+    window.addEventListener('error', (e) => {
+      console.error('Global error:', e.message, e.filename, e.lineno);
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      console.error('Unhandled rejection:', e.reason);
+    });
+  </script>
+
+  <script type="module" src="js/main.js?v=2"></script>
+</body>
+
+</html>

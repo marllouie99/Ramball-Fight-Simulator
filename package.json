@@ -1,0 +1,29 @@
+{
+  "name": "circle-mini-battle",
+  "version": "1.0.0",
+  "description": "Circle Mini-Battle desktop app",
+  "main": "electron-main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win"
+  },
+  "author": "",
+  "license": "ISC",
+  "build": {
+    "appId": "com.circleminibattle.app",
+    "productName": "Circle Mini-Battle",
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ]
+    },
+    "directories": {
+      "output": "dist"
+    }
+  },
+  "devDependencies": {
+    "electron": "^43.1.0",
+    "electron-builder": "^26.15.3"
+  }
+}

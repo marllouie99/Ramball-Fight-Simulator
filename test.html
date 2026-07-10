@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Circle Mini-Battle</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #111;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+    }
+
+    .game-box {
+      text-align: center;
+    }
+
+    canvas {
+      background: #1d1d1d;
+      border: 4px solid #fff;
+      border-radius: 10px;
+      box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="game-box">
+    <h2>Circle Mini-Battle</h2>
+    <canvas id="arena" width="600" height="360"></canvas>
+  </div>
+
+  <script>
+    // ─────────────────────────────────────────────
+    // CONFIG — tweak all game values here
+    // ─────────────────────────────────────────────
+    const CONFIG = {
+      arena:       { x: 30, y: 30, width: 540, height: 300 },
+      projectile:  { speed: 5.5, radius: 5, life: 120, damage: 10 },
+      gun:         { baseOffset: 10, barrelLength: 18 },   // gun base offset + barrel from fighter edge
+      spin:        { rate: 0.06 },                          // angle increment per frame (× fighter.speed)
+      shoot:       { cooldown: 24 },                        // frames between shots
+      collision:   { restitution: 0.95 },
+      hpBar:       { height: 6, yOffset: 16 },
+    };
+
+    // Derived constant — total distance from center to gun tip
+    const GUN_TIP_DIST = (r) => r + CONFIG.gun.baseOffset + CONFIG.gun.barrelLength;
+
+    // ─────────────────────────────────────────────
+    // FIGHTER DEFINITIONS
+    // ─────────────────────────────────────────────
+    const FIGHTER_DEFS = [
+      {
+        name: 'Red',
+        color: '#ff4d4d',
+        startX: 140, startY: 120,
+        startVx: 1.4, startVy: 1.0,
+        radius: 24,
+        aimbot: false,
+      },
+      {
+        name: 'Blue',
+        color: '#4da3ff',
+        startX: 460, startY: 220,
+        startVx: -1.2, startVy: -0.9,
+        radius: 26,
+        aimbot: true,
+      },
+    ];
+
+    // ─────────────────────────────────────────────
+    // STATE
+    // ─────────────────────────────────────────────
+    const canvas = document.getElementById('arena');
+    const ctx    = canvas.getContext('2d');
+    const arena  = CONFIG.arena;
+
+    const projectiles = [];
+
+    let gameOver = false;
+    let winner   = null;
+
+    // Build live fighter objects from definitions
+    function makeFighter(def) {
+      return {
+        name:          def.name,
+        color:         def.color,
+        aimbot:        def.aimbot,
+        x:             def.startX,
+        y:             def.startY,
+        vx:            def.startVx,
+        vy:            def.startVy,
+        r:             def.radius,
+        speed:         Math.hypot(def.startVx, def.startVy),
+        angle:         0,     // body rotation (always spins freely)
+        gunAngle:      0,     // weapon direction (aimbot: tracks target | normal: = angle)
+        shootCooldown: 0,
+        hp:            100,
+        maxHp:         100,
+        // Keep original start values for reset
+        _def: def,
+      };
+    }
+
+    const fighters = FIGHTER_DEFS.map(makeFighter);
+
+    // ─────────────────────────────────────────────
+    // HELPERS
+    // ─────────────────────────────────────────────
+
+    /** Re-scale a fighter's velocity to its original speed (preserves direction). */
+    function normalizeSpeed(fighter) {
+      const mag = Math.hypot(fighter.vx, fighter.vy);
+      if (mag > 0) {
+        fighter.vx = (fighter.vx / mag) * fighter.speed;
+        fighter.vy = (fighter.vy / mag) * fighter.speed;
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // UPDATE — FIGHTERS
+    // ─────────────────────────────────────────────
+
+    /** Reflect a fighter off the arena walls and restore constant speed. */
+    function resolveWallBounce(fighter) {
+      let bounced = false;
+
+      if (fighter.x - fighter.r < arena.x) {
+        fighter.x  = arena.x + fighter.r;
+        fighter.vx = Math.abs(fighter.vx);
+        bounced    = true;
+      } else if (fighter.x + fighter.r > arena.x + arena.width) {
+        fighter.x  = arena.x + arena.width - fighter.r;
+        fighter.vx = -Math.abs(fighter.vx);
+        bounced    = true;
+      }
+
+      if (fighter.y - fighter.r < arena.y) {
+        fighter.y  = arena.y + fighter.r;
+        fighter.vy = Math.abs(fighter.vy);
+        bounced    = true;
+      } else if (fighter.y + fighter.r > arena.y + arena.height) {
+        fighter.y  = arena.y + arena.height - fighter.r;
+        fighter.vy = -Math.abs(fighter.vy);
+        bounced    = true;
+      }
+
+      if (bounced) normalizeSpeed(fighter);
+    }
+
+    /** Elastic collision response between the two fighters. */
+    function resolveFighterCollision(a, b) {
+      const dx       = b.x - a.x;
+      const dy       = b.y - a.y;
+      const distance = Math.hypot(dx, dy);
+      const minDist  = a.r + b.r;
+
+      if (distance >= minDist) return;
+
+      // Collision normal
+      const nx = distance > 0 ? dx / distance : 1;
+      const ny = distance > 0 ? dy / distance : 0;
+
+      // Separate overlapping circles
+      const overlap = (minDist - distance) / 2;
+      a.x -= nx * overlap;
+      a.y -= ny * overlap;
+      b.x += nx * overlap;
+      b.y += ny * overlap;
+
+      // Impulse along normal
+      const dvx    = b.vx - a.vx;
+      const dvy    = b.vy - a.vy;
+      const dotN   = dvx * nx + dvy * ny;
+      if (dotN >= 0) return; // already separating
+
+      const { restitution } = CONFIG.collision;
+      const impulse = -(1 + restitution) * dotN / 2;
+
+      a.vx -= impulse * nx;
+      a.vy -= impulse * ny;
+      b.vx += impulse * nx;
+      b.vy += impulse * ny;
+
+      normalizeSpeed(a);
+      normalizeSpeed(b);
+    }
+
+    function updateFighters() {
+      if (gameOver) return;
+
+      fighters.forEach((fighter, fi) => {
+        // Shooting
+        if (fighter.shootCooldown > 0) {
+          fighter.shootCooldown -= 1;
+        } else {
+          fireProjectile(fighter, fi);
+          fighter.shootCooldown = CONFIG.shoot.cooldown;
+        }
+
+        // Movement
+        fighter.x     += fighter.vx;
+        fighter.y     += fighter.vy;
+        fighter.angle += fighter.speed * CONFIG.spin.rate;
+
+        // Gun tracking
+        const opponent    = fighters[1 - fi];
+        fighter.gunAngle  = fighter.aimbot
+          ? Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x)
+          : fighter.angle;
+
+        resolveWallBounce(fighter);
+      });
+
+      resolveFighterCollision(fighters[0], fighters[1]);
+    }
+
+    // ─────────────────────────────────────────────
+    // UPDATE — PROJECTILES
+    // ─────────────────────────────────────────────
+
+    /** Spawn a projectile from the fighter's gun tip in the gunAngle direction. */
+    function fireProjectile(fighter, ownerIndex) {
+      const { speed, radius, life } = CONFIG.projectile;
+      const tipDist = GUN_TIP_DIST(fighter.r);
+      const dirX    = Math.cos(fighter.gunAngle);
+      const dirY    = Math.sin(fighter.gunAngle);
+
+      projectiles.push({
+        x:     fighter.x + dirX * tipDist,
+        y:     fighter.y + dirY * tipDist,
+        vx:    dirX * speed,
+        vy:    dirY * speed,
+        r:     radius,
+        life,
+        color: fighter.color,
+        owner: ownerIndex,
+      });
+    }
+
+    /** Check if a projectile hit a fighter (skips its own owner). */
+    function checkProjectileHits(projectile) {
+      for (let fi = 0; fi < fighters.length; fi++) {
+        if (projectile.owner === fi) continue;
+        const fighter = fighters[fi];
+        const dist    = Math.hypot(fighter.x - projectile.x, fighter.y - projectile.y);
+        if (dist < fighter.r + projectile.r) {
+          fighter.hp = Math.max(0, fighter.hp - CONFIG.projectile.damage);
+          if (fighter.hp === 0 && !gameOver) {
+            gameOver = true;
+            winner   = fighters[projectile.owner];
+          }
+          return true; // hit confirmed
+        }
+      }
+      return false;
+    }
+
+    /** Returns true if the projectile is out of arena bounds or expired. */
+    function isProjectileExpired(p) {
+      return (
+        p.life <= 0               ||
+        p.x - p.r < arena.x      ||
+        p.x + p.r > arena.x + arena.width  ||
+        p.y - p.r < arena.y      ||
+        p.y + p.r > arena.y + arena.height
+      );
+    }
+
+    function updateProjectiles() {
+      for (let i = projectiles.length - 1; i >= 0; i--) {
+        const p = projectiles[i];
+        p.x    += p.vx;
+        p.y    += p.vy;
+        p.life -= 1;
+
+        if (checkProjectileHits(p) || isProjectileExpired(p)) {
+          projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    // ─────────────────────────────────────────────
+    // DRAW — ARENA
+    // ─────────────────────────────────────────────
+
+    function drawArena() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth   = 3;
+      ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
+    }
+
+    // ─────────────────────────────────────────────
+    // DRAW — PROJECTILES
+    // ─────────────────────────────────────────────
+
+    function drawProjectiles() {
+      projectiles.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // DRAW — FIGHTERS
+    // ─────────────────────────────────────────────
+
+    function drawTargetingLaser(fighter, opponent) {
+      const tipDist = GUN_TIP_DIST(fighter.r);
+      const tx = fighter.x + Math.cos(fighter.gunAngle) * tipDist;
+      const ty = fighter.y + Math.sin(fighter.gunAngle) * tipDist;
+
+      ctx.save();
+      ctx.setLineDash([4, 6]);
+      ctx.strokeStyle = 'rgba(255, 80, 80, 0.45)';
+      ctx.lineWidth   = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(opponent.x, opponent.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
+    function drawFighterBody(fighter) {
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y);
+      ctx.rotate(fighter.angle);
+
+      // Fill
+      ctx.beginPath();
+      ctx.arc(0, 0, fighter.r, 0, Math.PI * 2);
+      ctx.fillStyle = fighter.color;
+      ctx.fill();
+
+      // Clip and draw spinning cross-stripe
+      ctx.beginPath();
+      ctx.arc(0, 0, fighter.r, 0, Math.PI * 2);
+      ctx.clip();
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(-fighter.r,        -fighter.r * 0.22, fighter.r * 2,    fighter.r * 0.44);
+      ctx.fillRect(-fighter.r * 0.22, -fighter.r,        fighter.r * 0.44, fighter.r * 2);
+
+      ctx.restore();
+    }
+
+    function drawFighterOutline(fighter) {
+      ctx.beginPath();
+      ctx.arc(fighter.x, fighter.y, fighter.r, 0, Math.PI * 2);
+      ctx.lineWidth   = fighter.aimbot ? 3 : 2;
+      ctx.strokeStyle = fighter.aimbot ? '#00eaff' : '#111';
+      ctx.stroke();
+    }
+
+    function drawFighterGun(fighter) {
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y);
+      ctx.rotate(fighter.gunAngle);
+      ctx.translate(fighter.r + CONFIG.gun.baseOffset, 0);
+      ctx.fillStyle = fighter.aimbot ? '#00bcd4' : '#444';
+      ctx.fillRect(-3, -5, 14, 10);
+      ctx.fillStyle = fighter.aimbot ? '#007c91' : '#222';
+      ctx.fillRect(8, -2.5, 10, 5);
+      ctx.restore();
+    }
+
+    function drawHpBar(fighter, fighterIndex) {
+      const { height: barH, yOffset } = CONFIG.hpBar;
+      const barW    = fighter.r * 2.2;
+      const barX    = fighter.x - barW / 2;
+      const barY    = fighter.y - fighter.r - yOffset;
+      const hpRatio = Math.max(0, fighter.hp / fighter.maxHp);
+      const hue     = hpRatio * 120; // 120 = green, 0 = red
+
+      // Team color border for 2v2 mode
+      if (state.mode === '2v2') {
+        const teamIndex = fighterIndex < 2 ? 0 : 1;
+        const teamBorderColor = teamIndex === 0 ? '#4488ff' : '#ff4444';
+        ctx.fillStyle = teamBorderColor;
+        ctx.beginPath();
+        ctx.roundRect(barX - 3, barY - 3, barW + 6, barH + 6, 4);
+        ctx.fill();
+      }
+
+      // Background track
+      ctx.fillStyle = 'rgba(0,0,0,0.55)';
+      ctx.beginPath();
+      ctx.roundRect(barX - 1, barY - 1, barW + 2, barH + 2, 3);
+      ctx.fill();
+
+      // HP fill
+      ctx.fillStyle = `hsl(${hue}, 90%, 48%)`;
+      ctx.beginPath();
+      ctx.roundRect(barX, barY, barW * hpRatio, barH, 3);
+      ctx.fill();
+
+      // HP text
+      ctx.fillStyle   = '#fff';
+      ctx.font        = 'bold 9px Arial';
+      ctx.textAlign   = 'center';
+      ctx.fillText(`${fighter.hp}/${fighter.maxHp}`, fighter.x, barY - 3);
+    }
+
+    function drawAimbotBadge(fighter) {
+      ctx.fillStyle = '#00eaff';
+      ctx.font      = 'bold 8px Arial';
+      ctx.textAlign = 'center';
+      ctx.fillText('AIMBOT', fighter.x, fighter.y + fighter.r + 12);
+    }
+
+    function drawFighters() {
+      fighters.forEach((fighter, fi) => {
+        const opponent = fighters[1 - fi];
+
+        if (fighter.aimbot) drawTargetingLaser(fighter, opponent);
+        drawFighterBody(fighter);
+        drawFighterOutline(fighter);
+        drawFighterGun(fighter);
+        if (fighter.aimbot) drawAimbotBadge(fighter);
+        drawHpBar(fighter, fi);
+      });
+    }
+
+    // ─────────────────────────────────────────────
+    // DRAW — GAME OVER OVERLAY
+    // ─────────────────────────────────────────────
+
+    function drawGameOver() {
+      ctx.fillStyle = 'rgba(0,0,0,0.65)';
+      ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+
+      ctx.textAlign = 'center';
+      ctx.fillStyle = winner.color;
+      ctx.font      = 'bold 42px Arial';
+      ctx.fillText(`${winner.name} Wins!`, canvas.width / 2, canvas.height / 2 - 20);
+
+      ctx.fillStyle = '#fff';
+      ctx.font      = '18px Arial';
+      ctx.fillText('Click to Restart', canvas.width / 2, canvas.height / 2 + 20);
+    }
+
+    // ─────────────────────────────────────────────
+    // GAME LOOP
+    // ─────────────────────────────────────────────
+
+    function animate() {
+      updateFighters();
+      updateProjectiles();
+
+      drawArena();
+      drawProjectiles();
+      drawFighters();
+
+      if (gameOver) {
+        drawGameOver();
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // ─────────────────────────────────────────────
+    // RESET
+    // ─────────────────────────────────────────────
+
+    function resetFighter(fighter) {
+      const d          = fighter._def;
+      fighter.x        = d.startX;
+      fighter.y        = d.startY;
+      fighter.vx       = d.startVx;
+      fighter.vy       = d.startVy;
+      fighter.hp       = fighter.maxHp;
+      fighter.angle    = 0;
+      fighter.gunAngle = 0;
+      fighter.shootCooldown = 0;
+    }
+
+    function resetGame() {
+      fighters.forEach(resetFighter);
+      projectiles.length = 0;
+      gameOver = false;
+      winner   = null;
+      requestAnimationFrame(animate);
+    }
+
+    // ─────────────────────────────────────────────
+    // EVENT LISTENERS
+    // ─────────────────────────────────────────────
+
+    canvas.addEventListener('click', () => { if (gameOver) resetGame(); });
+
+    // ─────────────────────────────────────────────
+    // START
+    // ─────────────────────────────────────────────
+
+    animate();
+  </script>
+</body>
+
+</html>
