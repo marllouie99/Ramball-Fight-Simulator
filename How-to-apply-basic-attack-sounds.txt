@@ -75,7 +75,7 @@ should be called for ALL fighter types, not just 'aimbot':
       projectileSystem.fireProjectile(this, ownerIndex, this.damage);
     }
     // Play attack sound for all fighter types
-    const sound = getBasicAttackSound(this.name, this._def.type);
+    const sound = getBasicAttackSound(this._def.id, this._def.type);
     this._attackSoundTimer = sound.delay;
     this._attackSoundConfig = sound;
   }
@@ -87,7 +87,7 @@ you must manually add the sound trigger there:
     // ... existing attack code ...
 
     // Play attack sound
-    const sound = getBasicAttackSound(this.name, this._def.type);
+    const sound = getBasicAttackSound(this._def.id, this._def.type);
     this._attackSoundTimer = sound.delay;
     this._attackSoundConfig = sound;
   }

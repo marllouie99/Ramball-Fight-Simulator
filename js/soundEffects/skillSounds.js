@@ -1,46 +1,46 @@
-// ─────────────────────────────────────────────
+﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // SKILL SOUND EFFECTS CONFIG
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Configure sound effects for fighter skills and abilities.
 
 export const SKILL_SOUNDS = {
-  // ── Berserker ─────────────────────────────
-  berserker: {
+  // â”€â”€ Berserker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  10: {
     rage: {
-      src: 'assets/Sound Effects/Skills/ragescream.mp3',
+      src: 'Assets/Sound Effects/Skills/ragescream.mp3',
       volume: 0.4,
     }
   },
 
-  // ── Cronos ─────────────────────────────────
+  // â”€â”€ Cronos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Plays when Cronos deploys the time-stop sphere.
-  cronos: {
+  11: {
     sphere: {
       src: 'Assets/Sound Effects/Skills/cronosphere.mp3',
       volume: 0.7,
     },
   },
 
-  // ── Knight ─────────────────────────────────
+  // â”€â”€ Knight â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Plays when the Knight's shield successfully blocks a hit.
-  knight: {
+  6: {
     shieldblock: {
       src: 'Assets/Sound Effects/Skills/shieldblock.mp3',
       volume: 0.8,
     },
   },
 
-  // ── Doppelganger ─────────────────────────────
+  // â”€â”€ Doppelganger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Plays when Doppelganger summons an illusion.
-  doppelganger: {
+  14: {
     summonillusion: {
       src: 'Assets/Sound Effects/Skills/summinillusion.mp3',
       volume: 0.65,
     },
   },
 
-  // ── Ninja / Assassin ─────────────────────────
-  ninja: {
+  // â”€â”€ Ninja / Assassin â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  8: {
     stealthmode: {
       src: 'Assets/Sound Effects/Skills/woosh.mp3',
       volume: 0.6,
@@ -55,8 +55,8 @@ export const SKILL_SOUNDS = {
     },
   },
 
-  // ── Void Master ──────────────────────────────
-  voidmaster: {
+  // â”€â”€ Void Master â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  7: {
     blackhole: {
       src: 'Assets/Sound Effects/Skills/gravitypull.mp3',
       volume: 0.7,
@@ -66,16 +66,14 @@ export const SKILL_SOUNDS = {
 
 /**
  * Get the sound config for a fighter's specific skill.
- * @param {string} fighterName - Fighter name or type (e.g. 'Berserker')
+ * @param {number} fighterId - Fighter ID
  * @param {string} skillName - Name of the skill (e.g. 'rage')
  * @returns {{ src: string, volume: number } | null}
  */
-export function getSkillSound(fighterName, skillName) {
-  const lowerName = (fighterName || '').toLowerCase().replace(/\s+/g, '');
+export function getSkillSound(fighterId, skillName) {
   const lowerSkill = (skillName || '').toLowerCase();
 
-  // Try exact name match (ignoring spaces and case)
-  const fighterConfig = SKILL_SOUNDS[lowerName];
+  const fighterConfig = SKILL_SOUNDS[fighterId];
   if (!fighterConfig) return null;
 
   return fighterConfig[lowerSkill] || null;
