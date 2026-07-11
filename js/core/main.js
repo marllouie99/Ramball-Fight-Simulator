@@ -151,8 +151,6 @@ function animate(timestamp) {
       state.fpsLastTime = timestamp;
 
       // FPS Drop Detection
-      if (!state.fpsLogs) state.fpsLogs = [];
-      if (!state.allFpsLogs) state.allFpsLogs = [];
       if (state.fps < 45 && state.gameState === 'playing') {
         let issues = [];
         const projCount = getProjectiles().length;

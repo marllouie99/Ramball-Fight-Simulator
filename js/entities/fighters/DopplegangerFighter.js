@@ -10,6 +10,7 @@ import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../../graphics/weaponVisuals.js';
 import { drawDoppelgangerSkin } from '../../graphics/fighters/doppelgangerSkin.js';
+import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
 
 export class DopplegangerFighter extends Fighter {
   constructor(def) {

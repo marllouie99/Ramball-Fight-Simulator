@@ -55,8 +55,8 @@ export const SKILL_EFFECT_SOUNDS = {
  * @returns {{ src: string, volume: number, speed?: number } | null}
  */
 export function getSkillEffectSound(fighterName, effectName) {
-  const lowerName = (fighterName || '').toLowerCase().replace(/\s+/g, '');
-  const lowerEffect = (effectName || '').toLowerCase();
+  const lowerName = String(fighterName || '').toLowerCase().replace(/\s+/g, '');
+  const lowerEffect = String(effectName || '').toLowerCase();
 
   const fighterConfig = SKILL_EFFECT_SOUNDS[lowerName];
   if (!fighterConfig) return null;

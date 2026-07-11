@@ -169,8 +169,10 @@ export class KnightFighter extends Fighter {
   reset() {
     super.reset();
     
-    // Reset FSM to idle
-    this.fsm.setState('KnightIdle');
+    // Reset FSM to idle (guard against being called during constructor before fsm is initialized)
+    if (this.fsm) {
+      this.fsm.setState('KnightIdle');
+    }
     
     // Reset properties
     this.swipeCooldown   = 0;

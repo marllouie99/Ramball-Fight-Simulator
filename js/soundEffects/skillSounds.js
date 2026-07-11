@@ -71,7 +71,7 @@ export const SKILL_SOUNDS = {
  * @returns {{ src: string, volume: number } | null}
  */
 export function getSkillSound(fighterId, skillName) {
-  const lowerSkill = (skillName || '').toLowerCase();
+  const lowerSkill = String(skillName || '').toLowerCase();
 
   const fighterConfig = SKILL_SOUNDS[fighterId];
   if (!fighterConfig) return null;

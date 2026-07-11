@@ -596,7 +596,7 @@ class ProjectileSystem {
             }
             if (fighter.applyPoison) {
               fighter.applyPoison(attacker);
-              const poisonSound = getSkillEffectSound(4, 'poisonsizzle');
+              const poisonSound = getSkillEffectSound('alchemist', 'poisonsizzle');
               if (poisonSound) {
                 playSound(poisonSound.src, poisonSound.volume);
               }
@@ -698,7 +698,7 @@ class ProjectileSystem {
       shard.rotation = Math.random() * Math.PI * 2;
       shard.rotationSpeed = (Math.random() - 0.5) * 0.5;
       shard.isVisual = true; // Purely visual — no collision
-      this.projecticles.push(shard);
+      this.projectiles.push(shard);
     }
 
     // Poison bubble particles

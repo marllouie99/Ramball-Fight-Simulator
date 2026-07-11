@@ -92,6 +92,14 @@ export const state = {
   fps: 0,
   fpsFrames: 0,
   fpsLastTime: 0,
+  fpsLogs: [],
+  allFpsLogs: [],
+
+  // Match kill tracking for leaderboard
+  matchKills: [[], [], [], []],
+
+  // Machine gun casing effects
+  effects: [],
 
   // Round start countdown (2 seconds before fighters can move)
   countdownTimer: 0,

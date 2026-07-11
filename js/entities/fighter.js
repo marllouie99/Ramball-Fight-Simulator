@@ -396,7 +396,6 @@ export class Fighter {
           realAttacker.lastKilledDef = this._def;
           const realIdx = state.fighters.indexOf(realAttacker);
           if (realIdx >= 0) {
-            if (!state.matchKills) state.matchKills = [[], [], [], []];
             state.matchKills[realIdx].push(this._def);
           }
         }

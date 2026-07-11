@@ -9,6 +9,7 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawBerserkerDualAxes } from '../../graphics/weaponVisuals.js';
+import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
 
 export class BerserkerFighter extends Fighter {
   constructor(def) {

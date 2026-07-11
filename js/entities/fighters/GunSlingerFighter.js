@@ -8,7 +8,7 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
-import { drawGunSlingerDualRevolver } from '../../graphics/weaponVisuals.js';
+import { drawGunSlingerDualRevolver, GUNSLINGER_WEAPON_GRAPHICS } from '../../graphics/weapons/gunSlingerWeaponGraphics.js';
 
 export class GunSlingerFighter extends Fighter {
   constructor(def) {

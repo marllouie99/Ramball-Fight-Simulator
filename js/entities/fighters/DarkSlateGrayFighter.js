@@ -8,7 +8,7 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
-import { drawDarkSlateGrayShuriken } from '../../graphics/weaponVisuals.js';
+import { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee } from '../../graphics/weaponVisuals.js';
 
 export class DarkSlateGrayFighter extends Fighter {
   constructor(def) {
