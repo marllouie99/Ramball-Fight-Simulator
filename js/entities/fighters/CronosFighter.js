@@ -11,6 +11,15 @@ import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeapon
 import { drawCronosCrescentBlade } from '../../graphics/weaponVisuals.js';
 import { drawCronosPreActivateBarrier, drawCronosSphereImpact, drawCronosSphereVisual } from '../../graphics/draw.js';
 
+// Pre-calculated trigonometry arrays for fast hexagonal grid generation
+const HEX_ANGLE = Math.PI / 3;
+const HEX_COS = [];
+const HEX_SIN = [];
+for (let i = 0; i < 6; i++) {
+  HEX_COS.push(Math.cos(Math.PI / 6 + i * HEX_ANGLE));
+  HEX_SIN.push(Math.sin(Math.PI / 6 + i * HEX_ANGLE));
+}
+
 export class CronosFighter extends Fighter {
   constructor(def) {
     super(def);

@@ -26,8 +26,8 @@ export const CONFIG = {
     aimThreshold: 0.12, // radians; lower = must face enemy more precisely before firing
     shotCooldown: 10,   // frames between consecutive shots (independent of base cooldown)
     knockbackStrength: 8,    // velocity impulse applied to target on each hit
-    magazineSize: 4,    // number of bullets before needing to reload
-    reloadTime: 120,    // frames to reload (2 seconds at 60 fps)
+    magazineSize: 5,    // number of bullets before needing to reload
+    reloadTime: 130,    // frames to reload (2 seconds at 60 fps)
   },
 
   /** Blue — Aimbot fighter */

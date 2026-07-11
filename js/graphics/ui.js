@@ -728,9 +728,9 @@ export function drawLeaderboardScreen() {
   drawButton('✏️ EDIT: ' + (isLeaderboardEditMode ? 'ON' : 'OFF'), canvas.width - 90, 40, () => {
     if (isLeaderboardEditMode) {
       if (confirm('Save your edited leaderboard records?')) {
-        import('./state.js').then(m => m.saveLeaderboard());
+        import('../core/state.js').then(m => m.saveLeaderboard());
       } else {
-        import('./state.js').then(m => m.loadLeaderboard());
+        import('../core/state.js').then(m => m.loadLeaderboard());
       }
     }
     isLeaderboardEditMode = !isLeaderboardEditMode;
@@ -869,9 +869,9 @@ export function drawLeaderboardScreen() {
   drawButton('⌂ BACK', canvas.width / 2, footerY, () => {
     if (isLeaderboardEditMode) {
       if (confirm('Save your edited leaderboard records?')) {
-        import('./state.js').then(m => m.saveLeaderboard());
+        import('../core/state.js').then(m => m.saveLeaderboard());
       } else {
-        import('./state.js').then(m => m.loadLeaderboard());
+        import('../core/state.js').then(m => m.loadLeaderboard());
       }
       isLeaderboardEditMode = false;
     }
@@ -898,7 +898,7 @@ export function drawLeaderboardScreen() {
     if (mx >= 60 && mx <= 260 && my >= footerY - 30 && my <= footerY + 20) {
       if (confirm('Clear all leaderboard stats?')) {
         state.leaderboard = {};
-        import('./state.js').then(m => m.saveLeaderboard());
+        import('../core/state.js').then(m => m.saveLeaderboard());
       }
     }
   };
@@ -917,7 +917,7 @@ function _drawSmallEditor(ctx, val, x, y, fighterIndex, statName) {
   ctx.beginPath(); ctx.roundRect(mx, my, btnSize, btnSize, 4); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fillText('-', mx + btnSize / 2, y);
   _registerButton(mx, my, btnSize, btnSize, () => {
-    import('./state.js').then(m => {
+    import('../core/state.js').then(m => {
       m.initLeaderboardEntry(fighterIndex);
       state.leaderboard[fighterIndex][statName] = Math.max(0, state.leaderboard[fighterIndex][statName] - 1);
     });
@@ -930,7 +930,7 @@ function _drawSmallEditor(ctx, val, x, y, fighterIndex, statName) {
   ctx.beginPath(); ctx.roundRect(px, py, btnSize, btnSize, 4); ctx.fill();
   ctx.fillStyle = '#fff'; ctx.fillText('+', px + btnSize / 2, y);
   _registerButton(px, py, btnSize, btnSize, () => {
-    import('./state.js').then(m => {
+    import('../core/state.js').then(m => {
       m.initLeaderboardEntry(fighterIndex);
       state.leaderboard[fighterIndex][statName]++;
     });
@@ -2064,7 +2064,7 @@ export function clearHealthHud() {
 
 document.addEventListener('mousedown', (e) => {
   if (e.target.closest('.dummy-aggressive-toggle')) {
-    import('./state.js').then(m => {
+    import('../core/state.js').then(m => {
       m.state.dummyAggressive = !m.state.dummyAggressive;
     });
   }

@@ -284,8 +284,20 @@ function isAllowedFloatingText(text) {
   return SKILL_TEXT_WHITELIST.includes(normalizedText);
 }
 
+const FLOATING_TEXT_SPAM_COOLDOWN = 180; // ms window to filter identical messages in close proximity
+const spamPreventionCache = new Map();
+
 export function spawnFloatingText(x, y, text, color = '#ffffff') {
   if (MINIMAL_FLOATING_TEXT && !isAllowedFloatingText(text)) return;
+
+  // Filter duplicates to prevent FPS drops under dense damage ticks or status applications
+  const now = Date.now();
+  const cacheKey = `${text}_${Math.round(x / 40)}_${Math.round(y / 40)}`;
+  const lastSpawnedTime = spamPreventionCache.get(cacheKey);
+  if (lastSpawnedTime && (now - lastSpawnedTime) < FLOATING_TEXT_SPAM_COOLDOWN) {
+    return;
+  }
+  spamPreventionCache.set(cacheKey, now);
 
   // Remove oldest texts if we're at the cap
   if (state.floatingTexts.length >= MAX_FLOATING_TEXTS) {
