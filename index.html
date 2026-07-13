@@ -6,6 +6,41 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Circle Mini-Battle</title>
   <link rel="stylesheet" href="css/style.css?v=3" />
+  <style>
+    /* Optimize HTML & Body for OBS 9:16 Capture */
+    body {
+      margin: 0;
+      padding: 0;
+      background: #000; /* Deep black background for OBS keying/transparency if needed */
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100vw;
+      height: 100vh;
+    }
+    .game-container {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      width: 100%;
+      height: 100%;
+      max-width: 100%;
+      max-height: 100%;
+      aspect-ratio: 9 / 16;
+    }
+    #arena {
+      width: 100%;
+      height: 100%;
+      object-fit: contain; /* Ensures the canvas scales perfectly without losing its 9:16 proportions */
+    }
+    /* Desktop preview helper: if the screen is wider than portrait, keep it centered and readable */
+    @media (min-aspect-ratio: 9/16) {
+      .game-container {
+        max-width: 540px;
+      }
+    }
+  </style>
 </head>
 
 <body>

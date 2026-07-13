@@ -1,21 +1,23 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
+import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
-import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText } from '../../core/state.js';
 import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawWhiteRailgun, drawWhiteChargeEffect } from '../../graphics/weaponVisuals.js';
 
+/**
+ * Laser Fighter (White)
+ * Fires a continuous laser beam for 3 seconds when aligned with the enemy.
+ * Stops moving while the beam is firing.
+ * Deals initial high damage, then continuous damage over time.
+ */
 export class LaserFighter extends Fighter {
   constructor(def) {
     super(def);
     this.lastAimAligned = false;
     this.beamTimer = 0;
-    this.beamDuration     = CONFIG.laser.beamDuration;
+    this.beamDuration = CONFIG.laser.beamDuration;
     this.beamSlowDuration = CONFIG.laser.slowDuration;
     this.beamSlowMultiplier = CONFIG.laser.slowMultiplier;
     this.beamHitState = new Map();
@@ -237,7 +239,7 @@ export class LaserFighter extends Fighter {
           this._laserSoundKey = `ivory-laser-${ownerIndex}`;
         }
         if (!this._isLaserSoundPlaying) {
-          const sound = getBasicAttackSound(this._def.id, this._def.type);
+          const sound = getBasicAttackSound(this._def?.id, this._def?.type);
           playLoopingSound(this._laserSoundKey, sound.src, sound.volume);
           this._isLaserSoundPlaying = true;
         }
@@ -287,8 +289,9 @@ export class LaserFighter extends Fighter {
       const pulse2 = Math.cos(time * 1.3) * 2;
       const pulse3 = Math.sin(time * 0.8) * 3;
 
-      // Outer wide glow (cyan) (OPTIMIZED: removed shadowBlur - expensive operation)
-      ctx.shadowBlur = 0;
+      // Outer wide glow (cyan)
+      ctx.shadowColor = '#00ffff';
+      ctx.shadowBlur = 12 + pulse3;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
@@ -316,21 +319,22 @@ export class LaserFighter extends Fighter {
       ctx.lineCap = 'round';
       ctx.stroke();
 
-      // Energy nodes traveling down the beam for dynamic flow (OPTIMIZED: removed shadowBlur)
+      // Energy nodes traveling down the beam for dynamic flow
       const numNodes = 4;
       const speed = 0.6;
       ctx.fillStyle = '#ffffff';
-      ctx.shadowBlur = 0;
-      
+      ctx.shadowColor = '#ccffff';
+      ctx.shadowBlur = 8;
+
       for (let i = 0; i < numNodes; i++) {
         // Calculate offset (0 to 1) that wraps around
         let offset = ((time * speed) + (i / numNodes)) % 1.0;
         let nx = startX + Math.cos(angle) * (beamLen * offset);
         let ny = startY + Math.sin(angle) * (beamLen * offset);
-        
+
         // Node width pulses and is larger near the middle of the beam
         let nodeRadius = 1.5 + Math.sin(offset * Math.PI) * 3;
-        
+
         ctx.beginPath();
         ctx.arc(nx, ny, nodeRadius, 0, Math.PI * 2);
         ctx.fill();
@@ -362,14 +366,3 @@ export class LaserFighter extends Fighter {
     }
   }
 }
-
-
-/**
- * Knight Fighter (Gray)
- * Close-range brawler with a sword and shield.
- *
- * Normal Attack : Auto-swipes sword when enemy is in short range (15 dmg, 2 s CD)
- * Passive       : Shield has a chance to block incoming direct projectiles (no CD)
- * Skill         : On sword-break proc, stops and charges a shield dash â†’ 20 dmg bash,
- *                 then resets sword.
- */

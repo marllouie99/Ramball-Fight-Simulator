@@ -45,6 +45,46 @@ import {
   drawGunSlingerDualRevolver,
 } from './weaponVisuals.js';
 
+// --- Fighter Preview Cache ---
+const fighterPreviewCache = {};
+
+function preRenderFighterPreviews() {
+  const previewSize = 128; // Larger size for better quality when scaling down
+  FIGHTER_DEFS.forEach((def, index) => {
+    const canvas = document.createElement('canvas');
+    canvas.width = previewSize;
+    canvas.height = previewSize;
+    const ctx = canvas.getContext('2d');
+    
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    const previewFighter = new FighterClass({
+      ...def,
+      startX: previewSize / 2,
+      startY: previewSize / 2,
+    });
+    previewFighter.angle = 0; // Static angle for consistent previews
+    previewFighter.gunAngle = Math.PI / 4; // Consistent gun angle
+    
+    try {
+      if (typeof previewFighter.aim === 'function') {
+        previewFighter.aim({ x: previewSize, y: previewSize });
+      }
+      previewFighter.draw(ctx);
+      fighterPreviewCache[index] = canvas;
+    } catch (e) {
+      console.error('Failed to pre-render fighter preview:', def.name, e);
+    }
+  });
+}
+
+function getFighterPreview(index) {
+  return fighterPreviewCache[index];
+}
+
+// Initial pre-rendering call
+preRenderFighterPreviews();
+// --------------------------
+
 
 
 
@@ -208,22 +248,10 @@ function drawPlayerCard(slotProp, title, x, y, w, h, borderColor, enabled) {
     ctx.restore();
   }
 
-  const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-  const previewFighter = new FighterClass({
-    ...def,
-    startX: previewX,
-    startY: previewY,
-    startVx: 0,
-    startVy: 0,
-  });
-  previewFighter.angle = performance.now() / 180;
-  try {
-    if (typeof previewFighter.aim === 'function') {
-      previewFighter.aim({ x: previewX + 56, y: previewY + 12 });
-    }
-    previewFighter.draw(ctx);
-  } catch (e) {
-    console.error('Preview draw error:', e);
+  const previewImage = getFighterPreview(fighterIndex);
+  if (previewImage) {
+    const previewSize = 84;
+    ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
   }
 
   const btnW = 120;
@@ -409,37 +437,19 @@ function drawFighterSelectModal() {
 
   // Draw fighter model preview
   const previewX = detailX + detailW / 2;
-  const previewY = detailY + 36;
-
-  // Fighter body glow and circle
-  ctx.shadowColor = selectedDef.color;
-  ctx.shadowBlur = 12;
-  ctx.fillStyle = selectedDef.color;
-  ctx.beginPath();
-  ctx.arc(previewX, previewY, 16, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.shadowBlur = 0;
-
-  // Add a slight inner gradient/highlight for the body
-  const bodyGrad = ctx.createRadialGradient(previewX - 4, previewY - 4, 2, previewX, previewY, 16);
-  bodyGrad.addColorStop(0, 'rgba(255,255,255,0.3)');
-  bodyGrad.addColorStop(1, 'rgba(0,0,0,0.2)');
-  ctx.fillStyle = bodyGrad;
-  ctx.fill();
-
-  // Draw weapon preview
-  ctx.save();
-  ctx.translate(previewX, previewY);
-  ctx.scale(1.1, 1.1); // Slightly scale up the weapon
-  drawWeaponPreview(ctx, selectedDef.type, selectedDef.color);
-  ctx.restore();
+  const previewY = detailY + 45;
+  const previewImage = getFighterPreview(modalInspectIndex);
+  if (previewImage) {
+    const previewSize = 80;
+    ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
+  }
 
   // Fighter Name
   ctx.fillStyle = selectedDef.color;
   ctx.font = 'bold 17px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 70);
+  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 90);
 
   let textY = detailY + 100;
 
@@ -612,14 +622,14 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight = 16) {
 function updatePreviewBalls() {
   const { ctx, canvas } = state;
   if (state.previewBalls.length === 0) {
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 4; i++) {
       state.previewBalls.push({
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
-        vx: (Math.random() - 0.5) * 4,
-        vy: (Math.random() - 0.5) * 4,
-        r: 15 + Math.random() * 20,
-        color: Math.random() > 0.5 ? 'rgba(255, 77, 77, 0.2)' : 'rgba(77, 163, 255, 0.2)',
+        vx: (Math.random() - 0.5) * 2,
+        vy: (Math.random() - 0.5) * 2,
+        r: 20 + Math.random() * 25,
+        color: Math.random() > 0.5 ? 'rgba(255, 77, 77, 0.15)' : 'rgba(77, 163, 255, 0.15)',
       });
     }
   }
@@ -647,25 +657,19 @@ export function drawTitleScreen() {
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Animated gradient background
+  // Static gradient background
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  const time = Date.now() * 0.0005;
-  gradient.addColorStop(0, `hsl(${Math.sin(time) * 30 + 240}, 70%, 10%)`);
-  gradient.addColorStop(0.5, `hsl(${Math.sin(time * 0.7) * 20 + 260}, 60%, 15%)`);
-  gradient.addColorStop(1, `hsl(${Math.sin(time * 0.9) * 40 + 250}, 80%, 8%)`);
+  gradient.addColorStop(0, `hsl(240, 70%, 10%)`);
+  gradient.addColorStop(0.5, `hsl(260, 60%, 15%)`);
+  gradient.addColorStop(1, `hsl(250, 80%, 8%)`);
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Animated background particles
   updatePreviewBalls();
 
-  // Primary buttons with enhanced styling
-  const pulse = 1 + Math.sin(Date.now() / 150) * 0.04;
-  ctx.save();
-  ctx.translate(canvas.width / 2, 180);
-  ctx.scale(pulse, pulse);
-  drawButton('⚔ BATTLE', 0, -22, () => { state.gameState = 'select'; }, 200, 52);
-  ctx.restore();
+  // Primary buttons
+  drawButton('⚔ BATTLE', canvas.width / 2, 180 - 22, () => { state.gameState = 'select'; }, 200, 52);
 
   drawButton('📖 FIGHTER INDEX', canvas.width / 2, 250, () => { state.gameState = 'index'; }, 240, 48);
 
@@ -678,17 +682,12 @@ export function drawTitleScreen() {
     state.gameState = 'leaderboard';
   }, 240, 48);
 
-  // Footer with subtle animation
-  const footerPulse = 1 + Math.sin(Date.now() * 0.002) * 0.02;
-  ctx.save();
-  ctx.translate(canvas.width / 2, 350);
-  ctx.scale(footerPulse, footerPulse);
+  // Footer text
   ctx.fillStyle = 'rgba(200, 210, 255, 0.7)';
   ctx.font = '14px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('Press SPACE/ENTER, Click BATTLE, or use FIGHTER INDEX to inspect fighters', 0, 0);
-  ctx.restore();
+  ctx.fillText('Press SPACE/ENTER, Click BATTLE, or use FIGHTER INDEX to inspect fighters', canvas.width / 2, 350);
 }
 
 // ─────────────────────────────────────────────
@@ -1325,7 +1324,7 @@ function drawWeaponPreview(ctx, type, color) {
 
       case 'cronos':
         // Cronos crescent blade (melee weapon visual)
-        drawCronosCrescentBlade(ctx, 0, 0, gunAngle, r, false, 0, 0, 10);
+        drawCronosCrescentBlade(ctx, 0, 0, gunAngle, r, false, 0, 0, 10, 1);
         return;
 
       case 'bomber': {

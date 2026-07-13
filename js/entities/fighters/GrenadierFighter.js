@@ -1,15 +1,14 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
-import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
-import { drawGreenBoilingEffect, drawGreenBottleGun } from '../../graphics/weaponVisuals.js';
+import { spawnFloatingText } from '../../core/state.js';
+import { drawGreenBottleGun, drawGreenBoilingEffect } from '../../graphics/weaponVisuals.js';
 
+/**
+ * Grenadier Fighter (Green)
+ * Throws a grenade when the enemy enters its radius.
+ * Grenade deals AOE damage and poisons the enemy.
+ */
 export class GrenadierFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -133,8 +132,8 @@ export class GrenadierFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    const throwProgress = this.throwAnimationTimer > 0 
-      ? Math.sin((this.throwAnimationTimer / 15) * Math.PI) 
+    const throwProgress = this.throwAnimationTimer > 0
+      ? Math.sin((this.throwAnimationTimer / 15) * Math.PI)
       : 0;
     drawGreenBottleGun(ctx, this.x, this.y, this.gunAngle, this.r, throwProgress);
   }
@@ -149,10 +148,3 @@ export class GrenadierFighter extends Fighter {
     this.drawBoilingEffect(ctx);
   }
 }
-
-/**
- * Laser Fighter (White)
- * Fires a continuous laser beam for 3 seconds when aligned with the enemy.
- * Stops moving while the beam is firing.
- * Deals initial high damage, then continuous damage over time.
- */

@@ -32,10 +32,10 @@ export { drawBlueAimbotGun } from './weapons/rangerWeaponGraphics.js';
 export { drawMachineGun, drawMachineGunBullet, MACHINEGUN_WEAPON_GRAPHICS } from './machinegunWeaponGraphics.js';
 export { drawBomberGrenade } from './weapons/bomberWeaponGraphics.js';
 export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
+export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
 
 // ─────────────────────────────────────────────
 // GRAY KNIGHT WEAPONS (Shield & Sword)
-// Added here so `customFighters.js` can import them directly.
 // ─────────────────────────────────────────────
 
 export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile } from './weapons/knightWeaponGrpahics.js';

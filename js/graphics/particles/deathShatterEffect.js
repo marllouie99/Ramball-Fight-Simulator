@@ -3,17 +3,33 @@
 // Creates a shattering body effect when fighters die
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 
 /**
  * Spawns a death shatter effect at the fighter's position.
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
-  const shardCount = 12; // Number of shards
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  
+  // OPTIMIZED: Apply quality level to death effect limits
+  const qualityMultiplier = state.qualityLevel || 1.0;
+  const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 20 : 50) * qualityMultiplier);
+  
+  // OPTIMIZED: Reduce shard count based on quality level
+  const baseShardCount = isMulti ? 6 : 12;
+  const shardCount = Math.max(3, Math.floor(baseShardCount * qualityMultiplier));
   const baseSpeed = 3;    // Base outward velocity
   const color = fighter.color || '#ff4444';
   
   for (let i = 0; i < shardCount; i++) {
+    // If we reached the global limit, remove the oldest death effect using swap-and-pop
+    if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
+      // Swap-and-pop is O(1) instead of O(n) shift()
+      state.deathEffects[0] = state.deathEffects[state.deathEffects.length - 1];
+      state.deathEffects.pop();
+    }
+    
     // Random angle for each shard
     const angle = (Math.PI * 2 * i) / shardCount + (Math.random() - 0.5) * 0.5;
     const speed = baseSpeed + Math.random() * 2;

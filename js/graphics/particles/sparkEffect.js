@@ -28,15 +28,22 @@ function _getSpark() {
 
 /**
  * Return a spark particle to pool for reuse.
- * Uses null assignment for fast reset — avoids delete which triggers GC.
+ * Statically resets properties to keep the engine's hidden class optimized.
  */
 function _returnSpark(spark) {
-  for (const key of Object.keys(spark)) {
-    spark[key] = null;
-  }
-  if (sparkPool.length < SPARK_POOL_SIZE) {
-    sparkPool.push(spark);
-  }
+  spark.x = 0;
+  spark.y = 0;
+  spark.vx = 0;
+  spark.vy = 0;
+  spark.size = 0;
+  spark.life = 0;
+  spark.decay = 0;
+  spark.friction = 0;
+  spark.type = null;
+  spark.color = null;
+  spark.isFlash = false;
+  // Always return to pool (removed size limit to prevent memory waste)
+  sparkPool.push(spark);
 }
 
 /**
@@ -48,9 +55,14 @@ function _returnSpark(spark) {
  */
 export function spawnSparks(x, y, count = 8, type = 'crimson') {
   const isMulti = state && (state.mode === '2v2' || state.mode === 'ffa');
-  const MAX_SPARK_PARTICLES = isMulti ? 100 : 200;
+  // OPTIMIZED: Apply quality level to spark limits
+  const qualityMultiplier = state.qualityLevel || 1.0;
+  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * qualityMultiplier);
+  
+  // OPTIMIZED: Reduce spark count based on quality
+  const adjustedCount = Math.max(1, Math.floor(count * qualityMultiplier));
 
-  for (let i = 0; i < count; i++) {
+  for (let i = 0; i < adjustedCount; i++) {
     // Remove oldest if at limit — return it to pool first
     if (state.sparkEffects.length >= MAX_SPARK_PARTICLES) {
       const oldest = state.sparkEffects.shift();

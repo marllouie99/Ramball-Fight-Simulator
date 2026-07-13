@@ -3,8 +3,10 @@ const path = require('path');
 
 function createWindow () {
   const win = new BrowserWindow({
-    width: 1000,
+    width: 480,
     height: 800,
+    useContentSize: true, // Window size will match the web page content size exactly
+    resizable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
@@ -12,8 +14,8 @@ function createWindow () {
     autoHideMenuBar: true
   });
 
+  win.setAspectRatio(9 / 16); // Forces the window to maintain 9:16 ratio when resized
   win.loadFile('index.html');
-  win.maximize();
 }
 
 app.whenReady().then(() => {

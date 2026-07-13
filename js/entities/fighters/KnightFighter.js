@@ -9,7 +9,7 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { FighterStateMachine, FighterState } from '../../core/fighterStateMachine.js';
-import { drawGrayShield, drawGraySword } from '../../graphics/weaponVisuals.js';
+import { drawGrayShield, drawGraySword, drawGrayBrokenSword } from '../../graphics/weaponVisuals.js';
 
 // ─────────────────────────────────────────────
 // KNIGHT FSM STATES
@@ -76,7 +76,7 @@ class KnightDashingState extends FighterState {
 
   enter(prevState) {
     super.enter(prevState);
-    this.duration = CONFIG.knight.dashDurationFrames;
+    this.duration = CONFIG.knight.dashDuration || 40;
     this.hasHit = false;
     
     // Lock target position from when sword broke
@@ -86,8 +86,9 @@ class KnightDashingState extends FighterState {
     // Calculate direction to target
     const dx = this.targetX - this.fighter.x;
     const dy = this.targetY - this.fighter.y;
-    const dist = Math.hypot(dx, dy);
-    if (dist > 0) {
+    const distSq = dx * dx + dy * dy;
+    if (distSq > 0) {
+      const dist = Math.sqrt(distSq);
       this.dirX = dx / dist;
       this.dirY = dy / dist;
     } else {
@@ -252,8 +253,10 @@ export class KnightFighter extends Fighter {
   // â”€â”€ Sword swipe â”€â”€
   _trySwordSwipe(opponent, ownerIndex) {
     if (!opponent || this.swipeCooldown > 0 || this.swordBroken) return;
-    const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-    if (dist > this.r + opponent.r + CONFIG.knight.swordRange) return;
+    const dx = opponent.x - this.x;
+    const dy = opponent.y - this.y;
+    const maxDist = this.r + opponent.r + CONFIG.knight.swordRange;
+    if ((dx * dx + dy * dy) > maxDist * maxDist) return;
 
     // Hit!
     this.swipeAngle  = Math.atan2(opponent.y - this.y, opponent.x - this.x);
@@ -299,13 +302,15 @@ export class KnightFighter extends Fighter {
     if (this.dashTargetX != null && this.dashTargetY != null) {
       const dx = this.dashTargetX - this.x;
       const dy = this.dashTargetY - this.y;
-      const dist = Math.hypot(dx, dy) || 1;
+      const distSq = dx * dx + dy * dy;
+      const dist = distSq > 0 ? Math.sqrt(distSq) : 1;
       this.dashVx = (dx / dist) * CONFIG.knight.dashSpeed;
       this.dashVy = (dy / dist) * CONFIG.knight.dashSpeed;
     } else if (opponent) {
       const dx   = opponent.x - this.x;
       const dy   = opponent.y - this.y;
-      const dist = Math.hypot(dx, dy) || 1;
+      const distSq = dx * dx + dy * dy;
+      const dist = distSq > 0 ? Math.sqrt(distSq) : 1;
       this.dashVx = (dx / dist) * CONFIG.knight.dashSpeed;
       this.dashVy = (dy / dist) * CONFIG.knight.dashSpeed;
     } else {
@@ -326,8 +331,9 @@ export class KnightFighter extends Fighter {
       if (other.hp <= 0) continue;
       const dx = other.x - this.x;
       const dy = other.y - this.y;
-      const d = Math.hypot(dx, dy) || 1;
-      if (d <= radius) {
+      const dSq = dx * dx + dy * dy;
+      if (dSq <= radius * radius) {
+        const d = Math.sqrt(dSq) || 1;
         const nx = dx / d;
         const ny = dy / d;
         other.vx += nx * kb;
@@ -393,10 +399,11 @@ export class KnightFighter extends Fighter {
         this.vy = this.dashVy;
       } else {
         // Instead of physical reflection, bounce perfectly toward the enemy!
-        const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
+        const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy) || this.speed;
         const dx = opponent.x - this.x;
         const dy = opponent.y - this.y;
-        const dist = Math.hypot(dx, dy) || 1;
+        const distSq = dx * dx + dy * dy;
+        const dist = distSq > 0 ? Math.sqrt(distSq) : 1;
 
         this.vx = (dx / dist) * currentSpeed;
         this.vy = (dy / dist) * currentSpeed;
@@ -458,14 +465,17 @@ export class KnightFighter extends Fighter {
       this.angle += CONFIG.knight.dashSpeed * CONFIG.spin.rate * 3; // spin fast during dash
 
       if (!this.hasHitWithDash && opponent) {
-        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-        if (dist <= this.r + opponent.r + 4) {
+        const dx = opponent.x - this.x;
+        const dy = opponent.y - this.y;
+        const hitRadius = this.r + opponent.r + 4;
+        if ((dx * dx + dy * dy) <= hitRadius * hitRadius) {
           opponent.takeDamage(CONFIG.knight.dashDamage, this, { isMelee: true });
           spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SHIELD BASH!', '#88bbff');
           // Knockback
           const dx = opponent.x - this.x;
           const dy = opponent.y - this.y;
-          const d  = Math.hypot(dx, dy) || 1;
+          const dSq = dx * dx + dy * dy;
+          const d = dSq > 0 ? Math.sqrt(dSq) : 1;
           opponent.vx += (dx / d) * CONFIG.knight.dashKnockback;
           opponent.vy += (dy / d) * CONFIG.knight.dashKnockback;
           this.hasHitWithDash = true;
@@ -480,7 +490,7 @@ export class KnightFighter extends Fighter {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;
     }
-    const currentSpeed = Math.hypot(this.vx, this.vy);
+    const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
       const ns = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
       this.vx = (this.vx / currentSpeed) * ns;
@@ -509,7 +519,7 @@ export class KnightFighter extends Fighter {
 
     // If shield was broken, allow a one-time sword throw while moving
     if (this.canThrowSword && !this.swordThrown) {
-      const moveSpeed = Math.hypot(this.vx, this.vy);
+      const moveSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
       if (moveSpeed > 0.6) { // must be moving to throw
         if (projectileSystem) {
           projectileSystem.fireProjectile(this, ownerIndex, CONFIG.knight.shieldThrowDamage, false, CONFIG.projectile.speed * 1.2, false, 'sword');
@@ -667,7 +677,9 @@ export class KnightFighter extends Fighter {
 
     // â”€â”€ Charge ring â”€â”€
     if (this.isCharging()) {
-      const progress = 1 - this.dashChargeTimer / CONFIG.knight.dashChargeFrames;
+      const chargeState = this.fsm.currentState;
+      const chargeFrames = CONFIG.knight.dashChargeFrames || 30;
+      const progress = chargeState ? Math.min(1, chargeState.timer / chargeFrames) : 0;
       const rings    = 3;
       for (let i = 0; i < rings; i++) {
         const phase = (progress + i / rings) % 1;

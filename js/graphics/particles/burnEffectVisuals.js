@@ -21,10 +21,47 @@ class BurnParticle {
 class BurnEffectSystem {
   constructor() {
     this.particles = [];
+    this._pool = [];
+    this._POOL_SIZE = 200;
+    // Pre-allocate pool
+    for (let i = 0; i < this._POOL_SIZE; i++) {
+      this._pool.push(new BurnParticle(0, 0, 'fire', 1));
+    }
+  }
+
+  _getParticle(x, y, type, size) {
+    let p;
+    if (this._pool.length > 0) {
+      p = this._pool.pop();
+    } else {
+      p = new BurnParticle(x, y, type, size);
+    }
+    p.x = x;
+    p.y = y;
+    p.type = type;
+    p.size = size;
+    p.life = 1.0;
+    p.maxLife = 1.0;
+    p.vx = (Math.random() - 0.5) * 20;
+    p.vy = -30 - Math.random() * 40;
+    p.gravity = -20;
+    p.friction = 0.96;
+    p.color = '';
+    p.history = [];
+    return p;
+  }
+
+  _returnParticle(p) {
+    if (this._pool.length < this._POOL_SIZE) {
+      this._pool.push(p);
+    }
   }
 
   // Clear particles when round ends or resets
   clear() {
+    for (const p of this.particles) {
+      this._returnParticle(p);
+    }
     this.particles = [];
   }
 
@@ -34,18 +71,30 @@ class BurnEffectSystem {
    */
   spawnBurnParticles(fighter) {
     const isMulti = state && (state.mode === '2v2' || state.mode === 'FFA');
-    const maxBurn = isMulti ? 80 : 200;
-    if (this.particles.length > maxBurn) return;
+    
+    // OPTIMIZED: More aggressive limits for multi-fighter battles
+    const maxBurn = isMulti ? 40 : 200;
+    
+    // OPTIMIZED: Further reduce limit during low FPS
+    const fpsBasedLimit = state.fps < 40 ? 25 : maxBurn;
+    
+    if (this.particles.length > fpsBasedLimit) return;
+    
     const r = fighter.r;
     
+    // OPTIMIZED: Reduce spawn rates during low FPS
+    const fireChance = state.fps < 40 ? 0.2 : 0.4;
+    const sparkChance = state.fps < 40 ? 0.1 : 0.2;
+    const smokeChance = state.fps < 40 ? 0.08 : 0.15;
+    
     // 1. Fire particles (dense center flame)
-    if (Math.random() < 0.4) {
+    if (Math.random() < fireChance) {
       const angle = Math.random() * Math.PI * 2;
       const dist = Math.random() * r * 0.8;
       const px = fighter.x + Math.cos(angle) * dist;
       const py = fighter.y + Math.sin(angle) * dist;
       
-      const p = new BurnParticle(px, py, 'fire', 4 + Math.random() * 6);
+      const p = this._getParticle(px, py, 'fire', 4 + Math.random() * 6);
       p.maxLife = 0.35 + Math.random() * 0.25;
       p.life = p.maxLife;
       // Inherit a portion of the fighter's velocity for realistic trailing
@@ -55,12 +104,12 @@ class BurnEffectSystem {
     }
 
     // 2. Ember Sparks (crackles)
-    if (Math.random() < 0.2) {
+    if (Math.random() < sparkChance) {
       const angle = Math.random() * Math.PI * 2;
       const px = fighter.x + Math.cos(angle) * r;
       const py = fighter.y + Math.sin(angle) * r;
       
-      const p = new BurnParticle(px, py, 'spark', 1.5 + Math.random() * 1.5);
+      const p = this._getParticle(px, py, 'spark', 1.5 + Math.random() * 1.5);
       p.maxLife = 0.15 + Math.random() * 0.15;
       p.life = p.maxLife;
       const sparkAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5; // biased upwards
@@ -71,11 +120,11 @@ class BurnEffectSystem {
     }
 
     // 3. Smoke (rising ash)
-    if (Math.random() < 0.15) {
+    if (Math.random() < smokeChance) {
       const px = fighter.x + (Math.random() - 0.5) * r * 0.6;
       const py = fighter.y - r * 0.5; // spawn near top
       
-      const p = new BurnParticle(px, py, 'smoke', 6 + Math.random() * 8);
+      const p = this._getParticle(px, py, 'smoke', 6 + Math.random() * 8);
       p.maxLife = 0.6 + Math.random() * 0.4;
       p.life = p.maxLife;
       p.vx = (Math.random() - 0.5) * 10 + fighter.vx * 0.2;
@@ -92,7 +141,12 @@ class BurnEffectSystem {
       const p = this.particles[i];
       p.life -= dt;
       if (p.life <= 0) {
-        this.particles.splice(i, 1);
+        // Swap-and-pop: O(1) removal + return to pool
+        const last = this.particles.pop();
+        if (i < this.particles.length) {
+          this.particles[i] = last;
+        }
+        this._returnParticle(p);
         continue;
       }
 
@@ -119,25 +173,35 @@ class BurnEffectSystem {
   draw(ctx) {
     if (this.particles.length === 0) return;
 
+    // OPTIMIZED: Skip expensive composite operations during low FPS
+    const useSimpleRender = state.fps < 40 && state.gameState === 'playing';
+
     ctx.save();
 
     for (const p of this.particles) {
       const progress = p.life / p.maxLife;
 
       if (p.type === 'fire') {
-        ctx.globalCompositeOperation = 'lighter';
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-        grad.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
-        grad.addColorStop(0.2, `rgba(255, 200, 50, ${progress * 0.9})`);
-        grad.addColorStop(0.5, `rgba(255, 80, 0, ${progress * 0.6})`);
-        grad.addColorStop(1, `rgba(180, 0, 0, 0)`);
-        ctx.fillStyle = grad;
+        if (useSimpleRender) {
+          ctx.globalCompositeOperation = 'source-over';
+          ctx.fillStyle = `rgba(255, 150, 50, ${progress * 0.7})`;
+        } else {
+          ctx.globalCompositeOperation = 'lighter';
+          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+          grad.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
+          grad.addColorStop(0.2, `rgba(255, 200, 50, ${progress * 0.9})`);
+          grad.addColorStop(0.5, `rgba(255, 80, 0, ${progress * 0.6})`);
+          grad.addColorStop(1, `rgba(180, 0, 0, 0)`);
+          ctx.fillStyle = grad;
+        }
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
       } 
       else if (p.type === 'spark') {
-        ctx.globalCompositeOperation = 'lighter';
+        if (!useSimpleRender) {
+          ctx.globalCompositeOperation = 'lighter';
+        }
         ctx.strokeStyle = `rgba(255, ${120 + progress * 135}, 40, ${progress})`;
         ctx.lineWidth = p.size;
         ctx.lineCap = 'round';

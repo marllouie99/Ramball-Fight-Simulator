@@ -3,18 +3,27 @@
 // Creates an impactful blood-red visual burst when Berserker enters rage
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 
 /**
  * Spawns an impactful rage visual effect at the Berserker's position.
  * @param {Object} berserker - The Berserker fighter
  */
 export function spawnBerserkerRageEffect(berserker) {
-  const particleCount = 30;
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  // OPTIMIZED: Further reduced limits for better performance
+  const MAX_RAGE_EFFECTS = isMulti ? 10 : 25;
+  
+  // OPTIMIZED: Further reduce particle count in multi-fighter battles
+  const particleCount = isMulti ? 8 : 20;
   const color = '#ff0000'; // Blood red
   const secondaryColor = '#ff4444'; 
   
   // Create outward explosive particles
   for (let i = 0; i < particleCount; i++) {
+    // If we reached the global limit, skip spawning to avoid lag
+    if (state.berserkerRageEffects.length >= MAX_RAGE_EFFECTS) break;
+    
     const angle = (Math.PI * 2 * i) / particleCount + (Math.random() - 0.5) * 0.5;
     const speed = 4 + Math.random() * 5; // Fast burst
     
@@ -32,28 +41,32 @@ export function spawnBerserkerRageEffect(berserker) {
   }
   
   // Add a central flash (shockwave ring)
-  state.berserkerRageEffects.push({
-    x: berserker.x,
-    y: berserker.y,
-    size: berserker.r,
-    maxSize: berserker.r * 3.5, // expands very large
-    color: color,
-    life: 1.0,
-    decay: 0.05,
-    type: 'shockwave'
-  });
+  if (state.berserkerRageEffects.length < MAX_RAGE_EFFECTS) {
+    state.berserkerRageEffects.push({
+      x: berserker.x,
+      y: berserker.y,
+      size: berserker.r,
+      maxSize: berserker.r * 3.5, // expands very large
+      color: color,
+      life: 1.0,
+      decay: 0.05,
+      type: 'shockwave'
+    });
+  }
 
   // Add a bright inner flash
-  state.berserkerRageEffects.push({
-    x: berserker.x,
-    y: berserker.y,
-    size: berserker.r * 0.5,
-    maxSize: berserker.r * 2.0,
-    color: '#ffffff', // White hot center
-    life: 1.0,
-    decay: 0.08,
-    type: 'flash'
-  });
+  if (state.berserkerRageEffects.length < MAX_RAGE_EFFECTS) {
+    state.berserkerRageEffects.push({
+      x: berserker.x,
+      y: berserker.y,
+      size: berserker.r * 0.5,
+      maxSize: berserker.r * 2.0,
+      color: '#ffffff', // White hot center
+      life: 1.0,
+      decay: 0.08,
+      type: 'flash'
+    });
+  }
 }
 
 /**
@@ -83,7 +96,9 @@ export function updateBerserkerRageEffects() {
     }
     
     if (effect.life <= 0) {
-      state.berserkerRageEffects.splice(i, 1);
+      // PERFORMANCE: Use swap-and-pop for O(1) removal instead of splice O(n)
+      state.berserkerRageEffects[i] = state.berserkerRageEffects[state.berserkerRageEffects.length - 1];
+      state.berserkerRageEffects.pop();
     }
   }
 }

@@ -28,7 +28,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // Fires a fast, powerful shot when aim is aligned. Sound plays just before firing.
   1: {
     src: 'Assets/Sound Effects/Attacks/lasersniper1.mp3',
-    volume: 0.9,
+    volume: 1.1,
     delay: -3,
   },
 

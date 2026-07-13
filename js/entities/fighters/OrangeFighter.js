@@ -1,15 +1,16 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { state } from '../../core/state.js';
+import { playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawOrangeFlamethrowerGun } from '../../graphics/weaponVisuals.js';
+import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 
+/**
+ * Orange Fighter
+ * Automatically locks onto the opponent and draws a V-shaped aim indicator.
+ */
 export class OrangeFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -172,7 +173,7 @@ export class OrangeFighter extends Fighter {
     if (bounced) {
       const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
 
-    // Decide bounce target:
+      // Decide bounce target:
       // - when about to run out of fuel -> toward nearest fuel
       // - otherwise -> toward nearest fighter
       // Also: if the nearest fighter is DarkSlateGray and currently in stealth,
@@ -254,11 +255,11 @@ export class OrangeFighter extends Fighter {
         this._flameSoundKey = `orange-flame-${ownerIndex}`;
       }
       if (!this._isFlameSoundPlaying) {
-        const sound = getBasicAttackSound(this._def.id, this._def.type);
+        const sound = getBasicAttackSound(this._def?.id);
         playLoopingSound(this._flameSoundKey, sound.src, sound.volume);
         this._isFlameSoundPlaying = true;
       }
-      
+
       // Update flame particle system - calculate nozzle position
       const nozzleDistance = this.r + 45; // Nozzle is at the tip of the gun
       const nozzleX = this.x + Math.cos(this.gunAngle) * nozzleDistance;
@@ -283,7 +284,7 @@ export class OrangeFighter extends Fighter {
 
   drawFuelBar(ctx) {
     const fuelRatio = this.fuel / CONFIG.orange.maxFuel;
-    
+
     // Curved meter settings
     const meterRadius = this.r + 18;
     const meterThickness = 8;
@@ -291,10 +292,10 @@ export class OrangeFighter extends Fighter {
     const endAngle = Math.PI * 0.3;    // End at right side (curved upward)
     const totalAngle = startAngle - endAngle;
     const filledAngle = endAngle + (totalAngle * fuelRatio);
-    
+
     ctx.save();
     ctx.translate(this.x, this.y);
-    
+
     // Draw background arc (dark)
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, endAngle, startAngle);
@@ -302,7 +303,7 @@ export class OrangeFighter extends Fighter {
     ctx.lineWidth = meterThickness;
     ctx.lineCap = 'round';
     ctx.stroke();
-    
+
     // Determine color based on fuel level
     let startColor, endColor;
     if (fuelRatio > 0.5) {
@@ -315,7 +316,7 @@ export class OrangeFighter extends Fighter {
       startColor = '#ff4400';
       endColor = '#ff0000';
     }
-    
+
     // Draw filled arc with gradient
     const gradient = ctx.createLinearGradient(
       Math.cos(startAngle) * meterRadius,
@@ -325,35 +326,36 @@ export class OrangeFighter extends Fighter {
     );
     gradient.addColorStop(0, startColor);
     gradient.addColorStop(1, endColor);
-    
+
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
     ctx.strokeStyle = gradient;
     ctx.lineWidth = meterThickness;
     ctx.lineCap = 'round';
     ctx.stroke();
-    
-    // Draw glow effect (OPTIMIZED: removed shadowBlur - expensive operation)
-    ctx.shadowBlur = 0;
+
+    // Draw glow effect
+    ctx.shadowColor = startColor;
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
     ctx.strokeStyle = `rgba(255, 150, 0, ${0.3 + fuelRatio * 0.4})`;
     ctx.lineWidth = meterThickness + 2;
     ctx.stroke();
     ctx.shadowBlur = 0;
-    
+
     // Draw fuel text in center
     ctx.fillStyle = '#ffffff00';
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${Math.round(this.fuel)}`, 0, 0);
-    
+
     // Draw small "F" label below the meter
     ctx.fillStyle = 'rgba(255, 150, 0, 0.8)';
     ctx.font = 'bold 8px Arial';
     ctx.fillText('FUEL', 0, meterRadius + 12);
-    
+
     ctx.restore();
   }
 
@@ -363,10 +365,3 @@ export class OrangeFighter extends Fighter {
     this.drawFuelBar(ctx);
   }
 }
-
-/**
- * Berserker Fighter (Blood Red)
- * Dual-wielding axes with rage mechanic.
- * Gains rage when taking damage. During rage: increased damage, attack speed, movement speed, and lifesteal.
- * Auto-locks toward enemy when bouncing off walls.
- */

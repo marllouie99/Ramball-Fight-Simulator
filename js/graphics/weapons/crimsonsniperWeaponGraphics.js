@@ -77,12 +77,12 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
-
+  
   // --- 1. Long Dark Barrel ---
   drawPoly([
     [10, -4],
     [85, -4],
-    [85, 2],
+    85, 2,
     [10, 2],
     [10, -4]
   ], colors.darkMetal, colors.outline);
@@ -341,7 +341,7 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   // --- 12. GLOWING ACCENTS (Red) ---
   const now = Date.now();
   const pulse1 = Math.sin(now / 150) * 0.5 + 0.5; // 0 to 1
-  const pulse2 = Math.sin(now / 200 + Math.PI) * 0.5 + 0.5;
+  const pulse2 = Math.sin(now / 200 + Math.PI) * 0.5 + 0.2;
 
   // OPTIMIZED: Removed shadowBlur (expensive operation)
   

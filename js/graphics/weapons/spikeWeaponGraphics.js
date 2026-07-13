@@ -1,3 +1,5 @@
+import { state } from '../../core/state.js';
+
 // spikeWeaponGraphics.js
 //  - Use this file for Spike/Melee-specific weapon graphics (rotating spikes).
 //  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
@@ -24,7 +26,11 @@ export const SPIKE_WEAPON_GRAPHICS = {
  */
 export function drawSpikeWeapon(ctx, x, y, angle, r) {
   const cfg = SPIKE_WEAPON_GRAPHICS;
-  const numSpikes = cfg.positioning.numSpikes;
+  const qualityLevel = state.qualityLevel || 1.0;
+  const useLOD = (state.fps < 55 && state.gameState === 'playing') || qualityLevel < 0.8;
+  const useUltraLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.5;
+
+  const numSpikes = useUltraLOD ? 3 : (useLOD ? 4 : cfg.positioning.numSpikes);
   const innerOffset = cfg.positioning.innerOffset;
   const outerExtension = cfg.positioning.outerExtension;
   const spikeWidth = cfg.positioning.spikeWidth;
@@ -36,13 +42,11 @@ export function drawSpikeWeapon(ctx, x, y, angle, r) {
   const baseR = r + innerOffset;
   const tipR = baseR + outerExtension;
   
-  // OPTIMIZATION: Single radial gradient for all blades
   const grad = ctx.createRadialGradient(0, 0, baseR, 0, 0, tipR);
   grad.addColorStop(0, cfg.spikes.spikeShadow);
   grad.addColorStop(0.5, cfg.spikes.spikeColor);
   grad.addColorStop(1, cfg.spikes.spikeHighlight);
 
-  // OPTIMIZATION: Single path for all blade outlines
   ctx.beginPath();
   const angleStep = (Math.PI * 2) / numSpikes;
   
@@ -51,56 +55,61 @@ export function drawSpikeWeapon(ctx, x, y, angle, r) {
     const cos = Math.cos(currentAngle);
     const sin = Math.sin(currentAngle);
     
-    // Perpendicular vector for width
     const px = -sin;
     const py = cos;
     
-    // Base points
     const bx1 = cos * baseR + px * (spikeWidth / 2);
     const by1 = sin * baseR + py * (spikeWidth / 2);
     const bx2 = cos * baseR - px * (spikeWidth / 2);
     const by2 = sin * baseR - py * (spikeWidth / 2);
     
-    // Mid points for detailed faceted shape
-    const midR = baseR + outerExtension * 0.4;
-    const midW = spikeWidth * 0.25;
-    const mx1 = cos * midR + px * midW;
-    const my1 = sin * midR + py * midW;
-    const mx2 = cos * midR - px * midW;
-    const my2 = sin * midR - py * midW;
-    
-    // Tip point
     const tx = cos * tipR;
     const ty = sin * tipR;
-    
-    ctx.moveTo(bx1, by1);
-    ctx.lineTo(mx1, my1);
-    ctx.lineTo(tx, ty);
-    ctx.lineTo(mx2, my2);
-    ctx.lineTo(bx2, by2);
-    ctx.closePath();
+
+    if (useUltraLOD) {
+        // Simplified triangle shape for ultra low FPS
+        ctx.moveTo(bx1, by1);
+        ctx.lineTo(tx, ty);
+        ctx.lineTo(bx2, by2);
+        ctx.closePath();
+    } else {
+        const midR = baseR + outerExtension * 0.4;
+        const midW = spikeWidth * 0.25;
+        const mx1 = cos * midR + px * midW;
+        const my1 = sin * midR + py * midW;
+        const mx2 = cos * midR - px * midW;
+        const my2 = sin * midR - py * midW;
+        
+        ctx.moveTo(bx1, by1);
+        ctx.lineTo(mx1, my1);
+        ctx.lineTo(tx, ty);
+        ctx.lineTo(mx2, my2);
+        ctx.lineTo(bx2, by2);
+        ctx.closePath();
+    }
   }
   
   ctx.fillStyle = grad;
   ctx.fill();
   
-  ctx.strokeStyle = '#1a1f24'; // Darker outline for sharpness pop
+  ctx.strokeStyle = '#1a1f24';
   ctx.lineWidth = 1;
   ctx.stroke();
 
-  // Add center ridge details (3D sharpness effect) in a single path
-  ctx.beginPath();
-  for (let i = 0; i < numSpikes; i++) {
-    const currentAngle = i * angleStep;
-    const cos = Math.cos(currentAngle);
-    const sin = Math.sin(currentAngle);
-    
-    ctx.moveTo(cos * baseR, sin * baseR);
-    ctx.lineTo(cos * tipR, sin * tipR);
+  if (!useUltraLOD) {
+      ctx.beginPath();
+      for (let i = 0; i < numSpikes; i++) {
+        const currentAngle = i * angleStep;
+        const cos = Math.cos(currentAngle);
+        const sin = Math.sin(currentAngle);
+        
+        ctx.moveTo(cos * baseR, sin * baseR);
+        ctx.lineTo(cos * tipR, sin * tipR);
+      }
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
   }
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
 
   ctx.restore();
 }

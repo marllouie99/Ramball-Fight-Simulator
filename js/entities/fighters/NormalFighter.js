@@ -1,22 +1,23 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { state, spawnFloatingText } from '../../core/state.js';
+import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawRedSniperGun } from '../../graphics/weaponVisuals.js';
 
+/**
+ * Standard Normal Fighter
+ * Retains all default behavior from the base Fighter class.
+ */
 export class NormalFighter extends Fighter {
   constructor(def) {
     super(def);
     this.lastAimAligned = false;
-    
-    // Sharpshooter Magazine system
-    this.isSniper = (this.name === 'Sharpshooter');
+
+    // Sharpshooter (was Crimson Sniper) Magazine system
+    this.isSniper = (this._def?.id === 1);
     if (this.isSniper) {
       this.magazineBullets = CONFIG.normal.magazineSize;
       this.maxMagazine = CONFIG.normal.magazineSize;
@@ -77,7 +78,7 @@ export class NormalFighter extends Fighter {
         this.reloadDropX = this.x;
         this.reloadDropY = this.y;
         spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
-        const reloadSound = getSkillEffectSound('crimsonsniper', 'reload');
+        const reloadSound = getSkillEffectSound(this._def?.id, 'reload');
         if (reloadSound) {
           playSound(reloadSound.src, reloadSound.volume, reloadSound.speed || 1.0);
         }
@@ -89,40 +90,40 @@ export class NormalFighter extends Fighter {
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
       const canShoot = (!this.isSniper || !this.isReloading);
-      
+
       if (aligned && !this.lastAimAligned && this.shootCooldown === 0 && canShoot) {
         const redSpeed = CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1);
-        
-        // Calculate exact tip position for Sharpshooter's elongated rifle
+
+        // Calculate exact tip position for Crimson Sniper's elongated rifle
         let customSpawnX, customSpawnY;
         let visualType = undefined;
-        if (this.name === 'Sharpshooter' || this._def.type === 'normal') {
+        if (this._def?.id === 1 || this._def.type === 'normal') {
           const scale = 0.92;
           const baseX = this.r + 4;
           const barrelLength = this.r * 2.65 * scale;
           const customTipDist = baseX + barrelLength;
           customSpawnX = this.x + Math.cos(this.angle) * customTipDist;
           customSpawnY = this.y + Math.sin(this.angle) * customTipDist;
-          if (this.name === 'Sharpshooter') {
+          if (this._def?.id === 1) {
             visualType = 'crimsonSniperBullet';
             this.magazineBullets--; // Consume ammo
           }
         }
-        
+
         projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, redSpeed, false, visualType, customSpawnX, customSpawnY);
         this.shootCooldown = CONFIG.normal.shotCooldown;
 
         // Play Sharpshooter shot sound with configurable timing
-        if (this.name === 'Sharpshooter') {
+        if (this._def?.id === 1) {
           // Physics Recoil: Push the sniper backwards when firing
           const recoilForce = 8;
           this.vx -= Math.cos(this.angle) * recoilForce;
           this.vy -= Math.sin(this.angle) * recoilForce;
 
           // Set visual recoil value to animate the gun drawing
-          this.gunRecoil = 1.0; 
+          this.gunRecoil = 1.0;
 
-          const sound = getBasicAttackSound(this._def.id, this._def.type);
+          const sound = getBasicAttackSound(this._def?.id);
           this._attackSoundTimer = sound.delay;
           this._attackSoundConfig = sound;
         }
@@ -133,7 +134,7 @@ export class NormalFighter extends Fighter {
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
     }
-    
+
     // Decay visual recoil
     if (this.gunRecoil > 0) {
       this.gunRecoil = Math.max(0, this.gunRecoil - 0.08); // decays over ~12 frames
@@ -169,11 +170,11 @@ export class NormalFighter extends Fighter {
   /** Custom sniper-style gun for Red. */
   drawGun(ctx) {
     drawRedSniperGun(
-      ctx, 
-      this.x, 
-      this.y, 
-      this.gunAngle, 
-      this.r, 
+      ctx,
+      this.x,
+      this.y,
+      this.gunAngle,
+      this.r,
       this.gunRecoil || 0,
       this.magazineBullets,
       this.maxMagazine,
@@ -191,12 +192,16 @@ export class NormalFighter extends Fighter {
   }
 
   drawMagazineBar(ctx) {
+    // OPTIMIZATION: Quality-based LOD for magazine display
+    const qualityLevel = state.qualityLevel || 1.0;
+    const useLOD = qualityLevel < 0.6 || (state.fps < 50 && state.gameState === 'playing');
+
     const bullets = this.magazineBullets;
     const max = this.maxMagazine;
-    
+
     // Position underneath the body
     const startY = this.y + this.r + 15;
-    
+
     // Calculate total width to center the charges
     const chargeSpacing = 14;
     const totalWidth = (max - 1) * chargeSpacing;
@@ -212,35 +217,44 @@ export class NormalFighter extends Fighter {
       const w = 5;
       const h = 14;
 
+      // OPTIMIZED: Simplified battery drawing for LOD
+      if (useLOD) {
+        // Simple rectangle for low quality
+        ctx.fillStyle = cellProgress > 0.5 ? '#ff1111' : '#220505';
+        ctx.fillRect(cx - w, cy - h / 2, w * 2, h);
+        ctx.restore();
+        return;
+      }
+
       // Main Battery Casing (Chamfered Rectangle)
       ctx.fillStyle = '#1c1e21';
       ctx.strokeStyle = '#444';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(cx - w, cy - h/2 + 1);
-      ctx.lineTo(cx - w + 1, cy - h/2);
-      ctx.lineTo(cx + w - 1, cy - h/2);
-      ctx.lineTo(cx + w, cy - h/2 + 1);
-      ctx.lineTo(cx + w, cy + h/2 - 1);
-      ctx.lineTo(cx + w - 1, cy + h/2);
-      ctx.lineTo(cx - w + 1, cy + h/2);
-      ctx.lineTo(cx - w, cy + h/2 - 1);
+      ctx.moveTo(cx - w, cy - h / 2 + 1);
+      ctx.lineTo(cx - w + 1, cy - h / 2);
+      ctx.lineTo(cx + w - 1, cy - h / 2);
+      ctx.lineTo(cx + w, cy - h / 2 + 1);
+      ctx.lineTo(cx + w, cy + h / 2 - 1);
+      ctx.lineTo(cx + w - 1, cy + h / 2);
+      ctx.lineTo(cx - w + 1, cy + h / 2);
+      ctx.lineTo(cx - w, cy + h / 2 - 1);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
       // Top Contact Node (Metallic)
       ctx.fillStyle = '#8899aa';
-      ctx.fillRect(cx - 2, cy - h/2 - 2, 4, 2);
-      
+      ctx.fillRect(cx - 2, cy - h / 2 - 2, 4, 2);
+
       // Bottom Base Cap
       ctx.fillStyle = '#555';
-      ctx.fillRect(cx - 3, cy + h/2, 6, 2);
+      ctx.fillRect(cx - 3, cy + h / 2, 6, 2);
 
       // Tech Details (Dark panel lines on casing)
       ctx.fillStyle = '#000';
-      ctx.fillRect(cx - w + 1, cy - h/2 + 2, w * 2 - 2, 1);
-      ctx.fillRect(cx - w + 1, cy + h/2 - 3, w * 2 - 2, 1);
+      ctx.fillRect(cx - w + 1, cy - h / 2 + 2, w * 2 - 2, 1);
+      ctx.fillRect(cx - w + 1, cy + h / 2 - 3, w * 2 - 2, 1);
 
       const maxH = h - 8;
       const currentH = maxH * cellProgress;
@@ -249,63 +263,65 @@ export class NormalFighter extends Fighter {
       // Draw Empty Part (top)
       if (emptyH > 0) {
         ctx.fillStyle = '#220505';
-        ctx.fillRect(cx - w + 1.5, cy - h/2 + 4, w * 2 - 3, emptyH);
+        ctx.fillRect(cx - w + 1.5, cy - h / 2 + 4, w * 2 - 3, emptyH);
         ctx.fillStyle = '#110000';
-        ctx.fillRect(cx - 0.5, cy - h/2 + 4.5, 1, Math.max(0, emptyH - 0.5));
+        ctx.fillRect(cx - 0.5, cy - h / 2 + 4.5, 1, Math.max(0, emptyH - 0.5));
       }
 
       // Draw Active Filled Part (bottom)
       if (currentH > 0) {
         ctx.globalCompositeOperation = 'lighter';
-        
+
         const yOffset = emptyH;
 
-        // Energy Core Glass / Glow (OPTIMIZED: removed shadowBlur - expensive operation)
+        // Energy Core Glass / Glow
         ctx.fillStyle = '#ff1111';
-        ctx.shadowBlur = 0;
-        ctx.fillRect(cx - w + 1.5, cy - h/2 + 4 + yOffset, w * 2 - 3, currentH);
+        ctx.shadowBlur = 6 * cellProgress;
+        ctx.shadowColor = '#ff0000';
+        ctx.fillRect(cx - w + 1.5, cy - h / 2 + 4 + yOffset, w * 2 - 3, currentH);
 
         // Inner white hot filament (vertical line)
         ctx.fillStyle = '#ffffff';
         ctx.shadowBlur = 0;
-        ctx.fillRect(cx - 0.5, cy - h/2 + 4.5 + yOffset, 1, Math.max(0, currentH - 0.5));
+        ctx.fillRect(cx - 0.5, cy - h / 2 + 4.5 + yOffset, 1, Math.max(0, currentH - 0.5));
 
         // Horizontal energy ribs over the filament
         ctx.fillStyle = '#ffffff';
         ctx.globalAlpha = 0.8 * alpha;
-        for(let rY = cy + h/2 - 4 - 0.5; rY >= cy - h/2 + 4 + yOffset + 0.5; rY -= 2) {
-           ctx.fillRect(cx - 1.5, rY - 0.5, 3, 0.5);
+        for (let rY = cy + h / 2 - 4 - 0.5; rY >= cy - h / 2 + 4 + yOffset + 0.5; rY -= 2) {
+          ctx.fillRect(cx - 1.5, rY - 0.5, 3, 0.5);
         }
         ctx.globalAlpha = alpha;
-        
+
         ctx.globalCompositeOperation = 'source-over';
       }
       ctx.restore();
     };
 
-    if (this.isReloading && progress < 0.25) {
+    // OPTIMIZATION: Skip complex reload animation at low quality
+    if (!useLOD && this.isReloading && progress < 0.25) {
       // Draw the old empty batteries falling away ON THE GROUND where the player reloaded
       const fallProgress = progress / 0.25;
       const fallOffset = fallProgress * 50; // drop down 50px
       const fallAlpha = 1 - fallProgress;
-      
+
       const dropStartY = (this.reloadDropY || this.y) + this.r + 15;
       const dropStartX = (this.reloadDropX || this.x) - totalWidth / 2;
 
       for (let i = 0; i < max; i++) {
         const cx = dropStartX + i * chargeSpacing;
-        
+
         // Add scatter and rotation to make it look like physical debris
         const direction = (i % 2 === 0 ? -1 : 1);
         const scatterX = direction * (i * 3 + 4) * fallProgress;
         const angle = direction * fallProgress * (Math.PI * 1.5); // Spin as they fall
-        
+
         ctx.save();
         ctx.translate(cx + scatterX, dropStartY + fallOffset);
         ctx.rotate(angle);
-        
+
         // Draw with 10% residual glow (cellProgress = 0.1) so they stand out against the dark ground
-        drawBattery(0, 0, 0.1, fallAlpha); 
+        drawBattery(0, 0, 0.1, fallAlpha);
         ctx.restore();
       }
     }
@@ -313,18 +329,23 @@ export class NormalFighter extends Fighter {
     // Draw the active/new batteries
     for (let i = 0; i < max; i++) {
       const cx = startX + i * chargeSpacing;
-      
+
       if (this.isReloading) {
-         let cellProgress = Math.max(0, Math.min(1, fillAmount - i));
-         if (cellProgress > 0) {
-           // As it starts filling, it drops down from above (slide in)
-           const slideProgress = Math.min(1, cellProgress / 0.5); // animate entry fast
-           const slideOffset = (1 - slideProgress) * -10; // drops from 10px above
-           drawBattery(cx, startY + slideOffset, cellProgress, slideProgress);
-         }
+        let cellProgress = Math.max(0, Math.min(1, fillAmount - i));
+        if (cellProgress > 0) {
+          // OPTIMIZATION: Skip slide animation at low quality
+          if (useLOD) {
+            drawBattery(cx, startY, cellProgress, 1);
+          } else {
+            // As it starts filling, it drops down from above (slide in)
+            const slideProgress = Math.min(1, cellProgress / 0.5); // animate entry fast
+            const slideOffset = (1 - slideProgress) * -10; // drops from 10px above
+            drawBattery(cx, startY + slideOffset, cellProgress, slideProgress);
+          }
+        }
       } else {
-         const cellProgress = (i < bullets) ? 1 : 0;
-         drawBattery(cx, startY, cellProgress, 1);
+        const cellProgress = (i < bullets) ? 1 : 0;
+        drawBattery(cx, startY, cellProgress, 1);
       }
     }
 
@@ -337,9 +358,3 @@ export class NormalFighter extends Fighter {
     }
   }
 }
-
-/**
- * Aimbot Fighter
- * Auto-aims at the opponent and displays a targeting laser,
- * custom colored gun, custom outline glow, and a badge.
- */

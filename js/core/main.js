@@ -4,11 +4,12 @@
 
 import { state, getProjectiles } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas, compositeFlameCanvas } from '../graphics/canvasManager.js';
-import { updateFighters, updateProjectiles, updateIllusions } from '../systems/physics.js';
+import { updateFighters, updateProjectiles, updateIllusions, spatialGrid } from '../systems/physics.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { updateDeathEffects } from '../graphics/particles/deathShatterEffect.js';
 import { updateIllusionDeathEffects } from '../graphics/particles/illusionDeathEffect.js';
+import { updateDoppelgangerDeathEffects, drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
 import { updateIllusionSpawnEffects } from '../graphics/particles/illusionSpawnEffect.js';
 import { updateBerserkerRageEffects } from '../graphics/particles/berserkerRageEffect.js';
 import { updateBloodEffects } from '../graphics/particles/bloodEffect.js';
@@ -17,8 +18,8 @@ import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, restartCurr
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
 import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects } from '../graphics/draw.js';
-import { drawAllCronosSpheres } from '../entities/fighters/CronosFighter.js';
-import { stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
+import { drawAllCronosSpheres } from '../graphics/draw.js';
+import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 
 // ─────────────────────────────────────────────
@@ -37,6 +38,8 @@ window.addEventListener('resize', () => {
 // ─────────────────────────────────────────────
 
 window.addEventListener('keydown', (e) => {
+  unlockAudio();
+
   if (e.key === 'Escape') {
     if (state.gameState === 'playing') state.gameState = 'paused';
     else if (state.gameState === 'paused') state.gameState = 'playing';
@@ -71,11 +74,13 @@ state.canvas.addEventListener('mousemove', (e) => {
   const scaleY = state.canvas.height / rect.height;
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
-  
+
   handleUIMove(mx, my);
 });
 
 state.canvas.addEventListener('click', (e) => {
+  unlockAudio();
+
   const rect = state.canvas.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
   const scaleX = state.canvas.width / rect.width;
@@ -90,6 +95,10 @@ state.canvas.addEventListener('click', (e) => {
     state.gameState = 'select';
   }
 });
+
+state.canvas.addEventListener('touchstart', () => {
+  unlockAudio();
+}, { passive: true });
 
 state.canvas.addEventListener('wheel', (e) => {
   if (state.gameState === 'index' || state.gameState === 'weapons') {
@@ -150,44 +159,74 @@ function animate(timestamp) {
       state.fpsFrames = 0;
       state.fpsLastTime = timestamp;
 
+      // Dynamic quality system - adjust based on FPS
+      state.qualityCheckTimer++;
+      if (state.qualityCheckTimer >= state.qualityCheckInterval) {
+        state.qualityCheckTimer = 0;
+        // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
+        if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
+          const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop much faster when FPS is very low
+          state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
+        } else if (state.fps >= state.targetFps + 20 && state.qualityLevel < 1.0) {
+          state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.03); // Recover much slower
+        }
+      }
+
+      // OPTIMIZED: Enforce hard cap on total particles
+      const totalParticles = state.bloodEffects.length + state.deathEffects.length +
+        state.berserkerRageEffects.length + state.sparkEffects.length +
+        (burnEffectSystem?.particles?.length || 0) +
+        (flamewardenFlameSystem?.particles?.filter(p => p.active).length || 0);
+
+      if (totalParticles > state.maxTotalParticles) {
+        // Aggressively reduce quality if over particle cap
+        state.qualityLevel = Math.max(0.2, state.qualityLevel - 0.1);
+      }
+
       // FPS Drop Detection
       if (state.fps < 45 && state.gameState === 'playing') {
         let issues = [];
         const projCount = getProjectiles().length;
         if (projCount > 30) issues.push(`${projCount} Projectiles`);
-        
+
         let particleCount = state.bloodEffects.length + state.deathEffects.length + state.berserkerRageEffects.length;
         if (burnEffectSystem && burnEffectSystem.particles) particleCount += burnEffectSystem.particles.length;
         if (flamewardenFlameSystem && flamewardenFlameSystem.particles) particleCount += flamewardenFlameSystem.particles.length;
         if (particleCount > 80) issues.push(`${particleCount} Particles`);
-        
+
         let explosionsCount = (bomberExplosionSystem && bomberExplosionSystem.explosions) ? bomberExplosionSystem.explosions.length : 0;
         if (explosionsCount > 3) issues.push(`${explosionsCount} Explosions`);
-        
+
+        // OPTIMIZATION: Use spatial grid for clash detection instead of O(n²) loop
         let closeFighters = 0;
         let clashingNames = new Set();
-        for (let i=0; i<state.fighters.length; i++) {
-          for (let j=i+1; j<state.fighters.length; j++) {
-            let f1 = state.fighters[i];
-            let f2 = state.fighters[j];
-            if (f1 && f2 && f1.hp > 0 && f2.hp > 0) {
-              let dist = Math.hypot(f1.x - f2.x, f1.y - f2.y);
-              if (dist < 150) {
-                closeFighters++;
-                let n1 = (f1.fighterIndex !== undefined && FIGHTER_DEFS[f1.fighterIndex]) ? FIGHTER_DEFS[f1.fighterIndex].name : 'Unknown';
-                let n2 = (f2.fighterIndex !== undefined && FIGHTER_DEFS[f2.fighterIndex]) ? FIGHTER_DEFS[f2.fighterIndex].name : 'Unknown';
-                clashingNames.add(n1);
-                clashingNames.add(n2);
-              }
+
+        for (const fighter of state.fighters) {
+          if (!fighter || fighter.hp <= 0) continue;
+
+          const nearbyFighters = spatialGrid.getNearby(fighter.x, fighter.y, 150);
+          for (const other of nearbyFighters) {
+            if (other === fighter || !other.hp || other.hp <= 0) continue;
+
+            const dist = Math.hypot(other.x - fighter.x, other.y - fighter.y);
+            if (dist < 150) {
+              closeFighters++;
+              let n1 = (fighter.fighterIndex !== undefined && FIGHTER_DEFS[fighter.fighterIndex]) ? FIGHTER_DEFS[fighter.fighterIndex].name : 'Unknown';
+              let n2 = (other.fighterIndex !== undefined && FIGHTER_DEFS[other.fighterIndex]) ? FIGHTER_DEFS[other.fighterIndex].name : 'Unknown';
+              clashingNames.add(n1);
+              clashingNames.add(n2);
             }
           }
         }
-        
+
+        // Divide by 2 since each pair is counted twice
+        closeFighters = Math.floor(closeFighters / 2);
+
         if (closeFighters > 0) {
           let names = Array.from(clashingNames).join(', ');
           issues.push(`Clash (${closeFighters} close) [${names}]`);
         }
-        
+
         let logText = '';
         if (issues.length > 0) {
           if (closeFighters === 0) {
@@ -200,11 +239,20 @@ function animate(timestamp) {
           let alive = state.fighters.filter(f => f && f.hp > 0).map(f => (f.fighterIndex !== undefined && FIGHTER_DEFS[f.fighterIndex]) ? FIGHTER_DEFS[f.fighterIndex].name : 'Unknown');
           logText = `[FPS: ${state.fps}] Unknown Heavy Load [${alive.join(', ')}]`;
         }
-        
+
         state.fpsLogs.push({ text: logText, timer: 300 });
-        if (state.fpsLogs.length > 5) state.fpsLogs.shift();
-        
+        if (state.fpsLogs.length > 5) {
+          // Use swap-and-pop instead of shift() to avoid O(n) re-indexing
+          state.fpsLogs[0] = state.fpsLogs[state.fpsLogs.length - 1];
+          state.fpsLogs.pop();
+        }
+
         state.allFpsLogs.push(`[${new Date().toLocaleTimeString()}] ${logText}`);
+        // Cap allFpsLogs to prevent unbounded memory growth
+        const MAX_FPS_LOGS = 1000;
+        if (state.allFpsLogs.length > MAX_FPS_LOGS) {
+          state.allFpsLogs.splice(0, state.allFpsLogs.length - MAX_FPS_LOGS);
+        }
       }
     }
 
@@ -223,7 +271,7 @@ function animate(timestamp) {
 
     // Reset cached time for this frame (performance optimization)
     resetCachedTime();
-    
+
     // Update Logic based on state
     if (state.gameState === 'countdown') {
       // Countdown timer - increment until duration reached
@@ -250,7 +298,7 @@ function animate(timestamp) {
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
       state.roundEndTimer++;
-      
+
       // Auto next round / match
       const autoDelay = (state.mode === 'FFA' && state.ffaMatchComplete) ? 300 : 180;
       if (state.roundEndTimer >= autoDelay) {
@@ -264,7 +312,7 @@ function animate(timestamp) {
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
       state.matchEndTimer++;
-      
+
       // Auto next match
       if (state.matchEndTimer >= 300) {
         if (state.mode === '1v1') {
@@ -276,15 +324,29 @@ function animate(timestamp) {
       }
     }
 
+    // OPTIMIZATION: Quality-based particle system updates
+    const qualityLevel = state.qualityLevel || 1.0;
+    const fps = state.fps || 60;
+    const useAggressiveParticleMode = fps < 35 || qualityLevel < 0.4;
+
     // Update death effects (always update, even between rounds)
-    updateDeathEffects();
-    updateIllusionDeathEffects();
-    updateIllusionSpawnEffects();
-    updateBerserkerRageEffects();
+    if (!useAggressiveParticleMode || Math.random() > 0.5) {
+      updateDeathEffects();
+    }
+    if (!useAggressiveParticleMode) {
+      updateDoppelgangerDeathEffects();
+      updateIllusionDeathEffects();
+      updateIllusionSpawnEffects();
+      updateBerserkerRageEffects();
+    }
     // Update blood effects (always update, even between rounds)
-    updateBloodEffects();
+    if (!useAggressiveParticleMode || Math.random() > 0.7) {
+      updateBloodEffects();
+    }
     // Update spark effects (always update, even between rounds)
-    updateSparkEffects();
+    if (!useAggressiveParticleMode || Math.random() > 0.6) {
+      updateSparkEffects();
+    }
     // Update burn effects (always update, even between rounds)
     const dtGlobal = Math.min(FRAME_TIME / 1000, 0.1);
     if (state.gameState !== 'title' && state.gameState !== 'select' && state.gameState !== 'index' && state.gameState !== 'leaderboard') {
@@ -299,7 +361,7 @@ function animate(timestamp) {
 
     // Draw Logic based on state
     if (state.gameState === 'title') {
-      
+
       try {
         drawTitleScreen();
       } catch (screenError) {
@@ -333,15 +395,28 @@ function animate(timestamp) {
       drawIllusions(); // Draw Doppleganger illusions
       drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
       drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
-      bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
-      burnEffectSystem.draw(state.ctx); // Draw burn particles
+
+      // OPTIMIZATION: Quality-based particle drawing
+      if (!useAggressiveParticleMode) {
+        bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
+        burnEffectSystem.draw(state.ctx); // Draw burn particles
+      }
       drawFloatingTexts();
-      drawDeathEffects(); // Draw death shatter effects on top of everything
-      drawIllusionDeathEffects(); // Draw illusion death effects
-      drawIllusionSpawnEffects(); // Draw illusion spawn effects
-      drawBerserkerRageEffects(); // Draw berserker rage effects
-      drawBloodEffects(); // Draw blood effects on top of everything
-      drawSparkEffects(); // Draw spark effects on top of everything
+
+      if (!useAggressiveParticleMode) {
+        drawDeathEffects(); // Draw death shatter effects on top of everything
+        drawDoppelgangerDeathEffects();
+        drawIllusionDeathEffects(); // Draw illusion death effects
+        drawIllusionSpawnEffects(); // Draw illusion spawn effects
+        drawBerserkerRageEffects(); // Draw berserker rage effects
+      }
+
+      if (!useAggressiveParticleMode || Math.random() > 0.5) {
+        drawBloodEffects(); // Draw blood effects on top of everything
+      }
+      if (!useAggressiveParticleMode || Math.random() > 0.4) {
+        drawSparkEffects(); // Draw spark effects on top of everything
+      }
 
       // Draw FPS display
       state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
@@ -353,15 +428,15 @@ function animate(timestamp) {
       if (state.fpsLogs && state.fpsLogs.length > 0) {
         state.ctx.font = 'bold 12px monospace';
         state.ctx.textAlign = 'left';
-        
+
         let startY = state.canvas.height - 10 - (state.fpsLogs.length * 16);
-        
+
         // Draw copy instruction if not copied recently
         if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
           state.ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
           state.ctx.fillText('Press C to copy logs', 10, startY - 10);
         }
-        
+
         for (let i = 0; i < state.fpsLogs.length; i++) {
           let log = state.fpsLogs[i];
           let alpha = Math.min(1, log.timer / 60); // Fade out
@@ -369,7 +444,7 @@ function animate(timestamp) {
           state.ctx.fillText(log.text, 10, startY + (i * 16));
         }
       }
-      
+
       // Draw copied notification
       if (state.fpsLogsCopiedTimer > 0) {
         state.ctx.font = 'bold 12px monospace';

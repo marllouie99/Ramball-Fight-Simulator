@@ -5,6 +5,7 @@
 
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { CONFIG } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 // ─────────────────────────────────────────────
 // FLAMETHROWER PARTICLE SYSTEM (High-Performance)
@@ -12,7 +13,7 @@ import { CONFIG } from '../../core/config.js';
 // Uses additive blending for glow effect without expensive shadow operations.
 // Max 60 particles for consistent 60fps with dense flame appearance.
 
-const MAX_FLAME_PARTICLES = 60; // Reduced back to 60 for better performance against heavy visual fighters like Solar Champion
+const MAX_FLAME_PARTICLES = 25; // OPTIMIZED: Further reduced from 40 to 25 for severe performance situations
 
 // Color stops: [lifeRatio, r, g, b, alpha]
 // lifeRatio 0.0 = just born (white core), 1.0 = dying (smokey grey)
@@ -147,23 +148,42 @@ export class FlamethrowerParticleSystem {
   // Update all particles (call every frame)
   update(dt) {
     // Pre-filter black holes once per frame to avoid O(particles * projectiles) cost
-    const blackHoles = (typeof projectileSystem !== 'undefined' && projectileSystem && projectileSystem.projectiles) 
-      ? projectileSystem.projectiles.filter(p => p.isBlackHole && p.transformed)
-      : [];
+    // OPTIMIZED: Cache black holes and skip if none exist
+    let blackHoles = [];
+    if (typeof projectileSystem !== 'undefined' && projectileSystem && projectileSystem.projectiles) {
+      const hasBlackHoles = projectileSystem.projectiles.some(p => p.isBlackHole && p.transformed);
+      if (hasBlackHoles) {
+        blackHoles = projectileSystem.projectiles.filter(p => p.isBlackHole && p.transformed);
+      }
+    }
 
     // Spawn more particles while active for denser flame
     if (this.active) {
-      // Spawn 2-3 particles per frame to maintain ~60 particles alive
-      const spawnCount = 2 + Math.floor(Math.random() * 2);
+      // OPTIMIZED: Apply dynamic quality level to spawn rate with more aggressive reduction
+      const qualityMultiplier = state.qualityLevel || 1.0;
+      const baseSpawnCount = 1; // Always spawn 1 particle maximum for performance
+      const spawnCount = qualityMultiplier < 0.5 ? 1 : Math.max(1, Math.floor(baseSpawnCount * qualityMultiplier));
       for (let i = 0; i < spawnCount; i++) {
         this.spawnParticle();
       }
     }
 
     // Update existing particles
+    // OPTIMIZED: Apply distance-based culling - skip particles far from arena center
+    const arenaCenterX = state.arena.x + state.arena.width / 2;
+    const arenaCenterY = state.arena.y + state.arena.height / 2;
+    const maxDistance = Math.max(state.arena.width, state.arena.height) * 0.8;
+
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
       const p = this.particles[i];
       if (!p.active) continue;
+
+      // OPTIMIZED: Distance-based culling - deactivate particles too far from action
+      const distFromCenter = Math.hypot(p.x - arenaCenterX, p.y - arenaCenterY);
+      if (distFromCenter > maxDistance) {
+        p.active = false;
+        continue;
+      }
 
       // Update life
       p.life += dt;
@@ -183,6 +203,9 @@ export class FlamethrowerParticleSystem {
       // Slight drag to slow down over time
       p.vx *= (1 - 0.8 * dt);
       p.vy *= (1 - 0.8 * dt);
+
+      // OPTIMIZED: Skip black hole logic if no black holes exist
+      if (blackHoles.length === 0) continue;
 
       // Black Hole pull logic
       for (const proj of blackHoles) {

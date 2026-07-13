@@ -10,6 +10,10 @@ import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
+import { spatialGrid } from './physics.js';
+
+// Frame counter for visual-only particle optimization
+let visualUpdateFrame = 0;
 
 /**
  * Checks if two fighters are on the same team (for 2v2 mode).
@@ -30,8 +34,10 @@ class ProjectileSystem {
   constructor() {
     this.projectiles = [];
     this.frozenProjectiles = []; // Decoupled: frozen projectiles are moved here, ignored by update loop
-    this.pool = [];
     this.poolSize = 500; // Pre-allocate pool size
+    this.pool = Array.from({ length: this.poolSize }, () => ({}));
+    this.poolIndex = 0; // Circular pointer to reuse objects without array push/pop thrashing
+    this.maxActiveProjectiles = 200; // Dynamic limit based on fighter count
     this._preallocatePool();
   }
 
@@ -41,7 +47,11 @@ class ProjectileSystem {
    */
   _preallocatePool() {
     for (let i = 0; i < this.poolSize; i++) {
-      this.pool.push({});
+      const p = this.pool[i];
+      p.x = 0; p.y = 0; p.vx = 0; p.vy = 0; p.r = 0; p.life = 0; p.maxLife = 0;
+      p.owner = null; p.damage = 0; p.isFollowUp = false; p.isBlackHole = false;
+      p.isFlame = false; p.isGrenade = false; p.isBomberGrenade = false; p.isC4 = false;
+      p.history = [];
     }
   }
 
@@ -49,11 +59,9 @@ class ProjectileSystem {
    * Get a projectile from pool or create new one (fallback if pool exhausted).
    */
   _getProjectile() {
-    if (this.pool.length > 0) {
-      return this.pool.pop();
-    }
-    // Emergency fallback: pool exhausted (shouldn't happen with proper sizing)
-    return {};
+    const p = this.pool[this.poolIndex];
+    this.poolIndex = (this.poolIndex + 1) % this.poolSize;
+    return p;
   }
 
   /**
@@ -61,12 +69,32 @@ class ProjectileSystem {
    * Uses null assignment instead of delete — faster and GC-friendly.
    */
   _returnProjectile(proj) {
-    // Fast property reset — null out all own enumerable keys
-    for (const key of Object.keys(proj)) {
-      proj[key] = null;
-    }
-    if (this.pool.length < this.poolSize) {
-      this.pool.push(proj);
+    proj.isFlame = false;
+    proj.isBlackHole = false;
+    proj.isGrenade = false;
+    proj.isBomberGrenade = false;
+    proj.isC4 = false;
+    proj.capturedByBlackHole = null;
+    proj.stoppedByCronosSphere = false;
+    if (proj.history) proj.history.length = 0;
+  }
+
+  /**
+   * Updates dynamic projectile limits based on current fighter count and game mode.
+   * Called at the start of each update to adjust performance targets.
+   */
+  _updateDynamicLimits() {
+    const fighterCount = state.fighters.filter(f => f && f.hp > 0).length;
+    const illusionCount = state.illusions.filter(i => i && i.hp > 0).length;
+    const totalEntities = fighterCount + illusionCount;
+
+    // Reduce projectile limits in multi-player modes
+    if (totalEntities >= 6) {
+      this.maxActiveProjectiles = 100; // FFA with many entities
+    } else if (totalEntities >= 4) {
+      this.maxActiveProjectiles = 150; // 2v2 mode
+    } else {
+      this.maxActiveProjectiles = 200; // 1v1 mode
     }
   }
 
@@ -75,6 +103,11 @@ class ProjectileSystem {
    * Optionally accepts custom spawn position and angle for dual-wield fighters.
    */
   fireProjectile(fighter, ownerIndex, damage, isFollowUp = false, speedOverride, willBecomeBlackHole = false, visual, customSpawnX, customSpawnY, customAngle) {
+    // OPTIMIZATION: Skip projectile if we've exceeded the dynamic limit
+    if (this.projectiles.length >= this.maxActiveProjectiles) {
+      return; // Silently drop excess projectiles to maintain performance
+    }
+
     const { radius, life } = CONFIG.projectile;
     const speed = speedOverride ?? CONFIG.projectile.speed;
     const projDamage = Number(damage);
@@ -116,7 +149,7 @@ class ProjectileSystem {
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
     proj.isFollowUp = isFollowUp;
     proj.visual = visualType;
-    proj.history = [{ x: spawnX, y: spawnY }];
+    if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
     proj.historyMax = 10;
 
     if (willBecomeBlackHole) {
@@ -140,12 +173,12 @@ class ProjectileSystem {
     const speed = (speedOverride ?? CONFIG.orange.flameSpeed ?? CONFIG.projectile.speed) * (0.95 + Math.random() * 0.08);
     const radius = radiusOverride ?? CONFIG.orange.flameRadius ?? CONFIG.projectile.radius;
     const projDamage = Number(damage);
-    
+
     // Calculate life based on flameRange to ensure projectiles reach the full range
     const flameRange = CONFIG.orange.flameRange || 150;
     const calculatedLife = Math.ceil(flameRange / speed);
     const life = lifeOverride ?? calculatedLife;
-    
+
     const tipDist = GUN_TIP_DIST(fighter.r) + 15;
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
@@ -191,10 +224,11 @@ class ProjectileSystem {
 
     const targetX = opponent.x;
     const targetY = opponent.y;
-    const dist = Math.hypot(targetX - fighter.x, targetY - fighter.y);
+    const distSq = (targetX - fighter.x) * (targetX - fighter.x) + (targetY - fighter.y) * (targetY - fighter.y);
 
-    const dirX = (targetX - fighter.x) / (dist || 1);
-    const dirY = (targetY - fighter.y) / (dist || 1);
+    const dist = distSq > 0 ? Math.sqrt(distSq) : 1;
+    const dirX = (targetX - fighter.x) / dist;
+    const dirY = (targetY - fighter.y) / dist;
 
     const startX = fighter.x + dirX * tipDist;
     const startY = fighter.y + dirY * tipDist;
@@ -319,19 +353,24 @@ class ProjectileSystem {
 
   /**
    * Checks if a projectile hit a fighter (skips its own owner).
+   * OPTIMIZED: Uses spatial grid to reduce collision checks from O(n) to O(1) for nearby entities.
    */
   checkProjectileHits(projectile, fighters) {
     if (projectile.isExplosion) return false;
     if (projectile.isPoisonSpill) return false;
     if (projectile.isVisual) return false; // Visual-only particles skip all collision
 
-    for (let fi = 0; fi < fighters.length; fi++) {
+    // OPTIMIZED: Use spatial grid to get only nearby fighters instead of checking all
+    const nearbyFighters = spatialGrid.getNearby(projectile.x, projectile.y, projectile.r * 2 + 100);
+
+    for (const fighter of nearbyFighters) {
+      if (!fighter || fighter.hp <= 0) continue;
+      const fi = fighters.indexOf(fighter);
+      if (fi === -1) continue;
+
       if (projectile.owner === fi) continue;
       // Skip teammates in 2v2 mode
       if (areOnSameTeam(projectile.owner, fi)) continue;
-
-      const fighter = fighters[fi];
-      if (!fighter || fighter.hp <= 0) continue;
 
       // ── Bounding-box culling: skip expensive Math.hypot when projectile is far ──
       const hitRadius = fighter.r + projectile.r;
@@ -339,10 +378,12 @@ class ProjectileSystem {
       const dy = fighter.y - projectile.y;
       if (Math.abs(dx) > hitRadius || Math.abs(dy) > hitRadius) continue;
 
-      const dist = Math.hypot(dx, dy);
+      const distSq = dx * dx + dy * dy;
+      const hitRadiusSq = hitRadius * hitRadius;
       const proximityRadius = hitRadius + (CONFIG.darkslategray.proximityTriggerRadius || 0);
+      const proxRadiusSq = proximityRadius * proximityRadius;
 
-      if (dist < hitRadius) {
+      if (distSq < hitRadiusSq) {
         if (projectile.isBlackHole && projectile.hitTargets && projectile.hitTargets.has(fi)) {
           continue;
         }
@@ -360,7 +401,7 @@ class ProjectileSystem {
             const safeIntervalSeconds = Math.max(0.01, intervalSeconds);
             const intervalMs = safeIntervalSeconds * 1000;
             const now = Date.now();
-            
+
             // Check if fighter has been away from flames long enough to trigger burn
             if (fighter._lastFlameHitTime && (now - fighter._lastFlameHitTime) > intervalMs * 3) {
               // Apply burn effect when fighter gets away from flames
@@ -370,11 +411,11 @@ class ProjectileSystem {
                 fighter._flameContactDuration = 0;
               }
             }
-            
+
             if (fighter._lastFlameHitTime && (now - fighter._lastFlameHitTime) > intervalMs * 2) {
               fighter._flameContactDuration = 0;
             }
-          if (fighter._lastFlameHitTime && (now - fighter._lastFlameHitTime) < intervalMs) {
+            if (fighter._lastFlameHitTime && (now - fighter._lastFlameHitTime) < intervalMs) {
               // If the same fighter is in rapid successive contact with flames,
               // treat it as "dodged" for this flame particle to prevent absurd multi-ticking.
               // IMPORTANT: DarkSlateGray dodge logic should not be bypassed here,
@@ -433,7 +474,7 @@ class ProjectileSystem {
         return true;
       }
 
-      if (dist < proximityRadius && dist >= hitRadius) {
+      if (distSq < proxRadiusSq && distSq >= hitRadiusSq) {
         if (!projectile.nearMissFighters) projectile.nearMissFighters = new Set();
         if (!projectile.nearMissFighters.has(fi)) {
           projectile.nearMissFighters.add(fi);
@@ -456,8 +497,9 @@ class ProjectileSystem {
       const idy = illusion.y - projectile.y;
       if (Math.abs(idx) > hitRadius || Math.abs(idy) > hitRadius) continue;
 
-      const dist = Math.hypot(idx, idy);
-      if (dist < hitRadius) {
+      const distSq = idx * idx + idy * idy;
+      const hitRadiusSq = hitRadius * hitRadius;
+      if (distSq < hitRadiusSq) {
         const attacker = fighters[projectile.owner];
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
         return true;
@@ -488,9 +530,10 @@ class ProjectileSystem {
 
     for (const fighter of fighters) {
       if (!fighter || !fighter.sphereActive) continue;
-      const dist = Math.hypot(projectile.x - fighter.sphereX, projectile.y - fighter.sphereY);
+      const dx = projectile.x - fighter.sphereX;
+      const dy = projectile.y - fighter.sphereY;
       const range = CONFIG.cronos.sphereRadius;
-      if (dist <= range) {
+      if ((dx * dx + dy * dy) <= range * range) {
         if (frozenCount >= maxFrozen) return false; // Prevent freezing more
 
         // Save velocity for trajectory restoration
@@ -527,7 +570,7 @@ class ProjectileSystem {
    * Called when the sphere expires so frozen projectiles resume their trajectories.
    * Returns the number of projectiles restored.
    */
-  _restoreFrozenProjectiles(sphereOwnerIndex) {
+  restoreFrozenProjectiles(sphereOwnerIndex) {
     let restored = 0;
     for (let i = this.frozenProjectiles.length - 1; i >= 0; i--) {
       const p = this.frozenProjectiles[i];
@@ -540,14 +583,9 @@ class ProjectileSystem {
       if (typeof p._resumeVx === 'number' && typeof p._resumeVy === 'number') {
         p.vx = p._resumeVx;
         p.vy = p._resumeVy;
-        delete p._resumeVx;
-        delete p._resumeVy;
-      } else {
-        const speed = Math.hypot(p.vx, p.vy) || CONFIG.projectile.speed;
-        const angle = Math.atan2(p.vy, p.vx);
-        p.vx = Math.cos(angle) * speed;
-        p.vy = Math.sin(angle) * speed;
       }
+      delete p._resumeVx;
+      delete p._resumeVy;
       if (typeof p._resumeVz === 'number') {
         p.vz = p._resumeVz;
         delete p._resumeVz;
@@ -586,8 +624,10 @@ class ProjectileSystem {
       if (areOnSameTeam(p.owner, fi)) continue;
       const fighter = fighters[fi];
       if (!fighter) continue;
-      const dist = Math.hypot(fighter.x - p.x, fighter.y - p.y);
-      if (dist <= radius + fighter.r) {
+      const dx = fighter.x - p.x;
+      const dy = fighter.y - p.y;
+      const checkRadius = radius + fighter.r;
+      if ((dx * dx + dy * dy) <= checkRadius * checkRadius) {
         try {
           const applied = fighter.takeDamage(p.damage, attacker);
           if (applied) {
@@ -611,8 +651,10 @@ class ProjectileSystem {
     // AOE damage to illusions
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
-      const dist = Math.hypot(illusion.x - p.x, illusion.y - p.y);
-      if (dist <= radius + illusion.r) {
+      const dx = illusion.x - p.x;
+      const dy = illusion.y - p.y;
+      const checkRadius = radius + illusion.r;
+      if ((dx * dx + dy * dy) <= checkRadius * checkRadius) {
         applyDamageToTarget(illusion, p.damage, attacker, { isAOE: true });
       }
     }
@@ -637,9 +679,13 @@ class ProjectileSystem {
 
   /**
    * Creates a layered poison explosion visual effect for the Alchemist's grenade.
+   * OPTIMIZED: Reduced particle count for better performance with multiple fighters
    */
   createAlchemistExplosion({ x, y, radius, owner }) {
     const motion = { x, y, vx: 0, vy: 0, owner, explosionType: 'poison', isExplosion: true };
+    const qualityLevel = state.qualityLevel || 1.0;
+    const useLOD = (state.fps < 55 && state.gameState === 'playing') || qualityLevel < 0.8;
+    const useUltraLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.5;
 
     // Bright toxic flash
     const flash = this._getProjectile();
@@ -648,7 +694,7 @@ class ProjectileSystem {
     flash.life = 12;
     flash.maxLife = 12;
     flash.isExplosionFlash = true;
-    flash.isVisual = true; // Purely visual — no collision
+    flash.isVisual = true;
     this.projectiles.push(flash);
 
     // Poison cloud fireball
@@ -658,32 +704,36 @@ class ProjectileSystem {
     cloud.life = 28;
     cloud.maxLife = 28;
     cloud.isExplosionFireball = true;
-    cloud.isVisual = true; // Purely visual — no collision
+    cloud.isVisual = true;
     this.projectiles.push(cloud);
 
-    // Expanding toxic shockwave ring
-    const shockwave = this._getProjectile();
-    Object.assign(shockwave, motion);
-    shockwave.r = radius * 0.5;
-    shockwave.life = 22;
-    shockwave.maxLife = 22;
-    shockwave.isExplosionShockwave = true;
-    shockwave.isVisual = true; // Purely visual — no collision
-    this.projectiles.push(shockwave);
+    // Expanding toxic shockwave ring (skip in ultra LOD)
+    if (!useUltraLOD) {
+      const shockwave = this._getProjectile();
+      Object.assign(shockwave, motion);
+      shockwave.r = radius * 0.5;
+      shockwave.life = 22;
+      shockwave.maxLife = 22;
+      shockwave.isExplosionShockwave = true;
+      shockwave.isVisual = true;
+      this.projectiles.push(shockwave);
+    }
 
-    // Lingering green mist
-    const mist = this._getProjectile();
-    Object.assign(mist, motion);
-    mist.r = radius * 0.5;
-    mist.maxRadius = radius * 1.3;
-    mist.life = 45;
-    mist.maxLife = 45;
-    mist.isExplosionSmoke = true;
-    mist.isVisual = true; // Purely visual — no collision
-    this.projectiles.push(mist);
+    // Lingering green mist (skip in ultra LOD)
+    if (!useUltraLOD) {
+      const mist = this._getProjectile();
+      Object.assign(mist, motion);
+      mist.r = radius * 0.5;
+      mist.maxRadius = radius * 1.3;
+      mist.life = 45;
+      mist.maxLife = 45;
+      mist.isExplosionSmoke = true;
+      mist.isVisual = true;
+      this.projectiles.push(mist);
+    }
 
     // Glass shatter particles from the bottle breaking
-    const shardCount = 6 + Math.floor(Math.random() * 4);
+    const shardCount = useUltraLOD ? 1 + Math.floor(Math.random() * 2) : (useLOD ? 2 + Math.floor(Math.random() * 2) : 3 + Math.floor(Math.random() * 3));
     for (let i = 0; i < shardCount; i++) {
       const shard = this._getProjectile();
       Object.assign(shard, motion);
@@ -697,13 +747,14 @@ class ProjectileSystem {
       shard.isGlassShard = true;
       shard.rotation = Math.random() * Math.PI * 2;
       shard.rotationSpeed = (Math.random() - 0.5) * 0.5;
-      shard.isVisual = true; // Purely visual — no collision
+      shard.isVisual = true;
       this.projectiles.push(shard);
     }
 
     // Poison bubble particles
-    for (let i = 0; i < 5; i++) {
-      const angle = (i / 5) * Math.PI * 2 + Math.random() * 0.5;
+    const bubbleCount = useUltraLOD ? 1 : (useLOD ? 2 : 3);
+    for (let i = 0; i < bubbleCount; i++) {
+      const angle = (i / bubbleCount) * Math.PI * 2 + Math.random() * 0.5;
       const dist = radius * 0.2 + Math.random() * radius * 0.3;
       const bubble = this._getProjectile();
       Object.assign(bubble, motion);
@@ -715,8 +766,58 @@ class ProjectileSystem {
       bubble.life = 20 + Math.floor(Math.random() * 15);
       bubble.maxLife = bubble.life;
       bubble.isExplosionEmber = true;
-      bubble.isVisual = true; // Purely visual — no collision
+      bubble.isVisual = true;
       this.projectiles.push(bubble);
+    }
+  }
+
+  freezeProjectilesInSphere(cronosFighter) {
+    if (!cronosFighter || !cronosFighter.sphereActive) return;
+
+    const sphereX = cronosFighter.sphereX;
+    const sphereY = cronosFighter.sphereY;
+    const sphereRadius = CONFIG.cronos.sphereRadius;
+    const sphereRadiusSq = sphereRadius * sphereRadius;
+    const ownerIndex = state.fighters.indexOf(cronosFighter);
+    const maxFrozen = CONFIG.cronos.maxFrozenProjectiles || 40;
+    const qualityLevel = state.qualityLevel || 1.0;
+    const activeMaxFrozen = qualityLevel < 0.6 ? Math.min(15, maxFrozen) : maxFrozen;
+
+    // OPTIMIZATION: Use spatial grid to get only nearby projectiles instead of checking all
+    const nearbyProjectiles = [];
+    for (let i = 0; i < this.projectiles.length; i++) {
+      const p = this.projectiles[i];
+      const dx = p.x - sphereX;
+      const dy = p.y - sphereY;
+      // Quick bounding box check first
+      if (Math.abs(dx) <= sphereRadius && Math.abs(dy) <= sphereRadius) {
+        nearbyProjectiles.push(i);
+      }
+    }
+
+    for (let i = nearbyProjectiles.length - 1; i >= 0; i--) {
+      if (this.frozenProjectiles.length >= activeMaxFrozen) break;
+
+      const projIndex = nearbyProjectiles[i];
+      const p = this.projectiles[projIndex];
+      const dx = p.x - sphereX;
+      const dy = p.y - sphereY;
+
+      if (dx * dx + dy * dy <= sphereRadiusSq) {
+        // Freeze it and move it
+        p._resumeVx = p.vx;
+        p._resumeVy = p.vy;
+        p._resumeVz = p.vz;
+        p.vx = 0; p.vy = 0; p.vz = 0;
+        p.stoppedByCronosSphere = true;
+        p.frozenByCronosSphere = true;
+        p.frozenBySphereId = ownerIndex;
+        p.frozenByFighterIndex = ownerIndex;
+
+        this.frozenProjectiles.push(p);
+        this.projectiles[projIndex] = this.projectiles[this.projectiles.length - 1];
+        this.projectiles.pop();
+      }
     }
   }
 
@@ -731,8 +832,10 @@ class ProjectileSystem {
     for (const fighter of fighters) {
       if (!fighter) continue;
       if (!fighter.sphereActive) continue;
-      const dist = Math.hypot(x - fighter.sphereX, y - fighter.sphereY);
-      if (dist <= CONFIG.cronos.sphereRadius) {
+      const dx = x - fighter.sphereX;
+      const dy = y - fighter.sphereY;
+      const range = CONFIG.cronos.sphereRadius;
+      if ((dx * dx + dy * dy) <= range * range) {
         return true;
       }
     }
@@ -756,8 +859,10 @@ class ProjectileSystem {
       if (areOnSameTeam(p.owner, fi)) continue;
       const fighter = fighters[fi];
       if (!fighter) continue;
-      const dist = Math.hypot(fighter.x - p.x, fighter.y - p.y);
-      if (dist <= radius + fighter.r) {
+      const dx = fighter.x - p.x;
+      const dy = fighter.y - p.y;
+      const checkRadius = radius + fighter.r;
+      if ((dx * dx + dy * dy) <= checkRadius * checkRadius) {
         try {
           const applied = fighter.takeDamage(damage, attacker);
           if (applied) {
@@ -812,8 +917,10 @@ class ProjectileSystem {
       if (areOnSameTeam(p.owner, fi)) continue;
       const fighter = fighters[fi];
       if (!fighter) continue;
-      const dist = Math.hypot(fighter.x - p.x, fighter.y - p.y);
-      if (dist <= radius + fighter.r) {
+      const dx = fighter.x - p.x;
+      const dy = fighter.y - p.y;
+      const checkRadius = radius + fighter.r;
+      if ((dx * dx + dy * dy) <= checkRadius * checkRadius) {
         try {
           const applied = fighter.takeDamage(damage, attacker);
           if (applied) {
@@ -869,8 +976,12 @@ class ProjectileSystem {
       const fighter = fighters[fi];
       if (!fighter) continue;
 
-      const dist = Math.hypot(fighter.x - x, fighter.y - y);
-      if (dist <= radius + fighter.r) {
+      const dx = fighter.x - x;
+      const dy = fighter.y - y;
+      const distSq = dx * dx + dy * dy;
+      const checkRadius = radius + fighter.r;
+      if (distSq <= checkRadius * checkRadius) {
+        const dist = Math.sqrt(distSq);
         const distRatio = dist / Math.max(1, radius + fighter.r);
         const knockback = cfg.baseKnockback * (1 - Math.pow(distRatio, cfg.falloffExponent));
         const angle = Math.atan2(fighter.y - y, fighter.x - x);
@@ -887,8 +998,12 @@ class ProjectileSystem {
     // Apply concussive blast to illusions
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
-      const dist = Math.hypot(illusion.x - x, illusion.y - y);
-      if (dist <= radius + illusion.r) {
+      const dx = illusion.x - x;
+      const dy = illusion.y - y;
+      const distSq = dx * dx + dy * dy;
+      const checkRadius = radius + illusion.r;
+      if (distSq <= checkRadius * checkRadius) {
+        const dist = Math.sqrt(distSq);
         const distRatio = dist / Math.max(1, radius + illusion.r);
         const knockback = cfg.baseKnockback * (1 - Math.pow(distRatio, cfg.falloffExponent));
         const angle = Math.atan2(illusion.y - y, illusion.x - x);
@@ -915,8 +1030,9 @@ class ProjectileSystem {
       if (projectile.life <= 0) continue;
       if (!projectile.isBomberGrenade && !projectile.isC4) continue;
 
-      const dist = Math.hypot(projectile.x - x, projectile.y - y);
-      if (dist <= chainRadius) {
+      const dx = projectile.x - x;
+      const dy = projectile.y - y;
+      if ((dx * dx + dy * dy) <= chainRadius * chainRadius) {
         projectile.life = 0;
         projectile.aoeRadius = projectile.aoeRadius || radius * 0.8;
         if (projectile.isC4) {
@@ -947,32 +1063,51 @@ class ProjectileSystem {
    * Updates all projectiles in the system.
    */
   update(fighters) {
+    // OPTIMIZED: Update dynamic limits based on current entity count
+    this._updateDynamicLimits();
+
+    // OPTIMIZED: Rebuild spatial grid with fighters for projectile collision optimization
+    spatialGrid.clear();
+    for (const fighter of fighters) {
+      if (fighter && fighter.hp > 0) {
+        spatialGrid.insert(fighter);
+      }
+    }
+
+    // OPTIMIZED: Increment frame counter for visual-only particle updates
+    visualUpdateFrame++;
+
     // PERFORMANCE OPTIMIZATION: Hard limit on active projectiles
     // 2v2 and FFA can spawn a massive amount of particles (especially flames) leading to lag.
     if (this.projectiles.length > 0) {
       const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
-      const maxProjectiles = isMulti ? 80 : 250;
-      
+      // OPTIMIZED: Use dynamic limits instead of fixed values
+      const maxProjectiles = this.maxActiveProjectiles;
+
       if (this.projectiles.length > maxProjectiles) {
         let removedCount = 0;
         const targetToRemove = this.projectiles.length - maxProjectiles;
-        
+
         // First pass: remove oldest flames since they are purely visual/minor damage and spawn in hundreds
+        // PERFORMANCE: Use swap-and-pop for O(1) removal instead of splice O(n)
         for (let i = 0; i < this.projectiles.length && removedCount < targetToRemove; i++) {
           if (this.projectiles[i] && this.projectiles[i].isFlame) {
             this._returnProjectile(this.projectiles[i]);
-            this.projectiles.splice(i, 1);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
             i--;
             removedCount++;
           }
         }
-        
+
         // Second pass: if still over limit, just start pruning the oldest regular projectiles
+        // PERFORMANCE: Use swap-and-pop for O(1) removal instead of shift O(n)
         if (removedCount < targetToRemove) {
           const stillToRemove = targetToRemove - removedCount;
           for (let i = 0; i < stillToRemove && this.projectiles.length > 0; i++) {
             this._returnProjectile(this.projectiles[0]);
-            this.projectiles.shift();
+            this.projectiles[0] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
           }
         }
       }
@@ -989,19 +1124,32 @@ class ProjectileSystem {
         p.orbitRadius = Math.max(10, p.orbitRadius - 0.5);
         p.x = p.capturedByBlackHole.x + Math.cos(p.orbitAngle) * p.orbitRadius;
         p.y = p.capturedByBlackHole.y + Math.sin(p.orbitAngle) * p.orbitRadius;
-        
+
         if (p.angle !== undefined) {
-           p.angle = p.orbitAngle + Math.PI/2;
+          p.angle = p.orbitAngle + Math.PI / 2;
         }
-        
+
         // Clear history so the trail doesn't stretch across the screen like a snake
         if (p.history) {
-           p.history = [];
+          p.history = [];
         }
         continue;
       }
 
       if (p.isExplosion) {
+        // OPTIMIZED: Skip update for visual-only particles on alternate frames when quality is low
+        if (p.isVisual && state.qualityLevel < 0.8 && visualUpdateFrame % 2 === 0) {
+          // Still decrement life but skip position update
+          p.life -= 1;
+          if (p.life <= 0) {
+            this._returnProjectile(p);
+            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+            this.projectiles.pop();
+            i--;
+          }
+          continue;
+        }
+
         if (typeof p.vx === 'number') p.x += p.vx;
         if (typeof p.vy === 'number') p.y += p.vy;
         if (typeof p.gravity === 'number') p.vy += p.gravity;
@@ -1090,8 +1238,10 @@ class ProjectileSystem {
               if (areOnSameTeam(p.owner, fi)) continue;
               const fighter = fighters[fi];
               if (!fighter || fighter.hp <= 0) continue;
-              const dist = Math.hypot(fighter.x - p.x, fighter.y - p.y);
-              if (dist < fighter.r + p.r) {
+              const fdx = fighter.x - p.x;
+              const fdy = fighter.y - p.y;
+              const combinedR = fighter.r + p.r;
+              if ((fdx * fdx + fdy * fdy) < combinedR * combinedR) {
                 p.stuckToFighter = fi;
                 p.vx = 0;
                 p.vy = 0;
@@ -1136,8 +1286,7 @@ class ProjectileSystem {
           const ody = p.y - other.y;
           if (Math.abs(odx) > combinedRadius || Math.abs(ody) > combinedRadius) continue;
 
-          const dist = Math.hypot(odx, ody);
-          if (dist < combinedRadius) {
+          if ((odx * odx + ody * ody) < combinedRadius * combinedRadius) {
             hitByAttack = true;
             break;
           }
@@ -1209,7 +1358,7 @@ class ProjectileSystem {
           const dy = p.y - f.y;
           const effectiveRadius = p.r + f.r;
           if (Math.abs(dx) > effectiveRadius || Math.abs(dy) > effectiveRadius) continue;
-          
+
           const dist = Math.hypot(dx, dy);
           if (dist < effectiveRadius) {
             // Pull fighter toward hole center.
@@ -1224,7 +1373,7 @@ class ProjectileSystem {
             const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
             const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
             if (f.visualScaleTarget === undefined || targetScale < f.visualScaleTarget) {
-                f.visualScaleTarget = targetScale;
+              f.visualScaleTarget = targetScale;
             }
 
             const radialVelocity = f.vx * nx + f.vy * ny;
@@ -1258,15 +1407,15 @@ class ProjectileSystem {
             // Skip if the black hole owner is the illusion's owner (so Doppelganger's own black holes don't suck its illusions)
             // But wait, BlackFighter can't be Doppelganger. But just in case.
             if (illusion.owner === fighters[ownerIndex]) continue;
-            
+
             const dx = p.x - illusion.x;
             const dy = p.y - illusion.y;
             const effectiveRadius = p.r + illusion.r;
-            
+
             if (Math.abs(dx) > effectiveRadius || Math.abs(dy) > effectiveRadius) continue;
 
             const dist = Math.hypot(dx, dy);
-            
+
             if (dist < effectiveRadius) {
               const nx = dist > 0 ? dx / dist : 0;
               const ny = dist > 0 ? dy / dist : 0;
@@ -1277,7 +1426,7 @@ class ProjectileSystem {
               const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
               const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
               if (illusion.visualScaleTarget === undefined || targetScale < illusion.visualScaleTarget) {
-                  illusion.visualScaleTarget = targetScale;
+                illusion.visualScaleTarget = targetScale;
               }
 
               const radialVelocity = (illusion.vx || 0) * nx + (illusion.vy || 0) * ny;
@@ -1308,21 +1457,20 @@ class ProjectileSystem {
           // Skip visual-only and non-physical projectiles
           if (otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill) continue;
           if (otherProj.isBlackHole) continue;
-          
+
           const otherProjOwner = fighters[otherProj.owner];
           if (otherProjOwner && otherProjOwner._def && otherProjOwner._def.type === 'black') continue;
-          
+
           const dx = p.x - otherProj.x;
           const dy = p.y - otherProj.y;
           const effectiveRadius = p.r * 2.5; // pull radius for projectiles
-          
+
           // ── Bounding-box culling ──
           if (Math.abs(dx) > effectiveRadius || Math.abs(dy) > effectiveRadius) continue;
 
-          const dist = Math.hypot(dx, dy);
-          
-          if (dist < effectiveRadius) {
-            if (dist < p.r * 0.5) {
+          const distSq = dx * dx + dy * dy;
+          if (distSq < effectiveRadius * effectiveRadius) {
+            if (distSq < p.r * p.r * 0.25) {
               if (otherProj.isExplosion) {
                 // Sucked in! Destroy silently (no detonation)
                 this._returnProjectile(otherProj);
@@ -1338,21 +1486,23 @@ class ProjectileSystem {
 
               // Capture the projectile instead of destroying it
               if (!otherProj.capturedByBlackHole) {
+                const dist = Math.sqrt(distSq);
                 otherProj.capturedByBlackHole = p;
                 otherProj.orbitRadius = dist;
                 otherProj.orbitAngle = Math.atan2(otherProj.y - p.y, otherProj.x - p.x);
               }
             } else {
               // Pull the projectile
+              const dist = Math.sqrt(distSq);
               const nx = dx / dist;
               const ny = dy / dist;
               // Stronger pull on projectiles so they realistically spiral in
               const pullStrength = CONFIG.black.blackHolePullStrength * 2.5 * (1 - dist / effectiveRadius);
               otherProj.vx += nx * pullStrength;
               otherProj.vy += ny * pullStrength;
-              
+
               if (otherProj.angle !== undefined && !otherProj.isGrenade && !otherProj.isC4) {
-                 otherProj.angle = Math.atan2(otherProj.vy, otherProj.vx);
+                otherProj.angle = Math.atan2(otherProj.vy, otherProj.vx);
               }
             }
           }
@@ -1365,8 +1515,8 @@ class ProjectileSystem {
             if (capturedProj.capturedByBlackHole === p) {
               capturedProj.capturedByBlackHole = null;
               const releaseSpeed = CONFIG.black?.blackHoleReleaseSpeed ?? 3.5;
-              capturedProj.vx = Math.cos(capturedProj.orbitAngle + Math.PI/2) * releaseSpeed;
-              capturedProj.vy = Math.sin(capturedProj.orbitAngle + Math.PI/2) * releaseSpeed;
+              capturedProj.vx = Math.cos(capturedProj.orbitAngle + Math.PI / 2) * releaseSpeed;
+              capturedProj.vy = Math.sin(capturedProj.orbitAngle + Math.PI / 2) * releaseSpeed;
             }
           }
           this._returnProjectile(p);
@@ -1383,10 +1533,11 @@ class ProjectileSystem {
         const noise = (Math.random() - 0.5) * p.turbulence;
         const perpX = -p.vy;
         const perpY = p.vx;
-        const perpLen = Math.hypot(perpX, perpY) || 1;
+        const perpLenSq = perpX * perpX + perpY * perpY;
+        const perpLen = perpLenSq > 0 ? Math.sqrt(perpLenSq) : 1;
         p.vx += (perpX / perpLen) * noise;
         p.vy += (perpY / perpLen) * noise;
-        const speed = Math.hypot(p.vx, p.vy) || 1;
+        const speed = Math.sqrt(p.vx * p.vx + p.vy * p.vy) || 1;
         const desired = p.baseSpeed || speed;
         p.vx *= desired / speed;
         p.vy *= desired / speed;
@@ -1396,9 +1547,13 @@ class ProjectileSystem {
       // Record trail history for normal (non-special) projectiles
       // Used by drawProjectiles() to render a motion streak.
       // ── Decoupled: Frozen projectiles are in frozenProjectiles array, not here ──
+      // PERFORMANCE: Use swap-and-pop for O(1) removal instead of shift O(n)
       if (p.history) {
         p.history.push({ x: p.x, y: p.y });
-        if (p.history.length > (p.historyMax || 10)) p.history.shift();
+        if (p.history.length > (p.historyMax || 10)) {
+          p.history[0] = p.history[p.history.length - 1];
+          p.history.pop();
+        }
       }
 
       // Normal projectile movement
@@ -1414,7 +1569,7 @@ class ProjectileSystem {
           // Spawn wall hit sparks for Crimson Sniper - VISUAL ONLY (no collision/physics)
           const sparkCount = 6 + Math.random() * 4;
           const hitAngle = Math.atan2(-p.vy, -p.vx);
-          
+
           // 1. Impact Flash (visual-only)
           spawnImpactFlash(p.x, p.y, 25 + Math.random() * 15);
 

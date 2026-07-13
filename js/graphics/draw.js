@@ -16,7 +16,8 @@ import { drawIllusionDeathEffects } from './particles/illusionDeathEffect.js';
 import { drawIllusionSpawnEffects } from './particles/illusionSpawnEffect.js';
 import { drawBerserkerRageEffects } from './particles/berserkerRageEffect.js';
 import { drawSparkEffects } from './particles/sparkEffect.js';
-export { drawDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
+import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
+export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
 // Performance: Cache time at the start of each frame to avoid multiple Date.now() calls
 let _cachedTime = 0;
@@ -30,6 +31,20 @@ export function resetCachedTime() {
   _cachedTime = 0;
 }
 
+// ── Module-level cached hex vertex trig (shared by sphere, barrier, etc.) ──
+const _DRAW_HEX_ANGLE = Math.PI / 3;
+const _DRAW_HEX_COS = [
+  Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE), Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE * 2),
+  Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE * 3), Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE * 4), Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE * 5)
+];
+const _DRAW_HEX_SIN = [
+  Math.sin(Math.PI / 6), Math.sin(Math.PI / 6 + _DRAW_HEX_ANGLE), Math.sin(Math.PI / 6 + _DRAW_HEX_ANGLE * 2),
+  Math.sin(Math.PI / 6 + _DRAW_HEX_ANGLE * 3), Math.sin(Math.PI / 6 + _DRAW_HEX_ANGLE * 4), Math.sin(Math.PI / 6 + _DRAW_HEX_ANGLE * 5)
+];
+// Cached shimmer value (quantized to every ~3 frames to avoid per-frame sine)
+let _shimmerValue = 0.9;
+let _shimmerFrame = 0;
+
 // bomber explosion visuals are routed through js/weaponGraphic/bomberWeaponGraphics.js.
 // Change bomber graphics in that file instead of here.
 
@@ -38,7 +53,7 @@ export function drawArena() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
   // Arena background only, not the whole canvas.
-  ctx.fillStyle = '#222222';
+  ctx.fillStyle = '#000000';
   ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
   ctx.strokeStyle = '#ffffff';
@@ -226,19 +241,36 @@ export function drawCronosSphereVisual({
   now = Date.now(),
   frozenCount = 0,  // number of frozen projectiles for LOD
 }) {
+  // OPTIMIZATION: Aggressive LOD based on FPS and quality
+  const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const fps = (typeof state !== 'undefined' && state.fps) || 60;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
+  const useUltraLOD = qualityLevel < 0.4 || (fps < 40 && typeof state !== 'undefined' && state.gameState === 'playing');
+  const useLOD = isMulti || useUltraLOD || frozenCount > 15 || qualityLevel < 0.6 || (fps < 50 && typeof state !== 'undefined' && state.gameState === 'playing');
+
+  // OPTIMIZATION: Skip complex sphere drawing at ultra low quality
+  if (useUltraLOD) {
+    // Simple circle only
+    ctx.save();
+    ctx.globalAlpha = 0.6 * alpha;
+    ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+    return;
+  }
+
   const p = Math.min(1, Math.max(0, deployProgress));
   const R = radius;
-  const hexAngle = Math.PI / 3;
 
   // ── LOD: Use simplified rendering when many projectiles frozen ────────
-  const useLOD = frozenCount > 15;
   const lodCellSize = useLOD ? Math.max(30, R * 0.22) : Math.max(20, R * 0.14);
 
-  // ── Pre-compute static values ────────────────────────────────────────────
-  const cosAngles = [Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + hexAngle), Math.cos(Math.PI / 6 + hexAngle * 2),
-  Math.cos(Math.PI / 6 + hexAngle * 3), Math.cos(Math.PI / 6 + hexAngle * 4), Math.cos(Math.PI / 6 + hexAngle * 5)];
-  const sinAngles = [Math.sin(Math.PI / 6), Math.sin(Math.PI / 6 + hexAngle), Math.sin(Math.PI / 6 + hexAngle * 2),
-  Math.sin(Math.PI / 6 + hexAngle * 3), Math.sin(Math.PI / 6 + hexAngle * 4), Math.sin(Math.PI / 6 + hexAngle * 5)];
+  // ── Use module-level cached hex trig ──────────────────────────────────────
+  const cosAngles = _DRAW_HEX_COS;
+  const sinAngles = _DRAW_HEX_SIN;
 
   // ── Outer fresnel glow (ambient aura beyond the sphere) ──────────────────
   ctx.save();
@@ -383,7 +415,13 @@ export function drawCronosSphereVisual({
 
   // ── EDGE GLOW — integrated luminous ring at the sphere boundary ───────────
   // Uses screen blend + animated shimmer + gradient stroke to feel like part of the sphere
-  const shimmer = 0.82 + 0.18 * Math.sin(now / 280); // pulsing 0.82–1.0
+  // OPTIMIZATION: Quantize shimmer to every ~3 frames (avoids per-frame Math.sin)
+  _shimmerFrame++;
+  if (_shimmerFrame >= 3) {
+    _shimmerFrame = 0;
+    _shimmerValue = 0.82 + 0.18 * Math.sin(now / 280);
+  }
+  const shimmer = _shimmerValue;
 
 
 
@@ -416,28 +454,27 @@ export function drawCronosPreActivateBarrier({
   preProgress = 1,   // 0 = just started warning, 1 = about to activate
   now = Date.now(),
 }) {
+  // OPTIMIZATION: LOD gate — skip barrier entirely at low FPS/quality
+  const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const fps = (typeof state !== 'undefined' && state.fps) || 60;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
+  if (fps < 40 || qualityLevel < 0.4) return;
+  const useLOD = isMulti || qualityLevel < 0.6 || fps < 50;
+
   const p = Math.min(1, Math.max(0, preProgress));
   const R = radius;
-  const hexAngle = Math.PI / 3;
 
-  // Pre-compute hex angles
-  const cosAngles = [
-    Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + hexAngle), Math.cos(Math.PI / 6 + hexAngle * 2),
-    Math.cos(Math.PI / 6 + hexAngle * 3), Math.cos(Math.PI / 6 + hexAngle * 4), Math.cos(Math.PI / 6 + hexAngle * 5)
-  ];
-  const sinAngles = [
-    Math.sin(Math.PI / 6), Math.sin(Math.PI / 6 + hexAngle), Math.sin(Math.PI / 6 + hexAngle * 2),
-    Math.sin(Math.PI / 6 + hexAngle * 3), Math.sin(Math.PI / 6 + hexAngle * 4), Math.sin(Math.PI / 6 + hexAngle * 5)
-  ];
+  // Use module-level cached hex trig
+  const cosAngles = _DRAW_HEX_COS;
+  const sinAngles = _DRAW_HEX_SIN;
 
-  // ── Outer glow (fresnel-like) ───────────────────────────────────────────
+  // ── Outer glow (fresnel-like) — reduced from 4 to 3 gradient stops ───────
   ctx.save();
   const pulseIntensity = 0.5 + 0.5 * Math.sin(now / 180);
   const glowAlpha = (0.3 + 0.3 * p) * pulseIntensity;
   const glow = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.4);
   glow.addColorStop(0, `rgba(170,255,255,${glowAlpha * 0.6})`);
-  glow.addColorStop(0.4, `rgba(0,243,255,${glowAlpha * 0.4})`);
-  glow.addColorStop(0.7, `rgba(0,100,200,${glowAlpha * 0.2})`);
+  glow.addColorStop(0.5, `rgba(0,180,255,${glowAlpha * 0.3})`);
   glow.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.fillStyle = glow;
   ctx.beginPath();
@@ -478,25 +515,27 @@ export function drawCronosPreActivateBarrier({
   ctx.stroke();
   ctx.restore();
 
-  // ── Rotating energy arcs ────────────────────────────────────────────────
-  const rot = now / 400;
-  const arcW = Math.PI / 4;
-  ctx.save();
-  ctx.globalAlpha = (0.5 + 0.3 * p) * pulseIntensity;
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 1.05, rot, rot + arcW);
-  ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  // OPTIMIZATION: Skip rotating energy arcs at low quality
+  if (!useLOD) {
+    // ── Rotating energy arcs ────────────────────────────────────────────────
+    const rot = now / 400;
+    const arcW = Math.PI / 4;
+    ctx.save();
+    ctx.globalAlpha = (0.5 + 0.3 * p) * pulseIntensity;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.05, rot, rot + arcW);
+    ctx.strokeStyle = `rgba(255, 255, 255, 0.5)`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
 
-  const rot2 = -now / 650;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 1.1, rot2, rot2 + arcW * 0.5);
-  ctx.strokeStyle = `rgba(0, 200, 255, 0.3)`;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-  ctx.restore();
+    const rot2 = -now / 650;
+    ctx.beginPath();
+    ctx.arc(cx, cy, R * 1.1, rot2, rot2 + arcW * 0.5);
+    ctx.strokeStyle = `rgba(0, 200, 255, 0.3)`;
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // ── Honeycomb grid clipped to shell ──────────────────────────────────────
   // OPTIMIZED: Single-pass rendering with cached distances
@@ -1655,5 +1694,36 @@ export function drawIllusions() {
       illusion.swordSwingDuration,
       animTime
     );
+  }
+}
+
+export function drawAllCronosSpheres(ctx) {
+  // OPTIMIZATION: Skip sphere drawing entirely at very low FPS
+  const fps = (typeof state !== 'undefined' && state.fps) || 60;
+  const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
+  if (fps < 35 || qualityLevel < 0.3) return;
+
+  const now = getNow();
+  for (const fighter of state.fighters) {
+    if (!fighter || !fighter.sphereActive) continue;
+    const elapsed = CONFIG.cronos.sphereDuration - fighter.sphereTimer;
+    const deployProgress = Math.min(1, Math.max(0, elapsed / Math.max(1, CONFIG.cronos.sphereDuration)));
+
+    try {
+      if (typeof drawCronosSphereVisual === 'function') {
+        drawCronosSphereVisual({
+          ctx,
+          cx: fighter.sphereX,
+          cy: fighter.sphereY,
+          radius: CONFIG.cronos.sphereRadius,
+          alpha: 0.9,
+          deployProgress,
+          now,
+        });
+      }
+    } catch (e) {
+      console.error('Error in drawAllCronosSpheres:', e);
+    }
   }
 }

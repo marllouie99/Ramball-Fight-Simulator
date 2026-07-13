@@ -6,17 +6,60 @@ const _cache = new Map();
 const _loopingSounds = new Map();
 const _activeSounds = new Set();
 let _sharedAudioCtx = null;
+let _audioUnlocked = false;
+
+// Lightweight pool for cloning HTML5 Audio objects to stop heap allocation thrashing
+const _audioPool = [];
+const MAX_POOL_SIZE = 30;
+
+// Sound cache management to prevent unbounded memory growth
+const MAX_CACHE_SIZE = 50; // Maximum number of cached sounds
+
+function _pruneSoundCache() {
+  if (_cache.size > MAX_CACHE_SIZE) {
+    // Remove oldest entries (Map maintains insertion order)
+    const entriesToRemove = _cache.size - MAX_CACHE_SIZE;
+    const keysToRemove = Array.from(_cache.keys()).slice(0, entriesToRemove);
+    keysToRemove.forEach(key => _cache.delete(key));
+  }
+}
+
+function isAudioBufferLike(value) {
+  return typeof AudioBuffer !== 'undefined' && value instanceof AudioBuffer;
+}
 
 /** Get or create a shared AudioContext to avoid "too many contexts" errors. */
 function getAudioContext() {
   if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
     _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  // Resume if suspended (browsers require user interaction to start audio)
-  if (_sharedAudioCtx.state === 'suspended') {
+
+  // Only attempt resume after explicit unlock attempt from a user gesture.
+  if (_audioUnlocked && _sharedAudioCtx.state === 'suspended') {
     _sharedAudioCtx.resume().catch(() => {});
   }
   return _sharedAudioCtx;
+}
+
+/**
+ * Unlocks browser audio by resuming AudioContext from a user gesture.
+ * Safe to call repeatedly; no-op once unlocked.
+ * @returns {Promise<boolean>} True when audio is unlocked/running.
+ */
+export async function unlockAudio() {
+  try {
+    const audioCtx = getAudioContext();
+    if (audioCtx.state === 'running') {
+      _audioUnlocked = true;
+      return true;
+    }
+    await audioCtx.resume();
+    _audioUnlocked = audioCtx.state === 'running';
+    return _audioUnlocked;
+  } catch (e) {
+    _audioUnlocked = false;
+    return false;
+  }
 }
 
 /**
@@ -35,12 +78,16 @@ export async function preloadSound(src) {
     const audioCtx = getAudioContext();
     const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
     _cache.set(src, audioBuffer);
+    // Prune cache if it grows too large
+    _pruneSoundCache();
   } catch (e) {
     // Fallback: standard Audio element (may have loading delay)
     const audio = new Audio(src);
     audio.preload = 'auto';
     audio.load();
     _cache.set(src, audio);
+    // Prune cache if it grows too large
+    _pruneSoundCache();
   }
 }
 
@@ -67,9 +114,12 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0) {
   }
   // If cache holds an AudioBuffer, use Web Audio API for zero-latency playback
   const cached = _cache.get(src);
-  if (cached instanceof AudioBuffer) {
+  if (isAudioBufferLike(cached)) {
     try {
       const audioCtx = getAudioContext();
+      if (audioCtx.state !== 'running') {
+        throw new Error('AudioContext not running yet');
+      }
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
@@ -120,6 +170,7 @@ export function fadeOutLoopingSound(key, fadeMs = 300) {
       if (step >= steps) {
         clearInterval(interval);
         try { source.stop(); } catch (e) {}
+        try { gainNode.disconnect(); } catch (e) {}
         _loopingSounds.delete(key);
       }
     }, stepDelay);
@@ -157,6 +208,7 @@ export function stopLoopingSound(key) {
   // Handle Web Audio API objects
   if (soundObj.gainNode && soundObj.buffer) {
     try { soundObj.source.stop(); } catch (e) {}
+    try { soundObj.gainNode.disconnect(); } catch (e) {}
     _loopingSounds.delete(key);
     return;
   }
@@ -177,6 +229,7 @@ export function stopAllLoopingSounds() {
     // Handle Web Audio API objects
     if (soundObj.gainNode && soundObj.buffer) {
       try { soundObj.source.stop(); } catch (e) {}
+      try { soundObj.gainNode.disconnect(); } catch (e) {}
     } else {
       // Handle HTML Audio elements
       const audio = soundObj;
@@ -204,9 +257,12 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
   const cached = _cache.get(src);
 
   // Fast path: AudioBuffer (fully decoded during preload) — zero latency
-  if (cached instanceof AudioBuffer) {
+  if (isAudioBufferLike(cached)) {
     try {
       const audioCtx = getAudioContext();
+      if (audioCtx.state !== 'running') {
+        throw new Error('AudioContext not running yet');
+      }
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
@@ -223,15 +279,32 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
 
   // Slow path: Audio element fallback (may need to load/decode on demand)
   const base = cached ?? new Audio(src);
-  const clone = /** @type {HTMLAudioElement} */ (base.cloneNode());
+  let clone;
+  if (_audioPool.length > 0) {
+    clone = _audioPool.pop();
+    clone.src = base.src;
+  } else {
+    clone = /** @type {HTMLAudioElement} */ (base.cloneNode());
+  }
+
   clone.volume = Math.max(0, Math.min(1, volume));
   clone.playbackRate = Math.max(0.1, speed);
   clone.currentTime = Math.max(0, offset);
+  
+  const cleanup = () => {
+    _activeSounds.delete(clone);
+    clone.src = '';
+    try { clone.load(); } catch(e) {}
+    if (_audioPool.length < MAX_POOL_SIZE) {
+      _audioPool.push(clone);
+    }
+  };
+
   _activeSounds.add(clone);
-  clone.addEventListener('ended', () => _activeSounds.delete(clone), { once: true });
-  clone.addEventListener('pause', () => _activeSounds.delete(clone), { once: true });
+  clone.addEventListener('ended', cleanup, { once: true });
+  clone.addEventListener('pause', cleanup, { once: true });
+  
   clone.play().catch(() => {
-    // Silently ignore autoplay-blocked or missing-file errors in dev
     _activeSounds.delete(clone);
   });
   return clone;
@@ -242,8 +315,12 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
  */
 export function stopAllSounds() {
   _activeSounds.forEach((audio) => {
-    audio.pause();
-    audio.currentTime = 0;
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+      audio.src = '';
+      audio.load();
+    }
   });
   _activeSounds.clear();
 }

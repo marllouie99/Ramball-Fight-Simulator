@@ -1,15 +1,21 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { state, spawnFloatingText } from '../../core/state.js';
+import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee } from '../../graphics/weaponVisuals.js';
 
+/**
+ * DarkSlateGray Fighter (Ninja)
+ * Stealthy ninja with shuriken throwing and dodge mechanics.
+ * 
+ * Basic Attack: Throws shuriken (5 damage, normal fire rate)
+ * Passive Skill: Probability to dodge incoming projectiles
+ * Activate Skill: After 3 successful dodges, becomes invisible with speed boost (5 seconds)
+ * During Invisibility: Deals 2x damage on backstab attacks
+ */
 export class DarkSlateGrayFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -32,7 +38,7 @@ export class DarkSlateGrayFighter extends Fighter {
     this.attackEffectTimer = 0;      // For visual attack feedback
     this.attackEffects = [];         // Array to store active attack effect particles
 
-    // Flame-contact â†’ stealth build
+    // Flame-contact → stealth build
     this._flameContactBuildTimer = 0;
     this._flameContactStealthCooldownTimer = 0;
   }
@@ -168,32 +174,32 @@ export class DarkSlateGrayFighter extends Fighter {
           rotation: this.angle + (i % 2 === 0 ? 0.22 : -0.22),
         });
       }
-      
+
       this.dodgeCount++;
       this.dodgeCooldown = CONFIG.darkslategray.dodgeCooldown;
       this.flashStepTimer = CONFIG.darkslategray.dodgeFlashDuration;
       this.speed = this.baseSpeed * CONFIG.darkslategray.speedBoostMultiplier;
       this.startWeaponSwitch('melee');
-      
-      const stealthSound = getSkillSound('ninja', 'stealthmode');
+
+      const stealthSound = getSkillSound(this._def?.id, 'stealthmode');
       if (stealthSound) playSound(stealthSound.src, stealthSound.volume);
-      
+
       const dodgeText = opts.isMelee ? 'MELEE DODGE!' : 'DODGE!';
       spawnFloatingText(this.x, this.y - this.r - 10, dodgeText, '#88ff88');
-      
+
       // Check if invincibility should activate
       if (this.dodgeCount >= CONFIG.darkslategray.dodgesToActivate) {
         this.activateInvincibility();
       }
-      
+
       return false; // Damage dodged
     }
-    
+
     // During invincibility, still take damage from stray attacks but with visual feedback
     if (this.invincibilityTimer > 0) {
       spawnFloatingText(this.x, this.y - this.r - 10, 'HIT!', '#ff8888');
     }
-    
+
     return super.takeDamage(amount, attacker, opts);
   }
 
@@ -249,54 +255,60 @@ export class DarkSlateGrayFighter extends Fighter {
     this.dodgeCount = 0;
     this.speed = this.baseSpeed * CONFIG.darkslategray.speedBoostMultiplier;
     this.startWeaponSwitch('melee');
-    
-    const shadowSound = getSkillSound('ninja', 'shadowmode');
+
+    const shadowSound = getSkillSound(this._def?.id, 'shadowmode');
     if (shadowSound) playSound(shadowSound.src, shadowSound.volume);
-    
+
     spawnFloatingText(this.x, this.y - this.r - 15, 'SHADOW MODE!', '#8888ff');
   }
 
   checkBackstab(opponent, ownerIndex) {
     if ((this.invincibilityTimer === 0 && this.flashStepTimer === 0) || this.weaponMode !== 'melee' || this.backstabCooldown > 0 || !opponent) return;
-    
+
     // Prevent hitting the same opponent multiple times in quick succession
     if (this.lastBackstabOpponent === opponent) return;
-    
+
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const dist = Math.hypot(dx, dy);
-    
+
     // Check if in range using configurable melee attack radius
     if (dist > CONFIG.darkslategray.meleeAttackRadius) return;
-    
+
     // Check if behind opponent (within backstab angle)
     const angleToOpponent = Math.atan2(dy, dx);
     const opponentFacingAngle = opponent.angle;
     const angleDiff = this.normalizeAngle(angleToOpponent - opponentFacingAngle);
     const backstabThreshold = (CONFIG.darkslategray.backstabAngle * Math.PI / 180) / 2;
-    
+
     // Behind means the angle difference is close to PI (180 degrees)
     const isBehind = Math.abs(Math.abs(angleDiff) - Math.PI) < backstabThreshold;
-    
+
     if (isBehind) {
       const backstabDamage = this.damage * CONFIG.darkslategray.backstabDamageMultiplier;
       opponent.takeDamage(backstabDamage, this, { isMelee: true });
-      
-      const bsSound = getSkillSound('ninja', 'backstab');
+
+      const bsSound = getSkillSound(this._def?.id, 'backstab');
       if (bsSound) playSound(bsSound.src, bsSound.volume);
-      
+
       this.backstabCooldown = CONFIG.darkslategray.backstabCooldown;
       this.meleeSwingCooldown = CONFIG.darkslategray.meleeSwingCooldown; // Prevent melee swing right after backstab
       this.lastBackstabOpponent = opponent; // Track this hit
       this.backstabAnimationTimer = CONFIG.darkslategray.backstabAnimationDuration; // Start backstab animation
       this._spawnAttackEffect(opponent, 'backstab'); // Visual effect
-      
+
       // Recover HP on successful backstab based on config
       const recoveryAmount = this.maxHp * CONFIG.darkslategray.backstabRecoveryPercent;
       this.hp = Math.min(this.maxHp, this.hp + recoveryAmount);
       spawnFloatingText(this.x, this.y - this.r - 10, `+${Math.round(recoveryAmount)}`, '#00ff00');
-      
+
       spawnFloatingText(opponent.x, opponent.y - opponent.r - 10, 'BACKSTAB!', '#ff44ff');
+
+      // Break stealth mode upon attacking
+      if (this.invincibilityTimer > 0) {
+        this.invincibilityTimer = 1;
+      }
+
       return; // Exit after backstab to prevent melee swing from hitting same opponent
     }
   }
@@ -304,17 +316,17 @@ export class DarkSlateGrayFighter extends Fighter {
   checkMeleeSwing(opponent, ownerIndex) {
     // Only swing melee if in melee mode and during stealth
     if ((this.invincibilityTimer === 0 && this.flashStepTimer === 0) || this.weaponMode !== 'melee' || this.meleeSwingCooldown > 0 || !opponent) return;
-    
+
     // Prevent hitting the same opponent multiple times in quick succession
     if (this.lastMeleeOpponent === opponent) return;
-    
+
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const dist = Math.hypot(dx, dy);
-    
+
     // Check if in range using configurable melee attack radius
     if (dist > CONFIG.darkslategray.meleeAttackRadius) return;
-    
+
     // Deal normal damage from any direction (if no backstab was triggered)
     opponent.takeDamage(CONFIG.darkslategray.meleeSwingDamage, this, { isMelee: true });
     this.meleeSwingCooldown = CONFIG.darkslategray.meleeSwingCooldown;
@@ -322,8 +334,13 @@ export class DarkSlateGrayFighter extends Fighter {
     this.lastMeleeOpponent = opponent; // Track this hit
     this.swingAnimationTimer = CONFIG.darkslategray.swingAnimationDuration; // Start swing animation
     this._spawnAttackEffect(opponent, 'slash'); // Visual effect
-    
+
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 10, 'SLASH!', '#ffaa44');
+
+    // Break stealth mode upon attacking
+    if (this.invincibilityTimer > 0) {
+      this.invincibilityTimer = 1;
+    }
   }
 
   update(opponent, ownerIndex, arena) {
@@ -385,7 +402,7 @@ export class DarkSlateGrayFighter extends Fighter {
     // Handle invincibility timer
     if (this.invincibilityTimer > 0) {
       this.invincibilityTimer--;
-      
+
       if (this.invincibilityTimer === 0) {
         // End invincibility
         this.speed = this.baseSpeed;
@@ -414,13 +431,13 @@ export class DarkSlateGrayFighter extends Fighter {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
-      
+
       if (aligned) {
         const shurikenSpeed = CONFIG.darkslategray.shurikenSpeed;
         projectileSystem.fireProjectile(this, ownerIndex, CONFIG.darkslategray.shurikenDamage, false, shurikenSpeed, false, 'shuriken');
         this.shootCooldown = CONFIG.darkslategray.shurikenCooldown;
 
-        const sound = getBasicAttackSound(this._def.id, this._def.type);
+        const sound = getBasicAttackSound(this._def?.id);
         if (sound) playSound(sound.src, sound.volume);
       }
     }
@@ -604,7 +621,7 @@ export class DarkSlateGrayFighter extends Fighter {
     let animationOffsetScale = 1.0;
     let flashIntensity = 0;
     let thrustDirection = null; // For backstab thrust direction
-    
+
     if (this.swingAnimationTimer > 0) {
       // Swing animation: smooth arc with visible movement
       const swingProgress = 1 - this.swingAnimationTimer / CONFIG.darkslategray.swingAnimationDuration;
@@ -693,36 +710,36 @@ export class DarkSlateGrayFighter extends Fighter {
 
     // Draw afterimages from dodge - positioned at the location where dodge occurred
     for (const afterimage of this.afterimages) {
-      const afterimageProgress = afterimage.timer / afterimage.maxTimer; // 1 to 0 as it fades
-      const alpha = CONFIG.darkslategray.flashStepAlpha * afterimageProgress; // Fade out over time
-      
+      const progress = afterimage.timer / afterimage.maxTimer; // 1 to 0 as it fades
+      const alpha = CONFIG.darkslategray.flashStepAlpha * progress; // Fade out over time
+
       // Apply slight distortion to silhouette
       const scaleVariation = afterimage.distortion;
       const radiusWithDistortion = afterimage.radius * scaleVariation;
-      
+
       ctx.save();
-      
-        // Draw semi-transparent glow/halo around the afterimage
+
+      // Draw semi-transparent glow/halo around the afterimage
       ctx.globalAlpha = alpha * 0.25;
       ctx.fillStyle = afterimage.color;
       ctx.beginPath();
       ctx.arc(afterimage.x, afterimage.y, radiusWithDistortion * 1.2, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw main silhouette with lower opacity
       ctx.globalAlpha = alpha * 0.7;
       ctx.fillStyle = afterimage.color;
       ctx.beginPath();
       ctx.arc(afterimage.x, afterimage.y, radiusWithDistortion, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw soft secondary silhouette for subtle distortion
       ctx.globalAlpha = alpha * 0.3;
       ctx.fillStyle = afterimage.color;
       ctx.beginPath();
       ctx.arc(afterimage.x + radiusWithDistortion * 0.18, afterimage.y - radiusWithDistortion * 0.18, radiusWithDistortion * 0.92, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw silhouette outline
       ctx.globalAlpha = alpha * 0.5;
       ctx.strokeStyle = 'rgba(255,255,255,0.5)';
@@ -730,7 +747,7 @@ export class DarkSlateGrayFighter extends Fighter {
       ctx.beginPath();
       ctx.arc(afterimage.x, afterimage.y, radiusWithDistortion, 0, Math.PI * 2);
       ctx.stroke();
-      
+
       ctx.restore();
     }
 
@@ -757,16 +774,16 @@ export class DarkSlateGrayFighter extends Fighter {
 
     // Draw attack effect particles
     for (const effect of this.attackEffects) {
-      const effectProgress = 1 - effect.life / effect.maxLife;
-      const alpha = 1 - effectProgress; // Fade out
-      
+      const progress = 1 - effect.life / effect.maxLife;
+      const alpha = 1 - progress; // Fade out
+
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = effect.color;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Add glow effect for slash particles
       if (effect.glow) {
         ctx.globalAlpha = alpha * 0.35;
@@ -780,15 +797,10 @@ export class DarkSlateGrayFighter extends Fighter {
         ctx.arc(effect.x, effect.y, effect.size * 3.6, 0, Math.PI * 2);
         ctx.fill();
       }
-      
+
       ctx.restore();
     }
 
     // End dodge draw path; avoid drawing the fighter again opaquely.
   }
 }
-
-/**
- * Orange Fighter
- * Automatically locks onto the opponent and draws a V-shaped aim indicator.
- */

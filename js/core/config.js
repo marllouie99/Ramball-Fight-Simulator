@@ -252,6 +252,7 @@ export const CONFIG = {
     meleeSwingDuration: 10,   // frames for visible swing animation
     sphereMeleeDamage: 15,    // separate melee damage when inside own sphere
     sphereMeleeCooldown: 6,   // separate melee cooldown when inside own sphere
+    doubleStrikeWindow: 10,    // frames window to execute the second strike
     // TUNING: Bounce mechanics inside sphere
     sphereBounceForce: 0.5,   // velocity multiplier when bouncing inside sphere
     spherePreActivateFrames: 120, // frames before cooldown ends that the barrier starts glowing

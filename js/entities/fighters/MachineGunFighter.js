@@ -193,14 +193,27 @@ export class MachineGunFighter extends Fighter {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
-      
+
       if (aligned && this.shootCooldown === 0 && !this.isOverheated) {
         const speed = CONFIG.machinegun.bulletSpeed;
         const spawnX = this.x + Math.cos(this.gunAngle) * (this.r + 28);
         const spawnY = this.y + Math.sin(this.gunAngle) * (this.r + 28);
 
         projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, null, spawnX, spawnY);
-        this.shootCooldown = CONFIG.machinegun.shotCooldown;
+
+        // OPTIMIZATION: Dynamic fire rate based on game mode and fighter count
+        const fighterCount = state.fighters.filter(f => f && f.hp > 0).length;
+        const illusionCount = state.illusions.filter(i => i && i.hp > 0).length;
+        const totalEntities = fighterCount + illusionCount;
+
+        let dynamicCooldown = CONFIG.machinegun.shotCooldown;
+        if (totalEntities >= 6) {
+          dynamicCooldown = Math.max(6, CONFIG.machinegun.shotCooldown * 1.5); // Slower in FFA with many entities
+        } else if (totalEntities >= 4) {
+          dynamicCooldown = Math.max(5, CONFIG.machinegun.shotCooldown * 1.25); // Slower in 2v2
+        }
+
+        this.shootCooldown = dynamicCooldown;
         
         // Add heat and check for overheat
         this.heat += CONFIG.machinegun.heatPerShot;

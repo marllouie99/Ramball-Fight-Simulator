@@ -66,6 +66,9 @@ export const state = {
   // Illusion death effects (ethereal dissolving)
   illusionDeathEffects: [],
 
+  // Doppelganger death effects
+  doppelgangerDeathEffects: [],
+
   // Illusion spawn effects
   illusionSpawnEffects: [],
 
@@ -94,6 +97,13 @@ export const state = {
   fpsLastTime: 0,
   fpsLogs: [],
   allFpsLogs: [],
+
+  // Dynamic quality system for performance
+  qualityLevel: 1.0, // 1.0 = full quality, 0.5 = half quality, etc.
+  qualityCheckTimer: 0,
+  qualityCheckInterval: 15, // OPTIMIZED: Check every 15 frames (0.25 seconds) for immediate response
+  targetFps: 45, // OPTIMIZED: Lower threshold to 45 for more aggressive quality reduction
+  maxTotalParticles: 150, // OPTIMIZED: Hard cap on total particles across all systems
 
   // Match kill tracking for leaderboard
   matchKills: [[], [], [], []],
@@ -245,7 +255,7 @@ if (typeof window !== 'undefined') {
 // FLOATING TEXT LABELS
 // ─────────────────────────────────────────────
 
-const MAX_FLOATING_TEXTS = 50; // Cap to prevent performance issues
+const MAX_FLOATING_TEXTS = 10; // Aggressively lowered to avoid layouts inside recording hook
 const MINIMAL_FLOATING_TEXT = true; // Only show damage/heal numbers and key skill labels
 const SKILL_TEXT_WHITELIST = [
   'BLACK HOLE!',
@@ -287,17 +297,38 @@ function isAllowedFloatingText(text) {
 const FLOATING_TEXT_SPAM_COOLDOWN = 180; // ms window to filter identical messages in close proximity
 const spamPreventionCache = new Map();
 
+// CRC32-like fast hashing helper to avoid string garbage generation in loops
+function fastHash(text, x, y) {
+  let hash = 0;
+  for (let i = 0; i < text.length; i++) {
+    hash = (hash << 5) - hash + text.charCodeAt(i);
+  }
+  return hash ^ (x & 0xFFFF) ^ ((y & 0xFFFF) << 16);
+}
+
 export function spawnFloatingText(x, y, text, color = '#ffffff') {
   if (MINIMAL_FLOATING_TEXT && !isAllowedFloatingText(text)) return;
 
+  // Cap the global performance log to prevent infinite string allocation leaks
+  if (state.allFpsLogs.length > 100) {
+    state.allFpsLogs.shift();
+  }
+
   // Filter duplicates to prevent FPS drops under dense damage ticks or status applications
   const now = Date.now();
-  const cacheKey = `${text}_${Math.round(x / 40)}_${Math.round(y / 40)}`;
-  const lastSpawnedTime = spamPreventionCache.get(cacheKey);
+  const hashKey = fastHash(text, Math.round(x / 40), Math.round(y / 40));
+  const lastSpawnedTime = spamPreventionCache.get(hashKey);
   if (lastSpawnedTime && (now - lastSpawnedTime) < FLOATING_TEXT_SPAM_COOLDOWN) {
     return;
   }
-  spamPreventionCache.set(cacheKey, now);
+  spamPreventionCache.set(hashKey, now);
+
+  // Periodic garbage collection sweep of the static cache map
+  if (spamPreventionCache.size > 200) {
+    for (const [key, val] of spamPreventionCache.entries()) {
+      if (now - val > 2000) spamPreventionCache.delete(key);
+    }
+  }
 
   // Remove oldest texts if we're at the cap
   if (state.floatingTexts.length >= MAX_FLOATING_TEXTS) {

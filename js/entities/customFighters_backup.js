@@ -58,7 +58,7 @@ class NormalFighter extends Fighter {
   constructor(def) {
     super(def);
     this.lastAimAligned = false;
-    
+
     // Sharpshooter (was Crimson Sniper) Magazine system
     this.isSniper = (this._def?.id === 1);
     if (this.isSniper) {
@@ -133,10 +133,10 @@ class NormalFighter extends Fighter {
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
       const canShoot = (!this.isSniper || !this.isReloading);
-      
+
       if (aligned && !this.lastAimAligned && this.shootCooldown === 0 && canShoot) {
         const redSpeed = CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1);
-        
+
         // Calculate exact tip position for Crimson Sniper's elongated rifle
         let customSpawnX, customSpawnY;
         let visualType = undefined;
@@ -152,7 +152,7 @@ class NormalFighter extends Fighter {
             this.magazineBullets--; // Consume ammo
           }
         }
-        
+
         projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, redSpeed, false, visualType, customSpawnX, customSpawnY);
         this.shootCooldown = CONFIG.normal.shotCooldown;
 
@@ -177,7 +177,7 @@ class NormalFighter extends Fighter {
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
     }
-    
+
     // Decay visual recoil
     if (this.gunRecoil > 0) {
       this.gunRecoil = Math.max(0, this.gunRecoil - 0.08); // decays over ~12 frames
@@ -213,11 +213,11 @@ class NormalFighter extends Fighter {
   /** Custom sniper-style gun for Red. */
   drawGun(ctx) {
     drawRedSniperGun(
-      ctx, 
-      this.x, 
-      this.y, 
-      this.gunAngle, 
-      this.r, 
+      ctx,
+      this.x,
+      this.y,
+      this.gunAngle,
+      this.r,
       this.gunRecoil || 0,
       this.magazineBullets,
       this.maxMagazine,
@@ -237,10 +237,10 @@ class NormalFighter extends Fighter {
   drawMagazineBar(ctx) {
     const bullets = this.magazineBullets;
     const max = this.maxMagazine;
-    
+
     // Position underneath the body
     const startY = this.y + this.r + 15;
-    
+
     // Calculate total width to center the charges
     const chargeSpacing = 14;
     const totalWidth = (max - 1) * chargeSpacing;
@@ -261,30 +261,30 @@ class NormalFighter extends Fighter {
       ctx.strokeStyle = '#444';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.moveTo(cx - w, cy - h/2 + 1);
-      ctx.lineTo(cx - w + 1, cy - h/2);
-      ctx.lineTo(cx + w - 1, cy - h/2);
-      ctx.lineTo(cx + w, cy - h/2 + 1);
-      ctx.lineTo(cx + w, cy + h/2 - 1);
-      ctx.lineTo(cx + w - 1, cy + h/2);
-      ctx.lineTo(cx - w + 1, cy + h/2);
-      ctx.lineTo(cx - w, cy + h/2 - 1);
+      ctx.moveTo(cx - w, cy - h / 2 + 1);
+      ctx.lineTo(cx - w + 1, cy - h / 2);
+      ctx.lineTo(cx + w - 1, cy - h / 2);
+      ctx.lineTo(cx + w, cy - h / 2 + 1);
+      ctx.lineTo(cx + w, cy + h / 2 - 1);
+      ctx.lineTo(cx + w - 1, cy + h / 2);
+      ctx.lineTo(cx - w + 1, cy + h / 2);
+      ctx.lineTo(cx - w, cy + h / 2 - 1);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
       // Top Contact Node (Metallic)
       ctx.fillStyle = '#8899aa';
-      ctx.fillRect(cx - 2, cy - h/2 - 2, 4, 2);
-      
+      ctx.fillRect(cx - 2, cy - h / 2 - 2, 4, 2);
+
       // Bottom Base Cap
       ctx.fillStyle = '#555';
-      ctx.fillRect(cx - 3, cy + h/2, 6, 2);
+      ctx.fillRect(cx - 3, cy + h / 2, 6, 2);
 
       // Tech Details (Dark panel lines on casing)
       ctx.fillStyle = '#000';
-      ctx.fillRect(cx - w + 1, cy - h/2 + 2, w * 2 - 2, 1);
-      ctx.fillRect(cx - w + 1, cy + h/2 - 3, w * 2 - 2, 1);
+      ctx.fillRect(cx - w + 1, cy - h / 2 + 2, w * 2 - 2, 1);
+      ctx.fillRect(cx - w + 1, cy + h / 2 - 3, w * 2 - 2, 1);
 
       const maxH = h - 8;
       const currentH = maxH * cellProgress;
@@ -293,37 +293,33 @@ class NormalFighter extends Fighter {
       // Draw Empty Part (top)
       if (emptyH > 0) {
         ctx.fillStyle = '#220505';
-        ctx.fillRect(cx - w + 1.5, cy - h/2 + 4, w * 2 - 3, emptyH);
+        ctx.fillRect(cx - w + 1.5, cy - h / 2 + 4, w * 2 - 3, emptyH);
         ctx.fillStyle = '#110000';
-        ctx.fillRect(cx - 0.5, cy - h/2 + 4.5, 1, Math.max(0, emptyH - 0.5));
+        ctx.fillRect(cx - 0.5, cy - h / 2 + 4.5, 1, Math.max(0, emptyH - 0.5));
       }
 
       // Draw Active Filled Part (bottom)
       if (currentH > 0) {
-        ctx.globalCompositeOperation = 'lighter';
-        
+
         const yOffset = emptyH;
 
         // Energy Core Glass / Glow
-        ctx.fillStyle = '#ff1111';
-        ctx.shadowBlur = 6 * cellProgress;
-        ctx.shadowColor = '#ff0000';
-        ctx.fillRect(cx - w + 1.5, cy - h/2 + 4 + yOffset, w * 2 - 3, currentH);
+        ctx.fillStyle = 'rgba(255, 17, 17, 0.4)';
+        ctx.fillRect(cx - w + 0.5, cy - h / 2 + 3.5 + yOffset, w * 2 - 1, currentH + 1);
+        ctx.fillStyle = '#ff2222';
+        ctx.fillRect(cx - w + 1.5, cy - h / 2 + 4 + yOffset, w * 2 - 3, currentH);
 
         // Inner white hot filament (vertical line)
         ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 0;
-        ctx.fillRect(cx - 0.5, cy - h/2 + 4.5 + yOffset, 1, Math.max(0, currentH - 0.5));
+        ctx.fillRect(cx - 0.5, cy - h / 2 + 4.5 + yOffset, 1, Math.max(0, currentH - 0.5));
 
         // Horizontal energy ribs over the filament
         ctx.fillStyle = '#ffffff';
         ctx.globalAlpha = 0.8 * alpha;
-        for(let rY = cy + h/2 - 4 - 0.5; rY >= cy - h/2 + 4 + yOffset + 0.5; rY -= 2) {
-           ctx.fillRect(cx - 1.5, rY - 0.5, 3, 0.5);
+        for (let rY = cy + h / 2 - 4 - 0.5; rY >= cy - h / 2 + 4 + yOffset + 0.5; rY -= 2) {
+          ctx.fillRect(cx - 1.5, rY - 0.5, 3, 0.5);
         }
         ctx.globalAlpha = alpha;
-        
-        ctx.globalCompositeOperation = 'source-over';
       }
       ctx.restore();
     };
@@ -333,24 +329,24 @@ class NormalFighter extends Fighter {
       const fallProgress = progress / 0.25;
       const fallOffset = fallProgress * 50; // drop down 50px
       const fallAlpha = 1 - fallProgress;
-      
+
       const dropStartY = (this.reloadDropY || this.y) + this.r + 15;
       const dropStartX = (this.reloadDropX || this.x) - totalWidth / 2;
 
       for (let i = 0; i < max; i++) {
         const cx = dropStartX + i * chargeSpacing;
-        
+
         // Add scatter and rotation to make it look like physical debris
         const direction = (i % 2 === 0 ? -1 : 1);
         const scatterX = direction * (i * 3 + 4) * fallProgress;
         const angle = direction * fallProgress * (Math.PI * 1.5); // Spin as they fall
-        
+
         ctx.save();
         ctx.translate(cx + scatterX, dropStartY + fallOffset);
         ctx.rotate(angle);
-        
+
         // Draw with 10% residual glow (cellProgress = 0.1) so they stand out against the dark ground
-        drawBattery(0, 0, 0.1, fallAlpha); 
+        drawBattery(0, 0, 0.1, fallAlpha);
         ctx.restore();
       }
     }
@@ -358,18 +354,18 @@ class NormalFighter extends Fighter {
     // Draw the active/new batteries
     for (let i = 0; i < max; i++) {
       const cx = startX + i * chargeSpacing;
-      
+
       if (this.isReloading) {
-         let cellProgress = Math.max(0, Math.min(1, fillAmount - i));
-         if (cellProgress > 0) {
-           // As it starts filling, it drops down from above (slide in)
-           const slideProgress = Math.min(1, cellProgress / 0.5); // animate entry fast
-           const slideOffset = (1 - slideProgress) * -10; // drops from 10px above
-           drawBattery(cx, startY + slideOffset, cellProgress, slideProgress);
-         }
+        let cellProgress = Math.max(0, Math.min(1, fillAmount - i));
+        if (cellProgress > 0) {
+          // As it starts filling, it drops down from above (slide in)
+          const slideProgress = Math.min(1, cellProgress / 0.5); // animate entry fast
+          const slideOffset = (1 - slideProgress) * -10; // drops from 10px above
+          drawBattery(cx, startY + slideOffset, cellProgress, slideProgress);
+        }
       } else {
-         const cellProgress = (i < bullets) ? 1 : 0;
-         drawBattery(cx, startY, cellProgress, 1);
+        const cellProgress = (i < bullets) ? 1 : 0;
+        drawBattery(cx, startY, cellProgress, 1);
       }
     }
 
@@ -403,11 +399,11 @@ class AimbotFighter extends Fighter {
     // Blue fires an immediate follow-up shot only on original projectiles.
     if (!projectile.isFollowUp && projectileSystem) {
       spawnFloatingText(target.x, target.y - target.r - 5, 'DOUBLE SHOT!', '#00eaff');
-      
+
       const customTipDist = this.r + CONFIG.gun.baseOffset + 24;
       const customSpawnX = this.x + Math.cos(this.gunAngle) * customTipDist;
       const customSpawnY = this.y + Math.sin(this.gunAngle) * customTipDist;
-      
+
       projectileSystem.fireProjectile(this, ownerIndex, this.damage, true, undefined, false, undefined, customSpawnX, customSpawnY);
       this.shootCooldown = Math.max(CONFIG.aimbot.followUpMinCooldown, Math.floor(this.shootCooldownMax / 2));
 
@@ -578,32 +574,32 @@ class MeleeFighter extends Fighter {
 
   resolveWallBounce(arena, opponent) {
     super.resolveWallBounce(arena);
-    
+
     // Check if we hit a wall (super.resolveWallBounce clamps position to exact bounds)
     const epsilon = 0.01;
     const bounced = (Math.abs(this.x - this.r - arena.x) < epsilon) ||
-                    (Math.abs(this.x + this.r - (arena.x + arena.width)) < epsilon) ||
-                    (Math.abs(this.y - this.r - arena.y) < epsilon) ||
-                    (Math.abs(this.y + this.r - (arena.y + arena.height)) < epsilon);
+      (Math.abs(this.x + this.r - (arena.x + arena.width)) < epsilon) ||
+      (Math.abs(this.y - this.r - arena.y) < epsilon) ||
+      (Math.abs(this.y + this.r - (arena.y + arena.height)) < epsilon);
 
     if (bounced) {
       const lockChance = CONFIG.melee.rebounceLockChance ?? 0;
       if (Math.random() < lockChance) {
         let target = opponent;
-        
+
         // Find nearest valid target if opponent not provided or dead
         if (!target || target.hp <= 0) {
           let bestDist = Infinity;
           const myIndex = state.fighters.indexOf(this);
           const myTeam = state.getFighterTeam(myIndex);
-          
+
           for (let i = 0; i < state.fighters.length; i++) {
             const f = state.fighters[i];
             if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-            
+
             // Skip teammates in 2v2
             if (state.mode === '2v2' && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
-            
+
             const dist = Math.hypot(f.x - this.x, f.y - this.y);
             if (dist < bestDist) {
               bestDist = dist;
@@ -611,7 +607,7 @@ class MeleeFighter extends Fighter {
             }
           }
         }
-        
+
         if (target) {
           const dx = target.x - this.x;
           const dy = target.y - this.y;
@@ -777,8 +773,8 @@ class GrenadierFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    const throwProgress = this.throwAnimationTimer > 0 
-      ? Math.sin((this.throwAnimationTimer / 15) * Math.PI) 
+    const throwProgress = this.throwAnimationTimer > 0
+      ? Math.sin((this.throwAnimationTimer / 15) * Math.PI)
       : 0;
     drawGreenBottleGun(ctx, this.x, this.y, this.gunAngle, this.r, throwProgress);
   }
@@ -805,7 +801,7 @@ class LaserFighter extends Fighter {
     super(def);
     this.lastAimAligned = false;
     this.beamTimer = 0;
-    this.beamDuration     = CONFIG.laser.beamDuration;
+    this.beamDuration = CONFIG.laser.beamDuration;
     this.beamSlowDuration = CONFIG.laser.slowDuration;
     this.beamSlowMultiplier = CONFIG.laser.slowMultiplier;
     this.beamHitState = new Map();
@@ -1079,7 +1075,7 @@ class LaserFighter extends Fighter {
 
       // Outer wide glow (cyan)
       ctx.shadowBlur = 0; // Disabled for performance
-      
+
       // Widest, faintest glow layer
       ctx.beginPath();
       ctx.moveTo(startX, startY);
@@ -1120,22 +1116,22 @@ class LaserFighter extends Fighter {
       const numNodes = 4;
       const speed = 0.6;
       ctx.shadowBlur = 0; // Ensure shadow blur is off for performance
-      
+
       for (let i = 0; i < numNodes; i++) {
         // Calculate offset (0 to 1) that wraps around
         let offset = ((time * speed) + (i / numNodes)) % 1.0;
         let nx = startX + Math.cos(angle) * (beamLen * offset);
         let ny = startY + Math.sin(angle) * (beamLen * offset);
-        
+
         // Node width pulses and is larger near the middle of the beam
         let nodeRadius = 1.5 + Math.sin(offset * Math.PI) * 3;
-        
+
         // Outer glow layer
         ctx.fillStyle = 'rgba(0, 255, 255, 0.4)';
         ctx.beginPath();
         ctx.arc(nx, ny, nodeRadius * 2, 0, Math.PI * 2);
         ctx.fill();
-        
+
         // Inner core
         ctx.fillStyle = '#ffffff';
         ctx.beginPath();
@@ -1183,53 +1179,53 @@ class LaserFighter extends Fighter {
 class KnightFighter extends Fighter {
   constructor(def) {
     super(def);
-    this.swipeCooldown   = 0;
-    this.swipeActive     = false;
-    this.swipeTimer      = 0;
-    this.swipeAngle      = 0;
-    this.swordBroken     = false;
-    this.swordHealth     = CONFIG.knight.swordDurability;
-    this.shieldBroken    = false;
-    this.shieldHealth    = CONFIG.knight.shieldDurability;
-    this.canThrowSword   = false; // becomes true when shield breaks
-    this.swordThrown     = false; // tracks whether the sword was thrown after shield break
+    this.swipeCooldown = 0;
+    this.swipeActive = false;
+    this.swipeTimer = 0;
+    this.swipeAngle = 0;
+    this.swordBroken = false;
+    this.swordHealth = CONFIG.knight.swordDurability;
+    this.shieldBroken = false;
+    this.shieldHealth = CONFIG.knight.shieldDurability;
+    this.canThrowSword = false; // becomes true when shield breaks
+    this.swordThrown = false; // tracks whether the sword was thrown after shield break
     this.swordReturnTimer = 0;
     this.blockFlashTimer = 0;
     // dashState: 'none' | 'charging' | 'dashing'
-    this.dashState       = 'none';
+    this.dashState = 'none';
     this.dashChargeTimer = 0;
-    this.dashTimer       = 0;
-    this.dashVx          = 0;
-    this.dashVy          = 0;
-    this.hasHitWithDash  = false;
-    this.dashTargetX     = null; // fixed target locked when sword breaks
-    this.dashTargetY     = null;
+    this.dashTimer = 0;
+    this.dashVx = 0;
+    this.dashVy = 0;
+    this.hasHitWithDash = false;
+    this.dashTargetX = null; // fixed target locked when sword breaks
+    this.dashTargetY = null;
     this.shieldVisualOffset = -Math.PI / 2;
   }
 
   reset() {
     super.reset();
-    this.swipeCooldown   = 0;
-    this.swipeActive     = false;
-    this.swipeTimer      = 0;
-    this.swordBroken     = false;
-    this.swordHealth     = CONFIG.knight.swordDurability;
-    this.shieldBroken    = false;
-    this.shieldHealth    = CONFIG.knight.shieldDurability;
-    this.canThrowSword   = false;
-    this.swordThrown     = false;
+    this.swipeCooldown = 0;
+    this.swipeActive = false;
+    this.swipeTimer = 0;
+    this.swordBroken = false;
+    this.swordHealth = CONFIG.knight.swordDurability;
+    this.shieldBroken = false;
+    this.shieldHealth = CONFIG.knight.shieldDurability;
+    this.canThrowSword = false;
+    this.swordThrown = false;
     this.swordReturnTimer = 0;
     this.blockFlashTimer = 0;
-    this.dashState       = 'none';
+    this.dashState = 'none';
     this.dashChargeTimer = 0;
-    this.dashTimer       = 0;
-    this.dashVx          = 0;
-    this.dashVy          = 0;
-    this.hasHitWithDash  = false;
-    this.dashTargetX     = null;
-    this.dashTargetY     = null;
-    this.slashFadeTimer  = 0;
-    this.dashGlowFade    = 0;
+    this.dashTimer = 0;
+    this.dashVx = 0;
+    this.dashVy = 0;
+    this.hasHitWithDash = false;
+    this.dashTargetX = null;
+    this.dashTargetY = null;
+    this.slashFadeTimer = 0;
+    this.dashGlowFade = 0;
     this.shieldVisualOffset = -Math.PI / 2;
   }
 
@@ -1281,9 +1277,9 @@ class KnightFighter extends Fighter {
     if (dist > this.r + opponent.r + CONFIG.knight.swordRange) return;
 
     // Hit!
-    this.swipeAngle  = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    this.swipeAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
     this.swipeActive = true;
-    this.swipeTimer  = CONFIG.knight.swipeDuration;
+    this.swipeTimer = CONFIG.knight.swipeDuration;
     this.swipeCooldown = CONFIG.knight.swipeCooldown;
     opponent.takeDamage(CONFIG.knight.swordDamage, this, { isMelee: true });
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#e0e0e0');
@@ -1300,9 +1296,9 @@ class KnightFighter extends Fighter {
   }
 
   _breakSword(opponent) {
-    this.swordBroken     = true;
-    this.vx              = 0;
-    this.vy              = 0;
+    this.swordBroken = true;
+    this.vx = 0;
+    this.vy = 0;
     // Lock dash target at moment of sword break so opponent can dodge
     if (opponent) {
       this.dashTargetX = opponent.x;
@@ -1313,9 +1309,9 @@ class KnightFighter extends Fighter {
       this.dashTargetX = this.x + Math.cos(this.gunAngle) * lockDist;
       this.dashTargetY = this.y + Math.sin(this.gunAngle) * lockDist;
     }
-    this.dashState       = 'charging';
+    this.dashState = 'charging';
     this.dashChargeTimer = CONFIG.knight.dashChargeFrames;
-    this.hasHitWithDash  = false;
+    this.hasHitWithDash = false;
     spawnFloatingText(this.x, this.y - this.r - 14, 'SWORD BREAK!', '#ff9933');
     // apply a one-time knockback pulse to nearby enemies when charging begins
     try {
@@ -1337,8 +1333,8 @@ class KnightFighter extends Fighter {
       this.dashVx = (dx / dist) * CONFIG.knight.dashSpeed;
       this.dashVy = (dy / dist) * CONFIG.knight.dashSpeed;
     } else if (opponent) {
-      const dx   = opponent.x - this.x;
-      const dy   = opponent.y - this.y;
+      const dx = opponent.x - this.x;
+      const dy = opponent.y - this.y;
       const dist = Math.hypot(dx, dy) || 1;
       this.dashVx = (dx / dist) * CONFIG.knight.dashSpeed;
       this.dashVy = (dy / dist) * CONFIG.knight.dashSpeed;
@@ -1372,14 +1368,14 @@ class KnightFighter extends Fighter {
   }
 
   _endDash() {
-    this.dashState   = 'none';
+    this.dashState = 'none';
     // restore weapons after dash finishes
     this.restoreWeapons();
     // Continue floating naturally in the last dash direction.
     this.vx = this.dashVx;
     this.vy = this.dashVy;
-    this.dashVx      = 0;
-    this.dashVy      = 0;
+    this.dashVx = 0;
+    this.dashVy = 0;
     this.dashTargetX = null;
     this.dashTargetY = null;
   }
@@ -1482,26 +1478,26 @@ class KnightFighter extends Fighter {
 
     // — CHARGING phase: stand still, lock aim, wait —
     if (this.dashState === 'charging') {
-        this.dashChargeTimer--;
-        // aim at locked target (so target location is fixed during charge)
-        if (this.dashTargetX != null && this.dashTargetY != null) {
-          this.aimAt(this.dashTargetX, this.dashTargetY);
-        } else {
-          this.aim(opponent);
-        }
-        
-        // Dampen velocity rapidly so he comes to a halt
-        this.vx *= 0.8;
-        this.vy *= 0.8;
-        
-        // allow knockback to carry the fighter slightly while charging
-        this.x += this.vx;
-        this.y += this.vy;
-        // resolve bounce normally (no homing during charge)
-        this.resolveWallBounce(arena);
-        if (this.dashChargeTimer <= 0) {
-          this._launchDash();
-        }
+      this.dashChargeTimer--;
+      // aim at locked target (so target location is fixed during charge)
+      if (this.dashTargetX != null && this.dashTargetY != null) {
+        this.aimAt(this.dashTargetX, this.dashTargetY);
+      } else {
+        this.aim(opponent);
+      }
+
+      // Dampen velocity rapidly so he comes to a halt
+      this.vx *= 0.8;
+      this.vy *= 0.8;
+
+      // allow knockback to carry the fighter slightly while charging
+      this.x += this.vx;
+      this.y += this.vy;
+      // resolve bounce normally (no homing during charge)
+      this.resolveWallBounce(arena);
+      if (this.dashChargeTimer <= 0) {
+        this._launchDash();
+      }
       return;
     }
 
@@ -1511,7 +1507,7 @@ class KnightFighter extends Fighter {
       this.x += this.dashVx;
       this.y += this.dashVy;
       this.angle += CONFIG.knight.dashSpeed * CONFIG.spin.rate * 3; // spin fast during dash
-      
+
       // We pass opponent for homing bounces!
       this.resolveWallBounce(arena, opponent);
 
@@ -1523,7 +1519,7 @@ class KnightFighter extends Fighter {
           // Knockback
           const dx = opponent.x - this.x;
           const dy = opponent.y - this.y;
-          const d  = Math.hypot(dx, dy) || 1;
+          const d = Math.hypot(dx, dy) || 1;
           opponent.vx += (dx / d) * CONFIG.knight.dashKnockback;
           opponent.vy += (dy / d) * CONFIG.knight.dashKnockback;
           this.hasHitWithDash = true;
@@ -1553,35 +1549,35 @@ class KnightFighter extends Fighter {
     this.y += this.vy;
     this.angle += this.speed * CONFIG.spin.rate;
     this.aim(opponent);
-    
+
     // Projectile detection logic for Holy Knight front guard
     this.isDefendingFront = false;
     if (this.dashState === 'none' && typeof projectileSystem !== 'undefined' && projectileSystem && !this.swordBroken) {
       const detectRadius = this.r + (CONFIG.knight.shieldDetectRadius || 150);
       let closestProj = null;
       let minD = detectRadius;
-      
+
       for (let i = 0; i < projectileSystem.projectiles.length; i++) {
         const p = projectileSystem.projectiles[i];
         if (!p || p.owner === ownerIndex) continue; // skip own projectiles
-        
+
         const dx = p.x - this.x;
         const dy = p.y - this.y;
         const dist = Math.hypot(dx, dy);
-        
+
         if (dist < minD) {
           // Check if projectile is moving towards the knight
           const toKnightX = this.x - p.x;
           const toKnightY = this.y - p.y;
           const dot = (p.vx * toKnightX + p.vy * toKnightY);
-          
+
           if (dot > 0) { // moving towards
             minD = dist;
             closestProj = p;
           }
         }
       }
-      
+
       if (closestProj) {
         this.isDefendingFront = true;
         const targetAngle = Math.atan2(closestProj.y - this.y, closestProj.x - this.x);
@@ -1715,72 +1711,72 @@ class KnightFighter extends Fighter {
     if ((this.swipeActive && this.swipeTimer > 0) || this.slashFadeTimer > 0) {
       let progress = 1.0;
       let fade = this.slashFadeTimer / 15;
-      
+
       if (this.swipeActive) {
         progress = 1 - (this.swipeTimer / CONFIG.knight.swipeDuration);
         fade = 1.0;
       }
-      
+
       const glowAlpha = Math.pow(fade, 0.8);
       const arcRadius = this.r + 22;
-      
+
       const localStartAngle = -Math.PI / 2.8;
       const localEndAngle = Math.PI / 2.8;
       const localCurrentEndAngle = localStartAngle + (localEndAngle - localStartAngle) * progress;
-      
+
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.rotate(this.swipeAngle);
-      
+
       // The Growing Clip Region
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, arcRadius + 20, localStartAngle - 0.1, localCurrentEndAngle);
       ctx.closePath();
       ctx.clip();
-      
+
       // Fading Tail Gradient (Golden for new aesthetic)
       const fullStartY = Math.sin(localStartAngle) * arcRadius;
       const currentY = Math.sin(localCurrentEndAngle) * arcRadius;
-      const gradEndY = Math.max(fullStartY + 0.1, currentY); 
-      
+      const gradEndY = Math.max(fullStartY + 0.1, currentY);
+
       const tailGrad = ctx.createLinearGradient(0, fullStartY, 0, gradEndY);
-      tailGrad.addColorStop(0, 'rgba(255, 200, 0, 0.0)'); 
+      tailGrad.addColorStop(0, 'rgba(255, 200, 0, 0.0)');
       tailGrad.addColorStop(1, 'rgba(255, 240, 100, 1.0)');
-      
+
       ctx.globalCompositeOperation = 'screen';
       ctx.globalAlpha = glowAlpha;
       ctx.shadowColor = 'rgba(255, 200, 50, 0.65)';
       ctx.shadowBlur = 8;
-      
+
       // Main arc
       ctx.beginPath();
       ctx.arc(0, 0, arcRadius, localStartAngle, localEndAngle);
       ctx.strokeStyle = tailGrad;
-      ctx.lineWidth   = 5;
-      ctx.lineCap     = 'round';
+      ctx.lineWidth = 5;
+      ctx.lineCap = 'round';
       ctx.stroke();
-      
+
       // Secondary inner thin arc for extra glow
       ctx.globalAlpha = glowAlpha * 0.45;
       ctx.beginPath();
       ctx.arc(0, 0, arcRadius + 8, localStartAngle, localEndAngle);
       ctx.lineWidth = 2;
       ctx.stroke();
-      
+
       ctx.restore();
     }
 
     // ── Charge ring ──
     if (this.dashState === 'charging') {
       const progress = 1 - this.dashChargeTimer / CONFIG.knight.dashChargeFrames;
-      const rings    = 3;
+      const rings = 3;
       for (let i = 0; i < rings; i++) {
         const phase = (progress + i / rings) % 1;
         ctx.save();
-        ctx.globalAlpha  = (1 - phase) * 0.55;
-        ctx.strokeStyle  = '#88aaff';
-        ctx.lineWidth    = 2.5 - phase * 2;
+        ctx.globalAlpha = (1 - phase) * 0.55;
+        ctx.strokeStyle = '#88aaff';
+        ctx.lineWidth = 2.5 - phase * 2;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.r + 6 + phase * 24, 0, Math.PI * 2);
         ctx.stroke();
@@ -1790,13 +1786,13 @@ class KnightFighter extends Fighter {
       ctx.save();
       ctx.globalAlpha = 0.7 * progress;
       ctx.strokeStyle = '#aaccff';
-      ctx.lineWidth   = 2;
+      ctx.lineWidth = 2;
       const arrowLen = this.r + 38;
       ctx.beginPath();
       ctx.moveTo(this.x + Math.cos(this.gunAngle) * (this.r + 8),
-                 this.y + Math.sin(this.gunAngle) * (this.r + 8));
+        this.y + Math.sin(this.gunAngle) * (this.r + 8));
       ctx.lineTo(this.x + Math.cos(this.gunAngle) * arrowLen,
-                 this.y + Math.sin(this.gunAngle) * arrowLen);
+        this.y + Math.sin(this.gunAngle) * arrowLen);
       ctx.stroke();
       ctx.restore();
     }
@@ -1805,7 +1801,7 @@ class KnightFighter extends Fighter {
     if (this.dashState === 'dashing') {
       ctx.save();
       ctx.globalAlpha = 0.35;
-      ctx.fillStyle   = '#aabbff';
+      ctx.fillStyle = '#aabbff';
       ctx.beginPath();
       ctx.arc(this.x - this.dashVx * 3, this.y - this.dashVy * 3, this.r * 0.9, 0, Math.PI * 2);
       ctx.fill();
@@ -1867,15 +1863,15 @@ class BlackFighter extends Fighter {
     // Handle skill charging state
     if (this.skillCharging) {
       this.skillChargeTimer--;
-      
+
       // Still aim at opponent while charging
       this.aim(opponent);
-      
+
       // Allow knockback and other velocity changes to move the fighter
       this.x += this.vx;
       this.y += this.vy;
       this.resolveWallBounce(arena);
-      
+
       // When charging completes, summon the black hole
       if (this.skillChargeTimer <= 0) {
         this.skillCharging = false;
@@ -1906,7 +1902,7 @@ class BlackFighter extends Fighter {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
-      
+
       if (aligned) {
         const speed = CONFIG.black.projectileSpeed || (CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1));
         let isBlackHole = false;
@@ -1939,14 +1935,14 @@ class BlackFighter extends Fighter {
 
   startSkillCharge(opponent) {
     if (!opponent) return;
-    
+
     this.skillCharging = true;
     this.skillChargeTimer = CONFIG.black.skillChargeDuration;
-    
+
     // Stop movement immediately
     this.vx = 0;
     this.vy = 0;
-    
+
     spawnFloatingText(this.x, this.y - this.r - 15, 'CHARGING...', '#9900ff');
   }
 
@@ -1957,20 +1953,20 @@ class BlackFighter extends Fighter {
     const angleToOpponent = Math.atan2(opponent.y - this.y, opponent.x - this.x);
     const randomOffset = (Math.random() - 0.5) * Math.PI; // Random angle offset
     const spawnAngle = angleToOpponent + randomOffset;
-    
+
     const spawnDist = CONFIG.black.skillSpawnRadius;
     const spawnX = opponent.x + Math.cos(spawnAngle) * spawnDist;
     const spawnY = opponent.y + Math.sin(spawnAngle) * spawnDist;
 
     // Fire a black hole projectile at that position
     projectileSystem.fireBlackHole(spawnX, spawnY, ownerIndex, CONFIG.black.blackHoleDamage);
-    
+
     const bhSound = getSkillSound(this._def?.id, 'blackhole');
     if (bhSound) playSound(bhSound.src, bhSound.volume);
-    
+
     this.skillCooldown = CONFIG.black.skillCooldown;
     spawnFloatingText(spawnX, spawnY, 'BLACK HOLE!', '#9900ff');
-    
+
     // Resume gentle movement after summoning
     const angle = Math.random() * Math.PI * 2;
     this.vx = Math.cos(angle) * this.baseSpeed;
@@ -1994,7 +1990,7 @@ class BlackFighter extends Fighter {
     if (this.skillCharging) {
       const progress = 1 - (this.skillChargeTimer / CONFIG.black.skillChargeDuration);
       const rings = 3;
-      
+
       for (let i = 0; i < rings; i++) {
         const phase = (progress + i / rings) % 1;
         ctx.save();
@@ -2006,7 +2002,7 @@ class BlackFighter extends Fighter {
         ctx.stroke();
         ctx.restore();
       }
-      
+
       // Direction indicator
       ctx.save();
       ctx.globalAlpha = 0.7 * progress;
@@ -2015,9 +2011,9 @@ class BlackFighter extends Fighter {
       const arrowLen = this.r + 35;
       ctx.beginPath();
       ctx.moveTo(this.x + Math.cos(this.gunAngle) * (this.r + 8),
-                 this.y + Math.sin(this.gunAngle) * (this.r + 8));
+        this.y + Math.sin(this.gunAngle) * (this.r + 8));
       ctx.lineTo(this.x + Math.cos(this.gunAngle) * arrowLen,
-                 this.y + Math.sin(this.gunAngle) * arrowLen);
+        this.y + Math.sin(this.gunAngle) * arrowLen);
       ctx.stroke();
       ctx.restore();
     }
@@ -2193,32 +2189,32 @@ class DarkSlateGrayFighter extends Fighter {
           rotation: this.angle + (i % 2 === 0 ? 0.22 : -0.22),
         });
       }
-      
+
       this.dodgeCount++;
       this.dodgeCooldown = CONFIG.darkslategray.dodgeCooldown;
       this.flashStepTimer = CONFIG.darkslategray.dodgeFlashDuration;
       this.speed = this.baseSpeed * CONFIG.darkslategray.speedBoostMultiplier;
       this.startWeaponSwitch('melee');
-      
+
       const stealthSound = getSkillSound(this._def?.id, 'stealthmode');
       if (stealthSound) playSound(stealthSound.src, stealthSound.volume);
-      
+
       const dodgeText = opts.isMelee ? 'MELEE DODGE!' : 'DODGE!';
       spawnFloatingText(this.x, this.y - this.r - 10, dodgeText, '#88ff88');
-      
+
       // Check if invincibility should activate
       if (this.dodgeCount >= CONFIG.darkslategray.dodgesToActivate) {
         this.activateInvincibility();
       }
-      
+
       return false; // Damage dodged
     }
-    
+
     // During invincibility, still take damage from stray attacks but with visual feedback
     if (this.invincibilityTimer > 0) {
       spawnFloatingText(this.x, this.y - this.r - 10, 'HIT!', '#ff8888');
     }
-    
+
     return super.takeDamage(amount, attacker, opts);
   }
 
@@ -2274,58 +2270,58 @@ class DarkSlateGrayFighter extends Fighter {
     this.dodgeCount = 0;
     this.speed = this.baseSpeed * CONFIG.darkslategray.speedBoostMultiplier;
     this.startWeaponSwitch('melee');
-    
+
     const shadowSound = getSkillSound(this._def?.id, 'shadowmode');
     if (shadowSound) playSound(shadowSound.src, shadowSound.volume);
-    
+
     spawnFloatingText(this.x, this.y - this.r - 15, 'SHADOW MODE!', '#8888ff');
   }
 
   checkBackstab(opponent, ownerIndex) {
     if ((this.invincibilityTimer === 0 && this.flashStepTimer === 0) || this.weaponMode !== 'melee' || this.backstabCooldown > 0 || !opponent) return;
-    
+
     // Prevent hitting the same opponent multiple times in quick succession
     if (this.lastBackstabOpponent === opponent) return;
-    
+
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const dist = Math.hypot(dx, dy);
-    
+
     // Check if in range using configurable melee attack radius
     if (dist > CONFIG.darkslategray.meleeAttackRadius) return;
-    
+
     // Check if behind opponent (within backstab angle)
     const angleToOpponent = Math.atan2(dy, dx);
     const opponentFacingAngle = opponent.angle;
     const angleDiff = this.normalizeAngle(angleToOpponent - opponentFacingAngle);
     const backstabThreshold = (CONFIG.darkslategray.backstabAngle * Math.PI / 180) / 2;
-    
+
     // Behind means the angle difference is close to PI (180 degrees)
     const isBehind = Math.abs(Math.abs(angleDiff) - Math.PI) < backstabThreshold;
-    
+
     if (isBehind) {
       const backstabDamage = this.damage * CONFIG.darkslategray.backstabDamageMultiplier;
       opponent.takeDamage(backstabDamage, this, { isMelee: true });
-      
+
       const bsSound = getSkillSound(this._def?.id, 'backstab');
       if (bsSound) playSound(bsSound.src, bsSound.volume);
-      
+
       this.backstabCooldown = CONFIG.darkslategray.backstabCooldown;
       this.meleeSwingCooldown = CONFIG.darkslategray.meleeSwingCooldown; // Prevent melee swing right after backstab
       this.lastBackstabOpponent = opponent; // Track this hit
       this.backstabAnimationTimer = CONFIG.darkslategray.backstabAnimationDuration; // Start backstab animation
       this._spawnAttackEffect(opponent, 'backstab'); // Visual effect
-      
+
       // Recover HP on successful backstab based on config
       const recoveryAmount = this.maxHp * CONFIG.darkslategray.backstabRecoveryPercent;
       this.hp = Math.min(this.maxHp, this.hp + recoveryAmount);
       spawnFloatingText(this.x, this.y - this.r - 10, `+${Math.round(recoveryAmount)}`, '#00ff00');
-      
+
       spawnFloatingText(opponent.x, opponent.y - opponent.r - 10, 'BACKSTAB!', '#ff44ff');
 
       // Break stealth mode upon attacking
       if (this.invincibilityTimer > 0) {
-        this.invincibilityTimer = 1; 
+        this.invincibilityTimer = 1;
       }
 
       return; // Exit after backstab to prevent melee swing from hitting same opponent
@@ -2335,17 +2331,17 @@ class DarkSlateGrayFighter extends Fighter {
   checkMeleeSwing(opponent, ownerIndex) {
     // Only swing melee if in melee mode and during stealth
     if ((this.invincibilityTimer === 0 && this.flashStepTimer === 0) || this.weaponMode !== 'melee' || this.meleeSwingCooldown > 0 || !opponent) return;
-    
+
     // Prevent hitting the same opponent multiple times in quick succession
     if (this.lastMeleeOpponent === opponent) return;
-    
+
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const dist = Math.hypot(dx, dy);
-    
+
     // Check if in range using configurable melee attack radius
     if (dist > CONFIG.darkslategray.meleeAttackRadius) return;
-    
+
     // Deal normal damage from any direction (if no backstab was triggered)
     opponent.takeDamage(CONFIG.darkslategray.meleeSwingDamage, this, { isMelee: true });
     this.meleeSwingCooldown = CONFIG.darkslategray.meleeSwingCooldown;
@@ -2353,12 +2349,12 @@ class DarkSlateGrayFighter extends Fighter {
     this.lastMeleeOpponent = opponent; // Track this hit
     this.swingAnimationTimer = CONFIG.darkslategray.swingAnimationDuration; // Start swing animation
     this._spawnAttackEffect(opponent, 'slash'); // Visual effect
-    
+
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 10, 'SLASH!', '#ffaa44');
 
     // Break stealth mode upon attacking
     if (this.invincibilityTimer > 0) {
-      this.invincibilityTimer = 1; 
+      this.invincibilityTimer = 1;
     }
   }
 
@@ -2421,7 +2417,7 @@ class DarkSlateGrayFighter extends Fighter {
     // Handle invincibility timer
     if (this.invincibilityTimer > 0) {
       this.invincibilityTimer--;
-      
+
       if (this.invincibilityTimer === 0) {
         // End invincibility
         this.speed = this.baseSpeed;
@@ -2450,7 +2446,7 @@ class DarkSlateGrayFighter extends Fighter {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
-      
+
       if (aligned) {
         const shurikenSpeed = CONFIG.darkslategray.shurikenSpeed;
         projectileSystem.fireProjectile(this, ownerIndex, CONFIG.darkslategray.shurikenDamage, false, shurikenSpeed, false, 'shuriken');
@@ -2640,7 +2636,7 @@ class DarkSlateGrayFighter extends Fighter {
     let animationOffsetScale = 1.0;
     let flashIntensity = 0;
     let thrustDirection = null; // For backstab thrust direction
-    
+
     if (this.swingAnimationTimer > 0) {
       // Swing animation: smooth arc with visible movement
       const swingProgress = 1 - this.swingAnimationTimer / CONFIG.darkslategray.swingAnimationDuration;
@@ -2731,34 +2727,34 @@ class DarkSlateGrayFighter extends Fighter {
     for (const afterimage of this.afterimages) {
       const progress = afterimage.timer / afterimage.maxTimer; // 1 to 0 as it fades
       const alpha = CONFIG.darkslategray.flashStepAlpha * progress; // Fade out over time
-      
+
       // Apply slight distortion to silhouette
       const scaleVariation = afterimage.distortion;
       const radiusWithDistortion = afterimage.radius * scaleVariation;
-      
+
       ctx.save();
-      
-        // Draw semi-transparent glow/halo around the afterimage
+
+      // Draw semi-transparent glow/halo around the afterimage
       ctx.globalAlpha = alpha * 0.25;
       ctx.fillStyle = afterimage.color;
       ctx.beginPath();
       ctx.arc(afterimage.x, afterimage.y, radiusWithDistortion * 1.2, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw main silhouette with lower opacity
       ctx.globalAlpha = alpha * 0.7;
       ctx.fillStyle = afterimage.color;
       ctx.beginPath();
       ctx.arc(afterimage.x, afterimage.y, radiusWithDistortion, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw soft secondary silhouette for subtle distortion
       ctx.globalAlpha = alpha * 0.3;
       ctx.fillStyle = afterimage.color;
       ctx.beginPath();
       ctx.arc(afterimage.x + radiusWithDistortion * 0.18, afterimage.y - radiusWithDistortion * 0.18, radiusWithDistortion * 0.92, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Draw silhouette outline
       ctx.globalAlpha = alpha * 0.5;
       ctx.strokeStyle = 'rgba(255,255,255,0.5)';
@@ -2766,7 +2762,7 @@ class DarkSlateGrayFighter extends Fighter {
       ctx.beginPath();
       ctx.arc(afterimage.x, afterimage.y, radiusWithDistortion, 0, Math.PI * 2);
       ctx.stroke();
-      
+
       ctx.restore();
     }
 
@@ -2795,14 +2791,14 @@ class DarkSlateGrayFighter extends Fighter {
     for (const effect of this.attackEffects) {
       const progress = 1 - effect.life / effect.maxLife;
       const alpha = 1 - progress; // Fade out
-      
+
       ctx.save();
       ctx.globalAlpha = alpha;
       ctx.fillStyle = effect.color;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Add glow effect for slash particles
       if (effect.glow) {
         ctx.globalAlpha = alpha * 0.35;
@@ -2816,7 +2812,7 @@ class DarkSlateGrayFighter extends Fighter {
         ctx.arc(effect.x, effect.y, effect.size * 3.6, 0, Math.PI * 2);
         ctx.fill();
       }
-      
+
       ctx.restore();
     }
 
@@ -2990,7 +2986,7 @@ class OrangeFighter extends Fighter {
     if (bounced) {
       const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
 
-    // Decide bounce target:
+      // Decide bounce target:
       // - when about to run out of fuel -> toward nearest fuel
       // - otherwise -> toward nearest fighter
       // Also: if the nearest fighter is DarkSlateGray and currently in stealth,
@@ -3076,7 +3072,7 @@ class OrangeFighter extends Fighter {
         playLoopingSound(this._flameSoundKey, sound.src, sound.volume);
         this._isFlameSoundPlaying = true;
       }
-      
+
       // Update flame particle system - calculate nozzle position
       const nozzleDistance = this.r + 45; // Nozzle is at the tip of the gun
       const nozzleX = this.x + Math.cos(this.gunAngle) * nozzleDistance;
@@ -3101,7 +3097,7 @@ class OrangeFighter extends Fighter {
 
   drawFuelBar(ctx) {
     const fuelRatio = this.fuel / CONFIG.orange.maxFuel;
-    
+
     // Curved meter settings
     const meterRadius = this.r + 18;
     const meterThickness = 8;
@@ -3109,10 +3105,10 @@ class OrangeFighter extends Fighter {
     const endAngle = Math.PI * 0.3;    // End at right side (curved upward)
     const totalAngle = startAngle - endAngle;
     const filledAngle = endAngle + (totalAngle * fuelRatio);
-    
+
     ctx.save();
     ctx.translate(this.x, this.y);
-    
+
     // Draw background arc (dark)
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, endAngle, startAngle);
@@ -3120,7 +3116,7 @@ class OrangeFighter extends Fighter {
     ctx.lineWidth = meterThickness;
     ctx.lineCap = 'round';
     ctx.stroke();
-    
+
     // Determine color based on fuel level
     let startColor, endColor;
     if (fuelRatio > 0.5) {
@@ -3133,7 +3129,7 @@ class OrangeFighter extends Fighter {
       startColor = '#ff4400';
       endColor = '#ff0000';
     }
-    
+
     // Draw filled arc with gradient
     const gradient = ctx.createLinearGradient(
       Math.cos(startAngle) * meterRadius,
@@ -3143,14 +3139,14 @@ class OrangeFighter extends Fighter {
     );
     gradient.addColorStop(0, startColor);
     gradient.addColorStop(1, endColor);
-    
+
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
     ctx.strokeStyle = gradient;
     ctx.lineWidth = meterThickness;
     ctx.lineCap = 'round';
     ctx.stroke();
-    
+
     // Draw glow effect
     ctx.shadowColor = startColor;
     ctx.shadowBlur = 10;
@@ -3160,19 +3156,19 @@ class OrangeFighter extends Fighter {
     ctx.lineWidth = meterThickness + 2;
     ctx.stroke();
     ctx.shadowBlur = 0;
-    
+
     // Draw fuel text in center
     ctx.fillStyle = '#ffffff00';
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${Math.round(this.fuel)}`, 0, 0);
-    
+
     // Draw small "F" label below the meter
     ctx.fillStyle = 'rgba(255, 150, 0, 0.8)';
     ctx.font = 'bold 8px Arial';
     ctx.fillText('FUEL', 0, meterRadius + 12);
-    
+
     ctx.restore();
   }
 
@@ -3245,10 +3241,10 @@ class BerserkerFighter extends Fighter {
     // Apply rage bonuses
     this.speed = this.baseSpeed * CONFIG.berserker.rageMoveSpeedMultiplier;
     spawnFloatingText(this.x, this.y - this.r - 15, 'RAGE!', '#ff0000');
-    
+
     // Spawn visual effect
     spawnBerserkerRageEffect(this);
-    
+
     const rageSound = getSkillSound(this._def?.id, 'rage');
     if (rageSound) {
       playSound(rageSound.src, rageSound.volume);
@@ -3289,8 +3285,8 @@ class BerserkerFighter extends Fighter {
     this.axeSwingTimer = this.axeSwingDuration; // frames for swing animation
     // Immediately mirror swing angle into gunAngle so visuals rotate consistently
     this.gunAngle = this.axeSwingAngle;
-    this.axeCooldown = this.isInRage 
-      ? CONFIG.berserker.axeCooldown / CONFIG.berserker.rageAttackSpeedMultiplier 
+    this.axeCooldown = this.isInRage
+      ? CONFIG.berserker.axeCooldown / CONFIG.berserker.rageAttackSpeedMultiplier
       : CONFIG.berserker.axeCooldown;
 
     opponent.takeDamage(damage, this, { isMelee: true });
@@ -3478,30 +3474,30 @@ class BerserkerFighter extends Fighter {
 
   drawRageBar(ctx) {
     const rageRatio = this.rage / CONFIG.berserker.maxRage;
-    
+
     const barWidth = 50;
     const barHeight = 6;
     const barX = this.x - barWidth / 2;
     const barY = this.y + this.r + 15;
 
     ctx.save();
-    
+
     // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(barX, barY, barWidth, barHeight);
-    
+
     // Fill
     const gradient = ctx.createLinearGradient(barX, barY, barX + barWidth, barY);
     gradient.addColorStop(0, '#8b0000');
     gradient.addColorStop(1, '#ff0000');
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, barY, barWidth * rageRatio, barHeight);
-    
+
     // Border
     ctx.strokeStyle = '#ff0000';
     ctx.lineWidth = 1;
     ctx.strokeRect(barX, barY, barWidth, barHeight);
-    
+
     ctx.restore();
   }
 
@@ -3534,6 +3530,8 @@ class CronosFighter extends Fighter {
     this.meleeSwingTimer = 0;
     this.meleeSlashFadeTimer = 0;
     this.meleeSwingAngle = 0;
+    this.meleeSwingDirection = 1; // 1 = right-to-left, -1 = left-to-right
+    this.doubleStrikeTimer = 0;   // Window to execute the second strike
     this.attackSlashEffects = [];
   }
 
@@ -3550,6 +3548,8 @@ class CronosFighter extends Fighter {
     this.meleeSwingTimer = 0;
     this.meleeSlashFadeTimer = 0;
     this.meleeSwingAngle = 0;
+    this.meleeSwingDirection = 1;
+    this.doubleStrikeTimer = 0;
     this.attackSlashEffects = [];
   }
 
@@ -3788,9 +3788,15 @@ class CronosFighter extends Fighter {
   // Try melee attack with crescent blade
   _tryMeleeAttack(opponent, ownerIndex) {
     if (!opponent || this.meleeCooldown > 0) return;
-    
+
     const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     if (dist > this.r + opponent.r + CONFIG.cronos.meleeRange) return;
+
+    // Alternate slash directions for back-and-forth feel
+    this.meleeSwingDirection = -this.meleeSwingDirection;
+
+    // If this is the second strike of a double-slash, reset the strike queue window
+    this.doubleStrikeTimer = this.doubleStrikeTimer > 0 ? 0 : 15; // 15 frames window for the return slash
 
     // Hit!
     this.meleeSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
@@ -3800,7 +3806,7 @@ class CronosFighter extends Fighter {
     const sound = getBasicAttackSound(this._def?.id, this._def?.type);
     this._attackSoundTimer = sound.delay;
     this._attackSoundConfig = sound;
-    
+
     // Check if Cronos is inside his own sphere for different damage and cooldown
     let meleeDamage = CONFIG.cronos.meleeDamage;
     let meleeCooldown = CONFIG.cronos.meleeCooldown;
@@ -3814,8 +3820,11 @@ class CronosFighter extends Fighter {
       }
     }
     this.meleeCooldown = meleeCooldown;
+
+    // If queueing a double strike, use a much shorter cooldown for the rapid follow-up swing
+    this.meleeCooldown = this.doubleStrikeTimer > 0 ? Math.floor(meleeCooldown * 0.3) : meleeCooldown;
     this._spawnAttackSlashEffect();
-    
+
     applyDamageToTarget(opponent, meleeDamage, this, { isMelee: true });
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, hitText, '#FF007F');
 
@@ -3895,6 +3904,10 @@ class CronosFighter extends Fighter {
       this.sphereCooldown--;
     }
 
+    if (this.doubleStrikeTimer > 0) {
+      this.doubleStrikeTimer--;
+    }
+
     // Handle melee cooldown
     if (this.meleeCooldown > 0) {
       this.meleeCooldown--;
@@ -3928,24 +3941,24 @@ class CronosFighter extends Fighter {
 
             const dist = Math.hypot(fighter.x - this.sphereX, fighter.y - this.sphereY);
             if (dist <= CONFIG.cronos.sphereRadius) {
-                // Calculate remaining frames so we don't reset visual timer when reapplying
-                let remaining = fighter.timeStopTimer || 0;
-                if (fighter._timeStopOriginalDuration && fighter._timeStopStartTime) {
-                  const elapsedMs = performance.now() - fighter._timeStopStartTime;
-                  const elapsedFrames = (elapsedMs / 1000) * 60;
-                  remaining = Math.max(0, fighter._timeStopOriginalDuration - elapsedFrames);
-                }
-                if (remaining <= 0) {
-                  fighter.applyTimeStop(CONFIG.cronos.sphereDuration);
-                  // Save and zero velocities so fighters are hard-stopped by sphere
-                  if (typeof fighter._resumeVx !== 'number') fighter._resumeVx = fighter.vx;
-                  if (typeof fighter._resumeVy !== 'number') fighter._resumeVy = fighter.vy;
-                  fighter.vx = 0;
-                  fighter.vy = 0;
-                  fighter._frozenByCronosSphere = true;
-                }
-                // Suppress per-fighter freeze timer display because the sphere shows duration
-                fighter._suppressFreezeTimer = true;
+              // Calculate remaining frames so we don't reset visual timer when reapplying
+              let remaining = fighter.timeStopTimer || 0;
+              if (fighter._timeStopOriginalDuration && fighter._timeStopStartTime) {
+                const elapsedMs = performance.now() - fighter._timeStopStartTime;
+                const elapsedFrames = (elapsedMs / 1000) * 60;
+                remaining = Math.max(0, fighter._timeStopOriginalDuration - elapsedFrames);
+              }
+              if (remaining <= 0) {
+                fighter.applyTimeStop(CONFIG.cronos.sphereDuration);
+                // Save and zero velocities so fighters are hard-stopped by sphere
+                if (typeof fighter._resumeVx !== 'number') fighter._resumeVx = fighter.vx;
+                if (typeof fighter._resumeVy !== 'number') fighter._resumeVy = fighter.vy;
+                fighter.vx = 0;
+                fighter.vy = 0;
+                fighter._frozenByCronosSphere = true;
+              }
+              // Suppress per-fighter freeze timer display because the sphere shows duration
+              fighter._suppressFreezeTimer = true;
             }
           }
         }
@@ -3981,7 +3994,7 @@ class CronosFighter extends Fighter {
       if (state && state.illusions) {
         for (const illusion of state.illusions) {
           if (!illusion || illusion.hp <= 0) continue;
-          
+
           // Skip if owner is a teammate
           if (state.mode === GAME_MODES.TWO_VS_TWO && selfTeam !== null) {
             const ownerIndex = state.fighters.indexOf(illusion.owner);
@@ -3998,7 +4011,7 @@ class CronosFighter extends Fighter {
           }
         }
       }
-      
+
       if (sphereTarget) {
         opponent = sphereTarget; // override: lock onto the fighter/illusion trapped inside the sphere
         this._targetInsideSphere = true;
@@ -4030,7 +4043,7 @@ class CronosFighter extends Fighter {
           }
         }
       }
-      
+
       // Check if sphere expired
       if (this.sphereTimer <= 0) {
         // Resume fighters that were frozen by this sphere
@@ -4103,7 +4116,7 @@ class CronosFighter extends Fighter {
     this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
 
     this.aim(opponent);
-    
+
     // Custom bounce with sphere mechanics
     this.resolveWallBounce(arena, opponent);
 
@@ -4119,16 +4132,16 @@ class CronosFighter extends Fighter {
     this.sphereCooldown = CONFIG.cronos.sphereCooldown;
     this.sphereImpactTimer = 25; // frames for impact burst effect
     this.meleeCooldown = 0; // Reset melee cooldown to remove the attack delay
-    
+
     // Store the deployment location
     this.sphereX = this.x;
     this.sphereY = this.y;
-    
+
     spawnFloatingText(this.x, this.y - this.r - 15, 'TIME STOP!', '#00F3FF');
     // Play cronosphere sound
     const sphereSound = getSkillSound(this._def?.id, 'sphere');
     if (sphereSound) playSound(sphereSound.src, sphereSound.volume);
-    
+
     // Apply time stop to all other fighters and projectiles
     if (state && state.fighters) {
       for (const fighter of state.fighters) {
@@ -4157,7 +4170,7 @@ class CronosFighter extends Fighter {
         }
       }
     }
-    
+
     // Stop projectiles in sphere area
     const projectiles = projectileSystem.getProjectiles();
     let frozenCount = 0;
@@ -4223,35 +4236,35 @@ class CronosFighter extends Fighter {
           this.vx -= 2 * dot * nx;
           this.vy -= 2 * dot * ny;
         }
-        
+
         // Normalize speed and apply multiplier
         const bounceMultiplier = CONFIG.cronos.sphereBounceForce;
         let targetSpeed = (Math.hypot(this.vx, this.vy) || this.speed) * bounceMultiplier;
-        
+
         if (opponent) {
-           const dx = opponent.x - this.x;
-           const dy = opponent.y - this.y;
-           const dist = Math.hypot(dx, dy) || 1;
-           const homingVx = (dx / dist) * targetSpeed;
-           const homingVy = (dy / dist) * targetSpeed;
-           
-           // Check if homing direction points OUTWARD (which would make him stick to the wall)
-           const dotHoming = homingVx * nx + homingVy * ny;
-           if (dotHoming > 0) {
-             // Reflect the homing velocity inwards!
-             this.vx = homingVx - 2 * dotHoming * nx;
-             this.vy = homingVy - 2 * dotHoming * ny;
-           } else {
-             // Safe to just point directly at the opponent
-             this.vx = homingVx;
-             this.vy = homingVy;
-           }
+          const dx = opponent.x - this.x;
+          const dy = opponent.y - this.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const homingVx = (dx / dist) * targetSpeed;
+          const homingVy = (dy / dist) * targetSpeed;
+
+          // Check if homing direction points OUTWARD (which would make him stick to the wall)
+          const dotHoming = homingVx * nx + homingVy * ny;
+          if (dotHoming > 0) {
+            // Reflect the homing velocity inwards!
+            this.vx = homingVx - 2 * dotHoming * nx;
+            this.vy = homingVy - 2 * dotHoming * ny;
+          } else {
+            // Safe to just point directly at the opponent
+            this.vx = homingVx;
+            this.vy = homingVy;
+          }
         } else {
-           const speedMagnitude = Math.hypot(this.vx, this.vy);
-           if (speedMagnitude > 0) {
-              this.vx = (this.vx / speedMagnitude) * targetSpeed;
-              this.vy = (this.vy / speedMagnitude) * targetSpeed;
-           }
+          const speedMagnitude = Math.hypot(this.vx, this.vy);
+          if (speedMagnitude > 0) {
+            this.vx = (this.vx / speedMagnitude) * targetSpeed;
+            this.vy = (this.vy / speedMagnitude) * targetSpeed;
+          }
         }
 
         bounced = true;
@@ -4273,21 +4286,21 @@ class CronosFighter extends Fighter {
 
         // Homing bounce for arena walls (opponent is always inside arena, so this is safe)
         if (bouncedX || bouncedY) {
-           if (opponent) {
-             const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
-             const dx = opponent.x - this.x;
-             const dy = opponent.y - this.y;
-             const dist = Math.hypot(dx, dy) || 1;
-             this.vx = (dx / dist) * currentSpeed;
-             this.vy = (dy / dist) * currentSpeed;
-           } else {
-             const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
-             const speedMagnitude = Math.hypot(this.vx, this.vy);
-             if (speedMagnitude > 0) {
-                this.vx = (this.vx / speedMagnitude) * currentSpeed;
-                this.vy = (this.vy / speedMagnitude) * currentSpeed;
-             }
-           }
+          if (opponent) {
+            const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
+            const dx = opponent.x - this.x;
+            const dy = opponent.y - this.y;
+            const dist = Math.hypot(dx, dy) || 1;
+            this.vx = (dx / dist) * currentSpeed;
+            this.vy = (dy / dist) * currentSpeed;
+          } else {
+            const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
+            const speedMagnitude = Math.hypot(this.vx, this.vy);
+            if (speedMagnitude > 0) {
+              this.vx = (this.vx / speedMagnitude) * currentSpeed;
+              this.vy = (this.vy / speedMagnitude) * currentSpeed;
+            }
+          }
         }
       } else {
         // Normal bounce
@@ -4395,7 +4408,7 @@ class CronosFighter extends Fighter {
 
   drawOutline(ctx) {
     // Weapon visual will be added to weaponVisuals.js
-    drawCronosCrescentBlade(ctx, this.x, this.y, this.gunAngle, this.r, this.meleeSwingActive, this.meleeSwingTimer, this.meleeSwingAngle, CONFIG.cronos.meleeSwingDuration);
+    drawCronosCrescentBlade(ctx, this.x, this.y, this.gunAngle, this.r, this.meleeSwingActive, this.meleeSwingTimer, this.meleeSwingAngle, CONFIG.cronos.meleeSwingDuration, this.meleeSwingDirection);
   }
 
   // Override drawGun to prevent the base class weapon from being drawn
@@ -4408,7 +4421,7 @@ class CronosFighter extends Fighter {
     // Draw pre-activation barrier — stays visible from pre-activate window
     // all the way until the sphere is actually unleashed.
     const inPreWindow = this.sphereCooldown > 0 && this.sphereCooldown <= CONFIG.cronos.spherePreActivateFrames;
-    const sphereReady  = !this.sphereActive && this.sphereCooldown === 0;
+    const sphereReady = !this.sphereActive && this.sphereCooldown === 0;
     if (inPreWindow || sphereReady) {
       const now = Date.now();
       const progress = sphereReady
@@ -4486,26 +4499,26 @@ class CronosFighter extends Fighter {
     if (this.meleeSwingActive || this.meleeSlashFadeTimer > 0) {
       let swingProgress = 1.0;
       let fade = this.meleeSlashFadeTimer / 15;
-      
+
       if (this.meleeSwingActive) {
         swingProgress = 1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration);
         fade = 1.0;
       }
-      
+
       const arcRadius = this.r + 80;
       const innerRadius = this.r + 30;
-      
+
       const fullStartA = -Math.PI * 0.4; // Matches start of sword swing
       const fullEndA = Math.PI * 0.4;    // Matches end of sword swing
-      
+
       const currentEndA = fullStartA + (fullEndA - fullStartA) * swingProgress;
-      
+
       const fullEndX = Math.cos(fullEndA) * arcRadius;
       const fullStartX = Math.cos(fullStartA) * arcRadius;
       const fullStartY = Math.sin(fullStartA) * arcRadius;
       const cx = 2 * (innerRadius - 0.25 * (fullStartX + fullEndX));
-      
-      const glowAlpha = Math.pow(fade, 0.8) * 0.95; 
+
+      const glowAlpha = Math.pow(fade, 0.8) * 0.95;
 
       ctx.save();
       ctx.translate(this.x, this.y);
@@ -4530,8 +4543,8 @@ class CronosFighter extends Fighter {
 
       // Dynamic gradient that anchors bright tip to current sword position
       const currentY = Math.sin(currentEndA) * arcRadius;
-      const gradEndY = Math.max(fullStartY + 0.1, currentY); 
-      
+      const gradEndY = Math.max(fullStartY + 0.1, currentY);
+
       const slashGrad = ctx.createLinearGradient(0, fullStartY, 0, gradEndY);
       slashGrad.addColorStop(0, 'rgba(0, 229, 255, 0.0)');
       slashGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.4)');
@@ -4541,7 +4554,7 @@ class CronosFighter extends Fighter {
       ctx.fillStyle = slashGrad;
       ctx.globalAlpha = glowAlpha;
       ctx.fill();
-      
+
       // Outer edge
       ctx.beginPath();
       ctx.arc(0, 0, arcRadius, fullStartA, fullEndA);
@@ -4549,7 +4562,7 @@ class CronosFighter extends Fighter {
       ctx.lineWidth = 2.5;
       ctx.globalAlpha = glowAlpha * 0.85;
       ctx.stroke();
-      
+
       // Inner trail
       ctx.beginPath();
       ctx.arc(0, 0, arcRadius - 14, fullStartA * 0.8, fullEndA * 0.9);
@@ -4568,32 +4581,32 @@ class CronosFighter extends Fighter {
       // Honeycomb Texture Overlay
       ctx.globalCompositeOperation = 'screen';
       ctx.shadowBlur = 0; // Disable shadow for clean texture lines
-      
+
       const hexAngle = Math.PI / 3;
-      const cosA = [Math.cos(Math.PI/6), Math.cos(Math.PI/6+hexAngle), Math.cos(Math.PI/6+hexAngle*2), Math.cos(Math.PI/6+hexAngle*3), Math.cos(Math.PI/6+hexAngle*4), Math.cos(Math.PI/6+hexAngle*5)];
-      const sinA = [Math.sin(Math.PI/6), Math.sin(Math.PI/6+hexAngle), Math.sin(Math.PI/6+hexAngle*2), Math.sin(Math.PI/6+hexAngle*3), Math.sin(Math.PI/6+hexAngle*4), Math.sin(Math.PI/6+hexAngle*5)];
-      
+      const cosA = [Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + hexAngle), Math.cos(Math.PI / 6 + hexAngle * 2), Math.cos(Math.PI / 6 + hexAngle * 3), Math.cos(Math.PI / 6 + hexAngle * 4), Math.cos(Math.PI / 6 + hexAngle * 5)];
+      const sinA = [Math.sin(Math.PI / 6), Math.sin(Math.PI / 6 + hexAngle), Math.sin(Math.PI / 6 + hexAngle * 2), Math.sin(Math.PI / 6 + hexAngle * 3), Math.sin(Math.PI / 6 + hexAngle * 4), Math.sin(Math.PI / 6 + hexAngle * 5)];
+
       const cellSize = 8;
       const cellOffsetX = cellSize * 1.75;
       const cellOffsetY = cellSize * 1.52;
-      
+
       const minX = 0;
       const maxX = arcRadius;
       const minY = -arcRadius;
       const maxY = arcRadius;
-      
+
       const colStart = Math.floor(minX / cellOffsetX) - 1;
       const colEnd = Math.ceil(maxX / cellOffsetX) + 1;
       const rowStart = Math.floor(minY / cellOffsetY) - 1;
       const rowEnd = Math.ceil(maxY / cellOffsetY) + 1;
-      
+
       ctx.beginPath();
       for (let row = rowStart; row <= rowEnd; row++) {
         for (let col = colStart; col <= colEnd; col++) {
           const x = col * cellOffsetX + (row % 2 ? cellOffsetX * 0.5 : 0);
           const y = row * cellOffsetY;
           if (x < minX || x > maxX || y < minY || y > maxY) continue;
-          
+
           for (let i = 0; i < 6; i++) {
             const px = x + cosA[i] * cellSize;
             const py = y + sinA[i] * cellSize;
@@ -4603,12 +4616,12 @@ class CronosFighter extends Fighter {
           ctx.closePath();
         }
       }
-      
+
       // Use the exact same dynamic gradient as the slash body so the texture smoothly fades towards the tail
-      ctx.strokeStyle = slashGrad; 
+      ctx.strokeStyle = slashGrad;
       ctx.lineWidth = 1.5;
       // glowAlpha already scales the overall transparency
-      ctx.globalAlpha = glowAlpha * 1.2; 
+      ctx.globalAlpha = glowAlpha * 1.2;
       ctx.stroke();
 
       ctx.restore();
@@ -4711,11 +4724,11 @@ class BomberFighter extends Fighter {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
       if (dist <= CONFIG.bomber.c4PlantRadius) {
         this.plantingTimer = 40; // Freeze for ~0.6 seconds to plant
-        
+
         // Save current momentum to restore later
         this.prePlantVx = this.vx;
         this.prePlantVy = this.vy;
-        
+
         this.vx = 0;
         this.vy = 0;
         spawnFloatingText(this.x, this.y - this.r - 10, 'PLANTING...', '#FFAA00');
@@ -4727,7 +4740,7 @@ class BomberFighter extends Fighter {
       // Dampen movement strongly to keep him planted, but allow slight pushback
       this.vx *= 0.5;
       this.vy *= 0.5;
-      
+
       if (this.plantingTimer === 0) {
         // Restore momentum so he doesn't get stuck forever
         let rVx = this.prePlantVx || 0;
@@ -4752,12 +4765,12 @@ class BomberFighter extends Fighter {
         const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         const throwRadius = CONFIG.bomber.throwRadius;
         const restrictRadius = CONFIG.bomber.restrictRadius;
-  
+
         if (dist <= throwRadius && dist >= restrictRadius) {
           const isSticky = Math.random() < CONFIG.bomber.stickyBombChance;
           projectileSystem.fireBomberGrenade(this, ownerIndex, this.damage, opponent, isSticky);
           this.grenadeCooldown = CONFIG.bomber.grenadeCooldown;
-  
+
           if (isSticky) {
             spawnFloatingText(this.x, this.y - this.r - 10, 'STICKY!', '#FF6600');
           }
@@ -5046,16 +5059,16 @@ class GunSlingerFighter extends Fighter {
   _drawSmoke(ctx) {
     const count = this.smokeParticles.length;
     if (count === 0) return;
-    
+
     // Pre-compute common values
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
-    
+
     for (let i = 0; i < count; i++) {
       const p = this.smokeParticles[i];
       const alpha = (p.life / p.maxLife) * 0.35;
       const size = p.size;
-      
+
       // Use solid circle with alpha instead of expensive gradient
       // Inner bright core
       ctx.globalAlpha = alpha * 0.6;
@@ -5063,7 +5076,7 @@ class GunSlingerFighter extends Fighter {
       ctx.beginPath();
       ctx.arc(p.x, p.y, size * 0.5, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Outer soft ring
       ctx.globalAlpha = alpha * 0.3;
       ctx.fillStyle = '#606060';
@@ -5071,7 +5084,7 @@ class GunSlingerFighter extends Fighter {
       ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
       ctx.fill();
     }
-    
+
     ctx.restore();
   }
 
@@ -5095,7 +5108,7 @@ class GunSlingerFighter extends Fighter {
 
     ctx.save();
     ctx.globalCompositeOperation = 'source-over';
-    
+
     for (const [mx, my] of [[rightMuzzleX, rightMuzzleY], [leftMuzzleX, leftMuzzleY]]) {
       // Use solid circles instead of expensive gradient
       // Inner core
@@ -5104,7 +5117,7 @@ class GunSlingerFighter extends Fighter {
       ctx.beginPath();
       ctx.arc(mx, my, 8, 0, Math.PI * 2);
       ctx.fill();
-      
+
       // Outer soft ring
       ctx.globalAlpha = alpha * 0.4;
       ctx.fillStyle = '#555555';
@@ -5112,7 +5125,7 @@ class GunSlingerFighter extends Fighter {
       ctx.arc(mx, my, 14, 0, Math.PI * 2);
       ctx.fill();
     }
-    
+
     ctx.restore();
   }
 
@@ -5200,16 +5213,16 @@ class GunSlingerFighter extends Fighter {
     const gunAngle = target
       ? Math.atan2(target.y - this.y, target.x - this.x)
       : (this.currentGun === 'right' ? this.rightGunAngle : this.leftGunAngle);
-    
+
     // Calculate exact spawn position at the gun barrel tip
     const isRightGun = this.currentGun === 'right';
-    
+
     // Based on gunSlingerWeaponGraphics:
     // The guns are positioned at X = r * 0.3 (forward) and Y = +/- (r * 0.6) (sides)
     // The muzzle flash is drawn at X = 26 * 0.9 = 23.4 relative to gun center
     const forwardOffset = (this.r * 0.3) + 23.4;
     const sideOffset = isRightGun ? (this.r * 0.6) : -(this.r * 0.6);
-    
+
     // Convert local offsets to global coordinates based on gunAngle
     const spawnX = this.x + Math.cos(gunAngle) * forwardOffset - Math.sin(gunAngle) * sideOffset;
     const spawnY = this.y + Math.sin(gunAngle) * forwardOffset + Math.cos(gunAngle) * sideOffset;
@@ -5310,7 +5323,7 @@ class GunSlingerFighter extends Fighter {
 
     // Handle recoil animation decay (separate for each gun)
     const recoilConfig = GUNSLINGER_WEAPON_GRAPHICS.recoil;
-    
+
     // Right gun recoil decay
     if (this.rightRecoilOffset > 0) {
       this.rightRecoilOffset *= (1 - recoilConfig.recoilDecay);
@@ -5324,7 +5337,7 @@ class GunSlingerFighter extends Fighter {
         this.rightRecoilTilt = 0;
       }
     }
-    
+
     // Left gun recoil decay
     if (this.leftRecoilOffset > 0) {
       this.leftRecoilOffset *= (1 - recoilConfig.recoilDecay);
@@ -5364,10 +5377,10 @@ class GunSlingerFighter extends Fighter {
     // Handle active skill (rapid sync fire)
     if (this.skillActive) {
       this.skillBurstTimer++;
-      
+
       if (this.skillBurstTimer >= CONFIG.gunslinger.skillBurstInterval) {
         this.skillBurstTimer = 0;
-        
+
         if (this.skillBurstCount < CONFIG.gunslinger.skillBurstCount) {
           // Fire both guns in sync during skill - but with slight recoil offset for visual variety
           this.currentGun = 'right';
@@ -5439,7 +5452,7 @@ class GunSlingerFighter extends Fighter {
 
   drawGun(ctx) {
     const isFiring = this.muzzleFlashTimer > 0;
-    
+
     let gunSpinAngle = 0;
     if (this.gunSpinTimer > 0) {
       const t = this.gunSpinTimer / this.gunSpinDuration;
@@ -5449,11 +5462,11 @@ class GunSlingerFighter extends Fighter {
     }
 
     drawGunSlingerDualRevolver(
-      this.x, this.y, 
-      this.rightGunAngle, this.leftGunAngle, 
-      this.r, 
-      isFiring, 
-      this.muzzleFlashTimer, 
+      this.x, this.y,
+      this.rightGunAngle, this.leftGunAngle,
+      this.r,
+      isFiring,
+      this.muzzleFlashTimer,
       this.rightRecoilOffset, this.rightRecoilTilt,  // Right gun recoil
       this.leftRecoilOffset, this.leftRecoilTilt,      // Left gun recoil
       gunSpinAngle
@@ -5467,23 +5480,23 @@ class GunSlingerFighter extends Fighter {
   drawMagazineBar(ctx) {
     // Determine which way the character is aiming (using primary right gun angle)
     const isFacingLeft = Math.abs(this.rightGunAngle) > Math.PI / 2;
-    
+
     const magW = 16;
     const magH = 50;
-    
+
     let magX;
     let bendDir;
-    
+
     if (isFacingLeft) {
       // Character facing left -> put magazine on his right (behind him)
-      magX = this.x + this.r + 14; 
+      magX = this.x + this.r + 14;
       bendDir = -1; // Curve left (towards the player)
     } else {
       // Character facing right -> put magazine on his left (behind him)
-      magX = this.x - this.r - magW - 14; 
+      magX = this.x - this.r - magW - 14;
       bendDir = 1; // Curve right (towards the player)
     }
-    
+
     const magY = this.y - magH / 2;
     const bend = 8 * bendDir;
 
@@ -5495,10 +5508,10 @@ class GunSlingerFighter extends Fighter {
     ctx.shadowOffsetY = 3;
 
     // --- 1. Draw Magazine Body (Dark Polymer) ---
-    ctx.fillStyle = '#222428'; 
+    ctx.fillStyle = '#222428';
     ctx.strokeStyle = '#111';
     ctx.lineWidth = 1.5;
-    
+
     ctx.beginPath();
     ctx.moveTo(magX + 2, magY + 6);
     ctx.lineTo(magX + magW, magY);
@@ -5517,12 +5530,12 @@ class GunSlingerFighter extends Fighter {
     ctx.strokeStyle = '#1a1b1f';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    for(let ry = magY + 15; ry < magY + magH - 5; ry += 6) {
-        const t = (ry - magY) / magH; 
-        const curveOffset = 2 * (1 - t) * t * bend;
-        
-        ctx.moveTo(magX + 2 + curveOffset, ry);
-        ctx.lineTo(magX + 6 + curveOffset, ry);
+    for (let ry = magY + 15; ry < magY + magH - 5; ry += 6) {
+      const t = (ry - magY) / magH;
+      const curveOffset = 2 * (1 - t) * t * bend;
+
+      ctx.moveTo(magX + 2 + curveOffset, ry);
+      ctx.lineTo(magX + 6 + curveOffset, ry);
     }
     ctx.stroke();
 
@@ -5532,7 +5545,7 @@ class GunSlingerFighter extends Fighter {
     const winY = magY + 5;
     const winH = magH - 10;
     const innerBend = bend * 0.8;
-    
+
     ctx.beginPath();
     ctx.moveTo(winX, winY + 2);
     ctx.lineTo(winX + winW, winY);
@@ -5540,11 +5553,11 @@ class GunSlingerFighter extends Fighter {
     ctx.lineTo(winX, winY + winH);
     ctx.quadraticCurveTo(winX + innerBend, winY + winH / 2, winX, winY + 2);
     ctx.closePath();
-    
+
     // Fill the background of the window
-    ctx.fillStyle = 'rgba(10, 10, 10, 0.9)'; 
+    ctx.fillStyle = 'rgba(10, 10, 10, 0.9)';
     ctx.fill();
-    
+
     // Save state before clipping
     ctx.save();
     ctx.clip(); // Clip everything inside to the window shape
@@ -5553,60 +5566,60 @@ class GunSlingerFighter extends Fighter {
     const bullets = this.magazineBullets;
     const bW = 3.5;
     const bH = 6;
-    const rowSpacing = 3.1; 
-    
+    const rowSpacing = 3.1;
+
     // Spring follower (pushes bullets up)
     const activeRows = Math.ceil(bullets / 2);
     const followerY = winY + winH - 2 - activeRows * rowSpacing;
-    
+
     ctx.fillStyle = '#ff2a2a'; // Red polymer follower
     ctx.fillRect(winX - 10, followerY, winW + 20, 4);
 
     // Draw each bullet
     for (let i = 0; i < bullets; i++) {
-        const col = i % 2; 
-        const row = Math.floor(i / 2); 
-        
-        const by = winY + winH - 2 - bH - row * rowSpacing;
-        const t = (by - magY) / magH;
-        const curveOffset = 2 * (1 - t) * t * bend;
-        
-        // Staggered double-stack + curve offset
-        const bx = winX + 0.5 + col * 3.5 + curveOffset;
-        
-        // Brass casing
-        ctx.fillStyle = '#f2c62c'; 
-        ctx.fillRect(bx, by, bW, bH);
-        
-        // Casing shading
-        ctx.fillStyle = 'rgba(0,0,0,0.4)';
-        ctx.fillRect(bx + bW - 1.5, by, 1.5, bH);
-        
-        // Copper projectile tip
-        ctx.fillStyle = '#d4652f';
-        ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.lineTo(bx + bW/2, by - 3);
-        ctx.lineTo(bx + bW, by);
-        ctx.closePath();
-        ctx.fill();
+      const col = i % 2;
+      const row = Math.floor(i / 2);
+
+      const by = winY + winH - 2 - bH - row * rowSpacing;
+      const t = (by - magY) / magH;
+      const curveOffset = 2 * (1 - t) * t * bend;
+
+      // Staggered double-stack + curve offset
+      const bx = winX + 0.5 + col * 3.5 + curveOffset;
+
+      // Brass casing
+      ctx.fillStyle = '#f2c62c';
+      ctx.fillRect(bx, by, bW, bH);
+
+      // Casing shading
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.fillRect(bx + bW - 1.5, by, 1.5, bH);
+
+      // Copper projectile tip
+      ctx.fillStyle = '#d4652f';
+      ctx.beginPath();
+      ctx.moveTo(bx, by);
+      ctx.lineTo(bx + bW / 2, by - 3);
+      ctx.lineTo(bx + bW, by);
+      ctx.closePath();
+      ctx.fill();
     }
 
     // --- 4. Reload Animation / Overlay ---
     if (this.isReloading) {
       const reloadRatio = 1 - (this.reloadTimer / CONFIG.gunslinger.reloadTime);
       const scanY = winY + winH - (winH * reloadRatio);
-      
+
       ctx.fillStyle = 'rgba(0, 255, 255, 0.35)';
       ctx.fillRect(winX - 10, scanY, winW + 20, winH);
-      
+
       ctx.fillStyle = '#0ff';
       ctx.fillRect(winX - 10, scanY - 1, winW + 20, 2);
     }
-    
+
     // Restore clipping
     ctx.restore();
-    
+
     // Draw window border on top
     ctx.beginPath();
     ctx.moveTo(winX, winY + 2);
@@ -5628,8 +5641,8 @@ class GunSlingerFighter extends Fighter {
       ctx.textBaseline = 'middle';
       ctx.save();
       const textX = isFacingLeft ? magX + magW + 8 : magX - 8;
-      ctx.translate(textX, magY + magH/2);
-      ctx.rotate(isFacingLeft ? Math.PI/2 : -Math.PI/2);
+      ctx.translate(textX, magY + magH / 2);
+      ctx.rotate(isFacingLeft ? Math.PI / 2 : -Math.PI / 2);
       ctx.fillText('RELOAD', 0, 0);
       ctx.restore();
     } else {
@@ -5652,7 +5665,7 @@ class GunSlingerFighter extends Fighter {
       ctx.font = 'bold 10px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(`${bullets}`, magX + magW/2, magY + magH + 3);
+      ctx.fillText(`${bullets}`, magX + magW / 2, magY + magH + 3);
     }
 
     ctx.restore();
@@ -5691,7 +5704,7 @@ class DopplegangerFighter extends Fighter {
     this.swordSwingTimer = 0;
     this.swordSwingAngle = 0;
     this.swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20;
-    
+
     // Illusion tracking
     this.lastHealthThreshold = 1.0; // Starts at 100% (1.0)
     this.illusionsSummoned = 0;
@@ -5706,7 +5719,7 @@ class DopplegangerFighter extends Fighter {
     this.swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20;
     this.lastHealthThreshold = 1.0;
     this.illusionsSummoned = 0;
-    
+
     // Clear illusions on reset
     state.illusions = state.illusions.filter(ill => ill.owner !== this);
   }
@@ -5986,21 +5999,21 @@ class DummyFighter extends Fighter {
       this.damage = 0;
       this.cooldown = 9999;
     }
-    
+
     super.update(opponent, ownerIndex, arena);
 
     // Simple auto-aim and fire logic if aggressive
     if (state.dummyAggressive && opponent && !this.isDead) {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      
+
       // Smooth aim
       let delta = targetAngle - this.angle;
       while (delta <= -Math.PI) delta += Math.PI * 2;
       while (delta > Math.PI) delta -= Math.PI * 2;
       this.angle += delta * 0.1; // Turn speed
-      
+
       const aligned = Math.abs(delta) < 0.1;
-      
+
       if (aligned && this.shootCooldown <= 0) {
         // Fire basic projectile
         const speed = 8;
@@ -6032,21 +6045,21 @@ class DummyFighter extends Fighter {
 
 // Global mapping of type strings to Class definitions
 export const FIGHTER_CLASS_MAP = {
-  'normal':    NormalFighter,
-  'aimbot':    AimbotFighter,
-  'melee':     MeleeFighter,
+  'normal': NormalFighter,
+  'aimbot': AimbotFighter,
+  'melee': MeleeFighter,
   'grenadier': GrenadierFighter,
-  'laser':     LaserFighter,
-  'knight':    KnightFighter,
-  'black':     BlackFighter,
+  'laser': LaserFighter,
+  'knight': KnightFighter,
+  'black': BlackFighter,
   'darkslategray': DarkSlateGrayFighter,
-  'orange':    OrangeFighter,
+  'orange': OrangeFighter,
   'berserker': BerserkerFighter,
-  'cronos':    CronosFighter,
-  'bomber':    BomberFighter,
+  'cronos': CronosFighter,
+  'bomber': BomberFighter,
   'gunslinger': GunSlingerFighter,
   'doppleganger': DopplegangerFighter,
-  'dummy':     DummyFighter,
+  'dummy': DummyFighter,
 };
 
 export { NormalFighter, AimbotFighter, MeleeFighter, GrenadierFighter, LaserFighter, KnightFighter, DarkSlateGrayFighter, OrangeFighter, BerserkerFighter, CronosFighter, BomberFighter, GunSlingerFighter, DopplegangerFighter, DummyFighter };

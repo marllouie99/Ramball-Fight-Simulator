@@ -24,7 +24,7 @@ export const SKILL_EFFECT_SOUNDS = {
   // ── Crimson Sniper ────────────────────────
   crimsonsniper: {
     reload: {
-      src: 'assets/Sound Effects/SkillEffects/energyreloading.mp3',
+      src: 'Assets/Sound Effects/SkillEffects/energyreloading.mp3',
       volume: 0.8,
       speed: 1.2, // You can adjust this to make the reload sound faster/slower!
     },

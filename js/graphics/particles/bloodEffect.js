@@ -13,15 +13,24 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  * @param {number} damageAngle - Angle of the damage direction (radians), null for random
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
-  const particleCount = Math.min(7, Math.max(4, Math.floor(amount / 3)));
-  const color = fighter.color || '#ff4444';
   const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
-  const MAX_BLOOD_PARTICLES = isMulti ? 30 : 100;
+  
+  // OPTIMIZED: Apply quality level to blood particle limits
+  const qualityMultiplier = state.qualityLevel || 1.0;
+  let MAX_BLOOD_PARTICLES = Math.floor((isMulti ? 20 : 100) * qualityMultiplier);
+  
+  // OPTIMIZED: Reduce particle count based on quality level
+  const baseParticleCount = Math.max(2, Math.floor(amount / 3));
+  const particleCount = Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
+  
+  const color = fighter.color || '#ff4444';
   
   for (let i = 0; i < particleCount; i++) {
-    // If we reached the global limit, remove the oldest blood particle to avoid lag
+    // If we reached the global limit, remove the oldest blood particle using swap-and-pop
     if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
-      state.bloodEffects.shift();
+      // Swap-and-pop is O(1) instead of O(n) shift()
+      state.bloodEffects[0] = state.bloodEffects[state.bloodEffects.length - 1];
+      state.bloodEffects.pop();
     }
     // Random angle for each particle
     let angle = Math.random() * Math.PI * 2;

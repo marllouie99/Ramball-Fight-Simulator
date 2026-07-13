@@ -1,15 +1,16 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
-import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
-import { drawBomberGrenade } from '../../graphics/weaponVisuals.js';
+import { state, spawnFloatingText } from '../../core/state.js';
+import { drawBomberGrenade } from '../../graphics/weapons/bomberWeaponGraphics.js';
 
+/**
+ * Bomber Fighter (Brown)
+ * Throws grenades that explode on impact with AOE damage.
+ * Passive: Chance to throw sticky bombs that attach to enemies.
+ * Skill: Plants C4 bombs that explode after a delay.
+ * Unique: Leaves a powerful C4 bomb on death.
+ */
 export class BomberFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -20,7 +21,7 @@ export class BomberFighter extends Fighter {
     // Custom skin colors for bomber (static palette)
     this.skinColor = def.skinColor || def.color || '#4A2508';
     this.skinAccentColor = def.skinAccentColor || '#FFD700';
-    // Disable base class shooting â€” bomber only fires grenades via update()
+    // Disable base class shooting — bomber only fires grenades via update()
     this.shootCooldownMax = 9999;
   }
 
@@ -59,12 +60,12 @@ export class BomberFighter extends Fighter {
 
       // If too close, steer away; if too far, steer toward; if in range, do nothing
       if (dist < optimal - 5) {
-        // Too close â€” push away from opponent
+        // Too close — push away from opponent
         const pushStrength = steering * (1 - dist / optimal);
         this.vx -= (dx / dist) * pushStrength;
         this.vy -= (dy / dist) * pushStrength;
       } else if (dist > optimal + 5) {
-        // Too far â€” move toward opponent
+        // Too far — move toward opponent
         const pullStrength = steering * (1 - optimal / dist) * 0.5;
         this.vx += (dx / dist) * pullStrength;
         this.vy += (dy / dist) * pullStrength;
@@ -96,11 +97,11 @@ export class BomberFighter extends Fighter {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
       if (dist <= CONFIG.bomber.c4PlantRadius) {
         this.plantingTimer = 40; // Freeze for ~0.6 seconds to plant
-        
+
         // Save current momentum to restore later
         this.prePlantVx = this.vx;
         this.prePlantVy = this.vy;
-        
+
         this.vx = 0;
         this.vy = 0;
         spawnFloatingText(this.x, this.y - this.r - 10, 'PLANTING...', '#FFAA00');
@@ -112,7 +113,7 @@ export class BomberFighter extends Fighter {
       // Dampen movement strongly to keep him planted, but allow slight pushback
       this.vx *= 0.5;
       this.vy *= 0.5;
-      
+
       if (this.plantingTimer === 0) {
         // Restore momentum so he doesn't get stuck forever
         let rVx = this.prePlantVx || 0;
@@ -137,12 +138,12 @@ export class BomberFighter extends Fighter {
         const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         const throwRadius = CONFIG.bomber.throwRadius;
         const restrictRadius = CONFIG.bomber.restrictRadius;
-  
+
         if (dist <= throwRadius && dist >= restrictRadius) {
           const isSticky = Math.random() < CONFIG.bomber.stickyBombChance;
           projectileSystem.fireBomberGrenade(this, ownerIndex, this.damage, opponent, isSticky);
           this.grenadeCooldown = CONFIG.bomber.grenadeCooldown;
-  
+
           if (isSticky) {
             spawnFloatingText(this.x, this.y - this.r - 10, 'STICKY!', '#FF6600');
           }
@@ -191,7 +192,7 @@ export class BomberFighter extends Fighter {
     ctx.strokeStyle = this.skinColor || '#4A2508';
     ctx.stroke();
 
-    // Draw throw radius (max range â€” green dashed)
+    // Draw throw radius (max range — green dashed)
     const throwRadius = CONFIG.bomber.throwRadius;
     ctx.beginPath();
     ctx.arc(this.x, this.y, throwRadius, 0, Math.PI * 2);
@@ -201,7 +202,7 @@ export class BomberFighter extends Fighter {
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Draw restrict radius (min range â€” red dashed)
+    // Draw restrict radius (min range — red dashed)
     const restrictRadius = CONFIG.bomber.restrictRadius;
     ctx.beginPath();
     ctx.arc(this.x, this.y, restrictRadius, 0, Math.PI * 2);
@@ -326,11 +327,3 @@ export class BomberFighter extends Fighter {
     ctx.restore();
   }
 }
-
-/**
- * Gun Slinger Fighter
- * Dual-wields revolvers on both sides of the body.
- * Alternates shots with a delay between guns.
- * Passive: chance to deal critical damage.
- * Active skill: rapid sync fire from both guns.
- */

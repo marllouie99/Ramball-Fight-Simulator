@@ -1,16 +1,19 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
-import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
+import { spawnFloatingText } from '../../core/state.js';
+import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawBerserkerDualAxes } from '../../graphics/weaponVisuals.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
+import { state } from '../../core/state.js';
 
+/**
+ * Berserker Fighter (Blood Red)
+ * Dual-wielding axes with rage mechanic.
+ * Gains rage when taking damage. During rage: increased damage, attack speed, movement speed, and lifesteal.
+ * Auto-locks toward enemy when bouncing off walls.
+ */
 export class BerserkerFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -67,11 +70,11 @@ export class BerserkerFighter extends Fighter {
     // Apply rage bonuses
     this.speed = this.baseSpeed * CONFIG.berserker.rageMoveSpeedMultiplier;
     spawnFloatingText(this.x, this.y - this.r - 15, 'RAGE!', '#ff0000');
-    
+
     // Spawn visual effect
     spawnBerserkerRageEffect(this);
-    
-    const rageSound = getSkillSound('berserker', 'rage');
+
+    const rageSound = getSkillSound(this._def?.id, 'rage');
     if (rageSound) {
       playSound(rageSound.src, rageSound.volume);
     }
@@ -111,15 +114,15 @@ export class BerserkerFighter extends Fighter {
     this.axeSwingTimer = this.axeSwingDuration; // frames for swing animation
     // Immediately mirror swing angle into gunAngle so visuals rotate consistently
     this.gunAngle = this.axeSwingAngle;
-    this.axeCooldown = this.isInRage 
-      ? CONFIG.berserker.axeCooldown / CONFIG.berserker.rageAttackSpeedMultiplier 
+    this.axeCooldown = this.isInRage
+      ? CONFIG.berserker.axeCooldown / CONFIG.berserker.rageAttackSpeedMultiplier
       : CONFIG.berserker.axeCooldown;
 
     opponent.takeDamage(damage, this, { isMelee: true });
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#8b0000');
 
-    // Play attack sound
-    const sound = getBasicAttackSound(this._def.id, this._def.type);
+    // Play attack sound    
+    const sound = getBasicAttackSound(this._def?.id);
     this._attackSoundTimer = sound.delay;
     this._attackSoundConfig = sound;
 
@@ -204,8 +207,13 @@ export class BerserkerFighter extends Fighter {
       this.rageFadeTimer--;
     }
 
+    // OPTIMIZATION: Quality-based motion trail recording
+    const qualityLevel = state.qualityLevel || 1.0;
+    const fps = state.fps || 60;
+    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
+
     // Record history for the motion trail
-    if (this.isInRage || this.rageFadeTimer > 0) {
+    if ((this.isInRage || this.rageFadeTimer > 0) && !useAggressiveMode) {
       this.axeHistory.push({ x: this.x, y: this.y, gunAngle: this.gunAngle });
       if (this.axeHistory.length > 6) {
         this.axeHistory.shift();
@@ -282,7 +290,7 @@ export class BerserkerFighter extends Fighter {
       ctx.stroke();
     }
 
-    // Axe attack range ring â€” subtle solid ring (matching Grenadier/melee style)
+    // Axe attack range ring — subtle solid ring (matching Grenadier/melee style)
     const axeRange = CONFIG.berserker.axeRange ?? 35;
     const attackRadius = this.r + axeRange;
     ctx.beginPath();
@@ -300,30 +308,30 @@ export class BerserkerFighter extends Fighter {
 
   drawRageBar(ctx) {
     const rageRatio = this.rage / CONFIG.berserker.maxRage;
-    
+
     const barWidth = 50;
     const barHeight = 6;
     const barX = this.x - barWidth / 2;
     const barY = this.y + this.r + 15;
 
     ctx.save();
-    
+
     // Background
     ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.fillRect(barX, barY, barWidth, barHeight);
-    
+
     // Fill
     const gradient = ctx.createLinearGradient(barX, barY, barX + barWidth, barY);
     gradient.addColorStop(0, '#8b0000');
     gradient.addColorStop(1, '#ff0000');
     ctx.fillStyle = gradient;
     ctx.fillRect(barX, barY, barWidth * rageRatio, barHeight);
-    
+
     // Border
     ctx.strokeStyle = '#ff0000';
     ctx.lineWidth = 1;
     ctx.strokeRect(barX, barY, barWidth, barHeight);
-    
+
     ctx.restore();
   }
 
@@ -332,13 +340,3 @@ export class BerserkerFighter extends Fighter {
     this.drawRageBar(ctx);
   }
 }
-
-/**
- * Cronos Fighter (Time Stop)
- * Close-combat fighter with time manipulation abilities.
- * 
- * Skill: Deploys a time stop sphere that freezes enemies and projectiles.
- * Cronos can move freely inside the sphere with increased speed.
- * Passive: Chance to stop enemy movement on hit and when attacked.
- * Can bounce inside his sphere with enhanced force.
- */

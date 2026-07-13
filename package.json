@@ -1,10 +1,11 @@
 {
   "name": "circle-mini-battle",
   "version": "1.0.0",
-  "description": "Circle Mini-Battle desktop app",
+  "description": "Mini-Battle arena designed for 9:16 OBS capture and Electron desktop app",
   "main": "electron-main.js",
   "scripts": {
     "start": "electron .",
+    "start:electron": "electron .",
     "build": "electron-builder --win"
   },
   "author": "",
@@ -25,5 +26,8 @@
   "devDependencies": {
     "electron": "^43.1.0",
     "electron-builder": "^26.15.3"
+  },
+  "dependencies": {
+    "serve": "^14.2.1"
   }
 }

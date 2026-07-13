@@ -9,6 +9,57 @@ import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 
 // ─────────────────────────────────────────────
+// SPATIAL PARTITIONING GRID
+// ─────────────────────────────────────────────
+class SpatialGrid {
+  constructor(cellSize) {
+    this.cellSize = cellSize;
+    this.grid = new Map();
+  }
+
+  clear() {
+    this.grid.clear();
+  }
+
+  getKey(x, y) {
+    const cellX = Math.floor(x / this.cellSize);
+    const cellY = Math.floor(y / this.cellSize);
+    return `${cellX},${cellY}`;
+  }
+
+  insert(entity) {
+    const key = this.getKey(entity.x, entity.y);
+    if (!this.grid.has(key)) {
+      this.grid.set(key, []);
+    }
+    this.grid.get(key).push(entity);
+  }
+
+  getNearby(x, y, radius) {
+    const nearby = [];
+    const cellRadius = Math.ceil(radius / this.cellSize);
+    const cellX = Math.floor(x / this.cellSize);
+    const cellY = Math.floor(y / this.cellSize);
+
+    for (let dx = -cellRadius; dx <= cellRadius; dx++) {
+      for (let dy = -cellRadius; dy <= cellRadius; dy++) {
+        const key = `${cellX + dx},${cellY + dy}`;
+        const cell = this.grid.get(key);
+        if (cell) {
+          nearby.push(...cell);
+        }
+      }
+    }
+    return nearby;
+  }
+}
+
+const spatialGrid = new SpatialGrid(100);
+
+// Export spatial grid for use in other systems (e.g., projectile collision optimization)
+export { spatialGrid };
+
+// ─────────────────────────────────────────────
 // DOPPELGANGER ILLUSION ALIVE CHECK
 // ─────────────────────────────────────────────
 
@@ -38,7 +89,7 @@ export function spawnFuelPickup() {
   const padding = 30;
   const x = arena.x + padding + Math.random() * (arena.width - padding * 2);
   const y = arena.y + padding + Math.random() * (arena.height - padding * 2);
-  
+
   state.fuelPickups.push({
     x,
     y,
@@ -56,13 +107,28 @@ export function spawnFuelPickup() {
 export function updateIllusions() {
   if (state.gameState !== 'playing' && state.gameState !== 'roundEnd') return;
 
+  // Build spatial grid for optimized collision detection
+  spatialGrid.clear();
+  for (const illusion of state.illusions) {
+    if (illusion.hp > 0) {
+      spatialGrid.insert(illusion);
+    }
+  }
+  for (const fighter of state.fighters) {
+    if (fighter && fighter.hp > 0) {
+      spatialGrid.insert(fighter);
+    }
+  }
+
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
 
     // Illusions only disappear when they die (HP <= 0), not by duration
     if (illusion.hp <= 0) {
       spawnIllusionDeath(illusion); // Spawn ethereal death effect
-      state.illusions.splice(i, 1);
+      // High-performance swap-and-pop array cleanup instead of splice
+      state.illusions[i] = state.illusions[state.illusions.length - 1];
+      state.illusions.pop();
       spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
       continue;
     }
@@ -71,8 +137,10 @@ export function updateIllusions() {
     let insideSphere = false;
     for (const fighter of state.fighters) {
       if (!fighter || !fighter.sphereActive) continue;
-      const dist = Math.hypot(illusion.x - fighter.sphereX, illusion.y - fighter.sphereY);
-      if (dist <= CONFIG.cronos.sphereRadius) {
+      const dx = illusion.x - fighter.sphereX;
+      const dy = illusion.y - fighter.sphereY;
+      const radius = CONFIG.cronos.sphereRadius;
+      if ((dx * dx + dy * dy) <= radius * radius) {
         insideSphere = true;
         break;
       }
@@ -84,14 +152,14 @@ export function updateIllusions() {
       if (illusion.knockbackVx !== undefined && (Math.abs(illusion.knockbackVx) > 0.1 || Math.abs(illusion.knockbackVy) > 0.1)) {
         illusion.x += illusion.knockbackVx;
         illusion.y += illusion.knockbackVy;
-        
+
         illusion.knockbackVx *= 0.85;
         illusion.knockbackVy *= 0.85;
-        
+
         if (Math.abs(illusion.knockbackVx) <= 0.1) illusion.knockbackVx = 0;
         if (Math.abs(illusion.knockbackVy) <= 0.1) illusion.knockbackVy = 0;
       }
-      
+
       illusion.animationTime = (illusion.animationTime || 0) + 16.666;
 
       // Only apply base movement if not being heavily knocked back
@@ -100,42 +168,47 @@ export function updateIllusions() {
         illusion.x += illusion.vx;
         illusion.y += illusion.vy;
       }
-      
+
       // Normalize speed every frame to match owner's movement speed
-      const currentSpeed = Math.hypot(illusion.vx, illusion.vy);
+      const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
       const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
         || illusion.moveSpeed || 1.5;
-      if (currentSpeed > 0) {
-        illusion.vx = (illusion.vx / currentSpeed) * targetSpeed;
-        illusion.vy = (illusion.vy / currentSpeed) * targetSpeed;
+      if (speedSq > 0) {
+        const scale = targetSpeed / Math.sqrt(speedSq);
+        illusion.vx *= scale;
+        illusion.vy *= scale;
       }
     }
-    // Illusions don't spin
+
+    // OPTIMIZED: Use spatial grid for collision detection
+    const nearbyEntities = spatialGrid.getNearby(illusion.x, illusion.y, illusion.r * 2 + 50);
 
     // Check collision with fighters and bump them
-    for (const fighter of state.fighters) {
-      if (!fighter || fighter.hp <= 0) continue;
+    for (const entity of nearbyEntities) {
+      if (!entity || entity === illusion) continue;
+      if (entity.isIllusion) continue; // Skip illusions here, handled separately
+      if (!entity.hp || entity.hp <= 0) continue;
       // Cronos phases through illusions while inside his own sphere
-      if (fighter._isInsideOwnSphere?.()) continue;
-      
-      const dx = illusion.x - fighter.x;
-      const dy = illusion.y - fighter.y;
-      const minDist = illusion.r + fighter.r;
-      
+      if (entity._isInsideOwnSphere?.()) continue;
+
+      const dx = illusion.x - entity.x;
+      const dy = illusion.y - entity.y;
+      const minDist = illusion.r + entity.r;
+
       // Bounding box culling
       if (Math.abs(dx) > minDist || Math.abs(dy) > minDist) continue;
 
-      const dist = Math.hypot(dx, dy);
-      
-      if (dist < minDist && dist > 0) {
+      const distSq = dx * dx + dy * dy;
+      if (distSq < minDist * minDist && distSq > 0) {
+        const dist = Math.sqrt(distSq);
         // Bump illusion away from fighter
         const nx = dx / dist;
         const ny = dy / dist;
         const overlap = minDist - dist;
-        
+
         illusion.x += nx * overlap * 0.5;
         illusion.y += ny * overlap * 0.5;
-        
+
         // Bounce velocity
         const dotProduct = illusion.vx * nx + illusion.vy * ny;
         illusion.vx -= 2 * dotProduct * nx;
@@ -143,40 +216,40 @@ export function updateIllusions() {
       }
     }
 
-    // Check collision with other illusions
-    for (let j = 0; j < state.illusions.length; j++) {
-      if (i === j) continue;
-      const otherIllusion = state.illusions[j];
-      if (!otherIllusion || otherIllusion.hp <= 0) continue;
-      
-      const dx = illusion.x - otherIllusion.x;
-      const dy = illusion.y - otherIllusion.y;
-      const minDist = illusion.r + otherIllusion.r;
-      
+    // Check collision with other illusions (only check nearby)
+    for (const entity of nearbyEntities) {
+      if (!entity || entity === illusion) continue;
+      if (!entity.isIllusion) continue; // Skip fighters here
+      if (!entity.hp || entity.hp <= 0) continue;
+
+      const dx = illusion.x - entity.x;
+      const dy = illusion.y - entity.y;
+      const minDist = illusion.r + entity.r;
+
       // Bounding box culling
       if (Math.abs(dx) > minDist || Math.abs(dy) > minDist) continue;
 
-      const dist = Math.hypot(dx, dy);
-      
-      if (dist < minDist && dist > 0) {
+      const distSq = dx * dx + dy * dy;
+      if (distSq < minDist * minDist && distSq > 0) {
+        const dist = Math.sqrt(distSq);
         // Bump illusions away from each other
         const nx = dx / dist;
         const ny = dy / dist;
         const overlap = minDist - dist;
-        
+
         illusion.x += nx * overlap * 0.5;
         illusion.y += ny * overlap * 0.5;
-        otherIllusion.x -= nx * overlap * 0.5;
-        otherIllusion.y -= ny * overlap * 0.5;
-        
+        entity.x -= nx * overlap * 0.5;
+        entity.y -= ny * overlap * 0.5;
+
         // Bounce velocity for both illusions
         const dotProduct = illusion.vx * nx + illusion.vy * ny;
         illusion.vx -= 2 * dotProduct * nx;
         illusion.vy -= 2 * dotProduct * ny;
-        
-        const otherDotProduct = otherIllusion.vx * nx + otherIllusion.vy * ny;
-        otherIllusion.vx -= 2 * otherDotProduct * nx;
-        otherIllusion.vy -= 2 * otherDotProduct * ny;
+
+        const otherDotProduct = entity.vx * nx + entity.vy * ny;
+        entity.vx -= 2 * otherDotProduct * nx;
+        entity.vy -= 2 * otherDotProduct * ny;
       }
     }
 
@@ -203,12 +276,29 @@ export function updateIllusions() {
     let nearestTarget = null;
     if (!insideSphere) {
       let nearestDist = Infinity;
-      for (const fighter of state.fighters) {
-        if (!fighter || fighter.hp <= 0 || fighter === illusion.owner) continue;
-        const dist = Math.hypot(fighter.x - illusion.x, fighter.y - illusion.y);
-        if (dist < nearestDist) {
-          nearestDist = dist;
-          nearestTarget = fighter;
+      // OPTIMIZED: Only check nearby fighters instead of all fighters
+      for (const entity of nearbyEntities) {
+        if (!entity || entity.isIllusion || !entity.hp || entity.hp <= 0) continue;
+        if (entity === illusion.owner) continue;
+        const dx = entity.x - illusion.x;
+        const dy = entity.y - illusion.y;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < nearestDist) {
+          nearestDist = dSq;
+          nearestTarget = entity;
+        }
+      }
+      // Fallback: if no nearby targets, check all fighters
+      if (!nearestTarget) {
+        for (const fighter of state.fighters) {
+          if (!fighter || fighter.hp <= 0 || fighter === illusion.owner) continue;
+          const dx = fighter.x - illusion.x;
+          const dy = fighter.y - illusion.y;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < nearestDist) {
+            nearestDist = dSq;
+            nearestTarget = fighter;
+          }
         }
       }
       if (nearestTarget) {
@@ -222,14 +312,16 @@ export function updateIllusions() {
       if (nearestTarget && !insideSphere) {
         const dx = nearestTarget.x - illusion.x;
         const dy = nearestTarget.y - illusion.y;
-        const d = Math.hypot(dx, dy) || 1;
-        illusion.vx = (dx / d) * targetSpeed;
-        illusion.vy = (dy / d) * targetSpeed;
+        const dSq = dx * dx + dy * dy;
+        const scale = targetSpeed / (dSq > 0 ? Math.sqrt(dSq) : 1);
+        illusion.vx = dx * scale;
+        illusion.vy = dy * scale;
       } else {
         // Fallback if no target exists
-        const speed = Math.hypot(illusion.vx, illusion.vy) || 1;
-        illusion.vx = -(illusion.vx / speed) * targetSpeed;
-        illusion.vy = -(illusion.vy / speed) * targetSpeed;
+        const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
+        const scale = targetSpeed / (speedSq > 0 ? Math.sqrt(speedSq) : 1);
+        illusion.vx = -illusion.vx * scale;
+        illusion.vy = -illusion.vy * scale;
       }
     }
 
@@ -250,20 +342,24 @@ export function updateIllusions() {
     if (insideSphere) continue;
 
     // Try to attack nearby fighters (independent targeting, not following owner)
-    for (const fighter of state.fighters) {
-      if (!fighter || fighter.hp <= 0 || fighter === illusion.owner) continue;
-      if (fighter.invincibilityTimer > 0 || fighter.flashStepTimer > 0) continue;
+    // OPTIMIZED: Only check nearby entities
+    for (const entity of nearbyEntities) {
+      if (!entity || entity.isIllusion) continue;
+      if (!entity.hp || entity.hp <= 0 || entity === illusion.owner) continue;
+      if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0) continue;
 
-      const dist = Math.hypot(fighter.x - illusion.x, fighter.y - illusion.y);
-      if (dist <= illusion.r + fighter.r + CONFIG.doppleganger.swordRange && illusion.swordCooldown === 0) {
+      const dx = entity.x - illusion.x;
+      const dy = entity.y - illusion.y;
+      const maxAttackRange = illusion.r + entity.r + CONFIG.doppleganger.swordRange;
+      if ((dx * dx + dy * dy) <= maxAttackRange * maxAttackRange && illusion.swordCooldown === 0) {
         // Attack!
-        illusion.swordSwingAngle = Math.atan2(fighter.y - illusion.y, fighter.x - illusion.x);
+        illusion.swordSwingAngle = Math.atan2(entity.y - illusion.y, entity.x - illusion.x);
         illusion.swordSwingActive = true;
         illusion.swordSwingTimer = CONFIG.doppleganger.swordSwingDuration;
         illusion.swordSwingCooldown = CONFIG.doppleganger.swordCooldown;
         illusion.swordCooldown = CONFIG.doppleganger.swordCooldown;
-        fighter.takeDamage(illusion.damage, illusion.owner, { isMelee: true });
-        spawnFloatingText(fighter.x, fighter.y - fighter.r - 5, 'ILLUSION SLASH!', '#9b59b6');
+        entity.takeDamage(illusion.damage, illusion.owner, { isMelee: true });
+        spawnFloatingText(entity.x, entity.y - entity.r - 5, 'ILLUSION SLASH!', '#9b59b6');
         break;
       }
     }
@@ -280,7 +376,7 @@ export function updateFuelPickups() {
   state.fuelPickupSpawnTimer++;
   if (state.fuelPickupSpawnTimer >= CONFIG.orange.fuelPickupSpawnInterval) {
     state.fuelPickupSpawnTimer = 0;
-    
+
     // Only spawn if we haven't reached max pickups
     const activePickups = state.fuelPickups.filter(p => p.active).length;
     if (activePickups < CONFIG.orange.maxFuelPickups) {
@@ -291,7 +387,7 @@ export function updateFuelPickups() {
   // Update existing pickups
   for (let i = state.fuelPickups.length - 1; i >= 0; i--) {
     const pickup = state.fuelPickups[i];
-    
+
     if (!pickup.active) {
       pickup.respawnTimer--;
       if (pickup.respawnTimer <= 0) {
@@ -302,7 +398,7 @@ export function updateFuelPickups() {
       continue;
     }
 
-// Check collision with Orange fighters (fuel should only exist in arena when Orange is present)
+    // Check collision with Orange fighters (fuel should only exist in arena when Orange is present)
     const hasOrange = state.fighters.some(f => f && f.hp > 0 && f._def.type === 'orange');
     if (!hasOrange) {
       pickup.active = false;
@@ -311,15 +407,15 @@ export function updateFuelPickups() {
 
     for (const fighter of state.fighters) {
       if (!fighter || fighter.hp <= 0 || fighter._def.type !== 'orange') continue;
-      
-      
+
+
       const dist = Math.hypot(fighter.x - pickup.x, fighter.y - pickup.y);
       if (dist < fighter.r + pickup.radius) {
         // Pickup collected
         const fuelAmount = CONFIG.orange.fuelPickupAmount;
         fighter.fuel = Math.min(CONFIG.orange.maxFuel, fighter.fuel + fuelAmount);
         spawnFloatingText(fighter.x, fighter.y - fighter.r - 10, `+${fuelAmount} FUEL`, '#ff6600');
-        
+
         // Deactivate pickup and start respawn timer
         pickup.active = false;
         pickup.respawnTimer = CONFIG.orange.fuelPickupRespawnTime;
@@ -345,12 +441,14 @@ export function resolveFighterCollision(a, b) {
   const bPhases = b._isInsideOwnSphere?.() ?? false;
   if (aPhases || bPhases) return;
 
-  const dx       = b.x - a.x;
-  const dy       = b.y - a.y;
-  const distance = Math.hypot(dx, dy);
-  const minDist  = a.r + b.r;
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const distSq = dx * dx + dy * dy;
+  const minDist = a.r + b.r;
+  const minDistSq = minDist * minDist;
 
-  if (distance >= minDist) return;
+  if (distSq >= minDistSq) return;
+  const distance = Math.sqrt(distSq);
 
   // Collision hooks (for contact damage, etc.)
   a.onCollide(b);
@@ -384,8 +482,8 @@ export function resolveFighterCollision(a, b) {
   b.y += ny * overlap;
 
   // Only apply impulse if fighters are moving toward each other
-  const dvx  = b.vx - a.vx;
-  const dvy  = b.vy - a.vy;
+  const dvx = b.vx - a.vx;
+  const dvy = b.vy - a.vy;
   const dotN = dvx * nx + dvy * ny;
   if (dotN >= 0) return;
 
@@ -436,9 +534,9 @@ function getClosestOpponent(fighter) {
 
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance < bestDistance) {
-      bestDistance = distance;
+    const dSq = dx * dx + dy * dy;
+    if (dSq < bestDistance) {
+      bestDistance = dSq;
       closest = other;
     }
   });
@@ -450,9 +548,9 @@ function getClosestOpponent(fighter) {
     if (illusion.owner === fighter) continue;
     const dx = illusion.x - fighter.x;
     const dy = illusion.y - fighter.y;
-    const distance = Math.hypot(dx, dy);
-    if (distance < bestDistance) {
-      bestDistance = distance;
+    const dSq = dx * dx + dy * dy;
+    if (dSq < bestDistance) {
+      bestDistance = dSq;
       closest = illusion;
     }
   }
@@ -594,7 +692,7 @@ export function updateFighters() {
       // Black hole shrinking visual logic - applied globally so custom fighters don't miss it
       if (fighter.visualScale === undefined) fighter.visualScale = 1.0;
       if (fighter.visualScaleTarget === undefined) fighter.visualScaleTarget = 1.0;
-      
+
       const shrinkSpeed = CONFIG.black?.blackHoleVisualShrinkSpeed ?? 0.05;
       if (Math.abs(fighter.visualScale - fighter.visualScaleTarget) > 0.01) {
         fighter.visualScale += (fighter.visualScaleTarget - fighter.visualScale) * shrinkSpeed;
@@ -608,32 +706,63 @@ export function updateFighters() {
       fighter.update(opponent, fi, state.arena);
     });
 
+    // OPTIMIZED: Use spatial grid for fighter-fighter collisions
+    spatialGrid.clear();
+    for (const fighter of state.fighters) {
+      if (fighter && fighter.hp > 0) {
+        spatialGrid.insert(fighter);
+      }
+    }
+
     for (let i = 0; i < state.fighters.length; i++) {
-      for (let j = i + 1; j < state.fighters.length; j++) {
-        const a = state.fighters[i];
-        const b = state.fighters[j];
-        if (!a || !b || a.hp <= 0 || b.hp <= 0) continue;
+      const a = state.fighters[i];
+      if (!a || a.hp <= 0) continue;
+
+      const nearbyFighters = spatialGrid.getNearby(a.x, a.y, a.r * 2 + 50);
+      for (const b of nearbyFighters) {
+        const j = state.fighters.indexOf(b);
+        if (j <= i) continue; // Only check each pair once
+        if (!b || b.hp <= 0) continue;
         // Skip teammates in 2v2 mode
         if (state.mode === GAME_MODES.TWO_VS_TWO && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
         resolveFighterCollision(a, b);
       }
     }
 
-    // Check collisions between fighters and illusions
+    // OPTIMIZED: Check collisions between fighters and illusions using spatial grid
+    // Rebuild spatial grid with both fighters and illusions
+    spatialGrid.clear();
+    for (const fighter of state.fighters) {
+      if (fighter && fighter.hp > 0) {
+        spatialGrid.insert(fighter);
+      }
+    }
+    for (const illusion of state.illusions) {
+      if (illusion && illusion.hp > 0) {
+        spatialGrid.insert(illusion);
+      }
+    }
+
     for (const fighter of state.fighters) {
       if (!fighter || fighter.hp <= 0) continue;
       // Cronos phases through illusions while inside his own sphere
       if (fighter._isInsideOwnSphere?.()) continue;
-      for (const illusion of state.illusions) {
-        if (!illusion || illusion.hp <= 0) continue;
-        const dx = illusion.x - fighter.x;
-        const dy = illusion.y - fighter.y;
-        const dist = Math.hypot(dx, dy);
-        const minDist = illusion.r + fighter.r;
 
-        if (dist < minDist && dist > 0) {
+      const nearbyEntities = spatialGrid.getNearby(fighter.x, fighter.y, fighter.r * 2 + 50);
+      for (const entity of nearbyEntities) {
+        if (!entity || entity === fighter) continue;
+        if (!entity.isIllusion) continue; // Skip fighter-fighter collisions (already handled)
+        if (!entity.hp || entity.hp <= 0) continue;
+
+        const dx = entity.x - fighter.x;
+        const dy = entity.y - fighter.y;
+        const minDist = entity.r + fighter.r;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < minDist * minDist && distSq > 0) {
+          const dist = Math.sqrt(distSq);
           // Collision detected - trigger onCollide for the fighter
-          fighter.onCollide(illusion);
+          fighter.onCollide(entity);
 
           // Push them apart
           const nx = dx / dist;
@@ -641,8 +770,8 @@ export function updateFighters() {
           const overlap = minDist - dist;
           fighter.x -= nx * overlap * 0.5;
           fighter.y -= ny * overlap * 0.5;
-          illusion.x += nx * overlap * 0.5;
-          illusion.y += ny * overlap * 0.5;
+          entity.x += nx * overlap * 0.5;
+          entity.y += ny * overlap * 0.5;
         }
       }
     }

@@ -26,6 +26,7 @@ export const CRONOS_WEAPON_GRAPHICS = {
   },
   positioning: {
     scale: 1.0,
+    scale: 1.3,
     offset: 12,                      // Distance from fighter body edge
   },
   particles: {
@@ -42,7 +43,17 @@ export const CRONOS_WEAPON_GRAPHICS = {
  * ★ POSITION ADJUST: Change this offset to move blade closer/farther from fighter
  * ★ SIZE ADJUST: Change bladeScale to resize the entire weapon
  */
-export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swingTimer, swingAngle, swingDuration) {
+export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swingTimer, swingAngle, swingDuration, swingDirection) {
+  // OPTIMIZATION: Import state for quality check (need to add import at top)
+  // For now, we'll check if state is available globally
+  const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const fps = (typeof state !== 'undefined' && state.fps) || 60;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
+  const useLOD = isMulti || qualityLevel < 0.6 || (fps < 50 && typeof state !== 'undefined' && state.gameState === 'playing');
+
+  // OPTIMIZATION: Skip entire weapon drawing at very low FPS
+  if (fps < 40) return;
+
   ctx.save();
   ctx.translate(x, y);
 
@@ -53,19 +64,28 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   // ★ SIZE ADJUST: Change this scale to resize the entire blade
   const bladeScale = CRONOS_WEAPON_GRAPHICS.positioning.scale;
 
-  // Calculate swing rotation if active
+  // Calculate swing rotation if active - back and forth animation
   let rotation = gunAngle;
+  let visualScale = bladeScale;
   if (swingActive && swingTimer > 0) {
     const progress = 1 - (swingTimer / swingDuration);
     const swingTotal = Math.PI * 0.8;
-    const swingStart = swingAngle - swingTotal * 0.5;
-    rotation = swingStart + progress * swingTotal;
+    // Always swing from behind (swingAngle - PI) through the opponent (swingAngle)
+    // swingDirection determines which way we sweep through: clockwise or counter-clockwise
+    const behindAngle = swingAngle - Math.PI;
+    rotation = behindAngle + progress * swingTotal * swingDirection;
+    // Adjust visual scale based on swing direction to compensate for blade shape asymmetry
+    // When swinging the "other way", the blade shape appears larger, so scale it down slightly
+    visualScale = bladeScale * (swingDirection === 1 ? 1.0 : 0.92);
   }
 
   ctx.rotate(rotation);
 
-  // Honeycomb particle glow around the blade.
-  _drawCronosBladeParticles(ctx, bladeScale);
+  // OPTIMIZATION: Skip expensive particle system at low quality
+  if (!useLOD) {
+    // Honeycomb particle glow around the blade.
+    _drawCronosBladeParticles(ctx, bladeScale);
+  }
 
   const blade = CRONOS_WEAPON_GRAPHICS.blade;
 
@@ -205,23 +225,25 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   ctx.restore();
 }
 
+// ── Module-level cached hex vertex angles ──────────────────────────────────
+const _HEX_ANGLE = Math.PI / 3;
+const _HEX_COS = [
+  Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + _HEX_ANGLE), Math.cos(Math.PI / 6 + _HEX_ANGLE * 2),
+  Math.cos(Math.PI / 6 + _HEX_ANGLE * 3), Math.cos(Math.PI / 6 + _HEX_ANGLE * 4), Math.cos(Math.PI / 6 + _HEX_ANGLE * 5)
+];
+const _HEX_SIN = [
+  Math.sin(Math.PI / 6), Math.sin(Math.PI / 6 + _HEX_ANGLE), Math.sin(Math.PI / 6 + _HEX_ANGLE * 2),
+  Math.sin(Math.PI / 6 + _HEX_ANGLE * 3), Math.sin(Math.PI / 6 + _HEX_ANGLE * 4), Math.sin(Math.PI / 6 + _HEX_ANGLE * 5)
+];
+
+// ── Pre-computed tile hash phases (avoids per-tile Math.sin in hot loop) ────
+const _BLADE_TILE_CACHE = new Map();
+
 function _drawCronosBladeParticles(ctx, bladeScale) {
   const now = Date.now();
-  const part = CRONOS_WEAPON_GRAPHICS.particles;
-
-  // ── Pre-compute hex vertex angles (matching sphere's honeycomb) ──────────
-  const hexAngle = Math.PI / 3;
-  const cosAngles = [
-    Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + hexAngle), Math.cos(Math.PI / 6 + hexAngle * 2),
-    Math.cos(Math.PI / 6 + hexAngle * 3), Math.cos(Math.PI / 6 + hexAngle * 4), Math.cos(Math.PI / 6 + hexAngle * 5)
-  ];
-  const sinAngles = [
-    Math.sin(Math.PI / 6), Math.sin(Math.PI / 6 + hexAngle), Math.sin(Math.PI / 6 + hexAngle * 2),
-    Math.sin(Math.PI / 6 + hexAngle * 3), Math.sin(Math.PI / 6 + hexAngle * 4), Math.sin(Math.PI / 6 + hexAngle * 5)
-  ];
 
   // ── Blade-local honeycomb grid ───────────────────────────────────────────
-  const cellSize = part.cellSize * bladeScale;
+  const cellSize = CRONOS_WEAPON_GRAPHICS.particles.cellSize * bladeScale;
   const cellOffsetX = cellSize * 1.75;
   const cellOffsetY = cellSize * 1.52;
   const minX = 4 * bladeScale;
@@ -233,62 +255,110 @@ function _drawCronosBladeParticles(ctx, bladeScale) {
   const rowStart = Math.floor(minY / cellOffsetY) - 1;
   const rowEnd = Math.ceil(maxY / cellOffsetY) + 1;
 
+  // ── Frame-level time values (computed once, not per-tile) ────────────────
+  const timeA = (now / 1000) * Math.PI;
+  const timeB = now / 500;
+
+  // ── Global pulse for bloom (replaces per-tile pulse in bloom pass) ───────
+  const globalPulse = (Math.sin(timeB) + 1) / 2;
+
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
-  ctx.shadowBlur = 0; // Prevent inheriting expensive UI shadow blurs
+  ctx.shadowBlur = 0;
 
-  // ── Draw each tile with staggered random fade ─────────────────────────
+  // ── Collect visible tile positions ───────────────────────────────────────
+  // Reuse a flat array to avoid object allocation per tile
+  const tileCount = (colEnd - colStart + 1) * (rowEnd - rowStart + 1);
+  const tileXs = new Float32Array(tileCount);
+  const tileYs = new Float32Array(tileCount);
+  const tileFades = new Float32Array(tileCount);
+  let validCount = 0;
+
   for (let row = rowStart; row <= rowEnd; row++) {
+    const rowOdd = row % 2 ? cellOffsetX * 0.5 : 0;
     for (let col = colStart; col <= colEnd; col++) {
-      const x = col * cellOffsetX + (row % 2 ? cellOffsetX * 0.5 : 0);
+      const x = col * cellOffsetX + rowOdd;
       const y = row * cellOffsetY;
       if (x < minX || x > maxX || y < minY || y > maxY) continue;
 
-      const tileHash = ((row * 1619 + col * 31337) ^ (row * col * 7)) | 0;
-      const tilePhase = (Math.abs(Math.sin(tileHash * 12.9898 + 78.233)) * Math.PI * 2);
-      const tileFade = (Math.sin((now / 1000) * Math.PI + tilePhase) + 1) / 2;
-
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const px = x + cosAngles[i] * cellSize;
-        const py = y + sinAngles[i] * cellSize;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
+      // Cache tile phase to avoid per-frame Math.sin of hash
+      const key = (row << 16) | (col & 0xFFFF);
+      let tilePhase = _BLADE_TILE_CACHE.get(key);
+      if (tilePhase === undefined) {
+        const tileHash = ((row * 1619 + col * 31337) ^ (row * col * 7)) | 0;
+        tilePhase = Math.abs(Math.sin(tileHash * 12.9898 + 78.233)) * Math.PI * 2;
+        _BLADE_TILE_CACHE.set(key, tilePhase);
       }
-      ctx.closePath();
+      const tileFade = (Math.sin(timeA + tilePhase) + 1) / 2;
 
-      const pulse = (Math.sin((now / 500) + (row * 0.9 + col * 0.7)) + 1) / 2;
-      ctx.fillStyle = `rgba(10, 30, 60, ${pulse * 0.7 * tileFade})`;
-      ctx.fill();
-
-      ctx.strokeStyle = part.strokeColor.replace('0.8', `${0.8 * tileFade}`);
-      ctx.lineWidth = Math.max(0.8, cellSize * 0.1);
-      ctx.stroke();
-
-      if (((row + col) & 1) === 0) {
-        ctx.beginPath();
-        const cx2 = x + cosAngles[0] * cellSize * 0.5;
-        const cy2 = y + sinAngles[0] * cellSize * 0.5;
-        const cs = cellSize * 0.3;
-        ctx.moveTo(cx2 - cs, cy2 - cs * 0.7);
-        ctx.lineTo(cx2 + cs, cy2 + cs * 0.7);
-        ctx.moveTo(cx2 - cs * 0.7, cy2 + cs);
-        ctx.lineTo(cx2 + cs * 0.7, cy2 - cs);
-        ctx.strokeStyle = part.crossColor.replace('0.25', `${0.25 * tileFade}`);
-        ctx.lineWidth = Math.max(0.4, cellSize * 0.04);
-        ctx.stroke();
-      }
-
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const nx = x + cosAngles[i] * cellSize;
-        const ny = y + sinAngles[i] * cellSize;
-        ctx.moveTo(nx + cellSize * 0.06, ny);
-        ctx.arc(nx, ny, cellSize * 0.06, 0, Math.PI * 2);
-      }
-      ctx.fillStyle = part.dotColor.replace('0.6', `${0.6 * tileFade}`);
-      ctx.fill();
+      tileXs[validCount] = x;
+      tileYs[validCount] = y;
+      tileFades[validCount] = tileFade;
+      validCount++;
     }
+  }
+
+  // ── SINGLE BATCHED PASS: Bloom stroke + cell fill + cell stroke ──────────
+  // Instead of 3 separate full iterations, we do one pass with 2 batched paths.
+
+  // Batch 1: Bloom glow — single path, uniform style
+  // Use average fade as a global alpha multiplier (avoids per-tile strokeStyle changes)
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  const bloomAlpha = 0.22 * globalPulse; // Slightly reduced from 0.32 for batch uniformity
+  ctx.strokeStyle = `rgba(0, 243, 255, ${bloomAlpha})`;
+  ctx.lineWidth = cellSize * 0.75;
+  ctx.beginPath();
+  for (let i = 0; i < validCount; i++) {
+    const x = tileXs[i], y = tileYs[i];
+    const s = cellSize * 1.05;
+    ctx.moveTo(x + _HEX_COS[0] * s, y + _HEX_SIN[0] * s);
+    for (let j = 1; j < 6; j++) {
+      ctx.lineTo(x + _HEX_COS[j] * s, y + _HEX_SIN[j] * s);
+    }
+    ctx.closePath();
+  }
+  ctx.stroke();
+
+  // Batch 1.5: Core glow — single path, uniform style
+  ctx.strokeStyle = `rgba(184, 255, 255, ${0.30 * globalPulse})`;
+  ctx.lineWidth = cellSize * 0.25;
+  ctx.beginPath();
+  for (let i = 0; i < validCount; i++) {
+    const x = tileXs[i], y = tileYs[i];
+    ctx.moveTo(x + _HEX_COS[0] * cellSize, y + _HEX_SIN[0] * cellSize);
+    for (let j = 1; j < 6; j++) {
+      ctx.lineTo(x + _HEX_COS[j] * cellSize, y + _HEX_SIN[j] * cellSize);
+    }
+    ctx.closePath();
+  }
+  ctx.stroke();
+  ctx.restore();
+
+  // ── PASS 2: Sharp Solid Cells & Edges (Per-tile fade for twinkling effect) ──
+  // Use globalAlpha instead of expensive rgba string interpolation
+  ctx.fillStyle = 'rgb(8, 20, 52)';
+  ctx.strokeStyle = 'rgb(0, 243, 255)';
+  ctx.lineWidth = Math.max(1.2, cellSize * 0.14);
+
+  for (let i = 0; i < validCount; i++) {
+    const x = tileXs[i], y = tileYs[i];
+    const fade = tileFades[i];
+    
+    ctx.beginPath();
+    ctx.moveTo(x + _HEX_COS[0] * cellSize, y + _HEX_SIN[0] * cellSize);
+    for (let j = 1; j < 6; j++) {
+      ctx.lineTo(x + _HEX_COS[j] * cellSize, y + _HEX_SIN[j] * cellSize);
+    }
+    ctx.closePath();
+
+    // Fill with fade and pulse
+    ctx.globalAlpha = 0.85 * globalPulse * fade;
+    ctx.fill();
+
+    // Stroke with just fade
+    ctx.globalAlpha = 0.95 * fade;
+    ctx.stroke();
   }
 
   ctx.restore();

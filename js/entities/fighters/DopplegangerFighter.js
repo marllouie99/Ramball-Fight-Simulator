@@ -1,17 +1,18 @@
 import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
-import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { CONFIG } from '../../core/config.js';
+import { state, spawnFloatingText } from '../../core/state.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
-import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../../graphics/weaponVisuals.js';
+import { playSound } from '../../systems/soundSystem.js';
+import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from '../../graphics/weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../../graphics/fighters/doppelgangerSkin.js';
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
 
+/**
+ * Doppleganger — Illusion melee fighter
+ * Core mechanic: Creates illusions of itself when health drops by 25%
+ * Weapon: Purple crystalline sword
+ */
 export class DopplegangerFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -20,7 +21,7 @@ export class DopplegangerFighter extends Fighter {
     this.swordSwingTimer = 0;
     this.swordSwingAngle = 0;
     this.swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20;
-    
+
     // Illusion tracking
     this.lastHealthThreshold = 1.0; // Starts at 100% (1.0)
     this.illusionsSummoned = 0;
@@ -35,7 +36,7 @@ export class DopplegangerFighter extends Fighter {
     this.swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20;
     this.lastHealthThreshold = 1.0;
     this.illusionsSummoned = 0;
-    
+
     // Clear illusions on reset
     state.illusions = state.illusions.filter(ill => ill.owner !== this);
   }
@@ -68,10 +69,11 @@ export class DopplegangerFighter extends Fighter {
     if (bounced) {
       this.playWallBounceSound();
       // Instead of physical reflection, bounce perfectly toward the enemy
-      const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed;
+      const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy) || this.speed;
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
-      const d = Math.hypot(dx, dy) || 1;
+      const distSq = dx * dx + dy * dy;
+      const d = distSq > 0 ? Math.sqrt(distSq) : 1;
       this.vx = (dx / d) * currentSpeed;
       this.vy = (dy / d) * currentSpeed;
     }
@@ -98,7 +100,27 @@ export class DopplegangerFighter extends Fighter {
   }
 
   summonIllusion() {
-    if (this.illusionsSummoned >= CONFIG.doppleganger.maxIllusions) return;
+    // OPTIMIZATION: Early exit at very low FPS to prevent illusion spam
+    const fps = state.fps || 60;
+    if (fps < 35 && state.gameState === 'playing') return;
+
+    // Dynamic performance limit on illusions based on quality level, FPS, and fighter count
+    const qualityLevel = state.qualityLevel || 1.0;
+    const fighterCount = state.fighters.filter(f => f && f.hp > 0).length;
+    let dynamicMaxIllusions = CONFIG.doppleganger.maxIllusions;
+
+    // Reduce illusions in 2v2 and FFA modes based on fighter count
+    if (fighterCount >= 4) {
+      dynamicMaxIllusions = Math.max(2, Math.floor(dynamicMaxIllusions * 0.5)); // Max 2 illusions in 4-player modes
+    } else if (fighterCount >= 3) {
+      dynamicMaxIllusions = Math.max(3, Math.floor(dynamicMaxIllusions * 0.75)); // Max 3 illusions in 3-player modes
+    }
+
+    // Further reduce based on quality level and FPS - more aggressive
+    if (qualityLevel < 0.4 || fps < 40) dynamicMaxIllusions = Math.max(1, Math.floor(dynamicMaxIllusions * 0.5));
+    else if (qualityLevel < 0.7 || fps < 50) dynamicMaxIllusions = Math.max(1, Math.floor(dynamicMaxIllusions * 0.75));
+
+    if (this.illusionsSummoned >= dynamicMaxIllusions) return;
 
     // Spawn illusion at a random position near the Doppleganger
     const angle = Math.random() * Math.PI * 2;
@@ -113,14 +135,23 @@ export class DopplegangerFighter extends Fighter {
     const illusionSpeed = this.speed || this.baseSpeed || 3;
 
     // Lock onto nearest target initially
+    // OPTIMIZATION: Use opponent directly if available to avoid loop
     let targetAngle = Math.random() * Math.PI * 2;
-    let nearestDist = Infinity;
-    for (const fighter of state.fighters) {
-      if (!fighter || fighter.hp <= 0 || fighter === this) continue;
-      const dist = Math.hypot(fighter.x - illusionX, fighter.y - illusionY);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        targetAngle = Math.atan2(fighter.y - illusionY, fighter.x - illusionX);
+    if (this._currentOpponent && this._currentOpponent.hp > 0) {
+      targetAngle = Math.atan2(this._currentOpponent.y - illusionY, this._currentOpponent.x - illusionX);
+    } else {
+      let nearestDist = Infinity;
+      for (const fighter of state.fighters) {
+        if (!fighter || fighter.hp <= 0 || fighter === this) continue;
+
+        const dx = fighter.x - illusionX;
+        const dy = fighter.y - illusionY;
+        const distSq = dx * dx + dy * dy;
+
+        if (distSq < nearestDist) {
+          nearestDist = distSq;
+          targetAngle = Math.atan2(fighter.y - illusionY, fighter.x - illusionX);
+        }
       }
     }
 
@@ -154,14 +185,16 @@ export class DopplegangerFighter extends Fighter {
     this.illusionsSummoned++;
     spawnFloatingText(this.x, this.y - this.r - 15, 'ILLUSION!', '#9b59b6');
     // Play summon illusion sound
-    const illusionSound = getSkillSound('doppelganger', 'summonillusion');
+    const illusionSound = getSkillSound(this._def?.id, 'summonillusion');
     if (illusionSound) playSound(illusionSound.src, illusionSound.volume);
   }
 
   _trySwordSwing(opponent, ownerIndex) {
     if (!opponent || this.swordCooldown > 0) return;
-    const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-    if (dist > this.r + opponent.r + CONFIG.doppleganger.swordRange) return;
+    const dx = opponent.x - this.x;
+    const dy = opponent.y - this.y;
+    const maxRange = this.r + opponent.r + CONFIG.doppleganger.swordRange;
+    if ((dx * dx + dy * dy) > maxRange * maxRange) return;
 
     // Hit!
     this.swordSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
@@ -172,8 +205,8 @@ export class DopplegangerFighter extends Fighter {
     opponent.takeDamage(this.damage, this, { isMelee: true });
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#9b59b6');
 
-    // Play attack sound
-    const sound = getBasicAttackSound(this._def.id, this._def.type);
+    // Play attack sound    
+    const sound = getBasicAttackSound(this._def?.id);
     this._attackSoundTimer = sound.delay;
     this._attackSoundConfig = sound;
   }
@@ -212,7 +245,7 @@ export class DopplegangerFighter extends Fighter {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;
     }
-    const currentSpeed = Math.hypot(this.vx, this.vy);
+    const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
     if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
       const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
       this.vx = (this.vx / currentSpeed) * newSpeed;
@@ -238,8 +271,10 @@ export class DopplegangerFighter extends Fighter {
     const animTime = this.animationTime || Date.now();
     // Draw the haze and void core UNDER the body
     drawDopplegangerBodyEffect(ctx, this.x, this.y, this.r, this.angle, 'under', animTime);
-    // Custom body skin
+
+    // Custom body skin drawn in the middle slot
     drawDoppelgangerSkin(ctx, this.x, this.y, this.r, this.angle, animTime);
+
     // Draw the swirling violet smoke OVER the body
     drawDopplegangerBodyEffect(ctx, this.x, this.y, this.r, this.angle, 'over', animTime);
   }
@@ -258,12 +293,3 @@ export class DopplegangerFighter extends Fighter {
     );
   }
 }
-
-/**
- * Machine Gun Fighter (Storm Commando)
- * High-frequency fire rate using a tactical minigun.
- * Mechanics:
- * - Fire builds up "Heat". At 100 Heat, the gun overheats and locks out.
- * - Active Skill: Suppressive Sweep. Performs a fast tactical roll/slide in the movement direction
- *   while spraying a bullet cone that does not generate heat.
- */

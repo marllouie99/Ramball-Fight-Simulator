@@ -79,7 +79,8 @@ export class Fighter {
 
     const baseHp = Number(d.hp || 100);
     // Store original base speed before any multipliers (used for spin rate calculations)
-    const originalBaseSpeed = d.moveSpeed !== undefined ? d.moveSpeed : Math.hypot(d.startVx, d.startVy) || 1;
+    const startVx = d.startVx || 0, startVy = d.startVy || 0;
+    const originalBaseSpeed = d.moveSpeed !== undefined ? d.moveSpeed : Math.sqrt(startVx * startVx + startVy * startVy) || 1;
     // Apply mode speed multiplier only to movement speed, not spin rate
     const moveSpeed = originalBaseSpeed * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
 
@@ -112,6 +113,8 @@ export class Fighter {
 
     this.slowTimer = 0;
     this.slowMultiplier = 1;
+    this.hitStunTimer = 0;
+    this.hitStunMultiplier = 1;
     this.timeStopTimer = 0;
     this._timeStopFrozenAngle = undefined;
     this._timeStopFrozenGunAngle = undefined;
@@ -134,8 +137,10 @@ export class Fighter {
     if (!state || !state.fighters) return false;
     for (const f of state.fighters) {
       if (!f || !f.sphereActive || f === this) continue;
-      const dist = Math.hypot(this.x - f.sphereX, this.y - f.sphereY);
-      if (dist <= CONFIG.cronos.sphereRadius) return true;
+      const dx = this.x - f.sphereX;
+      const dy = this.y - f.sphereY;
+      const range = CONFIG.cronos.sphereRadius;
+      if ((dx * dx + dy * dy) <= range * range) return true;
     }
     return false;
   }
@@ -144,6 +149,15 @@ export class Fighter {
     // Refresh the slow if it's longer/stronger than current
     if (this.slowTimer < frames) this.slowTimer = frames;
     this.slowMultiplier = multiplier;
+  }
+
+  applyHitStun(frames) {
+    // Temporary slowdown when hit - creates impact feel
+    // Uses a separate stun timer that overrides normal speed
+    if (!this.hitStunTimer || this.hitStunTimer < frames) {
+      this.hitStunTimer = frames;
+      this.hitStunMultiplier = 0.3; // Very slow during stun (30% speed)
+    }
   }
 
   applyTimeStop(frames) {
@@ -231,6 +245,17 @@ export class Fighter {
 
   onDamageDealt(target, projectile, ownerIndex) {
     // Override in subclasses for special attack effects.
+  }
+
+  onDeath() {
+    // Default death effect
+    spawnDeathShatter(this);
+  }
+
+  // Knockback is now applied directly to fighter's position, so physics engines of custom fighters can't interfere.
+  applyKnockback(vx, vy) {
+    this.knockbackVx = vx;
+    this.knockbackVy = vy;
   }
 
   handlePoison() {
@@ -374,7 +399,7 @@ export class Fighter {
       if (this._def && this._def.type === 'orange') {
         flamewardenFlameSystem.clear();
       }
-      spawnDeathShatter(this);
+      this.onDeath();
       
       // Play death sound
       const faah = getAnnouncerSound('faah');
@@ -504,7 +529,7 @@ export class Fighter {
     }
 
     if (bounced) {
-      const speed = Math.hypot(this.vx, this.vy) || 1;
+      const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy) || 1;
       const bias = (Math.random() - 0.5) * 2.0;  // Increased for stronger tangent adjustment
       const nx = this.vx / speed;
       const ny = this.vy / speed;
@@ -586,6 +611,11 @@ export class Fighter {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;
     }
+    // Hit stun slows the fighter significantly on impact
+    if (this.hitStunTimer > 0) {
+      this.hitStunTimer--;
+      targetSpeed *= this.hitStunMultiplier;
+    }
 
     // Velocity Recovery (gradually return to target speed after knockback or slow)
     const currentSpeed = Math.hypot(this.vx, this.vy);
@@ -629,6 +659,11 @@ export class Fighter {
 
   /** Centralized status overlays (slow, poison, burn molten core) */
   drawStatusOverlays(ctx, baseRadius) {
+    // OPTIMIZATION: Quality-based status overlay rendering
+    const qualityLevel = state.qualityLevel || 1.0;
+    const fps = state.fps || 60;
+    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
+
     if (this.slowTimer > 0) {
       ctx.fillStyle = 'rgba(77, 163, 255, 0.3)';
       ctx.beginPath();
@@ -644,6 +679,15 @@ export class Fighter {
     }
 
     if (this.burnTimer > 0) {
+      // OPTIMIZATION: Simplified burn effect at low quality
+      if (useAggressiveMode) {
+        ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+        ctx.beginPath();
+        ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+        ctx.fill();
+        return;
+      }
+
       // 1. Pulse heat glow outline (OPTIMIZED: removed shadowBlur - expensive operation)
       const glowIntensity = Math.abs(Math.sin(Date.now() / 150));
       ctx.save();
@@ -662,7 +706,7 @@ export class Fighter {
       grad.addColorStop(0.35, `rgba(255, 130, 0, ${0.5 + pulse})`);
       grad.addColorStop(0.75, `rgba(200, 30, 0, ${0.35 + pulse})`);
       grad.addColorStop(1, 'rgba(100, 0, 0, 0)');
-      
+
       ctx.fillStyle = grad;
       ctx.beginPath();
       ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
@@ -700,6 +744,25 @@ export class Fighter {
   /** Draws the fighter's health points in the center. */
   drawHealth(ctx) {
     if (this.hp <= 0 || this._isWinnerReveal) return;
+
+    // OPTIMIZATION: Quality-based health text rendering
+    const qualityLevel = state.qualityLevel || 1.0;
+    const fps = state.fps || 60;
+    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
+
+    if (useAggressiveMode) {
+      // Simple text without stroke at low quality
+      ctx.save();
+      ctx.font = 'bold 16px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const hpText = Math.floor(this.hp).toString();
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(hpText, this.x, this.y);
+      ctx.restore();
+      return;
+    }
+
     ctx.save();
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
@@ -741,7 +804,8 @@ export class Fighter {
   /** Main entry point for drawing. */
   draw(ctx) {
     const scale = this.visualScale !== undefined ? this.visualScale : 1.0;
-    if (scale !== 1.0) {
+    const hasScale = scale !== 1.0 && scale > 0;
+    if (hasScale) {
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.scale(scale, scale);
@@ -754,7 +818,7 @@ export class Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
 
-    if (scale !== 1.0) {
+    if (hasScale) {
       ctx.restore();
     }
   }

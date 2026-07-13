@@ -13,7 +13,7 @@ export const MODE_SETTINGS = {
     label: '1v1',
     rounds: 3,
     hpMultiplier: 1.2,
-    speedMultiplier: 1,
+    speedMultiplier: 1.2,
     initialFuelPickups: 2,
     supportFourFighters: false,
   },

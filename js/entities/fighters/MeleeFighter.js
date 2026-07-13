@@ -1,16 +1,14 @@
-import { Fighter, applyDamageToTarget } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { GAME_MODES } from '../../core/modeConfig.js';
-import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { Fighter } from '../fighter.js';
+import { CONFIG } from '../../core/config.js';
+import { state, spawnFloatingText } from '../../core/state.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
-import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
 import { drawSpikeWeapon } from '../../graphics/weaponVisuals.js';
 import { drawSpikeSkin } from '../../graphics/fighters/spikeSkin.js';
 
+/**
+ * Melee Fighter (Yellow)
+ * Deals contact damage upon collision, and draws rotating spikes around its body.
+ */
 export class MeleeFighter extends Fighter {
   constructor(def) {
     super(def);
@@ -49,7 +47,7 @@ export class MeleeFighter extends Fighter {
       // TUNING: melee attack cooldown in frames.
       this.meleeCooldown = this.shootCooldownMax;
       this.applySpeedBoost();
-      const sound = getBasicAttackSound(this._def.id, this._def.type);
+      const sound = getBasicAttackSound(this._def?.id);
       this._attackSoundTimer = sound.delay;
       this._attackSoundConfig = sound;
     }
@@ -112,32 +110,32 @@ export class MeleeFighter extends Fighter {
 
   resolveWallBounce(arena, opponent) {
     super.resolveWallBounce(arena);
-    
+
     // Check if we hit a wall (super.resolveWallBounce clamps position to exact bounds)
     const epsilon = 0.01;
     const bounced = (Math.abs(this.x - this.r - arena.x) < epsilon) ||
-                    (Math.abs(this.x + this.r - (arena.x + arena.width)) < epsilon) ||
-                    (Math.abs(this.y - this.r - arena.y) < epsilon) ||
-                    (Math.abs(this.y + this.r - (arena.y + arena.height)) < epsilon);
+      (Math.abs(this.x + this.r - (arena.x + arena.width)) < epsilon) ||
+      (Math.abs(this.y - this.r - arena.y) < epsilon) ||
+      (Math.abs(this.y + this.r - (arena.y + arena.height)) < epsilon);
 
     if (bounced) {
       const lockChance = CONFIG.melee.rebounceLockChance ?? 0;
       if (Math.random() < lockChance) {
         let target = opponent;
-        
+
         // Find nearest valid target if opponent not provided or dead
         if (!target || target.hp <= 0) {
           let bestDist = Infinity;
           const myIndex = state.fighters.indexOf(this);
           const myTeam = state.getFighterTeam(myIndex);
-          
+
           for (let i = 0; i < state.fighters.length; i++) {
             const f = state.fighters[i];
             if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-            
+
             // Skip teammates in 2v2
             if (state.mode === '2v2' && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
-            
+
             const dist = Math.hypot(f.x - this.x, f.y - this.y);
             if (dist < bestDist) {
               bestDist = dist;
@@ -145,7 +143,7 @@ export class MeleeFighter extends Fighter {
             }
           }
         }
-        
+
         if (target) {
           const dx = target.x - this.x;
           const dy = target.y - this.y;
@@ -182,9 +180,3 @@ export class MeleeFighter extends Fighter {
     super.draw(ctx);
   }
 }
-
-/**
- * Grenadier Fighter (Green)
- * Throws a grenade when the enemy enters its radius.
- * Grenade deals AOE damage and poisons the enemy.
- */
