@@ -64,10 +64,6 @@ class ProjectileSystem {
     return p;
   }
 
-  /**
-   * Return projectile to pool for reuse.
-   * Uses null assignment instead of delete — faster and GC-friendly.
-   */
   _returnProjectile(proj) {
     proj.isFlame = false;
     proj.isBlackHole = false;
@@ -76,6 +72,26 @@ class ProjectileSystem {
     proj.isC4 = false;
     proj.capturedByBlackHole = null;
     proj.stoppedByCronosSphere = false;
+    
+    // Clear visual flags to fix recycle bugs (e.g., normal projectiles turning into green triangles)
+    proj.isExplosion = false;
+    proj.isGlassShard = false;
+    proj.isPoisonSpill = false;
+    proj.isExplosionFlash = false;
+    proj.isExplosionFireball = false;
+    proj.isExplosionShockwave = false;
+    proj.isExplosionSmoke = false;
+    proj.isExplosionScorch = false;
+    proj.isExplosionEmber = false;
+    proj.isExplosionSpark = false;
+    proj.isExplosionDebris = false;
+    proj.isVisual = false;
+    proj.isDeathC4 = false;
+    proj.isSticky = false;
+    proj.transformed = false;
+    proj.visual = null;
+    proj.explosionType = null;
+    
     if (proj.history) proj.history.length = 0;
   }
 
@@ -133,8 +149,11 @@ class ProjectileSystem {
     if (!visualType && fighter._def && fighter._def.type === 'gunslinger') {
       visualType = 'gunslingerBullet';
     }
-    if (!visualType && fighter._def && fighter._def.type === 'machinegun') {
-      visualType = 'machinegunBullet';
+    if (!visualType && fighter._def && fighter._def.type === 'Engineer') {
+      visualType = 'EngineerBullet';
+    }
+    if (!visualType && fighter._def && fighter._def.type === 'aimbot') {
+      visualType = 'rangerBullet';
     }
 
     const proj = this._getProjectile();
@@ -462,6 +481,13 @@ class ProjectileSystem {
             if (typeof attacker.onDamageDealt === 'function') {
               attacker.onDamageDealt(fighter, projectile, projectile.owner);
             }
+            if (projectile.visual === 'EngineerBullet') {
+              // Apply small knockback from shotgun pellets
+              const knockbackForce = 1.0; 
+              const hitAngle = Math.atan2(projectile.vy, projectile.vx);
+              fighter.vx += Math.cos(hitAngle) * knockbackForce;
+              fighter.vy += Math.sin(hitAngle) * knockbackForce;
+            }
             if (projectile.isBlackHole && projectile.hitTargets) {
               projectile.hitTargets.add(fi);
             }
@@ -684,8 +710,8 @@ class ProjectileSystem {
   createAlchemistExplosion({ x, y, radius, owner }) {
     const motion = { x, y, vx: 0, vy: 0, owner, explosionType: 'poison', isExplosion: true };
     const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = (state.fps < 55 && state.gameState === 'playing') || qualityLevel < 0.8;
-    const useUltraLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.5;
+    const useLOD = false;
+    const useUltraLOD = false;
 
     // Bright toxic flash
     const flash = this._getProjectile();
@@ -1551,9 +1577,14 @@ class ProjectileSystem {
       if (p.history) {
         p.history.push({ x: p.x, y: p.y });
         if (p.history.length > (p.historyMax || 10)) {
-          p.history[0] = p.history[p.history.length - 1];
-          p.history.pop();
+          p.history.shift();
         }
+      }
+
+      // Apply drag to shotgun pellets so they lose velocity quickly over distance
+      if (p.visual === 'EngineerBullet') {
+        p.vx *= 0.92;
+        p.vy *= 0.92;
       }
 
       // Normal projectile movement

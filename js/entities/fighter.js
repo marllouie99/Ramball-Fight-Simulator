@@ -15,6 +15,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, spawnFloatingText, recordWin, recordLoss } from '../core/state.js';
+import { drawSlowEffect, drawElectricStunEffect, drawPoisonEffect, drawBurnEffect } from '../graphics/statusEffects.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -191,6 +192,19 @@ export class Fighter {
 
 
   _handleTimeStop() {
+    // Electric stun - immobilize the fighter completely.
+    // We check this here because all subclasses short-circuit their update() if this method returns true.
+    if (this.electricStunTimer > 0) {
+      this.electricStunTimer--;
+      // Apply extreme friction to stop knockback quickly
+      this.vx *= 0.5;
+      this.vy *= 0.5;
+      this.x += this.vx;
+      this.y += this.vy;
+      // Note: Wall bounce isn't resolved here, but friction stops them before they can clip out of bounds anyway.
+      return true;
+    }
+
     // Return true when time stop is active (and handled) to allow callers to short-circuit.
     if (this.timeStopTimer > 0) {
       this.timeStopTimer--;
@@ -386,12 +400,16 @@ export class Fighter {
       if (attacker) {
         damageAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
       }
-      // Spawn blood effect in the damage direction
-      spawnBloodEffect(this, amount, damageAngle);
+      // Spawn blood effect in the damage direction (unless it's a turret)
+      if (!this.isTurret) {
+        spawnBloodEffect(this, amount, damageAngle);
+      }
       
       // Play hit sound unless it's a DPS/continuous effect
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole) {
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+        if (!this.isTurret) {
+          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+        }
       }
     }
     if (this.hp === 0 && state.gameState === 'playing') {
@@ -401,13 +419,17 @@ export class Fighter {
       }
       this.onDeath();
       
+      if (this.isTurret) {
+        return true;
+      }
+
       // Play death sound
       const faah = getAnnouncerSound('faah');
       if (faah) playSound(faah.src, faah.volume, faah.speed, faah.offset || 0);
 
       // Helper: a Doppelganger with surviving illusions is still "in play"
       const _isEffectivelyAlive = (f) => {
-        if (!f) return false;
+        if (!f || f.isTurret) return false;
         if (f.hp > 0) return true;
         if (f._def && f._def.type === 'doppleganger') {
           return state.illusions.some(ill => ill.owner === f && ill.hp > 0);
@@ -575,10 +597,14 @@ export class Fighter {
   /** Call this every frame to process pending attack sound timers. */
   _tickAttackSound() {
     if (this._attackSoundTimer !== undefined && this._attackSoundTimer !== null) {
+      console.log(`[${this.name}] _tickAttackSound: timer=`, this._attackSoundTimer);
       this._attackSoundTimer--;
       if (this._attackSoundTimer <= 0) {
         const sound = this._attackSoundConfig;
-        if (sound) playSound(sound.src, sound.volume);
+        if (sound) {
+          console.log(`[${this.name}] Playing sound:`, sound.src);
+          playSound(sound.src, sound.volume);
+        }
         this._attackSoundTimer = null;
         this._attackSoundConfig = null;
       }
@@ -662,42 +688,21 @@ export class Fighter {
     // OPTIMIZATION: Quality-based status overlay rendering
     const qualityLevel = state.qualityLevel || 1.0;
     const fps = state.fps || 60;
-    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
+    const useAggressiveMode = false;
 
     if (this.slowTimer > 0) {
-      ctx.fillStyle = 'rgba(77, 163, 255, 0.3)';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
+      drawSlowEffect(ctx, baseRadius);
+    }
+
+    if (this.electricStunTimer > 0) {
+      drawElectricStunEffect(ctx, baseRadius, useAggressiveMode);
     }
 
     if (this.poisonTicks > 0) {
-      ctx.fillStyle = 'rgba(77, 255, 77, 0.4)';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
+      drawPoisonEffect(ctx, baseRadius);
     }
 
     if (this.burnTimer > 0) {
-      // OPTIMIZATION: Simplified burn effect at low quality
-      if (useAggressiveMode) {
-        ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
-        ctx.beginPath();
-        ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-        ctx.fill();
-        return;
-      }
-
-      // 1. Pulse heat glow outline (OPTIMIZED: removed shadowBlur - expensive operation)
-      const glowIntensity = Math.abs(Math.sin(Date.now() / 150));
-      ctx.save();
-      ctx.strokeStyle = `rgba(255, 120, 0, ${0.4 + glowIntensity * 0.4})`;
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-
       // 2. Molten Inner Body Radial Gradient
       const offset = baseRadius * 0.15;
       const grad = ctx.createRadialGradient(-offset, -offset, 0, 0, 0, baseRadius);
@@ -744,24 +749,6 @@ export class Fighter {
   /** Draws the fighter's health points in the center. */
   drawHealth(ctx) {
     if (this.hp <= 0 || this._isWinnerReveal) return;
-
-    // OPTIMIZATION: Quality-based health text rendering
-    const qualityLevel = state.qualityLevel || 1.0;
-    const fps = state.fps || 60;
-    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
-
-    if (useAggressiveMode) {
-      // Simple text without stroke at low quality
-      ctx.save();
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const hpText = Math.floor(this.hp).toString();
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(hpText, this.x, this.y);
-      ctx.restore();
-      return;
-    }
 
     ctx.save();
     ctx.font = 'bold 18px Arial';
@@ -814,6 +801,14 @@ export class Fighter {
 
     this.drawBody(ctx);
     this.drawOutline(ctx);
+
+    // Universal dark stroke (same color for everyone, guaranteed on top)
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
     this.drawGun(ctx);
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);

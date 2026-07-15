@@ -43,6 +43,7 @@ import {
   drawSpikeWeapon,
   drawSingleSpike,
   drawGunSlingerDualRevolver,
+  drawEngineer,
 } from './weaponVisuals.js';
 
 // --- Fighter Preview Cache ---
@@ -1416,6 +1417,11 @@ function drawWeaponPreview(ctx, type, color) {
         return;
       }
 
+      case 'Engineer':
+        // Draws Engineer's shotgun active and wrench stowed on back
+        drawEngineer(ctx, { x: 0, y: 0, gunAngle: gunAngle, r: r, lastWeaponUsed: 'shotgun' });
+        return;
+
       default:
         // Fallback: draw the default gray gun used by base fighters
         ctx.save();
@@ -2018,29 +2024,62 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
 }
 
 export function drawHUD() {
-  const { ctx, canvas, fighters, scores, roundNum, mode } = state;
+  const { ctx, canvas, fighters, scores, roundNum, mode, gameState, matchEndTimer, roundEndTimer, roundWinner, ffaMatchComplete } = state;
   _clearButtons(); // We might not have buttons here, but good practice
 
+  // Calculate HUD opacity during champion reveal fade-in
+  let hudOpacity = 1;
+  if (gameState === 'matchEnd') {
+    const revealTimer = Math.max(0, matchEndTimer - 45); // match end delay
+    hudOpacity = Math.max(0, 1 - (revealTimer / 30));
+  } else if (gameState === 'roundEnd') {
+    const winnerIndex = roundWinner ? fighters.indexOf(roundWinner) : -1;
+    const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= 2;
+    const showModel = hasTwoWins && roundWinner;
+    const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || (showModel && mode !== 'FFA');
+    
+    if (isChampionReveal) {
+      const displayDelay = 60; // round end delay
+      const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
+      hudOpacity = Math.max(0, 1 - (delayedTimer / 30));
+    }
+  }
+
   // Health HUD is rendered below the canvas in DOM.
+  const containerBottom = document.getElementById('healthHud');
+  const containerLeft = document.getElementById('healthHudLeft');
+  const containerRight = document.getElementById('healthHudRight');
+  
+  if (containerBottom) containerBottom.style.opacity = hudOpacity;
+  if (containerLeft) containerLeft.style.opacity = hudOpacity;
+  if (containerRight) containerRight.style.opacity = hudOpacity;
+
   updateHealthHud();
 
-  const cx = state.arena.x + state.arena.width / 2;
-  const topY = state.arena.y - 36;
+  if (hudOpacity > 0) {
+    ctx.save();
+    ctx.globalAlpha = hudOpacity;
 
-  // Draw round on top
-  drawPanel(cx - 90, topY, 180, 26, 0.7);
+    const cx = state.arena.x + state.arena.width / 2;
+    const topY = state.arena.y - 36;
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 12px Arial';
-  ctx.textAlign = 'center';
-  const roundsMax = MODE_SETTINGS[mode]?.rounds || MODE_SETTINGS[GAME_MODES.ONE_VS_ONE].rounds;
-  ctx.fillText(`ROUND ${roundNum} OF ${roundsMax}`, cx, topY + 18);
+    // Draw round on top
+    drawPanel(cx - 90, topY, 180, 26, 0.7);
 
-  // Draw rotate message at the bottom
-  const bottomY = state.arena.y + state.arena.height + 20;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.font = 'italic 12px Arial';
-  ctx.fillText('PUT HEADPHONES ON FOR A BETTER EXPERIENCE', cx, bottomY);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    const roundsMax = MODE_SETTINGS[mode]?.rounds || MODE_SETTINGS[GAME_MODES.ONE_VS_ONE].rounds;
+    ctx.fillText(`ROUND ${roundNum} OF ${roundsMax}`, cx, topY + 18);
+
+    // Draw rotate message at the bottom
+    const bottomY = state.arena.y + state.arena.height + 20;
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'italic 12px Arial';
+    ctx.fillText('', cx, bottomY);
+
+    ctx.restore();
+  }
 }
 
 // Helper function to adjust color brightness
@@ -2081,25 +2120,13 @@ function updateHealthHud() {
   const cardsRight = [];
   const cardsBottom = [];
 
-  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [] }) => {
+  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5 }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
-    const safeBorder = borderColor ? `border-color:${borderColor};` : '';
-    // Use fighter's color theme for background
-    const bgStyle = fighterColor ? `background: linear-gradient(135deg, ${fighterColor}22 0%, rgba(16, 18, 22, 0.95) 60%);` : '';
-    const cardClasses = ['health-card', extraClass].filter(Boolean).join(' ');
     const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
     const glowAlpha = shakeTimer > 0 ? (shakeTimer / 12) * 0.85 : 0;
-    const shakeStyle = shakeTimer > 0 ? `transform: translateX(${shakeAmount}px); border-color: rgba(255, 96, 96, 0.9); box-shadow: 0 0 20px rgba(255, 80, 80, ${glowAlpha}), inset 0 0 0 1px rgba(255, 120, 120, ${Math.min(0.9, glowAlpha)});` : '';
-    // Winner glow effect - green pulsing glow
-    const winnerStyle = isWinner ? 'border-color: #22c55e; box-shadow: 0 0 25px rgba(34, 197, 94, 0.7), inset 0 0 0 2px rgba(34, 197, 94, 0.5);' : '';
-
-    // Build win indicator bullets
-    const winReq = Math.ceil(MODE_SETTINGS[GAME_MODES.ONE_VS_ONE].rounds / 2);
-    const winBullets = Array.from({ length: winReq }, (_, i) => {
-      const filled = i < wins;
-      const bulletColor = filled ? (fighterColor || fillColor) : 'rgba(255, 255, 255, 0.2)';
-      return `<span class="health-card__win-bullet" style="background:${bulletColor}; ${filled ? `box-shadow: 0 0 8px ${fighterColor || fillColor};` : ''}"></span>`;
-    }).join('');
+    const shakeStyle = shakeTimer > 0 ? `transform: translateX(${shakeAmount}px);` : '';
+    // Winner effect - no glow
+    const winnerStyle = '';
 
     let barsHTML = '';
     if (members && members.length > 0) {
@@ -2130,15 +2157,6 @@ function updateHealthHud() {
       `;
     }
 
-    let killsHTML = '';
-    if (kills && kills.length > 0) {
-      const badges = kills.map(kDef => {
-        const badgeColor = kDef.color || '#fff';
-        return `<span style="display:inline-block; width:10px; height:10px; border-radius:50%; background:${badgeColor}; border:1px solid rgba(255,255,255,0.5); margin-right:3px;" title="Killed: ${kDef.name}"></span>`;
-      }).join('');
-      killsHTML = `<div class="health-card__kills" style="margin-top: 6px; display: flex; flex-wrap: wrap;">${badges}</div>`;
-    }
-
     // Auto-scale title font size for long names
     const baseFontSize = extraClass.includes('ffa-card') ? 13 : 16;
     const maxChars = extraClass.includes('ffa-card') ? 10 : 12;
@@ -2147,18 +2165,21 @@ function updateHealthHud() {
     if (title.length > maxChars) {
       titleFontSize = Math.max(minFontSize, Math.floor(baseFontSize * maxChars / title.length));
     }
-    const titleStyle = titleFontSize < baseFontSize ? `style="font-size:${titleFontSize}px"` : '';
+    const titleStyle = titleFontSize < baseFontSize ? `font-size:${titleFontSize}px;` : '';
+    const nameColor = '#000000';
+
+    // Generate victory bullets (filled bullets for wins)
+    const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
+      const filled = i < wins;
+      return `<span class="health-card__win-bullet" style="background: ${filled ? '#ffd700' : 'rgba(0,0,0,0.2)'}; ${filled ? 'box-shadow: 0 0 6px rgba(255,215,0,0.6);' : ''}"></span>`;
+    }).join('');
 
     return `
-      <div class="${cardClasses}" style="${safeBorder}${bgStyle}${shakeStyle}${winnerStyle}">
-        <div class="health-card__header">
-          <div class="health-card__title" ${titleStyle}>${title}</div>
-          <div class="health-card__score">${scoreText}</div>
-        </div>
-        <div class="health-card__wins">${winBullets}</div>
+      <div class="health-card" style="${shakeStyle}${winnerStyle} display: inline-block; vertical-align: top; background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
+        <div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 6px;">${title}</div>
+        <div class="health-card__wins" style="margin: 6px 0 8px; display: flex; gap: 6px;">${winsBullets}</div>
         ${barsHTML}
-        ${killsHTML}
-        ${description ? `<div class="health-card__desc">${description}</div>` : ''}
+        ${description ? `<div class="health-card__desc" style="color: rgba(0, 0, 0, 0.7); margin-top: 8px; font-size: 11px; line-height: 1.3;">${description}</div>` : ''}
       </div>
     `;
   };
@@ -2190,7 +2211,7 @@ function updateHealthHud() {
     });
   } else {
     fighters.forEach((fighter, index) => {
-      if (!fighter) return;
+      if (!fighter || fighter.isTurret) return;
       const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
       const color = fighter.color || '#fff';
       const fighterName = fighter.name || `FIGHTER ${index + 1}`;
@@ -2234,7 +2255,8 @@ function updateHealthHud() {
         shakeTimer,
         isWinner: fighter === state.roundWinner,
         description: cardDesc,
-        kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : []
+        kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
+        maxBullets: 2
       });
 
       if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.FFA) {
@@ -2313,16 +2335,16 @@ export function drawRoundEndScreen() {
     winnerText = `${roundWinner.name.toUpperCase()} WINS ROUND ${roundNum}!`;
     ctx.fillStyle = roundWinner.color;
   }
-  ctx.font = 'bold 28px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(winnerText, cx, cy - 10);
+  const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || (showModel && mode !== 'FFA');
 
-  ctx.fillStyle = '#aaa';
-  ctx.font = '16px Arial';
-  if (Math.floor(Date.now() / 500) % 2 === 0) {
-    if (mode === 'FFA' && ffaMatchComplete) {
-      ctx.fillText(``, cx, cy + 25);
-    } else {
+  if (!isChampionReveal) {
+    ctx.font = 'bold 28px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(winnerText, cx, cy - 10);
+
+    ctx.fillStyle = '#aaa';
+    ctx.font = '16px Arial';
+    if (Math.floor(Date.now() / 500) % 2 === 0) {
       ctx.fillText(``, cx, cy + 25);
     }
   }
@@ -2407,7 +2429,11 @@ function drawFfaChampionReveal(winner, timer) {
   const pulse = 1 + Math.sin(timer * 0.10) * 0.12;
   const scale = 1.4 + Math.sin(timer * 0.08) * 0.08;
 
+  // Smooth fade-in animation over 30 frames (0.5 seconds at 60fps)
+  const fadeAlpha = Math.min(1, timer / 30);
+
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(cx, cy);
 
   for (let i = 0; i < 4; i += 1) {
@@ -2441,6 +2467,7 @@ function drawFfaChampionReveal(winner, timer) {
   preview._isWinnerReveal = true;
 
   ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.translate(cx, cy);
   ctx.scale(scale, scale);
   ctx.shadowBlur = 24;
@@ -2448,6 +2475,8 @@ function drawFfaChampionReveal(winner, timer) {
   preview.draw(ctx, null);
   ctx.restore();
 
+  ctx.save();
+  ctx.globalAlpha = fadeAlpha;
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
@@ -2456,11 +2485,12 @@ function drawFfaChampionReveal(winner, timer) {
 
   ctx.font = 'bold 24px Arial';
   ctx.textBaseline = 'top';
-  ctx.fillText(winner.name.toUpperCase(), cx, cy + winner.r * scale + 18);
+  ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
 
   ctx.fillStyle = '#ccc';
   ctx.font = '14px Arial';
-  ctx.fillText('Click to reset the FFA match', cx, cy + winner.r * scale + 44);
+  ctx.fillText('', cx, cy + winner.r * scale + 44);
+  ctx.restore();
 }
 
 export function drawMatchEndScreen() {
@@ -2514,16 +2544,18 @@ export function drawMatchEndScreen() {
     drawMatchWinnerReveal(matchWinner, state.matchEndTimer, mode);
   }
 
-  if (mode === '1v1') {
+  if (mode === '1v1' || mode === 'FFA') {
     ctx.fillStyle = '#aaa';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
     if (Math.floor(Date.now() / 500) % 2 === 0) {
-      ctx.fillText(``, cx, canvas.height - 30);
+      ctx.fillText(`CLICK ANYWHERE TO RESTART`, cx, canvas.height - 30);
     }
 
     _registerButton(0, 0, canvas.width, canvas.height, () => {
-      randomize1v1Fighters();
+      if (mode === '1v1') {
+        randomize1v1Fighters();
+      }
       resetMatch();
     });
   }
@@ -2640,16 +2672,31 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   ctx.shadowBlur = 0;
   ctx.font = 'bold 26px Arial';
   ctx.fillStyle = winner.color;
-  ctx.fillText(winner.name.toUpperCase(), cx, cy + winner.r * scale + 22);
+  ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
 
   ctx.restore();
 
   // ── Score display below champion ───────────────────────────────────────
-  if (mode !== 'FFA') {
-    ctx.fillStyle = '#aaa';
-    ctx.font = '16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`${state.scores[0]} — ${state.scores[1]}`, cx, cy + winner.r * scale + 50);
+  ctx.fillStyle = '#aaa';
+  ctx.font = '16px Arial';
+  ctx.textAlign = 'center';
+
+  if (mode === 'FFA') {
+    const startY = cy + 150;
+    const ffaResults = state.fighters
+      .map((f, i) => {
+        if (!f) return null;
+        return { name: f.name, score: state.scores[i] || 0, color: f.color };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.score - a.score);
+
+    ffaResults.forEach((result, idx) => {
+      ctx.fillStyle = result.color;
+      ctx.fillText(`${result.name}: ${result.score} WINS`, cx, startY + idx * 24);
+    });
+  } else {
+    ctx.fillText(`${state.scores[0]} — ${state.scores[1]}`, cx, cy + 150);
   }
 }
 

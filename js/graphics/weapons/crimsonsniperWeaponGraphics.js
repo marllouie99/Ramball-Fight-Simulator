@@ -481,3 +481,87 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
 
   ctx.restore();
 }
+
+/**
+ * Draws a Crimson Sniper's sci-fi energy projectile with a laser trail effect.
+ * @param {CanvasRenderingContext2D} ctx - The canvas context
+ * @param {Object} p - The projectile object
+ */
+export function drawCrimsonSniperBullet(ctx, p) {
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowBlur = ctx.shadowBlur;
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevGlobalAlpha = ctx.globalAlpha;
+  const prevCompositeOperation = ctx.globalCompositeOperation;
+
+  // Calculate direction for elongated shape
+  let angle = 0;
+  if (p.history && p.history.length > 0) {
+    const prev = p.history[p.history.length - 1];
+    angle = Math.atan2(p.y - prev.y, p.x - prev.x);
+  }
+
+  // Draw sci-fi laser trail using history array
+  if (p.history && p.history.length > 1) {
+    ctx.save();
+    
+    // Only use last few points for a short, fast trail
+    const startIdx = Math.max(0, p.history.length - 6);
+    
+    // Create gradient for trail
+    const lastPt = p.history[p.history.length - 1];
+    const gradient = ctx.createLinearGradient(
+      p.history[startIdx].x, p.history[startIdx].y,
+      lastPt.x, lastPt.y
+    );
+    gradient.addColorStop(0, 'rgba(255, 50, 100, 0)');
+    gradient.addColorStop(0.5, 'rgba(255, 80, 130, 0.6)');
+    gradient.addColorStop(1, 'rgba(255, 150, 180, 0.9)');
+    
+    // Single trail line with gradient
+    ctx.beginPath();
+    ctx.moveTo(p.history[startIdx].x, p.history[startIdx].y);
+    for (let i = startIdx + 1; i < p.history.length; i++) {
+      ctx.lineTo(p.history[i].x, p.history[i].y);
+    }
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 3;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+
+  // Draw the main sci-fi projectile - elongated energy bolt
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+  
+  // Outer glow - large diffuse
+  ctx.shadowColor = '#ff3366';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = 'rgba(255, 50, 100, 0.7)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.r * 1.6, p.r * 0.9, angle, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Inner bright core
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = 'rgba(255, 200, 220, 1)';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.r * 0.6, p.r * 0.35, angle, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+
+  // Restore context state
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowBlur = prevShadowBlur;
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
+  ctx.globalAlpha = prevGlobalAlpha;
+  ctx.globalCompositeOperation = prevCompositeOperation;
+}

@@ -3,8 +3,9 @@
 // ─────────────────────────────────────────────
 import { state, getProjectiles } from '../core/state.js';
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from './weaponVisuals.js';
+import { drawRangerBullet } from './weapons/rangerWeaponGraphics.js';
 import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash } from './weapons/gunSlingerWeaponGraphics.js';
-import { drawMachineGunBullet } from './machinegunWeaponGraphics.js';
+import { drawEngineerBullet, drawTurret, drawTurretBullet } from './engineerWeaponGraphics.js';
 import { drawBomberExplosionGraphic, drawBomberGrenade, drawGrenadeTrail, drawBomberC4 } from './weapons/bomberWeaponGraphics.js';
 import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
@@ -50,13 +51,17 @@ let _shimmerFrame = 0;
 
 export function drawArena() {
   const { ctx, canvas, arena } = state;
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Fill the entire canvas background with white
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Arena background only, not the whole canvas.
-  ctx.fillStyle = '#000000';
+  // Arena background (in case it needs to be different later, but right now it's also white)
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
-  ctx.strokeStyle = '#ffffff';
+  // Draw the arena boundary stroke
+  ctx.strokeStyle = '#000000';
   ctx.lineWidth = 3;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
 }
@@ -245,19 +250,23 @@ export function drawCronosSphereVisual({
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
-  const useUltraLOD = qualityLevel < 0.4 || (fps < 40 && typeof state !== 'undefined' && state.gameState === 'playing');
-  const useLOD = isMulti || useUltraLOD || frozenCount > 15 || qualityLevel < 0.6 || (fps < 50 && typeof state !== 'undefined' && state.gameState === 'playing');
+  const useUltraLOD = false;
+  const useLOD = false;
 
   // OPTIMIZATION: Skip complex sphere drawing at ultra low quality
   if (useUltraLOD) {
-    // Simple circle only
+    // Simplified but extremely visible: thick blue ring with solid inner fill
     ctx.save();
-    ctx.globalAlpha = 0.6 * alpha;
-    ctx.strokeStyle = 'rgba(0, 243, 255, 0.8)';
-    ctx.lineWidth = 2;
+    ctx.globalAlpha = alpha;
+    // Outer glow ring - dark cyan
+    ctx.strokeStyle = 'rgba(0, 160, 200, 1.0)';
+    ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
+    // Solid inner fill - dark cyan
+    ctx.fillStyle = 'rgba(0, 180, 220, 0.6)';
+    ctx.fill();
     ctx.restore();
     return;
   }
@@ -272,34 +281,8 @@ export function drawCronosSphereVisual({
   const cosAngles = _DRAW_HEX_COS;
   const sinAngles = _DRAW_HEX_SIN;
 
-  // ── Outer fresnel glow (ambient aura beyond the sphere) ──────────────────
-  ctx.save();
-  ctx.globalAlpha = 0.92 * alpha;
-  const glow = ctx.createRadialGradient(cx, cy, R * 0.12, cx, cy, R * 1.22);
-  glow.addColorStop(0, `rgba(170,255,255,${0.38 * p})`);
-  glow.addColorStop(0.3, `rgba(0,243,255,${0.28 * alpha})`);
-  glow.addColorStop(0.6, `rgba(0,100,200,${0.14 * alpha})`);
-  glow.addColorStop(0.82, `rgba(80,0,160,${0.08 * alpha})`);
-  glow.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = glow;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 1.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
+  // No outer glow - keeps the sphere crisp without blur
 
-  // ── Inner energy core (bright center) ────────────────────────────────────
-  ctx.save();
-  ctx.globalAlpha = 0.5 * alpha;
-  const core = ctx.createRadialGradient(cx, cy, R * 0.04, cx, cy, R * 0.82);
-  core.addColorStop(0, `rgba(220,255,255,${0.3 * alpha})`);
-  core.addColorStop(0.25, `rgba(0,243,255,${0.15 * alpha})`);
-  core.addColorStop(0.6, `rgba(0,80,180,${0.05 * alpha})`);
-  core.addColorStop(1, 'rgba(0,0,0,0)');
-  ctx.fillStyle = core;
-  ctx.beginPath();
-  ctx.arc(cx, cy, R * 0.8, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
 
   // ═══════════════════════════════════════════════════════════════════════════
   // PERFECT CIRCULAR CLIP REGION — everything below is masked to a clean circle
@@ -311,7 +294,7 @@ export function drawCronosSphereVisual({
 
   // ── Honeycomb grid (inside clipped region) ───────────────────────────────
   ctx.save();
-  ctx.globalCompositeOperation = 'screen';
+  // Removed 'screen' mode so grid stays visible on white
   ctx.globalAlpha = 0.85 * alpha;
   ctx.translate(cx, cy);
 
@@ -320,17 +303,17 @@ export function drawCronosSphereVisual({
 
   if (!gridData) {
     const cellSize = lodCellSize;
-  const colCount = Math.ceil(R / (cellSize * 1.75)) + 1;
-  const rowCount = Math.ceil(R / (cellSize * 1.52)) + 1;
-  const cellOffsetX = cellSize * 1.75;
-  const cellOffsetY = cellSize * 1.52;
-  const minDist = R * 0.16;
+    const colCount = Math.ceil(R / (cellSize * 1.75)) + 1;
+    const rowCount = Math.ceil(R / (cellSize * 1.52)) + 1;
+    const cellOffsetX = cellSize * 1.75;
+    const cellOffsetY = cellSize * 1.52;
+    const minDist = R * 0.16;
 
-  // Pre-compute hex vertex offsets
-  const hexOffsets = [];
-  for (let i = 0; i < 6; i++) {
-    hexOffsets.push({ x: cosAngles[i] * cellSize, y: sinAngles[i] * cellSize });
-  }
+    // Pre-compute hex vertex offsets
+    const hexOffsets = [];
+    for (let i = 0; i < 6; i++) {
+      hexOffsets.push({ x: cosAngles[i] * cellSize, y: sinAngles[i] * cellSize });
+    }
 
     // Build valid cells — clip() handles the circular boundary cleanly,
     // so we just include all cells whose center falls within the radius.
@@ -350,8 +333,20 @@ export function drawCronosSphereVisual({
 
   const { cellSize, hexOffsets, validCells } = gridData;
 
-  // Draw all hex fills in one path
-  ctx.fillStyle = 'rgba(10, 30, 60, 0.15)';
+  // 3D Volume Gradient - gives the sphere depth so it's not just a flat circle
+  const volumeGrad = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R);
+  volumeGrad.addColorStop(0, 'rgba(0, 240, 255, 0.3)');    // Bright luminous core
+  volumeGrad.addColorStop(0.5, 'rgba(0, 180, 220, 0.55)'); // Mid-tone cyan body
+  volumeGrad.addColorStop(0.85, 'rgba(0, 120, 180, 0.7)'); // Darker edge for depth
+  volumeGrad.addColorStop(1, 'rgba(0, 80, 140, 0.85)');    // Dark teal rim
+
+  ctx.fillStyle = volumeGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, R, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw all hex fills in one path - vibrant cyan fill
+  ctx.fillStyle = 'rgba(0, 200, 235, 0.4)';
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -363,9 +358,9 @@ export function drawCronosSphereVisual({
   }
   ctx.fill();
 
-  // Draw all hex edges in one path
-  ctx.strokeStyle = `rgba(0, 243, 255, 0.25)`;
-  ctx.lineWidth = Math.max(1, cellSize * 0.1);
+  // Draw all hex edges in one path - vibrant saturated cyan
+  ctx.strokeStyle = `rgba(0, 220, 255, 0.9)`;
+  ctx.lineWidth = Math.max(1.5, cellSize * 0.14);
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -379,7 +374,7 @@ export function drawCronosSphereVisual({
 
   // Draw corner node dots (sparse sampling)
   const dotRadius = cellSize * 0.06;
-  ctx.fillStyle = `rgba(0, 243, 255, 0.2)`;
+  ctx.fillStyle = `rgba(0, 200, 240, 0.5)`;
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -400,7 +395,7 @@ export function drawCronosSphereVisual({
   ctx.save();
   ctx.globalAlpha = 0.55 * alpha;
   ctx.translate(cx, cy);
-  ctx.strokeStyle = `rgba(0, 243, 255, 0.4)`;
+  ctx.strokeStyle = `rgba(0, 190, 230, 0.7)`;
   ctx.lineWidth = Math.max(1.2, R * 0.009);
   for (let i = 0; i < 2; i++) {
     const phase = now / 900 + i * 1.2;
@@ -425,18 +420,14 @@ export function drawCronosSphereVisual({
 
 
 
-  // Inner glow — gradient fill that bleeds into the sphere from the edge
+  // Crisp edge ring — clean border instead of blurry glow
   ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-  ctx.globalAlpha = 0.45 * alpha * shimmer;
-  const innerGlow = ctx.createRadialGradient(cx, cy, R * 0.88, cx, cy, R);
-  innerGlow.addColorStop(0, 'rgba(0, 243, 255, 0)');
-  innerGlow.addColorStop(0.5, 'rgba(0, 180, 255, 0.3)');
-  innerGlow.addColorStop(1, 'rgba(0, 243, 255, 0.9)');
-  ctx.fillStyle = innerGlow;
+  ctx.globalAlpha = alpha * shimmer;
+  ctx.strokeStyle = 'rgba(0, 210, 245, 0.95)';
+  ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.stroke();
   ctx.restore();
 
 }
@@ -458,8 +449,8 @@ export function drawCronosPreActivateBarrier({
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
-  if (fps < 40 || qualityLevel < 0.4) return;
-  const useLOD = isMulti || qualityLevel < 0.6 || fps < 50;
+
+  const useLOD = false;
 
   const p = Math.min(1, Math.max(0, preProgress));
   const R = radius;
@@ -471,11 +462,12 @@ export function drawCronosPreActivateBarrier({
   // ── Outer glow (fresnel-like) — reduced from 4 to 3 gradient stops ───────
   ctx.save();
   const pulseIntensity = 0.5 + 0.5 * Math.sin(now / 180);
-  const glowAlpha = (0.3 + 0.3 * p) * pulseIntensity;
+  const glowAlpha = (0.5 + 0.3 * p) * pulseIntensity;
   const glow = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R * 1.4);
-  glow.addColorStop(0, `rgba(170,255,255,${glowAlpha * 0.6})`);
-  glow.addColorStop(0.5, `rgba(0,180,255,${glowAlpha * 0.3})`);
-  glow.addColorStop(1, 'rgba(0,0,0,0)');
+  // Vibrant dark cyan
+  glow.addColorStop(0, `rgba(0,200,230,${glowAlpha * 1.5})`);
+  glow.addColorStop(0.5, `rgba(0,140,180,${glowAlpha * 1.0})`);
+  glow.addColorStop(1, 'rgba(0,140,180,0)'); // Fade to transparent cyan, not black
   ctx.fillStyle = glow;
   ctx.beginPath();
   ctx.arc(cx, cy, R * 1.4, 0, Math.PI * 2);
@@ -484,12 +476,13 @@ export function drawCronosPreActivateBarrier({
 
   // ── Inner energy core ───────────────────────────────────────────────────
   ctx.save();
-  const coreAlpha = (0.4 + 0.4 * p) * pulseIntensity;
+  const coreAlpha = (0.6 + 0.4 * p) * pulseIntensity;
   const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.85);
-  core.addColorStop(0, `rgba(220,255,255,${coreAlpha})`);
-  core.addColorStop(0.3, `rgba(0,243,255,${coreAlpha * 0.6})`);
-  core.addColorStop(0.7, `rgba(0,80,180,${coreAlpha * 0.25})`);
-  core.addColorStop(1, 'rgba(0,0,0,0)');
+  // Vibrant dark cyan
+  core.addColorStop(0, `rgba(0,220,240,${coreAlpha * 1.5})`);
+  core.addColorStop(0.3, `rgba(0,180,210,${coreAlpha * 1.2})`);
+  core.addColorStop(0.7, `rgba(0,120,160,${coreAlpha * 0.9})`);
+  core.addColorStop(1, 'rgba(0,120,160,0)'); // Fade to transparent cyan, not black
   ctx.fillStyle = core;
   ctx.beginPath();
   ctx.arc(cx, cy, R * 0.85, 0, Math.PI * 2);
@@ -547,23 +540,23 @@ export function drawCronosPreActivateBarrier({
 
   const cellSize = Math.max(9, R * 0.18);
   const shellRadius = R * 0.92;
-  
+
   const cacheKeyBarrier = `barrier_${Math.round(R)}`;
   let barrierData = _cronosGridCache.get(cacheKeyBarrier);
 
   if (!barrierData) {
     const colCount = Math.ceil(shellRadius / (cellSize * 1.75)) + 1;
-  const rowCount = Math.ceil(shellRadius / (cellSize * 1.52)) + 1;
-  const cellOffsetX = cellSize * 1.75;
-  const cellOffsetY = cellSize * 1.52;
-  const minDist = shellRadius * 0.1;
-  const maxDist = shellRadius * 0.98;
+    const rowCount = Math.ceil(shellRadius / (cellSize * 1.52)) + 1;
+    const cellOffsetX = cellSize * 1.75;
+    const cellOffsetY = cellSize * 1.52;
+    const minDist = shellRadius * 0.1;
+    const maxDist = shellRadius * 0.98;
 
-  // Pre-compute hex vertex offsets
-  const hexOffsets = [];
-  for (let i = 0; i < 6; i++) {
-    hexOffsets.push({ x: cosAngles[i] * cellSize, y: sinAngles[i] * cellSize });
-  }
+    // Pre-compute hex vertex offsets
+    const hexOffsets = [];
+    for (let i = 0; i < 6; i++) {
+      hexOffsets.push({ x: cosAngles[i] * cellSize, y: sinAngles[i] * cellSize });
+    }
 
     // OPTIMIZED: Pre-calculate valid cells once, cache distances
     const validCells = [];
@@ -763,19 +756,19 @@ export function drawProjectiles() {
         ctx.translate(p.x, p.y);
         ctx.rotate(p.rotation || 0);
         ctx.scale(lifeRatio, lifeRatio);
-        
+
         ctx.beginPath();
         ctx.moveTo(0, -p.r);
         ctx.lineTo(p.r * 0.8, p.r * 0.8);
         ctx.lineTo(-p.r * 0.8, p.r * 0.3);
         ctx.closePath();
-        
+
         ctx.fillStyle = `rgba(255, 255, 255, ${lifeRatio * 0.8})`;
         ctx.fill();
         ctx.strokeStyle = `rgba(180, 255, 180, ${lifeRatio})`;
         ctx.lineWidth = 1.5;
         ctx.stroke();
-        
+
         ctx.restore();
         return;
       }
@@ -936,12 +929,12 @@ export function drawProjectiles() {
       // Draw grenade as a tumbling poison bottle
       ctx.save();
       ctx.translate(p.x, p.y - p.z);
-      
+
       // Make the bottle tumble through the air
       // Base rotation direction on velocity
       const spinDirection = p.vx >= 0 ? 1 : -1;
       ctx.rotate((p.maxLife - p.life) * 0.25 * spinDirection);
-      
+
       // Draw the bottle
       drawPoisonBottleCore(ctx, 0.9);
       ctx.restore();
@@ -1060,7 +1053,9 @@ export function drawProjectiles() {
 
     // Sword projectile visual
     if (p.visual === 'sword') {
-      const angle = Math.atan2(p.vy, p.vx);
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
       // scale down a bit relative to typical fighter radius
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.5, owner.r / 24) : 0.9;
@@ -1070,7 +1065,9 @@ export function drawProjectiles() {
 
     // Shuriken projectile visual
     if (p.visual === 'shuriken') {
-      const angle = Math.atan2(p.vy, p.vx);
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
       // Add rotation for spinning effect
       const spinAngle = angle + (Date.now() / 100) % (Math.PI * 2);
       const owner = state.fighters && state.fighters[p.owner];
@@ -1081,7 +1078,9 @@ export function drawProjectiles() {
 
     // Gun Slinger bullet visual - detailed brass/copper revolver bullets
     if (p.visual === 'gunslingerBullet') {
-      const angle = Math.atan2(p.vy, p.vx);
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.7, owner.r / 22) : 1.0;
       const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
@@ -1090,14 +1089,34 @@ export function drawProjectiles() {
       return;
     }
 
-    // Machinegun bullet visual - brass tracer rounds with hot glow trail
-    if (p.visual === 'machinegunBullet') {
-      const angle = Math.atan2(p.vy, p.vx);
+    // Engineer bullet visual - brass tracer rounds with hot glow trail
+    if (p.visual === 'EngineerBullet') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.6, owner.r / 20) : 0.9;
       const lifeRatio = Math.max(0.4, (p.life || 40) / (p.maxLife || 40));
 
-      drawMachineGunBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      drawEngineerBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      return;
+    }
+
+    if (p.visual === 'turretBullet') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.6, owner.r / 20) : 0.9;
+      const lifeRatio = Math.max(0.4, (p.life || 40) / (p.maxLife || 40));
+
+      drawTurretBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      return;
+    }
+
+    // Add rangerBullet handler
+    if (p.visual === 'rangerBullet') {
+      drawRangerBullet(ctx, p);
       return;
     }
 
@@ -1111,7 +1130,7 @@ export function drawProjectiles() {
 
     if (p.history && p.history.length > 1 && (isRed || isBlue)) {
       ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
+      // Removed 'lighter' composite operation so trails stay visible on white
 
       // Trail polyline
       ctx.beginPath();
@@ -1145,7 +1164,7 @@ export function drawProjectiles() {
 
     // Projectile body core
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    // Removed 'lighter' composite operation so it doesn't wash out to white
 
     const outerGlow = isBlue ? 'rgba(0, 220, 255, 0.10)' : 'rgba(255, 80, 80, 0.12)';
     const coreGlow = isBlue ? 'rgba(0, 240, 255, 0.22)' : 'rgba(255, 120, 120, 0.22)';
@@ -1161,6 +1180,11 @@ export function drawProjectiles() {
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
     ctx.fill();
+    
+    // Add dark stroke so it stands out against the white background
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
 
     // extra cyan/red-ish inner bloom
     ctx.beginPath();
@@ -1339,14 +1363,14 @@ export function drawFighters() {
   // Draw time-stop visual effect (Cronos passive/sphere effect)
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || !fighter.timeStopTimer) return;
-    
+
     // Draw cyan glowing stasis effect
     ctx.save();
     ctx.translate(fighter.x, fighter.y);
-    
+
     const time = Date.now() / 200;
     const pulse = Math.sin(time * 2) * 0.5 + 0.5;
-    
+
     // Outer stasis ring
     ctx.beginPath();
     ctx.arc(0, 0, fighter.r + 4 + pulse * 4, 0, Math.PI * 2);
@@ -1373,7 +1397,7 @@ export function drawFighters() {
       ctx.stroke();
       ctx.restore();
     }
-    
+
     // Core freeze overlay
     ctx.beginPath();
     ctx.arc(0, 0, fighter.r * 0.6, 0, Math.PI * 2);
@@ -1661,6 +1685,11 @@ export function drawIllusions() {
     // Draw the swirling violet smoke OVER the body
     drawDopplegangerBodyEffect(ctx, 0, 0, illusion.r, 0, 'over', animTime);
 
+    // Draw status overlays (shock, poison, burn)
+    if (typeof illusion.drawStatusOverlays === 'function') {
+      illusion.drawStatusOverlays(ctx, illusion.r);
+    }
+
     // Draw illusion outline (optional if you still want an outline over the custom skin)
     ctx.beginPath();
     ctx.arc(0, 0, illusion.r, 0, Math.PI * 2);
@@ -1702,7 +1731,7 @@ export function drawAllCronosSpheres(ctx) {
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
-  if (fps < 35 || qualityLevel < 0.3) return;
+
 
   const now = getNow();
   for (const fighter of state.fighters) {
@@ -1727,3 +1756,4 @@ export function drawAllCronosSpheres(ctx) {
     }
   }
 }
+

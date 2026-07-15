@@ -93,7 +93,7 @@ export class GunSlingerFighter extends Fighter {
     // OPTIMIZATION: Quality-based smoke updates
     const qualityLevel = state.qualityLevel || 1.0;
     const fps = state.fps || 60;
-    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
+    const useAggressiveMode = false;
 
     if (useAggressiveMode && Math.random() > 0.5) return;
 

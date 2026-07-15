@@ -3469,7 +3469,7 @@ class BerserkerFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    drawBerserkerDualAxes(ctx, this.x, this.y, this.gunAngle, this.r, this.isInRage, this.axeSwingActive, this.axeSwingTimer, this.axeSwingAngle, this.axeSwingDuration, this.axeSlashFadeTimer, this.rageFadeTimer, this.axeHistory);
+    drawBerserkerDualAxes(ctx, this.x, this.y, this.gunAngle, this.r, this.isInRage, this.axeSwingActive, this.axeSwingTimer, this.axeSwingAngle, this.axeSwingDuration, this.axeSlashFadeTimer, this.rageFadeTimer, this.axeHistory, this.axeWindupTimer || 0, this.axeWindupDuration || 6);
   }
 
   drawRageBar(ctx) {

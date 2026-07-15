@@ -5,7 +5,7 @@ body {
   margin: 0;
   font-family: Arial, sans-serif;
   background: radial-gradient(circle at top, #262626 15%, #101010 65%);
-  color: #fff;
+  color: #fbfbfb;
   display: grid;
   place-items: center;
   min-height: 100vh;
@@ -27,7 +27,6 @@ body {
 .game-box {
   position: relative;
   text-align: center;
-  padding: 8px;
   width: min(100%, 640px);
   max-width: 100%;
   box-sizing: border-box;
@@ -57,7 +56,7 @@ canvas {
 
 .health-hud {
   position: absolute;
-  top: 610px;
+  top: 550px;
   left: 0;
   right: 0;
   z-index: 10;
@@ -66,9 +65,9 @@ canvas {
   justify-content: center;
   gap: 14px;
   margin: 0 auto;
-  padding: 0 16px;
-  width: 100%;
-  max-width: 540px;
+  padding: 0;
+  width: calc(100% * 460 / 540);
+  max-width: 460px;
   box-sizing: border-box;
 }
 
@@ -160,7 +159,7 @@ canvas {
   position: relative;
   width: 100%;
   height: 14px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.15);
   border-radius: 8px;
   overflow: hidden;
   margin: 8px 0 0;
@@ -177,7 +176,7 @@ canvas {
   justify-content: space-between;
   margin-top: 8px;
   font-size: 14px;
-  color: rgba(255, 255, 255, 0.75);
+  color: rgba(0, 0, 0, 0.75);
 }
 
 .health-card__meta span {
@@ -227,7 +226,7 @@ canvas {
 ───────────────────────────────────────────── */
 canvas {
   background: transparent;
-  border: 4px solid #fff;
+  border: 4px solid #ffffff;
   border-radius: 10px;
   box-shadow: 0 0 20px rgba(255, 255, 255, 0.15);
   cursor: pointer;
@@ -267,7 +266,7 @@ canvas {
   }
 
   .game-box {
-    padding: 4px;
+    padding: 0;
   }
 
   .health-card {

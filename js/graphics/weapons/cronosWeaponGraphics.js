@@ -30,7 +30,7 @@ export const CRONOS_WEAPON_GRAPHICS = {
     offset: 12,                      // Distance from fighter body edge
   },
   particles: {
-    cellSize: 3.2,                   // Honeycomb cell size
+    cellSize: 2.5,                   // Honeycomb cell size (reduced from 3.2)
     fillColor: 'rgba(10, 30, 60, 0.7)', // Cell fill base
     strokeColor: 'rgba(0, 243, 255, 0.8)', // Cell stroke
     crossColor: 'rgba(0, 243, 255, 0.25)', // Cross accent
@@ -49,10 +49,10 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
-  const useLOD = isMulti || qualityLevel < 0.6 || (fps < 50 && typeof state !== 'undefined' && state.gameState === 'playing');
+  const useLOD = false;
 
   // OPTIMIZATION: Skip entire weapon drawing at very low FPS
-  if (fps < 40) return;
+
 
   ctx.save();
   ctx.translate(x, y);
@@ -80,12 +80,6 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   }
 
   ctx.rotate(rotation);
-
-  // OPTIMIZATION: Skip expensive particle system at low quality
-  if (!useLOD) {
-    // Honeycomb particle glow around the blade.
-    _drawCronosBladeParticles(ctx, bladeScale);
-  }
 
   const blade = CRONOS_WEAPON_GRAPHICS.blade;
 
@@ -222,6 +216,11 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   });
   ctx.restore();
 
+  // Draw honeycomb effect ON TOP of the blade (after blade is drawn)
+  if (!useLOD) {
+    _drawCronosBladeParticles(ctx, bladeScale);
+  }
+
   ctx.restore();
 }
 
@@ -243,27 +242,29 @@ function _drawCronosBladeParticles(ctx, bladeScale) {
   const now = Date.now();
 
   // ── Blade-local honeycomb grid ───────────────────────────────────────────
+  // X = along blade (length), Y = perpendicular (width)
+  // minX/maxX = length, minY/maxY = width
   const cellSize = CRONOS_WEAPON_GRAPHICS.particles.cellSize * bladeScale;
-  const cellOffsetX = cellSize * 1.75;
-  const cellOffsetY = cellSize * 1.52;
-  const minX = 4 * bladeScale;
-  const maxX = 78 * bladeScale;
-  const minY = -14 * bladeScale;
-  const maxY = 14 * bladeScale;
+  const cellOffsetX = cellSize * 2.0;  // increased spacing = fewer tiles
+  const cellOffsetY = cellSize * 1.8;  // increased spacing = fewer tiles
+  const minX = 6 * bladeScale;   // left edge (matches blade start at x=6)
+  const maxX = 72 * bladeScale;  // right edge (matches blade end)
+  const minY = -1 * bladeScale;  // top edge (matches blade top)
+  const maxY = 5 * bladeScale;   // bottom edge (matches blade bottom)
   const colStart = Math.floor(minX / cellOffsetX) - 1;
   const colEnd = Math.ceil(maxX / cellOffsetX) + 1;
   const rowStart = Math.floor(minY / cellOffsetY) - 1;
   const rowEnd = Math.ceil(maxY / cellOffsetY) + 1;
 
   // ── Frame-level time values (computed once, not per-tile) ────────────────
-  const timeA = (now / 1000) * Math.PI;
+  const timeA = (now / 2000) * Math.PI;
   const timeB = now / 500;
 
   // ── Global pulse for bloom (replaces per-tile pulse in bloom pass) ───────
   const globalPulse = (Math.sin(timeB) + 1) / 2;
 
   ctx.save();
-  ctx.globalCompositeOperation = 'screen';
+  // Removed 'screen' composite operation for white background compatibility
   ctx.shadowBlur = 0;
 
   // ── Collect visible tile positions ───────────────────────────────────────
@@ -281,15 +282,24 @@ function _drawCronosBladeParticles(ctx, bladeScale) {
       const y = row * cellOffsetY;
       if (x < minX || x > maxX || y < minY || y > maxY) continue;
 
-      // Cache tile phase to avoid per-frame Math.sin of hash
+// Per-tile random phase AND speed for more variation
       const key = (row << 16) | (col & 0xFFFF);
-      let tilePhase = _BLADE_TILE_CACHE.get(key);
-      if (tilePhase === undefined) {
+      let tileData = _BLADE_TILE_CACHE.get(key);
+      if (tileData === undefined) {
         const tileHash = ((row * 1619 + col * 31337) ^ (row * col * 7)) | 0;
-        tilePhase = Math.abs(Math.sin(tileHash * 12.9898 + 78.233)) * Math.PI * 2;
-        _BLADE_TILE_CACHE.set(key, tilePhase);
+        tileData = {
+          phase: Math.abs(Math.sin(tileHash * 12.9898 + 78.233)) * Math.PI * 2,
+          speed: 0.5 + Math.abs(Math.sin(tileHash * 31.41 + 42.1)) * 1.0,  // 0.5x to 1.5x speed
+          dutyPhase: Math.abs(Math.sin(tileHash * 5.3 + 9.7)) * Math.PI * 2
+        };
+        _BLADE_TILE_CACHE.set(key, tileData);
       }
-      const tileFade = (Math.sin(timeA + tilePhase) + 1) / 2;
+      // Fast duty cycle: visible fade in and fade out
+      const dutyCycle = (Math.sin(timeA * 3.0 + tileData.dutyPhase) + 1) / 2;
+      // Fast twinkle adds variation while tile is active
+      const twinkle = (Math.sin(timeA * tileData.speed * 4.0 + tileData.phase) + 1) / 2;
+      // Combine: duty cycle controls visibility, twinkle adds sparkle
+      const tileFade = dutyCycle * 0.6 + twinkle * dutyCycle * 0.4;
 
       tileXs[validCount] = x;
       tileYs[validCount] = y;
@@ -299,46 +309,51 @@ function _drawCronosBladeParticles(ctx, bladeScale) {
   }
 
   // ── SINGLE BATCHED PASS: Bloom stroke + cell fill + cell stroke ──────────
-  // Instead of 3 separate full iterations, we do one pass with 2 batched paths.
+  // Changed to per-tile loop to prevent all tiles glowing synchronously.
 
-  // Batch 1: Bloom glow — single path, uniform style
-  // Use average fade as a global alpha multiplier (avoids per-tile strokeStyle changes)
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-  const bloomAlpha = 0.22 * globalPulse; // Slightly reduced from 0.32 for batch uniformity
-  ctx.strokeStyle = `rgba(0, 243, 255, ${bloomAlpha})`;
-  ctx.lineWidth = cellSize * 0.75;
-  ctx.beginPath();
+  // Removed 'lighter' composite operation
+  
   for (let i = 0; i < validCount; i++) {
+    const fade = tileFades[i];
+    if (fade < 0.02) continue; // Skip invisible tiles
+    
     const x = tileXs[i], y = tileYs[i];
+    
+    // Path for Bloom (slightly larger)
+    ctx.beginPath();
     const s = cellSize * 1.05;
     ctx.moveTo(x + _HEX_COS[0] * s, y + _HEX_SIN[0] * s);
     for (let j = 1; j < 6; j++) {
       ctx.lineTo(x + _HEX_COS[j] * s, y + _HEX_SIN[j] * s);
     }
     ctx.closePath();
-  }
-  ctx.stroke();
+    
+    // Bloom stroke
+    ctx.strokeStyle = 'rgb(0, 150, 255)'; // Deep saturated cyan
+    ctx.lineWidth = cellSize * 0.75;
+    ctx.globalAlpha = 0.22 * fade; 
+    ctx.stroke();
 
-  // Batch 1.5: Core glow — single path, uniform style
-  ctx.strokeStyle = `rgba(184, 255, 255, ${0.30 * globalPulse})`;
-  ctx.lineWidth = cellSize * 0.25;
-  ctx.beginPath();
-  for (let i = 0; i < validCount; i++) {
-    const x = tileXs[i], y = tileYs[i];
+    // Core glow stroke
+    ctx.beginPath();
     ctx.moveTo(x + _HEX_COS[0] * cellSize, y + _HEX_SIN[0] * cellSize);
     for (let j = 1; j < 6; j++) {
       ctx.lineTo(x + _HEX_COS[j] * cellSize, y + _HEX_SIN[j] * cellSize);
     }
     ctx.closePath();
+    
+    ctx.strokeStyle = 'rgb(0, 180, 255)'; // Saturated cyan stroke to outline cells
+    ctx.lineWidth = cellSize * 0.25;
+    ctx.globalAlpha = 0.30 * fade;
+    ctx.stroke();
   }
-  ctx.stroke();
   ctx.restore();
 
   // ── PASS 2: Sharp Solid Cells & Edges (Per-tile fade for twinkling effect) ──
   // Use globalAlpha instead of expensive rgba string interpolation
-  ctx.fillStyle = 'rgb(8, 20, 52)';
-  ctx.strokeStyle = 'rgb(0, 243, 255)';
+  ctx.fillStyle = 'rgb(0, 190, 220)'; // Vibrant cyan fill to match his theme
+  ctx.strokeStyle = 'rgb(0, 160, 255)'; // Deep saturated cyan lines
   ctx.lineWidth = Math.max(1.2, cellSize * 0.14);
 
   for (let i = 0; i < validCount; i++) {
@@ -352,8 +367,8 @@ function _drawCronosBladeParticles(ctx, bladeScale) {
     }
     ctx.closePath();
 
-    // Fill with fade and pulse
-    ctx.globalAlpha = 0.85 * globalPulse * fade;
+    // Fill with fade
+    ctx.globalAlpha = 0.85 * fade;
     ctx.fill();
 
     // Stroke with just fade

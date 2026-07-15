@@ -12,7 +12,7 @@ import { CronosFighter } from '../fighters/CronosFighter.js';
 import { BomberFighter } from '../fighters/BomberFighter.js';
 import { GunSlingerFighter } from '../fighters/GunSlingerFighter.js';
 import { DopplegangerFighter } from '../fighters/DopplegangerFighter.js';
-import { MachineGunFighter } from '../fighters/MachineGunFighter.js';
+import { EngineerFighter } from '../fighters/EngineerFighter.js';
 import { TargetDummyFighter } from '../fighters/TargetDummyFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
@@ -30,6 +30,7 @@ export const FIGHTER_CLASS_MAP = {
   'bomber':    BomberFighter,
   'gunslinger': GunSlingerFighter,
   'doppleganger': DopplegangerFighter,
-  'machinegun': MachineGunFighter,
+  'Engineer': EngineerFighter,
   'targetdummy': TargetDummyFighter,
 };
+

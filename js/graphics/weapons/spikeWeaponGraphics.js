@@ -27,8 +27,8 @@ export const SPIKE_WEAPON_GRAPHICS = {
 export function drawSpikeWeapon(ctx, x, y, angle, r) {
   const cfg = SPIKE_WEAPON_GRAPHICS;
   const qualityLevel = state.qualityLevel || 1.0;
-  const useLOD = (state.fps < 55 && state.gameState === 'playing') || qualityLevel < 0.8;
-  const useUltraLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.5;
+  const useLOD = false;
+  const useUltraLOD = false;
 
   const numSpikes = useUltraLOD ? 3 : (useLOD ? 4 : cfg.positioning.numSpikes);
   const innerOffset = cfg.positioning.innerOffset;

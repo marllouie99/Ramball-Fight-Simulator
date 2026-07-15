@@ -96,17 +96,17 @@ export function drawBerserkerDualAxes(ctx, x, y, gunAngle, r, isInRage, axeSwing
       let rot = 0;
       let fwd = 0;
       if (lt < 0.25) { // wind up backward & outward
-        rot = 0.5 * (lt / 0.25);
-        fwd = -4 * (lt / 0.25);
+        rot = 1.2 * (lt / 0.25);
+        fwd = -8 * (lt / 0.25);
       } else if (lt < 0.6) { // chop forward & inward
         const p = (lt - 0.25) / 0.35;
-        const ease = 1 - Math.pow(1 - p, 3);
-        rot = 0.5 - ease * 1.5;
-        fwd = -4 + ease * 24;
+        const ease = 1 - Math.pow(1 - p, 4);
+        rot = 1.2 - ease * 2.8;
+        fwd = -8 + ease * 36;
       } else { // recover
         const p = (lt - 0.6) / 0.4;
-        rot = -1.0 * (1 - p);
-        fwd = 20 * (1 - p);
+        rot = -1.6 * (1 - p);
+        fwd = 28 * (1 - p);
       }
       return { rot, fwd };
     };
@@ -164,156 +164,136 @@ export function drawBerserkerDualAxes(ctx, x, y, gunAngle, r, isInRage, axeSwing
 }
 
 
-function hexToTransparentRgba(hex) {
-  let r = parseInt(hex.slice(1, 3), 16);
-  let g = parseInt(hex.slice(3, 5), 16);
-  let b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r}, ${g}, ${b}, 0)`;
+function hexToTransparentRgba(hex, alpha = 0) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
+/**
+ * Enhanced Berserker Swing Effect.
+ * This function creates a more dynamic and impactful 'X' slash effect with particles,
+ * a shockwave, and more aggressive visuals, especially in rage mode.
+ */
 function drawBerserkerSwingEffect(ctx, r, progress, fade, isInRage, facingAngle) {
-  if (fade <= 0) return;
+    if (fade <= 0) return;
 
-  const glowAlpha = Math.pow(fade, 0.8) * 0.95;
-  const se = BERSERKER_WEAPON_GRAPHICS.swingEffect;
-  const color1 = isInRage ? se.primaryRage : se.primaryColor;
-  const color2 = isInRage ? '#ffffff' : '#ffcccc'; // bright inner core
-  
-  ctx.save();
-  ctx.rotate(facingAngle);
-  ctx.globalCompositeOperation = isInRage ? 'screen' : 'source-over';
+    const glowAlpha = Math.pow(fade, 0.75);
+    const se = BERSERKER_WEAPON_GRAPHICS.swingEffect;
 
-  const drawCrescentSlash = (slashProgress, isLeft) => {
+    ctx.save();
+    ctx.rotate(facingAngle);
+
+    // The composite operation determines how colors blend. 'screen' or 'lighter' are good for glows.
+    ctx.globalCompositeOperation = isInRage ? 'lighter' : 'screen';
+
+    // Defines the two slashes. The right axe swings first, then the left.
+    const rightSlashProgress = Math.min(1, Math.max(0, progress * 2.0));
+    const leftSlashProgress = Math.min(1, Math.max(0, (progress - 0.45) * 2.0));
+
+    const baseColor = isInRage ? se.primaryRage : se.primaryColor;
+    const coreColor = isInRage ? '#ffffff' : '#ffdddd';
+    const particleColors = isInRage ? ['#ff0000', '#ff8800', '#ffffff'] : ['#ffffff', '#cccccc'];
+
+    // Draw both slashes
+    if (rightSlashProgress > 0) {
+        drawImpactfulSlash(ctx, r, rightSlashProgress, glowAlpha, false, isInRage, baseColor, coreColor, particleColors);
+    }
+    if (leftSlashProgress > 0) {
+        drawImpactfulSlash(ctx, r, leftSlashProgress, glowAlpha, true, isInRage, baseColor, coreColor, particleColors);
+    }
+
+    ctx.restore();
+}
+
+/**
+ * Helper: draws a single, more visually aggressive slash.
+ */
+function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage, baseColor, coreColor, particleColors) {
     if (slashProgress <= 0 || slashProgress >= 1) return;
-    
-    // Scale up quickly, then fade out
-    const scale = Math.sin(slashProgress * Math.PI); 
-    const alpha = 1 - Math.pow(slashProgress, 1.5); 
-    
+
     ctx.save();
-    
-    const distance = r + 12 + Math.pow(slashProgress, 0.5) * 25; // pushes forward aggressively
+
+    // --- Animation Properties ---
+    // The animation is broken into phases: wind-up (invisible), slash, and fade-out.
+    const easeOutQuart = (t) => 1 - Math.pow(1 - t, 4);
+    const scale = easeOutQuart(Math.sin(slashProgress * Math.PI)); // Grows and shrinks smoothly
+    const alpha = (1 - Math.pow(slashProgress, 2)) * totalAlpha; // Fades out over time
+
+    // --- Positioning ---
+    // The slash is pushed forward from the character's center.
+    const distance = r + 15 + Math.pow(slashProgress, 0.7) * 35;
     ctx.translate(distance, 0);
-    
-    // Tilt the slash to form half of an X
-    const tilt = isLeft ? Math.PI / 4.5 : -Math.PI / 4.5;
+
+    // The tilt creates the 'X' shape when two slashes are drawn.
+    const tilt = isLeft ? Math.PI / 4 : -Math.PI / 4;
     ctx.rotate(tilt);
-    
-    const length = 45 + 15 * scale; 
-    const thickness = 22 * scale;
-    
-    // The main crescent shape
+
+    const length = 50 + 20 * scale;
+    const thickness = (18 + 10 * (isInRage ? 1.5 : 1)) * scale;
+
+    // --- Main Slash Shape (Thick, curved blade arc) ---
     ctx.beginPath();
-    ctx.moveTo(0, -length);
-    ctx.quadraticCurveTo(thickness, 0, 0, length);
-    ctx.quadraticCurveTo(thickness * 0.4, 0, 0, -length);
-    
-    // Fill with gradient
-    const grad = ctx.createLinearGradient(0, -length, 0, length);
-    grad.addColorStop(0, hexToTransparentRgba(color1));
-    grad.addColorStop(0.5, color1);
-    grad.addColorStop(1, hexToTransparentRgba(color1));
-    
+    ctx.moveTo(0, -length / 2);
+    ctx.quadraticCurveTo(thickness, 0, 0, length / 2);
+    ctx.quadraticCurveTo(thickness * 0.7, 0, 0, -length / 2);
+    ctx.closePath();
+
+    // --- Main Fill (Gradient for depth) ---
+    const grad = ctx.createLinearGradient(0, -length / 2, 0, length / 2);
+    grad.addColorStop(0, hexToTransparentRgba(baseColor, 0));
+    grad.addColorStop(0.5, baseColor);
+    grad.addColorStop(1, hexToTransparentRgba(baseColor, 0));
+
     ctx.fillStyle = grad;
-    ctx.globalAlpha = glowAlpha * alpha;
+    ctx.globalAlpha = alpha;
     ctx.fill();
-    
-    // Bright inner core
-    ctx.beginPath();
-    ctx.moveTo(0, -length * 0.7);
-    ctx.quadraticCurveTo(thickness * 0.5, 0, 0, length * 0.7);
-    ctx.quadraticCurveTo(thickness * 0.2, 0, 0, -length * 0.7);
-    ctx.fillStyle = color2;
-    ctx.globalAlpha = glowAlpha * alpha * 0.9;
-    ctx.fill();
-    
-    // Sharp leading edge
-    ctx.beginPath();
-    ctx.moveTo(0, -length);
-    ctx.quadraticCurveTo(thickness, 0, 0, length);
-    ctx.strokeStyle = isInRage ? '#ffdddd' : '#ffffff';
-    ctx.lineWidth = 2 * scale;
-    ctx.globalAlpha = glowAlpha * alpha * 0.8;
-    ctx.stroke();
 
-    // Chaotic slash particles in rage mode
-    if (isInRage) {
-      ctx.globalAlpha = glowAlpha * alpha * 0.8;
-      for (let i = 0; i < 4; i++) {
-        const px = thickness * 0.5 + Math.random() * 20 * scale;
-        const py = (Math.random() * 2 - 1) * length * 1.1;
+    // --- Inner Core (Bright, hot center of the slash) ---
+    if (slashProgress < 0.8) {
         ctx.beginPath();
-        ctx.arc(px, py, 1 + Math.random() * 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = Math.random() > 0.5 ? '#ffffff' : '#ff0000';
+        ctx.moveTo(0, -length * 0.4);
+        ctx.quadraticCurveTo(thickness * 0.4, 0, 0, length * 0.4);
+        ctx.quadraticCurveTo(thickness * 0.2, 0, 0, -length * 0.4);
+        ctx.fillStyle = coreColor;
+        ctx.globalAlpha = alpha * (1 - slashProgress); // Fades faster
         ctx.fill();
-      }
+    }
+
+    // --- Leading Edge (Sharp line) ---
+    ctx.beginPath();
+    ctx.moveTo(0, -length / 2);
+    ctx.quadraticCurveTo(thickness, 0, 0, length / 2);
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 2.5 * scale;
+    ctx.globalAlpha = alpha * 0.8;
+    ctx.stroke();
+
+    // --- Particle Burst ---
+    // Particles are generated most intensely around the middle of the animation.
+    const particleIntensity = Math.sin(slashProgress * Math.PI);
+    if (particleIntensity > 0.5) {
+        const particleCount = isInRage ? 8 : 4;
+        for (let i = 0; i < particleCount; i++) {
+            const pAlpha = alpha * (0.5 + Math.random() * 0.5);
+            const pSize = 1 + Math.random() * 2.5 * (isInRage ? 1.5 : 1);
+            
+            // Particles fly outwards from the slash center
+            const angle = (Math.random() - 0.5) * Math.PI * 1.5;
+            const speed = (20 + Math.random() * 30) * particleIntensity;
+            const px = thickness / 2 + Math.cos(angle) * speed;
+            const py = Math.sin(angle) * speed;
+
+            ctx.beginPath();
+            ctx.arc(px, py, pSize, 0, Math.PI * 2);
+            ctx.fillStyle = particleColors[Math.floor(Math.random() * particleColors.length)];
+            ctx.globalAlpha = pAlpha;
+            ctx.fill();
+        }
     }
     
     ctx.restore();
-  };
-
-  const rightProgress = Math.min(1, Math.max(0, progress * 2.2));
-  const leftProgress = Math.min(1, Math.max(0, (progress - 0.4) * 2.2));
-
-  drawCrescentSlash(rightProgress, false);
-  drawCrescentSlash(leftProgress, true);
-
-  // Lingering X mark
-  if (fade > 0 && progress > 0.5) {
-    ctx.save();
-    const finalDist = r + 12 + 25; 
-    ctx.translate(finalDist, 0);
-    
-    // Fade the mark out at the very end
-    let markAlpha = fade;
-    if (progress < 1.0) markAlpha *= (progress - 0.5) * 2; // fade in as slashes happen
-    
-    ctx.globalAlpha = glowAlpha * markAlpha * 0.6;
-    ctx.globalCompositeOperation = 'source-over';
-    
-    ctx.lineWidth = 6 + Math.random() * 2; // jittery width
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = isInRage ? '#cc0000' : '#8b0000';
-    
-    // Right slash mark - curved to look less like a letter
-    ctx.save();
-    ctx.rotate(-Math.PI / 4.2);
-    ctx.beginPath();
-    ctx.moveTo(4, -45);
-    ctx.quadraticCurveTo(-12, -5, -2, 42);
-    ctx.stroke();
-    
-    // Small secondary tear
-    ctx.lineWidth = ctx.lineWidth * 0.4;
-    ctx.beginPath();
-    ctx.moveTo(12, -25);
-    ctx.quadraticCurveTo(-2, 0, 5, 25);
-    ctx.stroke();
-    ctx.restore();
-
-    // Left slash mark - offset and curved
-    if (progress > 0.8) {
-        ctx.save();
-        ctx.rotate(Math.PI / 3.8); // Different angle for asymmetry
-        ctx.translate(-8, 5); // Offset the intersection point
-        ctx.beginPath();
-        ctx.moveTo(-5, -40);
-        ctx.quadraticCurveTo(15, 5, 2, 48);
-        ctx.stroke();
-        
-        // Small secondary tear
-        ctx.lineWidth = ctx.lineWidth * 0.4;
-        ctx.beginPath();
-        ctx.moveTo(-15, -15);
-        ctx.quadraticCurveTo(5, 5, -5, 28);
-        ctx.stroke();
-        ctx.restore();
-    }
-    
-    ctx.restore();
-  }
-
-  ctx.restore();
 }
 
 /**

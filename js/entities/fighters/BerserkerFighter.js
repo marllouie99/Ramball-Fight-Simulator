@@ -6,6 +6,7 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawBerserkerDualAxes } from '../../graphics/weaponVisuals.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
+import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 import { state } from '../../core/state.js';
 
 /**
@@ -28,6 +29,12 @@ export class BerserkerFighter extends Fighter {
     this.axeSwingDuration = CONFIG.berserker.axeSwingDurationFrames ?? 24;
     this.rageFadeTimer = 0;
     this.axeHistory = [];
+    // Wind-up and shake for impactful swing
+    this.axeWindupTimer = 0;
+    this.axeWindupDuration = CONFIG.berserker.axeWindupDuration ?? 6;
+    this.axeHitShakeX = 0;
+    this.axeHitShakeY = 0;
+    this.axeHitShakeTimer = 0;
   }
 
   reset() {
@@ -43,6 +50,11 @@ export class BerserkerFighter extends Fighter {
     this.axeSwingDuration = CONFIG.berserker.axeSwingDurationFrames ?? 24;
     this.rageFadeTimer = 0;
     this.axeHistory = [];
+    this.axeWindupTimer = 0;
+    this.axeWindupDuration = CONFIG.berserker.axeWindupDuration ?? 6;
+    this.axeHitShakeX = 0;
+    this.axeHitShakeY = 0;
+    this.axeHitShakeTimer = 0;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -107,19 +119,31 @@ export class BerserkerFighter extends Fighter {
       damage *= CONFIG.berserker.rageDamageMultiplier;
     }
 
-    // Hit!
+    // Hit! Start wind-up phase first (anticipation)
     this.axeSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    this.axeSwingActive = true;
-    this.axeSwingDuration = CONFIG.berserker.axeSwingDurationFrames ?? 24;
-    this.axeSwingTimer = this.axeSwingDuration; // frames for swing animation
-    // Immediately mirror swing angle into gunAngle so visuals rotate consistently
     this.gunAngle = this.axeSwingAngle;
+    this.axeWindupTimer = this.axeWindupDuration; // Brief wind-up before swing
+    this.axeSwingActive = false; // Swing starts after wind-up
+    this.axeSwingDuration = CONFIG.berserker.axeSwingDurationFrames ?? 24;
+    this.axeSwingTimer = this.axeSwingDuration;
+    this.axeSlashFadeTimer = 0;
     this.axeCooldown = this.isInRage
       ? CONFIG.berserker.axeCooldown / CONFIG.berserker.rageAttackSpeedMultiplier
       : CONFIG.berserker.axeCooldown;
 
+    // Deal damage and effects immediately on hit
     opponent.takeDamage(damage, this, { isMelee: true });
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#8b0000');
+
+    // IMPACT EFFECTS: Screen shake + sparks
+    const shakeIntensity = this.isInRage ? 8 : 5;
+    this.axeHitShakeX = (Math.random() - 0.5) * shakeIntensity;
+    this.axeHitShakeY = (Math.random() - 0.5) * shakeIntensity;
+    this.axeHitShakeTimer = 8;
+
+    // Spawn sparks at impact point
+    const sparkCount = this.isInRage ? 15 : 10;
+    spawnSparks(opponent.x, opponent.y, sparkCount, this.isInRage ? 'crimson' : 'flash');
 
     // Play attack sound    
     const sound = getBasicAttackSound(this._def?.id);
@@ -210,7 +234,7 @@ export class BerserkerFighter extends Fighter {
     // OPTIMIZATION: Quality-based motion trail recording
     const qualityLevel = state.qualityLevel || 1.0;
     const fps = state.fps || 60;
-    const useAggressiveMode = fps < 40 || qualityLevel < 0.5;
+    const useAggressiveMode = false;
 
     // Record history for the motion trail
     if ((this.isInRage || this.rageFadeTimer > 0) && !useAggressiveMode) {
@@ -225,6 +249,26 @@ export class BerserkerFighter extends Fighter {
     // Handle axe cooldown
     if (this.axeCooldown > 0) {
       this.axeCooldown--;
+    }
+
+    // Handle axe wind-up (brief anticipation before swing)
+    if (this.axeWindupTimer > 0) {
+      this.axeWindupTimer--;
+      if (this.axeWindupTimer <= 0) {
+        // Wind-up done, start the actual swing
+        this.axeSwingActive = true;
+      }
+    }
+
+    // Handle hit shake decay
+    if (this.axeHitShakeTimer > 0) {
+      this.axeHitShakeTimer--;
+      this.axeHitShakeX *= 0.7;
+      this.axeHitShakeY *= 0.7;
+      if (this.axeHitShakeTimer <= 0) {
+        this.axeHitShakeX = 0;
+        this.axeHitShakeY = 0;
+      }
     }
 
     // Handle axe swing animation
@@ -303,7 +347,10 @@ export class BerserkerFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    drawBerserkerDualAxes(ctx, this.x, this.y, this.gunAngle, this.r, this.isInRage, this.axeSwingActive, this.axeSwingTimer, this.axeSwingAngle, this.axeSwingDuration, this.axeSlashFadeTimer, this.rageFadeTimer, this.axeHistory);
+    // Apply hit shake offset for impact feedback
+    const shakeX = this.axeHitShakeX || 0;
+    const shakeY = this.axeHitShakeY || 0;
+    drawBerserkerDualAxes(ctx, this.x + shakeX, this.y + shakeY, this.gunAngle, this.r, this.isInRage, this.axeSwingActive, this.axeSwingTimer, this.axeSwingAngle, this.axeSwingDuration, this.axeSlashFadeTimer, this.rageFadeTimer, this.axeHistory, this.axeWindupTimer, this.axeWindupDuration);
   }
 
   drawRageBar(ctx) {

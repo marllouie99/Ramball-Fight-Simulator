@@ -269,14 +269,23 @@ export class DopplegangerFighter extends Fighter {
 
   drawBody(ctx) {
     const animTime = this.animationTime || Date.now();
+    
+    ctx.save();
+    ctx.translate(this.x, this.y);
+
     // Draw the haze and void core UNDER the body
-    drawDopplegangerBodyEffect(ctx, this.x, this.y, this.r, this.angle, 'under', animTime);
+    drawDopplegangerBodyEffect(ctx, 0, 0, this.r, this.angle, 'under', animTime);
 
     // Custom body skin drawn in the middle slot
-    drawDoppelgangerSkin(ctx, this.x, this.y, this.r, this.angle, animTime);
+    drawDoppelgangerSkin(ctx, 0, 0, this.r, this.angle, animTime);
 
     // Draw the swirling violet smoke OVER the body
-    drawDopplegangerBodyEffect(ctx, this.x, this.y, this.r, this.angle, 'over', animTime);
+    drawDopplegangerBodyEffect(ctx, 0, 0, this.r, this.angle, 'over', animTime);
+
+    // Draw status overlays (shock, poison, burn)
+    this.drawStatusOverlays(ctx, this.r);
+    
+    ctx.restore();
   }
 
   drawGun(ctx) {

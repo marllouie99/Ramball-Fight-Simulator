@@ -14,6 +14,7 @@ import { getSkillEffectSoundPaths } from '../soundEffects/skillEffectSounds.js';
 import { getAnnouncerSoundPaths, getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
+import { clearAllPools } from '../graphics/objectPool.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -173,6 +174,21 @@ export function reinitFighters() {
 
 export function randomize1v1Fighters() {
   if (FIGHTER_DEFS.length < 2) return;
+  
+  // DEBUG: Force Berserker (index 9) for player 1 to test axe swing
+  const FORCE_BERSERKER = true;
+  if (FORCE_BERSERKER) {
+    // Find Berserker index
+    const berserkerIdx = FIGHTER_DEFS.findIndex(d => d.id === 'berserker');
+    if (berserkerIdx !== -1) {
+      state.p1Index = berserkerIdx;
+      // Pick a random opponent
+      const otherIndices = FIGHTER_DEFS.map((_, idx) => idx).filter(idx => idx !== berserkerIdx);
+      state.p2Index = otherIndices[Math.floor(Math.random() * otherIndices.length)];
+      return;
+    }
+  }
+  
   const indices = FIGHTER_DEFS.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -205,6 +221,7 @@ export function startNextRound() {
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles from previous round
   burnEffectSystem.clear();
+  clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
 
@@ -213,6 +230,7 @@ export function restartCurrentRound() {
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
+  clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
 
@@ -252,6 +270,7 @@ export function resetMatch() {
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
+  clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
 

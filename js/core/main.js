@@ -163,13 +163,8 @@ function animate(timestamp) {
       state.qualityCheckTimer++;
       if (state.qualityCheckTimer >= state.qualityCheckInterval) {
         state.qualityCheckTimer = 0;
-        // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
-        if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
-          const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop much faster when FPS is very low
-          state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
-        } else if (state.fps >= state.targetFps + 20 && state.qualityLevel < 1.0) {
-          state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.03); // Recover much slower
-        }
+        // Quality Level is locked to 1.0; no dynamic downgrading
+        state.qualityLevel = 1.0;
       }
 
       // OPTIMIZED: Enforce hard cap on total particles
@@ -327,7 +322,7 @@ function animate(timestamp) {
     // OPTIMIZATION: Quality-based particle system updates
     const qualityLevel = state.qualityLevel || 1.0;
     const fps = state.fps || 60;
-    const useAggressiveParticleMode = fps < 35 || qualityLevel < 0.4;
+    const useAggressiveParticleMode = false;
 
     // Update death effects (always update, even between rounds)
     if (!useAggressiveParticleMode || Math.random() > 0.5) {
@@ -411,12 +406,8 @@ function animate(timestamp) {
         drawBerserkerRageEffects(); // Draw berserker rage effects
       }
 
-      if (!useAggressiveParticleMode || Math.random() > 0.5) {
-        drawBloodEffects(); // Draw blood effects on top of everything
-      }
-      if (!useAggressiveParticleMode || Math.random() > 0.4) {
-        drawSparkEffects(); // Draw spark effects on top of everything
-      }
+      drawBloodEffects(); // Draw blood effects on top of everything
+      drawSparkEffects(); // Draw spark effects on top of everything
 
       // Draw FPS display
       state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';

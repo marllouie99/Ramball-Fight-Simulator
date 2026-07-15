@@ -1,16 +1,26 @@
 import { CONFIG } from '../../core/config.js';
 
 export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
-  ctx.save();
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowBlur = ctx.shadowBlur;
+  const prevShadowOffsetX = ctx.shadowOffsetX;
+  const prevShadowOffsetY = ctx.shadowOffsetY;
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
   
+  let scaleY = 1;
   // Prevent upside-down graphics when aiming left
   if (Math.abs(gunAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
+    scaleY = -1;
   }
 
-  ctx.translate(r + CONFIG.gun.baseOffset, 0);
+  const baseOffset = CONFIG.gun.baseOffset;
+  ctx.translate(r + baseOffset, 0);
 
   // Redesigned Ranger's Pistol based on the reference image
   // Main body color is very dark grey/black with texture
@@ -108,8 +118,9 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
   // Glowing Cyan Elements
   const glowAlpha = 0.6 + 0.4 * pulse;
   const glowColor = `rgba(0, 255, 255, ${glowAlpha})`;
-  ctx.shadowColor = '#00ffff'; // keep blur color intense
-  ctx.shadowBlur = (6 + 4 * pulse) * scale;
+  // OPTIMIZED: Removed shadowBlur (expensive operation)
+  ctx.shadowColor = '#00ffff';
+  ctx.shadowBlur = 0;
   ctx.fillStyle = glowColor;
 
   // 1. Diagonal glowing slits on the back slide
@@ -130,14 +141,16 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
   ctx.fill();
   
   // Inner white dot for extreme brightness on the circular node
-  ctx.shadowBlur = (2 + 2 * pulse) * scale;
+  // OPTIMIZED: Removed shadowBlur (expensive operation)
+  ctx.shadowBlur = 0;
   ctx.fillStyle = `rgba(255, 255, 255, ${0.8 + 0.2 * pulse})`;
   ctx.beginPath();
   ctx.arc(4 * scale, 0, 0.6 * scale, 0, Math.PI * 2);
   ctx.fill();
   
   // Restore glow for next elements
-  ctx.shadowBlur = (6 + 4 * pulse) * scale;
+  // OPTIMIZED: Removed shadowBlur (expensive operation)
+  ctx.shadowBlur = 0;
   ctx.fillStyle = glowColor;
 
   // 3. Glowing horizontal line on the front barrel side
@@ -155,7 +168,8 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
   // 5. Holographic floating targeting rings ahead of the muzzle
   ctx.strokeStyle = `rgba(0, 255, 255, ${0.3 + 0.7 * pulse})`;
   ctx.lineWidth = 0.8 * scale;
-  ctx.shadowBlur = (4 + 2 * pulse) * scale;
+  // OPTIMIZED: Removed shadowBlur (expensive operation)
+  ctx.shadowBlur = 0;
   
   for (let i = 1; i <= 3; i++) {
     const ringOffset = 25 * scale + i * 3.5 * scale;
@@ -174,5 +188,105 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
     ctx.fill();
   }
 
+  // Manual transform reset
+  ctx.translate(-(r + baseOffset), 0);
+  if (scaleY === -1) {
+    ctx.scale(1, -1);
+  }
+  ctx.rotate(-gunAngle);
+  ctx.translate(-x, -y);
+
+  // Manual state restore
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowBlur = prevShadowBlur;
+  ctx.shadowOffsetX = prevShadowOffsetX;
+  ctx.shadowOffsetY = prevShadowOffsetY;
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
+}
+
+/**
+ * Draws a Ranger's projectile bullet with a clean sci-fi trail effect.
+ * @param {CanvasRenderingContext2D} ctx - The canvas context
+ * @param {Object} p - The projectile object
+ */
+export function drawRangerBullet(ctx, p) {
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowBlur = ctx.shadowBlur;
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevGlobalAlpha = ctx.globalAlpha;
+  const prevCompositeOperation = ctx.globalCompositeOperation;
+
+  // Calculate direction for elongated shape (using velocity so it works when frozen by time stop)
+  const vx = p.vx === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+  const vy = p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+  const angle = Math.atan2(vy, vx);
+
+  // Draw trail using history array - clean gradient trail
+  if (p.history && p.history.length > 1) {
+    ctx.save();
+    
+    // Only use last few points for a short, fast trail
+    const startIdx = Math.max(0, p.history.length - 6);
+    const lastPt = p.history[p.history.length - 1];
+    
+    // Create gradient for trail
+    const gradient = ctx.createLinearGradient(
+      p.history[startIdx].x, p.history[startIdx].y,
+      lastPt.x, lastPt.y
+    );
+    gradient.addColorStop(0, 'rgba(0, 180, 255, 0)');
+    gradient.addColorStop(0.5, 'rgba(0, 200, 255, 0.5)');
+    gradient.addColorStop(1, 'rgba(100, 230, 255, 0.85)');
+    
+    // Single clean trail line with gradient
+    ctx.beginPath();
+    ctx.moveTo(p.history[startIdx].x, p.history[startIdx].y);
+    for (let i = startIdx + 1; i < p.history.length; i++) {
+      ctx.lineTo(p.history[i].x, p.history[i].y);
+    }
+    ctx.strokeStyle = gradient;
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.stroke();
+    
+    ctx.restore();
+  }
+
+  // Draw the main bullet - elongated sci-fi energy bolt
+  ctx.save();
+  // Outer glow - large diffuse
+  ctx.shadowColor = '#00ccff';
+  ctx.shadowBlur = 10;
+  ctx.fillStyle = 'rgba(0, 180, 255, 0.9)'; // Made slightly more opaque for better visibility
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.r * 1.5, p.r * 0.85, angle, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Add dark stroke so it stands out against the white background
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  
+  // Inner bright core
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.ellipse(p.x, p.y, p.r * 0.55, p.r * 0.3, angle, 0, Math.PI * 2);
+  ctx.fill();
+  
   ctx.restore();
+
+  // Restore context state
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowBlur = prevShadowBlur;
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
+  ctx.globalAlpha = prevGlobalAlpha;
+  ctx.globalCompositeOperation = prevCompositeOperation;
 }

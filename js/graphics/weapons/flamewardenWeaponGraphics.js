@@ -13,7 +13,7 @@ import { state } from '../../core/state.js';
 // Uses additive blending for glow effect without expensive shadow operations.
 // Max 60 particles for consistent 60fps with dense flame appearance.
 
-const MAX_FLAME_PARTICLES = 25; // OPTIMIZED: Further reduced from 40 to 25 for severe performance situations
+const MAX_FLAME_PARTICLES = 80; // Increased significantly for dense, realistic fire stream
 
 // Color stops: [lifeRatio, r, g, b, alpha]
 // lifeRatio 0.0 = just born (white core), 1.0 = dying (smokey grey)
@@ -161,7 +161,7 @@ export class FlamethrowerParticleSystem {
     if (this.active) {
       // OPTIMIZED: Apply dynamic quality level to spawn rate with more aggressive reduction
       const qualityMultiplier = state.qualityLevel || 1.0;
-      const baseSpawnCount = 1; // Always spawn 1 particle maximum for performance
+      const baseSpawnCount = 3; // Spawn multiple particles per frame for dense fire
       const spawnCount = qualityMultiplier < 0.5 ? 1 : Math.max(1, Math.floor(baseSpawnCount * qualityMultiplier));
       for (let i = 0; i < spawnCount; i++) {
         this.spawnParticle();
@@ -200,9 +200,9 @@ export class FlamethrowerParticleSystem {
       p.vy -= 20 * dt; // Gentle upward force
       p.vx += p.turbulence * 40 * dt; // Wobbly movement
 
-      // Slight drag to slow down over time
-      p.vx *= (1 - 0.8 * dt);
-      p.vy *= (1 - 0.8 * dt);
+      // Stronger drag to simulate liquid burning and billowing in the air
+      p.vx *= (1 - 2.5 * dt);
+      p.vy *= (1 - 2.5 * dt);
 
       // OPTIMIZED: Skip black hole logic if no black holes exist
       if (blackHoles.length === 0) continue;
@@ -238,38 +238,72 @@ export class FlamethrowerParticleSystem {
 
   // Draw all particles (call every frame)
   draw(ctx) {
-    // Check if we have any active particles before saving context
-    let hasActive = false;
+    // Collect active particles
+    const activeParticles = [];
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
       if (this.particles[i].active) {
-        hasActive = true;
-        break;
+        activeParticles.push(this.particles[i]);
       }
     }
-    if (!hasActive) return;
+    
+    if (activeParticles.length === 0) return;
+
+    // VERY IMPORTANT: Sort oldest (highest life) first, newest (hot white core) last
+    // This perfectly layers the fire so the hot core stays solid on top!
+    activeParticles.sort((a, b) => b.life - a.life);
 
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
+    // Default source-over blending handles the layering perfectly
 
-    for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
-      const p = this.particles[i];
-      if (!p.active) continue;
-
+    for (const p of activeParticles) {
       const lifeRatio = p.life / p.maxLife;
 
-      // Size grows with distance from origin (based on life ratio)
-      const size = p.baseSize + (p.maxSize - p.baseSize) * lifeRatio;
+      // Maintain a tighter stream, billowing out only slightly at the end
+      const size = p.baseSize + (p.maxSize * 1.2 - p.baseSize) * lifeRatio;
 
-      // Get precomputed color string (avoid lerpColor object creation and string formatting)
-      const colorIdx = Math.floor(lifeRatio * (COLOR_LUT_SIZE - 1));
-      const colorStr = PRECOMPUTED_COLORS[Math.max(0, Math.min(COLOR_LUT_SIZE - 1, colorIdx))];
+      // Soft radial gradient for organic fire
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+      const alpha = lifeRatio > 0.8 ? 1.0 - ((lifeRatio - 0.8) / 0.2) : 1.0;
 
-      // Draw the particle as a filled circle
+      if (lifeRatio < 0.15) {
+        // Tight, white-hot napalm core
+        grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
+        grad.addColorStop(0.5, `rgba(255, 240, 100, ${alpha * 0.9})`);
+        grad.addColorStop(1, `rgba(255, 120, 0, 0)`);
+      } else if (lifeRatio < 0.5) {
+        // Bright orange directional fire
+        grad.addColorStop(0, `rgba(255, 200, 40, ${alpha * 0.95})`);
+        grad.addColorStop(0.6, `rgba(255, 80, 0, ${alpha * 0.8})`);
+        grad.addColorStop(1, `rgba(200, 20, 0, 0)`);
+      } else {
+        // Dark red edges and smoke
+        grad.addColorStop(0, `rgba(220, 50, 0, ${alpha * 0.7})`);
+        grad.addColorStop(0.7, `rgba(100, 10, 10, ${alpha * 0.4})`);
+        grad.addColorStop(1, `rgba(40, 20, 20, 0)`);
+      }
+
+      // Calculate orientation and stretching for chaotic, directional fire
+      const speed = Math.hypot(p.vx, p.vy);
+      const angle = Math.atan2(p.vy, p.vx);
+      // High speed = massively stretched fire streak. Low speed = round billow.
+      const stretch = Math.max(1.0, Math.min(4.0, speed / 60));
+      // Add chaotic wobble based on turbulence and life
+      const wobble = Math.sin(p.life * 20 + p.turbulence) * 0.3;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle + wobble);
+      // Scale X by stretch to create an elliptical gradient (motion-blurred fire streak)
+      // Scale Y slightly by life to simulate the fire expanding laterally
+      ctx.scale(stretch, 1.0 + lifeRatio * 0.5);
+
       ctx.beginPath();
-      ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-      ctx.fillStyle = colorStr;
+      ctx.arc(0, 0, size, 0, Math.PI * 2);
+      ctx.fillStyle = grad;
       ctx.fill();
-    }
+      
+      ctx.restore();
+    } // <-- Missing bracket for the loop
 
     ctx.restore();
   }

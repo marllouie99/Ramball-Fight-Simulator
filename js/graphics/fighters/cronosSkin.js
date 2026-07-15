@@ -10,7 +10,7 @@ export function drawCronosBody(ctx, r, angle) {
   ctx.fill();
 
   ctx.save();
-  ctx.globalCompositeOperation = 'screen';
+  // Removed 'screen' mode for better visibility on white background
   const sheen = ctx.createRadialGradient(-baseRadius * 0.2, -baseRadius * 0.2, 0, 0, 0, baseRadius);
   sheen.addColorStop(0, 'rgba(255,255,255,0.24)');
   sheen.addColorStop(0.65, 'rgba(0,243,255,0.00)');
@@ -52,7 +52,7 @@ export function drawCronosBody(ctx, r, angle) {
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius * 0.34, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+  ctx.strokeStyle = 'rgb(0, 150, 255)'; // Deep saturated cyan instead of dark stroke
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.restore();

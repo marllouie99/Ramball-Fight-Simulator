@@ -29,6 +29,13 @@ export const SKILL_EFFECT_SOUNDS = {
       speed: 1.2, // You can adjust this to make the reload sound faster/slower!
     },
   },
+  sharpshooter: {
+    reload: {
+      src: 'Assets/Sound Effects/SkillEffects/energyreloading.mp3',
+      volume: 0.8,
+      speed: 1.2,
+    },
+  },
 
   // ── Alchemist / Grenadier ─────────────────
   // Plays when a fighter gets hit by poison AOE.
@@ -55,7 +62,11 @@ export const SKILL_EFFECT_SOUNDS = {
  * @returns {{ src: string, volume: number, speed?: number } | null}
  */
 export function getSkillEffectSound(fighterName, effectName) {
-  const lowerName = String(fighterName || '').toLowerCase().replace(/\s+/g, '');
+  let nameKey = String(fighterName || '').toLowerCase().replace(/\s+/g, '');
+  if (nameKey === '1') {
+    nameKey = 'sharpshooter';
+  }
+  const lowerName = nameKey;
   const lowerEffect = String(effectName || '').toLowerCase();
 
   const fighterConfig = SKILL_EFFECT_SOUNDS[lowerName];

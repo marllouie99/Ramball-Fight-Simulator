@@ -22,6 +22,13 @@ export class AimbotFighter extends Fighter {
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
+    // Apply quick electric shock on hit based on probability
+    const stunChance = CONFIG.aimbot?.electricStunChance ?? 0.5;
+    if (Math.random() < stunChance) {
+      const stunDuration = CONFIG.aimbot?.electricStunDuration ?? 10;
+      target.electricStunTimer = Math.max(target.electricStunTimer || 0, stunDuration);
+    }
+
     // Blue fires an immediate follow-up shot only on original projectiles.
     if (!projectile.isFollowUp && projectileSystem) {
       spawnFloatingText(target.x, target.y - target.r - 5, 'DOUBLE SHOT!', '#00eaff');

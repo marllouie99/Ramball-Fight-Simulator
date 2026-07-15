@@ -5,6 +5,8 @@
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 
+import { CONFIG } from '../../core/config.js';
+
 /**
  * Spawns a blood effect at the fighter's position.
  * Particles spray outward from the damage direction.
@@ -14,39 +16,42 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
   const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
-  
-  // OPTIMIZED: Apply quality level to blood particle limits
+
+  // Allow far more blood particles so they can accumulate on the floor
   const qualityMultiplier = state.qualityLevel || 1.0;
-  let MAX_BLOOD_PARTICLES = Math.floor((isMulti ? 20 : 100) * qualityMultiplier);
-  
+  let MAX_BLOOD_PARTICLES = Math.floor((isMulti ? 200 : 400) * qualityMultiplier);
+
   // OPTIMIZED: Reduce particle count based on quality level
   const baseParticleCount = Math.max(2, Math.floor(amount / 3));
   const particleCount = Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
-  
-  const color = fighter.color || '#ff4444';
-  
+
+  let color = fighter.color || '#e60000';
+  // Increase saturation/depth for standard team/fighter colors so they pop on white
+  if (color === '#ff4d4d' || color === '#ff4444') color = '#e60000';
+  else if (color === '#4da3ff') color = '#0066ff';
+  else if (color === '#ffd700') color = '#ff9900';
+  else if (color === '#4dff4d') color = '#00cc00';
+
   for (let i = 0; i < particleCount; i++) {
-    // If we reached the global limit, remove the oldest blood particle using swap-and-pop
+    // If we reached the global limit, properly remove the oldest blood particle
     if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
-      // Swap-and-pop is O(1) instead of O(n) shift()
-      state.bloodEffects[0] = state.bloodEffects[state.bloodEffects.length - 1];
-      state.bloodEffects.pop();
+      state.bloodEffects.shift();
     }
     // Random angle for each particle
     let angle = Math.random() * Math.PI * 2;
     // Faster speed for more impact
     const speed = 2 + Math.random() * 3;
-    
+
     // If damage angle is provided, bias particles in the damage direction
     if (damageAngle !== null) {
       // Wider spread in the damage direction (90 degree spread)
       const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.5;
       angle = damageAngle + spreadAngle;
     }
-    
+
     // Bigger particles (3-6 pixels) for more visibility
     const size = 3 + Math.random() * 3;
-    
+
     state.bloodEffects.push({
       x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
       y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
@@ -55,7 +60,7 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
       size: size,
       color: color,
       life: 1.0,           // 1.0 = full life, 0 = dead
-      decay: 0.006 + Math.random() * 0.006, // 1.5-3 seconds to fade
+      decay: 0.001 + Math.random() * 0.001, // ~8-16 seconds to fade (stays much longer)
       friction: 0.94,     // Slow down over time
     });
   }
@@ -65,20 +70,33 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
  * Updates all blood effects.
  */
 export function updateBloodEffects() {
+  const arenaBottom = CONFIG.arena.y + CONFIG.arena.height;
+
   for (let i = state.bloodEffects.length - 1; i >= 0; i--) {
     const effect = state.bloodEffects[i];
-    
-    // Update position (spread outward)
+
+    // Apply gravity
+    effect.vy += 0.25;
+
+    // Update position
     effect.x += effect.vx;
     effect.y += effect.vy;
-    
-    // Slow down over time (friction to stop spreading)
+
+    // Check for floor collision
+    if (effect.y >= arenaBottom - effect.size / 2) {
+      effect.y = arenaBottom - effect.size / 2;
+      effect.vy *= -0.4; // Bounce on the floor
+      effect.vx *= 0.8; // Added friction when sliding on the floor
+    } else {
+      effect.vy *= 0.98; // Air resistance on falling speed
+    }
+
+    // Slow down horizontally over time (friction)
     effect.vx *= effect.friction;
-    effect.vy *= effect.friction;
-    
+
     // Fade out
     effect.life -= effect.decay;
-    
+
     // Remove dead effects
     if (effect.life <= 0) {
       state.bloodEffects.splice(i, 1);
@@ -93,14 +111,23 @@ export function drawBloodEffects() {
   const { ctx } = state;
   for (const effect of state.bloodEffects) {
     ctx.save();
+    // Remove 'lighter' composite operation so blood stays red on white background
+    ctx.translate(effect.x, effect.y);
+
+    // Spin the tiny cubes/squares as they fly outward
+    const rotation = (effect.vx + effect.vy) * effect.life * 0.5;
+    ctx.rotate(rotation);
+
     ctx.globalAlpha = effect.life;
-    
-    // Draw a small circle for blood particle
-    ctx.beginPath();
-    ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
     ctx.fillStyle = effect.color;
-    ctx.fill();
+    // Render as sharp digital square/cube shards
+    ctx.fillRect(-effect.size / 2, -effect.size / 2, effect.size, effect.size);
     
+    // Add dark stroke so it stands out against the white background
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-effect.size / 2, -effect.size / 2, effect.size, effect.size);
+
     ctx.restore();
   }
 }

@@ -34,7 +34,11 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   const tipLength = bulletLength * g.tipRatio;
   const casingLength = bulletLength - tipLength;
   
-  ctx.save();
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevShadowBlur = ctx.shadowBlur;
+
   ctx.translate(x, y);
   ctx.rotate(angle);
   
@@ -42,42 +46,85 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   const trailPulse = 0.7 + Math.sin(Date.now() * g.pulseSpeed) * 0.3;
   const trailAlpha = 0.5 * lifeRatio * trailPulse;
   
-  // Outer trail glow
+  // Outer trail glow - clean line-based trail
   const trailGradient = ctx.createLinearGradient(-bulletLength * g.trailLength, 0, 0, 0);
   trailGradient.addColorStop(0, 'rgba(255, 180, 80, 0)');
   trailGradient.addColorStop(0.5, `rgba(255, 160, 60, ${trailAlpha * 0.5})`);
   trailGradient.addColorStop(1, `rgba(255, 200, 100, ${trailAlpha})`);
   
+  // Draw as a thin line instead of triangle
   ctx.beginPath();
   ctx.moveTo(-bulletLength * g.trailLength, 0);
-  ctx.lineTo(0, -bulletWidth * 0.4);
-  ctx.lineTo(0, bulletWidth * 0.4);
-  ctx.closePath();
-  ctx.fillStyle = trailGradient;
-  ctx.fill();
+  ctx.lineTo(0, 0);
+  ctx.strokeStyle = trailGradient;
+  ctx.lineWidth = bulletWidth * 0.6;
+  ctx.lineCap = 'round';
+  ctx.stroke();
   
   // ── Bullet Glow ────────────────────────────────────────────────
   // OPTIMIZED: Removed shadowBlur (expensive operation)
   
   // ── Bullet Casing (brass body) ────────────────────────────────
-  // Main casing body
+  // Main casing body - using manual rounded rect for broad compatibility
+  const crX = -casingLength;
+  const crY = -bulletWidth * 0.45;
+  const crW = casingLength;
+  const crH = bulletWidth * 0.9;
+  const crR = bulletWidth * 0.2;
   ctx.beginPath();
-  ctx.roundRect(-casingLength, -bulletWidth * 0.45, casingLength, bulletWidth * 0.9, bulletWidth * 0.2);
+  ctx.moveTo(crX + crR, crY);
+  ctx.lineTo(crX + crW - crR, crY);
+  ctx.arcTo(crX + crW, crY, crX + crW, crY + crR, crR);
+  ctx.lineTo(crX + crW, crY + crH - crR);
+  ctx.arcTo(crX + crW, crY + crH, crX + crW - crR, crY + crH, crR);
+  ctx.lineTo(crX + crR, crY + crH);
+  ctx.arcTo(crX, crY + crH, crX, crY + crH - crR, crR);
+  ctx.lineTo(crX, crY + crR);
+  ctx.arcTo(crX, crY, crX + crR, crY, crR);
+  ctx.closePath();
   ctx.fillStyle = g.casingColor;
   ctx.fill();
   
   // Disable shadow for internal details to improve performance
   ctx.shadowBlur = 0;
 
-  // Casing highlight (top edge)
+  // Casing highlight (top edge) - manual rounded rect
+  const hlX = -casingLength + bulletWidth * 0.1;
+  const hlY = -bulletWidth * 0.45;
+  const hlW = casingLength * 0.6;
+  const hlH = bulletWidth * 0.25;
+  const hlR = bulletWidth * 0.1;
   ctx.beginPath();
-  ctx.roundRect(-casingLength + bulletWidth * 0.1, -bulletWidth * 0.45, casingLength * 0.6, bulletWidth * 0.25, bulletWidth * 0.1);
+  ctx.moveTo(hlX + hlR, hlY);
+  ctx.lineTo(hlX + hlW - hlR, hlY);
+  ctx.arcTo(hlX + hlW, hlY, hlX + hlW, hlY + hlR, hlR);
+  ctx.lineTo(hlX + hlW, hlY + hlH - hlR);
+  ctx.arcTo(hlX + hlW, hlY + hlH, hlX + hlW - hlR, hlY + hlH, hlR);
+  ctx.lineTo(hlX + hlR, hlY + hlH);
+  ctx.arcTo(hlX, hlY + hlH, hlX, hlY + hlH - hlR, hlR);
+  ctx.lineTo(hlX, hlY + hlR);
+  ctx.arcTo(hlX, hlY, hlX + hlR, hlY, hlR);
+  ctx.closePath();
   ctx.fillStyle = g.casingHighlight;
   ctx.fill();
   
-  // Casing shadow (bottom edge)
+  // Casing shadow (bottom edge) - manual rounded rect
+  const shX = -casingLength + bulletWidth * 0.1;
+  const shY = bulletWidth * 0.2;
+  const shW = casingLength * 0.6;
+  const shH = bulletWidth * 0.2;
+  const shR = bulletWidth * 0.1;
   ctx.beginPath();
-  ctx.roundRect(-casingLength + bulletWidth * 0.1, bulletWidth * 0.2, casingLength * 0.6, bulletWidth * 0.2, bulletWidth * 0.1);
+  ctx.moveTo(shX + shR, shY);
+  ctx.lineTo(shX + shW - shR, shY);
+  ctx.arcTo(shX + shW, shY, shX + shW, shY + shR, shR);
+  ctx.lineTo(shX + shW, shY + shH - shR);
+  ctx.arcTo(shX + shW, shY + shH, shX + shW - shR, shY + shH, shR);
+  ctx.lineTo(shX + shR, shY + shH);
+  ctx.arcTo(shX, shY + shH, shX, shY + shH - shR, shR);
+  ctx.lineTo(shX, shY + shR);
+  ctx.arcTo(shX, shY, shX + shR, shY, shR);
+  ctx.closePath();
   ctx.fillStyle = g.casingShadow;
   ctx.fill();
   
@@ -117,8 +164,12 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   ctx.fillStyle = g.tipHighlight;
   ctx.fill();
   
-  ctx.shadowBlur = 0;
-  ctx.restore();
+  ctx.rotate(-angle);
+  ctx.translate(-x, -y);
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
+  ctx.shadowBlur = prevShadowBlur;
 }
 
 // ─────────────────────────────────────────────
@@ -127,7 +178,10 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
 export function drawGunSlingerMuzzleFlash(ctx, x, y, angle, scale = 1, intensity = 1) {
   const g = GUNSLINGER_BULLET_GRAPHICS;
   
-  ctx.save();
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+
   ctx.translate(x, y);
   ctx.rotate(angle);
   
@@ -165,7 +219,11 @@ export function drawGunSlingerMuzzleFlash(ctx, x, y, angle, scale = 1, intensity
     ctx.stroke();
   }
   
-  ctx.restore();
+  ctx.rotate(-angle);
+  ctx.translate(-x, -y);
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
 }
 
 export const GUNSLINGER_WEAPON_GRAPHICS = {
@@ -210,6 +268,16 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
   const gunOffset = r + GUNSLINGER_WEAPON_GRAPHICS.positioning.gunOffset;
   const p = GUNSLINGER_WEAPON_GRAPHICS.revolver;
   const mf = GUNSLINGER_WEAPON_GRAPHICS.muzzleFlash;
+
+  // Manual state tracking for performance
+  const prevLineJoin = ctx.lineJoin;
+  const prevLineCap = ctx.lineCap;
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowBlur = ctx.shadowBlur;
+  const prevShadowOffsetY = ctx.shadowOffsetY;
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
 
   function drawRevolver() {
     ctx.lineJoin = 'round';
@@ -400,45 +468,46 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
   const sideOffset = r * 1.1;
 
   // ── Draw right revolver ──
-  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(rightGunAngle);
-  
-  // Position front-right
   ctx.translate(forwardOffset, sideOffset);
-  
-  // Apply recoil
   ctx.translate(-rightRecoilOffset, 0);
-  // Kick outward (positive angle means down/away from center on the right side)
   ctx.rotate(rightRecoilTilt);
-  
-  // Spin animation after reload
   ctx.rotate(gunSpinAngle);
-  
-  // Mirror the right gun so its grip points inward (towards center)
   ctx.scale(1, -1);
-  
   drawRevolver();
-  ctx.restore();
+  // Reverse right gun transforms
+  ctx.scale(1, -1);
+  ctx.rotate(-gunSpinAngle);
+  ctx.rotate(-rightRecoilTilt);
+  ctx.translate(rightRecoilOffset, 0);
+  ctx.translate(-forwardOffset, -sideOffset);
+  ctx.rotate(-rightGunAngle);
+  ctx.translate(-x, -y);
 
   // ── Draw left revolver ──
-  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(leftGunAngle);
-  
-  // Position front-left
   ctx.translate(forwardOffset, -sideOffset);
-  
-  // Apply recoil
   ctx.translate(-leftRecoilOffset, 0);
-  // Kick outward (negative angle means up/away from center on the left side)
   ctx.rotate(-leftRecoilTilt);
-  
-  // Spin animation after reload
   ctx.rotate(-gunSpinAngle);
-  
-  // Left gun grip naturally points inward (positive Y is towards center from -sideOffset)
-  
   drawRevolver();
-  ctx.restore();
+  // Reverse left gun transforms
+  ctx.rotate(gunSpinAngle);
+  ctx.rotate(leftRecoilTilt);
+  ctx.translate(leftRecoilOffset, 0);
+  ctx.translate(-forwardOffset, sideOffset);
+  ctx.rotate(-leftGunAngle);
+  ctx.translate(-x, -y);
+
+  // Restore state
+  ctx.lineJoin = prevLineJoin;
+  ctx.lineCap = prevLineCap;
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowBlur = prevShadowBlur;
+  ctx.shadowOffsetY = prevShadowOffsetY;
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
 }

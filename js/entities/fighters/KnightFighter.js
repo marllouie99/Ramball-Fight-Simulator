@@ -219,7 +219,7 @@ export class KnightFighter extends Fighter {
         this.blockFlashTimer = CONFIG.knight.blockFlashFrames;
         this.shieldHealth--;
         // Play shield block sound
-        const blockSound = getSkillSound('knight', 'shieldblock');
+        const blockSound = getSkillSound(this._def?.id, 'shieldblock');
         if (blockSound) playSound(blockSound.src, blockSound.volume);
         if (this.shieldHealth <= 0 && !this.shieldBroken) {
           this.shieldBroken = true;
@@ -241,8 +241,6 @@ export class KnightFighter extends Fighter {
             // ignore
           }
         } else {
-          // Space this out so it doesn't perfectly overlap with "BLOCK!"
-          spawnFloatingText(this.x, this.y - this.r - 28, `SHIELD ${this.shieldHealth}`, '#c8d8ff');
         }
         return false; // absorbed the hit
       }
@@ -436,6 +434,11 @@ export class KnightFighter extends Fighter {
     // Time stop - freeze ALL movement, spinning, and actions
     if (this._handleTimeStop()) {
       return;
+    }
+
+    // Advance state machine for charging/dashing logic
+    if (this.fsm) {
+      this.fsm.update(1);
     }
 
     // Shield glow fade out logic

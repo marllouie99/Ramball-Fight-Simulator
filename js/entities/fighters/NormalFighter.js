@@ -78,7 +78,7 @@ export class NormalFighter extends Fighter {
         this.reloadDropX = this.x;
         this.reloadDropY = this.y;
         spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
-        const reloadSound = getSkillEffectSound(this._def?.id, 'reload');
+        const reloadSound = getSkillEffectSound('crimsonsniper', 'reload');
         if (reloadSound) {
           playSound(reloadSound.src, reloadSound.volume, reloadSound.speed || 1.0);
         }
@@ -194,7 +194,7 @@ export class NormalFighter extends Fighter {
   drawMagazineBar(ctx) {
     // OPTIMIZATION: Quality-based LOD for magazine display
     const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = qualityLevel < 0.6 || (state.fps < 50 && state.gameState === 'playing');
+    const useLOD = false;
 
     const bullets = this.magazineBullets;
     const max = this.maxMagazine;

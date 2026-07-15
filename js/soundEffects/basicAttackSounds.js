@@ -111,7 +111,7 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: -2,
   },
 
-  // ── Storm Commando (Machine Gun) ───────────
+  // ── Engineer (Machine Gun) ───────────
   15: {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3', // Replace with custom machine gun sound if available
     volume: 0.25,                                     // Low volume due to extremely fast firing rate (every 4 frames)
@@ -136,12 +136,12 @@ export const BASIC_ATTACK_SOUNDS = {
 
 /**
  * Sound config lookup by fighter type (case-insensitive).
- * Add entries here keyed by fighter def.type (e.g. 'berserker', 'machinegun').
+ * Add entries here keyed by fighter def.type (e.g. 'berserker', 'Engineer').
  * This is checked as a fallback when BASIC_ATTACK_SOUNDS[id] has no entry.
  */
 export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
-  // Storm Commando � high-rate-of-fire automatic weapon
-  'machinegun': {
+  // Engineer � high-rate-of-fire automatic weapon
+  'Engineer': {
     src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
     volume: 0.45,
     delay: -1,
@@ -192,3 +192,4 @@ export function getBasicAttackSoundPaths() {
     .filter((s) => s !== BASIC_ATTACK_SOUNDS.default)
     .map((s) => s.src);
 }
+

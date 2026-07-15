@@ -474,12 +474,21 @@ export function resolveFighterCollision(a, b) {
   const tx = -ny;
   const ty = nx;
 
-  // Push circles apart equally
   const overlap = (minDist - distance) / 2;
-  a.x -= nx * overlap;
-  a.y -= ny * overlap;
-  b.x += nx * overlap;
-  b.y += ny * overlap;
+  if (a.isTurret || b.isTurret) {
+    if (a.isTurret && !b.isTurret) {
+      b.x += nx * overlap * 2;
+      b.y += ny * overlap * 2;
+    } else if (b.isTurret && !a.isTurret) {
+      a.x -= nx * overlap * 2;
+      a.y -= ny * overlap * 2;
+    }
+  } else if (!a.isTurret && !b.isTurret) {
+    a.x -= nx * overlap;
+    a.y -= ny * overlap;
+    b.x += nx * overlap;
+    b.y += ny * overlap;
+  }
 
   // Only apply impulse if fighters are moving toward each other
   const dvx = b.vx - a.vx;
@@ -501,13 +510,17 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  a.vx -= impulse * nx + randA * impulse * tx;
-  a.vy -= impulse * ny + randA * impulse * ty;
-  b.vx += impulse * nx + randB * impulse * tx;
-  b.vy += impulse * ny + randB * impulse * ty;
-
-  a.normalizeSpeed();
-  b.normalizeSpeed();
+  if (!a.isTurret) {
+    a.vx -= impulse * nx + randA * impulse * tx;
+    a.vy -= impulse * ny + randA * impulse * ty;
+    a.normalizeSpeed();
+  }
+  
+  if (!b.isTurret) {
+    b.vx += impulse * nx + randB * impulse * tx;
+    b.vy += impulse * ny + randB * impulse * ty;
+    b.normalizeSpeed();
+  }
 }
 
 // ─────────────────────────────────────────────
@@ -531,6 +544,10 @@ function getClosestOpponent(fighter) {
     if (!other || other === fighter || other.hp <= 0) return;
     if (other.invincibilityTimer > 0 || other.flashStepTimer > 0) return;
     if (state.mode === GAME_MODES.TWO_VS_TWO && fighterTeam !== null && state.getFighterTeam(otherIndex) === fighterTeam) return;
+    
+    // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa
+    if (other.owner === fighter || fighter.owner === other) return;
+    if (other.owner && other.owner === fighter.owner) return; // Same owner
 
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;

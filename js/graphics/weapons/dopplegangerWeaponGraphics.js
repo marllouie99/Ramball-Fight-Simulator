@@ -206,8 +206,8 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   const time = Date.now();
 
   const qualityLevel = state.qualityLevel || 1.0;
-  const useLOD = (state.fps < 45 && state.gameState === 'playing') || qualityLevel < 0.6;
-  const useUltraLOD = (state.fps < 38 && state.gameState === 'playing') || qualityLevel < 0.35;
+  const useLOD = false;
+  const useUltraLOD = false;
 
   if (isPhantom) {
     if (useUltraLOD) { return; } // OPTIMIZED: Disable phantom trace on ULTRA low FPS
@@ -414,128 +414,148 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   ctx.restore();
 }
 
+// Off-screen canvases for static smoke/glow caching to eliminate GC allocation pressure
+let _smokeCacheCanvas = null;
+let _glowCacheCanvas = null;
+let _wispCacheCanvas = null;
+
+function _initDoppelgangerCaches(r) {
+  const size = Math.ceil(r * 4);
+
+  if (!_smokeCacheCanvas) {
+    _smokeCacheCanvas = document.createElement('canvas');
+    _smokeCacheCanvas.width = size;
+    _smokeCacheCanvas.height = size;
+    const sCtx = _smokeCacheCanvas.getContext('2d');
+    const grad = sCtx.createRadialGradient(size / 2, size / 2, size * 0.05, size / 2, size / 2, size * 0.5);
+    grad.addColorStop(0, 'rgba(60, 9, 108, 0.45)');
+    grad.addColorStop(0.7, 'rgba(26, 0, 43, 0.2)');
+    grad.addColorStop(1, 'rgba(16, 0, 43, 0)');
+    sCtx.fillStyle = grad;
+    sCtx.beginPath();
+    sCtx.arc(size / 2, size / 2, size * 0.5, 0, Math.PI * 2);
+    sCtx.fill();
+  }
+
+  if (!_glowCacheCanvas) {
+    _glowCacheCanvas = document.createElement('canvas');
+    _glowCacheCanvas.width = size;
+    _glowCacheCanvas.height = size;
+    const gCtx = _glowCacheCanvas.getContext('2d');
+    const grad = gCtx.createRadialGradient(size / 2, size / 2, size * 0.1, size / 2, size / 2, size * 0.45);
+    grad.addColorStop(0, 'rgba(157, 78, 221, 0.2)');
+    grad.addColorStop(0.7, 'rgba(76, 201, 240, 0.05)');
+    grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
+    gCtx.fillStyle = grad;
+    gCtx.beginPath();
+    gCtx.arc(size / 2, size / 2, size * 0.45, 0, Math.PI * 2);
+    gCtx.fill();
+  }
+
+  if (!_wispCacheCanvas) {
+    _wispCacheCanvas = document.createElement('canvas');
+    _wispCacheCanvas.width = size;
+    _wispCacheCanvas.height = size;
+    const wCtx = _wispCacheCanvas.getContext('2d');
+    const grad = wCtx.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+    grad.addColorStop(0, 'rgba(173, 216, 230, 1.0)'); // Light blueish core
+    grad.addColorStop(0.5, 'rgba(157, 78, 221, 0.7)'); // Violet mid
+    grad.addColorStop(1, 'rgba(157, 78, 221, 0)'); // Fade out
+    wCtx.fillStyle = grad;
+    wCtx.beginPath();
+    wCtx.arc(size / 2, size / 2, size / 2, 0, Math.PI * 2);
+    wCtx.fill();
+  }
+}
+
 /**
  * Draws the fluid, ethereal shadow smoke around the Doppleganger's body.
  * This enhanced version uses procedural noise to create turbulent, organic smoke movement.
  */
 export function drawDopplegangerBodyEffect(ctx, x, y, r, angle, layer = 'under', timeOpt) {
-    const time = timeOpt || Date.now();
+  const time = timeOpt || Date.now();
 
-    // OPTIMIZATION: Early exit at very low FPS
-    const fps = state.fps || 60;
-    if (fps < 30 && state.gameState === 'playing') return;
+  // OPTIMIZATION: Only skip if FPS is severely broken (<15)
+  const fps = state.fps || 60;
+  if (fps < 15 && state.gameState === 'playing') return;
 
-    ctx.save();
-    ctx.translate(x, y);
+  _initDoppelgangerCaches(r);
 
-    const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = (fps < 45 && state.gameState === 'playing') || qualityLevel < 0.6;
-    const useUltraLOD = (fps < 38 && state.gameState === 'playing') || qualityLevel < 0.35;
+  ctx.save();
+  ctx.translate(x, y);
 
-    // A simple noise function using sine waves for organic-looking turbulence
-    // This is a cheap way to simulate Perlin/Simplex noise.
-    const turbulence = (t, freq, amp) => Math.sin(t * freq) * amp;
+  const qualityLevel = state.qualityLevel || 1.0;
+  const useLOD = false;
+  const useUltraLOD = false;
 
-    if (layer === 'under') {
-        if (useUltraLOD) {
-            ctx.restore();
-            return;
-        }
-        // Softer, more vibrant under-glow
-        ctx.globalCompositeOperation = 'lighter';
-        const grad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, r * 1.8);
-        const pulse = 0.5 + 0.5 * Math.sin(time / 500);
-        grad.addColorStop(0, `rgba(157, 78, 221, ${0.25 * pulse})`); // Brighter core
-        grad.addColorStop(0.7, `rgba(76, 201, 240, 0.1)`);
-        grad.addColorStop(1, 'rgba(0, 255, 255, 0)');
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 1.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        return;
-    }
+  const turbulence = (t, freq, amp) => Math.sin(t * freq) * amp;
 
-    if (layer === 'over') {
-        ctx.globalCompositeOperation = 'source-over';
-        // OPTIMIZATION: Further reduce particle counts for performance
-        const particleCount = useUltraLOD ? 2 : (useLOD ? 3 : 5);
-
-        // 1. Base Shadow Smoke Layer (deep purple)
-        for (let i = 0; i < particleCount; i++) {
-            const idx = i + 1;
-            const swirlAngle = (time / (1000 + idx * 150)) + (idx * Math.PI * 2 / particleCount);
-            const dist = r * (0.4 + 0.3 * Math.sin(time / (900 + idx * 50)));
-            
-            // Apply turbulence
-            const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1000, 0.5 + idx * 0.1, r * 0.2);
-            const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1000, 0.6 + idx * 0.1, r * 0.2);
-
-            const smokeRadius = r * (0.6 + 0.3 * Math.cos(time / (700 + idx * 60)));
-            const alpha = 0.3 + 0.2 * Math.sin(time / (800 + idx * 70));
-
-            const smokeGrad = ctx.createRadialGradient(noisyX, noisyY, smokeRadius * 0.1, noisyX, noisyY, smokeRadius);
-            smokeGrad.addColorStop(0, `rgba(60, 9, 108, ${alpha})`);      // Dark violet core
-            smokeGrad.addColorStop(0.7, `rgba(26, 0, 43, ${alpha * 0.5})`); // Sheer shadow
-            smokeGrad.addColorStop(1, 'rgba(16, 0, 43, 0)');
-            
-            ctx.fillStyle = smokeGrad;
-            ctx.beginPath();
-            ctx.arc(noisyX, noisyY, smokeRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-
-        if (useUltraLOD) {
-            ctx.restore();
-            return;
-        }
-
-        // 2. Highlight Wisps Layer (brighter violet/cyan)
-        ctx.globalCompositeOperation = 'lighter';
-        // OPTIMIZATION: Reduce wisp count further
-        const wispCount = useUltraLOD ? 1 : (useLOD ? 2 : 3);
-        for (let i = 0; i < wispCount; i++) {
-            const idx = i + 1;
-            const swirlAngle = -(time / (800 + idx * 200)) + (idx * Math.PI * 2 / wispCount);
-            const dist = r * (0.6 + 0.2 * Math.cos(time / (600 + idx * 100)));
-
-            const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1200, 0.4 + idx * 0.2, r * 0.3);
-            const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1200, 0.5 + idx * 0.2, r * 0.3);
-
-            const wispRadius = r * (0.4 + 0.2 * Math.sin(time / (500 + idx * 80)));
-            const alpha = 0.15 + 0.1 * Math.cos(time / (400 + idx * 90));
-
-            const wispGrad = ctx.createRadialGradient(noisyX, noisyY, 0, noisyX, noisyY, wispRadius);
-            wispGrad.addColorStop(0, `rgba(173, 216, 230, ${alpha})`); // Light blueish
-            wispGrad.addColorStop(0.5, `rgba(157, 78, 221, ${alpha * 0.7})`); // Violet mid
-            wispGrad.addColorStop(1, 'rgba(157, 78, 221, 0)');
-
-            ctx.fillStyle = wispGrad;
-            ctx.beginPath();
-            ctx.arc(noisyX, noisyY, wispRadius, 0, Math.PI * 2);
-            ctx.fill();
-        }
-        
-        // 3. Energy Motes (small, bright particles)
-        // OPTIMIZATION: Remove expensive blur filter and reduce count
-        const moteCount = useUltraLOD ? 0 : (useLOD ? 2 : 4);
-        for (let i = 0; i < moteCount; i++) {
-            const idx = i + 1;
-            const angle = (time / 2000 + idx * 2.1) % (Math.PI * 2);
-            const dist = r * (0.2 + (idx / moteCount) * 0.8) + Math.sin(time / (600 + idx * 50)) * r * 0.2;
-
-            const moteX = Math.cos(angle) * dist;
-            const moteY = Math.sin(angle) * dist;
-            const moteSize = r * (0.05 + 0.05 * Math.sin(time / 300 + idx));
-            const alpha = 0.5 + 0.4 * Math.cos(time / 400 + idx * 1.5);
-
-            ctx.fillStyle = `rgba(224, 177, 203, ${alpha})`; // Bright pink/white
-            ctx.beginPath();
-            ctx.arc(moteX, moteY, moteSize, 0, Math.PI * 2);
-            // OPTIMIZATION: Removed expensive blur filter
-            ctx.fill();
-        }
-    }
-
+  if (layer === 'under') {
+    ctx.globalCompositeOperation = 'lighter';
+    // Draw a single simplified glow even on UltraLOD so the visual identity is preserved
+    const scaleSize = 1.0 + 0.1 * Math.sin(time / 500);
+    const cacheSize = _glowCacheCanvas.width;
+    ctx.globalAlpha = useUltraLOD ? 0.6 : 1.0;
+    ctx.drawImage(_glowCacheCanvas, -cacheSize * scaleSize / 2, -cacheSize * scaleSize / 2, cacheSize * scaleSize, cacheSize * scaleSize);
     ctx.restore();
+    return;
+  }
+
+  if (layer === 'over') {
+    ctx.globalCompositeOperation = 'source-over';
+    
+    // 1. Base Shadow Smoke Layer (deep purple)
+    const particleCount = useUltraLOD ? 2 : (useLOD ? 3 : 5);
+    for (let i = 0; i < particleCount; i++) {
+      const idx = i + 1;
+      const swirlAngle = (time / (1000 + idx * 150)) + (idx * Math.PI * 2 / particleCount);
+      const dist = r * (0.4 + 0.3 * Math.sin(time / (900 + idx * 50)));
+
+      // Apply turbulence
+      const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1000, 0.5 + idx * 0.1, r * 0.2);
+      const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1000, 0.6 + idx * 0.1, r * 0.2);
+      const smokeRadius = r * (0.6 + 0.3 * Math.cos(time / (700 + idx * 60)));
+
+      ctx.globalAlpha = 0.5 + 0.3 * Math.sin(time / (800 + idx * 70));
+      ctx.drawImage(_smokeCacheCanvas, noisyX - smokeRadius, noisyY - smokeRadius, smokeRadius * 2, smokeRadius * 2);
+    }
+
+    // 2. Highlight Wisps Layer (brighter violet/cyan)
+    ctx.globalCompositeOperation = 'lighter';
+    const wispCount = useUltraLOD ? 1 : (useLOD ? 2 : 3);
+    for (let i = 0; i < wispCount; i++) {
+      const idx = i + 1;
+      const swirlAngle = -(time / (800 + idx * 200)) + (idx * Math.PI * 2 / wispCount);
+      const dist = r * (0.6 + 0.2 * Math.cos(time / (600 + idx * 100)));
+
+      const noisyX = Math.cos(swirlAngle) * dist + turbulence(time / 1200, 0.4 + idx * 0.2, r * 0.3);
+      const noisyY = Math.sin(swirlAngle) * dist + turbulence(time / 1200, 0.5 + idx * 0.2, r * 0.3);
+
+      const wispRadius = r * (0.4 + 0.2 * Math.sin(time / (500 + idx * 80)));
+      const alpha = 0.15 + 0.1 * Math.cos(time / (400 + idx * 90));
+
+      ctx.globalAlpha = alpha; 
+      ctx.drawImage(_wispCacheCanvas, noisyX - wispRadius, noisyY - wispRadius, wispRadius * 2, wispRadius * 2);
+    }
+
+    // 3. Energy Motes (small, bright particles)
+    const moteCount = useUltraLOD ? 1 : (useLOD ? 2 : 4);
+    for (let i = 0; i < moteCount; i++) {
+      const idx = i + 1;
+      const angle = (time / 2000 + idx * 2.1) % (Math.PI * 2);
+      const dist = r * (0.2 + (idx / moteCount) * 0.8) + Math.sin(time / (600 + idx * 50)) * r * 0.2;
+
+      const moteX = Math.cos(angle) * dist;
+      const moteY = Math.sin(angle) * dist;
+      const moteSize = r * (0.05 + 0.05 * Math.sin(time / 300 + idx));
+      const alpha = 0.5 + 0.4 * Math.cos(time / 400 + idx * 1.5);
+
+      ctx.fillStyle = `rgba(224, 177, 203, ${alpha})`; 
+      ctx.beginPath();
+      ctx.arc(moteX, moteY, moteSize, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  ctx.restore();
 }

@@ -25,7 +25,7 @@ export const CONFIG = {
   normal: {
     aimThreshold: 0.12, // radians; lower = must face enemy more precisely before firing
     shotCooldown: 10,   // frames between consecutive shots (independent of base cooldown)
-    knockbackStrength: 8,    // velocity impulse applied to target on each hit
+    knockbackStrength: 20,    // velocity impulse applied to target on each hit
     magazineSize: 5,    // number of bullets before needing to reload
     reloadTime: 130,    // frames to reload (2 seconds at 60 fps)
   },
@@ -33,6 +33,8 @@ export const CONFIG = {
   /** Blue — Aimbot fighter */
   aimbot: {
     followUpMinCooldown: 10, // minimum frames of cooldown forced after a follow-up shot
+    electricStunDuration: 5, // frames the target is stunned after being hit (10 frames = ~0.16s)
+    electricStunChance: 0.40,  // 0.0 to 1.0 chance of triggering the stun on hit (0.5 = 50%)
   },
 
   /** Yellow — Melee fighter */
@@ -40,6 +42,7 @@ export const CONFIG = {
     speedBoostDuration: 120, // frames the speed burst lasts after a hit (120 = 2 s at 60 fps)
     speedBoostMultiplier: 2.5, // how many times faster Yellow moves during the boost
     trailLength: 10,  // how many past positions are kept for the ghost trail visual
+    rebounceLockChance: 0.4, // chance (0-1) to aggressively dash toward the nearest target upon hitting a wall
   },
 
 
@@ -114,11 +117,11 @@ export const CONFIG = {
 
 
     swordRange: 40,   // pixels from edge; how close enemy must be for a sword swipe
-    swipeCooldown: 60,  // frames between sword swipes (120 = 2 s at 60 fps)
+    swipeCooldown: 100,  // frames between sword swipes (120 = 2 s at 60 fps)
     swipeDuration: 18,   // frames the swipe arc animation plays
     swordDamage: 25,   // damage dealt by a sword swipe
     swordDurability: 3,    // number of swipes before the sword breaks
-    shieldBlockChance: 0.30, // probability (0–1) of blocking a direct incoming projectile
+    shieldBlockChance: 0.20, // probability (0–1) of blocking a direct incoming projectile
     blockFlashFrames: 15,   // duration of the visual flash when a block occurs
     shieldDurability: 2,    // number of successful blocks before the shield breaks
     shieldThrowDamage: 30,  // damage dealt by thrown sword after shield breaks
@@ -134,7 +137,7 @@ export const CONFIG = {
 
   /** Black — Black Hole fighter */
   black: {
-    shotCooldown: 15,   // frames between shots (medium fire rate)
+    shotCooldown: 17,   // frames between shots (medium fire rate)
     blackHoleChance: 0.01, // 100% chance for projectile to become black hole
     blackHoleRadius: 95,   // radius of black hole effect
     blackHoleDuration: 200, // frames the black hole lasts (4 seconds at 60 fps)
@@ -143,7 +146,7 @@ export const CONFIG = {
     skillCooldown: 300,    // frames between skill uses (5 seconds at 60 fps)
     skillSpawnRadius: 120, // radius around opponent to spawn black hole
     // Additional tuning values used by Black fighter implementation
-    enhancedBlackHoleChance: 0.2, // increased chance when enemy is already in black hole
+    enhancedBlackHoleChance: 0.1, // increased chance when enemy is already in black hole
     enhancedShotsGranted: 1, // number of guaranteed enhanced projectiles granted when enemy is pulled in
     summonIndicatorFrames: 36, // frames for the summon fade-in/out indicator (≈0.6s)
     skillChargeDuration: 30, // frames to charge skill before summoning (1s)
@@ -168,7 +171,6 @@ export const CONFIG = {
     flameContactStealthBuildFrames: 72, // frames of sustained flame contact before attempting stealth (≈1.2s at 60fps)
     flameContactStealthChance: 0.45,     // chance to trigger stealth when build completes (per attempt)
     flameContactStealthCooldown: 150,    // min frames between stealth triggers from flame contact (≈2.5s at 60fps)
-
 
     // TUNING: Invincibility skill activation
     dodgesToActivate: 3,         // number of successful dodges needed to activate skill
@@ -220,6 +222,7 @@ export const CONFIG = {
     axeCooldown: 25,          // frames between axe swings
     axeDamage: 5,             // base damage per axe swing
     axeSwingDurationFrames: 24, // frames for visible axe chop animation
+    axeWindupDuration: 6,     // frames of wind-up anticipation before swing
     dualAxeBonus: 1.3,         // damage multiplier when both axes hit (during rage)
 
     // During rage, rebounce snap point is moved away from the opponent.
@@ -248,10 +251,10 @@ export const CONFIG = {
     // TUNING: Melee attack
     meleeRange: 50,            // pixels from edge for crescent blade attack
     meleeCooldown: 90,         // frames between melee attacks
-    meleeDamage: 12,          // damage per crescent blade swing
+    meleeDamage: 10,          // damage per crescent blade swing
     meleeSwingDuration: 10,   // frames for visible swing animation
-    sphereMeleeDamage: 15,    // separate melee damage when inside own sphere
-    sphereMeleeCooldown: 6,   // separate melee cooldown when inside own sphere
+    sphereMeleeDamage: 2,    // separate melee damage when inside own sphere
+    sphereMeleeCooldown: 10,   // separate melee cooldown when inside own sphere
     doubleStrikeWindow: 10,    // frames window to execute the second strike
     // TUNING: Bounce mechanics inside sphere
     sphereBounceForce: 0.5,   // velocity multiplier when bouncing inside sphere
@@ -359,19 +362,44 @@ export const CONFIG = {
     illusionSpeedSync: true,  // if true, illusions spawn with current speed; if false, use base speed
   },
 
-  /** DarkGoldenRod — Machine Gun fighter */
-  machinegun: {
-    shotCooldown: 4,          // Extremely fast fire rate (every 4 frames)
-    bulletDamage: 1.8,        // Low damage per bullet to offset high rate of fire
-    bulletSpeed: 11.5,        // Very fast bullet velocity
-    heatPerShot: 3.2,         // Builds up heat quickly
-    coolRate: 0.6,            // Normal cooling speed when not firing
-    overheatCoolRate: 0.8,    // Cooling speed when locked in overheat state
-    overheatDuration: 120,    // Jammed duration (2 seconds at 60fps)
-    slowMultiplier: 0.4,      // Moves slower when gun is overheated
-    skillCooldown: 280,       // Cooldown of Suppressive Sweep roll (4.6 seconds)
-    skillRollSpeed: 8.5,      // High speed glide during the roll action
-    skillDuration: 30,        // Active frames of rolling
+  /** Engineer — Turret and Shotgun/Wrench */
+  Engineer: {
+    // Turret config
+    turretSpawnDistance: -40, // Negative means spawn BEHIND the engineer, positive means IN FRONT
+    turretBuildTime: 90,
+
+    // Shotgun stats (Range)
+    shotgunCooldown: 80,
+    shotgunPellets: 8,        // Increased from 5
+    shotgunSpread: 0.45,      // Spread angle in radians (wider)
+    shotgunDamage: 0.5,       // Lower per pellet, but more pellets total
+    shotgunSpeed: 30,         // Extremely fast initial burst, slowed down by drag
+    shotgunRange: 400,        // Max distance to trigger shotgun attack
+
+    // Wrench stats (Melee)
+    wrenchCooldown: 30,
+    wrenchDamage: 15,
+    wrenchRange: 85,          // Melee distance
+    wrenchSwipeDuration: 10,  // Animation duration
+
+    // Turret stats (Skill)
+    skillCooldown: 1000,
+    turretHp: 100,
+    turretDamage: 0.2,
+    turretFireRate: 7,
+    turretRange: 350,
+    turretBulletSpeed: 9,
+    turretAimSpeed: 0.08,     // Radians per frame
+    turretBuildTime: 90,      // Frames to build turret (1.5 seconds)
+    turretHealAmount: 30,     // Healing applied when bounced into
+    turretHealCooldown: 60,   // Cooldown between heal triggers per turret
+    turretAmmo: 20,            // Shots per magazine before reloading
+    turretReloadTime: 90,     // Frames to reload (1.5 seconds at 60fps)
+    turretAmmoBarOffsetY: 25, // Distance above turret to draw ammo UI
+    turretReloadBarWidth: 30, // Width of the reload progress bar
+    turretReloadBarHeight: 5, // Height of the reload progress bar
+    turretAmmoPipWidth: 4,    // Diameter of individual ammo pips
+    turretAmmoPipSpacing: 6,  // Spacing between ammo pips
   },
 };
 
@@ -561,7 +589,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0.03,
     type: 'cronos',
     hp: 120,
-    damage: 15,
+    damage: 10,
     cooldown: 35,
     moveSpeed: 4.8,
     projectileSpeedMultiplier: 1.0,
@@ -626,20 +654,20 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 15,
-    name: 'Storm Commando',
+    name: 'Engineer',
     color: '#b8860b',
     startX: 280, startY: 220,
     startVx: 1.1, startVy: 0.9,
     radius: 25,
     aimbot: false,
     spinRate: 0.02,
-    type: 'machinegun',
-    hp: 85,
-    damage: 1.8,
+    type: 'Engineer',
+    hp: 100,
+    damage: 5,
     cooldown: 4,
     moveSpeed: 4.4,
-    ability: 'Suppressive Sweep',
-    desc: 'Wields a heavy machine gun with a Heat meter. Active skill triggers a tactical roll while spraying bullets.',
+    ability: 'Deploy Turret',
+    desc: 'Builds a Turret to assist Engineer in fight.',
   },
 ];
 
@@ -654,3 +682,4 @@ export const GUN_TIP_DIST = (r) => r + CONFIG.gun.baseOffset + CONFIG.gun.barrel
 export function getFighterById(id) {
   return FIGHTER_DEFS.find(def => def.id === id);
 }
+

@@ -187,8 +187,8 @@ export class CronosFighter extends Fighter {
 
     const fps = state.fps || 60;
     const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = qualityLevel < 0.6 || (fps < 50 && state.gameState === 'playing');
-    const useUltraLOD = fps < 40 && state.gameState === 'playing';
+    const useLOD = false;
+    const useUltraLOD = false;
 
     for (const effect of this.attackSlashEffects) {
       const progress = 1 - effect.life / effect.maxLife;
@@ -202,22 +202,19 @@ export class CronosFighter extends Fighter {
       ctx.globalAlpha = alpha;
       ctx.lineCap = 'butt';
       ctx.lineJoin = 'miter';
-      ctx.globalCompositeOperation = 'screen';
+      // Removed 'screen' blending to prevent white blur on white background
 
       // Main slash core - sharp angular blade slash with BOTH tips pointed
       const slashGradient = ctx.createLinearGradient(-effect.size * 0.6, 0, effect.size * 0.6, 0);
-      slashGradient.addColorStop(0, `rgba(100, 220, 255, ${0.3 * alpha})`);
-      slashGradient.addColorStop(0.15, `rgba(120, 255, 255, ${0.7 * alpha})`);
-      slashGradient.addColorStop(0.5, `rgba(220, 255, 255, ${1.0 * alpha})`);
-      slashGradient.addColorStop(0.85, `rgba(140, 255, 255, ${0.7 * alpha})`);
-      slashGradient.addColorStop(1, `rgba(100, 220, 255, ${0.3 * alpha})`);
+      slashGradient.addColorStop(0, `rgba(0, 180, 220, ${0.3 * alpha})`);
+      slashGradient.addColorStop(0.15, `rgba(0, 200, 240, ${0.7 * alpha})`);
+      slashGradient.addColorStop(0.5, `rgba(0, 240, 255, ${1.0 * alpha})`);
+      slashGradient.addColorStop(0.85, `rgba(0, 200, 240, ${0.7 * alpha})`);
+      slashGradient.addColorStop(1, `rgba(0, 180, 220, ${0.3 * alpha})`);
 
       ctx.strokeStyle = slashGradient;
       ctx.lineWidth = 2 + progress * 4;
-      if (!useLOD) {
-        ctx.shadowColor = 'rgba(80, 255, 255, 1.0)';
-        ctx.shadowBlur = 10;
-      }
+      // Removed shadowBlur to prevent blur
 
       ctx.beginPath();
       // Sharp slash with BOTH tips pointed (diamond blade shape)
@@ -229,8 +226,8 @@ export class CronosFighter extends Fighter {
 
       // OPTIMIZATION: Skip detailed edge highlights on Ultra LOD
       if (!useUltraLOD) {
-        // Sharp BOTTOM edge highlight
-        ctx.strokeStyle = `rgba(230, 255, 255, ${0.95 * alpha})`;
+        // Sharp BOTTOM edge highlight - dark cyan
+        ctx.strokeStyle = `rgba(0, 200, 240, ${0.95 * alpha})`;
         ctx.lineWidth = 1.2;
         ctx.beginPath();
         ctx.moveTo(-effect.size * 0.45, -effect.size * 0.22);
@@ -239,8 +236,8 @@ export class CronosFighter extends Fighter {
         ctx.lineTo(effect.size * 0.45, effect.size * 0.22);
         ctx.stroke();
 
-        // Sharp TOP edge highlight
-        ctx.strokeStyle = `rgba(200, 255, 255, ${0.85 * alpha})`;
+        // Sharp TOP edge highlight - dark cyan
+        ctx.strokeStyle = `rgba(0, 180, 220, ${0.85 * alpha})`;
         ctx.lineWidth = 0.8;
         ctx.beginPath();
         ctx.moveTo(-effect.size * 0.5, -effect.size * 0.28);
@@ -249,16 +246,16 @@ export class CronosFighter extends Fighter {
         ctx.lineTo(effect.size * 0.5, effect.size * 0.28);
         ctx.stroke();
 
-        // Sharp LEFT tip accent (starting point)
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.9 * alpha})`;
+        // Sharp LEFT tip accent (starting point) - dark cyan
+        ctx.strokeStyle = `rgba(0, 220, 255, ${0.9 * alpha})`;
         ctx.lineWidth = 1.0;
         ctx.beginPath();
         ctx.moveTo(-effect.size * 0.55, -effect.size * 0.3);
         ctx.lineTo(-effect.size * 0.35, -effect.size * 0.18);
         ctx.stroke();
 
-        // Sharp RIGHT tip accent (ending point)
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+        // Sharp RIGHT tip accent (ending point) - dark cyan
+        ctx.strokeStyle = `rgba(0, 220, 255, ${0.95 * alpha})`;
         ctx.lineWidth = 1.0;
         ctx.beginPath();
         ctx.moveTo(effect.size * 0.45, effect.size * 0.22);
@@ -273,8 +270,8 @@ export class CronosFighter extends Fighter {
       }
 
       // Sharp diamond/blade glow fill - BOTH tips sharp
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = `rgba(140, 255, 255, ${0.45 * alpha})`;
+      // Removed 'lighter' blending
+      ctx.fillStyle = `rgba(0, 200, 240, ${0.6 * alpha})`;
       ctx.beginPath();
       // Left sharp tip
       ctx.moveTo(-effect.size * 0.55, -effect.size * 0.3);
@@ -288,11 +285,11 @@ export class CronosFighter extends Fighter {
       ctx.fill();
 
       // Sharp edge particles - small angular debris flying from both tips
-      ctx.globalCompositeOperation = 'screen';
-
+      // Removed 'screen' blending to prevent blur
+      
       // Skip complex particle math if on low-quality/low-FPS - more aggressive
       if (!useLOD && state.fps > 50) {
-        ctx.fillStyle = `rgba(200, 255, 255, ${0.8 * alpha})`;
+        ctx.fillStyle = `rgba(0, 190, 230, ${0.85 * alpha})`; // Vibrant cyan instead of white
         // OPTIMIZATION: Reduce particle count from 4 to 2 per tip
         const leftParticleAngles = [-0.3, 0.1];
         leftParticleAngles.forEach((pAngle, idx) => {
@@ -452,7 +449,7 @@ export class CronosFighter extends Fighter {
     // OPTIMIZATION: Aggressive performance mode - skip expensive operations at low FPS
     const fps = (typeof state !== 'undefined' && state.fps) || 60;
     const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
-    const useAggressiveMode = fps < 35 || qualityLevel < 0.4;
+    const useAggressiveMode = false;
 
     this.handlePoison();
     this.handleBurn();
@@ -834,7 +831,7 @@ export class CronosFighter extends Fighter {
     // OPTIMIZATION: Quality-based LOD for body drawing
     const qualityLevel = state.qualityLevel || 1.0;
     const isMulti = state && state.mode && state.mode !== '1v1';
-    const useLOD = isMulti || qualityLevel < 0.6 || (state.fps < 50 && state.gameState === 'playing');
+    const useLOD = false;
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -898,7 +895,7 @@ export class CronosFighter extends Fighter {
     ctx.beginPath();
     ctx.arc(0, 0, baseRadius * 0.34, 0, Math.PI * 2);
     ctx.fill();
-    ctx.strokeStyle = 'rgba(255,255,255,0.45)';
+    ctx.strokeStyle = 'rgb(0, 150, 255)'; // Deep saturated cyan instead of dark stroke
     ctx.lineWidth = 2;
     ctx.stroke();
     ctx.restore();
@@ -985,7 +982,7 @@ export class CronosFighter extends Fighter {
 
       const qualityLevel = state.qualityLevel || 1.0;
       const isMulti = state && state.mode && state.mode !== '1v1';
-      const useLOD = isMulti || qualityLevel < 0.6 || (state.fps < 50 && state.gameState === 'playing');
+      const useLOD = false;
 
       if (this.meleeSwingActive) {
         swingProgress = 1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration);
@@ -1027,11 +1024,7 @@ export class CronosFighter extends Fighter {
       ctx.closePath();
       ctx.clip();
 
-      ctx.globalCompositeOperation = 'screen';
-      if (!useLOD) {
-        ctx.shadowColor = 'rgba(0, 229, 255, 0.9)';
-        ctx.shadowBlur = 10;
-      }
+      // No shadow blur - keeps the slash crisp on white background
 
       // Draw full shape (revealed by clip)
       ctx.beginPath();
@@ -1047,10 +1040,10 @@ export class CronosFighter extends Fighter {
         : Math.min(fullEndY - 0.1, currentY);
 
       const slashGrad = ctx.createLinearGradient(0, gradStartY, 0, gradEndY);
-      slashGrad.addColorStop(0, 'rgba(0, 229, 255, 0.0)');
-      slashGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.4)');
-      slashGrad.addColorStop(0.85, 'rgba(180, 255, 255, 0.85)');
-      slashGrad.addColorStop(1, 'rgba(255, 255, 255, 0.9)');
+      slashGrad.addColorStop(0, 'rgba(0, 180, 220, 0.0)');
+      slashGrad.addColorStop(0.3, 'rgba(0, 200, 235, 0.7)');
+      slashGrad.addColorStop(0.7, 'rgba(0, 220, 245, 0.9)');
+      slashGrad.addColorStop(1, 'rgba(0, 240, 255, 1.0)');
 
       ctx.fillStyle = slashGrad;
       ctx.globalAlpha = glowAlpha;
@@ -1059,16 +1052,16 @@ export class CronosFighter extends Fighter {
       // Outer edge
       ctx.beginPath();
       ctx.arc(0, 0, arcRadius, fullStartA, fullEndA);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = 'rgba(0, 220, 240, 1.0)';
+      ctx.lineWidth = 3;
       ctx.globalAlpha = glowAlpha * 0.85;
       ctx.stroke();
 
       // Inner trail
       ctx.beginPath();
       ctx.arc(0, 0, arcRadius - 14, fullStartA * 0.8, fullEndA * 0.9);
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.8)';
-      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = 'rgba(0, 200, 230, 0.9)';
+      ctx.lineWidth = 2;
       ctx.globalAlpha = glowAlpha * 0.6;
       ctx.stroke();
 
@@ -1081,7 +1074,7 @@ export class CronosFighter extends Fighter {
         ctx.closePath();
         ctx.clip();
 
-        ctx.globalCompositeOperation = 'screen';
+        // Removed 'screen' blending for white background
         ctx.shadowBlur = 0;
 
         // OPTIMIZATION: Use module-level cached cos/sin (was rebuilding 12 values per frame)

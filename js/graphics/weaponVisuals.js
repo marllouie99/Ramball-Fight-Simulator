@@ -29,7 +29,7 @@ export { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee, drawShurikenProjecti
 export { drawWhiteRailgun, drawWhiteChargeEffect } from './weapons/ivoryWeaponGraphics.js';
 export { drawSpikeWeapon, drawSingleSpike } from './weapons/spikeWeaponGraphics.js';
 export { drawBlueAimbotGun } from './weapons/rangerWeaponGraphics.js';
-export { drawMachineGun, drawMachineGunBullet, MACHINEGUN_WEAPON_GRAPHICS } from './machinegunWeaponGraphics.js';
+export { drawEngineer, drawEngineerBullet, drawTurret, drawTurretBullet, Engineer_WEAPON_GRAPHICS } from './engineerWeaponGraphics.js';
 export { drawBomberGrenade } from './weapons/bomberWeaponGraphics.js';
 export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
@@ -328,3 +328,4 @@ export function drawGreenBoilingEffect(ctx, x, y, gunAngle, r, active) {
 }
 
 // ─────────────────────────────────────────────
+
