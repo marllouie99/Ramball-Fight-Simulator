@@ -4,6 +4,7 @@ import { projectileSystem } from '../systems/projectileSystem.js';
 import { spawnFloatingText, state } from '../core/state.js';
 import { playSound } from '../systems/soundSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
+import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { drawTurret } from '../graphics/weaponVisuals.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
 import { spawnDeathShatter, spawnMachineCorpse } from '../graphics/particles/deathShatterEffect.js';
@@ -28,7 +29,7 @@ export class TurretEntity extends Fighter {
       spinRate: 0.05,
     };
     super(def);
-    
+
     this.owner = ownerFighter;
     this.isTurret = true;
     this.healCooldownTimer = 0;
@@ -36,7 +37,7 @@ export class TurretEntity extends Fighter {
     this.hitFlashTimer = 0;
     this.healTimer = 0;
     this.smokeParticles = [];
-    
+
     // Ammo system
     this.ammo = CONFIG.Engineer.turretAmmo;
     this.maxAmmo = CONFIG.Engineer.turretAmmo;
@@ -55,14 +56,14 @@ export class TurretEntity extends Fighter {
     if (this.isBuilding) return false;
     // Turrets are immune to poison damage
     if (opts.isPoison) return false;
-    
+
     const applied = super.takeDamage(amount, attacker, opts);
     if (applied && this.hp > 0) {
       this.hitFlashTimer = 10;
     }
     return applied;
   }
-  
+
   applyPoison(attacker) {
     // Override to do nothing, turrets are machines
   }
@@ -73,6 +74,8 @@ export class TurretEntity extends Fighter {
     for (let i = 0; i < 4; i++) {
       spawnSparks(this.x, this.y, 8, 'orange');
     }
+    const deathSound = getSkillEffectSound('turret', 'death');
+    if (deathSound) playSound(deathSound.src, deathSound.volume);
   }
 
   heal(amount) {
@@ -110,7 +113,7 @@ export class TurretEntity extends Fighter {
 
     const oldX = this.x;
     const oldY = this.y;
-    
+
     // Apply blackhole velocity and friction
     this.x += this.vx;
     this.y += this.vy;
@@ -178,7 +181,7 @@ export class TurretEntity extends Fighter {
     // Check for nearby opponent to shoot
     let target = null;
     let minDist = Infinity;
-    
+
     if (state) {
       // Find the team of the owner to avoid shooting teammates
       const ownerTeam = state.mode === '2v2' ? state.getFighterTeam(state.fighters.indexOf(this.owner)) : null;
@@ -186,7 +189,7 @@ export class TurretEntity extends Fighter {
 
       const evaluateTarget = (f) => {
         if (!f || f === this || f === this.owner || f.hp <= 0) return;
-        
+
         // Skip stealthed targets (if property exists and is > 0)
         if (f.invincibilityTimer > 0 || f.flashStepTimer > 0) return;
 
@@ -231,31 +234,31 @@ export class TurretEntity extends Fighter {
       this.gunAngle += 0.02; // slowly rotate gun when idle
     }
   }
-  
+
   aimAt(tx, ty) {
     const targetAngle = Math.atan2(ty - this.y, tx - this.x);
     // Smoothly rotate towards target angle
     let diff = targetAngle - this.gunAngle;
-    
+
     // Normalize difference to -PI to PI
     while (diff < -Math.PI) diff += Math.PI * 2;
     while (diff > Math.PI) diff -= Math.PI * 2;
-    
+
     const aimSpeed = CONFIG.Engineer.turretAimSpeed || 0.08;
-    
+
     if (Math.abs(diff) <= aimSpeed) {
       this.gunAngle = targetAngle;
     } else {
       this.gunAngle += Math.sign(diff) * aimSpeed;
     }
-    
+
     // Return true if we are closely aimed at the target
     return Math.abs(diff) < 0.15;
   }
 
   shootAtTarget(target) {
     if (!projectileSystem) return;
-    
+
     // Get index of the Engineer for projectile ownership
     const ownerIndex = state.fighters.indexOf(this.owner);
     if (ownerIndex === -1) return;
@@ -280,6 +283,9 @@ export class TurretEntity extends Fighter {
     const spawnX2 = this.x + muzzleX * cosA - lowerY * sinA;
     const spawnY2 = this.y + muzzleX * sinA + lowerY * cosA;
     projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'gunslingerBullet', spawnX2, spawnY2, this.gunAngle);
+
+    const shotSound = getBasicAttackSound(this._def?.id);
+    if (shotSound) playSound(shotSound.src, shotSound.volume);
     
     // Spawn smoke particles at the muzzle tips
     for (let i = 0; i < 4; i++) {
@@ -301,7 +307,7 @@ export class TurretEntity extends Fighter {
 
     this.shootCooldown = this.shootCooldownMax;
     this.recoilTimer = 10; // Add recoil animation timer
-    
+
     // Consume ammo — trigger reload when magazine is empty
     this.ammo--;
     if (this.ammo <= 0) {
@@ -309,14 +315,14 @@ export class TurretEntity extends Fighter {
       this.reloadTimer = CONFIG.Engineer.turretReloadTime;
       spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
     }
-    
+
     // Turret loses HP based on its damage when it shoots
     this.hp -= this.damage;
     if (this.hp <= 0) {
       this.hp = 0;
       if (this.onDeath) this.onDeath();
     }
-    
+
     // Play sound
     const sound = getBasicAttackSound(this.owner._def.id, 'aimbot'); // Reusing aimbot sound for turret
     if (sound) {
@@ -325,10 +331,10 @@ export class TurretEntity extends Fighter {
       this._attackSoundConfig = sound;
     }
   }
-  
+
   draw(ctx) {
     if (this.hp <= 0) return;
-    
+
     drawTurret(ctx, this);
 
     // Draw smoke particles
@@ -393,19 +399,19 @@ export class TurretEntity extends Fighter {
     if (this.isBuilding) return;
 
     const startY = this.y - this.r - (CONFIG.Engineer.turretAmmoBarOffsetY || 25);
-    
+
     if (this.isReloading) {
       const progress = 1 - (this.reloadTimer / CONFIG.Engineer.turretReloadTime);
       const width = CONFIG.Engineer.turretReloadBarWidth || 30;
       const height = CONFIG.Engineer.turretReloadBarHeight || 5;
       const startX = this.x - width / 2;
-      
+
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
       ctx.fillRect(startX, startY, width, height);
-      
+
       ctx.fillStyle = '#ff6666';
       ctx.fillRect(startX, startY, width * progress, height);
-      
+
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1;
       ctx.strokeRect(startX, startY, width, height);

@@ -1,4 +1,4 @@
-﻿// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // SKILL SOUND EFFECTS CONFIG
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Configure sound effects for fighter skills and abilities.
@@ -55,11 +55,39 @@ export const SKILL_SOUNDS = {
     },
   },
 
-  // â”€â”€ Void Master â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Void Master ──────────────────────────────
   7: {
     blackhole: {
       src: 'Assets/Sound Effects/Skills/gravitypull.mp3',
       volume: 0.7,
+    },
+  },
+
+  // ── Engineer ─────────────────────────────────
+  15: {
+    build: {
+      src: 'Assets/Sound Effects/Skills/hammer.mp3',
+      volume: 0.6,
+    },
+    repair: {
+      src: 'Assets/Sound Effects/Skills/repair.mp3',
+      volume: 0.8,
+    },
+  },
+
+  // ── Ruby ───────────────────────────────
+  16: {
+    spin: {
+      src: 'Assets/Sound Effects/Skills/spinslash.mp3',
+      volume: 0.7,
+    },
+    pull: {
+      src: 'Assets/Sound Effects/Skills/hookchain.mp3',
+      volume: 0.7,
+    },
+    dash: {
+      src: 'Assets/Sound Effects/Skills/dash1.mp3',
+      volume: 0.4,
     },
   },
 };

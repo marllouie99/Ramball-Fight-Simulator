@@ -42,6 +42,7 @@ class KnightChargingState extends FighterState {
     super.enter(prevState);
     this.duration = CONFIG.knight.dashChargeFrames;
     this.hasAppliedKnockback = false;
+    playSound('Assets/Sound Effects/Skills/shieldcharge.mp3', 0.8);
   }
 
   update(dt) {
@@ -78,6 +79,7 @@ class KnightDashingState extends FighterState {
     super.enter(prevState);
     this.duration = CONFIG.knight.dashDuration || 40;
     this.hasHit = false;
+    playSound('Assets/Sound Effects/Skills/dash1.mp3', 0.6);
     
     // Lock target position from when sword broke
     this.targetX = this.fighter.dashTargetX;
@@ -165,6 +167,8 @@ export class KnightFighter extends Fighter {
     // Visual properties
     this.slashFadeTimer  = 0;
     this.dashGlowFade    = 0;
+    this.shieldVisualOffset = -Math.PI / 2;
+    this.shieldHoldTimer = 0;
   }
 
   reset() {
@@ -194,6 +198,8 @@ export class KnightFighter extends Fighter {
     this.dashVy          = 0;
     this.slashFadeTimer  = 0;
     this.dashGlowFade    = 0;
+    this.shieldVisualOffset = -Math.PI / 2;
+    this.shieldHoldTimer = 0;
   }
 
   // ── State helpers for external code ──
@@ -217,6 +223,7 @@ export class KnightFighter extends Fighter {
       if (Math.random() < CONFIG.knight.shieldBlockChance) {
         // Shield absorbs this hit; reduce shield health and possibly break
         this.blockFlashTimer = CONFIG.knight.blockFlashFrames;
+        this.shieldHoldTimer = CONFIG.knight.shieldHoldFrames || 60;
         this.shieldHealth--;
         // Play shield block sound
         const blockSound = getSkillSound(this._def?.id, 'shieldblock');
@@ -262,6 +269,12 @@ export class KnightFighter extends Fighter {
     this.swipeTimer  = CONFIG.knight.swipeDuration;
     this.swipeCooldown = CONFIG.knight.swipeCooldown;
     opponent.takeDamage(CONFIG.knight.swordDamage, this, { isMelee: true });
+    
+    // Physical hit knockback
+    const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    opponent.vx += Math.cos(kbAngle) * 6;
+    opponent.vy += Math.sin(kbAngle) * 6;
+
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#e0e0e0');
     // Play sword swing sound
     const swipeSound = getBasicAttackSound(this._def.id, this._def.type);
@@ -427,14 +440,56 @@ export class KnightFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     this.handlePoison();
     this.handleBurn();
-    this._tickCooldowns();
-    this._tickAttackSound();
-    if (this.blockFlashTimer > 0) this.blockFlashTimer--;
 
     // Time stop - freeze ALL movement, spinning, and actions
     if (this._handleTimeStop()) {
       return;
     }
+
+    this._tickCooldowns();
+    this._tickAttackSound();
+    if (this.blockFlashTimer > 0) this.blockFlashTimer--;
+    if (this.shieldHoldTimer > 0) this.shieldHoldTimer--;
+
+    // Detect incoming attacks for shield block visual
+    let blocking = false;
+    if (this.shieldHoldTimer > 0) {
+      blocking = true;
+    }
+    const projectiles = getProjectiles();
+    for (let i = 0; i < projectiles.length; i++) {
+      const p = projectiles[i];
+      // Exclude visual-only particles and our own projectiles
+      if (p.owner !== ownerIndex && !p.isVisual && p.maxLife > 0) {
+        const dx = p.x - this.x;
+        const dy = p.y - this.y;
+        const distSq = dx * dx + dy * dy;
+        const projRadius = CONFIG.knight.blockProjectileDetectionRadius || 200;
+        if (distSq < projRadius * projRadius) {
+          // Check if moving towards us (dot product of relative position and velocity is negative)
+          const dot = dx * p.vx + dy * p.vy;
+          if (dot < 0) {
+            blocking = true;
+            break;
+          }
+        }
+      }
+    }
+    
+    // Also check for close opponent melee range
+    if (!blocking && opponent && !opponent.isDead && opponent.hp > 0) {
+      const dx = opponent.x - this.x;
+      const dy = opponent.y - this.y;
+      const distSq = dx * dx + dy * dy;
+      const meleeRadius = CONFIG.knight.blockMeleeDetectionRadius || 130;
+      if (distSq < meleeRadius * meleeRadius) {
+        blocking = true;
+      }
+    }
+
+    // Lerp shield offset
+    const targetOffset = (blocking || this.isDashing() || this.isCharging()) ? 0 : -Math.PI / 2;
+    this.shieldVisualOffset += (targetOffset - this.shieldVisualOffset) * 0.2;
 
     // Advance state machine for charging/dashing logic
     if (this.fsm) {
@@ -583,7 +638,7 @@ export class KnightFighter extends Fighter {
     const isDashing = this.isDashing();
 
     // Draw shield
-    drawGrayShield(ctx, this.x, this.y, ga, this.blockFlashTimer, isDashing ? 'charging' : null, this.r, this.dashGlowFade);
+    drawGrayShield(ctx, this.x, this.y, ga, this.blockFlashTimer, isDashing ? 'charging' : null, this.r, this.dashGlowFade, this.shieldVisualOffset);
 
     // Sword: if swiping, animate the sword arc; otherwise draw normally.
     // Hide the sword completely while it is thrown.
@@ -610,7 +665,7 @@ export class KnightFighter extends Fighter {
       const p = 1 - (this.blockFlashTimer / CONFIG.knight.blockFlashFrames);
       ctx.save();
       ctx.translate(this.x, this.y);
-      ctx.rotate(this.gunAngle - Math.PI / 2);
+      ctx.rotate(this.gunAngle + this.shieldVisualOffset);
       ctx.translate(this.r + 5, 0);
       ctx.beginPath();
       ctx.arc(0, 0, 10 + p * 20, 0, Math.PI * 2);
@@ -632,49 +687,87 @@ export class KnightFighter extends Fighter {
       const glowAlpha = Math.pow(fade, 0.8);
       const arcRadius = this.r + 22;
       
-      const localStartAngle = -Math.PI / 2.8;
-      const localEndAngle = Math.PI / 2.8;
+      const swingTotal = Math.PI * 1.1;
+      const localStartAngle = -swingTotal * 0.5;
+      const localEndAngle = swingTotal * 0.5;
       const localCurrentEndAngle = localStartAngle + (localEndAngle - localStartAngle) * progress;
       
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.rotate(this.swipeAngle);
       
-      // The Growing Clip Region
+      ctx.globalAlpha = glowAlpha;
+      ctx.globalCompositeOperation = 'source-over';
+      
+      // Calculate linear gradient points based on the arc
+      const startX = Math.cos(localStartAngle) * arcRadius;
+      const startY = Math.sin(localStartAngle) * arcRadius;
+      const endX = Math.cos(localCurrentEndAngle) * arcRadius;
+      const endY = Math.sin(localCurrentEndAngle) * arcRadius;
+      
+      const gradX = Math.abs(endX - startX) < 0.1 ? endX + 0.1 : endX;
+      const gradY = Math.abs(endY - startY) < 0.1 ? endY + 0.1 : endY;
+
+      const slashGrad = ctx.createLinearGradient(startX, startY, gradX, gradY);
+      slashGrad.addColorStop(0, 'rgba(255, 100, 0, 0.0)');
+      slashGrad.addColorStop(0.5, 'rgba(255, 160, 0, 0.4)');
+      slashGrad.addColorStop(0.8, 'rgba(255, 230, 50, 0.8)');
+      slashGrad.addColorStop(1, 'rgba(255, 255, 255, 1.0)');
+
+      // 1. Broad, heavy trailing sweep
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      ctx.arc(0, 0, arcRadius + 20, localStartAngle - 0.1, localCurrentEndAngle);
+      ctx.arc(0, 0, arcRadius + 28, localStartAngle, localCurrentEndAngle);
       ctx.closePath();
-      ctx.clip();
-      
-      // Fading Tail Gradient (Golden for new aesthetic)
-      const fullStartY = Math.sin(localStartAngle) * arcRadius;
-      const currentY = Math.sin(localCurrentEndAngle) * arcRadius;
-      const gradEndY = Math.max(fullStartY + 0.1, currentY); 
-      
-      const tailGrad = ctx.createLinearGradient(0, fullStartY, 0, gradEndY);
-      tailGrad.addColorStop(0, 'rgba(255, 200, 0, 0.0)'); 
-      tailGrad.addColorStop(1, 'rgba(255, 240, 100, 1.0)');
-      
-      ctx.globalCompositeOperation = 'screen';
+      ctx.fillStyle = slashGrad;
+      ctx.globalAlpha = glowAlpha * 0.4;
+      ctx.fill();
+
+      // 2. Sharp crescent metallic blade
       ctx.globalAlpha = glowAlpha;
-      ctx.shadowBlur = 0;
-      
-      // Main arc
       ctx.beginPath();
-      ctx.arc(0, 0, arcRadius, localStartAngle, localEndAngle);
-      ctx.strokeStyle = tailGrad;
-      ctx.lineWidth   = 5;
-      ctx.lineCap     = 'round';
-      ctx.stroke();
-      
-      // Secondary inner thin arc for extra glow
-      ctx.globalAlpha = glowAlpha * 0.45;
+      ctx.arc(0, 0, arcRadius + 15, localStartAngle, localCurrentEndAngle);
+      ctx.arc(0, 0, arcRadius - 5, localCurrentEndAngle, localStartAngle, true);
+      ctx.closePath();
+      ctx.fillStyle = slashGrad;
+      ctx.fill();
+
+      // 3. Ultra-bright cutting edge
       ctx.beginPath();
-      ctx.arc(0, 0, arcRadius + 8, localStartAngle, localEndAngle);
-      ctx.lineWidth = 2;
+      ctx.arc(0, 0, arcRadius + 5, localStartAngle, localCurrentEndAngle);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
       ctx.stroke();
-      
+
+      // 4. Heavy impact Flash at the leading tip
+      ctx.beginPath();
+      ctx.arc(endX, endY, 20, 0, Math.PI * 2);
+      const tipGrad = ctx.createRadialGradient(endX, endY, 0, endX, endY, 20);
+      tipGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
+      tipGrad.addColorStop(0.3, 'rgba(255, 200, 50, 0.8)');
+      tipGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+      ctx.fillStyle = tipGrad;
+      ctx.fill();
+
+      // 5. High-speed metallic sparks along the arc
+      if (progress > 0.3 && glowAlpha > 0.5) {
+        ctx.strokeStyle = 'rgba(255, 230, 150, 0.9)';
+        ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
+        // Generate a few deterministic sparks based on progress so it doesn't flicker randomly
+        for (let i = 0; i < 4; i++) {
+           let rOffset = ((i * 13) % 20) - 10;
+           let aOffset = localCurrentEndAngle - (i * 0.1);
+           if (aOffset > localStartAngle) {
+             ctx.beginPath();
+             ctx.moveTo(Math.cos(aOffset) * (arcRadius + 15 + rOffset), Math.sin(aOffset) * (arcRadius + 15 + rOffset));
+             ctx.lineTo(Math.cos(aOffset) * (arcRadius + 35 + rOffset * 2), Math.sin(aOffset) * (arcRadius + 35 + rOffset * 2));
+             ctx.stroke();
+           }
+        }
+      }
+
       ctx.restore();
     }
 
@@ -710,18 +803,38 @@ export class KnightFighter extends Fighter {
       ctx.restore();
     }
 
-    // â”€â”€ Dash motion blur â”€â”€
+    // ── Dash motion blur ──
     if (this.fsm.isInState('KnightDashing')) {
       ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.fillStyle   = '#aabbff';
-      ctx.beginPath();
-      ctx.arc(this.x - this.dashVx * 3, this.y - this.dashVy * 3, this.r * 0.9, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 0.18;
-      ctx.beginPath();
-      ctx.arc(this.x - this.dashVx * 6, this.y - this.dashVy * 6, this.r * 0.7, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.globalCompositeOperation = 'screen';
+      const trailCount = 3;
+      for (let i = 1; i <= trailCount; i++) {
+        const tx = this.x - this.dashVx * i * 2;
+        const ty = this.y - this.dashVy * i * 2;
+        
+        ctx.save();
+        ctx.translate(tx, ty);
+        // Dim the trail as it goes back
+        ctx.globalAlpha = 0.6 / i;
+        
+        // Golden body glow
+        ctx.fillStyle = '#ff9900';
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r * (1 - i * 0.1), 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Golden charging shield arc (matches his actual shield angle)
+        ctx.rotate(this.gunAngle + this.shieldVisualOffset);
+        ctx.translate(this.r + 5, 0);
+        ctx.beginPath();
+        ctx.arc(0, 0, 22 - i * 2, -Math.PI/2.5, Math.PI/2.5);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = '#ffea75';
+        ctx.lineCap = 'round';
+        ctx.stroke();
+        
+        ctx.restore();
+      }
       ctx.restore();
     }
 

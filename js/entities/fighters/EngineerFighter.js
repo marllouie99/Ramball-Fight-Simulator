@@ -145,8 +145,8 @@ export class EngineerFighter extends Fighter {
         this.wrenchTimer = CONFIG.Engineer.wrenchSwipeDuration || 10;
         this.wrenchAngle = this.gunAngle;
         
-        const hitSound = getBasicAttackSound(this._def?.id, 'melee');
-        if (hitSound) playSound(hitSound.src, hitSound.volume * 0.4);
+        const buildSound = getSkillSound(this._def?.id, 'build');
+        if (buildSound) playSound(buildSound.src, buildSound.volume);
       }
       
       if (this.buildTimer <= 0) {
@@ -174,7 +174,7 @@ export class EngineerFighter extends Fighter {
         // Visual text on self too
         spawnFloatingText(this.x, this.y - this.r - 5, "HEAL!", "#00FF00");
         
-        const healSound = getSkillSound(this._def?.id, 'heal');
+        const healSound = getSkillSound(this._def?.id, 'repair');
         if (healSound) playSound(healSound.src, healSound.volume);
       }
     }
@@ -259,6 +259,8 @@ export class EngineerFighter extends Fighter {
       module.spawnSparks(muzzleX, muzzleY, 5, 'gray'); // smoke
     });
 
+    const shotSound = getBasicAttackSound(this._def?.id);
+    if (shotSound) playSound(shotSound.src, shotSound.volume);
     this.shotgunCooldown = CONFIG.Engineer.shotgunCooldown;
     this.shotgunRecoilTimer = 15;
     

@@ -151,10 +151,10 @@ export class BomberFighter extends Fighter {
       }
     }
 
-    // Movement
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
+    // Move slightly forward towards current movement vector (unless planting C4)
+    if (this.plantingTimer === 0) {
+      this.applyMovementPhysics();
+    }
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);

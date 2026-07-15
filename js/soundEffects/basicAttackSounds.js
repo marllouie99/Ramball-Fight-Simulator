@@ -95,6 +95,22 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: -2,
   },
 
+  // ── Engineer ───────────────────────────────
+  // Shotgun blast.
+  15: {
+    src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+
+  // ── Turret ─────────────────────────────────
+  // Turret shot.
+  999: {
+    src: 'Assets/Sound Effects/Skills/turretshot.mp3',
+    volume: 0.1,
+    delay: 0,
+  },
+
   // ── Ninja / Assassin ───────────────────────
   // Throws a shuriken
   8: {
@@ -122,6 +138,14 @@ export const BASIC_ATTACK_SOUNDS = {
   14: {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3', // Ethereal/phantom sword slash
     volume: 0.5,
+    delay: 0,
+  },
+
+  // ── Ruby ─────────────────────────────────────
+  // Scythe melee attack
+  16: {
+    src: 'Assets/Sound Effects/Attacks/syctheattack.mp3',
+    volume: 0.7,
     delay: 0,
   },
 

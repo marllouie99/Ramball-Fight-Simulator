@@ -93,7 +93,7 @@ export const CONFIG = {
     beamBackwardSpeed: 0.8, // backward drift force while the beam is active
     beamDriftRetention: 0.92, // proportion of current velocity retained each frame during beam fire
     beamDriftBlend: 0.08,   // proportion of beam recoil blended into velocity each frame
-    beamRotateSpeed: 0.003, // max radians per frame the beam can rotate toward the target while firing
+    beamRotateSpeed: 0.015, // increased to allow the beam to effectively track moving targets
     initialKnockback: 1,     // velocity impulse on the very first beam contact
     tickDamage: 2.5,     // damage applied every tick interval after the initial hit
     tickInterval: 7,    // frames between damage ticks while beam is active
@@ -119,14 +119,17 @@ export const CONFIG = {
     swordRange: 40,   // pixels from edge; how close enemy must be for a sword swipe
     swipeCooldown: 100,  // frames between sword swipes (120 = 2 s at 60 fps)
     swipeDuration: 18,   // frames the swipe arc animation plays
-    swordDamage: 25,   // damage dealt by a sword swipe
+    swordDamage: 20,   // damage dealt by a sword swipe
     swordDurability: 3,    // number of swipes before the sword breaks
-    shieldBlockChance: 0.20, // probability (0–1) of blocking a direct incoming projectile
+    shieldBlockChance: 0.50, // probability (0–1) of blocking a direct incoming projectile
     blockFlashFrames: 15,   // duration of the visual flash when a block occurs
+    shieldHoldFrames: 60,   // frames to keep shield in front after successfully blocking an attack
+    blockProjectileDetectionRadius: 250, // radius to detect incoming projectiles for shield block visual
+    blockMeleeDetectionRadius: 130, // radius to detect close enemies for shield block visual
     shieldDurability: 2,    // number of successful blocks before the shield breaks
     shieldThrowDamage: 30,  // damage dealt by thrown sword after shield breaks
     swordReturnFrames: 180, // frames until thrown sword returns (≈3s)
-    dashChargeFrames: 30,   // frames Gray locks in and charges before the shield dash (≈0.8 s)
+    dashChargeFrames: 10,   // frames Gray locks in and charges before the shield dash (≈0.8 s)
     chargeKnockback: 2.0,   // velocity applied to nearby enemies when charging begins
     chargeKnockbackRadius: 90, // radius in px for the charge knockback effect
     dashDuration: 40,   // max frames the dash itself lasts before it auto-cancels
@@ -162,7 +165,7 @@ export const CONFIG = {
 
     // TUNING: Dodge mechanics
     dodgeChance: 0.30,           // probability (0-1) of dodging incoming projectiles
-    dodgeFlashDuration: 180,      // frames the flash step visual effect lasts (increased for visibility)
+    dodgeFlashDuration: 100,      // frames the flash step visual effect lasts (increased for visibility)
     dodgeCooldown: 15,           // frames minimum between dodge attempts
 
     // TUNING: Flame-contact stealth build
@@ -174,7 +177,7 @@ export const CONFIG = {
 
     // TUNING: Invincibility skill activation
     dodgesToActivate: 3,         // number of successful dodges needed to activate skill
-    invincibilityDuration: 500, // frames the invincibility lasts (5 seconds at 60 fps)
+    invincibilityDuration: 300, // frames the invincibility lasts (5 seconds at 60 fps)
     speedBoostMultiplier: 2.5,  // movement speed multiplier during invincibility
 
     // TUNING: Backstab mechanics
@@ -390,7 +393,7 @@ export const CONFIG = {
     turretRange: 350,
     turretBulletSpeed: 9,
     turretAimSpeed: 0.08,     // Radians per frame
-    turretBuildTime: 90,      // Frames to build turret (1.5 seconds)
+    turretBuildTime: 150,      // Frames to build turret (1.5 seconds)
     turretHealAmount: 30,     // Healing applied when bounced into
     turretHealCooldown: 60,   // Cooldown between heal triggers per turret
     turretAmmo: 20,            // Shots per magazine before reloading
@@ -400,6 +403,31 @@ export const CONFIG = {
     turretReloadBarHeight: 5, // Height of the reload progress bar
     turretAmmoPipWidth: 4,    // Diameter of individual ammo pips
     turretAmmoPipSpacing: 6,  // Spacing between ammo pips
+  },
+
+  /** Ruby — Scythe fighter */
+  ruby: {
+    // Basic Attack
+    scytheDamage: 10,
+    scytheRange: 45, // pixels from edge
+    scytheCooldown: 40,
+    lifestealPercent: 0.25, // 25% of damage dealt
+
+    // Active Skill (Pull)
+    activePullRange: 200,
+    activePullCooldown: 240, // 4 seconds at 60fps
+    activePullForce: 12.0,
+    activeSlowDuration: 20, // 1.5 seconds at 60fps
+
+    // Passive Skill (360 Spin)
+    passiveSpinRadius: 80,
+    passiveSpinCooldown: 300, // 5 seconds at 60fps
+    passiveSpinDamage: 15,
+    passiveLifestealPercent: 1.00, // 50% lifesteal on spin
+
+    // Core Mechanic (Dash)
+    dashSpeedMultiplier: 3.0,
+    dashDuration: 12,
   },
 };
 
@@ -500,7 +528,7 @@ export const FIGHTER_DEFS = [
     aimbot: false,
     type: 'knight',
     hp: 110,
-    damage: 15,   // sword swipe damage (mirrors CONFIG.knight.swordDamage)
+    damage: 20,   // sword swipe damage (mirrors CONFIG.knight.swordDamage)
     cooldown: 180,  // not used directly; knight manages its own swipeCooldown
     moveSpeed: 3.8,
     ability: "Knight's Code",
@@ -668,6 +696,24 @@ export const FIGHTER_DEFS = [
     moveSpeed: 4.4,
     ability: 'Deploy Turret',
     desc: 'Builds a Turret to assist Engineer in fight.',
+  },
+  {
+    id: 16,
+    name: 'Ruby',
+    color: '#E0115F',
+    startX: 310, startY: 250,
+    startVx: 1.4, startVy: 0.9,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0.05,
+    type: 'ruby',
+    hp: 90,
+    damage: 12,
+    cooldown: 40,
+    moveSpeed: 4.8,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Scythe Dance',
+    desc: 'Casting abilities triggers a short dash. Swings and pulls scythe to lifesteal.',
   },
 ];
 

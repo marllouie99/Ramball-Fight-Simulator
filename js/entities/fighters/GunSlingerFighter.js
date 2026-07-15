@@ -510,9 +510,7 @@ export class GunSlingerFighter extends Fighter {
 
     // Movement — slow down during reload
     const speedMult = this.isReloading ? CONFIG.gunslinger.reloadSpeedPenalty : 1;
-    this.x += this.vx * speedMult;
-    this.y += this.vy * speedMult;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
+    this.applyMovementPhysics(speedMult);
 
     this.resolveWallBounce(arena);
   }

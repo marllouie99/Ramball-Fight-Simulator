@@ -45,6 +45,7 @@ import {
   drawGunSlingerDualRevolver,
   drawEngineer,
 } from './weaponVisuals.js';
+import { drawRubyScythe } from './weapons/rubyWeaponGraphics.js';
 
 // --- Fighter Preview Cache ---
 const fighterPreviewCache = {};
@@ -1326,6 +1327,11 @@ function drawWeaponPreview(ctx, type, color) {
       case 'cronos':
         // Cronos crescent blade (melee weapon visual)
         drawCronosCrescentBlade(ctx, 0, 0, gunAngle, r, false, 0, 0, 10, 1);
+        return;
+
+      case 'ruby':
+        // Ruby's huge scythe
+        drawRubyScythe(ctx, { r, gunAngle, activePullActive: false, passiveSpinActive: false, scytheSwingActive: false });
         return;
 
       case 'bomber': {

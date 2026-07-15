@@ -43,7 +43,24 @@ export class LaserFighter extends Fighter {
 
   aim(opponent) {
     if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      
+      // Initialize gunAngle if undefined
+      if (this.gunAngle === undefined) {
+        this.gunAngle = targetAngle;
+      }
+
+      const delta = this.normalizeAngle(targetAngle - this.gunAngle);
+      // Slowly rotate towards the target. 
+      // We can use a slightly faster speed for aiming than for firing, 
+      // or just use the config value. Let's use config value * 2 for aiming.
+      const maxRotate = (CONFIG.laser.beamRotateSpeed || 0.015) * 2; 
+
+      if (Math.abs(delta) > maxRotate) {
+        this.gunAngle += Math.sign(delta) * maxRotate;
+      } else {
+        this.gunAngle = targetAngle;
+      }
     }
   }
 

@@ -51,17 +51,17 @@ let _shimmerFrame = 0;
 
 export function drawArena() {
   const { ctx, canvas, arena } = state;
-  
+
   // Fill the entire canvas background with white
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Arena background (in case it needs to be different later, but right now it's also white)
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#ffffffff';
   ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
   // Draw the arena boundary stroke
-  ctx.strokeStyle = '#000000';
+  ctx.strokeStyle = '#000000ff';
   ctx.lineWidth = 3;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
 }
@@ -1060,6 +1060,27 @@ export function drawProjectiles() {
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.5, owner.r / 24) : 0.9;
       drawGraySwordProjectile(ctx, p.x, p.y, angle, scale);
+      
+      if (p.stoppedByCronosSphere || p.frozenByCronosSphere) {
+         ctx.save();
+         ctx.translate(p.x, p.y);
+         ctx.rotate(angle);
+         // Cyan time-stasis crystal casing around the sword
+         ctx.fillStyle = 'rgba(0, 243, 255, 0.25)';
+         ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
+         ctx.lineWidth = 2;
+         ctx.beginPath();
+         // Elongated ellipse matching the sword's profile
+         ctx.ellipse(20 * scale, 0, 32 * scale, 10 * scale, 0, 0, Math.PI * 2);
+         ctx.fill();
+         ctx.stroke();
+         // Inner bright core
+         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+         ctx.beginPath();
+         ctx.ellipse(20 * scale, 0, 18 * scale, 4 * scale, 0, 0, Math.PI * 2);
+         ctx.fill();
+         ctx.restore();
+      }
       return;
     }
 
@@ -1180,7 +1201,7 @@ export function drawProjectiles() {
     ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
     ctx.fillStyle = p.color;
     ctx.fill();
-    
+
     // Add dark stroke so it stands out against the white background
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.lineWidth = 1.5;

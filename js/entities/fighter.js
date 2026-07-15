@@ -611,6 +611,41 @@ export class Fighter {
     }
   }
 
+  /**
+   * Applies slow timer, hit stun, velocity recovery, and basic position update.
+   * Extracted so subclasses that override update() can still use base physics.
+   * @param {number} extraMultiplier - Extra speed multiplier (e.g. for reloading)
+   */
+  applyMovementPhysics(extraMultiplier = 1) {
+    // Determine intended target speed
+    let targetSpeed = this.speed;
+    if (this.slowTimer > 0) {
+      this.slowTimer--;
+      targetSpeed *= this.slowMultiplier;
+    }
+    // Hit stun slows the fighter significantly on impact
+    if (this.hitStunTimer > 0) {
+      this.hitStunTimer--;
+      targetSpeed *= this.hitStunMultiplier;
+    }
+    
+    targetSpeed *= extraMultiplier;
+
+    // Velocity Recovery (gradually return to target speed after knockback or slow)
+    const currentSpeed = Math.hypot(this.vx, this.vy);
+    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
+      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
+      this.vx = (this.vx / currentSpeed) * newSpeed;
+      this.vy = (this.vy / currentSpeed) * newSpeed;
+    }
+
+    // Movement
+    this.x += this.vx;
+    this.y += this.vy;
+    const spinRate = this._def.spinRate ?? CONFIG.spin.rate;
+    this.angle += this.speed * spinRate;
+  }
+
   /** Standard per-frame update tick for basic movement, shooting, and physics. */
   update(opponent, ownerIndex, arena) {
     this.handlePoison();
@@ -631,31 +666,7 @@ export class Fighter {
       this.shootCooldown = this.shootCooldownMax;
     }
 
-    // Determine intended target speed
-    let targetSpeed = this.speed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
-    }
-    // Hit stun slows the fighter significantly on impact
-    if (this.hitStunTimer > 0) {
-      this.hitStunTimer--;
-      targetSpeed *= this.hitStunMultiplier;
-    }
-
-    // Velocity Recovery (gradually return to target speed after knockback or slow)
-    const currentSpeed = Math.hypot(this.vx, this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-      this.vx = (this.vx / currentSpeed) * newSpeed;
-      this.vy = (this.vy / currentSpeed) * newSpeed;
-    }
-
-    // Movement
-    this.x += this.vx;
-    this.y += this.vy;
-    const spinRate = this._def.spinRate ?? CONFIG.spin.rate;
-    this.angle += this.speed * spinRate;
+    this.applyMovementPhysics();
 
     // Aiming & Bouncing
     this.aim(opponent);

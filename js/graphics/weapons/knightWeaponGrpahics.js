@@ -10,7 +10,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
   const goldLight = '#fff085';
   let goldMid = '#e6b927';
   const goldDark = '#b38212';
-  const goldShadow = '#593c00';
+  const goldShadow = '#000000'; // Outer outline changed to black
 
   if (blockFlashTimer > 0) {
     goldMid = '#ffffff';
@@ -75,7 +75,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
   ctx.fill();
   
   ctx.strokeStyle = goldShadow;
-  ctx.lineWidth = 2 * shieldScale;
+  ctx.lineWidth = 1.5 * shieldScale; // Thin black outer rim
   ctx.lineJoin = 'round';
   ctx.stroke();
 
@@ -144,7 +144,7 @@ function drawSwordBase(ctx, swordScale, isBroken) {
   const goldLight = '#fff085';
   const goldMid = '#e6b927';
   const goldDark = '#b38212';
-  const goldShadow = '#593c00';
+  const goldShadow = '#000000'; // Outer outline changed to black
   const gripDark = '#2c241b';
 
   // 1. BLADE (drawn first so hilt overlays it)

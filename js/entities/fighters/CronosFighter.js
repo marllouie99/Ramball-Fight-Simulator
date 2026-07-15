@@ -23,6 +23,48 @@ for (let i = 0; i < 6; i++) {
 const _SLASH_COS = _BODY_HEX_COS;
 const _SLASH_SIN = _BODY_HEX_SIN;
 
+// Global cached pattern for Cronos honeycomb trail
+let _cronosHoneycombPattern = null;
+function getCronosHoneycombPattern(ctx) {
+  if (_cronosHoneycombPattern) return _cronosHoneycombPattern;
+  
+  const s = 18; // Hex size - made larger
+  const w = Math.round(s * Math.sqrt(3));
+  const h = Math.round(s * 3);
+  
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const pctx = canvas.getContext('2d');
+  
+  // Use solid white with high alpha so it contrasts against the bright cyan background
+  pctx.strokeStyle = 'rgba(255, 255, 255, 0.6)'; 
+  pctx.lineWidth = 2.0;
+  
+  function drawHex(x, y) {
+    pctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      // Draw slightly smaller to leave a gap
+      const px = x + _SLASH_COS[i] * (s * 0.9);
+      const py = y + _SLASH_SIN[i] * (s * 0.9);
+      if (i === 0) pctx.moveTo(px, py);
+      else pctx.lineTo(px, py);
+    }
+    pctx.closePath();
+    pctx.stroke();
+  }
+
+  // Draw tiling centers for pointy-topped hexagons
+  drawHex(0, 0);
+  drawHex(w, 0);
+  drawHex(0, h);
+  drawHex(w, h);
+  drawHex(w/2, h/2);
+  
+  _cronosHoneycombPattern = ctx.createPattern(canvas, 'repeat');
+  return _cronosHoneycombPattern;
+}
+
 /**
  * Cronos Fighter (Time Stop)
  * Close-combat fighter with time manipulation abilities.
@@ -76,24 +118,45 @@ export class CronosFighter extends Fighter {
   }
 
   _applyCronosSpeed() {
-    // OPTIMIZATION: Only calculate sphere distance when sphere is active
-    if (!this.sphereActive) {
-      this.speed = this.baseSpeed;
-      return;
+    let modeMult = 1.0;
+    if (typeof state !== 'undefined' && state.mode) {
+      if (state.mode === '1v1') modeMult = 1.2;
+      else if (state.mode === '2v2') modeMult = 1.1;
     }
-
-    const distToSphere = Math.hypot(this.x - this.sphereX, this.y - this.sphereY);
-    const insideSphere = distToSphere <= CONFIG.cronos.sphereRadius;
-    const targetSpeed = insideSphere
-      ? this.baseSpeed * CONFIG.cronos.sphereSpeedMultiplier
-      : this.baseSpeed;
-
+    
+    let baseMoveSpeed = this.baseSpeed * modeMult;
+    let targetSpeed = baseMoveSpeed;
+    
+    if (this.sphereActive) {
+      const distToSphere = Math.hypot(this.x - this.sphereX, this.y - this.sphereY);
+      const insideSphere = distToSphere <= CONFIG.cronos.sphereRadius;
+      if (insideSphere) {
+        targetSpeed = baseMoveSpeed * CONFIG.cronos.sphereSpeedMultiplier;
+      }
+    }
+    
     this.speed = targetSpeed;
 
+    // Apply slow and hit stun effects
+    if (this.slowTimer > 0) {
+      this.slowTimer--;
+      targetSpeed *= this.slowMultiplier;
+    }
+    if (this.hitStunTimer > 0) {
+      this.hitStunTimer--;
+      targetSpeed *= this.hitStunMultiplier;
+    }
+
+    // Apply instant velocity scaling to make sphere dashes and slow recoveries snappy
     const currentMagnitude = Math.hypot(this.vx, this.vy);
     if (currentMagnitude > 0) {
       this.vx = (this.vx / currentMagnitude) * targetSpeed;
       this.vy = (this.vy / currentMagnitude) * targetSpeed;
+    } else {
+      // Kickstart movement if completely stopped
+      const angle = this.angle || (Math.random() * Math.PI * 2);
+      this.vx = Math.cos(angle) * targetSpeed;
+      this.vy = Math.sin(angle) * targetSpeed;
     }
   }
 
@@ -193,6 +256,9 @@ export class CronosFighter extends Fighter {
     for (const effect of this.attackSlashEffects) {
       const progress = 1 - effect.life / effect.maxLife;
       const alpha = effect.alpha * (1 - progress);
+
+      // Honeycomb effect completely removed.
+      
       const scale = 0.5 + progress * 0.9;
 
       ctx.save();
@@ -383,6 +449,12 @@ export class CronosFighter extends Fighter {
     this._spawnAttackSlashEffect();
 
     applyDamageToTarget(opponent, meleeDamage, this, { isMelee: true });
+    
+    // Physical hit knockback (less per hit since he hits twice rapidly)
+    const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    opponent.vx += Math.cos(kbAngle) * 4;
+    opponent.vy += Math.sin(kbAngle) * 4;
+
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, hitText, '#FF007F');
 
     // Passive stop chance on hit
@@ -483,6 +555,20 @@ export class CronosFighter extends Fighter {
     // Handle melee swing animation
     if (this.meleeSwingActive) {
       this.meleeSwingTimer--;
+      
+      // Spawn honeycomb trail particles continuously during swing
+      if (!useAggressiveMode) {
+        const progress = 1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration);
+        const swingTotal = Math.PI * 0.8;
+        let currentAngle = 0;
+        if (this.meleeSwingDirection === 1) {
+           currentAngle = this.meleeSwingAngle - (swingTotal / 2) + progress * swingTotal;
+        } else {
+           currentAngle = this.meleeSwingAngle + (swingTotal / 2) - progress * swingTotal;
+        }
+        // Honeycomb trail spawning removed
+      }
+
       if (this.meleeSwingTimer <= 0) {
         this.meleeSwingActive = false;
         this.meleeSlashFadeTimer = 15; // Delay before it disappears (fade out)
@@ -641,6 +727,14 @@ export class CronosFighter extends Fighter {
     this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
 
     this.aim(opponent);
+
+    // Ambient movement honeycomb trail emitted from the blade when moving
+    const currentMagnitude = Math.hypot(this.vx, this.vy);
+    if (!this.meleeSwingActive && currentMagnitude > 1.0 && !useAggressiveMode) {
+      if (Math.random() < 0.15) { // Reduced spawn chance
+        // Ambient honeycomb trail spawning removed
+      }
+    }
 
     // Custom bounce with sphere mechanics
     this.resolveWallBounce(arena, opponent);
@@ -998,7 +1092,9 @@ export class CronosFighter extends Fighter {
       const fullStartA = -Math.PI * 0.4; // Matches start of sword swing
       const fullEndA = Math.PI * 0.4;    // Matches end of sword swing
 
-      const currentEndA = fullStartA + (fullEndA - fullStartA) * swingProgress;
+      const currentEndA = isForward 
+         ? fullStartA + (fullEndA - fullStartA) * swingProgress
+         : fullEndA - (fullEndA - fullStartA) * swingProgress;
 
       const fullEndX = Math.cos(fullEndA) * arcRadius;
       const fullStartX = Math.cos(fullStartA) * arcRadius;
@@ -1013,7 +1109,6 @@ export class CronosFighter extends Fighter {
       ctx.rotate(this.meleeSwingAngle);
 
       // Clip region so the slash "grows" trailing the sword
-      // Always sweep clockwise to stay inside the forward-facing cone
       ctx.beginPath();
       ctx.moveTo(0, 0);
       if (isForward) {

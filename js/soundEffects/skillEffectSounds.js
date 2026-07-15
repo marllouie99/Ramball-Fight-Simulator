@@ -53,6 +53,14 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 0.6,
     },
   },
+
+  // ── Turret ──────────────────────────────────
+  turret: {
+    death: {
+      src: 'Assets/Sound Effects/Skills/machinebroken.mp3',
+      volume: 1.0,
+    },
+  },
 };
 
 /**
