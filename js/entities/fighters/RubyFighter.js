@@ -1,6 +1,6 @@
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -128,6 +128,7 @@ export class RubyFighter extends Fighter {
     if (applied) {
       spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#E0115F');
       this.heal(damage * lifesteal);
+      triggerGlobalScreenShake(5, 6);
     }
 
     const sound = getBasicAttackSound(this._def?.id);
@@ -326,6 +327,7 @@ export class RubyFighter extends Fighter {
         if (applied) {
           totalHeal += damage * lifesteal;
           spawnFloatingText(f.x, f.y - f.r - 5, 'SPIN!', '#E0115F');
+          triggerGlobalScreenShake(8, 8);
           
           // Pull target closer
           const dx = this.x - f.x;

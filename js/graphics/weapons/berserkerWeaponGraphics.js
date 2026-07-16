@@ -7,18 +7,18 @@ import { CONFIG } from '../../core/config.js';
 
 export const BERSERKER_WEAPON_GRAPHICS = {
   axe: {
-    handleBase: '#4a3018',           // Brown wooden handle
-    handleRage: '#5a2010',           // Rage mode handle (darkens slightly reddish)
-    gripColor: '#1a1105',            // Dark leather grip wrap
-    collarColor: '#222222',          // Dark iron metal collar
-    bladeCoreA: '#b0b5b9',           // Main blade color (steel)
-    bladeCoreARage: '#ff2a2a',       // Rage mode blade (glows red)
-    bladeCoreB: '#d0d5d9',           // Blade highlight (light steel)
-    bladeCoreBRage: '#ff6a6a',       // Rage mode highlight
-    bladeSpine: '#404549',           // Blade shadow (dark iron)
-    bladeSpineRage: '#6a1010',       // Rage mode shadow
-    bladeEdge: '#f0f5f9',            // Blade edge (sharp bright steel)
-    bladeEdgeRage: '#ffd0d0',        // Rage mode edge
+    handleBase: '#2b2d31',           // Dark grey metal handle (sci-fi)
+    handleRage: '#3a1e1e',           // Rage mode handle
+    gripColor: '#0a0b0c',            // Black synthetic grip wrap
+    collarColor: '#181a1f',          // Dark armor alloy collar
+    bladeCoreA: '#353a40',           // Main blade color (dark sci-fi alloy)
+    bladeCoreARage: '#4a2020',       // Rage mode blade
+    bladeCoreB: '#4c535c',           // Blade highlight (lighter alloy)
+    bladeCoreBRage: '#6a2b2b',       // Rage mode highlight
+    bladeSpine: '#000000',           // Black edges
+    bladeSpineRage: '#000000',       // Black edges in rage
+    bladeEdge: '#000000',            // Black neon edge
+    bladeEdgeRage: '#ff3333',        // Neon red edge in rage
     rageGlow: 'rgba(255, 0, 0, 0.35)', // Rage aura
   },
   positioning: {
@@ -42,41 +42,6 @@ export function drawBerserkerDualAxes(ctx, x, y, gunAngle, r, isInRage, axeSwing
   const isGlowing = isInRage || rageFadeTimer > 0;
   const glowIntensity = isInRage ? 1.0 : fadeOutRatio;
 
-  // Draw motion trail behind the character before translating to current position
-  if (isGlowing && axeHistory && axeHistory.length > 0) {
-    // Limit to max 4 points for performance
-    const trailSlice = axeHistory.slice(-4);
-    for (let i = 0; i < trailSlice.length; i++) {
-      const hist = trailSlice[i];
-      const age = (i + 1) / trailSlice.length; // 0 to 1
-      const trailAlpha = 0.4 * glowIntensity * age;
-
-      ctx.save();
-      ctx.translate(hist.x, hist.y);
-      ctx.rotate(hist.gunAngle);
-
-      if (Math.abs(hist.gunAngle) > Math.PI / 2) {
-        ctx.scale(1, -1);
-      }
-
-      ctx.globalAlpha = trailAlpha;
-
-      // Draw trail axes statically since calculating swing state for trails is expensive
-      ctx.save();
-      ctx.translate(0, -sideOffset);
-      ctx.scale(1, -1);
-      drawSingleAxe(ctx, 0, scale, true, true, false, glowIntensity, true);
-      ctx.restore();
-
-      ctx.save();
-      ctx.translate(0, sideOffset);
-      drawSingleAxe(ctx, 0, scale, true, true, false, glowIntensity, true);
-      ctx.restore();
-
-      ctx.restore();
-    }
-  }
-
   ctx.translate(x, y);
 
   const defaultAxesRotation = axeSwingActive ? axeSwingAngle : gunAngle;
@@ -84,45 +49,67 @@ export function drawBerserkerDualAxes(ctx, x, y, gunAngle, r, isInRage, axeSwing
 
   const SWING_DURATION = Math.max(1, axeSwingDuration || CONFIG.berserker?.axeSwingDurationFrames || 24);
 
-  let leftRot = 0, rightRot = 0;
-  let leftFwd = 0, rightFwd = 0;
+  let leftArmRot = 0, leftWristRot = 0, leftFwd = 0, leftSide = 0;
+  let rightArmRot = 0, rightWristRot = 0, rightFwd = 0, rightSide = 0;
 
   if (axeSwingActive) {
     const t = Math.max(0, Math.min(1, (SWING_DURATION - axeSwingTimer) / SWING_DURATION));
     swingProgress = t;
 
-    // Helper for alternating chop animation
+    // Helper for alternating chop animation with smooth easing and 2D path
     const getChopTransform = (lt) => {
-      let rot = 0;
+      let armRot = 0;
+      let wristRot = 0;
       let fwd = 0;
-      if (lt < 0.25) { // wind up backward & outward
-        rot = 1.2 * (lt / 0.25);
-        fwd = -8 * (lt / 0.25);
-      } else if (lt < 0.6) { // chop forward & inward
-        const p = (lt - 0.25) / 0.35;
-        const ease = 1 - Math.pow(1 - p, 4);
-        rot = 1.2 - ease * 2.8;
-        fwd = -8 + ease * 36;
-      } else { // recover
-        const p = (lt - 0.6) / 0.4;
-        rot = -1.6 * (1 - p);
-        fwd = 28 * (1 - p);
+      let side = 0;
+
+      if (lt <= 0 || lt >= 1) return { armRot, wristRot, fwd, side };
+
+      // Using smoothstep (p * p * (3 - 2 * p)) ensures there are no instant velocity jumps between frames
+      if (lt < 0.25) { // Wind up (expanded to ~5 frames)
+        const p = lt / 0.25;
+        const ease = p * p * (3 - 2 * p);
+        armRot = 0.5 * ease;       
+        wristRot = 0.5 * ease;     
+        fwd = -5 * ease;           
+        side = 8 * ease;          
+      } else if (lt < 0.65) { // The Slash (expanded to ~7.5 frames)
+        const p = (lt - 0.25) / 0.40;
+        const ease = p * p * (3 - 2 * p); 
+        armRot = 0.5 - ease * 2.0;   // 114 degree sweep
+        wristRot = 0.5 - ease * 2.0; 
+        fwd = -5 + ease * 25;        
+        side = 8 - ease * 12;       
+      } else { // Recovery (expanded to ~6.5 frames, twice as long as before!)
+        const p = (lt - 0.65) / 0.35;
+        const ease = p * p * (3 - 2 * p); 
+        armRot = -1.5 * (1 - ease); 
+        wristRot = -1.5 * (1 - ease);
+        fwd = 20 * (1 - ease); 
+        side = -4 * (1 - ease);
       }
-      return { rot, fwd };
+
+      return { armRot, wristRot, fwd, side };
     };
 
-    if (t < 0.5) {
-      // Right axe swings (t: 0 to 0.5)
-      const lt = t / 0.5;
-      const { rot, fwd } = getChopTransform(lt);
-      rightRot = rot;
+    // Right axe swings from t=0.0 to t=0.8 (Gets 19 frames instead of 12!)
+    if (t < 0.8) {
+      const lt = t / 0.8;
+      const { armRot, wristRot, fwd, side } = getChopTransform(lt);
+      rightArmRot = armRot;
+      rightWristRot = wristRot;
       rightFwd = fwd;
-    } else {
-      // Left axe swings (t: 0.5 to 1.0)
-      const lt = (t - 0.5) / 0.5;
-      const { rot, fwd } = getChopTransform(lt);
-      leftRot = rot;
+      rightSide = side;
+    }
+
+    // Left axe swings from t=0.2 to t=1.0 (Gets 19 frames instead of 12!)
+    if (t > 0.2) {
+      const lt = (t - 0.2) / 0.8;
+      const { armRot, wristRot, fwd, side } = getChopTransform(lt);
+      leftArmRot = armRot;
+      leftWristRot = wristRot;
       leftFwd = fwd;
+      leftSide = side;
     }
   }
 
@@ -147,16 +134,18 @@ export function drawBerserkerDualAxes(ctx, x, y, gunAngle, r, isInRage, axeSwing
   // Draw Left Axe (mirrored vertically)
   ctx.save();
   ctx.scale(1, -1); // Mirror Y so it's symmetrical to the right axe
-  ctx.translate(holdX + leftFwd, holdY);
-  ctx.rotate(holdRot + leftRot);
+  ctx.rotate(leftArmRot); // Swing around body
+  ctx.translate(holdX + leftFwd, holdY + leftSide); // 2D sweep path
+  ctx.rotate(holdRot + leftWristRot); // Local wrist rotation
   // isRight=false so blade faces inward (towards center)
   drawSingleAxe(ctx, 0, scale, isGlowing, false, axeSwingActive, glowIntensity, false);
   ctx.restore();
 
   // Draw Right Axe
   ctx.save();
-  ctx.translate(holdX + rightFwd, holdY);
-  ctx.rotate(holdRot + rightRot);
+  ctx.rotate(rightArmRot); // Swing around body
+  ctx.translate(holdX + rightFwd, holdY + rightSide); // 2D sweep path
+  ctx.rotate(holdRot + rightWristRot); // Local wrist rotation
   drawSingleAxe(ctx, 0, scale, isGlowing, false, axeSwingActive, glowIntensity, false);
   ctx.restore();
 
@@ -315,16 +304,20 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   const bladeEdge = isInRage ? axe.bladeEdgeRage : axe.bladeEdge;
 
   // --- HANDLE ---
-  // Core shaft (dark wood or metal)
   ctx.fillStyle = handleBase;
-  ctx.fillRect(-2.5 * scale, -12 * scale, 5 * scale, 36 * scale);
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.beginPath();
+  ctx.rect(-2.5 * scale, -12 * scale, 5 * scale, 52 * scale);
+  ctx.fill();
+  ctx.stroke();
 
   // Leather wrap (rugged, horizontal/angled strips on lower grip)
   ctx.strokeStyle = axe.gripColor;
   ctx.lineWidth = 1.5 * scale;
   ctx.lineCap = 'butt';
-  for (let i = 0; i < 7; i++) {
-    const yy = 6 * scale + i * 3 * scale;
+  for (let i = 0; i < 13; i++) {
+    const yy = 2 * scale + i * 3 * scale;
     ctx.beginPath();
     ctx.moveTo(-2.5 * scale, yy);
     ctx.lineTo(2.5 * scale, yy + 1.5 * scale);
@@ -333,22 +326,22 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
 
   // Pommel (Crushing mace head / heavy spike)
   ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1 * scale;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
   ctx.beginPath();
-  ctx.moveTo(-4 * scale, 24 * scale);
-  ctx.lineTo(4 * scale, 24 * scale);
-  ctx.lineTo(5 * scale, 28 * scale);
-  ctx.lineTo(0, 34 * scale);
-  ctx.lineTo(-5 * scale, 28 * scale);
+  ctx.moveTo(-4 * scale, 40 * scale);
+  ctx.lineTo(4 * scale, 40 * scale);
+  ctx.lineTo(5 * scale, 44 * scale);
+  ctx.lineTo(0, 50 * scale);
+  ctx.lineTo(-5 * scale, 44 * scale);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   // --- COLLAR (Forged Armor Housing) ---
   ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#333';
-  ctx.lineWidth = 1 * scale;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
   ctx.beginPath();
   // Bulky rectangular clamp with angled corners
   ctx.moveTo(-4 * scale, -18 * scale);
@@ -364,9 +357,10 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.stroke();
 
   // Glowing vertical rune in the collar
-  ctx.fillStyle = isInRage ? '#fff' : bladeCoreA;
+  ctx.fillStyle = isInRage ? '#fff' : bladeEdge;
   if (!isTrail) {
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
+    ctx.shadowColor = isInRage ? '#ff3333' : '#000000';
+    ctx.shadowBlur = 6 * scale;
   }
   ctx.beginPath();
   ctx.moveTo(0, -14 * scale);
@@ -447,12 +441,18 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.fillStyle = bodyGrad;
   ctx.fill();
 
-  // Spine outline
-  ctx.lineWidth = 1.5 * scale;
-  ctx.strokeStyle = bladeSpine;
-  ctx.stroke();
+  const pulse = (0.7 + 0.3 * Math.sin(Date.now() / 150)) * glowIntensity;
 
-  // Inner groove/blood channel
+  // Spine outline (normal dark stroke)
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#000000';
+  ctx.stroke();
+  ctx.restore();
+
+  // Inner Groove (Dark indent)
   ctx.beginPath();
   ctx.moveTo(bladeDir * 6 * scale, -12 * scale);
   ctx.lineTo(bladeDir * 14 * scale, -12 * scale);
@@ -461,22 +461,18 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.lineTo(bladeDir * 14 * scale, 4 * scale);
   ctx.lineTo(bladeDir * 11 * scale, 6 * scale);
   ctx.lineTo(bladeDir * 6 * scale, 0 * scale);
-  ctx.lineWidth = 1.2 * scale;
 
-  if (isInRage) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const pulse = (0.6 + 0.4 * Math.sin(Date.now() / 100)) * glowIntensity;
-    ctx.strokeStyle = `rgba(255, 50, 50, ${pulse})`;
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
-    ctx.stroke();
-    ctx.restore();
-  } else {
-    ctx.strokeStyle = 'rgba(30, 0, 0, 0.6)';
-    ctx.stroke();
-  }
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#111111';
+  ctx.fillStyle = '#222222';
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 
-  // Bright edge rim (Sharpened chopping edge)
+  // Bright edge rim (Glowing neon on the axe's blade chopping edge)
   ctx.beginPath();
   ctx.moveTo(bladeDir * 15 * scale, -18 * scale);
   ctx.lineTo(bladeDir * 20 * scale, -10 * scale);
@@ -485,14 +481,33 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.lineTo(bladeDir * 19 * scale, 10 * scale);
   ctx.lineTo(bladeDir * 16 * scale, 14 * scale);
 
-  ctx.lineWidth = 1.8 * scale;
-  ctx.strokeStyle = bladeEdge;
-  if (isInRage) {
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
-    ctx.strokeStyle = '#ffffff';
-  }
-  ctx.stroke();
-  ctx.shadowBlur = 0;
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+    
+    // Outer glow
+    ctx.lineWidth = 6.0 * scale;
+    ctx.globalAlpha = 0.5 * pulse;
+    ctx.strokeStyle = isInRage ? '#ff0000' : '#000000';
+    if (!isTrail) { 
+        ctx.shadowColor = isInRage ? '#ff0000' : '#000000'; 
+        ctx.shadowBlur = 15 * scale; 
+    }
+    ctx.stroke();
+    
+    // Mid glow
+    ctx.lineWidth = 3.0 * scale;
+    ctx.globalAlpha = 1.0 * pulse;
+    ctx.strokeStyle = isInRage ? '#ff3333' : '#111111';
+    ctx.stroke();
+    
+    // Inner core
+    ctx.globalAlpha = 1.0;
+    ctx.lineWidth = 1.0 * scale;
+    ctx.strokeStyle = isInRage ? '#ffcccc' : '#333333';
+    ctx.shadowBlur = 0;
+    ctx.stroke();
+    ctx.restore();
   ctx.restore();
 
   // --- BACK SPIKE (Forged Hook) ---
@@ -511,18 +526,29 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.fillStyle = spikeGrad;
   ctx.fill();
 
-  ctx.lineWidth = 1 * scale;
-  ctx.strokeStyle = bladeSpine;
+  // Stroke for back spike
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#000000';
   ctx.stroke();
+  ctx.restore();
 
-  // Spike Edge highlight
+  // Spike Edge highlight (metallic)
   ctx.beginPath();
   ctx.moveTo(-bladeDir * 14 * scale, -10 * scale);
   ctx.lineTo(-bladeDir * 10 * scale, -7 * scale);
   ctx.lineTo(-bladeDir * 18 * scale, 0 * scale);
-  ctx.lineWidth = 1.2 * scale;
-  ctx.strokeStyle = bladeEdge;
+
+  ctx.save();
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = bladeCoreB;
   ctx.stroke();
+  ctx.restore();
 
   ctx.restore();
 }
+

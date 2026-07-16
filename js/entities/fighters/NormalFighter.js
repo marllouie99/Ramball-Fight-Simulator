@@ -1,11 +1,13 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
+import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawRedSniperGun } from '../../graphics/weaponVisuals.js';
+import { spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
 
 /**
  * Standard Normal Fighter
@@ -24,6 +26,8 @@ export class NormalFighter extends Fighter {
       this.reloadTimer = 0;
       this.isReloading = false;
       this.reloadFinishFlash = 0;
+      this.tensionAuraIntensity = 0;
+      this.executionWindupTimer = 0;
     }
   }
 
@@ -34,6 +38,7 @@ export class NormalFighter extends Fighter {
       this.reloadTimer = 0;
       this.isReloading = false;
       this.reloadFinishFlash = 0;
+      this.executionWindupTimer = 0;
     }
   }
 
@@ -43,6 +48,60 @@ export class NormalFighter extends Fighter {
     return angle;
   }
 
+  _fireWeapon(ownerIndex, isEnhanced) {
+    let finalSpeed = CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1);
+    let customSpawnX, customSpawnY;
+    let visualType = undefined;
+    let finalDamage = this.damage;
+
+    const scale = 0.92;
+    const baseX = this.r + 4;
+    const barrelLength = this.r * 2.65 * scale;
+    const customTipDist = baseX + barrelLength;
+    customSpawnX = this.x + Math.cos(this.angle) * customTipDist;
+    customSpawnY = this.y + Math.sin(this.angle) * customTipDist;
+
+    if (this._def?.id === 1) {
+      if (isEnhanced) {
+        visualType = 'crimsonSniperBullet_enhanced';
+        finalDamage = this.damage * (CONFIG.sharpshooter?.enhancedDamageMultiplier || 2.5);
+        finalSpeed *= (CONFIG.sharpshooter?.enhancedSpeedMultiplier || 1.5);
+        spawnFloatingText(this.x, this.y - this.r - 20, 'EXECUTE!', '#ff0000');
+        triggerGlobalScreenShake(15, 10);
+      } else {
+        visualType = 'crimsonSniperBullet';
+      }
+      this.magazineBullets--;
+
+      // When dropping to exactly 2 bullets, play the ready sound to signal the tension aura
+      if (this.magazineBullets === 2) {
+        const readySound = getSkillEffectSound('sharpshooter', 'enhanceready');
+        if (readySound) {
+          playSound(readySound.src, readySound.volume, readySound.speed || 1.0);
+        }
+      }
+    }
+
+    projectileSystem.fireProjectile(this, ownerIndex, finalDamage, false, finalSpeed, false, visualType, customSpawnX, customSpawnY);
+    this.shootCooldown = CONFIG.normal.shotCooldown;
+
+    // Physics Recoil
+    let recoilForce = isEnhanced ? (CONFIG.sharpshooter?.enhancedRecoilForce || 30) : 8;
+    this.vx -= Math.cos(this.angle) * recoilForce;
+    this.vy -= Math.sin(this.angle) * recoilForce;
+    this.gunRecoil = 1.0;
+
+    if (isEnhanced && this._def?.id === 1) {
+      const enhanceSound = getSkillSound(this._def?.id, 'enhance');
+      if (enhanceSound) {
+        playSound(enhanceSound.src, enhanceSound.volume);
+      }
+    } else {
+      const sound = getBasicAttackSound(this._def?.id);
+      this._attackSoundTimer = sound.delay;
+      this._attackSoundConfig = sound;
+    }
+  }
 
   update(opponent, ownerIndex, arena) {
     this.handlePoison();
@@ -50,13 +109,20 @@ export class NormalFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Time stop - freeze ALL movement, spinning, and actions
+    // Time stop
     if (this._handleTimeStop()) {
       return;
     }
 
     if (this.isSniper) {
       if (this.reloadFinishFlash > 0) this.reloadFinishFlash--;
+
+      if (this.executionWindupTimer > 0) {
+        this.executionWindupTimer--;
+        if (this.executionWindupTimer === 0) {
+          this._fireWeapon(ownerIndex, true);
+        }
+      }
 
       // Handle Reloading
       if (this.isReloading) {
@@ -66,8 +132,8 @@ export class NormalFighter extends Fighter {
           this.magazineBullets = this.maxMagazine;
           this.isReloading = false;
           spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADED!', '#ffff00');
-          this.reloadFinishFlash = 20; // Trigger a bright flash
-          this.gunRecoil = 8; // Small gun kick as it chambers a round
+          this.reloadFinishFlash = 20;
+          this.gunRecoil = 0;
         }
       }
 
@@ -75,57 +141,36 @@ export class NormalFighter extends Fighter {
       if (this.magazineBullets <= 0 && !this.isReloading) {
         this.isReloading = true;
         this.reloadTimer = CONFIG.normal.reloadTime;
-        this.reloadDropX = this.x;
-        this.reloadDropY = this.y;
         spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
         const reloadSound = getSkillEffectSound('crimsonsniper', 'reload');
         if (reloadSound) {
           playSound(reloadSound.src, reloadSound.volume, reloadSound.speed || 1.0);
         }
       }
+
+      // Smooth Tension Aura calculation
+      if (this.magazineBullets <= 2 && !this.isReloading && this.magazineBullets > 0) {
+        const targetIntensity = this.magazineBullets === 1 ? 1.0 : 0.25;
+        this.tensionAuraIntensity = Math.min(targetIntensity, (this.tensionAuraIntensity || 0) + 0.015);
+      } else {
+        this.tensionAuraIntensity = Math.max(0, (this.tensionAuraIntensity || 0) - 0.05);
+      }
     }
 
-    if (opponent) {
+    if (opponent && this.executionWindupTimer === 0) {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
       const canShoot = (!this.isSniper || !this.isReloading);
 
       if (aligned && !this.lastAimAligned && this.shootCooldown === 0 && canShoot) {
-        const redSpeed = CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1);
-
-        // Calculate exact tip position for Crimson Sniper's elongated rifle
-        let customSpawnX, customSpawnY;
-        let visualType = undefined;
-        if (this._def?.id === 1 || this._def.type === 'normal') {
-          const scale = 0.92;
-          const baseX = this.r + 4;
-          const barrelLength = this.r * 2.65 * scale;
-          const customTipDist = baseX + barrelLength;
-          customSpawnX = this.x + Math.cos(this.angle) * customTipDist;
-          customSpawnY = this.y + Math.sin(this.angle) * customTipDist;
-          if (this._def?.id === 1) {
-            visualType = 'crimsonSniperBullet';
-            this.magazineBullets--; // Consume ammo
-          }
-        }
-
-        projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, redSpeed, false, visualType, customSpawnX, customSpawnY);
-        this.shootCooldown = CONFIG.normal.shotCooldown;
-
-        // Play Sharpshooter shot sound with configurable timing
-        if (this._def?.id === 1) {
-          // Physics Recoil: Push the sniper backwards when firing
-          const recoilForce = 8;
-          this.vx -= Math.cos(this.angle) * recoilForce;
-          this.vy -= Math.sin(this.angle) * recoilForce;
-
-          // Set visual recoil value to animate the gun drawing
-          this.gunRecoil = 1.0;
-
-          const sound = getBasicAttackSound(this._def?.id);
-          this._attackSoundTimer = sound.delay;
-          this._attackSoundConfig = sound;
+        if (this.isSniper && this.magazineBullets === 1) {
+          // Start the windup for the execution shot instead of firing immediately
+          this.executionWindupTimer = CONFIG.sharpshooter?.executeWindupFrames || 25;
+          spawnFloatingText(this.x, this.y - this.r - 20, 'CHARGING...', '#ffaa00');
+        } else {
+          // Normal shot
+          this._fireWeapon(ownerIndex, false);
         }
       }
       this.lastAimAligned = aligned;
@@ -143,14 +188,37 @@ export class NormalFighter extends Fighter {
     let moveMultiplier = 1.0;
     let spinMultiplier = 1.0;
 
-    if (this.isSniper && this.isReloading) {
-      moveMultiplier = 0.2; // Move very slow
-      spinMultiplier = 0.0; // Stop spinning
+    if (this.isSniper) {
+      if (this.isReloading) {
+        moveMultiplier = 0.2; // Move very slow while reloading
+        spinMultiplier = 0.0; // Stop spinning
+      } else if (this.magazineBullets === 1) {
+        // FOCUS STATE: Stop moving and focus aim for the final execute shot
+        moveMultiplier = 0.05; // Almost completely stationary
+        spinMultiplier = 0.0;
+        
+        // Spawn focusing aura/text occasionally
+        if (Math.random() < 0.05) {
+          spawnFloatingText(this.x, this.y - this.r - 25, 'FOCUS...', '#ff4444');
+        }
+      }
     }
 
     this.x += this.vx * moveMultiplier;
     this.y += this.vy * moveMultiplier;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate) * spinMultiplier;
+    
+    if (this.isSniper && opponent) {
+      if (!this.isReloading) {
+        // Sharpshooter uses Target Lock: constantly track the opponent instead of spinning wildly
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        const diff = this.normalizeAngle(targetAngle - this.angle);
+        // Smoothly and quickly interpolate aiming angle (25% per frame)
+        this.angle += diff * 0.25;
+      }
+    } else {
+      // Normal spinning behavior
+      this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate) * spinMultiplier;
+    }
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);
@@ -180,7 +248,8 @@ export class NormalFighter extends Fighter {
       this.maxMagazine,
       this.reloadTimer,
       this.isReloading,
-      this.reloadFinishFlash || 0
+      this.reloadFinishFlash || 0,
+      this.tensionAuraIntensity || 0
     );
   }
 

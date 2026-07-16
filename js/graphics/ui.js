@@ -46,6 +46,7 @@ import {
   drawEngineer,
 } from './weaponVisuals.js';
 import { drawRubyScythe } from './weapons/rubyWeaponGraphics.js';
+import { drawMusashiWeapons, drawMusashiSheaths } from './weapons/musashiWeaponGraphics.js';
 
 // --- Fighter Preview Cache ---
 const fighterPreviewCache = {};
@@ -1333,6 +1334,23 @@ function drawWeaponPreview(ctx, type, color) {
         // Ruby's huge scythe
         drawRubyScythe(ctx, { r, gunAngle, activePullActive: false, passiveSpinActive: false, scytheSwingActive: false });
         return;
+
+      case 'musashi': {
+        const mockFighter = {
+          x: 0,
+          y: 0,
+          r: r,
+          gunAngle: gunAngle,
+          oarWindupTimer: 0,
+          strikeTimer: 0,
+          nitenActiveTimer: 0,
+          isNitenSecondHit: false,
+          currentStance: 'water'
+        };
+        drawMusashiSheaths(ctx, mockFighter, false);
+        drawMusashiWeapons(ctx, mockFighter);
+        return;
+      }
 
       case 'bomber': {
         const skinColor = color || '#4A2508';

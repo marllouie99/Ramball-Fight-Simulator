@@ -18,6 +18,8 @@ import { drawIllusionSpawnEffects } from './particles/illusionSpawnEffect.js';
 import { drawBerserkerRageEffects } from './particles/berserkerRageEffect.js';
 import { drawSparkEffects } from './particles/sparkEffect.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
+import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.js';
+import { projectileSystem } from '../systems/projectileSystem.js';
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
 // Performance: Cache time at the start of each frame to avoid multiple Date.now() calls
@@ -1141,6 +1143,16 @@ export function drawProjectiles() {
       return;
     }
 
+    // Crimson Sniper bullet
+    if (p.visual === 'crimsonSniperBullet') {
+      drawCrimsonSniperBullet(ctx, p, false);
+      return;
+    }
+    if (p.visual === 'crimsonSniperBullet_enhanced') {
+      drawCrimsonSniperBullet(ctx, p, true);
+      return;
+    }
+
     // Default projectile draw
     // Make projectile visuals depend on the owner projectile color/type.
     // RED: red-orange motion trail; BLUE: cyan “laser-ish” streak.
@@ -1330,6 +1342,16 @@ export function drawBlackHoleEffects() {
       ctx.restore();
     }
   });
+
+  // Draw stuck shurikens on the walls
+  if (projectileSystem.stuckShurikens && projectileSystem.stuckShurikens.length > 0) {
+    projectileSystem.stuckShurikens.forEach(s => {
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, s.life / 60); // Fade out over the last 60 frames
+      drawShurikenProjectile(ctx, s.x, s.y, s.angle, s.scale);
+      ctx.restore();
+    });
+  }
 }
 
 // ─────────────────────────────────────────────

@@ -82,7 +82,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // ── Knight ─────────────────────────────────
   // Sword swipe melee attack. Sound plays on swing.
   6: {
-    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    src: 'Assets/Sound Effects/Attacks/energysword2.mp3',
     volume: 0.7,
     delay: 0,
   },
@@ -99,7 +99,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // Shotgun blast.
   15: {
     src: 'Assets/Sound Effects/Attacks/shootgunshot.mp3',
-    volume: 0.8,
+    volume: 1.1,
     delay: 0,
   },
 
@@ -107,7 +107,7 @@ export const BASIC_ATTACK_SOUNDS = {
   // Turret shot.
   999: {
     src: 'Assets/Sound Effects/Skills/turretshot.mp3',
-    volume: 0.1,
+    volume: 0.01,
     delay: 0,
   },
 
@@ -127,12 +127,7 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: -2,
   },
 
-  // ── Engineer (Machine Gun) ───────────
-  15: {
-    src: 'Assets/Sound Effects/Attacks/laserpew.mp3', // Replace with custom machine gun sound if available
-    volume: 0.25,                                     // Low volume due to extremely fast firing rate (every 4 frames)
-    delay: -1,
-  },
+
 
   // ── Doppleganger ───────────────────────────
   14: {

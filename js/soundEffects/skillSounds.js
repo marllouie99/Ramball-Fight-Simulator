@@ -12,7 +12,7 @@ export const SKILL_SOUNDS = {
     }
   },
 
-  // â”€â”€ Cronos â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Cronos ─────────────────────────────────
   // Plays when Cronos deploys the time-stop sphere.
   11: {
     sphere: {
@@ -21,16 +21,25 @@ export const SKILL_SOUNDS = {
     },
   },
 
-  // â”€â”€ Knight â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-  // Plays when the Knight's shield successfully blocks a hit.
-  6: {
-    shieldblock: {
-      src: 'Assets/Sound Effects/Skills/shieldblock.mp3',
+  // ── Sharpshooter ───────────────────────────
+  // Plays when the Sharpshooter fires the enhanced pierce bullet.
+  1: {
+    enhance: {
+      src: 'Assets/Sound Effects/Skills/enhance.mp3',
       volume: 0.8,
     },
   },
 
-  // â”€â”€ Doppelganger â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Knight ─────────────────────────────────
+  // Plays when the Knight's shield successfully blocks a hit.
+  6: {
+    shieldblock: {
+      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+      volume: 0.8,
+    },
+  },
+
+  // ── Doppelganger ─────────────────────────────
   // Plays when Doppelganger summons an illusion.
   14: {
     summonillusion: {

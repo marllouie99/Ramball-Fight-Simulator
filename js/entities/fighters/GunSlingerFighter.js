@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -295,6 +295,9 @@ export class GunSlingerFighter extends Fighter {
     const spawnY = this.y + Math.sin(gunAngle) * forwardOffset + Math.cos(gunAngle) * sideOffset;
 
     projectileSystem.fireProjectile(this, ownerIndex, bulletDamage, false, speed, false, null, spawnX, spawnY, gunAngle);
+    
+    // Physical kickback shake
+    triggerGlobalScreenShake(isSkill ? 6 : 3, 4);
 
     // Play Gun Slinger shot sound with configurable timing
     const sound = getBasicAttackSound(this._def?.id, this._def?.type);

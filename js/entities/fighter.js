@@ -15,7 +15,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, spawnFloatingText, recordWin, recordLoss } from '../core/state.js';
-import { drawSlowEffect, drawElectricStunEffect, drawPoisonEffect, drawBurnEffect } from '../graphics/statusEffects.js';
+import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect } from '../graphics/statusEffects.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -192,6 +192,22 @@ export class Fighter {
 
 
   _handleTimeStop() {
+    // Crimson Execution Stun & DoT
+    if (this.crimsonElectrifiedTimer > 0) {
+      this.crimsonElectrifiedTimer--;
+      
+      const dmgPerSec = CONFIG.sharpshooter?.electrifiedDamagePerSec || 15;
+      this.takeDamage(dmgPerSec / 60, this.lastCrimsonAttacker, { isElectrified: true });
+      
+      // Apply extreme friction to stop knockback quickly
+      this.vx *= 0.5;
+      this.vy *= 0.5;
+      this.x += this.vx;
+      this.y += this.vy;
+      // Return true to skip standard update logic (immobilize)
+      return true;
+    }
+
     // Electric stun - immobilize the fighter completely.
     // We check this here because all subclasses short-circuit their update() if this method returns true.
     if (this.electricStunTimer > 0) {
@@ -457,7 +473,8 @@ export class Fighter {
       }
 
       const aliveCount = state.fighters.filter((f) => f && _isEffectivelyAlive(f)).length;
-      const attackerIndex = state.fighters.indexOf(attacker);
+      // Use realAttacker (owner of the turret/illusion) to properly track scores and wins
+      const realAttackerIndex = state.fighters.indexOf(realAttacker);
       const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
 
       recordKill();
@@ -487,10 +504,10 @@ export class Fighter {
           }
         }
       } else if (state.mode !== 'FFA' && roundEnds) {
-        if (attackerIndex >= 0) {
-          state.scores[attackerIndex]++;
+        if (realAttackerIndex >= 0) {
+          state.scores[realAttackerIndex]++;
         }
-        state.roundWinner = attacker;
+        state.roundWinner = realAttacker;
         state.roundEndTimer = 0;
 
         // Stop all sounds when round ends
@@ -498,10 +515,10 @@ export class Fighter {
         stopAllLoopingSounds();
 
         const winThreshold = Math.ceil(CONFIG.rounds.max / 2);
-        if (attackerIndex >= 0 && state.scores[attackerIndex] >= winThreshold) {
+        if (realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold) {
           // Record win/loss for leaderboard (1v1 mode only) when they become champion
-          if (state.mode === GAME_MODES.ONE_VS_ONE && attacker) {
-            const winnerFighterIndex = typeof attacker.fighterIndex === 'number' ? attacker.fighterIndex : attackerIndex;
+          if (state.mode === GAME_MODES.ONE_VS_ONE && realAttacker) {
+            const winnerFighterIndex = typeof realAttacker.fighterIndex === 'number' ? realAttacker.fighterIndex : realAttackerIndex;
             const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
             const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'
               ? state.fighters[loserIndex].fighterIndex
@@ -510,7 +527,7 @@ export class Fighter {
             recordLoss(loserFighterIndex);
           }
 
-          state.matchWinner = attacker;
+          state.matchWinner = realAttacker;
           state.gameState = 'matchEnd';
         } else {
           state.gameState = 'roundEnd';
@@ -628,6 +645,10 @@ export class Fighter {
       this.hitStunTimer--;
       targetSpeed *= this.hitStunMultiplier;
     }
+    // Crimson electrified visual timer
+    if (this.crimsonElectrifiedTimer > 0) {
+      this.crimsonElectrifiedTimer--;
+    }
     
     targetSpeed *= extraMultiplier;
 
@@ -707,6 +728,10 @@ export class Fighter {
 
     if (this.electricStunTimer > 0) {
       drawElectricStunEffect(ctx, baseRadius, useAggressiveMode);
+    }
+    
+    if (this.crimsonElectrifiedTimer > 0) {
+      drawCrimsonElectrifiedEffect(ctx, baseRadius);
     }
 
     if (this.poisonTicks > 0) {

@@ -21,6 +21,9 @@ export const state = {
   ctx,
   arena: CONFIG.arena,
 
+  // Global screen shake
+  screenShake: { timer: 0, intensity: 0 },
+
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'
   mode: GAME_MODES.ONE_VS_ONE,
@@ -161,6 +164,19 @@ export function getProjectiles() {
 export function clearProjectiles() {
   if (_projectileSystem) {
     _projectileSystem.clear();
+  }
+}
+
+// ─────────────────────────────────────────────
+// SCREEN SHAKE
+// ─────────────────────────────────────────────
+
+export function triggerGlobalScreenShake(intensity, duration) {
+  if (state.screenShake.timer < duration) {
+    state.screenShake.timer = duration;
+  }
+  if (state.screenShake.intensity < intensity) {
+    state.screenShake.intensity = intensity;
   }
 }
 

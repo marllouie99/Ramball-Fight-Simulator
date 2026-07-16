@@ -41,6 +41,8 @@ export class DarkSlateGrayFighter extends Fighter {
     // Flame-contact → stealth build
     this._flameContactBuildTimer = 0;
     this._flameContactStealthCooldownTimer = 0;
+    
+    this.throwAnimationTimer = 0;
   }
 
   reset() {
@@ -66,6 +68,7 @@ export class DarkSlateGrayFighter extends Fighter {
     this.backstabAnimationTimer = 0;
     this.attackEffectTimer = 0;
     this.attackEffects = [];
+    this.throwAnimationTimer = 0;
   }
 
   // Delegate to the base Fighter class method
@@ -398,6 +401,10 @@ export class DarkSlateGrayFighter extends Fighter {
         this.attackEffects.splice(i, 1);
       }
     }
+    
+    if (this.throwAnimationTimer > 0) {
+      this.throwAnimationTimer--;
+    }
 
     // Handle invincibility timer
     if (this.invincibilityTimer > 0) {
@@ -436,6 +443,7 @@ export class DarkSlateGrayFighter extends Fighter {
         const shurikenSpeed = CONFIG.darkslategray.shurikenSpeed;
         projectileSystem.fireProjectile(this, ownerIndex, CONFIG.darkslategray.shurikenDamage, false, shurikenSpeed, false, 'shuriken');
         this.shootCooldown = CONFIG.darkslategray.shurikenCooldown;
+        this.throwAnimationTimer = 15;
 
         const sound = getBasicAttackSound(this._def?.id);
         if (sound) playSound(sound.src, sound.volume);
@@ -640,9 +648,14 @@ export class DarkSlateGrayFighter extends Fighter {
     }
 
     if (oldWeapon === 'shuriken') {
+      const throwProgress = this.throwAnimationTimer > 0 ? Math.sin((this.throwAnimationTimer / 15) * Math.PI) : 0;
+      const throwOffset = throwProgress * 10;
+      const throwRotation = throwProgress * Math.PI;
+
       ctx.save();
       ctx.globalAlpha = baseAlpha * fadeOld;
-      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle + progress * 0.4, this.r);
+      ctx.translate(Math.cos(this.gunAngle) * throwOffset, Math.sin(this.gunAngle) * throwOffset);
+      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle + progress * 0.4 + throwRotation, this.r);
       ctx.restore();
     } else {
       ctx.save();
@@ -652,9 +665,14 @@ export class DarkSlateGrayFighter extends Fighter {
     }
 
     if (newWeapon === 'shuriken') {
+      const throwProgress = this.throwAnimationTimer > 0 ? Math.sin((this.throwAnimationTimer / 15) * Math.PI) : 0;
+      const throwOffset = throwProgress * 10;
+      const throwRotation = throwProgress * Math.PI;
+
       ctx.save();
       ctx.globalAlpha = baseAlpha * fadeNew;
-      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle - (1 - progress) * 0.4, this.r);
+      ctx.translate(Math.cos(this.gunAngle) * throwOffset, Math.sin(this.gunAngle) * throwOffset);
+      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle - (1 - progress) * 0.4 + throwRotation, this.r);
       ctx.restore();
     } else {
       ctx.save();

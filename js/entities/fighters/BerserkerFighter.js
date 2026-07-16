@@ -1,6 +1,6 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { spawnFloatingText } from '../../core/state.js';
+import { spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -120,7 +120,10 @@ export class BerserkerFighter extends Fighter {
     }
 
     // Hit! Start wind-up phase first (anticipation)
-    this.axeSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    let baseAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    // Add random angle for madman swings (wider spread during rage)
+    const randomSpread = this.isInRage ? Math.PI : Math.PI / 2; // +/- 90 degrees in rage, +/- 45 normally
+    this.axeSwingAngle = baseAngle + (Math.random() - 0.5) * randomSpread;
     this.gunAngle = this.axeSwingAngle;
     this.axeWindupTimer = this.axeWindupDuration; // Brief wind-up before swing
     this.axeSwingActive = false; // Swing starts after wind-up
@@ -140,6 +143,9 @@ export class BerserkerFighter extends Fighter {
     this.axeHitShakeX = (Math.random() - 0.5) * shakeIntensity;
     this.axeHitShakeY = (Math.random() - 0.5) * shakeIntensity;
     this.axeHitShakeTimer = 8;
+    
+    // Global arena shake
+    triggerGlobalScreenShake(this.isInRage ? 12 : 8, 8);
 
     // Spawn sparks at impact point
     const sparkCount = this.isInRage ? 15 : 10;
@@ -236,16 +242,6 @@ export class BerserkerFighter extends Fighter {
     const fps = state.fps || 60;
     const useAggressiveMode = false;
 
-    // Record history for the motion trail
-    if ((this.isInRage || this.rageFadeTimer > 0) && !useAggressiveMode) {
-      this.axeHistory.push({ x: this.x, y: this.y, gunAngle: this.gunAngle });
-      if (this.axeHistory.length > 6) {
-        this.axeHistory.shift();
-      }
-    } else {
-      if (this.axeHistory.length > 0) this.axeHistory = [];
-    }
-
     // Handle axe cooldown
     if (this.axeCooldown > 0) {
       this.axeCooldown--;
@@ -282,34 +278,52 @@ export class BerserkerFighter extends Fighter {
       this.axeSlashFadeTimer--;
     }
 
+    this._updateAxeParticles(useAggressiveMode);
+
     // Try axe swing if in range
     if (opponent) {
       this._tryAxeSwing(opponent, ownerIndex);
     }
 
-    // Determine intended target speed
-    let targetSpeed = this.speed;
-    if (this.slowTimer > 0) {
-      this.slowTimer--;
-      targetSpeed *= this.slowMultiplier;
+    if (this.isInRage && opponent) {
+      // Actively steer towards the opponent instead of just bouncing
+      const dx = opponent.x - this.x;
+      const dy = opponent.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0) {
+        // Determine intended target speed for steering
+        let targetSpeed = this.speed;
+        if (this.slowTimer > 0) targetSpeed *= this.slowMultiplier;
+        if (this.hitStunTimer > 0) targetSpeed *= this.hitStunMultiplier;
+
+        // Smoothly steer velocity towards target
+        const steerFactor = 0.08; 
+        const desiredVx = (dx / dist) * targetSpeed;
+        const desiredVy = (dy / dist) * targetSpeed;
+        
+        this.vx += (desiredVx - this.vx) * steerFactor;
+        this.vy += (desiredVy - this.vy) * steerFactor;
+        
+        // Normalize speed so he doesn't slow down or speed up unintentionally while turning
+        const currentSpeed = Math.hypot(this.vx, this.vy) || 1;
+        this.vx = (this.vx / currentSpeed) * targetSpeed;
+        this.vy = (this.vy / currentSpeed) * targetSpeed;
+      }
     }
 
-    // Velocity Recovery (gradually return to target speed after knockback or slow)
-    const currentSpeed = Math.hypot(this.vx, this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-      this.vx = (this.vx / currentSpeed) * newSpeed;
-      this.vy = (this.vy / currentSpeed) * newSpeed;
-    }
-
-    // Movement
-    this.x += this.vx;
-    this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
+    // Unified physics movement handles slow/hit-stun/velocity-recovery/position/angle update
+    this.applyMovementPhysics();
 
     // Aiming & Bouncing
     this.aim(opponent);
-    this.resolveWallBounce(arena, opponent);
+    
+    // When steering during rage, use standard bounce (slides along walls)
+    // Otherwise, use the Berserker's special bounce (rebounces toward opponent)
+    if (this.isInRage) {
+      super.resolveWallBounce(arena);
+    } else {
+      this.resolveWallBounce(arena, opponent);
+    }
   }
 
   aim(opponent) {
@@ -384,6 +398,237 @@ export class BerserkerFighter extends Fighter {
 
   draw(ctx) {
     super.draw(ctx);
+    this._drawAxeParticles(ctx);
     this.drawRageBar(ctx);
+  }
+
+  _updateAxeParticles(useAggressiveMode) {
+    if (!this.rightAxeTrail) this.rightAxeTrail = [];
+    if (!this.leftAxeTrail) this.leftAxeTrail = [];
+    if (!this.axeSmokeParticles) this.axeSmokeParticles = [];
+
+    // Fade and clean up sharp trails
+    for (let p of this.rightAxeTrail) p.life--;
+    this.rightAxeTrail = this.rightAxeTrail.filter(p => p.life > 0);
+    for (let p of this.leftAxeTrail) p.life--;
+    this.leftAxeTrail = this.leftAxeTrail.filter(p => p.life > 0);
+
+    // Fade and clean up demonic smoke
+    for (let p of this.axeSmokeParticles) {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.life--;
+      p.size += 0.5; // Slowly billows
+      p.angle += p.spin; // slowly rotate the smudge
+    }
+    this.axeSmokeParticles = this.axeSmokeParticles.filter(p => p.life > 0);
+
+    // Spawn new trails if swinging OR moving
+    const speed = Math.hypot(this.vx, this.vy);
+    const isMoving = speed > 0.5;
+    const isSwinging = this.axeSwingActive;
+
+    if ((isSwinging || isMoving) && !useAggressiveMode) {
+      const duration = this.axeSwingDuration || 24;
+      const t = 1 - (this.axeSwingTimer / duration);
+      
+      const getBladePos = (isLeft) => {
+        if (isSwinging) {
+            let progress = isLeft ? (t - 0.2) / 0.8 : t / 0.8;
+            // If the axe is actively in its swing arc phase
+            if (progress >= 0.25 && progress <= 0.75) {
+                const sweep = (progress - 0.25) / 0.50; 
+                const ease = sweep * sweep * (3 - 2 * sweep);
+                let angleOffset = 1.2 - ease * 2.4; 
+                if (isLeft) angleOffset = -angleOffset; 
+                
+                const angle = this.axeSwingAngle + angleOffset;
+                const dist = this.r + 25 + Math.sin(sweep * Math.PI) * 20;
+                
+                return { 
+                    x: this.x + Math.cos(angle) * dist, 
+                    y: this.y + Math.sin(angle) * dist,
+                    angle: angle // Return angle so we can spawn along the shaft
+                };
+            }
+        }
+        
+        // Idle/Moving position (when not actively sweeping the blade)
+        const sideDir = isLeft ? -Math.PI * 0.45 : Math.PI * 0.45;
+        const holdDist = this.r + 12;
+        const bladeFwd = 18;
+        
+        const hx = this.x + Math.cos(this.gunAngle + sideDir) * holdDist;
+        const hy = this.y + Math.sin(this.gunAngle + sideDir) * holdDist;
+        
+        return {
+           x: hx + Math.cos(this.gunAngle) * bladeFwd,
+           y: hy + Math.sin(this.gunAngle) * bladeFwd,
+           angle: this.gunAngle // Forward facing angle
+        };
+      };
+
+      // Helper to push trail and spawn thick demonic smoke
+      const spawnAt = (pos, trailArray, isLeft) => {
+          if (!pos) return;
+          
+          // Only push to trail if it moved sufficiently (prevents the trail from knotting up when standing still)
+          let shouldPush = true;
+          if (trailArray.length > 0) {
+              const last = trailArray[trailArray.length - 1];
+              const distToLast = Math.hypot(pos.x - last.x, pos.y - last.y);
+              if (distToLast < 1.0) shouldPush = false;
+          }
+          
+          if (shouldPush) {
+              trailArray.push({ x: pos.x, y: pos.y, life: 12, jitter: Math.random() * 8 });
+          }
+          
+          if (shouldPush) {
+              // Reduced smoke counts significantly to avoid making it too intense
+              let smokeCount = 0;
+              if (this.isInRage) {
+                  smokeCount = isSwinging ? 3 : 1;
+              } else {
+                  smokeCount = isSwinging ? 2 : (Math.random() > 0.5 ? 1 : 0); 
+              }
+              
+              for (let i = 0; i < smokeCount; i++) { 
+                 const isRage = this.isInRage;
+                 
+                 // Distribute the smoke along the entire length of the axe (from tip backward 35 pixels to the handle)
+                 const shaftOffset = Math.random() * 35; 
+                 const px = pos.x - Math.cos(pos.angle) * shaftOffset;
+                 const py = pos.y - Math.sin(pos.angle) * shaftOffset;
+                 
+                 this.axeSmokeParticles.push({
+                    x: px + (Math.random() - 0.5) * (isRage ? 15 : 8), // Tighter spread
+                    y: py + (Math.random() - 0.5) * (isRage ? 15 : 8),
+                    vx: (Math.random() - 0.5) * (isRage ? 1.5 : 1.0),
+                    vy: (Math.random() - 0.5) * (isRage ? 1.5 : 1.0) - (isRage ? 0.5 : 0.2),
+                    life: 15 + Math.random() * 10, 
+                    maxLife: 25,
+                    size: isRage ? (6 + Math.random() * 6) : (4 + Math.random() * 4), // Smaller puffs
+                    stretch: 0.4 + Math.random() * 0.4, 
+                    angle: Math.random() * Math.PI * 2, 
+                    spin: (Math.random() - 0.5) * 0.1, 
+                    color: isRage 
+                        ? (Math.random() > 0.6 ? '#000000' : (Math.random() > 0.4 ? '#4a0000' : '#880000'))
+                        : (Math.random() > 0.5 ? '#000000' : '#1a1a1a') // Pitch black and dark charcoal
+                 });
+              }
+          }
+      };
+
+      spawnAt(getBladePos(false), this.rightAxeTrail, false);
+      spawnAt(getBladePos(true), this.leftAxeTrail, true);
+    }
+  }
+
+  _drawAxeParticles(ctx) {
+    // 1. Draw thick demonic smoke clouds (organic smudges)
+    if (this.axeSmokeParticles) {
+        for (const p of this.axeSmokeParticles) {
+            ctx.save();
+            ctx.translate(p.x, p.y);
+            ctx.rotate(p.angle);
+            
+            const progress = p.life / p.maxLife; // 1 to 0
+            // Reduced alpha slightly so the black smoke isn't completely opaque and overbearing
+            ctx.globalAlpha = progress * 0.7; 
+            ctx.fillStyle = p.color;
+            
+            // Draw an elongated, random oval/smudge instead of a perfect circle
+            ctx.beginPath();
+            ctx.ellipse(0, 0, p.size, p.size * p.stretch, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+    }
+
+    // 2. Draw sharp, vibrating anime slashes (using filled polygons to prevent 'sausage' ends)
+    ctx.save();
+    
+    const drawCrescentPolygon = (trail, r, g, b, baseThickness) => {
+        if (!trail || trail.length < 2) return;
+        
+        // The slash stays mostly solid
+        const headLife = trail[trail.length - 1].life / 12;
+        const globalAlpha = headLife > 0.2 ? 1.0 : (headLife / 0.2);
+        
+        ctx.fillStyle = `rgba(${r}, ${g}, ${b}, ${globalAlpha})`;
+        ctx.beginPath();
+        
+        const outer = [];
+        const inner = [];
+        
+        for (let i = 0; i < trail.length; i++) {
+            const p = trail[i];
+            const progress = p.life / 12; // 0 to 1
+            
+            // Thickness tapers to 0 at the tail, is thickest in the middle, and tapers sharply to 0 at the head
+            let thickness = baseThickness * progress;
+            if (i === trail.length - 1 || i === 0) {
+                thickness = 0; // Razor sharp tips at both ends! (no sausage)
+            }
+            
+            // Only add chaotic vibration/jitter if in rage mode!
+            if (this.isInRage) {
+                thickness += (p.jitter * progress * 0.4);
+            }
+            
+            // Compute normal
+            let prev = i > 0 ? trail[i - 1] : trail[0];
+            let next = i < trail.length - 1 ? trail[i + 1] : trail[trail.length - 1];
+            
+            // Fallback for endpoints
+            if (i === 0 && trail.length > 1) next = trail[1];
+            if (i === trail.length - 1 && trail.length > 1) prev = trail[trail.length - 2];
+            
+            let dx = next.x - prev.x;
+            let dy = next.y - prev.y;
+            let len = Math.hypot(dx, dy) || 1;
+            
+            // Outward normal
+            let nx = -dy / len;
+            let ny = dx / len;
+            
+            outer.push({ x: p.x + nx * thickness, y: p.y + ny * thickness });
+            inner.push({ x: p.x - nx * thickness, y: p.y - ny * thickness });
+        }
+        
+        // Connect outer curve
+        ctx.moveTo(outer[0].x, outer[0].y);
+        for (let i = 1; i < outer.length; i++) {
+            ctx.lineTo(outer[i].x, outer[i].y);
+        }
+        // Connect inner curve (in reverse)
+        for (let i = inner.length - 1; i >= 0; i--) {
+            ctx.lineTo(inner[i].x, inner[i].y);
+        }
+        
+        ctx.closePath();
+        ctx.fill();
+    };
+
+    if (this.isInRage) {
+        // Draw the massive 3 layers for the anime style: Black Aura, Crimson Aura, White Core
+        drawCrescentPolygon(this.rightAxeTrail, 0, 0, 0, 16);
+        drawCrescentPolygon(this.rightAxeTrail, 220, 0, 0, 8);
+        drawCrescentPolygon(this.rightAxeTrail, 255, 255, 255, 2);
+
+        drawCrescentPolygon(this.leftAxeTrail, 0, 0, 0, 16);
+        drawCrescentPolygon(this.leftAxeTrail, 220, 0, 0, 8);
+        drawCrescentPolygon(this.leftAxeTrail, 255, 255, 255, 2);
+    } else {
+        // Draw a dark "black neon" trail for normal non-rage swings
+        drawCrescentPolygon(this.rightAxeTrail, 0, 0, 0, 4); // Pitch black outer aura
+        drawCrescentPolygon(this.rightAxeTrail, 51, 51, 51, 2); // #333333 inner core (matches axe)
+
+        drawCrescentPolygon(this.leftAxeTrail, 0, 0, 0, 4);
+        drawCrescentPolygon(this.leftAxeTrail, 51, 51, 51, 2);
+    }
+    
+    ctx.restore();
   }
 }

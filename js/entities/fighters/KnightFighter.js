@@ -2,7 +2,7 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, getProjectiles, clearProjectiles, spawnFloatingText } from '../../core/state.js';
+import { state, getProjectiles, clearProjectiles, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -269,6 +269,7 @@ export class KnightFighter extends Fighter {
     this.swipeTimer  = CONFIG.knight.swipeDuration;
     this.swipeCooldown = CONFIG.knight.swipeCooldown;
     opponent.takeDamage(CONFIG.knight.swordDamage, this, { isMelee: true });
+    triggerGlobalScreenShake(6, 8);
     
     // Physical hit knockback
     const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
@@ -528,6 +529,7 @@ export class KnightFighter extends Fighter {
         const hitRadius = this.r + opponent.r + 4;
         if ((dx * dx + dy * dy) <= hitRadius * hitRadius) {
           opponent.takeDamage(CONFIG.knight.dashDamage, this, { isMelee: true });
+          triggerGlobalScreenShake(12, 10);
           spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SHIELD BASH!', '#88bbff');
           // Knockback
           const dx = opponent.x - this.x;
@@ -601,6 +603,27 @@ export class KnightFighter extends Fighter {
     }
     // Try auto-swipe
     this._trySwordSwipe(opponent, ownerIndex);
+
+    // Track sword history for movement afterimages
+    if (!this.swordTrailHistory) this.swordTrailHistory = [];
+    
+    let swordAngle = this.gunAngle;
+    if (this.swipeActive && this.swipeTimer > 0) {
+      const progress = 1 - this.swipeTimer / CONFIG.knight.swipeDuration;
+      const swingTotal = Math.PI * 1.1;
+      const swingStart = this.swipeAngle - swingTotal * 0.5;
+      swordAngle = swingStart + progress * swingTotal;
+    }
+    
+    // Only save history if actually moving to prevent stacking when standing still
+    const moveSpeedSq = this.vx * this.vx + this.vy * this.vy;
+    if (moveSpeedSq > 0.5 || this.swipeActive) {
+      this.swordTrailHistory.unshift({ x: this.x, y: this.y, angle: swordAngle });
+      if (this.swordTrailHistory.length > 20) this.swordTrailHistory.pop();
+    } else {
+      // Degrade history when standing still so trail disappears
+      if (this.swordTrailHistory.length > 0) this.swordTrailHistory.pop();
+    }
   }
 
   // â”€â”€ Drawing â”€â”€
@@ -643,14 +666,59 @@ export class KnightFighter extends Fighter {
     // Sword: if swiping, animate the sword arc; otherwise draw normally.
     // Hide the sword completely while it is thrown.
     let swordAngle = ga;
+    let swingStart, swingTotal, progress;
     if (this.swipeActive && this.swipeTimer > 0) {
-      const progress = 1 - this.swipeTimer / CONFIG.knight.swipeDuration; // 0 -> 1
-      const swingTotal = Math.PI * 1.1; // total sweep angle for visible arc
-      const swingStart = this.swipeAngle - swingTotal * 0.5;
+      progress = 1 - this.swipeTimer / CONFIG.knight.swipeDuration; // 0 -> 1
+      swingTotal = Math.PI * 1.1; // total sweep angle for visible arc
+      swingStart = this.swipeAngle - swingTotal * 0.5;
       swordAngle = swingStart + progress * swingTotal;
     }
 
     if (!this.swordThrown) {
+      
+      // --- DRAW AFTERIMAGES FROM MOVEMENT HISTORY ---
+      // Disable movement trails during a swing to save massive performance (they overlap anyway)
+      if (this.swordTrailHistory && this.swordTrailHistory.length > 0 && !this.swipeActive) {
+          ctx.save();
+          // Draw a fading trail of past sword positions, sampling further back so it visibly trails
+          for (let i = 4; i < this.swordTrailHistory.length; i += 4) { 
+             const past = this.swordTrailHistory[i];
+             ctx.globalAlpha = 0.5 * (1 - (i / 20)); // Fades smoothly as it gets older
+             ctx.globalCompositeOperation = 'screen'; 
+             
+             if (!this.swordBroken) {
+                drawGraySword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true);
+             } else {
+                drawGrayBrokenSword(ctx, past.x, past.y, past.angle, this.r, isDashing ? 'dashing' : null, true);
+             }
+          }
+          ctx.restore();
+      }
+      // --- DRAW AFTERIMAGES DURING SWING ---
+      if (this.swipeActive && this.swipeTimer > 0) {
+          ctx.save();
+          // Draw 4 trailing afterimages for a cool sci-fi energy ghosting effect
+          for (let i = 1; i <= 4; i++) {
+             // Calculate angle slightly further back in the swing time
+             const pastProgress = Math.max(0, progress - (i * 0.05)); 
+             if (pastProgress > 0) {
+                 const trailAngle = swingStart + pastProgress * swingTotal;
+                 ctx.globalAlpha = 0.5 - (i * 0.1); // Opacity fades out trailing behind
+                 
+                 // 'screen' makes overlapping energy edges look brighter and more blinding
+                 ctx.globalCompositeOperation = 'screen'; 
+                 
+                 if (!this.swordBroken) {
+                    drawGraySword(ctx, this.x, this.y, trailAngle, this.r, isDashing ? 'dashing' : null, true);
+                 } else {
+                    drawGrayBrokenSword(ctx, this.x, this.y, trailAngle, this.r, isDashing ? 'dashing' : null, true);
+                 }
+             }
+          }
+          ctx.restore();
+      }
+
+      // Draw Main Sword
       if (!this.swordBroken) {
         drawGraySword(ctx, this.x, this.y, swordAngle, this.r, isDashing ? 'dashing' : null);
       } else {
@@ -660,7 +728,7 @@ export class KnightFighter extends Fighter {
   }
 
   draw(ctx) {
-    // â”€â”€ Block expanding flash â”€â”€
+    // ——— Block expanding flash ———
     if (this.blockFlashTimer > 0) {
       const p = 1 - (this.blockFlashTimer / CONFIG.knight.blockFlashFrames);
       ctx.save();
@@ -674,20 +742,23 @@ export class KnightFighter extends Fighter {
       ctx.restore();
     }
 
-    // â”€â”€ Swipe arc flash â”€â”€
+      // ── Anime Vibe Swipe arc flash ──
     if ((this.swipeActive && this.swipeTimer > 0) || this.slashFadeTimer > 0) {
       let progress = 1.0;
       let fade = this.slashFadeTimer / 15;
       
       if (this.swipeActive) {
-        progress = 1 - (this.swipeTimer / CONFIG.knight.swipeDuration);
+        // Anime ease-out: explosive start, slowing down near the end
+        let rawProgress = 1 - (this.swipeTimer / CONFIG.knight.swipeDuration);
+        progress = 1 - Math.pow(1 - rawProgress, 3);
         fade = 1.0;
       }
       
       const glowAlpha = Math.pow(fade, 0.8);
-      const arcRadius = this.r + 22;
+      const arcRadius = this.r + 28; // slightly larger for anime vibe
       
-      const swingTotal = Math.PI * 1.1;
+      // Broader swing angle for an exaggerated slash
+      const swingTotal = Math.PI * 1.35;
       const localStartAngle = -swingTotal * 0.5;
       const localEndAngle = swingTotal * 0.5;
       const localCurrentEndAngle = localStartAngle + (localEndAngle - localStartAngle) * progress;
@@ -696,10 +767,10 @@ export class KnightFighter extends Fighter {
       ctx.translate(this.x, this.y);
       ctx.rotate(this.swipeAngle);
       
+      // Use source-over because the arena is white; lighter makes it invisible
       ctx.globalAlpha = glowAlpha;
       ctx.globalCompositeOperation = 'source-over';
       
-      // Calculate linear gradient points based on the arc
       const startX = Math.cos(localStartAngle) * arcRadius;
       const startY = Math.sin(localStartAngle) * arcRadius;
       const endX = Math.cos(localCurrentEndAngle) * arcRadius;
@@ -708,64 +779,143 @@ export class KnightFighter extends Fighter {
       const gradX = Math.abs(endX - startX) < 0.1 ? endX + 0.1 : endX;
       const gradY = Math.abs(endY - startY) < 0.1 ? endY + 0.1 : endY;
 
-      const slashGrad = ctx.createLinearGradient(startX, startY, gradX, gradY);
-      slashGrad.addColorStop(0, 'rgba(255, 100, 0, 0.0)');
-      slashGrad.addColorStop(0.5, 'rgba(255, 160, 0, 0.4)');
-      slashGrad.addColorStop(0.8, 'rgba(255, 230, 50, 0.8)');
-      slashGrad.addColorStop(1, 'rgba(255, 255, 255, 1.0)');
-
-      // 1. Broad, heavy trailing sweep
+      // --- GLOWING NEON BASE SLASH ---
+      // Draw a bright, smooth sci-fi glowing crescent underneath the rough pencil sketch
+      ctx.save();
       ctx.beginPath();
-      ctx.moveTo(0, 0);
-      ctx.arc(0, 0, arcRadius + 28, localStartAngle, localCurrentEndAngle);
-      ctx.closePath();
-      ctx.fillStyle = slashGrad;
-      ctx.globalAlpha = glowAlpha * 0.4;
-      ctx.fill();
-
-      // 2. Sharp crescent metallic blade
-      ctx.globalAlpha = glowAlpha;
-      ctx.beginPath();
-      ctx.arc(0, 0, arcRadius + 15, localStartAngle, localCurrentEndAngle);
-      ctx.arc(0, 0, arcRadius - 5, localCurrentEndAngle, localStartAngle, true);
-      ctx.closePath();
-      ctx.fillStyle = slashGrad;
-      ctx.fill();
-
-      // 3. Ultra-bright cutting edge
-      ctx.beginPath();
-      ctx.arc(0, 0, arcRadius + 5, localStartAngle, localCurrentEndAngle);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.lineWidth = 4;
+      const neonSegments = 30;
+      const neonStep = (localCurrentEndAngle - localStartAngle) / Math.max(0.01, neonSegments);
+      let nFirst = true;
+      for (let step = 0; step <= neonSegments; step++) {
+          const a = localStartAngle + step * neonStep;
+          const t = step / neonSegments;
+          const taper = Math.sin(t * Math.PI);
+          // The neon core has a slight outward bulge
+          const r = arcRadius + (6 * taper);
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if (nFirst) {
+              ctx.moveTo(px, py);
+              nFirst = false;
+          } else {
+              ctx.lineTo(px, py);
+          }
+      }
+      
       ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      
+      // Faint ambient neon aura
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#ff8800';
+      ctx.strokeStyle = `rgba(255, 150, 0, ${0.4 * glowAlpha})`;
+      ctx.lineWidth = 14;
       ctx.stroke();
 
-      // 4. Heavy impact Flash at the leading tip
-      ctx.beginPath();
-      ctx.arc(endX, endY, 20, 0, Math.PI * 2);
-      const tipGrad = ctx.createRadialGradient(endX, endY, 0, endX, endY, 20);
-      tipGrad.addColorStop(0, 'rgba(255, 255, 255, 1)');
-      tipGrad.addColorStop(0.3, 'rgba(255, 200, 50, 0.8)');
-      tipGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
-      ctx.fillStyle = tipGrad;
-      ctx.fill();
+      // Bright intense gold core
+      ctx.shadowBlur = 5;
+      ctx.shadowColor = '#ffcc00';
+      ctx.strokeStyle = `rgba(255, 215, 0, ${0.7 * glowAlpha})`;
+      ctx.lineWidth = 4;
+      ctx.stroke();
+      
+      ctx.restore();
 
-      // 5. High-speed metallic sparks along the arc
-      if (progress > 0.3 && glowAlpha > 0.5) {
-        ctx.strokeStyle = 'rgba(255, 230, 150, 0.9)';
-        ctx.lineWidth = 2;
-        ctx.lineCap = 'round';
-        // Generate a few deterministic sparks based on progress so it doesn't flicker randomly
-        for (let i = 0; i < 4; i++) {
-           let rOffset = ((i * 13) % 20) - 10;
-           let aOffset = localCurrentEndAngle - (i * 0.1);
-           if (aOffset > localStartAngle) {
-             ctx.beginPath();
-             ctx.moveTo(Math.cos(aOffset) * (arcRadius + 15 + rOffset), Math.sin(aOffset) * (arcRadius + 15 + rOffset));
-             ctx.lineTo(Math.cos(aOffset) * (arcRadius + 35 + rOffset * 2), Math.sin(aOffset) * (arcRadius + 35 + rOffset * 2));
-             ctx.stroke();
-           }
-        }
+      // --- PENCIL DRAWN SKETCHY SLASH ---
+      // Draw many overlapping, smooth arcs in graphite colors to simulate multiple fast pencil strokes
+      // No jagged edges, no gold colors, to avoid the 'electric' look.
+
+      const numStrokes = 45; // Lots of scratchy pencil lines
+      
+      for (let i = 0; i < numStrokes; i++) {
+          ctx.beginPath();
+          
+          // Deterministic pseudo-random values based on stroke index 'i'
+          const rand1 = Math.abs(Math.sin(i * 12.9898));
+          const rand2 = Math.abs(Math.sin(i * 78.233));
+          const rand3 = Math.abs(Math.sin(i * 37.719));
+          const rand4 = Math.abs(Math.sin(i * 91.133));
+
+          // Slight random offset for the angle to make strokes imperfect and uneven
+          const sAngle = localStartAngle + (rand1 * 0.4 - 0.2);
+          const eAngle = localCurrentEndAngle + (rand2 * 0.4 - 0.1);
+          
+          if (sAngle >= eAngle) continue;
+
+          // Divide the stroke into segments to create a smooth tapering curve
+          const segments = 25;
+          const aStep = (eAngle - sAngle) / segments;
+          
+          // Base spread logic for this stroke
+          let rSpread = rand3;
+          let spreadDist = (rSpread > 0.8 ? (rand4 * 40 - 20) : (rand4 * 16 - 8));
+          
+          let first = true;
+          for (let step = 0; step <= segments; step++) {
+              const a = sAngle + step * aStep;
+              
+              // Normalize angle relative to the FULL swing to create a global crescent envelope
+              const t = (a - localStartAngle) / Math.max(0.01, localCurrentEndAngle - localStartAngle);
+              
+              // Math.sin(t * Math.PI) creates a curve that is 0 at the tips and 1 in the middle.
+              // We use this to pinch all pencil strokes tightly together at the start and end.
+              const taper = Math.sin(Math.max(0, Math.min(1, t)) * Math.PI);
+              
+              // Apply the taper to the radius. Strokes spread wide in the middle and pinch sharp at the tips.
+              // Power of 0.7 gives a slightly fatter belly and sharper needle-like ends.
+              const r = arcRadius + (spreadDist * Math.pow(taper, 0.7));
+              
+              const px = Math.cos(a) * r;
+              const py = Math.sin(a) * r;
+              
+              if (first) {
+                  ctx.moveTo(px, py);
+                  first = false;
+              } else {
+                  ctx.lineTo(px, py);
+              }
+          }
+          
+          // Graphite and Colored Pencil mixing: dark grays, blacks, and golds
+          const colorRand = Math.abs(Math.sin(i * 53.111));
+          const alphaBase = 0.5 + 0.5 * Math.abs(Math.sin(i * 17.111)); // Opacity variation
+
+          if (colorRand > 0.6) {
+              ctx.strokeStyle = `rgba(30, 30, 30, ${alphaBase * 0.8 * glowAlpha})`; // Standard graphite
+              ctx.lineWidth = rand1 * 1.5 + 0.5;
+          } else if (colorRand > 0.3) {
+              ctx.strokeStyle = `rgba(180, 130, 0, ${alphaBase * 0.7 * glowAlpha})`; // Dark Gold colored pencil
+              ctx.lineWidth = rand2 * 2 + 0.5;
+          } else if (colorRand > 0.15) {
+              ctx.strokeStyle = `rgba(255, 215, 0, ${alphaBase * 0.85 * glowAlpha})`; // Bright Gold pencil
+              ctx.lineWidth = rand3 * 1.5 + 0.5;
+          } else {
+              ctx.strokeStyle = `rgba(10, 10, 10, ${alphaBase * 0.9 * glowAlpha})`; // Heavy black pencil press
+              ctx.lineWidth = rand4 * 2.5 + 1;
+          }
+          
+          ctx.stroke();
+      }
+
+      // --- PENCIL SPEED LINES / SCRATCHES ---
+      // Short, straight graphite scratches following the curve
+      const numLines = Math.floor(20 * progress);
+      for(let i=0; i<numLines; i++) {
+          const r1 = Math.abs(Math.sin(i * 41.111));
+          const r2 = Math.abs(Math.sin(i * 61.222));
+          const r3 = Math.abs(Math.sin(i * 81.333));
+          
+          const a = localStartAngle + r1 * (localCurrentEndAngle - localStartAngle);
+          const r = arcRadius + (r2 * 26 - 13);
+          
+          ctx.beginPath();
+          ctx.moveTo(Math.cos(a)*r, Math.sin(a)*r);
+          // Short scratch in the direction of the swing
+          ctx.lineTo(Math.cos(a + 0.08)*r, Math.sin(a + 0.08)*r);
+          
+          ctx.strokeStyle = r3 > 0.3 ? `rgba(40, 40, 40, ${(0.3 + 0.7*r1) * 0.7 * glowAlpha})` : `rgba(218, 165, 32, ${(0.3 + 0.7*r2) * 0.8 * glowAlpha})`;
+          ctx.lineWidth = r3 * 1.5 + 0.5;
+          ctx.stroke();
       }
 
       ctx.restore();

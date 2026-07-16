@@ -39,13 +39,13 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
     }
     // Random angle for each particle
     let angle = Math.random() * Math.PI * 2;
-    // Faster speed for more impact
-    const speed = 2 + Math.random() * 3;
+    // Massive initial burst speed for a horizontal spray
+    const speed = 12 + Math.random() * 20;
 
     // If damage angle is provided, bias particles in the damage direction
     if (damageAngle !== null) {
-      // Wider spread in the damage direction (90 degree spread)
-      const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.5;
+      // Create a sharp, directed cone spray ('<') away from the attacker
+      const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.6; // ~108 degree cone
       angle = damageAngle + spreadAngle;
     }
 
@@ -59,9 +59,10 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
       vy: Math.sin(angle) * speed,
       size: size,
       color: color,
-      life: 1.0,           // 1.0 = full life, 0 = dead
-      decay: 0.001 + Math.random() * 0.001, // ~8-16 seconds to fade (stays much longer)
-      friction: 0.94,     // Slow down over time
+      life: 1.0,           
+      decay: 0.001 + Math.random() * 0.001, 
+      airResistance: 0.94, // Lighter air friction so they fly further
+      friction: 0.90,      // Ground friction
     });
   }
 }
@@ -75,8 +76,12 @@ export function updateBloodEffects() {
   for (let i = state.bloodEffects.length - 1; i >= 0; i--) {
     const effect = state.bloodEffects[i];
 
-    // Apply gravity
-    effect.vy += 0.25;
+    // Air resistance slows the blood down slightly as it flies
+    effect.vx *= effect.airResistance;
+    effect.vy *= effect.airResistance;
+
+    // Apply low gravity so it shoots out straight before falling
+    effect.vy += 0.15;
 
     // Update position
     effect.x += effect.vx;
@@ -85,14 +90,9 @@ export function updateBloodEffects() {
     // Check for floor collision
     if (effect.y >= arenaBottom - effect.size / 2) {
       effect.y = arenaBottom - effect.size / 2;
-      effect.vy *= -0.4; // Bounce on the floor
-      effect.vx *= 0.8; // Added friction when sliding on the floor
-    } else {
-      effect.vy *= 0.98; // Air resistance on falling speed
+      effect.vy *= -0.2; // Slight bounce
+      effect.vx *= effect.friction; // Slow down quickly when sliding on the floor
     }
-
-    // Slow down horizontally over time (friction)
-    effect.vx *= effect.friction;
 
     // Fade out
     effect.life -= effect.decay;

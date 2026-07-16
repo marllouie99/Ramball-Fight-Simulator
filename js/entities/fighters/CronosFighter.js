@@ -2,7 +2,7 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -449,11 +449,15 @@ export class CronosFighter extends Fighter {
     this._spawnAttackSlashEffect();
 
     applyDamageToTarget(opponent, meleeDamage, this, { isMelee: true });
+    triggerGlobalScreenShake(this._isInsideOwnSphere() ? 8 : 4, 5);
     
     // Physical hit knockback (less per hit since he hits twice rapidly)
-    const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    opponent.vx += Math.cos(kbAngle) * 4;
-    opponent.vy += Math.sin(kbAngle) * 4;
+    // Do not apply knockback to turrets
+    if (!opponent.isTurret) {
+      const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      opponent.vx += Math.cos(kbAngle) * 4;
+      opponent.vy += Math.sin(kbAngle) * 4;
+    }
 
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, hitText, '#FF007F');
 
@@ -1092,9 +1096,8 @@ export class CronosFighter extends Fighter {
       const fullStartA = -Math.PI * 0.4; // Matches start of sword swing
       const fullEndA = Math.PI * 0.4;    // Matches end of sword swing
 
-      const currentEndA = isForward 
-         ? fullStartA + (fullEndA - fullStartA) * swingProgress
-         : fullEndA - (fullEndA - fullStartA) * swingProgress;
+      // ALWAYS calculate current angle as if swinging forward
+      const currentEndA = fullStartA + (fullEndA - fullStartA) * swingProgress;
 
       const fullEndX = Math.cos(fullEndA) * arcRadius;
       const fullStartX = Math.cos(fullStartA) * arcRadius;
@@ -1107,15 +1110,17 @@ export class CronosFighter extends Fighter {
       ctx.save();
       ctx.translate(this.x, this.y);
       ctx.rotate(this.meleeSwingAngle);
+      
+      // Mirror the entire slash visual vertically if it's a reverse swing
+      // This automatically flips the crescent shape, clip mask, and gradient!
+      if (!isForward) {
+          ctx.scale(1, -1);
+      }
 
       // Clip region so the slash "grows" trailing the sword
       ctx.beginPath();
       ctx.moveTo(0, 0);
-      if (isForward) {
-        ctx.arc(0, 0, arcRadius + 20, fullStartA, currentEndA, false);
-      } else {
-        ctx.arc(0, 0, arcRadius + 20, fullEndA, currentEndA, true); // counter-clockwise for reverse
-      }
+      ctx.arc(0, 0, arcRadius + 20, fullStartA, currentEndA, false);
       ctx.closePath();
       ctx.clip();
 
@@ -1129,10 +1134,8 @@ export class CronosFighter extends Fighter {
 
       // Dynamic gradient that anchors bright tip to current sword position
       const currentY = Math.sin(currentEndA) * arcRadius;
-      const gradStartY = isForward ? fullStartY : fullEndY;
-      const gradEndY = isForward
-        ? Math.max(fullStartY + 0.1, currentY)
-        : Math.min(fullEndY - 0.1, currentY);
+      const gradStartY = fullStartY;
+      const gradEndY = Math.max(fullStartY + 0.1, currentY);
 
       const slashGrad = ctx.createLinearGradient(0, gradStartY, 0, gradEndY);
       slashGrad.addColorStop(0, 'rgba(0, 180, 220, 0.0)');

@@ -21,7 +21,7 @@ export const CRIMSON_SNIPER_WEAPON_GRAPHICS = {
   }
 };
 
-export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, maxAmmo = 4, reloadTimer = 0, isReloading = false, flashTimer = 0) {
+export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, maxAmmo = 4, reloadTimer = 0, isReloading = false, flashTimer = 0, tensionIntensity = 0) {
   ctx.save();
   ctx.translate(x, y);
   
@@ -81,40 +81,14 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   // --- 1. Long Dark Barrel ---
   drawPoly([
     [10, -4],
-    [85, -4],
-    85, 2,
+    [125, -4],
+    [125, 2],
     [10, 2],
     [10, -4]
   ], colors.darkMetal, colors.outline);
 
   // --- 2. Muzzle Brake ---
-  drawPoly([
-    [85, -6],
-    [98, -6],
-    [102, -2],
-    [102, 2],
-    [96, 6],
-    [85, 6],
-    [85, -6]
-  ], colors.darkMetal, colors.outline);
-
-  // Upper vent
-  drawPoly([
-    [88, -6],
-    [92, -9],
-    [96, -9],
-    [94, -6],
-    [88, -6]
-  ], colors.darkMetal, colors.outline);
-
-  // Lower vent
-  drawPoly([
-    [88, 6],
-    [90, 8],
-    [96, 8],
-    [94, 6],
-    [88, 6]
-  ], colors.darkMetal, colors.outline);
+  // (Removed bulky muzzle brake to make the barrel sleek and straight)
 
   // --- 3. Main Black Polymer (Stock + Grip + Lower Receiver) ---
   drawPoly([
@@ -419,40 +393,40 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   ctx.lineTo(34 * s, -13 * s);
   ctx.fill();
 
-  // Muzzle glow (inside the brake)
+  // Muzzle glow (at the tip of the barrel)
   ctx.fillStyle = colors.glowCore;
   ctx.beginPath();
-  ctx.arc(86 * s, 0, 2 * s + pulse1 * 0.5 * s, 0, Math.PI * 2);
+  ctx.arc(125 * s, 0, 2 * s + pulse1 * 0.5 * s, 0, Math.PI * 2);
   ctx.fill();
 
   // --- 13. DYNAMIC LASER SIGHT & ENERGY ---
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = 'source-over'; // Changed from 'lighter' so it is visible on white backgrounds
   ctx.shadowBlur = 0; // Turn off shadow for lighter elements
   
   // Laser Sight Beam
-  const beamLength = 200 * s;
+  const beamLength = 1200 * s; // Extended to stretch across the arena
   const beamAlpha = 0.2 + pulse1 * 0.15;
-  const grad = ctx.createLinearGradient(102 * s, 0, 102 * s + beamLength, 0);
+  const grad = ctx.createLinearGradient(125 * s, 0, 125 * s + beamLength, 0);
   grad.addColorStop(0, `rgba(255, 30, 30, ${beamAlpha})`);
   grad.addColorStop(1, 'rgba(255, 30, 30, 0)');
   
   ctx.beginPath();
-  ctx.moveTo(102 * s, -0.6 * s);
-  ctx.lineTo(102 * s + beamLength, -0.6 * s);
-  ctx.lineTo(102 * s + beamLength, 0.6 * s);
-  ctx.lineTo(102 * s, 0.6 * s);
+  ctx.moveTo(125 * s, -0.6 * s);
+  ctx.lineTo(125 * s + beamLength, -0.6 * s);
+  ctx.lineTo(125 * s + beamLength, 0.6 * s);
+  ctx.lineTo(125 * s, 0.6 * s);
   ctx.fillStyle = grad;
   ctx.fill();
 
   // Bright center of the laser sight
-  const coreGrad = ctx.createLinearGradient(102 * s, 0, 102 * s + beamLength * 0.6, 0);
+  const coreGrad = ctx.createLinearGradient(125 * s, 0, 125 * s + beamLength * 0.6, 0);
   coreGrad.addColorStop(0, `rgba(255, 200, 200, ${beamAlpha * 1.5})`);
   coreGrad.addColorStop(1, 'rgba(255, 200, 200, 0)');
   ctx.beginPath();
-  ctx.moveTo(102 * s, -0.2 * s);
-  ctx.lineTo(102 * s + beamLength * 0.6, -0.2 * s);
-  ctx.lineTo(102 * s + beamLength * 0.6, 0.2 * s);
-  ctx.lineTo(102 * s, 0.2 * s);
+  ctx.moveTo(125 * s, -0.2 * s);
+  ctx.lineTo(125 * s + beamLength * 0.6, -0.2 * s);
+  ctx.lineTo(125 * s + beamLength * 0.6, 0.2 * s);
+  ctx.lineTo(125 * s, 0.2 * s);
   ctx.fillStyle = coreGrad;
   ctx.fill();
 
@@ -477,6 +451,123 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
     ctx.stroke();
   }
   
+  // --- 14. ANIME SHOCKWAVE (WOOSH) ON FIRE ---
+  if (recoil > 0) {
+    const shockProgress = 1.0 - recoil; // 0.0 to 1.0
+    // The shockwave blasts forward and expands massively
+    const shockX = 102 * s + shockProgress * 80 * s; 
+    const shockHeight = 40 * s + Math.pow(shockProgress, 0.5) * 180 * s; 
+    const shockWidth = 10 * s + Math.pow(shockProgress, 0.5) * 40 * s;
+    const shockThickness = Math.pow(recoil, 1.5) * 12; // Thins out quickly
+    
+    ctx.save();
+    // Do NOT use 'lighter' since the arena background is white/light.
+    // Use 'source-over' with dark/contrasting colors so it's highly visible!
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.translate(shockX, 0); // Moves forward from muzzle
+    
+    // Draw an anime-style sharp crescent / shock ring (Dark Crimson)
+    ctx.beginPath();
+    ctx.ellipse(0, 0, shockWidth, shockHeight, 0, -Math.PI/2.5, Math.PI/2.5);
+    ctx.lineWidth = shockThickness * s;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = `rgba(180, 0, 0, ${recoil})`; // Deep red blast
+    ctx.stroke();
+    
+    // An inner, sharper black ring trailing slightly behind
+    ctx.beginPath();
+    ctx.ellipse(-5 * s, 0, shockWidth * 0.8, shockHeight * 0.8, 0, -Math.PI/2.5, Math.PI/2.5);
+    ctx.lineWidth = (shockThickness * 0.5) * s;
+    ctx.strokeStyle = `rgba(0, 0, 0, ${recoil * 0.8})`; // Black pressure ring
+    ctx.stroke();
+
+    // A horizontal blast line (the 'woosh' wind line) piercing through the center
+    const lineLength = 100 * s + shockProgress * 300 * s;
+    ctx.beginPath();
+    ctx.moveTo(-lineLength * 0.3, 0);
+    ctx.lineTo(lineLength * 0.7, 0);
+    ctx.lineWidth = Math.pow(recoil, 2) * 6 * s;
+    ctx.strokeStyle = `rgba(30, 30, 35, ${recoil * 0.7})`; // Dark gray/black wind streak
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  // --- 15. TENSION AURA: ENHANCED SHOT READY ---
+  // The intensity smooths in as ammo drops to 2 and fully surges at 1
+  if (tensionIntensity > 0) {
+    const time = Date.now() / 150;
+    
+    ctx.save();
+    // Center the aura around the middle of the long barrel
+    ctx.translate(60 * s, 0);
+    
+    // 1. Smooth Fade-in Dark Red Smoke
+    const auraGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 45 * s);
+    auraGrad.addColorStop(0, `rgba(180, 0, 0, ${0.6 * tensionIntensity})`);
+    auraGrad.addColorStop(0.5, `rgba(80, 0, 0, ${0.3 * tensionIntensity})`);
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = auraGrad;
+    for (let i = -1; i <= 2; i++) {
+        // Smoke clouds smoothly drifting
+        const xOffset = i * 25 * s + Math.sin(time * 0.5 + i) * 10 * s;
+        const yOffset = Math.cos(time * 0.5 + i * 2) * 8 * s;
+        ctx.beginPath();
+        ctx.ellipse(xOffset, yOffset, 40 * s, 25 * s, 0, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    
+    // 2. Smoke-red Lightning Ascending (converging) to the gun
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    
+    // Fewer sparks at lower intensities
+    const baseSparks = tensionIntensity > 0.5 ? 4 : 1; 
+    const numSparks = baseSparks + Math.floor(Math.random() * (tensionIntensity > 0.5 ? 3 : 2));
+    for (let i = 0; i < numSparks; i++) {
+        const isDark = Math.random() > 0.8;
+        ctx.strokeStyle = isDark ? `rgba(30, 0, 0, ${0.9 * tensionIntensity})` : `rgba(255, ${Math.random() * 50}, 50, ${0.8 * tensionIntensity})`;
+        ctx.lineWidth = (isDark ? 2 : 1.5) * s;
+        
+        // Pick a point along the barrel
+        const barrelX = (Math.random() - 0.5) * 110 * s;
+        
+        // Start the spark OUTSIDE the gun (ascending from the smoke aura)
+        const startY = (Math.random() > 0.5 ? 1 : -1) * (15 + Math.random() * 25) * s;
+        const startX = barrelX + (Math.random() - 0.5) * 20 * s;
+        
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        
+        let curX = startX;
+        let curY = startY;
+        const segments = 3;
+        
+        for (let j = 1; j <= segments; j++) {
+            const t = j / segments;
+            // Interpolate towards the barrel center
+            const targetX = startX + (barrelX - startX) * t;
+            const targetY = startY + (0 - startY) * t;
+            
+            // Add jaggedness
+            curX = targetX + (Math.random() - 0.5) * 12 * s;
+            curY = targetY + (Math.random() - 0.5) * 8 * s;
+            
+            // Force the final point to hit the barrel exactly
+            if (j === segments) {
+                curX = barrelX;
+                curY = 0;
+            }
+            
+            ctx.lineTo(curX, curY);
+        }
+        ctx.stroke();
+    }
+    
+    ctx.restore();
+  }
+
   ctx.globalCompositeOperation = 'source-over';
 
   ctx.restore();
@@ -486,8 +577,9 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
  * Draws a Crimson Sniper's sci-fi energy projectile with a laser trail effect.
  * @param {CanvasRenderingContext2D} ctx - The canvas context
  * @param {Object} p - The projectile object
+ * @param {boolean} isEnhanced - Whether this is the final, massively boosted execute shot
  */
-export function drawCrimsonSniperBullet(ctx, p) {
+export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
   const prevShadowColor = ctx.shadowColor;
   const prevShadowBlur = ctx.shadowBlur;
   const prevFillStyle = ctx.fillStyle;
@@ -503,57 +595,260 @@ export function drawCrimsonSniperBullet(ctx, p) {
     angle = Math.atan2(p.y - prev.y, p.x - prev.x);
   }
 
-  // Draw sci-fi laser trail using history array
+  // Draw high-speed wind/smoke trail using history array
   if (p.history && p.history.length > 1) {
     ctx.save();
     
-    // Only use last few points for a short, fast trail
-    const startIdx = Math.max(0, p.history.length - 6);
+    // Use last few points for the trail
+    const startIdx = Math.max(0, p.history.length - (isEnhanced ? 12 : 8));
     
-    // Create gradient for trail
+    // Create gradient for trail (dark red to black/transparent)
     const lastPt = p.history[p.history.length - 1];
     const gradient = ctx.createLinearGradient(
       p.history[startIdx].x, p.history[startIdx].y,
       lastPt.x, lastPt.y
     );
-    gradient.addColorStop(0, 'rgba(255, 50, 100, 0)');
-    gradient.addColorStop(0.5, 'rgba(255, 80, 130, 0.6)');
-    gradient.addColorStop(1, 'rgba(255, 150, 180, 0.9)');
     
-    // Single trail line with gradient
+    if (isEnhanced) {
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.7)');
+      gradient.addColorStop(0.7, 'rgba(150, 0, 0, 0.9)');
+      gradient.addColorStop(1, 'rgba(255, 0, 0, 1)');
+    } else {
+      gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+      gradient.addColorStop(0.5, 'rgba(100, 0, 0, 0.4)');
+      gradient.addColorStop(1, 'rgba(180, 0, 0, 0.8)');
+    }
+    
+    // Draw thick trail line
     ctx.beginPath();
     ctx.moveTo(p.history[startIdx].x, p.history[startIdx].y);
     for (let i = startIdx + 1; i < p.history.length; i++) {
       ctx.lineTo(p.history[i].x, p.history[i].y);
     }
     ctx.strokeStyle = gradient;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = p.r * (isEnhanced ? 3.0 : 1.5);
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
     
+    // If enhanced, draw chaotic lightning trails
+    if (isEnhanced) {
+      ctx.beginPath();
+      ctx.moveTo(p.history[startIdx].x, p.history[startIdx].y);
+      for (let i = startIdx + 1; i < p.history.length; i++) {
+        const offset = (Math.random() - 0.5) * p.r * 5;
+        ctx.lineTo(p.history[i].x + offset, p.history[i].y - offset);
+      }
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.lineWidth = 1;
+      ctx.stroke();
+    }
+    
     ctx.restore();
   }
 
-  // Draw the main sci-fi projectile - elongated energy bolt
+  // Draw the main projectile
   ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.translate(p.x, p.y);
+  ctx.rotate(angle);
   
-  // Outer glow - large diffuse
-  ctx.shadowColor = '#ff3366';
-  ctx.shadowBlur = 10;
-  ctx.fillStyle = 'rgba(255, 50, 100, 0.7)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y, p.r * 1.6, p.r * 0.9, angle, 0, Math.PI * 2);
-  ctx.fill();
-  
-  // Inner bright core
-  ctx.shadowBlur = 0;
-  ctx.fillStyle = 'rgba(255, 200, 220, 1)';
-  ctx.beginPath();
-  ctx.ellipse(p.x, p.y, p.r * 0.6, p.r * 0.35, angle, 0, Math.PI * 2);
-  ctx.fill();
-  
+  if (isEnhanced) {
+    // ═══════════════════════════════════════════════════════
+    // ENHANCED EXECUTE SHOT — Crackling Crimson Energy Bolt
+    // Inspired by violent lightning: jagged, branching, alive
+    // ═══════════════════════════════════════════════════════
+    const s = p.r * 0.8;
+    
+    // 1. Dark smoky haze removed per user request
+    
+    // Helper: draw a single jagged lightning tendril
+    const drawLightningBranch = (startX, startY, endX, endY, width, color, segments) => {
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      const dx = (endX - startX) / segments;
+      const dy = (endY - startY) / segments;
+      for (let i = 1; i < segments; i++) {
+        const jitterX = (Math.random() - 0.5) * s * 6;
+        const jitterY = (Math.random() - 0.5) * s * 8;
+        ctx.lineTo(startX + dx * i + jitterX, startY + dy * i + jitterY);
+      }
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+    };
+    
+    // 1.5 Flowing dark & white realistic flames
+    // Using bezier curves for an organic, wavy fire look
+    for (let i = 0; i < 7; i++) {
+      const startX = -s * 10 + Math.random() * s * 25;
+      const startY = (Math.random() - 0.5) * s * 4;
+      const length = s * 15 + Math.random() * s * 25;
+      const width = s * 4 + Math.random() * s * 6;
+      
+      // Control points for the flowing flame curves
+      const cp1X = startX - length * 0.3;
+      const cp1Y = startY - width * 1.5;
+      const cp2X = startX - length * 0.7;
+      const cp2Y = startY + width * 0.5;
+      
+      const cp3X = startX - length * 0.6;
+      const cp3Y = startY + width * 1.5;
+      const cp4X = startX - length * 0.2;
+      const cp4Y = startY - width * 0.2;
+      
+      // Draw smooth flowing dark/black outer flame
+      ctx.fillStyle = `rgba(${Math.random() * 20}, ${Math.random() * 20}, ${Math.random() * 20}, ${0.8 + Math.random() * 0.2})`;
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      // Top curve backwards
+      ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, startX - length, startY);
+      // Bottom curve coming back to start
+      ctx.bezierCurveTo(cp3X, cp3Y, cp4X, cp4Y, startX, startY);
+      ctx.closePath();
+      ctx.fill();
+      
+      // Draw smooth white/grey inner core flame
+      const innerLength = length * 0.7;
+      const innerWidth = width * 0.5;
+      
+      ctx.fillStyle = Math.random() > 0.5 ? `rgba(255, 255, 255, ${0.7 + Math.random() * 0.3})` : `rgba(200, 200, 200, ${0.6 + Math.random() * 0.4})`;
+      ctx.beginPath();
+      ctx.moveTo(startX + s * 2, startY);
+      ctx.bezierCurveTo(
+        startX - innerLength * 0.3, startY - innerWidth * 1.5,
+        startX - innerLength * 0.7, startY + innerWidth * 0.5,
+        startX - innerLength, startY
+      );
+      ctx.bezierCurveTo(
+        startX - innerLength * 0.6, startY + innerWidth * 1.5,
+        startX - innerLength * 0.2, startY - innerWidth * 0.2,
+        startX + s * 2, startY
+      );
+      ctx.closePath();
+      ctx.fill();
+    }
+    
+    // 2. Outer dark crimson lightning tendrils (many, chaotic, thin)
+    for (let i = 0; i < 8; i++) {
+      const spreadY = (Math.random() - 0.5) * s * 5;
+      drawLightningBranch(
+        -s * 35 + Math.random() * s * 6, spreadY,
+        s * 18 + Math.random() * s * 5, (Math.random() - 0.5) * s * 4,
+        1 + Math.random() * 1.5,
+        `rgba(${120 + Math.random() * 60}, 0, 0, ${0.5 + Math.random() * 0.4})`,
+        8 + Math.floor(Math.random() * 5)
+      );
+    }
+    
+    // 3. Mid-layer: Bright crimson main bolt branches
+    for (let i = 0; i < 5; i++) {
+      const spreadY = (Math.random() - 0.5) * s * 2;
+      drawLightningBranch(
+        -s * 30, spreadY,
+        s * 15, (Math.random() - 0.5) * s * 1.5,
+        2 + Math.random() * 2.5,
+        `rgba(255, ${20 + Math.random() * 40}, ${Math.random() * 30}, ${0.7 + Math.random() * 0.3})`,
+        10 + Math.floor(Math.random() * 4)
+      );
+    }
+    
+    // 4. Forking side branches (perpendicular tendrils splitting off the main bolt)
+    for (let i = 0; i < 7; i++) {
+      const branchX = -s * 25 + Math.random() * s * 38;
+      const branchY = (Math.random() - 0.5) * s * 2;
+      const forkEndY = branchY + (Math.random() > 0.5 ? 1 : -1) * (s * 5 + Math.random() * s * 10);
+      const forkEndX = branchX + (Math.random() - 0.5) * s * 8;
+      drawLightningBranch(
+        branchX, branchY,
+        forkEndX, forkEndY,
+        0.8 + Math.random(),
+        `rgba(200, ${Math.random() * 30}, ${Math.random() * 20}, ${0.4 + Math.random() * 0.4})`,
+        3 + Math.floor(Math.random() * 3)
+      );
+    }
+    
+    // 5. Inner core glow (bright crimson-white hottest center)
+    const coreGrad = ctx.createLinearGradient(-s * 28, 0, s * 15, 0);
+    coreGrad.addColorStop(0, 'rgba(255, 80, 80, 0)');
+    coreGrad.addColorStop(0.15, 'rgba(255, 120, 120, 0.6)');
+    coreGrad.addColorStop(0.5, 'rgba(255, 200, 200, 0.9)');
+    coreGrad.addColorStop(0.8, 'rgba(255, 255, 255, 1)');
+    coreGrad.addColorStop(1, 'rgba(255, 200, 200, 0.5)');
+    drawLightningBranch(
+      -s * 28, 0,
+      s * 15, 0,
+      3.5 + Math.random() * 2,
+      coreGrad,
+      14
+    );
+    
+    // 6. White-hot piercing core (the absolute brightest center line)
+    drawLightningBranch(
+      -s * 24, 0,
+      s * 13, 0,
+      1.5 + Math.random(),
+      `rgba(255, 255, 255, ${0.8 + Math.random() * 0.2})`,
+      16
+    );
+    
+    // 7. Leading tip flash (sharp bright point at the front)
+    const tipGrad = ctx.createRadialGradient(s * 12, 0, 0, s * 12, 0, s * 6);
+    tipGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
+    tipGrad.addColorStop(0.3, 'rgba(255, 80, 80, 0.6)');
+    tipGrad.addColorStop(1, 'rgba(150, 0, 0, 0)');
+    ctx.fillStyle = tipGrad;
+    ctx.beginPath();
+    ctx.arc(s * 12, 0, s * 6, 0, Math.PI * 2);
+    ctx.fill();
+    
+  } else {
+    // ═══════════════════════════════════════════════════════
+    // NORMAL BULLET — Sleek armor-piercing tracer slug
+    // ═══════════════════════════════════════════════════════
+    const scale = p.r * 0.55;
+    
+    // Aerodynamic shock cone / red blast front
+    ctx.beginPath();
+    ctx.moveTo(scale * 5, 0);
+    ctx.lineTo(-scale * 8, scale * 2.5);
+    ctx.lineTo(-scale * 5, 0);
+    ctx.lineTo(-scale * 8, -scale * 2.5);
+    ctx.fillStyle = 'rgba(200, 20, 20, 0.8)';
+    ctx.fill();
+
+    // Elongated thick tracer body (Deep red) - Smooth tapered ellipse
+    ctx.fillStyle = '#cc0000';
+    ctx.beginPath();
+    ctx.ellipse(-scale * 3, 0, scale * 7, scale * 0.8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Solid black inner core - Sleek aerodynamic shape
+    ctx.fillStyle = '#000000';
+    ctx.beginPath();
+    ctx.ellipse(-scale * 2, 0, scale * 6, scale * 0.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Blinding white piercing needle - Sharp thin ellipse
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.ellipse(-scale * 1, 0, scale * 5, scale * 0.15, 0, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Mach rings (shock diamonds) traveling with the bullet
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = 1.0;
+    for (let i = 0; i < 3; i++) {
+      ctx.beginPath();
+      ctx.ellipse(-scale * 2 - i * (scale * 3.5), 0, scale * 0.5, scale * 3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
   ctx.restore();
 
   // Restore context state

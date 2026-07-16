@@ -44,6 +44,9 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
   ctx.lineTo(5 * scale, 4 * scale); // top front of grip
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
   
   // Grip texture (stippling / dimples effect)
   ctx.fillStyle = '#0f1112';
@@ -65,9 +68,12 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
   ctx.lineTo(-4 * scale, 4 * scale);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
   // Trigger guard
-  ctx.strokeStyle = '#181b1d';
+  ctx.strokeStyle = '#000000';
   ctx.lineWidth = 1.5 * scale;
   ctx.beginPath();
   ctx.moveTo(4 * scale, 3 * scale);
@@ -87,7 +93,12 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
 
   // Main Barrel Body
   ctx.fillStyle = '#1e2226';
-  ctx.fillRect(-2 * scale, -4 * scale, 24 * scale, 7 * scale);
+  ctx.beginPath();
+  ctx.rect(-2 * scale, -4 * scale, 24 * scale, 7 * scale);
+  ctx.fill();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
   
   // Slide detail (Top layer)
   ctx.fillStyle = '#2a2f34';
@@ -98,14 +109,27 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r) {
   ctx.lineTo(-4 * scale, -3 * scale);
   ctx.closePath();
   ctx.fill();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
   // Barrel tip (Muzzle)
   ctx.fillStyle = '#111315';
-  ctx.fillRect(20 * scale, -3 * scale, 4 * scale, 5 * scale);
+  ctx.beginPath();
+  ctx.rect(20 * scale, -3 * scale, 4 * scale, 5 * scale);
+  ctx.fill();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
   // Under-barrel section (rail)
   ctx.fillStyle = '#181b1d';
-  ctx.fillRect(8 * scale, 3 * scale, 12 * scale, 2 * scale);
+  ctx.beginPath();
+  ctx.rect(8 * scale, 3 * scale, 12 * scale, 2 * scale);
+  ctx.fill();
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5 * scale;
+  ctx.stroke();
 
   // Reset shadow for glowing elements
   ctx.shadowOffsetX = 0;

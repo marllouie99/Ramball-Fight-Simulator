@@ -381,6 +381,24 @@ function animate(timestamp) {
     } else if (state.gameState === 'weaponDetail') {
       drawWeaponDetailScreen();
     } else {
+      // Apply Global Screen Shake via CSS transform (always resets cleanly)
+      if (state.screenShake && state.screenShake.timer > 0) {
+        state.screenShake.timer--;
+        const curShake = state.screenShake.intensity;
+        const offsetX = (Math.random() - 0.5) * curShake;
+        const offsetY = (Math.random() - 0.5) * curShake;
+        state.canvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
+        
+        // Decay intensity
+        state.screenShake.intensity *= 0.9;
+        
+        // Reset when done
+        if (state.screenShake.timer <= 0) {
+          state.canvas.style.transform = '';
+          state.screenShake.intensity = 0;
+        }
+      }
+
       drawArena();
       drawFlames(); // Draw all flames to offscreen canvas (batched for performance)
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles

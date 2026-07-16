@@ -236,7 +236,9 @@ export class LaserFighter extends Fighter {
       const delta = this.normalizeAngle(targetAngle - this.gunAngle);
       const aligned = Math.abs(delta) < CONFIG.laser.aimThreshold;
 
-      if (aligned && this.shootCooldown === 0) {
+      // Charge the beam as long as the cooldown is ready, regardless of alignment.
+      // This prevents the charge from constantly resetting while trying to track a moving target.
+      if (this.shootCooldown === 0) {
         if (this.beamCharge === 0) {
           const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
           if (chargeSound) playSound(chargeSound.src, chargeSound.volume);

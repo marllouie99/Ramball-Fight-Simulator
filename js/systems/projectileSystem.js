@@ -3,13 +3,13 @@
 // ─────────────────────────────────────────────
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
-import { state, registerProjectileSystem } from '../core/state.js';
+import { state, registerProjectileSystem, triggerGlobalScreenShake } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { playSound } from './soundSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
-import { spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch } from '../graphics/particles/sparkEffect.js';
 import { spatialGrid } from './physics.js';
 
 // Frame counter for visual-only particle optimization
@@ -34,6 +34,7 @@ class ProjectileSystem {
   constructor() {
     this.projectiles = [];
     this.frozenProjectiles = []; // Decoupled: frozen projectiles are moved here, ignored by update loop
+    this.stuckShurikens = []; // Array for shurikens stuck in the wall
     this.poolSize = 500; // Pre-allocate pool size
     this.pool = Array.from({ length: this.poolSize }, () => ({}));
     this.poolIndex = 0; // Circular pointer to reuse objects without array push/pop thrashing
@@ -390,6 +391,8 @@ class ProjectileSystem {
       if (projectile.owner === fi) continue;
       // Skip teammates in 2v2 mode
       if (areOnSameTeam(projectile.owner, fi)) continue;
+      // Skip if this projectile has piercing and already hit this fighter
+      if (projectile.hitFighters && projectile.hitFighters.has(fighter)) continue;
 
       // ── Bounding-box culling: skip expensive Math.hypot when projectile is far ──
       const hitRadius = fighter.r + projectile.r;
@@ -491,7 +494,24 @@ class ProjectileSystem {
             if (projectile.isBlackHole && projectile.hitTargets) {
               projectile.hitTargets.add(fi);
             }
-            return true;
+            
+            // Enhanced sniper bullet pierces through enemies!
+            if (projectile.visual === 'crimsonSniperBullet_enhanced') {
+              if (!projectile.hitFighters) projectile.hitFighters = new Set();
+              projectile.hitFighters.add(fighter);
+              // Spawn a huge splash of blood/sparks on pierce
+              spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
+              spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
+              // Spawn crimson lightning shockwave on pierce-through
+              spawnCrimsonLightningImpact(fighter.x, fighter.y, 50);
+              // Apply the crimson electrified visual effect to the target
+              const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
+              fighter.crimsonElectrifiedTimer = Math.max(fighter.crimsonElectrifiedTimer || 0, duration);
+              fighter.lastCrimsonAttacker = attacker;
+              // Do NOT return true, so the projectile is not destroyed
+            } else {
+              return true;
+            }
           }
 
           projectile.dodgedFighters.add(fighter);
@@ -517,6 +537,9 @@ class ProjectileSystem {
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
 
+      // Skip if this projectile has piercing and already hit this illusion
+      if (projectile.hitFighters && projectile.hitFighters.has(illusion)) continue;
+
       // ── Bounding-box culling for illusion collision ──
       const hitRadius = illusion.r + projectile.r;
       const idx = illusion.x - projectile.x;
@@ -528,7 +551,21 @@ class ProjectileSystem {
       if (distSq < hitRadiusSq) {
         const attacker = fighters[projectile.owner];
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
-        return true;
+        
+        // Enhanced sniper bullet pierces through illusions!
+        if (projectile.visual === 'crimsonSniperBullet_enhanced') {
+          if (!projectile.hitFighters) projectile.hitFighters = new Set();
+          projectile.hitFighters.add(illusion);
+          spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
+          spawnImpactFlash(illusion.x, illusion.y, 25, 'crimsonSniper');
+          // Apply the crimson electrified visual effect to the target
+          const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
+          illusion.crimsonElectrifiedTimer = Math.max(illusion.crimsonElectrifiedTimer || 0, duration);
+          illusion.lastCrimsonAttacker = attacker;
+          // Do NOT return true
+        } else {
+          return true;
+        }
       }
     }
 
@@ -1596,16 +1633,48 @@ class ProjectileSystem {
       const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
-        if (p.visual === 'crimsonSniperBullet' && expired && !hit && p.life > 0) {
+        const isCrimson = p.visual === 'crimsonSniperBullet';
+        const isCrimsonEnhanced = p.visual === 'crimsonSniperBullet_enhanced';
+        
+        if ((isCrimson || isCrimsonEnhanced) && expired && !hit && p.life > 0) {
           // Spawn wall hit sparks for Crimson Sniper - VISUAL ONLY (no collision/physics)
-          const sparkCount = 6 + Math.random() * 4;
+          const sparkMultiplier = isCrimsonEnhanced ? 3 : 1;
+          const sparkCount = (6 + Math.random() * 4) * sparkMultiplier;
           const hitAngle = Math.atan2(-p.vy, -p.vx);
 
           // 1. Impact Flash (visual-only)
-          spawnImpactFlash(p.x, p.y, 25 + Math.random() * 15);
+          const flashSize = (25 + Math.random() * 15) * (isCrimsonEnhanced ? 2.5 : 1);
+          spawnImpactFlash(p.x, p.y, flashSize, 'crimsonSniper');
 
           // 2. High-speed sparks (visual-only, bypass physics/collision)
-          spawnSparks(p.x, p.y, sparkCount, 'crimson');
+          spawnSparks(p.x, p.y, sparkCount, 'crimsonSniper');
+          
+          // 3. Enhanced bullet gets a massive crimson lightning shockwave on wall impact
+          if (isCrimsonEnhanced) {
+            spawnCrimsonLightningImpact(p.x, p.y, 80);
+            
+            // Spawn an intense ground scorch at the impact site
+            spawnGroundScorch(p.x, p.y, 80, 150);
+            
+            // Massive arena shake
+            triggerGlobalScreenShake(25, 20);
+          }
+        }
+
+        if (p.visual === 'shuriken' && expired && !hit && p.life > 0) {
+          if (Math.random() < 0.6) {
+            const arena = CONFIG.arena;
+            let stuckX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+            let stuckY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+            this.stuckShurikens.push({
+              x: stuckX,
+              y: stuckY,
+              angle: Math.atan2(p.vy, p.vx) + (Math.random() * Math.PI),
+              life: 300,
+              maxLife: 300,
+              scale: Math.max(0.6, (fighters[p.owner] ? fighters[p.owner].r / 25 : 0.8))
+            });
+          }
         }
 
         this._returnProjectile(p);
@@ -1631,6 +1700,17 @@ class ProjectileSystem {
           }
         }
         f.enemyInBlackHole = nowInHole;
+      }
+    }
+
+    // Update stuck shurikens
+    for (let i = 0; i < this.stuckShurikens.length; i++) {
+      const s = this.stuckShurikens[i];
+      s.life--;
+      if (s.life <= 0) {
+        this.stuckShurikens[i] = this.stuckShurikens[this.stuckShurikens.length - 1];
+        this.stuckShurikens.pop();
+        i--;
       }
     }
   }
@@ -1674,6 +1754,7 @@ class ProjectileSystem {
       this._returnProjectile(this.frozenProjectiles[i]);
     }
     this.frozenProjectiles.length = 0;
+    this.stuckShurikens.length = 0;
   }
 
   /**

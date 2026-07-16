@@ -11,8 +11,8 @@ export const ASSASSIN_WEAPON_GRAPHICS = {
     centerColor: '#2a2a2a',           // Center hole color
   },
   positioning: {
-    shurikenScale: 1.0,
-    shurikenOffset: 10,               // Distance from fighter body edge
+    shurikenScale: 1.8,
+    shurikenOffset: 12,               // Distance from fighter body edge
     meleeScale: 1.0,
     meleeOffset: 6,                   // Distance from fighter body edge
   },
@@ -211,7 +211,8 @@ export function drawShurikenProjectile(ctx, x, y, angle, scale = 1.0) {
   ctx.translate(x, y);
   ctx.rotate(angle);
 
-  const shurikenScale = Math.max(0.5, scale);
+  // Increase the base scale of the projectile to match the held weapon
+  const shurikenScale = Math.max(0.5, scale * 1.8);
   const shuriken = ASSASSIN_WEAPON_GRAPHICS.shuriken;
   const dim = ASSASSIN_WEAPON_GRAPHICS.dimensions;
 

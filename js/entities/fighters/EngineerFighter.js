@@ -1,7 +1,7 @@
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -147,6 +147,8 @@ export class EngineerFighter extends Fighter {
         
         const buildSound = getSkillSound(this._def?.id, 'build');
         if (buildSound) playSound(buildSound.src, buildSound.volume);
+        
+        triggerGlobalScreenShake(4, 5);
       }
       
       if (this.buildTimer <= 0) {
@@ -157,6 +159,7 @@ export class EngineerFighter extends Fighter {
           this.turretEntity.isBuilding = false;
           this.turretEntity.buildProgress = 1;
           spawnFloatingText(this.turretEntity.x, this.turretEntity.y - 20, "DEPLOYED!", "#8B4513");
+          triggerGlobalScreenShake(15, 12);
         }
       }
       return; // Skip normal steering/attacking while building
@@ -196,6 +199,7 @@ export class EngineerFighter extends Fighter {
           this.wrenchCooldown = CONFIG.Engineer.wrenchCooldown;
           
           opponent.takeDamage(CONFIG.Engineer.wrenchDamage, this, { isMelee: true });
+          triggerGlobalScreenShake(8, 8);
           spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'WHACK!', '#FFD700');
           
           const hitSound = getBasicAttackSound(this._def?.id, 'melee'); // Default melee or specific
@@ -249,6 +253,8 @@ export class EngineerFighter extends Fighter {
       
       projectileSystem.fireProjectile(this, state.fighters.indexOf(this), damage, false, speedVariance, false, 'EngineerBullet', spawnX, spawnY, pAngle);
     }
+    
+    triggerGlobalScreenShake(12, 10);
 
     // Muzzle Flash & Smoke
     import('../../graphics/particles/sparkEffect.js').then(module => {
@@ -261,6 +267,7 @@ export class EngineerFighter extends Fighter {
 
     const shotSound = getBasicAttackSound(this._def?.id);
     if (shotSound) playSound(shotSound.src, shotSound.volume);
+    
     this.shotgunCooldown = CONFIG.Engineer.shotgunCooldown;
     this.shotgunRecoilTimer = 15;
     
@@ -268,9 +275,6 @@ export class EngineerFighter extends Fighter {
     const recoilForce = 3.5; // Punchy recoil
     this.vx -= Math.cos(this.gunAngle) * recoilForce;
     this.vy -= Math.sin(this.gunAngle) * recoilForce;
-    
-    const sound = getBasicAttackSound(this._def?.id, 'shotgun');
-    if (sound) playSound(sound.src, sound.volume);
   }
 
   aim(opponent) {

@@ -8,29 +8,29 @@ import { CONFIG } from '../../core/config.js';
 export const IVORY_WEAPON_GRAPHICS = {
   railgun: {
     stockColor: '#1e2329',             // Back stock color
-    stockStroke: '#0f1214',            // Stock outline
+    stockStroke: '#000000',            // Stock outline
     batteryColor: '#00f0ff',           // Blue battery indicator
     bodyGradient1: '#ffffff',          // Main body light
     bodyGradient2: '#eef3f7',          // Main body mid
     bodyGradient3: '#a9b6c7',          // Main body dark
-    bodyStroke: '#4e5a6e',             // Body outline
+    bodyStroke: '#000000',             // Body outline
     panelLine: '#c5d1df',              // Panel line color
     chamberDark: '#11151a',            // Energy chamber dark
     chamberCore: '#ccffff',            // Glowing core
     chamberCenter: '#ffffff',          // Bright center line
     chamberGrill: '#1e2329',           // Grill over core
     gripColor: '#262c33',              // Lower grip color
-    gripStroke: '#0f1214',             // Grip outline
+    gripStroke: '#000000',             // Grip outline
     barrelColor: '#2c343d',            // Barrel system color
-    barrelStroke: '#161a1f',           // Barrel outline
+    barrelStroke: '#000000',           // Barrel outline
     barrelRing: '#6d7b8f',             // Barrel rings
     muzzleGradient1: '#eef3f7',        // Muzzle light
     muzzleGradient2: '#8695a8',       // Muzzle dark
-    muzzleStroke: '#323c4a',          // Muzzle outline
+    muzzleStroke: '#000000',          // Muzzle outline
     emitterColor: '#00ffff',           // Emitter glow
     emitterHighlight: '#ffffff',       // Emitter highlight
     sightColor: '#313a45',             // Top sight color
-    sightStroke: '#161a1f',            // Sight outline
+    sightStroke: '#000000',            // Sight outline
     sightLens: '#00ffff',              // Sight lens color
   },
   positioning: {

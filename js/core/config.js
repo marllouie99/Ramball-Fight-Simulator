@@ -26,8 +26,18 @@ export const CONFIG = {
     aimThreshold: 0.12, // radians; lower = must face enemy more precisely before firing
     shotCooldown: 10,   // frames between consecutive shots (independent of base cooldown)
     knockbackStrength: 20,    // velocity impulse applied to target on each hit
-    magazineSize: 5,    // number of bullets before needing to reload
+    magazineSize: 7,    // number of bullets before needing to reload
     reloadTime: 130,    // frames to reload (2 seconds at 60 fps)
+  },
+
+  /** Sharpshooter / Crimson Sniper specific */
+  sharpshooter: {
+    enhancedDamageMultiplier: 2.5, // Damage multiplier for the final execution bullet
+    enhancedSpeedMultiplier: 1.5,  // Projectile speed multiplier for the execution bullet
+    electrifiedDuration: 45,       // Frames the crackling lightning effect lasts on target (45 = 0.75s)
+    electrifiedDamagePerSec: 15,   // Damage per second taken while electrified
+    enhancedRecoilForce: 30,       // Massive backward physics push on the shooter when the final bullet is fired
+    executeWindupFrames: 30,       // Delay frames (charge up) before firing the execution bullet
   },
 
   /** Blue — Aimbot fighter */
@@ -84,7 +94,7 @@ export const CONFIG = {
   laser: {
     aimThreshold: 0.12,  // radians; must face enemy this precisely to start the beam
     beamDuration: 100,   // frames the beam fires for (180 = 3 s at 60 fps)
-    windupDuration: 240, // frames of beam charge before firing (240 = 4 s at 60 fps)
+    windupDuration: 150, // frames of beam charge before firing (240 = 4 s at 60 fps)
     beamLength: 1200,  // pixels; how far the beam reaches across the arena
     slowDuration: 180,    // frames the slow debuff lasts on hit targets (60 = 1 s)
     slowMultiplier: 1.0,   // speed fraction while slowed (0.6 = 40 % slower)
@@ -164,7 +174,7 @@ export const CONFIG = {
     shurikenCooldown: 25,        // frames between shuriken throws (normal fire rate)
 
     // TUNING: Dodge mechanics
-    dodgeChance: 0.30,           // probability (0-1) of dodging incoming projectiles
+    dodgeChance: 0.50,           // probability (0-1) of dodging incoming projectiles
     dodgeFlashDuration: 100,      // frames the flash step visual effect lasts (increased for visibility)
     dodgeCooldown: 15,           // frames minimum between dodge attempts
 
@@ -215,16 +225,16 @@ export const CONFIG = {
     ragePerDamage: 0,           // legacy (disabled)
     rageFromDamageScale: 2.5,
 
-    rageDuration: 350,          // frames rage state lasts (5 seconds at 60 fps)
+    rageDuration: 200,          // frames rage state lasts (5 seconds at 60 fps)
     rageDamageMultiplier: 1.8, // damage multiplier during rage
-    rageAttackSpeedMultiplier: 1.5, // attack speed multiplier during rage (lower cooldown)
+    rageAttackSpeedMultiplier: 1.1, // attack speed multiplier during rage (lower cooldown)
     rageMoveSpeedMultiplier: 2.0,  // movement speed multiplier during rage
     lifestealPercent: 0.8,     // HP recovered as percentage of damage dealt during rage (0.3 = 30%)
 
     axeRange: 35,              // pixels from edge for axe swing attack
     axeCooldown: 25,          // frames between axe swings
     axeDamage: 5,             // base damage per axe swing
-    axeSwingDurationFrames: 24, // frames for visible axe chop animation
+    axeSwingDurationFrames: 30, // frames for visible axe chop animation
     axeWindupDuration: 6,     // frames of wind-up anticipation before swing
     dualAxeBonus: 1.3,         // damage multiplier when both axes hit (during rage)
 
@@ -428,6 +438,43 @@ export const CONFIG = {
     // Core Mechanic (Dash)
     dashSpeedMultiplier: 3.0,
     dashDuration: 12,
+  },
+
+  /** Musashi — Dual Sword Stance Fighter */
+  musashi: {
+    // General
+    stanceDurationFrames: 300, // 5 seconds per stance
+    baseMoveSpeed: 4.8,
+
+    // Core Attack (Dual Wielding)
+    swordRange: 40,
+    attackCooldown: 45, // frames between dual sword strikes
+    katanaDamage: 12,
+    wakizashiDamage: 8,
+    strikeDurationFrames: 10,
+
+    // Stances
+    earthArmorMultiplier: 1.1,    // takes 50% damage
+    earthSpeedMultiplier: 1.1,
+    waterSpeedMultiplier: 1.3,
+    waterDodgeDistance: 80,
+    fireDamageMultiplier: 1.1,
+    fireDamageTakenMultiplier: 1.1,
+    windDeflectRadius: 100,
+    voidDodgeChance: 1.0,         // 100% dodge
+    voidLethalDamage: 10,
+
+    // Active Abilities
+    nitenStrikeCooldown: 300,
+    nitenStrikeKnockback: 15,
+    nitenStrikeDamage: 7, // total
+
+    flurryCooldown: 480,
+    flurryDamage: 5,
+
+    preemptiveStrikeCooldown: 360,
+    preemptiveStrikeDuration: 60, // Window to get hit and counter
+    preemptiveCounterDamage: 7,
   },
 };
 
@@ -714,6 +761,24 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Scythe Dance',
     desc: 'Casting abilities triggers a short dash. Swings and pulls scythe to lifesteal.',
+  },
+  {
+    id: 17,
+    name: 'Musashi',
+    color: '#34495e',
+    startX: 290, startY: 240,
+    startVx: 1.2, startVy: -1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0.03,
+    type: 'musashi',
+    hp: 100,
+    damage: 20, // (Katana + Wakizashi)
+    cooldown: 45,
+    moveSpeed: 4.8,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'The Five Rings',
+    desc: 'Cycles through 5 stances autonomously. Uses Oar Smash, Niten Strike, and Preemptive Counters.',
   },
 ];
 

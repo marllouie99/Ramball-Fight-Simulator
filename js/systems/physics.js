@@ -511,14 +511,19 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret) {
-    a.vx -= impulse * nx + randA * impulse * tx;
-    a.vy -= impulse * ny + randA * impulse * ty;
+    // Fighters in rage ignore the bounce impulse so they can stick to their targets
+    if (!a.isInRage) {
+      a.vx -= impulse * nx + randA * impulse * tx;
+      a.vy -= impulse * ny + randA * impulse * ty;
+    }
     a.normalizeSpeed();
   }
   
   if (!b.isTurret) {
-    b.vx += impulse * nx + randB * impulse * tx;
-    b.vy += impulse * ny + randB * impulse * ty;
+    if (!b.isInRage) {
+      b.vx += impulse * nx + randB * impulse * tx;
+      b.vy += impulse * ny + randB * impulse * ty;
+    }
     b.normalizeSpeed();
   }
 }

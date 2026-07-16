@@ -35,6 +35,11 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 0.8,
       speed: 1.2,
     },
+    enhanceready: {
+      src: 'Assets/Sound Effects/SkillEffects/enhanceready.mp3',
+      volume: 0.75,
+      speed: 1.0,
+    },
   },
 
   // ── Alchemist / Grenadier ─────────────────
