@@ -1,6 +1,32 @@
 import { CONFIG } from '../../core/config.js';
 
-export function drawRubyScythe(ctx, fighter) {
+
+const RubyTheme = {
+  glowShadow: 'rgba(255, 0, 100, 1)',
+  aura: 'rgba(10, 0, 5, 0.85)',
+  core: 'rgba(255, 0, 100, 0.9)',
+  glowSrc1: '#ff0055',
+  glowSrc2: '#ff1493',
+  darkSrc1: '#1a000d',
+  darkSrc2: '#4a001a',
+  heatSoft1: '255, 0, 85',
+  heatSoft2: '200, 0, 60',
+  plasma1: 'rgba(255, 20, 100, 0.8)',
+  plasma2: 'rgba(200, 0, 80, 0.4)',
+  guard1: '130, 0, 10',
+  guard2: '40, 0, 5',
+  bladeSnout: '#ef4444',
+  candy1: '#990033',
+  candy2: '#ff0055',
+  candy3: '#ff1493',
+  candy4: '#cc0052',
+  candy5: '#80002a',
+  panel: 'rgba(127, 29, 29, 0.6)'
+};
+
+export function drawRubyScythe(ctx, fighter, customTheme = null) {
+  const theme = customTheme || RubyTheme;
+  const baseAlpha = ctx.globalAlpha;
   // --- Pre-calculate weapon transforms for trails and particles ---
   let currentAngle = fighter.gunAngle;
   let stretchAmount = 0;
@@ -18,7 +44,6 @@ export function drawRubyScythe(ctx, fighter) {
     if (phase === 0) {
       // WIND_UP: Smoothly pull the scythe back in anticipation
       const t = 1 - (fighter.activePullPhaseTimer / fighter.pullPhaseWindUp);
-      // smooth cubic ease-in-out
       const ease = t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
       stretchAmount = -40 * ease; // pull the shaft backwards heavily
       bladeRotation = -Math.PI / 1.5 * ease; // wind up the blade to open it completely
@@ -142,7 +167,7 @@ export function drawRubyScythe(ctx, fighter) {
     
     // Add canvas glow
     ctx.shadowBlur = 15;
-    ctx.shadowColor = 'rgba(255, 0, 100, 1)';
+    ctx.shadowColor = theme.glowShadow;
 
     // Quantize time to 15fps (approx 66ms per frame) for that staccato, hand-drawn anime feel
     const msPerFrame = 1000 / 15;
@@ -211,7 +236,7 @@ export function drawRubyScythe(ctx, fighter) {
     ctx.closePath();
     
     // Inky Black Outer Aura (Anime style dark energy)
-    ctx.fillStyle = 'rgba(10, 0, 5, 0.85)';
+    ctx.fillStyle = theme.aura;
     ctx.fill();
 
     // ----------------------------------------------------
@@ -260,7 +285,7 @@ export function drawRubyScythe(ctx, fighter) {
     ctx.lineTo(firstCoreTx, firstCoreTy);
     ctx.closePath();
 
-    ctx.fillStyle = 'rgba(255, 0, 100, 0.9)';
+    ctx.fillStyle = theme.core;
     ctx.fill();
 
     // ----------------------------------------------------
@@ -350,7 +375,7 @@ export function drawRubyScythe(ctx, fighter) {
   for (const p of darkParticles) {
     const alpha = (p.life / p.maxLife) * p.startAlpha;
     const size = p.startSize * (p.life / p.maxLife);
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = baseAlpha * alpha;
     ctx.fillStyle = p.color;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y - size);
@@ -368,7 +393,7 @@ export function drawRubyScythe(ctx, fighter) {
   for (const p of glowParticles) {
     const alpha = (p.life / p.maxLife) * p.startAlpha;
     const size = p.startSize * (p.life / p.maxLife);
-    ctx.globalAlpha = alpha;
+    ctx.globalAlpha = baseAlpha * alpha;
     ctx.fillStyle = p.color;
     ctx.beginPath();
     ctx.moveTo(p.x, p.y - size);
@@ -391,6 +416,26 @@ export function drawRubyScythe(ctx, fighter) {
 
   // Shift the weapon back so she is holding the pommel and middle of the shaft
   ctx.translate(fighter.r + gripOffset, 0);
+
+  // Draw Hands (they stay with the fighter, even if the weapon is thrown)
+  ctx.save();
+  
+  // Rear hand (near pommel)
+  ctx.beginPath();
+  ctx.arc(15, 0, 6, 0, Math.PI * 2);
+  ctx.fillStyle = fighter.color || '#e0115f'; // Default ruby color
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
+  
+  // Front hand (further up shaft)
+  ctx.beginPath();
+  ctx.arc(45, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.restore();
 
   // Detach the weapon during the hook throw (this leaves space for the chain!)
   if (stretchAmount !== 0) {
@@ -453,9 +498,9 @@ export function drawRubyScythe(ctx, fighter) {
 
   // Red cylinder (Rose/Pink Theme)
   const redGrad = ctx.createLinearGradient(0, -3, 0, 3);
-  redGrad.addColorStop(0, '#990033'); // Dark Rose
-  redGrad.addColorStop(0.5, '#ff1493'); // Vivid Pink
-  redGrad.addColorStop(1, '#cc0052'); // Crimson Pink
+  redGrad.addColorStop(0, theme.candy1); // Dark Rose
+  redGrad.addColorStop(0.5, theme.glowSrc2); // Vivid Pink
+  redGrad.addColorStop(1, theme.candy4); // Crimson Pink
   ctx.fillStyle = redGrad;
   ctx.fillRect(-30, -2.5, 13, 5);
   ctx.strokeRect(-30, -2.5, 13, 5);
@@ -504,7 +549,7 @@ export function drawRubyScythe(ctx, fighter) {
   ctx.bezierCurveTo(-5, -poleW - 6, -20, -poleW - 6, -32, -poleW - 1);
   ctx.stroke();
 
-  ctx.strokeStyle = '#ef4444';
+  ctx.strokeStyle = theme.bladeSnout;
   ctx.lineWidth = 2 / pommelScale;
   ctx.stroke();
 
@@ -604,8 +649,8 @@ export function drawRubyScythe(ctx, fighter) {
 
     const isGlow = Math.random() > 0.45;
     const color = isGlow
-      ? (Math.random() > 0.5 ? '#ff0055' : '#ff1493') // Deep Pink / Vivid Pink
-      : (Math.random() > 0.5 ? '#1a000d' : '#4a001a'); // Dark Magenta ink
+      ? (Math.random() > 0.5 ? theme.glowSrc1 : theme.glowSrc2) // Deep Pink / Vivid Pink
+      : (Math.random() > 0.5 ? theme.darkSrc1 : theme.darkSrc2); // Dark Magenta ink
 
     const vx = (Math.random() - 0.5) * 0.4;
     const vy = (Math.random() - 0.5) * 0.4 - 0.15;
@@ -708,8 +753,8 @@ export function drawRubyScythe(ctx, fighter) {
 
     // Use drawPlasma to stretch the smoke so it fades out as sharp directional mist rather than round bubbles
     drawPlasma(t, offsetDist, 1.0, size,
-      `rgba(255, 0, 85, ${Math.max(0, alpha)})`, // Rose/Pink smoke
-      `rgba(200, 0, 60, ${Math.max(0, alpha * 0.8)})`,
+      `rgba(${theme.heatSoft1}, ${Math.max(0, alpha)})`, // Rose/Pink smoke
+      `rgba(${theme.heatSoft2}, ${Math.max(0, alpha * 0.8)})`,
       2.5, 0.6
     );
   }
@@ -723,14 +768,14 @@ export function drawRubyScythe(ctx, fighter) {
     const dragDist = 15 + wave * 10;
 
     // Deep rose needles (razor sharp size=3)
-    drawPlasma(t, dragDist, 1.2, 3, 'rgba(255, 20, 100, 0.8)', 'rgba(200, 0, 80, 0.4)', 2.5, 0.4);
+    drawPlasma(t, dragDist, 1.2, 3, theme.plasma1, theme.plasma2, 2.5, 0.4);
   }
 
   // 3. Dense Guard Origin
   const guardGlowAlpha = 0.8 + Math.sin(time * 6) * 0.2;
   const guardGlow = ctx.createRadialGradient(originX, originY, 0, originX, originY, 45);
-  guardGlow.addColorStop(0, `rgba(130, 0, 10, ${guardGlowAlpha})`);
-  guardGlow.addColorStop(0.3, `rgba(40, 0, 5, ${guardGlowAlpha * 0.7})`);
+  guardGlow.addColorStop(0, `rgba(${theme.guard1}, ${guardGlowAlpha})`);
+  guardGlow.addColorStop(0.3, `rgba(${theme.guard2}, ${guardGlowAlpha * 0.7})`);
   guardGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = guardGlow;
   ctx.beginPath();
@@ -765,7 +810,7 @@ export function drawRubyScythe(ctx, fighter) {
   ctx.lineWidth = headStroke * 0.6;
   ctx.stroke();
 
-  ctx.fillStyle = '#ef4444';
+  ctx.fillStyle = theme.bladeSnout;
   ctx.beginPath();
   ctx.moveTo(18, 8);
   ctx.lineTo(22, 10);
@@ -775,11 +820,11 @@ export function drawRubyScythe(ctx, fighter) {
 
   // Rose Pink Blade
   const candyRed = ctx.createLinearGradient(10, 0, tipX, tipY);
-  candyRed.addColorStop(0, '#990033'); // Dark Rose
-  candyRed.addColorStop(0.3, '#ff0055'); // Deep Pink
-  candyRed.addColorStop(0.6, '#ff1493'); // Vivid Pink
-  candyRed.addColorStop(0.8, '#cc0052'); // Crimson Pink
-  candyRed.addColorStop(1, '#80002a'); // Very Dark Rose
+  candyRed.addColorStop(0, theme.candy1); // Dark Rose
+  candyRed.addColorStop(0.3, theme.glowSrc1); // Deep Pink
+  candyRed.addColorStop(0.6, theme.glowSrc2); // Vivid Pink
+  candyRed.addColorStop(0.8, theme.candy4); // Crimson Pink
+  candyRed.addColorStop(1, theme.candy5); // Very Dark Rose
 
   ctx.fillStyle = candyRed;
   ctx.beginPath();
@@ -796,7 +841,7 @@ export function drawRubyScythe(ctx, fighter) {
   ctx.stroke();
 
   // Red blade panel lines
-  ctx.strokeStyle = 'rgba(127, 29, 29, 0.6)';
+  ctx.strokeStyle = theme.panel;
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(15, -25);
@@ -879,7 +924,7 @@ export function drawRubyScythe(ctx, fighter) {
   ctx.lineWidth = headStroke * 0.6;
   ctx.stroke();
 
-  ctx.strokeStyle = '#ff1493'; // Vivid Pink panel line
+  ctx.strokeStyle = theme.glowSrc2; // Vivid Pink panel line
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(-2, -16);
@@ -901,13 +946,13 @@ export function drawRubyScythe(ctx, fighter) {
   
   // Outer thick pink glow
   drawEdgePath();
-  ctx.strokeStyle = 'rgba(255, 20, 147, 0.5)'; // Vivid pink
+  ctx.strokeStyle = theme.plasma2; // Vivid pink
   ctx.lineWidth = 14;
   ctx.stroke();
   
   // Inner hot pink glow
   drawEdgePath();
-  ctx.strokeStyle = 'rgba(255, 102, 178, 0.8)'; // Bright pink
+  ctx.strokeStyle = theme.plasma1; // Bright pink
   ctx.lineWidth = 6;
   ctx.stroke();
   
@@ -970,8 +1015,8 @@ export function drawRubyScythe(ctx, fighter) {
     const alpha = (0.3 - t * 0.1) * (0.8 + 0.2 * Math.sin(time * 4 + i));
 
     const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, size);
-    grad.addColorStop(0, `rgba(100, 0, 40, ${alpha})`);     // Dark magenta
-    grad.addColorStop(0.5, `rgba(40, 0, 15, ${alpha * 0.5})`);
+    grad.addColorStop(0, `rgba(${theme.guard1}, ${alpha})`);     // Dark magenta
+    grad.addColorStop(0.5, `rgba(${theme.guard2}, ${alpha * 0.5})`);
     grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
     ctx.fillStyle = grad;
@@ -990,7 +1035,7 @@ export function drawRubyScythe(ctx, fighter) {
     const dragDist = 10 + wave * 8 + t * 5;
 
     // Sharp (size 2)
-    drawPlasma(t, dragDist, 1.3, 2, 'rgba(255, 20, 147, 0.9)', 'rgba(255, 0, 85, 0.5)', 4.0, 0.2); // Vivid pink plasma
+    drawPlasma(t, dragDist, 1.3, 2, theme.core, `rgba(${theme.heatSoft1}, 0.5)`, 4.0, 0.2); // Vivid pink plasma
   }
 
   // Ultra-bright glowing liquid core
@@ -1000,14 +1045,14 @@ export function drawRubyScythe(ctx, fighter) {
     const dragDist = 5 + wave * 4 + t * 5;
 
     // Razor sharp (size 1)
-    drawPlasma(t, dragDist, 1.4, 1, 'rgba(255, 200, 255, 1.0)', 'rgba(255, 102, 178, 0.8)', 3.5, 0.15); // White-pink core
+    drawPlasma(t, dragDist, 1.4, 1, 'rgba(255, 255, 255, 1.0)', theme.plasma1, 3.5, 0.15); // White-pink core
   }
 
   // Dense plasma directly hugging the blade spine to anchor the heat
   for (let i = 0; i < 30; i++) {
     const t = i / 29;
     // Core anchor, sharp size (1.5)
-    drawPlasma(t, 0, 0, 1.5, 'rgba(255, 20, 147, 0.9)', 'rgba(255, 0, 85, 0.6)', 2.0, 0.6); // Vivid pink anchor
+    drawPlasma(t, 0, 0, 1.5, theme.core, `rgba(${theme.heatSoft1}, 0.6)`, 2.0, 0.6); // Vivid pink anchor
   }
 
   ctx.restore(); // Restore foreground aura context
@@ -1108,7 +1153,7 @@ export function drawRubyScythe(ctx, fighter) {
 
         ctx.closePath();
         ctx.fillStyle = color;
-        ctx.globalAlpha = alpha;
+        ctx.globalAlpha = baseAlpha * alpha;
         // Force source-over so the bright glows don't vanish against white backgrounds
         ctx.globalCompositeOperation = 'source-over';
         ctx.fill();
@@ -1116,17 +1161,17 @@ export function drawRubyScythe(ctx, fighter) {
 
       // 1. Background Inky Swirls (Dark, rich, source-over)
       drawRibbon(0.8, 1.25, 0.9, '#050000', 0.6 * overallAlpha, 1.5, 1.15, -0.15, false);
-      drawRibbon(0.4, 0.8, 0.6, '#1a0000', 0.7 * overallAlpha, 1.2, 0.9, 0.1, false);
-      drawRibbon(0.6, 1.1, 0.8, '#4a0000', 0.8 * overallAlpha, 1.4, 1.05, -0.05, false);
+      drawRibbon(0.4, 0.8, 0.6, theme.darkSrc1, 0.7 * overallAlpha, 1.2, 0.9, 0.1, false);
+      drawRibbon(0.6, 1.1, 0.8, theme.darkSrc2, 0.8 * overallAlpha, 1.4, 1.05, -0.05, false);
 
       // 2. Main Additive Glow Layers (vibrant, lighter)
-      drawRibbon(0.5, 1.15, 0.7, '#ff1493', 0.6 * overallAlpha, 1.3, 1.0, 0, true);   // Main wide pink glow
-      drawRibbon(0.5, 1.05, 0.85, '#ff0080', 0.8 * overallAlpha, 1.4, 0.95, 0, true);  // Vivid pink/crimson inner glow
+      drawRibbon(0.5, 1.15, 0.7, theme.glowSrc2, 0.6 * overallAlpha, 1.3, 1.0, 0, true);   // Main wide pink glow
+      drawRibbon(0.5, 1.05, 0.85, theme.glowSrc1, 0.8 * overallAlpha, 1.4, 0.95, 0, true);  // Vivid pink/crimson inner glow
       drawRibbon(0.5, 1.02, 0.95, '#ffffff', 1.0 * overallAlpha, 1.6, 0.85, 0, true);  // Blinding white-hot core
 
       // 3. Detached sweeping ribbons for kinetic energy
-      drawRibbon(1.05, 1.35, 1.2, '#ff0055', 0.5 * overallAlpha, 1.5, 1.1, -0.2, true); // Outer wisp
-      drawRibbon(0.3, 0.6, 0.4, '#ff66b2', 0.6 * overallAlpha, 1.3, 0.8, 0.15, true);   // Inner wisp
+      drawRibbon(1.05, 1.35, 1.2, theme.glowSrc1, 0.5 * overallAlpha, 1.5, 1.1, -0.2, true); // Outer wisp
+      drawRibbon(0.3, 0.6, 0.4, theme.glowSrc2, 0.6 * overallAlpha, 1.3, 0.8, 0.15, true);   // Inner wisp
 
       // Reset composite operation
       ctx.globalCompositeOperation = 'source-over';
@@ -1136,7 +1181,7 @@ export function drawRubyScythe(ctx, fighter) {
 
   if (fighter.activePullActive && fighter.activePullPhase === 2) {
     ctx.save();
-    ctx.globalAlpha = 0.2;
+    ctx.globalAlpha = ctx.globalAlpha * 0.2;
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = poleW * 2 + 5;
     ctx.beginPath();

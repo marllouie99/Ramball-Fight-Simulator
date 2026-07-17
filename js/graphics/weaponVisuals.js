@@ -33,6 +33,7 @@ export { drawEngineer, drawEngineerBullet, drawTurret, drawTurretBullet, Enginee
 export { drawBomberGrenade } from './weapons/bomberWeaponGraphics.js';
 export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
+export { drawZeusWeapon } from './weapons/zeusWeaponGraphics.js';
 
 // ─────────────────────────────────────────────
 // GRAY KNIGHT WEAPONS (Shield & Sword)

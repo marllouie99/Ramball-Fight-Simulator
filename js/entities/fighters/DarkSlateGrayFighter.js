@@ -655,12 +655,12 @@ export class DarkSlateGrayFighter extends Fighter {
       ctx.save();
       ctx.globalAlpha = baseAlpha * fadeOld;
       ctx.translate(Math.cos(this.gunAngle) * throwOffset, Math.sin(this.gunAngle) * throwOffset);
-      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle + progress * 0.4 + throwRotation, this.r);
+      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle + progress * 0.4 + throwRotation, this.r, this.color);
       ctx.restore();
     } else {
       ctx.save();
       ctx.globalAlpha = baseAlpha * fadeOld;
-      drawDarkSlateGrayMelee(ctx, this.x, this.y, this.gunAngle - progress * 0.4 + animationRotation, this.r, animationOffsetScale, flashIntensity);
+      drawDarkSlateGrayMelee(ctx, this.x, this.y, this.gunAngle - progress * 0.4 + animationRotation, this.r, animationOffsetScale, flashIntensity, this.color);
       ctx.restore();
     }
 
@@ -672,12 +672,12 @@ export class DarkSlateGrayFighter extends Fighter {
       ctx.save();
       ctx.globalAlpha = baseAlpha * fadeNew;
       ctx.translate(Math.cos(this.gunAngle) * throwOffset, Math.sin(this.gunAngle) * throwOffset);
-      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle - (1 - progress) * 0.4 + throwRotation, this.r);
+      drawDarkSlateGrayShuriken(ctx, this.x, this.y, this.gunAngle - (1 - progress) * 0.4 + throwRotation, this.r, this.color);
       ctx.restore();
     } else {
       ctx.save();
       ctx.globalAlpha = baseAlpha * fadeNew;
-      drawDarkSlateGrayMelee(ctx, this.x, this.y, this.gunAngle + (1 - progress) * 0.4 + animationRotation, this.r, animationOffsetScale, flashIntensity);
+      drawDarkSlateGrayMelee(ctx, this.x, this.y, this.gunAngle + (1 - progress) * 0.4 + animationRotation, this.r, animationOffsetScale, flashIntensity, this.color);
       ctx.restore();
     }
   }

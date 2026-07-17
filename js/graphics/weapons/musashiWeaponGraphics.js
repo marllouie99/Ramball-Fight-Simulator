@@ -51,14 +51,14 @@ export function drawMusashiWeapons(ctx, fighter) {
     // Draw Katana (Right) — dark blade with glowing neon edge
     ctx.save();
     ctx.rotate(rightSwordAngle);
-    drawKatana(ctx, fighter.r, 1.0, aura);
+    drawKatana(ctx, fighter.r, 1.0, aura, fighter.color);
     ctx.restore();
     
     // Draw Wakizashi (Left) — shorter, wider metallic blade
     ctx.save();
     ctx.rotate(leftSwordAngle);
     ctx.scale(1, -1);
-    drawWakizashi(ctx, fighter.r, 1.0, aura);
+    drawWakizashi(ctx, fighter.r, 1.0, aura, fighter.color);
     ctx.restore();
   
   ctx.restore();
@@ -196,7 +196,7 @@ function _drawBrushSmokeTrail(ctx, bladeAngle, offset, alpha, bladeLen, isFlippe
 // ─────────────────────────────────────────────
 // KATANA — Dark blade with glowing neon edge (Reference Image 1)
 // ─────────────────────────────────────────────
-function drawKatana(ctx, offset, scale, auraColor) {
+function drawKatana(ctx, offset, scale, auraColor, fighterColor = '#555') {
   ctx.save();
   ctx.translate(offset, 0);
   ctx.scale(scale, scale);
@@ -323,13 +323,22 @@ function drawKatana(ctx, offset, scale, auraColor) {
     ctx.fill();
   }
 
+  // ── Hand ──
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(-7, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
+
   ctx.restore();
 }
 
 // ─────────────────────────────────────────────
 // WAKIZASHI — Wide metallic blade with wrapped handle (Reference Image 2)
 // ─────────────────────────────────────────────
-function drawWakizashi(ctx, offset, scale, auraColor) {
+function drawWakizashi(ctx, offset, scale, auraColor, fighterColor = '#555') {
   ctx.save();
   ctx.translate(offset, 0);
   ctx.scale(scale, scale);
@@ -455,6 +464,15 @@ function drawWakizashi(ctx, offset, scale, auraColor) {
   ctx.stroke();
   
   ctx.restore();
+
+  // ── Hand ──
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(-5, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
 
   ctx.restore();
 }

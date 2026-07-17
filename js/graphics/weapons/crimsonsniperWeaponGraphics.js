@@ -21,7 +21,7 @@ export const CRIMSON_SNIPER_WEAPON_GRAPHICS = {
   }
 };
 
-export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, maxAmmo = 4, reloadTimer = 0, isReloading = false, flashTimer = 0, tensionIntensity = 0) {
+export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, maxAmmo = 4, reloadTimer = 0, isReloading = false, flashTimer = 0, tensionIntensity = 0, fighterColor = '#ff1111') {
   ctx.save();
   ctx.translate(x, y);
   
@@ -570,6 +570,18 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
 
   ctx.globalCompositeOperation = 'source-over';
 
+  // ── Hand ──
+  ctx.save();
+  ctx.translate(3 * s, 10 * s); // Position hand near the trigger grip
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
+  ctx.restore();
+
   ctx.restore();
 }
 
@@ -578,8 +590,9 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
  * @param {CanvasRenderingContext2D} ctx - The canvas context
  * @param {Object} p - The projectile object
  * @param {boolean} isEnhanced - Whether this is the final, massively boosted execute shot
+ * @param {boolean} isTrickster - Whether this is stolen by the trickster (turns green)
  */
-export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
+export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false, isTrickster = false) {
   const prevShadowColor = ctx.shadowColor;
   const prevShadowBlur = ctx.shadowBlur;
   const prevFillStyle = ctx.fillStyle;
@@ -612,8 +625,8 @@ export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
     if (isEnhanced) {
       gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
       gradient.addColorStop(0.3, 'rgba(0, 0, 0, 0.7)');
-      gradient.addColorStop(0.7, 'rgba(150, 0, 0, 0.9)');
-      gradient.addColorStop(1, 'rgba(255, 0, 0, 1)');
+      gradient.addColorStop(0.7, isTrickster ? 'rgba(0, 150, 0, 0.9)' : 'rgba(150, 0, 0, 0.9)');
+      gradient.addColorStop(1, isTrickster ? 'rgba(0, 255, 0, 1)' : 'rgba(255, 0, 0, 1)');
     } else {
       gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
       gradient.addColorStop(0.5, 'rgba(100, 0, 0, 0.4)');
@@ -736,11 +749,13 @@ export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
     // 2. Outer dark crimson lightning tendrils (many, chaotic, thin)
     for (let i = 0; i < 8; i++) {
       const spreadY = (Math.random() - 0.5) * s * 5;
+      const r = isTrickster ? 0 : 120 + Math.random() * 60;
+      const g = isTrickster ? 120 + Math.random() * 60 : 0;
       drawLightningBranch(
         -s * 35 + Math.random() * s * 6, spreadY,
         s * 18 + Math.random() * s * 5, (Math.random() - 0.5) * s * 4,
         1 + Math.random() * 1.5,
-        `rgba(${120 + Math.random() * 60}, 0, 0, ${0.5 + Math.random() * 0.4})`,
+        `rgba(${r}, ${g}, 0, ${0.5 + Math.random() * 0.4})`,
         8 + Math.floor(Math.random() * 5)
       );
     }
@@ -748,11 +763,14 @@ export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
     // 3. Mid-layer: Bright crimson main bolt branches
     for (let i = 0; i < 5; i++) {
       const spreadY = (Math.random() - 0.5) * s * 2;
+      const r = isTrickster ? Math.random() * 30 : 255;
+      const g = isTrickster ? 255 : 20 + Math.random() * 40;
+      const b = isTrickster ? 20 + Math.random() * 40 : Math.random() * 30;
       drawLightningBranch(
         -s * 30, spreadY,
         s * 15, (Math.random() - 0.5) * s * 1.5,
         2 + Math.random() * 2.5,
-        `rgba(255, ${20 + Math.random() * 40}, ${Math.random() * 30}, ${0.7 + Math.random() * 0.3})`,
+        `rgba(${r}, ${g}, ${b}, ${0.7 + Math.random() * 0.3})`,
         10 + Math.floor(Math.random() * 4)
       );
     }
@@ -763,22 +781,33 @@ export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
       const branchY = (Math.random() - 0.5) * s * 2;
       const forkEndY = branchY + (Math.random() > 0.5 ? 1 : -1) * (s * 5 + Math.random() * s * 10);
       const forkEndX = branchX + (Math.random() - 0.5) * s * 8;
+      const r = isTrickster ? Math.random() * 20 : 200;
+      const g = isTrickster ? 200 : Math.random() * 30;
+      const b = isTrickster ? Math.random() * 30 : Math.random() * 20;
       drawLightningBranch(
         branchX, branchY,
         forkEndX, forkEndY,
         0.8 + Math.random(),
-        `rgba(200, ${Math.random() * 30}, ${Math.random() * 20}, ${0.4 + Math.random() * 0.4})`,
+        `rgba(${r}, ${g}, ${b}, ${0.4 + Math.random() * 0.4})`,
         3 + Math.floor(Math.random() * 3)
       );
     }
     
     // 5. Inner core glow (bright crimson-white hottest center)
     const coreGrad = ctx.createLinearGradient(-s * 28, 0, s * 15, 0);
-    coreGrad.addColorStop(0, 'rgba(255, 80, 80, 0)');
-    coreGrad.addColorStop(0.15, 'rgba(255, 120, 120, 0.6)');
-    coreGrad.addColorStop(0.5, 'rgba(255, 200, 200, 0.9)');
-    coreGrad.addColorStop(0.8, 'rgba(255, 255, 255, 1)');
-    coreGrad.addColorStop(1, 'rgba(255, 200, 200, 0.5)');
+    if (isTrickster) {
+      coreGrad.addColorStop(0, 'rgba(80, 255, 80, 0)');
+      coreGrad.addColorStop(0.15, 'rgba(120, 255, 120, 0.6)');
+      coreGrad.addColorStop(0.5, 'rgba(200, 255, 200, 0.9)');
+      coreGrad.addColorStop(0.8, 'rgba(255, 255, 255, 1)');
+      coreGrad.addColorStop(1, 'rgba(200, 255, 200, 0.5)');
+    } else {
+      coreGrad.addColorStop(0, 'rgba(255, 80, 80, 0)');
+      coreGrad.addColorStop(0.15, 'rgba(255, 120, 120, 0.6)');
+      coreGrad.addColorStop(0.5, 'rgba(255, 200, 200, 0.9)');
+      coreGrad.addColorStop(0.8, 'rgba(255, 255, 255, 1)');
+      coreGrad.addColorStop(1, 'rgba(255, 200, 200, 0.5)');
+    }
     drawLightningBranch(
       -s * 28, 0,
       s * 15, 0,
@@ -799,8 +828,8 @@ export function drawCrimsonSniperBullet(ctx, p, isEnhanced = false) {
     // 7. Leading tip flash (sharp bright point at the front)
     const tipGrad = ctx.createRadialGradient(s * 12, 0, 0, s * 12, 0, s * 6);
     tipGrad.addColorStop(0, 'rgba(255, 255, 255, 0.9)');
-    tipGrad.addColorStop(0.3, 'rgba(255, 80, 80, 0.6)');
-    tipGrad.addColorStop(1, 'rgba(150, 0, 0, 0)');
+    tipGrad.addColorStop(0.3, isTrickster ? 'rgba(80, 255, 80, 0.6)' : 'rgba(255, 80, 80, 0.6)');
+    tipGrad.addColorStop(1, isTrickster ? 'rgba(0, 150, 0, 0)' : 'rgba(150, 0, 0, 0)');
     ctx.fillStyle = tipGrad;
     ctx.beginPath();
     ctx.arc(s * 12, 0, s * 6, 0, Math.PI * 2);

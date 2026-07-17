@@ -368,7 +368,7 @@ export const FLAMEWARDEN_WEAPON_GRAPHICS = {
   },
 };
 
-export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
+export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor = '#ff6a00') {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
@@ -521,5 +521,27 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r) {
   // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.fill();
 
+  ctx.restore();
+
+  // ── Hand ──
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(gunAngle);
+  
+  if (Math.abs(gunAngle) > Math.PI / 2) {
+    ctx.scale(1, -1);
+  }
+  
+  // Position hand at the rear handle/grip of the flamethrower
+  ctx.translate(Math.max(0, r + FLAMEWARDEN_WEAPON_GRAPHICS.positioning.bodyOffset) - 6 * FLAMEWARDEN_WEAPON_GRAPHICS.positioning.scale, 5 * FLAMEWARDEN_WEAPON_GRAPHICS.positioning.scale);
+  
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
+  
   ctx.restore();
 }

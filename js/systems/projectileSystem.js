@@ -138,9 +138,31 @@ class ProjectileSystem {
       dirX = Math.cos(angle);
       dirY = Math.sin(angle);
     } else {
-      const tipDist = GUN_TIP_DIST(fighter.r);
+      let tipDist = GUN_TIP_DIST(fighter.r);
       dirX = Math.cos(fighter.gunAngle);
       dirY = Math.sin(fighter.gunAngle);
+      
+      // Prevent "gun clipping" by scaling down the tip spawn offset if an enemy is too close
+      if (typeof state !== 'undefined' && state.fighters && typeof spatialGrid !== 'undefined') {
+        const nearbyFighters = spatialGrid.getNearby(fighter.x, fighter.y, tipDist + 50);
+        for (const f of nearbyFighters) {
+          if (f && f !== fighter && f.hp > 0) {
+            const fi = state.fighters.indexOf(f);
+            if (fi !== -1 && !areOnSameTeam(ownerIndex, fi)) {
+              const dx = f.x - fighter.x;
+              const dy = f.y - fighter.y;
+              const distToEnemy = Math.hypot(dx, dy);
+              if (distToEnemy < tipDist + f.r) {
+                const maxAllowedTipDist = Math.max(0, distToEnemy - f.r);
+                if (maxAllowedTipDist < tipDist) {
+                  tipDist = maxAllowedTipDist;
+                }
+              }
+            }
+          }
+        }
+      }
+      
       spawnX = fighter.x + dirX * tipDist;
       spawnY = fighter.y + dirY * tipDist;
     }
@@ -230,6 +252,38 @@ class ProjectileSystem {
     proj.turbulence = 0.06 + Math.random() * 0.06;
     proj.wobblePhase = Math.random() * Math.PI * 2;
 
+    this.projectiles.push(proj);
+  }
+  
+  /**
+   * Spawns a Chain Lightning projectile for Zeus.
+   */
+  fireChainLightning(fighter, ownerIndex, damage, chainCount) {
+    const tipDist = GUN_TIP_DIST(fighter.r);
+    const speed = CONFIG.zeus.lightningSpeed || 18;
+    const dirX = Math.cos(fighter.gunAngle);
+    const dirY = Math.sin(fighter.gunAngle);
+    
+    const proj = this._getProjectile();
+    proj.x = fighter.x + dirX * tipDist;
+    proj.y = fighter.y + dirY * tipDist;
+    proj.vx = dirX * speed;
+    proj.vy = dirY * speed;
+    proj.r = 6;
+    proj.life = 100;
+    proj.maxLife = 100;
+    proj.color = '#00BFFF';
+    proj.owner = ownerIndex;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 0;
+    proj.isChainLightning = true;
+    proj.chainCount = chainCount;
+    proj.visual = 'chainLightning';
+    proj.hitTargets = new Set();
+    
+    // Trail for lightning visual
+    if (proj.history) { proj.history.length = 0; proj.history.push({ x: proj.x, y: proj.y }); }
+    proj.historyMax = 15;
+    
     this.projectiles.push(proj);
   }
 
@@ -496,19 +550,146 @@ class ProjectileSystem {
             }
             
             // Enhanced sniper bullet pierces through enemies!
-            if (projectile.visual === 'crimsonSniperBullet_enhanced') {
+            if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
               if (!projectile.hitFighters) projectile.hitFighters = new Set();
               projectile.hitFighters.add(fighter);
-              // Spawn a huge splash of blood/sparks on pierce
-              spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
-              spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-              // Spawn crimson lightning shockwave on pierce-through
-              spawnCrimsonLightningImpact(fighter.x, fighter.y, 50);
+              
+              const isTrickster = projectile.visual === 'tricksterSniperBullet_enhanced';
+              
+              if (isTrickster) {
+                // Green effects for trickster
+                spawnSparks(fighter.x, fighter.y, 8, 'lightningTrail', 'rgba(0, 255, 0, 1)');
+                spawnImpactFlash(fighter.x, fighter.y, 25, 'lightningTrail'); // Will fallback to default color or we can use custom
+                
+                // Spawn green lightning shockwave
+                if (typeof spawnCrimsonLightningImpact === 'function') {
+                  spawnCrimsonLightningImpact(fighter.x, fighter.y, 50, true); // true for isTrickster
+                }
+              } else {
+                // Red effects for sharpshooter
+                spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
+                spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
+                if (typeof spawnCrimsonLightningImpact === 'function') {
+                  spawnCrimsonLightningImpact(fighter.x, fighter.y, 50, false);
+                }
+              }
+              
               // Apply the crimson electrified visual effect to the target
               const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
               fighter.crimsonElectrifiedTimer = Math.max(fighter.crimsonElectrifiedTimer || 0, duration);
+              fighter.crimsonElectrifiedTrickster = isTrickster; // Save trickster state for green electricity
               fighter.lastCrimsonAttacker = attacker;
               // Do NOT return true, so the projectile is not destroyed
+            } else if (projectile.isArcaneBolt) {
+                 if (!projectile.hitFighters) projectile.hitFighters = new Set();
+                 projectile.hitFighters.add(fighter);
+                 if (projectile.bouncesLeft > 0) {
+                     projectile.bouncesLeft--;
+                     projectile.damage *= projectile.bounceDamageMultiplier;
+                     // find nearest valid enemy to bounce towards
+                     let bestDist = Infinity;
+                     let bestFighter = null;
+                     for (let f of fighters) {
+                        if (f && f !== fighter && f !== attacker && f.hp > 0 && !projectile.hitFighters.has(f)) {
+                            const ddx = f.x - projectile.x;
+                            const ddy = f.y - projectile.y;
+                            const distSq = ddx*ddx + ddy*ddy;
+                            if (distSq < bestDist) {
+                                bestDist = distSq;
+                                bestFighter = f;
+                            }
+                        }
+                     }
+                     if (bestFighter) {
+                        const ddx = bestFighter.x - projectile.x;
+                        const ddy = bestFighter.y - projectile.y;
+                        const dist = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
+                        const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
+                        projectile.vx = (ddx/dist) * speed;
+                        projectile.vy = (ddy/dist) * speed;
+                        projectile.life = 180;
+                     }
+                     // Do NOT return true, so the projectile is not destroyed
+                 } else {
+                     return true; // no bounces left, destroy it
+                 }
+            } else if (projectile.isChainLightning) {
+                 if (!projectile.hitFighters) projectile.hitFighters = new Set();
+                 projectile.hitFighters.add(fighter);
+                 
+                 // Apply Zeus Debuffs
+                 if (Math.random() < (CONFIG.zeus.staticChance || 0)) {
+                     fighter.staticDebuffTimer = CONFIG.zeus.staticDuration || 120;
+                 }
+                 if (Math.random() < (CONFIG.zeus.stunChance || 0)) {
+                     fighter.electricStunTimer = Math.max(fighter.electricStunTimer || 0, CONFIG.zeus.stunDuration || 15);
+                 }
+                 
+                 // Apply dramatic hit-pause and screen shake ONLY on the direct hit (not on bounces)
+                 if (projectile.hitFighters.size === 1) {
+                     if (typeof fighter.applyTimeStop === 'function') {
+                       fighter.applyTimeStop(2);
+                     }
+                     if (attacker && typeof attacker.applyTimeStop === 'function') {
+                       attacker.applyTimeStop(2);
+                     }
+                     
+                     if (typeof triggerGlobalScreenShake === 'function') {
+                       triggerGlobalScreenShake(2, 4);
+                     }
+                 }
+                 
+                 // Apply visual thunder roots effect
+                 fighter.thunderRootsTimer = Math.max(fighter.thunderRootsTimer || 0, 45);
+                 
+                 // Add vertical thunder strike visual and electric roots
+                 if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
+                 state.zeusStormStrikes.push({
+                   x: fighter.x,
+                   y: fighter.y,
+                   life: 15,
+                   maxLife: 15
+                 });
+                 
+                 spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
+                 
+                 if (projectile.chainCount > 0) {
+                     projectile.chainCount--;
+                     projectile.damage *= (CONFIG.zeus.chainDamageMultiplier || 0.8);
+                     
+                     // Find nearest valid enemy to chain towards
+                     let bestDist = (CONFIG.zeus.chainRange || 150) ** 2;
+                     let bestFighter = null;
+                     for (let f of fighters) {
+                        if (f && f !== fighter && f !== attacker && f.hp > 0 && !projectile.hitFighters.has(f) && !areOnSameTeam(projectile.owner, fighters.indexOf(f))) {
+                            const ddx = f.x - projectile.x;
+                            const ddy = f.y - projectile.y;
+                            const distSq = ddx*ddx + ddy*ddy;
+                            if (distSq < bestDist) {
+                                bestDist = distSq;
+                                bestFighter = f;
+                            }
+                        }
+                     }
+                     
+                     if (bestFighter) {
+                        const ddx = bestFighter.x - projectile.x;
+                        const ddy = bestFighter.y - projectile.y;
+                        const dist = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
+                        const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
+                        projectile.vx = (ddx/dist) * speed;
+                        projectile.vy = (ddy/dist) * speed;
+                        projectile.life = 100; // Reset life
+                     } else {
+                        // Bouncing off wall if no targets - just reverse or random angle
+                        const angle = Math.atan2(projectile.vy, projectile.vx) + (Math.random() - 0.5) * Math.PI;
+                        const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
+                        projectile.vx = Math.cos(angle) * speed;
+                        projectile.vy = Math.sin(angle) * speed;
+                     }
+                 } else {
+                     return true; // No chains left
+                 }
             } else {
               return true;
             }
@@ -537,6 +718,12 @@ class ProjectileSystem {
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
 
+      // Skip friendly illusions
+      const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+      if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
+        if (projectile.owner === illusionOwnerIndex || areOnSameTeam(projectile.owner, illusionOwnerIndex)) continue;
+      }
+
       // Skip if this projectile has piercing and already hit this illusion
       if (projectile.hitFighters && projectile.hitFighters.has(illusion)) continue;
 
@@ -553,7 +740,7 @@ class ProjectileSystem {
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
         
         // Enhanced sniper bullet pierces through illusions!
-        if (projectile.visual === 'crimsonSniperBullet_enhanced') {
+        if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
           if (!projectile.hitFighters) projectile.hitFighters = new Set();
           projectile.hitFighters.add(illusion);
           spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
@@ -714,6 +901,13 @@ class ProjectileSystem {
     // AOE damage to illusions
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
+      
+      // Skip friendly illusions
+      const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+      if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
+        if (p.owner === illusionOwnerIndex || areOnSameTeam(p.owner, illusionOwnerIndex)) continue;
+      }
+
       const dx = illusion.x - p.x;
       const dy = illusion.y - p.y;
       const checkRadius = radius + illusion.r;
@@ -1061,6 +1255,13 @@ class ProjectileSystem {
     // Apply concussive blast to illusions
     for (const illusion of state.illusions || []) {
       if (!illusion || illusion.hp <= 0) continue;
+
+      // Skip friendly illusions
+      const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+      if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
+        if (owner === illusionOwnerIndex || areOnSameTeam(owner, illusionOwnerIndex)) continue;
+      }
+
       const dx = illusion.x - x;
       const dy = illusion.y - y;
       const distSq = dx * dx + dy * dy;
@@ -1467,9 +1668,11 @@ class ProjectileSystem {
         if (typeof state !== 'undefined' && state.illusions) {
           for (const illusion of state.illusions) {
             if (!illusion || illusion.hp <= 0) continue;
-            // Skip if the black hole owner is the illusion's owner (so Doppelganger's own black holes don't suck its illusions)
-            // But wait, BlackFighter can't be Doppelganger. But just in case.
-            if (illusion.owner === fighters[ownerIndex]) continue;
+            // Skip if the black hole owner is on the same team as the illusion
+            const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+            if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
+              if (ownerIndex === illusionOwnerIndex || areOnSameTeam(ownerIndex, illusionOwnerIndex)) continue;
+            }
 
             const dx = p.x - illusion.x;
             const dy = p.y - illusion.y;
@@ -1607,14 +1810,55 @@ class ProjectileSystem {
         p.wobblePhase += 0.18;
       }
 
+      // Smooth serpentine wave movement for Arcane Bolt
+      if (p.isArcaneBolt) {
+        if (p.wobblePhase === undefined) {
+          p.wobblePhase = (p.id || Math.random()) * 10;
+        }
+        const perpX = -p.vy;
+        const perpY = p.vx;
+        const speed = Math.hypot(p.vx, p.vy);
+        const normX = speed !== 0 ? perpX / speed : 0;
+        const normY = speed !== 0 ? perpY / speed : 0;
+        
+        // Fluid, elegant curve
+        const waveSpeed = 0.12; 
+        const waveAmplitude = 1.8;
+        const wobble = Math.cos(p.wobblePhase) * waveAmplitude;
+        
+        p.x += normX * wobble;
+        p.y += normY * wobble;
+        
+        p.wobblePhase += waveSpeed;
+      }
+
+      // Natural zigzag movement for Chain Lightning
+      if (p.isChainLightning) {
+        const perpX = -p.vy;
+        const perpY = p.vx;
+        const speed = Math.hypot(p.vx, p.vy);
+        if (speed !== 0) {
+          const normX = perpX / speed;
+          const normY = perpY / speed;
+          // Random lateral offset each frame creates a jagged path
+          const jaggedOffset = (Math.random() - 0.5) * 16;
+          p.x += normX * jaggedOffset;
+          p.y += normY * jaggedOffset;
+        }
+      }
+
       // Record trail history for normal (non-special) projectiles
       // Used by drawProjectiles() to render a motion streak.
       // ── Decoupled: Frozen projectiles are in frozenProjectiles array, not here ──
       // PERFORMANCE: Use swap-and-pop for O(1) removal instead of shift O(n)
-      if (p.history) {
+      if (!p.fadingOut) {
+        if (!p.history) p.history = [];
         p.history.push({ x: p.x, y: p.y });
-        if (p.history.length > (p.historyMax || 10)) {
-          p.history.shift();
+        const maxHistory = p.historyMax || (p.isArcaneBolt ? 30 : (p.isBlue ? 8 : 10));
+        if (p.history.length > maxHistory) {
+          while (p.history.length > maxHistory) {
+            p.history.shift();
+          }
         }
       }
 
@@ -1628,6 +1872,68 @@ class ProjectileSystem {
       p.x += p.vx;
       p.y += p.vy;
       p.life -= 1;
+
+      // TRICKSTER / CRONOS SPHERE BLENDER EFFECT:
+      // If the owner has an active Time Sphere, trap their projectiles inside it!
+      const owner = fighters[p.owner];
+      if (owner && owner.sphereActive && owner.sphereTimer > 0) {
+        const R = CONFIG.cronos.sphereRadius;
+        // Check if it was previously inside the sphere, but is now outside
+        const prevX = p.x - p.vx;
+        const prevY = p.y - p.vy;
+        const prevDistSq = (prevX - owner.sphereX) ** 2 + (prevY - owner.sphereY) ** 2;
+        const currentDistSq = (p.x - owner.sphereX) ** 2 + (p.y - owner.sphereY) ** 2;
+        
+        if (prevDistSq <= R * R && currentDistSq > R * R) {
+          const dist = Math.sqrt(currentDistSq);
+          const nx = (p.x - owner.sphereX) / dist;
+          const ny = (p.y - owner.sphereY) / dist;
+          
+          // Reflect velocity against the sphere's inner normal
+          const dot = p.vx * nx + p.vy * ny;
+          if (dot > 0) {
+            p.vx = p.vx - 2 * dot * nx;
+            p.vy = p.vy - 2 * dot * ny;
+            
+            // Push it safely back inside the boundary
+            p.x = owner.sphereX + nx * (R - 1);
+            p.y = owner.sphereY + ny * (R - 1);
+            
+            // Update rotation for visual consistency (like Shurikens or bullets)
+            if (p.rotation !== undefined && !p.isGrenade && !p.isBomberGrenade) {
+              p.rotation = Math.atan2(p.vy, p.vx);
+            }
+          }
+        }
+      }
+
+
+
+      if (p.fadingOut) {
+        // Trail shrinks from the tail toward the impact point
+        // Just consume old tail positions — do NOT move p.x/p.y
+        if (p.history && p.history.length > 0) {
+          // Remove 1 point per frame so it shrinks slower and smoother
+          p.history.shift();
+        }
+
+        // Dissolve into magical sparks while fading
+        if (p.isArcaneBolt && Math.random() < 0.8) {
+          spawnSparks(p.x, p.y, 2, 'arcane');
+        }
+        
+        // Smoothly fade out the opacity
+        if (p.fadingAlpha === undefined) p.fadingAlpha = 1.0;
+        p.fadingAlpha -= 0.06; // About ~16 frames to fully fade to invisible
+        
+        if (p.fadingAlpha <= 0 || (!p.history || p.history.length <= 1)) {
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+        }
+        continue;
+      }
 
       const hit = this.checkProjectileHits(p, fighters);
       const expired = this.isProjectileExpired(p);
@@ -1677,11 +1983,18 @@ class ProjectileSystem {
           }
         }
 
-        this._returnProjectile(p);
-        // Swap with last element and pop for O(1) removal
-        this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
-        this.projectiles.pop();
-        i--; // Adjust index since we swapped
+        if (p.history && p.history.length > 1) {
+          p.fadingOut = true;
+          // Stop collision and movement logic
+          p.vx = 0;
+          p.vy = 0;
+        } else {
+          this._returnProjectile(p);
+          // Swap with last element and pop for O(1) removal
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--; // Adjust index since we swapped
+        }
       }
     }
 
@@ -1735,6 +2048,58 @@ class ProjectileSystem {
     proj.tickTimer = 0;
     proj.indicatorTimer = CONFIG.black.summonIndicatorFrames;
     proj.indicatorLife = CONFIG.black.summonIndicatorFrames;
+    this.projectiles.push(proj);
+  }
+
+  fireArcaneBolt(fighter, ownerIndex, damage, opponent) {
+    if (!fighter || !opponent) return;
+    const speed = CONFIG.trickster.boltSpeed;
+    const radius = CONFIG.projectile.radius * 0.9;
+    const tipDist = GUN_TIP_DIST(fighter.r);
+    
+    const targetX = opponent.x;
+    const targetY = opponent.y;
+    const dist = Math.hypot(targetX - fighter.x, targetY - fighter.y) || 1;
+    const dirX = (targetX - fighter.x) / dist;
+    const dirY = (targetY - fighter.y) / dist;
+    const gunAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : Math.atan2(dirY, dirX);
+    const cosA = Math.cos(gunAngle);
+    const sinA = Math.sin(gunAngle);
+    
+    // The staff is translated and rotated in drawTricksterStaff:
+    // 1. Translated by (fighter.r * 0.4, fighter.r * 0.85)
+    // 2. Rotated by Math.PI * 0.3
+    // 3. The tip of the crystal is at (0, -75) relative to the staff
+    const tipLocalX = 75 * Math.sin(Math.PI * 0.3) + fighter.r * 0.4;
+    const tipLocalY = -75 * Math.cos(Math.PI * 0.3) + fighter.r * 0.85;
+
+    // Prevent gun clipping when extremely close to the opponent (e.g. frozen in Time Sphere)
+    const tipOffsetDist = Math.hypot(tipLocalX, tipLocalY);
+    const maxOffset = Math.max(0, dist - opponent.r);
+    let scale = 1.0;
+    if (tipOffsetDist > maxOffset) {
+      scale = maxOffset / tipOffsetDist;
+    }
+    const scaledTipX = tipLocalX * scale;
+    const scaledTipY = tipLocalY * scale;
+    
+    // Convert local hand coordinates to world coordinates based on the fighter's rotation
+    const startX = fighter.x + scaledTipX * cosA - scaledTipY * sinA;
+    const startY = fighter.y + scaledTipX * sinA + scaledTipY * cosA;
+    const proj = this._getProjectile();
+    proj.x = startX;
+    proj.y = startY;
+    proj.vx = dirX * speed;
+    proj.vy = dirY * speed;
+    proj.r = radius;
+    proj.life = 180; // 3 seconds max life per bounce
+    proj.maxLife = 180;
+    proj.color = '#00ffff'; // Electric cyan/blue
+
+    proj.owner = ownerIndex;
+    proj.damage = damage;
+    proj.isArcaneBolt = true;
+    proj.hitFighters = new Set();
     this.projectiles.push(proj);
   }
 

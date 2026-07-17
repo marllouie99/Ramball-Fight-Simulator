@@ -99,6 +99,34 @@ export const SKILL_SOUNDS = {
       volume: 0.4,
     },
   },
+
+  // ── Trickster ─────────────────────────────
+  trickster: {
+    telekinesis: {
+      src: 'Assets/Sound Effects/Attacks/magic_cast.mp3',
+      volume: 0.8
+    },
+    telekinesisDrop: {
+      src: 'Assets/Sound Effects/Attacks/heavyhit.mp3',
+      volume: 0.9
+    },
+    spellSteal: {
+      src: 'Assets/Sound Effects/Attacks/magic_drain.mp3', // Assume this exists or fallback
+      volume: 0.9
+    }
+  },
+
+  // ── Zeus ─────────────────────────────
+  zeus: {
+    aegis: {
+      src: 'Assets/Sound Effects/Attacks/electric_shock.mp3', // Will use fallback if doesn't exist
+      volume: 0.7
+    },
+    storm: {
+      src: 'Assets/Sound Effects/Attacks/thunder_strike.mp3', // Fallback to heavyhit or magic
+      volume: 1.0
+    }
+  }
 };
 
 /**

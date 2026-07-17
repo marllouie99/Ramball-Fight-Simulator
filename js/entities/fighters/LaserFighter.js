@@ -5,6 +5,7 @@ import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawWhiteRailgun, drawWhiteChargeEffect } from '../../graphics/weaponVisuals.js';
+import { spawnSparks, spawnLaserSmoke } from '../../graphics/particles/sparkEffect.js';
 
 /**
  * Laser Fighter (White)
@@ -65,7 +66,8 @@ export class LaserFighter extends Fighter {
   }
 
   getBeamLine() {
-    const tipDist = GUN_TIP_DIST(this.r);
+    // Solar Champion railgun muzzle tip: baseX(-5) + 160 * scale(0.35) = 51 from fighter edge
+    const tipDist = this.r + 51;
     const startX = this.x + Math.cos(this.gunAngle) * tipDist;
     const startY = this.y + Math.sin(this.gunAngle) * tipDist;
     const beamLength = CONFIG.laser.beamLength;
@@ -186,6 +188,11 @@ export class LaserFighter extends Fighter {
     if (this.beamTimer > 0) {
       this.beamTimer--;
 
+      // Continuous violent screen shake while firing
+      if (!state.screenShake || state.screenShake.timer <= 1) {
+        state.screenShake = { timer: 5, intensity: 6 };
+      }
+
       // Slowly rotate toward the target while firing the beam
       if (opponent) {
         const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
@@ -198,7 +205,9 @@ export class LaserFighter extends Fighter {
         }
       }
 
-      const hitFighters = this.getBeamHitFighters(state.fighters);
+      // Check all valid targets, including fighters and illusions/clones
+      const allTargets = state.fighters.concat(state.illusions || []);
+      const hitFighters = this.getBeamHitFighters(allTargets);
       for (const fighter of hitFighters) {
         this.applyBeamEffectsToTarget(fighter, ownerIndex);
       }
@@ -244,6 +253,12 @@ export class LaserFighter extends Fighter {
           if (chargeSound) playSound(chargeSound.src, chargeSound.volume);
         }
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
+        
+        // Tremor screen shake during charge
+        const chargeRatio = this.beamCharge / CONFIG.laser.windupDuration;
+        if (chargeRatio > 0.4 && (!state.screenShake || state.screenShake.intensity < chargeRatio * 4)) {
+          state.screenShake = { timer: 2, intensity: chargeRatio * 4 };
+        }
       } else {
         this.beamCharge = Math.max(this.beamCharge - 1, 0);
       }
@@ -253,6 +268,9 @@ export class LaserFighter extends Fighter {
         this.shootCooldown = this.shootCooldownMax;
         this.beamHitState.clear();
         this.beamCharge = 0;
+
+        // Massive screen shake when beam fires
+        state.screenShake = { timer: 20, intensity: 15 };
 
         if (!this._laserSoundKey) {
           this._laserSoundKey = `ivory-laser-${ownerIndex}`;
@@ -287,15 +305,60 @@ export class LaserFighter extends Fighter {
       fadeOutLoopingSound(this._laserSoundKey, 300);
       this._isLaserSoundPlaying = false;
     }
+    
+    // Emit smoke smoothly during the beam firing, getting thicker as the gun heats up
+    if (this.beamTimer > 0) {
+      const heatRatio = 1 - (this.beamTimer / this.beamDuration); // 0 to 1
+      if (Math.random() < heatRatio * 0.9) {
+        const tipDist = this.r + 51;
+        const muzzleX = this.x + Math.cos(this.gunAngle) * tipDist;
+        const muzzleY = this.y + Math.sin(this.gunAngle) * tipDist;
+        const smokeVx = Math.cos(this.gunAngle) * (4 + Math.random() * 2);
+        const smokeVy = Math.sin(this.gunAngle) * (4 + Math.random() * 2);
+        spawnLaserSmoke(muzzleX, muzzleY, smokeVx, smokeVy);
+      }
+    } 
+    // Cool down smoke effect right after firing
+    // The beam fires for beamDuration frames, during which shootCooldown ticks down.
+    // So when the beam ends, shootCooldown is at shootCooldownMax - beamDuration.
+    else if (this.beamTimer === 0 && this.shootCooldown > 0 && this.shootCooldown > this.shootCooldownMax - (this.beamDuration + 30)) {
+      // For the first 30 frames after the beam finishes, emit intense smoke from the muzzle
+      if (Math.random() < 0.6) {
+        // Calculate muzzle tip position
+        const tipDist = this.r + 51;
+        const muzzleX = this.x + Math.cos(this.gunAngle) * tipDist;
+        const muzzleY = this.y + Math.sin(this.gunAngle) * tipDist;
+        
+        // Smoke escapes forward and slightly randomly
+        const smokeVx = Math.cos(this.gunAngle) * 3;
+        const smokeVy = Math.sin(this.gunAngle) * 3;
+        
+        spawnLaserSmoke(muzzleX, muzzleY, smokeVx, smokeVy);
+      }
+    }
   }
 
   draw(ctx) {
+    if (this.hp <= 0) return;
+
     if (this.beamCharge > 0 && this.beamTimer === 0) {
       this.drawChargeEffect(ctx);
     }
 
-    if (this.beamTimer > 0) {
+    super.draw(ctx);
+  }
+
+  // Draw the beam and hit glows ON TOP of all fighters
+  drawBeamOverlay(ctx) {
+    if (this.hp <= 0 || this.beamTimer <= 0) return;
       ctx.save();
+      
+      // Smooth fade in over the first 8 frames, and fade out over the last 8 frames
+      const fadeOutMultiplier = Math.min(1, this.beamTimer / 8);
+      const timeFired = this.beamDuration - this.beamTimer;
+      const fadeInMultiplier = Math.min(1, timeFired / 8);
+      const fadeMultiplier = fadeOutMultiplier * fadeInMultiplier;
+      
       const { startX, startY, endX, endY } = this.getBeamLine();
       const dx = endX - startX;
       const dy = endY - startY;
@@ -308,14 +371,25 @@ export class LaserFighter extends Fighter {
       const pulse2 = Math.cos(time * 1.3) * 2;
       const pulse3 = Math.sin(time * 0.8) * 3;
 
-      // Outer wide glow (cyan)
-      ctx.shadowColor = '#00ffff';
-      ctx.shadowBlur = 12 + pulse3;
+      // Outer huge bloom (orange)
+      ctx.shadowColor = '#ff6600';
+      ctx.shadowBlur = (25 + pulse3 * 2) * fadeMultiplier;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
-      ctx.strokeStyle = 'rgba(0, 255, 255, 0.15)';
-      ctx.lineWidth = (CONFIG.laser.glowWidth || 12) + 6 + pulse3;
+      ctx.strokeStyle = `rgba(255, 120, 0, ${0.3 * fadeMultiplier})`;
+      ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) + 16 + pulse3 * 1.5) * fadeMultiplier;
+      ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // Secondary wide glow (bright orange)
+      ctx.shadowBlur = (15 + pulse2) * fadeMultiplier;
+      ctx.shadowColor = '#ffaa00';
+      ctx.beginPath();
+      ctx.moveTo(startX, startY);
+      ctx.lineTo(endX, endY);
+      ctx.strokeStyle = `rgba(255, 180, 50, ${0.5 * fadeMultiplier})`;
+      ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) + 4 + pulse2) * fadeMultiplier;
       ctx.lineCap = 'round';
       ctx.stroke();
       ctx.shadowBlur = 0; // reset shadow for inner layers to keep it optimized
@@ -324,26 +398,28 @@ export class LaserFighter extends Fighter {
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
-      ctx.strokeStyle = 'rgba(200, 255, 255, 0.5)';
-      ctx.lineWidth = (CONFIG.laser.glowWidth || 12) - 2 + pulse2;
+      ctx.strokeStyle = `rgba(255, 220, 150, ${0.8 * fadeMultiplier})`;
+      ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) - 2 + pulse2) * fadeMultiplier;
       ctx.lineCap = 'round';
       ctx.stroke();
 
       // Inner core (white)
+      ctx.shadowColor = '#ffffff';
+      ctx.shadowBlur = 10 * fadeMultiplier;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = (CONFIG.laser.coreWidth || 4) + pulse1;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${fadeMultiplier})`;
+      ctx.lineWidth = ((CONFIG.laser.coreWidth || 4) + pulse1 + 1.5) * fadeMultiplier;
       ctx.lineCap = 'round';
       ctx.stroke();
 
       // Energy nodes traveling down the beam for dynamic flow
-      const numNodes = 4;
-      const speed = 0.6;
-      ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = '#ccffff';
-      ctx.shadowBlur = 8;
+      const numNodes = 6; // More nodes
+      const speed = 1.0;  // Faster nodes
+      ctx.fillStyle = `rgba(255, 255, 255, ${fadeMultiplier})`;
+      ctx.shadowColor = '#ffcc00';
+      ctx.shadowBlur = 15 * fadeMultiplier; // Brighter node glow
 
       for (let i = 0; i < numNodes; i++) {
         // Calculate offset (0 to 1) that wraps around
@@ -352,7 +428,7 @@ export class LaserFighter extends Fighter {
         let ny = startY + Math.sin(angle) * (beamLen * offset);
 
         // Node width pulses and is larger near the middle of the beam
-        let nodeRadius = 1.5 + Math.sin(offset * Math.PI) * 3;
+        let nodeRadius = (2 + Math.sin(offset * Math.PI) * 4) * fadeMultiplier;
 
         ctx.beginPath();
         ctx.arc(nx, ny, nodeRadius, 0, Math.PI * 2);
@@ -360,9 +436,63 @@ export class LaserFighter extends Fighter {
       }
 
       ctx.restore();
-    }
 
-    super.draw(ctx);
+      // Draw massive glow around targets currently being hit by the beam
+      for (const [target, hitState] of this.beamHitState.entries()) {
+        if (!target || target.hp <= 0) continue;
+        
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+        
+        // Large radial bloom around the target
+        const hitGlow = ctx.createRadialGradient(target.x, target.y, target.r * 0.2, target.x, target.y, target.r * 3);
+        hitGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.8 + Math.random() * 0.2) * fadeMultiplier})`);
+        hitGlow.addColorStop(0.2, `rgba(255, 150, 50, ${(0.6 + Math.random() * 0.2) * fadeMultiplier})`);
+        hitGlow.addColorStop(1, 'rgba(255, 50, 0, 0)');
+        
+        ctx.fillStyle = hitGlow;
+        ctx.beginPath();
+        ctx.arc(target.x, target.y, target.r * 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Draw proximity illumination on ANY fighter near the beam
+      if (state && state.fighters) {
+        const l2 = dx * dx + dy * dy;
+        if (l2 > 0) {
+          for (const f of state.fighters) {
+            if (!f || f.hp <= 0 || f === this) continue;
+
+            let t = ((f.x - startX) * dx + (f.y - startY) * dy) / l2;
+            t = Math.max(0, Math.min(1, t));
+            const projX = startX + t * dx;
+            const projY = startY + t * dy;
+            const dist = Math.hypot(f.x - projX, f.y - projY);
+
+            // If within 150 pixels of the beam center, cast light on them
+            const maxLightDist = 150;
+            if (dist < maxLightDist && !this.beamHitState.has(f)) {
+              // Calculate light intensity (0 to 1) based on distance
+              const intensity = 1 - (dist / maxLightDist);
+              
+              ctx.save();
+              ctx.globalCompositeOperation = 'lighter';
+              const shineGlow = ctx.createRadialGradient(f.x, f.y, f.r * 0.5, f.x, f.y, f.r * 1.5);
+              
+              // Orange/yellow cast light
+              shineGlow.addColorStop(0, `rgba(255, 180, 50, ${intensity * 0.5 * fadeMultiplier})`);
+              shineGlow.addColorStop(1, 'rgba(255, 100, 0, 0)');
+              
+              ctx.fillStyle = shineGlow;
+              ctx.beginPath();
+              ctx.arc(f.x, f.y, f.r * 1.5, 0, Math.PI * 2);
+              ctx.fill();
+              ctx.restore();
+            }
+          }
+        }
+      }
   }
 
   drawChargeEffect(ctx) {
@@ -370,18 +500,42 @@ export class LaserFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    drawWhiteRailgun(ctx, this.x, this.y, this.gunAngle, this.r);
+    drawWhiteRailgun(ctx, this.x, this.y, this.gunAngle, this.r, this.beamCharge, this.beamTimer);
+    
+    // Draw Hand holding the gun
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.gunAngle);
+    if (Math.abs(this.gunAngle) > Math.PI / 2) {
+      ctx.scale(1, -1);
+    }
+    
+    // Position hand on the gun grip
+    ctx.translate(this.r + 6, 0);
+    ctx.beginPath();
+    ctx.arc(0, 3, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.restore();
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
-    // Optional: pushback effect when laser hits
-    if (projectile && projectile.isLaser && !this.initialHitDone) {
-      const knockbackStrength = 1.0;
-      const dx = target.x - this.x;
-      const dy = target.y - this.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      target.vx += (dx / dist) * knockbackStrength;
-      target.vy += (dy / dist) * knockbackStrength;
+    if (projectile && projectile.isLaser) {
+      // Spawn intense sparks at the hit location
+      spawnSparks(target.x, target.y, 3, 'laserHit');
+
+      // Optional: pushback effect when laser hits
+      if (!this.initialHitDone) {
+        const knockbackStrength = 1.0;
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        target.vx += (dx / dist) * knockbackStrength;
+        target.vy += (dy / dist) * knockbackStrength;
+      }
     }
   }
 }

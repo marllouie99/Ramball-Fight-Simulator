@@ -173,6 +173,24 @@ export class BlackFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    // Draw hands holding the void orbs (orbiting below the orbs)
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.fillStyle = this.color;
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    
+    // Left hand
+    ctx.beginPath();
+    ctx.arc(-this.r - 8, 0, 6, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    
+    // Right hand
+    ctx.beginPath();
+    ctx.arc(this.r + 8, 0, 6, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    ctx.restore();
+
     drawVoidmasterWeapon(ctx, this.x, this.y, this.r);
   }
 

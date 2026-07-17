@@ -1022,7 +1022,7 @@ export class CronosFighter extends Fighter {
 
   drawOutline(ctx) {
     // Weapon visual will be added to weaponVisuals.js
-    drawCronosCrescentBlade(ctx, this.x, this.y, this.gunAngle, this.r, this.meleeSwingActive, this.meleeSwingTimer, this.meleeSwingAngle, CONFIG.cronos.meleeSwingDuration, this.meleeSwingDirection);
+    drawCronosCrescentBlade(ctx, this.x, this.y, this.gunAngle, this.r, this.meleeSwingActive, this.meleeSwingTimer, this.meleeSwingAngle, CONFIG.cronos.meleeSwingDuration, this.meleeSwingDirection, this.color);
   }
 
   // Override drawGun to prevent the base class weapon from being drawn

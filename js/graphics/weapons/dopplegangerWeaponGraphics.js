@@ -61,7 +61,7 @@ export const DOPPLEGANGER_WEAPON_GRAPHICS = {
   },
 };
 
-export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingActive = false, swordSwingTimer = 0, swordSwingAngle = 0, swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20, timeOpt) {
+export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingActive = false, swordSwingTimer = 0, swordSwingAngle = 0, swordSwingDuration = CONFIG.doppleganger?.swordSwingDuration ?? 20, timeOpt, fighterColor = '#7b2cbf') {
   if (!CONFIG.doppleganger) return;
 
   const sword = DOPPLEGANGER_WEAPON_GRAPHICS.sword;
@@ -104,7 +104,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
       swingRot = endStrikeAngle * (1 - p) + restingAngle * p;
     }
 
-    drawDopplegangerSwingEffect(ctx, r, swingProgress, defaultSwordRotation);
+    drawDopplegangerSwingEffect(ctx, r, swingProgress, defaultSwordRotation, fighterColor);
   }
 
   // To make the hand grip look correct, we want to rotate around the body center first (defaultSwordRotation),
@@ -139,7 +139,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
   ctx.restore();
 }
 
-function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle) {
+function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor) {
   const fade = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
   if (fade <= 0) return;
 
@@ -198,6 +198,24 @@ function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle) {
     ctx.fill();
   }
 
+  ctx.restore();
+
+  // ── Hand ──
+  ctx.save();
+  ctx.rotate(facingAngle);
+  
+  // Position hand at the sword handle
+  const sideOffsetHand = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset;
+  ctx.translate(sideOffsetHand, 0);
+  
+  ctx.fillStyle = fighterColor || '#7b2cbf';
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
+  
   ctx.restore();
 }
 

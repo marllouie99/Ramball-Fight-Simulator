@@ -44,6 +44,7 @@ import {
   drawSingleSpike,
   drawGunSlingerDualRevolver,
   drawEngineer,
+  drawZeusWeapon
 } from './weaponVisuals.js';
 import { drawRubyScythe } from './weapons/rubyWeaponGraphics.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from './weapons/musashiWeaponGraphics.js';
@@ -1023,97 +1024,111 @@ export function drawIndexScreen() {
 
 export function drawWeaponMenu() {
   const { ctx, canvas } = state;
+  
+  // Reset context to prevent leaks from previous frames
+  ctx.globalAlpha = 1.0;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.shadowBlur = 0;
+  
   _clearButtons();
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Background
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#0a0a1a');
-  gradient.addColorStop(1, '#1a1a2e');
-  ctx.fillStyle = gradient;
+  // Cinematic Background (Dark Vignette)
+  const bgGrad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.8);
+  bgGrad.addColorStop(0, '#111520');
+  bgGrad.addColorStop(1, '#05070a');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   updatePreviewBalls();
 
   // Title
   ctx.fillStyle = '#fff';
-  ctx.font = 'bold 26px Arial';
+  ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('⚔ WEAPON MENU', canvas.width / 2, 42);
+  ctx.shadowColor = '#fff';
+  ctx.shadowBlur = 10;
+  ctx.fillText('WEAPON ARSENAL', canvas.width / 2, 45);
+  ctx.shadowBlur = 0;
 
   ctx.fillStyle = '#888';
   ctx.font = '12px Arial';
-  ctx.fillText('Browse all fighter weapons and their stats', canvas.width / 2, 70);
+  ctx.fillText('Inspect detailed weapon schematics', canvas.width / 2, 65);
 
-  const cardX = 30;
-  const cardW = canvas.width - 60;
-  const cardH = 140;
-  const cardSpacing = 18;
+  const cardX = Math.max(30, (canvas.width - 600) / 2);
+  const cardW = Math.min(canvas.width - 60, 600);
+  const cardH = 130;
+  const cardSpacing = 20;
 
   FIGHTER_DEFS.forEach((def, idx) => {
-    const cardY = 90 + idx * (cardH + cardSpacing) - state.weaponScroll;
-    if (cardY > canvas.height || cardY + cardH < 0) {
-      return;
-    }
+    const cardY = 95 + idx * (cardH + cardSpacing) - state.weaponScroll;
+    if (cardY > canvas.height || cardY + cardH < 0) return;
 
-    drawPanel(cardX, cardY, cardW, cardH, 0.85);
-
-    // Fighter name and color indicator
-    ctx.fillStyle = def.color;
-    ctx.fillRect(cardX + 10, cardY + 10, 6, cardH - 20);
-
-    ctx.fillStyle = def.color;
-    ctx.font = 'bold 15px Arial';
-    ctx.textAlign = 'left';
-    ctx.textBaseline = 'top';
-    ctx.fillText(def.name.toUpperCase(), cardX + 26, cardY + 12);
-
-    ctx.fillStyle = '#888';
-    ctx.font = '11px Arial';
-    ctx.fillText(def.type.toUpperCase(), cardX + 26, cardY + 32);
-
-    // Weapon stats
-    ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 12px Arial';
-    ctx.fillText(def.ability, cardX + 26, cardY + 52);
-
-    // Stats row
-    ctx.fillStyle = '#fff';
-    ctx.font = '12px Arial';
-    const statsText = `DMG ${def.damage}   CD ${(def.cooldown / 60).toFixed(1)}s   PROJ SPD ${def.projectileSpeedMultiplier ? def.projectileSpeedMultiplier.toFixed(1) : '1.0'}x`;
-    ctx.fillText(statsText, cardX + 26, cardY + 74);
-
-    // Description
-    ctx.fillStyle = '#aaa';
-    ctx.font = '11px Arial';
-    wrapText(ctx, def.desc, cardX + 26, cardY + 96, cardW - 40, 16);
-
-    // Weapon visual preview area
-    const previewAreaX = cardX + cardW - 100;
-    const previewAreaY = cardY + 15;
-    const previewAreaW = 80;
-    const previewAreaH = cardH - 30;
-
-    drawPanel(previewAreaX, previewAreaY, previewAreaW, previewAreaH, 0.6);
-
-    // Draw weapon preview based on fighter type
+    // Glassmorphism Panel
     ctx.save();
-    ctx.translate(previewAreaX + previewAreaW / 2, previewAreaY + previewAreaH / 2);
-    ctx.scale(0.5, 0.5);
+    ctx.fillStyle = 'rgba(20, 25, 35, 0.6)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 8);
+    ctx.fill();
+    ctx.stroke();
 
-    // Draw a simple weapon representation based on type
-    drawWeaponPreview(ctx, def.type, def.color);
-
+    // Glowing left accent line
+    ctx.fillStyle = def.color;
+    ctx.shadowColor = def.color;
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY + 10, 4, cardH - 20, 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
     ctx.restore();
 
-    // Click hint
-    ctx.fillStyle = '#666';
-    ctx.font = '10px Arial';
-    ctx.textAlign = 'right';
-    ctx.fillText('Click for details →', cardX + cardW - 10, cardY + cardH - 10);
+    // Text Layout
+    ctx.fillStyle = def.color;
+    ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(def.name.toUpperCase(), cardX + 24, cardY + 16);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 11px Arial';
+    ctx.fillText(def.type.toUpperCase(), cardX + 24, cardY + 40);
+
+    ctx.fillStyle = '#ffd700';
+    ctx.font = '12px Arial';
+    ctx.fillText(def.ability, cardX + 24, cardY + 58);
+
+    // Shortened description snippet
+    ctx.fillStyle = '#888';
+    ctx.font = '11px Arial';
+    wrapText(ctx, def.desc, cardX + 24, cardY + 80, cardW - 160, 16);
+
+    // Weapon Preview Pedestal
+    const previewSize = 90;
+    const previewX = cardX + cardW - previewSize / 2 - 20;
+    const previewY = cardY + cardH / 2;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const pedGrad = ctx.createRadialGradient(previewX, previewY, 0, previewX, previewY, previewSize / 2);
+    pedGrad.addColorStop(0, `rgba(255, 255, 255, 0.1)`);
+    pedGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pedGrad;
+    ctx.beginPath();
+    ctx.arc(previewX, previewY, previewSize / 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(previewX, previewY);
+    ctx.scale(0.65, 0.65);
+    // Add a slight floating animation per card
+    ctx.translate(0, Math.sin(Date.now() / 300 + idx) * 4);
+    drawWeaponPreview(ctx, def.type, def.color);
+    ctx.restore();
 
     // Make card clickable
     drawButton('', cardX + cardW / 2, cardY + cardH / 2, () => {
@@ -1122,12 +1137,42 @@ export function drawWeaponMenu() {
     }, cardW, cardH, true);
   });
 
-  drawButton('⌂ BACK', 75, 335, () => { goToTitle(); }, 100, 35);
+  drawButton('⌂ BACK', 75, canvas.height - 40, () => { goToTitle(); }, 100, 35);
 }
 
 // ─────────────────────────────────────────────
 // WEAPON DETAIL SCREEN
 // ─────────────────────────────────────────────
+
+function drawPremiumStatBar(ctx, x, y, width, label, valueStr, percentage, color) {
+  // Label
+  ctx.fillStyle = '#aaa';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.fillText(label, x, y - 5);
+  
+  // Value text
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText(valueStr, x + width, y - 5);
+
+  // Background bar
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.beginPath();
+  ctx.roundRect(x, y, width, 6, 3);
+  ctx.fill();
+
+  // Foreground bar (glow)
+  ctx.fillStyle = color;
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.roundRect(x, y, Math.max(6, width * percentage), 6, 3);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+}
 
 export function drawWeaponDetailScreen() {
   const { ctx, canvas } = state;
@@ -1137,133 +1182,152 @@ export function drawWeaponDetailScreen() {
     return;
   }
 
+  // Reset context to prevent leaks from previous frames
+  ctx.globalAlpha = 1.0;
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.shadowBlur = 0;
+
   _clearButtons();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Background
-  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#0a0a1a');
-  gradient.addColorStop(1, '#1a1a2e');
-  ctx.fillStyle = gradient;
+  // Cinematic Background
+  const bgGrad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.8);
+  bgGrad.addColorStop(0, '#0f141e');
+  bgGrad.addColorStop(1, '#020305');
+  ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Main panel
-  const panelX = 40;
-  const panelY = 40;
-  const panelW = canvas.width - 80;
-  const panelH = canvas.height - 80;
+  // Hero Display: massive radial backlight matching signature color
+  const heroY = canvas.height * 0.38;
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(canvas.width / 2, heroY, 0, canvas.width / 2, heroY, 250);
+  // Parse hex to rgba for glow
+  let r=0, g=150, b=255;
+  if (def.color.startsWith('#') && def.color.length === 7) {
+    r = parseInt(def.color.slice(1,3), 16);
+    g = parseInt(def.color.slice(3,5), 16);
+    b = parseInt(def.color.slice(5,7), 16);
+  }
+  glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
+  glow.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.05)`);
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
 
-  drawPanel(panelX, panelY, panelW, panelH, 0.9);
+  // Animated Hero Weapon Display
+  ctx.save();
+  ctx.translate(canvas.width / 2, heroY);
+  ctx.scale(2.4, 2.4);
+  // Bobbing animation
+  ctx.translate(0, Math.sin(Date.now() / 400) * 8);
+  
+  if (state.showWeaponModel) {
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    const previewFighter = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+    previewFighter.angle = 0;
+    try {
+      // The fighter might need a fake opponent to render certain things (like eyes tracking)
+      previewFighter.draw(ctx, { x: 100, y: 0 });
+    } catch (e) {
+      console.error('Preview draw error:', e);
+    }
+  } else {
+    drawWeaponPreview(ctx, def.type, def.color);
+  }
+  ctx.restore();
 
-  // Color accent bar
+  // Glassmorphism Info Panel at the bottom
+  const panelH = Math.min(280, canvas.height * 0.45);
+  const panelY = canvas.height - panelH - 20;
+  const panelW = Math.min(canvas.width - 40, 700);
+  const panelX = (canvas.width - panelW) / 2;
+
+  ctx.fillStyle = 'rgba(15, 20, 30, 0.7)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(panelX, panelY, panelW, panelH, 12);
+  ctx.fill();
+  ctx.stroke();
+
+  // Top Accent Line on the panel
   ctx.fillStyle = def.color;
-  ctx.fillRect(panelX, panelY, 8, panelH);
+  ctx.shadowColor = def.color;
+  ctx.shadowBlur = 10;
+  ctx.beginPath();
+  ctx.roundRect(canvas.width / 2 - 40, panelY, 80, 3, 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
 
-  // Fighter name
-  ctx.fillStyle = def.color;
+  // Header Texts
+  ctx.fillStyle = '#fff';
   ctx.font = 'bold 32px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
-  ctx.fillText(def.name.toUpperCase(), canvas.width / 2, panelY + 30);
+  ctx.fillText(def.name.toUpperCase(), canvas.width / 2, panelY + 25);
 
-  // Type badge
-  ctx.fillStyle = '#333';
-  ctx.fillRect(canvas.width / 2 - 60, panelY + 70, 120, 28);
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 14px Arial';
-  ctx.fillText(def.type.toUpperCase(), canvas.width / 2, panelY + 78);
-
-  // Large weapon preview
-  const previewCenterX = canvas.width / 2;
-  const previewCenterY = panelY + 180;
-  const previewSize = 120;
-
-  // Preview background circle
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
-  ctx.beginPath();
-  ctx.arc(previewCenterX, previewCenterY, previewSize + 20, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Draw animated weapon preview
-  ctx.save();
-  ctx.translate(previewCenterX, previewCenterY);
-  ctx.scale(1.5, 1.5);
-  drawWeaponPreview(ctx, def.type, def.color);
-  ctx.restore();
-
-  // Ability name
   ctx.fillStyle = '#ffd700';
-  ctx.font = 'bold 20px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(def.ability, canvas.width / 2, panelY + 320);
+  ctx.font = 'bold 16px Arial';
+  ctx.fillText(def.ability.toUpperCase(), canvas.width / 2, panelY + 65);
 
-  // Stats section
-  const statsY = panelY + 360;
-  const statBoxW = 150;
-  const statBoxH = 80;
-  const statSpacing = 20;
-  const totalWidth = statBoxW * 3 + statSpacing * 2;
-  const startX = (canvas.width - totalWidth) / 2;
+  // Stats Section (Horizontal Bars)
+  const barW = Math.min(500, panelW - 100);
+  const statsX = (canvas.width - barW) / 2;
+  const barY = panelY + 110;
+  
+  // Normalization logic for stats
+  const maxDmg = 150; // max reasonable damage
+  const maxCD = 10; // max 10 sec
+  const maxSpd = 3.0; // max 3x speed
 
-  // Damage stat
-  drawPanel(startX, statsY, statBoxW, statBoxH, 0.7);
-  ctx.fillStyle = '#ff6b6b';
-  ctx.font = 'bold 28px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText(def.damage, startX + statBoxW / 2, statsY + 35);
-  ctx.fillStyle = '#888';
-  ctx.font = '12px Arial';
-  ctx.fillText('DAMAGE', startX + statBoxW / 2, statsY + 55);
+  const dmgVal = def.damage;
+  const dmgPct = Math.min(1, dmgVal / maxDmg);
+  
+  const cdVal = def.cooldown / 60;
+  const cdPct = Math.min(1, cdVal / maxCD);
+  
+  const spdVal = def.projectileSpeedMultiplier || 1.0;
+  const spdPct = Math.min(1, spdVal / maxSpd);
 
-  // Cooldown stat
-  drawPanel(startX + statBoxW + statSpacing, statsY, statBoxW, statBoxH, 0.7);
-  ctx.fillStyle = '#4ecdc4';
-  ctx.font = 'bold 28px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText((def.cooldown / 60).toFixed(1) + 's', startX + statBoxW + statSpacing + statBoxW / 2, statsY + 35);
-  ctx.fillStyle = '#888';
-  ctx.font = '12px Arial';
-  ctx.fillText('COOLDOWN', startX + statBoxW + statSpacing + statBoxW / 2, statsY + 55);
-
-  // Projectile speed stat
-  drawPanel(startX + (statBoxW + statSpacing) * 2, statsY, statBoxW, statBoxH, 0.7);
-  ctx.fillStyle = '#a855f7';
-  ctx.font = 'bold 28px Arial';
-  ctx.textAlign = 'center';
-  ctx.fillText((def.projectileSpeedMultiplier ? def.projectileSpeedMultiplier.toFixed(1) : '1.0') + 'x', startX + (statBoxW + statSpacing) * 2 + statBoxW / 2, statsY + 35);
-  ctx.fillStyle = '#888';
-  ctx.font = '12px Arial';
-  ctx.fillText('PROJ SPEED', startX + (statBoxW + statSpacing) * 2 + statBoxW / 2, statsY + 55);
+  drawPremiumStatBar(ctx, statsX, barY, barW, 'DAMAGE OUTPUT', dmgVal.toString(), dmgPct, '#ff4d4d');
+  drawPremiumStatBar(ctx, statsX, barY + 30, barW, 'COOLDOWN TIME', cdVal.toFixed(1) + 's', cdPct, '#4da6ff');
+  drawPremiumStatBar(ctx, statsX, barY + 60, barW, 'PROJECTILE VELOCITY', spdVal.toFixed(1) + 'x', spdPct, '#b366ff');
 
   // Description
-  const descY = statsY + statBoxH + 30;
   ctx.fillStyle = '#ccc';
-  ctx.font = '14px Arial';
-  ctx.textAlign = 'center';
-  wrapText(ctx, def.desc, canvas.width / 2, descY, panelW - 60, 20);
+  ctx.font = '13px Arial';
+  wrapText(ctx, def.desc, canvas.width / 2, barY + 100, barW, 20);
 
-  // HP info
-  ctx.fillStyle = '#4ade80';
-  ctx.font = 'bold 16px Arial';
-  ctx.fillText(`HP: ${def.hp}`, canvas.width / 2, descY + 60);
-
-  // Navigation buttons
-  const btnY = panelY + panelH - 50;
-  drawButton('← BACK TO LIST', 150, btnY, () => {
+  // Navigation (Pinned to the top)
+  const btnY = 35; 
+  drawButton('← ARSENAL', 80, btnY, () => {
     state.gameState = 'weapons';
-  }, 200, 40);
+  }, 120, 35);
 
-  // Previous/Next navigation
+  // Toggle Fighter Model Button
+  const toggleText = state.showWeaponModel ? '▣ SHOW MODEL' : '☐ SHOW MODEL';
+  drawButton(toggleText, canvas.width / 2, btnY, () => {
+    state.showWeaponModel = !state.showWeaponModel;
+  }, 160, 35);
+
   const currentIdx = FIGHTER_DEFS.findIndex(f => f.type === def.type);
   if (currentIdx > 0) {
-    drawButton('◄ PREV', canvas.width / 2 - 120, btnY, () => {
+    drawButton('◄ PREV', canvas.width - 240, btnY, () => {
       state.selectedWeapon = FIGHTER_DEFS[currentIdx - 1];
-    }, 140, 40);
+    }, 100, 35);
   }
   if (currentIdx < FIGHTER_DEFS.length - 1) {
-    drawButton('NEXT ►', canvas.width / 2 + 120, btnY, () => {
+    drawButton('NEXT ►', canvas.width - 120, btnY, () => {
       state.selectedWeapon = FIGHTER_DEFS[currentIdx + 1];
-    }, 140, 40);
+    }, 100, 35);
   }
 }
 
@@ -1280,6 +1344,16 @@ function drawWeaponPreview(ctx, type, color) {
   // The in-game visuals expect absolute positions, but our preview draws around (0,0)
   // so we pass x=y=0.
   const r = 25; // approximate fighter radius for consistent weapon sizing
+
+  // Offset the canvas to perfectly center the weapon (which is usually drawn at X = r)
+  let offsetX = -40; // Default offset for most right-handed weapons
+  if (type === 'black') offsetX = 0; // Symmetrical
+  else if (type === 'knight' || type === 'musashi') offsetX = -20; 
+  else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
+  else if (type === 'cronos') offsetX = -55; // Huge blade
+  else if (type === 'ruby') offsetX = -75; // Massive scythe
+  
+  ctx.translate(offsetX, 0);
 
   try {
     switch (type) {
@@ -1444,6 +1518,11 @@ function drawWeaponPreview(ctx, type, color) {
       case 'Engineer':
         // Draws Engineer's shotgun active and wrench stowed on back
         drawEngineer(ctx, { x: 0, y: 0, gunAngle: gunAngle, r: r, lastWeaponUsed: 'shotgun' });
+        return;
+
+      case 'zeus':
+        // Draws the Master Bolt
+        drawZeusWeapon(ctx, 0, 0, gunAngle, r, Date.now() / 200);
         return;
 
       default:
@@ -2490,13 +2569,30 @@ function drawFfaChampionReveal(winner, timer) {
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
 
+  // Use an offscreen canvas to guarantee perfect fade-in composition
+  // This prevents complex weapon rendering logic from overriding globalAlpha
+  if (!state._championPreviewCanvas) {
+    state._championPreviewCanvas = document.createElement('canvas');
+    state._championPreviewCanvas.width = 400;
+    state._championPreviewCanvas.height = 400;
+    state._championPreviewCtx = state._championPreviewCanvas.getContext('2d');
+  }
+  
+  const pCtx = state._championPreviewCtx;
+  pCtx.clearRect(0, 0, 400, 400);
+  
+  pCtx.save();
+  pCtx.translate(200, 200);
+  pCtx.shadowBlur = 24;
+  pCtx.shadowColor = winner.color;
+  preview.draw(pCtx, null);
+  pCtx.restore();
+
   ctx.save();
   ctx.globalAlpha = fadeAlpha;
   ctx.translate(cx, cy);
   ctx.scale(scale, scale);
-  ctx.shadowBlur = 24;
-  ctx.shadowColor = winner.color;
-  preview.draw(ctx, null);
+  ctx.drawImage(state._championPreviewCanvas, -200, -200);
   ctx.restore();
 
   ctx.save();

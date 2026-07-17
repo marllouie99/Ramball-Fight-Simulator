@@ -537,7 +537,8 @@ export class GunSlingerFighter extends Fighter {
       this.muzzleFlashTimer,
       this.rightRecoilOffset, this.rightRecoilTilt,  // Right gun recoil
       this.leftRecoilOffset, this.leftRecoilTilt,      // Left gun recoil
-      gunSpinAngle
+      gunSpinAngle,
+      this.color
     );
     // Draw smoke effect around the guns
     this._drawSmoke(ctx);

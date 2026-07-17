@@ -9,15 +9,15 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  * Spawns an impactful rage visual effect at the Berserker's position.
  * @param {Object} berserker - The Berserker fighter
  */
-export function spawnBerserkerRageEffect(berserker) {
+export function spawnBerserkerRageEffect(berserker, colorOverride, secondaryColorOverride) {
   const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
   // OPTIMIZED: Further reduced limits for better performance
   const MAX_RAGE_EFFECTS = isMulti ? 10 : 25;
   
   // OPTIMIZED: Further reduce particle count in multi-fighter battles
   const particleCount = isMulti ? 8 : 20;
-  const color = '#ff0000'; // Blood red
-  const secondaryColor = '#ff4444'; 
+  const color = colorOverride || '#ff0000'; // Blood red
+  const secondaryColor = secondaryColorOverride || '#ff4444'; 
   
   // Create outward explosive particles
   for (let i = 0; i < particleCount; i++) {

@@ -249,7 +249,8 @@ export class NormalFighter extends Fighter {
       this.reloadTimer,
       this.isReloading,
       this.reloadFinishFlash || 0,
-      this.tensionAuraIntensity || 0
+      this.tensionAuraIntensity || 0,
+      this.color
     );
   }
 

@@ -224,6 +224,8 @@ export class BerserkerFighter extends Fighter {
 
     // Time stop - freeze ALL movement, spinning, and actions
     if (this._handleTimeStop()) {
+      // Allow existing trails and smoke to continue fading out naturally
+      this._updateAxeParticles(false, true);
       return;
     }
 
@@ -402,7 +404,7 @@ export class BerserkerFighter extends Fighter {
     this.drawRageBar(ctx);
   }
 
-  _updateAxeParticles(useAggressiveMode) {
+  _updateAxeParticles(useAggressiveMode, isTimeStopped = false) {
     if (!this.rightAxeTrail) this.rightAxeTrail = [];
     if (!this.leftAxeTrail) this.leftAxeTrail = [];
     if (!this.axeSmokeParticles) this.axeSmokeParticles = [];
@@ -422,6 +424,9 @@ export class BerserkerFighter extends Fighter {
       p.angle += p.spin; // slowly rotate the smudge
     }
     this.axeSmokeParticles = this.axeSmokeParticles.filter(p => p.life > 0);
+
+    // Do not spawn new trails if time-stopped
+    if (isTimeStopped) return;
 
     // Spawn new trails if swinging OR moving
     const speed = Math.hypot(this.vx, this.vy);

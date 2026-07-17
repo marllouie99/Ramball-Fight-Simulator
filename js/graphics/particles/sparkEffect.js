@@ -88,11 +88,94 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
       spark.color = rand > 0.65 ? 'rgba(0, 0, 0, 1)' : (rand > 0.25 ? 'rgba(200, 0, 0, 1)' : 'rgba(255, 255, 255, 1)');
     } else if (type === 'flash') {
       spark.color = 'rgba(255, 200, 100, 1)';
+    } else if (type === 'arcane') {
+      // Bright glowing green magic particles
+      spark.color = `rgba(${20 + Math.random() * 80}, ${200 + Math.random() * 55}, ${20 + Math.random() * 80}, 1)`;
+    } else if (type === 'arcaneAscendLine') {
+      spark.color = `rgba(${20 + Math.random() * 80}, ${200 + Math.random() * 55}, ${20 + Math.random() * 80}, 1)`;
+      // Override physics to strictly float upwards
+      spark.vx = (Math.random() - 0.5) * 1.5;
+      spark.vy = -1.5 - Math.random() * 2.5; 
+      spark.size = 2.5 + Math.random() * 2.5; // Thicker lines
+      spark.decay = 1 / 30; // Last exactly 30 frames
+      spark.friction = 0.98; // Keeps floating longer
+    } else if (type === 'laserHit') {
+      const rand = Math.random();
+      // Mix of dark scorched debris, intense orange, and white to stand out on the white arena
+      if (rand > 0.6) {
+        spark.color = 'rgba(20, 20, 20, 1)'; // Dark scorched armor/debris (highly visible on white)
+      } else if (rand > 0.2) {
+        spark.color = 'rgba(255, 100, 0, 1)'; // Fiery orange
+      } else {
+        spark.color = 'rgba(255, 255, 255, 1)'; // Core heat
+      }
+      spark.decay = 0.05 + Math.random() * 0.08; // Fast violent sparks
+    } else if (type === 'thunderSpark') {
+      const rand = Math.random();
+      spark.color = rand > 0.5 ? 'rgba(0, 220, 255, 1)' : 'rgba(255, 255, 255, 1)';
+      spark.vx = Math.cos(angle) * speed * 2.0;
+      spark.vy = Math.sin(angle) * speed * 2.0;
+      spark.decay = 0.03 + Math.random() * 0.05;
+      spark.friction = 0.90;
+      spark.isFlash = true; // IMPORTANT: route to custom jagged rendering
     } else {
       spark.color = `rgba(255, ${50 + Math.random() * 100}, ${20 + Math.random() * 50}, 1)`;
     }
 
     state.sparkEffects.push(spark);
+  }
+}
+
+/**
+ * Spawns floating rocks/debris under a telekinesis target
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} count - Number of rocks to spawn
+ */
+export function spawnTelekinesisDebris(x, y, count = 2) {
+  const isMulti = state && (state.mode === '2v2' || state.mode === 'ffa');
+  const qualityMultiplier = state.qualityLevel || 1.0;
+  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * qualityMultiplier);
+  
+  const adjustedCount = Math.max(1, Math.floor(count * qualityMultiplier));
+
+  for (let i = 0; i < adjustedCount; i++) {
+    if (state.sparkEffects.length >= MAX_SPARK_PARTICLES) {
+      const oldest = state.sparkEffects.shift();
+      if (oldest) _returnSpark(oldest);
+    }
+
+    const debris = _getSpark();
+    // Spawn around the base (random radius)
+    const angle = Math.random() * Math.PI * 2;
+    const radius = 10 + Math.random() * 20;
+    
+    debris.x = x + Math.cos(angle) * radius;
+    debris.y = y + Math.sin(angle) * radius;
+    debris.vx = (Math.random() - 0.5) * 1.5; // More horizontal spread
+    debris.vy = -3.0 - Math.random() * 4.0; // Fast initial explosive lift
+    
+    const sizeRoll = Math.random();
+    if (sizeRoll < 0.6) {
+      debris.size = 1 + Math.random() * 2.5; // Small pebbles
+    } else if (sizeRoll < 0.9) {
+      debris.size = 3.5 + Math.random() * 3.5; // Medium chunks
+    } else {
+      debris.size = 8 + Math.random() * 4; // Large boulders
+    }
+    debris.life = 1.0;
+    debris.decay = 0.003 + Math.random() * 0.003; // Extremely slow decay (lasts 150-300 frames)
+    debris.friction = 0.94; // Strong friction so it stops mid-air and hovers
+    debris.type = 'telekinesisDebris';
+    debris.isFlash = false;
+    debris.rotation = Math.random() * Math.PI * 2;
+    debris.rotationSpeed = (Math.random() - 0.5) * 0.1;
+    
+    // Dark green/grey theme
+    const isGreen = Math.random() > 0.5;
+    debris.color = isGreen ? 'rgba(46, 139, 87, 1)' : 'rgba(30, 40, 30, 1)';
+    
+    state.sparkEffects.push(debris);
   }
 }
 
@@ -134,7 +217,7 @@ export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
  * @param {number} y - Y position
  * @param {number} radius - Base radius
  */
-export function spawnCrimsonLightningImpact(x, y, radius = 60) {
+export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = false) {
   // 1. Bright white-crimson core flash
   const coreFlash = _getSpark();
   coreFlash.x = x;
@@ -144,7 +227,7 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60) {
   coreFlash.size = radius * 0.6;
   coreFlash.life = 1.0;
   coreFlash.decay = 0.08;
-  coreFlash.type = 'crimsonLightningCore';
+  coreFlash.type = isTrickster ? 'tricksterLightningCore' : 'crimsonLightningCore';
   coreFlash.isFlash = true;
   coreFlash.friction = 1;
   coreFlash.color = 'white';
@@ -161,10 +244,10 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60) {
     ringEffect.targetSize = radius * (1.5 + ring * 0.8); // expand target
     ringEffect.life = 1.0;
     ringEffect.decay = 0.04 + ring * 0.02;
-    ringEffect.type = 'crimsonLightningRing';
+    ringEffect.type = isTrickster ? 'tricksterLightningRing' : 'crimsonLightningRing';
     ringEffect.isFlash = true;
     ringEffect.friction = 1;
-    ringEffect.color = 'crimson';
+    ringEffect.color = isTrickster ? 'lime' : 'crimson';
     state.sparkEffects.push(ringEffect);
   }
 
@@ -182,12 +265,16 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60) {
     spark.life = 1.0;
     spark.decay = 0.03 + Math.random() * 0.03;
     spark.friction = 0.95;
-    spark.type = 'crimsonLightningArc';
+    spark.type = isTrickster ? 'tricksterLightningArc' : 'crimsonLightningArc';
     spark.isFlash = false;
     spark.angle = angle; // store for drawing direction
-    // Alternate between crimson, dark red, white
+    // Alternate between green, dark green, white for trickster, else crimson colors
     const rand = Math.random();
-    spark.color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(255, 30, 30, 1)' : 'rgba(150, 0, 0, 1)');
+    if (isTrickster) {
+      spark.color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(50, 255, 50, 1)' : 'rgba(0, 150, 0, 1)');
+    } else {
+      spark.color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(255, 30, 30, 1)' : 'rgba(150, 0, 0, 1)');
+    }
     state.sparkEffects.push(spark);
   }
 }
@@ -199,7 +286,7 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60) {
  * @param {number} radius - The size of the scorch mark
  * @param {number} durationFrames - How many frames the scorch persists
  */
-export function spawnGroundScorch(x, y, radius, durationFrames = 120) {
+export function spawnGroundScorch(x, y, radius, durationFrames = 120, colorTheme = 'crimson') {
   const scorch = _getSpark();
   scorch.x = x;
   scorch.y = y;
@@ -208,7 +295,8 @@ export function spawnGroundScorch(x, y, radius, durationFrames = 120) {
   scorch.size = radius;
   scorch.life = 1.0;
   scorch.decay = 1.0 / durationFrames;
-  scorch.type = 'crimsonGroundScorch';
+  scorch.type = 'groundScorch';
+  scorch.color = colorTheme;
   scorch.isFlash = true; // Hook into the flash rendering block
 
   // 1. Generate an organic, jagged scorch boundary
@@ -260,8 +348,239 @@ export function spawnGroundScorch(x, y, radius, durationFrames = 120) {
 }
 
 /**
- * Updates all spark effects. These decay even when frozen in Cronos sphere.
+ * Spawns an arcane crater (dark green/magical theme)
+ * @param {number} x - The x coordinate
+ * @param {number} y - The y coordinate
+ * @param {number} radius - The size of the scorch mark
+ * @param {number} durationFrames - How many frames the scorch persists
+ */
+export function spawnArcaneCrater(x, y, radius, durationFrames = 120) {
+  // Use the exact same generation logic as scorch but change type
+  spawnGroundScorch(x, y, radius, durationFrames);
+  const scorch = state.sparkEffects[state.sparkEffects.length - 1];
+  scorch.type = 'arcaneGroundScorch';
+}
+
+/**
+ * Spawns dark green arcane smoke.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} vx - X velocity
+ * @param {number} vy - Y velocity
+ * @param {string} smokeType - 'ground', 'airborne', or 'burst'
+ */
+export function spawnArcaneSmoke(x, y, vx = 0, vy = 0, smokeType = 'burst') {
+  const smoke = _getSpark();
+  smoke.x = x;
+  smoke.y = y;
+  smoke.vx = vx + (Math.random() - 0.5) * 1.5;
+  smoke.vy = vy + (Math.random() - 0.5) * 1.5;
+  smoke.size = 10 + Math.random() * 10;
+  smoke.targetSize = smoke.size + 20 + Math.random() * 20;
+  
+  if (smokeType === 'ground') {
+    smoke.targetSize *= 2; 
+    smoke.decay = 0.015 + Math.random() * 0.01;
+    smoke.rotationSpeed = (Math.random() - 0.5) * 0.05;
+    smoke.type = 'arcaneSmokeGround';
+  } else if (smokeType === 'airborne') {
+    smoke.size = 25 + Math.random() * 10; // Much larger base size
+    smoke.targetSize = smoke.size + 15 + Math.random() * 10; 
+    smoke.decay = 0.005 + Math.random() * 0.005; // Very slow decay
+    smoke.rotationSpeed = (Math.random() - 0.5) * 0.01; // Very slow rotation
+    smoke.type = 'arcaneSmokeAirborne';
+  } else {
+    smoke.decay = 0.02 + Math.random() * 0.02;
+    smoke.rotationSpeed = (Math.random() - 0.5) * 0.05;
+    smoke.type = 'arcaneSmoke';
+  }
+  
+  smoke.life = 1.0;
+  smoke.friction = 0.92;
+  smoke.isFlash = false;
+  smoke.rotation = Math.random() * Math.PI * 2;
+  
+  if (smokeType === 'airborne') {
+    // Airborne cloud is ALWAYS a pure, vibrant magical blue/cyan
+    smoke.color = `rgba(0, 200, 255, 0.7)`;
+  } else {
+    // Ground bursts mix light greys and brighter cyans, with much lower opacity
+    const isCyan = Math.random() > 0.2; // 80% chance for cyan
+    smoke.color = isCyan ? `rgba(0, 180, 255, 0.35)` : `rgba(80, 80, 80, 0.3)`;
+  }
+  
+  state.sparkEffects.push(smoke);
+  return smoke;
+}
+
+/**
+ * Spawns hot, colored smoke escaping from the laser muzzle.
+ */
+export function spawnLaserSmoke(x, y, vx, vy) {
+  const smoke = _getSpark();
+  smoke.x = x;
+  smoke.y = y;
+  
+  // High initial velocity that slows down quickly due to high friction
+  smoke.vx = vx + (Math.random() - 0.5) * 2.0;
+  smoke.vy = vy + (Math.random() - 0.5) * 2.0;
+  
+  smoke.size = 5 + Math.random() * 8; // Small initially
+  smoke.targetSize = smoke.size + 15 + Math.random() * 20; // Expands heavily
+  
+  smoke.decay = 0.015 + Math.random() * 0.01; // Dissipates fast
+  smoke.rotationSpeed = (Math.random() - 0.5) * 0.08;
+  smoke.type = 'laserSmoke';
+  
+  smoke.life = 1.0;
+  smoke.friction = 0.90; // High air resistance
+  smoke.isFlash = false;
+  smoke.rotation = Math.random() * Math.PI * 2;
+  
+  const rand = Math.random();
+  // Mix of bright orange, white, and dark grey ash smoke
+  if (rand > 0.6) {
+    smoke.color = 'rgba(255, 120, 0, 0.4)'; // Orange
+  } else if (rand > 0.3) {
+    smoke.color = 'rgba(255, 255, 255, 0.3)'; // White hot
+  } else {
+    smoke.color = 'rgba(50, 50, 50, 0.4)'; // Dark ash
+  }
+  
+  state.sparkEffects.push(smoke);
+  return smoke;
+}
+
+/**
+ * Spawns an expanding blue/cyan shockwave ring on impact.
+ * @param {number} x 
+ * @param {number} y 
+ */
+export function spawnArcaneShockwave(x, y) {
+  // Spawn two overlapping rings - deep blue and cyan - for a layered arcane look
+  const blueWave = _getSpark();
+  blueWave.x = x;
+  blueWave.y = y;
+  blueWave.vx = 0;
+  blueWave.vy = 0;
+  blueWave.size = 10;
+  blueWave.targetSize = 130;
+  blueWave.life = 1.0;
+  blueWave.decay = 1 / 45; // Slower fade, lasts 45 frames
+  blueWave.friction = 0;
+  blueWave.type = 'arcaneShockwave';
+  blueWave.color = 'rgba(0, 100, 255, 1)'; // Deep blue
+  state.sparkEffects.push(blueWave);
+
+  const cyanWave = _getSpark();
+  cyanWave.x = x;
+  cyanWave.y = y;
+  cyanWave.vx = 0;
+  cyanWave.vy = 0;
+  cyanWave.size = 5;
+  cyanWave.targetSize = 100;
+  cyanWave.life = 1.0;
+  cyanWave.decay = 1 / 30; // Lasts 30 frames
+  cyanWave.friction = 0;
+  cyanWave.type = 'arcaneShockwave';
+  cyanWave.color = 'rgba(0, 255, 255, 1)'; // Bright Cyan
+  state.sparkEffects.push(cyanWave);
+}
+
+/**
+ * Spawns a bright arcane flash directly beneath the target's feet on landing.
+ * @param {number} x
+ * @param {number} y
+ */
+export function spawnArcaneFlash(x, y) {
+  const flash = _getSpark();
+  flash.x = x;
+  flash.y = y;
+  flash.vx = 0;
+  flash.vy = 0;
+  flash.size = 50;
+  flash.targetSize = 90;
+  flash.life = 1.0;
+  flash.decay = 1 / 30; // Slower flash, lasts 30 frames
+  flash.friction = 0;
+  flash.type = 'arcaneFlash';
+  flash.color = 'rgba(100, 255, 180, 1)'; // Bright green-white
+  state.sparkEffects.push(flash);
+}
+
+/**
+ * Spawns floating arcane glyph fragments (diamonds, triangles, squares) that hover and fade.
+ * @param {number} x
+ * @param {number} y
+ * @param {number} count
+ */
+export function spawnArcaneGlyphs(x, y, count = 12) {
+  const shapes = ['diamond', 'triangle', 'square'];
+  const colors = [
+    'rgba(30, 200, 100, 1)',  // Green
+    'rgba(50, 220, 255, 1)',  // Cyan
+    'rgba(100, 255, 180, 1)', // Bright green-white
+    'rgba(40, 255, 140, 1)',  // Neon green
+  ];
+  
+  for (let i = 0; i < count; i++) {
+    const glyph = _getSpark();
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 20 + Math.random() * 40;
+    
+    glyph.x = x + Math.cos(angle) * dist;
+    glyph.y = y + Math.sin(angle) * dist;
+    // Very gentle drift - hover instead of flying outward
+    glyph.vx = (Math.random() - 0.5) * 0.8;
+    glyph.vy = -0.3 - Math.random() * 0.7; // Slight upward float
+    glyph.size = 3 + Math.random() * 5;
+    glyph.life = 1.0;
+    glyph.decay = 0.015 + Math.random() * 0.015; // ~30-60 frames
+    glyph.friction = 0.97;
+    glyph.type = 'arcaneGlyph';
+    glyph.rotation = Math.random() * Math.PI * 2;
+    glyph.rotationSpeed = (Math.random() - 0.5) * 0.1;
+    glyph.color = colors[Math.floor(Math.random() * colors.length)];
+    glyph.glyphShape = shapes[Math.floor(Math.random() * shapes.length)];
+    state.sparkEffects.push(glyph);
+  }
+}
+
+/**
  * Dead sparks are returned to the pool instead of being spliced out.
+ */
+
+export function spawnSpellStealWisps(trickster, target, color, count = 20) {
+  for (let i = 0; i < count; i++) {
+    if (state.sparkEffects.length >= (state.mode === '2v2' || state.mode === 'ffa' ? 250 : 500)) return;
+    
+    const spark = _getSpark();
+    
+    // Spawn in a wide circle around the opponent
+    const angle = Math.random() * Math.PI * 2;
+    const spawnDist = target.r + 30 + Math.random() * 40;
+    spark.x = target.x + Math.cos(angle) * spawnDist;
+    spark.y = target.y + Math.sin(angle) * spawnDist;
+    
+    // Initial burst outwards
+    spark.vx = Math.cos(angle) * (2 + Math.random() * 5);
+    spark.vy = Math.sin(angle) * (2 + Math.random() * 5);
+    
+    spark.type = 'spellStealWisp';
+    spark.isFlash = true;
+    spark.targetRef = trickster;
+    spark.color = color || '#39FF14'; // Fallback to green
+    spark.size = 8 + Math.random() * 6; // Much larger
+    spark.life = 1.5; // Start with >1 alpha to persist longer
+    spark.decay = 0.01 + Math.random() * 0.01;
+    spark.friction = 0.90;
+    
+    state.sparkEffects.push(spark);
+  }
+}
+
+/**
+ * Update all spark physics and lifespans
  * @param {boolean} frozen - Whether time is stopped (sparks still decay)
  */
 export function updateSparkEffects(frozen = false) {
@@ -273,10 +592,49 @@ export function updateSparkEffects(frozen = false) {
 
     // Only move if not frozen
     if (!frozen) {
+      if (effect.type === 'spellStealWisp' && effect.targetRef && effect.targetRef.hp > 0) {
+        // Homing behavior
+        const target = effect.targetRef;
+        const dx = target.x - effect.x;
+        const dy = (target.y - target.r/2) - effect.y; // aim for center
+        const dist = Math.hypot(dx, dy) || 1;
+        
+        effect.vx += (dx / dist) * 1.5;
+        effect.vy += (dy / dist) * 1.5;
+        
+        // Speed limit
+        const maxSpeed = 15;
+        const speed = Math.hypot(effect.vx, effect.vy);
+        if (speed > maxSpeed) {
+          effect.vx = (effect.vx / speed) * maxSpeed;
+          effect.vy = (effect.vy / speed) * maxSpeed;
+        }
+        
+        if (dist < 30) {
+          effect.life -= 0.1; // fade out quickly on hit
+        }
+      }
+
       effect.x += effect.vx;
       effect.y += effect.vy;
       effect.vx *= effect.friction;
       effect.vy *= effect.friction;
+      
+      // Make telekinesis debris continuously bob and drift after stopping
+      if (effect.type === 'telekinesisDebris') {
+        effect.y += Math.sin(effect.life * 30 + effect.rotation) * 0.4;
+        effect.x += Math.cos(effect.life * 20 + effect.rotation) * 0.2;
+      }
+      
+      // Make scattered debris roll across the ground
+      if (effect.type === 'telekinesisDebrisScattered') {
+        const speedSq = effect.vx * effect.vx + effect.vy * effect.vy;
+        if (speedSq > 0.01) {
+          const speed = Math.sqrt(speedSq);
+          // Roll based on speed and inverse size (smaller rocks roll faster)
+          effect.rotation += (effect.vx > 0 ? speed : -speed) / (effect.size * 2);
+        }
+      }
     }
 
     // Remove dead effects — return to pool instead of splice
@@ -290,11 +648,17 @@ export function updateSparkEffects(frozen = false) {
 /**
  * Draws all spark effects using gradient-based glow (no shadowBlur).
  */
-export function drawSparkEffects() {
+export function drawSparkEffects(layer = 'all') {
   const { ctx } = state;
   if (!ctx) return;
 
   for (const effect of state.sparkEffects) {
+    const isBackground = effect.type === 'groundScorch' || 
+                         effect.type === 'arcaneGroundScorch';
+    
+    if (layer === 'background' && !isBackground) continue;
+    if (layer === 'foreground' && isBackground) continue;
+
     // Skip effects with non-finite coordinates to prevent createRadialGradient errors
     if (!Number.isFinite(effect.x) || !Number.isFinite(effect.y) || !Number.isFinite(effect.size)) continue;
 
@@ -302,28 +666,61 @@ export function drawSparkEffects() {
     ctx.globalAlpha = effect.life;
 
     if (effect.isFlash) {
-      if (effect.type === 'crimsonLightningCore') {
-        // Blinding white-to-crimson radial core flash
+      if (effect.type === 'crimsonLightningCore' || effect.type === 'tricksterLightningCore') {
+        // Sharp blinding core flash with jagged edges
+        const isTrickster = effect.type === 'tricksterLightningCore';
+        effect.size += (100 * 0.8 - effect.size) * 0.2; // Expand fast
+        ctx.fillStyle = `rgba(255, 255, 255, ${effect.life})`;
+        
+        ctx.beginPath();
+        // Draw a starburst/jagged flash shape
+        const points = 12;
+        for (let p = 0; p < points; p++) {
+          const angle = (p / points) * Math.PI * 2;
+          const r = p % 2 === 0 ? effect.size : effect.size * 0.4;
+          const px = effect.x + Math.cos(angle) * r;
+          const py = effect.y + Math.sin(angle) * r;
+          if (p === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Outer colored glow
+        const gradient = ctx.createRadialGradient(effect.x, effect.y, effect.size * 0.3, effect.x, effect.y, effect.size * 1.5);
+        gradient.addColorStop(0, isTrickster ? `rgba(100, 255, 100, ${effect.life * 0.8})` : `rgba(255, 50, 50, ${effect.life * 0.8})`);
+        gradient.addColorStop(1, isTrickster ? 'rgba(0, 255, 0, 0)' : 'rgba(255, 0, 0, 0)');
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (effect.type === 'spellStealWisp') {
         const gradient = ctx.createRadialGradient(
           effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size
+          effect.x, effect.y, effect.size * 2
         );
-        gradient.addColorStop(0, `rgba(255, 255, 255, ${0.9 * effect.life})`);
-        gradient.addColorStop(0.3, `rgba(255, 120, 120, ${0.7 * effect.life})`);
-        gradient.addColorStop(0.6, `rgba(200, 0, 0, ${0.4 * effect.life})`);
-        gradient.addColorStop(1, 'rgba(80, 0, 0, 0)');
+        gradient.addColorStop(0, `rgba(255, 255, 255, ${effect.life})`);
+        
+        // We'll parse the hex color or use a fallback if it fails.
+        // Assuming effect.color is a valid hex or string like '#39FF14'
+        gradient.addColorStop(0.3, effect.color); // will render with globalAlpha
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.globalCompositeOperation = 'lighter';
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.arc(effect.x, effect.y, effect.size * 2, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
-      } else if (effect.type === 'crimsonGroundScorch') {
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'groundScorch') {
         // Massive, highly-detailed organic scorch mark burned into the ground
         ctx.globalCompositeOperation = 'multiply';
         
         ctx.translate(effect.x, effect.y);
 
-        // Deep black/red burned organic polygon
-        ctx.fillStyle = `rgba(30, 0, 0, ${effect.life * 0.8})`;
+        // Deep burned organic polygon (dark blue/black for thunder, dark red/black for crimson)
+        const isThunder = effect.color === 'thunder';
+        ctx.fillStyle = isThunder ? `rgba(0, 10, 30, ${effect.life * 0.8})` : `rgba(30, 0, 0, ${effect.life * 0.8})`;
         ctx.beginPath();
         if (effect.points && effect.points.length > 0) {
           ctx.moveTo(effect.points[0].x, effect.points[0].y);
@@ -334,9 +731,71 @@ export function drawSparkEffects() {
         ctx.closePath();
         ctx.fill();
         
-        // Inner molten branching cracks
+        // Inner molten branching cracks (cyan for thunder, orange/red for crimson)
         ctx.globalCompositeOperation = 'source-over';
-        ctx.strokeStyle = `rgba(255, 60, 10, ${effect.life * 0.8})`;
+        ctx.strokeStyle = isThunder ? `rgba(0, 220, 255, ${effect.life * 0.8})` : `rgba(255, 60, 10, ${effect.life * 0.8})`;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.lineWidth = 1 + effect.life * 1.5;
+        
+        ctx.beginPath();
+        if (effect.cracks && !isThunder) {
+          // Standard molten cracks for crimson
+          ctx.strokeStyle = `rgba(255, 60, 10, ${effect.life * 0.8})`;
+          ctx.lineWidth = 1 + effect.life * 1.5;
+          for (const path of effect.cracks) {
+            if (path.length > 0) {
+              ctx.moveTo(path[0].x, path[0].y);
+              for (let i = 1; i < path.length; i++) {
+                ctx.lineTo(path[i].x, path[i].y);
+              }
+            }
+          }
+          ctx.stroke();
+        }
+      } else if (effect.type === 'thunderSpark') {
+        // Draw as a small jagged lightning bolt trailing behind its velocity
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+        ctx.lineWidth = effect.size * 0.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'miter';
+        ctx.shadowBlur = 5;
+        ctx.shadowColor = effect.color;
+        
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        
+        // Draw a jagged tail based on velocity
+        const tailX = effect.x - effect.vx * 3;
+        const tailY = effect.y - effect.vy * 3;
+        const midX = (effect.x + tailX) / 2 + (Math.random() - 0.5) * effect.size * 3;
+        const midY = (effect.y + tailY) / 2 + (Math.random() - 0.5) * effect.size * 3;
+        
+        ctx.lineTo(midX, midY);
+        ctx.lineTo(tailX, tailY);
+        ctx.stroke();
+        
+      } else if (effect.type === 'arcaneGroundScorch') {
+        // Massive, highly-detailed organic scorch mark burned into the ground
+        ctx.globalCompositeOperation = 'multiply';
+        
+        ctx.translate(effect.x, effect.y);
+
+        // Deep black/blue burned organic polygon
+        ctx.fillStyle = `rgba(10, 15, 30, ${effect.life * 0.8})`;
+        ctx.beginPath();
+        if (effect.points && effect.points.length > 0) {
+          ctx.moveTo(effect.points[0].x, effect.points[0].y);
+          for (let i = 1; i < effect.points.length; i++) {
+            ctx.lineTo(effect.points[i].x, effect.points[i].y);
+          }
+        }
+        ctx.closePath();
+        ctx.fill();
+        
+        // Inner molten branching cracks (glowing blue/cyan)
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = `rgba(40, 200, 255, ${effect.life * 0.8})`;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.lineWidth = 1 + effect.life * 1.5;
@@ -355,20 +814,21 @@ export function drawSparkEffects() {
         ctx.stroke();
         
         // Darker outer cracks for depth
-        ctx.strokeStyle = `rgba(40, 0, 0, ${effect.life * 0.9})`;
+        ctx.strokeStyle = `rgba(0, 10, 40, ${effect.life * 0.9})`; // Dark blue/black
         ctx.lineWidth = 2 + effect.life * 2;
         ctx.globalCompositeOperation = 'multiply';
         ctx.stroke();
         
         ctx.translate(-effect.x, -effect.y);
         ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'crimsonLightningRing') {
+      } else if (effect.type === 'crimsonLightningRing' || effect.type === 'tricksterLightningRing') {
+        const isTrickster = effect.type === 'tricksterLightningRing';
         // Expanding jagged crimson shockwave ring
         // Expand size toward target
         if (effect.targetSize) {
           effect.size += (effect.targetSize - effect.size) * 0.15;
         }
-        ctx.strokeStyle = `rgba(200, 0, 0, ${effect.life * 0.8})`;
+        ctx.strokeStyle = isTrickster ? `rgba(0, 200, 0, ${effect.life * 0.8})` : `rgba(200, 0, 0, ${effect.life * 0.8})`;
         ctx.lineWidth = 3 * effect.life;
         ctx.beginPath();
         // Draw jagged circle instead of smooth
@@ -384,7 +844,7 @@ export function drawSparkEffects() {
         ctx.closePath();
         ctx.stroke();
         // Inner white ring
-        ctx.strokeStyle = `rgba(255, 200, 200, ${effect.life * 0.5})`;
+        ctx.strokeStyle = isTrickster ? `rgba(200, 255, 200, ${effect.life * 0.5})` : `rgba(255, 200, 200, ${effect.life * 0.5})`;
         ctx.lineWidth = 1;
         ctx.beginPath();
         for (let seg = 0; seg <= segments; seg++) {
@@ -411,6 +871,98 @@ export function drawSparkEffects() {
         ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
+      } else if (effect.type === 'arcaneAscendLine') {
+        // Glowing vertical thin line ascending upwards
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = effect.color;
+        ctx.lineWidth = effect.size;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        // Draw the line pointing downwards (opposite to vy) with a long stretch to form a beam
+        ctx.lineTo(effect.x - effect.vx * 15, effect.y - effect.vy * 15); 
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'arcaneShockwave') {
+        // Expanding dark green shockwave ring
+        effect.size += (effect.targetSize - effect.size) * 0.06; // Much slower, graceful expansion
+        
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+        ctx.lineWidth = 6 * effect.life; // Thins out as it expands
+        
+        ctx.shadowBlur = 20 * effect.life;
+        ctx.shadowColor = 'rgba(50, 255, 120, 1)';
+        ctx.globalCompositeOperation = 'lighter'; // Neon additive edge
+        
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'arcaneFlash') {
+        // Bright radial flash beneath feet on landing
+        effect.size += (effect.targetSize - effect.size) * 0.06; // Slower size blooming
+        
+        const gradient = ctx.createRadialGradient(
+          effect.x, effect.y, 0,
+          effect.x, effect.y, effect.size
+        );
+        gradient.addColorStop(0, `rgba(200, 255, 230, ${effect.life * 0.9})`);
+        gradient.addColorStop(0.3, `rgba(100, 255, 180, ${effect.life * 0.6})`);
+        gradient.addColorStop(0.7, `rgba(30, 200, 100, ${effect.life * 0.3})`);
+        gradient.addColorStop(1, 'rgba(30, 200, 100, 0)');
+        
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'arcaneGlyph') {
+        // Floating arcane glyph fragments - diamonds, triangles, squares
+        ctx.translate(effect.x, effect.y);
+        effect.rotation += effect.rotationSpeed;
+        ctx.rotate(effect.rotation);
+        
+        // ctx.globalCompositeOperation = 'lighter'; // Removed so it shows up on white backgrounds!
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = effect.color.replace('1)', `${effect.life})`);
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = effect.color;
+        
+        const s = effect.size;
+        ctx.beginPath();
+        
+        if (effect.glyphShape === 'diamond') {
+          ctx.moveTo(0, -s);
+          ctx.lineTo(s * 0.6, 0);
+          ctx.lineTo(0, s);
+          ctx.lineTo(-s * 0.6, 0);
+          ctx.closePath();
+        } else if (effect.glyphShape === 'triangle') {
+          ctx.moveTo(0, -s);
+          ctx.lineTo(s * 0.85, s * 0.7);
+          ctx.lineTo(-s * 0.85, s * 0.7);
+          ctx.closePath();
+        } else { // square
+          ctx.rect(-s * 0.5, -s * 0.5, s, s);
+        }
+        
+        ctx.fill();
+        
+        // Thin bright outline for crispness
+        ctx.strokeStyle = `rgba(200, 255, 230, ${effect.life * 0.8})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.rotate(-effect.rotation);
+        ctx.translate(-effect.x, -effect.y);
       } else {
         // Default impact flash
         const gradient = ctx.createRadialGradient(
@@ -425,7 +977,7 @@ export function drawSparkEffects() {
         ctx.fillStyle = gradient;
         ctx.fill();
       }
-    } else if (effect.type === 'crimsonLightningArc') {
+    } else if (effect.type === 'crimsonLightningArc' || effect.type === 'tricksterLightningArc') {
       // Lightning arc spark — draw as a short jagged line instead of a dot
       const len = effect.size * 4;
       const angle = Math.atan2(effect.vy, effect.vx);
@@ -444,6 +996,98 @@ export function drawSparkEffects() {
           effect.y + Math.sin(angle) * len * t + jy
         );
       }
+        ctx.stroke();
+      } else if (effect.type === 'arcaneSmokeAirborne' || effect.type === 'arcaneSmoke' || effect.type === 'arcaneSmokeGround' || effect.type === 'laserSmoke') {
+        // Soft, expanding, rotating slow smoke
+        if (effect.type === 'arcaneSmokeAirborne') {
+           effect.size += (effect.targetSize - effect.size) * 0.02; // Expand slowly
+        } else {
+           effect.size += (effect.targetSize - effect.size) * 0.05; // Expand fast
+        }
+        
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(effect.rotation + effect.life * effect.rotationSpeed);
+        
+        // Use a flat, solid color fill so it looks like a stylized solid cloud
+        ctx.fillStyle = effect.color;
+        
+        ctx.beginPath();
+        // Draw overlapping puffs to create a cloudy/smoky cluster
+        ctx.arc(0, 0, effect.size * 0.7, 0, Math.PI * 2); 
+        ctx.arc(-effect.size * 0.4, -effect.size * 0.2, effect.size * 0.5, 0, Math.PI * 2); 
+        ctx.arc(effect.size * 0.4, -effect.size * 0.2, effect.size * 0.5, 0, Math.PI * 2); 
+        ctx.arc(-effect.size * 0.3, effect.size * 0.4, effect.size * 0.4, 0, Math.PI * 2); 
+        ctx.arc(effect.size * 0.3, effect.size * 0.4, effect.size * 0.4, 0, Math.PI * 2);
+        
+        if (effect.type === 'arcaneSmokeAirborne') {
+           // Draw neon glowing edges FIRST
+           ctx.globalCompositeOperation = 'lighter';
+           ctx.shadowBlur = 30;
+           ctx.shadowColor = `rgba(50, 255, 120, ${effect.life})`;
+           ctx.strokeStyle = `rgba(50, 255, 120, ${effect.life * 0.9})`;
+           ctx.lineWidth = 6; // Thick stroke so the edge peeks out
+           ctx.stroke(); 
+           
+           ctx.shadowBlur = 0; // Reset
+           ctx.globalCompositeOperation = 'source-over'; // Reset
+        }
+        
+        // Fill the solid inner cloud body OVER the glowing skeleton
+        // This covers the inner intersecting lines, leaving only the outer halo
+        ctx.fill();
+        
+        ctx.rotate(-(effect.rotation + effect.life * effect.rotationSpeed));
+        ctx.translate(-effect.x, -effect.y);
+      } else if (effect.type === 'telekinesisDebris' || effect.type === 'telekinesisDebrisScattered') {
+      // Draw a detailed rocky shape with shading and magical aura
+      ctx.translate(effect.x, effect.y);
+      if (effect.rotation) ctx.rotate(effect.rotation);
+      ctx.rotate(effect.life * effect.rotationSpeed * 100 || 0);
+
+      // Draw a subtle magical aura beneath the rock
+      const auraGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, effect.size * 1.5);
+      auraGradient.addColorStop(0, `rgba(46, 139, 87, ${effect.life * 0.6})`);
+      auraGradient.addColorStop(1, 'rgba(46, 139, 87, 0)');
+      ctx.fillStyle = auraGradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, effect.size * 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Rock base polygon (dark shadow side)
+      ctx.beginPath();
+      ctx.moveTo(-effect.size, -effect.size * 0.5);
+      ctx.lineTo(-effect.size * 0.3, -effect.size * 0.9);
+      ctx.lineTo(effect.size * 0.7, -effect.size * 0.6);
+      ctx.lineTo(effect.size, effect.size * 0.3);
+      ctx.lineTo(effect.size * 0.4, effect.size * 0.8);
+      ctx.lineTo(-effect.size * 0.7, effect.size * 0.7);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(15, 20, 15, ${effect.life})`;
+      ctx.fill();
+
+      // Highlight/texture polygon (lit side)
+      ctx.beginPath();
+      ctx.moveTo(-effect.size * 0.9, -effect.size * 0.4);
+      ctx.lineTo(-effect.size * 0.3, -effect.size * 0.8);
+      ctx.lineTo(effect.size * 0.6, -effect.size * 0.5);
+      ctx.lineTo(effect.size * 0.1, effect.size * 0.1);
+      ctx.lineTo(-effect.size * 0.5, 0);
+      ctx.closePath();
+      ctx.fillStyle = effect.color.replace('1)', `${effect.life})`); // The green/grey color
+      ctx.fill();
+      
+      // A small bright highlight for depth (edge highlight)
+      ctx.beginPath();
+      ctx.moveTo(-effect.size * 0.2, -effect.size * 0.7);
+      ctx.lineTo(effect.size * 0.3, -effect.size * 0.4);
+      ctx.lineTo(-effect.size * 0.1, -effect.size * 0.2);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.3})`;
+      ctx.fill();
+      
+      // Magical glowing outline
+      ctx.lineWidth = 1;
+      ctx.strokeStyle = `rgba(0, 255, 100, ${effect.life * 0.6})`;
       ctx.stroke();
     } else {
       // Standard spark - small glowing dot with gradient
@@ -456,6 +1100,8 @@ export function drawSparkEffects() {
       
       if (effect.type === 'crimsonSniper') {
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      } else if (effect.type === 'lightningTrail') {
+        gradient.addColorStop(1, effect.color.replace(/[\d.]+\)$/, '0)'));
       } else {
         gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
       }

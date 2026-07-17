@@ -144,6 +144,14 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: 0,
   },
 
+  // ── Trickster ────────────────────────────────
+  // Arcane bolt
+  18: {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.6,
+    delay: -1,
+  },
+
   // ── Default fallback ─────────────────────────
   // Used when a fighter has no custom sound entry.
   default: {
@@ -151,6 +159,20 @@ export const BASIC_ATTACK_SOUNDS = {
     volume: 0.5,
     delay: 0,
   },
+  trickster: {
+    src: 'Assets/Sound Effects/Attacks/magic_shoot.mp3',
+    volume: 0.6,
+    delay: 0,
+    pitchVariation: 0.1
+  },
+  
+  // ── Zeus ─────────────────────────────
+  zeus: {
+    src: 'Assets/Sound Effects/Attacks/electric_zap.mp3', // Fallback handled by soundSystem
+    volume: 0.65,
+    delay: 0,
+    pitchVariation: 0.15
+  }
 };
 
 /**

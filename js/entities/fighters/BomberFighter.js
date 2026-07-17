@@ -306,24 +306,16 @@ export class BomberFighter extends Fighter {
       isHeld: true,
     });
 
-    // Draw fingers gripping the grenade (simple representation)
+    // Draw hand holding the grenade
     ctx.save();
     ctx.translate(handX, handY);
-    ctx.rotate(this.gunAngle);
-
-    // Draw simple finger indicators
-    ctx.strokeStyle = '#8B7355';
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-
-    // Three fingers wrapping around the grenade
-    for (let i = 0; i < 3; i++) {
-      const fingerY = -4 + i * 4;
-      ctx.beginPath();
-      ctx.arc(forwardOffset + sideOffset * 0.9, fingerY, 3, 0, Math.PI, true);
-      ctx.stroke();
-    }
-
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
     ctx.restore();
   }
 }

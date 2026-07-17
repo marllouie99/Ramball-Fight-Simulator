@@ -43,7 +43,7 @@ export const CONFIG = {
   /** Blue — Aimbot fighter */
   aimbot: {
     followUpMinCooldown: 10, // minimum frames of cooldown forced after a follow-up shot
-    electricStunDuration: 5, // frames the target is stunned after being hit (10 frames = ~0.16s)
+    electricStunDuration: 8, // frames the target is stunned after being hit (10 frames = ~0.16s)
     electricStunChance: 0.40,  // 0.0 to 1.0 chance of triggering the stun on hit (0.5 = 50%)
   },
 
@@ -105,7 +105,7 @@ export const CONFIG = {
     beamDriftBlend: 0.08,   // proportion of beam recoil blended into velocity each frame
     beamRotateSpeed: 0.015, // increased to allow the beam to effectively track moving targets
     initialKnockback: 1,     // velocity impulse on the very first beam contact
-    tickDamage: 2.5,     // damage applied every tick interval after the initial hit
+    tickDamage: 5.5,     // damage applied every tick interval after the initial hit
     tickInterval: 7,    // frames between damage ticks while beam is active
     coreWidth: 4,     // base pixel width of the bright beam core (flickers ± 2 px)
     glowWidth: 12,    // base pixel width of the soft glow layer (flickers ± 4 px)
@@ -448,8 +448,8 @@ export const CONFIG = {
 
     // Core Attack (Dual Wielding)
     swordRange: 40,
-    attackCooldown: 45, // frames between dual sword strikes
-    katanaDamage: 12,
+    attackCooldown: 80, // frames between dual sword strikes
+    katanaDamage: 10,
     wakizashiDamage: 8,
     strikeDurationFrames: 10,
 
@@ -458,7 +458,7 @@ export const CONFIG = {
     earthSpeedMultiplier: 1.1,
     waterSpeedMultiplier: 1.3,
     waterDodgeDistance: 80,
-    fireDamageMultiplier: 1.1,
+    fireDamageMultiplier: 1.0,
     fireDamageTakenMultiplier: 1.1,
     windDeflectRadius: 100,
     voidDodgeChance: 1.0,         // 100% dodge
@@ -469,12 +469,67 @@ export const CONFIG = {
     nitenStrikeKnockback: 15,
     nitenStrikeDamage: 7, // total
 
-    flurryCooldown: 480,
+    flurryCooldown: 700,
     flurryDamage: 5,
 
     preemptiveStrikeCooldown: 360,
     preemptiveStrikeDuration: 60, // Window to get hit and counter
     preemptiveCounterDamage: 7,
+  },
+
+  /** Trickster — Spell Steal and Arcane Magic */
+  trickster: {
+    // Basic Attack: Arcane Bolt
+    boltDamage: 12,
+    boltSpeed: 8,
+    bounceCount: 4,
+    bounceDamageMultiplier: 0.7, // Damage multiplier on each bounce
+    attackCooldown: 100,
+
+    // Skill 1: Telekinesis
+    telekinesisCooldown: 400,
+    telekinesisDuration: 90, // Frames target is held in air
+    telekinesisStunRadius: 100, // AoE stun on landing
+    telekinesisStunDuration: 60, // Frames enemies are stunned on landing
+    telekinesisRange: 250,
+
+    // Ultimate: Spell Steal
+    spellStealCooldown: 500,
+    spellStealDuration: 1000, // 7 seconds
+    spellStealRange: 350,
+  },
+
+  /** Zeus — Lightning Spell Caster */
+  zeus: {
+    // Basic Attack: Chain Lightning (fast projectile)
+    lightningDamage: 8,
+    lightningSpeed: 30,
+    chainCount: 3,         // How many times it bounces
+    chainRange: 150,       // Range to find next target
+    chainDamageMultiplier: 0.8, // Decay per bounce
+    attackCooldown: 150,
+
+    // Debuff system
+    stunChance: 1.0,
+    stunDuration: 10,
+    paralyzeChance: 0.3,
+    paralyzeDuration: 60,
+    paralyzeSlowMultiplier: 0.5,
+    staticChance: 0.5,
+    staticDuration: 120,
+    staticDamageBonus: 1.5, // 50% extra damage to static targets
+
+    // Passive: Aegis Shield
+    aegisCooldown: 300,    // 5 seconds
+    aegisShockDamage: 15,
+    aegisParalyzeDuration: 90,
+    aegisTriggerRange: 200, // Increased range to trigger on more attacks
+
+    // Ultimate: Storm
+    stormCooldown: 900,    // 15 seconds
+    stormDuration: 180,    // 3 seconds
+    stormStrikesPerSec: 3, // Per enemy
+    stormStrikeDamage: 12,
   },
 };
 
@@ -502,7 +557,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 2,
-    name: 'Ranger',
+    name: 'Jazz',
     color: '#4da3ff',
     startX: 460, startY: 280,
     startVx: -1.2, startVy: -0.9,
@@ -511,7 +566,7 @@ export const FIGHTER_DEFS = [
     type: 'aimbot',
     hp: 60,
     damage: 5,
-    cooldown: 40,  // 1 second at 60fps
+    cooldown: 30,  // 1 second at 60fps
     moveSpeed: 5.0,
     ability: 'Aimbot Laser',
     desc: 'Fires an instant follow up projectile everytime he hits an enemy.',
@@ -773,13 +828,49 @@ export const FIGHTER_DEFS = [
     spinRate: 0.03,
     type: 'musashi',
     hp: 100,
-    damage: 20, // (Katana + Wakizashi)
+    damage: 10, // (Katana + Wakizashi)
     cooldown: 45,
     moveSpeed: 4.8,
     projectileSpeedMultiplier: 1.0,
-    ability: 'The Five Rings',
-    desc: 'Cycles through 5 stances autonomously. Uses Oar Smash, Niten Strike, and Preemptive Counters.',
+    ability: 'Dual Stances',
+    desc: 'Switches between five stances (Earth, Water, Fire, Wind, Void) giving passive effects and unique skills.',
   },
+  {
+    id: 18,
+    name: 'Trickster',
+    color: '#03e631ff',
+    startX: 310, startY: 230,
+    startVx: -1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0.02,
+    type: 'trickster',
+    hp: 85,
+    damage: 12,
+    cooldown: 100,
+    moveSpeed: 5.2,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Spell Steal',
+    desc: 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
+  },
+  {
+    id: 19,
+    name: 'Zeus',
+    color: '#00BFFF',
+    startX: 300, startY: 250,
+    startVx: 1.1, startVy: 0.9,
+    radius: 25,
+    aimbot: true,
+    spinRate: 0,
+    type: 'zeus',
+    hp: 200,
+    damage: 8,
+    cooldown: 100,
+    moveSpeed: 3.0,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Storm Bringer',
+    desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
+  }
 ];
 
 // ─────────────────────────────────────────────

@@ -262,7 +262,7 @@ export const GUNSLINGER_WEAPON_GRAPHICS = {
   },
 };
 
-export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0) {
+export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0, fighterColor = '#888') {
   const ctx = state.ctx;
   const scale = GUNSLINGER_WEAPON_GRAPHICS.positioning.scale;
   const gunOffset = r + GUNSLINGER_WEAPON_GRAPHICS.positioning.gunOffset;
@@ -461,6 +461,16 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
       ctx.fill();
       ctx.shadowBlur = 0;
     }
+    
+    // --- 9. Hand ---
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = fighterColor;
+    ctx.beginPath();
+    ctx.arc(-8 * scale, 12 * scale, 6 * scale, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.5 * scale;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
   }
 
   // Define ideal offsets for dual-wielding

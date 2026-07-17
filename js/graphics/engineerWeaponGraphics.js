@@ -528,10 +528,19 @@ export function drawEngineerBullet(ctx, x, y, angle, scale, lifeRatio) {
 }
 
 export function drawTurret(ctx, turret) {
-  const { x, y, r, gunAngle, isBuilding, buildProgress } = turret;
+  const { x, y, r, gunAngle, isBuilding, buildProgress, owner } = turret;
+  
+  let zOffset = turret.z || 0;
+  if (isBuilding) {
+    // If the engineer is airborne while building, visually lift the turret and its debris
+    const engineer = state.fighters && state.fighters[owner];
+    if (engineer && engineer.z) {
+      zOffset = engineer.z;
+    }
+  }
 
   ctx.save();
-  ctx.translate(x, y);
+  ctx.translate(x, y - zOffset);
 
   // Build progress thresholds for each piece
   // Phase 1 (0.00–0.20): Tripod legs appear one by one

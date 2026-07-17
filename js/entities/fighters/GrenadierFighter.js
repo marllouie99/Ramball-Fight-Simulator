@@ -133,6 +133,24 @@ export class GrenadierFighter extends Fighter {
       ? Math.sin((this.throwAnimationTimer / 15) * Math.PI)
       : 0;
     drawGreenBottleGun(ctx, this.x, this.y, this.gunAngle, this.r, throwProgress);
+    
+    // Draw Hand holding the bottle
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.gunAngle);
+    if (Math.abs(this.gunAngle) > Math.PI / 2) {
+      ctx.scale(1, -1);
+    }
+    
+    ctx.translate(this.r + 6, 0);
+    ctx.beginPath();
+    ctx.arc(0, 3, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.restore();
   }
 
   drawBoilingEffect(ctx) {

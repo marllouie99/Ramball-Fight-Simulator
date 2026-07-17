@@ -22,11 +22,11 @@ export class AimbotFighter extends Fighter {
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
-    // Apply quick electric shock on hit based on probability
+    // Apply dubstep stun effect on hit based on probability
     const stunChance = CONFIG.aimbot?.electricStunChance ?? 0.5;
     if (Math.random() < stunChance) {
-      const stunDuration = CONFIG.aimbot?.electricStunDuration ?? 10;
-      target.electricStunTimer = Math.max(target.electricStunTimer || 0, stunDuration);
+      const stunDuration = CONFIG.aimbot?.electricStunDuration ?? 15; // slightly longer to enjoy the music notes
+      target.dubstepStunTimer = Math.max(target.dubstepStunTimer || 0, stunDuration);
     }
 
     // Blue fires an immediate follow-up shot only on original projectiles.
@@ -71,7 +71,26 @@ export class AimbotFighter extends Fighter {
 
   /** Custom gun for Blue Aimbot. */
   drawGun(ctx) {
-    drawBlueAimbotGun(ctx, this.x, this.y, this.gunAngle, this.r);
+    drawBlueAimbotGun(ctx, this.x, this.y, this.gunAngle, this.r, this);
+    
+    // Draw Hand holding the gun
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.gunAngle);
+    if (Math.abs(this.gunAngle) > Math.PI / 2) {
+      ctx.scale(1, -1);
+    }
+    
+    // Position hand on the gun grip
+    ctx.translate(this.r + 6, 0);
+    ctx.beginPath();
+    ctx.arc(0, 3, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.restore();
   }
 
   /** Draws a dashed target locking laser. */

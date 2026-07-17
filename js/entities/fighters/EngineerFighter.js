@@ -54,6 +54,19 @@ export class EngineerFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
+    // Cancel building if incapacitated (lifted, stunned, or time-stopped)
+    if (this.isBuildingTurret && (this.z > 0 || this.electricStunTimer > 0 || this.stunTimer > 0 || this.timeStopTimer > 0)) {
+      this.isBuildingTurret = false;
+      if (this.turretEntity && state && state.fighters) {
+        const idx = state.fighters.indexOf(this.turretEntity);
+        if (idx !== -1) {
+          state.fighters.splice(idx, 1);
+        }
+      }
+      this.turretEntity = null;
+      this.skillCooldown = CONFIG.Engineer.skillCooldown;
+    }
+
     // Time stop - freeze ALL movement, spinning, and actions
     if (this._handleTimeStop()) {
       return;
@@ -296,6 +309,25 @@ export class EngineerFighter extends Fighter {
       shotgunRecoilTimer: this.shotgunRecoilTimer || 0,
       lastWeaponUsed: this.lastWeaponUsed || 'shotgun'
     });
+    
+    // Draw Hand holding the weapon
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(this.gunAngle);
+    if (Math.abs(this.gunAngle) < Math.PI / 2) {
+      ctx.translate(this.r + 6, 0);
+    } else {
+      ctx.scale(1, -1);
+      ctx.translate(this.r + 6, 0);
+    }
+    ctx.beginPath();
+    ctx.arc(0, 3, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.restore();
     
     if (this.isBuildingTurret) {
       const barWidth = 40;

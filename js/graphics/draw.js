@@ -2,6 +2,7 @@
 // DRAW — ARENA
 // ─────────────────────────────────────────────
 import { state, getProjectiles } from '../core/state.js';
+import { TricksterCronosTheme } from '../entities/fighters/trickster/tricksterThemes.js';
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from './weaponVisuals.js';
 import { drawRangerBullet } from './weapons/rangerWeaponGraphics.js';
 import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash } from './weapons/gunSlingerWeaponGraphics.js';
@@ -20,6 +21,8 @@ import { drawSparkEffects } from './particles/sparkEffect.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
 import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
+import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
+
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
 // Performance: Cache time at the start of each frame to avoid multiple Date.now() calls
@@ -1149,7 +1152,70 @@ export function drawProjectiles() {
       return;
     }
     if (p.visual === 'crimsonSniperBullet_enhanced') {
-      drawCrimsonSniperBullet(ctx, p, true);
+      drawCrimsonSniperBullet(ctx, p, true, false);
+      return;
+    }
+    
+    if (p.visual === 'tricksterSniperBullet_enhanced') {
+      drawCrimsonSniperBullet(ctx, p, true, true);
+      return;
+    }
+
+    // Zeus Chain Lightning Visual
+    if (p.visual === 'chainLightning') {
+      ctx.save();
+      
+      // Draw a bright glowing white core at the leading tip with a strong blue aura
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'rgba(0, 191, 255, 1)';
+      ctx.fill();
+      
+      // Draw jagged trail with motion blur and thinning effect
+      if (p.history && p.history.length > 1) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'rgba(0, 191, 255, 1)'; // Strong light blue luminance
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'miter';
+        
+        // Loop from oldest (i=0) to newest (i = length-2)
+        for (let i = 0; i < p.history.length - 1; i++) {
+          // Rapidly thin out: older segments are thinner
+          const progress = i / (p.history.length - 1);
+          const thickness = 0.5 + progress * 4.5;
+          
+          // Disconnected zig-zags for motion blur: randomly skip some segments
+          if (Math.random() < 0.25) continue;
+          
+          const pt1 = p.history[i];
+          const pt2 = p.history[i+1];
+          
+          ctx.beginPath();
+          
+          // Small local jitter for even more jaggedness
+          const j1x = pt1.x + (Math.random() - 0.5) * 4;
+          const j1y = pt1.y + (Math.random() - 0.5) * 4;
+          const j2x = pt2.x + (Math.random() - 0.5) * 4;
+          const j2y = pt2.y + (Math.random() - 0.5) * 4;
+          
+          ctx.moveTo(j1x, j1y);
+          ctx.lineTo(j2x, j2y);
+          
+          // 1. Draw softer blue aura
+          ctx.strokeStyle = 'rgba(0, 191, 255, 0.3)';
+          ctx.lineWidth = thickness + 2;
+          ctx.stroke();
+          
+          // 2. Draw purely white core
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = thickness;
+          ctx.stroke();
+        }
+      }
+      
+      ctx.restore();
       return;
     }
 

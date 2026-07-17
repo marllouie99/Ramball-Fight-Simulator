@@ -15,7 +15,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, spawnFloatingText, recordWin, recordLoss } from '../core/state.js';
-import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect } from '../graphics/statusEffects.js';
+import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect } from '../graphics/statusEffects.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -116,6 +116,7 @@ export class Fighter {
     this.slowMultiplier = 1;
     this.hitStunTimer = 0;
     this.hitStunMultiplier = 1;
+    this.dubstepStunTimer = 0;
     this.timeStopTimer = 0;
     this._timeStopFrozenAngle = undefined;
     this._timeStopFrozenGunAngle = undefined;
@@ -161,6 +162,19 @@ export class Fighter {
     }
   }
 
+  interruptAttacks() {
+    this.meleeSwingActive = false;
+    this.meleeSwingTimer = 0;
+    this.meleeSlashFadeTimer = 0;
+    this.attackSwingTimer = 0;
+    // Removed this.isDashing = false; because it overwrites KnightFighter's isDashing() method
+    this.dashTimer = 0;
+    this.scytheSwingActive = false;
+    this.scytheSwingTimer = 0;
+    this.stolenWindUpTimer = 0;
+  }
+
+
   applyTimeStop(frames) {
     // Ensure a numeric timer field exists for legacy code that may read it
     if (!this.timeStopTimer) this.timeStopTimer = 0;
@@ -192,6 +206,36 @@ export class Fighter {
 
 
   _handleTimeStop() {
+    const isFrozen = (this.crimsonElectrifiedTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.timeStopTimer > 0);
+
+    if (isFrozen) {
+      // DECAY VISUAL TRAILS SO THEY DON'T FREEZE IN PLACE WHILE INCAPACITATED
+      if (this.dashTrail) {
+        for (let i = this.dashTrail.length - 1; i >= 0; i--) {
+          this.dashTrail[i].alpha -= 0.02;
+          if (this.dashTrail[i].alpha <= 0) this.dashTrail.splice(i, 1);
+        }
+      }
+      if (this.afterImages && this.afterImages.length > 0) {
+        for (let i = this.afterImages.length - 1; i >= 0; i--) {
+          this.afterImages[i].timer--;
+          if (this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
+        }
+      }
+      if (this.slashEffects && this.slashEffects.length > 0) {
+        for (let i = this.slashEffects.length - 1; i >= 0; i--) {
+          this.slashEffects[i].timer--;
+          if (this.slashEffects[i].timer <= 0) this.slashEffects.splice(i, 1);
+        }
+      }
+      if (this.swordTrailHistory && this.swordTrailHistory.length > 0) {
+        this.swordTrailHistory.pop();
+      }
+      if (this.trailHistory && this.trailHistory.length > 0) {
+        this.trailHistory.shift();
+      }
+    }
+
     // Crimson Execution Stun & DoT
     if (this.crimsonElectrifiedTimer > 0) {
       this.crimsonElectrifiedTimer--;
@@ -212,6 +256,16 @@ export class Fighter {
     // We check this here because all subclasses short-circuit their update() if this method returns true.
     if (this.electricStunTimer > 0) {
       this.electricStunTimer--;
+    }
+    
+    if (this.dubstepStunTimer > 0) {
+      this.dubstepStunTimer--;
+      this.dubstepStunVisualTimer = 45; // 0.75 seconds of visual fade out
+    } else if (this.dubstepStunVisualTimer > 0) {
+      this.dubstepStunVisualTimer--;
+    }
+    
+    if (this.electricStunTimer > 0 || this.dubstepStunTimer > 0) {
       // Apply extreme friction to stop knockback quickly
       this.vx *= 0.5;
       this.vy *= 0.5;
@@ -653,7 +707,17 @@ export class Fighter {
     targetSpeed *= extraMultiplier;
 
     // Velocity Recovery (gradually return to target speed after knockback or slow)
-    const currentSpeed = Math.hypot(this.vx, this.vy);
+    let currentSpeed = Math.hypot(this.vx, this.vy);
+    
+    // Auto-recover from zero velocity if we should be moving
+    if (targetSpeed > 0 && currentSpeed < 0.05) {
+      // Nudge in the direction of our facing angle
+      const nudgeAngle = this.angle || this.gunAngle || 0;
+      this.vx = Math.cos(nudgeAngle) * 0.1;
+      this.vy = Math.sin(nudgeAngle) * 0.1;
+      currentSpeed = 0.1;
+    }
+    
     if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
       const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
       this.vx = (this.vx / currentSpeed) * newSpeed;
@@ -673,6 +737,10 @@ export class Fighter {
     this.handleBurn();
     this._tickCooldowns();
     this._tickAttackSound();
+    
+    if (this.thunderRootsTimer > 0) {
+      this.thunderRootsTimer--;
+    }
 
     // Time stop - freeze movement if time stopped
     if (this._handleTimeStop()) {
@@ -730,12 +798,20 @@ export class Fighter {
       drawElectricStunEffect(ctx, baseRadius, useAggressiveMode);
     }
     
+    if (this.dubstepStunVisualTimer > 0) {
+      drawDubstepStunEffect(ctx, baseRadius, this.dubstepStunVisualTimer);
+    }
+    
     if (this.crimsonElectrifiedTimer > 0) {
-      drawCrimsonElectrifiedEffect(ctx, baseRadius);
+      drawCrimsonElectrifiedEffect(ctx, baseRadius, this.crimsonElectrifiedTrickster);
     }
 
     if (this.poisonTicks > 0) {
       drawPoisonEffect(ctx, baseRadius);
+    }
+    
+    if (this.thunderRootsTimer > 0) {
+      drawThunderRootsEffect(ctx, baseRadius);
     }
 
     if (this.burnTimer > 0) {
@@ -779,6 +855,16 @@ export class Fighter {
     ctx.fillRect(-3, -5, 14, 10);
     ctx.fillStyle = '#222';
     ctx.fillRect(8, -2.5, 10, 5);
+    
+    // Draw Hand holding the gun
+    ctx.beginPath();
+    ctx.arc(0, 3, 6, 0, Math.PI * 2); // Hand positioned on the grip
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    
     ctx.restore();
   }
 
@@ -827,11 +913,27 @@ export class Fighter {
   /** Main entry point for drawing. */
   draw(ctx) {
     const scale = this.visualScale !== undefined ? this.visualScale : 1.0;
+    const zOffset = this.z || 0;
     const hasScale = scale !== 1.0 && scale > 0;
-    if (hasScale) {
+    const hasZ = zOffset > 0;
+
+    if (hasZ) {
+      // Draw shadow at the original ground position
       ctx.save();
       ctx.translate(this.x, this.y);
-      ctx.scale(scale, scale);
+      ctx.scale(1, 0.5); // Squash shadow vertically for perspective
+      ctx.beginPath();
+      ctx.arc(0, 0, this.r * scale, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.6 - (zOffset / 150))})`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (hasScale || hasZ) {
+      ctx.save();
+      // Move context so that drawing at (this.x, this.y) actually draws at (this.x, this.y - zOffset)
+      ctx.translate(this.x, this.y - zOffset);
+      if (hasScale) ctx.scale(scale, scale);
       ctx.translate(-this.x, -this.y);
     }
 
@@ -849,7 +951,7 @@ export class Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
 
-    if (hasScale) {
+    if (hasScale || hasZ) {
       ctx.restore();
     }
   }

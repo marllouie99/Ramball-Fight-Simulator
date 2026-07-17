@@ -14,6 +14,7 @@ import { updateIllusionSpawnEffects } from '../graphics/particles/illusionSpawnE
 import { updateBerserkerRageEffects } from '../graphics/particles/berserkerRageEffect.js';
 import { updateBloodEffects } from '../graphics/particles/bloodEffect.js';
 import { updateSparkEffects } from '../graphics/particles/sparkEffect.js';
+import { updateLightningEffects, drawLightningEffects } from '../graphics/particles/lightningEffects.js';
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
@@ -342,6 +343,7 @@ function animate(timestamp) {
     if (!useAggressiveParticleMode || Math.random() > 0.6) {
       updateSparkEffects();
     }
+    updateLightningEffects(); // Update lightning effects
     // Update burn effects (always update, even between rounds)
     const dtGlobal = Math.min(FRAME_TIME / 1000, 0.1);
     if (state.gameState !== 'title' && state.gameState !== 'select' && state.gameState !== 'index' && state.gameState !== 'leaderboard') {
@@ -404,16 +406,27 @@ function animate(timestamp) {
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles
       drawFuelPickups();
       drawBlackHoleEffects(); // Draw blackhole effects BEFORE fighters so they appear behind
+      drawSparkEffects('background'); // Draw ground-level spark effects (debris, scorches) BEFORE fighters
       drawFighters();
       drawIllusions(); // Draw Doppleganger illusions
       drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
       drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
+      
+      // Draw Laser Beams and Hit Glows ON TOP of fighters and normal projectiles
+      if (state.fighters) {
+        for (const f of state.fighters) {
+          if (f && typeof f.drawBeamOverlay === 'function') {
+            f.drawBeamOverlay(state.ctx);
+          }
+        }
+      }
 
       // OPTIMIZATION: Quality-based particle drawing
       if (!useAggressiveParticleMode) {
         bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
         burnEffectSystem.draw(state.ctx); // Draw burn particles
       }
+      drawLightningEffects(state.ctx); // Draw lightning effects above explosions but below floating texts
       drawFloatingTexts();
 
       if (!useAggressiveParticleMode) {
@@ -425,7 +438,7 @@ function animate(timestamp) {
       }
 
       drawBloodEffects(); // Draw blood effects on top of everything
-      drawSparkEffects(); // Draw spark effects on top of everything
+      drawSparkEffects('foreground'); // Draw spark effects on top of everything
 
       // Draw FPS display
       state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';

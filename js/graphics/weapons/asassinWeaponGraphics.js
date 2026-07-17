@@ -30,7 +30,7 @@ export const ASSASSIN_WEAPON_GRAPHICS = {
  * ★ POSITION ADJUST: Change this offset to move shuriken closer/farther from fighter
  * ★ SIZE ADJUST: Change shurikenScale to resize the entire weapon
  */
-export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r) {
+export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor = '#4a6a6a') {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
@@ -100,10 +100,19 @@ export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r) {
     ctx.restore();
   }
 
+  // ── Hand ──
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(0, 0, 6, 0, Math.PI * 2); // Center of shuriken
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
+
   ctx.restore();
 }
 
-export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetScale = 1.0, flashIntensity = 0) {
+export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetScale = 1.0, flashIntensity = 0, fighterColor = '#4a6a6a') {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle + Math.PI / 2);
@@ -196,6 +205,15 @@ export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetSc
   ctx.lineTo(bladeLength * 0.25, bladeWidth * 0.5 - 1.5);
   ctx.strokeStyle = `rgba(255, 255, 255, ${0.4 + flashIntensity * 0.6})`;
   ctx.lineWidth = 1 + flashIntensity * 2;
+  ctx.stroke();
+
+  // ── Hand ──
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(-r * 0.6 * 1.2 / 2, 0, 6, 0, Math.PI * 2); // Center of hilt
+  ctx.fill();
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#000';
   ctx.stroke();
 
   ctx.restore();

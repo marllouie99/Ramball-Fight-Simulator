@@ -548,6 +548,15 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.strokeStyle = bladeCoreB;
   ctx.stroke();
   ctx.restore();
+  
+  // Draw Hand (Grip)
+  ctx.beginPath();
+  ctx.arc(0, 15 * scale, 6 * scale, 0, Math.PI * 2);
+  ctx.fillStyle = '#cc0000'; // Dark red matching Berserker
+  ctx.fill();
+  ctx.lineWidth = 1.5 * scale;
+  ctx.strokeStyle = '#000000';
+  ctx.stroke();
 
   ctx.restore();
 }

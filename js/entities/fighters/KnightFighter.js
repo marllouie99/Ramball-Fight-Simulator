@@ -724,7 +724,35 @@ export class KnightFighter extends Fighter {
       } else {
         drawGrayBrokenSword(ctx, this.x, this.y, swordAngle, this.r, isDashing ? 'dashing' : null);
       }
+      
+      // Draw Sword Hand (drawn over sword hilt)
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(swordAngle);
+      ctx.translate(this.r + 5, 0);
+      ctx.beginPath();
+      ctx.arc(0, 0, 6, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      ctx.restore();
     }
+    
+    // Draw Shield Hand (drawn over shield grip)
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(ga + this.shieldVisualOffset);
+    ctx.translate(this.r + 2, 0); // Shield is slightly closer
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.restore();
   }
 
   draw(ctx) {

@@ -298,7 +298,9 @@ export class DopplegangerFighter extends Fighter {
       this.swordSwingActive,
       this.swordSwingTimer,
       this.swordSwingAngle,
-      this.swordSwingDuration
+      this.swordSwingDuration,
+      animTime,
+      this.color
     );
   }
 }

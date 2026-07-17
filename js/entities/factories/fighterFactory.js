@@ -16,6 +16,8 @@ import { EngineerFighter } from '../fighters/EngineerFighter.js';
 import { TargetDummyFighter } from '../fighters/TargetDummyFighter.js';
 import { RubyFighter } from '../fighters/RubyFighter.js';
 import { MusashiFighter } from '../fighters/MusashiFighter.js';
+import { TricksterFighter } from '../fighters/TricksterFighter.js';
+import { ZeusFighter } from '../fighters/ZeusFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -36,4 +38,6 @@ export const FIGHTER_CLASS_MAP = {
   'targetdummy': TargetDummyFighter,
   'ruby': RubyFighter,
   'musashi': MusashiFighter,
+  'trickster': TricksterFighter,
+  'zeus': ZeusFighter,
 };

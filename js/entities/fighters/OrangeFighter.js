@@ -279,7 +279,7 @@ export class OrangeFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    drawOrangeFlamethrowerGun(ctx, this.x, this.y, this.gunAngle, this.r);
+    drawOrangeFlamethrowerGun(ctx, this.x, this.y, this.gunAngle, this.r, this.color);
   }
 
   drawFuelBar(ctx) {

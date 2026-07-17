@@ -43,7 +43,7 @@ export const CRONOS_WEAPON_GRAPHICS = {
  * ★ POSITION ADJUST: Change this offset to move blade closer/farther from fighter
  * ★ SIZE ADJUST: Change bladeScale to resize the entire weapon
  */
-export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swingTimer, swingAngle, swingDuration, swingDirection) {
+export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swingTimer, swingAngle, swingDuration, swingDirection, fighterColor = '#00f3ff') {
   // OPTIMIZATION: Import state for quality check (need to add import at top)
   // For now, we'll check if state is available globally
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
@@ -228,6 +228,15 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
     ctx.fill();
   });
   ctx.restore();
+
+  // ── Hand ──
+  ctx.fillStyle = fighterColor;
+  ctx.beginPath();
+  ctx.arc(-10 * bladeScale, 0, 6 * bladeScale, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.lineWidth = 1.5 * bladeScale;
+  ctx.strokeStyle = '#000';
+  ctx.stroke();
 
   ctx.restore();
 }
