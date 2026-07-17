@@ -1,4 +1,6 @@
 import { CONFIG } from '../../core/config.js';
+import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 
 // berserkerWeaponGraphics.js
 //  - Use this file for Berserker-specific weapon graphics (dual axes).
@@ -202,6 +204,12 @@ function drawBerserkerSwingEffect(ctx, r, progress, fade, isInRage, facingAngle)
 function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage, baseColor, coreColor, particleColors) {
     if (slashProgress <= 0 || slashProgress >= 1) return;
 
+    const fps = state.fps || 60;
+    const qualityLevel = state.qualityLevel || 1.0;
+    const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+    const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+    const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+
     ctx.save();
 
     // --- Animation Properties ---
@@ -262,8 +270,8 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
     // --- Particle Burst ---
     // Particles are generated most intensely around the middle of the animation.
     const particleIntensity = Math.sin(slashProgress * Math.PI);
-    if (particleIntensity > 0.5) {
-        const particleCount = isInRage ? 8 : 4;
+    if (!useUltraLOD && particleIntensity > 0.5) {
+        const particleCount = useLOD ? (isInRage ? 4 : 2) : (isInRage ? 8 : 4);
         for (let i = 0; i < particleCount; i++) {
             const pAlpha = alpha * (0.5 + Math.random() * 0.5);
             const pSize = 1 + Math.random() * 2.5 * (isInRage ? 1.5 : 1);
@@ -290,6 +298,12 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
  * Completely redesigned to feature an aggressive, jagged, forged bearded axe, heavy back spikes, and glowing runes.
  */
 function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, glowIntensity = 1.0, isTrail = false) {
+  const fps = state.fps || 60;
+  const qualityLevel = state.qualityLevel || 1.0;
+  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+
   ctx.save();
   ctx.translate(xOffset, 0);
 
@@ -358,7 +372,7 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
 
   // Glowing vertical rune in the collar
   ctx.fillStyle = isInRage ? '#fff' : bladeEdge;
-  if (!isTrail) {
+  if (!isTrail && !useUltraLOD) {
     ctx.shadowColor = isInRage ? '#ff3333' : '#000000';
     ctx.shadowBlur = 6 * scale;
   }
@@ -369,7 +383,7 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.lineTo(-1.5 * scale, -10 * scale);
   ctx.closePath();
   ctx.fill();
-  if (!isTrail) {
+  if (!isTrail && !useUltraLOD) {
     ctx.shadowBlur = 0; // reset
   }
 
@@ -381,7 +395,7 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
     const t = Date.now() / 70; // Fast flicker
 
     // Draw fewer layers for trails to optimize FPS
-    const numLayers = isTrail ? 1 : 3;
+    const numLayers = isTrail ? 1 : (useUltraLOD ? 1 : (useLOD ? 2 : 3));
 
     for (let i = 0; i < numLayers; i++) {
       ctx.beginPath();
@@ -405,7 +419,7 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
           `rgba(180, 0, 0, ${0.15 * glowIntensity})`;
 
       // shadowBlur is very expensive, disable it for trails
-      if (!isTrail) {
+      if (!isTrail && !useUltraLOD) {
         ctx.shadowColor = '#ff2000';
         ctx.shadowBlur = (10 + i * 10) * glowIntensity;
       }
@@ -489,7 +503,7 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
     ctx.lineWidth = 6.0 * scale;
     ctx.globalAlpha = 0.5 * pulse;
     ctx.strokeStyle = isInRage ? '#ff0000' : '#000000';
-    if (!isTrail) { 
+    if (!isTrail && !useUltraLOD) { 
         ctx.shadowColor = isInRage ? '#ff0000' : '#000000'; 
         ctx.shadowBlur = 15 * scale; 
     }

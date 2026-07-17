@@ -4,6 +4,7 @@
 // These bypass physics and collision entirely - pure visual decoration
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 
 // ─────────────────────────────────────────────
 // OBJECT POOL — eliminates GC thrashing from rapid spark spawn/despawn
@@ -54,13 +55,15 @@ function _returnSpark(spark) {
  * @param {string} type - 'crimson' for red/orange sparks, 'flash' for impact flash
  */
 export function spawnSparks(x, y, count = 8, type = 'crimson') {
-  const isMulti = state && (state.mode === '2v2' || state.mode === 'ffa');
-  // OPTIMIZED: Apply quality level to spark limits
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
   const qualityMultiplier = state.qualityLevel || 1.0;
-  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * qualityMultiplier);
+  const fps = state.fps || 60;
   
-  // OPTIMIZED: Reduce spark count based on quality
-  const adjustedCount = Math.max(1, Math.floor(count * qualityMultiplier));
+  // Further reduce limits during clashes in multiplayer
+  const dynamicQuality = isMulti && fps < 45 ? Math.min(qualityMultiplier, 0.4) : qualityMultiplier;
+  
+  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * dynamicQuality);
+  const adjustedCount = Math.max(1, Math.floor(count * dynamicQuality));
 
   for (let i = 0; i < adjustedCount; i++) {
     // Remove oldest if at limit — return it to pool first
@@ -133,11 +136,13 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
  * @param {number} count - Number of rocks to spawn
  */
 export function spawnTelekinesisDebris(x, y, count = 2) {
-  const isMulti = state && (state.mode === '2v2' || state.mode === 'ffa');
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
   const qualityMultiplier = state.qualityLevel || 1.0;
-  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * qualityMultiplier);
-  
-  const adjustedCount = Math.max(1, Math.floor(count * qualityMultiplier));
+  const fps = state.fps || 60;
+  const dynamicQuality = isMulti && fps < 45 ? Math.min(qualityMultiplier, 0.4) : qualityMultiplier;
+
+  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * dynamicQuality);
+  const adjustedCount = Math.max(1, Math.floor(count * dynamicQuality));
 
   for (let i = 0; i < adjustedCount; i++) {
     if (state.sparkEffects.length >= MAX_SPARK_PARTICLES) {
@@ -186,8 +191,9 @@ export function spawnTelekinesisDebris(x, y, count = 2) {
  * @param {number} radius - Flash radius
  */
 export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
-  const isMulti = state && (state.mode === '2v2' || state.mode === 'ffa');
-  const MAX_FLASHES = isMulti ? 20 : 40;
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const fps = state.fps || 60;
+  const MAX_FLASHES = isMulti ? (fps < 45 ? 10 : 20) : 40;
 
   if (state.sparkEffects.length >= MAX_FLASHES) {
     const oldest = state.sparkEffects.shift();
@@ -552,7 +558,8 @@ export function spawnArcaneGlyphs(x, y, count = 12) {
 
 export function spawnSpellStealWisps(trickster, target, color, count = 20) {
   for (let i = 0; i < count; i++) {
-    if (state.sparkEffects.length >= (state.mode === '2v2' || state.mode === 'ffa' ? 250 : 500)) return;
+    const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+    if (state.sparkEffects.length >= (isMulti ? 250 : 500)) return;
     
     const spark = _getSpark();
     

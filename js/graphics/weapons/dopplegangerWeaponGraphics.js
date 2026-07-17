@@ -1,5 +1,6 @@
 import { CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 
 // dopplegangerWeaponGraphics.js
 // Doppelganger's Crystalline Ethereal Sword
@@ -223,9 +224,11 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   const sword = DOPPLEGANGER_WEAPON_GRAPHICS.sword;
   const time = Date.now();
 
+  const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
-  const useLOD = false;
-  const useUltraLOD = false;
+  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   if (isPhantom) {
     if (useUltraLOD) { return; } // OPTIMIZED: Disable phantom trace on ULTRA low FPS
@@ -503,8 +506,9 @@ export function drawDopplegangerBodyEffect(ctx, x, y, r, angle, layer = 'under',
   ctx.translate(x, y);
 
   const qualityLevel = state.qualityLevel || 1.0;
-  const useLOD = false;
-  const useUltraLOD = false;
+  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   const turbulence = (t, freq, amp) => Math.sin(t * freq) * amp;
 

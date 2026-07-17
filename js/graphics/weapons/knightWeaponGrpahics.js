@@ -1,4 +1,13 @@
+import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
+
 export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, r, dashGlowFade = 0, shieldVisualOffset = -Math.PI / 2) {
+  const fps = state.fps || 60;
+  const qualityLevel = state.qualityLevel || 1.0;
+  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+
   ctx.save();
   ctx.translate(x, y);
   const shieldAngle = gunAngle + shieldVisualOffset;
@@ -54,18 +63,21 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
     ctx.stroke();
 
     // 3. Digital Crackling Energy Lines
-    ctx.beginPath();
-    for (let i = 0; i < 8; i++) {
-      const ang = Math.random() * Math.PI * 2;
+    if (!useUltraLOD) {
+      ctx.beginPath();
+      const lineCount = useLOD ? 3 : 8;
+      for (let i = 0; i < lineCount; i++) {
+        const ang = Math.random() * Math.PI * 2;
       const dist = 20 + Math.random() * 20; 
       const len = 8 + Math.random() * 15;   
       ctx.moveTo(Math.cos(ang) * dist * shieldScale, Math.sin(ang) * dist * shieldScale);
       ctx.lineTo(Math.cos(ang+0.1) * (dist - len/2) * shieldScale, Math.sin(ang+0.1) * (dist - len/2) * shieldScale);
       ctx.lineTo(Math.cos(ang) * (dist - len) * shieldScale, Math.sin(ang) * (dist - len) * shieldScale);
+      }
+      ctx.lineWidth = (1 + Math.random() * 2) * shieldScale;
+      ctx.strokeStyle = neonCore;
+      ctx.stroke();
     }
-    ctx.lineWidth = (1 + Math.random() * 2) * shieldScale;
-    ctx.strokeStyle = neonCore;
-    ctx.stroke();
     ctx.restore();
   }
 
@@ -142,8 +154,10 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
   ctx.lineJoin = 'round';
 
   // Bloom effect for the core
-  ctx.shadowBlur = 10 * shieldScale;
-  ctx.shadowColor = '#ff8800';
+  if (!useUltraLOD) {
+    ctx.shadowBlur = 10 * shieldScale;
+    ctx.shadowColor = '#ff8800';
+  }
 
   // Outer emitter ring
   ctx.beginPath();
@@ -225,8 +239,10 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
     ctx.scale(hoverScale, hoverScale);
 
     // Base state is a crisp, clean, thin-lined hologram without heavy glow
-    ctx.shadowBlur = (1 + flashBoost * 14) * shieldScale;
-    ctx.shadowColor = '#ffaa00';
+    if (!useUltraLOD) {
+      ctx.shadowBlur = (1 + flashBoost * 14) * shieldScale;
+      ctx.shadowColor = '#ffaa00';
+    }
     
     ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + flashBoost * 0.5})`;
     ctx.lineWidth = (1.0 + flashBoost * 1.5) * shieldScale;
@@ -274,6 +290,12 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
 }
 
 function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
+  const fps = state.fps || 60;
+  const qualityLevel = state.qualityLevel || 1.0;
+  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+
   // Sci-Fi Palette
   const armorDark = '#1a1c20';
   const armorMid = '#2a2d34';
@@ -325,7 +347,7 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    if (!isTrail) {
+    if (!isTrail && !useLOD) {
       // 1. Wide ambient glow
       ctx.strokeStyle = 'rgba(255, 150, 0, 0.2)';
       ctx.lineWidth = 14 * swordScale;
@@ -410,7 +432,7 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    if (!isTrail) {
+    if (!isTrail && !useLOD) {
       // 1. Wide ambient glow
       ctx.strokeStyle = 'rgba(255, 150, 0, 0.2)';
       ctx.lineWidth = 16 * swordScale;

@@ -255,8 +255,8 @@ export function drawCronosSphereVisual({
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
-  const useUltraLOD = false;
-  const useLOD = false;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   // OPTIMIZATION: Skip complex sphere drawing at ultra low quality
   if (useUltraLOD) {
@@ -455,7 +455,7 @@ export function drawCronosPreActivateBarrier({
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
 
-  const useLOD = false;
+  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
 
   const p = Math.min(1, Math.max(0, preProgress));
   const R = radius;

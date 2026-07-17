@@ -15,14 +15,15 @@ import { CONFIG } from '../../core/config.js';
  * @param {number} damageAngle - Angle of the damage direction (radians), null for random
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isFFA = state && state.mode === GAME_MODES.FFA;
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || isFFA);
 
   // Allow far more blood particles so they can accumulate on the floor
   const qualityMultiplier = state.qualityLevel || 1.0;
-  let MAX_BLOOD_PARTICLES = Math.floor((isMulti ? 200 : 400) * qualityMultiplier);
+  let MAX_BLOOD_PARTICLES = Math.floor((isFFA ? 100 : isMulti ? 200 : 400) * qualityMultiplier);
 
   // OPTIMIZED: Reduce particle count based on quality level
-  const baseParticleCount = Math.max(2, Math.floor(amount / 3));
+  const baseParticleCount = Math.max(2, Math.floor(amount / (isFFA ? 6 : 3)));
   const particleCount = Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
 
   let color = fighter.color || '#e60000';
