@@ -238,14 +238,23 @@ export function startCountdown() {
   state.countdownTimer = 0;
   state.gameState = 'countdown';
 
-  if (state.roundNum === 1) {
-    const snd = getAnnouncerSound('round1');
-    if (snd) playSound(snd.src, snd.volume, snd.speed, snd.offset || 0);
+  const maxRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+  let soundKey = null;
+
+  if (state.roundNum === maxRounds) {
+    soundKey = 'finalround';
+  } else if (state.roundNum === 1) {
+    soundKey = 'round1';
   } else if (state.roundNum === 2) {
-    const snd = getAnnouncerSound('round2');
-    if (snd) playSound(snd.src, snd.volume, snd.speed, snd.offset || 0);
+    soundKey = 'round2';
   } else if (state.roundNum === 3) {
-    const snd = getAnnouncerSound('round3');
+    soundKey = 'round3';
+  } else if (state.roundNum === 4) {
+    soundKey = 'round4';
+  }
+
+  if (soundKey) {
+    const snd = getAnnouncerSound(soundKey);
     if (snd) playSound(snd.src, snd.volume, snd.speed, snd.offset || 0);
   }
 }

@@ -18,6 +18,18 @@ export const ANNOUNCER_SOUNDS = {
         offset: 0,
     },
     round3: {
+        src: 'Assets/Sound Effects/Announcer/round3.mp3',
+        volume: 1.0,
+        speed: 1.5,
+        offset: 0,
+    },
+    round4: {
+        src: 'Assets/Sound Effects/Announcer/round4.mp3',
+        volume: 1.0,
+        speed: 1.5,
+        offset: 0,
+    },
+    finalround: {
         src: 'Assets/Sound Effects/Announcer/finalround.mp3',
         volume: 1.0,
         speed: 1.0,
