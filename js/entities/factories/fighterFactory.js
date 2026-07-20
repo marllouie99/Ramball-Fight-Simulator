@@ -18,6 +18,9 @@ import { RubyFighter } from '../fighters/RubyFighter.js';
 import { MusashiFighter } from '../fighters/MusashiFighter.js';
 import { TricksterFighter } from '../fighters/TricksterFighter.js';
 import { ZeusFighter } from '../fighters/ZeusFighter.js';
+import { HydraFighter } from '../fighters/HydraFighter.js';
+import { GojoFighter } from '../fighters/GojoFighter.js';
+import { SukunaFighter } from '../fighters/SukunaFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -40,4 +43,7 @@ export const FIGHTER_CLASS_MAP = {
   'musashi': MusashiFighter,
   'trickster': TricksterFighter,
   'zeus': ZeusFighter,
+  'hydra': HydraFighter,
+  'gojo': GojoFighter,
+  'sukuna': SukunaFighter,
 };

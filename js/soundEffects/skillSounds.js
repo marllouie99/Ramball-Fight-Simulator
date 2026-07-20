@@ -100,18 +100,38 @@ export const SKILL_SOUNDS = {
     },
   },
 
+  // ── Zeus (ID 19) ─────────────────────────────
+  19: {
+    aegis: {
+      src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+      volume: 0.7
+    },
+    storm: {
+      src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
+      volume: 1.5
+    }
+  },
+
+  // ── Musashi ──────────────────────────────
+  musashi: {
+    dash: {
+      src: 'Assets/Sound Effects/Skills/dash3.mp3',
+      volume: 1.0
+    }
+  },
+
   // ── Trickster ─────────────────────────────
   trickster: {
     telekinesis: {
-      src: 'Assets/Sound Effects/Attacks/magic_cast.mp3',
+      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
       volume: 0.8
     },
     telekinesisDrop: {
-      src: 'Assets/Sound Effects/Attacks/heavyhit.mp3',
+      src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
       volume: 0.9
     },
     spellSteal: {
-      src: 'Assets/Sound Effects/Attacks/magic_drain.mp3', // Assume this exists or fallback
+      src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
       volume: 0.9
     }
   },
@@ -119,12 +139,44 @@ export const SKILL_SOUNDS = {
   // ── Zeus ─────────────────────────────
   zeus: {
     aegis: {
-      src: 'Assets/Sound Effects/Attacks/electric_shock.mp3', // Will use fallback if doesn't exist
+      src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
       volume: 0.7
     },
     storm: {
-      src: 'Assets/Sound Effects/Attacks/thunder_strike.mp3', // Fallback to heavyhit or magic
+      src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
       volume: 1.0
+    }
+  },
+
+  // ── Gojo ─────────────────────────────
+  21: {
+    purple_charge: {
+      src: 'Assets/Sound Effects/Skills/mixing.mp3',
+      volume: 4.8
+    },
+    purple_fire: {
+      src: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
+      volume: 1.5
+    }
+  },
+
+  // ── Sukuna ───────────────────────────
+  22: {
+    divineflame: {
+      src: 'Assets/Sound Effects/Skills/fugaignite.mp3',
+      volume: 1.0
+    },
+    fuga_fire: {
+      src: 'Assets/Sound Effects/Skills/fuga.mp3',
+      volume: 1.5
+    },
+    fuga_travel: {
+      src: 'Assets/Sound Effects/Skills/fugatravel.mp3',
+      volume: 1.0
+    },
+    fuga_explode: {
+      src: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
+      volume: 1.5
     }
   }
 };

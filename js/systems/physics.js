@@ -1,10 +1,10 @@
 // ─────────────────────────────────────────────
 // FIGHTER COLLISION
 // ─────────────────────────────────────────────
-import { CONFIG } from '../core/config.js';
+import { CONFIG, FIGHTER_DEFS } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { projectileSystem } from './projectileSystem.js';
-import { state, spawnFloatingText, recordWin, recordLoss } from '../core/state.js';
+import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance } from '../core/state.js';
 import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 
@@ -511,8 +511,8 @@ export function resolveFighterCollision(a, b) {
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
   if (!a.isTurret) {
-    // Fighters in rage ignore the bounce impulse so they can stick to their targets
-    if (!a.isInRage) {
+    // Fighters in rage or melee mode ignore the bounce impulse so they can stick to their targets
+    if (!a.isInRage && !a.isMeleeMode) {
       a.vx -= impulse * nx + randA * impulse * tx;
       a.vy -= impulse * ny + randA * impulse * ty;
     }
@@ -520,7 +520,7 @@ export function resolveFighterCollision(a, b) {
   }
   
   if (!b.isTurret) {
-    if (!b.isInRage) {
+    if (!b.isInRage && !b.isMeleeMode) {
       b.vx += impulse * nx + randB * impulse * tx;
       b.vy += impulse * ny + randB * impulse * ty;
     }
@@ -681,6 +681,68 @@ function endRoundIf1v1Ended() {
   }
 }
 
+function endRoundIfTlfsEnded() {
+  if (state.mode !== 'TLFS' || state.gameState !== 'playing') return;
+
+  const player = state.fighters[0];
+  let enemy = state.fighters[1];
+
+  if (!player || player.hp <= 0) {
+    // Player died - show Champion Screen
+    state.matchWinner = enemy;
+    state.matchEndTimer = 0;
+    state.gameState = 'matchEnd';
+    return;
+  }
+
+  // Check if enemy died
+  if (enemy && enemy.hp <= 0) {
+    // Enemy died - increment defeated count
+    state.tlfsDefeatedEnemies = (state.tlfsDefeatedEnemies || 0) + 1;
+
+    if (state.tlfsDefeatedEnemies >= 5) {
+      // Player won the gauntlet
+      state.matchWinner = player;
+      state.matchEndTimer = 0;
+      state.gameState = 'matchEnd';
+      
+      // Stop sounds
+      stopAllSounds();
+      stopAllLoopingSounds();
+    } else {
+      // Clean up dead enemy so they don't interact while we wait for next tick?
+      // Actually, we can just instantly spawn a new one in their place!
+      let nextEnemyIndex = 1; // fallback
+      if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
+        nextEnemyIndex = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];
+      }
+
+      state.p2Index = nextEnemyIndex;
+      const newEnemy = createFighterInstance(FIGHTER_DEFS[nextEnemyIndex], nextEnemyIndex);
+      if (newEnemy) {
+        newEnemy.reset();
+        
+        // Spawn them on the right side
+        const arena = state.arena;
+        newEnemy.x = arena.x + arena.width * 0.75;
+        newEnemy.y = arena.y + arena.height * 0.5;
+        newEnemy.angle = Math.PI;
+        newEnemy.gunAngle = Math.PI;
+        newEnemy.rightGunAngle = Math.PI;
+        newEnemy.leftGunAngle = Math.PI;
+        newEnemy.vx = -newEnemy.speed;
+        newEnemy.vy = 0;
+
+        // Replace the old enemy
+        state.fighters[1] = newEnemy;
+        
+        // Spawn "NEXT FIGHTER!" text
+        spawnFloatingText(newEnemy.x, newEnemy.y - newEnemy.r - 20, 'NEW CHALLENGER!', '#ff4d4d');
+      }
+    }
+  }
+}
+
 // ─────────────────────────────────────────────
 // FIGHTER UPDATE (main loop step)
 // ─────────────────────────────────────────────
@@ -725,7 +787,19 @@ export function updateFighters() {
       fighter.visualScaleTarget = 1.0;
 
       const opponent = getClosestOpponent(fighter);
-      fighter.update(opponent, fi, state.arena);
+      let effectiveOpponent = opponent;
+      // If the target is Musashi and he is flurrying, delay enemy reaction time by making them target his ghost trail
+      if (opponent && opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
+         effectiveOpponent = new Proxy(opponent, {
+            get(target, prop) {
+               if (prop === 'x') return target.flurryGhost.x;
+               if (prop === 'y') return target.flurryGhost.y;
+               const value = target[prop];
+               return typeof value === 'function' ? value.bind(target) : value;
+            }
+         });
+      }
+      fighter.update(effectiveOpponent, fi, state.arena);
     });
 
     // OPTIMIZED: Use spatial grid for fighter-fighter collisions
@@ -806,5 +880,6 @@ export function updateFighters() {
     endRoundIfFFAEnded();
     endRoundIf2v2Ended();
     endRoundIf1v1Ended();
+    endRoundIfTlfsEnded();
   }
 }

@@ -10,6 +10,7 @@ import { drawEngineerBullet, drawTurret, drawTurretBullet } from './engineerWeap
 import { drawBomberExplosionGraphic, drawBomberGrenade, drawGrenadeTrail, drawBomberC4 } from './weapons/bomberWeaponGraphics.js';
 import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
+import { drawTricksterBolt } from './weapons/tricksterWeaponGraphics.js';
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { initFlameCanvas, resizeFlameCanvas, drawFlamesToCanvas, clearFlameCanvas } from './canvasManager.js';
 import { drawDeathEffects } from './particles/deathShatterEffect.js';
@@ -22,6 +23,7 @@ import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelganger
 import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
+import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
 
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
@@ -62,13 +64,420 @@ export function drawArena() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Arena background (in case it needs to be different later, but right now it's also white)
-  ctx.fillStyle = '#ffffffff';
+  ctx.fillStyle = 'rgb(250, 250, 250)';
   ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
   // Draw the arena boundary stroke
   ctx.strokeStyle = '#000000ff';
   ctx.lineWidth = 3;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
+}
+
+/**
+ * Draws a purple dim screen overlay when Gojo's Hollow Purple orb is active.
+ * The overlay opacity is based on the purple orb's remaining life/duration.
+ */
+export function drawPurpleDimScreen() {
+  const { ctx, canvas, fighters } = state;
+  
+  // Find the active purple orb or a channeling Gojo
+  const purpleOrb = getProjectiles().find(p => p.isGojoPurple && p.life > 0);
+  const channelingGojo = fighters ? fighters.find(f => f.isChannelingPurple) : null;
+  
+  if (!purpleOrb && !channelingGojo) return;
+  
+  let opacity = 0;
+  let centerX = canvas.width / 2;
+  let centerY = canvas.height / 2;
+
+  if (channelingGojo) {
+    // Smoothly fade in the dark screen while Gojo is mixing Red and Blue
+    const chargeRatio = channelingGojo.purpleChargeTimer / (channelingGojo.purpleChargeMax || 120);
+    opacity = 0.5 * chargeRatio;
+    centerX = channelingGojo.x;
+    centerY = channelingGojo.y;
+  } else if (purpleOrb) {
+    // Calculate opacity based on remaining life (fade out as life decreases)
+    const lifeRatio = purpleOrb.life / purpleOrb.maxLife;
+    opacity = 0.5; // Much darker base opacity for dramatic effect
+    if (lifeRatio < 0.5) {
+      opacity = 0.5 * (lifeRatio / 0.5); // Fade from 0.5 to 0 as life goes from 50% to 0%
+    }
+    centerX = purpleOrb.x;
+    centerY = purpleOrb.y;
+  }
+  
+  // Don't draw if opacity is too low
+  if (opacity < 0.01) return;
+  
+  // Create a purple radial gradient from the origin position
+  const gradient = ctx.createRadialGradient(
+    centerX, centerY, 0,
+    centerX, centerY, Math.max(canvas.width, canvas.height)
+  );
+  
+  gradient.addColorStop(0, `rgba(138, 43, 226, ${opacity * 0.4})`);  // Bright purple at the center (Blue Violet)
+  gradient.addColorStop(0.3, `rgba(75, 0, 130, ${opacity * 0.8})`);  // Indigo/Deep Purple
+  gradient.addColorStop(0.6, `rgba(40, 0, 80, ${opacity * 1.2})`);   // Very dark purple
+  gradient.addColorStop(1, `rgba(10, 0, 25, ${opacity * 1.5})`);     // Almost black purple at edges
+  
+  // Fill the entire canvas with the purple overlay
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+/**
+ * Draws a dark dim screen overlay when Zeus is charging or casting his Storm ultimate.
+ * The overlay opacity increases during charge, then stays at max while strikes are active.
+ */
+export function drawStormDimScreen() {
+  const { ctx, canvas } = state;
+  
+  // Find Zeus fighters that are charging or actively storming
+  const zeusStorming = state.fighters?.filter(f => 
+    f && f._def?.type === 'zeus' && (f.isChargingStorm || f.stormActive)
+  );
+  
+  // Also check if there are active storm strikes happening
+  const hasActiveStrikes = state.zeusStormStrikes && state.zeusStormStrikes.length > 0;
+  
+  // If no Zeus is storming and no strikes active, don't draw the overlay
+  if ((!zeusStorming || zeusStorming.length === 0) && !hasActiveStrikes) return;
+  
+  // Get the first Zeus fighter for reference
+  const zeus = zeusStorming ? zeusStorming[0] : null;
+  
+  // Calculate opacity
+  let opacity;
+  if (zeus && zeus.isChargingStorm) {
+    // During charge: opacity increases with charge progress
+    const chargeProgress = 1.0 - (zeus.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120));
+    const dimOpacity = CONFIG.zeus.stormDimOpacity || 0.7;
+    opacity = chargeProgress * dimOpacity;
+  } else {
+    // During active storm: always at max opacity
+    opacity = CONFIG.zeus.stormDimOpacity || 0.7;
+  }
+  
+  // Don't draw if opacity is too low
+  if (opacity < 0.01) return;
+  
+  // Fill the entire canvas with a plain dark overlay
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+/**
+ * Draws a dark fiery dim screen overlay with flame lightning when Sukuna channels or fires Furnace (Fuga).
+ */
+export function drawFurnaceDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  // Find Sukuna fighters channeling Furnace
+  const sukunaFuga = state.fighters?.find(f => 
+    f && (f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && f.isChannelingDivineFlame
+  );
+  
+  // Also check if Furnace fire arrow is actively flying
+  const furnaceArrow = getProjectiles().find(p => (p.isSukunaFurnace || p.visual === 'sukunaFurnaceArrow') && p.life > 0);
+
+  if (!sukunaFuga && !furnaceArrow) return;
+
+  let opacity = 0.65;
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  if (sukunaFuga) {
+    const progress = Math.min(1.0, sukunaFuga.divineFlameChargeTimer / Math.max(1, sukunaFuga.divineFlameChargeMax));
+    opacity = 0.25 + progress * 0.55;
+    cx = sukunaFuga.x;
+    cy = sukunaFuga.y;
+  } else if (furnaceArrow) {
+    opacity = 0.45;
+    cx = furnaceArrow.x;
+    cy = furnaceArrow.y;
+  }
+
+  if (opacity < 0.02) return;
+
+  ctx.save();
+
+  // Dark fiery vignette gradient centered on Sukuna/Arrow
+  const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, Math.max(canvas.width, canvas.height) * 0.95);
+  grad.addColorStop(0, `rgba(255, 60, 0, ${opacity * 0.25})`);
+  grad.addColorStop(0.3, `rgba(120, 20, 0, ${opacity * 0.65})`);
+  grad.addColorStop(0.7, `rgba(30, 5, 2, ${opacity * 0.85})`);
+  grad.addColorStop(1, `rgba(10, 2, 2, ${opacity * 0.95})`);
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+}
+
+/**
+ * Draws Sukuna's Furnace (Fuga) Divine Flame Arrow Construct.
+ * Long turbulent roaring fire trail with fluid curling patterns.
+ * Color cascade: white → bright yellow → golden orange → deep orange → crimson.
+ * Conveys supernatural speed, unstoppable momentum, and immense magical power.
+ */
+export function drawDivineFlameArrowConstruct(ctx, {
+  x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012
+}) {
+  if (progress <= 0) return;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+
+  const notchX = -32 * progress;
+  const tipX = 28 * progress;
+  const totalLen = tipX - notchX;
+  const headLen = 22 * progress;
+  const headX = tipX - headLen;
+
+  // 1. OUTMOST THERMAL HEAT DISTORTION AURA
+  const auraR = (42 + progress * 28);
+  const auraGrad = ctx.createRadialGradient(tipX * 0.2, 0, 4, tipX * 0.1, 0, auraR * 2.0);
+  auraGrad.addColorStop(0, `rgba(255, 240, 160, ${0.5 * progress})`);
+  auraGrad.addColorStop(0.25, `rgba(255, 140, 0, ${0.35 * progress})`);
+  auraGrad.addColorStop(0.55, `rgba(200, 40, 0, ${0.18 * progress})`);
+  auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = auraGrad;
+  ctx.beginPath();
+  ctx.ellipse(tipX * 0.2, 0, auraR * 2.2, auraR * 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Switch to ADDITIVE LIGHTING for hyper-realistic fire
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // ═══════════════════════════════════════════════════════════════
+  // 2. ROARING FLAME TONGUES — long, turbulent, curling backward
+  // Uses traveling wave + multi-frequency turbulence for fluid motion
+  // ═══════════════════════════════════════════════════════════════
+  const numTendrils = 16;
+  for (let i = 0; i < numTendrils; i++) {
+    const side = i % 2 === 0 ? 1 : -1;
+    const ratio = i / (numTendrils - 1);
+    const originX = tipX - ratio * totalLen;
+
+    // Traveling wave with multi-frequency turbulence for fluid, smoke-like curling
+    const flowPhase = time * 6.5 - ratio * 14.0 + i * 0.6;
+    const turb1 = Math.sin(flowPhase) * 12;
+    const turb2 = Math.sin(flowPhase * 1.7 + i * 1.1) * 6;
+    const turb3 = Math.cos(flowPhase * 0.6 + i * 2.3) * 4;
+
+    // Flames get dramatically longer toward the rear (velocity-stretched)
+    const lenMultiplier = isFlying ? (1.0 + ratio * 1.8) : (1.0 + ratio * 0.8);
+    const flameLen = (28 + turb1 + turb2 + ratio * 30) * progress * lenMultiplier;
+    const spread = (8 + Math.cos(flowPhase * 0.85) * 6 + ratio * 14 + turb3) * progress;
+    const wave = Math.sin(flowPhase * 1.4) * 7 * progress;
+
+    // More control points for fluid S-curve motion
+    ctx.beginPath();
+    ctx.moveTo(originX, side * 2);
+    ctx.bezierCurveTo(
+      originX - flameLen * 0.25, side * (spread * 1.3 + wave),
+      originX - flameLen * 0.55, side * (spread * 1.6 - wave * 0.8),
+      originX - flameLen * 0.75, side * (spread * 1.1 + wave * 0.4)
+    );
+    ctx.bezierCurveTo(
+      originX - flameLen * 0.9, side * (spread * 0.7),
+      originX - flameLen, side * (spread * 0.3 + turb3 * 0.3),
+      originX - flameLen, side * (spread * 0.15)
+    );
+    // Return path (thin inner edge)
+    ctx.bezierCurveTo(
+      originX - flameLen * 0.85, side * (spread * 0.2),
+      originX - flameLen * 0.4, side * (spread * 0.15),
+      originX, side * 2
+    );
+    ctx.closePath();
+
+    // Color cascade from white-hot (near arrow) to crimson (tips)
+    const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
+    if (ratio < 0.3) {
+      // Near tip: white → bright yellow core
+      tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
+      tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
+      tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
+      tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+    } else if (ratio < 0.6) {
+      // Mid shaft: golden orange → deep orange
+      tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
+      tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
+      tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
+      tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
+    } else {
+      // Rear: deep orange → crimson red
+      tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
+      tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
+      tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
+      tGrad.addColorStop(1, 'rgba(80, 5, 0, 0)');
+    }
+    ctx.fillStyle = tGrad;
+    ctx.fill();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 3. TWIN FIERY TAIL FLETCHING (Rear Plumes at notchX)
+  // Wild streaming plumes that convey unstoppable momentum
+  // ═══════════════════════════════════════════════════════════════
+  for (let side of [-1, 1]) {
+    const tailPhase = time * 7.5 + side * 1.5;
+    const plumeScale = isFlying ? 1.6 : 1.0;
+    const fletchLen = (40 + Math.sin(tailPhase) * 10) * progress * plumeScale;
+    const fletchSpread = (20 + Math.cos(tailPhase * 0.8) * 7) * progress;
+
+    ctx.beginPath();
+    ctx.moveTo(notchX + 8 * progress, 0);
+    ctx.bezierCurveTo(
+      notchX - fletchLen * 0.3, side * fletchSpread * 0.4,
+      notchX - fletchLen * 0.7, side * fletchSpread * 1.4,
+      notchX - fletchLen, side * fletchSpread * 1.1
+    );
+    ctx.bezierCurveTo(
+      notchX - fletchLen * 0.8, side * fletchSpread * 0.6,
+      notchX - fletchLen * 0.35, side * 3,
+      notchX + 8 * progress, 0
+    );
+    ctx.closePath();
+
+    const flGrad = ctx.createLinearGradient(notchX, 0, notchX - fletchLen, side * fletchSpread);
+    flGrad.addColorStop(0, `rgba(255, 250, 200, ${0.95 * progress})`);
+    flGrad.addColorStop(0.25, `rgba(255, 180, 30, ${0.85 * progress})`);
+    flGrad.addColorStop(0.55, `rgba(240, 80, 0, ${0.55 * progress})`);
+    flGrad.addColorStop(0.8, `rgba(180, 20, 0, ${0.3 * progress})`);
+    flGrad.addColorStop(1, 'rgba(80, 0, 0, 0)');
+    ctx.fillStyle = flGrad;
+    ctx.fill();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 4. MOLTEN LAVA SHAFT & INCANDESCENT CORE
+  // ═══════════════════════════════════════════════════════════════
+  const shaftGrad = ctx.createLinearGradient(notchX, 0, headX + 4, 0);
+  shaftGrad.addColorStop(0, `rgba(255, 90, 0, ${0.75 * progress})`);
+  shaftGrad.addColorStop(0.3, `rgba(255, 180, 30, ${0.9 * progress})`);
+  shaftGrad.addColorStop(0.7, `rgba(255, 245, 160, ${0.95 * progress})`);
+  shaftGrad.addColorStop(1, `rgba(255, 255, 240, 1.0)`);
+
+  ctx.beginPath();
+  ctx.moveTo(notchX, -2.5 * progress);
+  ctx.lineTo(headX + 4, -4 * progress);
+  ctx.lineTo(headX + 4, 4 * progress);
+  ctx.lineTo(notchX, 2.5 * progress);
+  ctx.closePath();
+  ctx.fillStyle = shaftGrad;
+  ctx.fill();
+
+  // White incandescent inner core spine line
+  ctx.beginPath();
+  ctx.moveTo(notchX + 4 * progress, 0);
+  ctx.lineTo(headX + 6, 0);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${progress})`;
+  ctx.lineWidth = 2.5 * progress;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Intricate Magma / Lava Crack Patterns along shaft
+  ctx.strokeStyle = `rgba(255, 235, 130, ${0.95 * progress})`;
+  ctx.lineWidth = 1.3 * progress;
+  const numCracks = 6;
+  for (let c = 0; c < numCracks; c++) {
+    const cx = notchX + (c + 0.5) * ((headX - notchX) / numCracks);
+    const side = c % 2 === 0 ? 1 : -1;
+    const cWobble = Math.sin(time * 3 + c * 2) * 2;
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, side * 0.5);
+    ctx.quadraticCurveTo(cx, side * (4.5 + cWobble), cx + 7, side * 1.2);
+    ctx.stroke();
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // 5. VOLCANIC OBSIDIAN MAGMA ARROWHEAD
+  // ═══════════════════════════════════════════════════════════════
+  const tipApexX = tipX + 6 * progress;
+  const barbX = headX - 6 * progress;
+  const barbY = 17 * progress;
+
+  // (A) Dark Volcanic Crystalline Base Plate
+  ctx.beginPath();
+  ctx.moveTo(tipApexX, 0);
+  ctx.quadraticCurveTo(tipApexX - 10 * progress, -barbY * 0.5, barbX, -barbY);
+  ctx.quadraticCurveTo(headX + 4 * progress, -barbY * 0.4, headX + 2 * progress, 0);
+  ctx.quadraticCurveTo(headX + 4 * progress, barbY * 0.4, barbX, barbY);
+  ctx.quadraticCurveTo(tipApexX - 10 * progress, barbY * 0.5, tipApexX, 0);
+  ctx.closePath();
+
+  const obsidianGrad = ctx.createLinearGradient(barbX, 0, tipApexX, 0);
+  obsidianGrad.addColorStop(0, `rgba(140, 10, 0, ${0.95 * progress})`);
+  obsidianGrad.addColorStop(0.4, `rgba(220, 60, 0, ${0.95 * progress})`);
+  obsidianGrad.addColorStop(0.8, `rgba(255, 180, 30, ${0.98 * progress})`);
+  obsidianGrad.addColorStop(1, `rgba(255, 255, 220, 1.0)`);
+  ctx.fillStyle = obsidianGrad;
+  ctx.fill();
+
+  // Dark volcanic rock contour lines
+  ctx.strokeStyle = `rgba(80, 0, 0, ${0.85 * progress})`;
+  ctx.lineWidth = 1.5 * progress;
+  ctx.stroke();
+
+  // (B) Lava Veins inside Arrowhead Plate
+  ctx.strokeStyle = `rgba(255, 240, 160, ${0.95 * progress})`;
+  ctx.lineWidth = 1.6 * progress;
+  
+  // Center vein
+  ctx.beginPath();
+  ctx.moveTo(headX + 2 * progress, 0);
+  ctx.lineTo(tipApexX - 2 * progress, 0);
+  ctx.stroke();
+
+  // Branching veins to top & bottom barb wings
+  for (let side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(headX + 6 * progress, 0);
+    ctx.quadraticCurveTo(headX + 10 * progress, side * (barbY * 0.4), barbX + 4 * progress, side * (barbY * 0.85));
+    ctx.stroke();
+  }
+
+  // (C) Dripping Molten Lava Droplets from Barb Wing Tips
+  for (let side of [-1, 1]) {
+    const dripLen = (6 + Math.sin(time * 4 + side * 2) * 3) * progress;
+    const dripX = barbX - dripLen * 0.8;
+    const dripY = side * (barbY + dripLen * 0.5);
+
+    ctx.beginPath();
+    ctx.moveTo(barbX, side * barbY);
+    ctx.quadraticCurveTo(dripX, side * (barbY + 2), dripX - 2 * progress, dripY);
+    ctx.arc(dripX - 2 * progress, dripY, 2.2 * progress, 0, Math.PI * 2);
+    ctx.closePath();
+
+    const dripGrad = ctx.createRadialGradient(dripX, dripY, 0, dripX, dripY, 4 * progress);
+    dripGrad.addColorStop(0, `rgba(255, 255, 220, ${progress})`);
+    dripGrad.addColorStop(0.5, `rgba(255, 140, 0, ${0.9 * progress})`);
+    dripGrad.addColorStop(1, 'rgba(180, 20, 0, 0)');
+    ctx.fillStyle = dripGrad;
+    ctx.fill();
+  }
+
+  // (D) Blinding White Nose Tip Flare
+  const tipGlow = ctx.createRadialGradient(tipApexX, 0, 0, tipApexX, 0, 16 * progress);
+  tipGlow.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
+  tipGlow.addColorStop(0.3, `rgba(255, 250, 200, ${0.9 * progress})`);
+  tipGlow.addColorStop(0.6, `rgba(255, 200, 80, ${0.5 * progress})`);
+  tipGlow.addColorStop(1, 'rgba(255, 90, 0, 0)');
+  ctx.fillStyle = tipGlow;
+  ctx.beginPath();
+  ctx.arc(tipApexX, 0, 16 * progress, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore(); // Restore globalCompositeOperation ('lighter')
+  ctx.restore(); // Restore transform matrix
 }
 
 // ─────────────────────────────────────────────
@@ -102,142 +511,180 @@ function drawBlackHoleVisual({
     ctx.restore();
   }
 
-  const pulse = 1 + Math.sin(now / 220) * 0.08;
+  const pulse = 1 + Math.sin(now / 220) * 0.05;
 
-  // --- Dark core / gravitational well ---
   ctx.save();
   ctx.globalAlpha = alpha;
-  const coreGlow = ctx.createRadialGradient(
-    p.x,
-    p.y,
-    Math.max(0.6, eventHorizon * 0.2),
-    p.x,
-    p.y,
-    outerDiskR * 1.1
-  );
-  coreGlow.addColorStop(0, `rgba(0,0,0,${0.95})`);
-  coreGlow.addColorStop(0.25, `rgba(10,0,20,${0.85 * alpha})`);
-  coreGlow.addColorStop(0.6, `rgba(60,0,120,${0.25 * alpha})`);
-  coreGlow.addColorStop(1, `rgba(153,0,255,${0.0})`);
-  ctx.fillStyle = coreGlow;
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, outerDiskR * 1.05 * pulse, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // --- Accretion disk bands (reduced from 12 to 6 for performance) ---
-  ctx.save();
-  ctx.globalAlpha = alpha;
+  
   ctx.translate(p.x, p.y);
 
-  // If rotateAngle is provided (projectile phase), bias rotation so it reads directionally.
-  const diskRot = (rotateAngle ?? 0) + now / 650;
+  // If rotateAngle is provided, use it (usually for the projectile phase).
+  // Otherwise, a slight wobble to give it life without spinning like a pinwheel.
+  let diskRot = rotateAngle;
+  if (diskRot === null || diskRot === undefined) {
+    diskRot = Math.sin(now / 2500) * 0.15;
+  }
   ctx.rotate(diskRot);
 
-  const bandCount = 6; // Reduced from 12 for performance
-  for (let i = 0; i < bandCount; i++) {
-    const t = i / bandCount;
-    const bandWidth = (2 * Math.PI) / bandCount;
-    const bandAlpha = (0.10 + 0.10 * Math.sin(t * Math.PI * 2 + now / 300)) * pulse;
+  // High-frequency energy flickering/throbbing (feels more natural than position jitter)
+  const energyFlicker = 1 + (Math.sin(now / 15) * 0.03 + Math.cos(now / 23) * 0.02);
 
-    ctx.strokeStyle = `rgba(204,102,255,${Math.max(0, bandAlpha * 0.9)})`;
-    ctx.lineWidth = Math.max(1, outerDiskR * 0.06);
-
-    const a0 = t * 2 * Math.PI;
-    const a1 = a0 + bandWidth * 0.78;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, (innerDiskR + outerDiskR) * 0.5, a0, a1);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(255,210,255,${Math.max(0, bandAlpha * 0.35)})`;
-    ctx.lineWidth = Math.max(0.8, outerDiskR * 0.035);
-    ctx.beginPath();
-    ctx.arc(
-      0,
-      0,
-      innerDiskR * (0.98 + 0.06 * Math.sin(now / 280 + i)),
-      a0 + bandWidth * 0.15,
-      a1 - bandWidth * 0.15
-    );
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // --- Event horizon ring ---
-  ctx.save();
-  ctx.globalAlpha = alpha;
+  // 1. Large background nebula glow (purple)
+  const glowGrad = ctx.createRadialGradient(0, 0, eventHorizon * 0.5, 0, 0, outerDiskR * 2.8 * energyFlicker);
+  glowGrad.addColorStop(0, `rgba(180, 50, 255, 0.4)`);
+  glowGrad.addColorStop(0.3, `rgba(130, 20, 255, 0.25)`);
+  glowGrad.addColorStop(1, `rgba(80, 0, 180, 0)`);
+  ctx.fillStyle = glowGrad;
   ctx.beginPath();
-  ctx.arc(p.x, p.y, eventHorizon * 1.25, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(204,102,255,${0.55 * alpha})`;
-  ctx.lineWidth = Math.max(2, outerDiskR * 0.05);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(p.x, p.y, eventHorizon, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(0,0,0,${0.95})`;
+  ctx.arc(0, 0, outerDiskR * 2.8 * energyFlicker, 0, Math.PI * 2);
   ctx.fill();
 
+  // 2. The Horizontal Accretion Disk Flare (Interstellar style)
+  ctx.globalCompositeOperation = 'screen';
+  
+  // Apply the intense flicker directly to the flare width/height
+  const streakWidth = outerDiskR * 3.5 * pulse * energyFlicker;
+  const streakHeight = eventHorizon * 0.35 * energyFlicker;
+  
+  ctx.save();
+  ctx.scale(1, streakHeight / streakWidth);
+  
+  // Outer flare
   ctx.beginPath();
-  ctx.arc(p.x, p.y, eventHorizon * 0.82, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255,220,255,${0.12 * alpha})`;
-  ctx.lineWidth = Math.max(1, outerDiskR * 0.02);
-  ctx.stroke();
+  ctx.arc(0, 0, streakWidth, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(140, 30, 255, 0.4)`;
+  ctx.fill();
+
+  // Mid flare
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth * 0.6, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(200, 100, 255, 0.6)`;
+  ctx.fill();
+  
+  // Inner core flare
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth * 0.3, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 180, 255, 0.8)`;
+  ctx.fill();
+  
   ctx.restore();
 
-  // --- Suction specks / lensing streaks (reduced from 10-26 to 6-12 for performance) ---
-  const suctionStrength = 0.55 + 0.45 * Math.sin(now / 180 + (p.x + p.y) * 0.01);
-  const speckCount = Math.max(6, Math.min(12, Math.floor(outerDiskR * 0.12))); // Reduced from 0.22 to 0.12
-
+  // Very thin bright center line extending outwards
   ctx.save();
-  ctx.globalAlpha = alpha;
-  for (let i = 0; i < speckCount; i++) {
-    const ang = (i / speckCount) * Math.PI * 2 + now / 1000;
-    const randish = (Math.sin(i * 12.9898 + p.x * 0.01 + p.y * 0.01) * 43758.5453) % 1;
-    const startT = 0.35 + (randish * 0.6);
+  ctx.scale(1, (streakHeight * 0.08) / (streakWidth * 1.5));
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth * 1.5 * energyFlicker, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 255, 0.9)`;
+  ctx.fill();
+  ctx.restore();
 
-    const startR = outerDiskR * pulse * startT;
-    const endR = eventHorizon * (0.95 + 0.25 * suctionStrength);
+  // 3. The Photon Ring (Circular glow behind the event horizon)
+  const ringR = eventHorizon * 1.15;
+  ctx.beginPath();
+  ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+  ctx.lineWidth = eventHorizon * 0.3;
+  ctx.strokeStyle = `rgba(160, 40, 255, 0.6)`;
+  ctx.stroke();
 
-    const sx = p.x + Math.cos(ang) * startR;
-    const sy = p.y + Math.sin(ang) * startR;
-    const ex = p.x + Math.cos(ang) * (endR * 0.98);
-    const ey = p.y + Math.sin(ang) * (endR * 0.98);
+  ctx.beginPath();
+  ctx.arc(0, 0, eventHorizon * 1.08, 0, Math.PI * 2);
+  ctx.lineWidth = eventHorizon * 0.12;
+  ctx.strokeStyle = `rgba(230, 130, 255, 0.9)`;
+  ctx.stroke();
 
-    const fade = 1 - startT;
+  ctx.beginPath();
+  ctx.arc(0, 0, eventHorizon * 1.03, 0, Math.PI * 2);
+  ctx.lineWidth = eventHorizon * 0.05;
+  ctx.strokeStyle = `rgba(255, 255, 255, 1)`;
+  ctx.stroke();
+  
+  ctx.globalCompositeOperation = 'source-over';
 
+  // 4. Orbital swirling lines (thick, bright, 3D perspective, outside event horizon)
+  ctx.globalCompositeOperation = 'screen'; 
+  const lineCount = 8;
+  for (let i = 0; i < lineCount; i++) {
+    const orbitSpeed = (i % 2 === 0 ? 1 : -1) * (600 + i * 150);
+    const orbitAngle = now / orbitSpeed + (i * Math.PI * 2) / lineCount;
+    
+    // X radius is large (accretion disk width)
+    const orbitRadiusX = eventHorizon * 1.6 + (outerDiskR * 0.8) * (i / lineCount);
+    
+    // Y radius must be strictly larger than eventHorizon so it NEVER crosses the black hole!
+    const orbitRadiusY = eventHorizon * 1.1 + (outerDiskR * 0.3) * (i / lineCount);
+    
+    const lineLength = Math.PI * 0.8 + 0.4 * Math.sin(now / 300 + i);
+    
     ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(ex, ey);
-    ctx.strokeStyle = `rgba(204,102,255,${0.08 + 0.12 * fade * alpha})`;
-    ctx.lineWidth = Math.max(1, outerDiskR * 0.018);
+    ctx.ellipse(0, 0, orbitRadiusX, orbitRadiusY, 0, orbitAngle, orbitAngle + lineLength);
+    
+    const lineAlpha = (0.6 + 0.4 * Math.sin(now / 200 + i)) * alpha;
+    ctx.strokeStyle = `rgba(255, 180, 255, ${lineAlpha})`;
+    ctx.lineWidth = Math.max(1, outerDiskR * 0.015); // Thinner elegant lines
     ctx.lineCap = 'round';
     ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over'; 
 
+  // 5. Small debris/pebbles getting sucked in
+  const pebbleCount = Math.max(12, Math.min(25, Math.floor(outerDiskR * 0.25))); 
+  for (let i = 0; i < pebbleCount; i++) {
+    const timeOffset = i * 1337.5;
+    const life = ((now + timeOffset) % 2000) / 2000;
+    
+    const dist = outerDiskR * 2.2 * (1 - Math.pow(life, 2)) + eventHorizon * 1.05;
+    const ang = i * Math.PI * 2 / pebbleCount + life * Math.PI * 8 * (i % 2 === 0 ? 1 : -1);
+    
+    // Elliptical path that matches the swirling rings
+    const px = Math.cos(ang) * dist;
+    // Y is squished, but always maintains a safe distance from center
+    const py = Math.sin(ang) * (eventHorizon * 1.05 + (dist - eventHorizon * 1.05) * 0.35);
+
+    const fade = Math.sin(life * Math.PI); 
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(life * Math.PI * 15 + i);
+    
     ctx.beginPath();
-    const headR = Math.max(0.9, outerDiskR * 0.012 * (1 - fade * 0.6));
-    ctx.arc(ex, ey, headR, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,220,255,${0.06 + 0.14 * fade * alpha})`;
+    const s = Math.max(2.5, outerDiskR * 0.035) * (1 - life * 0.3); 
+    ctx.moveTo(-s, -s * 0.5);
+    ctx.lineTo(s * 0.8, -s * 1.2);
+    ctx.lineTo(s * 1.1, s * 0.7);
+    ctx.lineTo(-s * 0.6, s);
+    ctx.closePath();
+    
+    ctx.fillStyle = `rgba(220, 180, 255, ${0.95 * fade * alpha})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * fade * alpha})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 6. The Event Horizon (Pure Black Hole in the center)
+  // Drawn last so it perfectly covers anything passing behind/into it
+  ctx.beginPath();
+  ctx.arc(0, 0, eventHorizon, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(0, 0, 0, 1)`;
+  ctx.fill();
+  
+  // 7. Some tiny stars/particles in the background glow for the "space" feel
+  const starCount = Math.floor(outerDiskR * 0.3);
+  for (let i = 0; i < starCount; i++) {
+    const rand1 = Math.sin(p.x * 12.9898 + i) * 43758.5453;
+    const rand2 = Math.cos(p.y * 78.233 + i) * 43758.5453;
+    const rDist = eventHorizon * 1.5 + (outerDiskR * 1.5) * (Math.abs(rand1) % 1);
+    const rAng = (Math.abs(rand2) % 1) * Math.PI * 2 + now / 2000;
+    
+    const twinkle = 0.5 + 0.5 * Math.sin(now / (200 + i * 50));
+    
+    ctx.beginPath();
+    ctx.arc(Math.cos(rAng) * rDist, Math.sin(rAng) * rDist, Math.max(0.5, outerDiskR * 0.01) * twinkle, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + 0.6 * twinkle})`;
     ctx.fill();
   }
-  ctx.restore();
 
-  // --- Inner swirl arcs ---
-  ctx.save();
-  ctx.globalAlpha = alpha;
-  ctx.translate(p.x, p.y);
-
-  const swirlRot = now / 500;
-  ctx.rotate(swirlRot);
-
-  ctx.strokeStyle = `rgba(153,0,255,${0.22 * alpha})`;
-  ctx.lineWidth = Math.max(1.2, outerDiskR * 0.03);
-  for (let i = 0; i < 2; i++) {
-    ctx.beginPath();
-    ctx.rotate((Math.PI * 2) / 3);
-    ctx.arc(0, 0, outerDiskR * (0.55 + i * 0.12), -Math.PI * 0.15, Math.PI * 0.65);
-    ctx.stroke();
-  }
   ctx.restore();
 }
 
@@ -250,6 +697,7 @@ export function drawCronosSphereVisual({
   deployProgress = 1,
   now = Date.now(),
   frozenCount = 0,  // number of frozen projectiles for LOD
+  theme = null,
 }) {
   // OPTIMIZATION: Aggressive LOD based on FPS and quality
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
@@ -258,19 +706,34 @@ export function drawCronosSphereVisual({
   const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
+  // Set up default theme if none is provided
+  const t = theme || {
+    lodOuterGlow: 'rgba(0, 160, 200, 1.0)',
+    lodInnerFill: 'rgba(0, 180, 220, 0.6)',
+    vol1: 'rgba(0, 240, 255, 0.3)',
+    vol2: 'rgba(0, 180, 220, 0.55)',
+    vol3: 'rgba(0, 120, 180, 0.7)',
+    vol4: 'rgba(0, 80, 140, 0.85)',
+    hexFill: 'rgba(0, 200, 235, 0.4)',
+    hexEdge: 'rgba(0, 220, 255, 0.9)',
+    hexDot: 'rgba(0, 200, 240, 0.5)',
+    pulseRing: 'rgba(0, 190, 230, 0.7)',
+    crispEdge: 'rgba(0, 210, 245, 0.95)'
+  };
+
   // OPTIMIZATION: Skip complex sphere drawing at ultra low quality
   if (useUltraLOD) {
     // Simplified but extremely visible: thick blue ring with solid inner fill
     ctx.save();
     ctx.globalAlpha = alpha;
-    // Outer glow ring - dark cyan
-    ctx.strokeStyle = 'rgba(0, 160, 200, 1.0)';
+    // Outer glow ring
+    ctx.strokeStyle = t.lodOuterGlow;
     ctx.lineWidth = 6;
     ctx.beginPath();
     ctx.arc(cx, cy, radius, 0, Math.PI * 2);
     ctx.stroke();
-    // Solid inner fill - dark cyan
-    ctx.fillStyle = 'rgba(0, 180, 220, 0.6)';
+    // Solid inner fill
+    ctx.fillStyle = t.lodInnerFill;
     ctx.fill();
     ctx.restore();
     return;
@@ -340,18 +803,18 @@ export function drawCronosSphereVisual({
 
   // 3D Volume Gradient - gives the sphere depth so it's not just a flat circle
   const volumeGrad = ctx.createRadialGradient(0, 0, R * 0.1, 0, 0, R);
-  volumeGrad.addColorStop(0, 'rgba(0, 240, 255, 0.3)');    // Bright luminous core
-  volumeGrad.addColorStop(0.5, 'rgba(0, 180, 220, 0.55)'); // Mid-tone cyan body
-  volumeGrad.addColorStop(0.85, 'rgba(0, 120, 180, 0.7)'); // Darker edge for depth
-  volumeGrad.addColorStop(1, 'rgba(0, 80, 140, 0.85)');    // Dark teal rim
+  volumeGrad.addColorStop(0, t.vol1);    // Bright luminous core
+  volumeGrad.addColorStop(0.5, t.vol2);  // Mid-tone body
+  volumeGrad.addColorStop(0.85, t.vol3); // Darker edge for depth
+  volumeGrad.addColorStop(1, t.vol4);    // Dark rim
 
   ctx.fillStyle = volumeGrad;
   ctx.beginPath();
   ctx.arc(0, 0, R, 0, Math.PI * 2);
   ctx.fill();
 
-  // Draw all hex fills in one path - vibrant cyan fill
-  ctx.fillStyle = 'rgba(0, 200, 235, 0.4)';
+  // Draw all hex fills in one path
+  ctx.fillStyle = t.hexFill;
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -363,8 +826,8 @@ export function drawCronosSphereVisual({
   }
   ctx.fill();
 
-  // Draw all hex edges in one path - vibrant saturated cyan
-  ctx.strokeStyle = `rgba(0, 220, 255, 0.9)`;
+  // Draw all hex edges in one path
+  ctx.strokeStyle = t.hexEdge;
   ctx.lineWidth = Math.max(1.5, cellSize * 0.14);
   ctx.beginPath();
   for (const cell of validCells) {
@@ -379,7 +842,7 @@ export function drawCronosSphereVisual({
 
   // Draw corner node dots (sparse sampling)
   const dotRadius = cellSize * 0.06;
-  ctx.fillStyle = `rgba(0, 200, 240, 0.5)`;
+  ctx.fillStyle = t.hexDot;
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -400,7 +863,7 @@ export function drawCronosSphereVisual({
   ctx.save();
   ctx.globalAlpha = 0.55 * alpha;
   ctx.translate(cx, cy);
-  ctx.strokeStyle = `rgba(0, 190, 230, 0.7)`;
+  ctx.strokeStyle = t.pulseRing;
   ctx.lineWidth = Math.max(1.2, R * 0.009);
   for (let i = 0; i < 2; i++) {
     const phase = now / 900 + i * 1.2;
@@ -428,7 +891,7 @@ export function drawCronosSphereVisual({
   // Crisp edge ring — clean border instead of blurry glow
   ctx.save();
   ctx.globalAlpha = alpha * shimmer;
-  ctx.strokeStyle = 'rgba(0, 210, 245, 0.95)';
+  ctx.strokeStyle = t.crispEdge;
   ctx.lineWidth = 2.5;
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
@@ -1102,6 +1565,451 @@ export function drawProjectiles() {
       return;
     }
 
+    // Sukuna slash visual - Crimson Black Crescent Blade Arc (Basic Attack)
+    if (p.visual === 'sukunaSlash') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      const r = 24;
+      // Outer crescent arc & inner returning arc
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+      ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+      ctx.closePath();
+
+      // Pitch black ink contour
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.92 * lifeRatio})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * lifeRatio})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Vivid crimson inner crescent fill
+      ctx.save();
+      ctx.scale(0.85, 0.85);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.52, Math.PI * 0.52, false);
+      ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.48, -Math.PI * 0.48, true);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(220, 10, 10, ${0.95 * lifeRatio})`;
+      ctx.fill();
+      ctx.restore();
+
+      // Razor-sharp white crescent core line
+      ctx.strokeStyle = `rgba(255, 255, 255, ${0.98 * lifeRatio})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Ghost Blade visual - Ethereal translucent blade with trailing effect
+    if (p.visual === 'ghostBlade') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      const r = 24;
+      
+      // Dark drop shadow for visibility against white background
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 8;
+      ctx.shadowOffsetX = 3;
+      ctx.shadowOffsetY = 3;
+      
+      // Crimson glow effect (outer blur)
+      ctx.shadowColor = 'rgba(180, 30, 30, 0.8)';
+      ctx.shadowBlur = 15;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+      // Ghost trail - fading afterimages behind the blade
+      for (let i = 3; i >= 1; i--) {
+        const trailAlpha = 0.15 * lifeRatio * (4 - i) / 3;
+        const trailOffset = i * 8;
+        ctx.save();
+        ctx.translate(-trailOffset, 0);
+        ctx.globalAlpha = trailAlpha;
+        ctx.beginPath();
+        // Crescent moon shape
+        ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+        ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 100, 100, 1)';
+        ctx.fill();
+        ctx.restore();
+      }
+      
+      // Main ghost blade - crescent moon shape
+      ctx.globalAlpha = 0.7 * lifeRatio;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+      ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 180, 180, 1)';
+      ctx.fill();
+      
+      // Sharp outer crescent edge
+      ctx.strokeStyle = `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
+      ctx.lineWidth = 2;
+      ctx.shadowColor = 'rgba(255, 100, 100, 0.9)';
+      ctx.shadowBlur = 12;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.98, -Math.PI * 0.58, Math.PI * 0.58, false);
+      ctx.stroke();
+      
+      // Sharp inner crescent edge
+      ctx.beginPath();
+      ctx.arc(r * 0.5, 0, r * 0.78, Math.PI * 0.53, -Math.PI * 0.53, true);
+      ctx.stroke();
+      
+      // Thin bright center line
+      ctx.strokeStyle = `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
+      ctx.lineWidth = 1;
+      ctx.shadowBlur = 5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.6, -Math.PI * 0.5, Math.PI * 0.5, false);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Sukuna Cleave visual - Pure White Slash with Dark Drop Shadow
+    if (p.visual === 'sukunaCleave') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(1.2, owner.r / 15) : 1.4;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      // Add dark drop shadow so the white blade stands out against the white arena
+      ctx.shadowColor = `rgba(0, 0, 0, ${0.8 * lifeRatio})`;
+      ctx.shadowBlur = 12;
+      ctx.shadowOffsetX = 2;
+      ctx.shadowOffsetY = 2;
+
+      const r = 24;
+      
+      // Draw the pure white crescent blade
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+      ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+      ctx.closePath();
+      
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * lifeRatio})`;
+      ctx.fill();
+
+      // Sharp core line for extra detail
+      ctx.shadowColor = 'transparent'; // turn off shadow for the inner details
+      ctx.strokeStyle = `rgba(230, 240, 255, ${1.0 * lifeRatio})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Sukuna Furnace (Fuga) Arrow visual - supernatural velocity flame arrow with long turbulent roaring fire trail
+    if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const time = Date.now() * 0.012;
+      const speed = Math.hypot(vx, vy);
+
+      // Initialize trail history and particle systems
+      if (!p._fugaFlameTimer) p._fugaFlameTimer = 0;
+      p._fugaFlameTimer++;
+
+      if (!p._trailHistory) p._trailHistory = [];
+      if (!p.flameParticles) p.flameParticles = [];
+      if (!p.emberParticles) p.emberParticles = [];
+
+      // Record position trail for the long streaming fire wake
+      p._trailHistory.push({ x: p.x, y: p.y, time: time });
+      const maxTrailLen = 48;
+      while (p._trailHistory.length > maxTrailLen) p._trailHistory.shift();
+
+      // ── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched ──
+      for (let i = 0; i < 3; i++) {
+        const spawnOffset = -Math.random() * 20;
+        p.flameParticles.push({
+          x: spawnOffset,
+          y: (Math.random() - 0.5) * 14,
+          vx: -(3.0 + Math.random() * 5.0 + speed * 0.12),
+          vy: (Math.random() - 0.5) * 2.5,
+          size: 6 + Math.random() * 10,
+          maxSize: 22 + Math.random() * 18,
+          life: 1.0,
+          maxLife: 1.0,
+          decay: 0.018 + Math.random() * 0.014,
+          wobblePhase: Math.random() * Math.PI * 2,
+          wobbleSpeed: 0.12 + Math.random() * 0.2,
+          turbSeed: Math.random() * 100,
+          layer: i % 3 // 0=white-core, 1=golden, 2=crimson-outer
+        });
+      }
+
+      // ── SPAWN EMBERS: Glowing sparks that dissolve at trail end ──
+      if (Math.random() < 0.85) {
+        p.emberParticles.push({
+          x: 5 - Math.random() * 25,
+          y: (Math.random() - 0.5) * 20,
+          vx: -(4 + Math.random() * 8 + speed * 0.18),
+          vy: (Math.random() - 0.5) * 5.0,
+          size: 1.0 + Math.random() * 2.0,
+          life: 1.0,
+          maxLife: 1.0,
+          decay: 0.012 + Math.random() * 0.012,
+          trail: []
+        });
+      }
+
+      // Cap particles
+      while (p.flameParticles.length > 120) p.flameParticles.shift();
+      while (p.emberParticles.length > 40) p.emberParticles.shift();
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+
+      // ═══════════════════════════════════════════════════════════════
+      // LAYER 0: LONG TURBULENT FIRE WAKE (drawn from trail history)
+      // A massive streaking energy wake that makes the arrow look
+      // like it's ripping through the air and igniting everything
+      // ═══════════════════════════════════════════════════════════════
+      if (p._trailHistory.length > 3) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Convert trail history to local coordinates
+        const cosA = Math.cos(-angle);
+        const sinA = Math.sin(-angle);
+        const localTrail = p._trailHistory.map(pt => {
+          const dx = pt.x - p.x;
+          const dy = pt.y - p.y;
+          return { x: dx * cosA - dy * sinA, y: dx * sinA + dy * cosA };
+        });
+
+        // Draw multiple layered turbulent fire tongues along the trail
+        for (let layer = 0; layer < 3; layer++) {
+          const widthMul = layer === 0 ? 1.0 : layer === 1 ? 0.6 : 0.3;
+          const baseWidth = (18 + speed * 0.5) * widthMul;
+
+          ctx.beginPath();
+          const len = localTrail.length;
+
+          // Top edge with turbulence
+          for (let j = len - 1; j >= 0; j--) {
+            const t = j / (len - 1); // 0=oldest, 1=newest
+            const fadeWidth = baseWidth * (0.15 + t * 0.85);
+            const turb = Math.sin(time * 7.0 - j * 0.6 + layer * 2.1) * fadeWidth * 0.4;
+            const turb2 = Math.cos(time * 5.3 + j * 0.9 + layer * 1.3) * fadeWidth * 0.25;
+            const yOff = fadeWidth + turb + turb2;
+            if (j === len - 1) ctx.moveTo(localTrail[j].x, localTrail[j].y - yOff);
+            else ctx.lineTo(localTrail[j].x, localTrail[j].y - yOff);
+          }
+
+          // Bottom edge with turbulence (reversed)
+          for (let j = 0; j < len; j++) {
+            const t = j / (len - 1);
+            const fadeWidth = baseWidth * (0.15 + t * 0.85);
+            const turb = Math.sin(time * 7.0 - j * 0.6 + layer * 2.1 + 3.14) * fadeWidth * 0.4;
+            const turb2 = Math.cos(time * 5.3 + j * 0.9 + layer * 1.3 + 1.57) * fadeWidth * 0.25;
+            const yOff = fadeWidth + turb + turb2;
+            ctx.lineTo(localTrail[j].x, localTrail[j].y + yOff);
+          }
+
+          ctx.closePath();
+
+          // Color cascade: white → yellow → golden orange → deep orange → crimson
+          const trailStartX = localTrail[len - 1].x;
+          const trailEndX = localTrail[0].x;
+          const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
+
+          if (layer === 0) {
+            // Outermost: crimson → deep orange fade
+            wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
+            wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
+            wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
+            wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
+          } else if (layer === 1) {
+            // Middle: golden orange → deep orange
+            wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
+            wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
+            wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
+            wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
+          } else {
+            // Innermost core: white → bright yellow
+            wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
+            wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
+            wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
+            wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
+          }
+
+          ctx.fillStyle = wakeGrad;
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // LAYER 1: FLUID FLAME BLOBS — curling, twisting smoke-fire
+      // ═══════════════════════════════════════════════════════════════
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = p.flameParticles.length - 1; i >= 0; i--) {
+        const fp = p.flameParticles[i];
+        fp.life -= fp.decay;
+        if (fp.life <= 0) { p.flameParticles.splice(i, 1); continue; }
+
+        // Fluid curl motion: sine wobble + turbulence offset
+        fp.wobblePhase += fp.wobbleSpeed;
+        const turbX = Math.sin(fp.turbSeed + time * 3.5) * 2.0;
+        const turbY = Math.cos(fp.turbSeed * 1.7 + time * 2.8) * 3.0;
+        fp.x += fp.vx + turbX * 0.3;
+        fp.y += fp.vy + turbY * 0.3;
+        fp.vy += Math.sin(fp.wobblePhase) * 0.15; // gentle curling drift
+
+        const prog = fp.life / fp.maxLife;
+        const ageRatio = 1 - prog; // 0=new, 1=dying
+        const curSize = fp.size + (fp.maxSize - fp.size) * ageRatio;
+        const alpha = prog * prog; // quadratic falloff for smoother fade
+        const wobY = Math.sin(fp.wobblePhase) * 3.0;
+
+        // Velocity-stretched ellipses (more elongated = more speed feel)
+        const stretchX = curSize * (1.6 + speed * 0.03);
+        const stretchY = curSize * (0.7 + ageRatio * 0.3);
+
+        const pGrad = ctx.createRadialGradient(fp.x, fp.y + wobY, 0, fp.x, fp.y + wobY, Math.max(stretchX, stretchY));
+
+        if (fp.layer === 0) {
+          // White-hot core blobs (youngest, closest to arrow)
+          pGrad.addColorStop(0, `rgba(255, 255, 250, ${alpha * 0.95})`);
+          pGrad.addColorStop(0.3, `rgba(255, 245, 180, ${alpha * 0.8})`);
+          pGrad.addColorStop(0.6, `rgba(255, 200, 60, ${alpha * 0.5})`);
+          pGrad.addColorStop(1, 'rgba(255, 120, 0, 0)');
+        } else if (fp.layer === 1) {
+          // Golden-orange mid layer
+          pGrad.addColorStop(0, `rgba(255, 220, 80, ${alpha * 0.85})`);
+          pGrad.addColorStop(0.35, `rgba(255, 160, 20, ${alpha * 0.65})`);
+          pGrad.addColorStop(0.7, `rgba(230, 80, 0, ${alpha * 0.35})`);
+          pGrad.addColorStop(1, 'rgba(160, 20, 0, 0)');
+        } else {
+          // Crimson-red outer layer (oldest, farthest back)
+          pGrad.addColorStop(0, `rgba(255, 140, 30, ${alpha * 0.7})`);
+          pGrad.addColorStop(0.4, `rgba(220, 50, 0, ${alpha * 0.45})`);
+          pGrad.addColorStop(0.8, `rgba(140, 15, 0, ${alpha * 0.2})`);
+          pGrad.addColorStop(1, 'rgba(60, 0, 0, 0)');
+        }
+
+        ctx.fillStyle = pGrad;
+        ctx.beginPath();
+        ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // ═══════════════════════════════════════════════════════════════
+      // LAYER 2: GLOWING EMBER SPARKS — dissolving at trail end
+      // ═══════════════════════════════════════════════════════════════
+      for (let i = p.emberParticles.length - 1; i >= 0; i--) {
+        const ep = p.emberParticles[i];
+        ep.life -= ep.decay;
+        if (ep.life <= 0) { p.emberParticles.splice(i, 1); continue; }
+        ep.trail.push({ x: ep.x, y: ep.y });
+        if (ep.trail.length > 8) ep.trail.shift();
+        ep.x += ep.vx;
+        ep.y += ep.vy;
+        ep.vy += (Math.random() - 0.5) * 0.4; // random drift
+        const prog = ep.life / ep.maxLife;
+
+        // Ember streak trail
+        if (ep.trail.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
+          for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
+          ctx.lineTo(ep.x, ep.y);
+          ctx.strokeStyle = `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
+          ctx.lineWidth = ep.size * 0.7;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+
+        // Bright ember head
+        ctx.beginPath();
+        ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
+        ctx.fill();
+      }
+
+      ctx.restore(); // lighter
+
+      // ═══════════════════════════════════════════════════════════════
+      // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES
+      // Thin velocity lines showing air being torn apart
+      // ═══════════════════════════════════════════════════════════════
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = 'rgba(255, 200, 100, 0.4)';
+      ctx.lineWidth = 1.0;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        const yOff = (i - 2) * 6 + Math.sin(time * 8 + i * 1.7) * 4;
+        const startX = -10 - Math.random() * 10;
+        const endX = startX - 25 - Math.random() * 35;
+        ctx.beginPath();
+        ctx.moveTo(startX, yOff);
+        ctx.lineTo(endX, yOff + Math.sin(time * 6 + i) * 3);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.restore(); // restore translate/rotate
+
+      // Draw main Volcanic Magma Flame Arrow construct on top
+      drawDivineFlameArrowConstruct(ctx, {
+        x: p.x,
+        y: p.y,
+        angle,
+        scale: 1.0,
+        progress: 1.0,
+        isFlying: true,
+        time
+      });
+
+      return;
+    }
+
     // Gun Slinger bullet visual - detailed brass/copper revolver bullets
     if (p.visual === 'gunslingerBullet') {
       const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
@@ -1219,13 +2127,46 @@ export function drawProjectiles() {
       return;
     }
 
+    if (p.isArcaneBolt) {
+      drawTricksterBolt(ctx, p);
+      return;
+    }
+
+    if (p.visual === 'gojoBlue' || p.isGojoPurple) {
+      ctx.save();
+      
+      const colorType = p.isGojoPurple ? 'purple' : 'blue';
+      
+      // Calculate fade-out for purple orb when life is running out
+      if (p.isGojoPurple) {
+        const lifeRatio = p.life / p.maxLife;
+        // Start fading when life is below 30%, smooth fade from 30% to 0%
+        if (lifeRatio < 0.3) {
+          const fadeAlpha = lifeRatio / 0.3; // 0 to 1 as life goes from 0% to 30%
+          ctx.globalAlpha = fadeAlpha;
+        }
+      }
+      
+      // Draw custom trail for Purple orb - Hollow Purple effect
+      if (p.isGojoPurple && p.history && p.history.length > 1) {
+        drawPurpleOrbTrail(ctx, p, Date.now());
+      }
+      
+      // Draw the highly detailed orb
+      drawGojoOrb(ctx, p.x, p.y, p.r, Date.now(), colorType, 0);
+      
+      ctx.restore();
+      return;
+    }
+
     // Default projectile draw
     // Make projectile visuals depend on the owner projectile color/type.
     // RED: red-orange motion trail; BLUE: cyan “laser-ish” streak.
     const isRed = (p.color && p.color.toLowerCase().includes('ff4d4d')) ||
       (p.color && p.color.toLowerCase().includes('ff') && p.color.toLowerCase().includes('4d'));
     const isBlue = (p.color && p.color.toLowerCase().includes('4da3ff')) ||
-      (p.color && p.color.toLowerCase().includes('a3') && p.color.toLowerCase().includes('ff'));
+      (p.color && p.color.toLowerCase().includes('a3') && p.color.toLowerCase().includes('ff')) ||
+      (p.color && p.color.toLowerCase().includes('00ffff'));
 
     if (p.history && p.history.length > 1 && (isRed || isBlue)) {
       ctx.save();
@@ -1522,6 +2463,16 @@ export function drawFighters() {
       fighter._drawAttackSlashEffects(ctx);
     } catch (e) {
       console.error('fighter slash effect draw error:', e);
+    }
+  });
+
+  // Draw beam overlays (LaserFighter / Trickster laser beams) on top of fighters
+  fighters.forEach((fighter) => {
+    if (!fighter || fighter.hp <= 0 || typeof fighter.drawBeamOverlay !== 'function') return;
+    try {
+      fighter.drawBeamOverlay(ctx);
+    } catch (e) {
+      console.error('fighter beam overlay draw error:', e);
     }
   });
 
@@ -1858,10 +2809,122 @@ export function drawAllCronosSpheres(ctx) {
           alpha: 0.9,
           deployProgress,
           now,
+          theme: fighter.sphereTheme
         });
       }
     } catch (e) {
       console.error('Error in drawAllCronosSpheres:', e);
+    }
+  }
+}
+
+export function drawThermobaricExplosions(ctx) {
+  if (!state.thermobaricExplosions || state.thermobaricExplosions.length === 0) return;
+
+  for (let i = state.thermobaricExplosions.length - 1; i >= 0; i--) {
+    const exp = state.thermobaricExplosions[i];
+    exp.life--;
+    
+    const progress = 1 - (exp.life / exp.maxLife);
+    const radius = exp.radius + (exp.maxRadius - exp.radius) * Math.sin(progress * Math.PI * 0.5);
+    const alpha = Math.max(0, 1 - progress);
+
+    ctx.save();
+
+    // 1. CRACKS & SHATTERED GROUND AT IMPACT SURFACE
+    if (exp.cracks && exp.cracks.length > 0) {
+      ctx.save();
+      const crackAlpha = Math.max(0, 1 - progress * 0.7);
+      
+      // Lava glow seam inside cracks
+      ctx.strokeStyle = `rgba(255, 60, 0, ${0.9 * crackAlpha})`;
+      ctx.lineWidth = 4;
+      ctx.lineCap = 'round';
+      exp.cracks.forEach(segments => {
+        segments.forEach(seg => {
+          ctx.beginPath();
+          ctx.moveTo(seg.x1, seg.y1);
+          ctx.lineTo(seg.x2, seg.y2);
+          ctx.stroke();
+        });
+      });
+
+      // Dark charcoal cracked ground contour
+      ctx.strokeStyle = `rgba(20, 20, 20, ${0.95 * crackAlpha})`;
+      ctx.lineWidth = 2;
+      exp.cracks.forEach(segments => {
+        segments.forEach(seg => {
+          ctx.beginPath();
+          ctx.moveTo(seg.x1, seg.y1);
+          ctx.lineTo(seg.x2, seg.y2);
+          ctx.stroke();
+        });
+      });
+      ctx.restore();
+    }
+
+    ctx.translate(exp.x, exp.y);
+
+    // 2. EXPANDING RINGS OF ORANGE AND RED FLAMES OUTWARD
+    // Outer deep crimson flame shockwave
+    ctx.lineWidth = 18 * (1 - progress);
+    ctx.strokeStyle = `rgba(200, 10, 0, ${0.85 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Mid vibrant orange flame ring
+    ctx.lineWidth = 10 * (1 - progress);
+    ctx.strokeStyle = `rgba(255, 120, 0, ${0.9 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.85, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Inner bright white-gold heat wave ring
+    ctx.lineWidth = 5 * (1 - progress);
+    ctx.strokeStyle = `rgba(255, 230, 160, ${0.95 * alpha})`;
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.65, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 3. FLYING DEBRIS AND EMBERS
+    if (exp.debris && exp.debris.length > 0) {
+      exp.debris.forEach(d => {
+        d.x += d.vx;
+        d.y += d.vy;
+        d.vy += 0.25; // gravity drop
+        d.rot += d.rotSpeed;
+
+        ctx.save();
+        ctx.translate(d.x - exp.x, d.y - exp.y);
+        ctx.rotate(d.rot);
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = d.color;
+        ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+        ctx.restore();
+      });
+    }
+
+    // 4. BRIGHT WHITE CORE AT IMPACT POINT
+    if (progress < 0.45) {
+      const coreAlpha = (0.45 - progress) / 0.45;
+      const coreR = radius * (0.6 - progress * 0.5);
+
+      const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, coreR));
+      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * coreAlpha})`);
+      coreGrad.addColorStop(0.5, `rgba(255, 240, 200, ${0.85 * coreAlpha})`);
+      coreGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, Math.max(1, coreR), 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    if (exp.life <= 0) {
+      state.thermobaricExplosions.splice(i, 1);
     }
   }
 }

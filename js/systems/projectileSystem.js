@@ -5,8 +5,9 @@ import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { state, registerProjectileSystem, triggerGlobalScreenShake } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
-import { playSound } from './soundSystem.js';
+import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound } from './soundSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
+import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch } from '../graphics/particles/sparkEffect.js';
@@ -93,6 +94,11 @@ class ProjectileSystem {
     proj.visual = null;
     proj.explosionType = null;
     
+    if (proj.soundKey) {
+      fadeOutLoopingSound(proj.soundKey, 500); // Smooth fade out over 0.5s when projectile dies
+      proj.soundKey = null;
+    }
+    
     if (proj.history) proj.history.length = 0;
   }
 
@@ -120,10 +126,10 @@ class ProjectileSystem {
    * Optionally accepts custom spawn position and angle for dual-wield fighters.
    */
   fireProjectile(fighter, ownerIndex, damage, isFollowUp = false, speedOverride, willBecomeBlackHole = false, visual, customSpawnX, customSpawnY, customAngle) {
-    // OPTIMIZATION: Skip projectile if we've exceeded the dynamic limit
-    if (this.projectiles.length >= this.maxActiveProjectiles) {
-      return; // Silently drop excess projectiles to maintain performance
-    }
+    // OPTIMIZATION: We used to drop projectiles here if we exceeded maxActiveProjectiles,
+    // but that caused real bullets to fail to spawn when there were too many visual particles.
+    // We now let the array exceed the limit temporarily, and update() will prune oldest/visual
+    // projectiles on the next frame to maintain performance without breaking gameplay.
 
     const { radius, life } = CONFIG.projectile;
     const speed = speedOverride ?? CONFIG.projectile.speed;
@@ -147,8 +153,19 @@ class ProjectileSystem {
         const nearbyFighters = spatialGrid.getNearby(fighter.x, fighter.y, tipDist + 50);
         for (const f of nearbyFighters) {
           if (f && f !== fighter && f.hp > 0) {
+            let isEnemy = false;
             const fi = state.fighters.indexOf(f);
-            if (fi !== -1 && !areOnSameTeam(ownerIndex, fi)) {
+            
+            if (fi !== -1) {
+              // It's a fighter
+              isEnemy = !areOnSameTeam(ownerIndex, fi);
+            } else if (f.isIllusion) {
+              // It's an illusion
+              const illusionOwnerIndex = f.owner?.fighterIndex ?? state.fighters.indexOf(f.owner);
+              isEnemy = (illusionOwnerIndex !== ownerIndex) && !areOnSameTeam(ownerIndex, illusionOwnerIndex);
+            }
+
+            if (isEnemy) {
               const dx = f.x - fighter.x;
               const dy = f.y - fighter.y;
               const distToEnemy = Math.hypot(dx, dy);
@@ -178,6 +195,9 @@ class ProjectileSystem {
     if (!visualType && fighter._def && fighter._def.type === 'aimbot') {
       visualType = 'rangerBullet';
     }
+    if (!visualType && fighter._def && (fighter._def.type === 'sukuna' || fighter._def.name === 'Sukuna')) {
+      visualType = 'sukunaSlash';
+    }
 
     const proj = this._getProjectile();
     proj.x = spawnX;
@@ -186,6 +206,7 @@ class ProjectileSystem {
     proj.vy = dirY * speed;
     proj.r = radius;
     proj.life = life;
+    proj.maxLife = life;
     proj.color = fighter.color;
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
@@ -285,6 +306,270 @@ class ProjectileSystem {
     proj.historyMax = 15;
     
     this.projectiles.push(proj);
+  }
+
+  fireGojoBlue(fighter, ownerIndex, damage, customSpawnX, customSpawnY, customAngle) {
+    const radius = CONFIG.gojo.blueRadius || 80;
+    const speed = CONFIG.gojo.blueSpeed || (CONFIG.projectile.speed * (fighter.projectileSpeedMultiplier || 1.5));
+    const projDamage = Number(damage);
+
+    let spawnX, spawnY, dirX, dirY;
+    if (customSpawnX !== undefined && customSpawnY !== undefined) {
+      spawnX = customSpawnX;
+      spawnY = customSpawnY;
+      const angle = customAngle !== undefined ? customAngle : fighter.gunAngle;
+      dirX = Math.cos(angle);
+      dirY = Math.sin(angle);
+    } else {
+      const tipDist = GUN_TIP_DIST(fighter.r);
+      dirX = Math.cos(fighter.gunAngle);
+      dirY = Math.sin(fighter.gunAngle);
+      spawnX = fighter.x + dirX * tipDist;
+      spawnY = fighter.y + dirY * tipDist;
+    }
+
+    const proj = this._getProjectile();
+    proj.x = spawnX;
+    proj.y = spawnY;
+    proj.vx = dirX * speed;
+    proj.vy = dirY * speed;
+    proj.r = 10;
+    proj.life = 180; // Extended lifetime to reach arena walls
+    proj.maxLife = 180;
+    proj.color = '#00FFFF'; // Cyan
+    proj.owner = ownerIndex;
+    proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
+    
+    proj.isGojoBlue = true;
+    proj.visual = 'gojoBlue'; // Distinct visual
+    proj.hitTargets = new Set();
+    
+    if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
+    proj.historyMax = 10;
+    this.projectiles.push(proj);
+  }
+
+  fireGojoPurple(fighter, ownerIndex, damage) {
+    const speed = CONFIG.gojo.purpleSpeed || 8;
+    const tipDist = GUN_TIP_DIST(fighter.r) + 20;
+    const dirX = Math.cos(fighter.gunAngle);
+    const dirY = Math.sin(fighter.gunAngle);
+    
+    const proj = this._getProjectile();
+    proj.x = fighter.x + dirX * tipDist;
+    proj.y = fighter.y + dirY * tipDist;
+    proj.vx = dirX * speed;
+    proj.vy = dirY * speed;
+    proj.r = CONFIG.gojo.purpleRadius || 40;
+    proj.life = CONFIG.gojo.purpleLife || 300;
+    proj.maxLife = proj.life;
+    proj.color = '#8A2BE2'; // Purple
+    proj.owner = ownerIndex;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 10;
+    proj.isGojoPurple = true;
+    proj.hitTargets = new Set();
+    proj.hitFighters = new Set(); // Piercing
+    proj.purpleDPS = CONFIG.gojo.purpleDPS || 5;
+    proj.purpleDPSInterval = CONFIG.gojo.purpleDPSInterval || 30;
+    proj.purpleLastDPSTick = 0;
+    proj.purpleDamagedFighters = new Set(); // Track who has been DPS'd
+    
+    // Initialize history for trail effect - Hollow Purple swirling vortex
+    proj.history = [];
+    proj.history.push({ x: proj.x, y: proj.y });
+    proj.historyMax = 20;
+    this.projectiles.push(proj);
+
+    // Screen shake when purple orb fires - massive impact!
+    const shakeIntensity = CONFIG.gojo.purpleShakeIntensity || 25;
+    const shakeDuration = CONFIG.gojo.purpleShakeDuration || 30;
+    triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+
+    // Play Hollow Purple audio and loop it while the projectile exists
+    const sound = getSkillSound(21, 'purple_fire');
+    if (sound) {
+      const soundKey = 'purple_fire_' + Math.random().toString(36).substr(2, 9);
+      proj.soundKey = soundKey;
+      playLoopingSound(soundKey, sound.src, sound.volume);
+    }
+  }
+
+  /**
+   * Fires Sukuna's Dismantle grid slashes (long distance basic attack).
+   * Spawns parallel faint flying slashes in a grid formation.
+   */
+  fireSukunaDismantleGrid(fighter, ownerIndex, damage) {
+    const speed = CONFIG.sukuna?.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
+    const angle = fighter.gunAngle;
+    const tipDist = GUN_TIP_DIST(fighter.r);
+    
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+    const perpX = -dirY;
+    const perpY = dirX;
+    
+    const startX = fighter.x + dirX * tipDist;
+    const startY = fighter.y + dirY * tipDist;
+
+    const offsets = [-14, 0, 14];
+    offsets.forEach((offset, idx) => {
+      const proj = this._getProjectile();
+      proj.x = startX + perpX * offset;
+      proj.y = startY + perpY * offset;
+      proj.vx = dirX * speed;
+      proj.vy = dirY * speed;
+      proj.r = 6;
+      proj.life = 90;
+      proj.maxLife = 90;
+      proj.color = '#8B0000';
+      proj.owner = ownerIndex;
+      proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 8;
+      proj.visual = 'sukunaDismantleGrid';
+      proj.gridIndex = idx;
+      proj.history = [];
+      proj.history.push({ x: proj.x, y: proj.y });
+      proj.historyMax = 8;
+      this.projectiles.push(proj);
+    });
+  }
+
+  /**
+   * Fires Sukuna's Furnace (Fuga) flaming arrow nuke.
+   */
+  fireSukunaFurnace(fighter, ownerIndex, damage) {
+    const speed = CONFIG.sukuna?.divineFlameSpeed || (CONFIG.projectile.speed * 1.8);
+    const tipDist = GUN_TIP_DIST(fighter.r) + 15;
+    const dirX = Math.cos(fighter.gunAngle);
+    const dirY = Math.sin(fighter.gunAngle);
+    
+    const proj = this._getProjectile();
+    proj.x = fighter.x + dirX * tipDist;
+    proj.y = fighter.y + dirY * tipDist;
+    proj.vx = dirX * speed;
+    proj.vy = dirY * speed;
+    proj.r = 10;
+    proj.life = 180;
+    proj.maxLife = 180;
+    proj.color = '#FF4500';
+    proj.owner = ownerIndex;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 35;
+    proj.isSukunaFurnace = true;
+    proj.visual = 'sukunaFurnaceArrow';
+    proj.history = [];
+    proj.history.push({ x: proj.x, y: proj.y });
+    proj.historyMax = 12;
+    
+    // Initialize wind-blown flame particle system for Fuga arrow
+    proj.flameParticles = [];
+    proj.emberParticles = [];
+    proj._fugaFlameTimer = 0;
+    
+    this.projectiles.push(proj);
+  }
+
+  /**
+   * Alias for backwards compatibility
+   */
+  fireSukunaDivineFlame(fighter, ownerIndex, damage) {
+    this.fireSukunaFurnace(fighter, ownerIndex, damage);
+  }
+
+  /**
+   * Triggers a thermobaric explosion upon Furnace arrow impact.
+   */
+  triggerThermobaricExplosion(x, y, ownerIndex, damage) {
+    const splashRadius = 140;
+    const attacker = state.fighters ? state.fighters[ownerIndex] : null;
+    
+    // Play explosion sound
+    const fugaExplodeSound = getSkillSound(attacker?._def?.id || 'sukuna', 'fuga_explode');
+    if (fugaExplodeSound) playSound(fugaExplodeSound.src, fugaExplodeSound.volume);
+    
+    triggerGlobalScreenShake(18, 25);
+    if (typeof spawnGroundScorch === 'function') spawnGroundScorch(x, y, 80);
+    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 100, 'orange');
+    if (typeof spawnSparks === 'function') spawnSparks(x, y, 45, 'orange', '#FF4500');
+
+    // Generate ground cracks radiating from impact point
+    const cracks = [];
+    const numCracks = 8;
+    for (let c = 0; c < numCracks; c++) {
+      const crackAngle = (c / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const crackLen = 45 + Math.random() * 55;
+      const segments = [];
+      let currentX = x;
+      let currentY = y;
+      const numSegs = 4;
+      for (let s = 0; s < numSegs; s++) {
+        const segLen = (crackLen / numSegs);
+        const segAngle = crackAngle + (Math.random() - 0.5) * 0.5;
+        const nextX = currentX + Math.cos(segAngle) * segLen;
+        const nextY = currentY + Math.sin(segAngle) * segLen;
+        segments.push({ x1: currentX, y1: currentY, x2: nextX, y2: nextY });
+        currentX = nextX;
+        currentY = nextY;
+      }
+      cracks.push(segments);
+    }
+
+    // Generate flying rock debris & ember chunks
+    const debris = [];
+    const numDebris = 16;
+    for (let d = 0; d < numDebris; d++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 4 + Math.random() * 9;
+      debris.push({
+        x: x + Math.cos(angle) * 10,
+        y: y + Math.sin(angle) * 10,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1.5,
+        size: 3 + Math.random() * 5,
+        rot: Math.random() * Math.PI * 2,
+        rotSpeed: (Math.random() - 0.5) * 0.3,
+        color: Math.random() > 0.4 ? '#333333' : '#FF4500'
+      });
+    }
+
+    if (!state.thermobaricExplosions) state.thermobaricExplosions = [];
+    state.thermobaricExplosions.push({
+      x, y, radius: 10, maxRadius: splashRadius, life: 32, maxLife: 32,
+      cracks, debris
+    });
+
+    const sound = getSkillEffectSound('explosion');
+    if (sound) playSound(sound.src, sound.volume || 0.8);
+
+    if (state.fighters) {
+      state.fighters.forEach((f, idx) => {
+        if (f && f.hp > 0 && idx !== ownerIndex && !areOnSameTeam(ownerIndex, idx)) {
+          const dist = Math.hypot(f.x - x, f.y - y);
+          if (dist <= splashRadius) {
+            const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
+            const splashDmg = damage * splashRatio;
+            f.takeDamage(splashDmg, attacker, { isExplosion: true });
+            
+            const angle = Math.atan2(f.y - y, f.x - x);
+            const pushForce = 12 * (1 - dist / splashRadius);
+            f.vx += Math.cos(angle) * pushForce;
+            f.vy += Math.sin(angle) * pushForce;
+          }
+        }
+      });
+    }
+
+    if (state.illusions) {
+      state.illusions.forEach((ill) => {
+        if (ill && ill.hp > 0) {
+          const illOwner = ill.owner?.fighterIndex ?? (state.fighters ? state.fighters.indexOf(ill.owner) : -1);
+          if (illOwner !== ownerIndex && !areOnSameTeam(ownerIndex, illOwner)) {
+            const dist = Math.hypot(ill.x - x, ill.y - y);
+            if (dist <= splashRadius) {
+              applyDamageToTarget(ill, damage * 0.7, attacker, { isExplosion: true });
+            }
+          }
+        }
+      });
+    }
   }
 
   /**
@@ -549,8 +834,16 @@ class ProjectileSystem {
               projectile.hitTargets.add(fi);
             }
             
-            // Enhanced sniper bullet pierces through enemies!
-            if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
+            // Sukuna slashes pierce through enemies like paper!
+            if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade') {
+              if (!projectile.hitFighters) projectile.hitFighters = new Set();
+              projectile.hitFighters.add(fighter);
+              
+              // Spawn some blood/sparks to show it sliced straight through
+              spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
+              
+              // Do NOT return true, allowing it to continue flying
+            } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
               if (!projectile.hitFighters) projectile.hitFighters = new Set();
               projectile.hitFighters.add(fighter);
               
@@ -580,6 +873,26 @@ class ProjectileSystem {
               fighter.crimsonElectrifiedTrickster = isTrickster; // Save trickster state for green electricity
               fighter.lastCrimsonAttacker = attacker;
               // Do NOT return true, so the projectile is not destroyed
+            } else if (projectile.isGojoPurple) {
+              if (!projectile.hitFighters) projectile.hitFighters = new Set();
+              projectile.hitFighters.add(fighter);
+              spawnSparks(fighter.x, fighter.y, 8, 'lightningTrail', '#8A2BE2');
+              spawnImpactFlash(fighter.x, fighter.y, 35, 'lightningTrail');
+              if (typeof triggerGlobalScreenShake === 'function') {
+                triggerGlobalScreenShake(2, 4);
+              }
+              // Do NOT return true
+            } else if (projectile.isSukunaFurnace) {
+              this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
+              return true;
+            } else if (projectile.isGojoBlue) {
+              if (!projectile.hitFighters) projectile.hitFighters = new Set();
+              if (!projectile.hitFighters.has(fighter)) {
+                projectile.hitFighters.add(fighter);
+                spawnSparks(fighter.x, fighter.y, 6, 'lightningTrail', '#00D4CC');
+                spawnImpactFlash(fighter.x, fighter.y, 20, 'lightningTrail');
+              }
+              // Do NOT return true so Gojo Blue passes THROUGH targets to the walls!
             } else if (projectile.isArcaneBolt) {
                  if (!projectile.hitFighters) projectile.hitFighters = new Set();
                  projectile.hitFighters.add(fighter);
@@ -653,28 +966,54 @@ class ProjectileSystem {
                  
                  spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
                  
+                 // Play thunder strike sound on basic attack hit
+                 if (attacker && typeof attacker._def !== 'undefined') {
+                   const stormSound = getSkillSound(attacker._def.id, 'storm');
+                   if (stormSound) playSound(stormSound.src, stormSound.volume * 0.5);
+                 }
+                 
                  if (projectile.chainCount > 0) {
                      projectile.chainCount--;
                      projectile.damage *= (CONFIG.zeus.chainDamageMultiplier || 0.8);
                      
                      // Find nearest valid enemy to chain towards
                      let bestDist = (CONFIG.zeus.chainRange || 150) ** 2;
-                     let bestFighter = null;
-                     for (let f of fighters) {
-                        if (f && f !== fighter && f !== attacker && f.hp > 0 && !projectile.hitFighters.has(f) && !areOnSameTeam(projectile.owner, fighters.indexOf(f))) {
-                            const ddx = f.x - projectile.x;
-                            const ddy = f.y - projectile.y;
-                            const distSq = ddx*ddx + ddy*ddy;
-                            if (distSq < bestDist) {
-                                bestDist = distSq;
-                                bestFighter = f;
-                            }
-                        }
+                     let bestTarget = null;
+                     
+                     // Helper to check and update best target
+                     const checkTarget = (t, index = null) => {
+                         let isEnemy = false;
+                         if (index !== null) {
+                             isEnemy = !areOnSameTeam(projectile.owner, index);
+                         } else if (t.owner) {
+                             isEnemy = !areOnSameTeam(projectile.owner, fighters.indexOf(t.owner));
+                         }
+                         
+                         if (t && t !== fighter && t !== attacker && t.hp > 0 && !projectile.hitFighters.has(t) && isEnemy) {
+                             const ddx = t.x - projectile.x;
+                             const ddy = t.y - projectile.y;
+                             const distSq = ddx*ddx + ddy*ddy;
+                             if (distSq < bestDist) {
+                                 bestDist = distSq;
+                                 bestTarget = t;
+                             }
+                         }
+                     };
+
+                     // Check main fighters
+                     for (let i = 0; i < fighters.length; i++) {
+                         checkTarget(fighters[i], i);
+                     }
+                     // Check illusions
+                     if (state.illusions) {
+                         for (let ill of state.illusions) {
+                             checkTarget(ill);
+                         }
                      }
                      
-                     if (bestFighter) {
-                        const ddx = bestFighter.x - projectile.x;
-                        const ddy = bestFighter.y - projectile.y;
+                     if (bestTarget) {
+                        const ddx = bestTarget.x - projectile.x;
+                        const ddy = bestTarget.y - projectile.y;
                         const dist = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
                         const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
                         projectile.vx = (ddx/dist) * speed;
@@ -739,8 +1078,13 @@ class ProjectileSystem {
         const attacker = fighters[projectile.owner];
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
         
-        // Enhanced sniper bullet pierces through illusions!
-        if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
+        // Sukuna slashes pierce through illusions!
+        if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid') {
+          if (!projectile.hitFighters) projectile.hitFighters = new Set();
+          projectile.hitFighters.add(illusion);
+          spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
+          // Do NOT return true
+        } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
           if (!projectile.hitFighters) projectile.hitFighters = new Set();
           projectile.hitFighters.add(illusion);
           spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
@@ -749,6 +1093,12 @@ class ProjectileSystem {
           const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
           illusion.crimsonElectrifiedTimer = Math.max(illusion.crimsonElectrifiedTimer || 0, duration);
           illusion.lastCrimsonAttacker = attacker;
+          // Do NOT return true
+        } else if (projectile.isGojoPurple) {
+          if (!projectile.hitFighters) projectile.hitFighters = new Set();
+          projectile.hitFighters.add(illusion);
+          spawnSparks(illusion.x, illusion.y, 8, 'lightningTrail', '#8A2BE2');
+          spawnImpactFlash(illusion.x, illusion.y, 25, 'lightningTrail');
           // Do NOT return true
         } else {
           return true;
@@ -1314,6 +1664,36 @@ class ProjectileSystem {
    */
   isProjectileExpired(p) {
     const arena = CONFIG.arena;
+    
+    // Sukuna Furnace Arrow: triggers thermobaric explosion on wall hit or max range expiration
+    if (p.isSukunaFurnace) {
+      if (
+        p.life <= 0 ||
+        p.x - p.r < arena.x ||
+        p.x + p.r > arena.x + arena.width ||
+        p.y - p.r < arena.y ||
+        p.y + p.r > arena.y + arena.height
+      ) {
+        this.triggerThermobaricExplosion(p.x, p.y, p.owner, p.damage);
+        return true;
+      }
+      return false;
+    }
+
+    // Gojo Purple orb: don't expire on wall hit, instead stick to the wall
+    if (p.isGojoPurple) {
+      if (p.life <= 0) return true;
+      
+      // Clamp position to arena boundaries so it sticks to walls
+      const halfR = p.r / 2;
+      if (p.x - halfR < arena.x) { p.x = arena.x + halfR; p.vx = 0; }
+      if (p.x + halfR > arena.x + arena.width) { p.x = arena.x + arena.width - halfR; p.vx = 0; }
+      if (p.y - halfR < arena.y) { p.y = arena.y + halfR; p.vy = 0; }
+      if (p.y + halfR > arena.y + arena.height) { p.y = arena.y + arena.height - halfR; p.vy = 0; }
+      
+      return false; // Never expire from wall collision
+    }
+    
     return (
       p.life <= 0 ||
       p.x - p.r < arena.x ||
@@ -1365,13 +1745,15 @@ class ProjectileSystem {
         }
 
         // Second pass: if still over limit, just start pruning the oldest regular projectiles
-        // PERFORMANCE: Use swap-and-pop for O(1) removal instead of shift O(n)
         if (removedCount < targetToRemove) {
           const stillToRemove = targetToRemove - removedCount;
-          for (let i = 0; i < stillToRemove && this.projectiles.length > 0; i++) {
-            this._returnProjectile(this.projectiles[0]);
-            this.projectiles[0] = this.projectiles[this.projectiles.length - 1];
-            this.projectiles.pop();
+          if (stillToRemove > 0 && this.projectiles.length > 0) {
+            // Use splice to maintain array order and correctly remove the oldest items.
+            // (The previous O(1) swap-and-pop at index 0 inadvertently deleted the newest items).
+            const removed = this.projectiles.splice(0, stillToRemove);
+            for (let i = 0; i < removed.length; i++) {
+              this._returnProjectile(removed[i]);
+            }
           }
         }
       }
@@ -1426,6 +1808,180 @@ class ProjectileSystem {
           i--;
         }
         continue;
+      }
+
+      // --- Gojo Limitless (Infinity) Spatial Projectile Interception ---
+      if (!p.isGojoBlue && !p.isGojoPurple && !p.isVisual && p.life > 0) {
+        for (let fi = 0; fi < fighters.length; fi++) {
+          if (fi === p.owner) continue;
+          const f = fighters[fi];
+          if (!f || f.hp <= 0 || f.characterId !== 'gojo') continue;
+          if (areOnSameTeam(p.owner, fi)) continue;
+
+          const infinityRadius = f.r + 30;
+          const dx = p.x - f.x;
+          const dy = p.y - (f.y - (f.z || 0));
+          const distSq = dx * dx + dy * dy;
+          if (distSq <= infinityRadius * infinityRadius && (f.infinityCooldown <= 0 || f.infinityActive)) {
+            // Intercepted by Limitless: speed reduced to 0 and damage nullified!
+            p.vx *= 0.02;
+            p.vy *= 0.02;
+            p.life = 0; // Nullified at Infinity barrier
+            if (typeof f.triggerInfinityBlock === 'function') {
+              f.triggerInfinityBlock(p.x, p.y);
+            }
+          }
+        }
+      }
+
+      // --- Gojo Blue Pull & Drag Logic ---
+      if (p.isGojoBlue) {
+        const pullRadius = CONFIG.gojo.blueRadius || 90; // Pull radius for Blue
+        const ownerTeam = state.getFighterTeam(p.owner);
+        for (let fi = 0; fi < fighters.length; fi++) {
+          if (fi === p.owner) continue;
+          const f = fighters[fi];
+          if (!f || f.hp <= 0) continue;
+          
+          const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
+          if (isEnemy && !f.immuneToCC) {
+            const dx = p.x - f.x;
+            const dy = p.y - f.y;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0 && dist < pullRadius) {
+              // 1. Inward spatial attraction toward orb center
+              const pullStrength = 3.5;
+              const force = (pullRadius - dist) / pullRadius * pullStrength;
+              f.x += (dx / dist) * force;
+              f.y += (dy / dist) * force;
+
+              // 2. Drag & carry target along with orb velocity toward the wall
+              const dragSpeed = 0.55;
+              f.vx = f.vx * 0.4 + p.vx * dragSpeed;
+              f.vy = f.vy * 0.4 + p.vy * dragSpeed;
+            }
+          }
+        }
+        // Allow it to fall through to standard movement and hit logic!
+      }
+
+      // --- Gojo Purple DPS + Slow + Pull Logic ---
+      if (p.isGojoPurple) {
+        const ownerTeam = state.getFighterTeam(p.owner);
+        const purpleSlowDuration = CONFIG.gojo.purpleSlowDuration || 60;
+        const purpleSlowMultiplier = CONFIG.gojo.purpleSlowMultiplier || 0.5;
+        const purplePullForce = CONFIG.gojo.purplePullForce || 2.0;
+        const purpleScale = CONFIG.gojo.purpleScale || 1.0;
+        const effectiveRadius = p.r * purpleScale; // Scaled hit radius based on visual size
+        
+        // Continuous screen shake while purple orb is active
+        p.purpleShakeCounter = (p.purpleShakeCounter || 0) + 1;
+        if (p.purpleShakeCounter >= 5) { // Shake every 5 frames for continuous effect
+          p.purpleShakeCounter = 0;
+          const shakeIntensity = CONFIG.gojo.purpleShakeIntensity || 2;
+          const shakeDuration = CONFIG.gojo.purpleShakeDuration || 30;
+          triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+        }
+        
+        // Record history for trail effect - Hollow Purple swirling vortex
+        p.history.push({ x: p.x, y: p.y });
+        if (p.history.length > 20) p.history.shift(); // Keep last 20 positions for trail
+        
+        // Destroy incoming enemy projectiles (like Sukuna's slashes) that touch Purple
+        for (let j = 0; j < this.projectiles.length; j++) {
+            const otherProj = this.projectiles[j];
+            if (otherProj === p || otherProj.isVisual || otherProj.life <= 0) continue;
+            // Only destroy enemy projectiles
+            if (areOnSameTeam(p.owner, otherProj.owner)) continue;
+            
+            // Check distance to see if the enemy projectile touches the Purple Orb
+            const dx = p.x - otherProj.x;
+            const dy = p.y - otherProj.y;
+            const distSq = dx * dx + dy * dy;
+            if (distSq <= effectiveRadius * effectiveRadius) {
+                // Sucked into Hollow Purple and erased from existence
+                otherProj.life = 0;
+                spawnSparks(otherProj.x, otherProj.y, 3, 'purpleTrail', '#8A2BE2');
+            }
+        }
+        
+        // DPS tick - damage enemies within the purple orb's radius periodically
+        p.purpleLastDPSTick = (p.purpleLastDPSTick || 0) + 1;
+        if (p.purpleLastDPSTick >= p.purpleDPSInterval) {
+          p.purpleLastDPSTick = 0;
+          
+          // Find all enemies within the purple orb's radius and apply DPS damage
+          for (let fi = 0; fi < fighters.length; fi++) {
+            if (fi === p.owner) continue;
+            const f = fighters[fi];
+            if (!f || f.hp <= 0) continue;
+            
+            const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
+            if (isEnemy) {
+              const dx = f.x - p.x;
+              const dy = f.y - p.y;
+              const distSq = dx * dx + dy * dy;
+              const radiusSq = effectiveRadius * effectiveRadius;
+              
+              if (distSq < radiusSq) {
+                // Apply DPS damage
+                const attacker = fighters[p.owner];
+                const dpsDamage = p.purpleDPS * (p.purpleDPSInterval / 60); // Convert DPS to per-tick damage
+                if (typeof f.takeDamage === 'function') {
+                  f.takeDamage(dpsDamage, attacker, { isProjectile: true, projectile: p });
+                }
+                
+                // Apply slow effect - refresh duration if already slowed
+                if (f.slowTimer !== undefined) {
+                  f.slowTimer = Math.max(f.slowTimer, purpleSlowDuration);
+                  f.slowMultiplier = Math.min(f.slowMultiplier || 1, purpleSlowMultiplier);
+                }
+                
+                // Dampen velocity so fighters don't fight against the drag
+                if (f.vx !== undefined && f.vy !== undefined) {
+                  f.vx *= 0.8; // Reduce velocity by 20% each frame while being dragged
+                  f.vy *= 0.8;
+                }
+                
+                // Visual feedback - sparks on DPS tick
+                spawnSparks(f.x, f.y, 5, 'lightningTrail', '#8A2BE2');
+              }
+            }
+          }
+        }
+        
+        // Continuous slow + pull effect for all enemies in the purple orb's radius
+        for (let fi = 0; fi < fighters.length; fi++) {
+          if (fi === p.owner) continue;
+          const f = fighters[fi];
+          if (!f || f.hp <= 0) continue;
+          
+          const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
+          if (isEnemy && !f.immuneToCC) {
+            const dx = p.x - f.x;
+            const dy = p.y - f.y;
+            const dist = Math.hypot(dx, dy);
+            
+            if (dist > 0 && dist < effectiveRadius) {
+              // Apply slow effect continuously while in range
+              if (f.slowTimer !== undefined) {
+                f.slowTimer = Math.max(f.slowTimer || 0, 10); // Keep slow active
+                f.slowMultiplier = Math.min(f.slowMultiplier || 1, purpleSlowMultiplier);
+              }
+              
+              // Drag enemy toward purple orb center
+              const pullStrength = purplePullForce * (1 - dist / effectiveRadius); // Stronger pull near center
+              f.x += (dx / dist) * pullStrength;
+              f.y += (dy / dist) * pullStrength;
+              
+              // Dampen velocity so fighters don't fight against the drag
+              if (f.vx !== undefined && f.vy !== undefined) {
+                f.vx *= 0.8; // Reduce velocity by 20% each frame while being dragged
+                f.vy *= 0.8;
+              }
+            }
+          }
+        }
       }
 
       if (p.isGrenade) {
@@ -1625,30 +2181,32 @@ class ProjectileSystem {
 
           const dist = Math.hypot(dx, dy);
           if (dist < effectiveRadius) {
-            // Pull fighter toward hole center.
-            // Stronger pull when the fighter is moving faster than normal,
-            // so speed boosts can't let them escape the black hole.
-            const nx = dist > 0 ? dx / dist : 0;
-            const ny = dist > 0 ? dy / dist : 0;
-            const speedFactor = Math.max(1, f.speed / (f.baseSpeed || f.speed || 1));
-            const pullStrength = CONFIG.black.blackHolePullStrength * speedFactor * (1 - dist / effectiveRadius);
+            if (!f.immuneToCC) {
+              // Pull fighter toward hole center.
+              // Stronger pull when the fighter is moving faster than normal,
+              // so speed boosts can't let them escape the black hole.
+              const nx = dist > 0 ? dx / dist : 0;
+              const ny = dist > 0 ? dy / dist : 0;
+              const speedFactor = Math.max(1, f.speed / (f.baseSpeed || f.speed || 1));
+              const pullStrength = CONFIG.black.blackHolePullStrength * speedFactor * (1 - dist / effectiveRadius);
 
-            // Apply visual shrinking effect
-            const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
-            const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
-            if (f.visualScaleTarget === undefined || targetScale < f.visualScaleTarget) {
-              f.visualScaleTarget = targetScale;
+              // Apply visual shrinking effect
+              const minScale = CONFIG.black.blackHoleVisualShrinkMin ?? 0.3;
+              const targetScale = minScale + (1 - minScale) * (dist / effectiveRadius);
+              if (f.visualScaleTarget === undefined || targetScale < f.visualScaleTarget) {
+                f.visualScaleTarget = targetScale;
+              }
+
+              const radialVelocity = f.vx * nx + f.vy * ny;
+              if (radialVelocity < 0) {
+                const correction = -radialVelocity * 1.2;
+                f.vx += nx * correction;
+                f.vy += ny * correction;
+              }
+
+              f.vx += nx * pullStrength;
+              f.vy += ny * pullStrength;
             }
-
-            const radialVelocity = f.vx * nx + f.vy * ny;
-            if (radialVelocity < 0) {
-              const correction = -radialVelocity * 1.2;
-              f.vx += nx * correction;
-              f.vy += ny * correction;
-            }
-
-            f.vx += nx * pullStrength;
-            f.vy += ny * pullStrength;
 
             // Mark owner as having an enemy in hole (affects enhanced shots)
             ownerHasEnemyInHole[ownerIndex] = true;
@@ -1985,6 +2543,9 @@ class ProjectileSystem {
 
         if (p.history && p.history.length > 1) {
           p.fadingOut = true;
+          // Store velocity before setting to 0 so visual angle is maintained during fade out
+          p._resumeVx = p.vx;
+          p._resumeVy = p.vy;
           // Stop collision and movement logic
           p.vx = 0;
           p.vy = 0;

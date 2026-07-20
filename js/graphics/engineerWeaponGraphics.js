@@ -249,7 +249,7 @@ function drawEngineerShotgunModel(ctx, recoilTimer) {
   ctx.restore();
 }
 
-function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, isStowed = false) {
+export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, isStowed = false) {
   ctx.save();
   ctx.translate(x, y);
   

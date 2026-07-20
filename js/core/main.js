@@ -18,16 +18,22 @@ import { updateLightningEffects, drawLightningEffects } from '../graphics/partic
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
-import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects } from '../graphics/draw.js';
-import { drawAllCronosSpheres } from '../graphics/draw.js';
+import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen } from '../graphics/draw.js';
+import { drawAllCronosSpheres, drawThermobaricExplosions } from '../graphics/draw.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
+import { initGraphicsCache, clearCache } from '../graphics/graphicsCache.js';
 
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
 initFlameCanvas();
 resizeFlameCanvas();
+
+// ─────────────────────────────────────────────
+// GRAPHICS CACHE INITIALIZATION
+// ─────────────────────────────────────────────
+initGraphicsCache();
 
 // Handle window resize for flame canvas
 window.addEventListener('resize', () => {
@@ -64,6 +70,16 @@ window.addEventListener('keydown', (e) => {
       const logText = state.allFpsLogs.join('\n');
       navigator.clipboard.writeText(logText).catch(err => console.error('Failed to copy logs:', err));
       state.fpsLogsCopiedTimer = 120; // Show copied message for 2 seconds
+    }
+  } else if (e.key.toLowerCase() === 't') {
+    // DEBUG: Press 'T' to trigger Gojo's RCT aura (for testing visual effect)
+    if (state.gameState === 'playing' && state.fighters) {
+      state.fighters.forEach(fighter => {
+        if (fighter && fighter._def && fighter._def.type === 'gojo') {
+          fighter.healingAuraTimer = 180;
+          console.log('[DEBUG] Triggering Gojo RCT aura...');
+        }
+      });
     }
   }
 });
@@ -164,8 +180,13 @@ function animate(timestamp) {
       state.qualityCheckTimer++;
       if (state.qualityCheckTimer >= state.qualityCheckInterval) {
         state.qualityCheckTimer = 0;
-        // Quality Level is locked to 1.0; no dynamic downgrading
-        state.qualityLevel = 1.0;
+        // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
+        if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
+          const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop much faster when FPS is very low
+          state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
+        } else if (state.fps >= state.targetFps + 20 && state.qualityLevel < 1.0) {
+          state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.03); // Recover much slower
+        }
       }
 
       // OPTIMIZED: Enforce hard cap on total particles
@@ -323,7 +344,7 @@ function animate(timestamp) {
     // OPTIMIZATION: Quality-based particle system updates
     const qualityLevel = state.qualityLevel || 1.0;
     const fps = state.fps || 60;
-    const useAggressiveParticleMode = false;
+    const useAggressiveParticleMode = fps < 35 || qualityLevel < 0.4;
 
     // Update death effects (always update, even between rounds)
     if (!useAggressiveParticleMode || Math.random() > 0.5) {
@@ -343,7 +364,8 @@ function animate(timestamp) {
     if (!useAggressiveParticleMode || Math.random() > 0.6) {
       updateSparkEffects();
     }
-    updateLightningEffects(); // Update lightning effects
+    // Update lightning effects for Zeus storm strikes
+    updateLightningEffects();
     // Update burn effects (always update, even between rounds)
     const dtGlobal = Math.min(FRAME_TIME / 1000, 0.1);
     if (state.gameState !== 'title' && state.gameState !== 'select' && state.gameState !== 'index' && state.gameState !== 'leaderboard') {
@@ -355,6 +377,17 @@ function animate(timestamp) {
     }
     burnEffectSystem.update(dtGlobal);
     bomberExplosionSystem.update(dtGlobal);
+
+    // Apply global screen shake
+    let shakeX = 0, shakeY = 0;
+    if (state.screenShake && state.screenShake.timer > 0) {
+      shakeX = (Math.random() - 0.5) * state.screenShake.intensity * 2;
+      shakeY = (Math.random() - 0.5) * state.screenShake.intensity * 2;
+      state.screenShake.timer--;
+      if (state.screenShake.timer <= 0) {
+        state.screenShake.intensity = 0;
+      }
+    }
 
     // Draw Logic based on state
     if (state.gameState === 'title') {
@@ -383,50 +416,35 @@ function animate(timestamp) {
     } else if (state.gameState === 'weaponDetail') {
       drawWeaponDetailScreen();
     } else {
-      // Apply Global Screen Shake via CSS transform (always resets cleanly)
-      if (state.screenShake && state.screenShake.timer > 0) {
-        state.screenShake.timer--;
-        const curShake = state.screenShake.intensity;
-        const offsetX = (Math.random() - 0.5) * curShake;
-        const offsetY = (Math.random() - 0.5) * curShake;
-        state.canvas.style.transform = `translate(${offsetX}px, ${offsetY}px)`;
-        
-        // Decay intensity
-        state.screenShake.intensity *= 0.9;
-        
-        // Reset when done
-        if (state.screenShake.timer <= 0) {
-          state.canvas.style.transform = '';
-          state.screenShake.intensity = 0;
-        }
-      }
+      // Apply screen shake for game rendering
+      state.ctx.save();
+      state.ctx.translate(shakeX, shakeY);
 
       drawArena();
+      drawPurpleDimScreen(); // Draw purple dim screen overlay when Gojo's Hollow Purple is active
+      drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
+      drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
       drawFlames(); // Draw all flames to offscreen canvas (batched for performance)
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles
       drawFuelPickups();
       drawBlackHoleEffects(); // Draw blackhole effects BEFORE fighters so they appear behind
-      drawSparkEffects('background'); // Draw ground-level spark effects (debris, scorches) BEFORE fighters
+      // Draw Sukuna Domain Expansion background (liquid water floor) BEFORE fighters so they aren't overlayed
+      if (state.fighters) {
+        state.fighters.forEach(f => {
+          if (f && f.drawDomainBackground) f.drawDomainBackground(state.ctx);
+        });
+      }
       drawFighters();
       drawIllusions(); // Draw Doppleganger illusions
       drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
       drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
-      
-      // Draw Laser Beams and Hit Glows ON TOP of fighters and normal projectiles
-      if (state.fighters) {
-        for (const f of state.fighters) {
-          if (f && typeof f.drawBeamOverlay === 'function') {
-            f.drawBeamOverlay(state.ctx);
-          }
-        }
-      }
 
       // OPTIMIZATION: Quality-based particle drawing
       if (!useAggressiveParticleMode) {
         bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
+        drawThermobaricExplosions(state.ctx); // Draw Furnace thermobaric explosion shockwaves
         burnEffectSystem.draw(state.ctx); // Draw burn particles
       }
-      drawLightningEffects(state.ctx); // Draw lightning effects above explosions but below floating texts
       drawFloatingTexts();
 
       if (!useAggressiveParticleMode) {
@@ -437,8 +455,13 @@ function animate(timestamp) {
         drawBerserkerRageEffects(); // Draw berserker rage effects
       }
 
-      drawBloodEffects(); // Draw blood effects on top of everything
-      drawSparkEffects('foreground'); // Draw spark effects on top of everything
+      if (!useAggressiveParticleMode || Math.random() > 0.5) {
+        drawBloodEffects(); // Draw blood effects on top of everything
+      }
+      if (!useAggressiveParticleMode || Math.random() > 0.4) {
+        drawSparkEffects(); // Draw spark effects on top of everything
+      }
+      drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
 
       // Draw FPS display
       state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
@@ -478,6 +501,9 @@ function animate(timestamp) {
 
       // Composite flame canvas onto main canvas (after all other drawing)
       compositeFlameCanvas();
+
+      // Restore canvas transform (end screen shake)
+      state.ctx.restore();
 
       if (state.gameState === 'playing') {
         drawHUD();

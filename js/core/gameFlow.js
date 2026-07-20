@@ -83,6 +83,12 @@ export function reinitFighters() {
 
   state.fighters.forEach((fighter) => fighter.reset());
 
+  if (state.mode === 'TLFS' && state.fighters[0]) {
+    const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
+    state.fighters[0].maxHp = fixedHp;
+    state.fighters[0].hp = fixedHp;
+  }
+
   const arena = state.arena;
   if (state.mode === GAME_MODES.FFA) {
     const leftX = arena.x + arena.width * 0.20;
@@ -226,6 +232,7 @@ export function startNextRound() {
 }
 
 export function restartCurrentRound() {
+  state.illusions = []; // Clear all illusions
   reinitFighters();
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
@@ -241,7 +248,9 @@ export function startCountdown() {
   const maxRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
   let soundKey = null;
 
-  if (state.roundNum === maxRounds) {
+  if (state.mode === 'TLFS') {
+    soundKey = null; // No announcer for TLFS
+  } else if (state.roundNum === maxRounds) {
     soundKey = 'finalround';
   } else if (state.roundNum === 1) {
     soundKey = 'round1';
@@ -260,6 +269,12 @@ export function startCountdown() {
 }
 
 export function resetMatch() {
+  if (state.mode === 'TLFS') {
+    state.tlfsDefeatedEnemies = 0;
+    if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
+      state.p2Index = state.tlfsAllowedEnemies[Math.floor(Math.random() * state.tlfsAllowedEnemies.length)];
+    }
+  }
   state.scores = [0, 0, 0, 0];
   state.teamScores = [0, 0]; // Reset 2v2 team scores
   state.roundNum = 1;

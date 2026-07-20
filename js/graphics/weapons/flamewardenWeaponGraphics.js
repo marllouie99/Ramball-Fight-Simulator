@@ -249,61 +249,115 @@ export class FlamethrowerParticleSystem {
     if (activeParticles.length === 0) return;
 
     // VERY IMPORTANT: Sort oldest (highest life) first, newest (hot white core) last
-    // This perfectly layers the fire so the hot core stays solid on top!
+    // This perfectly layers the volumetric gradients so the hot core stays solid on top
     activeParticles.sort((a, b) => b.life - a.life);
 
     ctx.save();
-    // Default source-over blending handles the layering perfectly
+    
+    // Use source-over blending since lighter blending becomes invisible on light arena backgrounds
+    ctx.globalCompositeOperation = 'source-over';
 
     for (const p of activeParticles) {
       const lifeRatio = p.life / p.maxLife;
 
-      // Maintain a tighter stream, billowing out only slightly at the end
-      const size = p.baseSize + (p.maxSize * 1.2 - p.baseSize) * lifeRatio;
+      // Draw smoke on the outermost edges for older particles
+      // Reduced opacity dramatically so it's wispy and doesn't compound into mud
+      if (lifeRatio > 0.5) {
+        const smokeSize = (p.baseSize + (p.maxSize * 1.6 - p.baseSize) * lifeRatio) * 1.3;
+        const smokeAlpha = Math.max(0, Math.sin((lifeRatio - 0.5) / 0.5 * Math.PI) * 0.15); // VERY transparent
+        const smokeWobble = Math.sin(p.life * 10 + p.turbulence) * Math.PI;
 
-      // Soft radial gradient for organic fire
-      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-      const alpha = lifeRatio > 0.8 ? 1.0 - ((lifeRatio - 0.8) / 0.2) : 1.0;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(smokeWobble);
 
-      if (lifeRatio < 0.15) {
-        // Tight, white-hot napalm core
-        grad.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-        grad.addColorStop(0.5, `rgba(255, 240, 100, ${alpha * 0.9})`);
-        grad.addColorStop(1, `rgba(255, 120, 0, 0)`);
-      } else if (lifeRatio < 0.5) {
-        // Bright orange directional fire
-        grad.addColorStop(0, `rgba(255, 200, 40, ${alpha * 0.95})`);
-        grad.addColorStop(0.6, `rgba(255, 80, 0, ${alpha * 0.8})`);
-        grad.addColorStop(1, `rgba(200, 20, 0, 0)`);
-      } else {
-        // Dark red edges and smoke
-        grad.addColorStop(0, `rgba(220, 50, 0, ${alpha * 0.7})`);
-        grad.addColorStop(0.7, `rgba(100, 10, 10, ${alpha * 0.4})`);
-        grad.addColorStop(1, `rgba(40, 20, 20, 0)`);
+        const smokeGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, smokeSize);
+        smokeGrad.addColorStop(0, `rgba(180, 0, 255, ${smokeAlpha})`);
+        smokeGrad.addColorStop(1, 'rgba(100, 0, 150, 0)');
+        
+        ctx.beginPath();
+        // Smoke can be perfectly circular/soft
+        ctx.arc(0, 0, smokeSize, 0, Math.PI * 2);
+        ctx.fillStyle = smokeGrad;
+        ctx.fill();
+        ctx.restore();
       }
 
-      // Calculate orientation and stretching for chaotic, directional fire
+      // Base size grows as the flame expands (tendrils)
+      const size = p.baseSize + (p.maxSize * 1.6 - p.baseSize) * lifeRatio;
+
+      // Calculate orientation and stretching for fluid flow
       const speed = Math.hypot(p.vx, p.vy);
       const angle = Math.atan2(p.vy, p.vx);
-      // High speed = massively stretched fire streak. Low speed = round billow.
-      const stretch = Math.max(1.0, Math.min(4.0, speed / 60));
-      // Add chaotic wobble based on turbulence and life
-      const wobble = Math.sin(p.life * 20 + p.turbulence) * 0.3;
+      const stretch = Math.max(1.0, Math.min(3.5, speed / 60));
+      const wobble = Math.sin(p.life * 20 + p.turbulence) * 0.2;
 
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(angle + wobble);
-      // Scale X by stretch to create an elliptical gradient (motion-blurred fire streak)
-      // Scale Y slightly by life to simulate the fire expanding laterally
-      ctx.scale(stretch, 1.0 + lifeRatio * 0.5);
+      ctx.scale(stretch, 1.0 + lifeRatio * 0.4); 
+
+      // Soft, purely radial gradient for volumetric blending
+      // MUST be created after transformation so the gradient moves/scales with the particle
+      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
+      
+      // Adjust colors for a bright, fiery look without getting muddy on light backgrounds
+      const alphaScale = Math.max(0, lifeRatio > 0.8 ? 1.0 - ((lifeRatio - 0.8) / 0.2) : 1.0);
+      
+      if (lifeRatio < 0.2) {
+        grad.addColorStop(0, `rgba(255, 255, 255, ${alphaScale})`);
+        grad.addColorStop(0.5, `rgba(255, 240, 100, ${alphaScale * 0.9})`);
+        grad.addColorStop(1, 'rgba(255, 150, 0, 0)');
+      } else if (lifeRatio < 0.6) {
+        grad.addColorStop(0, `rgba(255, 220, 50, ${alphaScale * 0.9})`);
+        grad.addColorStop(0.6, `rgba(255, 100, 0, ${alphaScale * 0.7})`);
+        grad.addColorStop(1, 'rgba(200, 40, 0, 0)');
+      } else {
+        grad.addColorStop(0, `rgba(255, 100, 0, ${alphaScale * 0.6})`);
+        grad.addColorStop(0.7, `rgba(180, 20, 0, ${alphaScale * 0.3})`);
+        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      }
 
       ctx.beginPath();
-      ctx.arc(0, 0, size, 0, Math.PI * 2);
+      // Restore the fluid, flowy procedural shape to define rolling tendrils and cuts
+      const numPoints = 12;
+      const points = [];
+      for (let j = 0; j < numPoints; j++) {
+        const theta = (j / numPoints) * Math.PI * 2;
+        let r = size;
+        
+        // Gentle billow for flowy smokey shape
+        const billow = Math.sin(theta * 2 - p.life * 12 + p.turbulence * 5);
+        // Soft rounded cuts
+        const cut = Math.pow(Math.sin(theta * 3 - p.life * 15 + p.turbulence * 3), 2);
+        
+        const deform = 0.15 + (lifeRatio * 0.5); 
+        r += size * deform * billow;
+        r -= size * deform * cut * 0.8; 
+        
+        r = Math.max(size * 0.2, r);
+        points.push({ x: Math.cos(theta) * r, y: Math.sin(theta) * r });
+      }
+      
+      // Draw smooth closed loop using quadratic curves through midpoints
+      const startX = (points[numPoints - 1].x + points[0].x) / 2;
+      const startY = (points[numPoints - 1].y + points[0].y) / 2;
+      ctx.moveTo(startX, startY);
+      
+      for (let j = 0; j < numPoints; j++) {
+        const curr = points[j];
+        const next = points[(j + 1) % numPoints];
+        const midX = (curr.x + next.x) / 2;
+        const midY = (curr.y + next.y) / 2;
+        ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+      }
+      ctx.closePath();
+      
       ctx.fillStyle = grad;
       ctx.fill();
       
       ctx.restore();
-    } // <-- Missing bracket for the loop
+    }
 
     ctx.restore();
   }

@@ -660,6 +660,20 @@ export class KnightFighter extends Fighter {
     const ga = this.gunAngle;
     const isDashing = this.isDashing();
 
+    // Draw Shield Hand (drawn under shield grip)
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(ga + this.shieldVisualOffset);
+    ctx.translate(this.r + 2, 0); // Shield is slightly closer
+    ctx.beginPath();
+    ctx.arc(0, 0, 6, 0, Math.PI * 2);
+    ctx.fillStyle = this.color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.stroke();
+    ctx.restore();
+
     // Draw shield
     drawGrayShield(ctx, this.x, this.y, ga, this.blockFlashTimer, isDashing ? 'charging' : null, this.r, this.dashGlowFade, this.shieldVisualOffset);
 
@@ -728,8 +742,15 @@ export class KnightFighter extends Fighter {
       // Draw Sword Hand (drawn over sword hilt)
       ctx.save();
       ctx.translate(this.x, this.y);
-      ctx.rotate(swordAngle);
-      ctx.translate(this.r + 5, 0);
+      if (isDashing) {
+        ctx.rotate(swordAngle);
+        ctx.translate(this.r + 8, 16);
+      } else {
+        ctx.rotate(swordAngle + Math.PI / 2);
+        ctx.translate(this.r + 12, 0); 
+        ctx.rotate(-Math.PI / 2);
+      }
+      ctx.translate(-13, 0); // Move to hilt center
       ctx.beginPath();
       ctx.arc(0, 0, 6, 0, Math.PI * 2);
       ctx.fillStyle = this.color;
@@ -739,20 +760,6 @@ export class KnightFighter extends Fighter {
       ctx.stroke();
       ctx.restore();
     }
-    
-    // Draw Shield Hand (drawn over shield grip)
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(ga + this.shieldVisualOffset);
-    ctx.translate(this.r + 2, 0); // Shield is slightly closer
-    ctx.beginPath();
-    ctx.arc(0, 0, 6, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
-    ctx.restore();
   }
 
   draw(ctx) {

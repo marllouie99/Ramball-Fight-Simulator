@@ -66,6 +66,18 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 1.0,
     },
   },
+
+  // ── Zeus ────────────────────────────────────
+  zeus: {
+    thunderstrike: {
+      src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
+      volume: 1.5,
+    },
+    thundercloud: {
+      src: 'Assets/Sound Effects/SkillEffects/thundercloudcoming.mp3',
+      volume: 0.8,
+    },
+  },
 };
 
 /**

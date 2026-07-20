@@ -196,17 +196,108 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
   ctx.restore(); // Restore initial scale and translation
 }
 
-export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress = 1, fighterColor = '#102040') {
+export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress = 1, fighterColor = '#102040', isChannelingStorm = false, chargeProgress = 0) {
   ctx.save();
   ctx.translate(x, y);
+
+  const now = Date.now();
+  const pulse = 0.85 + Math.sin(now * 0.008) * 0.15;
+
+  if (isChannelingStorm) {
+    // 1. Draw lightning bolt flying up to the sky
+    const throwProgress = Math.min(1, chargeProgress * 3); // 0 to 1 quickly
+    if (chargeProgress < 1.0) { 
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, 1.0 - Math.pow(throwProgress, 2));
+        
+        const flyY = -throwProgress * 500;
+        
+        // Draw glowing lightning trail
+        if (throwProgress > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            
+            // Dynamic snappy crackling electric worms
+            const numWorms = 4;
+            for (let i = 0; i < numWorms; i++) {
+                ctx.beginPath();
+                ctx.moveTo(0, 0);
+                
+                let curY = 0;
+                const segments = 5 + Math.floor(Math.random() * 4);
+                const segLen = flyY / segments;
+                
+                for (let s = 1; s <= segments; s++) {
+                    const t = s / segments;
+                    let nextY = segLen * s;
+                    // Violent jitter horizontally (thickest in the middle)
+                    let nextX = (Math.random() - 0.5) * 70 * Math.sin(t * Math.PI);
+                    if (s === segments) {
+                        nextX = 0; // Connect to the bolt tip
+                        nextY = flyY;
+                    }
+                    ctx.lineTo(nextX, nextY);
+                    curY = nextY;
+                }
+                
+                // Randomly color the worm cyan or white
+                if (Math.random() > 0.3) {
+                    ctx.strokeStyle = `rgba(0, 220, 255, ${0.4 + Math.random() * 0.4})`;
+                    ctx.lineWidth = 4 + Math.random() * 8;
+                } else {
+                    ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 + Math.random() * 0.4})`;
+                    ctx.lineWidth = 2 + Math.random() * 3;
+                }
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+            }
+            ctx.restore();
+        }
+
+        ctx.translate(0, flyY); // Fly straight up screen
+        ctx.rotate(-Math.PI/2); // Point straight up
+        drawThunderboltShape(ctx, 1.0, pulse);
+        ctx.restore();
+    }
+    
+    // 2. Draw two hands raised "on top of head" (in front of him)
+    ctx.rotate(gunAngle);
+    
+    // Hands raise up and shake powerfully over the top edge of his body
+    const shakeAmount = chargeProgress * 3;
+    const shakeX = (Math.random() * shakeAmount - shakeAmount/2);
+    const shakeY = (Math.random() * shakeAmount - shakeAmount/2);
+    
+    // Position arms outstretched (one in front, one behind for side-view)
+    const handRadiusOffset = r - 2; // Slightly inside the edge so they anchor
+    const leftX = handRadiusOffset * Math.cos(Math.PI) + shakeX; // Back hand
+    const leftY = handRadiusOffset * Math.sin(Math.PI) + shakeY;
+    const rightX = handRadiusOffset * Math.cos(0) + shakeX;      // Front hand
+    const rightY = handRadiusOffset * Math.sin(0) + shakeY;
+    
+    ctx.fillStyle = fighterColor;
+    ctx.strokeStyle = '#000';
+    ctx.lineWidth = 1.5;
+    
+    // Left hand
+    ctx.beginPath();
+    ctx.arc(leftX, leftY, 6.5, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    
+    // Right hand
+    ctx.beginPath();
+    ctx.arc(rightX, rightY, 6.5, 0, Math.PI * 2);
+    ctx.fill(); ctx.stroke();
+    
+    ctx.restore();
+    return; // Skip normal weapon drawing
+  }
+
   ctx.rotate(gunAngle);
 
   if (Math.abs(gunAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
   }
-  
-  const now = Date.now();
-  const pulse = 0.85 + Math.sin(now * 0.008) * 0.15;
   
   let weaponPullback = 0;
   let weaponAngle = 0;

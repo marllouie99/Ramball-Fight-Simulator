@@ -30,17 +30,30 @@ export function drawTricksterStaff(ctx, fighter) {
     thrustOffset = Math.sin(progress * Math.PI) * 12; // thrusts outward
   }
   
-  if (fighter.stolenWindUpTimer > 0) {
-    // Lift staff directly in front with both hands
-    // A slight shake effect for intense channeling
+  if (fighter.stolenWindUpTimer > 0 || fighter.beamCharge > 0 || fighter.beamTimer > 0) {
+    // Point the staff exactly at the target like a rifle
     const shakeX = (Math.random() - 0.5) * 3;
     const shakeY = (Math.random() - 0.5) * 3;
-    ctx.translate(fighter.r + 15 + shakeX, shakeY);
-    ctx.rotate(Math.PI / 2); // Point straight forward
+    const gAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : 0;
+    ctx.translate(Math.cos(gAngle) * fighter.r + shakeX, Math.sin(gAngle) * fighter.r + shakeY);
+    ctx.rotate(gAngle - (fighter.rotation || 0) + Math.PI / 2);
+  } else if (fighter.tkTimer > 0) {
+    // Telekinesis channel: lift the staff high in the right hand and point it EXACTLY at the drop location
+    const shakeX = (Math.random() - 0.5) * 2;
+    const shakeY = (Math.random() - 0.5) * 2;
+    ctx.translate(fighter.r * 0.4 + shakeX, fighter.r * 0.85 + shakeY);
+    // The staff is drawn along the Y axis, so its "front" (the crystal) points up (-Y).
+    // To make -Y point to gunAngle, we add Math.PI / 2.
+    const targetRot = fighter.gunAngle - (fighter.rotation || 0) + Math.PI / 2;
+    ctx.rotate(targetRot);
   } else {
     // Position the staff in the "right hand" (off to the side and slightly forward)
     ctx.translate(fighter.r * 0.4 + thrustOffset, fighter.r * 0.85 + idleHover);
-    ctx.rotate(Math.PI * 0.3 + swingAngle);
+    let baseRot = Math.PI * 0.3; // Default idle angle
+    if (fighter.gunAngle !== undefined && fighter.attackCooldown <= 15) {
+      baseRot = fighter.gunAngle - (fighter.rotation || 0) + Math.PI / 2;
+    }
+    ctx.rotate(baseRot + swingAngle);
   }
 
   // Staff dimensions
@@ -306,6 +319,167 @@ export function drawTricksterStaff(ctx, fighter) {
     ctx.beginPath();
     ctx.arc(0, 5, 6, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+export function drawTricksterBolt(ctx, p) {
+  ctx.save();
+  
+  // Base trickster green color
+  const coreColor = '#39FF14';
+  
+  // 1. Draw glowing trail with particles
+  if (p.history && p.history.length > 1) {
+    const histLen = p.history.length;
+    
+    for (let i = 0; i < histLen - 1; i++) {
+      const pt = p.history[i];
+      const nextPt = p.history[i + 1];
+      
+      // Calculate how "old" this segment is.
+      // i = 0 is the oldest (tail end), i = histLen - 1 is the newest (near the head).
+      const progress = (i + 1) / histLen;
+      
+      // Tapering width and fading alpha
+      const currentRadius = p.r * 2.8 * progress;
+      const alpha = progress * 0.6;
+      
+      // Outer ethereal green trail segment
+      ctx.beginPath();
+      ctx.moveTo(pt.x, pt.y);
+      ctx.lineTo(nextPt.x, nextPt.y);
+      ctx.strokeStyle = `rgba(57, 255, 20, ${alpha})`;
+      ctx.lineWidth = currentRadius;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Inner bright streak segment
+      ctx.beginPath();
+      ctx.moveTo(pt.x, pt.y);
+      ctx.lineTo(nextPt.x, nextPt.y);
+      ctx.strokeStyle = `rgba(200, 255, 200, ${alpha * 1.5})`;
+      ctx.lineWidth = currentRadius * 0.35;
+      ctx.stroke();
+      
+      // Draw "sparkles" along the history, more dense near the head
+      if (i % 2 === 0) {
+        const sparkCount = Math.floor(progress * 3);
+        for (let s = 0; s < sparkCount; s++) {
+          const randX = Math.sin(pt.x * 12.345 + s * 45) * p.r * 2.5;
+          const randY = Math.cos(pt.y * 54.321 + s * 33) * p.r * 2.5;
+          
+          ctx.beginPath();
+          // Tiny particles that also fade out towards the tail
+          const sparkSize = (Math.sin(pt.x + Date.now()/100) * 0.5 + 1.0) * progress * 1.5;
+          ctx.fillStyle = `rgba(255, 255, 255, ${progress})`;
+          ctx.arc(pt.x + randX, pt.y + randY, sparkSize, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    }
+  }
+
+  // 2. Draw the main diamond/teardrop core
+  ctx.translate(p.x, p.y);
+  ctx.rotate(p.rotation || 0);
+
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = coreColor;
+
+  // Outer green aura (larger and more distinct to anchor the tail)
+  ctx.fillStyle = `rgba(57, 255, 20, 0.95)`;
+  ctx.beginPath();
+  ctx.moveTo(p.r * 3.0, 0); // front tip (sharp)
+  ctx.lineTo(0, p.r * 1.6); // bottom corner (wide)
+  ctx.lineTo(-p.r * 1.5, 0); // back tail
+  ctx.lineTo(0, -p.r * 1.6); // top corner (wide)
+  ctx.closePath();
+  ctx.fill();
+
+  // Inner bright white core (diamond shaped)
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.moveTo(p.r * 2.0, 0);
+  ctx.lineTo(0, p.r * 0.8);
+  ctx.lineTo(-p.r * 0.8, 0);
+  ctx.lineTo(0, -p.r * 0.8);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+export function drawTricksterChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
+  if (beamCharge <= 0) return;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(gunAngle);
+
+  if (Math.abs(gunAngle) > Math.PI / 2) {
+    ctx.scale(1, -1);
+  }
+
+  // Position at the staff tip (roughly r + 75)
+  const tipDist = r + 75;
+  // Fallback to 60 if CONFIG.laser is not defined yet here
+  const windupDuration = (typeof CONFIG !== 'undefined' && CONFIG.laser) ? CONFIG.laser.windupDuration : 60;
+  const chargeNorm = Math.min(1, beamCharge / windupDuration);
+  const glowRadius = 15 + chargeNorm * 35;
+  const alpha = 0.2 + chargeNorm * 0.6;
+  const time = Date.now() / 80;
+  
+  // Central concentrated energy core
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = '#00ff00';
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  ctx.arc(tipDist, 0, 3 + chargeNorm * 5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Expanding pulsing energy rings (Shockwaves at the tip)
+  for (let i = 0; i < 3; i++) {
+    const ringPhase = ((time * 0.5 + i * 0.33) % 1);
+    ctx.beginPath();
+    ctx.arc(tipDist, 0, glowRadius * ringPhase, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0, 255, 100, ${(1 - ringPhase) * alpha})`;
+    ctx.lineWidth = 2 * (1 - ringPhase);
+    ctx.stroke();
+  }
+
+  // ── Massive Sucking Particles Effect ──
+  const particleCount = 25 + Math.floor(chargeNorm * 15);
+  for (let i = 0; i < particleCount; i++) {
+    const pPhase = ((time * 1.5 + i * 0.618) % 1); 
+    const angleOffset = i * (Math.PI * 2 / particleCount) + (time * 0.2); 
+    const inwardProgress = Math.pow(pPhase, 3);
+    
+    const maxDist = 180;
+    const currentDist = maxDist * (1 - inwardProgress);
+    
+    const xPos = tipDist + Math.cos(angleOffset) * currentDist;
+    const yPos = Math.sin(angleOffset) * currentDist;
+    
+    const tailLength = (10 + chargeNorm * 15) * (1 - inwardProgress);
+    const tailDist = currentDist + tailLength;
+    const xTail = tipDist + Math.cos(angleOffset) * tailDist;
+    const yTail = Math.sin(angleOffset) * tailDist;
+
+    ctx.beginPath();
+    ctx.moveTo(xPos, yPos);
+    ctx.lineTo(xTail, yTail);
+    
+    let streakAlpha = Math.min(1, inwardProgress * 2); 
+    let color = (inwardProgress > 0.8) ? `rgba(255, 255, 255, ${streakAlpha})` : `rgba(0, 255, 50, ${streakAlpha})`;
+    
+    ctx.strokeStyle = color;
+    ctx.lineWidth = (1 + chargeNorm * 1.5) * (1 - Math.pow(inwardProgress, 8));
+    ctx.stroke();
   }
 
   ctx.restore();

@@ -4,7 +4,7 @@ export const STOLEN_SKILL_CONFIG = {
     damageMultiplier: 1.2,
     cooldownMultiplier: 0.8
   },
-  
+
   // Specific overrides for individual stolen skills
   skills: {
     orange: {
@@ -15,7 +15,9 @@ export const STOLEN_SKILL_CONFIG = {
     cronos: {
       // e.g. Trickster's stolen time sphere
       cooldownMultiplier: 0.9,
-      sphereSpeedMultiplier: 5 
+      sphereSpeedMultiplier: 5,
+      sphereStaffDamage: 18,
+      sphereStaffCooldown: 100
     },
     bomber: {
       damageMultiplier: 1.2

@@ -16,11 +16,17 @@
 //   delay = 10  → sound plays 10 frames after (good for syncing with projectile travel)
 
 export const BASIC_ATTACK_SOUNDS = {
-  // ── Ranger (aimbot) ──────────────────────────
-  // Fires a homing projectile. Sound plays slightly before the shot.
+  // ── Ranger (aimbot/Jazz) ──────────────────────────
+  // Fires a homing projectile. Uses dubstep gun notes sequentially.
   2: {
-    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
-    volume: 0.6,
+    src: [
+      'Assets/Sound Effects/Attacks/do.mp3',
+      'Assets/Sound Effects/Attacks/ri.mp3',
+      'Assets/Sound Effects/Attacks/mi.mp3',
+      'Assets/Sound Effects/Attacks/fa.mp3',
+      'Assets/Sound Effects/Attacks/so.mp3'
+    ],
+    volume: 0.8,
     delay: -2,
   },
 
@@ -160,15 +166,22 @@ export const BASIC_ATTACK_SOUNDS = {
     delay: 0,
   },
   trickster: {
-    src: 'Assets/Sound Effects/Attacks/magic_shoot.mp3',
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
     volume: 0.6,
     delay: 0,
     pitchVariation: 0.1
   },
-  
+
+  // ── Musashi ──────────────────────────
+  musashi: {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+
   // ── Zeus ─────────────────────────────
   zeus: {
-    src: 'Assets/Sound Effects/Attacks/electric_zap.mp3', // Fallback handled by soundSystem
+    src: 'Assets/Sound Effects/Attacks/thunderstike.mp3',
     volume: 0.65,
     delay: 0,
     pitchVariation: 0.15
@@ -187,7 +200,24 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.45,
     delay: -1,
   },
-};
+  // Gojo — Blue Orbs & Melee punches
+  'gojo': {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+  'gojo_melee': {
+    src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+    volume: 0.8,
+    delay: 0,
+  },
+  // Zeus — chain lightning attack
+  'zeus': {
+    src: 'Assets/Sound Effects/Attacks/thunderstike.mp3',
+    volume: 0.65,
+    delay: 0,
+    pitchVariation: 0.15
+  },};
 
 /**
  * Get the sound config for a fighter.
@@ -229,8 +259,16 @@ export function getBasicAttackSound(id, type) {
  * @returns {string[]}
  */
 export function getBasicAttackSoundPaths() {
-  return Object.values(BASIC_ATTACK_SOUNDS)
+  const paths = [];
+  Object.values(BASIC_ATTACK_SOUNDS)
     .filter((s) => s !== BASIC_ATTACK_SOUNDS.default)
-    .map((s) => s.src);
+    .forEach((s) => {
+      if (Array.isArray(s.src)) {
+        paths.push(...s.src);
+      } else {
+        paths.push(s.src);
+      }
+    });
+  return paths;
 }
 

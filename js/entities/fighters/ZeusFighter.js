@@ -4,6 +4,7 @@ import { spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js
 import { playSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
+import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawZeusWeapon } from '../../graphics/weapons/zeusWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -13,7 +14,7 @@ export class ZeusFighter extends Fighter {
   constructor(def) {
     super(def);
     this.aegisCooldown = 0;
-    this.stormCooldown = 0;
+    this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormActive = false;
     this.stormTimer = 0;
     
@@ -22,15 +23,19 @@ export class ZeusFighter extends Fighter {
     
     // Aura animation state
     this.auraPhase = 0;
+    
+    // Thunder cloud sound flag (play once when throwing thunderbolt to sky)
+    this._thunderCloudSoundPlayed = false;
   }
 
   reset() {
     super.reset();
     this.aegisCooldown = 0;
-    this.stormCooldown = 0;
+    this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormActive = false;
     this.stormTimer = 0;
     this.auraPhase = 0;
+    this._thunderCloudSoundPlayed = false;
   }
 
   getAttackProgress() {
@@ -116,7 +121,6 @@ export class ZeusFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     // Visual hovering effect: float like Trickster
     this.z = 25 + Math.sin(Date.now() / 200) * 6;
-    this.auraPhase += 0.15;
 
     this.handlePoison();
     this.handleBurn();
@@ -128,7 +132,34 @@ export class ZeusFighter extends Fighter {
     }
     
     if (this.aegisCooldown > 0) this.aegisCooldown--;
-    if (this.stormCooldown > 0) this.stormCooldown--;
+    if (this.stormCooldown > 0) {
+      this.stormCooldown--;
+      
+      // Telegraph animation triggers when exactly TelegraphFrames remain
+      if (this.stormCooldown === CONFIG.zeus.stormTelegraphFrames) {
+        spawnFloatingText(this.x, this.y - this.r - 20, 'CHARGING STORM...', '#00FFFF');
+        // Play an ominous gathering sound if available, otherwise reuse aegis logic
+        const sound = getSkillSound(this._def?.id, 'aegis');
+        if (sound) playSound(sound.src, sound.volume * 0.7);
+      }
+    }
+    
+    // Are we in the telegraph window before storm casts?
+    this.isChargingStorm = this.stormCooldown > 0 && this.stormCooldown <= (CONFIG.zeus.stormTelegraphFrames || 120);
+    
+    // Play thundercloud sound once when throwing thunderbolt to the sky
+    if (this.isChargingStorm && !this._thunderCloudSoundPlayed) {
+      this._thunderCloudSoundPlayed = true;
+      const cloudSound = getSkillEffectSound('zeus', 'thundercloud');
+      if (cloudSound) playSound(cloudSound.src, cloudSound.volume);
+    }
+    // Reset flag when not charging
+    if (!this.isChargingStorm) {
+      this._thunderCloudSoundPlayed = false;
+    }
+    
+    // If charging, the clouds billow and flash wildly
+    this.auraPhase += this.isChargingStorm ? 0.45 : 0.15;
     
     // Ultimate check
     if (this.stormCooldown <= 0 && !this.stormActive && opponent) {
@@ -143,15 +174,21 @@ export class ZeusFighter extends Fighter {
       }
     }
 
-    // Basic attack
-    if (this.shootCooldown > 0) {
-      this.shootCooldown--;
+    // Immobilize and stop shooting during ultimate cast
+    if (this.isChargingStorm || this.stormActive) {
+      this.vx *= 0.5; // Rapidly halt movement
+      this.vy *= 0.5;
+      this.applyMovementPhysics(0); // Set target speed to 0 to prevent input override
     } else {
-      this.shoot(ownerIndex);
-      this.shootCooldown = this.shootCooldownMax;
+      // Basic attack
+      if (this.shootCooldown > 0) {
+        this.shootCooldown--;
+      } else {
+        this.shoot(ownerIndex);
+        this.shootCooldown = this.shootCooldownMax;
+      }
+      this.applyMovementPhysics();
     }
-
-    this.applyMovementPhysics();
     
     // Aim directly at opponent
     if (opponent && !opponent.isDead) {
@@ -170,7 +207,7 @@ export class ZeusFighter extends Fighter {
     this.stormLastStrikeTimer = 0;
     
     spawnFloatingText(this.x, this.y - this.r - 20, 'STORM!', '#FFFFFF');
-    triggerGlobalScreenShake(8, 20);
+    triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
     
     const sound = getSkillSound(this._def?.id, 'storm');
     if (sound) playSound(sound.src, sound.volume);
@@ -186,9 +223,14 @@ export class ZeusFighter extends Fighter {
       
       // Hit all living enemies
       if (state && state.fighters) {
+        const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+
         state.fighters.forEach((f, idx) => {
-          if (f && f !== this && f.hp > 0 && state.getFighterTeam(idx) !== state.getFighterTeam(state.fighters.indexOf(this))) {
-            this._strikeEnemyWithStorm(f);
+          if (f && f !== this && f.hp > 0) {
+            const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+            if (isEnemy) {
+              this._strikeEnemyWithStorm(f);
+            }
           }
         });
         
@@ -196,7 +238,11 @@ export class ZeusFighter extends Fighter {
         if (state.illusions) {
           state.illusions.forEach(ill => {
             if (ill && ill.hp > 0 && ill.owner !== this) {
-               this._strikeEnemyWithStorm(ill);
+              const illOwnerTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
+              const isEnemy = myTeam === null || illOwnerTeam !== myTeam;
+              if (isEnemy) {
+                 this._strikeEnemyWithStorm(ill);
+              }
             }
           });
         }
@@ -223,8 +269,13 @@ export class ZeusFighter extends Fighter {
     target.thunderRootsTimer = Math.max(target.thunderRootsTimer || 0, 45);
     
     // Visuals
+    triggerGlobalScreenShake(CONFIG.zeus.stormStrikeShakeIntensity || 4, CONFIG.zeus.stormStrikeShakeFrames || 10);
     spawnImpactFlash(target.x, target.y, 50, 'lightningTrail');
     spawnSparks(target.x, target.y, 10, 'lightningTrail', '#FFFFFF');
+    
+    // Play storm strike sound for each hit
+    const stormSound = getSkillSound(this._def?.id, 'storm');
+    if (stormSound) playSound(stormSound.src, stormSound.volume * 0.6);
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
@@ -266,8 +317,15 @@ export class ZeusFighter extends Fighter {
       const cloudSize = baseSize + Math.sin(this.auraPhase * 1.2 + i) * 4;
       
       // Determine if this cloud puff is flashing with internal lightning
+      let flashThreshold = 0.92; // Short intense flash
+      if (this.isChargingStorm) {
+        flashThreshold = 0.4; // Flash very frequently while charging
+      } else if (this.stormActive) {
+        flashThreshold = 0.2; // Almost constantly flashing during the storm
+      }
+      
       const flashValue = Math.sin(this.auraPhase * 2.5 + i * 13);
-      const isFlashing = flashValue > 0.92; // Short intense flash
+      const isFlashing = flashValue > flashThreshold; 
       
       ctx.beginPath();
       ctx.arc(cx, cy, cloudSize, 0, Math.PI * 2);
@@ -346,6 +404,9 @@ export class ZeusFighter extends Fighter {
     // Draw background 3D Aegis Shield arcs
     this._drawAegisShield(ctx, true);
 
+    // Draw background Storm Telegraph vortex
+    this._drawStormTelegraph(ctx, true);
+
     const pb = this.getBodyPullback();
     const dx = Math.cos(this.gunAngle) * pb;
     const dy = Math.sin(this.gunAngle) * pb;
@@ -366,6 +427,37 @@ export class ZeusFighter extends Fighter {
     
     // Draw foreground 3D Aegis Shield arcs
     this._drawAegisShield(ctx, false);
+    
+    // Draw foreground Storm Telegraph vortex
+    this._drawStormTelegraph(ctx, false);
+  }
+  
+  _drawStormTelegraph(ctx, drawBackground) {
+    if (!this.isChargingStorm) return;
+    if (!drawBackground) return; // The flat ring is drawn on the ground, behind Zeus
+    
+    const chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120)); // 0.0 to 1.0
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.rotate(Date.now() / 200);
+    
+    ctx.beginPath();
+    // Ring shrinks from 3x radius down to his body radius
+    const ringRadius = this.r * 3 * (1 - chargeProgress) + this.r;
+    ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+    
+    ctx.strokeStyle = `rgba(0, 255, 255, ${chargeProgress * 0.8})`;
+    ctx.lineWidth = 2 + chargeProgress * 5;
+    ctx.setLineDash([15, 15]);
+    ctx.stroke();
+    
+    // Inner intense glow that builds up
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r * 1.5 + chargeProgress * 20, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0, 200, 255, ${chargeProgress * 0.4})`;
+    ctx.fill();
+    
+    ctx.restore();
   }
 
   _drawAegisShield(ctx, drawBackground) {
@@ -457,7 +549,7 @@ export class ZeusFighter extends Fighter {
   }
 
   drawOutline(ctx) {
-    // Simple upward light glow onto Zeus (moves with body)
+    // Basic fighter outline overlay
     ctx.save();
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r * 1.3, 0, Math.PI * 2);
@@ -478,7 +570,16 @@ export class ZeusFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    let chargeProgress = 0;
+    if (this.isChargingStorm) {
+      chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120));
+    } else if (this.stormActive) {
+      chargeProgress = 1.0;
+    }
+    
+    const isChanneling = this.isChargingStorm || this.stormActive;
+    
     // Because draw() already shifted this.x and this.y, we just draw at this.x, this.y
-    drawZeusWeapon(ctx, this.x, this.y, this.gunAngle, this.r, this.auraPhase, this.getAttackProgress(), this.color);
+    drawZeusWeapon(ctx, this.x, this.y, this.gunAngle, this.r, this.auraPhase, this.getAttackProgress(), this.color, isChanneling, chargeProgress);
   }
 }

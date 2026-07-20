@@ -5,8 +5,11 @@ export function drawMusashiWeapons(ctx, fighter) {
   // Draw Dual Swords (Katana and Wakizashi)
   
   // Handle strike animation
-  let rightSwordAngle = fighter.gunAngle;
-    let leftSwordAngle = fighter.gunAngle;
+  let targetRightHandAngle = fighter.gunAngle;
+  let targetLeftHandAngle = fighter.gunAngle;
+  let targetRightBladeAngle = 0;
+  let targetLeftBladeAngle = 0;
+  let lerpSpeed = 1.0; // Snapping transition for stances
     
     const strikeMax = 15;
     if (fighter.strikeTimer > 0) {
@@ -15,23 +18,75 @@ export function drawMusashiWeapons(ctx, fighter) {
       if (fighter.nitenActiveTimer > 0 || fighter.isNitenSecondHit) {
         if (!fighter.isNitenSecondHit) {
           // Wakizashi quick strike
-          leftSwordAngle = fighter.strikeAngle - Math.PI/4 + (prog * Math.PI/2);
-          rightSwordAngle = fighter.gunAngle + Math.PI/6; // held back
+          targetLeftHandAngle = fighter.strikeAngle - Math.PI/4 + (prog * Math.PI/2);
+          targetRightHandAngle = fighter.gunAngle + Math.PI/6; // held back
         } else {
           // Katana heavy strike
-          rightSwordAngle = fighter.strikeAngle - Math.PI/2 + (prog * Math.PI);
-          leftSwordAngle = fighter.gunAngle - Math.PI/6; // held back
+          targetRightHandAngle = fighter.strikeAngle - Math.PI/2 + (prog * Math.PI);
+          targetLeftHandAngle = fighter.gunAngle - Math.PI/6; // held back
         }
       } else {
         // Basic dual strike
-        rightSwordAngle = fighter.strikeAngle - Math.PI/4 + (prog * Math.PI/2);
-        leftSwordAngle = fighter.strikeAngle + Math.PI/4 - (prog * Math.PI/2);
+        targetRightHandAngle = fighter.strikeAngle - Math.PI/4 + (prog * Math.PI/2);
+        targetLeftHandAngle = fighter.strikeAngle + Math.PI/4 - (prog * Math.PI/2);
       }
     } else {
-      // Idle hold
-      rightSwordAngle = fighter.gunAngle + 0.3;
-      leftSwordAngle = fighter.gunAngle - 0.3;
+      // Point Katana towards the target during a dash, but keep Wakizashi at the side
+      if (fighter.dashAnimTimer && fighter.dashAnimTimer > 0) {
+        targetRightHandAngle = fighter.gunAngle;
+        targetRightBladeAngle = 0;
+        
+        targetLeftHandAngle = fighter.gunAngle - Math.PI/3;
+        targetLeftBladeAngle = Math.PI/10;
+      }
     }
+    
+    const isIdle = (fighter.dashAnimTimer || 0) <= 0 && 
+                   (fighter.strikeTimer || 0) <= 0 && 
+                   (fighter.flurryHitsLeft || 0) <= 0;
+
+    if (isIdle) {
+      // If undefined (like in UI menu), default to 0 so he shows the X-guard
+      const distSq = fighter.distToTargetSq !== undefined ? fighter.distToTargetSq : 0;
+      const isClose = distSq < 40000; // ~200 pixels
+
+      if (isClose) {
+         // X-shape guard (Close range)
+         targetRightHandAngle = fighter.gunAngle + Math.PI/5;
+         targetRightBladeAngle = -Math.PI/2.2;
+         targetLeftHandAngle = fighter.gunAngle - Math.PI/5;
+         targetLeftBladeAngle = Math.PI/2.2;
+      } else {
+         // Relaxed holding stance (Out of range)
+         targetRightHandAngle = fighter.gunAngle + Math.PI/3;
+         targetRightBladeAngle = -Math.PI/10;
+         targetLeftHandAngle = fighter.gunAngle - Math.PI/3;
+         targetLeftBladeAngle = Math.PI/10;
+      }
+    } else {
+      lerpSpeed = 1.0; // Snappy instant updates during attacks and dashes
+    }
+
+    // Initialize visual angles on first frame
+    if (fighter.vRightHandAngle === undefined) {
+       fighter.vRightHandAngle = targetRightHandAngle;
+       fighter.vRightBladeAngle = targetRightBladeAngle;
+       fighter.vLeftHandAngle = targetLeftHandAngle;
+       fighter.vLeftBladeAngle = targetLeftBladeAngle;
+    }
+
+    // Smooth shortest-path angle interpolation
+    const lerpAngle = (current, target, t) => {
+       let diff = (target - current) % (Math.PI * 2);
+       if (diff > Math.PI) diff -= Math.PI * 2;
+       if (diff < -Math.PI) diff += Math.PI * 2;
+       return current + diff * t;
+    };
+
+    fighter.vRightHandAngle = lerpAngle(fighter.vRightHandAngle, targetRightHandAngle, lerpSpeed);
+    fighter.vRightBladeAngle = lerpAngle(fighter.vRightBladeAngle, targetRightBladeAngle, lerpSpeed);
+    fighter.vLeftHandAngle = lerpAngle(fighter.vLeftHandAngle, targetLeftHandAngle, lerpSpeed);
+    fighter.vLeftBladeAngle = lerpAngle(fighter.vLeftBladeAngle, targetLeftBladeAngle, lerpSpeed);
     
     // Stance colors (Solid for intense glow)
     let aura = '#fff';
@@ -44,19 +99,25 @@ export function drawMusashiWeapons(ctx, fighter) {
     // ── INK-BRUSH SMOKE TRAIL (after Phantom Flurry) ──
     if (fighter.flurrySmokeTimer > 0) {
       const smokeAlpha = fighter.flurrySmokeTimer / 150;
-      _drawBrushSmokeTrail(ctx, rightSwordAngle, fighter.r, smokeAlpha, 87, false);
-      _drawBrushSmokeTrail(ctx, leftSwordAngle, fighter.r, smokeAlpha, 58, true);
+      _drawBrushSmokeTrail(ctx, fighter.vRightHandAngle, fighter.r, smokeAlpha, 87, false);
+      _drawBrushSmokeTrail(ctx, fighter.vLeftHandAngle, fighter.r, smokeAlpha, 58, true);
     }
 
     // Draw Katana (Right) — dark blade with glowing neon edge
     ctx.save();
-    ctx.rotate(rightSwordAngle);
+    ctx.rotate(fighter.vRightHandAngle);
+    ctx.translate(fighter.r, 0); // Pivot at hand
+    ctx.rotate(fighter.vRightBladeAngle);
+    ctx.translate(-fighter.r, 0); // Revert translate for drawKatana
     drawKatana(ctx, fighter.r, 1.0, aura, fighter.color);
     ctx.restore();
     
     // Draw Wakizashi (Left) — shorter, wider metallic blade
     ctx.save();
-    ctx.rotate(leftSwordAngle);
+    ctx.rotate(fighter.vLeftHandAngle);
+    ctx.translate(fighter.r, 0); // Pivot at hand
+    ctx.rotate(fighter.vLeftBladeAngle);
+    ctx.translate(-fighter.r, 0); // Revert translate for drawWakizashi
     ctx.scale(1, -1);
     drawWakizashi(ctx, fighter.r, 1.0, aura, fighter.color);
     ctx.restore();

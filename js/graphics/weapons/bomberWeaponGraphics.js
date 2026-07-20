@@ -281,15 +281,18 @@ function generateDebrisTexture(size, seed) {
 }
 
 function drawTexturedCircle(ctx, x, y, radius, texture, alpha = 1, rotation = 0) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
   ctx.translate(x, y);
   ctx.rotate(rotation);
   ctx.drawImage(texture, -radius, -radius, radius * 2, radius * 2);
-  ctx.restore();
+  ctx.rotate(-rotation);
+  ctx.translate(-x, -y);
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawTexturedRing(ctx, x, y, innerR, outerR, texture, alpha = 1) {
+  // NOTE: clip() requires save/restore - cannot be optimized
   ctx.save();
   ctx.globalAlpha = alpha;
   ctx.beginPath();
@@ -301,26 +304,31 @@ function drawTexturedRing(ctx, x, y, innerR, outerR, texture, alpha = 1) {
 }
 
 function drawTexturedEllipse(ctx, x, y, rx, ry, texture, alpha = 1, rotation = 0) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
   ctx.translate(x, y);
   ctx.rotate(rotation);
   ctx.scale(1, ry / rx);
   ctx.drawImage(texture, -rx, -rx, rx * 2, rx * 2);
-  ctx.restore();
+  ctx.scale(1, rx / ry);
+  ctx.rotate(-rotation);
+  ctx.translate(-x, -y);
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawCrackOverlay(ctx, x, y, radius, seed, alpha = 1) {
   const crackTex = generateCrackTexture(radius * 2, seed);
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
-  ctx.translate(x - radius, y - radius);
-  ctx.drawImage(crackTex, 0, 0, radius * 2, radius * 2);
-  ctx.restore();
+  ctx.drawImage(crackTex, x - radius, y - radius, radius * 2, radius * 2);
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawSparkLines(ctx, x, y, radius, count, alpha, color) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
+  const prevStroke = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevLineCap = ctx.lineCap;
   ctx.globalAlpha = alpha;
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
@@ -340,11 +348,15 @@ function drawSparkLines(ctx, x, y, radius, count, alpha, color) {
     );
     ctx.stroke();
   }
-  ctx.restore();
+
+  ctx.lineCap = prevLineCap;
+  ctx.lineWidth = prevLineWidth;
+  ctx.strokeStyle = prevStroke;
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawBubbleParticles(ctx, x, y, radius, count, alpha, seed) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
 
   for (let i = 0; i < count; i++) {
@@ -364,11 +376,11 @@ function drawBubbleParticles(ctx, x, y, radius, count, alpha, seed) {
     ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + seededRand(seed + i + 50) * 0.3})`;
     ctx.fill();
   }
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawEmberParticles(ctx, x, y, radius, count, alpha, seed, color) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
 
   for (let i = 0; i < count; i++) {
@@ -384,13 +396,12 @@ function drawEmberParticles(ctx, x, y, radius, count, alpha, seed, color) {
     // OPTIMIZED: Removed shadowBlur (expensive operation)
     ctx.fill();
   }
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawSwirlTexture(ctx, x, y, radius, alpha, seed, color1, color2) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
-  ctx.translate(x, y);
 
   const arms = 6;
   for (let i = 0; i < arms; i++) {
@@ -398,22 +409,22 @@ function drawSwirlTexture(ctx, x, y, radius, alpha, seed, color1, color2) {
     const swirl = fbm(Math.cos(angle) * 2 + seed, Math.sin(angle) * 2, 3, seed);
 
     ctx.beginPath();
-    ctx.moveTo(0, 0);
+    ctx.moveTo(x, y);
     const len = radius * (0.5 + swirl * 0.5);
-    const cx = Math.cos(angle + 0.5) * len * 0.6;
-    const cy = Math.sin(angle + 0.5) * len * 0.6;
-    ctx.quadraticCurveTo(cx, cy, Math.cos(angle) * len, Math.sin(angle) * len);
+    const cx = x + Math.cos(angle + 0.5) * len * 0.6;
+    const cy = y + Math.sin(angle + 0.5) * len * 0.6;
+    ctx.quadraticCurveTo(cx, cy, x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     ctx.strokeStyle = color1;
     ctx.lineWidth = 3 + swirl * 4;
     ctx.lineCap = 'round';
     ctx.stroke();
   }
 
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawHeatDistortion(ctx, x, y, radius, alpha) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha * 0.15;
   const grad = ctx.createRadialGradient(x, y, 0, x, y, radius * 1.5);
   grad.addColorStop(0, 'rgba(255, 200, 100, 0.3)');
@@ -423,11 +434,11 @@ function drawHeatDistortion(ctx, x, y, radius, alpha) {
   ctx.beginPath();
   ctx.arc(x, y, radius * 1.5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 }
 
 function drawScorchDetail(ctx, x, y, radius, alpha, seed) {
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = alpha;
 
   const charGrad = ctx.createRadialGradient(x, y, 0, x, y, radius);
@@ -449,7 +460,7 @@ function drawScorchDetail(ctx, x, y, radius, alpha, seed) {
   ctx.ellipse(x, y, radius * 0.5, radius * 0.3, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 }
 
 export const BOMBER_WEAPON_GRAPHICS = {
@@ -524,7 +535,7 @@ export function drawBomberExplosionGraphic(p) {
 
   // FLASH: fast bright burst when the explosion begins.
   if (p.isExplosionFlash) {
-    ctx.save();
+    const prevAlpha = ctx.globalAlpha;
     const radius = p.r * (1 + (1 - lifeRatio) * 0.4);
     const alpha = fadeAlpha;
     const isPoison = p.explosionType === 'poison';
@@ -550,13 +561,12 @@ export function drawBomberExplosionGraphic(p) {
     ctx.arc(x, y, radius, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
     return;
   }
 
   // FIREBALL: glowing core and heat glow effect.
   if (p.isExplosionFireball) {
-    ctx.save();
     // Removed globalCompositeOperation='lighter' for performance — use alpha blending instead
     const ballRadius = p.r * (0.75 + (1 - lifeRatio) * 0.5);
     const alpha = fadeAlpha;
@@ -590,13 +600,13 @@ export function drawBomberExplosionGraphic(p) {
     ctx.arc(x, y, ballRadius * 0.25, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.restore();
     return;
   }
 
   // SHOCKWAVE: expanding ring line that pulses outward.
   if (p.isExplosionShockwave) {
-    ctx.save();
+    const prevStroke = ctx.strokeStyle;
+    const prevLineWidth = ctx.lineWidth;
     const ringRadius = p.r * (1 + (1 - lifeRatio) * 0.7);
     const ringAlpha = Math.max(0, fadeAlpha * 0.9 * (1 - Math.abs(0.5 - lifeRatio) * 1.8));
     const isPoison = p.explosionType === 'poison';
@@ -607,13 +617,14 @@ export function drawBomberExplosionGraphic(p) {
     ctx.beginPath();
     ctx.arc(x, y, ringRadius, 0, Math.PI * 2);
     ctx.stroke();
-    ctx.restore();
+    ctx.lineWidth = prevLineWidth;
+    ctx.strokeStyle = prevStroke;
     return;
   }
 
   // SMOKE: fading smoke cloud around the explosion.
   if (p.isExplosionSmoke) {
-    ctx.save();
+    const prevAlpha = ctx.globalAlpha;
     const smokeRadius = p.r + (p.maxRadius - p.r) * (1 - lifeRatio);
     const alpha = fadeAlpha * 0.2;
     const isPoison = p.explosionType === 'poison';
@@ -632,13 +643,13 @@ export function drawBomberExplosionGraphic(p) {
     ctx.arc(x, y, smokeRadius * 0.5, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
     return;
   }
 
   // SCORCH: ground scorch mark that appears on impact.
   if (p.isExplosionScorch) {
-    ctx.save();
+    const prevAlpha = ctx.globalAlpha;
     const scorchRadius = p.r;
     const alpha = 0.25 * fadeAlpha;
 
@@ -649,13 +660,13 @@ export function drawBomberExplosionGraphic(p) {
     ctx.ellipse(x, y, scorchRadius, scorchRadius * 0.55, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
     return;
   }
 
   // EMBER: glowing ember particle ring inside the explosion.
   if (p.isExplosionEmber) {
-    ctx.save();
+    const prevFill = ctx.fillStyle;
     const emberAlpha = Math.max(0, fadeAlpha * 0.9);
     const isPoison = p.explosionType === 'poison';
     if (isPoison) {
@@ -670,13 +681,15 @@ export function drawBomberExplosionGraphic(p) {
     ctx.beginPath();
     ctx.arc(x, y, p.r, 0, Math.PI * 2);
     ctx.fill();
-    ctx.restore();
+    ctx.fillStyle = prevFill;
     return;
   }
 
   // SPARK: electrical or bright spark lines around the blast.
   if (p.isExplosionSpark) {
-    ctx.save();
+    const prevFill = ctx.fillStyle;
+    const prevStroke = ctx.strokeStyle;
+    const prevLineWidth = ctx.lineWidth;
     const sparkAlpha = fadeAlpha * 0.85;
     ctx.fillStyle = `rgba(255, 255, 150, ${sparkAlpha})`;
     ctx.beginPath();
@@ -690,19 +703,21 @@ export function drawBomberExplosionGraphic(p) {
     ctx.moveTo(x, y - p.r);
     ctx.lineTo(x, y + p.r);
     ctx.stroke();
-    ctx.restore();
+    ctx.lineWidth = prevLineWidth;
+    ctx.strokeStyle = prevStroke;
+    ctx.fillStyle = prevFill;
     return;
   }
 
   // DEBRIS: chunked debris pieces that fly out from the explosion.
   if (p.isExplosionDebris) {
-    ctx.save();
     const debrisAlpha = fadeAlpha * 0.85;
     ctx.translate(x, y);
     ctx.rotate(p.rotation || 0);
     ctx.fillStyle = `rgba(85, 51, 0, ${debrisAlpha})`;
     ctx.fillRect(-p.r, -p.r * 0.5, p.r * 2, p.r);
-    ctx.restore();
+    ctx.rotate(-(p.rotation || 0));
+    ctx.translate(-x, -y);
     return;
   }
 
@@ -710,13 +725,13 @@ export function drawBomberExplosionGraphic(p) {
   // issues. All explosion types now have specific effects above. This code should never run.
   // Keeping it as a safety net but with minimal rendering cost.
   const baseRadius = p.r;
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = fadeAlpha * 0.3;
   ctx.beginPath();
   ctx.arc(x, y, baseRadius, 0, Math.PI * 2);
   ctx.fillStyle = '#2d8a2d';
   ctx.fill();
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 }
 
 // ─────────────────────────────────────────────
@@ -740,15 +755,15 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
 
   const cfg = BOMBER_WEAPON_GRAPHICS.grenade;
 
-  ctx.save();
+  // Manual state backup for grenade
   ctx.translate(x, y - zHeight);
 
   // ── TRAIL EFFECT (Simplified Shadow Silhouettes) ───────────────────────
   // Limit trail points to 3 for performance
   const maxTrailPoints = 3;
   if (trailPoints.length > 0) {
+    const prevAlpha = ctx.globalAlpha;
     const trailSlice = trailPoints.slice(-maxTrailPoints);
-    ctx.save();
     // Draw shadow silhouettes at each trail point (newest to oldest)
     for (let i = trailSlice.length - 1; i >= 0; i--) {
       const tp = trailSlice[i];
@@ -766,23 +781,32 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
       ctx.fillStyle = '#1a1a1a';
       ctx.fill();
     }
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
   }
 
   // ── SHADOW ────────────────────────────────────────────────────────────────
-  ctx.save();
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowBlur = ctx.shadowBlur;
+  const prevShadowOffsetY = ctx.shadowOffsetY;
+  ctx.shadowColor = 'rgba(0, 0, 0, 0)';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
   ctx.beginPath();
   ctx.ellipse(0, radius * 0.9, radius * 0.85, radius * 0.25, 0, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
   ctx.fill();
-  ctx.restore();
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowBlur = prevShadowBlur;
+  ctx.shadowOffsetY = prevShadowOffsetY;
 
   // ── GRENADE ROTATION ─────────────────────────────────────────────────────
   ctx.rotate(rotation);
 
   // ── GRENADE BODY (main sphere) ────────────────────────────────────────────
   // Outer glow for depth (OPTIMIZED: removed shadowBlur)
-  ctx.save();
+  const prevBodyShadowColor = ctx.shadowColor;
+  const prevBodyShadowBlur = ctx.shadowBlur;
+  const prevBodyShadowOffsetY = ctx.shadowOffsetY;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 3;
@@ -800,10 +824,12 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fillStyle = bodyGrad;
   ctx.fill();
-  ctx.restore();
+  ctx.shadowColor = prevBodyShadowColor;
+  ctx.shadowBlur = prevBodyShadowBlur;
+  ctx.shadowOffsetY = prevBodyShadowOffsetY;
 
   // ── BODY SEGMENT BANDS (horizontal grooves) ─────────────────────────────
-  ctx.save();
+  const prevBandAlpha = ctx.globalAlpha;
   ctx.globalAlpha = 0.7;
 
   // Top band
@@ -828,7 +854,7 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.ellipse(0, radius * 0.35, radius * 0.88, radius * 0.12, 0, Math.PI, Math.PI * 2);
   ctx.stroke();
 
-  ctx.restore();
+  ctx.globalAlpha = prevBandAlpha;
 
   // ── WARNING STRIPES (hazard pattern) ────────────────────────────────────
   ctx.save();
@@ -848,8 +874,9 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.restore();
 
   // ── FUSE NECK (top section) ──────────────────────────────────────────────
-  ctx.save();
-  // Shadow for depth (OPTIMIZED: removed shadowBlur)
+  const prevNeckShadowColor = ctx.shadowColor;
+  const prevNeckShadowBlur = ctx.shadowBlur;
+  const prevNeckShadowOffsetY = ctx.shadowOffsetY;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
@@ -875,10 +902,14 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.fillStyle = cfg.bandHighlight;
   ctx.fill();
 
-  ctx.restore();
+  ctx.shadowColor = prevNeckShadowColor;
+  ctx.shadowBlur = prevNeckShadowBlur;
+  ctx.shadowOffsetY = prevNeckShadowOffsetY;
 
   // ── FUSE CORD ─────────────────────────────────────────────────────────────
-  ctx.save();
+  const prevFuseStroke = ctx.strokeStyle;
+  const prevFuseLineWidth = ctx.lineWidth;
+  const prevFuseLineCap = ctx.lineCap;
   ctx.strokeStyle = cfg.fuseColor;
   ctx.lineWidth = radius * 0.08;
   ctx.lineCap = 'round';
@@ -895,10 +926,15 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
     ctx.lineTo(xOff, yOff);
   }
   ctx.stroke();
-  ctx.restore();
+  ctx.lineCap = prevFuseLineCap;
+  ctx.lineWidth = prevFuseLineWidth;
+  ctx.strokeStyle = prevFuseStroke;
 
   // ── SAFETY PIN (ring) ────────────────────────────────────────────────────
-  ctx.save();
+  const prevPinStroke = ctx.strokeStyle;
+  const prevPinLineWidth = ctx.lineWidth;
+  const prevPinLineCap = ctx.lineCap;
+  const prevPinFill = ctx.fillStyle;
   ctx.strokeStyle = cfg.pinColor;
   ctx.lineWidth = radius * 0.06;
   ctx.lineCap = 'round';
@@ -926,12 +962,13 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.fillStyle = cfg.pinColor;
   ctx.fill();
 
-  ctx.restore();
+  ctx.fillStyle = prevPinFill;
+  ctx.lineCap = prevPinLineCap;
+  ctx.lineWidth = prevPinLineWidth;
+  ctx.strokeStyle = prevPinStroke;
 
   // ── SPARK / IGNITER (animated) ────────────────────────────────────────────
   if (isSticky) {
-    ctx.save();
-
     const sparkIntensity = 0.5 + Math.sin(sparkPhase) * 0.5;
     const sparkX = 0;
     const sparkY = -radius * 1.15 - radius * 0.5;
@@ -967,12 +1004,10 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
     ctx.fillStyle = cfg.sparkCore;
     // OPTIMIZED: Removed shadowBlur (expensive operation)
     ctx.fill();
-
-    ctx.restore();
   }
 
   // ── SPECULAR HIGHLIGHT (top-left shine) ──────────────────────────────────
-  ctx.save();
+  const prevSpecAlpha = ctx.globalAlpha;
   ctx.globalAlpha = 0.4;
   const specGrad = ctx.createRadialGradient(
     -radius * 0.35, -radius * 0.35, 0,
@@ -985,18 +1020,21 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.restore();
+  ctx.globalAlpha = prevSpecAlpha;
 
   // ── OUTLINE ──────────────────────────────────────────────────────────────
-  ctx.save();
+  const prevOutlineStroke = ctx.strokeStyle;
+  const prevOutlineLineWidth = ctx.lineWidth;
   ctx.beginPath();
   ctx.arc(0, 0, radius, 0, Math.PI * 2);
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.restore();
+  ctx.lineWidth = prevOutlineLineWidth;
+  ctx.strokeStyle = prevOutlineStroke;
 
-  ctx.restore(); // Main save
+  // Restore grenade states
+  ctx.translate(-x, -(y - zHeight));
 }
 
 // ─────────────────────────────────────────────
@@ -1006,7 +1044,11 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
 export function drawGrenadeTrail(ctx, points, radius, color) {
   if (!points || points.length < 2) return;
 
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
+  const prevStroke = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+  const prevLineCap = ctx.lineCap;
+  const prevLineJoin = ctx.lineJoin;
   ctx.globalAlpha = 0.5;
   ctx.strokeStyle = color || 'rgba(100, 180, 100, 0.4)';
   ctx.lineWidth = radius * 0.8;
@@ -1025,7 +1067,11 @@ export function drawGrenadeTrail(ctx, points, radius, color) {
   ctx.lineWidth = radius * 0.4;
   ctx.stroke();
 
-  ctx.restore();
+  ctx.lineJoin = prevLineJoin;
+  ctx.lineCap = prevLineCap;
+  ctx.lineWidth = prevLineWidth;
+  ctx.strokeStyle = prevStroke;
+  ctx.globalAlpha = prevAlpha;
 }
 
 // ─────────────────────────────────────────────
@@ -1085,12 +1131,12 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
 
   const cfg = c4Colors;
 
-  ctx.save();
+  // Manual state backup for C4
   ctx.translate(x, y - zHeight);
 
   // ── TRAIL EFFECT (Shadow Silhouettes) ───────────────────────────────────
   if (trailPoints.length > 0) {
-    ctx.save();
+    const prevAlpha = ctx.globalAlpha;
     for (let i = trailPoints.length - 1; i >= 0; i--) {
       const tp = trailPoints[i];
       const tx = tp.x - x;
@@ -1099,7 +1145,6 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
       const alpha = (1 - age) * 0.35;
       const scale = 1 - age * 0.25;
 
-      ctx.save();
       ctx.translate(tx, ty);
       ctx.rotate(rotation);
       ctx.globalAlpha = alpha;
@@ -1108,18 +1153,17 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
       ctx.fillStyle = isDeathC4 ? '#3a1a0a' : '#4a4030';
       ctx.fillRect(-radius * scale * 1.1, -radius * scale * 0.7, radius * 2.2 * scale, radius * 1.4 * scale);
 
-      ctx.restore();
+      ctx.rotate(-rotation);
+      ctx.translate(-tx, -ty);
     }
-    ctx.restore();
+    ctx.globalAlpha = prevAlpha;
   }
 
   // ── SHADOW ────────────────────────────────────────────────────────────────
-  ctx.save();
   ctx.beginPath();
   ctx.ellipse(0, radius * 0.85, radius * 1.15, radius * 0.3, 0, 0, Math.PI * 2);
   ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
   ctx.fill();
-  ctx.restore();
 
   // ── C4 ROTATION ──────────────────────────────────────────────────────────
   ctx.rotate(rotation);
@@ -1129,8 +1173,9 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.scale(pulse, pulse);
 
   // ── C4 MAIN BODY (rectangular block) ─────────────────────────────────────
-  ctx.save();
   // Shadow for depth (OPTIMIZED: removed shadowBlur)
+  const prevShadowColor = ctx.shadowColor;
+  const prevShadowOffsetY = ctx.shadowOffsetY;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 4;
@@ -1153,10 +1198,12 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.fillStyle = bodyGrad;
   ctx.fill();
 
-  ctx.restore();
+  // Reset shadow
+  ctx.shadowColor = prevShadowColor;
+  ctx.shadowOffsetY = prevShadowOffsetY;
 
   // ── BODY TEXTURE (subtle plastic texture lines) ─────────────────────────
-  ctx.save();
+  const prevAlpha = ctx.globalAlpha;
   ctx.globalAlpha = 0.15;
   ctx.strokeStyle = cfg.bodyDark;
   ctx.lineWidth = 0.5;
@@ -1167,10 +1214,10 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
     ctx.lineTo(bodyWidth / 2 - radius * 0.1, yOff);
     ctx.stroke();
   }
-  ctx.restore();
+  ctx.globalAlpha = prevAlpha;
 
   // ── WARNING STRIPES (hazard pattern on sides) ────────────────────────────
-  ctx.save();
+  ctx.save(); // Keep clip save
   ctx.globalAlpha = 0.7;
   const stripeWidth = radius * 0.12;
   const stripeSpacing = radius * 0.24;
@@ -1182,15 +1229,15 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   for (let i = -6; i <= 6; i++) {
     const offset = i * stripeSpacing - bodyHeight / 2;
     ctx.fillStyle = cfg.warningColor;
-    ctx.save();
     ctx.translate(-bodyWidth / 2, 0);
     ctx.rotate(Math.PI / 4);
     ctx.fillRect(-bodyHeight, offset - stripeWidth / 2, bodyHeight * 2, stripeWidth);
-    ctx.restore();
+    ctx.rotate(-Math.PI / 4);
+    ctx.translate(bodyWidth / 2, 0);
   }
   ctx.restore();
 
-  ctx.save();
+  ctx.save(); // Keep clip save
   ctx.globalAlpha = 0.7;
   // Right side stripes
   ctx.beginPath();
@@ -1199,27 +1246,28 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   for (let i = -6; i <= 6; i++) {
     const offset = i * stripeSpacing - bodyHeight / 2;
     ctx.fillStyle = cfg.warningColor;
-    ctx.save();
     ctx.translate(bodyWidth / 2, 0);
     ctx.rotate(-Math.PI / 4);
     ctx.fillRect(-bodyHeight, offset - stripeWidth / 2, bodyHeight * 2, stripeWidth);
-    ctx.restore();
+    ctx.rotate(Math.PI / 4);
+    ctx.translate(-bodyWidth / 2, 0);
   }
   ctx.restore();
 
   // ── C-4 TEXT MARKING ─────────────────────────────────────────────────────
-  ctx.save();
+  const prevTextAlpha = ctx.globalAlpha;
   ctx.font = `bold ${radius * 0.45}px Arial`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillStyle = cfg.textColor;
   ctx.globalAlpha = 0.85;
   ctx.fillText('C-4', 0, radius * 0.05);
-  ctx.restore();
+  ctx.globalAlpha = prevTextAlpha;
 
   // ── DETONATOR CAP (top center) ──────────────────────────────────────────
-  ctx.save();
   // Shadow for depth (OPTIMIZED: removed shadowBlur)
+  const prevCapShadowColor = ctx.shadowColor;
+  const prevCapShadowOffsetY = ctx.shadowOffsetY;
   ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 2;
@@ -1245,10 +1293,11 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.fillStyle = cfg.capHighlight;
   ctx.fill();
 
-  ctx.restore();
+  // Reset shadow
+  ctx.shadowColor = prevCapShadowColor;
+  ctx.shadowOffsetY = prevCapShadowOffsetY;
 
   // ── DETONATOR NECK (connection to body) ──────────────────────────────────
-  ctx.save();
   ctx.fillStyle = cfg.capColor;
   ctx.beginPath();
   ctx.moveTo(-capWidth * 0.35, capY - capHeight / 2);
@@ -1257,16 +1306,11 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.lineTo(capWidth * 0.35, capY - capHeight / 2);
   ctx.closePath();
   ctx.fill();
-  ctx.restore();
 
   // ── LED INDICATOR LIGHT (blinking) ───────────────────────────────────────
-  ctx.save();
   const ledPhase = Math.sin(sparkPhase * 3);
   const ledOn = ledPhase > 0.3;
-  const ledBrightness = ledOn ? (0.5 + ledPhase * 0.5) : 0.2;
 
-  // LED glow (OPTIMIZED: removed shadowBlur - expensive operation)
-  
   // LED body
   const ledRadius = radius * 0.1;
   const ledX = 0;
@@ -1290,11 +1334,10 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
     ctx.fill();
   }
 
-  ctx.restore();
-
   // ── WIRES (connecting to detonator) ──────────────────────────────────────
-  ctx.save();
   ctx.strokeStyle = cfg.wireColor;
+  const prevLineWidth = ctx.lineWidth;
+  const prevLineCap = ctx.lineCap;
   ctx.lineWidth = radius * 0.04;
   ctx.lineCap = 'round';
 
@@ -1319,10 +1362,12 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.arc(capWidth * 0.3, capY, radius * 0.05, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.restore();
+  // Reset line styles
+  ctx.lineWidth = prevLineWidth;
+  ctx.lineCap = prevLineCap;
 
   // ── BODY EDGE HIGHLIGHTS ─────────────────────────────────────────────────
-  ctx.save();
+  const prevEdgeAlpha = ctx.globalAlpha;
   ctx.globalAlpha = 0.3;
   ctx.strokeStyle = cfg.bodyLight;
   ctx.lineWidth = 1.5;
@@ -1339,10 +1384,7 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.lineTo(-bodyWidth / 2 + radius * 0.1, bodyHeight / 2 - radius * 0.2);
   ctx.stroke();
 
-  ctx.restore();
-
   // ── BODY SHADOW EDGE ─────────────────────────────────────────────────────
-  ctx.save();
   ctx.globalAlpha = 0.25;
   ctx.strokeStyle = cfg.bodyDark;
   ctx.lineWidth = 1.5;
@@ -1359,16 +1401,18 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   ctx.lineTo(bodyWidth / 2 - radius * 0.1, bodyHeight / 2 - radius * 0.2);
   ctx.stroke();
 
-  ctx.restore();
-
   // ── OUTLINE ──────────────────────────────────────────────────────────────
-  ctx.save();
+  ctx.globalAlpha = 1.0; // Reset alpha for outline
   ctx.beginPath();
   ctx.roundRect(-bodyWidth / 2, -bodyHeight / 2, bodyWidth, bodyHeight, radius * 0.15);
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
   ctx.lineWidth = 1.5;
   ctx.stroke();
-  ctx.restore();
 
-  ctx.restore(); // Main save
+  ctx.globalAlpha = prevEdgeAlpha;
+
+  // Restore C4 states (reverse order of transforms)
+  ctx.scale(1 / pulse, 1 / pulse);
+  ctx.rotate(-rotation);
+  ctx.translate(-x, -(y - zHeight));
 }

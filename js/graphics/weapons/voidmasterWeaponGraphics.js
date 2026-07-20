@@ -1,23 +1,32 @@
 export function drawVoidmasterWeapon(ctx, x, y, r) {
-  ctx.save();
+  const prevFillStyle = ctx.fillStyle;
+  const prevStrokeStyle = ctx.strokeStyle;
+  const prevLineWidth = ctx.lineWidth;
+
   ctx.translate(x, y);
 
   // Note: purposely not rotating by the fighter's body angle 
   // so the weapons do not spin with the character.
 
+  const orbOffset = r + 8;
+
   // Left orb
-  ctx.save();
-  ctx.translate(-r - 8, 0);
+  ctx.translate(-orbOffset, 0);
   drawVoidOrb(ctx, 0);
-  ctx.restore();
+  ctx.translate(orbOffset, 0);
 
   // Right orb
-  ctx.save();
-  ctx.translate(r + 8, 0);
+  ctx.translate(orbOffset, 0);
   drawVoidOrb(ctx, Math.PI);
-  ctx.restore();
+  ctx.translate(-orbOffset, 0);
 
-  ctx.restore();
+  // Manual transform reset
+  ctx.translate(-x, -y);
+
+  // Manual state restore
+  ctx.fillStyle = prevFillStyle;
+  ctx.strokeStyle = prevStrokeStyle;
+  ctx.lineWidth = prevLineWidth;
 }
 
 function drawVoidOrb(ctx, phaseOffset) {

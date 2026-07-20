@@ -26,6 +26,7 @@ export const state = {
 
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'
+  indexCategory: 'All',
   mode: GAME_MODES.ONE_VS_ONE,
   testMode: false, // Disables leaderboard recording
   dummyAggressive: false, // Whether target dummies fight back
@@ -38,6 +39,10 @@ export const state = {
   roundEndTimer: 0,
   matchEndTimer: 0,
   ffaMatchComplete: false,
+
+  // TLFS gamemode state
+  tlfsAllowedEnemies: [], // Will be populated with all fighter indices
+  tlfsDefeatedEnemies: 0,
 
   // Leaderboard for 1v1 mode - tracks wins and losses per fighter
   leaderboard: {}, // { fighterIndex: { wins: 0, losses: 0 } }
@@ -299,7 +304,8 @@ const SKILL_TEXT_WHITELIST = [
   'THROW!',
   'CRIT!',
   'BLOCK!',
-  'PLANTING...'
+  'PLANTING...',
+  'RCT'
 ];
 
 function isAllowedFloatingText(text) {

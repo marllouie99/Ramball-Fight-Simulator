@@ -829,11 +829,8 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   ctx.fillStyle = candyRed;
   ctx.beginPath();
   ctx.moveTo(10, -10);
-  ctx.bezierCurveTo(45, -20, 35, -70, tipX, tipY);
-  ctx.lineTo(tipX + 15, tipY + 15);
-  ctx.quadraticCurveTo(-30, -60, -10, -25);
-  ctx.lineTo(-15, 0);
-  ctx.lineTo(0, 5);
+  ctx.bezierCurveTo(45, -20, 35, -70, tipX, tipY); // Outer curve
+  ctx.bezierCurveTo(-15, -70, 0, -20, -5, 0);      // Smooth inner crescent
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = '#000';
@@ -853,9 +850,10 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   ctx.fillStyle = '#18181b';
   ctx.beginPath();
   ctx.moveTo(12, -8);
-  ctx.bezierCurveTo(48, -20, 38, -72, tipX - 5, tipY - 5);
-  ctx.lineTo(tipX + 15, tipY);
-  ctx.bezierCurveTo(25, -60, 25, -20, 5, -5);
+  // Outer edge of the spine (runs up the middle of the red blade)
+  ctx.bezierCurveTo(30, -20, 20, -60, tipX + 15, tipY + 15);
+  // Inner edge of the spine (matches the inner crescent of the blade exactly)
+  ctx.bezierCurveTo(-15, -70, 0, -20, -5, 0);
   ctx.closePath();
   ctx.fill();
   ctx.strokeStyle = '#000';

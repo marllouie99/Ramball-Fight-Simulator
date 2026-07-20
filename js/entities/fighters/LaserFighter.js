@@ -171,9 +171,23 @@ export class LaserFighter extends Fighter {
     }
   }
 
+  interruptAttacks() {
+    super.interruptAttacks();
+    this.beamTimer = 0;
+    this.beamCharge = 0;
+    this.skillActive = false;
+    
+    // Stop the laser sound immediately if it's playing
+    if (this._isLaserSoundPlaying && this._laserSoundKey) {
+      fadeOutLoopingSound(this._laserSoundKey, 100);
+      this._isLaserSoundPlaying = false;
+    }
+  }
+
   update(opponent, ownerIndex, arena) {
     this.handlePoison();
     this.handleBurn();
+
     this._tickCooldowns();
 
     // Time stop - freeze ALL movement, spinning, and actions

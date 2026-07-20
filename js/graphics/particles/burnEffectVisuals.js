@@ -74,18 +74,32 @@ class BurnEffectSystem {
     
     // OPTIMIZED: More aggressive limits for multi-fighter battles
     const maxBurn = isMulti ? 40 : 200;
-    
-    // OPTIMIZED: Further reduce limit during low FPS
     const fpsBasedLimit = state.fps < 40 ? 25 : maxBurn;
-    
     if (this.particles.length > fpsBasedLimit) return;
     
     const r = fighter.r;
-    
-    // OPTIMIZED: Reduce spawn rates during low FPS
     const fireChance = state.fps < 40 ? 0.2 : 0.4;
     const sparkChance = state.fps < 40 ? 0.1 : 0.2;
     const smokeChance = state.fps < 40 ? 0.08 : 0.15;
+
+    // Determine directional flow vector based on channeling angle or movement
+    let flowVx = 0;
+    let flowVy = -12; // gentle soft upward drift when stationary
+    let gravity = -6;
+
+    if (fighter.isChannelingDivineFlame) {
+      // Flow backward along arrow axis (opposite gunAngle)
+      const rearAngle = (fighter.gunAngle || 0) + Math.PI;
+      const speed = 25 + Math.random() * 25;
+      flowVx = Math.cos(rearAngle) * speed;
+      flowVy = Math.sin(rearAngle) * speed;
+      gravity = 0;
+    } else if (Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5) {
+      // Flow backward relative to movement direction
+      flowVx = -(fighter.vx || 0) * 1.2;
+      flowVy = -(fighter.vy || 0) * 1.2;
+      gravity = -4;
+    }
     
     // 1. Fire particles (dense center flame)
     if (Math.random() < fireChance) {
@@ -97,9 +111,9 @@ class BurnEffectSystem {
       const p = this._getParticle(px, py, 'fire', 4 + Math.random() * 6);
       p.maxLife = 0.35 + Math.random() * 0.25;
       p.life = p.maxLife;
-      // Inherit a portion of the fighter's velocity for realistic trailing
-      p.vx += fighter.vx * 0.5;
-      p.vy += fighter.vy * 0.5;
+      p.vx = flowVx + (Math.random() - 0.5) * 12;
+      p.vy = flowVy + (Math.random() - 0.5) * 12;
+      p.gravity = gravity;
       this.particles.push(p);
     }
 
@@ -112,23 +126,29 @@ class BurnEffectSystem {
       const p = this._getParticle(px, py, 'spark', 1.5 + Math.random() * 1.5);
       p.maxLife = 0.15 + Math.random() * 0.15;
       p.life = p.maxLife;
-      const sparkAngle = -Math.PI / 2 + (Math.random() - 0.5) * 1.5; // biased upwards
-      const speed = 60 + Math.random() * 60;
-      p.vx = Math.cos(sparkAngle) * speed + fighter.vx * 0.3;
-      p.vy = Math.sin(sparkAngle) * speed + fighter.vy * 0.3;
+      const sparkAngle = fighter.isChannelingDivineFlame 
+        ? ((fighter.gunAngle || 0) + Math.PI + (Math.random() - 0.5) * 0.8)
+        : Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5
+          ? (Math.atan2(-(fighter.vy || 0), -(fighter.vx || 0)) + (Math.random() - 0.5) * 0.8)
+          : (-Math.PI / 2 + (Math.random() - 0.5) * 1.5);
+      const speed = 40 + Math.random() * 40;
+      p.vx = Math.cos(sparkAngle) * speed;
+      p.vy = Math.sin(sparkAngle) * speed;
+      p.gravity = gravity;
       this.particles.push(p);
     }
 
     // 3. Smoke (rising ash)
     if (Math.random() < smokeChance) {
       const px = fighter.x + (Math.random() - 0.5) * r * 0.6;
-      const py = fighter.y - r * 0.5; // spawn near top
+      const py = fighter.y - r * 0.3;
       
       const p = this._getParticle(px, py, 'smoke', 6 + Math.random() * 8);
       p.maxLife = 0.6 + Math.random() * 0.4;
       p.life = p.maxLife;
-      p.vx = (Math.random() - 0.5) * 10 + fighter.vx * 0.2;
-      p.vy = -40 - Math.random() * 20 + fighter.vy * 0.2;
+      p.vx = flowVx * 0.5 + (Math.random() - 0.5) * 8;
+      p.vy = flowVy * 0.5 + (Math.random() - 0.5) * 8 - 10;
+      p.gravity = -10;
       p.friction = 0.98;
       this.particles.push(p);
     }
@@ -176,32 +196,85 @@ class BurnEffectSystem {
     // OPTIMIZED: Skip expensive composite operations during low FPS
     const useSimpleRender = state.fps < 40 && state.gameState === 'playing';
 
+    // Pre-sort so lighter elements blend correctly if needed, but lighter handles it regardless.
+    this.particles.sort((a, b) => b.life - a.life);
     ctx.save();
 
-    for (const p of this.particles) {
-      const progress = p.life / p.maxLife;
+    // Use source-over blending because lighter blending is invisible against light arena backgrounds
+    ctx.globalCompositeOperation = 'source-over';
 
+    for (const p of this.particles) {
       if (p.type === 'fire') {
+        const progress = p.life / p.maxLife;
+        const size = p.size * (1.2 + (1 - progress) * 0.5); // Grows slightly as it lives
+
         if (useSimpleRender) {
-          ctx.globalCompositeOperation = 'source-over';
           ctx.fillStyle = `rgba(255, 150, 50, ${progress * 0.7})`;
-        } else {
-          ctx.globalCompositeOperation = 'lighter';
-          const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
+          ctx.fill();
+          continue;
+        }
+
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
+        
+        // Brighter colors that fade out cleanly without getting muddy
+        if (progress > 0.6) { // Young
           grad.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
-          grad.addColorStop(0.2, `rgba(255, 200, 50, ${progress * 0.9})`);
-          grad.addColorStop(0.5, `rgba(255, 80, 0, ${progress * 0.6})`);
-          grad.addColorStop(1, `rgba(180, 0, 0, 0)`);
-          ctx.fillStyle = grad;
+          grad.addColorStop(0.5, `rgba(255, 220, 50, ${progress * 0.9})`);
+          grad.addColorStop(1, `rgba(255, 100, 0, 0)`);
+        } else { // Older
+          grad.addColorStop(0, `rgba(255, 150, 20, ${progress * 0.8})`);
+          grad.addColorStop(0.7, `rgba(200, 40, 0, ${progress * 0.4})`);
+          grad.addColorStop(1, `rgba(100, 0, 0, 0)`);
         }
+        
+        ctx.fillStyle = grad;
         ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      } 
-      else if (p.type === 'spark') {
-        if (!useSimpleRender) {
-          ctx.globalCompositeOperation = 'lighter';
+        
+        // Restore fluid, flowy procedural shape
+        const numPoints = 10;
+        const points = [];
+        for (let j = 0; j < numPoints; j++) {
+          const theta = (j / numPoints) * Math.PI * 2;
+          let r = size;
+          
+          const turbulence = (p.x + p.y) % 10;
+          const billow = Math.sin(theta * 2 - p.life * 8 + turbulence);
+          const cut = Math.pow(Math.sin(theta * 3 - p.life * 12 + turbulence * 1.5), 2);
+          
+          const deform = 0.1 + ((1.0 - progress) * 0.4); 
+          r += size * deform * billow;
+          r -= size * deform * cut * 0.7;
+          
+          r = Math.max(size * 0.3, r);
+          
+          // Volumetric wobble
+          const wobbleX = Math.sin(p.life * 15 + p.y * 0.1) * 2;
+          
+          points.push({
+            x: p.x + wobbleX + Math.cos(theta) * r,
+            y: p.y + Math.sin(theta) * r
+          });
         }
+        
+        // Draw smooth closed loop
+        const startX = (points[numPoints - 1].x + points[0].x) / 2;
+        const startY = (points[numPoints - 1].y + points[0].y) / 2;
+        ctx.moveTo(startX, startY);
+        
+        for (let j = 0; j < numPoints; j++) {
+          const curr = points[j];
+          const next = points[(j + 1) % numPoints];
+          const midX = (curr.x + next.x) / 2;
+          const midY = (curr.y + next.y) / 2;
+          ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
+        }
+        ctx.closePath();
+        ctx.fill();
+      }
+      else if (p.type === 'spark') {
+        const progress = p.life / p.maxLife;
         ctx.strokeStyle = `rgba(255, ${120 + progress * 135}, 40, ${progress})`;
         ctx.lineWidth = p.size;
         ctx.lineCap = 'round';
@@ -218,11 +291,15 @@ class BurnEffectSystem {
         ctx.stroke();
       } 
       else if (p.type === 'smoke') {
-        ctx.globalCompositeOperation = 'source-over';
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-        grad.addColorStop(0, `rgba(50, 45, 45, ${progress * 0.45})`);
-        grad.addColorStop(0.6, `rgba(25, 25, 25, ${progress * 0.2})`);
+        const progress = p.life / p.maxLife;
+        // Blend from dark purple/red to black based on progress - kept VERY faint to avoid muddy overlap
+        const alpha = Math.sin(progress * Math.PI) * 0.1;
+        
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 1.2);
+        grad.addColorStop(0, `rgba(40, 20, 50, ${alpha})`); 
+        grad.addColorStop(0.6, `rgba(20, 15, 25, ${alpha * 0.6})`);
         grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        
         ctx.fillStyle = grad;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);

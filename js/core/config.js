@@ -494,7 +494,7 @@ export const CONFIG = {
     telekinesisRange: 250,
 
     // Ultimate: Spell Steal
-    spellStealCooldown: 500,
+    spellStealCooldown: 1000,
     spellStealDuration: 1000, // 7 seconds
     spellStealRange: 350,
   },
@@ -527,9 +527,106 @@ export const CONFIG = {
 
     // Ultimate: Storm
     stormCooldown: 900,    // 15 seconds
-    stormDuration: 180,    // 3 seconds
+    stormDuration: 130,    // 3 seconds
     stormStrikesPerSec: 3, // Per enemy
-    stormStrikeDamage: 12,
+    stormStrikeDamage: 5,
+
+    // Storm Visuals & FX
+    stormTelegraphFrames: 120,       // Duration of the channeling wind-up
+    stormDimOpacity: 0.7,            // How dark the arena becomes
+    stormCastShakeIntensity: 8,      // Screen shake when storm activates
+    stormCastShakeFrames: 20,
+    stormStrikeShakeIntensity: 4,    // Screen shake on each lightning impact
+    stormStrikeShakeFrames: 10,
+  },
+
+  /** Gojo Satoru — Limitless Fighter */
+  gojo: {
+    infinityCooldown: 240,    // Cooldown before Infinity block triggers again
+    blueCooldown: 80,         // Fire rate for basic attack (Blue orb) - Lower is faster
+    blueSpeed: 7.5,           // Speed of Blue orb projectile
+    blueRadius: 100,           // Pull radius of Blue explosion
+    bluePullForce: 6.5,       // Pull strength of Blue
+    redKnockback: 25,         // Knockback force of Red
+    redCooldown: 300,         // Cooldown of Red
+    redRange: 100,            // Range to trigger Red
+    purpleCooldown: 650,      // Cooldown of Hollow Purple
+    purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
+    purpleDamage: 10,         // Continuous piercing damage per tick
+    purpleSpeed: 5,           // Speed of Purple orb
+    purpleRadius: 50,         // Radius of Purple orb
+    purpleLife: 250,         // How long Purple orb stays in arena (frames)
+    purpleTravelTime: 20,    // Frames the orb travels before stopping (0 = stop immediately)
+    purpleScale: 10.0,        // Scale multiplier for hit radius (visual size)
+    purpleDPS: 30,            // Damage per second dealt to enemies inside the orb
+    purpleDPSInterval: 10,   // Frames between DPS ticks (30 = 0.5s at 60fps)
+    purpleSlowDuration: 60,  // Frames the slow effect lasts (1 second at 60fps)
+    purpleSlowMultiplier: 0.5, // Speed multiplier while slowed (0.5 = 50% speed)
+    purplePullForce: 5.0,    // How strongly enemies are dragged toward the orb center
+    purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
+    purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
+    domainCooldown: 1200,     // 20s Ultimate cooldown
+    domainDuration: 180,      // Domain lasts 3 seconds (paralyzes enemies)
+    // Reverse Cursed Technique - Self heal when at low HP
+    reverseCursedTechniqueHpThreshold: 0.30,  // Triggers when HP drops to 25% or below
+    reverseCursedTechniqueHealPercent: 0.20,   // Heals 35% of max HP
+    reverseCursedTechniqueCooldown: 550,      // 15 second cooldown before it can trigger again
+    // Melee Mode (Hand-to-Hand Combat)
+    initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
+    meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
+    closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
+    meleePunchDamage: 3,     // Damage dealt by each punch
+    meleePunchCooldown: 20,   // Frames between punches
+    teleportDelay: 5,        // Frames delay before teleport after punch
+    teleportSpeed: 15,        // Speed of teleport movement (pixels per frame)
+  },
+
+  /** Ryomen Sukuna — King of Curses */
+  sukuna: {
+    // Reverse Cursed Technique (Passive)
+    reverseCursedTechniqueHpThreshold: 0.30,  // Triggers when HP drops to 30% or below
+    reverseCursedTechniqueHealPercent: 0.40,   // Heals 40% of max HP
+    reverseCursedTechniqueCooldown: 1200,      // 20 second cooldown before it can trigger again
+
+    // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
+    slashDamage: 8,          // Base damage per Dismantle / Martial Arts strike
+    slashSpeed: 50,          // Speed of Dismantle slash projectiles
+    slashCooldown: 50,       // Frames between basic attacks
+    meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
+    meleePunchCooldown: 30,  // Attack speed of melee punches (lower = faster)
+
+    // Bleed Debuff
+    bleedDamagePerStack: 2,  // Damage per bleed stack
+    maxBleedStacks: 5,        // Maximum bleed stacks
+    bleedDuration: 180,       // Frames bleed lasts (3 seconds)
+
+    // Skill 1: Phantom Flurry + Cleave
+    flurryCooldown: 600,      // Cooldown between Phantom Flurry activations
+    flurryHits: 10,            // Number of strikes in flurry
+    flurryDamage: 6,          // Damage per flurry strike
+    flurryHitInterval: 5,     // Frames between flurry strikes
+    flurryRange: 150,          // Range to trigger flurry
+    flurryCleaveBonusMultiplier: 2.0, // Bonus Dismantle/Cleave damage multiplier on flurry finish
+    rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
+
+    // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
+    divineFlameCooldown: 610,      // Cooldown between Furnace uses (8.33 seconds)
+    divineFlameChargeMax: 150,      // Charge up duration (1.5 seconds)
+    divineFlameDamage: 30,         // Primary direct hit nuke damage
+    divineFlameSpeed: 10,          // Speed of Furnace fire arrow
+    divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
+    divineFlameShakeIntensity: 16, // Screen shake intensity on impact
+    divineFlameShakeDuration: 22,  // Screen shake duration
+    thermobaricSplashRadius: 130,  // Thermobaric explosion splash damage radius
+
+    // Ultimate Skill: Domain Expansion — Malevolent Shrine
+    domainCooldown: 1000,     // Cooldown before domain can trigger (25 seconds at 60 fps)
+    domainDuration: 2000,      // Domain duration (3 seconds)
+    domainDamage: 5,          // Base damage per slash tick
+    domainDamageInterval: 10,  // Frames between slash ticks
+    domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
+    domainRadius: 240,        // Radius of the open-air death zone
+    domainRampRatePerSec: 0.10,// 10% damage increase per second targets stay inside
   },
 };
 
@@ -540,6 +637,7 @@ export const FIGHTER_DEFS = [
   {
     id: 1,
     name: 'Sharpshooter',
+    category: 'Sci-Fi & Modern',
     color: '#ff4d4d',
     startX: 140, startY: 180,
     startVx: 1.4, startVy: 1.0,
@@ -558,6 +656,7 @@ export const FIGHTER_DEFS = [
   {
     id: 2,
     name: 'Jazz',
+    category: 'Sci-Fi & Modern',
     color: '#4da3ff',
     startX: 460, startY: 280,
     startVx: -1.2, startVy: -0.9,
@@ -569,11 +668,12 @@ export const FIGHTER_DEFS = [
     cooldown: 30,  // 1 second at 60fps
     moveSpeed: 5.0,
     ability: 'Aimbot Laser',
-    desc: 'Fires an instant follow up projectile everytime he hits an enemy.',
+    desc: 'Wields a dubstep gun that fires musical notes and triggers an instant follow-up projectile on hit.',
   },
   {
     id: 3,
     name: 'Spike',
+    category: 'Fantasy & Magic',
     color: '#e5c158',
     startX: 300, startY: 240, // start center
     startVx: 1.6, startVy: -1.2,
@@ -589,7 +689,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 4,
-    name: 'Alchemist',
+    name: 'Circe',
+    category: 'Greek Mythology',
     color: '#4dff4d',
     startX: 220, startY: 240,
     startVx: 1.3, startVy: 1.1,
@@ -605,7 +706,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 5,
-    name: 'Solar Champion',
+    name: 'Hyperion',
+    category: 'Greek Mythology',
     color: '#ffffff',
     startX: 300, startY: 210,
     startVx: 1.4, startVy: 1.0,
@@ -623,6 +725,7 @@ export const FIGHTER_DEFS = [
   {
     id: 6,
     name: 'Knight',
+    category: 'Fantasy & Magic',
     color: '#9e9e9e',
     startX: 200, startY: 220,
     startVx: 0.7, startVy: 0.5,
@@ -638,7 +741,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 7,
-    name: 'Void Master',
+    name: 'Erebus',
+    category: 'Greek Mythology',
     color: '#6200a0',
     startX: 250, startY: 260,
     startVx: 1.0, startVy: 0.8,
@@ -656,7 +760,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 8,
-    name: 'Ninja',
+    name: 'Shinobi',
+    category: 'Japanese',
     color: '#2f4f4f',
     startX: 280, startY: 250,
     startVx: 1.2, startVy: -0.8,
@@ -674,7 +779,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 9,
-    name: 'Flame Warden',
+    name: 'Ember',
+    category: 'Fantasy & Magic',
     color: '#ff8c00',
     startX: 300, startY: 230,
     startVx: 1.3, startVy: 1.0,
@@ -693,6 +799,7 @@ export const FIGHTER_DEFS = [
   {
     id: 10,
     name: 'Berserker',
+    category: 'Fantasy & Magic',
     color: '#8b0000',
     startX: 320, startY: 260,
     startVx: 1.5, startVy: -1.0,
@@ -710,7 +817,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 11,
-    name: 'Cronos',
+    name: 'Cronus',
+    category: 'Greek Mythology',
     color: '#07cdfa',
     startX: 300, startY: 240,
     startVx: 1.2, startVy: 0.8,
@@ -728,7 +836,8 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 12,
-    name: 'Bomber',
+    name: 'Bombardier',
+    category: 'Sci-Fi & Modern',
     color: '#6A3F1E',
     skinColor: '#5A3B1A',
     skinAccentColor: '#E0B05B',
@@ -749,6 +858,7 @@ export const FIGHTER_DEFS = [
   {
     id: 13,
     name: 'Gun Slinger',
+    category: 'Sci-Fi & Modern',
     color: '#C19A6B',
     startX: 260, startY: 250,
     startVx: 1.4, startVy: -0.8,
@@ -767,6 +877,7 @@ export const FIGHTER_DEFS = [
   {
     id: 14,
     name: 'Doppelganger',
+    category: 'Fantasy & Magic',
     color: '#9b59b6',
     startX: 300, startY: 240,
     startVx: 1.3, startVy: -1.0,
@@ -785,6 +896,7 @@ export const FIGHTER_DEFS = [
   {
     id: 15,
     name: 'Engineer',
+    category: 'Sci-Fi & Modern',
     color: '#b8860b',
     startX: 280, startY: 220,
     startVx: 1.1, startVy: 0.9,
@@ -802,6 +914,7 @@ export const FIGHTER_DEFS = [
   {
     id: 16,
     name: 'Ruby',
+    category: 'Fantasy & Magic',
     color: '#E0115F',
     startX: 310, startY: 250,
     startVx: 1.4, startVy: 0.9,
@@ -820,6 +933,7 @@ export const FIGHTER_DEFS = [
   {
     id: 17,
     name: 'Musashi',
+    category: 'Japanese',
     color: '#34495e',
     startX: 290, startY: 240,
     startVx: 1.2, startVy: -1.0,
@@ -838,6 +952,7 @@ export const FIGHTER_DEFS = [
   {
     id: 18,
     name: 'Trickster',
+    category: 'Fantasy & Magic',
     color: '#03e631ff',
     startX: 310, startY: 230,
     startVx: -1.2, startVy: 1.0,
@@ -848,7 +963,7 @@ export const FIGHTER_DEFS = [
     hp: 85,
     damage: 12,
     cooldown: 100,
-    moveSpeed: 5.2,
+    moveSpeed: 8.2,
     projectileSpeedMultiplier: 1.0,
     ability: 'Spell Steal',
     desc: 'Fires bouncing arcane bolts. Telekinetically lifts and stuns enemies. Ultimate steals the last used enemy skill.',
@@ -856,6 +971,7 @@ export const FIGHTER_DEFS = [
   {
     id: 19,
     name: 'Zeus',
+    category: 'Greek Mythology',
     color: '#00BFFF',
     startX: 300, startY: 250,
     startVx: 1.1, startVy: 0.9,
@@ -863,13 +979,70 @@ export const FIGHTER_DEFS = [
     aimbot: true,
     spinRate: 0,
     type: 'zeus',
-    hp: 200,
+    hp: 150,
     damage: 8,
     cooldown: 100,
     moveSpeed: 3.0,
     projectileSpeedMultiplier: 1.0,
     ability: 'Storm Bringer',
     desc: 'Throws chain lightning. Passively shocks melee attackers. Ultimate summons a map-wide thunderstorm.',
+  },
+  {
+    id: 20,
+    name: 'Hydra',
+    category: 'Fantasy & Magic',
+    color: '#4B0082', // Dark Purple
+    startX: 300, startY: 250,
+    startVx: 0.8, startVy: 0.7,
+    radius: 25, // Standard size
+    aimbot: false,
+    spinRate: 0,
+    type: 'hydra',
+    hp: 1000, // 5x health
+    damage: 8, // Very low base damage. When stealing a weapon, uses the copied fighter's exact damage value.
+    cooldown: 0, // Doesn't fire normally
+    moveSpeed: 8.5, // Slow
+    projectileSpeedMultiplier: 1.0,
+    ability: 'The Overdrive',
+    desc: 'Extremely tanky. Steals physical weapons upon being hit (copying their exact damage). Passively destroys incoming projectiles. Ultimate grants CC immunity.',
+  },
+  {
+    id: 21,
+    name: 'Gojo',
+    category: 'Anime',
+    color: '#E0FFFF', // Light Cyan
+    startX: 300, startY: 250,
+    startVx: 1.1, startVy: 0.9,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'gojo',
+    hp: 1000,
+    damage: 8,
+    cooldown: 80,
+    moveSpeed: 4.5,
+    projectileSpeedMultiplier: 6.0,
+    ability: 'Limitless',
+    desc: 'Passively blocks attacks with Infinity. Uses Lapse Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
+  },
+  {
+    id: 22,
+    name: 'Sukuna',
+    category: 'Anime',
+    color: '#8B0000', // Dark Crimson
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'sukuna',
+    hp: 1000,
+    damage: 8,
+    cooldown: 80,
+    moveSpeed: 4.8,
+    projectileSpeedMultiplier: 3.0,
+    ability: 'King of Curses',
+    desc: 'Passively heals with Reverse Cursed Technique at low HP. Basic attacks apply bleed and break shields. Spiderweb triggers when surrounded. Divine Flame is a devastating fire arrow. Malevolent Shrine domain deals unblockable damage.',
   }
 ];
 

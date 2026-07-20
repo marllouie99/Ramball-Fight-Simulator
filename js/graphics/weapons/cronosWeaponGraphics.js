@@ -79,6 +79,10 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   // Rotate first so the weapon orbits the fighter
   ctx.rotate(rotation);
 
+  if (Math.abs(gunAngle) > Math.PI / 2) {
+    ctx.scale(1, -1);
+  }
+
   // ★ POSITION ADJUST: Change this offset to move blade closer/farther from fighter
   // Increase = farther away, Decrease = closer to body
   ctx.translate(r + CRONOS_WEAPON_GRAPHICS.positioning.offset, 0);

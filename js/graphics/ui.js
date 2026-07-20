@@ -109,6 +109,7 @@ state.canvas.addEventListener('wheel', (e) => {
   const listY = modalY + 64;
   const listW = 240;
   const listH = modalH - 120;
+  let modalScrollOffset = 0;
 
   if (mx >= listX && mx <= listX + listW && my >= listY && my <= listY + listH) {
     const itemH = 38;
@@ -119,6 +120,72 @@ state.canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
   }
 }, { passive: false });
+
+function drawTlfsEnemyPoolGrid(x, y, w, h) {
+  const { ctx } = state;
+  drawPanel(x, y, w, h, 0.84);
+
+  // Draw grid of toggleable fighters
+  const cols = 4;
+  const padding = 10;
+  const availableW = w - padding * 2;
+  const gap = 8;
+  const cellW = (availableW - gap * (cols - 1)) / cols;
+  const cellH = cellW; // square cells
+  
+  const startX = x + padding;
+  let currentY = y + padding;
+  
+  // Filter out dummy
+  const poolFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx })).filter(({ def }) => def.type !== 'dummy');
+  
+  poolFighters.forEach(({ def, idx }, listPos) => {
+    const col = listPos % cols;
+    const row = Math.floor(listPos / cols);
+    const cellX = startX + col * (cellW + gap);
+    const cellY = currentY + row * (cellH + gap);
+    
+    const isSelected = state.tlfsAllowedEnemies.includes(idx);
+    
+    // Draw cell bg
+    ctx.fillStyle = isSelected ? 'rgba(255, 77, 77, 0.3)' : 'rgba(20, 22, 28, 0.8)';
+    ctx.strokeStyle = isSelected ? '#ff4d4d' : 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.roundRect(cellX, cellY, cellW, cellH, 6);
+    ctx.fill();
+    ctx.stroke();
+    
+    // Draw badge
+    drawSmallFighterBadge(ctx, def, cellX + cellW / 2, cellY + cellH / 2, Math.min(cellW, cellH) * 0.7);
+    
+    // Draw X if not selected
+    if (!isSelected) {
+      ctx.strokeStyle = 'rgba(255, 0, 0, 0.7)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(cellX + 4, cellY + 4);
+      ctx.lineTo(cellX + cellW - 4, cellY + cellH - 4);
+      ctx.moveTo(cellX + cellW - 4, cellY + 4);
+      ctx.lineTo(cellX + 4, cellY + cellH - 4);
+      ctx.stroke();
+    }
+    
+    // Register button
+    _registerButton(cellX, cellY, cellW, cellH, () => {
+      if (isSelected) {
+        // Prevent deselecting if it would drop below 5 fighters
+        if (state.tlfsAllowedEnemies.length <= 5) {
+          spawnFloatingText(cellX + cellW/2, cellY, 'MINIMUM 5 ENEMIES!', '#ff4d4d');
+          return;
+        }
+        state.tlfsAllowedEnemies = state.tlfsAllowedEnemies.filter(i => i !== idx);
+      } else {
+        state.tlfsAllowedEnemies.push(idx);
+      }
+    });
+  });
+}
 
 // Draw a tiny fighter badge using the fighter class draw routine.
 function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
@@ -960,14 +1027,59 @@ export function drawIndexScreen() {
   ctx.font = '12px Arial';
   ctx.fillText('Scroll to browse fighters, or click a card for more details', canvas.width / 2, 70);
 
+  const categories = ['All', 'Greek Mythology', 'Japanese', 'Sci-Fi & Modern', 'Fantasy & Magic'];
+  
+  const catXStart = 30;
+  let currentCX = catXStart;
+  let currentCY = 85;
+  
+  categories.forEach(cat => {
+    ctx.font = 'bold 11px Arial';
+    const textW = ctx.measureText(cat).width;
+    const btnW = textW + 16;
+    const btnH = 24;
+    
+    if (currentCX + btnW > canvas.width - 30) {
+      currentCX = catXStart;
+      currentCY += btnH + 8;
+    }
+    
+    const isSelected = (state.indexCategory || 'All') === cat;
+    
+    ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.85)' : 'rgba(50,50,50,0.85)';
+    ctx.beginPath();
+    ctx.roundRect(currentCX, currentCY, btnW, btnH, 12);
+    ctx.fill();
+    
+    ctx.fillStyle = isSelected ? '#000' : '#ccc';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(cat, currentCX + btnW/2, currentCY + btnH/2);
+    
+    _registerButton(currentCX, currentCY, btnW, btnH, () => {
+       state.indexCategory = cat;
+       state.indexScroll = 0; // Reset scroll on category change
+    });
+    
+    currentCX += btnW + 8;
+  });
+
+  const cardsStartY = currentCY + 36;
   const cardX = 30;
   const cardW = canvas.width - 60;
   const cardH = 120;
   const cardSpacing = 22;
 
-  FIGHTER_DEFS.forEach((def, idx) => {
-    const cardY = 90 + idx * (cardH + cardSpacing) - state.indexScroll;
-    if (cardY > canvas.height || cardY + cardH < 0) {
+  const filteredDefs = FIGHTER_DEFS.filter(def => 
+    !state.indexCategory || state.indexCategory === 'All' || def.category === state.indexCategory
+  );
+
+  filteredDefs.forEach((def, displayIdx) => {
+    const originalIdx = FIGHTER_DEFS.findIndex(d => d.id === def.id);
+    const cardY = cardsStartY + displayIdx * (cardH + cardSpacing) - state.indexScroll;
+    
+    // Don't draw if outside scroll area
+    if (cardY > canvas.height || cardY + cardH < cardsStartY - 10) {
       return;
     }
 
@@ -1010,7 +1122,7 @@ export function drawIndexScreen() {
     wrapText(ctx, def.desc, cardX + 95, cardY + 96, cardW - 110, 16);
 
     _registerButton(cardX, cardY, cardW, cardH, () => {
-      state.indexInspectIndex = idx;
+      state.indexInspectIndex = originalIdx;
       state.gameState = 'indexDetail';
     });
   });
@@ -1839,14 +1951,29 @@ export function drawSelectScreen() {
     ctx.fillText('RED SIDE', leftX + cardW / 2, topY - 24);
     ctx.fillStyle = '#4da3ff';
     ctx.fillText('BLUE SIDE', rightX + cardW / 2, topY - 24);
+  } else if (mode === 'TLFS') {
+    ctx.fillStyle = '#00f3ff';
+    ctx.font = 'bold 16px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText('YOUR CHAMPION', leftX + cardW / 2, topY - 24);
+    ctx.fillStyle = '#ff4d4d';
+    ctx.fillText('ENEMY POOL', rightX + cardW / 2, topY - 24);
   }
 
-  drawPlayerCard('p1Index', mode === '2v2' ? 'RED 1' : 'PLAYER 1', leftX, topY, cardW, cardH, '#ff4d4d', true);
-  drawPlayerCard('p2Index', mode === '2v2' ? 'BLUE 1' : 'PLAYER 2', rightX, topY, cardW, cardH, '#4da3ff', true);
-  const p3Enabled = mode === 'FFA' || mode === '2v2';
-  const p4Enabled = mode === 'FFA' || mode === '2v2';
-  drawPlayerCard('p3Index', mode === '2v2' ? 'RED 2' : 'PLAYER 3', leftX, bottomY, cardW, cardH, '#ff4d4d', p3Enabled);
-  drawPlayerCard('p4Index', mode === '2v2' ? 'BLUE 2' : 'PLAYER 4', rightX, bottomY, cardW, cardH, '#4da3ff', p4Enabled);
+  if (mode === 'TLFS') {
+    // Only one player card
+    drawPlayerCard('p1Index', 'PLAYER 1', leftX, topY + cardH / 2, cardW, cardH, '#00f3ff', true);
+    
+    // Draw Enemy Pool toggles
+    drawTlfsEnemyPoolGrid(rightX, topY, cardW, cardH * 2 + cardGap);
+  } else {
+    drawPlayerCard('p1Index', mode === '2v2' ? 'RED 1' : 'PLAYER 1', leftX, topY, cardW, cardH, '#ff4d4d', true);
+    drawPlayerCard('p2Index', mode === '2v2' ? 'BLUE 1' : 'PLAYER 2', rightX, topY, cardW, cardH, '#4da3ff', true);
+    const p3Enabled = mode === 'FFA' || mode === '2v2';
+    const p4Enabled = mode === 'FFA' || mode === '2v2';
+    drawPlayerCard('p3Index', mode === '2v2' ? 'RED 2' : 'PLAYER 3', leftX, bottomY, cardW, cardH, '#ff4d4d', p3Enabled);
+    drawPlayerCard('p4Index', mode === '2v2' ? 'BLUE 2' : 'PLAYER 4', rightX, bottomY, cardW, cardH, '#4da3ff', p4Enabled);
+  }
 
   // Ensure footer is placed exactly after the bottom cards with padding
   const footerY = bottomY + cardH + 34;
@@ -1861,6 +1988,10 @@ export function drawSelectScreen() {
   } else if (mode === '1v1') {
     drawButton('🎲 RANDOMIZE', centerX, footerY, () => { randomize1v1Fighters(); }, actionBtnW, 36);
     drawButton('⚔ START BATTLE', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
+    drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
+  } else if (mode === 'TLFS') {
+    drawButton('🎲 RANDOMIZE', centerX, footerY, () => { state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length); }, actionBtnW, 36);
+    drawButton('⚔ START GAUNTLET', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
     drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
   } else {
     drawButton('⚔ START BATTLE', centerX - actionBtnW / 2 - actionSpacing / 2, footerY, () => { startGame(); }, actionBtnW, 36);
@@ -1887,10 +2018,10 @@ function randomizeFfaFighters() {
 
 function drawModeSelection(cx, cy) {
   const { ctx, canvas } = state;
-  const modes = [{ id: '1v1', label: '1v1' }, { id: '2v2', label: '2v2' }, { id: 'FFA', label: 'FFA' }];
-  const buttonWidth = Math.min(120, Math.max(88, canvas.width * 0.16));
+  const modes = [{ id: '1v1', label: '1v1' }, { id: '2v2', label: '2v2' }, { id: 'FFA', label: 'FFA' }, { id: 'TLFS', label: 'TLFS' }];
+  const buttonWidth = Math.min(100, Math.max(70, canvas.width * 0.12)); // slightly smaller to fit 4 buttons
   const buttonHeight = 36;
-  const gap = Math.min(20, Math.max(12, canvas.width * 0.03));
+  const gap = Math.min(15, Math.max(10, canvas.width * 0.02));
   const totalWidth = modes.length * buttonWidth + (modes.length - 1) * gap;
   let startX = cx - totalWidth / 2;
 
@@ -1915,6 +2046,12 @@ function drawModeSelection(cx, cy) {
       if (state.mode === 'FFA' || state.mode === '2v2') {
         state.p3Index = state.p3Index ?? 2;
         state.p4Index = state.p4Index ?? 3;
+      }
+      if (state.mode === 'TLFS') {
+        // Initialize allowed enemies list if not already
+        if (!state.tlfsAllowedEnemies || state.tlfsAllowedEnemies.length === 0) {
+          state.tlfsAllowedEnemies = FIGHTER_DEFS.map((_, i) => i);
+        }
       }
     });
 
@@ -2362,7 +2499,7 @@ function updateHealthHud() {
         maxBullets: 2
       });
 
-      if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.FFA) {
+      if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.FFA || mode === 'TLFS') {
         cardsBottom.push(cardHTML);
       } else if (index % 2 === 0) {
         cardsLeft.push(cardHTML);
@@ -2655,6 +2792,52 @@ export function drawMatchEndScreen() {
     ctx.fillStyle = '#aaa';
     ctx.font = '16px Arial';
     ctx.fillText(`${state.teamScores[0]} — ${state.teamScores[1]}`, cx, cy + 55);
+    ctx.restore();
+    return;
+  }
+
+  // TLFS mode Champion Screen
+  if (mode === 'TLFS') {
+    const wonGauntlet = state.matchWinner === fighters[0];
+    
+    ctx.save();
+    ctx.textAlign = 'center';
+    
+    if (wonGauntlet) {
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#ffd700';
+      ctx.fillStyle = '#ffd700';
+      ctx.font = 'bold 48px Arial';
+      ctx.fillText('CHAMPION!', cx, cy - 40);
+      
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 24px Arial';
+      ctx.shadowBlur = 0;
+      ctx.fillText(`YOU DEFEATED 5 ENEMIES`, cx, cy + 10);
+    } else {
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = '#ff4d4d';
+      ctx.fillStyle = '#ff4d4d';
+      ctx.font = 'bold 48px Arial';
+      ctx.fillText('CHAMPION FALLEN', cx, cy - 40);
+      
+      ctx.fillStyle = '#fff';
+      ctx.font = 'bold 24px Arial';
+      ctx.shadowBlur = 0;
+      ctx.fillText(`YOU DEFEATED ${state.tlfsDefeatedEnemies} ENEMIES`, cx, cy + 10);
+    }
+    
+    ctx.fillStyle = '#aaa';
+    ctx.font = '14px Arial';
+    if (Math.floor(Date.now() / 500) % 2 === 0) {
+      ctx.fillText(`CLICK ANYWHERE TO RESTART`, cx, canvas.height - 30);
+    }
+
+    _registerButton(0, 0, canvas.width, canvas.height, () => {
+      resetMatch();
+      goToTitle(); // Optional: send them back to select screen after TLFS
+    });
+    
     ctx.restore();
     return;
   }

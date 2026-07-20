@@ -108,6 +108,9 @@ export class Fighter {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
 
+    this.rctVisualTimer = 0;
+    this.rctVisualMaxTimer = 60;
+
     this.poisonTicks = 0;
     this.poisonTimer = 0;
     this.lastPoisonAttacker = null;
@@ -148,12 +151,14 @@ export class Fighter {
   }
 
   applySlow(frames, multiplier) {
+    if (this.immuneToCC) return;
     // Refresh the slow if it's longer/stronger than current
     if (this.slowTimer < frames) this.slowTimer = frames;
     this.slowMultiplier = multiplier;
   }
 
   applyHitStun(frames) {
+    if (this.immuneToCC) return;
     // Temporary slowdown when hit - creates impact feel
     // Uses a separate stun timer that overrides normal speed
     if (!this.hitStunTimer || this.hitStunTimer < frames) {
@@ -163,6 +168,7 @@ export class Fighter {
   }
 
   interruptAttacks() {
+    // Universal interrupts
     this.meleeSwingActive = false;
     this.meleeSwingTimer = 0;
     this.meleeSlashFadeTimer = 0;
@@ -172,10 +178,43 @@ export class Fighter {
     this.scytheSwingActive = false;
     this.scytheSwingTimer = 0;
     this.stolenWindUpTimer = 0;
+
+    // Musashi
+    this.flurryHitsLeft = 0;
+    this.flurryGhost = null;
+
+    // Zeus
+    this.stormActive = false;
+    this.aegisActive = false;
+
+    // Knight
+    this.swipeActive = false;
+    this.swipeTimer = 0;
+
+    // Cronos
+    this.sphereActive = false;
+
+    // Ruby
+    this.flameActive = false;
+
+    // Laser / Doppler
+    this.beamActive = false;
+    this.skillActive = false;
+
+    // Berserker
+    this.axeSwingActive = false;
+
+    // Trickster
+    this.telekinesisTimer = 0;
+    this.tkTimer = 0;
+    if (this.tkTarget && this.tkTarget.tkLifted) {
+      this.tkTarget.tkLifted = false;
+    }
   }
 
 
   applyTimeStop(frames) {
+    if (this.immuneToCC) return;
     // Ensure a numeric timer field exists for legacy code that may read it
     if (!this.timeStopTimer) this.timeStopTimer = 0;
 
@@ -384,6 +423,8 @@ export class Fighter {
     if (this._flameHitCooldown > 0) this._flameHitCooldown--;
     if (this.burnSpreadCooldown > 0) this.burnSpreadCooldown--;
     if (this._healthBarShakeTimer > 0) this._healthBarShakeTimer--;
+    if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+    if (this.rctVisualTimer > 0) this.rctVisualTimer--;
     
     // Universal knockback physics (processed for all custom fighters without breaking their steering logic)
     if (this.knockbackVx !== undefined && (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1)) {
@@ -475,14 +516,16 @@ export class Fighter {
         spawnBloodEffect(this, amount, damageAngle);
       }
       
-      // Play hit sound unless it's a DPS/continuous effect
+      // Play hit sound and trigger hit flash unless it's a DPS/continuous effect
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole) {
         if (!this.isTurret) {
           playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+          this.hitFlashTimer = 8;
         }
       }
     }
-    if (this.hp === 0 && state.gameState === 'playing') {
+    if (this.hp === 0 && !this._hasDied) {
+      this._hasDied = true;
       // Clear flame particles if the dying fighter is the Flamewarden
       if (this._def && this._def.type === 'orange') {
         flamewardenFlameSystem.clear();
@@ -526,64 +569,77 @@ export class Fighter {
         return true;
       }
 
-      const aliveCount = state.fighters.filter((f) => f && _isEffectivelyAlive(f)).length;
-      // Use realAttacker (owner of the turret/illusion) to properly track scores and wins
-      const realAttackerIndex = state.fighters.indexOf(realAttacker);
-      const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
-
       recordKill();
 
-      if (state.mode === '2v2') {
-        // 2v2: check if a team is eliminated (including doppelganger illusions)
-        const team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
-        const team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
-        
-        if (!team0Alive || !team1Alive) {
-          // A team has been eliminated - round ends
-          const winningTeam = team0Alive ? 0 : 1;
-          state.teamScores[winningTeam]++;
-          state.roundWinner = state.fighters[winningTeam * 2]; // First fighter of winning team
+      // Only check for round/match transitions if we are still playing
+      if (state.gameState === 'playing') {
+        const aliveCount = state.fighters.filter((f) => f && _isEffectivelyAlive(f)).length;
+        // Use realAttacker (owner of the turret/illusion) to properly track scores and wins
+        const realAttackerIndex = state.fighters.indexOf(realAttacker);
+        const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
+
+        if (state.mode === '2v2') {
+          // 2v2: check if a team is eliminated (including doppelganger illusions)
+          const team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
+          const team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
+          
+          if (!team0Alive || !team1Alive) {
+            // A team has been eliminated - round ends
+            const winningTeam = team0Alive ? 0 : 1;
+            state.teamScores[winningTeam]++;
+            state.roundWinner = state.fighters[winningTeam * 2]; // First fighter of winning team
+            state.roundEndTimer = 0;
+
+            // Stop all sounds when round ends
+            stopAllSounds();
+            stopAllLoopingSounds();
+
+            const winThreshold = 2; // Best of 3
+            if (state.teamScores[winningTeam] >= winThreshold) {
+              state.matchWinner = state.fighters[winningTeam * 2];
+              state.gameState = 'matchEnd';
+            } else {
+              state.gameState = 'roundEnd';
+            }
+          }
+        } else if (state.mode !== 'FFA' && roundEnds) {
+          if (realAttackerIndex >= 0) {
+            state.scores[realAttackerIndex]++;
+          }
+          state.roundWinner = realAttacker;
           state.roundEndTimer = 0;
 
           // Stop all sounds when round ends
           stopAllSounds();
           stopAllLoopingSounds();
 
-          const winThreshold = 2; // Best of 3
-          if (state.teamScores[winningTeam] >= winThreshold) {
-            state.matchWinner = state.fighters[winningTeam * 2];
+          const winThreshold = Math.ceil(CONFIG.rounds.max / 2);
+          if (realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold) {
+            // Record win/loss for leaderboard (1v1 mode only) when they become champion
+            if (state.mode === GAME_MODES.ONE_VS_ONE && realAttacker) {
+              const winnerFighterIndex = typeof realAttacker.fighterIndex === 'number' ? realAttacker.fighterIndex : realAttackerIndex;
+              const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
+              const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'
+                ? state.fighters[loserIndex].fighterIndex
+                : loserIndex;
+              recordWin(winnerFighterIndex);
+              recordLoss(loserFighterIndex);
+            }
+
+            state.matchWinner = realAttacker;
             state.gameState = 'matchEnd';
           } else {
             state.gameState = 'roundEnd';
           }
-        }
-      } else if (state.mode !== 'FFA' && roundEnds) {
-        if (realAttackerIndex >= 0) {
-          state.scores[realAttackerIndex]++;
-        }
-        state.roundWinner = realAttacker;
-        state.roundEndTimer = 0;
+        } else if (state.mode === 'FFA' && roundEnds) {
+          state.roundWinner = realAttacker;
+          state.roundEndTimer = 0;
+          state.ffaMatchComplete = true; // Signals main.js to show leaderboards
 
-        // Stop all sounds when round ends
-        stopAllSounds();
-        stopAllLoopingSounds();
+          // Stop all sounds when round ends
+          stopAllSounds();
+          stopAllLoopingSounds();
 
-        const winThreshold = Math.ceil(CONFIG.rounds.max / 2);
-        if (realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold) {
-          // Record win/loss for leaderboard (1v1 mode only) when they become champion
-          if (state.mode === GAME_MODES.ONE_VS_ONE && realAttacker) {
-            const winnerFighterIndex = typeof realAttacker.fighterIndex === 'number' ? realAttacker.fighterIndex : realAttackerIndex;
-            const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
-            const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'
-              ? state.fighters[loserIndex].fighterIndex
-              : loserIndex;
-            recordWin(winnerFighterIndex);
-            recordLoss(loserFighterIndex);
-          }
-
-          state.matchWinner = realAttacker;
-          state.gameState = 'matchEnd';
-        } else {
           state.gameState = 'roundEnd';
         }
       }
@@ -668,13 +724,17 @@ export class Fighter {
   /** Call this every frame to process pending attack sound timers. */
   _tickAttackSound() {
     if (this._attackSoundTimer !== undefined && this._attackSoundTimer !== null) {
-      console.log(`[${this.name}] _tickAttackSound: timer=`, this._attackSoundTimer);
       this._attackSoundTimer--;
       if (this._attackSoundTimer <= 0) {
         const sound = this._attackSoundConfig;
         if (sound) {
-          console.log(`[${this.name}] Playing sound:`, sound.src);
-          playSound(sound.src, sound.volume);
+          if (Array.isArray(sound.src)) {
+            if (this._soundIndex === undefined) this._soundIndex = 0;
+            playSound(sound.src[this._soundIndex], sound.volume);
+            this._soundIndex = (this._soundIndex + 1) % sound.src.length;
+          } else {
+            playSound(sound.src, sound.volume);
+          }
         }
         this._attackSoundTimer = null;
         this._attackSoundConfig = null;
@@ -789,6 +849,16 @@ export class Fighter {
     const qualityLevel = state.qualityLevel || 1.0;
     const fps = state.fps || 60;
     const useAggressiveMode = false;
+
+    if (this.hitFlashTimer > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${this.hitFlashTimer / 8})`;
+      ctx.fill();
+      ctx.restore();
+    }
 
     if (this.slowTimer > 0) {
       drawSlowEffect(ctx, baseRadius);
@@ -947,6 +1017,8 @@ export class Fighter {
     ctx.strokeStyle = '#000000';
     ctx.stroke();
 
+    // RCT visuals moved to subclass draw methods to ensure they draw ON TOP of auras
+
     this.drawGun(ctx);
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
@@ -954,5 +1026,39 @@ export class Fighter {
     if (hasScale || hasZ) {
       ctx.restore();
     }
+  }
+
+  /** Draws concentric green rings and aura for Reverse Cursed Technique. */
+  _drawRCTVisuals(ctx) {
+    const prog = 1 - (this.rctVisualTimer / this.rctVisualMaxTimer); // 0 to 1
+    const alpha = Math.sin((1 - prog) * Math.PI); // fade in and out
+
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    // Removed 'lighter' composite operation because it turns white on bright backgrounds
+
+    // Draw 3 concentric green rings expanding
+    for (let i = 0; i < 3; i++) {
+      const ringProg = (prog + i * 0.3) % 1.0;
+      const ringRadius = this.r + (ringProg * 60);
+      const ringAlpha = alpha * (1 - ringProg);
+
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 4 + (1 - ringProg) * 6; // Thicker lines
+      ctx.strokeStyle = `rgba(0, 255, 100, ${ringAlpha})`; // Brighter neon green
+      ctx.stroke();
+    }
+
+    // Add a soft green core glow
+    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.r * 2);
+    coreGrad.addColorStop(0, `rgba(0, 255, 100, ${alpha * 0.6})`);
+    coreGrad.addColorStop(1, 'rgba(0, 255, 100, 0)');
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r * 2, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
   }
 }

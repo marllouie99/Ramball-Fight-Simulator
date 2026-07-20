@@ -6,6 +6,7 @@ export const GAME_MODES = {
   ONE_VS_ONE: '1v1',
   TWO_VS_TWO: '2v2',
   FFA: 'FFA',
+  TLFS: 'TLFS',
 };
 
 export const MODE_SETTINGS = {
@@ -13,9 +14,18 @@ export const MODE_SETTINGS = {
     label: '1v1',
     rounds: 3,
     hpMultiplier: 1.2,
+    speedMultiplier: 1.5,
+    initialFuelPickups: 2,
+    supportFourFighters: false,
+  },
+  [GAME_MODES.TLFS]: {
+    label: 'TLFS',
+    rounds: 1, // Only 1 round in TLFS
+    hpMultiplier: 1.2,
     speedMultiplier: 1.4,
     initialFuelPickups: 2,
     supportFourFighters: false,
+    playerFixedHp: 500, // Configurable fixed HP for the player
   },
   [GAME_MODES.TWO_VS_TWO]: {
     label: '2v2',

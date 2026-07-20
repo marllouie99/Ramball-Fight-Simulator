@@ -2,6 +2,9 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, getProjectiles, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
+import { playSound } from '../../systems/soundSystem.js';
+import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
+import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../../graphics/weapons/musashiWeaponGraphics.js';
 
 export class MusashiFighter extends Fighter {
@@ -92,6 +95,14 @@ export class MusashiFighter extends Fighter {
       stance: this.currentStance,
       size: (this.r + 25) * sizeMult
     });
+    if (this.currentStance === 'void') this.takeDamage(-CONFIG.musashi.voidHealAmount, this);
+  }
+
+  interruptAttacks() {
+    super.interruptAttacks();
+    if (this.stances && this.stanceIndex !== undefined) {
+      this.currentStance = this.stances[this.stanceIndex];
+    }
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -109,6 +120,8 @@ export class MusashiFighter extends Fighter {
       const dist = Math.sqrt(dx * dx + dy * dy) || 1;
       this.x = attacker.x - (dx / dist) * (attacker.r + this.r + 15);
       this.y = attacker.y - (dy / dist) * (attacker.r + this.r + 15);
+      const dashSound = getSkillSound('musashi', 'dash');
+      if (dashSound) playSound(dashSound.src, dashSound.volume);
       
       // Spawn afterimages (closely packed trail)
       if (!this.afterImages) this.afterImages = [];
@@ -156,8 +169,16 @@ export class MusashiFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    this.distToTargetSq = Infinity;
     this.handlePoison();
     this.handleBurn();
+    this._tickCooldowns();
+    this._tickAttackSound();
+
+    // Track position history for delayed auto-aim during flurry
+    if (!this.posHistory) this.posHistory = [];
+    this.posHistory.push({ x: this.x, y: this.y });
+    if (this.posHistory.length > 30) this.posHistory.shift();
 
     if (this._handleTimeStop()) return;
 
@@ -176,9 +197,11 @@ export class MusashiFighter extends Fighter {
     if (this.strikeTimer > 0) this.strikeTimer--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.flurrySmokeTimer > 0) this.flurrySmokeTimer--;
+    if (this.dashAnimTimer > 0) this.dashAnimTimer--;
 
     // Phantom Flurry Execution Logic
     if (this.flurryHitsLeft > 0) {
+       this.flurryGhost = this.posHistory[0] || { x: this.x, y: this.y };
        this.vx *= 0.1;
        this.vy *= 0.1;
        
@@ -189,8 +212,9 @@ export class MusashiFighter extends Fighter {
          
          // Cycle through all 5 stances during the flurry!
          // This causes the weapon auras and the slash effects to change color on every single hit
-         if (this.flurryHitsLeft === 0) {
+         if (this.flurryHitsLeft <= 0) {
            // Activate smoke trail and restore real stance when flurry finishes
+           this.flurryGhost = null;
            this.flurrySmokeTimer = 150; 
            this.currentStance = this.stances[this.stanceIndex];
          } else {
@@ -221,6 +245,8 @@ export class MusashiFighter extends Fighter {
             
             triggerGlobalScreenShake(6, 6);
             spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 10, 'flash');
+            const attackSound = getBasicAttackSound('musashi');
+            if (attackSound) playSound(attackSound.src, attackSound.volume);
             
             this.strikeTimer = 10;
             this.gunAngle = this.strikeAngle; // visual weapon update
@@ -337,6 +363,7 @@ export class MusashiFighter extends Fighter {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
       const distSq = dx * dx + dy * dy;
+      this.distToTargetSq = distSq;
       const rangeHit = Math.pow(this.r + opponent.r + CONFIG.musashi.swordRange, 2);
 
       // Preemptive Strike activation
@@ -359,8 +386,12 @@ export class MusashiFighter extends Fighter {
          const oldX = this.x;
          const oldY = this.y;
          
-         this.x = opponent.x - (dx/dist) * (this.r + opponent.r + 5);
-         this.y = opponent.y - (dy/dist) * (this.r + opponent.r + 5);
+         this.flurryGhost = { x: oldX, y: oldY };
+         this.x = opponent.x + (dx/dist) * (this.r + opponent.r + 5);
+         this.y = opponent.y + (dy/dist) * (this.r + opponent.r + 5);
+         this.dashAnimTimer = 15;
+         const dashSound = getSkillSound('musashi', 'dash');
+         if (dashSound) playSound(dashSound.src, dashSound.volume);
          
          if (!this.afterImages) this.afterImages = [];
          const teleportDist = Math.sqrt((this.x - oldX)**2 + (this.y - oldY)**2);
@@ -381,6 +412,8 @@ export class MusashiFighter extends Fighter {
          }
          
          spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#ff00ff');
+         const attackSound = getBasicAttackSound('musashi');
+         if (attackSound) playSound(attackSound.src, attackSound.volume);
          isAttacking = true;
       }
 
@@ -403,6 +436,8 @@ export class MusashiFighter extends Fighter {
           spawnFloatingText(opponent.x, opponent.y - 10, 'NITEN QUICK!', '#fff');
           triggerGlobalScreenShake(4, 5);
           spawnSparks(opponent.x, opponent.y, 8, 'flash');
+          const attackSound = getBasicAttackSound('musashi');
+          if (attackSound) playSound(attackSound.src, attackSound.volume);
           
           isAttacking = true;
         }
@@ -424,11 +459,16 @@ export class MusashiFighter extends Fighter {
           
           triggerGlobalScreenShake(5, 5);
           spawnSparks(opponent.x, opponent.y, 12, 'flash');
+          const attackSound = getBasicAttackSound('musashi');
+          if (attackSound) playSound(attackSound.src, attackSound.volume);
           
           if (this.currentStance === 'water') {
              // Dodge slide backwards or through
              this.x += Math.cos(this.gunAngle) * 30;
              this.y += Math.sin(this.gunAngle) * 30;
+             const dashSound = getSkillSound('musashi', 'dash');
+             if (dashSound) playSound(dashSound.src, dashSound.volume);
+             this.dashAnimTimer = 15;
           }
           isAttacking = true;
         }

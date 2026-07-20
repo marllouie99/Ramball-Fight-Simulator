@@ -121,6 +121,24 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
       spark.decay = 0.03 + Math.random() * 0.05;
       spark.friction = 0.90;
       spark.isFlash = true; // IMPORTANT: route to custom jagged rendering
+    } else if (type === 'ghostTrail') {
+      const gray = 150 + Math.random() * 50;
+      spark.color = `rgba(${gray}, ${gray}, ${gray + 20}, 1)`;
+      spark.vx = (Math.random() - 0.5) * 1.0;
+      spark.vy = -1.0 - Math.random() * 2.0; // float upwards
+      spark.size = 2 + Math.random() * 2;
+      spark.decay = 0.02 + Math.random() * 0.03; // slow fade
+      spark.friction = 0.95;
+    } else if (type === 'healing') {
+      // Bright blue healing particles for Gojo's Reverse Cursed Technique
+      const blueIntensity = 180 + Math.random() * 75;
+      spark.color = `rgba(50, ${100 + Math.random() * 80}, ${blueIntensity}, 1)`;
+      spark.vx = (Math.random() - 0.5) * 4;
+      spark.vy = (Math.random() - 0.5) * 4;
+      spark.size = 2 + Math.random() * 3;
+      spark.decay = 0.03 + Math.random() * 0.04;
+      spark.friction = 0.90;
+      spark.isGlow = true; // Enable glow rendering
     } else {
       spark.color = `rgba(255, ${50 + Math.random() * 100}, ${20 + Math.random() * 50}, 1)`;
     }
@@ -970,6 +988,27 @@ export function drawSparkEffects(layer = 'all') {
         ctx.globalCompositeOperation = 'source-over';
         ctx.rotate(-effect.rotation);
         ctx.translate(-effect.x, -effect.y);
+      } else if (effect.type === 'healing') {
+        // Bright blue healing particles for Gojo's Reverse Cursed Technique
+        ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'rgba(50, 150, 255, 1)';
+        
+        const gradient = ctx.createRadialGradient(
+          effect.x, effect.y, 0,
+          effect.x, effect.y, effect.size
+        );
+        gradient.addColorStop(0, `rgba(200, 240, 255, ${effect.life})`);
+        gradient.addColorStop(0.4, `rgba(50, 150, 255, ${effect.life * 0.8})`);
+        gradient.addColorStop(1, 'rgba(0, 100, 200, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        
+        ctx.shadowBlur = 0;
+        ctx.globalCompositeOperation = 'source-over';
       } else {
         // Default impact flash
         const gradient = ctx.createRadialGradient(
@@ -1096,6 +1135,63 @@ export function drawSparkEffects(layer = 'all') {
       ctx.lineWidth = 1;
       ctx.strokeStyle = `rgba(0, 255, 100, ${effect.life * 0.6})`;
       ctx.stroke();
+    } else if (effect.type === 'meleeClashShockwave') {
+      // Expanding ground shockwave ring for Sukuna-Gojo melee clashes
+      // Purple and crimson energy clash effect
+      effect.size += (effect.targetSize - effect.size) * 0.08;
+      
+      // Ground impact shadow (dark circle at base for visibility on white)
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = `rgba(30, 10, 40, ${effect.life * 0.4})`;
+      ctx.beginPath();
+      ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Outer purple ring (Gojo's cursed energy) - thick with dark outline
+      ctx.globalCompositeOperation = 'lighter';
+      
+      // Dark outline for contrast on white background
+      ctx.strokeStyle = `rgba(60, 0, 80, ${effect.life * 0.9})`;
+      ctx.lineWidth = 14 * effect.life;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Main purple ring
+      ctx.strokeStyle = `rgba(180, 60, 255, ${effect.life * 0.95})`;
+      ctx.lineWidth = 10 * effect.life;
+      ctx.shadowBlur = 20 * effect.life;
+      ctx.shadowColor = 'rgba(138, 43, 226, 1)';
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Inner crimson ring (Sukuna's cursed energy)
+      ctx.strokeStyle = `rgba(255, 50, 80, ${effect.life * 0.95})`;
+      ctx.lineWidth = 8 * effect.life;
+      ctx.shadowColor = 'rgba(220, 20, 60, 1)';
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // White core flash with dark outline
+      ctx.strokeStyle = `rgba(40, 40, 40, ${effect.life * 0.8})`;
+      ctx.lineWidth = 5 * effect.life;
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.strokeStyle = `rgba(255, 240, 240, ${effect.life * 0.9})`;
+      ctx.lineWidth = 3 * effect.life;
+      ctx.shadowBlur = 15 * effect.life;
+      ctx.shadowColor = 'rgba(255, 255, 255, 1)';
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = 'source-over';
     } else {
       // Standard spark - small glowing dot with gradient
       const gradient = ctx.createRadialGradient(
@@ -1121,4 +1217,38 @@ export function drawSparkEffects(layer = 'all') {
 
     ctx.restore();
   }
+}
+
+/**
+ * Spawns a ground shockwave effect for Sukuna-Gojo melee clashes.
+ * Creates an expanding ring with purple (Gojo) and crimson (Sukuna) energy.
+ * @param {number} x - X position (midpoint between fighters)
+ * @param {number} y - Y position (ground level)
+ * @param {number} radius - Base radius of the shockwave
+ */
+export function spawnMeleeClashShockwave(x, y, radius = 80) {
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const fps = state.fps || 60;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
+
+  if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
+    const oldest = state.sparkEffects.shift();
+    if (oldest) _returnSpark(oldest);
+  }
+
+  const shockwave = _getSpark();
+  shockwave.x = x;
+  shockwave.y = y;
+  shockwave.vx = 0;
+  shockwave.vy = 0;
+  shockwave.size = radius * 0.2; // starts small
+  shockwave.targetSize = radius; // expands to this size
+  shockwave.life = 1.0;
+  shockwave.decay = 0.04; // lasts ~25 frames
+  shockwave.friction = 1;
+  shockwave.type = 'meleeClashShockwave';
+  shockwave.isFlash = true;
+  shockwave.color = 'clash';
+
+  state.sparkEffects.push(shockwave);
 }

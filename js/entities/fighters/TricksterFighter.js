@@ -5,13 +5,15 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { spawnSparks, spawnImpactFlash, spawnTelekinesisDebris, spawnArcaneCrater, spawnArcaneSmoke, spawnArcaneShockwave, spawnArcaneFlash, spawnArcaneGlyphs, spawnSpellStealWisps } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { spawnBerserkerRageEffect } from '../../graphics/particles/berserkerRageEffect.js';
-import { drawTricksterStaff } from '../../graphics/weapons/tricksterWeaponGraphics.js';
+import { drawTricksterStaff, drawTricksterChargeEffect } from '../../graphics/weapons/tricksterWeaponGraphics.js';
 import { updateStolenRubyHook, updateStolenCronosSphere, resolveStolenCronosWallBounce } from './trickster/tricksterStealLogic.js';
-import { getStolenMultiplier } from './trickster/stolenSkillConfig.js';
-import { TricksterRubyTheme } from './trickster/tricksterThemes.js';
+import { getStolenMultiplier, STOLEN_SKILL_CONFIG } from './trickster/stolenSkillConfig.js';
+import { TricksterRubyTheme, TricksterCronosTheme } from './trickster/tricksterThemes.js';
 import { drawRubyScythe } from '../../graphics/weapons/rubyWeaponGraphics.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
+import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
+import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 
 export class TricksterFighter extends Fighter {
   constructor(def) {
@@ -36,28 +38,43 @@ export class TricksterFighter extends Fighter {
     this.stolenWindUpTimer = 0;
     this.tricksterRageTimer = 0;
     
+    // Laser state
+    this.beamCharge = 0;
+    this.beamTimer = 0;
+    this.beamHitState = new Map();
+    
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.slashEffects = [];
     this.afterImages = [];
     
+    this.stormActive = false;
+    this.stormTimer = 0;
+    this.stormLastStrikeTimer = 0;
+    
     // For specific stolen skills that need internal cooldowns
     this.stolenSkillCooldown = 0;
     
-    // Permanent orbiting magical debris (stops flickering caused by particle birth/death)
+    // Pseudo-random helper to keep debris consistent across instantiations (for UI screens)
+    const prng = (seed) => {
+      const x = Math.sin(seed) * 10000;
+      return x - Math.floor(x);
+    };
+
+    // Permanent orbiting magical debris
     this.orbitingDebris = [];
     for (let i = 0; i < 6; i++) {
       this.orbitingDebris.push({
-        angle: (i / 6) * Math.PI * 2, // Evenly spaced initially
-        dist: 35 + Math.random() * 7, // Wider Saturn-like orbit distance!
-        speed: 0.02 + Math.random() * 0.03, // Orbit speed
-        size: 5 + Math.random() * 4,
-        rotation: Math.random() * Math.PI * 2,
-        rotationSpeed: (Math.random() - 0.5) * 0.05,
-        color: `rgba(${100 + Math.random()*40}, ${110 + Math.random()*30}, ${100 + Math.random()*30}, 1)`,
-        zPhase: Math.random() * Math.PI * 2,
-        zSpeed: 0.03 + Math.random() * 0.04
+        baseAngle: (i / 6) * Math.PI * 2,
+        dist: 35 + prng(i * 1.1) * 7,
+        speed: 0.02 + prng(i * 2.2) * 0.03,
+        size: 5 + prng(i * 3.3) * 4,
+        baseRotation: prng(i * 4.4) * Math.PI * 2,
+        rotationSpeed: (prng(i * 5.5) - 0.5) * 0.05,
+        color: `rgba(${100 + prng(i * 6.6)*40}, ${110 + prng(i * 7.7)*30}, ${100 + prng(i * 8.8)*30}, 1)`,
+        baseZPhase: prng(i * 9.9) * Math.PI * 2,
+        zSpeed: 0.03 + prng(i * 10.1) * 0.04
       });
     }
   }
@@ -86,12 +103,211 @@ export class TricksterFighter extends Fighter {
     this.pullTargets = [];
     this.primaryHookTarget = null;
     
+    this.stormActive = false;
+    this.stormTimer = 0;
+    this.stormLastStrikeTimer = 0;
+    
     // Phase durations (frames)
     this.pullPhaseWindUp = 14;
     this.pullPhaseSwingOut = 10;
     this.pullPhaseHookGrab = 3;
     this.pullPhasePullDrag = 25;
     this.pullPhaseDisengage = 12;
+  }
+
+  interruptAttacks() {
+    super.interruptAttacks();
+    this.stolenWindUpTimer = 0;
+    this.activePullActive = false;
+    this.activePullPhase = -1;
+    this.pullTargets = [];
+    this.beamCharge = 0;
+    this.beamTimer = 0;
+    this.stormActive = false;
+    
+    // Stop the laser sound immediately if it's playing
+    if (this._isLaserSoundPlaying && this._laserSoundKey) {
+      fadeOutLoopingSound(this._laserSoundKey, 100);
+      this._isLaserSoundPlaying = false;
+    }
+  }
+
+  getBeamLine() {
+    // Trickster staff tip is roughly r + 75 away
+    const tipDist = this.r + 75;
+    const startX = this.x + Math.cos(this.gunAngle) * tipDist;
+    const startY = this.y + Math.sin(this.gunAngle) * tipDist;
+    const beamLength = CONFIG.laser.beamLength;
+    const endX = startX + Math.cos(this.gunAngle) * beamLength;
+    const endY = startY + Math.sin(this.gunAngle) * beamLength;
+
+    return { startX, startY, endX, endY };
+  }
+
+  getBeamHitFighters(fighters) {
+    if (!fighters || fighters.length === 0) return [];
+
+    const { startX, startY, endX, endY } = this.getBeamLine();
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const l2 = dx * dx + dy * dy;
+
+    if (l2 === 0) return [];
+
+    const hitFighters = [];
+
+    for (let fi = 0; fi < fighters.length; fi++) {
+      const fighter = fighters[fi];
+      if (!fighter || fighter === this || fighter.hp <= 0) continue;
+
+      let t = ((fighter.x - startX) * dx + (fighter.y - startY) * dy) / l2;
+      t = Math.max(0, Math.min(1, t));
+
+      const projX = startX + t * dx;
+      const projY = startY + t * dy;
+      const distToCenter = Math.hypot(fighter.x - projX, fighter.y - projY);
+
+      if (distToCenter <= fighter.r + 4) {
+        hitFighters.push(fighter);
+      }
+    }
+
+    return hitFighters;
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    const tookDamage = super.takeDamage(amount, attacker, opts);
+    if (tookDamage && amount > 0) {
+      if (this.stolenType === 'berserker') {
+        const rageGain = amount * (CONFIG.berserker.rageFromDamageScale || 2);
+        this.rage = Math.min(CONFIG.berserker.maxRage || 100, (this.rage || 0) + rageGain);
+        
+        if (this.rage >= (CONFIG.berserker.maxRage || 100) && !this.isInRage) {
+          this.isInRage = true;
+          this.rageTimer = CONFIG.berserker.rageDuration || 480;
+          this.rage = 0;
+        }
+      }
+    }
+    return tookDamage;
+  }
+
+  applyBeamEffectsToTarget(target, ownerIndex) {
+    if (!target || target === this) return;
+
+    let hitState = this.beamHitState.get(target);
+    if (!hitState) {
+      hitState = { initialHitDone: false, continuousDamageTimer: 0 };
+      this.beamHitState.set(target, hitState);
+    }
+
+    const dx = target.x - this.x;
+    const dy = target.y - this.y;
+    const dist = Math.hypot(dx, dy) || 1;
+
+    // Use a damage multiplier for stolen skills if necessary, but trickster usually borrows raw config for beam
+    const dmgMulti = getStolenMultiplier('laser', 'damageMultiplier');
+
+    if (!hitState.initialHitDone) {
+      const applied = target.takeDamage(this.damage * dmgMulti, this, { isProjectile: true, isLaser: true });
+      if (applied) {
+        const slowChance = Number(CONFIG.laser.slowChance || 1);
+        if (slowChance >= 1 || Math.random() <= slowChance) {
+          // Default beam slow duration and multiplier if trickster doesn't define it
+          target.applySlow(CONFIG.laser.beamSlowDuration || 60, CONFIG.laser.beamSlowMultiplier || 0.4);
+          spawnFloatingText(target.x, target.y - target.r - 5, 'SLOWED!', '#88ccff');
+        }
+
+        const startPush = Number(CONFIG.laser.initialKnockback) || 0;
+        if (startPush !== 0) {
+          target.vx += (dx / dist) * startPush;
+          target.vy += (dy / dist) * startPush;
+        }
+
+        hitState.initialHitDone = true;
+        spawnFloatingText(target.x, target.y - target.r - 5, 'BEAM HIT!', '#00ff00');
+
+        if (typeof this.onDamageDealt === 'function') {
+          this.onDamageDealt(target, { damage: this.damage * dmgMulti, isLaser: true }, ownerIndex);
+        }
+      }
+      return;
+    }
+
+    hitState.continuousDamageTimer++;
+    if (hitState.continuousDamageTimer >= CONFIG.laser.tickInterval) {
+      const applied = target.takeDamage(CONFIG.laser.tickDamage * dmgMulti, this, { isProjectile: true, isLaser: true });
+      if (applied) {
+        const pushStrength = Number(CONFIG.laser.initialKnockback) || 0;
+        if (pushStrength !== 0) {
+          target.vx += (dx / dist) * pushStrength;
+          target.vy += (dy / dist) * pushStrength;
+        }
+
+        spawnFloatingText(target.x, target.y - target.r - 5, 'ZZZAP!', '#aaffaa');
+        if (typeof this.onDamageDealt === 'function') {
+          this.onDamageDealt(target, { damage: CONFIG.laser.tickDamage * dmgMulti, isLaser: true }, ownerIndex);
+        }
+      }
+      hitState.continuousDamageTimer = 0;
+    }
+  }
+
+  _processStolenStorm(ownerIndex) {
+    this.stormLastStrikeTimer++;
+    const interval = Math.floor(60 / (CONFIG.zeus.stormStrikesPerSec || 3));
+    
+    if (this.stormLastStrikeTimer >= interval) {
+      this.stormLastStrikeTimer = 0;
+      
+      if (state && state.fighters) {
+        const myTeam = state.getFighterTeam(ownerIndex);
+
+        state.fighters.forEach((f, idx) => {
+          if (f && f !== this && f.hp > 0) {
+            const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+            if (isEnemy) this._strikeEnemyWithStolenStorm(f);
+          }
+        });
+        
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (ill && ill.hp > 0 && ill.owner !== this) {
+              const illOwnerTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
+              const isEnemy = myTeam === null || illOwnerTeam !== myTeam;
+              if (isEnemy) this._strikeEnemyWithStolenStorm(ill);
+            }
+          });
+        }
+      }
+    }
+  }
+
+  _strikeEnemyWithStolenStorm(target) {
+    const dmgMulti = getStolenMultiplier('zeus', 'damageMultiplier');
+    let damage = (CONFIG.zeus.stormStrikeDamage || 15) * dmgMulti;
+    
+    target.takeDamage(damage, this, { isStorm: true });
+    
+    if (target.applySlow) {
+      target.applySlow(CONFIG.zeus.paralyzeDuration || 30, CONFIG.zeus.paralyzeSlowMultiplier || 0.5);
+    }
+    
+    triggerGlobalScreenShake(CONFIG.zeus.stormStrikeShakeIntensity || 4, CONFIG.zeus.stormStrikeShakeFrames || 10);
+    spawnImpactFlash(target.x, target.y, 50, 'ghostTrail');
+    spawnSparks(target.x, target.y, 10, 'arcane');
+    
+    const stormSound = getSkillSound(99, 'storm');
+    if (stormSound) playSound(stormSound.src, stormSound.volume * 0.6);
+    
+    if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
+    state.zeusStormStrikes.push({
+      x: target.x,
+      y: target.y,
+      life: 15,
+      maxLife: 15,
+      color: 'green'
+    });
   }
 
   update(opponent, ownerIndex, arena) {
@@ -101,13 +317,25 @@ export class TricksterFighter extends Fighter {
 
     this.handlePoison();
     this.handleBurn();
+    this._tickCooldowns();
+    this._tickAttackSound();
     
     const isTimeStopped = this._handleTimeStop();
     if (typeof this._updateStaffTrail === 'function') this._updateStaffTrail(isTimeStopped);
     if (isTimeStopped) return;
+    // Clear Berserker Rage if the buff faded or changed
+    if (this.stolenType !== 'berserker') {
+      this.rage = 0;
+      this.rageTimer = 0;
+      this.rageFadeTimer = 0;
+      this.isInRage = false;
+      this.berserkerRageActivated = false;
+    }
 
     // Handle stolen Berserker Rage
-    if (this.stolenType === 'berserker') {
+    if (this.stolenType === 'berserker' && this.isInRage) {
+      this.rageTimer--;
+
       if (!this.berserkerRageActivated) {
         this.berserkerRageActivated = true;
         spawnFloatingText(this.x, this.y - this.r - 10, 'ARCANE RAGE!', '#00ff64');
@@ -120,7 +348,7 @@ export class TricksterFighter extends Fighter {
       this.speed = this.baseSpeed * (CONFIG.berserker.rageMoveSpeedMultiplier || 2.0);
       
       // Spawn green afterimages (motion trails) while in rage
-      if (this.stolenTimer > 0 && this.stolenTimer % 3 === 0) {
+      if (this.rageTimer % 3 === 0) {
         if (!this.afterImages) this.afterImages = [];
         this.afterImages.push({
           x: this.x,
@@ -130,9 +358,146 @@ export class TricksterFighter extends Fighter {
           color: '#00ff64'
         });
       }
+
+      if (this.rageTimer <= 0) {
+        this.isInRage = false;
+        this.berserkerRageActivated = false;
+        this.rageFadeTimer = 45;
+        this.speed = this.baseSpeed;
+        spawnFloatingText(this.x, this.y - this.r - 15, 'RAGE ENDED', '#aaa');
+      }
     } else {
+      if (this.rageFadeTimer > 0) this.rageFadeTimer--;
       this.berserkerRageActivated = false;
       this.speed = this.baseSpeed;
+    }
+
+    // Stolen Zeus Storm Logic
+    if (this.stormActive) {
+      this.stormTimer--;
+      this._processStolenStorm(ownerIndex);
+      if (this.stormTimer <= 0) {
+        this.stormActive = false;
+        spawnFloatingText(this.x, this.y - this.r - 10, 'STORM ENDED', '#aaa');
+      }
+    }
+
+    // Stolen Laser Logic
+    if (this.beamTimer > 0) {
+      this.beamTimer--;
+      
+      // Continuous violent screen shake while firing
+      if (!state.screenShake || state.screenShake.timer <= 1) {
+        state.screenShake = { timer: 5, intensity: 6 };
+      }
+
+      // Slowly rotate toward the target while firing the beam
+      if (opponent) {
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        let delta = targetAngle - this.gunAngle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        
+        const maxRotate = CONFIG.laser.beamRotateSpeed || 0.015;
+        if (Math.abs(delta) > maxRotate) {
+          this.gunAngle += Math.sign(delta) * maxRotate;
+        } else {
+          this.gunAngle = targetAngle;
+        }
+      }
+
+      // Check all valid targets
+      const allTargets = state.fighters.concat(state.illusions || []);
+      const hitFighters = this.getBeamHitFighters(allTargets);
+      for (const fighter of hitFighters) {
+        this.applyBeamEffectsToTarget(fighter, ownerIndex);
+      }
+
+      // Drift slowly backward while firing
+      const backwardSpeed = Number(CONFIG.laser.beamBackwardSpeed) || 0;
+      const beamRecoilX = -Math.cos(this.gunAngle) * backwardSpeed;
+      const beamRecoilY = -Math.sin(this.gunAngle) * backwardSpeed;
+      const retention = Number(CONFIG.laser.beamDriftRetention) || 0.92;
+      const blend = Number(CONFIG.laser.beamDriftBlend) || 0.08;
+
+      this.vx = this.vx * retention + beamRecoilX * blend;
+      this.vy = this.vy * retention + beamRecoilY * blend;
+
+      this.x += this.vx;
+      this.y += this.vy;
+      this.resolveWallBounce(arena);
+      return; // Skip normal update when firing laser
+    }
+
+    // Stop laser sound if beam ends
+    if (this.beamTimer === 0 && this._isLaserSoundPlaying) {
+      if (this._laserSoundKey) fadeOutLoopingSound(this._laserSoundKey, 100);
+      this._isLaserSoundPlaying = false;
+    }
+
+    // Charge the laser
+    if (this.stolenType === 'laser' && this.stolenSkillCooldown <= 0) {
+      if (opponent) {
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        let delta = targetAngle - this.gunAngle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        
+        // Rotate towards opponent while charging
+        const maxRotate = CONFIG.laser.aimRotateSpeed || 0.05;
+        if (Math.abs(delta) > maxRotate) {
+          this.gunAngle += Math.sign(delta) * maxRotate;
+        } else {
+          this.gunAngle = targetAngle;
+        }
+
+        // Recalculate delta after rotation for alignment check
+        delta = targetAngle - this.gunAngle;
+        while (delta > Math.PI) delta -= Math.PI * 2;
+        while (delta < -Math.PI) delta += Math.PI * 2;
+        
+        const aligned = Math.abs(delta) < (CONFIG.laser.aimThreshold || 0.1);
+
+        if (this.beamCharge === 0) {
+          const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
+          if (chargeSound) playSound(chargeSound.src, chargeSound.volume);
+        }
+        
+        this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
+        
+        // Tremor screen shake during charge
+        const chargeRatio = this.beamCharge / CONFIG.laser.windupDuration;
+        if (chargeRatio > 0.4 && (!state.screenShake || state.screenShake.intensity < chargeRatio * 4)) {
+          state.screenShake = { timer: 2, intensity: chargeRatio * 4 };
+        }
+
+        if (aligned && this.beamCharge >= CONFIG.laser.windupDuration) {
+          this.beamTimer = CONFIG.laser.beamDuration;
+          this.stolenSkillCooldown = 300 * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
+          this.beamHitState.clear();
+          this.beamCharge = 0;
+          
+          state.screenShake = { timer: 20, intensity: 15 };
+
+          if (!this._laserSoundKey) {
+            this._laserSoundKey = `ivory-laser-${ownerIndex}`;
+          }
+          if (!this._isLaserSoundPlaying) {
+            const sound = getBasicAttackSound('laser', 'laser'); // Assuming LaserFighter uses this for its beam sound
+            if (sound) playLoopingSound(this._laserSoundKey, sound.src, sound.volume);
+            this._isLaserSoundPlaying = true;
+          }
+
+          // Small backward knockback when beam starts
+          const kickback = CONFIG.laser.beamStartKnockback || 0;
+          this.vx += -Math.cos(this.gunAngle) * kickback;
+          this.vy += -Math.sin(this.gunAngle) * kickback;
+        }
+      } else {
+        this.beamCharge = Math.max(this.beamCharge - 1, 0);
+      }
+    } else {
+       this.beamCharge = Math.max(this.beamCharge - 1, 0);
     }
 
     if (this.flurryHitsLeft > 0) {
@@ -453,7 +818,7 @@ export class TricksterFighter extends Fighter {
       }
 
       // Skill 1: Telekinesis
-      if (this.telekinesisCooldown <= 0 && !this.stolenType && distSq < CONFIG.trickster.telekinesisRange * CONFIG.trickster.telekinesisRange) {
+      if (this.telekinesisCooldown <= 0 && !this.stolenType && distSq < CONFIG.trickster.telekinesisRange * CONFIG.trickster.telekinesisRange && !opponent.immuneToCC) {
         this.telekinesisCooldown = CONFIG.trickster.telekinesisCooldown;
         this.tkTarget = opponent;
         this.tkTimer = CONFIG.trickster.telekinesisDuration;
@@ -493,7 +858,7 @@ export class TricksterFighter extends Fighter {
       // Check heavy stolen skills every frame
       let castedHeavy = false;
       if (this.stolenType && !this.tkTimer && this.stolenSkillCooldown <= 0) {
-        if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal'].includes(this.stolenType)) {
+        if (['cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'musashi', 'normal', 'zeus'].includes(this.stolenType)) {
           // It's a Heavy Spell! (One-time cast that consumes the stolen buff)
           castedHeavy = true;
           this.executeStolenSkill(opponent, ownerIndex);
@@ -513,7 +878,20 @@ export class TricksterFighter extends Fighter {
         if (!castedSpammable) {
           // Normal Arcane Bolt
           let dmg = CONFIG.trickster.boltDamage;
-          if (this.stolenType === 'berserker') {
+          if (this.stolenType === 'cronos' && this._isInsideOwnSphere && this._isInsideOwnSphere()) {
+             // Apply Sphere buffs to Arcane Bolt
+             const cronosCfg = STOLEN_SKILL_CONFIG.skills.cronos;
+             this.attackCooldown = cronosCfg.sphereStaffCooldown || 40;
+             dmg = cronosCfg.sphereStaffDamage || 18;
+             
+             // Ensure swing animation finishes before the next attack
+             this.attackSwingTimer = Math.min(15, cronosCfg.sphereStaffCooldown || 40);
+             
+             // Aim before swinging the visual effect
+             if (opponent) {
+                this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+             }
+          } else if (this.stolenType === 'berserker') {
             // Apply Berserker Rage buffs to Arcane Bolt
             const rageAttackMultiplier = CONFIG.berserker.rageAttackSpeedMultiplier || 1.1;
             this.attackCooldown = (CONFIG.trickster.attackCooldown / rageAttackMultiplier) * getStolenMultiplier('berserker', 'cooldownMultiplier');
@@ -566,12 +944,7 @@ export class TricksterFighter extends Fighter {
     this.applyMovementPhysics();
     this.resolveWallBounce(arena, opponent);
 
-    // Update permanent orbiting debris
-    for (const debris of this.orbitingDebris) {
-      debris.angle += debris.speed;
-      debris.rotation += debris.rotationSpeed;
-      debris.zPhase += debris.zSpeed;
-    }
+    // Orbiting debris is updated dynamically in _drawDebrisLayer using performance.now()
     // Update Stolen Ruby Hook
     updateStolenRubyHook(this);
     if (this.sphereActive) {
@@ -631,8 +1004,8 @@ export class TricksterFighter extends Fighter {
         break;
       case 'bomber':
       case 'grenadier':
-      case 'laser':
       case 'normal':
+      case 'zeus':
         // These are heavy skills! We will enter the wind-up phase first!
         if (this.stolenSkillCooldown <= 0) {
            this.stolenWindUpTimer = this.stolenType === 'normal' ? (CONFIG.sharpshooter?.executeWindupFrames || 30) : 30; 
@@ -663,7 +1036,7 @@ export class TricksterFighter extends Fighter {
     }
     
     // Clear the stolen skill after casting ONLY if it's a spammable skill
-    if (skillCast && !['musashi', 'cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'normal'].includes(this.stolenType)) {
+    if (skillCast && !['musashi', 'cronos', 'ruby', 'bomber', 'grenadier', 'laser', 'normal', 'zeus'].includes(this.stolenType)) {
       this.stolenType = null;
       this.stolenTimer = 0;
     }
@@ -709,21 +1082,27 @@ export class TricksterFighter extends Fighter {
         break;
       case 'cronos':
         this.sphereActive = true;
+        this.sphereTheme = TricksterCronosTheme;
         this.sphereX = this.x;
         this.sphereY = this.y;
         this.sphereTimer = CONFIG.cronos.sphereDuration;
         this.stolenSkillCooldown = CONFIG.cronos.sphereCooldown * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
         spawnFloatingText(this.x, this.y - this.r - 10, 'TIME SPHERE!', '#07cdfa');
         break;
+      case 'zeus':
+        this.stormActive = true;
+        this.stormTimer = CONFIG.zeus.stormDuration * getStolenMultiplier('zeus', 'durationMultiplier') || CONFIG.zeus.stormDuration;
+        this.stormLastStrikeTimer = 0;
+        this.stolenSkillCooldown = CONFIG.zeus.stormCooldown * getStolenMultiplier('zeus', 'cooldownMultiplier');
+        spawnFloatingText(this.x, this.y - this.r - 20, 'ARCANE STORM!', '#00ff64');
+        triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
+        const stormSound = getSkillSound(99, 'storm');
+        if (stormSound) playSound(stormSound.src, stormSound.volume * 0.7);
+        break;
       case 'grenadier':
         projectileSystem.fireGrenade(this, ownerIndex, (CONFIG.grenadier.poisonDamagePerTick || 10) * getStolenMultiplier(this.stolenType, 'damageMultiplier'), opponent);
         this.stolenSkillCooldown = CONFIG.grenadier.throwCooldown * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
         break;
-      case 'laser':
-         this.beamActive = true;
-         this.beamTimer = CONFIG.laser.beamDuration;
-         this.stolenSkillCooldown = 300 * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
-         break;
       case 'ruby':
          if (opponent) {
            this.stolenSkillCooldown = (CONFIG.ruby?.activePullCooldown || 240) * getStolenMultiplier(this.stolenType, 'cooldownMultiplier');
@@ -943,10 +1322,16 @@ export class TricksterFighter extends Fighter {
         ctx.fill();
     };
 
-    // Draw green anime-style trails
-    drawCrescentPolygon(this.staffTrail, 0, 0, 0, 16);     // Black Aura
-    drawCrescentPolygon(this.staffTrail, 0, 220, 100, 8);  // Green Aura
-    drawCrescentPolygon(this.staffTrail, 255, 255, 255, 2);// White Core
+    if (this.isInRage) {
+      // Draw massive green anime-style trails when in rage
+      drawCrescentPolygon(this.staffTrail, 0, 0, 0, 16);     // Black Aura
+      drawCrescentPolygon(this.staffTrail, 0, 220, 100, 8);  // Green Aura
+      drawCrescentPolygon(this.staffTrail, 255, 255, 255, 2);// White Core
+    } else {
+      // Draw a dark basic trail for normal non-rage swings
+      drawCrescentPolygon(this.staffTrail, 0, 0, 0, 4);
+      drawCrescentPolygon(this.staffTrail, 51, 51, 51, 2);
+    }
 
     ctx.restore();
   }
@@ -1120,9 +1505,180 @@ export class TricksterFighter extends Fighter {
       });
     }
 
+    // Draw Stolen Laser Charge Effect
+    if (this.beamCharge > 0) {
+      drawTricksterChargeEffect(ctx, this.x, this.y, this.gunAngle, this.beamCharge, this.r);
+    }
+
+    // Draw teleport-in effect
+    this._drawTeleportEffect(ctx);
+
     if (typeof this._drawStaffTrail === 'function') {
       this._drawStaffTrail(ctx);
     }
+    
+    this.drawRageBar(ctx);
+  }
+
+  drawBeamOverlay(ctx) {
+    if (this.hp <= 0 || this.beamTimer <= 0) return;
+    
+    // Smooth fade in over the first 8 frames, and fade out over the last 8 frames
+    const fadeOutMultiplier = Math.min(1, this.beamTimer / 8);
+    const timeFired = (typeof CONFIG !== 'undefined' && CONFIG.laser ? CONFIG.laser.beamDuration : 100) - this.beamTimer;
+    const fadeInMultiplier = Math.min(1, Math.max(0, timeFired) / 8);
+    const fadeMultiplier = fadeOutMultiplier * fadeInMultiplier;
+    
+    let { startX, startY, endX, endY } = this.getBeamLine();
+    const zOffset = this.z || 0;
+    startY -= zOffset;
+    endY -= zOffset;
+    
+    const dx = endX - startX;
+    const dy = endY - startY;
+    const beamLen = Math.hypot(dx, dy);
+    const angle = Math.atan2(dy, dx);
+    
+    const time = performance.now() / 150;
+    const pulse1 = Math.sin(time) * 1.5;
+    const pulse2 = Math.cos(time * 1.3) * 2;
+    const pulse3 = Math.sin(time * 0.8) * 3;
+
+    ctx.save();
+    
+    // Outer huge bloom (green)
+    ctx.shadowColor = '#00ff64';
+    ctx.shadowBlur = (25 + pulse3 * 2) * fadeMultiplier;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = `rgba(0, 255, 100, ${0.3 * fadeMultiplier})`;
+    ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) + 16 + pulse3 * 1.5) * fadeMultiplier;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Secondary wide glow (bright green)
+    ctx.shadowBlur = (15 + pulse2) * fadeMultiplier;
+    ctx.shadowColor = '#00ff00';
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = `rgba(50, 255, 100, ${0.5 * fadeMultiplier})`;
+    ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) + 4 + pulse2) * fadeMultiplier;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+    ctx.shadowBlur = 0; 
+
+    // Mid bright glow
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = `rgba(150, 255, 150, ${0.8 * fadeMultiplier})`;
+    ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) - 2 + pulse2) * fadeMultiplier;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Inner core (white)
+    ctx.shadowColor = '#ffffff';
+    ctx.shadowBlur = 10 * fadeMultiplier;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${fadeMultiplier})`;
+    ctx.lineWidth = ((CONFIG.laser.coreWidth || 4) + pulse1 + 1.5) * fadeMultiplier;
+    ctx.lineCap = 'round';
+    ctx.stroke();
+
+    // Energy nodes traveling down the beam
+    const numNodes = 6;
+    const speed = 1.0;
+    ctx.fillStyle = `rgba(255, 255, 255, ${fadeMultiplier})`;
+    ctx.shadowColor = '#00ff00';
+    ctx.shadowBlur = 15 * fadeMultiplier;
+
+    for (let i = 0; i < numNodes; i++) {
+      let offset = ((time * speed) + (i / numNodes)) % 1.0;
+      let nx = startX + Math.cos(angle) * (beamLen * offset);
+      let ny = startY + Math.sin(angle) * (beamLen * offset);
+      let nodeRadius = (2 + Math.sin(offset * Math.PI) * 4) * fadeMultiplier;
+
+      ctx.beginPath();
+      ctx.arc(nx, ny, nodeRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Target hit glow
+    for (const [target, hitState] of this.beamHitState.entries()) {
+      if (!target || target.hp <= 0) continue;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const hitGlow = ctx.createRadialGradient(target.x, target.y, target.r * 0.2, target.x, target.y, target.r * 3);
+      hitGlow.addColorStop(0, `rgba(255, 255, 255, ${(0.8 + Math.random() * 0.2) * fadeMultiplier})`);
+      hitGlow.addColorStop(0.2, `rgba(50, 255, 100, ${(0.6 + Math.random() * 0.2) * fadeMultiplier})`);
+      hitGlow.addColorStop(1, 'rgba(0, 255, 50, 0)');
+      ctx.fillStyle = hitGlow;
+      ctx.beginPath();
+      ctx.arc(target.x, target.y, target.r * 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Proximity illumination on ANY fighter near the beam
+    if (state && state.fighters) {
+      const l2 = dx * dx + dy * dy;
+      if (l2 > 0) {
+        for (const f of state.fighters) {
+          if (!f || f.hp <= 0 || f === this) continue;
+          let t = ((f.x - startX) * dx + (f.y - startY) * dy) / l2;
+          t = Math.max(0, Math.min(1, t));
+          const projX = startX + t * dx;
+          const projY = startY + t * dy;
+          const dist = Math.hypot(f.x - projX, f.y - projY);
+
+          const maxLightDist = 150;
+          if (dist < maxLightDist && !this.beamHitState.has(f)) {
+            const intensity = 1 - (dist / maxLightDist);
+            ctx.save();
+            ctx.globalCompositeOperation = 'lighter';
+            const shineGlow = ctx.createRadialGradient(f.x, f.y, f.r * 0.5, f.x, f.y, f.r * 1.5);
+            shineGlow.addColorStop(0, `rgba(50, 255, 100, ${intensity * 0.5 * fadeMultiplier})`);
+            shineGlow.addColorStop(1, 'rgba(0, 255, 50, 0)');
+            
+            ctx.fillStyle = shineGlow;
+            ctx.beginPath();
+            ctx.arc(f.x, f.y, f.r * 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+          }
+        }
+      }
+    }
+  }
+
+  _drawTeleportEffect(ctx) {
+    if (this._teleportTimer <= 0) return;
+    const progress = 1 - (this._teleportTimer / 20);
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.translate(this.x, this.y);
+    
+    ctx.beginPath();
+    ctx.arc(0, 0, this.r + 30 * (1 - progress), 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(0, 255, 100, ${1 - progress})`;
+    ctx.lineWidth = 4 * progress;
+    ctx.stroke();
+    
+    // Vertical rift
+    ctx.beginPath();
+    ctx.moveTo(0, -this.r * 1.5 - 20 * (1 - progress));
+    ctx.lineTo(0, this.r * 1.5 + 20 * (1 - progress));
+    ctx.strokeStyle = `rgba(200, 255, 200, ${1 - progress})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    
+    ctx.restore();
   }
 
   resolveWallBounce(arena, opponent) {
@@ -1165,20 +1721,27 @@ export class TricksterFighter extends Fighter {
     ctx.save();
     ctx.translate(this.x, this.y);
     
+    const time = performance.now() / 1000; // time in seconds
+
     for (const debris of this.orbitingDebris) {
-      const isBehind = Math.sin(debris.angle) < 0;
+      // 60 frames per second multiplier to match old speed
+      const angle = debris.baseAngle + time * (debris.speed * 60);
+      const rotation = debris.baseRotation + time * (debris.rotationSpeed * 60);
+      const zPhase = debris.baseZPhase + time * (debris.zSpeed * 60);
+
+      const isBehind = Math.sin(angle) < 0;
       if (isBehind !== drawBehind) continue;
       
-      const px = Math.cos(debris.angle) * debris.dist;
-      const py = Math.sin(debris.angle) * debris.dist * 0.5; // Oval orbit for isometric perspective
+      const px = Math.cos(angle) * debris.dist;
+      const py = Math.sin(angle) * debris.dist * 0.5; // Oval orbit for isometric perspective
       
       // Calculate floating height independently for each rock
-      const pz = this.z + Math.sin(debris.zPhase) * 12;
+      const pz = this.z + Math.sin(zPhase) * 12;
       
       ctx.save();
       // Apply position and Z-height subtraction
       ctx.translate(px, py - pz);
-      ctx.rotate(debris.rotation);
+      ctx.rotate(rotation);
       
       const s = debris.size;
       
@@ -1213,6 +1776,56 @@ export class TricksterFighter extends Fighter {
       ctx.restore();
     }
     
+    ctx.restore();
+  }
+  drawRageBar(ctx) {
+    if (this.stolenType !== 'berserker') return;
+    if (this.rage <= 0 && this.rageTimer <= 0 && this.rageFadeTimer <= 0) return;
+
+    ctx.save();
+    
+    // Draw directly below the fighter
+    // The exact height matches where Berserker draws it (this.y + this.r + 20)
+    ctx.translate(this.x, this.y + this.r + 20);
+
+    const barWidth = 40;
+    const barHeight = 6;
+    
+    // Base dark background
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(-barWidth / 2, 0, barWidth, barHeight);
+
+    let fillRatio = 0;
+    let fillColor = '#00ff64'; // Arcane rage green
+    let glowColor = '#00cc50';
+
+    if (this.isInRage) {
+      // Draining full bar during rage
+      fillRatio = this.rageTimer / (CONFIG.berserker.rageDuration || 480);
+      fillRatio = Math.max(0, Math.min(1, fillRatio));
+    } else if (this.rageFadeTimer > 0) {
+      // Fading out empty bar after rage
+      fillRatio = 0;
+      ctx.globalAlpha = this.rageFadeTimer / 45;
+    } else {
+      // Filling bar before rage
+      fillRatio = this.rage / (CONFIG.berserker.maxRage || 100);
+      fillRatio = Math.max(0, Math.min(1, fillRatio));
+    }
+
+    if (fillRatio > 0) {
+      ctx.shadowBlur = 10;
+      ctx.shadowColor = glowColor;
+      ctx.fillStyle = fillColor;
+      ctx.fillRect(-barWidth / 2, 0, barWidth * fillRatio, barHeight);
+      ctx.shadowBlur = 0;
+    }
+
+    // Border
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(-barWidth / 2, 0, barWidth, barHeight);
+
     ctx.restore();
   }
 }
