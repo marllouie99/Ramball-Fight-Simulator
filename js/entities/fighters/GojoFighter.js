@@ -1550,27 +1550,32 @@ export class GojoFighter extends Fighter {
     ctx.shadowBlur = 20 * progress;
     ctx.shadowColor = mainColor;
 
-    // Generate smooth flame contour points
-    const numPoints = 24;
-    const baseRadius = r + 10;
+    // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
+    const numPoints = 28;
+    const baseRadius = r + 15;
     const points = [];
+    const moveOffset = (this.x + this.y) * 0.015;
 
     for (let i = 0; i < numPoints; i++) {
       const angle = (Math.PI * 2 / numPoints) * i;
 
-      // Gentle flowing waves (slow, smooth, no sharp noise)
-      const wave1 = Math.sin(time * 0.003 + i * 0.9) * 5;
-      const wave2 = Math.cos(time * 0.0025 - i * 1.3) * 3;
+      // Upward direction bias (flames flow upward)
+      const upFactor = Math.max(0, -Math.sin(angle) + 0.25);
+      const sideFactor = 1.0 - upFactor * 0.5;
 
-      // Flames rise upward naturally (-Y) with soft bulge
-      const isTop = Math.sin(angle) < -0.2;
-      const upwardBulge = isTop ? (8 + Math.sin(time * 0.004 + i * 0.7) * 4) : 0;
+      // Base shape evolution for stretching flame tongues
+      const baseTongue1 = Math.pow(Math.sin(angle * 1.5 + time * 0.0005 - moveOffset * 0.2) * 0.5 + 0.5, 3.0) * 25 * upFactor;
+      const baseTongue2 = Math.pow(Math.cos(angle * 2.2 - time * 0.0004 + moveOffset * 0.15) * 0.5 + 0.5, 2.5) * 18 * upFactor;
 
-      const radius = baseRadius + wave1 + wave2 + upwardBulge;
+      // Localized height flicker
+      const tongueFlicker = Math.sin(time * 0.002 + i * 1.4) * 5 * upFactor;
+      const sideWave = Math.sin(time * 0.0012 + i * 0.8) * 4 * sideFactor;
+
+      const totalRadius = baseRadius + baseTongue1 + baseTongue2 + tongueFlicker + sideWave;
 
       points.push({
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius
+        x: Math.cos(angle) * totalRadius,
+        y: Math.sin(angle) * totalRadius
       });
     }
 

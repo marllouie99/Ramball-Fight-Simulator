@@ -217,7 +217,14 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.65,
     delay: 0,
     pitchVariation: 0.15
-  },};
+  },
+  // Yuta — Katana Slash
+  'yuta': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+};
 
 /**
  * Get the sound config for a fighter.

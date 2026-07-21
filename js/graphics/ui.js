@@ -2425,8 +2425,8 @@ function updateHealthHud() {
     }).join('');
 
     return `
-      <div class="health-card" style="${shakeStyle}${winnerStyle} display: inline-block; vertical-align: top; background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
-        <div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 6px;">${title}</div>
+      <div class="health-card" style="${shakeStyle}${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
+        <div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 6px; font-weight: bold;">${title}</div>
         <div class="health-card__wins" style="margin: 6px 0 8px; display: flex; gap: 6px;">${winsBullets}</div>
         ${barsHTML}
         ${description ? `<div class="health-card__desc" style="color: rgba(0, 0, 0, 0.7); margin-top: 8px; font-size: 11px; line-height: 1.3;">${description}</div>` : ''}
@@ -2659,7 +2659,7 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.gunAngle = 0;
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
-  if (def.type === 'gojo' || def.type === 'sukuna') {
+  if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
 
@@ -2725,7 +2725,7 @@ function drawFfaChampionReveal(winner, timer) {
   preview.gunAngle = 0;
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
-  if (def.type === 'gojo' || def.type === 'sukuna') {
+  if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
 
@@ -2963,7 +2963,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   preview.gunAngle = 0;
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
-  if (def.type === 'gojo' || def.type === 'sukuna') {
+  if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
 

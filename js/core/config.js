@@ -12,7 +12,7 @@ export const CONFIG = {
   hpBar: { height: 6, yOffset: 16 },
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
   globalFighter: {
-    sizeMultiplier: 1.1,                       // scale the size of all fighters globally (1.0 = default)
+    sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
   },
 
   // ─────────────────────────────────────────────
@@ -633,6 +633,41 @@ export const CONFIG = {
     domainRadius: 240,        // Radius of the open-air death zone
     domainRampRatePerSec: 0.10,// 10% damage increase per second targets stay inside
   },
+
+  /** Yuta Okkotsu — Special Grade Sorcerer */
+  yuta: {
+    rctRevivalHpThreshold: 0.05,
+    rctRevivalDuration: 150,
+    rctRevivalCooldown: 99999,
+    meleeCooldown: 50,
+    meleeRange: 75,
+    meleeDamage: 15,
+    meleeArc: Math.PI / 2,
+    parryThreatRadius: 180,
+    parryMeleeThreatRadius: 120,
+    parryAnticipationDuration: 45,
+    parryGuardDuration: 90,
+    parryActiveChance: 0.85,
+    parryPassiveChance: 0.25,
+    flurryHits: 5,
+    flurryDamage: 8,
+    flurryHitInterval: 6,
+    flurryParryMin: 5,
+    flurryParryMax: 7,
+    cursedSpeechRadius: 150,
+    cursedSpeechFreezeTime: 45,
+    thinIceBreakerDamage: 25,
+    thinIceBreakerSpeed: 25,
+    rikaRadius: 30,
+    rikaCooldown: 600,
+    rikaSpeedMultiplier: 1.3,
+    rikaDamage: 12,
+    domainCooldown: 1500,
+    domainChargeMax: 90,
+    domainDuration: 400,
+    domainCooldownReduction: 0.8,
+    regenRate: 0.05,
+  },
 };
 
 // ─────────────────────────────────────────────
@@ -1048,6 +1083,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
     desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
+  },
+  {
+    id: 23,
+    name: 'Yuta',
+    category: 'Anime',
+    color: '#EEEEEE', // Soft Silver / White
+    startX: 400, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'yuta',
+    hp: 200,
+    damage: 15,
+    cooldown: 50,
+    moveSpeed: 4.8,
+    projectileSpeedMultiplier: 3.0,
+    ability: 'Copy & Rika',
+    desc: 'Manifests Rika, copies techniques, and uses Authentic Mutual Love domain.',
   }
 ];
 

@@ -271,10 +271,10 @@ export function drawDivineFlameArrowConstruct(ctx, {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  // ═══════════════════════════════════════════════════════════════
-  // 2. ROARING FLAME TONGUES — long, turbulent, curling backward
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // 2. ROARING FLAME TONGUES ΓÇö long, turbulent, curling backward
   // Uses traveling wave + multi-frequency turbulence for fluid motion
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   const numTendrils = 16;
   for (let i = 0; i < numTendrils; i++) {
     const side = i % 2 === 0 ? 1 : -1;
@@ -317,19 +317,19 @@ export function drawDivineFlameArrowConstruct(ctx, {
     // Color cascade from white-hot (near arrow) to crimson (tips)
     const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
     if (ratio < 0.3) {
-      // Near tip: white → bright yellow core
+      // Near tip: white ΓåÆ bright yellow core
       tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
       tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
       tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
       tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
     } else if (ratio < 0.6) {
-      // Mid shaft: golden orange → deep orange
+      // Mid shaft: golden orange ΓåÆ deep orange
       tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
       tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
       tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
       tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
     } else {
-      // Rear: deep orange → crimson red
+      // Rear: deep orange ΓåÆ crimson red
       tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
       tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
       tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
@@ -339,10 +339,10 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.fill();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   // 3. TWIN FIERY TAIL FLETCHING (Rear Plumes at notchX)
   // Wild streaming plumes that convey unstoppable momentum
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   for (let side of [-1, 1]) {
     const tailPhase = time * 7.5 + side * 1.5;
     const plumeScale = isFlying ? 1.6 : 1.0;
@@ -373,9 +373,9 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.fill();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   // 4. MOLTEN LAVA SHAFT & INCANDESCENT CORE
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   const shaftGrad = ctx.createLinearGradient(notchX, 0, headX + 4, 0);
   shaftGrad.addColorStop(0, `rgba(255, 90, 0, ${0.75 * progress})`);
   shaftGrad.addColorStop(0.3, `rgba(255, 180, 30, ${0.9 * progress})`);
@@ -415,9 +415,9 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.stroke();
   }
 
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   // 5. VOLCANIC OBSIDIAN MAGMA ARROWHEAD
-  // ═══════════════════════════════════════════════════════════════
+  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
   const tipApexX = tipX + 6 * progress;
   const barbX = headX - 6 * progress;
   const barbY = 17 * progress;
@@ -496,6 +496,7 @@ export function drawDivineFlameArrowConstruct(ctx, {
   ctx.restore(); // Restore globalCompositeOperation ('lighter')
   ctx.restore(); // Restore transform matrix
 }
+
 
 // ─────────────────────────────────────────────
 // DRAW — PROJECTILES
