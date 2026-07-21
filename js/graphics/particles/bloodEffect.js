@@ -53,6 +53,10 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
     // Bigger particles (3-6 pixels) for more visibility
     const size = 3 + Math.random() * 3;
 
+    if (state.bloodEffects.length >= 50) {
+      state.bloodEffects.shift();
+    }
+
     state.bloodEffects.push({
       x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
       y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
@@ -61,7 +65,7 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
       size: size,
       color: color,
       life: 1.0,           
-      decay: 0.001 + Math.random() * 0.001, 
+      decay: 0.008 + Math.random() * 0.006, 
       airResistance: 0.94, // Lighter air friction so they fly further
       friction: 0.90,      // Ground friction
     });

@@ -332,7 +332,7 @@ function animate(timestamp) {
 
       // Auto next match
       if (state.matchEndTimer >= 300) {
-        if (state.mode === '1v1') {
+        if (state.mode === '1v1' || state.mode === 'Stand Off') {
           resetMatchWithRandom1v1Fighters();
         } else {
           // For 2v2 or others that might use matchEnd
@@ -508,6 +508,7 @@ function animate(timestamp) {
       if (state.gameState === 'playing') {
         drawHUD();
       } else if (state.gameState === 'countdown') {
+        drawFighters(); // Draw fighters during countdown to show cursed energy auras
         drawCountdown();
       } else if (state.gameState === 'paused') {
         drawPauseScreen();

@@ -150,9 +150,21 @@ export const SKILL_SOUNDS = {
 
   // ── Gojo ─────────────────────────────
   21: {
+    domain_channel: {
+      src: 'Assets/Sound Effects/Skills/gojodomain.mp3',
+      volume: 2.0
+    },
+    domain_expansion: {
+      src: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
+      volume: 5.0
+    },
+    domain_activate: {
+      src: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
+      volume: 2.0
+    },
     purple_charge: {
       src: 'Assets/Sound Effects/Skills/mixing.mp3',
-      volume: 4.8
+      volume: 5.0
     },
     purple_fire: {
       src: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
@@ -162,17 +174,25 @@ export const SKILL_SOUNDS = {
 
   // ── Sukuna ───────────────────────────
   22: {
+    domain_channel: {
+      src: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+      volume: 5.5
+    },
+    domain_activate: {
+      src: 'Assets/Sound Effects/Skills/shrine.mp3',
+      volume: 1.5
+    },
     divineflame: {
       src: 'Assets/Sound Effects/Skills/fugaignite.mp3',
-      volume: 1.0
+      volume: 2.0
     },
     fuga_fire: {
       src: 'Assets/Sound Effects/Skills/fuga.mp3',
-      volume: 1.5
+      volume: 3.5
     },
     fuga_travel: {
       src: 'Assets/Sound Effects/Skills/fugatravel.mp3',
-      volume: 1.0
+      volume: 1.5
     },
     fuga_explode: {
       src: 'Assets/Sound Effects/Skills/fugaexplode.mp3',

@@ -69,7 +69,7 @@ export function drawArena() {
 
   // Draw the arena boundary stroke
   ctx.strokeStyle = '#000000ff';
-  ctx.lineWidth = 3;
+  ctx.lineWidth = 6;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
 }
 
@@ -167,6 +167,8 @@ export function drawStormDimScreen() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
+let currentFurnaceDimOpacity = 0;
+
 /**
  * Draws a dark fiery dim screen overlay with flame lightning when Sukuna channels or fires Furnace (Fuga).
  */
@@ -174,36 +176,51 @@ export function drawFurnaceDimScreen() {
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
-  // Find Sukuna fighters channeling Furnace
+  // Find Sukuna fighters channeling Furnace or in post-fire recovery
   const sukunaFuga = state.fighters?.find(f => 
-    f && (f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && f.isChannelingDivineFlame
+    f && (f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
   );
   
   // Also check if Furnace fire arrow is actively flying
   const furnaceArrow = getProjectiles().find(p => (p.isSukunaFurnace || p.visual === 'sukunaFurnaceArrow') && p.life > 0);
 
-  if (!sukunaFuga && !furnaceArrow) return;
-
-  let opacity = 0.65;
+  let targetOpacity = 0;
   let cx = canvas.width / 2;
   let cy = canvas.height / 2;
 
   if (sukunaFuga) {
-    const progress = Math.min(1.0, sukunaFuga.divineFlameChargeTimer / Math.max(1, sukunaFuga.divineFlameChargeMax));
-    opacity = 0.25 + progress * 0.55;
     cx = sukunaFuga.x;
     cy = sukunaFuga.y;
+    if (sukunaFuga.isChannelingDivineFlame) {
+      const progress = Math.min(1.0, sukunaFuga.divineFlameChargeTimer / Math.max(1, sukunaFuga.divineFlameChargeMax));
+      targetOpacity = 0.25 + progress * 0.55;
+    } else if (sukunaFuga.divineFlameRecoveryTimer > 0) {
+      const maxRecovery = CONFIG.sukuna.divineFlameRecoveryTime || 60;
+      const recProgress = sukunaFuga.divineFlameRecoveryTimer / maxRecovery;
+      targetOpacity = 0.55 * recProgress;
+    }
   } else if (furnaceArrow) {
-    opacity = 0.45;
+    targetOpacity = 0.55;
     cx = furnaceArrow.x;
     cy = furnaceArrow.y;
   }
 
-  if (opacity < 0.02) return;
+  // Smoothly interpolate dim opacity for seamless fade-in and gradual fade-out
+  if (targetOpacity > currentFurnaceDimOpacity) {
+    currentFurnaceDimOpacity += (targetOpacity - currentFurnaceDimOpacity) * 0.15; // Smooth charge fade-in
+  } else {
+    currentFurnaceDimOpacity += (targetOpacity - currentFurnaceDimOpacity) * 0.06; // Smooth gradual fade-out
+  }
+
+  if (currentFurnaceDimOpacity < 0.01) {
+    currentFurnaceDimOpacity = 0;
+    return;
+  }
 
   ctx.save();
 
   // Dark fiery vignette gradient centered on Sukuna/Arrow
+  const opacity = currentFurnaceDimOpacity;
   const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, Math.max(canvas.width, canvas.height) * 0.95);
   grad.addColorStop(0, `rgba(255, 60, 0, ${opacity * 0.25})`);
   grad.addColorStop(0.3, `rgba(120, 20, 0, ${opacity * 0.65})`);
@@ -2136,6 +2153,7 @@ export function drawProjectiles() {
       ctx.save();
       
       const colorType = p.isGojoPurple ? 'purple' : 'blue';
+      const visualTime = p.visualTime || Date.now();
       
       // Calculate fade-out for purple orb when life is running out
       if (p.isGojoPurple) {
@@ -2149,11 +2167,11 @@ export function drawProjectiles() {
       
       // Draw custom trail for Purple orb - Hollow Purple effect
       if (p.isGojoPurple && p.history && p.history.length > 1) {
-        drawPurpleOrbTrail(ctx, p, Date.now());
+        drawPurpleOrbTrail(ctx, p, visualTime);
       }
       
       // Draw the highly detailed orb
-      drawGojoOrb(ctx, p.x, p.y, p.r, Date.now(), colorType, 0);
+      drawGojoOrb(ctx, p.x, p.y, p.r, visualTime, colorType, 0);
       
       ctx.restore();
       return;

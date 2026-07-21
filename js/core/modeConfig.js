@@ -4,6 +4,7 @@
 
 export const GAME_MODES = {
   ONE_VS_ONE: '1v1',
+  STAND_OFF: 'Stand Off',
   TWO_VS_TWO: '2v2',
   FFA: 'FFA',
   TLFS: 'TLFS',
@@ -14,6 +15,15 @@ export const MODE_SETTINGS = {
     label: '1v1',
     rounds: 3,
     hpMultiplier: 1.2,
+    speedMultiplier: 1.5,
+    initialFuelPickups: 2,
+    supportFourFighters: false,
+  },
+  [GAME_MODES.STAND_OFF]: {
+    label: 'Stand Off',
+    rounds: 1, // Only 1 round in Stand Off
+    hpMultiplier: 1.0,
+    fixedHp: 1200, // 1000 HP for both fighters
     speedMultiplier: 1.5,
     initialFuelPickups: 2,
     supportFourFighters: false,

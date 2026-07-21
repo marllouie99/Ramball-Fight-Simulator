@@ -123,7 +123,8 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0) {
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
-      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+      // Web Audio API supports gain values above 1.0 for amplification/boosting
+      gainNode.gain.value = Math.max(0, Math.min(15, volume));
       source.connect(gainNode);
       gainNode.connect(audioCtx.destination);
       source.playbackRate.value = Math.max(0.1, speed);
@@ -266,7 +267,8 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
-      gainNode.gain.value = Math.max(0, Math.min(1, volume));
+      // Web Audio API supports gain values above 1.0 for amplification/boosting
+      gainNode.gain.value = Math.max(0, Math.min(15, volume));
       source.connect(gainNode);
       gainNode.connect(audioCtx.destination);
       source.playbackRate.value = Math.max(0.1, speed);

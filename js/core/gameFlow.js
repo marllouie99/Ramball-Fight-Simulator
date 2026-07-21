@@ -48,6 +48,8 @@ export function resetFighter(fighter) {
 
 export function reinitFighters() {
   state.floatingTexts.length = 0;
+  if (state.bloodEffects) state.bloodEffects.length = 0;
+  if (state.sparkEffects) state.sparkEffects.length = 0;
   state.roundWinner = null;
   state.roundEndTimer = 0;
 
@@ -87,6 +89,14 @@ export function reinitFighters() {
     const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
     state.fighters[0].maxHp = fixedHp;
     state.fighters[0].hp = fixedHp;
+  } else if (MODE_SETTINGS[state.mode]?.fixedHp) {
+    const fixedHp = MODE_SETTINGS[state.mode].fixedHp;
+    state.fighters.forEach((f) => {
+      if (f) {
+        f.maxHp = fixedHp;
+        f.hp = fixedHp;
+      }
+    });
   }
 
   const arena = state.arena;
@@ -221,6 +231,13 @@ export function startNextRound() {
     return;
   }
 
+  const maxRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+  if (state.roundNum >= maxRounds) {
+    // Already at or past max rounds — end the match instead of starting a new round
+    resetMatch();
+    return;
+  }
+
   state.roundNum++;
   state.illusions = []; // Clear all illusions on new round
   reinitFighters();
@@ -244,6 +261,15 @@ export function restartCurrentRound() {
 export function startCountdown() {
   state.countdownTimer = 0;
   state.gameState = 'countdown';
+
+  // Initialize combat aura for Gojo/Sukuna during countdown
+  state.fighters.forEach(f => {
+    if (f && f._def && f._def.type === 'gojo') {
+      f.combatAuraOpacity = 1;
+    } else if (f && f._def && f._def.type === 'sukuna') {
+      f.combatAuraOpacity = 1;
+    }
+  });
 
   const maxRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
   let soundKey = null;

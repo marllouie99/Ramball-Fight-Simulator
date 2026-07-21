@@ -39,10 +39,12 @@ export class SukunaFighter extends Fighter {
     this.divineFlameRecoveryTimer = 0;
 
     // Domain Expansion: Malevolent Shrine (Ultimate)
-    this.domainCooldown = 1200; // Delay initial cast
+    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000; // Delay initial cast reads from CONFIG
     this.domainActive = false;
-    this.domainTimer = 0;
-    this.hasUsedDomain = false; // Ensures domain can only be cast once per round
+    this.isChannelingDomainExpansion = false;
+    this.domainChargeTimer = 0;
+    this.domainChargeMax = CONFIG.sukuna.domainChargeMax || 90; // 1.5 seconds channel
+    this.domainUseCount = 0; // Allows domain to be cast up to 2 times per round
     this.domainTimeInsideMap = new Map(); // Tracks enemy frames inside domain for ramping damage
 
     // Bleed debuff tracking
@@ -98,10 +100,13 @@ export class SukunaFighter extends Fighter {
     this.divineFlameChargeTimer = 0;
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 90;
     this.divineFlameRecoveryTimer = 0;
-    this.domainCooldown = 1200;
+
+    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000;
+    this.isChannelingDomainExpansion = false;
+    this.domainChargeTimer = 0;
     this.domainActive = false;
     this.domainTimer = 0;
-    this.hasUsedDomain = false;
+    this.domainUseCount = 0;
     if (this.domainTimeInsideMap) {
       this.domainTimeInsideMap.clear();
     } else {
@@ -217,6 +222,32 @@ export class SukunaFighter extends Fighter {
     if (this._slashSoundCooldown > 0) this._slashSoundCooldown--;
     if (this.slashGlowTimer > 0) this.slashGlowTimer--;
 
+    // Domain active state (Malevolent Shrine open-barrier domain slashes continue even if Sukuna is paralyzed by Unlimited Void)
+    if (this.domainActive) {
+      // Freeze domain duration timer while trapped in Gojo's Unlimited Void time stop so duration is not wasted!
+      if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer) {
+        this.domainTimer--;
+      }
+      if (this.domainTimer <= 0) {
+        this.domainActive = false;
+      } else {
+        this._applyDomainEffect(arena);
+        // Sukuna himself only unleashes active rapid slashes when not paralyzed
+        if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer) {
+          this._doDomainRapidSlashes(opponent, arena, ownerIndex);
+        }
+      }
+    }
+
+    // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during time stop
+    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
+      for (let i = this.slashHitVisuals.length - 1; i >= 0; i--) {
+        if (--this.slashHitVisuals[i].timer <= 0) {
+          this.slashHitVisuals.splice(i, 1);
+        }
+      }
+    }
+
     if (this._handleTimeStop()) return;
 
     // Update Sakuga impact frame timer
@@ -259,15 +290,6 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    // Update slash hit visuals (Ghost blade slashes)
-    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
-      for (let i = this.slashHitVisuals.length - 1; i >= 0; i--) {
-        if (--this.slashHitVisuals[i].timer <= 0) {
-          this.slashHitVisuals.splice(i, 1);
-        }
-      }
-    }
-
     // Melee mode state management (Gojo-style forced close combat)
     let distToOpponent = Infinity;
     if (opponent && !opponent.isDead) {
@@ -299,7 +321,10 @@ export class SukunaFighter extends Fighter {
     }
 
     if (this.combatAuraOpacity === undefined) this.combatAuraOpacity = 0;
-    if (inMeleeCombatMode) {
+    if (state.gameState === 'countdown') {
+      // Keep aura at full opacity during countdown for dramatic effect
+      this.combatAuraOpacity = 1.0;
+    } else if (inMeleeCombatMode) {
       this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.08);
     } else {
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.04);
@@ -323,7 +348,7 @@ export class SukunaFighter extends Fighter {
       this.divineFlameChargeTimer++;
 
       // Play "Fuga" voice line exactly 45 frames (0.75s) before firing
-      if (this.divineFlameChargeTimer === Math.max(1, this.divineFlameChargeMax - 70)) {
+      if (this.divineFlameChargeTimer === Math.max(1, this.divineFlameChargeMax - 100)) {
         const sound = getSkillSound(this._def?.id, 'fuga_fire');
         if (sound) playSound(sound.src, sound.volume);
       }
@@ -346,6 +371,41 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
+    // Handle Domain Expansion Channeling
+    if (this.isChannelingDomainExpansion) {
+      this.domainChargeTimer++;
+
+      // Stop all movement while channeling
+      this.vx = 0;
+      this.vy = 0;
+      this.applyMovementPhysics(0);
+
+      // Track opponent while channeling
+      if (opponent && !opponent.isDead) {
+        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      }
+
+      // ====================================================================
+      // AUDIO TIMING ADJUSTMENT FOR SHRINE.MP3
+      // Change '30' to adjust how many frames before the domain opens that the audio plays.
+      // 60 frames = 1 second. 
+      // If you want it to play right as the channel starts, set it to: this.domainChargeTimer === 1
+      // ====================================================================
+      const audioTriggerFrame = Math.max(1, this.domainChargeMax - 50);
+      if (this.domainChargeTimer === audioTriggerFrame) {
+        const activateSound = getSkillSound(this._def.id, 'domain_activate');
+        if (activateSound) playSound(activateSound.src, activateSound.volume);
+      }
+
+      if (this.domainChargeTimer >= this.domainChargeMax) {
+        this.isChannelingDomainExpansion = false;
+        this._activateDomain(arena);
+      }
+
+      this.resolveWallBounce(arena);
+      return;
+    }
+
     // Handle Divine Flame Post-Fire Recovery
     if (this.divineFlameRecoveryTimer > 0) {
       this.divineFlameRecoveryTimer--;
@@ -361,16 +421,9 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
-    // Domain active state
+    // Skip normal behavior while in Domain Expansion
     if (this.domainActive) {
-      this.domainTimer--;
-      if (this.domainTimer <= 0) {
-        this.domainActive = false;
-      } else {
-        this._applyDomainEffect(arena);
-        this._doDomainRapidSlashes(opponent, arena, ownerIndex);
-      }
-      return; // Skip normal behavior while in Domain Expansion
+      return;
     }
 
     // Check for Spiderweb (Skill 1 - Passive trigger)
@@ -708,14 +761,13 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    // Check for Domain Expansion (Ultimate) - only when not in flurry range & hasn't used domain yet
-    if (this.domainCooldown <= 0 && !this.domainActive && !this.hasUsedDomain && opponent && this.flurryHitsLeft <= 0) {
-      const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
-      const flurryRange = CONFIG.sukuna.flurryRange || 150;
-      // Only activate domain if opponent is outside flurry range
-      if (distSq > flurryRange ** 2) {
-        this._activateDomain(arena);
-      }
+    // Check for Domain Expansion (Ultimate)
+    if (this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
+      this.isChannelingDomainExpansion = true;
+      this.domainChargeTimer = 0;
+      triggerGlobalScreenShake(6, 90); // Tremble for the full 1.5 seconds
+      const channelSound = getSkillSound(this._def.id, 'domain_channel');
+      if (channelSound) playSound(channelSound.src, channelSound.volume);
     }
 
     // Handle Melee Combat Mode vs Ranged Mode
@@ -969,7 +1021,7 @@ export class SukunaFighter extends Fighter {
       stopLoopingSound(this.fugaSoundKey);
       this.fugaSoundKey = null;
     }
-    
+
     // Play the Fuga travel/unleash audio
     const sound = getSkillSound(this._def?.id, 'fuga_travel');
     if (sound) playSound(sound.src, sound.volume);
@@ -1021,7 +1073,7 @@ export class SukunaFighter extends Fighter {
 
   _activateDomain(arena) {
     this.domainActive = true;
-    this.hasUsedDomain = true;
+    this.domainUseCount++;
     this.domainTimer = CONFIG.sukuna.domainDuration || 180;
     this.domainCooldown = CONFIG.sukuna.domainCooldown || 1500;
 
@@ -1047,8 +1099,13 @@ export class SukunaFighter extends Fighter {
   _doDomainRapidSlashes(opponent, arena, ownerIndex) {
     if (!opponent || opponent.isDead) return;
 
+    const isFrozen = (this.timeStopTimer > 0) || (this.electricStunTimer > 0) || (this.crimsonElectrifiedTimer > 0);
+
     if (this.rapidSlashTimer === undefined || this.rapidSlashTimer <= 0) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      const aimAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      if (!isFrozen) {
+        this.gunAngle = aimAngle;
+      }
 
       const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
       const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
@@ -1064,7 +1121,7 @@ export class SukunaFighter extends Fighter {
           'ghostBlade',
           this.x,
           this.y,
-          this.gunAngle
+          aimAngle
         );
       }
 
@@ -1073,7 +1130,7 @@ export class SukunaFighter extends Fighter {
       spawnSparks(opponent.x, opponent.y, 20, 'crimsonSniper', '#8B0000');
       this.slashGlowTimer = 25;
 
-      const cleaveAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      const cleaveAngle = aimAngle;
       opponent.vx += Math.cos(cleaveAngle) * 3;
       opponent.vy += Math.sin(cleaveAngle) * 3;
 
@@ -1081,7 +1138,7 @@ export class SukunaFighter extends Fighter {
       this.slashHitVisuals.push({
         x: opponent.x,
         y: opponent.y,
-        angle: this.gunAngle,
+        angle: aimAngle,
         timer: 12,
         maxTimer: 12,
         scale: 1.0 + Math.random() * 0.3
@@ -1095,35 +1152,41 @@ export class SukunaFighter extends Fighter {
 
       spawnImpactFlash(this.x, this.y, 15, 'crimsonSniper');
 
-      const oldX = this.x;
-      const oldY = this.y;
+      if (!isFrozen) {
+        const oldX = this.x;
+        const oldY = this.y;
 
-      const teleportAngle = Math.random() * Math.PI * 2;
-      const teleportDist = 120 + Math.random() * 150; // Increased teleport distance in Domain
-      this.x = this.x + Math.cos(teleportAngle) * teleportDist;
-      this.y = this.y + Math.sin(teleportAngle) * teleportDist;
+        const teleportAngle = Math.random() * Math.PI * 2;
+        const teleportDist = 120 + Math.random() * 150; // Increased teleport distance in Domain
+        this.x = this.x + Math.cos(teleportAngle) * teleportDist;
+        this.y = this.y + Math.sin(teleportAngle) * teleportDist;
 
-      // Clamp to arena bounds
-      this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
-      this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
+        // Clamp to arena bounds
+        if (arena) {
+          this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
+          this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
+        }
 
-      if (!this.afterImages) this.afterImages = [];
-      this.afterImages.push({ x: oldX, y: oldY, timer: 10 });
+        if (!this.afterImages) this.afterImages = [];
+        this.afterImages.push({ x: oldX, y: oldY, timer: 10 });
 
-      spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-      spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
+        spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+        spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
 
-      if (typeof this.applyTimeStop === 'function') this.applyTimeStop(4);
+        if (typeof this.applyTimeStop === 'function') this.applyTimeStop(4);
+      }
 
       this.rapidSlashTimer = CONFIG.sukuna.domainRapidSlashCooldown || 10;
     } else {
       this.rapidSlashTimer--;
     }
 
-    this.vx = 0;
-    this.vy = 0;
-    this.applyMovementPhysics(0);
-    this.resolveWallBounce(arena, opponent);
+    if (!isFrozen) {
+      this.vx = 0;
+      this.vy = 0;
+      this.applyMovementPhysics(0);
+      this.resolveWallBounce(arena, opponent);
+    }
 
     // Update visuals
     if (this.afterImages) {
@@ -1144,9 +1207,10 @@ export class SukunaFighter extends Fighter {
     const domainDamageInterval = CONFIG.sukuna.domainDamageInterval || 8;
 
     if (!this.domainTimeInsideMap) this.domainTimeInsideMap = new Map();
+    this._domainFrame = (this._domainFrame || 0) + 1;
 
     // Apply damage every few frames to all enemies in the arena
-    if (this.domainTimer % domainDamageInterval === 0) {
+    if (this._domainFrame % domainDamageInterval === 0) {
       let playedSwordSwing = false;
       if (this._slashSoundCooldown === undefined || this._slashSoundCooldown <= 0) {
         playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
@@ -1178,6 +1242,10 @@ export class SukunaFighter extends Fighter {
       }
 
       let hitEnemyThisTick = false;
+      const ownerIdx = state.fighters.indexOf(this);
+      const shrineX = this.domainX || this.x;
+      const shrineY = this.domainY || this.y;
+
       state.fighters.forEach((f, idx) => {
         if (f && f !== this && f.hp > 0) {
           const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
@@ -1192,6 +1260,24 @@ export class SukunaFighter extends Fighter {
 
             f.takeDamage(finalDamage, this, { isDomain: true, bypassShield: true });
             f.applyHitStun(6);
+
+            // Fire visible slash projectile from Malevolent Shrine toward enemy
+            if (projectileSystem) {
+              const angle = Math.atan2(f.y - shrineY, f.x - shrineX);
+              const slashSpeed = (CONFIG.sukuna.slashSpeed || 15) * 1.3;
+              projectileSystem.fireProjectile(
+                this,
+                ownerIdx,
+                0, // Damage is dealt directly above
+                false,
+                slashSpeed,
+                false,
+                'ghostBlade',
+                shrineX,
+                shrineY,
+                angle
+              );
+            }
 
             if (Math.random() < 0.6) {
               spawnSparks(f.x, f.y, 4, 'crimsonSniper', '#8B0000');
@@ -1226,11 +1312,14 @@ export class SukunaFighter extends Fighter {
 
   draw(ctx) {
     // Render Cursed Energy Aura BEHIND body and weapon constructs
+    // Also show during countdown for dramatic effect
     if (this.rctVisualTimer > 0) {
       this._drawSukunaCursedEnergyAura(ctx, 'rct');
     } else if (this.isChannelingDivineFlame || this.divineFlameRecoveryTimer > 0) {
       this._drawSukunaCursedEnergyAura(ctx, 'fuga');
-    } else if (this.combatAuraOpacity > 0) {
+    } else if (this.isChannelingDomainExpansion) {
+      this._drawSukunaCursedEnergyAura(ctx, 'domain');
+    } else if (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal) {
       this._drawSukunaCursedEnergyAura(ctx, 'red');
     }
 
@@ -1242,7 +1331,7 @@ export class SukunaFighter extends Fighter {
     super.draw(ctx);
 
     // Render high-intensity cursed energy flash on Sukuna's hands when unleashing slashes
-    this._drawHandCursedEnergy(ctx);
+    // this._drawHandCursedEnergy(ctx);
 
     // Draw Sakuga Anime Impact Frame (red/black ink impact)
     if (this.sakugaImpactTimer > 0) {
@@ -1606,6 +1695,9 @@ export class SukunaFighter extends Fighter {
         const maxTime = this.divineFlameChargeMax || 150;
         progress = Math.min(1.0, Math.max(0, (this.divineFlameChargeTimer / maxTime) || 1));
       }
+    } else if (colorTheme === 'domain') {
+      const maxTime = this.domainChargeMax || 90;
+      progress = Math.min(1.0, Math.max(0, (this.domainChargeTimer / maxTime) || 1));
     } else {
       progress = Math.min(1, Math.max(0, this.combatAuraOpacity || 0));
     }
@@ -1614,7 +1706,13 @@ export class SukunaFighter extends Fighter {
 
     // Stepped 30-frame anime animation loop (30 FPS Sakuga frame rate)
     const frameRate = 30;
-    const frameIndex = Math.floor((Date.now() / 1000) * frameRate) % 30;
+    if (this.timeStopTimer > 0 && typeof this._timeStopFrozenTime !== 'number') {
+      this._timeStopFrozenTime = Date.now();
+    } else if (this.timeStopTimer <= 0) {
+      delete this._timeStopFrozenTime;
+    }
+    const nowTime = (this.timeStopTimer > 0 && this._timeStopFrozenTime !== undefined) ? this._timeStopFrozenTime : Date.now();
+    const frameIndex = Math.floor((nowTime / 1000) * frameRate) % 30;
     const time = frameIndex * 120;
 
     ctx.save();
@@ -1636,13 +1734,52 @@ export class SukunaFighter extends Fighter {
     if (isRCT) {
       mainColor = '#32CD32';
       fillColor = `rgba(50, 205, 50, ${0.25 * progress})`;
-      coreColor = `rgba(144, 238, 144, ${0.25 * progress})`;
+      coreColor = `rgba(0, 100, 0, ${0.30 * progress})`;
       wispColor = '#00FF7F';
     } else if (isFuga) {
       mainColor = '#FF4500';
-      fillColor = `rgba(255, 69, 0, ${0.35 * progress})`;
-      coreColor = `rgba(255, 140, 0, ${0.4 * progress})`;
+      fillColor = `rgba(255, 69, 0, ${0.20 * progress})`;
+      coreColor = `rgba(200, 40, 0, ${0.25 * progress})`;
       wispColor = '#FFD700';
+    } else if (colorTheme === 'domain') {
+      mainColor = '#4B0082'; // Indigo/Dark Purple
+      fillColor = `rgba(0, 0, 0, ${0.85 * progress})`; // Almost solid black
+      coreColor = `rgba(139, 0, 0, ${0.90 * progress})`; // Solid blood red core
+      wispColor = '#8B0000';
+
+      // Draw persistent text over his head
+      ctx.save();
+      ctx.font = 'bold 24px Arial';
+      ctx.fillStyle = `rgba(220, 20, 60, ${progress})`; // Crimson text fading in
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      const textY = -r - 50 - (Math.sin(Date.now() / 150) * 5); // Floating effect
+      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
+      ctx.fillText('DOMAIN EXPANSION', 0, textY);
+      ctx.restore();
+
+      // Draw graphic ring on the ground
+      ctx.save();
+      ctx.scale(1, 0.4); // Isometric perspective
+      const ringRadius = 160 * progress; // Expands outwards
+
+      // Outer blood ring
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = `rgba(139, 0, 0, ${progress})`;
+      ctx.stroke();
+
+      // Inner rotating dashed indigo ring
+      ctx.rotate(Date.now() / 300);
+      ctx.beginPath();
+      ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
+      ctx.setLineDash([15, 15]);
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = `rgba(75, 0, 130, ${progress * 1.2})`;
+      ctx.stroke();
+      ctx.restore();
     }
 
     const strokeColor = '#000000';
@@ -1768,7 +1905,8 @@ export class SukunaFighter extends Fighter {
     }
     ctx.globalAlpha = 1.0;
 
-    // Soft rising flame wisps (smooth curves, bright red-orange)
+    // Soft rising flame wisps (smooth curves, bright red-orange) (Removed to prevent wiggling lines)
+    /*
     ctx.strokeStyle = wispColor;
     ctx.lineWidth = 2;
     ctx.globalAlpha = 0.65 * progress;
@@ -1788,264 +1926,740 @@ export class SukunaFighter extends Fighter {
       );
       ctx.stroke();
     }
+    */
+    ctx.restore();
+  }
+
+  // Helper method to render detailed realistic human & demon skulls
+  _drawRealisticSkull(ctx, sx, sy, scale = 1.0, isDemon = false) {
+    ctx.save();
+    ctx.translate(sx, sy);
+    ctx.scale(scale, scale);
+
+    // Cranium bone gradient fill
+    const craniumGlow = ctx.createRadialGradient(-1, -2, 1, 0, 0, 7);
+    craniumGlow.addColorStop(0, '#F5EFE6');
+    craniumGlow.addColorStop(0.7, '#D4C7B4');
+    craniumGlow.addColorStop(1, '#8A7A68');
+
+    ctx.fillStyle = craniumGlow;
+    ctx.strokeStyle = '#1F140A';
+    ctx.lineWidth = 1.1;
+
+    // Anatomical Human Skull Outline (Cranium + Zygomatic Arches + Maxilla/Mandible)
+    ctx.beginPath();
+    ctx.moveTo(-4.5, -2.5);
+    ctx.quadraticCurveTo(-6.5, -9, 0, -10); // Top cranium dome
+    ctx.quadraticCurveTo(6.5, -9, 4.5, -2.5);
+    ctx.lineTo(5.5, 1); // Right cheekbone
+    ctx.lineTo(3.8, 2);
+    ctx.lineTo(3.8, 6.5); // Right upper jaw
+    ctx.lineTo(2.2, 8.5); // Right mandible base
+    ctx.lineTo(-2.2, 8.5); // Left mandible base
+    ctx.lineTo(-3.8, 6.5); // Left upper jaw
+    ctx.lineTo(-3.8, 2);
+    ctx.lineTo(-5.5, 1); // Left cheekbone
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Dark Hollow Anatomical Eye Sockets
+    ctx.fillStyle = '#180002';
+    // Left socket
+    ctx.beginPath();
+    ctx.moveTo(-1.8, -3.8);
+    ctx.lineTo(-5, -3.2);
+    ctx.lineTo(-4.2, -0.2);
+    ctx.lineTo(-1.6, -1.2);
+    ctx.closePath();
+    ctx.fill();
+    // Right socket
+    ctx.beginPath();
+    ctx.moveTo(1.8, -3.8);
+    ctx.lineTo(5, -3.2);
+    ctx.lineTo(4.2, -0.2);
+    ctx.lineTo(1.6, -1.2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Inverted Heart / Triangular Nasal Cavity
+    ctx.beginPath();
+    ctx.moveTo(0, 0.5);
+    ctx.lineTo(-1.1, 2.5);
+    ctx.lineTo(1.1, 2.5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Teeth division lines along maxilla & jaw
+    ctx.strokeStyle = '#2B1A0C';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-2.8, 4.8); ctx.lineTo(2.8, 4.8);
+    for (let tx = -2; tx <= 2; tx += 1) {
+      ctx.moveTo(tx, 3.5); ctx.lineTo(tx, 6.5);
+    }
+    ctx.stroke();
+
+    // Demon / Ox Horns attached to skull if specified
+    if (isDemon) {
+      ctx.fillStyle = '#221208';
+      ctx.strokeStyle = '#050201';
+      ctx.lineWidth = 1;
+
+      // Left Demon Horn
+      ctx.beginPath();
+      ctx.moveTo(-4.5, -5.5);
+      ctx.quadraticCurveTo(-10, -11, -8, -14);
+      ctx.quadraticCurveTo(-5.5, -9, -2.5, -7.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Right Demon Horn
+      ctx.beginPath();
+      ctx.moveTo(4.5, -5.5);
+      ctx.quadraticCurveTo(10, -11, 8, -14);
+      ctx.quadraticCurveTo(5.5, -9, 2.5, -7.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+
     ctx.restore();
   }
 
   // Helper method to render the Malevolent Shrine structure
   _drawShrineBody(ctx) {
+    if (!this._shrineCacheCanvas) {
+      this._shrineCacheCanvas = document.createElement('canvas');
+      this._shrineCacheCanvas.width = 360;
+      this._shrineCacheCanvas.height = 420;
+      const offCtx = this._shrineCacheCanvas.getContext('2d');
+      offCtx.translate(180, 230);
+      this._renderFullShrineToContext(offCtx);
+    }
+
+    ctx.drawImage(this._shrineCacheCanvas, -180, -230);
+  }
+
+  // Pre-rendered vector graphics for Malevolent Shrine (cached to offscreen canvas)
+  _renderFullShrineToContext(ctx) {
     // Shrine Ambient Backing Glow & Shadows
-    const bgGlow = ctx.createRadialGradient(0, -20, 10, 0, -20, 90);
-    bgGlow.addColorStop(0, 'rgba(255, 30, 0, 0.55)');
-    bgGlow.addColorStop(0.5, 'rgba(120, 0, 0, 0.35)');
+    const bgGlow = ctx.createRadialGradient(0, -35, 15, 0, -35, 110);
+    bgGlow.addColorStop(0, 'rgba(255, 30, 0, 0.65)');
+    bgGlow.addColorStop(0.5, 'rgba(120, 0, 0, 0.4)');
     bgGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = bgGlow;
     ctx.beginPath();
-    ctx.arc(0, -20, 90, 0, Math.PI * 2);
+    ctx.arc(0, -35, 110, 0, Math.PI * 2);
     ctx.fill();
 
-    // ── SKULLS SCATTERED AROUND THE BASE ──
-    const skullPositions = [
-      { x: -55, y: 12, s: 5 }, { x: -42, y: 16, s: 4 }, { x: -30, y: 14, s: 5.5 },
-      { x: -18, y: 17, s: 4 }, { x: -8, y: 15, s: 5 }, { x: 8, y: 16, s: 4.5 },
-      { x: 20, y: 14, s: 5 }, { x: 32, y: 17, s: 4 }, { x: 45, y: 13, s: 5.5 },
-      { x: 57, y: 15, s: 4.5 }, { x: -65, y: 10, s: 3.5 }, { x: 65, y: 11, s: 3.5 },
-      { x: -48, y: 20, s: 3 }, { x: 0, y: 19, s: 3.5 }, { x: 50, y: 20, s: 3 },
-    ];
-    skullPositions.forEach(sk => {
-      ctx.fillStyle = '#C8BEB0';
-      ctx.strokeStyle = '#1A1008';
+    // ── SIDE PROFILE MOUTHS (Flanking the Shrine Behind Pillars) ──
+    const drawSideMouth = (cx, cy, isLeft) => {
+      ctx.save();
+      ctx.translate(cx, cy);
+      const scaleX = isLeft ? 1 : -1;
+      ctx.scale(scaleX * 0.85, 0.85); // Slightly larger scale
+
+      // Side Teeth (Square human teeth following the curve) — BIGGER
+      ctx.fillStyle = '#F5EFE6';
+      ctx.strokeStyle = '#2B1B10';
       ctx.lineWidth = 1;
-      // Skull cranium
-      ctx.beginPath();
-      ctx.arc(sk.x, sk.y, sk.s, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      // Jaw
-      ctx.beginPath();
-      ctx.arc(sk.x, sk.y + sk.s * 0.6, sk.s * 0.7, 0, Math.PI);
-      ctx.fill();
-      ctx.stroke();
-      // Eye sockets
-      ctx.fillStyle = '#1A0000';
-      ctx.beginPath();
-      ctx.arc(sk.x - sk.s * 0.3, sk.y - sk.s * 0.15, sk.s * 0.22, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(sk.x + sk.s * 0.3, sk.y - sk.s * 0.15, sk.s * 0.22, 0, Math.PI * 2);
-      ctx.fill();
-    });
 
-    // ── SHRINE PILLARS (Dark Vermilion Pillars) ──
-    ctx.fillStyle = '#4A080A';
-    ctx.strokeStyle = '#000000';
+      // Upper Side Teeth — bigger
+      const upperTeeth = [
+        { x: -8, y: -26, w: 6, h: 16, ang: 0.05 },
+        { x: 0, y: -24, w: 6, h: 15, ang: 0.2 },
+        { x: 8, y: -20, w: 6, h: 14, ang: 0.4 },
+        { x: 16, y: -15, w: 5.5, h: 13, ang: 0.6 },
+        { x: 23, y: -9, w: 5.5, h: 12, ang: 0.8 },
+        { x: 29, y: -3, w: 5, h: 10, ang: 1.0 }
+      ];
+      upperTeeth.forEach(t => {
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.rotate(t.ang);
+        ctx.fillStyle = '#F5EFE6';
+        ctx.fillRect(-t.w / 2, 0, t.w, t.h);
+        ctx.strokeRect(-t.w / 2, 0, t.w, t.h);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.fillRect(-t.w / 2 + 1, 1, t.w - 2, 3);
+        ctx.restore();
+      });
+
+      // Lower Side Teeth — bigger
+      const lowerTeeth = [
+        { x: -8, y: 26, w: 6, h: 16, ang: -0.05 },
+        { x: 0, y: 24, w: 6, h: 15, ang: -0.2 },
+        { x: 8, y: 20, w: 6, h: 14, ang: -0.4 },
+        { x: 16, y: 15, w: 5.5, h: 13, ang: -0.6 },
+        { x: 23, y: 9, w: 5.5, h: 12, ang: -0.8 },
+        { x: 29, y: 3, w: 5, h: 10, ang: -1.0 }
+      ];
+      lowerTeeth.forEach(t => {
+        ctx.save();
+        ctx.translate(t.x, t.y);
+        ctx.rotate(t.ang);
+        ctx.fillStyle = '#F5EFE6';
+        ctx.fillRect(-t.w / 2, -t.h, t.w, t.h);
+        ctx.strokeRect(-t.w / 2, -t.h, t.w, t.h);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.fillRect(-t.w / 2 + 1, -t.h + 1, t.w - 2, 3);
+        ctx.restore();
+      });
+
+      ctx.restore();
+    };
+
+    // Draw Left & Right Side Mouths (Behind the Pillars)
+    drawSideMouth(-58, -8, true);
+    drawSideMouth(58, -8, false);
+
+    // ── SHRINE VERMILION PILLARS & LINTEL ──
+    ctx.fillStyle = '#5A0A0C';
+    ctx.strokeStyle = '#1A0000';
     ctx.lineWidth = 2;
-    ctx.fillRect(-42, -38, 8, 55);
-    ctx.strokeRect(-42, -38, 8, 55);
-    ctx.fillRect(34, -38, 8, 55);
-    ctx.strokeRect(34, -38, 8, 55);
+    // Left & Right Main Columns
+    ctx.fillRect(-44, -40, 9, 58);
+    ctx.strokeRect(-44, -40, 9, 58);
+    ctx.fillRect(35, -40, 9, 58);
+    ctx.strokeRect(35, -40, 9, 58);
 
-    // ── OPEN MOUTH WITH TEETH (replacing the door) ──
-    // Outer lip shape — upper lip arch
-    ctx.fillStyle = '#3A0008';
+    // Inner Vermilion Accents & Gold Capitals
+    ctx.fillStyle = '#D4AF37';
+    ctx.fillRect(-45, -42, 11, 4);
+    ctx.fillRect(34, -42, 11, 4);
+
+    // Horizontal Lintel Beam above mouth
+    ctx.fillStyle = '#3D0608';
+    ctx.fillRect(-45, -42, 90, 8);
+    ctx.strokeRect(-45, -42, 90, 8);
+    ctx.fillStyle = '#B8860B';
+    ctx.fillRect(-43, -39, 86, 2);
+
+    // ── OPEN MOUTH MAW WITH SQUARE HUMAN TEETH ──
+    // Lip / Fleshy Border
+    ctx.fillStyle = '#2D0204';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(-34, -5);
-    ctx.quadraticCurveTo(-34, -35, 0, -38);
-    ctx.quadraticCurveTo(34, -35, 34, -5);
-    ctx.lineTo(34, 10);
-    ctx.quadraticCurveTo(20, 18, 0, 20);
-    ctx.quadraticCurveTo(-20, 18, -34, 10);
+    ctx.moveTo(-35, -8);
+    ctx.quadraticCurveTo(-35, -36, 0, -38);
+    ctx.quadraticCurveTo(35, -36, 35, -8);
+    ctx.lineTo(35, 12);
+    ctx.quadraticCurveTo(20, 20, 0, 22);
+    ctx.quadraticCurveTo(-20, 20, -35, 12);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Deep red throat void inside the mouth
-    const throatGlow = ctx.createRadialGradient(0, -8, 3, 0, -5, 28);
-    throatGlow.addColorStop(0, 'rgba(255, 40, 10, 0.9)');
-    throatGlow.addColorStop(0.4, 'rgba(180, 10, 0, 0.7)');
-    throatGlow.addColorStop(1, 'rgba(10, 0, 0, 0.95)');
+    // Deep Red / Crimson Throat Cavity
+    const throatGlow = ctx.createRadialGradient(0, -6, 4, 0, -4, 30);
+    throatGlow.addColorStop(0, 'rgba(255, 30, 10, 0.95)');
+    throatGlow.addColorStop(0.45, 'rgba(160, 8, 0, 0.85)');
+    throatGlow.addColorStop(1, 'rgba(5, 0, 0, 0.98)');
     ctx.fillStyle = throatGlow;
     ctx.beginPath();
-    ctx.moveTo(-28, -3);
-    ctx.quadraticCurveTo(-28, -28, 0, -32);
-    ctx.quadraticCurveTo(28, -28, 28, -3);
-    ctx.lineTo(28, 6);
-    ctx.quadraticCurveTo(15, 12, 0, 14);
-    ctx.quadraticCurveTo(-15, 12, -28, 6);
+    ctx.moveTo(-30, -5);
+    ctx.quadraticCurveTo(-30, -30, 0, -33);
+    ctx.quadraticCurveTo(30, -30, 30, -5);
+    ctx.lineTo(30, 8);
+    ctx.quadraticCurveTo(16, 14, 0, 16);
+    ctx.quadraticCurveTo(-16, 14, -30, 8);
     ctx.closePath();
     ctx.fill();
 
-    // Upper teeth (jagged fangs hanging down)
-    ctx.fillStyle = '#E8DDD0';
-    ctx.strokeStyle = '#2A1A08';
+    // ── SQUARE / RECTANGULAR HUMAN TEETH ──
+    // Upper Human Teeth (6 large teeth along upper jaw arch)
+    const upperTeethSquare = [
+      { x: -22, w: 8, h: 14 }, { x: -13, w: 8, h: 15 }, { x: -4, w: 8, h: 16 },
+      { x: 4, w: 8, h: 16 }, { x: 13, w: 8, h: 15 }, { x: 22, w: 8, h: 14 }
+    ];
+
+    // Lower Human Teeth (6 large teeth along lower jaw arch)
+    const lowerTeethSquare = [
+      { x: -20, w: 8, h: 13 }, { x: -11, w: 8, h: 14 }, { x: -3, w: 8, h: 15 },
+      { x: 5, w: 8, h: 15 }, { x: 13, w: 8, h: 14 }, { x: 21, w: 8, h: 13 }
+    ];
+    upperTeethSquare.forEach(t => {
+      ctx.fillStyle = '#F5EFE6';
+      ctx.strokeStyle = '#2B1B10';
+      ctx.lineWidth = 1;
+      const topY = -29;
+      // Draw rounded rectangular tooth
+      const cornerR = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(t.x - t.w / 2 + cornerR, topY);
+      ctx.lineTo(t.x + t.w / 2 - cornerR, topY);
+      ctx.quadraticCurveTo(t.x + t.w / 2, topY, t.x + t.w / 2, topY + cornerR);
+      ctx.lineTo(t.x + t.w / 2, topY + t.h - cornerR);
+      ctx.quadraticCurveTo(t.x + t.w / 2, topY + t.h, t.x + t.w / 2 - cornerR, topY + t.h);
+      ctx.lineTo(t.x - t.w / 2 + cornerR, topY + t.h);
+      ctx.quadraticCurveTo(t.x - t.w / 2, topY + t.h, t.x - t.w / 2, topY + t.h - cornerR);
+      ctx.lineTo(t.x - t.w / 2, topY + cornerR);
+      ctx.quadraticCurveTo(t.x - t.w / 2, topY, t.x - t.w / 2 + cornerR, topY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Tooth enamel gradient highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillRect(t.x - t.w / 2 + 1, topY + 1, t.w - 2, 3);
+    });
+
+
+
+    lowerTeethSquare.forEach(t => {
+      ctx.fillStyle = '#F5EFE6';
+      ctx.strokeStyle = '#2B1B10';
+      ctx.lineWidth = 1;
+      const botY = 12;
+      const cornerR = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(t.x - t.w / 2 + cornerR, botY - t.h);
+      ctx.lineTo(t.x + t.w / 2 - cornerR, botY - t.h);
+      ctx.quadraticCurveTo(t.x + t.w / 2, botY - t.h, t.x + t.w / 2, botY - t.h + cornerR);
+      ctx.lineTo(t.x + t.w / 2, botY - cornerR);
+      ctx.quadraticCurveTo(t.x + t.w / 2, botY, t.x + t.w / 2 - cornerR, botY);
+      ctx.lineTo(t.x - t.w / 2 + cornerR, botY);
+      ctx.quadraticCurveTo(t.x - t.w / 2, botY, t.x - t.w / 2, botY - cornerR);
+      ctx.lineTo(t.x - t.w / 2, botY - t.h + cornerR);
+      ctx.quadraticCurveTo(t.x - t.w / 2, botY - t.h, t.x - t.w / 2 + cornerR, botY - t.h);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Enamel highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.fillRect(t.x - t.w / 2 + 1, botY - t.h + 1, t.w - 2, 3);
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── REDESIGNED ANIME-ACCURATE MALEVOLENT SHRINE ROOF ──
+    // ══════════════════════════════════════════════════════════════════════
+
+    // ── 1. UNDER-EAVE BRACKET CLUSTERS & WOODEN RAFTERS (Doukyou / Tokyou) ──
+    ctx.fillStyle = '#2A0406';
+    for (let rx = -68; rx <= 68; rx += 8) {
+      ctx.fillRect(rx - 2, -48, 4, 10);
+    }
+    ctx.fillStyle = '#D4AF37'; // Golden bracket ends
+    for (let rx = -64; rx <= 64; rx += 16) {
+      ctx.fillRect(rx - 2.5, -43, 5, 3);
+    }
+    // Horizontal support beam under eaves
+    ctx.fillStyle = '#3D0608';
+    ctx.fillRect(-70, -48, 140, 4);
+    ctx.strokeStyle = '#B8860B';
     ctx.lineWidth = 1;
-    const upperTeeth = [
-      { x: -24, w: 6, h: 10 }, { x: -16, w: 5, h: 13 }, { x: -9, w: 6, h: 9 },
-      { x: -2, w: 5, h: 14 }, { x: 4, w: 6, h: 10 }, { x: 11, w: 5, h: 13 },
-      { x: 18, w: 6, h: 9 }, { x: 24, w: 5, h: 11 },
-    ];
-    upperTeeth.forEach(t => {
-      ctx.beginPath();
-      ctx.moveTo(t.x - t.w / 2, -28);
-      ctx.lineTo(t.x, -28 + t.h);
-      ctx.lineTo(t.x + t.w / 2, -28);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    });
+    ctx.strokeRect(-70, -48, 140, 4);
 
-    // Lower teeth (pointing upward from the bottom jaw)
-    const lowerTeeth = [
-      { x: -22, w: 5, h: 8 }, { x: -14, w: 6, h: 11 }, { x: -6, w: 5, h: 7 },
-      { x: 2, w: 6, h: 12 }, { x: 10, w: 5, h: 8 }, { x: 17, w: 6, h: 10 },
-      { x: 24, w: 5, h: 7 },
-    ];
-    lowerTeeth.forEach(t => {
-      ctx.beginPath();
-      ctx.moveTo(t.x - t.w / 2, 10);
-      ctx.lineTo(t.x, 10 - t.h);
-      ctx.lineTo(t.x + t.w / 2, 10);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-    });
-
-    // ── MAIN PAGODA ROOF (Lower tier) ──
-    ctx.fillStyle = '#1A0406';
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 2. MAIN LOWER ROOF TIER — Wide Sweeping Concave Eaves ──
+    // ══════════════════════════════════════════════════════════════════════
+    // Heavy, imposing overhang with flared eave tips curving up at corners
+    const lowerRoofGrad = ctx.createLinearGradient(0, -72, 0, -44);
+    lowerRoofGrad.addColorStop(0, '#2A0204');
+    lowerRoofGrad.addColorStop(0.4, '#4A0608');
+    lowerRoofGrad.addColorStop(0.8, '#5A0A0C');
+    lowerRoofGrad.addColorStop(1, '#3A0406');
+    ctx.fillStyle = lowerRoofGrad;
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2.5;
+
     ctx.beginPath();
-    ctx.moveTo(-60, -38);
-    ctx.quadraticCurveTo(-28, -50, 0, -55);
-    ctx.quadraticCurveTo(28, -50, 60, -38);
-    ctx.lineTo(52, -46);
-    ctx.quadraticCurveTo(22, -58, 0, -62);
-    ctx.quadraticCurveTo(-22, -58, -52, -46);
+    // Bottom eave edge — wide sweeping concave curve (sags down in center, flares at tips)
+    ctx.moveTo(-90, -52);                          // Far left eave tip (flared out)
+    ctx.quadraticCurveTo(-70, -40, -40, -38);      // Left droop down
+    ctx.quadraticCurveTo(0, -34, 40, -38);         // Center sag (concave belly)
+    ctx.quadraticCurveTo(70, -40, 90, -52);        // Right flare up
+    // Right upturned eave corner (dramatic curl upward)
+    ctx.quadraticCurveTo(86, -60, 78, -58);
+    // FLAT RIDGE running across the top
+    ctx.lineTo(68, -68);
+    ctx.lineTo(-68, -68);
+    ctx.lineTo(-78, -58);
+    // Left upturned eave corner
+    ctx.quadraticCurveTo(-86, -60, -90, -52);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // ── UPPER TIER ROOF GABLE ──
-    ctx.fillStyle = '#120203';
+    // Layered roof tile ridges for depth (horizontal lines on lower roof)
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = 1;
+    for (let ridgeY = -66; ridgeY <= -42; ridgeY += 5) {
+      const spread = 0.6 + (ridgeY + 68) / 26 * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(-85 * spread, ridgeY);
+      ctx.quadraticCurveTo(0, ridgeY + 4 * spread, 85 * spread, ridgeY);
+      ctx.stroke();
+    }
+
+    // Vertical tile texture lines (fan out from ridge to eave)
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1;
+    for (let tx = -60; tx <= 60; tx += 7) {
+      ctx.beginPath();
+      const topX = tx * 0.82;
+      const topY = -67;
+      const botX = tx * 1.2;
+      const eaveY = -38 + Math.abs(tx) * 0.18;
+      ctx.moveTo(topX, topY);
+      ctx.lineTo(botX, eaveY);
+      ctx.stroke();
+    }
+
+    // Gold trim along bottom eave edge
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.moveTo(-38, -60);
-    ctx.quadraticCurveTo(-18, -75, 0, -82);
-    ctx.quadraticCurveTo(18, -75, 38, -60);
-    ctx.lineTo(30, -68);
-    ctx.quadraticCurveTo(14, -82, 0, -88);
-    ctx.quadraticCurveTo(-14, -82, -30, -68);
+    ctx.moveTo(-90, -52);
+    ctx.quadraticCurveTo(-70, -40, -40, -38);
+    ctx.quadraticCurveTo(0, -34, 40, -38);
+    ctx.quadraticCurveTo(70, -40, 90, -52);
+    ctx.stroke();
+
+    // Secondary gold trim along flat ridge top
+    ctx.strokeStyle = '#B8860B';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-68, -68);
+    ctx.lineTo(68, -68);
+    ctx.stroke();
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 3. UPPER TIER GABLE ROOF (Chidori Hafu / Triangular Peak) ──
+    // ══════════════════════════════════════════════════════════════════════
+    const upperRoofGrad = ctx.createLinearGradient(0, -100, 0, -64);
+    upperRoofGrad.addColorStop(0, '#1A0102');
+    upperRoofGrad.addColorStop(0.5, '#380305');
+    upperRoofGrad.addColorStop(1, '#4A0608');
+    ctx.fillStyle = upperRoofGrad;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2.5;
+
+    ctx.beginPath();
+    // Bottom edge of upper gable (sits on top of lower roof ridge)
+    ctx.moveTo(-58, -66);
+    // Outer gable eave edges sweeping up to the peak
+    ctx.quadraticCurveTo(-30, -82, 0, -94);
+    ctx.quadraticCurveTo(30, -82, 58, -66);
+    // Upper ridge corners (slightly upturned)
+    ctx.quadraticCurveTo(50, -74, 42, -72);
+    // Inner gable boundary
+    ctx.quadraticCurveTo(22, -88, 0, -100);
+    ctx.quadraticCurveTo(-22, -88, -42, -72);
+    ctx.quadraticCurveTo(-50, -74, -58, -66);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // ── MASSIVE ANIME-ACCURATE BULL HORNS ON THE ROOF ──
-    const drawBullHorn = (bx, by, cpX, cpY, tx, ty, baseW, color, highlight) => {
-      const angle = Math.atan2(cpY - by, cpX - bx);
+    // Vertical tile texture on upper gable
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 0.8;
+    for (let tx = -40; tx <= 40; tx += 6) {
+      const ratio = Math.abs(tx) / 50;
+      ctx.beginPath();
+      ctx.moveTo(tx * 0.7, -68 - (1 - ratio) * 28);
+      ctx.lineTo(tx, -66 - ratio * 4);
+      ctx.stroke();
+    }
+
+    // Gold trim on upper gable outer eave edge
+    ctx.strokeStyle = '#FFD700';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-58, -66);
+    ctx.quadraticCurveTo(-30, -82, 0, -94);
+    ctx.quadraticCurveTo(30, -82, 58, -66);
+    ctx.stroke();
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 4. DISTINCTIVE BULL-LIKE HORNS AT CORNER RIDGES ──
+    // ══════════════════════════════════════════════════════════════════════
+    // Horns protrude from: 4 corners of lower roof eaves + 2 corners of upper gable ridge
+    // They sweep dramatically outward and upward, mimicking an enraged bull
+
+    const drawBullHorn = (bx, by, cp1x, cp1y, cp2x, cp2y, tipX, tipY, baseW, color, highlightColor) => {
+      // Calculate perpendicular for base width
+      const dx = cp1x - bx;
+      const dy = cp1y - by;
+      const angle = Math.atan2(dy, dx);
       const perp = angle + Math.PI / 2;
       const blx = bx + Math.cos(perp) * baseW;
       const bly = by + Math.sin(perp) * baseW;
       const brx = bx - Math.cos(perp) * baseW;
       const bry = by - Math.sin(perp) * baseW;
 
-      ctx.fillStyle = color;
-      ctx.strokeStyle = '#081014';
-      ctx.lineWidth = 1.8;
+      // Horn body with bone gradient
+      const hornGrad = ctx.createLinearGradient(bx, by, tipX, tipY);
+      hornGrad.addColorStop(0, color);
+      hornGrad.addColorStop(0.6, '#1A2C30');
+      hornGrad.addColorStop(1, '#0A1418');
+      ctx.fillStyle = hornGrad;
+      ctx.strokeStyle = '#040A0C';
+      ctx.lineWidth = 2;
 
       ctx.beginPath();
       ctx.moveTo(blx, bly);
-      ctx.quadraticCurveTo(cpX, cpY, tx, ty);
-      ctx.quadraticCurveTo(cpX, cpY, brx, bry);
+      // Outer curve — sweeping outward then back
+      ctx.bezierCurveTo(cp1x - 2, cp1y - 2, cp2x, cp2y, tipX, tipY);
+      // Inner curve — back to base
+      ctx.bezierCurveTo(cp2x + 4, cp2y + 4, cp1x + 4, cp1y + 3, brx, bry);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Ridge highlight along outer curve
-      if (highlight) {
-        ctx.strokeStyle = highlight;
-        ctx.lineWidth = 1.5;
-        ctx.globalAlpha = 0.6;
+      // Ridge highlight along outer curve (bony shine)
+      if (highlightColor) {
+        ctx.strokeStyle = highlightColor;
+        ctx.lineWidth = 1.8;
+        ctx.globalAlpha = 0.5;
         ctx.beginPath();
-        ctx.moveTo(bx, by);
-        ctx.quadraticCurveTo(cpX, cpY, tx, ty);
+        ctx.moveTo((blx + brx) / 2, (bly + bry) / 2);
+        ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, tipX, tipY);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
       }
+
+
     };
 
-    // ── LEFT SIDE HORNS (Curving Up & Inward) ──
-    drawBullHorn(-55, -38, -90, -75, -35, -100, 7, '#2A5058', '#6AABB8');
-    drawBullHorn(-42, -48, -70, -85, -22, -105, 6, '#3A6068', '#7ABBC8');
-    drawBullHorn(-30, -58, -50, -95, -12, -108, 5, '#2A5058', '#5A9AA8');
-    drawBullHorn(-18, -68, -32, -102, -5, -112, 4, '#3A6068', '#6AABB8');
-    drawBullHorn(-8, -78, -16, -105, -2, -115, 3, '#4A7078', '#8ACBD8');
+    // ── LOWER LEFT EAVE CORNER HORN — sweeps far left and upward ──
+    drawBullHorn(
+      -86, -52,       // base at left eave corner
+      -115, -60,      // cp1: sweeps outward
+      -125, -85,      // cp2: curves up dramatically
+      -110, -108,     // tip: fierce upward point
+      8, '#1F3A40', '#6ABBC8'
+    );
 
-    // ── RIGHT SIDE HORNS (Mirrored, Curving Up & Inward) ──
-    drawBullHorn(55, -38, 90, -75, 35, -100, 7, '#2A5058', '#6AABB8');
-    drawBullHorn(42, -48, 70, -85, 22, -105, 6, '#3A6068', '#7ABBC8');
-    drawBullHorn(30, -58, 50, -95, 12, -108, 5, '#2A5058', '#5A9AA8');
-    drawBullHorn(18, -68, 32, -102, 5, -112, 4, '#3A6068', '#6AABB8');
-    drawBullHorn(8, -78, 16, -105, 2, -115, 3, '#4A7078', '#8ACBD8');
+    // ── LOWER RIGHT EAVE CORNER HORN — mirrored ──
+    drawBullHorn(
+      86, -52,        // base at right eave corner
+      115, -60,       // cp1: sweeps outward
+      125, -85,       // cp2: curves up
+      110, -108,      // tip: fierce upward point
+      8, '#1F3A40', '#6ABBC8'
+    );
 
-    // ── CENTER OX/DEMON SKULL ON ROOF PEAK ──
-    ctx.fillStyle = '#DCDCDC';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, -75, 8, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = '#8B0000';
-    ctx.beginPath();
-    ctx.arc(-3, -76, 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(3, -76, 2, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = '#DCDCDC';
-    ctx.beginPath();
-    ctx.moveTo(-5, -79);
-    ctx.quadraticCurveTo(-14, -90, -20, -88);
-    ctx.quadraticCurveTo(-12, -82, -3, -77);
-    ctx.fill();
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(5, -79);
-    ctx.quadraticCurveTo(14, -90, 20, -88);
-    ctx.quadraticCurveTo(12, -82, 3, -77);
-    ctx.fill();
-    ctx.stroke();
+    // ── UPPER LEFT RIDGE CORNER HORN — curving outward from gable corner ──
+    drawBullHorn(
+      -56, -66,       // base at upper left ridge corner
+      -85, -72,       // cp1: outward sweep
+      -95, -100,      // cp2: dramatic upward arc
+      -78, -125,      // tip: high and fierce
+      6, '#2F4A50', '#7ACBD0'
+    );
 
-    // ── HANGING SKULLS at eave corners and along roof ──
-    ctx.fillStyle = '#C8BEB0';
-    ctx.strokeStyle = '#1A1008';
-    ctx.lineWidth = 1;
-    const hangingSkullPos = [
-      { x: -55, y: -36, s: 4.5 }, { x: 55, y: -36, s: 4.5 },
-      { x: -40, y: -48, s: 3.5 }, { x: 40, y: -48, s: 3.5 },
-      { x: -25, y: -58, s: 3 }, { x: 25, y: -58, s: 3 },
-    ];
-    hangingSkullPos.forEach(sk => {
-      ctx.strokeStyle = '#555';
-      ctx.lineWidth = 0.8;
+    // ── UPPER RIGHT RIDGE CORNER HORN — mirrored ──
+    drawBullHorn(
+      56, -66,        // base at upper right ridge corner
+      85, -72,        // cp1: outward sweep
+      95, -100,       // cp2: dramatic upward arc
+      78, -125,       // tip: high and fierce
+      6, '#2F4A50', '#7ACBD0'
+    );
+
+    // ── TOP LEFT PEAK HORN — flanking the demon mask, sweeping up and outward ──
+    drawBullHorn(
+      -18, -92,       // base near top of gable peak (left of demon mask)
+      -35, -100,      // cp1: sweeps outward
+      -42, -112,      // cp2: shorter upward arc
+      -28, -122,      // tip: shorter and closer in
+      4, '#2A4450', '#8ADBE8'
+    );
+
+    // ── TOP RIGHT PEAK HORN — mirrored ──
+    drawBullHorn(
+      18, -92,        // base near top of gable peak (right of demon mask)
+      35, -100,       // cp1: sweeps outward
+      42, -112,       // cp2: shorter upward arc
+      28, -122,       // tip: shorter and closer in
+      4, '#2A4450', '#8ADBE8'
+    );
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 5. SMALLER SHARP HORN-LIKE PROTRUSIONS ALONG ROOF EDGES ──
+    // ══════════════════════════════════════════════════════════════════════
+    // Twisted, grotesque spikes integrated into the roof's edges and corners
+
+    const drawSmallHorn = (sx, sy, tipDx, tipDy, w) => {
+      ctx.fillStyle = '#1A2A2E';
+      ctx.strokeStyle = '#060E10';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.moveTo(sk.x, sk.y - sk.s - 4);
-      ctx.lineTo(sk.x, sk.y - sk.s);
+      ctx.moveTo(sx - w, sy);
+      ctx.quadraticCurveTo(sx + tipDx * 0.5, sy + tipDy * 0.5, sx + tipDx, sy + tipDy);
+      ctx.quadraticCurveTo(sx + tipDx * 0.5, sy + tipDy * 0.5, sx + w, sy);
+      ctx.closePath();
+      ctx.fill();
       ctx.stroke();
-      ctx.fillStyle = '#C8BEB0';
-      ctx.strokeStyle = '#1A1008';
+    };
+
+    // Spikes along the lower eave edge (left side)
+    drawSmallHorn(-72, -46, -12, -22, 3);
+    drawSmallHorn(-55, -40, -8, -18, 2.5);
+    drawSmallHorn(-35, -37, -6, -16, 2);
+    // Spikes along the lower eave edge (right side)
+    drawSmallHorn(72, -46, 12, -22, 3);
+    drawSmallHorn(55, -40, 8, -18, 2.5);
+    drawSmallHorn(35, -37, 6, -16, 2);
+    // Spikes along upper gable edges
+    drawSmallHorn(-42, -72, -8, -14, 2);
+    drawSmallHorn(-25, -80, -5, -12, 1.8);
+    drawSmallHorn(42, -72, 8, -14, 2);
+    drawSmallHorn(25, -80, 5, -12, 1.8);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 6. CLOSED-TEETH MOUTH AT CENTER GABLE PEAK ──
+    // ══════════════════════════════════════════════════════════════════════
+    // A row of closed teeth visible at the top center of the gable (like the reference)
+
+    ctx.save();
+    ctx.translate(0, -86);
+
+    // Dark mouth slit behind the teeth
+    ctx.fillStyle = '#0A0000';
+    ctx.beginPath();
+    ctx.moveTo(-18, -2);
+    ctx.quadraticCurveTo(0, -6, 18, -2);
+    ctx.quadraticCurveTo(0, 6, -18, -2);
+    ctx.closePath();
+    ctx.fill();
+
+    // Upper closed teeth (hanging down)
+    const gableUpperTeeth = [
+      { x: -14, w: 5.5, h: 8 }, { x: -8, w: 5.5, h: 9 }, { x: -2.5, w: 5.5, h: 10 },
+      { x: 3, w: 5.5, h: 10 }, { x: 8.5, w: 5.5, h: 9 }, { x: 14, w: 5.5, h: 8 }
+    ];
+    gableUpperTeeth.forEach(t => {
+      ctx.fillStyle = '#F5EFE6';
+      ctx.strokeStyle = '#2B1B10';
+      ctx.lineWidth = 0.8;
+      const cornerR = 1;
+      ctx.beginPath();
+      ctx.moveTo(t.x - t.w / 2 + cornerR, -4);
+      ctx.lineTo(t.x + t.w / 2 - cornerR, -4);
+      ctx.quadraticCurveTo(t.x + t.w / 2, -4, t.x + t.w / 2, -4 + cornerR);
+      ctx.lineTo(t.x + t.w / 2, -4 + t.h - cornerR);
+      ctx.quadraticCurveTo(t.x + t.w / 2, -4 + t.h, t.x + t.w / 2 - cornerR, -4 + t.h);
+      ctx.lineTo(t.x - t.w / 2 + cornerR, -4 + t.h);
+      ctx.quadraticCurveTo(t.x - t.w / 2, -4 + t.h, t.x - t.w / 2, -4 + t.h - cornerR);
+      ctx.lineTo(t.x - t.w / 2, -4 + cornerR);
+      ctx.quadraticCurveTo(t.x - t.w / 2, -4, t.x - t.w / 2 + cornerR, -4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Enamel highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fillRect(t.x - t.w / 2 + 1, -3, t.w - 2, 2);
+    });
+
+    // Lower closed teeth (pointing up, meeting the upper teeth)
+    const gableLowerTeeth = [
+      { x: -12, w: 5, h: 7 }, { x: -6, w: 5, h: 8 }, { x: 0, w: 5, h: 8.5 },
+      { x: 6, w: 5, h: 8 }, { x: 12, w: 5, h: 7 }
+    ];
+    gableLowerTeeth.forEach(t => {
+      ctx.fillStyle = '#F5EFE6';
+      ctx.strokeStyle = '#2B1B10';
+      ctx.lineWidth = 0.8;
+      const cornerR = 1;
+      const botY = 4;
+      ctx.beginPath();
+      ctx.moveTo(t.x - t.w / 2 + cornerR, botY);
+      ctx.lineTo(t.x + t.w / 2 - cornerR, botY);
+      ctx.quadraticCurveTo(t.x + t.w / 2, botY, t.x + t.w / 2, botY - cornerR);
+      ctx.lineTo(t.x + t.w / 2, botY - t.h + cornerR);
+      ctx.quadraticCurveTo(t.x + t.w / 2, botY - t.h, t.x + t.w / 2 - cornerR, botY - t.h);
+      ctx.lineTo(t.x - t.w / 2 + cornerR, botY - t.h);
+      ctx.quadraticCurveTo(t.x - t.w / 2, botY - t.h, t.x - t.w / 2, botY - t.h + cornerR);
+      ctx.lineTo(t.x - t.w / 2, botY - cornerR);
+      ctx.quadraticCurveTo(t.x - t.w / 2, botY, t.x - t.w / 2 + cornerR, botY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      // Enamel highlight
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+      ctx.fillRect(t.x - t.w / 2 + 1, botY - 3, t.w - 2, 2);
+    });
+
+    ctx.restore(); // End gable mouth transform
+
+    // ── POINTY SHORT PILLAR AT ROOF PEAK ──
+    // Dark pointed pillar/finial at the very top
+    ctx.fillStyle = '#2A0406';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    // Pillar base (short rectangular shaft)
+    ctx.fillRect(-4, -102, 8, 10);
+    ctx.strokeRect(-4, -102, 8, 10);
+    // Pointed tip
+    ctx.beginPath();
+    ctx.moveTo(0, -115);
+    ctx.lineTo(-5, -102);
+    ctx.lineTo(5, -102);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Gold accent ring at base of pillar
+    ctx.fillStyle = '#D4AF37';
+    ctx.fillRect(-5, -93, 10, 3);
+    ctx.strokeStyle = '#5C4033';
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(-5, -93, 10, 3);
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 7. ANIMALISTIC SKULLS AT ROOF EDGES AND CORNERS ──
+    // ══════════════════════════════════════════════════════════════════════
+    // Skulls integrated into the roof structure — hanging from eaves and at gable corners
+
+    const hangingSkulls = [
+      // Lower eave corners
+      { x: -85, y: -48, s: 0.85 }, { x: 85, y: -48, s: 0.85 },
+      // Along lower eave edge
+      { x: -60, y: -40, s: 0.7 }, { x: 60, y: -40, s: 0.7 },
+      { x: -30, y: -36, s: 0.65 }, { x: 30, y: -36, s: 0.65 },
+      { x: 0, y: -34, s: 0.6 },
+      // At upper gable corners
+      { x: -52, y: -64, s: 0.75 }, { x: 52, y: -64, s: 0.75 },
+      // Along upper gable edges
+      { x: -30, y: -76, s: 0.65 }, { x: 30, y: -76, s: 0.65 },
+    ];
+    hangingSkulls.forEach((sk, i) => {
+      // Hanging chain / sinew
+      ctx.strokeStyle = '#444';
       ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(sk.x, sk.y, sk.s, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(sk.x, sk.y - 5);
+      ctx.lineTo(sk.x + Math.sin(sk.x * 0.1) * 2, sk.y + 2);
       ctx.stroke();
-      ctx.fillStyle = '#1A0000';
-      ctx.beginPath();
-      ctx.arc(sk.x - sk.s * 0.3, sk.y - sk.s * 0.15, sk.s * 0.25, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(sk.x + sk.s * 0.3, sk.y - sk.s * 0.15, sk.s * 0.25, 0, Math.PI * 2);
-      ctx.fill();
+      this._drawRealisticSkull(ctx, sk.x, sk.y + 6, sk.s, i % 2 === 0);
+    });
+
+    // ══════════════════════════════════════════════════════════════════════
+    // ── 8. SKULL MOUND AT SHRINE BASE ──
+    // ══════════════════════════════════════════════════════════════════════
+    const baseSkulls = [
+      // Layer 1: Back row
+      { x: -65, y: 14, s: 0.6, d: true }, { x: 65, y: 14, s: 0.6, d: true },
+      { x: -52, y: 16, s: 0.65 }, { x: 52, y: 16, s: 0.65 },
+      // Layer 2: Middle Pile
+      { x: -42, y: 18, s: 0.7 }, { x: -28, y: 17, s: 0.75, d: true },
+      { x: -16, y: 19, s: 0.75 }, { x: -5, y: 18, s: 0.8 },
+      { x: 5, y: 18, s: 0.8 }, { x: 16, y: 19, s: 0.75 },
+      { x: 28, y: 17, s: 0.75, d: true }, { x: 42, y: 18, s: 0.7 },
+      // Layer 3: Front Mound
+      { x: -58, y: 21, s: 0.65 }, { x: -38, y: 22, s: 0.8 },
+      { x: -22, y: 23, s: 0.85 }, { x: -9, y: 22, s: 0.8 },
+      { x: 0, y: 24, s: 0.85, d: true }, { x: 9, y: 22, s: 0.8 },
+      { x: 22, y: 23, s: 0.85 }, { x: 38, y: 22, s: 0.8 },
+      { x: 58, y: 21, s: 0.65 }
+    ];
+    baseSkulls.forEach(sk => {
+      this._drawRealisticSkull(ctx, sk.x, sk.y, sk.s, sk.d || false);
     });
   }
 

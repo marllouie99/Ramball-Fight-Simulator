@@ -116,6 +116,8 @@ class ProjectileSystem {
       this.maxActiveProjectiles = 100; // FFA with many entities
     } else if (totalEntities >= 4) {
       this.maxActiveProjectiles = 150; // 2v2 mode
+    } else if (state.mode === 'Stand Off') {
+      this.maxActiveProjectiles = 120; // Stand Off high HP duel optimization
     } else {
       this.maxActiveProjectiles = 200; // 1v1 mode
     }
@@ -548,6 +550,13 @@ class ProjectileSystem {
             const splashDmg = damage * splashRatio;
             f.takeDamage(splashDmg, attacker, { isExplosion: true });
             
+            // Apply burn effect to targets hit by Fuga
+            if (typeof f.applyBurn === 'function') {
+              f.burnTimer = CONFIG.sukuna?.divineFlameBurnDuration || CONFIG.orange.burnDuration;
+              f.burnDamageTimer = 0;
+              f.lastBurnAttacker = attacker;
+            }
+            
             const angle = Math.atan2(f.y - y, f.x - x);
             const pushForce = 12 * (1 - dist / splashRadius);
             f.vx += Math.cos(angle) * pushForce;
@@ -841,6 +850,12 @@ class ProjectileSystem {
               
               // Spawn some blood/sparks to show it sliced straight through
               spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
+
+              // Apply a small physical push backward on hit
+              const knockbackForce = 2.5; 
+              const angle = Math.atan2(projectile.vy, projectile.vx);
+              fighter.vx += Math.cos(angle) * knockbackForce;
+              fighter.vy += Math.sin(angle) * knockbackForce;
               
               // Do NOT return true, allowing it to continue flying
             } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
@@ -1683,14 +1698,16 @@ class ProjectileSystem {
     // Gojo Purple orb: don't expire on wall hit, instead stick to the wall
     if (p.isGojoPurple) {
       if (p.life <= 0) return true;
-      
+
       // Clamp position to arena boundaries so it sticks to walls
+      // Zero BOTH velocity components on wall contact so the orb stops completely
+      // instead of sliding along the wall edge
       const halfR = p.r / 2;
-      if (p.x - halfR < arena.x) { p.x = arena.x + halfR; p.vx = 0; }
-      if (p.x + halfR > arena.x + arena.width) { p.x = arena.x + arena.width - halfR; p.vx = 0; }
-      if (p.y - halfR < arena.y) { p.y = arena.y + halfR; p.vy = 0; }
-      if (p.y + halfR > arena.y + arena.height) { p.y = arena.y + arena.height - halfR; p.vy = 0; }
-      
+      if (p.x - halfR < arena.x) { p.x = arena.x + halfR; p.vx = 0; p.vy = 0; }
+      if (p.x + halfR > arena.x + arena.width) { p.x = arena.x + arena.width - halfR; p.vx = 0; p.vy = 0; }
+      if (p.y - halfR < arena.y) { p.y = arena.y + halfR; p.vx = 0; p.vy = 0; }
+      if (p.y + halfR > arena.y + arena.height) { p.y = arena.y + arena.height - halfR; p.vx = 0; p.vy = 0; }
+
       return false; // Never expire from wall collision
     }
     
@@ -1811,7 +1828,7 @@ class ProjectileSystem {
       }
 
       // --- Gojo Limitless (Infinity) Spatial Projectile Interception ---
-      if (!p.isGojoBlue && !p.isGojoPurple && !p.isVisual && p.life > 0) {
+      if (!p.isGojoBlue && !p.isGojoPurple && !p.isVisual && p.visual !== 'ghostBlade' && p.life > 0) {
         for (let fi = 0; fi < fighters.length; fi++) {
           if (fi === p.owner) continue;
           const f = fighters[fi];
@@ -1867,6 +1884,9 @@ class ProjectileSystem {
 
       // --- Gojo Purple DPS + Slow + Pull Logic ---
       if (p.isGojoPurple) {
+        // Advance visual time for animations so it freezes when caught in time sphere
+        p.visualTime = (p.visualTime || Date.now()) + 16.667;
+
         const ownerTeam = state.getFighterTeam(p.owner);
         const purpleSlowDuration = CONFIG.gojo.purpleSlowDuration || 60;
         const purpleSlowMultiplier = CONFIG.gojo.purpleSlowMultiplier || 0.5;

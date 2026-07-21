@@ -2,7 +2,7 @@
 // BASE FIGHTER CLASS
 // ─────────────────────────────────────────────
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
-import { MODE_HP_MULTIPLIER, MODE_SPEED_MULTIPLIER, GAME_MODES } from '../core/modeConfig.js';
+import { MODE_HP_MULTIPLIER, MODE_SPEED_MULTIPLIER, MODE_SETTINGS, GAME_MODES } from '../core/modeConfig.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { playSound, stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
@@ -613,7 +613,8 @@ export class Fighter {
           stopAllSounds();
           stopAllLoopingSounds();
 
-          const winThreshold = Math.ceil(CONFIG.rounds.max / 2);
+          const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
+          const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
           if (realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold) {
             // Record win/loss for leaderboard (1v1 mode only) when they become champion
             if (state.mode === GAME_MODES.ONE_VS_ONE && realAttacker) {
@@ -787,8 +788,10 @@ export class Fighter {
     // Movement
     this.x += this.vx;
     this.y += this.vy;
-    const spinRate = this._def.spinRate ?? CONFIG.spin.rate;
-    this.angle += this.speed * spinRate;
+    if (!this.hitStunTimer || this.hitStunTimer <= 0) {
+      const spinRate = this._def.spinRate ?? CONFIG.spin.rate;
+      this.angle += this.speed * spinRate;
+    }
   }
 
   /** Standard per-frame update tick for basic movement, shooting, and physics. */
@@ -808,9 +811,10 @@ export class Fighter {
     }
 
     // Shooting
+    const canAct = !this.hitStunTimer || this.hitStunTimer <= 0;
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
-    } else if (this._def.type !== 'orange') { // Prevent Orange from using this default shoot
+    } else if (this._def.type !== 'orange' && canAct) { // Prevent Orange from using this default shoot
       this.shoot(ownerIndex);
       this.shootCooldown = this.shootCooldownMax;
     }
@@ -818,7 +822,9 @@ export class Fighter {
     this.applyMovementPhysics();
 
     // Aiming & Bouncing
-    this.aim(opponent);
+    if (canAct) {
+      this.aim(opponent);
+    }
     this.resolveWallBounce(arena);
   }
 

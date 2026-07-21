@@ -1985,7 +1985,7 @@ export function drawSelectScreen() {
     drawButton('🎲 RANDOMIZE', centerX, footerY, () => { randomizeFfaFighters(); }, actionBtnW, 36);
     drawButton('⚔ START BATTLE', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
     drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
-  } else if (mode === '1v1') {
+  } else if (mode === '1v1' || mode === 'Stand Off') {
     drawButton('🎲 RANDOMIZE', centerX, footerY, () => { randomize1v1Fighters(); }, actionBtnW, 36);
     drawButton('⚔ START BATTLE', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
     drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
@@ -2018,8 +2018,14 @@ function randomizeFfaFighters() {
 
 function drawModeSelection(cx, cy) {
   const { ctx, canvas } = state;
-  const modes = [{ id: '1v1', label: '1v1' }, { id: '2v2', label: '2v2' }, { id: 'FFA', label: 'FFA' }, { id: 'TLFS', label: 'TLFS' }];
-  const buttonWidth = Math.min(100, Math.max(70, canvas.width * 0.12)); // slightly smaller to fit 4 buttons
+  const modes = [
+    { id: '1v1', label: '1v1' },
+    { id: 'Stand Off', label: 'Stand Off' },
+    { id: '2v2', label: '2v2' },
+    { id: 'FFA', label: 'FFA' },
+    { id: 'TLFS', label: 'TLFS' }
+  ];
+  const buttonWidth = Math.min(90, Math.max(65, canvas.width * 0.10));
   const buttonHeight = 36;
   const gap = Math.min(15, Math.max(10, canvas.width * 0.02));
   const totalWidth = modes.length * buttonWidth + (modes.length - 1) * gap;
@@ -2274,9 +2280,11 @@ export function drawHUD() {
     hudOpacity = Math.max(0, 1 - (revealTimer / 30));
   } else if (gameState === 'roundEnd') {
     const winnerIndex = roundWinner ? fighters.indexOf(roundWinner) : -1;
-    const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= 2;
+    const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+    const winThreshold = modeRounds === 1 ? 1 : 2;
+    const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThreshold;
     const showModel = hasTwoWins && roundWinner;
-    const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || (showModel && mode !== 'FFA');
+    const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || showModel;
     
     if (isChampionReveal) {
       const displayDelay = 60; // round end delay
@@ -2303,14 +2311,16 @@ export function drawHUD() {
     const cx = state.arena.x + state.arena.width / 2;
     const topY = state.arena.y - 36;
 
-    // Draw round on top
-    drawPanel(cx - 90, topY, 180, 26, 0.7);
+    // Draw round on top (hidden in Stand Off mode)
+    if (mode !== 'Stand Off') {
+        drawPanel(cx - 90, topY, 180, 26, 0.7);
 
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 12px Arial';
-    ctx.textAlign = 'center';
-    const roundsMax = MODE_SETTINGS[mode]?.rounds || MODE_SETTINGS[GAME_MODES.ONE_VS_ONE].rounds;
-    ctx.fillText(`ROUND ${roundNum} OF ${roundsMax}`, cx, topY + 18);
+        ctx.fillStyle = '#fff';
+        ctx.font = 'bold 12px Arial';
+        ctx.textAlign = 'center';
+        const roundsMax = MODE_SETTINGS[mode]?.rounds || MODE_SETTINGS[GAME_MODES.ONE_VS_ONE].rounds;
+        ctx.fillText(`ROUND ${roundNum} OF ${roundsMax}`, cx, topY + 18);
+    }
 
     // Draw rotate message at the bottom
     const bottomY = state.arena.y + state.arena.height + 20;
@@ -2496,10 +2506,10 @@ function updateHealthHud() {
         isWinner: fighter === state.roundWinner,
         description: cardDesc,
         kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
-        maxBullets: 2
+        maxBullets: mode === GAME_MODES.STAND_OFF ? 0 : 2
       });
 
-      if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.FFA || mode === 'TLFS') {
+      if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.FFA || mode === 'TLFS') {
         cardsBottom.push(cardHTML);
       } else if (index % 2 === 0) {
         cardsLeft.push(cardHTML);
@@ -2562,7 +2572,9 @@ export function drawRoundEndScreen() {
 
   // Check if winner has 2 victories (match win condition)
   const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
-  const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= 2;
+  const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+  const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
+  const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThresholdForReveal;
   const showModel = hasTwoWins && roundWinner;
 
   // Determine winner text
@@ -2572,10 +2584,15 @@ export function drawRoundEndScreen() {
     winnerText = `TEAM ${winningTeam + 1} WINS ROUND ${roundNum}!`;
     ctx.fillStyle = winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
   } else {
-    winnerText = `${roundWinner.name.toUpperCase()} WINS ROUND ${roundNum}!`;
-    ctx.fillStyle = roundWinner.color;
+    if (roundWinner) {
+      winnerText = `${roundWinner.name.toUpperCase()} WINS ROUND ${roundNum}!`;
+      ctx.fillStyle = roundWinner.color;
+    } else {
+      winnerText = `ROUND ${roundNum} IS A DRAW!`;
+      ctx.fillStyle = '#ffffff';
+    }
   }
-  const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || (showModel && mode !== 'FFA');
+  const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || showModel;
 
   if (!isChampionReveal) {
     ctx.font = 'bold 28px Arial';
@@ -2642,6 +2659,9 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.gunAngle = 0;
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
+  if (def.type === 'gojo' || def.type === 'sukuna') {
+    preview.combatAuraOpacity = 1;
+  }
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -2705,6 +2725,9 @@ function drawFfaChampionReveal(winner, timer) {
   preview.gunAngle = 0;
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
+  if (def.type === 'gojo' || def.type === 'sukuna') {
+    preview.combatAuraOpacity = 1;
+  }
 
   // Use an offscreen canvas to guarantee perfect fade-in composition
   // This prevents complex weapon rendering logic from overriding globalAlpha
@@ -2847,7 +2870,7 @@ export function drawMatchEndScreen() {
     drawMatchWinnerReveal(matchWinner, state.matchEndTimer, mode);
   }
 
-  if (mode === '1v1' || mode === 'FFA') {
+  if (mode === '1v1' || mode === 'Stand Off' || mode === 'FFA') {
     ctx.fillStyle = '#aaa';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
@@ -2856,7 +2879,7 @@ export function drawMatchEndScreen() {
     }
 
     _registerButton(0, 0, canvas.width, canvas.height, () => {
-      if (mode === '1v1') {
+      if (mode === '1v1' || mode === 'Stand Off') {
         randomize1v1Fighters();
       }
       resetMatch();
@@ -2940,6 +2963,9 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   preview.gunAngle = 0;
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
+  if (def.type === 'gojo' || def.type === 'sukuna') {
+    preview.combatAuraOpacity = 1;
+  }
 
   ctx.save();
   ctx.translate(cx, cy);

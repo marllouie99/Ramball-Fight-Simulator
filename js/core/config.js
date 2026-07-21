@@ -250,9 +250,9 @@ export const CONFIG = {
   cronos: {
     // TUNING: Time Stop Sphere mechanics
     sphereRadius: 200,         // radius of the time stop sphere
-    sphereDuration: 200,       // frames the sphere lasts (3 seconds at 60 fps)
+    sphereDuration: 300,       // frames the sphere lasts (3 seconds at 60 fps)
     sphereCooldown: 800,       // frames between sphere deployments (5 seconds at 60 fps)
-    sphereSpeedMultiplier: 5.0, // movement speed multiplier inside sphere
+    sphereSpeedMultiplier: 7.0, // movement speed multiplier inside sphere
     sphereActivationDistance: 120, // max distance to opponent to trigger sphere activation
 
     // TUNING: Passive skills
@@ -266,7 +266,7 @@ export const CONFIG = {
     meleeCooldown: 90,         // frames between melee attacks
     meleeDamage: 10,          // damage per crescent blade swing
     meleeSwingDuration: 10,   // frames for visible swing animation
-    sphereMeleeDamage: 2,    // separate melee damage when inside own sphere
+    sphereMeleeDamage: 8,    // separate melee damage when inside own sphere
     sphereMeleeCooldown: 10,   // separate melee cooldown when inside own sphere
     doubleStrikeWindow: 10,    // frames window to execute the second strike
     // TUNING: Bounce mechanics inside sphere
@@ -543,16 +543,16 @@ export const CONFIG = {
   /** Gojo Satoru — Limitless Fighter */
   gojo: {
     infinityCooldown: 240,    // Cooldown before Infinity block triggers again
-    blueCooldown: 80,         // Fire rate for basic attack (Blue orb) - Lower is faster
-    blueSpeed: 7.5,           // Speed of Blue orb projectile
+    blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster
+    blueSpeed: 10.5,           // Speed of Blue orb projectile
     blueRadius: 100,           // Pull radius of Blue explosion
-    bluePullForce: 6.5,       // Pull strength of Blue
+    bluePullForce: 0.5,       // Pull strength of Blue
     redKnockback: 25,         // Knockback force of Red
     redCooldown: 300,         // Cooldown of Red
     redRange: 100,            // Range to trigger Red
-    purpleCooldown: 650,      // Cooldown of Hollow Purple
+    purpleCooldown: 800,      // Cooldown of Hollow Purple
     purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
-    purpleDamage: 10,         // Continuous piercing damage per tick
+    purpleDamage: 20,         // Continuous piercing damage per tick
     purpleSpeed: 5,           // Speed of Purple orb
     purpleRadius: 50,         // Radius of Purple orb
     purpleLife: 250,         // How long Purple orb stays in arena (frames)
@@ -565,18 +565,21 @@ export const CONFIG = {
     purplePullForce: 5.0,    // How strongly enemies are dragged toward the orb center
     purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
     purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
-    domainCooldown: 1200,     // 20s Ultimate cooldown
-    domainDuration: 180,      // Domain lasts 3 seconds (paralyzes enemies)
+    domainCooldown: 1500,     // 20s Ultimate cooldown
+    domainChargeMax: 150,     // 2s Channeling duration before domain opens
+    domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
+    domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
+    domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
     // Reverse Cursed Technique - Self heal when at low HP
-    reverseCursedTechniqueHpThreshold: 0.30,  // Triggers when HP drops to 25% or below
+    reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 25% or below
     reverseCursedTechniqueHealPercent: 0.20,   // Heals 35% of max HP
-    reverseCursedTechniqueCooldown: 550,      // 15 second cooldown before it can trigger again
+    reverseCursedTechniqueCooldown: 1200,      // 15 second cooldown before it can trigger again
     // Melee Mode (Hand-to-Hand Combat)
     initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
     meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
     closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
-    meleePunchDamage: 3,     // Damage dealt by each punch
-    meleePunchCooldown: 20,   // Frames between punches
+    meleePunchDamage: 10,     // Damage dealt by each punch
+    meleePunchCooldown: 10,   // Frames between punches
     teleportDelay: 5,        // Frames delay before teleport after punch
     teleportSpeed: 15,        // Speed of teleport movement (pixels per frame)
   },
@@ -584,12 +587,12 @@ export const CONFIG = {
   /** Ryomen Sukuna — King of Curses */
   sukuna: {
     // Reverse Cursed Technique (Passive)
-    reverseCursedTechniqueHpThreshold: 0.30,  // Triggers when HP drops to 30% or below
-    reverseCursedTechniqueHealPercent: 0.40,   // Heals 40% of max HP
+    reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 30% or below
+    reverseCursedTechniqueHealPercent: 0.20,   // Heals 40% of max HP
     reverseCursedTechniqueCooldown: 1200,      // 20 second cooldown before it can trigger again
 
     // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
-    slashDamage: 8,          // Base damage per Dismantle / Martial Arts strike
+    slashDamage: 12,          // Base damage per Dismantle / Martial Arts strike
     slashSpeed: 50,          // Speed of Dismantle slash projectiles
     slashCooldown: 50,       // Frames between basic attacks
     meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
@@ -612,18 +615,20 @@ export const CONFIG = {
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     divineFlameCooldown: 610,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 150,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 30,         // Primary direct hit nuke damage
-    divineFlameSpeed: 10,          // Speed of Furnace fire arrow
+    divineFlameDamage: 100,         // Primary direct hit nuke damage
+    divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
     divineFlameShakeIntensity: 16, // Screen shake intensity on impact
     divineFlameShakeDuration: 22,  // Screen shake duration
-    thermobaricSplashRadius: 130,  // Thermobaric explosion splash damage radius
+    thermobaricSplashRadius: 150,  // Thermobaric explosion splash damage radius
+    divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
     domainCooldown: 1000,     // Cooldown before domain can trigger (25 seconds at 60 fps)
-    domainDuration: 2000,      // Domain duration (3 seconds)
-    domainDamage: 5,          // Base damage per slash tick
-    domainDamageInterval: 10,  // Frames between slash ticks
+    domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
+    domainDuration: 500,      // Domain duration (3 seconds)
+    domainDamage: 7,          // Base damage per slash tick
+    domainDamageInterval: 20,  // Frames between slash ticks
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
     domainRadius: 240,        // Radius of the open-air death zone
     domainRampRatePerSec: 0.10,// 10% damage increase per second targets stay inside
@@ -1017,13 +1022,13 @@ export const FIGHTER_DEFS = [
     aimbot: false,
     spinRate: 0,
     type: 'gojo',
-    hp: 1000,
-    damage: 8,
+    hp: 200,
+    damage: 12,
     cooldown: 80,
     moveSpeed: 4.5,
     projectileSpeedMultiplier: 6.0,
     ability: 'Limitless',
-    desc: 'Passively blocks attacks with Infinity. Uses Lapse Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
+    desc: 'Uses Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
   },
   {
     id: 22,
@@ -1036,13 +1041,13 @@ export const FIGHTER_DEFS = [
     aimbot: false,
     spinRate: 0,
     type: 'sukuna',
-    hp: 1000,
+    hp: 200,
     damage: 8,
     cooldown: 80,
     moveSpeed: 4.8,
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
-    desc: 'Passively heals with Reverse Cursed Technique at low HP. Basic attacks apply bleed and break shields. Spiderweb triggers when surrounded. Divine Flame is a devastating fire arrow. Malevolent Shrine domain deals unblockable damage.',
+    desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
   }
 ];
 

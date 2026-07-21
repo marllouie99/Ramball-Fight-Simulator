@@ -475,19 +475,36 @@ export function resolveFighterCollision(a, b) {
   const ty = nx;
 
   const overlap = (minDist - distance) / 2;
-  if (a.isTurret || b.isTurret) {
-    if (a.isTurret && !b.isTurret) {
+  
+  const aIsGojoDomain = a.domainActive && a._def?.id === 'gojo';
+  const bIsGojoDomain = b.domainActive && b._def?.id === 'gojo';
+  
+  const teamA = state.getFighterTeam(state.fighters.indexOf(a));
+  const teamB = state.getFighterTeam(state.fighters.indexOf(b));
+  const isEnemy = teamA === null || teamB === null || teamA !== teamB;
+
+  const aIsImmovable = a.isTurret || (bIsGojoDomain && isEnemy);
+  const bIsImmovable = b.isTurret || (aIsGojoDomain && isEnemy);
+
+  if (aIsImmovable || bIsImmovable) {
+    if (aIsImmovable && !bIsImmovable) {
       b.x += nx * overlap * 2;
       b.y += ny * overlap * 2;
-    } else if (b.isTurret && !a.isTurret) {
+    } else if (bIsImmovable && !aIsImmovable) {
       a.x -= nx * overlap * 2;
       a.y -= ny * overlap * 2;
     }
-  } else if (!a.isTurret && !b.isTurret) {
+  } else {
     a.x -= nx * overlap;
     a.y -= ny * overlap;
     b.x += nx * overlap;
     b.y += ny * overlap;
+  }
+
+  // Force both fighters to stay within the arena immediately after collision push
+  if (state && state.arena) {
+    if (typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
+    if (typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
   }
 
   // Only apply impulse if fighters are moving toward each other
@@ -637,7 +654,7 @@ function endRoundIf2v2Ended() {
 }
 
 function endRoundIf1v1Ended() {
-  if (state.mode !== GAME_MODES.ONE_VS_ONE || state.gameState !== 'playing') return;
+  if ((state.mode !== GAME_MODES.ONE_VS_ONE && state.mode !== GAME_MODES.STAND_OFF) || state.gameState !== 'playing') return;
 
   const effectivelyAlive = state.fighters.filter((f) => f && isFighterEffectivelyAlive(f));
   if (effectivelyAlive.length > 1) return;
@@ -654,7 +671,7 @@ function endRoundIf1v1Ended() {
     const winnerIndex = state.fighters.indexOf(winner);
     if (winnerIndex >= 0) {
       state.scores[winnerIndex]++;
-      const winThreshold = 2;
+      const winThreshold = MODE_SETTINGS[state.mode]?.rounds === 1 ? 1 : 2;
 
       const loserIndex = winnerIndex === 0 ? 1 : 0;
       const winnerFighterIndex = typeof winner.fighterIndex === 'number' ? winner.fighterIndex : winnerIndex;
