@@ -22,28 +22,30 @@ class SpatialGrid {
   }
 
   getKey(x, y) {
-    const cellX = Math.floor(x / this.cellSize);
-    const cellY = Math.floor(y / this.cellSize);
-    return `${cellX},${cellY}`;
+    const cellX = (x / this.cellSize) | 0;
+    const cellY = (y / this.cellSize) | 0;
+    return (((cellX + 2000) & 0xFFFF) << 16) | ((cellY + 2000) & 0xFFFF);
   }
 
   insert(entity) {
     const key = this.getKey(entity.x, entity.y);
-    if (!this.grid.has(key)) {
-      this.grid.set(key, []);
+    let cell = this.grid.get(key);
+    if (!cell) {
+      cell = [];
+      this.grid.set(key, cell);
     }
-    this.grid.get(key).push(entity);
+    cell.push(entity);
   }
 
   getNearby(x, y, radius) {
     const nearby = [];
     const cellRadius = Math.ceil(radius / this.cellSize);
-    const cellX = Math.floor(x / this.cellSize);
-    const cellY = Math.floor(y / this.cellSize);
+    const cellX = (x / this.cellSize) | 0;
+    const cellY = (y / this.cellSize) | 0;
 
     for (let dx = -cellRadius; dx <= cellRadius; dx++) {
       for (let dy = -cellRadius; dy <= cellRadius; dy++) {
-        const key = `${cellX + dx},${cellY + dy}`;
+        const key = ((((cellX + dx) + 2000) & 0xFFFF) << 16) | (((cellY + dy) + 2000) & 0xFFFF);
         const cell = this.grid.get(key);
         if (cell) {
           nearby.push(...cell);
@@ -125,6 +127,7 @@ export function updateIllusions() {
 
     // Illusions only disappear when they die (HP <= 0), not by duration
     if (illusion.hp <= 0) {
+      if (illusion.isRika) continue; // Rika handles her own death animation
       spawnIllusionDeath(illusion); // Spawn ethereal death effect
       // High-performance swap-and-pop array cleanup instead of splice
       state.illusions[i] = state.illusions[state.illusions.length - 1];
@@ -164,7 +167,7 @@ export function updateIllusions() {
 
       // Only apply base movement if not being heavily knocked back
       const isKnockedBack = illusion.knockbackVx !== undefined && (Math.abs(illusion.knockbackVx) > 2 || Math.abs(illusion.knockbackVy) > 2);
-      if (!isKnockedBack) {
+      if (!isKnockedBack && !illusion.isRika) { // Rika handles her own movement
         illusion.x += illusion.vx;
         illusion.y += illusion.vy;
       }

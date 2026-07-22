@@ -194,10 +194,8 @@ class BurnEffectSystem {
     if (this.particles.length === 0) return;
 
     // OPTIMIZED: Skip expensive composite operations during low FPS
-    const useSimpleRender = state.fps < 40 && state.gameState === 'playing';
+    const useSimpleRender = state.fps < 45 && state.gameState === 'playing';
 
-    // Pre-sort so lighter elements blend correctly if needed, but lighter handles it regardless.
-    this.particles.sort((a, b) => b.life - a.life);
     ctx.save();
 
     // Use source-over blending because lighter blending is invisible against light arena backgrounds
@@ -231,46 +229,7 @@ class BurnEffectSystem {
         
         ctx.fillStyle = grad;
         ctx.beginPath();
-        
-        // Restore fluid, flowy procedural shape
-        const numPoints = 10;
-        const points = [];
-        for (let j = 0; j < numPoints; j++) {
-          const theta = (j / numPoints) * Math.PI * 2;
-          let r = size;
-          
-          const turbulence = (p.x + p.y) % 10;
-          const billow = Math.sin(theta * 2 - p.life * 8 + turbulence);
-          const cut = Math.pow(Math.sin(theta * 3 - p.life * 12 + turbulence * 1.5), 2);
-          
-          const deform = 0.1 + ((1.0 - progress) * 0.4); 
-          r += size * deform * billow;
-          r -= size * deform * cut * 0.7;
-          
-          r = Math.max(size * 0.3, r);
-          
-          // Volumetric wobble
-          const wobbleX = Math.sin(p.life * 15 + p.y * 0.1) * 2;
-          
-          points.push({
-            x: p.x + wobbleX + Math.cos(theta) * r,
-            y: p.y + Math.sin(theta) * r
-          });
-        }
-        
-        // Draw smooth closed loop
-        const startX = (points[numPoints - 1].x + points[0].x) / 2;
-        const startY = (points[numPoints - 1].y + points[0].y) / 2;
-        ctx.moveTo(startX, startY);
-        
-        for (let j = 0; j < numPoints; j++) {
-          const curr = points[j];
-          const next = points[(j + 1) % numPoints];
-          const midX = (curr.x + next.x) / 2;
-          const midY = (curr.y + next.y) / 2;
-          ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-        }
-        ctx.closePath();
+        ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
         ctx.fill();
       }
       else if (p.type === 'spark') {

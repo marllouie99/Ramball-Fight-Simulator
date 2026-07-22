@@ -1335,7 +1335,55 @@ export function drawWeaponDetailScreen() {
   // Bobbing animation
   ctx.translate(0, Math.sin(Date.now() / 400) * 8);
   
-  if (state.showWeaponModel) {
+  if (state.showSummonModel) {
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    const previewFighter = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+    previewFighter.x = 0;
+    previewFighter.y = 0;
+    previewFighter.angle = 0;
+
+    try {
+      if (def.type === 'yuta' && previewFighter.rika) {
+        // Only draw Rika and center her perfectly
+        previewFighter.rika.active = true;
+        previewFighter.rika.x = 0;
+        previewFighter.rika.y = 0;
+        previewFighter.cursedEnergyAlpha = 1.0;
+        
+        // Drive both arm timers independently so they alternate, not swing together
+        if ((state.previewRightArmTimer || 0) > 0) {
+          state.previewRightArmTimer--;
+          // Fire left arm 30 frames after right arm starts
+          if (state.previewRightArmTimer === 30 && (state.previewLeftArmTimer || 0) <= 0) {
+            state.previewLeftArmTimer = 60;
+          }
+        }
+        if ((state.previewLeftArmTimer || 0) > 0) {
+          state.previewLeftArmTimer--;
+        }
+        previewFighter.rika.attackTimer  = state.previewRightArmTimer || 0;
+        previewFighter.rika.leftArmTimer = state.previewLeftArmTimer  || 0;
+
+        // Draw cursed energy aura if toggled on
+        if (state.previewShowCursedEnergy) {
+          previewFighter._drawRikaCursedEnergyAura(ctx);
+        }
+
+        previewFighter._drawRika(ctx, { x: 100, y: 0 });
+      } else {
+        // Fallback for others that might not have custom standalone draw
+        previewFighter.draw(ctx, { x: 100, y: 0 });
+      }
+    } catch (e) {
+      console.error('Preview summon draw error:', e);
+    }
+  } else if (state.showWeaponModel) {
     const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
     const previewFighter = new FighterClass({
       ...def,
@@ -1424,11 +1472,36 @@ export function drawWeaponDetailScreen() {
     state.gameState = 'weapons';
   }, 120, 35);
 
-  // Toggle Fighter Model Button
-  const toggleText = state.showWeaponModel ? '▣ SHOW MODEL' : '☐ SHOW MODEL';
-  drawButton(toggleText, canvas.width / 2, btnY, () => {
+  // Toggle Fighter Model & Summon Buttons
+  const hasSummon = ['yuta', 'doppleganger', 'Engineer', 'black'].includes(def.type);
+
+  const modelToggleText = state.showWeaponModel ? '▣ MODEL' : '☐ MODEL';
+  drawButton(modelToggleText, canvas.width / 2 - (hasSummon ? 85 : 0), btnY, () => {
     state.showWeaponModel = !state.showWeaponModel;
-  }, 160, 35);
+    if (state.showWeaponModel) state.showSummonModel = false;
+  }, 130, 35);
+
+  if (hasSummon) {
+    const summonLabel = (def.type === 'yuta') ? 'RIKA' : (def.type === 'Engineer' ? 'TURRET' : 'SUMMON');
+    const summonToggleText = state.showSummonModel ? `👻 ${summonLabel}: ON` : `👻 ${summonLabel}: OFF`;
+    drawButton(summonToggleText, canvas.width / 2 + 75, btnY, () => {
+      state.showSummonModel = !state.showSummonModel;
+      if (state.showSummonModel) state.showWeaponModel = false;
+    }, 150, 35);
+    
+    // Minion Actions (Left side of the screen)
+    if (state.showSummonModel) {
+      drawButton('💥 ATTACK ANIM', 120, 200, () => {
+        state.previewRightArmTimer = 60;
+        state.previewLeftArmTimer  = 0;
+      }, 160, 40);
+
+      const ceLabel = state.previewShowCursedEnergy ? '🔮 CURSE ENERGY: ON' : '🔮 CURSE ENERGY: OFF';
+      drawButton(ceLabel, 120, 250, () => {
+        state.previewShowCursedEnergy = !state.previewShowCursedEnergy;
+      }, 160, 40);
+    }
+  }
 
   const currentIdx = FIGHTER_DEFS.findIndex(f => f.type === def.type);
   if (currentIdx > 0) {
@@ -1622,6 +1695,38 @@ function drawWeaponPreview(ctx, type, color) {
         ctx.fillStyle = '#df80ff';
         ctx.fill();
         ctx.restore();
+
+        ctx.restore();
+        return;
+      }
+
+      case 'yuta': {
+        // Draw Yuta Katana + Rika Cursed Energy Aura in weapon preview
+        ctx.save();
+        ctx.translate(r, 0);
+        ctx.rotate(0.2);
+
+        // Katana blade
+        ctx.fillStyle = '#E8E8E8';
+        ctx.strokeStyle = '#222222';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.rect(0, -2, 28, 4);
+        ctx.fill();
+        ctx.stroke();
+
+        // Katana tsuba (guard) & hilt
+        ctx.fillStyle = '#FFD700';
+        ctx.fillRect(-2, -5, 4, 10);
+        ctx.fillStyle = '#111111';
+        ctx.fillRect(-12, -2.5, 10, 5);
+
+        // Cursed energy glow surrounding blade
+        ctx.shadowColor = '#FF1493';
+        ctx.shadowBlur = 10;
+        ctx.strokeStyle = '#FF69B4';
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(0, -2, 28, 4);
 
         ctx.restore();
         return;

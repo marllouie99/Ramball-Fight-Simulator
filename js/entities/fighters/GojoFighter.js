@@ -177,6 +177,7 @@ export class GojoFighter extends Fighter {
     if (this.redEffectTimer > 0) {
       this.redEffectTimer--;
     }
+    if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.infinityBlockTimer > 0) {
       this.infinityBlockTimer--;
     }
@@ -211,6 +212,22 @@ export class GojoFighter extends Fighter {
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
 
+    // Distance check to closest opponent for melee range combat aura
+    const meleeDistanceThreshold = 220;
+    let inMeleeRange = false;
+    const myTeam = state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0);
+    if (state.fighters) {
+      state.fighters.forEach((f, idx) => {
+        if (f && f !== this && f.hp > 0) {
+          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+          if (isEnemy && Math.hypot(f.x - this.x, f.y - this.y) <= meleeDistanceThreshold) {
+            inMeleeRange = true;
+          }
+        }
+      });
+    }
+    this.inMeleeRange = inMeleeRange;
+
     // Smooth fade IN & fade OUT for Cursed Energy combat aura
     if (this.combatAuraOpacity === undefined) this.combatAuraOpacity = 0;
     if (state.gameState === 'countdown') {
@@ -219,16 +236,11 @@ export class GojoFighter extends Fighter {
     } else if (this.isChannelingPurple) {
       // Smoothly fade OUT body aura while mixing Red & Blue into Purple (focusing energy into the orbs)
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.05);
-    } else if (this.isMeleeMode || this.forcedMeleeTimer > 0) {
-      if (this.forcedMeleeTimer > 0 && this.forcedMeleeTimer < 45) {
-        // Fade OUT in final 45 frames of forced combat mode
-        this.combatAuraOpacity = Math.max(0, this.forcedMeleeTimer / 45);
-      } else {
-        // Fade IN smoothly (+0.06 per frame = ~16 frames full fade-in)
-        this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.06);
-      }
+    } else if (this.inMeleeRange || this.forcedMeleeTimer > 0 || this.domainActive) {
+      // Fade IN smoothly (+0.08 per frame)
+      this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.08);
     } else {
-      // Fade OUT smoothly (-0.035 per frame = ~30 frames full fade-out when exiting combat)
+      // Fade OUT smoothly (-0.035 per frame)
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.035);
     }
 
@@ -236,10 +248,10 @@ export class GojoFighter extends Fighter {
       this.infinityCooldown--;
       if (this.infinityCooldown <= 0) this.infinityActive = true;
     }
-    if (this.redCooldown > 0) this.redCooldown--;
-    if (this.purpleCooldown > 0) this.purpleCooldown--;
-    if (this.domainCooldown > 0) this.domainCooldown--;
-    if (this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
+    if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
+    if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
+    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) this.domainCooldown--;
+    if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.healingAuraTimer > 0) this.healingAuraTimer--;
 
     // Check for Reverse Cursed Technique (Self heal at low HP)
@@ -411,7 +423,11 @@ export class GojoFighter extends Fighter {
 
     // Switch modes based on distance & cooldown (only when not in special states)
     if (!this.isTeleporting && !this.isChannelingPurple) {
-      if (this.forcedMeleeTimer > 0) {
+      if (this.domainActive) {
+        this.isMeleeMode = true; // Force melee mode in domain
+        this.vx = 0;
+        this.vy = 0;
+      } else if (this.forcedMeleeTimer > 0) {
         this.wasForcedMelee = true;
         if (!this.isMeleeMode) {
           // In forced melee period - switch to melee mode
@@ -455,6 +471,8 @@ export class GojoFighter extends Fighter {
 
     // Handle Melee Mode (Hand-to-Hand Combat)
     if (this.isMeleeMode) {
+      this.vx = 0; // Lock movement during punch-teleport sequence
+      this.vy = 0;
       if (opponent && !opponent.isDead) {
         this._updateMeleeCombat(opponent, arena);
       }
@@ -510,7 +528,7 @@ export class GojoFighter extends Fighter {
       this.meleePunchCooldown--;
 
       // Slightly pull Gojo toward opponent to stick during rapid 3-hit combos
-      if (opponent && !opponent.isDead && this.meleeComboCount > 0) {
+      if (opponent && !opponent.isDead && this.meleeComboCount > 0 && !this.domainActive) {
         const dx = opponent.x - this.x;
         const dy = opponent.y - this.y;
         const dist = Math.hypot(dx, dy);
@@ -528,8 +546,8 @@ export class GojoFighter extends Fighter {
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
     if (this.meleeComboTarget === undefined) this.meleeComboTarget = Math.random() < 0.35 ? 3 : 1;
 
-    // 1. Only Teleport when starting a new combo sequence (meleeComboCount === 0)
-    if (this.meleeComboCount === 0) {
+    // 1. Only Teleport when starting a new combo sequence (or always when domain is active)
+    if (this.meleeComboCount === 0 || this.domainActive) {
       const oldX = this.x;
       const oldY = this.y;
 
@@ -621,6 +639,10 @@ export class GojoFighter extends Fighter {
    */
   _meleePunch(opponent) {
     const punchDamage = CONFIG.gojo.meleePunchDamage || 8;
+
+    // Trigger smooth hand punch animation (matches Sukuna's 8-frame punch timing)
+    this.punchAnimTimer = 8;
+    this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
     // Apply damage
     opponent.takeDamage(punchDamage, this, { isMelee: true });
@@ -764,6 +786,7 @@ export class GojoFighter extends Fighter {
 
   _activateDomain(arena) {
     this.domainActive = true;
+    this.domainActivationTime = Date.now();
     this.domainUseCount++;
     this.domainTimer = CONFIG.gojo.domainDuration || 300;
     this.domainCooldown = CONFIG.gojo.domainCooldown || 1200;
@@ -810,6 +833,38 @@ export class GojoFighter extends Fighter {
         }
       }
     });
+
+    // Also apply domain paralysis to valid enemy illusions (like Rika)
+    if (state.illusions) {
+      state.illusions.forEach((ill) => {
+        if (ill && ill.hp > 0 && typeof ill.takeDamage === 'function') {
+          let isEnemy = true;
+          if (myTeam !== null) {
+            let illOwnerIndex = -1;
+            if (ill.ownerIndex !== undefined) {
+              illOwnerIndex = ill.ownerIndex;
+            } else if (ill.owner && state.fighters.indexOf(ill.owner) !== -1) {
+              illOwnerIndex = state.fighters.indexOf(ill.owner);
+            }
+            if (illOwnerIndex !== -1) {
+              isEnemy = state.getFighterTeam(illOwnerIndex) !== myTeam;
+            }
+          }
+          
+          if (isEnemy) {
+            if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15);
+            if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15);
+            ill.vx = 0;
+            ill.vy = 0;
+
+            if (Math.random() < 0.35) {
+              spawnSparks(ill.x + (Math.random() - 0.5) * ill.r, ill.y - ill.r * 0.5, 3, 'lightningTrail', '#00E5FF');
+              spawnImpactFlash(ill.x, ill.y, 14, 'lightningTrail');
+            }
+          }
+        }
+      });
+    }
   }
 
   // PUBLIC: Draw Unlimited Void cosmic background BEFORE fighters so they aren't overlayed
@@ -847,8 +902,6 @@ export class GojoFighter extends Fighter {
 
     // ── 3. INFINITE KNOWLEDGE SINGULARITY RING AROUND GOJO ──
     const ringPulse = Math.sin(time * 0.004) * 6;
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = '#00E5FF';
     ctx.strokeStyle = 'rgba(0, 229, 255, 0.65)';
     ctx.lineWidth = 3;
     ctx.beginPath();
@@ -971,16 +1024,14 @@ export class GojoFighter extends Fighter {
       ctx.lineWidth = 4;
       ctx.textAlign = 'center';
       const textY = -this.r - 55 - (Math.sin(Date.now() / 150) * 5); // Floating effect
-      ctx.strokeText('UNLIMITED VOID', 0, textY);
-      ctx.fillText('UNLIMITED VOID', 0, textY);
+      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
+      ctx.fillText('DOMAIN EXPANSION', 0, textY);
 
       // 2. Isometric Ground Summoning Ring
       ctx.scale(1, 0.4); // Isometric perspective
       const ringRadius = 160 * progress;
 
       // Outer glowing cyan ring
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = '#00E5FF';
       ctx.beginPath();
       ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
       ctx.lineWidth = 6;
@@ -1035,8 +1086,6 @@ export class GojoFighter extends Fighter {
         ctx.closePath();
 
         // Soft glowing cyan-teal spirit flame fill
-        ctx.shadowBlur = 12;
-        ctx.shadowColor = '#00F0C0';
         ctx.fillStyle = 'rgba(0, 212, 204, 0.75)';
         ctx.fill();
 
@@ -1071,8 +1120,6 @@ export class GojoFighter extends Fighter {
 
         // 1. Outer Glowing Blue Shockwave Ring
         const ringRadius = (this.r + 5) * (0.8 + 1.2 * prog);
-        ctx.shadowColor = '#00BFFF';
-        ctx.shadowBlur = 18;
         ctx.strokeStyle = '#00BFFF';
         ctx.lineWidth = 5 * (1 - prog * 0.5);
         ctx.beginPath();
@@ -1123,18 +1170,23 @@ export class GojoFighter extends Fighter {
       this._drawReversalRedEffect(ctx);
     }
 
-    // Draw fighter body FIRST (underneath the energy)
-    drawGojoBody(ctx, this);
-
-    this.drawGun(ctx);
-
-    // Draw JJK Cursed Energy Flame Aura ON TOP of body (engulfing him)
-    // Also show during countdown for dramatic effect
-    if (this.isChannelingRCT || this.healingAuraTimer > 0) {
+    // 1. Draw JJK Cursed Energy Flame Aura BEHIND body
+    // Suppress aura while channeling Hollow Purple so Red & Blue orbs stand out cleanly
+    if (this.isChannelingPurple) {
+      // Aura suppressed during Hollow Purple orb fusion
+    } else if (this.isChannelingRCT || this.healingAuraTimer > 0) {
       this._drawJJKCursedEnergyAura(ctx, 'rct');
     } else if (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal) {
       this._drawJJKCursedEnergyAura(ctx, 'blue');
     }
+
+    // 2. Draw fighter body
+    drawGojoBody(ctx, this);
+
+    this.drawGun(ctx);
+
+    // 3. Draw physical circle hands + blobby hand cursed energy ON TOP of body
+    this._drawHandCursedEnergy(ctx);
 
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
@@ -1153,6 +1205,126 @@ export class GojoFighter extends Fighter {
       drawOrbitingOrb('red', 0);
       drawOrbitingOrb('blue', (Math.PI * 2) / 3);
       drawOrbitingOrb('purple', (Math.PI * 4) / 3);
+    }
+  }
+
+  // Render physical circle hands + animated blobby Cursed Energy flame aura on Gojo's hands
+  _drawHandCursedEnergy(ctx) {
+    const basePosY = (this.y - (this.z || 0));
+
+    // Dynamic hand animation offsets (Left hand rests in center of body by default)
+    let frontOffset = 6;
+    let frontAngleOffset = 0;
+
+    let backHandX = this.x;
+    let backHandY = basePosY;
+    let hideFrontHand = false;
+    let hideBackHand = false;
+
+    // 1. Melee Punch Animation (Smooth 8-frame strike & retraction matching Sukuna)
+    if (this.punchAnimTimer > 0) {
+      const t = (8 - Math.min(8, this.punchAnimTimer)) / 8; // 0 to 1 progress over 8 frames
+      const snap = t < 0.25 ? (t / 0.25) : Math.max(0, 1 - (t - 0.25) / 0.75); // Thrusts out 25%, smoothly retracts 75%
+      if (this.punchAnimHand === 0) {
+        frontOffset += snap * 24;        // Right hand punches 24px forward
+        // Left hand stays anchored right at center of body (this.x, basePosY)
+      } else {
+        const backAngle = this.gunAngle;
+        const backOffset = (this.r + 6) + snap * 24;
+        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches 24px forward!
+        backHandY = basePosY + Math.sin(backAngle) * backOffset;
+        frontOffset = -this.r + 2;       // Right hand pulls into chest center
+      }
+    }
+
+    // 2. Reversal Red / Blue / Hollow Purple Clasping Gesture
+    else if (this.redEffectTimer > 0 || this.isChannelingPurple || this.isChannelingDomainExpansion) {
+      frontAngleOffset = -0.15;
+      frontOffset = 18;
+
+      const backAngle = this.gunAngle + 0.15;
+      const backOffset = 18;
+      backHandX = this.x + Math.cos(backAngle) * (this.r + backOffset);
+      backHandY = basePosY + Math.sin(backAngle) * (this.r + backOffset);
+    }
+
+    // Front hand (Right hand) position
+    const frontAngle = this.gunAngle + frontAngleOffset;
+    const frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
+    const frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
+
+    // 1. Draw Physical Circle Hands (skin color with crisp black outline)
+    ctx.save();
+    ctx.fillStyle = '#FFE0BD';
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 2.5;
+
+    if (!hideFrontHand) {
+      ctx.beginPath();
+      ctx.arc(frontHandX, frontHandY, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    if (!hideBackHand) {
+      ctx.beginPath();
+      ctx.arc(backHandX, backHandY, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 2. Draw Quick Crimson Finger-Snap Flare at Gojo's hand when Reversal Red triggers
+    if (this.redEffectTimer > 0) {
+      const maxT = 20;
+      const t = Math.max(0, Math.min(1, 1 - (this.redEffectTimer / maxT)));
+      const flareScale = Math.sin(t * Math.PI);
+
+      ctx.save();
+      ctx.translate(frontHandX, frontHandY);
+
+      // Crimson outer glow gradient
+      const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, 16 * flareScale);
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      grad.addColorStop(0.3, 'rgba(255, 30, 60, 0.85)');
+      grad.addColorStop(0.7, 'rgba(200, 0, 40, 0.4)');
+      grad.addColorStop(1, 'rgba(150, 0, 20, 0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16 * flareScale, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Sharp 4-point Red Starburst Rays
+      ctx.strokeStyle = '#FF3355';
+      ctx.lineWidth = 2 * flareScale;
+      const rayLen = 22 * flareScale;
+      for (let i = 0; i < 4; i++) {
+        const rayAngle = (Math.PI / 2) * i + (t * 0.5);
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(rayAngle) * 3, Math.sin(rayAngle) * 3);
+        ctx.lineTo(Math.cos(rayAngle) * rayLen, Math.sin(rayAngle) * rayLen);
+        ctx.stroke();
+      }
+
+      // Piercing white inner core
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4 * flareScale, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // 3. Draw Blobby Cursed Energy Aura over Gojo's hands ONLY during active Melee Punches and RCT
+    const isAttackingWithHand = (this.punchAnimTimer > 0) || (this.isChannelingRCT || this.healingAuraTimer > 0);
+
+    if (isAttackingWithHand && !this.isChannelingPurple) {
+      let theme = (this.isChannelingRCT || this.healingAuraTimer > 0) ? 'rct' : 'blue';
+      const blobRadius = (this.punchAnimTimer > 0) ? 11 : 8;
+
+      if (!hideFrontHand) this._drawJJKCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
+      if (!hideBackHand) this._drawJJKCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
     }
   }
 
@@ -1518,10 +1690,12 @@ export class GojoFighter extends Fighter {
    * Render JJK-authentic Cursed Energy Flame Aura engulfing the character.
    * Smooth, flowing flame silhouette with thick dark ink contour (not spiky).
    */
-  _drawJJKCursedEnergyAura(ctx, colorTheme = 'rct') {
+  _drawJJKCursedEnergyAura(ctx, colorTheme = 'blue', overrideX = null, overrideY = null, overrideRadius = null) {
     // Calculate smooth fade-in & fade-out progress
     let progress = 1.0;
-    if (colorTheme === 'rct') {
+    if (overrideX !== null) {
+      progress = 1.0;
+    } else if (colorTheme === 'rct') {
       progress = Math.min(1, (this.healingAuraTimer / 180) || (this.rctChannelTimer / 150) || 1);
     } else {
       progress = Math.min(1, Math.max(0, this.combatAuraOpacity || 0));
@@ -1535,20 +1709,33 @@ export class GojoFighter extends Fighter {
     const time = frameIndex * 120; // 30 distinct stepped frames
 
     ctx.save();
-    ctx.translate(this.x, this.y - (this.z || 0));
+    const posX = overrideX !== null ? overrideX : this.x;
+    const posY = overrideY !== null ? overrideY : (this.y - (this.z || 0));
+    ctx.translate(posX, posY);
     ctx.globalCompositeOperation = 'source-over';
 
-    const r = this.r;
+    const r = overrideRadius !== null ? overrideRadius : this.r;
 
-    const isRCT = colorTheme === 'rct';
-    const mainColor = isRCT ? '#32CD32' : '#00D4CC';
-    const fillColor = isRCT ? `rgba(50, 205, 50, ${0.25 * progress})` : `rgba(0, 212, 204, ${0.15 * progress})`;
-    const coreColor = isRCT ? `rgba(144, 238, 144, ${0.25 * progress})` : `rgba(200, 255, 250, ${0.18 * progress})`;
+    let mainColor = '#00D4CC';
+    let fillColor = `rgba(0, 212, 204, ${0.15 * progress})`;
+    let coreColor = `rgba(200, 255, 250, ${0.18 * progress})`;
+
+    if (colorTheme === 'rct') {
+      mainColor = '#32CD32';
+      fillColor = `rgba(50, 205, 50, ${0.25 * progress})`;
+      coreColor = `rgba(144, 238, 144, ${0.25 * progress})`;
+    } else if (colorTheme === 'red') {
+      mainColor = '#FF1100';
+      fillColor = `rgba(255, 17, 0, ${0.25 * progress})`;
+      coreColor = `rgba(255, 100, 100, ${0.25 * progress})`;
+    } else if (colorTheme === 'purple') {
+      mainColor = '#9900FF';
+      fillColor = `rgba(153, 0, 255, ${0.25 * progress})`;
+      coreColor = `rgba(204, 100, 255, ${0.25 * progress})`;
+    }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 
-    // Soft ambient glow
-    ctx.shadowBlur = 20 * progress;
-    ctx.shadowColor = mainColor;
+    // (Removed shadowBlur for 60 FPS performance)
 
     // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
     const numPoints = 28;
@@ -1605,29 +1792,18 @@ export class GojoFighter extends Fighter {
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
-    // Draw outline as individual segments with varying width
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    let mxG = (points[numPoints - 1].x + points[0].x) / 2;
+    let myG = (points[numPoints - 1].y + points[0].y) / 2;
+    ctx.moveTo(mxG, myG);
     for (let i = 0; i < numPoints; i++) {
       const p = points[i];
       const next = points[(i + 1) % numPoints];
-      const midX = (p.x + next.x) / 2;
-      const midY = (p.y + next.y) / 2;
-
-      // Brush pressure varies per segment (thick in some spots, thin in others)
-      const pressureNoise = Math.sin(time * 0.002 + i * 1.7) * 0.5 + 0.5; // 0 to 1
-      const baseThick = 1.2 + pressureNoise * 2.5; // ranges from 1.2px to 3.7px
-
-      ctx.lineWidth = baseThick;
-      ctx.beginPath();
-
-      // Get previous midpoint as start
-      const prev = points[(i - 1 + numPoints) % numPoints];
-      const prevMidX = (prev.x + p.x) / 2;
-      const prevMidY = (prev.y + p.y) / 2;
-
-      ctx.moveTo(prevMidX, prevMidY);
-      ctx.quadraticCurveTo(p.x, p.y, midX, midY);
-      ctx.stroke();
+      ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
     }
+    ctx.closePath();
+    ctx.stroke();
 
     // Inner bright core wash
     ctx.beginPath();
@@ -1813,8 +1989,6 @@ export class GojoFighter extends Fighter {
     // 1. Directional Violent Repulsion Cone & Beam
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
-    ctx.shadowBlur = 30 * alpha;
-    ctx.shadowColor = '#FF0033';
 
     // Crimson Repulsion Beam Cone
     const coneGrad = ctx.createLinearGradient(fingerDist, 0, fingerDist + beamLength, 0);
@@ -1873,8 +2047,6 @@ export class GojoFighter extends Fighter {
 
     // 3. Expanding Crimson Repulsion Rings with Ink Edge
     ctx.save();
-    ctx.shadowBlur = 18;
-    ctx.shadowColor = '#FF0033';
     ctx.strokeStyle = '#FF0033';
     ctx.lineWidth = 3.5 * (1 - prog * 0.5);
 
@@ -1891,8 +2063,6 @@ export class GojoFighter extends Fighter {
     ctx.translate(fingerDist, 0);
 
     // Outer Crimson Glow
-    ctx.shadowBlur = 25;
-    ctx.shadowColor = '#FF0033';
 
     const orbR = 10 * (1.3 - prog * 0.4);
     const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, orbR * 2.2);

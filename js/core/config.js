@@ -565,7 +565,7 @@ export const CONFIG = {
     purplePullForce: 5.0,    // How strongly enemies are dragged toward the orb center
     purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
     purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
-    domainCooldown: 1500,     // 20s Ultimate cooldown
+    domainCooldown: 1100,     // 20s Ultimate cooldown
     domainChargeMax: 150,     // 2s Channeling duration before domain opens
     domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
     domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
@@ -604,7 +604,7 @@ export const CONFIG = {
     bleedDuration: 180,       // Frames bleed lasts (3 seconds)
 
     // Skill 1: Phantom Flurry + Cleave
-    flurryCooldown: 600,      // Cooldown between Phantom Flurry activations
+    flurryCooldown: 700,      // Cooldown between Phantom Flurry activations
     flurryHits: 10,            // Number of strikes in flurry
     flurryDamage: 6,          // Damage per flurry strike
     flurryHitInterval: 5,     // Frames between flurry strikes
@@ -636,37 +636,55 @@ export const CONFIG = {
 
   /** Yuta Okkotsu — Special Grade Sorcerer */
   yuta: {
-    rctRevivalHpThreshold: 0.05,
-    rctRevivalDuration: 150,
-    rctRevivalCooldown: 99999,
-    meleeCooldown: 50,
-    meleeRange: 75,
-    meleeDamage: 15,
-    meleeArc: Math.PI / 2,
-    parryThreatRadius: 180,
-    parryMeleeThreatRadius: 120,
-    parryAnticipationDuration: 45,
-    parryGuardDuration: 90,
-    parryActiveChance: 0.85,
-    parryPassiveChance: 0.25,
-    flurryHits: 5,
-    flurryDamage: 8,
-    flurryHitInterval: 6,
-    flurryParryMin: 5,
-    flurryParryMax: 7,
-    cursedSpeechRadius: 150,
-    cursedSpeechFreezeTime: 45,
-    thinIceBreakerDamage: 25,
-    thinIceBreakerSpeed: 25,
-    rikaRadius: 30,
-    rikaCooldown: 600,
-    rikaSpeedMultiplier: 1.3,
-    rikaDamage: 12,
-    domainCooldown: 1500,
-    domainChargeMax: 90,
-    domainDuration: 400,
-    domainCooldownReduction: 0.8,
-    regenRate: 0.05,
+    // Passive: Reverse Cursed Technique (RCT) & Passive Regeneration
+    regenRate: 0.03,                         // HP restored per frame passively
+    rctRevivalHpThreshold: 0.05,             // Triggers RCT revival when HP drops to 5% or below
+    rctRevivalHealPercent: 0.15,             // Percentage of max HP restored upon RCT revival
+    rctRevivalDuration: 150,                 // Frames the revival heal process lasts (2.5 seconds at 60fps)
+    rctRevivalCooldown: 99999,               // Cooldown before RCT revival can trigger again (once per match)
+
+    // Basic Attack: Katana Melee
+    meleeCooldown: 50,                       // Frames between katana strikes
+    meleeRange: 75,                          // Pixel distance required to land melee hit
+    meleeDamage: 15,                         // Base damage per katana swing
+    meleeArc: Math.PI / 2,                   // Arc angle in radians for melee swing area
+
+    // Defensive / Counter Mechanic: Parry & Guard Stance
+    parryThreatRadius: 180,                  // Detection radius in pixels for incoming projectile threats
+    parryMeleeThreatRadius: 120,             // Detection radius in pixels for incoming melee threats
+    parryAnticipationDuration: 45,           // Frames to raise guard posture when threat is detected
+    parryGuardDuration: 90,                  // Frames to hold block pose after parrying an attack
+    parryActiveChance: 0.35,                 // Probability (0-1) of parrying while actively guarding
+    parryPassiveChance: 0.25,                // Probability (0-1) of parrying passively when not guarding
+
+    // Special Mechanic: Phantom Flurry (Parry Counterattack)
+    flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
+    flurryParryMax: 7,                       // Maximum random target threshold for Flurry activation
+    flurryHits: 5,                           // Number of rapid teleport slashes in Flurry execution
+    flurryDamage: 8,                         // Damage per slash during Flurry
+    flurryHitInterval: 6,                    // Frames delay between each Flurry slash
+
+    // Copied Techniques (Ranged Skill Cycle)
+    cursedSpeechRadius: 150,                 // Impact shockwave radius in pixels for "DON'T MOVE!"
+    cursedSpeechFreezeTime: 45,              // Frames enemies are frozen in place (0.75 seconds)
+    thinIceBreakerDamage: 25,                // Damage dealt by Thin Ice Breaker spatial distortion
+    thinIceBreakerSpeed: 25,                 // Speed of Thin Ice Breaker projectile
+
+    // Summon Companion: Rika Orimoto
+    rikaMaxHp: 500,                          // Maximum health pool when summoned
+    rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
+    rikaCooldown: 1200,                      // Cooldown between Rika actions/manifestations (frames)
+    rikaDuration: 1000,                       // Frames Rika stays active when summoned (60 frames = 1 second)
+    rikaSpeedMultiplier: 1.8,                // Movement speed multiplier relative to Yuta's base speed
+    rikaDamage: 12,                          // Physical damage dealt per attack tick by Rika
+    rikaAttackRate: 10,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
+
+    // Ultimate Skill: Domain Expansion — Authentic Mutual Love
+    domainCooldown: 1200,                    // Cooldown before domain can trigger (25 seconds at 60fps)
+    domainChargeMax: 90,                     // Channeling duration before domain opens (1.5 seconds)
+    domainDuration: 1000,                    // Frames domain stays active (~16.6 seconds, matched with Rika)
+    domainRadius: 350,                       // Radius of the domain boundary in pixels
+    domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
   },
 };
 

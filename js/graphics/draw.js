@@ -1,6 +1,6 @@
-// ─────────────────────────────────────────────
-// DRAW — ARENA
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DRAW â€” ARENA
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 import { state, getProjectiles } from '../core/state.js';
 import { TricksterCronosTheme } from '../entities/fighters/trickster/tricksterThemes.js';
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from './weaponVisuals.js';
@@ -39,7 +39,7 @@ export function resetCachedTime() {
   _cachedTime = 0;
 }
 
-// ── Module-level cached hex vertex trig (shared by sphere, barrier, etc.) ──
+// â”€â”€ Module-level cached hex vertex trig (shared by sphere, barrier, etc.) â”€â”€
 const _DRAW_HEX_ANGLE = Math.PI / 3;
 const _DRAW_HEX_COS = [
   Math.cos(Math.PI / 6), Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE), Math.cos(Math.PI / 6 + _DRAW_HEX_ANGLE * 2),
@@ -58,18 +58,21 @@ let _shimmerFrame = 0;
 
 export function drawArena() {
   const { ctx, canvas, arena } = state;
+  const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive);
 
-  // Fill the entire canvas background with white
-  ctx.fillStyle = '#ffffff';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  if (!hasActiveDomain) {
+    // Fill the entire canvas background with white
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Arena background (in case it needs to be different later, but right now it's also white)
-  ctx.fillStyle = 'rgb(250, 250, 250)';
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+    // Arena background (in case it needs to be different later, but right now it's also white)
+    ctx.fillStyle = 'rgb(250, 250, 250)';
+    ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  }
 
   // Draw the arena boundary stroke
   ctx.strokeStyle = '#000000ff';
-  ctx.lineWidth = 6;
+  ctx.lineWidth = 16;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
 }
 
@@ -236,7 +239,7 @@ export function drawFurnaceDimScreen() {
 /**
  * Draws Sukuna's Furnace (Fuga) Divine Flame Arrow Construct.
  * Long turbulent roaring fire trail with fluid curling patterns.
- * Color cascade: white → bright yellow → golden orange → deep orange → crimson.
+ * Color cascade: white â†’ bright yellow â†’ golden orange â†’ deep orange â†’ crimson.
  * Conveys supernatural speed, unstoppable momentum, and immense magical power.
  */
 export function drawDivineFlameArrowConstruct(ctx, {
@@ -271,10 +274,10 @@ export function drawDivineFlameArrowConstruct(ctx, {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
-  // 2. ROARING FLAME TONGUES ΓÇö long, turbulent, curling backward
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  // 2. ROARING FLAME TONGUES Î“Ã‡Ã¶ long, turbulent, curling backward
   // Uses traveling wave + multi-frequency turbulence for fluid motion
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   const numTendrils = 16;
   for (let i = 0; i < numTendrils; i++) {
     const side = i % 2 === 0 ? 1 : -1;
@@ -317,19 +320,19 @@ export function drawDivineFlameArrowConstruct(ctx, {
     // Color cascade from white-hot (near arrow) to crimson (tips)
     const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
     if (ratio < 0.3) {
-      // Near tip: white ΓåÆ bright yellow core
+      // Near tip: white Î“Ã¥Ã† bright yellow core
       tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
       tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
       tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
       tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
     } else if (ratio < 0.6) {
-      // Mid shaft: golden orange ΓåÆ deep orange
+      // Mid shaft: golden orange Î“Ã¥Ã† deep orange
       tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
       tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
       tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
       tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
     } else {
-      // Rear: deep orange ΓåÆ crimson red
+      // Rear: deep orange Î“Ã¥Ã† crimson red
       tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
       tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
       tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
@@ -339,10 +342,10 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.fill();
   }
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   // 3. TWIN FIERY TAIL FLETCHING (Rear Plumes at notchX)
   // Wild streaming plumes that convey unstoppable momentum
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   for (let side of [-1, 1]) {
     const tailPhase = time * 7.5 + side * 1.5;
     const plumeScale = isFlying ? 1.6 : 1.0;
@@ -373,9 +376,9 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.fill();
   }
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   // 4. MOLTEN LAVA SHAFT & INCANDESCENT CORE
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   const shaftGrad = ctx.createLinearGradient(notchX, 0, headX + 4, 0);
   shaftGrad.addColorStop(0, `rgba(255, 90, 0, ${0.75 * progress})`);
   shaftGrad.addColorStop(0.3, `rgba(255, 180, 30, ${0.9 * progress})`);
@@ -415,9 +418,9 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.stroke();
   }
 
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   // 5. VOLCANIC OBSIDIAN MAGMA ARROWHEAD
-  // ΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉΓòÉ
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
   const tipApexX = tipX + 6 * progress;
   const barbX = headX - 6 * progress;
   const barbY = 17 * progress;
@@ -498,9 +501,9 @@ export function drawDivineFlameArrowConstruct(ctx, {
 }
 
 
-// ─────────────────────────────────────────────
-// DRAW — PROJECTILES
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DRAW â€” PROJECTILES
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function drawBlackHoleVisual({
   ctx,
@@ -760,25 +763,25 @@ export function drawCronosSphereVisual({
   const p = Math.min(1, Math.max(0, deployProgress));
   const R = radius;
 
-  // ── LOD: Use simplified rendering when many projectiles frozen ────────
+  // â”€â”€ LOD: Use simplified rendering when many projectiles frozen â”€â”€â”€â”€â”€â”€â”€â”€
   const lodCellSize = useLOD ? Math.max(30, R * 0.22) : Math.max(20, R * 0.14);
 
-  // ── Use module-level cached hex trig ──────────────────────────────────────
+  // â”€â”€ Use module-level cached hex trig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cosAngles = _DRAW_HEX_COS;
   const sinAngles = _DRAW_HEX_SIN;
 
   // No outer glow - keeps the sphere crisp without blur
 
 
-  // ═══════════════════════════════════════════════════════════════════════════
-  // PERFECT CIRCULAR CLIP REGION — everything below is masked to a clean circle
-  // ═══════════════════════════════════════════════════════════════════════════
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+  // PERFECT CIRCULAR CLIP REGION â€” everything below is masked to a clean circle
+  // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
   ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.clip();
 
-  // ── Honeycomb grid (inside clipped region) ───────────────────────────────
+  // â”€â”€ Honeycomb grid (inside clipped region) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   // Removed 'screen' mode so grid stays visible on white
   ctx.globalAlpha = 0.85 * alpha;
@@ -801,7 +804,7 @@ export function drawCronosSphereVisual({
       hexOffsets.push({ x: cosAngles[i] * cellSize, y: sinAngles[i] * cellSize });
     }
 
-    // Build valid cells — clip() handles the circular boundary cleanly,
+    // Build valid cells â€” clip() handles the circular boundary cleanly,
     // so we just include all cells whose center falls within the radius.
     const validCells = [];
     for (let row = -rowCount; row <= rowCount; row++) {
@@ -877,7 +880,7 @@ export function drawCronosSphereVisual({
 
 
 
-  // ── Energy pulse rings (inside clip, subtle) ─────────────────────────────
+  // â”€â”€ Energy pulse rings (inside clip, subtle) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   ctx.globalAlpha = 0.55 * alpha;
   ctx.translate(cx, cy);
@@ -894,7 +897,7 @@ export function drawCronosSphereVisual({
 
   ctx.restore(); // END CLIP REGION
 
-  // ── EDGE GLOW — integrated luminous ring at the sphere boundary ───────────
+  // â”€â”€ EDGE GLOW â€” integrated luminous ring at the sphere boundary â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // Uses screen blend + animated shimmer + gradient stroke to feel like part of the sphere
   // OPTIMIZATION: Quantize shimmer to every ~3 frames (avoids per-frame Math.sin)
   _shimmerFrame++;
@@ -906,7 +909,7 @@ export function drawCronosSphereVisual({
 
 
 
-  // Crisp edge ring — clean border instead of blurry glow
+  // Crisp edge ring â€” clean border instead of blurry glow
   ctx.save();
   ctx.globalAlpha = alpha * shimmer;
   ctx.strokeStyle = t.crispEdge;
@@ -921,7 +924,7 @@ export function drawCronosSphereVisual({
 /**
  * Cronos Pre-Activate Barrier Effect
  * A glowing honeycomb barrier that surrounds Cronos when his sphere is about to activate.
- * Matches the aesthetic of drawCronosSphereVisual — hexagonal, cyan glow, pulsing.
+ * Matches the aesthetic of drawCronosSphereVisual â€” hexagonal, cyan glow, pulsing.
  */
 export function drawCronosPreActivateBarrier({
   ctx,
@@ -931,7 +934,7 @@ export function drawCronosPreActivateBarrier({
   preProgress = 1,   // 0 = just started warning, 1 = about to activate
   now = Date.now(),
 }) {
-  // OPTIMIZATION: LOD gate — skip barrier entirely at low FPS/quality
+  // OPTIMIZATION: LOD gate â€” skip barrier entirely at low FPS/quality
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
@@ -945,7 +948,7 @@ export function drawCronosPreActivateBarrier({
   const cosAngles = _DRAW_HEX_COS;
   const sinAngles = _DRAW_HEX_SIN;
 
-  // ── Outer glow (fresnel-like) — reduced from 4 to 3 gradient stops ───────
+  // â”€â”€ Outer glow (fresnel-like) â€” reduced from 4 to 3 gradient stops â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   const pulseIntensity = 0.5 + 0.5 * Math.sin(now / 180);
   const glowAlpha = (0.5 + 0.3 * p) * pulseIntensity;
@@ -960,7 +963,7 @@ export function drawCronosPreActivateBarrier({
   ctx.fill();
   ctx.restore();
 
-  // ── Inner energy core ───────────────────────────────────────────────────
+  // â”€â”€ Inner energy core â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   const coreAlpha = (0.6 + 0.4 * p) * pulseIntensity;
   const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, R * 0.85);
@@ -975,7 +978,7 @@ export function drawCronosPreActivateBarrier({
   ctx.fill();
   ctx.restore();
 
-  // ── Primary barrier shell outline ────────────────────────────────────────
+  // â”€â”€ Primary barrier shell outline â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   // OPTIMIZED: Removed shadowBlur (expensive operation)
   ctx.globalAlpha = (0.5 + 0.3 * p) * pulseIntensity;
@@ -996,7 +999,7 @@ export function drawCronosPreActivateBarrier({
 
   // OPTIMIZATION: Skip rotating energy arcs at low quality
   if (!useLOD) {
-    // ── Rotating energy arcs ────────────────────────────────────────────────
+    // â”€â”€ Rotating energy arcs â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     const rot = now / 400;
     const arcW = Math.PI / 4;
     ctx.save();
@@ -1016,7 +1019,7 @@ export function drawCronosPreActivateBarrier({
     ctx.restore();
   }
 
-  // ── Honeycomb grid clipped to shell ──────────────────────────────────────
+  // â”€â”€ Honeycomb grid clipped to shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   // OPTIMIZED: Single-pass rendering with cached distances
   ctx.save();
   ctx.globalCompositeOperation = 'screen';
@@ -1104,7 +1107,7 @@ export function drawCronosPreActivateBarrier({
   ctx.fill();
   ctx.restore();
 
-  // ── Energy pulse rings ───────────────────────────────────────────────────
+  // â”€â”€ Energy pulse rings â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   ctx.globalAlpha = (0.4 + 0.3 * p) * pulseIntensity;
   ctx.translate(cx, cy);
@@ -1119,7 +1122,7 @@ export function drawCronosPreActivateBarrier({
   }
   ctx.restore();
 
-  // ── Hexagonal node points at shell ────────────────────────────────────────
+  // â”€â”€ Hexagonal node points at shell â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   ctx.save();
   ctx.globalAlpha = (0.35 + 0.3 * p) * pulseIntensity;
   ctx.translate(cx, cy);
@@ -1138,7 +1141,7 @@ export function drawCronosPreActivateBarrier({
   ctx.restore();
 }
 
-// ── Cronos Sphere Impact Burst ─────────────────────────────────────────────
+// â”€â”€ Cronos Sphere Impact Burst â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Called when Cronos unleashes his sphere. Matches the sphere's cyan/honeycomb style.
 export function drawCronosSphereImpact({ ctx, cx, cy, radius, impactProgress, now }) {
   const p = Math.min(1, Math.max(0, impactProgress));
@@ -1266,7 +1269,7 @@ export function drawProjectiles() {
       return;
     }
 
-    // ── POISON SPILL: boiling liquid pool with foam, bubbles, and surface texture ──
+    // â”€â”€ POISON SPILL: boiling liquid pool with foam, bubbles, and surface texture â”€â”€
     if (p.isPoisonSpill) {
       const lifeRatio = Math.max(0, Math.min(1, p.life / (p.maxLife || 1)));
       const fadeAlpha = lifeRatio;
@@ -1275,14 +1278,14 @@ export function drawProjectiles() {
 
       ctx.save();
 
-      // ── Layer 1: Dark base shadow ───────────────────────────────────────────
+      // â”€â”€ Layer 1: Dark base shadow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       ctx.globalAlpha = fadeAlpha * 0.4;
       ctx.beginPath();
       ctx.arc(p.x, p.y, baseRadius * 1.1, 0, Math.PI * 2);
       ctx.fillStyle = '#0d2b0d';
       ctx.fill();
 
-      // ── Layer 2: Main liquid pool with irregular boiling edge ─────────────────
+      // â”€â”€ Layer 2: Main liquid pool with irregular boiling edge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       ctx.globalAlpha = fadeAlpha * 0.65;
       ctx.beginPath();
       // Draw irregular boiling edge using multiple arc segments
@@ -1310,7 +1313,7 @@ export function drawProjectiles() {
       ctx.fillStyle = liquidGrad;
       ctx.fill();
 
-      // ── Layer 4: Boiling surface bubbles (popping and rising) ─────────────────
+      // â”€â”€ Layer 4: Boiling surface bubbles (popping and rising) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const bubbleCount = 10;
       for (let i = 0; i < bubbleCount; i++) {
         const seed = i * 137.5; // Golden angle for even distribution
@@ -1341,7 +1344,7 @@ export function drawProjectiles() {
         }
       }
 
-      // ── Layer 5: Surface ripples (expanding circles from random points) ────────
+      // â”€â”€ Layer 5: Surface ripples (expanding circles from random points) â”€â”€â”€â”€â”€â”€â”€â”€
       const rippleCount = 3;
       for (let r = 0; r < rippleCount; r++) {
         const rPhase = ((now / 900 + r * 0.33) % 1);
@@ -1360,7 +1363,7 @@ export function drawProjectiles() {
         ctx.stroke();
       }
 
-      // ── Layer 6: Foam patches on surface ─────────────────────────────────────
+      // â”€â”€ Layer 6: Foam patches on surface â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       const foamCount = 5;
       for (let f = 0; f < foamCount; f++) {
         const fSeed = f * 97.3;
@@ -1376,7 +1379,7 @@ export function drawProjectiles() {
         ctx.fill();
       }
 
-      // ── Layer 7: Inner glow core ─────────────────────────────────────────────
+      // â”€â”€ Layer 7: Inner glow core â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       ctx.globalAlpha = fadeAlpha * 0.4;
       const coreGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, baseRadius * 0.4);
       coreGrad.addColorStop(0, 'rgba(200,255,200,0.6)');
@@ -1427,7 +1430,7 @@ export function drawProjectiles() {
       return;
     }
 
-    // ── C4 EXPLOSIVE: high-quality military C4 charge ──────────────────────
+    // â”€â”€ C4 EXPLOSIVE: high-quality military C4 charge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if (p.isC4) {
       const sparkPhase = (now / 200) % (Math.PI * 2);
       const rotation = p.rotation || 0;
@@ -1456,7 +1459,7 @@ export function drawProjectiles() {
     }
 
     if (p.isBomberGrenade) {
-      // ── HIGH-QUALITY GRENADE DRAWING ─────────────────────────────────────
+      // â”€â”€ HIGH-QUALITY GRENADE DRAWING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
       // Use the detailed grenade renderer from bomberWeaponGraphics.js
       const zOffset = p.z || 0;
       const sparkPhase = Date.now() / 100;
@@ -1777,7 +1780,7 @@ export function drawProjectiles() {
       const maxTrailLen = 48;
       while (p._trailHistory.length > maxTrailLen) p._trailHistory.shift();
 
-      // ── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched ──
+      // â”€â”€ SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched â”€â”€
       for (let i = 0; i < 3; i++) {
         const spawnOffset = -Math.random() * 20;
         p.flameParticles.push({
@@ -1797,7 +1800,7 @@ export function drawProjectiles() {
         });
       }
 
-      // ── SPAWN EMBERS: Glowing sparks that dissolve at trail end ──
+      // â”€â”€ SPAWN EMBERS: Glowing sparks that dissolve at trail end â”€â”€
       if (Math.random() < 0.85) {
         p.emberParticles.push({
           x: 5 - Math.random() * 25,
@@ -1820,11 +1823,11 @@ export function drawProjectiles() {
       ctx.translate(p.x, p.y);
       ctx.rotate(angle);
 
-      // ═══════════════════════════════════════════════════════════════
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       // LAYER 0: LONG TURBULENT FIRE WAKE (drawn from trail history)
       // A massive streaking energy wake that makes the arrow look
       // like it's ripping through the air and igniting everything
-      // ═══════════════════════════════════════════════════════════════
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       if (p._trailHistory.length > 3) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1869,25 +1872,25 @@ export function drawProjectiles() {
 
           ctx.closePath();
 
-          // Color cascade: white → yellow → golden orange → deep orange → crimson
+          // Color cascade: white â†’ yellow â†’ golden orange â†’ deep orange â†’ crimson
           const trailStartX = localTrail[len - 1].x;
           const trailEndX = localTrail[0].x;
           const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
 
           if (layer === 0) {
-            // Outermost: crimson → deep orange fade
+            // Outermost: crimson â†’ deep orange fade
             wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
             wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
             wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
             wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
           } else if (layer === 1) {
-            // Middle: golden orange → deep orange
+            // Middle: golden orange â†’ deep orange
             wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
             wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
             wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
             wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
           } else {
-            // Innermost core: white → bright yellow
+            // Innermost core: white â†’ bright yellow
             wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
             wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
             wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
@@ -1900,9 +1903,9 @@ export function drawProjectiles() {
         ctx.restore();
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // LAYER 1: FLUID FLAME BLOBS — curling, twisting smoke-fire
-      // ═══════════════════════════════════════════════════════════════
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // LAYER 1: FLUID FLAME BLOBS â€” curling, twisting smoke-fire
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
 
@@ -1957,9 +1960,9 @@ export function drawProjectiles() {
         ctx.fill();
       }
 
-      // ═══════════════════════════════════════════════════════════════
-      // LAYER 2: GLOWING EMBER SPARKS — dissolving at trail end
-      // ═══════════════════════════════════════════════════════════════
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // LAYER 2: GLOWING EMBER SPARKS â€” dissolving at trail end
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       for (let i = p.emberParticles.length - 1; i >= 0; i--) {
         const ep = p.emberParticles[i];
         ep.life -= ep.decay;
@@ -1992,10 +1995,10 @@ export function drawProjectiles() {
 
       ctx.restore(); // lighter
 
-      // ═══════════════════════════════════════════════════════════════
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES
       // Thin velocity lines showing air being torn apart
-      // ═══════════════════════════════════════════════════════════════
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       ctx.save();
       ctx.globalAlpha = 0.35;
       ctx.strokeStyle = 'rgba(255, 200, 100, 0.4)';
@@ -2180,7 +2183,7 @@ export function drawProjectiles() {
 
     // Default projectile draw
     // Make projectile visuals depend on the owner projectile color/type.
-    // RED: red-orange motion trail; BLUE: cyan “laser-ish” streak.
+    // RED: red-orange motion trail; BLUE: cyan â€œlaser-ishâ€ streak.
     const isRed = (p.color && p.color.toLowerCase().includes('ff4d4d')) ||
       (p.color && p.color.toLowerCase().includes('ff') && p.color.toLowerCase().includes('4d'));
     const isBlue = (p.color && p.color.toLowerCase().includes('4da3ff')) ||
@@ -2256,9 +2259,9 @@ export function drawProjectiles() {
   });
 }
 
-// ─────────────────────────────────────────────
-// DRAW — BLACK HOLE EFFECTS (drawn BEFORE fighters)
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DRAW â€” BLACK HOLE EFFECTS (drawn BEFORE fighters)
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function drawBlackHoleEffects() {
   const ctx = state.ctx;
@@ -2380,9 +2383,9 @@ export function drawBlackHoleEffects() {
   }
 }
 
-// ─────────────────────────────────────────────
-// DRAW — ALL FIGHTERS
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DRAW â€” ALL FIGHTERS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function drawFighters() {
   const { ctx, fighters, mode } = state;
@@ -2419,7 +2422,24 @@ export function drawFighters() {
     });
   }
 
-  fighters.forEach((fighter, fi) => {
+  // Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
+  // Exception: Fighters with an active domain expansion are forced to draw last (on top of everyone).
+  const sortedFighters = [...fighters].map((f, i) => ({f, i})).sort((a, b) => {
+    if (!a.f) return -1;
+    if (!b.f) return 1;
+
+    // Force active domain expansions to the top layer
+    const aDomain = a.f.domainActive;
+    const bDomain = b.f.domainActive;
+    if (aDomain && !bDomain) return 1;
+    if (!aDomain && bDomain) return -1;
+
+    return a.f.y - b.f.y;
+  });
+
+  sortedFighters.forEach((item) => {
+    const fighter = item.f;
+    const fi = item.i;
     if (!fighter || fighter.hp <= 0) return;
     const opponent = mode === 'FFA' ? null : fighters[1 - fi];
     try {
@@ -2530,9 +2550,9 @@ export function drawFighters() {
   });
 }
 
-// ─────────────────────────────────────────────
-// DRAW — FUEL PICKUPS
-// ─────────────────────────────────────────────
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DRAW â€” FUEL PICKUPS
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function drawFuelPickups() {
   const { ctx, fuelPickups, fighters } = state;
@@ -2550,7 +2570,7 @@ export function drawFuelPickups() {
     const pulse = 0.85 + Math.sin(pickup.pulsePhase) * 0.15;
     const r = pickup.radius * pulse; // base radius for scaling
 
-    // ── Outer glow ──
+    // â”€â”€ Outer glow â”€â”€
     const glowGrad = ctx.createRadialGradient(pickup.x, pickup.y, r * 0.6, pickup.x, pickup.y, r * 2.2);
     glowGrad.addColorStop(0, 'rgba(255, 180, 30, 0.5)');
     glowGrad.addColorStop(0.5, 'rgba(255, 120, 0, 0.25)');
@@ -2560,14 +2580,14 @@ export function drawFuelPickups() {
     ctx.arc(pickup.x, pickup.y, r * 2.2, 0, Math.PI * 2);
     ctx.fill();
 
-    // ── Battery dimensions ──
+    // â”€â”€ Battery dimensions â”€â”€
     const bw = r * 1.6;   // battery body width (half)
     const bh = r * 1.1;   // battery body height (half)
     const br = r * 0.35;  // corner radius
     const nx = pickup.x;  // center x
     const ny = pickup.y;  // center y
 
-    // ── Battery body (rounded rectangle) ──
+    // â”€â”€ Battery body (rounded rectangle) â”€â”€
     ctx.fillStyle = '#4a4a4a';
     ctx.beginPath();
     roundedRect(ctx, nx - bw, ny - bh, bw * 2, bh * 2, br);
@@ -2654,9 +2674,9 @@ function roundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────
 // DRAW — FLOATING TEXT LABELS
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────
 
 export function drawFloatingTexts() {
   const { ctx } = state;
@@ -2707,9 +2727,9 @@ export function drawFloatingTexts() {
   state.floatingTexts = activeTexts;
 }
 
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────
 // DRAW — FLAMES (Batched for Performance)
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────
 
 /**
  * Draw all flame projectiles to the dedicated flame canvas.
@@ -2728,14 +2748,17 @@ export function drawFlames() {
   drawFlamesToCanvas(flames);
 }
 
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────
 // DRAW — ILLUSIONS (Doppleganger)
-// ─────────────────────────────────────────────
+// ──────────────────────────────────────────
 
 export function drawIllusions() {
   const { ctx, illusions } = state;
 
   for (const illusion of illusions) {
+    // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
+    if (illusion.isRika) continue;
+
     // Illusions don't fade out based on duration anymore - they persist until death
     // But we can add a subtle visual effect to show age if desired
     const age = CONFIG.doppleganger.illusionDuration - (illusion.duration || 0);
@@ -2840,104 +2863,367 @@ export function drawAllCronosSpheres(ctx) {
 export function drawThermobaricExplosions(ctx) {
   if (!state.thermobaricExplosions || state.thermobaricExplosions.length === 0) return;
 
+  const nowTime = Date.now();
+
   for (let i = state.thermobaricExplosions.length - 1; i >= 0; i--) {
     const exp = state.thermobaricExplosions[i];
     exp.life--;
-    
-    const progress = 1 - (exp.life / exp.maxLife);
-    const radius = exp.radius + (exp.maxRadius - exp.radius) * Math.sin(progress * Math.PI * 0.5);
-    const alpha = Math.max(0, 1 - progress);
+
+    const craterProgress = 1 - (exp.life / exp.maxLife);
+    const craterAlpha = Math.max(0, 1 - craterProgress);
+
+    const explosionFrames = 50;
+    const explosionLife = Math.max(0, exp.life - (exp.maxLife - explosionFrames));
+    const explosionProgress = 1 - (explosionLife / explosionFrames);
+    const expAlpha = Math.max(0, 1 - explosionProgress);
+    const radius = exp.radius + (exp.maxRadius - exp.radius) * Math.sin(Math.min(1, explosionProgress) * Math.PI * 0.5);
+
+    const R = exp.maxRadius;
+    const cx = exp.x;
+    const cy = exp.y;
+    const rimPts = exp.rimPoints || [];
 
     ctx.save();
 
-    // 1. CRACKS & SHATTERED GROUND AT IMPACT SURFACE
+    // Helper: draw wobbly ellipse from pre-generated rim points
+    const drawWobblyEllipse = (scaleX, scaleY, rimScale) => {
+      if (rimPts.length === 0) { ctx.arc(0, 0, scaleX, 0, Math.PI * 2); return; }
+      ctx.beginPath();
+      for (let r = 0; r < rimPts.length; r++) {
+        const pt = rimPts[r];
+        const nextPt = rimPts[(r + 1) % rimPts.length];
+        const w = pt.wobble * rimScale;
+        const px = Math.cos(pt.angle) * scaleX * w;
+        const py = Math.sin(pt.angle) * scaleY * w;
+        const nw = nextPt.wobble * rimScale;
+        const nx = Math.cos(nextPt.angle) * scaleX * nw;
+        const ny = Math.sin(nextPt.angle) * scaleY * nw;
+        if (r === 0) ctx.moveTo(px, py);
+        const midX = (px + nx) / 2;
+        const midY = (py + ny) / 2;
+        ctx.quadraticCurveTo(px, py, midX, midY);
+      }
+      ctx.closePath();
+    };
+
+    // â”€â”€ CRATER LAYERS â”€â”€
+    ctx.save();
+    ctx.translate(cx, cy);
+
+    ctx.save();
+    ctx.globalAlpha = craterAlpha * 0.7;
+    ctx.fillStyle = '#1a1008';
+    drawWobblyEllipse(R * 0.9, R * 0.65, 1.05);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = craterAlpha * 0.85;
+    ctx.fillStyle = '#0d0a06';
+    drawWobblyEllipse(R * 0.78, R * 0.56, 1.0);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = craterAlpha * 0.9;
+    const depGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.55);
+    depGrad.addColorStop(0, `rgba(40, 10, 0, ${craterAlpha})`);
+    depGrad.addColorStop(0.6, `rgba(20, 8, 2, ${craterAlpha * 0.9})`);
+    depGrad.addColorStop(1, 'rgba(15, 5, 0, 0)');
+    ctx.fillStyle = depGrad;
+    drawWobblyEllipse(R * 0.65, R * 0.45, 0.95);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = craterAlpha * 0.5;
+    for (let ring = 0; ring < 3; ring++) {
+      const ringR = R * (0.35 + ring * 0.12);
+      const ringAlpha = (1 - ring * 0.3) * craterAlpha;
+      ctx.strokeStyle = `rgba(80, 20, 0, ${ringAlpha * 0.4})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ringR, ringR * 0.7, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    ctx.save();
+    const magmaPulse = 0.85 + Math.sin(nowTime * 0.003 + (exp.seed || 0) * 10) * 0.15;
+    const magmaGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 0.4 * magmaPulse);
+    magmaGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * craterAlpha * magmaPulse})`);
+    magmaGrad.addColorStop(0.3, `rgba(255, 120, 20, ${0.7 * craterAlpha * magmaPulse})`);
+    magmaGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.45 * craterAlpha})`);
+    magmaGrad.addColorStop(1, 'rgba(80, 10, 0, 0)');
+    ctx.fillStyle = magmaGrad;
+    ctx.beginPath();
+    drawWobblyEllipse(R * 0.4 * magmaPulse, R * 0.28 * magmaPulse, 0.9);
+    ctx.fill();
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = craterAlpha * 0.6;
+    for (let v = 0; v < 6; v++) {
+      const va = (v / 6) * Math.PI * 2 + (exp.seed || 0) * 5;
+      const vLen = R * (0.25 + (exp.seed || 0.5) * 0.2);
+      ctx.strokeStyle = `rgba(255, 80, 0, ${0.7 * craterAlpha})`;
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = '#FF4500';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      const cp1x = Math.cos(va + 0.3) * vLen * 0.4;
+      const cp1y = Math.sin(va + 0.3) * vLen * 0.4 * 0.7;
+      const cp2x = Math.cos(va - 0.2) * vLen * 0.7;
+      const cp2y = Math.sin(va - 0.2) * vLen * 0.7 * 0.7;
+      const evx = Math.cos(va) * vLen;
+      const evy = Math.sin(va) * vLen * 0.7;
+      ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, evx, evy);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    ctx.save();
+    ctx.globalAlpha = craterAlpha * 0.35;
+    ctx.strokeStyle = `rgba(120, 40, 0, ${craterAlpha * 0.5})`;
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = '#FF6600';
+    ctx.shadowBlur = 8;
+    drawWobblyEllipse(R * 0.78, R * 0.56, 1.0);
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    ctx.restore();
+
+    // â”€â”€ CURVED BEZIER CRACK VEINS â”€â”€
     if (exp.cracks && exp.cracks.length > 0) {
       ctx.save();
-      const crackAlpha = Math.max(0, 1 - progress * 0.7);
-      
-      // Lava glow seam inside cracks
-      ctx.strokeStyle = `rgba(255, 60, 0, ${0.9 * crackAlpha})`;
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
-      exp.cracks.forEach(segments => {
-        segments.forEach(seg => {
-          ctx.beginPath();
-          ctx.moveTo(seg.x1, seg.y1);
-          ctx.lineTo(seg.x2, seg.y2);
-          ctx.stroke();
-        });
-      });
+      exp.cracks.forEach(crack => {
+        const pts = crack.points;
+        if (!pts || pts.length < 2) return;
 
-      // Dark charcoal cracked ground contour
-      ctx.strokeStyle = `rgba(20, 20, 20, ${0.95 * crackAlpha})`;
-      ctx.lineWidth = 2;
-      exp.cracks.forEach(segments => {
-        segments.forEach(seg => {
-          ctx.beginPath();
-          ctx.moveTo(seg.x1, seg.y1);
-          ctx.lineTo(seg.x2, seg.y2);
-          ctx.stroke();
-        });
+        ctx.strokeStyle = `rgba(255, 80, 0, ${0.8 * craterAlpha})`;
+        ctx.lineWidth = (crack.width + 3) * craterAlpha;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.shadowColor = '#FF4500';
+        ctx.shadowBlur = 10 * craterAlpha;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let p = 1; p < pts.length; p++) {
+          const pt = pts[p];
+          if (pt.cpx !== undefined) {
+            ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+          } else {
+            ctx.lineTo(pt.x, pt.y);
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(15, 5, 0, ${0.9 * craterAlpha})`;
+        ctx.lineWidth = crack.width * craterAlpha;
+        ctx.shadowBlur = 0;
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let p = 1; p < pts.length; p++) {
+          const pt = pts[p];
+          if (pt.cpx !== undefined) {
+            ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+          } else {
+            ctx.lineTo(pt.x, pt.y);
+          }
+        }
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(255, 200, 100, ${0.5 * craterAlpha})`;
+        ctx.lineWidth = Math.max(0.5, (crack.width - 1) * 0.5 * craterAlpha);
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let p = 1; p < pts.length; p++) {
+          const pt = pts[p];
+          if (pt.cpx !== undefined) {
+            ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+          } else {
+            ctx.lineTo(pt.x, pt.y);
+          }
+        }
+        ctx.stroke();
       });
       ctx.restore();
     }
 
-    ctx.translate(exp.x, exp.y);
+    // â”€â”€ EXPLOSION FLASH â”€â”€
+    ctx.save();
+    ctx.translate(cx, cy);
 
-    // 2. EXPANDING RINGS OF ORANGE AND RED FLAMES OUTWARD
-    // Outer deep crimson flame shockwave
-    ctx.lineWidth = 18 * (1 - progress);
-    ctx.strokeStyle = `rgba(200, 10, 0, ${0.85 * alpha})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.stroke();
+    if (explosionProgress < 1.0) {
+      if (explosionProgress < 0.5) {
+        const spikeAlpha = (0.5 - explosionProgress) / 0.5;
+        ctx.save();
+        const numSpikes = 14;
+        for (let s = 0; s < numSpikes; s++) {
+          const angle = (Math.PI * 2 / numSpikes) * s + (s % 2 === 0 ? 0.15 : -0.15);
+          const spikeLen = R * (1.0 + (exp.seed || 0.5) * 0.6) * (explosionProgress * 2.5);
+          const spikeW = (12 + s % 3 * 6) * spikeAlpha;
+          ctx.save();
+          ctx.rotate(angle);
+          ctx.fillStyle = `rgba(10, 5, 0, ${spikeAlpha * 0.9})`;
+          ctx.beginPath();
+          ctx.moveTo(R * 0.15, -spikeW * 0.3);
+          ctx.quadraticCurveTo(spikeLen * 0.5, -spikeW * 0.5, spikeLen, 0);
+          ctx.quadraticCurveTo(spikeLen * 0.5, spikeW * 0.5, R * 0.15, spikeW * 0.3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.restore();
+        }
+        ctx.restore();
+      }
 
-    // Mid vibrant orange flame ring
-    ctx.lineWidth = 10 * (1 - progress);
-    ctx.strokeStyle = `rgba(255, 120, 0, ${0.9 * alpha})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.85, 0, Math.PI * 2);
-    ctx.stroke();
+      ctx.shadowColor = '#FF0000';
+      ctx.shadowBlur = 18 * expAlpha;
+      ctx.lineWidth = 24 * (1 - explosionProgress);
+      ctx.strokeStyle = `rgba(180, 10, 0, ${0.85 * expAlpha})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.stroke();
 
-    // Inner bright white-gold heat wave ring
-    ctx.lineWidth = 5 * (1 - progress);
-    ctx.strokeStyle = `rgba(255, 230, 160, ${0.95 * alpha})`;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius * 0.65, 0, Math.PI * 2);
-    ctx.stroke();
+      ctx.lineWidth = 14 * (1 - explosionProgress);
+      ctx.strokeStyle = `rgba(255, 140, 0, ${0.9 * expAlpha})`;
+      ctx.shadowColor = '#FF8C00';
+      ctx.shadowBlur = 12 * expAlpha;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.82, 0, Math.PI * 2);
+      ctx.stroke();
 
-    // 3. FLYING DEBRIS AND EMBERS
+      ctx.lineWidth = 6 * (1 - explosionProgress);
+      ctx.strokeStyle = `rgba(255, 250, 200, ${expAlpha})`;
+      ctx.shadowBlur = 0;
+      ctx.beginPath();
+      ctx.arc(0, 0, radius * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.save();
+      const pH = R * 3.0 * Math.sin(explosionProgress * Math.PI);
+      const pW = R * 0.7 * (1 - explosionProgress * 0.4);
+      if (pH > 1) {
+        const pGrad = ctx.createLinearGradient(0, 0, 0, -pH);
+        pGrad.addColorStop(0, `rgba(255, 255, 240, ${0.95 * expAlpha})`);
+        pGrad.addColorStop(0.15, `rgba(255, 180, 30, ${0.85 * expAlpha})`);
+        pGrad.addColorStop(0.5, `rgba(220, 40, 0, ${0.6 * expAlpha})`);
+        pGrad.addColorStop(0.8, `rgba(60, 10, 0, ${0.3 * expAlpha})`);
+        pGrad.addColorStop(1, 'rgba(20, 5, 0, 0)');
+        ctx.fillStyle = pGrad;
+        ctx.beginPath();
+        ctx.moveTo(-pW * 0.5, 0);
+        ctx.bezierCurveTo(-pW * 0.6, -pH * 0.3, -pW * 0.9, -pH * 0.7, -pW * 0.4, -pH);
+        ctx.lineTo(pW * 0.4, -pH);
+        ctx.bezierCurveTo(pW * 0.9, -pH * 0.7, pW * 0.6, -pH * 0.3, pW * 0.5, 0);
+        ctx.closePath();
+        ctx.fill();
+      }
+      ctx.restore();
+
+      if (explosionProgress < 0.5) {
+        const coreA = (0.5 - explosionProgress) / 0.5;
+        const coreR = radius * (0.75 - explosionProgress * 0.4);
+        const cG = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, coreR));
+        cG.addColorStop(0, `rgba(255, 255, 255, ${coreA})`);
+        cG.addColorStop(0.25, `rgba(255, 245, 210, ${0.9 * coreA})`);
+        cG.addColorStop(0.6, `rgba(255, 120, 0, ${0.5 * coreA})`);
+        cG.addColorStop(1, 'rgba(200, 20, 0, 0)');
+        ctx.fillStyle = cG;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(1, coreR), 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    ctx.restore();
+
+    // ── DEBRIS, EMBERS & SMOKE ──
     if (exp.debris && exp.debris.length > 0) {
-      exp.debris.forEach(d => {
+      exp.debris.forEach((d, idx) => {
         d.x += d.vx;
         d.y += d.vy;
-        d.vy += 0.25; // gravity drop
+        if (d.type === 'ember') {
+          d.vy -= 0.15;
+          d.vx *= 0.99;
+          d.x += Math.sin(nowTime * 0.004 + idx * 1.7) * 0.8;
+        } else if (d.type === 'smoke') {
+          d.vy -= 0.08;
+          d.vx *= 0.97;
+          d.vy *= 0.97;
+          d.size += 0.15;
+        } else {
+          d.vy += 0.35;
+        }
         d.rot += d.rotSpeed;
-
         ctx.save();
-        ctx.translate(d.x - exp.x, d.y - exp.y);
+        ctx.translate(d.x - cx, d.y - cy);
         ctx.rotate(d.rot);
-        ctx.globalAlpha = alpha;
-        ctx.fillStyle = d.color;
-        ctx.fillRect(-d.size / 2, -d.size / 2, d.size, d.size);
+        if (d.type === 'ember') {
+          ctx.globalAlpha = craterAlpha * 0.9;
+          ctx.shadowColor = '#FF6600';
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = d.color;
+          ctx.beginPath();
+          ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#FFD700';
+          ctx.beginPath();
+          ctx.arc(0, 0, d.size * 0.2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        } else if (d.type === 'smoke') {
+          ctx.globalAlpha = craterAlpha * 0.25;
+          const sG = ctx.createRadialGradient(0, 0, 0, 0, 0, d.size);
+          sG.addColorStop(0, `rgba(60, 50, 40, ${craterAlpha * 0.3})`);
+          sG.addColorStop(1, 'rgba(40, 30, 20, 0)');
+          ctx.fillStyle = sG;
+          ctx.beginPath();
+          ctx.arc(0, 0, d.size, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          ctx.globalAlpha = craterAlpha * 0.85;
+          ctx.fillStyle = d.color;
+          ctx.beginPath();
+          const s = d.size;
+          ctx.moveTo(-s * 0.5, -s * 0.3);
+          ctx.lineTo(s * 0.2, -s * 0.5);
+          ctx.lineTo(s * 0.5, s * 0.1);
+          ctx.lineTo(s * 0.1, s * 0.5);
+          ctx.lineTo(-s * 0.4, s * 0.3);
+          ctx.closePath();
+          ctx.fill();
+          ctx.strokeStyle = '#111';
+          ctx.lineWidth = 0.5;
+          ctx.stroke();
+        }
         ctx.restore();
       });
     }
 
-    // 4. BRIGHT WHITE CORE AT IMPACT POINT
-    if (progress < 0.45) {
-      const coreAlpha = (0.45 - progress) / 0.45;
-      const coreR = radius * (0.6 - progress * 0.5);
-
-      const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, Math.max(1, coreR));
-      coreGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * coreAlpha})`);
-      coreGrad.addColorStop(0.5, `rgba(255, 240, 200, ${0.85 * coreAlpha})`);
-      coreGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
-
-      ctx.fillStyle = coreGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, Math.max(1, coreR), 0, Math.PI * 2);
-      ctx.fill();
+    // â”€â”€ RISING HEAT SHIMMER WISPS â”€â”€
+    if (craterAlpha > 0.1) {
+      ctx.save();
+      ctx.globalAlpha = craterAlpha * 0.2;
+      for (let w = 0; w < 5; w++) {
+        const wx = Math.sin(nowTime * 0.002 + w * 2.1 + (exp.seed || 0) * 8) * R * 0.4;
+        const wPhase = ((nowTime * 0.001 + w * 1.3) % 3) / 3;
+        const wy = -wPhase * R * 2.5;
+        const wAlpha = Math.sin(wPhase * Math.PI) * craterAlpha * 0.2;
+        const wSize = 5 + wPhase * 15;
+        const hG = ctx.createRadialGradient(wx, wy, 0, wx, wy, wSize);
+        hG.addColorStop(0, `rgba(200, 100, 30, ${wAlpha})`);
+        hG.addColorStop(1, 'rgba(100, 40, 10, 0)');
+        ctx.fillStyle = hG;
+        ctx.beginPath();
+        ctx.arc(wx, wy, wSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
     }
 
     ctx.restore();

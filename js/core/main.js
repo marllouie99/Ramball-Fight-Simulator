@@ -192,7 +192,7 @@ function animate(timestamp) {
       // OPTIMIZED: Enforce hard cap on total particles
       const totalParticles = state.bloodEffects.length + state.deathEffects.length +
         state.berserkerRageEffects.length + state.sparkEffects.length +
-        (burnEffectSystem?.particles?.length || 0) +
+        (burnEffectSystem?.particles?.filter(p => p.active).length || 0) +
         (flamewardenFlameSystem?.particles?.filter(p => p.active).length || 0);
 
       if (totalParticles > state.maxTotalParticles) {
@@ -206,9 +206,9 @@ function animate(timestamp) {
         const projCount = getProjectiles().length;
         if (projCount > 30) issues.push(`${projCount} Projectiles`);
 
-        let particleCount = state.bloodEffects.length + state.deathEffects.length + state.berserkerRageEffects.length;
-        if (burnEffectSystem && burnEffectSystem.particles) particleCount += burnEffectSystem.particles.length;
-        if (flamewardenFlameSystem && flamewardenFlameSystem.particles) particleCount += flamewardenFlameSystem.particles.length;
+        let particleCount = state.bloodEffects.length + state.deathEffects.length + state.berserkerRageEffects.length + (state.sparkEffects ? state.sparkEffects.length : 0);
+        if (burnEffectSystem && burnEffectSystem.particles) particleCount += burnEffectSystem.particles.filter(p => p && p.active).length;
+        if (flamewardenFlameSystem && flamewardenFlameSystem.particles) particleCount += flamewardenFlameSystem.particles.filter(p => p && p.active).length;
         if (particleCount > 80) issues.push(`${particleCount} Particles`);
 
         let explosionsCount = (bomberExplosionSystem && bomberExplosionSystem.explosions) ? bomberExplosionSystem.explosions.length : 0;
@@ -428,12 +428,35 @@ function animate(timestamp) {
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles
       drawFuelPickups();
       drawBlackHoleEffects(); // Draw blackhole effects BEFORE fighters so they appear behind
-      // Draw Sukuna Domain Expansion background (liquid water floor) BEFORE fighters so they aren't overlayed
+      // Draw Domain Expansions (Render all active domains, blending them gracefully during domain clashes)
       if (state.fighters) {
-        state.fighters.forEach(f => {
-          if (f && f.drawDomainBackground) f.drawDomainBackground(state.ctx);
-        });
+        const activeDomainFighters = state.fighters
+          .filter(f => f && (f.domainActive || (f.type === 'yuta' && f.rika && f.rika.active)))
+          .sort((a, b) => {
+            const aTime = (a && a.domainActive && a.domainActivationTime) ? a.domainActivationTime : 0;
+            const bTime = (b && b.domainActive && b.domainActivationTime) ? b.domainActivationTime : 0;
+            return aTime - bTime;
+          });
+
+        if (activeDomainFighters.length > 0) {
+          activeDomainFighters.forEach((fighter, index) => {
+            state.ctx.save();
+            const isClashSecondary = (index > 0);
+            if (isClashSecondary) {
+              state.ctx.globalAlpha = 0.65;
+            }
+            if (fighter.drawDomainBackground) fighter.drawDomainBackground(state.ctx, isClashSecondary);
+            if (fighter.drawDomainForeground) fighter.drawDomainForeground(state.ctx, isClashSecondary);
+            state.ctx.restore();
+          });
+        }
       }
+
+      // Draw thermobaric explosion shockwaves (Fuga) on the ground, before fighters
+      if (!useAggressiveParticleMode) {
+        drawThermobaricExplosions(state.ctx); 
+      }
+
       drawFighters();
       drawIllusions(); // Draw Doppleganger illusions
       drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
@@ -442,7 +465,6 @@ function animate(timestamp) {
       // OPTIMIZATION: Quality-based particle drawing
       if (!useAggressiveParticleMode) {
         bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
-        drawThermobaricExplosions(state.ctx); // Draw Furnace thermobaric explosion shockwaves
         burnEffectSystem.draw(state.ctx); // Draw burn particles
       }
       drawFloatingTexts();
@@ -455,10 +477,12 @@ function animate(timestamp) {
         drawBerserkerRageEffects(); // Draw berserker rage effects
       }
 
-      if (!useAggressiveParticleMode || Math.random() > 0.5) {
+      const isDomainClash = state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
+
+      if (!useAggressiveParticleMode && (!isDomainClash || Math.random() > 0.5)) {
         drawBloodEffects(); // Draw blood effects on top of everything
       }
-      if (!useAggressiveParticleMode || Math.random() > 0.4) {
+      if (!useAggressiveParticleMode || Math.random() > (isDomainClash ? 0.65 : 0.4)) {
         drawSparkEffects(); // Draw spark effects on top of everything
       }
       drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes

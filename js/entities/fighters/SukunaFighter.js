@@ -192,6 +192,8 @@ export class SukunaFighter extends Fighter {
 
     // Spawn slash visual on target & hand cursed energy flash
     this.slashGlowTimer = 25;
+    this.slashSwingTimer = 10;
+    this.slashHand = this.slashHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
     if (!this.slashHitVisuals) this.slashHitVisuals = [];
     this.slashHitVisuals.push({
       x: closestEnemy.x,
@@ -313,6 +315,8 @@ export class SukunaFighter extends Fighter {
     }
 
     if (this.meleePunchCooldown > 0) this.meleePunchCooldown--;
+    if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+    if (this.slashSwingTimer > 0) this.slashSwingTimer--;
 
     // Smooth fade IN & fade OUT for Cursed Energy aura in hand-to-hand combat mode & flurry
     let inMeleeCombatMode = false;
@@ -331,11 +335,11 @@ export class SukunaFighter extends Fighter {
     }
 
     // Update cooldowns
-    if (this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
+    if (!this.reverseCursedTechniqueTriggered && (this.rctVisualTimer || 0) <= 0 && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.spiderwebCooldown > 0) this.spiderwebCooldown--;
-    if (this.divineFlameCooldown > 0) this.divineFlameCooldown--;
-    if (this.domainCooldown > 0) this.domainCooldown--;
-    if (this.flurryCooldown > 0) this.flurryCooldown--;
+    if (!this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0 && this.divineFlameCooldown > 0) this.divineFlameCooldown--;
+    if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) this.domainCooldown--;
+    if ((this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0 && this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
 
     // Track position history for delayed auto-aim during flurry
@@ -501,6 +505,10 @@ export class SukunaFighter extends Fighter {
           // Apply bleed on flurry hits
           this.applyBleed(this.flurryTarget, 1);
 
+          this.slashGlowTimer = 20;
+          this.slashSwingTimer = 10;
+          this.slashHand = this.slashHand === 1 ? 0 : 1;
+
           spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#8B0000');
           triggerGlobalScreenShake(6, 6);
           spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'crimsonSniper', '#8B0000');
@@ -615,6 +623,8 @@ export class SukunaFighter extends Fighter {
           triggerGlobalScreenShake(6, 8);
           spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 20, 'crimsonSniper', '#8B0000');
           this.slashGlowTimer = 25;
+          this.slashSwingTimer = 10;
+          this.slashHand = this.slashHand === 1 ? 0 : 1;
 
           // Apply knockback to target
           const cleaveAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
@@ -772,6 +782,8 @@ export class SukunaFighter extends Fighter {
 
     // Handle Melee Combat Mode vs Ranged Mode
     if (this.isMeleeMode) {
+      this.vx = 0; // Lock movement during melee punch-teleport sequence
+      this.vy = 0;
       if (opponent && !opponent.isDead) {
         this._updateMeleeCombat(opponent, arena, ownerIndex);
       }
@@ -881,6 +893,9 @@ export class SukunaFighter extends Fighter {
     this.sakugaImpactSeed = Math.random();
 
     // Punch shockwave effect (matching Gojo's style, in crimson red)
+    this.punchAnimTimer = 12;
+    this.punchAnimHand = (this.punchAnimHand || 0) ^ 1; // Toggle front/back hand for punches
+
     if (!this.punchEffects) this.punchEffects = [];
     this.punchEffects.push({
       x: opponent.x,
@@ -1073,6 +1088,7 @@ export class SukunaFighter extends Fighter {
 
   _activateDomain(arena) {
     this.domainActive = true;
+    this.domainActivationTime = Date.now();
     this.domainUseCount++;
     this.domainTimer = CONFIG.sukuna.domainDuration || 180;
     this.domainCooldown = CONFIG.sukuna.domainCooldown || 1500;
@@ -1127,8 +1143,10 @@ export class SukunaFighter extends Fighter {
 
       spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
       triggerGlobalScreenShake(6, 8);
-      spawnSparks(opponent.x, opponent.y, 20, 'crimsonSniper', '#8B0000');
+      spawnSparks(opponent.x, opponent.y, 4, 'crimsonSniper', '#8B0000');
       this.slashGlowTimer = 25;
+      this.slashSwingTimer = 10;
+      this.slashHand = this.slashHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
       const cleaveAngle = aimAngle;
       opponent.vx += Math.cos(cleaveAngle) * 3;
@@ -1150,7 +1168,7 @@ export class SukunaFighter extends Fighter {
         this._slashSoundCooldown = 15;
       }
 
-      spawnImpactFlash(this.x, this.y, 15, 'crimsonSniper');
+      spawnImpactFlash(this.x, this.y, 4, 'crimsonSniper');
 
       if (!isFrozen) {
         const oldX = this.x;
@@ -1168,12 +1186,19 @@ export class SukunaFighter extends Fighter {
         }
 
         if (!this.afterImages) this.afterImages = [];
-        this.afterImages.push({ x: oldX, y: oldY, timer: 10 });
+        let img = this.afterImages.find(a => a.timer <= 0);
+        if (!img && this.afterImages.length < 4) {
+          img = { x: 0, y: 0, timer: 0 };
+          this.afterImages.push(img);
+        }
+        if (img) {
+          img.x = oldX;
+          img.y = oldY;
+          img.timer = 10;
+        }
 
-        spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-        spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
-
-        if (typeof this.applyTimeStop === 'function') this.applyTimeStop(4);
+        spawnImpactFlash(oldX, oldY, 5, 'crimsonSniper');
+        spawnImpactFlash(this.x, this.y, 5, 'crimsonSniper');
       }
 
       this.rapidSlashTimer = CONFIG.sukuna.domainRapidSlashCooldown || 10;
@@ -1188,10 +1213,10 @@ export class SukunaFighter extends Fighter {
       this.resolveWallBounce(arena, opponent);
     }
 
-    // Update visuals
+    // Update visuals without array splices
     if (this.afterImages) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        if (--this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
+      for (let i = 0; i < this.afterImages.length; i++) {
+        if (this.afterImages[i].timer > 0) this.afterImages[i].timer--;
       }
     }
     if (this.slashHitVisuals) {
@@ -1221,24 +1246,27 @@ export class SukunaFighter extends Fighter {
       // Random aesthetic slashes throughout the arena to visualize the domain's relentless attacks
       if (!this.slashHitVisuals) this.slashHitVisuals = [];
 
-      // Spawn 1-2 random slashes at a time
-      const slashesToSpawn = 1 + Math.floor(Math.random() * 2);
-      for (let i = 0; i < slashesToSpawn; i++) {
-        let randX = Math.random() * 1200;
-        let randY = Math.random() * 800;
-        if (arena) {
-          randX = arena.x + Math.random() * arena.width;
-          randY = arena.y + Math.random() * arena.height;
-        }
+      // Skip spawning extra ambient slash objects during domain clashes for Performance Mode
+      const isDomainClash = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+      if (!isDomainClash) {
+        const slashesToSpawn = 1 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < slashesToSpawn; i++) {
+          let randX = Math.random() * 1200;
+          let randY = Math.random() * 800;
+          if (arena) {
+            randX = arena.x + Math.random() * arena.width;
+            randY = arena.y + Math.random() * arena.height;
+          }
 
-        this.slashHitVisuals.push({
-          x: randX,
-          y: randY,
-          angle: Math.random() * Math.PI * 2,
-          timer: 10 + Math.floor(Math.random() * 6),
-          maxTimer: 15,
-          scale: 0.5 + Math.random() * 1.5
-        });
+          this.slashHitVisuals.push({
+            x: randX,
+            y: randY,
+            angle: Math.random() * Math.PI * 2,
+            timer: 10 + Math.floor(Math.random() * 6),
+            maxTimer: 15,
+            scale: 0.5 + Math.random() * 1.5
+          });
+        }
       }
 
       let hitEnemyThisTick = false;
@@ -1287,6 +1315,51 @@ export class SukunaFighter extends Fighter {
         }
       });
 
+      // Also apply domain slashes to valid enemy illusions (like Rika)
+      if (state.illusions) {
+        state.illusions.forEach((ill) => {
+          if (ill && ill.hp > 0 && typeof ill.takeDamage === 'function') {
+            let isEnemy = true;
+            if (myTeam !== null) {
+              let illOwnerIndex = -1;
+              if (ill.ownerIndex !== undefined) {
+                illOwnerIndex = ill.ownerIndex;
+              } else if (ill.owner && state.fighters.indexOf(ill.owner) !== -1) {
+                illOwnerIndex = state.fighters.indexOf(ill.owner);
+              }
+              if (illOwnerIndex !== -1) {
+                isEnemy = state.getFighterTeam(illOwnerIndex) !== myTeam;
+              }
+            }
+            
+            if (isEnemy) {
+              hitEnemyThisTick = true;
+              const timeInside = (this.domainTimeInsideMap.get(ill) || 0) + domainDamageInterval;
+              this.domainTimeInsideMap.set(ill, timeInside);
+
+              const rampMultiplier = 1 + (timeInside / 60) * 0.10;
+              const finalDamage = domainDamage * rampMultiplier;
+
+              ill.takeDamage(finalDamage, this, { isDomain: true, bypassShield: true });
+              if (typeof ill.applyHitStun === 'function') ill.applyHitStun(6);
+
+              if (projectileSystem) {
+                const angle = Math.atan2(ill.y - shrineY, ill.x - shrineX);
+                const slashSpeed = (CONFIG.sukuna.slashSpeed || 15) * 1.3;
+                projectileSystem.fireProjectile(
+                  this, ownerIdx, 0, false, slashSpeed, false, 'ghostBlade', shrineX, shrineY, angle
+                );
+              }
+
+              if (Math.random() < 0.6) {
+                spawnSparks(ill.x, ill.y, 4, 'crimsonSniper', '#8B0000');
+                spawnImpactFlash(ill.x, ill.y, 18, 'crimsonSniper');
+              }
+            }
+          }
+        });
+      }
+
       if (hitEnemyThisTick && playedSwordSwing) {
         playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.4);
       }
@@ -1323,15 +1396,12 @@ export class SukunaFighter extends Fighter {
       this._drawSukunaCursedEnergyAura(ctx, 'red');
     }
 
-    // Draw Malevolent Shrine Domain Expansion BEHIND Sukuna
-    if (this.domainActive) {
-      this._drawMalevolentShrine(ctx);
-    }
+    // Malevolent Shrine is now drawn in drawDomainBackground so it renders behind all fighters
 
     super.draw(ctx);
 
-    // Render high-intensity cursed energy flash on Sukuna's hands when unleashing slashes
-    // this._drawHandCursedEnergy(ctx);
+    // Render small version of blobby cursed energy on Sukuna's both hands on opposite sides of his body
+    this._drawHandCursedEnergy(ctx);
 
     // Draw Sakuga Anime Impact Frame (red/black ink impact)
     if (this.sakugaImpactTimer > 0) {
@@ -1356,8 +1426,6 @@ export class SukunaFighter extends Fighter {
 
         // 1. Outer Crimson Shockwave Ring
         const ringRadius = (this.r + 5) * (0.8 + 1.2 * prog);
-        ctx.shadowColor = '#FF1100';
-        ctx.shadowBlur = 18;
         ctx.strokeStyle = '#FF1100';
         ctx.lineWidth = 5 * (1 - prog * 0.5);
         ctx.beginPath();
@@ -1365,7 +1433,6 @@ export class SukunaFighter extends Fighter {
         ctx.stroke();
 
         // 2. High-contrast Black Ink Outline
-        ctx.shadowBlur = 0;
         ctx.strokeStyle = '#0a0a0a';
         ctx.lineWidth = 2.5 * (1 - prog * 0.5);
         ctx.beginPath();
@@ -1473,18 +1540,6 @@ export class SukunaFighter extends Fighter {
         ctx.scale(slash.scale, slash.scale);
 
         const r = 22;
-        // Dark shadow for visibility
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-        ctx.shadowBlur = 8;
-        ctx.shadowOffsetX = 3;
-        ctx.shadowOffsetY = 3;
-
-        // Ghostly glow
-        ctx.shadowColor = 'rgba(180, 200, 255, 0.7)';
-        ctx.shadowBlur = 15;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
-
         // Crescent slash shape
         ctx.globalAlpha = 0.85 * ratio;
         ctx.beginPath();
@@ -1497,8 +1552,6 @@ export class SukunaFighter extends Fighter {
         // Bright edge
         ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * ratio})`;
         ctx.lineWidth = 2;
-        ctx.shadowColor = 'rgba(200, 220, 255, 0.9)';
-        ctx.shadowBlur = 12;
         ctx.beginPath();
         ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
         ctx.stroke();
@@ -1565,18 +1618,106 @@ export class SukunaFighter extends Fighter {
 
   }
 
-  // Render high-contrast Cursed Energy flame & sparks on Sukuna's hand when unleashing slashes
+  // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands
   _drawHandCursedEnergy(ctx) {
-    const isRangedSlashing = this.slashGlowTimer > 0;
-    const isCleaveSlashing = this.rapidSlashHitsLeft > 0 || this.flurryHitsLeft > 0;
+    const basePosY = (this.y - (this.z || 0));
+    const nowTime = Date.now();
 
-    if (!isRangedSlashing && !isCleaveSlashing) return;
+    // Dynamic hand animation offsets (Left hand rests in center of body by default)
+    let frontOffset = 6;
+    let frontAngleOffset = 0;
 
-    const handX = this.x + Math.cos(this.gunAngle) * (this.r + 8);
-    const handY = (this.y - (this.z || 0)) + Math.sin(this.gunAngle) * (this.r + 8);
+    let backHandX = this.x;
+    let backHandY = basePosY;
+    let hideFrontHand = false;
+    let hideBackHand = false;
 
-    // Render Sukuna's actual Cursed Energy Flame Aura scaled tightly to his hand!
-    this._drawSukunaCursedEnergyAura(ctx, 'red', handX, handY, 4);
+    // 1. Snappy Melee Punch Animation (Striking hand punches 24px forward, off-hand stays visible)
+    if (this.punchAnimTimer > 0) {
+      const t = (8 - Math.min(8, this.punchAnimTimer)) / 8; // 0 to 1 progress over 8 frames
+      const snap = t < 0.25 ? (t / 0.25) : Math.max(0, 1 - (t - 0.25) / 0.75);
+      if (this.punchAnimHand === 0) {
+        frontOffset += snap * 24;        // Right hand punches 24px forward
+        // Left hand stays anchored right at center of body (this.x, basePosY)
+      } else {
+        const backAngle = this.gunAngle;
+        const backOffset = (this.r + 6) + snap * 24;
+        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches 24px forward!
+        backHandY = basePosY + Math.sin(backAngle) * backOffset;
+        frontOffset = -this.r + 2;       // Right hand pulls into chest center
+      }
+    }
+
+    // 2. Snappy Single-Hand Slash Swing Animation (Fast 10-frame snappy chop across body)
+    else if (this.slashSwingTimer > 0 || this.slashGlowTimer > 0 || this.rapidSlashHitsLeft > 0 || this.flurryHitsLeft > 0) {
+      const swingMax = 10;
+      const rawT = this.slashSwingTimer > 0 ? (1 - this.slashSwingTimer / swingMax) : 1.0;
+      const swingProg = Math.pow(rawT, 0.4); // Fast snappy acceleration curve
+      const swingAngleOffset = (swingProg * 3.14 - 1.57);
+      const swingThrust = Math.sin(swingProg * Math.PI) * 35;
+
+      if (this.slashHand === 1) {
+        // Left hand slashes across body! Hide right hand!
+        hideFrontHand = true;
+        const backAngle = this.gunAngle - swingAngleOffset;
+        const backOffset = (this.r + 6) + swingThrust;
+        backHandX = this.x + Math.cos(backAngle) * backOffset;
+        backHandY = basePosY + Math.sin(backAngle) * backOffset;
+      } else {
+        // Right hand slashes across body! Hide left hand!
+        hideBackHand = true;
+        frontAngleOffset = swingAngleOffset;
+        frontOffset = 6 + swingThrust;
+      }
+    }
+
+    // 3. Fuga (Divine Flame Arrow) Clasping Stance (Both hands clasp forward)
+    else if (this.isChannelingDivineFlame) {
+      frontAngleOffset = -0.15;
+      frontOffset = 18;
+
+      const backAngle = this.gunAngle + 0.15;
+      const backOffset = 18;
+      backHandX = this.x + Math.cos(backAngle) * (this.r + backOffset);
+      backHandY = basePosY + Math.sin(backAngle) * (this.r + backOffset);
+    }
+
+    // Front hand (Right hand) position
+    const frontAngle = this.gunAngle + frontAngleOffset;
+    const frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
+    const frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
+
+    // 1. Draw Physical Circle Hands (body/skin color with crisp black outline)
+    ctx.save();
+    ctx.fillStyle = this.color || '#e0a899';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2.5;
+
+    if (!hideFrontHand) {
+      ctx.beginPath();
+      ctx.arc(frontHandX, frontHandY, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    if (!hideBackHand) {
+      ctx.beginPath();
+      ctx.arc(backHandX, backHandY, 6.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 2. Draw Blobby Cursed Energy Aura over active circle hands
+    const isActive = (this.combatAuraOpacity > 0.05) || (this.slashGlowTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0) || (this.domainActive) || (this.isChannelingDivineFlame) || (state.gameState === 'countdown') || (this.punchAnimTimer > 0);
+
+    if (isActive) {
+      const theme = (this.rctVisualTimer > 0) ? 'rct' : ((this.isChannelingDivineFlame || this.divineFlameRecoveryTimer > 0) ? 'fuga' : 'red');
+      const blobRadius = (this.punchAnimTimer > 0 || this.slashGlowTimer > 0 || this.isChannelingDivineFlame) ? 18 : 14;
+
+      if (!hideFrontHand) this._drawSukunaCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
+      if (!hideBackHand) this._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
+    }
   }
 
   // Draw glowing cursed energy on Sukuna's hands when unleashing slashes
@@ -1784,9 +1925,7 @@ export class SukunaFighter extends Fighter {
 
     const strokeColor = '#000000';
 
-    // Soft ambient glow
-    ctx.shadowBlur = 22 * progress;
-    ctx.shadowColor = mainColor;
+    // (Removed expensive shadowBlur)
 
     // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
     const numPoints = 28;
@@ -1837,7 +1976,6 @@ export class SukunaFighter extends Fighter {
     ctx.fill();
 
     // Ink brush stroke outline (varying thickness like calligraphy brush)
-    ctx.shadowBlur = 0;
     ctx.strokeStyle = strokeColor;
     ctx.globalAlpha = progress;
     ctx.lineCap = 'round';
@@ -2669,10 +2807,10 @@ export class SukunaFighter extends Fighter {
   }
 
   // PUBLIC: Draw domain liquid water floor BEFORE fighters so they aren't overlayed
-  drawDomainBackground(ctx) {
+  drawDomainBackground(ctx, isClashSecondary = false) {
     if (!this.domainActive) return;
 
-    const domainRadius = 2500;
+    const domainRadius = 1000;
     const time = Date.now();
     const sx = this.domainX !== undefined ? this.domainX : this.x;
     const sy = this.domainY !== undefined ? this.domainY : this.y;
@@ -2680,20 +2818,24 @@ export class SukunaFighter extends Fighter {
     ctx.save();
 
     // ── 1. DARK LIQUID WATER FLOOR & SPECULAR SHEEN ──
-    const liquidGrad = ctx.createLinearGradient(0, sy - 200, 0, sy + 600);
-    liquidGrad.addColorStop(0, 'rgba(15, 2, 5, 0.88)');
-    liquidGrad.addColorStop(0.3, 'rgba(40, 4, 10, 0.82)');
-    liquidGrad.addColorStop(0.7, 'rgba(25, 3, 8, 0.86)');
-    liquidGrad.addColorStop(1, 'rgba(10, 1, 3, 0.92)');
+    if (!isClashSecondary) {
+      const liquidGrad = ctx.createLinearGradient(0, sy - 200, 0, sy + 600);
+      liquidGrad.addColorStop(0, 'rgba(15, 2, 5, 0.88)');
+      liquidGrad.addColorStop(0.3, 'rgba(40, 4, 10, 0.82)');
+      liquidGrad.addColorStop(0.7, 'rgba(25, 3, 8, 0.86)');
+      liquidGrad.addColorStop(1, 'rgba(10, 1, 3, 0.92)');
 
-    ctx.fillStyle = liquidGrad;
-    ctx.beginPath();
-    ctx.arc(sx, sy, domainRadius, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.fillStyle = liquidGrad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, domainRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
-    // Horizontal liquid water wave sheen lines across the floor
+    // Horizontal liquid water wave sheen lines across the floor (skip during heavy multi-domain clashes to lock 60 FPS)
+    const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+    const waveCount = isMultiDomain ? 4 : 12;
     ctx.lineWidth = 1;
-    for (let w = 0; w < 12; w++) {
+    for (let w = 0; w < waveCount; w++) {
       const wy = sy - 150 + w * 45 + Math.sin(time * 0.002 + w) * 8;
       const waveAlpha = 0.12 + Math.sin(time * 0.003 + w * 1.5) * 0.08;
       ctx.strokeStyle = `rgba(240, 80, 80, ${waveAlpha})`;
@@ -2733,7 +2875,9 @@ export class SukunaFighter extends Fighter {
   }
 
   // Draw Malevolent Shrine structure & embers (called during fighter draw, AFTER background)
-  _drawMalevolentShrine(ctx) {
+  drawDomainForeground(ctx) {
+    if (!this.domainActive) return;
+    
     const time = Date.now();
     const sx = this.domainX !== undefined ? this.domainX : this.x;
     const sy = this.domainY !== undefined ? this.domainY : this.y;

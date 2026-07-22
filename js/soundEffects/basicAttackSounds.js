@@ -224,6 +224,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.7,
     delay: 0,
   },
+  // Sukuna — Dismantle invisible slashes
+  'sukuna': {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.5,
+    delay: 0,
+  },
 };
 
 /**

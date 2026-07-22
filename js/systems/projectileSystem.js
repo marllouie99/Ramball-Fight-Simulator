@@ -492,50 +492,86 @@ class ProjectileSystem {
     if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 100, 'orange');
     if (typeof spawnSparks === 'function') spawnSparks(x, y, 45, 'orange', '#FF4500');
 
-    // Generate ground cracks radiating from impact point
+    // Generate organic curved ground cracks (bezier veins) radiating from impact
     const cracks = [];
-    const numCracks = 8;
+    const numCracks = 12;
     for (let c = 0; c < numCracks; c++) {
-      const crackAngle = (c / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const crackLen = 45 + Math.random() * 55;
-      const segments = [];
-      let currentX = x;
-      let currentY = y;
-      const numSegs = 4;
+      const crackAngle = (c / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const crackLen = 55 + Math.random() * 70;
+      const points = [{ x: x, y: y }];
+      let curX = x, curY = y, curAngle = crackAngle;
+      const numSegs = 6 + Math.floor(Math.random() * 3);
       for (let s = 0; s < numSegs; s++) {
-        const segLen = (crackLen / numSegs);
-        const segAngle = crackAngle + (Math.random() - 0.5) * 0.5;
-        const nextX = currentX + Math.cos(segAngle) * segLen;
-        const nextY = currentY + Math.sin(segAngle) * segLen;
-        segments.push({ x1: currentX, y1: currentY, x2: nextX, y2: nextY });
-        currentX = nextX;
-        currentY = nextY;
+        const segLen = crackLen / numSegs;
+        curAngle += (Math.random() - 0.5) * 0.7; // organic wobble
+        curX += Math.cos(curAngle) * segLen;
+        curY += Math.sin(curAngle) * segLen;
+        // control point for bezier curve
+        const cpx = curX + (Math.random() - 0.5) * 12;
+        const cpy = curY + (Math.random() - 0.5) * 12;
+        points.push({ x: curX, y: curY, cpx, cpy });
       }
-      cracks.push(segments);
+      cracks.push({ points, width: 2 + Math.random() * 3 });
+
+      // Branch cracks (smaller forks off main vein)
+      if (Math.random() < 0.6) {
+        const branchStart = Math.floor(points.length * (0.3 + Math.random() * 0.4));
+        const bp = points[branchStart];
+        if (bp) {
+          const branchAngle = crackAngle + (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.8);
+          const branchPts = [{ x: bp.x, y: bp.y }];
+          let bx = bp.x, by = bp.y, ba = branchAngle;
+          const branchSegs = 3 + Math.floor(Math.random() * 2);
+          for (let b = 0; b < branchSegs; b++) {
+            ba += (Math.random() - 0.5) * 0.6;
+            bx += Math.cos(ba) * (crackLen / numSegs * 0.7);
+            by += Math.sin(ba) * (crackLen / numSegs * 0.7);
+            branchPts.push({ x: bx, y: by, cpx: bx + (Math.random()-0.5)*8, cpy: by + (Math.random()-0.5)*8 });
+          }
+          cracks.push({ points: branchPts, width: 1 + Math.random() * 1.5 });
+        }
+      }
     }
 
-    // Generate flying rock debris & ember chunks
+    // Generate flying rock debris, glowing embers, and smoke wisps
     const debris = [];
-    const numDebris = 16;
+    const numDebris = 28;
     for (let d = 0; d < numDebris; d++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 4 + Math.random() * 9;
+      const speed = 3 + Math.random() * 10;
+      const typeRoll = Math.random();
+      let type, color, size;
+      if (typeRoll < 0.35) {
+        type = 'rock'; color = '#222'; size = 3 + Math.random() * 6;
+      } else if (typeRoll < 0.65) {
+        type = 'ember'; color = '#FF4500'; size = 2 + Math.random() * 3;
+      } else {
+        type = 'smoke'; color = '#555'; size = 6 + Math.random() * 10;
+      }
       debris.push({
-        x: x + Math.cos(angle) * 10,
-        y: y + Math.sin(angle) * 10,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 1.5,
-        size: 3 + Math.random() * 5,
-        rot: Math.random() * Math.PI * 2,
+        x: x + Math.cos(angle) * 8,
+        y: y + Math.sin(angle) * 8,
+        vx: Math.cos(angle) * speed * (type === 'smoke' ? 0.3 : 1),
+        vy: Math.sin(angle) * speed * (type === 'smoke' ? 0.3 : 1) - (type === 'ember' ? 3 : 1),
+        size, rot: Math.random() * Math.PI * 2,
         rotSpeed: (Math.random() - 0.5) * 0.3,
-        color: Math.random() > 0.4 ? '#333333' : '#FF4500'
+        color, type
       });
+    }
+
+    // Pre-generate crater rim wobble points for organic shape
+    const rimPoints = [];
+    const rimSegments = 32;
+    for (let r = 0; r < rimSegments; r++) {
+      const a = (r / rimSegments) * Math.PI * 2;
+      const wobble = 0.85 + Math.random() * 0.3; // 0.85 to 1.15
+      rimPoints.push({ angle: a, wobble });
     }
 
     if (!state.thermobaricExplosions) state.thermobaricExplosions = [];
     state.thermobaricExplosions.push({
-      x, y, radius: 10, maxRadius: splashRadius, life: 32, maxLife: 32,
-      cracks, debris
+      x, y, radius: 10, maxRadius: splashRadius, life: 180, maxLife: 180,
+      cracks, debris, rimPoints, seed: Math.random()
     });
 
     const sound = getSkillEffectSound('explosion');

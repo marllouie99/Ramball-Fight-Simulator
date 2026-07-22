@@ -56,14 +56,15 @@ function _returnSpark(spark) {
  */
 export function spawnSparks(x, y, count = 8, type = 'crimson') {
   const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isDomainClash = state && state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
   const qualityMultiplier = state.qualityLevel || 1.0;
   const fps = state.fps || 60;
   
-  // Further reduce limits during clashes in multiplayer
-  const dynamicQuality = isMulti && fps < 45 ? Math.min(qualityMultiplier, 0.4) : qualityMultiplier;
+  // Further reduce limits during clashes in multiplayer or dual domain expansion
+  const dynamicQuality = (isMulti || isDomainClash) && fps < 55 ? Math.min(qualityMultiplier, 0.3) : qualityMultiplier;
   
-  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * dynamicQuality);
-  const adjustedCount = Math.max(1, Math.floor(count * dynamicQuality));
+  const MAX_SPARK_PARTICLES = isDomainClash ? 30 : Math.floor((isMulti ? 100 : 200) * dynamicQuality);
+  const adjustedCount = Math.max(1, Math.floor(count * (isDomainClash ? 0.3 : dynamicQuality)));
 
   for (let i = 0; i < adjustedCount; i++) {
     // Remove oldest if at limit — return it to pool first
@@ -139,6 +140,21 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
       spark.decay = 0.03 + Math.random() * 0.04;
       spark.friction = 0.90;
       spark.isGlow = true; // Enable glow rendering
+    } else if (type === 'rikaCurse') {
+      // Rising cursed energy particles (magenta/violet/dark purple)
+      const rand = Math.random();
+      if (rand > 0.6) {
+        spark.color = `rgba(${200 + Math.random() * 55}, 20, ${180 + Math.random() * 55}, 1)`; // Hot pink / Magenta
+      } else if (rand > 0.3) {
+        spark.color = `rgba(${100 + Math.random() * 50}, 0, ${150 + Math.random() * 50}, 1)`; // Dark Violet / Purple
+      } else {
+        spark.color = `rgba(${35 + Math.random() * 25}, 10, ${55 + Math.random() * 25}, 1)`; // Deep dark purple
+      }
+      spark.vx = (Math.random() - 0.5) * 2.5; // Slight drift
+      spark.vy = -0.6 - Math.random() * 1.4;  // Float upwards
+      spark.size = 2.0 + Math.random() * 3.5;
+      spark.decay = 0.02 + Math.random() * 0.02; // Fade out over ~25-50 frames
+      spark.friction = 0.96; // Float longer
     } else {
       spark.color = `rgba(255, ${50 + Math.random() * 100}, ${20 + Math.random() * 50}, 1)`;
     }
@@ -1205,6 +1221,8 @@ export function drawSparkEffects(layer = 'all') {
         gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
       } else if (effect.type === 'lightningTrail') {
         gradient.addColorStop(1, effect.color.replace(/[\d.]+\)$/, '0)'));
+      } else if (effect.type === 'rikaCurse') {
+        gradient.addColorStop(1, effect.color.replace('1)', '0)'));
       } else {
         gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
       }
