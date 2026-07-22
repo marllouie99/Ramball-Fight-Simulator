@@ -166,7 +166,6 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
     ctx.globalCompositeOperation = 'source-over';
     
     // Add canvas glow
-    ctx.shadowBlur = 15;
     ctx.shadowColor = theme.glowShadow;
 
     // Quantize time to 15fps (approx 66ms per frame) for that staccato, hand-drawn anime feel

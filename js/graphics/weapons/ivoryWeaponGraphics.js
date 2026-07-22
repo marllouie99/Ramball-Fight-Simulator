@@ -179,31 +179,24 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
 
   // --- NEON GLOW PASSES ---
   
-  // Layer 1: Massive Ambient Bloom (Wide and soft)
+  // Layer 1: Ambient Bloom (Wide additive bloom)
   ctx.globalCompositeOperation = 'lighter';
-  ctx.shadowColor = '#ff3300';
-  ctx.shadowBlur = 40 * neonPulse * s;
   ctx.strokeStyle = `rgba(255, 60, 0, ${0.5 * neonPulse})`;
   ctx.lineWidth = 14 * s;
   drawNeonPaths();
 
   // Layer 2: Secondary Hot Glow (Medium width)
-  ctx.shadowColor = '#ff6600';
-  ctx.shadowBlur = 20 * neonPulse * s;
   ctx.strokeStyle = `rgba(255, 120, 0, ${0.7 * neonPulse})`;
   ctx.lineWidth = 6 * s;
   drawNeonPaths();
 
   // Layer 3: Tight Brilliant Edge
   ctx.globalCompositeOperation = 'source-over';
-  ctx.shadowColor = '#ffcc00';
-  ctx.shadowBlur = 10 * neonPulse * s;
   ctx.strokeStyle = `rgba(255, 200, 50, ${0.9 * neonPulse})`;
   ctx.lineWidth = 3 * s;
   drawNeonPaths();
 
   // Layer 4: Razor Thin Pure White Core
-  ctx.shadowBlur = 0;
   ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * neonPulse})`;
   ctx.lineWidth = 1.2 * s;
   drawNeonPaths();
@@ -236,7 +229,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
   ctx.fillStyle = black; ctx.fill(); ctx.stroke();
 
   if (glowPulse > 0) {
-    ctx.shadowBlur = 15 * glowPulse;
     ctx.shadowColor = orangeGlow;
   }
   ctx.beginPath(); ctx.arc(cx * s, cy * s, 12 * s, 0, Math.PI*2);

@@ -155,7 +155,6 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
 
   // Bloom effect for the core
   if (!useUltraLOD) {
-    ctx.shadowBlur = 10 * shieldScale;
     ctx.shadowColor = '#ff8800';
   }
 
@@ -240,8 +239,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
 
     // Base state is a crisp, clean, thin-lined hologram without heavy glow
     if (!useUltraLOD) {
-      ctx.shadowBlur = (1 + flashBoost * 14) * shieldScale;
-      ctx.shadowColor = '#ffaa00';
+      ctx.shadowColor = '#ffffff';
     }
     
     ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + flashBoost * 0.5})`;
@@ -356,8 +354,6 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
       // 2. Intense tight glow with bloom
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
       ctx.lineWidth = 6 * swordScale;
-      ctx.shadowBlur = 12 * swordScale;
-      ctx.shadowColor = '#ff8800';
       ctx.stroke();
     } else {
       // Simplified neon core for trails to massively boost FPS
@@ -367,7 +363,6 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
     }
 
     // 3. Sharp inner edge
-    ctx.shadowBlur = 0;
     ctx.strokeStyle = neonEdge;
     ctx.lineWidth = 2.5 * swordScale;
     ctx.stroke();
@@ -441,8 +436,6 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
       // 2. Intense tight glow with bloom
       ctx.strokeStyle = 'rgba(255, 215, 0, 0.6)';
       ctx.lineWidth = 8 * swordScale;
-      ctx.shadowBlur = 15 * swordScale;
-      ctx.shadowColor = '#ff8800';
       ctx.stroke();
     } else {
       // Simplified neon core for trails to massively boost FPS

@@ -489,8 +489,8 @@ class ProjectileSystem {
     
     triggerGlobalScreenShake(18, 25);
     if (typeof spawnGroundScorch === 'function') spawnGroundScorch(x, y, 80);
-    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 100, 'orange');
-    if (typeof spawnSparks === 'function') spawnSparks(x, y, 45, 'orange', '#FF4500');
+    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 60, 'orange');
+    if (typeof spawnSparks === 'function') spawnSparks(x, y, 18, 'orange', '#FF4500');
 
     // Generate organic curved ground cracks (bezier veins) radiating from impact
     const cracks = [];

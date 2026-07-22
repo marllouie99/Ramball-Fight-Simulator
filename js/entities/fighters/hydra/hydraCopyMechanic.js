@@ -38,5 +38,5 @@ export function performStolenAttack(fighter, opponent) {
     spawnSparks(opponent.x, opponent.y, 10, 'blood');
     
     spawnFloatingText(opponent.x, opponent.y, 'SMACK!', '#ccc');
-    playSound('Assets/Sound Effects/Attacks/swordclash.mp3', 0.5);
+    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
 }

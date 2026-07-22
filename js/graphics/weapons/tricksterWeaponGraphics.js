@@ -219,8 +219,6 @@ export function drawTricksterStaff(ctx, fighter) {
   
   if (fighter.stolenWindUpTimer > 0 && fighter.stolenColor) {
     const pulse = Math.sin(Date.now() / 50) * 0.5 + 0.5; // rapid pulse
-    ctx.shadowColor = fighter.stolenColor;
-    ctx.shadowBlur = 25 + pulse * 40; // Huge blur
     
     // Draw an intense massive aura behind the crystal
     ctx.fillStyle = fighter.stolenColor;
@@ -229,9 +227,6 @@ export function drawTricksterStaff(ctx, fighter) {
     ctx.arc(0, crystalCenterY, 30 + pulse * 20, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = baseAlpha;
-  } else {
-    ctx.shadowColor = coreColor;
-    ctx.shadowBlur = 15 + Math.sin(Date.now() / 150) * 8; // Deep pulsating glow
   }
   
   // Outer Diamond Crystal
@@ -299,11 +294,12 @@ export function drawTricksterStaff(ctx, fighter) {
   ctx.stroke();
 
   // ADD HANDS (NEW CODE)
-  ctx.fillStyle = fighter._def ? fighter._def.color : '#8A2BE2'; // Trickster's purple
+  ctx.fillStyle = fighter._def ? fighter._def.color : '#8A2BE2';  // 2. Bright Energy Core (Cyan/Teal Glow)
+  ctx.save();
+  ctx.fillStyle = '#00f7ff'; // reset shadow for hand
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';
   ctx.globalAlpha = baseAlpha;
-  ctx.shadowBlur = 0; // reset shadow for hand
   
   if (fighter.stolenWindUpTimer > 0) {
     // Left hand

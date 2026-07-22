@@ -25,8 +25,11 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
   let midX = domX;
   let midY = domY;
 
+  const domainRadius = CONFIG.yuta.domainRadius || 350;
+
   ctx.save();
 
+  // ── 1. DARK ATMOSPHERIC VOID & ROSY AMBIENT GLOW ──
   if (!isClashSecondary) {
     const bgGrad = ctx.createRadialGradient(midX, midY, 40, midX, midY, 650);
     bgGrad.addColorStop(0, `rgba(55, 10, 32, ${(0.65 + pulse) * alphaMult})`);   // Dark rose core
@@ -39,6 +42,7 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
   }
 
   if (fighter.domainActive) {
+    // ── 2. DARK ATMOSPHERIC VORTEX ──
     ctx.save();
     ctx.globalAlpha = (0.6 + pulse * 2) * alphaMult;
     
@@ -65,7 +69,7 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     }
     ctx.restore();
 
-    // ── 3. INFINITE FIELD OF GROUND-PIERCED KATANAS (Hardware Accelerated Canvas Cache) ──
+    // ── 3. INFINITE FIELD OF GROUND-PIERCED KATANAS (Offscreen Canvas Cache) ──
     ctx.save();
     
     const cacheKey = `${arenaW}_${arenaH}_${domX}_${domY}`;
@@ -202,76 +206,231 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 
     ctx.restore();
 
-    // ── 4. TOWERING CROSS PILLARS ──
+    // ── 4. TOWERING CROSS PILLARS & DROOPING METALLIC CHAINS ──
     ctx.save();
+    const crossPillars = [];
     const layout = [
       { dx: -arenaW * 0.38, dy:  arenaH * 0.25, tilt: -0.14 },
       { dx: -arenaW * 0.28, dy: -arenaH * 0.08, tilt:  0.00 },
       { dx: -arenaW * 0.14, dy: -arenaH * 0.34, tilt:  0.10 },
       { dx:  arenaW * 0.14, dy: -arenaH * 0.34, tilt:  0.00 },
-      { dx:  arenaW * 0.28, dy: -arenaH * 0.08, tilt: -0.10 },
-      { dx:  arenaW * 0.38, dy:  arenaH * 0.25, tilt:  0.14 }
+      { dx:  arenaW * 0.28, dy: -arenaH * 0.08, tilt: -0.12 },
+      { dx:  arenaW * 0.38, dy:  arenaH * 0.25, tilt:  0.00 }
     ];
 
-    layout.forEach(p => {
-      const px = domX + p.dx;
-      const py = domY + p.dy;
+    for (let p = 0; p < layout.length; p++) {
+      const px = domX + layout[p].dx;
+      const py = domY + layout[p].dy;
 
-      ctx.save();
-      ctx.translate(px, py);
-      ctx.rotate(p.tilt);
+      const depth = py - domY; 
+      const scale = 1.1 + ((depth + arenaH * 0.34) / (arenaH * 0.6)) * 2.4; 
+      const tiltAngle = layout[p].tilt;
 
-      ctx.fillStyle = '#0a0306';
+      crossPillars.push({ px, py, scale, seed: p, id: p, tiltAngle });
+    }
+
+    // Continuous chain connecting sequentially from left to right along the horseshoe arch
+    const chainConnections = [
+      [0, 1], // Lower-left to Mid-left
+      [1, 2], // Mid-left to Top-left
+      [2, 3], // Top-left to Top-right (drapes across the top)
+      [3, 4], // Top-right to Mid-right
+      [4, 5]  // Mid-right to Lower-right
+    ];
+
+    // Draw Chains between pillars BEFORE sorting, so chains render behind pillar bodies
+    ctx.save();
+    ctx.lineCap = 'round';
+    for (const [i1, i2] of chainConnections) {
+      const p1 = crossPillars[i1];
+      const p2 = crossPillars[i2];
+      
+      const attachX1 = p1.px - Math.sin(p1.tiltAngle) * (45 * p1.scale);
+      const attachY1 = p1.py - Math.cos(p1.tiltAngle) * (45 * p1.scale);
+      const attachX2 = p2.px - Math.sin(p2.tiltAngle) * (45 * p2.scale);
+      const attachY2 = p2.py - Math.cos(p2.tiltAngle) * (45 * p2.scale);
+      
+      const dist = Math.hypot(attachX2 - attachX1, attachY2 - attachY1);
+      const cpX = (attachX1 + attachX2) / 2;
+      const cpY = (attachY1 + attachY2) / 2 + Math.min(120, dist * 0.32);
+
+      // Base dark shadow chain
+      ctx.strokeStyle = '#050204';
+      ctx.lineWidth = Math.max(2, 3.5 * ((p1.scale + p2.scale) / 2));
       ctx.beginPath();
-      ctx.ellipse(0, 10, 32, 11, 0, 0, Math.PI * 2);
+      ctx.moveTo(attachX1, attachY1);
+      ctx.quadraticCurveTo(cpX, cpY, attachX2, attachY2);
+      ctx.stroke();
+      
+      // Chain links (dashed metallic)
+      ctx.strokeStyle = '#5a4d56';
+      ctx.lineWidth = Math.max(1.5, 2.5 * ((p1.scale + p2.scale) / 2));
+      ctx.setLineDash([5, 8]);
+      ctx.beginPath();
+      ctx.moveTo(attachX1, attachY1);
+      ctx.quadraticCurveTo(cpX, cpY, attachX2, attachY2);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+
+    // Sort pillars by depth (Y) so foreground pillars overlap background elements
+    crossPillars.sort((a, b) => a.py - b.py);
+
+    const w = 10;
+    const h = 55;
+    const beamW = 34;
+    const beamH = 8;
+    const beamY = -h + 12;
+
+    const pillarGrad = ctx.createLinearGradient(-w/2, 0, w/2, 0);
+    pillarGrad.addColorStop(0, '#110c14');
+    pillarGrad.addColorStop(0.2, '#2e2233');
+    pillarGrad.addColorStop(0.7, '#43344a');
+    pillarGrad.addColorStop(1, '#1b1420');
+
+    const beamGrad = ctx.createLinearGradient(0, beamY, 0, beamY + beamH);
+    beamGrad.addColorStop(0, '#43344a');
+    beamGrad.addColorStop(0.5, '#2e2233');
+    beamGrad.addColorStop(1, '#110c14');
+
+    crossPillars.forEach(pillar => {
+      ctx.save();
+      ctx.translate(pillar.px, pillar.py);
+      ctx.rotate(pillar.tiltAngle);
+      ctx.scale(pillar.scale, pillar.scale);
+
+      // Ground shadow & impact crater at pillar base to ground the pillar firmly into earth
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.75)';
+      ctx.beginPath();
+      ctx.ellipse(0, 2, w * 1.8, w * 0.65, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#1c1719';
-      ctx.strokeStyle = '#050304';
-      ctx.lineWidth = 1.8;
+      // Radiating ground cracks around pillar base
+      ctx.strokeStyle = 'rgba(10, 3, 12, 0.85)';
+      ctx.lineWidth = 0.8;
       ctx.beginPath();
-      ctx.ellipse(0, 5, 26, 8, 0, 0, Math.PI * 2);
+      ctx.moveTo(-w * 0.8, 1); ctx.lineTo(-w * 1.9, 6);
+      ctx.moveTo(w * 0.8, 1); ctx.lineTo(w * 1.9, 7);
+      ctx.moveTo(0, 2); ctx.lineTo(0, 10);
+      ctx.stroke();
+      ctx.restore();
+
+      // Draw vertical pillar body
+      ctx.fillStyle = pillarGrad;
+      ctx.strokeStyle = '#050205';
+      ctx.lineWidth = 0.8;
+      
+      ctx.beginPath();
+      ctx.rect(-w/2, -h, w, h + 2);
+      ctx.fill();
+      ctx.stroke();
+      
+      ctx.fillStyle = beamGrad;
+      ctx.beginPath();
+      ctx.rect(-beamW/2, beamY, beamW, beamH);
       ctx.fill();
       ctx.stroke();
 
-      const pillarH = 260;
-      const pillarW = 20;
+      // Stone Rubble & Debris Mound piled around pillar base (roots pillar into ground)
+      ctx.fillStyle = '#221828';
+      ctx.strokeStyle = '#0c0710';
+      ctx.lineWidth = 0.6;
 
-      const pGrad = ctx.createLinearGradient(-pillarW / 2, 0, pillarW / 2, 0);
-      pGrad.addColorStop(0, '#42373c');
-      pGrad.addColorStop(0.25, '#292225');
-      pGrad.addColorStop(0.7, '#151113');
-      pGrad.addColorStop(1, '#090708');
+      ctx.beginPath();
+      ctx.moveTo(-w * 1.3, 2);
+      ctx.lineTo(-w * 0.6, -6);
+      ctx.lineTo(-w * 0.1, 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-      ctx.fillStyle = pGrad;
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 2;
-      ctx.fillRect(-pillarW / 2, -pillarH, pillarW, pillarH);
-      ctx.strokeRect(-pillarW / 2, -pillarH, pillarW, pillarH);
+      ctx.beginPath();
+      ctx.moveTo(0, 2);
+      ctx.lineTo(w * 0.65, -7);
+      ctx.lineTo(w * 1.3, 2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.fillRect(-pillarW / 2 + 2, -pillarH, 3, pillarH);
+      ctx.fillStyle = '#3a2b42';
+      ctx.beginPath();
+      ctx.moveTo(-w * 0.45, 3);
+      ctx.lineTo(0, -3);
+      ctx.lineTo(w * 0.45, 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-      const crossY = -pillarH * 0.72;
-      const armL = 58;
-      const armH = 18;
+      // Stone Textures & Detailed Jagged Cracks (Clipped strictly inside pillar stone)
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(-w/2 + 0.5, -h + 0.5, w - 1, h);
+      ctx.rect(-beamW/2 + 0.5, beamY + 0.5, beamW - 1, beamH - 1);
+      ctx.clip();
 
-      const armGrad = ctx.createLinearGradient(0, crossY - armH / 2, 0, crossY + armH / 2);
-      armGrad.addColorStop(0, '#382e32');
-      armGrad.addColorStop(0.5, '#221b1e');
-      armGrad.addColorStop(1, '#100c0e');
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      for(let i = 0; i < 8; i++) {
+         const tx = (((pillar.seed * 7.1 + i * 3.3) * 13) % (w - 2)) - (w/2 - 1);
+         const ty = -h + 4 + ((((pillar.seed * 2.3 + i * 4.1) * 17) % 1) * (h - 8));
+         ctx.fillRect(tx, ty, 1.2, 1.2);
+      }
 
-      ctx.fillStyle = armGrad;
-      ctx.fillRect(-armL / 2, crossY - armH / 2, armL, armH);
-      ctx.strokeRect(-armL / 2, crossY - armH / 2, armL, armH);
+      const drawCrackPath = (offsetX, offsetY, color, width) => {
+        ctx.strokeStyle = color;
+        ctx.lineWidth = width;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'miter';
+        ctx.beginPath();
+        
+        const seed = pillar.seed;
+        const x = (Math.sin(seed * 4.1) * (w * 0.22)) + offsetX;
+        const y = -h + 5 + offsetY;
+        ctx.moveTo(x, y);
+        ctx.lineTo(x + 1.8, y + 10);
+        ctx.lineTo(x - 1.8, y + 22);
+        ctx.lineTo(x + 1.2, y + 35);
+        ctx.lineTo(x - 1.0, y + 46);
 
-      ctx.fillStyle = '#0f080a';
-      ctx.fillRect(-pillarW / 2 - 2, crossY - armH / 2 - 2, pillarW + 4, armH + 4);
-      ctx.strokeRect(-pillarW / 2 - 2, crossY - armH / 2 - 2, pillarW + 4, armH + 4);
+        const bx = x - 1.8;
+        const by = y + 22;
+        ctx.moveTo(bx, by);
+        ctx.lineTo(bx - 2.2, by + 10);
+        ctx.lineTo(bx - 0.8, by + 18);
 
+        ctx.moveTo(-beamW * 0.32 + offsetX, beamY + 1.5 + offsetY);
+        ctx.lineTo(-beamW * 0.24 + offsetX, beamY + 4.0 + offsetY);
+        ctx.lineTo(-beamW * 0.29 + offsetX, beamY + 6.5 + offsetY);
+
+        ctx.moveTo(beamW * 0.22 + offsetX, beamY + 1.5 + offsetY);
+        ctx.lineTo(beamW * 0.28 + offsetX, beamY + 4.5 + offsetY);
+        ctx.lineTo(beamW * 0.24 + offsetX, beamY + 6.5 + offsetY);
+
+        ctx.stroke();
+      };
+
+      drawCrackPath(0, 0, 'rgba(5, 2, 7, 0.95)', 0.8);
+      drawCrackPath(0.4, 0.4, 'rgba(190, 170, 210, 0.3)', 0.5);
+
+      ctx.restore();
       ctx.restore();
     });
 
+    ctx.restore();
+
+    // ── 5. ATMOSPHERIC FLOATING PETALS ──
+    ctx.save();
+    for (let p = 0; p < 16; p++) {
+      const px = domX + Math.sin(time * 0.0006 + p * 1.7) * (domainRadius * 0.85);
+      const py = domY + Math.cos(time * 0.0005 + p * 2.3) * (domainRadius * 0.85);
+      const pAlpha = 0.25 + Math.sin(time * 0.002 + p) * 0.15;
+
+      ctx.fillStyle = `rgba(255, 182, 193, ${pAlpha})`;
+      ctx.beginPath();
+      ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+      ctx.fill();
+    }
     ctx.restore();
   }
 

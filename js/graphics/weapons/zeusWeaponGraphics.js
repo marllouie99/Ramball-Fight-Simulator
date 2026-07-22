@@ -51,7 +51,6 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
   // ─── Outer glow layer (electric blue bloom) ───
   ctx.save();
   ctx.shadowColor = 'rgba(0, 191, 255, 0.5)';
-  ctx.shadowBlur = 15 * pulse; // Reduced blur intensity
 
   ctx.beginPath();
   ctx.moveTo(upperEdge[0].x, upperEdge[0].y);
@@ -76,7 +75,6 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
 
   ctx.save();
   ctx.shadowColor = '#FFFFFF';
-  ctx.shadowBlur = 8;
 
   ctx.beginPath();
   ctx.moveTo(innerUpper[0].x, innerUpper[0].y);
@@ -161,8 +159,6 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
 
     ctx.strokeStyle = `rgba(0, 220, 255, ${0.4 + pseudoRand(7) * 0.4})`;
     ctx.lineWidth = 0.8 + pseudoRand(8) * 1.2;
-    ctx.shadowColor = '#00BFFF';
-    ctx.shadowBlur = 6;
     ctx.stroke();
   }
   ctx.restore();

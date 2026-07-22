@@ -26,6 +26,15 @@ import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
 import { drawArena, drawPurpleDimScreen } from './renderers/arenaRenderer.js';
 
+let _cachedTime = 0;
+function getNow() {
+  if (_cachedTime === 0) _cachedTime = Date.now();
+  return _cachedTime;
+}
+export function resetCachedTime() {
+  _cachedTime = 0;
+}
+
 export { drawArena, drawPurpleDimScreen, drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
 /**
@@ -1714,9 +1723,9 @@ export function drawProjectiles() {
         });
       }
 
-      // Cap particles
-      while (p.flameParticles.length > 120) p.flameParticles.shift();
-      while (p.emberParticles.length > 40) p.emberParticles.shift();
+      // Cap particles for 60 FPS performance
+      while (p.flameParticles.length > 25) p.flameParticles.shift();
+      while (p.emberParticles.length > 15) p.emberParticles.shift();
 
       ctx.save();
       ctx.translate(p.x, p.y);
@@ -1831,29 +1840,11 @@ export function drawProjectiles() {
         const stretchX = curSize * (1.6 + speed * 0.03);
         const stretchY = curSize * (0.7 + ageRatio * 0.3);
 
-        const pGrad = ctx.createRadialGradient(fp.x, fp.y + wobY, 0, fp.x, fp.y + wobY, Math.max(stretchX, stretchY));
-
-        if (fp.layer === 0) {
-          // White-hot core blobs (youngest, closest to arrow)
-          pGrad.addColorStop(0, `rgba(255, 255, 250, ${alpha * 0.95})`);
-          pGrad.addColorStop(0.3, `rgba(255, 245, 180, ${alpha * 0.8})`);
-          pGrad.addColorStop(0.6, `rgba(255, 200, 60, ${alpha * 0.5})`);
-          pGrad.addColorStop(1, 'rgba(255, 120, 0, 0)');
-        } else if (fp.layer === 1) {
-          // Golden-orange mid layer
-          pGrad.addColorStop(0, `rgba(255, 220, 80, ${alpha * 0.85})`);
-          pGrad.addColorStop(0.35, `rgba(255, 160, 20, ${alpha * 0.65})`);
-          pGrad.addColorStop(0.7, `rgba(230, 80, 0, ${alpha * 0.35})`);
-          pGrad.addColorStop(1, 'rgba(160, 20, 0, 0)');
-        } else {
-          // Crimson-red outer layer (oldest, farthest back)
-          pGrad.addColorStop(0, `rgba(255, 140, 30, ${alpha * 0.7})`);
-          pGrad.addColorStop(0.4, `rgba(220, 50, 0, ${alpha * 0.45})`);
-          pGrad.addColorStop(0.8, `rgba(140, 15, 0, ${alpha * 0.2})`);
-          pGrad.addColorStop(1, 'rgba(60, 0, 0, 0)');
-        }
-
-        ctx.fillStyle = pGrad;
+        ctx.fillStyle = fp.layer === 0
+          ? `rgba(255, 245, 180, ${alpha * 0.75})`
+          : fp.layer === 1
+          ? `rgba(255, 140, 20, ${alpha * 0.55})`
+          : `rgba(220, 40, 0, ${alpha * 0.35})`;
         ctx.beginPath();
         ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
         ctx.fill();

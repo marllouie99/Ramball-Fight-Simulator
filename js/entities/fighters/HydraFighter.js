@@ -243,7 +243,7 @@ export class HydraFighter extends Fighter {
     this.vy += Math.sin(this.gunAngle) * 3;
     
     spawnFloatingText(opponent.x, opponent.y, 'SMACK!', '#ccc');
-    playSound('Assets/Sound Effects/Attacks/swordclash.mp3', 0.5);
+    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
   }
 
   drawBody(ctx) {
