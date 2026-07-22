@@ -46,8 +46,9 @@ import {
   drawEngineer,
   drawZeusWeapon
 } from './weaponVisuals.js';
-import { drawRubyScythe } from './weapons/rubyWeaponGraphics.js';
-import { drawMusashiWeapons, drawMusashiSheaths } from './weapons/musashiWeaponGraphics.js';
+import { renderTeamHpCard } from './ui/hudRenderer.js';
+import { renderFpsDebugOverlay } from './ui/debugOverlay.js';
+export { renderTeamHpCard, renderFpsDebugOverlay };
 
 // --- Fighter Preview Cache ---
 const fighterPreviewCache = {};
