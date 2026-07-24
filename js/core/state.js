@@ -105,6 +105,7 @@ export const state = {
   fpsLastTime: 0,
   fpsLogs: [],
   allFpsLogs: [],
+  hideFpsLogs: true,
 
   // Dynamic quality system for performance
   qualityLevel: 1.0, // 1.0 = full quality, 0.5 = half quality, etc.
@@ -305,7 +306,15 @@ const SKILL_TEXT_WHITELIST = [
   'CRIT!',
   'BLOCK!',
   'PLANTING...',
-  'RCT'
+  'RCT',
+  'SILENCED!',
+  'INVERTED SPEAR PARRY!',
+  'INFINITY NULLIFIED!',
+  'SPLIT SOUL SWEEP!',
+  'PHANTOM FLURRY!',
+  'SOUL WOUNDED!',
+  'SKILL INTERRUPTED!',
+  'COOLDOWN RESET!'
 ];
 
 function isAllowedFloatingText(text) {
@@ -313,6 +322,7 @@ function isAllowedFloatingText(text) {
   const isNumeric = /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
   if (isNumeric) return true;
   if (normalizedText.startsWith('SHIELD ')) return true;
+  if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY')) return true;
   return SKILL_TEXT_WHITELIST.includes(normalizedText);
 }
 

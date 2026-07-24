@@ -8,6 +8,7 @@ import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawGunSlingerDualRevolver, GUNSLINGER_WEAPON_GRAPHICS } from '../../graphics/weapons/gunSlingerWeaponGraphics.js';
 import { spatialGrid } from '../../systems/physics.js';
+import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
 
 /**
  * Gun Slinger Fighter
@@ -21,6 +22,8 @@ export class GunSlingerFighter extends Fighter {
     super(def);
     this.leftGunTimer = 0; // Timer for left gun delay
     this.muzzleFlashTimer = 0; // Timer for muzzle flash animation
+    this.rightMuzzleFlashTimer = 0;
+    this.leftMuzzleFlashTimer = 0;
     this.skillTimer = 0; // Cooldown for active skill
     this.skillActive = false; // Is skill currently active
     this.skillBurstTimer = 0; // Timer for skill burst intervals
@@ -50,6 +53,8 @@ export class GunSlingerFighter extends Fighter {
     super.reset();
     this.leftGunTimer = 0;
     this.muzzleFlashTimer = 0;
+    this.rightMuzzleFlashTimer = 0;
+    this.leftMuzzleFlashTimer = 0;
     this.skillTimer = 0;
     this.skillActive = false;
     this.skillBurstTimer = 0;
@@ -193,13 +198,29 @@ export class GunSlingerFighter extends Fighter {
   aim(opponent, secondaryOpponent = null) {
     if (!opponent) return;
 
-    this.rightGunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    let targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
+    if (opponent.isStealthed) {
+      let diff = targetAngle - (this.rightGunAngle || 0);
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      this.rightGunAngle = (this.rightGunAngle || 0) + diff * turnRate;
+    } else {
+      this.rightGunAngle = targetAngle; // Instant fast lock-on!
+    }
     this.gunAngle = this.rightGunAngle;
 
     if (secondaryOpponent) {
-      this.leftGunAngle = Math.atan2(secondaryOpponent.y - this.y, secondaryOpponent.x - this.x);
+      let secTargetAngle = Math.atan2(secondaryOpponent.y - this.y, secondaryOpponent.x - this.x);
+      if (secondaryOpponent.isStealthed) {
+        let diff = secTargetAngle - (this.leftGunAngle || 0);
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        this.leftGunAngle = (this.leftGunAngle || 0) + diff * turnRate;
+      } else {
+        this.leftGunAngle = secTargetAngle; // Instant fast lock-on!
+      }
     } else {
-      // Both guns aim at the primary target
       this.leftGunAngle = this.rightGunAngle;
     }
   }
@@ -296,6 +317,16 @@ export class GunSlingerFighter extends Fighter {
 
     projectileSystem.fireProjectile(this, ownerIndex, bulletDamage, false, speed, false, null, spawnX, spawnY, gunAngle);
     
+    // Spawn fiery golden sparks on the tip of the gun barrel
+    spawnSparks(spawnX, spawnY, 6, 'flash');
+
+    if (isRightGun) {
+      this.rightMuzzleFlashTimer = 8;
+    } else {
+      this.leftMuzzleFlashTimer = 8;
+    }
+    this.muzzleFlashTimer = 8;
+
     // Physical kickback shake
     triggerGlobalScreenShake(isSkill ? 6 : 3, 4);
 
@@ -384,6 +415,12 @@ export class GunSlingerFighter extends Fighter {
     // Handle muzzle flash timer
     if (this.muzzleFlashTimer > 0) {
       this.muzzleFlashTimer--;
+    }
+    if (this.rightMuzzleFlashTimer > 0) {
+      this.rightMuzzleFlashTimer--;
+    }
+    if (this.leftMuzzleFlashTimer > 0) {
+      this.leftMuzzleFlashTimer--;
     }
 
     // Handle gun spin timer
@@ -533,12 +570,14 @@ export class GunSlingerFighter extends Fighter {
       this.x, this.y,
       this.rightGunAngle, this.leftGunAngle,
       this.r,
-      isFiring,
-      this.muzzleFlashTimer,
+      this.rightMuzzleFlashTimer > 0,
+      this.rightMuzzleFlashTimer,
       this.rightRecoilOffset, this.rightRecoilTilt,  // Right gun recoil
       this.leftRecoilOffset, this.leftRecoilTilt,      // Left gun recoil
       gunSpinAngle,
-      this.color
+      this.color,
+      this.leftMuzzleFlashTimer > 0,
+      this.leftMuzzleFlashTimer
     );
     // Draw smoke effect around the guns
     this._drawSmoke(ctx);

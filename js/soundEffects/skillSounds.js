@@ -2,6 +2,10 @@
 // SKILL SOUND EFFECTS CONFIG
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // Configure sound effects for fighter skills and abilities.
+// Properties:
+//   - src:      File path to the audio file
+//   - volume:   Playback volume (0.0 to 1.0, can be >1.0 for gain)
+//   - delay:    Seconds (or frames, depending on skill logic) to wait before playing the sound
 
 export const SKILL_SOUNDS = {
   // â”€â”€ Berserker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -9,6 +13,7 @@ export const SKILL_SOUNDS = {
     rage: {
       src: 'Assets/Sound Effects/Skills/ragescream.mp3',
       volume: 0.4,
+      delay: 0
     }
   },
 
@@ -18,6 +23,7 @@ export const SKILL_SOUNDS = {
     sphere: {
       src: 'Assets/Sound Effects/Skills/cronosphere.mp3',
       volume: 0.7,
+      delay: 0
     },
   },
 
@@ -27,6 +33,7 @@ export const SKILL_SOUNDS = {
     enhance: {
       src: 'Assets/Sound Effects/Skills/enhance.mp3',
       volume: 0.8,
+      delay: 0
     },
   },
 
@@ -36,6 +43,7 @@ export const SKILL_SOUNDS = {
     shieldblock: {
       src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
       volume: 0.8,
+      delay: 0
     },
   },
 
@@ -45,6 +53,7 @@ export const SKILL_SOUNDS = {
     summonillusion: {
       src: 'Assets/Sound Effects/Skills/summinillusion.mp3',
       volume: 0.65,
+      delay: 0
     },
   },
 
@@ -53,14 +62,17 @@ export const SKILL_SOUNDS = {
     stealthmode: {
       src: 'Assets/Sound Effects/Skills/woosh.mp3',
       volume: 0.6,
+      delay: 0
     },
     shadowmode: {
       src: 'Assets/Sound Effects/Skills/woosh.mp3',
       volume: 0.6,
+      delay: 0
     },
     backstab: {
       src: 'Assets/Sound Effects/Skills/backstab.mp3',
       volume: 0.7,
+      delay: 0
     },
   },
 
@@ -69,6 +81,7 @@ export const SKILL_SOUNDS = {
     blackhole: {
       src: 'Assets/Sound Effects/Skills/gravitypull.mp3',
       volume: 0.7,
+      delay: 0
     },
   },
 
@@ -77,10 +90,12 @@ export const SKILL_SOUNDS = {
     build: {
       src: 'Assets/Sound Effects/Skills/hammer.mp3',
       volume: 0.6,
+      delay: 0
     },
     repair: {
       src: 'Assets/Sound Effects/Skills/repair.mp3',
       volume: 0.8,
+      delay: 0
     },
   },
 
@@ -89,14 +104,17 @@ export const SKILL_SOUNDS = {
     spin: {
       src: 'Assets/Sound Effects/Skills/spinslash.mp3',
       volume: 0.7,
+      delay: 0
     },
     pull: {
       src: 'Assets/Sound Effects/Skills/hookchain.mp3',
       volume: 0.7,
+      delay: 0
     },
     dash: {
       src: 'Assets/Sound Effects/Skills/dash1.mp3',
       volume: 0.4,
+      delay: 0
     },
   },
 
@@ -105,10 +123,14 @@ export const SKILL_SOUNDS = {
     aegis: {
       src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
       volume: 0.7
+      ,
+      delay: 0
     },
     storm: {
       src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
       volume: 1.5
+      ,
+      delay: 0
     }
   },
 
@@ -117,6 +139,8 @@ export const SKILL_SOUNDS = {
     dash: {
       src: 'Assets/Sound Effects/Skills/dash3.mp3',
       volume: 1.0
+      ,
+      delay: 0
     }
   },
 
@@ -125,14 +149,20 @@ export const SKILL_SOUNDS = {
     telekinesis: {
       src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
       volume: 0.8
+      ,
+      delay: 0
     },
     telekinesisDrop: {
       src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
       volume: 0.9
+      ,
+      delay: 0
     },
     spellSteal: {
       src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
       volume: 0.9
+      ,
+      delay: 0
     }
   },
 
@@ -141,10 +171,14 @@ export const SKILL_SOUNDS = {
     aegis: {
       src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
       volume: 0.7
+      ,
+      delay: 0
     },
     storm: {
       src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
       volume: 1.0
+      ,
+      delay: 0
     }
   },
 
@@ -152,23 +186,33 @@ export const SKILL_SOUNDS = {
   21: {
     domain_channel: {
       src: 'Assets/Sound Effects/Skills/gojodomain.mp3',
-      volume: 2.0
+      volume: 5.0
+      ,
+      delay: 0
     },
     domain_expansion: {
       src: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
       volume: 5.0
+      ,
+      delay: 0
     },
     domain_activate: {
       src: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
-      volume: 2.0
+      volume: 5.0
+      ,
+      delay: -0.10
     },
     purple_charge: {
       src: 'Assets/Sound Effects/Skills/mixing.mp3',
       volume: 5.0
+      ,
+      delay: 0
     },
     purple_fire: {
       src: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
-      volume: 1.5
+      volume: 1.0
+      ,
+      delay: 0
     }
   },
 
@@ -177,26 +221,61 @@ export const SKILL_SOUNDS = {
     domain_channel: {
       src: 'Assets/Sound Effects/Skills/domainexpansion.mp3',
       volume: 5.5
+      ,
+      delay: 0
     },
     domain_activate: {
       src: 'Assets/Sound Effects/Skills/shrine.mp3',
       volume: 1.5
+      ,
+      delay: 0
     },
     divineflame: {
       src: 'Assets/Sound Effects/Skills/fugaignite.mp3',
       volume: 2.0
+      ,
+      delay: 0
     },
     fuga_fire: {
       src: 'Assets/Sound Effects/Skills/fuga.mp3',
       volume: 3.5
+      ,
+      delay: 0
     },
     fuga_travel: {
       src: 'Assets/Sound Effects/Skills/fugatravel.mp3',
       volume: 1.5
+      ,
+      delay: 0
     },
     fuga_explode: {
       src: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
-      volume: 1.5
+      volume: 1.5,
+      delay: 0
+    }
+  },
+
+  // ── Yuta ─────────────────────────────
+  23: {
+    domain_channel: {
+      src: 'Assets/Sound Effects/Skills/yutadomainexpansion.mp3',
+      volume: 3.0,
+      delay: 0
+    },
+    domain_activate: {
+      src: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3', // Generic domain deploy sound instead of Sukuna's shrine
+      volume: 2.0,
+      delay: 0
+    },
+    rika_appearance: {
+      src: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', // Rika's roar when she arises
+      volume: 1.5,
+      delay: 0
+    },
+    parry: {
+      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+      volume: 0.8,
+      delay: 0
     }
   }
 };
@@ -206,6 +285,7 @@ export const SKILL_SOUNDS = {
  * @param {number} fighterId - Fighter ID
  * @param {string} skillName - Name of the skill (e.g. 'rage')
  * @returns {{ src: string, volume: number } | null}
+
  */
 export function getSkillSound(fighterId, skillName) {
   const lowerSkill = String(skillName || '').toLowerCase();

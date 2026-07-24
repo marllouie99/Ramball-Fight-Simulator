@@ -8,9 +8,8 @@ import { drawEngineerWrench } from '../../../graphics/engineerWeaponGraphics.js'
 export function drawStolenWeapon(ctx, fighter) {
   ctx.save();
   
-  // Apply a ghostly filter: translucent, colorless, and slightly bright
-  ctx.globalAlpha = 0.6;
-  ctx.filter = 'grayscale(100%) brightness(1.5)';
+  // Apply a ghostly effect: translucent and spectral
+  ctx.globalAlpha = 0.5;
 
   const weaponType = (fighter.stolenWeaponType || '').toLowerCase();
 

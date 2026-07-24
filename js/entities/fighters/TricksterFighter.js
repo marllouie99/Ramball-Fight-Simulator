@@ -299,6 +299,9 @@ export class TricksterFighter extends Fighter {
     
     const stormSound = getSkillSound(99, 'storm');
     if (stormSound) playSound(stormSound.src, stormSound.volume * 0.6);
+
+    const thunderSound = getSkillSound('zeus', 'thunderstrike');
+    if (thunderSound) playSound(thunderSound.src, (thunderSound.volume || 1.0) * 0.6);
     
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
     state.zeusStormStrikes.push({
@@ -1827,5 +1830,28 @@ export class TricksterFighter extends Fighter {
     ctx.strokeRect(-barWidth / 2, 0, barWidth, barHeight);
 
     ctx.restore();
+  }
+
+  /**
+   * Domain expansion background rendering for Trickster
+   */
+  drawDomainBackground(ctx, isClashSecondary = false) {
+    if (!this.domainActive) return;
+    const arena = CONFIG.arena;
+    if (!arena) return;
+
+    ctx.save();
+    // Dark void domain canvas background
+    ctx.fillStyle = '#050510';
+    ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+
+    // Deep arcane domain background fill
+    ctx.fillStyle = 'rgba(10, 25, 20, 0.95)';
+    ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+    ctx.restore();
+  }
+
+  drawDomainForeground(ctx, isClashSecondary = false) {
+    if (!this.domainActive) return;
   }
 }

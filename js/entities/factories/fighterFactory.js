@@ -22,6 +22,7 @@ import { HydraFighter } from '../fighters/HydraFighter.js';
 import { GojoFighter } from '../fighters/GojoFighter.js';
 import { SukunaFighter } from '../fighters/SukunaFighter.js';
 import { YutaFighter } from '../fighters/YutaFighter.js';
+import { TojiFighter } from '../fighters/TojiFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -48,4 +49,5 @@ export const FIGHTER_CLASS_MAP = {
   'gojo': GojoFighter,
   'sukuna': SukunaFighter,
   'yuta': YutaFighter,
+  'toji': TojiFighter,
 };

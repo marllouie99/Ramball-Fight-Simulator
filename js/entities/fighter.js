@@ -15,7 +15,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, spawnFloatingText, recordWin, recordLoss } from '../core/state.js';
-import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect } from '../graphics/statusEffects.js';
+import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -128,13 +128,23 @@ export class Fighter {
     // timestamp (ms) when this fighter last took flame contact damage
     this._lastFlameHitTime = 0;
     this._flameContactDuration = 0;
-    // Health bar damage shake timer (frames)
+    // Health bar damage shake and hit/heal edge glow timers (frames)
     this._healthBarShakeTimer = 0;
+    this._healthBarHitTimer = 0;
+    this._healthBarHealTimer = 0;
+    this._lastHp = this.hp;
     // Burn effect state
     this.burnTimer = 0;
     this.burnDamageTimer = 0;
     this.lastBurnAttacker = null;
     this.burnSpreadCooldown = 0;
+    // Silence effect state
+    this.silenceTimer = 0;
+  }
+
+  /** Returns true if this fighter is currently silenced by anti-technique effects (e.g. Inverted Spear of Heaven). */
+  isSilenced() {
+    return (this.silenceTimer || 0) > 0;
   }
 
   /** Returns true if this fighter is currently inside any active Cronos time-stop sphere. */
@@ -291,6 +301,11 @@ export class Fighter {
       return true;
     }
 
+    if (this.silenceTimer > 0) {
+      this.silenceTimer--;
+      this.interruptAttacks();
+    }
+
     // Electric stun - immobilize the fighter completely.
     // We check this here because all subclasses short-circuit their update() if this method returns true.
     if (this.electricStunTimer > 0) {
@@ -376,9 +391,11 @@ export class Fighter {
   }
 
   // Knockback is now applied directly to fighter's position, so physics engines of custom fighters can't interfere.
+  // Knockback is applied directly to fighter's position, so physics engines of custom fighters can't interfere.
   applyKnockback(vx, vy) {
     this.knockbackVx = vx;
     this.knockbackVy = vy;
+    this.knockbackStunTimer = 45; // 45 frames of steering freeze so ricochet wall bouncing executes freely!
   }
 
   handlePoison() {
@@ -423,9 +440,18 @@ export class Fighter {
     if (this._flameHitCooldown > 0) this._flameHitCooldown--;
     if (this.burnSpreadCooldown > 0) this.burnSpreadCooldown--;
     if (this._healthBarShakeTimer > 0) this._healthBarShakeTimer--;
+    if (this._healthBarHitTimer > 0) this._healthBarHitTimer--;
+    if (this._healthBarHealTimer > 0) this._healthBarHealTimer--;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
     if (this.rctVisualTimer > 0) this.rctVisualTimer--;
     
+    // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
+    if (this.knockbackStunTimer > 0) {
+      this.knockbackStunTimer--;
+      this.vx = 0;
+      this.vy = 0;
+    }
+
     // Universal knockback physics (processed for all custom fighters without breaking their steering logic)
     if (this.knockbackVx !== undefined && (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1)) {
       this.x += this.knockbackVx;
@@ -435,15 +461,29 @@ export class Fighter {
       const arena = CONFIG.arena;
       if (arena) {
         let bounced = false;
-        if (this.x - this.r < arena.x) { this.x = arena.x + this.r; this.knockbackVx = Math.abs(this.knockbackVx) * 0.8; bounced = true; }
-        if (this.x + this.r > arena.x + arena.width) { this.x = arena.x + arena.width - this.r; this.knockbackVx = -Math.abs(this.knockbackVx) * 0.8; bounced = true; }
-        if (this.y - this.r < arena.y) { this.y = arena.y + this.r; this.knockbackVy = Math.abs(this.knockbackVy) * 0.8; bounced = true; }
-        if (this.y + this.r > arena.y + arena.height) { this.y = arena.y + arena.height - this.r; this.knockbackVy = -Math.abs(this.knockbackVy) * 0.8; bounced = true; }
+        const currentSpeed = Math.hypot(this.knockbackVx, this.knockbackVy);
+
+        // Silky Smooth Kinetic Ricochet Wall Bounce (0.82 smooth velocity reflection)
+        const bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
+
+        if (this.x - this.r < arena.x) { this.x = arena.x + this.r; this.knockbackVx = Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
+        if (this.x + this.r > arena.x + arena.width) { this.x = arena.x + arena.width - this.r; this.knockbackVx = -Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
+        if (this.y - this.r < arena.y) { this.y = arena.y + this.r; this.knockbackVy = Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
+        if (this.y + this.r > arena.y + arena.height) { this.y = arena.y + arena.height - this.r; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
+
+        if (bounced && !this.isFirstHitKnockback && currentSpeed > 6) {
+          triggerGlobalScreenShake(5, 6); // Subtle micro camera punch for smooth motion!
+          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
+          spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
+          spawnSparks(this.x, this.y, 14, 'crimsonSniper');
+          spawnMeleeClashShockwave(this.x, this.y, 100, 'yuta');
+        }
       }
       
-      // Decay knockback velocity
-      this.knockbackVx *= 0.85;
-      this.knockbackVy *= 0.85;
+      // Decay knockback velocity smoothly (uses knockbackDecay if specified, default 0.90 for silky smooth gliding)
+      const decay = this.knockbackDecay || 0.90;
+      this.knockbackVx *= decay;
+      this.knockbackVy *= decay;
       
       if (Math.abs(this.knockbackVx) <= 0.1) this.knockbackVx = 0;
       if (Math.abs(this.knockbackVy) <= 0.1) this.knockbackVy = 0;
@@ -463,7 +503,7 @@ export class Fighter {
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
   takeDamage(amount, attacker, opts = {}) {
-    if (this.hp <= 0) return false;
+    if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain)) return false;
 
     // Base fighter doesn't block; sanitize inputs before applying damage.
     let currentHp = Number(this.hp);
@@ -497,6 +537,7 @@ export class Fighter {
       const color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
       const damageText = `${Math.round(amount)}`;
       this._healthBarShakeTimer = 12;
+      this._healthBarHitTimer = 14;
       if (!opts.fromBlackHole) {
         spawnFloatingText(this.x, this.y - this.r - 8, damageText, color);
       } else {
@@ -648,6 +689,22 @@ export class Fighter {
     return true;
   }
 
+  /** Heals the fighter by a given amount and triggers the green health bar edge glow effect. */
+  heal(amount, opts = {}) {
+    if (this.hp <= 0 || amount <= 0) return false;
+    const prevHp = Number(this.hp) || 0;
+    this.hp = Math.min(this.maxHp, Number((prevHp + amount).toFixed(2)));
+    if (this.hp > prevHp) {
+      this._healthBarHealTimer = 14;
+      if (!opts.silent) {
+        const color = opts.color || '#22c55e';
+        spawnFloatingText(this.x, this.y - this.r - 8, `+${Math.round(amount)}`, color);
+      }
+      return true;
+    }
+    return false;
+  }
+
   /** Resolves wall collision and bounces back with varied angles. */
   resolveWallBounce(arena) {
     let bounced = false;
@@ -703,9 +760,29 @@ export class Fighter {
     // Disabled as requested
   }
 
-  /** Controls how the gun is aimed. Default aims in direction of body rotation. */
+  /** Controls how the gun is aimed. Default aims in direction of opponent with delayed reaction time if stealthed. */
   aim(opponent) {
-    this.gunAngle = this.angle;
+    if (!opponent) {
+      this.gunAngle = this.angle;
+      return;
+    }
+
+    const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+
+    // If opponent is stealthed (e.g. Toji Heavenly Restriction), aim tracking has a sluggish delayed reaction time!
+    if (opponent.isStealthed) {
+      const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      let diff = targetAngle - currentAngle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
+      this.gunAngle = currentAngle + diff * turnRate;
+      this.angle = this.gunAngle;
+      return;
+    }
+
+    this.gunAngle = targetAngle;
+    this.angle = targetAngle;
   }
 
   /** Collision hook to trigger custom logic. Override in subclasses. */
@@ -831,7 +908,16 @@ export class Fighter {
   /** Draws the basic circle body. Subclasses can override for custom rendering. */
   drawBody(ctx) {
     ctx.save();
-    ctx.translate(this.x, this.y);
+    let tremorX = 0;
+    let tremorY = 0;
+    const currentShake = (typeof state !== 'undefined' && state.screenShake) ? (state.screenShake.intensity || 0) : 0;
+    const isAnyFighterChanneling = (typeof state !== 'undefined' && state.fighters) ? state.fighters.some(f => f && (f.isChannelingDomain || f.isChannelingDomainExpansion)) : false;
+    if (currentShake > 0 || isAnyFighterChanneling) {
+      const shakeAmt = isAnyFighterChanneling ? 4.0 : Math.min(6, currentShake * 0.6);
+      tremorX = (Math.random() - 0.5) * shakeAmt;
+      tremorY = (Math.random() - 0.5) * shakeAmt;
+    }
+    ctx.translate(this.x + tremorX, this.y + tremorY);
     ctx.rotate(this.angle);
     
     // Flip vertically if facing left to prevent being upside-down
@@ -884,6 +970,10 @@ export class Fighter {
 
     if (this.poisonTicks > 0) {
       drawPoisonEffect(ctx, baseRadius);
+    }
+    
+    if (this.silenceTimer > 0) {
+      drawSilenceEffect(ctx, baseRadius);
     }
     
     if (this.thunderRootsTimer > 0) {

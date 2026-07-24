@@ -5,7 +5,7 @@ import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { state, registerProjectileSystem, triggerGlobalScreenShake } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
-import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound } from './soundSystem.js';
+import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound, fadeOutSound, fadeOutSoundBySrc } from './soundSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
@@ -97,6 +97,17 @@ class ProjectileSystem {
     if (proj.soundKey) {
       fadeOutLoopingSound(proj.soundKey, 500); // Smooth fade out over 0.5s when projectile dies
       proj.soundKey = null;
+    }
+    
+    if (proj.purpleSoundHandle) {
+      fadeOutSound(proj.purpleSoundHandle, 350);
+      proj.purpleSoundHandle = null;
+    }
+
+    if (proj.isGojoPurple) {
+      fadeOutSoundBySrc('hollowpurple', 350);
+      proj.isGojoPurple = false;
+      proj.isGojoPurpleOrb = false;
     }
     
     if (proj.history) proj.history.length = 0;
@@ -227,6 +238,7 @@ class ProjectileSystem {
     }
 
     this.projectiles.push(proj);
+    return proj;
   }
 
   /**
@@ -369,6 +381,7 @@ class ProjectileSystem {
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 10;
     proj.isGojoPurple = true;
+    proj.isGojoPurpleOrb = true;
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
     proj.purpleDPS = CONFIG.gojo.purpleDPS || 5;
@@ -387,12 +400,10 @@ class ProjectileSystem {
     const shakeDuration = CONFIG.gojo.purpleShakeDuration || 30;
     triggerGlobalScreenShake(shakeIntensity, shakeDuration);
 
-    // Play Hollow Purple audio and loop it while the projectile exists
+    // Play Hollow Purple audio effect (play once per cast, non-looping)
     const sound = getSkillSound(21, 'purple_fire');
     if (sound) {
-      const soundKey = 'purple_fire_' + Math.random().toString(36).substr(2, 9);
-      proj.soundKey = soundKey;
-      playLoopingSound(soundKey, sound.src, sound.volume);
+      proj.purpleSoundHandle = playSound(sound.src, sound.volume);
     }
   }
 
@@ -768,7 +779,7 @@ class ProjectileSystem {
     const nearbyFighters = spatialGrid.getNearby(projectile.x, projectile.y, projectile.r * 2 + 100);
 
     for (const fighter of nearbyFighters) {
-      if (!fighter || fighter.hp <= 0) continue;
+      if (!fighter || fighter.hp <= 0 || fighter.isAmbushing) continue;
       const fi = fighters.indexOf(fighter);
       if (fi === -1) continue;
 
@@ -1021,6 +1032,8 @@ class ProjectileSystem {
                  if (attacker && typeof attacker._def !== 'undefined') {
                    const stormSound = getSkillSound(attacker._def.id, 'storm');
                    if (stormSound) playSound(stormSound.src, stormSound.volume * 0.5);
+                   const thunderSound = getSkillSound(attacker._def.id, 'thunderstrike');
+                   if (thunderSound) playSound(thunderSound.src, (thunderSound.volume || 1.0) * 0.5);
                  }
                  
                  if (projectile.chainCount > 0) {
@@ -1109,9 +1122,17 @@ class ProjectileSystem {
       if (!illusion || illusion.hp <= 0) continue;
 
       // Skip friendly illusions
-      const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+      let illusionOwnerIndex = illusion.owner?.fighterIndex;
+      if (typeof illusionOwnerIndex !== 'number' || illusionOwnerIndex < 0) {
+        if (typeof illusion.owner === 'number') {
+          illusionOwnerIndex = illusion.owner;
+        } else if (illusion.owner && state.fighters) {
+          illusionOwnerIndex = state.fighters.indexOf(illusion.owner);
+        }
+      }
+
       if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
-        if (projectile.owner === illusionOwnerIndex || areOnSameTeam(projectile.owner, illusionOwnerIndex)) continue;
+        if (projectile.owner === illusionOwnerIndex || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, illusionOwnerIndex))) continue;
       }
 
       // Skip if this projectile has piercing and already hit this illusion
@@ -1129,13 +1150,20 @@ class ProjectileSystem {
         const attacker = fighters[projectile.owner];
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
         
-        // Sukuna slashes pierce through illusions!
-        if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid') {
+        // 1. Sukuna Fuga (Furnace) arrow: trigger thermobaric explosion on contact with illusion!
+        if (projectile.isSukunaFurnace) {
+          this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
+          return true;
+        } 
+        // 2. Sukuna slashes: pierce through illusions
+        else if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade') {
           if (!projectile.hitFighters) projectile.hitFighters = new Set();
           projectile.hitFighters.add(illusion);
           spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
           // Do NOT return true
-        } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
+        } 
+        // 3. Sharpshooter / Trickster enhanced sniper bullets: pierce through illusions
+        else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
           if (!projectile.hitFighters) projectile.hitFighters = new Set();
           projectile.hitFighters.add(illusion);
           spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
@@ -1145,11 +1173,23 @@ class ProjectileSystem {
           illusion.crimsonElectrifiedTimer = Math.max(illusion.crimsonElectrifiedTimer || 0, duration);
           illusion.lastCrimsonAttacker = attacker;
           // Do NOT return true
-        } else if (projectile.isGojoPurple) {
+        } 
+        // 4. Gojo Purple orb: pierces through illusions
+        else if (projectile.isGojoPurple) {
           if (!projectile.hitFighters) projectile.hitFighters = new Set();
           projectile.hitFighters.add(illusion);
           spawnSparks(illusion.x, illusion.y, 8, 'lightningTrail', '#8A2BE2');
           spawnImpactFlash(illusion.x, illusion.y, 25, 'lightningTrail');
+          // Do NOT return true
+        } 
+        // 5. Gojo Blue orb: pierces through illusions
+        else if (projectile.isGojoBlue) {
+          if (!projectile.hitFighters) projectile.hitFighters = new Set();
+          if (!projectile.hitFighters.has(illusion)) {
+            projectile.hitFighters.add(illusion);
+            spawnSparks(illusion.x, illusion.y, 6, 'lightningTrail', '#00D4CC');
+            spawnImpactFlash(illusion.x, illusion.y, 20, 'lightningTrail');
+          }
           // Do NOT return true
         } else {
           return true;
@@ -1797,15 +1837,18 @@ class ProjectileSystem {
           }
         }
 
-        // Second pass: if still over limit, just start pruning the oldest regular projectiles
+        // Second pass: if still over limit, prune oldest regular non-critical projectiles
         if (removedCount < targetToRemove) {
           const stillToRemove = targetToRemove - removedCount;
-          if (stillToRemove > 0 && this.projectiles.length > 0) {
-            // Use splice to maintain array order and correctly remove the oldest items.
-            // (The previous O(1) swap-and-pop at index 0 inadvertently deleted the newest items).
-            const removed = this.projectiles.splice(0, stillToRemove);
-            for (let i = 0; i < removed.length; i++) {
-              this._returnProjectile(removed[i]);
+          let pruned = 0;
+          for (let i = 0; i < this.projectiles.length && pruned < stillToRemove; i++) {
+            const p = this.projectiles[i];
+            const isCriticalSlash = p && (p.visual === 'ghostBlade' || p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.isGojoPurple || p.isSukunaFurnace);
+            if (p && !isCriticalSlash) {
+              this._returnProjectile(p);
+              this.projectiles.splice(i, 1);
+              i--;
+              pruned++;
             }
           }
         }
@@ -1817,6 +1860,22 @@ class ProjectileSystem {
 
     for (let i = this.projectiles.length - 1; i >= 0; i--) {
       const p = this.projectiles[i];
+
+      // --- Gojo Limitless Infinity Mid-Air Freeze Update ---
+      if (p.isFrozenByInfinity) {
+        p.vx = 0;
+        p.vy = 0;
+        if (p.infinityFreezeTimer === undefined) p.infinityFreezeTimer = 240;
+        p.infinityFreezeTimer--;
+
+        if (p.infinityFreezeTimer <= 0) {
+          // Expire projectile after mid-air freeze
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+        }
+        continue;
+      }
 
       if (p.capturedByBlackHole) {
         p.orbitAngle += 0.15;
@@ -1864,24 +1923,53 @@ class ProjectileSystem {
       }
 
       // --- Gojo Limitless (Infinity) Spatial Projectile Interception ---
-      if (!p.isGojoBlue && !p.isGojoPurple && !p.isVisual && p.visual !== 'ghostBlade' && p.life > 0) {
+      if (!p.isGojoBlue && !p.isGojoPurple && (!p.isVisual || p.isFrozenByInfinity) && p.life > 0) {
         for (let fi = 0; fi < fighters.length; fi++) {
-          if (fi === p.owner) continue;
           const f = fighters[fi];
-          if (!f || f.hp <= 0 || f.characterId !== 'gojo') continue;
+          if (!f || f.hp <= 0) continue;
+          const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
+          if (!isGojo) continue;
           if (areOnSameTeam(p.owner, fi)) continue;
 
           const infinityRadius = f.r + 30;
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
-          if (distSq <= infinityRadius * infinityRadius && (f.infinityCooldown <= 0 || f.infinityActive)) {
-            // Intercepted by Limitless: speed reduced to 0 and damage nullified!
-            p.vx *= 0.02;
-            p.vy *= 0.02;
-            p.life = 0; // Nullified at Infinity barrier
-            if (typeof f.triggerInfinityBlock === 'function') {
-              f.triggerInfinityBlock(p.x, p.y);
+          const isLimitlessActive = (f.infinityCooldown <= 0 || f.infinityActive || f.infinityBlockTimer > 0 || p.targetIsGojoLimitless);
+          if (distSq <= infinityRadius * infinityRadius && isLimitlessActive) {
+            // Check configurable freeze chance (CONFIG.gojo.infinityFreezeChance)
+            const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 1.0;
+            if (!p.isFrozenByInfinity && Math.random() <= freezeChance) {
+              // Prune oldest frozen projectile if exceeding max limit to guarantee 60 FPS
+              const maxFrozen = CONFIG.gojo?.infinityMaxFrozenProjectiles ?? 12;
+              let activeFrozenCount = 0;
+              let oldestFrozenProj = null;
+              for (let k = 0; k < this.projectiles.length; k++) {
+                if (this.projectiles[k].isFrozenByInfinity && this.projectiles[k].infinityFreezeTimer > 15) {
+                  activeFrozenCount++;
+                  if (!oldestFrozenProj || this.projectiles[k].infinityFreezeTimer < oldestFrozenProj.infinityFreezeTimer) {
+                    oldestFrozenProj = this.projectiles[k];
+                  }
+                }
+              }
+              if (activeFrozenCount >= maxFrozen && oldestFrozenProj) {
+                oldestFrozenProj.infinityFreezeTimer = 15; // Smoothly dissolve oldest frozen projectile
+              }
+
+              p.isFrozenByInfinity = true;
+              const freezeDuration = CONFIG.gojo?.infinityFreezeDuration ?? 240;
+              p.infinityFreezeTimer = freezeDuration;
+              p.life = freezeDuration;
+              p.maxLife = freezeDuration;
+              p._resumeVx = p.vx;
+              p._resumeVy = p.vy;
+              p.vx = 0;
+              p.vy = 0;
+              p.damage = 0; // Nullify damage completely
+              p.isVisual = true; // Disable further damage collision
+              if (typeof f.triggerInfinityBlock === 'function') {
+                f.triggerInfinityBlock(p.x, p.y);
+              }
             }
           }
         }
@@ -2113,7 +2201,7 @@ class ProjectileSystem {
               if (p.owner === fi) continue;
               if (areOnSameTeam(p.owner, fi)) continue;
               const fighter = fighters[fi];
-              if (!fighter || fighter.hp <= 0) continue;
+              if (!fighter || fighter.hp <= 0 || fighter.isAmbushing) continue;
               const fdx = fighter.x - p.x;
               const fdy = fighter.y - p.y;
               const combinedR = fighter.r + p.r;

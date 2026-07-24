@@ -14,6 +14,9 @@ export function updateLightningEffects() {
       strike.soundPlayed = true;
       const thunderSound = getSkillEffectSound('zeus', 'thunderstrike');
       if (thunderSound) playSound(thunderSound.src, thunderSound.volume);
+
+      const thunderSound2 = getSkillEffectSound('zeus', 'thunderstrike2');
+      if (thunderSound2) playSound(thunderSound2.src, thunderSound2.volume);
     }
     
     strike.life--;

@@ -27,12 +27,15 @@ export class YutaFighter extends Fighter {
     this.domainChargeTimer = 0;
     this.domainChargeMax = CONFIG.yuta.domainChargeMax || 90;
     this.isChannelingDomain = false;
+    this.hasActivatedDomainAt25Hp = false;
+    this.domainUseCount = 0;
 
     this.techniqueCooldown = this.cooldown;
     this.copiedTechniqueIndex = 0;
 
     this.slashFadeTimer = 0;
     this.cursedEnergyAlpha = 0; // Smooth transition multiplier for Rika cursed energy aura
+    this.rikaCallTimer = 0; // Freeze movement while calling Rika
 
     // Disable Fighter.js base shoot cooldown so we can handle it ourselves
     this.shootCooldownMax = 0;
@@ -82,6 +85,38 @@ export class YutaFighter extends Fighter {
     this.afterImages = [];
     this.posHistory = [];
     this.sakugaImpactTimer = 0;
+    this.rikaCallTimer = 0;
+    this.hasActivatedDomainAt25Hp = false;
+    this.domainUseCount = 0;
+  }
+
+  _spawnTeleportAfterimages(oldX, oldY, targetX, targetY, customAngle = null) {
+    if (!this.afterImages) this.afterImages = [];
+    const dx = targetX - oldX;
+    const dy = targetY - oldY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+
+    const pathAngle = Math.atan2(dy, dx);
+    const facingAngle = (customAngle !== null) ? customAngle : (this.gunAngle !== undefined ? this.gunAngle : pathAngle);
+    const steps = Math.max(5, Math.floor(dist / 8)); // Dense afterimages every 8px
+
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const maxTimer = 24 - Math.floor(t * 6);
+      this.afterImages.push({
+        x: oldX + dx * t,
+        y: oldY + dy * t,
+        angle: facingAngle,
+        timer: maxTimer,
+        maxTimer: maxTimer,
+        isFlurry: (this.flurryHitsLeft > 0),
+        fromX: oldX,
+        fromY: oldY,
+        toX: targetX,
+        toY: targetY
+      });
+    }
   }
 
   update(opponent, ownerIndex, arena, updateProjectiles = true) {
@@ -126,9 +161,41 @@ export class YutaFighter extends Fighter {
 
     super.update(opponent, ownerIndex, arena, updateProjectiles);
 
+    // Freeze Yuta's movement for a moment while he calls for Rika (prevent during Domain Expansion)
+    if (this.domainActive || this.isChannelingDomain) {
+      this.rikaCallTimer = 0;
+    }
+
+    if (this.rikaCallTimer > 0 && !this.domainActive && !this.isChannelingDomain) {
+      this.rikaCallTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Spawn cursed energy gathering sparks at the blade tip & palm while summoning Rika
+      if (Math.random() < 0.6) {
+        const tipPos = this._getKatanaTipPositions();
+        spawnSparks(tipPos.outer.x, tipPos.outer.y, 2, 'silver', 'rgba(255, 20, 147, 1)');
+      }
+      if (this.rikaCallTimer % 5 === 0) {
+        spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
+      }
+    }
+
+    if (this.isChannelingDomain) {
+      this.timeStopTimer = 0;
+      this.electricStunTimer = 0;
+      this.dubstepStunTimer = 0;
+      this.hitStunTimer = 0;
+    }
+
     if (this._handleTimeStop()) return;
 
-    if (this.sakugaImpactTimer > 0) this.sakugaImpactTimer--;
+    // Fade afterimages every frame (when not time-stopped)
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        if (--this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
+      }
+    }
 
     // Track position history for delayed auto-aim during flurry
     if (!this.posHistory) this.posHistory = [];
@@ -157,7 +224,11 @@ export class YutaFighter extends Fighter {
           this.trailGenTimer = 40;
           this.meleeCooldown = this.meleeCooldownMax; // trigger swing animation
 
-          this.flurryTarget.takeDamage(CONFIG.yuta.flurryDamage || 8, this, { isMelee: true });
+          const isRikaAlive = this.isRikaAliveInDomain();
+          const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+          const flurryDmg = (CONFIG.yuta.flurryDamage || 8) * dmgMult;
+
+          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true });
           this.flurryTarget.applyHitStun(15);
 
           spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
@@ -178,6 +249,12 @@ export class YutaFighter extends Fighter {
             rk.y = this.y;
             rk.hp = rk.maxHp; // Restore her HP
             
+            const appearSound = getSkillSound(this._def?.id || 'yuta', 'rika_appearance');
+            if (appearSound) {
+              playSound(appearSound.src, appearSound.volume);
+              playSound('Assets/Sound Effects/Skills/comerika.mp3', 1.0);
+            }
+
             // Add her to the global targeting pool so AI and projectiles lock onto her
             if (typeof state !== 'undefined') {
               if (!state.illusions) state.illusions = [];
@@ -191,12 +268,13 @@ export class YutaFighter extends Fighter {
           const oldY = this.y;
           this.x = this.flurryTarget.x + Math.cos(angle) * dist;
           this.y = this.flurryTarget.y + Math.sin(angle) * dist;
+          this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
 
-          if (!this.afterImages) this.afterImages = [];
-          this.afterImages.push({ x: oldX, y: oldY, timer: 8 });
+          this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
 
           spawnImpactFlash(oldX, oldY, 15, 'silver');
           spawnImpactFlash(this.x, this.y, 20, 'silver');
+          playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.7);
 
           // Play sword swing sound
           const swingSnd = getBasicAttackSound(this.id, this._def?.type);
@@ -208,13 +286,6 @@ export class YutaFighter extends Fighter {
 
           if (typeof this.applyTimeStop === 'function') this.applyTimeStop(6);
           if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(6);
-
-          this.sakugaImpactTimer = 6;
-          this.sakugaImpactMaxTimer = 6;
-          this.sakugaImpactX = this.flurryTarget.x;
-          this.sakugaImpactY = this.flurryTarget.y;
-          this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-          this.sakugaImpactSeed = Math.random();
         } else {
           this.flurryHitsLeft = 0;
         }
@@ -222,17 +293,12 @@ export class YutaFighter extends Fighter {
 
       this.x += this.vx;
       this.y += this.vy;
-      if (this.afterImages) {
-        for (let i = this.afterImages.length - 1; i >= 0; i--) {
-          if (--this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
-        }
-      }
       return;
     }
 
-    // Smoothly fade Yuta's cursed energy in when Rika is active / domain is active, and out when done
+    // Smoothly fade Yuta's cursed energy in when Rika is active / domain is active / calling Rika, and out when done
     const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
-    const targetAura = (this.isChannelingDomain || this.domainActive || (this.rika && this.rika.active) || isCountdown) ? 1.0 : 0.0;
+    const targetAura = (this.isChannelingDomain || this.domainActive || (this.rikaCallTimer > 0) || (this.rika && this.rika.active) || isCountdown) ? 1.0 : 0.0;
     if (this.cursedEnergyAlpha === undefined) this.cursedEnergyAlpha = 0;
     if (this.cursedEnergyAlpha < targetAura) {
       this.cursedEnergyAlpha = Math.min(targetAura, this.cursedEnergyAlpha + 0.04); // Fades in over ~25 frames
@@ -328,29 +394,16 @@ export class YutaFighter extends Fighter {
     if (this.domainCooldown > 0 && !this.domainActive) this.domainCooldown--;
 
     if (this.isChannelingDomain) {
-      // Only lock Yuta in place when he is NOT being knocked back by an attack.
-      // If he has active knockback or hitstun, let the physics push him around
-      // so Gojo/Sukuna rapid punches visibly stagger him.
-      const hasKnockback = (Math.abs(this.knockbackVx || 0) > 0.5 || Math.abs(this.knockbackVy || 0) > 0.5);
-      const isStunned = (this.hitStunTimer > 0);
-      if (!hasKnockback && !isStunned) {
-        this.vx = 0;
-        this.vy = 0;
-      }
+      this.vx = 0;
+      this.vy = 0;
+      this.hitStunTimer = 0; // Domain Hyper-Armor: prevents domain channeling from being interrupted/frozen
 
-      // Interrupt domain charge if Yuta was just hit hard enough
-      if (isStunned && this.hitStunTimer >= 10) {
-        // Cancel the domain channel — the enemy disrupted his concentration
-        this.isChannelingDomain = false;
-        this.domainChargeTimer = 0;
-        spawnFloatingText(this.x, this.y - 30, 'INTERRUPTED!', '#FF4444');
-        spawnSparks(this.x, this.y, 6, 'silver');
-        // Give partial cooldown refund so he can try again sooner
-        this.domainCooldown = Math.floor((CONFIG.yuta.domainCooldown || 1500) * 0.4);
-        return;
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
       }
 
       this.domainChargeTimer++;
+      triggerGlobalScreenShake(6, 120); // Strong continuous tremor matching Gojo & Sukuna
 
       // Spawn some charge particles
       if (this.domainChargeTimer % 3 === 0) {
@@ -358,7 +411,6 @@ export class YutaFighter extends Fighter {
       }
       if (this.domainChargeTimer % 15 === 0) {
         spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 147, 0.4)');
-        triggerGlobalScreenShake(2, 5); // Micro-shakes as he concentrates
       }
 
       // Play domain_activate audio before deploying
@@ -372,6 +424,7 @@ export class YutaFighter extends Fighter {
       if (this.domainChargeTimer >= this.domainChargeMax) {
         this.activateDomain();
       }
+      updateRika(this, arena || CONFIG.arena);
       return; // Stop other logic while channeling
     }
 
@@ -382,17 +435,45 @@ export class YutaFighter extends Fighter {
         this.domainCooldown = CONFIG.yuta.domainCooldown || 1500;
         spawnFloatingText(this.x, this.y - 40, 'DOMAIN ENDED', '#cccccc');
       } else {
+        // Continuous ambient cursed energy vibration inside domain
+        if (this.domainTimer % 25 === 0) {
+          triggerGlobalScreenShake(4, 12);
+        }
+
         // Domain buffs: Faster cooldowns
         if (this.techniqueCooldown > 0) {
           this.techniqueCooldown -= (1 / (1 - (CONFIG.yuta.domainCooldownReduction || 0.8))) - 1;
+        }
+
+        // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
+        if (this.hp > 0 && this.hp < this.maxHp) {
+          const isRikaAlive = this.isRikaAliveInDomain();
+          const regenMult = isRikaAlive ? (CONFIG.yuta.domainRikaRegenMultiplier || 2.0) : 1.0;
+          const rctRate = (CONFIG.yuta.domainRctHealRate || 0.45) * regenMult;
+          this.hp = Math.min(this.maxHp, this.hp + rctRate);
+
+          if (Math.random() < 0.12) {
+            spawnSparks(this.x, this.y, isRikaAlive ? 4 : 2, '#32CD32', '#00FF7F');
+            if (Math.random() < 0.25) {
+              spawnFloatingText(this.x, this.y - 25, isRikaAlive ? '+RCT 2x' : '+RCT', '#00FF00');
+            }
+          }
         }
       }
     }
 
     updateRika(this, arena || CONFIG.arena);
 
-    // Domain expansion activation check
-    if (this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomain && this.hp > 0) {
+    // Domain Trigger (Up to 2 activations per round): 1st at 25% HP, 2nd after domain cooldown when low HP/in battle
+    const hpRatio = this.hp / (this.maxHp || 200);
+    const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.25;
+    const maxDomainUses = CONFIG.yuta?.domainMaxUses || 2;
+
+    const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0);
+    const isFirstTrigger = (this.domainUseCount === 0 && hpRatio <= domainHpThreshold);
+    const isSecondTrigger = (this.domainUseCount === 1 && (this.domainCooldown <= 0 || hpRatio <= domainHpThreshold));
+
+    if (canActivate && (isFirstTrigger || isSecondTrigger)) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;
@@ -401,6 +482,8 @@ export class YutaFighter extends Fighter {
       });
 
       if (hasEnemies) {
+        this.domainUseCount++;
+        this.hasActivatedDomainAt25Hp = true;
         this.isChannelingDomain = true;
         this.domainChargeTimer = 0;
         this.vx = 0;
@@ -408,7 +491,7 @@ export class YutaFighter extends Fighter {
         this._playedDeployAudio = false;
         
         triggerGlobalScreenShake(6, 120); // Long screen shake matching Gojo/Sukuna
-        const channelSound = getSkillSound(this._def?.id, 'domain_channel');
+        const channelSound = getSkillSound(this._def?.id || 'yuta', 'domain_channel');
         if (channelSound) playSound(channelSound.src, channelSound.volume);
       }
     }
@@ -422,14 +505,14 @@ export class YutaFighter extends Fighter {
       const arc = CONFIG.yuta.meleeArc || (Math.PI / 2);
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
-      // Auto-aim if stunned because super.update() skips aim() during hitStun
+      // Auto-aim if stunned because super.update() skips aim() during hitStun (sluggish delayed reaction time if stealthed)
       if (opponent) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.aim(opponent);
       }
 
       for (let i = 0; i < state.fighters.length; i++) {
         const enemy = state.fighters[i];
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0) continue;
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed) continue;
 
         const enemyTeam = state.getFighterTeam(i);
         if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
@@ -525,8 +608,9 @@ export class YutaFighter extends Fighter {
 
     const isGuarding = this.blockPoseTimer > 0;
     const blockChance = isGuarding ? (CONFIG.yuta.parryActiveChance ?? 0.85) : (CONFIG.yuta.parryPassiveChance ?? 0.25);
+    const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
 
-    if (!this.domainActive && !isSwinging && !unblockable && this.hp > 0 && Math.random() < blockChance) {
+    if (!this.domainActive && !isStunned && !isSwinging && !unblockable && this.hp > 0 && Math.random() < blockChance) {
       // Successfully blocked!
       this.parryCount++;
       if (this.parryCount >= this.targetParriesForFlurry && attacker && !attacker.isDead && !this.isChannelingDomain) {
@@ -547,8 +631,11 @@ export class YutaFighter extends Fighter {
         this.x = attacker.x + (dx / dist) * (this.r + attacker.r + 5);
         this.y = attacker.y + (dy / dist) * (this.r + attacker.r + 5);
 
+        this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
+
         spawnImpactFlash(oldX, oldY, 25, 'silver');
         spawnImpactFlash(this.x, this.y, 30, 'silver');
+        playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
         triggerGlobalScreenShake(8, 10);
 
         spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#FF1493');
@@ -559,19 +646,29 @@ export class YutaFighter extends Fighter {
       }
 
       this.blockPoseTimer = CONFIG.yuta.parryGuardDuration || 90; // Hold block pose
-      this.parryType = Math.random() < 0.20 ? 'guard' : 'deflect'; // Choose visual parry pose (80% deflection, 20% guard)
-      this.trailGenTimer = this.parryType === 'deflect' ? 40 : 0;  // Generate a tip trail for 40 frames (~0.66s)
+      // Dynamically switch stance position on every single parry so Yuta never holds a stiff pose
+      const lastStance = this.parryStanceIndex || 0;
+      this.parryStanceIndex = (lastStance + Math.floor(Math.random() * 3 + 1)) % 4;
+      this.parryHitAnimTimer = 22; // Trigger crisp 22-frame strike deflection animation
+      this.parryType = 'deflect';
+      this.trailGenTimer = 35; // Generate katana tip trail during parry
 
-      // Spawn block sparks exactly along the katana blade's position
-      const bladeAngle = this.gunAngle + Math.PI / 2;
-      const baseDist = this.r - 18;
+      // Calculate blade orientation according to the newly selected stance position
+      const stanceIdx = this.parryStanceIndex;
+      let stanceAngleOffset = Math.PI / 2;
+      if (stanceIdx === 0) stanceAngleOffset = -Math.PI * 0.42;
+      else if (stanceIdx === 1) stanceAngleOffset = Math.PI * 0.68;
+      else if (stanceIdx === 2) stanceAngleOffset = Math.PI / 2;
+      else if (stanceIdx === 3) stanceAngleOffset = -Math.PI * 0.75;
+
+      const bladeAngle = this.gunAngle + stanceAngleOffset;
+      const baseDist = this.r - 12;
       const hiltX = this.x + Math.cos(this.gunAngle) * baseDist;
       const hiltY = this.y + Math.sin(this.gunAngle) * baseDist;
 
-      // Spawn 12 sparks distributed along the blade length
-      for (let i = 0; i < 12; i++) {
-        // Blade starts around 25px from hilt and goes to ~90px
-        const bladeOffset = 25 + Math.random() * 65;
+      // Spawn 14 sparks distributed along the active stance's blade position
+      for (let i = 0; i < 14; i++) {
+        const bladeOffset = 20 + Math.random() * 65;
         const sparkX = hiltX + Math.cos(bladeAngle) * bladeOffset;
         const sparkY = hiltY + Math.sin(bladeAngle) * bladeOffset;
 
@@ -580,8 +677,8 @@ export class YutaFighter extends Fighter {
       }
 
       // Spawn a main dark impact flash at the midpoint of Yuta's guard
-      const flashX = hiltX + Math.cos(bladeAngle) * 55;
-      const flashY = hiltY + Math.sin(bladeAngle) * 55;
+      const flashX = hiltX + Math.cos(bladeAngle) * 50;
+      const flashY = hiltY + Math.sin(bladeAngle) * 50;
       spawnImpactFlash(flashX, flashY, 55, 'dark');
 
       triggerGlobalScreenShake(4, 10); // Parry shake
@@ -655,25 +752,59 @@ export class YutaFighter extends Fighter {
     this.domainTimer = CONFIG.yuta.domainDuration || 400;
     this.domainX = this.x;
     this.domainY = this.y;
+    this.rikaCallTimer = 0; // Force clear any call freeze
 
-    // Refresh Rika so she manifests immediately when the domain opens
+    // Refresh Rika so she is full HP when the domain opens (without re-triggering freeze if already active)
     if (this.rika) {
-      this.rika.cooldownTimer = 0;
+      const wasAlreadyActive = this.rika.active && !this.rika.isDying && !this.rika.disappearing;
       this.rika.killedInDomain = false;
+      this.rika.isDying = false;
+      this.rika.disappearing = false;
+      this.rika.hp = this.rika.maxHp; // Restore HP to 100%
+
+      if (!wasAlreadyActive) {
+        this.rika.active = false;
+        this.rika.cooldownTimer = 0;
+
+        // Play Rika Appearance audio (rikaAppearance.mp3) when Rika is summoned into domain!
+        const appearSound = getSkillSound(this._def?.id || 'yuta', 'rika_appearance');
+        if (appearSound) {
+          playSound(appearSound.src, appearSound.volume, appearSound.speed, appearSound.offset);
+          playSound('Assets/Sound Effects/Skills/comerika.mp3', 1.0);
+        } else {
+          playSound('Assets/Sound Effects/Skills/rikaAppearance1.mp3', 1.5);
+          playSound('Assets/Sound Effects/Skills/comerika.mp3', 1.0);
+        }
+      } else {
+        // If she was already active, keep her moving continuously without freezing Yuta or Rika!
+        this.rika.active = true;
+        this.rika.spawnTimer = 0;
+        this.rika.spawnScale = 1.0;
+        this.rikaCallTimer = 0;
+      }
     }
 
-    triggerGlobalScreenShake(10, 20);
+    triggerGlobalScreenShake(14, 50); // Heavy impact shake matching Gojo/Sukuna
     spawnFloatingText(this.x, this.y - 50, 'AUTHENTIC MUTUAL LOVE', '#ffb6c1');
-    // playSound('Assets/Sound Effects/Skills/yutadomaindeploy.mp3', 0.8); // If added
+
+    // Apply domain trap paralysis & tremor to trapped enemy fighters
+    if (typeof state !== 'undefined' && state.fighters) {
+      const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+      state.fighters.forEach((f, idx) => {
+        if (f && f !== this && f.hp > 0) {
+          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+          if (isEnemy) {
+            if (typeof f.applyHitStun === 'function') f.applyHitStun(20);
+            spawnFloatingText(f.x, f.y - 30, 'TRAPPED IN DOMAIN!', '#FF69B4');
+            spawnSparks(f.x, f.y, 6, 'silver', 'rgba(255, 105, 180, 1)');
+          }
+        }
+      });
+    }
   }
 
-  aim(opponent) {
-    if (opponent) {
-      // Auto-lock aim to the target
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    } else {
-      this.gunAngle = this.angle;
-    }
+  isRikaAliveInDomain() {
+    return (this.domainActive && this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0);
   }
 
   shoot(ownerIndex) {
@@ -766,8 +897,17 @@ export class YutaFighter extends Fighter {
         angleDiff = Math.abs(angleDiff);
 
         if (angleDiff <= arc / 2) {
-          enemy.takeDamage(damage, this, { isPhysical: true });
+          const isRikaAlive = this.isRikaAliveInDomain();
+          const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+          const finalDamage = damage * dmgMult;
+
+          enemy.takeDamage(finalDamage, this, { isPhysical: true });
           hitSomeone = true;
+          if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(4, 6);
+
+          if (isRikaAlive) {
+            spawnFloatingText(enemy.x, enemy.y - 20, `${Math.round(finalDamage)}!`, '#FF1493');
+          }
 
           spawnImpactFlash(enemy.x, enemy.y, 25);
           spawnBloodEffect(enemy, 10, this.targetAngle);
@@ -777,10 +917,11 @@ export class YutaFighter extends Fighter {
           enemy.vy += Math.sin(this.targetAngle) * pushForce;
 
           // Check for clash with Gojo or Sukuna
-          if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter')) {
+          if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {
             const midX = (this.x + enemy.x) / 2;
             const midY = (this.y + enemy.y) / 2;
-            spawnMeleeClashShockwave(midX, midY, 100);
+            const isSukuna = (enemy._def?.id === 'sukuna' || enemy.type === 'sukuna' || enemy._def?.name === 'SukunaFighter');
+            spawnMeleeClashShockwave(midX, midY, 100, isSukuna ? 'yuta' : 'gojo');
             triggerGlobalScreenShake(8, 10);
           }
         }
@@ -814,7 +955,20 @@ export class YutaFighter extends Fighter {
 
     let tipX, tipY, innerX, innerY;
 
-    if (this.blockPoseTimer > 0 && !isSwinging) {
+    if (this.rikaCallTimer > 0) {
+      // Raised summoning pose for Katana when calling Rika
+      const humAngle = Math.sin(Date.now() * 0.08) * 0.08;
+      const humShift = Math.cos(Date.now() * 0.1) * 2;
+      const callAngle = currentAngle - Math.PI * 0.35 + humAngle;
+
+      const L = (this.r - 8 + humShift) + 81 * 1.2;
+      tipX = this.x + Math.cos(callAngle) * L;
+      tipY = this.y + Math.sin(callAngle) * L;
+
+      const innerL = L - 25;
+      innerX = this.x + Math.cos(callAngle) * innerL;
+      innerY = this.y + Math.sin(callAngle) * innerL;
+    } else if (this.blockPoseTimer > 0 && !isSwinging) {
       const parryType = this.parryType || 'guard';
       if (parryType === 'deflect') {
         const totalDur = CONFIG.yuta.parryGuardDuration || 90;
@@ -875,74 +1029,6 @@ export class YutaFighter extends Fighter {
     };
   }
 
-  draw(ctx) {
-    // Draw afterimages during flurry
-    if (this.afterImages && this.afterImages.length > 0) {
-      ctx.save();
-      for (let i = 0; i < this.afterImages.length; i++) {
-        const ai = this.afterImages[i];
-        const alpha = Math.max(0, ai.timer / 10) * 0.4;
-        ctx.globalAlpha = alpha;
-
-        ctx.translate(ai.x, ai.y);
-        ctx.fillStyle = '#FF1493'; // Deep Pink
-        ctx.beginPath();
-        ctx.arc(0, 0, this.r * 1.1, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.translate(-ai.x, -ai.y);
-      }
-      ctx.restore();
-    }
-
-    super.draw(ctx);
-
-    // Draw Sakuga Anime Impact Frame
-    if (this.sakugaImpactTimer > 0) {
-      ctx.save();
-      const progress = 1 - (this.sakugaImpactTimer / this.sakugaImpactMaxTimer);
-      const alpha = 1 - Math.pow(progress, 3);
-
-      ctx.translate(this.sakugaImpactX, this.sakugaImpactY);
-      ctx.rotate(this.sakugaImpactAngle);
-
-      const impactScale = 1.0 + progress * 1.5;
-      ctx.scale(impactScale, impactScale);
-
-      ctx.globalAlpha = alpha * 0.9;
-
-      // Central black ink burst
-      ctx.fillStyle = 'black';
-      ctx.beginPath();
-      for (let i = 0; i < 12; i++) {
-        const a = (i / 12) * Math.PI * 2 + (this.sakugaImpactSeed * Math.PI);
-        const r = 25 + Math.sin(this.sakugaImpactSeed * 100 + i * 1.5) * 45;
-        const cx = Math.cos(a) * r;
-        const cy = Math.sin(a) * r;
-        if (i === 0) ctx.moveTo(cx, cy);
-        else ctx.lineTo(cx, cy);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // Outer pink ink splatters
-      ctx.globalCompositeOperation = 'screen';
-      ctx.fillStyle = '#FF1493';
-      ctx.globalAlpha = alpha * 0.7;
-      ctx.beginPath();
-      for (let i = 0; i < 8; i++) {
-        const a = (i / 8) * Math.PI * 2 - (this.sakugaImpactSeed * Math.PI);
-        const r = 40 + Math.sin(this.sakugaImpactSeed * 50 + i * 2.1) * 60;
-        const cx = Math.cos(a) * r;
-        const cy = Math.sin(a) * r;
-        if (i === 0) ctx.moveTo(cx, cy);
-        else ctx.lineTo(cx, cy);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.restore();
-    }
-  }
 
   drawGun(ctx) {
     // Draw the chest strap here so it layers over the body but UNDER the HP text
@@ -1182,37 +1268,68 @@ export class YutaFighter extends Fighter {
     }
 
     let parryPoseActive = (this.blockPoseTimer > 0);
-    let currentParryType = this.parryType || 'guard';
 
     if (parryPoseActive) {
       this.blockPoseTimer--;
+      if (this.parryHitAnimTimer > 0) this.parryHitAnimTimer--;
 
-      if (currentParryType === 'deflect') {
-        // Counter-Swing Parry: A fast, sharp counter-swipe deflecting the threat
-        const totalDur = CONFIG.yuta.parryGuardDuration || 90;
-        const swingDur = 8; // Super fast deflect swing (8 frames)
-
-        let swingProgress = Math.min(1.0, (totalDur - this.blockPoseTimer) / swingDur);
-        let returnProgress = Math.max(0, (12 - this.blockPoseTimer) / 12); // Snappy return (12 frames)
-
-        let deflectAngle = 0;
-        let currentTranslateX = this.r - 10;
-
-        if (swingProgress < 1.0) {
-          deflectAngle = (Math.PI / 3.5) - (Math.PI * 0.6) * swingProgress;
-          currentTranslateX = (this.r - 10) + 15 * swingProgress;
-        } else {
-          deflectAngle = (-Math.PI / 4) * (1 - returnProgress);
-          currentTranslateX = (this.r - 10) + 15 * (1 - returnProgress);
-        }
-
-        ctx.translate(currentTranslateX, 0);
-        ctx.rotate(deflectAngle);
+      const stanceIndex = (this.parryStanceIndex || 0) % 4;
+      const hitTimer = this.parryHitAnimTimer || 0;
+      
+      // Calculate snap progress (0 -> 1 over first 6 frames of hit, then spring back over 16 frames)
+      let strikeFactor = 0;
+      if (hitTimer > 16) {
+        // Fast snap out impact (22 -> 16)
+        strikeFactor = (22 - hitTimer) / 6;
       } else {
-        // Static Guard Pose: Hold sword flat across chest
-        ctx.translate(this.r - 18, 0);
-        ctx.rotate(Math.PI / 2);
+        // Smooth spring return (16 -> 0)
+        strikeFactor = hitTimer / 16;
       }
+
+      // Base stance position and angle for each of the 4 positions
+      let baseOffsetX = this.r - 12;
+      let baseOffsetY = 0;
+      let baseAngle = Math.PI / 2;
+      let strikeAngleOffset = 0;
+
+      if (stanceIndex === 0) {
+        // Stance 0: High Slash Deflect (Upper diagonal riposte)
+        baseOffsetX = this.r - 10;
+        baseOffsetY = -10;
+        baseAngle = -Math.PI * 0.42;
+        strikeAngleOffset = Math.PI * 0.35 * strikeFactor;
+      } else if (stanceIndex === 1) {
+        // Stance 1: Low Sweep Deflect (Bottom diagonal parry)
+        baseOffsetX = this.r - 8;
+        baseOffsetY = 12;
+        baseAngle = Math.PI * 0.68;
+        strikeAngleOffset = -Math.PI * 0.38 * strikeFactor;
+      } else if (stanceIndex === 2) {
+        // Stance 2: Center Vertical Shield Guard
+        baseOffsetX = this.r - 18;
+        baseOffsetY = 0;
+        baseAngle = Math.PI / 2;
+        strikeAngleOffset = (Math.sin(strikeFactor * Math.PI) * 0.28);
+      } else if (stanceIndex === 3) {
+        // Stance 3: Backhand Reverse Deflect
+        baseOffsetX = this.r - 14;
+        baseOffsetY = -12;
+        baseAngle = -Math.PI * 0.75;
+        strikeAngleOffset = Math.PI * 0.45 * strikeFactor;
+      }
+
+      // Add dynamic impact vibration/recoil shift when hitTimer is active
+      const vibrationX = hitTimer > 0 ? (Math.sin(hitTimer * 2.8) * 3.5 * (hitTimer / 22)) : 0;
+      const vibrationY = hitTimer > 0 ? (Math.cos(hitTimer * 3.1) * 2.0 * (hitTimer / 22)) : 0;
+
+      ctx.translate(baseOffsetX + vibrationX, baseOffsetY + vibrationY);
+      ctx.rotate(baseAngle + strikeAngleOffset);
+    } else if (this.rikaCallTimer > 0) {
+      // Rika Summoning Channeling Pose: Raise Katana upward with ritual micro-vibration
+      const humAngle = Math.sin(Date.now() * 0.08) * 0.08;
+      const humShift = Math.cos(Date.now() * 0.1) * 2;
+      ctx.translate(this.r - 8 + humShift, -4);
+      ctx.rotate(-Math.PI * 0.35 + humAngle);
     } else {
       ctx.translate(this.r - 10, 0);
     }
@@ -1715,6 +1832,17 @@ export class YutaFighter extends Fighter {
   }
 
   draw(ctx, opponent) {
+    ctx.save();
+    let tremorX = 0;
+    let tremorY = 0;
+    const currentShake = (typeof state !== 'undefined' && state.screenShake) ? (state.screenShake.intensity || 0) : 0;
+    if (this.isChannelingDomain || currentShake > 0) {
+      const shakeAmt = this.isChannelingDomain ? 5.0 : Math.min(6, currentShake * 0.6);
+      tremorX = (Math.random() - 0.5) * shakeAmt;
+      tremorY = (Math.random() - 0.5) * shakeAmt;
+    }
+    ctx.translate(tremorX, tremorY);
+
     if (this.isChannelingDomain) {
       this._drawDomainChannelAura(ctx);
     }
@@ -1725,6 +1853,94 @@ export class YutaFighter extends Fighter {
     this._drawYutaSwordBag(ctx);
 
     super.draw(ctx, opponent);
+    ctx.restore();
+
+    // Draw afterimages during flurry & teleports (Draw ON TOP of Sakuga Impact Frame so they are never covered!)
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = 0; i < this.afterImages.length; i++) {
+        const ai = this.afterImages[i];
+        const maxT = ai.maxTimer || 25;
+        const progress = Math.max(0, Math.min(1, ai.timer / maxT));
+        const alpha = Math.pow(progress, 0.7) * 0.2; // High visibility smooth fade
+
+        ctx.save();
+
+        // 1. High-Speed Dash Trajectory Streaks
+        if (ai.fromX !== undefined && ai.toX !== undefined) {
+          ctx.save();
+          ctx.globalAlpha = alpha * 0.45;
+          ctx.strokeStyle = '#FF1493';
+          ctx.lineWidth = 3;
+          ctx.beginPath();
+          ctx.moveTo(ai.fromX, ai.fromY);
+          ctx.lineTo(ai.toX, ai.toY);
+          ctx.stroke();
+
+          // Inner white-hot streak core
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(ai.fromX, ai.fromY);
+          ctx.lineTo(ai.toX, ai.toY);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        ctx.translate(ai.x, ai.y);
+        ctx.rotate(ai.angle || 0);
+
+        // 2. Outer Cursed Energy Radial Glow Aura (Neon Pink / Violet Bloom)
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const auraGrad = ctx.createRadialGradient(0, 0, this.r * 0.3, 0, 0, this.r * 1.85);
+        auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`);
+        auraGrad.addColorStop(0.4, `rgba(255, 20, 147, ${alpha * 0.7})`);
+        auraGrad.addColorStop(0.8, `rgba(160, 32, 240, ${alpha * 0.35})`);
+        auraGrad.addColorStop(1, 'rgba(255, 20, 147, 0)');
+        ctx.fillStyle = auraGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r * 1.85, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        // 3. Phantom Body Silhouette Circle
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(0, 0, this.r * 1.1, 0, Math.PI * 2);
+        ctx.fillStyle = '#FF1493'; // Vibrant Deep Pink
+        ctx.fill();
+        ctx.strokeStyle = '#FFFFFF'; // Crisp White Outline for extreme contrast
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
+
+        // 4. Directional Eye Glints (High-speed facing indicator)
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
+        ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 5. Extended Katana Phantom Blade Silhouette
+        const swordLength = 48;
+        ctx.beginPath();
+        ctx.moveTo(this.r * 0.6, 6);
+        ctx.lineTo(this.r * 0.6 + swordLength, 2);
+        ctx.lineTo(this.r * 0.6 + swordLength + 8, 0);
+        ctx.lineTo(this.r * 0.6 + swordLength, -2);
+        ctx.lineTo(this.r * 0.6, -6);
+        ctx.closePath();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        ctx.fill();
+        ctx.strokeStyle = '#FF1493';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+
+        ctx.restore();
+      }
+    }
 
     if (this.rika && this.rikaAlpha > 0) {
       if (this.hp <= 0) {
@@ -1748,10 +1964,47 @@ export class YutaFighter extends Fighter {
         }
       }
 
+      const rk = this.rika;
+      const spawnScale = rk.spawnScale ?? 1.0;
+      let drawX = rk.x;
+      let drawY = rk.y;
+      if (rk.spawnTimer > 0) {
+        const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+        const progress = 1 - (rk.spawnTimer / ariseMax);
+        const shakeAmt = (1.0 - progress * 0.4) * 5;
+        drawX += (Math.random() - 0.5) * shakeAmt;
+        drawY += (Math.random() - 0.5) * shakeAmt;
+      }
+
+      let targetAngle = 0;
+      if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
+        targetAngle = rk.angle || 0;
+      } else {
+        if (opponent && !opponent.isDead) {
+          const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
+          if (opponent.isStealthed) {
+            let diff = desiredAngle - (rk.angle || 0);
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            targetAngle = (rk.angle || 0) + diff * (CONFIG.toji?.stealthTurnRate || 0.035);
+          } else {
+            targetAngle = desiredAngle;
+          }
+        } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
+          targetAngle = Math.atan2(rk.vy, rk.vx);
+        } else {
+          targetAngle = rk.angle || 0;
+        }
+        rk.angle = targetAngle;
+      }
+
+      const renderState = { drawX, drawY, targetAngle, spawnScale };
+
       ctx.save();
+      ctx.translate(tremorX, tremorY);
       ctx.globalAlpha = this.rikaAlpha;
-      this._drawRikaCursedEnergyAura(ctx, opponent);
-      this._drawRika(ctx, opponent);
+      this._drawRikaCursedEnergyAura(ctx, opponent, renderState);
+      this._drawRika(ctx, opponent, renderState);
       ctx.restore();
     }
   }
@@ -1798,32 +2051,52 @@ export class YutaFighter extends Fighter {
     ctx.restore();
   }
 
-  _drawRika(ctx, opponent) {
+  _drawRika(ctx, opponent, renderState = null) {
     if (!this.rika) return;
 
-    ctx.save();
-    ctx.translate(this.rika.x, this.rika.y);
-
     const rk = this.rika;
+    const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
+
+    let drawX = renderState ? renderState.drawX : rk.x;
+    let drawY = renderState ? renderState.drawY : rk.y;
+    if (!renderState && rk.spawnTimer > 0) {
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const progress = 1 - (rk.spawnTimer / ariseMax);
+      const shakeAmt = (1.0 - progress * 0.4) * 5;
+      drawX += (Math.random() - 0.5) * shakeAmt;
+      drawY += (Math.random() - 0.5) * shakeAmt;
+    }
+
+    ctx.save();
+    ctx.translate(drawX, drawY);
+    ctx.scale(spawnScale, spawnScale);
+
     const r = (rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30;
     const now = Date.now();
     const pulse = Math.sin(now / 150) * (r * 0.06);
 
-    // Determine facing angle towards target or movement direction (bird's-eye view facing angle)
-    let targetAngle = 0;
-    
-    if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
-      // Freeze rotation when paralyzed or dying
-      targetAngle = rk.angle || 0;
-    } else {
-      if (opponent && !opponent.isDead) {
-        targetAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
-      } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
-        targetAngle = Math.atan2(rk.vy, rk.vx);
-      } else {
+    let targetAngle = renderState ? renderState.targetAngle : 0;
+    if (!renderState) {
+      if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
         targetAngle = rk.angle || 0;
+      } else {
+        if (opponent && !opponent.isDead) {
+          const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
+          if (opponent.isStealthed) {
+            let diff = desiredAngle - (rk.angle || 0);
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            targetAngle = (rk.angle || 0) + diff * (CONFIG.toji?.stealthTurnRate || 0.035);
+          } else {
+            targetAngle = desiredAngle;
+          }
+        } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
+          targetAngle = Math.atan2(rk.vy, rk.vx);
+        } else {
+          targetAngle = rk.angle || 0;
+        }
+        rk.angle = targetAngle;
       }
-      rk.angle = targetAngle; // Save for next frame
     }
 
     // Rotate context so +x is forward facing
@@ -2170,8 +2443,22 @@ export class YutaFighter extends Fighter {
       }
     }
 
+    // Emergence Arm Sweep & Finger Wave Animation (as she rises & pauses)
+    const isEmerging = (this.rika && this.rika.spawnTimer > 0);
+    let emergenceAngleOffset = 0;
+    let emergenceFingerFlex = 0;
+
+    if (isEmerging) {
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const progress = 1 - (this.rika.spawnTimer / ariseMax);
+      // Arms sweep out wide during rise and pause moment
+      emergenceAngleOffset = (Math.sin(progress * Math.PI) * 0.35 * sideSign);
+      // Dynamic finger wave flex as her clawed hands emerge
+      emergenceFingerFlex = Math.sin((now / 100) + (isLeft ? 0 : 1.5)) * 0.22;
+    }
+
     const idleBreath = (attackTimer === 0) ? Math.sin(now / 800) * 0.03 : 0;
-    const currentAngle = idleAngle + angleOffset + idleBreath;
+    const currentAngle = idleAngle + angleOffset + emergenceAngleOffset + idleBreath;
 
     const finalHandX = shoulderX + Math.cos(currentAngle) * armLen;
     const finalHandY = shoulderY + Math.sin(currentAngle) * armLen;
@@ -2188,7 +2475,7 @@ export class YutaFighter extends Fighter {
       { name: 'Ring', baseX: 15, baseY: isLeft ? -3.5 : 3.5, len: 26, baseAngle: isLeft ? -0.22 : 0.22, thick: 3.8 },
       { name: 'Pinky', baseX: 13, baseY: isLeft ? -5.5 : 5.5, len: 21, baseAngle: isLeft ? -0.45 : 0.45, thick: 3.2 }
     ];
-    const flexIdle = (attackTimer === 0) ? Math.sin(now / 400) * 0.05 : 0;
+    const flexIdle = ((attackTimer === 0) ? Math.sin(now / 400) * 0.05 : 0) + emergenceFingerFlex;
 
     // Claw slash visual has been moved to the end of _drawRika for correct layering on top of the torso
 
@@ -2335,7 +2622,7 @@ export class YutaFighter extends Fighter {
     ctx.restore();
   }
 
-  _drawRikaCursedEnergyAura(ctx, opponent) {
+  _drawRikaCursedEnergyAura(ctx, opponent, renderState = null) {
     const rk = this.rika;
     if (!rk) return;
 
@@ -2350,11 +2637,27 @@ export class YutaFighter extends Fighter {
     const frameIndex = Math.floor(Date.now() / (1000 / frameRate));
     const time = frameIndex * 120;
 
-    let targetAngle = 0;
-    if (opponent && !opponent.isDead) {
-      targetAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
-    } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
-      targetAngle = Math.atan2(rk.vy, rk.vx);
+    let targetAngle = renderState ? renderState.targetAngle : 0;
+    if (!renderState) {
+      if (rk.timeStopTimer > 0 || rk.hitStunTimer > 0 || rk.isDying) {
+        targetAngle = rk.angle || 0;
+      } else {
+        if (opponent && !opponent.isDead) {
+          const desiredAngle = Math.atan2(opponent.y - rk.y, opponent.x - rk.x);
+          if (opponent.isStealthed) {
+            let diff = desiredAngle - (rk.angle || 0);
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            targetAngle = (rk.angle || 0) + diff * (CONFIG.toji?.stealthTurnRate || 0.035);
+          } else {
+            targetAngle = desiredAngle;
+          }
+        } else if (Math.hypot(rk.vx, rk.vy) > 0.1) {
+          targetAngle = Math.atan2(rk.vy, rk.vx);
+        } else {
+          targetAngle = rk.angle || 0;
+        }
+      }
     }
 
     const yutaDx = this.x - rk.x;
@@ -2367,8 +2670,35 @@ export class YutaFighter extends Fighter {
     const rightArmTimer = rk.rightArmTimer || 0;
     const leftArmTimer = rk.leftArmTimer || 0;
 
+    const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
+    const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+    let ariseCeAlpha = 1.0;
+    if (rk.spawnTimer > 0) {
+      // 1. Rika rises and expands first (0% - 50% of spawnTimer)
+      // 2. Cursed Energy slowly attaches to her body afterward (50% - 100% of spawnTimer)
+      const progress = 1.0 - (rk.spawnTimer / ariseMax);
+      if (progress < 0.45) {
+        ariseCeAlpha = 0.0;
+      } else {
+        ariseCeAlpha = Math.min(1.0, (progress - 0.45) / 0.55);
+      }
+    }
+
+    let drawX = renderState ? renderState.drawX : rk.x;
+    let drawY = renderState ? renderState.drawY : rk.y;
+    if (!renderState && rk.spawnTimer > 0) {
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const progress = 1 - (rk.spawnTimer / ariseMax);
+      const shakeAmt = (1.0 - progress * 0.4) * 5;
+      drawX += (Math.random() - 0.5) * shakeAmt;
+      drawY += (Math.random() - 0.5) * shakeAmt;
+    }
+
     ctx.save();
-    ctx.translate(rk.x, rk.y);
+    ctx.translate(drawX, drawY);
+    ctx.scale(spawnScale, spawnScale);
+    ctx.rotate(targetAngle);
+    ctx.globalAlpha = (ctx.globalAlpha || 1.0) * ariseCeAlpha;
 
     // === 1. Luminous Backlight (Soft Natural Pink Diffusion) ===
     ctx.save();
@@ -2384,8 +2714,6 @@ export class YutaFighter extends Fighter {
     ctx.fillStyle = backGlow;
     ctx.fill();
     ctx.restore();
-
-    ctx.rotate(targetAngle);
 
     // Helper: Draw a form-fitting Yuta-style flame path around points
     const drawFlamePath = (pts, fillAlpha = 0.75) => {
@@ -2450,42 +2778,43 @@ export class YutaFighter extends Fighter {
       ctx.closePath();
       ctx.fill();
 
-      // === Yuta's 3-Layer Inset Rough Ink Brush Hatch Cuts Along Border ===
+      // === Yuta's Inset Rough Ink Brush Hatch Cuts Along Border (FPS Optimized) ===
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = '#000000';
       ctx.lineCap = 'butt';
 
-      const insetScales = [0.84, 0.91, 0.96];
+      const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+      const isLowFps = (state.fps && state.fps < 55);
+      const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
+
       for (let layer = 0; layer < insetScales.length; layer++) {
         const scale = insetScales[layer];
         const speedDir = (layer % 2 === 0 ? 1 : -1);
         const flowTime = time * 0.003 * speedDir;
 
+        ctx.beginPath();
         for (let i = 0; i < numPts; i++) {
-          // Slow wave (long strokes) + fast wave (short details) = variety
           const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
           const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
           const cutSeed = longWave + shortWave;
-          if (cutSeed < 0.15) continue; // Higher threshold to reduce density
+          if (cutSeed < 0.25) continue; // Slightly higher threshold to cut draw calls
 
           const p = pts[i];
           const next = pts[(i + 1) % numPts];
 
-          // Scale points towards center for inset placement
           const psx = cx + (p.x - cx) * scale;
           const psy = cy + (p.y - cy) * scale;
           const nsx = cx + (next.x - cx) * scale;
           const nsy = cy + (next.y - cy) * scale;
 
-          ctx.lineWidth = 0.5 + (cutSeed * 1.5);
-          ctx.beginPath();
-          ctx.moveTo(psx, psy);
-          // Add slight jaggedness to the cut
           const jagX = Math.cos(i * 43) * 3;
           const jagY = Math.sin(i * 43) * 3;
+
+          ctx.moveTo(psx, psy);
           ctx.lineTo(nsx + jagX, nsy + jagY);
-          ctx.stroke();
         }
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
       }
 
       ctx.restore();
@@ -2533,17 +2862,17 @@ export class YutaFighter extends Fighter {
       ctx.closePath();
       ctx.fill();
 
+      // Batched outline stroke for high FPS
       ctx.strokeStyle = '#000000';
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
       for (let i = 0; i < fillPoly.length - 1; i++) {
-        const pressureNoise = Math.sin(time * 0.002 + i * 1.7) * 0.5 + 0.5;
-        ctx.lineWidth = 1.0 + pressureNoise * 2.2;
-        ctx.beginPath();
         ctx.moveTo(fillPoly[i].x, fillPoly[i].y);
         ctx.lineTo(fillPoly[i+1].x, fillPoly[i+1].y);
-        ctx.stroke();
       }
+      ctx.stroke();
 
       const corePoly = extrude(0.7);
       ctx.fillStyle = 'rgba(255, 192, 203, 0.85)';
@@ -2556,27 +2885,31 @@ export class YutaFighter extends Fighter {
       ctx.globalAlpha = 0.9;
       ctx.strokeStyle = '#000000';
       ctx.lineCap = 'butt';
-      const insetScales = [0.84, 0.91, 0.96];
+
+      const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+      const isLowFps = (state.fps && state.fps < 55);
+      const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
+
       for (let layer = 0; layer < insetScales.length; layer++) {
         const scale = insetScales[layer];
         const cutPoly = extrude(scale);
         const speedDir = (layer % 2 === 0 ? 1 : -1);
         const flowTime = time * 0.003 * speedDir;
 
+        ctx.beginPath();
         for (let i = 0; i < cutPoly.length - 1; i++) {
           const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
           const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
           const cutSeed = longWave + shortWave;
-          if (cutSeed < 0.15) continue;
+          if (cutSeed < 0.25) continue;
 
-          ctx.lineWidth = 0.5 + (cutSeed * 1.5);
-          ctx.beginPath();
-          ctx.moveTo(cutPoly[i].x, cutPoly[i].y);
           const jagX = Math.cos(i * 43) * 2;
           const jagY = Math.sin(i * 43) * 2;
+          ctx.moveTo(cutPoly[i].x, cutPoly[i].y);
           ctx.lineTo(cutPoly[i+1].x + jagX, cutPoly[i+1].y + jagY);
-          ctx.stroke();
         }
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
       }
       ctx.restore();
     };
@@ -2739,44 +3072,147 @@ export class YutaFighter extends Fighter {
     ctx.restore();
   }
 
+  _renderYutaAuraFrameCanvas(frameIdx, isRCT) {
+    const key = `${frameIdx}_${isRCT ? 'rct' : 'norm'}`;
+    if (!this._yutaAuraCanvasCache) this._yutaAuraCanvasCache = new Map();
+    if (this._yutaAuraCanvasCache.has(key)) {
+      return this._yutaAuraCanvasCache.get(key);
+    }
+
+    const offW = 160;
+    const offH = 160;
+    const canvas = document.createElement('canvas');
+    canvas.width = offW;
+    canvas.height = offH;
+    const offCtx = canvas.getContext('2d');
+
+    const time = frameIdx * 120;
+    const r = this.r || 25;
+    const cx = offW / 2;
+    const cy = offH / 2;
+
+    offCtx.save();
+    offCtx.translate(cx, cy);
+
+    const fillColor = isRCT ? 'rgba(50, 205, 50, 0.75)' : 'rgba(255, 105, 180, 0.75)';
+    const coreColor = isRCT ? 'rgba(144, 238, 144, 0.85)' : 'rgba(255, 192, 203, 0.85)';
+    const strokeColor = '#000000';
+
+    const numPoints = 28;
+    const baseRadius = r + 15;
+    const points = [];
+
+    for (let i = 0; i < numPoints; i++) {
+      const angle = (Math.PI * 2 / numPoints) * i;
+      const upFactor = Math.max(0, -Math.sin(angle) + 0.25);
+      const sideFactor = 1.0 - upFactor * 0.5;
+
+      const baseTongue1 = Math.pow(Math.sin(angle * 1.5 + time * 0.0005) * 0.5 + 0.5, 3.0) * 25 * upFactor;
+      const baseTongue2 = Math.pow(Math.cos(angle * 2.2 - time * 0.0004) * 0.5 + 0.5, 2.5) * 18 * upFactor;
+
+      const flicker1 = Math.sin(time * 0.0018 + angle * 2.5) * 0.15 + 0.85;
+      const flicker2 = Math.cos(time * 0.0022 - angle * 3.0) * 0.15 + 0.85;
+
+      const tongue1 = baseTongue1 * flicker1;
+      const tongue2 = baseTongue2 * flicker2;
+      const bubble = Math.pow(Math.sin(angle * 3.0 + time * 0.0017) * Math.cos(angle * 1.8 - time * 0.0011), 2.0) * 9 * sideFactor;
+      const flow = Math.sin(time * 0.0006 + angle) * 3;
+
+      const radius = baseRadius + flow + bubble + tongue1 + tongue2;
+      points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
+    }
+
+    // Outer flame fill
+    offCtx.beginPath();
+    let mx = (points[numPoints - 1].x + points[0].x) / 2;
+    let my = (points[numPoints - 1].y + points[0].y) / 2;
+    offCtx.moveTo(mx, my);
+    for (let i = 0; i < numPoints; i++) {
+      const p = points[i];
+      const next = points[(i + 1) % numPoints];
+      offCtx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+    }
+    offCtx.closePath();
+    offCtx.fillStyle = fillColor;
+    offCtx.fill();
+
+    // Calligraphy ink contour
+    offCtx.strokeStyle = strokeColor;
+    offCtx.lineWidth = 2.2;
+    offCtx.stroke();
+
+    // Inner core wash
+    offCtx.save();
+    offCtx.scale(0.75, 0.75);
+    offCtx.beginPath();
+    offCtx.moveTo(mx, my);
+    for (let i = 0; i < numPoints; i++) {
+      const p = points[i];
+      const next = points[(i + 1) % numPoints];
+      offCtx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+    }
+    offCtx.closePath();
+    offCtx.fillStyle = coreColor;
+    offCtx.fill();
+    offCtx.restore();
+
+    // Full 3-layer Calligraphy Ink Brush Hatch Cuts
+    offCtx.strokeStyle = strokeColor;
+    offCtx.lineCap = 'butt';
+    const insetScales = [0.84, 0.91, 0.96];
+    for (let layer = 0; layer < insetScales.length; layer++) {
+      const scale = insetScales[layer];
+      const speedDir = (layer % 2 === 0 ? 1 : -1);
+      const flowTime = time * 0.003 * speedDir;
+
+      offCtx.beginPath();
+      for (let i = 0; i < numPoints; i++) {
+        const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
+        const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
+        const cutSeed = longWave + shortWave;
+        if (cutSeed < 0.15) continue;
+
+        const p = points[i];
+        const next = points[(i + 1) % numPoints];
+        const jagX = Math.cos(i * 43) * 3;
+        const jagY = Math.sin(i * 43) * 3;
+        offCtx.moveTo(p.x * scale, p.y * scale);
+        offCtx.lineTo(next.x * scale + jagX, next.y * scale + jagY);
+      }
+      offCtx.lineWidth = 1.0;
+      offCtx.stroke();
+    }
+
+    offCtx.restore();
+    this._yutaAuraCanvasCache.set(key, canvas);
+    return canvas;
+  }
+
   _drawYutaCursedEnergyAura(ctx) {
-    // Only active when Yuta's cursed energy is manifested (summoned with Rika)
     const isRCT = (this.rctRevivalTimer > 0);
     const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
 
-    // Only active when Yuta's cursed energy is manifested (summoned with Rika) OR he's reviving OR countdown
     let activeMultiplier = this.cursedEnergyAlpha || 0;
     if (isRCT || isCountdown) activeMultiplier = 1.0;
-
     if (activeMultiplier <= 0.01) return;
 
-    // Determine opacity based on technique usage or domain charging
     let progress = 0;
     if (isRCT) {
       progress = Math.min(1.0, this.rctRevivalTimer / (CONFIG.yuta.rctRevivalDuration || 150));
     } else if (this.isChannelingDomain) {
       progress = this.domainChargeTimer / this.domainChargeMax;
     } else if (this.techniqueCooldown > this.cooldown - 30) {
-      // Glow briefly after using a technique
       progress = (this.techniqueCooldown - (this.cooldown - 30)) / 30;
     } else {
-      // Passive weak glow (increased from 0.3 to 0.65 to fix pale colors without becoming solid plastic)
       progress = 0.65;
     }
 
-    // Scale by the active transition multiplier
     progress *= activeMultiplier;
-
     if (progress <= 0) return;
 
-    // Stepped 30-frame anime animation loop (30 FPS Sakuga frame rate)
-    // Infinite stepped frames (no modulus snapping)
     const frameRate = 30;
-    const frameIndex = Math.floor(Date.now() / (1000 / frameRate));
+    const frameIndex = Math.floor(Date.now() / (1000 / frameRate)) % 30;
     const time = frameIndex * 120;
-
-    // Add velocity/position influence (subtle multiplier to prevent rapid wiggling)
-    const moveOffset = (this.x + this.y) * 0.015;
 
     ctx.save();
     ctx.translate(this.x, this.y - (this.z || 0));
@@ -2790,10 +3226,10 @@ export class YutaFighter extends Fighter {
       backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.3 * progress})`);
       backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
     } else {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Soft white core
-      backGlow.addColorStop(0.35, `rgba(255, 105, 180, ${0.35 * progress})`);// Natural pink bloom
-      backGlow.addColorStop(0.7, `rgba(255, 20, 147, ${0.15 * progress})`);  // Soft outer feathering
-      backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');                     // Smooth blend into environment
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);
+      backGlow.addColorStop(0.35, `rgba(255, 105, 180, ${0.35 * progress})`);
+      backGlow.addColorStop(0.7, `rgba(255, 20, 147, ${0.15 * progress})`);
+      backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
     }
 
     ctx.beginPath();
@@ -2803,138 +3239,10 @@ export class YutaFighter extends Fighter {
 
     ctx.globalCompositeOperation = 'source-over';
 
-    const r = this.r;
-
-    const mainColor = isRCT ? '#32CD32' : '#FF1493';
-    const fillColor = isRCT ? `rgba(50, 205, 50, ${0.75 * progress})` : `rgba(255, 105, 180, ${0.75 * progress})`;
-    const coreColor = isRCT ? `rgba(144, 238, 144, ${0.85 * progress})` : `rgba(255, 192, 203, ${0.85 * progress})`;
-    const strokeColor = '#000000'; // Pure pitch black JJK ink contour
-
-    // Generate smooth flame contour points (Viscous Liquid Fire Silhouette)
-    const numPoints = 28; // Increased resolution for smoother rounded tongues
-    const baseRadius = r + 15;
-    const points = [];
-
-    for (let i = 0; i < numPoints; i++) {
-      const angle = (Math.PI * 2 / numPoints) * i;
-
-      // Upward direction bias (flames flow upward)
-      const upFactor = Math.max(0, -Math.sin(angle) + 0.25); // active on top, fades towards bottom
-      const sideFactor = 1.0 - upFactor * 0.5; // active on sides and bottom
-
-      // Slow base shape evolution (how tongues grow/morph)
-      const baseTongue1 = Math.pow(Math.sin(angle * 1.5 + time * 0.0005 - moveOffset * 0.2) * 0.5 + 0.5, 3.0) * 25 * upFactor;
-      const baseTongue2 = Math.pow(Math.cos(angle * 2.2 - time * 0.0004 + moveOffset * 0.15) * 0.5 + 0.5, 2.5) * 18 * upFactor;
-
-      // Gentle, localized height flicker (smoothed frequency and amplitude)
-      const flicker1 = Math.sin(time * 0.0018 + angle * 2.5) * 0.15 + 0.85;
-      const flicker2 = Math.cos(time * 0.0022 - angle * 3.0) * 0.15 + 0.85;
-
-      const tongue1 = baseTongue1 * flicker1;
-      const tongue2 = baseTongue2 * flicker2;
-
-      // Viscous bubbling outward on the sides/bottom
-      const bubble = Math.pow(Math.sin(angle * 3.0 + time * 0.0017) * Math.cos(angle * 1.8 - time * 0.0011), 2.0) * 9 * sideFactor;
-
-      // General slow breathing flow
-      const flow = Math.sin(time * 0.0006 + angle) * 3;
-
-      const radius = baseRadius + flow + bubble + tongue1 + tongue2;
-
-      points.push({
-        x: Math.cos(angle) * radius,
-        y: Math.sin(angle) * radius
-      });
-    }
-
-    // Draw smooth closed curve through midpoints (no sharp corners)
-    ctx.beginPath();
-    let mx = (points[numPoints - 1].x + points[0].x) / 2;
-    let my = (points[numPoints - 1].y + points[0].y) / 2;
-    ctx.moveTo(mx, my);
-
-    for (let i = 0; i < numPoints; i++) {
-      const p = points[i];
-      const next = points[(i + 1) % numPoints];
-      const midX = (p.x + next.x) / 2;
-      const midY = (p.y + next.y) / 2;
-      ctx.quadraticCurveTo(p.x, p.y, midX, midY);
-    }
-    ctx.closePath();
-
-    // Fill with translucent cursed energy
-    ctx.fillStyle = fillColor;
-    ctx.fill();
-
-    // Ink brush stroke outline (varying thickness like calligraphy brush)
-    ctx.strokeStyle = strokeColor;
+    // Hardware Accelerated Pre-Rendered Offscreen Sakuga Aura Canvas
+    const frameCanvas = this._renderYutaAuraFrameCanvas(frameIndex, isRCT);
     ctx.globalAlpha = progress;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    let mxA = (points[numPoints - 1].x + points[0].x) / 2;
-    let myA = (points[numPoints - 1].y + points[0].y) / 2;
-    ctx.moveTo(mxA, myA);
-    for (let i = 0; i < numPoints; i++) {
-      const p = points[i];
-      const next = points[(i + 1) % numPoints];
-      ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-    }
-    ctx.closePath();
-    ctx.stroke();
-
-    // Inner bright core wash (scaled down jagged flames)
-    // Matches the jagged structure so the white core radiates outwards properly
-    ctx.save();
-    ctx.scale(0.75, 0.75); // Shrink the exact flame path to 75% size to form the core
-    ctx.beginPath();
-    ctx.moveTo(mx, my);
-    for (let i = 0; i < numPoints; i++) {
-      const p = points[i];
-      const next = points[(i + 1) % numPoints];
-      const midX = (p.x + next.x) / 2;
-      const midY = (p.y + next.y) / 2;
-      ctx.quadraticCurveTo(p.x, p.y, midX, midY);
-    }
-    ctx.closePath();
-    ctx.fillStyle = coreColor;
-    ctx.fill();
-    ctx.restore();
-
-    // Rough, thin black ink brush cuts & hatches moving along the border contour
-    ctx.globalAlpha = 0.9 * progress;
-    ctx.strokeStyle = '#000000';
-    ctx.lineCap = 'butt';
-
-    // Draw 3 layers of thin, rough, broken/cut ink lines moving alongside the border
-    const insetScales = [0.84, 0.91, 0.96];
-    for (let layer = 0; layer < insetScales.length; layer++) {
-      const scale = insetScales[layer];
-      const speedDir = (layer % 2 === 0 ? 1 : -1);
-      const flowTime = time * 0.003 * speedDir;
-
-      for (let i = 0; i < numPoints; i++) {
-        // Slow wave (for long strokes) + fast wave (for short details) = variety of longevity
-        const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-        const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-        const cutSeed = longWave + shortWave;
-        if (cutSeed < 0.15) continue; // Higher threshold to reduce density and clutter
-
-        const p = points[i];
-        const next = points[(i + 1) % numPoints];
-
-        ctx.lineWidth = 0.5 + (cutSeed * 1.5);
-        ctx.beginPath();
-        ctx.moveTo(p.x * scale, p.y * scale);
-        // Add a slight jaggedness to the cut
-        const jagX = Math.cos(i * 43) * 3;
-        const jagY = Math.sin(i * 43) * 3;
-        ctx.lineTo(next.x * scale + jagX, next.y * scale + jagY);
-        ctx.stroke();
-      }
-    }
+    ctx.drawImage(frameCanvas, -80, -80);
 
     ctx.restore();
   }

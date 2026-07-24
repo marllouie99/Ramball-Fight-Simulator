@@ -71,11 +71,29 @@ export const SKILL_EFFECT_SOUNDS = {
   zeus: {
     thunderstrike: {
       src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
-      volume: 1.5,
+      volume: 8.5,
+    },
+    thunderstrike2: {
+      src: 'Assets/Sound Effects/Skills/thunderstrike.mp3',
+      volume: 1.0,
     },
     thundercloud: {
       src: 'Assets/Sound Effects/SkillEffects/thundercloudcoming.mp3',
-      volume: 0.8,
+      volume: 8.8,
+    },
+  },
+
+  // ── Yuta Okkotsu / Rika ────────────────────
+  yuta: {
+    groundsmash: {
+      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      volume: 1.9,
+      speed: 1.0,
+    },
+    groundtremble: {
+      src: 'Assets/Sound Effects/SkillEffects/groundTremble.mp3',
+      volume: 1.2,
+      speed: 1.0,
     },
   },
 };

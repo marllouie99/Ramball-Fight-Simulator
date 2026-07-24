@@ -340,3 +340,55 @@ export function drawThunderRootsEffect(ctx, baseRadius) {
   
   ctx.restore();
 }
+
+/**
+ * Renders Silence debuff visual (Inverted Spear anti-technique lock).
+ */
+export function drawSilenceEffect(ctx, baseRadius) {
+  ctx.save();
+  const t = Date.now();
+  const pulse = Math.sin(t / 100) * 0.12 + 0.65;
+
+  // 1. Glowing Deep Purple Inner Body Overlay (Target body glows deep purple!)
+  const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, baseRadius * 1.15);
+  grad.addColorStop(0, `rgba(200, 100, 255, ${pulse * 0.85})`); // Bright magenta-purple core
+  grad.addColorStop(0.6, `rgba(130, 40, 210, ${pulse * 0.75})`); // Deep JJK cursed purple body
+  grad.addColorStop(1.0, `rgba(70, 10, 120, 0.35)`);             // Outer purple fade
+
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius * 1.05, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Bright Purple Body Outline Glow Ring
+  ctx.strokeStyle = `rgba(210, 120, 255, ${pulse})`;
+  ctx.lineWidth = 3.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius * 1.05, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 3. Anti-Technique Lock Ring (Purple-ash rotating dashed circle)
+  ctx.strokeStyle = `rgba(230, 160, 255, ${pulse * 0.95})`;
+  ctx.lineWidth = 2.5;
+  ctx.setLineDash([5, 5]);
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius * 1.3, t / 150, t / 150 + Math.PI * 2);
+  ctx.stroke();
+
+  // 4. Silence Padlock Icon floating above target's head
+  const lockY = -baseRadius - 14;
+  ctx.fillStyle = '#D8A0FF';
+  ctx.strokeStyle = '#5A189A';
+  ctx.lineWidth = 2;
+  
+  // Padlock body
+  ctx.fillRect(-6, lockY - 5, 12, 10);
+  ctx.strokeRect(-6, lockY - 5, 12, 10);
+  // Padlock shackle
+  ctx.beginPath();
+  ctx.arc(0, lockY - 5, 4, Math.PI, 0);
+  ctx.stroke();
+
+  ctx.restore();
+}
+

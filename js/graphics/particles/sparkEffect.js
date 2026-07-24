@@ -727,31 +727,21 @@ export function drawSparkEffects(layer = 'all') {
         ctx.closePath();
         ctx.fill();
         
-        // Outer colored glow
-        const gradient = ctx.createRadialGradient(effect.x, effect.y, effect.size * 0.3, effect.x, effect.y, effect.size * 1.5);
-        gradient.addColorStop(0, isTrickster ? `rgba(100, 255, 100, ${effect.life * 0.8})` : `rgba(255, 50, 50, ${effect.life * 0.8})`);
-        gradient.addColorStop(1, isTrickster ? 'rgba(0, 255, 0, 0)' : 'rgba(255, 0, 0, 0)');
-        ctx.fillStyle = gradient;
+        // Outer colored glow (GPU blend mode lighter for fast zero-lag glow)
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = isTrickster ? `rgba(100, 255, 100, ${effect.life * 0.5})` : `rgba(255, 50, 50, ${effect.life * 0.5})`;
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.size * 1.5, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'spellStealWisp') {
-        const gradient = ctx.createRadialGradient(
-          effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size * 2
-        );
-        gradient.addColorStop(0, `rgba(255, 255, 255, ${effect.life})`);
-        
-        // We'll parse the hex color or use a fallback if it fails.
-        // Assuming effect.color is a valid hex or string like '#39FF14'
-        gradient.addColorStop(0.3, effect.color); // will render with globalAlpha
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        
         ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = effect.color || '#39FF14';
+        ctx.globalAlpha = effect.life * 0.8;
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 2, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
+        ctx.arc(effect.x, effect.y, effect.size * 1.8, 0, Math.PI * 2);
         ctx.fill();
+        ctx.globalAlpha = 1.0;
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'groundScorch') {
         // Massive, highly-detailed organic scorch mark burned into the ground
@@ -944,6 +934,32 @@ export function drawSparkEffects(layer = 'all') {
         
         ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'rikaRoarShockwave') {
+        // Expanding hot-pink & dark ink cursed roar shockwave ring
+        if (effect.targetSize) {
+          effect.size += (effect.targetSize - effect.size) * 0.16;
+        }
+        
+        // 1. Hot Pink Outer Glow Ring
+        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
+        ctx.lineWidth = 7 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 2. High-contrast Black Ink Outline Ring (visible on light backgrounds)
+        ctx.strokeStyle = `rgba(10, 2, 5, ${effect.life * 0.9})`;
+        ctx.lineWidth = 3 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 3. Piercing White-Hot Inner Core Ring
+        ctx.strokeStyle = `rgba(255, 240, 245, ${effect.life * 0.95})`;
+        ctx.lineWidth = 2 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
+        ctx.stroke();
       } else if (effect.type === 'arcaneFlash') {
         // Bright radial flash beneath feet on landing
         effect.size += (effect.targetSize - effect.size) * 0.06; // Slower size blooming
@@ -1152,62 +1168,139 @@ export function drawSparkEffects(layer = 'all') {
       ctx.strokeStyle = `rgba(0, 255, 100, ${effect.life * 0.6})`;
       ctx.stroke();
     } else if (effect.type === 'meleeClashShockwave') {
-      // Expanding ground shockwave ring for Sukuna-Gojo melee clashes
-      // Purple and crimson energy clash effect
+      // Expanding ground shockwave ring for Sukuna-Gojo & Sukuna-Yuta/Rika clashes
       effect.size += (effect.targetSize - effect.size) * 0.08;
-      
+      const isYutaClash = (effect.clashType === 'yuta');
+
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = `rgba(30, 10, 40, ${effect.life * 0.4})`;
+      ctx.fillStyle = isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`;
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
-      
-      // Outer purple ring (Gojo's cursed energy) - thick with dark outline
+
       ctx.globalCompositeOperation = 'lighter';
+
+      if (isYutaClash) {
+        // ── YUTA & RIKA VS SUKUNA CLASH SHOCKWAVE ──
+        // Outer Hot Pink / Dark Magenta Ring (Yuta & Rika's Pure Love / Monstrous Cursed Energy)
+        ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.9})`;
+        ctx.lineWidth = 15 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.98})`;
+        ctx.lineWidth = 11 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner Crimson Blood Ring (Sukuna's Cursed Energy)
+        ctx.strokeStyle = `rgba(255, 30, 60, ${effect.life * 0.95})`;
+        ctx.lineWidth = 8 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // White core flash
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Dynamic Katana / Cleave X-shaped Cross Slash at clash center
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(Math.PI / 4 + (1 - effect.life) * 0.2);
+        const slashLen = effect.size * 0.75;
+        
+        ctx.strokeStyle = `rgba(255, 30, 60, ${effect.life * 0.7})`;
+        ctx.lineWidth = 7 * effect.life;
+        ctx.beginPath();
+        ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
+        ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 3.5 * effect.life;
+        ctx.beginPath();
+        ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
+        ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // Outer purple ring (Gojo's cursed energy) - thick with dark outline
+        ctx.strokeStyle = `rgba(60, 0, 80, ${effect.life * 0.9})`;
+        ctx.lineWidth = 14 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Main purple ring
+        ctx.strokeStyle = `rgba(180, 60, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 10 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Inner crimson ring (Sukuna's cursed energy)
+        ctx.strokeStyle = `rgba(255, 50, 80, ${effect.life * 0.95})`;
+        ctx.lineWidth = 8 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // White core flash with dark outline
+        ctx.strokeStyle = `rgba(40, 40, 40, ${effect.life * 0.8})`;
+        ctx.lineWidth = 5 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.strokeStyle = `rgba(255, 240, 240, ${effect.life * 0.9})`;
+        ctx.lineWidth = 3 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      ctx.globalCompositeOperation = 'source-over';
+    } else if (effect.type === 'rikaRoarShockwave') {
+      // Expanding dark purple & hot pink cursed energy roar shockwave ring
+      effect.size += (effect.targetSize - effect.size) * 0.18;
       
-      // Dark outline for contrast on white background
-      ctx.strokeStyle = `rgba(60, 0, 80, ${effect.life * 0.9})`;
-      ctx.lineWidth = 14 * effect.life;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowBlur = 25 * effect.life;
+      ctx.shadowColor = 'rgba(255, 20, 147, 1)';
+
+      // Outer glowing hot pink cursed energy shockwave ring
+      ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
+      ctx.lineWidth = 12 * effect.life;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
       ctx.stroke();
-      
-      // Main purple ring
-      ctx.strokeStyle = `rgba(180, 60, 255, ${effect.life * 0.95})`;
-      ctx.lineWidth = 10 * effect.life;
-      ctx.shadowBlur = 20 * effect.life;
-      ctx.shadowColor = 'rgba(138, 43, 226, 1)';
+
+      // Middle dark-purple contrast ring
+      ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.8})`;
+      ctx.lineWidth = 6 * effect.life;
       ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
       ctx.stroke();
-      
-      // Inner crimson ring (Sukuna's cursed energy)
-      ctx.strokeStyle = `rgba(255, 50, 80, ${effect.life * 0.95})`;
-      ctx.lineWidth = 8 * effect.life;
-      ctx.shadowColor = 'rgba(220, 20, 60, 1)';
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size * 0.65, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      // White core flash with dark outline
-      ctx.strokeStyle = `rgba(40, 40, 40, ${effect.life * 0.8})`;
-      ctx.lineWidth = 5 * effect.life;
-      ctx.shadowBlur = 0;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
-      ctx.stroke();
-      
-      ctx.strokeStyle = `rgba(255, 240, 240, ${effect.life * 0.9})`;
-      ctx.lineWidth = 3 * effect.life;
-      ctx.shadowBlur = 15 * effect.life;
+
+      // Inner white-hot core ring
       ctx.shadowColor = 'rgba(255, 255, 255, 1)';
+      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+      ctx.lineWidth = 4 * effect.life;
       ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size * 0.35, 0, Math.PI * 2);
+      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
       ctx.stroke();
-      
+
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
     } else {
       // Standard spark - small glowing dot with gradient
       const gradient = ctx.createRadialGradient(
@@ -1238,13 +1331,14 @@ export function drawSparkEffects(layer = 'all') {
 }
 
 /**
- * Spawns a ground shockwave effect for Sukuna-Gojo melee clashes.
- * Creates an expanding ring with purple (Gojo) and crimson (Sukuna) energy.
+ * Spawns a ground shockwave effect for Sukuna-Gojo & Sukuna-Yuta melee clashes.
+ * Creates an expanding ring with purple/pink energy and crimson energy.
  * @param {number} x - X position (midpoint between fighters)
  * @param {number} y - Y position (ground level)
  * @param {number} radius - Base radius of the shockwave
+ * @param {string} clashType - 'gojo' or 'yuta'
  */
-export function spawnMeleeClashShockwave(x, y, radius = 80) {
+export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') {
   const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
@@ -1265,8 +1359,41 @@ export function spawnMeleeClashShockwave(x, y, radius = 80) {
   shockwave.decay = 0.04; // lasts ~25 frames
   shockwave.friction = 1;
   shockwave.type = 'meleeClashShockwave';
+  shockwave.clashType = clashType;
   shockwave.isFlash = true;
   shockwave.color = 'clash';
+
+  state.sparkEffects.push(shockwave);
+}
+
+/**
+ * Spawns an expanding dark purple/pink cursed energy roar shockwave ring for Rika.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} radius - Target radius of shockwave
+ */
+export function spawnRikaRoarShockwave(x, y, radius = 180) {
+  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const fps = state.fps || 60;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
+
+  if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
+    const oldest = state.sparkEffects.shift();
+    if (oldest) _returnSpark(oldest);
+  }
+
+  const shockwave = _getSpark();
+  shockwave.x = x;
+  shockwave.y = y;
+  shockwave.vx = 0;
+  shockwave.vy = 0;
+  shockwave.size = 12;
+  shockwave.targetSize = radius;
+  shockwave.life = 1.0;
+  shockwave.decay = 0.035; // lasts ~28 frames
+  shockwave.type = 'rikaRoarShockwave';
+  shockwave.isFlash = true;
+  shockwave.color = 'pinkCurse';
 
   state.sparkEffects.push(shockwave);
 }

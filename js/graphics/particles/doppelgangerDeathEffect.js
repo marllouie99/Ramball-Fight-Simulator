@@ -169,7 +169,6 @@ export function drawDoppelgangerDeathEffects() {
         ctx.rotate(p.angle);
         ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
         if (p.color === '#f1c40f') {
-            ctx.filter = 'blur(2px)';
             ctx.fillStyle = '#fff';
             ctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size);
         }

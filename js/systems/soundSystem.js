@@ -254,7 +254,22 @@ export function stopAllLoopingSounds() {
  * @param {number} [offset=0] - Time in seconds to start playing from (advance)
  * @returns {HTMLAudioElement|null} The audio element (null for Web Audio playback)
  */
+const _lastPlayTimes = new Map();
+const SOUND_THROTTLE_MS = 60; // Prevent identical audio file from double-playing within 60ms
+
+const _activeSoundHandles = new Set();
+
 export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
+  if (!src) return null;
+
+  // Throttling guard: Prevent same sound file from playing multiple times simultaneously within 60ms
+  const now = performance.now();
+  const lastTime = _lastPlayTimes.get(src) || 0;
+  if (now - lastTime < SOUND_THROTTLE_MS) {
+    return null;
+  }
+  _lastPlayTimes.set(src, now);
+
   const cached = _cache.get(src);
 
   // Fast path: AudioBuffer (fully decoded during preload) — zero latency
@@ -271,20 +286,37 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
       gainNode.gain.value = Math.max(0, Math.min(15, volume));
       source.connect(gainNode);
       gainNode.connect(audioCtx.destination);
-      source.playbackRate.value = Math.max(0.1, speed);
+      const safeSpeed = Math.max(0.1, speed);
+      source.playbackRate.value = safeSpeed;
+      const startTime = audioCtx.currentTime;
       source.start(0, Math.max(0, offset));
+
+      const duration = Math.max(0, (cached.duration - Math.max(0, offset)) / safeSpeed);
+      const endTime = startTime + duration;
+
+      const handle = {
+        src,
+        isPlaying: () => getAudioContext().currentTime < endTime,
+        duration,
+        source,
+        gainNode
+      };
+      _activeSoundHandles.add(handle);
+      setTimeout(() => { _activeSoundHandles.delete(handle); }, duration * 1000 + 100);
+
+      return handle;
     } catch (e) {
       // Fall through to Audio element fallback
     }
-    return null;
   }
 
   // Slow path: Audio element fallback (may need to load/decode on demand)
   const base = cached ?? new Audio(src);
   let clone;
-  if (_audioPool.length > 0) {
-    clone = _audioPool.pop();
-    clone.src = base.src;
+  let poolIdx = _audioPool.findIndex(a => a && (a.paused || a.ended));
+  if (poolIdx >= 0) {
+    clone = _audioPool.splice(poolIdx, 1)[0];
+    clone.src = base.src || src;
   } else {
     clone = /** @type {HTMLAudioElement} */ (base.cloneNode());
   }
@@ -293,23 +325,138 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
   clone.playbackRate = Math.max(0.1, speed);
   clone.currentTime = Math.max(0, offset);
   
+  const handle = {
+    src,
+    isPlaying: () => !clone.paused && !clone.ended,
+    audio: clone
+  };
+  _activeSoundHandles.add(handle);
+
   const cleanup = () => {
     _activeSounds.delete(clone);
-    clone.src = '';
-    try { clone.load(); } catch(e) {}
-    if (_audioPool.length < MAX_POOL_SIZE) {
+    _activeSoundHandles.delete(handle);
+    if (_audioPool.length < MAX_POOL_SIZE && !_audioPool.includes(clone)) {
       _audioPool.push(clone);
     }
   };
 
   _activeSounds.add(clone);
   clone.addEventListener('ended', cleanup, { once: true });
-  clone.addEventListener('pause', cleanup, { once: true });
   
   clone.play().catch(() => {
     _activeSounds.delete(clone);
+    _activeSoundHandles.delete(handle);
   });
-  return clone;
+  
+  return handle;
+}
+
+/**
+ * Stop a played sound instance immediately.
+ * Works for both Web Audio API handle objects and HTMLAudioElements.
+ * @param {object|HTMLAudioElement} soundHandle
+ */
+export function stopSound(soundHandle) {
+  if (!soundHandle) return;
+  try {
+    if (soundHandle.source && typeof soundHandle.source.stop === 'function') {
+      try { soundHandle.source.stop(0); } catch(e) {}
+      try { soundHandle.source.disconnect(); } catch(e) {}
+    }
+    if (soundHandle.gainNode && typeof soundHandle.gainNode.disconnect === 'function') {
+      try { soundHandle.gainNode.gain.setValueAtTime(0, getAudioContext().currentTime); } catch(e) {}
+      try { soundHandle.gainNode.disconnect(); } catch(e) {}
+    }
+    if (soundHandle.audio) {
+      try { soundHandle.audio.pause(); } catch(e) {}
+      soundHandle.audio.currentTime = 0;
+    }
+    if (typeof soundHandle.pause === 'function') {
+      try { soundHandle.pause(); } catch(e) {}
+      soundHandle.currentTime = 0;
+    }
+  } catch (e) {}
+  _activeSoundHandles.delete(soundHandle);
+}
+
+/**
+ * Smoothly fade out a played sound instance over fadeMs milliseconds before stopping.
+ * Works for both Web Audio API handle objects and HTMLAudioElements.
+ * @param {object|HTMLAudioElement} soundHandle
+ * @param {number} [fadeMs=350] - Fade duration in milliseconds
+ */
+export function fadeOutSound(soundHandle, fadeMs = 350) {
+  if (!soundHandle) return;
+
+  // Web Audio API instance (gainNode)
+  if (soundHandle.gainNode) {
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      const currentGain = soundHandle.gainNode.gain.value;
+      soundHandle.gainNode.gain.setValueAtTime(currentGain, now);
+      soundHandle.gainNode.gain.linearRampToValueAtTime(0.001, now + (fadeMs / 1000));
+      setTimeout(() => {
+        try { if (soundHandle.source) soundHandle.source.stop(0); } catch(e) {}
+        try { if (soundHandle.source) soundHandle.source.disconnect(); } catch(e) {}
+        try { soundHandle.gainNode.disconnect(); } catch(e) {}
+        _activeSoundHandles.delete(soundHandle);
+      }, fadeMs + 20);
+      return;
+    } catch(e) {}
+  }
+
+  // HTML5 Audio element instance
+  const audio = soundHandle.audio || (typeof soundHandle.pause === 'function' ? soundHandle : null);
+  if (audio && !audio.paused && !audio.ended) {
+    const startVol = audio.volume;
+    const steps = 15;
+    const stepDelay = Math.max(10, fadeMs / steps);
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      const progress = step / steps;
+      audio.volume = Math.max(0, startVol * (1 - progress));
+      if (step >= steps) {
+        clearInterval(interval);
+        try { audio.pause(); } catch(e) {}
+        audio.currentTime = 0;
+        _activeSoundHandles.delete(soundHandle);
+      }
+    }, stepDelay);
+    return;
+  }
+
+  stopSound(soundHandle);
+}
+
+/**
+ * Smoothly fade out all active non-looping sound instances matching a sound file src.
+ * @param {string} src - Path or partial substring of sound file (e.g. 'groundTremble')
+ * @param {number} [fadeMs=350] - Fade duration in milliseconds
+ */
+export function fadeOutSoundBySrc(src, fadeMs = 350) {
+  if (!src) return;
+  const target = String(src).toLowerCase();
+  for (const handle of Array.from(_activeSoundHandles)) {
+    if (handle && handle.src && String(handle.src).toLowerCase().includes(target)) {
+      fadeOutSound(handle, fadeMs);
+    }
+  }
+}
+
+/**
+ * Stop all active non-looping sound instances playing a matching sound file src.
+ * @param {string} src - Path or partial substring of sound file (e.g. 'groundTremble')
+ */
+export function stopSoundBySrc(src) {
+  if (!src) return;
+  const target = String(src).toLowerCase();
+  for (const handle of Array.from(_activeSoundHandles)) {
+    if (handle && handle.src && String(handle.src).toLowerCase().includes(target)) {
+      stopSound(handle);
+    }
+  }
 }
 
 /**

@@ -262,7 +262,7 @@ export const GUNSLINGER_WEAPON_GRAPHICS = {
   },
 };
 
-export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0, fighterColor = '#888') {
+export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0, fighterColor = '#888', leftIsFiring = false, leftFlashFrame = 0) {
   const ctx = state.ctx;
   const scale = GUNSLINGER_WEAPON_GRAPHICS.positioning.scale;
   const gunOffset = r + GUNSLINGER_WEAPON_GRAPHICS.positioning.gunOffset;
@@ -279,11 +279,11 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
   const prevStrokeStyle = ctx.strokeStyle;
   const prevLineWidth = ctx.lineWidth;
 
-  function drawRevolver() {
+  function drawRevolver(gunIsFiring, gunFlashFrame) {
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Apply a slight shadow for depth (OPTIMIZED: removed shadowBlur)
+    // Apply a slight shadow for depth
     ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 2;
@@ -310,13 +310,13 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.strokeStyle = '#1e110b';
     ctx.lineWidth = 0.5 * scale;
     ctx.beginPath();
-    for(let i=0; i<6; i++) {
-        const offset = i * 1.5 * scale;
-        ctx.moveTo((-14 + offset) * scale, 8 * scale);
-        ctx.lineTo((-17 + offset) * scale, 24 * scale);
-        
-        ctx.moveTo((-17 + offset) * scale, 8 * scale);
-        ctx.lineTo((-14 + offset) * scale, 24 * scale);
+    for (let i = 0; i < 6; i++) {
+      const offset = i * 1.5 * scale;
+      ctx.moveTo((-14 + offset) * scale, 8 * scale);
+      ctx.lineTo((-17 + offset) * scale, 24 * scale);
+      
+      ctx.moveTo((-17 + offset) * scale, 8 * scale);
+      ctx.lineTo((-14 + offset) * scale, 24 * scale);
     }
     ctx.stroke();
 
@@ -375,8 +375,8 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
 
     // Cylinder Notches (back edge)
     ctx.fillStyle = p.bodyShadow;
-    for(let i=0; i<3; i++) {
-        ctx.fillRect(-0.5 * scale, (-1 + i*3.5) * scale, 1.5 * scale, 1.5 * scale);
+    for (let i = 0; i < 3; i++) {
+      ctx.fillRect(-0.5 * scale, (-1 + i * 3.5) * scale, 1.5 * scale, 1.5 * scale);
     }
     
     // Frame boundary over cylinder
@@ -439,27 +439,13 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.lineTo(-10 * scale, -7 * scale);
     ctx.lineTo(-7 * scale, -3 * scale);
     ctx.fill();
-    // Spurr (thumb grip)
-    ctx.fillStyle = p.bodyShadow;
-    ctx.fillRect(-14 * scale, -6.5 * scale, 2 * scale, 1 * scale);
 
-    // --- 8. Screws / Pins ---
-    ctx.fillStyle = p.bodyHighlight;
-    ctx.beginPath();
-    ctx.arc(-2 * scale, 2 * scale, 0.8 * scale, 0, Math.PI*2);
-    ctx.arc(3 * scale, 6 * scale, 0.6 * scale, 0, Math.PI*2);
-    ctx.fill();
-
-    // --- Muzzle Flash ---
-    if (isFiring) {
-      const flashScale = Math.max(0, 1 - flashFrame / 5);
-      ctx.shadowColor = mf.glowColor;
-      ctx.shadowBlur = mf.maxBlur * flashScale;
-      ctx.fillStyle = mf.coreColor;
-      ctx.beginPath();
-      ctx.arc(48 * scale, -0.5 * scale, mf.maxCoreRadius * scale * flashScale, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+    // --- 8. Muzzle Flash & Sparks ---
+    if (gunIsFiring || gunFlashFrame > 0) {
+      const intensity = gunFlashFrame > 0 ? Math.min(1.0, Math.max(0.3, gunFlashFrame / 6.0)) : 1.0;
+      ctx.save();
+      drawGunSlingerMuzzleFlash(ctx, 45 * scale, -0.5 * scale, 0, scale, intensity);
+      ctx.restore();
     }
     
     // --- 9. Hand ---
@@ -485,7 +471,7 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
   ctx.rotate(rightRecoilTilt);
   ctx.rotate(gunSpinAngle);
   ctx.scale(1, -1);
-  drawRevolver();
+  drawRevolver(isFiring, flashFrame);
   // Reverse right gun transforms
   ctx.scale(1, -1);
   ctx.rotate(-gunSpinAngle);
@@ -502,7 +488,7 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
   ctx.translate(-leftRecoilOffset, 0);
   ctx.rotate(-leftRecoilTilt);
   ctx.rotate(-gunSpinAngle);
-  drawRevolver();
+  drawRevolver(leftIsFiring !== undefined ? leftIsFiring : isFiring, leftFlashFrame || flashFrame);
   // Reverse left gun transforms
   ctx.rotate(gunSpinAngle);
   ctx.rotate(leftRecoilTilt);

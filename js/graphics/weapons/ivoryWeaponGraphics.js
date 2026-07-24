@@ -279,7 +279,6 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
   ], charcoal, outline);
   
   // Glowing Emitter Opening
-  ctx.shadowBlur = (glowPulse > 0) ? 20 * glowPulse : 0;
   ctx.shadowColor = orangeGlow;
   ctx.shadowOffsetY = 0;
   ctx.beginPath(); ctx.arc(160 * s, 2 * s, (isFiring ? 6 : 4) * s, 0, Math.PI*2);

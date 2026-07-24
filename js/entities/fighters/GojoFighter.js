@@ -1,7 +1,7 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { playSound, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
@@ -13,6 +13,8 @@ import { drawGojoWeapon, drawGojoOrb } from '../../graphics/weapons/gojoWeaponGr
 export class GojoFighter extends Fighter {
   constructor(def) {
     super(def);
+    this.characterId = 'gojo';
+    this.type = 'gojo';
     this.shootCooldownMax = CONFIG.gojo.blueCooldown ?? def.cooldown;
     this.cooldown = this.shootCooldownMax;
     this.infinityCooldown = 0;
@@ -23,6 +25,8 @@ export class GojoFighter extends Fighter {
     this.isChannelingPurple = false;
     this.purpleChargeTimer = 0;
     this.purpleChargeMax = CONFIG.gojo.purpleChargeMax || 120;
+    this._hasPlayedPurpleChannelSound = false;
+    this._purpleChargeSoundHandle = null;
 
     this.domainCooldown = CONFIG.gojo.domainCooldown ?? 1000; // Initial cast delay reads from CONFIG
     this.domainActive = false;
@@ -30,6 +34,7 @@ export class GojoFighter extends Fighter {
     this.domainChargeTimer = 0;
     this.domainChargeMax = CONFIG.gojo.domainChargeMax || 120;
     this.isChannelingDomainExpansion = false;
+    this._hasPlayedDomainChannelSound = false;
     this.domainUseCount = 0; // Allows domain to be cast up to 2 times per round
 
     this.reverseCursedTechniqueCooldown = 0;
@@ -38,12 +43,12 @@ export class GojoFighter extends Fighter {
     this.isChannelingRCT = false;
     this.rctChannelTimer = 0;
 
-    // Melee Mode (Hand-to-Hand Combat)
-    this.isMeleeMode = false;
+    // Melee Mode (Hand-to-Hand Combat) - Start in Melee Mode for Epic Intro Clash!
+    this.isMeleeMode = true;
     this.meleePunchCooldown = 0;
     this.afterImages = []; // Blue afterimages for teleport effect
-    this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 1500;
-    this.wasForcedMelee = this.forcedMeleeTimer > 0;
+    this.forcedMeleeTimer = CONFIG.gojo.forcedMeleeIntroDuration ?? 180;
+    this.wasForcedMelee = true;
     this.meleeModeCooldown = 0;
     this.hitFlameWisps = []; // Residual stretched Cursed Energy flame wisps on hit
     this.combatAuraOpacity = 0; // Smooth fade-in & fade-out opacity for Cursed Energy aura
@@ -52,6 +57,7 @@ export class GojoFighter extends Fighter {
     this.redEffectMaxTimer = 18;
     this.infinityBlockTimer = 0;
     this.infinityBlockMaxTimer = 25;
+    this.teleportSlideTimer = 0;
   }
 
   reset() {
@@ -71,6 +77,7 @@ export class GojoFighter extends Fighter {
     this.domainChargeTimer = 0;
     this.domainChargeMax = CONFIG.gojo.domainChargeMax || 120;
     this.isChannelingDomainExpansion = false;
+    this._hasPlayedDomainChannelSound = false;
     this.domainExpansionAudioDelay = 0;
     this.domainUseCount = 0;
     this.reverseCursedTechniqueCooldown = 0;
@@ -78,18 +85,19 @@ export class GojoFighter extends Fighter {
     this.healingAuraTimer = 0;
     this.isChannelingRCT = false;
     this.rctChannelTimer = 0;
-    // Melee Mode reset
-    this.isMeleeMode = false;
+    // Melee Mode reset - Start round in Melee Mode for Epic Intro Clash!
+    this.isMeleeMode = true;
     this.meleePunchCooldown = 0;
     this.hitFlameWisps = [];
     this.afterImages = [];
-    this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 1500;
-    this.wasForcedMelee = this.forcedMeleeTimer > 0;
+    this.forcedMeleeTimer = CONFIG.gojo.forcedMeleeIntroDuration ?? 180;
+    this.wasForcedMelee = true;
     this.meleeModeCooldown = 0;
     this.combatAuraOpacity = 0;
     this.purpleRecoveryTimer = 0;
     this.redEffectTimer = 0;
     this.infinityBlockTimer = 0;
+    this.teleportSlideTimer = 0;
   }
 
   getAttackProgress() {
@@ -123,14 +131,13 @@ export class GojoFighter extends Fighter {
     const ry = this.y + Math.sin(this.gunAngle) * releaseDist;
     spawnImpactFlash(rx, ry, 20, 'lightningTrail');
 
-    const sound = getBasicAttackSound(null, 'gojo');
-    this._attackSoundTimer = sound?.delay || 0;
-    this._attackSoundConfig = sound;
+    const sound = getBasicAttackSound(21, 'gojo');
+    if (sound) playSound(sound.src, sound.volume);
   }
 
-  triggerInfinityBlock(hitX, hitY) {
+  triggerInfinityBlock(hitX, hitY, attacker) {
     if (this.infinityCooldown > 0) return false;
-    this.infinityCooldown = CONFIG.gojo.infinityCooldown || 240;
+    this.infinityCooldown = CONFIG.gojo.infinityCooldown ?? 240;
     this.infinityActive = false;
     this.infinityBlockTimer = 25;
     this.infinityBlockMaxTimer = 25;
@@ -141,13 +148,34 @@ export class GojoFighter extends Fighter {
     spawnImpactFlash(this.infinityBlockX, this.infinityBlockY, 40, 'lightningTrail');
     spawnSparks(this.infinityBlockX, this.infinityBlockY, 15, 'lightningTrail', '#E0FFFF');
     triggerGlobalScreenShake(3, 6);
+
+    // If a melee attacker struck Infinity, freeze them mid-strike in front of the barrier for 0.75s (Toji is immune due to Heavenly Restriction!)
+    if (attacker && typeof attacker.applyTimeStop === 'function') {
+      if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
+        attacker.applyTimeStop(CONFIG.gojo.infinityMeleeFreezeDuration ?? 45);
+      }
+    }
     return true;
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    // If getting meleed or hit by physical attack, force switch into Melee Mode to punch back
+    if (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= 160)) {
+      this.isMeleeMode = true;
+      this.meleeModeCooldown = 0;
+    }
+
+    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled when targeted by Toji's ambush!)
+    const isTargetOfAmbush = (attacker && attacker.isAmbushing) || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (this.isTargetOfAmbush === true);
+    if (!isTargetOfAmbush && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+      this._executeTeleportDodge(attacker, CONFIG.arena);
+      this.dodgeCooldown = CONFIG.gojo.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
+      return false; // Negate damage
+    }
+
     // Check Infinity Passive first
     if (this.infinityCooldown <= 0 && attacker && this.hp > 0 && !opts.isStorm) {
-      this.triggerInfinityBlock(attacker.x || this.x, attacker.y || this.y);
+      this.triggerInfinityBlock(attacker.x || this.x, attacker.y || this.y, attacker);
       return false;
     }
 
@@ -163,13 +191,132 @@ export class GojoFighter extends Fighter {
     return result;
   }
 
+  /**
+   * Applies a fluid slide brake physics momentum & afterimage trail when Gojo finishes teleporting.
+   */
+  _applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena) {
+    if (this.isDead) return;
+    const dx = targetX - oldX;
+    const dy = targetY - oldY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+
+    const nx = dx / dist;
+    const ny = dy / dist;
+
+    // Start Gojo slightly offset back along arrival trajectory (18-24px)
+    const slideOffset = Math.min(24, dist * 0.35);
+    const slideSpeed = 13.5; // Initial slide brake momentum
+
+    let startX = targetX - nx * slideOffset;
+    let startY = targetY - ny * slideOffset;
+
+    if (arena) {
+      startX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, startX));
+      startY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, startY));
+    }
+
+    this.x = startX;
+    this.y = startY;
+
+    // Apply forward velocity that friction-brakes smoothly to a standstill
+    this.vx = nx * slideSpeed;
+    this.vy = ny * slideSpeed;
+    this.teleportSlideTimer = 10;
+
+    // Spawn dense afterimages along the teleport-slide path
+    if (!this.afterImages) this.afterImages = [];
+    const pathAngle = Math.atan2(dy, dx);
+    const facingAngle = this.gunAngle !== undefined ? this.gunAngle : pathAngle;
+    const steps = Math.max(4, Math.floor(dist / 12));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const maxTimer = 24 - Math.floor(t * 6);
+      this.afterImages.push({
+        x: oldX + dx * t,
+        y: oldY + dy * t,
+        angle: facingAngle,
+        timer: maxTimer,
+        maxTimer: maxTimer,
+        fromX: oldX,
+        fromY: oldY,
+        toX: targetX,
+        toY: targetY
+      });
+    }
+  }
+
+  _executeTeleportDodge(attacker, arena) {
+    if (this.isDead) return;
+    const oldX = this.x;
+    const oldY = this.y;
+
+    // Determine dodge direction (sideways/flank relative to attacker)
+    const angle = attacker ? (Math.atan2(this.y - attacker.y, this.x - attacker.x) + (Math.random() < 0.5 ? 1.2 : -1.2)) : (Math.random() * Math.PI * 2);
+    const dist = (CONFIG.gojo.teleportDodgeDistance ?? 85) + Math.random() * 20;
+
+    let targetX = this.x + Math.cos(angle) * dist;
+    let targetY = this.y + Math.sin(angle) * dist;
+
+    if (arena) {
+      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+    }
+
+    this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+
+    // Visuals: Floating text & teleport flashes
+    spawnFloatingText(oldX, oldY - this.r - 10, 'EVADE!', '#00BFFF');
+    spawnImpactFlash(oldX, oldY, 22, 'lightningTrail');
+    spawnImpactFlash(this.x, this.y, 22, 'lightningTrail');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+  }
+
   update(opponent, ownerIndex, arena) {
+    if (this.hp <= 0) {
+      if (this.isChannelingPurple) {
+        this.isChannelingPurple = false;
+        this._hasPlayedPurpleChannelSound = false;
+        if (this._purpleChargeSoundHandle) {
+          fadeOutSound(this._purpleChargeSoundHandle, 200);
+          this._purpleChargeSoundHandle = null;
+        }
+        fadeOutSoundBySrc('mixing', 200);
+      }
+      return;
+    }
+
     this.handlePoison();
     this.handleBurn();
     this._tickCooldowns();
     this._tickAttackSound();
 
-    if (this._handleTimeStop()) return;
+    // Fade afterimages every frame
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        if (--this.afterImages[i].timer <= 0) {
+          this.afterImages.splice(i, 1);
+        }
+      }
+    }
+
+    if (this._handleTimeStop()) {
+      if (this.isChannelingDomainExpansion) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+      }
+      if (this.isChannelingPurple) {
+        this.isChannelingPurple = false;
+        this.purpleChargeTimer = 0;
+        this._hasPlayedPurpleChannelSound = false;
+        if (this._purpleChargeSoundHandle) {
+          fadeOutSound(this._purpleChargeSoundHandle, 200);
+          this._purpleChargeSoundHandle = null;
+        }
+        fadeOutSoundBySrc('mixing', 200);
+      }
+      return;
+    }
 
     // Update Sakuga impact frame & Red effect timers
     if (this.sakugaImpactTimer > 0) {
@@ -209,9 +356,37 @@ export class GojoFighter extends Fighter {
       }
     }
 
+    if (!this.isChannelingDomainExpansion) this._hasPlayedDomainChannelSound = false;
+    if (!this.isChannelingPurple) this._hasPlayedPurpleChannelSound = false;
+
     if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
+    if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+
+    if (this.infinityCooldown > 0) {
+      this.infinityCooldown--;
+      if (this.infinityCooldown <= 0) {
+        this.infinityActive = true;
+      }
+    }
+
+    if (this.teleportSlideTimer > 0) {
+      this.teleportSlideTimer--;
+      this.vx *= 0.64;
+      this.vy *= 0.64;
+      if (Math.random() < 0.4) {
+        spawnSparks(this.x + (Math.random() - 0.5) * this.r, this.y + (Math.random() - 0.5) * this.r, 1, 'lightningTrail', '#00BFFF');
+      }
+    }
+
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        if (--this.afterImages[i].timer <= 0) {
+          this.afterImages.splice(i, 1);
+        }
+      }
+    }
 
     // Distance check to closest opponent for melee range combat aura
     const meleeDistanceThreshold = 220;
@@ -261,14 +436,6 @@ export class GojoFighter extends Fighter {
     // Domain active state
     if (this.domainActive) {
       this.domainTimer--;
-      // Play gojodomainexpansion.mp3 1.5s (90 frames) after domain deployment
-      if (this.domainExpansionAudioDelay !== undefined && this.domainExpansionAudioDelay > 0) {
-        this.domainExpansionAudioDelay--;
-        if (this.domainExpansionAudioDelay === 0) {
-          const expSound = getSkillSound(this._def?.id, 'domain_expansion');
-          if (expSound) playSound(expSound.src, expSound.volume);
-        }
-      }
       if (this.domainTimer <= 0) {
         this.domainActive = false;
       } else {
@@ -282,32 +449,44 @@ export class GojoFighter extends Fighter {
     }
 
     // Check for Domain Expansion (Ultimate)
-    if (this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    const isSilenced = (this.silenceTimer || 0) > 0;
+    if (!isSilenced && this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
       this.isChannelingDomainExpansion = true;
       this.domainChargeTimer = 0;
       this._playedDeployAudio = false;
       triggerGlobalScreenShake(6, 120);
-      const channelSound = getSkillSound(this._def?.id, 'domain_channel');
-      if (channelSound) playSound(channelSound.src, channelSound.volume);
+      if (!this._hasPlayedDomainChannelSound) {
+        this._hasPlayedDomainChannelSound = true;
+        const channelSound = getSkillSound(this._def?.id, 'domain_channel');
+        if (channelSound) playSound(channelSound.src, channelSound.volume);
+      }
     }
 
     // Handle Domain Expansion Channeling
     if (this.isChannelingDomainExpansion) {
+      if (isSilenced) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+        this.domainCooldown = CONFIG.gojo?.domainCooldown || 1500;
+        return;
+      }
       this.domainChargeTimer++;
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Play gojodomaindeploy.mp3 in advance at domainDeployAudioFrame
-      const deployAudioFrame = CONFIG.gojo.domainDeployAudioFrame ?? this.domainChargeMax;
-      if (this.domainChargeTimer === deployAudioFrame && !this._playedDeployAudio) {
-        this._playedDeployAudio = true;
-        const activateSound = getSkillSound(this._def?.id, 'domain_activate') || getSkillSound(this._def?.id, 'domain');
-        if (activateSound) playSound(activateSound.src, activateSound.volume);
-      }
-
+      // Track opponent while channeling (sluggish delayed reaction time if stealthed)
       if (opponent && !opponent.isDead) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        if (opponent.isStealthed) {
+          let diff = targetAngle - this.gunAngle;
+          while (diff < -Math.PI) diff += Math.PI * 2;
+          while (diff > Math.PI) diff -= Math.PI * 2;
+          const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
+          this.gunAngle += diff * turnRate; // Sluggish delayed turn rate
+        } else {
+          this.gunAngle = targetAngle; // Instant fast lock-on!
+        }
       }
 
       if (this.domainChargeTimer >= this.domainChargeMax) {
@@ -329,8 +508,13 @@ export class GojoFighter extends Fighter {
         this.purpleChargeTimer = 0;
         spawnFloatingText(this.x, this.y - this.r - 20, 'HOLLOW PURPLE', '#8A2BE2');
 
-        const sound = getSkillSound(this._def?.id, 'purple_charge');
-        if (sound) playSound(sound.src, sound.volume);
+        if (!this._hasPlayedPurpleChannelSound) {
+          this._hasPlayedPurpleChannelSound = true;
+          const sound = getSkillSound(this._def?.id, 'purple_charge');
+          if (sound) {
+            this._purpleChargeSoundHandle = playSound(sound.src, sound.volume);
+          }
+        }
       }
     }
 
@@ -355,7 +539,14 @@ export class GojoFighter extends Fighter {
       this.z = Math.sin(levitateProgress * Math.PI * 0.5) * maxLevitationHeight;
 
       if (opponent && !opponent.isDead) {
-        this.gunAngle = Math.atan2(opponent.y - (this.y - this.z), opponent.x - this.x);
+        this.aim(opponent);
+        // Lapse Blue Gravitational Distortion: Slows opponent movement by 50% while mixing Red & Blue into Purple!
+        if (typeof opponent.applySlow === 'function') {
+          opponent.applySlow(10, 0.50);
+        } else {
+          opponent.slowTimer = 10;
+          opponent.slowMultiplier = 0.50;
+        }
       }
 
       if (this.purpleChargeTimer >= this.purpleChargeMax) {
@@ -395,7 +586,7 @@ export class GojoFighter extends Fighter {
       }
 
       if (opponent && !opponent.isDead) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.aim(opponent);
       }
 
       if (this.rctChannelTimer <= 0) {
@@ -415,47 +606,48 @@ export class GojoFighter extends Fighter {
     // Delete enemy projectiles if Purple is active
     this._deleteEnemyProjectilesInPurple();
 
-    // Check distance and switch between melee/ranged mode
-    const closeRangeRadius = CONFIG.gojo.closeRangeRadius || 120;
-    let distToOpponent = Infinity;
-    if (opponent && !opponent.isDead) {
-      distToOpponent = Math.hypot(this.x - opponent.x, this.y - opponent.y);
+    // Check if ANY enemy is currently meleeing Gojo or in close range
+    let isBeingMeleed = false;
+    let closestEnemyDist = Infinity;
+
+    if (state.fighters && state.fighters.length > 0) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0) continue;
+        const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
+        if (!isEnemy) continue;
+
+        const d = Math.hypot(this.x - f.x, this.y - f.y);
+        if (d < closestEnemyDist) closestEnemyDist = d;
+
+        if (d <= 180 || f.isMeleeMode || f.flurryTarget === this) {
+          isBeingMeleed = true;
+          break;
+        }
+      }
     }
 
-    // Switch modes based on distance & cooldown (only when not in special states)
+    // Switch modes based on distance & melee engagement (only when not in special states)
     if (!this.isTeleporting && !this.isChannelingPurple) {
       if (this.domainActive) {
         this.isMeleeMode = true; // Force melee mode in domain
         this.vx = 0;
         this.vy = 0;
+      } else if (this.meleeModeCooldown > 0) {
+        // Mandatory ranged separation period after combo finisher
+        this.isMeleeMode = false;
+      } else if (isBeingMeleed) {
+        // Enter Melee Mode when in close melee engagement
+        this.isMeleeMode = true;
       } else if (this.forcedMeleeTimer > 0) {
         this.wasForcedMelee = true;
-        if (!this.isMeleeMode) {
-          // In forced melee period - switch to melee mode
-          this.isMeleeMode = true;
-          this.meleeComboCount = 0;
-        }
-      } else if (this.forcedMeleeTimer === 0 && this.wasForcedMelee) {
-        // Forced hand-to-hand combat mode just expired! Start cooldown and teleport away to ranged mode
-        this.wasForcedMelee = false;
-        this.isMeleeMode = false;
-        this.meleeModeCooldown = CONFIG.gojo.meleeModeCooldown || 600; // Start hand combat cooldown
-        if (opponent && !opponent.isDead) {
-          this._teleportAwayFrom(opponent, arena);
-        }
-      } else if (this.meleeModeCooldown <= 0 && distToOpponent <= closeRangeRadius) {
-        if (!this.isMeleeMode) {
-          // Just entered melee range & melee cooldown is ready - re-trigger hand-to-hand combat!
-          this.isMeleeMode = true;
-          this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 200;
-          this.wasForcedMelee = true;
-          this.meleeComboCount = 0;
-        }
+        this.isMeleeMode = true;
       } else {
-        if (this.isMeleeMode) {
-          // Just left melee range / forced melee expired - switch back to ranged mode and teleport away!
+        if (this.isMeleeMode && closestEnemyDist > 220) {
+          // Left melee range - switch back to ranged mode and teleport away
           this.isMeleeMode = false;
-          this.meleeModeCooldown = CONFIG.gojo.meleeModeCooldown || 600;
+          this.wasForcedMelee = false;
+          this.meleeModeCooldown = 240;
           if (opponent && !opponent.isDead) {
             this._teleportAwayFrom(opponent, arena);
           }
@@ -471,27 +663,30 @@ export class GojoFighter extends Fighter {
     }
 
     // Handle Melee Mode (Hand-to-Hand Combat)
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0);
+    
     if (this.isMeleeMode) {
-      this.vx = 0; // Lock movement during punch-teleport sequence
-      this.vy = 0;
-      if (opponent && !opponent.isDead) {
+      if ((this.teleportSlideTimer || 0) <= 0 && canAct) {
+        this.vx = 0; // Lock movement after slide brake finishes
+        this.vy = 0;
+      }
+      if (canAct && opponent && !opponent.isDead) {
         this._updateMeleeCombat(opponent, arena);
       }
     } else {
       // Ranged Mode - Basic attack with blue orbs
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
-      } else {
+      } else if (canAct) {
         this.shoot(ownerIndex);
         this.shootCooldown = this.shootCooldownMax;
       }
     }
 
-    this.applyMovementPhysics();
+    const isMovementLocked = (this.teleportSlideTimer > 0) || this.isMeleeMode;
+    this.applyMovementPhysics(isMovementLocked ? 0 : 1);
 
     if (opponent && !opponent.isDead) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    } else {
       this.aim(opponent);
     }
 
@@ -547,38 +742,25 @@ export class GojoFighter extends Fighter {
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
     if (this.meleeComboTarget === undefined) this.meleeComboTarget = Math.random() < 0.35 ? 3 : 1;
 
-    // 1. Only Teleport when starting a new combo sequence (or always when domain is active)
-    if (this.meleeComboCount === 0 || this.domainActive) {
-      const oldX = this.x;
-      const oldY = this.y;
+    // Teleport to a new flank angle around the opponent for EVERY punch (punch-teleport-punch-teleport anime sequence)
+    const oldX = this.x;
+    const oldY = this.y;
 
-      const angleToOpponent = Math.random() * Math.PI * 2;
-      const behindOffset = opponent.r + this.r + 8;
-      let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
-      let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
+    const angleToOpponent = Math.random() * Math.PI * 2;
+    const behindOffset = opponent.r + this.r + 8;
+    let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
+    let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
 
-      // Clamp to arena bounds
+    if (arena) {
       targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
       targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
-
-      this.x = targetX;
-      this.y = targetY;
-
-      spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
-      spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
-    } else {
-      // For follow-up punches in a combo, ensure Gojo stays right next to the opponent
-      const dx = opponent.x - this.x;
-      const dy = opponent.y - this.y;
-      const currentDist = Math.hypot(dx, dy);
-      const idealDist = opponent.r + this.r + 8;
-
-      if (currentDist > idealDist + 4) {
-        const angle = Math.atan2(dy, dx);
-        this.x = opponent.x - Math.cos(angle) * idealDist;
-        this.y = opponent.y - Math.sin(angle) * idealDist;
-      }
     }
+
+    this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+
+    spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
+    spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
 
     // 2. Execute punch at current position
     this._meleePunch(opponent);
@@ -603,10 +785,18 @@ export class GojoFighter extends Fighter {
     // Set cooldown for next punch
     this.meleePunchCooldown = punchCooldown;
 
-    // Reset combo counter when combo target is reached
+    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
     if (this.meleeComboCount >= this.meleeComboTarget) {
       this.meleeComboCount = 0;
       this.meleeComboTarget = Math.random() < 0.35 ? 3 : 1; // 35% chance for 3 rapid attacks, 65% chance for 1 attack
+
+      if (!this.domainActive) {
+        this.isMeleeMode = false;
+        this.meleeModeCooldown = CONFIG.gojo.meleeModeSeparationCooldown ?? 240; // 4 seconds of mandatory ranged separation!
+        if (opponent && !opponent.isDead) {
+          this._teleportAwayFrom(opponent, arena);
+        }
+      }
     }
 
     this.resolveWallBounce(arena);
@@ -616,23 +806,30 @@ export class GojoFighter extends Fighter {
    * Teleports Gojo away to range when transitioning out of melee mode
    */
   _teleportAwayFrom(opponent, arena) {
-    if (!opponent) return;
+    if (!opponent || opponent.isAmbushing || this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0) return;
     const oldX = this.x;
     const oldY = this.y;
 
     const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
-    const dist = 300;
+    const dist = CONFIG.gojo.comboDisengageDistance ?? 300;
     let targetX = opponent.x + Math.cos(angle) * dist;
     let targetY = opponent.y + Math.sin(angle) * dist;
 
-    targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-    targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+    if (arena) {
+      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+    }
 
-    this.x = targetX;
-    this.y = targetY;
+    this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+
+    // Apply a smooth breather pause before resuming Blue orb attacks (prevents snappy instant spam)
+    const breatherDuration = CONFIG.gojo.modeSwitchBreatherDuration ?? 45;
+    this.shootCooldown = Math.max(this.shootCooldown || 0, breatherDuration);
+    this.modeSwitchBreatherTimer = breatherDuration;
 
     spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
     spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
   }
 
   /**
@@ -750,6 +947,12 @@ export class GojoFighter extends Fighter {
 
   _firePurple(ownerIndex) {
     this.isChannelingPurple = false;
+    this._hasPlayedPurpleChannelSound = false;
+    if (this._purpleChargeSoundHandle) {
+      fadeOutSound(this._purpleChargeSoundHandle, 300);
+      this._purpleChargeSoundHandle = null;
+    }
+    fadeOutSoundBySrc('mixing', 300);
     this.purpleRecoveryTimer = 30; // Just 30 frames (0.5s) for smooth descent
     this.purpleCooldown = CONFIG.gojo.purpleCooldown || 600;
     this.z = 35; // Start descent from hovering altitude
@@ -758,6 +961,58 @@ export class GojoFighter extends Fighter {
 
     if (projectileSystem && projectileSystem.fireGojoPurple) {
       projectileSystem.fireGojoPurple(this, ownerIndex, CONFIG.gojo.purpleDamage || 10);
+    }
+
+    // Teleport to target and engage rapid punch combo right after firing Purple!
+    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+    let opponent = null;
+    if (state.fighters) {
+      let minDist = Infinity;
+      state.fighters.forEach((f, idx) => {
+        if (f && f !== this && f.hp > 0) {
+          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+          if (isEnemy) {
+            const d = Math.hypot(this.x - f.x, this.y - f.y);
+            if (d < minDist) {
+              minDist = d;
+              opponent = f;
+            }
+          }
+        }
+      });
+    }
+
+    if (opponent && !opponent.isDead) {
+      const oldX = this.x;
+      const oldY = this.y;
+
+      // Teleport right next to opponent (behind/flank)
+      const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() < 0.5 ? 0.8 : -0.8);
+      const closeOffset = opponent.r + this.r + 10;
+      let targetX = opponent.x + Math.cos(angle) * closeOffset;
+      let targetY = opponent.y + Math.sin(angle) * closeOffset;
+
+      const arena = CONFIG.arena;
+      if (arena) {
+        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+      }
+
+      this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+
+      // Visuals & Sound
+      spawnFloatingText(this.x, this.y - this.r - 20, 'TELEPORT STRIKE!', '#00BFFF');
+      spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
+      spawnImpactFlash(this.x, this.y, 30, 'lightningTrail');
+      playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+
+      // Force Melee Mode & rapid punch combo!
+      this.isMeleeMode = true;
+      this.forcedMeleeTimer = CONFIG.gojo.purpleFollowupMeleeDuration ?? 120; // 2 seconds forced melee
+      this.meleeModeCooldown = 0;
+      this.meleeComboCount = 0;
+      this.meleeComboTarget = CONFIG.gojo.purpleFollowupComboPunches ?? 4; // 4 rapid punches
+      this.meleePunchCooldown = 0; // Immediate first punch
     }
   }
 
@@ -786,6 +1041,8 @@ export class GojoFighter extends Fighter {
   }
 
   _activateDomain(arena) {
+    this.isChannelingDomainExpansion = false;
+    this._hasPlayedDomainChannelSound = false;
     this.domainActive = true;
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
@@ -814,6 +1071,9 @@ export class GojoFighter extends Fighter {
     const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
     state.fighters.forEach((f, idx) => {
       if (f && f !== this && f.hp > 0) {
+        // Heavenly Restriction: Toji has zero Cursed Energy and is 100% immune to domain sure-hit effects & traps!
+        if (f.domainImmunity || f.characterId === 'toji' || f.type === 'toji') return;
+
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
         if (isEnemy) {
           // Absolute paralysis / brain overload from Unlimited Void
@@ -967,7 +1227,7 @@ export class GojoFighter extends Fighter {
     if (this.isDead) return;
 
     // Domain Expansion Channeling Visuals (Ground ring, Aura, and Header Text)
-    if (this.isChannelingDomainExpansion) {
+    if (this.isChannelingDomainExpansion && (this.timeStopTimer || 0) <= 0) {
       const progress = Math.min(1.0, this.domainChargeTimer / Math.max(1, this.domainChargeMax));
 
       ctx.save();
@@ -1063,6 +1323,22 @@ export class GojoFighter extends Fighter {
       });
     }
 
+    // Draw afterimages during dodge & teleports
+    if (this.afterImages && this.afterImages.length > 0) {
+      ctx.save();
+      this.afterImages.forEach(img => {
+        if (img && img.timer > 0) {
+          const alpha = (img.timer / 8) * 0.5;
+          ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+          ctx.fillStyle = img.color || '#00BFFF';
+          ctx.beginPath();
+          ctx.arc(img.x, img.y, img.r || this.r, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+      ctx.restore();
+    }
+
     // Draw Gojo Punch Impact Effects
     if (this.punchEffects && this.punchEffects.length > 0) {
       this.punchEffects.forEach(effect => {
@@ -1121,6 +1397,79 @@ export class GojoFighter extends Fighter {
       });
     }
 
+    // Draw afterimages during teleports & high-speed moves
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = 0; i < this.afterImages.length; i++) {
+        const img = this.afterImages[i];
+        if (img && img.timer > 0) {
+          const maxT = img.maxTimer || 20;
+          const progress = Math.max(0, Math.min(1, img.timer / maxT));
+          const alpha = Math.pow(progress, 0.7) * 0.2;
+
+          ctx.save();
+
+          // 1. Dash Trajectory Line (Electric Cyan)
+          if (img.fromX !== undefined && img.toX !== undefined) {
+            ctx.save();
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.strokeStyle = '#00BFFF';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(img.fromX, img.fromY);
+            ctx.lineTo(img.toX, img.toY);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(img.fromX, img.fromY);
+            ctx.lineTo(img.toX, img.toY);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.translate(img.x, img.y);
+          ctx.rotate(img.angle || 0);
+
+          // 2. Limitless Electric Cyan Cursed Energy Glow
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          const auraGrad = ctx.createRadialGradient(0, 0, this.r * 0.3, 0, 0, this.r * 1.8);
+          auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`);
+          auraGrad.addColorStop(0.4, `rgba(0, 191, 255, ${alpha * 0.75})`);
+          auraGrad.addColorStop(0.8, `rgba(0, 100, 255, ${alpha * 0.4})`);
+          auraGrad.addColorStop(1, 'rgba(0, 191, 255, 0)');
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 3. Body Circle Silhouette
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.1, 0, Math.PI * 2);
+          ctx.fillStyle = '#00BFFF';
+          ctx.fill();
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          // 4. Electric Blue Six Eyes Glints
+          ctx.fillStyle = '#E0FFFF';
+          ctx.beginPath();
+          ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
+          ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+
+          ctx.restore();
+        }
+      }
+    }
+
     // Draw Reversal Red Repulsion Effect
     if (this.redEffectTimer > 0) {
       this._drawReversalRedEffect(ctx);
@@ -1136,12 +1485,15 @@ export class GojoFighter extends Fighter {
       this._drawJJKCursedEnergyAura(ctx, 'blue');
     }
 
+    // Draw hand Cursed Energy flame blobs BEHIND body
+    this._drawHandCursedEnergyAura(ctx);
+
     // 2. Draw fighter body
     drawGojoBody(ctx, this);
 
     this.drawGun(ctx);
 
-    // 3. Draw physical circle hands + blobby hand cursed energy ON TOP of body
+    // 3. Draw physical circle hands + flare ON TOP of body
     this._drawHandCursedEnergy(ctx);
 
     this.drawHealth(ctx);
@@ -1164,16 +1516,28 @@ export class GojoFighter extends Fighter {
     }
   }
 
-  // Render physical circle hands + animated blobby Cursed Energy flame aura on Gojo's hands
-  _drawHandCursedEnergy(ctx) {
+  // Calculate hand positions for melee punch / skill gestures
+  _getHandPositions() {
     const basePosY = (this.y - (this.z || 0));
+
+    // Champion Screen / Victory Reveal / Fighter Index Stance: Hide hands completely
+    const isWinnerScreen = this._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    if (isWinnerScreen) {
+      return null;
+    }
+
+    // Do not display hands in Blue Orb (ranged) mode unless executing a specific hand skill or punch animation
+    const isUsingHandSkill = (this.punchAnimTimer > 0) || (this.redEffectTimer > 0) || (this.isChannelingPurple) || (this.isChannelingDomainExpansion);
+    if (!this.isMeleeMode && !isUsingHandSkill) {
+      return null;
+    }
 
     // Dynamic hand animation offsets (Left hand rests in center of body by default)
     let frontOffset = 6;
     let frontAngleOffset = 0;
 
-    let backHandX = this.x;
-    let backHandY = basePosY;
+    let backHandX = this.x - Math.cos(this.gunAngle + Math.PI / 2) * (this.r * 0.35);
+    let backHandY = basePosY - Math.sin(this.gunAngle + Math.PI / 2) * (this.r * 0.35);
     let hideFrontHand = false;
     let hideBackHand = false;
 
@@ -1206,13 +1570,44 @@ export class GojoFighter extends Fighter {
 
     // Front hand (Right hand) position
     const frontAngle = this.gunAngle + frontAngleOffset;
-    const frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
-    const frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
+    let frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
+    let frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
 
-    // 1. Draw Physical Circle Hands (skin color with crisp black outline)
+    return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
+  }
+
+  // Render hand Cursed Energy flame aura BEHIND physical body
+  _drawHandCursedEnergyAura(ctx) {
+    // Disable hand Cursed Energy flame aura on Gojo's hands during domain active rapid attacks
+    if (this.domainActive) return;
+
+    const hands = this._getHandPositions();
+    if (!hands) return;
+
+    const isRCT = (this.isChannelingRCT || this.healingAuraTimer > 0);
+    const isPurple = (this.isChannelingPurple);
+    const isActive = !isRCT && !isPurple && ((this.combatAuraOpacity > 0.05) || (this.isMeleeMode) || (this.punchAnimTimer > 0) || (this.redEffectTimer > 0) || (this.isChannelingDomainExpansion) || (state.gameState === 'countdown'));
+
+    if (isActive) {
+      const theme = (this.redEffectTimer > 0 ? 'red' : 'blue');
+      const blobRadius = (this.punchAnimTimer > 0) ? 15.0 : 12.0;
+
+      if (!hands.hideFrontHand) this._drawJJKCursedEnergyAura(ctx, theme, hands.frontHandX, hands.frontHandY, blobRadius);
+      if (!hands.hideBackHand) this._drawJJKCursedEnergyAura(ctx, theme, hands.backHandX, hands.backHandY, blobRadius);
+    }
+  }
+
+  // Render physical circle hands ON TOP of body
+  _drawHandCursedEnergy(ctx) {
+    const hands = this._getHandPositions();
+    if (!hands) return;
+
+    const { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand } = hands;
+
+    // Draw Physical Circle Hands ON TOP of body
     ctx.save();
-    ctx.fillStyle = '#FFE0BD';
-    ctx.strokeStyle = '#111111';
+    ctx.fillStyle = this.color || '#FFE4C4';
+    ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
 
     if (!hideFrontHand) {
@@ -1230,7 +1625,7 @@ export class GojoFighter extends Fighter {
     }
     ctx.restore();
 
-    // 2. Draw Quick Crimson Finger-Snap Flare at Gojo's hand when Reversal Red triggers
+    // Draw Quick Crimson Finger-Snap Flare at Gojo's hand when Reversal Red triggers
     if (this.redEffectTimer > 0) {
       const maxT = 20;
       const t = Math.max(0, Math.min(1, 1 - (this.redEffectTimer / maxT)));
@@ -1270,17 +1665,6 @@ export class GojoFighter extends Fighter {
       ctx.fill();
 
       ctx.restore();
-    }
-
-    // 3. Draw Blobby Cursed Energy Aura over Gojo's hands ONLY during active Melee Punches and RCT
-    const isAttackingWithHand = (this.punchAnimTimer > 0) || (this.isChannelingRCT || this.healingAuraTimer > 0);
-
-    if (isAttackingWithHand && !this.isChannelingPurple) {
-      let theme = (this.isChannelingRCT || this.healingAuraTimer > 0) ? 'rct' : 'blue';
-      const blobRadius = (this.punchAnimTimer > 0) ? 11 : 8;
-
-      if (!hideFrontHand) this._drawJJKCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
-      if (!hideBackHand) this._drawJJKCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
     }
   }
 
@@ -1672,22 +2056,51 @@ export class GojoFighter extends Fighter {
 
     const r = overrideRadius !== null ? overrideRadius : this.r;
 
+    // === Luminous Body Backlight (Soft Electric Blue Bloom - Matching Yuta) ===
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const glowRadius = r + 90 + Math.sin(time * 0.005) * 8;
+    const backGlow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, glowRadius);
+    if (colorTheme === 'rct') {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
+      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.3 * progress})`);
+      backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
+    } else if (colorTheme === 'red') {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
+      backGlow.addColorStop(0.4, `rgba(255, 50, 0, ${0.4 * progress})`);
+      backGlow.addColorStop(1, 'rgba(255, 0, 0, 0)');
+    } else if (colorTheme === 'purple') {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
+      backGlow.addColorStop(0.4, `rgba(180, 50, 255, ${0.4 * progress})`);
+      backGlow.addColorStop(1, 'rgba(120, 0, 255, 0)');
+    } else {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Soft white core
+      backGlow.addColorStop(0.35, `rgba(0, 212, 255, ${0.40 * progress})`); // Electric cyan bloom
+      backGlow.addColorStop(0.7, `rgba(0, 140, 255, ${0.18 * progress})`);  // Soft outer feathering
+      backGlow.addColorStop(1, 'rgba(0, 100, 255, 0)');
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+    ctx.fillStyle = backGlow;
+    ctx.fill();
+    ctx.restore();
+
     let mainColor = '#00D4CC';
-    let fillColor = `rgba(0, 212, 204, ${0.15 * progress})`;
-    let coreColor = `rgba(200, 255, 250, ${0.18 * progress})`;
+    let fillColor = `rgba(0, 212, 204, ${0.70 * progress})`;
+    let coreColor = `rgba(200, 255, 250, ${0.85 * progress})`;
 
     if (colorTheme === 'rct') {
       mainColor = '#32CD32';
-      fillColor = `rgba(50, 205, 50, ${0.25 * progress})`;
-      coreColor = `rgba(144, 238, 144, ${0.25 * progress})`;
+      fillColor = `rgba(50, 205, 50, ${0.70 * progress})`;
+      coreColor = `rgba(144, 238, 144, ${0.85 * progress})`;
     } else if (colorTheme === 'red') {
       mainColor = '#FF1100';
-      fillColor = `rgba(255, 17, 0, ${0.25 * progress})`;
-      coreColor = `rgba(255, 100, 100, ${0.25 * progress})`;
+      fillColor = `rgba(255, 17, 0, ${0.72 * progress})`;
+      coreColor = `rgba(255, 120, 100, ${0.85 * progress})`;
     } else if (colorTheme === 'purple') {
       mainColor = '#9900FF';
-      fillColor = `rgba(153, 0, 255, ${0.25 * progress})`;
-      coreColor = `rgba(204, 100, 255, ${0.25 * progress})`;
+      fillColor = `rgba(153, 0, 255, ${0.72 * progress})`;
+      coreColor = `rgba(204, 120, 255, ${0.85 * progress})`;
     }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 
@@ -1695,15 +2108,16 @@ export class GojoFighter extends Fighter {
 
     // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
     const numPoints = 28;
-    const baseRadius = r + 15;
+    const baseRadius = overrideX !== null ? (r + 9.0) : (r + 15);
     const points = [];
     const moveOffset = (this.x + this.y) * 0.015;
+    const stretchMult = overrideX !== null ? 0.2 : 1.0;
 
     for (let i = 0; i < numPoints; i++) {
       const angle = (Math.PI * 2 / numPoints) * i;
 
-      // Upward direction bias (flames flow upward)
-      const upFactor = Math.max(0, -Math.sin(angle) + 0.25);
+      // Upward direction bias (flames flow upward on body, symmetrical on hands)
+      const upFactor = Math.max(0, -Math.sin(angle) + 0.25) * stretchMult;
       const sideFactor = 1.0 - upFactor * 0.5;
 
       // Base shape evolution for stretching flame tongues
@@ -1761,11 +2175,22 @@ export class GojoFighter extends Fighter {
     ctx.closePath();
     ctx.stroke();
 
-    // Inner bright core wash
+    // Inner bright core wash (scaled down flame silhouette matching Yuta)
+    ctx.save();
+    ctx.scale(0.75, 0.75);
     ctx.beginPath();
-    ctx.arc(0, 0, r + 3, 0, Math.PI * 2);
+    ctx.moveTo(mx, my);
+    for (let i = 0; i < numPoints; i++) {
+      const p = points[i];
+      const next = points[(i + 1) % numPoints];
+      const midX = (p.x + next.x) / 2;
+      const midY = (p.y + next.y) / 2;
+      ctx.quadraticCurveTo(p.x, p.y, midX, midY);
+    }
+    ctx.closePath();
     ctx.fillStyle = coreColor;
     ctx.fill();
+    ctx.restore();
 
     // Rough, thin black ink brush cuts & hatches moving along the border contour
     ctx.globalAlpha = 0.9 * progress;

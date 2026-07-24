@@ -273,9 +273,12 @@ export class ZeusFighter extends Fighter {
     spawnImpactFlash(target.x, target.y, 50, 'lightningTrail');
     spawnSparks(target.x, target.y, 10, 'lightningTrail', '#FFFFFF');
     
-    // Play storm strike sound for each hit
+    // Play storm strike sound for each hit (both stormstrike.mp3 & thunderstrike.mp3)
     const stormSound = getSkillSound(this._def?.id, 'storm');
     if (stormSound) playSound(stormSound.src, stormSound.volume * 0.6);
+
+    const thunderSound = getSkillSound(this._def?.id, 'thunderstrike');
+    if (thunderSound) playSound(thunderSound.src, thunderSound.volume * 0.6);
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];

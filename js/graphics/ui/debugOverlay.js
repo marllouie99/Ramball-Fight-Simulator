@@ -4,7 +4,7 @@
 import { state } from '../../core/state.js';
 
 export function renderFpsDebugOverlay(ctx) {
-  if (!state || !state.fps) return;
+  if (!state || !state.fps || state.hideFpsLogs) return;
 
   ctx.save();
   ctx.font = 'bold 12px Consolas, monospace';

@@ -57,6 +57,9 @@ function executeCursedSpeech(fighter) {
 
 function executeThinIceBreaker(fighter, angle) {
   const speed = CONFIG.yuta.thinIceBreakerSpeed || 25;
+  const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
+  const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+  const baseDmg = CONFIG.yuta.thinIceBreakerDamage || 25;
 
   projectileSystem.projectiles.push({
     owner: state.fighters.indexOf(fighter),
@@ -65,7 +68,7 @@ function executeThinIceBreaker(fighter, angle) {
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     r: 8,
-    damage: CONFIG.yuta.thinIceBreakerDamage || 25,
+    damage: baseDmg * dmgMult,
     life: 60,
     maxLife: 60,
     visual: 'thinIceBreaker',

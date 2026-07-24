@@ -2,7 +2,7 @@
 // CONFIG — tweak all game values here
 // ─────────────────────────────────────────────
 export const CONFIG = {
-  arena: { x: 40, y: 100, width: 460, height: 460 },
+  arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
   spin: { rate: 0.06 },                        // angle increment per frame (× fighter.speed)
@@ -129,7 +129,7 @@ export const CONFIG = {
     swordRange: 40,   // pixels from edge; how close enemy must be for a sword swipe
     swipeCooldown: 100,  // frames between sword swipes (120 = 2 s at 60 fps)
     swipeDuration: 18,   // frames the swipe arc animation plays
-    swordDamage: 20,   // damage dealt by a sword swipe
+    swordDamage: 30,   // damage dealt by a sword swipe
     swordDurability: 3,    // number of swipes before the sword breaks
     shieldBlockChance: 0.50, // probability (0–1) of blocking a direct incoming projectile
     blockFlashFrames: 15,   // duration of the visual flash when a block occurs
@@ -339,8 +339,8 @@ export const CONFIG = {
     // TUNING: Basic attack (alternating dual revolvers)
     leftGunDelay: 8,          // frames delay for left gun shot after right gun
     shotCooldown: 15,         // frames between alternating shots (rapid fire)
-    bulletDamage: 5,          // damage per bullet
-    bulletSpeed: 10.0,        // speed of bullets
+    bulletDamage: 7,          // damage per bullet
+    bulletSpeed: 15.0,        // speed of bullets
     basicAttackKnockback: 5.0,// very small knockback on basic attacks
 
     // TUNING: Passive skill (damage multiplier chance)
@@ -352,7 +352,7 @@ export const CONFIG = {
     skillDuration: 60,        // frames the rapid sync fire lasts (1 second at 60 fps)
     skillBurstCount: 8,       // number of bullet pairs fired during skill
     skillBurstInterval: 8,    // frames between each bullet pair during skill
-    skillDamage: 2,           // damage per bullet during skill (lower but balanced)
+    skillDamage: 7,           // damage per bullet during skill (lower but balanced)
     skillRequiresFullMag: true, // skill can only be activated with full magazine
     autoSkillThreshold: 3,     // bullets or less triggers active skill before reload
     leftGunAngleOffset: 0.3,   // default left gun aim offset when no secondary target exists
@@ -363,7 +363,7 @@ export const CONFIG = {
     // TUNING: Melee attack (purple sword)
     swordRange: 40,           // pixels from edge for sword swing attack
     swordCooldown: 45,        // frames between sword swings
-    swordDamage: 10,         // damage per sword swing
+    swordDamage: 15,         // damage per sword swing
     swordSwingDuration: 20,   // frames for visible sword swing animation
 
     // TUNING: Passive skill (illusion summoning)
@@ -502,7 +502,7 @@ export const CONFIG = {
   /** Zeus — Lightning Spell Caster */
   zeus: {
     // Basic Attack: Chain Lightning (fast projectile)
-    lightningDamage: 8,
+    lightningDamage: 20,
     lightningSpeed: 30,
     chainCount: 3,         // How many times it bounces
     chainRange: 150,       // Range to find next target
@@ -529,7 +529,7 @@ export const CONFIG = {
     stormCooldown: 900,    // 15 seconds
     stormDuration: 130,    // 3 seconds
     stormStrikesPerSec: 3, // Per enemy
-    stormStrikeDamage: 5,
+    stormStrikeDamage: 25,
 
     // Storm Visuals & FX
     stormTelegraphFrames: 120,       // Duration of the channeling wind-up
@@ -544,8 +544,9 @@ export const CONFIG = {
   gojo: {
     infinityCooldown: 240,    // Cooldown before Infinity block triggers again
     blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster
+    modeSwitchBreatherDuration: 45, // Breather pause (frames) when Gojo switches to Ranged/Blue mode (~0.75s)
     blueSpeed: 10.5,           // Speed of Blue orb projectile
-    blueRadius: 100,           // Pull radius of Blue explosion
+    blueRadius: 50,           // Pull radius of Blue explosion
     bluePullForce: 0.5,       // Pull strength of Blue
     redKnockback: 25,         // Knockback force of Red
     redCooldown: 300,         // Cooldown of Red
@@ -565,7 +566,7 @@ export const CONFIG = {
     purplePullForce: 5.0,    // How strongly enemies are dragged toward the orb center
     purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
     purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
-    domainCooldown: 1100,     // 20s Ultimate cooldown
+    domainCooldown: 1500,     // 20s Ultimate cooldown
     domainChargeMax: 150,     // 2s Channeling duration before domain opens
     domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
     domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
@@ -582,6 +583,25 @@ export const CONFIG = {
     meleePunchCooldown: 10,   // Frames between punches
     teleportDelay: 5,        // Frames delay before teleport after punch
     teleportSpeed: 15,        // Speed of teleport movement (pixels per frame)
+
+    // Teleport Dodge / Evade Mechanic
+    teleportDodgeChance: 0.10,               // 30% chance to teleport dodge incoming attacks
+    teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
+    teleportDodgeDistance: 85,               // Distance teleported on dodge
+
+    // Limitless Infinity Barrier Mechanics
+    infinityCooldown: 240,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
+    infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
+    infinityFreezeDuration: 100,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
+    infinityMeleeFreezeDuration: 20,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
+    infinityMaxFrozenProjectiles: 4,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
+
+    // Anime Melee Combat Rhythm & Disengage
+    forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round
+    meleeModeSeparationCooldown: 240,        // Frames (4.0 seconds) mandatory ranged separation after combo disengage
+    comboDisengageDistance: 300,             // Distance (pixels) teleported away on combo finisher
+    purpleFollowupMeleeDuration: 120,        // Frames (2.0 seconds) forced melee combo after firing Hollow Purple
+    purpleFollowupComboPunches: 4,           // Number of rapid punch-teleports in Purple follow-up combo
   },
 
   /** Ryomen Sukuna — King of Curses */
@@ -592,11 +612,21 @@ export const CONFIG = {
     reverseCursedTechniqueCooldown: 1200,      // 20 second cooldown before it can trigger again
 
     // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
-    slashDamage: 12,          // Base damage per Dismantle / Martial Arts strike
+    slashDamage: 15,          // Base damage per Dismantle / Martial Arts strike
     slashSpeed: 50,          // Speed of Dismantle slash projectiles
     slashCooldown: 50,       // Frames between basic attacks
     meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
     meleePunchCooldown: 30,  // Attack speed of melee punches (lower = faster)
+
+    // Teleport Dodge / Evade Mechanic
+    teleportDodgeChance: 0.10,               // 30% chance to teleport dodge incoming attacks
+    teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
+    teleportDodgeDistance: 85,               // Distance teleported on dodge
+
+    // Anime Melee Combat Rhythm & Disengage
+    forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round
+    meleeModeSeparationCooldown: 240,        // Frames (4.0 seconds) mandatory ranged separation after combo disengage
+    comboDisengageDistance: 300,             // Distance (pixels) teleported away on combo finisher
 
     // Bleed Debuff
     bleedDamagePerStack: 2,  // Damage per bleed stack
@@ -627,7 +657,7 @@ export const CONFIG = {
     domainCooldown: 1000,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
-    domainDamage: 7,          // Base damage per slash tick
+    domainDamage: 10,          // Base damage per slash tick
     domainDamageInterval: 20,  // Frames between slash ticks
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
     domainRadius: 240,        // Radius of the open-air death zone
@@ -642,6 +672,11 @@ export const CONFIG = {
     rctRevivalHealPercent: 0.15,             // Percentage of max HP restored upon RCT revival
     rctRevivalDuration: 150,                 // Frames the revival heal process lasts (2.5 seconds at 60fps)
     rctRevivalCooldown: 99999,               // Cooldown before RCT revival can trigger again (once per match)
+
+    // Teleport Dodge / Evade Mechanic
+    teleportDodgeChance: 0.30,               // 30% chance to teleport dodge incoming attacks
+    teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
+    teleportDodgeDistance: 85,               // Distance teleported on dodge
 
     // Basic Attack: Katana Melee
     meleeCooldown: 50,                       // Frames between katana strikes
@@ -659,7 +694,7 @@ export const CONFIG = {
 
     // Special Mechanic: Phantom Flurry (Parry Counterattack)
     flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
-    flurryParryMax: 7,                       // Maximum random target threshold for Flurry activation
+    flurryParryMax: 3,                       // Maximum random target threshold for Flurry activation
     flurryHits: 5,                           // Number of rapid teleport slashes in Flurry execution
     flurryDamage: 8,                         // Damage per slash during Flurry
     flurryHitInterval: 6,                    // Frames delay between each Flurry slash
@@ -673,18 +708,109 @@ export const CONFIG = {
     // Summon Companion: Rika Orimoto
     rikaMaxHp: 500,                          // Maximum health pool when summoned
     rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
-    rikaCooldown: 1200,                      // Cooldown between Rika actions/manifestations (frames)
-    rikaDuration: 1000,                       // Frames Rika stays active when summoned (60 frames = 1 second)
+    rikaCooldown: 600,                       // Cooldown between Rika actions/manifestations (frames)
+    rikaSummonHpThreshold: 0.50,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
+    rikaSummonChargeDuration: 80,            // Channeling/pause duration when Yuta calls Rika (frames)
+    rikaAriseDuration: 120,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
+    rikaDuration: 1000,                      // Frames Rika stays active when summoned (60 frames = 1 second)
     rikaSpeedMultiplier: 1.8,                // Movement speed multiplier relative to Yuta's base speed
-    rikaDamage: 12,                          // Physical damage dealt per attack tick by Rika
-    rikaAttackRate: 10,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
+    rikaDamage: 25,                          // Physical damage dealt per attack tick by Rika
+    rikaAttackRate: 30,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
+
+    // Rika Full Emergence (#1) & Vengeful Death Dispersion (#8) Config Tuning
+    rikaEmergenceDamage: 25,                 // AOE damage dealt when Rika completes full emergence (#1)
+    rikaEmergenceRadius: 250,                // AOE blast radius in pixels for Full Emergence (#1)
+    rikaEmergenceKnockback: 8,               // Outward radial knockback force on Full Emergence (#1)
+    rikaEmergenceHitStun: 15,                // Hitstun duration (frames) applied by Full Emergence (#1)
+
+    rikaHitKnockback: 16,                    // Physical smash bounce impulse applied to enemy targets hit by Rika
+    rikaHitRecoil: 6,                        // Equal-and-opposite physical bounce force applied back onto Rika
+    rikaHitStun: 12,                         // Hitstun duration (frames) applied to targets smashed by Rika
+
+    rikaDeathExplosionDamage: 35,            // AOE damage dealt when Rika's shell shatters on death (#8)
+    rikaDeathExplosionRadius: 280,           // AOE blast radius in pixels for Vengeful Death Dispersion (#8)
+    rikaDeathExplosionKnockback: 10,          // Outward radial knockback force on Death Dispersion (#8)
+    rikaDeathExplosionHitStun: 20,           // Hitstun duration (frames) applied by Death Dispersion (#8)
 
     // Ultimate Skill: Domain Expansion — Authentic Mutual Love
-    domainCooldown: 1200,                    // Cooldown before domain can trigger (25 seconds at 60fps)
+    domainCooldown: 1300,                     // Cooldown before 2nd domain can trigger (~13 seconds)
+    domainHpThreshold: 0.25,                 // Triggers Yuta's Domain Expansion and Rika re-summon at 25% HP
+    domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
     domainChargeMax: 90,                     // Channeling duration before domain opens (1.5 seconds)
-    domainDuration: 1000,                    // Frames domain stays active (~16.6 seconds, matched with Rika)
+    domainDuration: 800,                     // Frames domain stays active (~6.67 seconds at 60fps)
     domainRadius: 350,                       // Radius of the domain boundary in pixels
     domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
+    domainRctHealRate: 0.50,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
+    domainRikaRegenMultiplier: 1.2,          // 2x RCT regen multiplier inside domain while Rika is alive
+    domainRikaDamageMultiplier: 2.0,         // 1.5x damage dealt multiplier inside domain while Rika is alive
+    domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
+    domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
+
+    // AUDIO TUNING — Audio volumes & lead timing
+    audio: {
+      comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!" (90 frames = 1.5s)
+      comeRikaVolume: 2.5,                   // Volume of "Come, Rika!" (comerika.mp3)
+      rikaAppearanceVolume: 2.5,             // Volume of Rika emergence (rikaAppearance.mp3)
+      rikaAttackVolume: 0.8,                 // Volume of Rika claw slash impacts (backstab.mp3)
+      rikaNoiseVolume: 1.5,                  // Volume of Rika demonic roars (rikanoise1.mp3, rikanoise2.mp3, rikanoise3.mp3)
+      rikaNoiseCooldown: 25,                 // Cooldown in frames between Rika attack roars to prevent audio cutting/spam
+      domainChannelVolume: 3.5,              // Volume during domain expansion channeling (yutadomainexpansion.mp3)
+      domainDeployVolume: 3.5,               // Volume when domain expansion opens (gojodomainexpansion.mp3)
+    },
+  },
+
+  /** Toji — Sorcerer Killer */
+  toji: {
+    // Passive: Heavenly Restriction
+    stealthDodgeChance: 0.20,    // 40% chance to physically dodge normal projectiles
+    parryChance: 0.10,           // 45% chance to parry incoming strikes/projectiles with Inverted Spear
+    domainImmunity: true,        // Ignores all Domain Expansion effects completely
+    homingImmunity: true,        // Cannot be targeted by auto-aim
+    stealthDuration: 240,        // Active Stealth duration in frames (240 frames = 4.0 seconds)
+    stealthCooldown: 550,        // Stealth cooldown in frames (420 frames = 7.0 seconds)
+    stealthTurnRate: 0.08,       // Aim tracking reaction rate when enemies aim at stealthed Toji (delayed but functional!)
+    channelDetectionRadius: 550, // Detection radius (px) to sense enemy skill/domain channeling
+    channelInterruptChance: 0.20, // 10% chance to force Sequence 1 ambush and interrupt channeling
+    channelInterruptCooldownFrames: 800, // Cooldown (frames) for the interrupt mechanic (900 frames = ~15s)
+    channelReactionFrames: 50,   // Delay in frames before Toji reacts to a channeled skill
+
+    // Ambush Move Sequence (Stealth Cooldown Re-entry Ambush)
+    ambushTriggerFrames: 55,       // Frames before stealth cooldown ends when ambush triggers
+    ambushFrontPauseDuration: 10,   // 1st Sequence: Pause duration (frames) in front of target (fast)
+    ambushBackChargeDuration: 15,  // 1st Sequence: Charging duration (frames) at back before Spear thrust (crisp & instant!)
+    ambushBackThrustDamage: 50,    // 1st Sequence: True Damage of the Inverted Spear backstab thrust
+    ambushTargetFreezeDuration: 40, // 1st Sequence: Target freeze duration (frames) so sequence executes smoothly
+    ambushKatanaChargeDuration: 12, // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
+    ambushKatanaFreezeDuration: 40, // 2nd Sequence: Target freeze duration (frames) for Katana execution
+    ambushKnockbackForce: 48,      // Extreme high-speed knockback force launching target flying & bouncing across arena!
+    ambushPhantomFlurryStrikes: 10,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
+    ambushPhantomFlurryFrameRate: 10, // 3rd Sequence: Attack speed in frames between each phantom strike (lower is faster!)
+    ambushPhantomFlurryDamage: 15,    // 3rd Sequence: True Damage per phantom strike (6 hits × 8 = 48 total damage)
+    ambushPhantomFlurryDistance: 8,   // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
+
+    // Primary Melee: Inverted Spear of Heaven
+    spearRange: 50,              // Distance required to land melee hit
+    spearCooldown: 40,           // Frames between melee strikes (fast)
+    spearDamage: 15,             // Base damage per swing
+    silenceDuration: 180,        // Frames target is Silenced on hit (3.0 seconds at 60fps)
+    pierceInfinity: true,        // Ignores Infinity and shield blocks
+
+    // Secondary Weapon: Split Soul Katana
+    katanaRange: 75,             // Wide sweep range
+    katanaCooldown: 300,         // Cooldown between Soul Slashes (5 seconds at 60fps)
+    katanaDamage: 35,            // Massive True Damage
+    soulWoundDuration: 180,      // Frames target is afflicted with Soul Wound anti-heal (3 seconds)
+
+    // Active Skill: Chain of a Thousand Miles
+    chainRange: 300,             // Maximum grapple distance
+    chainSpeed: 20,              // Speed of the chain projectile
+    chainPullSpeed: 15,          // Speed at which Toji is pulled to target
+    chainCooldown: 240,          // Frames between chain uses (4 seconds)
+
+    // Utility Skill: Fly Heads Swarm
+    swarmCount: 8,               // Number of Fly Heads spawned
+    swarmDuration: 180,          // Frames the swarm lasts (3 seconds)
+    swarmCooldown: 400,          // Frames between swarm uses (6.67 seconds)
   },
 };
 
@@ -791,7 +917,7 @@ export const FIGHTER_DEFS = [
     aimbot: false,
     type: 'knight',
     hp: 110,
-    damage: 20,   // sword swipe damage (mirrors CONFIG.knight.swordDamage)
+    damage: 30,   // sword swipe damage (mirrors CONFIG.knight.swordDamage)
     cooldown: 180,  // not used directly; knight manages its own swipeCooldown
     moveSpeed: 3.8,
     ability: "Knight's Code",
@@ -925,7 +1051,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0.03,
     type: 'gunslinger',
     hp: 70,
-    damage: 3.5,
+    damage: 7,
     cooldown: 15,
     moveSpeed: 5.0,
     projectileSpeedMultiplier: 1.0,
@@ -944,7 +1070,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0,
     type: 'doppleganger',
     hp: 100,
-    damage: 10,
+    damage: 15,
     cooldown: 45,
     moveSpeed: 5.5,
     projectileSpeedMultiplier: 1.0,
@@ -1038,7 +1164,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0,
     type: 'zeus',
     hp: 150,
-    damage: 8,
+    damage: 20,
     cooldown: 100,
     moveSpeed: 3.0,
     projectileSpeedMultiplier: 1.0,
@@ -1095,7 +1221,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0,
     type: 'sukuna',
     hp: 200,
-    damage: 8,
+    damage: 15,
     cooldown: 80,
     moveSpeed: 4.8,
     projectileSpeedMultiplier: 3.0,
@@ -1119,7 +1245,26 @@ export const FIGHTER_DEFS = [
     moveSpeed: 4.8,
     projectileSpeedMultiplier: 3.0,
     ability: 'Copy & Rika',
-    desc: 'Manifests Rika, copies techniques, and uses Authentic Mutual Love domain.',
+    desc: 'Summons Rika to assist Yuta in fight and uses Authentic Mutual Love domain.',
+  },
+  {
+    id: 99,
+    name: 'Toji',
+    category: 'Anime',
+    color: '#281438', // Dark Shadow Purple
+    startX: 350, startY: 250,
+    startVx: 1.5, startVy: 1.5,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'toji',
+    hp: 120,
+    damage: 12,
+    cooldown: 40,
+    moveSpeed: 8.0,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Heavenly Restriction',
+    desc: 'Zero Cursed Energy. Immune to Domains. Silences enemies with the Inverted Spear of Heaven.',
   }
 ];
 

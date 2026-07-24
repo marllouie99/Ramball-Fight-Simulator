@@ -44,10 +44,17 @@ import {
   drawSingleSpike,
   drawGunSlingerDualRevolver,
   drawEngineer,
-  drawZeusWeapon
+  drawZeusWeapon,
+  drawInvertedSpear,
+  drawSplitSoulKatana
 } from './weaponVisuals.js';
 import { renderTeamHpCard } from './ui/hudRenderer.js';
 import { renderFpsDebugOverlay } from './ui/debugOverlay.js';
+import { drawMusashiWeapons, drawMusashiSheaths } from './weapons/musashiWeaponGraphics.js';
+import { drawRubyScythe } from './weapons/rubyWeaponGraphics.js';
+import { playSound } from '../systems/soundSystem.js';
+import { getSkillSound } from '../soundEffects/skillSounds.js';
+import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 export { renderTeamHpCard, renderFpsDebugOverlay };
 
 // --- Fighter Preview Cache ---
@@ -99,25 +106,32 @@ state.canvas.addEventListener('wheel', (e) => {
   const rect = state.canvas.getBoundingClientRect();
   const scaleX = state.canvas.width / rect.width;
   const scaleY = state.canvas.height / rect.height;
-  const mx = (e.clientX - rect.left) * scaleX;
-  const my = (e.clientY - rect.top) * scaleY;
+  const mouseX = (e.clientX - rect.left) * scaleX;
+  const mouseY = (e.clientY - rect.top) * scaleY;
 
-  const modalW = 620;
-  const modalH = 380;
-  const modalX = (state.canvas.width - modalW) / 2;
-  const modalY = (state.canvas.height - modalH) / 2;
-  const listX = modalX + 24;
-  const listY = modalY + 64;
-  const listW = 240;
-  const listH = modalH - 120;
-  let modalScrollOffset = 0;
+  // Match modal dimensions from drawFighterSelectModal
+  const modalW = Math.min(state.canvas.width - 20, 520);
+  const modalH = Math.min(state.canvas.height - 20, 520);
+  const mx = (state.canvas.width - modalW) / 2;
+  const my = (state.canvas.height - modalH) / 2;
 
-  if (mx >= listX && mx <= listX + listW && my >= listY && my <= listY + listH) {
-    const itemH = 38;
-    const itemGap = 10;
-    const totalHeight = FIGHTER_DEFS.length * (itemH + itemGap);
-    const maxScroll = Math.max(0, totalHeight - listH);
-    modalScrollOffset = Math.min(Math.max(0, modalScrollOffset + e.deltaY * 0.75), maxScroll);
+  const cols = 3;
+  const gap = 10;
+  const gridW = 210;
+  const listX = mx + 24;
+  const listY = my + 68;
+  const gridVisibleH = modalH - 128 - 10; // grid clipping area height
+
+  const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
+  const cellH = cellW + 18;
+
+  // Check if mouse is inside the grid area
+  if (mouseX >= listX && mouseX <= listX + gridW && mouseY >= listY && mouseY <= listY + gridVisibleH) {
+    const totalFighters = FIGHTER_DEFS.filter(def => !(!state.dummyEnabled && def.type === 'dummy')).length;
+    const totalRows = Math.ceil(totalFighters / cols);
+    const totalGridH = totalRows * (cellH + gap) - gap;
+    const maxScroll = Math.max(0, totalGridH - gridVisibleH);
+    modalGridScroll = Math.min(Math.max(0, modalGridScroll + e.deltaY * 0.8), maxScroll);
     e.preventDefault();
   }
 }, { passive: false });
@@ -271,6 +285,7 @@ export function handleUIClick(mx, my) {
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
+let modalGridScroll = 0;
 
 function drawPlayerCard(slotProp, title, x, y, w, h, borderColor, enabled) {
   const { ctx, mode } = state;
@@ -399,164 +414,265 @@ function drawStatBar(ctx, label, value, maxValue, x, y, width, color) {
 
 function drawFighterSelectModal() {
   const { ctx, canvas } = state;
-  const modalW = Math.min(canvas.width - 20, 560);
-  const modalH = Math.min(canvas.height - 20, 460);
+  const modalW = Math.min(canvas.width - 20, 520);
+  const modalH = Math.min(canvas.height - 20, 520);
   const mx = (canvas.width - modalW) / 2;
   const my = (canvas.height - modalH) / 2;
 
-  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  // Dark glass backdrop overlay
+  ctx.fillStyle = 'rgba(6, 8, 14, 0.78)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawPanel(mx, my, modalW, modalH, 0.94, 14);
+  const selectedDef = FIGHTER_DEFS[modalInspectIndex] || FIGHTER_DEFS[0];
+  const accentColor = selectedDef.color || '#ff1493';
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 22px Arial';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'top';
+  // Draw main outer Glassmorphism container with neon glow
+  ctx.save();
+  ctx.shadowColor = accentColor;
+  ctx.shadowBlur = 18;
+  drawPanel(mx, my, modalW, modalH, 0.94, 16);
+  ctx.restore();
 
+  // Header Banner
   const pNumMatch = selectingSlot ? selectingSlot.match(/\d/) : null;
   const slotLabel = pNumMatch ? `PLAYER ${pNumMatch[0]}` : 'PLAYER';
-  ctx.fillText(`SELECT FIGHTER FOR ${slotLabel}`, mx + 24, my + 20);
 
-  // Grid Configuration
-  const cols = 4;
-  const gap = 12;
-  // Calculate cell size based on available width, reserving roughly half for the grid
-  const maxGridW = modalW * 0.52;
-  const cellW = Math.floor((maxGridW - (cols - 1) * gap) / cols);
-  const cellH = cellW;
-  const gridW = cols * cellW + (cols - 1) * gap;
+  ctx.fillStyle = accentColor;
+  ctx.font = '900 11px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('SELECT CHAMPION', mx + 24, my + 16);
 
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 20px Arial';
+  ctx.fillText(`FIGHTER FOR ${slotLabel}`, mx + 24, my + 30);
+
+  // Top header accent line
+  ctx.fillStyle = accentColor;
+  ctx.fillRect(mx + 24, my + 56, modalW - 48, 2);
+
+  // ── Grid Configuration (Left Side) ──
+  const cols = 3;
+  const gap = 10;
+  const gridW = 210;
   const listX = mx + 24;
-  const listY = my + 60;
+  const listY = my + 68;
+  const gridVisibleH = modalH - 128 - 10; // visible area for the grid
 
-  // Filter out dummy-type fighters when dummy is disabled
+  const cellW = Math.floor((gridW - (cols - 1) * gap) / cols); // ~63px
+  const cellH = cellW + 18; // ~81px
+
+  // Filter out dummy when dummy disabled
   const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
+
+  const totalRows = Math.ceil(modalAvailableFighters.length / cols);
+  const totalGridH = totalRows * (cellH + gap) - gap;
+  const maxScroll = Math.max(0, totalGridH - gridVisibleH);
+
+  // Clamp scroll
+  if (modalGridScroll > maxScroll) modalGridScroll = maxScroll;
+  if (modalGridScroll < 0) modalGridScroll = 0;
+
+  // ── Draw grid items inside a clipping region ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(listX, listY, gridW, gridVisibleH);
+  ctx.clip();
 
   modalAvailableFighters.forEach(({ def, idx }, gridPos) => {
     const col = gridPos % cols;
     const row = Math.floor(gridPos / cols);
 
     const itemX = listX + col * (cellW + gap);
-    const itemY = listY + row * (cellH + gap);
+    const itemY = listY + row * (cellH + gap) - modalGridScroll;
 
-    const selected = idx === modalInspectIndex;
+    // Skip items fully outside the visible clipping area
+    if (itemY + cellH < listY || itemY > listY + gridVisibleH) return;
 
-    ctx.fillStyle = selected ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.06)';
-    ctx.strokeStyle = selected ? def.color : 'rgba(255,255,255,0.12)';
-    ctx.lineWidth = selected ? 2 : 1;
+    const isSelected = idx === modalInspectIndex;
+
+    // Card background
+    ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)';
+    ctx.strokeStyle = isSelected ? def.color : 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = isSelected ? 2 : 1;
     ctx.beginPath();
     ctx.roundRect(itemX, itemY, cellW, cellH, 10);
     ctx.fill();
     ctx.stroke();
 
-    if (selected) {
+    if (isSelected) {
+      ctx.save();
       ctx.shadowColor = def.color;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 12;
       ctx.stroke();
-      ctx.shadowBlur = 0;
+      ctx.restore();
     }
 
-    // Draw abbreviated name or initials inside cell
-    ctx.fillStyle = def.color;
-    ctx.font = 'bold 15px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-
-    const words = def.name.split(' ');
-    let abbr = '';
-    if (words.length > 1) {
-      abbr = words[0][0] + words[1][0];
+    // Fighter Preview Avatar inside card
+    const avatarX = itemX + cellW / 2;
+    const avatarY = itemY + cellH / 2 - 8;
+    const previewImg = getFighterPreview(idx);
+    if (previewImg) {
+      const avatarSize = cellW - 12;
+      ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
     } else {
-      abbr = words[0].substring(0, 3);
+      ctx.fillStyle = def.color;
+      ctx.beginPath();
+      ctx.arc(avatarX, avatarY, 16, 0, Math.PI * 2);
+      ctx.fill();
     }
 
-    // Draw fighter's color as a circle behind text
-    ctx.globalAlpha = selected ? 0.3 : 0.15;
-    ctx.beginPath();
-    ctx.arc(itemX + cellW / 2, itemY + cellH / 2 - 8, 16, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.globalAlpha = 1.0;
+    // Card Name Tag
+    ctx.fillStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.7)';
+    ctx.font = isSelected ? 'bold 10px Arial' : '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
 
-    ctx.fillText(abbr.toUpperCase(), itemX + cellW / 2, itemY + cellH / 2 - 8);
-
-    // Draw full name tiny at the bottom of the cell
-    ctx.fillStyle = selected ? '#fff' : '#aaa';
-    ctx.font = '9px Arial';
     let shortName = def.name;
-    if (shortName.length > 10) shortName = shortName.substring(0, 9) + '.';
-    ctx.fillText(shortName.toUpperCase(), itemX + cellW / 2, itemY + cellH - 12);
+    if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
+    ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 4);
+  });
 
-    _registerButton(itemX, itemY, cellW, cellH, () => {
-      modalInspectIndex = idx;
+  ctx.restore(); // end clipping region
+
+  // ── Register click buttons OUTSIDE clip (using visible bounds check) ──
+  modalAvailableFighters.forEach(({ def, idx }, gridPos) => {
+    const col = gridPos % cols;
+    const row = Math.floor(gridPos / cols);
+
+    const itemX = listX + col * (cellW + gap);
+    const itemY = listY + row * (cellH + gap) - modalGridScroll;
+
+    // Only register if mostly visible
+    if (itemY + cellH < listY + 10 || itemY > listY + gridVisibleH - 10) return;
+
+    _registerButton(itemX, Math.max(itemY, listY), cellW, Math.min(itemY + cellH, listY + gridVisibleH) - Math.max(itemY, listY), () => {
+      if (modalInspectIndex !== idx) {
+        modalInspectIndex = idx;
+      }
     });
   });
 
-  const detailX = listX + gridW + 24;
+  // ── Scroll indicators ──
+  if (modalGridScroll > 0) {
+    // Top fade / arrow
+    const fadeGrad = ctx.createLinearGradient(listX, listY, listX, listY + 18);
+    fadeGrad.addColorStop(0, 'rgba(10, 10, 20, 0.9)');
+    fadeGrad.addColorStop(1, 'rgba(10, 10, 20, 0)');
+    ctx.fillStyle = fadeGrad;
+    ctx.fillRect(listX, listY, gridW, 18);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('▲', listX + gridW / 2, listY + 8);
+  }
+  if (modalGridScroll < maxScroll) {
+    // Bottom fade / arrow
+    const fadeGrad = ctx.createLinearGradient(listX, listY + gridVisibleH - 18, listX, listY + gridVisibleH);
+    fadeGrad.addColorStop(0, 'rgba(10, 10, 20, 0)');
+    fadeGrad.addColorStop(1, 'rgba(10, 10, 20, 0.9)');
+    ctx.fillStyle = fadeGrad;
+    ctx.fillRect(listX, listY + gridVisibleH - 18, gridW, 18);
+
+    ctx.fillStyle = 'rgba(255,255,255,0.6)';
+    ctx.font = '10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('▼', listX + gridW / 2, listY + gridVisibleH - 8);
+  }
+
+  // ── Right Side: Champion Showcase Stage ──
+  const detailX = listX + gridW + 20;
   const detailW = modalW - (detailX - mx) - 24;
-  const detailY = my + 60;
-  const detailH = modalH - 130;
-  const selectedDef = FIGHTER_DEFS[modalInspectIndex];
+  const detailY = my + 68;
+  const detailH = modalH - 128;
 
-  drawPanel(detailX, detailY, detailW, detailH, 0.9, 12);
+  drawPanel(detailX, detailY, detailW, detailH, 0.88, 14);
 
-  // Fancy title background (taller to fit the model)
-  ctx.fillStyle = 'rgba(255,255,255,0.05)';
-  ctx.beginPath();
-  ctx.roundRect(detailX, detailY, detailW, 86, { tl: 12, tr: 12, bl: 0, br: 0 });
-  ctx.fill();
-
-  // Draw fighter model preview
+  // Live Stage Pulse Aura behind Preview Image
   const previewX = detailX + detailW / 2;
-  const previewY = detailY + 45;
+  const previewY = detailY + 58;
+  const now = performance.now() * 0.003;
+  const pulseR = 46 + Math.sin(now) * 4;
+
+  ctx.save();
+  ctx.globalAlpha = 0.25;
+  ctx.fillStyle = accentColor;
+  ctx.beginPath();
+  ctx.arc(previewX, previewY, pulseR, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Draw Champion Preview Image
   const previewImage = getFighterPreview(modalInspectIndex);
   if (previewImage) {
-    const previewSize = 80;
+    const previewSize = 86;
     ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
   }
 
-  // Fighter Name
-  ctx.fillStyle = selectedDef.color;
-  ctx.font = 'bold 17px Arial';
+  // Champion Name
+  ctx.fillStyle = accentColor;
+  ctx.font = '900 17px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 90);
+  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 114);
 
-  let textY = detailY + 100;
+  // Class Badge Pill
+  ctx.fillStyle = 'rgba(0,0,0,0.4)';
+  ctx.strokeStyle = accentColor;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(previewX - 55, detailY + 128, 110, 18, 9);
+  ctx.fill();
+  ctx.stroke();
 
-  ctx.fillStyle = '#aaa';
-  ctx.font = '11px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText(`CLASS: ${selectedDef.type.toUpperCase()}`, detailX + 16, textY);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 9px Arial';
+  ctx.fillText(selectedDef.type.toUpperCase(), previewX, detailY + 137);
+
+  // Stat Bars
+  let textY = detailY + 158;
+  const barW = detailW - 28;
+  const barX = detailX + 14;
+
+  drawStatBar(ctx, 'HP', selectedDef.hp, 150, barX, textY, barW, selectedDef.color);
+  textY += 18;
+  drawStatBar(ctx, 'DMG', selectedDef.damage, 60, barX, textY, barW, '#f9c846');
+  textY += 18;
+  drawStatBar(ctx, 'SPD', selectedDef.speed || 2, 4, barX, textY, barW, '#8ad4ff');
   textY += 24;
 
-  const barW = detailW - 32;
-  drawStatBar(ctx, 'HP', selectedDef.hp, 150, detailX + 16, textY, barW, selectedDef.color);
-  textY += 18;
-  drawStatBar(ctx, 'DMG', selectedDef.damage, 60, detailX + 16, textY, barW, '#f9c846');
-  textY += 18;
-  drawStatBar(ctx, 'RFR', Math.min(2, selectedDef.cooldown / 60), 2, detailX + 16, textY, barW, '#8ad4ff');
-  textY += 28;
-
+  // Ability Header
   ctx.fillStyle = '#ffd700';
-  ctx.font = 'bold 12px Arial';
-  ctx.fillText(selectedDef.ability.toUpperCase(), detailX + 16, textY);
-  textY += 18;
+  ctx.font = 'bold 11px Arial';
+  ctx.textAlign = 'left';
+  ctx.fillText(`ABILITY: ${selectedDef.ability.toUpperCase()}`, barX, textY);
+  textY += 16;
 
-  ctx.fillStyle = '#ccc';
-  ctx.font = '11px Arial';
+  // Ability Description
+  ctx.fillStyle = 'rgba(255,255,255,0.85)';
+  ctx.font = '10px Arial';
   ctx.textBaseline = 'top';
-  wrapText(ctx, selectedDef.desc, detailX + 16, textY, detailW - 32, 16);
+  wrapText(ctx, selectedDef.desc, barX, textY, barW, 14);
 
-  const footerY = my + modalH - 44;
-  drawButton('CANCEL', mx + modalW / 2 - 110, footerY, () => { selectingSlot = null; }, 120, 38);
-  drawButton('CONFIRM', mx + modalW / 2 + 110, footerY, () => {
+  // Footer Action Buttons
+  const footerY = my + modalH - 28;
+  const btnW = 120;
+  const btnH = 36;
+
+  drawButton('CANCEL', mx + 90, footerY, () => {
+    selectingSlot = null;
+  }, btnW, btnH);
+
+  drawButton('LOCK IN', mx + modalW - 90, footerY, () => {
     if (selectingSlot) {
       state[selectingSlot] = modalInspectIndex;
     }
     selectingSlot = null;
-  }, 120, 38);
+  }, btnW, btnH);
 }
 
 // ─────────────────────────────────────────────
@@ -1405,6 +1521,32 @@ export function drawWeaponDetailScreen() {
   }
   ctx.restore();
 
+  // Interactive Pagination for Multi-Weapon Fighters (Toji)
+  if (def.type === 'toji') {
+    state.tojiWeaponIndex = state.tojiWeaponIndex || 0;
+    const currentWeaponLabel = (state.tojiWeaponIndex === 0) 
+      ? '1/2: INVERTED SPEAR OF HEAVEN' 
+      : '2/2: SPLIT SOUL KATANA';
+
+    const pagY = canvas.height * 0.42;
+
+    // Pagination Dots & Label
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
+
+    // Left Arrow Button
+    drawButton('◄', canvas.width / 2 - 140, pagY - 7, () => {
+      state.tojiWeaponIndex = (state.tojiWeaponIndex === 0) ? 1 : 0;
+    }, 35, 26);
+
+    // Right Arrow Button
+    drawButton('►', canvas.width / 2 + 140, pagY - 7, () => {
+      state.tojiWeaponIndex = (state.tojiWeaponIndex === 0) ? 1 : 0;
+    }, 35, 26);
+  }
+
   // Glassmorphism Info Panel at the bottom
   const panelH = Math.min(280, canvas.height * 0.45);
   const panelY = canvas.height - panelH - 20;
@@ -1538,6 +1680,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'zeus' || type === 'darkslategray' || type === 'berserker' || type === 'bomber' || type === 'melee') offsetX = -35;
   else if (type === 'cronos') offsetX = -55; // Huge blade
   else if (type === 'ruby') offsetX = -75; // Massive scythe
+  else if (type === 'toji') offsetX = -40; // Inverted Spear
   
   ctx.translate(offsetX, 0);
 
@@ -1742,6 +1885,21 @@ function drawWeaponPreview(ctx, type, color) {
         // Draws the Master Bolt
         drawZeusWeapon(ctx, 0, 0, gunAngle, r, Date.now() / 200);
         return;
+
+      case 'toji': {
+        // Detail screen uses manual pagination index; Grid cards auto-cycle every 2.5 seconds
+        const isDetail = (state.gameState === 'weaponDetail');
+        const activeIndex = isDetail 
+          ? (state.tojiWeaponIndex || 0) 
+          : (Math.floor(Date.now() / 2500) % 2);
+        
+        if (activeIndex === 0) {
+          drawInvertedSpear(ctx, 0, 0, gunAngle, r);
+        } else {
+          drawSplitSoulKatana(ctx, 0, 0, gunAngle, r);
+        }
+        return;
+      }
 
       default:
         // Fallback: draw the default gray gun used by base fighters
@@ -2476,13 +2634,46 @@ function updateHealthHud() {
   const cardsRight = [];
   const cardsBottom = [];
 
-  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5 }) => {
+  const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
-    const glowAlpha = shakeTimer > 0 ? (shakeTimer / 12) * 0.85 : 0;
     const shakeStyle = shakeTimer > 0 ? `transform: translateX(${shakeAmount}px);` : '';
     // Winner effect - no glow
     const winnerStyle = '';
+
+    const getGlowStyles = (f) => {
+      if (!f) return { glowStyle: '', glowClass: '' };
+      if (f._lastHp === undefined) {
+        f._lastHp = f.hp;
+      } else {
+        const delta = f.hp - f._lastHp;
+        if (delta < -0.1) f._healthBarHitTimer = 14;
+        else if (delta > 0.1) f._healthBarHealTimer = 14;
+        f._lastHp = f.hp;
+      }
+      if (f._healthBarHitTimer > 0) f._healthBarHitTimer--;
+      if (f._healthBarHealTimer > 0) f._healthBarHealTimer--;
+
+      const hitTimer = f._healthBarHitTimer || 0;
+      const healTimer = f._healthBarHealTimer || 0;
+
+      if (hitTimer > 0) {
+        const alpha = (hitTimer / 14).toFixed(2);
+        const intensity = (1 + 0.35 * (hitTimer / 14)).toFixed(2);
+        return {
+          glowStyle: `box-shadow: 0 0 14px 2px rgba(255, 30, 30, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha}); filter: brightness(${intensity});`,
+          glowClass: ' hit-glow'
+        };
+      } else if (healTimer > 0) {
+        const alpha = (healTimer / 14).toFixed(2);
+        const intensity = (1 + 0.35 * (healTimer / 14)).toFixed(2);
+        return {
+          glowStyle: `box-shadow: 0 0 14px 2px rgba(34, 197, 94, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha}); filter: brightness(${intensity});`,
+          glowClass: ' heal-glow'
+        };
+      }
+      return { glowStyle: '', glowClass: '' };
+    };
 
     let barsHTML = '';
     if (members && members.length > 0) {
@@ -2490,12 +2681,13 @@ function updateHealthHud() {
         const ratio = m.maxHp > 0 ? Math.max(0, Number(m.hp) / Number(m.maxHp)) : 0;
         const percent = Math.round(ratio * 100);
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
-        const fillStyle = `width:${percent}%; background:${barColor};`;
+        const { glowStyle, glowClass } = getGlowStyles(m);
+        const fillStyle = `width:${percent}%; background:${barColor}; ${glowStyle}`;
         return `
           <div class="health-card__member" style="margin-top: 12px;">
             <div style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.95); font-weight: bold;">${m.name || 'Unknown'}</div>
-            <div class="health-card__bar">
-              <div class="health-card__fill" style="${fillStyle}"></div>
+            <div class="health-card__bar${glowClass}">
+              <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
             </div>
             <div class="health-card__meta"><span>HP</span><span>${Math.floor(Math.max(0, Number(m.hp) || 0))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}</span></div>
           </div>
@@ -2504,10 +2696,11 @@ function updateHealthHud() {
     } else {
       const percent = Math.round(safeRatio * 100);
       const barColor = safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444';
-      const fillStyle = `width:${percent}%; background:${barColor};`;
+      const { glowStyle, glowClass } = getGlowStyles(targetFighter);
+      const fillStyle = `width:${percent}%; background:${barColor}; ${glowStyle}`;
       barsHTML = `
-        <div class="health-card__bar">
-          <div class="health-card__fill" style="${fillStyle}"></div>
+        <div class="health-card__bar${glowClass}">
+          <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
         </div>
         <div class="health-card__meta"><span>${metaLabel}</span><span>${metaValue}</span></div>
       `;
@@ -2560,7 +2753,7 @@ function updateHealthHud() {
         shakeTimer,
         isWinner: isWinner,
         borderColor: isWinner ? '#ffd700' : null,
-        kills: members.flatMap(m => state.matchKills ? state.matchKills[fighters.indexOf(m)] || [] : [])
+        kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : [])
       });
       if (teamIndex === 0) cardsLeft.push(cardHTML);
       else cardsRight.push(cardHTML);
@@ -2612,7 +2805,8 @@ function updateHealthHud() {
         isWinner: fighter === state.roundWinner,
         description: cardDesc,
         kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
-        maxBullets: mode === GAME_MODES.STAND_OFF ? 0 : 2
+        maxBullets: mode === GAME_MODES.STAND_OFF ? 0 : 2,
+        targetFighter: fighter
       });
 
       if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.FFA || mode === 'TLFS') {

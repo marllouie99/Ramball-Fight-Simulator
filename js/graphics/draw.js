@@ -27,6 +27,8 @@ import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/goj
 import { drawArena, drawPurpleDimScreen } from './renderers/arenaRenderer.js';
 
 let _cachedTime = 0;
+let _sortedFightersBuffer = [];
+let _fugaLocalTrailPool = [];
 function getNow() {
   if (_cachedTime === 0) _cachedTime = Date.now();
   return _cachedTime;
@@ -140,6 +142,72 @@ export function drawFurnaceDimScreen() {
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+
+let currentRikaSummonDimOpacity = 0;
+
+/**
+ * Draws a dark purple/pink cursed energy dim screen overlay when Yuta calls or summons Rika.
+ */
+export function drawRikaSummonDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  // Find Yuta fighters calling for Rika or when Rika is expanding on summon
+  const yutaSummoning = state.fighters?.find(f =>
+    f && (f._def?.type === 'yuta' || f._def?.id === 'yuta' || f._def?.id === 23 || f._def?.name === 'Yuta') &&
+    (f.rikaCallTimer > 0 || (f.rika && f.rika.active && f.rika.spawnTimer > 0))
+  );
+
+  let targetOpacity = 0;
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  if (yutaSummoning) {
+    cx = yutaSummoning.x;
+    cy = yutaSummoning.y;
+    if (yutaSummoning.rikaCallTimer > 0) {
+      // Fade in smoothly as Yuta channels
+      const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 40;
+      const progress = 1.0 - (yutaSummoning.rikaCallTimer / maxCharge);
+      targetOpacity = 0.25 + progress * 0.50; // Up to 0.75 opacity
+    } else if (yutaSummoning.rika && yutaSummoning.rika.spawnTimer > 0) {
+      // Hold high dim while Rika expands/arises
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const progress = yutaSummoning.rika.spawnTimer / ariseMax;
+      targetOpacity = 0.75 * progress;
+    }
+  }
+
+  // Smooth interpolation for zero popping
+  currentRikaSummonDimOpacity += (targetOpacity - currentRikaSummonDimOpacity) * 0.15;
+  if (currentRikaSummonDimOpacity < 0.01) {
+    currentRikaSummonDimOpacity = 0;
+    return;
+  }
+
+  ctx.save();
+
+  // Dark Vignette Gradient centered on Yuta
+  const opacity = currentRikaSummonDimOpacity;
+  const maxR = Math.max(canvas.width, canvas.height) * 0.85;
+  const gradient = ctx.createRadialGradient(cx, cy, 30, cx, cy, maxR);
+  gradient.addColorStop(0, `rgba(20, 2, 30, ${opacity * 0.45})`);
+  gradient.addColorStop(0.4, `rgba(12, 0, 22, ${opacity * 0.75})`);
+  gradient.addColorStop(0.85, `rgba(5, 0, 10, ${opacity * 0.95})`);
+
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Pulsing Cursed Energy Ring around Yuta/Rika
+  ctx.globalCompositeOperation = 'screen';
+  ctx.beginPath();
+  const ringR = 85 + Math.sin(Date.now() * 0.01) * 15;
+  ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+  ctx.strokeStyle = `rgba(255, 20, 147, ${opacity * 0.45})`;
+  ctx.lineWidth = 14;
+  ctx.stroke();
 
   ctx.restore();
 }
@@ -151,7 +219,7 @@ export function drawFurnaceDimScreen() {
  * Conveys supernatural speed, unstoppable momentum, and immense magical power.
  */
 export function drawDivineFlameArrowConstruct(ctx, {
-  x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012
+  x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
 }) {
   if (progress <= 0) return;
 
@@ -166,13 +234,20 @@ export function drawDivineFlameArrowConstruct(ctx, {
   const headLen = 22 * progress;
   const headX = tipX - headLen;
 
-  // 1. OUTMOST THERMAL HEAT DISTORTION AURA
+  // 1. OUTMOST SPATIAL DISTORTION AURA
   const auraR = (42 + progress * 28);
   const auraGrad = ctx.createRadialGradient(tipX * 0.2, 0, 4, tipX * 0.1, 0, auraR * 2.0);
-  auraGrad.addColorStop(0, `rgba(255, 240, 160, ${0.5 * progress})`);
-  auraGrad.addColorStop(0.25, `rgba(255, 140, 0, ${0.35 * progress})`);
-  auraGrad.addColorStop(0.55, `rgba(200, 40, 0, ${0.18 * progress})`);
-  auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  if (isFrozenByInfinity) {
+    auraGrad.addColorStop(0, `rgba(224, 255, 255, ${0.65 * progress})`);
+    auraGrad.addColorStop(0.25, `rgba(0, 229, 255, ${0.45 * progress})`);
+    auraGrad.addColorStop(0.55, `rgba(0, 100, 255, ${0.25 * progress})`);
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  } else {
+    auraGrad.addColorStop(0, `rgba(255, 240, 160, ${0.5 * progress})`);
+    auraGrad.addColorStop(0.25, `rgba(255, 140, 0, ${0.35 * progress})`);
+    auraGrad.addColorStop(0.55, `rgba(200, 40, 0, ${0.18 * progress})`);
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  }
   ctx.fillStyle = auraGrad;
   ctx.beginPath();
   ctx.ellipse(tipX * 0.2, 0, auraR * 2.2, auraR * 1.2, 0, 0, Math.PI * 2);
@@ -225,26 +300,42 @@ export function drawDivineFlameArrowConstruct(ctx, {
     );
     ctx.closePath();
 
-    // Color cascade from white-hot (near arrow) to crimson (tips)
+    // Color cascade from white-hot to cyan/blue (if frozen) or crimson (if normal)
     const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
-    if (ratio < 0.3) {
-      // Near tip: white Î“Ã¥Ã† bright yellow core
-      tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
-      tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
-      tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
-      tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
-    } else if (ratio < 0.6) {
-      // Mid shaft: golden orange Î“Ã¥Ã† deep orange
-      tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
-      tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
-      tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
-      tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
+    if (isFrozenByInfinity) {
+      if (ratio < 0.3) {
+        tGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(224, 255, 255, ${0.8 * progress})`);
+        tGrad.addColorStop(0.6, `rgba(0, 229, 255, ${0.6 * progress})`);
+        tGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+      } else if (ratio < 0.6) {
+        tGrad.addColorStop(0, `rgba(0, 229, 255, ${0.85 * progress})`);
+        tGrad.addColorStop(0.35, `rgba(0, 160, 255, ${0.65 * progress})`);
+        tGrad.addColorStop(0.7, `rgba(0, 80, 220, ${0.4 * progress})`);
+        tGrad.addColorStop(1, 'rgba(0, 30, 150, 0)');
+      } else {
+        tGrad.addColorStop(0, `rgba(0, 180, 255, ${0.75 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(0, 100, 240, ${0.55 * progress})`);
+        tGrad.addColorStop(0.65, `rgba(0, 40, 180, ${0.3 * progress})`);
+        tGrad.addColorStop(1, 'rgba(0, 15, 100, 0)');
+      }
     } else {
-      // Rear: deep orange Î“Ã¥Ã† crimson red
-      tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
-      tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
-      tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
-      tGrad.addColorStop(1, 'rgba(80, 5, 0, 0)');
+      if (ratio < 0.3) {
+        tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
+        tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
+        tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+      } else if (ratio < 0.6) {
+        tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
+        tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
+        tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
+        tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
+      } else {
+        tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
+        tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
+        tGrad.addColorStop(1, 'rgba(80, 5, 0, 0)');
+      }
     }
     ctx.fillStyle = tGrad;
     ctx.fill();
@@ -1146,6 +1237,31 @@ export function drawProjectiles() {
     if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY) {
       return;
     }
+    // === GOJO LIMITLESS INFINITY: Spatial Distortion Barrier Ring for Frozen Projectiles ===
+    if (p.isFrozenByInfinity) {
+      const fadeAlpha = (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer < 30) ? Math.max(0, p.infinityFreezeTimer / 30) : 1.0;
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1.0) * fadeAlpha;
+      ctx.globalCompositeOperation = 'lighter';
+      const time = Date.now();
+
+      // Concentric Refraction Rings around frozen projectile (No solid filled cyan balls!)
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 12) + 6 + Math.sin(time * 0.01) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner White Core Ring
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 12) + 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
     if (p.isExplosion) {
       if (p.isGlassShard) {
         const lifeRatio = p.life / p.maxLife;
@@ -1522,19 +1638,19 @@ export function drawProjectiles() {
       ctx.lineWidth = 3;
       ctx.stroke();
 
-      // Vivid crimson inner crescent fill
+      // Vivid inner crescent fill (Electric Cyan if frozen by Limitless, Crimson if normal)
       ctx.save();
       ctx.scale(0.85, 0.85);
       ctx.beginPath();
       ctx.arc(0, 0, r, -Math.PI * 0.52, Math.PI * 0.52, false);
       ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.48, -Math.PI * 0.48, true);
       ctx.closePath();
-      ctx.fillStyle = `rgba(220, 10, 10, ${0.95 * lifeRatio})`;
+      ctx.fillStyle = p.isFrozenByInfinity ? `rgba(0, 229, 255, ${0.95 * lifeRatio})` : `rgba(220, 10, 10, ${0.95 * lifeRatio})`;
       ctx.fill();
       ctx.restore();
 
-      // Razor-sharp white crescent core line
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.98 * lifeRatio})`;
+      // Razor-sharp white/cyan crescent core line
+      ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 255, 255, ${0.98 * lifeRatio})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
@@ -1566,8 +1682,8 @@ export function drawProjectiles() {
       ctx.shadowOffsetX = 3;
       ctx.shadowOffsetY = 3;
       
-      // Crimson glow effect (outer blur)
-      ctx.shadowColor = 'rgba(180, 30, 30, 0.8)';
+      // Glow effect (Electric Cyan blur if frozen by Limitless, Crimson blur if normal)
+      ctx.shadowColor = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.9)' : 'rgba(180, 30, 30, 0.8)';
       ctx.shadowBlur = 15;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
@@ -1584,24 +1700,24 @@ export function drawProjectiles() {
         ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
         ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(255, 100, 100, 1)';
+        ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.8)' : 'rgba(255, 100, 100, 1)';
         ctx.fill();
         ctx.restore();
       }
       
-      // Main ghost blade - crescent moon shape
-      ctx.globalAlpha = 0.7 * lifeRatio;
+      // Main ghost blade - crescent moon shape (Electric Cyan if frozen by Limitless)
+      ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
       ctx.beginPath();
       ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
       ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
       ctx.closePath();
-      ctx.fillStyle = 'rgba(255, 180, 180, 1)';
+      ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.95)' : 'rgba(255, 180, 180, 1)';
       ctx.fill();
       
       // Sharp outer crescent edge
-      ctx.strokeStyle = `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
+      ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.95 * lifeRatio})` : `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
       ctx.lineWidth = 2;
-      ctx.shadowColor = 'rgba(255, 100, 100, 0.9)';
+      ctx.shadowColor = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.9)' : 'rgba(255, 100, 100, 0.9)';
       ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.98, -Math.PI * 0.58, Math.PI * 0.58, false);
@@ -1613,7 +1729,7 @@ export function drawProjectiles() {
       ctx.stroke();
       
       // Thin bright center line
-      ctx.strokeStyle = `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
+      ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(255, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
       ctx.lineWidth = 1;
       ctx.shadowBlur = 5;
       ctx.beginPath();
@@ -1688,7 +1804,7 @@ export function drawProjectiles() {
       const maxTrailLen = 48;
       while (p._trailHistory.length > maxTrailLen) p._trailHistory.shift();
 
-      // â”€â”€ SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched â”€â”€
+      // ─── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched ───
       for (let i = 0; i < 3; i++) {
         const spawnOffset = -Math.random() * 20;
         p.flameParticles.push({
@@ -1708,7 +1824,7 @@ export function drawProjectiles() {
         });
       }
 
-      // â”€â”€ SPAWN EMBERS: Glowing sparks that dissolve at trail end â”€â”€
+      // ─── SPAWN EMBERS: Glowing sparks that dissolve at trail end ───
       if (Math.random() < 0.85) {
         p.emberParticles.push({
           x: 5 - Math.random() * 25,
@@ -1731,11 +1847,11 @@ export function drawProjectiles() {
       ctx.translate(p.x, p.y);
       ctx.rotate(angle);
 
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // ─────────────────────────────────────────────────────────
       // LAYER 0: LONG TURBULENT FIRE WAKE (drawn from trail history)
       // A massive streaking energy wake that makes the arrow look
       // like it's ripping through the air and igniting everything
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // ─────────────────────────────────────────────────────────
       if (p._trailHistory.length > 3) {
         ctx.save();
         ctx.globalCompositeOperation = 'lighter';
@@ -1743,11 +1859,18 @@ export function drawProjectiles() {
         // Convert trail history to local coordinates
         const cosA = Math.cos(-angle);
         const sinA = Math.sin(-angle);
-        const localTrail = p._trailHistory.map(pt => {
+        if (!_fugaLocalTrailPool || _fugaLocalTrailPool.length < p._trailHistory.length) {
+          _fugaLocalTrailPool = [];
+          for (let k = 0; k < 60; k++) _fugaLocalTrailPool.push({ x: 0, y: 0 });
+        }
+        const localTrail = _fugaLocalTrailPool;
+        for (let k = 0; k < p._trailHistory.length; k++) {
+          const pt = p._trailHistory[k];
           const dx = pt.x - p.x;
           const dy = pt.y - p.y;
-          return { x: dx * cosA - dy * sinA, y: dx * sinA + dy * cosA };
-        });
+          localTrail[k].x = dx * cosA - dy * sinA;
+          localTrail[k].y = dx * sinA + dy * cosA;
+        }
 
         // Draw multiple layered turbulent fire tongues along the trail
         for (let layer = 0; layer < 3; layer++) {
@@ -1785,24 +1908,40 @@ export function drawProjectiles() {
           const trailEndX = localTrail[0].x;
           const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
 
-          if (layer === 0) {
-            // Outermost: crimson â†’ deep orange fade
-            wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
-            wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
-            wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
-            wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
-          } else if (layer === 1) {
-            // Middle: golden orange â†’ deep orange
-            wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
-            wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
-            wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
-            wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
+          if (p.isFrozenByInfinity) {
+            if (layer === 0) {
+              wakeGrad.addColorStop(0, `rgba(0, 120, 255, ${0.40})`);
+              wakeGrad.addColorStop(0.3, `rgba(0, 80, 220, ${0.30})`);
+              wakeGrad.addColorStop(0.7, `rgba(0, 40, 180, ${0.15})`);
+              wakeGrad.addColorStop(1, 'rgba(0, 10, 80, 0)');
+            } else if (layer === 1) {
+              wakeGrad.addColorStop(0, `rgba(0, 229, 255, ${0.60})`);
+              wakeGrad.addColorStop(0.25, `rgba(0, 160, 255, ${0.45})`);
+              wakeGrad.addColorStop(0.6, `rgba(0, 90, 220, ${0.25})`);
+              wakeGrad.addColorStop(1, 'rgba(0, 20, 100, 0)');
+            } else {
+              wakeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85})`);
+              wakeGrad.addColorStop(0.15, `rgba(224, 255, 255, ${0.70})`);
+              wakeGrad.addColorStop(0.4, `rgba(0, 229, 255, ${0.50})`);
+              wakeGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+            }
           } else {
-            // Innermost core: white â†’ bright yellow
-            wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
-            wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
-            wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
-            wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
+            if (layer === 0) {
+              wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
+              wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
+              wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
+              wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
+            } else if (layer === 1) {
+              wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
+              wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
+              wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
+              wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
+            } else {
+              wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
+              wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
+              wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
+              wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
+            }
           }
 
           ctx.fillStyle = wakeGrad;
@@ -1840,11 +1979,19 @@ export function drawProjectiles() {
         const stretchX = curSize * (1.6 + speed * 0.03);
         const stretchY = curSize * (0.7 + ageRatio * 0.3);
 
-        ctx.fillStyle = fp.layer === 0
-          ? `rgba(255, 245, 180, ${alpha * 0.75})`
-          : fp.layer === 1
-          ? `rgba(255, 140, 20, ${alpha * 0.55})`
-          : `rgba(220, 40, 0, ${alpha * 0.35})`;
+        if (p.isFrozenByInfinity) {
+          ctx.fillStyle = fp.layer === 0
+            ? `rgba(255, 255, 255, ${alpha * 0.85})`
+            : fp.layer === 1
+            ? `rgba(0, 229, 255, ${alpha * 0.65})`
+            : `rgba(0, 120, 255, ${alpha * 0.45})`;
+        } else {
+          ctx.fillStyle = fp.layer === 0
+            ? `rgba(255, 245, 180, ${alpha * 0.75})`
+            : fp.layer === 1
+            ? `rgba(255, 140, 20, ${alpha * 0.55})`
+            : `rgba(220, 40, 0, ${alpha * 0.35})`;
+        }
         ctx.beginPath();
         ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
         ctx.fill();
@@ -1870,7 +2017,9 @@ export function drawProjectiles() {
           ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
           for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
           ctx.lineTo(ep.x, ep.y);
-          ctx.strokeStyle = `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
+          ctx.strokeStyle = p.isFrozenByInfinity
+            ? `rgba(0, 229, 255, ${prog * 0.7})`
+            : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
           ctx.lineWidth = ep.size * 0.7;
           ctx.lineCap = 'round';
           ctx.stroke();
@@ -1879,7 +2028,9 @@ export function drawProjectiles() {
         // Bright ember head
         ctx.beginPath();
         ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
+        ctx.fillStyle = p.isFrozenByInfinity
+          ? `rgba(224, 255, 255, ${prog})`
+          : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
         ctx.fill();
       }
 
@@ -1891,7 +2042,7 @@ export function drawProjectiles() {
       // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
       ctx.save();
       ctx.globalAlpha = 0.35;
-      ctx.strokeStyle = 'rgba(255, 200, 100, 0.4)';
+      ctx.strokeStyle = p.isFrozenByInfinity ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 200, 100, 0.4)';
       ctx.lineWidth = 1.0;
       ctx.lineCap = 'round';
       for (let i = 0; i < 5; i++) {
@@ -1907,7 +2058,7 @@ export function drawProjectiles() {
 
       ctx.restore(); // restore translate/rotate
 
-      // Draw main Volcanic Magma Flame Arrow construct on top
+      // Draw main Volcanic Magma / Electric Cyan Flame Arrow construct on top
       drawDivineFlameArrowConstruct(ctx, {
         x: p.x,
         y: p.y,
@@ -1915,7 +2066,8 @@ export function drawProjectiles() {
         scale: 1.0,
         progress: 1.0,
         isFlying: true,
-        time
+        time,
+        isFrozenByInfinity: p.isFrozenByInfinity
       });
 
       return;
@@ -2314,7 +2466,15 @@ export function drawFighters() {
 
   // Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
   // Exception: Fighters with an active domain expansion are forced to draw last (on top of everyone).
-  const sortedFighters = [...fighters].map((f, i) => ({f, i})).sort((a, b) => {
+  if (!_sortedFightersBuffer || _sortedFightersBuffer.length !== fighters.length) {
+    _sortedFightersBuffer = new Array(fighters.length);
+    for (let i = 0; i < fighters.length; i++) _sortedFightersBuffer[i] = { f: null, i: 0 };
+  }
+  for (let i = 0; i < fighters.length; i++) {
+    _sortedFightersBuffer[i].f = fighters[i];
+    _sortedFightersBuffer[i].i = i;
+  }
+  _sortedFightersBuffer.sort((a, b) => {
     if (!a.f) return -1;
     if (!b.f) return 1;
 
@@ -2327,7 +2487,7 @@ export function drawFighters() {
     return a.f.y - b.f.y;
   });
 
-  sortedFighters.forEach((item) => {
+  _sortedFightersBuffer.forEach((item) => {
     const fighter = item.f;
     const fi = item.i;
     if (!fighter || fighter.hp <= 0) return;
@@ -2342,6 +2502,7 @@ export function drawFighters() {
   // Draw time-stop visual effect (Cronos passive/sphere effect)
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || !fighter.timeStopTimer) return;
+    if (fighter._def?.type === 'sukuna' || fighter._def?.id === 'sukuna' || fighter._def?.name === 'Sukuna') return;
 
     // Draw cyan glowing stasis effect
     ctx.save();
@@ -2858,8 +3019,6 @@ export function drawThermobaricExplosions(ctx) {
       const vLen = R * (0.25 + (exp.seed || 0.5) * 0.2);
       ctx.strokeStyle = `rgba(255, 80, 0, ${0.7 * craterAlpha})`;
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = '#FF4500';
-      ctx.shadowBlur = 6;
       ctx.beginPath();
       ctx.moveTo(0, 0);
       const cp1x = Math.cos(va + 0.3) * vLen * 0.4;
@@ -2871,18 +3030,14 @@ export function drawThermobaricExplosions(ctx) {
       ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, evx, evy);
       ctx.stroke();
     }
-    ctx.shadowBlur = 0;
     ctx.restore();
 
     ctx.save();
     ctx.globalAlpha = craterAlpha * 0.35;
     ctx.strokeStyle = `rgba(120, 40, 0, ${craterAlpha * 0.5})`;
     ctx.lineWidth = 2.5;
-    ctx.shadowColor = '#FF6600';
-    ctx.shadowBlur = 8;
     drawWobblyEllipse(R * 0.78, R * 0.56, 1.0);
     ctx.stroke();
-    ctx.shadowBlur = 0;
     ctx.restore();
 
     ctx.restore();
@@ -2898,8 +3053,6 @@ export function drawThermobaricExplosions(ctx) {
         ctx.lineWidth = (crack.width + 3) * craterAlpha;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
-        ctx.shadowColor = '#FF4500';
-        ctx.shadowBlur = 10 * craterAlpha;
         ctx.beginPath();
         ctx.moveTo(pts[0].x, pts[0].y);
         for (let p = 1; p < pts.length; p++) {
@@ -2971,8 +3124,7 @@ export function drawThermobaricExplosions(ctx) {
         ctx.restore();
       }
 
-      ctx.shadowColor = '#FF0000';
-      ctx.shadowBlur = 18 * expAlpha;
+      ctx.globalCompositeOperation = 'lighter';
       ctx.lineWidth = 24 * (1 - explosionProgress);
       ctx.strokeStyle = `rgba(180, 10, 0, ${0.85 * expAlpha})`;
       ctx.beginPath();
@@ -2981,8 +3133,6 @@ export function drawThermobaricExplosions(ctx) {
 
       ctx.lineWidth = 14 * (1 - explosionProgress);
       ctx.strokeStyle = `rgba(255, 140, 0, ${0.9 * expAlpha})`;
-      ctx.shadowColor = '#FF8C00';
-      ctx.shadowBlur = 12 * expAlpha;
       ctx.beginPath();
       ctx.arc(0, 0, radius * 0.82, 0, Math.PI * 2);
       ctx.stroke();

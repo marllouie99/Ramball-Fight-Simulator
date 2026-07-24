@@ -183,8 +183,29 @@ export const BASIC_ATTACK_SOUNDS = {
   zeus: {
     src: 'Assets/Sound Effects/Attacks/thunderstike.mp3',
     volume: 0.65,
-    delay: 0,
+    delay: -0.10,
     pitchVariation: 0.15
+  },
+
+  // ── Sukuna (ID 22) ───────────────────
+  22: {
+    src: ['Assets/Sound Effects/Attacks/swordswing.mp3', 'Assets/Sound Effects/Skills/backstab.mp3'],
+    volume: 0.6,
+    delay: 0,
+  },
+
+  // ── Yuta (ID 23) ─────────────────────
+  23: {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.7,
+    delay: 0,
+  },
+
+  // ── Gojo (ID 21) ─────────────────────
+  21: {
+    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    volume: 0.6,
+    delay: 0,
   }
 };
 
@@ -194,7 +215,7 @@ export const BASIC_ATTACK_SOUNDS = {
  * This is checked as a fallback when BASIC_ATTACK_SOUNDS[id] has no entry.
  */
 export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
-  // Engineer � high-rate-of-fire automatic weapon
+  // Engineer — high-rate-of-fire automatic weapon
   'Engineer': {
     src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
     volume: 0.45,
@@ -207,8 +228,8 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     delay: 0,
   },
   'gojo_melee': {
-    src: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-    volume: 0.8,
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.8,
     delay: 0,
   },
   // Zeus — chain lightning attack
@@ -224,10 +245,15 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.7,
     delay: 0,
   },
-  // Sukuna — Dismantle invisible slashes
+  // Sukuna — Dismantle slashes & Melee punches
   'sukuna': {
-    src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
-    volume: 0.5,
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.6,
+    delay: 0,
+  },
+  'sukuna_melee': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 0.8,
     delay: 0,
   },
 };

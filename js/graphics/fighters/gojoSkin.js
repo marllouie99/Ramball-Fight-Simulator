@@ -34,65 +34,65 @@ export function drawGojoBody(ctx, fighter) {
     // Avatar is drawn statically facing forward (upright)
     // No rotation so he always faces the player's POV
 
-    // Enhanced Limitless (Infinity) Spatial Distortion Barrier
+    // === ENHANCED GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER ===
     if (fighter.infinityActive || fighter.infinityCooldown <= 0) {
       const time = Date.now();
       ctx.save();
-      
-      // 1. Outer Spatial Refraction Aura
-      const infinityR = fighter.r + 14 + Math.sin(time * 0.004) * 3;
-      ctx.shadowBlur = 18;
-      ctx.shadowColor = '#00FFFF';
+      ctx.globalCompositeOperation = 'lighter';
 
-      const auraGrad = ctx.createRadialGradient(0, 0, fighter.r * 0.5, 0, 0, infinityR);
-      auraGrad.addColorStop(0, 'rgba(224, 255, 255, 0.05)');
-      auraGrad.addColorStop(0.6, 'rgba(180, 245, 255, 0.20)');
-      auraGrad.addColorStop(1, 'rgba(0, 230, 255, 0.40)');
+      const infinityR = fighter.r + 30;
+      const pulse = Math.sin(time * 0.005) * 2;
+      const barrierRadius = infinityR + pulse;
 
-      ctx.fillStyle = auraGrad;
+      // 1. Crisp Spatial Refraction Barrier Ring (No solid filled cyan ball!)
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.arc(0, 0, infinityR, 0, Math.PI * 2);
-      ctx.fill();
-
-      // 2. Concentric Refraction Rings (Infinite division of space)
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = 'rgba(224, 255, 255, 0.75)';
-      ctx.lineWidth = 1.4;
-      ctx.beginPath();
-      ctx.arc(0, 0, infinityR, 0, Math.PI * 2);
+      ctx.arc(0, 0, barrierRadius, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(0, 220, 255, 0.40)';
-      ctx.lineWidth = 0.9;
+      // 3. Inner White Core Barrier Ring
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(0, 0, infinityR * 0.85, 0, Math.PI * 2);
+      ctx.arc(0, 0, barrierRadius - 3, 0, Math.PI * 2);
       ctx.stroke();
+
+      // 4. Rotating Infinity Spatial Distortion Arcs (Infinite division of space)
+      const rot1 = time * 0.002;
+      ctx.strokeStyle = 'rgba(224, 255, 255, 0.65)';
+      ctx.lineWidth = 1.5;
+      for (let a = 0; a < 3; a++) {
+        const startA = rot1 + a * (Math.PI * 2 / 3);
+        ctx.beginPath();
+        ctx.arc(0, 0, barrierRadius - 1, startA, startA + Math.PI * 0.4);
+        ctx.stroke();
+      }
 
       ctx.restore();
     }
 
-    // Active Infinity Block Shield Flash & Spatial Ripple
+    // === ACTIVE INFINITY BLOCK SHIELD FLASH & RIPPLE ===
     if (fighter.infinityBlockTimer > 0) {
       const blockProg = 1 - (fighter.infinityBlockTimer / (fighter.infinityBlockMaxTimer || 25));
       const alpha = Math.sin((1 - blockProg) * Math.PI);
-      const rippleR = (fighter.r + 10) + blockProg * 35;
+      const rippleR = (fighter.r + 15) + blockProg * 40;
 
       ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
       ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-      ctx.shadowBlur = 25;
-      ctx.shadowColor = '#E0FFFF';
 
-      // Spatial Flash Shield
-      ctx.beginPath();
-      ctx.arc(0, 0, rippleR, 0, Math.PI * 2);
+      // Concentric Expanding Infinity Shockwaves
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 4.5 * (1 - blockProg);
+      ctx.beginPath();
+      ctx.arc(0, 0, rippleR, 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.beginPath();
-      ctx.arc(0, 0, rippleR * 0.8, 0, Math.PI * 2);
       ctx.strokeStyle = '#00E5FF';
-      ctx.lineWidth = 2.5 * (1 - blockProg);
+      ctx.lineWidth = 3.0 * (1 - blockProg);
+      ctx.beginPath();
+      ctx.arc(0, 0, rippleR * 0.85, 0, Math.PI * 2);
       ctx.stroke();
 
       ctx.restore();

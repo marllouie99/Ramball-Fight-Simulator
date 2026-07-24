@@ -8,6 +8,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../g
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { renderSukunaDomainBackground, renderSukunaDomainForeground } from './sukuna/sukunaDomainVisuals.js';
+import { drawSukunaBody } from '../../graphics/fighters/sukunaSkin.js';
 
 export class SukunaFighter extends Fighter {
   constructor(def) {
@@ -23,10 +24,10 @@ export class SukunaFighter extends Fighter {
     // Martial Arts combo counter for close distance basic attack
     this.martialArtsComboCount = 0;
 
-    // Gojo-style Melee Combat Mode
-    this.isMeleeMode = false;
-    this.forcedMeleeTimer = 0;
-    this.wasForcedMelee = false;
+    // Gojo-style Melee Combat Mode - Start round in Melee Mode for Epic Intro Clash!
+    this.isMeleeMode = true;
+    this.forcedMeleeTimer = 180;
+    this.wasForcedMelee = true;
     this.meleeModeCooldown = 0;
     this.meleeComboCount = 0;
     this.meleeComboTarget = 0;
@@ -43,6 +44,7 @@ export class SukunaFighter extends Fighter {
     this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000; // Delay initial cast reads from CONFIG
     this.domainActive = false;
     this.isChannelingDomainExpansion = false;
+    this._hasPlayedDomainChannelSound = false;
     this.domainChargeTimer = 0;
     this.domainChargeMax = CONFIG.sukuna.domainChargeMax || 90; // 1.5 seconds channel
     this.domainUseCount = 0; // Allows domain to be cast up to 2 times per round
@@ -88,9 +90,10 @@ export class SukunaFighter extends Fighter {
     this.reverseCursedTechniqueTriggered = false;
     this.martialArtsComboCount = 0;
 
-    this.isMeleeMode = false;
-    this.forcedMeleeTimer = 0;
-    this.wasForcedMelee = false;
+    // Start round in Melee Mode for Epic Intro Clash!
+    this.isMeleeMode = true;
+    this.forcedMeleeTimer = CONFIG.sukuna.forcedMeleeIntroDuration ?? 180;
+    this.wasForcedMelee = true;
     this.meleeModeCooldown = 0;
     this.meleeComboCount = 0;
     this.meleeComboTarget = 0;
@@ -104,6 +107,7 @@ export class SukunaFighter extends Fighter {
 
     this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000;
     this.isChannelingDomainExpansion = false;
+    this._hasPlayedDomainChannelSound = false;
     this.domainChargeTimer = 0;
     this.domainActive = false;
     this.domainTimer = 0;
@@ -130,6 +134,15 @@ export class SukunaFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready)
+    if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
+    const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
+    if (this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+      this._executeTeleportDodge(attacker, CONFIG.arena);
+      this.dodgeCooldown = CONFIG.sukuna.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
+      return false; // Negate damage
+    }
+
     const result = super.takeDamage(amount, attacker, opts);
 
     // Check for Reverse Cursed Technique trigger on fatal hit or low HP
@@ -144,6 +157,62 @@ export class SukunaFighter extends Fighter {
     }
 
     return result;
+  }
+
+  _spawnTeleportAfterimages(oldX, oldY, targetX, targetY) {
+    if (!this.afterImages) this.afterImages = [];
+    const dx = targetX - oldX;
+    const dy = targetY - oldY;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 1) return;
+
+    const pathAngle = Math.atan2(dy, dx);
+    const facingAngle = this.gunAngle !== undefined ? this.gunAngle : pathAngle;
+    const steps = Math.max(4, Math.floor(dist / 12));
+    for (let i = 0; i <= steps; i++) {
+      const t = i / steps;
+      const maxTimer = 24 - Math.floor(t * 6);
+      this.afterImages.push({
+        x: oldX + dx * t,
+        y: oldY + dy * t,
+        angle: facingAngle,
+        timer: maxTimer,
+        maxTimer: maxTimer,
+        fromX: oldX,
+        fromY: oldY,
+        toX: targetX,
+        toY: targetY
+      });
+    }
+  }
+
+  _executeTeleportDodge(attacker, arena) {
+    if (this.isDead) return;
+    const oldX = this.x;
+    const oldY = this.y;
+
+    // Determine dodge direction (sideways/flank relative to attacker)
+    const angle = attacker ? (Math.atan2(this.y - attacker.y, this.x - attacker.x) + (Math.random() < 0.5 ? 1.2 : -1.2)) : (Math.random() * Math.PI * 2);
+    const dist = (CONFIG.sukuna.teleportDodgeDistance ?? 85) + Math.random() * 20;
+
+    let targetX = this.x + Math.cos(angle) * dist;
+    let targetY = this.y + Math.sin(angle) * dist;
+
+    if (arena) {
+      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+    }
+
+    this.x = targetX;
+    this.y = targetY;
+
+    // Visuals: Floating text, crimson afterimage & teleport flashes
+    spawnFloatingText(oldX, oldY - this.r - 10, 'EVADE!', '#FF2400');
+    spawnImpactFlash(oldX, oldY, 22, 'crimsonSniper');
+    spawnImpactFlash(this.x, this.y, 22, 'crimsonSniper');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+
+    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
   }
 
   shoot(ownerIndex) {
@@ -209,10 +278,6 @@ export class SukunaFighter extends Fighter {
     const dismantleAngle = Math.atan2(closestEnemy.y - this.y, closestEnemy.x - this.x);
     closestEnemy.vx += Math.cos(dismantleAngle) * 3;
     closestEnemy.vy += Math.sin(dismantleAngle) * 3;
-
-    const sound = getBasicAttackSound(this._def?.id, this._def?.type);
-    this._attackSoundTimer = sound?.delay ?? 0;
-    this._attackSoundConfig = sound;
   }
 
   update(opponent, ownerIndex, arena) {
@@ -251,7 +316,22 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    if (this._handleTimeStop()) return;
+    if (this._handleTimeStop()) {
+      // Cancel active skill channels if paralyzed / time-stopped by Unlimited Void
+      if (this.isChannelingDomainExpansion) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+      }
+      if (this.isChannelingDivineFlame) {
+        this.isChannelingDivineFlame = false;
+        this.divineFlameChargeTimer = 0;
+        if (this.fugaSoundKey) {
+          stopLoopingSound(this.fugaSoundKey);
+          this.fugaSoundKey = null;
+        }
+      }
+      return;
+    }
 
     // Update Sakuga impact frame timer
     if (this.sakugaImpactTimer > 0) {
@@ -293,6 +373,15 @@ export class SukunaFighter extends Fighter {
       }
     }
 
+    // Update teleport afterimages
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        if (--this.afterImages[i].timer <= 0) {
+          this.afterImages.splice(i, 1);
+        }
+      }
+    }
+
     // Melee mode state management (Gojo-style forced close combat)
     let distToOpponent = Infinity;
     if (opponent && !opponent.isDead) {
@@ -300,17 +389,22 @@ export class SukunaFighter extends Fighter {
     }
 
     // Switch modes dynamically based on distance (only when not in special states)
-    if (!this.isChannelingDivineFlame && !this.domainActive && this.flurryHitsLeft <= 0 && this.rapidSlashHitsLeft <= 0) {
-      if (distToOpponent <= 140) {
+    if (!this.isChannelingDivineFlame && !this.domainActive && (this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0) {
+      if (this.meleeModeCooldown > 0) {
+        // In mandatory ranged separation period after combo finisher
+        this.isMeleeMode = false;
+      } else if (distToOpponent <= 160) {
         if (!this.isMeleeMode) {
-          // Just entered melee range
           this.isMeleeMode = true;
           this.meleeComboCount = 0;
         }
-      } else if (distToOpponent > 200 || this.meleeComboCount === 0) {
+      } else if (distToOpponent > 220) {
         if (this.isMeleeMode) {
-          // Left melee range (with hysteresis to finish combos)
           this.isMeleeMode = false;
+          this.meleeModeCooldown = 240;
+          if (opponent && !opponent.isDead) {
+            this._teleportAwayFrom(opponent, arena);
+          }
         }
       }
     }
@@ -318,6 +412,16 @@ export class SukunaFighter extends Fighter {
     if (this.meleePunchCooldown > 0) this.meleePunchCooldown--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
+    if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+
+    // Update afterimages (fades afterimages during melee, dodge & flurry)
+    if (this.afterImages && this.afterImages.length > 0) {
+      for (let i = this.afterImages.length - 1; i >= 0; i--) {
+        if (--this.afterImages[i].timer <= 0) {
+          this.afterImages.splice(i, 1);
+        }
+      }
+    }
 
     // Smooth fade IN & fade OUT for Cursed Energy aura in hand-to-hand combat mode & flurry
     let inMeleeCombatMode = false;
@@ -363,9 +467,9 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Track opponent while channeling
+      // Track opponent while channeling (sluggish delayed reaction time if stealthed)
       if (opponent && !opponent.isDead) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.aim(opponent);
       }
 
       if (this.divineFlameChargeTimer >= this.divineFlameChargeMax) {
@@ -378,6 +482,12 @@ export class SukunaFighter extends Fighter {
 
     // Handle Domain Expansion Channeling
     if (this.isChannelingDomainExpansion) {
+      if ((this.silenceTimer || 0) > 0) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+        this.domainCooldown = CONFIG.sukuna?.domainCooldown || 1500;
+        return;
+      }
       this.domainChargeTimer++;
 
       // Stop all movement while channeling
@@ -385,9 +495,9 @@ export class SukunaFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Track opponent while channeling
+      // Track opponent while channeling (sluggish delayed reaction time if stealthed)
       if (opponent && !opponent.isDead) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.aim(opponent);
       }
 
       // ====================================================================
@@ -419,7 +529,7 @@ export class SukunaFighter extends Fighter {
       this.applyMovementPhysics(0);
 
       if (opponent && !opponent.isDead) {
-        this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        this.aim(opponent);
       }
 
       this.resolveWallBounce(arena);
@@ -458,11 +568,10 @@ export class SukunaFighter extends Fighter {
             this.y = this.flurryTarget.y + Math.sin(escapeAngle) * escapeDist;
 
             // Make sure he aims perfectly back at the target
-            this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+            this.aim(this.flurryTarget);
 
             // Spawn some visual flare for the teleport
-            if (!this.afterImages) this.afterImages = [];
-            this.afterImages.push({ x: oldX, y: oldY, timer: 8 });
+            this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
             spawnImpactFlash(oldX, oldY, 15, 'crimsonSniper');
             spawnImpactFlash(this.x, this.y, 20, 'crimsonSniper');
 
@@ -528,8 +637,7 @@ export class SukunaFighter extends Fighter {
           this.y = this.flurryTarget.y + Math.sin(angle) * dist;
 
           // Spawn afterimages along the teleport path
-          if (!this.afterImages) this.afterImages = [];
-          this.afterImages.push({ x: oldX, y: oldY, timer: 8 });
+          this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
           spawnImpactFlash(oldX, oldY, 15, 'crimsonSniper');
           spawnImpactFlash(this.x, this.y, 20, 'crimsonSniper');
@@ -600,13 +708,16 @@ export class SukunaFighter extends Fighter {
 
       if (this.rapidSlashTimer <= 0) {
         if (projectileSystem && this.flurryTarget && !this.flurryTarget.isDead) {
-          this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
-          const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
+          // Direct aim calculation to target (overriding stealth aim penalty during flurry combo!)
+          const directAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+          const slashAngle = directAngle + (Math.random() - 0.5) * 0.45; // Dynamic multi-angle arc variance per strike!
+          this.gunAngle = directAngle;
 
+          const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
           const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
           const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
 
-          // Fire one ghost blade slash at the target
+          // Fire one ghost blade slash directly along the multi-directional slashAngle
           projectileSystem.fireProjectile(
             this,
             ownerIndex,
@@ -617,7 +728,7 @@ export class SukunaFighter extends Fighter {
             'ghostBlade',
             this.x,
             this.y,
-            this.gunAngle
+            slashAngle
           );
 
           spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
@@ -637,7 +748,7 @@ export class SukunaFighter extends Fighter {
           this.slashHitVisuals.push({
             x: this.flurryTarget.x,
             y: this.flurryTarget.y,
-            angle: this.gunAngle,
+            angle: slashAngle,
             timer: 12,
             maxTimer: 12,
             scale: 1.0 + Math.random() * 0.3
@@ -661,23 +772,25 @@ export class SukunaFighter extends Fighter {
             const oldX = this.x;
             const oldY = this.y;
 
-            // Teleport to a small random position around current location
+            // Teleport to a dynamic surrounding position around the target so slashes unleash from all 360° directions!
             const teleportAngle = Math.random() * Math.PI * 2;
-            const teleportDist = 20 + Math.random() * 30; // 20-50 pixels away (small hop)
-            this.x = this.x + Math.cos(teleportAngle) * teleportDist;
-            this.y = this.y + Math.sin(teleportAngle) * teleportDist;
+            const targetRadius = this.flurryTarget.r || 20;
+            const teleportDist = targetRadius + this.r + 25 + Math.random() * 40;
+            this.x = this.flurryTarget.x + Math.cos(teleportAngle) * teleportDist;
+            this.y = this.flurryTarget.y + Math.sin(teleportAngle) * teleportDist;
 
-            // Clamp to arena bounds (assuming 1200x700 arena)
-            this.x = Math.max(30, Math.min(1170, this.x));
-            this.y = Math.max(30, Math.min(670, this.y));
+            // Clamp to arena bounds
+            const arena = CONFIG.arena || { x: 0, y: 0, width: 1200, height: 700 };
+            this.x = Math.max(arena.x + 30, Math.min(arena.x + arena.width - 30, this.x));
+            this.y = Math.max(arena.y + 30, Math.min(arena.y + arena.height - 30, this.y));
 
             // Spawn afterimage at old position
-            if (!this.afterImages) this.afterImages = [];
-            this.afterImages.push({ x: oldX, y: oldY, timer: 10 });
+            this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
             // Visual effects for teleport
             spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
             spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
+            playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.7);
 
             // Apply hit pause for dramatic effect
             if (typeof this.applyTimeStop === 'function') this.applyTimeStop(4);
@@ -749,7 +862,7 @@ export class SukunaFighter extends Fighter {
         triggerGlobalScreenShake(8, 10);
 
         spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#8B0000');
-        const attackSound = getBasicAttackSound('musashi');
+        const attackSound = getBasicAttackSound(null, 'sukuna_melee');
         if (attackSound) playSound(attackSound.src, attackSound.volume);
       }
     }
@@ -773,12 +886,16 @@ export class SukunaFighter extends Fighter {
     }
 
     // Check for Domain Expansion (Ultimate)
-    if (this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
+    const isSilenced = (this.silenceTimer || 0) > 0;
+    if (!isSilenced && this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
       this.isChannelingDomainExpansion = true;
       this.domainChargeTimer = 0;
       triggerGlobalScreenShake(6, 90); // Tremble for the full 1.5 seconds
-      const channelSound = getSkillSound(this._def.id, 'domain_channel');
-      if (channelSound) playSound(channelSound.src, channelSound.volume);
+      if (!this._hasPlayedDomainChannelSound) {
+        this._hasPlayedDomainChannelSound = true;
+        const channelSound = getSkillSound(this._def.id, 'domain_channel');
+        if (channelSound) playSound(channelSound.src, channelSound.volume);
+      }
     }
 
     // Handle Melee Combat Mode vs Ranged Mode
@@ -801,7 +918,7 @@ export class SukunaFighter extends Fighter {
     this.applyMovementPhysics();
 
     if (opponent && !opponent.isDead) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      this.aim(opponent);
     } else {
       this.aim(opponent);
     }
@@ -838,38 +955,26 @@ export class SukunaFighter extends Fighter {
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
     if (this.meleeComboTarget === undefined) this.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
 
-    // 1. Only Teleport when starting a new combo sequence
-    if (this.meleeComboCount === 0) {
-      const oldX = this.x;
-      const oldY = this.y;
+    // Teleport to a new flank angle around the opponent for EVERY punch (punch-teleport-punch-teleport anime sequence)
+    const oldX = this.x;
+    const oldY = this.y;
 
-      const angleToOpponent = Math.random() * Math.PI * 2;
-      const behindOffset = opponent.r + this.r + 8;
-      let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
-      let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
+    const angleToOpponent = Math.random() * Math.PI * 2;
+    const behindOffset = opponent.r + this.r + 8;
+    let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
+    let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
 
-      // Clamp to arena bounds
-      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+    // Clamp to arena bounds
+    targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+    targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
 
-      this.x = targetX;
-      this.y = targetY;
+    this.x = targetX;
+    this.y = targetY;
 
-      spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-      spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
-    } else {
-      // For follow-up punches in a combo, ensure Sukuna stays right next to the opponent
-      const dx = opponent.x - this.x;
-      const dy = opponent.y - this.y;
-      const currentDist = Math.hypot(dx, dy);
-      const idealDist = opponent.r + this.r + 8;
-
-      if (currentDist > idealDist + 4) {
-        const angle = Math.atan2(dy, dx);
-        this.x = opponent.x - Math.cos(angle) * idealDist;
-        this.y = opponent.y - Math.sin(angle) * idealDist;
-      }
-    }
+    spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+    spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
+    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
     // 2. Execute Martial Arts hit at current position
     this.meleeComboCount++;
@@ -925,13 +1030,14 @@ export class SukunaFighter extends Fighter {
       });
     }
 
-    // Check for Gojo clash shockwave
-    if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter')) {
+    // Check for Gojo or Yuta clash shockwave
+    if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter' || opponent._def.id === 'yuta' || opponent._def.name === 'YutaFighter' || opponent.type === 'yuta')) {
       if (!this.meleeClashCooldown) this.meleeClashCooldown = 0;
       if (this.meleeClashCooldown <= 0) {
         const midX = (this.x + opponent.x) / 2;
         const midY = (this.y + opponent.y) / 2;
-        spawnMeleeClashShockwave(midX, midY, 100);
+        const isYuta = (opponent._def?.id === 'yuta' || opponent.type === 'yuta' || opponent._def?.name === 'YutaFighter');
+        spawnMeleeClashShockwave(midX, midY, 100, isYuta ? 'yuta' : 'gojo');
         triggerGlobalScreenShake(8, 10);
         this.meleeClashCooldown = 30;
       }
@@ -944,8 +1050,8 @@ export class SukunaFighter extends Fighter {
     // Every hit is pure Cursed Martial Arts (no slashes)
     spawnFloatingText(this.x, this.y - this.r - 25, 'MARTIAL ARTS', '#8B0000');
 
-    const attackSound = getBasicAttackSound('musashi');
-    if (attackSound) playSound(attackSound.src, attackSound.volume * 0.7);
+    const attackSound = getBasicAttackSound(null, 'sukuna_melee');
+    if (attackSound) playSound(attackSound.src, attackSound.volume * 0.8);
 
     // Hit pause on the opponent only (prevents the attacker from lagging)
     if (typeof opponent.applyTimeStop === 'function') opponent.applyTimeStop(5);
@@ -953,13 +1059,43 @@ export class SukunaFighter extends Fighter {
     // Set cooldown for next punch
     this.meleePunchCooldown = punchCooldown;
 
-    // Reset combo counter when combo target is reached
+    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
     if (this.meleeComboCount >= this.meleeComboTarget) {
       this.meleeComboCount = 0;
       this.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
+
+      if (!this.domainActive && (this.flurryHitsLeft || 0) <= 0) {
+        this.isMeleeMode = false;
+        this.meleeModeCooldown = CONFIG.sukuna.meleeModeSeparationCooldown ?? 240; // 4 seconds of mandatory ranged separation!
+        if (opponent && !opponent.isDead) {
+          this._teleportAwayFrom(opponent, arena);
+        }
+      }
     }
 
     this.resolveWallBounce(arena);
+  }
+
+  _teleportAwayFrom(opponent, arena) {
+    if (!opponent) return;
+    const oldX = this.x;
+    const oldY = this.y;
+
+    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
+    const dist = CONFIG.sukuna.comboDisengageDistance ?? 300;
+    let targetX = opponent.x + Math.cos(angle) * dist;
+    let targetY = opponent.y + Math.sin(angle) * dist;
+
+    targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+    targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+
+    this.x = targetX;
+    this.y = targetY;
+
+    spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+    spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
   }
 
   _checkSpiderwebTrigger(arena) {
@@ -1088,6 +1224,9 @@ export class SukunaFighter extends Fighter {
   }
 
   _activateDomain(arena) {
+    this.isChannelingDomainExpansion = false;
+    this._hasPlayedDomainChannelSound = false;
+    this.domainChargeTimer = 0;
     this.domainActive = true;
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
@@ -1186,17 +1325,7 @@ export class SukunaFighter extends Fighter {
           this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
         }
 
-        if (!this.afterImages) this.afterImages = [];
-        let img = this.afterImages.find(a => a.timer <= 0);
-        if (!img && this.afterImages.length < 4) {
-          img = { x: 0, y: 0, timer: 0 };
-          this.afterImages.push(img);
-        }
-        if (img) {
-          img.x = oldX;
-          img.y = oldY;
-          img.timer = 10;
-        }
+        this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
         spawnImpactFlash(oldX, oldY, 5, 'crimsonSniper');
         spawnImpactFlash(this.x, this.y, 5, 'crimsonSniper');
@@ -1247,27 +1376,25 @@ export class SukunaFighter extends Fighter {
       // Random aesthetic slashes throughout the arena to visualize the domain's relentless attacks
       if (!this.slashHitVisuals) this.slashHitVisuals = [];
 
-      // Skip spawning extra ambient slash objects during domain clashes for Performance Mode
+      // Spawn ambient slash objects throughout the arena (tuned count during domain clashes for performance)
       const isDomainClash = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-      if (!isDomainClash) {
-        const slashesToSpawn = 1 + Math.floor(Math.random() * 2);
-        for (let i = 0; i < slashesToSpawn; i++) {
-          let randX = Math.random() * 1200;
-          let randY = Math.random() * 800;
-          if (arena) {
-            randX = arena.x + Math.random() * arena.width;
-            randY = arena.y + Math.random() * arena.height;
-          }
-
-          this.slashHitVisuals.push({
-            x: randX,
-            y: randY,
-            angle: Math.random() * Math.PI * 2,
-            timer: 10 + Math.floor(Math.random() * 6),
-            maxTimer: 15,
-            scale: 0.5 + Math.random() * 1.5
-          });
+      const slashesToSpawn = isDomainClash ? 1 : (1 + Math.floor(Math.random() * 2));
+      for (let i = 0; i < slashesToSpawn; i++) {
+        let randX = Math.random() * 1200;
+        let randY = Math.random() * 800;
+        if (arena) {
+          randX = arena.x + Math.random() * arena.width;
+          randY = arena.y + Math.random() * arena.height;
         }
+
+        this.slashHitVisuals.push({
+          x: randX,
+          y: randY,
+          angle: Math.random() * Math.PI * 2,
+          timer: 10 + Math.floor(Math.random() * 6),
+          maxTimer: 15,
+          scale: 0.5 + Math.random() * 1.5
+        });
       }
 
       let hitEnemyThisTick = false;
@@ -1277,6 +1404,9 @@ export class SukunaFighter extends Fighter {
 
       state.fighters.forEach((f, idx) => {
         if (f && f !== this && f.hp > 0) {
+          // Sukuna's Malevolent Shrine slashes everything in its open domain (Cleave for CE, Dismantle for non-CE like Toji)
+          if (f.domainImmunity && f.characterId !== 'toji' && f.type !== 'toji') return;
+
           const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
           if (isEnemy) {
             hitEnemyThisTick = true;
@@ -1294,7 +1424,7 @@ export class SukunaFighter extends Fighter {
             if (projectileSystem) {
               const angle = Math.atan2(f.y - shrineY, f.x - shrineX);
               const slashSpeed = (CONFIG.sukuna.slashSpeed || 15) * 1.3;
-              projectileSystem.fireProjectile(
+              const proj = projectileSystem.fireProjectile(
                 this,
                 ownerIdx,
                 0, // Damage is dealt directly above
@@ -1306,6 +1436,11 @@ export class SukunaFighter extends Fighter {
                 shrineY,
                 angle
               );
+              const isTargetGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
+              if (proj && isTargetGojo) {
+                proj.targetIsGojoLimitless = (f.infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer !== undefined && f.infinityBlockTimer > 0));
+              }
+
             }
 
             if (Math.random() < 0.6) {
@@ -1384,14 +1519,61 @@ export class SukunaFighter extends Fighter {
     }
   }
 
+  drawBody(ctx) {
+    drawSukunaBody(ctx, this);
+  }
+
+  // Override status overlays for Sukuna: keep stun/freeze effects in crimson energy instead of blue rings!
+  drawStatusOverlays(ctx, baseRadius) {
+    if (this.hitFlashTimer > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${this.hitFlashTimer / 8})`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // Replace blue electric stun ring with Sukuna crimson aura
+    if (this.electricStunTimer > 0 || this.crimsonElectrifiedTimer > 0) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 30, 0, 0.2)';
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (this.poisonTicks > 0) {
+      drawPoisonEffect(ctx, baseRadius);
+    }
+
+    if (this.burnTimer > 0) {
+      const offset = baseRadius * 0.15;
+      const grad = ctx.createRadialGradient(-offset, -offset, 0, 0, 0, baseRadius);
+      const pulse = 0.05 * Math.sin(Date.now() / 100);
+      grad.addColorStop(0, 'rgba(255, 255, 220, 0.65)');
+      grad.addColorStop(0.35, `rgba(255, 130, 0, ${0.5 + pulse})`);
+      grad.addColorStop(0.75, `rgba(200, 30, 0, ${0.35 + pulse})`);
+      grad.addColorStop(1, 'rgba(100, 0, 0, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
   draw(ctx) {
     // Render Cursed Energy Aura BEHIND body and weapon constructs
     // Also show during countdown for dramatic effect
+    const isParalyzed = (this.timeStopTimer > 0) || (this.electricStunTimer > 0) || (this.crimsonElectrifiedTimer > 0);
+
     if (this.rctVisualTimer > 0) {
       this._drawSukunaCursedEnergyAura(ctx, 'rct');
     } else if (this.isChannelingDivineFlame || this.divineFlameRecoveryTimer > 0) {
       this._drawSukunaCursedEnergyAura(ctx, 'fuga');
-    } else if (this.isChannelingDomainExpansion) {
+    } else if (this.isChannelingDomainExpansion && !this.domainActive && !isParalyzed) {
       this._drawSukunaCursedEnergyAura(ctx, 'domain');
     } else if (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal) {
       this._drawSukunaCursedEnergyAura(ctx, 'red');
@@ -1471,18 +1653,77 @@ export class SukunaFighter extends Fighter {
       });
     }
 
-    // Draw afterimages during flurry
+    // Draw afterimages during flurry, dodge & melee teleports
     if (this.afterImages && this.afterImages.length > 0) {
-      ctx.save();
-      this.afterImages.forEach(img => {
-        const alpha = img.timer / 8;
-        ctx.globalAlpha = alpha * 0.5;
-        ctx.fillStyle = this._def?.color || '#8B0000';
-        ctx.beginPath();
-        ctx.arc(img.x, img.y, this.r, 0, Math.PI * 2);
-        ctx.fill();
-      });
-      ctx.restore();
+      for (let i = 0; i < this.afterImages.length; i++) {
+        const img = this.afterImages[i];
+        if (img && img.timer > 0) {
+          const maxT = img.maxTimer || 20;
+          const progress = Math.max(0, Math.min(1, img.timer / maxT));
+          const alpha = Math.pow(progress, 0.7) * 0.2;
+
+          ctx.save();
+
+          // 1. Dash Trajectory Line
+          if (img.fromX !== undefined && img.toX !== undefined) {
+            ctx.save();
+            ctx.globalAlpha = alpha * 0.5;
+            ctx.strokeStyle = '#FF1100';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(img.fromX, img.fromY);
+            ctx.lineTo(img.toX, img.toY);
+            ctx.stroke();
+
+            ctx.strokeStyle = '#FFFFFF';
+            ctx.lineWidth = 1.2;
+            ctx.beginPath();
+            ctx.moveTo(img.fromX, img.fromY);
+            ctx.lineTo(img.toX, img.toY);
+            ctx.stroke();
+            ctx.restore();
+          }
+
+          ctx.translate(img.x, img.y);
+          ctx.rotate(img.angle || 0);
+
+          // 2. Volcanic Crimson Cursed Energy Glow
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          const auraGrad = ctx.createRadialGradient(0, 0, this.r * 0.3, 0, 0, this.r * 1.8);
+          auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`);
+          auraGrad.addColorStop(0.4, `rgba(255, 30, 0, ${alpha * 0.75})`);
+          auraGrad.addColorStop(0.8, `rgba(139, 0, 0, ${alpha * 0.4})`);
+          auraGrad.addColorStop(1, 'rgba(139, 0, 0, 0)');
+          ctx.fillStyle = auraGrad;
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 3. Body Circle Silhouette
+          ctx.save();
+          ctx.globalAlpha = alpha;
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.1, 0, Math.PI * 2);
+          ctx.fillStyle = '#8B0000';
+          ctx.fill();
+          ctx.strokeStyle = '#FF4500';
+          ctx.lineWidth = 2.5;
+          ctx.stroke();
+
+          // 4. Crimson Eye Glints
+          ctx.fillStyle = '#FFD700';
+          ctx.beginPath();
+          ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
+          ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.restore();
+
+          ctx.restore();
+        }
+      }
     }
 
     // Draw Skill 1 Slash visual arcs on flurry target (Crescent Blade Arcs)
@@ -1547,18 +1788,29 @@ export class SukunaFighter extends Fighter {
         ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5, false);
         ctx.arc(r * 0.45, 0, r * 0.8, Math.PI * 0.45, -Math.PI * 0.45, true);
         ctx.closePath();
-        ctx.fillStyle = 'rgba(220, 235, 255, 1)';
+        // Heavy black ink outline & deep crimson cursed energy blade arc
+        ctx.fillStyle = `rgba(10, 2, 2, ${0.9 * ratio})`;
         ctx.fill();
-
-        // Bright edge
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * ratio})`;
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
+        ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * ratio})`;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
+        // Crimson cursed energy blade core
+        ctx.save();
+        ctx.scale(0.85, 0.85);
         ctx.beginPath();
-        ctx.arc(r * 0.45, 0, r * 0.78, Math.PI * 0.43, -Math.PI * 0.43, true);
+        ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5, false);
+        ctx.arc(r * 0.45, 0, r * 0.8, Math.PI * 0.45, -Math.PI * 0.45, true);
+        ctx.closePath();
+        ctx.fillStyle = `rgba(220, 20, 20, ${0.95 * ratio})`;
+        ctx.fill();
+        ctx.restore();
+
+        // White-hot razor crescent edge line
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * ratio})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
         ctx.stroke();
 
         ctx.restore();
@@ -1615,8 +1867,9 @@ export class SukunaFighter extends Fighter {
       ctx.restore();
     }
 
-
-
+    // Ensure Sukuna's HP text and freeze timer are always rendered on top of his hands and Cursed Energy aura
+    this.drawHealth(ctx);
+    this.drawFreezeTimer(ctx);
   }
 
   // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands
@@ -1628,10 +1881,17 @@ export class SukunaFighter extends Fighter {
     let frontOffset = 6;
     let frontAngleOffset = 0;
 
-    let backHandX = this.x;
-    let backHandY = basePosY;
+    let backHandX = this.x - Math.cos(this.gunAngle + Math.PI / 2) * (this.r * 0.35);
+    let backHandY = basePosY - Math.sin(this.gunAngle + Math.PI / 2) * (this.r * 0.35);
     let hideFrontHand = false;
     let hideBackHand = false;
+
+    // Champion Screen / Victory Reveal / Fighter Index Stance: Hide hands completely
+    const isWinnerScreen = this._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+
+    if (isWinnerScreen) {
+      return;
+    }
 
     // 1. Snappy Melee Punch Animation (Striking hand punches 24px forward, off-hand stays visible)
     if (this.punchAnimTimer > 0) {
@@ -1672,23 +1932,55 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    // 3. Fuga (Divine Flame Arrow) Clasping Stance (Both hands clasp forward)
+    // 3. Fuga (Divine Flame Arrow) Kamino Archer Bow Stance (Leading arm extends, trailing arm pulls back into archery drawback)
     else if (this.isChannelingDivineFlame) {
-      frontAngleOffset = -0.15;
-      frontOffset = 18;
+      const progress = Math.min(1.0, (this.divineFlameChargeTimer || 0) / Math.max(1, this.divineFlameChargeMax || 90));
 
-      const backAngle = this.gunAngle + 0.15;
-      const backOffset = 18;
-      backHandX = this.x + Math.cos(backAngle) * (this.r + backOffset);
-      backHandY = basePosY + Math.sin(backAngle) * (this.r + backOffset);
+      // Leading Bow Arm (Front hand extending far forward to hold bow riser):
+      frontAngleOffset = -0.15;
+      frontOffset = 24 + progress * 8; // Extends 24px to 32px out along aim angle
+
+      // Trailing Draw String Arm (Back hand pulling arrow notch deep behind body):
+      const pullAngle = this.gunAngle + Math.PI; // Pulls backward opposite to facing direction
+      const drawbackDist = 6 + progress * 24;     // Pulls 6px to 30px back into deep archery drawback
+      const perpX = Math.cos(this.gunAngle + Math.PI / 2) * 4;
+      const perpY = Math.sin(this.gunAngle + Math.PI / 2) * 4;
+
+      backHandX = this.x + Math.cos(pullAngle) * drawbackDist + perpX;
+      backHandY = basePosY + Math.sin(pullAngle) * drawbackDist + perpY;
     }
 
     // Front hand (Right hand) position
     const frontAngle = this.gunAngle + frontAngleOffset;
-    const frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
-    const frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
+    let frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
+    let frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
 
-    // 1. Draw Physical Circle Hands (body/skin color with crisp black outline)
+    // Safety Clamp: Prevent hands from extending above the top boundary of body circle (-this.r + 6)
+    const maxTopY = basePosY - (this.r - 6);
+    if (frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
+      frontHandY = maxTopY;
+    }
+    if (backHandY < maxTopY && !this.isChannelingDivineFlame) {
+      backHandY = maxTopY;
+    }
+
+    // 1. Draw Cursed Energy Aura BEHIND physical hands (skip during RCT and Fuga channeling)
+    const isRCT = (this.rctVisualTimer > 0);
+    const isFuga = (this.isChannelingDivineFlame);
+    const isActive = !isRCT && !isFuga && ((this.combatAuraOpacity > 0.05) || (this.slashGlowTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0) || (this.domainActive) || (state.gameState === 'countdown') || (this.punchAnimTimer > 0));
+
+    if (isActive) {
+      let theme = 'red';
+      if (this.isChannelingDomainExpansion && !this.domainActive) {
+        theme = 'domain';
+      }
+      const blobRadius = (this.punchAnimTimer > 0 || this.slashGlowTimer > 0) ? 15.0 : 12.0;
+
+      if (!hideFrontHand) this._drawSukunaCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
+      if (!hideBackHand) this._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
+    }
+
+    // 2. Draw Physical Circle Hands ON TOP of aura
     ctx.save();
     ctx.fillStyle = this.color || '#e0a899';
     ctx.strokeStyle = '#000000';
@@ -1709,15 +2001,39 @@ export class SukunaFighter extends Fighter {
     }
     ctx.restore();
 
-    // 2. Draw Blobby Cursed Energy Aura over active circle hands
-    const isActive = (this.combatAuraOpacity > 0.05) || (this.slashGlowTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0) || (this.domainActive) || (this.isChannelingDivineFlame) || (state.gameState === 'countdown') || (this.punchAnimTimer > 0);
+    // Taut glowing fiery Cursed Energy bowstring during Fuga charge!
+    if (this.isChannelingDivineFlame && !hideFrontHand && !hideBackHand) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const progress = Math.min(1.0, (this.divineFlameChargeTimer || 0) / Math.max(1, this.divineFlameChargeMax || 90));
 
-    if (isActive) {
-      const theme = (this.rctVisualTimer > 0) ? 'rct' : ((this.isChannelingDivineFlame || this.divineFlameRecoveryTimer > 0) ? 'fuga' : 'red');
-      const blobRadius = (this.punchAnimTimer > 0 || this.slashGlowTimer > 0 || this.isChannelingDivineFlame) ? 18 : 14;
+      const perpX = Math.cos(this.gunAngle + Math.PI / 2) * 22;
+      const perpY = Math.sin(this.gunAngle + Math.PI / 2) * 22;
 
-      if (!hideFrontHand) this._drawSukunaCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
-      if (!hideBackHand) this._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
+      const upperTipX = frontHandX + perpX;
+      const upperTipY = frontHandY + perpY;
+      const lowerTipX = frontHandX - perpX;
+      const lowerTipY = frontHandY - perpY;
+
+      // Outer flame glow bowstring
+      ctx.strokeStyle = `rgba(255, 120, 0, ${0.75 * progress})`;
+      ctx.lineWidth = 3.5;
+      ctx.beginPath();
+      ctx.moveTo(upperTipX, upperTipY);
+      ctx.lineTo(backHandX, backHandY);
+      ctx.lineTo(lowerTipX, lowerTipY);
+      ctx.stroke();
+
+      // White-hot core bowstring
+      ctx.strokeStyle = `rgba(255, 255, 240, ${0.95 * progress})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(upperTipX, upperTipY);
+      ctx.lineTo(backHandX, backHandY);
+      ctx.lineTo(lowerTipX, lowerTipY);
+      ctx.stroke();
+
+      ctx.restore();
     }
   }
 
@@ -1835,11 +2151,11 @@ export class SukunaFighter extends Fighter {
       } else {
         // Fades in over the channeling duration
         const maxTime = this.divineFlameChargeMax || 150;
-        progress = Math.min(1.0, Math.max(0, (this.divineFlameChargeTimer / maxTime) || 1));
+        progress = this.isChannelingDivineFlame ? Math.min(1.0, Math.max(0, this.divineFlameChargeTimer / maxTime)) : 0;
       }
     } else if (colorTheme === 'domain') {
       const maxTime = this.domainChargeMax || 90;
-      progress = Math.min(1.0, Math.max(0, (this.domainChargeTimer / maxTime) || 1));
+      progress = (this.isChannelingDomainExpansion && !this.domainActive) ? Math.min(1.0, Math.max(0, this.domainChargeTimer / maxTime)) : 0;
     } else {
       progress = Math.min(1, Math.max(0, this.combatAuraOpacity || 0));
     }
@@ -1856,32 +2172,56 @@ export class SukunaFighter extends Fighter {
     const nowTime = (this.timeStopTimer > 0 && this._timeStopFrozenTime !== undefined) ? this._timeStopFrozenTime : Date.now();
     const frameIndex = Math.floor((nowTime / 1000) * frameRate) % 30;
     const time = frameIndex * 120;
-
     ctx.save();
     const posX = overrideX !== null ? overrideX : this.x;
     const posY = overrideY !== null ? overrideY : (this.y - (this.z || 0));
     ctx.translate(posX, posY);
     ctx.globalCompositeOperation = 'source-over';
-
     const r = overrideRadius !== null ? overrideRadius : this.r;
 
     const isRCT = colorTheme === 'rct';
     const isFuga = colorTheme === 'fuga';
 
-    let mainColor = '#8B0000';
-    let fillColor = `rgba(139, 0, 0, ${0.18 * progress})`;
-    let coreColor = `rgba(80, 0, 0, ${0.22 * progress})`;
-    let wispColor = '#FF2200';
+    // === Luminous Body/Hand Backlight (Soft Volcanic Crimson Bloom) ===
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const glowRadius = overrideX !== null ? (r + 25) : (r + 90 + Math.sin(time * 0.005) * 8);
+    const backGlow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, glowRadius);
+    if (isRCT) {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
+      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.3 * progress})`);
+      backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
+    } else if (isFuga) {
+      backGlow.addColorStop(0, `rgba(255, 255, 250, ${0.55 * progress})`);   // White-hot core
+      backGlow.addColorStop(0.35, `rgba(255, 120, 20, ${0.45 * progress})`); // Fiery orange bloom
+      backGlow.addColorStop(0.7, `rgba(220, 40, 0, ${0.22 * progress})`);   // Crimson outer feathering
+      backGlow.addColorStop(1, 'rgba(120, 10, 0, 0)');
+    } else {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Soft white core
+      backGlow.addColorStop(0.35, `rgba(255, 30, 0, ${0.42 * progress})`);  // Crimson red bloom
+      backGlow.addColorStop(0.7, `rgba(180, 0, 0, ${0.20 * progress})`);    // Deep blood red feathering
+      backGlow.addColorStop(1, 'rgba(80, 0, 0, 0)');
+    }
+    ctx.beginPath();
+    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+    ctx.fillStyle = backGlow;
+    ctx.fill();
+    ctx.restore();
+
+    let mainColor = '#FF1100';
+    let fillColor = `rgba(230, 20, 20, ${0.72 * progress})`;
+    let coreColor = `rgba(255, 120, 100, ${0.85 * progress})`;
+    let wispColor = '#FF3300';
 
     if (isRCT) {
       mainColor = '#32CD32';
-      fillColor = `rgba(50, 205, 50, ${0.25 * progress})`;
-      coreColor = `rgba(0, 100, 0, ${0.30 * progress})`;
+      fillColor = `rgba(50, 205, 50, ${0.72 * progress})`;
+      coreColor = `rgba(144, 238, 144, ${0.85 * progress})`;
       wispColor = '#00FF7F';
     } else if (isFuga) {
       mainColor = '#FF4500';
-      fillColor = `rgba(255, 69, 0, ${0.20 * progress})`;
-      coreColor = `rgba(200, 40, 0, ${0.25 * progress})`;
+      fillColor = `rgba(255, 69, 0, ${0.75 * progress})`;
+      coreColor = `rgba(255, 200, 60, ${0.88 * progress})`;
       wispColor = '#FFD700';
     } else if (colorTheme === 'domain') {
       mainColor = '#4B0082'; // Indigo/Dark Purple
@@ -1889,39 +2229,41 @@ export class SukunaFighter extends Fighter {
       coreColor = `rgba(139, 0, 0, ${0.90 * progress})`; // Solid blood red core
       wispColor = '#8B0000';
 
-      // Draw persistent text over his head
-      ctx.save();
-      ctx.font = 'bold 24px Arial';
-      ctx.fillStyle = `rgba(220, 20, 60, ${progress})`; // Crimson text fading in
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -r - 50 - (Math.sin(Date.now() / 150) * 5); // Floating effect
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+      // Draw persistent text and ground ring ONLY during main body channeling (not on hands or after domain deployment)
+      if (overrideX === null && this.isChannelingDomainExpansion && !this.domainActive) {
+        ctx.save();
+        ctx.font = 'bold 24px Arial';
+        ctx.fillStyle = `rgba(220, 20, 60, ${progress})`; // Crimson text fading in
+        ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
+        ctx.lineWidth = 4;
+        ctx.textAlign = 'center';
+        const textY = -r - 50 - (Math.sin(Date.now() / 150) * 5); // Floating effect
+        ctx.strokeText('DOMAIN EXPANSION', 0, textY);
+        ctx.fillText('DOMAIN EXPANSION', 0, textY);
+        ctx.restore();
 
-      // Draw graphic ring on the ground
-      ctx.save();
-      ctx.scale(1, 0.4); // Isometric perspective
-      const ringRadius = 160 * progress; // Expands outwards
+        // Draw graphic ring on the ground
+        ctx.save();
+        ctx.scale(1, 0.4); // Isometric perspective
+        const ringRadius = 160 * progress; // Expands outwards
 
-      // Outer blood ring
-      ctx.beginPath();
-      ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-      ctx.lineWidth = 6;
-      ctx.strokeStyle = `rgba(139, 0, 0, ${progress})`;
-      ctx.stroke();
+        // Outer blood ring
+        ctx.beginPath();
+        ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+        ctx.lineWidth = 6;
+        ctx.strokeStyle = `rgba(139, 0, 0, ${progress})`;
+        ctx.stroke();
 
-      // Inner rotating dashed indigo ring
-      ctx.rotate(Date.now() / 300);
-      ctx.beginPath();
-      ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
-      ctx.setLineDash([15, 15]);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = `rgba(75, 0, 130, ${progress * 1.2})`;
-      ctx.stroke();
-      ctx.restore();
+        // Inner rotating dashed indigo ring
+        ctx.rotate(Date.now() / 300);
+        ctx.beginPath();
+        ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
+        ctx.setLineDash([15, 15]);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = `rgba(75, 0, 130, ${progress * 1.2})`;
+        ctx.stroke();
+        ctx.restore();
+      }
     }
 
     const strokeColor = '#000000';
@@ -1930,25 +2272,25 @@ export class SukunaFighter extends Fighter {
 
     // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
     const numPoints = 28;
-    const scaleFactor = overrideRadius !== null ? (overrideRadius / this.r) : 1.0;
-    const baseRadius = (r + 15) * scaleFactor;
+    const baseRadius = overrideX !== null ? (r + 9.0) : (r + 15);
     const points = [];
     const moveOffset = (this.x + this.y) * 0.015;
+    const stretchMult = overrideX !== null ? 0.2 : 1.0;
 
     for (let i = 0; i < numPoints; i++) {
       const angle = (Math.PI * 2 / numPoints) * i;
 
-      // Upward direction bias (flames flow upward)
-      const upFactor = Math.max(0, -Math.sin(angle) + 0.25);
+      // Upward direction bias (flames flow upward on body, symmetrical on hands)
+      const upFactor = Math.max(0, -Math.sin(angle) + 0.25) * stretchMult;
       const sideFactor = 1.0 - upFactor * 0.5;
 
       // Base shape evolution for stretching flame tongues
-      const baseTongue1 = Math.pow(Math.sin(angle * 1.5 + time * 0.0005 - moveOffset * 0.2) * 0.5 + 0.5, 3.0) * 25 * upFactor * scaleFactor;
-      const baseTongue2 = Math.pow(Math.cos(angle * 2.2 - time * 0.0004 + moveOffset * 0.15) * 0.5 + 0.5, 2.5) * 18 * upFactor * scaleFactor;
+      const baseTongue1 = Math.pow(Math.sin(angle * 1.5 + time * 0.0005 - moveOffset * 0.2) * 0.5 + 0.5, 3.0) * 25 * upFactor;
+      const baseTongue2 = Math.pow(Math.cos(angle * 2.2 - time * 0.0004 + moveOffset * 0.15) * 0.5 + 0.5, 2.5) * 18 * upFactor;
 
       // Localized height flicker
-      const tongueFlicker = Math.sin(time * 0.002 + i * 1.4) * 5 * upFactor * scaleFactor;
-      const sideWave = Math.sin(time * 0.0012 + i * 0.8) * 4 * sideFactor * scaleFactor;
+      const tongueFlicker = Math.sin(time * 0.002 + i * 1.4) * 5 * upFactor;
+      const sideWave = Math.sin(time * 0.0012 + i * 0.8) * 4 * sideFactor;
 
       const totalRadius = baseRadius + baseTongue1 + baseTongue2 + tongueFlicker + sideWave;
       points.push({

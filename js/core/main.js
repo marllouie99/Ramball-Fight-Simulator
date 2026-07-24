@@ -18,11 +18,12 @@ import { updateLightningEffects, drawLightningEffects } from '../graphics/partic
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
-import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen } from '../graphics/draw.js';
+import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } from '../graphics/draw.js';
 import { drawAllCronosSpheres, drawThermobaricExplosions } from '../graphics/draw.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { initGraphicsCache, clearCache } from '../graphics/graphicsCache.js';
+import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaDomainVisuals.js';
 
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
@@ -71,6 +72,8 @@ window.addEventListener('keydown', (e) => {
       navigator.clipboard.writeText(logText).catch(err => console.error('Failed to copy logs:', err));
       state.fpsLogsCopiedTimer = 120; // Show copied message for 2 seconds
     }
+  } else if (e.key.toLowerCase() === 'h') {
+    state.hideFpsLogs = !state.hideFpsLogs;
   } else if (e.key.toLowerCase() === 't') {
     // DEBUG: Press 'T' to trigger Gojo's RCT aura (for testing visual effect)
     if (state.gameState === 'playing' && state.fighters) {
@@ -424,6 +427,7 @@ function animate(timestamp) {
       drawPurpleDimScreen(); // Draw purple dim screen overlay when Gojo's Hollow Purple is active
       drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
       drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
+      drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
       drawFlames(); // Draw all flames to offscreen canvas (batched for performance)
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles
       drawFuelPickups();
@@ -449,6 +453,15 @@ function animate(timestamp) {
             if (fighter.drawDomainForeground) fighter.drawDomainForeground(state.ctx, isClashSecondary);
             state.ctx.restore();
           });
+
+          // Render Yuta vs Sukuna Domain Clash Rift overlay on top of both domains
+          if (activeDomainFighters.length > 1) {
+            const yutaDomain = activeDomainFighters.find(f => f.type === 'yuta' || (f._def && f._def.id === 'yuta'));
+            const sukunaDomain = activeDomainFighters.find(f => f.type === 'sukuna' || (f._def && f._def.id === 'sukuna'));
+            if (yutaDomain && sukunaDomain) {
+              renderYutaSukunaDomainClashRift(state.ctx, yutaDomain, sukunaDomain);
+            }
+          }
         }
       }
 
@@ -462,8 +475,10 @@ function animate(timestamp) {
       drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
       drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
 
-      // OPTIMIZATION: Quality-based particle drawing
-      if (!useAggressiveParticleMode) {
+      const isDomainClash = state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
+
+      // OPTIMIZATION: Quality-based particle drawing (throttled during domain clashes for locked 60 FPS)
+      if (!useAggressiveParticleMode && (!isDomainClash || Math.random() > 0.5)) {
         bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
         burnEffectSystem.draw(state.ctx); // Draw burn particles
       }
@@ -477,8 +492,6 @@ function animate(timestamp) {
         drawBerserkerRageEffects(); // Draw berserker rage effects
       }
 
-      const isDomainClash = state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
-
       if (!useAggressiveParticleMode && (!isDomainClash || Math.random() > 0.5)) {
         drawBloodEffects(); // Draw blood effects on top of everything
       }
@@ -487,40 +500,42 @@ function animate(timestamp) {
       }
       drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
 
-      // Draw FPS display
-      state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      state.ctx.font = '12px monospace';
-      state.ctx.textAlign = 'left';
-      state.ctx.fillText(`FPS: ${state.fps}`, 10, 20);
-
-      // Draw FPS Drop Causes as a log list
-      if (state.fpsLogs && state.fpsLogs.length > 0) {
-        state.ctx.font = 'bold 12px monospace';
+      // Draw FPS display and logs (if not hidden by user pressing H)
+      if (!state.hideFpsLogs) {
+        state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        state.ctx.font = '12px monospace';
         state.ctx.textAlign = 'left';
+        state.ctx.fillText(`FPS: ${state.fps}`, 10, 20);
 
-        let startY = state.canvas.height - 10 - (state.fpsLogs.length * 16);
+        // Draw FPS Drop Causes as a log list
+        if (state.fpsLogs && state.fpsLogs.length > 0) {
+          state.ctx.font = 'bold 12px monospace';
+          state.ctx.textAlign = 'left';
 
-        // Draw copy instruction if not copied recently
-        if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
-          state.ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
-          state.ctx.fillText('Press C to copy logs', 10, startY - 10);
+          let startY = state.canvas.height - 10 - (state.fpsLogs.length * 16);
+
+          // Draw copy and hide instructions if not copied recently
+          if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
+            state.ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
+            state.ctx.fillText('Press C to copy logs | Press H to hide', 10, startY - 10);
+          }
+
+          for (let i = 0; i < state.fpsLogs.length; i++) {
+            let log = state.fpsLogs[i];
+            let alpha = Math.min(1, log.timer / 60); // Fade out
+            state.ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
+            state.ctx.fillText(log.text, 10, startY + (i * 16));
+          }
         }
 
-        for (let i = 0; i < state.fpsLogs.length; i++) {
-          let log = state.fpsLogs[i];
-          let alpha = Math.min(1, log.timer / 60); // Fade out
-          state.ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
-          state.ctx.fillText(log.text, 10, startY + (i * 16));
+        // Draw copied notification
+        if (state.fpsLogsCopiedTimer > 0) {
+          state.ctx.font = 'bold 12px monospace';
+          state.ctx.textAlign = 'left';
+          let startY = state.canvas.height - 10 - ((state.fpsLogs ? state.fpsLogs.length : 0) * 16);
+          state.ctx.fillStyle = `rgba(100, 255, 100, ${Math.min(1, state.fpsLogsCopiedTimer / 30)})`;
+          state.ctx.fillText('Copied to clipboard!', 10, startY - 10);
         }
-      }
-
-      // Draw copied notification
-      if (state.fpsLogsCopiedTimer > 0) {
-        state.ctx.font = 'bold 12px monospace';
-        state.ctx.textAlign = 'left';
-        let startY = state.canvas.height - 10 - ((state.fpsLogs ? state.fpsLogs.length : 0) * 16);
-        state.ctx.fillStyle = `rgba(100, 255, 100, ${Math.min(1, state.fpsLogsCopiedTimer / 30)})`;
-        state.ctx.fillText('Copied to clipboard!', 10, startY - 10);
       }
 
       // Composite flame canvas onto main canvas (after all other drawing)

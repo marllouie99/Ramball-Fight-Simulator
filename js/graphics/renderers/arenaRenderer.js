@@ -1,59 +1,118 @@
 // ─────────────────────────────────────────────
 // ARENA & SCREEN OVERLAY RENDERER
 // ─────────────────────────────────────────────
-import { state } from '../../core/state.js';
+import { state, getProjectiles } from '../../core/state.js';
 
 export function drawArena() {
   const { ctx, canvas, arena } = state;
-  const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive);
+  const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
   if (!hasActiveDomain) {
-    // Fill the entire canvas background with white
-    ctx.fillStyle = '#ffffff';
+    // Fill the entire canvas background with black for the top and bottom letterboxing
+    ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    // Arena background (in case it needs to be different later, but right now it's also white)
+    // Fill the middle area (arena + HUD) with white
+    ctx.fillStyle = '#ffffff';
+    const whiteAreaStartY = arena.y - 20;
+    const whiteAreaEndY = 770; // Brought bottom dark cover higher up towards the top
+    ctx.fillRect(0, whiteAreaStartY, canvas.width, whiteAreaEndY - whiteAreaStartY);
+
+    // Arena background (in case it needs to be different later, but right now it's a slightly off-white)
     ctx.fillStyle = 'rgb(250, 250, 250)';
     ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
   }
 
-  // Draw the arena boundary stroke
+  // Draw the arena boundary stroke (thinner, sleek wall border)
   ctx.strokeStyle = '#000000ff';
-  ctx.lineWidth = 16;
+  ctx.lineWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
+    ? state.config.arena.wallWidth 
+    : 4;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
 }
 
+let currentPurpleDimOpacity = 0;
+
 /**
- * Draws a purple dim screen overlay when Gojo's Hollow Purple orb is active.
- * The overlay opacity is based on the purple orb's remaining life/duration.
+ * Draws a purple dim screen overlay when Gojo's Hollow Purple is being channeled,
+ * actively moving as a projectile, or in post-fire recovery.
  */
 export function drawPurpleDimScreen() {
   const { ctx, canvas } = state;
   if (!ctx || !canvas) return;
 
-  const activeProjectiles = state.getProjectiles ? state.getProjectiles() : [];
-  const purpleOrb = activeProjectiles.find(p => p && p.isGojoPurpleOrb);
+  const activeProjectiles = typeof getProjectiles === 'function' ? getProjectiles() : [];
+  const purpleOrb = activeProjectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0);
 
-  if (!purpleOrb) return;
+  const gojoFighter = state.fighters?.find(f =>
+    f && (f.isChannelingPurple || (f.purpleRecoveryTimer && f.purpleRecoveryTimer > 0))
+  );
 
-  const maxLife = purpleOrb.maxLife || 180;
-  const currentLife = purpleOrb.life || 0;
-  const lifeRatio = Math.max(0, Math.min(1, currentLife / maxLife));
-  const opacity = Math.sin(lifeRatio * Math.PI) * 0.45;
+  let targetOpacity = 0;
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  if (gojoFighter && gojoFighter.isChannelingPurple) {
+    cx = gojoFighter.x;
+    cy = gojoFighter.y - (gojoFighter.z || 0);
+    const chargeMax = gojoFighter.purpleChargeMax || 120;
+    const progress = Math.min(1.0, (gojoFighter.purpleChargeTimer || 0) / Math.max(1, chargeMax));
+    targetOpacity = 0.25 + progress * 0.55; // Smooth charge up from 0.25 to 0.80
+  } else if (purpleOrb) {
+    cx = purpleOrb.x;
+    cy = purpleOrb.y;
+    const maxLife = purpleOrb.maxLife || 300;
+    const currentLife = purpleOrb.life || 0;
+    const lifeRatio = Math.max(0, Math.min(1, currentLife / maxLife));
+    targetOpacity = 0.50 + Math.sin(lifeRatio * Math.PI) * 0.20; // High intensity during orb flight
+  } else if (gojoFighter && gojoFighter.purpleRecoveryTimer > 0) {
+    cx = gojoFighter.x;
+    cy = gojoFighter.y - (gojoFighter.z || 0);
+    const recProgress = gojoFighter.purpleRecoveryTimer / 30;
+    targetOpacity = 0.45 * recProgress;
+  }
+
+  // Smoothly interpolate dim opacity for seamless fade-in and gradual fade-out
+  if (targetOpacity > currentPurpleDimOpacity) {
+    currentPurpleDimOpacity += (targetOpacity - currentPurpleDimOpacity) * 0.15; // Smooth charge fade-in
+  } else {
+    currentPurpleDimOpacity += (targetOpacity - currentPurpleDimOpacity) * 0.06; // Smooth gradual fade-out
+  }
+
+  if (currentPurpleDimOpacity < 0.01) {
+    currentPurpleDimOpacity = 0;
+    return;
+  }
 
   ctx.save();
-  ctx.fillStyle = `rgba(30, 0, 50, ${opacity})`;
+
+  const opacity = currentPurpleDimOpacity;
+
+  // Dark base purple overlay
+  ctx.fillStyle = `rgba(18, 2, 32, ${opacity * 0.7})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const time = Date.now();
-  const vignetteGrad = ctx.createRadialGradient(
-    canvas.width / 2, canvas.height / 2, canvas.width * 0.2,
-    canvas.width / 2, canvas.height / 2, canvas.width * 0.75
-  );
-  vignetteGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  vignetteGrad.addColorStop(1, `rgba(75, 0, 130, ${opacity * 0.8})`);
+  // Dynamic radial gradient centered on Gojo or Purple Orb
+  const maxDim = Math.max(canvas.width, canvas.height) * 0.95;
+  const roundCx = Math.round(cx / 10) * 10;
+  const roundCy = Math.round(cy / 10) * 10;
+  const key = `${roundCx}_${roundCy}_${maxDim}`;
 
-  ctx.fillStyle = vignetteGrad;
+  if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {
+    state._cachedPurpleDimKey = key;
+    state._cachedPurpleDimGrad = ctx.createRadialGradient(
+      roundCx, roundCy, 40,
+      roundCx, roundCy, maxDim
+    );
+    state._cachedPurpleDimGrad.addColorStop(0, `rgba(147, 51, 234, 0.25)`);  // Bright electric purple center
+    state._cachedPurpleDimGrad.addColorStop(0.35, `rgba(88, 28, 135, 0.60)`); // Deep purple aura
+    state._cachedPurpleDimGrad.addColorStop(0.70, `rgba(30, 0, 50, 0.85)`);   // Dark void
+    state._cachedPurpleDimGrad.addColorStop(1.0, `rgba(10, 0, 20, 0.95)`);   // Outer dark edge
+  }
+
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = state._cachedPurpleDimGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }
+

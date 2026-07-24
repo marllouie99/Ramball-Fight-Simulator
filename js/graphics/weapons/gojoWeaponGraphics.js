@@ -65,7 +65,6 @@ export function drawGojoWeapon(ctx, fighter) {
             // Single centered fist with punching animation
             ctx.save();
             ctx.shadowColor = '#00BFFF';
-            ctx.shadowBlur = glowIntensity;
             ctx.fillStyle = '#4488AA';
             ctx.beginPath();
             ctx.arc(fistDistance, 0, fistRadius, 0, Math.PI * 2);
@@ -121,8 +120,6 @@ export function drawGojoWeapon(ctx, fighter) {
                 ctx.translate(currentDist, 0);
                 ctx.strokeStyle = '#00F0C0';
                 ctx.lineWidth = 1.5;
-                ctx.shadowColor = '#00F0C0';
-                ctx.shadowBlur = 10;
                 
                 // Draw 3 imploding suction rings collapsing into the blue orb
                 for (let rIdx = 0; rIdx < 3; rIdx++) {
@@ -273,7 +270,7 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
     
     ctx.globalCompositeOperation = 'lighter';
     
-    for (let i = 0; i < 15; i++) {
+    for (let i = 0; i < 5; i++) {
         const seed = i * 999.99;
         
         const angle = time / (200 + (seed % 100)) + seed;
@@ -284,7 +281,6 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
         
         const blobR = baseR * (0.4 + (seed % 5) / 10 + Math.sin(time / 150 + seed) * 0.2);
         
-        // Seamless radial gradient to perfectly simulate noise texture without distinct shapes
         const blobGlow = ctx.createRadialGradient(px, py, 0, px, py, blobR);
         blobGlow.addColorStop(0, `rgba(${plasma2.join(',')}, ${0.5 + (seed % 4) / 10})`);
         blobGlow.addColorStop(0.4, `rgba(${plasma1.join(',')}, ${0.3 + (seed % 4) / 10})`);
@@ -481,7 +477,6 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP) {
     ctx.fillRect(-streakLength * 0.7, -softHeight * 0.5, streakLength * 1.4, softHeight);
 
     // 2. Bright Central White/Magenta-Purple Star Core
-    ctx.shadowBlur = 28 * alpha;
     ctx.shadowColor = '#D033FF';
 
     const coreR = 8.5 * alpha;

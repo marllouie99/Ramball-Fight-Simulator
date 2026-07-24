@@ -13,22 +13,33 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
 
   ctx.save();
 
-  // ── 1. DARK LIQUID WATER FLOOR & SPECULAR SHEEN ──
-  if (!isClashSecondary) {
-    const liquidGrad = ctx.createLinearGradient(0, sy - 200, 0, sy + 600);
-    liquidGrad.addColorStop(0, 'rgba(15, 2, 5, 0.88)');
-    liquidGrad.addColorStop(0.3, 'rgba(40, 4, 10, 0.82)');
-    liquidGrad.addColorStop(0.7, 'rgba(25, 3, 8, 0.86)');
-    liquidGrad.addColorStop(1, 'rgba(10, 1, 3, 0.92)');
+  // Detect if clashing with Yuta's domain specifically
+  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+  const yutaClashFighter = isMultiDomain ? state.fighters.find(f => f && f.domainActive && (f.type === 'yuta' || (f._def && f._def.id === 'yuta'))) : null;
+  const isYutaClash = !!yutaClashFighter;
 
-    ctx.fillStyle = liquidGrad;
-    ctx.beginPath();
-    ctx.arc(sx, sy, domainRadius, 0, Math.PI * 2);
-    ctx.fill();
+  // ── 1. DARK LIQUID WATER FLOOR & SPECULAR SHEEN ──
+  ctx.save();
+  if (isClashSecondary) {
+    ctx.globalAlpha = 0.70; // Blends on top of existing domain during domain clash
   }
 
+  if (!fighter._cachedLiquidGrad || fighter._cachedLiquidGradY !== sy) {
+    fighter._cachedLiquidGradY = sy;
+    fighter._cachedLiquidGrad = ctx.createLinearGradient(0, sy - 200, 0, sy + 600);
+    fighter._cachedLiquidGrad.addColorStop(0, 'rgba(15, 2, 5, 0.88)');
+    fighter._cachedLiquidGrad.addColorStop(0.3, 'rgba(40, 4, 10, 0.82)');
+    fighter._cachedLiquidGrad.addColorStop(0.7, 'rgba(25, 3, 8, 0.86)');
+    fighter._cachedLiquidGrad.addColorStop(1, 'rgba(10, 1, 3, 0.92)');
+  }
+
+  ctx.fillStyle = fighter._cachedLiquidGrad;
+  ctx.beginPath();
+  ctx.arc(sx, sy, domainRadius, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
   // Horizontal liquid water wave sheen lines across the floor
-  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
   const waveCount = isMultiDomain ? 4 : 12;
   ctx.lineWidth = 1;
   for (let w = 0; w < waveCount; w++) {
@@ -39,6 +50,31 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
     ctx.moveTo(sx - 1200, wy);
     ctx.quadraticCurveTo(sx, wy + Math.sin(time * 0.004 + w * 2) * 12, sx + 1200, wy);
     ctx.stroke();
+  }
+
+  // ── DOMAIN CLASH: Blood-water crimson ripples radiating toward Yuta's domain side ──
+  if (isYutaClash) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const yDomX = yutaClashFighter.domainX !== undefined ? yutaClashFighter.domainX : yutaClashFighter.x;
+    const yDomY = yutaClashFighter.domainY !== undefined ? yutaClashFighter.domainY : yutaClashFighter.y;
+    const dirAngle = Math.atan2(yDomY - sy, yDomX - sx);
+
+    // Radiate 5 concentric blood ripple arcs toward Yuta's domain
+    for (let r = 0; r < 5; r++) {
+      const rippleRadius = 80 + r * 55 + Math.sin(time * 0.003 + r * 1.2) * 15;
+      const rippleAlpha = 0.18 + Math.sin(time * 0.004 + r * 2.5) * 0.1;
+      ctx.strokeStyle = `rgba(180, 20, 20, ${rippleAlpha})`;
+      ctx.lineWidth = 2.5 - r * 0.3;
+      ctx.shadowBlur = 8;
+      ctx.shadowColor = 'rgba(255, 0, 0, 0.4)';
+      ctx.beginPath();
+      // Arc only on the half facing Yuta's domain
+      ctx.arc(sx, sy, rippleRadius, dirAngle - Math.PI * 0.4, dirAngle + Math.PI * 0.4);
+      ctx.stroke();
+    }
+    ctx.shadowBlur = 0;
+    ctx.restore();
   }
 
   // ── 2. WATER REFLECTION OF THE SHRINE STRUCTURE ──
@@ -77,6 +113,11 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   const sx = fighter.domainX !== undefined ? fighter.domainX : fighter.x;
   const sy = fighter.domainY !== undefined ? fighter.domainY : fighter.y;
 
+  // Detect Yuta domain clash
+  const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+  const yutaClashFighter = isMultiDomain ? state.fighters.find(f => f && f.domainActive && (f.type === 'yuta' || (f._def && f._def.id === 'yuta'))) : null;
+  const isYutaClash = !!yutaClashFighter;
+
   ctx.save();
 
   // ── REAL SHRINE STRUCTURE (Above Water Level) ──
@@ -85,14 +126,44 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   fighter._drawShrineBody(ctx);
   ctx.restore();
 
-  // Floating Blood/Spark Embers inside Domain
-  for (let p = 0; p < 10; p++) {
-    const px = sx + (Math.sin(time * 0.002 + p * 1.7) * 450);
-    const py = sy + (Math.cos(time * 0.0025 + p * 2.3) * 300);
-    ctx.fillStyle = '#FF2200';
+  // ── DOMAIN CLASH: Crimson cleave slash arcs flickering around the Shrine ──
+  if (isYutaClash) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+
+    // 3 rotating cleave slash arcs around the Shrine roof horns
+    for (let s = 0; s < 3; s++) {
+      const slashAngle = (s / 3) * Math.PI * 2 + time * 0.004;
+      const slashRadius = 80 + Math.sin(time * 0.005 + s * 2) * 20;
+      const slashAlpha = 0.4 + Math.sin(time * 0.006 + s * 3) * 0.25;
+
+      ctx.strokeStyle = `rgba(255, 20, 20, ${slashAlpha})`;
+      ctx.lineWidth = 3;
+
+      // Draw a curved cleave slash arc
+      ctx.beginPath();
+      const arcStart = slashAngle - 0.4;
+      const arcEnd = slashAngle + 0.4;
+      ctx.arc(sx, sy - 35, slashRadius, arcStart, arcEnd);
+      ctx.stroke();
+
+      // Thin white edge highlight
+      ctx.strokeStyle = `rgba(255, 200, 200, ${slashAlpha * 0.7})`;
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(sx, sy - 35, slashRadius - 2, arcStart + 0.05, arcEnd - 0.05);
+      ctx.stroke();
+    }
+
+    // Pulsing crimson energy border on Sukuna's domain edge
+    const borderPulse = 0.3 + Math.sin(time / 220) * 0.15;
+    ctx.strokeStyle = `rgba(220, 20, 60, ${borderPulse})`;
+    ctx.lineWidth = 3.5;
     ctx.beginPath();
-    ctx.arc(px, py, 1.8 + (p % 3), 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(sx, sy, 450, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   ctx.restore();

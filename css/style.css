@@ -1,15 +1,20 @@
 /* ─────────────────────────────────────────────
    Base
 ───────────────────────────────────────────── */
-body {
+html, body {
   margin: 0;
+  padding: 0;
   font-family: Arial, sans-serif;
-  background: radial-gradient(circle at top, #262626 15%, #101010 65%);
-  color: #fbfbfb;
-  display: grid;
-  place-items: center;
+  background: #ffffff;
+  color: #111111;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100vw;
+  height: 100vh;
   min-height: 100vh;
-  padding: 12px;
+  overflow: hidden;
+  box-sizing: border-box;
 }
 
 /* ─────────────────────────────────────────────
@@ -18,17 +23,26 @@ body {
 .game-container {
   display: flex;
   justify-content: center;
-  align-items: flex-start;
+  align-items: center;
   gap: 20px;
   width: 100%;
-  max-width: 1200px;
+  max-width: 540px;
+  height: 100%;
+  max-height: 100vh;
+  margin: auto;
+  box-sizing: border-box;
 }
 
 .game-box {
   position: relative;
   text-align: center;
-  width: min(100%, 640px);
-  max-width: 100%;
+  width: 100%;
+  max-width: 540px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: auto;
   box-sizing: border-box;
 }
 
@@ -56,7 +70,7 @@ canvas {
 
 .health-hud {
   position: absolute;
-  top: 60.5%;
+  top: 67.8%;
   left: 0;
   right: 0;
   z-index: 10;
@@ -161,14 +175,34 @@ canvas {
   height: 14px;
   background: rgba(0, 0, 0, 0.15);
   border-radius: 8px;
-  overflow: hidden;
+  overflow: visible;
   margin: 8px 0 0;
+  transition: box-shadow 120ms ease, border-color 120ms ease;
 }
 
 .health-card__fill {
   height: 100%;
   border-radius: 8px;
-  transition: width 180ms ease;
+  transition: width 180ms ease, box-shadow 120ms ease, filter 120ms ease;
+  box-sizing: border-box;
+}
+
+.health-card__fill.hit-glow {
+  box-shadow: 0 0 14px 3px rgba(255, 40, 40, 0.95), inset 0 0 8px 2px #ffffff;
+  filter: brightness(1.3);
+}
+
+.health-card__fill.heal-glow {
+  box-shadow: 0 0 14px 3px rgba(34, 197, 94, 0.95), inset 0 0 8px 2px #ffffff;
+  filter: brightness(1.35);
+}
+
+.health-card__bar.hit-glow {
+  box-shadow: 0 0 10px 2px rgba(255, 40, 40, 0.6);
+}
+
+.health-card__bar.heal-glow {
+  box-shadow: 0 0 10px 2px rgba(34, 197, 94, 0.6);
 }
 
 .health-card__meta {
@@ -242,7 +276,7 @@ canvas {
     flex-direction: row;
     flex-wrap: wrap;
     justify-content: center;
-    align-items: flex-start;
+    align-items: center;
     gap: 12px;
   }
 
