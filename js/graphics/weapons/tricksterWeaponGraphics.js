@@ -1,3 +1,5 @@
+import { getHandSize } from '../../core/config.js';
+
 /**
  * Trickster's Weapon: The Arcane Staff
  * A long, slender shaft with a complex, ornate, asymmetrical headpiece.
@@ -301,19 +303,20 @@ export function drawTricksterStaff(ctx, fighter) {
   ctx.strokeStyle = '#000';
   ctx.globalAlpha = baseAlpha;
   
+  const handR = getHandSize(6);
   if (fighter.stolenWindUpTimer > 0) {
     // Left hand
     ctx.beginPath();
-    ctx.arc(-shaftThickness/2 - 4, 10, 6, 0, Math.PI * 2);
+    ctx.arc(-shaftThickness/2 - 4, 10, handR, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
     // Right hand
     ctx.beginPath();
-    ctx.arc(shaftThickness/2 + 4, -10, 6, 0, Math.PI * 2);
+    ctx.arc(shaftThickness/2 + 4, -10, handR, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
   } else {
     // Single hand gripping the staff
     ctx.beginPath();
-    ctx.arc(0, 5, 6, 0, Math.PI * 2);
+    ctx.arc(0, 5, handR, 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
   }
 

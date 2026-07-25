@@ -1,8 +1,24 @@
 export function drawSlowEffect(ctx, baseRadius) {
-  ctx.fillStyle = 'rgba(77, 163, 255, 0.3)';
+  // A subtle dark blue aura with descending rings indicating "weighed down"
+  ctx.fillStyle = 'rgba(40, 60, 100, 0.4)';
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
   ctx.fill();
+  
+  const time = Date.now();
+  ctx.strokeStyle = 'rgba(100, 150, 255, 0.7)';
+  ctx.lineWidth = 2;
+  const numRings = 3;
+  for (let i = 0; i < numRings; i++) {
+    const p = ((time / 1000) + (i / numRings)) % 1; // 0 to 1 over 1 second
+    const yOffset = (p * 2 - 1) * baseRadius; // Moves from top (-radius) to bottom (+radius)
+    // Calculate radius of the ring at this yOffset to wrap around the sphere
+    const ringRadius = Math.sqrt(Math.max(0, baseRadius * baseRadius - yOffset * yOffset)) + 4; 
+    
+    ctx.beginPath();
+    ctx.ellipse(0, yOffset, ringRadius, ringRadius * 0.35, 0, 0, Math.PI * 2);
+    ctx.stroke();
+  }
 }
 
 export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode) {
@@ -374,6 +390,7 @@ export function drawSilenceEffect(ctx, baseRadius) {
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius * 1.3, t / 150, t / 150 + Math.PI * 2);
   ctx.stroke();
+  ctx.setLineDash([]); // Prevent dashed line leak
 
   // 4. Silence Padlock Icon floating above target's head
   const lockY = -baseRadius - 14;

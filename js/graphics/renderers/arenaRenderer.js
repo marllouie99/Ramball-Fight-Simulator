@@ -76,7 +76,7 @@ export function drawPurpleDimScreen() {
   if (targetOpacity > currentPurpleDimOpacity) {
     currentPurpleDimOpacity += (targetOpacity - currentPurpleDimOpacity) * 0.15; // Smooth charge fade-in
   } else {
-    currentPurpleDimOpacity += (targetOpacity - currentPurpleDimOpacity) * 0.06; // Smooth gradual fade-out
+    currentPurpleDimOpacity += (targetOpacity - currentPurpleDimOpacity) * 0.18; // Smooth clear fade-out
   }
 
   if (currentPurpleDimOpacity < 0.01) {
@@ -90,7 +90,7 @@ export function drawPurpleDimScreen() {
 
   // Dark base purple overlay
   ctx.fillStyle = `rgba(18, 2, 32, ${opacity * 0.7})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
 
   // Dynamic radial gradient centered on Gojo or Purple Orb
   const maxDim = Math.max(canvas.width, canvas.height) * 0.95;
@@ -112,7 +112,82 @@ export function drawPurpleDimScreen() {
 
   ctx.globalAlpha = opacity;
   ctx.fillStyle = state._cachedPurpleDimGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
   ctx.restore();
 }
 
+let currentTojiUltimateOpacity = 0;
+let flyHeads = [];
+
+export function drawTojiUltimateOverlay() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas) return;
+
+  const toji = state.fighters?.find(f => f && f.ultimateActive && (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING' || f.ultimatePhase === 'CRATER_FADEIN' || f.ultimatePhase === 'CRATER'));
+
+  let targetOpacity = 0;
+  if (toji) {
+    targetOpacity = 0.85; // Very dark
+    
+    // Spawn fly heads if we have less than 40
+    if (Math.random() < 0.4 && flyHeads.length < 40) {
+      flyHeads.push({
+        x: canvas.width + Math.random() * 100,
+        y: Math.random() * canvas.height,
+        vx: -15 - Math.random() * 20,
+        vy: (Math.random() - 0.5) * 5,
+        size: 5 + Math.random() * 10 // Reduced from 15 + Math.random() * 30 to be much smaller
+      });
+    }
+  }
+
+  // Smooth fade
+  if (targetOpacity > currentTojiUltimateOpacity) {
+    currentTojiUltimateOpacity += (targetOpacity - currentTojiUltimateOpacity) * 0.15;
+  } else {
+    currentTojiUltimateOpacity += (targetOpacity - currentTojiUltimateOpacity) * 0.18;
+  }
+
+  if (currentTojiUltimateOpacity < 0.01) {
+    currentTojiUltimateOpacity = 0;
+    flyHeads = []; // Clear array when not in use
+    return;
+  }
+
+  ctx.save();
+  // Reset the transform temporarily so the pitch-black overlay and swarm are perfectly glued to the camera
+  // and do not jitter or expose the edges of the screen during violent screen shakes.
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = currentTojiUltimateOpacity;
+  
+  // Pitch black overlay
+  ctx.fillStyle = '#050505';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw and update fly heads
+  ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+  for (let i = flyHeads.length - 1; i >= 0; i--) {
+    const head = flyHeads[i];
+    
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, head.size, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Tiny red eyes
+    ctx.fillStyle = 'red';
+    ctx.beginPath();
+    ctx.arc(head.x - head.size * 0.3, head.y - head.size * 0.1, 2, 0, Math.PI * 2);
+    ctx.arc(head.x + head.size * 0.1, head.y - head.size * 0.1, 2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
+    
+    head.x += head.vx;
+    head.y += head.vy;
+    
+    if (head.x < -100) {
+      flyHeads.splice(i, 1);
+    }
+  }
+
+  ctx.restore();
+}

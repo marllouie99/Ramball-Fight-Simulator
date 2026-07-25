@@ -206,12 +206,36 @@ export const SKILL_SOUNDS = {
       src: 'Assets/Sound Effects/Skills/mixing.mp3',
       volume: 5.0
       ,
-      delay: 0
+      delay: -0.10
     },
     purple_fire: {
       src: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
-      volume: 1.0
-      ,
+      volume: 1.0,
+      delay: 0
+    },
+    purple_deploy: {
+      src: 'Assets/Sound Effects/Skills/purpledeploy.mp3',
+      volume: 2.5,
+      delay: 0
+    },
+    red_charging: {
+      src: 'Assets/Sound Effects/Skills/redcharging.mp3',
+      volume: 2.0,
+      delay: 0
+    },
+    red_channeling: {
+      src: 'Assets/Sound Effects/Skills/redchanneling.mp3',
+      volume: 1.8,
+      delay: 0
+    },
+    red_deploy: {
+      src: 'Assets/Sound Effects/Skills/reddeploy.mp3',
+      volume: 2.0,
+      delay: 0
+    },
+    red_blast: {
+      src: 'Assets/Sound Effects/Skills/redblast.mp3',
+      volume: 2.5,
       delay: 0
     }
   },

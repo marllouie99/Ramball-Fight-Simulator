@@ -77,6 +77,7 @@ function getCronosHoneycombPattern(ctx) {
 export class CronosFighter extends Fighter {
   constructor(def) {
     super(def);
+    this.type = 'cronos';
     this.sphereActive = false;
     this.sphereTimer = 0;
     this.sphereCooldown = CONFIG.cronos.sphereCooldown;
@@ -88,7 +89,7 @@ export class CronosFighter extends Fighter {
     this.meleeSwingTimer = 0;
     this.meleeSlashFadeTimer = 0;
     this.meleeSwingAngle = 0;
-    this.meleeSwingDirection = 1;
+    this.meleeSwingDirection = -1; // -1 so first strike flips to 1 (top-to-bottom downward slash)
     this.doubleStrikeTimer = 0;
     this.attackSlashEffects = [];
   }
@@ -106,9 +107,25 @@ export class CronosFighter extends Fighter {
     this.meleeSwingTimer = 0;
     this.meleeSlashFadeTimer = 0;
     this.meleeSwingAngle = 0;
-    this.meleeSwingDirection = 1; // 1 = right-to-left, -1 = left-to-right
+    this.meleeSwingDirection = -1; // 1 = right-to-left (top-to-bottom), -1 = left-to-right (bottom-to-top)
     this.doubleStrikeTimer = 0;   // Window to execute the second strike
     this.attackSlashEffects = [];
+  }
+
+  triggerDemoAttack() {
+    this.meleeSwingActive = true;
+    this.meleeSwingTimer = CONFIG.cronos?.meleeSwingDuration || 20;
+    if (this._demoSwingDir === undefined) {
+      this._demoSwingDir = 1;
+    } else {
+      this._demoSwingDir *= -1;
+    }
+    this.meleeSwingDirection = this._demoSwingDir;
+    this.meleeSwingAngle = 0;
+    try {
+      const sound = getBasicAttackSound(this._def?.id, this._def?.type);
+      if (sound) playSound(sound.src, sound.volume);
+    } catch (e) {}
   }
 
   normalizeAngle(angle) {
@@ -1074,7 +1091,8 @@ export class CronosFighter extends Fighter {
     }
 
     // Draw melee swing arc
-    if (this.meleeSwingActive || this.meleeSlashFadeTimer > 0) {
+    const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
+    if (this.meleeSwingActive || this.meleeSlashFadeTimer > 0 || editP) {
       let swingProgress = 1.0;
       let fade = this.meleeSlashFadeTimer / 15;
 
@@ -1082,16 +1100,16 @@ export class CronosFighter extends Fighter {
       const isMulti = state && state.mode && state.mode !== '1v1';
       const useLOD = false;
 
-      if (this.meleeSwingActive) {
-        swingProgress = 1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration);
+      if (this.meleeSwingActive || editP) {
+        swingProgress = editP ? 0.5 : (1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration));
         fade = 1.0;
       }
 
       // Determine swing direction for correct visual arc rendering
       const isForward = this.meleeSwingDirection === 1;
 
-      const arcRadius = this.r + 80;
-      const innerRadius = this.r + 30;
+      const arcRadius = (this.r + 80) * (editP ? editP.scale : 1.0);
+      const innerRadius = (this.r + 30) * (editP ? editP.scale : 1.0);
 
       const fullStartA = -Math.PI * 0.4; // Matches start of sword swing
       const fullEndA = Math.PI * 0.4;    // Matches end of sword swing
@@ -1109,6 +1127,9 @@ export class CronosFighter extends Fighter {
 
       ctx.save();
       ctx.translate(this.x, this.y);
+      if (editP) {
+        ctx.translate(editP.offsetX, editP.offsetY);
+      }
       ctx.rotate(this.meleeSwingAngle);
       
       // Mirror the entire slash visual vertically if it's a reverse swing

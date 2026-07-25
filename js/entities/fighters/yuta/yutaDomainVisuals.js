@@ -27,8 +27,6 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 
   const domainRadius = CONFIG.yuta.domainRadius || 350;
 
-  ctx.save();
-
   // ── 1. DARK ATMOSPHERIC VOID & ROSY AMBIENT GLOW ──
   const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
   if (!fighter._cachedYutaBgGrad || fighter._cachedYutaBgMidX !== midX || fighter._cachedYutaBgMidY !== midY) {
@@ -58,15 +56,20 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     ctx.save();
     ctx.globalAlpha = (0.6 + pulse * 2) * alphaMult;
     
-    const vortexGradient = ctx.createRadialGradient(domX, domY - arenaH * 0.45, 50, domX, domY - arenaH * 0.45, 600);
-    vortexGradient.addColorStop(0, '#000000');
-    vortexGradient.addColorStop(0.2, '#0c0207');
-    vortexGradient.addColorStop(0.6, 'rgba(20, 5, 15, 0.6)');
-    vortexGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = vortexGradient;
+    // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
     ctx.beginPath();
     ctx.arc(domX, domY - arenaH * 0.45, 600, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(20, 5, 15, 0.4)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(domX, domY - arenaH * 0.45, 300, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(12, 2, 7, 0.7)';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(domX, domY - arenaH * 0.45, 100, 0, Math.PI * 2);
+    ctx.fillStyle = '#000000';
     ctx.fill();
     
     const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
@@ -424,10 +427,8 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     }
 
     ctx.restore();
-    ctx.restore();
   }
 
-  ctx.restore();
   ctx.restore();
 }
 

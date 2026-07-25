@@ -269,7 +269,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
  */
 export function getBasicAttackSound(id, type) {
   // 1. Try numeric ID lookup
-  if (id !== undefined && BASIC_ATTACK_SOUNDS[id] !== undefined) {
+  if (id !== undefined && id !== null && BASIC_ATTACK_SOUNDS[id] !== undefined) {
     return BASIC_ATTACK_SOUNDS[id];
   }
 

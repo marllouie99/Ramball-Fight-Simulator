@@ -1,4 +1,4 @@
-import { CONFIG } from '../../core/config.js';
+import { CONFIG, getHandSize } from '../../core/config.js';
 
 
 const RubyTheme = {
@@ -421,7 +421,7 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   
   // Rear hand (near pommel)
   ctx.beginPath();
-  ctx.arc(15, 0, 6, 0, Math.PI * 2);
+  ctx.arc(15, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fillStyle = fighter.color || '#e0115f'; // Default ruby color
   ctx.fill();
   ctx.lineWidth = 1.5;
@@ -430,7 +430,7 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   
   // Front hand (further up shaft)
   ctx.beginPath();
-  ctx.arc(45, 0, 6, 0, Math.PI * 2);
+  ctx.arc(45, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   

@@ -3,6 +3,8 @@
 //  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
 //  - If you want to change Assassin weapon visuals, edit the palette or functions below.
 
+import { getHandSize } from '../../core/config.js';
+
 export const ASSASSIN_WEAPON_GRAPHICS = {
   shuriken: {
     bladeColor: '#3a3a3a',            // Main blade color
@@ -103,7 +105,7 @@ export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor =
   // ── Hand ──
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(0, 0, 6, 0, Math.PI * 2); // Center of shuriken
+  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2); // Center of shuriken
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';
@@ -210,7 +212,7 @@ export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetSc
   // ── Hand ──
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(-r * 0.6 * 1.2 / 2, 0, 6, 0, Math.PI * 2); // Center of hilt
+  ctx.arc(-r * 0.6 * 1.2 / 2, 0, getHandSize(6), 0, Math.PI * 2); // Center of hilt
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';

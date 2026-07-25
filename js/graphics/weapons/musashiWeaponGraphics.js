@@ -1,3 +1,5 @@
+import { getHandSize } from '../../core/config.js';
+
 export function drawMusashiWeapons(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
@@ -386,7 +388,7 @@ function drawKatana(ctx, offset, scale, auraColor, fighterColor = '#555') {
   // ── Hand ──
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(-7, 0, 6, 0, Math.PI * 2);
+  ctx.arc(-7, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';
@@ -528,7 +530,7 @@ function drawWakizashi(ctx, offset, scale, auraColor, fighterColor = '#555') {
   // ── Hand ──
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(-5, 0, 6, 0, Math.PI * 2);
+  ctx.arc(-5, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';

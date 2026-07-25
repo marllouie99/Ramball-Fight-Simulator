@@ -1,4 +1,5 @@
 import { drawStolenWeapon } from '../../entities/fighters/hydra/hydraStolenWeapons.js';
+import { getHandSize } from '../../core/config.js';
 
 /**
  * Hydra's Weapon Graphics
@@ -6,7 +7,7 @@ import { drawStolenWeapon } from '../../entities/fighters/hydra/hydraStolenWeapo
  */
 
 export function drawHydraGun(ctx, fighter) {
-    const handRadius = fighter.r * 0.35;
+    const handRadius = getHandSize(fighter.r * 0.35);
     
     if (fighter.stolenWeaponType) {
        // Draw the stolen weapon (managed centrally)

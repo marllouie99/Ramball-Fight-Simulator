@@ -22,10 +22,25 @@ export const state = {
   arena: CONFIG.arena,
 
   // Global screen shake
-  screenShake: { timer: 0, intensity: 0 },
+  screenShake: { timer: 0, maxTimer: 0, intensity: 0 },
 
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'
+  
+  // Interactive Slash Visual Studio Editor State
+  slashEditMode: false,
+  slashAutoLoop: false,
+  slashEditParams: {
+    offsetX: 0,
+    offsetY: 0,
+    scale: 1.0,
+    thickness: 1.0,
+    duration: 35,
+    arcStart: -0.75,
+    arcEnd: 0.85,
+    speedMult: 1.0
+  },
+  
   indexCategory: 'All',
   mode: GAME_MODES.ONE_VS_ONE,
   testMode: false, // Disables leaderboard recording
@@ -110,9 +125,9 @@ export const state = {
   // Dynamic quality system for performance
   qualityLevel: 1.0, // 1.0 = full quality, 0.5 = half quality, etc.
   qualityCheckTimer: 0,
-  qualityCheckInterval: 15, // OPTIMIZED: Check every 15 frames (0.25 seconds) for immediate response
-  targetFps: 45, // OPTIMIZED: Lower threshold to 45 for more aggressive quality reduction
-  maxTotalParticles: 150, // OPTIMIZED: Hard cap on total particles across all systems
+  qualityCheckInterval: 10, // OPTIMIZED: Check every 10 frames for faster response to OBS frame drops
+  targetFps: 55, // OPTIMIZED: Higher threshold to drop quality earlier and maintain solid 60 FPS for recording
+  maxTotalParticles: 100, // OPTIMIZED: Tighter cap on particles to reduce GPU overhead while streaming
 
   // Match kill tracking for leaderboard
   matchKills: [[], [], [], []],
@@ -180,6 +195,7 @@ export function clearProjectiles() {
 export function triggerGlobalScreenShake(intensity, duration) {
   if (state.screenShake.timer < duration) {
     state.screenShake.timer = duration;
+    state.screenShake.maxTimer = duration;
   }
   if (state.screenShake.intensity < intensity) {
     state.screenShake.intensity = intensity;

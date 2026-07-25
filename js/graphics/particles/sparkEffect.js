@@ -219,6 +219,55 @@ export function spawnTelekinesisDebris(x, y, count = 2) {
 }
 
 /**
+ * Spawns swirling wind debris (small pebbles and leaves) around Toji during his ultimate charge.
+ */
+export function spawnTojiWhirlingWindDebris(x, y, count = 2) {
+  for (let i = 0; i < count; i++) {
+    if (state.sparkEffects.length >= 120) {
+      const oldest = state.sparkEffects.shift();
+      if (oldest) _returnSpark(oldest);
+    }
+
+    const debris = _getSpark();
+    const isLeaf = Math.random() < 0.50; // 50% chance leaf, 50% chance pebble
+    
+    // Spawn in a strict orbital circle around center
+    const radius = 30 + Math.random() * 65;
+    const angle = Math.random() * Math.PI * 2;
+    
+    debris.cx = x; // Center X
+    debris.cy = y; // Center Y
+    debris.orbitRadius = radius;
+    debris.orbitAngle = angle;
+    debris.orbitSpeed = (0.05 + Math.random() * 0.05) * (Math.random() > 0.5 ? 1 : -1);
+    
+    debris.x = x + Math.cos(angle) * radius;
+    debris.y = y + Math.sin(angle) * (radius * 0.55);
+    debris.vx = 0;
+    debris.vy = 0;
+
+    debris.life = 1.0;
+    debris.decay = 0.018 + Math.random() * 0.015; // Lasts ~50-70 frames orbiting
+    debris.friction = 1.0;
+    debris.type = isLeaf ? 'tojiWindLeaf' : 'tojiWindPebble';
+    debris.isFlash = false;
+    debris.rotation = Math.random() * Math.PI * 2;
+    debris.rotationSpeed = (Math.random() - 0.5) * 0.15;
+    debris.size = isLeaf ? (2.5 + Math.random() * 2.5) : (1.2 + Math.random() * 2.0);
+
+    if (isLeaf) {
+      const leafColors = ['#2E8B57', '#3CB371', '#556B2F', '#D2691E', '#8B5A2B', '#A0522D'];
+      debris.color = leafColors[Math.floor(Math.random() * leafColors.length)];
+    } else {
+      const pebbleColors = ['#3A3D40', '#4A4D50', '#25282B', '#5A5D60', '#1F2225'];
+      debris.color = pebbleColors[Math.floor(Math.random() * pebbleColors.length)];
+    }
+
+    state.sparkEffects.push(debris);
+  }
+}
+
+/**
  * Spawns an impact flash (visual-only).
  * @param {number} x - X position
  * @param {number} y - Y position
@@ -666,6 +715,16 @@ export function updateSparkEffects(frozen = false) {
         effect.y += Math.sin(effect.life * 30 + effect.rotation) * 0.4;
         effect.x += Math.cos(effect.life * 20 + effect.rotation) * 0.2;
       }
+
+      if (effect.type === 'tojiWindPebble' || effect.type === 'tojiWindLeaf') {
+        effect.orbitAngle = (effect.orbitAngle || 0) + (effect.orbitSpeed || 0.05);
+        effect.rotation += effect.rotationSpeed;
+        
+        // Strict orbital circular motion around Toji's area
+        const r = effect.orbitRadius || 50;
+        effect.x = effect.cx + Math.cos(effect.orbitAngle) * r;
+        effect.y = effect.cy + Math.sin(effect.orbitAngle) * (r * 0.55) + Math.sin(effect.orbitAngle * 3) * 3;
+      }
       
       // Make scattered debris roll across the ground
       if (effect.type === 'telekinesisDebrisScattered') {
@@ -771,13 +830,16 @@ export function drawSparkEffects(layer = 'all') {
         
         ctx.beginPath();
         if (effect.cracks && !isThunder) {
-          // Standard molten cracks for crimson
+          // Rapidly shoot the cracks outward like a shockwave fracture!
+          const shockwaveProgress = Math.min(1.0, (1.0 - effect.life) * 12.0); // Reaches 1.0 extremely fast
+
           ctx.strokeStyle = `rgba(255, 60, 10, ${effect.life * 0.8})`;
           ctx.lineWidth = 1 + effect.life * 1.5;
           for (const path of effect.cracks) {
             if (path.length > 0) {
+              const drawSegments = Math.max(1, Math.floor(path.length * shockwaveProgress));
               ctx.moveTo(path[0].x, path[0].y);
-              for (let i = 1; i < path.length; i++) {
+              for (let i = 1; i < drawSegments; i++) {
                 ctx.lineTo(path[i].x, path[i].y);
               }
             }
@@ -1116,6 +1178,44 @@ export function drawSparkEffects(layer = 'all') {
         
         ctx.rotate(-(effect.rotation + effect.life * effect.rotationSpeed));
         ctx.translate(-effect.x, -effect.y);
+      } else if (effect.type === 'tojiWindPebble') {
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(effect.rotation || 0);
+        ctx.fillStyle = effect.color || '#3A3D40';
+        ctx.globalAlpha = Math.min(1.0, effect.life * 1.3);
+        
+        // Irregular tiny pebble shape
+        ctx.beginPath();
+        const s = effect.size;
+        ctx.moveTo(-s, -s * 0.6);
+        ctx.lineTo(s * 0.8, -s * 0.8);
+        ctx.lineTo(s, s * 0.4);
+        ctx.lineTo(-s * 0.4, s);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      } else if (effect.type === 'tojiWindLeaf') {
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate((effect.rotation || 0) + effect.life * 0.1);
+        ctx.fillStyle = effect.color || '#2E8B57';
+        ctx.globalAlpha = Math.min(1.0, effect.life * 1.3);
+        
+        // Delicate leaf shape (pointed oval with central vein)
+        const lw = effect.size * 1.6;
+        const lh = effect.size * 0.8;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, lw, lh, 0, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.4)';
+        ctx.lineWidth = 0.7;
+        ctx.beginPath();
+        ctx.moveTo(-lw * 0.7, 0);
+        ctx.lineTo(lw * 0.7, 0);
+        ctx.stroke();
+        ctx.restore();
       } else if (effect.type === 'telekinesisDebris' || effect.type === 'telekinesisDebrisScattered') {
       // Draw a detailed rocky shape with shading and magical aura
       ctx.translate(effect.x, effect.y);
@@ -1171,10 +1271,11 @@ export function drawSparkEffects(layer = 'all') {
       // Expanding ground shockwave ring for Sukuna-Gojo & Sukuna-Yuta/Rika clashes
       effect.size += (effect.targetSize - effect.size) * 0.08;
       const isYutaClash = (effect.clashType === 'yuta');
+      const isTojiClash = (effect.clashType === 'toji');
 
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`;
+      ctx.fillStyle = isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : (isTojiClash ? `rgba(20, 22, 25, ${effect.life * 0.5})` : `rgba(30, 10, 40, ${effect.life * 0.4})`);
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1228,6 +1329,43 @@ export function drawSparkEffects(layer = 'all') {
         ctx.beginPath();
         ctx.moveTo(-slashLen, 0); ctx.lineTo(slashLen, 0);
         ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
+        ctx.stroke();
+        ctx.restore();
+      } else if (isTojiClash) {
+        // ── TOJI PHYSICAL SHOCKWAVE ──
+        // Outer Dark Slate Air Pressure Ring
+        ctx.strokeStyle = `rgba(45, 50, 55, ${effect.life * 0.8})`;
+        ctx.lineWidth = 18 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Middle Purple Soul Aura Ring
+        ctx.strokeStyle = `rgba(160, 80, 240, ${effect.life * 0.85})`;
+        ctx.lineWidth = 10 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.85, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner White-Hot Impact Force Ring
+        ctx.strokeStyle = `rgba(250, 252, 255, ${effect.life * 0.9})`;
+        ctx.lineWidth = 6 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.6, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // High-Speed Wind Distortion Lines (Inner Starburst)
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate((1 - effect.life) * 0.5);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.5})`;
+        ctx.lineWidth = 2 * effect.life;
+        ctx.beginPath();
+        for (let i = 0; i < 8; i++) {
+           const angle = (i / 8) * Math.PI * 2;
+           ctx.moveTo(Math.cos(angle) * (effect.size * 0.2), Math.sin(angle) * (effect.size * 0.2));
+           ctx.lineTo(Math.cos(angle) * (effect.size * 0.9), Math.sin(angle) * (effect.size * 0.9));
+        }
         ctx.stroke();
         ctx.restore();
       } else {

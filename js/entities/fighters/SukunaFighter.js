@@ -1,5 +1,5 @@
 import { Fighter } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
+import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -77,6 +77,16 @@ export class SukunaFighter extends Fighter {
     this._slashSoundCooldown = 0;
   }
 
+  interruptAttacks() {
+    super.interruptAttacks();
+    if (this.fugaSoundKey) {
+      stopLoopingSound(this.fugaSoundKey);
+      this.fugaSoundKey = null;
+    }
+    this.isChannelingDivineFlame = false;
+    this.divineFlameChargeTimer = 0;
+  }
+
   reset() {
     super.reset();
 
@@ -131,6 +141,15 @@ export class SukunaFighter extends Fighter {
     this.hitFlameWisps = [];
     this.combatAuraOpacity = 0;
     this.sakugaImpactTimer = 0;
+  }
+
+  triggerDemoAttack() {
+    const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {} };
+    this.slashGlowTimer = 40;
+    this.punchAnimTimer = 35;
+    if (typeof this.performCleaveStrike === 'function') {
+      this.performCleaveStrike(fakeTarget, 0);
+    }
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -316,8 +335,9 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    if (this._handleTimeStop()) {
-      // Cancel active skill channels if paralyzed / time-stopped by Unlimited Void
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      // Cancel active skill channels if paralyzed / time-stopped / ambushed
       if (this.isChannelingDomainExpansion) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
@@ -325,12 +345,18 @@ export class SukunaFighter extends Fighter {
       if (this.isChannelingDivineFlame) {
         this.isChannelingDivineFlame = false;
         this.divineFlameChargeTimer = 0;
-        if (this.fugaSoundKey) {
-          stopLoopingSound(this.fugaSoundKey);
-          this.fugaSoundKey = null;
-        }
       }
-      return;
+      if (this.fugaSoundKey) {
+        stopLoopingSound(this.fugaSoundKey);
+        this.fugaSoundKey = null;
+      }
+      return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop
+    }
+
+    // Failsafe: stop Fuga charge audio if not currently channeling Divine Flame
+    if (!this.isChannelingDivineFlame && this.fugaSoundKey) {
+      stopLoopingSound(this.fugaSoundKey);
+      this.fugaSoundKey = null;
     }
 
     // Update Sakuga impact frame timer
@@ -393,6 +419,9 @@ export class SukunaFighter extends Fighter {
       if (this.meleeModeCooldown > 0) {
         // In mandatory ranged separation period after combo finisher
         this.isMeleeMode = false;
+      } else if (opponent && opponent.isStealthed && !this.domainActive) {
+        // Disengage from melee combat while opponent is in stealth mode
+        this.isMeleeMode = false;
       } else if (distToOpponent <= 160) {
         if (!this.isMeleeMode) {
           this.isMeleeMode = true;
@@ -409,7 +438,6 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    if (this.meleePunchCooldown > 0) this.meleePunchCooldown--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
@@ -592,7 +620,7 @@ export class SukunaFighter extends Fighter {
         state.fighters.forEach((f, idx) => {
           if (f && f !== this && f.hp > 0) {
             const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-            if (isEnemy) {
+            if (isEnemy && !f.isStealthed) {
               const dist = Math.hypot(this.x - f.x, this.y - f.y);
               if (dist <= flurryRange) {
                 possibleTargets.push(f);
@@ -609,14 +637,22 @@ export class SukunaFighter extends Fighter {
         if (this.flurryTarget && !this.flurryTarget.isDead) {
           this.strikeAngle = Math.random() * Math.PI * 2;
 
+          // Play sword swing sound explicitly so it's heard even if target is invincible (e.g., Toji's ultimate)
+          if (this._slashSoundCooldown <= 0) {
+            playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.65);
+            playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
+            this._slashSoundCooldown = 8; // Faster cooldown for Phase 1 barrage
+          }
+
           this.flurryTarget.takeDamage(CONFIG.sukuna.flurryDamage || 6, this, { isMelee: true });
           this.flurryTarget.applyHitStun(15);
 
           // Apply bleed on flurry hits
           this.applyBleed(this.flurryTarget, 1);
 
+          this.punchAnimTimer = 16;
+          this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1;
           this.slashGlowTimer = 20;
-          this.slashSwingTimer = 10;
           this.slashHand = this.slashHand === 1 ? 0 : 1;
 
           spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#8B0000');
@@ -635,6 +671,7 @@ export class SukunaFighter extends Fighter {
           const oldY = this.y;
           this.x = this.flurryTarget.x + Math.cos(angle) * dist;
           this.y = this.flurryTarget.y + Math.sin(angle) * dist;
+          this.aim(this.flurryTarget);
 
           // Spawn afterimages along the teleport path
           this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
@@ -734,6 +771,7 @@ export class SukunaFighter extends Fighter {
           spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
           triggerGlobalScreenShake(6, 8);
           spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 20, 'crimsonSniper', '#8B0000');
+          this.punchAnimTimer = 0;
           this.slashGlowTimer = 25;
           this.slashSwingTimer = 10;
           this.slashHand = this.slashHand === 1 ? 0 : 1;
@@ -783,6 +821,7 @@ export class SukunaFighter extends Fighter {
             const arena = CONFIG.arena || { x: 0, y: 0, width: 1200, height: 700 };
             this.x = Math.max(arena.x + 30, Math.min(arena.x + arena.width - 30, this.x));
             this.y = Math.max(arena.y + 30, Math.min(arena.y + arena.height - 30, this.y));
+            this.aim(this.flurryTarget);
 
             // Spawn afterimage at old position
             this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
@@ -838,7 +877,7 @@ export class SukunaFighter extends Fighter {
     }
 
     // Check for Phantom Flurry activation (priority over domain when close)
-    if (this.flurryCooldown <= 0 && opponent && !opponent.isDead) {
+    if (this.flurryCooldown <= 0 && opponent && !opponent.isDead && !opponent.isStealthed) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const flurryRange = CONFIG.sukuna.flurryRange || 150;
       if (distSq <= flurryRange ** 2) {
@@ -867,9 +906,11 @@ export class SukunaFighter extends Fighter {
       }
     }
 
+    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
+
     // Check for Divine Flame (Skill 2)
-    // Don't cast if opponent is channeling an ultimate to prevent double-freezes
-    if (this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && this.flurryHitsLeft <= 0 && !opponent.isChannelingPurple) {
+    // Don't cast if ambushed, stunned, or opponent is performing sequence/ultimate
+    if (!isAmbushedOrStunned && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const safeDistance = 200;
       if (distSq > safeDistance ** 2) {
@@ -887,7 +928,7 @@ export class SukunaFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!isSilenced && this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
+    if (!isSilenced && !isAmbushedOrStunned && this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
       this.isChannelingDomainExpansion = true;
       this.domainChargeTimer = 0;
       triggerGlobalScreenShake(6, 90); // Tremble for the full 1.5 seconds
@@ -949,7 +990,7 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
-    if (!opponent || opponent.isDead) return;
+    if (!opponent || opponent.isDead || (opponent.isStealthed && !this.domainActive)) return;
 
     // Initialize combo state
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
@@ -970,23 +1011,18 @@ export class SukunaFighter extends Fighter {
 
     this.x = targetX;
     this.y = targetY;
-
-    spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-    spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
+    this.aim(opponent);
     playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
-    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
-    // 2. Execute Martial Arts hit at current position
+    // Execute Martial Arts hit at current position
     this.meleeComboCount++;
     this.martialArtsComboCount++;
 
     const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
-    const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
-
     opponent.takeDamage(slashDamage, this, { isMelee: true });
     opponent.applyHitStun(12);
-    spawnSparks(opponent.x, opponent.y, 25, 'crimsonSniper', '#8B0000');
-    triggerGlobalScreenShake(5, 6);
+    spawnSparks(opponent.x, opponent.y, 15, 'crimsonSniper', '#8B0000');
+    triggerGlobalScreenShake(4, 5);
 
     const martialArtsAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
 
@@ -998,9 +1034,9 @@ export class SukunaFighter extends Fighter {
     this.sakugaImpactAngle = Math.random() * Math.PI * 2;
     this.sakugaImpactSeed = Math.random();
 
-    // Punch shockwave effect (matching Gojo's style, in crimson red)
-    this.punchAnimTimer = 12;
-    this.punchAnimHand = (this.punchAnimHand || 0) ^ 1; // Toggle front/back hand for punches
+    // Punch shockwave effect
+    this.punchAnimTimer = 16;
+    this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
     if (!this.punchEffects) this.punchEffects = [];
     this.punchEffects.push({
@@ -1010,25 +1046,6 @@ export class SukunaFighter extends Fighter {
       timer: 12,
       maxTimer: 12
     });
-
-    // Residual cursed energy flame wisps
-    if (!this.hitFlameWisps) this.hitFlameWisps = [];
-    for (let k = 0; k < 5; k++) {
-      const spreadAngle = martialArtsAngle + (Math.random() - 0.5) * 1.4;
-      const stretchSpeed = 5 + Math.random() * 7;
-      this.hitFlameWisps.push({
-        x: opponent.x + (Math.random() - 0.5) * 12,
-        y: opponent.y + (Math.random() - 0.5) * 12,
-        vx: Math.cos(spreadAngle) * stretchSpeed,
-        vy: Math.sin(spreadAngle) * stretchSpeed,
-        angle: spreadAngle,
-        timer: 18,
-        maxTimer: 18,
-        length: 14 + Math.random() * 18,
-        width: 3.5 + Math.random() * 3.5,
-        color: '#8B0000'
-      });
-    }
 
     // Check for Gojo or Yuta clash shockwave
     if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter' || opponent._def.id === 'yuta' || opponent._def.name === 'YutaFighter' || opponent.type === 'yuta')) {
@@ -1418,7 +1435,9 @@ export class SukunaFighter extends Fighter {
             const finalDamage = domainDamage * rampMultiplier;
 
             f.takeDamage(finalDamage, this, { isDomain: true, bypassShield: true });
-            f.applyHitStun(6);
+            if (f.characterId !== 'toji' && f.type !== 'toji' && !f.domainImmunity && !f.immuneToCC) {
+              f.applyHitStun(6);
+            }
 
             // Fire visible slash projectile from Malevolent Shrine toward enemy
             if (projectileSystem) {
@@ -1568,6 +1587,7 @@ export class SukunaFighter extends Fighter {
     // Render Cursed Energy Aura BEHIND body and weapon constructs
     // Also show during countdown for dramatic effect
     const isParalyzed = (this.timeStopTimer > 0) || (this.electricStunTimer > 0) || (this.crimsonElectrifiedTimer > 0);
+    const isFrozenByDomain = (this.timeStopTimer > 0) || (this.hitStunTimer > 0);
 
     if (this.rctVisualTimer > 0) {
       this._drawSukunaCursedEnergyAura(ctx, 'rct');
@@ -1575,7 +1595,7 @@ export class SukunaFighter extends Fighter {
       this._drawSukunaCursedEnergyAura(ctx, 'fuga');
     } else if (this.isChannelingDomainExpansion && !this.domainActive && !isParalyzed) {
       this._drawSukunaCursedEnergyAura(ctx, 'domain');
-    } else if (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal) {
+    } else if (!isFrozenByDomain && (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal)) {
       this._drawSukunaCursedEnergyAura(ctx, 'red');
     }
 
@@ -1689,15 +1709,20 @@ export class SukunaFighter extends Fighter {
 
           // 2. Volcanic Crimson Cursed Energy Glow
           ctx.save();
-          ctx.globalCompositeOperation = 'screen';
-          const auraGrad = ctx.createRadialGradient(0, 0, this.r * 0.3, 0, 0, this.r * 1.8);
-          auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`);
-          auraGrad.addColorStop(0.4, `rgba(255, 30, 0, ${alpha * 0.75})`);
-          auraGrad.addColorStop(0.8, `rgba(139, 0, 0, ${alpha * 0.4})`);
-          auraGrad.addColorStop(1, 'rgba(139, 0, 0, 0)');
-          ctx.fillStyle = auraGrad;
+          // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
           ctx.beginPath();
           ctx.arc(0, 0, this.r * 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(139, 0, 0, ${alpha * 0.3})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 30, 0, ${alpha * 0.5})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
           ctx.fill();
           ctx.restore();
 
@@ -1854,13 +1879,20 @@ export class SukunaFighter extends Fighter {
       ctx.save();
       ctx.rotate(this.gunAngle);
       const notchX = -32 * progress;
-      const originGrad = ctx.createRadialGradient(notchX, 0, 2, notchX, 0, 18 * progress);
-      originGrad.addColorStop(0, `rgba(255, 255, 220, ${0.95 * progress})`);
-      originGrad.addColorStop(0.4, `rgba(255, 140, 20, ${0.7 * progress})`);
-      originGrad.addColorStop(1, 'rgba(255, 50, 0, 0)');
-      ctx.fillStyle = originGrad;
+      // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
       ctx.beginPath();
       ctx.arc(notchX, 0, 18 * progress, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 50, 0, ${0.3 * progress})`;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(notchX, 0, 10 * progress, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 140, 20, ${0.7 * progress})`;
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.arc(notchX, 0, 5 * progress, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 220, ${0.95 * progress})`;
       ctx.fill();
       ctx.restore();
 
@@ -1886,35 +1918,50 @@ export class SukunaFighter extends Fighter {
     let hideFrontHand = false;
     let hideBackHand = false;
 
-    // Champion Screen / Victory Reveal / Fighter Index Stance: Hide hands completely
-    const isWinnerScreen = this._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Target of Ambush: Hide hands completely
+    const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+    const isWinnerScreen = this._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
 
-    if (isWinnerScreen) {
+    if (isWinnerScreen || this.isTargetOfAmbush) {
       return;
     }
 
-    // 1. Snappy Melee Punch Animation (Striking hand punches 24px forward, off-hand stays visible)
+    // 1. Snappy Melee Punch Animation (Alternating 1-2 punches with clear Left & Right fist paths)
     if (this.punchAnimTimer > 0) {
-      const t = (8 - Math.min(8, this.punchAnimTimer)) / 8; // 0 to 1 progress over 8 frames
-      const snap = t < 0.25 ? (t / 0.25) : Math.max(0, 1 - (t - 0.25) / 0.75);
+      const maxTimer = 16;
+      const t = (maxTimer - Math.min(maxTimer, this.punchAnimTimer)) / maxTimer; // 0 to 1 progress over 16 frames
+      const snap = t < 0.3 ? (t / 0.3) : Math.max(0, 1 - (t - 0.3) / 0.7); // Explosive thrust out 30%, smoothly retracts 70%
+      const punchDist = snap * 24; // 24px punch thrust (lands cleanly on target contact point!)
+
       if (this.punchAnimHand === 0) {
-        frontOffset += snap * 24;        // Right hand punches 24px forward
-        // Left hand stays anchored right at center of body (this.x, basePosY)
+        // --- RIGHT HAND PUNCH (Strikes along right flank) ---
+        frontAngleOffset = 0.22;         // Right side angle offset
+        frontOffset += punchDist;        // Right hand punches 24px forward
+
+        // Left hand stays tucked in tight martial arts guard at chest
+        const guardAngle = this.gunAngle - 0.35;
+        const guardDist = this.r * 0.4;
+        backHandX = this.x + Math.cos(guardAngle) * guardDist;
+        backHandY = basePosY + Math.sin(guardAngle) * guardDist;
       } else {
-        const backAngle = this.gunAngle;
-        const backOffset = (this.r + 6) + snap * 24;
+        // --- LEFT HAND PUNCH (Strikes along left flank) ---
+        const backAngle = this.gunAngle - 0.22; // Left side angle offset
+        const backOffset = (this.r + 6) + punchDist;
         backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches 24px forward!
         backHandY = basePosY + Math.sin(backAngle) * backOffset;
-        frontOffset = -this.r + 2;       // Right hand pulls into chest center
+
+        // Right hand pulls into tight right guard at chest
+        frontAngleOffset = 0.35;
+        frontOffset = -this.r * 0.5;
       }
     }
 
-    // 2. Snappy Single-Hand Slash Swing Animation (Fast 10-frame snappy chop across body)
-    else if (this.slashSwingTimer > 0 || this.slashGlowTimer > 0 || this.rapidSlashHitsLeft > 0 || this.flurryHitsLeft > 0) {
+    // 2. Single-Hand Slash Swing Animation (Fast 10-frame single-hand chop across body when unleashing Cleave / Dismantle slashes)
+    else if (this.slashSwingTimer > 0 || (this.rapidSlashHitsLeft > 0 && this.punchAnimTimer <= 0)) {
       const swingMax = 10;
-      const rawT = this.slashSwingTimer > 0 ? (1 - this.slashSwingTimer / swingMax) : 1.0;
+      const rawT = (10 - Math.max(0, this.slashSwingTimer)) / swingMax; // 0 to 1 smooth progress over 10 frames
       const swingProg = Math.pow(rawT, 0.4); // Fast snappy acceleration curve
-      const swingAngleOffset = (swingProg * 3.14 - 1.57);
+      const swingAngleOffset = (swingProg * Math.PI - Math.PI / 2);
       const swingThrust = Math.sin(swingProg * Math.PI) * 35;
 
       if (this.slashHand === 1) {
@@ -1955,19 +2002,21 @@ export class SukunaFighter extends Fighter {
     let frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
     let frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
 
-    // Safety Clamp: Prevent hands from extending above the top boundary of body circle (-this.r + 6)
+    // Safety Clamp: Prevent idle hands from extending above the top boundary of body circle (-this.r + 6)
+    const isAttacking = (this.punchAnimTimer > 0) || (this.slashSwingTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0);
     const maxTopY = basePosY - (this.r - 6);
-    if (frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
+    if (!isAttacking && frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
       frontHandY = maxTopY;
     }
-    if (backHandY < maxTopY && !this.isChannelingDivineFlame) {
+    if (!isAttacking && backHandY < maxTopY && !this.isChannelingDivineFlame) {
       backHandY = maxTopY;
     }
 
     // 1. Draw Cursed Energy Aura BEHIND physical hands (skip during RCT and Fuga channeling)
     const isRCT = (this.rctVisualTimer > 0);
     const isFuga = (this.isChannelingDivineFlame);
-    const isActive = !isRCT && !isFuga && ((this.combatAuraOpacity > 0.05) || (this.slashGlowTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0) || (this.domainActive) || (state.gameState === 'countdown') || (this.punchAnimTimer > 0));
+    const isFrozenByDomain = (this.timeStopTimer > 0) || (this.hitStunTimer > 0);
+    const isActive = !isRCT && !isFuga && !isFrozenByDomain && ((this.combatAuraOpacity > 0.05) || (this.slashGlowTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0) || (this.domainActive) || (state.gameState === 'countdown') || (this.punchAnimTimer > 0));
 
     if (isActive) {
       let theme = 'red';
@@ -1988,18 +2037,36 @@ export class SukunaFighter extends Fighter {
 
     if (!hideFrontHand) {
       ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, 6.5, 0, Math.PI * 2);
+      ctx.arc(frontHandX, frontHandY, getHandSize(6.5, this), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
 
     if (!hideBackHand) {
       ctx.beginPath();
-      ctx.arc(backHandX, backHandY, 6.5, 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, getHandSize(6.5, this), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
     ctx.restore();
+
+    // Clean crisp energy flash ring around punching fist during punch animation
+    if (this.punchAnimTimer > 0 && !this.domainActive && !this.isChannelingDomainExpansion) {
+      const strikingX = this.punchAnimHand === 0 ? frontHandX : backHandX;
+      const strikingY = this.punchAnimHand === 0 ? frontHandY : backHandY;
+
+      ctx.save();
+      ctx.translate(strikingX, strikingY);
+
+      // Clean crisp Crimson Impact Ring
+      ctx.strokeStyle = '#FF2400';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(0, 0, 10, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
 
     // Taut glowing fiery Cursed Energy bowstring during Fuga charge!
     if (this.isChannelingDivineFlame && !hideFrontHand && !hideBackHand) {
@@ -2262,6 +2329,7 @@ export class SukunaFighter extends Fighter {
         ctx.lineWidth = 4;
         ctx.strokeStyle = `rgba(75, 0, 130, ${progress * 1.2})`;
         ctx.stroke();
+        ctx.setLineDash([]);
         ctx.restore();
       }
     }

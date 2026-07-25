@@ -458,14 +458,20 @@ export function updateRika(fighter, arena) {
       // 1. Target Physical Smash Bounce Impulse (blasts enemy away with heavy momentum)
       const smashVx = Math.cos(pushAngle) * knockbackForce;
       const smashVy = Math.sin(pushAngle) * knockbackForce;
-      rk.target.vx = (rk.target.vx || 0) + smashVx;
-      rk.target.vy = (rk.target.vy || 0) + smashVy;
 
-      if (typeof rk.target.applyKnockback === 'function') {
-        rk.target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
-      }
-      if (typeof rk.target.applyHitStun === 'function') {
-        rk.target.applyHitStun(hitStunDuration);
+      const isTojiTarget = rk.target.characterId === 'toji' || rk.target.type === 'toji' || rk.target.domainImmunity;
+      if (isTojiTarget) {
+        rk.target.vx = (rk.target.vx || 0) + smashVx * 0.4;
+        rk.target.vy = (rk.target.vy || 0) + smashVy * 0.4;
+      } else {
+        rk.target.vx = (rk.target.vx || 0) + smashVx;
+        rk.target.vy = (rk.target.vy || 0) + smashVy;
+        if (typeof rk.target.applyKnockback === 'function') {
+          rk.target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
+        }
+        if (typeof rk.target.applyHitStun === 'function') {
+          rk.target.applyHitStun(hitStunDuration);
+        }
       }
 
       // 2. Rika Equal-and-Opposite Physical Recoil (Rika bounces back off target on impact)

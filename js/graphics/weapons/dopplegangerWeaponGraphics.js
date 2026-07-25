@@ -1,4 +1,4 @@
-import { CONFIG } from '../../core/config.js';
+import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 
@@ -211,7 +211,7 @@ function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor
   
   ctx.fillStyle = fighterColor || '#7b2cbf';
   ctx.beginPath();
-  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';

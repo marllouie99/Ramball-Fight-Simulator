@@ -3,6 +3,8 @@
 //  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
 //  - If you want to change Cronos weapon visuals, edit the palette or drawCronosCrescentBlade() below.
 
+import { getHandSize } from '../../core/config.js';
+
 export const CRONOS_WEAPON_GRAPHICS = {
   blade: {
     pommelColor: '#1b1d21',          // Dark pommel
@@ -57,12 +59,24 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   ctx.save();
   ctx.translate(x, y);
 
+  const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
+  if (editP) {
+    ctx.translate(editP.offsetX, editP.offsetY);
+  }
+
+  let effectiveActive = swingActive;
+  let effectiveTimer = swingTimer;
+  if (editP) {
+    effectiveActive = true;
+    effectiveTimer = Math.floor(swingDuration * 0.5);
+  }
+
   // Calculate swing rotation if active - back and forth animation
   const bladeScale = CRONOS_WEAPON_GRAPHICS.positioning.scale;
   let rotation = gunAngle;
   let visualScale = bladeScale;
-  if (swingActive && swingTimer > 0) {
-    const progress = 1 - (swingTimer / swingDuration);
+  if (effectiveActive && effectiveTimer > 0) {
+    const progress = 1 - (effectiveTimer / swingDuration);
     const swingTotal = Math.PI * 0.8;
     
     // Forward swing starts from left (-0.4 PI) and sweeps to right (+0.4 PI)
@@ -236,7 +250,7 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   // ── Hand ──
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(-10 * bladeScale, 0, 6 * bladeScale, 0, Math.PI * 2);
+  ctx.arc(-10 * bladeScale, 0, getHandSize(6 * bladeScale), 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5 * bladeScale;
   ctx.strokeStyle = '#000';

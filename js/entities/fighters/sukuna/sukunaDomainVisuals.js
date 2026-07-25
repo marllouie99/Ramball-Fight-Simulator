@@ -66,14 +66,14 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
       const rippleAlpha = 0.18 + Math.sin(time * 0.004 + r * 2.5) * 0.1;
       ctx.strokeStyle = `rgba(180, 20, 20, ${rippleAlpha})`;
       ctx.lineWidth = 2.5 - r * 0.3;
-      ctx.shadowBlur = 8;
-      ctx.shadowColor = 'rgba(255, 0, 0, 0.4)';
+      // OPTIMIZED: Removed shadowBlur. Used an alpha layered stroke for glow effect
       ctx.beginPath();
-      // Arc only on the half facing Yuta's domain
       ctx.arc(sx, sy, rippleRadius, dirAngle - Math.PI * 0.4, dirAngle + Math.PI * 0.4);
       ctx.stroke();
+      ctx.lineWidth = (2.5 - r * 0.3) * 2;
+      ctx.strokeStyle = `rgba(255, 0, 0, ${rippleAlpha * 0.4})`;
+      ctx.stroke();
     }
-    ctx.shadowBlur = 0;
     ctx.restore();
   }
 

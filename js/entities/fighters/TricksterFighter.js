@@ -1843,7 +1843,7 @@ export class TricksterFighter extends Fighter {
     ctx.save();
     // Dark void domain canvas background
     ctx.fillStyle = '#050510';
-    ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+    ctx.fillRect(-200, -200, state.canvas.width + 400, state.canvas.height + 400);
 
     // Deep arcane domain background fill
     ctx.fillStyle = 'rgba(10, 25, 20, 0.95)';

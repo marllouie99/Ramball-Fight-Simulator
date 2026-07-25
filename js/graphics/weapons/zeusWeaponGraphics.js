@@ -1,5 +1,7 @@
 // zeusWeaponGraphics.js — The Master Bolt
 // A double-pointed, jagged crystal spear of pure lightning energy.
+import { getHandSize } from '../../core/config.js';
+
 
 export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
   ctx.save();
@@ -277,12 +279,12 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
     
     // Left hand
     ctx.beginPath();
-    ctx.arc(leftX, leftY, 6.5, 0, Math.PI * 2);
+    ctx.arc(leftX, leftY, getHandSize(6.5), 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
     
     // Right hand
     ctx.beginPath();
-    ctx.arc(rightX, rightY, 6.5, 0, Math.PI * 2);
+    ctx.arc(rightX, rightY, getHandSize(6.5), 0, Math.PI * 2);
     ctx.fill(); ctx.stroke();
     
     ctx.restore();
@@ -363,7 +365,7 @@ export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress
   
   // Main grip hand
   ctx.beginPath();
-  ctx.arc(0, 0, 7, 0, Math.PI * 2);
+  ctx.arc(0, 0, getHandSize(7), 0, Math.PI * 2);
   ctx.fill();
   ctx.stroke();
   ctx.restore();

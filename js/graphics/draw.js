@@ -24,11 +24,12 @@ import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.j
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
-import { drawArena, drawPurpleDimScreen } from './renderers/arenaRenderer.js';
+import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay } from './renderers/arenaRenderer.js';
 
 let _cachedTime = 0;
 let _sortedFightersBuffer = [];
 let _fugaLocalTrailPool = [];
+const _cronosGridCache = new Map();
 function getNow() {
   if (_cachedTime === 0) _cachedTime = Date.now();
   return _cachedTime;
@@ -37,7 +38,7 @@ export function resetCachedTime() {
   _cachedTime = 0;
 }
 
-export { drawArena, drawPurpleDimScreen, drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
+export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
 /**
  * Draws a dark dim screen overlay when Zeus is charging or casting his Storm ultimate.
@@ -218,6 +219,8 @@ export function drawRikaSummonDimScreen() {
  * Color cascade: white â†’ bright yellow â†’ golden orange â†’ deep orange â†’ crimson.
  * Conveys supernatural speed, unstoppable momentum, and immense magical power.
  */
+
+
 export function drawDivineFlameArrowConstruct(ctx, {
   x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
 }) {
@@ -989,6 +992,7 @@ export function drawCronosPreActivateBarrier({
   ctx.restore();
 
   // Outer thin ring
+  ctx.save();
   ctx.beginPath();
   ctx.arc(cx, cy, R * 0.97, 0, Math.PI * 2);
   ctx.strokeStyle = `rgba(100, 220, 255, ${(0.15 + 0.1 * p) * pulseIntensity})`;
@@ -1063,8 +1067,8 @@ export function drawCronosPreActivateBarrier({
 
   const { hexOffsets, validCells } = barrierData;
 
-  // Batch 1: Fill cells
-  ctx.fillStyle = 'rgba(10, 30, 60, 0.65)';
+  // Batch 1: Fill cells (Light cyan tint so Cronos remains 100% visible inside barrier)
+  ctx.fillStyle = 'rgba(0, 243, 255, 0.08)';
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -1676,17 +1680,13 @@ export function drawProjectiles() {
 
       const r = 24;
       
-      // Dark drop shadow for visibility against white background
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 8;
-      ctx.shadowOffsetX = 3;
-      ctx.shadowOffsetY = 3;
-      
-      // Glow effect (Electric Cyan blur if frozen by Limitless, Crimson blur if normal)
-      ctx.shadowColor = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.9)' : 'rgba(180, 30, 30, 0.8)';
-      ctx.shadowBlur = 15;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 0;
+      // OPTIMIZED: Removed shadowBlur. Used a dark underlay path for drop shadow instead
+      ctx.beginPath();
+      ctx.arc(3, 3, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+      ctx.arc(r * 0.5 + 3, 3, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fill();
       
       // Ghost trail - fading afterimages behind the blade
       for (let i = 3; i >= 1; i--) {
@@ -1717,8 +1717,6 @@ export function drawProjectiles() {
       // Sharp outer crescent edge
       ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.95 * lifeRatio})` : `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
       ctx.lineWidth = 2;
-      ctx.shadowColor = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.9)' : 'rgba(255, 100, 100, 0.9)';
-      ctx.shadowBlur = 12;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.98, -Math.PI * 0.58, Math.PI * 0.58, false);
       ctx.stroke();
@@ -1731,7 +1729,6 @@ export function drawProjectiles() {
       // Thin bright center line
       ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(255, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
       ctx.lineWidth = 1;
-      ctx.shadowBlur = 5;
       ctx.beginPath();
       ctx.arc(0, 0, r * 0.6, -Math.PI * 0.5, Math.PI * 0.5, false);
       ctx.stroke();
@@ -1754,13 +1751,15 @@ export function drawProjectiles() {
       ctx.rotate(angle);
       ctx.scale(scale, scale);
 
-      // Add dark drop shadow so the white blade stands out against the white arena
-      ctx.shadowColor = `rgba(0, 0, 0, ${0.8 * lifeRatio})`;
-      ctx.shadowBlur = 12;
-      ctx.shadowOffsetX = 2;
-      ctx.shadowOffsetY = 2;
-
       const r = 24;
+
+      // OPTIMIZED: Removed shadowBlur. Used a dark underlay path for drop shadow instead
+      ctx.beginPath();
+      ctx.arc(2, 2, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+      ctx.arc(r * 0.45 + 2, 2, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * lifeRatio})`;
+      ctx.fill();
       
       // Draw the pure white crescent blade
       ctx.beginPath();
@@ -2484,6 +2483,12 @@ export function drawFighters() {
     if (aDomain && !bDomain) return 1;
     if (!aDomain && bDomain) return -1;
 
+    // Force active punchers/attackers/skill casters to render on top of their targets so punching hands & skill effects overlay opponent bodies
+    const aPunching = (a.f.punchAnimTimer && a.f.punchAnimTimer > 0) || (a.f.isChannelingPurple) || (a.f.redEffectTimer && a.f.redEffectTimer > 0);
+    const bPunching = (b.f.punchAnimTimer && b.f.punchAnimTimer > 0) || (b.f.isChannelingPurple) || (b.f.redEffectTimer && b.f.redEffectTimer > 0);
+    if (aPunching && !bPunching) return 1;
+    if (!aPunching && bPunching) return -1;
+
     return a.f.y - b.f.y;
   });
 
@@ -2880,16 +2885,11 @@ export function drawIllusions() {
 }
 
 export function drawAllCronosSpheres(ctx) {
-  // OPTIMIZATION: Skip sphere drawing entirely at very low FPS
-  const fps = (typeof state !== 'undefined' && state.fps) || 60;
-  const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
-
-
   const now = getNow();
-  for (const fighter of state.fighters) {
+  const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
+  for (const fighter of allEntities) {
     if (!fighter || !fighter.sphereActive) continue;
-    const elapsed = CONFIG.cronos.sphereDuration - fighter.sphereTimer;
+    const elapsed = CONFIG.cronos.sphereDuration - (fighter.sphereTimer || 0);
     const deployProgress = Math.min(1, Math.max(0, elapsed / Math.max(1, CONFIG.cronos.sphereDuration)));
 
     try {
@@ -3205,8 +3205,11 @@ export function drawThermobaricExplosions(ctx) {
         ctx.rotate(d.rot);
         if (d.type === 'ember') {
           ctx.globalAlpha = craterAlpha * 0.9;
-          ctx.shadowColor = '#FF6600';
-          ctx.shadowBlur = 6;
+          // OPTIMIZED: Removed shadowBlur. Used layered alpha circles.
+          ctx.fillStyle = 'rgba(255, 102, 0, 0.4)';
+          ctx.beginPath();
+          ctx.arc(0, 0, d.size * 1.2, 0, Math.PI * 2);
+          ctx.fill();
           ctx.fillStyle = d.color;
           ctx.beginPath();
           ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
@@ -3215,15 +3218,16 @@ export function drawThermobaricExplosions(ctx) {
           ctx.beginPath();
           ctx.arc(0, 0, d.size * 0.2, 0, Math.PI * 2);
           ctx.fill();
-          ctx.shadowBlur = 0;
         } else if (d.type === 'smoke') {
           ctx.globalAlpha = craterAlpha * 0.25;
-          const sG = ctx.createRadialGradient(0, 0, 0, 0, 0, d.size);
-          sG.addColorStop(0, `rgba(60, 50, 40, ${craterAlpha * 0.3})`);
-          sG.addColorStop(1, 'rgba(40, 30, 20, 0)');
-          ctx.fillStyle = sG;
+          // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
+          ctx.fillStyle = `rgba(60, 50, 40, ${craterAlpha * 0.15})`;
           ctx.beginPath();
           ctx.arc(0, 0, d.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = `rgba(30, 20, 15, ${craterAlpha * 0.4})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, d.size * 0.5, 0, Math.PI * 2);
           ctx.fill();
         } else {
           ctx.globalAlpha = craterAlpha * 0.85;

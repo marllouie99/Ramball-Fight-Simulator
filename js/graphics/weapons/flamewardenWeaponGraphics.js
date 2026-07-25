@@ -4,7 +4,7 @@
 //  - If you want to change Flamewarden weapon visuals, edit the palette or drawOrangeFlamethrowerGun() below.
 
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { CONFIG } from '../../core/config.js';
+import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
 // ─────────────────────────────────────────────
@@ -591,7 +591,7 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor =
   
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';

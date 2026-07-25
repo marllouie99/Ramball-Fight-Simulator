@@ -3,6 +3,8 @@
 //  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
 //  - If you want to change Crimson Sniper weapon visuals, edit the palette or drawRedSniperGun() below.
 
+import { getHandSize } from '../../core/config.js';
+
 export const CRIMSON_SNIPER_WEAPON_GRAPHICS = {
   colors: {
     whiteMetal: '#e8e8eb',     // Main body
@@ -575,7 +577,7 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   ctx.translate(3 * s, 10 * s); // Position hand near the trigger grip
   ctx.fillStyle = fighterColor;
   ctx.beginPath();
-  ctx.arc(0, 0, 6, 0, Math.PI * 2);
+  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2);
   ctx.fill();
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = '#000';

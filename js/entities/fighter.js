@@ -1,7 +1,7 @@
 // ─────────────────────────────────────────────
 // BASE FIGHTER CLASS
 // ─────────────────────────────────────────────
-import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
+import { CONFIG, GUN_TIP_DIST, getHandSize } from '../core/config.js';
 import { MODE_HP_MULTIPLIER, MODE_SPEED_MULTIPLIER, MODE_SETTINGS, GAME_MODES } from '../core/modeConfig.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { playSound, stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
@@ -14,7 +14,8 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
-import { state, spawnFloatingText, recordWin, recordLoss } from '../core/state.js';
+import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake } from '../core/state.js';
+import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
@@ -58,6 +59,7 @@ export class Fighter {
   constructor(def) {
     this._def = def;
     this.id = def.id;
+    this.type = def.type;
     this.name = def.name;
     this.color = def.color;
     
@@ -70,6 +72,17 @@ export class Fighter {
     this.lastKilledDef = null;
     
     this.reset();
+  }
+
+  /** Default demo attack trigger for menu preview (can be overridden by subclasses). */
+  triggerDemoAttack() {
+    this.spearSwingTimer = 45;
+    this.punchAnimTimer = 35;
+    this.recoilTimer = 25;
+    try {
+      const sound = getBasicAttackSound(this.id, this._def?.type);
+      if (sound) playSound(sound.src, sound.volume);
+    } catch (e) {}
   }
 
   /** Restores all dynamic values to their initial states. */
@@ -161,14 +174,14 @@ export class Fighter {
   }
 
   applySlow(frames, multiplier) {
-    if (this.immuneToCC) return;
+    if (this.immuneToCC || this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') return;
     // Refresh the slow if it's longer/stronger than current
     if (this.slowTimer < frames) this.slowTimer = frames;
     this.slowMultiplier = multiplier;
   }
 
   applyHitStun(frames) {
-    if (this.immuneToCC) return;
+    if (this.immuneToCC || this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') return;
     // Temporary slowdown when hit - creates impact feel
     // Uses a separate stun timer that overrides normal speed
     if (!this.hitStunTimer || this.hitStunTimer < frames) {
@@ -214,17 +227,21 @@ export class Fighter {
     // Berserker
     this.axeSwingActive = false;
 
-    // Trickster
-    this.telekinesisTimer = 0;
-    this.tkTimer = 0;
-    if (this.tkTarget && this.tkTarget.tkLifted) {
-      this.tkTarget.tkLifted = false;
-    }
+    // Sukuna / Gojo / Martial Arts
+    this.flurryHitsLeft = 0;
+    this.flurryTimer = 0;
+    this.rapidSlashHitsLeft = 0;
+    this.rapidSlashTimer = 0;
+    this.meleeComboCount = 0;
+    this.teleportSlideTimer = 0;
+    this.isChannelingDivineFlame = false;
+    this.isChannelingDomainExpansion = false;
+    this.isChannelingDomain = false;
   }
 
 
   applyTimeStop(frames) {
-    if (this.immuneToCC) return;
+    if (this.immuneToCC || this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') return;
     // Ensure a numeric timer field exists for legacy code that may read it
     if (!this.timeStopTimer) this.timeStopTimer = 0;
 
@@ -255,6 +272,13 @@ export class Fighter {
 
 
   _handleTimeStop() {
+    if (this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') {
+      this.timeStopTimer = 0;
+      this.electricStunTimer = 0;
+      this.crimsonElectrifiedTimer = 0;
+      this.dubstepStunTimer = 0;
+      return false;
+    }
     const isFrozen = (this.crimsonElectrifiedTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.timeStopTimer > 0);
 
     if (isFrozen) {
@@ -395,7 +419,11 @@ export class Fighter {
   applyKnockback(vx, vy) {
     this.knockbackVx = vx;
     this.knockbackVy = vy;
-    this.knockbackStunTimer = 45; // 45 frames of steering freeze so ricochet wall bouncing executes freely!
+    this.vx = vx;
+    this.vy = vy;
+    if (!this.domainImmunity && this.characterId !== 'toji' && this.type !== 'toji') {
+      this.knockbackStunTimer = 20; // Steering freeze for normal fighters so knockback slides cleanly
+    }
   }
 
   handlePoison() {
@@ -762,8 +790,7 @@ export class Fighter {
 
   /** Controls how the gun is aimed. Default aims in direction of opponent with delayed reaction time if stealthed. */
   aim(opponent) {
-    if (!opponent) {
-      this.gunAngle = this.angle;
+    if (!opponent || this.isTargetOfAmbush) {
       return;
     }
 
@@ -953,7 +980,13 @@ export class Fighter {
     }
 
     if (this.slowTimer > 0) {
-      drawSlowEffect(ctx, baseRadius);
+      // Suppress the generic slow visual if they are currently trapped in Toji's cinematic ultimate
+      const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+        f && f.ultimateActive && f.ultimateTarget === this && (f.type === 'toji' || f.characterId === 'toji')
+      );
+      if (!trappedInTojiUltimate) {
+        drawSlowEffect(ctx, baseRadius);
+      }
     }
 
     if (this.electricStunTimer > 0) {
@@ -1008,6 +1041,7 @@ export class Fighter {
 
   /** Draws standard grey weapon barrel. */
   drawGun(ctx) {
+    if (this.isTargetOfAmbush) return;
     ctx.save();
     ctx.translate(this.x, this.y);
     ctx.rotate(this.gunAngle);
@@ -1024,7 +1058,7 @@ export class Fighter {
     
     // Draw Hand holding the gun
     ctx.beginPath();
-    ctx.arc(0, 3, 6, 0, Math.PI * 2); // Hand positioned on the grip
+    ctx.arc(0, 3, getHandSize(6, this), 0, Math.PI * 2); // Hand positioned on the grip
     ctx.fillStyle = this.color;
     ctx.fill();
     ctx.lineWidth = 1.5;

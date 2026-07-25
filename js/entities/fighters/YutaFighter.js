@@ -1,5 +1,5 @@
 import { Fighter } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
+import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -14,6 +14,7 @@ import { projectileSystem } from '../../systems/projectileSystem.js';
 export class YutaFighter extends Fighter {
   constructor(def) {
     super(def);
+    this.type = 'yuta';
     this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 50;
     this.meleeCooldown = 0;
     this.swordTrail = [];
@@ -117,6 +118,10 @@ export class YutaFighter extends Fighter {
         toY: targetY
       });
     }
+  }
+
+  triggerDemoAttack() {
+    this.executeKatanaMelee(0);
   }
 
   update(opponent, ownerIndex, arena, updateProjectiles = true) {
@@ -298,7 +303,9 @@ export class YutaFighter extends Fighter {
 
     // Smoothly fade Yuta's cursed energy in when Rika is active / domain is active / calling Rika, and out when done
     const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
-    const targetAura = (this.isChannelingDomain || this.domainActive || (this.rikaCallTimer > 0) || (this.rika && this.rika.active) || isCountdown) ? 1.0 : 0.0;
+    // Suppress CE aura when frozen by Gojo's domain (time stop / hit stun)
+    const isFrozenByDomain = (this.timeStopTimer > 0) || (this.hitStunTimer > 0);
+    const targetAura = (!isFrozenByDomain && (this.isChannelingDomain || this.domainActive || (this.rikaCallTimer > 0) || (this.rika && this.rika.active) || isCountdown)) ? 1.0 : 0.0;
     if (this.cursedEnergyAlpha === undefined) this.cursedEnergyAlpha = 0;
     if (this.cursedEnergyAlpha < targetAura) {
       this.cursedEnergyAlpha = Math.min(targetAura, this.cursedEnergyAlpha + 0.04); // Fades in over ~25 frames
@@ -319,7 +326,8 @@ export class YutaFighter extends Fighter {
     const maxCd_glow = this.meleeCooldownMax;
     const isSwinging_glow = (this.meleeCooldown > maxCd_glow - 15);
     const isBlocking_glow = (this.blockPoseTimer > 0);
-    const targetGlow = (isSwinging_glow || isBlocking_glow) ? 1.0 : (this.cursedEnergyAlpha || 0);
+    // Suppress weapon CE glow when frozen by Gojo's domain (reuses isFrozenByDomain from above)
+    const targetGlow = (!isFrozenByDomain && (isSwinging_glow || isBlocking_glow)) ? 1.0 : (isFrozenByDomain ? 0.0 : (this.cursedEnergyAlpha || 0));
 
     if (this.swordGlowAlpha === undefined) this.swordGlowAlpha = 0;
     if (this.swordGlowAlpha < targetGlow) {
@@ -1014,13 +1022,20 @@ export class YutaFighter extends Fighter {
       }
     } else {
       // Normal / Swing position
-      const L = (this.r - 10) + 81 * 1.2;
-      tipX = this.x + Math.cos(currentAngle) * L;
-      tipY = this.y + Math.sin(currentAngle) * L;
+      const flipY = (Math.abs(currentAngle) > Math.PI / 2) ? -1 : 1;
 
-      const innerL = L - 25;
-      innerX = this.x + Math.cos(currentAngle) * innerL;
-      innerY = this.y + Math.sin(currentAngle) * innerL;
+      // Exact transformed coordinates matching drawGun transforms
+      const px = (this.r - 10) + 81 * 1.2;
+      const py = -8.0 * 1.2 * flipY;
+
+      tipX = this.x + Math.cos(currentAngle) * px - Math.sin(currentAngle) * py;
+      tipY = this.y + Math.sin(currentAngle) * px + Math.cos(currentAngle) * py;
+
+      const innerPx = (this.r - 10) + 52 * 1.2;
+      const innerPy = -2.2 * 1.2 * flipY;
+
+      innerX = this.x + Math.cos(currentAngle) * innerPx - Math.sin(currentAngle) * innerPy;
+      innerY = this.y + Math.sin(currentAngle) * innerPx + Math.cos(currentAngle) * innerPy;
     }
 
     return {
@@ -1035,14 +1050,32 @@ export class YutaFighter extends Fighter {
     this._drawYutaSwordStrap(ctx);
 
     // Determine swing state
+    const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
     const maxCd = this.meleeCooldownMax;
-    let isSwinging = (this.meleeCooldown > maxCd - 15);
+    let isSwinging = (this.meleeCooldown > maxCd - 15) || !!editP;
     let progress = 1.0;
     let fade = (this.slashFadeTimer || 0) / 15;
 
     if (isSwinging) {
-      progress = (maxCd - this.meleeCooldown) / 15;
+      progress = editP ? 0.5 : (maxCd - this.meleeCooldown) / 15;
       fade = 1.0;
+    }
+
+    // Generate static sword trail points when in editor mode
+    if (editP) {
+      this.swordTrail = [];
+      const tipPos = this._getKatanaTipPositions();
+      const numPts = 16;
+      for (let i = 0; i < numPts; i++) {
+        const t = i / (numPts - 1);
+        const a = -0.45 * Math.PI + t * (0.90 * Math.PI);
+        const r = 90 * editP.scale;
+        const ox = tipPos.outer.x + Math.cos(a) * r + editP.offsetX;
+        const oy = tipPos.outer.y + Math.sin(a) * r + editP.offsetY;
+        const ix = tipPos.outer.x + Math.cos(a) * (r - 22 * editP.thickness) + editP.offsetX;
+        const iy = tipPos.outer.y + Math.sin(a) * (r - 22 * editP.thickness) + editP.offsetY;
+        this.swordTrail.push({ outer: { x: ox, y: oy }, inner: { x: ix, y: iy }, life: 1.0 });
+      }
     }
 
     // --- DRAW DYNAMIC KATANA TIP TRAIL IN WORLD SPACE ---
@@ -1051,7 +1084,7 @@ export class YutaFighter extends Fighter {
       ctx.globalCompositeOperation = 'source-over'; // Standard blending for visibility on white arenas
 
       // Fades out smoothly only in the last 12 frames of the duration
-      const trailAlpha = Math.min(1.0, (this.trailGenTimer || 0) / 12);
+      const trailAlpha = editP ? 1.0 : Math.min(1.0, (this.trailGenTimer || 0) / 12);
       ctx.globalAlpha = trailAlpha;
 
       const numSegments = this.swordTrail.length;
@@ -1639,7 +1672,7 @@ export class YutaFighter extends Fighter {
     // 7. Hand holding the hilt (drawn over the hilt wrapper and aura)
     ctx.beginPath();
     // Hand positioned on the long hilt
-    ctx.arc(-2, 0.5, 5, 0, Math.PI * 2);
+    ctx.arc(-2, 0.5, getHandSize(5, this), 0, Math.PI * 2);
     ctx.fillStyle = this.color;
     ctx.fill();
     ctx.lineWidth = 1.2;
@@ -2102,52 +2135,39 @@ export class YutaFighter extends Fighter {
     // Rotate context so +x is forward facing
     ctx.rotate(targetAngle);
 
-    // 2. Stretching Tail / Tether connecting Rika back to Yuta
+    // 2. Trailing Shadow Tail extending naturally behind Rika's spine
     ctx.save();
-    // Calculate Yuta's position relative to Rika's local space (we're already translated to rk.x, rk.y and rotated)
-    const yutaDx = this.x - rk.x;
-    const yutaDy = this.y - rk.y;
-    // Transform Yuta's relative position into Rika's rotated coordinate system
-    const cosA = Math.cos(-targetAngle);
-    const sinA = Math.sin(-targetAngle);
-    const localYutaX = yutaDx * cosA - yutaDy * sinA;
-    const localYutaY = yutaDx * sinA + yutaDy * cosA;
+    const tailLen = r * 1.5;
+    const tailWave1 = Math.sin(now / 110) * 4;
+    const tailWave2 = Math.cos(now / 140) * 5;
 
-    const tailDist = Math.hypot(localYutaX, localYutaY);
-    const tailWave1 = Math.sin(now / 100) * 7;
-    const tailWave2 = Math.cos(now / 130) * 9;
+    const baseWidth = r * 0.28;
+    const midWidth = r * 0.16;
 
-    // Tail thickness tapers from Rika (thick) to Yuta (thin)
-    const baseWidth = r * 0.22;
-    const tipWidth = r * 0.06;
-
-    // Draw filled tail shape using two bezier curves (top edge and bottom edge)
     ctx.beginPath();
-    // Top edge: from Rika's back toward Yuta
+    // Top edge: extending backward behind Rika
     ctx.moveTo(-r * 0.4, -baseWidth);
     ctx.bezierCurveTo(
-      localYutaX * 0.35, localYutaY * 0.35 - baseWidth * 0.7 + tailWave1,
-      localYutaX * 0.7, localYutaY * 0.7 - tipWidth * 1.5 + tailWave2,
-      localYutaX, localYutaY - tipWidth
+      -r * 0.8, -midWidth + tailWave1,
+      -r * 1.2, tailWave2,
+      -tailLen, 0
     );
-    // Bottom edge: back from Yuta to Rika
-    ctx.lineTo(localYutaX, localYutaY + tipWidth);
+    // Bottom edge: returning to Rika's back
     ctx.bezierCurveTo(
-      localYutaX * 0.7, localYutaY * 0.7 + tipWidth * 1.5 + tailWave2,
-      localYutaX * 0.35, localYutaY * 0.35 + baseWidth * 0.7 + tailWave1,
+      -r * 1.2, tailWave2,
+      -r * 0.8, midWidth + tailWave1,
       -r * 0.4, baseWidth
     );
     ctx.closePath();
 
-    const tailGrad = ctx.createLinearGradient(-r * 0.4, 0, localYutaX, localYutaY);
+    const tailGrad = ctx.createLinearGradient(-r * 0.4, 0, -tailLen, 0);
     tailGrad.addColorStop(0, '#420E63');
-    tailGrad.addColorStop(0.4, '#210638');
-    tailGrad.addColorStop(0.8, '#0A0016');
-    tailGrad.addColorStop(1, 'rgba(10, 0, 22, 0.3)');
+    tailGrad.addColorStop(0.5, '#210638');
+    tailGrad.addColorStop(1, 'rgba(10, 0, 22, 0)');
     ctx.fillStyle = tailGrad;
     ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.lineWidth = 1.2;
     ctx.stroke();
     ctx.restore();
 

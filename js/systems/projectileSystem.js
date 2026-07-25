@@ -2076,13 +2076,13 @@ class ProjectileSystem {
                 }
                 
                 // Apply slow effect - refresh duration if already slowed
-                if (f.slowTimer !== undefined) {
+                if (f.slowTimer !== undefined && !f.immuneToCC && f.characterId !== 'toji' && f.type !== 'toji') {
                   f.slowTimer = Math.max(f.slowTimer, purpleSlowDuration);
                   f.slowMultiplier = Math.min(f.slowMultiplier || 1, purpleSlowMultiplier);
                 }
                 
                 // Dampen velocity so fighters don't fight against the drag
-                if (f.vx !== undefined && f.vy !== undefined) {
+                if (f.vx !== undefined && f.vy !== undefined && !f.immuneToCC && f.characterId !== 'toji' && f.type !== 'toji') {
                   f.vx *= 0.8; // Reduce velocity by 20% each frame while being dragged
                   f.vy *= 0.8;
                 }
@@ -2101,7 +2101,8 @@ class ProjectileSystem {
           if (!f || f.hp <= 0) continue;
           
           const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
-          if (isEnemy && !f.immuneToCC) {
+          const isImmune = f.immuneToCC || f.characterId === 'toji' || f.type === 'toji';
+          if (isEnemy && !isImmune) {
             const dx = p.x - f.x;
             const dy = p.y - f.y;
             const dist = Math.hypot(dx, dy);

@@ -1,14 +1,14 @@
 import { Fighter } from '../fighter.js';
-import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
+import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
+import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound, fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { renderGojoDomainBackground } from './gojo/gojoDomainVisuals.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawGojoBody } from '../../graphics/fighters/gojoSkin.js';
-import { drawGojoWeapon, drawGojoOrb } from '../../graphics/weapons/gojoWeaponGraphics.js';
+import { drawGojoWeapon, drawGojoOrb, drawAnamorphicLensFlare } from '../../graphics/weapons/gojoWeaponGraphics.js';
 
 export class GojoFighter extends Fighter {
   constructor(def) {
@@ -52,9 +52,13 @@ export class GojoFighter extends Fighter {
     this.meleeModeCooldown = 0;
     this.hitFlameWisps = []; // Residual stretched Cursed Energy flame wisps on hit
     this.combatAuraOpacity = 0; // Smooth fade-in & fade-out opacity for Cursed Energy aura
+    this.postDomainFadeInTimer = 0; // Timer to fade in CE after domain ends
     this.purpleRecoveryTimer = 0; // 2.5s recovery stasis after firing Purple
+    this.purpleRetreatTimer = 0; // Delay before teleport-away after firing Purple
     this.redEffectTimer = 0;
-    this.redEffectMaxTimer = 18;
+    this.redEffectMaxTimer = 75;
+    this.redBuildupPhase = false;
+    this.redDetonated = false;
     this.infinityBlockTimer = 0;
     this.infinityBlockMaxTimer = 25;
     this.teleportSlideTimer = 0;
@@ -95,9 +99,38 @@ export class GojoFighter extends Fighter {
     this.meleeModeCooldown = 0;
     this.combatAuraOpacity = 0;
     this.purpleRecoveryTimer = 0;
+    this.purpleRetreatTimer = 0;
     this.redEffectTimer = 0;
+    this.redBuildupPhase = false;
+    this.redDetonated = false;
     this.infinityBlockTimer = 0;
     this.teleportSlideTimer = 0;
+  }
+
+  isChannelingAnySkill() {
+    return (
+      this.isChannelingDomainExpansion ||
+      this.isChannelingPurple ||
+      (this.redEffectTimer || 0) > 0 ||
+      this.isChannelingRCT ||
+      this.domainActive ||
+      (this.purpleRecoveryTimer || 0) > 0 ||
+      (this.purpleRetreatTimer || 0) > 0
+    );
+  }
+
+  interruptAttacks() {
+    super.interruptAttacks();
+    this.redEffectTimer = 0;
+    this.redBuildupPhase = false;
+    this.redDetonated = false;
+    this.isChannelingPurple = false;
+    this.isChannelingDomainExpansion = false;
+    this.isTargetOfAmbush = false;
+    if (this._purpleChargeSoundHandle) {
+      fadeOutSound(this._purpleChargeSoundHandle, 200);
+      this._purpleChargeSoundHandle = null;
+    }
   }
 
   getAttackProgress() {
@@ -161,6 +194,9 @@ export class GojoFighter extends Fighter {
   takeDamage(amount, attacker, opts = {}) {
     // If getting meleed or hit by physical attack, force switch into Melee Mode to punch back
     if (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= 160)) {
+      if (!this.isMeleeMode && this.forcedMeleeTimer <= 0) {
+        this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 100;
+      }
       this.isMeleeMode = true;
       this.meleeModeCooldown = 0;
     }
@@ -300,6 +336,14 @@ export class GojoFighter extends Fighter {
       }
     }
 
+    // Update Sakuga impact frame & Red effect timers (must tick even during timeStop/hitStun!)
+    if (this.sakugaImpactTimer > 0) {
+      this.sakugaImpactTimer--;
+    }
+    if (this.redEffectTimer > 0) {
+      this.redEffectTimer--;
+    }
+
     if (this._handleTimeStop()) {
       if (this.isChannelingDomainExpansion) {
         this.isChannelingDomainExpansion = false;
@@ -318,12 +362,42 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    // Update Sakuga impact frame & Red effect timers
-    if (this.sakugaImpactTimer > 0) {
-      this.sakugaImpactTimer--;
-    }
     if (this.redEffectTimer > 0) {
-      this.redEffectTimer--;
+
+      // Buildup phase: freeze nearby enemies in place (near-zero slow)
+      const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 20;
+      const redRemaining = this.redEffectTimer;
+      const redMax = this.redEffectMaxTimer;
+      if (this.redBuildupPhase && redRemaining > redMax - RED_BUILDUP_FRAMES) {
+        // still in buildup — hard-freeze nearby enemies by damping velocity directly each frame
+        const myTeam = state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0);
+        if (state.fighters) {
+          state.fighters.forEach((f, idx) => {
+            if (f && f !== this && f.hp > 0 && (!f.immuneToCC || f.characterId === 'toji' || f.type === 'toji')) {
+              const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+              if (isEnemy) {
+                // Directly damp velocity to near-zero each frame (visible freeze)
+                f.vx *= 0.05;
+                f.vy *= 0.05;
+                // Also set slowTimer so applyMovementPhysics won't re-accelerate
+                if (typeof f.applySlow === 'function') {
+                  f.applySlow(3, 0.05, { isRed: true });
+                } else {
+                  f.slowTimer = 3;
+                  f.slowMultiplier = 0.05;
+                }
+              }
+            }
+          });
+        }
+      }
+
+      // Detonation threshold — trigger exactly once when buildup window ends
+      if (this.redBuildupPhase && redRemaining <= redMax - RED_BUILDUP_FRAMES && !this.redDetonated) {
+        this.redDetonated = true;
+        this.redBuildupPhase = false;
+        this._detonateRed();
+      }
     }
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.infinityBlockTimer > 0) {
@@ -363,6 +437,7 @@ export class GojoFighter extends Fighter {
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+    if (this.hitStunTimer > 0) this.hitStunTimer--;
 
     if (this.infinityCooldown > 0) {
       this.infinityCooldown--;
@@ -412,12 +487,17 @@ export class GojoFighter extends Fighter {
     } else if (this.isChannelingPurple) {
       // Smoothly fade OUT body aura while mixing Red & Blue into Purple (focusing energy into the orbs)
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.05);
-    } else if (this.inMeleeRange || this.forcedMeleeTimer > 0 || this.domainActive) {
-      // Fade IN smoothly (+0.08 per frame)
+    } else if (this.inMeleeRange || this.forcedMeleeTimer > 0 || this.domainActive || this.postDomainFadeInTimer > 0) {
+      // Fade IN smoothly (+0.08 per frame) when in melee, domain active, or during post-domain fade-in
       this.combatAuraOpacity = Math.min(1.0, this.combatAuraOpacity + 0.08);
     } else {
       // Fade OUT smoothly (-0.035 per frame)
       this.combatAuraOpacity = Math.max(0, this.combatAuraOpacity - 0.035);
+    }
+
+    // Countdown post-domain fade-in timer
+    if (this.postDomainFadeInTimer > 0) {
+      this.postDomainFadeInTimer--;
     }
 
     if (this.infinityCooldown > 0) {
@@ -425,10 +505,30 @@ export class GojoFighter extends Fighter {
       if (this.infinityCooldown <= 0) this.infinityActive = true;
     }
     if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
+    // Tick down red-slow ring timer on all fighters
+    if (state.fighters) {
+      state.fighters.forEach(f => {
+        if (f && f.redSlowTimer > 0) f.redSlowTimer--;
+      });
+    }
     if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
     if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) this.domainCooldown--;
     if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.healingAuraTimer > 0) this.healingAuraTimer--;
+
+    // Completely immobilize Gojo if Toji is actively performing his ambush sequence on him (unless Gojo's domain is active)
+    const isActuallyBeingAmbushed = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f.hp > 0 && 
+      f.characterId === 'toji' && 
+      f.isAmbushing
+    );
+    if (!isActuallyBeingAmbushed) {
+      this.isTargetOfAmbush = false;
+    } else if (!this.domainActive) {
+      this.vx = 0;
+      this.vy = 0;
+      return; // Immobilize AI & abilities while Toji is actively striking Gojo in ambush
+    }
 
     // Check for Reverse Cursed Technique (Self heal at low HP)
     this._checkReverseCursedTechnique(opponent, arena);
@@ -438,6 +538,22 @@ export class GojoFighter extends Fighter {
       this.domainTimer--;
       if (this.domainTimer <= 0) {
         this.domainActive = false;
+        this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
+        this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
+
+        // Unfreeze all enemy fighters when Gojo's domain expires
+        if (state.fighters) {
+          state.fighters.forEach(f => {
+            if (f && f !== this) {
+              f.timeStopTimer = 0;
+              f.hitStunTimer = 0;
+              delete f._timeStopOriginalDuration;
+              delete f._timeStopStartTime;
+              delete f._timeStopFrozenAngle;
+              delete f._timeStopFrozenGunAngle;
+            }
+          });
+        }
       } else {
         // Apply paralyze to all enemies on the map
         this._applyDomainEffect();
@@ -450,9 +566,10 @@ export class GojoFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!isSilenced && this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    if (!isSilenced && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
       this.isChannelingDomainExpansion = true;
       this.domainChargeTimer = 0;
+      this._domainChannelAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
       this._playedDeployAudio = false;
       triggerGlobalScreenShake(6, 120);
       if (!this._hasPlayedDomainChannelSound) {
@@ -475,18 +592,10 @@ export class GojoFighter extends Fighter {
       this.vy = 0;
       this.applyMovementPhysics(0);
 
-      // Track opponent while channeling (sluggish delayed reaction time if stealthed)
-      if (opponent && !opponent.isDead) {
-        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        if (opponent.isStealthed) {
-          let diff = targetAngle - this.gunAngle;
-          while (diff < -Math.PI) diff += Math.PI * 2;
-          while (diff > Math.PI) diff -= Math.PI * 2;
-          const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-          this.gunAngle += diff * turnRate; // Sluggish delayed turn rate
-        } else {
-          this.gunAngle = targetAngle; // Instant fast lock-on!
-        }
+      // Lock stance and hand sign angle fixed in place while channeling domain expansion
+      if (this._domainChannelAngle !== undefined) {
+        this.gunAngle = this._domainChannelAngle;
+        this.angle = this._domainChannelAngle;
       }
 
       if (this.domainChargeTimer >= this.domainChargeMax) {
@@ -500,7 +609,7 @@ export class GojoFighter extends Fighter {
 
     // Check for Hollow Purple (Skill)
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
-    if (this.purpleCooldown <= 0 && !this.isChannelingPurple && opponent && this.forcedMeleeTimer <= 0 && !opponent.isChannelingDivineFlame) {
+    if (!this.isChannelingAnySkill() && this.purpleCooldown <= 0 && opponent && this.forcedMeleeTimer <= 0 && !opponent.isChannelingDivineFlame) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const safeDistance = 300; // Different from Sukuna's 200 to prevent simultaneous casting
       if (distSq > safeDistance ** 2) {
@@ -512,7 +621,16 @@ export class GojoFighter extends Fighter {
           this._hasPlayedPurpleChannelSound = true;
           const sound = getSkillSound(this._def?.id, 'purple_charge');
           if (sound) {
-            this._purpleChargeSoundHandle = playSound(sound.src, sound.volume);
+            const delayMs = Math.max(0, (sound.delay || 0) * 1000);
+            if (delayMs > 0) {
+              setTimeout(() => {
+                if (this.isChannelingPurple && this.hp > 0) {
+                  this._purpleChargeSoundHandle = playSound(sound.src, sound.volume);
+                }
+              }, delayMs);
+            } else {
+              this._purpleChargeSoundHandle = playSound(sound.src, sound.volume);
+            }
           }
         }
       }
@@ -533,6 +651,13 @@ export class GojoFighter extends Fighter {
         playSound('Assets/Sound Effects/SkillEffects/flare.mp3', 2.0);
       }
 
+      // Play purple deploy sound when Red & Blue have merged and Purple is about to fire (at 75% progress)
+      const deployTriggerFrame = Math.floor(this.purpleChargeMax * 0.75);
+      if (this.purpleChargeTimer === deployTriggerFrame) {
+        const sDeploy = getSkillSound(this._def?.id, 'purple_deploy');
+        playSound(sDeploy?.src || 'Assets/Sound Effects/Skills/purpledeploy.mp3', sDeploy?.volume ?? 2.5);
+      }
+
       // 2. Levitation: Gojo rises smoothly in the air as Red and Blue mix
       const levitateProgress = Math.min(1.0, this.purpleChargeTimer / (this.purpleChargeMax * 0.4));
       const maxLevitationHeight = 35;
@@ -541,11 +666,13 @@ export class GojoFighter extends Fighter {
       if (opponent && !opponent.isDead) {
         this.aim(opponent);
         // Lapse Blue Gravitational Distortion: Slows opponent movement by 50% while mixing Red & Blue into Purple!
-        if (typeof opponent.applySlow === 'function') {
-          opponent.applySlow(10, 0.50);
-        } else {
-          opponent.slowTimer = 10;
-          opponent.slowMultiplier = 0.50;
+        if (!opponent.immuneToCC && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
+          if (typeof opponent.applySlow === 'function') {
+            opponent.applySlow(10, 0.50);
+          } else {
+            opponent.slowTimer = 10;
+            opponent.slowMultiplier = 0.50;
+          }
         }
       }
 
@@ -557,13 +684,25 @@ export class GojoFighter extends Fighter {
       return; // Don't do basic attacks while channeling
     }
 
-    // Handle Purple Post-Fire Descent (Gojo can move while descending back to the ground)
+    // Handle Purple Post-Fire Descent (Gojo STOPS during the 2s breather — no movement at all)
     if (this.purpleRecoveryTimer > 0) {
       this.purpleRecoveryTimer--;
 
       // Smooth sine descent from 35px down to 0px over the timer duration
-      const descentProgress = this.purpleRecoveryTimer / 30; // 1.0 down to 0.0
+      const descentProgress = this.purpleRecoveryTimer / 120; // 1.0 down to 0.0
       this.z = Math.sin(Math.min(1, descentProgress) * Math.PI * 0.5) * 35;
+
+      // Completely stop movement during breather — no steering, no drift
+      this.vx = 0;
+      this.vy = 0;
+    }
+
+    // Handle delayed teleport-away after Purple fires (Gojo stays in place while Purple fires/explodes)
+    if (this.purpleRetreatTimer > 0) {
+      this.purpleRetreatTimer--;
+      if (this.purpleRetreatTimer === 0) {
+        this._executePurpleRetreat();
+      }
     }
 
     // Handle RCT Channeling (Reverse Cursed Technique - 2.5 seconds heal duration)
@@ -595,12 +734,42 @@ export class GojoFighter extends Fighter {
     }
 
     // Check for Red (Close-range repel)
-    if (this.redCooldown <= 0 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    if (!this.isChannelingAnySkill() && this.redCooldown <= 0 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const triggerRange = CONFIG.gojo.redRange || 100;
       if (distSq <= triggerRange ** 2) {
         this._activateRed();
       }
+    }
+
+    // Handle Reversal Red Channeling & Buildup (Gojo stops completely to cast Red before doing anything else)
+    if (this.redEffectTimer > 0) {
+      this.vx = 0;
+      this.vy = 0;
+      this.applyMovementPhysics(0);
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
+      }
+      // Repel & pause any nearby enemy so they don't stick to or push Gojo like a magnet during Red buildup
+      if (state.fighters) {
+        state.fighters.forEach(f => {
+          if (f && f !== this && f.hp > 0) {
+            const d = Math.hypot(f.x - this.x, f.y - this.y);
+            const minAllowed = this.r + f.r + 15;
+            if (d < minAllowed) {
+              const pushAngle = Math.atan2(f.y - this.y, f.x - this.x);
+              const pushDist = minAllowed - d;
+              f.x += Math.cos(pushAngle) * pushDist;
+              f.y += Math.sin(pushAngle) * pushDist;
+              f.vx = 0;
+              f.vy = 0;
+              if (typeof f.applyHitStun === 'function') f.applyHitStun(6);
+            }
+          }
+        });
+      }
+      this.resolveWallBounce(arena);
+      return; // Stop basic attacks, melee punches, and mode switches until Red finishes!
     }
 
     // Delete enemy projectiles if Purple is active
@@ -613,7 +782,7 @@ export class GojoFighter extends Fighter {
     if (state.fighters && state.fighters.length > 0) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
-        if (!f || f === this || f.hp <= 0) continue;
+        if (!f || f === this || f.hp <= 0 || (f.isStealthed && !this.domainActive)) continue;
         const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
         if (!isEnemy) continue;
 
@@ -636,8 +805,14 @@ export class GojoFighter extends Fighter {
       } else if (this.meleeModeCooldown > 0) {
         // Mandatory ranged separation period after combo finisher
         this.isMeleeMode = false;
+      } else if (opponent && opponent.isStealthed && !this.domainActive) {
+        // Disengage from melee combat while opponent is in stealth mode
+        this.isMeleeMode = false;
       } else if (isBeingMeleed) {
         // Enter Melee Mode when in close melee engagement
+        if (!this.isMeleeMode && this.forcedMeleeTimer <= 0) {
+          this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 100;
+        }
         this.isMeleeMode = true;
       } else if (this.forcedMeleeTimer > 0) {
         this.wasForcedMelee = true;
@@ -663,7 +838,7 @@ export class GojoFighter extends Fighter {
     }
 
     // Handle Melee Mode (Hand-to-Hand Combat)
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0);
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && (this.purpleRecoveryTimer <= 0);
     
     if (this.isMeleeMode) {
       if ((this.teleportSlideTimer || 0) <= 0 && canAct) {
@@ -683,10 +858,15 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    const isMovementLocked = (this.teleportSlideTimer > 0) || this.isMeleeMode;
+    const isMovementLocked = (this.teleportSlideTimer > 0) || this.isMeleeMode || this.redBuildupPhase;
+    // Hard-stop Gojo's velocity immediately when the orb starts building
+    if (this.redBuildupPhase) {
+      this.vx *= 0.05;
+      this.vy *= 0.05;
+    }
     this.applyMovementPhysics(isMovementLocked ? 0 : 1);
 
-    if (opponent && !opponent.isDead) {
+    if (opponent && !opponent.isDead && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0) {
       this.aim(opponent);
     }
 
@@ -736,31 +916,46 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (!opponent || opponent.isDead) return;
+    if (!opponent || opponent.isDead || (opponent.isStealthed && !this.domainActive)) return;
 
     // Initialize combo state
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
     if (this.meleeComboTarget === undefined) this.meleeComboTarget = Math.random() < 0.35 ? 3 : 1;
 
+    // Check if opponent is frozen by domain effect (timeStopTimer or hitStunTimer from domain)
+    // If so, skip the teleport sequence and just punch from current position
+    const opponentIsFrozenByDomain = opponent && (
+      (opponent.timeStopTimer && opponent.timeStopTimer > 0) ||
+      (opponent.hitStunTimer && opponent.hitStunTimer > 0)
+    );
+
     // Teleport to a new flank angle around the opponent for EVERY punch (punch-teleport-punch-teleport anime sequence)
-    const oldX = this.x;
-    const oldY = this.y;
+    // Skip teleport if opponent is frozen by domain (already in range) — just punch from current position
+    // Always teleport on the FIRST punch of a combo to get into range
+    const shouldTeleport = !opponentIsFrozenByDomain || this.meleeComboCount === 0;
+    if (shouldTeleport) {
+      const oldX = this.x;
+      const oldY = this.y;
 
-    const angleToOpponent = Math.random() * Math.PI * 2;
-    const behindOffset = opponent.r + this.r + 8;
-    let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
-    let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
+      // Store the flank angle so all punches in this combo use the same position (no angle switching mid-combo)
+      if (this.meleeFlankAngle === undefined) {
+        this.meleeFlankAngle = Math.random() * Math.PI * 2;
+      }
+      const behindOffset = opponent.r + this.r + 8;
+      let targetX = opponent.x - Math.cos(this.meleeFlankAngle) * behindOffset;
+      let targetY = opponent.y - Math.sin(this.meleeFlankAngle) * behindOffset;
 
-    if (arena) {
-      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+      if (arena) {
+        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+      }
+
+      this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+
+      spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
+      spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
+      playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
     }
-
-    this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
-
-    spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
-    spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
 
     // 2. Execute punch at current position
     this._meleePunch(opponent);
@@ -789,8 +984,9 @@ export class GojoFighter extends Fighter {
     if (this.meleeComboCount >= this.meleeComboTarget) {
       this.meleeComboCount = 0;
       this.meleeComboTarget = Math.random() < 0.35 ? 3 : 1; // 35% chance for 3 rapid attacks, 65% chance for 1 attack
+      this.meleeFlankAngle = undefined; // Clear flank angle so next combo picks a fresh angle
 
-      if (!this.domainActive) {
+      if (!this.domainActive && this.forcedMeleeTimer <= 0) {
         this.isMeleeMode = false;
         this.meleeModeCooldown = CONFIG.gojo.meleeModeSeparationCooldown ?? 240; // 4 seconds of mandatory ranged separation!
         if (opponent && !opponent.isDead) {
@@ -904,41 +1100,148 @@ export class GojoFighter extends Fighter {
   }
 
   _activateRed() {
-    this.redCooldown = CONFIG.gojo.redCooldown || 300;
-    this.redEffectTimer = 18;
-    this.redEffectMaxTimer = 18;
+    const buildupFrames = CONFIG.gojo.redBuildupFrames || 20;
+    const blastFadeFrames = 25;
+    const totalFrames = buildupFrames + blastFadeFrames;
 
-    // Find target angle facing enemy
+    this.redCooldown = CONFIG.gojo.redCooldown || 300;
+    this.redEffectTimer = totalFrames;
+    this.redEffectMaxTimer = totalFrames;
+    this.redBuildupPhase = true;
+    this.redDetonated = false;
+    this._hasPlayedRedFlareSound = false;
+    this._hasPlayedRedChannelingSound = false;
+
+    // Prevent simultaneous attacks during the buildup & blast
+    this.shootCooldown = this.shootCooldownMax || 40;
+    this.meleeModeCooldown = Math.max(this.meleeModeCooldown || 0, totalFrames + 15);
+    this.isMeleeMode = false;
+
+    // Find and lock target angle toward nearest enemy
     const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
     let targetF = null;
     state.fighters.forEach((f, idx) => {
       if (f && f !== this && f.hp > 0) {
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (isEnemy && (!targetF || Math.hypot(f.x - this.x, f.y - this.y) < Math.hypot(targetF.x - this.x, targetF.y - this.y))) {
-          targetF = f;
+        if (isEnemy) {
+          const dist = Math.hypot(f.x - this.x, f.y - this.y);
+          if (!targetF || dist < Math.hypot(targetF.x - this.x, targetF.y - this.y)) {
+            targetF = f;
+          }
+          // Immediately cancel any ongoing enemy flurry/teleport when Red begins charging
+          if (dist < (CONFIG.gojo.redRange || 100) + 200) {
+            if (typeof f.interruptAttacks === 'function') f.interruptAttacks();
+            f.timeStopTimer = 0;
+            f.flurryHitsLeft = 0;
+            f.flurryTimer = 0;
+            f.rapidSlashHitsLeft = 0;
+            f.rapidSlashTimer = 0;
+            f.isTeleporting = false;
+            f.teleportSlideTimer = 0;
+            // Pause & immobilize enemy during Red buildup so they don't run into Gojo
+            if (typeof f.applyHitStun === 'function') f.applyHitStun(buildupFrames + 5);
+            f.vx = 0;
+            f.vy = 0;
+          }
         }
       }
     });
     this.redTargetAngle = targetF ? Math.atan2(targetF.y - this.y, targetF.x - this.x) : this.gunAngle;
 
+    // Text pop and light buildup sparks (orb is forming — not the boom yet)
     spawnFloatingText(this.x, this.y - this.r - 20, 'REVERSAL RED', '#FF1144');
-    spawnImpactFlash(this.x, this.y, 60, 'crimsonSniper');
-    spawnSparks(this.x, this.y, 30, 'crimsonSniper');
-    triggerGlobalScreenShake(12, 10);
+    spawnSparks(this.x, this.y, 12, 'crimsonSniper');
+    triggerGlobalScreenShake(4, 6);
 
+    // Reversal Red Audio Trigger: Play charging sound effect & channeling voice line together simultaneously
+    const sCharging = getSkillSound(this._def?.id, 'red_charging');
+    playSound(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 2.0);
+
+    const sChan = getSkillSound(this._def?.id, 'red_channeling');
+    playSound(sChan?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sChan?.volume ?? 1.8);
+  }
+
+  /** Called exactly once at the detonation threshold — this is the actual SNAP BOOM. */
+  _detonateRed() {
+    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
     const knockback = CONFIG.gojo.redKnockback || 25;
+    const slowDuration = CONFIG.gojo.redSlowDuration || 120;
+    const slowMultiplier = CONFIG.gojo.redSlowMultiplier || 0.35;
 
-    // Repel all enemies in radius
+    // BOOM! Heavy flash, intense screen shake, sparks
+    spawnImpactFlash(this.x, this.y, 80, 'crimsonSniper');
+    spawnSparks(this.x, this.y, 45, 'crimsonSniper');
+    
+    const shakeIntensity = CONFIG.gojo.redShakeIntensity || 22;
+    const shakeDuration = CONFIG.gojo.redShakeDuration || 25;
+    triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+
+    // Audio: Detonation blast sound
+    const sBlast = getSkillSound(this._def?.id, 'red_blast');
+    playSound(sBlast?.src || 'Assets/Sound Effects/Skills/redblast.mp3', sBlast?.volume ?? 2.5);
+
+    // Repel + damage + slow all enemies in radius
     state.fighters.forEach((f, idx) => {
       if (f && f !== this && f.hp > 0) {
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
         if (isEnemy) {
           const dist = Math.hypot(this.x - f.x, this.y - f.y);
           if (dist < (CONFIG.gojo.redRange || 100) + 50) {
+            // Immediately interrupt ongoing enemy actions & clear timeStop freeze so knockback physics applies immediately
+            if (typeof f.interruptAttacks === 'function') {
+              f.interruptAttacks();
+            }
+            f.timeStopTimer = 0;
+            f.crimsonElectrifiedTimer = 0;
+            f.electricStunTimer = 0;
+            f.flurryHitsLeft = 0;
+            f.flurryTimer = 0;
+            f.rapidSlashHitsLeft = 0;
+            f.rapidSlashTimer = 0;
+            f.meleeComboCount = 0;
+            f.isTeleporting = false;
+            f.teleportSlideTimer = 0;
+            f.isChannelingDivineFlame = false;
+            f.isChannelingDomainExpansion = false;
+            f.isChannelingDomain = false;
+
+            // Direct repulsive blast wave knockback impulse (Explosive ground slide!)
             const angle = Math.atan2(f.y - this.y, f.x - this.x);
-            f.vx += Math.cos(angle) * knockback;
-            f.vy += Math.sin(angle) * knockback;
-            f.takeDamage(this.damage * 2, this, { isRed: true });
+            const knockVx = Math.cos(angle) * knockback;
+            const knockVy = Math.sin(angle) * knockback;
+
+            f.vx = knockVx;
+            f.vy = knockVy;
+            f.knockbackDecay = 0.92; // Silky smooth high-speed ground slide friction
+            if (typeof f.applyKnockback === 'function') {
+              f.applyKnockback(knockVx, knockVy);
+            }
+
+            // Spawn ground impact sparks and dust wave along slide vector
+            spawnSparks(f.x, f.y, 25, 'crimsonSniper');
+            spawnMeleeClashShockwave(f.x, f.y, 110, 'yuta');
+
+            // Damage
+            const redDamage = CONFIG.gojo.redDamage !== undefined ? CONFIG.gojo.redDamage : (this.damage * 2);
+            f.takeDamage(redDamage, this, { isRed: true });
+
+            // Apply Hit Stun (disables/immobilizes enemy actions for impact window)
+            if (typeof f.applyHitStun === 'function') {
+              f.applyHitStun(35);
+            }
+
+            // Post-detonation slow + track for red ring visual (applies to Toji even in stealth mode)
+            if (!f.immuneToCC || f.characterId === 'toji' || f.type === 'toji') {
+              if (typeof f.applySlow === 'function') {
+                f.applySlow(slowDuration, slowMultiplier, { isRed: true });
+              } else {
+                f.slowTimer = Math.max(f.slowTimer || 0, slowDuration);
+                f.slowMultiplier = slowMultiplier;
+              }
+              // Mark with red-slow so we can draw the crimson ring visual
+              f.redSlowTimer = slowDuration;
+              f.redSlowMaxTimer = slowDuration;
+            }
           }
         }
       }
@@ -953,7 +1256,7 @@ export class GojoFighter extends Fighter {
       this._purpleChargeSoundHandle = null;
     }
     fadeOutSoundBySrc('mixing', 300);
-    this.purpleRecoveryTimer = 30; // Just 30 frames (0.5s) for smooth descent
+    this.purpleRecoveryTimer = 120; // 2s recovery stasis after firing Purple
     this.purpleCooldown = CONFIG.gojo.purpleCooldown || 600;
     this.z = 35; // Start descent from hovering altitude
 
@@ -963,7 +1266,12 @@ export class GojoFighter extends Fighter {
       projectileSystem.fireGojoPurple(this, ownerIndex, CONFIG.gojo.purpleDamage || 10);
     }
 
-    // Teleport to target and engage rapid punch combo right after firing Purple!
+    // Set a delay before teleporting away — Gojo stays in place while Purple fires/explodes
+    this.purpleRetreatTimer = CONFIG.gojo.purpleRetreatDelay ?? 20; // ~0.33s delay before retreat
+  }
+
+  // Executes the teleport-away after Purple has fired and the delay has elapsed
+  _executePurpleRetreat() {
     const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
     let opponent = null;
     if (state.fighters) {
@@ -986,11 +1294,11 @@ export class GojoFighter extends Fighter {
       const oldX = this.x;
       const oldY = this.y;
 
-      // Teleport right next to opponent (behind/flank)
-      const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() < 0.5 ? 0.8 : -0.8);
-      const closeOffset = opponent.r + this.r + 10;
-      let targetX = opponent.x + Math.cos(angle) * closeOffset;
-      let targetY = opponent.y + Math.sin(angle) * closeOffset;
+      // Teleport away from opponent (opposite direction of Purple explosion)
+      const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() < 0.5 ? 0.3 : -0.3);
+      const retreatDist = CONFIG.gojo.purpleRetreatDistance ?? 280;
+      let targetX = this.x + Math.cos(angle) * retreatDist;
+      let targetY = this.y + Math.sin(angle) * retreatDist;
 
       const arena = CONFIG.arena;
       if (arena) {
@@ -1001,18 +1309,10 @@ export class GojoFighter extends Fighter {
       this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
 
       // Visuals & Sound
-      spawnFloatingText(this.x, this.y - this.r - 20, 'TELEPORT STRIKE!', '#00BFFF');
+      spawnFloatingText(this.x, this.y - this.r - 20, 'RETREAT!', '#00BFFF');
       spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
       spawnImpactFlash(this.x, this.y, 30, 'lightningTrail');
       playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
-
-      // Force Melee Mode & rapid punch combo!
-      this.isMeleeMode = true;
-      this.forcedMeleeTimer = CONFIG.gojo.purpleFollowupMeleeDuration ?? 120; // 2 seconds forced melee
-      this.meleeModeCooldown = 0;
-      this.meleeComboCount = 0;
-      this.meleeComboTarget = CONFIG.gojo.purpleFollowupComboPunches ?? 4; // 4 rapid punches
-      this.meleePunchCooldown = 0; // Immediate first punch
     }
   }
 
@@ -1049,6 +1349,7 @@ export class GojoFighter extends Fighter {
     this.domainTimer = CONFIG.gojo.domainDuration || 300;
     this.domainCooldown = CONFIG.gojo.domainCooldown || 1200;
     this.domainExpansionAudioDelay = CONFIG.gojo.domainExpansionAudioDelay ?? 90; // Delay (in frames) after deployment before gojodomainexpansion.mp3 plays
+    this.postDomainFadeInTimer = 0; // Reset fade-in timer when domain activates
 
     // Force Melee Mode (Hand-to-Hand Combat) for the domain duration
     this.isMeleeMode = true;
@@ -1134,7 +1435,7 @@ export class GojoFighter extends Fighter {
   }
 
   _checkReverseCursedTechnique(opponent, arena) {
-    if (this.isDead) return;
+    if (this.isDead || this.isChannelingAnySkill()) return;
     if (this.reverseCursedTechniqueCooldown > 0) return;
 
     const threshold = CONFIG.gojo.reverseCursedTechniqueHpThreshold || 0.10;
@@ -1261,6 +1562,35 @@ export class GojoFighter extends Fighter {
       ctx.setLineDash([15, 15]);
       ctx.lineWidth = 4;
       ctx.strokeStyle = `rgba(138, 43, 226, ${progress * 1.2})`;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      ctx.restore();
+    }
+
+    // Purple Recovery Stasis Ring
+    if ((this.purpleRecoveryTimer || 0) > 0) {
+      ctx.save();
+      const pulse = 1 + Math.sin(Date.now() / 100) * 0.1;
+      const ringRadius = (this.r + 10) * pulse;
+
+      // Base glowing aura (Increased opacity for better visibility)
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, ringRadius, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(138, 43, 226, 0.35)'; // Bright BlueViolet
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(138, 43, 226, 0.85)';
+      ctx.lineWidth = 3.0;
+      ctx.stroke();
+
+      // Countdown arc
+      const maxRecovery = 120; // 2 seconds
+      const ratio = Math.max(0, Math.min(1, this.purpleRecoveryTimer / maxRecovery));
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, ringRadius + 6, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * ratio));
+      ctx.strokeStyle = '#00E5FF'; // Very bright Cyan for maximum visibility
+      ctx.lineWidth = 4.5;
+      ctx.lineCap = 'round';
       ctx.stroke();
 
       ctx.restore();
@@ -1433,15 +1763,20 @@ export class GojoFighter extends Fighter {
 
           // 2. Limitless Electric Cyan Cursed Energy Glow
           ctx.save();
-          ctx.globalCompositeOperation = 'screen';
-          const auraGrad = ctx.createRadialGradient(0, 0, this.r * 0.3, 0, 0, this.r * 1.8);
-          auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`);
-          auraGrad.addColorStop(0.4, `rgba(0, 191, 255, ${alpha * 0.75})`);
-          auraGrad.addColorStop(0.8, `rgba(0, 100, 255, ${alpha * 0.4})`);
-          auraGrad.addColorStop(1, 'rgba(0, 191, 255, 0)');
-          ctx.fillStyle = auraGrad;
+          // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
           ctx.beginPath();
           ctx.arc(0, 0, this.r * 1.8, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(0, 100, 255, ${alpha * 0.3})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.2, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(0, 191, 255, ${alpha * 0.5})`;
+          ctx.fill();
+
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
           ctx.fill();
           ctx.restore();
 
@@ -1470,18 +1805,18 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    // Draw Reversal Red Repulsion Effect
-    if (this.redEffectTimer > 0) {
-      this._drawReversalRedEffect(ctx);
-    }
+    // (Reversal Red effect now drawn AFTER body — see below)
 
     // 1. Draw JJK Cursed Energy Flame Aura BEHIND body
     // Suppress aura while channeling Hollow Purple so Red & Blue orbs stand out cleanly
+    // Also suppress when frozen by Gojo's own domain or when his domain is active
+    const isFrozenByDomain = (this.timeStopTimer > 0) || (this.hitStunTimer > 0);
+    const isInOwnDomain = this.domainActive;
     if (this.isChannelingPurple) {
       // Aura suppressed during Hollow Purple orb fusion
     } else if (this.isChannelingRCT || this.healingAuraTimer > 0) {
       this._drawJJKCursedEnergyAura(ctx, 'rct');
-    } else if (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal) {
+    } else if (!isFrozenByDomain && !isInOwnDomain && (this.combatAuraOpacity > 0 || state.gameState === 'countdown' || this._isWinnerReveal)) {
       this._drawJJKCursedEnergyAura(ctx, 'blue');
     }
 
@@ -1491,13 +1826,34 @@ export class GojoFighter extends Fighter {
     // 2. Draw fighter body
     drawGojoBody(ctx, this);
 
-    this.drawGun(ctx);
+    if (!this.isChannelingPurple) {
+      this.drawGun(ctx);
+    }
 
     // 3. Draw physical circle hands + flare ON TOP of body
     this._drawHandCursedEnergy(ctx);
 
+    // Draw Hollow Purple Red & Blue fusing orbs ON TOP of hands so hands don't cover them
+    if (this.isChannelingPurple) {
+      this.drawGun(ctx);
+    }
+
+    // Draw Reversal Red Orb + blast ON TOP of body and hands
+    if (this.redEffectTimer > 0) {
+      this._drawReversalRedEffect(ctx);
+    }
+
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+
+    // Draw Reversal Red slow countdown rings on any affected enemies
+    if (state.fighters) {
+      state.fighters.forEach(f => {
+        if (f && f !== this && f.redSlowTimer > 0) {
+          this._drawRedSlowRing(ctx, f);
+        }
+      });
+    }
 
     if (this._isWinnerReveal) {
       const t = Date.now();
@@ -1520,14 +1876,18 @@ export class GojoFighter extends Fighter {
   _getHandPositions() {
     const basePosY = (this.y - (this.z || 0));
 
-    // Champion Screen / Victory Reveal / Fighter Index Stance: Hide hands completely
-    const isWinnerScreen = this._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown: Hide hands completely
+    const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+    const isWinnerScreen = this._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
     if (isWinnerScreen) {
       return null;
     }
 
-    // Do not display hands in Blue Orb (ranged) mode unless executing a specific hand skill or punch animation
-    const isUsingHandSkill = (this.punchAnimTimer > 0) || (this.redEffectTimer > 0) || (this.isChannelingPurple) || (this.isChannelingDomainExpansion);
+    // Do not display extra hands when Reversal Red is active, when target of ambush, or in ranged mode (unless using punch/purple/domain)
+    if (this.redEffectTimer > 0 || this.isTargetOfAmbush) {
+      return null;
+    }
+    const isUsingHandSkill = (this.punchAnimTimer > 0) || (this.isChannelingPurple) || (this.isChannelingDomainExpansion);
     if (!this.isMeleeMode && !isUsingHandSkill) {
       return null;
     }
@@ -1541,55 +1901,108 @@ export class GojoFighter extends Fighter {
     let hideFrontHand = false;
     let hideBackHand = false;
 
-    // 1. Melee Punch Animation (Smooth 8-frame strike & retraction matching Sukuna)
+    // 1. Snappy Melee Punch Animation (Alternating 1-2 punches with clear Left & Right fist paths)
     if (this.punchAnimTimer > 0) {
       const t = (8 - Math.min(8, this.punchAnimTimer)) / 8; // 0 to 1 progress over 8 frames
       const snap = t < 0.25 ? (t / 0.25) : Math.max(0, 1 - (t - 0.25) / 0.75); // Thrusts out 25%, smoothly retracts 75%
+
       if (this.punchAnimHand === 0) {
-        frontOffset += snap * 24;        // Right hand punches 24px forward
-        // Left hand stays anchored right at center of body (this.x, basePosY)
+        // --- RIGHT HAND PUNCH (Strikes along right flank) ---
+        frontAngleOffset = 0.22;         // Right side angle offset
+        frontOffset += snap * 26;        // Right hand punches 26px forward
+
+        // Left hand stays tucked in tight martial arts guard at chest
+        const guardAngle = this.gunAngle - 0.35;
+        const guardDist = this.r * 0.4;
+        backHandX = this.x + Math.cos(guardAngle) * guardDist;
+        backHandY = basePosY + Math.sin(guardAngle) * guardDist;
       } else {
-        const backAngle = this.gunAngle;
-        const backOffset = (this.r + 6) + snap * 24;
-        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches 24px forward!
+        // --- LEFT HAND PUNCH (Strikes along left flank) ---
+        const backAngle = this.gunAngle - 0.22; // Left side angle offset
+        const backOffset = (this.r + 6) + snap * 26;
+        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches 26px forward!
         backHandY = basePosY + Math.sin(backAngle) * backOffset;
-        frontOffset = -this.r + 2;       // Right hand pulls into chest center
+
+        // Right hand pulls into tight right guard at chest
+        frontAngleOffset = 0.35;
+        frontOffset = -this.r * 0.5;
       }
     }
 
-    // 2. Reversal Red / Blue / Hollow Purple Clasping Gesture
-    else if (this.redEffectTimer > 0 || this.isChannelingPurple || this.isChannelingDomainExpansion) {
-      frontAngleOffset = -0.15;
-      frontOffset = 18;
+    // 2. Hollow Purple Fusion Gesture - Hands dynamically cup & merge Red (+Y) and Blue (-Y) orbs
+    else if (this.isChannelingPurple) {
+      const mergeProgress = typeof this.getPurpleChargeProgress === 'function' ? this.getPurpleChargeProgress() : 0;
+      const handDistance = this.r + 10;
+      const handSpread = 14 * (1 - mergeProgress);
 
-      const backAngle = this.gunAngle + 0.15;
-      const backOffset = 18;
-      backHandX = this.x + Math.cos(backAngle) * (this.r + backOffset);
-      backHandY = basePosY + Math.sin(backAngle) * (this.r + backOffset);
+      // Right hand (front hand) holding Red Orb on +Y (Right side)
+      const rightRotX = Math.cos(this.gunAngle) * handDistance - Math.sin(this.gunAngle) * handSpread;
+      const rightRotY = Math.sin(this.gunAngle) * handDistance + Math.cos(this.gunAngle) * handSpread;
+      const frontHandX = this.x + rightRotX;
+      const frontHandY = basePosY + rightRotY;
+
+      // Left hand (back hand) holding Blue Orb on -Y (Left side)
+      const leftRotX = Math.cos(this.gunAngle) * handDistance - Math.sin(this.gunAngle) * (-handSpread);
+      const leftRotY = Math.sin(this.gunAngle) * handDistance + Math.cos(this.gunAngle) * (-handSpread);
+      backHandX = this.x + leftRotX;
+      backHandY = basePosY + leftRotY;
+
+      return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
     }
 
-    // Front hand (Right hand) position
+
+    // 4. Domain Expansion Hand Sign Gesture
+    else if (this.isChannelingDomainExpansion) {
+      const domainDist = this.r + 8;
+      const frontHandX = this.x + Math.cos(this.gunAngle) * domainDist - Math.sin(this.gunAngle) * 3;
+      const frontHandY = basePosY + Math.sin(this.gunAngle) * domainDist + Math.cos(this.gunAngle) * 3;
+
+      backHandX = this.x + Math.cos(this.gunAngle) * domainDist - Math.sin(this.gunAngle) * (-3);
+      backHandY = basePosY + Math.sin(this.gunAngle) * domainDist + Math.cos(this.gunAngle) * (-3);
+
+      return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
+    }
+
+    // Front hand (Right hand) default position
     const frontAngle = this.gunAngle + frontAngleOffset;
     let frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
     let frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
+
+    // Safety Clamp: Prevent hands from extending above the top boundary of body circle (-this.r + 6)
+    const maxTopY = basePosY - (this.r - 6);
+    if (frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
+      frontHandY = maxTopY;
+    }
+    if (backHandY < maxTopY && !this.isChannelingPurple && !this.isChannelingDomainExpansion) {
+      backHandY = maxTopY;
+    }
 
     return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
   }
 
   // Render hand Cursed Energy flame aura BEHIND physical body
   _drawHandCursedEnergyAura(ctx) {
-    // Disable hand Cursed Energy flame aura on Gojo's hands during domain active rapid attacks
-    if (this.domainActive) return;
+    // Hide Cursed Energy aura on hands during domain activation and domain expansion
+    if (this.isChannelingDomainExpansion || this.domainActive) return;
 
     const hands = this._getHandPositions();
     if (!hands) return;
 
     const isRCT = (this.isChannelingRCT || this.healingAuraTimer > 0);
     const isPurple = (this.isChannelingPurple);
-    const isActive = !isRCT && !isPurple && ((this.combatAuraOpacity > 0.05) || (this.isMeleeMode) || (this.punchAnimTimer > 0) || (this.redEffectTimer > 0) || (this.isChannelingDomainExpansion) || (state.gameState === 'countdown'));
+    const isFrozenByDomain = (this.timeStopTimer > 0) || (this.hitStunTimer > 0);
+    const isActive = !isRCT && !isPurple && !isFrozenByDomain && ((this.combatAuraOpacity > 0.05) || (this.isMeleeMode) || (this.punchAnimTimer > 0) || (this.redEffectTimer > 0) || (state.gameState === 'countdown'));
 
     if (isActive) {
-      const theme = (this.redEffectTimer > 0 ? 'red' : 'blue');
+      // During Phase 1 (orb buildup), suppress the hand aura so the red orb stands alone.
+      // During Phase 2+ blast the hand aura can show.
+      const buildupFrames = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.redBuildupFrames) || 20;
+      const totalFrames  = this.redEffectMaxTimer || 75;
+      const elapsed      = totalFrames - this.redEffectTimer;
+      const isOrbBuildup = (this.redEffectTimer > 0) && this.redBuildupPhase;
+      if (isOrbBuildup) return; // Suppress during buildup — orb renders on top
+
+      const theme = (this.redEffectTimer > 0 ? 'blue' : 'blue'); // always blue for hand aura
       const blobRadius = (this.punchAnimTimer > 0) ? 15.0 : 12.0;
 
       if (!hands.hideFrontHand) this._drawJJKCursedEnergyAura(ctx, theme, hands.frontHandX, hands.frontHandY, blobRadius);
@@ -1612,60 +2025,53 @@ export class GojoFighter extends Fighter {
 
     if (!hideFrontHand) {
       ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, 6.5, 0, Math.PI * 2);
+      ctx.arc(frontHandX, frontHandY, getHandSize(6.5, this), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
 
     if (!hideBackHand) {
       ctx.beginPath();
-      ctx.arc(backHandX, backHandY, 6.5, 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, getHandSize(6.5, this), 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
     ctx.restore();
 
-    // Draw Quick Crimson Finger-Snap Flare at Gojo's hand when Reversal Red triggers
-    if (this.redEffectTimer > 0) {
-      const maxT = 20;
-      const t = Math.max(0, Math.min(1, 1 - (this.redEffectTimer / maxT)));
-      const flareScale = Math.sin(t * Math.PI);
+    // Draw Cursed Energy fist glow around punching hand during punch animation ON TOP of fighters (suppressed during domain)
+    if (this.punchAnimTimer > 0 && !this.domainActive && !this.isChannelingDomainExpansion) {
+      const strikingX = this.punchAnimHand === 0 ? frontHandX : backHandX;
+      const strikingY = this.punchAnimHand === 0 ? frontHandY : backHandY;
 
       ctx.save();
-      ctx.translate(frontHandX, frontHandY);
+      ctx.translate(strikingX, strikingY);
 
-      // Crimson outer glow gradient
-      const grad = ctx.createRadialGradient(0, 0, 2, 0, 0, 16 * flareScale);
-      grad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-      grad.addColorStop(0.3, 'rgba(255, 30, 60, 0.85)');
-      grad.addColorStop(0.7, 'rgba(200, 0, 40, 0.4)');
-      grad.addColorStop(1, 'rgba(150, 0, 20, 0)');
+      // Glowing Cursed Energy aura around punching fist
+      const auraGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 16);
+      auraGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
+      auraGrad.addColorStop(0.35, 'rgba(0, 229, 255, 0.85)');
+      auraGrad.addColorStop(0.7, 'rgba(0, 150, 255, 0.4)');
+      auraGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
 
-      ctx.fillStyle = grad;
+      ctx.fillStyle = auraGrad;
       ctx.beginPath();
-      ctx.arc(0, 0, 16 * flareScale, 0, Math.PI * 2);
+      ctx.arc(0, 0, 16, 0, Math.PI * 2);
       ctx.fill();
 
-      // Sharp 4-point Red Starburst Rays
-      ctx.strokeStyle = '#FF3355';
-      ctx.lineWidth = 2 * flareScale;
-      const rayLen = 22 * flareScale;
+      // Sharp Cyan Cursed Energy Ray Flares
+      ctx.strokeStyle = '#00E5FF';
+      ctx.lineWidth = 2;
       for (let i = 0; i < 4; i++) {
-        const rayAngle = (Math.PI / 2) * i + (t * 0.5);
+        const rayAngle = (Math.PI / 2) * i + (Date.now() * 0.01);
         ctx.beginPath();
         ctx.moveTo(Math.cos(rayAngle) * 3, Math.sin(rayAngle) * 3);
-        ctx.lineTo(Math.cos(rayAngle) * rayLen, Math.sin(rayAngle) * rayLen);
+        ctx.lineTo(Math.cos(rayAngle) * 12, Math.sin(rayAngle) * 12);
         ctx.stroke();
       }
 
-      // Piercing white inner core
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.arc(0, 0, 4 * flareScale, 0, Math.PI * 2);
-      ctx.fill();
-
       ctx.restore();
     }
+
   }
 
   drawOutline(ctx) {
@@ -1684,73 +2090,42 @@ export class GojoFighter extends Fighter {
     // 'lighter' blending on white background makes colors invisible
     ctx.globalCompositeOperation = 'source-over';
 
-    // === LAYER 1: THE DARK OUTER EDGE (Deep Blue Silhouette) ===
-    // Deep blue creates contrast against white background
-    const outerRadius = this.r * 1.8; // Reduced from 2.5
-    const outerGradient = ctx.createRadialGradient(
-      this.x, this.y, this.r * 0.5,
-      this.x, this.y, outerRadius
-    );
-    outerGradient.addColorStop(0, `rgba(100, 180, 255, ${0.98 * progress})`); // Bright blue center
-    outerGradient.addColorStop(0.3, `rgba(80, 160, 255, ${0.98 * progress})`); // Vivid blue
-    outerGradient.addColorStop(0.5, `rgba(60, 140, 255, ${0.95 * progress})`); // Rich blue
-    outerGradient.addColorStop(0.7, `rgba(40, 120, 255, ${0.85 * progress})`); // Deep blue
-    outerGradient.addColorStop(1, 'rgba(20, 80, 200, 0)'); // Fade to blue
+    // OPTIMIZED: Replaced 5 expensive per-frame radial gradients with layered alpha circles
+    // which look nearly identical but render exponentially faster.
+    
+    ctx.save();
+    ctx.translate(this.x, this.y);
+    ctx.globalAlpha = progress;
 
+    // === LAYER 1: THE DARK OUTER EDGE (Deep Blue Silhouette) ===
+    const outerRadius = this.r * 1.8;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, outerRadius, 0, Math.PI * 2);
-    ctx.fillStyle = outerGradient;
+    ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(40, 120, 255, 0.4)';
     ctx.fill();
 
     // === LAYER 2: SOFT SMUDGING (Rich Blue Gradient) ===
-    // Creates the smoky, ethereal gradient effect
-    const smokeRadius = this.r * 1.6; // Reduced from 2.2
-    const smokeGradient = ctx.createRadialGradient(
-      this.x, this.y, this.r * 0.3,
-      this.x, this.y, smokeRadius
-    );
-    smokeGradient.addColorStop(0, `rgba(120, 200, 255, ${0.95 * progress})`); // Bright blue
-    smokeGradient.addColorStop(0.3, `rgba(100, 180, 255, ${0.98 * progress})`); // Vivid blue
-    smokeGradient.addColorStop(0.6, `rgba(80, 160, 255, ${0.9 * progress})`); // Rich blue
-    smokeGradient.addColorStop(1, 'rgba(60, 140, 255, 0)');
-
+    const smokeRadius = this.r * 1.6;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, smokeRadius, 0, Math.PI * 2);
-    ctx.fillStyle = smokeGradient;
+    ctx.arc(0, 0, smokeRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(80, 160, 255, 0.5)';
     ctx.fill();
 
-    // === LAYER 3: THE BRIGHT CORE (Vibrant Blue Hugging the Character) ===
-    // Fire is brightest at its source - this layer hugs the character's body
-    const coreRadius = this.r * 1.1; // Reduced from 1.5
-    const coreGradient = ctx.createRadialGradient(
-      this.x, this.y, this.r * 0.4,
-      this.x, this.y, coreRadius
-    );
-    coreGradient.addColorStop(0, `rgba(150, 220, 255, ${1.0 * progress})`); // Bright cyan core
-    coreGradient.addColorStop(0.3, `rgba(120, 200, 255, ${0.98 * progress})`); // Vivid blue
-    coreGradient.addColorStop(0.6, `rgba(100, 180, 255, ${0.95 * progress})`); // Medium blue
-    coreGradient.addColorStop(1, 'rgba(80, 160, 255, 0)'); // Fade to blue
-
+    // === LAYER 3: THE BRIGHT CORE (Vibrant Blue) ===
+    const coreRadius = this.r * 1.1;
     ctx.beginPath();
-    ctx.arc(this.x, this.y, coreRadius, 0, Math.PI * 2);
-    ctx.fillStyle = coreGradient;
+    ctx.arc(0, 0, coreRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(120, 200, 255, 0.6)';
     ctx.fill();
 
     // === LAYER 4: THE HOT CENTER (Bright Emerald Green & Cyan Core) ===
     const whiteHotRadius = this.r * 0.9;
-    const whiteHotGradient = ctx.createRadialGradient(
-      this.x, this.y, 0,
-      this.x, this.y, whiteHotRadius
-    );
-    whiteHotGradient.addColorStop(0, `rgba(200, 255, 220, ${1.0 * progress})`); // Bright white-green center
-    whiteHotGradient.addColorStop(0.3, `rgba(0, 255, 150, ${0.95 * progress})`); // Vibrant emerald green
-    whiteHotGradient.addColorStop(0.6, `rgba(100, 220, 255, ${0.85 * progress})`); // Cyan transition
-    whiteHotGradient.addColorStop(1, 'rgba(0, 200, 150, 0)');
-
     ctx.beginPath();
-    ctx.arc(this.x, this.y, whiteHotRadius, 0, Math.PI * 2);
-    ctx.fillStyle = whiteHotGradient;
+    ctx.arc(0, 0, whiteHotRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0, 255, 150, 0.7)';
     ctx.fill();
+    
+    ctx.restore();
 
     // === LAYER 5: CAST DEEP SHADOWS (Dark Shadows on Back Side) ===
     // Creates dramatic contrast by placing dark shadows on parts facing away
@@ -1904,8 +2279,11 @@ export class GojoFighter extends Fighter {
       ctx.ellipse(0, 0, ringRadius, ringRadius * (0.18 + r * 0.08), 0, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(100, 180, 255, ${(0.95 - r * 0.2) * progress})`;
       ctx.lineWidth = 3 - r * 0.5;
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = 'rgba(80, 160, 255, 1)';
+      
+      // OPTIMIZED: Removed shadowBlur. Used an alpha layered stroke for glow effect
+      ctx.stroke();
+      ctx.lineWidth = (3 - r * 0.5) * 2;
+      ctx.strokeStyle = `rgba(80, 160, 255, ${(0.3) * progress})`;
       ctx.stroke();
 
       ctx.restore();
@@ -1923,8 +2301,11 @@ export class GojoFighter extends Fighter {
       ctx.ellipse(0, 0, innerRingRadius, innerRingRadius * 0.15, 0, 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(0, 255, 136, ${(0.95 - r * 0.15) * progress})`;
       ctx.lineWidth = 2.5;
-      ctx.shadowBlur = 12;
-      ctx.shadowColor = 'rgba(0, 255, 136, 1)';
+      
+      // OPTIMIZED: Removed shadowBlur. Used an alpha layered stroke for glow effect
+      ctx.stroke();
+      ctx.lineWidth = 5;
+      ctx.strokeStyle = `rgba(0, 255, 136, ${(0.3) * progress})`;
       ctx.stroke();
 
       ctx.restore();
@@ -2023,6 +2404,7 @@ export class GojoFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (this.isChannelingDomainExpansion || this.domainActive) return;
     drawGojoWeapon(ctx, this);
   }
 
@@ -2347,137 +2729,264 @@ export class GojoFighter extends Fighter {
   }
 
   /**
-   * Render authentic JJK Cursed Technique Reversal: Red (Aka) visual effect.
-   * Uses the same JJK ink brush algorithm (varying pressure, dry-brush jitter, broken cuts) as Gojo's spiritual energy edges.
+   * Render Cursed Technique Reversal: Red — three-phase animation:
+   *   Phase 1 (buildup): Red orb manifests and swells at Gojo's fingertip. Enemies are frozen.
+   *   Phase 2 (BOOM): Detonation flash — orb explodes into repulsion cone + rings.
+   *   Phase 3 (fade): Blast wave expands and dissipates.
    */
   _drawReversalRedEffect(ctx) {
-    const prog = 1 - (this.redEffectTimer / this.redEffectMaxTimer); // 0 to 1
-    const alpha = Math.sin((1 - prog) * Math.PI);
-    const angle = this.redTargetAngle || this.gunAngle || 0;
-    const time = Date.now();
+    const totalFrames  = this.redEffectMaxTimer;           // e.g. 75
+    const remaining    = this.redEffectTimer;              // counts down from totalFrames → 0
+    const elapsed      = totalFrames - remaining;          // 0 → totalFrames
+    const buildupEnd   = CONFIG.gojo.redBuildupFrames || 20; // first 20 frames = Phase 1
+    const angle        = this.redTargetAngle || this.gunAngle || 0;
+    const fingerDist   = this.r + 14;
+    const time         = Date.now();
+    const maxRange     = (CONFIG.gojo.redRange || 100) + 50;
+
+    // Smooth screen dimming with deep crimson vignette overlay as Gojo charges Red
+    let screenDimAlpha = 0;
+    if (elapsed <= buildupEnd) {
+      const buildProg = elapsed / buildupEnd; // 0 to 1
+      screenDimAlpha = Math.sin(buildProg * Math.PI * 0.5) * 0.65; // Smooth ramp up to 0.65
+    } else {
+      const blastProg = (elapsed - buildupEnd) / Math.max(1, totalFrames - buildupEnd); // 0 to 1
+      screenDimAlpha = (1 - blastProg) * 0.65; // Smooth fade out after blast
+    }
+
+    if (screenDimAlpha > 0.01) {
+      ctx.save();
+      const canvas = (typeof state !== 'undefined' && state.canvas) ? state.canvas : null;
+      const cw = canvas ? canvas.width : 2000;
+      const ch = canvas ? canvas.height : 2000;
+      const maxR = Math.max(cw, ch) * 1.5;
+
+      const redGrad = ctx.createRadialGradient(this.x, this.y - (this.z || 0), 20, this.x, this.y - (this.z || 0), maxR);
+      redGrad.addColorStop(0, `rgba(140, 0, 25, ${screenDimAlpha * 0.25})`);
+      redGrad.addColorStop(0.3, `rgba(70, 0, 12, ${screenDimAlpha * 0.60})`);
+      redGrad.addColorStop(0.65, `rgba(25, 0, 5, ${screenDimAlpha * 0.85})`);
+      redGrad.addColorStop(1, `rgba(0, 0, 0, ${screenDimAlpha * 0.95})`);
+
+      ctx.fillStyle = redGrad;
+      ctx.fillRect(-600, -600, cw + 1200, ch + 1200);
+      ctx.restore();
+    }
 
     ctx.save();
     ctx.translate(this.x, this.y - (this.z || 0));
     ctx.rotate(angle);
-    ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
-    // Fingertip origin point
-    const fingerDist = this.r + 14;
-    const maxRange = (CONFIG.gojo.redRange || 100) + 50;
-    const beamLength = maxRange * (0.3 + prog * 0.9);
-    const beamSpread = 35 * (0.5 + prog * 0.8);
+    // ─── Phase 1: FLARE FIRST, then orb condenses from it ──────────────────
+    if (elapsed <= buildupEnd) {
+      const buildProg  = elapsed / buildupEnd;       // 0 → 1
+      // Sub-phase boundary: first 40% = pure flare, remaining 60% = orb emerges
+      const flareCutoff = 0.4;
+      const isFlarePhase = buildProg <= flareCutoff;
 
-    // 1. Directional Violent Repulsion Cone & Beam
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+      // ── Sub-phase A: Crimson Starburst Flare (0 → 40%) ──────────────────
+      {
+        // Flare is fully bright at start and fades as the orb takes over
+        const flareP   = isFlarePhase
+          ? buildProg / flareCutoff          // 0 → 1 (building up)
+          : 1 - (buildProg - flareCutoff) / (1 - flareCutoff); // 1 → 0 (fading)
+        const flareIn  = isFlarePhase ? flareP * flareP : 1;   // ease-in on arrival
+        const flareAlpha = Math.sin(flareP * Math.PI);          // peaks at center, fades both ends
 
-    // Crimson Repulsion Beam Cone
-    const coneGrad = ctx.createLinearGradient(fingerDist, 0, fingerDist + beamLength, 0);
-    coneGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');  // White-hot origin
-    coneGrad.addColorStop(0.25, 'rgba(255, 0, 51, 0.9)');  // Intense Crimson Red
-    coneGrad.addColorStop(0.7, 'rgba(200, 0, 40, 0.5)');   // Deep Blood Red
-    coneGrad.addColorStop(1, 'rgba(150, 0, 20, 0)');
+        if (flareAlpha > 0.01) {
+          const flareR = 32 * (0.4 + flareP * 0.6);
 
-    ctx.beginPath();
-    ctx.moveTo(fingerDist, 0);
-    ctx.lineTo(fingerDist + beamLength, -beamSpread);
-    ctx.quadraticCurveTo(fingerDist + beamLength * 1.1, 0, fingerDist + beamLength, beamSpread);
-    ctx.closePath();
-    ctx.fillStyle = coneGrad;
-    ctx.fill();
-    ctx.restore();
-
-    // 2. SAME JJK INK BRUSH STROKES as Spiritual Energy Edges (varying pressure, broken cuts & dry-brush jitter)
-    ctx.strokeStyle = '#000000'; // Pitch black JJK ink
-    ctx.lineCap = 'butt';
-    ctx.lineJoin = 'miter';
-
-    const numArcs = 6;
-    for (let k = 0; k < numArcs; k++) {
-      const arcDist = fingerDist + 15 + k * (beamLength / numArcs) * (0.5 + prog * 0.6);
-      const arcSpread = (22 + k * 16 * prog) * (Math.PI / 180);
-      const numSegments = 16;
-
-      // Draw broken dry-brush ink strokes along each repulsion arc
-      for (let layer = 0; layer < 2; layer++) {
-        const offsetR = arcDist * (1.0 + (layer === 0 ? 0 : -0.05));
-
-        for (let i = 0; i < numSegments; i++) {
-          const segAngle1 = -arcSpread + (arcSpread * 2 / numSegments) * i;
-          const segAngle2 = -arcSpread + (arcSpread * 2 / numSegments) * (i + 1);
-
-          // Cut & gap noise (broken short/tall dry-brush cuts)
-          const cutSeed = Math.sin(i * 13.7 + k * 23.1 + layer * 41.5 + time * 0.01);
-          if (cutSeed < -0.15) continue; // Gap/cut in ink stroke!
-
-          // Pressure noise (varying brush thickness: 0.6px to 3.5px)
-          const pressureNoise = Math.sin(i * 3.1 + k * 5.7 + time * 0.02) * 0.5 + 0.5;
-          const strokeThick = 0.6 + pressureNoise * 2.8;
-
-          // Micro jitter for rough dry-brush texture
-          const jitterX = (Math.sin(i * 9.1 + k * 17.3) * 0.8);
-          const jitterY = (Math.cos(i * 11.3 + k * 19.7) * 0.8);
-
-          ctx.lineWidth = strokeThick;
+          // Outer crimson bloom
+          ctx.save();
+          ctx.globalCompositeOperation = 'lighter';
+          const bloom = ctx.createRadialGradient(fingerDist, 0, 0, fingerDist, 0, flareR * 3.5);
+          bloom.addColorStop(0,   `rgba(255, 255, 255, ${0.9 * flareAlpha})`);
+          bloom.addColorStop(0.15,`rgba(255, 80,  80,  ${0.8 * flareAlpha})`);
+          bloom.addColorStop(0.4, `rgba(220, 0,   40,  ${0.5 * flareAlpha})`);
+          bloom.addColorStop(1,   'rgba(150, 0, 20, 0)');
+          ctx.fillStyle = bloom;
           ctx.beginPath();
-          ctx.arc(jitterX, jitterY, offsetR, segAngle1, segAngle2);
-          ctx.stroke();
+          ctx.arc(fingerDist, 0, flareR * 3.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 6-point starburst rays radiating outward
+          ctx.save();
+          ctx.translate(fingerDist, 0);
+          ctx.globalAlpha = flareAlpha * 0.95;
+          const numRays  = 6;
+          const rayLen   = flareR * (1.2 + flareP * 1.4);
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineCap = 'round';
+          for (let i = 0; i < numRays; i++) {
+            const rayAngle = (Math.PI * 2 / numRays) * i + (elapsed * 0.04);
+            const innerR   = flareR * 0.15;
+            ctx.lineWidth  = (3.5 - i * 0.2) * flareAlpha;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(rayAngle) * innerR, Math.sin(rayAngle) * innerR);
+            ctx.lineTo(Math.cos(rayAngle) * rayLen,  Math.sin(rayAngle) * rayLen);
+            ctx.stroke();
+            // Thin secondary ray between each main ray
+            const midAngle = rayAngle + Math.PI / numRays;
+            ctx.lineWidth  = 1.2 * flareAlpha;
+            ctx.beginPath();
+            ctx.moveTo(Math.cos(midAngle) * innerR,       Math.sin(midAngle) * innerR);
+            ctx.lineTo(Math.cos(midAngle) * rayLen * 0.6, Math.sin(midAngle) * rayLen * 0.6);
+            ctx.stroke();
+          }
+          // White-hot core point of the flare
+          ctx.fillStyle = '#FFFFFF';
+          ctx.globalAlpha = flareAlpha;
+          ctx.beginPath();
+          ctx.arc(0, 0, flareR * 0.35, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = `rgba(255, 60, 60, ${flareAlpha * 0.8})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, flareR * 0.6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         }
+      }
+
+      // ── Sub-phase B: Orb condenses from the flare (40% → 100%) ──────────
+      if (!isFlarePhase) {
+        const orbProg  = (buildProg - flareCutoff) / (1 - flareCutoff); // 0 → 1
+        const eased    = orbProg * orbProg;                              // ease-in
+
+        const baseR = getHandSize(6) * (0.2 + eased * 1.8);
+        const pulse  = Math.sin(time / 120) * 0.08;
+        const r2     = baseR * (1 + pulse);
+
+        // Use the same drawGojoOrb as Hollow Purple channeling — identical red orb visual
+        drawGojoOrb(ctx, fingerDist, 0, r2, time, 'red', 0);
+
+        // Draw Anamorphic Red Lens Flare Beam delayed until right before explosion (final 25% of orb charge)
+        if (orbProg > 0.75) {
+          const flareP = (orbProg - 0.75) / 0.25; // 0.0 to 1.0 fast intense ignition right before explosion
+          drawAnamorphicLensFlare(ctx, fingerDist, 0, flareP, 'red');
+
+          if (!this._hasPlayedRedFlareSound) {
+            this._hasPlayedRedFlareSound = true;
+            triggerGlobalScreenShake(8, 12); // Pre-detonation flare tremor
+            const sDep = getSkillSound(this._def?.id, 'red_deploy');
+            playSound(sDep?.src || 'Assets/Sound Effects/Skills/reddeploy.mp3', sDep?.volume ?? 2.0);
+          }
+        }
+      }
+
+
+    // ─── Phase 2 + 3: BOOM and Fade (elapsed > buildupEnd) ──────────────────
+    } else {
+      const blastElapsed = elapsed - buildupEnd;           // 0 → (totalFrames - buildupEnd)
+      const blastTotal   = totalFrames - buildupEnd;
+      const blastProg    = blastElapsed / blastTotal;      // 0 → 1
+
+      // Fade-out alpha: peaks at 0 and fades toward 1
+      const alpha = Math.max(0, Math.sin((1 - blastProg) * Math.PI));
+      ctx.globalAlpha = alpha;
+
+      const beamLength = maxRange * (0.2 + blastProg * 1.1);
+      const beamSpread = 40  * (0.4 + blastProg * 0.9);
+
+      // 1. Repulsion cone beam
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const coneGrad = ctx.createLinearGradient(fingerDist, 0, fingerDist + beamLength, 0);
+      coneGrad.addColorStop(0,    'rgba(255, 255, 255, 1.0)');
+      coneGrad.addColorStop(0.2,  'rgba(255, 0, 51, 0.9)');
+      coneGrad.addColorStop(0.65, 'rgba(200, 0, 40, 0.45)');
+      coneGrad.addColorStop(1,    'rgba(150, 0, 20, 0)');
+      ctx.beginPath();
+      ctx.moveTo(fingerDist, 0);
+      ctx.lineTo(fingerDist + beamLength, -beamSpread);
+      ctx.quadraticCurveTo(fingerDist + beamLength * 1.1, 0, fingerDist + beamLength, beamSpread);
+      ctx.closePath();
+      ctx.fillStyle = coneGrad;
+      ctx.fill();
+      ctx.restore();
+
+      // 2. JJK ink-brush arc strokes along the repulsion wave
+      ctx.strokeStyle = '#000000';
+      ctx.lineCap = 'butt';
+      ctx.lineJoin = 'miter';
+      const numArcs = 6;
+      for (let k = 0; k < numArcs; k++) {
+        const arcDist    = fingerDist + 15 + k * (beamLength / numArcs) * (0.5 + blastProg * 0.6);
+        const arcSpread  = (22 + k * 16 * blastProg) * (Math.PI / 180);
+        const numSegs    = 16;
+        for (let layer = 0; layer < 2; layer++) {
+          const offsetR = arcDist * (layer === 0 ? 1.0 : 0.95);
+          for (let i = 0; i < numSegs; i++) {
+            const a1 = -arcSpread + (arcSpread * 2 / numSegs) * i;
+            const a2 = -arcSpread + (arcSpread * 2 / numSegs) * (i + 1);
+            if (Math.sin(i * 13.7 + k * 23.1 + layer * 41.5 + time * 0.01) < -0.15) continue;
+            const pn = Math.sin(i * 3.1 + k * 5.7 + time * 0.02) * 0.5 + 0.5;
+            ctx.lineWidth = 0.6 + pn * 2.8;
+            ctx.beginPath();
+            ctx.arc(Math.sin(i * 9.1 + k * 17.3) * 0.8, Math.cos(i * 11.3 + k * 19.7) * 0.8, offsetR, a1, a2);
+            ctx.stroke();
+          }
+        }
+      }
+
+      // 3. Expanding crimson repulsion rings (centered on Gojo, fan toward target)
+      ctx.save();
+      ctx.strokeStyle = '#FF0033';
+      ctx.lineWidth = 3.5 * (1 - blastProg * 0.5);
+      for (let rIdx = 0; rIdx < 3; rIdx++) {
+        const ringR = (this.r + 15) + (rIdx * 38 + blastProg * 120);
+        ctx.beginPath();
+        ctx.arc(0, 0, ringR, -Math.PI * 0.65, Math.PI * 0.65);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 4. Fingertip orb — shrinks and fades using same drawGojoOrb visual as blast releases
+      const orbR = getHandSize(10) * (1 - blastProg * 0.85);
+      if (orbR > 1) {
+        ctx.globalAlpha = alpha * (1 - blastProg * 0.6);
+        drawGojoOrb(ctx, fingerDist, 0, orbR, time, 'red', 0);
+        ctx.globalAlpha = alpha; // restore for anything after
       }
     }
 
-    // 3. Expanding Crimson Repulsion Rings with Ink Edge
-    ctx.save();
-    ctx.strokeStyle = '#FF0033';
-    ctx.lineWidth = 3.5 * (1 - prog * 0.5);
-
-    for (let rIdx = 0; rIdx < 3; rIdx++) {
-      const ringR = (this.r + 15) + (rIdx * 35 + prog * 110);
-      ctx.beginPath();
-      ctx.arc(0, 0, ringR, -Math.PI * 0.65, Math.PI * 0.65);
-      ctx.stroke();
-    }
     ctx.restore();
+  }
 
-    // 4. Dense Crimson Fingertip Orb (Aka Core) with JJK Ink Brush Edge
+  /**
+   * Draw the crimson countdown ring on a fighter that was hit by Reversal Red slow.
+   * The ring shrinks from full circumference to nothing as redSlowTimer counts down.
+   */
+  _drawRedSlowRing(ctx, target) {
+    if (!target || !target.redSlowTimer || target.redSlowTimer <= 0) return;
+    const prog     = target.redSlowTimer / (target.redSlowMaxTimer || 120); // 1 → 0
+    const ringR    = target.r + 8 + (1 - prog) * 4;   // expands slightly as it fades
+    const arcEnd   = prog * Math.PI * 2;               // full circle → zero arc
+    const alpha    = Math.min(1, prog * 1.8);
+
     ctx.save();
-    ctx.translate(fingerDist, 0);
+    ctx.translate(target.x, target.y);
 
-    // Outer Crimson Glow
-
-    const orbR = 10 * (1.3 - prog * 0.4);
-    const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, orbR * 2.2);
-    coreGrad.addColorStop(0, '#FFFFFF');                  // Hot white center
-    coreGrad.addColorStop(0.3, 'rgba(255, 0, 51, 1.0)');  // Pure Crimson Aka Red
-    coreGrad.addColorStop(0.75, 'rgba(150, 0, 30, 0.8)'); // Deep Blood Red
-    coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = coreGrad;
+    // Outer crimson glow ring
+    ctx.strokeStyle = `rgba(255, 0, 40, ${alpha * 0.45})`;
+    ctx.lineWidth   = 5;
     ctx.beginPath();
-    ctx.arc(0, 0, orbR * 2.2, 0, Math.PI * 2);
+    ctx.arc(0, 0, ringR + 3, -Math.PI / 2, -Math.PI / 2 + arcEnd);
+    ctx.stroke();
+
+    // Bright crimson core ring
+    ctx.strokeStyle = `rgba(255, 60, 60, ${alpha * 0.85})`;
+    ctx.lineWidth   = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, ringR, -Math.PI / 2, -Math.PI / 2 + arcEnd);
+    ctx.stroke();
+
+    // White hot leading edge dot
+    const ledX = Math.cos(-Math.PI / 2 + arcEnd) * ringR;
+    const ledY = Math.sin(-Math.PI / 2 + arcEnd) * ringR;
+    ctx.fillStyle = `rgba(255, 220, 220, ${alpha})`;
+    ctx.beginPath();
+    ctx.arc(ledX, ledY, 3.5, 0, Math.PI * 2);
     ctx.fill();
-
-    // JJK Ink Brush Contour around Fingertip Orb (using pressure noise & cut segments)
-    ctx.shadowBlur = 0;
-    ctx.strokeStyle = '#000000';
-    ctx.lineCap = 'butt';
-    const orbSegments = 12;
-    for (let i = 0; i < orbSegments; i++) {
-      const a1 = (Math.PI * 2 / orbSegments) * i;
-      const a2 = (Math.PI * 2 / orbSegments) * (i + 1);
-
-      const cutSeed = Math.sin(i * 19.3 + time * 0.01);
-      if (cutSeed < -0.3) continue; // Broken ink cuts!
-
-      const pressureNoise = Math.sin(i * 2.9 + time * 0.015) * 0.5 + 0.5;
-      ctx.lineWidth = 0.8 + pressureNoise * 2.2;
-
-      ctx.beginPath();
-      ctx.arc(0, 0, orbR * 0.9, a1, a2);
-      ctx.stroke();
-    }
-
-    ctx.restore();
 
     ctx.restore();
   }

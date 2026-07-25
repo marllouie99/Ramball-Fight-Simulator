@@ -444,6 +444,10 @@ export function resolveFighterCollision(a, b) {
   const bPhases = b._isInsideOwnSphere?.() ?? false;
   if (aPhases || bPhases) return;
 
+  // Toji phases through fighters during his Ultimate sequence (ethereal assassin)
+  if (a.ultimateActive && (a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
+  if (b.ultimateActive && (b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
+
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const distSq = dx * dx + dy * dy;

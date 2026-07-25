@@ -1,3 +1,5 @@
+import { getHandSize } from '../../core/config.js';
+
 export function drawGojoWeapon(ctx, fighter) {
     const z = fighter.z || 0;
     ctx.save();
@@ -7,7 +9,7 @@ export function drawGojoWeapon(ctx, fighter) {
     const r = fighter.r;
     
     // Draw glowing hands/orbs instead of a gun
-    const handRadius = 6;
+    const handRadius = getHandSize(6);
     const handDistance = r + 10;
     const handSpread = 14;
 
@@ -42,41 +44,13 @@ export function drawGojoWeapon(ctx, fighter) {
             drawAnamorphicLensFlare(ctx, handDistance, 0, flareP);
         }
     } else {
-        // Melee Mode - Draw fists instead of blue orb
-        if (transition < 1) {
-            ctx.save();
-            ctx.globalAlpha = 1 - transition;
-            const fistRadius = 8;
-            
-            // Calculate punch animation extension
-            let punchProgress = 0;
-            if (fighter.meleePunchCooldown > 0) {
-                // Assuming max cooldown is around 8 frames
-                punchProgress = Math.min(1, fighter.meleePunchCooldown / 8.0); 
-            }
-            // Math.sin creates a curve that goes from 0 up to 1 and back to 0
-            const punchExtension = Math.sin(punchProgress * Math.PI) * 20; 
-            const fistDistance = r + 5 + punchExtension;
-            
-            // Pulsing effect for fists
-            const pulse = Math.sin(Date.now() / 100) * 2;
-            const glowIntensity = 8 + pulse;
-            
-            // Single centered fist with punching animation
-            ctx.save();
-            ctx.shadowColor = '#00BFFF';
-            ctx.fillStyle = '#4488AA';
-            ctx.beginPath();
-            ctx.arc(fistDistance, 0, fistRadius, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.strokeStyle = '#00BFFF';
-            ctx.lineWidth = 2;
-            ctx.stroke();
+        // Melee Mode - Hands are drawn with full punch animation in GojoFighter._drawHandCursedEnergy
+        // Suppress the Blue Orb entirely while Reversal Red is active, or while channeling Domain Expansion / Domain is active
+        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive) {
             ctx.restore();
-            
-            ctx.restore();
+            return;
         }
-        
+
         // Normal stance - Floating Blue orb in front with intense Bloom & prep charge
         if (transition > 0) {
             ctx.save();
@@ -89,7 +63,7 @@ export function drawGojoWeapon(ctx, fighter) {
             let chargeRings = false;
 
             if (fighter.shootCooldown > 0 && fighter.shootCooldownMax > 0) {
-                const progress = fighter.shootCooldown / fighter.shootCooldownMax;
+                const progress = Math.min(1.0, Math.max(0, fighter.shootCooldown / fighter.shootCooldownMax));
                 // progress goes from 1.0 down to 0.0
                 if (progress > 0.7) {
                     // Just fired! Peak flash & push
@@ -437,7 +411,7 @@ export function drawPurpleOrbTrail(ctx, p, time) {
  * Render a cinematic horizontal anamorphic lens flare beam when Red + Blue merge into Purple.
  * Matches the reference image style (hot white core, cyan-blue horizontal streak lines).
  */
-export function drawAnamorphicLensFlare(ctx, x, y, flareP) {
+export function drawAnamorphicLensFlare(ctx, x, y, flareP, colorType = 'purple') {
     ctx.save();
     ctx.translate(x, y);
     
@@ -446,45 +420,68 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP) {
     ctx.globalCompositeOperation = 'lighter';
     ctx.globalAlpha = alpha;
 
-    // 1. Long Horizontal Anamorphic Red + Blue -> Purple Fusion Streak Beam
+    // 1. Long Horizontal Anamorphic Lens Flare Beam
     const streakLength = 280 * alpha;
     const streakHeight = 4.0;
     
-    // Red on left (-X), Blue on right (+X), Purple & White in center!
     const beamGrad = ctx.createLinearGradient(-streakLength, 0, streakLength, 0);
-    beamGrad.addColorStop(0, 'rgba(255, 0, 80, 0)');
-    beamGrad.addColorStop(0.2, 'rgba(255, 30, 90, 0.6)');
-    beamGrad.addColorStop(0.42, 'rgba(220, 50, 255, 0.9)');  // Vibrant Purple
-    beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Hot White Fusion Core
-    beamGrad.addColorStop(0.58, 'rgba(180, 70, 255, 0.9)');  // Vibrant Purple
-    beamGrad.addColorStop(0.8, 'rgba(0, 170, 255, 0.6)');    // Blue
-    beamGrad.addColorStop(1, 'rgba(0, 140, 255, 0)');
+    if (colorType === 'red') {
+        beamGrad.addColorStop(0, 'rgba(255, 0, 50, 0)');
+        beamGrad.addColorStop(0.25, 'rgba(255, 20, 60, 0.7)');
+        beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Hot White Core
+        beamGrad.addColorStop(0.75, 'rgba(255, 20, 60, 0.7)');
+        beamGrad.addColorStop(1, 'rgba(255, 0, 50, 0)');
+    } else {
+        // Red on left (-X), Blue on right (+X), Purple & White in center!
+        beamGrad.addColorStop(0, 'rgba(255, 0, 80, 0)');
+        beamGrad.addColorStop(0.2, 'rgba(255, 30, 90, 0.6)');
+        beamGrad.addColorStop(0.42, 'rgba(220, 50, 255, 0.9)');  // Vibrant Purple
+        beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Hot White Fusion Core
+        beamGrad.addColorStop(0.58, 'rgba(180, 70, 255, 0.9)');  // Vibrant Purple
+        beamGrad.addColorStop(0.8, 'rgba(0, 170, 255, 0.6)');    // Blue
+        beamGrad.addColorStop(1, 'rgba(0, 140, 255, 0)');
+    }
 
     // Draw main horizontal beam line
     ctx.fillStyle = beamGrad;
     ctx.fillRect(-streakLength, -streakHeight * 0.5, streakLength * 2, streakHeight);
 
-    // Secondary wider soft horizontal glow beam (Red to Purple to Blue)
+    // Secondary wider soft horizontal glow beam
     const softHeight = 16 * alpha;
     const softGrad = ctx.createLinearGradient(-streakLength * 0.7, 0, streakLength * 0.7, 0);
-    softGrad.addColorStop(0, 'rgba(255, 0, 60, 0)');
-    softGrad.addColorStop(0.25, 'rgba(255, 20, 80, 0.35)');
-    softGrad.addColorStop(0.5, 'rgba(180, 0, 255, 0.5)'); // Deep Purple center
-    softGrad.addColorStop(0.75, 'rgba(0, 150, 255, 0.35)');
-    softGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
+    if (colorType === 'red') {
+        softGrad.addColorStop(0, 'rgba(255, 0, 40, 0)');
+        softGrad.addColorStop(0.3, 'rgba(255, 20, 50, 0.45)');
+        softGrad.addColorStop(0.5, 'rgba(255, 0, 30, 0.7)');
+        softGrad.addColorStop(0.7, 'rgba(255, 20, 50, 0.45)');
+        softGrad.addColorStop(1, 'rgba(255, 0, 40, 0)');
+    } else {
+        softGrad.addColorStop(0, 'rgba(255, 0, 60, 0)');
+        softGrad.addColorStop(0.25, 'rgba(255, 20, 80, 0.35)');
+        softGrad.addColorStop(0.5, 'rgba(180, 0, 255, 0.5)'); // Deep Purple center
+        softGrad.addColorStop(0.75, 'rgba(0, 150, 255, 0.35)');
+        softGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
+    }
 
     ctx.fillStyle = softGrad;
     ctx.fillRect(-streakLength * 0.7, -softHeight * 0.5, streakLength * 1.4, softHeight);
 
-    // 2. Bright Central White/Magenta-Purple Star Core
-    ctx.shadowColor = '#D033FF';
+    // 2. Bright Central White/Core Star Core
+    ctx.shadowColor = colorType === 'red' ? '#FF0033' : '#D033FF';
 
     const coreR = 8.5 * alpha;
     const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 2.5);
-    coreGrad.addColorStop(0, '#FFFFFF');
-    coreGrad.addColorStop(0.35, 'rgba(255, 100, 220, 0.9)');
-    coreGrad.addColorStop(0.7, 'rgba(160, 0, 255, 0.5)');
-    coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    if (colorType === 'red') {
+        coreGrad.addColorStop(0, '#FFFFFF');
+        coreGrad.addColorStop(0.35, 'rgba(255, 100, 120, 0.95)');
+        coreGrad.addColorStop(0.7, 'rgba(220, 0, 40, 0.6)');
+        coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    } else {
+        coreGrad.addColorStop(0, '#FFFFFF');
+        coreGrad.addColorStop(0.35, 'rgba(255, 100, 220, 0.9)');
+        coreGrad.addColorStop(0.7, 'rgba(160, 0, 255, 0.5)');
+        coreGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    }
 
     ctx.fillStyle = coreGrad;
     ctx.beginPath();

@@ -453,6 +453,7 @@ export class ZeusFighter extends Fighter {
     ctx.lineWidth = 2 + chargeProgress * 5;
     ctx.setLineDash([15, 15]);
     ctx.stroke();
+    ctx.setLineDash([]);
     
     // Inner intense glow that builds up
     ctx.beginPath();

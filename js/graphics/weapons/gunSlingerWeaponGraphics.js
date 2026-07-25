@@ -1,4 +1,5 @@
 import { state } from '../../core/state.js';
+import { getHandSize } from '../../core/config.js';
 
 // gunSlingerWeaponGraphics.js
 //  - Use this file for Gun Slinger-specific weapon graphics (dual revolvers).
@@ -452,7 +453,7 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.shadowBlur = 0;
     ctx.fillStyle = fighterColor;
     ctx.beginPath();
-    ctx.arc(-8 * scale, 12 * scale, 6 * scale, 0, Math.PI * 2);
+    ctx.arc(-8 * scale, 12 * scale, getHandSize(6 * scale), 0, Math.PI * 2);
     ctx.fill();
     ctx.lineWidth = 1.5 * scale;
     ctx.strokeStyle = '#000';

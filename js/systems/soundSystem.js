@@ -13,7 +13,7 @@ const _audioPool = [];
 const MAX_POOL_SIZE = 30;
 
 // Sound cache management to prevent unbounded memory growth
-const MAX_CACHE_SIZE = 50; // Maximum number of cached sounds
+const MAX_CACHE_SIZE = 250; // Maximum number of cached sounds
 
 function _pruneSoundCache() {
   if (_cache.size > MAX_CACHE_SIZE) {
@@ -70,6 +70,11 @@ export async function unlockAudio() {
  * @param {string} src - Path to the audio file (relative or absolute)
  */
 export async function preloadSound(src) {
+  if (!src) return;
+  if (Array.isArray(src)) {
+    await Promise.all(src.map((s) => preloadSound(s)));
+    return;
+  }
   if (_cache.has(src)) return;
   try {
     const response = await fetch(src);
@@ -255,14 +260,44 @@ export function stopAllLoopingSounds() {
  * @returns {HTMLAudioElement|null} The audio element (null for Web Audio playback)
  */
 const _lastPlayTimes = new Map();
-const SOUND_THROTTLE_MS = 60; // Prevent identical audio file from double-playing within 60ms
+const SOUND_THROTTLE_MS = 15; // Prevent identical audio file from double-playing within same frame (15ms)
 
 const _activeSoundHandles = new Set();
 
-export function playSound(src, volume = 1.0, speed = 1.0, offset = 0) {
+export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0) {
   if (!src) return null;
 
-  // Throttling guard: Prevent same sound file from playing multiple times simultaneously within 60ms
+  // Support passing a sound config object directly: playSound({ src: '...', volume: 1.2, delay: -0.1 })
+  if (typeof src === 'object' && !Array.isArray(src)) {
+    const obj = src;
+    src = obj.src;
+    if (obj.volume !== undefined) volume = obj.volume;
+    if (obj.speed !== undefined) speed = obj.speed;
+    if (obj.offset !== undefined) offset = obj.offset;
+    if (obj.delay !== undefined) delay = obj.delay;
+  }
+
+  // Handle positive delay option (schedules playback after delayMs)
+  if (delay > 0) {
+    const delayMs = delay < 10 ? delay * 1000 : delay;
+    setTimeout(() => {
+      playSound(src, volume, speed, offset, 0);
+    }, delayMs);
+    return null;
+  }
+
+  // Handle Array of sound sources (play each sound in the array)
+  if (Array.isArray(src)) {
+    if (src.length === 0) return null;
+    let lastResult = null;
+    for (const singleSrc of src) {
+      const res = playSound(singleSrc, volume, speed, offset, 0);
+      if (res) lastResult = res;
+    }
+    return lastResult;
+  }
+
+  // Throttling guard: Prevent same sound file from playing multiple times simultaneously within 15ms
   const now = performance.now();
   const lastTime = _lastPlayTimes.get(src) || 0;
   if (now - lastTime < SOUND_THROTTLE_MS) {

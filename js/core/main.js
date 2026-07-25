@@ -18,7 +18,7 @@ import { updateLightningEffects, drawLightningEffects } from '../graphics/partic
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
-import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } from '../graphics/draw.js';
+import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, resetCachedTime, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawTojiUltimateOverlay } from '../graphics/draw.js';
 import { drawAllCronosSpheres, drawThermobaricExplosions } from '../graphics/draw.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -381,16 +381,30 @@ function animate(timestamp) {
     burnEffectSystem.update(dtGlobal);
     bomberExplosionSystem.update(dtGlobal);
 
-    // Apply global screen shake
+    // Apply global screen shake (dampened smoothly back to zero as timer expires)
     let shakeX = 0, shakeY = 0;
     if (state.screenShake && state.screenShake.timer > 0) {
-      shakeX = (Math.random() - 0.5) * state.screenShake.intensity * 2;
-      shakeY = (Math.random() - 0.5) * state.screenShake.intensity * 2;
+      const maxTimer = state.screenShake.maxTimer || state.screenShake.timer;
+      const dampRatio = maxTimer > 0 ? (state.screenShake.timer / maxTimer) : 1.0;
+      const currentIntensity = state.screenShake.intensity * dampRatio;
+      
+      shakeX = (Math.random() - 0.5) * currentIntensity * 2;
+      shakeY = (Math.random() - 0.5) * currentIntensity * 2;
       state.screenShake.timer--;
       if (state.screenShake.timer <= 0) {
         state.screenShake.intensity = 0;
+        state.screenShake.maxTimer = 0;
       }
     }
+
+    // Sync HTML DOM Health HUD containers with screen shake so DOM cards and Canvas Arena shake as one locked unit
+    const containerBottom = document.getElementById('healthHud');
+    const containerLeft = document.getElementById('healthHudLeft');
+    const containerRight = document.getElementById('healthHudRight');
+    const hudTransform = (shakeX !== 0 || shakeY !== 0) ? `translate3d(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px, 0)` : '';
+    if (containerBottom) containerBottom.style.transform = hudTransform;
+    if (containerLeft) containerLeft.style.transform = hudTransform;
+    if (containerRight) containerRight.style.transform = hudTransform;
 
     // Draw Logic based on state
     if (state.gameState === 'title') {
@@ -420,14 +434,16 @@ function animate(timestamp) {
       drawWeaponDetailScreen();
     } else {
       // Apply screen shake for game rendering
-      state.ctx.save();
-      state.ctx.translate(shakeX, shakeY);
+      const previousTransform = state.ctx.getTransform();
+      try {
+        state.ctx.translate(shakeX, shakeY);
 
-      drawArena();
+        drawArena();
       drawPurpleDimScreen(); // Draw purple dim screen overlay when Gojo's Hollow Purple is active
       drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
       drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
       drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
+      drawTojiUltimateOverlay(); // Draw pitch black overlay with Fly Heads when Toji uses Ultimate
       drawFlames(); // Draw all flames to offscreen canvas (batched for performance)
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles
       drawFuelPickups();
@@ -541,13 +557,16 @@ function animate(timestamp) {
       // Composite flame canvas onto main canvas (after all other drawing)
       compositeFlameCanvas();
 
-      // Restore canvas transform (end screen shake)
-      state.ctx.restore();
-
-      if (state.gameState === 'playing') {
+      if (state.gameState === 'playing' || state.gameState === 'countdown') {
         drawHUD();
-      } else if (state.gameState === 'countdown') {
-        drawFighters(); // Draw fighters during countdown to show cursed energy auras
+      }
+
+      } finally {
+        // Restore canvas transform exactly (end screen shake)
+        state.ctx.setTransform(previousTransform);
+      }
+
+      if (state.gameState === 'countdown') {
         drawCountdown();
       } else if (state.gameState === 'paused') {
         drawPauseScreen();

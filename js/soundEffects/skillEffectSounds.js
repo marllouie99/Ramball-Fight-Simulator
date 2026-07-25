@@ -96,6 +96,60 @@ export const SKILL_EFFECT_SOUNDS = {
       speed: 1.0,
     },
   },
+
+  // ── Toji Fushiguro ──────────────────────────
+  toji: {
+    finalblowcharging: {
+      src: 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3',
+      volume: 4.5,
+      delay: -0.10,
+    },
+    thirdseqflurry: {
+      src: 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3',
+      volume: 3.5,
+      delay: -0.10,
+    },
+    ultimatefinalblow: {
+      src: 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3',
+      volume: 4.5,
+      delay: 0,
+    },
+    secondweaponattack: {
+      src: 'Assets/Sound Effects/Skills/toji-2stseq-2ndweaponAttack.mp3',
+      volume: 4.2,
+      delay: -0.30,
+    },
+    backthrust: {
+      src: 'Assets/Sound Effects/Skills/toji-backthrust.mp3',
+      volume: 4.2,
+      delay: -0.20,
+    },
+    firstseqteleport: {
+      src: 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3',
+      volume: 4.0,
+      delay: -0.10,
+    },
+    ultimatechanneling: {
+      src: 'Assets/Sound Effects/Skills/toji-ultimatechanneling.mp3',
+      volume: 4.0,
+      delay: 0,
+    },
+    vanish: {
+      src: 'Assets/Sound Effects/Skills/woosh.mp3',
+      volume: 5.0,
+      delay: 0,
+    },
+    strike: {
+      src: 'Assets/Sound Effects/Skills/dash5.mp3',
+      volume: 1.0,
+      delay: 0,
+    },
+    dash: {
+      src: 'Assets/Sound Effects/Skills/dash5.mp3',
+      volume: 1.0,
+      delay: 0,
+    },
+  },
 };
 
 /**
@@ -116,6 +170,17 @@ export function getSkillEffectSound(fighterName, effectName) {
   if (!fighterConfig) return null;
 
   return fighterConfig[lowerEffect] || null;
+}
+
+/**
+ * Play a skill effect sound by fighter name and effect name, automatically applying volume, speed, and delay.
+ * @param {string} fighterName
+ * @param {string} effectName
+ */
+export function playSkillEffectSound(fighterName, effectName) {
+  const sound = getSkillEffectSound(fighterName, effectName);
+  if (!sound) return null;
+  return playSound(sound);
 }
 
 /**

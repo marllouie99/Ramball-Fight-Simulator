@@ -26,7 +26,7 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   voidGrad.addColorStop(1, 'rgba(2, 8, 25, 0.80)');      // Soft cosmic edge
 
   ctx.fillStyle = voidGrad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
   ctx.restore();
 
   // ── 3. INFINITE KNOWLEDGE SINGULARITY RING AROUND GOJO ──

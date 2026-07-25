@@ -13,6 +13,7 @@ export const CONFIG = {
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
   globalFighter: {
     sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
+    handSizeMultiplier: 1.5,                   // scale the size of all fighter hands globally (1.0 = default)
   },
 
   // ─────────────────────────────────────────────
@@ -339,7 +340,7 @@ export const CONFIG = {
     // TUNING: Basic attack (alternating dual revolvers)
     leftGunDelay: 8,          // frames delay for left gun shot after right gun
     shotCooldown: 15,         // frames between alternating shots (rapid fire)
-    bulletDamage: 7,          // damage per bullet
+    bulletDamage: 10,          // damage per bullet
     bulletSpeed: 15.0,        // speed of bullets
     basicAttackKnockback: 5.0,// very small knockback on basic attacks
 
@@ -494,7 +495,7 @@ export const CONFIG = {
     telekinesisRange: 250,
 
     // Ultimate: Spell Steal
-    spellStealCooldown: 1000,
+    spellStealCooldown: 700,
     spellStealDuration: 1000, // 7 seconds
     spellStealRange: 350,
   },
@@ -505,12 +506,12 @@ export const CONFIG = {
     lightningDamage: 20,
     lightningSpeed: 30,
     chainCount: 3,         // How many times it bounces
-    chainRange: 150,       // Range to find next target
+    chainRange: 250,       // Range to find next target
     chainDamageMultiplier: 0.8, // Decay per bounce
     attackCooldown: 150,
 
     // Debuff system
-    stunChance: 1.0,
+    stunChance: 0.0,
     stunDuration: 10,
     paralyzeChance: 0.3,
     paralyzeDuration: 60,
@@ -548,10 +549,17 @@ export const CONFIG = {
     blueSpeed: 10.5,           // Speed of Blue orb projectile
     blueRadius: 50,           // Pull radius of Blue explosion
     bluePullForce: 0.5,       // Pull strength of Blue
+    redDamage: 50,            // Base damage dealt by Reversal Red blast
     redKnockback: 25,         // Knockback force of Red
-    redCooldown: 300,         // Cooldown of Red
+    redCooldown: 1000,         // Cooldown of Red
     redRange: 100,            // Range to trigger Red
-    purpleCooldown: 800,      // Cooldown of Hollow Purple
+    redTotalFrames: 75,       // Total frames for full Red animation (~1.25s at 60fps)
+    redBuildupFrames: 100,     // Frames of orb manifestation before the BOOM (~0.33s)
+    redSlowDuration: 120,     // Frames the post-detonation slow lasts (~2s at 60fps)
+    redSlowMultiplier: 0.35,  // Speed multiplier while slowed by Red (35% of normal)
+    redShakeIntensity: 22,    // Heavy screen shake intensity on Red detonation
+    redShakeDuration: 25,     // Duration of screen shake on Red detonation
+    purpleCooldown: 500,      // Cooldown of Hollow Purple
     purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
     purpleDamage: 20,         // Continuous piercing damage per tick
     purpleSpeed: 5,           // Speed of Purple orb
@@ -568,7 +576,7 @@ export const CONFIG = {
     purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
     domainCooldown: 1500,     // 20s Ultimate cooldown
     domainChargeMax: 150,     // 2s Channeling duration before domain opens
-    domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
+    domainDuration: 350,      // Domain lasts 3 seconds (paralyzes enemies)
     domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
     domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
     // Reverse Cursed Technique - Self heal when at low HP
@@ -576,7 +584,7 @@ export const CONFIG = {
     reverseCursedTechniqueHealPercent: 0.20,   // Heals 35% of max HP
     reverseCursedTechniqueCooldown: 1200,      // 15 second cooldown before it can trigger again
     // Melee Mode (Hand-to-Hand Combat)
-    initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
+    initialMeleeDuration: 30, // Forces hand-to-hand combat for the initial duration
     meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
     closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
     meleePunchDamage: 10,     // Damage dealt by each punch
@@ -591,7 +599,7 @@ export const CONFIG = {
 
     // Limitless Infinity Barrier Mechanics
     infinityCooldown: 240,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
-    infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
+    infinityFreezeChance: 0.2,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
     infinityFreezeDuration: 100,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
     infinityMeleeFreezeDuration: 20,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
     infinityMaxFrozenProjectiles: 4,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
@@ -616,8 +624,8 @@ export const CONFIG = {
     slashSpeed: 50,          // Speed of Dismantle slash projectiles
     slashCooldown: 50,       // Frames between basic attacks
     meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
-    meleePunchCooldown: 30,  // Attack speed of melee punches (lower = faster)
-
+    meleePunchCooldown: 32,  // Cooldown in frames (~0.53s) between attack-teleport punches in melee mode
+ 
     // Teleport Dodge / Evade Mechanic
     teleportDodgeChance: 0.10,               // 30% chance to teleport dodge incoming attacks
     teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
@@ -637,7 +645,7 @@ export const CONFIG = {
     flurryCooldown: 700,      // Cooldown between Phantom Flurry activations
     flurryHits: 10,            // Number of strikes in flurry
     flurryDamage: 6,          // Damage per flurry strike
-    flurryHitInterval: 5,     // Frames between flurry strikes
+    flurryHitInterval: 8,     // Frames delay (~0.13s) between flurry teleport strikes
     flurryRange: 150,          // Range to trigger flurry
     flurryCleaveBonusMultiplier: 2.0, // Bonus Dismantle/Cleave damage multiplier on flurry finish
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
@@ -661,7 +669,7 @@ export const CONFIG = {
     domainDamageInterval: 20,  // Frames between slash ticks
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
     domainRadius: 240,        // Radius of the open-air death zone
-    domainRampRatePerSec: 0.10,// 10% damage increase per second targets stay inside
+    domainRampRatePerSec: 0.12,// 10% damage increase per second targets stay inside
   },
 
   /** Yuta Okkotsu — Special Grade Sorcerer */
@@ -693,9 +701,9 @@ export const CONFIG = {
     parryPassiveChance: 0.25,                // Probability (0-1) of parrying passively when not guarding
 
     // Special Mechanic: Phantom Flurry (Parry Counterattack)
-    flurryParryMin: 5,                       // Minimum successful parries required to activate Flurry
-    flurryParryMax: 3,                       // Maximum random target threshold for Flurry activation
-    flurryHits: 5,                           // Number of rapid teleport slashes in Flurry execution
+    flurryParryMin: 2,                       // Minimum successful parries required to activate Flurry
+    flurryParryMax: 2,                       // Maximum random target threshold for Flurry activation
+    flurryHits: 3,                           // Number of rapid teleport slashes in Flurry execution
     flurryDamage: 8,                         // Damage per slash during Flurry
     flurryHitInterval: 6,                    // Frames delay between each Flurry slash
 
@@ -763,11 +771,11 @@ export const CONFIG = {
   toji: {
     // Passive: Heavenly Restriction
     stealthDodgeChance: 0.20,    // 40% chance to physically dodge normal projectiles
-    parryChance: 0.10,           // 45% chance to parry incoming strikes/projectiles with Inverted Spear
+    parryChance: 0.30,           // 45% chance to parry incoming strikes/projectiles with Inverted Spear
     domainImmunity: true,        // Ignores all Domain Expansion effects completely
     homingImmunity: true,        // Cannot be targeted by auto-aim
     stealthDuration: 240,        // Active Stealth duration in frames (240 frames = 4.0 seconds)
-    stealthCooldown: 550,        // Stealth cooldown in frames (420 frames = 7.0 seconds)
+    stealthCooldown: 500,        // Stealth cooldown in frames (420 frames = 7.0 seconds)
     stealthTurnRate: 0.08,       // Aim tracking reaction rate when enemies aim at stealthed Toji (delayed but functional!)
     channelDetectionRadius: 550, // Detection radius (px) to sense enemy skill/domain channeling
     channelInterruptChance: 0.20, // 10% chance to force Sequence 1 ambush and interrupt channeling
@@ -776,21 +784,22 @@ export const CONFIG = {
 
     // Ambush Move Sequence (Stealth Cooldown Re-entry Ambush)
     ambushTriggerFrames: 55,       // Frames before stealth cooldown ends when ambush triggers
-    ambushFrontPauseDuration: 10,   // 1st Sequence: Pause duration (frames) in front of target (fast)
-    ambushBackChargeDuration: 15,  // 1st Sequence: Charging duration (frames) at back before Spear thrust (crisp & instant!)
+    ambushFirstTeleportFrames: 25, // 1st Sequence: 1st teleport duration (frames) in front of target before teleporting to enemy back
+    ambushFrontPauseDuration: 18,   // 1st Sequence: Pause duration (frames) in front of target
+    ambushBackChargeDuration: 30,  // 1st Sequence: Charging duration (frames) at back before Spear thrust (slow & heavy)
     ambushBackThrustDamage: 50,    // 1st Sequence: True Damage of the Inverted Spear backstab thrust
-    ambushTargetFreezeDuration: 40, // 1st Sequence: Target freeze duration (frames) so sequence executes smoothly
-    ambushKatanaChargeDuration: 12, // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
-    ambushKatanaFreezeDuration: 40, // 2nd Sequence: Target freeze duration (frames) for Katana execution
+    ambushTargetFreezeDuration: 70, // 1st Sequence: Target freeze duration (frames) so sequence executes smoothly
+    ambushKatanaChargeDuration: 30, // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
+    ambushKatanaFreezeDuration: 70, // 2nd Sequence: Target freeze duration (frames) for Katana execution
     ambushKnockbackForce: 48,      // Extreme high-speed knockback force launching target flying & bouncing across arena!
-    ambushPhantomFlurryStrikes: 10,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
-    ambushPhantomFlurryFrameRate: 10, // 3rd Sequence: Attack speed in frames between each phantom strike (lower is faster!)
-    ambushPhantomFlurryDamage: 15,    // 3rd Sequence: True Damage per phantom strike (6 hits × 8 = 48 total damage)
+    ambushPhantomFlurryStrikes: 13,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
+    ambushPhantomFlurryFrameRate: 15, // 3rd Sequence: Slower readable attack speed between each phantom strike (42 frames = 0.7s)
+    ambushPhantomFlurryDamage: 15,    // 3rd Sequence: True Damage per phantom strike
     ambushPhantomFlurryDistance: 8,   // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
 
     // Primary Melee: Inverted Spear of Heaven
     spearRange: 50,              // Distance required to land melee hit
-    spearCooldown: 40,           // Frames between melee strikes (fast)
+    spearCooldown: 75,           // Spaced frames between basic melee strikes (0.92s swing)
     spearDamage: 15,             // Base damage per swing
     silenceDuration: 180,        // Frames target is Silenced on hit (3.0 seconds at 60fps)
     pierceInfinity: true,        // Ignores Infinity and shield blocks
@@ -801,16 +810,21 @@ export const CONFIG = {
     katanaDamage: 35,            // Massive True Damage
     soulWoundDuration: 180,      // Frames target is afflicted with Soul Wound anti-heal (3 seconds)
 
-    // Active Skill: Chain of a Thousand Miles
-    chainRange: 300,             // Maximum grapple distance
-    chainSpeed: 20,              // Speed of the chain projectile
-    chainPullSpeed: 15,          // Speed at which Toji is pulled to target
-    chainCooldown: 240,          // Frames between chain uses (4 seconds)
+    ultimateCooldown: 1000,
+    ultimateSwarmDuration: 500,     // (Legacy) Total duration of the ultimate sequence (now used for slow duration)
+    ultimateMaxStrikes: 6,          // Number of flash-step strikes before the final crater slam
+    ultimateAssaultDamage: 30,      // Damage per flash-step strike
+    ultimateCraterDamage: 65,       // Massive crater slam true damage
+    ultimateCraterRadius: 180,      // Blast radius of the final slam
 
-    // Utility Skill: Fly Heads Swarm
-    swarmCount: 8,               // Number of Fly Heads spawned
-    swarmDuration: 180,          // Frames the swarm lasts (3 seconds)
-    swarmCooldown: 400,          // Frames between swarm uses (6.67 seconds)
+    // Ultimate Animation & Timings
+    ultimateVanishDuration: 5,      // Frames spent invisible in the shadows between strikes
+    ultimateStrikeDuration: 20,       // Total frames he is visible during a strike (smooth & readable swing!)
+    ultimateSlideDistance: 100,       // How far away he spawns before sliding in
+    ultimateSlideSpeed: 50,           // How fast he slides in
+    ultimateCraterChargeTime: 90,     // Frames spent hovering in the air winding up the katana
+    ultimateCraterDiveTime: 15,       // Frames spent diving down to the ground
+    ultimateCraterFadeInFrames: 30,   // Frames for Toji to fade in before the crater slam
   },
 };
 
@@ -1051,7 +1065,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0.03,
     type: 'gunslinger',
     hp: 70,
-    damage: 7,
+    damage: 10,
     cooldown: 15,
     moveSpeed: 5.0,
     projectileSpeedMultiplier: 1.0,
@@ -1261,7 +1275,7 @@ export const FIGHTER_DEFS = [
     hp: 120,
     damage: 12,
     cooldown: 40,
-    moveSpeed: 8.0,
+    moveSpeed: 9.0,
     projectileSpeedMultiplier: 1.0,
     ability: 'Heavenly Restriction',
     desc: 'Zero Cursed Energy. Immune to Domains. Silences enemies with the Inverted Spear of Heaven.',
@@ -1278,5 +1292,10 @@ export const GUN_TIP_DIST = (r) => r + CONFIG.gun.baseOffset + CONFIG.gun.barrel
 /** Helper function to get fighter definition by ID */
 export function getFighterById(id) {
   return FIGHTER_DEFS.find(def => def.id === id);
+}
+
+/** Helper function to scale hand radius globally */
+export function getHandSize(baseSize = 6) {
+  return baseSize * (CONFIG.globalFighter?.handSizeMultiplier ?? 1.0);
 }
 

@@ -28,5 +28,8 @@ Toji fights up close using his signature cursed tool arsenal, featuring unified 
 * **Kinetic Wall Ricochet & 60% Slowdown:** Launches targets at high speed to smoothly bounce off arena walls, afflicting them with a **60% Movement Slowdown for 1.5s** after ricocheting!
 
 
-### 🪰 Utility Skill: Fly Heads Swarm
-Toji releases a cloud of low-level curses ("Fly Heads") around himself. While they deal no damage, they act as physical meat-shields, absorbing incoming high-damage projectiles so Toji can safely rush his target.
+### 💥 Ultimate Skill: Curse Inventory - Full Arsenal Unleashed
+Toji taps into his Curse Inventory to unleash an inescapable, cinematic execution sequence that pushes his Heavenly Restriction to its absolute limit:
+* **Phase 1 (The Swarm):** Toji releases a massive swarm of Fly Heads that visually darkens the arena, blinding the enemy and completely freezing them in fear.
+* **Phase 2 (4-Way Assault):** Moving faster than the eye can track, Toji flash-steps to 4 different angles around the frozen target in rapid succession, striking with a different Cursed Tool (and corresponding color flash) each time. Deals immense True Damage.
+* **Phase 3 (Crater Slam):** Toji teleports directly above the enemy and brings down a massive final slam that shatters the arena, dealing catastrophic True Damage in a huge blast radius.
