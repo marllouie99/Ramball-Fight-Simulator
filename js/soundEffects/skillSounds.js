@@ -314,7 +314,25 @@ export const SKILL_SOUNDS = {
 export function getSkillSound(fighterId, skillName) {
   const lowerSkill = String(skillName || '').toLowerCase();
 
-  const fighterConfig = SKILL_SOUNDS[fighterId];
+  let key = fighterId;
+  let fighterConfig = SKILL_SOUNDS[key];
+
+  if (!fighterConfig && (typeof key === 'string' || typeof key === 'number')) {
+    const strKey = String(key).toLowerCase();
+    const parsedNum = parseInt(strKey, 10);
+    if (!isNaN(parsedNum) && SKILL_SOUNDS[parsedNum]) {
+      fighterConfig = SKILL_SOUNDS[parsedNum];
+    } else if (strKey.includes('gojo')) {
+      fighterConfig = SKILL_SOUNDS[21];
+    } else if (strKey.includes('sukuna')) {
+      fighterConfig = SKILL_SOUNDS[22];
+    } else if (strKey.includes('mahoraga')) {
+      fighterConfig = SKILL_SOUNDS[23];
+    } else if (strKey.includes('toji')) {
+      fighterConfig = SKILL_SOUNDS[24];
+    }
+  }
+
   if (!fighterConfig) return null;
 
   return fighterConfig[lowerSkill] || null;

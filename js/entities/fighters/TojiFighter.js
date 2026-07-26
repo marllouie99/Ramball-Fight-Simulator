@@ -6,6 +6,10 @@ import { playSound } from '../../systems/soundSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave, spawnArcaneSmoke, spawnTojiWhirlingWindDebris, spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
 import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKatanaOverShoulder, drawRestedInvertedSpearAtHip, TOJI_WEAPON_CONFIG } from '../../graphics/weapons/tojiWeaponGraphics.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
+import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
+import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike } from './toji/tojiWeapons.js';
+import { modSpawnTeleportAfterimages, modStartAmbushSequence, modUpdateAmbushSequence } from './toji/tojiAmbush.js';
+import { modUpdateChannelSense, modUpdateStealth } from './toji/tojiSkills.js';
 
 /**
  * Toji Fushiguro - The Sorcerer Killer
@@ -54,19 +58,7 @@ export class TojiFighter extends Fighter {
   }
 
   _initChainPhysics() {
-    this.chainNodes = [];
-    const baseAngle = (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0)) + 0.42;
-    const ringX = (this.x || 0) + Math.cos(baseAngle) * ((this.r || 25) - 4);
-    const ringY = (this.y || 0) + Math.sin(baseAngle) * ((this.r || 25) - 4);
-
-    for (let i = 0; i < 9; i++) {
-      this.chainNodes.push({
-        x: ringX - i * 4,
-        y: ringY + i * 5,
-        vx: 0,
-        vy: 0
-      });
-    }
+    return modInitChain(this);
   }
 
   /**
@@ -282,7 +274,7 @@ export class TojiFighter extends Fighter {
         const offsetDist = 6 + Math.sin(Date.now() / 80) * 10;
         const offAngle = Math.random() * Math.PI * 2;
         if (!this.stealthAfterimages) this.stealthAfterimages = [];
-        this.stealthAfterimages.push({
+        pushTrailCap(this.stealthAfterimages, {
           x: this.x + Math.cos(offAngle) * offsetDist,
           y: this.y + Math.sin(offAngle) * offsetDist,
           angle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
@@ -290,7 +282,7 @@ export class TojiFighter extends Fighter {
           timer: 16,
           initialAlpha: 0.6,
           isDomainAfterimage: true
-        });
+        }, 30);
       }
 
       if (this.ultimateChargeTimer >= (this.ultimateChargeMax || 90)) {
@@ -667,26 +659,28 @@ export class TojiFighter extends Fighter {
 
   _updateAfterImages() {
     if (!this.stealthAfterimages || this.stealthAfterimages.length === 0) return;
-    for (let i = this.stealthAfterimages.length - 1; i >= 0; i--) {
-      const img = this.stealthAfterimages[i];
-      if (!img) {
-        this.stealthAfterimages.splice(i, 1);
-        continue;
-      }
+    fastCleanArray(this.stealthAfterimages, (img) => {
+      if (!img) return false;
       img.timer--;
       const maxT = img.maxTimer || 12;
       const progress = Math.max(0, Math.min(1, img.timer / maxT));
       img.alpha = (img.initialAlpha || 0.55) * Math.pow(progress, 0.7);
-      if (img.timer <= 0) {
-        this.stealthAfterimages.splice(i, 1);
-      }
-    }
+      return img.timer > 0;
+    });
   }
 
   /**
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
+    // Check Mahoraga Divine Adaptation Freeze first (bypasses Heavenly Restriction immunity)
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return; // Freeze Toji mid-action during Mahoraga's 3D Wheel rotation!
+    }
+
     // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red spatial repulsion slow!
     if ((this.redSlowTimer || 0) > 0) {
       this.redSlowTimer--;
@@ -704,9 +698,14 @@ export class TojiFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    if (this.ultimateCooldown > 0 && !this.ultimateActive) {
-      this.ultimateCooldown--;
-    }
+    // Toji Heavenly Restriction Immunity: Immune to time-stop, domain freeze, hit stun, and CC
+    this.timeStopTimer = 0;
+    this.hitStunTimer = 0;
+    this.knockbackStunTimer = 0;
+    this.electricStunTimer = 0;
+    this.dubstepStunTimer = 0;
+    this.crimsonElectrifiedTimer = 0;
+    this._suppressFreezeTimer = 0;
 
     if (this._handleTimeStop()) {
       return;
@@ -716,6 +715,7 @@ export class TojiFighter extends Fighter {
     if (this.spearCooldown > 0) this.spearCooldown--;
     if (this.spearSwingTimer > 0) this.spearSwingTimer--;
     if (this.phantomSlashTimer > 0) this.phantomSlashTimer--;
+    if (this.ultimateCooldown > 0) this.ultimateCooldown--;
 
     // Handle Ultimate Sequence
     if (this.ultimateActive) {
@@ -728,7 +728,8 @@ export class TojiFighter extends Fighter {
     }
 
     // Auto-trigger ultimate when ready (AI logic)
-    if (this.ultimateCooldown <= 0 && !this.ultimateActive && !this.isAmbushing && opponent && !opponent.isDead && (this.forcedMeleeTimer || 0) <= 0) {
+    const isEnemyDomainActive = state.fighters && state.fighters.some(f => f && f !== this && f.hp > 0 && (f.domainActive || f.isChannelingDomainExpansion || f.isChannelingDomain));
+    if (this.ultimateCooldown <= 0 && !this.ultimateActive && !this.isAmbushing && opponent && !opponent.isDead && (this.forcedMeleeTimer || 0) <= 0 && !isEnemyDomainActive) {
       this.triggerUltimate();
       return;
     }
@@ -740,58 +741,7 @@ export class TojiFighter extends Fighter {
     }
 
     // --- HEAVENLY RESTRICTION SENSE: 30% CHANCE TO FORCE SEQUENCE 1 AMBUSH WHEN ENEMY CHANNELS A SKILL ---
-    if (this._channelInterruptCooldown > 0) this._channelInterruptCooldown--;
-
-    if (!this.isAmbushing && opponent && !opponent.isDead) {
-      const isTargetChanneling = !!(
-        opponent.isChannelingPurple ||
-        opponent.isChannelingDomainExpansion ||
-        opponent.isChannelingDomain ||
-        opponent.isChannelingRCT ||
-        opponent.isChannelingDivineFlame ||
-        opponent.isChannelingStorm ||
-        (opponent.isChanneling === true)
-      );
-
-      if (isTargetChanneling) {
-        const detectionRadius = CONFIG.toji?.channelDetectionRadius || 450;
-        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-
-        // 1. Initial Detection & Dice Roll
-        if (dist <= detectionRadius && !this._hasAttemptedChannelInterrupt && !(this._channelInterruptCooldown > 0)) {
-          this._hasAttemptedChannelInterrupt = true;
-          const interruptChance = CONFIG.toji?.channelInterruptChance || 0.30;
-
-          if (Math.random() < interruptChance) {
-            // Roll succeeds! Start the reaction timer instead of instantly triggering it!
-            this._channelReactionTimer = CONFIG.toji?.channelReactionFrames ?? 15;
-          }
-        }
-
-        // 2. Reaction Time Countdown
-        if (this._channelReactionTimer > 0) {
-          this._channelReactionTimer--;
-          if (this._channelReactionTimer <= 0) {
-            // Trigger visual & audio indicator for Channel Sense Interrupt!
-            this.channelSenseIndicatorTimer = 35; // 35-frame indicator animation (~0.6s)
-            spawnImpactFlash(this.x, this.y, 65, 'crimsonSniper');
-            spawnMeleeClashShockwave(this.x, this.y, 110, 'yuta');
-            spawnCrimsonLightningImpact(this.x, this.y, 80);
-            playSound('Assets/Sound Effects/Skills/backstab.mp3', 1.0);
-
-            // Set cooldown so it can't trigger again for ~15 seconds (900 frames)
-            this._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 900;
-
-            // Forcefully break current state & launch Sequence 1 Ambush to interrupt!
-            this.startAmbushSequence(opponent, true);
-            return;
-          }
-        }
-      } else {
-        this._hasAttemptedChannelInterrupt = false; // Reset attempt lock when enemy is no longer channeling
-        this._channelReactionTimer = 0; // Abort reaction if they finish casting before Toji can react!
-      }
-    }
+    if (modUpdateChannelSense(this, opponent)) return;
 
     // Natural movement & wall bounce physics: nudge velocity towards opponent when stopped or low speed
     if (this.postUltimateRecoveryTimer > 0) this.postUltimateRecoveryTimer--;
@@ -809,51 +759,7 @@ export class TojiFighter extends Fighter {
     }
 
     // Handle Stealth Duration & Cooldown Timers
-    if (this.stealthTimer > 0) {
-      this.stealthTimer--;
-      this.isStealthed = true;
-      this.stealthActive = true;
-
-      // Spawn motion trail afterimages while moving during stealth
-      const speed = Math.hypot(this.vx || 0, this.vy || 0);
-      if (speed > 0.15 && this.spearSwingTimer <= 0) {
-        if (!this.stealthAfterimages) this.stealthAfterimages = [];
-        this.stealthAfterimages.push({
-          x: this.x,
-          y: this.y,
-          angle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
-          alpha: 0.60,
-          initialAlpha: 0.60,
-          maxTimer: 14,
-          timer: 14
-        });
-      }
-
-      if (this.stealthTimer <= 0) {
-        this.isStealthed = false;
-        this.stealthActive = false;
-        this.stealthCooldown = this.stealthMaxCooldown;
-      }
-    } else if (this.stealthCooldown > 0) {
-      const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 45;
-
-      // Check if stealth cooldown is about to end -> launch ambush move sequence!
-      if (!this.isAmbushing && this.stealthCooldown <= ambushTrigger && opponent && opponent.hp > 0) {
-        this.startAmbushSequence(opponent);
-        return;
-      }
-
-      this.stealthCooldown--;
-      this.isStealthed = false;
-      this.stealthActive = false;
-
-      if (this.stealthCooldown <= 0) {
-        this.stealthTimer = this.stealthMaxDuration;
-        this.isStealthed = true;
-        this.stealthActive = true;
-        spawnImpactFlash(this.x, this.y, 25, '#A040FF');
-      }
-    }
+    if (modUpdateStealth(this, opponent)) return;
 
     // Update katana slash fade timer
     if (this.katanaSlashFadeTimer > 0) this.katanaSlashFadeTimer--;
@@ -882,95 +788,7 @@ export class TojiFighter extends Fighter {
    * Simulates smooth hanging gravity physics for the chain attached to the weapon ring.
    */
   _updateChainPhysics() {
-    if (!this.chainNodes || this.chainNodes.length === 0) {
-      this._initChainPhysics();
-    }
-
-    const baseAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    const isAttacking = this.spearSwingTimer > 0;
-
-    let offsetAngle = 0.42;
-    let thrustDistance = 0;
-
-    if (isAttacking) {
-      const t = 1 - (this.spearSwingTimer / 15);
-      if (t < 0.25) {
-        const p = t / 0.25;
-        thrustDistance = -6 * p;
-        offsetAngle = 0.42 + 0.15 * p;
-      } else if (t < 0.65) {
-        const p = (t - 0.25) / 0.4;
-        thrustDistance = -6 + 32 * Math.sin(p * Math.PI);
-        offsetAngle = 0.57 - 0.9 * Math.sin(p * Math.PI * 0.5);
-      } else {
-        const p = (t - 0.65) / 0.35;
-        thrustDistance = 6 * (1 - p);
-        offsetAngle = -0.33 + (0.42 - (-0.33)) * p;
-      }
-    } else {
-      offsetAngle += Math.sin(Date.now() / 250) * 0.05;
-    }
-
-    const renderAngle = baseAngle + offsetAngle;
-    const totalRadius = (this.r - 4 + thrustDistance);
-    const ringX = this.x + Math.cos(renderAngle) * totalRadius;
-    const ringY = this.y + Math.sin(renderAngle) * totalRadius;
-    const linkDist = 4.8;
-
-    // Node 0 anchored directly to gold handle ring
-    this.chainNodes[0].x = ringX;
-    this.chainNodes[0].y = ringY;
-
-    const isMoving = (Math.hypot(this.vx || 0, this.vy || 0) > 0.15) || isAttacking;
-
-    if (!isMoving) {
-      // Smooth natural hanging loop relative to ring when stationary/countdown
-      for (let i = 1; i < this.chainNodes.length; i++) {
-        const hangAngle = renderAngle + Math.PI * (0.45 + i * 0.12);
-        const node = this.chainNodes[i];
-        const tx = ringX + Math.cos(hangAngle) * (i * linkDist * 0.75);
-        const ty = ringY + Math.sin(hangAngle) * (i * linkDist * 0.75) + (i * 1.2);
-        
-        node.x += (tx - node.x) * 0.35;
-        node.y += (ty - node.y) * 0.35;
-        node.vx = 0;
-        node.vy = 0;
-      }
-      return;
-    }
-
-    // Dynamic physics update: drag velocity and gravity downward
-    for (let i = 1; i < this.chainNodes.length; i++) {
-      const node = this.chainNodes[i];
-      node.vx = (node.vx + (this.vx * -0.03)) * 0.80;
-      node.vy = (node.vy + (this.vy * -0.03)) * 0.80 + 0.4; // Natural gravity hanging downward
-      node.x += node.vx;
-      node.y += node.vy;
-    }
-
-    // Strict distance constraint iterations (prevents stretching gaps under rapid movement)
-    for (let iter = 0; iter < 12; iter++) {
-      for (let i = 1; i < this.chainNodes.length; i++) {
-        const prev = this.chainNodes[i - 1];
-        const node = this.chainNodes[i];
-        const dx = node.x - prev.x;
-        const dy = node.y - prev.y;
-        const dist = Math.hypot(dx, dy) || 0.001;
-
-        if (dist !== linkDist) {
-          const delta = (dist - linkDist) / dist;
-          if (i - 1 === 0) {
-            node.x -= dx * delta;
-            node.y -= dy * delta;
-          } else {
-            node.x -= dx * delta * 0.5;
-            node.y -= dy * delta * 0.5;
-            prev.x += dx * delta * 0.5;
-            prev.y += dy * delta * 0.5;
-          }
-        }
-      }
-    }
+    return modUpdateChain(this);
   }
 
   /**
@@ -992,45 +810,7 @@ export class TojiFighter extends Fighter {
    * Spawns a multi-afterimage trail along a launch/teleport path with expanding ground shockwaves!
    */
   _spawnTeleportAfterimages(fromX, fromY, toX, toY, startAngle, endAngle) {
-    if (!this.stealthAfterimages) this.stealthAfterimages = [];
-
-    // Ground shockwave & impact flashes at departure and arrival points
-    spawnMeleeClashShockwave(fromX, fromY, 85, 'yuta');
-    spawnImpactFlash(fromX, fromY, 40, '#A040FF');
-
-    spawnMeleeClashShockwave(toX, toY, 115, 'yuta');
-    spawnImpactFlash(toX, toY, 50, '#A040FF');
-    spawnSparks(toX, toY, 8, 'crimsonSniper');
-
-    const strikeSound = getSkillEffectSound('toji', 'strike');
-    if (strikeSound) {
-      playSound(strikeSound.src, strikeSound.volume);
-    } else {
-      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
-    }
-
-    const steps = 6;
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const x = fromX + (toX - fromX) * t;
-      const y = fromY + (toY - fromY) * t;
-      const angle = startAngle + (endAngle - startAngle) * t;
-      const maxTimer = 22 - Math.floor(t * 4);
-
-      this.stealthAfterimages.push({
-        x: x,
-        y: y,
-        angle: angle,
-        maxTimer: maxTimer,
-        timer: maxTimer,
-        initialAlpha: 0.85 - t * 0.15,
-        fromX: fromX,
-        fromY: fromY,
-        toX: toX,
-        toY: toY,
-        isDomainAfterimage: this.ultimateActive || this.isChannelingDomain
-      });
-    }
+    modSpawnTeleportAfterimages(this, fromX, fromY, toX, toY, startAngle, endAngle);
   }
 
   /** Clamps coordinates strictly inside the arena bounds to prevent teleporting outside arena walls */
@@ -1050,78 +830,7 @@ export class TojiFighter extends Fighter {
    * @param {Boolean} isInterrupt - Whether this ambush was triggered by interrupting a skill
    */
   startAmbushSequence(opponent, isInterrupt = false) {
-    if (!opponent || opponent.hp <= 0) return;
-
-    const ownerIndex = state.fighters.indexOf(this);
-
-    this.isAmbushing = true;
-    this.ambushPhase = 'FRONT_LAUNCH';
-    this.ambushTimer = CONFIG.toji?.ambushFirstTeleportFrames ?? CONFIG.toji?.ambushFrontPauseDuration ?? 18;
-    this.katanaSlashTimer = 0;
-    this.katanaSlashFadeTimer = 0;
-    this._secondSeqAudioPlayed = false;
-
-    // Lock target's movement & teleport mechanics for the duration of all ambush sequences
-    opponent.isTargetOfAmbush = true;
-    opponent.vx = 0;
-    opponent.vy = 0;
-
-    // Capture target's channeling state at the EXACT instant ambush initiates
-    this.ambushTargetWasChanneling = !!(
-      opponent.isChannelingPurple ||
-      opponent.isChannelingDomainExpansion ||
-      opponent.isChannelingDomain ||
-      opponent.isChannelingRCT ||
-      opponent.isChannelingDivineFlame ||
-      opponent.isChannelingStorm ||
-      opponent.isChanneling
-    );
-
-    const oldX = this.x;
-    const oldY = this.y;
-    const startAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-    // Determine target facing angle
-    const targetAngle = opponent.gunAngle !== undefined ? opponent.gunAngle : (opponent.angle || 0);
-    const offsetDist = opponent.r + this.r + 18;
-
-    // Launch/teleport directly in front of target (clamped inside arena bounds)
-    const rawFrontX = opponent.x + Math.cos(targetAngle) * offsetDist;
-    const rawFrontY = opponent.y + Math.sin(targetAngle) * offsetDist;
-    const clampedFront = this._clampToArena(rawFrontX, rawFrontY);
-
-    this.x = clampedFront.x;
-    this.y = clampedFront.y;
-    this.vx = 0;
-    this.vy = 0;
-
-    // Aim directly into enemy's eyes
-    this.aim(opponent);
-
-    // Freeze target for a brief moment so the sequence executes smoothly
-    const freezeDuration = CONFIG.toji?.ambushTargetFreezeDuration || 60;
-    
-    // HUGE VISUAL INDICATOR IF THIS WAS AN INTERRUPT!
-    if (isInterrupt || this.ambushTargetWasChanneling) {
-      spawnFloatingText(opponent.x, opponent.y - opponent.r - 35, 'INTERRUPTED!', '#FF1133', 35);
-      spawnMeleeClashShockwave(opponent.x, opponent.y, 130, 'yuta');
-      spawnCrimsonLightningImpact(opponent.x, opponent.y, 90);
-      spawnImpactFlash(opponent.x, opponent.y, 65, 'crimsonSniper');
-    }
-    if (typeof opponent.applyTimeStop === 'function') {
-      opponent.applyTimeStop(freezeDuration);
-    }
-    opponent.vx = 0;
-    opponent.vy = 0;
-
-    // High-speed multi-afterimage streak along launch path
-    this._spawnTeleportAfterimages(oldX, oldY, clampedFront.x, clampedFront.y, startAngle, this.gunAngle);
-
-    spawnImpactFlash(oldX, oldY, 25, '#A040FF');
-    spawnImpactFlash(this.x, this.y, 30, '#A040FF');
-    spawnMeleeClashShockwave(this.x, this.y, 90, 'yuta'); // Ground shockwave on front launch landing!
-    const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
-    playSound(tpSound?.src || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpSound?.volume || 1.0, tpSound?.speed || 1.0, 0, tpSound?.delay || 0);
+    modStartAmbushSequence(this, opponent, isInterrupt);
   }
 
   /**
@@ -1129,394 +838,7 @@ export class TojiFighter extends Fighter {
    * Front pause -> Teleport to enemy back -> Stab attack & re-enter stealth!
    */
   updateAmbushSequence(opponent, ownerIndex) {
-    if (!opponent || opponent.hp <= 0 || !this.isAmbushing) {
-      if (typeof state !== 'undefined' && state.fighters) {
-        state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
-      }
-      this.isAmbushing = false;
-      this.ambushPhase = null;
-      this.stealthCooldown = 0;
-      const angle = Math.random() * Math.PI * 2;
-      this.vx = Math.cos(angle) * (this.speed || 3);
-      this.vy = Math.sin(angle) * (this.speed || 3);
-      this.normalizeSpeed();
-      return;
-    }
-
-    // Keep opponent locked in ambush target state
-    opponent.isTargetOfAmbush = true;
-
-    // Keep motion trail afterimages updating
-    if (this.stealthAfterimages && this.stealthAfterimages.length > 0) {
-      for (let i = this.stealthAfterimages.length - 1; i >= 0; i--) {
-        const img = this.stealthAfterimages[i];
-        img.timer--;
-        const maxT = img.maxTimer || 12;
-        const baseAlpha = img.initialAlpha !== undefined ? img.initialAlpha : 0.55;
-        img.alpha = Math.max(0, (img.timer / maxT) * baseAlpha);
-        if (img.timer <= 0) {
-          this.stealthAfterimages.splice(i, 1);
-        }
-      }
-    }
-
-    if (this.ambushPhase === 'FRONT_LAUNCH') {
-      this.vx = 0;
-      this.vy = 0;
-      this.aim(opponent);
-      opponent.vx = 0;
-      opponent.vy = 0;
-
-      this.ambushTimer--;
-      if (this.ambushTimer <= 0) {
-        // Phase 2: Instant flash-step teleport behind enemy & start weapon charge!
-        this.ambushPhase = 'BACK_CHARGE';
-        this.ambushTimer = CONFIG.toji?.ambushBackChargeDuration || 25;
-
-        const frontX = this.x;
-        const frontY = this.y;
-        const startAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-        const targetAngle = opponent.gunAngle !== undefined ? opponent.gunAngle : (opponent.angle || 0);
-        const offsetDist = opponent.r + this.r + 18;
-
-        // Position directly behind target (clamped inside arena bounds)
-        const rawBackX = opponent.x - Math.cos(targetAngle) * offsetDist;
-        const rawBackY = opponent.y - Math.sin(targetAngle) * offsetDist;
-        const clampedBack = this._clampToArena(rawBackX, rawBackY);
-
-        this.x = clampedBack.x;
-        this.y = clampedBack.y;
-        this.vx = 0;
-        this.vy = 0;
-
-        this.aim(opponent);
-
-        // Teleport streak afterimages from front to back
-        this._spawnTeleportAfterimages(frontX, frontY, clampedBack.x, clampedBack.y, startAngle, this.gunAngle);
-
-        spawnImpactFlash(frontX, frontY, 30, '#A040FF');
-        spawnImpactFlash(clampedBack.x, clampedBack.y, 35, 'rgba(255, 30, 75, 0.8)');
-        spawnMeleeClashShockwave(clampedBack.x, clampedBack.y, 110, 'yuta'); // Ground shockwave on backstab landing!
-        const strikeSound = getSkillEffectSound('toji', 'strike');
-        if (strikeSound) playSound(strikeSound.src, strikeSound.volume);
-        playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.8);
-      }
-    } else if (this.ambushPhase === 'BACK_CHARGE') {
-      // Stationary back position aiming at target's spine while charging weapon
-      this.vx = 0;
-      this.vy = 0;
-      this.aim(opponent);
-
-      // Keep target stationary
-      opponent.vx = 0;
-      opponent.vy = 0;
-
-      // Spawn weapon charging energy particles & micro rumble at the back
-      if (Math.random() < 0.75) {
-        const baseAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        const tipX = this.x + Math.cos(baseAngle) * (this.r + 20);
-        const tipY = this.y + Math.sin(baseAngle) * (this.r + 20);
-        spawnSparks(tipX, tipY, 2, 'crimsonSniper');
-        spawnSparks(tipX, tipY, 2, 'crimson');
-      }
-      if (this.ambushTimer % 4 === 0) {
-        triggerGlobalScreenShake(1.5, 3);
-      }
-
-      this.ambushTimer--;
-      if (this.ambushTimer <= 0) {
-        // Phase 3: UNLEASH EXPLOSIVE BACKSTAB THRUST STRIKE!
-        this.ambushPhase = 'BACK_STAB';
-
-        // --- HIGH-IMPACT SAKUGA AMBUSH STRIKE VISUAL & AUDIO EFFECTS ---
-        // 1. Subtle camera punch (4px rumble for 6 frames)
-        triggerGlobalScreenShake(4, 6);
-
-        // 2. Impact flashes & Shockwaves at back impact position
-        spawnImpactFlash(this.x, this.y, 110, 'rgba(255, 30, 75, 0.95)');
-        spawnMeleeClashShockwave(this.x, this.y, 140, 'yuta');
-        spawnCrimsonLightningImpact(this.x, this.y, 80);
-
-        // 3. Dense spark burst & expanding shockwave
-        spawnMeleeClashShockwave(this.x, this.y, 160, 'yuta');
-        spawnSparks(this.x, this.y, 25, 'crimsonSniper');
-        spawnSparks(this.x, this.y, 20, 'crimson');
-
-        // 4. Heavy impact audio stack
-        const backthrustSound = getSkillEffectSound('toji', 'backthrust');
-        playSound(backthrustSound?.src || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', backthrustSound?.volume || 1.2, backthrustSound?.speed || 1.0, 0, backthrustSound?.delay || 0);
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
-
-        // Execute Inverted Spear attack (damage, silence, nullify barrier, massive ambush thrust animation!)
-        this.performInvertedSpearStrike(opponent, ownerIndex, true);
-
-        // Stealth reactivates immediately upon completion!
-        this.stealthTimer = this.stealthMaxDuration;
-        this.stealthCooldown = 0;
-        this.isStealthed = true;
-        this.stealthActive = true;
-      }
-    } else if (this.ambushPhase === 'BACK_STAB') {
-      // Stay locked at the backstab position while thrusting Inverted Spear into target!
-      this.vx = 0;
-      this.vy = 0;
-      this.aim(opponent);
-
-      // When Inverted Spear thrust completes, smoothly draw Split Soul Katana before chasing!
-      if (this.spearSwingTimer <= 0) {
-        this.ambushPhase = 'KATANA_DRAW';
-        this.ambushTimer = 4; // Lightning-fast 4-frame Katana unsheathe transition (~0.06s)
-
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
-        spawnImpactFlash(this.x, this.y, 45, '#E2E6EC');
-        spawnMeleeClashShockwave(this.x, this.y, 80, 'yuta');
-        spawnSparks(this.x, this.y, 16, 'crimsonSniper');
-      }
-    } else if (this.ambushPhase === 'KATANA_DRAW') {
-      // Smoothly hold drawn Katana while tracking the flying target
-      this.vx = 0;
-      this.vy = 0;
-      this.aim(opponent);
-
-      this.ambushTimer--;
-      if (this.ambushTimer <= 0) {
-        // Flash-step pursuit to catch up with Katana drawn!
-        this.ambushPhase = 'KATANA_CHASE';
-        this.ambushTimer = 2; // Instantaneous 2-frame pursuit teleport!
-      }
-    } else if (this.ambushPhase === 'KATANA_CHASE') {
-      // Flash-step pursuit to catch up to the target!
-      const oldX = this.x;
-      const oldY = this.y;
-      const oldAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-      this.aim(opponent);
-      const targetAngle = this.gunAngle;
-      const offsetDist = opponent.r + this.r + 14;
-
-      const rawChaseX = opponent.x - Math.cos(targetAngle) * offsetDist;
-      const rawChaseY = opponent.y - Math.sin(targetAngle) * offsetDist;
-      const clampedChase = this._clampToArena(rawChaseX, rawChaseY);
-
-      this.x = clampedChase.x;
-      this.y = clampedChase.y;
-      this.vx = 0;
-      this.vy = 0;
-
-      // 2nd Sequence Freeze: Lock target in place for Katana charge pause
-      const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 40;
-      if (typeof opponent.applyTimeStop === 'function') {
-        opponent.applyTimeStop(katanaFreeze);
-      }
-      opponent.vx = 0;
-      opponent.vy = 0;
-
-      this._spawnTeleportAfterimages(oldX, oldY, clampedChase.x, clampedChase.y, oldAngle, targetAngle);
-
-      this.ambushTimer--;
-      if (this.ambushTimer <= 0) {
-        // Transition to KATANA_CHARGE (2nd Sequence Weapon Charging Pause)
-        this.ambushPhase = 'KATANA_CHARGE';
-        this.ambushTimer = CONFIG.toji?.ambushKatanaChargeDuration || 20;
-
-        const strikeSound = getSkillEffectSound('toji', 'strike');
-        if (strikeSound) playSound(strikeSound.src, strikeSound.volume);
-        spawnImpactFlash(this.x, this.y, 35, 'rgba(255, 30, 75, 0.8)');
-        spawnMeleeClashShockwave(this.x, this.y, 120, 'yuta'); // Ground shockwave on Katana chase landing!
-      }
-    } else if (this.ambushPhase === 'KATANA_CHARGE') {
-      // 2nd Sequence Katana Windup Pause aiming at target
-      this.vx = 0;
-      this.vy = 0;
-      this.aim(opponent);
-
-      // Keep target stationary in 2nd freeze
-      opponent.vx = 0;
-      opponent.vy = 0;
-
-      // Check for in-advance audio trigger during charge windup if delay is negative
-      const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
-      const soundDelay = secondSeqSound?.delay || 0;
-      if (!this._secondSeqAudioPlayed && soundDelay < 0) {
-        const advanceFrames = Math.round(Math.abs(soundDelay < -10 ? soundDelay / 1000 : soundDelay) * 60);
-        if (this.ambushTimer <= advanceFrames) {
-          this._secondSeqAudioPlayed = true;
-          playSound(secondSeqSound);
-        }
-      }
-
-      // Spawn Katana Cursed Energy Sparks & micro rumble
-      if (Math.random() < 0.75) {
-        const baseAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-        const tipX = this.x + Math.cos(baseAngle) * (this.r + 28);
-        const tipY = this.y + Math.sin(baseAngle) * (this.r + 28);
-        spawnSparks(tipX, tipY, 2, 'crimsonSniper');
-        spawnSparks(tipX, tipY, 2, 'crimson');
-      }
-      if (this.ambushTimer % 4 === 0) {
-        triggerGlobalScreenShake(1.5, 3);
-      }
-
-      this.ambushTimer--;
-      if (this.ambushTimer <= 0) {
-        // Phase 5: UNLEASH SKILL 2 SPLIT SOUL KATANA EXECUTION SLASH (2nd Hit & 2nd Knockback)!
-        this.ambushPhase = 'KATANA_SLASH';
-        this.katanaSlashTimer = 22; // 22-frame single crisp Katana swing duration
-
-        this.performSplitSoulKatanaSlash(opponent, ownerIndex);
-      }
-    } else if (this.ambushPhase === 'KATANA_SLASH') {
-      this.vx = 0;
-      this.vy = 0;
-      // Body angle is strictly locked during the swing (no aim call) for a crisp fixed-stance cut!
-
-      this.katanaSlashTimer--;
-      if (this.katanaSlashTimer <= 0) {
-        this.katanaSlashTimer = 0;
-
-        // Transition into Phase 3: PHANTOM FLURRY (6 Rapid Afterimage Teleport Strikes!)
-        this.ambushPhase = 'PHANTOM_FLURRY';
-        this.isAmbushThrust = false; // Reset so crescent slash renders instead of thrust cone!
-        this.phantomStrikeCount = 0;
-        this.phantomMaxStrikes = CONFIG.toji?.ambushPhantomFlurryStrikes || 6;
-        this.phantomStrikeTimer = 3; // First strike in 3 frames
-
-        const flurrySound = getSkillEffectSound('toji', 'thirdseqflurry');
-        playSound(flurrySound?.src || 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3', flurrySound?.volume || 1.5, flurrySound?.speed || 1.0, 0, flurrySound?.delay || 0);
-        this.phantomAngles = [
-          Math.PI * 0.75,   // 1: Top-left       ╲
-          -Math.PI * 0.25,  // 2: Bottom-right      ╲  (1st diagonal slash)
-          Math.PI * 0.25,   // 3: Top-right        ╱
-          -Math.PI * 0.75,  // 4: Bottom-left     ╱    (2nd diagonal slash → X complete!)
-          Math.PI * 0.75,   // 5: Top-left       ╲
-          -Math.PI * 0.25,  // 6: Bottom-right      ╲  (repeat 1st diagonal)
-        ];
-
-        // Freeze target in place for the full phantom flurry duration
-        const totalFlurryFrames = this.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 4) + 10;
-        if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
-        opponent.vx = 0;
-        opponent.vy = 0;
-      }
-    } else if (this.ambushPhase === 'PHANTOM_FLURRY') {
-      this.vx = 0;
-      this.vy = 0;
-
-      const flurryFrameRate = CONFIG.toji?.ambushPhantomFlurryFrameRate || 4;
-
-      this.phantomStrikeTimer--;
-      if (this.phantomStrikeTimer <= 0) {
-        this.phantomStrikeCount++;
-        this.phantomStrikeTimer = flurryFrameRate; // Configurable attack speed (frames between phantom strikes!)
-
-        const maxStrikes = this.phantomMaxStrikes || 6;
-        if (this.phantomStrikeCount <= maxStrikes) {
-          const idx = (this.phantomStrikeCount - 1) % this.phantomAngles.length;
-          const strikeAngle = this.phantomAngles[idx] + (Math.random() - 0.5) * 0.15;
-          const flurryDist = CONFIG.toji?.ambushPhantomFlurryDistance ?? 8;
-          const dist = opponent.r + this.r + flurryDist;
-
-          // Store old position for afterimage trail
-          const oldX = this.x;
-          const oldY = this.y;
-          const oldAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-          // Flash-teleport Toji around target at phantom angle (clamped inside arena bounds!)
-          const rawPhantomX = opponent.x + Math.cos(strikeAngle) * dist;
-          const rawPhantomY = opponent.y + Math.sin(strikeAngle) * dist;
-          const clampedPhantom = this._clampToArena(rawPhantomX, rawPhantomY);
-
-          this.x = clampedPhantom.x;
-          this.y = clampedPhantom.y;
-          this.aim(opponent);
-
-          // Reset weapon smooth lerp states so weapon snaps instantly to new strike pose without lerp lag!
-          delete this._smoothKatanaOffset;
-          delete this._smoothKatanaThrust;
-          delete this._smoothSpearOffset;
-          delete this._smoothSpearThrust;
-
-          // Spawn phantom afterimage trail between old and new position
-          this._spawnTeleportAfterimages(oldX, oldY, clampedPhantom.x, clampedPhantom.y, oldAngle, this.gunAngle);
-
-          // Active slash wave timer for this phantom strike
-          this.phantomSlashTimer = flurryFrameRate;
-          this._flurryHitApplied = false;
-
-          // Play swing audio on teleport launch
-          playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.1);
-          const strikeSound = getSkillEffectSound('toji', 'strike');
-          if (strikeSound) playSound(strikeSound.src, strikeSound.volume * 0.7);
-        } else {
-          // Phase 4: Step Back & Stealth Recovery!
-          opponent.isTargetOfAmbush = false; // Release target lock when ambush combo ends!
-          const escapeAngle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
-          this.vx = Math.cos(escapeAngle) * (this.speed || 3);
-          this.vy = Math.sin(escapeAngle) * (this.speed || 3);
-          this.normalizeSpeed();
-
-          this.stealthTimer = 120; // 2 seconds breather
-          this.stealthCooldown = 0;
-          this.isStealthed = true;
-          this.stealthActive = true;
-
-          this.isAmbushing = false;
-          this.ambushPhase = null;
-          if (typeof state !== 'undefined' && state.fighters) {
-            state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
-          }
-        }
-      }
-
-      // Synchronized Target Hit Flash & Impact Effect Execution (Triggers at frame 2 when blade slash connects with target!)
-      if (this.ambushPhase === 'PHANTOM_FLURRY' && !this._flurryHitApplied && opponent && opponent.hp > 0) {
-        const hitDelayFrame = Math.max(1, flurryFrameRate - 2);
-        if (this.phantomStrikeTimer <= hitDelayFrame) {
-          this._flurryHitApplied = true;
-
-          const maxStrikes = this.phantomMaxStrikes || 6;
-          const isFinalStrike = (this.phantomStrikeCount === maxStrikes);
-
-          // Apply True Damage & hit stun
-          const strikeDmg = CONFIG.toji?.ambushPhantomFlurryDamage || 15;
-          applyDamageToTarget(opponent, strikeDmg, this, { isMelee: true, isTrueDamage: true });
-          opponent.hitFlashTimer = 8; // Target flashes bright white EXACTLY as the blade connects!
-          if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(flurryFrameRate + 2);
-
-          // Natural physics hit reaction: target smoothly turns towards the slash impact (no instant snapping)
-          delete opponent._timeStopFrozenAngle;
-          delete opponent._timeStopFrozenGunAngle;
-          const targetHitAngle = Math.atan2(this.y - opponent.y, this.x - opponent.x);
-          let angleDiff = targetHitAngle - (opponent.angle || 0);
-          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          opponent.angle = (opponent.angle || 0) + angleDiff * 0.35; // Smooth physics turn lerp!
-          opponent.gunAngle = opponent.angle;
-
-          // Physics hit recoil — hold target locked in flurry center during sequence, launch on final hit!
-          opponent.vx = 0;
-          opponent.vy = 0;
-          const pushAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-          const recoilForce = isFinalStrike ? 38 : (4 + Math.random() * 2);
-          opponent.vx = Math.cos(pushAngle) * recoilForce;
-          opponent.vy = Math.sin(pushAngle) * recoilForce;
-          if (typeof opponent.applyKnockback === 'function') opponent.applyKnockback(opponent.vx, opponent.vy);
-
-          // Contact position between Toji's blade and Opponent
-          const contactX = (this.x + opponent.x) * 0.5;
-          const contactY = (this.y + opponent.y) * 0.5;
-
-          // Sakuga Impact Visual & Audio Effects
-          triggerGlobalScreenShake(isFinalStrike ? 8 : 4, isFinalStrike ? 8 : 4);
-          spawnImpactFlash(contactX, contactY, isFinalStrike ? 110 : 80, 'rgba(160, 30, 240, 0.95)');
-          spawnMeleeClashShockwave(contactX, contactY, isFinalStrike ? 160 : 110, 'yuta');
-          spawnSparks(contactX, contactY, isFinalStrike ? 28 : 16, 'crimsonSniper');
-          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.0);
-        }
-      }
-    }
+    modUpdateAmbushSequence(this, opponent, ownerIndex);
   }
 
   /**
@@ -1539,175 +861,11 @@ export class TojiFighter extends Fighter {
    * Inflicts True Damage, Soul Wound anti-heal debuff, and a 2nd massive knockback!
    */
   performSplitSoulKatanaSlash(target, ownerIndex) {
-    if (!this._secondSeqAudioPlayed) {
-      const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
-      playSound(secondSeqSound);
-    }
-    this._secondSeqAudioPlayed = false;
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
-    playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.2);
-
-    // Apply Katana Skill 2 True Damage & Soul Wound anti-heal
-    const damage = CONFIG.toji?.katanaDamage || 35;
-    applyDamageToTarget(target, damage, this, { isMelee: true, isTrueDamage: true });
-
-    const soulWoundDuration = CONFIG.toji?.soulWoundDuration || 180;
-    target.soulWoundTimer = soulWoundDuration;
-
-    // Apply Post-Ricochet Movement Slowdown (60% movement slow for 1.5s / 90 frames after ricocheting)
-    if (typeof target.applySlow === 'function') {
-      target.applySlow(90, 0.40);
-    } else {
-      target.slowTimer = 90;
-      target.slowMultiplier = 0.40;
-    }
-
-    // Completely unfreeze target & smoothly turn body angle towards hit impact (no instant snapping)
-    this._clearTargetFreeze(target);
-    const targetHitAngle = Math.atan2(this.y - target.y, this.x - target.x);
-    let angleDiff = targetHitAngle - (target.angle || 0);
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    target.angle = (target.angle || 0) + angleDiff * 0.40; // Smooth physics turn lerp!
-    target.gunAngle = target.angle;
-
-    // 2nd WIDE-SWEEPING ARC SLING KNOCKBACK (Finale hit: Silky smooth kinetic ricochet wall-bounce physics!)
-    target.isFirstHitKnockback = false; // Enable ricochet bouncing for finale hit!
-    const directAngle = Math.atan2(target.y - this.y, target.x - this.x);
-    const sweepSlingAngle = directAngle + 1.15;
-    const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 0.95; // 45px/frame smooth velocity!
-
-    const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
-    const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
-    target.vx = kbVx;
-    target.vy = kbVy;
-    target.knockbackDecay = 0.90; // Silky smooth kinetic deceleration curve!
-    target.applyKnockback(kbVx, kbVy);
-
-    // Sakuga Wide Sweep Visual Effects
-    triggerGlobalScreenShake(8, 10);
-    spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
-    spawnMeleeClashShockwave(target.x, target.y, 240, 'yuta');
-    spawnMeleeClashShockwave(target.x, target.y, 180, 'yuta');
-    spawnCrimsonLightningImpact(target.x, target.y, 140);
-    spawnSparks(target.x, target.y, 50, 'crimsonSniper');
+    return modKatanaSlash(this, target, ownerIndex);
   }
 
-  /**
-   * Executes the Inverted Spear of Heaven strike.
-   * Nullifies barriers (Infinity/shields) and applies Silence debuff to target.
-   */
   performInvertedSpearStrike(target, ownerIndex, isAmbushThrust = false) {
-    this.spearCooldown = this.spearCooldownMax;
-    this.isAmbushThrust = isAmbushThrust;
-    const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;
-    this.spearSwingMax = Math.round((isAmbushThrust ? 36 : 26) / speedMult);
-    this.spearSwingTimer = this.spearSwingMax;
-
-    // Play attack sound
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
-    playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.85);
-
-
-
-    // Barrier Nullification (Inverted Spear forcefully cancels Infinity / Shield blocks)
-    let wasInfinityActive = false;
-    if (target.characterId === 'gojo' && target.infinityActive) {
-      wasInfinityActive = true;
-      target.infinityActive = false;
-      target.infinityBlockTimer = 0;
-      if (isAmbushThrust) {
-        spawnSparks(target.x, target.y, 22, 'lightningTrail', '#00E5FF'); // Cyan infinity barrier shatter sparks!
-        spawnImpactFlash(target.x, target.y, 60, 'lightningTrail');
-      }
-    }
-
-    // Apply Damage directly to HP (True Damage / Piercing)
-    const thrustDamage = isAmbushThrust ? (CONFIG.toji?.ambushBackThrustDamage ?? 25) : this.spearDamage;
-    applyDamageToTarget(target, thrustDamage, this, { isMelee: true, isTrueDamage: true });
-
-    // Smoothly turn target body angle towards strike impact (no instant snapping)
-    delete target._timeStopFrozenAngle;
-    delete target._timeStopFrozenGunAngle;
-    const targetHitAngle = Math.atan2(this.y - target.y, this.x - target.x);
-    let angleDiff = targetHitAngle - (target.angle || 0);
-    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    target.angle = (target.angle || 0) + angleDiff * 0.40; // Smooth physics turn lerp!
-    target.gunAngle = target.angle;
-
-    // Restore Infinity state after piercing damage resolves (if applicable)
-    if (wasInfinityActive) {
-      target.infinityActive = true;
-    }
-
-    // Silence Debuff & Skill Interruption (Applied during ANY Spear Thrust WHEN target was actively channeling a skill!)
-    const wasPurple = target.isChannelingPurple;
-    const wasDomain = target.isChannelingDomainExpansion || target.isChannelingDomain;
-    const wasRCT = target.isChannelingRCT;
-    const wasDivineFlame = target.isChannelingDivineFlame;
-    const wasStorm = target.isChannelingStorm;
-    const wasGeneric = target.isChanneling;
-
-    const wasChanneling = this.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGeneric;
-    this.ambushTargetWasChanneling = false;
-
-    if (wasChanneling) {
-      const silenceFrames = CONFIG.toji?.silenceDuration || 90;
-      target.silenceTimer = silenceFrames;
-
-      // Forcefully cancel any active skill or ultimate channeling
-      target.isChannelingPurple = false;
-      target.purpleChargeTimer = 0;
-      target.isChannelingDomainExpansion = false;
-      target.isChannelingDomain = false;
-      target.domainChargeTimer = 0;
-      target.isChannelingRCT = false;
-      target.rctChannelTimer = 0;
-      target.isChannelingDivineFlame = false;
-      target.isChannelingStorm = false;
-      target.isChanneling = false;
-      target.channelTimer = 0;
-
-      // Reset ONLY the specific interrupted skill's cooldown to HALF maximum (so they get it back faster)
-      if (wasPurple && target.purpleCooldown !== undefined) target.purpleCooldown = (CONFIG.gojo?.purpleCooldown || 800) / 2;
-      if (wasDomain && target.domainCooldown !== undefined && !target.domainActive) target.domainCooldown = (CONFIG.gojo?.domainCooldown || CONFIG.sukuna?.domainCooldown || CONFIG.yuta?.domainCooldown || 1500) / 2;
-      if (wasRCT && target.rctCooldown !== undefined) target.rctCooldown = (CONFIG.yuta?.rctCooldown || 600) / 2;
-      if (wasDivineFlame && target.divineFlameCooldown !== undefined) target.divineFlameCooldown = (CONFIG.sukuna?.divineFlameCooldown || 900) / 2;
-      if (wasStorm && target.stormCooldown !== undefined) target.stormCooldown = (CONFIG.zeus?.stormCooldown || 900) / 2;
-      if (wasGeneric && typeof target.ultimateCooldown === 'number' && !target.ultimateActive) target.ultimateCooldown = (target.ultimateCooldownMax || 900) / 2;
-
-      spawnSparks(target.x, target.y, 18, '#A078C8'); // Deep purple silence pulse sparks!
-      spawnImpactFlash(target.x, target.y, 45, 'rgba(160, 30, 240, 0.9)');
-    }
-    
-    // Impact visual effects & micro-screen shake
-    triggerGlobalScreenShake(isAmbushThrust ? 6 : 3, isAmbushThrust ? 8 : 4);
-    spawnSparks(target.x, target.y, '#A078C8', 12);
-    spawnSparks(target.x, target.y, '#FF3355', 10);
-    spawnSparks(target.x, target.y, 12, 'crimsonSniper');
-    spawnImpactFlash(target.x, target.y, 30);
-
-    // 1st HIT KNOCKBACK (Target slides back smoothly WITHOUT bouncing so 2nd sequence executes cleanly!)
-    if (isAmbushThrust) {
-      this._clearTargetFreeze(target);
-      target.isFirstHitKnockback = true; // Disable wall rebounce for 1st hit!
-      const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
-      const knockbackSpeed = 28; // Smooth controlled distance!
-      
-      const kbVx = Math.cos(pushAngle) * knockbackSpeed;
-      const kbVy = Math.sin(pushAngle) * knockbackSpeed;
-      target.vx = kbVx;
-      target.vy = kbVy;
-      target.knockbackDecay = 0.84; // Smooth controlled linear slide so target stops cleanly!
-      target.applyKnockback(kbVx, kbVy);
-
-      // Heavy Knockback Blast Effects
-      spawnMeleeClashShockwave(target.x, target.y, 190, 'yuta');
-      spawnCrimsonLightningImpact(target.x, target.y, 110);
-      spawnMeleeClashShockwave(target.x, target.y, 140, 'yuta');
-      spawnSparks(target.x, target.y, 40, 'crimsonSniper');
-    }
+    return modSpearStrike(this, target, ownerIndex, isAmbushThrust);
   }
 
   /**

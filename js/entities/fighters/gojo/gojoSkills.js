@@ -1,0 +1,208 @@
+// ─────────────────────────────────────────────
+// SATORU GOJO LIMITLESS SKILLS MODULE
+// Encapsulates Reversal Red, Hollow Purple, and skill utilities
+// ─────────────────────────────────────────────
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
+import { projectileSystem } from '../../../systems/projectileSystem.js';
+import { CONFIG } from '../../../core/config.js';
+import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
+import { playSound, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
+import { getSkillSound } from '../../../soundEffects/skillSounds.js';
+
+export function activateRed(fighter) {
+  const buildupFrames = CONFIG.gojo?.redBuildupFrames || 20;
+  const blastFadeFrames = 25;
+  const totalFrames = buildupFrames + blastFadeFrames;
+
+  fighter.redCooldown = CONFIG.gojo?.redCooldown || 300;
+  fighter.redEffectTimer = totalFrames;
+  fighter.redEffectMaxTimer = totalFrames;
+  fighter.redBuildupPhase = true;
+  fighter.redDetonated = false;
+  fighter._hasPlayedRedFlareSound = false;
+  fighter._hasPlayedRedChannelingSound = false;
+
+  // Prevent simultaneous attacks during the buildup & blast
+  fighter.shootCooldown = fighter.shootCooldownMax || 40;
+  fighter.meleeModeCooldown = Math.max(fighter.meleeModeCooldown || 0, totalFrames + 15);
+  fighter.isMeleeMode = false;
+
+  // Find and lock target angle toward nearest enemy
+  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+  let targetF = null;
+  state.fighters.forEach((f, idx) => {
+    if (f && f !== fighter && f.hp > 0) {
+      const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+      if (isEnemy) {
+        const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
+        if (!targetF || dist < Math.hypot(targetF.x - fighter.x, targetF.y - fighter.y)) {
+          targetF = f;
+        }
+        // Immediately cancel any ongoing enemy flurry/teleport when Red begins charging
+        if (dist < (CONFIG.gojo?.redRange || 100) + 200) {
+          if (typeof f.interruptAttacks === 'function') f.interruptAttacks();
+          f.timeStopTimer = 0;
+          f.flurryHitsLeft = 0;
+          f.flurryTimer = 0;
+          f.rapidSlashHitsLeft = 0;
+          f.rapidSlashTimer = 0;
+          f.isTeleporting = false;
+          f.teleportSlideTimer = 0;
+          // Pause & immobilize enemy during Red buildup so they don't run into Gojo
+          if (typeof f.applyHitStun === 'function') f.applyHitStun(buildupFrames + 5);
+          f.vx = 0;
+          f.vy = 0;
+        }
+      }
+    }
+  });
+  fighter.redTargetAngle = targetF ? Math.atan2(targetF.y - fighter.y, targetF.x - fighter.x) : fighter.gunAngle;
+
+  // Text pop and light buildup sparks
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'REVERSAL RED', '#FF1144');
+  spawnSparks(fighter.x, fighter.y, 12, 'crimsonSniper');
+  triggerGlobalScreenShake(4, 6);
+
+  const sCharging = getSkillSound(fighter._def?.id, 'red_charging');
+  playSound(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 2.0);
+}
+
+export function detonateRed(fighter) {
+  if (fighter.redDetonated) return;
+  fighter.redDetonated = true;
+
+  const redRange = CONFIG.gojo?.redRange || 100;
+  const redDamage = CONFIG.gojo?.redDamage || 22;
+  const redKnockback = CONFIG.gojo?.redKnockback || 22;
+
+  // Heavy blast sparks & screen shake
+  spawnSparks(fighter.x, fighter.y, 35, 'crimsonSniper');
+  triggerGlobalScreenShake(12, 18);
+
+  const sBlast = getSkillSound(fighter._def?.id, 'red_blast');
+  playSound(sBlast?.src || 'Assets/Sound Effects/Skills/redblast.mp3', sBlast?.volume ?? 1.5);
+
+  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+  const arena = CONFIG.arena;
+
+  state.fighters.forEach((f, idx) => {
+    if (f && f !== fighter && f.hp > 0) {
+      const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+      if (isEnemy) {
+        const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
+        if (dist < redRange + f.r) {
+          const angle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
+          f.takeDamage(redDamage, fighter, { isRed: true });
+
+          const targetX = f.x + Math.cos(angle) * redKnockback * 8;
+          const targetY = f.y + Math.sin(angle) * redKnockback * 8;
+          if (typeof f.applyTeleportSlideBrake === 'function') {
+            f.applyTeleportSlideBrake(f.x, f.y, targetX, targetY, arena, 12);
+          } else {
+            f.vx = Math.cos(angle) * redKnockback;
+            f.vy = Math.sin(angle) * redKnockback;
+          }
+
+          const slowDuration = CONFIG.gojo?.redSlowDuration || 90;
+          const slowMultiplier = CONFIG.gojo?.redSlowMultiplier || 0.6;
+          if (typeof f.applySlow === 'function') {
+            f.applySlow(slowDuration, slowMultiplier, { isRed: true });
+          }
+          spawnImpactFlash(f.x, f.y, 45, 'crimsonSniper');
+        }
+      }
+    }
+  });
+}
+
+export function firePurple(fighter, ownerIndex) {
+  fighter.isChannelingPurple = false;
+  fighter._hasPlayedPurpleChannelSound = false;
+  if (fighter._purpleChargeSoundHandle) {
+    fadeOutSound(fighter._purpleChargeSoundHandle, 300);
+    fighter._purpleChargeSoundHandle = null;
+  }
+  fadeOutSoundBySrc('mixing', 300);
+  fighter.purpleRecoveryTimer = 120; // 2s recovery stasis
+  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 600;
+  fighter.z = 35; // Start descent from hovering altitude
+
+  triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 25);
+
+  if (projectileSystem && projectileSystem.fireGojoPurple) {
+    projectileSystem.fireGojoPurple(fighter, ownerIndex, CONFIG.gojo?.purpleDamage || 10);
+  }
+
+  fighter.purpleRetreatTimer = CONFIG.gojo?.purpleRetreatDelay ?? 20;
+}
+
+export function executePurpleRetreat(fighter) {
+  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+  let opponent = null;
+  if (state.fighters) {
+    let minDist = Infinity;
+    state.fighters.forEach((f, idx) => {
+      if (f && f !== fighter && f.hp > 0) {
+        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+        if (isEnemy) {
+          const d = Math.hypot(fighter.x - f.x, fighter.y - f.y);
+          if (d < minDist) {
+            minDist = d;
+            opponent = f;
+          }
+        }
+      }
+    });
+  }
+
+  if (opponent && !opponent.isDead) {
+    const oldX = fighter.x;
+    const oldY = fighter.y;
+
+    const angle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x) + (Math.random() < 0.5 ? 0.3 : -0.3);
+    const retreatDist = CONFIG.gojo?.purpleRetreatDistance ?? 280;
+    let targetX = fighter.x + Math.cos(angle) * retreatDist;
+    let targetY = fighter.y + Math.sin(angle) * retreatDist;
+
+    const arena = CONFIG.arena;
+    if (arena) {
+      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
+      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    }
+
+    if (typeof fighter._applyTeleportSlideBrake === 'function') {
+      fighter._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+    } else {
+      fighter.x = targetX;
+      fighter.y = targetY;
+    }
+
+    spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'RETREAT!', '#00BFFF');
+    spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
+    spawnImpactFlash(fighter.x, fighter.y, 30, 'lightningTrail');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+  }
+}
+
+export function deleteEnemyProjectilesInPurple(fighter) {
+  if (!projectileSystem || !projectileSystem.projectiles) return;
+  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+
+  for (let p of projectileSystem.projectiles) {
+    if (p.isGojoPurple && (p.owner === state.fighters.indexOf(fighter) || state.getFighterTeam(p.owner) === myTeam)) {
+      for (let ep of projectileSystem.projectiles) {
+        if (ep !== p && ep.owner !== p.owner) {
+          const isEnemy = myTeam === null || state.getFighterTeam(ep.owner) !== myTeam;
+          if (isEnemy && !ep.isVisual) {
+            const dist = Math.hypot(p.x - ep.x, p.y - ep.y);
+            const suctionRange = (CONFIG.gojo?.purpleRadius || 60) + 180;
+            if (dist < suctionRange) {
+              ep.toRemove = true;
+              spawnSparks(ep.x, ep.y, 4, '#A020F0');
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -123,6 +123,30 @@ export const CONFIG = {
     poisonDamagePerTick: 2,   // damage per poison tick
   },
 
+  /** Mahoraga — Divine General */
+  mahoraga: {
+    isAvailableInArena: true,
+    throwCooldown: 1000,         // Long cooldown for throw barrage (1000 frames = ~16.6s at 60fps)
+    throwMinDistance: 180,       // Minimum distance to enter throw stance vs fallback to blitz
+    throwSpreadAngle: 0.28,       // Fan/spread angle scatter for thrown ruin debris (0.28 rad ~ 16 degrees)
+    throwDamage: 14,
+    throwSpeed: 25,
+    throwKnockback: 6.0,
+    throwBarrageCount: 10,
+    throwBarrageInterval: 5,
+    throwAimRotationSpeed: 0.06,
+    blitzHitsCount: 6,
+    blitzHitDamage: 16,
+    blitzFinisherDamage: 35,
+    blitzFinisherKnockback: 35.0,
+  },
+
+  // Neutral Close-Quarters Attack-Teleport Stance (Triggers while waiting for wheel to adapt!)
+  neutralAttacksPerTeleport: 2,    // Number of attacks before teleporting (e.g. 2 attacks -> teleport -> 2 attacks)
+  neutralAttackInterval: 20,       // Frame interval between consecutive attacks (~0.33s at 60fps)
+  neutralTeleportDelay: 12,        // Frame delay after teleporting before starting the next attack sequence (~0.20s)
+  neutralTeleportDistance: 55,     // Teleport distance offset around opponent
+
   /** Gray — Knight fighter */
   knight: {
 
@@ -625,11 +649,12 @@ export const CONFIG = {
     slashCooldown: 50,       // Frames between basic attacks
     meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
     meleePunchCooldown: 32,  // Cooldown in frames (~0.53s) between attack-teleport punches in melee mode
- 
+
     // Teleport Dodge / Evade Mechanic
     teleportDodgeChance: 0.10,               // 30% chance to teleport dodge incoming attacks
     teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
     teleportDodgeDistance: 85,               // Distance teleported on dodge
+    teleportSlideSpeed: 8.5,                 // Residual sliding velocity speed applied every time Sukuna teleports
 
     // Anime Melee Combat Rhythm & Disengage
     forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round
@@ -793,7 +818,7 @@ export const CONFIG = {
     ambushKatanaFreezeDuration: 70, // 2nd Sequence: Target freeze duration (frames) for Katana execution
     ambushKnockbackForce: 48,      // Extreme high-speed knockback force launching target flying & bouncing across arena!
     ambushPhantomFlurryStrikes: 13,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
-    ambushPhantomFlurryFrameRate: 15, // 3rd Sequence: Slower readable attack speed between each phantom strike (42 frames = 0.7s)
+    ambushPhantomFlurryFrameRate: 10, // 3rd Sequence: Slower readable attack speed between each phantom strike (42 frames = 0.7s)
     ambushPhantomFlurryDamage: 15,    // 3rd Sequence: True Damage per phantom strike
     ambushPhantomFlurryDistance: 8,   // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
 
@@ -825,6 +850,78 @@ export const CONFIG = {
     ultimateCraterChargeTime: 90,     // Frames spent hovering in the air winding up the katana
     ultimateCraterDiveTime: 15,       // Frames spent diving down to the ground
     ultimateCraterFadeInFrames: 30,   // Frames for Toji to fade in before the crater slam
+  },
+
+  /** Mahoraga — Divine General */
+  mahoraga: {
+    isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
+    hitsToAdapt: 20,                 // Number of hits required to rotate wheel and advance adaptation stage
+    maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
+    adaptationReductionPerStage: 0.12, // +12% damage reduction per adaptation stage (up to 96% at Stage 8)
+    adaptationDamageReduction: 0.8, // (Legacy) damage reduction fallback
+    rotateOnlyOnAdaptation: true,   // If true, wheel ONLY rotates 1 click when adaptation completes (not on basic hits)
+    enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
+    goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
+    wheelClickDuration: 30,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
+    swordRange: 20,                 // Melee range for Sword of Extermination
+    swordCooldown: 60,              // Frames between sword strikes (1 second at 60fps)
+    swordDamage: 15,                // True damage dealt by Sword of Extermination
+    cleaveCooldown: 600,            // 10 seconds cooldown for Active AoE Cleave
+    cleaveRadius: 150,              // Range of the AoE Cleave
+    cleaveDamage: 40,               // True damage of the AoE Cleave
+    cleaveWindupFrames: 30,         // Windup time for active skill
+    wheelRotationSpeed: 0.10,       // Passive visual rotation speed of the wheel
+
+    // Divine Shout (AoE Shockwave Roar)
+    shoutCooldown: 1000,             // 8 seconds cooldown between divine shouts
+    shoutWindupFrames: 15,          // Windup stance plant frames before shockwave release
+    shoutRadius: 180,               // Shockwave blast radius
+    shoutDamage: 30,                // Damage dealt to enemies caught in shockwave
+    shoutKnockback: 18,             // Knockback force applied to enemies
+
+    // Cursed Energy Throw (Rapid Barrage Ranged Skill)
+    throwCooldown: 1000,             // 6 seconds cooldown between rapid throw barrages
+    throwMinDistance: 240,          // Minimum distance required to trigger rapid throw skill
+    throwBarrageCount: 10,           // Number of rapid projectiles hurled in a single barrage
+    throwBarrageInterval: 10,         // Frames between each rapid throw in the barrage (snappy ~0.10s)
+    throwDamage: 14,                // Damage per thrown projectile in barrage
+    throwSpeed: 20,                 // Ultra-fast projectile velocity
+    throwKnockback: 7.0,            // HIT PHYSICS: Physical pushback force per thrown projectile impact
+    throwAimRotationSpeed: 0.06,    // HEAVY AIM ROTATION SPEED: Gradual aim tracking speed during throw barrage (smaller = slower heavy aim rotation!)
+
+    // Hand-to-Hand Blitz Sequence (Rapid Melee Flurry + On-Demand Teleport Chase)
+    blitzWindupFrames: 14,           // Windup transition frames before starting H2H flurry (~0.23s)
+    blitzTotalDurationFrames: 150,   // Total max duration for the entire H2H blitz state (~2.5s)
+    blitzMinStayFrames: 20,          // Minimum duration (frames) Mahoraga stays at location before teleporting again (~0.83s)
+    blitzHitsCount: 15,              // Total number of rapid melee hits in H2H flurry
+    blitzHitInterval: 10,            // RAPID ATTACK SPEED: Frame interval between each rapid melee hit (smaller = faster rapid strikes!)
+    blitzAttackAnimDuration: 7,      // RAPID ATTACK ANIMATION SPEED: Frame duration for each punch/chop stroke animation
+    blitzHitDamage: 16,              // Damage per rapid martial arts strike (Hits 1 to N-1)
+    blitzHitPushbackForce: 4.5,      // HIT PHYSICS: Slow pushback distance per rapid hit (pushes enemy back gradually hit-by-hit!)
+    blitzTeleportDistanceThreshold: 200, // Distance threshold to trigger on-demand teleport chase
+    blitzTargetSlowMultiplier: 0.25, // ENEMY SLOW-MOTION DEBUFF: Enemy movement speed multiplier during blitz (0.25 = 25% speed / 75% heavy slow)
+    afterimageLifetimeFrames: 12,    // AFTERIMAGE VANISH SPEED: Lifetime frames for teleport afterimage ghosts (12 frames = ~0.20s snappy Sukuna/Gojo vanish!)
+    blitzFinisherDamage: 35,         // Damage for final finisher cleave (Final Hit)
+    blitzFinisherKnockback: 35,      // Explosive knockback launch velocity for finisher
+
+    // Neutral Close-Quarters Attack-Teleport Stance (Triggers while waiting for wheel to adapt!)
+    enableCloseQuartersTeleport: true, // Toggle on/off close-quarters teleporting (set false to disable neutral teleporting completely)
+    neutralAttacksPerTeleport: 10,    // Number of attacks before teleporting (e.g. 2 attacks -> teleport -> 2 attacks)
+    neutralAttackInterval: 20,       // Frame interval between consecutive attacks (~0.33s at 60fps)
+    neutralTeleportDelay: 5,        // Frame delay after teleporting before starting the next attack sequence (~0.20s)
+    neutralTeleportDistance: 100,     // Teleport distance offset around opponent
+    neutralStanceDurationFrames: 200, // Total duration (frames) close-quarters attack-teleport stance lasts before ending (~3.33s at 60fps)
+    neutralStanceCooldownFrames: 550, // Recharge cooldown (frames) before close-quarters attack-teleport stance can re-trigger (~3.0s at 60fps)
+
+    // Reverse Cursed Technique (RCT / Divine Healing at Low HP)
+    enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing at low HP
+    rctHealThresholdHpPercent: 0.25,  // Triggers RCT healing when HP drops to 25% or below
+    rctHealAmountPercent: 0.35,       // Heals 35% of max HP back upon trigger
+    rctHealCooldownFrames: 1200,      // Recharge cooldown (frames) between RCT heals (1200 frames = ~20s at 60fps)
+
+    // Teleportation Speed & Afterimage Visibility Settings
+    afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)
+    adaptationDashSpeedFrames: 10,   // Teleportation travel speed / frames during flash-dash (smaller = faster instant teleport!)
   },
 };
 
@@ -1281,6 +1378,29 @@ export const FIGHTER_DEFS = [
     desc: 'Zero Cursed Energy. Immune to Domains. Silences enemies with the Inverted Spear of Heaven.',
   }
 ];
+
+// Conditionally add Mahoraga to the arena
+if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
+  FIGHTER_DEFS.push({
+    id: 100,
+    name: 'Mahoraga',
+    category: 'Anime',
+    color: '#F5F5DC', // Beige / Off-White
+    startX: 300, startY: 250,
+    startVx: 1.1, startVy: 1.1,
+    radius: 30, // Slightly larger base size
+    aimbot: false,
+    spinRate: 0,
+    type: 'mahoraga',
+    hp: 250, // Tanky boss-like health
+    damage: 25,
+    cooldown: 60,
+    moveSpeed: 4.5, // Slow but menacing
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Wheel of Adaptation',
+    desc: 'Adapts to damage types after taking multiple hits. Sword of Extermination deals True Damage.',
+  });
+}
 
 // ─────────────────────────────────────────────
 // DERIVED CONSTANTS

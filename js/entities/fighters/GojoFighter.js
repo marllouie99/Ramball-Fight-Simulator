@@ -6,7 +6,10 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { renderGojoDomainBackground } from './gojo/gojoDomainVisuals.js';
+import { activateRed as modActivateRed, detonateRed as modDetonateRed, firePurple as modFirePurple, executePurpleRetreat as modExecutePurpleRetreat, deleteEnemyProjectilesInPurple as modDeletePurpleProj } from './gojo/gojoSkills.js';
+import { triggerInfinityBlock as modTriggerInfinityBlock, applyTeleportSlideBrake as modApplyTeleportSlideBrake, executeTeleportDodge as modExecuteTeleportDodge } from './gojo/gojoCombat.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawGojoBody } from '../../graphics/fighters/gojoSkin.js';
 import { drawGojoWeapon, drawGojoOrb, drawAnamorphicLensFlare } from '../../graphics/weapons/gojoWeaponGraphics.js';
 
@@ -169,26 +172,7 @@ export class GojoFighter extends Fighter {
   }
 
   triggerInfinityBlock(hitX, hitY, attacker) {
-    if (this.infinityCooldown > 0) return false;
-    this.infinityCooldown = CONFIG.gojo.infinityCooldown ?? 240;
-    this.infinityActive = false;
-    this.infinityBlockTimer = 25;
-    this.infinityBlockMaxTimer = 25;
-    this.infinityBlockX = hitX !== undefined ? hitX : this.x;
-    this.infinityBlockY = hitY !== undefined ? hitY : this.y;
-
-    spawnFloatingText(this.x, this.y - this.r - 20, 'INFINITY', '#E0FFFF');
-    spawnImpactFlash(this.infinityBlockX, this.infinityBlockY, 40, 'lightningTrail');
-    spawnSparks(this.infinityBlockX, this.infinityBlockY, 15, 'lightningTrail', '#E0FFFF');
-    triggerGlobalScreenShake(3, 6);
-
-    // If a melee attacker struck Infinity, freeze them mid-strike in front of the barrier for 0.75s (Toji is immune due to Heavenly Restriction!)
-    if (attacker && typeof attacker.applyTimeStop === 'function') {
-      if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
-        attacker.applyTimeStop(CONFIG.gojo.infinityMeleeFreezeDuration ?? 45);
-      }
-    }
-    return true;
+    return modTriggerInfinityBlock(this, hitX, hitY, attacker);
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -227,88 +211,21 @@ export class GojoFighter extends Fighter {
     return result;
   }
 
-  /**
-   * Applies a fluid slide brake physics momentum & afterimage trail when Gojo finishes teleporting.
-   */
   _applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena) {
-    if (this.isDead) return;
-    const dx = targetX - oldX;
-    const dy = targetY - oldY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 1) return;
-
-    const nx = dx / dist;
-    const ny = dy / dist;
-
-    // Start Gojo slightly offset back along arrival trajectory (18-24px)
-    const slideOffset = Math.min(24, dist * 0.35);
-    const slideSpeed = 13.5; // Initial slide brake momentum
-
-    let startX = targetX - nx * slideOffset;
-    let startY = targetY - ny * slideOffset;
-
-    if (arena) {
-      startX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, startX));
-      startY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, startY));
-    }
-
-    this.x = startX;
-    this.y = startY;
-
-    // Apply forward velocity that friction-brakes smoothly to a standstill
-    this.vx = nx * slideSpeed;
-    this.vy = ny * slideSpeed;
-    this.teleportSlideTimer = 10;
-
-    // Spawn dense afterimages along the teleport-slide path
-    if (!this.afterImages) this.afterImages = [];
-    const pathAngle = Math.atan2(dy, dx);
-    const facingAngle = this.gunAngle !== undefined ? this.gunAngle : pathAngle;
-    const steps = Math.max(4, Math.floor(dist / 12));
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const maxTimer = 24 - Math.floor(t * 6);
-      this.afterImages.push({
-        x: oldX + dx * t,
-        y: oldY + dy * t,
-        angle: facingAngle,
-        timer: maxTimer,
-        maxTimer: maxTimer,
-        fromX: oldX,
-        fromY: oldY,
-        toX: targetX,
-        toY: targetY
-      });
-    }
+    return modApplyTeleportSlideBrake(this, oldX, oldY, targetX, targetY, arena);
   }
 
   _executeTeleportDodge(attacker, arena) {
-    if (this.isDead) return;
-    const oldX = this.x;
-    const oldY = this.y;
-
-    // Determine dodge direction (sideways/flank relative to attacker)
-    const angle = attacker ? (Math.atan2(this.y - attacker.y, this.x - attacker.x) + (Math.random() < 0.5 ? 1.2 : -1.2)) : (Math.random() * Math.PI * 2);
-    const dist = (CONFIG.gojo.teleportDodgeDistance ?? 85) + Math.random() * 20;
-
-    let targetX = this.x + Math.cos(angle) * dist;
-    let targetY = this.y + Math.sin(angle) * dist;
-
-    if (arena) {
-      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
-    }
-
-    this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
-
-    // Visuals: Floating text & teleport flashes
-    spawnFloatingText(oldX, oldY - this.r - 10, 'EVADE!', '#00BFFF');
-    spawnImpactFlash(oldX, oldY, 22, 'lightningTrail');
-    spawnImpactFlash(this.x, this.y, 22, 'lightningTrail');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+    return modExecuteTeleportDodge(this, attacker, arena);
   }
 
   update(opponent, ownerIndex, arena) {
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return; // Hold Gojo in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
     if (this.hp <= 0) {
       if (this.isChannelingPurple) {
         this.isChannelingPurple = false;
@@ -329,11 +246,10 @@ export class GojoFighter extends Fighter {
 
     // Fade afterimages every frame
     if (this.afterImages && this.afterImages.length > 0) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        if (--this.afterImages[i].timer <= 0) {
-          this.afterImages.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
     }
 
     // Update Sakuga impact frame & Red effect timers (must tick even during timeStop/hitStun!)
@@ -363,6 +279,11 @@ export class GojoFighter extends Fighter {
     }
 
     if (this.redEffectTimer > 0) {
+      if (!this._hasPlayedRedChannelingSound) {
+        this._hasPlayedRedChannelingSound = true;
+        const sChan = getSkillSound(this._def?.id || 21, 'red_channeling') || getSkillSound(21, 'red_channeling');
+        playSound(sChan?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sChan?.volume ?? 2.0);
+      }
 
       // Buildup phase: freeze nearby enemies in place (near-zero slow)
       const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 20;
@@ -406,17 +327,14 @@ export class GojoFighter extends Fighter {
 
     // Update punch effects & hit flame wisps so they animate even during hit pause
     if (this.punchEffects && this.punchEffects.length > 0) {
-      for (let i = this.punchEffects.length - 1; i >= 0; i--) {
-        this.punchEffects[i].timer--;
-        if (this.punchEffects[i].timer <= 0) {
-          this.punchEffects.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.punchEffects, (p) => {
+        p.timer--;
+        return p.timer > 0;
+      });
     }
 
     if (this.hitFlameWisps && this.hitFlameWisps.length > 0) {
-      for (let i = this.hitFlameWisps.length - 1; i >= 0; i--) {
-        const wisp = this.hitFlameWisps[i];
+      fastCleanArray(this.hitFlameWisps, (wisp, i) => {
         wisp.x += wisp.vx;
         wisp.y += wisp.vy;
         wisp.vy -= 0.18; // Soft upward flame buoyancy
@@ -424,14 +342,13 @@ export class GojoFighter extends Fighter {
         wisp.vx *= 0.90;
         wisp.vy *= 0.90;
         wisp.timer--;
-        if (wisp.timer <= 0) {
-          this.hitFlameWisps.splice(i, 1);
-        }
-      }
+        return wisp.timer > 0;
+      });
     }
 
     if (!this.isChannelingDomainExpansion) this._hasPlayedDomainChannelSound = false;
     if (!this.isChannelingPurple) this._hasPlayedPurpleChannelSound = false;
+    if (this.redEffectTimer <= 0) this._hasPlayedRedChannelingSound = false;
 
     if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
@@ -456,11 +373,10 @@ export class GojoFighter extends Fighter {
     }
 
     if (this.afterImages && this.afterImages.length > 0) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        if (--this.afterImages[i].timer <= 0) {
-          this.afterImages.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
     }
 
     // Distance check to closest opponent for melee range combat aura
@@ -805,8 +721,8 @@ export class GojoFighter extends Fighter {
       } else if (this.meleeModeCooldown > 0) {
         // Mandatory ranged separation period after combo finisher
         this.isMeleeMode = false;
-      } else if (opponent && opponent.isStealthed && !this.domainActive) {
-        // Disengage from melee combat while opponent is in stealth mode
+      } else if (opponent && opponent.isStealthed && !this.domainActive && !(opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji')) {
+        // Disengage from melee combat while non-Toji opponent is in stealth mode
         this.isMeleeMode = false;
       } else if (isBeingMeleed) {
         // Enter Melee Mode when in close melee engagement
@@ -872,22 +788,18 @@ export class GojoFighter extends Fighter {
 
     // Update afterimages
     if (this.afterImages && this.afterImages.length > 0) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        this.afterImages[i].timer--;
-        if (this.afterImages[i].timer <= 0) {
-          this.afterImages.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
     }
 
     // Update punch effects
     if (this.punchEffects && this.punchEffects.length > 0) {
-      for (let i = this.punchEffects.length - 1; i >= 0; i--) {
-        this.punchEffects[i].timer--;
-        if (this.punchEffects[i].timer <= 0) {
-          this.punchEffects.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.punchEffects, (p) => {
+        p.timer--;
+        return p.timer > 0;
+      });
     }
 
     this.resolveWallBounce(arena);
@@ -916,7 +828,8 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    if (!opponent || opponent.isDead || (opponent.isStealthed && !this.domainActive)) return;
+    const isTojiOpponent = opponent && (opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji');
+    if (!opponent || opponent.isDead || (opponent.isStealthed && !this.domainActive && !isTojiOpponent)) return;
 
     // Initialize combo state
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
@@ -1074,7 +987,7 @@ export class GojoFighter extends Fighter {
     for (let k = 0; k < 5; k++) {
       const spreadAngle = impactAngle + (Math.random() - 0.5) * 1.4;
       const stretchSpeed = 5 + Math.random() * 7;
-      this.hitFlameWisps.push({
+      pushTrailCap(this.hitFlameWisps, {
         x: opponent.x + (Math.random() - 0.5) * 12,
         y: opponent.y + (Math.random() - 0.5) * 12,
         vx: Math.cos(spreadAngle) * stretchSpeed,
@@ -1085,7 +998,7 @@ export class GojoFighter extends Fighter {
         length: 14 + Math.random() * 18,
         width: 3.5 + Math.random() * 3.5,
         color: '#00D4CC'
-      });
+      }, 30);
     }
 
     // Screen shake for impact
@@ -1100,70 +1013,10 @@ export class GojoFighter extends Fighter {
   }
 
   _activateRed() {
-    const buildupFrames = CONFIG.gojo.redBuildupFrames || 20;
-    const blastFadeFrames = 25;
-    const totalFrames = buildupFrames + blastFadeFrames;
-
-    this.redCooldown = CONFIG.gojo.redCooldown || 300;
-    this.redEffectTimer = totalFrames;
-    this.redEffectMaxTimer = totalFrames;
-    this.redBuildupPhase = true;
-    this.redDetonated = false;
-    this._hasPlayedRedFlareSound = false;
-    this._hasPlayedRedChannelingSound = false;
-
-    // Prevent simultaneous attacks during the buildup & blast
-    this.shootCooldown = this.shootCooldownMax || 40;
-    this.meleeModeCooldown = Math.max(this.meleeModeCooldown || 0, totalFrames + 15);
-    this.isMeleeMode = false;
-
-    // Find and lock target angle toward nearest enemy
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-    let targetF = null;
-    state.fighters.forEach((f, idx) => {
-      if (f && f !== this && f.hp > 0) {
-        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (isEnemy) {
-          const dist = Math.hypot(f.x - this.x, f.y - this.y);
-          if (!targetF || dist < Math.hypot(targetF.x - this.x, targetF.y - this.y)) {
-            targetF = f;
-          }
-          // Immediately cancel any ongoing enemy flurry/teleport when Red begins charging
-          if (dist < (CONFIG.gojo.redRange || 100) + 200) {
-            if (typeof f.interruptAttacks === 'function') f.interruptAttacks();
-            f.timeStopTimer = 0;
-            f.flurryHitsLeft = 0;
-            f.flurryTimer = 0;
-            f.rapidSlashHitsLeft = 0;
-            f.rapidSlashTimer = 0;
-            f.isTeleporting = false;
-            f.teleportSlideTimer = 0;
-            // Pause & immobilize enemy during Red buildup so they don't run into Gojo
-            if (typeof f.applyHitStun === 'function') f.applyHitStun(buildupFrames + 5);
-            f.vx = 0;
-            f.vy = 0;
-          }
-        }
-      }
-    });
-    this.redTargetAngle = targetF ? Math.atan2(targetF.y - this.y, targetF.x - this.x) : this.gunAngle;
-
-    // Text pop and light buildup sparks (orb is forming — not the boom yet)
-    spawnFloatingText(this.x, this.y - this.r - 20, 'REVERSAL RED', '#FF1144');
-    spawnSparks(this.x, this.y, 12, 'crimsonSniper');
-    triggerGlobalScreenShake(4, 6);
-
-    // Reversal Red Audio Trigger: Play charging sound effect & channeling voice line together simultaneously
-    const sCharging = getSkillSound(this._def?.id, 'red_charging');
-    playSound(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 2.0);
-
-    const sChan = getSkillSound(this._def?.id, 'red_channeling');
-    playSound(sChan?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sChan?.volume ?? 1.8);
+    return modActivateRed(this);
   }
 
-  /** Called exactly once at the detonation threshold — this is the actual SNAP BOOM. */
   _detonateRed() {
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
     const knockback = CONFIG.gojo.redKnockback || 25;
     const slowDuration = CONFIG.gojo.redSlowDuration || 120;
     const slowMultiplier = CONFIG.gojo.redSlowMultiplier || 0.35;
@@ -1181,6 +1034,7 @@ export class GojoFighter extends Fighter {
     playSound(sBlast?.src || 'Assets/Sound Effects/Skills/redblast.mp3', sBlast?.volume ?? 2.5);
 
     // Repel + damage + slow all enemies in radius
+    const myTeam = state.getFighterTeam(this.fighterIndex ?? state.fighters.indexOf(this));
     state.fighters.forEach((f, idx) => {
       if (f && f !== this && f.hp > 0) {
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
@@ -1249,96 +1103,17 @@ export class GojoFighter extends Fighter {
   }
 
   _firePurple(ownerIndex) {
-    this.isChannelingPurple = false;
-    this._hasPlayedPurpleChannelSound = false;
-    if (this._purpleChargeSoundHandle) {
-      fadeOutSound(this._purpleChargeSoundHandle, 300);
-      this._purpleChargeSoundHandle = null;
-    }
-    fadeOutSoundBySrc('mixing', 300);
-    this.purpleRecoveryTimer = 120; // 2s recovery stasis after firing Purple
-    this.purpleCooldown = CONFIG.gojo.purpleCooldown || 600;
-    this.z = 35; // Start descent from hovering altitude
-
-    triggerGlobalScreenShake(CONFIG.gojo.purpleShakeIntensity, CONFIG.gojo.purpleShakeDuration);
-
-    if (projectileSystem && projectileSystem.fireGojoPurple) {
-      projectileSystem.fireGojoPurple(this, ownerIndex, CONFIG.gojo.purpleDamage || 10);
-    }
-
-    // Set a delay before teleporting away — Gojo stays in place while Purple fires/explodes
-    this.purpleRetreatTimer = CONFIG.gojo.purpleRetreatDelay ?? 20; // ~0.33s delay before retreat
+    return modFirePurple(this, ownerIndex);
   }
 
-  // Executes the teleport-away after Purple has fired and the delay has elapsed
   _executePurpleRetreat() {
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-    let opponent = null;
-    if (state.fighters) {
-      let minDist = Infinity;
-      state.fighters.forEach((f, idx) => {
-        if (f && f !== this && f.hp > 0) {
-          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-          if (isEnemy) {
-            const d = Math.hypot(this.x - f.x, this.y - f.y);
-            if (d < minDist) {
-              minDist = d;
-              opponent = f;
-            }
-          }
-        }
-      });
-    }
-
-    if (opponent && !opponent.isDead) {
-      const oldX = this.x;
-      const oldY = this.y;
-
-      // Teleport away from opponent (opposite direction of Purple explosion)
-      const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() < 0.5 ? 0.3 : -0.3);
-      const retreatDist = CONFIG.gojo.purpleRetreatDistance ?? 280;
-      let targetX = this.x + Math.cos(angle) * retreatDist;
-      let targetY = this.y + Math.sin(angle) * retreatDist;
-
-      const arena = CONFIG.arena;
-      if (arena) {
-        targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-        targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
-      }
-
-      this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
-
-      // Visuals & Sound
-      spawnFloatingText(this.x, this.y - this.r - 20, 'RETREAT!', '#00BFFF');
-      spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
-      spawnImpactFlash(this.x, this.y, 30, 'lightningTrail');
-      playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
-    }
+    return modExecutePurpleRetreat(this);
   }
 
   _deleteEnemyProjectilesInPurple() {
-    if (!projectileSystem || !projectileSystem.projectiles) return;
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-
-    for (let p of projectileSystem.projectiles) {
-      if (p.isGojoPurple && (p.owner === state.fighters.indexOf(this) || state.getFighterTeam(p.owner) === myTeam)) {
-        // Found my purple orb. Now find nearby enemy projectiles and destroy them
-        for (let ep of projectileSystem.projectiles) {
-          if (ep !== p && ep.owner !== p.owner) {
-            const isEnemy = myTeam === null || state.getFighterTeam(ep.owner) !== myTeam;
-            if (isEnemy && !ep.isVisual) {
-              const dist = Math.hypot(p.x - ep.x, p.y - ep.y);
-              if (dist < p.r + ep.r + 20) {
-                // Destroy it
-                ep.life = 0;
-                spawnSparks(ep.x, ep.y, 3, 'lightningTrail', '#8A2BE2');
-              }
-            }
-          }
-        }
-      }
-    }
+    return modDeletePurpleProj(this);
   }
+
 
   _activateDomain(arena) {
     this.isChannelingDomainExpansion = false;
@@ -2776,106 +2551,35 @@ export class GojoFighter extends Fighter {
     ctx.translate(this.x, this.y - (this.z || 0));
     ctx.rotate(angle);
 
-    // ─── Phase 1: FLARE FIRST, then orb condenses from it ──────────────────
+    // ─── Phase 1: Red orb manifests and swells at Gojo's fingertip ─────────
     if (elapsed <= buildupEnd) {
       const buildProg  = elapsed / buildupEnd;       // 0 → 1
-      // Sub-phase boundary: first 40% = pure flare, remaining 60% = orb emerges
-      const flareCutoff = 0.4;
-      const isFlarePhase = buildProg <= flareCutoff;
+      const eased      = buildProg * buildProg;       // smooth ease-in
 
-      // ── Sub-phase A: Crimson Starburst Flare (0 → 40%) ──────────────────
-      {
-        // Flare is fully bright at start and fades as the orb takes over
-        const flareP   = isFlarePhase
-          ? buildProg / flareCutoff          // 0 → 1 (building up)
-          : 1 - (buildProg - flareCutoff) / (1 - flareCutoff); // 1 → 0 (fading)
-        const flareIn  = isFlarePhase ? flareP * flareP : 1;   // ease-in on arrival
-        const flareAlpha = Math.sin(flareP * Math.PI);          // peaks at center, fades both ends
+      const baseR = getHandSize(6) * (0.2 + eased * 1.8);
+      const pulse  = Math.sin(time / 120) * 0.08;
+      const r2     = baseR * (1 + pulse);
 
-        if (flareAlpha > 0.01) {
-          const flareR = 32 * (0.4 + flareP * 0.6);
+      // Manifest red orb at Gojo's fingertip
+      drawGojoOrb(ctx, fingerDist, 0, r2, time, 'red', 0);
 
-          // Outer crimson bloom
-          ctx.save();
-          ctx.globalCompositeOperation = 'lighter';
-          const bloom = ctx.createRadialGradient(fingerDist, 0, 0, fingerDist, 0, flareR * 3.5);
-          bloom.addColorStop(0,   `rgba(255, 255, 255, ${0.9 * flareAlpha})`);
-          bloom.addColorStop(0.15,`rgba(255, 80,  80,  ${0.8 * flareAlpha})`);
-          bloom.addColorStop(0.4, `rgba(220, 0,   40,  ${0.5 * flareAlpha})`);
-          bloom.addColorStop(1,   'rgba(150, 0, 20, 0)');
-          ctx.fillStyle = bloom;
-          ctx.beginPath();
-          ctx.arc(fingerDist, 0, flareR * 3.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
+      // Draw Anamorphic Red Lens Flare Beam delayed until right before explosion (final 25% of orb charge)
+      if (buildProg > 0.75) {
+        const flareP = (buildProg - 0.75) / 0.25; // 0.0 to 1.0 fast intense ignition right before explosion
+        drawAnamorphicLensFlare(ctx, fingerDist, 0, flareP, 'red');
 
-          // 6-point starburst rays radiating outward
-          ctx.save();
-          ctx.translate(fingerDist, 0);
-          ctx.globalAlpha = flareAlpha * 0.95;
-          const numRays  = 6;
-          const rayLen   = flareR * (1.2 + flareP * 1.4);
-          ctx.strokeStyle = '#FFFFFF';
-          ctx.lineCap = 'round';
-          for (let i = 0; i < numRays; i++) {
-            const rayAngle = (Math.PI * 2 / numRays) * i + (elapsed * 0.04);
-            const innerR   = flareR * 0.15;
-            ctx.lineWidth  = (3.5 - i * 0.2) * flareAlpha;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(rayAngle) * innerR, Math.sin(rayAngle) * innerR);
-            ctx.lineTo(Math.cos(rayAngle) * rayLen,  Math.sin(rayAngle) * rayLen);
-            ctx.stroke();
-            // Thin secondary ray between each main ray
-            const midAngle = rayAngle + Math.PI / numRays;
-            ctx.lineWidth  = 1.2 * flareAlpha;
-            ctx.beginPath();
-            ctx.moveTo(Math.cos(midAngle) * innerR,       Math.sin(midAngle) * innerR);
-            ctx.lineTo(Math.cos(midAngle) * rayLen * 0.6, Math.sin(midAngle) * rayLen * 0.6);
-            ctx.stroke();
-          }
-          // White-hot core point of the flare
-          ctx.fillStyle = '#FFFFFF';
-          ctx.globalAlpha = flareAlpha;
-          ctx.beginPath();
-          ctx.arc(0, 0, flareR * 0.35, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.fillStyle = `rgba(255, 60, 60, ${flareAlpha * 0.8})`;
-          ctx.beginPath();
-          ctx.arc(0, 0, flareR * 0.6, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.restore();
+        if (!this._hasPlayedRedFlareSound) {
+          this._hasPlayedRedFlareSound = true;
+          triggerGlobalScreenShake(8, 12); // Pre-detonation flare tremor
+          const sDep = getSkillSound(this._def?.id, 'red_deploy');
+          playSound(sDep?.src || 'Assets/Sound Effects/Skills/reddeploy.mp3', sDep?.volume ?? 2.0);
         }
       }
-
-      // ── Sub-phase B: Orb condenses from the flare (40% → 100%) ──────────
-      if (!isFlarePhase) {
-        const orbProg  = (buildProg - flareCutoff) / (1 - flareCutoff); // 0 → 1
-        const eased    = orbProg * orbProg;                              // ease-in
-
-        const baseR = getHandSize(6) * (0.2 + eased * 1.8);
-        const pulse  = Math.sin(time / 120) * 0.08;
-        const r2     = baseR * (1 + pulse);
-
-        // Use the same drawGojoOrb as Hollow Purple channeling — identical red orb visual
-        drawGojoOrb(ctx, fingerDist, 0, r2, time, 'red', 0);
-
-        // Draw Anamorphic Red Lens Flare Beam delayed until right before explosion (final 25% of orb charge)
-        if (orbProg > 0.75) {
-          const flareP = (orbProg - 0.75) / 0.25; // 0.0 to 1.0 fast intense ignition right before explosion
-          drawAnamorphicLensFlare(ctx, fingerDist, 0, flareP, 'red');
-
-          if (!this._hasPlayedRedFlareSound) {
-            this._hasPlayedRedFlareSound = true;
-            triggerGlobalScreenShake(8, 12); // Pre-detonation flare tremor
-            const sDep = getSkillSound(this._def?.id, 'red_deploy');
-            playSound(sDep?.src || 'Assets/Sound Effects/Skills/reddeploy.mp3', sDep?.volume ?? 2.0);
-          }
-        }
-      }
+    }
 
 
     // ─── Phase 2 + 3: BOOM and Fade (elapsed > buildupEnd) ──────────────────
-    } else {
+    else {
       const blastElapsed = elapsed - buildupEnd;           // 0 → (totalFrames - buildupEnd)
       const blastTotal   = totalFrames - buildupEnd;
       const blastProg    = blastElapsed / blastTotal;      // 0 → 1

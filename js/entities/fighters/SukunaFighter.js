@@ -6,8 +6,11 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
 import { renderSukunaDomainBackground, renderSukunaDomainForeground } from './sukuna/sukunaDomainVisuals.js';
+import { checkSpiderwebTrigger as modCheckSpiderweb, activateSpiderweb as modActivateSpiderweb, fireDivineFlame as modFireDivineFlame, activateReverseCursedTechnique as modActivateRCT, doDomainRapidSlashes as modDomainRapidSlashes, applyDomainEffect as modApplyDomainEffect } from './sukuna/sukunaSkills.js';
+import { spawnTeleportAfterimages as modSpawnTeleportAfterimages, executeTeleportDodge as modExecuteTeleportDodge, teleportAwayFrom as modTeleportAwayFrom, updateMeleeCombat as modUpdateMeleeCombat } from './sukuna/sukunaCombat.js';
 import { drawSukunaBody } from '../../graphics/fighters/sukunaSkin.js';
 
 export class SukunaFighter extends Fighter {
@@ -179,59 +182,11 @@ export class SukunaFighter extends Fighter {
   }
 
   _spawnTeleportAfterimages(oldX, oldY, targetX, targetY) {
-    if (!this.afterImages) this.afterImages = [];
-    const dx = targetX - oldX;
-    const dy = targetY - oldY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 1) return;
-
-    const pathAngle = Math.atan2(dy, dx);
-    const facingAngle = this.gunAngle !== undefined ? this.gunAngle : pathAngle;
-    const steps = Math.max(4, Math.floor(dist / 12));
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const maxTimer = 24 - Math.floor(t * 6);
-      this.afterImages.push({
-        x: oldX + dx * t,
-        y: oldY + dy * t,
-        angle: facingAngle,
-        timer: maxTimer,
-        maxTimer: maxTimer,
-        fromX: oldX,
-        fromY: oldY,
-        toX: targetX,
-        toY: targetY
-      });
-    }
+    return modSpawnTeleportAfterimages(this, oldX, oldY, targetX, targetY);
   }
 
   _executeTeleportDodge(attacker, arena) {
-    if (this.isDead) return;
-    const oldX = this.x;
-    const oldY = this.y;
-
-    // Determine dodge direction (sideways/flank relative to attacker)
-    const angle = attacker ? (Math.atan2(this.y - attacker.y, this.x - attacker.x) + (Math.random() < 0.5 ? 1.2 : -1.2)) : (Math.random() * Math.PI * 2);
-    const dist = (CONFIG.sukuna.teleportDodgeDistance ?? 85) + Math.random() * 20;
-
-    let targetX = this.x + Math.cos(angle) * dist;
-    let targetY = this.y + Math.sin(angle) * dist;
-
-    if (arena) {
-      targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-      targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
-    }
-
-    this.x = targetX;
-    this.y = targetY;
-
-    // Visuals: Floating text, crimson afterimage & teleport flashes
-    spawnFloatingText(oldX, oldY - this.r - 10, 'EVADE!', '#FF2400');
-    spawnImpactFlash(oldX, oldY, 22, 'crimsonSniper');
-    spawnImpactFlash(this.x, this.y, 22, 'crimsonSniper');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
-
-    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
+    return modExecuteTeleportDodge(this, attacker, arena);
   }
 
   shoot(ownerIndex) {
@@ -284,14 +239,14 @@ export class SukunaFighter extends Fighter {
     this.slashSwingTimer = 10;
     this.slashHand = this.slashHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
     if (!this.slashHitVisuals) this.slashHitVisuals = [];
-    this.slashHitVisuals.push({
+    pushTrailCap(this.slashHitVisuals, {
       x: closestEnemy.x,
       y: closestEnemy.y,
       angle: this.gunAngle,
       timer: 12,
       maxTimer: 12,
       scale: 1.0 + Math.random() * 0.3
-    });
+    }, 30);
 
     // Apply knockback to target
     const dismantleAngle = Math.atan2(closestEnemy.y - this.y, closestEnemy.x - this.x);
@@ -300,6 +255,13 @@ export class SukunaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return; // Hold Sukuna in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
+
     this.handlePoison();
     this.handleBurn();
     this._tickCooldowns();
@@ -319,8 +281,8 @@ export class SukunaFighter extends Fighter {
         this.domainActive = false;
       } else {
         this._applyDomainEffect(arena);
-        // Sukuna himself only unleashes active rapid slashes when not paralyzed
-        if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer) {
+        // Sukuna himself only unleashes active rapid slashes & teleports when not paralyzed and not channeling Fuga
+        if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer && !this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0) {
           this._doDomainRapidSlashes(opponent, arena, ownerIndex);
         }
       }
@@ -328,11 +290,10 @@ export class SukunaFighter extends Fighter {
 
     // Update slash hit visuals (Ghost blade / domain slashes) so they animate even during time stop
     if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
-      for (let i = this.slashHitVisuals.length - 1; i >= 0; i--) {
-        if (--this.slashHitVisuals[i].timer <= 0) {
-          this.slashHitVisuals.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.slashHitVisuals, (v) => {
+        v.timer--;
+        return v.timer > 0;
+      });
     }
 
     const isFrozen = this._handleTimeStop();
@@ -366,46 +327,40 @@ export class SukunaFighter extends Fighter {
 
     // Update hit flame wisps so they animate even during hit pause
     if (this.hitFlameWisps && this.hitFlameWisps.length > 0) {
-      for (let i = this.hitFlameWisps.length - 1; i >= 0; i--) {
-        const wisp = this.hitFlameWisps[i];
+      fastCleanArray(this.hitFlameWisps, (wisp) => {
         wisp.x += wisp.vx;
         wisp.y += wisp.vy;
         wisp.vy -= 0.18; // Soft upward flame buoyancy
-        wisp.angle += Math.sin(wisp.timer * 0.25 + i * 1.7) * 0.05; // Fluid curling sway
+        wisp.angle += Math.sin(wisp.timer * 0.25) * 0.05; // Fluid curling sway
         wisp.vx *= 0.90;
         wisp.vy *= 0.90;
         wisp.timer--;
-        if (wisp.timer <= 0) {
-          this.hitFlameWisps.splice(i, 1);
-        }
-      }
+        return wisp.timer > 0;
+      });
     }
 
     // Update Skill 1 flurry slash visual arcs
     if (this.flurrySlashVisuals && this.flurrySlashVisuals.length > 0) {
-      for (let i = this.flurrySlashVisuals.length - 1; i >= 0; i--) {
-        if (--this.flurrySlashVisuals[i].timer <= 0) {
-          this.flurrySlashVisuals.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.flurrySlashVisuals, (v) => {
+        v.timer--;
+        return v.timer > 0;
+      });
     }
 
     // Update punch effects
     if (this.punchEffects && this.punchEffects.length > 0) {
-      for (let i = this.punchEffects.length - 1; i >= 0; i--) {
-        if (--this.punchEffects[i].timer <= 0) {
-          this.punchEffects.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.punchEffects, (p) => {
+        p.timer--;
+        return p.timer > 0;
+      });
     }
 
     // Update teleport afterimages
     if (this.afterImages && this.afterImages.length > 0) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        if (--this.afterImages[i].timer <= 0) {
-          this.afterImages.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
     }
 
     // Melee mode state management (Gojo-style forced close combat)
@@ -416,11 +371,13 @@ export class SukunaFighter extends Fighter {
 
     // Switch modes dynamically based on distance (only when not in special states)
     if (!this.isChannelingDivineFlame && !this.domainActive && (this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0) {
+      const isToji = opponent && (opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji');
+
       if (this.meleeModeCooldown > 0) {
         // In mandatory ranged separation period after combo finisher
         this.isMeleeMode = false;
-      } else if (opponent && opponent.isStealthed && !this.domainActive) {
-        // Disengage from melee combat while opponent is in stealth mode
+      } else if (opponent && opponent.isStealthed && !this.domainActive && !isToji) {
+        // Disengage from melee combat while non-Toji opponent is in stealth mode
         this.isMeleeMode = false;
       } else if (distToOpponent <= 160) {
         if (!this.isMeleeMode) {
@@ -444,11 +401,10 @@ export class SukunaFighter extends Fighter {
 
     // Update afterimages (fades afterimages during melee, dodge & flurry)
     if (this.afterImages && this.afterImages.length > 0) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        if (--this.afterImages[i].timer <= 0) {
-          this.afterImages.splice(i, 1);
-        }
-      }
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
     }
 
     // Smooth fade IN & fade OUT for Cursed Energy aura in hand-to-hand combat mode & flurry
@@ -470,7 +426,10 @@ export class SukunaFighter extends Fighter {
     // Update cooldowns
     if (!this.reverseCursedTechniqueTriggered && (this.rctVisualTimer || 0) <= 0 && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.spiderwebCooldown > 0) this.spiderwebCooldown--;
-    if (!this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0 && this.divineFlameCooldown > 0) this.divineFlameCooldown--;
+    if (!this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0 && this.divineFlameCooldown > 0) {
+      this.divineFlameCooldown -= this.domainActive ? 4 : 1; // 4x faster recharge (25% cooldown duration) inside Malevolent Shrine!
+      if (this.divineFlameCooldown < 0) this.divineFlameCooldown = 0;
+    }
     if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) this.domainCooldown--;
     if ((this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0 && this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
@@ -566,6 +525,20 @@ export class SukunaFighter extends Fighter {
 
     // Skip normal behavior while in Domain Expansion
     if (this.domainActive) {
+      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
+
+      // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine!
+      if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead && (this.flurryHitsLeft || 0) <= 0) {
+        this.isChannelingDivineFlame = true;
+        this.divineFlameChargeTimer = 0;
+        spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA: OPEN)!', '#FF4500');
+
+        const sound = getSkillSound(this._def?.id, 'divineFlame');
+        if (sound) {
+          this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
+          playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
+        }
+      }
       return;
     }
 
@@ -731,9 +704,10 @@ export class SukunaFighter extends Fighter {
 
       // Update visual arrays so slashes still fade during flurry
       if (this.afterImages) {
-        for (let i = this.afterImages.length - 1; i >= 0; i--) {
-          if (--this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
-        }
+        fastCleanArray(this.afterImages, (img) => {
+          img.timer--;
+          return img.timer > 0;
+        });
       }
       return; // Skip normal behavior while in flurry
     }
@@ -854,30 +828,34 @@ export class SukunaFighter extends Fighter {
 
       // Update afterimages
       if (this.afterImages) {
-        for (let i = this.afterImages.length - 1; i >= 0; i--) {
-          if (--this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
-        }
+        fastCleanArray(this.afterImages, (img) => {
+          img.timer--;
+          return img.timer > 0;
+        });
       }
 
       // Update slash hit visuals
       if (this.slashHitVisuals) {
-        for (let i = this.slashHitVisuals.length - 1; i >= 0; i--) {
-          if (--this.slashHitVisuals[i].timer <= 0) this.slashHitVisuals.splice(i, 1);
-        }
+        fastCleanArray(this.slashHitVisuals, (v) => {
+          v.timer--;
+          return v.timer > 0;
+        });
       }
 
       // Update slash visuals
       if (this.flurrySlashVisuals) {
-        for (let i = this.flurrySlashVisuals.length - 1; i >= 0; i--) {
-          if (--this.flurrySlashVisuals[i].timer <= 0) this.flurrySlashVisuals.splice(i, 1);
-        }
+        fastCleanArray(this.flurrySlashVisuals, (v) => {
+          v.timer--;
+          return v.timer > 0;
+        });
       }
 
       return; // Skip normal behavior while rapid slashing
     }
 
     // Check for Phantom Flurry activation (priority over domain when close)
-    if (this.flurryCooldown <= 0 && opponent && !opponent.isDead && !opponent.isStealthed) {
+    const isTojiTarget = opponent && (opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji');
+    if (this.flurryCooldown <= 0 && opponent && !opponent.isDead && (!opponent.isStealthed || isTojiTarget)) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const flurryRange = CONFIG.sukuna.flurryRange || 150;
       if (distSq <= flurryRange ** 2) {
@@ -971,273 +949,27 @@ export class SukunaFighter extends Fighter {
    * Handle melee combat - teleports, then rapid strikes
    */
   _updateMeleeCombat(opponent, arena, ownerIndex) {
-    const punchCooldown = CONFIG.sukuna.meleePunchCooldown || 12;
-
-    // Handle punch cooldown
-    if (this.meleePunchCooldown > 0) {
-      this.meleePunchCooldown--;
-
-      // Slightly pull Sukuna toward opponent to stick during combos
-      if (opponent && !opponent.isDead && this.meleeComboCount > 0) {
-        const dx = opponent.x - this.x;
-        const dy = opponent.y - this.y;
-        const dist = Math.hypot(dx, dy);
-        if (dist > this.r + opponent.r + 5) {
-          this.vx += (dx / dist) * 0.5;
-          this.vy += (dy / dist) * 0.5;
-        }
-      }
-      return;
-    }
-
-    if (!opponent || opponent.isDead || (opponent.isStealthed && !this.domainActive)) return;
-
-    // Initialize combo state
-    if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
-    if (this.meleeComboTarget === undefined) this.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
-
-    // Teleport to a new flank angle around the opponent for EVERY punch (punch-teleport-punch-teleport anime sequence)
-    const oldX = this.x;
-    const oldY = this.y;
-
-    const angleToOpponent = Math.random() * Math.PI * 2;
-    const behindOffset = opponent.r + this.r + 8;
-    let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
-    let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
-
-    // Clamp to arena bounds
-    targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-    targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
-
-    this.x = targetX;
-    this.y = targetY;
-    this.aim(opponent);
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
-
-    // Execute Martial Arts hit at current position
-    this.meleeComboCount++;
-    this.martialArtsComboCount++;
-
-    const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
-    opponent.takeDamage(slashDamage, this, { isMelee: true });
-    opponent.applyHitStun(12);
-    spawnSparks(opponent.x, opponent.y, 15, 'crimsonSniper', '#8B0000');
-    triggerGlobalScreenShake(4, 5);
-
-    const martialArtsAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-
-    // Trigger Sakuga Anime Impact Frame (red/black ink impact)
-    this.sakugaImpactTimer = 6;
-    this.sakugaImpactMaxTimer = 6;
-    this.sakugaImpactX = opponent.x;
-    this.sakugaImpactY = opponent.y;
-    this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-    this.sakugaImpactSeed = Math.random();
-
-    // Punch shockwave effect
-    this.punchAnimTimer = 16;
-    this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
-
-    if (!this.punchEffects) this.punchEffects = [];
-    this.punchEffects.push({
-      x: opponent.x,
-      y: opponent.y,
-      angle: martialArtsAngle,
-      timer: 12,
-      maxTimer: 12
-    });
-
-    // Check for Gojo or Yuta clash shockwave
-    if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter' || opponent._def.id === 'yuta' || opponent._def.name === 'YutaFighter' || opponent.type === 'yuta')) {
-      if (!this.meleeClashCooldown) this.meleeClashCooldown = 0;
-      if (this.meleeClashCooldown <= 0) {
-        const midX = (this.x + opponent.x) / 2;
-        const midY = (this.y + opponent.y) / 2;
-        const isYuta = (opponent._def?.id === 'yuta' || opponent.type === 'yuta' || opponent._def?.name === 'YutaFighter');
-        spawnMeleeClashShockwave(midX, midY, 100, isYuta ? 'yuta' : 'gojo');
-        triggerGlobalScreenShake(8, 10);
-        this.meleeClashCooldown = 30;
-      }
-    }
-
-    // Apply knockback to target
-    opponent.vx += Math.cos(martialArtsAngle) * 2;
-    opponent.vy += Math.sin(martialArtsAngle) * 2;
-
-    // Every hit is pure Cursed Martial Arts (no slashes)
-    spawnFloatingText(this.x, this.y - this.r - 25, 'MARTIAL ARTS', '#8B0000');
-
-    const attackSound = getBasicAttackSound(null, 'sukuna_melee');
-    if (attackSound) playSound(attackSound.src, attackSound.volume * 0.8);
-
-    // Hit pause on the opponent only (prevents the attacker from lagging)
-    if (typeof opponent.applyTimeStop === 'function') opponent.applyTimeStop(5);
-
-    // Set cooldown for next punch
-    this.meleePunchCooldown = punchCooldown;
-
-    // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
-    if (this.meleeComboCount >= this.meleeComboTarget) {
-      this.meleeComboCount = 0;
-      this.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
-
-      if (!this.domainActive && (this.flurryHitsLeft || 0) <= 0) {
-        this.isMeleeMode = false;
-        this.meleeModeCooldown = CONFIG.sukuna.meleeModeSeparationCooldown ?? 240; // 4 seconds of mandatory ranged separation!
-        if (opponent && !opponent.isDead) {
-          this._teleportAwayFrom(opponent, arena);
-        }
-      }
-    }
-
-    this.resolveWallBounce(arena);
+    return modUpdateMeleeCombat(this, opponent, arena, ownerIndex);
   }
 
   _teleportAwayFrom(opponent, arena) {
-    if (!opponent) return;
-    const oldX = this.x;
-    const oldY = this.y;
-
-    const angle = Math.atan2(this.y - opponent.y, this.x - opponent.x) + (Math.random() - 0.5);
-    const dist = CONFIG.sukuna.comboDisengageDistance ?? 300;
-    let targetX = opponent.x + Math.cos(angle) * dist;
-    let targetY = opponent.y + Math.sin(angle) * dist;
-
-    targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
-    targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
-
-    this.x = targetX;
-    this.y = targetY;
-
-    spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-    spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
-    this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
+    return modTeleportAwayFrom(this, opponent, arena);
   }
 
   _checkSpiderwebTrigger(arena) {
-    if (this.spiderwebCooldown > 0) return;
-
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-    const spiderwebRange = CONFIG.sukuna.spiderwebRange || 100;
-    const minEnemiesToTrigger = CONFIG.sukuna.spiderwebMinEnemies || 2;
-
-    let nearbyEnemies = 0;
-    let totalDist = 0;
-
-    state.fighters.forEach((f, idx) => {
-      if (f && f !== this && f.hp > 0) {
-        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (isEnemy) {
-          const dist = Math.hypot(this.x - f.x, this.y - f.y);
-          if (dist <= spiderwebRange) {
-            nearbyEnemies++;
-            totalDist += dist;
-          }
-        }
-      }
-    });
-
-    this.surroundingEnemiesCount = nearbyEnemies;
-
-    // Trigger spiderweb if surrounded by enough enemies
-    if (nearbyEnemies >= minEnemiesToTrigger) {
-      this._activateSpiderweb();
-    }
+    return modCheckSpiderweb(this, arena);
   }
 
   _activateSpiderweb() {
-    this.spiderwebCooldown = CONFIG.sukuna.spiderwebCooldown || 300;
-
-    spawnFloatingText(this.x, this.y - this.r - 20, 'SPIDERWEB', '#8B0000');
-    spawnImpactFlash(this.x, this.y, 50, 'crimsonSniper');
-    triggerGlobalScreenShake(8, 12);
-
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-    const spiderwebRange = CONFIG.sukuna.spiderwebRange || 100;
-    const spiderwebDamage = CONFIG.sukuna.spiderwebDamage || 15;
-    const slowDuration = CONFIG.sukuna.spiderwebSlowDuration || 120;
-    const slowMultiplier = CONFIG.sukuna.spiderwebSlowMultiplier || 0.3;
-
-    state.fighters.forEach((f, idx) => {
-      if (f && f !== this && f.hp > 0) {
-        const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (isEnemy) {
-          const dist = Math.hypot(this.x - f.x, this.y - f.y);
-          if (dist <= spiderwebRange) {
-            // Deal damage
-            f.takeDamage(spiderwebDamage, this, { isSpiderweb: true });
-
-            // Apply slow
-            f.applySlow(slowDuration, slowMultiplier);
-
-            // Visual effects
-            spawnSparks(f.x, f.y, 8, 'crimsonSniper', '#8B0000');
-          }
-        }
-      }
-    });
-
-    const sound = getSkillSound(this._def?.id, 'spiderweb');
-    if (sound) playSound(sound.src, sound.volume);
+    return modActivateSpiderweb(this);
   }
 
   _fireDivineFlame(ownerIndex) {
-    this.isChannelingDivineFlame = false;
-
-    // Stop the Fuga charge audio
-    if (this.fugaSoundKey) {
-      stopLoopingSound(this.fugaSoundKey);
-      this.fugaSoundKey = null;
-    }
-
-    // Play the Fuga travel/unleash audio
-    const sound = getSkillSound(this._def?.id, 'fuga_travel');
-    if (sound) playSound(sound.src, sound.volume);
-
-    this.divineFlameRecoveryTimer = CONFIG.sukuna.divineFlameRecoveryTime || 60;
-    this.divineFlameCooldown = CONFIG.sukuna.divineFlameCooldown || 500;
-
-    triggerGlobalScreenShake(CONFIG.sukuna.divineFlameShakeIntensity || 10, CONFIG.sukuna.divineFlameShakeDuration || 15);
-
-    if (projectileSystem && projectileSystem.fireSukunaDivineFlame) {
-      projectileSystem.fireSukunaDivineFlame(this, ownerIndex, CONFIG.sukuna.divineFlameDamage || 25);
-    }
+    return modFireDivineFlame(this, ownerIndex);
   }
 
   _activateReverseCursedTechnique(attacker) {
-    this.reverseCursedTechniqueCooldown = CONFIG.sukuna.reverseCursedTechniqueCooldown || 1200;
-
-    const healPercent = CONFIG.sukuna.reverseCursedTechniqueHealPercent || 0.40;
-    const healAmount = this.maxHp * healPercent;
-
-    // If this was a fatal hit, revive with heal
-    if (this.hp <= 0) {
-      this.hp = healAmount;
-      this.isDead = false;
-    } else {
-      this.hp = Math.min(this.maxHp, this.hp + healAmount);
-    }
-
-    this.rctVisualMaxTimer = 150;
-    this.rctVisualTimer = 150;
-
-    spawnFloatingText(this.x, this.y - this.r - 40, 'REVERSE', '#00FF66');
-    spawnFloatingText(this.x, this.y - this.r - 20, '+' + Math.round(healAmount), '#00FF00');
-    spawnImpactFlash(this.x, this.y, 60, 'healing');
-    triggerGlobalScreenShake(6, 20);
-
-    // Healing particles
-    for (let i = 0; i < 20; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = this.r + 15;
-      const px = this.x + Math.cos(angle) * dist;
-      const py = this.y + Math.sin(angle) * dist;
-      spawnSparks(px, py, 2, 'healing');
-    }
-
-    const sound = getSkillSound(this._def?.id, 'reverseCursedTechnique');
-    if (sound) playSound(sound.src, sound.volume);
+    return modActivateRCT(this, attacker);
   }
 
   _activateDomain(arena) {
@@ -1270,255 +1002,11 @@ export class SukunaFighter extends Fighter {
   }
 
   _doDomainRapidSlashes(opponent, arena, ownerIndex) {
-    if (!opponent || opponent.isDead) return;
-
-    const isFrozen = (this.timeStopTimer > 0) || (this.electricStunTimer > 0) || (this.crimsonElectrifiedTimer > 0);
-
-    if (this.rapidSlashTimer === undefined || this.rapidSlashTimer <= 0) {
-      const aimAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      if (!isFrozen) {
-        this.gunAngle = aimAngle;
-      }
-
-      const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
-      const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
-
-      if (projectileSystem) {
-        projectileSystem.fireProjectile(
-          this,
-          ownerIndex,
-          slashDamage,
-          false,
-          slashSpeed,
-          false,
-          'ghostBlade',
-          this.x,
-          this.y,
-          aimAngle
-        );
-      }
-
-      spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
-      triggerGlobalScreenShake(6, 8);
-      spawnSparks(opponent.x, opponent.y, 4, 'crimsonSniper', '#8B0000');
-      this.slashGlowTimer = 25;
-      this.slashSwingTimer = 10;
-      this.slashHand = this.slashHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
-
-      const cleaveAngle = aimAngle;
-      opponent.vx += Math.cos(cleaveAngle) * 3;
-      opponent.vy += Math.sin(cleaveAngle) * 3;
-
-      if (!this.slashHitVisuals) this.slashHitVisuals = [];
-      this.slashHitVisuals.push({
-        x: opponent.x,
-        y: opponent.y,
-        angle: aimAngle,
-        timer: 12,
-        maxTimer: 12,
-        scale: 1.0 + Math.random() * 0.3
-      });
-
-      if (this._slashSoundCooldown <= 0) {
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
-        playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
-        this._slashSoundCooldown = 15;
-      }
-
-      spawnImpactFlash(this.x, this.y, 4, 'crimsonSniper');
-
-      if (!isFrozen) {
-        const oldX = this.x;
-        const oldY = this.y;
-
-        const teleportAngle = Math.random() * Math.PI * 2;
-        const teleportDist = 120 + Math.random() * 150; // Increased teleport distance in Domain
-        this.x = this.x + Math.cos(teleportAngle) * teleportDist;
-        this.y = this.y + Math.sin(teleportAngle) * teleportDist;
-
-        // Clamp to arena bounds
-        if (arena) {
-          this.x = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, this.x));
-          this.y = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, this.y));
-        }
-
-        this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
-
-        spawnImpactFlash(oldX, oldY, 5, 'crimsonSniper');
-        spawnImpactFlash(this.x, this.y, 5, 'crimsonSniper');
-      }
-
-      this.rapidSlashTimer = CONFIG.sukuna.domainRapidSlashCooldown || 10;
-    } else {
-      this.rapidSlashTimer--;
-    }
-
-    if (!isFrozen) {
-      this.vx = 0;
-      this.vy = 0;
-      this.applyMovementPhysics(0);
-      this.resolveWallBounce(arena, opponent);
-    }
-
-    // Update visuals without array splices
-    if (this.afterImages) {
-      for (let i = 0; i < this.afterImages.length; i++) {
-        if (this.afterImages[i].timer > 0) this.afterImages[i].timer--;
-      }
-    }
-    if (this.slashHitVisuals) {
-      for (let i = this.slashHitVisuals.length - 1; i >= 0; i--) {
-        if (--this.slashHitVisuals[i].timer <= 0) this.slashHitVisuals.splice(i, 1);
-      }
-    }
+    return modDomainRapidSlashes(this, opponent, arena, ownerIndex);
   }
 
   _applyDomainEffect(arena) {
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-    const domainDamage = CONFIG.sukuna.domainDamage || 4;
-    const domainDamageInterval = CONFIG.sukuna.domainDamageInterval || 8;
-
-    if (!this.domainTimeInsideMap) this.domainTimeInsideMap = new Map();
-    this._domainFrame = (this._domainFrame || 0) + 1;
-
-    // Apply damage every few frames to all enemies in the arena
-    if (this._domainFrame % domainDamageInterval === 0) {
-      let playedSwordSwing = false;
-      if (this._slashSoundCooldown === undefined || this._slashSoundCooldown <= 0) {
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
-        this._slashSoundCooldown = 15;
-        playedSwordSwing = true;
-      }
-
-      // Random aesthetic slashes throughout the arena to visualize the domain's relentless attacks
-      if (!this.slashHitVisuals) this.slashHitVisuals = [];
-
-      // Spawn ambient slash objects throughout the arena (tuned count during domain clashes for performance)
-      const isDomainClash = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-      const slashesToSpawn = isDomainClash ? 1 : (1 + Math.floor(Math.random() * 2));
-      for (let i = 0; i < slashesToSpawn; i++) {
-        let randX = Math.random() * 1200;
-        let randY = Math.random() * 800;
-        if (arena) {
-          randX = arena.x + Math.random() * arena.width;
-          randY = arena.y + Math.random() * arena.height;
-        }
-
-        this.slashHitVisuals.push({
-          x: randX,
-          y: randY,
-          angle: Math.random() * Math.PI * 2,
-          timer: 10 + Math.floor(Math.random() * 6),
-          maxTimer: 15,
-          scale: 0.5 + Math.random() * 1.5
-        });
-      }
-
-      let hitEnemyThisTick = false;
-      const ownerIdx = state.fighters.indexOf(this);
-      const shrineX = this.domainX || this.x;
-      const shrineY = this.domainY || this.y;
-
-      state.fighters.forEach((f, idx) => {
-        if (f && f !== this && f.hp > 0) {
-          // Sukuna's Malevolent Shrine slashes everything in its open domain (Cleave for CE, Dismantle for non-CE like Toji)
-          if (f.domainImmunity && f.characterId !== 'toji' && f.type !== 'toji') return;
-
-          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-          if (isEnemy) {
-            hitEnemyThisTick = true;
-            const timeInside = (this.domainTimeInsideMap.get(f) || 0) + domainDamageInterval;
-            this.domainTimeInsideMap.set(f, timeInside);
-
-            // Damage ramps up by 10% per second (60 frames) targets stay inside the death zone
-            const rampMultiplier = 1 + (timeInside / 60) * 0.10;
-            const finalDamage = domainDamage * rampMultiplier;
-
-            f.takeDamage(finalDamage, this, { isDomain: true, bypassShield: true });
-            if (f.characterId !== 'toji' && f.type !== 'toji' && !f.domainImmunity && !f.immuneToCC) {
-              f.applyHitStun(6);
-            }
-
-            // Fire visible slash projectile from Malevolent Shrine toward enemy
-            if (projectileSystem) {
-              const angle = Math.atan2(f.y - shrineY, f.x - shrineX);
-              const slashSpeed = (CONFIG.sukuna.slashSpeed || 15) * 1.3;
-              const proj = projectileSystem.fireProjectile(
-                this,
-                ownerIdx,
-                0, // Damage is dealt directly above
-                false,
-                slashSpeed,
-                false,
-                'ghostBlade',
-                shrineX,
-                shrineY,
-                angle
-              );
-              const isTargetGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
-              if (proj && isTargetGojo) {
-                proj.targetIsGojoLimitless = (f.infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer !== undefined && f.infinityBlockTimer > 0));
-              }
-
-            }
-
-            if (Math.random() < 0.6) {
-              spawnSparks(f.x, f.y, 4, 'crimsonSniper', '#8B0000');
-              spawnImpactFlash(f.x, f.y, 18, 'crimsonSniper');
-            }
-          }
-        }
-      });
-
-      // Also apply domain slashes to valid enemy illusions (like Rika)
-      if (state.illusions) {
-        state.illusions.forEach((ill) => {
-          if (ill && ill.hp > 0 && typeof ill.takeDamage === 'function') {
-            let isEnemy = true;
-            if (myTeam !== null) {
-              let illOwnerIndex = -1;
-              if (ill.ownerIndex !== undefined) {
-                illOwnerIndex = ill.ownerIndex;
-              } else if (ill.owner && state.fighters.indexOf(ill.owner) !== -1) {
-                illOwnerIndex = state.fighters.indexOf(ill.owner);
-              }
-              if (illOwnerIndex !== -1) {
-                isEnemy = state.getFighterTeam(illOwnerIndex) !== myTeam;
-              }
-            }
-            
-            if (isEnemy) {
-              hitEnemyThisTick = true;
-              const timeInside = (this.domainTimeInsideMap.get(ill) || 0) + domainDamageInterval;
-              this.domainTimeInsideMap.set(ill, timeInside);
-
-              const rampMultiplier = 1 + (timeInside / 60) * 0.10;
-              const finalDamage = domainDamage * rampMultiplier;
-
-              ill.takeDamage(finalDamage, this, { isDomain: true, bypassShield: true });
-              if (typeof ill.applyHitStun === 'function') ill.applyHitStun(6);
-
-              if (projectileSystem) {
-                const angle = Math.atan2(ill.y - shrineY, ill.x - shrineX);
-                const slashSpeed = (CONFIG.sukuna.slashSpeed || 15) * 1.3;
-                projectileSystem.fireProjectile(
-                  this, ownerIdx, 0, false, slashSpeed, false, 'ghostBlade', shrineX, shrineY, angle
-                );
-              }
-
-              if (Math.random() < 0.6) {
-                spawnSparks(ill.x, ill.y, 4, 'crimsonSniper', '#8B0000');
-                spawnImpactFlash(ill.x, ill.y, 18, 'crimsonSniper');
-              }
-            }
-          }
-        });
-      }
-
-      if (hitEnemyThisTick && playedSwordSwing) {
-        playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.4);
-      }
-    }
+    return modApplyDomainEffect(this, arena);
   }
 
   applyBleed(target, stacks) {

@@ -8,8 +8,10 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../g
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { initRika, updateRika } from './yuta/rikaLogic.js';
 import { renderYutaDomainBackground } from './yuta/yutaDomainVisuals.js';
+import { modExecuteKatanaMelee, modGetKatanaTipPositions } from './yuta/yutaKatana.js';
 import { getNextCopiedTechnique, executeCopiedTechnique } from './yuta/yutaCopyLogic.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 export class YutaFighter extends Fighter {
   constructor(def) {
@@ -105,7 +107,7 @@ export class YutaFighter extends Fighter {
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
       const maxTimer = 24 - Math.floor(t * 6);
-      this.afterImages.push({
+      pushTrailCap(this.afterImages, {
         x: oldX + dx * t,
         y: oldY + dy * t,
         angle: facingAngle,
@@ -116,7 +118,7 @@ export class YutaFighter extends Fighter {
         fromY: oldY,
         toX: targetX,
         toY: targetY
-      });
+      }, 30);
     }
   }
 
@@ -125,6 +127,13 @@ export class YutaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena, updateProjectiles = true) {
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return; // Hold Yuta in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
+
     if (this.rctCooldown > 0) this.rctCooldown--;
 
     // If reviving/healing via RCT, handle RCT and skip normal logic
@@ -197,9 +206,10 @@ export class YutaFighter extends Fighter {
 
     // Fade afterimages every frame (when not time-stopped)
     if (this.afterImages && this.afterImages.length > 0) {
-      for (let i = this.afterImages.length - 1; i >= 0; i--) {
-        if (--this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
-      }
+      fastCleanArray(this.afterImages, (img) => {
+        img.timer--;
+        return img.timer > 0;
+      });
     }
 
     // Track position history for delayed auto-aim during flurry
@@ -348,13 +358,11 @@ export class YutaFighter extends Fighter {
     }
 
     // Update Yuta's dynamic sword trail history
-    if (this.swordTrail) {
-      for (let i = this.swordTrail.length - 1; i >= 0; i--) {
-        this.swordTrail[i].life -= 0.09; // Faster decay (fades in ~11 frames) for a tighter, quicker tail
-        if (this.swordTrail[i].life <= 0) {
-          this.swordTrail.splice(i, 1);
-        }
-      }
+    if (this.swordTrail && this.swordTrail.length > 0) {
+      fastCleanArray(this.swordTrail, (t) => {
+        t.life -= 0.09; // Faster decay (fades in ~11 frames) for a tighter, quicker tail
+        return t.life > 0;
+      });
     }
 
     if (this.meleeCooldown > 0) {
@@ -381,11 +389,11 @@ export class YutaFighter extends Fighter {
       }
 
       if (shouldAdd) {
-        this.swordTrail.push({
+        pushTrailCap(this.swordTrail, {
           outer: pos.outer,
           inner: pos.inner,
           life: 1.0
-        });
+        }, 30);
       }
 
       // Keep trail capped for performance and styling
@@ -802,6 +810,9 @@ export class YutaFighter extends Fighter {
         if (f && f !== this && f.hp > 0) {
           const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
           if (isEnemy) {
+            if (f.domainImmunity || f.characterId === 'toji' || f.type === 'toji' || f._def?.id === 'toji') {
+              return; // Toji (Zero Cursed Energy) is immune to Domain Expansions
+            }
             if (typeof f.applyHitStun === 'function') f.applyHitStun(20);
             spawnFloatingText(f.x, f.y - 30, 'TRAPPED IN DOMAIN!', '#FF69B4');
             spawnSparks(f.x, f.y, 6, 'silver', 'rgba(255, 105, 180, 1)');
@@ -867,181 +878,11 @@ export class YutaFighter extends Fighter {
   }
 
   executeKatanaMelee(angle) {
-    this.blockPoseTimer = 0; // Drop guard instantly if he swings
-    this.meleeCooldown = this.meleeCooldownMax;
-    this.targetAngle = angle;
-    this.activeSlashType = (this.activeSlashType === undefined) ? 0 : (this.activeSlashType + 1) % 3;
-    this.trailGenTimer = 40; // Generate trail at tip for 40 frames (~0.66s)
-
-    // Play swing sound (using Fighter's standard delay queue)
-    const swingSnd = getBasicAttackSound(this.id, this._def?.type);
-    if (swingSnd) {
-      this._attackSoundTimer = swingSnd.delay;
-      this._attackSoundConfig = swingSnd;
-    }
-
-    const range = CONFIG.yuta.meleeRange || 75;
-    const damage = CONFIG.yuta.meleeDamage || 15;
-    const arc = CONFIG.yuta.meleeArc || (Math.PI / 2);
-
-    let hitSomeone = false;
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-
-    for (let i = 0; i < state.fighters.length; i++) {
-      const enemy = state.fighters[i];
-      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0) continue;
-
-      const enemyTeam = state.getFighterTeam(i);
-      if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
-
-      const dx = enemy.x - this.x;
-      const dy = enemy.y - this.y;
-      const dist = Math.hypot(dx, dy);
-
-      if (dist <= range + enemy.r) {
-        const enemyAngle = Math.atan2(dy, dx);
-        let angleDiff = Math.abs(enemyAngle - this.targetAngle);
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        angleDiff = Math.abs(angleDiff);
-
-        if (angleDiff <= arc / 2) {
-          const isRikaAlive = this.isRikaAliveInDomain();
-          const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
-          const finalDamage = damage * dmgMult;
-
-          enemy.takeDamage(finalDamage, this, { isPhysical: true });
-          hitSomeone = true;
-          if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(4, 6);
-
-          if (isRikaAlive) {
-            spawnFloatingText(enemy.x, enemy.y - 20, `${Math.round(finalDamage)}!`, '#FF1493');
-          }
-
-          spawnImpactFlash(enemy.x, enemy.y, 25);
-          spawnBloodEffect(enemy, 10, this.targetAngle);
-
-          const pushForce = 5;
-          enemy.vx += Math.cos(this.targetAngle) * pushForce;
-          enemy.vy += Math.sin(this.targetAngle) * pushForce;
-
-          // Check for clash with Gojo or Sukuna
-          if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {
-            const midX = (this.x + enemy.x) / 2;
-            const midY = (this.y + enemy.y) / 2;
-            const isSukuna = (enemy._def?.id === 'sukuna' || enemy.type === 'sukuna' || enemy._def?.name === 'SukunaFighter');
-            spawnMeleeClashShockwave(midX, midY, 100, isSukuna ? 'yuta' : 'gojo');
-            triggerGlobalScreenShake(8, 10);
-          }
-        }
-      }
-    }
-
-    if (hitSomeone) {
-      // playSound(getBasicAttackSound('hit'), 0.5);
-    } else {
-      // playSound(getBasicAttackSound('miss'), 0.3);
-    }
+    modExecuteKatanaMelee(this, angle);
   }
 
   _getKatanaTipPositions() {
-    const maxCd = this.meleeCooldownMax;
-    const isSwinging = (this.meleeCooldown > maxCd - 15);
-
-    let currentAngle = this.gunAngle;
-    const comboIndex = this.activeSlashType || 0;
-
-    if (isSwinging) {
-      const progress = (maxCd - this.meleeCooldown) / 15;
-      if (comboIndex === 0) {
-        currentAngle += (-Math.PI / 4) + (Math.PI / 2) * progress;
-      } else if (comboIndex === 1) {
-        currentAngle += (Math.PI / 4) - (Math.PI / 2) * progress;
-      } else if (comboIndex === 2) {
-        currentAngle += (-Math.PI * 0.6) + (Math.PI * 1.2) * progress;
-      }
-    }
-
-    let tipX, tipY, innerX, innerY;
-
-    if (this.rikaCallTimer > 0) {
-      // Raised summoning pose for Katana when calling Rika
-      const humAngle = Math.sin(Date.now() * 0.08) * 0.08;
-      const humShift = Math.cos(Date.now() * 0.1) * 2;
-      const callAngle = currentAngle - Math.PI * 0.35 + humAngle;
-
-      const L = (this.r - 8 + humShift) + 81 * 1.2;
-      tipX = this.x + Math.cos(callAngle) * L;
-      tipY = this.y + Math.sin(callAngle) * L;
-
-      const innerL = L - 25;
-      innerX = this.x + Math.cos(callAngle) * innerL;
-      innerY = this.y + Math.sin(callAngle) * innerL;
-    } else if (this.blockPoseTimer > 0 && !isSwinging) {
-      const parryType = this.parryType || 'guard';
-      if (parryType === 'deflect') {
-        const totalDur = CONFIG.yuta.parryGuardDuration || 90;
-        const swingDur = 8; // Super fast deflect swing (8 frames)
-
-        let swingProgress = Math.min(1.0, (totalDur - this.blockPoseTimer) / swingDur);
-        let returnProgress = Math.max(0, (12 - this.blockPoseTimer) / 12); // Snappy return (12 frames)
-
-        let deflectAngle = 0;
-        let currentTranslateX = this.r - 10;
-
-        if (swingProgress < 1.0) {
-          deflectAngle = (Math.PI / 3.5) - (Math.PI * 0.6) * swingProgress;
-          currentTranslateX = (this.r - 10) + 15 * swingProgress;
-        } else {
-          deflectAngle = (-Math.PI / 4) * (1 - returnProgress);
-          currentTranslateX = (this.r - 10) + 15 * (1 - returnProgress);
-        }
-
-        const L = currentTranslateX + 81 * 1.2;
-        const finalAngle = currentAngle + deflectAngle;
-
-        tipX = this.x + Math.cos(finalAngle) * L;
-        tipY = this.y + Math.sin(finalAngle) * L;
-
-        const innerL = L - 25;
-        innerX = this.x + Math.cos(finalAngle) * innerL;
-        innerY = this.y + Math.sin(finalAngle) * innerL;
-      } else {
-        // Static Guard Pose: perpendicular guard
-        const bladeAngle = currentAngle + Math.PI / 2;
-        const baseDist = this.r - 18;
-        const hiltX = this.x + Math.cos(currentAngle) * baseDist;
-        const hiltY = this.y + Math.sin(currentAngle) * baseDist;
-
-        const L = 81 * 1.2;
-        tipX = hiltX + Math.cos(bladeAngle) * L;
-        tipY = hiltY + Math.sin(bladeAngle) * L;
-
-        const innerL = L - 25;
-        innerX = hiltX + Math.cos(bladeAngle) * innerL;
-        innerY = hiltY + Math.sin(bladeAngle) * innerL;
-      }
-    } else {
-      // Normal / Swing position
-      const flipY = (Math.abs(currentAngle) > Math.PI / 2) ? -1 : 1;
-
-      // Exact transformed coordinates matching drawGun transforms
-      const px = (this.r - 10) + 81 * 1.2;
-      const py = -8.0 * 1.2 * flipY;
-
-      tipX = this.x + Math.cos(currentAngle) * px - Math.sin(currentAngle) * py;
-      tipY = this.y + Math.sin(currentAngle) * px + Math.cos(currentAngle) * py;
-
-      const innerPx = (this.r - 10) + 52 * 1.2;
-      const innerPy = -2.2 * 1.2 * flipY;
-
-      innerX = this.x + Math.cos(currentAngle) * innerPx - Math.sin(currentAngle) * innerPy;
-      innerY = this.y + Math.sin(currentAngle) * innerPx + Math.cos(currentAngle) * innerPy;
-    }
-
-    return {
-      outer: { x: tipX, y: tipY },
-      inner: { x: innerX, y: innerY }
-    };
+    return modGetKatanaTipPositions(this);
   }
 
 
@@ -1074,7 +915,7 @@ export class YutaFighter extends Fighter {
         const oy = tipPos.outer.y + Math.sin(a) * r + editP.offsetY;
         const ix = tipPos.outer.x + Math.cos(a) * (r - 22 * editP.thickness) + editP.offsetX;
         const iy = tipPos.outer.y + Math.sin(a) * (r - 22 * editP.thickness) + editP.offsetY;
-        this.swordTrail.push({ outer: { x: ox, y: oy }, inner: { x: ix, y: iy }, life: 1.0 });
+        pushTrailCap(this.swordTrail, { outer: { x: ox, y: oy }, inner: { x: ix, y: iy }, life: 1.0 }, 30);
       }
     }
 

@@ -347,6 +347,13 @@ export class DarkSlateGrayFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return; // Hold Assassin in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
+
     this.handlePoison();
     this.handleBurn();
     this._tickCooldowns();

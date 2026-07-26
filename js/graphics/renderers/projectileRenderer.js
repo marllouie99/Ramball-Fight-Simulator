@@ -1,0 +1,1721 @@
+
+import { state, getProjectiles } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
+const getNow = () => Date.now();
+import { drawBomberExplosionGraphic, drawBomberC4, drawBomberGrenade } from '../weapons/bomberWeaponGraphics.js';
+import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from '../weaponVisuals.js';
+import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from '../weapons/dopplegangerWeaponGraphics.js';
+import { drawTricksterBolt } from '../weapons/tricksterWeaponGraphics.js';
+import { drawGojoOrb, drawPurpleOrbTrail } from '../weapons/gojoWeaponGraphics.js';
+
+
+import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash } from '../weapons/gunSlingerWeaponGraphics.js';
+import { drawEngineerBullet, drawTurretBullet } from '../engineerWeaponGraphics.js';
+import { drawRangerBullet } from '../weapons/rangerWeaponGraphics.js';
+import { drawCrimsonSniperBullet } from '../weapons/crimsonsniperWeaponGraphics.js';
+let _fugaLocalTrailPool = [];
+
+export function drawProjectiles() {
+  const ctx = state.ctx;
+  const projectiles = getProjectiles();
+  const now = getNow(); // Cache time once for all projectiles
+
+  // View culling - define arena bounds with padding
+  const arena = CONFIG.arena;
+  const cullPadding = 50;
+  const minX = arena.x - cullPadding;
+  const maxX = arena.x + arena.width + cullPadding;
+  const minY = arena.y - cullPadding;
+  const maxY = arena.y + arena.height + cullPadding;
+
+  projectiles.forEach((p) => {
+    // Skip off-screen projectiles for performance
+    if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY) {
+      return;
+    }
+    // === GOJO LIMITLESS INFINITY: Spatial Distortion Barrier Ring for Frozen Projectiles ===
+    if (p.isFrozenByInfinity) {
+      const fadeAlpha = (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer < 30) ? Math.max(0, p.infinityFreezeTimer / 30) : 1.0;
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1.0) * fadeAlpha;
+      ctx.globalCompositeOperation = 'lighter';
+      const time = Date.now();
+
+      // Concentric Refraction Rings around frozen projectile (No solid filled cyan balls!)
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 12) + 6 + Math.sin(time * 0.01) * 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner White Core Ring
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 12) + 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    if (p.isExplosion) {
+      if (p.isGlassShard) {
+        const lifeRatio = p.life / p.maxLife;
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.rotation || 0);
+        ctx.scale(lifeRatio, lifeRatio);
+
+        ctx.beginPath();
+        ctx.moveTo(0, -p.r);
+        ctx.lineTo(p.r * 0.8, p.r * 0.8);
+        ctx.lineTo(-p.r * 0.8, p.r * 0.3);
+        ctx.closePath();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${lifeRatio * 0.8})`;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(180, 255, 180, ${lifeRatio})`;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.restore();
+        return;
+      }
+
+      // Save/restore to ensure no clip regions from previous drawings (like Cronos sphere) affect explosion rendering
+      ctx.save();
+      drawBomberExplosionGraphic(p);
+      ctx.restore();
+      return;
+    }
+
+    // â”€â”€ POISON SPILL: boiling liquid pool with foam, bubbles, and surface texture â”€â”€
+    if (p.isPoisonSpill) {
+      const lifeRatio = Math.max(0, Math.min(1, p.life / (p.maxLife || 1)));
+      const fadeAlpha = lifeRatio;
+      const baseRadius = p.r;
+      const now = Date.now();
+
+      ctx.save();
+
+      // â”€â”€ Layer 1: Dark base shadow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      ctx.globalAlpha = fadeAlpha * 0.4;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, baseRadius * 1.1, 0, Math.PI * 2);
+      ctx.fillStyle = '#0d2b0d';
+      ctx.fill();
+
+      // â”€â”€ Layer 2: Main liquid pool with irregular boiling edge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      ctx.globalAlpha = fadeAlpha * 0.65;
+      ctx.beginPath();
+      // Draw irregular boiling edge using multiple arc segments
+      const segments = 12;
+      for (let i = 0; i <= segments; i++) {
+        const angle = (i / segments) * Math.PI * 2;
+        const wobble = Math.sin(now / 200 + i * 1.3) * 0.08 +
+          Math.cos(now / 350 + i * 0.9) * 0.06 +
+          Math.sin(now / 120 + i * 2.1) * 0.04;
+        const r = baseRadius * (0.85 + wobble);
+        const px = p.x + Math.cos(angle) * r;
+        const py = p.y + Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      const liquidGrad = ctx.createRadialGradient(
+        p.x - baseRadius * 0.15, p.y - baseRadius * 0.15, 0,
+        p.x, p.y, baseRadius
+      );
+      liquidGrad.addColorStop(0, '#7dff7d');
+      liquidGrad.addColorStop(0.3, '#4dff4d');
+      liquidGrad.addColorStop(0.6, '#2eb82e');
+      liquidGrad.addColorStop(1, '#1a5c1a');
+      ctx.fillStyle = liquidGrad;
+      ctx.fill();
+
+      // â”€â”€ Layer 4: Boiling surface bubbles (popping and rising) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const bubbleCount = 10;
+      for (let i = 0; i < bubbleCount; i++) {
+        const seed = i * 137.5; // Golden angle for even distribution
+        const bPhase = (now / 600 + seed) % 1;
+        const bAngle = seed * 0.1;
+        const bDist = (0.15 + (bPhase * 0.7)) * baseRadius;
+        const bx = p.x + Math.cos(bAngle) * bDist;
+        const by = p.y + Math.sin(bAngle) * bDist;
+        // Bubbles grow then pop
+        const bScale = bPhase < 0.7 ? bPhase / 0.7 : (1 - bPhase) / 0.3;
+        const br = (2 + i % 3) * bScale;
+        const bAlpha = Math.max(0, fadeAlpha * (bPhase < 0.7 ? 0.8 : bScale * 0.8));
+
+        if (br > 0.5) {
+          ctx.globalAlpha = bAlpha;
+          ctx.fillStyle = '#b8ffb8';
+          ctx.beginPath();
+          ctx.arc(bx, by, br, 0, Math.PI * 2);
+          ctx.fill();
+          // Bubble highlight
+          if (br > 1.5) {
+            ctx.globalAlpha = bAlpha * 0.6;
+            ctx.fillStyle = '#e0ffe0';
+            ctx.beginPath();
+            ctx.arc(bx - br * 0.3, by - br * 0.3, br * 0.35, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+      }
+
+      // â”€â”€ Layer 5: Surface ripples (expanding circles from random points) â”€â”€â”€â”€â”€â”€â”€â”€
+      const rippleCount = 3;
+      for (let r = 0; r < rippleCount; r++) {
+        const rPhase = ((now / 900 + r * 0.33) % 1);
+        const rAngle = r * 2.1 + now / 2000;
+        const rDist = rPhase * baseRadius * 0.7;
+        const rx = p.x + Math.cos(rAngle) * rDist;
+        const ry = p.y + Math.sin(rAngle) * rDist;
+        const rAlpha = (1 - rPhase) * fadeAlpha * 0.3;
+        const rRadius = 3 + rPhase * 15;
+
+        ctx.globalAlpha = rAlpha;
+        ctx.strokeStyle = '#90ee90';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(rx, ry, rRadius, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+
+      // â”€â”€ Layer 6: Foam patches on surface â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      const foamCount = 5;
+      for (let f = 0; f < foamCount; f++) {
+        const fSeed = f * 97.3;
+        const fX = p.x + Math.cos(fSeed * 0.1 + now / 3000) * baseRadius * 0.5;
+        const fY = p.y + Math.sin(fSeed * 0.15 + now / 2500) * baseRadius * 0.5;
+        const fSize = 4 + (f % 3) * 2;
+        const fAlpha = (0.3 + Math.sin(now / 400 + fSeed) * 0.2) * fadeAlpha;
+
+        ctx.globalAlpha = fAlpha;
+        ctx.fillStyle = '#c8ffc8';
+        ctx.beginPath();
+        ctx.arc(fX, fY, fSize, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // â”€â”€ Layer 7: Inner glow core â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      ctx.globalAlpha = fadeAlpha * 0.4;
+      const coreGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, baseRadius * 0.4);
+      coreGrad.addColorStop(0, 'rgba(200,255,200,0.6)');
+      coreGrad.addColorStop(1, 'rgba(77,255,77,0)');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, baseRadius * 0.4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+      return;
+    }
+
+    if (p.isGrenade) {
+      // Draw tail trail
+      if (p.history && p.history.length > 0) {
+        ctx.beginPath();
+        ctx.moveTo(p.history[0].x, p.history[0].y - p.history[0].z);
+        for (let i = 1; i < p.history.length; i++) {
+          ctx.lineTo(p.history[i].x, p.history[i].y - p.history[i].z);
+        }
+        ctx.lineTo(p.x, p.y - p.z);
+        ctx.strokeStyle = 'rgba(77, 255, 77, 0.4)';
+        ctx.lineWidth = p.r * 1.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+      }
+
+      // Draw shadow
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,0,0,0.2)';
+      ctx.fill();
+
+      // Draw grenade as a tumbling poison bottle
+      ctx.save();
+      ctx.translate(p.x, p.y - p.z);
+
+      // Make the bottle tumble through the air
+      // Base rotation direction on velocity
+      const spinDirection = p.vx >= 0 ? 1 : -1;
+      ctx.rotate((p.maxLife - p.life) * 0.25 * spinDirection);
+
+      // Draw the bottle
+      drawPoisonBottleCore(ctx, 0.9);
+      ctx.restore();
+      return;
+    }
+
+    // â”€â”€ C4 EXPLOSIVE: high-quality military C4 charge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+    if (p.isC4) {
+      const sparkPhase = (now / 200) % (Math.PI * 2);
+      const rotation = p.rotation || 0;
+      const zHeight = p.z || 0;
+
+      // Get trail points if available
+      const trailPoints = p.history || [];
+
+      // Draw the high-quality C4
+      drawBomberC4(ctx, p.x, p.y, p.r, {
+        rotation: rotation,
+        sparkPhase: sparkPhase,
+        trailPoints: trailPoints,
+        shadowAlpha: 0.25,
+        zHeight: zHeight,
+        isDeathC4: p.isDeathC4 || false,
+        pulseIntensity: 1,
+      });
+      return;
+    }
+
+    if (p.isFlame) {
+      // Skip individual flame drawing - flames are batched in drawFlames()
+      // This improves performance by reducing draw calls
+      return;
+    }
+
+    if (p.isBomberGrenade) {
+      // â”€â”€ HIGH-QUALITY GRENADE DRAWING â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+      // Use the detailed grenade renderer from bomberWeaponGraphics.js
+      const zOffset = p.z || 0;
+      const sparkPhase = Date.now() / 100;
+
+      // Get trail points for arc visualization
+      const trailPoints = p.history ? p.history.slice(-6) : [];
+
+      // Calculate rotation based on velocity for tumbling effect
+      const rotation = Math.atan2(p.vy || 0, p.vx || 0) + Math.PI / 4;
+
+      // Shadow alpha based on height
+      const shadowAlpha = Math.max(0.1, 0.3 - zOffset * 0.01);
+
+      // Draw the high-quality grenade
+      drawBomberGrenade(ctx, p.x, p.y, p.r, {
+        rotation: rotation,
+        isSticky: p.isSticky || false,
+        sparkPhase: sparkPhase,
+        trailPoints: trailPoints,
+        shadowAlpha: shadowAlpha,
+        zHeight: zOffset,
+      });
+
+      return;
+    }
+
+    if (p.isC4) {
+      const now = Date.now();
+      const pulse = Math.sin(now / 150 + p.pulsePhase) * 0.15 + 1;
+      const lifeRatio = p.life / p.maxLife;
+      const urgency = 1 - lifeRatio;
+
+      // Draw pulsing glow
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 1.5 * pulse, 0, Math.PI * 2);
+      const glowColor = p.isDeathC4 ? `rgba(255, 0, 0, ${0.3 + urgency * 0.4})` : `rgba(255, 68, 68, ${0.3 + urgency * 0.4})`;
+      ctx.fillStyle = glowColor;
+      ctx.fill();
+
+      // Draw C4 body
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.5)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Draw blinking light
+      const blinkPhase = Math.sin(now / 100) > 0;
+      ctx.beginPath();
+      ctx.arc(p.x + p.r * 0.4, p.y - p.r * 0.3, 3, 0, Math.PI * 2);
+      ctx.fillStyle = blinkPhase ? '#FF0000' : '#660000';
+      ctx.fill();
+
+      // Draw "C4" text
+      ctx.fillStyle = '#FFFFFF';
+      ctx.font = 'bold 8px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('C4', p.x, p.y);
+
+      // Draw countdown ring for death C4
+      if (p.isDeathC4) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r + 5, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * lifeRatio));
+        ctx.strokeStyle = `rgba(255, 0, 0, ${0.5 + urgency * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      return;
+    }
+
+    // Black hole visuals are now drawn in drawBlackHoleEffects() which is called BEFORE fighters
+    // This ensures blackholes appear behind fighters instead of overlaying them
+    if (p.isBlackHole) {
+      return;
+    }
+
+    // Sword projectile visual
+    if (p.visual === 'sword') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      // scale down a bit relative to typical fighter radius
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.5, owner.r / 24) : 0.9;
+      drawGraySwordProjectile(ctx, p.x, p.y, angle, scale);
+      
+      if (p.stoppedByCronosSphere || p.frozenByCronosSphere) {
+         ctx.save();
+         ctx.translate(p.x, p.y);
+         ctx.rotate(angle);
+         // Cyan time-stasis crystal casing around the sword
+         ctx.fillStyle = 'rgba(0, 243, 255, 0.25)';
+         ctx.strokeStyle = 'rgba(0, 243, 255, 0.7)';
+         ctx.lineWidth = 2;
+         ctx.beginPath();
+         // Elongated ellipse matching the sword's profile
+         ctx.ellipse(20 * scale, 0, 32 * scale, 10 * scale, 0, 0, Math.PI * 2);
+         ctx.fill();
+         ctx.stroke();
+         // Inner bright core
+         ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+         ctx.beginPath();
+         ctx.ellipse(20 * scale, 0, 18 * scale, 4 * scale, 0, 0, Math.PI * 2);
+         ctx.fill();
+         ctx.restore();
+      }
+      return;
+    }
+
+    // Shuriken projectile visual
+    if (p.visual === 'shuriken') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      // Add rotation for spinning effect
+      const spinAngle = angle + (Date.now() / 100) % (Math.PI * 2);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.6, owner.r / 25) : 0.8;
+      drawShurikenProjectile(ctx, p.x, p.y, spinAngle, scale);
+      return;
+    }
+
+    // Sukuna slash visual - Crimson Black Crescent Blade Arc (Basic Attack)
+    if (p.visual === 'sukunaSlash') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      const r = 24;
+      // Outer crescent arc & inner returning arc
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+      ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+      ctx.closePath();
+
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.92 * lifeRatio})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * lifeRatio})`;
+      ctx.lineWidth = 3;
+      ctx.stroke();
+
+      // Vivid inner crescent fill (Electric Cyan if frozen by Limitless, Crimson if normal)
+      ctx.save();
+      ctx.scale(0.85, 0.85);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.52, Math.PI * 0.52, false);
+      ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.48, -Math.PI * 0.48, true);
+      ctx.closePath();
+      ctx.fillStyle = p.isFrozenByInfinity ? `rgba(0, 229, 255, ${0.95 * lifeRatio})` : `rgba(220, 10, 10, ${0.95 * lifeRatio})`;
+      ctx.fill();
+      ctx.restore();
+
+      // Razor-sharp white/cyan crescent core line
+      ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 255, 255, ${0.98 * lifeRatio})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // ─── MAHORAGA SHIBUYA ANIME RUIN THROWS: Pale Basalt Monoliths, Pale Concrete Slabs, and Pale Chalk Rubble ───
+    if (p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vy === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const moveAngle = Math.atan2(vy, vx);
+      const now = Date.now();
+      const spinAngle = moveAngle + (p.spinOffset || 0) + (now * 0.009);
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+
+      // Soft Ground Drop Shadow
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(0, 18, 28, 11, 0, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.fill();
+      ctx.restore();
+
+      ctx.rotate(spinAngle);
+
+      if (p.visual === 'mahoragaBasaltMonolith') {
+        // 1. PALE BONE & SLATE MONOLITH (With Radiant Pale Gold Fissure Cracks!)
+        ctx.beginPath();
+        ctx.moveTo(25, -4);
+        ctx.lineTo(16, 20);
+        ctx.lineTo(-8, 24);
+        ctx.lineTo(-24, 14);
+        ctx.lineTo(-26, -10);
+        ctx.lineTo(-10, -26);
+        ctx.lineTo(14, -20);
+        ctx.closePath();
+
+        const basaltGrad = ctx.createLinearGradient(-25, -25, 25, 25);
+        basaltGrad.addColorStop(0, '#F1F5F9');   // Pale bone highlight
+        basaltGrad.addColorStop(0.5, '#CBD5E1'); // Pale slate gray
+        basaltGrad.addColorStop(1, '#64748B');   // Muted stone shadow
+        ctx.fillStyle = basaltGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+
+        // Pale Gold-White Cursed Energy Fissure Veins
+        ctx.beginPath();
+        ctx.moveTo(14, -20); ctx.lineTo(3, -2); ctx.lineTo(-14, 12);
+        ctx.moveTo(-8, 24);  ctx.lineTo(1, 4);  ctx.lineTo(16, -8);
+        ctx.strokeStyle = '#FEF08A'; // Pale yellow gold fissure lines
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(3, -2); ctx.lineTo(16, -8);
+        ctx.strokeStyle = '#FFFFFF'; // Pure white-hot core
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+
+      } else if (p.visual === 'mahoragaRuinConcrete') {
+        // 2. PALE ASH CONCRETE SLAB (Pale Ash Gray with Muted Steel Spikes)
+        ctx.beginPath();
+        ctx.moveTo(26, -12);
+        ctx.lineTo(24, 14);
+        ctx.lineTo(-22, 16);
+        ctx.lineTo(-26, -14);
+        ctx.closePath();
+
+        const concGrad = ctx.createLinearGradient(-26, -14, 26, 16);
+        concGrad.addColorStop(0, '#E2E8F0');   // Pale ash white
+        concGrad.addColorStop(0.6, '#94A3B8'); // Soft cement gray
+        concGrad.addColorStop(1, '#475569');   // Muted slate edge
+        ctx.fillStyle = concGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#1E293B';
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+
+        // Muted Steel Rebar Spikes
+        ctx.strokeStyle = '#94A3B8'; // Pale steel gray
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(26, -6); ctx.lineTo(36, -8);
+        ctx.moveTo(24, 8);  ctx.lineTo(33, 12);
+        ctx.moveTo(-26, -4); ctx.lineTo(-35, -2);
+        ctx.stroke();
+
+        // Subtle Fracture Fissures
+        ctx.beginPath();
+        ctx.moveTo(-18, -14); ctx.lineTo(-4, 0); ctx.lineTo(20, 14);
+        ctx.strokeStyle = '#0F172A';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+      } else {
+        // 3. PALE CHALK LIMESTONE RUBBLE (Pale White Ash Stone + Glowing Pale Core)
+        ctx.beginPath();
+        ctx.moveTo(22, -8);
+        ctx.lineTo(18, 16);
+        ctx.lineTo(-12, 20);
+        ctx.lineTo(-24, 4);
+        ctx.lineTo(-18, -20);
+        ctx.lineTo(6, -22);
+        ctx.closePath();
+
+        const chalkGrad = ctx.createLinearGradient(-24, -22, 22, 20);
+        chalkGrad.addColorStop(0, '#F8FAFC');   // Pale chalk white
+        chalkGrad.addColorStop(0.5, '#E2E8F0'); // Soft ash gray
+        chalkGrad.addColorStop(1, '#94A3B8');   // Pale stone base
+        ctx.fillStyle = chalkGrad;
+        ctx.fill();
+        ctx.strokeStyle = '#334155';
+        ctx.lineWidth = 2.4;
+        ctx.stroke();
+
+        // Soft Glowing White-Gold Core
+        ctx.beginPath();
+        ctx.arc(0, 0, 9, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(254, 240, 138, 0.75)'; // Pale yellow aura
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.arc(0, 0, 5, 0, Math.PI * 2);
+        ctx.fillStyle = '#FFFFFF'; // Pure white core
+        ctx.fill();
+      }
+
+      ctx.restore();
+      return;
+    }
+
+    // Ghost Blade visual - Ethereal translucent blade with trailing effect
+    if (p.visual === 'ghostBlade') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.85, owner.r / 20) : 1.0;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      const r = 24;
+      
+      // OPTIMIZED: Removed shadowBlur. Used a dark underlay path for drop shadow instead
+      ctx.beginPath();
+      ctx.arc(3, 3, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+      ctx.arc(r * 0.5 + 3, 3, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+      ctx.fill();
+      
+      // Ghost trail - fading afterimages behind the blade
+      for (let i = 3; i >= 1; i--) {
+        const trailAlpha = 0.15 * lifeRatio * (4 - i) / 3;
+        const trailOffset = i * 8;
+        ctx.save();
+        ctx.translate(-trailOffset, 0);
+        ctx.globalAlpha = trailAlpha;
+        ctx.beginPath();
+        // Crescent moon shape
+        ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+        ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+        ctx.closePath();
+        ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.8)' : 'rgba(255, 100, 100, 1)';
+        ctx.fill();
+        ctx.restore();
+      }
+      
+      // Main ghost blade - crescent moon shape (Electric Cyan if frozen by Limitless)
+      ctx.globalAlpha = Math.max(0.70, 0.95 * lifeRatio);
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
+      ctx.arc(r * 0.5, 0, r * 0.8, Math.PI * 0.55, -Math.PI * 0.55, true);
+      ctx.closePath();
+      ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 229, 255, 0.95)' : 'rgba(255, 180, 180, 1)';
+      ctx.fill();
+      
+      // Sharp outer crescent edge
+      ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(224, 255, 255, ${0.95 * lifeRatio})` : `rgba(255, 200, 200, ${0.95 * lifeRatio})`;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.98, -Math.PI * 0.58, Math.PI * 0.58, false);
+      ctx.stroke();
+      
+      // Sharp inner crescent edge
+      ctx.beginPath();
+      ctx.arc(r * 0.5, 0, r * 0.78, Math.PI * 0.53, -Math.PI * 0.53, true);
+      ctx.stroke();
+      
+      // Thin bright center line
+      ctx.strokeStyle = p.isFrozenByInfinity ? `rgba(255, 255, 255, ${0.98 * lifeRatio})` : `rgba(255, 220, 220, ${0.98 * lifeRatio})`;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.6, -Math.PI * 0.5, Math.PI * 0.5, false);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Sukuna Cleave visual - Pure White Slash with Dark Drop Shadow
+    if (p.visual === 'sukunaCleave') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(1.2, owner.r / 15) : 1.4;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+      ctx.scale(scale, scale);
+
+      const r = 24;
+
+      // OPTIMIZED: Removed shadowBlur. Used a dark underlay path for drop shadow instead
+      ctx.beginPath();
+      ctx.arc(2, 2, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+      ctx.arc(r * 0.45 + 2, 2, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+      ctx.closePath();
+      ctx.fillStyle = `rgba(0, 0, 0, ${0.4 * lifeRatio})`;
+      ctx.fill();
+      
+      // Draw the pure white crescent blade
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
+      ctx.arc(r * 0.45, 0, r * 0.85, Math.PI * 0.50, -Math.PI * 0.50, true);
+      ctx.closePath();
+      
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.95 * lifeRatio})`;
+      ctx.fill();
+
+      // Sharp core line for extra detail
+      ctx.shadowColor = 'transparent'; // turn off shadow for the inner details
+      ctx.strokeStyle = `rgba(230, 240, 255, ${1.0 * lifeRatio})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
+      ctx.stroke();
+
+      ctx.restore();
+      return;
+    }
+
+    // Sukuna Furnace (Fuga) Arrow visual - supernatural velocity flame arrow with long turbulent roaring fire trail
+    if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const time = Date.now() * 0.012;
+      const speed = Math.hypot(vx, vy);
+
+      // Initialize trail history and particle systems
+      if (!p._fugaFlameTimer) p._fugaFlameTimer = 0;
+      p._fugaFlameTimer++;
+
+      if (!p._trailHistory) p._trailHistory = [];
+      if (!p.flameParticles) p.flameParticles = [];
+      if (!p.emberParticles) p.emberParticles = [];
+
+      // Record position trail for the long streaming fire wake
+      p._trailHistory.push({ x: p.x, y: p.y, time: time });
+      const maxTrailLen = 48;
+      while (p._trailHistory.length > maxTrailLen) p._trailHistory.shift();
+
+      // ─── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched ───
+      for (let i = 0; i < 3; i++) {
+        const spawnOffset = -Math.random() * 20;
+        p.flameParticles.push({
+          x: spawnOffset,
+          y: (Math.random() - 0.5) * 14,
+          vx: -(3.0 + Math.random() * 5.0 + speed * 0.12),
+          vy: (Math.random() - 0.5) * 2.5,
+          size: 6 + Math.random() * 10,
+          maxSize: 22 + Math.random() * 18,
+          life: 1.0,
+          maxLife: 1.0,
+          decay: 0.018 + Math.random() * 0.014,
+          wobblePhase: Math.random() * Math.PI * 2,
+          wobbleSpeed: 0.12 + Math.random() * 0.2,
+          turbSeed: Math.random() * 100,
+          layer: i % 3 // 0=white-core, 1=golden, 2=crimson-outer
+        });
+      }
+
+      // ─── SPAWN EMBERS: Glowing sparks that dissolve at trail end ───
+      if (Math.random() < 0.85) {
+        p.emberParticles.push({
+          x: 5 - Math.random() * 25,
+          y: (Math.random() - 0.5) * 20,
+          vx: -(4 + Math.random() * 8 + speed * 0.18),
+          vy: (Math.random() - 0.5) * 5.0,
+          size: 1.0 + Math.random() * 2.0,
+          life: 1.0,
+          maxLife: 1.0,
+          decay: 0.012 + Math.random() * 0.012,
+          trail: []
+        });
+      }
+
+      // Cap particles for 60 FPS performance
+      while (p.flameParticles.length > 25) p.flameParticles.shift();
+      while (p.emberParticles.length > 15) p.emberParticles.shift();
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(angle);
+
+      // ─────────────────────────────────────────────────────────
+      // LAYER 0: LONG TURBULENT FIRE WAKE (drawn from trail history)
+      // A massive streaking energy wake that makes the arrow look
+      // like it's ripping through the air and igniting everything
+      // ─────────────────────────────────────────────────────────
+      if (p._trailHistory.length > 3) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // Convert trail history to local coordinates
+        const cosA = Math.cos(-angle);
+        const sinA = Math.sin(-angle);
+        if (!_fugaLocalTrailPool || _fugaLocalTrailPool.length < p._trailHistory.length) {
+          _fugaLocalTrailPool = [];
+          for (let k = 0; k < 60; k++) _fugaLocalTrailPool.push({ x: 0, y: 0 });
+        }
+        const localTrail = _fugaLocalTrailPool;
+        for (let k = 0; k < p._trailHistory.length; k++) {
+          const pt = p._trailHistory[k];
+          const dx = pt.x - p.x;
+          const dy = pt.y - p.y;
+          localTrail[k].x = dx * cosA - dy * sinA;
+          localTrail[k].y = dx * sinA + dy * cosA;
+        }
+
+        // Draw multiple layered turbulent fire tongues along the trail
+        for (let layer = 0; layer < 3; layer++) {
+          const widthMul = layer === 0 ? 1.0 : layer === 1 ? 0.6 : 0.3;
+          const baseWidth = (18 + speed * 0.5) * widthMul;
+
+          ctx.beginPath();
+          const len = localTrail.length;
+
+          // Top edge with turbulence
+          for (let j = len - 1; j >= 0; j--) {
+            const t = j / (len - 1); // 0=oldest, 1=newest
+            const fadeWidth = baseWidth * (0.15 + t * 0.85);
+            const turb = Math.sin(time * 7.0 - j * 0.6 + layer * 2.1) * fadeWidth * 0.4;
+            const turb2 = Math.cos(time * 5.3 + j * 0.9 + layer * 1.3) * fadeWidth * 0.25;
+            const yOff = fadeWidth + turb + turb2;
+            if (j === len - 1) ctx.moveTo(localTrail[j].x, localTrail[j].y - yOff);
+            else ctx.lineTo(localTrail[j].x, localTrail[j].y - yOff);
+          }
+
+          // Bottom edge with turbulence (reversed)
+          for (let j = 0; j < len; j++) {
+            const t = j / (len - 1);
+            const fadeWidth = baseWidth * (0.15 + t * 0.85);
+            const turb = Math.sin(time * 7.0 - j * 0.6 + layer * 2.1 + 3.14) * fadeWidth * 0.4;
+            const turb2 = Math.cos(time * 5.3 + j * 0.9 + layer * 1.3 + 1.57) * fadeWidth * 0.25;
+            const yOff = fadeWidth + turb + turb2;
+            ctx.lineTo(localTrail[j].x, localTrail[j].y + yOff);
+          }
+
+          ctx.closePath();
+
+          // Color cascade: white â†’ yellow â†’ golden orange â†’ deep orange â†’ crimson
+          const trailStartX = localTrail[len - 1].x;
+          const trailEndX = localTrail[0].x;
+          const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
+
+          if (p.isFrozenByInfinity) {
+            if (layer === 0) {
+              wakeGrad.addColorStop(0, `rgba(0, 120, 255, ${0.40})`);
+              wakeGrad.addColorStop(0.3, `rgba(0, 80, 220, ${0.30})`);
+              wakeGrad.addColorStop(0.7, `rgba(0, 40, 180, ${0.15})`);
+              wakeGrad.addColorStop(1, 'rgba(0, 10, 80, 0)');
+            } else if (layer === 1) {
+              wakeGrad.addColorStop(0, `rgba(0, 229, 255, ${0.60})`);
+              wakeGrad.addColorStop(0.25, `rgba(0, 160, 255, ${0.45})`);
+              wakeGrad.addColorStop(0.6, `rgba(0, 90, 220, ${0.25})`);
+              wakeGrad.addColorStop(1, 'rgba(0, 20, 100, 0)');
+            } else {
+              wakeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85})`);
+              wakeGrad.addColorStop(0.15, `rgba(224, 255, 255, ${0.70})`);
+              wakeGrad.addColorStop(0.4, `rgba(0, 229, 255, ${0.50})`);
+              wakeGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+            }
+          } else {
+            if (layer === 0) {
+              wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
+              wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
+              wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
+              wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
+            } else if (layer === 1) {
+              wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
+              wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
+              wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
+              wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
+            } else {
+              wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
+              wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
+              wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
+              wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
+            }
+          }
+
+          ctx.fillStyle = wakeGrad;
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // LAYER 1: FLUID FLAME BLOBS â€” curling, twisting smoke-fire
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      for (let i = p.flameParticles.length - 1; i >= 0; i--) {
+        const fp = p.flameParticles[i];
+        fp.life -= fp.decay;
+        if (fp.life <= 0) { p.flameParticles.splice(i, 1); continue; }
+
+        // Fluid curl motion: sine wobble + turbulence offset
+        fp.wobblePhase += fp.wobbleSpeed;
+        const turbX = Math.sin(fp.turbSeed + time * 3.5) * 2.0;
+        const turbY = Math.cos(fp.turbSeed * 1.7 + time * 2.8) * 3.0;
+        fp.x += fp.vx + turbX * 0.3;
+        fp.y += fp.vy + turbY * 0.3;
+        fp.vy += Math.sin(fp.wobblePhase) * 0.15; // gentle curling drift
+
+        const prog = fp.life / fp.maxLife;
+        const ageRatio = 1 - prog; // 0=new, 1=dying
+        const curSize = fp.size + (fp.maxSize - fp.size) * ageRatio;
+        const alpha = prog * prog; // quadratic falloff for smoother fade
+        const wobY = Math.sin(fp.wobblePhase) * 3.0;
+
+        // Velocity-stretched ellipses (more elongated = more speed feel)
+        const stretchX = curSize * (1.6 + speed * 0.03);
+        const stretchY = curSize * (0.7 + ageRatio * 0.3);
+
+        if (p.isFrozenByInfinity) {
+          ctx.fillStyle = fp.layer === 0
+            ? `rgba(255, 255, 255, ${alpha * 0.85})`
+            : fp.layer === 1
+            ? `rgba(0, 229, 255, ${alpha * 0.65})`
+            : `rgba(0, 120, 255, ${alpha * 0.45})`;
+        } else {
+          ctx.fillStyle = fp.layer === 0
+            ? `rgba(255, 245, 180, ${alpha * 0.75})`
+            : fp.layer === 1
+            ? `rgba(255, 140, 20, ${alpha * 0.55})`
+            : `rgba(220, 40, 0, ${alpha * 0.35})`;
+        }
+        ctx.beginPath();
+        ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // LAYER 2: GLOWING EMBER SPARKS â€” dissolving at trail end
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      for (let i = p.emberParticles.length - 1; i >= 0; i--) {
+        const ep = p.emberParticles[i];
+        ep.life -= ep.decay;
+        if (ep.life <= 0) { p.emberParticles.splice(i, 1); continue; }
+        ep.trail.push({ x: ep.x, y: ep.y });
+        if (ep.trail.length > 8) ep.trail.shift();
+        ep.x += ep.vx;
+        ep.y += ep.vy;
+        ep.vy += (Math.random() - 0.5) * 0.4; // random drift
+        const prog = ep.life / ep.maxLife;
+
+        // Ember streak trail
+        if (ep.trail.length > 1) {
+          ctx.beginPath();
+          ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
+          for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
+          ctx.lineTo(ep.x, ep.y);
+          ctx.strokeStyle = p.isFrozenByInfinity
+            ? `rgba(0, 229, 255, ${prog * 0.7})`
+            : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
+          ctx.lineWidth = ep.size * 0.7;
+          ctx.lineCap = 'round';
+          ctx.stroke();
+        }
+
+        // Bright ember head
+        ctx.beginPath();
+        ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
+        ctx.fillStyle = p.isFrozenByInfinity
+          ? `rgba(224, 255, 255, ${prog})`
+          : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
+        ctx.fill();
+      }
+
+      ctx.restore(); // lighter
+
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES
+      // Thin velocity lines showing air being torn apart
+      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
+      ctx.save();
+      ctx.globalAlpha = 0.35;
+      ctx.strokeStyle = p.isFrozenByInfinity ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 200, 100, 0.4)';
+      ctx.lineWidth = 1.0;
+      ctx.lineCap = 'round';
+      for (let i = 0; i < 5; i++) {
+        const yOff = (i - 2) * 6 + Math.sin(time * 8 + i * 1.7) * 4;
+        const startX = -10 - Math.random() * 10;
+        const endX = startX - 25 - Math.random() * 35;
+        ctx.beginPath();
+        ctx.moveTo(startX, yOff);
+        ctx.lineTo(endX, yOff + Math.sin(time * 6 + i) * 3);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      ctx.restore(); // restore translate/rotate
+
+      // Draw main Volcanic Magma / Electric Cyan Flame Arrow construct on top
+      drawDivineFlameArrowConstruct(ctx, {
+        x: p.x,
+        y: p.y,
+        angle,
+        scale: 1.0,
+        progress: 1.0,
+        isFlying: true,
+        time,
+        isFrozenByInfinity: p.isFrozenByInfinity
+      });
+
+      return;
+    }
+
+    // Gun Slinger bullet visual - detailed brass/copper revolver bullets
+    if (p.visual === 'gunslingerBullet') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.7, owner.r / 22) : 1.0;
+      const lifeRatio = Math.max(0.3, (p.life || 30) / (p.maxLife || 30));
+
+      drawGunSlingerBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      return;
+    }
+
+    // Engineer bullet visual - brass tracer rounds with hot glow trail
+    if (p.visual === 'EngineerBullet') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.6, owner.r / 20) : 0.9;
+      const lifeRatio = Math.max(0.4, (p.life || 40) / (p.maxLife || 40));
+
+      drawEngineerBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      return;
+    }
+
+    if (p.visual === 'turretBullet') {
+      const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+      const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+      const angle = Math.atan2(vy, vx);
+      const owner = state.fighters && state.fighters[p.owner];
+      const scale = owner ? Math.max(0.6, owner.r / 20) : 0.9;
+      const lifeRatio = Math.max(0.4, (p.life || 40) / (p.maxLife || 40));
+
+      drawTurretBullet(ctx, p.x, p.y, angle, scale, lifeRatio);
+      return;
+    }
+
+    // Add rangerBullet handler
+    if (p.visual === 'rangerBullet') {
+      drawRangerBullet(ctx, p);
+      return;
+    }
+
+    // Crimson Sniper bullet
+    if (p.visual === 'crimsonSniperBullet') {
+      drawCrimsonSniperBullet(ctx, p, false);
+      return;
+    }
+    if (p.visual === 'crimsonSniperBullet_enhanced') {
+      drawCrimsonSniperBullet(ctx, p, true, false);
+      return;
+    }
+    
+    if (p.visual === 'tricksterSniperBullet_enhanced') {
+      drawCrimsonSniperBullet(ctx, p, true, true);
+      return;
+    }
+
+    // Zeus Chain Lightning Visual
+    if (p.visual === 'chainLightning') {
+      ctx.save();
+      
+      // Draw a bright glowing white core at the leading tip with a strong blue aura
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'rgba(0, 191, 255, 1)';
+      ctx.fill();
+      
+      // Draw jagged trail with motion blur and thinning effect
+      if (p.history && p.history.length > 1) {
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = 'rgba(0, 191, 255, 1)'; // Strong light blue luminance
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'miter';
+        
+        // Loop from oldest (i=0) to newest (i = length-2)
+        for (let i = 0; i < p.history.length - 1; i++) {
+          // Rapidly thin out: older segments are thinner
+          const progress = i / (p.history.length - 1);
+          const thickness = 0.5 + progress * 4.5;
+          
+          // Disconnected zig-zags for motion blur: randomly skip some segments
+          if (Math.random() < 0.25) continue;
+          
+          const pt1 = p.history[i];
+          const pt2 = p.history[i+1];
+          
+          ctx.beginPath();
+          
+          // Small local jitter for even more jaggedness
+          const j1x = pt1.x + (Math.random() - 0.5) * 4;
+          const j1y = pt1.y + (Math.random() - 0.5) * 4;
+          const j2x = pt2.x + (Math.random() - 0.5) * 4;
+          const j2y = pt2.y + (Math.random() - 0.5) * 4;
+          
+          ctx.moveTo(j1x, j1y);
+          ctx.lineTo(j2x, j2y);
+          
+          // 1. Draw softer blue aura
+          ctx.strokeStyle = 'rgba(0, 191, 255, 0.3)';
+          ctx.lineWidth = thickness + 2;
+          ctx.stroke();
+          
+          // 2. Draw purely white core
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = thickness;
+          ctx.stroke();
+        }
+      }
+      
+      ctx.restore();
+      return;
+    }
+
+    if (p.isArcaneBolt) {
+      drawTricksterBolt(ctx, p);
+      return;
+    }
+
+    if (p.visual === 'gojoBlue' || p.isGojoPurple) {
+      ctx.save();
+      
+      const colorType = p.isGojoPurple ? 'purple' : 'blue';
+      const visualTime = p.visualTime || Date.now();
+      
+      // Calculate fade-out for purple orb when life is running out
+      if (p.isGojoPurple) {
+        const lifeRatio = p.life / p.maxLife;
+        // Start fading when life is below 30%, smooth fade from 30% to 0%
+        if (lifeRatio < 0.3) {
+          const fadeAlpha = lifeRatio / 0.3; // 0 to 1 as life goes from 0% to 30%
+          ctx.globalAlpha = fadeAlpha;
+        }
+      }
+      
+      // Draw custom trail for Purple orb - Hollow Purple effect
+      if (p.isGojoPurple && p.history && p.history.length > 1) {
+        drawPurpleOrbTrail(ctx, p, visualTime);
+      }
+      
+      // Draw the highly detailed orb
+      drawGojoOrb(ctx, p.x, p.y, p.r, visualTime, colorType, 0);
+      
+      ctx.restore();
+      return;
+    }
+
+    // Default projectile draw
+    // Make projectile visuals depend on the owner projectile color/type.
+    // RED: red-orange motion trail; BLUE: cyan â€œlaser-ishâ€ streak.
+    const isRed = (p.color && p.color.toLowerCase().includes('ff4d4d')) ||
+      (p.color && p.color.toLowerCase().includes('ff') && p.color.toLowerCase().includes('4d'));
+    const isBlue = (p.color && p.color.toLowerCase().includes('4da3ff')) ||
+      (p.color && p.color.toLowerCase().includes('a3') && p.color.toLowerCase().includes('ff')) ||
+      (p.color && p.color.toLowerCase().includes('00ffff'));
+
+    if (p.history && p.history.length > 1 && (isRed || isBlue)) {
+      ctx.save();
+      // Removed 'lighter' composite operation so trails stay visible on white
+
+      // Trail polyline
+      ctx.beginPath();
+      const first = p.history[0];
+      ctx.moveTo(first.x, first.y);
+      for (let i = 1; i < p.history.length; i++) {
+        const pt = p.history[i];
+        ctx.lineTo(pt.x, pt.y);
+      }
+
+      const tailAlpha = isBlue ? 0.28 : 0.35;
+      ctx.strokeStyle = isBlue ? 'rgba(0, 220, 255, 0.95)' : p.color;
+      ctx.globalAlpha = tailAlpha;
+      ctx.lineWidth = Math.max(1.2, p.r * 0.9);
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.stroke();
+
+      // Stronger glow core along last segment
+      const prev = p.history[p.history.length - 2];
+      ctx.beginPath();
+      ctx.moveTo(prev.x, prev.y);
+      ctx.lineTo(p.x, p.y);
+      ctx.strokeStyle = p.color;
+      ctx.globalAlpha = 0.55;
+      ctx.lineWidth = Math.max(1.6, p.r * 1.35);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Projectile body core
+    ctx.save();
+    // Removed 'lighter' composite operation so it doesn't wash out to white
+
+    const outerGlow = isBlue ? 'rgba(0, 220, 255, 0.10)' : 'rgba(255, 80, 80, 0.12)';
+    const coreGlow = isBlue ? 'rgba(0, 240, 255, 0.22)' : 'rgba(255, 120, 120, 0.22)';
+
+    // outer glow
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * 2.0, 0, Math.PI * 2);
+    ctx.fillStyle = outerGlow;
+    ctx.fill();
+
+    // main core
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.fill();
+
+    // Add dark stroke so it stands out against the white background
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    // extra cyan/red-ish inner bloom
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r * 0.7, 0, Math.PI * 2);
+    ctx.fillStyle = coreGlow;
+    ctx.globalAlpha = 0.9;
+    ctx.fill();
+
+    ctx.restore();
+  });
+}
+
+
+/**
+ * Draws Sukuna's Furnace (Fuga) Divine Flame Arrow Construct.
+ * Long turbulent roaring fire trail with fluid curling patterns.
+ * Color cascade: white â†’ bright yellow â†’ golden orange â†’ deep orange â†’ crimson.
+ * Conveys supernatural speed, unstoppable momentum, and immense magical power.
+ */
+
+
+export function drawDivineFlameArrowConstruct(ctx, {
+  x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
+}) {
+  if (progress <= 0) return;
+
+  ctx.save();
+  ctx.translate(x, y);
+  ctx.rotate(angle);
+  ctx.scale(scale, scale);
+
+  const notchX = -32 * progress;
+  const tipX = 28 * progress;
+  const totalLen = tipX - notchX;
+  const headLen = 22 * progress;
+  const headX = tipX - headLen;
+
+  // 1. OUTMOST SPATIAL DISTORTION AURA
+  const auraR = (42 + progress * 28);
+  const auraGrad = ctx.createRadialGradient(tipX * 0.2, 0, 4, tipX * 0.1, 0, auraR * 2.0);
+  if (isFrozenByInfinity) {
+    auraGrad.addColorStop(0, `rgba(224, 255, 255, ${0.65 * progress})`);
+    auraGrad.addColorStop(0.25, `rgba(0, 229, 255, ${0.45 * progress})`);
+    auraGrad.addColorStop(0.55, `rgba(0, 100, 255, ${0.25 * progress})`);
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  } else {
+    auraGrad.addColorStop(0, `rgba(255, 240, 160, ${0.5 * progress})`);
+    auraGrad.addColorStop(0.25, `rgba(255, 140, 0, ${0.35 * progress})`);
+    auraGrad.addColorStop(0.55, `rgba(200, 40, 0, ${0.18 * progress})`);
+    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  }
+  ctx.fillStyle = auraGrad;
+  ctx.beginPath();
+  ctx.ellipse(tipX * 0.2, 0, auraR * 2.2, auraR * 1.2, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Switch to ADDITIVE LIGHTING for hyper-realistic fire
+  ctx.save();
+  ctx.globalCompositeOperation = 'lighter';
+
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  // 2. ROARING FLAME TONGUES Î“Ã‡Ã¶ long, turbulent, curling backward
+  // Uses traveling wave + multi-frequency turbulence for fluid motion
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  const numTendrils = 16;
+  for (let i = 0; i < numTendrils; i++) {
+    const side = i % 2 === 0 ? 1 : -1;
+    const ratio = i / (numTendrils - 1);
+    const originX = tipX - ratio * totalLen;
+
+    // Traveling wave with multi-frequency turbulence for fluid, smoke-like curling
+    const flowPhase = time * 6.5 - ratio * 14.0 + i * 0.6;
+    const turb1 = Math.sin(flowPhase) * 12;
+    const turb2 = Math.sin(flowPhase * 1.7 + i * 1.1) * 6;
+    const turb3 = Math.cos(flowPhase * 0.6 + i * 2.3) * 4;
+
+    // Flames get dramatically longer toward the rear (velocity-stretched)
+    const lenMultiplier = isFlying ? (1.0 + ratio * 1.8) : (1.0 + ratio * 0.8);
+    const flameLen = (28 + turb1 + turb2 + ratio * 30) * progress * lenMultiplier;
+    const spread = (8 + Math.cos(flowPhase * 0.85) * 6 + ratio * 14 + turb3) * progress;
+    const wave = Math.sin(flowPhase * 1.4) * 7 * progress;
+
+    // More control points for fluid S-curve motion
+    ctx.beginPath();
+    ctx.moveTo(originX, side * 2);
+    ctx.bezierCurveTo(
+      originX - flameLen * 0.25, side * (spread * 1.3 + wave),
+      originX - flameLen * 0.55, side * (spread * 1.6 - wave * 0.8),
+      originX - flameLen * 0.75, side * (spread * 1.1 + wave * 0.4)
+    );
+    ctx.bezierCurveTo(
+      originX - flameLen * 0.9, side * (spread * 0.7),
+      originX - flameLen, side * (spread * 0.3 + turb3 * 0.3),
+      originX - flameLen, side * (spread * 0.15)
+    );
+    // Return path (thin inner edge)
+    ctx.bezierCurveTo(
+      originX - flameLen * 0.85, side * (spread * 0.2),
+      originX - flameLen * 0.4, side * (spread * 0.15),
+      originX, side * 2
+    );
+    ctx.closePath();
+
+    // Color cascade from white-hot to cyan/blue (if frozen) or crimson (if normal)
+    const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
+    if (isFrozenByInfinity) {
+      if (ratio < 0.3) {
+        tGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(224, 255, 255, ${0.8 * progress})`);
+        tGrad.addColorStop(0.6, `rgba(0, 229, 255, ${0.6 * progress})`);
+        tGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+      } else if (ratio < 0.6) {
+        tGrad.addColorStop(0, `rgba(0, 229, 255, ${0.85 * progress})`);
+        tGrad.addColorStop(0.35, `rgba(0, 160, 255, ${0.65 * progress})`);
+        tGrad.addColorStop(0.7, `rgba(0, 80, 220, ${0.4 * progress})`);
+        tGrad.addColorStop(1, 'rgba(0, 30, 150, 0)');
+      } else {
+        tGrad.addColorStop(0, `rgba(0, 180, 255, ${0.75 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(0, 100, 240, ${0.55 * progress})`);
+        tGrad.addColorStop(0.65, `rgba(0, 40, 180, ${0.3 * progress})`);
+        tGrad.addColorStop(1, 'rgba(0, 15, 100, 0)');
+      }
+    } else {
+      if (ratio < 0.3) {
+        tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
+        tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
+        tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+      } else if (ratio < 0.6) {
+        tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
+        tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
+        tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
+        tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
+      } else {
+        tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
+        tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
+        tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
+        tGrad.addColorStop(1, 'rgba(80, 5, 0, 0)');
+      }
+    }
+    ctx.fillStyle = tGrad;
+    ctx.fill();
+  }
+
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  // 3. TWIN FIERY TAIL FLETCHING (Rear Plumes at notchX)
+  // Wild streaming plumes that convey unstoppable momentum
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  for (let side of [-1, 1]) {
+    const tailPhase = time * 7.5 + side * 1.5;
+    const plumeScale = isFlying ? 1.6 : 1.0;
+    const fletchLen = (40 + Math.sin(tailPhase) * 10) * progress * plumeScale;
+    const fletchSpread = (20 + Math.cos(tailPhase * 0.8) * 7) * progress;
+
+    ctx.beginPath();
+    ctx.moveTo(notchX + 8 * progress, 0);
+    ctx.bezierCurveTo(
+      notchX - fletchLen * 0.3, side * fletchSpread * 0.4,
+      notchX - fletchLen * 0.7, side * fletchSpread * 1.4,
+      notchX - fletchLen, side * fletchSpread * 1.1
+    );
+    ctx.bezierCurveTo(
+      notchX - fletchLen * 0.8, side * fletchSpread * 0.6,
+      notchX - fletchLen * 0.35, side * 3,
+      notchX + 8 * progress, 0
+    );
+    ctx.closePath();
+
+    const flGrad = ctx.createLinearGradient(notchX, 0, notchX - fletchLen, side * fletchSpread);
+    flGrad.addColorStop(0, `rgba(255, 250, 200, ${0.95 * progress})`);
+    flGrad.addColorStop(0.25, `rgba(255, 180, 30, ${0.85 * progress})`);
+    flGrad.addColorStop(0.55, `rgba(240, 80, 0, ${0.55 * progress})`);
+    flGrad.addColorStop(0.8, `rgba(180, 20, 0, ${0.3 * progress})`);
+    flGrad.addColorStop(1, 'rgba(80, 0, 0, 0)');
+    ctx.fillStyle = flGrad;
+    ctx.fill();
+  }
+
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  // 4. MOLTEN LAVA SHAFT & INCANDESCENT CORE
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  const shaftGrad = ctx.createLinearGradient(notchX, 0, headX + 4, 0);
+  shaftGrad.addColorStop(0, `rgba(255, 90, 0, ${0.75 * progress})`);
+  shaftGrad.addColorStop(0.3, `rgba(255, 180, 30, ${0.9 * progress})`);
+  shaftGrad.addColorStop(0.7, `rgba(255, 245, 160, ${0.95 * progress})`);
+  shaftGrad.addColorStop(1, `rgba(255, 255, 240, 1.0)`);
+
+  ctx.beginPath();
+  ctx.moveTo(notchX, -2.5 * progress);
+  ctx.lineTo(headX + 4, -4 * progress);
+  ctx.lineTo(headX + 4, 4 * progress);
+  ctx.lineTo(notchX, 2.5 * progress);
+  ctx.closePath();
+  ctx.fillStyle = shaftGrad;
+  ctx.fill();
+
+  // White incandescent inner core spine line
+  ctx.beginPath();
+  ctx.moveTo(notchX + 4 * progress, 0);
+  ctx.lineTo(headX + 6, 0);
+  ctx.strokeStyle = `rgba(255, 255, 255, ${progress})`;
+  ctx.lineWidth = 2.5 * progress;
+  ctx.lineCap = 'round';
+  ctx.stroke();
+
+  // Intricate Magma / Lava Crack Patterns along shaft
+  ctx.strokeStyle = `rgba(255, 235, 130, ${0.95 * progress})`;
+  ctx.lineWidth = 1.3 * progress;
+  const numCracks = 6;
+  for (let c = 0; c < numCracks; c++) {
+    const cx = notchX + (c + 0.5) * ((headX - notchX) / numCracks);
+    const side = c % 2 === 0 ? 1 : -1;
+    const cWobble = Math.sin(time * 3 + c * 2) * 2;
+
+    ctx.beginPath();
+    ctx.moveTo(cx - 6, side * 0.5);
+    ctx.quadraticCurveTo(cx, side * (4.5 + cWobble), cx + 7, side * 1.2);
+    ctx.stroke();
+  }
+
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  // 5. VOLCANIC OBSIDIAN MAGMA ARROWHEAD
+  // Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰Î“Ã²Ã‰
+  const tipApexX = tipX + 6 * progress;
+  const barbX = headX - 6 * progress;
+  const barbY = 17 * progress;
+
+  // (A) Dark Volcanic Crystalline Base Plate
+  ctx.beginPath();
+  ctx.moveTo(tipApexX, 0);
+  ctx.quadraticCurveTo(tipApexX - 10 * progress, -barbY * 0.5, barbX, -barbY);
+  ctx.quadraticCurveTo(headX + 4 * progress, -barbY * 0.4, headX + 2 * progress, 0);
+  ctx.quadraticCurveTo(headX + 4 * progress, barbY * 0.4, barbX, barbY);
+  ctx.quadraticCurveTo(tipApexX - 10 * progress, barbY * 0.5, tipApexX, 0);
+  ctx.closePath();
+
+  const obsidianGrad = ctx.createLinearGradient(barbX, 0, tipApexX, 0);
+  obsidianGrad.addColorStop(0, `rgba(140, 10, 0, ${0.95 * progress})`);
+  obsidianGrad.addColorStop(0.4, `rgba(220, 60, 0, ${0.95 * progress})`);
+  obsidianGrad.addColorStop(0.8, `rgba(255, 180, 30, ${0.98 * progress})`);
+  obsidianGrad.addColorStop(1, `rgba(255, 255, 220, 1.0)`);
+  ctx.fillStyle = obsidianGrad;
+  ctx.fill();
+
+  // Dark volcanic rock contour lines
+  ctx.strokeStyle = `rgba(80, 0, 0, ${0.85 * progress})`;
+  ctx.lineWidth = 1.5 * progress;
+  ctx.stroke();
+
+  // (B) Lava Veins inside Arrowhead Plate
+  ctx.strokeStyle = `rgba(255, 240, 160, ${0.95 * progress})`;
+  ctx.lineWidth = 1.6 * progress;
+  
+  // Center vein
+  ctx.beginPath();
+  ctx.moveTo(headX + 2 * progress, 0);
+  ctx.lineTo(tipApexX - 2 * progress, 0);
+  ctx.stroke();
+
+  // Branching veins to top & bottom barb wings
+  for (let side of [-1, 1]) {
+    ctx.beginPath();
+    ctx.moveTo(headX + 6 * progress, 0);
+    ctx.quadraticCurveTo(headX + 10 * progress, side * (barbY * 0.4), barbX + 4 * progress, side * (barbY * 0.85));
+    ctx.stroke();
+  }
+
+  // (C) Dripping Molten Lava Droplets from Barb Wing Tips
+  for (let side of [-1, 1]) {
+    const dripLen = (6 + Math.sin(time * 4 + side * 2) * 3) * progress;
+    const dripX = barbX - dripLen * 0.8;
+    const dripY = side * (barbY + dripLen * 0.5);
+
+    ctx.beginPath();
+    ctx.moveTo(barbX, side * barbY);
+    ctx.quadraticCurveTo(dripX, side * (barbY + 2), dripX - 2 * progress, dripY);
+    ctx.arc(dripX - 2 * progress, dripY, 2.2 * progress, 0, Math.PI * 2);
+    ctx.closePath();
+
+    const dripGrad = ctx.createRadialGradient(dripX, dripY, 0, dripX, dripY, 4 * progress);
+    dripGrad.addColorStop(0, `rgba(255, 255, 220, ${progress})`);
+    dripGrad.addColorStop(0.5, `rgba(255, 140, 0, ${0.9 * progress})`);
+    dripGrad.addColorStop(1, 'rgba(180, 20, 0, 0)');
+    ctx.fillStyle = dripGrad;
+    ctx.fill();
+  }
+
+  // (D) Blinding White Nose Tip Flare
+  const tipGlow = ctx.createRadialGradient(tipApexX, 0, 0, tipApexX, 0, 16 * progress);
+  tipGlow.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
+  tipGlow.addColorStop(0.3, `rgba(255, 250, 200, ${0.9 * progress})`);
+  tipGlow.addColorStop(0.6, `rgba(255, 200, 80, ${0.5 * progress})`);
+  tipGlow.addColorStop(1, 'rgba(255, 90, 0, 0)');
+  ctx.fillStyle = tipGlow;
+  ctx.beginPath();
+  ctx.arc(tipApexX, 0, 16 * progress, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore(); // Restore globalCompositeOperation ('lighter')
+  ctx.restore(); // Restore transform matrix
+}
+
+
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// DRAW â€” PROJECTILES
+// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+
+function drawBlackHoleVisual({
+  ctx,
+  p,
+  alpha,
+  now,
+  eventHorizon,
+  innerDiskR,
+  outerDiskR,
+  progress,
+  rotateAngle = null,
+  indicator = false,
+}) {
+  // Optional summon indicator ring
+  if (indicator && p.indicatorTimer > 0) {
+    const ip = p.indicatorTimer / (p.indicatorLife || 1);
+    const ringProgress = 1 - ip;
+    const ringRadius = (outerDiskR * 0.9) * (1 + ringProgress * 0.8);
+    ctx.save();
+    ctx.globalAlpha = Math.max(0, ip * 0.95) * alpha;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, ringRadius, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(204,102,255,${0.85 * ip})`;
+    ctx.lineWidth = Math.max(2, outerDiskR * 0.05) * (0.7 + ringProgress * 0.6);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  const pulse = 1 + Math.sin(now / 220) * 0.05;
+
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  
+  ctx.translate(p.x, p.y);
+
+  // If rotateAngle is provided, use it (usually for the projectile phase).
+  // Otherwise, a slight wobble to give it life without spinning like a pinwheel.
+  let diskRot = rotateAngle;
+  if (diskRot === null || diskRot === undefined) {
+    diskRot = Math.sin(now / 2500) * 0.15;
+  }
+  ctx.rotate(diskRot);
+
+  // High-frequency energy flickering/throbbing (feels more natural than position jitter)
+  const energyFlicker = 1 + (Math.sin(now / 15) * 0.03 + Math.cos(now / 23) * 0.02);
+
+  // 1. Large background nebula glow (purple)
+  const glowGrad = ctx.createRadialGradient(0, 0, eventHorizon * 0.5, 0, 0, outerDiskR * 2.8 * energyFlicker);
+  glowGrad.addColorStop(0, `rgba(180, 50, 255, 0.4)`);
+  glowGrad.addColorStop(0.3, `rgba(130, 20, 255, 0.25)`);
+  glowGrad.addColorStop(1, `rgba(80, 0, 180, 0)`);
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerDiskR * 2.8 * energyFlicker, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. The Horizontal Accretion Disk Flare (Interstellar style)
+  ctx.globalCompositeOperation = 'screen';
+  
+  // Apply the intense flicker directly to the flare width/height
+  const streakWidth = outerDiskR * 3.5 * pulse * energyFlicker;
+  const streakHeight = eventHorizon * 0.35 * energyFlicker;
+  
+  ctx.save();
+  ctx.scale(1, streakHeight / streakWidth);
+  
+  // Outer flare
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(140, 30, 255, 0.4)`;
+  ctx.fill();
+
+  // Mid flare
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth * 0.6, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(200, 100, 255, 0.6)`;
+  ctx.fill();
+  
+  // Inner core flare
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth * 0.3, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 180, 255, 0.8)`;
+  ctx.fill();
+  
+  ctx.restore();
+
+  // Very thin bright center line extending outwards
+  ctx.save();
+  ctx.scale(1, (streakHeight * 0.08) / (streakWidth * 1.5));
+  ctx.beginPath();
+  ctx.arc(0, 0, streakWidth * 1.5 * energyFlicker, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(255, 255, 255, 0.9)`;
+  ctx.fill();
+  ctx.restore();
+
+  // 3. The Photon Ring (Circular glow behind the event horizon)
+  const ringR = eventHorizon * 1.15;
+  ctx.beginPath();
+  ctx.arc(0, 0, ringR, 0, Math.PI * 2);
+  ctx.lineWidth = eventHorizon * 0.3;
+  ctx.strokeStyle = `rgba(160, 40, 255, 0.6)`;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, eventHorizon * 1.08, 0, Math.PI * 2);
+  ctx.lineWidth = eventHorizon * 0.12;
+  ctx.strokeStyle = `rgba(230, 130, 255, 0.9)`;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.arc(0, 0, eventHorizon * 1.03, 0, Math.PI * 2);
+  ctx.lineWidth = eventHorizon * 0.05;
+  ctx.strokeStyle = `rgba(255, 255, 255, 1)`;
+  ctx.stroke();
+  
+  ctx.globalCompositeOperation = 'source-over';
+
+  // 4. Orbital swirling lines (thick, bright, 3D perspective, outside event horizon)
+  ctx.globalCompositeOperation = 'screen'; 
+  const lineCount = 8;
+  for (let i = 0; i < lineCount; i++) {
+    const orbitSpeed = (i % 2 === 0 ? 1 : -1) * (600 + i * 150);
+    const orbitAngle = now / orbitSpeed + (i * Math.PI * 2) / lineCount;
+    
+    // X radius is large (accretion disk width)
+    const orbitRadiusX = eventHorizon * 1.6 + (outerDiskR * 0.8) * (i / lineCount);
+    
+    // Y radius must be strictly larger than eventHorizon so it NEVER crosses the black hole!
+    const orbitRadiusY = eventHorizon * 1.1 + (outerDiskR * 0.3) * (i / lineCount);
+    
+    const lineLength = Math.PI * 0.8 + 0.4 * Math.sin(now / 300 + i);
+    
+    ctx.beginPath();
+    ctx.ellipse(0, 0, orbitRadiusX, orbitRadiusY, 0, orbitAngle, orbitAngle + lineLength);
+    
+    const lineAlpha = (0.6 + 0.4 * Math.sin(now / 200 + i)) * alpha;
+    ctx.strokeStyle = `rgba(255, 180, 255, ${lineAlpha})`;
+    ctx.lineWidth = Math.max(1, outerDiskR * 0.015); // Thinner elegant lines
+    ctx.lineCap = 'round';
+    ctx.stroke();
+  }
+  ctx.globalCompositeOperation = 'source-over'; 
+
+  // 5. Small debris/pebbles getting sucked in
+  const pebbleCount = Math.max(12, Math.min(25, Math.floor(outerDiskR * 0.25))); 
+  for (let i = 0; i < pebbleCount; i++) {
+    const timeOffset = i * 1337.5;
+    const life = ((now + timeOffset) % 2000) / 2000;
+    
+    const dist = outerDiskR * 2.2 * (1 - Math.pow(life, 2)) + eventHorizon * 1.05;
+    const ang = i * Math.PI * 2 / pebbleCount + life * Math.PI * 8 * (i % 2 === 0 ? 1 : -1);
+    
+    // Elliptical path that matches the swirling rings
+    const px = Math.cos(ang) * dist;
+    // Y is squished, but always maintains a safe distance from center
+    const py = Math.sin(ang) * (eventHorizon * 1.05 + (dist - eventHorizon * 1.05) * 0.35);
+
+    const fade = Math.sin(life * Math.PI); 
+
+    ctx.save();
+    ctx.translate(px, py);
+    ctx.rotate(life * Math.PI * 15 + i);
+    
+    ctx.beginPath();
+    const s = Math.max(2.5, outerDiskR * 0.035) * (1 - life * 0.3); 
+    ctx.moveTo(-s, -s * 0.5);
+    ctx.lineTo(s * 0.8, -s * 1.2);
+    ctx.lineTo(s * 1.1, s * 0.7);
+    ctx.lineTo(-s * 0.6, s);
+    ctx.closePath();
+    
+    ctx.fillStyle = `rgba(220, 180, 255, ${0.95 * fade * alpha})`;
+    ctx.fill();
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * fade * alpha})`;
+    ctx.lineWidth = 1;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 6. The Event Horizon (Pure Black Hole in the center)
+  // Drawn last so it perfectly covers anything passing behind/into it
+  ctx.beginPath();
+  ctx.arc(0, 0, eventHorizon, 0, Math.PI * 2);
+  ctx.fillStyle = `rgba(0, 0, 0, 1)`;
+  ctx.fill();
+  
+  // 7. Some tiny stars/particles in the background glow for the "space" feel
+  const starCount = Math.floor(outerDiskR * 0.3);
+  for (let i = 0; i < starCount; i++) {
+    const rand1 = Math.sin(p.x * 12.9898 + i) * 43758.5453;
+    const rand2 = Math.cos(p.y * 78.233 + i) * 43758.5453;
+    const rDist = eventHorizon * 1.5 + (outerDiskR * 1.5) * (Math.abs(rand1) % 1);
+    const rAng = (Math.abs(rand2) % 1) * Math.PI * 2 + now / 2000;
+    
+    const twinkle = 0.5 + 0.5 * Math.sin(now / (200 + i * 50));
+    
+    ctx.beginPath();
+    ctx.arc(Math.cos(rAng) * rDist, Math.sin(rAng) * rDist, Math.max(0.5, outerDiskR * 0.01) * twinkle, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + 0.6 * twinkle})`;
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+

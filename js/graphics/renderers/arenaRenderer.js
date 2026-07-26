@@ -2,6 +2,7 @@
 // ARENA & SCREEN OVERLAY RENDERER
 // ─────────────────────────────────────────────
 import { state, getProjectiles } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
 
 export function drawArena() {
   const { ctx, canvas, arena } = state;
@@ -189,5 +190,41 @@ export function drawTojiUltimateOverlay() {
     }
   }
 
+  ctx.restore();
+}
+
+/**
+ * Draws a dark golden cinematic dim screen overlay when Mahoraga adapts and rotates his 3D Dharma Wheel.
+ */
+export function drawMahoragaAdaptationDimScreen() {
+  if (CONFIG.mahoraga?.enableGoldenScreenDim === false) return;
+
+  const { ctx, canvas } = state;
+  const mahoraga = state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && f.wheelClickTimer > 0);
+  if (!mahoraga) return;
+
+  const clickMax = CONFIG.mahoraga?.wheelClickDuration || 25;
+  const progress = mahoraga.wheelClickTimer / clickMax; // 1.0 down to 0.0
+  const maxOpacity = CONFIG.mahoraga?.goldenDimOpacity ?? 0.75;
+  const opacity = Math.sin(progress * Math.PI) * maxOpacity; // Smooth bell-curve opacity
+
+  if (opacity <= 0.01) return;
+
+  ctx.save();
+
+  // Dark Golden Vignette Radial Gradient centered at Mahoraga's wheel
+  const wheelY = mahoraga.y - mahoraga.r - 28;
+  const maxRadius = Math.max(canvas.width, canvas.height) * 0.9;
+  const grad = ctx.createRadialGradient(
+    mahoraga.x, wheelY, 15,
+    mahoraga.x, wheelY, maxRadius
+  );
+  grad.addColorStop(0, `rgba(255, 235, 100, ${opacity * 0.55})`);
+  grad.addColorStop(0.2, `rgba(20, 14, 4, ${opacity * 0.88})`);
+  grad.addColorStop(0.55, `rgba(8, 4, 1, ${opacity * 0.96})`);
+  grad.addColorStop(1, `rgba(0, 0, 0, ${opacity * 0.98})`);
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }

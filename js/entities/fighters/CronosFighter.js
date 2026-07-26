@@ -6,7 +6,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { playSound } from '../../systems/soundSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { drawCronosPreActivateBarrier, drawCronosSphereImpact } from '../../graphics/draw.js';
+import { drawCronosPreActivateBarrier, drawCronosSphereImpact, drawCronosSphereVisual } from '../../graphics/draw.js';
 import { drawCronosCrescentBlade } from '../../graphics/weapons/cronosWeaponGraphics.js';
 import { spatialGrid } from '../../systems/physics.js';
 
@@ -1049,45 +1049,68 @@ export class CronosFighter extends Fighter {
   }
 
   draw(ctx) {
-    // Draw pre-activation barrier — stays visible from pre-activate window
-    // all the way until the sphere is actually unleashed.
+    const now = performance.now();
+    // Draw pre-activation barrier ONLY when ultimate/skill is about to be ready
     const inPreWindow = this.sphereCooldown > 0 && this.sphereCooldown <= CONFIG.cronos.spherePreActivateFrames;
-    const sphereReady = !this.sphereActive && this.sphereCooldown === 0;
-    if (inPreWindow || sphereReady) {
-      const now = Date.now();
-      const progress = sphereReady
-        ? 1  // full intensity when fully charged
-        : 1 - this.sphereCooldown / Math.max(1, CONFIG.cronos.spherePreActivateFrames);
-      const barrierRadius = Math.max(this.r * 1.5, 55);
-      drawCronosPreActivateBarrier({
-        ctx,
-        cx: this.x,
-        cy: this.y,
-        radius: barrierRadius,
-        preProgress: progress,
-        now,
-      });
+
+    if (inPreWindow) {
+      const progress = 1.0 - (this.sphereCooldown / Math.max(1, CONFIG.cronos.spherePreActivateFrames));
+      try {
+        const barrierRadius = Math.max(this.r * 1.5, 55);
+        if (typeof drawCronosPreActivateBarrier === 'function') {
+          drawCronosPreActivateBarrier({
+            ctx,
+            cx: this.x,
+            cy: this.y,
+            radius: barrierRadius,
+            preProgress: progress,
+            now,
+          });
+        }
+      } catch (e) {
+        console.error('Error drawing Cronos barrier:', e);
+      }
     }
 
     // Draw sphere impact burst when sphere is first unleashed
     if (this.sphereImpactTimer > 0) {
-      const now = Date.now();
-      const impactProgress = 1 - this.sphereImpactTimer / 25;
-      drawCronosSphereImpact({
-        ctx,
-        cx: this.x,
-        cy: this.y,
-        radius: Math.max(this.r * 1.5, 55),
-        impactProgress,
-        now,
-      });
+      try {
+        const impactProgress = 1 - this.sphereImpactTimer / 25;
+        if (typeof drawCronosSphereImpact === 'function') {
+          drawCronosSphereImpact({
+            ctx,
+            cx: this.x,
+            cy: this.y,
+            radius: Math.max(this.r * 1.5, 55),
+            impactProgress,
+            now,
+          });
+        }
+      } catch (e) {
+        console.error('Error drawing Cronos impact:', e);
+      }
     }
 
     // Draw time stop sphere at deployment location
-    // The main sphere visual is now rendered globally via drawAllCronosSpheres()
-    // so it sits at the correct z-index over illusions and fighters.
     if (this.sphereActive) {
-      // This is now handled by drawAllCronosSpheres
+      try {
+        const elapsed = CONFIG.cronos.sphereDuration - (this.sphereTimer || 0);
+        const deployProgress = Math.min(1, Math.max(0, elapsed / Math.max(1, CONFIG.cronos.sphereDuration)));
+        if (typeof drawCronosSphereVisual === 'function') {
+          drawCronosSphereVisual({
+            ctx,
+            cx: this.sphereX,
+            cy: this.sphereY,
+            radius: CONFIG.cronos.sphereRadius,
+            alpha: 0.9,
+            deployProgress,
+            now,
+            theme: this.sphereTheme
+          });
+        }
+      } catch (e) {
+        console.error('Error drawing Cronos sphere visual:', e);
+      }
     }
 
     // Draw melee swing arc

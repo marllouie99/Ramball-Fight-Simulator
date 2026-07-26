@@ -5,6 +5,7 @@
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
+import { fastCleanArray } from './visualTrailSystem.js';
 
 // ─────────────────────────────────────────────
 // OBJECT POOL — eliminates GC thrashing from rapid spark spawn/despawn
@@ -155,6 +156,20 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
       spark.size = 2.0 + Math.random() * 3.5;
       spark.decay = 0.02 + Math.random() * 0.02; // Fade out over ~25-50 frames
       spark.friction = 0.96; // Float longer
+    } else if (type === 'paleStoneShatter') {
+      const rand = Math.random();
+      if (rand > 0.65) {
+        spark.color = 'rgba(241, 245, 249, 1)'; // Pale bone white rock shard
+      } else if (rand > 0.35) {
+        spark.color = 'rgba(203, 213, 225, 1)'; // Pale slate gray stone
+      } else if (rand > 0.15) {
+        spark.color = 'rgba(71, 85, 105, 1)';   // Dark slate fracture edge
+      } else {
+        spark.color = 'rgba(254, 240, 138, 1)'; // Pale gold cursed energy spark
+      }
+      spark.size = 2.5 + Math.random() * 4.5; // Chunkier rock fragments
+      spark.decay = 0.03 + Math.random() * 0.05; // Fade over 20-30 frames
+      spark.friction = 0.88; // Explosive shatter dispersion
     } else {
       spark.color = `rgba(255, ${50 + Math.random() * 100}, ${20 + Math.random() * 50}, 1)`;
     }
@@ -674,9 +689,7 @@ export function spawnSpellStealWisps(trickster, target, color, count = 20) {
  * @param {boolean} frozen - Whether time is stopped (sparks still decay)
  */
 export function updateSparkEffects(frozen = false) {
-  for (let i = state.sparkEffects.length - 1; i >= 0; i--) {
-    const effect = state.sparkEffects[i];
-
+  fastCleanArray(state.sparkEffects, (effect) => {
     // Sparks always decay, even when frozen in time sphere
     effect.life -= effect.decay;
 
@@ -739,10 +752,11 @@ export function updateSparkEffects(frozen = false) {
 
     // Remove dead effects — return to pool instead of splice
     if (effect.life <= 0) {
-      state.sparkEffects.splice(i, 1);
       _returnSpark(effect);
+      return false;
     }
-  }
+    return true;
+  });
 }
 
 /**

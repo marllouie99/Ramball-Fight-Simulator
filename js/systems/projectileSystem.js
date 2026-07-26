@@ -890,19 +890,30 @@ class ProjectileSystem {
               projectile.hitTargets.add(fi);
             }
             
-            // Sukuna slashes pierce through enemies like paper!
-            if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade') {
+            // Sukuna & Mahoraga slashes/thrown debris pierce through enemies with physical impact!
+            const isMahoragaThrow = projectile.visual === 'ghostBlade' || projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
+            if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || isMahoragaThrow) {
               if (!projectile.hitFighters) projectile.hitFighters = new Set();
               projectile.hitFighters.add(fighter);
               
-              // Spawn some blood/sparks to show it sliced straight through
-              spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
+              // Spawn rock dust, pale stone shatter fragments, & crunching impact flash
+              if (projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble') {
+                spawnSparks(fighter.x, fighter.y, 16, 'paleStoneShatter');
+                spawnImpactFlash(fighter.x, fighter.y, 35, '#E2E8F0');
+                playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
+                playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.4);
+              } else {
+                spawnSparks(fighter.x, fighter.y, 10, isMahoragaThrow ? 'gold' : 'crimsonSniper');
+              }
 
-              // Apply a small physical push backward on hit
-              const knockbackForce = 2.5; 
+              // Apply physical push backward on hit (using throwKnockback config for Mahoraga!)
+              const knockbackForce = (isMahoragaThrow && CONFIG.mahoraga?.throwKnockback !== undefined) ? CONFIG.mahoraga.throwKnockback : 6.0; 
               const angle = Math.atan2(projectile.vy, projectile.vx);
               fighter.vx += Math.cos(angle) * knockbackForce;
               fighter.vy += Math.sin(angle) * knockbackForce;
+              fighter.x += Math.cos(angle) * (knockbackForce * 0.5);
+              fighter.y += Math.sin(angle) * (knockbackForce * 0.5);
+              if (typeof fighter.applyHitStun === 'function') fighter.applyHitStun(8);
               
               // Do NOT return true, allowing it to continue flying
             } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
@@ -2642,6 +2653,14 @@ class ProjectileSystem {
       const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
+        const isMahoragaRuinDebris = p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';
+        if (isMahoragaRuinDebris) {
+          // Shatter / break animation on wall impact or expiration!
+          spawnSparks(p.x, p.y, 22, 'paleStoneShatter');
+          spawnImpactFlash(p.x, p.y, 42, '#E2E8F0');
+          playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.5);
+        }
+
         const isCrimson = p.visual === 'crimsonSniperBullet';
         const isCrimsonEnhanced = p.visual === 'crimsonSniperBullet_enhanced';
         

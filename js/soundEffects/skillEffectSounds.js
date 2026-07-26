@@ -104,11 +104,7 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 4.5,
       delay: -0.10,
     },
-    thirdseqflurry: {
-      src: 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3',
-      volume: 3.5,
-      delay: -0.10,
-    },
+
     ultimatefinalblow: {
       src: 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3',
       volume: 4.5,

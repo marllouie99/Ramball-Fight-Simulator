@@ -169,6 +169,13 @@ export class MusashiFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return; // Hold Musashi in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
+
     this.distToTargetSq = Infinity;
     this.handlePoison();
     this.handleBurn();

@@ -17,6 +17,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
+import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -43,7 +44,8 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
         spawnIllusionDeath(target);
         const idx = state.illusions?.findIndex((illusion) => illusion === target);
         if (idx >= 0) {
-          state.illusions.splice(idx, 1);
+          state.illusions[idx] = state.illusions[state.illusions.length - 1];
+          state.illusions.pop();
         }
       }
       return true;
@@ -272,6 +274,12 @@ export class Fighter {
 
 
   _handleTimeStop() {
+    if (this.mahoragaAdaptationFreezeTimer > 0) {
+      this.mahoragaAdaptationFreezeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return true; // Hold fighter in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
     if (this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') {
       this.timeStopTimer = 0;
       this.electricStunTimer = 0;
@@ -284,28 +292,28 @@ export class Fighter {
     if (isFrozen) {
       // DECAY VISUAL TRAILS SO THEY DON'T FREEZE IN PLACE WHILE INCAPACITATED
       if (this.dashTrail) {
-        for (let i = this.dashTrail.length - 1; i >= 0; i--) {
-          this.dashTrail[i].alpha -= 0.02;
-          if (this.dashTrail[i].alpha <= 0) this.dashTrail.splice(i, 1);
-        }
+        fastCleanArray(this.dashTrail, (item) => {
+          item.alpha -= 0.02;
+          return item.alpha > 0;
+        });
       }
       if (this.afterImages && this.afterImages.length > 0) {
-        for (let i = this.afterImages.length - 1; i >= 0; i--) {
-          this.afterImages[i].timer--;
-          if (this.afterImages[i].timer <= 0) this.afterImages.splice(i, 1);
-        }
+        fastCleanArray(this.afterImages, (item) => {
+          item.timer--;
+          return item.timer > 0;
+        });
       }
       if (this.slashEffects && this.slashEffects.length > 0) {
-        for (let i = this.slashEffects.length - 1; i >= 0; i--) {
-          this.slashEffects[i].timer--;
-          if (this.slashEffects[i].timer <= 0) this.slashEffects.splice(i, 1);
-        }
+        fastCleanArray(this.slashEffects, (item) => {
+          item.timer--;
+          return item.timer > 0;
+        });
       }
       if (this.swordTrailHistory && this.swordTrailHistory.length > 0) {
         this.swordTrailHistory.pop();
       }
       if (this.trailHistory && this.trailHistory.length > 0) {
-        this.trailHistory.shift();
+        this.trailHistory.pop();
       }
     }
 
