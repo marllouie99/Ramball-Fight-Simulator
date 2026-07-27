@@ -18,6 +18,8 @@ Mahoraga's iconic 3D 8-Spoked Dharma Wheel floats and rotates constantly above h
 * **Damage Type Tracking:** Tracks hit counters separately for **Melee**, **Ranged/Projectile**, and **Skill/Explosion** attacks.
 * **Progressive Adaptation Trigger:** Every **10 hits** received of a specific damage type, the wheel clicks and rotates by one spoke (45°), flashes bright gold, a heavy sound echoes, and Mahoraga advances his adaptation stage.
 * **Multi-Stage Mitigation:** Each turn of the wheel grants **+12% damage reduction**, scaling up across **8 total stages** (completing a full 360° rotation) to a maximum of **96% reduced damage**!
+* **⚡ Level 2 Adaptation (High-Speed Teleport Counter):** At **Wheel Level 2**, Mahoraga completely adapts to enemy high-speed teleportation and speed-blitzing (such as Sukuna, Gojo, Toji, and Yuta). Whenever the enemy teleports to attack, Mahoraga **instantly teleports directly behind them in real time**, counter-striking with a 22 True Damage sword chop or left punch in a high-speed duel!
+* **🔥 Level 4 Max Adaptation (Permanent Relentless Speed-Blitz):** At **Wheel Level 4** ($180^\circ$ rotation), Mahoraga ignores all other skills (cleaves, shouts, throws) and focuses **100% of his existence into a continuous, non-stop, hyper-speed Attack-Teleport-Attack-Teleport assault** for the rest of the battle! Every single strike, he teleports to a new angle around the enemy, leaving golden afterimages and landing relentless True Damage hits!
 
 ### ⚔️ Basic Attack: Sword of Extermination
 Mahoraga engages targets in close-quarters combat using the sacred blade attached to his wrist:

@@ -53,6 +53,10 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 }
 
 export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
+  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
+    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
+    if (realEnemy) opponent = realEnemy;
+  }
   if (!opponent || opponent.hp <= 0) return;
 
   fighter.isAmbushing = true;
@@ -124,6 +128,10 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
 }
 
 export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
+  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
+    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
+    if (realEnemy) opponent = realEnemy;
+  }
   if (fighter.mahoragaAdaptationFreezeTimer > 0) {
     fighter.vx = 0;
     fighter.vy = 0;
@@ -470,8 +478,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         
         if (isFinalStrike) {
            spawnCrimsonLightningImpact(contactX, contactY, 130);
-           const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
-           playSound(tpSound?.src || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', 1.0, 0.9, 0, tpSound?.delay || 0);
+           const finSound = getSkillEffectSound('toji', 'strike');
+           if (finSound) playSound(finSound.src, finSound.volume || 1.0);
+           playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
         }
       }
     }

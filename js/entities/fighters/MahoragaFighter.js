@@ -3,6 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { playSound } from '../../systems/soundSystem.js';
+import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawMahoraga3DWheel, drawMahoragaSword } from '../../graphics/weapons/mahoragaWeaponGraphics.js';
 import { drawMahoragaFaceWings, drawMahoragaChestNecklace } from '../../graphics/fighters/mahoragaSkin.js';
@@ -133,8 +134,8 @@ export class MahoragaFighter extends Fighter {
     // Increment hit counter for this attack type
     this.hitsTaken[type] += 1;
 
-    // Rotate wheel on basic hit ONLY IF rotateOnlyOnAdaptation is false in config
-    if (!rotateOnlyOnAdapt) {
+    // Rotate wheel on basic hit ONLY IF rotateOnlyOnAdaptation is false in config AND not in Level 8 Blitz mode
+    if (!rotateOnlyOnAdapt && !this.isInfinityBlitz) {
       this.wheelClickTimer = clickDuration;
       this.wheelTargetRotation = (this.wheelTargetRotation || 0) + (Math.PI / 4);
       this.wheelGlowTimer = 35;
@@ -183,6 +184,7 @@ export class MahoragaFighter extends Fighter {
     this.adaptationPauseMax = pauseFrames;
     this.wheelGlowTimer = 65;
     this.wheelClickTimer = pauseFrames;
+    this.wheelClickMax = pauseFrames;
     this.wheelStartRotation = this.wheelRotation || 0;
     this.wheelTargetRotation = this.wheelStartRotation + (Math.PI / 4);
     this.shieldIconTimer = 90;
@@ -200,9 +202,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     targetsToFreeze.forEach(f => {
-      if (typeof f.applyTimeStop === 'function') f.applyTimeStop(pauseFrames);
-      if (typeof f.applyHitStun === 'function') f.applyHitStun(pauseFrames);
-      f.mahoragaAdaptationFreezeTimer = pauseFrames; // Freezes Toji even during 1-3 ambush sequence combos!
+      f.mahoragaAdaptationFreezeTimer = pauseFrames; // Freezes position/velocity during 3D Wheel rotation without canceling active skill channeling!
       f.vx = 0;
       f.vy = 0;
     });
@@ -211,8 +211,33 @@ export class MahoragaFighter extends Fighter {
 
     const wheelY = this.y - this.r - 28;
     spawnFloatingText(this.x, wheelY - 25, `🛡️ -${reductionPct}% DAMAGE REDUCTION!`, '#FFD700');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+    playSkillEffectSound('mahoraga', 'wheelclick');
+    playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
     playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+
+    // Max Adaptation Awakening Check (Wheel 360° rotation complete at Stage 8)
+    const totalStages = (this.adaptationStage.melee || 0) + (this.adaptationStage.ranged || 0) + (this.adaptationStage.skill || 0);
+    if (totalStages >= 8 || currentStage >= 8) {
+      if (!this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0) {
+        this.isInfinityBlitz = true;
+        this.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames || 600;
+        this.isCleaving = false;
+        this.isShouting = false;
+        this.isThrowing = false;
+        this.isBlitzActive = false;
+
+        const wheelY = this.y - this.r - 28;
+        spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
+        triggerGlobalScreenShake(14, 30);
+        playSound('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+      }
+    } else if (totalStages >= 2 || currentStage >= 2) {
+      if (!this.hasAnnouncedLevel2) {
+        this.hasAnnouncedLevel2 = true;
+        spawnFloatingText(this.x, wheelY - 45, '⚡ ADAPTED TO TELEPORTATION & SPEED-BLITZ!', '#FFD700');
+      }
+    }
 
     // Save attacker for smooth divine flash-dash counter as soon as wheel rotation completes!
     if (attacker && !attacker.isDead && attacker !== this) {
@@ -381,7 +406,7 @@ export class MahoragaFighter extends Fighter {
         spawnSparks(target.x, target.y, 25, 'silver', '#FFFFFF');
         spawnMeleeClashShockwave(target.x, target.y, 110, 'silver');
         triggerGlobalScreenShake(10, 18);
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.0);
+        this._playRandomHeavyPunchSound(1.0);
         playSound('Assets/Sound Effects/Attacks/explosion.mp3', 0.8);
         playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
 
@@ -432,6 +457,7 @@ export class MahoragaFighter extends Fighter {
     // ----------------------------------------------------
     if (this.adaptationPauseTimer > 0) {
       this.adaptationPauseTimer--;
+      if (this.wheelClickTimer > 0) this.wheelClickTimer--;
       this.vx = 0;
       this.vy = 0;
 
@@ -444,19 +470,25 @@ export class MahoragaFighter extends Fighter {
         opponent.vy = 0;
       }
 
-      // Smooth easeInOutCubic wheel rotation progressing across the pause
-      const p = 1.0 - (this.adaptationPauseTimer / (this.adaptationPauseMax || 40));
-      const easeP = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
-      this.wheelRotation = (this.wheelStartRotation || 0) + easeP * (Math.PI / 4);
+      // Smooth easeInOutCubic wheel rotation progressing across the pause (unless continuously spinning in Blitz mode)
+      if (!this.isInfinityBlitz) {
+        const p = 1.0 - (this.adaptationPauseTimer / (this.adaptationPauseMax || 40));
+        const easeP = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+        this.wheelRotation = (this.wheelStartRotation || 0) + easeP * (Math.PI / 4);
+      } else {
+        this.wheelRotation += (CONFIG.mahoraga?.infinityBlitzWheelSpinSpeed || 0.08);
+      }
 
       // EXACT FRAME WHEEL FINISHES ROTATING 45 DEGREES -> START FLASH-DASH LERP!
       if (this.adaptationPauseTimer === 0 && this._pendingCounterTarget) {
-        this.wheelRotation = this.wheelTargetRotation;
+        if (!this.isInfinityBlitz) this.wheelRotation = this.wheelTargetRotation;
         this._startAdaptationFlashDash(this._pendingCounterTarget);
         this._pendingCounterTarget = null;
       }
       return; // Hold update loop during Adaptation Time-Freeze!
     }
+
+
 
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -464,8 +496,21 @@ export class MahoragaFighter extends Fighter {
       return;
     }
 
-    // Wheel Rotation Tick
-    if (this.wheelClickTimer > 0) {
+    // Wheel Rotation Tick (Level 8 Blitz continuous spin takes absolute priority)
+    if (this.isInfinityBlitz) {
+      this.infinityBlitzSpinSpeed = CONFIG.mahoraga?.infinityBlitzWheelSpinSpeed || 0.08;
+      this.wheelRotation += this.infinityBlitzSpinSpeed;
+      this.wheelTargetRotation = this.wheelRotation;
+      this.wheelClickTimer = 0;
+    } else if ((this.infinityBlitzSpinSpeed || 0) > 0.001) {
+      // Smooth deceleration curve as Speed-Blitz ends!
+      this.wheelRotation += this.infinityBlitzSpinSpeed;
+      this.infinityBlitzSpinSpeed *= 0.96;
+      this.wheelTargetRotation = this.wheelRotation;
+      if (this.infinityBlitzSpinSpeed <= 0.001) {
+        this.infinityBlitzSpinSpeed = 0;
+      }
+    } else if (this.wheelClickTimer > 0) {
       this.wheelClickTimer--;
       this.wheelRotation += (this.wheelTargetRotation - this.wheelRotation) * 0.25;
     } else if (this.wheelTargetRotation !== undefined) {
@@ -474,6 +519,7 @@ export class MahoragaFighter extends Fighter {
 
     if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
     if (this.shieldIconTimer > 0) this.shieldIconTimer--;
+    if (this.teleportCounterCooldown > 0) this.teleportCounterCooldown--;
 
     // Smooth retractable blade interpolation (hides blade back into forearm when throwing)
     if (this.isThrowing) {
@@ -500,6 +546,141 @@ export class MahoragaFighter extends Fighter {
     if (this.throwCooldown > 0) this.throwCooldown--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.leftPunchTimer > 0) this.leftPunchTimer--;
+    if (this.infinityBlitzCooldownTimer > 0) this.infinityBlitzCooldownTimer--;
+
+    // ----------------------------------------------------
+    // LEVEL 4 MAX ADAPTATION: SPEED-BLITZ DURATION & SMOOTH WHEEL DECELERATION
+    // ----------------------------------------------------
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+    if (totalStages >= 4 && !this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0) {
+      this.isInfinityBlitz = true;
+      this.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames || 600;
+      this.isCleaving = false;
+      this.isShouting = false;
+      this.isThrowing = false;
+      this.isBlitzActive = false;
+
+      const wheelY = this.y - this.r - 28;
+      spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 4 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
+      triggerGlobalScreenShake(14, 30);
+      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+    }
+
+    if (this.isInfinityBlitz) {
+      if (this.infinityBlitzDurationTimer > 0) {
+        this.infinityBlitzDurationTimer--;
+        if (this.infinityBlitzDurationTimer === 0) {
+          this.isInfinityBlitz = false;
+          this.infinityBlitzCooldownTimer = CONFIG.mahoraga?.infinityBlitzCooldownFrames || 600;
+
+          // RESET ALL ADAPTATIONS, WHEEL ROTATION, AND BUFFS!
+          this.hitsTaken = { melee: 0, ranged: 0, skill: 0 };
+          this.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+          this.adapted = { melee: false, ranged: false, skill: false };
+          this.wheelRotation = 0;
+          this.wheelTargetRotation = 0;
+          this.hasAnnouncedLevel2 = false;
+
+          spawnFloatingText(this.x, this.y - this.r - 25, '🔄 LEVEL 4 EXPIRED: BUFFS RESET!', '#FFD700');
+          triggerGlobalScreenShake(8, 16);
+          playSound('Assets/Sound Effects/Skills/machinebroken.mp3', 1.0);
+        }
+      }
+    }
+
+    // ----------------------------------------------------
+    // LEVEL 4 MAX ADAPTATION: PERMANENT RELENTLESS 2 ATTACKS -> TELEPORT COMBO LOOP!
+    // ----------------------------------------------------
+    if (this.isInfinityBlitz) {
+      // Ignore all other skill states
+      this.isCleaving = false;
+      this.isShouting = false;
+      this.isThrowing = false;
+      this.isBlitzActive = false;
+
+      this.infinityBlitzTimer = (this.infinityBlitzTimer || 0) + 1;
+      const interval = CONFIG.mahoraga?.infinityBlitzInterval || 12;
+
+      if (opponent && opponent.hp > 0 && !opponent.isDead) {
+        if (this.infinityBlitzTimer >= interval) {
+          this.infinityBlitzTimer = 0;
+
+          const distToEnemy = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+          const maxMeleeRange = this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 60);
+
+          // If enemy teleported / dashed away beyond melee range OR we completed our N-attack combo:
+          const reqAttacks = CONFIG.mahoraga?.infinityBlitzAttacksPerTeleport || 2;
+          const enemyEscaped = distToEnemy > maxMeleeRange;
+
+          if (enemyEscaped || (this.infinityBlitzAttacksInSeq || 0) >= reqAttacks) {
+            this.infinityBlitzAttacksInSeq = 0;
+
+            const oldX = this.x;
+            const oldY = this.y;
+
+            const flankAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x) + (Math.random() - 0.5) * Math.PI * 1.4;
+            const teleOffset = CONFIG.mahoraga?.infinityBlitzTeleportDistance ?? 18;
+            const teleDist = this.r + opponent.r + teleOffset;
+
+            let teleX = opponent.x + Math.cos(flankAngle) * teleDist;
+            let teleY = opponent.y + Math.sin(flankAngle) * teleDist;
+
+            const activeArena = arena || CONFIG.arena;
+            if (activeArena) {
+              teleX = Math.max(activeArena.x + this.r + 5, Math.min(activeArena.x + activeArena.width - this.r - 5, teleX));
+              teleY = Math.max(activeArena.y + this.r + 5, Math.min(activeArena.y + activeArena.height - this.r - 5, teleY));
+            }
+
+            this.x = teleX;
+            this.y = teleY;
+            this.aim(opponent);
+            this.vx = 0;
+            this.vy = 0;
+
+            this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
+            playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+          }
+
+          // ONLY deal damage if within valid melee range!
+          const currentDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+          if (currentDist <= maxMeleeRange) {
+            this.infinityBlitzAttacksInSeq = (this.infinityBlitzAttacksInSeq || 0) + 1;
+
+            // Perform Melee Strike (Alternating Sword Chop vs Left Off-Hand Punch)
+            this.attackCount = (this.attackCount || 0) + 1;
+            if (this.attackCount % 2 === 0) {
+              this.leftPunchTimer = 16;
+              this.leftPunchMaxTimer = 16;
+              this._playRandomHeavyPunchSound(1.0);
+            } else {
+              this.swordCombo = (this.swordCombo || 0) + 1;
+              this.punchAnimTimer = 16;
+              this.punchAnimMaxTimer = 16;
+              playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+            }
+
+            this.aim(opponent);
+            const damage = CONFIG.mahoraga?.infinityBlitzDamage ?? (CONFIG.mahoraga?.swordDamage || 25);
+            opponent.takeDamage(damage, this, { isMelee: true });
+
+            this.sakugaImpactTimer = 12;
+            this.sakugaImpactMaxTimer = 12;
+            this.sakugaImpactX = opponent.x;
+            this.sakugaImpactY = opponent.y;
+            this.sakugaImpactAngle = Math.random() * Math.PI * 2;
+            this.sakugaImpactSeed = Math.random();
+
+            spawnImpactFlash(opponent.x, opponent.y, 45, '#FFD700');
+            spawnSparks(opponent.x, opponent.y, 15, 'gold', '#FFFFFF');
+            spawnMeleeClashShockwave(opponent.x, opponent.y, 90, 'mahoraga');
+            triggerGlobalScreenShake(7, 12);
+            playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+          }
+        }
+      }
+      return; // Focus 100% on attack -> teleport combo loop!
+    }
 
     // Divine Shout Windup (AoE Shockwave Roar)
     if (this.isShouting) {
@@ -566,6 +747,28 @@ export class MahoragaFighter extends Fighter {
       return; // Hold planted stance during entire rapid barrage!
     }
 
+    // Lore-Accurate Adaptation: Detect enemy attack-teleport blitz sequence (Sukuna / Gojo / Toji) and counter-activate!
+    const isEnemyBlitzing = opponent && !opponent.isDead && (
+      opponent.isBlitzActive || 
+      opponent.isTeleportFlurry || 
+      opponent.isTeleporting ||
+      (opponent.flurryHitsLeft && opponent.flurryHitsLeft > 0) ||
+      (opponent.blitzHitsLeft && opponent.blitzHitsLeft > 0)
+    );
+
+    if (isEnemyBlitzing && !this.isBlitzActive && (this.blitzCooldownTimer || 0) <= 0) {
+      this.isBlitzActive = true;
+      this.blitzWindupTimer = 2; // Instant windup for counter!
+      this.blitzHitsLeft = CONFIG.mahoraga?.blitzHitsCount || 10;
+      this.blitzTimer = 0;
+      this.blitzStayTimer = 999; // Force instant 1st teleport
+      this.blitzTotalDuration = CONFIG.mahoraga?.blitzTotalDurationFrames || 150;
+      this.blitzTarget = opponent;
+      spawnFloatingText(this.x, this.y - this.r - 25, 'ADAPTED BLITZ DUEL!', '#FFD700');
+      playSkillEffectSound('mahoraga', 'wheelclick');
+      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+    }
+
     // ----------------------------------------------------
     // HAND-TO-HAND BLITZ SEQUENCE (Attack-Teleport-Attack-Teleport!)
     // ----------------------------------------------------
@@ -578,6 +781,7 @@ export class MahoragaFighter extends Fighter {
       if (!target || target.isDead) {
         this.isBlitzActive = false;
         this.blitzHitsLeft = 0;
+        this.blitzCooldownTimer = 180;
         return;
       }
 
@@ -614,12 +818,20 @@ export class MahoragaFighter extends Fighter {
         const totalHits = CONFIG.mahoraga?.blitzHitsCount || 6;
         const hitIndex = totalHits - this.blitzHitsLeft; // 1, 2, 3, 4, 5, 6
 
-        // 1. Check distance & minimum stay duration: ONLY TELEPORT WHEN ENEMY IS FAR AWAY AND STAY DURATION EXPIRED!
+        // Check distance & enemy teleporting status: Teleport instantly when enemy teleports or gets far away!
         const distToTarget = Math.hypot(this.x - target.x, this.y - target.y);
         const maxMeleeDist = CONFIG.mahoraga?.blitzTeleportDistanceThreshold || (this.r + target.r + (CONFIG.mahoraga?.swordRange || 80) + 40);
         const minStayFrames = CONFIG.mahoraga?.blitzMinStayFrames || 20;
 
-        if (distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) {
+        const isTargetBlitzing = target && (
+          target.isBlitzActive ||
+          target.isTeleportFlurry ||
+          target.isTeleporting ||
+          (target.flurryHitsLeft && target.flurryHitsLeft > 0) ||
+          (target.blitzHitsLeft && target.blitzHitsLeft > 0)
+        );
+
+        if ((distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) || (isTargetBlitzing && distToTarget > 55)) {
           this.blitzStayTimer = 0; // Reset stay duration timer on teleport!
           // Enemy is getting far away! Flash-teleport right next to target to continue the rapid melee flurry!
           const angles = [0, Math.PI, -Math.PI * 0.5, Math.PI * 0.5];
@@ -658,7 +870,7 @@ export class MahoragaFighter extends Fighter {
           // MANDATORY RULE 3: Immediately align aim to target from new position!
           this.aim(target);
 
-          playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+          playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
         } else {
           // Already in close range! Keep aim aligned to target
           this.aim(target);
@@ -674,12 +886,20 @@ export class MahoragaFighter extends Fighter {
           const animDur = CONFIG.mahoraga?.blitzAttackAnimDuration || 7;
           if (hitIndex % 2 === 1) {
             this.leftPunchTimer = animDur; // Off-hand punch
+            this.leftPunchMaxTimer = animDur;
           } else {
             this.punchAnimTimer = animDur; // Right hand martial chop
+            this.punchAnimMaxTimer = animDur;
             this.swordCombo = (this.swordCombo || 0) + 1;
           }
 
           // High-Octane Anime Action Visual Effects & Sound Layers
+          this.sakugaImpactTimer = 10;
+          this.sakugaImpactMaxTimer = 10;
+          this.sakugaImpactX = target.x;
+          this.sakugaImpactY = target.y;
+          this.sakugaImpactAngle = Math.random() * Math.PI * 2;
+          this.sakugaImpactSeed = Math.random();
           spawnImpactFlash(target.x, target.y, 38, '#FFFFFF');
           spawnMeleeClashShockwave(target.x, target.y, 65, 'mahoraga');
           spawnSparks(target.x, target.y, 18, 'gold', '#FFFFFF');
@@ -690,8 +910,8 @@ export class MahoragaFighter extends Fighter {
           const word = animeWords[(hitIndex - 1) % animeWords.length];
           spawnFloatingText(target.x + (Math.random() - 0.5) * 20, target.y - target.r - 20, word, '#FFD700');
 
-          // Audio layers (punch sound + razor swing)
-          playSound('Assets/Sound Effects/Attacks/punch.mp3', 0.9);
+          // Audio layers (random heavy punch sound + razor swing)
+          this._playRandomHeavyPunchSound(0.9);
           playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
 
           // Slow gradual pushback physics on each rapid hit (pushes enemy back gradually hit-by-hit!)
@@ -709,9 +929,16 @@ export class MahoragaFighter extends Fighter {
           target.takeDamage(finisherDamage, this, { isMelee: true, isSkill: true });
 
           this.punchAnimTimer = 18;
+          this.punchAnimMaxTimer = 18;
           this.swordCombo = (this.swordCombo || 0) + 1;
 
           // Anime Finisher Burst Effects!
+          this.sakugaImpactTimer = 18;
+          this.sakugaImpactMaxTimer = 18;
+          this.sakugaImpactX = target.x;
+          this.sakugaImpactY = target.y;
+          this.sakugaImpactAngle = Math.random() * Math.PI * 2;
+          this.sakugaImpactSeed = Math.random();
           spawnImpactFlash(target.x, target.y, 90, '#FFD700');
           spawnMeleeClashShockwave(target.x, target.y, 180, 'mahoraga');
           spawnSparks(target.x, target.y, 40, 'gold', '#FFFFFF');
@@ -779,7 +1006,7 @@ export class MahoragaFighter extends Fighter {
       const swordRange = CONFIG.mahoraga?.swordRange || 60;
       const meleeDist = this.r + opponent.r + swordRange;
 
-      // Detect if opponent is currently channeling/casting a skill
+      // Do not interrupt opponents who are currently channeling or charging a skill
       const isEnemyChanneling = (
         opponent.isChanneling ||
         opponent.isWindingUp ||
@@ -793,19 +1020,37 @@ export class MahoragaFighter extends Fighter {
         opponent.isChannelingDivineFlame
       );
 
-      const enableTeleport = CONFIG.mahoraga?.enableCloseQuartersTeleport ?? true;
-      const isStanceOnCooldown = (this.neutralStanceCooldownTimer || 0) > 0;
+      // ----------------------------------------------------
+      // WHEEL STAGE 2+: HIGH-SPEED ADAPTATION TO ENEMY TELEPORT-ATTACK BLITZ
+      // ----------------------------------------------------
+      const totalStages = (this.adaptationStage.melee || 0) + (this.adaptationStage.ranged || 0) + (this.adaptationStage.skill || 0);
+      const currentStage = Math.max(...Object.values(this.adaptationStage || { default: 0 }));
+      const hasAdaptedToTeleport = (totalStages >= 2 || currentStage >= 2 || this.isMaxAdapted);
 
-      // IF ENEMY IS CHANNELING A SKILL FAR AWAY AND STANCE IS NOT ON COOLDOWN -> TELEPORT INSTANTLY ONCE RIGHT TO THEM!
-      if (enableTeleport && !isStanceOnCooldown && isEnemyChanneling && distToOpponent > meleeDist + 15 && (this.channelingPunishTeleportTimer || 0) <= 0) {
-        this.channelingPunishTeleportTimer = 60; // 1-time teleport trigger guard
+      // Detect if opponent is performing an Attack-Teleport-Attack-Teleport sequence (Sukuna, Gojo, Toji, Yuta, etc.)
+      const isEnemyTeleportBlitzing = (
+        opponent.isBlitzActive ||
+        (opponent.rapidSlashHitsLeft && opponent.rapidSlashHitsLeft > 0) ||
+        (opponent.flurryHitsLeft && opponent.flurryHitsLeft > 0) ||
+        opponent.isTeleporting ||
+        (opponent.teleportCooldown && opponent.teleportCooldown > 80) ||
+        (opponent.tojiAmbushStage && opponent.tojiAmbushStage > 0) ||
+        (opponent.lastTeleportTime && (performance.now() - opponent.lastTeleportTime < 300)) ||
+        (opponent.punchAnimTimer > 0 && Math.hypot(opponent.vx, opponent.vy) > 12)
+      );
+
+      if (hasAdaptedToTeleport && isEnemyTeleportBlitzing && (this.teleportCounterCooldown || 0) <= 0) {
+        this.teleportCounterCooldown = 10; // 10 frame rapid counter cooldown (matches high-speed teleport duel pace!)
+
         const oldX = this.x;
         const oldY = this.y;
 
+        // Teleport directly behind the enemy's new position!
         const approachAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        const offsetDist = this.r + opponent.r + 15;
-        let teleX = opponent.x - Math.cos(approachAngle) * offsetDist;
-        let teleY = opponent.y - Math.sin(approachAngle) * offsetDist;
+        const backAngle = approachAngle + Math.PI + (Math.random() - 0.5) * 0.8;
+        const teleDist = this.r + opponent.r + 20;
+        let teleX = opponent.x + Math.cos(backAngle) * teleDist;
+        let teleY = opponent.y + Math.sin(backAngle) * teleDist;
 
         // Clamp inside arena boundaries
         const activeArena = arena || CONFIG.arena;
@@ -820,13 +1065,34 @@ export class MahoragaFighter extends Fighter {
         this.vx = 0;
         this.vy = 0;
 
+        // Alternating Counter Strike (Sword chop vs Left fist punch)
+        this.attackCount = (this.attackCount || 0) + 1;
+        if (this.attackCount % 2 === 0) {
+          this.leftPunchTimer = 18;
+          this.leftPunchMaxTimer = 18;
+          this._playRandomHeavyPunchSound(1.0);
+        } else {
+          this.swordCombo = (this.swordCombo || 0) + 1;
+          this.punchAnimTimer = 18;
+          this.punchAnimMaxTimer = 18;
+          playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+        }
+
+        // Deal counter damage back to enemy
+        opponent.takeDamage(22, this, { isMelee: true, isSkill: true });
+
+        // Spawn afterimages & clash effects
         this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
-        spawnFloatingText(this.x, this.y - this.r - 20, 'PUNISH!', '#FF4500');
-        playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
-        spawnImpactFlash(this.x, this.y, 30, '#FF4500');
+        spawnImpactFlash(opponent.x, opponent.y, 45, '#FFD700');
+        spawnSparks(opponent.x, opponent.y, 15, 'gold', '#FFFFFF');
+        spawnMeleeClashShockwave(opponent.x, opponent.y, 100, 'mahoraga');
+        triggerGlobalScreenShake(8, 15);
+        spawnFloatingText(this.x, this.y - this.r - 25, '⚡ TELEPORT ADAPTATION!', '#FFD700');
+        playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
       }
 
-      // Neutral Combat: Sword of Extermination chops & Left off-hand punches
+      // Standard Sword of Extermination chops & Left off-hand punches
       if (this.swordCooldown <= 0 && distToOpponent <= meleeDist) {
         this._performMeleeAttack(opponent);
       }
@@ -838,6 +1104,7 @@ export class MahoragaFighter extends Fighter {
     this.attackCount = (this.attackCount || 0) + 1;
     if (this.attackCount % 2 === 0) {
       this.leftPunchTimer = 20;
+      this.leftPunchMaxTimer = 20;
     } else {
       this.swordCombo = (this.swordCombo || 0) + 1;
       this.punchAnimTimer = 20;
@@ -848,9 +1115,20 @@ export class MahoragaFighter extends Fighter {
     this.wheelGlowTimer = 60;
     this.wheelTargetRotation = (this.wheelTargetRotation || 0) + (Math.PI / 4);
 
+    playSkillEffectSound('mahoraga', 'wheelclick');
     playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+    playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
     playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
+  }
+
+  _playRandomHeavyPunchSound(volume = 1.0) {
+    const heavyPunches = [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ];
+    const chosenSound = heavyPunches[Math.floor(Math.random() * heavyPunches.length)];
+    playSound(chosenSound, volume);
   }
 
   _spawnTeleportAfterimages(oldX, oldY, newX, newY, customAngle = null) {
@@ -921,9 +1199,10 @@ export class MahoragaFighter extends Fighter {
 
     if (this.attackCount % 2 === 0) {
       this.leftPunchTimer = 18;
+      this.leftPunchMaxTimer = 18;
 
-      playSound('Assets/Sound Effects/Attacks/punch.mp3', 1.0);
-      playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.7);
+      this._playRandomHeavyPunchSound(1.0);
+      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
 
       opponent.takeDamage(damage, this, { isMelee: true });
       opponent.applyHitStun(14);
@@ -954,41 +1233,37 @@ export class MahoragaFighter extends Fighter {
       let knockbackAngle = baseAngle;
       let knockbackForce = 12.0;
 
-      if (comboIndex === 0) {
-        knockbackAngle = this.gunAngle !== undefined ? this.gunAngle : baseAngle;
-        knockbackForce = 16.0;
-        opponent.applyHitStun(12);
-      } else if (comboIndex === 1) {
-        knockbackAngle = baseAngle + Math.PI * 0.25;
-        knockbackForce = 12.5;
-        opponent.applyHitStun(10);
-      } else {
-        knockbackAngle = baseAngle - Math.PI * 0.15;
-        knockbackForce = 14.0;
-        opponent.applyHitStun(16);
+      const isEnemyChanneling = opponent && (
+        opponent.isChanneling ||
+        opponent.isWindingUp ||
+        (opponent.domainChargeTimer && opponent.domainChargeTimer > 0) ||
+        (opponent.purpleChargeTimer && opponent.purpleChargeTimer > 0) ||
+        (opponent.divineFlameChargeTimer && opponent.divineFlameChargeTimer > 0) ||
+        (opponent.ultimateChargeTimer && opponent.ultimateChargeTimer > 0) ||
+        opponent.isCharging ||
+        opponent.isChargingSkill ||
+        opponent.isChannelingDomainExpansion ||
+        opponent.isChannelingDivineFlame
+      );
+
+      if (!isEnemyChanneling) {
+        if (comboIndex === 0) {
+          knockbackAngle = this.gunAngle !== undefined ? this.gunAngle : baseAngle;
+          knockbackForce = 16.0;
+          opponent.applyHitStun(12);
+        } else if (comboIndex === 1) {
+          knockbackAngle = baseAngle + Math.PI * 0.25;
+          knockbackForce = 12.5;
+          opponent.applyHitStun(10);
+        } else {
+          knockbackAngle = baseAngle - Math.PI * 0.15;
+          knockbackForce = 14.0;
+          opponent.applyHitStun(16);
+        }
+
+        opponent.vx += Math.cos(knockbackAngle) * knockbackForce;
+        opponent.vy += Math.sin(knockbackAngle) * knockbackForce;
       }
-
-      opponent.vx += Math.cos(knockbackAngle) * knockbackForce;
-      opponent.vy += Math.sin(knockbackAngle) * knockbackForce;
-    }
-
-    // Detect if opponent is currently channeling/casting a skill
-    const isEnemyChanneling = opponent && (
-      opponent.isChanneling ||
-      opponent.isWindingUp ||
-      (opponent.domainChargeTimer && opponent.domainChargeTimer > 0) ||
-      (opponent.purpleChargeTimer && opponent.purpleChargeTimer > 0) ||
-      (opponent.divineFlameChargeTimer && opponent.divineFlameChargeTimer > 0) ||
-      (opponent.ultimateChargeTimer && opponent.ultimateChargeTimer > 0) ||
-      opponent.isCharging ||
-      opponent.isChargingSkill ||
-      opponent.isChannelingDomainExpansion ||
-      opponent.isChannelingDivineFlame
-    );
-
-    // If opponent is channeling a skill, PUNISH THEM! Skip unnecessary teleports & continue close-range melee assault!
-    if (isEnemyChanneling) {
-      this.neutralAttacksInSequence = 0;
     }
 
     // --- NEUTRAL ATTACK-TELEPORT SEQUENCE (e.g. 2 Attacks -> Teleport -> 2 Attacks -> Teleport) ---
@@ -1025,7 +1300,7 @@ export class MahoragaFighter extends Fighter {
       // Spawn transparent speed afterimages along teleport line
       this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
 
-      playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
       spawnImpactFlash(this.x, this.y, 25, 'silver');
 
       // Post-teleport cooldown delay before starting next attack sequence
@@ -1141,9 +1416,117 @@ export class MahoragaFighter extends Fighter {
     }
   }
 
+  // Draw Sakuga Anime Impact Frame (anime speed lines + multi-strike phantom flurry + ink-brush burst)
+  _drawSakugaImpactFrame(ctx) {
+    const t = this.sakugaImpactTimer / this.sakugaImpactMaxTimer;
+    const alpha = Math.max(0, t);
+    const scale = 1.0 + (1.0 - t) * 0.6;
+
+    ctx.save();
+    ctx.translate(this.sakugaImpactX, this.sakugaImpactY);
+    ctx.rotate(this.sakugaImpactAngle);
+    ctx.scale(scale, scale);
+    ctx.globalAlpha = alpha;
+
+    const seed = this.sakugaImpactSeed || 0.5;
+
+    // 1. ANIME ACTION SPEED LINES (Radial speed-line rays bursting outward from impact point)
+    ctx.save();
+    const numRays = 16;
+    for (let r = 0; r < numRays; r++) {
+      const rayAngle = (r / numRays) * Math.PI * 2 + seed * 1.5;
+      const innerRadius = 15 + seed * 10;
+      const outerRadius = innerRadius + 45 + (r % 3 === 0 ? 35 : 15);
+      const rayWidth = 1.8 + (r % 2 === 0 ? 1.5 : 0.5);
+
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(rayAngle) * innerRadius, Math.sin(rayAngle) * innerRadius);
+      ctx.lineTo(Math.cos(rayAngle) * outerRadius, Math.sin(rayAngle) * outerRadius);
+      ctx.strokeStyle = (r % 3 === 0) ? '#FFFFFF' : ((r % 2 === 0) ? '#FFD700' : 'rgba(20, 10, 0, 0.7)');
+      ctx.lineWidth = rayWidth;
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 2. PHANTOM MULTI-STRIKE FLURRY ARCS (Fan of translucent phantom strikes simulating high-speed flurry)
+    ctx.save();
+    const numPhantomHits = 5;
+    for (let p = 0; p < numPhantomHits; p++) {
+      const pAngle = (p / numPhantomHits) * Math.PI * 2 + seed * 3.0;
+      const pDist = 25 + Math.sin(p * 1.7) * 12;
+      const px = Math.cos(pAngle) * pDist;
+      const py = Math.sin(pAngle) * pDist;
+
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(pAngle + Math.PI / 2);
+
+      // Phantom strike arc outline
+      ctx.beginPath();
+      ctx.arc(0, 0, 14, -Math.PI * 0.6, Math.PI * 0.6);
+      ctx.strokeStyle = (p % 2 === 0) ? `rgba(255, 215, 0, ${alpha * 0.85})` : `rgba(255, 255, 255, ${alpha * 0.95})`;
+      ctx.lineWidth = 3.0;
+      ctx.stroke();
+
+      // Sharp inner slash line
+      ctx.beginPath();
+      ctx.moveTo(-18, 0);
+      ctx.lineTo(18, 0);
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 2.0;
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 3. ANIME SAKUGA INK CLUSTERS & STARBURST RAYS
+    const numClusters = 6 + Math.floor(seed * 4);
+    for (let c = 0; c < numClusters; c++) {
+      const clusterAngle = (c / numClusters) * Math.PI * 2 + seed * 2.5;
+      const clusterDist = 20 + (seed * 12) * (c % 3 === 0 ? 1.6 : 0.6);
+      const cx = Math.cos(clusterAngle) * clusterDist;
+      const cy = Math.sin(clusterAngle) * clusterDist;
+
+      const numStrokes = 3 + Math.floor(seed * 3);
+      for (let s = 0; s < numStrokes; s++) {
+        const strokeAngle = clusterAngle + (s - 1) * 0.35 + seed * 1.2;
+        const strokeLen = 16 + seed * 20 + (s === 0 ? 14 : 0);
+        const strokeWidth = 1.8 + seed * 1.5;
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        const midX = cx + Math.cos(strokeAngle + 0.3) * strokeLen * 0.5;
+        const midY = cy + Math.sin(strokeAngle + 0.3) * strokeLen * 0.5;
+        const endX = cx + Math.cos(strokeAngle) * strokeLen;
+        const endY = cy + Math.sin(strokeAngle) * strokeLen;
+        ctx.quadraticCurveTo(midX, midY, endX, endY);
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = strokeWidth;
+        ctx.lineCap = 'round';
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.quadraticCurveTo(midX, midY, endX, endY);
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = strokeWidth * 0.45;
+        ctx.stroke();
+      }
+    }
+
+    // 4. CONCENTRIC IMPACT SHOCK RING
+    ctx.beginPath();
+    ctx.arc(0, 0, 35 * (1.0 + (1.0 - t) * 0.4), 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 215, 0, ${alpha * 0.8})`;
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
   drawGun(ctx) {
     if (this.isTargetOfAmbush) return;
-    drawMahoragaSword(ctx, this.x, this.y, this.gunAngle, this.r, this.punchAnimTimer, this.isCleaving, this.color, this.swordCombo || 0, this.isThrowing, this.bladeRetractProgress);
+    drawMahoragaSword(ctx, this);
   }
 
   draw(ctx, opponent) {
@@ -1243,16 +1626,6 @@ export class MahoragaFighter extends Fighter {
       });
     }
 
-    // 0b. Dark Screen Dim Overlay (Drawn BEFORE Mahoraga's body so Mahoraga stays 100% bright, crisp & undimmed!)
-    if (this.adaptationPauseTimer > 0) {
-      ctx.save();
-      const canvas = ctx.canvas;
-      if (canvas) {
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-      }
-      ctx.restore();
-    }
 
     // 1. Draw base fighter body & wrist blade (Paints Mahoraga bright & clear ON TOP of screen dim!)
     super.draw(ctx, opponent);
@@ -1260,13 +1633,11 @@ export class MahoragaFighter extends Fighter {
     // 2. Draw Eye-Socket Face Wings ON TOP OF BODY (Chaotic bony wings sprouting from eye sockets!)
     drawMahoragaFaceWings(ctx, this);
 
-    // 3. Draw Left Off-Hand Punch ON TOP OF BODY (Visible ONLY when punching with massive floating extension!)
-    if (this.leftPunchTimer > 0) {
-      drawMahoragaLeftPunch(ctx, this);
-    }
-
     // 3. Draw Shinto Ritual Chest Necklace & Amulet
     drawMahoragaChestNecklace(ctx, this);
+
+    // 4. Draw Left Off-Hand ON TOP OF BODY & NECKLACE (Always visible on the other side of body, lunging forward when punching!)
+    drawMahoragaLeftPunch(ctx, this);
 
     // 4. Draw 3D Wheel of Adaptation & Surrounding Golden Ring Highlight
     drawMahoraga3DWheel(ctx, this);
@@ -1360,6 +1731,11 @@ export class MahoragaFighter extends Fighter {
       ctx.stroke();
 
       ctx.restore();
+    }
+
+    if (this.sakugaImpactTimer > 0) {
+      this._drawSakugaImpactFrame(ctx);
+      this.sakugaImpactTimer--;
     }
 
     // Always draw Health Text on TOP of body additions, wings, necklace, and wheel!

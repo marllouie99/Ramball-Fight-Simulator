@@ -116,6 +116,12 @@ export class YutaFighter extends Fighter {
       return;
     }
 
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
+
     super.update(opponent, ownerIndex, arena, updateProjectiles);
 
     if (this.sakugaImpactTimer > 0) this.sakugaImpactTimer--;
@@ -466,6 +472,10 @@ export class YutaFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    if (this.isTargetOfAmbush) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+
     // 25% chance to block if not currently swinging his sword (85% if actively guarding)
     const maxCd = this.meleeCooldownMax;
     const isSwinging = (this.meleeCooldown > maxCd - 15);
@@ -496,18 +506,19 @@ export class YutaFighter extends Fighter {
         this.flurryGhost = { x: oldX, y: oldY };
         this.x = attacker.x + (dx / dist) * (this.r + attacker.r + 5);
         this.y = attacker.y + (dy / dist) * (this.r + attacker.r + 5);
+        if (attacker && !attacker.isDead) this.aim(attacker);
 
         spawnImpactFlash(oldX, oldY, 25, 'silver');
         spawnImpactFlash(this.x, this.y, 30, 'silver');
         triggerGlobalScreenShake(8, 10);
 
-        spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#FF1493');
         const attackSound = getBasicAttackSound('musashi');
         if (attackSound) playSound(attackSound.src, attackSound.volume);
         
         return 0; // Return early, damage blocked, flurry started
       }
 
+      if (attacker && !attacker.isDead) this.aim(attacker);
       this.blockPoseTimer = CONFIG.yuta.parryGuardDuration || 90; // Hold block pose
       this.parryType = Math.random() < 0.20 ? 'guard' : 'deflect'; // Choose visual parry pose (80% deflection, 20% guard)
       this.trailGenTimer = this.parryType === 'deflect' ? 40 : 0;  // Generate a tip trail for 40 frames (~0.66s)

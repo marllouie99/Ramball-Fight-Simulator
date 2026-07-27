@@ -575,7 +575,7 @@ export const CONFIG = {
     bluePullForce: 0.5,       // Pull strength of Blue
     redDamage: 50,            // Base damage dealt by Reversal Red blast
     redKnockback: 25,         // Knockback force of Red
-    redCooldown: 1000,         // Cooldown of Red
+    redCooldown: 1200,         // Cooldown of Red
     redRange: 100,            // Range to trigger Red
     redTotalFrames: 75,       // Total frames for full Red animation (~1.25s at 60fps)
     redBuildupFrames: 100,     // Frames of orb manifestation before the BOOM (~0.33s)
@@ -669,7 +669,7 @@ export const CONFIG = {
     // Skill 1: Phantom Flurry + Cleave
     flurryCooldown: 700,      // Cooldown between Phantom Flurry activations
     flurryHits: 10,            // Number of strikes in flurry
-    flurryDamage: 6,          // Damage per flurry strike
+    flurryDamage: 15,          // Damage per flurry strike
     flurryHitInterval: 8,     // Frames delay (~0.13s) between flurry teleport strikes
     flurryRange: 150,          // Range to trigger flurry
     flurryCleaveBonusMultiplier: 2.0, // Bonus Dismantle/Cleave damage multiplier on flurry finish
@@ -797,6 +797,7 @@ export const CONFIG = {
     // Passive: Heavenly Restriction
     stealthDodgeChance: 0.20,    // 40% chance to physically dodge normal projectiles
     parryChance: 0.30,           // 45% chance to parry incoming strikes/projectiles with Inverted Spear
+    parryAmbushCooldownFrames: 360, // Cooldown (frames) before a parry triggers a 3-Stage Ambush inside enemy domains (360 frames = 6.0s)
     domainImmunity: true,        // Ignores all Domain Expansion effects completely
     homingImmunity: true,        // Cannot be targeted by auto-aim
     stealthDuration: 240,        // Active Stealth duration in frames (240 frames = 4.0 seconds)
@@ -817,8 +818,8 @@ export const CONFIG = {
     ambushKatanaChargeDuration: 30, // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
     ambushKatanaFreezeDuration: 70, // 2nd Sequence: Target freeze duration (frames) for Katana execution
     ambushKnockbackForce: 48,      // Extreme high-speed knockback force launching target flying & bouncing across arena!
-    ambushPhantomFlurryStrikes: 13,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
-    ambushPhantomFlurryFrameRate: 10, // 3rd Sequence: Slower readable attack speed between each phantom strike (42 frames = 0.7s)
+    ambushPhantomFlurryStrikes: 10,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
+    ambushPhantomFlurryFrameRate: 8, // 3rd Sequence: Slower readable attack speed between each phantom strike (42 frames = 0.7s)
     ambushPhantomFlurryDamage: 15,    // 3rd Sequence: True Damage per phantom strike
     ambushPhantomFlurryDistance: 8,   // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
 
@@ -835,7 +836,7 @@ export const CONFIG = {
     katanaDamage: 35,            // Massive True Damage
     soulWoundDuration: 180,      // Frames target is afflicted with Soul Wound anti-heal (3 seconds)
 
-    ultimateCooldown: 1000,
+    ultimateCooldown: 1500,
     ultimateSwarmDuration: 500,     // (Legacy) Total duration of the ultimate sequence (now used for slow duration)
     ultimateMaxStrikes: 6,          // Number of flash-step strikes before the final crater slam
     ultimateAssaultDamage: 30,      // Damage per flash-step strike
@@ -855,14 +856,14 @@ export const CONFIG = {
   /** Mahoraga — Divine General */
   mahoraga: {
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
-    hitsToAdapt: 20,                 // Number of hits required to rotate wheel and advance adaptation stage
+    hitsToAdapt: 15,                 // Number of hits required to rotate wheel and advance adaptation stage
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
-    adaptationReductionPerStage: 0.12, // +12% damage reduction per adaptation stage (up to 96% at Stage 8)
+    adaptationReductionPerStage: 0.2, // +12% damage reduction per adaptation stage (up to 96% at Stage 8)
     adaptationDamageReduction: 0.8, // (Legacy) damage reduction fallback
     rotateOnlyOnAdaptation: true,   // If true, wheel ONLY rotates 1 click when adaptation completes (not on basic hits)
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
-    wheelClickDuration: 30,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
+    wheelClickDuration: 25,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
     swordRange: 20,                 // Melee range for Sword of Extermination
     swordCooldown: 60,              // Frames between sword strikes (1 second at 60fps)
     swordDamage: 15,                // True damage dealt by Sword of Extermination
@@ -871,6 +872,15 @@ export const CONFIG = {
     cleaveDamage: 40,               // True damage of the AoE Cleave
     cleaveWindupFrames: 30,         // Windup time for active skill
     wheelRotationSpeed: 0.10,       // Passive visual rotation speed of the wheel
+
+    // Level 8 Max Adaptation: Attack-Teleport Speed-Blitz Configs
+    infinityBlitzDurationFrames: 400,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
+    infinityBlitzInterval: 20,        // Frame interval between continuous attacks/strikes (smaller = faster strikes e.g. 6; larger = slower e.g. 20)
+    infinityBlitzAttacksPerTeleport: 5, // Number of attacks executed before teleporting to a new angle (e.g. 2 attacks -> teleport -> 2 attacks)
+    infinityBlitzDamage: 15,          // Damage per True Damage strike during Level 8 speed-blitz
+    infinityBlitzTeleportDistance: 18, // Teleport offset distance around opponent
+    infinityBlitzWheelSpinSpeed: 0.08,  // Continuous Wheel Rotation Speed during Level 8 Speed-Blitz stance (smaller = slower majestic spin e.g. 0.06; larger = faster e.g. 0.20)
+    infinityBlitzCooldownFrames: 600,   // Cooldown (frames) before Level 8 Speed-Blitz can re-trigger (10 seconds)
 
     // Divine Shout (AoE Shockwave Roar)
     shoutCooldown: 1000,             // 8 seconds cooldown between divine shouts
@@ -893,10 +903,10 @@ export const CONFIG = {
     blitzWindupFrames: 14,           // Windup transition frames before starting H2H flurry (~0.23s)
     blitzTotalDurationFrames: 150,   // Total max duration for the entire H2H blitz state (~2.5s)
     blitzMinStayFrames: 20,          // Minimum duration (frames) Mahoraga stays at location before teleporting again (~0.83s)
-    blitzHitsCount: 15,              // Total number of rapid melee hits in H2H flurry
-    blitzHitInterval: 10,            // RAPID ATTACK SPEED: Frame interval between each rapid melee hit (smaller = faster rapid strikes!)
+    blitzHitsCount: 10,              // Total number of rapid melee hits in H2H flurry
+    blitzHitInterval: 13,            // RAPID ATTACK SPEED: Frame interval between each rapid melee hit (smaller = faster rapid strikes!)
     blitzAttackAnimDuration: 7,      // RAPID ATTACK ANIMATION SPEED: Frame duration for each punch/chop stroke animation
-    blitzHitDamage: 16,              // Damage per rapid martial arts strike (Hits 1 to N-1)
+    blitzHitDamage: 15,              // Damage per rapid martial arts strike (Hits 1 to N-1)
     blitzHitPushbackForce: 4.5,      // HIT PHYSICS: Slow pushback distance per rapid hit (pushes enemy back gradually hit-by-hit!)
     blitzTeleportDistanceThreshold: 200, // Distance threshold to trigger on-demand teleport chase
     blitzTargetSlowMultiplier: 0.25, // ENEMY SLOW-MOTION DEBUFF: Enemy movement speed multiplier during blitz (0.25 = 25% speed / 75% heavy slow)
@@ -906,8 +916,8 @@ export const CONFIG = {
 
     // Neutral Close-Quarters Attack-Teleport Stance (Triggers while waiting for wheel to adapt!)
     enableCloseQuartersTeleport: true, // Toggle on/off close-quarters teleporting (set false to disable neutral teleporting completely)
-    neutralAttacksPerTeleport: 10,    // Number of attacks before teleporting (e.g. 2 attacks -> teleport -> 2 attacks)
-    neutralAttackInterval: 20,       // Frame interval between consecutive attacks (~0.33s at 60fps)
+    neutralAttacksPerTeleport: 3,    // Number of attacks before teleporting (e.g. 2 attacks -> teleport -> 2 attacks)
+    neutralAttackInterval: 15,       // Frame interval between consecutive attacks (~0.33s at 60fps)
     neutralTeleportDelay: 5,        // Frame delay after teleporting before starting the next attack sequence (~0.20s)
     neutralTeleportDistance: 100,     // Teleport distance offset around opponent
     neutralStanceDurationFrames: 200, // Total duration (frames) close-quarters attack-teleport stance lasts before ending (~3.33s at 60fps)
@@ -915,9 +925,9 @@ export const CONFIG = {
 
     // Reverse Cursed Technique (RCT / Divine Healing at Low HP)
     enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing at low HP
-    rctHealThresholdHpPercent: 0.25,  // Triggers RCT healing when HP drops to 25% or below
-    rctHealAmountPercent: 0.35,       // Heals 35% of max HP back upon trigger
-    rctHealCooldownFrames: 1200,      // Recharge cooldown (frames) between RCT heals (1200 frames = ~20s at 60fps)
+    rctHealThresholdHpPercent: 0.10,  // Triggers RCT healing when HP drops to 25% or below
+    rctHealAmountPercent: 0.15,       // Heals 35% of max HP back upon trigger
+    rctHealCooldownFrames: 1500,      // Recharge cooldown (frames) between RCT heals (1200 frames = ~20s at 60fps)
 
     // Teleportation Speed & Afterimage Visibility Settings
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)
@@ -1315,7 +1325,7 @@ export const FIGHTER_DEFS = [
     hp: 200,
     damage: 12,
     cooldown: 80,
-    moveSpeed: 4.5,
+    moveSpeed: 6.5,
     projectileSpeedMultiplier: 6.0,
     ability: 'Limitless',
     desc: 'Uses Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
@@ -1334,7 +1344,7 @@ export const FIGHTER_DEFS = [
     hp: 200,
     damage: 15,
     cooldown: 80,
-    moveSpeed: 4.8,
+    moveSpeed: 6.8,
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
     desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
@@ -1370,7 +1380,7 @@ export const FIGHTER_DEFS = [
     spinRate: 0,
     type: 'toji',
     hp: 120,
-    damage: 12,
+    damage: 15,
     cooldown: 40,
     moveSpeed: 9.0,
     projectileSpeedMultiplier: 1.0,
@@ -1395,7 +1405,7 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
     hp: 250, // Tanky boss-like health
     damage: 25,
     cooldown: 60,
-    moveSpeed: 4.5, // Slow but menacing
+    moveSpeed: 5.5, // Slow but menacing
     projectileSpeedMultiplier: 1.0,
     ability: 'Wheel of Adaptation',
     desc: 'Adapts to damage types after taking multiple hits. Sword of Extermination deals True Damage.',

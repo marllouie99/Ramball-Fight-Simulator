@@ -200,13 +200,15 @@ export function drawMahoragaAdaptationDimScreen() {
   if (CONFIG.mahoraga?.enableGoldenScreenDim === false) return;
 
   const { ctx, canvas } = state;
-  const mahoraga = state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && f.wheelClickTimer > 0);
+  const mahoraga = state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0));
   if (!mahoraga) return;
 
-  const clickMax = CONFIG.mahoraga?.wheelClickDuration || 25;
-  const progress = mahoraga.wheelClickTimer / clickMax; // 1.0 down to 0.0
-  const maxOpacity = CONFIG.mahoraga?.goldenDimOpacity ?? 0.75;
-  const opacity = Math.sin(progress * Math.PI) * maxOpacity; // Smooth bell-curve opacity
+  const timer = (mahoraga.adaptationPauseTimer && mahoraga.adaptationPauseTimer > 0) ? mahoraga.adaptationPauseTimer : mahoraga.wheelClickTimer;
+  const clickMax = mahoraga.adaptationPauseMax || mahoraga.wheelClickMax || CONFIG.mahoraga?.wheelClickDuration || 25;
+  const rawProgress = (clickMax - timer) / clickMax; // Elapsed progress: 0.0 -> 0.5 (peak) -> 1.0
+  const progress = Math.min(1.0, Math.max(0.0, rawProgress));
+  const maxOpacity = CONFIG.mahoraga?.goldenDimOpacity ?? 0.85;
+  const opacity = Math.sin(progress * Math.PI) * maxOpacity; // Bell-curve: 0 at start -> 1 at middle -> 0 at end!
 
   if (opacity <= 0.01) return;
 
@@ -214,17 +216,18 @@ export function drawMahoragaAdaptationDimScreen() {
 
   // Dark Golden Vignette Radial Gradient centered at Mahoraga's wheel
   const wheelY = mahoraga.y - mahoraga.r - 28;
-  const maxRadius = Math.max(canvas.width, canvas.height) * 0.9;
+  const maxRadius = Math.max(canvas.width, canvas.height) * 0.95;
   const grad = ctx.createRadialGradient(
     mahoraga.x, wheelY, 15,
     mahoraga.x, wheelY, maxRadius
   );
-  grad.addColorStop(0, `rgba(255, 235, 100, ${opacity * 0.55})`);
-  grad.addColorStop(0.2, `rgba(20, 14, 4, ${opacity * 0.88})`);
-  grad.addColorStop(0.55, `rgba(8, 4, 1, ${opacity * 0.96})`);
-  grad.addColorStop(1, `rgba(0, 0, 0, ${opacity * 0.98})`);
+  // Dark cinematic vignette overlay (properly darkens the entire arena including Gojo and afterimages!)
+  grad.addColorStop(0, `rgba(40, 30, 8, ${opacity * 0.65})`);
+  grad.addColorStop(0.25, `rgba(18, 12, 3, ${opacity * 0.88})`);
+  grad.addColorStop(0.60, `rgba(8, 4, 1, ${opacity * 0.96})`);
+  grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.98})`);
 
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
   ctx.restore();
 }

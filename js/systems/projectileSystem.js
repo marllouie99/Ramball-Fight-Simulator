@@ -1776,7 +1776,9 @@ class ProjectileSystem {
         p.y - p.r < arena.y ||
         p.y + p.r > arena.y + arena.height
       ) {
-        this.triggerThermobaricExplosion(p.x, p.y, p.owner, p.damage);
+        if (!p.isFrozenByInfinity) {
+          this.triggerThermobaricExplosion(p.x, p.y, p.owner, p.damage);
+        }
         return true;
       }
       return false;
@@ -2046,8 +2048,9 @@ class ProjectileSystem {
         for (let j = 0; j < this.projectiles.length; j++) {
             const otherProj = this.projectiles[j];
             if (otherProj === p || otherProj.isVisual || otherProj.life <= 0) continue;
-            // Only destroy enemy projectiles
+            // Only destroy enemy projectiles (and exclude Sukuna's Fuga thermobaric arrow)
             if (areOnSameTeam(p.owner, otherProj.owner)) continue;
+            if (otherProj.isSukunaFurnace || otherProj.visual === 'sukunaFurnaceArrow') continue;
             
             // Check distance to see if the enemy projectile touches the Purple Orb
             const dx = p.x - otherProj.x;

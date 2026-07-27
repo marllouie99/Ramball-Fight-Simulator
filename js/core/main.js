@@ -443,7 +443,6 @@ function animate(timestamp) {
       drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
       drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
       drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
-      drawMahoragaAdaptationDimScreen(); // Draw dark golden cinematic dim screen overlay when Mahoraga adapts wheel
       drawTojiUltimateOverlay(); // Draw pitch black overlay with Fly Heads when Toji uses Ultimate
       drawFlames(); // Draw all flames to offscreen canvas (batched for performance)
       flamewardenFlameSystem.draw(state.ctx); // Draw Flamewarden flamethrower particles
@@ -499,7 +498,6 @@ function animate(timestamp) {
         bomberExplosionSystem.draw(state.ctx); // Draw high fidelity explosions
         burnEffectSystem.draw(state.ctx); // Draw burn particles
       }
-      drawFloatingTexts();
 
       if (!useAggressiveParticleMode) {
         drawDeathEffects(); // Draw death shatter effects on top of everything
@@ -516,6 +514,10 @@ function animate(timestamp) {
         drawSparkEffects(); // Draw spark effects on top of everything
       }
       drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
+
+      drawMahoragaAdaptationDimScreen(); // Draw dark golden cinematic dim screen overlay when Mahoraga adapts wheel
+
+      drawFloatingTexts(); // Keep UI-like text on top of dim
 
       // Draw FPS display and logs (if not hidden by user pressing H)
       if (!state.hideFpsLogs) {

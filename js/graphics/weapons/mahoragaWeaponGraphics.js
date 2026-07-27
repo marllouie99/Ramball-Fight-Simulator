@@ -120,12 +120,19 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   }
 
   ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  const angle = fighter.gunAngle || 0;
+  ctx.rotate(angle);
+
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
   
-  // Position wheel floating above Mahoraga's head with subtle floating animation
+  // Position wheel floating above Mahoraga's head with subtle floating animation along his body orientation
   const floatOffset = Math.sin(Date.now() * 0.003) * 2;
-  const wheelYOffset = -fighter.r - 28 + floatOffset;
+  const wheelOffset = -fighter.r - 28 + floatOffset;
   
-  ctx.translate(fighter.x, fighter.y + wheelYOffset);
+  ctx.translate(0, wheelOffset);
 
   const scaleX = MAHORAGA_WEAPON_GRAPHICS.wheel.scaleX;
   const scaleY = MAHORAGA_WEAPON_GRAPHICS.wheel.scaleY;
@@ -134,17 +141,18 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   const sphereRadius = MAHORAGA_WEAPON_GRAPHICS.wheel.sphereRadius;
   const depthOffset = MAHORAGA_WEAPON_GRAPHICS.wheel.depthOffset;
 
-  // Glow Effect when adapting or adapted
-  const isGlowing = (fighter.wheelGlowTimer > 0) || (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill));
+  // Glow Effect when adapting, adapted, or Level 8 Speed-Blitz (decays smoothly during slowdown)
+  const spinFactor = (fighter.infinityBlitzSpinSpeed || 0) / 0.35;
+  const isGlowing = (fighter.isInfinityBlitz) || (spinFactor > 0.05) || (fighter.wheelGlowTimer > 0) || (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill));
   if (isGlowing) {
     ctx.save();
     ctx.scale(scaleX, scaleY);
     ctx.beginPath();
-    ctx.arc(0, 0, spokeRadius + 8, 0, Math.PI * 2);
-    const glowAlpha = fighter.wheelGlowTimer > 0 ? (fighter.wheelGlowTimer / 60) : 0.35;
-    const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, spokeRadius + 10);
-    glowGrad.addColorStop(0, `rgba(255, 223, 0, ${glowAlpha * 0.9})`);
-    glowGrad.addColorStop(0.6, `rgba(218, 165, 32, ${glowAlpha * 0.45})`);
+    ctx.arc(0, 0, spokeRadius + 12, 0, Math.PI * 2);
+    const glowAlpha = fighter.isInfinityBlitz ? 0.9 : Math.max(0.9 * spinFactor, fighter.wheelGlowTimer > 0 ? (fighter.wheelGlowTimer / 60) : 0.35);
+    const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, spokeRadius + 14);
+    glowGrad.addColorStop(0, `rgba(255, 255, 255, ${glowAlpha})`);
+    glowGrad.addColorStop(0.4, `rgba(255, 215, 0, ${glowAlpha * 0.8})`);
     glowGrad.addColorStop(1, 'rgba(218, 165, 32, 0)');
     ctx.fillStyle = glowGrad;
     ctx.fill();
@@ -415,25 +423,6 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   // LAYER 3: (Removed spinning orbital sparkles for clean, steady glow)
   // ----------------------------------------------------
 
-  // ----------------------------------------------------
-  // LAYER 4: SIMPLE FLOATING NUMBER BESIDE THE WHEEL
-  // ----------------------------------------------------
-  ctx.save();
-  ctx.font = '900 16px sans-serif';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  
-  const numText = `${activeStages}`;
-  const numX = 38;
-
-  ctx.lineWidth = 3.5;
-  ctx.strokeStyle = '#000000';
-  ctx.strokeText(numText, numX, 0);
-
-  ctx.fillStyle = activeStages > 0 ? '#FFD700' : '#E6B800';
-  ctx.fillText(numText, numX, 0);
-  ctx.restore();
-
   ctx.restore(); // Restore from wheel translation
 }
 
@@ -442,7 +431,26 @@ export function drawMahoraga3DWheel(ctx, fighter) {
 /**
  * Draws Mahoraga's Sword of Extermination Wrist Blade (Matching Reference Image 2 & 3).
  */
-export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punchAnimTimer = 0, isCleaving = false, color = '#F5F5DC', swordCombo = 0, isThrowing = false, bladeRetractProgress = 1.0) {
+export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punchAnimTimer = 0, isCleaving = false, color = '#F5F5DC', swordCombo = 0, isThrowing = false, bladeRetractProgress = 1.0, maxAnimTimer = 18, isWorldCutting = false, worldCuttingTimer = 0) {
+  let fighterObj = null;
+  if (typeof x === 'object' && x !== null) {
+    fighterObj = x;
+    const f = fighterObj;
+    x = f.x || 0;
+    y = f.y || 0;
+    gunAngle = f.gunAngle || 0;
+    r = f.r || 30;
+    punchAnimTimer = f.punchAnimTimer || 0;
+    isCleaving = f.isCleaving || false;
+    color = f.color || '#F5F5DC';
+    swordCombo = f.swordCombo || 0;
+    isThrowing = f.isThrowing || false;
+    bladeRetractProgress = f.bladeRetractProgress !== undefined ? f.bladeRetractProgress : 1.0;
+    maxAnimTimer = f.punchAnimMaxTimer || 18;
+    isWorldCutting = f.isWorldCutting || false;
+    worldCuttingTimer = f.worldCuttingTimer || 0;
+  }
+
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
@@ -458,22 +466,25 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   let extendDist = 0;
 
   if (punchAnimTimer > 0) {
-    const maxTimer = ((typeof CONFIG !== 'undefined' && CONFIG.mahoraga) ? CONFIG.mahoraga.blitzAttackAnimDuration : 10.0) || 10.0;
-    const progress = Math.min(1.0, Math.max(0.0, 1.0 - (punchAnimTimer / maxTimer))); // 0.0 to 1.0 smooth progression
+    const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
+    const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (punchAnimTimer / maxTimer))); // 0.0 to 1.0 smooth progression
+    
+    // Buttery smooth cubic ease-in-out curve
+    const progress = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
     const comboIndex = (swordCombo || 0) % 3;
 
     if (comboIndex === 1) {
-      // 1. WIDE HORIZONTAL CLEAVE SWEEP: Sweeps across in a wide 110-degree arc!
-      swingAngle = -Math.PI * 0.45 + progress * (Math.PI * 0.90);
-      extendDist = Math.sin(progress * Math.PI) * 20;
+      // 1. MASSIVE HORIZONTAL CLEAVE SWEEP: Sweeps across in a wide 252-degree martial arc!
+      swingAngle = -Math.PI * 0.70 + progress * (Math.PI * 1.40);
+      extendDist = Math.sin(progress * Math.PI) * 28;
     } else if (comboIndex === 2) {
-      // 2. DOWNWARD DIAGONAL OVERHEAD CHOP: Winds up high and chops down with heavy momentum!
-      swingAngle = Math.PI * 0.50 - progress * (Math.PI * 0.95);
-      extendDist = Math.sin(progress * Math.PI) * 24;
+      // 2. HEAVY OVERHEAD DIAGONAL CHOP: Winds up high behind back and chops down in a 270-degree arc!
+      swingAngle = Math.PI * 0.75 - progress * (Math.PI * 1.50);
+      extendDist = Math.sin(progress * Math.PI) * 30;
     } else {
-      // 3. DIVINE PIERCING THRUST & FLICK: Forward thrust lunging out with a sharp wrist twist
-      swingAngle = Math.sin(progress * Math.PI * 2) * 0.20;
-      extendDist = Math.sin(progress * Math.PI) * 32;
+      // 3. DIVINE PIERCING THRUST & SLICE: Wide forward thrust lunging out +38px with a 90-degree wrist slice!
+      swingAngle = -Math.PI * 0.25 + Math.sin(progress * Math.PI) * (Math.PI * 0.50);
+      extendDist = Math.sin(progress * Math.PI) * 38;
     }
   } else if (isThrowing) {
     // Bare-handed stance (blade smoothly retracted into forearm gauntlet)
@@ -481,13 +492,14 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     extendDist = 10;
   }
 
-  // Position right arm extending cleanly out from body
-  const armX = r * 0.8 + extendDist;
-  const armY = r * 0.25;
+  // Position right arm: pivot from shoulder joint so full arm, hand, & blade swing together!
+  const shoulderX = r * 0.5;
+  const shoulderY = r * 0.25;
 
   ctx.save();
-  ctx.translate(armX, armY);
-  ctx.rotate(swingAngle);
+  ctx.translate(shoulderX, shoulderY);
+  ctx.rotate(swingAngle); // Entire shoulder, arm, hand, & sword swing in unison!
+  ctx.translate(r * 0.3 + extendDist, 0);
 
   // 1. White Bandaged Forearm (Extending from body into wrist ring)
   ctx.beginPath();
@@ -516,18 +528,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   ctx.lineWidth = 2.2;
   ctx.stroke();
 
-  // Knuckle / finger details on large fist
-  ctx.beginPath();
-  ctx.arc(-1, 7, 5.0, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(4, 3, 4.0, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.4;
-  ctx.stroke();
 
   // 3. Black Gauntlet Wrist Ring Holder (Clamping wrist & top of hand)
   const ringW = 9;
@@ -795,16 +796,26 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 }
 
 /**
- * Draws Mahoraga's Left Off-Hand Punch (Layered BEHIND body, hidden when idle!).
+ * Draws Mahoraga's Left Off-Hand (Always visible on the opposite side of the body, lunging forward when punching!).
  */
 export function drawMahoragaLeftPunch(ctx, fighter) {
-  if (!fighter || !fighter.leftPunchTimer || fighter.leftPunchTimer <= 0) return;
+  if (!fighter) return;
 
-  const maxT = fighter.leftPunchMaxTimer || ((typeof CONFIG !== 'undefined' && CONFIG.mahoraga) ? CONFIG.mahoraga.blitzAttackAnimDuration : 10.0) || 10.0;
-  const progress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.leftPunchTimer / maxT)));
+  // Smooth continuous progress tracking with multi-frame recovery easing to eliminate 1-frame snaps
+  if (fighter.leftPunchTimer > 0) {
+    const maxT = (fighter.leftPunchMaxTimer && fighter.leftPunchMaxTimer > 0) ? fighter.leftPunchMaxTimer : 18.0;
+    fighter.currentPunchProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.leftPunchTimer / maxT)));
+  } else if (fighter.currentPunchProgress > 0) {
+    fighter.currentPunchProgress = Math.max(0.0, fighter.currentPunchProgress - 0.12);
+  } else {
+    fighter.currentPunchProgress = 0.0;
+  }
+
+  const rawProgress = fighter.currentPunchProgress || 0.0;
   
-  // Forward lunging punch extension out past body (+48px lunge distance!)
-  const punchLunge = Math.sin(progress * Math.PI) * 48;
+  // Smooth cubic ease-in-out curve for buttery fluid motion
+  const smoothProgress = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+  const progress = smoothProgress;
   const r = fighter.r || 30;
   
   const gunAngle = fighter.gunAngle || 0;
@@ -817,32 +828,63 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     ctx.scale(1, -1);
   }
 
-  // Position left arm offset laterally out to the side (-r * 0.65) with floating forward extension
-  const armX = r * 0.6 + punchLunge;
-  const armY = -r * 0.65;
+  // Calculate dynamic reach distance directly toward enemy target so punch connects cleanly!
+  let reachDist = 95;
+  if (fighter.target) {
+    const targetDist = Math.hypot(fighter.target.x - fighter.x, fighter.target.y - fighter.y);
+    reachDist = Math.max(55, Math.min(125, targetDist - r * 0.45));
+  }
+
+  // Position left arm: when idle, rest firmly on the LEFT SIDE (-X) of the body circle (-r * 0.8, +r * 0.25).
+  // When punching, smoothly lunge forward to hit the enemy!
+  const lungeProgress = Math.sin(smoothProgress * Math.PI); // Smooth 0 -> 1 -> 0 bell curve
+  const punchLunge = lungeProgress * reachDist;
+  const idleX = -r * 0.8;
+  const idleY = r * 0.25; // Perfectly aligned vertically with right hand (r * 0.25)!
+  const punchX = r * 0.6 + reachDist; // Dynamic reach extension directly to enemy!
+  const punchY = -r * 0.25;
+
+  const armX = idleX + lungeProgress * (punchX - idleX);
+  const armY = idleY + lungeProgress * (punchY - idleY);
 
   ctx.save();
   ctx.translate(armX, armY);
 
-  // 1. White Bandaged Left Forearm (Extended outward into fist)
+  // Calculate shoulder attachment point in body space and vector back from fist to shoulder
+  const shoulderX = -r * 0.5;
+  const shoulderY = r * 0.25;
+  const dx = shoulderX - armX;
+  const dy = shoulderY - armY;
+  const armDist = Math.hypot(dx, dy);
+  const armAngle = Math.atan2(dy, dx);
+
+  // 1. White Bandaged Left Arm (Connects shoulder to fist)
+  ctx.save();
+  ctx.rotate(armAngle);
+
   ctx.beginPath();
-  ctx.roundRect(-28, -9, 22, 18, 4);
+  ctx.roundRect(0, -8, armDist, 16, 3);
   ctx.fillStyle = '#EBEBE6'; // Off-white bandage color
   ctx.fill();
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2.4;
   ctx.stroke();
 
-  // Bandage texture lines
+  // Bandage texture lines along forearm
   ctx.strokeStyle = '#AFAFA5';
   ctx.lineWidth = 1.6;
+  const numLines = Math.max(2, Math.floor(armDist / 7));
   ctx.beginPath();
-  ctx.moveTo(-22, -9); ctx.lineTo(-19, 9);
-  ctx.moveTo(-14, -9); ctx.lineTo(-11, 9);
+  for (let i = 1; i < numLines; i++) {
+    const lx = (i / numLines) * armDist;
+    ctx.moveTo(lx - 2, -8);
+    ctx.lineTo(lx + 2, 8);
+  }
   ctx.stroke();
+  ctx.restore();
 
-  // 2. MASSIVE PROMINENT CLENCHED LEFT FIST (Radius = 16px!)
-  const fistRadius = 16.0;
+  // 2. CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
+  const fistRadius = 14.0;
   ctx.beginPath();
   ctx.arc(0, 0, fistRadius, 0, Math.PI * 2);
   ctx.fillStyle = fighter.color || '#F5F5DC'; // Skin tone matching body
@@ -851,88 +893,104 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   ctx.lineWidth = 2.5;
   ctx.stroke();
 
-  // Knuckle & finger lines on clenched fist
-  ctx.beginPath();
-  ctx.arc(3, 4, 6.0, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(-3, 3, 5.0, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
 
-  // 3. ANIME HIGH-IMPACT PUNCH VISUAL: Motion Trail, Air Gust Speed Lines & Golden Shockwave Disks!
+  // 3. ANIME HIGH-IMPACT PUNCH VISUAL: Distinguishable Conical Air Pressure Blast & Starburst Impact!
   if (progress > 0.05 && progress < 0.95) {
     const shockAlpha = Math.sin(progress * Math.PI);
 
-    // 3a. Fist Motion Streak / Trail behind punching arm
+    // 3a. Heavy Fist Motion Trail
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(-punchLunge * 0.8, 0);
-    ctx.lineTo(12, 0);
-    ctx.strokeStyle = `rgba(255, 215, 0, ${shockAlpha * 0.45})`;
-    ctx.lineWidth = fistRadius * 1.8;
+    ctx.moveTo(-punchLunge * 0.9, 0);
+    ctx.lineTo(14, 0);
+    ctx.strokeStyle = `rgba(255, 215, 0, ${shockAlpha * 0.55})`;
+    ctx.lineWidth = fistRadius * 2.2;
     ctx.lineCap = 'round';
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.moveTo(-punchLunge * 0.6, 0);
-    ctx.lineTo(12, 0);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${shockAlpha * 0.75})`;
-    ctx.lineWidth = fistRadius * 0.9;
+    ctx.moveTo(-punchLunge * 0.7, 0);
+    ctx.lineTo(14, 0);
+    ctx.strokeStyle = `rgba(255, 255, 255, ${shockAlpha * 0.85})`;
+    ctx.lineWidth = fistRadius * 1.1;
     ctx.stroke();
     ctx.restore();
 
-    // 3b. Forward Impact Speed Lines (Radiating Air Gust Blast)
+    // 3b. DISTINCT CONICAL SONIC COMPRESSION BLAST (Expanding forward cone!)
     ctx.save();
-    ctx.translate(16, 0);
-    const numLines = 6;
-    for (let i = 0; i < numLines; i++) {
-      const lineAngle = ((i / (numLines - 1)) - 0.5) * (Math.PI * 0.5);
-      const lineLen = 22 + progress * 26;
-      const startDist = 8 + progress * 10;
-      
+    ctx.translate(14, 0);
+
+    const coneLen = 32 + progress * 38;
+    const coneWidth = 14 + progress * 28;
+
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(coneLen, -coneWidth);
+    ctx.quadraticCurveTo(coneLen + 10, 0, coneLen, coneWidth);
+    ctx.closePath();
+
+    const coneGrad = ctx.createLinearGradient(0, 0, coneLen, 0);
+    coneGrad.addColorStop(0, `rgba(255, 255, 255, ${shockAlpha * 0.9})`);
+    coneGrad.addColorStop(0.35, `rgba(255, 235, 100, ${shockAlpha * 0.75})`);
+    coneGrad.addColorStop(0.75, `rgba(255, 160, 0, ${shockAlpha * 0.4})`);
+    coneGrad.addColorStop(1, 'rgba(255, 140, 0, 0)');
+    ctx.fillStyle = coneGrad;
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${shockAlpha * 0.95})`;
+    ctx.lineWidth = 2.2;
+    ctx.stroke();
+
+    // 3c. 8 Radial Sonic Gust Lines
+    const numRays = 8;
+    for (let i = 0; i < numRays; i++) {
+      const rayAngle = ((i / (numRays - 1)) - 0.5) * (Math.PI * 0.65);
+      const rayLen = 25 + progress * 32;
+      const startDist = 6 + progress * 12;
+
       ctx.beginPath();
-      ctx.moveTo(Math.cos(lineAngle) * startDist, Math.sin(lineAngle) * startDist);
-      ctx.lineTo(Math.cos(lineAngle) * (startDist + lineLen), Math.sin(lineAngle) * (startDist + lineLen));
-      ctx.strokeStyle = i % 2 === 0 ? `rgba(255, 255, 255, ${shockAlpha * 0.9})` : `rgba(254, 240, 138, ${shockAlpha * 0.85})`;
-      ctx.lineWidth = 2.2 - (i % 2) * 0.8;
+      ctx.moveTo(Math.cos(rayAngle) * startDist, Math.sin(rayAngle) * startDist);
+      ctx.lineTo(Math.cos(rayAngle) * (startDist + rayLen), Math.sin(rayAngle) * (startDist + rayLen));
+      ctx.strokeStyle = i % 2 === 0 ? `rgba(255, 255, 255, ${shockAlpha * 0.95})` : `rgba(255, 223, 0, ${shockAlpha * 0.85})`;
+      ctx.lineWidth = 2.4 - (i % 2) * 1.0;
       ctx.stroke();
     }
     ctx.restore();
 
-    // 3c. Expanding Air-Pressure Shockwave Rings (Golden + White Core)
-    const ringRadius = 14 + progress * 24;
+    // 3d. DENSE DUAL SHOCKWAVE DISKS
+    const ringRadius = 16 + progress * 28;
     ctx.save();
     ctx.beginPath();
-    ctx.ellipse(18 + progress * 10, 0, ringRadius * 0.6, ringRadius * 1.2, 0, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 215, 0, ${shockAlpha * 0.95})`;
-    ctx.lineWidth = 3.2;
+    ctx.ellipse(18 + progress * 12, 0, ringRadius * 0.5, ringRadius * 1.25, 0, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 223, 0, ${shockAlpha * 0.95})`;
+    ctx.lineWidth = 3.5;
     ctx.stroke();
 
     ctx.beginPath();
-    ctx.ellipse(14 + progress * 8, 0, ringRadius * 0.35, ringRadius * 0.75, 0, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255, 255, 255, ${shockAlpha * 0.85})`;
+    ctx.ellipse(14 + progress * 10, 0, ringRadius * 0.3, ringRadius * 0.8, 0, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255, 255, 255, ${shockAlpha * 0.9})`;
     ctx.fill();
     ctx.restore();
 
-    // 3d. Cross Flare at Peak Impact (progress ~ 0.5)
-    if (progress > 0.35 && progress < 0.65) {
-      const flareAlpha = Math.sin((progress - 0.35) / 0.3 * Math.PI);
+    // 3e. RADIANT 8-POINT IMPACT STARBURST FLARE
+    if (progress > 0.25 && progress < 0.75) {
+      const flareAlpha = Math.sin((progress - 0.25) / 0.5 * Math.PI);
       ctx.save();
       ctx.translate(14, 0);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${flareAlpha})`;
-      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${flareAlpha * 0.95})`;
+      ctx.lineWidth = 2.2;
 
       ctx.beginPath();
-      ctx.moveTo(0, -18); ctx.lineTo(0, 18);
+      ctx.moveTo(0, -22); ctx.lineTo(0, 22);
+      ctx.moveTo(-22, 0); ctx.lineTo(22, 0);
       ctx.stroke();
 
+      ctx.strokeStyle = `rgba(255, 235, 100, ${flareAlpha * 0.8})`;
+      ctx.lineWidth = 1.4;
       ctx.beginPath();
-      ctx.moveTo(-18, 0); ctx.lineTo(18, 0);
+      ctx.moveTo(-14, -14); ctx.lineTo(14, 14);
+      ctx.moveTo(-14, 14); ctx.lineTo(14, -14);
       ctx.stroke();
       ctx.restore();
     }

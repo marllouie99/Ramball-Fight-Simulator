@@ -281,6 +281,11 @@ export const SKILL_SOUNDS = {
 
   // ── Yuta ─────────────────────────────
   23: {
+    come_rika: {
+      src: 'Assets/Sound Effects/Skills/comerika.mp3',
+      volume: 2.5,
+      delay: 0
+    },
     domain_channel: {
       src: 'Assets/Sound Effects/Skills/yutadomainexpansion.mp3',
       volume: 3.0,
@@ -296,6 +301,26 @@ export const SKILL_SOUNDS = {
       volume: 1.5,
       delay: 0
     },
+    rika_attack: {
+      src: 'Assets/Sound Effects/Skills/backstab.mp3',
+      volume: 1.2,
+      delay: 0
+    },
+    rika_ground_smash: {
+      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      volume: 1.5,
+      delay: 0
+    },
+    rika_attack_noises: [
+      { src: 'Assets/Sound Effects/Attacks/rikanoise1.mp3', volume: 1.8 },
+      { src: 'Assets/Sound Effects/Attacks/rikanoise2.mp3', volume: 1.8 },
+      { src: 'Assets/Sound Effects/Attacks/rikanoise3.mp3', volume: 1.8 }
+    ],
+    rika_ground_tremble: {
+      src: 'Assets/Sound Effects/SkillEffects/groundTremble.mp3',
+      volume: 1.2,
+      delay: 0
+    },
     parry: {
       src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
       volume: 0.8,
@@ -309,7 +334,6 @@ export const SKILL_SOUNDS = {
  * @param {number} fighterId - Fighter ID
  * @param {string} skillName - Name of the skill (e.g. 'rage')
  * @returns {{ src: string, volume: number } | null}
-
  */
 export function getSkillSound(fighterId, skillName) {
   const lowerSkill = String(skillName || '').toLowerCase();
@@ -326,10 +350,12 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS[21];
     } else if (strKey.includes('sukuna')) {
       fighterConfig = SKILL_SOUNDS[22];
-    } else if (strKey.includes('mahoraga')) {
+    } else if (strKey.includes('yuta') || strKey.includes('rika')) {
       fighterConfig = SKILL_SOUNDS[23];
     } else if (strKey.includes('toji')) {
       fighterConfig = SKILL_SOUNDS[24];
+    } else if (strKey.includes('mahoraga')) {
+      fighterConfig = SKILL_SOUNDS[25];
     }
   }
 
@@ -346,7 +372,11 @@ export function getSkillSoundPaths() {
   const paths = [];
   for (const fighter of Object.values(SKILL_SOUNDS)) {
     for (const skill of Object.values(fighter)) {
-      if (skill && skill.src) {
+      if (Array.isArray(skill)) {
+        for (const item of skill) {
+          if (item && item.src) paths.push(item.src);
+        }
+      } else if (skill && skill.src) {
         paths.push(skill.src);
       }
     }

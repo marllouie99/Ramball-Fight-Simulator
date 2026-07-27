@@ -37,12 +37,13 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) 
 }
 
 export function executeTeleportDodge(fighter, attacker, arena) {
-  if (fighter.isDead) return;
+  if (fighter.isDead || fighter.isTargetOfAmbush) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 
-  const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() < 0.5 ? 1.2 : -1.2)) : (Math.random() * Math.PI * 2);
-  const dist = (CONFIG.sukuna?.teleportDodgeDistance ?? 85) + Math.random() * 20;
+  // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
+  const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
+  const dist = (CONFIG.sukuna?.teleportDodgeDistance ?? 75) + Math.random() * 15;
 
   let targetX = fighter.x + Math.cos(angle) * dist;
   let targetY = fighter.y + Math.sin(angle) * dist;
@@ -87,6 +88,7 @@ export function teleportAwayFrom(fighter, opponent, arena) {
   fighter.vx = 0;
   fighter.vy = 0;
 
+  spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
   spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
   spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
   playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
@@ -134,6 +136,9 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
 
   fighter.vx = 0;
   fighter.vy = 0;
+  spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
+  spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+  spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
   playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
 
   fighter.meleeComboCount++;
@@ -186,8 +191,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   const attackSound = getBasicAttackSound(null, 'sukuna_melee');
   if (attackSound) playSound(attackSound.src, attackSound.volume * 0.8);
 
-  if (typeof opponent.applyTimeStop === 'function') opponent.applyTimeStop(5);
-
+  // Time stop removed here so it does not cancel ultimates / domain channeling via hard CC!
   fighter.meleePunchCooldown = punchCooldown;
 
   if (fighter.meleeComboCount >= fighter.meleeComboTarget) {

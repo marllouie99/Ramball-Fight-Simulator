@@ -202,7 +202,11 @@ export class YutaFighter extends Fighter {
       this.hitStunTimer = 0;
     }
 
-    if (this._handleTimeStop()) return;
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
 
     // Fade afterimages every frame (when not time-stopped)
     if (this.afterImages && this.afterImages.length > 0) {
@@ -615,6 +619,10 @@ export class YutaFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    if (this.isTargetOfAmbush) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+
     // 25% chance to block if not currently swinging his sword (85% if actively guarding)
     const maxCd = this.meleeCooldownMax;
     const isSwinging = (this.meleeCooldown > maxCd - 15);
@@ -646,6 +654,7 @@ export class YutaFighter extends Fighter {
         this.flurryGhost = { x: oldX, y: oldY };
         this.x = attacker.x + (dx / dist) * (this.r + attacker.r + 5);
         this.y = attacker.y + (dy / dist) * (this.r + attacker.r + 5);
+        if (attacker && !attacker.isDead) this.aim(attacker);
 
         this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
@@ -654,13 +663,13 @@ export class YutaFighter extends Fighter {
         playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
         triggerGlobalScreenShake(8, 10);
 
-        spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#FF1493');
         const attackSound = getBasicAttackSound('musashi');
         if (attackSound) playSound(attackSound.src, attackSound.volume);
 
         return 0; // Return early, damage blocked, flurry started
       }
 
+      if (attacker && !attacker.isDead) this.aim(attacker);
       this.blockPoseTimer = CONFIG.yuta.parryGuardDuration || 90; // Hold block pose
       // Dynamically switch stance position on every single parry so Yuta never holds a stiff pose
       const lastStance = this.parryStanceIndex || 0;
@@ -759,6 +768,13 @@ export class YutaFighter extends Fighter {
     }
 
     return super.takeDamage(amount, attacker, opts);
+  }
+
+  resolveWallBounce(arena, opponent) {
+    super.resolveWallBounce(arena);
+    if (opponent && !opponent.isDead) {
+      this.aim(opponent);
+    }
   }
 
   activateDomain() {

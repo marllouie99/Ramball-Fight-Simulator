@@ -41,7 +41,7 @@ export function applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, a
   const ny = dy / dist;
 
   const slideOffset = Math.min(24, dist * 0.35);
-  const slideSpeed = 13.5;
+  const slideSpeed = 3.5;
 
   let startX = targetX - nx * slideOffset;
   let startY = targetY - ny * slideOffset;
@@ -56,7 +56,7 @@ export function applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, a
 
   fighter.vx = nx * slideSpeed;
   fighter.vy = ny * slideSpeed;
-  fighter.teleportSlideTimer = 10;
+  fighter.teleportSlideTimer = 6;
 
   if (!fighter.afterImages) fighter.afterImages = [];
   const pathAngle = Math.atan2(dy, dx);
@@ -80,12 +80,13 @@ export function applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, a
 }
 
 export function executeTeleportDodge(fighter, attacker, arena) {
-  if (fighter.isDead) return;
+  if (fighter.isDead || fighter.isTargetOfAmbush) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 
-  const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() < 0.5 ? 1.2 : -1.2)) : (Math.random() * Math.PI * 2);
-  const dist = (CONFIG.gojo?.teleportDodgeDistance ?? 85) + Math.random() * 20;
+  // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
+  const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
+  const dist = (CONFIG.gojo?.teleportDodgeDistance ?? 75) + Math.random() * 15;
 
   let targetX = fighter.x + Math.cos(angle) * dist;
   let targetY = fighter.y + Math.sin(angle) * dist;

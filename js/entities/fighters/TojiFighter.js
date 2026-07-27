@@ -163,9 +163,9 @@ export class TojiFighter extends Fighter {
       return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
     });
 
-    // Inverted Spear Parry & Counter-Attack (active inside enemy domains against strikes/projectiles, not domain slash ticks!)
+    // Inverted Spear Parry & Counter-Attack (active inside enemy domains against strikes/projectiles AND domain slash ticks!)
     const parryChance = CONFIG.toji?.parryChance || 0.45;
-    const canParry = isEnemyDomainActive && !opts.isDomain && (opts.isMelee || opts.isPhysical || !opts.isTrueDamage);
+    const canParry = isEnemyDomainActive && (opts.isMelee || opts.isPhysical || !opts.isTrueDamage);
 
     if (canParry && Math.random() < parryChance) {
       this.blockPoseTimer = 25; // 25-frame parry deflection pose
@@ -187,9 +187,14 @@ export class TojiFighter extends Fighter {
 
       playSound('Assets/Sound Effects/Skills/parry.mp3', 0.85);
 
-      // Instantly trigger 3-Stage Ambush Counter-Attack if not currently ambushing
-      if (!this.isAmbushing && attacker && attacker.hp > 0) {
-        this.startAmbushSequence(attacker);
+      // Trigger 3-Stage Ambush Counter-Attack with cooldown so it is not spammed continuously inside domains
+      let realTarget = (attacker && attacker.owner) ? attacker.owner : attacker;
+      if (realTarget && (realTarget.isRika || realTarget.type === 'rika' || realTarget._def?.type === 'rika')) {
+        realTarget = state.fighters.find(f => f && f !== this && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika');
+      }
+      if (!this.isAmbushing && (this._parryAmbushCooldown || 0) <= 0 && realTarget && realTarget.hp > 0 && !realTarget.isDead) {
+        this._parryAmbushCooldown = CONFIG.toji?.parryAmbushCooldownFrames || 360; // 6 second cooldown between parry counter-ambushes
+        this.startAmbushSequence(realTarget);
       }
 
       return false; // Damage parried & negated!
@@ -632,26 +637,29 @@ export class TojiFighter extends Fighter {
           this.ultimateTarget.vy = kbVy;
           this.ultimateTarget.knockbackDecay = 0.90; // Smooth kinetic deceleration
           this.ultimateTarget.applyKnockback(kbVx, kbVy);
-        }
-        
-        this._clearTargetFreeze(this);
-        this.ultimateActive = false;
-        this.isChannelingDomain = false;
-        this.ultimatePhase = null;
-        this.ultimateTarget = null;
-        this.ambushPhase = null;
-        this.isAmbushing = false;
-        this.spearSwingTimer = 0;
-        this.katanaSlashTimer = 0;
-        this.katanaSlashFadeTimer = 0;
-        this.phantomStrikeCount = 0;
-        this.postUltimateRecoveryTimer = 0; // Immediate instant movement recovery (0 frames freeze)!
+          
+          this._clearTargetFreeze(this);
+          this.ultimateActive = false;
+          this.isChannelingDomain = false;
+          this.ultimatePhase = null;
+          this.ultimateTarget = null;
+          this.ambushPhase = null;
+          this.isAmbushing = false;
+          this.spearSwingTimer = 0;
+          this.katanaSlashTimer = 0;
+          this.katanaSlashFadeTimer = 0;
+          this._hasAttemptedChannelInterrupt = false;
+          this._channelInterruptCooldown = 0;
+          this.phantomStrikeCount = 0;
+          this.postUltimateRecoveryTimer = 0; // Immediate instant movement recovery!
 
-        // Immediately enter stealth mode after landing ultimate final blow
-        this.stealthTimer = this.stealthMaxDuration;
-        this.stealthCooldown = 0;
-        this.isStealthed = true;
-        this.stealthActive = true;
+          this.vx = 0;
+          this.vy = 0;
+          this.stealthTimer = 40;
+          this.stealthCooldown = 40; // Triggers next ambush within 1 second after ultimate finishes!
+          this.isStealthed = true;
+          this.stealthActive = true;
+        }
       }
       return;
     }
@@ -673,6 +681,11 @@ export class TojiFighter extends Fighter {
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
+    if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
+      const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== this && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
+      if (realEnemy) opponent = realEnemy;
+    }
+
     // Check Mahoraga Divine Adaptation Freeze first (bypasses Heavenly Restriction immunity)
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
@@ -716,6 +729,7 @@ export class TojiFighter extends Fighter {
     if (this.spearSwingTimer > 0) this.spearSwingTimer--;
     if (this.phantomSlashTimer > 0) this.phantomSlashTimer--;
     if (this.ultimateCooldown > 0) this.ultimateCooldown--;
+    if (this._parryAmbushCooldown > 0) this._parryAmbushCooldown--;
 
     // Handle Ultimate Sequence
     if (this.ultimateActive) {

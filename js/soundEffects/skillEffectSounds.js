@@ -1,3 +1,5 @@
+import { playSound } from '../systems/soundSystem.js';
+
 // ─────────────────────────────────────────────
 // SKILL EFFECT SOUND EFFECTS CONFIG
 // ─────────────────────────────────────────────
@@ -144,6 +146,39 @@ export const SKILL_EFFECT_SOUNDS = {
       src: 'Assets/Sound Effects/Skills/dash5.mp3',
       volume: 1.0,
       delay: 0,
+    },
+  },
+
+  // ── Mahoraga ──────────────────────────────
+  mahoraga: {
+    wheelclick: {
+      src: 'Assets/Sound Effects/Skills/mahoraga-wheelclick.mp3',
+      volume: 1.5,
+      speed: 1.0,
+    },
+    punch: {
+      src: [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3',
+      ],
+      volume: 1.0,
+    },
+    heavypunch: {
+      src: [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3',
+      ],
+      volume: 1.0,
+    },
+    dash: {
+      src: 'Assets/Sound Effects/Skills/dash5.mp3',
+      volume: 1.0,
+    },
+    teleport: {
+      src: 'Assets/Sound Effects/Skills/dash5.mp3',
+      volume: 1.0,
     },
   },
 };

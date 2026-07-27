@@ -12,6 +12,10 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateChannelSense(fighter, opponent) {
+  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
+    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
+    if (realEnemy) opponent = realEnemy;
+  }
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
   if (!fighter.isAmbushing && opponent && !opponent.isDead) {
@@ -20,23 +24,24 @@ export function modUpdateChannelSense(fighter, opponent) {
       opponent.isChannelingDomainExpansion ||
       opponent.isChannelingDomain ||
       opponent.isChannelingRCT ||
+      (opponent.rctRevivalTimer || 0) > 0 ||
       opponent.isChannelingDivineFlame ||
       opponent.isChannelingStorm ||
       (opponent.isChanneling === true)
     );
 
     if (isTargetChanneling) {
-      const detectionRadius = CONFIG.toji?.channelDetectionRadius || 450;
+      const detectionRadius = CONFIG.toji?.channelDetectionRadius || 600;
       const dist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
 
-      // 1. Initial Detection & Dice Roll
+      // 1. Initial Detection & Instant Reaction
       if (dist <= detectionRadius && !fighter._hasAttemptedChannelInterrupt && !(fighter._channelInterruptCooldown > 0)) {
         fighter._hasAttemptedChannelInterrupt = true;
-        const interruptChance = CONFIG.toji?.channelInterruptChance || 0.30;
+        const interruptChance = CONFIG.toji?.channelInterruptChance || 1.0;
 
-        if (Math.random() < interruptChance) {
-          // Roll succeeds! Start the reaction timer instead of instantly triggering it!
-          fighter._channelReactionTimer = CONFIG.toji?.channelReactionFrames ?? 15;
+        if (Math.random() <= interruptChance) {
+          // Trigger reaction timer
+          fighter._channelReactionTimer = CONFIG.toji?.channelReactionFrames ?? 10;
         }
       }
 
@@ -45,14 +50,14 @@ export function modUpdateChannelSense(fighter, opponent) {
         fighter._channelReactionTimer--;
         if (fighter._channelReactionTimer <= 0) {
           // Trigger visual & audio indicator for Channel Sense Interrupt!
-          fighter.channelSenseIndicatorTimer = 35; // 35-frame indicator animation (~0.6s)
+          fighter.channelSenseIndicatorTimer = 35;
           spawnImpactFlash(fighter.x, fighter.y, 65, 'crimsonSniper');
           spawnMeleeClashShockwave(fighter.x, fighter.y, 110, 'yuta');
           spawnCrimsonLightningImpact(fighter.x, fighter.y, 80);
           playSound('Assets/Sound Effects/Skills/backstab.mp3', 1.0);
 
-          // Set cooldown so it can't trigger again for ~15 seconds (900 frames)
-          fighter._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 900;
+          // Set cooldown so it can trigger again after 3 seconds (180 frames)
+          fighter._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 180;
 
           // Forcefully break current state & launch Sequence 1 Ambush to interrupt!
           fighter.startAmbushSequence(opponent, true);
@@ -73,6 +78,10 @@ export function modUpdateChannelSense(fighter, opponent) {
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateStealth(fighter, opponent) {
+  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
+    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
+    if (realEnemy) opponent = realEnemy;
+  }
   if (fighter.stealthTimer > 0) {
     fighter.stealthTimer--;
     fighter.isStealthed = true;
@@ -97,6 +106,8 @@ export function modUpdateStealth(fighter, opponent) {
       fighter.isStealthed = false;
       fighter.stealthActive = false;
       fighter.stealthCooldown = fighter.stealthMaxCooldown;
+      fighter._hasAttemptedChannelInterrupt = false;
+      fighter._channelInterruptCooldown = 0;
     }
   } else if (fighter.stealthCooldown > 0) {
     const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 45;

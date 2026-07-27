@@ -311,8 +311,8 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
   if (isAudioBufferLike(cached)) {
     try {
       const audioCtx = getAudioContext();
-      if (audioCtx.state !== 'running') {
-        throw new Error('AudioContext not running yet');
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume().catch(() => {});
       }
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
@@ -346,14 +346,20 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
   }
 
   // Slow path: Audio element fallback (may need to load/decode on demand)
-  const base = cached ?? new Audio(src);
+  const base = (cached && typeof cached.cloneNode === 'function') ? cached : new Audio(src);
   let clone;
   let poolIdx = _audioPool.findIndex(a => a && (a.paused || a.ended));
   if (poolIdx >= 0) {
     clone = _audioPool.splice(poolIdx, 1)[0];
-    clone.src = base.src || src;
   } else {
-    clone = /** @type {HTMLAudioElement} */ (base.cloneNode());
+    try {
+      clone = /** @type {HTMLAudioElement} */ (base.cloneNode());
+    } catch(e) {
+      clone = new Audio(src);
+    }
+  }
+  if (!clone.src || clone.src === '' || clone.src === 'null') {
+    clone.src = src;
   }
 
   clone.volume = Math.max(0, Math.min(1, volume));
@@ -515,4 +521,15 @@ export function stopAllSounds() {
 export function stopAllAudio() {
   stopAllSounds();
   stopAllLoopingSounds();
+}
+
+// Auto-unlock AudioContext on first user interaction (click, keydown, touch)
+if (typeof window !== 'undefined') {
+  const unlockEvents = ['pointerdown', 'keydown', 'touchstart', 'click'];
+  const handleUnlock = () => {
+    unlockAudio();
+  };
+  unlockEvents.forEach((evt) => {
+    window.addEventListener(evt, handleUnlock, { passive: true });
+  });
 }

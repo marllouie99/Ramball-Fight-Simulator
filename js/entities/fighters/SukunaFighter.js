@@ -81,13 +81,26 @@ export class SukunaFighter extends Fighter {
   }
 
   interruptAttacks() {
+    // Preserve Fuga channeling state inside Malevolent Shrine! Only explicit direct cancellation (Gojo Void, Toji Ambush) can stop domain Fuga.
+    const preserveFuga = this.domainActive && this.isChannelingDivineFlame;
+    const savedChargeTimer = this.divineFlameChargeTimer;
+    const savedFugaKey = this.fugaSoundKey;
+
     super.interruptAttacks();
-    if (this.fugaSoundKey) {
-      stopLoopingSound(this.fugaSoundKey);
-      this.fugaSoundKey = null;
+
+    if (preserveFuga) {
+      // Restore Fuga channeling state that super.interruptAttacks() wiped
+      this.isChannelingDivineFlame = true;
+      this.divineFlameChargeTimer = savedChargeTimer;
+      this.fugaSoundKey = savedFugaKey;
+    } else {
+      if (this.fugaSoundKey) {
+        stopLoopingSound(this.fugaSoundKey);
+        this.fugaSoundKey = null;
+      }
+      this.isChannelingDivineFlame = false;
+      this.divineFlameChargeTimer = 0;
     }
-    this.isChannelingDivineFlame = false;
-    this.divineFlameChargeTimer = 0;
   }
 
   reset() {
@@ -155,11 +168,24 @@ export class SukunaFighter extends Fighter {
     }
   }
 
+  /**
+   * Helper method to check if Sukuna is currently channeling or performing any active skill/ultimate.
+   */
+  isChannelingAnySkill() {
+    return !!(
+      this.isChannelingDivineFlame ||
+      this.isChannelingDomainExpansion ||
+      (this.divineFlameRecoveryTimer || 0) > 0 ||
+      (this.flurryHitsLeft || 0) > 0 ||
+      this.isTargetOfAmbush
+    );
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready)
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
-    if (this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+    if (!this.isTargetOfAmbush && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.sukuna.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage
@@ -259,6 +285,13 @@ export class SukunaFighter extends Fighter {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
       this.vy = 0;
+      // Increment Fuga charge safely during wheel adaptation pause
+      if (this.isChannelingDivineFlame) {
+        this.divineFlameChargeTimer++;
+        if (this.divineFlameChargeTimer >= this.divineFlameChargeMax) {
+          this._fireDivineFlame(ownerIndex);
+        }
+      }
       return; // Hold Sukuna in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
     }
 
@@ -281,8 +314,9 @@ export class SukunaFighter extends Fighter {
         this.domainActive = false;
       } else {
         this._applyDomainEffect(arena);
-        // Sukuna himself only unleashes active rapid slashes & teleports when not paralyzed and not channeling Fuga
-        if (!this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer && !this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0) {
+        // Sukuna himself only unleashes active rapid slashes & teleports when not paralyzed, not ambushed, and not channeling Fuga
+        const isAmbushedOrTargetStealthed = this.isTargetOfAmbush || (opponent && opponent.isAmbushing);
+        if (!isAmbushedOrTargetStealthed && !this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer && !this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0) {
           this._doDomainRapidSlashes(opponent, arena, ownerIndex);
         }
       }
@@ -298,18 +332,19 @@ export class SukunaFighter extends Fighter {
 
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      // Cancel active skill channels if paralyzed / time-stopped / ambushed
+      // Cancel domain expansion channeling if paralyzed / time-stopped / ambushed
       if (this.isChannelingDomainExpansion) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
       }
-      if (this.isChannelingDivineFlame) {
+      // Only cancel Fuga if NOT inside active Malevolent Shrine (domain protects Fuga channeling!)
+      if (this.isChannelingDivineFlame && !this.domainActive) {
         this.isChannelingDivineFlame = false;
         this.divineFlameChargeTimer = 0;
-      }
-      if (this.fugaSoundKey) {
-        stopLoopingSound(this.fugaSoundKey);
-        this.fugaSoundKey = null;
+        if (this.fugaSoundKey) {
+          stopLoopingSound(this.fugaSoundKey);
+          this.fugaSoundKey = null;
+        }
       }
       return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop
     }
@@ -371,26 +406,21 @@ export class SukunaFighter extends Fighter {
 
     // Switch modes dynamically based on distance (only when not in special states)
     if (!this.isChannelingDivineFlame && !this.domainActive && (this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0) {
-      const isToji = opponent && (opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji');
-
       if (this.meleeModeCooldown > 0) {
         // In mandatory ranged separation period after combo finisher
         this.isMeleeMode = false;
-      } else if (opponent && opponent.isStealthed && !this.domainActive && !isToji) {
-        // Disengage from melee combat while non-Toji opponent is in stealth mode
+      } else if (opponent && (opponent.isStealthed || opponent.isAmbushing) && !this.domainActive) {
+        // Disengage from melee combat while opponent is in stealth or ambushing
         this.isMeleeMode = false;
-      } else if (distToOpponent <= 160) {
+      } else if (distToOpponent <= 140) {
         if (!this.isMeleeMode) {
           this.isMeleeMode = true;
           this.meleeComboCount = 0;
         }
-      } else if (distToOpponent > 220) {
+      } else if (distToOpponent > 260) {
         if (this.isMeleeMode) {
           this.isMeleeMode = false;
-          this.meleeModeCooldown = 240;
-          if (opponent && !opponent.isDead) {
-            this._teleportAwayFrom(opponent, arena);
-          }
+          this.meleeModeCooldown = 180;
         }
       }
     }
@@ -398,6 +428,7 @@ export class SukunaFighter extends Fighter {
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+    if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
 
     // Update afterimages (fades afterimages during melee, dodge & flurry)
     if (this.afterImages && this.afterImages.length > 0) {
@@ -431,6 +462,7 @@ export class SukunaFighter extends Fighter {
       if (this.divineFlameCooldown < 0) this.divineFlameCooldown = 0;
     }
     if (!this.domainActive && !this.isChannelingDomainExpansion && this.domainCooldown > 0) this.domainCooldown--;
+    if (!this.isChannelingDomainExpansion) this._hasPlayedDomainChannelSound = false;
     if ((this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0 && this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
 
@@ -525,10 +557,14 @@ export class SukunaFighter extends Fighter {
 
     // Skip normal behavior while in Domain Expansion
     if (this.domainActive) {
+      this.isMeleeMode = false;
+      this.flurryHitsLeft = 0;
+      this.rapidSlashHitsLeft = 0;
+
       const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
 
       // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine!
-      if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead && (this.flurryHitsLeft || 0) <= 0) {
+      if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
         this.isChannelingDivineFlame = true;
         this.divineFlameChargeTimer = 0;
         spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA: OPEN)!', '#FF4500');
@@ -713,8 +749,12 @@ export class SukunaFighter extends Fighter {
     }
 
     // Check for rapid slash follow-up state (Flurry Finisher)
-    // New behavior: Teleport -> 1 slash -> teleport -> 1 slash -> repeat, with movement allowed
     if (this.rapidSlashHitsLeft > 0) {
+      if (this.isTargetOfAmbush || (opponent && (opponent.isAmbushing || opponent.isStealthed))) {
+        this.rapidSlashHitsLeft = 0;
+        this.flurryHitsLeft = 0;
+        return;
+      }
       this.rapidSlashTimer--;
 
       if (this.rapidSlashTimer <= 0) {
@@ -808,8 +848,8 @@ export class SukunaFighter extends Fighter {
             // Apply hit pause for dramatic effect
             if (typeof this.applyTimeStop === 'function') this.applyTimeStop(4);
 
-            // Set timer for next slash (using config for adjustable duration)
-            this.rapidSlashTimer = CONFIG.sukuna.rapidSlashCooldown || 8;
+            // Set timer for next slash (readable rhythmic pacing)
+            this.rapidSlashTimer = CONFIG.sukuna.rapidSlashCooldown || 16;
           }
         } else {
           // Target is dead, end the rapid slash sequence
@@ -854,8 +894,7 @@ export class SukunaFighter extends Fighter {
     }
 
     // Check for Phantom Flurry activation (priority over domain when close)
-    const isTojiTarget = opponent && (opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji');
-    if (this.flurryCooldown <= 0 && opponent && !opponent.isDead && (!opponent.isStealthed || isTojiTarget)) {
+    if (!this.isTargetOfAmbush && this.flurryCooldown <= 0 && opponent && !opponent.isDead && !opponent.isStealthed && !opponent.isAmbushing) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const flurryRange = CONFIG.sukuna.flurryRange || 150;
       if (distSq <= flurryRange ** 2) {
@@ -878,7 +917,6 @@ export class SukunaFighter extends Fighter {
         spawnImpactFlash(this.x, this.y, 30, 'crimsonSniper');
         triggerGlobalScreenShake(8, 10);
 
-        spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#8B0000');
         const attackSound = getBasicAttackSound(null, 'sukuna_melee');
         if (attackSound) playSound(attackSound.src, attackSound.volume);
       }
@@ -887,12 +925,13 @@ export class SukunaFighter extends Fighter {
     const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
 
     // Check for Divine Flame (Skill 2)
-    // Don't cast if ambushed, stunned, or opponent is performing sequence/ultimate
-    if (!isAmbushedOrStunned && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
+    // Don't cast if ambushed, stunned, already channeling another skill, or opponent is performing sequence/ultimate
+    if (!isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const safeDistance = 200;
       if (distSq > safeDistance ** 2) {
         this.isChannelingDivineFlame = true;
+        this.isChannelingDomainExpansion = false; // Explicit mutual exclusion
         this.divineFlameChargeTimer = 0;
         spawnFloatingText(this.x, this.y - this.r - 20, 'FURNACE (FUGA)', '#FF4500');
 
@@ -906,8 +945,9 @@ export class SukunaFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!isSilenced && !isAmbushedOrStunned && this.domainCooldown <= 0 && !this.domainActive && !this.isChannelingDomainExpansion && this.domainUseCount < 2 && opponent && !opponent.isDead && this.flurryHitsLeft <= 0) {
+    if (!isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && this.domainUseCount < 2 && opponent && !opponent.isDead) {
       this.isChannelingDomainExpansion = true;
+      this.isChannelingDivineFlame = false; // Explicit mutual exclusion
       this.domainChargeTimer = 0;
       triggerGlobalScreenShake(6, 90); // Tremble for the full 1.5 seconds
       if (!this._hasPlayedDomainChannelSound) {
@@ -1414,17 +1454,33 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
-    // 1. Snappy Melee Punch Animation (Alternating 1-2 punches with clear Left & Right fist paths)
+    // 1. Smooth Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target with recovery easing)
     if (this.punchAnimTimer > 0) {
-      const maxTimer = 16;
-      const t = (maxTimer - Math.min(maxTimer, this.punchAnimTimer)) / maxTimer; // 0 to 1 progress over 16 frames
-      const snap = t < 0.3 ? (t / 0.3) : Math.max(0, 1 - (t - 0.3) / 0.7); // Explosive thrust out 30%, smoothly retracts 70%
-      const punchDist = snap * 24; // 24px punch thrust (lands cleanly on target contact point!)
+      const maxT = 16.0;
+      this.currentSukunaPunchProgress = Math.min(1.0, Math.max(0.0, 1.0 - (this.punchAnimTimer / maxT)));
+    } else if (this.currentSukunaPunchProgress > 0) {
+      this.currentSukunaPunchProgress = Math.max(0.0, this.currentSukunaPunchProgress - 0.12);
+    } else {
+      this.currentSukunaPunchProgress = 0.0;
+    }
+
+    if (this.currentSukunaPunchProgress > 0) {
+      const rawProgress = this.currentSukunaPunchProgress;
+      const smoothP = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+      const lungeProgress = Math.sin(smoothP * Math.PI); // Buttery smooth 0 -> 1 -> 0 bell curve
+
+      let reachDist = 85;
+      if (this.target) {
+        const distToTarget = Math.hypot(this.target.x - this.x, this.target.y - this.y);
+        reachDist = Math.max(50, Math.min(115, distToTarget - this.r * 0.45));
+      }
+
+      const punchDist = lungeProgress * reachDist; // Dynamic reach extension directly to opponent!
 
       if (this.punchAnimHand === 0) {
         // --- RIGHT HAND PUNCH (Strikes along right flank) ---
         frontAngleOffset = 0.22;         // Right side angle offset
-        frontOffset += punchDist;        // Right hand punches 24px forward
+        frontOffset += punchDist;        // Right hand punches forward to enemy!
 
         // Left hand stays tucked in tight martial arts guard at chest
         const guardAngle = this.gunAngle - 0.35;
@@ -1435,7 +1491,7 @@ export class SukunaFighter extends Fighter {
         // --- LEFT HAND PUNCH (Strikes along left flank) ---
         const backAngle = this.gunAngle - 0.22; // Left side angle offset
         const backOffset = (this.r + 6) + punchDist;
-        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches 24px forward!
+        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches forward to enemy!
         backHandY = basePosY + Math.sin(backAngle) * backOffset;
 
         // Right hand pulls into tight right guard at chest

@@ -256,6 +256,25 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.8,
     delay: 0,
   },
+  // Mahoraga — Heavy martial punches & rapid strikes
+  'mahoraga': {
+    src: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    volume: 1.0,
+    delay: 0,
+  },
+  'mahoraga_punch': {
+    src: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    volume: 1.0,
+    delay: 0,
+  },
 };
 
 /**

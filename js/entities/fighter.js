@@ -278,7 +278,8 @@ export class Fighter {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
       this.vy = 0;
-      return true; // Hold fighter in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+      // Game pause stasis: freeze movement without canceling active skill channeling
+      return false;
     }
     if (this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') {
       this.timeStopTimer = 0;

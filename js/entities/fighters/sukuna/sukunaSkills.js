@@ -84,9 +84,8 @@ export function fireDivineFlame(fighter, ownerIndex) {
 
   const isDomainFuga = fighter.domainActive;
   const normalCd = CONFIG.sukuna?.divineFlameCooldown || 500;
-  // Reduce Fuga cooldown to 25% inside Malevolent Shrine!
   fighter.divineFlameRecoveryTimer = CONFIG.sukuna?.divineFlameRecoveryTime || 60;
-  fighter.divineFlameCooldown = isDomainFuga ? Math.round(normalCd * 0.25) : normalCd;
+  fighter.divineFlameCooldown = normalCd;
   const shakeIntensity = isDomainFuga ? 18 : (CONFIG.sukuna?.divineFlameShakeIntensity || 10);
   const shakeDuration = isDomainFuga ? 30 : (CONFIG.sukuna?.divineFlameShakeDuration || 15);
   triggerGlobalScreenShake(shakeIntensity, shakeDuration);
@@ -300,18 +299,6 @@ export function applyDomainEffect(fighter, arena) {
             if (typeof f.applyHitStun === 'function') f.applyHitStun(6);
           }
 
-          if (projectileSystem) {
-            const angle = Math.atan2(f.y - shrineY, f.x - shrineX);
-            const slashSpeed = (CONFIG.sukuna?.slashSpeed || 15) * 1.3;
-            const proj = projectileSystem.fireProjectile(
-              fighter, ownerIdx, 0, false, slashSpeed, false, 'ghostBlade', shrineX, shrineY, angle
-            );
-            const isTargetGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
-            if (proj && isTargetGojo) {
-              proj.targetIsGojoLimitless = (f.infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer !== undefined && f.infinityBlockTimer > 0));
-            }
-          }
-
           if (Math.random() < 0.6) {
             spawnSparks(f.x, f.y, 4, 'crimsonSniper', '#8B0000');
             spawnImpactFlash(f.x, f.y, 18, 'crimsonSniper');
@@ -345,14 +332,6 @@ export function applyDomainEffect(fighter, arena) {
 
             ill.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
             if (typeof ill.applyHitStun === 'function') ill.applyHitStun(6);
-
-            if (projectileSystem) {
-              const angle = Math.atan2(ill.y - shrineY, ill.x - shrineX);
-              const slashSpeed = (CONFIG.sukuna?.slashSpeed || 15) * 1.3;
-              projectileSystem.fireProjectile(
-                fighter, ownerIdx, 0, false, slashSpeed, false, 'ghostBlade', shrineX, shrineY, angle
-              );
-            }
 
             if (Math.random() < 0.6) {
               spawnSparks(ill.x, ill.y, 4, 'crimsonSniper', '#8B0000');

@@ -3,25 +3,14 @@
 // Contains eye-socket wings, ritual chest necklace, and facial features.
 // ─────────────────────────────────────────────
 
-/**
- * Draws Mahoraga's Eye-Socket Organic Feathered Wings (Upper and Lower).
- * Features soft, curved feather-like wings with detailed internal cloud lines, 
- * central rachis spines, scalloped overlapping feather tips, and divine organic flow.
- */
-export function drawMahoragaFaceWings(ctx, fighter) {
-  if (!fighter) return;
+let cachedWingsCanvas = null;
 
-  ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-
-  const angle = fighter.gunAngle || 0;
-  ctx.rotate(angle);
-
-  // Flip Y when facing left so wings mirror correctly
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
-
-  const r = fighter.r || 30;
+function renderFullWingsToOffscreenBuffer(r) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 360;
+  canvas.height = 200;
+  const ctx = canvas.getContext('2d');
+  ctx.translate(180, 110);
 
   // Colors for organic divine feathered wings:
   const featherWhite = '#FAFAF8';    // Soft white feather body
@@ -309,6 +298,34 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   drawFeatherWing(1, false, 1);  // Lower Right - Middle
   drawFeatherWing(-1, false, 0); // Lower Left - Front
   drawFeatherWing(1, false, 0);  // Lower Right - Front
+
+  return canvas;
+}
+
+/**
+ * Draws Mahoraga's Eye-Socket Organic Feathered Wings (Upper and Lower).
+ * Hardware-accelerated with offscreen canvas caching to guarantee 60 FPS performance!
+ */
+export function drawMahoragaFaceWings(ctx, fighter) {
+  if (!fighter) return;
+
+  const r = fighter.r || 30;
+  if (!cachedWingsCanvas) {
+    cachedWingsCanvas = renderFullWingsToOffscreenBuffer(r);
+  }
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+
+  const angle = fighter.gunAngle || 0;
+  ctx.rotate(angle);
+
+  // Flip Y when facing left so wings mirror correctly
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
+
+  // Blit pre-cached high-resolution offscreen canvas (0ms CPU time!)
+  ctx.drawImage(cachedWingsCanvas, -180, -110);
 
   ctx.restore();
 }
