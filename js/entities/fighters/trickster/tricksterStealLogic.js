@@ -27,7 +27,7 @@ export function updateStolenRubyHook(fighter) {
       for (let i = 0; i < state.fighters.length; i++) {
         const f = state.fighters[i];
         if (!f || f === fighter || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-        if (state.mode === '2v2' && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
+        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
 
         const fDist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
         // Give a small 15px leeway because the weapon physically extends slightly past the max range
@@ -132,7 +132,7 @@ function applyStolenCronosSpeed(fighter) {
   let modeMult = 1.0;
   if (typeof state !== 'undefined' && state.mode) {
     if (state.mode === '1v1') modeMult = 1.2;
-    else if (state.mode === '2v2') modeMult = 1.1;
+    else if ((state.mode === '2v2' || state.mode === '1v2 Stand Off')) modeMult = 1.1;
   }
   
   let baseMoveSpeed = fighter.baseSpeed * modeMult;

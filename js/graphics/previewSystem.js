@@ -17,20 +17,49 @@ export class PreviewProjectileSystem {
     const dirX = Math.cos(fighter.gunAngle);
     const dirY = Math.sin(fighter.gunAngle);
     const tipDist = GUN_TIP_DIST(fighter.r);
-    const speed = speedOverride ?? CONFIG.projectile.speed;
+    const speed = speedOverride ?? (fighter._def?.projectileSpeedMultiplier ? CONFIG.projectile.speed * fighter._def.projectileSpeedMultiplier : CONFIG.projectile.speed);
+    const fighterType = fighter.type || fighter.characterId || fighter._def?.type || '';
 
-    this.projectiles.push({
+    const proj = {
       x: fighter.x + dirX * tipDist,
       y: fighter.y + dirY * tipDist,
       vx: dirX * speed,
       vy: dirY * speed,
       r: CONFIG.projectile.radius,
       life: CONFIG.projectile.life,
-      color: fighter.color,
+      color: fighter.color || '#ffffff',
       owner: ownerIndex,
       damage,
       isFollowUp,
-    });
+      fighterType,
+      angle: fighter.gunAngle,
+      spinAngle: 0,
+    };
+
+    if (fighterType === 'gojo') {
+      proj.r = 8;
+      proj.isGojoBlue = true;
+    } else if (fighterType === 'sukuna') {
+      proj.r = 12;
+      proj.isGhostBlade = true;
+    } else if (fighterType === 'darkslategray') {
+      proj.r = 8;
+      proj.isShuriken = true;
+    } else if (fighterType === 'aimbot') {
+      proj.isAimbot = true;
+    } else if (fighterType === 'orange') {
+      proj.isFlame = true;
+    } else if (fighterType === 'red') {
+      proj.isSniper = true;
+    } else if (fighterType === 'zeus') {
+      proj.isZeus = true;
+    } else if (fighterType === 'green') {
+      proj.isPoison = true;
+    } else if (fighterType === 'white' || fighterType === 'railgun') {
+      proj.isRailgun = true;
+    }
+
+    this.projectiles.push(proj);
   }
 
   fireGrenade(fighter, ownerIndex, damage, opponent) {

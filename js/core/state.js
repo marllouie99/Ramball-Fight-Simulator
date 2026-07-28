@@ -64,9 +64,14 @@ export const state = {
 
   // Team assignment for 2v2: fighters 0,1 are team 0; fighters 2,3 are team 1
   getFighterTeam(fighterIndex) {
-    if (state.mode !== GAME_MODES.TWO_VS_TWO) return null;
-    if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
-    return fighterIndex < 2 ? 0 : 1;
+    if (state.mode === GAME_MODES.TWO_VS_TWO) {
+      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
+      return fighterIndex < 2 ? 0 : 1;
+    } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
+      return fighterIndex === 0 ? 0 : 1;
+    }
+    return null;
   },
 
   // Fighters
@@ -110,8 +115,10 @@ export const state = {
   // UI state
   previewBalls: [],
   indexScroll: 0,
+  indexPage: 0,
   indexInspectIndex: 0,
   weaponScroll: 0,
+  weaponPage: 0,
   selectedWeapon: null,
 
   // FPS tracking

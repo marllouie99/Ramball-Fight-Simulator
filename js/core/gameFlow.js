@@ -47,11 +47,23 @@ export function resetFighter(fighter) {
 }
 
 export function reinitFighters() {
-  state.floatingTexts.length = 0;
+  if (state.floatingTexts) state.floatingTexts.length = 0;
   if (state.bloodEffects) state.bloodEffects.length = 0;
   if (state.sparkEffects) state.sparkEffects.length = 0;
+  if (state.deathEffects) state.deathEffects.length = 0;
+  if (state.illusionDeathEffects) state.illusionDeathEffects.length = 0;
+  if (state.doppelgangerDeathEffects) state.doppelgangerDeathEffects.length = 0;
+  if (state.illusionSpawnEffects) state.illusionSpawnEffects.length = 0;
+  if (state.berserkerRageEffects) state.berserkerRageEffects.length = 0;
+  if (state.effects) state.effects.length = 0;
+  if (state.illusions) state.illusions.length = 0;
   state.roundWinner = null;
   state.roundEndTimer = 0;
+
+  // Reset qualityLevel and screenShake on round init
+  state.qualityLevel = 1.0;
+  state.qualityCheckTimer = 0;
+  state.screenShake = { timer: 0, maxTimer: 0, intensity: 0 };
 
   // Clear fuel pickups
   state.fuelPickups.length = 0;
@@ -76,6 +88,9 @@ export function reinitFighters() {
     // UI shows RED side as p1/p3 and BLUE side as p2/p4,
     // so arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
+  } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+    // 1v2 mode: Team 0 is p1, Team 1 is p2 and p3
+    fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
   }
 
   state.fighters.length = 0;
@@ -89,6 +104,16 @@ export function reinitFighters() {
     const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
     state.fighters[0].maxHp = fixedHp;
     state.fighters[0].hp = fixedHp;
+  } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+    const fixedHp = MODE_SETTINGS[state.mode]?.fixedHp || 1000;
+    const soloFixedHp = MODE_SETTINGS[state.mode]?.soloFixedHp || 2000;
+    state.fighters.forEach((f, idx) => {
+      if (f) {
+        const hp = idx === 0 ? soloFixedHp : fixedHp;
+        f.maxHp = hp;
+        f.hp = hp;
+      }
+    });
   } else if (MODE_SETTINGS[state.mode]?.fixedHp) {
     const fixedHp = MODE_SETTINGS[state.mode].fixedHp;
     state.fighters.forEach((f) => {
@@ -160,6 +185,46 @@ export function reinitFighters() {
     const angle3 = Math.random() * Math.PI * 2;
     state.fighters[3].vx = Math.cos(angle3) * state.fighters[3].speed;
     state.fighters[3].vy = Math.sin(angle3) * state.fighters[3].speed;
+  } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+    const leftX = arena.x + arena.width * 0.25;
+    const rightX = arena.x + arena.width * 0.75;
+    const centerY = arena.y + arena.height * 0.5;
+    const verticalSpread = arena.height * 0.25;
+
+    // Team 1: Solo on left
+    if (state.fighters[0]) {
+      state.fighters[0].x = leftX;
+      state.fighters[0].y = centerY;
+      state.fighters[0].angle = 0;
+      state.fighters[0].gunAngle = 0;
+      state.fighters[0].rightGunAngle = 0;
+      state.fighters[0].leftGunAngle = 0;
+      state.fighters[0].vx = state.fighters[0].speed;
+      state.fighters[0].vy = 0;
+    }
+
+    // Team 2: Duo on right
+    if (state.fighters[1]) {
+      state.fighters[1].x = rightX;
+      state.fighters[1].y = centerY - verticalSpread;
+      state.fighters[1].angle = Math.PI;
+      state.fighters[1].gunAngle = Math.PI;
+      state.fighters[1].rightGunAngle = Math.PI;
+      state.fighters[1].leftGunAngle = Math.PI;
+      state.fighters[1].vx = -state.fighters[1].speed;
+      state.fighters[1].vy = 0;
+    }
+
+    if (state.fighters[2]) {
+      state.fighters[2].x = rightX;
+      state.fighters[2].y = centerY + verticalSpread;
+      state.fighters[2].angle = Math.PI;
+      state.fighters[2].gunAngle = Math.PI;
+      state.fighters[2].rightGunAngle = Math.PI;
+      state.fighters[2].leftGunAngle = Math.PI;
+      state.fighters[2].vx = -state.fighters[2].speed;
+      state.fighters[2].vy = 0;
+    }
   } else {
     // 1v1: Fighters on opposite sides, aligned horizontally, facing each other
     const centerY = arena.y + arena.height * 0.5;
@@ -220,6 +285,23 @@ export function resetMatchWithRandom1v1Fighters() {
   resetMatch();
 }
 
+export function randomize1v2Fighters() {
+  if (FIGHTER_DEFS.length < 3) return;
+  const indices = FIGHTER_DEFS.map((_, idx) => idx);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  state.p1Index = indices[0];
+  state.p2Index = indices[1];
+  state.p3Index = indices[2];
+}
+
+export function resetMatchWithRandom1v2Fighters() {
+  randomize1v2Fighters();
+  resetMatch();
+}
+
 export async function startGame() {
   await preloadGameSounds();
   resetMatch();
@@ -240,6 +322,7 @@ export function startNextRound() {
 
   state.roundNum++;
   state.illusions = []; // Clear all illusions on new round
+  stopAllLoopingSounds(); // Stop any lingering audio loops from previous round
   reinitFighters();
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles from previous round
@@ -250,6 +333,7 @@ export function startNextRound() {
 
 export function restartCurrentRound() {
   state.illusions = []; // Clear all illusions
+  stopAllLoopingSounds();
   reinitFighters();
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles

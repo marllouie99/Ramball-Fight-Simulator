@@ -30,6 +30,21 @@ export function drawArena() {
     ? state.config.arena.wallWidth 
     : 4;
   ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
+
+  // Draw "CRONOSPHERE" transparent watermark in the middle of the arena
+  const centerX = arena.x + arena.width / 2;
+  const centerY = arena.y + arena.height / 2;
+
+  ctx.save();
+  ctx.fillStyle = 'rgba(30, 120, 255, 0.15)';
+  ctx.font = '900 34px "Impact", "Trebuchet MS", "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  if ('letterSpacing' in ctx) {
+    ctx.letterSpacing = '6px';
+  }
+  ctx.fillText('CRONOSPHERE', centerX, centerY);
+  ctx.restore();
 }
 
 let currentPurpleDimOpacity = 0;

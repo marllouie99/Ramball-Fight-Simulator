@@ -1,7 +1,7 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
+import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
@@ -81,8 +81,9 @@ export class SukunaFighter extends Fighter {
   }
 
   interruptAttacks() {
-    // Preserve Fuga channeling state inside Malevolent Shrine! Only explicit direct cancellation (Gojo Void, Toji Ambush) can stop domain Fuga.
-    const preserveFuga = this.domainActive && this.isChannelingDivineFlame;
+    // Preserve Fuga channeling state when inside Malevolent Shrine OR when time-stopped by Gojo's domain!
+    const isDomainTimeStop = (this.timeStopTimer > 0);
+    const preserveFuga = (this.domainActive || isDomainTimeStop) && this.isChannelingDivineFlame;
     const savedChargeTimer = this.divineFlameChargeTimer;
     const savedFugaKey = this.fugaSoundKey;
 
@@ -93,6 +94,9 @@ export class SukunaFighter extends Fighter {
       this.isChannelingDivineFlame = true;
       this.divineFlameChargeTimer = savedChargeTimer;
       this.fugaSoundKey = savedFugaKey;
+      if (isDomainTimeStop && this.fugaSoundKey) {
+        pauseLoopingSound(this.fugaSoundKey);
+      }
     } else {
       if (this.fugaSoundKey) {
         stopLoopingSound(this.fugaSoundKey);
@@ -160,7 +164,7 @@ export class SukunaFighter extends Fighter {
   }
 
   triggerDemoAttack() {
-    const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {} };
+    const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
     this.slashGlowTimer = 40;
     this.punchAnimTimer = 35;
     if (typeof this.performCleaveStrike === 'function') {
@@ -337,16 +341,16 @@ export class SukunaFighter extends Fighter {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
       }
-      // Only cancel Fuga if NOT inside active Malevolent Shrine (domain protects Fuga channeling!)
-      if (this.isChannelingDivineFlame && !this.domainActive) {
-        this.isChannelingDivineFlame = false;
-        this.divineFlameChargeTimer = 0;
-        if (this.fugaSoundKey) {
-          stopLoopingSound(this.fugaSoundKey);
-          this.fugaSoundKey = null;
-        }
+      // Pause Fuga audio while frozen in Gojo's domain so audio stops until domain ends
+      if (this.isChannelingDivineFlame && this.fugaSoundKey) {
+        pauseLoopingSound(this.fugaSoundKey);
       }
       return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop
+    }
+
+    // Resume Fuga charge audio if channeling after unfreezing
+    if (this.isChannelingDivineFlame && this.fugaSoundKey) {
+      resumeLoopingSound(this.fugaSoundKey);
     }
 
     // Failsafe: stop Fuga charge audio if not currently channeling Divine Flame
@@ -893,8 +897,8 @@ export class SukunaFighter extends Fighter {
       return; // Skip normal behavior while rapid slashing
     }
 
-    // Check for Phantom Flurry activation (priority over domain when close)
-    if (!this.isTargetOfAmbush && this.flurryCooldown <= 0 && opponent && !opponent.isDead && !opponent.isStealthed && !opponent.isAmbushing) {
+    // Check for Phantom Flurry activation (disabled in demo mode)
+    if (!this.isDemoFighter && !this.isTargetOfAmbush && this.flurryCooldown <= 0 && opponent && !opponent.isDead && !opponent.isStealthed && !opponent.isAmbushing) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const flurryRange = CONFIG.sukuna.flurryRange || 150;
       if (distSq <= flurryRange ** 2) {
@@ -924,9 +928,8 @@ export class SukunaFighter extends Fighter {
 
     const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
 
-    // Check for Divine Flame (Skill 2)
-    // Don't cast if ambushed, stunned, already channeling another skill, or opponent is performing sequence/ultimate
-    if (!isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
+    // Check for Divine Flame (Skill 2 - disabled in demo mode)
+    if (!this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const safeDistance = 200;
       if (distSq > safeDistance ** 2) {
@@ -943,9 +946,9 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    // Check for Domain Expansion (Ultimate)
+    // Check for Domain Expansion (Ultimate - disabled in demo mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && this.domainUseCount < 2 && opponent && !opponent.isDead) {
+    if (!this.isDemoFighter && !isSilenced && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && !this.domainActive && this.domainUseCount < 2 && opponent && !opponent.isDead) {
       this.isChannelingDomainExpansion = true;
       this.isChannelingDivineFlame = false; // Explicit mutual exclusion
       this.domainChargeTimer = 0;

@@ -226,7 +226,7 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
 
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
-  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
@@ -443,7 +443,7 @@ let _wispCacheCanvas = null;
 function _initDoppelgangerCaches(r) {
   const size = Math.ceil(r * 4);
 
-  if (!_smokeCacheCanvas) {
+  if (!_smokeCacheCanvas || _smokeCacheCanvas.width !== size) {
     _smokeCacheCanvas = document.createElement('canvas');
     _smokeCacheCanvas.width = size;
     _smokeCacheCanvas.height = size;
@@ -458,7 +458,7 @@ function _initDoppelgangerCaches(r) {
     sCtx.fill();
   }
 
-  if (!_glowCacheCanvas) {
+  if (!_glowCacheCanvas || _glowCacheCanvas.width !== size) {
     _glowCacheCanvas = document.createElement('canvas');
     _glowCacheCanvas.width = size;
     _glowCacheCanvas.height = size;
@@ -473,7 +473,7 @@ function _initDoppelgangerCaches(r) {
     gCtx.fill();
   }
 
-  if (!_wispCacheCanvas) {
+  if (!_wispCacheCanvas || _wispCacheCanvas.width !== size) {
     _wispCacheCanvas = document.createElement('canvas');
     _wispCacheCanvas.width = size;
     _wispCacheCanvas.height = size;
@@ -506,7 +506,7 @@ export function drawDopplegangerBodyEffect(ctx, x, y, r, angle, layer = 'under',
   ctx.translate(x, y);
 
   const qualityLevel = state.qualityLevel || 1.0;
-  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 

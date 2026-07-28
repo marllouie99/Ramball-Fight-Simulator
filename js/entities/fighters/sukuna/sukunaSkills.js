@@ -286,8 +286,8 @@ export function applyDomainEffect(fighter, arena) {
         if (f.domainImmunity && f.characterId !== 'toji' && f.type !== 'toji') return;
 
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-        if (isEnemy) {
-          hitEnemyThisTick = true;
+        if (true) { // Hit EVERYONE in the domain (stray slashes hurt teammates)
+          if (isEnemy) hitEnemyThisTick = true; // Only enemies trigger the specific hit sounds
           const timeInside = (fighter.domainTimeInsideMap.get(f) || 0) + domainDamageInterval;
           fighter.domainTimeInsideMap.set(f, timeInside);
 
@@ -322,8 +322,8 @@ export function applyDomainEffect(fighter, arena) {
               isEnemy = state.getFighterTeam(illOwnerIndex) !== myTeam;
             }
           }
-          if (isEnemy) {
-            hitEnemyThisTick = true;
+          if (true) { // Hit EVERYONE'S illusions in the domain
+            if (isEnemy) hitEnemyThisTick = true;
             const timeInside = (fighter.domainTimeInsideMap.get(ill) || 0) + domainDamageInterval;
             fighter.domainTimeInsideMap.set(ill, timeInside);
 

@@ -46,8 +46,8 @@ export function drawHUD() {
     const cx = state.arena.x + state.arena.width / 2;
     const topY = state.arena.y - 36;
 
-    // Draw round on top (hidden in Stand Off mode)
-    if (mode !== 'Stand Off') {
+    // Draw round on top (hidden in Stand Off modes)
+    if (mode !== GAME_MODES.STAND_OFF && mode !== GAME_MODES.STAND_OFF_1V2 && mode !== 'Stand Off' && mode !== '1v2 Stand Off') {
         drawPanel(cx - 90, topY, 180, 26, 0.7);
 
         ctx.fillStyle = '#fff';
@@ -100,7 +100,8 @@ function updateHealthHud() {
   if (!containerBottom) return;
 
   const { fighters, mode, scores, teamScores } = state;
-  const teamMode = mode === GAME_MODES.TWO_VS_TWO;
+  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
+  const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
   const cardsLeft = [];
   const cardsRight = [];
   const cardsBottom = [];
@@ -155,8 +156,8 @@ function updateHealthHud() {
         const { glowStyle, glowClass } = getGlowStyles(m);
         const fillStyle = `width:${percent}%; background:${barColor}; ${glowStyle}`;
         return `
-          <div class="health-card__member" style="margin-top: 12px;">
-            <div style="font-size: 12px; margin-bottom: 6px; color: rgba(255,255,255,0.95); font-weight: bold;">${m.name || 'Unknown'}</div>
+          <div class="health-card__member" style="margin-top: 6px;">
+            <div style="font-size: 12px; margin-bottom: 4px; color: #000; font-weight: bold;">${m.name || ('PLAYER ' + (state.fighters.indexOf(m) + 1))}</div>
             <div class="health-card__bar${glowClass}">
               <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
             </div>
@@ -196,16 +197,19 @@ function updateHealthHud() {
 
     return `
       <div class="health-card" style="${shakeStyle}${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
-        <div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 6px; font-weight: bold;">${title}</div>
-        <div class="health-card__wins" style="margin: 6px 0 8px; display: flex; gap: 6px;">${winsBullets}</div>
+        ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 2px; font-weight: bold;">${title}</div>` : ''}
+        ${maxBullets > 0 ? `<div class="health-card__wins" style="margin: 4px 0 6px; display: flex; gap: 6px;">${winsBullets}</div>` : ''}
         ${barsHTML}
-        ${description ? `<div class="health-card__desc" style="color: rgba(0, 0, 0, 0.7); margin-top: 8px; font-size: 11px; line-height: 1.3;">${description}</div>` : ''}
+        ${description ? `<div class="health-card__desc" style="color: rgba(0, 0, 0, 0.7); margin-top: 4px; font-size: 10px; line-height: 1.2;">${description}</div>` : ''}
       </div>
     `;
   };
 
   if (teamMode) {
-    const teamLabels = [
+    const teamLabels = is1v2 ? [
+      { title: '', color: '#ff4d4d', indexes: [0], key: 'red' },
+      { title: '', color: '#4da3ff', indexes: [1, 2], key: 'blue' },
+    ] : [
       { title: 'RED TEAM', color: '#ff4d4d', indexes: [0, 1], key: 'red' },
       { title: 'BLUE TEAM', color: '#4da3ff', indexes: [2, 3], key: 'blue' },
     ];
@@ -224,10 +228,10 @@ function updateHealthHud() {
         shakeTimer,
         isWinner: isWinner,
         borderColor: isWinner ? '#ffd700' : null,
-        kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : [])
+        kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
+        maxBullets: is1v2 ? 0 : 3
       });
-      if (teamIndex === 0) cardsLeft.push(cardHTML);
-      else cardsRight.push(cardHTML);
+      cardsBottom.push(cardHTML);
     });
   } else {
     fighters.forEach((fighter, index) => {
@@ -298,5 +302,9 @@ function updateHealthHud() {
 
   const bottomHTML = cardsBottom.join('');
   if (containerBottom && containerBottom.innerHTML !== bottomHTML) containerBottom.innerHTML = bottomHTML;
+  
+  if (containerBottom) {
+    containerBottom.style.top = '';
+  }
 }
 

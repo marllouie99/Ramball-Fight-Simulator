@@ -49,6 +49,8 @@ export class TurretEntity extends Fighter {
   applyKnockback(vx, vy) {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
+    this.vx = 0;
+    this.vy = 0;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -107,7 +109,7 @@ export class TurretEntity extends Fighter {
       }
     }
 
-    if (this._handleTimeStop()) {
+    if (this._handleTimeStop() || this.isTargetOfAmbush) {
       return; // Freeze! No moving, aiming, or shooting
     }
 
@@ -184,7 +186,7 @@ export class TurretEntity extends Fighter {
 
     if (state) {
       // Find the team of the owner to avoid shooting teammates
-      const ownerTeam = state.mode === '2v2' ? state.getFighterTeam(state.fighters.indexOf(this.owner)) : null;
+      const ownerTeam = (state.mode === '2v2' || state.mode === '1v2 Stand Off') ? state.getFighterTeam(state.fighters.indexOf(this.owner)) : null;
       const myOwnerIndex = state.fighters.indexOf(this.owner);
 
       const evaluateTarget = (f) => {
@@ -277,12 +279,12 @@ export class TurretEntity extends Fighter {
     // Upper barrel projectile
     const spawnX1 = this.x + muzzleX * cosA - upperY * sinA;
     const spawnY1 = this.y + muzzleX * sinA + upperY * cosA;
-    projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'gunslingerBullet', spawnX1, spawnY1, this.gunAngle);
+    projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX1, spawnY1, this.gunAngle);
 
     // Lower barrel projectile
     const spawnX2 = this.x + muzzleX * cosA - lowerY * sinA;
     const spawnY2 = this.y + muzzleX * sinA + lowerY * cosA;
-    projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'gunslingerBullet', spawnX2, spawnY2, this.gunAngle);
+    projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX2, spawnY2, this.gunAngle);
 
     const shotSound = getBasicAttackSound(this._def?.id);
     if (shotSound) playSound(shotSound.src, shotSound.volume);

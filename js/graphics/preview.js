@@ -20,6 +20,8 @@ export function createPreviewFighter(def, x, y, options = {}) {
     startVx: 0,
     startVy: 0,
   });
+  fighter.hideHpText = true;
+  fighter.isDemoFighter = true;
 
   fighter.x = x;
   fighter.y = y;
@@ -32,15 +34,21 @@ export function createPreviewFighter(def, x, y, options = {}) {
   fighter.shootCooldownMax = Math.max(18, Math.floor((def.cooldown || CONFIG.shoot.cooldown) / 3));
   fighter.meleeCooldown = 0;
 
-  fighter.shoot = function(ownerIndex) {
-    previewProjectileSystem.fireProjectile(
-      this,
-      ownerIndex,
-      this.damage,
-      false,
-      this._def?.projectileSpeedMultiplier ? CONFIG.projectile.speed * this._def.projectileSpeedMultiplier : undefined
-    );
-  };
+  const isMelee = (def.category === 'Melee') || ['todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
+
+  if (isMelee) {
+    fighter.shoot = function() {};
+  } else {
+    fighter.shoot = function(ownerIndex) {
+      previewProjectileSystem.fireProjectile(
+        this,
+        ownerIndex,
+        this.damage,
+        false,
+        this._def?.projectileSpeedMultiplier ? CONFIG.projectile.speed * this._def.projectileSpeedMultiplier : undefined
+      );
+    };
+  }
 
   fighter.shootGrenade = function(ownerIndex, opponent) {
     previewProjectileSystem.fireGrenade(this, ownerIndex, this.damage, opponent);
@@ -60,6 +68,10 @@ export function createPreviewTarget(demoArea, options = {}) {
     takeDamage() {},
     applyPoison() {},
     onDamageDealt() {},
+    applyHitStun() {},
+    applySlow() {},
+    applyStun() {},
+    interruptAttacks() {},
   };
 }
 
@@ -90,37 +102,151 @@ export function updateIndexDetailDemo(def, demoArea) {
   const pstate = indexDetailState;
   const fighter = pstate.fighter;
   const target = pstate.target;
+  const demoSpeed = (state.indexDemoSpeed !== undefined) ? state.indexDemoSpeed : 1.0;
 
-  target.x += target.vx;
-  target.y += target.vy;
-  if (target.x - target.r < demoArea.x + 20) {
-    target.x = demoArea.x + 20 + target.r;
-    target.vx = Math.abs(target.vx);
-  } else if (target.x + target.r > demoArea.x + demoArea.width - 20) {
-    target.x = demoArea.x + demoArea.width - 20 - target.r;
-    target.vx = -Math.abs(target.vx);
-  }
-  if (target.y - target.r < demoArea.y + 20) {
-    target.y = demoArea.y + 20 + target.r;
-    target.vy = Math.abs(target.vy);
-  } else if (target.y + target.r > demoArea.y + demoArea.height - 20) {
-    target.y = demoArea.y + demoArea.height - 20 - target.r;
-    target.vy = -Math.abs(target.vy);
-  }
+  // Handle Special Ability Animation Demo Modes (Skills / Passives / Ultimates)
+  const currentAnim = state.indexDemoAnim;
+  if (currentAnim && currentAnim !== 'basic') {
+    pstate.hideTarget = true;
+    fighter.x = demoArea.x + demoArea.width / 2;
+    fighter.y = demoArea.y + demoArea.height / 2;
+    fighter.vx = 0;
+    fighter.vy = 0;
+    fighter.gunAngle = Math.PI / 2 + (state.indexDemoRotation || 0); // Facing downward/forward + demo rotation offset
+    fighter.angle = fighter.gunAngle;
 
-  fighter.update(target, 0, demoArea);
+    if (currentAnim === 'mixing' && def.type === 'gojo') {
+      fighter.isChannelingPurple = true;
+      fighter.purpleChargeMax = 180;
+      if (typeof fighter.getPurpleChargeProgress !== 'function') {
+        fighter.getPurpleChargeProgress = function() {
+          return Math.min(1.0, (this.purpleChargeTimer || 0) / (this.purpleChargeMax || 180));
+        };
+      }
+      if (demoSpeed > 0) {
+        fighter.purpleChargeTimer = ((fighter.purpleChargeTimer || 0) + 1) % 180;
+      }
+      const lev = Math.sin(Math.min(1.0, (fighter.purpleChargeTimer || 0) / (180 * 0.4)) * Math.PI * 0.5);
+      fighter.z = lev * 35;
+    } else if (currentAnim === 'red' && def.type === 'gojo') {
+      fighter.redEffectTimer = 45;
+      fighter.redEffectMaxTimer = 45;
+      fighter.redBuildupPhase = true;
+    } else if (currentAnim === 'domain') {
+      fighter.isChannelingDomainExpansion = true;
+      fighter.domainChargeMax = 120;
+      if (demoSpeed > 0) {
+        fighter.domainChargeTimer = ((fighter.domainChargeTimer || 0) + 1) % 120;
+      }
+    } else if (currentAnim === 'fuga' && def.type === 'sukuna') {
+      fighter.isChannelingDivineFlame = true;
+      fighter.divineFlameChargeMax = 120;
+      if (demoSpeed > 0) {
+        fighter.divineFlameChargeTimer = ((fighter.divineFlameChargeTimer || 0) + 1) % 120;
+      }
+    } else if (currentAnim === 'stealth' && def.type === 'toji') {
+      fighter.isStealthed = true;
+      fighter.stealthTimer = 60;
+    } else if (currentAnim === 'clap' && def.type === 'todo') {
+      fighter.punchAnimTimer = 18;
+      fighter.punchAnimHand = (pstate.frame % 30 < 15) ? 0 : 1;
+    } else if (currentAnim === 'level8' && def.type === 'mahoraga') {
+      fighter.isInfinityBlitz = true;
+      fighter.adaptationStage = { melee: 8, ranged: 0, skill: 0 };
+    }
 
-  if (def.type === 'melee') {
-    const dist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
-    if (dist < fighter.r + target.r + 14 && fighter.meleeCooldown === 0) {
-      fighter.meleeCooldown = fighter.shootCooldownMax;
-      fighter.applySpeedBoost();
-      previewProjectileSystem.addImpact(fighter.x + Math.cos(fighter.gunAngle) * (fighter.r + 8), fighter.y + Math.sin(fighter.gunAngle) * (fighter.r + 8), def.color, 0, 16);
+    pstate.frame += 1;
+    return pstate;
+  } else {
+    pstate.hideTarget = false;
+    if (fighter.isChannelingPurple && currentAnim !== 'mixing') {
+      fighter.isChannelingPurple = false;
+      fighter.z = 0;
+    }
+    if (fighter.isChannelingDomainExpansion && currentAnim !== 'domain') {
+      fighter.isChannelingDomainExpansion = false;
+    }
+    if (fighter.isChannelingDivineFlame && currentAnim !== 'fuga') {
+      fighter.isChannelingDivineFlame = false;
+    }
+    if (fighter.isStealthed && currentAnim !== 'stealth') {
+      fighter.isStealthed = false;
+    }
+    if (fighter.redEffectTimer && currentAnim !== 'red') {
+      fighter.redEffectTimer = 0;
+    }
+    if (fighter.isInfinityBlitz && currentAnim !== 'level8') {
+      fighter.isInfinityBlitz = false;
+      fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
     }
   }
 
-  previewProjectileSystem.update(demoArea, fighter, target);
+  // Stop / Pause (0x speed)
+  if (demoSpeed === 0) {
+    return pstate;
+  }
 
-  pstate.frame += 1;
+  let steps = 1;
+  if (demoSpeed === 0.5) {
+    pstate.subFrame = (pstate.subFrame || 0) + 0.5;
+    if (pstate.subFrame < 1) {
+      return pstate; // Advance frame every 2 ticks for 0.5x speed
+    }
+    pstate.subFrame -= 1;
+    steps = 1;
+  } else if (demoSpeed === 2.0) {
+    steps = 2; // Advance 2 ticks per frame for 2.0x speed
+  }
+
+  for (let s = 0; s < steps; s++) {
+    const isMelee = (def.category === 'Melee') || ['todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
+
+    // Force fighter to remain perfectly stationary in the center of the demo viewport
+    fighter.x = demoArea.x + demoArea.width / 2;
+    fighter.y = demoArea.y + demoArea.height / 2;
+    fighter.vx = 0;
+    fighter.vy = 0;
+
+    // Make the target dummy smoothly orbit/oscillate around the stationary fighter
+    const targetDist = isMelee ? (fighter.r + target.r + 15) : 100;
+    const orbitSpeed = 0.03;
+    target.x = fighter.x + Math.cos(pstate.frame * orbitSpeed) * targetDist;
+    // Add a figure-8 style bobbing to the orbit for dynamic tracking
+    target.y = fighter.y + Math.sin(pstate.frame * orbitSpeed * 1.5) * (targetDist * 0.7);
+
+    // Run fighter update (aiming, cooldowns, shooting)
+    fighter.update(target, 0, demoArea);
+    if (state.indexDemoRotation) {
+      fighter.gunAngle = (fighter.gunAngle || 0) + state.indexDemoRotation;
+      fighter.angle = fighter.gunAngle;
+    }
+
+    // Enforce stationary position again just in case update() altered it
+    fighter.x = demoArea.x + demoArea.width / 2;
+    fighter.y = demoArea.y + demoArea.height / 2;
+    fighter.vx = 0;
+    fighter.vy = 0;
+
+    if (isMelee) {
+      const dist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+      if (dist < fighter.r + target.r + 25 && (fighter.meleeCooldown || 0) <= 0) {
+        fighter.meleeCooldown = fighter.shootCooldownMax || 25;
+        if (typeof fighter.applySpeedBoost === 'function') {
+          fighter.applySpeedBoost();
+        }
+        previewProjectileSystem.addImpact(
+          fighter.x + Math.cos(fighter.gunAngle) * (fighter.r + 8),
+          fighter.y + Math.sin(fighter.gunAngle) * (fighter.r + 8),
+          def.color || '#ffffff',
+          0,
+          16
+        );
+      }
+    }
+
+    previewProjectileSystem.update(demoArea, fighter, target);
+    pstate.frame += 1;
+  }
+
   return pstate;
 }

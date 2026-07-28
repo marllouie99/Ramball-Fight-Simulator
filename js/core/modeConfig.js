@@ -5,6 +5,7 @@
 export const GAME_MODES = {
   ONE_VS_ONE: '1v1',
   STAND_OFF: 'Stand Off',
+  STAND_OFF_1V2: '1v2 Stand Off',
   TWO_VS_TWO: '2v2',
   FFA: 'FFA',
   TLFS: 'TLFS',
@@ -27,6 +28,20 @@ export const MODE_SETTINGS = {
     speedMultiplier: 1.5,
     initialFuelPickups: 2,
     supportFourFighters: false,
+  },
+  [GAME_MODES.STAND_OFF_1V2]: {
+    label: '1v2 Stand Off',
+    rounds: 1,
+    hpMultiplier: 1.0,
+    fixedHp: 1500, // For the duo
+    soloFixedHp: 3000, // For the alone fighter
+    speedMultiplier: 1.5,
+    initialFuelPickups: 2,
+    supportFourFighters: false, // We will manually handle 3 fighters
+    teamColors: {
+      team0: '#ff4d4d', // Solo
+      team1: '#4da3ff', // Duo
+    },
   },
   [GAME_MODES.TLFS]: {
     label: 'TLFS',
@@ -73,4 +88,5 @@ export const MODE_SPEED_MULTIPLIER = Object.fromEntries(
 
 export const MODE_TEAM_COLORS = {
   [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO].teamColors,
+  [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2].teamColors,
 };

@@ -10,7 +10,7 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  * @param {Object} berserker - The Berserker fighter
  */
 export function spawnBerserkerRageEffect(berserker, colorOverride, secondaryColorOverride) {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   // OPTIMIZED: Further reduced limits for better performance
   const MAX_RAGE_EFFECTS = isMulti ? 10 : 25;
   

@@ -16,7 +16,7 @@ import { CONFIG } from '../../core/config.js';
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
   const isFFA = state && state.mode === GAME_MODES.FFA;
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || isFFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
 
   // Limit blood particles aggressively to prevent frame drops
   const qualityMultiplier = state.qualityLevel || 1.0;

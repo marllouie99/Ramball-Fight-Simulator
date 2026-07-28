@@ -181,6 +181,28 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 1.0,
     },
   },
+
+  // ── Todo ──────────────────────────────
+  todo: {
+    clap: {
+      src: 'Assets/Sound Effects/Skills/todo-clap.mp3',
+      volume: 1.2,
+      speed: 1.0,
+    },
+    blackflash: {
+      src: 'Assets/Sound Effects/Skills/blackflash.mp3',
+      volume: 1.5,
+      speed: 1.0,
+    },
+    heavypunch: {
+      src: [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3',
+      ],
+      volume: 1.0,
+    }
+  },
 };
 
 /**

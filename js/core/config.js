@@ -1,11 +1,11 @@
-// ─────────────────────────────────────────────
-// CONFIG — tweak all game values here
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// CONFIG ΓÇö tweak all game values here
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const CONFIG = {
   arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
-  spin: { rate: 0.06 },                        // angle increment per frame (× fighter.speed)
+  spin: { rate: 0.06 },                        // angle increment per frame (├ù fighter.speed)
   shoot: { cooldown: 24 },                      // frames between shots
   collision: { restitution: 0.95 },
   spawn: { leftXRatio: 0.25, rightXRatio: 0.75, yRatio: 0.5, verticalOffset: 32 },
@@ -16,13 +16,13 @@ export const CONFIG = {
     handSizeMultiplier: 1.5,                   // scale the size of all fighter hands globally (1.0 = default)
   },
 
-  // ─────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // PER-FIGHTER TUNING
   // All attack / behaviour numbers live here so you
   // never need to touch customFighters.js for balance.
-  // ─────────────────────────────────────────────
+  // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
-  /** Red — Normal fighter */
+  /** Red ΓÇö Normal fighter */
   normal: {
     aimThreshold: 0.12, // radians; lower = must face enemy more precisely before firing
     shotCooldown: 10,   // frames between consecutive shots (independent of base cooldown)
@@ -41,14 +41,14 @@ export const CONFIG = {
     executeWindupFrames: 30,       // Delay frames (charge up) before firing the execution bullet
   },
 
-  /** Blue — Aimbot fighter */
+  /** Blue ΓÇö Aimbot fighter */
   aimbot: {
     followUpMinCooldown: 10, // minimum frames of cooldown forced after a follow-up shot
     electricStunDuration: 8, // frames the target is stunned after being hit (10 frames = ~0.16s)
     electricStunChance: 0.40,  // 0.0 to 1.0 chance of triggering the stun on hit (0.5 = 50%)
   },
 
-  /** Yellow — Melee fighter */
+  /** Yellow ΓÇö Melee fighter */
   melee: {
     speedBoostDuration: 120, // frames the speed burst lasts after a hit (120 = 2 s at 60 fps)
     speedBoostMultiplier: 2.5, // how many times faster Yellow moves during the boost
@@ -57,7 +57,7 @@ export const CONFIG = {
   },
 
 
-  /** Orange — Flamethrower fighter */
+  /** Orange ΓÇö Flamethrower fighter */
   orange: {
     flameCount: 5,                  // number of flame particles per burst
     flameSpread: 0.30,              // radians; half-angle of the flame cone (matches V-shape)
@@ -91,7 +91,7 @@ export const CONFIG = {
     fuelBarOffsetY: 40,            // vertical offset from fighter center for fuel bar
   },
 
-  /** White — Laser fighter */
+  /** White ΓÇö Laser fighter */
   laser: {
     aimThreshold: 0.12,  // radians; must face enemy this precisely to start the beam
     beamDuration: 100,   // frames the beam fires for (180 = 3 s at 60 fps)
@@ -108,11 +108,11 @@ export const CONFIG = {
     initialKnockback: 1,     // velocity impulse on the very first beam contact
     tickDamage: 5.5,     // damage applied every tick interval after the initial hit
     tickInterval: 7,    // frames between damage ticks while beam is active
-    coreWidth: 4,     // base pixel width of the bright beam core (flickers ± 2 px)
-    glowWidth: 12,    // base pixel width of the soft glow layer (flickers ± 4 px)
+    coreWidth: 4,     // base pixel width of the bright beam core (flickers ┬▒ 2 px)
+    glowWidth: 12,    // base pixel width of the soft glow layer (flickers ┬▒ 4 px)
   },
 
-  /** Green — Grenadier (grenade throw + poison DOT) */
+  /** Green ΓÇö Grenadier (grenade throw + poison DOT) */
   grenadier: {
     attackRadius: 150, // pixels; enemy must be closer than this to trigger a throw
     throwCooldown: 120, // frames between grenade throws
@@ -123,7 +123,7 @@ export const CONFIG = {
     poisonDamagePerTick: 2,   // damage per poison tick
   },
 
-  /** Mahoraga — Divine General */
+  /** Mahoraga ΓÇö Divine General */
   mahoraga: {
     isAvailableInArena: true,
     throwCooldown: 1000,         // Long cooldown for throw barrage (1000 frames = ~16.6s at 60fps)
@@ -147,7 +147,7 @@ export const CONFIG = {
   neutralTeleportDelay: 12,        // Frame delay after teleporting before starting the next attack sequence (~0.20s)
   neutralTeleportDistance: 55,     // Teleport distance offset around opponent
 
-  /** Gray — Knight fighter */
+  /** Gray ΓÇö Knight fighter */
   knight: {
 
 
@@ -156,15 +156,15 @@ export const CONFIG = {
     swipeDuration: 18,   // frames the swipe arc animation plays
     swordDamage: 30,   // damage dealt by a sword swipe
     swordDurability: 3,    // number of swipes before the sword breaks
-    shieldBlockChance: 0.50, // probability (0–1) of blocking a direct incoming projectile
+    shieldBlockChance: 0.50, // probability (0ΓÇô1) of blocking a direct incoming projectile
     blockFlashFrames: 15,   // duration of the visual flash when a block occurs
     shieldHoldFrames: 60,   // frames to keep shield in front after successfully blocking an attack
     blockProjectileDetectionRadius: 250, // radius to detect incoming projectiles for shield block visual
     blockMeleeDetectionRadius: 130, // radius to detect close enemies for shield block visual
     shieldDurability: 2,    // number of successful blocks before the shield breaks
     shieldThrowDamage: 30,  // damage dealt by thrown sword after shield breaks
-    swordReturnFrames: 180, // frames until thrown sword returns (≈3s)
-    dashChargeFrames: 10,   // frames Gray locks in and charges before the shield dash (≈0.8 s)
+    swordReturnFrames: 180, // frames until thrown sword returns (Γëê3s)
+    dashChargeFrames: 10,   // frames Gray locks in and charges before the shield dash (Γëê0.8 s)
     chargeKnockback: 2.0,   // velocity applied to nearby enemies when charging begins
     chargeKnockbackRadius: 90, // radius in px for the charge knockback effect
     dashDuration: 40,   // max frames the dash itself lasts before it auto-cancels
@@ -173,7 +173,7 @@ export const CONFIG = {
     dashKnockback: 7,    // velocity impulse applied to target on shield bash hit
   },
 
-  /** Black — Black Hole fighter */
+  /** Black ΓÇö Black Hole fighter */
   black: {
     shotCooldown: 17,   // frames between shots (medium fire rate)
     blackHoleChance: 0.01, // 100% chance for projectile to become black hole
@@ -186,12 +186,12 @@ export const CONFIG = {
     // Additional tuning values used by Black fighter implementation
     enhancedBlackHoleChance: 0.1, // increased chance when enemy is already in black hole
     enhancedShotsGranted: 1, // number of guaranteed enhanced projectiles granted when enemy is pulled in
-    summonIndicatorFrames: 36, // frames for the summon fade-in/out indicator (≈0.6s)
+    summonIndicatorFrames: 36, // frames for the summon fade-in/out indicator (Γëê0.6s)
     skillChargeDuration: 30, // frames to charge skill before summoning (1s)
     projectileSpeed: 4.0, // default speed for black projectiles when specified
   },
 
-  /** DarkSlateGray — Ninja fighter */
+  /** DarkSlateGray ΓÇö Ninja fighter */
   darkslategray: {
     // TUNING: Basic attack settings
     shurikenDamage: 5,           // damage per shuriken
@@ -206,9 +206,9 @@ export const CONFIG = {
     // TUNING: Flame-contact stealth build
     // When DarkSlateGray is continuously in contact with Orange's flames,
     // it can (with a chance) trigger stealth mode after building up time.
-    flameContactStealthBuildFrames: 72, // frames of sustained flame contact before attempting stealth (≈1.2s at 60fps)
+    flameContactStealthBuildFrames: 72, // frames of sustained flame contact before attempting stealth (Γëê1.2s at 60fps)
     flameContactStealthChance: 0.45,     // chance to trigger stealth when build completes (per attempt)
-    flameContactStealthCooldown: 150,    // min frames between stealth triggers from flame contact (≈2.5s at 60fps)
+    flameContactStealthCooldown: 150,    // min frames between stealth triggers from flame contact (Γëê2.5s at 60fps)
 
     // TUNING: Invincibility skill activation
     dodgesToActivate: 3,         // number of successful dodges needed to activate skill
@@ -217,7 +217,7 @@ export const CONFIG = {
 
     // TUNING: Backstab mechanics
     backstabDamageMultiplier: 2.0, // damage multiplier when backstabbing during invincibility
-    backstabAngle: 120,          // angle in degrees considered "behind" enemy (±60° from back)
+    backstabAngle: 120,          // angle in degrees considered "behind" enemy (┬▒60┬░ from back)
     backstabRange: 75,          // pixels from enemy edge to trigger backstab
     meleeAttackRadius: 75,      // melee attack radius for backstab detection (INCREASED for easier testing/visibility)
     backstabRecoveryPercent: 0.15, // HP recovery on successful backstab (1.0 = 100%)
@@ -240,7 +240,7 @@ export const CONFIG = {
     weaponSwitchDuration: 12,   // frames for weapon swap animation during stealth
   },
 
-  /** Berserker — Blood Red fighter */
+  /** Berserker ΓÇö Blood Red fighter */
   berserker: {
     // TUNING: Rage mechanic
     maxRage: 100,               // maximum rage meter
@@ -271,7 +271,7 @@ export const CONFIG = {
     rageRadiusScale: 1.0,
   },
 
-  /** Cronos — Time Stop fighter */
+  /** Cronos ΓÇö Time Stop fighter */
   cronos: {
     // TUNING: Time Stop Sphere mechanics
     sphereRadius: 200,         // radius of the time stop sphere
@@ -300,7 +300,7 @@ export const CONFIG = {
     maxFrozenProjectiles: 25,    // max projectiles frozen in time sphere (performance limit)
   },
 
-  /** Bomber — Explosive fighter */
+  /** Bomber ΓÇö Explosive fighter */
   bomber: {
     // TUNING: Basic attack (grenades)
     grenadeDamage: 17,         // damage per grenade explosion
@@ -349,11 +349,11 @@ export const CONFIG = {
 
     // TUNING: Grenade range restrictions
     throwRadius: 400,        // max distance at which bomber can throw grenades
-    restrictRadius: 130,      // min distance — bomber cannot throw grenades inside this radius    optimalDistance: 145,    // sweet-spot distance bomber tries to maintain from opponent
+    restrictRadius: 130,      // min distance ΓÇö bomber cannot throw grenades inside this radius    optimalDistance: 145,    // sweet-spot distance bomber tries to maintain from opponent
     steeringForce: 0.35,     // how strongly bomber steers toward optimal distance (0-1)
   },
 
-  /** Gun Slinger — Dual revolver fighter */
+  /** Gun Slinger ΓÇö Dual revolver fighter */
   gunslinger: {
     // TUNING: Magazine system
     magazineSize: 24,         // number of bullets in the magazine (6 per gun)
@@ -383,7 +383,7 @@ export const CONFIG = {
     leftGunAngleOffset: 0.3,   // default left gun aim offset when no secondary target exists
   },
 
-  /** Doppleganger — Illusion melee fighter */
+  /** Doppleganger ΓÇö Illusion melee fighter */
   doppleganger: {
     // TUNING: Melee attack (purple sword)
     swordRange: 40,           // pixels from edge for sword swing attack
@@ -400,7 +400,7 @@ export const CONFIG = {
     illusionSpeedSync: true,  // if true, illusions spawn with current speed; if false, use base speed
   },
 
-  /** Engineer — Turret and Shotgun/Wrench */
+  /** Engineer ΓÇö Turret and Shotgun/Wrench */
   Engineer: {
     // Turret config
     turretSpawnDistance: -40, // Negative means spawn BEHIND the engineer, positive means IN FRONT
@@ -440,7 +440,7 @@ export const CONFIG = {
     turretAmmoPipSpacing: 6,  // Spacing between ammo pips
   },
 
-  /** Ruby — Scythe fighter */
+  /** Ruby ΓÇö Scythe fighter */
   ruby: {
     // Basic Attack
     scytheDamage: 10,
@@ -465,7 +465,7 @@ export const CONFIG = {
     dashDuration: 12,
   },
 
-  /** Musashi — Dual Sword Stance Fighter */
+  /** Musashi ΓÇö Dual Sword Stance Fighter */
   musashi: {
     // General
     stanceDurationFrames: 300, // 5 seconds per stance
@@ -502,7 +502,7 @@ export const CONFIG = {
     preemptiveCounterDamage: 7,
   },
 
-  /** Trickster — Spell Steal and Arcane Magic */
+  /** Trickster ΓÇö Spell Steal and Arcane Magic */
   trickster: {
     // Basic Attack: Arcane Bolt
     boltDamage: 12,
@@ -524,7 +524,7 @@ export const CONFIG = {
     spellStealRange: 350,
   },
 
-  /** Zeus — Lightning Spell Caster */
+  /** Zeus ΓÇö Lightning Spell Caster */
   zeus: {
     // Basic Attack: Chain Lightning (fast projectile)
     lightningDamage: 20,
@@ -565,7 +565,7 @@ export const CONFIG = {
     stormStrikeShakeFrames: 10,
   },
 
-  /** Gojo Satoru — Limitless Fighter */
+  /** Gojo Satoru ΓÇö Limitless Fighter */
   gojo: {
     infinityCooldown: 240,    // Cooldown before Infinity block triggers again
     blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster
@@ -636,7 +636,7 @@ export const CONFIG = {
     purpleFollowupComboPunches: 4,           // Number of rapid punch-teleports in Purple follow-up combo
   },
 
-  /** Ryomen Sukuna — King of Curses */
+  /** Ryomen Sukuna ΓÇö King of Curses */
   sukuna: {
     // Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 30% or below
@@ -675,7 +675,7 @@ export const CONFIG = {
     flurryCleaveBonusMultiplier: 2.0, // Bonus Dismantle/Cleave damage multiplier on flurry finish
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
 
-    // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
+    // Skill 2: Furnace (Divine Flame / Fuga) ΓÇö Thermobaric Nuke
     divineFlameCooldown: 610,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 150,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 100,         // Primary direct hit nuke damage
@@ -686,7 +686,7 @@ export const CONFIG = {
     thermobaricSplashRadius: 150,  // Thermobaric explosion splash damage radius
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
-    // Ultimate Skill: Domain Expansion — Malevolent Shrine
+    // Ultimate Skill: Domain Expansion ΓÇö Malevolent Shrine
     domainCooldown: 1000,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
@@ -697,7 +697,7 @@ export const CONFIG = {
     domainRampRatePerSec: 0.12,// 10% damage increase per second targets stay inside
   },
 
-  /** Yuta Okkotsu — Special Grade Sorcerer */
+  /** Yuta Okkotsu ΓÇö Special Grade Sorcerer */
   yuta: {
     // Passive: Reverse Cursed Technique (RCT) & Passive Regeneration
     regenRate: 0.03,                         // HP restored per frame passively
@@ -765,7 +765,7 @@ export const CONFIG = {
     rikaDeathExplosionKnockback: 10,          // Outward radial knockback force on Death Dispersion (#8)
     rikaDeathExplosionHitStun: 20,           // Hitstun duration (frames) applied by Death Dispersion (#8)
 
-    // Ultimate Skill: Domain Expansion — Authentic Mutual Love
+    // Ultimate Skill: Domain Expansion ΓÇö Authentic Mutual Love
     domainCooldown: 1300,                     // Cooldown before 2nd domain can trigger (~13 seconds)
     domainHpThreshold: 0.25,                 // Triggers Yuta's Domain Expansion and Rika re-summon at 25% HP
     domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
@@ -779,7 +779,7 @@ export const CONFIG = {
     domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
     domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
 
-    // AUDIO TUNING — Audio volumes & lead timing
+    // AUDIO TUNING ΓÇö Audio volumes & lead timing
     audio: {
       comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!" (90 frames = 1.5s)
       comeRikaVolume: 2.5,                   // Volume of "Come, Rika!" (comerika.mp3)
@@ -792,7 +792,7 @@ export const CONFIG = {
     },
   },
 
-  /** Toji — Sorcerer Killer */
+  /** Toji ΓÇö Sorcerer Killer */
   toji: {
     // Passive: Heavenly Restriction
     stealthDodgeChance: 0.20,    // 40% chance to physically dodge normal projectiles
@@ -853,14 +853,12 @@ export const CONFIG = {
     ultimateCraterFadeInFrames: 30,   // Frames for Toji to fade in before the crater slam
   },
 
-  /** Mahoraga — Divine General */
+  /** Mahoraga ΓÇö Divine General */
   mahoraga: {
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
-    hitsToAdapt: 15,                 // Number of hits required to rotate wheel and advance adaptation stage
-    maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
-    adaptationReductionPerStage: 0.2, // +12% damage reduction per adaptation stage (up to 96% at Stage 8)
+    maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360┬░ rotation of Eight-Handled Wheel)
+    adaptationReductionPerStage: 0.1, // +12% damage reduction per adaptation stage (up to 96% at Stage 8)
     adaptationDamageReduction: 0.8, // (Legacy) damage reduction fallback
-    rotateOnlyOnAdaptation: true,   // If true, wheel ONLY rotates 1 click when adaptation completes (not on basic hits)
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
     wheelClickDuration: 25,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
@@ -929,15 +927,21 @@ export const CONFIG = {
     rctHealAmountPercent: 0.15,       // Heals 35% of max HP back upon trigger
     rctHealCooldownFrames: 1500,      // Recharge cooldown (frames) between RCT heals (1200 frames = ~20s at 60fps)
 
+    // Fatal Damage Adaptation (General rolling damage window wheel click)
+    fatalAdaptWindowFrames: 300,     // Rolling window duration (frames) — damage from any attack must accumulate within this time (300 = 5 seconds at 60fps)
+    fatalDamageThresholdPct: 0.10,  // Fraction of maxHp that must accumulate within the window to trigger wheel click (10% = e.g. 15 HP for a 150 HP Mahoraga)
+    fatalAdaptCooldownFrames: 300,   // Cooldown (frames) between wheel clicks — prevents back-to-back rapid triggers (300 = 5 seconds at 60fps)
+
+
     // Teleportation Speed & Afterimage Visibility Settings
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)
     adaptationDashSpeedFrames: 10,   // Teleportation travel speed / frames during flash-dash (smaller = faster instant teleport!)
   },
 };
 
-// ─────────────────────────────────────────────
-// FIGHTER DEFINITIONS — static data only
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// FIGHTER DEFINITIONS ΓÇö static data only
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 export const FIGHTER_DEFS = [
   {
     id: 1,
@@ -1412,9 +1416,9 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
   });
 }
 
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // DERIVED CONSTANTS
-// ─────────────────────────────────────────────
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 
 /** Total distance from fighter center to gun barrel tip. */
 export const GUN_TIP_DIST = (r) => r + CONFIG.gun.baseOffset + CONFIG.gun.barrelLength;

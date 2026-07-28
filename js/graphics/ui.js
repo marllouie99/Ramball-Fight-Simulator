@@ -24,7 +24,7 @@ import { GAME_MODES, MODE_ROUNDS, MODE_SETTINGS } from '../core/modeConfig.js';
 import { Fighter } from '../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../entities/factories/fighterFactory.js';
 import { state, getLeaderboardData } from '../core/state.js';
-import { previewProjectileSystem, updateIndexDetailDemo } from './preview.js';
+import { previewProjectileSystem, updateIndexDetailDemo, resetIndexDetailState } from './preview.js';
 import { startGame, goToTitle, startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters } from '../core/gameFlow.js';
 import {
   drawRedSniperGun,
@@ -56,7 +56,7 @@ import { renderTeamHpCard } from './ui/hudRenderer.js';
 import { renderFpsDebugOverlay } from './ui/debugOverlay.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from './weapons/musashiWeaponGraphics.js';
 import { drawRubyScythe } from './weapons/rubyWeaponGraphics.js';
-import { playSound } from '../systems/soundSystem.js';
+import { playSound, unlockAudio } from '../systems/soundSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { drawHUD, clearHealthHud } from './hudManager.js';
@@ -113,6 +113,31 @@ state.canvas.addEventListener('wheel', (e) => {
     return;
   }
 
+  if (state.gameState === 'weapons') {
+    e.preventDefault();
+    const totalPages = Math.ceil(FIGHTER_DEFS.length / 5);
+    if (e.deltaY > 0 && state.weaponPage < totalPages - 1) {
+      state.weaponPage++;
+    } else if (e.deltaY < 0 && state.weaponPage > 0) {
+      state.weaponPage--;
+    }
+    return;
+  }
+
+  if (state.gameState === 'index') {
+    e.preventDefault();
+    const filteredDefs = FIGHTER_DEFS.filter(def => 
+      !state.indexCategory || state.indexCategory === 'All' || def.category === state.indexCategory
+    );
+    const totalPages = Math.ceil(filteredDefs.length / 5);
+    if (e.deltaY > 0 && state.indexPage < totalPages - 1) {
+      state.indexPage++;
+    } else if (e.deltaY < 0 && state.indexPage > 0) {
+      state.indexPage--;
+    }
+    return;
+  }
+
   if (selectingSlot === null) return;
 
   const rect = state.canvas.getBoundingClientRect();
@@ -137,13 +162,15 @@ state.canvas.addEventListener('wheel', (e) => {
   const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
   const cellH = cellW + 18;
 
-  // Check if mouse is inside the grid area
-  if (mouseX >= listX && mouseX <= listX + gridW && mouseY >= listY && mouseY <= listY + gridVisibleH) {
+  // Check if mouse is inside the grid or pagination area
+  if (mouseX >= listX && mouseX <= listX + gridW && mouseY >= listY && mouseY <= listY + 440) {
     const totalFighters = FIGHTER_DEFS.filter(def => !(!state.dummyEnabled && def.type === 'dummy')).length;
-    const totalRows = Math.ceil(totalFighters / cols);
-    const totalGridH = totalRows * (cellH + gap) - gap;
-    const maxScroll = Math.max(0, totalGridH - gridVisibleH);
-    modalGridScroll = Math.min(Math.max(0, modalGridScroll + e.deltaY * 0.8), maxScroll);
+    const totalPages = Math.max(1, Math.ceil(totalFighters / 18));
+    if (e.deltaY > 0 && modalPage < totalPages - 1) {
+      modalPage++;
+    } else if (e.deltaY < 0 && modalPage > 0) {
+      modalPage--;
+    }
     e.preventDefault();
   }
 }, { passive: false });
@@ -297,142 +324,19 @@ export function handleUIClick(mx, my) {
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
-let modalGridScroll = 0;
+let modalPage = 0;
 
-function drawPlayerCard(slotProp, title, x, y, w, h, borderColor, enabled) {
-  const { ctx, mode } = state;
-  drawPanel(x, y, w, h, 0.86, 14);
 
-  ctx.fillStyle = borderColor;
-  ctx.strokeStyle = borderColor;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(x + 2, y + 2, w - 4, 34, 10);
-  ctx.stroke();
-
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 15px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(title, x + w / 2, y + 18);
-
-  const fighterIndex = state[slotProp];
-  const def = FIGHTER_DEFS[fighterIndex];
-
-  if (!enabled) {
-    ctx.fillStyle = 'rgba(255,255,255,0.55)';
-    ctx.font = 'bold 14px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('FFA ONLY', x + w / 2, y + h / 2 - 12);
-    ctx.font = '12px Arial';
-    ctx.fillText('Switch mode to select', x + w / 2, y + h / 2 + 16);
-    return;
-  }
-
-  // Right Side (Preview & Button)
-  const previewX = x + w - 74;
-  const previewY = y + 74;
-
-  const teamColor = mode === '2v2'
-    ? (slotProp === 'p1Index' || slotProp === 'p3Index' ? '#ff4d4d' : '#4da3ff')
-    : null;
-  if (teamColor) {
-    ctx.save();
-    ctx.globalAlpha = 0.14;
-    ctx.fillStyle = teamColor;
-    ctx.beginPath();
-    ctx.ellipse(previewX, previewY, 42, 42, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  const previewImage = getFighterPreview(fighterIndex);
-  if (previewImage) {
-    const previewSize = 84;
-    ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
-  }
-
-  const btnW = 120;
-  const btnH = 32;
-  const btnX = x + w - btnW - 14;
-  const btnY = y + h - btnH - 12;
-
-  drawPanel(btnX, btnY, btnW, btnH, 0.92, 10);
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 12px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('SELECT FIGHTER', btnX + btnW / 2, btnY + btnH / 2);
-
-  _registerButton(btnX, btnY, btnW, btnH, () => {
-    selectingSlot = slotProp;
-    modalInspectIndex = fighterIndex;
-  });
-
-  // Left Side (Text/Stats)
-  const detailX = x + 16;
-  let textY = y + 54;
-
-  ctx.fillStyle = def.color;
-  ctx.font = 'bold 15px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText(def.name.toUpperCase(), detailX, textY);
-
-  ctx.fillStyle = '#aaa';
-  ctx.font = '11px Arial';
-  textY += 18;
-  ctx.fillText(`CLASS: ${def.type.toUpperCase()}`, detailX, textY);
-  textY += 18;
-
-  drawStatBar(ctx, 'HP', def.hp, 100, detailX, textY, 110, def.color);
-  textY += 16;
-  drawStatBar(ctx, 'DMG', def.damage, 50, detailX, textY, 110, '#f9c846');
-  textY += 16;
-  drawStatBar(ctx, 'RFR', Math.min(2, def.cooldown / 60), 2, detailX, textY, 110, '#8ad4ff');
-  textY += 14;
-
-  // Fighter description
-  ctx.fillStyle = '#999';
-  ctx.font = '10px Arial';
-  const maxDescWidth = 110;
-  wrapText(ctx, def.desc, detailX, textY, maxDescWidth, 13);
-}
-
-function drawStatBar(ctx, label, value, maxValue, x, y, width, color) {
-  ctx.fillStyle = '#888';
-  ctx.font = '10px Arial';
-  ctx.textAlign = 'left';
-  ctx.textBaseline = 'middle';
-  ctx.fillText(label, x, y + 4);
-
-  const labelW = 28;
-  const barX = x + labelW;
-  const barY = y;
-  const barHeight = 8;
-  const barWidth = width - labelW;
-
-  ctx.fillStyle = 'rgba(255,255,255,0.12)';
-  ctx.beginPath();
-  ctx.roundRect(barX, barY, barWidth, barHeight, 4);
-  ctx.fill();
-
-  const ratio = Math.min(1, Math.max(0, value / maxValue));
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.roundRect(barX, barY, barWidth * ratio, barHeight, 4);
-  ctx.fill();
-}
 
 function drawFighterSelectModal() {
   const { ctx, canvas } = state;
-  const modalW = Math.min(canvas.width - 20, 520);
-  const modalH = Math.min(canvas.height - 20, 520);
+  const modalW = Math.min(canvas.width - 20, 510);
+  const modalH = Math.min(canvas.height - 40, 580);
   const mx = (canvas.width - modalW) / 2;
   const my = (canvas.height - modalH) / 2;
 
   // Dark glass backdrop overlay
-  ctx.fillStyle = 'rgba(6, 8, 14, 0.78)';
+  ctx.fillStyle = 'rgba(6, 8, 14, 0.82)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const selectedDef = FIGHTER_DEFS[modalInspectIndex] || FIGHTER_DEFS[0];
@@ -453,162 +357,172 @@ function drawFighterSelectModal() {
   ctx.font = '900 11px Arial';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('SELECT CHAMPION', mx + 24, my + 16);
+  ctx.fillText('SELECT CHAMPION', mx + 20, my + 14);
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 20px Arial';
-  ctx.fillText(`FIGHTER FOR ${slotLabel}`, mx + 24, my + 30);
+  ctx.font = 'bold 18px Arial';
+  ctx.fillText(`FIGHTER FOR ${slotLabel}`, mx + 20, my + 28);
 
   // Top header accent line
   ctx.fillStyle = accentColor;
-  ctx.fillRect(mx + 24, my + 56, modalW - 48, 2);
+  ctx.fillRect(mx + 20, my + 52, modalW - 40, 2);
 
-  // ── Grid Configuration (Left Side) ──
+  // ── Grid Configuration (Left Side: 6 Rows x 3 Columns = 18 per page) ──
   const cols = 3;
-  const gap = 10;
+  const itemsPerPage = 18; // 6x3 grid
+  const gap = 5;
   const gridW = 210;
-  const listX = mx + 24;
-  const listY = my + 68;
-  const gridVisibleH = modalH - 128 - 10; // visible area for the grid
+  const listX = mx + 20;
+  const listY = my + 62;
 
-  const cellW = Math.floor((gridW - (cols - 1) * gap) / cols); // ~63px
-  const cellH = cellW + 18; // ~81px
+  const cellW = Math.floor((gridW - (cols - 1) * gap) / cols); // ~66px
+  const cellH = 60; // 60px height per card
 
   // Filter out dummy when dummy disabled
   const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
 
-  const totalRows = Math.ceil(modalAvailableFighters.length / cols);
-  const totalGridH = totalRows * (cellH + gap) - gap;
-  const maxScroll = Math.max(0, totalGridH - gridVisibleH);
+  const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
 
-  // Clamp scroll
-  if (modalGridScroll > maxScroll) modalGridScroll = maxScroll;
-  if (modalGridScroll < 0) modalGridScroll = 0;
+  // Clamp current page
+  if (modalPage >= totalPages) modalPage = totalPages - 1;
+  if (modalPage < 0) modalPage = 0;
 
-  // ── Draw grid items inside a clipping region ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(listX, listY, gridW, gridVisibleH);
-  ctx.clip();
+  // Extract fighters for the active page
+  const currentPageFighters = modalAvailableFighters.slice(modalPage * itemsPerPage, (modalPage + 1) * itemsPerPage);
 
-  modalAvailableFighters.forEach(({ def, idx }, gridPos) => {
-    const col = gridPos % cols;
-    const row = Math.floor(gridPos / cols);
+  // Draw 6x3 Grid Cards for active page
+  currentPageFighters.forEach(({ def, idx }, pagePos) => {
+    const col = pagePos % cols;
+    const row = Math.floor(pagePos / cols);
 
     const itemX = listX + col * (cellW + gap);
-    const itemY = listY + row * (cellH + gap) - modalGridScroll;
-
-    // Skip items fully outside the visible clipping area
-    if (itemY + cellH < listY || itemY > listY + gridVisibleH) return;
+    const itemY = listY + row * (cellH + gap);
 
     const isSelected = idx === modalInspectIndex;
 
     // Card background
-    ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.04)';
+    ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.04)';
     ctx.strokeStyle = isSelected ? def.color : 'rgba(255,255,255,0.12)';
     ctx.lineWidth = isSelected ? 2 : 1;
     ctx.beginPath();
-    ctx.roundRect(itemX, itemY, cellW, cellH, 10);
+    ctx.roundRect(itemX, itemY, cellW, cellH, 8);
     ctx.fill();
     ctx.stroke();
 
     if (isSelected) {
       ctx.save();
       ctx.shadowColor = def.color;
-      ctx.shadowBlur = 12;
+      ctx.shadowBlur = 10;
       ctx.stroke();
       ctx.restore();
     }
 
     // Fighter Preview Avatar inside card
     const avatarX = itemX + cellW / 2;
-    const avatarY = itemY + cellH / 2 - 8;
+    const avatarY = itemY + cellH / 2 - 7;
     const previewImg = getFighterPreview(idx);
     if (previewImg) {
-      const avatarSize = cellW - 12;
+      const avatarSize = cellW - 14;
       ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
     } else {
       ctx.fillStyle = def.color;
       ctx.beginPath();
-      ctx.arc(avatarX, avatarY, 16, 0, Math.PI * 2);
+      ctx.arc(avatarX, avatarY, 14, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // Card Name Tag
-    ctx.fillStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.7)';
-    ctx.font = isSelected ? 'bold 10px Arial' : '10px Arial';
+    ctx.fillStyle = isSelected ? '#ffffff' : 'rgba(255,255,255,0.75)';
+    ctx.font = isSelected ? 'bold 9px Arial' : '9px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
 
     let shortName = def.name;
     if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
-    ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 4);
-  });
+    ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
 
-  ctx.restore(); // end clipping region
-
-  // ── Register click buttons OUTSIDE clip (using visible bounds check) ──
-  modalAvailableFighters.forEach(({ def, idx }, gridPos) => {
-    const col = gridPos % cols;
-    const row = Math.floor(gridPos / cols);
-
-    const itemX = listX + col * (cellW + gap);
-    const itemY = listY + row * (cellH + gap) - modalGridScroll;
-
-    // Only register if mostly visible
-    if (itemY + cellH < listY + 10 || itemY > listY + gridVisibleH - 10) return;
-
-    _registerButton(itemX, Math.max(itemY, listY), cellW, Math.min(itemY + cellH, listY + gridVisibleH) - Math.max(itemY, listY), () => {
+    // Register button click for selecting fighter
+    _registerButton(itemX, itemY, cellW, cellH, () => {
       if (modalInspectIndex !== idx) {
         modalInspectIndex = idx;
       }
     });
   });
 
-  // ── Scroll indicators ──
-  if (modalGridScroll > 0) {
-    // Top fade / arrow
-    const fadeGrad = ctx.createLinearGradient(listX, listY, listX, listY + 18);
-    fadeGrad.addColorStop(0, 'rgba(10, 10, 20, 0.9)');
-    fadeGrad.addColorStop(1, 'rgba(10, 10, 20, 0)');
-    ctx.fillStyle = fadeGrad;
-    ctx.fillRect(listX, listY, gridW, 18);
+  // ── Pagination Controls Bar ──
+  const navY = listY + 6 * (cellH + gap) + 4;
+  const navBtnW = 60;
+  const navBtnH = 26;
+  const navBtnCenterY = navY + navBtnH / 2;
 
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '10px Arial';
+  // Previous Page Button
+  const prevBtnCenterX = listX + navBtnW / 2;
+  if (modalPage > 0) {
+    drawButton('◄ PREV', prevBtnCenterX, navBtnCenterY, () => {
+      modalPage--;
+    }, navBtnW, navBtnH);
+  } else {
+    // Disabled/Dimmed PREV button
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(listX, navY, navBtnW, navBtnH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.font = 'bold 9px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('▲', listX + gridW / 2, listY + 8);
+    ctx.fillText('◄ PREV', prevBtnCenterX, navBtnCenterY);
   }
-  if (modalGridScroll < maxScroll) {
-    // Bottom fade / arrow
-    const fadeGrad = ctx.createLinearGradient(listX, listY + gridVisibleH - 18, listX, listY + gridVisibleH);
-    fadeGrad.addColorStop(0, 'rgba(10, 10, 20, 0)');
-    fadeGrad.addColorStop(1, 'rgba(10, 10, 20, 0.9)');
-    ctx.fillStyle = fadeGrad;
-    ctx.fillRect(listX, listY + gridVisibleH - 18, gridW, 18);
 
-    ctx.fillStyle = 'rgba(255,255,255,0.6)';
-    ctx.font = '10px Arial';
+  // Page Badge Text in center (well-spaced between buttons)
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, navBtnCenterY);
+
+  // Next Page Button
+  const nextBtnLeftX = listX + gridW - navBtnW;
+  const nextBtnCenterX = nextBtnLeftX + navBtnW / 2;
+  if (modalPage < totalPages - 1) {
+    drawButton('NEXT ►', nextBtnCenterX, navBtnCenterY, () => {
+      modalPage++;
+    }, navBtnW, navBtnH);
+  } else {
+    // Disabled/Dimmed NEXT button
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(nextBtnLeftX, navY, navBtnW, navBtnH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.font = 'bold 9px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('▼', listX + gridW / 2, listY + gridVisibleH - 8);
+    ctx.fillText('NEXT ►', nextBtnCenterX, navBtnCenterY);
   }
 
   // ── Right Side: Champion Showcase Stage ──
-  const detailX = listX + gridW + 20;
-  const detailW = modalW - (detailX - mx) - 24;
-  const detailY = my + 68;
-  const detailH = modalH - 128;
+  const detailX = listX + gridW + 16;
+  const detailW = modalW - (detailX - mx) - 20;
+  const detailY = my + 62;
+  const detailH = 422;
 
   drawPanel(detailX, detailY, detailW, detailH, 0.88, 14);
 
   // Live Stage Pulse Aura behind Preview Image
   const previewX = detailX + detailW / 2;
-  const previewY = detailY + 58;
+  const previewY = detailY + 54;
   const now = performance.now() * 0.003;
-  const pulseR = 46 + Math.sin(now) * 4;
+  const pulseR = 44 + Math.sin(now) * 4;
 
   ctx.save();
   ctx.globalAlpha = 0.25;
@@ -621,34 +535,34 @@ function drawFighterSelectModal() {
   // Draw Champion Preview Image
   const previewImage = getFighterPreview(modalInspectIndex);
   if (previewImage) {
-    const previewSize = 86;
+    const previewSize = 82;
     ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
   }
 
   // Champion Name
   ctx.fillStyle = accentColor;
-  ctx.font = '900 17px Arial';
+  ctx.font = '900 16px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 114);
+  ctx.fillText(selectedDef.name.toUpperCase(), previewX, detailY + 108);
 
   // Class Badge Pill
   ctx.fillStyle = 'rgba(0,0,0,0.4)';
   ctx.strokeStyle = accentColor;
   ctx.lineWidth = 1;
   ctx.beginPath();
-  ctx.roundRect(previewX - 55, detailY + 128, 110, 18, 9);
+  ctx.roundRect(previewX - 50, detailY + 120, 100, 18, 9);
   ctx.fill();
   ctx.stroke();
 
   ctx.fillStyle = '#ffffff';
   ctx.font = 'bold 9px Arial';
-  ctx.fillText(selectedDef.type.toUpperCase(), previewX, detailY + 137);
+  ctx.fillText(selectedDef.type.toUpperCase(), previewX, detailY + 129);
 
   // Stat Bars
-  let textY = detailY + 158;
-  const barW = detailW - 28;
-  const barX = detailX + 14;
+  let textY = detailY + 148;
+  const barW = detailW - 24;
+  const barX = detailX + 12;
 
   drawStatBar(ctx, 'HP', selectedDef.hp, 150, barX, textY, barW, selectedDef.color);
   textY += 18;
@@ -670,16 +584,16 @@ function drawFighterSelectModal() {
   ctx.textBaseline = 'top';
   wrapText(ctx, selectedDef.desc, barX, textY, barW, 14);
 
-  // Footer Action Buttons
-  const footerY = my + modalH - 28;
-  const btnW = 120;
-  const btnH = 36;
+  // Footer Action Buttons (Symmetrically Aligned Below Panels)
+  const footerY = my + modalH - 32;
+  const btnW = 130;
+  const btnH = 34;
 
-  drawButton('CANCEL', mx + 90, footerY, () => {
+  drawButton('CANCEL', listX + gridW / 2, footerY, () => {
     selectingSlot = null;
   }, btnW, btnH);
 
-  drawButton('LOCK IN', mx + modalW - 90, footerY, () => {
+  drawButton('LOCK IN', detailX + detailW / 2, footerY, () => {
     if (selectingSlot) {
       state[selectingSlot] = modalInspectIndex;
     }
@@ -829,7 +743,7 @@ function updatePreviewBalls() {
         vx: (Math.random() - 0.5) * 2,
         vy: (Math.random() - 0.5) * 2,
         r: 20 + Math.random() * 25,
-        color: Math.random() > 0.5 ? 'rgba(255, 77, 77, 0.15)' : 'rgba(77, 163, 255, 0.15)',
+        color: Math.random() > 0.5 ? 'rgba(255, 255, 255, 0.08)' : 'rgba(160, 160, 175, 0.06)',
       });
     }
   }
@@ -857,11 +771,11 @@ export function drawTitleScreen() {
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Static gradient background
+  // Black and white cinematic background
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, `hsl(240, 70%, 10%)`);
-  gradient.addColorStop(0.5, `hsl(260, 60%, 15%)`);
-  gradient.addColorStop(1, `hsl(250, 80%, 8%)`);
+  gradient.addColorStop(0, '#060709');
+  gradient.addColorStop(0.5, '#151820');
+  gradient.addColorStop(1, '#08090c');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -883,7 +797,7 @@ export function drawTitleScreen() {
   }, 240, 48);
 
   // Footer text
-  ctx.fillStyle = 'rgba(200, 210, 255, 0.7)';
+  ctx.fillStyle = 'rgba(220, 220, 230, 0.7)';
   ctx.font = '14px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -905,8 +819,9 @@ export function drawLeaderboardScreen() {
 
   // Background
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  gradient.addColorStop(0, '#0a0a1a');
-  gradient.addColorStop(1, '#1a1a2e');
+  gradient.addColorStop(0, '#060709');
+  gradient.addColorStop(0.5, '#151820');
+  gradient.addColorStop(1, '#08090c');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -1074,8 +989,10 @@ export function drawLeaderboardScreen() {
       }
       isLeaderboardEditMode = false;
     }
+    const returnState = state.leaderboardReturnState || 'title';
+    state.leaderboardReturnState = null;
     clearHealthHud();
-    state.gameState = 'title';
+    state.gameState = returnState;
   }, 160, 44);
 
   // Clear stats button (small, bottom left)
@@ -1146,21 +1063,26 @@ export function drawIndexScreen() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   updatePreviewBalls();
 
+  // Header Title
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 26px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
+  ctx.shadowColor = 'rgba(120, 180, 255, 0.6)';
+  ctx.shadowBlur = 10;
   ctx.fillText('FIGHTER INDEX', canvas.width / 2, 42);
+  ctx.shadowBlur = 0;
 
   ctx.fillStyle = '#888';
   ctx.font = '12px Arial';
-  ctx.fillText('Scroll to browse fighters, or click a card for more details', canvas.width / 2, 70);
+  ctx.fillText('Browse champion abilities and stats, or click a card for detail', canvas.width / 2, 64);
 
+  // Category Filter Pills
   const categories = ['All', 'Greek Mythology', 'Japanese', 'Sci-Fi & Modern', 'Fantasy & Magic'];
   
-  const catXStart = 30;
+  const catXStart = 20;
   let currentCX = catXStart;
-  let currentCY = 85;
+  let currentCY = 76;
   
   categories.forEach(cat => {
     ctx.font = 'bold 11px Arial';
@@ -1168,95 +1090,189 @@ export function drawIndexScreen() {
     const btnW = textW + 16;
     const btnH = 24;
     
-    if (currentCX + btnW > canvas.width - 30) {
+    if (currentCX + btnW > canvas.width - 20) {
       currentCX = catXStart;
-      currentCY += btnH + 8;
+      currentCY += btnH + 6;
     }
     
     const isSelected = (state.indexCategory || 'All') === cat;
     
-    ctx.fillStyle = isSelected ? 'rgba(255,255,255,0.85)' : 'rgba(50,50,50,0.85)';
+    ctx.fillStyle = isSelected ? 'rgba(255, 215, 0, 0.9)' : 'rgba(40, 45, 60, 0.85)';
+    ctx.strokeStyle = isSelected ? '#ffd700' : 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.roundRect(currentCX, currentCY, btnW, btnH, 12);
     ctx.fill();
+    ctx.stroke();
     
-    ctx.fillStyle = isSelected ? '#000' : '#ccc';
+    ctx.fillStyle = isSelected ? '#000000' : 'rgba(255, 255, 255, 0.8)';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(cat, currentCX + btnW/2, currentCY + btnH/2);
+    ctx.fillText(cat, currentCX + btnW / 2, currentCY + btnH / 2);
     
     _registerButton(currentCX, currentCY, btnW, btnH, () => {
        state.indexCategory = cat;
-       state.indexScroll = 0; // Reset scroll on category change
+       state.indexPage = 0; // Reset page on category change
     });
     
-    currentCX += btnW + 8;
+    currentCX += btnW + 6;
   });
 
-  const cardsStartY = currentCY + 36;
-  const cardX = 30;
-  const cardW = canvas.width - 60;
-  const cardH = 120;
-  const cardSpacing = 22;
+  const cardsStartY = currentCY + 34;
+  const cardX = Math.max(20, (canvas.width - 500) / 2);
+  const cardW = Math.min(canvas.width - 40, 500);
+  const cardH = 118;
+  const cardSpacing = 14;
+  const itemsPerPage = 5;
 
   const filteredDefs = FIGHTER_DEFS.filter(def => 
     !state.indexCategory || state.indexCategory === 'All' || def.category === state.indexCategory
   );
 
-  filteredDefs.forEach((def, displayIdx) => {
+  const totalPages = Math.max(1, Math.ceil(filteredDefs.length / itemsPerPage));
+  if (state.indexPage === undefined) state.indexPage = 0;
+  if (state.indexPage >= totalPages) state.indexPage = totalPages - 1;
+  if (state.indexPage < 0) state.indexPage = 0;
+
+  const startIdx = state.indexPage * itemsPerPage;
+  const pageItems = filteredDefs.slice(startIdx, startIdx + itemsPerPage);
+
+  pageItems.forEach((def, pos) => {
     const originalIdx = FIGHTER_DEFS.findIndex(d => d.id === def.id);
-    const cardY = cardsStartY + displayIdx * (cardH + cardSpacing) - state.indexScroll;
-    
-    // Don't draw if outside scroll area
-    if (cardY > canvas.height || cardY + cardH < cardsStartY - 10) {
-      return;
-    }
+    const cardY = cardsStartY + pos * (cardH + cardSpacing);
 
-    drawPanel(cardX, cardY, cardW, cardH, 0.85);
+    // Glassmorphism Card Container
+    ctx.save();
+    ctx.fillStyle = 'rgba(20, 25, 35, 0.75)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY, cardW, cardH, 10);
+    ctx.fill();
+    ctx.stroke();
 
-    const previewX = cardX + 55;
-    const previewY = cardY + cardH / 2;
-    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-    const previewFighter = new FighterClass({
-      ...def,
-      startX: previewX,
-      startY: previewY,
-      startVx: 0,
-      startVy: 0,
-    });
-    previewFighter.angle = performance.now() / 350;
-    try {
-      previewFighter.draw(ctx, { x: previewX + 80, y: previewY + 10 });
-    } catch (e) {
-      console.error('Preview draw error:', e);
-    }
-
+    // Glowing Left Accent Line
     ctx.fillStyle = def.color;
-    ctx.font = 'bold 15px Arial';
+    ctx.shadowColor = def.color;
+    ctx.shadowBlur = 15;
+    ctx.beginPath();
+    ctx.roundRect(cardX, cardY + 10, 4, cardH - 20, 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    ctx.restore();
+
+    // Fighter Preview Avatar
+    const avatarX = cardX + 48;
+    const avatarY = cardY + cardH / 2;
+    const avatarSize = 64;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const pedGrad = ctx.createRadialGradient(avatarX, avatarY, 0, avatarX, avatarY, avatarSize / 2);
+    pedGrad.addColorStop(0, `rgba(255, 255, 255, 0.15)`);
+    pedGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pedGrad;
+    ctx.beginPath();
+    ctx.arc(avatarX, avatarY, avatarSize / 2 + 4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const previewImg = getFighterPreview(originalIdx);
+    if (previewImg) {
+      ctx.drawImage(previewImg, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+    } else {
+      ctx.fillStyle = def.color;
+      ctx.beginPath();
+      ctx.arc(avatarX, avatarY, 20, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Text Content Layout
+    ctx.fillStyle = def.color;
+    ctx.font = 'bold 17px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(def.name.toUpperCase(), cardX + 95, cardY + 12);
+    ctx.fillText(def.name.toUpperCase(), cardX + 96, cardY + 12);
 
-    ctx.fillStyle = '#aaa';
-    ctx.font = '11px Arial';
-    ctx.fillText(`Class: ${def.type.toUpperCase()}`, cardX + 95, cardY + 36);
-    ctx.fillText(`HP ${def.hp}   DMG ${def.damage}   CD ${(def.cooldown / 60).toFixed(1)}s`, cardX + 95, cardY + 54);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 10px Arial';
+    ctx.fillText(`CLASS: ${def.type.toUpperCase()}  |  HP ${def.hp}  DMG ${def.damage}  CD ${(def.cooldown / 60).toFixed(1)}s`, cardX + 96, cardY + 34);
 
     ctx.fillStyle = '#ffd700';
-    ctx.font = 'bold 12px Arial';
-    ctx.fillText(def.ability, cardX + 95, cardY + 74);
+    ctx.font = 'bold 11px Arial';
+    ctx.fillText(def.ability, cardX + 96, cardY + 50);
 
-    ctx.fillStyle = '#ccc';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
     ctx.font = '11px Arial';
-    wrapText(ctx, def.desc, cardX + 95, cardY + 96, cardW - 110, 16);
+    wrapText(ctx, def.desc, cardX + 96, cardY + 68, cardW - 110, 15);
 
+    // Register Card Click Action
     _registerButton(cardX, cardY, cardW, cardH, () => {
       state.indexInspectIndex = originalIdx;
       state.gameState = 'indexDetail';
     });
   });
 
-  drawButton('⌂ BACK', 75, 335, () => { goToTitle(); }, 100, 35);
+  // ── Pagination Controls Bar ──
+  const navY = cardsStartY + itemsPerPage * (cardH + cardSpacing) + 2;
+  const navBtnW = 80;
+  const navBtnH = 30;
+  const navBtnCenterY = navY + navBtnH / 2;
+
+  // Previous Page Button
+  const prevBtnCenterX = cardX + navBtnW / 2;
+  if (state.indexPage > 0) {
+    drawButton('◄ PREV', prevBtnCenterX, navBtnCenterY, () => {
+      state.indexPage--;
+    }, navBtnW, navBtnH);
+  } else {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(cardX, navY, navBtnW, navBtnH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('◄ PREV', prevBtnCenterX, navBtnCenterY);
+  }
+
+  // Page Indicator Badge
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`PAGE ${state.indexPage + 1} / ${totalPages}`, cardX + cardW / 2, navBtnCenterY);
+
+  // Next Page Button
+  const nextBtnLeftX = cardX + cardW - navBtnW;
+  const nextBtnCenterX = nextBtnLeftX + navBtnW / 2;
+  if (state.indexPage < totalPages - 1) {
+    drawButton('NEXT ►', nextBtnCenterX, navBtnCenterY, () => {
+      state.indexPage++;
+    }, navBtnW, navBtnH);
+  } else {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(nextBtnLeftX, navY, navBtnW, navBtnH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('NEXT ►', nextBtnCenterX, navBtnCenterY);
+  }
+
+  // Back Button in footer
+  drawButton('⌂ BACK', cardX + 50, canvas.height - 40, () => { goToTitle(); }, 100, 35);
 }
 
 // ─────────────────────────────────────────────
@@ -1289,7 +1305,7 @@ export function drawWeaponMenu() {
   ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.shadowColor = '#fff';
+  ctx.shadowColor = 'rgba(120, 180, 255, 0.6)';
   ctx.shadowBlur = 10;
   ctx.fillText('WEAPON ARSENAL', canvas.width / 2, 45);
   ctx.shadowBlur = 0;
@@ -1298,22 +1314,33 @@ export function drawWeaponMenu() {
   ctx.font = '12px Arial';
   ctx.fillText('Inspect detailed weapon schematics', canvas.width / 2, 65);
 
-  const cardX = Math.max(30, (canvas.width - 600) / 2);
-  const cardW = Math.min(canvas.width - 60, 600);
-  const cardH = 130;
-  const cardSpacing = 20;
+  const cardX = Math.max(20, (canvas.width - 500) / 2);
+  const cardW = Math.min(canvas.width - 40, 500);
+  const cardH = 118;
+  const cardSpacing = 14;
+  const itemsPerPage = 5;
 
-  FIGHTER_DEFS.forEach((def, idx) => {
-    const cardY = 95 + idx * (cardH + cardSpacing) - state.weaponScroll;
-    if (cardY > canvas.height || cardY + cardH < 0) return;
+  const totalPages = Math.max(1, Math.ceil(FIGHTER_DEFS.length / itemsPerPage));
+  if (state.weaponPage === undefined) state.weaponPage = 0;
+  if (state.weaponPage >= totalPages) state.weaponPage = totalPages - 1;
+  if (state.weaponPage < 0) state.weaponPage = 0;
+
+  const startIdx = state.weaponPage * itemsPerPage;
+  const pageItems = FIGHTER_DEFS.slice(startIdx, startIdx + itemsPerPage);
+
+  const startY = 85;
+
+  pageItems.forEach((def, pos) => {
+    const idx = startIdx + pos;
+    const cardY = startY + pos * (cardH + cardSpacing);
 
     // Glassmorphism Panel
     ctx.save();
-    ctx.fillStyle = 'rgba(20, 25, 35, 0.6)';
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.fillStyle = 'rgba(20, 25, 35, 0.75)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
     ctx.lineWidth = 1;
     ctx.beginPath();
-    ctx.roundRect(cardX, cardY, cardW, cardH, 8);
+    ctx.roundRect(cardX, cardY, cardW, cardH, 10);
     ctx.fill();
     ctx.stroke();
 
@@ -1329,33 +1356,33 @@ export function drawWeaponMenu() {
 
     // Text Layout
     ctx.fillStyle = def.color;
-    ctx.font = 'bold 18px Arial';
+    ctx.font = 'bold 17px Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(def.name.toUpperCase(), cardX + 24, cardY + 16);
+    ctx.fillText(def.name.toUpperCase(), cardX + 22, cardY + 14);
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = 'bold 11px Arial';
-    ctx.fillText(def.type.toUpperCase(), cardX + 24, cardY + 40);
+    ctx.font = 'bold 10px Arial';
+    ctx.fillText(def.type.toUpperCase(), cardX + 22, cardY + 36);
 
     ctx.fillStyle = '#ffd700';
-    ctx.font = '12px Arial';
-    ctx.fillText(def.ability, cardX + 24, cardY + 58);
+    ctx.font = 'bold 11px Arial';
+    ctx.fillText(def.ability, cardX + 22, cardY + 52);
 
     // Shortened description snippet
-    ctx.fillStyle = '#888';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
     ctx.font = '11px Arial';
-    wrapText(ctx, def.desc, cardX + 24, cardY + 80, cardW - 160, 16);
+    wrapText(ctx, def.desc, cardX + 22, cardY + 70, cardW - 145, 15);
 
     // Weapon Preview Pedestal
-    const previewSize = 90;
-    const previewX = cardX + cardW - previewSize / 2 - 20;
+    const previewSize = 84;
+    const previewX = cardX + cardW - previewSize / 2 - 16;
     const previewY = cardY + cardH / 2;
 
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     const pedGrad = ctx.createRadialGradient(previewX, previewY, 0, previewX, previewY, previewSize / 2);
-    pedGrad.addColorStop(0, `rgba(255, 255, 255, 0.1)`);
+    pedGrad.addColorStop(0, `rgba(255, 255, 255, 0.12)`);
     pedGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = pedGrad;
     ctx.beginPath();
@@ -1372,13 +1399,71 @@ export function drawWeaponMenu() {
     ctx.restore();
 
     // Make card clickable
-    drawButton('', cardX + cardW / 2, cardY + cardH / 2, () => {
+    _registerButton(cardX, cardY, cardW, cardH, () => {
       state.selectedWeapon = def;
       state.gameState = 'weaponDetail';
-    }, cardW, cardH, true);
+    });
   });
 
-  drawButton('⌂ BACK', 75, canvas.height - 40, () => { goToTitle(); }, 100, 35);
+  // ── Pagination Controls Bar ──
+  const navY = startY + itemsPerPage * (cardH + cardSpacing) + 2;
+  const navBtnW = 80;
+  const navBtnH = 30;
+  const navBtnCenterY = navY + navBtnH / 2;
+
+  // Previous Page Button
+  const prevBtnCenterX = cardX + navBtnW / 2;
+  if (state.weaponPage > 0) {
+    drawButton('◄ PREV', prevBtnCenterX, navBtnCenterY, () => {
+      state.weaponPage--;
+    }, navBtnW, navBtnH);
+  } else {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(cardX, navY, navBtnW, navBtnH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('◄ PREV', prevBtnCenterX, navBtnCenterY);
+  }
+
+  // Page Indicator Badge
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 12px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`PAGE ${state.weaponPage + 1} / ${totalPages}`, cardX + cardW / 2, navBtnCenterY);
+
+  // Next Page Button
+  const nextBtnLeftX = cardX + cardW - navBtnW;
+  const nextBtnCenterX = nextBtnLeftX + navBtnW / 2;
+  if (state.weaponPage < totalPages - 1) {
+    drawButton('NEXT ►', nextBtnCenterX, navBtnCenterY, () => {
+      state.weaponPage++;
+    }, navBtnW, navBtnH);
+  } else {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(nextBtnLeftX, navY, navBtnW, navBtnH, 6);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('NEXT ►', nextBtnCenterX, navBtnCenterY);
+  }
+
+  drawButton('⌂ BACK', cardX + 50, canvas.height - 40, () => { goToTitle(); }, 100, 35);
 }
 
 // ─────────────────────────────────────────────
@@ -1428,17 +1513,17 @@ export function isFighterDemoAttacking(fighter) {
   );
 }
 
-export function drawSlashVisualStudioOverlay(ctx, def) {
+export function drawWeaponInfoCard(ctx, def) {
   const { canvas } = state;
-  const panelH = Math.min(210, canvas.height * 0.35);
+  const panelH = Math.min(150, canvas.height * 0.28);
   const panelY = canvas.height - panelH - 15;
   const panelW = Math.min(canvas.width - 30, 640);
   const panelX = (canvas.width - panelW) / 2;
 
-  // Glassmorphism Editor Panel (Replacing Bottom Fighter HUD)
+  // Glassmorphism Card Panel
   ctx.save();
-  ctx.fillStyle = 'rgba(10, 14, 24, 0.94)';
-  ctx.strokeStyle = '#FFD700';
+  ctx.fillStyle = 'rgba(10, 14, 24, 0.92)';
+  ctx.strokeStyle = def.color || '#FFD700';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.roundRect(panelX, panelY, panelW, panelH, 12);
@@ -1446,127 +1531,44 @@ export function drawSlashVisualStudioOverlay(ctx, def) {
   ctx.stroke();
 
   // Top Accent Line
-  ctx.fillStyle = '#FFD700';
-  ctx.shadowColor = '#FFD700';
+  ctx.fillStyle = def.color || '#FFD700';
+  ctx.shadowColor = def.color || '#FFD700';
   ctx.shadowBlur = 10;
   ctx.beginPath();
   ctx.roundRect(canvas.width / 2 - 40, panelY, 80, 3, 2);
   ctx.fill();
   ctx.shadowBlur = 0;
 
-  // Title
+  // Header: Name & Type
+  ctx.fillStyle = def.color || '#ffffff';
+  ctx.font = 'bold 18px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(def.name.toUpperCase(), panelX + 20, panelY + 16);
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.font = 'bold 11px Arial';
+  ctx.fillText((def.category || 'FIGHTER').toUpperCase(), panelX + 20, panelY + 38);
+
   ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 12px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('🛠 SLASH VISUAL STUDIO (STATIC EDITOR MODE)', canvas.width / 2, panelY + 20);
+  ctx.font = 'bold 12px Arial';
+  ctx.fillText(`⚡ ABILITY: ${def.ability || 'Special Weapon'}`, panelX + 20, panelY + 55);
 
-  // Auto-load saved config from localStorage if not already loaded for this fighter
-  const storageKey = `slashConfig_${def.type}`;
-  if (!state.slashEditParamsFighter || state.slashEditParamsFighter !== def.type) {
-    state.slashEditParamsFighter = def.type;
-    try {
-      const saved = localStorage.getItem(storageKey);
-      if (saved) {
-        state.slashEditParams = JSON.parse(saved);
-      } else {
-        state.slashEditParams = { offsetX: 0, offsetY: 0, scale: 1.0, thickness: 1.0, duration: 35, speedMult: 1.0 };
-      }
-    } catch (e) {
-      state.slashEditParams = { offsetX: 0, offsetY: 0, scale: 1.0, thickness: 1.0, duration: 35, speedMult: 1.0 };
-    }
-  }
+  // Description snippet
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+  ctx.font = '11px Arial';
+  wrapText(ctx, def.desc || '', panelX + 20, panelY + 76, panelW - 240, 16);
 
-  const params = state.slashEditParams = state.slashEditParams || {
-    offsetX: 0, offsetY: 0, scale: 1.0, thickness: 1.0, duration: 35, speedMult: 1.0
-  };
+  // Stat Bars Column (Right Side of Info Card)
+  const statW = 180;
+  const statX = panelX + panelW - statW - 20;
+  let statY = panelY + 32;
 
-  // 2-Column Grid Layout for Controls inside the Bottom Panel
-  const isNarrow = canvas.width < 550;
-  const col1X = isNarrow ? panelX + 15 : panelX + 30;
-  const col2X = isNarrow ? panelX + panelW / 2 + 10 : panelX + panelW / 2 + 20;
-  let row1Y = panelY + 48;
-  let row2Y = panelY + 48;
-  const colWidth = isNarrow ? Math.floor(panelW / 2 - 25) : 230;
-
-  // Helper row renderer
-  const drawControlRow = (colX, rowY, label, valStr, onDec, onInc) => {
-    ctx.fillStyle = '#aaa';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'left';
-    ctx.fillText(label, colX, rowY);
-
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 11px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(valStr, colX + colWidth - 52, rowY);
-
-    drawButton('-', colX + colWidth - 44, rowY - 5, onDec, 20, 18);
-    drawButton('+', colX + colWidth - 20, rowY - 5, onInc, 20, 18);
-  };
-
-  // Left Column
-  drawControlRow(col1X, row1Y, 'OFFSET X', `${params.offsetX}px`, 
-    () => { params.offsetX -= 5; }, () => { params.offsetX += 5; });
-  row1Y += 32;
-
-  drawControlRow(col1X, row1Y, 'OFFSET Y', `${params.offsetY}px`, 
-    () => { params.offsetY -= 5; }, () => { params.offsetY += 5; });
-  row1Y += 32;
-
-  drawControlRow(col1X, row1Y, 'SCALE', `${Math.round(params.scale * 100)}%`, 
-    () => { params.scale = Math.max(0.2, Number((params.scale - 0.1).toFixed(2))); }, 
-    () => { params.scale = Math.min(3.0, Number((params.scale + 0.1).toFixed(2))); });
-
-  // Right Column
-  drawControlRow(col2X, row2Y, 'THICKNESS', `${Math.round(params.thickness * 100)}%`, 
-    () => { params.thickness = Math.max(0.2, Number((params.thickness - 0.1).toFixed(2))); }, 
-    () => { params.thickness = Math.min(3.0, Number((params.thickness + 0.1).toFixed(2))); });
-  row2Y += 32;
-
-  drawControlRow(col2X, row2Y, 'DURATION', `${params.duration}f`, 
-    () => { params.duration = Math.max(10, params.duration - 5); }, 
-    () => { params.duration = Math.min(120, params.duration + 5); });
-  row2Y += 32;
-
-  // Action Buttons Row at bottom of panel
-  const actionRowY = panelY + panelH - 28;
-
-  drawButton('⚔ DEMO', canvas.width / 2 - 145, actionRowY, () => {
-    state.slashEditMode = false;
-    triggerWeaponDemoAttack(def);
-  }, 85, 26);
-
-  drawButton('💾 SAVE', canvas.width / 2 - 50, actionRowY, () => {
-    try {
-      localStorage.setItem(storageKey, JSON.stringify(params));
-      if (typeof CONFIG !== 'undefined') {
-        CONFIG.slashConfigs = CONFIG.slashConfigs || {};
-        CONFIG.slashConfigs[def.type] = { ...params };
-      }
-      spawnFloatingText(canvas.width / 2, canvas.height / 2 - 50, '💾 SAVED TO STORAGE!', '#FFD700');
-    } catch (e) {
-      console.error('Save config error:', e);
-    }
-  }, 85, 26);
-
-  drawButton('📋 COPY', canvas.width / 2 + 45, actionRowY, () => {
-    const jsonStr = JSON.stringify(params, null, 2);
-    console.log('--- EXPORTED SLASH CONFIG ---', jsonStr);
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(jsonStr).catch(() => {});
-    }
-    try {
-      spawnFloatingText(canvas.width / 2, canvas.height / 2 - 50, '📋 COPIED TO CLIPBOARD!', '#FFD700');
-    } catch (e) {}
-  }, 85, 26);
-
-  drawButton('↺ RESET', canvas.width / 2 + 135, actionRowY, () => {
-    state.slashEditParams = { offsetX: 0, offsetY: 0, scale: 1.0, thickness: 1.0, duration: 35, speedMult: 1.0 };
-    try {
-      localStorage.removeItem(storageKey);
-      spawnFloatingText(canvas.width / 2, canvas.height / 2 - 50, '↺ RESET TO DEFAULTS!', '#FFD700');
-    } catch (e) {}
-  }, 75, 26);
+  drawPremiumStatBar(ctx, statX, statY, statW, 'HEALTH', `${def.hp || 100} HP`, Math.min(1.0, (def.hp || 100) / 300), '#4da3ff');
+  statY += 28;
+  drawPremiumStatBar(ctx, statX, statY, statW, 'DAMAGE', `${def.damage || 10} DMG`, Math.min(1.0, (def.damage || 10) / 40), '#ff4d4d');
+  statY += 28;
+  drawPremiumStatBar(ctx, statX, statY, statW, 'MOVE SPEED', `${def.moveSpeed || 5} SPD`, Math.min(1.0, (def.moveSpeed || 5) / 10), '#55ff55');
 
   ctx.restore();
 }
@@ -1585,6 +1587,7 @@ export function triggerWeaponDemoAttack(def) {
       startVx: 0,
       startVy: 0,
     });
+    state.previewFighter.hideHpText = true;
   }
 
   const fighter = state.previewFighter;
@@ -1610,12 +1613,11 @@ export function drawWeaponDetailScreen() {
 
   if (!state.showSummonModel) {
     state.showWeaponModel = true;
-    if (state.slashEditMode === undefined) {
-      state.slashEditMode = true;
-    }
+    state.slashEditMode = false;
   }
 
   // Reset context to prevent leaks from previous frames
+  ctx.resetTransform();
   ctx.globalAlpha = 1.0;
   ctx.globalCompositeOperation = 'source-over';
   ctx.shadowBlur = 0;
@@ -1666,6 +1668,7 @@ export function drawWeaponDetailScreen() {
       startVx: 0,
       startVy: 0,
     });
+    previewFighter.hideHpText = true;
     previewFighter.x = 0;
     previewFighter.y = 0;
     previewFighter.angle = 0;
@@ -1715,6 +1718,7 @@ export function drawWeaponDetailScreen() {
         startVx: 0,
         startVy: 0,
       });
+      state.previewFighter.hideHpText = true;
     }
 
     const previewFighter = state.previewFighter;
@@ -1793,7 +1797,7 @@ export function drawWeaponDetailScreen() {
     }
 
     try {
-      const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {} };
+      const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
       previewFighter.draw(ctx, fakeTarget);
     } catch (e) {
       console.error('Preview draw error:', e);
@@ -1804,26 +1808,27 @@ export function drawWeaponDetailScreen() {
   ctx.restore();
 
   // Vertical Interactive Zoom Controls on right side of Hero display
-  const zoomX = canvas.width - 40;
+  const zoomX = canvas.width - 26;
   const zoomY = heroY - 45;
 
   drawButton('🔍+', zoomX, zoomY, () => {
     state.weaponPreviewScale = Math.min(4.8, (state.weaponPreviewScale || 2.4) + 0.4);
-  }, 36, 30);
+  }, 32, 24);
 
   const zoomPct = Math.round(((state.weaponPreviewScale || 2.4) / 2.4) * 100);
   ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 11px monospace';
+  ctx.font = 'bold 10px monospace';
   ctx.textAlign = 'center';
-  ctx.fillText(`${zoomPct}%`, zoomX, zoomY + 26);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`${zoomPct}%`, zoomX, zoomY + 22);
 
-  drawButton('1:1', zoomX, zoomY + 44, () => {
+  drawButton('1:1', zoomX, zoomY + 38, () => {
     state.weaponPreviewScale = 2.4;
-  }, 36, 22);
+  }, 32, 20);
 
-  drawButton('🔍-', zoomX, zoomY + 76, () => {
+  drawButton('🔍-', zoomX, zoomY + 60, () => {
     state.weaponPreviewScale = Math.max(1.0, (state.weaponPreviewScale || 2.4) - 0.4);
-  }, 36, 30);
+  }, 32, 24);
 
   // Interactive Pagination for Multi-Weapon Fighters (Toji)
   if (def.type === 'toji') {
@@ -1853,55 +1858,38 @@ export function drawWeaponDetailScreen() {
     }, 35, 26);
   }
 
-  // Permanently replace old Fighter Info Card HUD with Slash Visual Studio Editor
-  drawSlashVisualStudioOverlay(ctx, def);
+  // Fighter & Weapon Info Card HUD
+  drawWeaponInfoCard(ctx, def);
 
   // Navigation Bar (Row 1 at Y = 25: Left = Arsenal, Right = Prev/Next)
-  const navY = 25; 
-  drawButton('← ARSENAL', 65, navY, () => {
+  const navY = 22; 
+  drawButton('← ARSENAL', 60, navY, () => {
     state.gameState = 'weapons';
-  }, 100, 30);
+  }, 95, 28);
 
   const currentIdx = FIGHTER_DEFS.findIndex(f => f.type === def.type);
   if (currentIdx > 0) {
-    drawButton('◄ PREV', canvas.width - 115, navY, () => {
+    drawButton('◄ PREV', canvas.width - 105, navY, () => {
       state.selectedWeapon = FIGHTER_DEFS[currentIdx - 1];
-    }, 75, 30);
+    }, 65, 28);
   }
   if (currentIdx < FIGHTER_DEFS.length - 1) {
-    drawButton('NEXT ►', canvas.width - 35, navY, () => {
+    drawButton('NEXT ►', canvas.width - 36, navY, () => {
       state.selectedWeapon = FIGHTER_DEFS[currentIdx + 1];
-    }, 75, 30);
+    }, 65, 28);
   }
 
   // Action Bar (Row 2 at Y = 62: Dynamic Centered Buttons)
-  const actionY = 62;
+  const actionY = 58;
   const buttonsToDraw = [];
 
   const isAttacking = isFighterDemoAttacking(state.previewFighter);
   const demoBtnText = isAttacking ? '⚔ SWINGING...' : '⚔ DEMO ATTACK';
   buttonsToDraw.push({
     text: demoBtnText,
-    width: 130,
+    width: 125,
     action: () => { 
-      state.slashEditMode = false; // Temporarily disable static pose to play attack animation
       triggerWeaponDemoAttack(def); 
-    }
-  });
-
-  const staticBtnText = state.slashEditMode ? '👁 DISPLAY SLASH: ON' : '👁 DISPLAY SLASH';
-  buttonsToDraw.push({
-    text: staticBtnText,
-    width: 140,
-    action: () => { 
-      state.slashEditMode = !state.slashEditMode;
-      state.showWeaponModel = true;
-      if (state.previewFighter) {
-        state.previewFighter.spearSwingTimer = 0;
-        state.previewFighter.katanaSlashTimer = 0;
-        state.previewFighter.punchAnimTimer = 0;
-        state.previewFighter.meleeSwingTimer = 0;
-      }
     }
   });
 
@@ -1923,8 +1911,7 @@ export function drawWeaponDetailScreen() {
 
   // Calculate total width & centered starting X with spacing gap
   const totalBtnWidth = buttonsToDraw.reduce((acc, b) => acc + b.width, 0);
-  const availSpace = canvas.width - 40;
-  const gap = Math.max(8, Math.min(16, (availSpace - totalBtnWidth) / Math.max(1, buttonsToDraw.length - 1)));
+  const gap = 12;
   const totalRowW = totalBtnWidth + (buttonsToDraw.length - 1) * gap;
   let currentBtnX = (canvas.width - totalRowW) / 2;
 
@@ -2357,73 +2344,247 @@ function drawWeaponPreview(ctx, type, color) {
   }
 }
 
-
 export function drawIndexDetailScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  updatePreviewBalls();
 
   const def = FIGHTER_DEFS[state.indexInspectIndex];
-  const demoArea = { x: 310, y: 90, width: 260, height: 220 };
+  if (!def) {
+    state.gameState = 'index';
+    return;
+  }
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 26px Arial';
+  // 1. Cinematic Background & Signature Radial Aura
+  const bgGrad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.8);
+  bgGrad.addColorStop(0, '#0f141e');
+  bgGrad.addColorStop(1, '#020305');
+  ctx.fillStyle = bgGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  let r = 0, g = 150, b = 255;
+  if (def.color && def.color.startsWith('#') && def.color.length === 7) {
+    r = parseInt(def.color.slice(1, 3), 16);
+    g = parseInt(def.color.slice(3, 5), 16);
+    b = parseInt(def.color.slice(5, 7), 16);
+  }
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+  const glow = ctx.createRadialGradient(canvas.width * 0.7, canvas.height * 0.45, 0, canvas.width * 0.7, canvas.height * 0.45, 260);
+  glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.20)`);
+  glow.addColorStop(0.6, `rgba(${r}, ${g}, ${b}, 0.04)`);
+  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glow;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  // 2. Top Header Bar (Navigation & Title)
+  const headerY = 22;
+  drawButton('← INDEX', 65, headerY, () => { state.gameState = 'index'; }, 95, 28);
+
+  ctx.fillStyle = def.color || '#FFD700';
+  ctx.font = 'bold 20px Arial';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(def.name.toUpperCase(), canvas.width / 2, 42);
+  ctx.textBaseline = 'middle';
+  ctx.fillText(def.name.toUpperCase(), canvas.width / 2, headerY);
 
-  drawPanel(demoArea.x, demoArea.y, demoArea.width, demoArea.height, 0.85);
-  ctx.strokeStyle = 'rgba(255,255,255,0.25)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(demoArea.x, demoArea.y, demoArea.width, demoArea.height);
+  // Title Accent Line
+  ctx.fillStyle = def.color || '#FFD700';
+  ctx.shadowColor = def.color || '#FFD700';
+  ctx.shadowBlur = 8;
+  ctx.beginPath();
+  ctx.roundRect(canvas.width / 2 - 35, headerY + 12, 70, 2, 1);
+  ctx.fill();
+  ctx.shadowBlur = 0;
 
+  // Category Badge (Right side of header)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'right';
+  ctx.fillText(`[ ${(def.category || 'ANIME').toUpperCase()} / ${def.type.toUpperCase()} ]`, canvas.width - 25, headerY);
+
+  // 3. Two-Column Layout Calculations
+  const gap = 20;
+  const maxContainerW = 760;
+  const totalW = Math.min(canvas.width - 40, maxContainerW);
+  const leftW = Math.floor(totalW * 0.44);
+  const rightW = totalW - leftW - gap;
+
+  const startX = (canvas.width - totalW) / 2;
+  const startY = 62;
+  const panelH = Math.min(canvas.height - startY - 15, 430);
+
+  const leftX = startX;
+  const rightX = startX + leftW + gap;
+
+  // 4. LEFT PANEL: Fighter Stats & Profile Card
+  drawPanel(leftX, startY, leftW, panelH, 0.88, 12);
+  ctx.save();
+  ctx.strokeStyle = def.color || '#FFD700';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.roundRect(leftX, startY, leftW, panelH, 12);
+  ctx.stroke();
+  ctx.restore();
+
+  let curY = startY + 18;
+
+  // Explicitly reset canvas text alignment properties
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+
+  // Name & Category Tag
+  ctx.fillStyle = def.color || '#FFFFFF';
+  ctx.font = 'bold 18px Arial';
+  ctx.fillText(def.name.toUpperCase(), leftX + 18, curY);
+  curY += 24;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+  ctx.font = 'bold 10px Arial';
+  ctx.fillText(`CLASS: ${def.type.toUpperCase()}`, leftX + 18, curY);
+  curY += 18;
+
+  // Ability Name
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 11px Arial';
+  ctx.fillText(`⚡ ABILITY: ${def.ability || 'Standard'}`, leftX + 18, curY);
+  curY += 32;
+
+  // Stat Bars (Spacing 32px to account for label offset)
+  const statBarW = leftW - 36;
+  const fighterSpeed = def.moveSpeed || 5;
+  drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'HEALTH', `${def.hp} HP`, Math.min(1.0, def.hp / 300), '#4da3ff');
+  curY += 32;
+  drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'DAMAGE', `${def.damage} DMG`, Math.min(1.0, def.damage / 40), '#ff4d4d');
+  curY += 32;
+  drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'COOLDOWN', `${(def.cooldown / 60).toFixed(1)}s`, Math.max(0.1, 1 - (def.cooldown / 120)), '#ffd700');
+  curY += 32;
+  drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'MOVE SPEED', `${fighterSpeed.toFixed(1)}`, Math.min(1.0, fighterSpeed / 10), '#55ff55');
+  curY += 22;
+
+  // Divider Line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(leftX + 18, curY);
+  ctx.lineTo(leftX + leftW - 18, curY);
+  ctx.stroke();
+  curY += 14;
+
+  // Description Section (Reset text align and baseline)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.font = 'bold 10px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('DESCRIPTION:', leftX + 18, curY);
+  curY += 16;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+  ctx.font = '11px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  wrapText(ctx, def.desc || '', leftX + 18, curY, leftW - 36, 15);
+
+  // 5. RIGHT PANEL: Live Combat Demo Arena Window
+  drawPanel(rightX, startY, rightW, panelH, 0.90, 12);
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255, 215, 0, 0.4)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.roundRect(rightX, startY, rightW, panelH, 12);
+  ctx.stroke();
+  ctx.restore();
+
+  // Demo Arena Header Bar inside Panel
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.05)';
+  ctx.beginPath();
+  ctx.roundRect(rightX + 2, startY + 2, rightW - 4, 28, { tl: 10, tr: 10, bl: 0, br: 0 });
+  ctx.fill();
+
+  // Live Pulse Dot & Label
+  const dotPulse = Math.sin(Date.now() / 250) > 0;
+  ctx.fillStyle = dotPulse ? '#00FF88' : '#009944';
+  ctx.beginPath();
+  ctx.arc(rightX + 16, startY + 16, 4, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 11px monospace';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('LIVE COMBAT DEMO', rightX + 26, startY + 16);
+
+  // Demo Subtext
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'right';
+  ctx.fillText('AI Movement & Targeting', rightX + rightW - 14, startY + 16);
+
+  // Define Demo Area coordinates inside panel
+  const demoInnerY = startY + 34;
+  const demoInnerH = panelH - 44;
+  const demoArea = { x: rightX + 6, y: demoInnerY, width: rightW - 12, height: demoInnerH };
+
+  // Clip combat rendering inside the demo window
+  ctx.save();
+  ctx.beginPath();
+  ctx.roundRect(demoArea.x, demoArea.y, demoArea.width, demoArea.height, 8);
+  ctx.clip();
+
+  // Draw grid background inside demo area
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.06)';
+  ctx.lineWidth = 1;
+  const gridSize = 30;
+  for (let gx = demoArea.x; gx < demoArea.x + demoArea.width; gx += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(gx, demoArea.y);
+    ctx.lineTo(gx, demoArea.y + demoArea.height);
+    ctx.stroke();
+  }
+  for (let gy = demoArea.y; gy < demoArea.y + demoArea.height; gy += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(demoArea.x, gy);
+    ctx.lineTo(demoArea.x + demoArea.width, gy);
+    ctx.stroke();
+  }
+
+  // Update & Render Fighter Demo State
   const demoState = updateIndexDetailDemo(def, demoArea);
   const fighter = demoState.fighter;
   const target = demoState.target;
 
-  // Demo label and guide lines
-  ctx.fillStyle = '#fff';
-  ctx.font = '12px Arial';
-  ctx.textAlign = 'left';
-  ctx.fillText('DEMO: moves, aims, and fires', demoArea.x + 12, demoArea.y + 18);
+  // Target Dummy Pulsing Ring (Hidden during special animation demonstrations)
+  if (!demoState.hideTarget) {
+    const pulse = 0.4 + 0.6 * Math.abs(Math.sin(demoState.frame / 12));
+    ctx.save();
+    ctx.globalAlpha = pulse * 0.9;
+    ctx.beginPath();
+    ctx.arc(target.x, target.y, target.r + 8, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 77, 77, 0.18)';
+    ctx.fill();
+    ctx.restore();
 
-  ctx.save();
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 5; i++) {
-    const step = (i + 1) * 40;
-    ctx.strokeRect(demoArea.x + step, demoArea.y + step / 2, demoArea.width - step * 2, demoArea.height - step / 2 * 2);
+    ctx.beginPath();
+    ctx.arc(target.x, target.y, target.r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(255, 77, 77, 0.9)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Target Crosshair Lines
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(target.x - target.r - 6, target.y);
+    ctx.lineTo(target.x + target.r + 6, target.y);
+    ctx.moveTo(target.x, target.y - target.r - 6);
+    ctx.lineTo(target.x, target.y + target.r + 6);
+    ctx.stroke();
   }
-  ctx.restore();
 
-  const pulse = 0.4 + 0.6 * Math.abs(Math.sin(demoState.frame / 12));
-  ctx.save();
-  ctx.globalAlpha = pulse * 0.9;
-  ctx.beginPath();
-  ctx.arc(target.x, target.y, target.r + 8, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255, 77, 77, 0.18)';
-  ctx.fill();
-  ctx.restore();
-
-  ctx.beginPath();
-  ctx.arc(target.x, target.y, target.r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(255, 77, 77, 0.9)';
-  ctx.lineWidth = 2;
-  ctx.stroke();
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(target.x - target.r - 6, target.y);
-  ctx.lineTo(target.x + target.r + 6, target.y);
-  ctx.moveTo(target.x, target.y - target.r - 6);
-  ctx.lineTo(target.x, target.y + target.r + 6);
-  ctx.stroke();
-
+  // Projectiles (Custom & Signature Visuals for each character type)
   const projectiles = previewProjectileSystem.getProjectiles();
   projectiles.forEach((p) => {
     if (p.isGrenade) {
@@ -2438,27 +2599,117 @@ export function drawIndexDetailScreen() {
       ctx.lineWidth = 1.5;
       ctx.stroke();
       ctx.restore();
-
-      if (p.history && p.history.length > 1) {
-        ctx.save();
-        ctx.strokeStyle = 'rgba(77, 255, 77, 0.25)';
-        ctx.lineWidth = 2;
-        ctx.beginPath();
-        p.history.forEach((point, index) => {
-          if (index === 0) ctx.moveTo(point.x, point.y);
-          else ctx.lineTo(point.x, point.y);
-        });
-        ctx.stroke();
-        ctx.restore();
-      }
-    } else {
+    } else if (p.isGojoBlue) {
+      // Gojo Blue Sphere with Glowing Aura
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      const auraGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 14);
+      auraGrad.addColorStop(0, 'rgba(0, 229, 255, 0.9)');
+      auraGrad.addColorStop(0.5, 'rgba(0, 150, 255, 0.4)');
+      auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = auraGrad;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = p.color;
+      ctx.arc(0, 0, 14, 0, Math.PI * 2);
       ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(0, 0, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.isGhostBlade) {
+      // Sukuna Dismantle Ghost Blade Slash Arc
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle || 0);
+      ctx.strokeStyle = 'rgba(255, 70, 70, 0.95)';
+      ctx.shadowColor = '#ff0000';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, 16, -Math.PI * 0.35, Math.PI * 0.35);
+      ctx.stroke();
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.isShuriken) {
+      // DarkSlateGray Spinning Shuriken
+      p.spinAngle = (p.spinAngle || 0) + 0.25;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.spinAngle);
+      ctx.fillStyle = '#2f4f4f';
+      ctx.strokeStyle = '#a0a0a0';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = (i * Math.PI) / 2;
+        ctx.lineTo(Math.cos(a) * 9, Math.sin(a) * 9);
+        ctx.lineTo(Math.cos(a + Math.PI / 4) * 3, Math.sin(a + Math.PI / 4) * 3);
+      }
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.isSniper) {
+      // Red Sniper Tracer Beam
+      ctx.save();
+      ctx.strokeStyle = '#ff0055';
+      ctx.shadowColor = '#ff0055';
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.vx * 1.5, p.y - p.vy * 1.5);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.isFlame) {
+      // Orange Flamethrower Burst
+      ctx.save();
+      ctx.fillStyle = '#ff6600';
+      ctx.shadowColor = '#ff3300';
+      ctx.shadowBlur = 10;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, (p.r || 4) * (1 + Math.sin(Date.now() / 50) * 0.3), 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (p.isZeus) {
+      // Zeus Lightning Bolt
+      ctx.save();
+      ctx.strokeStyle = '#ffd700';
+      ctx.shadowColor = '#ffd700';
+      ctx.shadowBlur = 10;
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(p.x - p.vx * 1.2, p.y - p.vy * 1.2);
+      ctx.lineTo(p.x - p.vx * 0.6 + (Math.random() - 0.5) * 6, p.y - p.vy * 0.6 + (Math.random() - 0.5) * 6);
+      ctx.lineTo(p.x, p.y);
+      ctx.stroke();
+      ctx.restore();
+    } else if (p.isAimbot) {
+      // Aimbot Homing Bullet
+      ctx.save();
+      ctx.fillStyle = '#00e5ff';
+      ctx.shadowColor = '#00e5ff';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else {
+      // Default Styled Energy Bullet with Glow
+      ctx.save();
+      ctx.fillStyle = p.color || '#ffffff';
+      ctx.shadowColor = p.color || '#ffffff';
+      ctx.shadowBlur = 6;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r || 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
     }
   });
 
+  // Impacts
   const impacts = previewProjectileSystem.getImpacts();
   impacts.forEach((effect) => {
     ctx.beginPath();
@@ -2467,53 +2718,180 @@ export function drawIndexDetailScreen() {
     ctx.lineWidth = 2;
     ctx.globalAlpha = Math.max(0, effect.life / 14);
     ctx.stroke();
-    ctx.globalAlpha = 1;
   });
 
-  projectiles.forEach((p) => {
-    if (p.isGrenade && p.life <= 8) {
+  // Draw Demo Fighter
+  fighter.draw(ctx, target);
+
+  ctx.restore(); // Restore clip
+
+  // 5. Playback Speed & Rotation Controls Bar (Cleanly integrated at bottom of right card)
+  const currentSpeed = (state.indexDemoSpeed !== undefined) ? state.indexDemoSpeed : 1.0;
+  const ctrlY1 = startY + panelH - 18;
+  const btnCount = 5;
+  const btnW = Math.floor((rightW - 32) / btnCount);
+  const btnH = 22;
+  const totalBtnsW = btnW * btnCount + (btnCount - 1) * 4;
+  let btnX = rightX + (rightW - totalBtnsW) / 2 + btnW / 2;
+
+  const controlButtons = [
+    {
+      label: currentSpeed === 0 ? '▶ PLAY' : '⏸ STOP',
+      action: () => { state.indexDemoSpeed = currentSpeed === 0 ? 1.0 : 0; },
+      active: currentSpeed === 0,
+      glowColor: '#FF4444'
+    },
+    {
+      label: '0.5x',
+      action: () => { state.indexDemoSpeed = 0.5; },
+      active: currentSpeed === 0.5,
+      glowColor: '#00FF88'
+    },
+    {
+      label: '1.0x',
+      action: () => { state.indexDemoSpeed = 1.0; },
+      active: currentSpeed === 1.0,
+      glowColor: '#00FF88'
+    },
+    {
+      label: '2.0x',
+      action: () => { state.indexDemoSpeed = 2.0; },
+      active: currentSpeed === 2.0,
+      glowColor: '#00FF88'
+    },
+    {
+      label: '🔄 ROTATE',
+      action: () => {
+        state.indexDemoRotation = ((state.indexDemoRotation || 0) + Math.PI / 2) % (Math.PI * 2);
+      },
+      active: !!state.indexDemoRotation,
+      glowColor: '#FFD700'
+    }
+  ];
+
+  controlButtons.forEach((btn) => {
+    const isCurActive = btn.active;
+    drawButton(btn.label, btnX, ctrlY1, btn.action, btnW, btnH);
+
+    // Glowing highlight for active control option
+    if (isCurActive) {
       ctx.save();
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, 28 + (8 - p.life) * 2, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(77, 255, 77, 0.25)';
+      const color = btn.glowColor || '#00FF88';
+      ctx.strokeStyle = color;
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 8;
       ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(btnX - btnW / 2 - 1, ctrlY1 - btnH / 2 - 1, btnW + 2, btnH + 2, 5);
       ctx.stroke();
       ctx.restore();
     }
+
+    btnX += btnW + 4;
   });
 
-  fighter.draw(ctx, target);
+  // 6. Animation Demonstration Controls Panel (Simple & Clean)
+  const bottomY = startY + panelH + 14;
+  const bottomH = Math.max(72, canvas.height - bottomY - 16);
 
-  const leftX = 40;
-  const leftY = 100;
-  const leftW = 240;
+  drawPanel(startX, bottomY, totalW, bottomH, 0.88, 14);
 
-  drawPanel(leftX, 80, leftW, 300, 0.85);
-  ctx.fillStyle = def.color;
-  ctx.font = 'bold 20px Arial';
+  // Simple Clean Header
+  ctx.fillStyle = def.color || '#FFD700';
+  ctx.font = 'bold 11px monospace';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(def.name, leftX + 18, leftY + 4);
+  ctx.fillText('⚡ ANIMATION DEMO', startX + 16, bottomY + 12);
 
-  ctx.fillStyle = '#aaa';
-  ctx.font = '11px Arial';
-  ctx.fillText(`CLASS: ${def.type.toUpperCase()}`, leftX + 18, leftY + 32);
-  ctx.fillText(`ABILITY: ${def.ability}`, leftX + 18, leftY + 50);
-  ctx.fillText(`HP: ${def.hp}`, leftX + 18, leftY + 72);
-  ctx.fillText(`DMG: ${def.damage}`, leftX + 18, leftY + 88);
-  ctx.fillText(`COOLDOWN: ${(def.cooldown / 60).toFixed(1)}s`, leftX + 18, leftY + 104);
-  ctx.fillText(`MOVEMENT: ${fighter.speed.toFixed(1)}`, leftX + 18, leftY + 120);
-  ctx.fillText(`DESCRIPTION:`, leftX + 18, leftY + 144);
+  // Dynamic Button List for Character Animations
+  const animBtns = [
+    { id: 'basic', label: '⚔️ Basic' }
+  ];
 
-  ctx.fillStyle = '#ccc';
-  ctx.font = '11px Arial';
-  wrapText(ctx, def.desc, leftX + 18, leftY + 164, leftW - 36, 16);
+  if (def.type === 'gojo') {
+    animBtns.push(
+      { id: 'mixing', label: '🔮 Mixing' },
+      { id: 'red', label: '🔴 Red' },
+      { id: 'domain', label: '🌌 Void' }
+    );
+  } else if (def.type === 'sukuna') {
+    animBtns.push(
+      { id: 'flurry', label: '⚔️ Flurry' },
+      { id: 'fuga', label: '🔥 Fuga' },
+      { id: 'domain', label: '🏯 Shrine' }
+    );
+  } else if (def.type === 'toji') {
+    animBtns.push(
+      { id: 'spear', label: '🗡️ Spear' },
+      { id: 'stealth', label: '🥷 Stealth' }
+    );
+  } else if (def.type === 'todo') {
+    animBtns.push(
+      { id: 'rock', label: '🪨 Rock' },
+      { id: 'clap', label: '👏 Clap' }
+    );
+  } else if (def.type === 'mahoraga') {
+    animBtns.push(
+      { id: 'level8', label: '⚡ Level 8' }
+    );
+  } else if (def.type === 'zeus') {
+    animBtns.push(
+      { id: 'lightning', label: '⚡ Lightning' }
+    );
+  } else {
+    animBtns.push(
+      { id: 'ability', label: `✨ ${(def.ability || 'Ability').slice(0, 10)}` }
+    );
+  }
 
-  ctx.fillStyle = 'rgba(255,255,255,0.65)';
-  ctx.font = '11px Arial';
-  ctx.fillText('Demo arena shows how the fighter moves and aims.', leftX + 18, leftY + 260);
+  const activeAnim = state.indexDemoAnim || 'basic';
+  const bWidth = 110;
+  const bHeight = 28;
+  let bX = startX + 16 + bWidth / 2;
+  const bY = bottomY + 40;
 
-  drawButton('⌂ BACK', 75, 350, () => { state.gameState = 'index'; }, 100, 35);
+  animBtns.forEach((btn) => {
+    const isActive = activeAnim === btn.id;
+
+    drawButton(btn.label, bX, bY, () => {
+      unlockAudio();
+      state.indexDemoAnim = btn.id;
+      // Completely reset the demo state (fighter pos, target HP/pos, projectiles) when switching animations
+      const demoInnerY = startY + 34;
+      const demoInnerH = panelH - 44;
+      const demoArea = { x: rightX + 6, y: demoInnerY, width: rightW - 12, height: demoInnerH };
+      resetIndexDetailState(def, demoArea);
+
+      // Play audio for the specific animation demo
+      if (btn.id === 'mixing') playSound('Assets/Sound Effects/Skills/mixing.mp3', 3.0);
+      else if (btn.id === 'red') playSound('Assets/Sound Effects/Skills/redcharging.mp3', 2.0);
+      else if (btn.id === 'domain' && def.type === 'gojo') playSound('Assets/Sound Effects/Skills/gojodomain.mp3', 5.0);
+      else if (btn.id === 'fuga') playSound('Assets/Sound Effects/Skills/fuga.mp3', 3.5);
+      else if (btn.id === 'domain' && def.type === 'sukuna') playSound('Assets/Sound Effects/Skills/domainexpansion.mp3', 5.5);
+      else if (btn.id === 'flurry') playSound('Assets/Sound Effects/Skills/spinslash.mp3', 2.0);
+      else if (btn.id === 'spear') playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+      else if (btn.id === 'stealth') playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+      else if (btn.id === 'rock') playSound('Assets/Sound Effects/Skills/dash1.mp3', 1.0);
+      else if (btn.id === 'clap') playSound('Assets/Sound Effects/Skills/todo-clap.mp3', 2.0);
+      else if (btn.id === 'lightning') playSound('Assets/Sound Effects/Skills/thunderstrike.mp3', 1.5);
+      else if (btn.id === 'level8') playSound('Assets/Sound Effects/Skills/dash5.mp3', 2.0);
+    }, bWidth, bHeight);
+
+    if (isActive) {
+      ctx.save();
+      const glowColor = btn.id === 'basic' ? '#00FF88' : '#FFD700';
+      ctx.strokeStyle = glowColor;
+      ctx.shadowColor = glowColor;
+      ctx.shadowBlur = 8;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.roundRect(bX - bWidth / 2 - 1, bY - bHeight / 2 - 1, bWidth + 2, bHeight + 2, 6);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    bX += bWidth + 12;
+  });
 }
 
 
@@ -2521,100 +2899,298 @@ let selectInspectedIndex = 0;
 let previewFighterInstance = null;
 let lastInspectedIndex = -1;
 
+function drawPlayerCard(slotProp, title, x, y, w, h, borderColor, enabled, isLarge = false) {
+  const { ctx, mode } = state;
+  drawPanel(x, y, w, h, 0.86, 14);
+
+  ctx.fillStyle = borderColor;
+  ctx.strokeStyle = borderColor;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(x + 2, y + 2, w - 4, 30, 8);
+  ctx.stroke();
+
+  ctx.fillStyle = '#fff';
+  ctx.font = 'bold 13px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(title, x + w / 2, y + 17);
+
+  const fighterIndex = state[slotProp];
+  const def = FIGHTER_DEFS[fighterIndex];
+
+  if (!enabled) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.font = 'bold 13px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SLOT UNAVAILABLE', x + w / 2, y + h / 2);
+    return;
+  }
+
+  const previewImage = getFighterPreview(fighterIndex);
+
+  if (isLarge) {
+    const avatarX = x + w / 2;
+    const avatarY = y + 78;
+    const avatarSize = 82;
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    const pedGrad = ctx.createRadialGradient(avatarX, avatarY, 0, avatarX, avatarY, avatarSize / 2);
+    pedGrad.addColorStop(0, `${def.color}44`);
+    pedGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = pedGrad;
+    ctx.beginPath();
+    ctx.arc(avatarX, avatarY, avatarSize / 2 + 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    if (previewImage) {
+      ctx.drawImage(previewImage, avatarX - avatarSize / 2, avatarY - avatarSize / 2, avatarSize, avatarSize);
+    }
+
+    ctx.fillStyle = def.color;
+    ctx.font = '900 17px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(def.name.toUpperCase(), avatarX, y + 138);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 10px Arial';
+    ctx.fillText(`CLASS: ${def.type.toUpperCase()}`, avatarX, y + 158);
+
+    let textY = y + 178;
+    const barW = Math.min(160, w - 40);
+    const barX = x + (w - barW) / 2;
+
+    drawStatBar(ctx, 'HP', def.hp, 150, barX, textY, barW, def.color);
+    textY += 18;
+    drawStatBar(ctx, 'DMG', def.damage, 60, barX, textY, barW, '#f9c846');
+    textY += 18;
+    drawStatBar(ctx, 'SPD', def.speed || 2, 4, barX, textY, barW, '#8ad4ff');
+    textY += 24;
+
+    ctx.fillStyle = '#ffd700';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.fillText(`ABILITY: ${def.ability.toUpperCase()}`, avatarX, textY);
+    textY += 16;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.font = '10px Arial';
+    wrapText(ctx, def.desc, avatarX, textY, w - 32, 14);
+
+    const btnW = Math.min(150, w - 32);
+    const btnH = 32;
+    const btnX = x + (w - btnW) / 2;
+    const btnY = y + h - btnH - 12;
+
+    drawPanel(btnX, btnY, btnW, btnH, 0.92, 10);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 11px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SELECT FIGHTER', btnX + btnW / 2, btnY + btnH / 2);
+
+    _registerButton(btnX, btnY, btnW, btnH, () => {
+      selectingSlot = slotProp;
+      modalInspectIndex = fighterIndex;
+      const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
+        .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
+      const pos = modalAvailableFighters.findIndex(f => f.idx === fighterIndex);
+      modalPage = pos !== -1 ? Math.floor(pos / 18) : 0;
+    });
+
+  } else {
+    const previewX = x + w - 50;
+    const previewY = y + 62;
+
+    const teamColor = mode === '2v2'
+      ? (slotProp === 'p1Index' || slotProp === 'p3Index' ? '#ff4d4d' : '#4da3ff')
+      : null;
+    if (teamColor) {
+      ctx.save();
+      ctx.globalAlpha = 0.14;
+      ctx.fillStyle = teamColor;
+      ctx.beginPath();
+      ctx.ellipse(previewX, previewY, 36, 36, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (previewImage) {
+      const previewSize = 70;
+      ctx.drawImage(previewImage, previewX - previewSize / 2, previewY - previewSize / 2, previewSize, previewSize);
+    }
+
+    const detailX = x + 14;
+    let textY = y + 42;
+
+    ctx.fillStyle = def.color;
+    ctx.font = 'bold 14px Arial';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(def.name.toUpperCase(), detailX, textY);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.font = 'bold 9px Arial';
+    textY += 18;
+    ctx.fillText(`CLASS: ${def.type.toUpperCase()}`, detailX, textY);
+    textY += 16;
+
+    const barW = Math.min(95, w - 125);
+    drawStatBar(ctx, 'HP', def.hp, 150, detailX, textY, barW, def.color);
+    textY += 15;
+    drawStatBar(ctx, 'DMG', def.damage, 60, detailX, textY, barW, '#f9c846');
+    textY += 15;
+    drawStatBar(ctx, 'SPD', def.speed || 2, 4, detailX, textY, barW, '#8ad4ff');
+    textY += 14;
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = '9px Arial';
+    const maxDescWidth = w - 120;
+    wrapText(ctx, def.desc, detailX, textY, maxDescWidth, 12);
+
+    const btnW = 95;
+    const btnH = 26;
+    const btnX = x + w - btnW - 10;
+    const btnY = y + h - btnH - 8;
+
+    drawPanel(btnX, btnY, btnW, btnH, 0.92, 8);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 10px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('SELECT', btnX + btnW / 2, btnY + btnH / 2);
+
+    _registerButton(btnX, btnY, btnW, btnH, () => {
+      selectingSlot = slotProp;
+      modalInspectIndex = fighterIndex;
+      const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
+        .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
+      const pos = modalAvailableFighters.findIndex(f => f.idx === fighterIndex);
+      modalPage = pos !== -1 ? Math.floor(pos / 18) : 0;
+    });
+  }
+}
+
+function drawStatBar(ctx, label, value, maxValue, x, y, width, color) {
+  ctx.fillStyle = '#888';
+  ctx.font = '10px Arial';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText(label, x, y);
+
+  const barX = x + 28;
+  const barW = width - 28;
+  const barH = 7;
+
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.1)';
+  ctx.beginPath();
+  ctx.roundRect(barX, y + 2, barW, barH, 3);
+  ctx.fill();
+
+  const fillW = Math.min(barW, Math.max(4, (value / maxValue) * barW));
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.roundRect(barX, y + 2, fillW, barH, 3);
+  ctx.fill();
+}
+
 export function drawSelectScreen() {
   const { ctx, canvas, mode } = state;
   _clearButtons();
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Animated gradient background
+  // Sleek Black and White Cinematic Gradient
   const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
-  const time = Date.now() * 0.0005;
-  gradient.addColorStop(0, `hsl(${Math.sin(time) * 30 + 240}, 70%, 10%)`);
-  gradient.addColorStop(0.5, `hsl(${Math.sin(time * 0.7) * 20 + 260}, 60%, 15%)`);
-  gradient.addColorStop(1, `hsl(${Math.sin(time * 0.9) * 40 + 250}, 80%, 8%)`);
+  const time = Date.now() * 0.0003;
+  const pulse = Math.floor(Math.sin(time) * 6 + 18);
+  gradient.addColorStop(0, '#060709');
+  gradient.addColorStop(0.5, `rgb(${pulse}, ${pulse + 2}, ${pulse + 5})`);
+  gradient.addColorStop(1, '#08090c');
   ctx.fillStyle = gradient;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Background preview balls
   updatePreviewBalls();
 
-  // Title
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('CHOOSE YOUR FIGHTERS', canvas.width / 2, 44);
+  ctx.shadowColor = 'rgba(120, 180, 255, 0.6)';
+  ctx.shadowBlur = 10;
+  ctx.fillText('CHOOSE YOUR FIGHTERS', canvas.width / 2, 42);
+  ctx.shadowBlur = 0;
 
-  ctx.fillStyle = '#ccc';
-  ctx.font = 'bold 14px Arial';
+  ctx.fillStyle = '#aaa';
+  ctx.font = 'bold 12px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('GAME MODE', canvas.width / 2, 72);
+  ctx.fillText('GAME MODE', canvas.width / 2, 66);
 
-  const modeButtonY = 100;
+  const modeButtonY = 92;
   drawModeSelection(canvas.width / 2, modeButtonY);
 
-  // Test Mode Premium Toggle
-  const tmW = 150;
-  const tmH = 28;
-  const gap = 16;
+  const tmW = 140;
+  const tmH = 26;
+  const gap = 14;
   const tmX = canvas.width / 2 - tmW - gap / 2;
-  const tmY = 140 - tmH / 2;
+  const tmY = 124;
 
   ctx.fillStyle = state.testMode ? 'rgba(40, 180, 80, 0.3)' : 'rgba(100, 100, 100, 0.2)';
   ctx.strokeStyle = state.testMode ? '#4ade80' : 'rgba(255, 255, 255, 0.3)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(tmX, tmY, tmW, tmH, 14);
+  ctx.roundRect(tmX, tmY, tmW, tmH, 13);
   ctx.fill();
   ctx.stroke();
 
   ctx.fillStyle = state.testMode ? '#fff' : '#ccc';
-  ctx.font = 'bold 12px Arial';
+  ctx.font = 'bold 11px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('🧪 TEST MODE', tmX + tmW / 2 + (state.testMode ? -10 : 10), tmY + tmH / 2);
+  ctx.fillText('🧪 TEST MODE', tmX + tmW / 2 + (state.testMode ? -8 : 8), tmY + tmH / 2);
 
   ctx.beginPath();
-  ctx.arc(state.testMode ? tmX + tmW - 14 : tmX + 14, tmY + tmH / 2, 8, 0, Math.PI * 2);
+  ctx.arc(state.testMode ? tmX + tmW - 12 : tmX + 12, tmY + tmH / 2, 7, 0, Math.PI * 2);
   ctx.fillStyle = state.testMode ? '#4ade80' : '#888';
   ctx.shadowColor = state.testMode ? '#4ade80' : 'transparent';
-  ctx.shadowBlur = 10;
+  ctx.shadowBlur = 8;
   ctx.fill();
   ctx.shadowBlur = 0;
 
   _registerButton(tmX, tmY, tmW, tmH, () => { state.testMode = !state.testMode; });
 
-  // Dummy Visibility Toggle
   const daX = canvas.width / 2 + gap / 2;
-  const daY = 140 - tmH / 2;
+  const daY = 124;
 
   ctx.fillStyle = state.dummyEnabled ? 'rgba(34, 120, 60, 0.3)' : 'rgba(100, 100, 100, 0.2)';
   ctx.strokeStyle = state.dummyEnabled ? '#4ade80' : 'rgba(255, 255, 255, 0.3)';
   ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.roundRect(daX, daY, tmW, tmH, 14);
+  ctx.roundRect(daX, daY, tmW, tmH, 13);
   ctx.fill();
   ctx.stroke();
 
   ctx.fillStyle = state.dummyEnabled ? '#fff' : '#ccc';
-  ctx.font = 'bold 12px Arial';
+  ctx.font = 'bold 11px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('🎯 DUMMY', daX + tmW / 2 + (state.dummyEnabled ? -10 : 10), daY + tmH / 2);
+  ctx.fillText('🎯 DUMMY', daX + tmW / 2 + (state.dummyEnabled ? -8 : 8), daY + tmH / 2);
 
   ctx.beginPath();
-  ctx.arc(state.dummyEnabled ? daX + tmW - 14 : daX + 14, daY + tmH / 2, 8, 0, Math.PI * 2);
+  ctx.arc(state.dummyEnabled ? daX + tmW - 12 : daX + 12, daY + tmH / 2, 7, 0, Math.PI * 2);
   ctx.fillStyle = state.dummyEnabled ? '#4ade80' : '#888';
   ctx.shadowColor = state.dummyEnabled ? '#4ade80' : 'transparent';
-  ctx.shadowBlur = 10;
+  ctx.shadowBlur = 8;
   ctx.fill();
   ctx.shadowBlur = 0;
 
   _registerButton(daX, daY, tmW, tmH, () => {
     state.dummyEnabled = !state.dummyEnabled;
-    // If disabling, reset any player selection that points to a dummy-type fighter
     if (!state.dummyEnabled) {
       const dummyIdx = FIGHTER_DEFS.findIndex(d => d.type === 'dummy');
       if (dummyIdx !== -1) {
@@ -2626,71 +3202,120 @@ export function drawSelectScreen() {
     }
   });
 
-  const margin = 34;
-  const cardGap = 14;
-  const cardW = Math.min(250, Math.max(220, (canvas.width - margin * 2 - cardGap) / 2));
+  const topY = 165;
+  const margin = 20;
 
-  // Dynamically calculate card height to avoid overlapping with footer
-  const availableH = canvas.height - 180 - 70; // 180 is approx topY, 70 is space for footer
-  const cardH = Math.min(200, Math.max(150, (availableH - cardGap) / 2));
+  if (mode === '1v1' || mode === 'Stand Off') {
+    const cardGap = 20;
+    const cardW = Math.min(235, (canvas.width - margin * 2 - cardGap) / 2);
+    const cardH = 370;
 
-  const leftX = margin;
-  const rightX = canvas.width - margin - cardW;
-  const topY = 180;
-  const bottomY = topY + cardH + cardGap;
+    const leftX = canvas.width / 2 - cardW - cardGap / 2;
+    const rightX = canvas.width / 2 + cardGap / 2;
 
-  if (mode === '2v2') {
-    ctx.fillStyle = '#ff4d4d';
-    ctx.font = 'bold 16px Arial';
+    drawPlayerCard('p1Index', 'PLAYER 1', leftX, topY, cardW, cardH, '#ff4d4d', true, true);
+    drawPlayerCard('p2Index', 'PLAYER 2', rightX, topY, cardW, cardH, '#4da3ff', true, true);
+
+    const vsX = canvas.width / 2;
+    const vsY = topY + cardH / 2;
+    ctx.save();
+    ctx.fillStyle = '#060810';
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 2;
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = 12;
+    ctx.beginPath();
+    ctx.arc(vsX, vsY, 22, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+
+    ctx.fillStyle = '#ffd700';
+    ctx.font = '900 16px Arial';
     ctx.textAlign = 'center';
-    ctx.fillText('RED SIDE', leftX + cardW / 2, topY - 24);
-    ctx.fillStyle = '#4da3ff';
-    ctx.fillText('BLUE SIDE', rightX + cardW / 2, topY - 24);
-  } else if (mode === 'TLFS') {
-    ctx.fillStyle = '#00f3ff';
-    ctx.font = 'bold 16px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText('YOUR CHAMPION', leftX + cardW / 2, topY - 24);
-    ctx.fillStyle = '#ff4d4d';
-    ctx.fillText('ENEMY POOL', rightX + cardW / 2, topY - 24);
-  }
+    ctx.textBaseline = 'middle';
+    ctx.fillText('VS', vsX, vsY + 1);
+    ctx.restore();
 
-  if (mode === 'TLFS') {
-    // Only one player card
-    drawPlayerCard('p1Index', 'PLAYER 1', leftX, topY + cardH / 2, cardW, cardH, '#00f3ff', true);
+    const footerY = topY + cardH + 36;
+    const centerX = canvas.width / 2;
+    const actionBtnW = 140;
+    const actionSpacing = 16;
+
+    drawButton('⚔ START BATTLE', centerX - actionBtnW / 2 - actionSpacing / 2, footerY, () => { startGame(); }, actionBtnW, 40);
+    drawButton('🎲 RANDOMIZE', centerX + actionBtnW / 2 + actionSpacing / 2, footerY, () => { randomize1v1Fighters(); }, actionBtnW, 40);
+    drawButton('⌂ BACK', centerX, footerY + 48, () => { goToTitle(); }, 120, 34);
+
+  } else if (mode === '1v2 Stand Off') {
+    const cardGap = 12;
+    const cardW = Math.min(235, (canvas.width - margin * 2 - cardGap) / 2);
+    const cardH = 175;
+
+    const leftX = canvas.width / 2 - cardW - cardGap / 2;
+    const rightX = canvas.width / 2 + cardGap / 2;
+    const bottomY = topY + cardH + cardGap;
+
+    // Left side: Solo fighter
+    drawPlayerCard('p1Index', 'SOLO CHAMPION', leftX, topY, cardW, cardH * 2 + cardGap, '#ff4d4d', true, true);
     
-    // Draw Enemy Pool toggles
-    drawTlfsEnemyPoolGrid(rightX, topY, cardW, cardH * 2 + cardGap);
-  } else {
+    // Right side: Duo fighters
+    drawPlayerCard('p2Index', 'DUO 1', rightX, topY, cardW, cardH, '#4da3ff', true);
+    drawPlayerCard('p3Index', 'DUO 2', rightX, bottomY, cardW, cardH, '#4da3ff', true);
+
+    const footerY = bottomY + cardH + 34;
+    const centerX = canvas.width / 2;
+    const actionBtnW = 140;
+    const actionSpacing = 16;
+
+    drawButton('⚔ START BATTLE', centerX - actionBtnW / 2 - actionSpacing / 2, footerY, () => { startGame(); }, actionBtnW, 40);
+    // Since randomize doesn't exist for 1v2 in UI logic yet, we'll import and use it or just add it inline.
+    import('../core/gameFlow.js').then(m => {
+      drawButton('🎲 RANDOMIZE', centerX + actionBtnW / 2 + actionSpacing / 2, footerY, () => { m.randomize1v2Fighters(); }, actionBtnW, 40);
+    });
+    drawButton('⌂ BACK', centerX, footerY + 48, () => { goToTitle(); }, 120, 34);
+
+  } else if (mode === '2v2' || mode === 'FFA') {
+    const cardGap = 12;
+    const cardW = Math.min(235, (canvas.width - margin * 2 - cardGap) / 2);
+    const cardH = 175;
+
+    const leftX = canvas.width / 2 - cardW - cardGap / 2;
+    const rightX = canvas.width / 2 + cardGap / 2;
+    const bottomY = topY + cardH + cardGap;
+
     drawPlayerCard('p1Index', mode === '2v2' ? 'RED 1' : 'PLAYER 1', leftX, topY, cardW, cardH, '#ff4d4d', true);
     drawPlayerCard('p2Index', mode === '2v2' ? 'BLUE 1' : 'PLAYER 2', rightX, topY, cardW, cardH, '#4da3ff', true);
-    const p3Enabled = mode === 'FFA' || mode === '2v2';
-    const p4Enabled = mode === 'FFA' || mode === '2v2';
-    drawPlayerCard('p3Index', mode === '2v2' ? 'RED 2' : 'PLAYER 3', leftX, bottomY, cardW, cardH, '#ff4d4d', p3Enabled);
-    drawPlayerCard('p4Index', mode === '2v2' ? 'BLUE 2' : 'PLAYER 4', rightX, bottomY, cardW, cardH, '#4da3ff', p4Enabled);
-  }
+    drawPlayerCard('p3Index', mode === '2v2' ? 'RED 2' : 'PLAYER 3', leftX, bottomY, cardW, cardH, '#ff4d4d', true);
+    drawPlayerCard('p4Index', mode === '2v2' ? 'BLUE 2' : 'PLAYER 4', rightX, bottomY, cardW, cardH, '#4da3ff', true);
 
-  // Ensure footer is placed exactly after the bottom cards with padding
-  const footerY = bottomY + cardH + 34;
-  const centerX = canvas.width / 2;
-  const actionBtnW = Math.min(180, Math.max(120, canvas.width * 0.28));
-  const actionSpacing = Math.min(24, Math.max(14, canvas.width * 0.04));
+    const footerY = bottomY + cardH + 34;
+    const centerX = canvas.width / 2;
+    const actionBtnW = 140;
+    const actionSpacing = 16;
 
-  if (mode === 'FFA' || mode === '2v2') {
-    drawButton('🎲 RANDOMIZE', centerX, footerY, () => { randomizeFfaFighters(); }, actionBtnW, 36);
-    drawButton('⚔ START BATTLE', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
-    drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
-  } else if (mode === '1v1' || mode === 'Stand Off') {
-    drawButton('🎲 RANDOMIZE', centerX, footerY, () => { randomize1v1Fighters(); }, actionBtnW, 36);
-    drawButton('⚔ START BATTLE', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
-    drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
+    drawButton('⚔ START BATTLE', centerX - actionBtnW / 2 - actionSpacing / 2, footerY, () => { startGame(); }, actionBtnW, 40);
+    drawButton('🎲 RANDOMIZE', centerX + actionBtnW / 2 + actionSpacing / 2, footerY, () => { randomizeFfaFighters(); }, actionBtnW, 40);
+    drawButton('⌂ BACK', centerX, footerY + 48, () => { goToTitle(); }, 120, 34);
+
   } else if (mode === 'TLFS') {
-    drawButton('🎲 RANDOMIZE', centerX, footerY, () => { state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length); }, actionBtnW, 36);
-    drawButton('⚔ START GAUNTLET', centerX - actionBtnW - actionSpacing, footerY, () => { startGame(); }, actionBtnW, 36);
-    drawButton('⌂ BACK', centerX + actionBtnW + actionSpacing, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
-  } else {
-    drawButton('⚔ START BATTLE', centerX - actionBtnW / 2 - actionSpacing / 2, footerY, () => { startGame(); }, actionBtnW, 36);
-    drawButton('⌂ BACK', centerX + actionBtnW / 2 + actionSpacing / 2, footerY, () => { goToTitle(); }, Math.min(140, actionBtnW), 36);
+    const cardGap = 16;
+    const cardW = Math.min(235, (canvas.width - margin * 2 - cardGap) / 2);
+    const cardH = 370;
+
+    const leftX = canvas.width / 2 - cardW - cardGap / 2;
+    const rightX = canvas.width / 2 + cardGap / 2;
+
+    drawPlayerCard('p1Index', 'YOUR CHAMPION', leftX, topY, cardW, cardH, '#00f3ff', true, true);
+    drawTlfsEnemyPoolGrid(rightX, topY, cardW, cardH);
+
+    const footerY = topY + cardH + 36;
+    const centerX = canvas.width / 2;
+    const actionBtnW = 140;
+    const actionSpacing = 16;
+
+    drawButton('⚔ GAUNTLET', centerX - actionBtnW / 2 - actionSpacing / 2, footerY, () => { startGame(); }, actionBtnW, 40);
+    drawButton('🎲 RANDOMIZE', centerX + actionBtnW / 2 + actionSpacing / 2, footerY, () => { state.p1Index = Math.floor(Math.random() * FIGHTER_DEFS.length); }, actionBtnW, 40);
+    drawButton('⌂ BACK', centerX, footerY + 48, () => { goToTitle(); }, 120, 34);
   }
 
   if (selectingSlot !== null) {
@@ -2716,6 +3341,7 @@ function drawModeSelection(cx, cy) {
   const modes = [
     { id: '1v1', label: '1v1' },
     { id: 'Stand Off', label: 'Stand Off' },
+    { id: '1v2 Stand Off', label: '1v2 Stand Off' },
     { id: '2v2', label: '2v2' },
     { id: 'FFA', label: 'FFA' },
     { id: 'TLFS', label: 'TLFS' }
@@ -2971,25 +3597,43 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
 export function drawPauseScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
-  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillStyle = 'rgba(0,0,0,0.75)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  drawHUD(); // Keep HUD visible
+  drawHUD(); // Keep HUD visible in background
 
   const cx = state.arena.x + state.arena.width / 2;
   const cy = state.arena.y + state.arena.height / 2;
 
-  drawPanel(cx - 120, cy - 100, 240, 260);
+  const panelW = 260;
+  const panelH = 280;
+  drawPanel(cx - panelW / 2, cy - panelH / 2, panelW, panelH);
 
-  ctx.fillStyle = '#fff';
-  ctx.font = 'bold 24px Arial';
+  ctx.fillStyle = '#ffd700';
+  ctx.font = 'bold 26px Arial';
   ctx.textAlign = 'center';
-  ctx.fillText('PAUSED', cx, cy - 60);
+  ctx.textBaseline = 'middle';
+  ctx.fillText('PAUSED', cx, cy - 80);
 
-  drawButton('▶ Resume', cx, cy - 10, () => { state.gameState = 'playing'; });
-  drawButton('↺ Restart Round', cx, cy + 45, () => { restartCurrentRound(); });
-  drawButton('🏆 Leaderboard', cx, cy + 100, () => { state.gameState = 'leaderboard'; });
-  drawButton('⌂ Main Menu', cx, cy + 155, () => { goToTitle(); }, 200, 36);
+  const btnW = 200;
+  const btnH = 36;
+
+  drawButton('▶ Resume', cx, cy - 30, () => {
+    state.gameState = state.previousGameState || 'playing';
+  }, btnW, btnH);
+
+  drawButton('↺ Restart Round', cx, cy + 20, () => {
+    restartCurrentRound();
+  }, btnW, btnH);
+
+  drawButton('🏆 Leaderboard', cx, cy + 70, () => {
+    state.leaderboardReturnState = 'paused';
+    state.gameState = 'leaderboard';
+  }, btnW, btnH);
+
+  drawButton('⌂ Main Menu', cx, cy + 120, () => {
+    goToTitle();
+  }, btnW, btnH);
 }
 
 export function drawRoundEndScreen() {
@@ -3304,7 +3948,7 @@ export function drawMatchEndScreen() {
     drawMatchWinnerReveal(matchWinner, state.matchEndTimer, mode);
   }
 
-  if (mode === '1v1' || mode === 'Stand Off' || mode === 'FFA') {
+  if (mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off' || mode === 'FFA') {
     ctx.fillStyle = '#aaa';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
@@ -3313,7 +3957,9 @@ export function drawMatchEndScreen() {
     }
 
     _registerButton(0, 0, canvas.width, canvas.height, () => {
-      if (mode === '1v1' || mode === 'Stand Off') {
+      if (mode === '1v2 Stand Off') {
+        import('../core/gameFlow.js').then(m => m.randomize1v2Fighters());
+      } else if (mode === '1v1' || mode === 'Stand Off') {
         randomize1v1Fighters();
       }
       resetMatch();
@@ -3332,14 +3978,28 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   const cx = state.arena.x + state.arena.width / 2;
   const cy = state.arena.y + state.arena.height / 2 - 10;
 
+  // Detect winning team members for team modes (1v2 Stand Off or 2v2)
+  const winnerIndex = state.fighters ? state.fighters.indexOf(winner) : -1;
+  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : null;
+  let winningFighters = [winner];
+
+  if (winningTeam !== null && (mode === '2v2' || mode === '1v2 Stand Off')) {
+    const teamMembers = state.fighters.filter((f, idx) => f && state.getFighterTeam(idx) === winningTeam);
+    if (teamMembers.length > 1) {
+      winningFighters = teamMembers;
+    }
+  }
+
   // Scale animation
-  const scale = 1.5;
+  const isMultiWinner = winningFighters.length > 1;
+  const scale = isMultiWinner ? 1.1 : 1.5;
+  const offsets = isMultiWinner ? [-95, 95] : [0];
 
   // ── Expanding & pulsing rings ──────────────────────────────────────────
   ctx.save();
   ctx.translate(cx, cy);
   for (let i = 0; i < 6; i++) {
-    const radius = 80 + i * 22;
+    const radius = (isMultiWinner ? 130 : 80) + i * 24;
     const alpha = 0.22 - i * 0.03;
     ctx.beginPath();
     ctx.arc(0, 0, radius, 0, Math.PI * 2);
@@ -3350,10 +4010,10 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   ctx.restore();
 
   // ── Particle burst effect ───────────────────────────────────────────────
-  const particleCount = 24;
+  const particleCount = isMultiWinner ? 36 : 24;
   for (let i = 0; i < particleCount; i++) {
     const angle = (i / particleCount) * Math.PI * 2;
-    const dist = 90 + i * 4;
+    const dist = (isMultiWinner ? 135 : 90) + i * 4;
     const px = cx + Math.cos(angle) * dist;
     const py = cy + Math.sin(angle) * dist;
     const size = 2;
@@ -3368,7 +4028,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   // ── Secondary sparkle particles ─────────────────────────────────────────
   for (let i = 0; i < 12; i++) {
     const angle = (i / 12) * Math.PI * 2;
-    const dist = 60;
+    const dist = isMultiWinner ? 100 : 60;
     const px = cx + Math.cos(angle) * dist;
     const py = cy + Math.sin(angle) * dist;
     const alpha = 0.5;
@@ -3379,44 +4039,48 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     ctx.fill();
   }
 
-  // ── Draw the winner fighter model ───────────────────────────────────────
-  const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
-  const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-  const preview = new FighterClass({
-    ...def,
-    startX: 0,
-    startY: 0,
-    startVx: 0,
-    startVy: 0,
+  // ── Draw the winner fighter model(s) ───────────────────────────────────────
+  winningFighters.forEach((wFighter, idx) => {
+    const offsetX = offsets[idx] || 0;
+    const def = wFighter._def || FIGHTER_DEFS.find(d => d.id === wFighter._def?.id);
+    if (!def) return;
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    const preview = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+    preview.x = 0;
+    preview.y = 0;
+    preview.vx = 0;
+    preview.vy = 0;
+    preview.angle = 0;
+    preview.gunAngle = 0;
+    preview.shootCooldown = 0;
+    preview._isWinnerReveal = true;
+    if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
+      preview.combatAuraOpacity = 1;
+    }
+
+    ctx.save();
+    ctx.translate(cx + offsetX, cy);
+    ctx.scale(scale, scale);
+
+    // Glow effect
+    ctx.shadowBlur = 40;
+    ctx.shadowColor = wFighter.color || '#fff';
+
+    // Extra white glow ring behind the model
+    ctx.beginPath();
+    ctx.arc(0, 0, (wFighter.r || 20) + 8, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,0.08)`;
+    ctx.fill();
+
+    preview.draw(ctx, null);
+    ctx.restore();
   });
-  preview.x = 0;
-  preview.y = 0;
-  preview.vx = 0;
-  preview.vy = 0;
-  preview.angle = 0;
-  preview.gunAngle = 0;
-  preview.shootCooldown = 0;
-  preview._isWinnerReveal = true;
-  if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
-    preview.combatAuraOpacity = 1;
-  }
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-
-  // Glow effect
-  ctx.shadowBlur = 40;
-  ctx.shadowColor = winner.color;
-
-  // Extra white glow ring behind the model
-  ctx.beginPath();
-  ctx.arc(0, 0, winner.r + 8, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255,255,255,0.08)`;
-  ctx.fill();
-
-  preview.draw(ctx, null);
-  ctx.restore();
 
   // ── "CHAMPION" title text ───────────────────────────────────────────────
   const titleAlpha = Math.min(1, timer / 30);
@@ -3425,17 +4089,31 @@ function drawMatchWinnerReveal(winner, timer, mode) {
 
   // Text glow
   ctx.shadowBlur = 20;
-  ctx.shadowColor = winner.color;
+  ctx.shadowColor = winner.color || '#fff';
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 36px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText('CHAMPION', cx, cy - 130);
+  ctx.fillText(isMultiWinner ? 'CHAMPIONS' : 'CHAMPION', cx, cy - 145);
 
   ctx.shadowBlur = 0;
-  ctx.font = 'bold 26px Arial';
-  ctx.fillStyle = winner.color;
-  ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
+  if (isMultiWinner && winningFighters.length === 2) {
+    ctx.font = 'bold 20px Arial';
+    ctx.fillStyle = winningFighters[0].color || '#fff';
+    ctx.fillText(winningFighters[0].name.toUpperCase(), cx - 95, cy + 115);
+
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = 'bold 16px Arial';
+    ctx.fillText('&', cx, cy + 114);
+
+    ctx.font = 'bold 20px Arial';
+    ctx.fillStyle = winningFighters[1].color || '#fff';
+    ctx.fillText(winningFighters[1].name.toUpperCase(), cx + 95, cy + 115);
+  } else {
+    ctx.font = 'bold 24px Arial';
+    ctx.fillStyle = winner.color || '#fff';
+    ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
+  }
 
   ctx.restore();
 }

@@ -10,7 +10,7 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   
   // OPTIMIZED: Apply quality level to death effect limits
   const qualityMultiplier = state.qualityLevel || 1.0;

@@ -665,12 +665,12 @@ export class CronosFighter extends Fighter {
           // Check if fighter
           const fi = state.fighters.indexOf(entity);
           if (fi !== -1) {
-            if (state.mode === GAME_MODES.TWO_VS_TWO && selfTeam !== null && state.getFighterTeam(fi) === selfTeam) continue;
+            if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && selfTeam !== null && state.getFighterTeam(fi) === selfTeam) continue;
             if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0) continue;
           }
 
           // Check if illusion
-          if (entity.isIllusion && state.mode === GAME_MODES.TWO_VS_TWO && selfTeam !== null) {
+          if (entity.isIllusion && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && selfTeam !== null) {
             const ownerIndex = state.fighters.indexOf(entity.owner);
             if (ownerIndex >= 0 && state.getFighterTeam(ownerIndex) === selfTeam) continue;
           }
@@ -728,8 +728,8 @@ export class CronosFighter extends Fighter {
       // Normal speed when sphere is not active
       this._applyCronosSpeed();
 
-      // Try to deploy sphere when cooldown is ready and opponent is within activation distance
-      if (this.sphereCooldown === 0 && opponent) {
+      // Try to deploy sphere when cooldown is ready and opponent is within activation distance (disabled in demo mode)
+      if (!this.isDemoFighter && this.sphereCooldown === 0 && opponent) {
         const distToOpponent = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         if (distToOpponent <= CONFIG.cronos.sphereActivationDistance) {
           this.deployTimeStopSphere();

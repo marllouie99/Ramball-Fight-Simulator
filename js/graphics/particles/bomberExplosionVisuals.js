@@ -40,7 +40,7 @@ class HighFidelityExplosionSystem {
     flash.maxLife = 0.15;
     this.particles.push(flash);
 
-    const isMulti = state && (state.mode === '2v2' || state.mode === 'FFA');
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
     const particleScale = isMulti ? 0.4 : 1.0;
 
     // 2. Organic Fireball 

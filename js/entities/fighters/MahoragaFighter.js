@@ -32,6 +32,27 @@ export class MahoragaFighter extends Fighter {
       skill: false
     };
 
+    // Gojo-Specific Adaptation Tracking
+    this.gojoAdapted = { purple: false, red: false, blue: false };
+    this._lastGojoHitType = null; // 'purple', 'red', or 'blue' - last Gojo attack type that hit Mahoraga
+    this.gojoBlueDragImmune = false; // When adapted to Blue, immune to drag mechanic
+    this.gojoPurpleDodgeReady = false; // When adapted to Purple, next Purple triggers teleport dodge
+    this.gojoRedDodgeReady = false; // When adapted to Red, next Red triggers teleport dodge
+    // Shared rolling 5-second damage accumulator (ALL Gojo attack types contribute to one pool)
+    // Adaptation fires to whichever attack type was the LAST to hit when the threshold is crossed
+    this.totalAccumDamage = 0; // Total HP lost from any attack within the rolling window
+    this.accumTimer = 0;       // Frames remaining in the current 5-second window
+    this.fatalAdaptCooldown = 0;   // Cooldown between wheel clicks (prevents rapid re-triggering)
+    // Per-sphere permanent color history: each wheel click appends the adapted color so
+    // older adaptations (e.g. Blue) never get overwritten by newer ones (e.g. Purple)
+    this.gojoAdaptColorHistory = []; // ['#00FFFF', '#8A2BE2', ...] — one entry per wheel click
+    // Infinity Adaptation: counts how many times Mahoraga has been frozen by Gojo's Infinity
+    this.infinityFreezeCount = 0;   // Increments each time Mahoraga is frozen by Infinity
+    this.gojoInfinityImmune = false; // When adapted to Infinity, Mahoraga completely bypasses Limitless
+
+    // Wheel glow color override (set by Gojo adaptation type)
+    this.wheelGlowColor = null; // e.g. '#8A2BE2' for purple, '#FF1144' for red, '#00FFFF' for blue
+
     // Wheel Visuals
     this.wheelRotation = 0;
     this.wheelTargetRotation = 0;
@@ -70,6 +91,20 @@ export class MahoragaFighter extends Fighter {
     this.hitsTaken = { melee: 0, ranged: 0, skill: 0 };
     this.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
     this.adapted = { melee: false, ranged: false, skill: false };
+    
+    // Gojo-Specific Adaptation Reset
+    this.gojoAdapted = { purple: false, red: false, blue: false };
+    this._lastGojoHitType = null;
+    this.gojoBlueDragImmune = false;
+    this.gojoPurpleDodgeReady = false;
+    this.gojoRedDodgeReady = false;
+    this.totalAccumDamage = 0;
+    this.accumTimer = 0;
+    this.fatalAdaptCooldown = 0;
+    this.gojoAdaptColorHistory = [];
+    this.infinityFreezeCount = 0;
+    this.gojoInfinityImmune = false;
+    this.wheelGlowColor = null;
     
     this.wheelRotation = 0;
     this.wheelTargetRotation = 0;
@@ -117,10 +152,28 @@ export class MahoragaFighter extends Fighter {
   takeDamage(amount, attacker, opts = {}) {
     const type = opts.isMelee ? 'melee' : (opts.isSkill || opts.isUltimate || opts.isTrueDamage || opts.isExplosion ? 'skill' : 'ranged');
     const reductionPerStage = CONFIG.mahoraga?.adaptationReductionPerStage || 0.12;
-    const adaptThreshold = CONFIG.mahoraga?.hitsToAdapt || 3;
     const maxStages = CONFIG.mahoraga?.maxAdaptationStages || 8;
-    const rotateOnlyOnAdapt = CONFIG.mahoraga?.rotateOnlyOnAdaptation ?? true;
     const clickDuration = CONFIG.mahoraga?.wheelClickDuration || 25;
+
+    // ── Gojo-Specific Attack Detection ──
+    let gojoAttackType = null;
+    if (attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo')) {
+      if (opts.isRed) {
+        gojoAttackType = 'red';
+      } else if (opts.projectile && opts.projectile.isGojoPurple) {
+        gojoAttackType = 'purple';
+      } else if (opts.projectile && opts.projectile.isGojoBlue) {
+        gojoAttackType = 'blue';
+      }
+    }
+
+    // ── Gojo Purple Adaptation: Teleport Dodge ──
+    // (Dodge is now handled PROACTIVELY in update() the moment a Purple orb appears on the field.
+    //  Keeping this commented out to avoid double-triggering.)
+
+    // ── Gojo Red Adaptation: Teleport Dodge ──
+    // (Dodge is now handled PROACTIVELY in update() the moment Gojo enters Red buildup phase.
+    //  Keeping this commented out to avoid double-triggering.)
 
     let finalAmount = amount;
     const currentStage = this.adaptationStage[type] || 0;
@@ -131,39 +184,41 @@ export class MahoragaFighter extends Fighter {
       finalAmount = amount * (1.0 - reduction);
     }
 
-    // Increment hit counter for this attack type
-    this.hitsTaken[type] += 1;
+    // ── ROLLING SHARED FATAL DAMAGE ACCUMULATION WHEEL CLICK (General System) ──
+    // ALL damage feeds into a SINGLE shared pool.
+    // When the total HP lost within the 5-second window crosses the threshold,
+    // the wheel clicks and Mahoraga adapts to the LAST attack type that hit him.
+    if (!this.isInfinityBlitz) {
+      const windowFrames  = CONFIG.mahoraga?.fatalAdaptWindowFrames   ?? 300; // 5s window
+      const thresholdPct  = CONFIG.mahoraga?.fatalDamageThresholdPct  ?? 0.20; // 20% of maxHp
+      const adaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 300; // 5s between clicks
 
-    // Rotate wheel on basic hit ONLY IF rotateOnlyOnAdaptation is false in config AND not in Level 8 Blitz mode
-    if (!rotateOnlyOnAdapt && !this.isInfinityBlitz) {
-      this.wheelClickTimer = clickDuration;
-      this.wheelTargetRotation = (this.wheelTargetRotation || 0) + (Math.PI / 4);
-      this.wheelGlowTimer = 35;
-    }
+      // Add raw damage to the shared pool and refresh/extend the window
+      this.totalAccumDamage = (this.totalAccumDamage || 0) + amount;
+      this.accumTimer = windowFrames; 
+      
+      // Track Gojo-specific type if applicable, for special dodges
+      if (gojoAttackType) {
+        this._lastGojoHitType = gojoAttackType;
+      } else {
+        this._lastGojoHitType = null; // Clear to prevent adapting to Gojo from another enemy's attack
+      }
 
-    // Check if adaptation threshold reached for a NEW wheel rotation & stage advancement!
-    if (this.hitsTaken[type] % adaptThreshold === 0 && currentStage < maxStages) {
-      this._triggerAdaptation(type, attacker);
+      // When total accumulated damage crosses the threshold → wheel click!
+      const threshold = this.maxHp * thresholdPct;
+      if (this.totalAccumDamage >= threshold && (this.fatalAdaptCooldown || 0) <= 0) {
+        // Adapt generally to the type of this final hit (melee, ranged, skill)
+        this._triggerAdaptation(type, attacker);
+        this.fatalAdaptCooldown = adaptCooldown;
+        // Reset the shared pool so Mahoraga must accumulate fresh damage for the next click
+        this.totalAccumDamage = 0;
+        this.accumTimer = 0;
+      }
     }
 
     const result = super.takeDamage(finalAmount, attacker, opts);
 
-    // --- REVERSE CURSED TECHNIQUE (RCT / DIVINE HEALING AT 25% HP) ---
-    const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
-    const thresholdPct = CONFIG.mahoraga?.rctHealThresholdHpPercent ?? 0.25;
-    if (enableRCT && this.hp > 0 && !this.isDead && (this.hp / this.maxHp) <= thresholdPct && (this.rctHealCooldownTimer || 0) <= 0) {
-      const healHp = Math.round(this.maxHp * (CONFIG.mahoraga?.rctHealAmountPercent || 0.35));
-      this.hp = Math.min(this.maxHp, this.hp + healHp);
-      this.rctHealCooldownTimer = CONFIG.mahoraga?.rctHealCooldownFrames || 1200;
 
-      spawnFloatingText(this.x, this.y - this.r - 25, `✨ RCT HEAL! +${healHp}`, '#00FF66');
-      spawnImpactFlash(this.x, this.y, 65, 'healing');
-      spawnSparks(this.x, this.y, 25, 'gold', '#00FF66');
-      triggerGlobalScreenShake(8, 12);
-
-      playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
-    }
 
     return result;
   }
@@ -172,51 +227,71 @@ export class MahoragaFighter extends Fighter {
     this.adapted[type] = true;
     this.adaptationStage[type] = (this.adaptationStage[type] || 0) + 1;
     const currentStage = this.adaptationStage[type];
-    const clickDuration = CONFIG.mahoraga?.wheelClickDuration || 25;
     const reductionPerStage = CONFIG.mahoraga?.adaptationReductionPerStage || 0.12;
     const reductionPct = Math.round(Math.min(0.96, currentStage * reductionPerStage) * 100);
-    
-    // ----------------------------------------------------
-    // DRAMATIC ADAPTATION PAUSE MOMENT (Golden Dim + Wheel rotates BEFORE Teleport!)
-    // ----------------------------------------------------
-    const pauseFrames = 40; // 40 frames = 0.66s smooth cinematic pause
-    this.adaptationPauseTimer = pauseFrames;
-    this.adaptationPauseMax = pauseFrames;
-    this.wheelGlowTimer = 65;
-    this.wheelClickTimer = pauseFrames;
-    this.wheelClickMax = pauseFrames;
-    this.wheelStartRotation = this.wheelRotation || 0;
-    this.wheelTargetRotation = this.wheelStartRotation + (Math.PI / 4);
-    this.shieldIconTimer = 90;
-    this.shieldIconReduction = reductionPct;
 
-    // Freeze all enemy targets on screen (applyTimeStop + applyHitStun + zero velocity)
-    const targetsToFreeze = [];
-    if (attacker && attacker !== this && attacker.hp > 0) targetsToFreeze.push(attacker);
-    if (typeof state !== 'undefined' && state.fighters) {
-      state.fighters.forEach(f => {
-        if (f && f !== this && f.hp > 0 && !targetsToFreeze.includes(f)) {
-          targetsToFreeze.push(f);
-        }
+    const totalStages = (this.adaptationStage.melee || 0) + (this.adaptationStage.ranged || 0) + (this.adaptationStage.skill || 0);
+    const isLevel8 = totalStages >= 8 || currentStage >= 8 || this.isInfinityBlitz;
+
+    // Only do the discrete 45-degree step click & cinematic pause if NOT at Level 8 (continuous spin)
+    if (!isLevel8) {
+      const pauseFrames = 40; // 40 frames = 0.66s smooth cinematic pause
+      this.adaptationPauseTimer = pauseFrames;
+      this.adaptationPauseMax = pauseFrames;
+      this.wheelGlowTimer = 65;
+      this.wheelClickTimer = pauseFrames;
+      this.wheelClickMax = pauseFrames;
+      this.wheelStartRotation = this.wheelRotation || 0;
+      this.wheelTargetRotation = this.wheelStartRotation + (Math.PI / 4);
+
+      // Freeze all enemy targets on screen (applyTimeStop + applyHitStun + zero velocity)
+      const targetsToFreeze = [];
+      if (attacker && attacker !== this && attacker.hp > 0) targetsToFreeze.push(attacker);
+      if (typeof state !== 'undefined' && state.fighters) {
+        state.fighters.forEach(f => {
+          if (f && f !== this && f.hp > 0 && !targetsToFreeze.includes(f)) {
+            targetsToFreeze.push(f);
+          }
+        });
+      }
+
+      targetsToFreeze.forEach(f => {
+        f.mahoragaAdaptationFreezeTimer = pauseFrames;
+        f.vx = 0;
+        f.vy = 0;
       });
-    }
 
-    targetsToFreeze.forEach(f => {
-      f.mahoragaAdaptationFreezeTimer = pauseFrames; // Freezes position/velocity during 3D Wheel rotation without canceling active skill channeling!
-      f.vx = 0;
-      f.vy = 0;
-    });
+      playSkillEffectSound('mahoraga', 'wheelclick');
+      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+    } else {
+      // Level 8 Max Adaptation: keep wheel spinning continuously without discrete click pauses!
+      this.wheelGlowTimer = 40;
+    }
 
     triggerGlobalScreenShake(6, 18);
 
     const wheelY = this.y - this.r - 28;
     spawnFloatingText(this.x, wheelY - 25, `🛡️ -${reductionPct}% DAMAGE REDUCTION!`, '#FFD700');
-    playSkillEffectSound('mahoraga', 'wheelclick');
-    playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+
+    // Trigger pop-out Divine Shield Badge & RCT Healing (+) Emblem Badge
+    this.shieldIconTimer = 90;
+
+    // --- REVERSE CURSED TECHNIQUE (RCT / DIVINE HEALING ON WHEEL CLICK ADAPTATION) ---
+    const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
+    if (enableRCT && this.hp > 0 && !this.isDead) {
+      const healPercent = CONFIG.mahoraga?.rctHealPerClickPercent ?? 0.08;
+      const healHp = Math.round(this.maxHp * healPercent);
+      if (healHp > 0) {
+        this.hp = Math.min(this.maxHp, this.hp + healHp);
+        spawnFloatingText(this.x, wheelY - 45, `✨ RCT HEAL! +${healHp}`, '#00FF66');
+        spawnImpactFlash(this.x, this.y, 55, 'healing');
+        spawnSparks(this.x, this.y, 30, 'arcane');
+        spawnSparks(this.x, this.y, 20, 'arcaneAscendLine');
+      }
+    }
 
     // Max Adaptation Awakening Check (Wheel 360° rotation complete at Stage 8)
-    const totalStages = (this.adaptationStage.melee || 0) + (this.adaptationStage.ranged || 0) + (this.adaptationStage.skill || 0);
     if (totalStages >= 8 || currentStage >= 8) {
       if (!this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0) {
         this.isInfinityBlitz = true;
@@ -226,7 +301,6 @@ export class MahoragaFighter extends Fighter {
         this.isThrowing = false;
         this.isBlitzActive = false;
 
-        const wheelY = this.y - this.r - 28;
         spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
         triggerGlobalScreenShake(14, 30);
         playSound('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
@@ -239,9 +313,201 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    // Save attacker for smooth divine flash-dash counter as soon as wheel rotation completes!
+    // Save attacker for smooth divine flash-dash counter
     if (attacker && !attacker.isDead && attacker !== this) {
       this._pendingCounterTarget = attacker;
+    }
+
+    // ── Gojo-Specific Adaptation (Last Hit Priority) ──
+    // When wheel clicks due to a fatal Gojo hit, adapt/re-adapt to that attack type.
+    // No guard on gojoAdapted — each new wheel click refreshes the dodge readiness.
+    if (this._lastGojoHitType) {
+      this._applyGojoAdaptation(this._lastGojoHitType);
+    }
+  }
+
+  /**
+   * Apply Gojo-specific adaptation based on the attack type.
+   * - Purple: Next time Gojo fires Purple, Mahoraga teleports away.
+   * - Red: Next time Gojo uses Red, Mahoraga teleport-dodges.
+   * - Blue: Mahoraga becomes immune to Blue's drag mechanic (still takes damage).
+   */
+  _applyGojoAdaptation(gojoType) {
+    this.gojoAdapted[gojoType] = true;
+    const wheelY = this.y - this.r - 28;
+
+    // Set wheel glow color for the background wheel aura (most recent adaptation)
+    // Each sphere's PERMANENT color is tracked separately in gojoAdaptColorHistory
+    let adaptColor = null;
+    switch (gojoType) {
+      case 'purple':
+        adaptColor = '#8A2BE2'; // Purple
+        this.gojoPurpleDodgeReady = true;
+        spawnFloatingText(this.x, wheelY - 35, '🛡️ ADAPTED: PURPLE TELEPORT DODGE!', '#8A2BE2');
+        break;
+      case 'red':
+        adaptColor = '#FF1144'; // Red
+        this.gojoRedDodgeReady = true;
+        spawnFloatingText(this.x, wheelY - 35, '🛡️ ADAPTED: RED TELEPORT DODGE!', '#FF1144');
+        break;
+      case 'blue':
+        adaptColor = '#00FFFF'; // Cyan/Blue
+        this.gojoBlueDragImmune = true;
+        spawnFloatingText(this.x, wheelY - 35, '🛡️ ADAPTED: BLUE DRAG IMMUNITY!', '#00FFFF');
+        break;
+      case 'infinity':
+        adaptColor = '#A0C8FF'; // Ice-blue — Gojo's Infinity barrier color
+        this.gojoInfinityImmune = true;
+        spawnFloatingText(this.x, wheelY - 35, '⚡ ADAPTED: INFINITY BYPASS!', '#A0C8FF');
+        spawnFloatingText(this.x, wheelY - 52, '∞ Limitless no longer works on Mahoraga!', '#FFFFFF');
+        break;
+    }
+
+    // Push the new adaptation color into permanent history — NO DUPLICATES.
+    // Max 3 unique entries (one per Gojo attack type: blue, red, purple).
+    // Re-adapting to the same type refreshes the game effect but doesn't add a duplicate sphere color.
+    if (adaptColor) {
+      if (!this.gojoAdaptColorHistory) this.gojoAdaptColorHistory = [];
+      if (!this.gojoAdaptColorHistory.includes(adaptColor)) {
+        this.gojoAdaptColorHistory.push(adaptColor);
+      }
+    }
+
+    // wheelGlowColor = most recent adapt color (drives the background wheel aura glow only)
+    this.wheelGlowColor = adaptColor || this.wheelGlowColor;
+
+    spawnImpactFlash(this.x, this.y, 45, 'lightningTrail');
+    spawnSparks(this.x, this.y, 20, 'arcane', this.wheelGlowColor);
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+  }
+
+  /**
+   * Gojo Purple Teleport Dodge: When Gojo fires Purple and Mahoraga has adapted,
+   * Mahoraga instantly teleports away to a safe distance.
+   */
+  _gojoPurpleTeleportDodge(gojo, purpleOrb = null) {
+    const fromX = this.x;
+    const fromY = this.y;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    const margin = (this.r || 25) + 15;
+
+    // Dodge PERPENDICULAR to the orb to cleanly sidestep it
+    // Try both left and right sides, pick whichever lands cleanest inside the arena
+    const orbX = purpleOrb ? purpleOrb.x : (gojo.x || this.x);
+    const orbY = purpleOrb ? purpleOrb.y : (gojo.y || this.y);
+    // Purple can be huge, so we calculate the absolute maximum danger zone to clear it cleanly
+    const angleToOrb = Math.atan2(orbY - this.y, orbX - this.x);
+    const purpleDamageRadius = (CONFIG.gojo?.purpleRadius || 20) * (CONFIG.gojo?.purpleScale || 10.0);
+    const purplePullRadius = CONFIG.gojo?.purplePullRadius || 200;
+    const maxDangerRadius = Math.max(purpleDamageRadius, purplePullRadius);
+    const dodgeDist = maxDangerRadius + this.r + 40; 
+    const side = Math.random() < 0.5 ? 1 : -1;
+    const candidates = [
+      { x: this.x + Math.cos(angleToOrb + side * Math.PI / 2) * dodgeDist,
+        y: this.y + Math.sin(angleToOrb + side * Math.PI / 2) * dodgeDist },
+      { x: this.x + Math.cos(angleToOrb - side * Math.PI / 2) * dodgeDist,
+        y: this.y + Math.sin(angleToOrb - side * Math.PI / 2) * dodgeDist },
+      { x: this.x + Math.cos(angleToOrb + Math.PI) * dodgeDist, // fallback: retreat straight back
+        y: this.y + Math.sin(angleToOrb + Math.PI) * dodgeDist },
+    ];
+
+    let toX = fromX, toY = fromY;
+    for (const c of candidates) {
+      if (!arena) { toX = c.x; toY = c.y; break; }
+      const cx = Math.max(arena.x + margin, Math.min(arena.x + arena.width  - margin, c.x));
+      const cy = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, c.y));
+      // Accept the first candidate that doesn't get wall-clamped too heavily
+      if (Math.hypot(cx - c.x, cy - c.y) < 40) { toX = cx; toY = cy; break; }
+      toX = cx; toY = cy; // Use last clamped position as fallback
+    }
+
+    this.x = toX;
+    this.y = toY;
+    this.vx = 0;
+    this.vy = 0;
+    this.aim(gojo); // Re-aim after teleport
+
+    // Visual feedback
+    this._spawnTeleportAfterimages(fromX, fromY, toX, toY);
+    spawnImpactFlash(fromX, fromY, 30, '#8A2BE2');
+    spawnImpactFlash(toX, toY, 30, '#8A2BE2');
+    spawnSparks(fromX, fromY, 15, 'purpleTrail', '#8A2BE2');
+    spawnSparks(toX, toY, 15, 'purpleTrail', '#8A2BE2');
+    spawnFloatingText(toX, toY - this.r - 20, 'PURPLE DODGE!', '#8A2BE2');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+
+    this.gojoPurpleDodgeReady = false; // Disarmed until orb expires
+
+    // Post-dodge counter-attack: immediately dash back to Gojo to punish him!
+    if (!this.isInfinityBlitz) {
+      this.adaptationPauseTimer = 30; // 0.5s pause to let the dodge visual settle
+      this.adaptationPauseMax = 30;
+      this._pendingCounterTarget = gojo;
+      // He'll automatically trigger _startAdaptationFlashDash(gojo) when timer hits 0
+    } else {
+      this._startAdaptationFlashDash(gojo);
+    }
+  }
+
+  /**
+   * Gojo Red Teleport Dodge: When Gojo uses Red and Mahoraga has adapted,
+   * Mahoraga teleports to reposition and dodge the blast.
+   */
+  _gojoRedTeleportDodge(gojo) {
+    const fromX = this.x;
+    const fromY = this.y;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    const margin = (this.r || 25) + 15;
+
+    // Teleport PERPENDICULAR to the Gojo→Mahoraga line to dodge the Red blast
+    // Try both left and right sides, pick whichever lands cleanest inside the arena
+    const angleToGojo = Math.atan2(gojo.y - this.y, gojo.x - this.x);
+    const dodgeDist = CONFIG.mahoraga?.gojoDodgeDistance || 280;
+    const side = Math.random() < 0.5 ? 1 : -1;
+    const candidates = [
+      { x: this.x + Math.cos(angleToGojo + side * Math.PI / 2) * dodgeDist,
+        y: this.y + Math.sin(angleToGojo + side * Math.PI / 2) * dodgeDist },
+      { x: this.x + Math.cos(angleToGojo - side * Math.PI / 2) * dodgeDist,
+        y: this.y + Math.sin(angleToGojo - side * Math.PI / 2) * dodgeDist },
+      { x: this.x + Math.cos(angleToGojo + Math.PI) * dodgeDist, // fallback: retreat
+        y: this.y + Math.sin(angleToGojo + Math.PI) * dodgeDist },
+    ];
+
+    let toX = fromX, toY = fromY;
+    for (const c of candidates) {
+      if (!arena) { toX = c.x; toY = c.y; break; }
+      const cx = Math.max(arena.x + margin, Math.min(arena.x + arena.width  - margin, c.x));
+      const cy = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, c.y));
+      // Accept the first candidate that doesn't get wall-clamped too heavily
+      if (Math.hypot(cx - c.x, cy - c.y) < 40) { toX = cx; toY = cy; break; }
+      toX = cx; toY = cy; // Use last clamped position as fallback
+    }
+
+    this.x = toX;
+    this.y = toY;
+    this.vx = 0;
+    this.vy = 0;
+    this.aim(gojo); // Re-aim after repositioning
+
+    // Visual feedback
+    this._spawnTeleportAfterimages(fromX, fromY, toX, toY);
+    spawnImpactFlash(fromX, fromY, 28, '#FF1144');
+    spawnImpactFlash(toX, toY, 28, '#FF1144');
+    spawnSparks(fromX, fromY, 12, 'crimsonSniper', '#FF1144');
+    spawnSparks(toX, toY, 12, 'crimsonSniper', '#FF1144');
+    spawnFloatingText(toX, toY - this.r - 20, 'RED DODGE!', '#FF1144');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+
+    this.gojoRedDodgeReady = false; // Disarmed until next Red
+
+    // Post-dodge counter-attack: immediately dash back to Gojo to punish him!
+    if (!this.isInfinityBlitz) {
+      this.adaptationPauseTimer = 30; // 0.5s pause to let the dodge visual settle
+      this.adaptationPauseMax = 30;
+      this._pendingCounterTarget = gojo;
+      // He'll automatically trigger _startAdaptationFlashDash(gojo) when timer hits 0
+    } else {
+      this._startAdaptationFlashDash(gojo);
     }
   }
 
@@ -251,6 +517,12 @@ export class MahoragaFighter extends Fighter {
     const dy = toY - fromY;
     const dist = Math.hypot(dx, dy);
     if (dist < 1) return;
+
+    // Ground Perspective Divine Shockwaves at departure and destination points
+    spawnMeleeClashShockwave(fromX, fromY, 65, 'mahoraga');
+    spawnMeleeClashShockwave(toX, toY, 75, 'mahoraga');
+    spawnImpactFlash(fromX, fromY, 26, '#FFFFFF');
+    spawnImpactFlash(toX, toY, 32, '#FFFFFF');
 
     const pathAngle = Math.atan2(dy, dx);
     const facingAngle = customAngle !== null ? customAngle : (this.gunAngle !== undefined ? this.gunAngle : pathAngle);
@@ -332,10 +604,107 @@ export class MahoragaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    // Wheel Rotation Tick (runs even if frozen by domains for lore accuracy!)
+    if (this.isInfinityBlitz) {
+      this.infinityBlitzSpinSpeed = CONFIG.mahoraga?.infinityBlitzWheelSpinSpeed || 0.08;
+      this.wheelRotation += this.infinityBlitzSpinSpeed;
+      this.wheelTargetRotation = this.wheelRotation;
+      this.wheelClickTimer = 0;
+    } else if ((this.infinityBlitzSpinSpeed || 0) > 0.001) {
+      this.wheelRotation += this.infinityBlitzSpinSpeed;
+      this.infinityBlitzSpinSpeed *= 0.96;
+      this.wheelTargetRotation = this.wheelRotation;
+      if (this.infinityBlitzSpinSpeed <= 0.001) this.infinityBlitzSpinSpeed = 0;
+    } else if (this.wheelClickTimer > 0) {
+      this.wheelClickTimer--;
+      this.wheelRotation += (this.wheelTargetRotation - this.wheelRotation) * 0.25;
+    } else if (this.wheelTargetRotation !== undefined) {
+      this.wheelRotation = this.wheelTargetRotation;
+    }
+    if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
+
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      // PREVENT TELEPORTS & COMBOS: If frozen by domain, clear counter-attack queues!
+      this.adaptationPauseTimer = 0;
+      this.adaptationDashTimer = 0;
+      this._pendingCounterTarget = null;
+      return; // MANDATORY: Stop update execution so fighter is frozen!
+    }
+
     this.handlePoison();
     this.handleBurn();
     this._tickCooldowns();
     this._tickAttackSound();
+
+    if (this.infinityFreezeTimer > 0) {
+      // First frame of a new freeze? Increment the counter and check for adaptation
+      if (!this._wasInfinityFrozenLastFrame) {
+        this._wasInfinityFrozenLastFrame = true;
+        this.infinityFreezeCount = (this.infinityFreezeCount || 0) + 1;
+
+        const freezesNeeded = CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 3;
+        if (!this.gojoInfinityImmune && this.infinityFreezeCount >= freezesNeeded) {
+          // Wheel clicks — Mahoraga has felt Infinity enough times to counter it!
+          this._lastGojoHitType = 'infinity';
+          const gojoFighter = state.fighters
+            ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0)
+            : null;
+          this._triggerAdaptation('skill', gojoFighter || null);
+        }
+      }
+
+      this.infinityFreezeTimer--;
+      this.isFrozenByInfinity = true;
+      this.vx = 0;
+      this.vy = 0;
+      this.applyMovementPhysics(0);
+      return; // Hold Mahoraga in stasis while frozen by Infinity!
+    } else {
+      this.isFrozenByInfinity = false;
+      this._wasInfinityFrozenLastFrame = false; // Reset edge-detect flag when freeze ends
+    }
+
+    // ----------------------------------------------------
+    // PROACTIVE GOJO ADAPTATION DODGE TRIGGERS
+    // Mahoraga reacts the INSTANT Gojo fires — not when he's already being hit.
+    // Purple: teleports to the SAFEST ARENA CORNER away from the orb the moment it appears.
+    // Red:    teleports perpendicular the moment Gojo enters Red buildup phase.
+    // ----------------------------------------------------
+
+    // ── Purple: proactive detection + re-arm when orb expires ──
+    const livePurpleOrb = (projectileSystem && projectileSystem.projectiles)
+      ? projectileSystem.projectiles.find(p => p && p.isGojoPurple && (p.life || 0) > 0)
+      : null;
+
+    if (this.gojoAdapted && this.gojoAdapted.purple) {
+      if (this.gojoPurpleDodgeReady && (this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
+        if (livePurpleOrb) {
+          const gojoFighter = state.fighters
+            ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0)
+            : null;
+          if (gojoFighter) {
+            // Pass the orb so the dodge uses its position, not Gojo's position
+            this._gojoPurpleTeleportDodge(gojoFighter, livePurpleOrb);
+          }
+        }
+      }
+      // Re-arm the purple dodge the moment the orb leaves the field so NEXT purple also gets dodged
+      if (!this.gojoPurpleDodgeReady && !livePurpleOrb) {
+        this.gojoPurpleDodgeReady = true;
+      }
+    }
+
+    // ── Red: proactive detection ──
+    if (this.gojoRedDodgeReady && (this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
+      const gojoFighter = state.fighters
+        ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0 && (f.redEffectTimer || 0) > 0)
+        : null;
+      if (gojoFighter) {
+        this._gojoRedTeleportDodge(gojoFighter);
+      }
+    }
 
     // ----------------------------------------------------
     // HIGH-SPEED DIVINE FLASH-DASH TICK (Smooth Motion Interpolation)
@@ -488,37 +857,12 @@ export class MahoragaFighter extends Fighter {
       return; // Hold update loop during Adaptation Time-Freeze!
     }
 
-
-
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
-      return;
-    }
-
-    // Wheel Rotation Tick (Level 8 Blitz continuous spin takes absolute priority)
-    if (this.isInfinityBlitz) {
-      this.infinityBlitzSpinSpeed = CONFIG.mahoraga?.infinityBlitzWheelSpinSpeed || 0.08;
-      this.wheelRotation += this.infinityBlitzSpinSpeed;
-      this.wheelTargetRotation = this.wheelRotation;
-      this.wheelClickTimer = 0;
-    } else if ((this.infinityBlitzSpinSpeed || 0) > 0.001) {
-      // Smooth deceleration curve as Speed-Blitz ends!
-      this.wheelRotation += this.infinityBlitzSpinSpeed;
-      this.infinityBlitzSpinSpeed *= 0.96;
-      this.wheelTargetRotation = this.wheelRotation;
-      if (this.infinityBlitzSpinSpeed <= 0.001) {
-        this.infinityBlitzSpinSpeed = 0;
+    if (this.shieldIconTimer > 0) {
+      this.shieldIconTimer--;
+      if (Math.random() < 0.40) {
+        spawnSparks(this.x + (Math.random() - 0.5) * (this.r || 30), this.y + (Math.random() - 0.5) * (this.r || 30), 2, 'arcaneAscendLine');
       }
-    } else if (this.wheelClickTimer > 0) {
-      this.wheelClickTimer--;
-      this.wheelRotation += (this.wheelTargetRotation - this.wheelRotation) * 0.25;
-    } else if (this.wheelTargetRotation !== undefined) {
-      this.wheelRotation = this.wheelTargetRotation;
     }
-
-    if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
-    if (this.shieldIconTimer > 0) this.shieldIconTimer--;
     if (this.teleportCounterCooldown > 0) this.teleportCounterCooldown--;
 
     // Smooth retractable blade interpolation (hides blade back into forearm when throwing)
@@ -544,15 +888,25 @@ export class MahoragaFighter extends Fighter {
     if (this.cleaveCooldown > 0) this.cleaveCooldown--;
     if (this.shoutCooldown > 0) this.shoutCooldown--;
     if (this.throwCooldown > 0) this.throwCooldown--;
+    if (this.fatalAdaptCooldown > 0) this.fatalAdaptCooldown--;
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.leftPunchTimer > 0) this.leftPunchTimer--;
     if (this.infinityBlitzCooldownTimer > 0) this.infinityBlitzCooldownTimer--;
 
+    // Tick down the shared Gojo damage accumulation window — wipe accumulated damage when window expires
+    if (this.accumTimer > 0) {
+      this.accumTimer--;
+      if (this.accumTimer <= 0) {
+        this.totalAccumDamage = 0; // Window expired - reset the shared pool
+      }
+    }
+
+
     // ----------------------------------------------------
-    // LEVEL 4 MAX ADAPTATION: SPEED-BLITZ DURATION & SMOOTH WHEEL DECELERATION
+    // LEVEL 8 MAX ADAPTATION: SPEED-BLITZ DURATION & SMOOTH WHEEL DECELERATION
     // ----------------------------------------------------
     const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
-    if (totalStages >= 4 && !this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0) {
+    if (totalStages >= 8 && !this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0) {
       this.isInfinityBlitz = true;
       this.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames || 600;
       this.isCleaving = false;
@@ -561,10 +915,16 @@ export class MahoragaFighter extends Fighter {
       this.isBlitzActive = false;
 
       const wheelY = this.y - this.r - 28;
-      spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 4 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
+      spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
       triggerGlobalScreenShake(14, 30);
       playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
       playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+    }
+
+    if (this.isInfinityBlitz || totalStages >= 8) {
+      if (Math.random() < 0.6) {
+        spawnSparks(this.x + (Math.random() - 0.5) * this.r * 1.6, this.y + (Math.random() - 0.5) * this.r * 1.6, 2, 'arcane', '#9D4EDD');
+      }
     }
 
     if (this.isInfinityBlitz) {
@@ -582,7 +942,19 @@ export class MahoragaFighter extends Fighter {
           this.wheelTargetRotation = 0;
           this.hasAnnouncedLevel2 = false;
 
-          spawnFloatingText(this.x, this.y - this.r - 25, '🔄 LEVEL 4 EXPIRED: BUFFS RESET!', '#FFD700');
+          // Clear all Gojo-specific adaptations and histories
+          this.gojoAdapted = { purple: false, red: false, blue: false };
+          this.gojoBlueDragImmune = false;
+          this.gojoPurpleDodgeReady = false;
+          this.gojoRedDodgeReady = false;
+          this.gojoInfinityImmune = false;
+          this.totalAccumDamage = 0;
+          this.accumTimer = 0;
+          this.infinityFreezeCount = 0;
+          this.gojoAdaptColorHistory = [];
+          this.wheelGlowColor = null;
+
+          spawnFloatingText(this.x, this.y - this.r - 25, '🔄 LEVEL 8 EXPIRED: ADAPTATIONS RESET!', '#FFD700');
           triggerGlobalScreenShake(8, 16);
           playSound('Assets/Sound Effects/Skills/machinebroken.mp3', 1.0);
         }
@@ -685,8 +1057,10 @@ export class MahoragaFighter extends Fighter {
     // Divine Shout Windup (AoE Shockwave Roar)
     if (this.isShouting) {
       this.shoutWindupTimer++;
-      this.vx = 0;
-      this.vy = 0;
+      if ((this.knockbackStunTimer || 0) <= 0) {
+        this.vx = 0;
+        this.vy = 0;
+      }
       this.applyMovementPhysics(0);
 
       const maxWindup = CONFIG.mahoraga?.shoutWindupFrames || 15;
@@ -701,8 +1075,10 @@ export class MahoragaFighter extends Fighter {
 
     // Conditional Rapid Barrage Throw (Plants feet & hurls rapid high-speed projectiles!)
     if (this.isThrowing) {
-      this.vx = 0;
-      this.vy = 0;
+      if ((this.knockbackStunTimer || 0) <= 0) {
+        this.vx = 0;
+        this.vy = 0;
+      }
       this.applyMovementPhysics(0);
 
       if (opponent && !opponent.isDead) {
@@ -773,8 +1149,10 @@ export class MahoragaFighter extends Fighter {
     // HAND-TO-HAND BLITZ SEQUENCE (Attack-Teleport-Attack-Teleport!)
     // ----------------------------------------------------
     if (this.isBlitzActive) {
-      this.vx = 0;
-      this.vy = 0;
+      if ((this.knockbackStunTimer || 0) <= 0) {
+        this.vx = 0;
+        this.vy = 0;
+      }
       this.applyMovementPhysics(0);
 
       const target = this.blitzTarget || opponent;
@@ -979,8 +1357,10 @@ export class MahoragaFighter extends Fighter {
     // Active Cleave Skill (Sword of Extermination AoE)
     if (this.isCleaving) {
       this.cleaveWindupTimer++;
-      this.vx = 0;
-      this.vy = 0;
+      if ((this.knockbackStunTimer || 0) <= 0) {
+        this.vx = 0;
+        this.vy = 0;
+      }
       this.applyMovementPhysics(0);
 
       const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames || 30;
@@ -995,7 +1375,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     this.applyMovementPhysics();
-    if (this.punchAnimTimer > 0 || this.leftPunchTimer > 0) {
+    if ((this.punchAnimTimer > 0 || this.leftPunchTimer > 0) && (this.knockbackStunTimer || 0) <= 0) {
       this.vx = 0;
       this.vy = 0;
     }
@@ -1250,15 +1630,15 @@ export class MahoragaFighter extends Fighter {
         if (comboIndex === 0) {
           knockbackAngle = this.gunAngle !== undefined ? this.gunAngle : baseAngle;
           knockbackForce = 16.0;
-          opponent.applyHitStun(12);
+          if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(12);
         } else if (comboIndex === 1) {
           knockbackAngle = baseAngle + Math.PI * 0.25;
           knockbackForce = 12.5;
-          opponent.applyHitStun(10);
+          if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(10);
         } else {
           knockbackAngle = baseAngle - Math.PI * 0.15;
           knockbackForce = 14.0;
-          opponent.applyHitStun(16);
+          if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(16);
         }
 
         opponent.vx += Math.cos(knockbackAngle) * knockbackForce;
@@ -1524,6 +1904,126 @@ export class MahoragaFighter extends Fighter {
     ctx.restore();
   }
 
+  // Draw Dynamic Orbiting Cursed Purple Flame Particles & Embers (Small & Slow)
+  _drawCursedPurpleFlames(ctx) {
+    if (!this._flameParticles) {
+      this._flameParticles = [];
+    }
+
+    const particles = this._flameParticles;
+    const now = Date.now();
+    const time = now * 0.0015; // slower time scale
+
+    // Spawn new flame particles around Mahoraga's body
+    const spawnRate = 2; // 2 small particles per frame
+    for (let s = 0; s < spawnRate; s++) {
+      const angle = Math.random() * Math.PI * 2;
+      const orbitR = this.r * (0.75 + Math.random() * 0.4);
+      const startX = this.x + Math.cos(angle) * orbitR;
+      const startY = this.y + Math.sin(angle) * orbitR * 0.6 + (Math.random() - 0.5) * 10;
+
+      particles.push({
+        x: startX,
+        y: startY,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: -0.4 - Math.random() * 0.6, // gentle slow upward float
+        size: 3 + Math.random() * 4,     // small flame particle size (3-7px)
+        maxSize: 3 + Math.random() * 4,
+        life: 1.0,
+        decay: 0.012 + Math.random() * 0.015, // slower decay
+        rot: (Math.random() - 0.5) * 0.5,
+        vRot: (Math.random() - 0.5) * 0.05,
+        isEmber: Math.random() < 0.3
+      });
+    }
+
+    // Update and render flame particles
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+
+      // Update position & physics (slow sway and float)
+      p.x += p.vx + Math.sin(time * 2 + i) * 0.3;
+      p.y += p.vy;
+      p.rot += p.vRot;
+      p.life -= p.decay;
+
+      // Shrink size as it burns out
+      p.size = p.maxSize * Math.max(0, p.life);
+
+      if (p.life <= 0 || p.size <= 0.4) {
+        particles.splice(i, 1);
+        continue;
+      }
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+
+      if (p.isEmber) {
+        // === SMALL SLOW EMBER SPARK ===
+        ctx.shadowColor = '#c77dff';
+        ctx.shadowBlur = 6;
+
+        ctx.fillStyle = `rgba(243, 232, 255, ${p.life * 0.9})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, Math.max(0.8, p.size * 0.4), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 0.6;
+        ctx.stroke();
+      } else {
+        // === SMALL SLOW FLAME TONGUE PARTICLE ===
+        const sz = p.size;
+        const alpha = Math.min(1.0, p.life * 1.2);
+
+        // Purple Canvas Glow
+        ctx.shadowColor = '#c77dff';
+        ctx.shadowBlur = 8;
+
+        // 1. Small Teardrop Flame Shape Fill
+        ctx.beginPath();
+        ctx.moveTo(0, sz * 0.9);
+        ctx.quadraticCurveTo(-sz * 0.85, 0, 0, -sz * 1.4);
+        ctx.quadraticCurveTo(sz * 0.85, 0, 0, sz * 0.9);
+        ctx.closePath();
+
+        const flameGrad = ctx.createLinearGradient(0, sz * 0.9, 0, -sz * 1.4);
+        flameGrad.addColorStop(0, `rgba(123, 44, 191, ${alpha * 0.95})`);
+        flameGrad.addColorStop(0.5, `rgba(157, 78, 221, ${alpha * 0.90})`);
+        flameGrad.addColorStop(1, `rgba(224, 170, 255, ${alpha * 0.70})`);
+        ctx.fillStyle = flameGrad;
+        ctx.fill();
+
+        // 2. Fine Crisp Black Outline Stroke
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.95})`;
+        ctx.lineWidth = 0.8;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.stroke();
+
+        // 3. Inner White Core
+        const coreSz = sz * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(0, coreSz * 0.8);
+        ctx.quadraticCurveTo(-coreSz * 0.7, 0, 0, -coreSz * 1.3);
+        ctx.quadraticCurveTo(coreSz * 0.7, 0, 0, coreSz * 0.8);
+        ctx.closePath();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.85})`;
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
   drawGun(ctx) {
     if (this.isTargetOfAmbush) return;
     drawMahoragaSword(ctx, this);
@@ -1627,38 +2127,46 @@ export class MahoragaFighter extends Fighter {
     }
 
 
-    // 1. Draw base fighter body & wrist blade (Paints Mahoraga bright & clear ON TOP of screen dim!)
-    super.draw(ctx, opponent);
+    // ----------------------------------------------------
+    // UNDERLAY RINGS (Rendered BEFORE body & weapons so they never overlay!)
+    // ----------------------------------------------------
+    // A. LEVEL 8 MAX ADAPTATION: GOLDEN GLOW AROUND HIS EDGE BODY!
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+    const isLevel8 = totalStages >= 8 || this.isInfinityBlitz;
 
-    // 2. Draw Eye-Socket Face Wings ON TOP OF BODY (Chaotic bony wings sprouting from eye sockets!)
-    drawMahoragaFaceWings(ctx, this);
-
-    // 3. Draw Shinto Ritual Chest Necklace & Amulet
-    drawMahoragaChestNecklace(ctx, this);
-
-    // 4. Draw Left Off-Hand ON TOP OF BODY & NECKLACE (Always visible on the other side of body, lunging forward when punching!)
-    drawMahoragaLeftPunch(ctx, this);
-
-    // 4. Draw 3D Wheel of Adaptation & Surrounding Golden Ring Highlight
-    drawMahoraga3DWheel(ctx, this);
-
-    // 5. Draw Cleave Windup Visual
-    if (this.isCleaving) {
-      const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames || 30;
-      const progress = this.cleaveWindupTimer / maxWindup;
-      const radius = (CONFIG.mahoraga?.cleaveRadius || 150) * progress;
-
+    if (isLevel8) {
       ctx.save();
-      ctx.translate(this.x, this.y);
+      const pulse = Math.sin(Date.now() * 0.008) * 2.5;
+      const glowR = this.r + 3 + pulse;
+
+      // Soft outer golden aura bloom
       ctx.beginPath();
-      ctx.arc(0, 0, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(218, 165, 32, ${1 - progress})`;
-      ctx.lineWidth = 2;
+      ctx.arc(this.x, this.y, glowR + 5, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
+      ctx.lineWidth = 8;
       ctx.stroke();
+
+      // Sharp golden divine edge outline
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, glowR, 0, Math.PI * 2);
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 3.5;
+      ctx.shadowColor = '#FFD700';
+      ctx.shadowBlur = 16;
+      ctx.stroke();
+
+      // Bright white inner core rim highlight
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, glowR - 1.2, 0, Math.PI * 2);
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1.8;
+      ctx.shadowBlur = 0;
+      ctx.stroke();
+
       ctx.restore();
     }
 
-    // 6. Draw Neutral Close-Quarters Attack-Teleport Stance & Cooldown Ring Timer HUD
+    // B. Neutral Close-Quarters Attack-Teleport Stance & Cooldown Ring Timer HUD
     if (this.neutralStanceTimer > 0) {
       const maxT = CONFIG.mahoraga?.neutralStanceDurationFrames || 180;
       const progress = Math.max(0, Math.min(1, this.neutralStanceTimer / maxT));
@@ -1699,10 +2207,48 @@ export class MahoragaFighter extends Fighter {
       ctx.arc(tipX, tipY, 3.5, 0, Math.PI * 2);
       ctx.fillStyle = '#FFFFFF';
       ctx.fill();
-      ctx.strokeStyle = '#FFD700';
-      ctx.lineWidth = 1.5;
-      ctx.stroke();
 
+      ctx.restore();
+    }
+
+    ctx.save();
+
+    // 1. Draw base fighter body & wrist blade
+    super.draw(ctx, opponent);
+
+    // 2. Draw Eye-Socket Face Wings ON TOP OF BODY (Edges glow gold when Level 8!)
+    drawMahoragaFaceWings(ctx, this);
+
+    // 3. Draw Shinto Ritual Chest Necklace & Amulet
+    drawMahoragaChestNecklace(ctx, this);
+
+    // 4. Draw Left Off-Hand ON TOP OF BODY & NECKLACE
+    drawMahoragaLeftPunch(ctx, this);
+
+    // 5. Draw Dynamic Wispy S-Curve Cursed Flame Aura (ON TOP so it is 100% visible from any angle!)
+    // (Removed per user request — no flame particles at level 8)
+    // if (isLevel8) {
+    //   this._drawCursedPurpleFlames(ctx);
+    // }
+
+    // 6. Draw 3D Wheel of Adaptation & Surrounding Golden Ring Highlight
+    drawMahoraga3DWheel(ctx, this);
+
+    ctx.restore();
+
+    // 6. Draw Cleave Windup Visual
+    if (this.isCleaving) {
+      const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames || 30;
+      const progress = this.cleaveWindupTimer / maxWindup;
+      const radius = (CONFIG.mahoraga?.cleaveRadius || 150) * progress;
+
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.beginPath();
+      ctx.arc(0, 0, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(218, 165, 32, ${1 - progress})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
       ctx.restore();
     } else if (this.neutralStanceCooldownTimer > 0) {
       const maxCd = CONFIG.mahoraga?.neutralStanceCooldownFrames || 250;

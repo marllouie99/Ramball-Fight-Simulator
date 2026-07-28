@@ -194,7 +194,7 @@ export class RubyFighter extends Fighter {
         for (let i = 0; i < state.fighters.length; i++) {
           const f = state.fighters[i];
           if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-          if (state.mode === '2v2' && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
+          if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
 
           const fDist = Math.hypot(f.x - this.x, f.y - this.y);
           // Give a small 15px leeway because the weapon physically extends slightly past the max range
@@ -319,7 +319,7 @@ export class RubyFighter extends Fighter {
     for (let i = 0; i < state.fighters.length; i++) {
       const f = state.fighters[i];
       if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) continue;
-      if (state.mode === '2v2' && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
+      if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
 
       const fDist = Math.hypot(f.x - this.x, f.y - this.y);
       if (fDist <= range) {

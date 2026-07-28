@@ -70,7 +70,7 @@ class BurnEffectSystem {
    * Call this every frame inside the update loop for fighters with burnTimer > 0.
    */
   spawnBurnParticles(fighter) {
-    const isMulti = state && (state.mode === '2v2' || state.mode === 'FFA');
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
     
     // OPTIMIZED: More aggressive limits for multi-fighter battles
     const maxBurn = isMulti ? 40 : 200;

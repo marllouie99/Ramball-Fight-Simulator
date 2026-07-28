@@ -94,13 +94,22 @@ export function detonateRed(fighter) {
           const angle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
           f.takeDamage(redDamage, fighter, { isRed: true });
 
+          const kbVx = Math.cos(angle) * redKnockback;
+          const kbVy = Math.sin(angle) * redKnockback;
+
+          if (typeof f.applyRedKnockback === 'function') {
+            f.applyRedKnockback(kbVx, kbVy);
+          } else if (typeof f.applyKnockback === 'function') {
+            f.applyKnockback(kbVx, kbVy, { isRed: true });
+          }
+
           const targetX = f.x + Math.cos(angle) * redKnockback * 8;
           const targetY = f.y + Math.sin(angle) * redKnockback * 8;
           if (typeof f.applyTeleportSlideBrake === 'function') {
             f.applyTeleportSlideBrake(f.x, f.y, targetX, targetY, arena, 12);
           } else {
-            f.vx = Math.cos(angle) * redKnockback;
-            f.vy = Math.sin(angle) * redKnockback;
+            f.vx = kbVx;
+            f.vy = kbVy;
           }
 
           const slowDuration = CONFIG.gojo?.redSlowDuration || 90;

@@ -22,15 +22,15 @@ export const TricksterRubyTheme = {
 };
 
 export const TricksterCronosTheme = {
-  lodOuterGlow: 'rgba(0, 200, 80, 1.0)',
-  lodInnerFill: 'rgba(0, 220, 100, 0.6)',
-  vol1: 'rgba(0, 255, 120, 0.3)',
-  vol2: 'rgba(0, 220, 100, 0.55)',
-  vol3: 'rgba(0, 180, 80, 0.7)',
-  vol4: 'rgba(0, 140, 60, 0.85)',
-  hexFill: 'rgba(0, 235, 120, 0.4)',
-  hexEdge: 'rgba(0, 255, 130, 0.9)',
-  hexDot: 'rgba(0, 240, 120, 0.5)',
-  pulseRing: 'rgba(0, 230, 110, 0.7)',
-  crispEdge: 'rgba(0, 245, 120, 0.95)'
+  lodOuterGlow: 'rgba(0, 200, 80, 0.8)',
+  lodInnerFill: 'rgba(0, 220, 100, 0.3)',
+  vol1: 'rgba(0, 220, 120, 0.20)',
+  vol2: 'rgba(0, 180, 100, 0.25)',
+  vol3: 'rgba(0, 140, 80, 0.35)',
+  vol4: 'rgba(0, 100, 60, 0.55)',
+  hexFill: 'rgba(0, 210, 120, 0.15)',
+  hexEdge: 'rgba(0, 230, 130, 0.85)',
+  hexDot: 'rgba(0, 220, 120, 0.7)',
+  pulseRing: 'rgba(0, 210, 110, 0.5)',
+  crispEdge: 'rgba(0, 220, 120, 0.85)'
 };

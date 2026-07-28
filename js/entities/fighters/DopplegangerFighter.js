@@ -7,6 +7,7 @@ import { playSound } from '../../systems/soundSystem.js';
 import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from '../../graphics/weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../../graphics/fighters/doppelgangerSkin.js';
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
+import { spawnDoppelgangerDeath } from '../../graphics/particles/doppelgangerDeathEffect.js';
 
 /**
  * Doppleganger — Illusion melee fighter
@@ -100,27 +101,9 @@ export class DopplegangerFighter extends Fighter {
   }
 
   summonIllusion() {
-    // OPTIMIZATION: Early exit at very low FPS to prevent illusion spam
-    const fps = state.fps || 60;
-    if (fps < 35 && state.gameState === 'playing') return;
-
-    // Dynamic performance limit on illusions based on quality level, FPS, and fighter count
-    const qualityLevel = state.qualityLevel || 1.0;
-    const fighterCount = state.fighters.filter(f => f && f.hp > 0).length;
-    let dynamicMaxIllusions = CONFIG.doppleganger.maxIllusions;
-
-    // Reduce illusions in 2v2 and FFA modes based on fighter count
-    if (fighterCount >= 4) {
-      dynamicMaxIllusions = Math.max(2, Math.floor(dynamicMaxIllusions * 0.5)); // Max 2 illusions in 4-player modes
-    } else if (fighterCount >= 3) {
-      dynamicMaxIllusions = Math.max(3, Math.floor(dynamicMaxIllusions * 0.75)); // Max 3 illusions in 3-player modes
-    }
-
-    // Further reduce based on quality level and FPS - more aggressive
-    if (qualityLevel < 0.4 || fps < 40) dynamicMaxIllusions = Math.max(1, Math.floor(dynamicMaxIllusions * 0.5));
-    else if (qualityLevel < 0.7 || fps < 50) dynamicMaxIllusions = Math.max(1, Math.floor(dynamicMaxIllusions * 0.75));
-
-    if (this.illusionsSummoned >= dynamicMaxIllusions) return;
+    // Check max illusion cap
+    const maxIllusions = CONFIG.doppleganger?.maxIllusions || 4;
+    if (this.illusionsSummoned >= maxIllusions) return;
 
     // Spawn illusion at a random position near the Doppleganger
     const angle = Math.random() * Math.PI * 2;
@@ -211,16 +194,21 @@ export class DopplegangerFighter extends Fighter {
     this._attackSoundConfig = sound;
   }
 
+  onDeath() {
+    spawnDoppelgangerDeath(this);
+  }
+
   update(opponent, ownerIndex, arena) {
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
+
     this.handlePoison();
     this.handleBurn();
     this._tickCooldowns();
     this._tickAttackSound();
-
-    // Time stop - freeze movement
-    if (this._handleTimeStop()) {
-      return;
-    }
 
     // Sword swing cooldown
     if (this.swordCooldown > 0) {

@@ -239,7 +239,7 @@ export class GunSlingerFighter extends Fighter {
       if (other.invincibilityTimer > 0 || other.flashStepTimer > 0) continue;
 
       const otherIndex = state.fighters.indexOf(other);
-      if (state.mode === GAME_MODES.TWO_VS_TWO && selfTeam !== null && state.getFighterTeam(otherIndex) === selfTeam) continue;
+      if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && selfTeam !== null && state.getFighterTeam(otherIndex) === selfTeam) continue;
 
       const dx = other.x - this.x;
       const dy = other.y - this.y;

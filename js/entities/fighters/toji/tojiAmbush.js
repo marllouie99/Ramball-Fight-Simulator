@@ -53,10 +53,6 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 }
 
 export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
-  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
-    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
-    if (realEnemy) opponent = realEnemy;
-  }
   if (!opponent || opponent.hp <= 0) return;
 
   fighter.isAmbushing = true;
@@ -67,8 +63,10 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   fighter._secondSeqAudioPlayed = false;
 
   opponent.isTargetOfAmbush = true;
-  opponent.vx = 0;
-  opponent.vy = 0;
+  if (!opponent.domainActive) {
+    opponent.vx = 0;
+    opponent.vy = 0;
+  }
 
   fighter.ambushTargetChannelState = {
     purple: !!opponent.isChannelingPurple,
@@ -128,10 +126,6 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
 }
 
 export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
-  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
-    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
-    if (realEnemy) opponent = realEnemy;
-  }
   if (fighter.mahoragaAdaptationFreezeTimer > 0) {
     fighter.vx = 0;
     fighter.vy = 0;
@@ -209,8 +203,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.vy = 0;
     fighter.aim(opponent);
 
-    opponent.vx = 0;
-    opponent.vy = 0;
+    if (!opponent.domainActive) {
+      opponent.vx = 0;
+      opponent.vy = 0;
+    }
 
     if (Math.random() < 0.75) {
       const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
@@ -295,8 +291,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     if (typeof opponent.applyTimeStop === 'function') {
       opponent.applyTimeStop(katanaFreeze);
     }
-    opponent.vx = 0;
-    opponent.vy = 0;
+    if (!opponent.domainActive) {
+      opponent.vx = 0;
+      opponent.vy = 0;
+    }
 
     modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedChase.x, clampedChase.y, oldAngle, targetAngle);
 
@@ -315,8 +313,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.vy = 0;
     fighter.aim(opponent);
 
-    opponent.vx = 0;
-    opponent.vy = 0;
+    if (!opponent.domainActive) {
+      opponent.vx = 0;
+      opponent.vy = 0;
+    }
 
     const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
     const soundDelay = secondSeqSound?.delay || 0;
@@ -372,8 +372,10 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
       const totalFlurryFrames = fighter.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 4) + 10;
       if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
-      opponent.vx = 0;
-      opponent.vy = 0;
+      if (!opponent.domainActive) {
+        opponent.vx = 0;
+        opponent.vy = 0;
+      }
     }
   } else if (fighter.ambushPhase === 'PHANTOM_FLURRY') {
     fighter.vx = 0;
@@ -460,13 +462,15 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         opponent.angle = (opponent.angle || 0) + angleDiff * 0.35; 
         opponent.gunAngle = opponent.angle;
 
-        opponent.vx = 0;
-        opponent.vy = 0;
-        const pushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-        const recoilForce = isFinalStrike ? 38 : (4 + Math.random() * 2);
-        opponent.vx = Math.cos(pushAngle) * recoilForce;
-        opponent.vy = Math.sin(pushAngle) * recoilForce;
-        if (typeof opponent.applyKnockback === 'function') opponent.applyKnockback(opponent.vx, opponent.vy);
+        if (!opponent.isTurret && !opponent.cannotBeKnockbacked) {
+          opponent.vx = 0;
+          opponent.vy = 0;
+          const pushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+          const recoilForce = isFinalStrike ? 38 : (4 + Math.random() * 2);
+          opponent.vx = Math.cos(pushAngle) * recoilForce;
+          opponent.vy = Math.sin(pushAngle) * recoilForce;
+          if (typeof opponent.applyKnockback === 'function') opponent.applyKnockback(opponent.vx, opponent.vy);
+        }
 
         const contactX = (fighter.x + opponent.x) * 0.5;
         const contactY = (fighter.y + opponent.y) * 0.5;

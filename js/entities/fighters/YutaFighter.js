@@ -493,7 +493,7 @@ export class YutaFighter extends Fighter {
     const isFirstTrigger = (this.domainUseCount === 0 && hpRatio <= domainHpThreshold);
     const isSecondTrigger = (this.domainUseCount === 1 && (this.domainCooldown <= 0 || hpRatio <= domainHpThreshold));
 
-    if (canActivate && (isFirstTrigger || isSecondTrigger)) {
+    if (!this.isDemoFighter && canActivate && (isFirstTrigger || isSecondTrigger)) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;

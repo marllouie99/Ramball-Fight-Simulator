@@ -206,7 +206,7 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
 
     const fps = state.fps || 60;
     const qualityLevel = state.qualityLevel || 1.0;
-    const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
     const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
     const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
@@ -300,7 +300,7 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
 function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, glowIntensity = 1.0, isTrail = false) {
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
-  const isMulti = state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TWO_VS_TWO;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 

@@ -21,7 +21,7 @@ let visualUpdateFrame = 0;
  * Returns false for non-2v2 modes or if fighters are on different teams.
  */
 function areOnSameTeam(ownerIndex, targetIndex) {
-  if (state.mode !== GAME_MODES.TWO_VS_TWO) return false;
+  if (state.mode !== GAME_MODES.TWO_VS_TWO && state.mode !== GAME_MODES.STAND_OFF_1V2) return false;
   const ownerTeam = state.getFighterTeam(ownerIndex);
   const targetTeam = state.getFighterTeam(targetIndex);
   return ownerTeam !== null && ownerTeam === targetTeam;
@@ -590,7 +590,7 @@ class ProjectileSystem {
 
     if (state.fighters) {
       state.fighters.forEach((f, idx) => {
-        if (f && f.hp > 0 && idx !== ownerIndex && !areOnSameTeam(ownerIndex, idx)) {
+        if (f && f.hp > 0 && idx !== ownerIndex) {
           const dist = Math.hypot(f.x - x, f.y - y);
           if (dist <= splashRadius) {
             const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
@@ -617,7 +617,7 @@ class ProjectileSystem {
       state.illusions.forEach((ill) => {
         if (ill && ill.hp > 0) {
           const illOwner = ill.owner?.fighterIndex ?? (state.fighters ? state.fighters.indexOf(ill.owner) : -1);
-          if (illOwner !== ownerIndex && !areOnSameTeam(ownerIndex, illOwner)) {
+          if (illOwner !== ownerIndex) {
             const dist = Math.hypot(ill.x - x, ill.y - y);
             if (dist <= splashRadius) {
               applyDamageToTarget(ill, damage * 0.7, attacker, { isExplosion: true });
@@ -1830,7 +1830,7 @@ class ProjectileSystem {
     // PERFORMANCE OPTIMIZATION: Hard limit on active projectiles
     // 2v2 and FFA can spawn a massive amount of particles (especially flames) leading to lag.
     if (this.projectiles.length > 0) {
-      const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+      const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
       // OPTIMIZED: Use dynamic limits instead of fixed values
       const maxProjectiles = this.maxActiveProjectiles;
 
@@ -1856,7 +1856,17 @@ class ProjectileSystem {
           let pruned = 0;
           for (let i = 0; i < this.projectiles.length && pruned < stillToRemove; i++) {
             const p = this.projectiles[i];
-            const isCriticalSlash = p && (p.visual === 'ghostBlade' || p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.isGojoPurple || p.isSukunaFurnace);
+            const isCriticalSlash = p && (
+              p.visual === 'ghostBlade' ||
+              p.visual === 'sukunaSlash' ||
+              p.visual === 'sukunaCleave' ||
+              p.visual === 'sukunaDismantleGrid' ||
+              p.visual === 'turretBullet' ||
+              p.visual === 'EngineerBullet' ||
+              p.visual === 'gunslingerBullet' ||
+              p.isGojoPurple ||
+              p.isSukunaFurnace
+            );
             if (p && !isCriticalSlash) {
               this._returnProjectile(p);
               this.projectiles.splice(i, 1);
@@ -1998,7 +2008,7 @@ class ProjectileSystem {
           if (!f || f.hp <= 0) continue;
           
           const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
-          if (isEnemy && !f.immuneToCC) {
+          if (isEnemy && !f.immuneToCC && !f.gojoBlueDragImmune) {
             const dx = p.x - f.x;
             const dy = p.y - f.y;
             const dist = Math.hypot(dx, dy);
@@ -2029,7 +2039,8 @@ class ProjectileSystem {
         const purpleSlowMultiplier = CONFIG.gojo.purpleSlowMultiplier || 0.5;
         const purplePullForce = CONFIG.gojo.purplePullForce || 2.0;
         const purpleScale = CONFIG.gojo.purpleScale || 1.0;
-        const effectiveRadius = p.r * purpleScale; // Scaled hit radius based on visual size
+        const effectiveRadius = p.r * purpleScale; // Hit radius for damage/destruction
+        const purplePullRadius = CONFIG.gojo.purplePullRadius || (effectiveRadius * 1.5); // Pull/suction range
         
         // Continuous screen shake while purple orb is active
         p.purpleShakeCounter = (p.purpleShakeCounter || 0) + 1;
@@ -2075,7 +2086,7 @@ class ProjectileSystem {
             if (!f || f.hp <= 0) continue;
             
             const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
-            if (isEnemy) {
+            if (true) { // Purple damages EVERYONE
               const dx = f.x - p.x;
               const dy = f.y - p.y;
               const distSq = dx * dx + dy * dy;
@@ -2116,20 +2127,20 @@ class ProjectileSystem {
           
           const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
           const isImmune = f.immuneToCC || f.characterId === 'toji' || f.type === 'toji';
-          if (isEnemy && !isImmune) {
+          if (true && !isImmune) { // Purple pulls EVERYONE
             const dx = p.x - f.x;
             const dy = p.y - f.y;
             const dist = Math.hypot(dx, dy);
             
-            if (dist > 0 && dist < effectiveRadius) {
-              // Apply slow effect continuously while in range
+            if (dist > 0 && dist < purplePullRadius) {
+              // Apply slow effect continuously while in range (still uses pull radius)
               if (f.slowTimer !== undefined) {
                 f.slowTimer = Math.max(f.slowTimer || 0, 10); // Keep slow active
                 f.slowMultiplier = Math.min(f.slowMultiplier || 1, purpleSlowMultiplier);
               }
               
               // Drag enemy toward purple orb center
-              const pullStrength = purplePullForce * (1 - dist / effectiveRadius); // Stronger pull near center
+              const pullStrength = purplePullForce * (1 - dist / purplePullRadius); // Stronger pull near center
               f.x += (dx / dist) * pullStrength;
               f.y += (dy / dist) * pullStrength;
               

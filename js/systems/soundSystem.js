@@ -228,6 +228,39 @@ export function stopLoopingSound(key) {
 }
 
 /**
+ * Pause a looping sound without destroying its key or state.
+ * @param {string} key - Identifier passed to playLoopingSound
+ */
+export function pauseLoopingSound(key) {
+  const soundObj = _loopingSounds.get(key);
+  if (!soundObj) return;
+
+  if (soundObj.gainNode && soundObj.buffer) {
+    try { soundObj.gainNode.gain.value = 0; } catch (e) {}
+  } else if (typeof soundObj.pause === 'function') {
+    soundObj.pause();
+  }
+}
+
+/**
+ * Resume a paused looping sound.
+ * @param {string} key - Identifier passed to playLoopingSound
+ * @param {number} [volume=1.0] - Volume level 0.0 - 1.0
+ */
+export function resumeLoopingSound(key, volume = 1.0) {
+  const soundObj = _loopingSounds.get(key);
+  if (!soundObj) return;
+
+  if (soundObj.gainNode && soundObj.buffer) {
+    try { soundObj.gainNode.gain.value = Math.max(0, Math.min(15, volume)); } catch (e) {}
+  } else if (typeof soundObj.play === 'function') {
+    if (soundObj.paused) {
+      soundObj.play().catch(() => {});
+    }
+  }
+}
+
+/**
  * Stop all looping sounds and clear the registry.
  */
 export function stopAllLoopingSounds() {
@@ -358,9 +391,7 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
       clone = new Audio(src);
     }
   }
-  if (!clone.src || clone.src === '' || clone.src === 'null') {
-    clone.src = src;
-  }
+  clone.src = src;
 
   clone.volume = Math.max(0, Math.min(1, volume));
   clone.playbackRate = Math.max(0.1, speed);

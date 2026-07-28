@@ -56,7 +56,7 @@ function _returnSpark(spark) {
  * @param {string} type - 'crimson' for red/orange sparks, 'flash' for impact flash
  */
 export function spawnSparks(x, y, count = 8, type = 'crimson') {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const isDomainClash = state && state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
   const qualityMultiplier = state.qualityLevel || 1.0;
   const fps = state.fps || 60;
@@ -185,7 +185,7 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
  * @param {number} count - Number of rocks to spawn
  */
 export function spawnTelekinesisDebris(x, y, count = 2) {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const qualityMultiplier = state.qualityLevel || 1.0;
   const fps = state.fps || 60;
   const dynamicQuality = isMulti && fps < 45 ? Math.min(qualityMultiplier, 0.4) : qualityMultiplier;
@@ -289,7 +289,7 @@ export function spawnTojiWhirlingWindDebris(x, y, count = 2) {
  * @param {number} radius - Flash radius
  */
 export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_FLASHES = isMulti ? (fps < 45 ? 10 : 20) : 40;
 
@@ -656,7 +656,7 @@ export function spawnArcaneGlyphs(x, y, count = 12) {
 
 export function spawnSpellStealWisps(trickster, target, color, count = 20) {
   for (let i = 0; i < count; i++) {
-    const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
     if (state.sparkEffects.length >= (isMulti ? 250 : 500)) return;
     
     const spark = _getSpark();
@@ -1282,21 +1282,37 @@ export function drawSparkEffects(layer = 'all') {
       ctx.strokeStyle = `rgba(0, 255, 100, ${effect.life * 0.6})`;
       ctx.stroke();
     } else if (effect.type === 'meleeClashShockwave') {
-      // Expanding ground shockwave ring for Sukuna-Gojo & Sukuna-Yuta/Rika clashes
+      // Expanding ground shockwave ring for Sukuna-Gojo & Sukuna-Yuta/Rika clashes & Mahoraga teleports
       effect.size += (effect.targetSize - effect.size) * 0.08;
       const isYutaClash = (effect.clashType === 'yuta');
       const isTojiClash = (effect.clashType === 'toji');
+      const isMahoragaClash = (effect.clashType === 'mahoraga');
 
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : (isTojiClash ? `rgba(20, 22, 25, ${effect.life * 0.5})` : `rgba(30, 10, 40, ${effect.life * 0.4})`);
+      ctx.fillStyle = isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : (isTojiClash ? `rgba(20, 22, 25, ${effect.life * 0.5})` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`));
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.globalCompositeOperation = 'lighter';
 
-      if (isYutaClash) {
+      if (isMahoragaClash) {
+        // ── MAHORAGA DIVINE TELEPORT / IMPACT GROUND SHOCKWAVE ──
+        // Outer Golden Divine Aura Ring
+        ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
+        ctx.lineWidth = 12 * effect.life;
+        ctx.beginPath();
+        ctx.ellipse(effect.x, effect.y + 4, effect.size * 1.15, effect.size * 0.38, 0, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner White-Hot Impact Force Ring
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+        ctx.lineWidth = 6 * effect.life;
+        ctx.beginPath();
+        ctx.ellipse(effect.x, effect.y + 4, effect.size * 0.80, effect.size * 0.26, 0, 0, Math.PI * 2);
+        ctx.stroke();
+      } else if (isYutaClash) {
         // ── YUTA & RIKA VS SUKUNA CLASH SHOCKWAVE ──
         // Outer Hot Pink / Dark Magenta Ring (Yuta & Rika's Pure Love / Monstrous Cursed Energy)
         ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.9})`;
@@ -1491,7 +1507,7 @@ export function drawSparkEffects(layer = 'all') {
  * @param {string} clashType - 'gojo' or 'yuta'
  */
 export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
 
@@ -1525,7 +1541,7 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
  * @param {number} radius - Target radius of shockwave
  */
 export function spawnRikaRoarShockwave(x, y, radius = 180) {
-  const isMulti = state && (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.FFA);
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
 

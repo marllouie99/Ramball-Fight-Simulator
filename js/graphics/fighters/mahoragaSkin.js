@@ -3,9 +3,12 @@
 // Contains eye-socket wings, ritual chest necklace, and facial features.
 // ─────────────────────────────────────────────
 
-let cachedWingsCanvas = null;
+let cachedWingUL = null;
+let cachedWingUR = null;
+let cachedWingLL = null;
+let cachedWingLR = null;
 
-function renderFullWingsToOffscreenBuffer(r) {
+function renderSingleWingBuffer(r, side, isUpper) {
   const canvas = document.createElement('canvas');
   canvas.width = 360;
   canvas.height = 200;
@@ -20,7 +23,7 @@ function renderFullWingsToOffscreenBuffer(r) {
   const outlineColor = '#000000';   // Black outline
 
   // Helper to draw one organic feathered wing segment with divine cloud lines
-  function drawFeatherWing(side, isUpper, layerIndex) {
+  function drawFeatherWing(layerIndex) {
     ctx.save();
 
     // Fan out layers slightly so back layers are visible behind front layers
@@ -69,19 +72,17 @@ function renderFullWingsToOffscreenBuffer(r) {
     const getSpinePoint = (t) => {
       const topP = getTopPoint(t);
       const botP = getBotPoint(t);
-      // Spine runs roughly 35% from upper edge toward lower edge
       return {
         x: topP.x + (botP.x - topP.x) * 0.35,
         y: topP.y + (botP.y - topP.y) * 0.35
       };
     };
 
-    // Scalloped trailing edge notches (dividing wing into overlapping feather lobes)
+    // Scalloped trailing edge notches
     const notches = [0.75, 0.50, 0.25];
     const getNotchPoint = (t) => {
       const topP = getTopPoint(t);
       const botP = getBotPoint(t);
-      // Dip inward toward top curve to form distinct overlapping feather V-notches
       const dipRatio = 0.22;
       return {
         x: botP.x + (topP.x - botP.x) * dipRatio,
@@ -92,10 +93,8 @@ function renderFullWingsToOffscreenBuffer(r) {
     // 1. DRAW MAIN WING BODY WITH SCALLOPED TRAILING EDGE
     ctx.beginPath();
     ctx.moveTo(rootX, rootY);
-    // Upper organic wavy curve
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, tipX, tipY);
 
-    // Lower trailing edge: return through scalloped feather lobes
     const lobePoints = [
       { start: notches[0], end: 1.0 },
       { start: notches[1], end: notches[0] },
@@ -109,14 +108,12 @@ function renderFullWingsToOffscreenBuffer(r) {
       const midT = (lobe.start + lobe.end) * 0.5;
       const topMid = getTopPoint(midT);
       const botMid = getBotPoint(midT);
-      // Push control point outward for rounded feather lobe belly
       const cpX = botMid.x + (botMid.x - topMid.x) * 0.16;
       const cpY = botMid.y + (botMid.y - topMid.y) * 0.16;
       ctx.quadraticCurveTo(cpX, cpY, endP.x, endP.y);
     }
     ctx.closePath();
 
-    // Layer-adjusted gradient fill (back layers slightly darker/shadowed)
     const grad = ctx.createLinearGradient(rootX, rootY, tipX, tipY);
     if (layerIndex === 0) {
       grad.addColorStop(0.0, '#FFFFFF');
@@ -135,14 +132,13 @@ function renderFullWingsToOffscreenBuffer(r) {
     ctx.fillStyle = grad;
     ctx.fill();
 
-    // Black outline
     ctx.strokeStyle = outlineColor;
     ctx.lineWidth = 1.8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // 2. DRAW CENTRAL SPINE / RACHIS (Dividing the white space)
+    // 2. DRAW CENTRAL SPINE / RACHIS
     ctx.beginPath();
     const spineStart = getSpinePoint(0.05);
     ctx.moveTo(spineStart.x, spineStart.y);
@@ -155,7 +151,6 @@ function renderFullWingsToOffscreenBuffer(r) {
     ctx.globalAlpha = 0.85;
     ctx.stroke();
 
-    // White highlight along central spine
     ctx.beginPath();
     ctx.moveTo(spineStart.x, spineStart.y - 0.8);
     for (let t = 0.15; t <= 0.90; t += 0.1) {
@@ -167,21 +162,18 @@ function renderFullWingsToOffscreenBuffer(r) {
     ctx.globalAlpha = 0.95;
     ctx.stroke();
 
-    // 3. DRAW CLOUD LINES & FEATHER BARBS (Filling the white empty space!)
+    // 3. DRAW CLOUD LINES & FEATHER BARBS
     ctx.strokeStyle = featherDark;
     ctx.lineCap = 'round';
     ctx.globalAlpha = 0.85 - layerIndex * 0.1;
 
-    // A. Upper White Space Cloud Lines (Sweeping curved plumes above central spine)
     const upperCloudStations = [0.18, 0.32, 0.46, 0.60, 0.74, 0.86];
     for (let i = 0; i < upperCloudStations.length; i++) {
       const t = upperCloudStations[i];
       const startP = getSpinePoint(t);
-      // Curve forward and upward toward top edge (stopping at 86% across white space)
       const topEnd = getTopPoint(Math.min(0.96, t + 0.08));
       const endX = startP.x + (topEnd.x - startP.x) * 0.86;
       const endY = startP.y + (topEnd.y - startP.y) * 0.86;
-      // Cloud swirl control point (curving like traditional Japanese cloud/wind motif)
       const cpX = startP.x + (endX - startP.x) * 0.6 - side * r * 0.04;
       const cpY = startP.y + (endY - startP.y) * 0.6 - r * 0.03;
 
@@ -191,7 +183,6 @@ function renderFullWingsToOffscreenBuffer(r) {
       ctx.lineWidth = 1.2 - layerIndex * 0.15;
       ctx.stroke();
 
-      // White 3D highlight next to cloud line
       ctx.beginPath();
       ctx.moveTo(startP.x + 0.6, startP.y + 0.6);
       ctx.quadraticCurveTo(cpX + 0.6, cpY + 0.6, endX + 0.6, endY + 0.6);
@@ -203,13 +194,10 @@ function renderFullWingsToOffscreenBuffer(r) {
       ctx.globalAlpha = 0.85 - layerIndex * 0.1;
     }
 
-    // B. Lower White Space Cloud Lines & Notch Separation Grooves (Sweeping below central spine)
-    // Major separation lines out to each trailing edge notch
     for (let i = 0; i < notches.length; i++) {
       const nt = notches[i];
       const startP = getSpinePoint(Math.max(0.05, nt - 0.22));
       const notchP = getNotchPoint(nt);
-      // Stop just inside the notch border
       const endX = startP.x + (notchP.x - startP.x) * 0.92;
       const endY = startP.y + (notchP.y - startP.y) * 0.92;
       const cpX = (startP.x + endX) * 0.5 + side * r * 0.03;
@@ -222,11 +210,9 @@ function renderFullWingsToOffscreenBuffer(r) {
       ctx.stroke();
     }
 
-    // Diagonal cloud-barb lines filling each feather lobe body in the lower white space
     const lowerCloudStations = [0.12, 0.20, 0.30, 0.38, 0.45, 0.55, 0.62, 0.70, 0.80, 0.88];
     for (let i = 0; i < lowerCloudStations.length; i++) {
       const t = lowerCloudStations[i];
-      // Skip if very close to a major notch to keep linework clean
       if (notches.some(nt => Math.abs(t - (nt - 0.1)) < 0.03)) continue;
 
       const startP = getSpinePoint(t);
@@ -242,7 +228,6 @@ function renderFullWingsToOffscreenBuffer(r) {
       ctx.lineWidth = 1.0 - layerIndex * 0.1;
       ctx.stroke();
 
-      // White 3D highlight next to lower cloud line
       ctx.beginPath();
       ctx.moveTo(startP.x - 0.5, startP.y - 0.5);
       ctx.quadraticCurveTo(cpX - 0.5, cpY - 0.5, endX - 0.5, endY - 0.5);
@@ -254,7 +239,6 @@ function renderFullWingsToOffscreenBuffer(r) {
       ctx.globalAlpha = 0.85 - layerIndex * 0.1;
     }
 
-    // 4. COVERT BASE FEATHERS (Small rounded overlapping scale feathers at eye socket root)
     if (layerIndex === 0) {
       for (let c = 0; c < 3; c++) {
         const ct = 0.06 + c * 0.06;
@@ -272,7 +256,6 @@ function renderFullWingsToOffscreenBuffer(r) {
 
     ctx.globalAlpha = 1.0;
 
-    // Soft white highlight along upper edge
     ctx.beginPath();
     ctx.moveTo(rootX + side * 2, rootY - 2);
     ctx.bezierCurveTo(cp1x + side * 2, cp1y - 3, cp2x + side * 1.5, cp2y - 2, tipX + side * 0.8, tipY - 0.8);
@@ -283,35 +266,27 @@ function renderFullWingsToOffscreenBuffer(r) {
     ctx.restore();
   }
 
-  // Draw upper wings (3 layers per side for depth)
-  drawFeatherWing(-1, true, 2); // Upper Left - Back
-  drawFeatherWing(1, true, 2);  // Upper Right - Back
-  drawFeatherWing(-1, true, 1); // Upper Left - Middle
-  drawFeatherWing(1, true, 1);  // Upper Right - Middle
-  drawFeatherWing(-1, true, 0); // Upper Left - Front
-  drawFeatherWing(1, true, 0);  // Upper Right - Front
-
-  // Draw lower wings (3 layers per side for depth)
-  drawFeatherWing(-1, false, 2); // Lower Left - Back
-  drawFeatherWing(1, false, 2);  // Lower Right - Back
-  drawFeatherWing(-1, false, 1); // Lower Left - Middle
-  drawFeatherWing(1, false, 1);  // Lower Right - Middle
-  drawFeatherWing(-1, false, 0); // Lower Left - Front
-  drawFeatherWing(1, false, 0);  // Lower Right - Front
+  // Draw 3 layers for depth
+  drawFeatherWing(2);
+  drawFeatherWing(1);
+  drawFeatherWing(0);
 
   return canvas;
 }
 
 /**
- * Draws Mahoraga's Eye-Socket Organic Feathered Wings (Upper and Lower).
- * Hardware-accelerated with offscreen canvas caching to guarantee 60 FPS performance!
+ * Draws Mahoraga's Eye-Socket Organic Feathered Wings with Floating & Flapping Motion.
+ * Hardware-accelerated with 4 offscreen wing buffers!
  */
 export function drawMahoragaFaceWings(ctx, fighter) {
   if (!fighter) return;
 
   const r = fighter.r || 30;
-  if (!cachedWingsCanvas) {
-    cachedWingsCanvas = renderFullWingsToOffscreenBuffer(r);
+  if (!cachedWingUL) {
+    cachedWingUL = renderSingleWingBuffer(r, -1, true);  // Upper Left
+    cachedWingUR = renderSingleWingBuffer(r, 1, true);   // Upper Right
+    cachedWingLL = renderSingleWingBuffer(r, -1, false); // Lower Left
+    cachedWingLR = renderSingleWingBuffer(r, 1, false);  // Lower Right
   }
 
   ctx.save();
@@ -324,8 +299,52 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   const facingLeft = Math.abs(angle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
-  // Blit pre-cached high-resolution offscreen canvas (0ms CPU time!)
-  ctx.drawImage(cachedWingsCanvas, -180, -110);
+  // === Dynamic Organic Floating & Flapping Motion with Center Space Gap ===
+  const floatTime = Date.now() * 0.003;
+  const floatY = Math.sin(floatTime) * 2.5; // vertical breathing float
+
+  const wingGap = 6; // Subtle center gap between left and right wings
+
+  const ulPivotX = -r * 0.06 - wingGap, ulPivotY = -r * 0.58;
+  const urPivotX = r * 0.06 + wingGap,  urPivotY = -r * 0.58;
+  const llPivotX = -r * 0.06 - wingGap, llPivotY = -r * 0.33;
+  const lrPivotX = r * 0.06 + wingGap,  lrPivotY = -r * 0.33;
+
+  // 1. Upper Left Wing (Flap + Float + Left Gap Offset)
+  ctx.save();
+  const ulFlap = Math.sin(floatTime * 1.2) * 0.08;
+  ctx.translate(ulPivotX, ulPivotY + floatY);
+  ctx.rotate(ulFlap);
+  ctx.translate(-ulPivotX, -ulPivotY - floatY);
+  ctx.drawImage(cachedWingUL, -180 - wingGap, -110 + floatY);
+  ctx.restore();
+
+  // 2. Upper Right Wing (Mirrored Flap + Float + Right Gap Offset)
+  ctx.save();
+  const urFlap = -Math.sin(floatTime * 1.2) * 0.08;
+  ctx.translate(urPivotX, urPivotY + floatY);
+  ctx.rotate(urFlap);
+  ctx.translate(-urPivotX, -urPivotY - floatY);
+  ctx.drawImage(cachedWingUR, -180 + wingGap, -110 + floatY);
+  ctx.restore();
+
+  // 3. Lower Left Wing (Phase-shifted Flap + Float + Left Gap Offset)
+  ctx.save();
+  const llFlap = Math.sin(floatTime * 1.2 - 0.5) * 0.06;
+  ctx.translate(llPivotX, llPivotY + floatY * 0.8);
+  ctx.rotate(llFlap);
+  ctx.translate(-llPivotX, -llPivotY - floatY * 0.8);
+  ctx.drawImage(cachedWingLL, -180 - wingGap, -110 + floatY * 0.8);
+  ctx.restore();
+
+  // 4. Lower Right Wing (Mirrored Phase-shifted Flap + Float + Right Gap Offset)
+  ctx.save();
+  const lrFlap = -Math.sin(floatTime * 1.2 - 0.5) * 0.06;
+  ctx.translate(lrPivotX, lrPivotY + floatY * 0.8);
+  ctx.rotate(lrFlap);
+  ctx.translate(-lrPivotX, -lrPivotY - floatY * 0.8);
+  ctx.drawImage(cachedWingLR, -180 + wingGap, -110 + floatY * 0.8);
+  ctx.restore();
 
   ctx.restore();
 }

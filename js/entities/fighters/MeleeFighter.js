@@ -134,7 +134,7 @@ export class MeleeFighter extends Fighter {
             if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) continue;
 
             // Skip teammates in 2v2
-            if (state.mode === '2v2' && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
+            if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && myTeam === state.getFighterTeam(i)) continue;
 
             const dist = Math.hypot(f.x - this.x, f.y - this.y);
             if (dist < bestDist) {

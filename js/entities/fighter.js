@@ -54,7 +54,16 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     return false;
   }
 
-  return target.takeDamage(amount, attacker, opts);
+  if (typeof target.takeDamage === 'function') {
+    return target.takeDamage(amount, attacker, opts);
+  }
+
+  if (typeof target.hp === 'number') {
+    target.hp = Math.max(0, target.hp - (Number(amount) || 0));
+    return true;
+  }
+
+  return false;
 }
 
 export class Fighter {
@@ -274,13 +283,6 @@ export class Fighter {
 
 
   _handleTimeStop() {
-    if (this.mahoragaAdaptationFreezeTimer > 0) {
-      this.mahoragaAdaptationFreezeTimer--;
-      this.vx = 0;
-      this.vy = 0;
-      // Game pause stasis: freeze movement without canceling active skill channeling
-      return false;
-    }
     if (this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') {
       this.timeStopTimer = 0;
       this.electricStunTimer = 0;
@@ -291,6 +293,7 @@ export class Fighter {
     const isFrozen = (this.crimsonElectrifiedTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.timeStopTimer > 0);
 
     if (isFrozen) {
+      this.mahoragaAdaptationFreezeTimer = 0;
       // DECAY VISUAL TRAILS SO THEY DON'T FREEZE IN PLACE WHILE INCAPACITATED
       if (this.dashTrail) {
         fastCleanArray(this.dashTrail, (item) => {
@@ -430,7 +433,8 @@ export class Fighter {
     this.knockbackVy = vy;
     this.vx = vx;
     this.vy = vy;
-    if (!this.domainImmunity && this.characterId !== 'toji' && this.type !== 'toji') {
+    // Domain Immunity should NOT make you immune to physical knockback sliding!
+    if (this.characterId !== 'toji' && this.type !== 'toji') {
       this.knockbackStunTimer = 20; // Steering freeze for normal fighters so knockback slides cleanly
     }
   }
@@ -558,7 +562,7 @@ export class Fighter {
     const attackerIndex = state.fighters.indexOf(attacker);
     const targetIndex = state.fighters.indexOf(this);
     if (
-      state.mode === '2v2' &&
+      (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) &&
       attackerIndex >= 0 &&
       targetIndex >= 0 &&
       attackerIndex !== targetIndex &&
@@ -622,8 +626,9 @@ export class Fighter {
       const _isEffectivelyAlive = (f) => {
         if (!f || f.isTurret) return false;
         if (f.hp > 0) return true;
-        if (f._def && f._def.type === 'doppleganger') {
-          return state.illusions.some(ill => ill.owner === f && ill.hp > 0);
+        const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
+        if (isDoppel) {
+          return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.hp > 0);
         }
         return false;
       };
@@ -640,8 +645,8 @@ export class Fighter {
       };
 
       // If the dying fighter is a Doppelganger with surviving illusions, don't end the round
-      if (this._def && this._def.type === 'doppleganger' &&
-          state.illusions.some(ill => ill.owner === this && ill.hp > 0)) {
+      const isThisDoppel = this.type === 'doppleganger' || this._def?.type === 'doppleganger' || this.characterId === 'doppleganger';
+      if (isThisDoppel && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) {
         // Doppelganger died but illusions are still fighting — round continues
         recordKill();
         return true;
@@ -656,7 +661,7 @@ export class Fighter {
         const realAttackerIndex = state.fighters.indexOf(realAttacker);
         const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
 
-        if (state.mode === '2v2') {
+        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off')) {
           // 2v2: check if a team is eliminated (including doppelganger illusions)
           const team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
           const team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
@@ -1079,18 +1084,19 @@ export class Fighter {
 
   /** Draws the fighter's health points in the center. */
   drawHealth(ctx) {
-    if (this.hp <= 0 || this._isWinnerReveal) return;
+    if (this.hp <= 0 || this._isWinnerReveal || this.hideHpText) return;
 
     ctx.save();
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const hpText = Math.floor(this.hp).toString();
+    const drawY = this.y - (this.z || 0);
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.strokeText(hpText, this.x, this.y);
+    ctx.strokeText(hpText, this.x, drawY);
     ctx.fillStyle = '#ffffff';
-    ctx.fillText(hpText, this.x, this.y);
+    ctx.fillText(hpText, this.x, drawY);
     ctx.restore();
   }
 
@@ -1105,17 +1111,17 @@ export class Fighter {
     const remainingFrames = Math.max(0, this._timeStopOriginalDuration - elapsedFrames);
     const seconds = Math.ceil(remainingFrames / 60);
     const text = `⏳ ${seconds}s`;
-    const yOffset = this.r + 18;
+    const drawY = (this.y - (this.z || 0)) - (this.r + 18);
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
     // Shadow / outline
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.strokeText(text, this.x, this.y - yOffset);
+    ctx.strokeText(text, this.x, drawY);
     // Cyan glow
     ctx.fillStyle = '#00F3FF';
-    ctx.fillText(text, this.x, this.y - yOffset);
+    ctx.fillText(text, this.x, drawY);
     ctx.restore();
   }
 

@@ -94,8 +94,8 @@ export class EngineerFighter extends Fighter {
       this.turretEntity = null;
     }
 
-    // -- 1. SKILL: DEPLOY TURRET --
-    if (this.skillCooldown <= 0 && !this.isBuildingTurret && !this.turretEntity) {
+    // -- 1. SKILL: DEPLOY TURRET (Disabled in demo mode) --
+    if (!this.isDemoFighter && this.skillCooldown <= 0 && !this.isBuildingTurret && !this.turretEntity) {
       this.isBuildingTurret = true;
       this.buildTimer = CONFIG.Engineer.turretBuildTime || 90;
       

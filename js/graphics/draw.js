@@ -24,12 +24,19 @@ import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
 import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen } from './renderers/arenaRenderer.js';
 import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } from './renderers/environmentalRenderer.js';
+import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
+import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
 
 import { drawProjectiles as modDrawProjectiles, drawDivineFlameArrowConstruct } from './renderers/projectileRenderer.js';
 
 let _cachedTime = 0;
 let _sortedFightersBuffer = [];
 let _fugaLocalTrailPool = [];
+
+const _DRAW_HEX_COS = Array.from({ length: 6 }, (_, i) => Math.cos((i * Math.PI) / 3 + Math.PI / 6));
+const _DRAW_HEX_SIN = Array.from({ length: 6 }, (_, i) => Math.sin((i * Math.PI) / 3 + Math.PI / 6));
+
+const _cronosGridCache = new Map();
 
 export function resetCachedTime() {
   _cachedTime = 0;
@@ -59,23 +66,23 @@ export function drawCronosSphereVisual({
   // OPTIMIZATION: Aggressive LOD based on FPS and quality
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   // Set up default theme if none is provided
   const t = theme || {
-    lodOuterGlow: 'rgba(0, 160, 200, 1.0)',
-    lodInnerFill: 'rgba(0, 180, 220, 0.6)',
-    vol1: 'rgba(0, 220, 255, 0.45)',
-    vol2: 'rgba(0, 170, 225, 0.65)',
-    vol3: 'rgba(0, 120, 190, 0.8)',
-    vol4: 'rgba(0, 80, 150, 0.95)',
-    hexFill: 'rgba(0, 200, 240, 0.55)',
-    hexEdge: 'rgba(0, 220, 255, 0.95)',
-    hexDot: 'rgba(0, 200, 240, 0.6)',
-    pulseRing: 'rgba(0, 190, 230, 0.8)',
-    crispEdge: 'rgba(0, 210, 245, 0.98)'
+    lodOuterGlow: 'rgba(0, 220, 255, 0.8)',
+    lodInnerFill: 'rgba(0, 255, 255, 0.25)',
+    vol1: 'rgba(0, 255, 255, 0.15)',
+    vol2: 'rgba(0, 210, 255, 0.20)',
+    vol3: 'rgba(0, 150, 220, 0.35)',
+    vol4: 'rgba(0, 80, 160, 0.55)',
+    hexFill: 'rgba(0, 240, 255, 0.12)',
+    hexEdge: 'rgba(0, 255, 255, 0.90)',
+    hexDot: 'rgba(0, 255, 255, 0.8)',
+    pulseRing: 'rgba(0, 255, 255, 0.6)',
+    crispEdge: 'rgba(0, 255, 255, 0.95)'
   };
 
   // OPTIMIZATION: Skip complex sphere drawing at ultra low quality
@@ -99,8 +106,8 @@ export function drawCronosSphereVisual({
   const p = Math.min(1, Math.max(0, deployProgress));
   const R = radius;
 
-  // â”€â”€ LOD: Use simplified rendering when many projectiles frozen â”€â”€â”€â”€â”€â”€â”€â”€
-  const lodCellSize = useLOD ? Math.max(30, R * 0.22) : Math.max(20, R * 0.14);
+  // ── LOD: Use simplified rendering when many projectiles frozen ────────
+  const lodCellSize = useLOD ? Math.max(30, R * 0.20) : Math.max(18, R * 0.13);
 
   // â”€â”€ Use module-level cached hex trig â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const cosAngles = _DRAW_HEX_COS;
@@ -117,9 +124,8 @@ export function drawCronosSphereVisual({
   ctx.arc(cx, cy, R, 0, Math.PI * 2);
   ctx.clip();
 
-  // â”€â”€ Honeycomb grid (inside clipped region) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Honeycomb grid (inside clipped region) ──────────────────────────
   ctx.save();
-  // Removed 'screen' mode so grid stays visible on white
   ctx.globalAlpha = alpha;
   ctx.translate(cx, cy);
 
@@ -128,10 +134,10 @@ export function drawCronosSphereVisual({
 
   if (!gridData) {
     const cellSize = lodCellSize;
-    const colCount = Math.ceil(R / (cellSize * 1.75)) + 1;
-    const rowCount = Math.ceil(R / (cellSize * 1.52)) + 1;
-    const cellOffsetX = cellSize * 1.75;
-    const cellOffsetY = cellSize * 1.52;
+    const cellOffsetX = cellSize * Math.sqrt(3);
+    const cellOffsetY = cellSize * 1.5;
+    const colCount = Math.ceil(R / cellOffsetX) + 1;
+    const rowCount = Math.ceil(R / cellOffsetY) + 1;
     const minDist = 0;
 
     // Pre-compute hex vertex offsets
@@ -185,7 +191,7 @@ export function drawCronosSphereVisual({
 
   // Draw all hex edges in one path
   ctx.strokeStyle = t.hexEdge;
-  ctx.lineWidth = Math.max(1.5, cellSize * 0.14);
+  ctx.lineWidth = Math.max(1.0, cellSize * 0.05);
   ctx.beginPath();
   for (const cell of validCells) {
     const { x, y } = cell;
@@ -276,7 +282,7 @@ export function drawCronosPreActivateBarrier({
   // OPTIMIZATION: LOD gate â€” skip barrier entirely at low FPS/quality
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
 
   const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
 
@@ -380,10 +386,10 @@ export function drawCronosPreActivateBarrier({
   let barrierData = _cronosGridCache.get(cacheKeyBarrier);
 
   if (!barrierData) {
-    const colCount = Math.ceil(shellRadius / (cellSize * 1.75)) + 1;
-    const rowCount = Math.ceil(shellRadius / (cellSize * 1.52)) + 1;
-    const cellOffsetX = cellSize * 1.75;
-    const cellOffsetY = cellSize * 1.52;
+    const cellOffsetX = cellSize * Math.sqrt(3);
+    const cellOffsetY = cellSize * 1.5;
+    const colCount = Math.ceil(shellRadius / cellOffsetX) + 1;
+    const rowCount = Math.ceil(shellRadius / cellOffsetY) + 1;
     const minDist = 0;
     const maxDist = shellRadius * 0.98;
 
@@ -702,8 +708,8 @@ export function drawFighters() {
   const { ctx, fighters, mode } = state;
   // Removed debug overlay hiding to prevent DOM layout thrashing
 
-  // Draw team indicators for 2v2 mode before drawing fighters
-  if (mode === '2v2') {
+  // Draw team indicators for team modes before drawing fighters
+  if (mode === '2v2' || mode === '1v2 Stand Off') {
     fighters.forEach((fighter, fi) => {
       if (!fighter || fighter.hp <= 0) return;
       const team = state.getFighterTeam(fi);
@@ -712,14 +718,22 @@ export function drawFighters() {
       const teamColor = team === 0 ? '#ff4d4d' : '#4da3ff';
 
       ctx.save();
-      ctx.translate(fighter.x, fighter.y);
+      const drawY = fighter.y - (fighter.z || 0);
+      ctx.translate(fighter.x, drawY);
 
-      // Draw team indicator ring
+      // Draw team indicator ring (filled)
       ctx.beginPath();
       ctx.arc(0, 0, fighter.r + 8, 0, Math.PI * 2);
-      ctx.strokeStyle = teamColor;
-      ctx.lineWidth = 3;
-      ctx.globalAlpha = 0.7;
+      
+      // Solid fill so the 8px sticking out is very visible
+      ctx.fillStyle = teamColor;
+      ctx.globalAlpha = 1.0;
+      ctx.fill();
+      
+      // Crisp outline
+      ctx.strokeStyle = '#000'; // Add a black outline for contrast if desired, or keep teamColor
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 1.0;
       ctx.stroke();
 
       // Draw team silhouette/glow
@@ -818,6 +832,27 @@ export function drawFighters() {
     ctx.arc(0, 0, fighter.r * 0.6, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255, 255, 255, 0.2)`;
     ctx.fill();
+
+    ctx.restore();
+  });
+
+  // Draw Infinity Freeze visual effect (Gojo Limitless blocking)
+  fighters.forEach((fighter) => {
+    if (!fighter || fighter.hp <= 0 || !fighter.isFrozenByInfinity) return;
+
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y);
+
+    // Deep blue overlay to turn the entire body blue
+    ctx.beginPath();
+    ctx.arc(0, 0, fighter.r + 3, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(0, 229, 255, 0.6)`;
+    ctx.fill();
+
+    // Crisp bright cyan outline
+    ctx.strokeStyle = `rgba(224, 255, 255, 0.9)`;
+    ctx.lineWidth = 3;
+    ctx.stroke();
 
     ctx.restore();
   });
@@ -1085,21 +1120,21 @@ export function drawIllusions() {
     // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
     if (illusion.isRika) continue;
 
-    // Illusions don't fade out based on duration anymore - they persist until death
-    // But we can add a subtle visual effect to show age if desired
-    const age = CONFIG.doppleganger.illusionDuration - (illusion.duration || 0);
-    const ageRatio = Math.min(1, age / CONFIG.doppleganger.illusionDuration);
-
-    // Slight transparency increase as illusion ages (visual only, not removal)
-    const baseAlpha = 0.7;
-    const ageAlpha = baseAlpha - (ageRatio * 0.2); // Fade from 0.7 to 0.5 alpha over time
-
     ctx.save();
-    ctx.globalAlpha = ageAlpha;
+    ctx.globalAlpha = 0.85;
 
     // Draw illusion body
     ctx.translate(illusion.x, illusion.y);
-    ctx.rotate(illusion.angle);
+    ctx.rotate(illusion.angle || 0);
+
+    // Purple ethereal glow
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.fillStyle = 'rgba(155, 89, 182, 0.35)';
+    ctx.beginPath();
+    ctx.arc(0, 0, illusion.r + 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
     ctx.beginPath();
     const animTime = illusion.animationTime || Date.now();

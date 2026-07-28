@@ -66,7 +66,7 @@ export class TojiFighter extends Fighter {
    * Toji is completely immune to domain effects and sensory overload slow effects (like Gojo's Limitless).
    */
   triggerDemoAttack() {
-    const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {} };
+    const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
     if ((state.tojiWeaponIndex || 0) === 1) {
       this.ambushPhase = 'KATANA_SLASH';
       this.katanaSlashTimer = 50;
@@ -96,6 +96,28 @@ export class TojiFighter extends Fighter {
     this.slowTimer = 0;
     this.slowMultiplier = 1.0;
     return;
+  }
+
+  applyRedKnockback(vx, vy) {
+    this.redKnockbackTimer = 18;
+    this.redKnockbackVx = vx * 0.95;
+    this.redKnockbackVy = vy * 0.95;
+    this.isAmbushing = false;
+    this.ambushPhase = null;
+    this.katanaSlashTimer = 0;
+    this.phantomSlashTimer = 0;
+    if (this.ultimateActive) {
+      this.ultimateActive = false;
+      this.ultimatePhase = null;
+    }
+  }
+
+  applyKnockback(vx, vy, options = {}) {
+    if (options && options.isRed) {
+      this.applyRedKnockback(vx, vy);
+      return;
+    }
+    super.applyKnockback(vx, vy);
   }
 
   reset() {
@@ -188,7 +210,7 @@ export class TojiFighter extends Fighter {
       playSound('Assets/Sound Effects/Skills/parry.mp3', 0.85);
 
       // Trigger 3-Stage Ambush Counter-Attack with cooldown so it is not spammed continuously inside domains
-      let realTarget = (attacker && attacker.owner) ? attacker.owner : attacker;
+      let realTarget = (attacker && attacker.owner && !attacker.isTurret) ? attacker.owner : attacker;
       if (realTarget && (realTarget.isRika || realTarget.type === 'rika' || realTarget._def?.type === 'rika')) {
         realTarget = state.fighters.find(f => f && f !== this && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika');
       }
@@ -213,7 +235,28 @@ export class TojiFighter extends Fighter {
     const isDomainActive = state.fighters && state.fighters.some(f => f && f !== this && f.hp > 0 && (f.domainActive || f.isChannelingDomainExpansion || f.isChannelingDomain));
     if (isDomainActive) return;
 
-    const opponents = state.fighters.filter(f => f && f !== this && f.hp > 0 && !f.isDead);
+    const opponents = [];
+    const myTeam = (typeof state !== 'undefined' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+
+    if (typeof state !== 'undefined') {
+      if (state.fighters) {
+        state.fighters.forEach((f, idx) => {
+          if (!f || f === this || f.hp <= 0 || f.isDead) return;
+          if (f.invincibilityTimer > 0 || f.flashStepTimer > 0) return;
+          if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && state.getFighterTeam(idx) === myTeam) return;
+          if (f.owner === this) return;
+          opponents.push(f);
+        });
+      }
+      if (state.illusions) {
+        state.illusions.forEach(ill => {
+          if (!ill || ill.hp <= 0 || ill.isDead) return;
+          if (ill.owner === this) return;
+          opponents.push(ill);
+        });
+      }
+    }
+
     if (opponents.length === 0) return;
     
     // Find closest opponent
@@ -255,12 +298,44 @@ export class TojiFighter extends Fighter {
     if (!this.ultimateActive) return;
 
     if (!this.ultimateTarget || this.ultimateTarget.isDead || this.ultimateTarget.hp <= 0) {
-      this.ultimateActive = false;
-      this.isChannelingDomain = false;
-      this.ultimatePhase = null;
-      this.ultimateTarget = null;
-      this.postUltimateRecoveryTimer = 0;
-      return;
+      let nextTarget = null;
+      let minDist = Infinity;
+      const allTargets = [];
+      const myTeam = (typeof state !== 'undefined' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+      if (typeof state !== 'undefined') {
+        if (state.fighters) {
+          state.fighters.forEach((f, idx) => {
+            if (!f || f === this || f.hp <= 0 || f.isDead) return;
+            if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && myTeam !== null && state.getFighterTeam(idx) === myTeam) return;
+            if (f.owner === this) return;
+            allTargets.push(f);
+          });
+        }
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (!ill || ill.hp <= 0 || ill.isDead) return;
+            if (ill.owner === this) return;
+            allTargets.push(ill);
+          });
+        }
+      }
+      for (const t of allTargets) {
+        const dist = Math.hypot(t.x - this.x, t.y - this.y);
+        if (dist < minDist) {
+          minDist = dist;
+          nextTarget = t;
+        }
+      }
+      if (nextTarget) {
+        this.ultimateTarget = nextTarget;
+      } else {
+        this.ultimateActive = false;
+        this.isChannelingDomain = false;
+        this.ultimatePhase = null;
+        this.ultimateTarget = null;
+        this.postUltimateRecoveryTimer = 0;
+        return;
+      }
     }
 
     // Phase: CHANNELING — Toji channels his ultimate with Domain Expansion style ground ring, aura & afterimages
@@ -510,10 +585,12 @@ export class TojiFighter extends Fighter {
         triggerGlobalScreenShake(3, 10); // Small, crisp screen shake on hit
         
         // Apply knockback
-        const angleToTarget = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
-        const kbForce = 15;
-        this.ultimateTarget.vx += Math.cos(angleToTarget) * kbForce;
-        this.ultimateTarget.vy += Math.sin(angleToTarget) * kbForce;
+        if (!this.ultimateTarget.isTurret && !this.ultimateTarget.cannotBeKnockbacked) {
+          const angleToTarget = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+          const kbForce = 15;
+          this.ultimateTarget.vx += Math.cos(angleToTarget) * kbForce;
+          this.ultimateTarget.vy += Math.sin(angleToTarget) * kbForce;
+        }
         
         applyDamageToTarget(this.ultimateTarget, CONFIG.toji?.ultimateAssaultDamage || 30, this, { isMelee: true, isTrueDamage: true });
         
@@ -628,15 +705,19 @@ export class TojiFighter extends Fighter {
         // Unfreeze target & apply massive kinetic ricochet knockback launch!
         if (this.ultimateTarget && !this.ultimateTarget.isDead) {
           this._clearTargetFreeze(this.ultimateTarget);
-          this.ultimateTarget.isFirstHitKnockback = false; // Enable ricochet wall bouncing!
-          const kbAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
-          const kbForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 1.1; // 53px/frame explosive velocity!
-          const kbVx = Math.cos(kbAngle) * kbForce;
-          const kbVy = Math.sin(kbAngle) * kbForce;
-          this.ultimateTarget.vx = kbVx;
-          this.ultimateTarget.vy = kbVy;
-          this.ultimateTarget.knockbackDecay = 0.90; // Smooth kinetic deceleration
-          this.ultimateTarget.applyKnockback(kbVx, kbVy);
+          if (!this.ultimateTarget.isTurret && !this.ultimateTarget.cannotBeKnockbacked) {
+            this.ultimateTarget.isFirstHitKnockback = false; // Enable ricochet wall bouncing!
+            const kbAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+            const kbForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 1.1; // 53px/frame explosive velocity!
+            const kbVx = Math.cos(kbAngle) * kbForce;
+            const kbVy = Math.sin(kbAngle) * kbForce;
+            this.ultimateTarget.vx = kbVx;
+            this.ultimateTarget.vy = kbVy;
+            this.ultimateTarget.knockbackDecay = 0.90; // Smooth kinetic deceleration
+            if (typeof this.ultimateTarget.applyKnockback === 'function') {
+              this.ultimateTarget.applyKnockback(kbVx, kbVy);
+            }
+          }
           
           this._clearTargetFreeze(this);
           this.ultimateActive = false;
@@ -681,17 +762,26 @@ export class TojiFighter extends Fighter {
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
-    if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
-      const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== this && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
-      if (realEnemy) opponent = realEnemy;
-    }
-
     // Check Mahoraga Divine Adaptation Freeze first (bypasses Heavenly Restriction immunity)
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
       this.vy = 0;
       return; // Freeze Toji mid-action during Mahoraga's 3D Wheel rotation!
+    }
+
+    // Gojo Reversal Red Spatial Repulsion Knockback (bypasses Heavenly Restriction immunity!)
+    if ((this.redKnockbackTimer || 0) > 0) {
+      this.redKnockbackTimer--;
+      this.isAmbushing = false;
+      this.ambushPhase = null;
+      this.x += (this.redKnockbackVx || 0);
+      this.y += (this.redKnockbackVy || 0);
+      this.redKnockbackVx *= 0.88;
+      this.redKnockbackVy *= 0.88;
+      this.resolveWallBounce(arena, opponent);
+      if (opponent && opponent.hp > 0) this.aim(opponent);
+      return;
     }
 
     // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red spatial repulsion slow!
@@ -754,8 +844,8 @@ export class TojiFighter extends Fighter {
       return;
     }
 
-    // --- HEAVENLY RESTRICTION SENSE: 30% CHANCE TO FORCE SEQUENCE 1 AMBUSH WHEN ENEMY CHANNELS A SKILL ---
-    if (modUpdateChannelSense(this, opponent)) return;
+    // --- HEAVENLY RESTRICTION SENSE: SKIPPED IN DEMO PREVIEW MODE ---
+    if (!this.isDemoFighter && modUpdateChannelSense(this, opponent)) return;
 
     // Natural movement & wall bounce physics: nudge velocity towards opponent when stopped or low speed
     if (this.postUltimateRecoveryTimer > 0) this.postUltimateRecoveryTimer--;
@@ -772,8 +862,8 @@ export class TojiFighter extends Fighter {
       }
     }
 
-    // Handle Stealth Duration & Cooldown Timers
-    if (modUpdateStealth(this, opponent)) return;
+    // Handle Stealth Duration & Cooldown Timers (SKIPPED IN DEMO PREVIEW MODE)
+    if (!this.isDemoFighter && modUpdateStealth(this, opponent)) return;
 
     // Update katana slash fade timer
     if (this.katanaSlashFadeTimer > 0) this.katanaSlashFadeTimer--;

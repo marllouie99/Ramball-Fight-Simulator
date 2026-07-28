@@ -144,17 +144,19 @@ export function performSplitSoulKatanaSlash(fighter, target, ownerIndex) {
   target.angle = (target.angle || 0) + angleDiff * 0.40;
   target.gunAngle = target.angle;
 
-  target.isFirstHitKnockback = false;
-  const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-  const sweepSlingAngle = directAngle + 1.15;
-  const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 0.95;
+  if (!target.isTurret && !target.cannotBeKnockbacked) {
+    target.isFirstHitKnockback = false;
+    const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    const sweepSlingAngle = directAngle + 1.15;
+    const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 0.95;
 
-  const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
-  const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
-  target.vx = kbVx;
-  target.vy = kbVy;
-  target.knockbackDecay = 0.90;
-  if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+    const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
+    const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
+    target.vx = kbVx;
+    target.vy = kbVy;
+    target.knockbackDecay = 0.90;
+    if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+  }
 
   triggerGlobalScreenShake(8, 10);
   spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
@@ -248,16 +250,18 @@ export function performInvertedSpearStrike(fighter, target, ownerIndex, isAmbush
 
   if (isAmbushThrust) {
     if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
-    target.isFirstHitKnockback = true;
-    const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-    const knockbackSpeed = 28;
-    
-    const kbVx = Math.cos(pushAngle) * knockbackSpeed;
-    const kbVy = Math.sin(pushAngle) * knockbackSpeed;
-    target.vx = kbVx;
-    target.vy = kbVy;
-    target.knockbackDecay = 0.84;
-    if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+    if (!target.isTurret && !target.cannotBeKnockbacked) {
+      target.isFirstHitKnockback = true;
+      const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+      const knockbackSpeed = 28;
+      
+      const kbVx = Math.cos(pushAngle) * knockbackSpeed;
+      const kbVy = Math.sin(pushAngle) * knockbackSpeed;
+      target.vx = kbVx;
+      target.vy = kbVy;
+      target.knockbackDecay = 0.84;
+      if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+    }
 
     spawnMeleeClashShockwave(target.x, target.y, 190, 'yuta');
     spawnCrimsonLightningImpact(target.x, target.y, 110);

@@ -12,10 +12,6 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateChannelSense(fighter, opponent) {
-  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
-    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
-    if (realEnemy) opponent = realEnemy;
-  }
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
   if (!fighter.isAmbushing && opponent && !opponent.isDead) {
@@ -78,10 +74,6 @@ export function modUpdateChannelSense(fighter, opponent) {
  * @returns {Boolean} True if update loop should return early.
  */
 export function modUpdateStealth(fighter, opponent) {
-  if (opponent && (opponent.owner || opponent.isRika || opponent.type === 'rika' || opponent._def?.type === 'rika')) {
-    const realEnemy = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika') : null;
-    if (realEnemy) opponent = realEnemy;
-  }
   if (fighter.stealthTimer > 0) {
     fighter.stealthTimer--;
     fighter.isStealthed = true;

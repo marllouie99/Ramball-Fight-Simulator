@@ -15,7 +15,7 @@ import { updateBerserkerRageEffects } from '../graphics/particles/berserkerRageE
 import { updateBloodEffects } from '../graphics/particles/bloodEffect.js';
 import { updateSparkEffects } from '../graphics/particles/sparkEffect.js';
 import { updateLightningEffects, drawLightningEffects } from '../graphics/particles/lightningEffects.js';
-import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
+import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
 import { drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawIllusions, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, resetCachedTime } from '../graphics/draw.js';
@@ -48,9 +48,13 @@ window.addEventListener('resize', () => {
 window.addEventListener('keydown', (e) => {
   unlockAudio();
 
-  if (e.key === 'Escape') {
-    if (state.gameState === 'playing') state.gameState = 'paused';
-    else if (state.gameState === 'paused') state.gameState = 'playing';
+  if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+    if (state.gameState === 'playing' || state.gameState === 'countdown') {
+      state.previousGameState = state.gameState;
+      state.gameState = 'paused';
+    } else if (state.gameState === 'paused') {
+      state.gameState = state.previousGameState || 'playing';
+    }
   } else if (e.key === ' ' || e.key === 'Enter' || e.key.toLowerCase() === 's') {
     if (state.gameState === 'title') {
       stopAllSounds();
@@ -59,7 +63,11 @@ window.addEventListener('keydown', (e) => {
     }
     else if (state.gameState === 'select') startGame();
     else if (state.gameState === 'roundEnd') startNextRound();
-    else if (state.gameState === 'matchEnd') resetMatchWithRandom1v1Fighters();
+    else if (state.gameState === 'matchEnd') {
+      if (state.mode === '1v2 Stand Off') resetMatchWithRandom1v2Fighters();
+      else if (state.mode === '1v1' || state.mode === 'Stand Off') resetMatchWithRandom1v1Fighters();
+      else resetMatch();
+    }
   } else if (e.key.toLowerCase() === 'r') {
     if (state.gameState === 'playing' || state.gameState === 'roundEnd') {
       restartCurrentRound();
@@ -121,13 +129,25 @@ state.canvas.addEventListener('touchstart', () => {
 }, { passive: true });
 
 state.canvas.addEventListener('wheel', (e) => {
-  if (state.gameState === 'index' || state.gameState === 'weapons') {
+  if (state.gameState === 'weapons') {
     e.preventDefault();
-    const scrollState = state.gameState === 'index' ? 'indexScroll' : 'weaponScroll';
-    const itemHeight = 140;
-    const visibleItems = Math.floor((state.canvas.height - 90) / itemHeight);
-    const maxScroll = Math.max(0, FIGHTER_DEFS.length * itemHeight - (state.canvas.height - 90));
-    state[scrollState] = Math.min(Math.max(0, state[scrollState] + e.deltaY * 0.75), maxScroll);
+    const totalPages = Math.ceil(FIGHTER_DEFS.length / 5);
+    if (e.deltaY > 0 && state.weaponPage < totalPages - 1) {
+      state.weaponPage++;
+    } else if (e.deltaY < 0 && state.weaponPage > 0) {
+      state.weaponPage--;
+    }
+  } else if (state.gameState === 'index') {
+    e.preventDefault();
+    const filteredDefs = FIGHTER_DEFS.filter(def => 
+      !state.indexCategory || state.indexCategory === 'All' || def.category === state.indexCategory
+    );
+    const totalPages = Math.ceil(filteredDefs.length / 5);
+    if (e.deltaY > 0 && state.indexPage < totalPages - 1) {
+      state.indexPage++;
+    } else if (e.deltaY < 0 && state.indexPage > 0) {
+      state.indexPage--;
+    }
   }
 }, { passive: false });
 
@@ -185,10 +205,10 @@ function animate(timestamp) {
         state.qualityCheckTimer = 0;
         // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
         if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
-          const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop much faster when FPS is very low
+          const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop faster when FPS is low
           state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
-        } else if (state.fps >= state.targetFps + 20 && state.qualityLevel < 1.0) {
-          state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.03); // Recover much slower
+        } else if (state.fps >= state.targetFps - 2 && state.qualityLevel < 1.0) {
+          state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.1); // Recover quickly when FPS stabilizes
         }
       }
 
@@ -301,10 +321,26 @@ function animate(timestamp) {
       // Update flame particle system
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
+
       if (state.countdownTimer >= state.countdownDuration) {
         state.gameState = 'playing';
+        // Instant Battle Start Readiness: Clear initial spawn cooldowns so fighters attack & engage immediately when GO! hits!
+        if (state.fighters) {
+          state.fighters.forEach(f => {
+            if (f && f.hp > 0) {
+              f.shootCooldown = 0;
+              f.cooldown = 0;
+              f.meleeCooldown = 0;
+              f.forcedMeleeTimer = 0;
+              f.hitStunTimer = 0;
+              f.knockbackStunTimer = 0;
+            }
+          });
+        }
       }
-    } else if (state.gameState === 'playing') {
+    }
+    
+    if (state.gameState === 'playing') {
       updateFighters();
       updateProjectiles();
       // Update flame particle system
@@ -335,7 +371,9 @@ function animate(timestamp) {
 
       // Auto next match
       if (state.matchEndTimer >= 300) {
-        if (state.mode === '1v1' || state.mode === 'Stand Off') {
+        if (state.mode === '1v2 Stand Off') {
+          resetMatchWithRandom1v2Fighters();
+        } else if (state.mode === '1v1' || state.mode === 'Stand Off') {
           resetMatchWithRandom1v1Fighters();
         } else {
           // For 2v2 or others that might use matchEnd

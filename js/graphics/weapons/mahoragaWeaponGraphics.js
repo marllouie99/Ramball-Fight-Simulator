@@ -3,6 +3,52 @@
 //  - Keep gameplay and tuning values in js/config.js; only visual/graphical details belong here.
 import { CONFIG } from '../../core/config.js';
 
+/**
+ * Convert a hex color string (e.g. '#8A2BE2' or '#FF1144') to an RGB string (e.g. '138, 43, 226').
+ * Used for dynamic glow colors in the Dharma Wheel.
+ */
+function hexToRgb(hex) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+/**
+ * Lighten a hex color by mixing it with white.
+ * @param {string} hex - Hex color like '#8A2BE2'
+ * @param {number} factor - 0.0 to 1.0, how much to lighten (0 = no change, 1 = white)
+ * @returns {string} Lightened hex color
+ */
+function lightenHex(hex, factor) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const lr = Math.round(r + (255 - r) * factor);
+  const lg = Math.round(g + (255 - g) * factor);
+  const lb = Math.round(b + (255 - b) * factor);
+  return '#' + [lr, lg, lb].map(c => c.toString(16).padStart(2, '0')).join('');
+}
+
+/**
+ * Darken a hex color by mixing it with black.
+ * @param {string} hex - Hex color like '#8A2BE2'
+ * @param {number} factor - 0.0 to 1.0, how much to darken (0 = no change, 1 = black)
+ * @returns {string} Darkened hex color
+ */
+function darkenHex(hex, factor) {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.substring(0, 2), 16);
+  const g = parseInt(h.substring(2, 4), 16);
+  const b = parseInt(h.substring(4, 6), 16);
+  const dr = Math.round(r * (1 - factor));
+  const dg = Math.round(g * (1 - factor));
+  const db = Math.round(b * (1 - factor));
+  return '#' + [dr, dg, db].map(c => c.toString(16).padStart(2, '0')).join('');
+}
+
 export const MAHORAGA_WEAPON_GRAPHICS = {
   wheel: {
     scaleX: 1.25,
@@ -115,8 +161,26 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.stroke();
     ctx.restore();
 
-    ctx.restore();
-    ctx.restore();
+    ctx.restore(); // Restore left shield badge transform
+
+    // ----------------------------------------------------
+    // 3. SIMPLE GREEN + SIGN (Pops out on his right side!)
+    // ----------------------------------------------------
+    const rightX = fighter.x + r + 16;
+    const rightY = (fighter.y + 10) - progress * 28;
+
+    ctx.save();
+    ctx.translate(rightX, rightY);
+    ctx.scale(popScale, popScale);
+
+    // Simple bright green + sign
+    ctx.fillStyle = '#00FF66';
+    ctx.fillRect(-3, -10, 6, 20);
+    ctx.fillRect(-10, -3, 20, 6);
+
+    ctx.restore(); // Restore right RCT badge transform
+
+    ctx.restore(); // Restore root canvas context
   }
 
   ctx.save();
@@ -151,9 +215,14 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.arc(0, 0, spokeRadius + 12, 0, Math.PI * 2);
     const glowAlpha = fighter.isInfinityBlitz ? 0.9 : Math.max(0.9 * spinFactor, fighter.wheelGlowTimer > 0 ? (fighter.wheelGlowTimer / 60) : 0.35);
     const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, spokeRadius + 14);
+
+    // Use Gojo-adapted color if set, otherwise default gold
+    const glowColor = fighter.wheelGlowColor || '#FFD700';
+    const glowColorDark = fighter.wheelGlowColor || '#DAA520';
+
     glowGrad.addColorStop(0, `rgba(255, 255, 255, ${glowAlpha})`);
-    glowGrad.addColorStop(0.4, `rgba(255, 215, 0, ${glowAlpha * 0.8})`);
-    glowGrad.addColorStop(1, 'rgba(218, 165, 32, 0)');
+    glowGrad.addColorStop(0.4, `rgba(${hexToRgb(glowColor)}, ${glowAlpha * 0.8})`);
+    glowGrad.addColorStop(1, `rgba(${hexToRgb(glowColorDark)}, 0)`);
     ctx.fillStyle = glowGrad;
     ctx.fill();
     ctx.restore();
@@ -354,12 +423,31 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     activeStages = 1;
   }
 
-  // 5. 8 Golden Handle Spheres (Glow supercharged cyan/white based on adaptation level!)
+  // 5. 8 Handle Spheres (Glow color adapts to Gojo attack type when adapted!)
+  // Determine sphere colors: use Gojo-adapted color if set, otherwise default gold
+  const sphereGlowColor = fighter.wheelGlowColor || '#FFD700';
+  const sphereGlowRgb = hexToRgb(sphereGlowColor);
+  // Generate a lighter variant for the inner glow
+  const sphereGlowLight = fighter.wheelGlowColor ? lightenHex(sphereGlowColor, 0.5) : '#FFF9C4';
+  const sphereGlowLightRgb = hexToRgb(sphereGlowLight);
+  // Darker outer variant
+  const sphereGlowDark = fighter.wheelGlowColor ? darkenHex(sphereGlowColor, 0.4) : '#FF8C00';
+  const sphereGlowDarkRgb = hexToRgb(sphereGlowDark);
+
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
     const sx = Math.cos(angle) * spokeRadius;
     const sy = Math.sin(angle) * spokeRadius;
     const isLeveled = i < activeStages;
+
+    // Per-sphere color: use the permanent color from the history entry for this sphere's click.
+    // Spheres without a history entry (general/non-Gojo adaptations) fall back to gold — NOT wheelGlowColor.
+    const adaptColorHistory = fighter.gojoAdaptColorHistory;
+    const thisSphereColor      = (adaptColorHistory && adaptColorHistory[i]) ? adaptColorHistory[i] : '#FFD700';
+    const thisSphereColorLight = lightenHex(thisSphereColor, 0.5);
+    const thisSphereColorDark  = darkenHex(thisSphereColor, 0.4);
+    const thisSphereRgb        = hexToRgb(thisSphereColor);
+    const thisSphereRgbLight   = hexToRgb(thisSphereColorLight);
 
     // Draw steady outer energy halo around leveled spheres (No spinning/pulsing!)
     if (isLeveled) {
@@ -368,9 +456,9 @@ export function drawMahoraga3DWheel(ctx, fighter) {
       ctx.arc(sx, sy, sphereRadius * 3.0, 0, Math.PI * 2);
       const ballGlow = ctx.createRadialGradient(sx, sy, sphereRadius * 0.2, sx, sy, sphereRadius * 3.0);
       ballGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-      ballGlow.addColorStop(0.35, 'rgba(255, 235, 100, 0.85)');
-      ballGlow.addColorStop(0.7, 'rgba(255, 180, 0, 0.45)');
-      ballGlow.addColorStop(1, 'rgba(255, 215, 0, 0)');
+      ballGlow.addColorStop(0.35, `rgba(${thisSphereRgbLight}, 0.85)`);
+      ballGlow.addColorStop(0.7,  `rgba(${thisSphereRgb}, 0.45)`);
+      ballGlow.addColorStop(1,    `rgba(${thisSphereRgb}, 0)`);
       ctx.fillStyle = ballGlow;
       ctx.fill();
       ctx.restore();
@@ -388,11 +476,11 @@ export function drawMahoraga3DWheel(ctx, fighter) {
       sphereRadius
     );
     if (isLeveled) {
-      // Blazing divine white-hot golden energy for adapted spheres
+      // Each sphere uses its own permanent adaptation color from history
       sphereGrad.addColorStop(0, '#FFFFFF');
-      sphereGrad.addColorStop(0.25, '#FFF9C4');
-      sphereGrad.addColorStop(0.6, '#FFD700');
-      sphereGrad.addColorStop(1, '#FF8C00');
+      sphereGrad.addColorStop(0.25, thisSphereColorLight);
+      sphereGrad.addColorStop(0.6, thisSphereColor);
+      sphereGrad.addColorStop(1, thisSphereColorDark);
     } else {
       // Standard golden dharma spheres for unadapted levels
       sphereGrad.addColorStop(0, '#FFFFFF');
@@ -858,30 +946,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   const armDist = Math.hypot(dx, dy);
   const armAngle = Math.atan2(dy, dx);
 
-  // 1. White Bandaged Left Arm (Connects shoulder to fist)
-  ctx.save();
-  ctx.rotate(armAngle);
-
-  ctx.beginPath();
-  ctx.roundRect(0, -8, armDist, 16, 3);
-  ctx.fillStyle = '#EBEBE6'; // Off-white bandage color
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.4;
-  ctx.stroke();
-
-  // Bandage texture lines along forearm
-  ctx.strokeStyle = '#AFAFA5';
-  ctx.lineWidth = 1.6;
-  const numLines = Math.max(2, Math.floor(armDist / 7));
-  ctx.beginPath();
-  for (let i = 1; i < numLines; i++) {
-    const lx = (i / numLines) * armDist;
-    ctx.moveTo(lx - 2, -8);
-    ctx.lineTo(lx + 2, 8);
-  }
-  ctx.stroke();
-  ctx.restore();
+  // 1. (Rubber arm stretching removed completely! Fist flies forward cleanly for punch animation)
 
   // 2. CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
   const fistRadius = 14.0;

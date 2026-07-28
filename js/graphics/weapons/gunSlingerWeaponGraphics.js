@@ -35,11 +35,7 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   const tipLength = bulletLength * g.tipRatio;
   const casingLength = bulletLength - tipLength;
   
-  const prevFillStyle = ctx.fillStyle;
-  const prevStrokeStyle = ctx.strokeStyle;
-  const prevLineWidth = ctx.lineWidth;
-  const prevShadowBlur = ctx.shadowBlur;
-
+  ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
   
@@ -165,12 +161,7 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   ctx.fillStyle = g.tipHighlight;
   ctx.fill();
   
-  ctx.rotate(-angle);
-  ctx.translate(-x, -y);
-  ctx.fillStyle = prevFillStyle;
-  ctx.strokeStyle = prevStrokeStyle;
-  ctx.lineWidth = prevLineWidth;
-  ctx.shadowBlur = prevShadowBlur;
+  ctx.restore();
 }
 
 // ─────────────────────────────────────────────

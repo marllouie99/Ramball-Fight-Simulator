@@ -2,7 +2,7 @@
 // FIGHTER COLLISION
 // ─────────────────────────────────────────────
 import { CONFIG, FIGHTER_DEFS } from '../core/config.js';
-import { GAME_MODES } from '../core/modeConfig.js';
+import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { projectileSystem } from './projectileSystem.js';
 import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance } from '../core/state.js';
 import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
@@ -73,8 +73,9 @@ export function isFighterEffectivelyAlive(fighter) {
   if (!fighter) return false;
   if (fighter.hp > 0) return true;
   // Dead doppelganger with surviving illusions is still in play
-  if (fighter._def && fighter._def.type === 'doppleganger') {
-    return state.illusions.some(ill => ill.owner === fighter && ill.hp > 0);
+  const isDoppel = fighter.type === 'doppleganger' || fighter._def?.type === 'doppleganger' || fighter.characterId === 'doppleganger';
+  if (isDoppel) {
+    return state.illusions && state.illusions.some(ill => ill && ill.owner === fighter && ill.hp > 0);
   }
   return false;
 }
@@ -279,10 +280,16 @@ export function updateIllusions() {
     let nearestTarget = null;
     if (!insideSphere) {
       let nearestDist = Infinity;
+      const isTargetValid = (entity) => {
+        if (!entity || !entity.hp || entity.hp <= 0) return false;
+        if (entity === illusion.owner) return false;
+        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner && entity.team === illusion.owner.team) return false;
+        return true;
+      };
+
       // OPTIMIZED: Only check nearby fighters instead of all fighters
       for (const entity of nearbyEntities) {
-        if (!entity || entity.isIllusion || !entity.hp || entity.hp <= 0) continue;
-        if (entity === illusion.owner) continue;
+        if (!isTargetValid(entity)) continue;
         const dx = entity.x - illusion.x;
         const dy = entity.y - illusion.y;
         const dSq = dx * dx + dy * dy;
@@ -294,7 +301,7 @@ export function updateIllusions() {
       // Fallback: if no nearby targets, check all fighters
       if (!nearestTarget) {
         for (const fighter of state.fighters) {
-          if (!fighter || fighter.hp <= 0 || fighter === illusion.owner) continue;
+          if (!isTargetValid(fighter)) continue;
           const dx = fighter.x - illusion.x;
           const dy = fighter.y - illusion.y;
           const dSq = dx * dx + dy * dy;
@@ -345,10 +352,10 @@ export function updateIllusions() {
     if (insideSphere) continue;
 
     // Try to attack nearby fighters (independent targeting, not following owner)
-    // OPTIMIZED: Only check nearby entities
     for (const entity of nearbyEntities) {
-      if (!entity || entity.isIllusion) continue;
-      if (!entity.hp || entity.hp <= 0 || entity === illusion.owner) continue;
+      if (!entity || !entity.hp || entity.hp <= 0) continue;
+      if (entity === illusion.owner) continue;
+      if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner && entity.team === illusion.owner.team) continue;
       if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0) continue;
 
       const dx = entity.x - illusion.x;
@@ -361,7 +368,7 @@ export function updateIllusions() {
         illusion.swordSwingTimer = CONFIG.doppleganger.swordSwingDuration;
         illusion.swordSwingCooldown = CONFIG.doppleganger.swordCooldown;
         illusion.swordCooldown = CONFIG.doppleganger.swordCooldown;
-        entity.takeDamage(illusion.damage, illusion.owner, { isMelee: true });
+        entity.takeDamage(illusion.damage, illusion.owner || illusion, { isMelee: true });
         spawnFloatingText(entity.x, entity.y - entity.r - 5, 'ILLUSION SLASH!', '#9b59b6');
         break;
       }
@@ -572,7 +579,7 @@ function getClosestOpponent(fighter) {
   state.fighters.forEach((other, otherIndex) => {
     if (!other || other === fighter || other.hp <= 0) return;
     if (other.invincibilityTimer > 0 || other.flashStepTimer > 0) return;
-    if (state.mode === GAME_MODES.TWO_VS_TWO && fighterTeam !== null && state.getFighterTeam(otherIndex) === fighterTeam) return;
+    if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && fighterTeam !== null && state.getFighterTeam(otherIndex) === fighterTeam) return;
     
     // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa
     if (other.owner === fighter || fighter.owner === other) return;
@@ -633,10 +640,18 @@ function endRoundIfFFAEnded() {
 }
 
 function endRoundIf2v2Ended() {
-  if (state.mode !== GAME_MODES.TWO_VS_TWO || state.gameState !== 'playing') return;
+  if ((state.mode !== GAME_MODES.TWO_VS_TWO && state.mode !== GAME_MODES.STAND_OFF_1V2) || state.gameState !== 'playing') return;
 
-  const team0Alive = isFighterEffectivelyAlive(state.fighters[0]) || isFighterEffectivelyAlive(state.fighters[1]);
-  const team1Alive = isFighterEffectivelyAlive(state.fighters[2]) || isFighterEffectivelyAlive(state.fighters[3]);
+  let team0Alive = false;
+  let team1Alive = false;
+
+  if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+    team0Alive = isFighterEffectivelyAlive(state.fighters[0]);
+    team1Alive = isFighterEffectivelyAlive(state.fighters[1]) || isFighterEffectivelyAlive(state.fighters[2]);
+  } else {
+    team0Alive = isFighterEffectivelyAlive(state.fighters[0]) || isFighterEffectivelyAlive(state.fighters[1]);
+    team1Alive = isFighterEffectivelyAlive(state.fighters[2]) || isFighterEffectivelyAlive(state.fighters[3]);
+  }
 
   // Round ends when one team is eliminated (including all illusions)
   if (team0Alive && team1Alive) return;
@@ -650,7 +665,7 @@ function endRoundIf2v2Ended() {
   stopAllSounds();
   stopAllLoopingSounds();
 
-  const winThreshold = 2;
+  const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
   if (state.teamScores[winningTeam] >= winThreshold) {
     state.matchWinner = state.fighters[winningTeam * 2];
     state.matchEndTimer = 0;
@@ -844,7 +859,7 @@ export function updateFighters() {
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
         // Skip teammates in 2v2 mode
-        if (state.mode === GAME_MODES.TWO_VS_TWO && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
+        if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
         resolveFighterCollision(a, b);
       }
     }
