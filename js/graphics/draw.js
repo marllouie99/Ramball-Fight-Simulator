@@ -31,7 +31,8 @@ import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } fro
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
 
-import { drawProjectiles as modDrawProjectiles, drawDivineFlameArrowConstruct, drawBlackHoleVisual } from './renderers/projectileRenderer.js';
+import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';
+import { drawDivineFlameArrowConstruct } from './weapons/sukunaWeaponGraphics.js';
 
 let _cachedTime = 0;
 let _sortedFightersBuffer = [];
