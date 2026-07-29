@@ -10,7 +10,7 @@ import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { initRika, updateRika } from './yuta/rikaLogic.js';
 import { renderYutaDomainBackground } from './yuta/yutaDomainVisuals.js';
 import { modExecuteKatanaMelee, modGetKatanaTipPositions } from './yuta/yutaKatana.js';
-import { getNextCopiedTechnique, executeCopiedTechnique } from './yuta/yutaCopyLogic.js';
+import { getNextCopiedTechnique, executeCopiedTechnique, executeThinIceBreaker } from './yuta/yutaCopyLogic.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
@@ -222,7 +222,65 @@ export class YutaFighter extends Fighter {
     this.posHistory.push({ x: this.x, y: this.y });
     if (this.posHistory.length > 30) this.posHistory.shift();
 
+    // Thin Ice Breaker Execution Logic
+    if (this.thinIceBreakerPunchTimer > 0) {
+      this.thinIceBreakerPunchTimer--;
+    }
+
+    if (this.isChannelingThinIceBreaker) {
+      this.thinIceBreakerChargeTimer--;
+      
+      this.vx = 0;
+      this.vy = 0;
+      if (this.flurryTarget && !this.flurryTarget.isDead) {
+        this.aim(this.flurryTarget);
+      }
+      
+      // Visuals for charging
+      if (this.thinIceBreakerChargeTimer % 2 === 0) {
+        spawnImpactFlash(this.x, this.y, 45 + Math.random() * 25, 'rgba(0, 255, 255, 0.6)');
+        spawnSparks(this.x + Math.cos(this.gunAngle) * 15, this.y + Math.sin(this.gunAngle) * 15, 8, '#00FFFF', '#FFFFFF');
+      }
+
+      if (this.thinIceBreakerChargeTimer <= 0) {
+         this.isChannelingThinIceBreaker = false;
+         this.thinIceBreakerPunchTimer = 20;
+         executeThinIceBreaker(this, this.gunAngle);
+      }
+      return; // Freeze Yuta while he winds up
+    }
+    // Capture sword tip positions continuously after swinging to let the trail follow the sword tip
+    if (this.trailGenTimer > 0) {
+      this.trailGenTimer--;
+
+      const pos = this._getKatanaTipPositions();
+
+      let shouldAdd = true;
+      if (this.swordTrail.length > 0) {
+        const last = this.swordTrail[this.swordTrail.length - 1];
+        const dist = Math.hypot(pos.outer.x - last.outer.x, pos.outer.y - last.outer.y);
+        if (dist < 1.0) {
+          shouldAdd = false; // Don't stack points if standing still
+        }
+      }
+
+      if (shouldAdd) {
+        pushTrailCap(this.swordTrail, {
+          outer: pos.outer,
+          inner: pos.inner,
+          life: 1.0
+        }, 30);
+      }
+
+      // Keep trail capped for performance and styling
+      if (this.swordTrail.length > 16) {
+        this.swordTrail.shift();
+      }
+    }
+
     // Phantom Flurry Execution Logic
+    if (this.flurrySlashTimer > 0) this.flurrySlashTimer--;
+
     if (this.flurryHitsLeft > 0) {
       this.flurryGhost = this.posHistory[0] || { x: this.x, y: this.y };
       this.vx *= 0.1;
@@ -267,10 +325,11 @@ export class YutaFighter extends Fighter {
         }
 
         if (this.flurryTarget && !this.flurryTarget.isDead) {
-          this.gunAngle = Math.random() * Math.PI * 2;
           this.activeSlashType = (this.activeSlashType === undefined) ? 0 : (this.activeSlashType + 1) % 3;
           this.trailGenTimer = 40;
+          this.flurrySlashTimer = 18; // 18-frame smooth swing animation (matches flurryTimer to hold pose)
           this.meleeCooldown = this.meleeCooldownMax; // trigger swing animation
+          this.flurryTimer = 18; // 18-frame interval per teleport hit for clean readability
 
           const isRikaAlive = this.isRikaAliveInDomain();
           const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
@@ -317,6 +376,7 @@ export class YutaFighter extends Fighter {
           this.x = this.flurryTarget.x + Math.cos(angle) * dist;
           this.y = this.flurryTarget.y + Math.sin(angle) * dist;
           this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+          this.swordTrail = []; // Reset trail so it doesn't streak across the screen
 
           this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
 
@@ -405,35 +465,6 @@ export class YutaFighter extends Fighter {
       this.meleeCooldown--;
       if (this.meleeCooldown === maxCd - 15) {
         this.slashFadeTimer = 15;
-      }
-    }
-
-    // Capture sword tip positions continuously after swinging to let the trail follow the sword tip
-    if (this.trailGenTimer > 0) {
-      this.trailGenTimer--;
-
-      const pos = this._getKatanaTipPositions();
-
-      let shouldAdd = true;
-      if (this.swordTrail.length > 0) {
-        const last = this.swordTrail[this.swordTrail.length - 1];
-        const dist = Math.hypot(pos.outer.x - last.outer.x, pos.outer.y - last.outer.y);
-        if (dist < 1.0) {
-          shouldAdd = false; // Don't stack points if standing still
-        }
-      }
-
-      if (shouldAdd) {
-        pushTrailCap(this.swordTrail, {
-          outer: pos.outer,
-          inner: pos.inner,
-          life: 1.0
-        }, 30);
-      }
-
-      // Keep trail capped for performance and styling
-      if (this.swordTrail.length > 16) {
-        this.swordTrail.shift();
       }
     }
 
@@ -681,10 +712,6 @@ export class YutaFighter extends Fighter {
         this.parryCount = 0;
         this.targetParriesForFlurry = this._getRandomParryThreshold();
 
-        this.flurryHitsLeft = CONFIG.yuta.flurryHits || 5;
-        this.flurryTimer = 0;
-        this.flurryTarget = attacker;
-
         const dx = attacker.x - this.x;
         const dy = attacker.y - this.y;
         const dist = Math.hypot(dx, dy) || 1;
@@ -695,6 +722,7 @@ export class YutaFighter extends Fighter {
         this.x = attacker.x + (dx / dist) * (this.r + attacker.r + 5);
         this.y = attacker.y + (dy / dist) * (this.r + attacker.r + 5);
         if (attacker && !attacker.isDead) this.aim(attacker);
+        this.swordTrail = []; // Reset trail so it doesn't streak across the screen
 
         this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
@@ -703,10 +731,22 @@ export class YutaFighter extends Fighter {
         audioSystem.playSFX('skill_dash3', 0.8);
         triggerGlobalScreenShake(8, 10);
 
-        const attackSound = getBasicAttackSound('musashi');
-        if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
+        if (Math.random() < 0.5) {
+          this.blockPoseTimer = 0; // Clear block pose so he actually swings!
+          this.flurryHitsLeft = CONFIG.yuta.flurryHits || 5;
+          this.flurryTimer = 0;
+          this.flurryTarget = attacker;
+          const attackSound = getBasicAttackSound('musashi');
+          if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
+        } else {
+          this.blockPoseTimer = 0; // Clear block pose for Thin Ice Breaker punch too!
+          this.isChannelingThinIceBreaker = true;
+          this.thinIceBreakerChargeTimer = 15;
+          this.flurryTarget = attacker;
+          audioSystem.playSFX('skill_dash5', 0.9); // Generic charge sound for now
+        }
 
-        return 0; // Return early, damage blocked, flurry started
+        return 0; // Return early, damage blocked, flurry/ice breaker started
       }
 
       if (attacker && !attacker.isDead) this.aim(attacker);
@@ -959,11 +999,16 @@ export class YutaFighter extends Fighter {
     // Determine swing state
     const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
     const maxCd = this.meleeCooldownMax;
-    let isSwinging = (this.meleeCooldown > maxCd - 15) || !!editP;
+    const isFlurrySwinging = (this.flurrySlashTimer > 0);
+    let isSwinging = isFlurrySwinging || (this.meleeCooldown > maxCd - 15) || !!editP;
     let progress = 1.0;
     let fade = (this.slashFadeTimer || 0) / 15;
 
-    if (isSwinging) {
+    if (isFlurrySwinging) {
+      const maxF = 14;
+      progress = (maxF - this.flurrySlashTimer) / maxF;
+      fade = 1.0;
+    } else if (isSwinging) {
       progress = editP ? 0.5 : (maxCd - this.meleeCooldown) / 15;
       fade = 1.0;
     }
@@ -1192,7 +1237,18 @@ export class YutaFighter extends Fighter {
     let currentAngle = this.gunAngle;
     const comboIndex = this.activeSlashType || 0;
 
-    if (isSwinging) {
+    if (isFlurrySwinging) {
+      if (comboIndex === 0) {
+        // 1. Horizontal Left-to-Right Slash
+        currentAngle += (-Math.PI * 0.55) + (Math.PI * 1.1) * progress;
+      } else if (comboIndex === 1) {
+        // 2. Backhand Right-to-Left Slash
+        currentAngle += (Math.PI * 0.55) - (Math.PI * 1.1) * progress;
+      } else if (comboIndex === 2) {
+        // 3. Overhead Vertical Downward Chop
+        currentAngle += (-Math.PI * 0.85) + (Math.PI * 1.0) * progress;
+      }
+    } else if (isSwinging) {
       if (comboIndex === 0) {
         currentAngle += (-Math.PI / 4) + (Math.PI / 2) * progress;
       } else if (comboIndex === 1) {
@@ -1207,7 +1263,7 @@ export class YutaFighter extends Fighter {
       ctx.scale(1, -1);
     }
 
-    let parryPoseActive = (this.blockPoseTimer > 0);
+    let parryPoseActive = (this.blockPoseTimer > 0 && !isSwinging);
 
     if (parryPoseActive) {
       this.blockPoseTimer--;

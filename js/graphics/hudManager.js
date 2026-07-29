@@ -83,6 +83,15 @@ export function clearHealthHud() {
   if (containerBottom) containerBottom.innerHTML = '';
   if (containerLeft) containerLeft.innerHTML = '';
   if (containerRight) containerRight.innerHTML = '';
+  
+  const topHudLeft = document.getElementById('hudTopLeft');
+  const topHudRight = document.getElementById('hudTopRight');
+  const bottomHudLeft = document.getElementById('hudBottomLeft');
+  const bottomHudRight = document.getElementById('hudBottomRight');
+  if (topHudLeft) topHudLeft.innerHTML = '';
+  if (topHudRight) topHudRight.innerHTML = '';
+  if (bottomHudLeft) bottomHudLeft.innerHTML = '';
+  if (bottomHudRight) bottomHudRight.innerHTML = '';
 }
 
 document.addEventListener('mousedown', (e) => {
@@ -102,9 +111,23 @@ function updateHealthHud() {
   const { fighters, mode, scores, teamScores } = state;
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
   const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
+  const is1v1 = mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === 'TLFS';
+  
   const cardsLeft = [];
   const cardsRight = [];
   const cardsBottom = [];
+
+  const topHudLeft = document.getElementById('hudTopLeft');
+  const topHudRight = document.getElementById('hudTopRight');
+  const bottomHudLeft = document.getElementById('hudBottomLeft');
+  const bottomHudRight = document.getElementById('hudBottomRight');
+  
+  // Reset new HUDs
+  if (topHudLeft) topHudLeft.innerHTML = '';
+  if (topHudRight) topHudRight.innerHTML = '';
+  if (bottomHudLeft) bottomHudLeft.innerHTML = '';
+  if (bottomHudRight) bottomHudRight.innerHTML = '';
+
 
   const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
@@ -165,6 +188,43 @@ function updateHealthHud() {
           </div>
         `;
       }).join('');
+    } else if (targetFighter && (targetFighter.type === 'yuta' || (targetFighter._def && targetFighter._def.id === 'yuta'))) {
+      const f = targetFighter;
+      let rikaStatus = '<span style="color: #16a34a; font-weight: bold;">READY</span>';
+      if (f.rika && f.rika.active) {
+        rikaStatus = `<span style="color: #db2777; font-weight: bold;">ACTIVE (${(Math.max(0, f.rika.timer || 0) / 60).toFixed(1)}s)</span>`;
+      } else if (f.rika && f.rika.cooldownTimer > 0) {
+        rikaStatus = `<span style="color: #d97706; font-weight: bold;">${(f.rika.cooldownTimer / 60).toFixed(1)}s</span>`;
+      }
+
+      let domainStatus = '<span style="color: #16a34a; font-weight: bold;">READY</span>';
+      if (f.domainActive) {
+        domainStatus = `<span style="color: #9333ea; font-weight: bold;">ACTIVE (${(Math.max(0, f.domainTimer || 0) / 60).toFixed(1)}s)</span>`;
+      } else if (f.domainCooldownTimer > 0) {
+        domainStatus = `<span style="color: #d97706; font-weight: bold;">${(f.domainCooldownTimer / 60).toFixed(1)}s</span>`;
+      }
+
+      const parryCount = f.parryCount || 0;
+      const targetParries = f.targetParriesForFlurry || 3;
+      const parryStatus = `<span style="color: #0284c7; font-weight: bold;">${parryCount}/${targetParries}</span>`;
+
+      barsHTML = `
+        <div class="hud-cooldowns" style="margin: 4px 0 6px; font-family: Arial, sans-serif; font-size: 11px; display: flex; flex-direction: column; gap: 2px;">
+          <div style="display: flex; justify-content: space-between; color: #000000;">
+            <span style="font-weight: bold;">RIKA SUMMON</span>
+            <span>${rikaStatus}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: #000000;">
+            <span style="font-weight: bold;">DOMAIN EXPANSION</span>
+            <span>${domainStatus}</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; color: #000000;">
+            <span style="font-weight: bold;">PARRY COUNTER</span>
+            <span>${parryStatus}</span>
+          </div>
+        </div>
+        <div class="health-card__meta" style="font-size: 13px; font-weight: bold; color: #000000; margin-top: 4px;"><span>DMG: ${Math.max(0, Number(f.damage) || 0)}</span><span>${Math.floor(Math.max(0, Number(f.hp) || 0))}/${Math.floor(Math.max(0, Number(f.maxHp) || 0))}</span></div>
+      `;
     } else {
       const percent = Math.round(safeRatio * 100);
       const barColor = safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444';
@@ -174,7 +234,7 @@ function updateHealthHud() {
         <div class="health-card__bar${glowClass}">
           <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
         </div>
-        <div class="health-card__meta"><span>${metaLabel}</span><span>${metaValue}</span></div>
+        <div class="health-card__meta" style="font-size: 13px; font-weight: bold; color: #000000;"><span>${metaLabel}</span><span>${metaValue}</span></div>
       `;
     }
 
@@ -200,7 +260,6 @@ function updateHealthHud() {
         ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 2px; font-weight: bold;">${title}</div>` : ''}
         ${maxBullets > 0 ? `<div class="health-card__wins" style="margin: 4px 0 6px; display: flex; gap: 6px;">${winsBullets}</div>` : ''}
         ${barsHTML}
-        ${description ? `<div class="health-card__desc" style="color: rgba(0, 0, 0, 0.7); margin-top: 4px; font-size: 10px; line-height: 1.2;">${description}</div>` : ''}
       </div>
     `;
   };
@@ -284,7 +343,13 @@ function updateHealthHud() {
         targetFighter: fighter
       });
 
-      if (mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.FFA || mode === 'TLFS') {
+      if (is1v1) {
+        // We will handle 1v1 in the new HUD
+        // But we still push to cardsBottom if we want the old health bar.
+        // Actually, the user wants the new redesign to replace the old one for 1v1.
+        // We will skip pushing to cardsBottom for 1v1, except maybe we want to keep health?
+        // Let's just NOT push to cardsBottom so it's hidden, and we'll use the new HUD exclusively.
+      } else if (mode === GAME_MODES.FFA) {
         cardsBottom.push(cardHTML);
       } else if (index % 2 === 0) {
         cardsLeft.push(cardHTML);
@@ -292,6 +357,83 @@ function updateHealthHud() {
         cardsRight.push(cardHTML);
       }
     });
+  }
+
+  const getSkillProgress = (f) => {
+    if (!f) return 100;
+    let current = 0;
+    let max = 1;
+    if (f.type === 'yuta') {
+      current = Math.max(0, f.domainCooldownTimer || 0);
+      max = CONFIG.yuta.domainCooldown || 1500;
+    } else if (f.type === 'gunslinger') {
+      current = f.skillTimer || 0;
+      max = CONFIG.gunslinger.skillCooldown || 300;
+    } else if (f.skillCooldown !== undefined) {
+      current = f.skillCooldown;
+      max = (CONFIG[f.type] && CONFIG[f.type].skillCooldown) || 100;
+    } else if (f.cooldownTimer !== undefined) {
+      current = f.cooldownTimer;
+      max = f.cooldown || f.shootCooldownMax || 100;
+    }
+    // Return percentage (100 means ready, 0 means just used)
+    return Math.max(0, Math.min(100, (1 - (current / max)) * 100));
+  };
+
+  // Populate new 1v1 HUD
+  if (is1v1 && fighters.length >= 2) {
+    const f1 = fighters[0];
+    const f2 = fighters[1];
+    
+    if (f1 && !f1.isTurret) {
+      if (topHudLeft) {
+        topHudLeft.innerHTML = f1.name || 'FIGHTER 1';
+        topHudLeft.style.color = f1.color || '#a491d3';
+        topHudLeft.style.textAlign = 'left';
+      }
+      if (bottomHudLeft) {
+        bottomHudLeft.style.alignItems = 'flex-start';
+        bottomHudLeft.style.textAlign = 'left';
+        
+        const def = f1.fighterIndex !== undefined ? FIGHTER_DEFS[f1.fighterIndex] : null;
+        const ability = def ? (def.ability || def.name) : 'Skill';
+        const dmg = Math.max(0, Number(f1.damage) || 0);
+        const skillPct = getSkillProgress(f1);
+        const color = f1.color || '#a491d3';
+        bottomHudLeft.innerHTML = `
+          <div class="hud-skill-box">
+            <div class="hud-skill-box-fill" style="width: ${skillPct}%; background: ${color}; opacity: 0.8;"></div>
+            <div class="hud-skill-box-text">${ability}</div>
+          </div>
+          <div class="hud-damage-text" style="color: ${color};">Damage: ${dmg}</div>
+        `;
+      }
+    }
+    
+    if (f2 && !f2.isTurret) {
+      if (topHudRight) {
+        topHudRight.innerHTML = f2.name || 'FIGHTER 2';
+        topHudRight.style.color = f2.color || '#eab308';
+        topHudRight.style.textAlign = 'right';
+      }
+      if (bottomHudRight) {
+        bottomHudRight.style.alignItems = 'flex-end';
+        bottomHudRight.style.textAlign = 'right';
+        
+        const def = f2.fighterIndex !== undefined ? FIGHTER_DEFS[f2.fighterIndex] : null;
+        const ability = def ? (def.ability || def.name) : 'Skill';
+        const dmg = Math.max(0, Number(f2.damage) || 0);
+        const skillPct = getSkillProgress(f2);
+        const color = f2.color || '#eab308';
+        bottomHudRight.innerHTML = `
+          <div class="hud-skill-box">
+            <div class="hud-skill-box-fill" style="width: ${skillPct}%; background: ${color}; opacity: 0.8;"></div>
+            <div class="hud-skill-box-text">${ability}</div>
+          </div>
+          <div class="hud-damage-text" style="color: ${color};">Damage: ${dmg}</div>
+        `;
+      }
+    }
   }
 
   const leftHTML = cardsLeft.join('');

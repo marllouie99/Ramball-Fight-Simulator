@@ -6,7 +6,8 @@ import { CONFIG } from '../../core/config.js';
  * The overlay opacity increases during charge, then stays at max while strikes are active.
  */
 export function drawStormDimScreen() {
-  const { ctx, canvas } = state;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
   
   // Find Zeus fighters that are charging or actively storming
   const zeusStorming = state.fighters?.filter(f => 
@@ -37,9 +38,9 @@ export function drawStormDimScreen() {
   // Don't draw if opacity is too low
   if (opacity < 0.01) return;
   
-  // Fill the entire canvas with a plain dark overlay
+  // Fill the arena with a plain dark overlay
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 }
 
 let currentFurnaceDimOpacity = 0;
@@ -48,8 +49,8 @@ let currentFurnaceDimOpacity = 0;
  * Draws a dark fiery dim screen overlay with flame lightning when Sukuna channels or fires Furnace (Fuga).
  */
 export function drawFurnaceDimScreen() {
-  const { ctx, canvas } = state;
-  if (!ctx || !canvas) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
 
   // Find Sukuna fighters channeling Furnace or in post-fire recovery
   const sukunaFuga = state.fighters?.find(f => 
@@ -103,7 +104,7 @@ export function drawFurnaceDimScreen() {
   grad.addColorStop(1, `rgba(10, 2, 2, ${opacity * 0.95})`);
 
   ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
   ctx.restore();
 }
 
@@ -113,8 +114,8 @@ let currentRikaSummonDimOpacity = 0;
  * Draws a dark purple/pink cursed energy dim screen overlay when Yuta calls or summons Rika.
  */
 export function drawRikaSummonDimScreen() {
-  const { ctx, canvas } = state;
-  if (!ctx || !canvas) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
 
   // Find Yuta fighters calling for Rika or when Rika is expanding on summon
   const yutaSummoning = state.fighters?.find(f =>
@@ -160,7 +161,7 @@ export function drawRikaSummonDimScreen() {
   gradient.addColorStop(0.85, `rgba(5, 0, 10, ${opacity * 0.95})`);
 
   ctx.fillStyle = gradient;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
   // Pulsing Cursed Energy Ring around Yuta/Rika
   ctx.globalCompositeOperation = 'screen';

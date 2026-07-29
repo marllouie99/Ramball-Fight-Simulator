@@ -121,12 +121,32 @@ export function modExecuteKatanaMelee(fighter, angle) {
 
 export function modGetKatanaTipPositions(fighter) {
   const maxCd = fighter.meleeCooldownMax;
-  const isSwinging = (fighter.meleeCooldown > maxCd - 15);
+  const isFlurrySwinging = (fighter.flurrySlashTimer > 0);
+  const isSwinging = isFlurrySwinging || (fighter.meleeCooldown > maxCd - 15);
 
   let currentAngle = fighter.gunAngle;
   const comboIndex = fighter.activeSlashType || 0;
 
-  if (isSwinging) {
+  if (isFlurrySwinging) {
+    // flurrySlashTimer starts at 18. We want a fast 5-frame swing, then hold the pose!
+    const maxF = 18;
+    const swingFrames = 5;
+    
+    // progress goes from 0.0 to 1.0 during the first 5 frames, then stays at 1.0!
+    let progress = (maxF - fighter.flurrySlashTimer) / swingFrames;
+    if (progress > 1.0) progress = 1.0; 
+
+    if (comboIndex === 0) {
+      // 1. Horizontal Left-to-Right Slash
+      currentAngle += (-Math.PI * 0.6) + (Math.PI * 1.2) * progress;
+    } else if (comboIndex === 1) {
+      // 2. Backhand Right-to-Left Slash
+      currentAngle += (Math.PI * 0.6) - (Math.PI * 1.2) * progress;
+    } else if (comboIndex === 2) {
+      // 3. Overhead Vertical Downward Chop
+      currentAngle += (-Math.PI * 0.7) + (Math.PI * 0.9) * progress;
+    }
+  } else if (isSwinging) {
     const progress = (maxCd - fighter.meleeCooldown) / 15;
     if (comboIndex === 0) {
       currentAngle += (-Math.PI / 4) + (Math.PI / 2) * progress;

@@ -1052,10 +1052,10 @@ export class SukunaFighter extends Fighter {
     this.domainTimer = CONFIG.sukuna.domainDuration || 180;
     this.domainCooldown = CONFIG.sukuna.domainCooldown || 1500;
 
-    // Position at top center of the arena
+    // Position closer to the center of the arena so the top of the shrine isn't clipped
     if (arena) {
       this.domainX = arena.x + arena.width / 2;
-      this.domainY = arena.y + arena.height * 0.25; // 25% from the top (moved down)
+      this.domainY = arena.y + arena.height * 0.45; // 45% from the top (moved down to fit inside arena bounds)
     } else {
       this.domainX = this.x;
       this.domainY = this.y;

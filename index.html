@@ -11,7 +11,7 @@
     html, body {
       margin: 0;
       padding: 0;
-      background: #000000;
+      background: #ffffff;
       overflow: hidden;
       display: flex;
       justify-content: center;
@@ -48,12 +48,23 @@
 
 <body>
   <div class="game-container">
-    <div id="healthHudLeft" class="health-hud-side" aria-live="polite"></div>
+    <div id="healthHudLeft" class="health-hud-side" aria-live="polite" style="display: none;"></div>
     <div class="game-box">
+      <div id="hudTopContainer" class="hud-top-container">
+        <div id="hudTopLeft" class="hud-name-box"></div>
+        <div id="hudTopRight" class="hud-name-box"></div>
+      </div>
+
       <canvas id="arena" width="540" height="960"></canvas>
-      <div id="healthHud" class="health-hud" aria-live="polite"></div>
+
+      <div id="hudBottomContainer" class="hud-bottom-container">
+        <div id="hudBottomLeft" class="hud-skill-group"></div>
+        <div id="hudBottomRight" class="hud-skill-group"></div>
+      </div>
+      
+      <div id="healthHud" class="health-hud" aria-live="polite" style="display: none;"></div>
     </div>
-    <div id="healthHudRight" class="health-hud-side" aria-live="polite"></div>
+    <div id="healthHudRight" class="health-hud-side" aria-live="polite" style="display: none;"></div>
   </div>
 
   <!-- ES6 module entry point — all imports are resolved via import/export -->

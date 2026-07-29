@@ -80,6 +80,15 @@ export function renderGame() {
         state.ctx.translate(shakeX, shakeY);
 
         drawArena();
+
+        // ── GLOBAL ARENA CLIP ──
+        // Ensure absolutely no game visuals (fighters, projectiles, particles) can ever spill over the arena borders and obscure the HUD.
+        state.ctx.save();
+        if (state.arena) {
+          state.ctx.beginPath();
+          state.ctx.rect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+          state.ctx.clip();
+        }
       drawPurpleDimScreen(); // Draw purple dim screen overlay when Gojo's Hollow Purple is active
       drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
       drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
@@ -109,6 +118,7 @@ export function renderGame() {
           });
 
         if (activeDomainFighters.length > 0) {
+
           activeDomainFighters.forEach((fighter, index) => {
             state.ctx.save();
             const isClashSecondary = (index > 0);
@@ -128,6 +138,7 @@ export function renderGame() {
               renderYutaSukunaDomainClashRift(state.ctx, yutaDomain, sukunaDomain);
             }
           }
+          
         }
       }
 
@@ -174,7 +185,13 @@ export function renderGame() {
 
       drawMahoragaAdaptationDimScreen(); // Draw dark golden cinematic dim screen overlay when Mahoraga adapts wheel
 
-      drawFloatingTexts(); // Keep UI-like text on top of dim
+      // Composite flame canvas onto main canvas (clipped to arena bounds)
+      compositeFlameCanvas();
+
+      drawFloatingTexts(); // Keep UI-like text on top of dim and flames
+
+      // Restore the global arena clip so HUD and FPS logs can draw freely outside the arena
+      state.ctx.restore();
 
       // Draw FPS display and logs (if not hidden by user pressing H)
       if (!state.hideFpsLogs) {
@@ -214,8 +231,6 @@ export function renderGame() {
         }
       }
 
-      // Composite flame canvas onto main canvas (after all other drawing)
-      compositeFlameCanvas();
 
       if (state.gameState === 'playing' || state.gameState === 'countdown') {
         drawHUD();

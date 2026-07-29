@@ -37,6 +37,16 @@ export class YutaRenderer {
     Fighter.prototype.draw.call(fighter, ctx, opponent);
     ctx.restore();
 
+    // Draw spatial cracks (Thin Ice Breaker)
+    if (fighter.spatialCracks && fighter.spatialCracks.length > 0) {
+      YutaRenderer._drawSpatialCracks(ctx, fighter);
+    }
+
+    // Draw the left hand punching out for Thin Ice Breaker
+    if (fighter.thinIceBreakerChargeTimer > 0 || fighter.thinIceBreakerPunchTimer > 0) {
+      YutaRenderer._drawThinIceBreakerHand(ctx, fighter);
+    }
+
     // Draw afterimages during flurry & teleports (Draw ON TOP of Sakuga Impact Frame so they are never covered!)
     if (fighter.afterImages && fighter.afterImages.length > 0) {
       for (let i = 0; i < fighter.afterImages.length; i++) {
@@ -1558,6 +1568,104 @@ export class YutaRenderer {
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 0.8;
     ctx.strokeRect(-2, -2, 4, 4);
+
+    ctx.restore();
+  }
+
+  static _drawSpatialCracks(ctx, fighter) {
+    if (!fighter.spatialCracks || fighter.spatialCracks.length === 0) return;
+
+    ctx.save();
+    
+    // We clean up expired cracks here
+    let i = fighter.spatialCracks.length;
+    while (i--) {
+      const crack = fighter.spatialCracks[i];
+      crack.timer--;
+      if (crack.timer <= 0) {
+        fighter.spatialCracks.splice(i, 1);
+        continue;
+      }
+
+      const progress = crack.timer / crack.maxTimer;
+      const alpha = Math.max(0, progress);
+      const scale = 1 + (1 - progress) * 0.2; // slight expansion
+      
+      ctx.save();
+      ctx.translate(crack.x, crack.y);
+      ctx.rotate(crack.angle);
+      ctx.scale(scale, scale);
+      
+      // Draw shattered space polygons (Sky Manipulation effect)
+      ctx.globalAlpha = alpha;
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.65)';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 4;
+      
+      // Draw 3 jagged polygons forming a fractured cone shape
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(120, -90);
+      ctx.lineTo(180, -45);
+      ctx.lineTo(240, 0);
+      ctx.lineTo(180, 45);
+      ctx.lineTo(120, 90);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      
+      // Inner deeper fracture lines
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(140, -30);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(170, 0);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(140, 30);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
+  static _drawThinIceBreakerHand(ctx, fighter) {
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y);
+    ctx.rotate(fighter.gunAngle);
+
+    let extension = 0;
+    if (fighter.thinIceBreakerChargeTimer > 0) {
+      // Winding up (pulling hand back)
+      const maxCharge = 15;
+      const progress = 1 - (fighter.thinIceBreakerChargeTimer / maxCharge);
+      extension = -10 + progress * 5; 
+    } else if (fighter.thinIceBreakerPunchTimer > 0) {
+      // Punched out
+      const maxPunch = 20;
+      const progress = fighter.thinIceBreakerPunchTimer / maxPunch;
+      extension = 18 * Math.pow(progress, 0.2); // Snap out quickly, then hold
+    }
+
+    // Draw the left hand (y = -14) punching forward
+    ctx.translate(extension, -14);
+
+    // Left hand circle
+    ctx.fillStyle = fighter.color;
+    ctx.beginPath();
+    ctx.arc(0, 0, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    
+    // Draw cyan aura on the fist
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.6)';
+    ctx.beginPath();
+    ctx.arc(0, 0, 10, 0, Math.PI * 2);
+    ctx.fill();
 
     ctx.restore();
   }

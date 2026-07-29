@@ -8,19 +8,13 @@ export function drawArena() {
   const { ctx, canvas, arena } = state;
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
+  // Fill the entire canvas background with a light gray/white color
+  ctx.fillStyle = '#f5f5f5';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   if (!hasActiveDomain) {
-    // Fill the entire canvas background with black for the top and bottom letterboxing
-    ctx.fillStyle = '#000000';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-    // Fill the middle area (arena + HUD) with white
+    // Arena floor background
     ctx.fillStyle = '#ffffff';
-    const whiteAreaStartY = arena.y - 20;
-    const whiteAreaEndY = 770; // Brought bottom dark cover higher up towards the top
-    ctx.fillRect(0, whiteAreaStartY, canvas.width, whiteAreaEndY - whiteAreaStartY);
-
-    // Arena background (in case it needs to be different later, but right now it's a slightly off-white)
-    ctx.fillStyle = 'rgb(250, 250, 250)';
     ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
   }
 
@@ -54,8 +48,8 @@ let currentPurpleDimOpacity = 0;
  * actively moving as a projectile, or in post-fire recovery.
  */
 export function drawPurpleDimScreen() {
-  const { ctx, canvas } = state;
-  if (!ctx || !canvas) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
 
   const activeProjectiles = typeof getProjectiles === 'function' ? getProjectiles() : [];
   const purpleOrb = activeProjectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0);
@@ -106,10 +100,10 @@ export function drawPurpleDimScreen() {
 
   // Dark base purple overlay
   ctx.fillStyle = `rgba(18, 2, 32, ${opacity * 0.7})`;
-  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
   // Dynamic radial gradient centered on Gojo or Purple Orb
-  const maxDim = Math.max(canvas.width, canvas.height) * 0.95;
+  const maxDim = Math.max(arena.width, arena.height) * 0.70;
   const roundCx = Math.round(cx / 10) * 10;
   const roundCy = Math.round(cy / 10) * 10;
   const key = `${roundCx}_${roundCy}_${maxDim}`;
@@ -128,7 +122,7 @@ export function drawPurpleDimScreen() {
 
   ctx.globalAlpha = opacity;
   ctx.fillStyle = state._cachedPurpleDimGrad;
-  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
   ctx.restore();
 }
 
@@ -136,8 +130,8 @@ let currentTojiUltimateOpacity = 0;
 let flyHeads = [];
 
 export function drawTojiUltimateOverlay() {
-  const { ctx, canvas } = state;
-  if (!ctx || !canvas) return;
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
 
   const toji = state.fighters?.find(f => f && f.ultimateActive && (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING' || f.ultimatePhase === 'CRATER_FADEIN' || f.ultimatePhase === 'CRATER'));
 
@@ -178,7 +172,7 @@ export function drawTojiUltimateOverlay() {
   
   // Pitch black overlay
   ctx.fillStyle = '#050505';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
   // Draw and update fly heads
   ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
@@ -214,7 +208,7 @@ export function drawTojiUltimateOverlay() {
 export function drawMahoragaAdaptationDimScreen() {
   if (CONFIG.mahoraga?.enableGoldenScreenDim === false) return;
 
-  const { ctx, canvas } = state;
+  const { ctx, canvas, arena } = state;
   const mahoraga = state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0));
   if (!mahoraga) return;
 
@@ -231,7 +225,7 @@ export function drawMahoragaAdaptationDimScreen() {
 
   // Dark Golden Vignette Radial Gradient centered at Mahoraga's wheel
   const wheelY = mahoraga.y - mahoraga.r - 28;
-  const maxRadius = Math.max(canvas.width, canvas.height) * 0.95;
+  const maxRadius = Math.max(arena.width, arena.height) * 0.70;
   const grad = ctx.createRadialGradient(
     mahoraga.x, wheelY, 15,
     mahoraga.x, wheelY, maxRadius
@@ -243,7 +237,7 @@ export function drawMahoragaAdaptationDimScreen() {
   grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.98})`);
 
   ctx.fillStyle = grad;
-  ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
+  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
   ctx.restore();
 }
 

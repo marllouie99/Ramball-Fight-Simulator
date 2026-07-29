@@ -1,12 +1,13 @@
 /* ─────────────────────────────────────────────
    Base
 ───────────────────────────────────────────── */
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
   font-family: Arial, sans-serif;
-  background: #000000;
-  color: #ffffff;
+  background: #ffffff;
+  color: #000000;
   display: flex;
   justify-content: center;
   align-items: center;
@@ -77,25 +78,25 @@ canvas {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 14px;
+  gap: 16px;
   margin: 0 auto;
   padding: 0;
-  width: calc(100% * 460 / 540);
-  max-width: 460px;
+  width: calc(100% * 480 / 540);
+  max-width: 480px;
   box-sizing: border-box;
 }
 
 .health-card {
   flex: 1 1 180px;
   min-width: 180px;
-  max-width: 320px;
-  background: rgba(16, 18, 22, 0.92);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 18px;
-  padding: 14px 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  max-width: 230px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
   box-sizing: border-box;
-  transition: transform 80ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  transition: transform 80ms ease;
   will-change: transform;
 }
 
@@ -134,7 +135,7 @@ canvas {
 }
 
 .health-card__title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: bold;
   letter-spacing: 0.5px;
   text-transform: uppercase;
@@ -209,8 +210,9 @@ canvas {
   display: flex;
   justify-content: space-between;
   margin-top: 8px;
-  font-size: 14px;
-  color: rgba(0, 0, 0, 0.75);
+  font-size: 15px;
+  font-weight: bold;
+  color: #111111;
 }
 
 .health-card__meta span {
@@ -323,4 +325,105 @@ canvas {
     border-width: 2px;
     border-radius: 8px;
   }
+}
+
+/* ─────────────────────────────────────────────
+   New Redesigned HUD
+───────────────────────────────────────────── */
+.hud-top-container {
+  position: absolute;
+  top: 13.5%;
+  /* Tightly above arena */
+  left: 7.41%;
+  right: 7.41%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hud-name-box {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffffff;
+  -webkit-text-stroke: 1px black;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 3px 0 #000;
+}
+
+.hud-name-box:empty {
+  display: none;
+}
+
+.hud-bottom-container {
+  position: absolute;
+  top: 67.5%;
+  /* Tightly below arena without overlapping */
+  left: 7.41%;
+  right: 7.41%;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hud-skill-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud-skill-group:empty {
+  display: none;
+}
+
+.hud-skill-box {
+  position: relative;
+  background: #e0e0e0;
+  border: 2px solid #000000;
+  width: 180px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.hud-skill-box-text {
+  position: relative;
+  z-index: 2;
+  font-size: 11px;
+  font-weight: 900;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5px black;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.hud-skill-box-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  z-index: 1;
+  transition: width 0.1s linear;
+}
+
+.hud-damage-text {
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 900;
+  color: #ffffff;
+  -webkit-text-stroke: 0.5px black;
+  text-shadow: -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 2px 0 #000;
 }
