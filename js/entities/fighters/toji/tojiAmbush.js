@@ -9,6 +9,7 @@ import { playSound } from '../../../systems/soundSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { fastCleanArray, pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
+import { tojiGetTargetsInFrontalArc } from './tojiWeapons.js';
 
 export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, startAngle, endAngle) {
   if (!fighter.stealthAfterimages) fighter.stealthAfterimages = [];
@@ -133,8 +134,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   }
 
   if (!opponent || opponent.hp <= 0 || !fighter.isAmbushing) {
-    if (typeof state !== 'undefined' && state.fighters) {
-      state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
+    if (typeof state !== 'undefined') {
+      if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
+      if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
     }
     fighter.isAmbushing = false;
     fighter.ambushPhase = null;
@@ -421,6 +423,26 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         const strikeSound = getSkillEffectSound('toji', 'strike');
         if (strikeSound) playSound(strikeSound.src, strikeSound.volume * 0.7);
       } else {
+        // Apply the big final knockback blast before releasing the target
+        if (opponent && opponent.hp > 0 && !opponent.isTurret && !opponent.cannotBeKnockbacked) {
+          const finalPushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+          const finalRecoil = 38;
+          opponent.vx = Math.cos(finalPushAngle) * finalRecoil;
+          opponent.vy = Math.sin(finalPushAngle) * finalRecoil;
+          
+          if (typeof opponent.applyKnockback === 'function') {
+            opponent.applyKnockback(opponent.vx, opponent.vy);
+          }
+        }
+
+        // Release ALL freeze effects so opponent can actually fly from the knockback
+        if (opponent) {
+          opponent.timeStopTimer = 0;
+          opponent.hitStunTimer = 0;
+          opponent._timeStopOriginalDuration = 0;
+          opponent._timeStopStartTime = null;
+        }
+
         opponent.isTargetOfAmbush = false; 
         const escapeAngle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x) + (Math.random() - 0.5);
         fighter.vx = Math.cos(escapeAngle) * (fighter.speed || 3);
@@ -434,8 +456,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
         fighter.isAmbushing = false;
         fighter.ambushPhase = null;
-        if (typeof state !== 'undefined' && state.fighters) {
-          state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
+        if (typeof state !== 'undefined') {
+          if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
+          if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
         }
       }
     }
@@ -448,28 +471,34 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         const maxStrikes = fighter.phantomMaxStrikes || 6;
         const isFinalStrike = (fighter.phantomStrikeCount === maxStrikes);
 
+        const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+        const flurryTargets = tojiGetTargetsInFrontalArc(fighter, opponent, attackAngle, 65, Math.PI * 0.75);
+
         const strikeDmg = CONFIG.toji?.ambushPhantomFlurryDamage || 15;
-        applyDamageToTarget(opponent, strikeDmg, fighter, { isMelee: true, isTrueDamage: true });
-        opponent.hitFlashTimer = 8; 
-        if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(flurryFrameRate + 2);
 
-        delete opponent._timeStopFrozenAngle;
-        delete opponent._timeStopFrozenGunAngle;
-        const targetHitAngle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
-        let angleDiff = targetHitAngle - (opponent.angle || 0);
-        while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        opponent.angle = (opponent.angle || 0) + angleDiff * 0.35; 
-        opponent.gunAngle = opponent.angle;
+        for (const target of flurryTargets) {
+          applyDamageToTarget(target, strikeDmg, fighter, { isMelee: true, isTrueDamage: true });
+          target.hitFlashTimer = 8; 
+          if (typeof target.applyHitStun === 'function') target.applyHitStun(flurryFrameRate + 2);
 
-        if (!opponent.isTurret && !opponent.cannotBeKnockbacked) {
-          opponent.vx = 0;
-          opponent.vy = 0;
-          const pushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-          const recoilForce = isFinalStrike ? 38 : (4 + Math.random() * 2);
-          opponent.vx = Math.cos(pushAngle) * recoilForce;
-          opponent.vy = Math.sin(pushAngle) * recoilForce;
-          if (typeof opponent.applyKnockback === 'function') opponent.applyKnockback(opponent.vx, opponent.vy);
+          delete target._timeStopFrozenAngle;
+          delete target._timeStopFrozenGunAngle;
+          const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
+          let angleDiff = targetHitAngle - (target.angle || 0);
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+          target.angle = (target.angle || 0) + angleDiff * 0.35; 
+          target.gunAngle = target.angle;
+
+          if (!target.isTurret && !target.cannotBeKnockbacked) {
+            target.vx = 0;
+            target.vy = 0;
+            const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+            const recoilForce = isFinalStrike ? 38 : (4 + Math.random() * 2);
+            target.vx = Math.cos(pushAngle) * recoilForce;
+            target.vy = Math.sin(pushAngle) * recoilForce;
+            if (typeof target.applyKnockback === 'function') target.applyKnockback(target.vx, target.vy);
+          }
         }
 
         const contactX = (fighter.x + opponent.x) * 0.5;

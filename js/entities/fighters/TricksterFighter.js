@@ -81,6 +81,7 @@ export class TricksterFighter extends Fighter {
 
   reset() {
     super.reset();
+    this.z = 25;
     this.attackCooldown = 0;
     this.attackSwingTimer = 0;
     this.telekinesisCooldown = 0;
@@ -503,12 +504,19 @@ export class TricksterFighter extends Fighter {
        this.beamCharge = Math.max(this.beamCharge - 1, 0);
     }
 
+    // Phantom Flurry Execution Logic
     if (this.flurryHitsLeft > 0) {
        this.vx *= 0.1;
        this.vy *= 0.1;
        
        if (this.flurryTimer > 0) this.flurryTimer--;
        if (this.flurryTimer <= 0) {
+         if (this.flurryHitsLeft <= 0) {
+           this.flurryGhost = null;
+           this.flurryTarget = null;
+           return;
+         }
+
          this.flurryHitsLeft--;
          this.flurryTimer = 6;
          
@@ -524,37 +532,25 @@ export class TricksterFighter extends Fighter {
          if (this.flurryTarget && !this.flurryTarget.isDead) {
             this.strikeAngle = Math.random() * Math.PI * 2;
             
-            const flurryDmg = CONFIG.musashi.flurryDamage * getStolenMultiplier('musashi', 'damageMultiplier');
-            this.flurryTarget.takeDamage(flurryDmg, this, {isMelee: true});
-            this.flurryTarget.applyHitStun(15);
+            const flurryDmg = (CONFIG.trickster?.flurryDamage || 10) * getStolenMultiplier('musashi', 'damageMultiplier');
+            this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true });
+            if (typeof this.flurryTarget.applyHitStun === 'function') this.flurryTarget.applyHitStun(15);
             
-            if (!this.slashEffects) this.slashEffects = [];
-            this.slashEffects.push({
-              type: this.flurryHitsLeft % 2 === 0 ? 'slash_katana' : 'slash_wakizashi',
-              x: this.x,
-              y: this.y,
-              angle: this.strikeAngle,
-              timer: 15,
-              maxTimer: 15,
-              stance: ['earth', 'water', 'fire', 'wind', 'void'][this.flurryHitsLeft % 5],
-              size: (this.r + 25) * 1.4
-            });
             spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#fff');
             
             triggerGlobalScreenShake(6, 6);
             spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 10, 'flash');
-            
-            this.gunAngle = this.strikeAngle;
-            
+
             const angle = Math.random() * Math.PI * 2;
             const dist = this.flurryTarget.r + this.r + 10;
             const oldX = this.x;
             const oldY = this.y;
             this.x = this.flurryTarget.x + Math.cos(angle) * dist;
             this.y = this.flurryTarget.y + Math.sin(angle) * dist;
-            
+            this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+
             if (!this.afterImages) this.afterImages = [];
-            const teleportDist = Math.sqrt((this.x - oldX)**2 + (this.y - oldY)**2);
+            const teleportDist = Math.hypot(this.x - oldX, this.y - oldY);
             const numImages = Math.max(3, Math.floor(teleportDist / 12));
             for (let i = 0; i <= numImages; i++) {
               const t = i / numImages;
@@ -567,10 +563,11 @@ export class TricksterFighter extends Fighter {
               });
             }
 
-            this.applyTimeStop(6);
-            this.flurryTarget.applyTimeStop(6);
+            if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(8);
          } else {
             this.flurryHitsLeft = 0;
+            this.flurryGhost = null;
+            this.flurryTarget = null;
          }
        }
        

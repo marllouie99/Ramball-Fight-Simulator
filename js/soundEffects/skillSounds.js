@@ -128,7 +128,7 @@ export const SKILL_SOUNDS = {
     },
     storm: {
       src: 'Assets/Sound Effects/Skills/stormstrike.mp3',
-      volume: 1.5
+      volume: 3.5
       ,
       delay: 0
     }

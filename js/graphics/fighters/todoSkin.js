@@ -130,68 +130,69 @@ function drawTodoHands(ctx, fighter, skinColor) {
   const isPunching = fighter.punchAnimTimer > 0;
   const isClapping = fighter.boogieWoogieCooldown > fighter.boogieWoogieCooldownMax - 10;
 
-  // Hide hands when moving or idle; ONLY show hands during punch attacks animation or clapping!
-  if (!isPunching && !isClapping) return;
-
   const handRadius = getHandSize(7.5);
   const r = fighter.r;
-  const punchExtension = 22;
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(fighter.gunAngle + Math.PI / 2);
+  ctx.rotate(fighter.gunAngle + Math.PI / 2); // Side-profile rotation (same as body)
 
-  // Base positions:
-  let rightHandX = r * 0.35;
-  let rightHandY = r * 0.75; // Right side (+y, 7 o'clock)
+  // Smooth progress calculation matching Mahoraga's cubic ease-in-out curve
+  let rawProgress = 0;
+  if (isPunching) {
+    const maxT = fighter.punchMaxTime || 16;
+    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+  }
+  
+  const smoothProgress = rawProgress < 0.5 
+    ? 4 * rawProgress * rawProgress * rawProgress 
+    : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+    
+  const lungeExtension = Math.sin(smoothProgress * Math.PI) * 32; // Dynamic punch lunge forward
 
-  let leftHandX = r * 0.35;  // Left side (+x, 5 o'clock)
-  let leftHandY = -r * 0.75; // Left side (-y, 5 o'clock)
+  // In this rotated space: +X = forward (toward enemy), Y = left/right sides
+  // Side-profile stance: hands on opposite sides of body, aligned
+  let frontHandX = r * 0.35;     // Slightly forward
+  let frontHandY = r * 0.85;     // Right side of body
 
-  // Handle punch animations
-  if (fighter.punchAnimTimer > 0) {
-    const progress = 1 - (fighter.punchAnimTimer / fighter.punchMaxTime);
-    const extension = Math.sin(progress * Math.PI) * punchExtension;
+  let backHandX = r * 0.35;      // Slightly forward
+  let backHandY = -r * 0.85;     // Left side of body
 
+  // Handle punch animations (lunge toward enemy = extend along +X axis)
+  if (isPunching) {
     if (fighter.isRightPunch) {
-      rightHandX += extension;
-      rightHandY = r * 0.45;
+      frontHandX += lungeExtension;   // Front hand lunges forward toward enemy
+      frontHandY *= 0.4;              // Move toward center as fist extends
     } else {
-      leftHandX += extension;
-      leftHandY = -r * 0.45;
+      backHandX += lungeExtension;    // Back hand cross-punches forward
+      backHandY *= 0.4;               // Move toward center as fist extends
     }
   }
 
   // Clapping animation override (Boogie Woogie swap trigger)
   if (isClapping) {
-    rightHandX = r + 6;
-    rightHandY = 4;
-    leftHandX = r + 6;
-    leftHandY = -4;
+    frontHandX = 4;
+    frontHandY = -(r + 6);
+    backHandX = -4;
+    backHandY = -(r + 6);
   }
 
-  // Draw Left Hand (on Left Side)
-  if (!fighter.hideBackHand || isClapping) {
-    drawHandFist(ctx, leftHandX, leftHandY, handRadius, skinColor);
-  }
-
-  // Draw Right Hand (on Right Side)
-  if (!fighter.hideFrontHand || isClapping) {
-    drawHandFist(ctx, rightHandX, rightHandY, handRadius, skinColor);
-  }
+  // Draw both hands (ALWAYS visible in side-profile guard stance)
+  drawHandFist(ctx, backHandX, backHandY, handRadius, skinColor);
+  drawHandFist(ctx, frontHandX, frontHandY, handRadius, skinColor);
 
   // Clap shockwave visual
   if (isClapping) {
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(r + 8, 0, 16, -Math.PI / 2, Math.PI / 2);
+    ctx.arc(0, -(r + 8), 16, 0, Math.PI * 2);
     ctx.stroke();
 
     ctx.strokeStyle = '#4DA3FF';
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(r + 8, 0, 22, -Math.PI / 2, Math.PI / 2);
+    ctx.arc(0, -(r + 8), 22, 0, Math.PI * 2);
     ctx.stroke();
   }
 

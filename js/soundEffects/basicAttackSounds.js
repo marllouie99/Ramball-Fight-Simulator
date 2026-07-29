@@ -221,6 +221,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.45,
     delay: -1,
   },
+  // Turret — Turret shot
+  'turret': {
+    src: 'Assets/Sound Effects/Skills/turretshot.mp3',
+    volume: 0.01,
+    delay: 0,
+  },
   // Gojo — Blue Orbs & Melee punches
   'gojo': {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',

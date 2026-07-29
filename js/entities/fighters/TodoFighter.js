@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { drawTodoSkin } from '../../graphics/fighters/todoSkin.js';
 import { modUpdateMeleeCombat } from './todo/todoCombat.js';
-import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks } from './todo/todoSkills.js';
+import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage } from './todo/todoSkills.js';
 
 /**
  * Aoi Todo - The Boogie Woogie Brawler
@@ -29,6 +29,13 @@ export class TodoFighter extends Fighter {
     this.rockThrowCooldown = 0;
     this.rockThrowCooldownMax = CONFIG.todo?.rockCooldown || 300;
     this.cursedRocks = [];
+
+    // Rock Counter-Attack Combo state
+    this.rockCounterComboLeft = 0;
+    this.rockCounterComboTarget = null;
+    this.rockCounterComboInterval = CONFIG.todo?.rockCounterComboInterval || 12;
+    this.rockCounterComboTimer = 0;
+    this.disengageDelayTimer = 0;
 
     this.postUltimateRecoveryTimer = 0;
   }
@@ -57,9 +64,44 @@ export class TodoFighter extends Fighter {
     if (this.boogieWoogieCooldown > 0) this.boogieWoogieCooldown--;
     if (this.rockThrowCooldown > 0) this.rockThrowCooldown--;
     if (this.justSwappedTimer > 0) this.justSwappedTimer--;
+    if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+    if (this.cooldownTimer > 0) this.cooldownTimer--;
 
-    // Update active cursed rocks
-    modUpdateCursedRocks.call(this);
+    // Update active cursed rocks (pass targets so proximity detection works)
+    modUpdateCursedRocks.call(this, targets);
+
+    // Drive rock counter-attack combo punches (stay planted in place while punching)
+    if (this.rockCounterComboLeft > 0) {
+      this.vx = 0;
+      this.vy = 0;
+      this.rockCounterComboTimer--;
+      if (this.rockCounterComboTimer <= 0) {
+        const comboTarget = this.rockCounterComboTarget;
+        // Make sure the target is still alive and in bounds
+        if (comboTarget && !comboTarget.isDead && comboTarget.hp > 0) {
+          this.aim(comboTarget);
+          modUpdateMeleeCombat.call(this, comboTarget, true); // isCombo = true
+        }
+        this.rockCounterComboLeft--;
+        this.rockCounterComboTimer = this.rockCounterComboInterval;
+
+        // When final punch completes: set delay timer before clapping away for breather!
+        if (this.rockCounterComboLeft <= 0 && comboTarget) {
+          this.disengageDelayTimer = CONFIG.todo?.disengageDelayFrames || 18;
+        }
+      }
+    }
+
+    // Delay pause after final punch before clapping away for breather
+    if (this.disengageDelayTimer > 0) {
+      this.vx = 0;
+      this.vy = 0;
+      this.disengageDelayTimer--;
+      if (this.disengageDelayTimer <= 0 && this.rockCounterComboTarget) {
+        modRepositionDisengage.call(this, this.rockCounterComboTarget);
+        this.rockCounterComboTarget = null;
+      }
+    }
 
     // AI/Skill execution
     if (!this.playerControlled && targets.length > 0) {
@@ -71,18 +113,17 @@ export class TodoFighter extends Fighter {
         
         // AI Logic: Skills skipped in demo preview mode (only basic attacks!)
         if (!this.isDemoFighter) {
-          if (dist > 150 && this.rockThrowCooldown <= 0) {
+          // Todo throws rocks at range to set up his clap combo sequence (max 1 rock active)
+          if (dist > 60 && this.rockThrowCooldown <= 0 && this.cursedRocks.length === 0) {
             modThrowCursedRock.call(this, target);
-          }
-
-          if (this.boogieWoogieCooldown <= 0 && (dist > 250 || Math.random() < 0.02)) {
-            modUpdateBoogieWoogie.call(this, targets);
           }
         }
 
-        // Melee Combat (Basic Attack Punch)
-        if (dist <= (CONFIG.todo?.punchRange || 45) && (this.cooldownTimer || 0) <= 0) {
-          modUpdateMeleeCombat.call(this, target);
+        // Melee Combat (Basic Attack Punch if naturally in range)
+        const punchMaxRange = (this.r || 25) + (target.r || 25) + (CONFIG.todo?.punchRange || 60);
+        if (dist <= punchMaxRange && (this.cooldownTimer || 0) <= 0 && (this.rockCounterComboLeft || 0) <= 0 && (this.disengageDelayTimer || 0) <= 0) {
+          this.aim(target);
+          modUpdateMeleeCombat.call(this, target, false);
         }
       }
     }

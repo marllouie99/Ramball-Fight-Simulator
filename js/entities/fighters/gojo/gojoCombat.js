@@ -9,9 +9,12 @@ import { playSound } from '../../../systems/soundSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
-  if (fighter.infinityCooldown > 0) return false;
-  fighter.infinityCooldown = CONFIG.gojo?.infinityCooldown ?? 240;
-  fighter.infinityActive = false;
+  if (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0) return false;
+  
+  if ((fighter.infinityActiveTimer || 0) <= 0) {
+    fighter.infinityActiveTimer = CONFIG.gojo?.infinityActiveDuration ?? 60;
+  }
+
   fighter.infinityBlockTimer = 25;
   fighter.infinityBlockMaxTimer = 25;
   fighter.infinityBlockX = hitX !== undefined ? hitX : fighter.x;
@@ -22,9 +25,24 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   spawnSparks(fighter.infinityBlockX, fighter.infinityBlockY, 15, 'lightningTrail', '#E0FFFF');
   triggerGlobalScreenShake(3, 6);
 
-  if (attacker && typeof attacker.applyTimeStop === 'function') {
+  if (attacker && attacker !== fighter) {
     if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
-      attacker.applyTimeStop(CONFIG.gojo?.infinityMeleeFreezeDuration ?? 45);
+      if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
+        const hasAdapted = attacker.adapted?.melee || attacker.gojoInfinityImmune || attacker.isMaxAdapted;
+        if (hasAdapted) {
+          // Mahoraga adapted to Limitless — bypasses Infinity block completely!
+          return false;
+        }
+        attacker.infinityFreezeTimer = CONFIG.gojo?.infinityFreezeDuration || 60;
+      }
+      attacker.isFrozenByInfinity = true;
+      const duration = CONFIG.gojo?.infinityMeleeFreezeDuration ?? 45;
+      if (typeof attacker.applyTimeStop === 'function') {
+        attacker.applyTimeStop(duration);
+      }
+      attacker.timeStopTimer = Math.max(attacker.timeStopTimer || 0, duration);
+      attacker.vx = 0;
+      attacker.vy = 0;
     }
   }
   return true;

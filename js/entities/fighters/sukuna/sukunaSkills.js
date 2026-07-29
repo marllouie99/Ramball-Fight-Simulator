@@ -256,30 +256,11 @@ export function applyDomainEffect(fighter, arena) {
     }
 
     if (!fighter.slashHitVisuals) fighter.slashHitVisuals = [];
-    const isDomainClash = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-    const slashesToSpawn = isDomainClash ? 1 : (1 + Math.floor(Math.random() * 2));
-    for (let i = 0; i < slashesToSpawn; i++) {
-      let randX = Math.random() * 1200;
-      let randY = Math.random() * 800;
-      if (arena) {
-        randX = arena.x + Math.random() * arena.width;
-        randY = arena.y + Math.random() * arena.height;
-      }
-
-      fighter.slashHitVisuals.push({
-        x: randX,
-        y: randY,
-        angle: Math.random() * Math.PI * 2,
-        timer: 10 + Math.floor(Math.random() * 6),
-        maxTimer: 15,
-        scale: 0.5 + Math.random() * 1.5
-      });
-    }
-
     let hitEnemyThisTick = false;
     const ownerIdx = state.fighters.indexOf(fighter);
     const shrineX = fighter.domainX || fighter.x;
     const shrineY = fighter.domainY || fighter.y;
+    const slashSpeed = CONFIG.sukuna?.slashSpeed ?? (CONFIG.projectile?.speed ? CONFIG.projectile.speed * 1.6 : 22);
 
     state.fighters.forEach((f, idx) => {
       if (f && f !== fighter && f.hp > 0) {
@@ -294,15 +275,40 @@ export function applyDomainEffect(fighter, arena) {
           const rampMultiplier = 1 + (timeInside / 60) * 0.10;
           const finalDamage = domainDamage * rampMultiplier;
 
-          f.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
-          if (f.characterId !== 'toji' && f.type !== 'toji' && !f.domainImmunity && !f.immuneToCC) {
-            if (typeof f.applyHitStun === 'function') f.applyHitStun(6);
+          // Fire visible ghostBlade projectile directly from Malevolent Shrine towards the target!
+          const aimAngle = Math.atan2(f.y - (shrineY - 40), f.x - shrineX);
+          if (projectileSystem) {
+            projectileSystem.fireProjectile(
+              fighter,
+              ownerIdx,
+              finalDamage,
+              false,
+              slashSpeed,
+              false,
+              'ghostBlade',
+              shrineX + (Math.random() - 0.5) * 80,
+              shrineY - 40 + (Math.random() - 0.5) * 30,
+              aimAngle
+            );
           }
 
-          if (Math.random() < 0.6) {
-            spawnSparks(f.x, f.y, 4, 'crimsonSniper', '#8B0000');
-            spawnImpactFlash(f.x, f.y, 18, 'crimsonSniper');
+          f.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
+          if (f.characterId !== 'toji' && f.type !== 'toji' && !f.domainImmunity && !f.immuneToCC) {
+            if (typeof f.applyHitStun === 'function') f.applyHitStun(2);
           }
+
+          spawnSparks(f.x, f.y, 6, 'crimsonSniper', '#8B0000');
+          spawnImpactFlash(f.x, f.y, 22, 'crimsonSniper');
+          
+          // Spawn visual ghost blade slash directly on the enemy being shredded!
+          fighter.slashHitVisuals.push({
+            x: f.x + (Math.random() - 0.5) * f.r,
+            y: f.y + (Math.random() - 0.5) * f.r,
+            angle: aimAngle + (Math.random() - 0.5) * 0.6,
+            timer: 8 + Math.floor(Math.random() * 4),
+            maxTimer: 12,
+            scale: 0.8 + Math.random() * 0.5
+          });
         }
       }
     });
@@ -330,13 +336,37 @@ export function applyDomainEffect(fighter, arena) {
             const rampMultiplier = 1 + (timeInside / 60) * 0.10;
             const finalDamage = domainDamage * rampMultiplier;
 
+            // Fire visible ghostBlade projectile directly from Malevolent Shrine towards the illusion!
+            const aimAngle = Math.atan2(ill.y - (shrineY - 40), ill.x - shrineX);
+            if (projectileSystem) {
+              projectileSystem.fireProjectile(
+                fighter,
+                ownerIdx,
+                finalDamage,
+                false,
+                slashSpeed,
+                false,
+                'ghostBlade',
+                shrineX + (Math.random() - 0.5) * 80,
+                shrineY - 40 + (Math.random() - 0.5) * 30,
+                aimAngle
+              );
+            }
+
             ill.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
             if (typeof ill.applyHitStun === 'function') ill.applyHitStun(6);
 
-            if (Math.random() < 0.6) {
-              spawnSparks(ill.x, ill.y, 4, 'crimsonSniper', '#8B0000');
-              spawnImpactFlash(ill.x, ill.y, 18, 'crimsonSniper');
-            }
+            spawnSparks(ill.x, ill.y, 6, 'crimsonSniper', '#8B0000');
+            spawnImpactFlash(ill.x, ill.y, 22, 'crimsonSniper');
+
+            fighter.slashHitVisuals.push({
+              x: ill.x + (Math.random() - 0.5) * ill.r,
+              y: ill.y + (Math.random() - 0.5) * ill.r,
+              angle: aimAngle + (Math.random() - 0.5) * 0.6,
+              timer: 8 + Math.floor(Math.random() * 4),
+              maxTimer: 12,
+              scale: 0.8 + Math.random() * 0.5
+            });
           }
         }
       });

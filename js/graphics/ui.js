@@ -3879,23 +3879,7 @@ export function drawMatchEndScreen() {
   const cx = canvas.width / 2;
   const cy = canvas.height / 2;
 
-  // 2v2: show team winner text (no single fighter to display)
-  if (mode === '2v2') {
-    const winningTeam = state.teamScores[0] > state.teamScores[1] ? 0 : 1;
-    const teamColor = winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
-    ctx.save();
-    ctx.shadowBlur = 20;
-    ctx.shadowColor = teamColor;
-    ctx.fillStyle = teamColor;
-    ctx.font = 'bold 36px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(`TEAM ${winningTeam + 1}`, cx, cy - 20);
-    ctx.fillStyle = '#fff';
-    ctx.font = 'bold 24px Arial';
-    ctx.fillText('WINS THE MATCH!', cx, cy + 15);
-    ctx.restore();
-    return;
-  }
+
 
   // TLFS mode Champion Screen
   if (mode === 'TLFS') {
@@ -3943,12 +3927,13 @@ export function drawMatchEndScreen() {
     return;
   }
 
-  // Special champion reveal animation for match winner (1v1 & FFA)
-  if (matchWinner) {
-    drawMatchWinnerReveal(matchWinner, state.matchEndTimer, mode);
+  // Special champion reveal animation for match winner (1v1, 1v2 Stand Off, 2v2 & FFA)
+  const effectiveWinner = matchWinner || (state.fighters ? state.fighters[0] : null);
+  if (effectiveWinner) {
+    drawMatchWinnerReveal(effectiveWinner, state.matchEndTimer, mode);
   }
 
-  if (mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off' || mode === 'FFA') {
+  if (mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off' || mode === '2v2' || mode === 'FFA') {
     ctx.fillStyle = '#aaa';
     ctx.font = '14px Arial';
     ctx.textAlign = 'center';
@@ -3980,12 +3965,12 @@ function drawMatchWinnerReveal(winner, timer, mode) {
 
   // Detect winning team members for team modes (1v2 Stand Off or 2v2)
   const winnerIndex = state.fighters ? state.fighters.indexOf(winner) : -1;
-  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : null;
-  let winningFighters = [winner];
+  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : (state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+  let winningFighters = winner ? [winner] : [];
 
   if (winningTeam !== null && (mode === '2v2' || mode === '1v2 Stand Off')) {
     const teamMembers = state.fighters.filter((f, idx) => f && state.getFighterTeam(idx) === winningTeam);
-    if (teamMembers.length > 1) {
+    if (teamMembers.length > 0) {
       winningFighters = teamMembers;
     }
   }

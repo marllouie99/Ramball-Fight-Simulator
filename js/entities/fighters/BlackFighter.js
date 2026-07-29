@@ -109,7 +109,7 @@ export class BlackFighter extends Fighter {
         }
 
         projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, isBlackHole);
-        this.shootCooldown = CONFIG.black.shotCooldown;
+        this.shootCooldown = this._def?.cooldown || CONFIG.black.shotCooldown || 35;
 
         const sound = getBasicAttackSound(this._def?.id);
         if (sound) playSound(sound.src, sound.volume);

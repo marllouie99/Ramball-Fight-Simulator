@@ -626,12 +626,12 @@ export class SukunaFighter extends Fighter {
         }
 
         // Find all valid targets within range
+        let possibleTargets = [];
+        const flurryRange = CONFIG.sukuna.flurryRange || 450;
         const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-        const possibleTargets = [];
-        const flurryRange = CONFIG.sukuna.flurryRange || 150;
 
         state.fighters.forEach((f, idx) => {
-          if (f && f !== this && f.hp > 0) {
+          if (f && f !== this && f.hp > 0 && f.invincibilityTimer <= 0) {
             const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
             if (isEnemy && !f.isStealthed) {
               const dist = Math.hypot(this.x - f.x, this.y - f.y);
@@ -641,6 +641,16 @@ export class SukunaFighter extends Fighter {
             }
           }
         });
+
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (!ill || ill.hp <= 0 || ill.owner === this || ill.isRika) return;
+            if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+            if (Math.hypot(ill.x - this.x, ill.y - this.y) <= flurryRange) {
+              possibleTargets.push(ill);
+            }
+          });
+        }
 
         // Randomly pick a new target for every single hit to create an Omnislash effect
         if (possibleTargets.length > 0) {
@@ -692,9 +702,8 @@ export class SukunaFighter extends Fighter {
           spawnImpactFlash(oldX, oldY, 15, 'crimsonSniper');
           spawnImpactFlash(this.x, this.y, 20, 'crimsonSniper');
 
-          // Dramatic hit pause on both fighters to emphasize the strike
-          if (typeof this.applyTimeStop === 'function') this.applyTimeStop(6);
-          if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(6);
+          // Dramatic hit pause on target to emphasize the strike
+          if (typeof this.flurryTarget?.applyHitStun === 'function') this.flurryTarget.applyHitStun(8);
 
           // Trigger Sakuga Anime Impact Frame (Gojo-style visual)
           this.sakugaImpactTimer = 6;
@@ -849,8 +858,8 @@ export class SukunaFighter extends Fighter {
             spawnImpactFlash(this.x, this.y, 25, 'crimsonSniper');
             playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.7);
 
-            // Apply hit pause for dramatic effect
-            if (typeof this.applyTimeStop === 'function') this.applyTimeStop(4);
+            // Apply hit pause on target
+            if (typeof this.flurryTarget?.applyHitStun === 'function') this.flurryTarget.applyHitStun(8);
 
             // Set timer for next slash (readable rhythmic pacing)
             this.rapidSlashTimer = CONFIG.sukuna.rapidSlashCooldown || 16;

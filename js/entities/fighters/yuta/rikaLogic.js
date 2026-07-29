@@ -170,9 +170,55 @@ export function updateRika(fighter, arena) {
         spawnSparks(rk.x + (Math.random() - 0.5) * 40 * rk.spawnScale, rk.y + (Math.random() - 0.5) * 40 * rk.spawnScale, 3, 'rikaCurse');
       }
 
-      // Periodically blast roaring shockwaves as she arises
+      // Periodically blast roaring shockwaves & AOE roar damage as she arises
       if (rk.spawnTimer % 12 === 0 && typeof spawnRikaRoarShockwave === 'function') {
-        spawnRikaRoarShockwave(rk.x, rk.y, 100 + progress * 140);
+        const roarRadius = 100 + progress * 140;
+        spawnRikaRoarShockwave(rk.x, rk.y, roarRadius);
+
+        if (typeof state !== 'undefined') {
+          const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+          const roarPulseDamage = CONFIG.yuta?.rikaArisePulseDamage || 10;
+
+          // Hit enemy fighters in roar radius
+          if (state.fighters) {
+            state.fighters.forEach((enemy, idx) => {
+              if (enemy && enemy !== fighter && enemy.hp > 0 && enemy.invincibilityTimer <= 0) {
+                const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+                if (isEnemy) {
+                  const dx = enemy.x - rk.x;
+                  const dy = enemy.y - rk.y;
+                  const dist = Math.hypot(dx, dy) || 1;
+                  if (dist <= roarRadius + enemy.r) {
+                    enemy.takeDamage(roarPulseDamage, fighter, { isPhysical: true });
+                    if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(10);
+                    enemy.vx += (dx / dist) * 5;
+                    enemy.vy += (dy / dist) * 5;
+                    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(enemy.x, enemy.y, 35, 'rgba(255, 20, 147, 0.6)');
+                  }
+                }
+              }
+            });
+          }
+
+          // Hit enemy illusions in roar radius
+          if (state.illusions) {
+            state.illusions.forEach((ill) => {
+              if (ill && ill !== rk && ill.hp > 0 && ill.owner !== fighter) {
+                if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+                const dx = ill.x - rk.x;
+                const dy = ill.y - rk.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                if (dist <= roarRadius + (ill.r || 20)) {
+                  ill.takeDamage(roarPulseDamage, fighter, { isPhysical: true });
+                  if (typeof ill.applyHitStun === 'function') ill.applyHitStun(10);
+                  ill.vx += (dx / dist) * 5;
+                  ill.vy += (dy / dist) * 5;
+                  if (typeof spawnImpactFlash === 'function') spawnImpactFlash(ill.x, ill.y, 35, 'rgba(255, 20, 147, 0.6)');
+                }
+              }
+            });
+          }
+        }
       }
 
       // Heavy shockwave impact shake and triple shockwave explosion on exact frame of full emergence
@@ -200,31 +246,57 @@ export function updateRika(fighter, arena) {
           spawnFloatingText(rk.x, rk.y - 45, 'FULL EMERGENCE!', '#FF1493');
         }
 
-        // --- Emergence Blast Damage & Radial Knockback (#1) ---
-        if (typeof state !== 'undefined' && state.fighters) {
+        // --- Emergence Blast Damage & Radial Knockback for Fighters & Illusions ---
+        if (typeof state !== 'undefined') {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-          const emergenceRadius = CONFIG.yuta?.rikaEmergenceRadius || 250;
-          const emergenceDamage = CONFIG.yuta?.rikaEmergenceDamage || 25;
-          const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback || 8;
-          const emergenceHitStun = CONFIG.yuta?.rikaEmergenceHitStun || 15;
+          const emergenceRadius = CONFIG.yuta?.rikaEmergenceRadius || 260;
+          const emergenceDamage = CONFIG.yuta?.rikaEmergenceDamage || 35;
+          const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback || 18;
+          const emergenceHitStun = CONFIG.yuta?.rikaEmergenceHitStun || 20;
 
-          state.fighters.forEach((enemy, idx) => {
-            if (enemy && enemy !== fighter && enemy.hp > 0) {
-              const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
-              if (isEnemy) {
-                const dx = enemy.x - rk.x;
-                const dy = enemy.y - rk.y;
-                const dist = Math.hypot(dx, dy) || 1;
-                if (dist <= emergenceRadius) {
-                  enemy.takeDamage(emergenceDamage, fighter, { isPhysical: true });
-                  if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(emergenceHitStun);
-                  enemy.vx += (dx / dist) * emergenceKnockback;
-                  enemy.vy += (dy / dist) * emergenceKnockback;
-                  if (typeof spawnFloatingText === 'function') spawnFloatingText(enemy.x, enemy.y - 30, 'EMERGENCE BLAST!', '#FF1493');
+          if (state.fighters) {
+            state.fighters.forEach((enemy, idx) => {
+              if (enemy && enemy !== fighter && enemy.hp > 0 && enemy.invincibilityTimer <= 0) {
+                const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+                if (isEnemy) {
+                  const dx = enemy.x - rk.x;
+                  const dy = enemy.y - rk.y;
+                  const dist = Math.hypot(dx, dy) || 1;
+                  if (dist <= emergenceRadius + enemy.r) {
+                    enemy.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true });
+                    if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(emergenceHitStun);
+                    const pushVx = (dx / dist) * emergenceKnockback;
+                    const pushVy = (dy / dist) * emergenceKnockback;
+                    enemy.vx += pushVx;
+                    enemy.vy += pushVy;
+                    if (typeof enemy.applyKnockback === 'function') enemy.applyKnockback(pushVx * 0.5, pushVy * 0.5);
+                    if (typeof spawnFloatingText === 'function') spawnFloatingText(enemy.x, enemy.y - 30, 'EMERGENCE BLAST!', '#FF1493');
+                  }
                 }
               }
-            }
-          });
+            });
+          }
+
+          if (state.illusions) {
+            state.illusions.forEach((ill) => {
+              if (ill && ill !== rk && ill.hp > 0 && ill.owner !== fighter) {
+                if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+                const dx = ill.x - rk.x;
+                const dy = ill.y - rk.y;
+                const dist = Math.hypot(dx, dy) || 1;
+                if (dist <= emergenceRadius + (ill.r || 20)) {
+                  ill.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true });
+                  if (typeof ill.applyHitStun === 'function') ill.applyHitStun(emergenceHitStun);
+                  const pushVx = (dx / dist) * emergenceKnockback;
+                  const pushVy = (dy / dist) * emergenceKnockback;
+                  ill.vx += pushVx;
+                  ill.vy += pushVy;
+                  if (typeof ill.applyKnockback === 'function') ill.applyKnockback(pushVx * 0.5, pushVy * 0.5);
+                  if (typeof spawnFloatingText === 'function') spawnFloatingText(ill.x, ill.y - 30, 'EMERGENCE BLAST!', '#FF1493');
+                }
+              }
+            });
+          }
         }
       }
     } else if (!rk.disappearing && !rk.isDying) {
@@ -447,41 +519,81 @@ export function updateRika(fighter, arena) {
 
     // Melee attack when in range (but don't stop!)
     if (dist <= rk.r + rk.target.r + 5 && rk.attackTimer <= 0) {
-      rk.target.takeDamage(CONFIG.yuta.rikaDamage, fighter, { isPhysical: true });
+      const aoeRadius = CONFIG.yuta?.rikaAoeRadius || 85;
+      const contactX = (rk.x + rk.target.x) * 0.5;
+      const contactY = (rk.y + rk.target.y) * 0.5;
 
-      const pushAngle = Math.atan2(dy, dx);
+      const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+      const aoeTargets = new Set();
+      aoeTargets.add(rk.target);
+
+      // Collect all enemy fighters in AOE radius
+      if (state.fighters) {
+        for (let i = 0; i < state.fighters.length; i++) {
+          const enemy = state.fighters[i];
+          if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0) continue;
+          const enemyTeam = state.getFighterTeam(i);
+          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+
+          const d = Math.hypot(enemy.x - contactX, enemy.y - contactY);
+          if (d <= aoeRadius + enemy.r) {
+            aoeTargets.add(enemy);
+          }
+        }
+      }
+
+      // Collect all enemy illusions/minions in AOE radius
+      if (state.illusions) {
+        for (const ill of state.illusions) {
+          if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
+          if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+
+          const d = Math.hypot(ill.x - contactX, ill.y - contactY);
+          if (d <= aoeRadius + (ill.r || 20)) {
+            aoeTargets.add(ill);
+          }
+        }
+      }
+
+      const rikaDmg = CONFIG.yuta.rikaDamage || 25;
       const knockbackForce = CONFIG.yuta?.rikaHitKnockback || 16;
       const recoilForce = CONFIG.yuta?.rikaHitRecoil || 6;
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;
 
-      // 1. Target Physical Smash Bounce Impulse (blasts enemy away with heavy momentum)
-      const smashVx = Math.cos(pushAngle) * knockbackForce;
-      const smashVy = Math.sin(pushAngle) * knockbackForce;
+      for (const target of aoeTargets) {
+        target.takeDamage(rikaDmg, fighter, { isPhysical: true });
 
-      const isTojiTarget = rk.target.characterId === 'toji' || rk.target.type === 'toji' || rk.target.domainImmunity;
-      if (isTojiTarget) {
-        rk.target.vx = (rk.target.vx || 0) + smashVx * 0.4;
-        rk.target.vy = (rk.target.vy || 0) + smashVy * 0.4;
-      } else {
-        rk.target.vx = (rk.target.vx || 0) + smashVx;
-        rk.target.vy = (rk.target.vy || 0) + smashVy;
-        if (typeof rk.target.applyKnockback === 'function') {
-          rk.target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
+        const pushAngle = Math.atan2(target.y - rk.y, target.x - rk.x);
+        const smashVx = Math.cos(pushAngle) * knockbackForce;
+        const smashVy = Math.sin(pushAngle) * knockbackForce;
+
+        const isTojiTarget = target.characterId === 'toji' || target.type === 'toji' || target.domainImmunity;
+        if (isTojiTarget) {
+          target.vx = (target.vx || 0) + smashVx * 0.4;
+          target.vy = (target.vy || 0) + smashVy * 0.4;
+        } else {
+          target.vx = (target.vx || 0) + smashVx;
+          target.vy = (target.vy || 0) + smashVy;
+          if (typeof target.applyKnockback === 'function') {
+            target.applyKnockback(smashVx * 0.5, smashVy * 0.5);
+          }
+          if (typeof target.applyHitStun === 'function') {
+            target.applyHitStun(hitStunDuration);
+          }
         }
-        if (typeof rk.target.applyHitStun === 'function') {
-          rk.target.applyHitStun(hitStunDuration);
-        }
+
+        if (typeof spawnImpactFlash === 'function') spawnImpactFlash(target.x, target.y, 50, 'rgba(255, 20, 147, 0.7)');
+        if (typeof spawnSparks === 'function') spawnSparks(target.x, target.y, 8, 'rikaCurse');
       }
 
       // 2. Rika Equal-and-Opposite Physical Recoil (Rika bounces back off target on impact)
+      const pushAngle = Math.atan2(dy, dx);
       rk.vx = -Math.cos(pushAngle) * recoilForce;
       rk.vy = -Math.sin(pushAngle) * recoilForce;
 
       // 3. Heavy Impact Screen Shake, Flash & Sparks
       if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(8, 10);
-      if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.target.x, rk.target.y, 50, 'rgba(255, 20, 147, 0.7)');
-      if (typeof spawnSparks === 'function') spawnSparks(rk.target.x, rk.target.y, 8, 'rikaCurse');
-
+      if (typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(contactX, contactY, 110);
       rk.attackTimer = CONFIG.yuta.rikaAttackRate || 40;
 
       // Play random demonic Rika attack noise (rikanoise1.mp3, rikanoise2.mp3, rikanoise3.mp3)
@@ -610,6 +722,7 @@ function findRikaTarget(fighter, rk) {
   let closestTarget = null;
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
 
+  // Check main enemy fighters
   for (let i = 0; i < state.fighters.length; i++) {
     const enemy = state.fighters[i];
     if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || enemy.isStealthed) continue;
@@ -618,9 +731,27 @@ function findRikaTarget(fighter, rk) {
     if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
 
     const dist = Math.hypot(enemy.x - rk.x, enemy.y - rk.y);
-    if (dist < closestDist && dist < 400) { // Rika aggro range
+    if (dist < closestDist) {
       closestDist = dist;
       closestTarget = enemy;
+    }
+  }
+
+  // Also check illusions and summoned minions (Doppelganger illusions, Hydra copies, etc.)
+  if (state.illusions) {
+    for (const ill of state.illusions) {
+      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
+      
+      if (myTeam !== null && ill.owner) {
+        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ill.owner));
+        if (ownerTeam === myTeam) continue;
+      }
+
+      const dist = Math.hypot(ill.x - rk.x, ill.y - rk.y);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestTarget = ill;
+      }
     }
   }
   

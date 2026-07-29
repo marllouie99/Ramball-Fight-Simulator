@@ -8,7 +8,72 @@ import { playSound } from '../../../systems/soundSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { TOJI_WEAPON_CONFIG } from '../../../graphics/weapons/tojiWeaponGraphics.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
-import { triggerGlobalScreenShake } from '../../../core/state.js';
+import { state, triggerGlobalScreenShake } from '../../../core/state.js';
+
+export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, maxReach, arcAngle = Math.PI * 0.6) {
+  const targets = new Set();
+  if (primaryTarget && primaryTarget.hp > 0) {
+    targets.add(primaryTarget);
+  }
+
+  if (typeof state === 'undefined') return Array.from(targets);
+
+  const halfArc = arcAngle * 0.5;
+  const fighterTeam = (typeof state.getFighterTeam === 'function' && state.fighters) 
+    ? state.getFighterTeam(state.fighters.indexOf(fighter)) 
+    : null;
+
+  if (state.fighters) {
+    for (const other of state.fighters) {
+      if (!other || other === fighter || other.hp <= 0) continue;
+      
+      if (fighterTeam !== null && typeof state.getFighterTeam === 'function') {
+        const otherIndex = state.fighters.indexOf(other);
+        if (otherIndex >= 0 && state.getFighterTeam(otherIndex) === fighterTeam) continue;
+      }
+
+      const dx = other.x - fighter.x;
+      const dy = other.y - fighter.y;
+      const dist = Math.hypot(dx, dy);
+      const attackReach = fighter.r + (other.r || 20) + maxReach;
+
+      if (dist <= attackReach) {
+        const angleToOther = Math.atan2(dy, dx);
+        let diff = angleToOther - attackAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+
+        if (Math.abs(diff) <= halfArc) {
+          targets.add(other);
+        }
+      }
+    }
+  }
+
+  if (state.illusions) {
+    for (const ill of state.illusions) {
+      if (!ill || ill === fighter || ill.hp <= 0 || ill.owner === fighter) continue;
+
+      const dx = ill.x - fighter.x;
+      const dy = ill.y - fighter.y;
+      const dist = Math.hypot(dx, dy);
+      const attackReach = fighter.r + (ill.r || 20) + maxReach;
+
+      if (dist <= attackReach) {
+        const angleToOther = Math.atan2(dy, dx);
+        let diff = angleToOther - attackAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+
+        if (Math.abs(diff) <= halfArc) {
+          targets.add(ill);
+        }
+      }
+    }
+  }
+
+  return Array.from(targets);
+}
 
 export function initChainPhysics(fighter) {
   fighter.chainNodes = [];
@@ -114,7 +179,7 @@ export function updateChainPhysics(fighter) {
   }
 }
 
-export function performSplitSoulKatanaSlash(fighter, target, ownerIndex) {
+export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) {
   if (!fighter._secondSeqAudioPlayed) {
     const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
     playSound(secondSeqSound);
@@ -123,50 +188,58 @@ export function performSplitSoulKatanaSlash(fighter, target, ownerIndex) {
   playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
   playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.2);
 
+  const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  const reach = CONFIG.toji?.katanaRange || fighter.katanaRange || 75;
+  // Wide 160 degree frontal arc cleave for Katana!
+  const targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, Math.PI * 0.88);
+
   const damage = CONFIG.toji?.katanaDamage || 35;
-  applyDamageToTarget(target, damage, fighter, { isMelee: true, isTrueDamage: true });
-
   const soulWoundDuration = CONFIG.toji?.soulWoundDuration || 180;
-  target.soulWoundTimer = soulWoundDuration;
 
-  if (typeof target.applySlow === 'function') {
-    target.applySlow(90, 0.40);
-  } else {
-    target.slowTimer = 90;
-    target.slowMultiplier = 0.40;
-  }
+  for (const target of targets) {
+    applyDamageToTarget(target, damage, fighter, { isMelee: true, isTrueDamage: true, isSoulSplit: true });
+    target.soulWoundTimer = soulWoundDuration;
 
-  if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
-  const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
-  let angleDiff = targetHitAngle - (target.angle || 0);
-  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-  target.angle = (target.angle || 0) + angleDiff * 0.40;
-  target.gunAngle = target.angle;
+    if (typeof target.applySlow === 'function') {
+      target.applySlow(90, 0.40);
+    } else {
+      target.slowTimer = 90;
+      target.slowMultiplier = 0.40;
+    }
 
-  if (!target.isTurret && !target.cannotBeKnockbacked) {
-    target.isFirstHitKnockback = false;
-    const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-    const sweepSlingAngle = directAngle + 1.15;
-    const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 0.95;
+    if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
+    const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
+    let angleDiff = targetHitAngle - (target.angle || 0);
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    target.angle = (target.angle || 0) + angleDiff * 0.40;
+    target.gunAngle = target.angle;
 
-    const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
-    const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
-    target.vx = kbVx;
-    target.vy = kbVy;
-    target.knockbackDecay = 0.90;
-    if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+    if (!target.isTurret && !target.cannotBeKnockbacked) {
+      target.isFirstHitKnockback = false;
+      const directAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+      const sweepSlingAngle = directAngle + 1.15;
+      const knockbackForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 0.95;
+
+      const kbVx = Math.cos(sweepSlingAngle) * knockbackForce;
+      const kbVy = Math.sin(sweepSlingAngle) * knockbackForce;
+      target.vx = kbVx;
+      target.vy = kbVy;
+      target.knockbackDecay = 0.90;
+      if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+    }
+
+    spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
+    spawnMeleeClashShockwave(target.x, target.y, 240, 'yuta');
+    spawnMeleeClashShockwave(target.x, target.y, 180, 'yuta');
+    spawnCrimsonLightningImpact(target.x, target.y, 140);
+    spawnSparks(target.x, target.y, 50, 'crimsonSniper');
   }
 
   triggerGlobalScreenShake(8, 10);
-  spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
-  spawnMeleeClashShockwave(target.x, target.y, 240, 'yuta');
-  spawnMeleeClashShockwave(target.x, target.y, 180, 'yuta');
-  spawnCrimsonLightningImpact(target.x, target.y, 140);
-  spawnSparks(target.x, target.y, 50, 'crimsonSniper');
 }
 
-export function performInvertedSpearStrike(fighter, target, ownerIndex, isAmbushThrust = false) {
+export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
   fighter.spearCooldown = fighter.spearCooldownMax;
   fighter.isAmbushThrust = isAmbushThrust;
   const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;
@@ -176,96 +249,105 @@ export function performInvertedSpearStrike(fighter, target, ownerIndex, isAmbush
   playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
   playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.85);
 
-  let wasInfinityActive = false;
-  if (target.characterId === 'gojo' && target.infinityActive) {
-    wasInfinityActive = true;
-    target.infinityActive = false;
-    target.infinityBlockTimer = 0;
-    if (isAmbushThrust) {
-      spawnSparks(target.x, target.y, 22, 'lightningTrail', '#00E5FF');
-      spawnImpactFlash(target.x, target.y, 60, 'lightningTrail');
-    }
-  }
+  const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  const reach = CONFIG.toji?.spearRange || fighter.spearRange || 50;
+  // 120 degree frontal arc cone for Inverted Spear thrust/stab!
+  const targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, Math.PI * 0.67);
 
   const thrustDamage = isAmbushThrust ? (CONFIG.toji?.ambushBackThrustDamage ?? 25) : fighter.spearDamage;
-  applyDamageToTarget(target, thrustDamage, fighter, { isMelee: true, isTrueDamage: true });
 
-  delete target._timeStopFrozenAngle;
-  delete target._timeStopFrozenGunAngle;
-  const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
-  let angleDiff = targetHitAngle - (target.angle || 0);
-  while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-  while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-  target.angle = (target.angle || 0) + angleDiff * 0.40;
-  target.gunAngle = target.angle;
-
-  if (wasInfinityActive) {
-    target.infinityActive = true;
-  }
-
-  const chanState = fighter.ambushTargetChannelState || {};
-  const wasPurple = target.isChannelingPurple || chanState.purple;
-  const wasDomain = target.isChannelingDomainExpansion || target.isChannelingDomain || chanState.domain;
-  const wasRCT = target.isChannelingRCT || chanState.rct;
-  const wasDivineFlame = target.isChannelingDivineFlame || chanState.divineFlame;
-  const wasStorm = target.isChannelingStorm || chanState.storm;
-  const wasGeneric = target.isChanneling || chanState.generic;
-
-  const wasChanneling = isAmbushThrust && (fighter.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGeneric);
-  fighter.ambushTargetWasChanneling = false;
-  fighter.ambushTargetChannelState = null;
-
-  if (wasChanneling) {
-    const silenceFrames = CONFIG.toji?.silenceDuration || 90;
-    target.silenceTimer = silenceFrames;
-
-    target.isChannelingPurple = false;
-    target.purpleChargeTimer = 0;
-    target.isChannelingDomainExpansion = false;
-    target.isChannelingDomain = false;
-    target.domainChargeTimer = 0;
-    target.isChannelingRCT = false;
-    target.rctChannelTimer = 0;
-    target.isChannelingDivineFlame = false;
-    target.isChannelingStorm = false;
-    target.isChanneling = false;
-    target.channelTimer = 0;
-
-    if (wasPurple && target.purpleCooldown !== undefined) target.purpleCooldown = (CONFIG.gojo?.purpleCooldown || 800) / 2;
-    if (wasDomain && target.domainCooldown !== undefined && !target.domainActive) target.domainCooldown = (CONFIG.gojo?.domainCooldown || CONFIG.sukuna?.domainCooldown || CONFIG.yuta?.domainCooldown || 1500) / 2;
-    if (wasRCT && target.rctCooldown !== undefined) target.rctCooldown = (CONFIG.yuta?.rctCooldown || 600) / 2;
-    if (wasDivineFlame && target.divineFlameCooldown !== undefined) target.divineFlameCooldown = (CONFIG.sukuna?.divineFlameCooldown || 900) / 2;
-    if (wasStorm && target.stormCooldown !== undefined) target.stormCooldown = (CONFIG.zeus?.stormCooldown || 900) / 2;
-    if (wasGeneric && typeof target.ultimateCooldown === 'number' && !target.ultimateActive) target.ultimateCooldown = (target.ultimateCooldownMax || 900) / 2;
-
-    spawnSparks(target.x, target.y, 18, '#A078C8');
-    spawnImpactFlash(target.x, target.y, 45, 'rgba(160, 30, 240, 0.9)');
-  }
-  
-  triggerGlobalScreenShake(isAmbushThrust ? 6 : 3, isAmbushThrust ? 8 : 4);
-  spawnSparks(target.x, target.y, '#A078C8', 12);
-  spawnSparks(target.x, target.y, '#FF3355', 10);
-  spawnSparks(target.x, target.y, 12, 'crimsonSniper');
-  spawnImpactFlash(target.x, target.y, 30);
-
-  if (isAmbushThrust) {
-    if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
-    if (!target.isTurret && !target.cannotBeKnockbacked) {
-      target.isFirstHitKnockback = true;
-      const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-      const knockbackSpeed = 28;
-      
-      const kbVx = Math.cos(pushAngle) * knockbackSpeed;
-      const kbVy = Math.sin(pushAngle) * knockbackSpeed;
-      target.vx = kbVx;
-      target.vy = kbVy;
-      target.knockbackDecay = 0.84;
-      if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+  for (const target of targets) {
+    let wasInfinityActive = false;
+    if (target.characterId === 'gojo' && target.infinityActive) {
+      wasInfinityActive = true;
+      target.infinityActive = false;
+      target.infinityBlockTimer = 0;
+      if (isAmbushThrust) {
+        spawnSparks(target.x, target.y, 22, 'lightningTrail', '#00E5FF');
+        spawnImpactFlash(target.x, target.y, 60, 'lightningTrail');
+      }
     }
 
-    spawnMeleeClashShockwave(target.x, target.y, 190, 'yuta');
-    spawnCrimsonLightningImpact(target.x, target.y, 110);
-    spawnMeleeClashShockwave(target.x, target.y, 140, 'yuta');
-    spawnSparks(target.x, target.y, 40, 'crimsonSniper');
+    applyDamageToTarget(target, thrustDamage, fighter, { isMelee: true, isTrueDamage: true, isIsoh: true });
+
+    delete target._timeStopFrozenAngle;
+    delete target._timeStopFrozenGunAngle;
+    const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
+    let angleDiff = targetHitAngle - (target.angle || 0);
+    while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+    while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+    target.angle = (target.angle || 0) + angleDiff * 0.40;
+    target.gunAngle = target.angle;
+
+    if (wasInfinityActive) {
+      target.infinityActive = true;
+    }
+
+    const chanState = fighter.ambushTargetChannelState || {};
+    const wasPurple = target.isChannelingPurple || chanState.purple;
+    const wasDomain = target.isChannelingDomainExpansion || target.isChannelingDomain || chanState.domain;
+    const wasRCT = target.isChannelingRCT || chanState.rct;
+    const wasDivineFlame = target.isChannelingDivineFlame || chanState.divineFlame;
+    const wasStorm = target.isChannelingStorm || chanState.storm;
+    const wasGeneric = target.isChanneling || chanState.generic;
+
+    const wasChanneling = isAmbushThrust && (fighter.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGeneric);
+
+    if (wasChanneling) {
+      const silenceFrames = CONFIG.toji?.silenceDuration || 90;
+      target.silenceTimer = silenceFrames;
+
+      target.isChannelingPurple = false;
+      target.purpleChargeTimer = 0;
+      target.isChannelingDomainExpansion = false;
+      target.isChannelingDomain = false;
+      target.domainChargeTimer = 0;
+      target.isChannelingRCT = false;
+      target.rctChannelTimer = 0;
+      target.isChannelingDivineFlame = false;
+      target.isChannelingStorm = false;
+      target.isChanneling = false;
+      target.channelTimer = 0;
+
+      if (wasPurple && target.purpleCooldown !== undefined) target.purpleCooldown = (CONFIG.gojo?.purpleCooldown || 800) / 2;
+      if (wasDomain && target.domainCooldown !== undefined && !target.domainActive) target.domainCooldown = (CONFIG.gojo?.domainCooldown || CONFIG.sukuna?.domainCooldown || CONFIG.yuta?.domainCooldown || 1500) / 2;
+      if (wasRCT && target.rctCooldown !== undefined) target.rctCooldown = (CONFIG.yuta?.rctCooldown || 600) / 2;
+      if (wasDivineFlame && target.divineFlameCooldown !== undefined) target.divineFlameCooldown = (CONFIG.sukuna?.divineFlameCooldown || 900) / 2;
+      if (wasStorm && target.stormCooldown !== undefined) target.stormCooldown = (CONFIG.zeus?.stormCooldown || 900) / 2;
+      if (wasGeneric && typeof target.ultimateCooldown === 'number' && !target.ultimateActive) target.ultimateCooldown = (target.ultimateCooldownMax || 900) / 2;
+
+      spawnSparks(target.x, target.y, 18, '#A078C8');
+      spawnImpactFlash(target.x, target.y, 45, 'rgba(160, 30, 240, 0.9)');
+    }
+
+    spawnSparks(target.x, target.y, '#A078C8', 12);
+    spawnSparks(target.x, target.y, '#FF3355', 10);
+    spawnSparks(target.x, target.y, 12, 'crimsonSniper');
+    spawnImpactFlash(target.x, target.y, 30);
+
+    if (isAmbushThrust) {
+      if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
+      if (!target.isTurret && !target.cannotBeKnockbacked) {
+        target.isFirstHitKnockback = true;
+        const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+        const knockbackSpeed = 28;
+        
+        const kbVx = Math.cos(pushAngle) * knockbackSpeed;
+        const kbVy = Math.sin(pushAngle) * knockbackSpeed;
+        target.vx = kbVx;
+        target.vy = kbVy;
+        target.knockbackDecay = 0.84;
+        if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+      }
+
+      spawnMeleeClashShockwave(target.x, target.y, 190, 'yuta');
+      spawnCrimsonLightningImpact(target.x, target.y, 110);
+      spawnMeleeClashShockwave(target.x, target.y, 140, 'yuta');
+      spawnSparks(target.x, target.y, 40, 'crimsonSniper');
+    }
   }
+
+  fighter.ambushTargetWasChanneling = false;
+  fighter.ambushTargetChannelState = null;
+  triggerGlobalScreenShake(isAmbushThrust ? 6 : 3, isAmbushThrust ? 8 : 4);
 }

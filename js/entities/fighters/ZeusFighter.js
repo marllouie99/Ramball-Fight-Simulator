@@ -30,6 +30,7 @@ export class ZeusFighter extends Fighter {
 
   reset() {
     super.reset();
+    this.z = 25;
     this.aegisCooldown = 0;
     this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormActive = false;
@@ -65,7 +66,7 @@ export class ZeusFighter extends Fighter {
     // Flash at the release point (bolt tip)
     const releaseDist = this.r + 20; 
     const rx = this.x + Math.cos(this.gunAngle) * releaseDist;
-    const ry = this.y + Math.sin(this.gunAngle) * releaseDist;
+    const ry = (this.y - (this.z || 0)) + Math.sin(this.gunAngle) * releaseDist;
     spawnImpactFlash(rx, ry, 35, 'lightningTrail'); 
     spawnSparks(rx, ry, 12, 'lightningTrail', '#FFFFFF');
     
@@ -107,7 +108,7 @@ export class ZeusFighter extends Fighter {
     }
     attacker.electricStunTimer = Math.max(attacker.electricStunTimer || 0, 15);
     
-    spawnFloatingText(this.x, this.y - this.r - 20, 'AEGIS!', '#00BFFF');
+    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'AEGIS!', '#00BFFF');
     
     // Visuals
     spawnImpactFlash(attacker.x, attacker.y, 40, 'lightningTrail');
@@ -127,7 +128,9 @@ export class ZeusFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    if (this._handleTimeStop()) {
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
       return;
     }
     
@@ -137,7 +140,7 @@ export class ZeusFighter extends Fighter {
       
       // Telegraph animation triggers when exactly TelegraphFrames remain
       if (this.stormCooldown === CONFIG.zeus.stormTelegraphFrames) {
-        spawnFloatingText(this.x, this.y - this.r - 20, 'CHARGING STORM...', '#00FFFF');
+        spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'CHARGING STORM...', '#00FFFF');
         // Play an ominous gathering sound if available, otherwise reuse aegis logic
         const sound = getSkillSound(this._def?.id, 'aegis');
         if (sound) playSound(sound.src, sound.volume * 0.7);
@@ -206,7 +209,7 @@ export class ZeusFighter extends Fighter {
     this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormLastStrikeTimer = 0;
     
-    spawnFloatingText(this.x, this.y - this.r - 20, 'STORM!', '#FFFFFF');
+    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'STORM!', '#FFFFFF');
     triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
     
     const sound = getSkillSound(this._def?.id, 'storm');
@@ -437,11 +440,12 @@ export class ZeusFighter extends Fighter {
   
   _drawStormTelegraph(ctx, drawBackground) {
     if (!this.isChargingStorm) return;
-    if (!drawBackground) return; // The flat ring is drawn on the ground, behind Zeus
+    if (!drawBackground) return; // The flat ring is drawn behind Zeus
     
     const chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120)); // 0.0 to 1.0
+    const zOffset = this.z || 0;
     ctx.save();
-    ctx.translate(this.x, this.y);
+    ctx.translate(this.x, this.y - zOffset);
     ctx.rotate(Date.now() / 200);
     
     ctx.beginPath();
@@ -473,6 +477,7 @@ export class ZeusFighter extends Fighter {
     const shieldRadius = this.r + 15;
     const numOrbits = 3;
     const segments = 10;
+    const zOffset = this.z || 0;
     
     // Draw several orbiting lightning bolts in pseudo-3D space
     for (let i = 0; i < numOrbits; i++) {
@@ -523,7 +528,7 @@ export class ZeusFighter extends Fighter {
         // Project to 2D
         // Compress Y slightly to give a pseudo-3D isometric perspective look
         const px = this.x + x * shieldRadius;
-        const py = this.y + y * shieldRadius * 0.75;
+        const py = (this.y - zOffset) + y * shieldRadius * 0.75;
         
         if (j === 0) {
            ctx.moveTo(px, py);

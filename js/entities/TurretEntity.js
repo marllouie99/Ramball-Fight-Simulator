@@ -286,7 +286,7 @@ export class TurretEntity extends Fighter {
     const spawnY2 = this.y + muzzleX * sinA + lowerY * cosA;
     projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX2, spawnY2, this.gunAngle);
 
-    const shotSound = getBasicAttackSound(this._def?.id);
+    const shotSound = getBasicAttackSound(this._def?.id || 999, this._def?.type || 'turret');
     if (shotSound) playSound(shotSound.src, shotSound.volume);
     
     // Spawn smoke particles at the muzzle tips

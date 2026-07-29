@@ -137,6 +137,24 @@ export function updateIllusions() {
       continue;
     }
 
+    if (illusion.hitFlashTimer > 0) {
+      illusion.hitFlashTimer--;
+    }
+
+    // MANDATORY RULE 1: TimeStop & HitStun Freeze Guard
+    if (illusion.timeStopTimer > 0) {
+      illusion.timeStopTimer--;
+      illusion.vx = 0;
+      illusion.vy = 0;
+      continue; // Stop update and attack execution so illusion is completely frozen!
+    }
+    if (illusion.hitStunTimer > 0) {
+      illusion.hitStunTimer--;
+      illusion.vx = 0;
+      illusion.vy = 0;
+      continue;
+    }
+
     // Check if inside a Cronos sphere - freeze movement if so
     let insideSphere = false;
     for (const fighter of state.fighters) {
@@ -166,17 +184,34 @@ export function updateIllusions() {
 
       illusion.animationTime = (illusion.animationTime || 0) + 16.666;
 
+      // Wake up illusions if they were frozen by an ambush and are now free
+      if (!illusion.isTargetOfAmbush && illusion.vx === 0 && illusion.vy === 0 && !illusion.isRika) {
+        const randomAngle = Math.random() * Math.PI * 2;
+        illusion.vx = Math.cos(randomAngle);
+        illusion.vy = Math.sin(randomAngle);
+      }
+
       // Only apply base movement if not being heavily knocked back
       const isKnockedBack = illusion.knockbackVx !== undefined && (Math.abs(illusion.knockbackVx) > 2 || Math.abs(illusion.knockbackVy) > 2);
       if (!isKnockedBack && !illusion.isRika) { // Rika handles her own movement
-        illusion.x += illusion.vx;
-        illusion.y += illusion.vy;
+        // Freeze movement if currently targeted by ambush
+        if (illusion.isTargetOfAmbush) {
+          illusion.vx = 0;
+          illusion.vy = 0;
+        } else {
+          illusion.x += illusion.vx;
+          illusion.y += illusion.vy;
+        }
       }
 
       // Normalize speed every frame to match owner's movement speed
       const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
-      const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
+      let targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
         || illusion.moveSpeed || 1.5;
+      if (illusion.slowTimer !== undefined && illusion.slowTimer > 0) {
+        illusion.slowTimer--;
+        targetSpeed *= (illusion.slowMultiplier || 0.5);
+      }
       if (speedSq > 0) {
         const scale = targetSpeed / Math.sqrt(speedSq);
         illusion.vx *= scale;
@@ -282,8 +317,16 @@ export function updateIllusions() {
       let nearestDist = Infinity;
       const isTargetValid = (entity) => {
         if (!entity || !entity.hp || entity.hp <= 0) return false;
-        if (entity === illusion.owner) return false;
-        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner && entity.team === illusion.owner.team) return false;
+        if (entity === illusion) return false;
+        
+        const targetOwner = entity.isIllusion ? entity.owner : entity;
+        if (!targetOwner || targetOwner === illusion.owner) return false;
+        
+        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner) {
+          const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
+          const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
+          if (entityTeam !== null && entityTeam === ownerTeam) return false;
+        }
         return true;
       };
 
@@ -354,8 +397,16 @@ export function updateIllusions() {
     // Try to attack nearby fighters (independent targeting, not following owner)
     for (const entity of nearbyEntities) {
       if (!entity || !entity.hp || entity.hp <= 0) continue;
-      if (entity === illusion.owner) continue;
-      if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner && entity.team === illusion.owner.team) continue;
+      if (entity === illusion) continue;
+      
+      const targetOwner = entity.isIllusion ? entity.owner : entity;
+      if (!targetOwner || targetOwner === illusion.owner) continue;
+
+      if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner) {
+        const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
+        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
+        if (entityTeam !== null && entityTeam === ownerTeam) continue;
+      }
       if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0) continue;
 
       const dx = entity.x - illusion.x;
@@ -366,7 +417,6 @@ export function updateIllusions() {
         illusion.swordSwingAngle = Math.atan2(entity.y - illusion.y, entity.x - illusion.x);
         illusion.swordSwingActive = true;
         illusion.swordSwingTimer = CONFIG.doppleganger.swordSwingDuration;
-        illusion.swordSwingCooldown = CONFIG.doppleganger.swordCooldown;
         illusion.swordCooldown = CONFIG.doppleganger.swordCooldown;
         entity.takeDamage(illusion.damage, illusion.owner || illusion, { isMelee: true });
         spawnFloatingText(entity.x, entity.y - entity.r - 5, 'ILLUSION SLASH!', '#9b59b6');
@@ -500,19 +550,22 @@ export function resolveFighterCollision(a, b) {
   const aIsImmovable = a.isTurret || (bIsGojoDomain && isEnemy);
   const bIsImmovable = b.isTurret || (aIsGojoDomain && isEnemy);
 
+  const isTodoCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0);
+  const effectiveOverlap = isTodoCombo ? overlap * 0.1 : overlap;
+
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
-      b.x += nx * overlap * 2;
-      b.y += ny * overlap * 2;
+      b.x += nx * effectiveOverlap * 2;
+      b.y += ny * effectiveOverlap * 2;
     } else if (bIsImmovable && !aIsImmovable) {
-      a.x -= nx * overlap * 2;
-      a.y -= ny * overlap * 2;
+      a.x -= nx * effectiveOverlap * 2;
+      a.y -= ny * effectiveOverlap * 2;
     }
   } else {
-    a.x -= nx * overlap;
-    a.y -= ny * overlap;
-    b.x += nx * overlap;
-    b.y += ny * overlap;
+    a.x -= nx * effectiveOverlap;
+    a.y -= ny * effectiveOverlap;
+    b.x += nx * effectiveOverlap;
+    b.y += ny * effectiveOverlap;
   }
 
   // Force both fighters to stay within the arena immediately after collision push
@@ -526,6 +579,9 @@ export function resolveFighterCollision(a, b) {
   const dvy = b.vy - a.vy;
   const dotN = dvx * nx + dvy * ny;
   if (dotN >= 0) return;
+
+  // Prevent bounce response while Todo is delivering his combo so they don't bounce apart
+  if ((a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0)) return;
 
   // Laser slow should feel like a drag, not a push.
   // When either fighter is slowed, damp the collision impulse heavily.
@@ -599,6 +655,11 @@ function getClosestOpponent(fighter) {
     if (!illusion || illusion.hp <= 0) continue;
     // Skip if this illusion belongs to the fighter (Doppleganger shouldn't target own illusions)
     if (illusion.owner === fighter) continue;
+    // Skip if this illusion belongs to a teammate
+    if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && fighterTeam !== null && illusion.owner) {
+      const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
+      if (ownerTeam === fighterTeam) continue;
+    }
     const dx = illusion.x - fighter.x;
     const dy = illusion.y - fighter.y;
     const dSq = dx * dx + dy * dy;
@@ -658,7 +719,13 @@ function endRoundIf2v2Ended() {
 
   const winningTeam = team0Alive ? 0 : 1;
   state.teamScores[winningTeam]++;
-  state.roundWinner = state.fighters[winningTeam * 2];
+  
+  // Find effective winning fighter (alive fighter or fallback)
+  const winnerFighter = state.fighters.find((f, idx) => f && isFighterEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam)
+    || state.fighters.find((f, idx) => f && state.getFighterTeam(idx) === winningTeam)
+    || state.fighters[0];
+
+  state.roundWinner = winnerFighter;
   state.roundEndTimer = 0;
 
   // Stop all sounds when round ends
@@ -667,7 +734,7 @@ function endRoundIf2v2Ended() {
 
   const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
   if (state.teamScores[winningTeam] >= winThreshold) {
-    state.matchWinner = state.fighters[winningTeam * 2];
+    state.matchWinner = winnerFighter;
     state.matchEndTimer = 0;
     state.gameState = 'matchEnd';
   } else {
@@ -896,6 +963,17 @@ export function updateFighters() {
 
         if (distSq < minDist * minDist && distSq > 0) {
           const dist = Math.sqrt(distSq);
+
+          // If fighter is Gojo with active Infinity barrier, block and freeze incoming enemy or illusion (unless adapted Mahoraga or Toji)
+          if (fighter.infinityCooldown !== undefined && fighter.infinityCooldown <= 0 && fighter.hp > 0 && !fighter.isChannelingPurple && !fighter.domainActive) {
+            if (entity.owner !== fighter && entity.type !== 'toji' && entity.characterId !== 'toji' && typeof fighter.triggerInfinityBlock === 'function') {
+              const isMahoragaAdapted = (entity.type === 'mahoraga' || entity.characterId === 'mahoraga') && (entity.adapted?.melee || entity.gojoInfinityImmune || entity.isMaxAdapted);
+              if (!isMahoragaAdapted) {
+                fighter.triggerInfinityBlock(entity.x, entity.y, entity);
+              }
+            }
+          }
+
           // Collision detected - trigger onCollide for the fighter
           fighter.onCollide(entity);
 

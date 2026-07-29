@@ -148,10 +148,17 @@ export class TojiFighter extends Fighter {
     this.ultimateTimer = 0;
     this.ultimateTarget = null;
     this.ultimateAssaultCount = 0;
-    if (typeof state !== 'undefined' && state.fighters) {
-      state.fighters.forEach(f => {
-        if (f) f.isTargetOfAmbush = false;
-      });
+    if (typeof state !== 'undefined') {
+      if (state.fighters) {
+        state.fighters.forEach(f => {
+          if (f) f.isTargetOfAmbush = false;
+        });
+      }
+      if (state.illusions) {
+        state.illusions.forEach(ill => {
+          if (ill) ill.isTargetOfAmbush = false;
+        });
+      }
     }
     this._initChainPhysics();
   }
@@ -164,10 +171,17 @@ export class TojiFighter extends Fighter {
     this.isChannelingDomain = false;
     this.ultimatePhase = null;
     this.ultimateTarget = null;
-    if (typeof state !== 'undefined' && state.fighters) {
-      state.fighters.forEach(f => {
-        if (f) f.isTargetOfAmbush = false;
-      });
+    if (typeof state !== 'undefined') {
+      if (state.fighters) {
+        state.fighters.forEach(f => {
+          if (f) f.isTargetOfAmbush = false;
+        });
+      }
+      if (state.illusions) {
+        state.illusions.forEach(ill => {
+          if (ill) ill.isTargetOfAmbush = false;
+        });
+      }
     }
   }
 

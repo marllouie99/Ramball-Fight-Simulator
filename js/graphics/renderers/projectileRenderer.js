@@ -1515,7 +1515,7 @@ export function drawDivineFlameArrowConstruct(ctx, {
 // DRAW â€” PROJECTILES
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-function drawBlackHoleVisual({
+export function drawBlackHoleVisual({
   ctx,
   p,
   alpha,

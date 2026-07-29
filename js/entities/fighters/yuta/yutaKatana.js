@@ -22,59 +22,92 @@ export function modExecuteKatanaMelee(fighter, angle) {
     fighter._attackSoundConfig = swingSnd;
   }
 
-  const range = CONFIG.yuta.meleeRange || 75;
+  const range = CONFIG.yuta.meleeRange || 95;
   const damage = CONFIG.yuta.meleeDamage || 15;
-  const arc = CONFIG.yuta.meleeArc || (Math.PI / 2);
+  const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
 
   let hitSomeone = false;
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+  const validTargets = [];
 
-  for (let i = 0; i < state.fighters.length; i++) {
-    const enemy = state.fighters[i];
-    if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0) continue;
+  // Collect all enemy fighters in frontal Katana blade arc
+  if (state.fighters) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const enemy = state.fighters[i];
+      if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0) continue;
 
-    const enemyTeam = state.getFighterTeam(i);
-    if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+      const enemyTeam = state.getFighterTeam(i);
+      if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
 
-    const dx = enemy.x - fighter.x;
-    const dy = enemy.y - fighter.y;
-    const dist = Math.hypot(dx, dy);
+      const dx = enemy.x - fighter.x;
+      const dy = enemy.y - fighter.y;
+      const dist = Math.hypot(dx, dy);
 
-    if (dist <= range + enemy.r) {
-      const enemyAngle = Math.atan2(dy, dx);
-      let angleDiff = Math.abs(enemyAngle - fighter.targetAngle);
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-      angleDiff = Math.abs(angleDiff);
+      if (dist <= fighter.r + enemy.r + range) {
+        const enemyAngle = Math.atan2(dy, dx);
+        let angleDiff = Math.abs(enemyAngle - fighter.targetAngle);
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        angleDiff = Math.abs(angleDiff);
 
-      if (angleDiff <= arc / 2) {
-        const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
-        const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
-        const finalDamage = damage * dmgMult;
-
-        enemy.takeDamage(finalDamage, fighter, { isPhysical: true });
-        hitSomeone = true;
-        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(4, 6);
-
-        if (isRikaAlive) {
-          spawnFloatingText(enemy.x, enemy.y - 20, `${Math.round(finalDamage)}!`, '#FF1493');
-        }
-
-        spawnImpactFlash(enemy.x, enemy.y, 25);
-        spawnBloodEffect(enemy, 10, fighter.targetAngle);
-
-        const pushForce = 5;
-        enemy.vx += Math.cos(fighter.targetAngle) * pushForce;
-        enemy.vy += Math.sin(fighter.targetAngle) * pushForce;
-
-        // Check for clash with Gojo or Sukuna
-        if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {
-          const midX = (fighter.x + enemy.x) / 2;
-          const midY = (fighter.y + enemy.y) / 2;
-          const isSukuna = (enemy._def?.id === 'sukuna' || enemy.type === 'sukuna' || enemy._def?.name === 'SukunaFighter');
-          spawnMeleeClashShockwave(midX, midY, 100, isSukuna ? 'yuta' : 'gojo');
-          triggerGlobalScreenShake(8, 10);
+        if (angleDiff <= arc / 2) {
+          validTargets.push(enemy);
         }
       }
+    }
+  }
+
+  // Collect all enemy illusions & minions in frontal Katana blade arc
+  if (state.illusions) {
+    for (const ill of state.illusions) {
+      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
+      if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
+
+      const dx = ill.x - fighter.x;
+      const dy = ill.y - fighter.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= fighter.r + (ill.r || 20) + range) {
+        const enemyAngle = Math.atan2(dy, dx);
+        let angleDiff = Math.abs(enemyAngle - fighter.targetAngle);
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        angleDiff = Math.abs(angleDiff);
+
+        if (angleDiff <= arc / 2) {
+          validTargets.push(ill);
+        }
+      }
+    }
+  }
+
+  const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
+  const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+  const finalDamage = damage * dmgMult;
+
+  for (const enemy of validTargets) {
+    enemy.takeDamage(finalDamage, fighter, { isPhysical: true });
+    hitSomeone = true;
+
+    if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(4, 6);
+
+    if (isRikaAlive) {
+      spawnFloatingText(enemy.x, enemy.y - 20, `${Math.round(finalDamage)}!`, '#FF1493');
+    }
+
+    spawnImpactFlash(enemy.x, enemy.y, 25);
+    spawnBloodEffect(enemy, 10, fighter.targetAngle);
+
+    const pushForce = 6;
+    enemy.vx += Math.cos(fighter.targetAngle) * pushForce;
+    enemy.vy += Math.sin(fighter.targetAngle) * pushForce;
+    if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(12);
+
+    // Check for clash with Gojo or Sukuna
+    if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {
+      const midX = (fighter.x + enemy.x) / 2;
+      const midY = (fighter.y + enemy.y) / 2;
+      const isSukuna = (enemy._def?.id === 'sukuna' || enemy.type === 'sukuna' || enemy._def?.name === 'SukunaFighter');
+      spawnMeleeClashShockwave(midX, midY, 100, isSukuna ? 'yuta' : 'gojo');
+      triggerGlobalScreenShake(8, 10);
     }
   }
 

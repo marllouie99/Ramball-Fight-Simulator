@@ -161,7 +161,7 @@ function updateHealthHud() {
             <div class="health-card__bar${glowClass}">
               <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
             </div>
-            <div class="health-card__meta"><span>HP</span><span>${Math.floor(Math.max(0, Number(m.hp) || 0))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}</span></div>
+            <div class="health-card__meta" style="justify-content: flex-end; gap: 6px;"><span>HP</span><span>${Math.floor(Math.max(0, Number(m.hp) || 0))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}</span></div>
           </div>
         `;
       }).join('');

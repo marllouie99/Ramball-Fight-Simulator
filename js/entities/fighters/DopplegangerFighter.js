@@ -42,6 +42,8 @@ export class DopplegangerFighter extends Fighter {
     state.illusions = state.illusions.filter(ill => ill.owner !== this);
   }
 
+
+
   // Auto-lock toward enemy upon wall bounce
   resolveWallBounce(arena, opponent) {
     if (!opponent) {
@@ -158,6 +160,18 @@ export class DopplegangerFighter extends Fighter {
       gunAngle: 0,
       moveSpeed: illusionSpeed, // Store for speed normalization after bounce
       isIllusion: true,
+      timeStopTimer: 0,
+      hitStunTimer: 0,
+      applyTimeStop(duration) {
+        this.timeStopTimer = Math.max(this.timeStopTimer || 0, duration);
+      },
+      applyHitStun(duration) {
+        this.hitStunTimer = Math.max(this.hitStunTimer || 0, duration);
+      },
+      applyKnockback(vx, vy) {
+        this.knockbackVx = vx;
+        this.knockbackVy = vy;
+      },
       takeDamage(amount, attacker, opts = {}) {
         return applyDamageToTarget(this, amount, attacker, opts);
       },
@@ -200,7 +214,7 @@ export class DopplegangerFighter extends Fighter {
 
   update(opponent, ownerIndex, arena) {
     const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
+    if (isFrozen) {
       this.interruptAttacks();
       return;
     }
@@ -209,6 +223,11 @@ export class DopplegangerFighter extends Fighter {
     this.handleBurn();
     this._tickCooldowns();
     this._tickAttackSound();
+
+    if (this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
 
     // Sword swing cooldown
     if (this.swordCooldown > 0) {
@@ -233,11 +252,27 @@ export class DopplegangerFighter extends Fighter {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;
     }
-    const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-    if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
-      const newSpeed = currentSpeed + (targetSpeed - currentSpeed) * 0.04;
-      this.vx = (this.vx / currentSpeed) * newSpeed;
-      this.vy = (this.vy / currentSpeed) * newSpeed;
+    let currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
+
+    // While being knocked back, let velocity decay naturally - don't override it
+    const isKnockedBack = (this.knockbackStunTimer || 0) > 0 || currentSpeed > this.speed * 2.5;
+
+    if (isKnockedBack) {
+      // Decay knockback gradually
+      this.vx *= 0.88;
+      this.vy *= 0.88;
+      if (this.knockbackStunTimer > 0) this.knockbackStunTimer--;
+    } else {
+      // Auto-recover from zero velocity if we should be moving
+      if (targetSpeed > 0 && currentSpeed < 0.05) {
+        const nudgeAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        this.vx = Math.cos(nudgeAngle) * targetSpeed;
+        this.vy = Math.sin(nudgeAngle) * targetSpeed;
+        currentSpeed = targetSpeed;
+      } else if (currentSpeed > 0 && Math.abs(currentSpeed - targetSpeed) > 0.05) {
+        this.vx = (this.vx / currentSpeed) * targetSpeed;
+        this.vy = (this.vy / currentSpeed) * targetSpeed;
+      }
     }
 
     // Movement

@@ -117,47 +117,108 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   if (fighter.meleeComboCount === undefined) fighter.meleeComboCount = 0;
   if (fighter.meleeComboTarget === undefined) fighter.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
 
-  const oldX = fighter.x;
-  const oldY = fighter.y;
+  const distToOpponent = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
+  const attackReach = fighter.r + opponent.r + 35;
+  const isOutOfReach = distToOpponent > attackReach;
+  
+  const shouldTeleport = isOutOfReach || (fighter.meleeComboCount % (fighter.meleeComboTarget || 1) === 0);
 
-  const angleToOpponent = Math.random() * Math.PI * 2;
-  const behindOffset = opponent.r + fighter.r + 8;
-  let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
-  let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
+  if (shouldTeleport) {
+    const oldX = fighter.x;
+    const oldY = fighter.y;
 
-  if (arena) {
-    targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
-    targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    const angleToOpponent = Math.random() * Math.PI * 2;
+    const behindOffset = opponent.r + fighter.r + 8;
+    let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
+    let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
+
+    if (arena) {
+      targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
+      targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+    }
+
+    fighter.x = targetX;
+    fighter.y = targetY;
+    if (typeof fighter.aim === 'function') fighter.aim(opponent);
+
+    fighter.vx = 0;
+    fighter.vy = 0;
+    spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
+    spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+    spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
+    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
+  } else {
+    if (typeof fighter.aim === 'function') fighter.aim(opponent);
   }
-
-  fighter.x = targetX;
-  fighter.y = targetY;
-  if (typeof fighter.aim === 'function') fighter.aim(opponent);
-
-  fighter.vx = 0;
-  fighter.vy = 0;
-  spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
-  spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
-  spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
 
   fighter.meleeComboCount++;
   fighter.martialArtsComboCount = (fighter.martialArtsComboCount || 0) + 1;
 
   const slashDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
-  opponent.takeDamage(slashDamage, fighter, { isMelee: true });
-  if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(12);
-  spawnSparks(opponent.x, opponent.y, 15, 'crimsonSniper', '#8B0000');
+  const punchAngle = (opponent && !opponent.isDead) ? Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x) : (fighter.gunAngle || 0);
+  const reach = fighter.r + 65;
+  const arc = Math.PI * 0.5; // 90 degree frontal punch arc
+
+  const validTargets = [];
+  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+
+  const allEntities = [
+    ...(state.fighters || []),
+    ...(state.illusions || [])
+  ];
+
+  for (const ent of allEntities) {
+    if (!ent || ent.hp <= 0 || ent === fighter || (ent.invincibilityTimer || 0) > 0 || ent.isRika || ent.owner === fighter) continue;
+
+    if (ent.owner) {
+      const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
+      if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+    } else {
+      const entTeam = state.getFighterTeam(state.fighters.indexOf(ent));
+      if (myTeam !== null && entTeam !== null && myTeam === entTeam) continue;
+    }
+
+    const dx = ent.x - fighter.x;
+    const dy = ent.y - fighter.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist <= reach + (ent.r || 20)) {
+      const entAngle = Math.atan2(dy, dx);
+      let angleDiff = Math.abs(entAngle - punchAngle);
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      angleDiff = Math.abs(angleDiff);
+
+      if (angleDiff <= arc / 2) {
+        validTargets.push(ent);
+      }
+    }
+  }
+
+  if (validTargets.length === 0 && opponent && !opponent.isDead) {
+    validTargets.push(opponent);
+  }
+
+  for (const target of validTargets) {
+    target.takeDamage(slashDamage, fighter, { isMelee: true });
+    if (typeof target.applyHitStun === 'function') target.applyHitStun(12);
+    spawnSparks(target.x, target.y, 15, 'crimsonSniper', '#8B0000');
+
+    const pushForce = 4;
+    target.vx += Math.cos(punchAngle) * pushForce;
+    target.vy += Math.sin(punchAngle) * pushForce;
+  }
+
   triggerGlobalScreenShake(4, 5);
 
-  const martialArtsAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-
-  fighter.sakugaImpactTimer = 6;
-  fighter.sakugaImpactMaxTimer = 6;
-  fighter.sakugaImpactX = opponent.x;
-  fighter.sakugaImpactY = opponent.y;
-  fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
-  fighter.sakugaImpactSeed = Math.random();
+  const primaryTarget = validTargets[0] || opponent;
+  if (primaryTarget) {
+    fighter.sakugaImpactTimer = 6;
+    fighter.sakugaImpactMaxTimer = 6;
+    fighter.sakugaImpactX = primaryTarget.x;
+    fighter.sakugaImpactY = primaryTarget.y;
+    fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
+    fighter.sakugaImpactSeed = Math.random();
+  }
 
   fighter.punchAnimTimer = 16;
   fighter.punchAnimHand = fighter.punchAnimHand === 1 ? 0 : 1;
@@ -166,7 +227,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   fighter.punchEffects.push({
     x: opponent.x,
     y: opponent.y,
-    angle: martialArtsAngle,
+    angle: punchAngle,
     timer: 12,
     maxTimer: 12
   });
@@ -183,8 +244,8 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     }
   }
 
-  opponent.vx += Math.cos(martialArtsAngle) * 2;
-  opponent.vy += Math.sin(martialArtsAngle) * 2;
+  opponent.vx += Math.cos(punchAngle) * 2;
+  opponent.vy += Math.sin(punchAngle) * 2;
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'MARTIAL ARTS', '#8B0000');
 

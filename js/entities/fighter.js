@@ -39,6 +39,23 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     target.hp = Math.max(0, Number((currentHp - effectiveAmount).toFixed(2)));
 
     if (target.hp < prevHp && effectiveAmount > 0) {
+      // Trigger global white hit flash visual effect
+      target.hitFlashTimer = 8;
+
+      // Play flesh hit audio effect unless it's a continuous DPS/dot effect
+      // isPurpleDPS / isDomainDPS suppress rapid spam when multiple illusions are hit simultaneously
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified) {
+        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+      }
+
+      // Spawn blood/impact particle visual effect in damage direction
+      const damageAngle = opts.damageAngle ?? (attacker ? Math.atan2(target.y - attacker.y, target.x - attacker.x) : Math.random() * Math.PI * 2);
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(target, effectiveAmount, damageAngle);
+      } else if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 6, 'crimsonSniper');
+      }
+
       // No floating text for illusion damage
       if (target.hp <= 0) {
         spawnIllusionDeath(target);
@@ -376,6 +393,7 @@ export class Fighter {
       }
       if (this.timeStopTimer <= 0) {
         this.timeStopTimer = 0;
+        this.isFrozenByInfinity = false;
         delete this._suppressFreezeTimer;
         // Restore any saved velocities (from counter or sphere freezes)
         if (typeof this._resumeVx === 'number') {
@@ -599,10 +617,16 @@ export class Fighter {
       }
       
       // Play hit sound and trigger hit flash unless it's a DPS/continuous effect
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole) {
+      // isPurpleDPS, isElectrified, isDomainDPS suppress rapid audio spam when multiple targets are hit simultaneously
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS) {
         if (!this.isTurret) {
           playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
           this.hitFlashTimer = 8;
+        }
+      } else if (opts.isPurpleDPS || opts.isDomainDPS) {
+        // Still trigger visual hit flash for DPS effects — just no audio spam
+        if (!this.isTurret) {
+          this.hitFlashTimer = 6;
         }
       }
     }
@@ -661,25 +685,38 @@ export class Fighter {
         const realAttackerIndex = state.fighters.indexOf(realAttacker);
         const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
 
-        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off')) {
-          // 2v2: check if a team is eliminated (including doppelganger illusions)
-          const team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
-          const team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
+        if (state.mode === '2v2' || state.mode === '1v2 Stand Off') {
+          // 2v2 & 1v2: check if a team is eliminated (including doppelganger illusions)
+          let team0Alive = false;
+          let team1Alive = false;
+
+          if (state.mode === '1v2 Stand Off') {
+            team0Alive = _isEffectivelyAlive(state.fighters[0]);
+            team1Alive = _isEffectivelyAlive(state.fighters[1]) || _isEffectivelyAlive(state.fighters[2]);
+          } else {
+            team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
+            team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
+          }
           
           if (!team0Alive || !team1Alive) {
             // A team has been eliminated - round ends
             const winningTeam = team0Alive ? 0 : 1;
             state.teamScores[winningTeam]++;
-            state.roundWinner = state.fighters[winningTeam * 2]; // First fighter of winning team
+
+            const winnerFighter = state.fighters.find((f, idx) => f && _isEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam)
+              || state.fighters.find((f, idx) => f && state.getFighterTeam(idx) === winningTeam)
+              || state.fighters[0];
+
+            state.roundWinner = winnerFighter;
             state.roundEndTimer = 0;
 
             // Stop all sounds when round ends
             stopAllSounds();
             stopAllLoopingSounds();
 
-            const winThreshold = 2; // Best of 3
+            const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
             if (state.teamScores[winningTeam] >= winThreshold) {
-              state.matchWinner = state.fighters[winningTeam * 2];
+              state.matchWinner = winnerFighter;
               state.gameState = 'matchEnd';
             } else {
               state.gameState = 'roundEnd';

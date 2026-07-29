@@ -187,10 +187,11 @@ export function drawDoppelgangerDeathEffects() {
 
       case 'echo':
          ctx.globalAlpha = p.opacity;
-         ctx.translate(p.x, p.y);
-         ctx.scale(p.scale, p.scale);
-         ctx.rotate(p.angle);
-         drawDoppelgangerSkin(ctx, 0, 0, p.r, 0, Date.now());
+         ctx.strokeStyle = '#9b59b6';
+         ctx.lineWidth = 6 * p.opacity;
+         ctx.beginPath();
+         ctx.arc(p.x, p.y, p.r * p.scale, 0, Math.PI * 2);
+         ctx.stroke();
          break;
     }
     

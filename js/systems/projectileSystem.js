@@ -53,6 +53,8 @@ class ProjectileSystem {
       p.x = 0; p.y = 0; p.vx = 0; p.vy = 0; p.r = 0; p.life = 0; p.maxLife = 0;
       p.owner = null; p.damage = 0; p.isFollowUp = false; p.isBlackHole = false;
       p.isFlame = false; p.isGrenade = false; p.isBomberGrenade = false; p.isC4 = false;
+      p.fadingOut = false; p._resumeVx = undefined; p._resumeVy = undefined;
+      p.isFrozenByInfinity = false; p.infinityFreezeTimer = undefined;
       p.history = [];
     }
   }
@@ -74,6 +76,11 @@ class ProjectileSystem {
     proj.isC4 = false;
     proj.capturedByBlackHole = null;
     proj.stoppedByCronosSphere = false;
+    proj.fadingOut = false;
+    proj._resumeVx = undefined;
+    proj._resumeVy = undefined;
+    proj.isFrozenByInfinity = false;
+    proj.infinityFreezeTimer = undefined;
     
     // Clear visual flags to fix recycle bugs (e.g., normal projectiles turning into green triangles)
     proj.isExplosion = false;
@@ -224,6 +231,11 @@ class ProjectileSystem {
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
     proj.isFollowUp = isFollowUp;
+    proj.fadingOut = false;
+    proj._resumeVx = undefined;
+    proj._resumeVy = undefined;
+    proj.isFrozenByInfinity = false;
+    proj.infinityFreezeTimer = undefined;
     proj.visual = visualType;
     if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
     proj.historyMax = 10;
@@ -891,19 +903,36 @@ class ProjectileSystem {
             }
             
             // Sukuna & Mahoraga slashes/thrown debris pierce through enemies with physical impact!
-            const isMahoragaThrow = projectile.visual === 'ghostBlade' || projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
-            if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || isMahoragaThrow) {
+            const isSukunaSlash = projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade' || projectile.isSukunaSlash;
+            const isMahoragaThrow = projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
+            if (isSukunaSlash || isMahoragaThrow) {
               if (!projectile.hitFighters) projectile.hitFighters = new Set();
               projectile.hitFighters.add(fighter);
               
               // Spawn rock dust, pale stone shatter fragments, & crunching impact flash
-              if (projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble') {
+              if (isMahoragaThrow) {
                 spawnSparks(fighter.x, fighter.y, 16, 'paleStoneShatter');
                 spawnImpactFlash(fighter.x, fighter.y, 35, '#E2E8F0');
                 playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
                 playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.4);
               } else {
-                spawnSparks(fighter.x, fighter.y, 10, isMahoragaThrow ? 'gold' : 'crimsonSniper');
+                spawnSparks(fighter.x, fighter.y, 10, 'crimsonSniper');
+                spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
+                playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.5);
+
+                const attackerObj = state.fighters && state.fighters[projectile.owner];
+                if (attackerObj) {
+                  if (!attackerObj.slashHitVisuals) attackerObj.slashHitVisuals = [];
+                  const hitAngle = Math.atan2(projectile.vy, projectile.vx);
+                  attackerObj.slashHitVisuals.push({
+                    x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.4,
+                    y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.4,
+                    angle: hitAngle + (Math.random() - 0.5) * 0.4,
+                    timer: 12,
+                    maxTimer: 12,
+                    scale: 1.0 + Math.random() * 0.4
+                  });
+                }
               }
 
               // Apply physical push backward on hit (using throwKnockback config for Mahoraga!)
@@ -915,7 +944,8 @@ class ProjectileSystem {
               fighter.y += Math.sin(angle) * (knockbackForce * 0.5);
               if (typeof fighter.applyHitStun === 'function') fighter.applyHitStun(8);
               
-              // Do NOT return true, allowing it to continue flying
+              // Continue loop so the slash pierces through every enemy in its flight path!
+              continue;
             } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
               if (!projectile.hitFighters) projectile.hitFighters = new Set();
               projectile.hitFighters.add(fighter);
@@ -1167,11 +1197,28 @@ class ProjectileSystem {
           return true;
         } 
         // 2. Sukuna slashes: pierce through illusions
-        else if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade') {
+        else if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade' || projectile.isSukunaSlash) {
           if (!projectile.hitFighters) projectile.hitFighters = new Set();
           projectile.hitFighters.add(illusion);
           spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
-          // Do NOT return true
+          spawnImpactFlash(illusion.x, illusion.y, 22, 'crimsonSniper');
+          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.5);
+
+          const attackerObj = state.fighters && state.fighters[projectile.owner];
+          if (attackerObj) {
+            if (!attackerObj.slashHitVisuals) attackerObj.slashHitVisuals = [];
+            const hitAngle = Math.atan2(projectile.vy, projectile.vx);
+            attackerObj.slashHitVisuals.push({
+              x: illusion.x + (Math.random() - 0.5) * illusion.r * 0.4,
+              y: illusion.y + (Math.random() - 0.5) * illusion.r * 0.4,
+              angle: hitAngle + (Math.random() - 0.5) * 0.4,
+              timer: 12,
+              maxTimer: 12,
+              scale: 0.9 + Math.random() * 0.4
+            });
+          }
+          // Continue through illusions
+          continue;
         } 
         // 3. Sharpshooter / Trickster enhanced sniper bullets: pierce through illusions
         else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
@@ -2037,10 +2084,10 @@ class ProjectileSystem {
         const ownerTeam = state.getFighterTeam(p.owner);
         const purpleSlowDuration = CONFIG.gojo.purpleSlowDuration || 60;
         const purpleSlowMultiplier = CONFIG.gojo.purpleSlowMultiplier || 0.5;
-        const purplePullForce = CONFIG.gojo.purplePullForce || 2.0;
+        const purplePullForce = CONFIG.gojo.purplePullForce || 8.0;
         const purpleScale = CONFIG.gojo.purpleScale || 1.0;
         const effectiveRadius = p.r * purpleScale; // Hit radius for damage/destruction
-        const purplePullRadius = CONFIG.gojo.purplePullRadius || (effectiveRadius * 1.5); // Pull/suction range
+        const purplePullRadius = CONFIG.gojo.purplePullRadius || 280; // Pull/suction range
         
         // Continuous screen shake while purple orb is active
         p.purpleShakeCounter = (p.purpleShakeCounter || 0) + 1;
@@ -2074,80 +2121,78 @@ class ProjectileSystem {
             }
         }
         
-        // DPS tick - damage enemies within the purple orb's radius periodically
+        const ownerFighter = fighters[p.owner];
+        const allTargets = [
+          ...(state.fighters || []),
+          ...(state.illusions || [])
+        ];
+
+        // DPS tick - damage all valid targets (fighters & illusions) within the purple orb's radius
         p.purpleLastDPSTick = (p.purpleLastDPSTick || 0) + 1;
         if (p.purpleLastDPSTick >= p.purpleDPSInterval) {
           p.purpleLastDPSTick = 0;
           
-          // Find all enemies within the purple orb's radius and apply DPS damage
-          for (let fi = 0; fi < fighters.length; fi++) {
-            if (fi === p.owner) continue;
-            const f = fighters[fi];
-            if (!f || f.hp <= 0) continue;
+          for (let i = 0; i < allTargets.length; i++) {
+            const ent = allTargets[i];
+            if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+            if (ent.owner && ent.owner === ownerFighter) continue;
             
-            const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
-            if (true) { // Purple damages EVERYONE
-              const dx = f.x - p.x;
-              const dy = f.y - p.y;
-              const distSq = dx * dx + dy * dy;
-              const radiusSq = effectiveRadius * effectiveRadius;
-              
-              if (distSq < radiusSq) {
-                // Apply DPS damage
-                const attacker = fighters[p.owner];
-                const dpsDamage = p.purpleDPS * (p.purpleDPSInterval / 60); // Convert DPS to per-tick damage
-                if (typeof f.takeDamage === 'function') {
-                  f.takeDamage(dpsDamage, attacker, { isProjectile: true, projectile: p });
-                }
-                
-                // Apply slow effect - refresh duration if already slowed
-                if (f.slowTimer !== undefined && !f.immuneToCC && f.characterId !== 'toji' && f.type !== 'toji') {
-                  f.slowTimer = Math.max(f.slowTimer, purpleSlowDuration);
-                  f.slowMultiplier = Math.min(f.slowMultiplier || 1, purpleSlowMultiplier);
-                }
-                
-                // Dampen velocity so fighters don't fight against the drag
-                if (f.vx !== undefined && f.vy !== undefined && !f.immuneToCC && f.characterId !== 'toji' && f.type !== 'toji') {
-                  f.vx *= 0.8; // Reduce velocity by 20% each frame while being dragged
-                  f.vy *= 0.8;
-                }
-                
-                // Visual feedback - sparks on DPS tick
-                spawnSparks(f.x, f.y, 5, 'lightningTrail', '#8A2BE2');
+            const dx = ent.x - p.x;
+            const dy = ent.y - p.y;
+            const distSq = dx * dx + dy * dy;
+            const radiusSq = effectiveRadius * effectiveRadius;
+            
+            if (distSq < radiusSq) {
+              const dpsDamage = p.purpleDPS * (p.purpleDPSInterval / 60);
+              if (typeof ent.takeDamage === 'function') {
+                ent.takeDamage(dpsDamage, ownerFighter, { isPurpleDPS: true, isProjectile: true, projectile: p });
               }
+              
+              if (ent.slowTimer !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
+                ent.slowTimer = Math.max(ent.slowTimer, purpleSlowDuration);
+                ent.slowMultiplier = Math.min(ent.slowMultiplier || 1, purpleSlowMultiplier);
+              }
+              
+              if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
+                ent.vx *= 0.8;
+                ent.vy *= 0.8;
+              }
+              
+              spawnSparks(ent.x, ent.y, 5, 'lightningTrail', '#8A2BE2');
             }
           }
         }
         
-        // Continuous slow + pull effect for all enemies in the purple orb's radius
-        for (let fi = 0; fi < fighters.length; fi++) {
-          if (fi === p.owner) continue;
-          const f = fighters[fi];
-          if (!f || f.hp <= 0) continue;
+        // Continuous slow + pull effect for all targets (fighters & illusions) in the purple orb's radius
+        for (let i = 0; i < allTargets.length; i++) {
+          const ent = allTargets[i];
+          if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+          if (ent.owner && ent.owner === ownerFighter) continue;
           
-          const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
-          const isImmune = f.immuneToCC || f.characterId === 'toji' || f.type === 'toji';
-          if (true && !isImmune) { // Purple pulls EVERYONE
-            const dx = p.x - f.x;
-            const dy = p.y - f.y;
+          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
+          if (!isImmune) {
+            const dx = p.x - ent.x;
+            const dy = p.y - ent.y;
             const dist = Math.hypot(dx, dy);
             
             if (dist > 0 && dist < purplePullRadius) {
-              // Apply slow effect continuously while in range (still uses pull radius)
-              if (f.slowTimer !== undefined) {
-                f.slowTimer = Math.max(f.slowTimer || 0, 10); // Keep slow active
-                f.slowMultiplier = Math.min(f.slowMultiplier || 1, purpleSlowMultiplier);
+              if (ent.slowTimer !== undefined) {
+                ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
+                ent.slowMultiplier = Math.min(ent.slowMultiplier || 1, purpleSlowMultiplier);
               }
               
-              // Drag enemy toward purple orb center
-              const pullStrength = purplePullForce * (1 - dist / purplePullRadius); // Stronger pull near center
-              f.x += (dx / dist) * pullStrength;
-              f.y += (dy / dist) * pullStrength;
+              const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
+              ent.x += (dx / dist) * pullStrength;
+              ent.y += (dy / dist) * pullStrength;
+
+              if (ent.knockbackVx !== undefined && ent.knockbackVy !== undefined) {
+                ent.knockbackVx += (dx / dist) * pullStrength;
+                ent.knockbackVy += (dy / dist) * pullStrength;
+              }
               
-              // Dampen velocity so fighters don't fight against the drag
-              if (f.vx !== undefined && f.vy !== undefined) {
-                f.vx *= 0.8; // Reduce velocity by 20% each frame while being dragged
-                f.vy *= 0.8;
+              if (ent.vx !== undefined && ent.vy !== undefined) {
+                ent.vx *= 0.7;
+                ent.vy *= 0.7;
               }
             }
           }

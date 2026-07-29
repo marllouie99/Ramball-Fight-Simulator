@@ -330,10 +330,16 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
     return lastResult;
   }
 
-  // Throttling guard: Prevent same sound file from playing multiple times simultaneously within 15ms
+  // Throttling guard: Prevent same sound file from playing multiple times in rapid succession
   const now = performance.now();
   const lastTime = _lastPlayTimes.get(src) || 0;
-  if (now - lastTime < SOUND_THROTTLE_MS) {
+  
+  // Frequent combat sounds (hits, swings, slashes, summons) enforce a 70ms minimum gap to prevent audio machine-gun stutter
+  const srcLower = String(src).toLowerCase();
+  const isCombatSound = srcLower.includes('fleshhit') || srcLower.includes('sword') || srcLower.includes('slash') || srcLower.includes('illusion') || srcLower.includes('hit') || srcLower.includes('punch') || srcLower.includes('smash');
+  const minInterval = isCombatSound ? 70 : 25;
+
+  if (now - lastTime < minInterval) {
     return null;
   }
   _lastPlayTimes.set(src, now);
@@ -351,7 +357,9 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
       // Web Audio API supports gain values above 1.0 for amplification/boosting
-      gainNode.gain.value = Math.max(0, Math.min(15, volume));
+      const targetGain = Math.max(0, Math.min(15, volume));
+      gainNode.gain.setValueAtTime(targetGain, audioCtx.currentTime);
+      gainNode.gain.value = targetGain;
       source.connect(gainNode);
       gainNode.connect(audioCtx.destination);
       const safeSpeed = Math.max(0.1, speed);

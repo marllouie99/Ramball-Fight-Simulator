@@ -116,7 +116,6 @@ export class GojoFighter extends Fighter {
       this.isChannelingPurple ||
       (this.redEffectTimer || 0) > 0 ||
       this.isChannelingRCT ||
-      this.domainActive ||
       (this.purpleRecoveryTimer || 0) > 0 ||
       (this.purpleRetreatTimer || 0) > 0
     );
@@ -199,8 +198,8 @@ export class GojoFighter extends Fighter {
       return false; // Negate damage
     }
 
-    // Check Infinity Passive first
-    if (this.infinityCooldown <= 0 && attacker && this.hp > 0 && !opts.isStorm) {
+    // Check Infinity Passive first (Domain sure-hit & bypassShield attacks bypass Limitless Infinity, self-damage cannot trigger Infinity)
+    if (this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !attacker.domainActive) {
       if (attacker.characterId === 'mahoraga') {
         const totalStages = (attacker.adaptationStage?.melee || 0) + (attacker.adaptationStage?.ranged || 0) + (attacker.adaptationStage?.skill || 0);
         const hasAdapted = (attacker.adapted?.melee) || (totalStages >= 1) || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.gojoInfinityImmune;
@@ -332,6 +331,7 @@ export class GojoFighter extends Fighter {
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
+      this.timeStopTimer = 0;
     } else if (this._handleTimeStop()) {
       if (this.isChannelingDomainExpansion) {
         this.isChannelingDomainExpansion = false;
@@ -428,7 +428,14 @@ export class GojoFighter extends Fighter {
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
     if (this.hitStunTimer > 0) this.hitStunTimer--;
 
-    if (this.infinityCooldown > 0) {
+    if (this.infinityActiveTimer > 0) {
+      this.infinityActiveTimer--;
+      if (this.infinityActiveTimer <= 0) {
+        // Active window expired, start cooldown now!
+        this.infinityCooldown = CONFIG.gojo?.infinityCooldown ?? 240;
+        this.infinityActive = false;
+      }
+    } else if (this.infinityCooldown > 0) {
       this.infinityCooldown--;
       if (this.infinityCooldown <= 0) {
         this.infinityActive = true;
@@ -553,7 +560,7 @@ export class GojoFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate - disabled in demo preview mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
       this.isChannelingDomainExpansion = true;
       this.domainChargeTimer = 0;
       this._domainChannelAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
@@ -598,12 +605,9 @@ export class GojoFighter extends Fighter {
     // Check for Hollow Purple (Skill)
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
     if (!this.isChannelingAnySkill() && this.purpleCooldown <= 0 && opponent && this.forcedMeleeTimer <= 0 && !opponent.isChannelingDivineFlame) {
-      const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
-      const safeDistance = 300; // Different from Sukuna's 200 to prevent simultaneous casting
-      if (distSq > safeDistance ** 2) {
-        this.isChannelingPurple = true;
-        this.purpleChargeTimer = 0;
-        spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'HOLLOW PURPLE', '#8A2BE2');
+      this.isChannelingPurple = true;
+      this.purpleChargeTimer = 0;
+      spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'HOLLOW PURPLE', '#8A2BE2');
 
         if (!this._hasPlayedPurpleChannelSound) {
           this._hasPlayedPurpleChannelSound = true;
@@ -622,7 +626,6 @@ export class GojoFighter extends Fighter {
           }
         }
       }
-    }
 
     // Handle Purple Channeling
     if (this.isChannelingPurple) {
@@ -723,7 +726,7 @@ export class GojoFighter extends Fighter {
 
     // Check for Red (Close-range repel: holds Red ready until an enemy gets nearby)
     if (!this.isChannelingAnySkill() && this.redCooldown <= 0 && this.forcedMeleeTimer <= 0) {
-      const triggerRange = CONFIG.gojo.redRange || 100;
+      const triggerRange = CONFIG.gojo.redTriggerRange || 280;
       const myTeam = state.getFighterTeam(state.fighters ? state.fighters.indexOf(this) : 0);
       let hasNearbyEnemy = false;
 
@@ -1056,57 +1059,98 @@ export class GojoFighter extends Fighter {
     this.punchAnimTimer = 8;
     this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
-    // Apply damage
-    opponent.takeDamage(punchDamage, this, { isMelee: true });
-    
-    // Apply hit stun explicitly to interrupt their current action and prevent counter-attack during combo
-    if (typeof opponent.applyHitStun === 'function') {
-      opponent.applyHitStun(20);
+    // Gather all valid enemy targets (fighters & illusions) in Gojo's punch frontal arc (90 degrees, 65px reach)
+    const reach = this.r + 65;
+    const arc = Math.PI * 0.5; // 90 degree frontal punch arc
+    const punchAngle = (opponent && !opponent.isDead) ? Math.atan2(opponent.y - this.y, opponent.x - this.x) : (this.gunAngle || 0);
+
+    const validTargets = [];
+    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+
+    const allEntities = [
+      ...(state.fighters || []),
+      ...(state.illusions || [])
+    ];
+
+    for (const ent of allEntities) {
+      if (!ent || ent.hp <= 0 || ent === this || (ent.invincibilityTimer || 0) > 0 || ent.isRika || ent.owner === this) continue;
+
+      if (ent.owner) {
+        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
+        if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+      } else {
+        const entTeam = state.getFighterTeam(state.fighters.indexOf(ent));
+        if (myTeam !== null && entTeam !== null && myTeam === entTeam) continue;
+      }
+
+      const dx = ent.x - this.x;
+      const dy = ent.y - this.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= reach + (ent.r || 20)) {
+        const entAngle = Math.atan2(dy, dx);
+        let angleDiff = Math.abs(entAngle - punchAngle);
+        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+        angleDiff = Math.abs(angleDiff);
+
+        if (angleDiff <= arc / 2) {
+          validTargets.push(ent);
+        }
+      }
     }
 
-    // Visual feedback
-    spawnFloatingText(opponent.x, opponent.y - opponent.r - 10, 'PUNCH!', '#00BFFF');
-    spawnImpactFlash(opponent.x, opponent.y, 20, 'lightningTrail');
-
-    // Knockback the opponent (light on combo build-up, heavy on finisher)
-    // NOTE: No knockback during Domain Expansion or its immediate aftermath combo
-    if (!this.domainActive && !this.wasForcedMelee) {
-      const isFinalHit = this.meleeComboCount >= (this.meleeComboTarget || 1);
-      const knockbackForce = isFinalHit ? 6 : 1;
-      const angle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      opponent.vx += Math.cos(angle) * knockbackForce;
-      opponent.vy += Math.sin(angle) * knockbackForce;
+    if (validTargets.length === 0 && opponent && !opponent.isDead) {
+      validTargets.push(opponent);
     }
 
-    // Trigger Sakuga Anime Impact Frame (randomized angle & seed for variety)
-    this.sakugaImpactTimer = 6;
-    this.sakugaImpactMaxTimer = 6;
-    this.sakugaImpactX = opponent.x;
-    this.sakugaImpactY = opponent.y;
-    this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-    this.sakugaImpactSeed = Math.random();
+    for (const target of validTargets) {
+      target.takeDamage(punchDamage, this, { isMelee: true });
+      if (typeof target.applyHitStun === 'function') {
+        target.applyHitStun(20);
+      }
 
-    // Spawn residual small stretched Cursed Energy flame wisps at impact point
-    if (!this.hitFlameWisps) this.hitFlameWisps = [];
-    const impactAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    for (let k = 0; k < 5; k++) {
-      const spreadAngle = impactAngle + (Math.random() - 0.5) * 1.4;
-      const stretchSpeed = 5 + Math.random() * 7;
-      pushTrailCap(this.hitFlameWisps, {
-        x: opponent.x + (Math.random() - 0.5) * 12,
-        y: opponent.y + (Math.random() - 0.5) * 12,
-        vx: Math.cos(spreadAngle) * stretchSpeed,
-        vy: Math.sin(spreadAngle) * stretchSpeed,
-        angle: spreadAngle,
-        timer: 18,
-        maxTimer: 18,
-        length: 14 + Math.random() * 18,
-        width: 3.5 + Math.random() * 3.5,
-        color: '#00D4CC'
-      }, 30);
+      spawnFloatingText(target.x, target.y - (target.r || 20) - 10, 'PUNCH!', '#00BFFF');
+      spawnImpactFlash(target.x, target.y, 20, 'lightningTrail');
+
+      if (!this.domainActive && !this.wasForcedMelee) {
+        const isFinalHit = this.meleeComboCount >= (this.meleeComboTarget || 1);
+        const knockbackForce = isFinalHit ? 6 : 1;
+        const angle = Math.atan2(target.y - this.y, target.x - this.x);
+        target.vx += Math.cos(angle) * knockbackForce;
+        target.vy += Math.sin(angle) * knockbackForce;
+      }
+
+      // Spawn residual small stretched Cursed Energy flame wisps at impact point
+      if (!this.hitFlameWisps) this.hitFlameWisps = [];
+      const impactAngle = Math.atan2(target.y - this.y, target.x - this.x);
+      for (let k = 0; k < 5; k++) {
+        const spreadAngle = impactAngle + (Math.random() - 0.5) * 1.4;
+        const stretchSpeed = 5 + Math.random() * 7;
+        pushTrailCap(this.hitFlameWisps, {
+          x: target.x + (Math.random() - 0.5) * 12,
+          y: target.y + (Math.random() - 0.5) * 12,
+          vx: Math.cos(spreadAngle) * stretchSpeed,
+          vy: Math.sin(spreadAngle) * stretchSpeed,
+          angle: spreadAngle,
+          timer: 18,
+          maxTimer: 18,
+          length: 14 + Math.random() * 18,
+          width: 3.5 + Math.random() * 3.5,
+          color: '#00D4CC'
+        }, 30);
+      }
     }
 
-    // Screen shake for impact
+    const primaryTarget = validTargets[0] || opponent;
+    if (primaryTarget) {
+      this.sakugaImpactTimer = 6;
+      this.sakugaImpactMaxTimer = 6;
+      this.sakugaImpactX = primaryTarget.x;
+      this.sakugaImpactY = primaryTarget.y;
+      this.sakugaImpactAngle = Math.random() * Math.PI * 2;
+      this.sakugaImpactSeed = Math.random();
+    }
+
     triggerGlobalScreenShake(6, 6);
 
     // Sound effect
@@ -1145,7 +1189,8 @@ export class GojoFighter extends Fighter {
         const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
         if (isEnemy) {
           const dist = Math.hypot(this.x - f.x, this.y - f.y);
-          if (dist < (CONFIG.gojo.redRange || 100) + 50) {
+          const blastRadius = CONFIG.gojo.redBlastRadius || 350;
+          if (dist < blastRadius) {
             // Immediately interrupt ongoing enemy actions & clear timeStop freeze so knockback physics applies immediately
             if (typeof f.interruptAttacks === 'function') {
               f.interruptAttacks();
@@ -1299,7 +1344,11 @@ export class GojoFighter extends Fighter {
           
           if (true) { // Freeze EVERYONE (including teammates' illusions)
             if (typeof ill.applyHitStun === 'function') ill.applyHitStun(15);
+            else ill.hitStunTimer = Math.max(ill.hitStunTimer || 0, 15);
+
             if (typeof ill.applyTimeStop === 'function') ill.applyTimeStop(15);
+            else ill.timeStopTimer = Math.max(ill.timeStopTimer || 0, 15);
+
             ill.vx = 0;
             ill.vy = 0;
 

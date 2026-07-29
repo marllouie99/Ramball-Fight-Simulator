@@ -411,35 +411,92 @@ export class CronosFighter extends Fighter {
     }
   }
 
-  // Try melee attack with crescent blade
-  _tryMeleeAttack(opponent, ownerIndex) {
-    if (!opponent || this.meleeCooldown > 0) return;
+  /**
+   * Helper: Find all enemy targets (fighters, illusions) within Cronos's front-facing radius arc.
+   * @param {number} maxRangeOffset - Max distance offset beyond Cronos's radius
+   * @param {number} coneAngle - Frontal cone angle in radians (default Math.PI * 1.3 for 234 deg arc)
+   * @returns {Array<Object>} Array of target entities in front radius
+   */
+  _getFrontRadiusTargets(maxRangeOffset = 110, coneAngle = Math.PI * 1.3) {
+    const targets = [];
+    if (typeof state === 'undefined' || !state || !state.fighters) return targets;
 
-    const dx = opponent.x - this.x;
-    const dy = opponent.y - this.y;
-    const maxRange = this.r + opponent.r + CONFIG.cronos.meleeRange;
-    if ((dx * dx + dy * dy) > maxRange * maxRange) return;
+    const myIndex = state.fighters.indexOf(this);
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(myIndex) : null;
+    const facingAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+
+    const candidates = [...state.fighters, ...(state.illusions || [])];
+    for (const f of candidates) {
+      if (!f || f === this || f.hp <= 0 || f.isDead) continue;
+
+      const idx = state.fighters.indexOf(f);
+      if (idx !== -1) {
+        const enemyTeam = state.getFighterTeam ? state.getFighterTeam(idx) : null;
+        if (myTeam !== null && enemyTeam === myTeam) continue; // Skip teammates
+      } else if (f.owner) {
+        const ownerIdx = state.fighters.indexOf(f.owner);
+        const ownerTeam = state.getFighterTeam ? state.getFighterTeam(ownerIdx) : null;
+        if (myTeam !== null && ownerTeam === myTeam) continue;
+      }
+
+      const dx = f.x - this.x;
+      const dy = f.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      const maxHitDist = this.r + f.r + maxRangeOffset;
+
+      // Close-range proximity safety: if enemy is within 70px offset, always include!
+      const isVeryClose = dist <= (this.r + f.r + 70);
+
+      if (dist <= maxHitDist) {
+        const angleToEnemy = Math.atan2(dy, dx);
+        let diff = angleToEnemy - facingAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+
+        if (isVeryClose || Math.abs(diff) <= coneAngle / 2) {
+          targets.push(f);
+        }
+      }
+    }
+
+    return targets;
+  }
+
+  // Try melee attack with crescent blade (hits all targets within front radius)
+  _tryMeleeAttack(opponent, ownerIndex) {
+    if (this.meleeCooldown > 0) return;
+
+    const meleeReach = CONFIG.cronos.meleeRange || 110;
+    const maxRange = this.r + (opponent ? opponent.r : 20) + meleeReach;
+
+    // Gather all targets within front radius or close proximity
+    const frontTargets = this._getFrontRadiusTargets(meleeReach, Math.PI * 1.3);
+    if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
+      const dx = opponent.x - this.x;
+      const dy = opponent.y - this.y;
+      if ((dx * dx + dy * dy) <= maxRange * maxRange) {
+        frontTargets.push(opponent);
+      }
+    }
+
+    if (frontTargets.length === 0) return;
 
     // --- Double Strike Logic ---
-    // Determine if this is the first or second strike in a potential combo.
     const isFirstStrike = this.doubleStrikeTimer <= 0;
 
     // Alternate the visual swing direction for a back-and-forth feel.
     this.meleeSwingDirection *= -1;
 
     if (isFirstStrike) {
-      // This is the first hit, so open the window for the second strike.
       this.doubleStrikeTimer = CONFIG.cronos.doubleStrikeWindow ?? 15;
     } else {
-      // This is the second hit, so close the window.
       this.doubleStrikeTimer = 0;
     }
 
-    // For the first strike, lock the swing angle toward the opponent.
-    // For the rapid second strike, reuse the initial angle so it swings back along the same visual line
-    // even if Cronos has zipped past the opponent's position.
-    if (isFirstStrike) {
+    if (isFirstStrike && opponent) {
       this.meleeSwingAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    } else if (isFirstStrike) {
+      this.meleeSwingAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
     }
 
     this.meleeSwingActive = true;
@@ -459,35 +516,34 @@ export class CronosFighter extends Fighter {
       hitText = 'POWER SLASH!';
     }
 
-    // If this was the first strike, use a short cooldown to allow the second strike.
-    // Otherwise, use the normal cooldown to end the combo.
     this.meleeCooldown = isFirstStrike ? Math.floor(meleeCooldown * 0.1) : meleeCooldown;
 
     this._spawnAttackSlashEffect();
-
-    applyDamageToTarget(opponent, meleeDamage, this, { isMelee: true });
     triggerGlobalScreenShake(this._isInsideOwnSphere() ? 8 : 4, 5);
-    
-    // Physical hit knockback (less per hit since he hits twice rapidly)
-    // Do not apply knockback to turrets
-    if (!opponent.isTurret) {
-      const kbAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      opponent.vx += Math.cos(kbAngle) * 4;
-      opponent.vy += Math.sin(kbAngle) * 4;
-    }
 
-    spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, hitText, '#FF007F');
+    // Apply damage, knockback, floating text, and passive time stop to ALL targets in front radius!
+    for (const target of frontTargets) {
+      applyDamageToTarget(target, meleeDamage, this, { isMelee: true });
 
-    // Passive stop chance on hit
-    if (Math.random() < CONFIG.cronos.passiveStopChance) {
-      if (opponent.applyTimeStop) {
-        if (!opponent.timeStopTimer || opponent.timeStopTimer <= 0) {
-          opponent.applyTimeStop(CONFIG.cronos.passiveStopDuration);
-          opponent._suppressFreezeTimer = true;
-          spawnFloatingText(opponent.x, opponent.y - opponent.r - 15, 'STOPPED!', '#00F3FF');
-        } else {
-          // Just refresh silently
-          opponent.applyTimeStop(CONFIG.cronos.passiveStopDuration);
+      // Physical hit knockback
+      if (!target.isTurret) {
+        const kbAngle = Math.atan2(target.y - this.y, target.x - this.x);
+        target.vx += Math.cos(kbAngle) * 4;
+        target.vy += Math.sin(kbAngle) * 4;
+      }
+
+      spawnFloatingText(target.x, target.y - target.r - 5, hitText, '#FF007F');
+
+      // Passive stop chance on hit
+      if (Math.random() < CONFIG.cronos.passiveStopChance) {
+        if (target.applyTimeStop) {
+          if (!target.timeStopTimer || target.timeStopTimer <= 0) {
+            target.applyTimeStop(CONFIG.cronos.passiveStopDuration);
+            target._suppressFreezeTimer = true;
+            spawnFloatingText(target.x, target.y - target.r - 15, 'STOPPED!', '#00F3FF');
+          } else {
+            target.applyTimeStop(CONFIG.cronos.passiveStopDuration);
+          }
         }
       }
     }
@@ -760,8 +816,9 @@ export class CronosFighter extends Fighter {
     // Custom bounce with sphere mechanics
     this.resolveWallBounce(arena, opponent);
 
-    // Try melee attack
-    if (opponent) {
+    // Try melee attack if any target or opponent is in reach
+    const frontTargetsForAttack = this._getFrontRadiusTargets(CONFIG.cronos.meleeRange || 110, Math.PI * 1.3);
+    if (opponent || frontTargetsForAttack.length > 0) {
       this._tryMeleeAttack(opponent, ownerIndex);
     }
   }

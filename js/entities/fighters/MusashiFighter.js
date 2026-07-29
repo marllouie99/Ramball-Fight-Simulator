@@ -214,20 +214,20 @@ export class MusashiFighter extends Fighter {
        
        if (this.flurryTimer > 0) this.flurryTimer--;
        if (this.flurryTimer <= 0) {
-         this.flurryHitsLeft--;
-         this.flurryTimer = 6; // 6 frames between hits
-         
-         // Cycle through all 5 stances during the flurry!
-         // This causes the weapon auras and the slash effects to change color on every single hit
          if (this.flurryHitsLeft <= 0) {
            // Activate smoke trail and restore real stance when flurry finishes
            this.flurryGhost = null;
+           this.flurryTarget = null;
            this.flurrySmokeTimer = 150; 
            this.currentStance = this.stances[this.stanceIndex];
-         } else {
-           const flurryStances = ['earth', 'water', 'fire', 'wind', 'void'];
-           this.currentStance = flurryStances[this.flurryHitsLeft % 5];
+           return;
          }
+
+         this.flurryHitsLeft--;
+         this.flurryTimer = 6; // 6 frames between hits
+
+         const flurryStances = ['earth', 'water', 'fire', 'wind', 'void'];
+         this.currentStance = flurryStances[this.flurryHitsLeft % 5];
          
          // Find all valid targets (fighters and illusions) within a large jump radius
          let possibleTargets = state.fighters.filter(f => f && f !== this && f.hp > 0 && Math.hypot(f.x - this.x, f.y - this.y) < 450);
@@ -244,7 +244,7 @@ export class MusashiFighter extends Fighter {
             this.strikeAngle = Math.random() * Math.PI * 2;
             
             this.flurryTarget.takeDamage(CONFIG.musashi.flurryDamage, this, {isMelee: true});
-            this.flurryTarget.applyHitStun(15);
+            if (typeof this.flurryTarget.applyHitStun === 'function') this.flurryTarget.applyHitStun(15);
             
             const isKatana = this.flurryHitsLeft % 2 === 0;
             this.spawnSlash(isKatana ? 'slash_katana' : 'slash_wakizashi', 0, 1.4);
@@ -284,11 +284,12 @@ export class MusashiFighter extends Fighter {
               });
             }
 
-            // Dramatic hit pause on both fighters to emphasize the strike
-            this.applyTimeStop(6);
-            this.flurryTarget.applyTimeStop(6);
+            // Freeze ONLY the target during the flurry strike (do NOT freeze Musashi himself!)
+            if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(8);
          } else {
             this.flurryHitsLeft = 0; // abort if target dies
+            this.flurryGhost = null;
+            this.flurryTarget = null;
          }
        }
        

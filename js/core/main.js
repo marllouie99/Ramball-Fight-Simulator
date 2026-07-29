@@ -15,6 +15,7 @@ import { updateBerserkerRageEffects } from '../graphics/particles/berserkerRageE
 import { updateBloodEffects } from '../graphics/particles/bloodEffect.js';
 import { updateSparkEffects } from '../graphics/particles/sparkEffect.js';
 import { updateLightningEffects, drawLightningEffects } from '../graphics/particles/lightningEffects.js';
+import { updateBlackFlashEffects, drawBlackFlashEffects } from '../graphics/particles/blackFlashEffect.js';
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
 import { FIGHTER_DEFS } from './config.js';
 import { drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, handleUIClick, handleUIMove, drawHUD, drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown } from '../graphics/ui.js';
@@ -405,6 +406,8 @@ function animate(timestamp) {
     if (!useAggressiveParticleMode || Math.random() > 0.6) {
       updateSparkEffects();
     }
+    // Update Black Flash effects (Todo's cursed energy strike)
+    updateBlackFlashEffects();
     // Update lightning effects for Zeus storm strikes
     updateLightningEffects();
     // Update burn effects (always update, even between rounds)
@@ -551,6 +554,7 @@ function animate(timestamp) {
       if (!useAggressiveParticleMode || Math.random() > (isDomainClash ? 0.65 : 0.4)) {
         drawSparkEffects(); // Draw spark effects on top of everything
       }
+      drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact
       drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
 
       drawMahoragaAdaptationDimScreen(); // Draw dark golden cinematic dim screen overlay when Mahoraga adapts wheel

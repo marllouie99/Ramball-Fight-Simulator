@@ -229,12 +229,40 @@ export class YutaFighter extends Fighter {
 
       if (this.flurryTimer > 0) this.flurryTimer--;
       if (this.flurryTimer <= 0) {
-        this.flurryHitsLeft--;
-        this.flurryTimer = CONFIG.yuta.flurryHitInterval || 6;
         if (this.flurryHitsLeft <= 0) {
           this.flurryGhost = null;
           this.flurryTarget = null;
           return; // Flurry finished
+        }
+
+        this.flurryHitsLeft--;
+        this.flurryTimer = CONFIG.yuta.flurryHitInterval || 6;
+
+        // Query nearby valid enemy targets (fighters & illusions/minions) within 450px
+        const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+        let possibleTargets = state.fighters.filter((f, idx) => {
+          if (!f || f === this || f.hp <= 0 || f.invincibilityTimer > 0) return false;
+          const enemyTeam = state.getFighterTeam(idx);
+          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) return false;
+          return Math.hypot(f.x - this.x, f.y - this.y) < 450;
+        });
+
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (!ill || ill.hp <= 0 || ill.owner === this || ill.isRika) return;
+            if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+            if (Math.hypot(ill.x - this.x, ill.y - this.y) < 450) {
+              possibleTargets.push(ill);
+            }
+          });
+        }
+
+        if (possibleTargets.length > 0) {
+          if (this.flurryTarget && this.flurryTarget.hp > 0 && Math.random() < 0.6 && possibleTargets.includes(this.flurryTarget)) {
+            // Keep primary target
+          } else {
+            this.flurryTarget = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+          }
         }
 
         if (this.flurryTarget && !this.flurryTarget.isDead) {
@@ -248,7 +276,7 @@ export class YutaFighter extends Fighter {
           const flurryDmg = (CONFIG.yuta.flurryDamage || 8) * dmgMult;
 
           this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true });
-          this.flurryTarget.applyHitStun(15);
+          if (typeof this.flurryTarget.applyHitStun === 'function') this.flurryTarget.applyHitStun(15);
 
           spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
           triggerGlobalScreenShake(6, 6);
@@ -258,10 +286,10 @@ export class YutaFighter extends Fighter {
           this.flurryTarget.vx += Math.cos(flurryAngle) * 2;
           this.flurryTarget.vy += Math.sin(flurryAngle) * 2;
 
-          // Teleport
+          // Teleport around target
           const angle = Math.random() * Math.PI * 2;
           const rk = this.rika;
-          if (rk.cooldownTimer <= 0 && !rk.active) {
+          if (rk && rk.cooldownTimer <= 0 && !rk.active) {
             rk.active = true;
             rk.timer = CONFIG.yuta.rikaDuration || 600;
             rk.x = this.x;
@@ -303,10 +331,12 @@ export class YutaFighter extends Fighter {
             playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
           }
 
-          if (typeof this.applyTimeStop === 'function') this.applyTimeStop(6);
-          if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(6);
+          // Freeze target during the flurry slash (do NOT freeze Yuta himself!)
+          if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(8);
         } else {
           this.flurryHitsLeft = 0;
+          this.flurryGhost = null;
+          this.flurryTarget = null;
         }
       }
 
@@ -521,27 +551,36 @@ export class YutaFighter extends Fighter {
     // so he doesn't get infinitely stun-locked by Gojo or Sukuna's rapid punches.
     if (this.hitStunTimer > 0 && !this.isChannelingDomain && this.hp > 0 && this.meleeCooldown <= 0) {
       let enemyInMelee = false;
-      const range = CONFIG.yuta.meleeRange || 75;
-      const arc = CONFIG.yuta.meleeArc || (Math.PI / 2);
+      const range = CONFIG.yuta.meleeRange || 95;
+      const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
-      // Auto-aim if stunned because super.update() skips aim() during hitStun (sluggish delayed reaction time if stealthed)
       if (opponent) {
         this.aim(opponent);
       }
 
-      for (let i = 0; i < state.fighters.length; i++) {
-        const enemy = state.fighters[i];
-        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed) continue;
+      const allTargets = [
+        ...(state.fighters || []),
+        ...(state.illusions || [])
+      ];
 
-        const enemyTeam = state.getFighterTeam(i);
-        if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+      for (let i = 0; i < allTargets.length; i++) {
+        const enemy = allTargets[i];
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isStealthed || enemy.isRika || enemy.owner === this) continue;
+
+        if (enemy.owner) {
+          const ownerTeam = state.getFighterTeam(state.fighters.indexOf(enemy.owner));
+          if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+        } else {
+          const enemyTeam = state.getFighterTeam(state.fighters.indexOf(enemy));
+          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+        }
 
         const dx = enemy.x - this.x;
         const dy = enemy.y - this.y;
         const dist = Math.hypot(dx, dy);
 
-        if (dist <= range + enemy.r) {
+        if (dist <= range + this.r + (enemy.r || 20)) {
           const enemyAngle = Math.atan2(dy, dx);
           let angleDiff = Math.abs(enemyAngle - this.gunAngle);
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -849,22 +888,32 @@ export class YutaFighter extends Fighter {
 
     // Check if an enemy is in melee range
     let enemyInMelee = false;
-    const range = CONFIG.yuta.meleeRange || 75;
-    const arc = CONFIG.yuta.meleeArc || (Math.PI / 2);
+    const range = CONFIG.yuta.meleeRange || 95;
+    const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
     const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
-    for (let i = 0; i < state.fighters.length; i++) {
-      const enemy = state.fighters[i];
-      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0) continue;
+    const allTargets = [
+      ...(state.fighters || []),
+      ...(state.illusions || [])
+    ];
 
-      const enemyTeam = state.getFighterTeam(i);
-      if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+    for (let i = 0; i < allTargets.length; i++) {
+      const enemy = allTargets[i];
+      if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isRika || enemy.owner === this) continue;
+
+      if (enemy.owner) {
+        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(enemy.owner));
+        if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+      } else {
+        const enemyTeam = state.getFighterTeam(state.fighters.indexOf(enemy));
+        if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+      }
 
       const dx = enemy.x - this.x;
       const dy = enemy.y - this.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist <= range + enemy.r) {
+      if (dist <= range + this.r + (enemy.r || 20)) {
         const enemyAngle = Math.atan2(dy, dx);
         let angleDiff = Math.abs(enemyAngle - this.gunAngle);
         while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
@@ -2263,6 +2312,16 @@ export class YutaFighter extends Fighter {
       ctx.fillStyle = (hpRatio > 0.5) ? '#2ecc71' : (hpRatio > 0.25) ? '#f1c40f' : '#e74c3c'; // Green for high health
       ctx.fillRect(barX, barY, barW * hpRatio, barH);
       
+      ctx.restore();
+    }
+
+    if (rk && rk.hitFlashTimer > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 1.5, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${rk.hitFlashTimer / 8})`;
+      ctx.fill();
       ctx.restore();
     }
 
