@@ -1,6 +1,6 @@
 import { CONFIG } from '../../../core/config.js';
 import { spawnFloatingText, state } from '../../../core/state.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 
 export const COPIED_TECHNIQUES = [
@@ -32,7 +32,7 @@ function executeCursedSpeech(fighter) {
   spawnFloatingText(fighter.x, fighter.y - 40, '"DONT MOVE!"', '#FFFFFF');
   
   // Play sound if we had one
-  // playSound('Assets/Sound Effects/Skills/cursedspeech.mp3', 0.8);
+  // audioSystem.playSFX('skill_cursedspeech', 0.8);
   
   // We'll handle the actual hit logic by spawning a special visual projectile 
   // that instantly expands and checks collisions in projectileSystem.js, 

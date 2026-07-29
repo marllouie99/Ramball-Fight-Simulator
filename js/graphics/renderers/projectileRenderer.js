@@ -10,7 +10,7 @@ import { drawGojoOrb, drawPurpleOrbTrail } from '../weapons/gojoWeaponGraphics.j
 
 
 import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash } from '../weapons/gunSlingerWeaponGraphics.js';
-import { drawEngineerBullet, drawTurretBullet } from '../engineerWeaponGraphics.js';
+import { drawEngineerBullet, drawTurretBullet } from '../weapons/engineerWeaponGraphics.js';
 import { drawRangerBullet } from '../weapons/rangerWeaponGraphics.js';
 import { drawCrimsonSniperBullet } from '../weapons/crimsonsniperWeaponGraphics.js';
 import { drawSukunaSlash, drawGhostBlade, drawSukunaCleave, drawSukunaFurnaceArrow, drawDivineFlameArrowConstruct } from '../weapons/sukunaWeaponGraphics.js';
@@ -30,6 +30,8 @@ export function drawProjectiles() {
   const maxX = arena.x + arena.width + cullPadding;
   const minY = arena.y - cullPadding;
   const maxY = arena.y + arena.height + cullPadding;
+
+  const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 
   projectiles.forEach((p) => {
     // Skip off-screen projectiles for performance
@@ -411,141 +413,28 @@ export function drawProjectiles() {
 
     // Sukuna slash visual
     if (p.visual === 'sukunaSlash') {
+      if (isGojoDomainActive) return;
       drawSukunaSlash(ctx, p);
       return;
     }
 
     // Ghost Blade visual
     if (p.visual === 'ghostBlade') {
+      if (isGojoDomainActive) return;
       drawGhostBlade(ctx, p);
       return;
     }
 
     // Sukuna Cleave visual
     if (p.visual === 'sukunaCleave') {
+      if (isGojoDomainActive) return;
       drawSukunaCleave(ctx, p);
+      return;
     }
 
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-      // LAYER 1: FLUID FLAME BLOBS â€” curling, twisting smoke-fire
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-
-      for (let i = p.flameParticles.length - 1; i >= 0; i--) {
-        const fp = p.flameParticles[i];
-        fp.life -= fp.decay;
-        if (fp.life <= 0) { p.flameParticles.splice(i, 1); continue; }
-
-        // Fluid curl motion: sine wobble + turbulence offset
-        fp.wobblePhase += fp.wobbleSpeed;
-        const turbX = Math.sin(fp.turbSeed + time * 3.5) * 2.0;
-        const turbY = Math.cos(fp.turbSeed * 1.7 + time * 2.8) * 3.0;
-        fp.x += fp.vx + turbX * 0.3;
-        fp.y += fp.vy + turbY * 0.3;
-        fp.vy += Math.sin(fp.wobblePhase) * 0.15; // gentle curling drift
-
-        const prog = fp.life / fp.maxLife;
-        const ageRatio = 1 - prog; // 0=new, 1=dying
-        const curSize = fp.size + (fp.maxSize - fp.size) * ageRatio;
-        const alpha = prog * prog; // quadratic falloff for smoother fade
-        const wobY = Math.sin(fp.wobblePhase) * 3.0;
-
-        // Velocity-stretched ellipses (more elongated = more speed feel)
-        const stretchX = curSize * (1.6 + speed * 0.03);
-        const stretchY = curSize * (0.7 + ageRatio * 0.3);
-
-        if (p.isFrozenByInfinity) {
-          ctx.fillStyle = fp.layer === 0
-            ? `rgba(255, 255, 255, ${alpha * 0.85})`
-            : fp.layer === 1
-            ? `rgba(0, 229, 255, ${alpha * 0.65})`
-            : `rgba(0, 120, 255, ${alpha * 0.45})`;
-        } else {
-          ctx.fillStyle = fp.layer === 0
-            ? `rgba(255, 245, 180, ${alpha * 0.75})`
-            : fp.layer === 1
-            ? `rgba(255, 140, 20, ${alpha * 0.55})`
-            : `rgba(220, 40, 0, ${alpha * 0.35})`;
-        }
-        ctx.beginPath();
-        ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-      // LAYER 2: GLOWING EMBER SPARKS â€” dissolving at trail end
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-      for (let i = p.emberParticles.length - 1; i >= 0; i--) {
-        const ep = p.emberParticles[i];
-        ep.life -= ep.decay;
-        if (ep.life <= 0) { p.emberParticles.splice(i, 1); continue; }
-        ep.trail.push({ x: ep.x, y: ep.y });
-        if (ep.trail.length > 8) ep.trail.shift();
-        ep.x += ep.vx;
-        ep.y += ep.vy;
-        ep.vy += (Math.random() - 0.5) * 0.4; // random drift
-        const prog = ep.life / ep.maxLife;
-
-        // Ember streak trail
-        if (ep.trail.length > 1) {
-          ctx.beginPath();
-          ctx.moveTo(ep.trail[0].x, ep.trail[0].y);
-          for (let t = 1; t < ep.trail.length; t++) ctx.lineTo(ep.trail[t].x, ep.trail[t].y);
-          ctx.lineTo(ep.x, ep.y);
-          ctx.strokeStyle = p.isFrozenByInfinity
-            ? `rgba(0, 229, 255, ${prog * 0.7})`
-            : `rgba(255, ${140 + prog * 115}, 40, ${prog * 0.6})`;
-          ctx.lineWidth = ep.size * 0.7;
-          ctx.lineCap = 'round';
-          ctx.stroke();
-        }
-
-        // Bright ember head
-        ctx.beginPath();
-        ctx.arc(ep.x, ep.y, ep.size * (0.5 + prog * 0.8), 0, Math.PI * 2);
-        ctx.fillStyle = p.isFrozenByInfinity
-          ? `rgba(224, 255, 255, ${prog})`
-          : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
-        ctx.fill();
-      }
-
-      ctx.restore(); // lighter
-
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-      // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES
-      // Thin velocity lines showing air being torn apart
-      // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-      ctx.save();
-      ctx.globalAlpha = 0.35;
-      ctx.strokeStyle = p.isFrozenByInfinity ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 200, 100, 0.4)';
-      ctx.lineWidth = 1.0;
-      ctx.lineCap = 'round';
-      for (let i = 0; i < 5; i++) {
-        const yOff = (i - 2) * 6 + Math.sin(time * 8 + i * 1.7) * 4;
-        const startX = -10 - Math.random() * 10;
-        const endX = startX - 25 - Math.random() * 35;
-        ctx.beginPath();
-        ctx.moveTo(startX, yOff);
-        ctx.lineTo(endX, yOff + Math.sin(time * 6 + i) * 3);
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      ctx.restore(); // restore translate/rotate
-
-      // Draw main Volcanic Magma / Electric Cyan Flame Arrow construct on top
-      drawDivineFlameArrowConstruct(ctx, {
-        x: p.x,
-        y: p.y,
-        angle,
-        scale: 1.0,
-        progress: 1.0,
-        isFlying: true,
-        time,
-        isFrozenByInfinity: p.isFrozenByInfinity
-      });
-
+    // Sukuna Furnace Arrow
+    if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
+      drawSukunaFurnaceArrow(ctx, p);
       return;
     }
 

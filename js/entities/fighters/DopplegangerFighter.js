@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { drawDopplegangerPurpleSword, drawDopplegangerBodyEffect } from '../../graphics/weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../../graphics/fighters/doppelgangerSkin.js';
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
@@ -183,7 +183,7 @@ export class DopplegangerFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 15, 'ILLUSION!', '#9b59b6');
     // Play summon illusion sound
     const illusionSound = getSkillSound(this._def?.id, 'summonillusion');
-    if (illusionSound) playSound(illusionSound.src, illusionSound.volume);
+    if (illusionSound) audioSystem.playSFX(illusionSound.src, illusionSound.volume);
   }
 
   _trySwordSwing(opponent, ownerIndex) {

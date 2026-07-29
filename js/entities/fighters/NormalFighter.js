@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -77,7 +77,7 @@ export class NormalFighter extends Fighter {
       if (this.magazineBullets === 2) {
         const readySound = getSkillEffectSound('sharpshooter', 'enhanceready');
         if (readySound) {
-          playSound(readySound.src, readySound.volume, readySound.speed || 1.0);
+          audioSystem.playSFX(readySound.src, readySound.volume, readySound.speed || 1.0);
         }
       }
     }
@@ -94,7 +94,7 @@ export class NormalFighter extends Fighter {
     if (isEnhanced && this._def?.id === 1) {
       const enhanceSound = getSkillSound(this._def?.id, 'enhance');
       if (enhanceSound) {
-        playSound(enhanceSound.src, enhanceSound.volume);
+        audioSystem.playSFX(enhanceSound.src, enhanceSound.volume);
       }
     } else {
       const sound = getBasicAttackSound(this._def?.id);
@@ -144,7 +144,7 @@ export class NormalFighter extends Fighter {
         spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
         const reloadSound = getSkillEffectSound('crimsonsniper', 'reload');
         if (reloadSound) {
-          playSound(reloadSound.src, reloadSound.volume, reloadSound.speed || 1.0);
+          audioSystem.playSFX(reloadSound.src, reloadSound.volume, reloadSound.speed || 1.0);
         }
       }
 

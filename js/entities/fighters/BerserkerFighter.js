@@ -1,7 +1,7 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawBerserkerDualAxes } from '../../graphics/weaponVisuals.js';
@@ -88,7 +88,7 @@ export class BerserkerFighter extends Fighter {
 
     const rageSound = getSkillSound(this._def?.id, 'rage');
     if (rageSound) {
-      playSound(rageSound.src, rageSound.volume);
+      audioSystem.playSFX(rageSound.src, rageSound.volume);
     }
   }
 

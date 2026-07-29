@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 import { applyDamageToTarget } from '../../fighter.js';
 import { CONFIG } from '../../../core/config.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { TOJI_WEAPON_CONFIG } from '../../../graphics/weapons/tojiWeaponGraphics.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
@@ -182,11 +182,11 @@ export function updateChainPhysics(fighter) {
 export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) {
   if (!fighter._secondSeqAudioPlayed) {
     const secondSeqSound = getSkillEffectSound('toji', 'secondweaponattack');
-    playSound(secondSeqSound);
+    audioSystem.playSFX(secondSeqSound);
   }
   fighter._secondSeqAudioPlayed = false;
-  playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
-  playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.2);
+  audioSystem.playSFX('attack_swordswing', 1.0);
+  audioSystem.playSFX('attack_fleshhit', 1.2);
 
   const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
   const reach = CONFIG.toji?.katanaRange || fighter.katanaRange || 75;
@@ -246,8 +246,8 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
   fighter.spearSwingMax = Math.round((isAmbushThrust ? 36 : 26) / speedMult);
   fighter.spearSwingTimer = fighter.spearSwingMax;
 
-  playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
-  playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.85);
+  audioSystem.playSFX('attack_swordswing', 0.85);
+  audioSystem.playSFX('skill_backstab', 0.85);
 
   const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
   const reach = CONFIG.toji?.spearRange || fighter.spearRange || 50;

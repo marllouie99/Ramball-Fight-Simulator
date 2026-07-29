@@ -395,6 +395,8 @@ class ProjectileSystem {
     proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 10;
     proj.isGojoPurple = true;
     proj.isGojoPurpleOrb = true;
+    proj.behaviorType = 'gojo_purple';
+    proj.visual = 'gojoPurpleOrb';
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
     proj.purpleDPS = CONFIG.gojo.purpleDPS || 5;
@@ -481,6 +483,7 @@ class ProjectileSystem {
     proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 35;
     proj.isSukunaFurnace = true;
     proj.visual = 'sukunaFurnaceArrow';
+    proj.behaviorType = 'sukuna_furnace';
     proj.history = [];
     proj.history.push({ x: proj.x, y: proj.y });
     proj.historyMax = 12;
@@ -2558,6 +2561,7 @@ class ProjectileSystem {
     proj.damage = damage || CONFIG.black.blackHoleDamage;
     proj.isBlackHole = true;
     proj.transformed = true;
+    proj.behaviorType = 'black_hole';
     proj.tickTimer = 0;
     proj.indicatorTimer = CONFIG.black.summonIndicatorFrames;
     proj.indicatorLife = CONFIG.black.summonIndicatorFrames;
@@ -2661,6 +2665,9 @@ class ProjectileSystem {
 }
 
 // Global projectile system instance for production use
+import { registerProjectileBehaviors } from './projectiles/projectileRegistry.js';
+registerProjectileBehaviors();
+
 export const projectileSystem = new ProjectileSystem();
 
 // Register with state module so getProjectiles/clearProjectiles work

@@ -2,7 +2,7 @@ import { Fighter } from './fighter.js';
 import { CONFIG } from '../core/config.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { spawnFloatingText, state } from '../core/state.js';
-import { playSound } from '../systems/soundSystem.js';
+import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { drawTurret } from '../graphics/weaponVisuals.js';
@@ -77,7 +77,7 @@ export class TurretEntity extends Fighter {
       spawnSparks(this.x, this.y, 8, 'orange');
     }
     const deathSound = getSkillEffectSound('turret', 'death');
-    if (deathSound) playSound(deathSound.src, deathSound.volume);
+    if (deathSound) audioSystem.playSFX(deathSound.src, deathSound.volume);
   }
 
   heal(amount) {
@@ -287,7 +287,7 @@ export class TurretEntity extends Fighter {
     projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX2, spawnY2, this.gunAngle);
 
     const shotSound = getBasicAttackSound(this._def?.id || 999, this._def?.type || 'turret');
-    if (shotSound) playSound(shotSound.src, shotSound.volume);
+    if (shotSound) audioSystem.playSFX(shotSound.src, shotSound.volume);
     
     // Spawn smoke particles at the muzzle tips
     for (let i = 0; i < 4; i++) {
@@ -328,7 +328,7 @@ export class TurretEntity extends Fighter {
     // Play sound
     const sound = getBasicAttackSound(this.owner._def.id, 'aimbot'); // Reusing aimbot sound for turret
     if (sound) {
-      playSound(sound.src, sound.volume * 0.7);
+      audioSystem.playSFX(sound.src, sound.volume * 0.7);
       this._attackSoundTimer = sound.delay;
       this._attackSoundConfig = sound;
     }

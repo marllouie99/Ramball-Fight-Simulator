@@ -1,7 +1,7 @@
 import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import { state, triggerGlobalScreenShake } from '../core/state.js';
-import { playSound } from './soundSystem.js';
+import { audioSystem } from '../systems/audioSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact } from '../graphics/particles/sparkEffect.js';
 
@@ -36,12 +36,12 @@ export const HitImpactSystem = {
       if (isMahoragaThrow) {
         spawnSparks(target.x, target.y, 16, 'paleStoneShatter');
         spawnImpactFlash(target.x, target.y, 35, '#E2E8F0');
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
-        playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.4);
+        audioSystem.playSFX('attack_fleshhit', 0.8);
+        audioSystem.playSFX('attack_groundsmash', 0.4);
       } else {
         spawnSparks(target.x, target.y, 10, 'crimsonSniper');
         spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.5);
+        audioSystem.playSFX('attack_fleshhit', 0.5);
 
         if (attacker) {
           if (!attacker.slashHitVisuals) attacker.slashHitVisuals = [];
@@ -194,9 +194,9 @@ export const HitImpactSystem = {
       // Play thunder strike sound on basic attack hit
       if (attacker && typeof attacker._def !== 'undefined') {
         const stormSound = getSkillSound(attacker._def.id, 'storm');
-        if (stormSound) playSound(stormSound.src, stormSound.volume * 0.5);
+        if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.5);
         const thunderSound = getSkillSound(attacker._def.id, 'thunderstrike');
-        if (thunderSound) playSound(thunderSound.src, (thunderSound.volume || 1.0) * 0.5);
+        if (thunderSound) audioSystem.playSFX(thunderSound.src, (thunderSound.volume || 1.0) * 0.5);
       }
       
       if (projectile.chainCount > 0) {

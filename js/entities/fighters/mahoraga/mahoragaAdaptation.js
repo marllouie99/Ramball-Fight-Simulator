@@ -7,7 +7,7 @@ import { CONFIG } from '../../../core/config.js';
 import { mahoragaAdaptationConfig } from './mahoragaAdaptationConfig.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 
 /**
@@ -170,8 +170,8 @@ export function triggerAdaptation(fighter, type, attacker) {
     });
 
     playSkillEffectSound('mahoraga', 'wheelclick');
-    playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+    audioSystem.playSFX('skill_dash5', 1.0);
+    audioSystem.playSFX('attack_swordswing', 1.0);
   } else {
     fighter.wheelGlowTimer = 40;
   }
@@ -214,8 +214,8 @@ export function triggerAdaptation(fighter, type, attacker) {
 
       spawnFloatingText(fighter.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
       triggerGlobalScreenShake(14, 30);
-      playSound('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+      audioSystem.playSFX('skill_dash3', 1.0);
+      audioSystem.playSFX('attack_swordswing', 1.0);
     }
   } else if (totalStages >= 2 || currentStage >= 2) {
     if (!fighter.hasAnnouncedLevel2) {
@@ -282,7 +282,7 @@ export function applyGojoAdaptation(fighter, gojoType) {
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+  audioSystem.playSFX('skill_dash3', 0.8);
 }
 
 /**

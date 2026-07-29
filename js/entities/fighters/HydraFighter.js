@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { drawHydraBody } from '../../graphics/fighters/hydraSkin.js';
 import { drawHydraGun } from '../../graphics/weapons/hydraWeaponGraphics.js';
 import { handleWeaponSteal, performStolenAttack as performStolenAttackLogic } from './hydra/hydraCopyMechanic.js';
@@ -132,7 +132,7 @@ export class HydraFighter extends Fighter {
     spawnSparks(opponent.x, opponent.y, 8, 'blood');
     
     spawnFloatingText(opponent.x, opponent.y, 'PUNCH!', '#fff');
-    playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.5);
+    audioSystem.playSFX('attack_fleshhit', 0.5);
   }
 
   update(opponent, ownerIndex, arena) {
@@ -243,7 +243,7 @@ export class HydraFighter extends Fighter {
     this.vy += Math.sin(this.gunAngle) * 3;
     
     spawnFloatingText(opponent.x, opponent.y, 'SMACK!', '#ccc');
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
+    audioSystem.playSFX('attack_swordswing', 0.5);
   }
 
   drawBody(ctx) {

@@ -1080,7 +1080,7 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
     hp: 250, // Tanky boss-like health
     damage: 25,
     cooldown: 60,
-    moveSpeed: 5.5, // Slow but menacing
+    moveSpeed: 6.5, // Slow but menacing
     projectileSpeedMultiplier: 1.0,
     ability: 'Wheel of Adaptation',
     desc: 'Adapts to damage types after taking multiple hits. Sword of Extermination deals True Damage.',

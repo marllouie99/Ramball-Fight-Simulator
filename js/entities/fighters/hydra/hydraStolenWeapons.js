@@ -1,5 +1,5 @@
 import { drawCronosCrescentBlade } from '../../../graphics/weapons/cronosWeaponGraphics.js';
-import { drawEngineerWrench } from '../../../graphics/engineerWeaponGraphics.js';
+import { drawEngineerWrench } from '../../../graphics/weapons/engineerWeaponGraphics.js';
 
 /**
  * Handles rendering of all weapons stolen by Hydra.

@@ -6,7 +6,7 @@
 import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
 import { spawnTeleportAfterimages } from './mahoragaSkills.js';
@@ -21,7 +21,7 @@ export function playRandomHeavyPunchSound(volume = 1.0) {
     'Assets/Sound Effects/Attacks/heavypunch3.mp3'
   ];
   const chosenSound = heavyPunches[Math.floor(Math.random() * heavyPunches.length)];
-  playSound(chosenSound, volume);
+  audioSystem.playSFX(chosenSound, volume);
 }
 
 /**
@@ -108,7 +108,7 @@ export function performMeleeAttack(fighter, opponent) {
       fighter.swordCombo = (fighter.swordCombo || 0) + 1;
       fighter.punchAnimTimer = 18;
       fighter.punchAnimMaxTimer = 18;
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+      audioSystem.playSFX('attack_swordswing', 1.0);
     }
 
     const frontTargets = getFrontRadiusTargets(fighter, CONFIG.mahoraga?.swordRange || 110, Math.PI * 1.3);
@@ -143,7 +143,7 @@ export function performMeleeAttack(fighter, opponent) {
     fighter.swordCombo = (fighter.swordCombo || 0) + 1;
     fighter.punchAnimTimer = 18;
     fighter.punchAnimMaxTimer = 18;
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+    audioSystem.playSFX('attack_swordswing', 1.0);
   }
 
   // AOE frontal arc damage to ALL targets
@@ -200,7 +200,7 @@ export function performMeleeAttack(fighter, opponent) {
 
     spawnTeleportAfterimages(fighter, oldX, oldY, fighter.x, fighter.y, fighter.gunAngle);
 
-    playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+    audioSystem.playSFX('skill_dash5', 1.0);
     spawnImpactFlash(fighter.x, fighter.y, 25, 'silver');
 
     // Post-teleport cooldown delay
@@ -213,8 +213,8 @@ export function performMeleeAttack(fighter, opponent) {
  */
 export function executeCleave(fighter, opponent) {
   triggerGlobalScreenShake(8, 15);
-  playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
-  playSound('Assets/Sound Effects/Attacks/explosion.mp3', 0.6);
+  audioSystem.playSFX('attack_swordswing', 1.0);
+  audioSystem.playSFX('attack_explosion', 0.6);
 
   const cleaveRadius = CONFIG.mahoraga?.cleaveRadius || 150;
   const damage = CONFIG.mahoraga?.cleaveDamage || 40;
@@ -276,7 +276,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
     customAngle
   );
 
-  playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
+  audioSystem.playSFX('attack_swordswing', 0.6);
 }
 
 /**
@@ -288,8 +288,8 @@ export function executeShout(fighter, opponent, ownerIndex) {
   const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 18;
 
   triggerGlobalScreenShake(10, 20);
-  playSound('Assets/Sound Effects/Attacks/explosion.mp3', 0.8);
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+  audioSystem.playSFX('attack_explosion', 0.8);
+  audioSystem.playSFX('skill_dash3', 0.9);
 
   spawnMeleeClashShockwave(fighter.x, fighter.y, shoutRadius, 'silver');
   spawnImpactFlash(fighter.x, fighter.y, shoutRadius * 0.7, '#E0E0E0');

@@ -1,3 +1,4 @@
+import { fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -10,7 +11,7 @@ import { updateStolenRubyHook, updateStolenCronosSphere, resolveStolenCronosWall
 import { getStolenMultiplier, STOLEN_SKILL_CONFIG } from './trickster/stolenSkillConfig.js';
 import { TricksterRubyTheme, TricksterCronosTheme } from './trickster/tricksterThemes.js';
 import { drawRubyScythe } from '../../graphics/weapons/rubyWeaponGraphics.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
@@ -299,10 +300,10 @@ export class TricksterFighter extends Fighter {
     spawnSparks(target.x, target.y, 10, 'arcane');
     
     const stormSound = getSkillSound(99, 'storm');
-    if (stormSound) playSound(stormSound.src, stormSound.volume * 0.6);
+    if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.6);
 
     const thunderSound = getSkillSound('zeus', 'thunderstrike');
-    if (thunderSound) playSound(thunderSound.src, (thunderSound.volume || 1.0) * 0.6);
+    if (thunderSound) audioSystem.playSFX(thunderSound.src, (thunderSound.volume || 1.0) * 0.6);
     
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
     state.zeusStormStrikes.push({
@@ -464,7 +465,7 @@ export class TricksterFighter extends Fighter {
 
         if (this.beamCharge === 0) {
           const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
-          if (chargeSound) playSound(chargeSound.src, chargeSound.volume);
+          if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume);
         }
         
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
@@ -488,7 +489,7 @@ export class TricksterFighter extends Fighter {
           }
           if (!this._isLaserSoundPlaying) {
             const sound = getBasicAttackSound('laser', 'laser'); // Assuming LaserFighter uses this for its beam sound
-            if (sound) playLoopingSound(this._laserSoundKey, sound.src, sound.volume);
+            if (sound) audioSystem.playLoop(this._laserSoundKey, sound.src, sound.volume);
             this._isLaserSoundPlaying = true;
           }
 
@@ -1097,7 +1098,7 @@ export class TricksterFighter extends Fighter {
         spawnFloatingText(this.x, this.y - this.r - 20, 'ARCANE STORM!', '#00ff64');
         triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
         const stormSound = getSkillSound(99, 'storm');
-        if (stormSound) playSound(stormSound.src, stormSound.volume * 0.7);
+        if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.7);
         break;
       case 'grenadier':
         projectileSystem.fireGrenade(this, ownerIndex, (CONFIG.grenadier.poisonDamagePerTick || 10) * getStolenMultiplier(this.stolenType, 'damageMultiplier'), opponent);
@@ -1142,7 +1143,7 @@ export class TricksterFighter extends Fighter {
            
            const enhanceSound = getSkillSound(1, 'enhance'); // 1 is Sharpshooter ID
            if (enhanceSound) {
-             playSound(enhanceSound.src, enhanceSound.volume);
+             audioSystem.playSFX(enhanceSound.src, enhanceSound.volume);
            }
         }
         break;

@@ -2,7 +2,7 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { TurretEntity } from '../TurretEntity.js';
@@ -133,7 +133,7 @@ export class EngineerFighter extends Fighter {
       this.turretEntity = turret;
       
       const sound = getSkillSound(this._def?.id, 'deploy');
-      if (sound) playSound(sound.src, sound.volume);
+      if (sound) audioSystem.playSFX(sound.src, sound.volume);
     }
 
     if (this.isBuildingTurret) {
@@ -159,7 +159,7 @@ export class EngineerFighter extends Fighter {
         this.wrenchAngle = this.gunAngle;
         
         const buildSound = getSkillSound(this._def?.id, 'build');
-        if (buildSound) playSound(buildSound.src, buildSound.volume);
+        if (buildSound) audioSystem.playSFX(buildSound.src, buildSound.volume);
         
         triggerGlobalScreenShake(4, 5);
       }
@@ -191,7 +191,7 @@ export class EngineerFighter extends Fighter {
         spawnFloatingText(this.x, this.y - this.r - 5, "HEAL!", "#00FF00");
         
         const healSound = getSkillSound(this._def?.id, 'repair');
-        if (healSound) playSound(healSound.src, healSound.volume);
+        if (healSound) audioSystem.playSFX(healSound.src, healSound.volume);
       }
     }
 
@@ -216,7 +216,7 @@ export class EngineerFighter extends Fighter {
           spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'WHACK!', '#FFD700');
           
           const hitSound = getBasicAttackSound(this._def?.id, 'melee'); // Default melee or specific
-          if (hitSound) playSound(hitSound.src, hitSound.volume);
+          if (hitSound) audioSystem.playSFX(hitSound.src, hitSound.volume);
         }
       } else if (dist <= CONFIG.Engineer.shotgunRange) {
         // Range: Shotgun
@@ -279,7 +279,7 @@ export class EngineerFighter extends Fighter {
     });
 
     const shotSound = getBasicAttackSound(this._def?.id);
-    if (shotSound) playSound(shotSound.src, shotSound.volume);
+    if (shotSound) audioSystem.playSFX(shotSound.src, shotSound.volume);
     
     this.shotgunCooldown = CONFIG.Engineer.shotgunCooldown;
     this.shotgunRecoilTimer = 15;

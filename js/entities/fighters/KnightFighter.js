@@ -3,7 +3,7 @@ import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, getProjectiles, clearProjectiles, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -42,7 +42,7 @@ class KnightChargingState extends FighterState {
     super.enter(prevState);
     this.duration = CONFIG.knight.dashChargeFrames;
     this.hasAppliedKnockback = false;
-    playSound('Assets/Sound Effects/Skills/shieldcharge.mp3', 0.8);
+    audioSystem.playSFX('skill_shieldcharge', 0.8);
   }
 
   update(dt) {
@@ -79,7 +79,7 @@ class KnightDashingState extends FighterState {
     super.enter(prevState);
     this.duration = CONFIG.knight.dashDuration || 40;
     this.hasHit = false;
-    playSound('Assets/Sound Effects/Skills/dash1.mp3', 0.6);
+    audioSystem.playSFX('skill_dash1', 0.6);
     
     // Lock target position from when sword broke
     this.targetX = this.fighter.dashTargetX;
@@ -227,7 +227,7 @@ export class KnightFighter extends Fighter {
         this.shieldHealth--;
         // Play shield block sound
         const blockSound = getSkillSound(this._def?.id, 'shieldblock');
-        if (blockSound) playSound(blockSound.src, blockSound.volume);
+        if (blockSound) audioSystem.playSFX(blockSound.src, blockSound.volume);
         if (this.shieldHealth <= 0 && !this.shieldBroken) {
           this.shieldBroken = true;
           this.canThrowSword = true; // allow sword throw

@@ -10,9 +10,9 @@ export const gojoConfig = {
     bluePullForce: 0.5,       // Pull strength of Blue
     redDamage: 50,            // Base damage dealt by Reversal Red blast
     redKnockback: 25,         // Knockback force of Red
-    redCooldown: 1200,         // Cooldown of Red
+    redCooldown: 1000,         // Cooldown of Red
     redRange: 100,            // Base range
-    redTriggerRange: 280,     // Range in pixels to trigger Red against enemies (including ranged fighters)
+    redTriggerRange: 80,     // Range in pixels to trigger Red against enemies (including ranged fighters)
     redBlastRadius: 400,      // Explosive blast wave radius in pixels that repels enemies on detonation
     redTotalFrames: 75,       // Total frames for full Red animation (~1.25s at 60fps)
     redBuildupFrames: 100,     // Frames of orb manifestation before the BOOM (~0.33s)
@@ -36,9 +36,9 @@ export const gojoConfig = {
     purplePullForce: 8.0,    // How strongly enemies and illusions are dragged toward the orb center
     purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
     purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
-    domainCooldown: 1500,     // 20s Ultimate cooldown
-    domainChargeMax: 150,     // 2s Channeling duration before domain opens
-    domainDuration: 350,      // Domain lasts 3 seconds (paralyzes enemies)
+    domainCooldown: 2000,     // 20s Ultimate cooldown
+    domainChargeMax: 130,     // 2s Channeling duration before domain opens
+    domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
     domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
     domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
     // Reverse Cursed Technique - Self heal when at low HP
@@ -65,7 +65,7 @@ export const gojoConfig = {
     infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
     infinityFreezeDuration: 50,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
     infinityMeleeFreezeDuration: 10,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
-    infinityMaxFrozenProjectiles: 10,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
+    infinityMaxFrozenProjectiles: 15,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
 
     // Anime Melee Combat Rhythm & Disengage
     forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round

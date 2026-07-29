@@ -1,7 +1,8 @@
+import { fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
 import { state, spawnFloatingText } from '../../core/state.js';
-import { playSound, playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawWhiteRailgun, drawWhiteChargeEffect } from '../../graphics/weaponVisuals.js';
@@ -264,7 +265,7 @@ export class LaserFighter extends Fighter {
       if (this.shootCooldown === 0) {
         if (this.beamCharge === 0) {
           const chargeSound = getSkillEffectSound('solarchampion', 'lasercharge');
-          if (chargeSound) playSound(chargeSound.src, chargeSound.volume);
+          if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume);
         }
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
         
@@ -291,7 +292,7 @@ export class LaserFighter extends Fighter {
         }
         if (!this._isLaserSoundPlaying) {
           const sound = getBasicAttackSound(this._def?.id, this._def?.type);
-          playLoopingSound(this._laserSoundKey, sound.src, sound.volume);
+          audioSystem.playLoop(this._laserSoundKey, sound.src, sound.volume);
           this._isLaserSoundPlaying = true;
         }
 

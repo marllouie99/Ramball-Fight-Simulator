@@ -12,7 +12,7 @@ export const sukunaConfig = {
     slashSpeed: 50,          // Speed of Dismantle slash projectiles
     slashCooldown: 50,       // Frames between basic attacks
     meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
-    meleePunchCooldown: 12,  // Cooldown in frames (~0.2s) between attack-teleport punches in melee mode
+    meleePunchCooldown: 15,  // Cooldown in frames (~0.2s) between attack-teleport punches in melee mode
 
     // Teleport Dodge / Evade Mechanic
     teleportDodgeChance: 0.10,               // 30% chance to teleport dodge incoming attacks
@@ -40,7 +40,7 @@ export const sukunaConfig = {
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
-    divineFlameCooldown: 610,      // Cooldown between Furnace uses (8.33 seconds)
+    divineFlameCooldown: 1500,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 150,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 100,         // Primary direct hit nuke damage
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
@@ -51,7 +51,7 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1000,     // Cooldown before domain can trigger (25 seconds at 60 fps)
+    domainCooldown: 2000,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
     domainDamage: 10,          // Base damage per slash tick

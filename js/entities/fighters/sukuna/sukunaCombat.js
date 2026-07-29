@@ -5,7 +5,7 @@
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
 
@@ -62,7 +62,7 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   spawnFloatingText(oldX, oldY - fighter.r - 10, 'EVADE!', '#FF2400');
   spawnImpactFlash(oldX, oldY, 22, 'crimsonSniper');
   spawnImpactFlash(fighter.x, fighter.y, 22, 'crimsonSniper');
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+  audioSystem.playSFX('skill_dash3', 0.8);
 
   spawnTeleportAfterimages(fighter, oldX, oldY, fighter.x, fighter.y);
 }
@@ -91,7 +91,7 @@ export function teleportAwayFrom(fighter, opponent, arena) {
   spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
   spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
   spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+  audioSystem.playSFX('skill_dash3', 0.8);
 }
 
 export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
@@ -146,7 +146,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
     spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
     spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.6);
+    audioSystem.playSFX('skill_dash3', 0.6);
   } else {
     if (typeof fighter.aim === 'function') fighter.aim(opponent);
   }
@@ -250,7 +250,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'MARTIAL ARTS', '#8B0000');
 
   const attackSound = getBasicAttackSound(null, 'sukuna_melee');
-  if (attackSound) playSound(attackSound.src, attackSound.volume * 0.8);
+  if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume * 0.8);
 
   // Time stop removed here so it does not cancel ultimates / domain channeling via hard CC!
   fighter.meleePunchCooldown = punchCooldown;

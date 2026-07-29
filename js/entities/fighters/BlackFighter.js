@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawVoidmasterWeapon } from '../../graphics/weapons/voidmasterWeaponGraphics.js';
@@ -112,7 +112,7 @@ export class BlackFighter extends Fighter {
         this.shootCooldown = this._def?.cooldown || CONFIG.black.shotCooldown || 35;
 
         const sound = getBasicAttackSound(this._def?.id);
-        if (sound) playSound(sound.src, sound.volume);
+        if (sound) audioSystem.playSFX(sound.src, sound.volume);
       }
     }
 
@@ -153,7 +153,7 @@ export class BlackFighter extends Fighter {
     projectileSystem.fireBlackHole(spawnX, spawnY, ownerIndex, CONFIG.black.blackHoleDamage);
 
     const bhSound = getSkillSound(this._def?.id, 'blackhole');
-    if (bhSound) playSound(bhSound.src, bhSound.volume);
+    if (bhSound) audioSystem.playSFX(bhSound.src, bhSound.volume);
 
     this.skillCooldown = CONFIG.black.skillCooldown;
     spawnFloatingText(spawnX, spawnY, 'BLACK HOLE!', '#9900ff');

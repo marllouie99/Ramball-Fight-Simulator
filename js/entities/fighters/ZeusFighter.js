@@ -1,7 +1,7 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -116,7 +116,7 @@ export class ZeusFighter extends Fighter {
     triggerGlobalScreenShake(4, 5);
     
     const sound = getSkillSound(this._def?.id, 'aegis');
-    if (sound) playSound(sound.src, sound.volume);
+    if (sound) audioSystem.playSFX(sound.src, sound.volume);
   }
 
   update(opponent, ownerIndex, arena) {
@@ -143,7 +143,7 @@ export class ZeusFighter extends Fighter {
         spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'CHARGING STORM...', '#00FFFF');
         // Play an ominous gathering sound if available, otherwise reuse aegis logic
         const sound = getSkillSound(this._def?.id, 'aegis');
-        if (sound) playSound(sound.src, sound.volume * 0.7);
+        if (sound) audioSystem.playSFX(sound.src, sound.volume * 0.7);
       }
     }
     
@@ -154,7 +154,7 @@ export class ZeusFighter extends Fighter {
     if (this.isChargingStorm && !this._thunderCloudSoundPlayed) {
       this._thunderCloudSoundPlayed = true;
       const cloudSound = getSkillEffectSound('zeus', 'thundercloud');
-      if (cloudSound) playSound(cloudSound.src, cloudSound.volume);
+      if (cloudSound) audioSystem.playSFX(cloudSound.src, cloudSound.volume);
     }
     // Reset flag when not charging
     if (!this.isChargingStorm) {
@@ -213,7 +213,7 @@ export class ZeusFighter extends Fighter {
     triggerGlobalScreenShake(CONFIG.zeus.stormCastShakeIntensity || 8, CONFIG.zeus.stormCastShakeFrames || 20);
     
     const sound = getSkillSound(this._def?.id, 'storm');
-    if (sound) playSound(sound.src, sound.volume);
+    if (sound) audioSystem.playSFX(sound.src, sound.volume);
   }
   
   _processStorm() {
@@ -278,10 +278,10 @@ export class ZeusFighter extends Fighter {
     
     // Play storm strike sound for each hit (both stormstrike.mp3 & thunderstrike.mp3)
     const stormSound = getSkillSound(this._def?.id, 'storm');
-    if (stormSound) playSound(stormSound.src, stormSound.volume * 0.6);
+    if (stormSound) audioSystem.playSFX(stormSound.src, stormSound.volume * 0.6);
 
     const thunderSound = getSkillSound(this._def?.id, 'thunderstrike');
-    if (thunderSound) playSound(thunderSound.src, thunderSound.volume * 0.6);
+    if (thunderSound) audioSystem.playSFX(thunderSound.src, thunderSound.volume * 0.6);
     
     // Register storm strike visual globally
     if (!state.zeusStormStrikes) state.zeusStormStrikes = [];

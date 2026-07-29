@@ -5,7 +5,7 @@
 import { applyDamageToTarget } from '../../fighter.js';
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { fastCleanArray, pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
@@ -23,9 +23,9 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 
   const strikeSound = getSkillEffectSound('toji', 'strike');
   if (strikeSound) {
-    playSound(strikeSound.src, strikeSound.volume);
+    audioSystem.playSFX(strikeSound.src, strikeSound.volume);
   } else {
-    playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+    audioSystem.playSFX('skill_dash5', 1.0);
   }
 
   const steps = 6;
@@ -123,7 +123,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   spawnImpactFlash(fighter.x, fighter.y, 30, '#A040FF');
   spawnMeleeClashShockwave(fighter.x, fighter.y, 90, 'yuta'); 
   const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
-  playSound(tpSound?.src || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpSound?.volume || 1.0, tpSound?.speed || 1.0, 0, tpSound?.delay || 0);
+  audioSystem.playSFX(tpSound?.src || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpSound?.volume || 1.0, tpSound?.speed || 1.0, 0, tpSound?.delay || 0);
 }
 
 export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
@@ -197,8 +197,8 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       spawnImpactFlash(clampedBack.x, clampedBack.y, 35, 'rgba(255, 30, 75, 0.8)');
       spawnMeleeClashShockwave(clampedBack.x, clampedBack.y, 110, 'yuta');
       const strikeSound = getSkillEffectSound('toji', 'strike');
-      if (strikeSound) playSound(strikeSound.src, strikeSound.volume);
-      playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.8);
+      if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
+      audioSystem.playSFX('skill_backstab', 0.8);
     }
   } else if (fighter.ambushPhase === 'BACK_CHARGE') {
     fighter.vx = 0;
@@ -236,9 +236,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       spawnSparks(fighter.x, fighter.y, 20, 'crimson');
 
       const backthrustSound = getSkillEffectSound('toji', 'backthrust');
-      playSound(backthrustSound?.src || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', backthrustSound?.volume || 1.2, backthrustSound?.speed || 1.0, 0, backthrustSound?.delay || 0);
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
-      playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
+      audioSystem.playSFX(backthrustSound?.src || 'Assets/Sound Effects/Skills/toji-backthrust.mp3', backthrustSound?.volume || 1.2, backthrustSound?.speed || 1.0, 0, backthrustSound?.delay || 0);
+      audioSystem.playSFX('attack_swordswing', 0.8);
+      audioSystem.playSFX('attack_fleshhit', 0.8);
 
       fighter.performInvertedSpearStrike(opponent, ownerIndex, true);
 
@@ -256,7 +256,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       fighter.ambushPhase = 'KATANA_DRAW';
       fighter.ambushTimer = 4;
 
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
+      audioSystem.playSFX('attack_swordswing', 0.85);
       spawnImpactFlash(fighter.x, fighter.y, 45, '#E2E6EC');
       spawnMeleeClashShockwave(fighter.x, fighter.y, 80, 'yuta');
       spawnSparks(fighter.x, fighter.y, 16, 'crimsonSniper');
@@ -306,7 +306,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       fighter.ambushTimer = CONFIG.toji?.ambushKatanaChargeDuration || 20;
 
       const strikeSound = getSkillEffectSound('toji', 'strike');
-      if (strikeSound) playSound(strikeSound.src, strikeSound.volume);
+      if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
       spawnImpactFlash(fighter.x, fighter.y, 35, 'rgba(255, 30, 75, 0.8)');
       spawnMeleeClashShockwave(fighter.x, fighter.y, 120, 'yuta');
     }
@@ -326,7 +326,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       const advanceFrames = Math.round(Math.abs(soundDelay < -10 ? soundDelay / 1000 : soundDelay) * 60);
       if (fighter.ambushTimer <= advanceFrames) {
         fighter._secondSeqAudioPlayed = true;
-        playSound(secondSeqSound);
+        audioSystem.playSFX(secondSeqSound);
       }
     }
 
@@ -419,9 +419,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.phantomSlashTimer = flurryFrameRate;
         fighter._flurryHitApplied = false;
 
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.1);
+        audioSystem.playSFX('attack_swordswing', 1.1);
         const strikeSound = getSkillEffectSound('toji', 'strike');
-        if (strikeSound) playSound(strikeSound.src, strikeSound.volume * 0.7);
+        if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume * 0.7);
       } else {
         // Apply the big final knockback blast before releasing the target
         if (opponent && opponent.hp > 0 && !opponent.isTurret && !opponent.cannotBeKnockbacked) {
@@ -512,8 +512,8 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         if (isFinalStrike) {
            spawnCrimsonLightningImpact(contactX, contactY, 130);
            const finSound = getSkillEffectSound('toji', 'strike');
-           if (finSound) playSound(finSound.src, finSound.volume || 1.0);
-           playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
+           if (finSound) audioSystem.playSFX(finSound.src, finSound.volume || 1.0);
+           audioSystem.playSFX('attack_swordswing', 0.9);
         }
       }
     }

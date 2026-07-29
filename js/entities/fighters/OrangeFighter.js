@@ -1,8 +1,9 @@
+import { fadeOutLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state } from '../../core/state.js';
-import { playLoopingSound, fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { drawOrangeFlamethrowerGun } from '../../graphics/weaponVisuals.js';
 import { flamewardenFlameSystem } from '../../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -256,7 +257,7 @@ export class OrangeFighter extends Fighter {
       }
       if (!this._isFlameSoundPlaying) {
         const sound = getBasicAttackSound(this._def?.id);
-        playLoopingSound(this._flameSoundKey, sound.src, sound.volume);
+        audioSystem.playLoop(this._flameSoundKey, sound.src, sound.volume);
         this._isFlameSoundPlaying = true;
       }
 

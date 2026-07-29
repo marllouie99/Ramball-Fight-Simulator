@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, getProjectiles, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { spawnSparks } from '../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../../graphics/weapons/musashiWeaponGraphics.js';
@@ -121,7 +121,7 @@ export class MusashiFighter extends Fighter {
       this.x = attacker.x - (dx / dist) * (attacker.r + this.r + 15);
       this.y = attacker.y - (dy / dist) * (attacker.r + this.r + 15);
       const dashSound = getSkillSound('musashi', 'dash');
-      if (dashSound) playSound(dashSound.src, dashSound.volume);
+      if (dashSound) audioSystem.playSFX(dashSound.src, dashSound.volume);
       
       // Spawn afterimages (closely packed trail)
       if (!this.afterImages) this.afterImages = [];
@@ -253,7 +253,7 @@ export class MusashiFighter extends Fighter {
             triggerGlobalScreenShake(6, 6);
             spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 10, 'flash');
             const attackSound = getBasicAttackSound('musashi');
-            if (attackSound) playSound(attackSound.src, attackSound.volume);
+            if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
             
             this.strikeTimer = 10;
             this.gunAngle = this.strikeAngle; // visual weapon update
@@ -399,7 +399,7 @@ export class MusashiFighter extends Fighter {
          this.y = opponent.y + (dy/dist) * (this.r + opponent.r + 5);
          this.dashAnimTimer = 15;
          const dashSound = getSkillSound('musashi', 'dash');
-         if (dashSound) playSound(dashSound.src, dashSound.volume);
+         if (dashSound) audioSystem.playSFX(dashSound.src, dashSound.volume);
          
          if (!this.afterImages) this.afterImages = [];
          const teleportDist = Math.sqrt((this.x - oldX)**2 + (this.y - oldY)**2);
@@ -421,7 +421,7 @@ export class MusashiFighter extends Fighter {
          
          spawnFloatingText(this.x, this.y - 30, 'PHANTOM FLURRY!', '#ff00ff');
          const attackSound = getBasicAttackSound('musashi');
-         if (attackSound) playSound(attackSound.src, attackSound.volume);
+         if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
          isAttacking = true;
       }
 
@@ -445,7 +445,7 @@ export class MusashiFighter extends Fighter {
           triggerGlobalScreenShake(4, 5);
           spawnSparks(opponent.x, opponent.y, 8, 'flash');
           const attackSound = getBasicAttackSound('musashi');
-          if (attackSound) playSound(attackSound.src, attackSound.volume);
+          if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
           
           isAttacking = true;
         }
@@ -468,14 +468,14 @@ export class MusashiFighter extends Fighter {
           triggerGlobalScreenShake(5, 5);
           spawnSparks(opponent.x, opponent.y, 12, 'flash');
           const attackSound = getBasicAttackSound('musashi');
-          if (attackSound) playSound(attackSound.src, attackSound.volume);
+          if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
           
           if (this.currentStance === 'water') {
              // Dodge slide backwards or through
              this.x += Math.cos(this.gunAngle) * 30;
              this.y += Math.sin(this.gunAngle) * 30;
              const dashSound = getSkillSound('musashi', 'dash');
-             if (dashSound) playSound(dashSound.src, dashSound.volume);
+             if (dashSound) audioSystem.playSFX(dashSound.src, dashSound.volume);
              this.dashAnimTimer = 15;
           }
           isAttacking = true;

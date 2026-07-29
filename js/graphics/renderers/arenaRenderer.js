@@ -246,3 +246,128 @@ export function drawMahoragaAdaptationDimScreen() {
   ctx.fillRect(-200, -200, canvas.width + 400, canvas.height + 400);
   ctx.restore();
 }
+
+export function drawFuelPickups() {
+  const { ctx, fuelPickups, fighters } = state;
+
+  // Only draw fuel pickups if an Orange fighter is currently alive in the arena.
+  const hasOrange = fighters.some(f => f && f.hp > 0 && f._def.type === 'orange');
+  if (!hasOrange) return;
+
+  fuelPickups.forEach(pickup => {
+    if (!pickup.active) return;
+
+    ctx.save();
+
+    // Pulsing effect
+    const pulse = 0.85 + Math.sin(pickup.pulsePhase) * 0.15;
+    const r = pickup.radius * pulse; // base radius for scaling
+
+    // â”€â”€ Outer glow â”€â”€
+    const glowGrad = ctx.createRadialGradient(pickup.x, pickup.y, r * 0.6, pickup.x, pickup.y, r * 2.2);
+    glowGrad.addColorStop(0, 'rgba(255, 180, 30, 0.5)');
+    glowGrad.addColorStop(0.5, 'rgba(255, 120, 0, 0.25)');
+    glowGrad.addColorStop(1, 'rgba(255, 60, 0, 0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(pickup.x, pickup.y, r * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+
+    // â”€â”€ Battery dimensions â”€â”€
+    const bw = r * 1.6;   // battery body width (half)
+    const bh = r * 1.1;   // battery body height (half)
+    const br = r * 0.35;  // corner radius
+    const nx = pickup.x;  // center x
+    const ny = pickup.y;  // center y
+
+    // â”€â”€ Battery body (rounded rectangle) â”€â”€
+    ctx.fillStyle = '#4a4a4a';
+    ctx.beginPath();
+    roundedRect(ctx, nx - bw, ny - bh, bw * 2, bh * 2, br);
+    ctx.fill();
+
+    // ── Body metallic gradient overlay ──
+    const bodyGrad = ctx.createLinearGradient(nx - bw, ny - bh, nx + bw, ny + bh);
+    bodyGrad.addColorStop(0, '#6e6e6e');
+    bodyGrad.addColorStop(0.3, '#8a8a8a');
+    bodyGrad.addColorStop(0.5, '#b0b0b0');
+    bodyGrad.addColorStop(0.7, '#8a8a8a');
+    bodyGrad.addColorStop(1, '#5a5a5a');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    roundedRect(ctx, nx - bw + 1.5, ny - bh + 1.5, bw * 2 - 3, bh * 2 - 3, br - 1);
+    ctx.fill();
+
+    // ── Positive terminal nub (top) ──
+    const nubW = r * 0.35;
+    const nubH = r * 0.45;
+    ctx.fillStyle = '#c0c0c0';
+    ctx.beginPath();
+    roundedRect(ctx, nx - nubW, ny - bh - nubH, nubW * 2, nubH, r * 0.15);
+    ctx.fill();
+    // nub highlight
+    ctx.fillStyle = '#e0e0e0';
+    ctx.beginPath();
+    roundedRect(ctx, nx - nubW + 1, ny - bh - nubH + 1, nubW * 2 - 2, nubH * 0.55, r * 0.1);
+    ctx.fill();
+
+    // ── Fuel level indicator (colored bar inside battery) ──
+    const fuelRatio = 0.75; // pickups are always "full" looking
+    const barPad = r * 0.25;
+    const barX = nx - bw + barPad;
+    const barY = ny - bh + barPad;
+    const barW = (bw * 2 - barPad * 2) * fuelRatio;
+    const barH = bh * 2 - barPad * 2;
+
+    // Bar background (dark empty portion)
+    ctx.fillStyle = '#2a2a2a';
+    ctx.beginPath();
+    roundedRect(ctx, barX, barY, bw * 2 - barPad * 2, barH, r * 0.12);
+    ctx.fill();
+
+    // Bar fill (green-to-orange gradient = energy)
+    const barGrad = ctx.createLinearGradient(barX, barY, barX + barW, barY);
+    barGrad.addColorStop(0, '#4caf50');
+    barGrad.addColorStop(0.5, '#ff9800');
+    barGrad.addColorStop(1, '#ff5722');
+    ctx.fillStyle = barGrad;
+    ctx.beginPath();
+    roundedRect(ctx, barX, barY, barW, barH, r * 0.12);
+    ctx.fill();
+
+    // ── Small "F" label on the bar ──
+    ctx.fillStyle = '#ffffff';
+    ctx.font = `bold ${Math.round(r * 0.55)}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('F', nx, ny);
+
+    // ── Battery outline ──
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    roundedRect(ctx, nx - bw, ny - bh, bw * 2, bh * 2, br);
+    ctx.stroke();
+
+    ctx.restore();
+  });
+}
+
+// Helper: draw a rounded rectangle path
+function roundedRect(ctx, x, y, w, h, r) {
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+}
+
+// ──────────────────────────────────────────
+// DRAW — FLOATING TEXT LABELS
+// ──────────────────────────────────────────
+

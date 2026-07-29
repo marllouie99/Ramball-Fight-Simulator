@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { drawGunSlingerDualRevolver, GUNSLINGER_WEAPON_GRAPHICS } from '../../graphics/weapons/gunSlingerWeaponGraphics.js';
@@ -265,7 +265,7 @@ export class GunSlingerFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 10, 'RELOADING', '#66ccff');
     // Play reload sound
     const reloadSound = getSkillEffectSound('gunslinger', 'reload');
-    if (reloadSound) playSound(reloadSound.src, reloadSound.volume);
+    if (reloadSound) audioSystem.playSFX(reloadSound.src, reloadSound.volume);
   }
 
   _finishReload() {

@@ -5,7 +5,7 @@
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
@@ -119,5 +119,5 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   spawnFloatingText(oldX, oldY - fighter.r - 10, 'EVADE!', '#00BFFF');
   spawnImpactFlash(oldX, oldY, 22, 'lightningTrail');
   spawnImpactFlash(fighter.x, fighter.y, 22, 'lightningTrail');
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.8);
+  audioSystem.playSFX('skill_dash3', 0.8);
 }

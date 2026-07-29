@@ -1,7 +1,8 @@
+import { fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnRikaRoarShockwave } from '../../../graphics/particles/sparkEffect.js';
-import { playSound, stopSound, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 
@@ -99,7 +100,7 @@ export function updateRika(fighter, arena) {
     if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(3, 8);
 
     const comeSound = getSkillSound(fighter.id || fighter._def?.id || 'yuta', 'come_rika');
-    playSound(comeSound?.src || 'Assets/Sound Effects/Skills/comerika.mp3', comeSound?.volume || 2.5);
+    audioSystem.playSFX(comeSound?.src || 'Assets/Sound Effects/Skills/comerika.mp3', comeSound?.volume || 2.5);
   }
 
   if (!rk.active && rk.cooldownTimer > 0) {
@@ -160,10 +161,10 @@ export function updateRika(fighter, arena) {
       if (!rk.playedAriseRoarSound) {
         rk.playedAriseRoarSound = true;
         const appearSound = getSkillSound(fighter.id || fighter._def?.id || 'yuta', 'rika_appearance');
-        playSound(appearSound?.src || 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', appearSound?.volume || 1.5);
+        audioSystem.playSFX(appearSound?.src || 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', appearSound?.volume || 1.5);
 
         const trembleSound = getSkillSound(fighter._def?.id || 'yuta', 'rika_ground_tremble') || getSkillEffectSound('yuta', 'groundtremble');
-        rk.activeTrembleSound = playSound(trembleSound?.src || 'Assets/Sound Effects/SkillEffects/groundTremble.mp3', trembleSound?.volume ?? 1.8, trembleSound?.speed ?? 1.0);
+        rk.activeTrembleSound = audioSystem.playSFX(trembleSound?.src || 'Assets/Sound Effects/SkillEffects/groundTremble.mp3', trembleSound?.volume ?? 1.8, trembleSound?.speed ?? 1.0);
       }
 
       if (rk.spawnTimer % 3 === 0) {
@@ -443,7 +444,7 @@ export function updateRika(fighter, arena) {
       
       // Play Rika Appearance sound (rikaAppearance.mp3) when Rika manifests!
       const appearSound = getSkillSound(fighter.id || fighter._def?.id || 'yuta', 'rika_appearance');
-      playSound(appearSound?.src || 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', appearSound?.volume || 1.5);
+      audioSystem.playSFX(appearSound?.src || 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', appearSound?.volume || 1.5);
 
       // Add her to the global targeting pool so AI and projectiles lock onto her
       if (typeof state !== 'undefined') {
@@ -616,7 +617,7 @@ export function updateRika(fighter, arena) {
           if (randomNoise && randomNoise.src) {
             rk.lastRoarSrc = randomNoise.src;
             const vol = CONFIG.yuta?.audio?.rikaNoiseVolume ?? randomNoise.volume ?? 1.8;
-            const handle = playSound(randomNoise.src, vol);
+            const handle = audioSystem.playSFX(randomNoise.src, vol);
             rk.activeRoarSound = handle;
 
             const durationMs = (handle && typeof handle.duration === 'number' && handle.duration > 0)
@@ -630,10 +631,10 @@ export function updateRika(fighter, arena) {
       // Play physical claw impact sound (backstab.mp3) and groundSmash.mp3 on Rika attack
       const attackSound = getSkillSound(fighter._def?.id || 'yuta', 'rika_attack');
       const volume = CONFIG.yuta?.audio?.rikaAttackVolume ?? attackSound?.volume ?? 1.2;
-      playSound(attackSound?.src || 'Assets/Sound Effects/Skills/backstab.mp3', volume);
+      audioSystem.playSFX(attackSound?.src || 'Assets/Sound Effects/Skills/backstab.mp3', volume);
 
       const smashSound = getSkillSound(fighter._def?.id || 'yuta', 'rika_ground_smash') || getSkillEffectSound('yuta', 'groundsmash');
-      playSound(smashSound?.src || 'Assets/Sound Effects/Attacks/groundSmash.mp3', smashSound?.volume ?? 1.5, smashSound?.speed ?? 1.0);
+      audioSystem.playSFX(smashSound?.src || 'Assets/Sound Effects/Attacks/groundSmash.mp3', smashSound?.volume ?? 1.5, smashSound?.speed ?? 1.0);
 
       // Alternate arms for fluid rapid dual-hand claw slashing!
       if (rk.lastArmUsed === 'right') {

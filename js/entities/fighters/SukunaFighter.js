@@ -185,6 +185,22 @@ export class SukunaFighter extends Fighter {
     );
   }
 
+  interruptAttacks() {
+    this.timeStopTimer = 0;
+    this.flurryHitsLeft = 0;
+    this.flurryTimer = 0;
+    this.rapidSlashHitsLeft = 0;
+    this.rapidSlashTimer = 0;
+    this.isTeleporting = false;
+    this.teleportSlideTimer = 0;
+    
+    // Cancel domain channeling & Fuga channeling
+    this.isChannelingDomainExpansion = false;
+    this.domainChargeTimer = 0;
+    this.isChannelingDivineFlame = false;
+    this.divineFlameChargeTimer = 0;
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready)
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
@@ -952,6 +968,7 @@ export class SukunaFighter extends Fighter {
           this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
           playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
         }
+        return; // Prevent melee/shoot in the same frame
       }
     }
 
@@ -967,6 +984,7 @@ export class SukunaFighter extends Fighter {
         const channelSound = getSkillSound(this._def.id, 'domain_channel');
         if (channelSound) playSound(channelSound.src, channelSound.volume);
       }
+      return; // Prevent melee/shoot in the same frame
     }
 
     // Handle Melee Combat Mode vs Ranged Mode

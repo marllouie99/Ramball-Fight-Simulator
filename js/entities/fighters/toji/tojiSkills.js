@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 /**
@@ -50,7 +50,7 @@ export function modUpdateChannelSense(fighter, opponent) {
           spawnImpactFlash(fighter.x, fighter.y, 65, 'crimsonSniper');
           spawnMeleeClashShockwave(fighter.x, fighter.y, 110, 'yuta');
           spawnCrimsonLightningImpact(fighter.x, fighter.y, 80);
-          playSound('Assets/Sound Effects/Skills/backstab.mp3', 1.0);
+          audioSystem.playSFX('skill_backstab', 1.0);
 
           // Set cooldown so it can trigger again after 3 seconds (180 frames)
           fighter._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 180;

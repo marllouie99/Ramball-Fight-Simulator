@@ -1,6 +1,6 @@
 import { state } from '../../core/state.js';
 import { drawThunderRootsEffect } from '../statusEffects.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 
 export function updateLightningEffects() {
@@ -13,10 +13,10 @@ export function updateLightningEffects() {
     if (strike.life === strike.maxLife && !strike.soundPlayed) {
       strike.soundPlayed = true;
       const thunderSound = getSkillEffectSound('zeus', 'thunderstrike');
-      if (thunderSound) playSound(thunderSound.src, thunderSound.volume);
+      if (thunderSound) audioSystem.playSFX(thunderSound.src, thunderSound.volume);
 
       const thunderSound2 = getSkillEffectSound('zeus', 'thunderstrike2');
-      if (thunderSound2) playSound(thunderSound2.src, thunderSound2.volume);
+      if (thunderSound2) audioSystem.playSFX(thunderSound2.src, thunderSound2.volume);
     }
     
     strike.life--;

@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee } from '../../graphics/weaponVisuals.js';
@@ -185,7 +185,7 @@ export class DarkSlateGrayFighter extends Fighter {
       this.startWeaponSwitch('melee');
 
       const stealthSound = getSkillSound(this._def?.id, 'stealthmode');
-      if (stealthSound) playSound(stealthSound.src, stealthSound.volume);
+      if (stealthSound) audioSystem.playSFX(stealthSound.src, stealthSound.volume);
 
       const dodgeText = opts.isMelee ? 'MELEE DODGE!' : 'DODGE!';
       spawnFloatingText(this.x, this.y - this.r - 10, dodgeText, '#88ff88');
@@ -260,7 +260,7 @@ export class DarkSlateGrayFighter extends Fighter {
     this.startWeaponSwitch('melee');
 
     const shadowSound = getSkillSound(this._def?.id, 'shadowmode');
-    if (shadowSound) playSound(shadowSound.src, shadowSound.volume);
+    if (shadowSound) audioSystem.playSFX(shadowSound.src, shadowSound.volume);
 
     spawnFloatingText(this.x, this.y - this.r - 15, 'SHADOW MODE!', '#8888ff');
   }
@@ -292,7 +292,7 @@ export class DarkSlateGrayFighter extends Fighter {
       opponent.takeDamage(backstabDamage, this, { isMelee: true });
 
       const bsSound = getSkillSound(this._def?.id, 'backstab');
-      if (bsSound) playSound(bsSound.src, bsSound.volume);
+      if (bsSound) audioSystem.playSFX(bsSound.src, bsSound.volume);
 
       this.backstabCooldown = CONFIG.darkslategray.backstabCooldown;
       this.meleeSwingCooldown = CONFIG.darkslategray.meleeSwingCooldown; // Prevent melee swing right after backstab
@@ -453,7 +453,7 @@ export class DarkSlateGrayFighter extends Fighter {
         this.throwAnimationTimer = 15;
 
         const sound = getBasicAttackSound(this._def?.id);
-        if (sound) playSound(sound.src, sound.volume);
+        if (sound) audioSystem.playSFX(sound.src, sound.volume);
       }
     }
 

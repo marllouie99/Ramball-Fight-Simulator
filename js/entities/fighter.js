@@ -1,16 +1,19 @@
+import { stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // BASE FIGHTER CLASS
 // ─────────────────────────────────────────────
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../core/config.js';
 import { MODE_HP_MULTIPLIER, MODE_SPEED_MULTIPLIER, MODE_SETTINGS, GAME_MODES } from '../core/modeConfig.js';
 import { projectileSystem } from '../systems/projectileSystem.js';
-import { playSound, stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
+import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
 import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
+import { StatusEffectsManager } from './components/StatusEffectsManager.js';
+import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
@@ -45,7 +48,7 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       // Play flesh hit audio effect unless it's a continuous DPS/dot effect
       // isPurpleDPS / isDomainDPS suppress rapid spam when multiple illusions are hit simultaneously
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified) {
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+        audioSystem.playSFX('attack_fleshhit', 0.6);
       }
 
       // Spawn blood/impact particle visual effect in damage direction
@@ -109,7 +112,7 @@ export class Fighter {
     this.recoilTimer = 25;
     try {
       const sound = getBasicAttackSound(this.id, this._def?.type);
-      if (sound) playSound(sound.src, sound.volume);
+      if (sound) audioSystem.playSFX(sound.src, sound.volume);
     } catch (e) {}
   }
 
@@ -149,6 +152,8 @@ export class Fighter {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
 
+    this.statusEffects = new StatusEffectsManager(this);
+
     this.rctVisualTimer = 0;
     this.rctVisualMaxTimer = 60;
 
@@ -185,7 +190,7 @@ export class Fighter {
 
   /** Returns true if this fighter is currently silenced by anti-technique effects (e.g. Inverted Spear of Heaven). */
   isSilenced() {
-    return (this.silenceTimer || 0) > 0;
+    return this.statusEffects.isSilenced();
   }
 
   /** Returns true if this fighter is currently inside any active Cronos time-stop sphere. */
@@ -202,20 +207,11 @@ export class Fighter {
   }
 
   applySlow(frames, multiplier) {
-    if (this.immuneToCC || this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') return;
-    // Refresh the slow if it's longer/stronger than current
-    if (this.slowTimer < frames) this.slowTimer = frames;
-    this.slowMultiplier = multiplier;
+    this.statusEffects.applySlow(frames, multiplier);
   }
 
   applyHitStun(frames) {
-    if (this.immuneToCC || this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') return;
-    // Temporary slowdown when hit - creates impact feel
-    // Uses a separate stun timer that overrides normal speed
-    if (!this.hitStunTimer || this.hitStunTimer < frames) {
-      this.hitStunTimer = frames;
-      this.hitStunMultiplier = 0.3; // Very slow during stun (30% speed)
-    }
+    this.statusEffects.applyHitStun(frames);
   }
 
   interruptAttacks() {
@@ -269,170 +265,19 @@ export class Fighter {
 
 
   applyTimeStop(frames) {
-    if (this.immuneToCC || this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') return;
-    // Ensure a numeric timer field exists for legacy code that may read it
-    if (!this.timeStopTimer) this.timeStopTimer = 0;
-
-    // Preserve angles so visual rotation and gun aim remain frozen.
-    if (typeof this._timeStopFrozenAngle !== 'number') this._timeStopFrozenAngle = this.angle;
-    if (typeof this._timeStopFrozenGunAngle !== 'number') this._timeStopFrozenGunAngle = this.gunAngle;
-
-    // Compute current remaining frames based on previously stored start/original values
-    let currentRemaining = this.timeStopTimer || 0;
-    if (this._timeStopOriginalDuration && this._timeStopStartTime) {
-      const elapsedMs = performance.now() - this._timeStopStartTime;
-      const elapsedFrames = (elapsedMs / 1000) * 60;
-      currentRemaining = Math.max(0, this._timeStopOriginalDuration - elapsedFrames);
-    }
-
-    // Only reset the visual timer/start time if the new duration extends the current remaining time.
-    // This prevents the active sphere re-applying every frame from locking the displayed countdown.
-    if (frames > currentRemaining) {
-      this._timeStopOriginalDuration = frames;
-      this._timeStopStartTime = performance.now();
-      // update legacy frame counter too so code that relies on it sees the refreshed value
-      if (this.timeStopTimer < frames) this.timeStopTimer = frames;
-    } else {
-      // Ensure legacy timer is at least as large as remaining if not resetting start time
-      if (this.timeStopTimer < currentRemaining) this.timeStopTimer = Math.ceil(currentRemaining);
-    }
+    this.statusEffects.applyTimeStop(frames);
   }
 
-
   _handleTimeStop() {
-    if (this.domainImmunity || this.characterId === 'toji' || this.type === 'toji') {
-      this.timeStopTimer = 0;
-      this.electricStunTimer = 0;
-      this.crimsonElectrifiedTimer = 0;
-      this.dubstepStunTimer = 0;
-      return false;
-    }
-    const isFrozen = (this.crimsonElectrifiedTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.timeStopTimer > 0);
-
-    if (isFrozen) {
-      this.mahoragaAdaptationFreezeTimer = 0;
-      // DECAY VISUAL TRAILS SO THEY DON'T FREEZE IN PLACE WHILE INCAPACITATED
-      if (this.dashTrail) {
-        fastCleanArray(this.dashTrail, (item) => {
-          item.alpha -= 0.02;
-          return item.alpha > 0;
-        });
-      }
-      if (this.afterImages && this.afterImages.length > 0) {
-        fastCleanArray(this.afterImages, (item) => {
-          item.timer--;
-          return item.timer > 0;
-        });
-      }
-      if (this.slashEffects && this.slashEffects.length > 0) {
-        fastCleanArray(this.slashEffects, (item) => {
-          item.timer--;
-          return item.timer > 0;
-        });
-      }
-      if (this.swordTrailHistory && this.swordTrailHistory.length > 0) {
-        this.swordTrailHistory.pop();
-      }
-      if (this.trailHistory && this.trailHistory.length > 0) {
-        this.trailHistory.pop();
-      }
-    }
-
-    // Crimson Execution Stun & DoT
-    if (this.crimsonElectrifiedTimer > 0) {
-      this.crimsonElectrifiedTimer--;
-      
-      const dmgPerSec = CONFIG.sharpshooter?.electrifiedDamagePerSec || 15;
-      this.takeDamage(dmgPerSec / 60, this.lastCrimsonAttacker, { isElectrified: true });
-      
-      // Apply extreme friction to stop knockback quickly
-      this.vx *= 0.5;
-      this.vy *= 0.5;
-      this.x += this.vx;
-      this.y += this.vy;
-      // Return true to skip standard update logic (immobilize)
-      return true;
-    }
-
-    if (this.silenceTimer > 0) {
-      this.silenceTimer--;
-      this.interruptAttacks();
-    }
-
-    // Electric stun - immobilize the fighter completely.
-    // We check this here because all subclasses short-circuit their update() if this method returns true.
-    if (this.electricStunTimer > 0) {
-      this.electricStunTimer--;
-    }
-    
-    if (this.dubstepStunTimer > 0) {
-      this.dubstepStunTimer--;
-      this.dubstepStunVisualTimer = 45; // 0.75 seconds of visual fade out
-    } else if (this.dubstepStunVisualTimer > 0) {
-      this.dubstepStunVisualTimer--;
-    }
-    
-    if (this.electricStunTimer > 0 || this.dubstepStunTimer > 0) {
-      // Apply extreme friction to stop knockback quickly
-      this.vx *= 0.5;
-      this.vy *= 0.5;
-      this.x += this.vx;
-      this.y += this.vy;
-      // Note: Wall bounce isn't resolved here, but friction stops them before they can clip out of bounds anyway.
-      return true;
-    }
-
-    // Return true when time stop is active (and handled) to allow callers to short-circuit.
-    if (this.timeStopTimer > 0) {
-      this.timeStopTimer--;
-      if (typeof this._timeStopFrozenAngle === 'number') {
-        this.angle = this._timeStopFrozenAngle;
-      }
-      if (typeof this._timeStopFrozenGunAngle === 'number') {
-        this.gunAngle = this._timeStopFrozenGunAngle;
-      }
-      if (this.timeStopTimer <= 0) {
-        this.timeStopTimer = 0;
-        this.isFrozenByInfinity = false;
-        delete this._suppressFreezeTimer;
-        // Restore any saved velocities (from counter or sphere freezes)
-        if (typeof this._resumeVx === 'number') {
-          this.vx = this._resumeVx;
-          delete this._resumeVx;
-        }
-        if (typeof this._resumeVy === 'number') {
-          this.vy = this._resumeVy;
-          delete this._resumeVy;
-        }
-        delete this._timeStopFrozenAngle;
-        delete this._timeStopFrozenGunAngle;
-        delete this._timeStopOriginalDuration;
-        delete this._timeStopStartTime;
-      }
-      return true;
-    }
-    return false;
+    return this.statusEffects.handleTimeStop();
   }
 
   applyPoison(attacker) {
-    // ===== Poison tuning =====
-    const grenadierCfg = CONFIG.grenadier || {};
-    const ticks = (typeof grenadierCfg.poisonTicks === 'number')
-      ? grenadierCfg.poisonTicks
-      : 2;
-
-
-    this.poisonTicks = ticks;
-    this.poisonTimer = 0;
-    this.lastPoisonAttacker = attacker;
+    this.statusEffects.applyPoison(attacker);
   }
 
-
-
   applyBurn(attacker) {
-    this.burnTimer = CONFIG.orange.burnDuration;
-    this.burnDamageTimer = 0;
-    this.lastBurnAttacker = attacker;
+    this.statusEffects.applyBurn(attacker);
   }
 
   onDamageDealt(target, projectile, ownerIndex) {
@@ -458,39 +303,11 @@ export class Fighter {
   }
 
   handlePoison() {
-    if (this.poisonTicks > 0) {
-
-      this.poisonTimer++;
-
-      // ===== Poison tuning =====
-      const grenadierCfg = CONFIG.grenadier || {};
-      const intervalFrames = (typeof grenadierCfg.poisonIntervalFrames === 'number')
-        ? grenadierCfg.poisonIntervalFrames
-        : 60;
-
-      const damagePerTick = (typeof grenadierCfg.poisonDamagePerTick === 'number')
-        ? grenadierCfg.poisonDamagePerTick
-        : 2;
-
-
-      if (this.poisonTimer >= intervalFrames) {
-        this.takeDamage(damagePerTick, this.lastPoisonAttacker, { isPoison: true });
-        this.poisonTicks--;
-        this.poisonTimer = 0;
-      }
-    }
+    this.statusEffects.handlePoison();
   }
 
   handleBurn() {
-    if (this.burnTimer > 0) {
-      this.burnTimer--;
-      this.burnDamageTimer++;
-      if (this.burnDamageTimer >= CONFIG.orange.burnDamageInterval) {
-        const damage = CONFIG.orange.burnDamagePerSecond;
-        this.takeDamage(damage, this.lastBurnAttacker, { isBurn: true });
-        this.burnDamageTimer = 0;
-      }
-    }
+    this.statusEffects.handleBurn();
   }
 
   /** Per-frame housekeeping for cooldowns. */
@@ -532,7 +349,7 @@ export class Fighter {
 
         if (bounced && !this.isFirstHitKnockback && currentSpeed > 6) {
           triggerGlobalScreenShake(5, 6); // Subtle micro camera punch for smooth motion!
-          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
+          audioSystem.playSFX('attack_fleshhit', 0.9);
           spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
           spawnSparks(this.x, this.y, 14, 'crimsonSniper');
           spawnMeleeClashShockwave(this.x, this.y, 100, 'yuta');
@@ -620,7 +437,7 @@ export class Fighter {
       // isPurpleDPS, isElectrified, isDomainDPS suppress rapid audio spam when multiple targets are hit simultaneously
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS) {
         if (!this.isTurret) {
-          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.6);
+          audioSystem.playSFX('attack_fleshhit', 0.6);
           this.hitFlashTimer = 8;
         }
       } else if (opts.isPurpleDPS || opts.isDomainDPS) {
@@ -644,7 +461,7 @@ export class Fighter {
 
       // Play death sound
       const faah = getAnnouncerSound('faah');
-      if (faah) playSound(faah.src, faah.volume, faah.speed, faah.offset || 0);
+      if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
 
       // Helper: a Doppelganger with surviving illusions is still "in play"
       const _isEffectivelyAlive = (f) => {
@@ -845,7 +662,15 @@ export class Fighter {
       return;
     }
 
-    const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+    // Target Musashi's ghost if he is flurrying
+    let targetX = opponent.x;
+    let targetY = opponent.y;
+    if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
+      targetX = opponent.flurryGhost.x;
+      targetY = opponent.flurryGhost.y;
+    }
+
+    const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
 
     // If opponent is stealthed (e.g. Toji Heavenly Restriction), aim tracking has a sluggish delayed reaction time!
     if (opponent.isStealthed) {
@@ -886,10 +711,10 @@ export class Fighter {
         if (sound) {
           if (Array.isArray(sound.src)) {
             if (this._soundIndex === undefined) this._soundIndex = 0;
-            playSound(sound.src[this._soundIndex], sound.volume);
+            audioSystem.playSFX(sound.src[this._soundIndex], sound.volume);
             this._soundIndex = (this._soundIndex + 1) % sound.src.length;
           } else {
-            playSound(sound.src, sound.volume);
+            audioSystem.playSFX(sound.src, sound.volume);
           }
         }
         this._attackSoundTimer = null;
@@ -956,6 +781,19 @@ export class Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
     
+    // Black hole shrinking visual logic
+    if (this.visualScale === undefined) this.visualScale = 1.0;
+    if (this.visualScaleTarget === undefined) this.visualScaleTarget = 1.0;
+
+    const shrinkSpeed = CONFIG.black?.blackHoleVisualShrinkSpeed ?? 0.05;
+    if (Math.abs(this.visualScale - this.visualScaleTarget) > 0.01) {
+      this.visualScale += (this.visualScaleTarget - this.visualScale) * shrinkSpeed;
+    } else {
+      this.visualScale = this.visualScaleTarget;
+    }
+    // Reset target to 1.0; projectile system will lower it if currently inside a black hole
+    this.visualScaleTarget = 1.0;
+
     if (this.thunderRootsTimer > 0) {
       this.thunderRootsTimer--;
     }
@@ -985,229 +823,33 @@ export class Fighter {
 
   /** Draws the basic circle body. Subclasses can override for custom rendering. */
   drawBody(ctx) {
-    ctx.save();
-    let tremorX = 0;
-    let tremorY = 0;
-    const currentShake = (typeof state !== 'undefined' && state.screenShake) ? (state.screenShake.intensity || 0) : 0;
-    const isAnyFighterChanneling = (typeof state !== 'undefined' && state.fighters) ? state.fighters.some(f => f && (f.isChannelingDomain || f.isChannelingDomainExpansion)) : false;
-    if (currentShake > 0 || isAnyFighterChanneling) {
-      const shakeAmt = isAnyFighterChanneling ? 4.0 : Math.min(6, currentShake * 0.6);
-      tremorX = (Math.random() - 0.5) * shakeAmt;
-      tremorY = (Math.random() - 0.5) * shakeAmt;
-    }
-    ctx.translate(this.x + tremorX, this.y + tremorY);
-    ctx.rotate(this.angle);
-    
-    // Flip vertically if facing left to prevent being upside-down
-    if (Math.abs(this.angle) > Math.PI / 2) {
-      ctx.scale(1, -1);
-    }
-
-    ctx.beginPath();
-    ctx.arc(0, 0, this.r, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-
-    this.drawStatusOverlays(ctx, this.r);
-
-    ctx.restore();
+    FighterRenderer.drawBody(ctx, this);
   }
 
-  /** Centralized status overlays (slow, poison, burn molten core) */
   drawStatusOverlays(ctx, baseRadius) {
-    // OPTIMIZATION: Quality-based status overlay rendering
-    const qualityLevel = state.qualityLevel || 1.0;
-    const fps = state.fps || 60;
-    const useAggressiveMode = false;
-
-    if (this.hitFlashTimer > 0) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'lighter';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 255, 255, ${this.hitFlashTimer / 8})`;
-      ctx.fill();
-      ctx.restore();
-    }
-
-    if (this.slowTimer > 0) {
-      // Suppress the generic slow visual if they are currently trapped in Toji's cinematic ultimate
-      const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-        f && f.ultimateActive && f.ultimateTarget === this && (f.type === 'toji' || f.characterId === 'toji')
-      );
-      if (!trappedInTojiUltimate) {
-        drawSlowEffect(ctx, baseRadius);
-      }
-    }
-
-    if (this.electricStunTimer > 0) {
-      drawElectricStunEffect(ctx, baseRadius, useAggressiveMode);
-    }
-    
-    if (this.dubstepStunVisualTimer > 0) {
-      drawDubstepStunEffect(ctx, baseRadius, this.dubstepStunVisualTimer);
-    }
-    
-    if (this.crimsonElectrifiedTimer > 0) {
-      drawCrimsonElectrifiedEffect(ctx, baseRadius, this.crimsonElectrifiedTrickster);
-    }
-
-    if (this.poisonTicks > 0) {
-      drawPoisonEffect(ctx, baseRadius);
-    }
-    
-    if (this.silenceTimer > 0) {
-      drawSilenceEffect(ctx, baseRadius);
-    }
-    
-    if (this.thunderRootsTimer > 0) {
-      drawThunderRootsEffect(ctx, baseRadius);
-    }
-
-    if (this.burnTimer > 0) {
-      // 2. Molten Inner Body Radial Gradient
-      const offset = baseRadius * 0.15;
-      const grad = ctx.createRadialGradient(-offset, -offset, 0, 0, 0, baseRadius);
-      const pulse = 0.05 * Math.sin(Date.now() / 100);
-      grad.addColorStop(0, 'rgba(255, 255, 220, 0.65)'); // Hot-white/yellow center
-      grad.addColorStop(0.35, `rgba(255, 130, 0, ${0.5 + pulse})`);
-      grad.addColorStop(0.75, `rgba(200, 30, 0, ${0.35 + pulse})`);
-      grad.addColorStop(1, 'rgba(100, 0, 0, 0)');
-
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    FighterRenderer.drawStatusOverlays(ctx, this);
   }
 
-  /** Draws standard fighter outline. */
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-    ctx.stroke();
+    FighterRenderer.drawOutline(ctx, this);
   }
 
   /** Draws standard grey weapon barrel. */
   drawGun(ctx) {
-    if (this.isTargetOfAmbush) return;
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.gunAngle);
-    
-    if (Math.abs(this.gunAngle) > Math.PI / 2) {
-      ctx.scale(1, -1);
-    }
-    
-    ctx.translate(this.r + CONFIG.gun.baseOffset, 0);
-    ctx.fillStyle = '#444';
-    ctx.fillRect(-3, -5, 14, 10);
-    ctx.fillStyle = '#222';
-    ctx.fillRect(8, -2.5, 10, 5);
-    
-    // Draw Hand holding the gun
-    ctx.beginPath();
-    ctx.arc(0, 3, getHandSize(6, this), 0, Math.PI * 2); // Hand positioned on the grip
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
-    
-    ctx.restore();
+    FighterRenderer.drawGun(ctx, this);
   }
 
-  /** Draws the fighter's health points in the center. */
   drawHealth(ctx) {
-    if (this.hp <= 0 || this._isWinnerReveal || this.hideHpText) return;
-
-    ctx.save();
-    ctx.font = 'bold 18px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const hpText = Math.floor(this.hp).toString();
-    const drawY = this.y - (this.z || 0);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.strokeText(hpText, this.x, drawY);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(hpText, this.x, drawY);
-    ctx.restore();
+    FighterRenderer.drawHealth(ctx, this);
   }
 
-  /** Draws a floating freeze timer above the fighter when time-stopped. */
   drawFreezeTimer(ctx) {
-    if (this._suppressFreezeTimer) return;
-    if (!this._timeStopStartTime || !this._timeStopOriginalDuration) return;
-    ctx.save();
-    // Calculate remaining time from elapsed time so timer counts down even while frozen.
-    const elapsedMs = performance.now() - this._timeStopStartTime;
-    const elapsedFrames = (elapsedMs / 1000) * 60;
-    const remainingFrames = Math.max(0, this._timeStopOriginalDuration - elapsedFrames);
-    const seconds = Math.ceil(remainingFrames / 60);
-    const text = `⏳ ${seconds}s`;
-    const drawY = (this.y - (this.z || 0)) - (this.r + 18);
-    ctx.font = 'bold 11px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    // Shadow / outline
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.strokeText(text, this.x, drawY);
-    // Cyan glow
-    ctx.fillStyle = '#00F3FF';
-    ctx.fillText(text, this.x, drawY);
-    ctx.restore();
+    FighterRenderer.drawFreezeTimer(ctx, this);
   }
 
   /** Main entry point for drawing. */
   draw(ctx) {
-    const scale = this.visualScale !== undefined ? this.visualScale : 1.0;
-    const zOffset = this.z || 0;
-    const hasScale = scale !== 1.0 && scale > 0;
-    const hasZ = zOffset > 0;
-
-    if (hasZ) {
-      // Draw shadow at the original ground position
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.scale(1, 0.5); // Squash shadow vertically for perspective
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r * scale, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.6 - (zOffset / 150))})`;
-      ctx.fill();
-      ctx.restore();
-    }
-
-    if (hasScale || hasZ) {
-      ctx.save();
-      // Move context so that drawing at (this.x, this.y) actually draws at (this.x, this.y - zOffset)
-      ctx.translate(this.x, this.y - zOffset);
-      if (hasScale) ctx.scale(scale, scale);
-      ctx.translate(-this.x, -this.y);
-    }
-
-    this.drawBody(ctx);
-    this.drawOutline(ctx);
-
-    // Universal dark stroke (same color for everyone, guaranteed on top)
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#000000';
-    ctx.stroke();
-
-    // RCT visuals moved to subclass draw methods to ensure they draw ON TOP of auras
-
-    this.drawGun(ctx);
-    this.drawHealth(ctx);
-    this.drawFreezeTimer(ctx);
-
-    if (hasScale || hasZ) {
-      ctx.restore();
-    }
+    FighterRenderer.draw(ctx, this);
   }
 
   /** Draws concentric green rings and aura for Reverse Cursed Technique. */

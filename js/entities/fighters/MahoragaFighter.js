@@ -2,7 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawMahoragaSword } from '../../graphics/weapons/mahoragaWeaponGraphics.js';
@@ -217,7 +217,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // Calculate Dynamic Movement Speed based on Gold Adaptations
-    const baseSpeed = CONFIG.mahoraga?.speed || 3.5;
+    const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.speed || 3.5;
     const goldStages = (this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0);
     const speedBoost = CONFIG.mahoraga?.adaptationSpeedBoostPerStage || 0.10;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
@@ -312,8 +312,8 @@ export class MahoragaFighter extends Fighter {
         spawnMeleeClashShockwave(target.x, target.y, 110, 'silver');
         triggerGlobalScreenShake(10, 18);
         this._playRandomHeavyPunchSound(1.0);
-        playSound('Assets/Sound Effects/Attacks/explosion.mp3', 0.8);
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+        audioSystem.playSFX('attack_explosion', 0.8);
+        audioSystem.playSFX('attack_swordswing', 1.0);
 
         this._executeShout(target, ownerIndex);
 
@@ -436,8 +436,8 @@ export class MahoragaFighter extends Fighter {
       const wheelY = this.y - this.r - 28;
       spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
       triggerGlobalScreenShake(14, 30);
-      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+      audioSystem.playSFX('skill_dash5', 1.0);
+      audioSystem.playSFX('attack_swordswing', 1.0);
     }
 
     if (this.isInfinityBlitz || totalStages >= 8) {
@@ -473,7 +473,7 @@ export class MahoragaFighter extends Fighter {
 
           spawnFloatingText(this.x, this.y - this.r - 25, '🔄 LEVEL 8 EXPIRED: ADAPTATIONS RESET!', '#FFD700');
           triggerGlobalScreenShake(8, 16);
-          playSound('Assets/Sound Effects/Skills/machinebroken.mp3', 1.0);
+          audioSystem.playSFX('skill_machinebroken', 1.0);
         }
       }
     }
@@ -524,7 +524,7 @@ export class MahoragaFighter extends Fighter {
             this.vy = 0;
 
             this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
-            playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+            audioSystem.playSFX('skill_dash5', 1.0);
           }
 
           const currentDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
@@ -540,7 +540,7 @@ export class MahoragaFighter extends Fighter {
               this.swordCombo = (this.swordCombo || 0) + 1;
               this.punchAnimTimer = 16;
               this.punchAnimMaxTimer = 16;
-              playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+              audioSystem.playSFX('attack_swordswing', 1.0);
             }
 
             this.aim(opponent);
@@ -558,7 +558,7 @@ export class MahoragaFighter extends Fighter {
             spawnSparks(opponent.x, opponent.y, 15, 'gold', '#FFFFFF');
             spawnMeleeClashShockwave(opponent.x, opponent.y, 90, 'mahoraga');
             triggerGlobalScreenShake(7, 12);
-            playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+            audioSystem.playSFX('attack_swordswing', 1.0);
           }
         }
       }
@@ -650,7 +650,7 @@ export class MahoragaFighter extends Fighter {
       this.blitzTarget = opponent;
       spawnFloatingText(this.x, this.y - this.r - 25, 'ADAPTED BLITZ DUEL!', '#FFD700');
       playSkillEffectSound('mahoraga', 'wheelclick');
-      playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+      audioSystem.playSFX('skill_dash5', 1.0);
     }
 
     // ── HAND-TO-HAND BLITZ SEQUENCE ──
@@ -743,7 +743,7 @@ export class MahoragaFighter extends Fighter {
           this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY);
           this.aim(target);
 
-          playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+          audioSystem.playSFX('skill_dash5', 1.0);
         } else {
           this.aim(target);
         }
@@ -780,7 +780,7 @@ export class MahoragaFighter extends Fighter {
           spawnFloatingText(target.x + (Math.random() - 0.5) * 20, target.y - target.r - 20, word, '#FFD700');
 
           this._playRandomHeavyPunchSound(0.9);
-          playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
+          audioSystem.playSFX('attack_swordswing', 0.8);
 
           const pushForce = CONFIG.mahoraga?.blitzHitPushbackForce ?? 4.5;
           const pushAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(target.y - this.y, target.x - this.x);
@@ -810,8 +810,8 @@ export class MahoragaFighter extends Fighter {
           spawnSparks(target.x, target.y, 40, 'gold', '#FFFFFF');
           triggerGlobalScreenShake(14, 25);
           spawnFloatingText(target.x, target.y - target.r - 35, 'FINISHER CLEAVE!!', '#FF3300');
-          playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 1.0);
-          playSound('Assets/Sound Effects/Attacks/explosion.mp3', 0.9);
+          audioSystem.playSFX('attack_groundsmash', 1.0);
+          audioSystem.playSFX('attack_explosion', 0.9);
 
           target.timeStopTimer = 0;
           target.mahoragaAdaptationFreezeTimer = 0;
@@ -829,8 +829,8 @@ export class MahoragaFighter extends Fighter {
           spawnSparks(target.x, target.y, 30, 'gold', '#FFFFFF');
           spawnMeleeClashShockwave(target.x, target.y, 120, 'gold');
           triggerGlobalScreenShake(12, 22);
-          playSound('Assets/Sound Effects/Attacks/explosion.mp3', 1.0);
-          playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+          audioSystem.playSFX('attack_explosion', 1.0);
+          audioSystem.playSFX('attack_swordswing', 1.0);
           spawnFloatingText(target.x, target.y - 30, 'FINISHER CLEAVE!', '#FFD700');
 
           this.isBlitzActive = false;
@@ -855,7 +855,7 @@ export class MahoragaFighter extends Fighter {
           spawnSparks(opponent.x, opponent.y, 15, 'gold', '#FFFFFF');
           spawnMeleeClashShockwave(opponent.x, opponent.y, 90, 'mahoraga');
           triggerGlobalScreenShake(7, 12);
-          playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+          audioSystem.playSFX('attack_swordswing', 1.0);
         }
       }
       return;
@@ -871,7 +871,6 @@ export class MahoragaFighter extends Fighter {
       this.applyMovementPhysics(0);
 
       const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames || 30;
-
       if (this.cleaveWindupTimer >= maxWindup) {
         this._executeCleave(opponent);
         this.isCleaving = false;
@@ -879,6 +878,15 @@ export class MahoragaFighter extends Fighter {
         this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown || 600;
       }
       return; 
+    }
+
+    // ── Natural Bounce Movement (no direct-chase steering) ──
+    // Mahoraga uses natural wall-bounce physics like other fighters.
+    // His resolveWallBounce override biases bounce direction towards the enemy.
+    // Only apply friction if opponent is dead so he doesn't stop moving.
+    if (!opponent || opponent.isDead) {
+      this.vx *= 0.9;
+      this.vy *= 0.9;
     }
 
     this.applyMovementPhysics();
@@ -893,17 +901,7 @@ export class MahoragaFighter extends Fighter {
       const swordRange = CONFIG.mahoraga?.swordRange || 60;
       const meleeDist = this.r + opponent.r + swordRange;
 
-      // ── AI STEERING CHASE LOGIC ──
-      if ((this.punchAnimTimer || 0) <= 0 && (this.leftPunchTimer || 0) <= 0 && (this.knockbackStunTimer || 0) <= 0) {
-        if (distToOpponent > meleeDist * 0.6) {
-          this.vx += Math.cos(this.gunAngle) * 0.8;
-          this.vy += Math.sin(this.gunAngle) * 0.8;
-          this.normalizeSpeed(); // Ensure steering respects dynamic speed cap
-        } else {
-          this.vx *= 0.8;
-          this.vy *= 0.8;
-        }
-      }
+
 
       const isEnemyChanneling = (
         opponent.isChanneling ||
@@ -967,7 +965,7 @@ export class MahoragaFighter extends Fighter {
           this.swordCombo = (this.swordCombo || 0) + 1;
           this.punchAnimTimer = 18;
           this.punchAnimMaxTimer = 18;
-          playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+          audioSystem.playSFX('attack_swordswing', 1.0);
         }
 
         const counterTargets = this._getFrontRadiusTargets(100, Math.PI * 1.3);
@@ -982,8 +980,8 @@ export class MahoragaFighter extends Fighter {
         spawnMeleeClashShockwave(opponent.x, opponent.y, 100, 'mahoraga');
         triggerGlobalScreenShake(8, 15);
         spawnFloatingText(this.x, this.y - this.r - 25, '⚡ TELEPORT ADAPTATION!', '#FFD700');
-        playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+        audioSystem.playSFX('skill_dash5', 1.0);
+        audioSystem.playSFX('attack_swordswing', 1.0);
       }
 
       // Standard Sword of Extermination chops & Left off-hand punches
@@ -994,6 +992,7 @@ export class MahoragaFighter extends Fighter {
         this._performMeleeAttack(opponent);
       }
     }
+    this._bounceTarget = opponent; // Store for resolveWallBounce override
     if (arena) this.resolveWallBounce(arena);
   }
 
@@ -1015,6 +1014,63 @@ export class MahoragaFighter extends Fighter {
     setTimeout(() => {
       this.isCleaving = false;
     }, 35);
+  }
+
+  /**
+   * Override wall bounce so Mahoraga bounces naturally but biases
+   * his post-bounce direction towards the current enemy.
+   * This gives the "rebounce forward to the enemy" feel.
+   */
+  resolveWallBounce(arena) {
+    let bounced = false;
+    const restitution = CONFIG.collision.restitution;
+    const angleJitter = 3.5;
+
+    if (this.x - this.r < arena.x) {
+      this.x = arena.x + this.r;
+      this.vx = Math.abs(this.vx) * restitution;
+      this.vy += (Math.random() - 0.5) * angleJitter;
+      bounced = true;
+    } else if (this.x + this.r > arena.x + arena.width) {
+      this.x = arena.x + arena.width - this.r;
+      this.vx = -Math.abs(this.vx) * restitution;
+      this.vy += (Math.random() - 0.5) * angleJitter;
+      bounced = true;
+    }
+
+    if (this.y - this.r < arena.y) {
+      this.y = arena.y + this.r;
+      this.vy = Math.abs(this.vy) * restitution;
+      this.vx += (Math.random() - 0.5) * angleJitter;
+      bounced = true;
+    } else if (this.y + this.r > arena.y + arena.height) {
+      this.y = arena.y + arena.height - this.r;
+      this.vy = -Math.abs(this.vy) * restitution;
+      this.vx += (Math.random() - 0.5) * angleJitter;
+      bounced = true;
+    }
+
+    if (bounced) {
+      const target = this._bounceTarget;
+      const speed = Math.hypot(this.vx, this.vy) || this.speed;
+
+      if (target && !target.isDead && target.hp > 0) {
+        // Bias the bounce direction towards the enemy
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        const toEnemyVx = (dx / dist) * speed;
+        const toEnemyVy = (dy / dist) * speed;
+
+        // Blend: 60% towards enemy, 40% natural bounce
+        const biasFactor = 0.6;
+        this.vx = this.vx * (1 - biasFactor) + toEnemyVx * biasFactor;
+        this.vy = this.vy * (1 - biasFactor) + toEnemyVy * biasFactor;
+      }
+
+      // Re-normalize to configured speed
+      this.normalizeSpeed();
+    }
   }
 
   drawGun(ctx) {

@@ -2,7 +2,7 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave, spawnArcaneSmoke, spawnTojiWhirlingWindDebris, spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
 import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKatanaOverShoulder, drawRestedInvertedSpearAtHip, TOJI_WEAPON_CONFIG } from '../../graphics/weapons/tojiWeaponGraphics.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -221,7 +221,7 @@ export class TojiFighter extends Fighter {
       }
       spawnImpactFlash(hiltX + Math.cos(bladeAngle) * 35, hiltY + Math.sin(bladeAngle) * 35, 55, 'dark');
 
-      playSound('Assets/Sound Effects/Skills/parry.mp3', 0.85);
+      audioSystem.playSFX('skill_parry', 0.85);
 
       // Trigger 3-Stage Ambush Counter-Attack with cooldown so it is not spammed continuously inside domains
       let realTarget = (attacker && attacker.owner && !attacker.isTurret) ? attacker.owner : attacker;
@@ -301,7 +301,7 @@ export class TojiFighter extends Fighter {
     // Global dramatic screen shake and sound for domain channeling
     triggerGlobalScreenShake(6, 90);
     const channelSound = getSkillEffectSound('toji', 'ultimatechanneling');
-    playSound(channelSound?.src || 'Assets/Sound Effects/Skills/toji-ultimatechanneling.mp3', channelSound?.volume || 1.0, channelSound?.speed || 1.0, 0, channelSound?.delay || 0);
+    audioSystem.playSFX(channelSound?.src || 'Assets/Sound Effects/Skills/toji-ultimatechanneling.mp3', channelSound?.volume || 1.0, channelSound?.speed || 1.0, 0, channelSound?.delay || 0);
   }
 
   /**
@@ -386,7 +386,7 @@ export class TojiFighter extends Fighter {
         this.ultimateCycleTimer = CONFIG.toji?.ultimateVanishDuration ?? 120; // Initial delay before the first strike
         
         const vanishSound = getSkillEffectSound('toji', 'vanish');
-        if (vanishSound) playSound(vanishSound.src, vanishSound.volume);
+        if (vanishSound) audioSystem.playSFX(vanishSound.src, vanishSound.volume);
         
         // Spawn a large puff of dark smoke to signify his vanishing
         for (let i = 0; i < 4; i++) {
@@ -437,7 +437,7 @@ export class TojiFighter extends Fighter {
       this.craterFadeInTotal = fadeInFrames;
 
       const finalBlowChargeSound = getSkillEffectSound('toji', 'finalblowcharging');
-      playSound(finalBlowChargeSound?.src || 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3', finalBlowChargeSound?.volume || 1.5, finalBlowChargeSound?.speed || 1.0, 0, finalBlowChargeSound?.delay || 0);
+      audioSystem.playSFX(finalBlowChargeSound?.src || 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3', finalBlowChargeSound?.volume || 1.5, finalBlowChargeSound?.speed || 1.0, 0, finalBlowChargeSound?.delay || 0);
       
       // Spawn above the target — this is where he'll charge the katana
       const clampedStart = this._clampToArena(this.ultimateTarget.x, this.ultimateTarget.y - 150);
@@ -540,9 +540,9 @@ export class TojiFighter extends Fighter {
 
         const strikeSound = getSkillEffectSound('toji', 'strike');
         if (strikeSound) {
-          playSound(strikeSound.src, strikeSound.volume);
+          audioSystem.playSFX(strikeSound.src, strikeSound.volume);
         } else {
-          playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+          audioSystem.playSFX('skill_dash5', 1.0);
         }
       }
       return;
@@ -593,9 +593,9 @@ export class TojiFighter extends Fighter {
         
         spawnImpactFlash(this.ultimateTarget.x, this.ultimateTarget.y, 45, color);
         spawnMeleeClashShockwave(this.ultimateTarget.x, this.ultimateTarget.y, 80, 'toji');
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
-        playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
-        playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.85);
+        audioSystem.playSFX('attack_swordswing', 0.9);
+        audioSystem.playSFX('attack_fleshhit', 0.9);
+        audioSystem.playSFX('skill_backstab', 0.85);
         triggerGlobalScreenShake(3, 10); // Small, crisp screen shake on hit
         
         // Apply knockback
@@ -627,7 +627,7 @@ export class TojiFighter extends Fighter {
         this.vy = 0;
         
         const vanishSound = getSkillEffectSound('toji', 'vanish');
-        if (vanishSound) playSound(vanishSound.src, vanishSound.volume);
+        if (vanishSound) audioSystem.playSFX(vanishSound.src, vanishSound.volume);
         
         this.ultimatePhase = 'VANISHED';
         this.ultimateCycleTimer = CONFIG.toji?.ultimateVanishDuration ?? 120;
@@ -687,8 +687,8 @@ export class TojiFighter extends Fighter {
         spawnMeleeClashShockwave(this.x, groundY, 140, 'toji');
 
         const finalBlowSound = getSkillEffectSound('toji', 'ultimatefinalblow');
-        playSound(finalBlowSound?.src || 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3', finalBlowSound?.volume || 1.5, finalBlowSound?.speed || 1.0, 0, finalBlowSound?.delay || 0);
-        playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 1.0);
+        audioSystem.playSFX(finalBlowSound?.src || 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3', finalBlowSound?.volume || 1.5, finalBlowSound?.speed || 1.0, 0, finalBlowSound?.delay || 0);
+        audioSystem.playSFX('attack_swordswing', 1.0);
       } else if (this.ultimateCycleTimer > 0) {
         this.ultimateCycleTimer--;
         
@@ -712,7 +712,7 @@ export class TojiFighter extends Fighter {
         spawnMeleeClashShockwave(this.x, this.y, CONFIG.toji?.ultimateCraterRadius || 180, 'toji');
         spawnCrimsonLightningImpact(this.x, this.y, 160);
         spawnSparks(this.x, this.y, 50, 'crimsonSniper');
-        playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 1.2);
+        audioSystem.playSFX('attack_groundsmash', 1.2);
         
         applyDamageToTarget(this.ultimateTarget, CONFIG.toji?.ultimateCraterDamage || 65, this, { isMelee: true, isTrueDamage: true });
 

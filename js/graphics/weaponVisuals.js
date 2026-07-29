@@ -30,7 +30,7 @@ export { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee, drawShurikenProjecti
 export { drawWhiteRailgun, drawWhiteChargeEffect } from './weapons/ivoryWeaponGraphics.js';
 export { drawSpikeWeapon, drawSingleSpike } from './weapons/spikeWeaponGraphics.js';
 export { drawBlueAimbotGun } from './weapons/rangerWeaponGraphics.js';
-export { drawEngineer, drawEngineerBullet, drawTurret, drawTurretBullet, Engineer_WEAPON_GRAPHICS } from './engineerWeaponGraphics.js';
+export { drawEngineer, drawEngineerBullet, drawTurret, drawTurretBullet, Engineer_WEAPON_GRAPHICS } from './weapons/engineerWeaponGraphics.js';
 export { drawBomberGrenade } from './weapons/bomberWeaponGraphics.js';
 export { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
@@ -42,7 +42,7 @@ export { drawMahoragaFaceWings, drawMahoragaChestNecklace } from './fighters/mah
 // GRAY KNIGHT WEAPONS (Shield & Sword)
 // ─────────────────────────────────────────────
 
-export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile } from './weapons/knightWeaponGrpahics.js';
+export { drawGrayShield, drawGraySword, drawGrayBrokenSword, drawGraySwordProjectile } from './weapons/knightWeaponGraphics.js';
 
 export function drawSwordProjectile(ctx, x, y, angle, scale = 1.0) {
   // Draw the same cyberpunk sword art used for Gray's held sword,

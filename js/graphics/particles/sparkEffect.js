@@ -7,46 +7,7 @@ import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
 
-// ─────────────────────────────────────────────
-// OBJECT POOL — eliminates GC thrashing from rapid spark spawn/despawn
-// ─────────────────────────────────────────────
-const SPARK_POOL_SIZE = 300;
-const sparkPool = [];
-
-// Pre-allocate the entire pool at module load time
-for (let i = 0; i < SPARK_POOL_SIZE; i++) {
-  sparkPool.push({});
-}
-
-/**
- * Get a spark particle from pool or create new one (fallback).
- */
-function _getSpark() {
-  if (sparkPool.length > 0) {
-    return sparkPool.pop();
-  }
-  return {};
-}
-
-/**
- * Return a spark particle to pool for reuse.
- * Statically resets properties to keep the engine's hidden class optimized.
- */
-function _returnSpark(spark) {
-  spark.x = 0;
-  spark.y = 0;
-  spark.vx = 0;
-  spark.vy = 0;
-  spark.size = 0;
-  spark.life = 0;
-  spark.decay = 0;
-  spark.friction = 0;
-  spark.type = null;
-  spark.color = null;
-  spark.isFlash = false;
-  // Always return to pool (removed size limit to prevent memory waste)
-  sparkPool.push(spark);
-}
+import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 
 /**
  * Spawns spark effects at a position (visual-only, no collision).
@@ -56,126 +17,7 @@ function _returnSpark(spark) {
  * @param {string} type - 'crimson' for red/orange sparks, 'flash' for impact flash
  */
 export function spawnSparks(x, y, count = 8, type = 'crimson') {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const isDomainClash = state && state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
-  const qualityMultiplier = state.qualityLevel || 1.0;
-  const fps = state.fps || 60;
-  
-  // Further reduce limits during clashes in multiplayer or dual domain expansion
-  const dynamicQuality = (isMulti || isDomainClash) && fps < 55 ? Math.min(qualityMultiplier, 0.3) : qualityMultiplier;
-  
-  const MAX_SPARK_PARTICLES = isDomainClash ? 30 : Math.floor((isMulti ? 100 : 200) * dynamicQuality);
-  const adjustedCount = Math.max(1, Math.floor(count * (isDomainClash ? 0.3 : dynamicQuality)));
-
-  for (let i = 0; i < adjustedCount; i++) {
-    // Remove oldest if at limit — return it to pool first
-    if (state.sparkEffects.length >= MAX_SPARK_PARTICLES) {
-      const oldest = state.sparkEffects.shift();
-      if (oldest) _returnSpark(oldest);
-    }
-
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 2 + Math.random() * 6;
-
-    const spark = _getSpark();
-    spark.x = x;
-    spark.y = y;
-    spark.vx = Math.cos(angle) * speed;
-    spark.vy = Math.sin(angle) * speed;
-    spark.size = 1.5 + Math.random() * 3;
-    spark.life = 1.0;
-    spark.decay = 0.04 + Math.random() * 0.06; // Fade out in ~15-25 frames
-    spark.friction = 0.92;
-    spark.type = type; // 'crimson', 'flash', or 'crimsonSniper'
-    if (type === 'crimsonSniper') {
-      const rand = Math.random();
-      // Black, Crimson, and White shards for anime style
-      spark.color = rand > 0.65 ? 'rgba(0, 0, 0, 1)' : (rand > 0.25 ? 'rgba(200, 0, 0, 1)' : 'rgba(255, 255, 255, 1)');
-    } else if (type === 'flash') {
-      spark.color = 'rgba(255, 200, 100, 1)';
-    } else if (type === 'arcane') {
-      // Bright glowing green magic particles
-      spark.color = `rgba(${20 + Math.random() * 80}, ${200 + Math.random() * 55}, ${20 + Math.random() * 80}, 1)`;
-    } else if (type === 'arcaneAscendLine') {
-      spark.color = `rgba(${20 + Math.random() * 80}, ${200 + Math.random() * 55}, ${20 + Math.random() * 80}, 1)`;
-      // Override physics to strictly float upwards
-      spark.vx = (Math.random() - 0.5) * 1.5;
-      spark.vy = -1.5 - Math.random() * 2.5; 
-      spark.size = 2.5 + Math.random() * 2.5; // Thicker lines
-      spark.decay = 1 / 30; // Last exactly 30 frames
-      spark.friction = 0.98; // Keeps floating longer
-    } else if (type === 'laserHit') {
-      const rand = Math.random();
-      // Mix of dark scorched debris, intense orange, and white to stand out on the white arena
-      if (rand > 0.6) {
-        spark.color = 'rgba(20, 20, 20, 1)'; // Dark scorched armor/debris (highly visible on white)
-      } else if (rand > 0.2) {
-        spark.color = 'rgba(255, 100, 0, 1)'; // Fiery orange
-      } else {
-        spark.color = 'rgba(255, 255, 255, 1)'; // Core heat
-      }
-      spark.decay = 0.05 + Math.random() * 0.08; // Fast violent sparks
-    } else if (type === 'thunderSpark') {
-      const rand = Math.random();
-      spark.color = rand > 0.5 ? 'rgba(0, 220, 255, 1)' : 'rgba(255, 255, 255, 1)';
-      spark.vx = Math.cos(angle) * speed * 2.0;
-      spark.vy = Math.sin(angle) * speed * 2.0;
-      spark.decay = 0.03 + Math.random() * 0.05;
-      spark.friction = 0.90;
-      spark.isFlash = true; // IMPORTANT: route to custom jagged rendering
-    } else if (type === 'ghostTrail') {
-      const gray = 150 + Math.random() * 50;
-      spark.color = `rgba(${gray}, ${gray}, ${gray + 20}, 1)`;
-      spark.vx = (Math.random() - 0.5) * 1.0;
-      spark.vy = -1.0 - Math.random() * 2.0; // float upwards
-      spark.size = 2 + Math.random() * 2;
-      spark.decay = 0.02 + Math.random() * 0.03; // slow fade
-      spark.friction = 0.95;
-    } else if (type === 'healing') {
-      // Bright blue healing particles for Gojo's Reverse Cursed Technique
-      const blueIntensity = 180 + Math.random() * 75;
-      spark.color = `rgba(50, ${100 + Math.random() * 80}, ${blueIntensity}, 1)`;
-      spark.vx = (Math.random() - 0.5) * 4;
-      spark.vy = (Math.random() - 0.5) * 4;
-      spark.size = 2 + Math.random() * 3;
-      spark.decay = 0.03 + Math.random() * 0.04;
-      spark.friction = 0.90;
-      spark.isGlow = true; // Enable glow rendering
-    } else if (type === 'rikaCurse') {
-      // Rising cursed energy particles (magenta/violet/dark purple)
-      const rand = Math.random();
-      if (rand > 0.6) {
-        spark.color = `rgba(${200 + Math.random() * 55}, 20, ${180 + Math.random() * 55}, 1)`; // Hot pink / Magenta
-      } else if (rand > 0.3) {
-        spark.color = `rgba(${100 + Math.random() * 50}, 0, ${150 + Math.random() * 50}, 1)`; // Dark Violet / Purple
-      } else {
-        spark.color = `rgba(${35 + Math.random() * 25}, 10, ${55 + Math.random() * 25}, 1)`; // Deep dark purple
-      }
-      spark.vx = (Math.random() - 0.5) * 2.5; // Slight drift
-      spark.vy = -0.6 - Math.random() * 1.4;  // Float upwards
-      spark.size = 2.0 + Math.random() * 3.5;
-      spark.decay = 0.02 + Math.random() * 0.02; // Fade out over ~25-50 frames
-      spark.friction = 0.96; // Float longer
-    } else if (type === 'paleStoneShatter') {
-      const rand = Math.random();
-      if (rand > 0.65) {
-        spark.color = 'rgba(241, 245, 249, 1)'; // Pale bone white rock shard
-      } else if (rand > 0.35) {
-        spark.color = 'rgba(203, 213, 225, 1)'; // Pale slate gray stone
-      } else if (rand > 0.15) {
-        spark.color = 'rgba(71, 85, 105, 1)';   // Dark slate fracture edge
-      } else {
-        spark.color = 'rgba(254, 240, 138, 1)'; // Pale gold cursed energy spark
-      }
-      spark.size = 2.5 + Math.random() * 4.5; // Chunkier rock fragments
-      spark.decay = 0.03 + Math.random() * 0.05; // Fade over 20-30 frames
-      spark.friction = 0.88; // Explosive shatter dispersion
-    } else {
-      spark.color = `rgba(255, ${50 + Math.random() * 100}, ${20 + Math.random() * 50}, 1)`;
-    }
-
-    state.sparkEffects.push(spark);
-  }
+  ParticleSystem.spawn(x, y, count, type);
 }
 
 /**
@@ -185,52 +27,7 @@ export function spawnSparks(x, y, count = 8, type = 'crimson') {
  * @param {number} count - Number of rocks to spawn
  */
 export function spawnTelekinesisDebris(x, y, count = 2) {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const qualityMultiplier = state.qualityLevel || 1.0;
-  const fps = state.fps || 60;
-  const dynamicQuality = isMulti && fps < 45 ? Math.min(qualityMultiplier, 0.4) : qualityMultiplier;
-
-  const MAX_SPARK_PARTICLES = Math.floor((isMulti ? 100 : 200) * dynamicQuality);
-  const adjustedCount = Math.max(1, Math.floor(count * dynamicQuality));
-
-  for (let i = 0; i < adjustedCount; i++) {
-    if (state.sparkEffects.length >= MAX_SPARK_PARTICLES) {
-      const oldest = state.sparkEffects.shift();
-      if (oldest) _returnSpark(oldest);
-    }
-
-    const debris = _getSpark();
-    // Spawn around the base (random radius)
-    const angle = Math.random() * Math.PI * 2;
-    const radius = 10 + Math.random() * 20;
-    
-    debris.x = x + Math.cos(angle) * radius;
-    debris.y = y + Math.sin(angle) * radius;
-    debris.vx = (Math.random() - 0.5) * 1.5; // More horizontal spread
-    debris.vy = -3.0 - Math.random() * 4.0; // Fast initial explosive lift
-    
-    const sizeRoll = Math.random();
-    if (sizeRoll < 0.6) {
-      debris.size = 1 + Math.random() * 2.5; // Small pebbles
-    } else if (sizeRoll < 0.9) {
-      debris.size = 3.5 + Math.random() * 3.5; // Medium chunks
-    } else {
-      debris.size = 8 + Math.random() * 4; // Large boulders
-    }
-    debris.life = 1.0;
-    debris.decay = 0.003 + Math.random() * 0.003; // Extremely slow decay (lasts 150-300 frames)
-    debris.friction = 0.94; // Strong friction so it stops mid-air and hovers
-    debris.type = 'telekinesisDebris';
-    debris.isFlash = false;
-    debris.rotation = Math.random() * Math.PI * 2;
-    debris.rotationSpeed = (Math.random() - 0.5) * 0.1;
-    
-    // Dark green/grey theme
-    const isGreen = Math.random() > 0.5;
-    debris.color = isGreen ? 'rgba(46, 139, 87, 1)' : 'rgba(30, 40, 30, 1)';
-    
-    state.sparkEffects.push(debris);
-  }
+  ParticleSystem.spawn(x, y, count, 'telekinesisDebris');
 }
 
 /**
@@ -238,47 +35,8 @@ export function spawnTelekinesisDebris(x, y, count = 2) {
  */
 export function spawnTojiWhirlingWindDebris(x, y, count = 2) {
   for (let i = 0; i < count; i++) {
-    if (state.sparkEffects.length >= 120) {
-      const oldest = state.sparkEffects.shift();
-      if (oldest) _returnSpark(oldest);
-    }
-
-    const debris = _getSpark();
-    const isLeaf = Math.random() < 0.50; // 50% chance leaf, 50% chance pebble
-    
-    // Spawn in a strict orbital circle around center
-    const radius = 30 + Math.random() * 65;
-    const angle = Math.random() * Math.PI * 2;
-    
-    debris.cx = x; // Center X
-    debris.cy = y; // Center Y
-    debris.orbitRadius = radius;
-    debris.orbitAngle = angle;
-    debris.orbitSpeed = (0.05 + Math.random() * 0.05) * (Math.random() > 0.5 ? 1 : -1);
-    
-    debris.x = x + Math.cos(angle) * radius;
-    debris.y = y + Math.sin(angle) * (radius * 0.55);
-    debris.vx = 0;
-    debris.vy = 0;
-
-    debris.life = 1.0;
-    debris.decay = 0.018 + Math.random() * 0.015; // Lasts ~50-70 frames orbiting
-    debris.friction = 1.0;
-    debris.type = isLeaf ? 'tojiWindLeaf' : 'tojiWindPebble';
-    debris.isFlash = false;
-    debris.rotation = Math.random() * Math.PI * 2;
-    debris.rotationSpeed = (Math.random() - 0.5) * 0.15;
-    debris.size = isLeaf ? (2.5 + Math.random() * 2.5) : (1.2 + Math.random() * 2.0);
-
-    if (isLeaf) {
-      const leafColors = ['#2E8B57', '#3CB371', '#556B2F', '#D2691E', '#8B5A2B', '#A0522D'];
-      debris.color = leafColors[Math.floor(Math.random() * leafColors.length)];
-    } else {
-      const pebbleColors = ['#3A3D40', '#4A4D50', '#25282B', '#5A5D60', '#1F2225'];
-      debris.color = pebbleColors[Math.floor(Math.random() * pebbleColors.length)];
-    }
-
-    state.sparkEffects.push(debris);
+    const isLeaf = Math.random() < 0.50;
+    ParticleSystem.spawn(x, y, 1, isLeaf ? 'tojiWindLeaf' : 'tojiWindPebble');
   }
 }
 
@@ -289,28 +47,13 @@ export function spawnTojiWhirlingWindDebris(x, y, count = 2) {
  * @param {number} radius - Flash radius
  */
 export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const fps = state.fps || 60;
-  const MAX_FLASHES = isMulti ? (fps < 45 ? 10 : 20) : 40;
-
-  if (state.sparkEffects.length >= MAX_FLASHES) {
-    const oldest = state.sparkEffects.shift();
-    if (oldest) _returnSpark(oldest);
-  }
-
-  const flash = _getSpark();
-  flash.x = x;
-  flash.y = y;
-  flash.vx = 0;
-  flash.vy = 0;
-  flash.size = radius;
-  flash.life = 1.0;
-  flash.decay = 0.15; // Fast fade
-  flash.type = type === 'crimsonSniper' ? 'crimsonSniperFlash' : 'flash';
-  flash.isFlash = true;
-  flash.color = 'rgba(255, 255, 255, 1)'; // Unused for flashes, handled by gradients
-
-  state.sparkEffects.push(flash);
+  ParticleSystem.spawn(x, y, 1, 'flash_default', {
+    size: radius,
+    decay: 0.15, // Fast fade
+    type: type === 'crimsonSniper' ? 'crimsonSniperFlash' : 'flash',
+    isFlash: true,
+    color: 'rgba(255, 255, 255, 1)'
+  });
 }
 
 /**
@@ -323,36 +66,28 @@ export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
  */
 export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = false) {
   // 1. Bright white-crimson core flash
-  const coreFlash = _getSpark();
-  coreFlash.x = x;
-  coreFlash.y = y;
-  coreFlash.vx = 0;
-  coreFlash.vy = 0;
-  coreFlash.size = radius * 0.6;
-  coreFlash.life = 1.0;
-  coreFlash.decay = 0.08;
-  coreFlash.type = isTrickster ? 'tricksterLightningCore' : 'crimsonLightningCore';
-  coreFlash.isFlash = true;
-  coreFlash.friction = 1;
-  coreFlash.color = 'white';
-  state.sparkEffects.push(coreFlash);
+  ParticleSystem.spawn(x, y, 1, 'default', {
+    vx: 0, vy: 0,
+    size: radius * 0.6,
+    decay: 0.08,
+    type: isTrickster ? 'tricksterLightningCore' : 'crimsonLightningCore',
+    isFlash: true,
+    friction: 1,
+    color: 'white'
+  });
 
   // 2. Expanding crimson shockwave rings (2 rings at different speeds)
   for (let ring = 0; ring < 2; ring++) {
-    const ringEffect = _getSpark();
-    ringEffect.x = x;
-    ringEffect.y = y;
-    ringEffect.vx = 0;
-    ringEffect.vy = 0;
-    ringEffect.size = radius * 0.2; // starts small, expands
-    ringEffect.targetSize = radius * (1.5 + ring * 0.8); // expand target
-    ringEffect.life = 1.0;
-    ringEffect.decay = 0.04 + ring * 0.02;
-    ringEffect.type = isTrickster ? 'tricksterLightningRing' : 'crimsonLightningRing';
-    ringEffect.isFlash = true;
-    ringEffect.friction = 1;
-    ringEffect.color = isTrickster ? 'lime' : 'crimson';
-    state.sparkEffects.push(ringEffect);
+    ParticleSystem.spawn(x, y, 1, 'default', {
+      vx: 0, vy: 0,
+      size: radius * 0.2, // starts small, expands
+      targetSize: radius * (1.5 + ring * 0.8), // expand target
+      decay: 0.04 + ring * 0.02,
+      type: isTrickster ? 'tricksterLightningRing' : 'crimsonLightningRing',
+      isFlash: true,
+      friction: 1,
+      color: isTrickster ? 'lime' : 'crimson'
+    });
   }
 
   // 3. Radial lightning arc sparks shooting outward
@@ -360,26 +95,25 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = fal
   for (let i = 0; i < arcCount; i++) {
     const angle = (i / arcCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
     const speed = 4 + Math.random() * 6;
-    const spark = _getSpark();
-    spark.x = x;
-    spark.y = y;
-    spark.vx = Math.cos(angle) * speed;
-    spark.vy = Math.sin(angle) * speed;
-    spark.size = 2 + Math.random() * 3;
-    spark.life = 1.0;
-    spark.decay = 0.03 + Math.random() * 0.03;
-    spark.friction = 0.95;
-    spark.type = isTrickster ? 'tricksterLightningArc' : 'crimsonLightningArc';
-    spark.isFlash = false;
-    spark.angle = angle; // store for drawing direction
-    // Alternate between green, dark green, white for trickster, else crimson colors
     const rand = Math.random();
+    let color;
     if (isTrickster) {
-      spark.color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(50, 255, 50, 1)' : 'rgba(0, 150, 0, 1)');
+      color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(50, 255, 50, 1)' : 'rgba(0, 150, 0, 1)');
     } else {
-      spark.color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(255, 30, 30, 1)' : 'rgba(150, 0, 0, 1)');
+      color = rand > 0.7 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(255, 30, 30, 1)' : 'rgba(150, 0, 0, 1)');
     }
-    state.sparkEffects.push(spark);
+
+    ParticleSystem.spawn(x, y, 1, 'default', {
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2 + Math.random() * 3,
+      decay: 0.03 + Math.random() * 0.03,
+      friction: 0.95,
+      type: isTrickster ? 'tricksterLightningArc' : 'crimsonLightningArc',
+      isFlash: false,
+      angle: angle, // store for drawing direction
+      color: color
+    });
   }
 }
 
@@ -391,7 +125,7 @@ export function spawnCrimsonLightningImpact(x, y, radius = 60, isTrickster = fal
  * @param {number} durationFrames - How many frames the scorch persists
  */
 export function spawnGroundScorch(x, y, radius, durationFrames = 120, colorTheme = 'crimson') {
-  const scorch = _getSpark();
+  const scorch = ParticleSystem.getParticle();
   scorch.x = x;
   scorch.y = y;
   scorch.vx = 0;
@@ -474,7 +208,7 @@ export function spawnArcaneCrater(x, y, radius, durationFrames = 120) {
  * @param {string} smokeType - 'ground', 'airborne', or 'burst'
  */
 export function spawnArcaneSmoke(x, y, vx = 0, vy = 0, smokeType = 'burst') {
-  const smoke = _getSpark();
+  const smoke = ParticleSystem.getParticle();
   smoke.x = x;
   smoke.y = y;
   smoke.vx = vx + (Math.random() - 0.5) * 1.5;
@@ -521,7 +255,7 @@ export function spawnArcaneSmoke(x, y, vx = 0, vy = 0, smokeType = 'burst') {
  * Spawns hot, colored smoke escaping from the laser muzzle.
  */
 export function spawnLaserSmoke(x, y, vx, vy) {
-  const smoke = _getSpark();
+  const smoke = ParticleSystem.getParticle();
   smoke.x = x;
   smoke.y = y;
   
@@ -562,7 +296,7 @@ export function spawnLaserSmoke(x, y, vx, vy) {
  */
 export function spawnArcaneShockwave(x, y) {
   // Spawn two overlapping rings - deep blue and cyan - for a layered arcane look
-  const blueWave = _getSpark();
+  const blueWave = ParticleSystem.getParticle();
   blueWave.x = x;
   blueWave.y = y;
   blueWave.vx = 0;
@@ -576,7 +310,7 @@ export function spawnArcaneShockwave(x, y) {
   blueWave.color = 'rgba(0, 100, 255, 1)'; // Deep blue
   state.sparkEffects.push(blueWave);
 
-  const cyanWave = _getSpark();
+  const cyanWave = ParticleSystem.getParticle();
   cyanWave.x = x;
   cyanWave.y = y;
   cyanWave.vx = 0;
@@ -597,7 +331,7 @@ export function spawnArcaneShockwave(x, y) {
  * @param {number} y
  */
 export function spawnArcaneFlash(x, y) {
-  const flash = _getSpark();
+  const flash = ParticleSystem.getParticle();
   flash.x = x;
   flash.y = y;
   flash.vx = 0;
@@ -628,7 +362,7 @@ export function spawnArcaneGlyphs(x, y, count = 12) {
   ];
   
   for (let i = 0; i < count; i++) {
-    const glyph = _getSpark();
+    const glyph = ParticleSystem.getParticle();
     const angle = Math.random() * Math.PI * 2;
     const dist = 20 + Math.random() * 40;
     
@@ -659,7 +393,7 @@ export function spawnSpellStealWisps(trickster, target, color, count = 20) {
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
     if (state.sparkEffects.length >= (isMulti ? 250 : 500)) return;
     
-    const spark = _getSpark();
+    const spark = ParticleSystem.getParticle();
     
     // Spawn in a wide circle around the opponent
     const angle = Math.random() * Math.PI * 2;
@@ -752,7 +486,7 @@ export function updateSparkEffects(frozen = false) {
 
     // Remove dead effects — return to pool instead of splice
     if (effect.life <= 0) {
-      _returnSpark(effect);
+      ParticleSystem.returnParticle(effect);
       return false;
     }
     return true;
@@ -1513,10 +1247,10 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
 
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
     const oldest = state.sparkEffects.shift();
-    if (oldest) _returnSpark(oldest);
+    if (oldest) ParticleSystem.returnParticle(oldest);
   }
 
-  const shockwave = _getSpark();
+  const shockwave = ParticleSystem.getParticle();
   shockwave.x = x;
   shockwave.y = y;
   shockwave.vx = 0;
@@ -1547,10 +1281,10 @@ export function spawnRikaRoarShockwave(x, y, radius = 180) {
 
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
     const oldest = state.sparkEffects.shift();
-    if (oldest) _returnSpark(oldest);
+    if (oldest) ParticleSystem.returnParticle(oldest);
   }
 
-  const shockwave = _getSpark();
+  const shockwave = ParticleSystem.getParticle();
   shockwave.x = x;
   shockwave.y = y;
   shockwave.vx = 0;

@@ -6,7 +6,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../cor
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
-import { playSound, stopLoopingSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
 
@@ -68,19 +68,19 @@ export function activateSpiderweb(fighter) {
   });
 
   const sound = getSkillSound(fighter._def?.id, 'spiderweb');
-  if (sound) playSound(sound.src, sound.volume);
+  if (sound) audioSystem.playSFX(sound.src, sound.volume);
 }
 
 export function fireDivineFlame(fighter, ownerIndex) {
   fighter.isChannelingDivineFlame = false;
 
   if (fighter.fugaSoundKey) {
-    stopLoopingSound(fighter.fugaSoundKey);
+    audioSystem.emit("stopLoop", fighter.fugaSoundKey);
     fighter.fugaSoundKey = null;
   }
 
   const sound = getSkillSound(fighter._def?.id, 'fuga_travel');
-  if (sound) playSound(sound.src, sound.volume);
+  if (sound) audioSystem.playSFX(sound.src, sound.volume);
 
   const isDomainFuga = fighter.domainActive;
   const normalCd = CONFIG.sukuna?.divineFlameCooldown || 500;
@@ -93,7 +93,7 @@ export function fireDivineFlame(fighter, ownerIndex) {
   if (isDomainFuga) {
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 35, 'THERMOBARIC FUGA EXPLOSION!!', '#FF3300');
     spawnImpactFlash(fighter.x, fighter.y, 140, 'gold');
-    playSound('Assets/Sound Effects/Attacks/explosion.mp3', 1.0);
+    audioSystem.playSFX('attack_explosion', 1.0);
   }
 
   const baseDamage = CONFIG.sukuna?.divineFlameDamage || 25;
@@ -126,7 +126,7 @@ export function activateReverseCursedTechnique(fighter, attacker) {
   triggerGlobalScreenShake(6, 20);
 
   const sound = getSkillSound(fighter._def?.id, 'reverseCursedTechnique');
-  if (sound) playSound(sound.src, sound.volume);
+  if (sound) audioSystem.playSFX(sound.src, sound.volume);
 }
 
 export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
@@ -181,8 +181,8 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     });
 
     if (fighter._slashSoundCooldown <= 0) {
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
-      playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
+      audioSystem.playSFX('attack_swordswing', 0.6);
+      audioSystem.playSFX('skill_backstab', 0.5);
       fighter._slashSoundCooldown = 15;
     }
 
@@ -250,7 +250,7 @@ export function applyDomainEffect(fighter, arena) {
   if (fighter._domainFrame % domainDamageInterval === 0) {
     let playedSwordSwing = false;
     if (fighter._slashSoundCooldown === undefined || fighter._slashSoundCooldown <= 0) {
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
+      audioSystem.playSFX('attack_swordswing', 0.5);
       fighter._slashSoundCooldown = 15;
       playedSwordSwing = true;
     }
@@ -373,7 +373,7 @@ export function applyDomainEffect(fighter, arena) {
     }
 
     if (hitEnemyThisTick && playedSwordSwing) {
-      playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.4);
+      audioSystem.playSFX('skill_backstab', 0.4);
     }
   }
 }

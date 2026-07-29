@@ -1,3 +1,4 @@
+import { audioSystem } from '../../../systems/audioSystem.js';
 // ─────────────────────────────────────────────
 // YUTA OKKOTSU KATANA COMBAT MODULE
 // Handles Katana melee hit detection and dynamic blade tip positioning
@@ -112,9 +113,9 @@ export function modExecuteKatanaMelee(fighter, angle) {
   }
 
   if (hitSomeone) {
-    // playSound(getBasicAttackSound('hit'), 0.5);
+    // audioSystem.playSFX(getBasicAttackSound('hit'), 0.5);
   } else {
-    // playSound(getBasicAttackSound('miss'), 0.3);
+    // audioSystem.playSFX(getBasicAttackSound('miss'), 0.3);
   }
 }
 

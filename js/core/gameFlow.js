@@ -1,3 +1,4 @@
+import { stopAllSounds, stopAllLoopingSounds, preloadSound } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // GAME FLOW — State transitions and round management
 // Extracted from main.js so that ui.js can import these without
@@ -7,7 +8,7 @@ import { CONFIG, FIGHTER_DEFS } from './config.js';
 import { GAME_MODES, MODE_SETTINGS } from './modeConfig.js';
 import { state, createFighterInstance, clearProjectiles } from './state.js';
 import { updateFighters, updateProjectiles, spawnFuelPickup } from '../systems/physics.js';
-import { preloadSound, playSound, stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
+import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSoundPaths } from '../soundEffects/basicAttackSounds.js';
 import { getSkillSoundPaths } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSoundPaths } from '../soundEffects/skillEffectSounds.js';
@@ -374,7 +375,7 @@ export function startCountdown() {
 
   if (soundKey) {
     const snd = getAnnouncerSound(soundKey);
-    if (snd) playSound(snd.src, snd.volume, snd.speed, snd.offset || 0);
+    if (snd) audioSystem.playSFX(snd.src, snd.volume, snd.speed, snd.offset || 0);
   }
 }
 

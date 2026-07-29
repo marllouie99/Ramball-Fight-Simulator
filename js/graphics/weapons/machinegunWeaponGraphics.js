@@ -4,7 +4,7 @@
 // Tactical futuristic minigun with rotating barrel assembly.
 // Keep gameplay/tuning values in js/config.js; only visual details here.
 
-import { state } from '../core/state.js';
+import { state } from '../../core/state.js';
 
 // ─────────────────────────────────────────────
 // GRAPHICS CONFIGURATION

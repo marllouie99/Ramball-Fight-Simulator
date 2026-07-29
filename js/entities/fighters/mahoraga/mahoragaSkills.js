@@ -6,7 +6,7 @@
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 /**
@@ -87,7 +87,7 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
   spawnImpactFlash(fromX, fromY, 40, '#8A2BE2');
   spawnSparks(fromX, fromY, 20, 'arcane', '#8A2BE2');
   spawnImpactFlash(toX, toY, 35, '#8A2BE2');
-  playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+  audioSystem.playSFX('skill_dash5', 1.0);
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ PURPLE DODGED!', '#8A2BE2');
 }
 
@@ -125,7 +125,7 @@ export function gojoRedTeleportDodge(fighter, gojo) {
   spawnImpactFlash(fromX, fromY, 40, '#FF1144');
   spawnSparks(fromX, fromY, 20, 'arcane', '#FF1144');
   spawnImpactFlash(toX, toY, 35, '#FF1144');
-  playSound('Assets/Sound Effects/Skills/dash5.mp3', 1.0);
+  audioSystem.playSFX('skill_dash5', 1.0);
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ RED DODGED!', '#FF1144');
 }
 
@@ -208,5 +208,5 @@ export function startAdaptationFlashDash(fighter, attacker) {
 
   spawnImpactFlash(fromX, fromY, 28, '#E0E0E0');
   spawnSparks(fromX, fromY, 12, 'silver', '#FFFFFF');
-  playSound('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+  audioSystem.playSFX('skill_dash3', 1.0);
 }

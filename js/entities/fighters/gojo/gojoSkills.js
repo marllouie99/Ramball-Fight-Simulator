@@ -1,3 +1,4 @@
+import { fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // SATORU GOJO LIMITLESS SKILLS MODULE
 // Encapsulates Reversal Red, Hollow Purple, and skill utilities
@@ -6,7 +7,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../cor
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { CONFIG } from '../../../core/config.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
-import { playSound, fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 
 export function activateRed(fighter) {
@@ -56,6 +57,8 @@ export function activateRed(fighter) {
       }
     }
   });
+  
+  fighter._redTargetRef = targetF;
   fighter.redTargetAngle = targetF ? Math.atan2(targetF.y - fighter.y, targetF.x - fighter.x) : fighter.gunAngle;
 
   // Text pop and light buildup sparks
@@ -64,7 +67,7 @@ export function activateRed(fighter) {
   triggerGlobalScreenShake(4, 6);
 
   const sCharging = getSkillSound(fighter._def?.id, 'red_charging');
-  playSound(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 2.0);
+  audioSystem.playSFX(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 2.0);
 }
 
 export function detonateRed(fighter) {
@@ -80,7 +83,7 @@ export function detonateRed(fighter) {
   triggerGlobalScreenShake(12, 18);
 
   const sBlast = getSkillSound(fighter._def?.id, 'red_blast');
-  playSound(sBlast?.src || 'Assets/Sound Effects/Skills/redblast.mp3', sBlast?.volume ?? 1.5);
+  audioSystem.playSFX(sBlast?.src || 'Assets/Sound Effects/Skills/redblast.mp3', sBlast?.volume ?? 1.5);
 
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
   const arena = CONFIG.arena;
@@ -189,7 +192,7 @@ export function executePurpleRetreat(fighter) {
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'RETREAT!', '#00BFFF');
     spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
     spawnImpactFlash(fighter.x, fighter.y, 30, 'lightningTrail');
-    playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+    audioSystem.playSFX('skill_dash3', 0.9);
   }
 }
 

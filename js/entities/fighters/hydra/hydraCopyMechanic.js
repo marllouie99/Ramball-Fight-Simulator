@@ -1,5 +1,5 @@
 import { spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
-import { playSound } from '../../../systems/soundSystem.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
 
 /**
@@ -38,5 +38,5 @@ export function performStolenAttack(fighter, opponent) {
     spawnSparks(opponent.x, opponent.y, 10, 'blood');
     
     spawnFloatingText(opponent.x, opponent.y, 'SMACK!', '#ccc');
-    playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.5);
+    audioSystem.playSFX('attack_swordswing', 0.5);
 }

@@ -1,7 +1,7 @@
 import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawRubyScythe } from '../../graphics/weapons/rubyWeaponGraphics.js';
@@ -80,7 +80,7 @@ export class RubyFighter extends Fighter {
     }
 
     const sound = getSkillSound(this._def?.id, 'dash');
-    if (sound) playSound(sound.src, sound.volume);
+    if (sound) audioSystem.playSFX(sound.src, sound.volume);
   }
 
   heal(amount) {
@@ -168,7 +168,7 @@ export class RubyFighter extends Fighter {
     this.vy = 0;
 
     const sound = getSkillSound(this._def?.id, 'pull');
-    if (sound) playSound(sound.src, sound.volume);
+    if (sound) audioSystem.playSFX(sound.src, sound.volume);
   }
 
   /** Advance the multi-phase pull each frame. */
@@ -352,7 +352,7 @@ export class RubyFighter extends Fighter {
     if (totalHeal > 0) this.heal(totalHeal);
 
     const sound = getSkillSound(this._def?.id, 'spin');
-    if (sound) playSound(sound.src, sound.volume);
+    if (sound) audioSystem.playSFX(sound.src, sound.volume);
   }
 
   // ── main update ─────────────────────────────────────

@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
-import { playSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawCronosPreActivateBarrier, drawCronosSphereImpact, drawCronosSphereVisual } from '../../graphics/draw.js';
@@ -124,7 +124,7 @@ export class CronosFighter extends Fighter {
     this.meleeSwingAngle = 0;
     try {
       const sound = getBasicAttackSound(this._def?.id, this._def?.type);
-      if (sound) playSound(sound.src, sound.volume);
+      if (sound) audioSystem.playSFX(sound.src, sound.volume);
     } catch (e) {}
   }
 
@@ -837,7 +837,7 @@ export class CronosFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 15, 'TIME STOP!', '#00F3FF');
     // Play cronosphere sound    
     const sphereSound = getSkillSound(this._def?.id, 'sphere');
-    if (sphereSound) playSound(sphereSound.src, sphereSound.volume);
+    if (sphereSound) audioSystem.playSFX(sphereSound.src, sphereSound.volume);
 
     // Apply time stop to all other fighters and projectiles
     if (state && state.fighters) {
