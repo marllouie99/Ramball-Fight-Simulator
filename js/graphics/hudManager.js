@@ -400,9 +400,13 @@ function updateHealthHud() {
         const dmg = Math.max(0, Number(f1.damage) || 0);
         const skillPct = getSkillProgress(f1);
         const color = f1.color || '#a491d3';
+        const isReady = skillPct >= 99;
+        const boxStyle = isReady ? `border-color: ${color}; box-shadow: 0 0 14px ${color}, 0 4px 14px rgba(0,0,0,0.6);` : '';
+        const fillStyle = `width: ${skillPct}%; background: linear-gradient(90deg, ${adjustColor(color, -50)}, ${color}); box-shadow: 2px 0 12px ${color};`;
+
         bottomHudLeft.innerHTML = `
-          <div class="hud-skill-box">
-            <div class="hud-skill-box-fill" style="width: ${skillPct}%; background: ${color}; opacity: 0.8;"></div>
+          <div class="hud-skill-box" style="${boxStyle}">
+            <div class="hud-skill-box-fill" style="${fillStyle}"></div>
             <div class="hud-skill-box-text">${ability}</div>
           </div>
           <div class="hud-damage-text" style="color: ${color};">Damage: ${dmg}</div>
@@ -425,9 +429,13 @@ function updateHealthHud() {
         const dmg = Math.max(0, Number(f2.damage) || 0);
         const skillPct = getSkillProgress(f2);
         const color = f2.color || '#eab308';
+        const isReady = skillPct >= 99;
+        const boxStyle = isReady ? `border-color: ${color}; box-shadow: 0 0 14px ${color}, 0 4px 14px rgba(0,0,0,0.6);` : '';
+        const fillStyle = `width: ${skillPct}%; background: linear-gradient(90deg, ${adjustColor(color, -50)}, ${color}); box-shadow: 2px 0 12px ${color};`;
+
         bottomHudRight.innerHTML = `
-          <div class="hud-skill-box">
-            <div class="hud-skill-box-fill" style="width: ${skillPct}%; background: ${color}; opacity: 0.8;"></div>
+          <div class="hud-skill-box" style="${boxStyle}">
+            <div class="hud-skill-box-fill" style="${fillStyle}"></div>
             <div class="hud-skill-box-text">${ability}</div>
           </div>
           <div class="hud-damage-text" style="color: ${color};">Damage: ${dmg}</div>
