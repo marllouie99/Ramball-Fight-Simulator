@@ -1065,6 +1065,133 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   ctx.restore();
 }
 
+export function drawMahoragaThrow(ctx, p) {
+  const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+  const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+  const moveAngle = Math.atan2(vy, vx);
+  const now = Date.now();
+  const spinAngle = moveAngle + (p.spinOffset || 0) + (now * 0.009);
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+
+  // Soft Ground Drop Shadow
+  ctx.save();
+  ctx.beginPath();
+  ctx.ellipse(0, 18, 28, 11, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.rotate(spinAngle);
+
+  if (p.visual === 'mahoragaBasaltMonolith') {
+    // 1. PALE BONE & SLATE MONOLITH (With Radiant Pale Gold Fissure Cracks!)
+    ctx.beginPath();
+    ctx.moveTo(25, -4);
+    ctx.lineTo(16, 20);
+    ctx.lineTo(-8, 24);
+    ctx.lineTo(-24, 14);
+    ctx.lineTo(-26, -10);
+    ctx.lineTo(-10, -26);
+    ctx.lineTo(14, -20);
+    ctx.closePath();
+
+    const basaltGrad = ctx.createLinearGradient(-25, -25, 25, 25);
+    basaltGrad.addColorStop(0, '#F1F5F9');   // Pale bone highlight
+    basaltGrad.addColorStop(0.5, '#CBD5E1'); // Pale slate gray
+    basaltGrad.addColorStop(1, '#64748B');   // Muted stone shadow
+    ctx.fillStyle = basaltGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // Pale Gold-White Cursed Energy Fissure Veins
+    ctx.beginPath();
+    ctx.moveTo(14, -20); ctx.lineTo(3, -2); ctx.lineTo(-14, 12);
+    ctx.moveTo(-8, 24);  ctx.lineTo(1, 4);  ctx.lineTo(16, -8);
+    ctx.strokeStyle = '#FEF08A'; // Pale yellow gold fissure lines
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(3, -2); ctx.lineTo(16, -8);
+    ctx.strokeStyle = '#FFFFFF'; // Pure white-hot core
+    ctx.lineWidth = 1.4;
+    ctx.stroke();
+
+  } else if (p.visual === 'mahoragaRuinConcrete') {
+    // 2. PALE ASH CONCRETE SLAB (Pale Ash Gray with Muted Steel Spikes)
+    ctx.beginPath();
+    ctx.moveTo(26, -12);
+    ctx.lineTo(24, 14);
+    ctx.lineTo(-22, 16);
+    ctx.lineTo(-26, -14);
+    ctx.closePath();
+
+    const concGrad = ctx.createLinearGradient(-26, -14, 26, 16);
+    concGrad.addColorStop(0, '#E2E8F0');   // Pale ash white
+    concGrad.addColorStop(0.6, '#94A3B8'); // Soft cement gray
+    concGrad.addColorStop(1, '#475569');   // Muted slate edge
+    ctx.fillStyle = concGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#1E293B';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // Muted Steel Rebar Spikes
+    ctx.strokeStyle = '#94A3B8'; // Pale steel gray
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(26, -6); ctx.lineTo(36, -8);
+    ctx.moveTo(24, 8);  ctx.lineTo(33, 12);
+    ctx.moveTo(-26, -4); ctx.lineTo(-35, -2);
+    ctx.stroke();
+
+    // Subtle Fracture Fissures
+    ctx.beginPath();
+    ctx.moveTo(-18, -14); ctx.lineTo(-4, 0); ctx.lineTo(20, 14);
+    ctx.strokeStyle = '#0F172A';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+  } else {
+    // 3. PALE CHALK LIMESTONE RUBBLE (Pale White Ash Stone + Glowing Pale Core)
+    ctx.beginPath();
+    ctx.moveTo(22, -8);
+    ctx.lineTo(18, 16);
+    ctx.lineTo(-12, 20);
+    ctx.lineTo(-24, 4);
+    ctx.lineTo(-18, -20);
+    ctx.lineTo(6, -22);
+    ctx.closePath();
+
+    const chalkGrad = ctx.createLinearGradient(-24, -22, 22, 20);
+    chalkGrad.addColorStop(0, '#F8FAFC');   // Pale chalk white
+    chalkGrad.addColorStop(0.5, '#E2E8F0'); // Soft ash gray
+    chalkGrad.addColorStop(1, '#94A3B8');   // Pale stone base
+    ctx.fillStyle = chalkGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    // Soft Glowing White-Gold Core
+    ctx.beginPath();
+    ctx.arc(0, 0, 9, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(254, 240, 138, 0.75)'; // Pale yellow aura
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, 5, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF'; // Pure white core
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 if (typeof window !== 'undefined') {
   window.drawMahoragaLeftPunch = drawMahoragaLeftPunch;
 }

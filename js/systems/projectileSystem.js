@@ -12,6 +12,7 @@ import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch } from '../graphics/particles/sparkEffect.js';
 import { spatialGrid } from './physics.js';
+import { HitImpactSystem } from './hitImpactSystem.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -902,240 +903,17 @@ class ProjectileSystem {
               projectile.hitTargets.add(fi);
             }
             
-            // Sukuna & Mahoraga slashes/thrown debris pierce through enemies with physical impact!
-            const isSukunaSlash = projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade' || projectile.isSukunaSlash;
-            const isMahoragaThrow = projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
-            if (isSukunaSlash || isMahoragaThrow) {
-              if (!projectile.hitFighters) projectile.hitFighters = new Set();
-              projectile.hitFighters.add(fighter);
-              
-              // Spawn rock dust, pale stone shatter fragments, & crunching impact flash
-              if (isMahoragaThrow) {
-                spawnSparks(fighter.x, fighter.y, 16, 'paleStoneShatter');
-                spawnImpactFlash(fighter.x, fighter.y, 35, '#E2E8F0');
-                playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.8);
-                playSound('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.4);
-              } else {
-                spawnSparks(fighter.x, fighter.y, 10, 'crimsonSniper');
-                spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-                playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.5);
-
-                const attackerObj = state.fighters && state.fighters[projectile.owner];
-                if (attackerObj) {
-                  if (!attackerObj.slashHitVisuals) attackerObj.slashHitVisuals = [];
-                  const hitAngle = Math.atan2(projectile.vy, projectile.vx);
-                  attackerObj.slashHitVisuals.push({
-                    x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.4,
-                    y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.4,
-                    angle: hitAngle + (Math.random() - 0.5) * 0.4,
-                    timer: 12,
-                    maxTimer: 12,
-                    scale: 1.0 + Math.random() * 0.4
-                  });
-                }
-              }
-
-              // Apply physical push backward on hit (using throwKnockback config for Mahoraga!)
-              const knockbackForce = (isMahoragaThrow && CONFIG.mahoraga?.throwKnockback !== undefined) ? CONFIG.mahoraga.throwKnockback : 6.0; 
-              const angle = Math.atan2(projectile.vy, projectile.vx);
-              fighter.vx += Math.cos(angle) * knockbackForce;
-              fighter.vy += Math.sin(angle) * knockbackForce;
-              fighter.x += Math.cos(angle) * (knockbackForce * 0.5);
-              fighter.y += Math.sin(angle) * (knockbackForce * 0.5);
-              if (typeof fighter.applyHitStun === 'function') fighter.applyHitStun(8);
-              
-              // Continue loop so the slash pierces through every enemy in its flight path!
-              continue;
-            } else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
-              if (!projectile.hitFighters) projectile.hitFighters = new Set();
-              projectile.hitFighters.add(fighter);
-              
-              const isTrickster = projectile.visual === 'tricksterSniperBullet_enhanced';
-              
-              if (isTrickster) {
-                // Green effects for trickster
-                spawnSparks(fighter.x, fighter.y, 8, 'lightningTrail', 'rgba(0, 255, 0, 1)');
-                spawnImpactFlash(fighter.x, fighter.y, 25, 'lightningTrail'); // Will fallback to default color or we can use custom
-                
-                // Spawn green lightning shockwave
-                if (typeof spawnCrimsonLightningImpact === 'function') {
-                  spawnCrimsonLightningImpact(fighter.x, fighter.y, 50, true); // true for isTrickster
-                }
-              } else {
-                // Red effects for sharpshooter
-                spawnSparks(fighter.x, fighter.y, 8, 'crimsonSniper');
-                spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
-                if (typeof spawnCrimsonLightningImpact === 'function') {
-                  spawnCrimsonLightningImpact(fighter.x, fighter.y, 50, false);
-                }
-              }
-              
-              // Apply the crimson electrified visual effect to the target
-              const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
-              fighter.crimsonElectrifiedTimer = Math.max(fighter.crimsonElectrifiedTimer || 0, duration);
-              fighter.crimsonElectrifiedTrickster = isTrickster; // Save trickster state for green electricity
-              fighter.lastCrimsonAttacker = attacker;
-              // Do NOT return true, so the projectile is not destroyed
-            } else if (projectile.isGojoPurple) {
-              if (!projectile.hitFighters) projectile.hitFighters = new Set();
-              projectile.hitFighters.add(fighter);
-              spawnSparks(fighter.x, fighter.y, 8, 'lightningTrail', '#8A2BE2');
-              spawnImpactFlash(fighter.x, fighter.y, 35, 'lightningTrail');
-              if (typeof triggerGlobalScreenShake === 'function') {
-                triggerGlobalScreenShake(2, 4);
-              }
-              // Do NOT return true
-            } else if (projectile.isSukunaFurnace) {
+            if (projectile.isSukunaFurnace) {
               this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
               return true;
-            } else if (projectile.isGojoBlue) {
-              if (!projectile.hitFighters) projectile.hitFighters = new Set();
-              if (!projectile.hitFighters.has(fighter)) {
-                projectile.hitFighters.add(fighter);
-                spawnSparks(fighter.x, fighter.y, 6, 'lightningTrail', '#00D4CC');
-                spawnImpactFlash(fighter.x, fighter.y, 20, 'lightningTrail');
-              }
-              // Do NOT return true so Gojo Blue passes THROUGH targets to the walls!
-            } else if (projectile.isArcaneBolt) {
-                 if (!projectile.hitFighters) projectile.hitFighters = new Set();
-                 projectile.hitFighters.add(fighter);
-                 if (projectile.bouncesLeft > 0) {
-                     projectile.bouncesLeft--;
-                     projectile.damage *= projectile.bounceDamageMultiplier;
-                     // find nearest valid enemy to bounce towards
-                     let bestDist = Infinity;
-                     let bestFighter = null;
-                     for (let f of fighters) {
-                        if (f && f !== fighter && f !== attacker && f.hp > 0 && !projectile.hitFighters.has(f)) {
-                            const ddx = f.x - projectile.x;
-                            const ddy = f.y - projectile.y;
-                            const distSq = ddx*ddx + ddy*ddy;
-                            if (distSq < bestDist) {
-                                bestDist = distSq;
-                                bestFighter = f;
-                            }
-                        }
-                     }
-                     if (bestFighter) {
-                        const ddx = bestFighter.x - projectile.x;
-                        const ddy = bestFighter.y - projectile.y;
-                        const dist = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
-                        const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
-                        projectile.vx = (ddx/dist) * speed;
-                        projectile.vy = (ddy/dist) * speed;
-                        projectile.life = 180;
-                     }
-                     // Do NOT return true, so the projectile is not destroyed
-                 } else {
-                     return true; // no bounces left, destroy it
-                 }
-            } else if (projectile.isChainLightning) {
-                 if (!projectile.hitFighters) projectile.hitFighters = new Set();
-                 projectile.hitFighters.add(fighter);
-                 
-                 // Apply Zeus Debuffs
-                 if (Math.random() < (CONFIG.zeus.staticChance || 0)) {
-                     fighter.staticDebuffTimer = CONFIG.zeus.staticDuration || 120;
-                 }
-                 if (Math.random() < (CONFIG.zeus.stunChance || 0)) {
-                     fighter.electricStunTimer = Math.max(fighter.electricStunTimer || 0, CONFIG.zeus.stunDuration || 15);
-                 }
-                 
-                 // Apply dramatic hit-pause and screen shake ONLY on the direct hit (not on bounces)
-                 if (projectile.hitFighters.size === 1) {
-                     if (typeof fighter.applyTimeStop === 'function') {
-                       fighter.applyTimeStop(2);
-                     }
-                     if (attacker && typeof attacker.applyTimeStop === 'function') {
-                       attacker.applyTimeStop(2);
-                     }
-                     
-                     if (typeof triggerGlobalScreenShake === 'function') {
-                       triggerGlobalScreenShake(2, 4);
-                     }
-                 }
-                 
-                 // Apply visual thunder roots effect
-                 fighter.thunderRootsTimer = Math.max(fighter.thunderRootsTimer || 0, 45);
-                 
-                 // Add vertical thunder strike visual and electric roots
-                 if (!state.zeusStormStrikes) state.zeusStormStrikes = [];
-                 state.zeusStormStrikes.push({
-                   x: fighter.x,
-                   y: fighter.y,
-                   life: 15,
-                   maxLife: 15
-                 });
-                 
-                 spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
-                 
-                 // Play thunder strike sound on basic attack hit
-                 if (attacker && typeof attacker._def !== 'undefined') {
-                   const stormSound = getSkillSound(attacker._def.id, 'storm');
-                   if (stormSound) playSound(stormSound.src, stormSound.volume * 0.5);
-                   const thunderSound = getSkillSound(attacker._def.id, 'thunderstrike');
-                   if (thunderSound) playSound(thunderSound.src, (thunderSound.volume || 1.0) * 0.5);
-                 }
-                 
-                 if (projectile.chainCount > 0) {
-                     projectile.chainCount--;
-                     projectile.damage *= (CONFIG.zeus.chainDamageMultiplier || 0.8);
-                     
-                     // Find nearest valid enemy to chain towards
-                     let bestDist = (CONFIG.zeus.chainRange || 150) ** 2;
-                     let bestTarget = null;
-                     
-                     // Helper to check and update best target
-                     const checkTarget = (t, index = null) => {
-                         let isEnemy = false;
-                         if (index !== null) {
-                             isEnemy = !areOnSameTeam(projectile.owner, index);
-                         } else if (t.owner) {
-                             isEnemy = !areOnSameTeam(projectile.owner, fighters.indexOf(t.owner));
-                         }
-                         
-                         if (t && t !== fighter && t !== attacker && t.hp > 0 && !projectile.hitFighters.has(t) && isEnemy) {
-                             const ddx = t.x - projectile.x;
-                             const ddy = t.y - projectile.y;
-                             const distSq = ddx*ddx + ddy*ddy;
-                             if (distSq < bestDist) {
-                                 bestDist = distSq;
-                                 bestTarget = t;
-                             }
-                         }
-                     };
-
-                     // Check main fighters
-                     for (let i = 0; i < fighters.length; i++) {
-                         checkTarget(fighters[i], i);
-                     }
-                     // Check illusions
-                     if (state.illusions) {
-                         for (let ill of state.illusions) {
-                             checkTarget(ill);
-                         }
-                     }
-                     
-                     if (bestTarget) {
-                        const ddx = bestTarget.x - projectile.x;
-                        const ddy = bestTarget.y - projectile.y;
-                        const dist = Math.sqrt(ddx*ddx + ddy*ddy) || 1;
-                        const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
-                        projectile.vx = (ddx/dist) * speed;
-                        projectile.vy = (ddy/dist) * speed;
-                        projectile.life = 100; // Reset life
-                     } else {
-                        // Bouncing off wall if no targets - just reverse or random angle
-                        const angle = Math.atan2(projectile.vy, projectile.vx) + (Math.random() - 0.5) * Math.PI;
-                        const speed = Math.sqrt(projectile.vx*projectile.vx + projectile.vy*projectile.vy) || 1;
-                        projectile.vx = Math.cos(angle) * speed;
-                        projectile.vy = Math.sin(angle) * speed;
-                     }
-                 } else {
-                     return true; // No chains left
-                 }
+            }
+            
+            // Delegate visual and piercing logic to HitImpactSystem
+            const shouldDestroy = HitImpactSystem.processProjectileHit(fighter, projectile, attacker, fighters);
+            if (!shouldDestroy) {
+              continue; // Projectile pierces or bounces
             } else {
-              return true;
+              return true; // Projectile is destroyed
             }
           }
 
@@ -1191,66 +969,17 @@ class ProjectileSystem {
         const attacker = fighters[projectile.owner];
         applyDamageToTarget(illusion, projectile.damage, attacker, { isProjectile: true, projectile });
         
-        // 1. Sukuna Fuga (Furnace) arrow: trigger thermobaric explosion on contact with illusion!
         if (projectile.isSukunaFurnace) {
           this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
           return true;
         } 
-        // 2. Sukuna slashes: pierce through illusions
-        else if (projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade' || projectile.isSukunaSlash) {
-          if (!projectile.hitFighters) projectile.hitFighters = new Set();
-          projectile.hitFighters.add(illusion);
-          spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
-          spawnImpactFlash(illusion.x, illusion.y, 22, 'crimsonSniper');
-          playSound('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.5);
-
-          const attackerObj = state.fighters && state.fighters[projectile.owner];
-          if (attackerObj) {
-            if (!attackerObj.slashHitVisuals) attackerObj.slashHitVisuals = [];
-            const hitAngle = Math.atan2(projectile.vy, projectile.vx);
-            attackerObj.slashHitVisuals.push({
-              x: illusion.x + (Math.random() - 0.5) * illusion.r * 0.4,
-              y: illusion.y + (Math.random() - 0.5) * illusion.r * 0.4,
-              angle: hitAngle + (Math.random() - 0.5) * 0.4,
-              timer: 12,
-              maxTimer: 12,
-              scale: 0.9 + Math.random() * 0.4
-            });
-          }
-          // Continue through illusions
-          continue;
-        } 
-        // 3. Sharpshooter / Trickster enhanced sniper bullets: pierce through illusions
-        else if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {
-          if (!projectile.hitFighters) projectile.hitFighters = new Set();
-          projectile.hitFighters.add(illusion);
-          spawnSparks(illusion.x, illusion.y, 8, 'crimsonSniper');
-          spawnImpactFlash(illusion.x, illusion.y, 25, 'crimsonSniper');
-          // Apply the crimson electrified visual effect to the target
-          const duration = CONFIG.sharpshooter?.electrifiedDuration || 45;
-          illusion.crimsonElectrifiedTimer = Math.max(illusion.crimsonElectrifiedTimer || 0, duration);
-          illusion.lastCrimsonAttacker = attacker;
-          // Do NOT return true
-        } 
-        // 4. Gojo Purple orb: pierces through illusions
-        else if (projectile.isGojoPurple) {
-          if (!projectile.hitFighters) projectile.hitFighters = new Set();
-          projectile.hitFighters.add(illusion);
-          spawnSparks(illusion.x, illusion.y, 8, 'lightningTrail', '#8A2BE2');
-          spawnImpactFlash(illusion.x, illusion.y, 25, 'lightningTrail');
-          // Do NOT return true
-        } 
-        // 5. Gojo Blue orb: pierces through illusions
-        else if (projectile.isGojoBlue) {
-          if (!projectile.hitFighters) projectile.hitFighters = new Set();
-          if (!projectile.hitFighters.has(illusion)) {
-            projectile.hitFighters.add(illusion);
-            spawnSparks(illusion.x, illusion.y, 6, 'lightningTrail', '#00D4CC');
-            spawnImpactFlash(illusion.x, illusion.y, 20, 'lightningTrail');
-          }
-          // Do NOT return true
+        
+        // Delegate visual and piercing logic to HitImpactSystem
+        const shouldDestroy = HitImpactSystem.processProjectileHit(illusion, projectile, attacker, fighters);
+        if (!shouldDestroy) {
+          continue; // Projectile pierces or bounces
         } else {
-          return true;
+          return true; // Projectile is destroyed
         }
       }
     }

@@ -281,9 +281,9 @@ export function applyDomainEffect(fighter, arena) {
             projectileSystem.fireProjectile(
               fighter,
               ownerIdx,
-              finalDamage,
+              0, // 0 damage so the projectile is just a visual effect (domain deals instant damage below)
               false,
-              slashSpeed,
+              65, // extremely fast speed so it hits instantly
               false,
               'ghostBlade',
               shrineX + (Math.random() - 0.5) * 80,
@@ -342,9 +342,9 @@ export function applyDomainEffect(fighter, arena) {
               projectileSystem.fireProjectile(
                 fighter,
                 ownerIdx,
-                finalDamage,
+                0, // 0 damage
                 false,
-                slashSpeed,
+                65, // extremely fast speed
                 false,
                 'ghostBlade',
                 shrineX + (Math.random() - 0.5) * 80,
