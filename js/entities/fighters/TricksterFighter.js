@@ -1845,7 +1845,7 @@ export class TricksterFighter extends Fighter {
 
     // Deep arcane domain background fill
     ctx.fillStyle = 'rgba(10, 25, 20, 0.95)';
-    ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+    ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
     ctx.restore();
   }
 

@@ -75,11 +75,14 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
     }
   }
 
-  fighter.x = toX;
-  fighter.y = toY;
-  fighter.vx = 0;
-  fighter.vy = 0;
-  fighter.aim(gojo);
+  fighter.dashFromX = fromX;
+  fighter.dashFromY = fromY;
+  fighter.dashToX = toX;
+  fighter.dashToY = toY;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  fighter.adaptationDashTimer = dashFrames;
+  fighter.adaptationDashTarget = gojo;
+  fighter.adaptationDashIsCounter = false;
 
   fighter.gojoPurpleDodgeReady = false;
 
@@ -113,11 +116,14 @@ export function gojoRedTeleportDodge(fighter, gojo) {
     toY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, toY));
   }
 
-  fighter.x = toX;
-  fighter.y = toY;
-  fighter.vx = 0;
-  fighter.vy = 0;
-  fighter.aim(gojo);
+  fighter.dashFromX = fromX;
+  fighter.dashFromY = fromY;
+  fighter.dashToX = toX;
+  fighter.dashToY = toY;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  fighter.adaptationDashTimer = dashFrames;
+  fighter.adaptationDashTarget = gojo;
+  fighter.adaptationDashIsCounter = false;
 
   fighter.gojoRedDodgeReady = false;
 
@@ -203,10 +209,213 @@ export function startAdaptationFlashDash(fighter, attacker) {
   const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
   fighter.adaptationDashTimer = dashFrames;
   fighter.adaptationDashTarget = attacker;
+  fighter.adaptationDashIsCounter = true;
 
   spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
 
   spawnImpactFlash(fromX, fromY, 28, '#E0E0E0');
   spawnSparks(fromX, fromY, 12, 'silver', '#FFFFFF');
   audioSystem.playSFX('skill_dash3', 1.0);
+}
+
+/**
+ * Sukuna Fuga Teleport Dodge: When Sukuna fires Fuga and Mahoraga has adapted,
+ * Mahoraga instantly teleports away to a safe distance.
+ */
+export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
+  const fromX = fighter.x;
+  const fromY = fighter.y;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const margin = (fighter.r || 25) + 15;
+
+  const orbX = fugaOrb ? fugaOrb.x : (sukuna.x || fighter.x);
+  const orbY = fugaOrb ? fugaOrb.y : (sukuna.y || fighter.y);
+  const angleToOrb = Math.atan2(orbY - fighter.y, orbX - fighter.x);
+  const fugaDamageRadius = 140;
+
+  const dodgeDist = fugaDamageRadius + (fighter.r || 25) + 80;
+  const perpAngleLeft  = angleToOrb + Math.PI / 2;
+  const perpAngleRight = angleToOrb - Math.PI / 2;
+
+  let leftX = fighter.x + Math.cos(perpAngleLeft) * dodgeDist;
+  let leftY = fighter.y + Math.sin(perpAngleLeft) * dodgeDist;
+  let rightX = fighter.x + Math.cos(perpAngleRight) * dodgeDist;
+  let rightY = fighter.y + Math.sin(perpAngleRight) * dodgeDist;
+
+  if (arena) {
+    leftX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, leftX));
+    leftY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, leftY));
+    rightX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, rightX));
+    rightY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, rightY));
+  }
+
+  const leftDistToOrb  = Math.hypot(leftX - orbX, leftY - orbY);
+  const rightDistToOrb = Math.hypot(rightX - orbX, rightY - orbY);
+
+  let toX, toY;
+  if (leftDistToOrb >= rightDistToOrb) {
+    toX = leftX;
+    toY = leftY;
+  } else {
+    toX = rightX;
+    toY = rightY;
+  }
+
+  // Also check arena corners for the safest landing spot
+  if (arena) {
+    const corners = [
+      { x: arena.x + margin, y: arena.y + margin },
+      { x: arena.x + arena.width - margin, y: arena.y + margin },
+      { x: arena.x + margin, y: arena.y + arena.height - margin },
+      { x: arena.x + arena.width - margin, y: arena.y + arena.height - margin },
+    ];
+    let bestCorner = null;
+    let bestDist = Math.hypot(toX - orbX, toY - orbY);
+    for (const c of corners) {
+      const d = Math.hypot(c.x - orbX, c.y - orbY);
+      if (d > bestDist) {
+        bestDist = d;
+        bestCorner = c;
+      }
+    }
+    if (bestCorner) {
+      toX = bestCorner.x;
+      toY = bestCorner.y;
+    }
+  }
+
+  fighter.dashFromX = fromX;
+  fighter.dashFromY = fromY;
+  fighter.dashToX = toX;
+  fighter.dashToY = toY;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  fighter.adaptationDashTimer = dashFrames;
+  fighter.adaptationDashTarget = sukuna;
+  fighter.adaptationDashIsCounter = false;
+
+  fighter.sukunaFugaDodgeReady = false;
+
+  spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
+  spawnImpactFlash(fromX, fromY, 40, '#FF6F00');
+  spawnSparks(fromX, fromY, 20, 'arcane', '#FF6F00');
+  spawnImpactFlash(toX, toY, 35, '#FF6F00');
+  audioSystem.playSFX('skill_dash5', 1.0);
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ FUGA DODGED!', '#FF6F00');
+}
+
+/**
+ * General Skill Shot Teleport Dodge: When a registered skill shot is fired
+ * and Mahoraga has adapted to it, Mahoraga instantly teleports away.
+ */
+export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
+  if (projectile && projectile.skillShotId === 'tojiAmbush') return;
+  const fromX = fighter.x;
+  const fromY = fighter.y;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const margin = (fighter.r || 25) + 15;
+
+  const orbX = projectile.x;
+  const orbY = projectile.y;
+  const angleToOrb = Math.atan2(orbY - fighter.y, orbX - fighter.x);
+  const damageRadius = projectile.dodgeRadius || 140;
+
+  const dodgeDist = damageRadius + (fighter.r || 25) + 80;
+  let toX, toY;
+
+  // For massive sweeping attacks like lasers, teleporting sideways might still get us caught.
+  // Instead, teleport BEHIND the attacker!
+  if (damageRadius > 400 && attacker) {
+    const distBehind = (attacker.r || 25) + (fighter.r || 25) + 60;
+    const angleFromAttacker = Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x);
+    // Directly opposite to the angle from attacker to fighter (meaning behind attacker)
+    toX = attacker.x - Math.cos(angleFromAttacker) * distBehind;
+    toY = attacker.y - Math.sin(angleFromAttacker) * distBehind;
+
+    if (arena) {
+      toX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, toX));
+      toY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, toY));
+    }
+  } else {
+    const perpAngleLeft  = angleToOrb + Math.PI / 2;
+    const perpAngleRight = angleToOrb - Math.PI / 2;
+
+    let leftX = fighter.x + Math.cos(perpAngleLeft) * dodgeDist;
+    let leftY = fighter.y + Math.sin(perpAngleLeft) * dodgeDist;
+    let rightX = fighter.x + Math.cos(perpAngleRight) * dodgeDist;
+    let rightY = fighter.y + Math.sin(perpAngleRight) * dodgeDist;
+
+    if (arena) {
+      leftX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, leftX));
+      leftY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, leftY));
+      rightX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, rightX));
+      rightY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, rightY));
+    }
+
+    const leftDistToOrb  = Math.hypot(leftX - orbX, leftY - orbY);
+    const rightDistToOrb = Math.hypot(rightX - orbX, rightY - orbY);
+
+    if (leftDistToOrb >= rightDistToOrb) {
+      toX = leftX;
+      toY = leftY;
+    } else {
+      toX = rightX;
+      toY = rightY;
+    }
+
+    // Also check arena corners for the safest landing spot
+    if (arena) {
+      const corners = [
+        { x: arena.x + margin, y: arena.y + margin },
+        { x: arena.x + arena.width - margin, y: arena.y + margin },
+        { x: arena.x + margin, y: arena.y + arena.height - margin },
+        { x: arena.x + arena.width - margin, y: arena.y + arena.height - margin },
+      ];
+      let bestCorner = null;
+      let bestDist = Math.hypot(toX - orbX, toY - orbY);
+      for (const c of corners) {
+        const d = Math.hypot(c.x - orbX, c.y - orbY);
+        if (d > bestDist) {
+          bestDist = d;
+          bestCorner = c;
+        }
+      }
+      if (bestCorner) {
+        toX = bestCorner.x;
+        toY = bestCorner.y;
+      }
+    }
+  }
+
+  fighter.dashFromX = fromX;
+  fighter.dashFromY = fromY;
+  fighter.dashToX = toX;
+  fighter.dashToY = toY;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  fighter.adaptationDashTimer = dashFrames;
+  fighter.adaptationDashTarget = attacker;
+  fighter.adaptationDashIsCounter = false;
+  fighter.dodgeIFrames = 20; // Gain complete invincibility for 20 frames!
+
+  const skillId = projectile.skillShotId;
+  if (fighter.skillDodgeReady) {
+    fighter.skillDodgeReady[skillId] = false;
+  }
+
+  // Backwards compatibility resets
+  if (skillId === 'purple') {
+    fighter.gojoPurpleDodgeReady = false;
+  }
+  if (skillId === 'divineFlame') {
+    fighter.sukunaFugaDodgeReady = false;
+  }
+
+  const color = projectile.skillShotColor || '#FFD700';
+  const displayName = skillId.toUpperCase().replace('_', ' ');
+
+  spawnTeleportAfterimages(fighter, fromX, fromY, toX, toY);
+  spawnImpactFlash(fromX, fromY, 40, color);
+  spawnSparks(fromX, fromY, 20, 'arcane', color);
+  spawnImpactFlash(toX, toY, 35, color);
+  audioSystem.playSFX('skill_dash5', 1.0);
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚡ ${displayName} DODGED!`, color);
 }

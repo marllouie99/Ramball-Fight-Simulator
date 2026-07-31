@@ -367,46 +367,7 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
     ctx.restore();
   }
 
-  // B. Neutral Stance Ring Timer HUD
-  if (fighter.neutralStanceTimer > 0) {
-    const maxT = CONFIG.mahoraga?.neutralStanceDurationFrames || 180;
-    const progress = Math.max(0, Math.min(1, fighter.neutralStanceTimer / maxT));
-    const ringRadius = fighter.r + 15;
 
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
-    ctx.lineWidth = 4.5;
-    ctx.stroke();
-
-    const startAngle = -Math.PI / 2;
-    const endAngle = startAngle + progress * Math.PI * 2;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, startAngle, endAngle);
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.95)';
-    ctx.lineWidth = 3.5;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, startAngle, endAngle);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    const tipX = Math.cos(endAngle) * ringRadius;
-    const tipY = Math.sin(endAngle) * ringRadius;
-    ctx.beginPath();
-    ctx.arc(tipX, tipY, 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fill();
-
-    ctx.restore();
-  }
 
   ctx.save();
 
@@ -440,31 +401,6 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
     ctx.strokeStyle = `rgba(218, 165, 32, ${1 - progress})`;
     ctx.lineWidth = 2;
     ctx.stroke();
-    ctx.restore();
-  } else if (fighter.neutralStanceCooldownTimer > 0) {
-    const maxCd = CONFIG.mahoraga?.neutralStanceCooldownFrames || 250;
-    const progress = Math.max(0, Math.min(1, 1.0 - (fighter.neutralStanceCooldownTimer / maxCd)));
-    const ringRadius = fighter.r + 15;
-
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-
-    const startAngle = -Math.PI / 2;
-    const endAngle = startAngle + progress * Math.PI * 2;
-
-    ctx.beginPath();
-    ctx.arc(0, 0, ringRadius, startAngle, endAngle);
-    ctx.strokeStyle = 'rgba(239, 68, 68, 0.80)';
-    ctx.lineWidth = 2.8;
-    ctx.lineCap = 'round';
-    ctx.stroke();
-
     ctx.restore();
   }
 

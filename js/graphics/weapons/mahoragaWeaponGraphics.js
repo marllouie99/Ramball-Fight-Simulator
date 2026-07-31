@@ -186,11 +186,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
-  const angle = fighter.gunAngle || 0;
-  ctx.rotate(angle);
-
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
+  // Keep the wheel statically positioned above his head (no rotation or flip scaling)
   
   // Position wheel floating above Mahoraga's head with subtle floating animation along his body orientation
   const floatOffset = Math.sin(Date.now() * 0.003) * 2;
@@ -540,18 +536,16 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   }
 
   ctx.save();
-  ctx.translate(x, y);
-  ctx.rotate(gunAngle);
-
-  if (Math.abs(gunAngle) > Math.PI / 2) {
-    ctx.scale(1, -1);
-  }
+  ctx.translate(x, y); // Center of Mahoraga (statically upright)
 
   const bladeLength = 58;
   const bladeWidth = 12;
 
   let swingAngle = 0;
   let extendDist = 0;
+
+  const isParrying = (fighterObj && fighterObj.defensePoseType === 'parry' && (fighterObj.defensePoseTimer || 0) > 0);
+  const isGuarding = (fighterObj && fighterObj.defensePoseType === 'guard' && (fighterObj.defensePoseTimer || 0) > 0);
 
   if (punchAnimTimer > 0) {
     const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
@@ -574,19 +568,60 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       swingAngle = -Math.PI * 0.25 + Math.sin(progress * Math.PI) * (Math.PI * 0.50);
       extendDist = Math.sin(progress * Math.PI) * 38;
     }
+  } else if (isParrying) {
+    // Parry Pose: snappy blade deflection swing
+    const maxT = fighterObj.defensePoseMaxTimer || 25;
+    const t = 1.0 - (fighterObj.defensePoseTimer / maxT);
+    const p = Math.sin(t * Math.PI); // 0 -> 1 -> 0 sweep
+    swingAngle = Math.PI * 0.25 - p * (Math.PI * 0.45);
+    extendDist = 18 + p * 15;
+  } else if (isGuarding) {
+    // Guard / Block Pose: sword hand pulled in close covering face
+    swingAngle = -Math.PI * 0.35;
+    extendDist = -12;
   } else if (isThrowing) {
-    // Bare-handed stance (blade smoothly retracted into forearm gauntlet)
-    swingAngle = -Math.PI * 0.25;
-    extendDist = 10;
+    // Alternating right hand throw swing (blade remains retracted into forearm gauntlet)
+    const shotsLeft = fighterObj ? (fighterObj.throwBarrageShotsLeft || 0) : 0;
+    const isRightArmTurn = (shotsLeft % 2 === 0);
+    
+    if (isRightArmTurn && fighterObj) {
+      const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 5;
+      const t = (fighterObj.throwBarrageTimer || 0) / interval;
+      const p = Math.sin(t * Math.PI); // Smooth 0 -> 1 -> 0 lunge
+      
+      swingAngle = -Math.PI * 0.25 + p * 0.45;
+      extendDist = 10 + p * 38;
+    } else {
+      swingAngle = -Math.PI * 0.25;
+      extendDist = 10;
+    }
+  } else {
+    // Statically follow gunAngle when idle/resting
+    swingAngle = 0;
+    extendDist = 0;
   }
 
-  // Position right arm: pivot from shoulder joint so full arm, hand, & blade swing together!
-  const shoulderX = r * 0.5;
-  const shoulderY = r * 0.25;
+  // Right shoulder is statically positioned on the right side of his chest
+  const shoulderX = r * 0.75;
+  const shoulderY = r * 0.20;
+
+  // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
+  const bodyAngle = (fighterObj && fighterObj.angle) || 0;
+  const cosB = Math.cos(bodyAngle);
+  const sinB = Math.sin(bodyAngle);
+  const rotatedShoulderX = shoulderX * cosB - shoulderY * sinB;
+  const rotatedShoulderY = shoulderX * sinB + shoulderY * cosB;
 
   ctx.save();
-  ctx.translate(shoulderX, shoulderY);
-  ctx.rotate(swingAngle); // Entire shoulder, arm, hand, & sword swing in unison!
+  ctx.translate(rotatedShoulderX, rotatedShoulderY);
+  
+  // Rotate by gunAngle and local swingAngle at the shoulder joint (do NOT rotate by body angle to prevent the sword hand from spinning!)
+  ctx.rotate(gunAngle + swingAngle);
+
+  // Flip Y when facing left so sword faces target correctly
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
+
   ctx.translate(r * 0.3 + extendDist, 0);
 
   // 1. White Bandaged Forearm (Extending from body into wrist ring)
@@ -638,7 +673,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   ctx.stroke();
 
   // 4. RETRACTABLE SWORD OF EXTERMINATION BLADE (Slides in & out of the wrist gauntlet ring!)
-  const retractScale = bladeRetractProgress !== undefined ? Math.max(0, Math.min(1, bladeRetractProgress)) : (isThrowing ? 0.0 : 1.0);
+  const retractScale = isGuarding ? 0.45 : (isParrying ? 1.0 : (bladeRetractProgress !== undefined ? Math.max(0, Math.min(1, bladeRetractProgress)) : (isThrowing ? 0.0 : 1.0)));
 
   if (retractScale > 0.02) {
     ctx.save();
@@ -718,17 +753,16 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       ctx.stroke();
       ctx.shadowBlur = 0;
 
-      // 2. Dynamic Trailing V-Speed Lines (Stretching & trailing smoothly behind blade tip!)
-      const lineTrailLength = 20 + progress * 26; // Stretches out dynamically as thrust accelerates!
+      // 2. Dynamic Trailing V-Speed Lines (REMOVED - User requested removal of web-like effects)
+      /* 
+      const lineTrailLength = 20 + progress * 26;
       
       const vLines = [
-        // Top V-branch (slanting back close to upper blade edge)
         { headOffsetX: 4,   headOffsetY: -3, tailOffsetY: -8,  width: 1.8, color: '#FFFFFF' },
         { headOffsetX: -2,  headOffsetY: -4, tailOffsetY: -12, width: 1.5, color: '#FFF59D' },
         { headOffsetX: -8,  headOffsetY: -5, tailOffsetY: -15, width: 1.2, color: '#FFD700' },
         { headOffsetX: -15, headOffsetY: -6, tailOffsetY: -18, width: 1.0, color: '#FF9100' },
         
-        // Bottom V-branch (slanting back close to lower blade edge)
         { headOffsetX: 4,   headOffsetY: 3,  tailOffsetY: 8,   width: 1.8, color: '#FFFFFF' },
         { headOffsetX: -2,  headOffsetY: 4,  tailOffsetY: 12,  width: 1.5, color: '#FFF59D' },
         { headOffsetX: -8,  headOffsetY: 5,  tailOffsetY: 15,  width: 1.2, color: '#FFD700' },
@@ -751,6 +785,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
         ctx.stroke();
         ctx.shadowBlur = 0;
       }
+      */
 
     } else {
       // ----------------------------------------------------
@@ -899,22 +934,34 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     fighter.currentPunchProgress = 0.0;
   }
 
-  const rawProgress = fighter.currentPunchProgress || 0.0;
-  
-  // Smooth cubic ease-in-out curve for buttery fluid motion
-  const smoothProgress = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
-  const progress = smoothProgress;
+  let lungeProgress = 0;
+  const isThrowing = fighter.isThrowing || false;
+  const isGuarding = fighter.defensePoseType === 'guard' && (fighter.defensePoseTimer || 0) > 0;
+
+  if (isThrowing) {
+    const shotsLeft = fighter.throwBarrageShotsLeft || 0;
+    const isLeftArmTurn = (shotsLeft % 2 === 1);
+    if (isLeftArmTurn) {
+      const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 5;
+      const t = (fighter.throwBarrageTimer || 0) / interval;
+      lungeProgress = Math.sin(t * Math.PI); // Smooth 0 -> 1 -> 0 lunge
+    }
+  } else if (isGuarding) {
+    lungeProgress = 0;
+  } else {
+    const rawProgress = fighter.currentPunchProgress || 0.0;
+    // Smooth cubic ease-in-out curve for buttery fluid motion
+    const smoothProgress = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+    lungeProgress = Math.sin(smoothProgress * Math.PI);
+  }
+
+  const progress = isThrowing ? lungeProgress : (isGuarding ? 0 : (fighter.currentPunchProgress || 0.0));
   const r = fighter.r || 30;
   
   const gunAngle = fighter.gunAngle || 0;
 
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(gunAngle);
-
-  if (Math.abs(gunAngle) > Math.PI / 2) {
-    ctx.scale(1, -1);
-  }
+  ctx.translate(fighter.x, fighter.y); // Center of Mahoraga (statically upright)
 
   // Calculate dynamic reach distance directly toward enemy target so punch connects cleanly!
   let reachDist = 95;
@@ -923,20 +970,45 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     reachDist = Math.max(55, Math.min(125, targetDist - r * 0.45));
   }
 
-  // Position left arm: when idle, rest firmly on the LEFT SIDE (-X) of the body circle (-r * 0.8, +r * 0.25).
-  // When punching, smoothly lunge forward to hit the enemy!
-  const lungeProgress = Math.sin(smoothProgress * Math.PI); // Smooth 0 -> 1 -> 0 bell curve
-  const punchLunge = lungeProgress * reachDist;
-  const idleX = -r * 0.8;
-  const idleY = r * 0.25; // Perfectly aligned vertically with right hand (r * 0.25)!
-  const punchX = r * 0.6 + reachDist; // Dynamic reach extension directly to enemy!
-  const punchY = -r * 0.25;
+  // Left shoulder is statically positioned on the left side of his chest
+  const idleX = -r * 0.75;
+  const idleY = r * 0.20;
 
-  const armX = idleX + lungeProgress * (punchX - idleX);
-  const armY = idleY + lungeProgress * (punchY - idleY);
+  // Rotate idle shoulder position by bodyAngle (fighter.angle) so arm starts from the correct position on the spinning body
+  const bodyAngle = fighter.angle || 0;
+  const cosB = Math.cos(bodyAngle);
+  const sinB = Math.sin(bodyAngle);
+  const rotatedIdleX = idleX * cosB - idleY * sinB;
+  const rotatedIdleY = idleX * sinB + idleY * cosB;
+
+  // Punch lunges out in the gunAngle direction
+  const punchX = Math.cos(gunAngle) * (r * 0.6 + reachDist);
+  const punchY = Math.sin(gunAngle) * (r * 0.6 + reachDist);
+
+  // Position left arm: when idle, rest on the rotated left side. When punching, lunge toward target!
+  const punchLunge = lungeProgress * reachDist;
+
+  let armX = rotatedIdleX + lungeProgress * (punchX - rotatedIdleX);
+  let armY = rotatedIdleY + lungeProgress * (punchY - rotatedIdleY);
+
+  if (isGuarding) {
+    armX = -r * 0.25;
+    armY = -r * 0.45;
+  }
 
   ctx.save();
   ctx.translate(armX, armY);
+  
+  // Rotate the fist & visual trails by gunAngle toward target
+  if (isGuarding) {
+    ctx.rotate(gunAngle - Math.PI * 0.3);
+  } else {
+    ctx.rotate(gunAngle);
+  }
+
+  // Flip Y when facing left
+  const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
 
   // Calculate shoulder attachment point in body space and vector back from fist to shoulder
   const shoulderX = -r * 0.5;
@@ -961,7 +1033,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
 
 
   // 3. ANIME HIGH-IMPACT PUNCH VISUAL: Distinguishable Conical Air Pressure Blast & Starburst Impact!
-  if (progress > 0.05 && progress < 0.95) {
+  if (progress > 0.05 && progress < 0.95 && !isThrowing) {
     const shockAlpha = Math.sin(progress * Math.PI);
 
     // 3a. Heavy Fist Motion Trail
@@ -982,7 +1054,8 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     ctx.stroke();
     ctx.restore();
 
-    // 3b. DISTINCT CONICAL SONIC COMPRESSION BLAST (Expanding forward cone!)
+    // 3b. DISTINCT CONICAL SONIC COMPRESSION BLAST (REMOVED - Web-like visual)
+    /*
     ctx.save();
     ctx.translate(14, 0);
 
@@ -1059,6 +1132,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
       ctx.stroke();
       ctx.restore();
     }
+    */
   }
 
   ctx.restore();

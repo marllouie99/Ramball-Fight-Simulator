@@ -184,6 +184,36 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       const rawBackY = opponent.y - Math.sin(targetAngle) * offsetDist;
       const clampedBack = fighter._clampToArena(rawBackX, rawBackY);
 
+      // ── MAHORAGA ADAPTATION INTERCEPT: COUNTER-SHOUT ON BACK TELEPORT ──
+      if ((opponent.characterId === 'mahoraga' || opponent.type === 'mahoraga') && 
+          opponent.adaptedSkills && opponent.adaptedSkills['tojiAmbush']) {
+        
+        // Visual of Toji trying to teleport to the back
+        modSpawnTeleportAfterimages(fighter, frontX, frontY, clampedBack.x, clampedBack.y, startAngle, fighter.gunAngle);
+        
+        fighter.x = clampedBack.x;
+        fighter.y = clampedBack.y;
+        fighter.vx = 0;
+        fighter.vy = 0;
+        fighter.aim(opponent);
+
+        // Cancel ambush & put stealth on cooldown
+        fighter.isAmbushing = false;
+        fighter.ambushTimer = 0;
+        fighter.stealthCooldown = fighter.stealthMaxCooldown || (CONFIG.toji?.stealthCooldownFrames || 600);
+        fighter._hasAttemptedChannelInterrupt = true;
+        
+        opponent.isTargetOfAmbush = false;
+        opponent.timeStopTimer = 0; // Unfreeze Mahoraga so he can roar!
+
+        // Force Mahoraga to instantly execute a Divine Shout to blow Toji away
+        spawnFloatingText(opponent.x, opponent.y - opponent.r - 45, 'ADAPTED!', '#FFD700', 45);
+        if (typeof opponent._executeShout === 'function') {
+          opponent._executeShout(fighter, opponent.owner);
+        }
+        return;
+      }
+
       fighter.x = clampedBack.x;
       fighter.y = clampedBack.y;
       fighter.vx = 0;
@@ -477,7 +507,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         const strikeDmg = CONFIG.toji?.ambushPhantomFlurryDamage || 15;
 
         for (const target of flurryTargets) {
-          applyDamageToTarget(target, strikeDmg, fighter, { isMelee: true, isTrueDamage: true });
+          applyDamageToTarget(target, strikeDmg, fighter, { isMelee: true, isTrueDamage: true, isAdaptableSkillShot: true, skillShotId: 'tojiAmbush' });
           target.hitFlashTimer = 8; 
           if (typeof target.applyHitStun === 'function') target.applyHitStun(flurryFrameRate + 2);
 
@@ -487,7 +517,9 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
           let angleDiff = targetHitAngle - (target.angle || 0);
           while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-          target.angle = (target.angle || 0) + angleDiff * 0.35; 
+          if (target.characterId !== 'mahoraga' && target.type !== 'mahoraga') {
+            target.angle = (target.angle || 0) + angleDiff * 0.35;
+          }
           target.gunAngle = target.angle;
 
           if (!target.isTurret && !target.cannotBeKnockbacked) {

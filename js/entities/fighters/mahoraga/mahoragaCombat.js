@@ -5,7 +5,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahoragaShoutShockwave, spawnMahoragaShoutBurst } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
@@ -87,7 +87,8 @@ export function performMeleeAttack(fighter, opponent) {
   const teleportDist = CONFIG.mahoraga?.neutralTeleportDistance || 55;
 
   // Track stance duration window and cooldown
-  const isStanceOnCooldown = (fighter.neutralStanceCooldownTimer || 0) > 0;
+  const isStanceEnabled = CONFIG.mahoraga?.enableCloseQuartersTeleport !== false;
+  const isStanceOnCooldown = !isStanceEnabled || (fighter.neutralStanceCooldownTimer || 0) > 0;
 
   // Initialize stance tracking timers on first entry
   if (!fighter.neutralStanceTimer && !isStanceOnCooldown) {
@@ -111,8 +112,14 @@ export function performMeleeAttack(fighter, opponent) {
       audioSystem.playSFX('attack_swordswing', 1.0);
     }
 
-    const frontTargets = getFrontRadiusTargets(fighter, CONFIG.mahoraga?.swordRange || 110, Math.PI * 1.3);
-    if (opponent && !frontTargets.includes(opponent)) frontTargets.push(opponent);
+    const range = CONFIG.mahoraga?.swordRange || 110;
+    const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
+    if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
+      const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y);
+      if (dist <= range + fighter.r + opponent.r) {
+        frontTargets.push(opponent);
+      }
+    }
     const damage = CONFIG.mahoraga?.swordDamage || 25;
     for (const t of frontTargets) {
       t.takeDamage(damage, fighter, { isMelee: true });
@@ -122,7 +129,9 @@ export function performMeleeAttack(fighter, opponent) {
       t.vy += Math.sin(pushAngle) * 4;
     }
     if (frontTargets.length > 0) {
-      spawnImpactFlash(opponent.x, opponent.y, 35, '#FFFFFF');
+      const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+      // Spawn golden spiky crescent effect for both punches and blade slash attacks!
+      spawnAnimePunchImpactFrame(opponent.x, opponent.y, 55, angle, 'gold');
       spawnSparks(opponent.x, opponent.y, 12, 'silver', '#FFFFFF');
       triggerGlobalScreenShake(5, 8);
     }
@@ -147,8 +156,14 @@ export function performMeleeAttack(fighter, opponent) {
   }
 
   // AOE frontal arc damage to ALL targets
-  const frontTargets = getFrontRadiusTargets(fighter, CONFIG.mahoraga?.swordRange || 110, Math.PI * 1.3);
-  if (opponent && !frontTargets.includes(opponent)) frontTargets.push(opponent);
+  const range = CONFIG.mahoraga?.swordRange || 110;
+  const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
+  if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
+    const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y);
+    if (dist <= range + fighter.r + opponent.r) {
+      frontTargets.push(opponent);
+    }
+  }
   const damage = CONFIG.mahoraga?.swordDamage || 25;
   for (const t of frontTargets) {
     t.takeDamage(damage, fighter, { isMelee: true });
@@ -158,18 +173,23 @@ export function performMeleeAttack(fighter, opponent) {
     t.vy += Math.sin(pushAngle) * 4;
   }
   if (frontTargets.length > 0) {
-    spawnImpactFlash(opponent.x, opponent.y, 35, '#FFFFFF');
+    const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    // Spawn golden spiky crescent effect for both punches and blade slash attacks!
+    spawnAnimePunchImpactFrame(opponent.x, opponent.y, 55, angle, 'gold');
     spawnSparks(opponent.x, opponent.y, 12, 'silver', '#FFFFFF');
     triggerGlobalScreenShake(5, 8);
   }
 
-  // Sakuga impact visuals on main opponent
-  fighter.sakugaImpactTimer = 8;
-  fighter.sakugaImpactMaxTimer = 8;
-  fighter.sakugaImpactX = opponent.x;
-  fighter.sakugaImpactY = opponent.y;
-  fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
-  fighter.sakugaImpactSeed = Math.random();
+  // Sakuga impact visuals on main opponent (only for sword combo hits, not punches)
+  const isPunch = (fighter.attackCount % 2 === 0);
+  if (!isPunch) {
+    fighter.sakugaImpactTimer = 8;
+    fighter.sakugaImpactMaxTimer = 8;
+    fighter.sakugaImpactX = opponent.x;
+    fighter.sakugaImpactY = opponent.y;
+    fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
+    fighter.sakugaImpactSeed = Math.random();
+  }
 
   // Teleport after every N attacks
   if (fighter.neutralStanceAttackCount >= attacksPerTeleport) {
@@ -192,13 +212,17 @@ export function performMeleeAttack(fighter, opponent) {
       teleY = Math.max(arena.y + fighter.r + 5, Math.min(arena.y + arena.height - fighter.r - 5, teleY));
     }
 
-    fighter.x = teleX;
-    fighter.y = teleY;
-    fighter.aim(opponent);
-    fighter.vx = 0;
-    fighter.vy = 0;
+    // Set up smooth flash-dash travel using the adaptationDashSpeedFrames config
+    fighter.dashFromX = oldX;
+    fighter.dashFromY = oldY;
+    fighter.dashToX = teleX;
+    fighter.dashToY = teleY;
+    const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+    fighter.adaptationDashTimer = dashFrames;
+    fighter.adaptationDashTarget = opponent;
+    fighter.adaptationDashIsCounter = false;
 
-    spawnTeleportAfterimages(fighter, oldX, oldY, fighter.x, fighter.y, fighter.gunAngle);
+    spawnTeleportAfterimages(fighter, oldX, oldY, teleX, teleY, fighter.gunAngle);
 
     audioSystem.playSFX('skill_dash5', 1.0);
     spawnImpactFlash(fighter.x, fighter.y, 25, 'silver');
@@ -291,35 +315,49 @@ export function executeShout(fighter, opponent, ownerIndex) {
   audioSystem.playSFX('attack_explosion', 0.8);
   audioSystem.playSFX('skill_dash3', 0.9);
 
-  spawnMeleeClashShockwave(fighter.x, fighter.y, shoutRadius, 'silver');
-  spawnImpactFlash(fighter.x, fighter.y, shoutRadius * 0.7, '#E0E0E0');
-
-  for (let i = 0; i < 16; i++) {
-    const angle = (i / 16) * Math.PI * 2;
-    const dist = shoutRadius * 0.4;
-    spawnSparks(
-      fighter.x + Math.cos(angle) * dist,
-      fighter.y + Math.sin(angle) * dist,
-      4, 'silver', '#FFFFFF'
-    );
-  }
+  // Spawn the improved Concentric Gold/Silver Shockwave and Outward Spark Burst
+  spawnMahoragaShoutBurst(fighter.x, fighter.y, shoutRadius);
+  spawnImpactFlash(fighter.x, fighter.y, shoutRadius * 0.7, '#FFD700');
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'DIVINE SHOUT!', '#E0E8FF');
 
-  // Damage all enemies within shout radius
+  // Damage all enemies (fighters & illusions) within shout radius
   if (state.fighters) {
     const myIndex = state.fighters.indexOf(fighter);
     const myTeam = state.getFighterTeam(myIndex);
 
-    state.fighters.forEach((f, idx) => {
+    const targetList = [...state.fighters, ...(state.illusions || [])];
+
+    targetList.forEach((f) => {
       if (!f || f === fighter || f.hp <= 0) return;
-      const enemyTeam = state.getFighterTeam(idx);
-      if (myTeam !== null && enemyTeam === myTeam) return;
+
+      // Avoid hitting teammates or friendly illusions
+      let isTeammate = false;
+      if (state.fighters.includes(f)) {
+        const idx = state.fighters.indexOf(f);
+        const enemyTeam = state.getFighterTeam(idx);
+        isTeammate = myTeam !== null && enemyTeam === myTeam;
+      } else if (f.owner) {
+        const ownerIdx = state.fighters.indexOf(f.owner);
+        const enemyTeam = state.getFighterTeam(ownerIdx);
+        isTeammate = myTeam !== null && enemyTeam === myTeam;
+      }
+      if (isTeammate) return;
 
       const dist = Math.hypot(fighter.x - f.x, fighter.y - f.y);
       if (dist <= shoutRadius) {
         f.takeDamage(shoutDamage, fighter, { isSkill: true });
         f.applyHitStun(18);
+
+        // Apply brief slow movement debuff
+        const slowDur = CONFIG.mahoraga?.shoutSlowDurationFrames || 90;
+        const slowMult = CONFIG.mahoraga?.shoutSlowMultiplier || 0.50;
+        if (typeof f.applySlow === 'function') {
+          f.applySlow(slowDur, slowMult, { isMahoragaShout: true });
+        } else {
+          f.slowTimer = slowDur;
+          f.slowMultiplier = slowMult;
+        }
 
         const pushAngle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
         f.vx += Math.cos(pushAngle) * shoutKnockback;

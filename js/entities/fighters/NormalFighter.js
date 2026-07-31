@@ -82,7 +82,11 @@ export class NormalFighter extends Fighter {
       }
     }
 
-    projectileSystem.fireProjectile(this, ownerIndex, finalDamage, false, finalSpeed, false, visualType, customSpawnX, customSpawnY);
+    const bullet = projectileSystem.fireProjectile(this, ownerIndex, finalDamage, false, finalSpeed, false, visualType, customSpawnX, customSpawnY);
+    if (isEnhanced && this._def?.id === 1 && bullet) {
+      bullet.isAdaptableSkillShot = true;
+      bullet.skillShotId = 'sharpshooter_executor';
+    }
     this.shootCooldown = CONFIG.normal.shotCooldown;
 
     // Physics Recoil
@@ -118,10 +122,13 @@ export class NormalFighter extends Fighter {
       if (this.reloadFinishFlash > 0) this.reloadFinishFlash--;
 
       if (this.executionWindupTimer > 0) {
+        this.isFiringSkillShot = 'sharpshooter_executor';
         this.executionWindupTimer--;
         if (this.executionWindupTimer === 0) {
           this._fireWeapon(ownerIndex, true);
         }
+      } else {
+        this.isFiringSkillShot = null;
       }
 
       // Handle Reloading

@@ -588,6 +588,12 @@ export function drawProjectiles() {
       return;
     }
 
+    // Mahoraga concrete/basalt thrown debris visuals
+    if (p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble') {
+      drawMahoragaThrow(ctx, p);
+      return;
+    }
+
     // Default projectile draw
     // Make projectile visuals depend on the owner projectile color/type.
     // RED: red-orange motion trail; BLUE: cyan â€œlaser-ishâ€ streak.

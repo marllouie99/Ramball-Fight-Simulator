@@ -16,6 +16,7 @@ import { drawSukunaBody } from '../../graphics/fighters/sukunaSkin.js';
 export class SukunaFighter extends Fighter {
   constructor(def) {
     super(def);
+    this.characterId = 'sukuna';
 
     // Bind basic attack cooldown to the specific Sukuna config
     this.shootCooldownMax = CONFIG.sukuna.slashCooldown || 100;
@@ -1462,19 +1463,10 @@ export class SukunaFighter extends Fighter {
     this.drawFreezeTimer(ctx);
   }
 
-  // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands
+  // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands (Front POV style)
   _drawHandCursedEnergy(ctx) {
     const basePosY = (this.y - (this.z || 0));
     const nowTime = Date.now();
-
-    // Dynamic hand animation offsets (Left hand rests in center of body by default)
-    let frontOffset = 6;
-    let frontAngleOffset = 0;
-
-    let backHandX = this.x - Math.cos(this.gunAngle + Math.PI / 2) * (this.r * 0.35);
-    let backHandY = basePosY - Math.sin(this.gunAngle + Math.PI / 2) * (this.r * 0.35);
-    let hideFrontHand = false;
-    let hideBackHand = false;
 
     // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Target of Ambush: Hide hands completely
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
@@ -1484,12 +1476,36 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
+    const angle = this.gunAngle || 0;
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    
+    // Helper to transform local Front POV coordinates to global coordinates
+    const toGlobal = (lx, ly) => {
+      if (facingLeft) lx = -lx; // Mirror across X axis when facing left
+      return {
+        x: this.x + lx,
+        y: basePosY + ly
+      };
+    };
+
+    let hideFrontHand = false;
+    let hideBackHand = false;
+    const r = this.r || 25;
+
+    // Default rest positions in Front POV frame (+X is right, -X is left, relative to camera)
+    // Front POV facing camera: Left hand is visually on the right (+X), Right hand is on the left (-X)
+    let lx1 = -r * 0.55;    // Right Arm 
+    let ly1 = r * 0.35;     // Slightly forward to camera
+    
+    let lx2 = r * 0.55;     // Left Arm 
+    let ly2 = r * 0.35;     // Slightly forward to camera
+
     // 1. Smooth Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target with recovery easing)
     if (this.punchAnimTimer > 0) {
       const maxT = 16.0;
       this.currentSukunaPunchProgress = Math.min(1.0, Math.max(0.0, 1.0 - (this.punchAnimTimer / maxT)));
-    } else if (this.currentSukunaPunchProgress > 0) {
-      this.currentSukunaPunchProgress = Math.max(0.0, this.currentSukunaPunchProgress - 0.12);
     } else {
       this.currentSukunaPunchProgress = 0.0;
     }
@@ -1508,25 +1524,13 @@ export class SukunaFighter extends Fighter {
       const punchDist = lungeProgress * reachDist; // Dynamic reach extension directly to opponent!
 
       if (this.punchAnimHand === 0) {
-        // --- RIGHT HAND PUNCH (Strikes along right flank) ---
-        frontAngleOffset = 0.22;         // Right side angle offset
-        frontOffset += punchDist;        // Right hand punches forward to enemy!
-
-        // Left hand stays tucked in tight martial arts guard at chest
-        const guardAngle = this.gunAngle - 0.35;
-        const guardDist = this.r * 0.4;
-        backHandX = this.x + Math.cos(guardAngle) * guardDist;
-        backHandY = basePosY + Math.sin(guardAngle) * guardDist;
+        // --- RIGHT HAND PUNCH (Strikes and flies over body!) ---
+        lx1 += punchDist * 1.5; 
+        ly1 *= 0.4;
       } else {
-        // --- LEFT HAND PUNCH (Strikes along left flank) ---
-        const backAngle = this.gunAngle - 0.22; // Left side angle offset
-        const backOffset = (this.r + 6) + punchDist;
-        backHandX = this.x + Math.cos(backAngle) * backOffset; // Left hand punches forward to enemy!
-        backHandY = basePosY + Math.sin(backAngle) * backOffset;
-
-        // Right hand pulls into tight right guard at chest
-        frontAngleOffset = 0.35;
-        frontOffset = -this.r * 0.5;
+        // --- LEFT HAND PUNCH ---
+        lx2 -= punchDist * 1.2;
+        ly2 *= 0.4;
       }
     }
 
@@ -1535,21 +1539,18 @@ export class SukunaFighter extends Fighter {
       const swingMax = 10;
       const rawT = (10 - Math.max(0, this.slashSwingTimer)) / swingMax; // 0 to 1 smooth progress over 10 frames
       const swingProg = Math.pow(rawT, 0.4); // Fast snappy acceleration curve
-      const swingAngleOffset = (swingProg * Math.PI - Math.PI / 2);
       const swingThrust = Math.sin(swingProg * Math.PI) * 35;
 
       if (this.slashHand === 1) {
         // Left hand slashes across body! Hide right hand!
         hideFrontHand = true;
-        const backAngle = this.gunAngle - swingAngleOffset;
-        const backOffset = (this.r + 6) + swingThrust;
-        backHandX = this.x + Math.cos(backAngle) * backOffset;
-        backHandY = basePosY + Math.sin(backAngle) * backOffset;
+        lx2 -= swingThrust * 1.2;
+        ly2 += swingThrust * 0.5; // Swipe across slightly towards camera
       } else {
         // Right hand slashes across body! Hide left hand!
         hideBackHand = true;
-        frontAngleOffset = swingAngleOffset;
-        frontOffset = 6 + swingThrust;
+        lx1 += swingThrust * 1.8; // Right hand flies over!
+        ly1 += swingThrust * 0.5;
       }
     }
 
@@ -1557,29 +1558,38 @@ export class SukunaFighter extends Fighter {
     else if (this.isChannelingDivineFlame) {
       const progress = Math.min(1.0, (this.divineFlameChargeTimer || 0) / Math.max(1, this.divineFlameChargeMax || 90));
 
-      // Leading Bow Arm (Front hand extending far forward to hold bow riser):
-      frontAngleOffset = -0.15;
-      frontOffset = 24 + progress * 8; // Extends 24px to 32px out along aim angle
+      // Leading Bow Arm (Left Hand extending far forward to hold bow riser):
+      lx2 = r * 0.5 + 24 + progress * 8; 
+      ly2 = 0;
 
-      // Trailing Draw String Arm (Back hand pulling arrow notch deep behind body):
-      const pullAngle = this.gunAngle + Math.PI; // Pulls backward opposite to facing direction
-      const drawbackDist = 6 + progress * 24;     // Pulls 6px to 30px back into deep archery drawback
-      const perpX = Math.cos(this.gunAngle + Math.PI / 2) * 4;
-      const perpY = Math.sin(this.gunAngle + Math.PI / 2) * 4;
-
-      backHandX = this.x + Math.cos(pullAngle) * drawbackDist + perpX;
-      backHandY = basePosY + Math.sin(pullAngle) * drawbackDist + perpY;
+      // Trailing Draw String Arm (Right Hand pulling arrow notch deep behind body):
+      lx1 = -r * 0.2 - (6 + progress * 24);
+      ly1 = 0;
     }
-
-    // Front hand (Right hand) position
-    const frontAngle = this.gunAngle + frontAngleOffset;
-    let frontHandX = this.x + Math.cos(frontAngle) * (this.r + frontOffset);
-    let frontHandY = basePosY + Math.sin(frontAngle) * (this.r + frontOffset);
+    
+    // Actually, wait! The user wants the Mahoraga Front POV style!
+    // In Front POV style, we use toGlobal which DOES apply gunAngle rotation:
+    const toGlobalRigged = (lx, ly) => {
+      if (facingLeft) ly = -ly; // Mirror across X axis when facing left
+      return {
+        x: this.x + (lx * cosA - ly * sinA),
+        y: basePosY + (lx * sinA + ly * cosA)
+      };
+    };
+    
+    // For Sukuna, I will use the rigorous toGlobalRigged to match Gojo and Todo's hands!
+    const fHand = toGlobalRigged(lx1, ly1);
+    const bHand = toGlobalRigged(lx2, ly2);
+    
+    let frontHandX = fHand.x;
+    let frontHandY = fHand.y;
+    let backHandX = bHand.x;
+    let backHandY = bHand.y;
 
     // Safety Clamp: Prevent idle hands from extending above the top boundary of body circle (-this.r + 6)
     const isAttacking = (this.punchAnimTimer > 0) || (this.slashSwingTimer > 0) || (this.rapidSlashHitsLeft > 0) || (this.flurryHitsLeft > 0);
     const maxTopY = basePosY - (this.r - 6);
-    if (!isAttacking && frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
+    if (!isAttacking && frontHandY < maxTopY && (lx1 < 0 || Math.abs(lx1) > 1.0)) {
       frontHandY = maxTopY;
     }
     if (!isAttacking && backHandY < maxTopY && !this.isChannelingDivineFlame) {

@@ -110,7 +110,7 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.vx = 0;
   preview.vy = 0;
   preview.angle = 0;
-  preview.gunAngle = 0;
+  preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Yuta faces forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
   if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
@@ -176,7 +176,7 @@ function drawFfaChampionReveal(winner, timer) {
   preview.vx = 0;
   preview.vy = 0;
   preview.angle = 0;
-  preview.gunAngle = 0;
+  preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Yuta faces forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
   if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
@@ -413,7 +413,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     preview.vx = 0;
     preview.vy = 0;
     preview.angle = 0;
-    preview.gunAngle = 0;
+    preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Relaxed resting pose pointing downwards, but Yuta points forward to align his bag
     preview.shootCooldown = 0;
     preview._isWinnerReveal = true;
     if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {

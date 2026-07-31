@@ -291,13 +291,10 @@ export function drawMahoragaFaceWings(ctx, fighter) {
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
-
-  const angle = fighter.gunAngle || 0;
-  ctx.rotate(angle);
-
-  // Flip Y when facing left so wings mirror correctly
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
+  
+  const rotAngle = fighter.angle || 0;
+  ctx.rotate(rotAngle);
+  if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
 
   // === Dynamic Organic Floating & Flapping Motion with Center Space Gap ===
   const floatTime = Date.now() * 0.003;
@@ -358,13 +355,11 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
   
-  // Rotate fully to match fighter facing angle and orientation
-  const angle = fighter.gunAngle || 0;
-  ctx.rotate(angle);
-
-  // Flip Y when facing left so necklace ribbons orient correctly with body direction
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
+  const rotAngle = fighter.angle || 0;
+  ctx.rotate(rotAngle);
+  if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
+  
+  // Keep chest necklace statically oriented relative to the rotated body
 
   const r = fighter.r || 30;
   const chestY = r * 0.15; // Lowered mid-chest position

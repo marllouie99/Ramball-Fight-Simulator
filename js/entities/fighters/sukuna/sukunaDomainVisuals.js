@@ -79,7 +79,7 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
 
   // ── 2. WATER REFLECTION OF THE SHRINE STRUCTURE ──
   ctx.save();
-  ctx.translate(sx, sy + 30);
+  ctx.translate(sx, sy - 40);
   ctx.scale(1, -0.45);
   ctx.globalAlpha = 0.32;
   fighter._drawShrineBody(ctx);
@@ -120,9 +120,9 @@ export function renderSukunaDomainForeground(fighter, ctx) {
 
   ctx.save();
 
-  // ── REAL SHRINE STRUCTURE (Above Water Level) ──
+  // ── REAL SHRINE STRUCTURE (Above Water Level - Shifted higher toward top) ──
   ctx.save();
-  ctx.translate(sx, sy - 35);
+  ctx.translate(sx, sy - 120);
   fighter._drawShrineBody(ctx);
   ctx.restore();
 
@@ -144,14 +144,14 @@ export function renderSukunaDomainForeground(fighter, ctx) {
       ctx.beginPath();
       const arcStart = slashAngle - 0.4;
       const arcEnd = slashAngle + 0.4;
-      ctx.arc(sx, sy - 35, slashRadius, arcStart, arcEnd);
+      ctx.arc(sx, sy - 120, slashRadius, arcStart, arcEnd);
       ctx.stroke();
 
       // Thin white edge highlight
       ctx.strokeStyle = `rgba(255, 200, 200, ${slashAlpha * 0.7})`;
       ctx.lineWidth = 1.2;
       ctx.beginPath();
-      ctx.arc(sx, sy - 35, slashRadius - 2, arcStart + 0.05, arcEnd - 0.05);
+      ctx.arc(sx, sy - 120, slashRadius - 2, arcStart + 0.05, arcEnd - 0.05);
       ctx.stroke();
     }
 

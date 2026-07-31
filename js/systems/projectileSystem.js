@@ -397,6 +397,8 @@ class ProjectileSystem {
     proj.isGojoPurpleOrb = true;
     proj.behaviorType = 'gojo_purple';
     proj.visual = 'gojoPurpleOrb';
+    proj.isAdaptableSkillShot = true;
+    proj.skillShotId = 'purple';
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
     proj.purpleDPS = CONFIG.gojo.purpleDPS || 5;
@@ -484,6 +486,8 @@ class ProjectileSystem {
     proj.isSukunaFurnace = true;
     proj.visual = 'sukunaFurnaceArrow';
     proj.behaviorType = 'sukuna_furnace';
+    proj.isAdaptableSkillShot = true;
+    proj.skillShotId = 'divineFlame';
     proj.history = [];
     proj.history.push({ x: proj.x, y: proj.y });
     proj.historyMax = 12;
@@ -611,7 +615,7 @@ class ProjectileSystem {
           if (dist <= splashRadius) {
             const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
             const splashDmg = damage * splashRatio;
-            f.takeDamage(splashDmg, attacker, { isExplosion: true });
+            f.takeDamage(splashDmg, attacker, { isExplosion: true, isDivineFlame: true });
             
             // Apply burn effect to targets hit by Fuga
             if (typeof f.applyBurn === 'function') {

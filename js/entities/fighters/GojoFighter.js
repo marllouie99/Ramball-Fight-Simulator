@@ -202,7 +202,9 @@ export class GojoFighter extends Fighter {
     }
 
     // Check Infinity Passive first (Domain sure-hit & bypassShield attacks bypass Limitless Infinity, self-damage cannot trigger Infinity)
-    if (this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !attacker.domainActive) {
+    // Toji Fushiguro (ISOH lore exception): Inverted Spear of Heaven always pierces Limitless Infinity — skip block entirely
+    const isToji = attacker && (attacker.characterId === 'toji' || attacker.type === 'toji');
+    if (!isToji && this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !attacker.domainActive) {
       if (attacker.characterId === 'mahoraga') {
         const totalStages = (attacker.adaptationStage?.melee || 0) + (attacker.adaptationStage?.ranged || 0) + (attacker.adaptationStage?.skill || 0);
         const hasAdapted = (attacker.adapted?.melee) || (totalStages >= 1) || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.gojoInfinityImmune;
@@ -1083,6 +1085,7 @@ export class GojoFighter extends Fighter {
    * Execute a melee punch attack
    */
   _meleePunch(opponent) {
+    if (opponent) this.target = opponent;
     const punchDamage = CONFIG.gojo.meleePunchDamage || 8;
 
     // Trigger smooth hand punch animation (matches Sukuna's 8-frame punch timing)

@@ -281,6 +281,27 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 1.0,
     delay: 0,
   },
+  // Todo — Brawler melee punches (uses Gojo punch attack audio)
+  'todo': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.8,
+    delay: 0,
+  },
+  'todo_punch': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.8,
+    delay: 0,
+  },
+  'yuji': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.5,
+    delay: 0,
+  },
+  'yuji_punch': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.5,
+    delay: 0,
+  },
 };
 
 /**

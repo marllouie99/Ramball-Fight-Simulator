@@ -30,4 +30,8 @@ export const todoConfig = {
     slowDuration: 60,             // Duration in frames enemy is heavily slowed when Todo teleports to them (1.0 second)
     slowMultiplier: 0.25,         // Speed multiplier during slow (0.25 = 75% movement slow)
     hitStunFrames: 20,            // Hitstun frames applied to enemy on arrival
+
+    // Audio Sound Effects Configuration (Configurable via Assets/Sound Effects folder)
+    punchSound: 'Assets/Sound Effects/Attacks/punch.mp3', // Gojo's punch attack sound effect
+    punchVolume: 2.8,
 };

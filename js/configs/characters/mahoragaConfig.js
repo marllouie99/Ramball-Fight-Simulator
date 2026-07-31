@@ -25,6 +25,9 @@ export const mahoragaConfig = {
     infinityBlitzTeleportDistance: 18, // Teleport offset distance around opponent
     infinityBlitzWheelSpinSpeed: 0.08,  // Continuous Wheel Rotation Speed during Level 8 Speed-Blitz stance (smaller = slower majestic spin e.g. 0.06; larger = faster e.g. 0.20)
     infinityBlitzCooldownFrames: 600,   // Cooldown (frames) before Level 8 Speed-Blitz can re-trigger (10 seconds)
+    infinityBlitzTeleportSpeedMultiplier: 0.20, // Travel duration speed multiplier during blitz stance teleports (smaller = faster, e.g. 0.20 * 15 frames = 3 frame travel)
+    infinityBlitzStrikeSlowDurationFrames: 15, // Slow duration applied to enemy upon landing a speed-blitz strike (15 frames)
+    infinityBlitzStrikeSlowMultiplier: 0.40,   // Slow movement multiplier (0.40 = 40% speed / 60% slow)
 
     // Divine Shout (AoE Shockwave Roar)
     shoutCooldown: 1000,             // 8 seconds cooldown between divine shouts
@@ -32,6 +35,8 @@ export const mahoragaConfig = {
     shoutRadius: 180,               // Shockwave blast radius
     shoutDamage: 30,                // Damage dealt to enemies caught in shockwave
     shoutKnockback: 18,             // Knockback force applied to enemies
+    shoutSlowDurationFrames: 90,     // Slow duration in frames applied to caught enemies (90 = 1.5 seconds)
+    shoutSlowMultiplier: 0.50,       // Slow speed multiplier (0.50 = 50% slow movement)
 
     // Cursed Energy Throw (Rapid Barrage Ranged Skill)
     throwCooldown: 1000,             // 6 seconds cooldown between rapid throw barrages
@@ -72,16 +77,22 @@ export const mahoragaConfig = {
     rctHealThresholdHpPercent: 0.10,  // Triggers RCT healing when HP drops to 25% or below
     rctHealAmountPercent: 0.01,       // Heals 35% of max HP back upon trigger
     rctHealCooldownFrames: 1500,      // Recharge cooldown (frames) between RCT heals (1200 frames = ~20s at 60fps)
-    
+
     rctHealLevelInterval: 3,          // How many adaptation levels (wheel clicks) before Mahoraga triggers a heal (e.g., every 3 levels)
     rctHealPerClickPercent: 0.08,     // How much HP Mahoraga heals when the wheel click heal triggers (8% of max HP)
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
-    fatalAdaptWindowFrames: 300,     // Rolling window duration (frames) — damage from any attack must accumulate within this time (300 = 5 seconds at 60fps)
-    fatalDamageThresholdPct: 0.10,  // Fraction of maxHp that must accumulate within the window to trigger wheel click (10% = e.g. 15 HP for a 150 HP Mahoraga)
+    fatalAdaptWindowFrames: 500,     // Rolling window duration (frames) — damage from any attack must accumulate within this time (300 = 5 seconds at 60fps)
+    fatalDamageThresholdPct: 0.05,  // Fraction of maxHp that must accumulate within the window to trigger wheel click (10% = e.g. 15 HP for a 150 HP Mahoraga)
     fatalAdaptCooldownFrames: 300,   // Cooldown (frames) between wheel clicks — prevents back-to-back rapid triggers (300 = 5 seconds at 60fps)
 
     // Teleportation Speed & Afterimage Visibility Settings
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)
-    adaptationDashSpeedFrames: 10,   // Teleportation travel speed / frames during flash-dash (smaller = faster instant teleport!)
+    adaptationDashSpeedFrames: 15,   // Teleportation travel speed / frames during flash-dash (smaller = faster instant teleport!)
+
+    // Parry mechanic
+    parryChancePerStage: 0.08,        // +8% parry chance per gold adaptation stage (max 75%)
+    parryMaxChance: 0.75,             // Maximum parry/block chance cap (75%)
+    parryDurationFrames: 25,          // Duration (frames) of snappy blade parry pose
+    guardDurationFrames: 60,          // Duration (frames) of crossed-arm face guard pose
 };

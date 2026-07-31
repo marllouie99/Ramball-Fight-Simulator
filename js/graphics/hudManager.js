@@ -32,10 +32,50 @@ export function drawHUD() {
   const containerBottom = document.getElementById('healthHud');
   const containerLeft = document.getElementById('healthHudLeft');
   const containerRight = document.getElementById('healthHudRight');
+  const topContainer = document.querySelector('.hud-top-container');
+  const bottomContainer = document.querySelector('.hud-bottom-container');
   
-  if (containerBottom) containerBottom.style.opacity = hudOpacity;
-  if (containerLeft) containerLeft.style.opacity = hudOpacity;
-  if (containerRight) containerRight.style.opacity = hudOpacity;
+  if (containerBottom) {
+    containerBottom.style.opacity = hudOpacity;
+    if (hudOpacity <= 0) {
+      containerBottom.style.visibility = 'hidden';
+      containerBottom.style.pointerEvents = 'none';
+    } else {
+      containerBottom.style.display = 'flex';
+      containerBottom.style.visibility = 'visible';
+      containerBottom.style.pointerEvents = 'auto';
+    }
+  }
+  if (containerLeft) {
+    containerLeft.style.opacity = hudOpacity;
+    if (hudOpacity <= 0) {
+      containerLeft.style.visibility = 'hidden';
+      containerLeft.style.pointerEvents = 'none';
+    } else {
+      containerLeft.style.display = 'block';
+      containerLeft.style.visibility = 'visible';
+      containerLeft.style.pointerEvents = 'auto';
+    }
+  }
+  if (containerRight) {
+    containerRight.style.opacity = hudOpacity;
+    if (hudOpacity <= 0) {
+      containerRight.style.visibility = 'hidden';
+      containerRight.style.pointerEvents = 'none';
+    } else {
+      containerRight.style.display = 'block';
+      containerRight.style.visibility = 'visible';
+      containerRight.style.pointerEvents = 'auto';
+    }
+  }
+  if (topContainer) {
+    topContainer.style.opacity = hudOpacity;
+    topContainer.style.display = 'none';
+  }
+  if (bottomContainer) {
+    bottomContainer.style.opacity = hudOpacity;
+    bottomContainer.style.display = 'none';
+  }
 
   updateHealthHud();
 
@@ -129,6 +169,128 @@ function updateHealthHud() {
   if (bottomHudRight) bottomHudRight.innerHTML = '';
 
 
+  const getSkillDataForFighter = (f) => {
+    if (f.characterId === 'gojo' || f.type === 'gojo') {
+      const themeColor = f.color || '#00e5ff';
+      const domainMax = CONFIG.gojo?.domainCooldown || 2000;
+      const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
+      let domainPct;
+      if (f.isChannelingDomainExpansion) {
+        domainPct = 100;
+      } else if (f.domainActive) {
+        const domainDuration = CONFIG.gojo?.domainDuration || 400;
+        const remaining = f.domainTimer || 0;
+        domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
+      } else {
+        domainPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
+      }
+
+      const activeProjectiles = typeof getProjectiles === 'function' ? getProjectiles() : [];
+      const purpleOrb = activeProjectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0 && p.owner === state.fighters?.indexOf(f));
+      const purpleMax = CONFIG.gojo?.purpleCooldown || 1500;
+      const purpleTimer = f.purpleCooldown !== undefined ? f.purpleCooldown : purpleMax;
+      let purplePct;
+      if (f.isChannelingPurple) {
+        const chargeMax = CONFIG.gojo?.purpleChargeMax || 100;
+        const chargeTimer = f.purpleChargeTimer || 0;
+        purplePct = Math.max(0, Math.min(100, (1 - chargeTimer / chargeMax) * 100));
+      } else if (purpleOrb) {
+        const orbMaxLife = CONFIG.gojo?.purpleLife || 250;
+        purplePct = Math.max(0, Math.min(100, (purpleOrb.life / orbMaxLife) * 100));
+      } else if ((f.purpleRecoveryTimer || 0) > 0) {
+        purplePct = 0;
+      } else {
+        purplePct = Math.max(0, Math.min(100, (1 - (purpleTimer / purpleMax)) * 100));
+      }
+
+      const redMax = CONFIG.gojo?.redCooldown || 1000;
+      const redTimer = f.redCooldown !== undefined ? f.redCooldown : redMax;
+      const redPct = Math.max(0, Math.min(100, (1 - (redTimer / redMax)) * 100));
+
+      return [
+        { id: 'uv',     pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'UNLIMITED VOID' },
+        { id: 'purple', pct: purplePct, ready: purplePct >= 99, color: themeColor, label: 'HOLLOW PURPLE' },
+        { id: 'red',    pct: redPct,    ready: redPct >= 99,    color: themeColor, label: 'REVERSAL RED' },
+      ];
+    }
+    if (f.characterId === 'toji' || f.type === 'toji') {
+      const themeColor = '#a855f7';
+      const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
+      const ambushMax = (CONFIG.toji?.stealthCooldown || 500) - ambushTrigger;
+      const rawAmbushTimer = f.stealthCooldown !== undefined ? f.stealthCooldown : 0;
+      let ambushPct = 0;
+      if (f.stealthTimer > 0) { ambushPct = 0; }
+      else {
+        const cooldownRemaining = Math.max(0, rawAmbushTimer - ambushTrigger);
+        ambushPct = Math.max(0, Math.min(100, (1 - (cooldownRemaining / ambushMax)) * 100));
+      }
+      if (f.isAmbushing) {
+        let ap = 0;
+        const ph = f.ambushPhase;
+        if (ph === 'FRONT_PAUSE' || ph === 'FRONT_LAUNCH') { ap = 0.05; }
+        else if (ph === 'BACK_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushBackChargeDuration || 25))); ap = 0.10 + p * 0.20; }
+        else if (ph === 'BACK_STAB' || ph === 'KATANA_DRAW') { ap = 0.35; }
+        else if (ph === 'KATANA_CHASE' || ph === 'KATANA_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushKatanaChargeDuration || 30))); ap = 0.40 + p * 0.20; }
+        else if (ph === 'KATANA_SLASH') { ap = 0.65; }
+        else if (ph === 'PHANTOM_FLURRY') { ap = 0.65 + ((f.phantomStrikeCount || 0) / (CONFIG.toji?.ambushPhantomFlurryStrikes || 10)) * 0.25; }
+        else if (ph === 'FINISHER_DASH' || ph === 'FINISHER_SLASH') { ap = 0.95; }
+        ambushPct = Math.max(0, 100 - ap * 100);
+      }
+      const ultMax = f.ultimateCooldownMax || CONFIG.toji?.ultimateCooldown || 1500;
+      const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
+      let ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      if (f.ultimateActive) {
+        let ap = 0;
+        if (f.ultimatePhase === 'CHANNELING') { ap = ((f.ultimateChargeTimer || 0) / (f.ultimateChargeMax || 90)) * 0.15; }
+        else if (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING') { ap = 0.15 + ((f.ultimateAssaultCount || 0) / (CONFIG.toji?.ultimateMaxStrikes || 6)) * 0.40; }
+        else if (f.ultimatePhase === 'CRATER_FADEIN') { ap = 0.55 + Math.max(0, 1 - ((f.ultimateCycleTimer || 0) / (f.craterFadeInTotal || 30))) * 0.05; }
+        else if (f.ultimatePhase === 'CRATER_CHARGE') { ap = 0.60 + Math.max(0, 1 - ((f.ultimateCycleTimer || 0) / (CONFIG.toji?.ultimateCraterChargeTime || 90))) * 0.35; }
+        else if (f.ultimatePhase === 'CRATER_DIVE') { ap = 0.95 + Math.max(0, 1 - ((f.ultimateCycleTimer || 0) / (CONFIG.toji?.ultimateCraterDiveTime || 15))) * 0.05; }
+        ultPct = Math.max(0, 100 - ap * 100);
+      }
+      return [
+        { id: 'ambush', pct: ambushPct, ready: ambushPct >= 99, color: themeColor, label: 'STEALTH AMBUSH' },
+        { id: 'ult',    pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'HEAVENLY RESTRICTION' },
+      ];
+    }
+    // Default
+    let current = 0;
+    let max = 1;
+    if (f.type === 'yuta') {
+      current = Math.max(0, f.domainCooldownTimer || 0);
+      max = CONFIG.yuta?.domainCooldown || 1500;
+    } else if (f.type === 'gunslinger') {
+      current = f.skillTimer || 0;
+      max = CONFIG.gunslinger?.skillCooldown || 300;
+    } else if (f.skillCooldown !== undefined) {
+      current = f.skillCooldown;
+      max = (CONFIG[f.type] && CONFIG[f.type].skillCooldown) || 100;
+    } else if (f.cooldownTimer !== undefined) {
+      current = f.cooldownTimer;
+      max = f.cooldown || f.shootCooldownMax || 100;
+    }
+    const skillPct = Math.max(0, Math.min(100, (1 - (current / max)) * 100));
+    
+    const color = f.color || '#a491d3';
+    const def = f.fighterIndex !== undefined ? FIGHTER_DEFS[f.fighterIndex] : null;
+    const ability = def ? (def.ability || def.name) : 'Skill';
+    return [{ id: 'skill', pct: skillPct, ready: skillPct >= 99, color, label: ability.toUpperCase() }];
+  };
+
+  const generateFighterSkillsHTML = (f, align) => {
+    const skills = getSkillDataForFighter(f);
+    const barStrokeColor = (CONFIG.theme && CONFIG.theme.hudProgressBarStrokeColor) ? CONFIG.theme.hudProgressBarStrokeColor : 'transparent';
+    const barStrokeWidth = (CONFIG.theme && CONFIG.theme.hudProgressBarStrokeWidth) ? CONFIG.theme.hudProgressBarStrokeWidth : '0px';
+    const barStrokeStyle = `border: ${barStrokeWidth} solid ${barStrokeColor}; box-sizing: border-box;`;
+
+    return skills.map(s => `
+      <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}" data-skill-id="${s.id}" style="--skill-glow-color: ${s.color}; margin-top: 4px; ${barStrokeStyle}">
+        <div class="hud-skill-box-fill" style="width: ${s.pct}%; background: ${s.color};"></div>
+        <div class="hud-skill-box-text" style="text-align: ${align};">${s.label}</div>
+      </div>
+    `).join('');
+  };
+
   const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
@@ -188,43 +350,6 @@ function updateHealthHud() {
           </div>
         `;
       }).join('');
-    } else if (targetFighter && (targetFighter.type === 'yuta' || (targetFighter._def && targetFighter._def.id === 'yuta'))) {
-      const f = targetFighter;
-      let rikaStatus = '<span style="color: #16a34a; font-weight: bold;">READY</span>';
-      if (f.rika && f.rika.active) {
-        rikaStatus = `<span style="color: #db2777; font-weight: bold;">ACTIVE (${(Math.max(0, f.rika.timer || 0) / 60).toFixed(1)}s)</span>`;
-      } else if (f.rika && f.rika.cooldownTimer > 0) {
-        rikaStatus = `<span style="color: #d97706; font-weight: bold;">${(f.rika.cooldownTimer / 60).toFixed(1)}s</span>`;
-      }
-
-      let domainStatus = '<span style="color: #16a34a; font-weight: bold;">READY</span>';
-      if (f.domainActive) {
-        domainStatus = `<span style="color: #9333ea; font-weight: bold;">ACTIVE (${(Math.max(0, f.domainTimer || 0) / 60).toFixed(1)}s)</span>`;
-      } else if (f.domainCooldownTimer > 0) {
-        domainStatus = `<span style="color: #d97706; font-weight: bold;">${(f.domainCooldownTimer / 60).toFixed(1)}s</span>`;
-      }
-
-      const parryCount = f.parryCount || 0;
-      const targetParries = f.targetParriesForFlurry || 3;
-      const parryStatus = `<span style="color: #0284c7; font-weight: bold;">${parryCount}/${targetParries}</span>`;
-
-      barsHTML = `
-        <div class="hud-cooldowns" style="margin: 4px 0 6px; font-family: Arial, sans-serif; font-size: 11px; display: flex; flex-direction: column; gap: 2px;">
-          <div style="display: flex; justify-content: space-between; color: #000000;">
-            <span style="font-weight: bold;">RIKA SUMMON</span>
-            <span>${rikaStatus}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; color: #000000;">
-            <span style="font-weight: bold;">DOMAIN EXPANSION</span>
-            <span>${domainStatus}</span>
-          </div>
-          <div style="display: flex; justify-content: space-between; color: #000000;">
-            <span style="font-weight: bold;">PARRY COUNTER</span>
-            <span>${parryStatus}</span>
-          </div>
-        </div>
-        <div class="health-card__meta" style="font-size: 13px; font-weight: bold; color: #000000; margin-top: 4px;"><span>DMG: ${Math.max(0, Number(f.damage) || 0)}</span><span>${Math.floor(Math.max(0, Number(f.hp) || 0))}/${Math.floor(Math.max(0, Number(f.maxHp) || 0))}</span></div>
-      `;
     } else {
       const percent = Math.round(safeRatio * 100);
       const barColor = safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444';
@@ -234,7 +359,10 @@ function updateHealthHud() {
         <div class="health-card__bar${glowClass}">
           <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
         </div>
-        <div class="health-card__meta" style="font-size: 13px; font-weight: bold; color: #000000;"><span>${metaLabel}</span><span>${metaValue}</span></div>
+        <div class="health-card__meta" style="font-size: 13px; color: #000000;"><span>${metaLabel}</span><span>${metaValue}</span></div>
+        <div class="health-card__desc" style="color: #666666;">
+          ${description}
+        </div>
       `;
     }
 
@@ -343,13 +471,7 @@ function updateHealthHud() {
         targetFighter: fighter
       });
 
-      if (is1v1) {
-        // We will handle 1v1 in the new HUD
-        // But we still push to cardsBottom if we want the old health bar.
-        // Actually, the user wants the new redesign to replace the old one for 1v1.
-        // We will skip pushing to cardsBottom for 1v1, except maybe we want to keep health?
-        // Let's just NOT push to cardsBottom so it's hidden, and we'll use the new HUD exclusively.
-      } else if (mode === GAME_MODES.FFA) {
+      if (mode === GAME_MODES.FFA || mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'TLFS') {
         cardsBottom.push(cardHTML);
       } else if (index % 2 === 0) {
         cardsLeft.push(cardHTML);
@@ -357,91 +479,6 @@ function updateHealthHud() {
         cardsRight.push(cardHTML);
       }
     });
-  }
-
-  const getSkillProgress = (f) => {
-    if (!f) return 100;
-    let current = 0;
-    let max = 1;
-    if (f.type === 'yuta') {
-      current = Math.max(0, f.domainCooldownTimer || 0);
-      max = CONFIG.yuta.domainCooldown || 1500;
-    } else if (f.type === 'gunslinger') {
-      current = f.skillTimer || 0;
-      max = CONFIG.gunslinger.skillCooldown || 300;
-    } else if (f.skillCooldown !== undefined) {
-      current = f.skillCooldown;
-      max = (CONFIG[f.type] && CONFIG[f.type].skillCooldown) || 100;
-    } else if (f.cooldownTimer !== undefined) {
-      current = f.cooldownTimer;
-      max = f.cooldown || f.shootCooldownMax || 100;
-    }
-    // Return percentage (100 means ready, 0 means just used)
-    return Math.max(0, Math.min(100, (1 - (current / max)) * 100));
-  };
-
-  // Populate new 1v1 HUD
-  if (is1v1 && fighters.length >= 2) {
-    const f1 = fighters[0];
-    const f2 = fighters[1];
-    
-    if (f1 && !f1.isTurret) {
-      if (topHudLeft) {
-        topHudLeft.innerHTML = f1.name || 'FIGHTER 1';
-        topHudLeft.style.color = f1.color || '#a491d3';
-        topHudLeft.style.textAlign = 'left';
-      }
-      if (bottomHudLeft) {
-        bottomHudLeft.style.alignItems = 'flex-start';
-        bottomHudLeft.style.textAlign = 'left';
-        
-        const def = f1.fighterIndex !== undefined ? FIGHTER_DEFS[f1.fighterIndex] : null;
-        const ability = def ? (def.ability || def.name) : 'Skill';
-        const dmg = Math.max(0, Number(f1.damage) || 0);
-        const skillPct = getSkillProgress(f1);
-        const color = f1.color || '#a491d3';
-        const isReady = skillPct >= 99;
-        const boxStyle = isReady ? `border-color: ${color}; box-shadow: 0 0 14px ${color}, 0 4px 14px rgba(0,0,0,0.6);` : '';
-        const fillStyle = `width: ${skillPct}%; background: linear-gradient(90deg, ${adjustColor(color, -50)}, ${color}); box-shadow: 2px 0 12px ${color};`;
-
-        bottomHudLeft.innerHTML = `
-          <div class="hud-skill-box" style="${boxStyle}">
-            <div class="hud-skill-box-fill" style="${fillStyle}"></div>
-            <div class="hud-skill-box-text">${ability}</div>
-          </div>
-          <div class="hud-damage-text" style="color: ${color};">Damage: ${dmg}</div>
-        `;
-      }
-    }
-    
-    if (f2 && !f2.isTurret) {
-      if (topHudRight) {
-        topHudRight.innerHTML = f2.name || 'FIGHTER 2';
-        topHudRight.style.color = f2.color || '#eab308';
-        topHudRight.style.textAlign = 'right';
-      }
-      if (bottomHudRight) {
-        bottomHudRight.style.alignItems = 'flex-end';
-        bottomHudRight.style.textAlign = 'right';
-        
-        const def = f2.fighterIndex !== undefined ? FIGHTER_DEFS[f2.fighterIndex] : null;
-        const ability = def ? (def.ability || def.name) : 'Skill';
-        const dmg = Math.max(0, Number(f2.damage) || 0);
-        const skillPct = getSkillProgress(f2);
-        const color = f2.color || '#eab308';
-        const isReady = skillPct >= 99;
-        const boxStyle = isReady ? `border-color: ${color}; box-shadow: 0 0 14px ${color}, 0 4px 14px rgba(0,0,0,0.6);` : '';
-        const fillStyle = `width: ${skillPct}%; background: linear-gradient(90deg, ${adjustColor(color, -50)}, ${color}); box-shadow: 2px 0 12px ${color};`;
-
-        bottomHudRight.innerHTML = `
-          <div class="hud-skill-box" style="${boxStyle}">
-            <div class="hud-skill-box-fill" style="${fillStyle}"></div>
-            <div class="hud-skill-box-text">${ability}</div>
-          </div>
-          <div class="hud-damage-text" style="color: ${color};">Damage: ${dmg}</div>
-        `;
-      }
-    }
   }
 
   const leftHTML = cardsLeft.join('');

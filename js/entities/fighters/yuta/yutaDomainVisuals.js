@@ -49,7 +49,7 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     ctx.restore();
   } else if (!isClashSecondary) {
     if (arena) {
-      ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+      ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
     } else {
       ctx.fillRect(midX - 1000, midY - 1000, 2000, 2000);
     }

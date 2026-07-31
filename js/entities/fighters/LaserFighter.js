@@ -124,7 +124,12 @@ export class LaserFighter extends Fighter {
 
     if (!hitState.initialHitDone) {
       // Initial hit: apply damage + slow (and optionally a tiny start push)
-      const applied = target.takeDamage(this.damage, this, { isProjectile: true, isLaser: true });
+      const applied = target.takeDamage(this.damage, this, {
+        isProjectile: true,
+        isLaser: true,
+        isAdaptableSkillShot: true,
+        skillShotId: 'laser_beam'
+      });
       if (applied) {
         // Slow (chance)
         const slowChance = Number(CONFIG.laser.slowChance || 1);
@@ -154,7 +159,12 @@ export class LaserFighter extends Fighter {
     // Continuous contact: tick damage and apply continuous push every tick interval.
     hitState.continuousDamageTimer++;
     if (hitState.continuousDamageTimer >= CONFIG.laser.tickInterval) {
-      const applied = target.takeDamage(CONFIG.laser.tickDamage, this, { isProjectile: true, isLaser: true });
+      const applied = target.takeDamage(CONFIG.laser.tickDamage, this, {
+        isProjectile: true,
+        isLaser: true,
+        isAdaptableSkillShot: true,
+        skillShotId: 'laser_beam'
+      });
       if (applied) {
         // Continuous push direction (from beam owner -> target)
         const pushStrength = Number(CONFIG.laser.initialKnockback) || 0;
@@ -201,6 +211,7 @@ export class LaserFighter extends Fighter {
     }
 
     if (this.beamTimer > 0) {
+      this.isFiringSkillShot = 'laser_beam';
       this.beamTimer--;
 
       // Continuous violent screen shake while firing
@@ -246,6 +257,8 @@ export class LaserFighter extends Fighter {
       this.resolveWallBounce(arena);
       return;
     }
+
+    this.isFiringSkillShot = null;
 
     // Resume movement after the beam ends if White has no current velocity.
     if (this.vx === 0 && this.vy === 0) {

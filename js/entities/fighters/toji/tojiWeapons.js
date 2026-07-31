@@ -197,7 +197,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
   const soulWoundDuration = CONFIG.toji?.soulWoundDuration || 180;
 
   for (const target of targets) {
-    applyDamageToTarget(target, damage, fighter, { isMelee: true, isTrueDamage: true, isSoulSplit: true });
+    applyDamageToTarget(target, damage, fighter, { isMelee: true, isTrueDamage: true, isSoulSplit: true, isAdaptableSkillShot: !!fighter.isAmbushing, skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null });
     target.soulWoundTimer = soulWoundDuration;
 
     if (typeof target.applySlow === 'function') {
@@ -212,7 +212,9 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
     let angleDiff = targetHitAngle - (target.angle || 0);
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    target.angle = (target.angle || 0) + angleDiff * 0.40;
+    if (target.characterId !== 'mahoraga' && target.type !== 'mahoraga') {
+      target.angle = (target.angle || 0) + angleDiff * 0.40;
+    }
     target.gunAngle = target.angle;
 
     if (!target.isTurret && !target.cannotBeKnockbacked) {
@@ -268,7 +270,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       }
     }
 
-    applyDamageToTarget(target, thrustDamage, fighter, { isMelee: true, isTrueDamage: true, isIsoh: true });
+    applyDamageToTarget(target, thrustDamage, fighter, { isMelee: true, isTrueDamage: true, isIsoh: true, isAdaptableSkillShot: !!fighter.isAmbushing, skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null });
 
     delete target._timeStopFrozenAngle;
     delete target._timeStopFrozenGunAngle;
@@ -276,7 +278,9 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     let angleDiff = targetHitAngle - (target.angle || 0);
     while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
     while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-    target.angle = (target.angle || 0) + angleDiff * 0.40;
+    if (target.characterId !== 'mahoraga' && target.type !== 'mahoraga') {
+      target.angle = (target.angle || 0) + angleDiff * 0.40;
+    }
     target.gunAngle = target.angle;
 
     if (wasInfinityActive) {

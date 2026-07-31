@@ -8,12 +8,12 @@ export const mahoragaAdaptationConfig = {
   // ── GOJO SATORU ──
   gojo: {
     infinity: {
-      requiredFreezes: 3, // Must be frozen by Limitless twice to adapt
+      requiredFreezes: 2, // Must be frozen by Limitless twice to adapt
       bypassesInfinity: true
     },
-    red: { damageThresholdPct: 0.15, windowFrames: 400 },
-    blue: { damageThresholdPct: 0.15, windowFrames: 400 },
-    purple: { damageThresholdPct: 0.25, windowFrames: 600 }
+    red: { damageThresholdPct: 0.04, windowFrames: 400 },
+    blue: { damageThresholdPct: 0.03, windowFrames: 400 },
+    purple: { damageThresholdPct: 0.06, windowFrames: 600 }
   },
 
   // ── RYOMEN SUKUNA ──

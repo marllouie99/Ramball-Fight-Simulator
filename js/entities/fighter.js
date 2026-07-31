@@ -105,6 +105,30 @@ export class Fighter {
     this.reset();
   }
 
+  get hp() {
+    return this._hp;
+  }
+
+  set hp(value) {
+    const oldHp = this._hp;
+    if (oldHp !== undefined && value > oldHp) {
+      if (this.blackFlashDebuffTimer > 0) {
+        if (state && state.gameState === 'playing') {
+          const healingAmount = value - oldHp;
+          const reducedHealing = healingAmount * (CONFIG.blackFlash?.debuff?.healReductionMultiplier ?? 0.5);
+          value = oldHp + reducedHealing;
+          
+          const now = Date.now();
+          if (!this._lastReducedHealTextTime || now - this._lastReducedHealTextTime > 400) {
+            spawnFloatingText(this.x, this.y - this.r - 28, "RCT Reduced", "#FF0000");
+            this._lastReducedHealTextTime = now;
+          }
+        }
+      }
+    }
+    this._hp = value;
+  }
+
   /** Default demo attack trigger for menu preview (can be overridden by subclasses). */
   triggerDemoAttack() {
     this.spearSwingTimer = 45;
@@ -186,6 +210,7 @@ export class Fighter {
     this.burnSpreadCooldown = 0;
     // Silence effect state
     this.silenceTimer = 0;
+    this.blackFlashDebuffTimer = 0;
   }
 
   /** Returns true if this fighter is currently silenced by anti-technique effects (e.g. Inverted Spear of Heaven). */
@@ -320,6 +345,8 @@ export class Fighter {
     if (this._healthBarHealTimer > 0) this._healthBarHealTimer--;
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
     if (this.rctVisualTimer > 0) this.rctVisualTimer--;
+    if (this.blackFlashDebuffTimer > 0) this.blackFlashDebuffTimer--;
+    if (this.blackFlashTimer > 0) this.blackFlashTimer--;
     
     // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
     if (this.knockbackStunTimer > 0) {
@@ -590,11 +617,12 @@ export class Fighter {
     if (this.hp <= 0 || amount <= 0) return false;
     const prevHp = Number(this.hp) || 0;
     this.hp = Math.min(this.maxHp, Number((prevHp + amount).toFixed(2)));
-    if (this.hp > prevHp) {
+    const actualHealed = this.hp - prevHp;
+    if (actualHealed > 0) {
       this._healthBarHealTimer = 14;
       if (!opts.silent) {
         const color = opts.color || '#22c55e';
-        spawnFloatingText(this.x, this.y - this.r - 8, `+${Math.round(amount)}`, color);
+        spawnFloatingText(this.x, this.y - this.r - 8, `+${Math.round(actualHealed)}`, color);
       }
       return true;
     }
@@ -731,6 +759,12 @@ export class Fighter {
   applyMovementPhysics(extraMultiplier = 1) {
     // Determine intended target speed
     let targetSpeed = this.speed;
+    if (this.blackFlashTimer > 0) {
+      targetSpeed *= (CONFIG.blackFlash?.zone?.speedMultiplier ?? 1.20); // 120% speed inside "The Zone"
+    }
+    if (this.soulSwapActive) {
+      targetSpeed *= (CONFIG.yuji?.soulSwapSpeedMultiplier ?? 1.30); // noticeable speed boost during Soul Swap
+    }
     if (this.slowTimer > 0) {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;

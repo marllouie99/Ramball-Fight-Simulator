@@ -1283,8 +1283,8 @@ export class YutaRenderer {
     offCtx.save();
     offCtx.translate(cx, cy);
 
-    const fillColor = isRCT ? 'rgba(50, 205, 50, 0.75)' : 'rgba(255, 105, 180, 0.75)';
-    const coreColor = isRCT ? 'rgba(144, 238, 144, 0.85)' : 'rgba(255, 192, 203, 0.85)';
+    const fillColor = isRCT ? 'rgba(50, 205, 50, 0.95)' : 'rgba(255, 105, 180, 0.95)';
+    const coreColor = isRCT ? 'rgba(144, 238, 144, 1.0)' : 'rgba(255, 192, 203, 1.0)';
     const strokeColor = '#000000';
 
     const numPoints = 28;
@@ -1382,7 +1382,9 @@ export class YutaRenderer {
     const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown');
 
     let activeMultiplier = fighter.cursedEnergyAlpha || 0;
-    if (isRCT || isCountdown) activeMultiplier = 1.0;
+    if (isRCT || isCountdown || fighter._isWinnerReveal || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0)) {
+      activeMultiplier = 1.0;
+    }
     if (activeMultiplier <= 0.01) return;
 
     let progress = 0;
@@ -1393,7 +1395,7 @@ export class YutaRenderer {
     } else if (fighter.techniqueCooldown > fighter.cooldown - 30) {
       progress = (fighter.techniqueCooldown - (fighter.cooldown - 30)) / 30;
     } else {
-      progress = 0.65;
+      progress = 1.0;
     }
 
     progress *= activeMultiplier;
@@ -1411,13 +1413,13 @@ export class YutaRenderer {
     const glowRadius = fighter.r + 90 + Math.sin(time * 0.005) * 8;
     const backGlow = ctx.createRadialGradient(0, 0, fighter.r * 0.1, 0, 0, glowRadius);
     if (isRCT) {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
-      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.3 * progress})`);
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.8 * progress})`);
+      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.6 * progress})`);
       backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
     } else {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);
-      backGlow.addColorStop(0.35, `rgba(255, 105, 180, ${0.35 * progress})`);
-      backGlow.addColorStop(0.7, `rgba(255, 20, 147, ${0.15 * progress})`);
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.8 * progress})`);
+      backGlow.addColorStop(0.35, `rgba(255, 105, 180, ${0.6 * progress})`);
+      backGlow.addColorStop(0.7, `rgba(255, 20, 147, ${0.3 * progress})`);
       backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
     }
 

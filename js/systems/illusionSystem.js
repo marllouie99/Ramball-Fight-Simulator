@@ -12,6 +12,11 @@ export function updateIllusions() {
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
 
+    // Always decrement hit flash even if dying, so they don't get stuck white
+    if (illusion.hitFlashTimer > 0) {
+      illusion.hitFlashTimer--;
+    }
+
     // Illusions only disappear when they die (HP <= 0), not by duration
     if (illusion.hp <= 0) {
       if (illusion.isRika) continue; // Rika handles her own death animation
@@ -21,10 +26,6 @@ export function updateIllusions() {
       state.illusions.pop();
       spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
       continue;
-    }
-
-    if (illusion.hitFlashTimer > 0) {
-      illusion.hitFlashTimer--;
     }
 
     // MANDATORY RULE 1: TimeStop & HitStun Freeze Guard

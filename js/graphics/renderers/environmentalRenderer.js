@@ -40,7 +40,7 @@ export function drawStormDimScreen() {
   
   // Fill the arena with a plain dark overlay
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
 let currentFurnaceDimOpacity = 0;
@@ -104,7 +104,7 @@ export function drawFurnaceDimScreen() {
   grad.addColorStop(1, `rgba(10, 2, 2, ${opacity * 0.95})`);
 
   ctx.fillStyle = grad;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }
 
@@ -161,7 +161,7 @@ export function drawRikaSummonDimScreen() {
   gradient.addColorStop(0.85, `rgba(5, 0, 10, ${opacity * 0.95})`);
 
   ctx.fillStyle = gradient;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Pulsing Cursed Energy Ring around Yuta/Rika
   ctx.globalCompositeOperation = 'screen';

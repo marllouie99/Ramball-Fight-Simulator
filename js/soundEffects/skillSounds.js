@@ -326,6 +326,35 @@ export const SKILL_SOUNDS = {
       volume: 0.8,
       delay: 0
     }
+  },
+  // ── Todo ──────────────────────────────
+  24: {
+    blackflash: {
+      src: 'Assets/Sound Effects/Skills/blackflash.mp3',
+      volume: 0.5,
+      delay: 0
+    }
+  },
+  // ── Yuji ──────────────────────────────
+  25: {
+    blackflash: {
+      src: 'Assets/Sound Effects/Skills/blackflash.mp3',
+      volume: 0.5,
+      delay: 0
+    }
+  },
+  // ── Mahoraga ──────────────────────────
+  100: {
+    parry: {
+      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+      volume: 0.8,
+      delay: 0
+    },
+    shieldblock: {
+      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+      volume: 0.7,
+      delay: 0
+    }
   }
 };
 
@@ -353,9 +382,13 @@ export function getSkillSound(fighterId, skillName) {
     } else if (strKey.includes('yuta') || strKey.includes('rika')) {
       fighterConfig = SKILL_SOUNDS[23];
     } else if (strKey.includes('toji')) {
+      fighterConfig = SKILL_SOUNDS[99];
+    } else if (strKey.includes('todo')) {
       fighterConfig = SKILL_SOUNDS[24];
-    } else if (strKey.includes('mahoraga')) {
+    } else if (strKey.includes('yuji')) {
       fighterConfig = SKILL_SOUNDS[25];
+    } else if (strKey.includes('mahoraga')) {
+      fighterConfig = SKILL_SOUNDS[100];
     }
   }
 

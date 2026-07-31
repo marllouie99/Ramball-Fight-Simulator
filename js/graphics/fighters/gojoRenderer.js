@@ -357,7 +357,7 @@ export class GojoRenderer {
     }
   }
 
-  // Calculate hand positions for melee punch / skill gestures
+  // Calculate hand positions for melee punch / skill gestures (Front POV style)
   static _getHandPositions(fighter) {
     const basePosY = (fighter.y - (fighter.z || 0));
 
@@ -369,7 +369,8 @@ export class GojoRenderer {
     }
 
     // Do not display extra hands when Reversal Red is active, when target of ambush, or in ranged mode (unless using punch/purple/domain)
-    if (fighter.redEffectTimer > 0 || fighter.isTargetOfAmbush) {
+    // EXCEPTION: During Hollow Purple mixing (isChannelingPurple), Red orb is still active but hands MUST show for the fusion gesture
+    if ((fighter.redEffectTimer > 0 && !fighter.isChannelingPurple) || fighter.isTargetOfAmbush) {
       return null;
     }
     const isUsingHandSkill = (fighter.punchAnimTimer > 0) || (fighter.isChannelingPurple) || (fighter.isChannelingDomainExpansion);
@@ -377,92 +378,86 @@ export class GojoRenderer {
       return null;
     }
 
-    // Dynamic hand animation offsets (Left hand rests in center of body by default)
-    let frontOffset = 6;
-    let frontAngleOffset = 0;
+    const angle = fighter.gunAngle || 0;
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    
+    // Helper to transform local Front POV coordinates to global coordinates
+    const toGlobal = (lx, ly) => {
+      if (facingLeft) ly = -ly; // Mirror across X axis when facing left
+      return {
+        x: fighter.x + (lx * cosA - ly * sinA),
+        y: basePosY + (lx * sinA + ly * cosA)
+      };
+    };
 
-    let backHandX = fighter.x - Math.cos(fighter.gunAngle + Math.PI / 2) * (fighter.r * 0.35);
-    let backHandY = basePosY - Math.sin(fighter.gunAngle + Math.PI / 2) * (fighter.r * 0.35);
     let hideFrontHand = false;
     let hideBackHand = false;
+    const r = fighter.r || 25;
 
-    // 1. Snappy Melee Punch Animation (Alternating 1-2 punches with clear Left & Right fist paths)
+    // 2. Hollow Purple Fusion Gesture
+    if (fighter.isChannelingPurple) {
+      const mergeProgress = typeof fighter.getPurpleChargeProgress === 'function' ? fighter.getPurpleChargeProgress() : 0;
+      const handDistance = r + 10;
+      const handSpread = 14 * (1 - mergeProgress);
+
+      const fHand = toGlobal(handDistance, handSpread);
+      const bHand = toGlobal(handDistance, -handSpread);
+      return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
+    }
+
+    // 4. Domain Expansion Hand Sign Gesture
+    if (fighter.isChannelingDomainExpansion) {
+      const domainDist = r + 8;
+      const fHand = toGlobal(domainDist, 3);
+      const bHand = toGlobal(domainDist, -3);
+      return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
+    }
+
+    // Default rest positions in Front POV frame (+X is enemy, +Y is camera)
+    // Left shoulder is at +X (closest to enemy), Right shoulder is at -X (furthest)
+    let lx1 = -r * 0.55;    // Right Arm (frontHand/strikingX 0)
+    let ly1 = r * 0.35;     // Slightly forward to camera
+    
+    let lx2 = r * 0.55;     // Left Arm (backHand)
+    let ly2 = r * 0.35;     // Slightly forward to camera
+
+    // 1. Snappy Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target)
     if (fighter.punchAnimTimer > 0) {
-      const t = (8 - Math.min(8, fighter.punchAnimTimer)) / 8; // 0 to 1 progress over 8 frames
-      const snap = t < 0.25 ? (t / 0.25) : Math.max(0, 1 - (t - 0.25) / 0.75); // Thrusts out 25%, smoothly retracts 75%
+      const maxT = 8.0;
+      const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+      const smoothP = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
+      const lungeProgress = Math.sin(smoothP * Math.PI); // Smooth 0 -> 1 -> 0 bell curve
+
+      let reachDist = 75;
+      const targetEnt = fighter.target || (fighter.flurryTarget && !fighter.flurryTarget.isDead ? fighter.flurryTarget : null);
+      if (targetEnt) {
+        const distToTarget = Math.hypot(targetEnt.x - fighter.x, targetEnt.y - fighter.y);
+        reachDist = Math.max(45, Math.min(105, distToTarget - fighter.r * 0.45));
+      }
+
+      const punchDist = lungeProgress * reachDist;
 
       if (fighter.punchAnimHand === 0) {
-        // --- RIGHT HAND PUNCH (Strikes along right flank) ---
-        frontAngleOffset = 0.22;         // Right side angle offset
-        frontOffset += snap * 26;        // Right hand punches 26px forward
-
-        // Left hand stays tucked in tight martial arts guard at chest
-        const guardAngle = fighter.gunAngle - 0.35;
-        const guardDist = fighter.r * 0.4;
-        backHandX = fighter.x + Math.cos(guardAngle) * guardDist;
-        backHandY = basePosY + Math.sin(guardAngle) * guardDist;
+        // --- RIGHT HAND PUNCH (Strikes along right flank and flies over body!) ---
+        lx1 += punchDist * 1.5; 
+        ly1 *= 0.4;
       } else {
         // --- LEFT HAND PUNCH (Strikes along left flank) ---
-        const backAngle = fighter.gunAngle - 0.22; // Left side angle offset
-        const backOffset = (fighter.r + 6) + snap * 26;
-        backHandX = fighter.x + Math.cos(backAngle) * backOffset; // Left hand punches 26px forward!
-        backHandY = basePosY + Math.sin(backAngle) * backOffset;
-
-        // Right hand pulls into tight right guard at chest
-        frontAngleOffset = 0.35;
-        frontOffset = -fighter.r * 0.5;
+        lx2 += punchDist * 1.2; 
+        ly2 *= 0.4;
       }
     }
 
-    // 2. Hollow Purple Fusion Gesture - Hands dynamically cup & merge Red (+Y) and Blue (-Y) orbs
-    else if (fighter.isChannelingPurple) {
-      const mergeProgress = typeof fighter.getPurpleChargeProgress === 'function' ? fighter.getPurpleChargeProgress() : 0;
-      const handDistance = fighter.r + 10;
-      const handSpread = 14 * (1 - mergeProgress);
+    const fHand = toGlobal(lx1, ly1);
+    const bHand = toGlobal(lx2, ly2);
 
-      // Right hand (front hand) holding Red Orb on +Y (Right side)
-      const rightRotX = Math.cos(fighter.gunAngle) * handDistance - Math.sin(fighter.gunAngle) * handSpread;
-      const rightRotY = Math.sin(fighter.gunAngle) * handDistance + Math.cos(fighter.gunAngle) * handSpread;
-      const frontHandX = fighter.x + rightRotX;
-      const frontHandY = basePosY + rightRotY;
-
-      // Left hand (back hand) holding Blue Orb on -Y (Left side)
-      const leftRotX = Math.cos(fighter.gunAngle) * handDistance - Math.sin(fighter.gunAngle) * (-handSpread);
-      const leftRotY = Math.sin(fighter.gunAngle) * handDistance + Math.cos(fighter.gunAngle) * (-handSpread);
-      backHandX = fighter.x + leftRotX;
-      backHandY = basePosY + leftRotY;
-
-      return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
-    }
-
-
-    // 4. Domain Expansion Hand Sign Gesture
-    else if (fighter.isChannelingDomainExpansion) {
-      const domainDist = fighter.r + 8;
-      const frontHandX = fighter.x + Math.cos(fighter.gunAngle) * domainDist - Math.sin(fighter.gunAngle) * 3;
-      const frontHandY = basePosY + Math.sin(fighter.gunAngle) * domainDist + Math.cos(fighter.gunAngle) * 3;
-
-      backHandX = fighter.x + Math.cos(fighter.gunAngle) * domainDist - Math.sin(fighter.gunAngle) * (-3);
-      backHandY = basePosY + Math.sin(fighter.gunAngle) * domainDist + Math.cos(fighter.gunAngle) * (-3);
-
-      return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
-    }
-
-    // Front hand (Right hand) default position
-    const frontAngle = fighter.gunAngle + frontAngleOffset;
-    let frontHandX = fighter.x + Math.cos(frontAngle) * (fighter.r + frontOffset);
-    let frontHandY = basePosY + Math.sin(frontAngle) * (fighter.r + frontOffset);
-
-    // Safety Clamp: Prevent hands from extending above the top boundary of body circle (-fighter.r + 6)
-    const maxTopY = basePosY - (fighter.r - 6);
-    if (frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
-      frontHandY = maxTopY;
-    }
-    if (backHandY < maxTopY && !fighter.isChannelingPurple && !fighter.isChannelingDomainExpansion) {
-      backHandY = maxTopY;
-    }
-
-    return { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand };
+    return { 
+      frontHandX: fHand.x, frontHandY: fHand.y, 
+      backHandX: bHand.x, backHandY: bHand.y, 
+      hideFrontHand, hideBackHand 
+    };
   }
 
   // Render hand Cursed Energy flame aura BEHIND physical body
@@ -940,6 +935,10 @@ export class GojoRenderer {
       backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
       backGlow.addColorStop(0.4, `rgba(180, 50, 255, ${0.4 * progress})`);
       backGlow.addColorStop(1, 'rgba(120, 0, 255, 0)');
+    } else if (colorTheme === 'pink') {
+      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
+      backGlow.addColorStop(0.4, `rgba(255, 50, 150, ${0.4 * progress})`);
+      backGlow.addColorStop(1, 'rgba(255, 0, 100, 0)');
     } else {
       backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Soft white core
       backGlow.addColorStop(0.35, `rgba(0, 212, 255, ${0.40 * progress})`); // Electric cyan bloom
@@ -968,6 +967,10 @@ export class GojoRenderer {
       mainColor = '#9900FF';
       fillColor = `rgba(153, 0, 255, ${0.72 * progress})`;
       coreColor = `rgba(204, 120, 255, ${0.85 * progress})`;
+    } else if (colorTheme === 'pink') {
+      mainColor = '#FF1493';
+      fillColor = `rgba(255, 20, 147, ${0.72 * progress})`;
+      coreColor = `rgba(255, 200, 220, ${0.85 * progress})`;
     }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 

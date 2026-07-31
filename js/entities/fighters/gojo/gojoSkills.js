@@ -95,7 +95,7 @@ export function detonateRed(fighter) {
         const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
         if (dist < redRange + f.r) {
           const angle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
-          f.takeDamage(redDamage, fighter, { isRed: true });
+          f.takeDamage(redDamage, fighter, { isRed: true, isAdaptableSkillShot: true, skillShotId: 'red' });
 
           const kbVx = Math.cos(angle) * redKnockback;
           const kbVy = Math.sin(angle) * redKnockback;

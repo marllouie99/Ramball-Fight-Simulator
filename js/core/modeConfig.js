@@ -24,7 +24,7 @@ export const MODE_SETTINGS = {
     label: 'Stand Off',
     rounds: 1, // Only 1 round in Stand Off
     hpMultiplier: 1.0,
-    fixedHp: 1500, // 1000 HP for both fighters
+    fixedHp: 1000, // 1000 HP for both fighters
     speedMultiplier: 1.5,
     initialFuelPickups: 2,
     supportFourFighters: false,
@@ -33,7 +33,7 @@ export const MODE_SETTINGS = {
     label: '1v2 Stand Off',
     rounds: 1,
     hpMultiplier: 1.0,
-    fixedHp: 1000, // For the duo
+    fixedHp: 1500, // For the duo
     soloFixedHp: 1500, // For the alone fighter
     speedMultiplier: 1.6,
     initialFuelPickups: 2,

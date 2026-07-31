@@ -16,8 +16,9 @@ import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
  * @param {number} count - Number of sparks to spawn
  * @param {string} type - 'crimson' for red/orange sparks, 'flash' for impact flash
  */
-export function spawnSparks(x, y, count = 8, type = 'crimson') {
-  ParticleSystem.spawn(x, y, count, type);
+export function spawnSparks(x, y, count = 8, type = 'crimson', customColor = null) {
+  const overrideProps = customColor ? { color: customColor } : {};
+  ParticleSystem.spawn(x, y, count, type, overrideProps);
 }
 
 /**
@@ -744,6 +745,25 @@ export function drawSparkEffects(layer = 'all') {
         
         ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'mahoragaShoutShockwave') {
+        // Expanding golden & silver roar shockwave ring
+        if (effect.targetSize) {
+          effect.size += (effect.targetSize - effect.size) * 0.16;
+        }
+        
+        // 1. Golden Outer Glow Ring
+        ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.85})`;
+        ctx.lineWidth = 7 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 2. Silver Contrast Ring
+        ctx.strokeStyle = `rgba(224, 232, 255, ${effect.life * 0.9})`;
+        ctx.lineWidth = 3 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
+        ctx.stroke();
       } else if (effect.type === 'rikaRoarShockwave') {
         // Expanding hot-pink & dark ink cursed roar shockwave ring
         if (effect.targetSize) {
@@ -1021,17 +1041,53 @@ export function drawSparkEffects(layer = 'all') {
       const isYutaClash = (effect.clashType === 'yuta');
       const isTojiClash = (effect.clashType === 'toji');
       const isMahoragaClash = (effect.clashType === 'mahoraga');
+      const isTodoClap = (effect.clashType === 'todo');
 
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : (isTojiClash ? `rgba(20, 22, 25, ${effect.life * 0.5})` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`));
+      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : (isTojiClash ? `rgba(20, 22, 25, ${effect.life * 0.5})` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`)));
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.globalCompositeOperation = 'lighter';
 
-      if (isMahoragaClash) {
+      if (isTodoClap) {
+        // ── AOI TODO BOOGIE WOOGIE CLAP SHOCKWAVE ──
+        // 1. Outer Electric Cyan Cursed Energy Ring
+        ctx.strokeStyle = `rgba(0, 240, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 10 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 1.1, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 2. Vivid Electric Blue Second Ring
+        ctx.strokeStyle = `rgba(0, 150, 255, ${effect.life * 0.90})`;
+        ctx.lineWidth = 6 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 3. Inner White-Hot Clap Pressure Core
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.40, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // 4. Radiant Cursed Energy Rays radiating from clap center
+        ctx.strokeStyle = `rgba(0, 240, 255, ${effect.life * 0.85})`;
+        ctx.lineWidth = 2.5 * effect.life;
+        for (let i = 0; i < 6; i++) {
+          const rayAngle = (Math.PI / 3) * i;
+          const r1 = effect.size * 0.3;
+          const r2 = effect.size * 1.2;
+          ctx.beginPath();
+          ctx.moveTo(effect.x + Math.cos(rayAngle) * r1, effect.y + Math.sin(rayAngle) * r1);
+          ctx.lineTo(effect.x + Math.cos(rayAngle) * r2, effect.y + Math.sin(rayAngle) * r2);
+          ctx.stroke();
+        }
+      } else if (isMahoragaClash) {
         // ── MAHORAGA DIVINE TELEPORT / IMPACT GROUND SHOCKWAVE ──
         // Outer Golden Divine Aura Ring
         ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
@@ -1169,6 +1225,40 @@ export function drawSparkEffects(layer = 'all') {
       }
 
       ctx.globalCompositeOperation = 'source-over';
+    } else if (effect.type === 'mahoragaShoutShockwave') {
+      // Expanding golden & silver roar shockwave ring
+      effect.size += (effect.targetSize - effect.size) * 0.18;
+      
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.shadowBlur = 25 * effect.life;
+      ctx.shadowColor = 'rgba(255, 215, 0, 1)';
+
+      // Outer glowing golden shockwave ring
+      ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
+      ctx.lineWidth = 12 * effect.life;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Middle silver contrast ring
+      ctx.strokeStyle = `rgba(224, 232, 255, ${effect.life * 0.8})`;
+      ctx.lineWidth = 6 * effect.life;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Inner white-hot core ring
+      ctx.shadowColor = 'rgba(255, 255, 255, 1)';
+      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+      ctx.lineWidth = 4 * effect.life;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.shadowBlur = 0;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.restore();
     } else if (effect.type === 'rikaRoarShockwave') {
       // Expanding dark purple & hot pink cursed energy roar shockwave ring
       effect.size += (effect.targetSize - effect.size) * 0.18;
@@ -1203,6 +1293,132 @@ export function drawSparkEffects(layer = 'all') {
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
+    } else if (effect.type === 'animeImpactFrame') {
+      // ── SPIKY CRESCENT IMPACT (Chopped in 8 Pieces + Action Lines) ──
+      ctx.save();
+      // Explicitly clear shadows to prevent circular black shadows from rendering
+      ctx.shadowColor = 'transparent';
+      ctx.shadowBlur = 0;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 0;
+      
+      ctx.translate(effect.x, effect.y);
+      // hitAngle + PI: concave opening faces BACK toward attacker, spiky outer arc faces punch direction
+      ctx.rotate((effect.hitAngle || 0) + Math.PI);
+
+      const alpha = effect.life;
+      const R = effect.size;
+
+      ctx.globalCompositeOperation = 'source-over';
+
+      const outerR = R * 1.12;
+      const innerR = R * 0.84;        // slim band
+      const halfArc = Math.PI * 0.72; // ±130° → 260° total arc
+      const totalArc = halfArc * 2;   // 260° arc span
+
+      // ── 8 SLIM CHOPPED CRESCENT PIECES (DIFFERENT LENGTHS & WIDE GAPS) ──
+      const segments = [
+        { t0: 0.00, t1: 0.09, maxSpike: 1.12 },
+        { t0: 0.14, t1: 0.25, maxSpike: 1.30 },
+        { t0: 0.29, t1: 0.44, maxSpike: 1.38 },
+        { t0: 0.48, t1: 0.56, maxSpike: 1.15 },
+        { t0: 0.60, t1: 0.72, maxSpike: 1.32 },
+        { t0: 0.76, t1: 0.84, maxSpike: 1.20 },
+        { t0: 0.88, t1: 0.94, maxSpike: 1.25 },
+        { t0: 0.97, t1: 0.99, maxSpike: 1.10 },
+      ];
+
+      // Draw radial speed/action lines projecting outward
+      const isGold = (effect.color === 'gold');
+      const isBlackPink = (effect.color === 'blackpink');
+      const lineCount = 14;
+      ctx.lineWidth = 1.8;
+      for (let i = 0; i < lineCount; i++) {
+        const a = -halfArc + (i / (lineCount - 1)) * totalArc + (Math.sin(i * 1.7) * 0.06);
+        const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
+        const startRad = innerR * 0.85;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(a) * startRad, Math.sin(a) * startRad);
+        ctx.lineTo(Math.cos(a) * (startRad + len), Math.sin(a) * (startRad + len));
+        
+        // Alternating colors based on theme
+        if (isGold) {
+          ctx.strokeStyle = (i % 3 === 0) ? `rgba(0, 0, 0, ${alpha * 0.95})` : `rgba(255, 215, 0, ${alpha * 0.95})`;
+        } else if (isBlackPink) {
+          ctx.strokeStyle = (i % 3 === 0) ? `rgba(15, 10, 15, ${alpha * 0.95})` : `rgba(255, 20, 147, ${alpha * 0.95})`; // black and hot pink
+        } else {
+          ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.9})`;
+        }
+        ctx.stroke();
+      }
+
+      for (let sIdx = 0; sIdx < segments.length; sIdx++) {
+        const seg = segments[sIdx];
+        const segN = 10;
+
+        // Draw main colored segment
+        if (isGold) {
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 0, 0, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 200, 0, ${Math.min(1.0, alpha * 1.25)})`;
+        } else if (isBlackPink) {
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(15, 10, 15, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 20, 147, ${Math.min(1.0, alpha * 1.25)})`;
+        } else {
+          ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1.0, alpha * 1.25)})`;
+        }
+        ctx.beginPath();
+
+        for (let i = 0; i <= segN; i++) {
+          const localT = i / segN;
+          const globalT = seg.t0 + localT * (seg.t1 - seg.t0);
+          const a = -halfArc + globalT * totalArc;
+
+          let r;
+          if (i === 0 || i === segN) {
+            r = outerR * 0.80; // sharp tapered tips at piece edges
+          } else if (i === Math.round(segN * 0.5)) {
+            r = outerR * seg.maxSpike; // peak spike of segment
+          } else {
+            const tooth = (i % 2 === 0) ? 0.88 : 1.06;
+            r = outerR * tooth;
+          }
+
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+
+          if (i === 0) ctx.moveTo(px, py);
+          else         ctx.lineTo(px, py);
+        }
+
+        const aStart = -halfArc + seg.t0 * totalArc;
+        const aEnd   = -halfArc + seg.t1 * totalArc;
+
+        ctx.arc(0, 0, innerR, aEnd, aStart, true);
+        ctx.closePath();
+        ctx.fill();
+
+        // Draw a secondary thin outer stroke line accent on each segment
+        if (isGold) {
+          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 215, 0, ${Math.min(1.0, alpha * 0.8)})` : `rgba(0, 0, 0, ${Math.min(1.0, alpha * 0.85)})`;
+        } else if (isBlackPink) {
+          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 20, 147, ${Math.min(1.0, alpha * 0.8)})` : `rgba(15, 10, 15, ${Math.min(1.0, alpha * 0.85)})`;
+        } else {
+          ctx.strokeStyle = `rgba(0, 0, 0, ${Math.min(1.0, alpha * 0.75)})`;
+        }
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        for (let i = 0; i <= segN; i++) {
+          const localT = i / segN;
+          const globalT = seg.t0 + localT * (seg.t1 - seg.t0);
+          const a = -halfArc + globalT * totalArc;
+          const r = outerR * (seg.maxSpike * 1.06) * (1.0 + (i % 2 === 0 ? 0.025 : -0.025));
+          const px = Math.cos(a) * r;
+          const py = Math.sin(a) * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else         ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+      }
+
+      ctx.restore();
     } else {
       // Standard spark - small glowing dot with gradient
       const gradient = ctx.createRadialGradient(
@@ -1224,7 +1440,6 @@ export function drawSparkEffects(layer = 'all') {
 
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-      ctx.fillStyle = gradient;
       ctx.fill();
     }
 
@@ -1268,6 +1483,23 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   state.sparkEffects.push(shockwave);
 }
 
+export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, color = 'black') {
+  const shockwave = ParticleSystem.getParticle();
+  shockwave.x = x;
+  shockwave.y = y;
+  shockwave.vx = 0;
+  shockwave.vy = 0;
+  shockwave.size = radius; // start at full size
+  shockwave.targetSize = radius;
+  shockwave.life = 1.0;
+  shockwave.decay = 0.055; // ~18 frames of high-visibility sakuga impact
+  shockwave.type = 'animeImpactFrame';
+  shockwave.hitAngle = hitAngle;
+  shockwave.color = color;
+
+  state.sparkEffects.push(shockwave);
+}
+
 /**
  * Spawns an expanding dark purple/pink cursed energy roar shockwave ring for Rika.
  * @param {number} x - X position
@@ -1298,4 +1530,94 @@ export function spawnRikaRoarShockwave(x, y, radius = 180) {
   shockwave.color = 'pinkCurse';
 
   state.sparkEffects.push(shockwave);
+}
+
+/**
+ * Spawns an expanding golden/silver roar shockwave ring for Mahoraga's Divine Shout.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} radius - Target radius of shockwave
+ */
+export function spawnMahoragaShoutShockwave(x, y, radius = 180) {
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const fps = state.fps || 60;
+  const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
+
+  if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
+    const oldest = state.sparkEffects.shift();
+    if (oldest) ParticleSystem.returnParticle(oldest);
+  }
+
+  const shockwave = ParticleSystem.getParticle();
+  shockwave.x = x;
+  shockwave.y = y;
+  shockwave.vx = 0;
+  shockwave.vy = 0;
+  shockwave.size = 12;
+  shockwave.targetSize = radius;
+  shockwave.life = 1.0;
+  shockwave.decay = 0.035; // lasts ~28 frames
+  shockwave.type = 'mahoragaShoutShockwave';
+  shockwave.isFlash = true;
+  shockwave.color = 'gold';
+
+  state.sparkEffects.push(shockwave);
+}
+
+/**
+ * Spawns a massive concentric gold/silver shockwave & outward spark blast for Mahoraga's Divine Shout.
+ * @param {number} x - X position
+ * @param {number} y - Y position
+ * @param {number} radius - Target radius of shockwave
+ */
+export function spawnMahoragaShoutBurst(x, y, radius = 180) {
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const fps = state.fps || 60;
+  const MAX_PARTICLES = isMulti ? (fps < 45 ? 100 : 250) : 400;
+
+  // Concentric Shockwave 1 (Outer Gold)
+  spawnMahoragaShoutShockwave(x, y, radius);
+
+  // Concentric Shockwave 2 (Medium Gold, Faster decay)
+  const sw2 = ParticleSystem.getParticle();
+  sw2.x = x; sw2.y = y; sw2.vx = 0; sw2.vy = 0;
+  sw2.size = 15; sw2.targetSize = radius * 0.75;
+  sw2.life = 1.0; sw2.decay = 0.045;
+  sw2.type = 'mahoragaShoutShockwave';
+  sw2.isFlash = true; sw2.color = 'gold';
+  state.sparkEffects.push(sw2);
+
+  // Concentric Shockwave 3 (Inner Silver, Fastest decay)
+  const sw3 = ParticleSystem.getParticle();
+  sw3.x = x; sw3.y = y; sw3.vx = 0; sw3.vy = 0;
+  sw3.size = 25; sw3.targetSize = radius * 0.50;
+  sw3.life = 1.0; sw3.decay = 0.055;
+  sw3.type = 'mahoragaShoutShockwave';
+  sw3.isFlash = true; sw3.color = 'silver';
+  state.sparkEffects.push(sw3);
+
+  // Outward exploding sparks
+  for (let i = 0; i < 30; i++) {
+    if (state.sparkEffects.length >= MAX_PARTICLES) {
+      const oldest = state.sparkEffects.shift();
+      if (oldest) ParticleSystem.returnParticle(oldest);
+    }
+
+    const angle = (i / 30) * Math.PI * 2 + (Math.random() - 0.5) * 0.15;
+    const speed = 5 + Math.random() * 9;
+
+    const spark = ParticleSystem.getParticle();
+    spark.x = x + Math.cos(angle) * 15;
+    spark.y = y + Math.sin(angle) * 15;
+    spark.vx = Math.cos(angle) * speed;
+    spark.vy = Math.sin(angle) * speed;
+    spark.size = 2 + Math.random() * 3;
+    spark.life = 1.0;
+    spark.decay = 0.02 + Math.random() * 0.02; // lasts ~25-50 frames
+    spark.friction = 0.93;
+    spark.type = 'silver';
+    spark.color = Math.random() < 0.70 ? '#FFD700' : '#E8F5FF';
+
+    state.sparkEffects.push(spark);
+  }
 }

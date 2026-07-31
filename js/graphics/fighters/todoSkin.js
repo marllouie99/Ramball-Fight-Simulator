@@ -1,27 +1,83 @@
 import { getHandSize } from '../../core/config.js';
+import { GojoRenderer } from './gojoRenderer.js';
 
 /**
  * Visual Skin Renderer for Aoi Todo (Boogie Woogie Brawler)
  */
 export function drawTodoSkin(ctx, fighter) {
+  // 1. Draw afterimages (Zone trails) at their absolute coordinates
+  if (fighter.afterImages && fighter.afterImages.length > 0) {
+    ctx.save();
+    for (let i = 0; i < fighter.afterImages.length; i++) {
+      const ai = fighter.afterImages[i];
+      if (ai.timer <= 0) continue;
+      const progress = ai.timer / ai.maxTimer;
+      const alpha = progress * 0.35; // Soft trail opacity
+
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      ctx.translate(ai.x, ai.y);
+      ctx.rotate(ai.angle);
+
+      // Flip vertically if facing left
+      if (Math.abs(ai.angle) > Math.PI / 2) {
+        ctx.scale(1, -1);
+      }
+
+      // Draw Todo afterimage body circle (deep gold/bronze theme silhouette)
+      ctx.beginPath();
+      ctx.arc(0, 0, ai.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(210, 105, 30, 0.4)'; // Todo's chocolate theme silhouette
+      ctx.fill();
+
+      // Add a soft red glow outline
+      ctx.strokeStyle = 'rgba(230, 0, 30, 0.5)';
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
+
+      ctx.restore();
+    }
+    ctx.restore();
+  }
+
   const r = fighter.r;
-  const skinColor = (fighter.color && fighter.color !== '#1A1A2E' && fighter.color !== '#8D5524') ? fighter.color : '#D89B77'; // Natural human skin brown
+  const skinColor = '#EBBF9E'; // Naked Tone skin base
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(fighter.gunAngle + Math.PI / 2);
+  
+  // Draw Cursed Energy body aura if opacity > 0 or on victory screen
+  const auraOpacity = (fighter && fighter._isWinnerReveal) ? 1.0 : (fighter.combatAuraOpacity || 0);
+  if (auraOpacity > 0.01) {
+    ctx.save();
+    ctx.globalAlpha = auraOpacity;
+    drawTodoCursedEnergyAura(ctx, fighter);
+    ctx.restore();
+  }
+  
+  // Keep body statically facing the camera (upright, like Gojo & Yuji)
+  ctx.rotate(Math.PI / 2);
 
-  // 1. Natural Human Skin Brown Body Base
+  // 1a. Naked Tone Skin Base (#EBBF9E)
   ctx.fillStyle = skinColor;
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
+
+  // 1b. Dark Navy Blue Hakama Pants (#223148) at bottom/feet
+  ctx.fillStyle = '#223148';
+  ctx.beginPath();
+  ctx.arc(0, 0, r, -Math.PI * 0.25, Math.PI * 0.25);
+  ctx.fill();
+
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 2.5;
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 2. Spiky Hair & Topknot (Man-Bun) - Large and prominent on top edge
-  ctx.fillStyle = '#181820'; // Dark hair base
+  // 2. Pure Black Spiky Hair & Topknot Man-Bun (#0A0A0A)
+  ctx.fillStyle = '#0A0A0A'; // Pure Black Hair
   // Spiky hair tufts along top curve of head
   ctx.beginPath();
   ctx.arc(-r * 0.70, 0, r * 0.55, Math.PI * 0.45, Math.PI * 1.55);
@@ -35,13 +91,13 @@ export function drawTodoSkin(ctx, fighter) {
   ctx.lineWidth = 1.8;
   ctx.stroke();
 
-  // Topknot Gold/Yellow hair tie band (larger)
-  ctx.fillStyle = '#D4AF37';
+  // Topknot White hair tie band (#F3F3F3)
+  ctx.fillStyle = '#F3F3F3';
   ctx.fillRect(-r * 0.85, -r * 0.20, 5, r * 0.40);
 
-  // 3. Authentic Anime Facial Burn Scar (Multi-stepped patch matching reference image)
+  // 3. Authentic Anime Facial Burn Scar (#CA9688)
   ctx.save();
-  ctx.fillStyle = '#83472C'; // Burned skin tissue brown-red
+  ctx.fillStyle = '#CA9688'; // Warm Dusty Rose Burn Scar tissue
   ctx.beginPath();
   // Wide top edge along hair line
   ctx.moveTo(-r * 0.48, -r * 0.52);
@@ -64,13 +120,13 @@ export function drawTodoSkin(ctx, fighter) {
   ctx.closePath();
   ctx.fill();
 
-  // Dark border outline around burn scar
-  ctx.strokeStyle = '#4D2413';
+  // Contour outline around burn scar (#966054)
+  ctx.strokeStyle = '#966054';
   ctx.lineWidth = 1.2;
   ctx.stroke();
 
-  // Horizontal skin crease lines across burn scar (matching reference image)
-  ctx.strokeStyle = 'rgba(60, 25, 10, 0.55)';
+  // Horizontal skin crease lines across burn scar
+  ctx.strokeStyle = 'rgba(150, 96, 84, 0.6)';
   ctx.lineWidth = 1.0;
   const creasePositions = [-0.40, -0.25, -0.10, 0.05, 0.20, 0.35, 0.50, 0.62];
   for (let posX of creasePositions) {
@@ -83,8 +139,8 @@ export function drawTodoSkin(ctx, fighter) {
 
   ctx.restore();
 
-  // 4. Martial Artist Eyebrows & Eyes
-  ctx.fillStyle = '#0F0F14';
+  // 4. Martial Artist Eyebrows & Eyes (#223148 / #F3F3F3)
+  ctx.fillStyle = '#141B26';
   // Right Eyebrow & Eye
   ctx.beginPath();
   ctx.moveTo(r * 0.3, r * 0.25);
@@ -99,9 +155,17 @@ export function drawTodoSkin(ctx, fighter) {
   ctx.lineTo(r * 0.35, -r * 0.35);
   ctx.fill();
 
-  // 5. "Black Flash Window" / Just Swapped Aura
-  if (fighter.justSwappedTimer > 0) {
-    const alpha = fighter.justSwappedTimer / 45;
+  // Eye highlights (#F3F3F3)
+  ctx.fillStyle = '#F3F3F3';
+  ctx.beginPath();
+  ctx.arc(r * 0.42, r * 0.24, 1.2, 0, Math.PI * 2);
+  ctx.arc(r * 0.42, -r * 0.24, 1.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 5. "Black Flash Window" / Just Swapped Aura (incorporates lingering visual glow)
+  const bfVal = fighter ? Math.max(fighter.justSwappedTimer || 0, fighter.blackFlashGlowTimer || 0) : 0;
+  if (bfVal > 0) {
+    const alpha = bfVal / 45;
     ctx.strokeStyle = `rgba(180, 0, 0, ${alpha})`;
     ctx.lineWidth = 3.5;
     ctx.beginPath();
@@ -119,7 +183,7 @@ export function drawTodoSkin(ctx, fighter) {
 
   ctx.restore();
 
-  // 7. Draw Hands (Recolored plain brown hands matching skin tone)
+  // 7. Draw Hands (Recolored hands matching #EBBF9E skin tone)
   drawTodoHands(ctx, fighter, skinColor);
 
   // 8. Draw Cursed Rocks
@@ -128,14 +192,19 @@ export function drawTodoSkin(ctx, fighter) {
 
 function drawTodoHands(ctx, fighter, skinColor) {
   const isPunching = fighter.punchAnimTimer > 0;
-  const isClapping = fighter.boogieWoogieCooldown > fighter.boogieWoogieCooldownMax - 10;
+  const isClapping = (fighter.clapAnimTimer || 0) > 0;
 
   const handRadius = getHandSize(7.5);
   const r = fighter.r;
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
-  ctx.rotate(fighter.gunAngle + Math.PI / 2); // Side-profile rotation (same as body)
+  
+  // Force hands to point straight down (0 angle relative to body) on Champion Screen
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  ctx.rotate(angle);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
 
   // Smooth progress calculation matching Mahoraga's cubic ease-in-out curve
   let rawProgress = 0;
@@ -150,69 +219,165 @@ function drawTodoHands(ctx, fighter, skinColor) {
     
   const lungeExtension = Math.sin(smoothProgress * Math.PI) * 32; // Dynamic punch lunge forward
 
-  // In this rotated space: +X = forward (toward enemy), Y = left/right sides
-  // Side-profile stance: hands on opposite sides of body, aligned
-  let frontHandX = r * 0.35;     // Slightly forward
-  let frontHandY = r * 0.85;     // Right side of body
+  // In this Front POV frame: +X is towards enemy, +Y is towards camera
+  // Right shoulder is at -X, Left shoulder is at +X
+  let frontHandX = -r * 0.55;    // Right Arm (further from enemy)
+  let frontHandY = r * 0.35;     // Slightly forward to camera
+  
+  let backHandX = r * 0.55;      // Left Arm (closer to enemy)
+  let backHandY = r * 0.35;      // Slightly forward to camera
 
-  let backHandX = r * 0.35;      // Slightly forward
-  let backHandY = -r * 0.85;     // Left side of body
-
-  // Handle punch animations (lunge toward enemy = extend along +X axis)
+  // Handle punch animations (extend along +X axis towards enemy)
   if (isPunching) {
     if (fighter.isRightPunch) {
-      frontHandX += lungeExtension;   // Front hand lunges forward toward enemy
-      frontHandY *= 0.4;              // Move toward center as fist extends
+      // Right arm starts behind and FLIES OVER the body to reach the enemy!
+      frontHandX += lungeExtension * 2.2; 
+      frontHandY *= 0.4;
     } else {
-      backHandX += lungeExtension;    // Back hand cross-punches forward
-      backHandY *= 0.4;               // Move toward center as fist extends
+      // Left arm punches forward normally
+      backHandX += lungeExtension * 1.2;
+      backHandY *= 0.4;
     }
   }
 
-  // Clapping animation override (Boogie Woogie swap trigger)
+  // Clapping animation override (Buttery smooth 3-phase clap curve: Windup -> Collision -> Retraction)
   if (isClapping) {
-    frontHandX = 4;
-    frontHandY = -(r + 6);
-    backHandX = -4;
-    backHandY = -(r + 6);
+    const timer = fighter.clapAnimTimer || 0;
+    const maxT = 20;
+    const progress = Math.min(1.0, Math.max(0.0, 1.0 - (timer / maxT))); // 0 -> 1 over 20 frames
+
+    const restFX = -r * 0.55;
+    const restFY = r * 0.35;
+    const restBX = r * 0.55;
+    const restBY = r * 0.35;
+
+    const clapTargetX = 2.5;
+    const clapTargetY = r + 14;
+
+    if (progress < 0.35) {
+      // Phase 1: Smooth Windup (hands swing out in an arc and accelerate together to center)
+      const p1 = progress / 0.35;
+      const easeP1 = p1 * p1; // Smooth acceleration
+      frontHandX = restFX + ((-clapTargetX) - restFX) * easeP1;
+      frontHandY = restFY + (clapTargetY - restFY) * easeP1;
+      backHandX = restBX + (clapTargetX - restBX) * easeP1;
+      backHandY = restBY + (clapTargetY - restBY) * easeP1;
+    } else if (progress < 0.55) {
+      // Phase 2: Collision & Recoil (hands meet at center with subtle elastic vibration)
+      const p2 = (progress - 0.35) / 0.20;
+      const recoil = Math.sin(p2 * Math.PI) * 2.5;
+      frontHandX = -clapTargetX - recoil * 0.5;
+      frontHandY = clapTargetY + recoil * 0.3;
+      backHandX = clapTargetX + recoil * 0.5;
+      backHandY = clapTargetY + recoil * 0.3;
+    } else {
+      // Phase 3: Smooth Retraction (hands smoothly open back up to resting guard stance)
+      const p3 = (progress - 0.55) / 0.45;
+      const easeP3 = 1 - Math.pow(1 - p3, 2); // Smooth deceleration ease-out
+      frontHandX = (-clapTargetX) + (restFX - (-clapTargetX)) * easeP3;
+      frontHandY = clapTargetY + (restFY - clapTargetY) * easeP3;
+      backHandX = clapTargetX + (restBX - clapTargetX) * easeP3;
+      backHandY = clapTargetY + (restBY - clapTargetY) * easeP3;
+    }
   }
 
   // Draw both hands (ALWAYS visible in side-profile guard stance)
-  drawHandFist(ctx, backHandX, backHandY, handRadius, skinColor);
-  drawHandFist(ctx, frontHandX, frontHandY, handRadius, skinColor);
+  drawHandFist(ctx, backHandX, backHandY, handRadius, skinColor, fighter);
+  drawHandFist(ctx, frontHandX, frontHandY, handRadius, skinColor, fighter);
 
-  // Clap shockwave visual
-  if (isClapping) {
-    ctx.strokeStyle = '#FFFFFF';
+  // Clap shockwave visual (bursts outward at exact moment of hand collision at progress = 0.35 / frame 13!)
+  if (isClapping && (fighter.clapAnimTimer || 0) <= 13) {
+    const shockProgress = (13 - (fighter.clapAnimTimer || 0)) / 13;
+    const shockAlpha = Math.max(0, 1 - shockProgress);
+    const shockRadius = 8 + shockProgress * 24;
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${shockAlpha})`;
     ctx.lineWidth = 2.5;
     ctx.beginPath();
-    ctx.arc(0, -(r + 8), 16, 0, Math.PI * 2);
+    ctx.arc(0, r + 14, shockRadius, 0, Math.PI * 2);
     ctx.stroke();
 
-    ctx.strokeStyle = '#4DA3FF';
+    ctx.strokeStyle = `rgba(77, 163, 255, ${shockAlpha * 0.85})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.arc(0, -(r + 8), 22, 0, Math.PI * 2);
+    ctx.arc(0, r + 14, shockRadius + 6, 0, Math.PI * 2);
     ctx.stroke();
   }
 
   ctx.restore();
 }
 
-/** Draws a brawler fist matching skin color */
-function drawHandFist(ctx, x, y, radius, skinColor) {
+/** Draws a brawler fist matching skin color (#EBBF9E) with optional Cursed Energy glow */
+function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   ctx.save();
+  
+  const inBFState = (fighter && (fighter.justSwappedTimer > 0 || fighter.blackFlashGlowTimer > 0));
+  const bfVal = fighter ? Math.max(fighter.justSwappedTimer || 0, fighter.blackFlashGlowTimer || 0) : 0;
+  const alpha = bfVal / 45;
 
-  // Fist base - matching human skin brown color
-  ctx.fillStyle = (skinColor && skinColor !== '#1A1A2E' && skinColor !== '#8D5524') ? skinColor : '#D89B77';
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
+  // 1. CE glow around fist — standard blue or Black Flash zone crimson/black theme
+  const opacity = (fighter && fighter._isWinnerReveal) ? 1.0 : ((fighter && fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 0.0);
+  const glow = Math.max(opacity, inBFState ? alpha : 0);
 
-  // Solid black fist outline
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  if (glow > 0.01) {
+    const fistCeGrad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 1.75);
+    
+    if (inBFState) {
+      // Crimson Zone Glow: Lilac-white core -> Deep Crimson red -> Stark Black edge
+      fistCeGrad.addColorStop(0,    `rgba(243, 232, 255, ${0.95 * alpha})`);
+      fistCeGrad.addColorStop(0.35, `rgba(179, 0, 0, ${0.85 * alpha})`);
+      fistCeGrad.addColorStop(0.75, `rgba(0, 0, 0, ${0.75 * alpha})`);
+      fistCeGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+    } else {
+      fistCeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85 * glow})`);
+      fistCeGrad.addColorStop(0.35, `rgba(0, 235, 255, ${0.70 * glow})`);
+      fistCeGrad.addColorStop(0.75, `rgba(0, 140, 255, ${0.35 * glow})`);
+      fistCeGrad.addColorStop(1.0, 'rgba(0, 80, 255, 0)');
+    }
+
+    ctx.fillStyle = fistCeGrad;
+    ctx.beginPath();
+    ctx.arc(x, y, radius * 1.75, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 2. Fist body
+  if (inBFState) {
+    ctx.save();
+    // Inner blooming gradient inside the hand itself
+    const innerGrad = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius);
+    innerGrad.addColorStop(0,   `rgba(255, 230, 235, ${0.7 * alpha})`);  // hot white core
+    innerGrad.addColorStop(0.5, `rgba(230, 0, 30, ${0.45 * alpha})`);   // bright blooming crimson
+    innerGrad.addColorStop(1,   `rgba(120, 0, 10, ${0.15 * alpha})`);     // transparent deep crimson edge
+    ctx.fillStyle = innerGrad;
+
+    // Glowing bloom shadow (shadowBlur) on the fill itself!
+    ctx.shadowColor = '#FF0000';
+    ctx.shadowBlur = 14;
+
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  } else {
+    ctx.fillStyle = '#EBBF9E';
+    ctx.beginPath();
+    ctx.arc(x, y, radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // 3. Solid black fist outline (or glowing crimson if in BF state)
+  if (inBFState) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(230, 0, 30, ${0.65 * alpha})`;
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+    ctx.restore();
+  } else {
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
 
   ctx.restore();
 }
@@ -221,17 +386,136 @@ function drawCursedRocks(ctx, fighter) {
   if (!fighter.cursedRocks || fighter.cursedRocks.length === 0) return;
 
   for (let rock of fighter.cursedRocks) {
-    ctx.fillStyle = '#555'; // Grey rock
+    const isTargetOfClap = rock.hasTriggeredTeleport || 
+      (fighter.pendingSwapData && (fighter.pendingSwapData.rock === rock || fighter.pendingSwapData.swapTarget === rock));
+
+    let ceSurgeAlpha = 0.0; // Idle rock has NO CE aura displayed!
+    let rockAuraRadius = rock.radius * 1.35; // Balanced aura size relative to rock radius
+
+    if (isTargetOfClap && (fighter.clapAnimTimer || 0) > 0) {
+      const animTimer = fighter.clapAnimTimer || 0;
+      const windupTimer = fighter.clapWindupTimer || 0;
+
+      if (windupTimer > 0) {
+        // Phase 1: Smooth Fade-In (0.0 -> 1.0) as hands swing together
+        const progressIn = Math.min(1.0, Math.max(0.0, (20 - animTimer) / 7.0));
+        ceSurgeAlpha = Math.pow(progressIn, 1.5);
+      } else {
+        // Phase 2: Smooth Fade-Out (1.0 -> 0.0) as hands retract after clap impact
+        const progressOut = Math.min(1.0, Math.max(0.0, animTimer / 13.0));
+        ceSurgeAlpha = Math.pow(progressOut, 1.2);
+      }
+
+      rockAuraRadius = rock.radius * (1.1 + ceSurgeAlpha * 0.4); // Dynamic aura radius matching intensity
+    }
+
+    // 1. Render EXACT JJK Cursed Energy Sakuga Aura BEHIND rock (Smooth Fade-In -> Peak -> Smooth Fade-Out)
+    if (ceSurgeAlpha > 0.01) {
+      const rockFighter = {
+        x: rock.x,
+        y: rock.y,
+        r: rockAuraRadius,
+        combatAuraOpacity: ceSurgeAlpha
+      };
+      GojoRenderer._drawJJKCursedEnergyAura(ctx, rockFighter, 'blue', rock.x, rock.y, rockAuraRadius);
+    }
+
+    // 2. Base Grey Rock Body
+    ctx.save();
+    ctx.fillStyle = '#555';
     ctx.beginPath();
     ctx.arc(rock.x, rock.y, rock.radius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Cursed energy glow around rock
-    ctx.strokeStyle = 'rgba(77, 163, 255, 0.8)'; // Blue Cursed Energy
-    ctx.lineWidth = 2;
+    // Solid Black Rock Outline
+    ctx.strokeStyle = '#111';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+/**
+ * Render JJK Cursed Energy Cyan Flame Aura surrounding Todo's body
+ */
+function drawTodoCursedEnergyAura(ctx, fighter) {
+  const r = fighter.r;
+  const time = Date.now();
+
+  ctx.save();
+
+  // 1. Outer Radial Glow Bloom (Deep Cyan & Electric Blue)
+  const outerRadius = r * 1.85;
+  const glowGrad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, outerRadius);
+  glowGrad.addColorStop(0, 'rgba(0, 240, 255, 0.50)');
+  glowGrad.addColorStop(0.35, 'rgba(0, 175, 255, 0.35)');
+  glowGrad.addColorStop(0.70, 'rgba(0, 100, 255, 0.18)');
+  glowGrad.addColorStop(1.0, 'rgba(0, 40, 180, 0)');
+
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Animated JJK Flame Tendrils (Rising & Waving Cyan CE Flames around Todo's body)
+  const flameCount = 7;
+  for (let i = 0; i < flameCount; i++) {
+    const baseAngle = (Math.PI * 2 / flameCount) * i;
+    const rotation = time * 0.003;
+    const angle = baseAngle + rotation;
+
+    ctx.save();
+    ctx.rotate(angle);
+
+    const flameLength = r * (0.75 + Math.sin(time * 0.01 + i * 1.2) * 0.25);
+    const flameWidth = r * 0.32;
+
+    const flameGrad = ctx.createLinearGradient(r * 0.7, 0, r * 0.7 + flameLength, 0);
+    flameGrad.addColorStop(0, 'rgba(0, 240, 255, 0.85)');
+    flameGrad.addColorStop(0.4, 'rgba(0, 160, 255, 0.65)');
+    flameGrad.addColorStop(0.8, 'rgba(0, 90, 255, 0.28)');
+    flameGrad.addColorStop(1, 'rgba(0, 40, 180, 0)');
+
     ctx.beginPath();
-    ctx.arc(rock.x, rock.y, rock.radius + 2, 0, Math.PI * 2);
+    ctx.moveTo(r * 0.7, 0);
+
+    const segments = 8;
+    for (let j = 0; j <= segments; j++) {
+      const t = j / segments;
+      const x = r * 0.7 + flameLength * t;
+      const waveOffset = Math.sin(time * 0.015 + j * 0.6 + i * 0.9) * flameWidth * (1 - t * 0.4);
+      const width = flameWidth * (1 - t * 0.6);
+      ctx.lineTo(x, waveOffset - width * 0.5);
+    }
+
+    for (let j = segments; j >= 0; j--) {
+      const t = j / segments;
+      const x = r * 0.7 + flameLength * t;
+      const waveOffset = Math.sin(time * 0.015 + j * 0.6 + i * 0.9) * flameWidth * (1 - t * 0.4);
+      const width = flameWidth * (1 - t * 0.6);
+      ctx.lineTo(x, waveOffset + width * 0.5);
+    }
+
+    ctx.fillStyle = flameGrad;
+    ctx.fill();
+    ctx.restore();
+  }
+
+  // 3. Electric Cursed Energy Arcs / Rays
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
+  ctx.lineWidth = 1.8;
+  for (let i = 0; i < 4; i++) {
+    const sparkAngle = (Math.PI / 2) * i + (time * 0.007);
+    const startR = r * 1.0;
+    const endR = r * (1.3 + Math.sin(time * 0.01 + i) * 0.2);
+
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(sparkAngle) * startR, Math.sin(sparkAngle) * startR);
+    ctx.lineTo(Math.cos(sparkAngle) * endR, Math.sin(sparkAngle) * endR);
     ctx.stroke();
   }
+
+  ctx.restore();
 }
 

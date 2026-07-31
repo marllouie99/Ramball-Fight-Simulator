@@ -1334,7 +1334,10 @@ export class YutaFighter extends Fighter {
 
     // === Cursed Energy Katana Aura (Rendered BEHIND the blade) ===
     // Glows pink when swinging, when blocking, or when Rika/Domain is active
-    const auraOpacity = this.swordGlowAlpha || 0;
+    let auraOpacity = this.swordGlowAlpha || 0;
+    if (this._isWinnerReveal || (this.combatAuraOpacity && this.combatAuraOpacity > 0)) {
+      auraOpacity = 1.0;
+    }
 
     if (auraOpacity > 0.01) {
       const frameRate = 30;

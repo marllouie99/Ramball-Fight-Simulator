@@ -3,8 +3,8 @@
 // ─────────────────────────────────────────────
 export const tojiConfig = {
     // Passive: Heavenly Restriction
-    stealthDodgeChance: 0.20,    // 40% chance to physically dodge normal projectiles
-    parryChance: 0.30,           // 45% chance to parry incoming strikes/projectiles with Inverted Spear
+    stealthDodgeChance: 0.10,    // 40% chance to physically dodge normal projectiles
+    parryChance: 0.10,           // 45% chance to parry incoming strikes/projectiles with Inverted Spear
     parryAmbushCooldownFrames: 360, // Cooldown (frames) before a parry triggers a 3-Stage Ambush inside enemy domains (360 frames = 6.0s)
     domainImmunity: true,        // Ignores all Domain Expansion effects completely
     homingImmunity: true,        // Cannot be targeted by auto-aim
@@ -12,7 +12,7 @@ export const tojiConfig = {
     stealthCooldown: 500,        // Stealth cooldown in frames (420 frames = 7.0 seconds)
     stealthTurnRate: 0.08,       // Aim tracking reaction rate when enemies aim at stealthed Toji (delayed but functional!)
     channelDetectionRadius: 550, // Detection radius (px) to sense enemy skill/domain channeling
-    channelInterruptChance: 0.20, // 10% chance to force Sequence 1 ambush and interrupt channeling
+    channelInterruptChance: 0.10, // 10% chance to force Sequence 1 ambush and interrupt channeling
     channelInterruptCooldownFrames: 800, // Cooldown (frames) for the interrupt mechanic (900 frames = ~15s)
     channelReactionFrames: 50,   // Delay in frames before Toji reacts to a channeled skill
 

@@ -92,6 +92,13 @@ export class TojiFighter extends Fighter {
       this.redSlowMaxTimer = frames;
       return;
     }
+    // Mahoraga's Divine Shout shockwave bypasses Heavenly Restriction slow immunity!
+    if (options && options.isMahoragaShout) {
+      this.slowTimer = Math.max(this.slowTimer || 0, frames);
+      this.slowMultiplier = multiplier;
+      this.mahoragaShoutSlowTimer = frames;
+      return;
+    }
     // Overridden to do nothing for standard slows
     this.slowTimer = 0;
     this.slowMultiplier = 1.0;
@@ -99,9 +106,11 @@ export class TojiFighter extends Fighter {
   }
 
   applyRedKnockback(vx, vy) {
-    this.redKnockbackTimer = 18;
-    this.redKnockbackVx = vx * 0.95;
-    this.redKnockbackVy = vy * 0.95;
+    this.redKnockbackTimer = 24; // slightly longer to ensure smooth slide
+    this.redKnockbackVx = vx * 1.1; // boost slightly for visual impact
+    this.redKnockbackVy = vy * 1.1;
+    this.vx = this.redKnockbackVx;
+    this.vy = this.redKnockbackVy;
     this.isAmbushing = false;
     this.ambushPhase = null;
     this.katanaSlashTimer = 0;
@@ -789,19 +798,36 @@ export class TojiFighter extends Fighter {
       this.redKnockbackTimer--;
       this.isAmbushing = false;
       this.ambushPhase = null;
-      this.x += (this.redKnockbackVx || 0);
-      this.y += (this.redKnockbackVy || 0);
-      this.redKnockbackVx *= 0.88;
-      this.redKnockbackVy *= 0.88;
+      
+      this.vx = this.redKnockbackVx || 0;
+      this.vy = this.redKnockbackVy || 0;
+      
+      this.x += this.vx;
+      this.y += this.vy;
+      
+      this.redKnockbackVx *= 0.90; // smooth decay
+      this.redKnockbackVy *= 0.90;
+      
       this.resolveWallBounce(arena, opponent);
+      
+      // If wall bounce inverted vx/vy, keep redKnockback aligned
+      this.redKnockbackVx = this.vx;
+      this.redKnockbackVy = this.vy;
+      
       if (opponent && opponent.hp > 0) this.aim(opponent);
+      
+      // Update afterimages so he gets motion trails during the slide
+      this._updateAfterImages();
       return;
     }
 
-    // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red spatial repulsion slow!
+    // Heavenly Restriction: Toji passively purges standard slow effects, EXCEPT Gojo's Reversal Red spatial repulsion slow and Mahoraga's Divine Shout!
     if ((this.redSlowTimer || 0) > 0) {
       this.redSlowTimer--;
-      this.slowTimer = 2;
+      this.slowTimer = Math.max(this.slowTimer || 0, 2);
+    } else if ((this.mahoragaShoutSlowTimer || 0) > 0) {
+      this.mahoragaShoutSlowTimer--;
+      this.slowTimer = Math.max(this.slowTimer || 0, 2);
     } else {
       this.slowTimer = 0;
     }
@@ -883,8 +909,14 @@ export class TojiFighter extends Fighter {
     if (this.katanaSlashFadeTimer > 0) this.katanaSlashFadeTimer--;
 
     // Basic movement and aim logic (Pure natural bounce physics!)
-    this.x += this.vx;
-    this.y += this.vy;
+    let moveVx = this.vx;
+    let moveVy = this.vy;
+    if (this.slowTimer > 0) {
+      moveVx *= this.slowMultiplier;
+      moveVy *= this.slowMultiplier;
+    }
+    this.x += moveVx;
+    this.y += moveVy;
 
     this.aim(opponent);
     this.resolveWallBounce(arena, opponent);

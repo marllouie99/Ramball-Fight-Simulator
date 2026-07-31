@@ -8,9 +8,15 @@ export function drawArena() {
   const { ctx, canvas, arena } = state;
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
-  // Fill the entire canvas background with a light gray/white color
-  ctx.fillStyle = '#f5f5f5';
+  // Fill the entire canvas with black so it blends with the window background
+  ctx.fillStyle = '#000000';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw the white gameplay area that tightly hugs the arena and the HUD
+  const whiteTop = arena.y - 20;
+  const whiteBottom = 820;
+  ctx.fillStyle = '#f5f5f5';
+  ctx.fillRect(0, whiteTop, canvas.width, whiteBottom - whiteTop);
 
   if (!hasActiveDomain) {
     // Arena floor background
@@ -100,7 +106,7 @@ export function drawPurpleDimScreen() {
 
   // Dark base purple overlay
   ctx.fillStyle = `rgba(18, 2, 32, ${opacity * 0.7})`;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Dynamic radial gradient centered on Gojo or Purple Orb
   const maxDim = Math.max(arena.width, arena.height) * 0.70;
@@ -122,7 +128,7 @@ export function drawPurpleDimScreen() {
 
   ctx.globalAlpha = opacity;
   ctx.fillStyle = state._cachedPurpleDimGrad;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }
 
@@ -172,7 +178,7 @@ export function drawTojiUltimateOverlay() {
   
   // Pitch black overlay
   ctx.fillStyle = '#050505';
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Draw and update fly heads
   ctx.fillStyle = 'rgba(20, 20, 20, 0.9)';
@@ -237,7 +243,7 @@ export function drawMahoragaAdaptationDimScreen() {
   grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.98})`);
 
   ctx.fillStyle = grad;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 }
 

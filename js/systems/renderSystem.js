@@ -82,13 +82,7 @@ export function renderGame() {
         drawArena();
 
         // ── GLOBAL ARENA CLIP ──
-        // Ensure absolutely no game visuals (fighters, projectiles, particles) can ever spill over the arena borders and obscure the HUD.
-        state.ctx.save();
-        if (state.arena) {
-          state.ctx.beginPath();
-          state.ctx.rect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
-          state.ctx.clip();
-        }
+        // (Removed as per user request to allow visuals and dim screen effects to bleed outside the arena)
       drawPurpleDimScreen(); // Draw purple dim screen overlay when Gojo's Hollow Purple is active
       drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
       drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
@@ -191,7 +185,7 @@ export function renderGame() {
       drawFloatingTexts(); // Keep UI-like text on top of dim and flames
 
       // Restore the global arena clip so HUD and FPS logs can draw freely outside the arena
-      state.ctx.restore();
+      // END GLOBAL ARENA CLIP (removed)
 
       // Draw FPS display and logs (if not hidden by user pressing H)
       if (!state.hideFpsLogs) {

@@ -9,6 +9,7 @@ import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../cor
 import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
+import { SKILL_REGISTRY } from '../../../configs/skills/skillRegistry.js';
 
 /**
  * Handle adaptation damage accumulation inside takeDamage().
@@ -30,6 +31,31 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     } else if (opts.projectile && opts.projectile.isGojoBlue) {
       gojoAttackType = 'blue';
     }
+  }
+
+  // ── Sukuna-Specific Attack Detection ──
+  let sukunaAttackType = null;
+  if (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna')) {
+    if (opts.isDivineFlame) {
+      sukunaAttackType = 'divineFlame';
+    }
+  }
+
+  // ── General / Skill Shot Adaptation Detection ──
+  let skillShotId = null;
+  let skillShotColor = null;
+  if (opts.isAdaptableSkillShot) {
+    skillShotId = opts.skillShotId;
+    skillShotColor = opts.skillShotColor || (skillShotId && SKILL_REGISTRY[skillShotId]?.skillShotColor) || '#FFD700';
+  } else if (opts.projectile && opts.projectile.isAdaptableSkillShot) {
+    skillShotId = opts.projectile.skillShotId;
+    skillShotColor = opts.projectile.skillShotColor || (skillShotId && SKILL_REGISTRY[skillShotId]?.skillShotColor) || '#FFD700';
+  } else if (opts.isDivineFlame) {
+    skillShotId = 'divineFlame';
+    skillShotColor = '#FF6F00';
+  } else if (opts.projectile && opts.projectile.isGojoPurple) {
+    skillShotId = 'purple';
+    skillShotColor = '#8A2BE2';
   }
 
   let finalAmount = amount;
@@ -80,21 +106,67 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
       }
     }
 
-    fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + amount;
-    fighter.accumTimer = windowFrames;
+    let thresholdPctDefault = 0.15; // default 15%
+    let windowFramesDefault = 300;  // default 5s
 
-    if (gojoAttackType) {
-      fighter._lastGojoHitType = gojoAttackType;
-    } else {
-      fighter._lastGojoHitType = null;
+    // Default to the provided options, but override if present in the SKILL_REGISTRY
+    if (opts.isAdaptableSkillShot) {
+      if (opts.adaptationThresholdPct !== undefined) thresholdPct = opts.adaptationThresholdPct;
+      if (opts.adaptationWindowFrames !== undefined) windowFrames = opts.adaptationWindowFrames;
+      
+      const registryEntry = SKILL_REGISTRY[opts.skillShotId];
+      if (registryEntry) {
+        if (registryEntry.adaptationThresholdPct !== undefined) thresholdPct = registryEntry.adaptationThresholdPct;
+        if (registryEntry.adaptationWindowFrames !== undefined) windowFrames = registryEntry.adaptationWindowFrames;
+      }
+    } else if (opts.projectile && opts.projectile.isAdaptableSkillShot) {
+      if (opts.projectile.adaptationThresholdPct !== undefined) thresholdPct = opts.projectile.adaptationThresholdPct;
+      if (opts.projectile.adaptationWindowFrames !== undefined) windowFrames = opts.projectile.adaptationWindowFrames;
+      
+      const registryEntry = SKILL_REGISTRY[opts.projectile.skillShotId];
+      if (registryEntry) {
+        if (registryEntry.adaptationThresholdPct !== undefined) thresholdPct = registryEntry.adaptationThresholdPct;
+        if (registryEntry.adaptationWindowFrames !== undefined) windowFrames = registryEntry.adaptationWindowFrames;
+      }
     }
 
-    const threshold = fighter.maxHp * thresholdPct;
-    if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-      triggerAdaptation(fighter, type, attacker);
-      fighter.fatalAdaptCooldown = adaptCooldown;
-      fighter.totalAccumDamage = 0;
-      fighter.accumTimer = 0;
+    const isAdaptableSkill = opts.isAdaptableSkillShot || (opts.projectile && opts.projectile.isAdaptableSkillShot);
+    
+    if (isAdaptableSkill) {
+      if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.skillExposureTimer) {
+        const delay = (skillShotId && SKILL_REGISTRY[skillShotId]?.adaptationDelayFrames) || 60;
+        fighter.skillExposureTimer = delay; // Timer to click the wheel!
+        fighter.exposedSkillType = type;
+        fighter.exposedSkillAttacker = attacker;
+        
+        if (gojoAttackType) fighter._lastGojoHitType = gojoAttackType;
+        if (sukunaAttackType) fighter._lastSukunaHitType = sukunaAttackType;
+        if (skillShotId) {
+          fighter._lastSkillShotId = skillShotId;
+          fighter._lastSkillShotColor = skillShotColor;
+        }
+      }
+    } else {
+      fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + amount;
+      fighter.accumTimer = windowFrames;
+
+      if (gojoAttackType) {
+        fighter._lastGojoHitType = gojoAttackType;
+      }
+
+      if (sukunaAttackType) {
+        fighter._lastSukunaHitType = sukunaAttackType;
+      }
+
+      if (skillShotId) {
+        fighter._lastSkillShotId = skillShotId;
+        fighter._lastSkillShotColor = skillShotColor;
+      }
+
+      const threshold = fighter.maxHp * thresholdPct;
+      if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
+        triggerAdaptation(fighter, type, attacker);
+      }
     }
   }
 
@@ -122,6 +194,34 @@ export function triggerAdaptation(fighter, type, attacker) {
       if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
       if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
         addedNewGojoColor = true;
+        fighter.gojoAdaptColorHistory.push(adaptColor);
+      }
+    }
+  }
+
+  let addedNewSukunaColor = false;
+  if (fighter._lastSukunaHitType) {
+    const sukunaType = fighter._lastSukunaHitType;
+    let adaptColor = null;
+    if (sukunaType === 'divineFlame') adaptColor = '#FF6F00'; // Orange
+    
+    if (adaptColor) {
+      if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+      if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+        addedNewSukunaColor = true;
+        fighter.gojoAdaptColorHistory.push(adaptColor);
+      }
+    }
+  }
+
+  let addedNewSkillShotColor = false;
+  if (fighter._lastSkillShotId && fighter._lastSkillShotColor) {
+    const color = fighter._lastSkillShotColor;
+    if (color) {
+      if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+      if (!fighter.gojoAdaptColorHistory.includes(color)) {
+        addedNewSkillShotColor = true;
+        fighter.gojoAdaptColorHistory.push(color);
       }
     }
   }
@@ -130,7 +230,8 @@ export function triggerAdaptation(fighter, type, attacker) {
   fighter.adaptationStage[type] = (fighter.adaptationStage[type] || 0) + 1;
   const currentStage = fighter.adaptationStage[type];
   
-  if (!addedNewGojoColor) {
+  const addedNewSpecialColor = addedNewGojoColor || addedNewSukunaColor || addedNewSkillShotColor;
+  if (!addedNewSpecialColor) {
     fighter.goldAdaptationStage[type] = (fighter.goldAdaptationStage[type] || 0) + 1;
   }
   
@@ -177,6 +278,11 @@ export function triggerAdaptation(fighter, type, attacker) {
   }
 
   triggerGlobalScreenShake(6, 18);
+
+  // Global Cooldown and Accumulation Resets
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 300;
+  fighter.totalAccumDamage = 0;
+  fighter.accumTimer = 0;
 
   const wheelY = fighter.y - fighter.r - 28;
   if (!addedNewGojoColor) {
@@ -233,6 +339,22 @@ export function triggerAdaptation(fighter, type, attacker) {
   if (fighter._lastGojoHitType) {
     applyGojoAdaptation(fighter, fighter._lastGojoHitType);
   }
+
+  // ── Sukuna-Specific Adaptation (Last Hit Priority) ──
+  if (fighter._lastSukunaHitType) {
+    applySukunaAdaptation(fighter, fighter._lastSukunaHitType);
+  }
+
+  // ── Generalized Skill Shot Adaptation ──
+  if (fighter._lastSkillShotId && fighter._lastSkillShotColor) {
+    applySkillShotAdaptation(fighter, fighter._lastSkillShotId, fighter._lastSkillShotColor);
+  }
+
+  // Clear hit memory after adaptation triggers
+  fighter._lastGojoHitType = null;
+  fighter._lastSukunaHitType = null;
+  fighter._lastSkillShotId = null;
+  fighter._lastSkillShotColor = null;
 }
 
 /**
@@ -323,4 +445,85 @@ export function handleInfinityFreeze(fighter) {
     fighter._wasInfinityFrozenLastFrame = false;
     return false;
   }
+}
+
+/**
+ * Apply Sukuna-specific adaptation based on the attack type.
+ * - divineFlame: Next time Sukuna fires Fuga, Mahoraga teleports away.
+ */
+export function applySukunaAdaptation(fighter, sukunaType) {
+  if (!fighter.sukunaAdapted) {
+    fighter.sukunaAdapted = { divineFlame: false };
+  }
+  fighter.sukunaAdapted[sukunaType] = true;
+  const wheelY = fighter.y - fighter.r - 28;
+
+  let adaptColor = null;
+  switch (sukunaType) {
+    case 'divineFlame':
+      adaptColor = '#FF6F00'; // Orange
+      fighter.sukunaFugaDodgeReady = true;
+      spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: FUGA TELEPORT DODGE!', '#FF6F00');
+      break;
+  }
+
+  if (adaptColor) {
+    if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+    if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+      fighter.gojoAdaptColorHistory.push(adaptColor);
+    }
+  }
+
+  fighter.wheelGlowColor = adaptColor || fighter.wheelGlowColor;
+
+  spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
+  audioSystem.playSFX('skill_dash3', 0.8);
+}
+
+/**
+ * Apply general skill shot adaptation.
+ * - skillShotId: The unique ID of the skill shot to adapt to.
+ * - color: Color of the wheel ball and sparks when adapting/dodging.
+ */
+export function applySkillShotAdaptation(fighter, skillShotId, color) {
+  if (!fighter.adaptedSkills) {
+    fighter.adaptedSkills = {};
+  }
+  if (!fighter.skillDodgeReady) {
+    fighter.skillDodgeReady = {};
+  }
+
+  if (fighter.adaptedSkills[skillShotId]) return;
+
+  fighter.adaptedSkills[skillShotId] = true;
+  fighter.skillDodgeReady[skillShotId] = true;
+
+  // Track specific old variables for backwards compatibility
+  if (skillShotId === 'purple') {
+    fighter.gojoAdapted.purple = true;
+    fighter.gojoPurpleDodgeReady = true;
+  }
+  if (skillShotId === 'divineFlame') {
+    if (!fighter.sukunaAdapted) fighter.sukunaAdapted = { divineFlame: false };
+    fighter.sukunaAdapted.divineFlame = true;
+    fighter.sukunaFugaDodgeReady = true;
+  }
+
+  fighter.wheelGlowColor = color || fighter.wheelGlowColor;
+
+  if (color) {
+    if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+    if (!fighter.gojoAdaptColorHistory.includes(color)) {
+      fighter.gojoAdaptColorHistory.push(color);
+    }
+  }
+
+  const wheelY = fighter.y - fighter.r - 28;
+  const displayName = skillShotId.toUpperCase().replace('_', ' ');
+  spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} DODGE!`, color);
+
+  spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
+  audioSystem.playSFX('skill_dash3', 0.8);
 }

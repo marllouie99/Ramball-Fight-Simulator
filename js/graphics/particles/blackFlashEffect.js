@@ -29,6 +29,50 @@ function _returnBFParticle(p) {
 // Separate array so we never mix with sparkEffects
 const _blackFlashParticles = [];
 
+/** Generates a jagged path that branches out like cracks or tree branches. */
+function _generateBranchingBolt(startX, startY, baseAngle, totalLen) {
+  const mainPath = [];
+  const branches = [];
+  
+  const steps = 4 + Math.floor(Math.random() * 2);
+  const stepLen = totalLen / steps;
+  
+  let curX = startX;
+  let curY = startY;
+  let angle = baseAngle;
+  mainPath.push({ x: curX, y: curY });
+  
+  for (let i = 1; i <= steps; i++) {
+    angle += (Math.random() - 0.5) * 0.6; // jag left/right
+    curX += Math.cos(angle) * stepLen;
+    curY += Math.sin(angle) * stepLen;
+    mainPath.push({ x: curX, y: curY });
+    
+    // Possibility to split/branch at intermediate nodes
+    if (i === 2 || i === 3) {
+      if (Math.random() < 0.75) {
+        // Spawn a branch!
+        const branchAngle = angle + (Math.random() < 0.5 ? 1 : -1) * (0.45 + Math.random() * 0.45);
+        const branchSteps = steps - i;
+        const branchPath = [{ x: curX, y: curY }];
+        let bx = curX;
+        let by = curY;
+        let ba = branchAngle;
+        
+        for (let b = 0; b < branchSteps; b++) {
+          ba += (Math.random() - 0.5) * 0.55;
+          bx += Math.cos(ba) * stepLen * 0.95;
+          by += Math.sin(ba) * stepLen * 0.95;
+          branchPath.push({ x: bx, y: by });
+        }
+        branches.push(branchPath);
+      }
+    }
+  }
+  
+  return { mainPath, branches };
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // SPAWN — Call this to trigger the Black Flash at (x, y)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -46,7 +90,7 @@ export function spawnBlackFlash(x, y) {
   core.size = 6;
   core.maxSize = 55;
   core.life = 1.0;
-  core.decay = 0.045;
+  core.decay = 0.025; // Implodes over 40 frames (~0.67s)
   core.friction = 1;
   _blackFlashParticles.push(core);
 
@@ -57,7 +101,7 @@ export function spawnBlackFlash(x, y) {
   screenFlash.x = x; screenFlash.y = y;
   screenFlash.size = 0; // unused
   screenFlash.life = 1.0;
-  screenFlash.decay = 0.12; // very fast fade
+  screenFlash.decay = 0.08; // Lingers on screen for ~12 frames (0.2s)
   _blackFlashParticles.push(screenFlash);
 
   // ── 3. EXPANDING VOID SHOCKWAVE RINGS (2 rings) ──────────────────────────
@@ -68,7 +112,7 @@ export function spawnBlackFlash(x, y) {
     ring.size = 10 + r * 15;
     ring.maxSize = 90 + r * 50;
     ring.life = 1.0;
-    ring.decay = 0.035 + r * 0.02;
+    ring.decay = 0.022 + r * 0.012; // Lingers for 30-45 frames
     ring.lineWidth = 3 - r;
     _blackFlashParticles.push(ring);
   }
@@ -82,13 +126,14 @@ export function spawnBlackFlash(x, y) {
     bolt.type = 'bfBolt';
     bolt.x = x; bolt.y = y;
     bolt.angle = baseAngle;
-    // Generate jagged path segments
-    const segCount = 4 + Math.floor(Math.random() * 3);
-    const totalLen = 40 + Math.random() * 35;
-    bolt.data = _buildJaggedPath(x, y, baseAngle, segCount, totalLen);
+    
+    // Use the branching generator
+    const totalLen = 50 + Math.random() * 45;
+    bolt.data = _generateBranchingBolt(x, y, baseAngle, totalLen);
+    
     bolt.life = 1.0;
-    bolt.decay = 0.04 + Math.random() * 0.03;
-    bolt.size = 1.5 + Math.random() * 1.5;
+    bolt.decay = 0.020 + Math.random() * 0.015; // Lingers for 30-50 frames (~0.5s - 0.8s) so crackles are highly visible
+    bolt.size = 2.5 + Math.random() * 2.5;
     _blackFlashParticles.push(bolt);
   }
 
@@ -96,7 +141,7 @@ export function spawnBlackFlash(x, y) {
   const shardCount = 14;
   for (let i = 0; i < shardCount; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 3.5 + Math.random() * 6;
+    const speed = 4.5 + Math.random() * 8;
     const shard = _getBFParticle();
     shard.type = 'bfShard';
     shard.x = x; shard.y = y;
@@ -104,8 +149,8 @@ export function spawnBlackFlash(x, y) {
     shard.vy = Math.sin(angle) * speed;
     shard.size = 3 + Math.random() * 4;
     shard.life = 1.0;
-    shard.decay = 0.025 + Math.random() * 0.04;
-    shard.friction = 0.91;
+    shard.decay = 0.018 + Math.random() * 0.018; // Lingers for 30-55 frames
+    shard.friction = 0.90;
     // Alternate between pitch black, deep crimson, and dark purple (JJK palette)
     const palette = ['#000000', '#1a0000', '#3b0000', '#1a001a', '#ff0000', '#cc0000'];
     shard.color = palette[Math.floor(Math.random() * palette.length)];
@@ -121,25 +166,6 @@ export function spawnBlackFlash(x, y) {
   glow.life = 1.0;
   glow.decay = 0.05;
   _blackFlashParticles.push(glow);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// HELPERS
-// ─────────────────────────────────────────────────────────────────────────────
-
-/** Builds a jagged segmented path for the cursed energy bolt. */
-function _buildJaggedPath(startX, startY, baseAngle, segs, totalLen) {
-  const points = [{ x: startX, y: startY }];
-  let cx = startX, cy = startY;
-  const segLen = totalLen / segs;
-  let angle = baseAngle;
-  for (let s = 0; s < segs; s++) {
-    angle += (Math.random() - 0.5) * 0.7; // jag left/right
-    cx += Math.cos(angle) * segLen;
-    cy += Math.sin(angle) * segLen;
-    points.push({ x: cx, y: cy });
-  }
-  return points;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -167,7 +193,7 @@ export function updateBlackFlashEffects(frozen = false) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DRAW — Call every frame to render all Black Flash particles
+// DRAW — Call every frame from the main game loop
 // ─────────────────────────────────────────────────────────────────────────────
 export function drawBlackFlashEffects(ctx) {
   if (!ctx || _blackFlashParticles.length === 0) return;
@@ -191,7 +217,6 @@ export function drawBlackFlashEffects(ctx) {
     } else if (p.type === 'bfCore') {
       // ── Expanding black void sphere ─────────────────────────────────────
       // Grows fast → shrinks (implosion feel)
-      const growPhase = 1.0 - p.life;
       p.size = p.size + (p.maxSize - p.size) * 0.25;
 
       ctx.globalCompositeOperation = 'multiply';
@@ -213,9 +238,9 @@ export function drawBlackFlashEffects(ctx) {
       p.size = p.size + (p.maxSize - p.size) * 0.15;
 
       ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = `rgba(180, 0, 0, ${p.life * 0.8})`;
+      ctx.strokeStyle = `rgba(160, 0, 10, ${p.life * 0.8})`;
       ctx.lineWidth = (p.lineWidth || 2) * p.life;
-      ctx.shadowColor = '#ff0000';
+      ctx.shadowColor = '#800000';
       ctx.shadowBlur = 8;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
@@ -224,35 +249,132 @@ export function drawBlackFlashEffects(ctx) {
       ctx.shadowBlur = 0;
 
     } else if (p.type === 'bfBolt') {
-      // ── Jagged cursed energy bolt ──────────────────────────────────────
-      if (!p.data || p.data.length < 2) { ctx.restore(); continue; }
+      // ── Jagged cursed energy bolt with branching tree-branch paths ──
+      if (!p.data || !p.data.mainPath || p.data.mainPath.length < 2) { ctx.restore(); continue; }
 
-      ctx.globalCompositeOperation = 'lighter';
+      // Rapidly flicker opacity for an electric, crackling look
+      const flicker = 0.6 + Math.random() * 0.4;
+      ctx.globalAlpha = Math.max(0, p.life * flicker);
+
       ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.shadowBlur = 6;
+      ctx.lineJoin = 'miter';
+      
+      // Calculate jittered path points for this frame so outline & core remain aligned
+      const jitterMain = p.data.mainPath.map((pt, idx) => {
+        if (idx === 0) return { x: pt.x, y: pt.y }; // keep starting center locked
+        return {
+          x: pt.x + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5),
+          y: pt.y + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5)
+        };
+      });
+      
+      const jitterBranches = p.data.branches.map(branch => {
+        return branch.map((pt, idx) => {
+          if (idx === 0) {
+            // Tie branch start directly to the corresponding main path node
+            return { x: jitterMain[2]?.x || pt.x, y: jitterMain[2]?.y || pt.y };
+          }
+          return {
+            x: pt.x + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5),
+            y: pt.y + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5)
+          };
+        });
+      });
 
-      // Outer glow (deep red)
-      ctx.strokeStyle = `rgba(200, 0, 0, ${p.life * 0.6})`;
-      ctx.lineWidth = (p.size + 2) * p.life;
-      ctx.shadowColor = '#ff0000';
-      ctx.beginPath();
-      ctx.moveTo(p.data[0].x, p.data[0].y);
-      for (let i = 1; i < p.data.length; i++) ctx.lineTo(p.data[i].x, p.data[i].y);
-      ctx.stroke();
+      // ── Calculate dynamic growth progress ──
+      // The main path grows from length 0 to 1 over the first 22% of the particle's lifetime
+      const gMain = Math.min(1.0, (1.0 - p.life) / 0.22);
+      
+      // Branches split off around the middle nodes of the main path, so they only start growing
+      // when the main path is at least half extended (gMain > 0.5)
+      let gBranch = 0.0;
+      if (gMain > 0.5) {
+        gBranch = (gMain - 0.5) / 0.5; // Scales from 0.0 to 1.0
+      }
 
-      // Core (white/bright red — cursed energy core)
-      ctx.strokeStyle = `rgba(255, 200, 200, ${p.life * 0.9})`;
-      ctx.lineWidth = p.size * p.life;
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 3;
-      ctx.beginPath();
-      ctx.moveTo(p.data[0].x, p.data[0].y);
-      for (let i = 1; i < p.data.length; i++) ctx.lineTo(p.data[i].x, p.data[i].y);
-      ctx.stroke();
+      const drawMain = _getSubPath(jitterMain, gMain);
+      const drawBranches = jitterBranches.map(branch => _getSubPath(branch, gBranch)).filter(b => b.length > 0);
+      
+      const drawPath = (points) => {
+        if (!points || points.length < 2) return;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        ctx.stroke();
+      };
+      
+      // Step 1: Draw massive deep crimson red glow under all paths
+      ctx.strokeStyle = `rgba(160, 0, 10, ${p.life * 0.45})`;
+      ctx.lineWidth = (p.size * 5.0 + 8) * p.life;
+      drawPath(drawMain);
+      for (const branch of drawBranches) {
+        drawPath(branch);
+      }
 
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.shadowBlur = 0;
+      // Step 2: Draw thick stark black contours
+      ctx.strokeStyle = `rgba(0, 0, 0, ${p.life * 0.95})`;
+      ctx.lineWidth = (p.size * 3.5 + 4) * p.life;
+      drawPath(drawMain);
+      for (const branch of drawBranches) {
+        drawPath(branch);
+      }
+
+      // Step 3: Draw deep crimson red cores (#B30000)
+      ctx.strokeStyle = `rgba(179, 0, 0, ${p.life * 0.95})`;
+      ctx.lineWidth = (p.size * 1.5 + 1.2) * p.life;
+      drawPath(drawMain);
+      for (const branch of drawBranches) {
+        drawPath(branch);
+      }
+
+      // Step 4: Draw thin electric lilac-tinted white center lines (#F3E8FF)
+      ctx.strokeStyle = `rgba(243, 232, 255, ${p.life * 0.95})`;
+      ctx.lineWidth = p.size * 0.5 * p.life;
+      drawPath(drawMain);
+      for (const branch of drawBranches) {
+        drawPath(branch);
+      }
+      
+      // Step 5: Draw a few flame-wisps on the main path nodes close to center
+      const limitPts = Math.min(drawMain.length, 3);
+      for (let j = 0; j < limitPts; j++) {
+        const pt = drawMain[j];
+        const progress = j / (drawMain.length - 1 || 1);
+        const wispSize = (8 + (1 - progress) * 14) * p.life * (0.8 + Math.random() * 0.4);
+        
+        ctx.save();
+        ctx.translate(pt.x, pt.y);
+        ctx.rotate(p.angle || 0);
+        
+        // Flame contour: stark black
+        ctx.beginPath();
+        ctx.moveTo(-wispSize * 0.25, 0);
+        ctx.quadraticCurveTo(wispSize * 0.3, wispSize * 0.55, wispSize * 0.95, 0);
+        ctx.quadraticCurveTo(wispSize * 0.3, -wispSize * 0.55, -wispSize * 0.25, 0);
+        ctx.closePath();
+        ctx.fillStyle = '#000000';
+        ctx.fill();
+        
+        // Inner deep crimson red flame core (#B30000)
+        ctx.beginPath();
+        ctx.moveTo(-wispSize * 0.15, 0);
+        ctx.quadraticCurveTo(wispSize * 0.25, wispSize * 0.35, wispSize * 0.65, 0);
+        ctx.quadraticCurveTo(wispSize * 0.25, -wispSize * 0.35, -wispSize * 0.15, 0);
+        ctx.closePath();
+        ctx.fillStyle = '#B30000';
+        ctx.fill();
+        
+        // Lilac-tinted white hot core center (#F3E8FF)
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.quadraticCurveTo(wispSize * 0.15, wispSize * 0.15, wispSize * 0.4, 0);
+        ctx.quadraticCurveTo(wispSize * 0.15, -wispSize * 0.15, 0, 0);
+        ctx.closePath();
+        ctx.fillStyle = '#F3E8FF';
+        ctx.fill();
+        
+        ctx.restore();
+      }
 
     } else if (p.type === 'bfShard') {
       // ── Flying void fragment ───────────────────────────────────────────
@@ -282,9 +404,10 @@ export function drawBlackFlashEffects(ctx) {
 
       ctx.globalCompositeOperation = 'lighter';
       const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-      glowGrad.addColorStop(0,   `rgba(255, 80, 0,  ${p.life * 0.7})`);
-      glowGrad.addColorStop(0.4, `rgba(180, 0, 0,   ${p.life * 0.5})`);
-      glowGrad.addColorStop(0.8, `rgba(80, 0, 0,    ${p.life * 0.25})`);
+      // Red core gradient (lilac/deep crimson)
+      glowGrad.addColorStop(0,   `rgba(180, 0, 10,  ${p.life * 0.7})`);
+      glowGrad.addColorStop(0.4, `rgba(120, 0, 5,   ${p.life * 0.5})`);
+      glowGrad.addColorStop(0.8, `rgba(60, 0, 2,    ${p.life * 0.25})`);
       glowGrad.addColorStop(1,   `rgba(0, 0, 0, 0)`);
       ctx.fillStyle = glowGrad;
       ctx.beginPath();
@@ -298,3 +421,31 @@ export function drawBlackFlashEffects(ctx) {
 
   ctx.restore();
 }
+
+// Helper to calculate a sub-path of points up to a given progress fraction (0.0 to 1.0)
+function _getSubPath(points, progress) {
+  if (!points || points.length < 2) return [];
+  if (progress <= 0.001) return [];
+  if (progress >= 0.999) return points;
+  
+  const subPoints = [points[0]];
+  const totalSegments = points.length - 1;
+  const targetSeg = progress * totalSegments;
+  const fullSegs = Math.floor(targetSeg);
+  const partial = targetSeg - fullSegs;
+  
+  for (let i = 1; i <= fullSegs; i++) {
+    subPoints.push(points[i]);
+  }
+  
+  if (fullSegs < totalSegments && partial > 0.001) {
+    const lastPt = points[fullSegs];
+    const nextPt = points[fullSegs + 1];
+    subPoints.push({
+      x: lastPt.x + (nextPt.x - lastPt.x) * partial,
+      y: lastPt.y + (nextPt.y - lastPt.y) * partial
+    });
+  }
+  return subPoints;
+}
+

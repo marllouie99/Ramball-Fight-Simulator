@@ -32,7 +32,7 @@ export function renderGojoDomainBackground(fighter, ctx, isClashSecondary = fals
   }
 
   ctx.fillStyle = fighter._cachedGojoBgGrad;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
 
   // ── 2. HORIZONTAL CYAN SHEEN WAVE LINES (MATCHING SUKUNA'S FLOOR WAVE LINES IN BLUE) ──

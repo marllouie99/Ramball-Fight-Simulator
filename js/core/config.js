@@ -1,4 +1,4 @@
-﻿// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
+// ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // CONFIG ΓÇö tweak all game values here
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 import { gojoConfig } from '../configs/characters/gojoConfig.js?v=2';
@@ -7,6 +7,8 @@ import { yutaConfig } from '../configs/characters/yutaConfig.js';
 import { tojiConfig } from '../configs/characters/tojiConfig.js';
 import { mahoragaConfig } from '../configs/characters/mahoragaConfig.js';
 import { todoConfig } from '../configs/characters/todoConfig.js';
+import { yujiConfig } from '../configs/characters/yujiConfig.js';
+import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {
   arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
@@ -22,6 +24,7 @@ export const CONFIG = {
     sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
     handSizeMultiplier: 1.5,                   // scale the size of all fighter hands globally (1.0 = default)
   },
+  blackFlash: blackFlashConfig,
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // PER-FIGHTER TUNING
@@ -589,6 +592,9 @@ export const CONFIG = {
 
   /** Aoi Todo — Boogie Woogie Brawler */
   todo: todoConfig,
+
+  /** Yuji Itadori — Black Flash Brawler */
+  yuji: yujiConfig,
 };
 
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1019,7 +1025,7 @@ export const FIGHTER_DEFS = [
     hp: 200,
     damage: 15,
     cooldown: 50,
-    moveSpeed: 4.8,
+    moveSpeed: 5.8,
     projectileSpeedMultiplier: 3.0,
     ability: 'Copy & Rika',
     desc: 'Summons Rika to assist Yuta in fight and uses Authentic Mutual Love domain.',
@@ -1057,10 +1063,29 @@ export const FIGHTER_DEFS = [
     hp: 220,
     damage: 12,
     cooldown: 60,
-    moveSpeed: 5.5,
+    moveSpeed: 6.5,
     projectileSpeedMultiplier: 1.0,
     ability: 'Boogie Woogie',
-    desc: 'Claps hands to swap positions with enemies or cursed rocks. Focuses on disorienting opponents. [Read Mechanics](FighterDescription/todo.md)',
+    desc: 'Claps hands to swap positions with enemies or cursed rocks. Focuses on disorienting opponents.',
+  },
+  {
+    id: 25,
+    name: 'Yuji Itadori',
+    category: 'Anime',
+    color: '#D95C7E', // Deep pink JJK uniform
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'yuji',
+    hp: 230,
+    damage: 18,
+    cooldown: 18,
+    moveSpeed: 7.0,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Black Flash',
+    desc: 'Attacks with black flash.',
   }
 ];
 
@@ -1083,7 +1108,7 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
     moveSpeed: 6.5, // Slow but menacing
     projectileSpeedMultiplier: 1.0,
     ability: 'Wheel of Adaptation',
-    desc: 'Adapts to damage types after taking multiple hits. Sword of Extermination deals True Damage.',
+    desc: 'Adapts to damage types. Increase chance of parry and blocks to incoming attacks for each wheel rotation.',
   });
 }
 

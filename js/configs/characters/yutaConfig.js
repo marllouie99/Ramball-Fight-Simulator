@@ -16,7 +16,7 @@ export const yutaConfig = {
 
   // Basic Attack: Katana Melee
   meleeCooldown: 50,                       // Frames between katana strikes
-  meleeRange: 95,                          // Katana blade length reach distance in pixels
+  meleeRange: 70,                          // Katana blade length reach distance in pixels
   meleeDamage: 15,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
 

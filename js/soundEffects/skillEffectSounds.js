@@ -195,12 +195,12 @@ export const SKILL_EFFECT_SOUNDS = {
       speed: 1.0,
     },
     heavypunch: {
-      src: [
-        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-        'Assets/Sound Effects/Attacks/heavypunch3.mp3',
-      ],
-      volume: 1.0,
+      src: 'Assets/Sound Effects/Attacks/punch.mp3', // Gojo punch attack audio
+      volume: 2.8,
+    },
+    punch: {
+      src: 'Assets/Sound Effects/Attacks/punch.mp3', // Gojo punch attack audio
+      volume: 2.8,
     }
   },
 };
