@@ -500,19 +500,27 @@ export function drawProjectiles() {
     // Zeus Chain Lightning Visual
     if (p.visual === 'chainLightning') {
       ctx.save();
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
       
       // Draw a bright glowing white core at the leading tip with a strong blue aura
+      if (!isGamePlay) {
+        // Full-quality: layered glow rings
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 2.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 191, 255, 0.2)';
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r * 1.5, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(0, 191, 255, 0.5)';
+        ctx.fill();
+      }
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.r * 0.8, 0, Math.PI * 2);
       ctx.fillStyle = '#FFFFFF';
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = 'rgba(0, 191, 255, 1)';
       ctx.fill();
       
       // Draw jagged trail with motion blur and thinning effect
       if (p.history && p.history.length > 1) {
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = 'rgba(0, 191, 255, 1)'; // Strong light blue luminance
         ctx.lineCap = 'round';
         ctx.lineJoin = 'miter';
         

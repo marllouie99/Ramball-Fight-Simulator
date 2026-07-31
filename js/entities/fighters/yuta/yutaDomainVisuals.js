@@ -5,8 +5,7 @@ import { CONFIG } from '../../../core/config.js';
 import { state } from '../../../core/state.js';
 
 export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = false) {
-  const isRikaVisible = (fighter.rika && (fighter.rika.active || (fighter.rikaAlpha && fighter.rikaAlpha > 0.05)));
-  if (!fighter.domainActive && !isRikaVisible) return;
+  if (!fighter.domainActive) return;
 
   ctx.save();
   const time = Date.now();
@@ -569,13 +568,17 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
     const surgeRadius = (rk.r || 30) * 3.5 + Math.sin(time / 200) * 15;
     const surgeAlpha = 0.18 + Math.sin(time / 180) * 0.08;
 
-    const surgeGrad = ctx.createRadialGradient(rk.x, rk.y, 0, rk.x, rk.y, surgeRadius);
-    surgeGrad.addColorStop(0, `rgba(255, 20, 147, ${surgeAlpha * 1.5})`);
-    surgeGrad.addColorStop(0.3, `rgba(138, 43, 226, ${surgeAlpha})`);
-    surgeGrad.addColorStop(0.6, `rgba(75, 0, 130, ${surgeAlpha * 0.5})`);
-    surgeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = surgeGrad;
+    const isGamePlay = (typeof state !== 'undefined' && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+    if (isGamePlay) {
+      ctx.fillStyle = `rgba(255, 20, 147, ${surgeAlpha * 1.2})`;
+    } else {
+      const surgeGrad = ctx.createRadialGradient(rk.x, rk.y, 0, rk.x, rk.y, surgeRadius);
+      surgeGrad.addColorStop(0, `rgba(255, 20, 147, ${surgeAlpha * 1.5})`);
+      surgeGrad.addColorStop(0.3, `rgba(138, 43, 226, ${surgeAlpha})`);
+      surgeGrad.addColorStop(0.6, `rgba(75, 0, 130, ${surgeAlpha * 0.5})`);
+      surgeGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = surgeGrad;
+    }
     ctx.beginPath();
     ctx.arc(rk.x, rk.y, surgeRadius, 0, Math.PI * 2);
     ctx.fill();

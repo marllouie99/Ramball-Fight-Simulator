@@ -66,8 +66,11 @@ export class ParticleSystem {
     const generator = ParticleRegistry[type] || ParticleRegistry['default'];
 
     for (let i = 0; i < adjustedCount; i++) {
+      let insertIdx = -1;
       if (state.sparkEffects.length >= MAX_PARTICLES) {
-        const oldest = state.sparkEffects.shift();
+        // Fast O(1) overwrite instead of O(N) shift
+        insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+        const oldest = state.sparkEffects[insertIdx];
         if (oldest) this.returnParticle(oldest);
       }
 
@@ -110,7 +113,11 @@ export class ParticleSystem {
       // Apply any overrides passed in (like forcing radius for impact flash)
       Object.assign(spark, overrideProps);
 
-      state.sparkEffects.push(spark);
+      if (insertIdx !== -1) {
+        state.sparkEffects[insertIdx] = spark;
+      } else {
+        state.sparkEffects.push(spark);
+      }
     }
   }
 }

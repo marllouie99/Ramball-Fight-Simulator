@@ -330,7 +330,8 @@ export const SKILL_SOUNDS = {
   // ── Todo ──────────────────────────────
   24: {
     blackflash: {
-      src: 'Assets/Sound Effects/Skills/blackflash.mp3',
+      src: 'Assets/Sound Effects/Skills/blackflash1.mp3',
+      src2: 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3',
       volume: 0.5,
       delay: 0
     }
@@ -338,7 +339,8 @@ export const SKILL_SOUNDS = {
   // ── Yuji ──────────────────────────────
   25: {
     blackflash: {
-      src: 'Assets/Sound Effects/Skills/blackflash.mp3',
+      src: 'Assets/Sound Effects/Skills/blackflash1.mp3',
+      src2: 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3',
       volume: 0.5,
       delay: 0
     }

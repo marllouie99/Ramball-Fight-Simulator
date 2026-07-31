@@ -152,15 +152,9 @@ export function drawRikaSummonDimScreen() {
 
   ctx.save();
 
-  // Dark Vignette Gradient centered on Yuta
+  // Dark flat overlay wash (optimized to bypass expensive radial gradient creation on large screens)
   const opacity = currentRikaSummonDimOpacity;
-  const maxR = Math.max(canvas.width, canvas.height) * 0.85;
-  const gradient = ctx.createRadialGradient(cx, cy, 30, cx, cy, maxR);
-  gradient.addColorStop(0, `rgba(20, 2, 30, ${opacity * 0.45})`);
-  gradient.addColorStop(0.4, `rgba(12, 0, 22, ${opacity * 0.75})`);
-  gradient.addColorStop(0.85, `rgba(5, 0, 10, ${opacity * 0.95})`);
-
-  ctx.fillStyle = gradient;
+  ctx.fillStyle = `rgba(10, 0, 18, ${opacity * 0.82})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Pulsing Cursed Energy Ring around Yuta/Rika

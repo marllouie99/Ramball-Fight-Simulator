@@ -60,6 +60,7 @@ export class YutaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.afterImages = [];
+    this.lastParryCounterType = null;
     this.posHistory = [];
     this.sakugaImpactTimer = 0;
     this.sakugaImpactMaxTimer = 6;
@@ -87,6 +88,7 @@ export class YutaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = null;
     this.afterImages = [];
+    this.lastParryCounterType = null;
     this.posHistory = [];
     this.sakugaImpactTimer = 0;
     this.rikaCallTimer = 0;
@@ -420,7 +422,7 @@ export class YutaFighter extends Fighter {
 
     // Smoothly fade Rika herself in/out to prevent snappy appearances
     if (this.rikaAlpha === undefined) this.rikaAlpha = 0;
-    const targetRika = (this.rika && this.rika.active) ? 1.0 : 0.0;
+    const targetRika = (this.rika && this.rika.active && !this.rika.isDying) ? 1.0 : 0.0;
     if (this.rikaAlpha < targetRika) {
       this.rikaAlpha = Math.min(targetRika, this.rikaAlpha + 0.05); // Fades in over 20 frames
     } else if (this.rikaAlpha > targetRika) {
@@ -499,8 +501,14 @@ export class YutaFighter extends Fighter {
       const deployAudioFrame = CONFIG.yuta.domainDeployAudioFrame ?? this.domainChargeMax;
       if (this.domainChargeTimer === deployAudioFrame && !this._playedDeployAudio) {
         this._playedDeployAudio = true;
-        const activateSound = getSkillSound(this._def?.id, 'domain_activate') || getSkillSound(this._def?.id, 'domain');
-        if (activateSound) audioSystem.playSFX(activateSound.src, activateSound.volume);
+        if (CONFIG.yuta?.domainDeploySound) {
+          audioSystem.playSFX(
+            CONFIG.yuta.domainDeploySound,
+            CONFIG.yuta.domainDeployVolume ?? 3.5,
+            1.0, 0,
+            CONFIG.yuta.domainDeployDelay ?? 0
+          );
+        }
       }
 
       if (this.domainChargeTimer >= this.domainChargeMax) {
@@ -573,8 +581,14 @@ export class YutaFighter extends Fighter {
         this._playedDeployAudio = false;
         
         triggerGlobalScreenShake(6, 120); // Long screen shake matching Gojo/Sukuna
-        const channelSound = getSkillSound(this._def?.id || 'yuta', 'domain_channel');
-        if (channelSound) audioSystem.playSFX(channelSound.src, channelSound.volume);
+        if (CONFIG.yuta?.domainChannelSound) {
+          audioSystem.playSFX(
+            CONFIG.yuta.domainChannelSound,
+            CONFIG.yuta.domainChannelVolume ?? 3.5,
+            1.0, 0,
+            CONFIG.yuta.domainChannelDelay ?? 0
+          );
+        }
       }
     }
 
@@ -707,6 +721,13 @@ export class YutaFighter extends Fighter {
 
     if (!this.domainActive && !isStunned && !isSwinging && !unblockable && this.hp > 0 && Math.random() < blockChance) {
       // Successfully blocked!
+      
+      const isAlreadyCountering = (this.flurryHitsLeft > 0) || this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0) || (this.flurrySlashTimer > 0);
+      if (isAlreadyCountering) {
+        spawnSparks(this.x, this.y, 4, 'silver', 'rgba(255, 20, 147, 1)');
+        return 0; // Passively block damage during active counter to prevent interruption
+      }
+
       this.parryCount++;
       if (this.parryCount >= this.targetParriesForFlurry && attacker && !attacker.isDead && !this.isChannelingDomain) {
         this.parryCount = 0;
@@ -731,14 +752,28 @@ export class YutaFighter extends Fighter {
         audioSystem.playSFX('skill_dash3', 0.8);
         triggerGlobalScreenShake(8, 10);
 
-        if (Math.random() < 0.5) {
+        // Determine counter type based on strict alternation
+        const triggerFlurry = (this.lastParryCounterType !== 'flurry');
+
+        if (triggerFlurry) {
+          this.lastParryCounterType = 'flurry';
           this.blockPoseTimer = 0; // Clear block pose so he actually swings!
           this.flurryHitsLeft = CONFIG.yuta.flurryHits || 5;
           this.flurryTimer = 0;
           this.flurryTarget = attacker;
           const attackSound = getBasicAttackSound('musashi');
           if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
+          const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 1.0;
+          if (CONFIG.yuta?.phantomFlurryNoiseSound && Math.random() < flurryNoiseChance) {
+            audioSystem.playSFX(
+              CONFIG.yuta.phantomFlurryNoiseSound,
+              CONFIG.yuta.phantomFlurryNoiseVolume ?? 2.0,
+              1.0, 0,
+              CONFIG.yuta.phantomFlurryNoiseDelay ?? 0
+            );
+          }
         } else {
+          this.lastParryCounterType = 'thin_ice';
           this.blockPoseTimer = 0; // Clear block pose for Thin Ice Breaker punch too!
           this.isChannelingThinIceBreaker = true;
           this.thinIceBreakerChargeTimer = 15;
@@ -851,9 +886,62 @@ export class YutaFighter extends Fighter {
   }
 
   resolveWallBounce(arena, opponent) {
-    super.resolveWallBounce(arena);
-    if (opponent && !opponent.isDead) {
-      this.aim(opponent);
+    let bounced = false;
+    const restitution = CONFIG.collision.restitution || 0.8;
+
+    if (this.x - this.r < arena.x) {
+      this.x = arena.x + this.r;
+      bounced = true;
+    } else if (this.x + this.r > arena.x + arena.width) {
+      this.x = arena.x + arena.width - this.r;
+      bounced = true;
+    }
+
+    if (this.y - this.r < arena.y) {
+      this.y = arena.y + this.r;
+      bounced = true;
+    } else if (this.y + this.r > arena.y + arena.height) {
+      this.y = arena.y + arena.height - this.r;
+      bounced = true;
+    }
+
+    if (bounced) {
+      if (typeof this.playWallBounceSound === 'function') this.playWallBounceSound();
+
+      let target = opponent;
+      if (!target || target.isDead || target.hp <= 0) {
+        let nearest = null;
+        let nearestDist = Infinity;
+        const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
+        for (const f of allEntities) {
+          if (!f || f === this || f.hp <= 0) continue;
+          if (f.team === this.team) continue;
+          const dist = Math.hypot(f.x - this.x, f.y - this.y);
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearest = f;
+          }
+        }
+        target = nearest;
+      }
+
+      const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 8;
+
+      if (target) {
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        this.vx = (dx / dist) * currentSpeed * restitution;
+        this.vy = (dy / dist) * currentSpeed * restitution;
+        this.aim(target);
+      } else {
+        if (this.x - this.r <= arena.x || this.x + this.r >= arena.x + arena.width) {
+          this.vx = -this.vx * restitution;
+        }
+        if (this.y - this.r <= arena.y || this.y + this.r >= arena.y + arena.height) {
+          this.vy = -this.vy * restitution;
+        }
+      }
     }
   }
 
@@ -878,14 +966,22 @@ export class YutaFighter extends Fighter {
         this.rika.active = false;
         this.rika.cooldownTimer = 0;
 
-        // Play Rika Appearance audio (rikaAppearance.mp3) when Rika is summoned into domain!
-        const appearSound = getSkillSound(this._def?.id || 'yuta', 'rika_appearance');
-        if (appearSound) {
-          audioSystem.playSFX(appearSound.src, appearSound.volume, appearSound.speed, appearSound.offset);
-          audioSystem.playSFX('skill_comerika', 1.0);
-        } else {
-          audioSystem.playSFX('skill_rikaAppearance1', 1.5);
-          audioSystem.playSFX('skill_comerika', 1.0);
+        // Play Rika Appearance audio when Rika is summoned into domain!
+        if (CONFIG.yuta?.rikaAppearanceSound) {
+          audioSystem.playSFX(
+            CONFIG.yuta.rikaAppearanceSound,
+            CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
+            1.0, 0,
+            CONFIG.yuta.rikaAppearanceDelay ?? 0
+          );
+        }
+        if (CONFIG.yuta?.comeRikaSound) {
+          audioSystem.playSFX(
+            CONFIG.yuta.comeRikaSound,
+            CONFIG.yuta.comeRikaVolume ?? 2.5,
+            1.0, 0,
+            CONFIG.yuta.comeRikaDelay ?? 0
+          );
         }
       } else {
         // If she was already active, keep her moving continuously without freezing Yuta or Rika!
@@ -993,6 +1089,8 @@ export class YutaFighter extends Fighter {
 
 
   drawGun(ctx) {
+    const isGamePlay = (typeof state !== 'undefined' && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+
     // Draw the chest strap here so it layers over the body but UNDER the HP text
     this._drawYutaSwordStrap(ctx);
 
@@ -1056,6 +1154,22 @@ export class YutaFighter extends Fighter {
         ctx.lineTo(plast.x, plast.y);
       };
 
+      // Allocation-free reverse path tracer to avoid cloning/reversing arrays
+      const smoothPathReversed = (pts, selectFn) => {
+        const lastIdx = pts.length - 1;
+        const p0 = selectFn(pts[lastIdx], lastIdx);
+        ctx.lineTo(p0.x, p0.y);
+        for (let i = lastIdx - 1; i > 0; i--) {
+          const pi = selectFn(pts[i], i);
+          const pi1 = selectFn(pts[i - 1], i - 1);
+          const xc = (pi.x + pi1.x) / 2;
+          const yc = (pi.y + pi1.y) / 2;
+          ctx.quadraticCurveTo(pi.x, pi.y, xc, yc);
+        }
+        const pFirst = selectFn(pts[0], 0);
+        ctx.lineTo(pFirst.x, pFirst.y);
+      };
+
       // Selectors for outer, inner, and core coordinates along the trail
       const getOuter = (p) => p.outer;
       const getInner = (p) => {
@@ -1082,135 +1196,149 @@ export class YutaFighter extends Fighter {
       smoothPath(this.swordTrail, getOuter);
       ctx.stroke();
 
-      // 2. Main pink crescent body fill (smooth, curved polygon)
+      // 2. Main pink crescent body fill (smooth, curved polygon) - Optimized: Allocation-free backward loop
       ctx.fillStyle = 'rgba(255, 20, 147, 0.45)'; // Vibrant deep hot pink
       ctx.beginPath();
       smoothPath(this.swordTrail, getOuter);
-      const reversedTrail = [...this.swordTrail].reverse();
-      const r0 = getInner(reversedTrail[0]);
-      ctx.lineTo(r0.x, r0.y);
-      smoothPath(reversedTrail, getInner);
+      smoothPathReversed(this.swordTrail, getInner);
       ctx.closePath();
       ctx.fill();
 
-      // 3. Searing white-pink core fill (gives it a glowing blade center)
+      // 3. Searing white-pink core fill - Optimized: Allocation-free backward loop
       ctx.fillStyle = 'rgba(255, 220, 235, 0.85)';
       ctx.beginPath();
       smoothPath(this.swordTrail, getOuter);
-      const coreReversed = [...this.swordTrail].reverse();
-      const cr0 = getCoreInner(coreReversed[0]);
-      ctx.lineTo(cr0.x, cr0.y);
-      smoothPath(coreReversed, getCoreInner);
+      smoothPathReversed(this.swordTrail, getCoreInner);
       ctx.closePath();
       ctx.fill();
 
-      // 4. JJK calligraphy ink outlines (segment-by-segment Bezier curves with varying pressure width)
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+      // 4. JJK calligraphy ink outlines
+      if (isGamePlay) {
+        // High-performance gameplay drawing path:
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-      // Outer calligraphy outline
-      if (numSegments > 2) {
-        for (let i = 1; i < numSegments - 1; i++) {
-          const p = this.swordTrail[i];
-          const prev = this.swordTrail[i - 1];
-          const next = this.swordTrail[i + 1];
-
-          const prevMidX = (prev.outer.x + p.outer.x) / 2;
-          const prevMidY = (prev.outer.y + p.outer.y) / 2;
-          const midX = (p.outer.x + next.outer.x) / 2;
-          const midY = (p.outer.y + next.outer.y) / 2;
-
-          const pressureNoise = Math.sin(Date.now() * 0.005 + i * 1.7) * 0.5 + 0.5;
-          ctx.lineWidth = (0.7 + pressureNoise * 1.5) * p.life;
-
-          ctx.beginPath();
-          ctx.moveTo(prevMidX, prevMidY);
-          ctx.quadraticCurveTo(p.outer.x, p.outer.y, midX, midY);
-          ctx.stroke();
-        }
-
-        // Connect start segment
-        const p0 = this.swordTrail[0];
-        const p1 = this.swordTrail[1];
-        const startMidX = (p0.outer.x + p1.outer.x) / 2;
-        const startMidY = (p0.outer.y + p1.outer.y) / 2;
-        ctx.lineWidth = 0.8 * p0.life;
-        ctx.beginPath();
-        ctx.moveTo(p0.outer.x, p0.outer.y);
-        ctx.lineTo(startMidX, startMidY);
-        ctx.stroke();
-
-        // Connect end segment
-        const pLast = this.swordTrail[numSegments - 1];
-        const pPenult = this.swordTrail[numSegments - 2];
-        const endMidX = (pLast.outer.x + pPenult.outer.x) / 2;
-        const endMidY = (pLast.outer.y + pPenult.outer.y) / 2;
-        ctx.lineWidth = 0.8 * pLast.life;
-        ctx.beginPath();
-        ctx.moveTo(endMidX, endMidY);
-        ctx.lineTo(pLast.outer.x, pLast.outer.y);
-        ctx.stroke();
-      } else {
-        // Fallback for short trails
-        ctx.lineWidth = 2.0;
+        // Outer outline (single continuous path)
+        ctx.lineWidth = 1.6;
         ctx.beginPath();
         smoothPath(this.swordTrail, getOuter);
         ctx.stroke();
-      }
 
-      // Inner calligraphy outline
-      if (numSegments > 2) {
-        for (let i = 1; i < numSegments - 1; i++) {
-          const p = this.swordTrail[i];
-          const prev = this.swordTrail[i - 1];
-          const next = this.swordTrail[i + 1];
+        // Inner outline (single continuous path)
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        smoothPath(this.swordTrail, getInner);
+        ctx.stroke();
+      } else {
+        // Original detailed calligraphy outlines with varying pressure
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
 
-          const pInner = getInner(p);
-          const prevInner = getInner(prev);
-          const nextInner = getInner(next);
+        // Outer calligraphy outline
+        if (numSegments > 2) {
+          for (let i = 1; i < numSegments - 1; i++) {
+            const p = this.swordTrail[i];
+            const prev = this.swordTrail[i - 1];
+            const next = this.swordTrail[i + 1];
 
-          const prevMidX = (prevInner.x + pInner.x) / 2;
-          const prevMidY = (prevInner.y + pInner.y) / 2;
-          const midX = (pInner.x + nextInner.x) / 2;
-          const midY = (pInner.y + nextInner.y) / 2;
+            const prevMidX = (prev.outer.x + p.outer.x) / 2;
+            const prevMidY = (prev.outer.y + p.outer.y) / 2;
+            const midX = (p.outer.x + next.outer.x) / 2;
+            const midY = (p.outer.y + next.outer.y) / 2;
 
-          const pressureNoise = Math.sin(Date.now() * 0.005 + i * 1.7 + Math.PI) * 0.5 + 0.5;
-          ctx.lineWidth = (0.4 + pressureNoise * 1.0) * p.life;
+            const pressureNoise = Math.sin(Date.now() * 0.005 + i * 1.7) * 0.5 + 0.5;
+            ctx.lineWidth = (0.7 + pressureNoise * 1.5) * p.life;
 
+            ctx.beginPath();
+            ctx.moveTo(prevMidX, prevMidY);
+            ctx.quadraticCurveTo(p.outer.x, p.outer.y, midX, midY);
+            ctx.stroke();
+          }
+
+          // Connect start segment
+          const p0 = this.swordTrail[0];
+          const p1 = this.swordTrail[1];
+          const startMidX = (p0.outer.x + p1.outer.x) / 2;
+          const startMidY = (p0.outer.y + p1.outer.y) / 2;
+          ctx.lineWidth = 0.8 * p0.life;
           ctx.beginPath();
-          ctx.moveTo(prevMidX, prevMidY);
-          ctx.quadraticCurveTo(pInner.x, pInner.y, midX, midY);
+          ctx.moveTo(p0.outer.x, p0.outer.y);
+          ctx.lineTo(startMidX, startMidY);
+          ctx.stroke();
+
+          // Connect end segment
+          const pLast = this.swordTrail[numSegments - 1];
+          const pPenult = this.swordTrail[numSegments - 2];
+          const endMidX = (pLast.outer.x + pPenult.outer.x) / 2;
+          const endMidY = (pLast.outer.y + pPenult.outer.y) / 2;
+          ctx.lineWidth = 0.8 * pLast.life;
+          ctx.beginPath();
+          ctx.moveTo(endMidX, endMidY);
+          ctx.lineTo(pLast.outer.x, pLast.outer.y);
+          ctx.stroke();
+        } else {
+          // Fallback for short trails
+          ctx.lineWidth = 2.0;
+          ctx.beginPath();
+          smoothPath(this.swordTrail, getOuter);
           ctx.stroke();
         }
 
-        // Connect start segment
-        const p0 = getInner(this.swordTrail[0]);
-        const p1 = getInner(this.swordTrail[1]);
-        const startMidX = (p0.x + p1.x) / 2;
-        const startMidY = (p0.y + p1.y) / 2;
-        ctx.lineWidth = 0.5 * this.swordTrail[0].life;
-        ctx.beginPath();
-        ctx.moveTo(p0.x, p0.y);
-        ctx.lineTo(startMidX, startMidY);
-        ctx.stroke();
+        // Inner calligraphy outline
+        if (numSegments > 2) {
+          for (let i = 1; i < numSegments - 1; i++) {
+            const p = this.swordTrail[i];
+            const prev = this.swordTrail[i - 1];
+            const next = this.swordTrail[i + 1];
 
-        // Connect end segment
-        const pLast = getInner(this.swordTrail[numSegments - 1]);
-        const pPenult = getInner(this.swordTrail[numSegments - 2]);
-        const endMidX = (pLast.x + pPenult.x) / 2;
-        const endMidY = (pLast.y + pPenult.y) / 2;
-        ctx.lineWidth = 0.5 * this.swordTrail[numSegments - 1].life;
-        ctx.beginPath();
-        ctx.moveTo(endMidX, endMidY);
-        ctx.lineTo(pLast.x, pLast.y);
-        ctx.stroke();
-      } else {
-        // Fallback for short trails
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        smoothPath(reversedTrail, getInner);
-        ctx.stroke();
+            const pInner = getInner(p);
+            const prevInner = getInner(prev);
+            const nextInner = getInner(next);
+
+            const prevMidX = (prevInner.x + pInner.x) / 2;
+            const prevMidY = (prevInner.y + pInner.y) / 2;
+            const midX = (pInner.x + nextInner.x) / 2;
+            const midY = (pInner.y + nextInner.y) / 2;
+
+            const pressureNoise = Math.sin(Date.now() * 0.005 + i * 1.7 + Math.PI) * 0.5 + 0.5;
+            ctx.lineWidth = (0.4 + pressureNoise * 1.0) * p.life;
+
+            ctx.beginPath();
+            ctx.moveTo(prevMidX, prevMidY);
+            ctx.quadraticCurveTo(pInner.x, pInner.y, midX, midY);
+            ctx.stroke();
+          }
+
+          // Connect start segment
+          const p0 = getInner(this.swordTrail[0]);
+          const p1 = getInner(this.swordTrail[1]);
+          const startMidX = (p0.x + p1.x) / 2;
+          const startMidY = (p0.y + p1.y) / 2;
+          ctx.lineWidth = 0.5 * this.swordTrail[0].life;
+          ctx.beginPath();
+          ctx.moveTo(p0.x, p0.y);
+          ctx.lineTo(startMidX, startMidY);
+          ctx.stroke();
+
+          // Connect end segment
+          const pLast = getInner(this.swordTrail[numSegments - 1]);
+          const pPenult = getInner(this.swordTrail[numSegments - 2]);
+          const endMidX = (pLast.x + pPenult.x) / 2;
+          const endMidY = (pLast.y + pPenult.y) / 2;
+          ctx.lineWidth = 0.5 * this.swordTrail[numSegments - 1].life;
+          ctx.beginPath();
+          ctx.moveTo(endMidX, endMidY);
+          ctx.lineTo(pLast.x, pLast.y);
+          ctx.stroke();
+        } else {
+          // Fallback for short trails
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          smoothPathReversed(this.swordTrail, getInner);
+          ctx.stroke();
+        }
       }
 
       // 5. Continuous interior ink speed lines (flowing along the trail center)
@@ -1340,158 +1468,205 @@ export class YutaFighter extends Fighter {
     }
 
     if (auraOpacity > 0.01) {
-      const frameRate = 30;
-      // Infinite stepped frames (no modulus snapping)
-      const frameIndex = Math.floor(Date.now() / (1000 / frameRate));
-      const time = frameIndex * 120;
-      // Add velocity/position influence so the flames react naturally as he moves
-      // Kept very subtle (0.015) so it doesn't vibrate violently during fast dashes
-      const moveOffset = (this.x + this.y) * 0.015;
-
       ctx.save();
 
-      // === Volumetric Katana Backlight (Replicating Champion Screen) ===
-      ctx.globalCompositeOperation = 'screen';
-      const katanaGlow = ctx.createLinearGradient(-15, 0, 85, 0);
-      katanaGlow.addColorStop(0, `rgba(255, 255, 255, ${0.4 * auraOpacity})`);
-      katanaGlow.addColorStop(0.6, `rgba(255, 105, 180, ${0.2 * auraOpacity})`);
-      katanaGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
-
-      ctx.beginPath();
-      ctx.moveTo(-15, 0);
-      ctx.quadraticCurveTo(35, 1.5, 85, -4); // Follows the blade curve
-      ctx.lineWidth = 35;
-      ctx.lineCap = 'round';
-      ctx.strokeStyle = katanaGlow;
-      ctx.stroke();
-
-      ctx.globalCompositeOperation = 'source-over';
-
-      const mainColor = '#FF1493';
       const fillColor = `rgba(255, 105, 180, 0.7)`; // Fixed alpha so it doesn't double-multiply
       const coreColor = `rgba(255, 192, 203, 0.8)`;
       const strokeColor = `rgba(0, 0, 0, 0.75)`;
 
-      // (Removed shadowBlur for 60 FPS performance)
+      if (isGamePlay) {
+        // === Volumetric Katana Backlight (Optimized solid glow during gameplay) ===
+        ctx.globalCompositeOperation = 'screen';
+        ctx.strokeStyle = `rgba(255, 20, 147, ${0.25 * auraOpacity})`;
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.quadraticCurveTo(35, 1.5, 85, -4);
+        ctx.lineWidth = 35;
+        ctx.lineCap = 'round';
+        ctx.stroke();
 
-      // Generate outer flame points (Viscous Liquid Fire Silhouette)
-      let allPoints = [];
+        ctx.globalCompositeOperation = 'source-over';
 
-      // Top edge (left to right) - Localized flame tongues (flicker instead of slide)
-      for (let x = -15; x <= 85; x += 5) {
-        let cy = (x > 19) ? (x - 19) * -0.09 : 0;
+        // Fast simplified outer aura shape
+        ctx.fillStyle = fillColor;
+        ctx.beginPath();
+        ctx.moveTo(-15, -6 * auraOpacity);
+        ctx.lineTo(35, -7 * auraOpacity);
+        ctx.lineTo(85, -12 * auraOpacity);
+        ctx.lineTo(85, 8 * auraOpacity);
+        ctx.lineTo(35, 3 * auraOpacity);
+        ctx.lineTo(-15, 2 * auraOpacity);
+        ctx.closePath();
+        ctx.fill();
+        
+        // Fast simplified inner core shape
+        ctx.fillStyle = coreColor;
+        ctx.beginPath();
+        ctx.moveTo(-12, -2 * auraOpacity);
+        ctx.lineTo(35, -3 * auraOpacity);
+        ctx.lineTo(80, -5 * auraOpacity);
+        ctx.lineTo(80, 3 * auraOpacity);
+        ctx.lineTo(35, 1 * auraOpacity);
+        ctx.lineTo(-12, 1 * auraOpacity);
+        ctx.closePath();
+        ctx.fill();
 
-        // Slow base shape evolution (how tongues grow/morph)
-        let baseShape = Math.pow(Math.sin(x * 0.05 + time * 0.0008) * 0.5 + 0.5, 3.0) * 18;
+        // Thin black border around the aura shape
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(-15, -6 * auraOpacity);
+        ctx.lineTo(35, -7 * auraOpacity);
+        ctx.lineTo(85, -12 * auraOpacity);
+        ctx.lineTo(85, 8 * auraOpacity);
+        ctx.lineTo(35, 3 * auraOpacity);
+        ctx.lineTo(-15, 2 * auraOpacity);
+        ctx.closePath();
+        ctx.stroke();
+      } else {
+        const frameRate = 30;
+        // Infinite stepped frames (no modulus snapping)
+        const frameIndex = Math.floor(Date.now() / (1000 / frameRate));
+        const time = frameIndex * 120;
+        // Add velocity/position influence so the flames react naturally as he moves
+        const moveOffset = (this.x + this.y) * 0.015;
 
-        // Gentle, localized height flicker (smoothed frequency and amplitude)
-        let flicker = Math.sin(time * 0.002 + x * 0.2 - moveOffset) * 0.15 + 0.85;
+        // === Volumetric Katana Backlight (Replicating Champion Screen) ===
+        ctx.globalCompositeOperation = 'screen';
+        const katanaGlow = ctx.createLinearGradient(-15, 0, 85, 0);
+        katanaGlow.addColorStop(0, `rgba(255, 255, 255, ${0.4 * auraOpacity})`);
+        katanaGlow.addColorStop(0.6, `rgba(255, 105, 180, ${0.2 * auraOpacity})`);
+        katanaGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
 
-        let topWave = (baseShape * flicker + 3) * auraOpacity;
-        allPoints.push({ x: x, y: cy - 4 - topWave });
-      }
+        ctx.beginPath();
+        ctx.moveTo(-15, 0);
+        ctx.quadraticCurveTo(35, 1.5, 85, -4); // Follows the blade curve
+        ctx.lineWidth = 35;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = katanaGlow;
+        ctx.stroke();
 
-      // Bottom edge (right to left) - Localized flame tongues
-      for (let x = 85; x >= -15; x -= 5) {
-        let cy = (x > 19) ? (x - 19) * -0.09 : 0;
+        ctx.globalCompositeOperation = 'source-over';
 
-        let baseShape = Math.pow(Math.cos(x * 0.06 - time * 0.0006) * 0.5 + 0.5, 2.5) * 18;
-        let flicker = Math.cos(time * 0.0025 - x * 0.25 + moveOffset) * 0.15 + 0.85;
+        // Generate outer flame points (Viscous Liquid Fire Silhouette)
+        let allPoints = [];
 
-        let botWave = (baseShape * flicker + 3) * auraOpacity;
-        allPoints.push({ x: x, y: cy + 4 + botWave });
-      }
+        // Top edge (left to right) - Localized flame tongues (flicker instead of slide)
+        for (let x = -15; x <= 85; x += 5) {
+          let cy = (x > 19) ? (x - 19) * -0.09 : 0;
 
-      // Outer flame fill
-      ctx.beginPath();
-      let mx = (allPoints[allPoints.length - 1].x + allPoints[0].x) / 2;
-      let my = (allPoints[allPoints.length - 1].y + allPoints[0].y) / 2;
-      ctx.moveTo(mx, my);
-      for (let i = 0; i < allPoints.length; i++) {
-        let p = allPoints[i];
-        let next = allPoints[(i + 1) % allPoints.length];
-        let xc = (p.x + next.x) / 2;
-        let yc = (p.y + next.y) / 2;
-        ctx.quadraticCurveTo(p.x, p.y, xc, yc);
-      }
-      ctx.closePath();
-      ctx.fillStyle = fillColor;
-      ctx.fill();
+          // Slow base shape evolution (how tongues grow/morph)
+          let baseShape = Math.pow(Math.sin(x * 0.05 + time * 0.0008) * 0.5 + 0.5, 3.0) * 18;
 
-      // Inner glowing core (shrunk vertically towards the blade)
-      ctx.beginPath();
-      ctx.moveTo(mx, my * 0.4);
-      for (let i = 0; i < allPoints.length; i++) {
-        let p = allPoints[i];
-        let next = allPoints[(i + 1) % allPoints.length];
-        let xc = (p.x + next.x) / 2;
-        let yc = (p.y + next.y) / 2;
-        // Shrink the y-coordinates tightly around the blade
-        ctx.quadraticCurveTo(p.x, p.y * 0.4, xc, yc * 0.4);
-      }
-      ctx.closePath();
-      ctx.fillStyle = coreColor;
-      ctx.fill();
+          // Gentle, localized height flicker (smoothed frequency and amplitude)
+          let flicker = Math.sin(time * 0.002 + x * 0.2 - moveOffset) * 0.15 + 0.85;
 
-      // Primary Ink brush stroke outline (varying thickness like calligraphy brush)
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = strokeColor;
-      ctx.globalAlpha = auraOpacity;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+          let topWave = (baseShape * flicker + 3) * auraOpacity;
+          allPoints.push({ x: x, y: cy - 4 - topWave });
+        }
 
-      ctx.lineWidth = 1.6;
-      ctx.beginPath();
-      let mxS = (allPoints[allPoints.length - 1].x + allPoints[0].x) / 2;
-      let myS = (allPoints[allPoints.length - 1].y + allPoints[0].y) / 2;
-      ctx.moveTo(mxS, myS);
-      for (let i = 0; i < allPoints.length; i++) {
-        const p = allPoints[i];
-        const next = allPoints[(i + 1) % allPoints.length];
-        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-      }
-      ctx.closePath();
-      ctx.stroke();
+        // Bottom edge (right to left) - Localized flame tongues
+        for (let x = 85; x >= -15; x -= 5) {
+          let cy = (x > 19) ? (x - 19) * -0.09 : 0;
 
-      // Chaotic, broken JJK black ink brush cuts & hatches inside the katana aura
-      ctx.shadowBlur = 0;
-      ctx.strokeStyle = strokeColor;
-      ctx.lineCap = 'butt';
+          let baseShape = Math.pow(Math.cos(x * 0.06 - time * 0.0006) * 0.5 + 0.5, 2.5) * 18;
+          let flicker = Math.cos(time * 0.0025 - x * 0.25 + moveOffset) * 0.15 + 0.85;
 
-      const insetScales = [0.65, 0.8, 0.92]; // Scaled closer to the blade center (inside the pink)
-      for (let layer = 0; layer < insetScales.length; layer++) {
-        const scale = insetScales[layer];
-        const speedDir = (layer % 2 === 0 ? 1 : -1);
-        const flowTime = time * 0.003 * speedDir;
+          let botWave = (baseShape * flicker + 3) * auraOpacity;
+          allPoints.push({ x: x, y: cy + 4 + botWave });
+        }
 
+        // Outer flame fill
+        ctx.beginPath();
+        let mx = (allPoints[allPoints.length - 1].x + allPoints[0].x) / 2;
+        let my = (allPoints[allPoints.length - 1].y + allPoints[0].y) / 2;
+        ctx.moveTo(mx, my);
         for (let i = 0; i < allPoints.length; i++) {
-          // Slow wave (for long strokes) + fast wave (for short details) = variety of longevity
-          const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-          const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-          const cutSeed = longWave + shortWave;
-          if (cutSeed < 0.15) continue; // Higher threshold to reduce density and clutter
+          let p = allPoints[i];
+          let next = allPoints[(i + 1) % allPoints.length];
+          let xc = (p.x + next.x) / 2;
+          let yc = (p.y + next.y) / 2;
+          ctx.quadraticCurveTo(p.x, p.y, xc, yc);
+        }
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
 
+        // Inner glowing core (shrunk vertically towards the blade)
+        ctx.beginPath();
+        ctx.moveTo(mx, my * 0.4);
+        for (let i = 0; i < allPoints.length; i++) {
+          let p = allPoints[i];
+          let next = allPoints[(i + 1) % allPoints.length];
+          let xc = (p.x + next.x) / 2;
+          let yc = (p.y + next.y) / 2;
+          // Shrink the y-coordinates tightly around the blade
+          ctx.quadraticCurveTo(p.x, p.y * 0.4, xc, yc * 0.4);
+        }
+        ctx.closePath();
+        ctx.fillStyle = coreColor;
+        ctx.fill();
+
+        // Primary Ink brush stroke outline (varying thickness like calligraphy brush)
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = strokeColor;
+        ctx.globalAlpha = auraOpacity;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        let mxS = (allPoints[allPoints.length - 1].x + allPoints[0].x) / 2;
+        let myS = (allPoints[allPoints.length - 1].y + allPoints[0].y) / 2;
+        ctx.moveTo(mxS, myS);
+        for (let i = 0; i < allPoints.length; i++) {
           const p = allPoints[i];
           const next = allPoints[(i + 1) % allPoints.length];
+          ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+        }
+        ctx.closePath();
+        ctx.stroke();
 
-          // Find blade center line for both points to curve correctly
-          let pCy = (p.x > 19) ? (p.x - 19) * -0.09 : 0;
-          let nextCy = (next.x > 19) ? (next.x - 19) * -0.09 : 0;
+        // Chaotic, broken JJK black ink brush cuts & hatches inside the katana aura
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = strokeColor;
+        ctx.lineCap = 'butt';
 
-          // Scale Y relative to the blade center line so cuts sit inside the pink aura
-          let yStart = pCy + (p.y - pCy) * scale;
-          let yEnd = nextCy + (next.y - nextCy) * scale;
+        const insetScales = [0.65, 0.8, 0.92]; // Scaled closer to the blade center (inside the pink)
+        for (let layer = 0; layer < insetScales.length; layer++) {
+          const scale = insetScales[layer];
+          const speedDir = (layer % 2 === 0 ? 1 : -1);
+          const flowTime = time * 0.003 * speedDir;
 
-          ctx.lineWidth = 0.4 + (cutSeed * 1.2);
-          ctx.beginPath();
-          ctx.moveTo(p.x, yStart);
+          for (let i = 0; i < allPoints.length; i++) {
+            // Slow wave (for long strokes) + fast wave (for short details) = variety of longevity
+            const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
+            const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
+            const cutSeed = longWave + shortWave;
+            if (cutSeed < 0.15) continue; // Higher threshold to reduce density and clutter
 
-          // Add a slight jaggedness to the cut
-          const jagX = Math.cos(i * 43) * 1.5;
-          const jagY = Math.sin(i * 43) * 1.5;
+            const p = allPoints[i];
+            const next = allPoints[(i + 1) % allPoints.length];
 
-          ctx.lineTo(next.x + jagX, yEnd + jagY);
-          ctx.stroke();
+            // Find blade center line for both points to curve correctly
+            let pCy = (p.x > 19) ? (p.x - 19) * -0.09 : 0;
+            let nextCy = (next.x > 19) ? (next.x - 19) * -0.09 : 0;
+
+            // Scale Y relative to the blade center line so cuts sit inside the pink aura
+            let yStart = pCy + (p.y - pCy) * scale;
+            let yEnd = nextCy + (next.y - nextCy) * scale;
+
+            ctx.lineWidth = 0.4 + (cutSeed * 1.2);
+            ctx.beginPath();
+            ctx.moveTo(p.x, yStart);
+
+            // Add a slight jaggedness to the cut
+            const jagX = Math.cos(i * 43) * 1.5;
+            const jagY = Math.sin(i * 43) * 1.5;
+
+            ctx.lineTo(next.x + jagX, yEnd + jagY);
+            ctx.stroke();
+          }
         }
       }
 
@@ -1499,151 +1674,190 @@ export class YutaFighter extends Fighter {
     }
 
     // Draw Lore-Accurate Katana (Matching reference image)
+    if (isGamePlay) {
+      // 1. Tsuka (Black Hilt)
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(-15, -2.5, 23, 5);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.0;
+      ctx.strokeRect(-15, -2.5, 23, 5);
 
-    // 1. Kashira (Gold Pommel)
-    ctx.fillStyle = '#D4AF37';
-    ctx.fillRect(-18, -3, 3, 6);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.0;
-    ctx.strokeRect(-18, -3, 3, 6);
+      // 2. Tsuba (Golden Guard)
+      ctx.fillStyle = '#C5A059';
+      ctx.fillRect(10.8, -6, 4, 12);
+      ctx.strokeRect(10.8, -6, 4, 12);
 
-    // 2. Tsuka (Black Hilt underwrap)
-    ctx.fillStyle = '#1A1A1A';
-    ctx.fillRect(-15, -2.5, 23, 5);
-    ctx.strokeStyle = '#000000';
-    ctx.strokeRect(-15, -2.5, 23, 5);
+      // 3. Habaki (Collar)
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(14.8, -2, 4, 4);
 
-    // Menuki (Tiny gold ornaments inside the black tsuka gaps)
-    ctx.fillStyle = '#DAA520';
-    for (let dx = -13.25; dx <= 6; dx += 3.5) {
-      ctx.fillRect(dx, -0.5, 1, 1);
-    }
-
-    // 3. Tsuka-ito (Red criss-cross wrap pattern)
-    ctx.strokeStyle = '#D11A2A'; // Red wrap
-    ctx.lineWidth = 1.2;
-    ctx.lineCap = 'butt';
-    for (let dx = -15; dx <= 6; dx += 3.5) {
+      // 4. Blade - Curved silver blade
       ctx.beginPath();
-      ctx.moveTo(dx, -2.5);
-      ctx.lineTo(dx + 3.5, 2.5);
+      ctx.moveTo(19, -1.8);
+      ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
+      ctx.quadraticCurveTo(78, -3.5, 75, -2.2);
+      ctx.quadraticCurveTo(49, 1.2, 19, 2.2);
+      ctx.closePath();
+      ctx.fillStyle = '#E5E8E8';
+      ctx.fill();
+      if (auraOpacity > 0.05) {
+        ctx.fillStyle = `rgba(255, 20, 147, ${auraOpacity * 0.4})`;
+        ctx.fill();
+      }
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.0;
       ctx.stroke();
+
+      // 5. Hand holding the hilt
       ctx.beginPath();
-      ctx.moveTo(dx + 3.5, -2.5);
-      ctx.lineTo(dx, 2.5);
+      ctx.arc(-2, 0.5, getHandSize(5, this), 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+    } else {
+      // 1. Kashira (Gold Pommel)
+      ctx.fillStyle = '#D4AF37';
+      ctx.fillRect(-18, -3, 3, 6);
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.0;
+      ctx.strokeRect(-18, -3, 3, 6);
+
+      // 2. Tsuka (Black Hilt underwrap)
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(-15, -2.5, 23, 5);
+      ctx.strokeStyle = '#000000';
+      ctx.strokeRect(-15, -2.5, 23, 5);
+
+      // Menuki (Tiny gold ornaments inside the black tsuka gaps)
+      ctx.fillStyle = '#DAA520';
+      for (let dx = -13.25; dx <= 6; dx += 3.5) {
+        ctx.fillRect(dx, -0.5, 1, 1);
+      }
+
+      // 3. Tsuka-ito (Red criss-cross wrap pattern)
+      ctx.strokeStyle = '#D11A2A'; // Red wrap
+      ctx.lineWidth = 1.2;
+      ctx.lineCap = 'butt';
+      for (let dx = -15; dx <= 6; dx += 3.5) {
+        ctx.beginPath();
+        ctx.moveTo(dx, -2.5);
+        ctx.lineTo(dx + 3.5, 2.5);
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.moveTo(dx + 3.5, -2.5);
+        ctx.lineTo(dx, 2.5);
+        ctx.stroke();
+      }
+
+      // Fuchi (Dark Golden Hilt Collar)
+      ctx.fillStyle = '#8B6508';
+      ctx.fillRect(8, -2.5, 2, 5);
+      ctx.strokeRect(8, -2.5, 2, 5);
+
+      // Left Seppa (Spacer washer)
+      ctx.fillStyle = '#DAA520';
+      ctx.fillRect(10, -4, 0.8, 8);
+
+      // 4. Tsuba (Golden Rounded Rectangular Guard)
+      ctx.fillStyle = '#C5A059';
+      ctx.beginPath();
+      ctx.moveTo(10.8, -7);
+      ctx.quadraticCurveTo(10.8, -8.5, 12.3, -8.5);
+      ctx.lineTo(13.3, -8.5);
+      ctx.quadraticCurveTo(14.8, -8.5, 14.8, -7);
+      ctx.lineTo(14.8, 7);
+      ctx.quadraticCurveTo(14.8, 8.5, 13.3, 8.5);
+      ctx.lineTo(12.3, 8.5);
+      ctx.quadraticCurveTo(10.8, 8.5, 10.8, 7);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = '#000000';
+      ctx.stroke();
+
+      // Tsuba Details (two hitsu-ana holes / engravings in the guard)
+      ctx.fillStyle = '#1A1A1A';
+      ctx.fillRect(12.3, -4.5, 1, 1.2);
+      ctx.fillRect(12.3, 3.3, 1, 1.2);
+
+      // Right Seppa (Spacer washer)
+      ctx.fillStyle = '#DAA520';
+      ctx.fillRect(14.8, -4, 0.8, 8);
+
+      // 5. Habaki (Golden Blade Collar)
+      ctx.fillStyle = '#FFD700';
+      ctx.fillRect(15.6, -2, 3.4, 4);
+      ctx.strokeRect(15.6, -2, 3.4, 4);
+
+      // 6. Blade — Curved katana shape with authentic sori (gentle upward arc)
+      ctx.beginPath();
+      ctx.moveTo(19, -1.8);                             // Spine start
+      ctx.quadraticCurveTo(49, -4.2, 81, -8.0);         // Spine curve all the way to the tip point
+      ctx.quadraticCurveTo(78, -3.5, 75, -2.2);         // Crescent tip cutting edge sweep
+      ctx.quadraticCurveTo(49, 1.2, 19, 2.2);           // Main cutting edge back to habaki
+      ctx.closePath();
+      ctx.fillStyle = '#E5E8E8';                        // Polished silver steel
+      ctx.fill();
+      if (auraOpacity > 0.05) {
+        ctx.fillStyle = `rgba(255, 20, 147, ${auraOpacity * 0.4})`; // Hot pink cursed glow overlay
+        ctx.fill();
+      }
+
+      // Second, overlay the dark spine (Shinogi-ji) ending at the Yokote line (tip division)
+      ctx.beginPath();
+      ctx.moveTo(19, -1.8);
+      ctx.quadraticCurveTo(49, -4.0, 75, -6.8);         // Spine top boundary
+      ctx.lineTo(75, -4.2);                             // Yokote dividing line
+      ctx.quadraticCurveTo(49, -0.8, 19, 0.2);          // Shinogi boundary line
+      ctx.closePath();
+      ctx.fillStyle = '#2F3538';                        // Dark spine steel
+      ctx.fill();
+      if (auraOpacity > 0.05) {
+        ctx.fillStyle = `rgba(255, 105, 180, ${auraOpacity * 0.35})`; // Pink spine glow tint
+        ctx.fill();
+      }
+
+      // Hamon line (temper line) — complex wavy boundary line
+      ctx.beginPath();
+      ctx.moveTo(19, 0.2);
+      for (let x = 19; x <= 75; x += 3.5) {
+        const waveY = 0.2 - 4.4 * ((x - 19) / 56) + Math.sin(x * 0.75) * 0.45;
+        ctx.lineTo(x, waveY);
+      }
+      ctx.strokeStyle = auraOpacity > 0.05 ? `rgba(255, 240, 245, ${0.65 + auraOpacity * 0.35})` : 'rgba(255, 255, 255, 0.65)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // Metallic Mune Highlight — bright shine along the back spine of the blade
+      ctx.beginPath();
+      ctx.moveTo(19, -1.8);
+      ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+
+      // Third, draw a clean black stroke outline over the entire outer blade boundary
+      ctx.beginPath();
+      ctx.moveTo(19, -1.8);
+      ctx.quadraticCurveTo(49, -4.2, 81, -8.0);         // Spine curve to tip point
+      ctx.quadraticCurveTo(78, -3.5, 75, -2.2);         // Crescent tip curve
+      ctx.quadraticCurveTo(49, 1.2, 19, 2.2);           // Main cutting edge back to habaki
+      ctx.closePath();
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+
+      // 7. Hand holding the hilt (drawn over the hilt wrapper and aura)
+      ctx.beginPath();
+      ctx.arc(-2, 0.5, getHandSize(5, this), 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#000';
       ctx.stroke();
     }
-
-    // Fuchi (Dark Golden Hilt Collar)
-    ctx.fillStyle = '#8B6508';
-    ctx.fillRect(8, -2.5, 2, 5);
-    ctx.strokeRect(8, -2.5, 2, 5);
-
-    // Left Seppa (Spacer washer)
-    ctx.fillStyle = '#DAA520';
-    ctx.fillRect(10, -4, 0.8, 8);
-
-    // 4. Tsuba (Golden Rounded Rectangular Guard)
-    ctx.fillStyle = '#C5A059';
-    ctx.beginPath();
-    ctx.moveTo(10.8, -7);
-    ctx.quadraticCurveTo(10.8, -8.5, 12.3, -8.5);
-    ctx.lineTo(13.3, -8.5);
-    ctx.quadraticCurveTo(14.8, -8.5, 14.8, -7);
-    ctx.lineTo(14.8, 7);
-    ctx.quadraticCurveTo(14.8, 8.5, 13.3, 8.5);
-    ctx.lineTo(12.3, 8.5);
-    ctx.quadraticCurveTo(10.8, 8.5, 10.8, 7);
-    ctx.closePath();
-    ctx.fill();
-    ctx.lineWidth = 1.0;
-    ctx.strokeStyle = '#000000';
-    ctx.stroke();
-
-    // Tsuba Details (two hitsu-ana holes / engravings in the guard)
-    ctx.fillStyle = '#1A1A1A';
-    ctx.fillRect(12.3, -4.5, 1, 1.2);
-    ctx.fillRect(12.3, 3.3, 1, 1.2);
-
-    // Right Seppa (Spacer washer)
-    ctx.fillStyle = '#DAA520';
-    ctx.fillRect(14.8, -4, 0.8, 8);
-
-    // 5. Habaki (Golden Blade Collar)
-    ctx.fillStyle = '#FFD700';
-    ctx.fillRect(15.6, -2, 3.4, 4);
-    ctx.strokeRect(15.6, -2, 3.4, 4);
-
-    // 6. Blade — Curved katana shape with authentic sori (gentle upward arc)
-
-    // First, draw the entire blade shape in polished silver (Ha/Kissaki base)
-    ctx.beginPath();
-    ctx.moveTo(19, -1.8);                             // Spine start
-    ctx.quadraticCurveTo(49, -4.2, 81, -8.0);         // Spine curve all the way to the tip point
-    ctx.quadraticCurveTo(78, -3.5, 75, -2.2);         // Crescent tip cutting edge sweep
-    ctx.quadraticCurveTo(49, 1.2, 19, 2.2);           // Main cutting edge back to habaki
-    ctx.closePath();
-    ctx.fillStyle = '#E5E8E8';                        // Polished silver steel
-    ctx.fill();
-    if (auraOpacity > 0.05) {
-      ctx.fillStyle = `rgba(255, 20, 147, ${auraOpacity * 0.4})`; // Hot pink cursed glow overlay
-      ctx.fill();
-    }
-
-    // Second, overlay the dark spine (Shinogi-ji) ending at the Yokote line (tip division)
-    ctx.beginPath();
-    ctx.moveTo(19, -1.8);
-    ctx.quadraticCurveTo(49, -4.0, 75, -6.8);         // Spine top boundary
-    ctx.lineTo(75, -4.2);                             // Yokote dividing line
-    ctx.quadraticCurveTo(49, -0.8, 19, 0.2);          // Shinogi boundary line
-    ctx.closePath();
-    ctx.fillStyle = '#2F3538';                        // Dark spine steel
-    ctx.fill();
-    if (auraOpacity > 0.05) {
-      ctx.fillStyle = `rgba(255, 105, 180, ${auraOpacity * 0.35})`; // Pink spine glow tint
-      ctx.fill();
-    }
-
-    // Hamon line (temper line) — complex wavy boundary line
-    ctx.beginPath();
-    ctx.moveTo(19, 0.2);
-    for (let x = 19; x <= 75; x += 3.5) {
-      // Create a gorgeous wavy sine temper pattern
-      const waveY = 0.2 - 4.4 * ((x - 19) / 56) + Math.sin(x * 0.75) * 0.45;
-      ctx.lineTo(x, waveY);
-    }
-    ctx.strokeStyle = auraOpacity > 0.05 ? `rgba(255, 240, 245, ${0.65 + auraOpacity * 0.35})` : 'rgba(255, 255, 255, 0.65)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // Metallic Mune Highlight — bright shine along the back spine of the blade
-    ctx.beginPath();
-    ctx.moveTo(19, -1.8);
-    ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-    ctx.lineWidth = 0.5;
-    ctx.stroke();
-
-    // Third, draw a clean black stroke outline over the entire outer blade boundary
-    ctx.beginPath();
-    ctx.moveTo(19, -1.8);
-    ctx.quadraticCurveTo(49, -4.2, 81, -8.0);         // Spine curve to tip point
-    ctx.quadraticCurveTo(78, -3.5, 75, -2.2);         // Crescent tip curve
-    ctx.quadraticCurveTo(49, 1.2, 19, 2.2);           // Main cutting edge back to habaki
-    ctx.closePath();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.0;
-    ctx.stroke();
-
-    // 7. Hand holding the hilt (drawn over the hilt wrapper and aura)
-    ctx.beginPath();
-    // Hand positioned on the long hilt
-    ctx.arc(-2, 0.5, getHandSize(5, this), 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.lineWidth = 1.2;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
 
     ctx.restore();
 
@@ -1690,20 +1904,17 @@ export class YutaFighter extends Fighter {
       ctx.globalCompositeOperation = 'source-over';
       ctx.globalAlpha = glowAlpha;
 
-      const numSegments = 30;
+      const numSegments = isGamePlay ? 10 : 30;
       const arcWidth = currentEndAngle - fullStartAngle;
 
       // =====================================================
       // --- SHARP CRESCENT SLASH (Anime-style, pointed tips)
       // =====================================================
-      // Thickness profile: 0 at both tips, peaks at center — true crescent silhouette.
-      // Uses a bell-curve (sin) so edges taper to razor-thin points.
       const maxThickness = 28; // Half-width of the crescent at its widest
       const outerOffset = 8; // Outer crescent is puffed outward from arcRadius
       const innerOffset = 6; // Inner crescent cuts inward from arcRadius
 
-      // Helper: crescent thickness weight at normalised position t∈[0,1]
-      // sin(t*π) gives 0 at both ends, 1 at centre. Pow sharpens the tip taper.
+      // Helper: crescent thickness weight at normalised position
       const crescentWeight = (t) => Math.pow(Math.sin(t * Math.PI), 1.5);
 
       // ------ 1. Main pink crescent body ------
@@ -1730,7 +1941,6 @@ export class YutaFighter extends Fighter {
       ctx.fill();
 
       // ------ 2. Bright white-pink core edge (thin inner blade highlight) ------
-      // Sits just inside the outer edge — gives the crescent a razor-like brightness.
       const coreGrad = ctx.createLinearGradient(
         Math.cos(fullStartAngle) * arcRadius, Math.sin(fullStartAngle) * arcRadius,
         Math.cos(fullStartAngle + arcWidth) * arcRadius, Math.sin(fullStartAngle + arcWidth) * arcRadius
@@ -1776,50 +1986,74 @@ export class YutaFighter extends Fighter {
       ctx.stroke();
       ctx.globalCompositeOperation = 'source-over';
 
-      // ------ 4. Ink calligraphy strokes (sparse, interior detail) ------
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
-      ctx.lineCap = 'butt';
-      const inkRadii = [arcRadius - 4, arcRadius + outerOffset * 0.5];
-      for (let layer = 0; layer < inkRadii.length; layer++) {
-        const radius = inkRadii[layer];
-        const segments = 10;
-        for (let s = 0; s < segments; s++) {
-          const ratio = s / segments;
-          const angle = fullStartAngle + arcWidth * ratio;
-          if (isAnticlockwise ? (angle < currentEndAngle) : (angle > currentEndAngle)) break;
-          const inkSeed = Math.sin(ratio * 14.5 + Date.now() * 0.015 + layer * 23.3);
-          if (inkSeed < 0.1) continue; // sparser gaps
-          const nextAngle = fullStartAngle + arcWidth * ((s + 1) / segments);
-          const drawEndAngle = isAnticlockwise
-            ? Math.max(nextAngle, currentEndAngle)
-            : Math.min(nextAngle, currentEndAngle);
-          ctx.lineWidth = 0.8 + (inkSeed + 1) * 1.5;
+      if (isGamePlay) {
+        // ------ 4. Radial speed-line spikes near the leading tip (Grouped into 1 path/stroke!) ------
+        ctx.strokeStyle = 'rgba(255, 200, 240, 0.85)';
+        ctx.lineCap = 'round';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        for (let i = 0; i < 5; i++) {
+          const spikeRatio = 0.62 + i * 0.09;
+          if (spikeRatio > 1.0) continue;
+          const spikeAngle = fullStartAngle + arcWidth * spikeRatio;
+          if (isAnticlockwise ? (spikeAngle < currentEndAngle) : (spikeAngle > currentEndAngle)) continue;
+          const w = crescentWeight(spikeRatio);
+          const baseR = arcRadius + outerOffset + maxThickness * w;
+          const spikeLen = 10 + Math.abs(Math.sin(spikeRatio * 32.1 + Date.now() * 0.01)) * 18;
+          const spikeSeed = Math.sin(spikeRatio * 32.1 + Date.now() * 0.01);
+          ctx.moveTo(Math.cos(spikeAngle) * baseR, Math.sin(spikeAngle) * baseR);
+          ctx.lineTo(
+            Math.cos(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen),
+            Math.sin(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen)
+          );
+        }
+        ctx.stroke();
+      } else {
+        // ------ 4. Ink calligraphy strokes (sparse, interior detail) ------
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
+        ctx.lineCap = 'butt';
+        const inkRadii = [arcRadius - 4, arcRadius + outerOffset * 0.5];
+        for (let layer = 0; layer < inkRadii.length; layer++) {
+          const radius = inkRadii[layer];
+          const segments = 10;
+          for (let s = 0; s < segments; s++) {
+            const ratio = s / segments;
+            const angle = fullStartAngle + arcWidth * ratio;
+            if (isAnticlockwise ? (angle < currentEndAngle) : (angle > currentEndAngle)) break;
+            const inkSeed = Math.sin(ratio * 14.5 + Date.now() * 0.015 + layer * 23.3);
+            if (inkSeed < 0.1) continue;
+            const nextAngle = fullStartAngle + arcWidth * ((s + 1) / segments);
+            const drawEndAngle = isAnticlockwise
+              ? Math.max(nextAngle, currentEndAngle)
+              : Math.min(nextAngle, currentEndAngle);
+            ctx.lineWidth = 0.8 + (inkSeed + 1) * 1.5;
+            ctx.beginPath();
+            ctx.arc(0, 0, radius + Math.sin(s * 19.7) * 2, angle, drawEndAngle, isAnticlockwise);
+            ctx.stroke();
+          }
+        }
+
+        // ------ 5. Radial speed-line spikes near the leading tip ------
+        ctx.strokeStyle = 'rgba(255, 200, 240, 0.85)';
+        ctx.lineCap = 'round';
+        for (let i = 0; i < 5; i++) {
+          const spikeRatio = 0.62 + i * 0.09;
+          if (spikeRatio > 1.0) continue;
+          const spikeAngle = fullStartAngle + arcWidth * spikeRatio;
+          if (isAnticlockwise ? (spikeAngle < currentEndAngle) : (spikeAngle > currentEndAngle)) continue;
+          const w = crescentWeight(spikeRatio);
+          const baseR = arcRadius + outerOffset + maxThickness * w;
+          const spikeLen = 10 + Math.abs(Math.sin(spikeRatio * 32.1 + Date.now() * 0.01)) * 18;
+          const spikeSeed = Math.sin(spikeRatio * 32.1 + Date.now() * 0.01);
+          ctx.lineWidth = 1.5 - i * 0.2;
           ctx.beginPath();
-          ctx.arc(0, 0, radius + Math.sin(s * 19.7) * 2, angle, drawEndAngle, isAnticlockwise);
+          ctx.moveTo(Math.cos(spikeAngle) * baseR, Math.sin(spikeAngle) * baseR);
+          ctx.lineTo(
+            Math.cos(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen),
+            Math.sin(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen)
+          );
           ctx.stroke();
         }
-      }
-
-      // ------ 5. Radial speed-line spikes near the leading tip ------
-      ctx.strokeStyle = 'rgba(255, 200, 240, 0.85)';
-      ctx.lineCap = 'round';
-      for (let i = 0; i < 5; i++) {
-        const spikeRatio = 0.62 + i * 0.09;
-        if (spikeRatio > 1.0) continue;
-        const spikeAngle = fullStartAngle + arcWidth * spikeRatio;
-        if (isAnticlockwise ? (spikeAngle < currentEndAngle) : (spikeAngle > currentEndAngle)) continue;
-        const w = crescentWeight(spikeRatio);
-        const baseR = arcRadius + outerOffset + maxThickness * w;
-        const spikeLen = 10 + Math.abs(Math.sin(spikeRatio * 32.1 + Date.now() * 0.01)) * 18;
-        const spikeSeed = Math.sin(spikeRatio * 32.1 + Date.now() * 0.01);
-        ctx.lineWidth = 1.5 - i * 0.2;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(spikeAngle) * baseR, Math.sin(spikeAngle) * baseR);
-        ctx.lineTo(
-          Math.cos(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen),
-          Math.sin(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen)
-        );
-        ctx.stroke();
       }
 
       ctx.restore();
@@ -1829,7 +2063,7 @@ export class YutaFighter extends Fighter {
   draw(ctx, opponent) { YutaRenderer.draw(ctx, this, opponent); }
   _drawDomainChannelAura(ctx) { YutaRenderer._drawDomainChannelAura(ctx, this); }
   _drawRika(ctx, opponent, renderState = null) { YutaRenderer._drawRika(ctx, this, opponent, renderState); }
-  _drawTopDownArmAndClaw(ctx, shoulderX, shoulderY, handX, handY, isLeft, attackTimer) { YutaRenderer._drawTopDownArmAndClaw(ctx, this, shoulderX, shoulderY, handX, handY, isLeft, attackTimer); }
+  _drawTopDownArmAndClaw(ctx, shoulderX, shoulderY, handX, handY, isLeft, attackTimer, isGamePlay = false) { YutaRenderer._drawTopDownArmAndClaw(ctx, this, shoulderX, shoulderY, handX, handY, isLeft, attackTimer, isGamePlay); }
   _drawRikaCursedEnergyAura(ctx, opponent, renderState = null) { YutaRenderer._drawRikaCursedEnergyAura(ctx, this, opponent, renderState); }
   _renderYutaAuraFrameCanvas(frameIdx, isRCT) { return YutaRenderer._renderYutaAuraFrameCanvas(this, frameIdx, isRCT); }
   _drawYutaCursedEnergyAura(ctx) { YutaRenderer._drawYutaCursedEnergyAura(ctx, this); }

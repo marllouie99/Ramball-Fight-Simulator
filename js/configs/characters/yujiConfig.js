@@ -24,6 +24,8 @@ export const yujiConfig = {
   blackFlashZonePunchSpeed: 35, // Animation frames for a standard punch inside the Zone
   blackFlashZonePunchCooldown: 30, // Cooldown in frames between basic punches inside the Zone
 
+
+
   // Skill 1: Divergent Fist Combo Rush
   comboCooldown: 400,           // Cooldown in frames before Rush can be used again (~6.67s)
   comboHits: 6,                 // Number of rapid punches in the combo sequence
@@ -45,7 +47,35 @@ export const yujiConfig = {
   soulSwapSpeedMultiplier: 1.3,    // Movement speed boost during Soul Swap
   soulSwapCooldown: 99999,         // Once per match only
 
+
+
+
+
+
+
+
+
+
+  //----------------------------------AUDIO CONFIG-----------------------------------------//
+
   // Audio
   punchSound: 'Assets/Sound Effects/Attacks/punch.mp3',
   punchVolume: 2.5,
+  punchSounds: [
+    'Assets/Sound Effects/Attacks/yuji-noise1.mp3',
+    'Assets/Sound Effects/Attacks/yuji-noise2.mp3',
+    'Assets/Sound Effects/Attacks/yuji-noise3.mp3'
+  ],
+  punchSoundsVolume: 1.5,
+  punchSoundsChance: 0.5, // 50% chance to play the voice noises on basic attack
+
+  // Black Flash Entrance Audio
+  blackFlashEnterSound: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
+  blackFlashEnterVolume: 2.0,
+  blackFlashEnterDelay: -0.10, // Delay in milliseconds before playing the sound
+
+  // Transformation Audio
+  transformationSound: 'Assets/Sound Effects/Skills/yuji-transformation.mp3',
+  transformationVolume: 2.0,
+  transformationDelay: 0,
 };

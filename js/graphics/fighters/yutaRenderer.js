@@ -8,6 +8,8 @@ import { spawnBloodEffect } from '../particles/bloodEffect.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
 import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
 
+const _yutaAuraCanvasCache = new Map();
+
 export class YutaRenderer {
   static drawDomainBackground(ctx, fighter, isClashSecondary = false) {
     renderYutaDomainBackground(fighter, ctx, isClashSecondary);
@@ -56,11 +58,10 @@ export class YutaRenderer {
         const alpha = Math.pow(progress, 0.7) * 0.2; // High visibility smooth fade
 
         ctx.save();
+        ctx.globalAlpha = alpha;
 
         // 1. High-Speed Dash Trajectory Streaks
         if (ai.fromX !== undefined && ai.toX !== undefined) {
-          ctx.save();
-          ctx.globalAlpha = alpha * 0.45;
           ctx.strokeStyle = '#FF1493';
           ctx.lineWidth = 3;
           ctx.beginPath();
@@ -75,29 +76,20 @@ export class YutaRenderer {
           ctx.moveTo(ai.fromX, ai.fromY);
           ctx.lineTo(ai.toX, ai.toY);
           ctx.stroke();
-          ctx.restore();
         }
 
         ctx.translate(ai.x, ai.y);
         ctx.rotate(ai.angle || 0);
 
-        // 2. Outer Cursed Energy Radial Glow Aura (Neon Pink / Violet Bloom)
-        ctx.save();
+        // 2. Outer Cursed Energy Radial Glow Aura (Neon Pink / Violet Bloom) - Optimized: Solid fill circle instead of radial gradient
         ctx.globalCompositeOperation = 'screen';
-        const auraGrad = ctx.createRadialGradient(0, 0, fighter.r * 0.3, 0, 0, fighter.r * 1.85);
-        auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.9})`);
-        auraGrad.addColorStop(0.4, `rgba(255, 20, 147, ${alpha * 0.7})`);
-        auraGrad.addColorStop(0.8, `rgba(160, 32, 240, ${alpha * 0.35})`);
-        auraGrad.addColorStop(1, 'rgba(255, 20, 147, 0)');
-        ctx.fillStyle = auraGrad;
+        ctx.fillStyle = `rgba(255, 20, 147, 0.18)`;
         ctx.beginPath();
         ctx.arc(0, 0, fighter.r * 1.85, 0, Math.PI * 2);
         ctx.fill();
-        ctx.restore();
+        ctx.globalCompositeOperation = 'source-over';
 
         // 3. Phantom Body Silhouette Circle
-        ctx.save();
-        ctx.globalAlpha = alpha;
         ctx.beginPath();
         ctx.arc(0, 0, fighter.r * 1.1, 0, Math.PI * 2);
         ctx.fillStyle = '#FF1493'; // Vibrant Deep Pink
@@ -127,8 +119,6 @@ export class YutaRenderer {
         ctx.strokeStyle = '#FF1493';
         ctx.lineWidth = 1.5;
         ctx.stroke();
-
-        ctx.restore();
 
         ctx.restore();
       }
@@ -248,6 +238,7 @@ export class YutaRenderer {
 
     const rk = fighter.rika;
     const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
+    const isGamePlay = !renderState;
 
     let drawX = renderState ? renderState.drawX : rk.x;
     let drawY = renderState ? renderState.drawY : rk.y;
@@ -319,11 +310,15 @@ export class YutaRenderer {
     );
     ctx.closePath();
 
-    const tailGrad = ctx.createLinearGradient(-r * 0.4, 0, -tailLen, 0);
-    tailGrad.addColorStop(0, '#420E63');
-    tailGrad.addColorStop(0.5, '#210638');
-    tailGrad.addColorStop(1, 'rgba(10, 0, 22, 0)');
-    ctx.fillStyle = tailGrad;
+    if (isGamePlay) {
+      ctx.fillStyle = '#210638';
+    } else {
+      const tailGrad = ctx.createLinearGradient(-r * 0.4, 0, -tailLen, 0);
+      tailGrad.addColorStop(0, '#420E63');
+      tailGrad.addColorStop(0.5, '#210638');
+      tailGrad.addColorStop(1, 'rgba(10, 0, 22, 0)');
+      ctx.fillStyle = tailGrad;
+    }
     ctx.fill();
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
     ctx.lineWidth = 1.2;
@@ -339,49 +334,61 @@ export class YutaRenderer {
     const leftArmTimer = rk.leftArmTimer || 0;
 
     // Left Arm (-y side)
-    fighter._drawTopDownArmAndClaw(ctx, r * 0.2, -r * 1.1, r * 1.3, -r * 1.3, true, leftArmTimer);
+    fighter._drawTopDownArmAndClaw(ctx, r * 0.2, -r * 1.1, r * 1.3, -r * 1.3, true, leftArmTimer, isGamePlay);
     // Right Arm (+y side)
-    fighter._drawTopDownArmAndClaw(ctx, r * 0.2, r * 1.1, r * 1.3, r * 1.3, false, rightArmTimer);
+    fighter._drawTopDownArmAndClaw(ctx, r * 0.2, r * 1.1, r * 1.3, r * 1.3, false, rightArmTimer, isGamePlay);
 
     // 4. Main Torso Circle (Base Hull from top-down)
     ctx.beginPath();
     ctx.arc(0, 0, r + pulse * 0.5, 0, Math.PI * 2);
-    const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.2, 0, 0, r);
-    bodyGrad.addColorStop(0, '#F6F2FA');   // Bone highlight
-    bodyGrad.addColorStop(0.65, '#D2C8DC'); // Muscle grey
-    bodyGrad.addColorStop(1, '#4D3E5E');   // Outer shadow
-    ctx.fillStyle = bodyGrad;
+    
+    if (isGamePlay) {
+      ctx.fillStyle = '#D2C8DC';
+    } else {
+      const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.2, r * 0.2, 0, 0, r);
+      bodyGrad.addColorStop(0, '#F6F2FA');   // Bone highlight
+      bodyGrad.addColorStop(0.65, '#D2C8DC'); // Muscle grey
+      bodyGrad.addColorStop(1, '#4D3E5E');   // Outer shadow
+      ctx.fillStyle = bodyGrad;
+    }
+    
     ctx.fill();
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Ribcage / Skeletal overlay on shoulders/back
-    ctx.save();
-    ctx.strokeStyle = 'rgba(70, 50, 90, 0.4)';
-    ctx.lineWidth = 2;
-    for (let i = -2; i <= 2; i++) {
-      ctx.beginPath();
-      ctx.arc(i * 4, 0, r * 0.6, -Math.PI * 0.4, Math.PI * 0.4);
-      ctx.stroke();
+    // Ribcage / Skeletal overlay on shoulders/back (skipped during active gameplay for speed)
+    if (!isGamePlay) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(70, 50, 90, 0.4)';
+      ctx.lineWidth = 2;
+      for (let i = -2; i <= 2; i++) {
+        ctx.beginPath();
+        ctx.arc(i * 4, 0, r * 0.6, -Math.PI * 0.4, Math.PI * 0.4);
+        ctx.stroke();
+      }
+      ctx.restore();
     }
-    ctx.restore();
 
     // 5. Crown Tendrils / Tubes (sweeping back over shoulders/spine)
-    // Draw black outline pass first, then white tendrils on top
+    // Reduce tendril count and segment math during active gameplay
+    const tendrilCount = isGamePlay ? 3 : 5;
+    const numSegments = isGamePlay ? 6 : 12;
+    const loopMin = isGamePlay ? -1 : -2;
+    const loopMax = isGamePlay ? 1 : 2;
+
     for (let pass = 0; pass < 2; pass++) {
       ctx.save();
       ctx.strokeStyle = pass === 0 ? '#000000' : '#EBE5F2';
       ctx.lineWidth = pass === 0 ? 5.5 : 3.5;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-      for (let i = -2; i <= 2; i++) {
-        const offset = i * 8; // Base y-spread
+      for (let i = loopMin; i <= loopMax; i++) {
+        const offset = i * (isGamePlay ? 12 : 8); // Base y-spread
 
         ctx.beginPath();
         ctx.moveTo(r * 0.4, offset * 0.5); // Root on head
 
-        const numSegments = 12;
         const tendrilLength = r * 2.5;
 
         for (let s = 1; s <= numSegments; s++) {
@@ -392,8 +399,6 @@ export class YutaRenderer {
           const waveAmplitude = 14 * Math.pow(progress, 1.5);
 
           // Traveling sine wave along the tendril's length
-          // -progress * 6 creates the spatial "S" ripples
-          // + i offsets the phase of each strand
           const waveY = Math.sin((now / 120) - (progress * 6) + i) * waveAmplitude;
 
           // Tendrils spread out slightly more at the tips
@@ -417,13 +422,15 @@ export class YutaRenderer {
     ctx.lineWidth = 2;
     ctx.stroke();
 
-    // Head Shell Rib Lines
-    ctx.strokeStyle = 'rgba(120, 100, 140, 0.4)';
-    ctx.lineWidth = 1.5;
-    for (let k = -2; k <= 2; k++) {
-      ctx.beginPath();
-      ctx.arc(r * 0.5, k * 4, r * 0.35, -Math.PI * 0.4, Math.PI * 0.4);
-      ctx.stroke();
+    // Head Shell Rib Lines (skipped during active gameplay)
+    if (!isGamePlay) {
+      ctx.strokeStyle = 'rgba(120, 100, 140, 0.4)';
+      ctx.lineWidth = 1.5;
+      for (let k = -2; k <= 2; k++) {
+        ctx.beginPath();
+        ctx.arc(r * 0.5, k * 4, r * 0.35, -Math.PI * 0.4, Math.PI * 0.4);
+        ctx.stroke();
+      }
     }
 
     // Gaping Maw
@@ -436,17 +443,17 @@ export class YutaRenderer {
     ctx.fillStyle = '#1A000A';
     ctx.fill();
 
-    // Sharp Teeth inside maw (Top & Bottom halves)
+    // Sharp Teeth inside maw (grouped path for massive Canvas draw call reduction)
     ctx.fillStyle = '#FFFEE0';
+    ctx.beginPath();
     for (let t = -3; t <= 3; t++) {
       if (t === 0) continue;
       const toothY = t * (mouthOpen * 0.12);
-      ctx.beginPath();
       ctx.moveTo(r * 0.75, toothY);
       ctx.lineTo(r * 0.9, toothY + (t > 0 ? 1 : -1));
       ctx.lineTo(r * 0.8, toothY + (t > 0 ? 2 : -2));
-      ctx.fill();
     }
+    ctx.fill();
     ctx.restore();
 
     // Attack Slash Ring Effect
@@ -581,7 +588,7 @@ export class YutaRenderer {
     ctx.restore(); // Restore main transform
   }
 
-  static _drawTopDownArmAndClaw(ctx, fighter, shoulderX, shoulderY, handX, handY, isLeft, attackTimer) {
+  static _drawTopDownArmAndClaw(ctx, fighter, shoulderX, shoulderY, handX, handY, isLeft, attackTimer, isGamePlay = false) {
     ctx.save();
 
     const sideSign = isLeft ? -1 : 1;
@@ -666,8 +673,6 @@ export class YutaRenderer {
     ];
     const flexIdle = ((attackTimer === 0) ? Math.sin(now / 400) * 0.05 : 0) + emergenceFingerFlex;
 
-    // Claw slash visual has been moved to the end of _drawRika for correct layering on top of the torso
-
     // Muscular Arm with tapering organic outline
     ctx.save();
     const armAngle = Math.atan2(finalHandY - shoulderY, finalHandX - shoulderX);
@@ -681,11 +686,15 @@ export class YutaRenderer {
     ctx.quadraticCurveTo(elbowX - nx * 6, elbowY - ny * 6, shoulderX - nx * wShoulder, shoulderY - ny * wShoulder);
     ctx.closePath();
 
-    const armGrad = ctx.createLinearGradient(shoulderX, shoulderY, finalHandX, finalHandY);
-    armGrad.addColorStop(0, '#EAE3F2');
-    armGrad.addColorStop(0.7, '#D3C8DC');
-    armGrad.addColorStop(1, '#B5A6C4');
-    ctx.fillStyle = armGrad;
+    if (isGamePlay) {
+      ctx.fillStyle = '#D3C8DC';
+    } else {
+      const armGrad = ctx.createLinearGradient(shoulderX, shoulderY, finalHandX, finalHandY);
+      armGrad.addColorStop(0, '#EAE3F2');
+      armGrad.addColorStop(0.7, '#D3C8DC');
+      armGrad.addColorStop(1, '#B5A6C4');
+      ctx.fillStyle = armGrad;
+    }
     ctx.fill();
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
@@ -716,11 +725,15 @@ export class YutaRenderer {
     ctx.bezierCurveTo(10, wWrist * 1.3, 4, wWrist * 1.1, 0, wWrist);
     ctx.closePath();
 
-    const palmGrad = ctx.createRadialGradient(8, 0, 2, 8, 0, 16);
-    palmGrad.addColorStop(0, '#F6F2FA');
-    palmGrad.addColorStop(0.6, '#D6CCE0');
-    palmGrad.addColorStop(1, '#8A779E');
-    ctx.fillStyle = palmGrad;
+    if (isGamePlay) {
+      ctx.fillStyle = '#D6CCE0';
+    } else {
+      const palmGrad = ctx.createRadialGradient(8, 0, 2, 8, 0, 16);
+      palmGrad.addColorStop(0, '#F6F2FA');
+      palmGrad.addColorStop(0.6, '#D6CCE0');
+      palmGrad.addColorStop(1, '#8A779E');
+      ctx.fillStyle = palmGrad;
+    }
     ctx.fill();
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
@@ -756,53 +769,70 @@ export class YutaRenderer {
       const tipX = l * 1.15;
       const tipY = isLeft ? 3.5 : -3.5;
 
-      // Draw Organic Finger Body (Polygon / Path)
-      ctx.beginPath();
-      ctx.moveTo(0, -w * 0.5);
-      ctx.quadraticCurveTo(p1x, p1y - w * 0.45, p2x, p2y - w * 0.35);
-      ctx.lineTo(tipX, tipY);
-      ctx.lineTo(p2x, p2y + w * 0.35);
-      ctx.quadraticCurveTo(p1x, p1y + w * 0.45, 0, w * 0.5);
-      ctx.closePath();
+      if (isGamePlay) {
+        // Fast simplified spiky claw triangle for gameplay (no expensive quadratic curves)
+        ctx.fillStyle = '#D2C6DE';
+        ctx.beginPath();
+        ctx.moveTo(0, -w * 0.4);
+        ctx.lineTo(tipX, tipY);
+        ctx.lineTo(0, w * 0.4);
+        ctx.closePath();
+        ctx.fill();
 
-      const fingerGrad = ctx.createLinearGradient(0, 0, tipX, tipY);
-      fingerGrad.addColorStop(0, '#F8F5FA');
-      fingerGrad.addColorStop(0.5, '#D2C6DE');
-      fingerGrad.addColorStop(0.85, '#68547C');
-      fingerGrad.addColorStop(1, '#1E1029');
-      ctx.fillStyle = fingerGrad;
-      ctx.fill();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+      } else {
+        // Draw Organic Finger Body (Polygon / Path)
+        ctx.beginPath();
+        ctx.moveTo(0, -w * 0.5);
+        ctx.quadraticCurveTo(p1x, p1y - w * 0.45, p2x, p2y - w * 0.35);
+        ctx.lineTo(tipX, tipY);
+        ctx.lineTo(p2x, p2y + w * 0.35);
+        ctx.quadraticCurveTo(p1x, p1y + w * 0.45, 0, w * 0.5);
+        ctx.closePath();
 
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
+        const fingerGrad = ctx.createLinearGradient(0, 0, tipX, tipY);
+        fingerGrad.addColorStop(0, '#F8F5FA');
+        fingerGrad.addColorStop(0.5, '#D2C6DE');
+        fingerGrad.addColorStop(0.85, '#68547C');
+        fingerGrad.addColorStop(1, '#1E1029');
+        ctx.fillStyle = fingerGrad;
+        ctx.fill();
 
-      // Rounded Knuckle Bulge (Joint 1)
-      ctx.beginPath();
-      ctx.arc(0, 0, w * 0.55, 0, Math.PI * 2);
-      ctx.fillStyle = '#E3D8EB';
-      ctx.fill();
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      }
 
-      // Middle Joint (Joint 2) Crease Lines (Image 2 style)
-      ctx.beginPath();
-      ctx.moveTo(p1x, p1y - w * 0.4);
-      ctx.lineTo(p1x, p1y + w * 0.4);
-      ctx.moveTo(p1x + 2, p1y - w * 0.35);
-      ctx.lineTo(p1x + 2, p1y + w * 0.35);
-      ctx.strokeStyle = 'rgba(50, 25, 70, 0.5)';
-      ctx.lineWidth = 1;
-      ctx.stroke();
+      if (!isGamePlay) {
+        // Rounded Knuckle Bulge (Joint 1)
+        ctx.beginPath();
+        ctx.arc(0, 0, w * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = '#E3D8EB';
+        ctx.fill();
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.2;
+        ctx.stroke();
 
-      // Distal Talon / Nail highlight at tip
-      ctx.beginPath();
-      ctx.moveTo(p2x, p2y);
-      ctx.lineTo(tipX, tipY);
-      ctx.strokeStyle = '#12081A';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
+        // Middle Joint (Joint 2) Crease Lines (Image 2 style)
+        ctx.beginPath();
+        ctx.moveTo(p1x, p1y - w * 0.4);
+        ctx.lineTo(p1x, p1y + w * 0.4);
+        ctx.moveTo(p1x + 2, p1y - w * 0.35);
+        ctx.lineTo(p1x + 2, p1y + w * 0.35);
+        ctx.strokeStyle = 'rgba(50, 25, 70, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Distal Talon / Nail highlight at tip
+        ctx.beginPath();
+        ctx.moveTo(p2x, p2y);
+        ctx.lineTo(tipX, tipY);
+        ctx.strokeStyle = '#12081A';
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+      }
 
       ctx.restore();
     });
@@ -820,6 +850,7 @@ export class YutaRenderer {
 
     const r = (rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30;
     const now = Date.now();
+    const isGamePlay = !renderState;
 
     // Stepped 30-frame anime animation loop (matching Yuta's 30fps Sakuga frame rate)
     const frameRate = 30;
@@ -863,8 +894,6 @@ export class YutaRenderer {
     const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
     let ariseCeAlpha = 1.0;
     if (rk.spawnTimer > 0) {
-      // 1. Rika rises and expands first (0% - 50% of spawnTimer)
-      // 2. Cursed Energy slowly attaches to her body afterward (50% - 100% of spawnTimer)
       const progress = 1.0 - (rk.spawnTimer / ariseMax);
       if (progress < 0.45) {
         ariseCeAlpha = 0.0;
@@ -889,15 +918,15 @@ export class YutaRenderer {
     ctx.rotate(targetAngle);
     ctx.globalAlpha = (ctx.globalAlpha || 1.0) * ariseCeAlpha;
 
-    // === 1. Luminous Backlight (Soft Natural Pink Diffusion) ===
+    // === 1. Luminous Backlight ===
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     const glowRadius = Math.max(0.1, r * 4.5 + Math.sin(time * 0.005) * (r * 0.3));
     const backGlow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, glowRadius);
-    backGlow.addColorStop(0, 'rgba(255, 255, 255, 0.4)');     // Soft white core
-    backGlow.addColorStop(0.3, 'rgba(255, 105, 180, 0.35)');  // Natural pink diffusion
-    backGlow.addColorStop(0.7, 'rgba(255, 20, 147, 0.15)');   // Subtle outer feathering
-    backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');         // Smooth blend into environment
+    backGlow.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
+    backGlow.addColorStop(0.3, 'rgba(255, 105, 180, 0.35)');
+    backGlow.addColorStop(0.7, 'rgba(255, 20, 147, 0.15)');
+    backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
     ctx.beginPath();
     ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
     ctx.fillStyle = backGlow;
@@ -909,7 +938,6 @@ export class YutaRenderer {
       const numPts = pts.length;
       if (numPts < 3) return;
 
-      // Outer Hot Pink Glow & Fill
       ctx.save();
       ctx.fillStyle = `rgba(255, 105, 180, ${fillAlpha})`;
 
@@ -925,11 +953,10 @@ export class YutaRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // === Yuta's Per-Segment Variable-Pressure Calligraphy Ink Brush Outline ===
+      // ink Outline
       ctx.strokeStyle = '#000000';
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
-
       ctx.lineWidth = 2.2;
       ctx.beginPath();
       mx = (pts[numPts - 1].x + pts[0].x) / 2;
@@ -943,7 +970,7 @@ export class YutaRenderer {
       ctx.closePath();
       ctx.stroke();
 
-      // Inner Light Pink Core Wash (Inset fill at 70% towards center)
+      // Inner Light Pink Core Wash
       let cx = 0, cy = 0;
       pts.forEach(p => { cx += p.x; cy += p.y; });
       cx /= numPts; cy /= numPts;
@@ -967,43 +994,45 @@ export class YutaRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // === Yuta's Inset Rough Ink Brush Hatch Cuts Along Border (FPS Optimized) ===
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#000000';
-      ctx.lineCap = 'butt';
+      // Hatch Cuts (skipped in gameplay to optimize Electron performance)
+      if (!isGamePlay) {
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#000000';
+        ctx.lineCap = 'butt';
 
-      const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-      const isLowFps = (state.fps && state.fps < 55);
-      const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
+        const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+        const isLowFps = (state.fps && state.fps < 55);
+        const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
 
-      for (let layer = 0; layer < insetScales.length; layer++) {
-        const scale = insetScales[layer];
-        const speedDir = (layer % 2 === 0 ? 1 : -1);
-        const flowTime = time * 0.003 * speedDir;
+        for (let layer = 0; layer < insetScales.length; layer++) {
+          const scale = insetScales[layer];
+          const speedDir = (layer % 2 === 0 ? 1 : -1);
+          const flowTime = time * 0.003 * speedDir;
 
-        ctx.beginPath();
-        for (let i = 0; i < numPts; i++) {
-          const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-          const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-          const cutSeed = longWave + shortWave;
-          if (cutSeed < 0.25) continue; // Slightly higher threshold to cut draw calls
+          ctx.beginPath();
+          for (let i = 0; i < numPts; i++) {
+            const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
+            const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
+            const cutSeed = longWave + shortWave;
+            if (cutSeed < 0.25) continue;
 
-          const p = pts[i];
-          const next = pts[(i + 1) % numPts];
+            const p = pts[i];
+            const next = pts[(i + 1) % numPts];
 
-          const psx = cx + (p.x - cx) * scale;
-          const psy = cy + (p.y - cy) * scale;
-          const nsx = cx + (next.x - cx) * scale;
-          const nsy = cy + (next.y - cy) * scale;
+            const psx = cx + (p.x - cx) * scale;
+            const psy = cy + (p.y - cy) * scale;
+            const nsx = cx + (next.x - cx) * scale;
+            const nsy = cy + (next.y - cy) * scale;
 
-          const jagX = Math.cos(i * 43) * 3;
-          const jagY = Math.sin(i * 43) * 3;
+            const jagX = Math.cos(i * 43) * 3;
+            const jagY = Math.sin(i * 43) * 3;
 
-          ctx.moveTo(psx, psy);
-          ctx.lineTo(nsx + jagX, nsy + jagY);
+            ctx.moveTo(psx, psy);
+            ctx.lineTo(nsx + jagX, nsy + jagY);
+          }
+          ctx.lineWidth = 1.2;
+          ctx.stroke();
         }
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
       }
 
       ctx.restore();
@@ -1051,7 +1080,7 @@ export class YutaRenderer {
       ctx.closePath();
       ctx.fill();
 
-      // Batched outline stroke for high FPS
+      // Batched outline stroke
       ctx.strokeStyle = '#000000';
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
@@ -1071,34 +1100,37 @@ export class YutaRenderer {
       ctx.closePath();
       ctx.fill();
 
-      ctx.globalAlpha = 0.9;
-      ctx.strokeStyle = '#000000';
-      ctx.lineCap = 'butt';
+      // Hatch Cuts (skipped in gameplay to optimize Electron performance)
+      if (!isGamePlay) {
+        ctx.globalAlpha = 0.9;
+        ctx.strokeStyle = '#000000';
+        ctx.lineCap = 'butt';
 
-      const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
-      const isLowFps = (state.fps && state.fps < 55);
-      const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
+        const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
+        const isLowFps = (state.fps && state.fps < 55);
+        const insetScales = (isMultiDomain || isLowFps) ? [0.91] : [0.86, 0.94];
 
-      for (let layer = 0; layer < insetScales.length; layer++) {
-        const scale = insetScales[layer];
-        const cutPoly = extrude(scale);
-        const speedDir = (layer % 2 === 0 ? 1 : -1);
-        const flowTime = time * 0.003 * speedDir;
+        for (let layer = 0; layer < insetScales.length; layer++) {
+          const scale = insetScales[layer];
+          const cutPoly = extrude(scale);
+          const speedDir = (layer % 2 === 0 ? 1 : -1);
+          const flowTime = time * 0.003 * speedDir;
 
-        ctx.beginPath();
-        for (let i = 0; i < cutPoly.length - 1; i++) {
-          const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
-          const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
-          const cutSeed = longWave + shortWave;
-          if (cutSeed < 0.25) continue;
+          ctx.beginPath();
+          for (let i = 0; i < cutPoly.length - 1; i++) {
+            const longWave = Math.sin(i * 0.35 + layer * 8.0 + flowTime * 1.5) * 0.6;
+            const shortWave = Math.sin(i * 2.5 - layer * 5.0 + flowTime * 3.5) * 0.4;
+            const cutSeed = longWave + shortWave;
+            if (cutSeed < 0.25) continue;
 
-          const jagX = Math.cos(i * 43) * 2;
-          const jagY = Math.sin(i * 43) * 2;
-          ctx.moveTo(cutPoly[i].x, cutPoly[i].y);
-          ctx.lineTo(cutPoly[i+1].x + jagX, cutPoly[i+1].y + jagY);
+            const jagX = Math.cos(i * 43) * 2;
+            const jagY = Math.sin(i * 43) * 2;
+            ctx.moveTo(cutPoly[i].x, cutPoly[i].y);
+            ctx.lineTo(cutPoly[i+1].x + jagX, cutPoly[i+1].y + jagY);
+          }
+          ctx.lineWidth = 1.0;
+          ctx.stroke();
         }
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
       }
       ctx.restore();
     };
@@ -1120,13 +1152,14 @@ export class YutaRenderer {
     const ts1 = { x: localYutaX * 0.35, y: localYutaY * 0.35 + tailWave1 };
     const ts2 = { x: localYutaX * 0.7, y: localYutaY * 0.7 + tailWave2 };
     const ts3 = { x: localYutaX, y: localYutaY };
-    for (let i = 0; i <= 12; i++) tetherSpine.push(getBezierPt(i/12, ts0, ts1, ts2, ts3));
+    const tsSegments = isGamePlay ? 6 : 12;
+    for (let i = 0; i <= tsSegments; i++) tetherSpine.push(getBezierPt(i/tsSegments, ts0, ts1, ts2, ts3));
 
     drawFlameStroke(tetherSpine, r * 0.22 + 8, r * 0.06 + 5);
 
     // === 3. Torso & Head Dome Form-Fitting Flame Body ===
     const torsoHeadPts = [];
-    const numTH = 24;
+    const numTH = isGamePlay ? 12 : 24;
     for (let i = 0; i < numTH; i++) {
       const a = (Math.PI * 2 / numTH) * i;
       const cosA = Math.cos(a);
@@ -1143,24 +1176,29 @@ export class YutaRenderer {
     }
     drawFlamePath(torsoHeadPts);
 
-    // === 4. Wavy Crown Hair Tendrils Form-Fitting Flame Tubes ===
-    for (let i = -2; i <= 2; i++) {
-      const offset = i * 8;
-      const numSegments = 12;
-      const tendrilLength = r * 2.5;
+    // === 4. Wavy Crown Hair Tendrils Form-Fitting Flame Tubes (skipped in gameplay to optimize performance) ===
+    if (!isGamePlay) {
+      const tendrilMin = -2;
+      const tendrilMax = 2;
+      const tendrilSegments = 12;
 
-      const tendrilSpine = [{ x: r * 0.4, y: offset * 0.5 }];
-      for (let s = 1; s <= numSegments; s++) {
-        const progress = s / numSegments;
-        const currentX = r * 0.4 - (tendrilLength * progress);
-        const waveAmplitude = 14 * Math.pow(progress, 1.5);
-        const waveY = Math.sin((now / 120) - (progress * 6) + i) * waveAmplitude;
-        const currentY = (offset * 0.5) + (offset * progress * 0.8) + waveY;
-        const flicker = Math.sin(time * 0.002 + s * 0.4 + i) * 2.5;
-        tendrilSpine.push({ x: currentX, y: currentY + flicker });
+      for (let i = tendrilMin; i <= tendrilMax; i++) {
+        const offset = i * 8;
+        const tendrilLength = r * 2.5;
+
+        const tendrilSpine = [{ x: r * 0.4, y: offset * 0.5 }];
+        for (let s = 1; s <= tendrilSegments; s++) {
+          const progress = s / tendrilSegments;
+          const currentX = r * 0.4 - (tendrilLength * progress);
+          const waveAmplitude = 14 * Math.pow(progress, 1.5);
+          const waveY = Math.sin((now / 120) - (progress * 6) + i) * waveAmplitude;
+          const currentY = (offset * 0.5) + (offset * progress * 0.8) + waveY;
+          const flicker = Math.sin(time * 0.002 + s * 0.4 + i) * 2.5;
+          tendrilSpine.push({ x: currentX, y: currentY + flicker });
+        }
+        
+        drawFlameStroke(tendrilSpine, 6, 2.5);
       }
-      
-      drawFlameStroke(tendrilSpine, 6, 2.5);
     }
 
     // === 5. Left & Right Form-Fitting Arm & Claw Flame Sleeves ===
@@ -1208,6 +1246,24 @@ export class YutaRenderer {
       const elbowX = (shoulderX + finalHandX) * 0.5 + 10;
       const elbowY = (shoulderY + finalHandY) * 0.5 + (20 * sideSign);
 
+      const pad = 10;
+
+      if (isGamePlay) {
+        // Highly optimized simple arm capsule path for match gameplay
+        const rawPts = [
+          { x: shoulderX, y: shoulderY - pad * sideSign },
+          { x: elbowX, y: elbowY - pad * 1.2 * sideSign },
+          { x: finalHandX, y: finalHandY - pad * 0.8 * sideSign },
+          { x: finalHandX, y: finalHandY + pad * 0.8 * sideSign },
+          { x: elbowX, y: elbowY + pad * 1.2 * sideSign },
+          { x: shoulderX, y: shoulderY + pad * sideSign }
+        ];
+        return rawPts.map((p, idx) => {
+          const noise = Math.sin(idx * 2.3 + time * 0.0015) * 4;
+          return { x: p.x + noise, y: p.y + noise };
+        });
+      }
+
       const fingersData = [
         { baseX: 7, baseY: isLeft ? 5.5 : -5.5, len: 19, baseAngle: isLeft ? 0.65 : -0.65 },
         { baseX: 15, baseY: isLeft ? 3.5 : -3.5, len: 26, baseAngle: isLeft ? 0.22 : -0.22 },
@@ -1231,7 +1287,6 @@ export class YutaRenderer {
         };
       });
 
-      const pad = 10;
       const rawPts = [];
       rawPts.push({ x: shoulderX, y: shoulderY - pad * sideSign });
       rawPts.push({ x: elbowX, y: elbowY - pad * 1.2 * sideSign });
@@ -1255,17 +1310,18 @@ export class YutaRenderer {
       });
     };
 
-    drawFlamePath(buildArmPoints(true, leftArmTimer));
-    drawFlamePath(buildArmPoints(false, rightArmTimer));
+    if (!isGamePlay) {
+      drawFlamePath(buildArmPoints(true, leftArmTimer));
+      drawFlamePath(buildArmPoints(false, rightArmTimer));
+    }
 
     ctx.restore();
   }
 
-  static _renderYutaAuraFrameCanvas(fighter, frameIdx, isRCT) {
+  static _renderYutaAuraFrameCanvas(frameIdx, isRCT) {
     const key = `${frameIdx}_${isRCT ? 'rct' : 'norm'}`;
-    if (!fighter._yutaAuraCanvasCache) fighter._yutaAuraCanvasCache = new Map();
-    if (fighter._yutaAuraCanvasCache.has(key)) {
-      return fighter._yutaAuraCanvasCache.get(key);
+    if (_yutaAuraCanvasCache.has(key)) {
+      return _yutaAuraCanvasCache.get(key);
     }
 
     const offW = 160;
@@ -1276,7 +1332,7 @@ export class YutaRenderer {
     const offCtx = canvas.getContext('2d');
 
     const time = frameIdx * 120;
-    const r = fighter.r || 25;
+    const r = 25; // standard fighter radius
     const cx = offW / 2;
     const cy = offH / 2;
 
@@ -1373,7 +1429,7 @@ export class YutaRenderer {
     }
 
     offCtx.restore();
-    fighter._yutaAuraCanvasCache.set(key, canvas);
+    _yutaAuraCanvasCache.set(key, canvas);
     return canvas;
   }
 
@@ -1431,7 +1487,7 @@ export class YutaRenderer {
     ctx.globalCompositeOperation = 'source-over';
 
     // Hardware Accelerated Pre-Rendered Offscreen Sakuga Aura Canvas
-    const frameCanvas = fighter._renderYutaAuraFrameCanvas(frameIndex, isRCT);
+    const frameCanvas = YutaRenderer._renderYutaAuraFrameCanvas(frameIndex, isRCT);
     ctx.globalAlpha = progress;
     ctx.drawImage(frameCanvas, -80, -80);
 
@@ -1452,13 +1508,8 @@ export class YutaRenderer {
     const length = Math.hypot(dx, dy); // Length is now ~70 pixels
     const bagAngle = Math.atan2(dy, dx);
 
-    ctx.save();
-    // Translate to the start point and rotate so the bag runs along the local X-axis
     ctx.translate(startX, startY);
     ctx.rotate(bagAngle);
-
-    // Now the bag extends from x=0 to x=length along the X-axis.
-    // The width is along the Y-axis.
 
     // 1. Tapered Canvas Body Polygon (Wider at top, narrower at bottom)
     const topW = 3.5;
@@ -1478,32 +1529,7 @@ export class YutaRenderer {
     ctx.fill();
     ctx.stroke();
 
-    // 2. Fabric Folds and Creases (Canvas texture)
-    // Dark creases
-    ctx.strokeStyle = '#1D2124';
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    for (let i = 12; i < length - 12; i += 16) {
-      // Diagonal folds crossing the bag
-      ctx.moveTo(i, -topW + 0.5);
-      ctx.lineTo(i + 4, topW - 0.5);
-    }
-    ctx.stroke();
-
-    // Highlight creases (Lighter canvas reflecting light)
-    ctx.strokeStyle = '#4A5057';
-    ctx.lineWidth = 0.5;
-    ctx.beginPath();
-    for (let i = 20; i < length - 15; i += 22) {
-      ctx.moveTo(i, topW - 0.5);
-      ctx.lineTo(i + 6, -topW + 0.5);
-    }
-    // A long subtle vertical fold down the middle
-    ctx.moveTo(10, -0.5);
-    ctx.lineTo(length - 10, -0.5);
-    ctx.stroke();
-
-    // 3. Stitched Reinforcement Base Cap
+    // 2. Stitched Reinforcement Base Cap
     ctx.fillStyle = '#1A1C1F'; // Darker base fabric
     ctx.beginPath();
     ctx.moveTo(length - 7, -botW);
@@ -1514,38 +1540,11 @@ export class YutaRenderer {
     ctx.fill();
     ctx.stroke(); // Stroke black around base
 
-    // 4. Zipper Detail at the Top
-    ctx.strokeStyle = '#000000'; // Zipper track
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.moveTo(5, -topW + 0.5);
-    ctx.lineTo(5, topW - 0.5);
-    ctx.stroke();
-
-    // Silver Zipper Pull Tab
-    ctx.fillStyle = '#8A8E91';
-    ctx.fillRect(4.5, -0.5, 2, 2.5);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 0.4;
-    ctx.strokeRect(4.5, -0.5, 2, 2.5);
-
-    // 5. Metallic D-Ring Hook at the Top
-    ctx.strokeStyle = '#666'; // Gunmetal ring
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.moveTo(0, -1.5);
-    ctx.lineTo(-3, -1.5);
-    ctx.lineTo(-3, 1.5);
-    ctx.lineTo(0, 1.5);
-    ctx.stroke();
-
-    // 6. Thick Black Canvas Collar/Opening
+    // 3. Thick Black Canvas Collar/Opening
     ctx.fillStyle = '#111111';
     ctx.fillRect(-1.5, -topW - 0.2, 2.5, topW * 2 + 0.4);
-    ctx.lineWidth = 0.8;
     ctx.strokeRect(-1.5, -topW - 0.2, 2.5, topW * 2 + 0.4);
 
-    ctx.restore(); // Restore from bag rotation and translation
     ctx.restore(); // Restore from Yuta scaling and rotation
   }
 

@@ -16,9 +16,13 @@ export function modExecuteKatanaMelee(fighter, angle) {
   fighter.activeSlashType = (fighter.activeSlashType === undefined) ? 0 : (fighter.activeSlashType + 1) % 3;
   fighter.trailGenTimer = 40; // Generate trail at tip for 40 frames (~0.66s)
 
-  // Play swing sound (using Fighter's standard delay queue)
-  const swingSnd = getBasicAttackSound(fighter.id, fighter._def?.type);
-  if (swingSnd) {
+  // Play swing sound (using Yuta's config and Fighter's standard delay queue)
+  const swingSnd = {
+    src: CONFIG.yuta?.katanaSwingSound || 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: CONFIG.yuta?.katanaSwingVolume ?? 0.7,
+    delay: CONFIG.yuta?.katanaSwingDelay ?? 0
+  };
+  if (swingSnd.src) {
     fighter._attackSoundTimer = swingSnd.delay;
     fighter._attackSoundConfig = swingSnd;
   }

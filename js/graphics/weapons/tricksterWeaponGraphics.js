@@ -1,4 +1,5 @@
 import { getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 /**
  * Trickster's Weapon: The Arcane Staff
@@ -275,9 +276,9 @@ export function drawTricksterStaff(ctx, fighter) {
   ctx.restore();
 
   // 6. Glowing Arcane Runes etched on the shaft
+  const _isGPRune = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
   ctx.globalAlpha = baseAlpha;
-  ctx.shadowBlur = 5;
-  ctx.shadowColor = coreColor;
+  if (!_isGPRune) { ctx.shadowBlur = 5; ctx.shadowColor = coreColor; }
   ctx.strokeStyle = coreColor;
   ctx.lineWidth = 1.5;
   
@@ -385,8 +386,8 @@ export function drawTricksterBolt(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(p.rotation || 0);
 
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = coreColor;
+  const _isGPProj = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+  if (!_isGPProj) { ctx.shadowBlur = 20; ctx.shadowColor = coreColor; }
 
   // Outer green aura (larger and more distinct to anchor the tail)
   ctx.fillStyle = `rgba(57, 255, 20, 0.95)`;

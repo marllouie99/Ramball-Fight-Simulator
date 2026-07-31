@@ -12,7 +12,6 @@ import { getHandSize } from '../../core/config.js';
 export function drawYujiSkin(ctx, fighter) {
   // 1. Draw afterimages (Zone trails) at their absolute coordinates
   if (fighter.afterImages && fighter.afterImages.length > 0) {
-    ctx.save();
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];
       if (ai.timer <= 0) continue;
@@ -42,7 +41,6 @@ export function drawYujiSkin(ctx, fighter) {
 
       ctx.restore();
     }
-    ctx.restore();
   }
 
   const r = fighter.r;
@@ -50,50 +48,45 @@ export function drawYujiSkin(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
-  // Black Flash Charge Ring removed for now
-  
-  // Black Flash Zone Visual Indicator (crackling red/black sparks)
+  // Black Flash Zone Visual Indicator (crackling red/black sparks) - Optimized with batched stroke calls
   if (fighter.blackFlashTimer > 0) {
     const pulse = 0.6 + Math.sin(Date.now() * 0.015) * 0.4;
-    ctx.save();
-    ctx.shadowBlur = 0;
     
     // Draw rotating black outline sparks
     ctx.strokeStyle = `rgba(0, 0, 0, ${pulse * 0.85})`;
     ctx.lineWidth = 3.2;
+    ctx.beginPath();
     for (let i = 0; i < 4; i++) {
       const a = (Math.PI / 2) * i + (Date.now() * 0.016);
-      ctx.beginPath();
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 14), Math.sin(a) * (r + 14));
-      ctx.stroke();
     }
+    ctx.stroke();
     
     // Draw rotating crimson core sparks (#B30000)
     ctx.strokeStyle = `rgba(179, 0, 0, ${pulse})`;
     ctx.lineWidth = 1.8;
+    ctx.beginPath();
     for (let i = 0; i < 4; i++) {
       const a = (Math.PI / 2) * i + (Date.now() * 0.016);
-      ctx.beginPath();
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 12), Math.sin(a) * (r + 12));
-      ctx.stroke();
     }
+    ctx.stroke();
 
     // Draw rotating lilac-white inner highlights (#F3E8FF)
     ctx.strokeStyle = `rgba(243, 232, 255, ${pulse * 0.9})`;
     ctx.lineWidth = 0.8;
+    ctx.beginPath();
     for (let i = 0; i < 4; i++) {
       const a = (Math.PI / 2) * i + (Date.now() * 0.016);
-      ctx.beginPath();
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9));
-      ctx.stroke();
     }
-    ctx.restore();
+    ctx.stroke();
   }
 
-  // ── Soul Swap Swirling Rotating Crimson Energy Rings (similar to Gojo/Sukuna body rings) ──
+  // ── Soul Swap Swirling Rotating Crimson Energy Rings - Optimized to eliminate nested save/restore ──
   if (fighter.soulSwapActive) {
     const time = Date.now();
     const ringRotation = time * 0.005;
@@ -102,11 +95,8 @@ export function drawYujiSkin(ctx, fighter) {
     ctx.save();
     ctx.rotate(ringRotation);
 
-    // Draw 3 counter-rotating crimson/red elliptical rings
+    // Draw 3 counter-rotating crimson/red elliptical rings (using incremental rotation cascade)
     for (let i = 0; i < 3; i++) {
-      ctx.save();
-      ctx.rotate(i * Math.PI / 3);
-
       ctx.beginPath();
       ctx.ellipse(0, 0, ringRadius, ringRadius * (0.22 + i * 0.06), 0, 0, Math.PI * 2);
       
@@ -120,7 +110,7 @@ export function drawYujiSkin(ctx, fighter) {
       ctx.lineWidth = 1.8 - i * 0.3;
       ctx.stroke();
 
-      ctx.restore();
+      ctx.rotate(Math.PI / 3);
     }
     ctx.restore();
   }

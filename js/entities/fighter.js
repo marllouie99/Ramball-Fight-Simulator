@@ -54,7 +54,8 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       // Spawn blood/impact particle visual effect in damage direction
       const damageAngle = opts.damageAngle ?? (attacker ? Math.atan2(target.y - attacker.y, target.x - attacker.x) : Math.random() * Math.PI * 2);
       if (typeof spawnBloodEffect === 'function') {
-        spawnBloodEffect(target, effectiveAmount, damageAngle);
+        const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(effectiveAmount * 0.16)) : effectiveAmount;
+        spawnBloodEffect(target, bloodAmount, damageAngle);
       } else if (typeof spawnSparks === 'function') {
         spawnSparks(target.x, target.y, 6, 'crimsonSniper');
       }
@@ -457,7 +458,8 @@ export class Fighter {
       }
       // Spawn blood effect in the damage direction (unless it's a turret)
       if (!this.isTurret) {
-        spawnBloodEffect(this, amount, damageAngle);
+        const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
+        spawnBloodEffect(this, bloodAmount, damageAngle);
       }
       
       // Play hit sound and trigger hit flash unless it's a DPS/continuous effect
@@ -852,7 +854,7 @@ export class Fighter {
     if (canAct) {
       this.aim(opponent);
     }
-    this.resolveWallBounce(arena);
+    this.resolveWallBounce(arena, opponent);
   }
 
   /** Draws the basic circle body. Subclasses can override for custom rendering. */

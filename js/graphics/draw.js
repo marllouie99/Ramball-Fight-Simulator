@@ -619,3 +619,19 @@ export function drawThermobaricExplosions(ctx) {
   modDrawThermobaricExplosions(ctx);
 }
 
+export function drawThinIceBreakerDimScreen() {
+  const { ctx, canvas } = state;
+  if (!ctx || !canvas || !state.thinIceBreakerDimTimer || state.thinIceBreakerDimTimer <= 0) return;
+
+  const maxTimer = 18;
+  const progress = state.thinIceBreakerDimTimer / maxTimer;
+  // Flash instantly, then smoothly fade out to 0 using a power curve
+  const opacity = 0.65 * Math.pow(progress, 1.8);
+
+  ctx.save();
+  // Deep dark spatial blue/gray overlay
+  ctx.fillStyle = `rgba(3, 12, 20, ${opacity})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+}
+

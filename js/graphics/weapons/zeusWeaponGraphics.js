@@ -1,6 +1,7 @@
 // zeusWeaponGraphics.js — The Master Bolt
 // A double-pointed, jagged crystal spear of pure lightning energy.
 import { getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 
 export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
@@ -185,9 +186,10 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
     ctx.beginPath();
     ctx.arc(sx, sy, sz, 0, Math.PI * 2);
     ctx.fillStyle = pr(4) > 0.5 ? '#FFFFFF' : '#00FFFF';
-    ctx.shadowColor = '#00BFFF';
-    ctx.shadowBlur = 6;
+    const _isGP = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+    if (!_isGP) { ctx.shadowColor = '#00BFFF'; ctx.shadowBlur = 6; }
     ctx.fill();
+    ctx.shadowBlur = 0;
   }
   ctx.restore();
 

@@ -99,8 +99,14 @@ export function updateRika(fighter, arena) {
     if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
     if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(3, 8);
 
-    const comeSound = getSkillSound(fighter.id || fighter._def?.id || 'yuta', 'come_rika');
-    audioSystem.playSFX(comeSound?.src || 'Assets/Sound Effects/Skills/comerika.mp3', comeSound?.volume || 2.5);
+    if (CONFIG.yuta?.comeRikaSound) {
+      audioSystem.playSFX(
+        CONFIG.yuta.comeRikaSound,
+        CONFIG.yuta.comeRikaVolume ?? 2.5,
+        1.0, 0,
+        CONFIG.yuta.comeRikaDelay ?? 0
+      );
+    }
   }
 
   if (!rk.active && rk.cooldownTimer > 0) {
@@ -160,11 +166,23 @@ export function updateRika(fighter, arena) {
       // Play Rika arise audio (rikaAppearance1.mp3 & groundTremble.mp3) as she arises into physical reality!
       if (!rk.playedAriseRoarSound) {
         rk.playedAriseRoarSound = true;
-        const appearSound = getSkillSound(fighter.id || fighter._def?.id || 'yuta', 'rika_appearance');
-        audioSystem.playSFX(appearSound?.src || 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', appearSound?.volume || 1.5);
+        if (CONFIG.yuta?.rikaAppearanceSound) {
+          audioSystem.playSFX(
+            CONFIG.yuta.rikaAppearanceSound,
+            CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
+            1.0, 0,
+            CONFIG.yuta.rikaAppearanceDelay ?? 0
+          );
+        }
 
-        const trembleSound = getSkillSound(fighter._def?.id || 'yuta', 'rika_ground_tremble') || getSkillEffectSound('yuta', 'groundtremble');
-        rk.activeTrembleSound = audioSystem.playSFX(trembleSound?.src || 'Assets/Sound Effects/SkillEffects/groundTremble.mp3', trembleSound?.volume ?? 1.8, trembleSound?.speed ?? 1.0);
+        if (CONFIG.yuta?.rikaGroundTrembleSound) {
+          rk.activeTrembleSound = audioSystem.playSFX(
+            CONFIG.yuta.rikaGroundTrembleSound,
+            CONFIG.yuta.rikaGroundTrembleVolume ?? 1.8,
+            1.0, 0,
+            CONFIG.yuta.rikaGroundTrembleDelay ?? 0
+          );
+        }
       }
 
       if (rk.spawnTimer % 3 === 0) {
@@ -190,7 +208,7 @@ export function updateRika(fighter, arena) {
                   const dy = enemy.y - rk.y;
                   const dist = Math.hypot(dx, dy) || 1;
                   if (dist <= roarRadius + enemy.r) {
-                    enemy.takeDamage(roarPulseDamage, fighter, { isPhysical: true });
+                    enemy.takeDamage(roarPulseDamage, fighter, { isPhysical: true, isRikaAttack: true });
                     if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(10);
                     enemy.vx += (dx / dist) * 5;
                     enemy.vy += (dy / dist) * 5;
@@ -210,7 +228,7 @@ export function updateRika(fighter, arena) {
                 const dy = ill.y - rk.y;
                 const dist = Math.hypot(dx, dy) || 1;
                 if (dist <= roarRadius + (ill.r || 20)) {
-                  ill.takeDamage(roarPulseDamage, fighter, { isPhysical: true });
+                  ill.takeDamage(roarPulseDamage, fighter, { isPhysical: true, isRikaAttack: true });
                   if (typeof ill.applyHitStun === 'function') ill.applyHitStun(10);
                   ill.vx += (dx / dist) * 5;
                   ill.vy += (dy / dist) * 5;
@@ -264,7 +282,7 @@ export function updateRika(fighter, arena) {
                   const dy = enemy.y - rk.y;
                   const dist = Math.hypot(dx, dy) || 1;
                   if (dist <= emergenceRadius + enemy.r) {
-                    enemy.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true });
+                    enemy.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true, isRikaAttack: true });
                     if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(emergenceHitStun);
                     const pushVx = (dx / dist) * emergenceKnockback;
                     const pushVy = (dy / dist) * emergenceKnockback;
@@ -286,7 +304,7 @@ export function updateRika(fighter, arena) {
                 const dy = ill.y - rk.y;
                 const dist = Math.hypot(dx, dy) || 1;
                 if (dist <= emergenceRadius + (ill.r || 20)) {
-                  ill.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true });
+                  ill.takeDamage(emergenceDamage, fighter, { isPhysical: true, isTrueDamage: true, isRikaAttack: true });
                   if (typeof ill.applyHitStun === 'function') ill.applyHitStun(emergenceHitStun);
                   const pushVx = (dx / dist) * emergenceKnockback;
                   const pushVy = (dy / dist) * emergenceKnockback;
@@ -331,7 +349,7 @@ export function updateRika(fighter, arena) {
                 const dy = enemy.y - rk.y;
                 const dist = Math.hypot(dx, dy) || 1;
                 if (dist <= dispersionRadius) {
-                  enemy.takeDamage(dispersionDamage, fighter, { isPhysical: true, isExplosion: true });
+                  enemy.takeDamage(dispersionDamage, fighter, { isPhysical: true, isExplosion: true, isRikaAttack: true });
                   if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(dispersionHitStun);
                   enemy.vx += (dx / dist) * dispersionKnockback;
                   enemy.vy += (dy / dist) * dispersionKnockback;
@@ -412,7 +430,7 @@ export function updateRika(fighter, arena) {
         if (rk.hp <= 0) {
           // ENTER DYING STATE
           rk.isDying = true;
-          rk.deathTimer = 90; // 1.5 seconds of dying animation before explosion
+          rk.deathTimer = 30; // 0.5 seconds of dying animation before explosion
         } else {
           // GRACEFUL SHRINK (Timer Expiration)
           rk.disappearing = true;
@@ -443,8 +461,14 @@ export function updateRika(fighter, arena) {
       rk.spawnScale = 0.05;
       
       // Play Rika Appearance sound (rikaAppearance.mp3) when Rika manifests!
-      const appearSound = getSkillSound(fighter.id || fighter._def?.id || 'yuta', 'rika_appearance');
-      audioSystem.playSFX(appearSound?.src || 'Assets/Sound Effects/Skills/rikaAppearance1.mp3', appearSound?.volume || 1.5);
+      if (CONFIG.yuta?.rikaAppearanceSound) {
+        audioSystem.playSFX(
+          CONFIG.yuta.rikaAppearanceSound,
+          CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
+          1.0, 0,
+          CONFIG.yuta.rikaAppearanceDelay ?? 0
+        );
+      }
 
       // Add her to the global targeting pool so AI and projectiles lock onto her
       if (typeof state !== 'undefined') {
@@ -562,7 +586,7 @@ export function updateRika(fighter, arena) {
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;
 
       for (const target of aoeTargets) {
-        target.takeDamage(rikaDmg, fighter, { isPhysical: true });
+        target.takeDamage(rikaDmg, fighter, { isPhysical: true, isRikaAttack: true });
 
         const pushAngle = Math.atan2(target.y - rk.y, target.x - rk.x);
         const smashVx = Math.cos(pushAngle) * knockbackForce;
@@ -603,11 +627,12 @@ export function updateRika(fighter, arena) {
       const isRoarActive = rk.roarEndTime && nowMs < rk.roarEndTime;
 
       if (!isRoarActive) {
-        const noiseList = getSkillSound(fighter._def?.id || 'yuta', 'rika_attack_noises') || [
-          { src: 'Assets/Sound Effects/Attacks/rikanoise1.mp3', volume: 1.8 },
-          { src: 'Assets/Sound Effects/Attacks/rikanoise2.mp3', volume: 1.8 },
-          { src: 'Assets/Sound Effects/Attacks/rikanoise3.mp3', volume: 1.8 }
+        const noises = CONFIG.yuta?.rikaNoises || [
+          'Assets/Sound Effects/Attacks/rikanoise1.mp3',
+          'Assets/Sound Effects/Attacks/rikanoise2.mp3',
+          'Assets/Sound Effects/Attacks/rikanoise3.mp3'
         ];
+        const noiseList = noises.map(n => typeof n === 'string' ? { src: n } : n);
 
         if (Array.isArray(noiseList) && noiseList.length > 0) {
           const available = noiseList.filter(n => !rk.lastRoarSrc || n.src !== rk.lastRoarSrc);
@@ -616,8 +641,13 @@ export function updateRika(fighter, arena) {
 
           if (randomNoise && randomNoise.src) {
             rk.lastRoarSrc = randomNoise.src;
-            const vol = CONFIG.yuta?.audio?.rikaNoiseVolume ?? randomNoise.volume ?? 1.8;
-            const handle = audioSystem.playSFX(randomNoise.src, vol);
+            const vol = CONFIG.yuta?.rikaNoiseVolume ?? 1.5;
+            const handle = audioSystem.playSFX(
+              randomNoise.src,
+              vol,
+              1.0, 0,
+              CONFIG.yuta?.rikaNoiseDelay ?? 0
+            );
             rk.activeRoarSound = handle;
 
             const durationMs = (handle && typeof handle.duration === 'number' && handle.duration > 0)
@@ -629,12 +659,23 @@ export function updateRika(fighter, arena) {
       }
 
       // Play physical claw impact sound (backstab.mp3) and groundSmash.mp3 on Rika attack
-      const attackSound = getSkillSound(fighter._def?.id || 'yuta', 'rika_attack');
-      const volume = CONFIG.yuta?.audio?.rikaAttackVolume ?? attackSound?.volume ?? 1.2;
-      audioSystem.playSFX(attackSound?.src || 'Assets/Sound Effects/Skills/backstab.mp3', volume);
+      if (CONFIG.yuta?.rikaAttackSound) {
+        audioSystem.playSFX(
+          CONFIG.yuta.rikaAttackSound,
+          CONFIG.yuta.rikaAttackVolume ?? 0.8,
+          1.0, 0,
+          CONFIG.yuta.rikaAttackDelay ?? 0
+        );
+      }
 
-      const smashSound = getSkillSound(fighter._def?.id || 'yuta', 'rika_ground_smash') || getSkillEffectSound('yuta', 'groundsmash');
-      audioSystem.playSFX(smashSound?.src || 'Assets/Sound Effects/Attacks/groundSmash.mp3', smashSound?.volume ?? 1.5, smashSound?.speed ?? 1.0);
+      if (CONFIG.yuta?.rikaGroundSmashSound) {
+        audioSystem.playSFX(
+          CONFIG.yuta.rikaGroundSmashSound,
+          CONFIG.yuta.rikaGroundSmashVolume ?? 1.5,
+          1.0, 0,
+          CONFIG.yuta.rikaGroundSmashDelay ?? 0
+        );
+      }
 
       // Alternate arms for fluid rapid dual-hand claw slashing!
       if (rk.lastArmUsed === 'right') {

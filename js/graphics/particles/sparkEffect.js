@@ -501,6 +501,8 @@ export function drawSparkEffects(layer = 'all') {
   const { ctx } = state;
   if (!ctx) return;
 
+  const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+
   for (const effect of state.sparkEffects) {
     const isBackground = effect.type === 'groundScorch' || 
                          effect.type === 'arcaneGroundScorch';
@@ -553,7 +555,7 @@ export function drawSparkEffects(layer = 'all') {
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'groundScorch') {
         // Massive, highly-detailed organic scorch mark burned into the ground
-        ctx.globalCompositeOperation = 'multiply';
+        if (!isGamePlay) ctx.globalCompositeOperation = 'multiply';
         
         ctx.translate(effect.x, effect.y);
 
@@ -601,8 +603,10 @@ export function drawSparkEffects(layer = 'all') {
         ctx.lineWidth = effect.size * 0.8;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'miter';
-        ctx.shadowBlur = 5;
-        ctx.shadowColor = effect.color;
+        if (!isGamePlay) {
+          ctx.shadowBlur = 5;
+          ctx.shadowColor = effect.color;
+        }
         
         ctx.beginPath();
         ctx.moveTo(effect.x, effect.y);
@@ -619,7 +623,7 @@ export function drawSparkEffects(layer = 'all') {
         
       } else if (effect.type === 'arcaneGroundScorch') {
         // Massive, highly-detailed organic scorch mark burned into the ground
-        ctx.globalCompositeOperation = 'multiply';
+        if (!isGamePlay) ctx.globalCompositeOperation = 'multiply';
         
         ctx.translate(effect.x, effect.y);
 
@@ -658,7 +662,7 @@ export function drawSparkEffects(layer = 'all') {
         // Darker outer cracks for depth
         ctx.strokeStyle = `rgba(0, 10, 40, ${effect.life * 0.9})`; // Dark blue/black
         ctx.lineWidth = 2 + effect.life * 2;
-        ctx.globalCompositeOperation = 'multiply';
+        if (!isGamePlay) ctx.globalCompositeOperation = 'multiply';
         ctx.stroke();
         
         ctx.translate(-effect.x, -effect.y);
@@ -770,26 +774,42 @@ export function drawSparkEffects(layer = 'all') {
           effect.size += (effect.targetSize - effect.size) * 0.16;
         }
         
-        // 1. Hot Pink Outer Glow Ring
-        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
-        ctx.lineWidth = 7 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+        const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+        if (isGamePlay) {
+          // Gameplay-optimized dual-stroke ring
+          ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
+          ctx.lineWidth = 6 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // 2. High-contrast Black Ink Outline Ring (visible on light backgrounds)
-        ctx.strokeStyle = `rgba(10, 2, 5, ${effect.life * 0.9})`;
-        ctx.lineWidth = 3 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
-        ctx.stroke();
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 2.5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.94), 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // 1. Hot Pink Outer Glow Ring
+          ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
+          ctx.lineWidth = 7 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
 
-        // 3. Piercing White-Hot Inner Core Ring
-        ctx.strokeStyle = `rgba(255, 240, 245, ${effect.life * 0.95})`;
-        ctx.lineWidth = 2 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
-        ctx.stroke();
+          // 2. High-contrast Black Ink Outline Ring (visible on light backgrounds)
+          ctx.strokeStyle = `rgba(10, 2, 5, ${effect.life * 0.9})`;
+          ctx.lineWidth = 3 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
+          ctx.stroke();
+
+          // 3. Piercing White-Hot Inner Core Ring
+          ctx.strokeStyle = `rgba(255, 240, 245, ${effect.life * 0.95})`;
+          ctx.lineWidth = 2 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
+          ctx.stroke();
+        }
       } else if (effect.type === 'arcaneFlash') {
         // Bright radial flash beneath feet on landing
         effect.size += (effect.targetSize - effect.size) * 0.06; // Slower size blooming
@@ -930,8 +950,7 @@ export function drawSparkEffects(layer = 'all') {
         if (effect.type === 'arcaneSmokeAirborne') {
            // Draw neon glowing edges FIRST
            ctx.globalCompositeOperation = 'lighter';
-           ctx.shadowBlur = 30;
-           ctx.shadowColor = `rgba(50, 255, 120, ${effect.life})`;
+           if (!isGamePlay) { ctx.shadowBlur = 30; ctx.shadowColor = `rgba(50, 255, 120, ${effect.life})`; }
            ctx.strokeStyle = `rgba(50, 255, 120, ${effect.life * 0.9})`;
            ctx.lineWidth = 6; // Thick stroke so the edge peeks out
            ctx.stroke(); 
@@ -991,13 +1010,20 @@ export function drawSparkEffects(layer = 'all') {
       ctx.rotate(effect.life * effect.rotationSpeed * 100 || 0);
 
       // Draw a subtle magical aura beneath the rock
-      const auraGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, effect.size * 1.5);
-      auraGradient.addColorStop(0, `rgba(46, 139, 87, ${effect.life * 0.6})`);
-      auraGradient.addColorStop(1, 'rgba(46, 139, 87, 0)');
-      ctx.fillStyle = auraGradient;
-      ctx.beginPath();
-      ctx.arc(0, 0, effect.size * 1.5, 0, Math.PI * 2);
-      ctx.fill();
+      if (isGamePlay) {
+        ctx.fillStyle = `rgba(46, 139, 87, ${effect.life * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, effect.size * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const auraGradient = ctx.createRadialGradient(0, 0, 0, 0, 0, effect.size * 1.5);
+        auraGradient.addColorStop(0, `rgba(46, 139, 87, ${effect.life * 0.6})`);
+        auraGradient.addColorStop(1, 'rgba(46, 139, 87, 0)');
+        ctx.fillStyle = auraGradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, effect.size * 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
 
       // Rock base polygon (dark shadow side)
       ctx.beginPath();
@@ -1231,8 +1257,7 @@ export function drawSparkEffects(layer = 'all') {
       
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.shadowBlur = 25 * effect.life;
-      ctx.shadowColor = 'rgba(255, 215, 0, 1)';
+      if (!isGamePlay) { ctx.shadowBlur = 25 * effect.life; ctx.shadowColor = 'rgba(255, 215, 0, 1)'; }
 
       // Outer glowing golden shockwave ring
       ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
@@ -1263,32 +1288,47 @@ export function drawSparkEffects(layer = 'all') {
       // Expanding dark purple & hot pink cursed energy roar shockwave ring
       effect.size += (effect.targetSize - effect.size) * 0.18;
       
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      ctx.shadowBlur = 25 * effect.life;
-      ctx.shadowColor = 'rgba(255, 20, 147, 1)';
 
-      // Outer glowing hot pink cursed energy shockwave ring
-      ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
-      ctx.lineWidth = 12 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-      ctx.stroke();
+      if (isGamePlay) {
+        // High-performance double-stroke glow without shadowBlur
+        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
+        ctx.lineWidth = 9 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
 
-      // Middle dark-purple contrast ring
-      ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.8})`;
-      ctx.lineWidth = 6 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
-      ctx.stroke();
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
+        ctx.stroke();
+      } else {
+        // Original 3-layer drawing with shadowBlur
+        ctx.shadowBlur = 25 * effect.life;
+        ctx.shadowColor = 'rgba(255, 20, 147, 1)';
 
-      // Inner white-hot core ring
-      ctx.shadowColor = 'rgba(255, 255, 255, 1)';
-      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-      ctx.lineWidth = 4 * effect.life;
-      ctx.beginPath();
-      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
-      ctx.stroke();
+        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
+        ctx.lineWidth = 12 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.8})`;
+        ctx.lineWidth = 6 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.shadowColor = 'rgba(255, 255, 255, 1)';
+        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
       ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
@@ -1420,22 +1460,29 @@ export function drawSparkEffects(layer = 'all') {
 
       ctx.restore();
     } else {
-      // Standard spark - small glowing dot with gradient
-      const gradient = ctx.createRadialGradient(
-        effect.x, effect.y, 0,
-        effect.x, effect.y, effect.size
-      );
-      gradient.addColorStop(0, effect.color);
-      gradient.addColorStop(0.5, effect.color.replace('1)', '0.6)'));
-      
-      if (effect.type === 'crimsonSniper') {
-        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      } else if (effect.type === 'lightningTrail') {
-        gradient.addColorStop(1, effect.color.replace(/[\d.]+\)$/, '0)'));
-      } else if (effect.type === 'rikaCurse') {
-        gradient.addColorStop(1, effect.color.replace('1)', '0)'));
+      // Standard spark - small glowing dot
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+      if (isGamePlay) {
+        // During gameplay: skip per-particle radial gradient (saves huge CPU time per frame)
+        ctx.fillStyle = effect.color;
       } else {
-        gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        const gradient = ctx.createRadialGradient(
+          effect.x, effect.y, 0,
+          effect.x, effect.y, effect.size
+        );
+        gradient.addColorStop(0, effect.color);
+        gradient.addColorStop(0.5, effect.color.replace('1)', '0.6)'));
+        
+        if (effect.type === 'crimsonSniper') {
+          gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        } else if (effect.type === 'lightningTrail') {
+          gradient.addColorStop(1, effect.color.replace(/[\d.]+\)$/, '0)'));
+        } else if (effect.type === 'rikaCurse') {
+          gradient.addColorStop(1, effect.color.replace('1)', '0)'));
+        } else {
+          gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        }
+        ctx.fillStyle = gradient;
       }
 
       ctx.beginPath();
@@ -1459,9 +1506,10 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
-
+  let insertIdx = -1;
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
-    const oldest = state.sparkEffects.shift();
+    insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+    const oldest = state.sparkEffects[insertIdx];
     if (oldest) ParticleSystem.returnParticle(oldest);
   }
 
@@ -1479,8 +1527,11 @@ export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') 
   shockwave.clashType = clashType;
   shockwave.isFlash = true;
   shockwave.color = 'clash';
-
-  state.sparkEffects.push(shockwave);
+  if (insertIdx !== -1) {
+    state.sparkEffects[insertIdx] = shockwave;
+  } else {
+    state.sparkEffects.push(shockwave);
+  }
 }
 
 export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, color = 'black') {
@@ -1510,9 +1561,10 @@ export function spawnRikaRoarShockwave(x, y, radius = 180) {
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
-
+  let insertIdx = -1;
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
-    const oldest = state.sparkEffects.shift();
+    insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+    const oldest = state.sparkEffects[insertIdx];
     if (oldest) ParticleSystem.returnParticle(oldest);
   }
 
@@ -1528,8 +1580,11 @@ export function spawnRikaRoarShockwave(x, y, radius = 180) {
   shockwave.type = 'rikaRoarShockwave';
   shockwave.isFlash = true;
   shockwave.color = 'pinkCurse';
-
-  state.sparkEffects.push(shockwave);
+  if (insertIdx !== -1) {
+    state.sparkEffects[insertIdx] = shockwave;
+  } else {
+    state.sparkEffects.push(shockwave);
+  }
 }
 
 /**
@@ -1542,9 +1597,10 @@ export function spawnMahoragaShoutShockwave(x, y, radius = 180) {
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
-
+  let insertIdx = -1;
   if (state.sparkEffects.length >= MAX_SHOCKWAVES) {
-    const oldest = state.sparkEffects.shift();
+    insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+    const oldest = state.sparkEffects[insertIdx];
     if (oldest) ParticleSystem.returnParticle(oldest);
   }
 
@@ -1560,8 +1616,11 @@ export function spawnMahoragaShoutShockwave(x, y, radius = 180) {
   shockwave.type = 'mahoragaShoutShockwave';
   shockwave.isFlash = true;
   shockwave.color = 'gold';
-
-  state.sparkEffects.push(shockwave);
+  if (insertIdx !== -1) {
+    state.sparkEffects[insertIdx] = shockwave;
+  } else {
+    state.sparkEffects.push(shockwave);
+  }
 }
 
 /**
@@ -1598,8 +1657,10 @@ export function spawnMahoragaShoutBurst(x, y, radius = 180) {
 
   // Outward exploding sparks
   for (let i = 0; i < 30; i++) {
+    let insertIdx = -1;
     if (state.sparkEffects.length >= MAX_PARTICLES) {
-      const oldest = state.sparkEffects.shift();
+      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const oldest = state.sparkEffects[insertIdx];
       if (oldest) ParticleSystem.returnParticle(oldest);
     }
 
@@ -1618,6 +1679,10 @@ export function spawnMahoragaShoutBurst(x, y, radius = 180) {
     spark.type = 'silver';
     spark.color = Math.random() < 0.70 ? '#FFD700' : '#E8F5FF';
 
-    state.sparkEffects.push(spark);
+    if (insertIdx !== -1) {
+      state.sparkEffects[insertIdx] = spark;
+    } else {
+      state.sparkEffects.push(spark);
+    }
   }
 }

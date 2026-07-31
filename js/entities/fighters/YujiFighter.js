@@ -116,8 +116,14 @@ export class YujiFighter extends Fighter {
       this.hasDismantleCharge = true;
       
       spawnFloatingText(this.x, this.y - this.r - 28, "SUKUNA TAKES OVER!", "#CC0000");
-      audioSystem.playSFX('Assets/Sound Effects/Skills/backstab.mp3', 1.0);
-      audioSystem.playSFX('Assets/Sound Effects/Skills/redcharging.mp3', 1.0);
+      if (CONFIG.yuji?.transformationSound) {
+        audioSystem.playSFX(
+          CONFIG.yuji.transformationSound,
+          CONFIG.yuji.transformationVolume ?? 2.0,
+          1.0, 0,
+          CONFIG.yuji.transformationDelay ?? 0
+        );
+      }
     }
 
     super.update(opponent, ownerIndex, arena);
@@ -382,6 +388,66 @@ export class YujiFighter extends Fighter {
     // Clear Black Flash zone on hard interrupt
     this.blackFlashTimer = 0;
     this.blackFlashHitsLeft = 0;
+  }
+
+  resolveWallBounce(arena, opponent) {
+    let bounced = false;
+    const restitution = CONFIG.collision.restitution || 0.8;
+
+    if (this.x - this.r < arena.x) {
+      this.x = arena.x + this.r;
+      bounced = true;
+    } else if (this.x + this.r > arena.x + arena.width) {
+      this.x = arena.x + arena.width - this.r;
+      bounced = true;
+    }
+
+    if (this.y - this.r < arena.y) {
+      this.y = arena.y + this.r;
+      bounced = true;
+    } else if (this.y + this.r > arena.y + arena.height) {
+      this.y = arena.y + arena.height - this.r;
+      bounced = true;
+    }
+
+    if (bounced) {
+      if (typeof this.playWallBounceSound === 'function') this.playWallBounceSound();
+
+      let target = opponent;
+      if (!target || target.isDead || target.hp <= 0) {
+        let nearest = null;
+        let nearestDist = Infinity;
+        const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
+        for (const f of allEntities) {
+          if (!f || f === this || f.hp <= 0) continue;
+          if (f.team === this.team) continue;
+          const dist = Math.hypot(f.x - this.x, f.y - this.y);
+          if (dist < nearestDist) {
+            nearestDist = dist;
+            nearest = f;
+          }
+        }
+        target = nearest;
+      }
+
+      const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 8;
+
+      if (target) {
+        const dx = target.x - this.x;
+        const dy = target.y - this.y;
+        const dist = Math.hypot(dx, dy) || 1;
+        this.vx = (dx / dist) * currentSpeed * restitution;
+        this.vy = (dy / dist) * currentSpeed * restitution;
+        this.aim(target);
+      } else {
+        if (this.x - this.r <= arena.x || this.x + this.r >= arena.x + arena.width) {
+          this.vx = -this.vx * restitution;
+        }
+        if (this.y - this.r <= arena.y || this.y + this.r >= arena.y + arena.height) {
+          this.vy = -this.vy * restitution;
+        }
+      }
+    }
   }
 
   draw(ctx) {

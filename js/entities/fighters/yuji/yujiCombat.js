@@ -5,10 +5,28 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { spawnBlackFlash } from '../../../graphics/particles/blackFlashEffect.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
+let lastPunchSoundSrc = null;
 
-function playYujiPunchSound() {
-  const soundSrc = CONFIG.yuji?.punchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
-  const soundVol = CONFIG.yuji?.punchVolume || 2.5;
+function playYujiPunchSound(disableVoice = false) {
+  const sounds = CONFIG.yuji?.punchSounds;
+  const chance = CONFIG.yuji?.punchSoundsChance ?? 1.0;
+  const shouldPlayNoise = !disableVoice && Math.random() < chance;
+
+  let soundSrc;
+  let soundVol;
+  if (shouldPlayNoise && sounds && Array.isArray(sounds) && sounds.length > 0) {
+    let availableSounds = sounds;
+    if (sounds.length > 1 && lastPunchSoundSrc) {
+      availableSounds = sounds.filter(s => s !== lastPunchSoundSrc);
+    }
+    const idx = Math.floor(Math.random() * availableSounds.length);
+    soundSrc = availableSounds[idx];
+    lastPunchSoundSrc = soundSrc;
+    soundVol = CONFIG.yuji?.punchSoundsVolume || CONFIG.yuji?.punchVolume || 2.5;
+  } else {
+    soundSrc = CONFIG.yuji?.punchSound || 'Assets/Sound Effects/Attacks/punch.mp3';
+    soundVol = CONFIG.yuji?.punchVolume || 2.5;
+  }
   audioSystem.playSFX(soundSrc, soundVol);
 }
 
@@ -21,6 +39,21 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
   if (!isCombo && this.punchAnimTimer > 0) return;
 
   const isZone = (this.blackFlashTimer > 0);
+  
+  const thresholdForAudio = this.soulSwapActive 
+    ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
+    : (CONFIG.yuji?.blackFlashThreshold || 4);
+    
+  if (!isZone && this.blackFlashCharge >= thresholdForAudio) {
+    if (CONFIG.yuji?.blackFlashEnterSound && !this.soulSwapActive) {
+      audioSystem.playSFX(
+        CONFIG.yuji.blackFlashEnterSound, 
+        CONFIG.yuji.blackFlashEnterVolume ?? 1.5,
+        1.0, 0, 
+        CONFIG.yuji.blackFlashEnterDelay ?? 0
+      );
+    }
+  }
 
   // Start punch animation (combo punches are faster: 8 frames)
   const normalSpeed = this.punchMaxTime || 25;
@@ -119,7 +152,10 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
         if (isBlackFlash) {
           spawnBlackFlash(target.x, target.y);
           const sound = getSkillSound(this.id, 'blackflash');
-          if (sound) audioSystem.playSFX(sound.src, sound.volume);
+          if (sound) {
+            audioSystem.playSFX(sound.src, sound.volume);
+            if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
+          }
           if (typeof target.applySlow === 'function') {
             target.applySlow(
               CONFIG.blackFlash?.debuff?.slowDuration ?? 70,
@@ -149,7 +185,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
 
   // Sound effects
   if (hitAny) {
-    playYujiPunchSound();
+    playYujiPunchSound(isBlackFlash || this.soulSwapActive);
     
     // Build Black Flash charge / manage zone
     if (isBlackFlash) {
@@ -176,7 +212,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
     }
   } else {
     // Punched the air
-    playYujiPunchSound();
+    playYujiPunchSound(isBlackFlash || this.soulSwapActive);
     // Only reset charge on whiff if we are NOT in the active Black Flash zone
     if (this.blackFlashTimer <= 0 && CONFIG.yuji?.blackFlashResetOnMiss) {
       this.blackFlashCharge = 0; // Reset charge on whiff

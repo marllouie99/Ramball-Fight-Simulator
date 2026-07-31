@@ -89,7 +89,10 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     spawnBlackFlash(target.x, target.y);
     playTodoPunchSound();
     const sound = getSkillSound(this.id, 'blackflash');
-    if (sound) audioSystem.playSFX(sound.src, sound.volume);
+    if (sound) {
+      audioSystem.playSFX(sound.src, sound.volume);
+      if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
+    }
     if (typeof target.applySlow === 'function') {
       target.applySlow(
         CONFIG.blackFlash?.debuff?.slowDuration ?? 70,

@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
-
+import { fastCleanArray } from './visualTrailSystem.js';
 import { CONFIG } from '../../core/config.js';
 
 /**
@@ -34,10 +34,6 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
   else if (color === '#4dff4d') color = '#00cc00';
 
   for (let i = 0; i < particleCount; i++) {
-    // If we reached the global limit, properly remove the oldest blood particle
-    if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
-      state.bloodEffects.shift();
-    }
     // Random angle for each particle
     let angle = Math.random() * Math.PI * 2;
     // Massive initial burst speed for a horizontal spray
@@ -53,11 +49,7 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
     // Bigger particles (3-6 pixels) for more visibility
     const size = 3 + Math.random() * 3;
 
-    if (state.bloodEffects.length >= 50) {
-      state.bloodEffects.shift();
-    }
-
-    state.bloodEffects.push({
+    const newEffect = {
       x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
       y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
       vx: Math.cos(angle) * speed,
@@ -68,7 +60,15 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
       decay: 0.008 + Math.random() * 0.006, 
       airResistance: 0.94, // Lighter air friction so they fly further
       friction: 0.90,      // Ground friction
-    });
+    };
+
+    // Fast O(1) overwrite of random existing particle if over limit, avoiding O(N) shift()
+    if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
+       const overwriteIdx = Math.floor(Math.random() * state.bloodEffects.length);
+       state.bloodEffects[overwriteIdx] = newEffect;
+    } else {
+       state.bloodEffects.push(newEffect);
+    }
   }
 }
 
@@ -78,9 +78,7 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
 export function updateBloodEffects() {
   const arenaBottom = CONFIG.arena.y + CONFIG.arena.height;
 
-  for (let i = state.bloodEffects.length - 1; i >= 0; i--) {
-    const effect = state.bloodEffects[i];
-
+  fastCleanArray(state.bloodEffects, (effect) => {
     // Air resistance slows the blood down slightly as it flies
     effect.vx *= effect.airResistance;
     effect.vy *= effect.airResistance;
@@ -103,10 +101,8 @@ export function updateBloodEffects() {
     effect.life -= effect.decay;
 
     // Remove dead effects
-    if (effect.life <= 0) {
-      state.bloodEffects.splice(i, 1);
-    }
-  }
+    return effect.life > 0;
+  });
 }
 
 /**

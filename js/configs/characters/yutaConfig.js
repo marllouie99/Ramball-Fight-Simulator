@@ -32,7 +32,7 @@ export const yutaConfig = {
   flurryParryMin: 2,                       // Minimum successful parries required to activate Flurry
   flurryParryMax: 2,                       // Maximum random target threshold for Flurry activation
   flurryHits: 5,                           // Number of rapid teleport slashes in Flurry execution
-  flurryDamage: 8,                         // Damage per slash during Flurry
+  flurryDamage: 15,                         // Damage per slash during Flurry
   flurryHitInterval: 10,                    // Frames delay between each Flurry slash
 
   // Copied Techniques (Ranged Skill Cycle)
@@ -82,15 +82,68 @@ export const yutaConfig = {
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
 
-  // AUDIO TUNING — Audio volumes & lead timing
-  audio: {
-    comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!" (90 frames = 1.5s)
-    comeRikaVolume: 2.5,                   // Volume of "Come, Rika!" (comerika.mp3)
-    rikaAppearanceVolume: 2.5,             // Volume of Rika emergence (rikaAppearance.mp3)
-    rikaAttackVolume: 0.8,                 // Volume of Rika claw slash impacts (backstab.mp3)
-    rikaNoiseVolume: 1.5,                  // Volume of Rika demonic roars (rikanoise1.mp3, rikanoise2.mp3, rikanoise3.mp3)
-    rikaNoiseCooldown: 25,                 // Cooldown in frames between Rika attack roars to prevent audio cutting/spam
-    domainChannelVolume: 3.5,              // Volume during domain expansion channeling (yutadomainexpansion.mp3)
-    domainDeployVolume: 3.5,               // Volume when domain expansion opens (gojodomainexpansion.mp3)
-  },
+  //----------------------------------AUDIO CONFIG-----------------------------------------//
+
+  // Basic Attack: Katana Swing
+  katanaSwingSound: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+  katanaSwingVolume: 0.7,
+  katanaSwingDelay: 0,
+
+  // Summon Companion: Rika Orimoto
+  comeRikaSound: 'Assets/Sound Effects/Skills/comerika.mp3',
+  comeRikaVolume: 2.5,
+  comeRikaDelay: 0,
+  comeRikaLeadTime: 90,                  // Frames before Rika emerges to play "Come, Rika!"
+
+  rikaAppearanceSound: 'Assets/Sound Effects/Skills/rikaAppearance1.mp3',
+  rikaAppearanceVolume: 2.5,
+  rikaAppearanceDelay: 0,
+
+  rikaAttackSound: 'Assets/Sound Effects/Skills/backstab.mp3',
+  rikaAttackVolume: 0.8,
+  rikaAttackDelay: 0,
+
+  rikaGroundSmashSound: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+  rikaGroundSmashVolume: 1.5,
+  rikaGroundSmashDelay: 0,
+
+  rikaGroundTrembleSound: 'Assets/Sound Effects/SkillEffects/groundTremble.mp3',
+  rikaGroundTrembleVolume: 1.8,
+  rikaGroundTrembleDelay: 0,
+
+  rikaNoises: [
+    'Assets/Sound Effects/Attacks/rikanoise1.mp3',
+    'Assets/Sound Effects/Attacks/rikanoise2.mp3',
+    'Assets/Sound Effects/Attacks/rikanoise3.mp3'
+  ],
+  rikaNoiseVolume: 1.5,
+  rikaNoiseDelay: 0,
+  rikaNoiseCooldown: 25,                 // Cooldown in frames between Rika attack roars
+
+  // Thin Ice Breaker
+  thinIceBreakerSound: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
+  thinIceBreakerVolume: 1.5,
+  thinIceBreakerDelay: 0,
+  thinIceBreakerMaxDuration: 1200, // Stop playback after 1000ms
+
+  thinIceBreakerNoiseSound: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
+  thinIceBreakerNoiseVolume: 1.5,
+  thinIceBreakerNoiseDelay: 0,
+  thinIceBreakerNoiseChance: 0.5,
+  thinIceBreakerNoiseMaxDuration: 750, // Stop voice line after 750ms
+
+  // Ultimate: Domain Expansion
+  domainChannelSound: 'Assets/Sound Effects/Skills/yutadomainexpansion.mp3',
+  domainChannelVolume: 3.5,
+  domainChannelDelay: 0,
+
+  domainDeploySound: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
+  domainDeployVolume: 3.5,
+  domainDeployDelay: 0,
+
+  // Phantom Flurry Counter
+  phantomFlurryNoiseSound: 'Assets/Sound Effects/Skills/yuta-flurry-noise.mp3',
+  phantomFlurryNoiseVolume: 2.0,
+  phantomFlurryNoiseDelay: 0,
+  phantomFlurryNoiseChance: 0.5,
 };

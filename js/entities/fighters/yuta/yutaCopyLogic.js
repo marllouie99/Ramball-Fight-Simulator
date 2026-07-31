@@ -2,6 +2,7 @@ import { CONFIG } from '../../../core/config.js';
 import { spawnFloatingText, state } from '../../../core/state.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
+import { stopSound } from '../../../systems/soundSystem.js';
 
 export const COPIED_TECHNIQUES = [
   'CURSED_SPEECH',
@@ -78,7 +79,35 @@ export function executeThinIceBreaker(fighter, angle) {
   const range = 250;
   const coneArc = Math.PI * 0.8; // 144 degrees
   
-  audioSystem.playSFX('attack_groundsmash', 1.0);
+  if (CONFIG.yuta?.thinIceBreakerSound) {
+    const handle = audioSystem.playSFX(
+      CONFIG.yuta.thinIceBreakerSound,
+      CONFIG.yuta.thinIceBreakerVolume ?? 1.5,
+      1.0, 0,
+      CONFIG.yuta.thinIceBreakerDelay ?? 0
+    );
+    const maxDur = CONFIG.yuta?.thinIceBreakerMaxDuration;
+    if (handle && typeof maxDur === 'number' && maxDur > 0) {
+      setTimeout(() => {
+        try { stopSound(handle); } catch (e) {}
+      }, maxDur);
+    }
+  }
+  const thinIceBreakerNoiseChance = CONFIG.yuta?.thinIceBreakerNoiseChance ?? 1.0;
+  if (CONFIG.yuta?.thinIceBreakerNoiseSound && Math.random() < thinIceBreakerNoiseChance) {
+    const handle = audioSystem.playSFX(
+      CONFIG.yuta.thinIceBreakerNoiseSound,
+      CONFIG.yuta.thinIceBreakerNoiseVolume ?? 1.5,
+      1.0, 0,
+      CONFIG.yuta.thinIceBreakerNoiseDelay ?? 0
+    );
+    const maxDur = CONFIG.yuta?.thinIceBreakerNoiseMaxDuration;
+    if (handle && typeof maxDur === 'number' && maxDur > 0) {
+      setTimeout(() => {
+        try { stopSound(handle); } catch (e) {}
+      }, maxDur);
+    }
+  }
   
   // Hit detection
   state.fighters.forEach(target => {
@@ -95,6 +124,7 @@ export function executeThinIceBreaker(fighter, angle) {
         if (Math.abs(angleDiff) < coneArc / 2) {
           // Unblockable hit via 'fromBlackHole' trick which ignores parries
           target.takeDamage(damage, fighter, { fromBlackHole: true }); 
+          state.thinIceBreakerDimTimer = 18; // Trigger quick screen dim effect
           
           // Apply massive knockback
           if (typeof target.applyKnockback === 'function') {

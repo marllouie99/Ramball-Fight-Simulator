@@ -10,7 +10,7 @@ import {
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen,
-  drawAllCronosSpheres, drawThermobaricExplosions
+  drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -36,6 +36,10 @@ export function renderGame() {
         state.screenShake.intensity = 0;
         state.screenShake.maxTimer = 0;
       }
+    }
+
+    if (state.thinIceBreakerDimTimer && state.thinIceBreakerDimTimer > 0) {
+      state.thinIceBreakerDimTimer--;
     }
 
     // Sync HTML DOM Health HUD containers with screen shake so DOM cards and Canvas Arena shake as one locked unit
@@ -88,6 +92,7 @@ export function renderGame() {
       drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
       drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
       drawTojiUltimateOverlay(); // Draw pitch black overlay with Fly Heads when Toji uses Ultimate
+      drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
       
       const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 

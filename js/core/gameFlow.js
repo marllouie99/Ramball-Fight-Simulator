@@ -27,7 +27,10 @@ const SOUND_ASSETS = {
   flameWardenShot: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
   rangerLaserPew: 'Assets/Sound Effects/Attacks/laserpew.mp3',
   spikeStab: 'Assets/Sound Effects/Attacks/spikestab.mp3',
+  yutaThinIceBreaker: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
+  yutaThinIceBreakerNoise: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
 };
+
 
 function preloadGameSounds() {
   // Legacy assets + basic attack sounds + skill sounds + skill effect sounds
@@ -36,7 +39,32 @@ function preloadGameSounds() {
   const skillPaths = getSkillSoundPaths();
   const skillEffectPaths = getSkillEffectSoundPaths();
   const announcerPaths = getAnnouncerSoundPaths();
-  const allPaths = [...new Set([...legacyPaths, ...basicAttackPaths, ...skillPaths, ...skillEffectPaths, ...announcerPaths])];
+  
+  const yujiSounds = [];
+  if (CONFIG.yuji) {
+    if (CONFIG.yuji.punchSound) yujiSounds.push(CONFIG.yuji.punchSound);
+    if (CONFIG.yuji.punchSounds) yujiSounds.push(...CONFIG.yuji.punchSounds);
+    if (CONFIG.yuji.blackFlashEnterSound) yujiSounds.push(CONFIG.yuji.blackFlashEnterSound);
+    if (CONFIG.yuji.transformationSound) yujiSounds.push(CONFIG.yuji.transformationSound);
+  }
+
+  const yutaSounds = [];
+  if (CONFIG.yuta) {
+    if (CONFIG.yuta.katanaSwingSound) yutaSounds.push(CONFIG.yuta.katanaSwingSound);
+    if (CONFIG.yuta.comeRikaSound) yutaSounds.push(CONFIG.yuta.comeRikaSound);
+    if (CONFIG.yuta.rikaAppearanceSound) yutaSounds.push(CONFIG.yuta.rikaAppearanceSound);
+    if (CONFIG.yuta.rikaAttackSound) yutaSounds.push(CONFIG.yuta.rikaAttackSound);
+    if (CONFIG.yuta.rikaGroundSmashSound) yutaSounds.push(CONFIG.yuta.rikaGroundSmashSound);
+    if (CONFIG.yuta.rikaGroundTrembleSound) yutaSounds.push(CONFIG.yuta.rikaGroundTrembleSound);
+    if (CONFIG.yuta.rikaNoises) yutaSounds.push(...CONFIG.yuta.rikaNoises);
+    if (CONFIG.yuta.thinIceBreakerSound) yutaSounds.push(CONFIG.yuta.thinIceBreakerSound);
+    if (CONFIG.yuta.thinIceBreakerNoiseSound) yutaSounds.push(CONFIG.yuta.thinIceBreakerNoiseSound);
+    if (CONFIG.yuta.domainChannelSound) yutaSounds.push(CONFIG.yuta.domainChannelSound);
+    if (CONFIG.yuta.domainDeploySound) yutaSounds.push(CONFIG.yuta.domainDeploySound);
+    if (CONFIG.yuta.phantomFlurryNoiseSound) yutaSounds.push(CONFIG.yuta.phantomFlurryNoiseSound);
+  }
+
+  const allPaths = [...new Set([...legacyPaths, ...basicAttackPaths, ...skillPaths, ...skillEffectPaths, ...announcerPaths, ...yujiSounds, ...yutaSounds])];
   return Promise.all(allPaths.map(preloadSound));
 }
 

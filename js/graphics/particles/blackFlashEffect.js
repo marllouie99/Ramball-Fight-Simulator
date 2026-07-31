@@ -23,6 +23,9 @@ function _returnBFParticle(p) {
   p.type = null; p.x = 0; p.y = 0; p.vx = 0; p.vy = 0;
   p.size = 0; p.life = 0; p.decay = 0; p.friction = 1;
   p.angle = 0; p.color = null; p.data = null;
+  p._jitterMain = null;
+  p._jitterBranches = null;
+  p._lastJitterTick = null;
   _bfPool.push(p);
 }
 
@@ -119,7 +122,7 @@ export function spawnBlackFlash(x, y) {
 
   // ── 4. CURSED ENERGY JAGGED CRACK BOLTS ──────────────────────────────────
   // Radial lightning-like energy tendrils shooting outward.
-  const boltCount = 10 + Math.floor(Math.random() * 4);
+  const boltCount = 7 + Math.floor(Math.random() * 3);
   for (let i = 0; i < boltCount; i++) {
     const baseAngle = (i / boltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
     const bolt = _getBFParticle();
@@ -138,7 +141,7 @@ export function spawnBlackFlash(x, y) {
   }
 
   // ── 5. VOID PARTICLE SHARDS — small dark fragments flying out ────────────
-  const shardCount = 14;
+  const shardCount = 8;
   for (let i = 0; i < shardCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 4.5 + Math.random() * 8;
@@ -198,59 +201,79 @@ export function updateBlackFlashEffects(frozen = false) {
 export function drawBlackFlashEffects(ctx) {
   if (!ctx || _blackFlashParticles.length === 0) return;
 
-  ctx.save();
+  const originalGCO = ctx.globalCompositeOperation;
+  const originalAlpha = ctx.globalAlpha;
 
   for (const p of _blackFlashParticles) {
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.life <= 0) continue;
 
-    ctx.save();
     ctx.globalAlpha = Math.max(0, p.life);
 
     if (p.type === 'bfScreenFlash') {
       // ── Full-screen deep crimson wash (JJK's signature red flash) ──────
-      ctx.globalCompositeOperation = 'multiply';
-      ctx.globalAlpha = p.life * 0.45;
-      ctx.fillStyle = '#3b0000';
-      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-      ctx.globalCompositeOperation = 'source-over';
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+      if (isGamePlay) {
+        // High-performance source-over translucent wash to avoid expensive canvas multiply blend-mode readback
+        ctx.globalAlpha = p.life * 0.38;
+        ctx.fillStyle = '#280005';
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      } else {
+        ctx.globalCompositeOperation = 'multiply';
+        ctx.globalAlpha = p.life * 0.45;
+        ctx.fillStyle = '#3b0000';
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
     } else if (p.type === 'bfCore') {
       // ── Expanding black void sphere ─────────────────────────────────────
-      // Grows fast → shrinks (implosion feel)
       p.size = p.size + (p.maxSize - p.size) * 0.25;
 
-      ctx.globalCompositeOperation = 'multiply';
-
-      // Black void interior
-      const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-      grad.addColorStop(0, `rgba(0, 0, 0, ${p.life})`);
-      grad.addColorStop(0.6, `rgba(20, 0, 0, ${p.life * 0.85})`);
-      grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-
-      ctx.globalCompositeOperation = 'source-over';
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+      if (isGamePlay) {
+        ctx.globalCompositeOperation = 'source-over'; // Fast drawing without readbacks
+        // Fast flat circle fill instead of radial gradient creation
+        ctx.fillStyle = 'rgba(10, 0, 0, 0.85)';
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 0.75, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.globalCompositeOperation = 'multiply';
+        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+        grad.addColorStop(0, `rgba(0, 0, 0, 1.0)`);
+        grad.addColorStop(0.6, `rgba(20, 0, 0, 0.85)`);
+        grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
+      }
 
     } else if (p.type === 'bfRing') {
-      // ── Expanding void shockwave ring ──────────────────────────────────
+      // ── Expanding void shockwave ring (optimized shadowBlur removal) ────
       p.size = p.size + (p.maxSize - p.size) * 0.15;
-
       ctx.globalCompositeOperation = 'lighter';
-      ctx.strokeStyle = `rgba(160, 0, 10, ${p.life * 0.8})`;
-      ctx.lineWidth = (p.lineWidth || 2) * p.life;
-      ctx.shadowColor = '#800000';
-      ctx.shadowBlur = 8;
+      
+      // Pass 1: Thick outer blur-simulating glow circle
+      ctx.strokeStyle = `rgba(160, 0, 10, ${p.life * 0.25})`;
+      ctx.lineWidth = (p.lineWidth || 2) * p.life + 12;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.stroke();
+
+      // Pass 2: Sharp high-opacity inner core circle
+      ctx.strokeStyle = `rgba(255, 30, 40, ${p.life * 0.8})`;
+      ctx.lineWidth = (p.lineWidth || 2) * p.life;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.stroke();
+      
       ctx.globalCompositeOperation = 'source-over';
-      ctx.shadowBlur = 0;
 
     } else if (p.type === 'bfBolt') {
       // ── Jagged cursed energy bolt with branching tree-branch paths ──
-      if (!p.data || !p.data.mainPath || p.data.mainPath.length < 2) { ctx.restore(); continue; }
+      if (!p.data || !p.data.mainPath || p.data.mainPath.length < 2) continue;
 
       // Rapidly flicker opacity for an electric, crackling look
       const flicker = 0.6 + Math.random() * 0.4;
@@ -259,121 +282,148 @@ export function drawBlackFlashEffects(ctx) {
       ctx.lineCap = 'round';
       ctx.lineJoin = 'miter';
       
-      // Calculate jittered path points for this frame so outline & core remain aligned
-      const jitterMain = p.data.mainPath.map((pt, idx) => {
-        if (idx === 0) return { x: pt.x, y: pt.y }; // keep starting center locked
-        return {
-          x: pt.x + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5),
-          y: pt.y + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5)
-        };
-      });
-      
-      const jitterBranches = p.data.branches.map(branch => {
-        return branch.map((pt, idx) => {
-          if (idx === 0) {
-            // Tie branch start directly to the corresponding main path node
-            return { x: jitterMain[2]?.x || pt.x, y: jitterMain[2]?.y || pt.y };
-          }
+      // Calculate or retrieve cached jittered path points for this frame
+      const jitterTick = Math.floor(Date.now() / 40); // 25Hz jitter is visual-equivalent to 60Hz but avoids recalculation
+      if (!p._jitterMain || p._lastJitterTick !== jitterTick) {
+        p._lastJitterTick = jitterTick;
+        p._jitterMain = p.data.mainPath.map((pt, idx) => {
+          if (idx === 0) return { x: pt.x, y: pt.y }; // keep starting center locked
           return {
             x: pt.x + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5),
             y: pt.y + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5)
           };
         });
-      });
+        
+        p._jitterBranches = p.data.branches.map(branch => {
+          return branch.map((pt, idx) => {
+            if (idx === 0) {
+              return { x: p._jitterMain[2]?.x || pt.x, y: p._jitterMain[2]?.y || pt.y };
+            }
+            return {
+              x: pt.x + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5),
+              y: pt.y + (Math.random() - 0.5) * 10 * (1 - p.life * 0.5)
+            };
+          });
+        });
+      }
+      
+      const jitterMain = p._jitterMain;
+      const jitterBranches = p._jitterBranches;
 
       // ── Calculate dynamic growth progress ──
-      // The main path grows from length 0 to 1 over the first 22% of the particle's lifetime
       const gMain = Math.min(1.0, (1.0 - p.life) / 0.22);
-      
-      // Branches split off around the middle nodes of the main path, so they only start growing
-      // when the main path is at least half extended (gMain > 0.5)
       let gBranch = 0.0;
       if (gMain > 0.5) {
         gBranch = (gMain - 0.5) / 0.5; // Scales from 0.0 to 1.0
       }
 
-      const drawMain = _getSubPath(jitterMain, gMain);
-      const drawBranches = jitterBranches.map(branch => _getSubPath(branch, gBranch)).filter(b => b.length > 0);
+      // Avoid slice/creation overhead when fully grown (which is 78% of the duration)
+      const drawMain = (gMain >= 0.999) ? jitterMain : _getSubPath(jitterMain, gMain);
+      const drawBranches = (gBranch >= 0.999) 
+        ? jitterBranches 
+        : jitterBranches.map(branch => _getSubPath(branch, gBranch)).filter(b => b.length > 0);
       
-      const drawPath = (points) => {
-        if (!points || points.length < 2) return;
+      // Batch all paths (main + branches) into a single path and call stroke once to optimize Canvas draw calls
+      const drawPathsCombined = (mainPoints, branchesList) => {
         ctx.beginPath();
-        ctx.moveTo(points[0].x, points[0].y);
-        for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+        if (mainPoints && mainPoints.length >= 2) {
+          ctx.moveTo(mainPoints[0].x, mainPoints[0].y);
+          for (let i = 1; i < mainPoints.length; i++) ctx.lineTo(mainPoints[i].x, mainPoints[i].y);
+        }
+        for (const branch of branchesList) {
+          if (branch && branch.length >= 2) {
+            ctx.moveTo(branch[0].x, branch[0].y);
+            for (let i = 1; i < branch.length; i++) ctx.lineTo(branch[i].x, branch[i].y);
+          }
+        }
         ctx.stroke();
       };
       
-      // Step 1: Draw massive deep crimson red glow under all paths
-      ctx.strokeStyle = `rgba(160, 0, 10, ${p.life * 0.45})`;
-      ctx.lineWidth = (p.size * 5.0 + 8) * p.life;
-      drawPath(drawMain);
-      for (const branch of drawBranches) {
-        drawPath(branch);
-      }
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+      if (isGamePlay) {
+        // High-performance gameplay-optimized drawing (3 passes, no expensive flame-wisps)
+        // Pass 1: Crimson/Black outer contour
+        ctx.strokeStyle = `rgba(0, 0, 0, ${p.life * 0.9})`;
+        ctx.lineWidth = (p.size * 3.5 + 4) * p.life;
+        drawPathsCombined(drawMain, drawBranches);
 
-      // Step 2: Draw thick stark black contours
-      ctx.strokeStyle = `rgba(0, 0, 0, ${p.life * 0.95})`;
-      ctx.lineWidth = (p.size * 3.5 + 4) * p.life;
-      drawPath(drawMain);
-      for (const branch of drawBranches) {
-        drawPath(branch);
-      }
+        // Pass 2: Electric red-pink glow
+        ctx.strokeStyle = `rgba(255, 20, 147, ${p.life * 0.85})`;
+        ctx.lineWidth = (p.size * 2.0 + 1) * p.life;
+        drawPathsCombined(drawMain, drawBranches);
 
-      // Step 3: Draw deep crimson red cores (#B30000)
-      ctx.strokeStyle = `rgba(179, 0, 0, ${p.life * 0.95})`;
-      ctx.lineWidth = (p.size * 1.5 + 1.2) * p.life;
-      drawPath(drawMain);
-      for (const branch of drawBranches) {
-        drawPath(branch);
-      }
+        // Pass 3: White center core
+        ctx.strokeStyle = `rgba(255, 255, 255, ${p.life * 0.95})`;
+        ctx.lineWidth = p.size * 0.7 * p.life;
+        drawPathsCombined(drawMain, drawBranches);
+      } else {
+        // Step 1: Draw massive deep crimson red glow under all paths
+        ctx.strokeStyle = `rgba(160, 0, 10, ${p.life * 0.45})`;
+        ctx.lineWidth = (p.size * 5.0 + 8) * p.life;
+        drawPathsCombined(drawMain, drawBranches);
 
-      // Step 4: Draw thin electric lilac-tinted white center lines (#F3E8FF)
-      ctx.strokeStyle = `rgba(243, 232, 255, ${p.life * 0.95})`;
-      ctx.lineWidth = p.size * 0.5 * p.life;
-      drawPath(drawMain);
-      for (const branch of drawBranches) {
-        drawPath(branch);
-      }
-      
-      // Step 5: Draw a few flame-wisps on the main path nodes close to center
-      const limitPts = Math.min(drawMain.length, 3);
-      for (let j = 0; j < limitPts; j++) {
-        const pt = drawMain[j];
-        const progress = j / (drawMain.length - 1 || 1);
-        const wispSize = (8 + (1 - progress) * 14) * p.life * (0.8 + Math.random() * 0.4);
+        // Step 2: Draw thick stark black contours
+        ctx.strokeStyle = `rgba(0, 0, 0, ${p.life * 0.95})`;
+        ctx.lineWidth = (p.size * 3.5 + 4) * p.life;
+        drawPathsCombined(drawMain, drawBranches);
+
+        // Step 3: Draw deep crimson red cores (#B30000)
+        ctx.strokeStyle = `rgba(179, 0, 0, ${p.life * 0.95})`;
+        ctx.lineWidth = (p.size * 1.5 + 1.2) * p.life;
+        drawPathsCombined(drawMain, drawBranches);
+
+        // Step 4: Draw thin electric lilac-tinted white center lines (#F3E8FF)
+        ctx.strokeStyle = `rgba(243, 232, 255, ${p.life * 0.95})`;
+        ctx.lineWidth = p.size * 0.5 * p.life;
+        drawPathsCombined(drawMain, drawBranches);
         
-        ctx.save();
-        ctx.translate(pt.x, pt.y);
-        ctx.rotate(p.angle || 0);
-        
-        // Flame contour: stark black
-        ctx.beginPath();
-        ctx.moveTo(-wispSize * 0.25, 0);
-        ctx.quadraticCurveTo(wispSize * 0.3, wispSize * 0.55, wispSize * 0.95, 0);
-        ctx.quadraticCurveTo(wispSize * 0.3, -wispSize * 0.55, -wispSize * 0.25, 0);
-        ctx.closePath();
-        ctx.fillStyle = '#000000';
-        ctx.fill();
-        
-        // Inner deep crimson red flame core (#B30000)
-        ctx.beginPath();
-        ctx.moveTo(-wispSize * 0.15, 0);
-        ctx.quadraticCurveTo(wispSize * 0.25, wispSize * 0.35, wispSize * 0.65, 0);
-        ctx.quadraticCurveTo(wispSize * 0.25, -wispSize * 0.35, -wispSize * 0.15, 0);
-        ctx.closePath();
-        ctx.fillStyle = '#B30000';
-        ctx.fill();
-        
-        // Lilac-tinted white hot core center (#F3E8FF)
-        ctx.beginPath();
-        ctx.moveTo(0, 0);
-        ctx.quadraticCurveTo(wispSize * 0.15, wispSize * 0.15, wispSize * 0.4, 0);
-        ctx.quadraticCurveTo(wispSize * 0.15, -wispSize * 0.15, 0, 0);
-        ctx.closePath();
-        ctx.fillStyle = '#F3E8FF';
-        ctx.fill();
-        
-        ctx.restore();
+        // Step 5: Draw flame-wisps on the main path nodes close to center (skipped at low alpha/life)
+        if (p.life > 0.15) {
+          const limitPts = Math.min(drawMain.length, 3);
+          for (let j = 0; j < limitPts; j++) {
+            const pt = drawMain[j];
+            const progress = j / (drawMain.length - 1 || 1);
+            const wispSize = (8 + (1 - progress) * 14) * p.life * (0.8 + Math.random() * 0.4);
+            
+            ctx.save();
+            ctx.translate(pt.x, pt.y);
+            ctx.rotate(p.angle || 0);
+            
+            // Flame contour: stark black
+            ctx.beginPath();
+            ctx.moveTo(-wispSize * 0.25, 0);
+            ctx.quadraticCurveTo(wispSize * 0.3, wispSize * 0.55, wispSize * 0.95, 0);
+            ctx.quadraticCurveTo(wispSize * 0.3, -wispSize * 0.55, -wispSize * 0.25, 0);
+            ctx.closePath();
+            ctx.fillStyle = '#000000';
+            ctx.fill();
+            
+            // Only draw detailed cores if the wisp is large enough to be resolved visually
+            if (wispSize > 4) {
+              // Inner deep crimson red flame core (#B30000)
+              ctx.beginPath();
+              ctx.moveTo(-wispSize * 0.15, 0);
+              ctx.quadraticCurveTo(wispSize * 0.25, wispSize * 0.35, wispSize * 0.65, 0);
+              ctx.quadraticCurveTo(wispSize * 0.25, -wispSize * 0.35, -wispSize * 0.15, 0);
+              ctx.closePath();
+              ctx.fillStyle = '#B30000';
+              ctx.fill();
+            }
+            
+            if (wispSize > 8) {
+              // Lilac-tinted white hot core center (#F3E8FF)
+              ctx.beginPath();
+              ctx.moveTo(0, 0);
+              ctx.quadraticCurveTo(wispSize * 0.15, wispSize * 0.15, wispSize * 0.4, 0);
+              ctx.quadraticCurveTo(wispSize * 0.15, -wispSize * 0.15, 0, 0);
+              ctx.closePath();
+              ctx.fillStyle = '#F3E8FF';
+              ctx.fill();
+            }
+            
+            ctx.restore();
+          }
+        }
       }
 
     } else if (p.type === 'bfShard') {
@@ -403,23 +453,30 @@ export function drawBlackFlashEffects(ctx) {
       p.size = p.size + (p.maxSize - p.size) * 0.1;
 
       ctx.globalCompositeOperation = 'lighter';
-      const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-      // Red core gradient (lilac/deep crimson)
-      glowGrad.addColorStop(0,   `rgba(180, 0, 10,  ${p.life * 0.7})`);
-      glowGrad.addColorStop(0.4, `rgba(120, 0, 5,   ${p.life * 0.5})`);
-      glowGrad.addColorStop(0.8, `rgba(60, 0, 2,    ${p.life * 0.25})`);
-      glowGrad.addColorStop(1,   `rgba(0, 0, 0, 0)`);
-      ctx.fillStyle = glowGrad;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalCompositeOperation = 'source-over';
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+      if (isGamePlay) {
+        // Fast flat circle fill instead of radial gradient creation
+        ctx.fillStyle = `rgba(180, 0, 10, ${p.life * 0.4})`;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 0.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        const glowGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
+        // Red core gradient (lilac/deep crimson)
+        glowGrad.addColorStop(0,   `rgba(180, 0, 10,  ${p.life * 0.7})`);
+        glowGrad.addColorStop(0.4, `rgba(120, 0, 5,   ${p.life * 0.5})`);
+        glowGrad.addColorStop(0.8, `rgba(60, 0, 2,    ${p.life * 0.25})`);
+        glowGrad.addColorStop(1,   `rgba(0, 0, 0, 0)`);
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
-
-    ctx.restore();
   }
 
-  ctx.restore();
+  ctx.globalCompositeOperation = originalGCO;
+  ctx.globalAlpha = originalAlpha;
 }
 
 // Helper to calculate a sub-path of points up to a given progress fraction (0.0 to 1.0)
