@@ -38,6 +38,10 @@ export class GunSlingerFighter extends Fighter {
     this.reloadTimer = 0; // Reload timer
     this.isReloading = false; // Is currently reloading
 
+    // Dynamic crit stats
+    this.critChance = CONFIG.gunslinger.critChance || 0.20;
+    this.critMultiplier = CONFIG.gunslinger.critMultiplier || 1.8;
+
     // Smoke effect for skill
     this.smokeTimer = 0; // Timer for smoke effect duration
     this.smokeParticles = []; // Array of smoke particles
@@ -65,6 +69,8 @@ export class GunSlingerFighter extends Fighter {
     this.magazineBullets = this.maxMagazine;
     this.reloadTimer = 0;
     this.isReloading = false;
+    this.critChance = CONFIG.gunslinger.critChance || 0.20;
+    this.critMultiplier = CONFIG.gunslinger.critMultiplier || 1.8;
     this.smokeTimer = 0;
     this.smokeParticles = [];
     this.rightRecoilOffset = 0;
@@ -315,7 +321,7 @@ export class GunSlingerFighter extends Fighter {
     const spawnX = this.x + Math.cos(gunAngle) * forwardOffset - Math.sin(gunAngle) * sideOffset;
     const spawnY = this.y + Math.sin(gunAngle) * forwardOffset + Math.cos(gunAngle) * sideOffset;
 
-    projectileSystem.fireProjectile(this, ownerIndex, bulletDamage, false, speed, false, null, spawnX, spawnY, gunAngle);
+    const proj = projectileSystem.fireProjectile(this, ownerIndex, bulletDamage, false, speed, false, null, spawnX, spawnY, gunAngle);
     
     // Spawn fiery golden sparks on the tip of the gun barrel
     spawnSparks(spawnX, spawnY, 6, 'flash');
@@ -335,8 +341,10 @@ export class GunSlingerFighter extends Fighter {
     this._attackSoundTimer = sound.delay;
     this._attackSoundConfig = sound;
 
-    const isCrit = !isSkill && Math.random() < CONFIG.gunslinger.critChance;
-    this._lastShotWasCrit = isCrit;
+    const isCrit = !isSkill && Math.random() < this.critChance;
+    if (proj) {
+      proj.isCrit = isCrit;
+    }
 
     if (this.currentGun === 'right') {
       this.currentGun = 'left';
@@ -371,12 +379,20 @@ export class GunSlingerFighter extends Fighter {
       target.knockbackVx = (target.knockbackVx || 0) + (dx / dist) * knockbackStrength;
       target.knockbackVy = (target.knockbackVy || 0) + (dy / dist) * knockbackStrength;
 
-      // Apply critical damage if the last shot was a crit
-      if (this._lastShotWasCrit) {
-        const extraDamage = this.damage * (CONFIG.gunslinger.critMultiplier - 1);
+      // Apply critical damage if the projectile was a crit
+      if (projectile.isCrit) {
+        const extraDamage = this.damage * (this.critMultiplier - 1);
         target.takeDamage(extraDamage, this, { isCrit: true });
         spawnFloatingText(target.x, target.y - target.r - 15, 'CRIT!', '#ffaa00');
-        this._lastShotWasCrit = false;
+
+        // Increase critChance and critMultiplier
+        const chanceInc = CONFIG.gunslinger.critChanceIncrease || 0.05;
+        const multInc = CONFIG.gunslinger.critMultiplierIncrease || 0.15;
+        const maxChance = CONFIG.gunslinger.maxCritChance || 0.80;
+        const maxMult = CONFIG.gunslinger.maxCritMultiplier || 3.5;
+
+        this.critChance = Math.min(maxChance, this.critChance + chanceInc);
+        this.critMultiplier = Math.min(maxMult, this.critMultiplier + multInc);
       }
     }
   }
@@ -610,11 +626,6 @@ export class GunSlingerFighter extends Fighter {
 
     ctx.save();
 
-    // --- Depth Shadow ---
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.6)';
-    ctx.shadowBlur = 6;
-    ctx.shadowOffsetY = 3;
-
     // --- 1. Draw Magazine Body (Dark Polymer) ---
     ctx.fillStyle = '#222428';
     ctx.strokeStyle = '#111';
@@ -629,10 +640,6 @@ export class GunSlingerFighter extends Fighter {
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
-
-    // Disable shadow for inner components
-    ctx.shadowBlur = 0;
-    ctx.shadowOffsetY = 0;
 
     // --- Add Magazine Ridges (Texture) ---
     ctx.strokeStyle = '#1a1b1f';
@@ -795,6 +802,5 @@ export class GunSlingerFighter extends Fighter {
     }
 
     super.draw(ctx);
-    this.drawMagazineBar(ctx);
   }
 }

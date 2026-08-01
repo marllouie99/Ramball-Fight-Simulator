@@ -225,5 +225,24 @@ export const ParticleRegistry = {
       rotationSpeed: (Math.random() - 0.5) * 0.15,
       isOrbit: true
     };
-  }
+  },
+  
+  // ─── LAYLA BULLET SPARKS & FLASH ───
+  laylaSpark: () => ({
+    color: Math.random() > 0.4 ? 'rgba(0, 229, 255, 1)' : 'rgba(224, 255, 255, 1)',
+    decay: 0.04 + Math.random() * 0.06,
+    size: 1.5 + Math.random() * 3,
+    speed: 3 + Math.random() * 6,
+    friction: 0.90,
+    isFlash: true
+  }),
+  flash_layla: () => ({
+    color: 'rgba(0, 229, 255, 0.85)',
+    decay: 0.15 + Math.random() * 0.1,
+    size: 25 + Math.random() * 15,
+    speed: 0,
+    friction: 0,
+    isFlash: true,
+    isGlow: true
+  })
 };

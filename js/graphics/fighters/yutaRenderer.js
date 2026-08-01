@@ -1,4 +1,5 @@
 import { Fighter } from '../../entities/fighter.js';
+import { FighterRenderer } from '../renderers/fighterRenderer.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
@@ -16,6 +17,9 @@ export class YutaRenderer {
   }
 
   static draw(ctx, fighter, opponent) {
+    const wasHidingHp = fighter.hideHpText;
+    fighter.hideHpText = true;
+
     ctx.save();
     let tremorX = 0;
     let tremorY = 0;
@@ -191,6 +195,11 @@ export class YutaRenderer {
         ctx.restore();
       }
     }
+
+    fighter.hideHpText = wasHidingHp;
+    if (!fighter.hideHpText) {
+      FighterRenderer.drawHealth(ctx, fighter);
+    }
   }
 
   static _drawDomainChannelAura(ctx, fighter) {
@@ -240,7 +249,7 @@ export class YutaRenderer {
 
     const rk = fighter.rika;
     const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
-    const isGamePlay = !renderState;
+    const isGamePlay = renderState ? !!renderState.isHybrid : true;
 
     let drawX = renderState ? renderState.drawX : rk.x;
     let drawY = renderState ? renderState.drawY : rk.y;
@@ -851,7 +860,7 @@ export class YutaRenderer {
 
     const r = (rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30;
     const now = Date.now();
-    const isGamePlay = !renderState;
+    const isGamePlay = renderState ? !!renderState.isHybrid : true;
 
     // Stepped 30-frame anime animation loop (matching Yuta's 30fps Sakuga frame rate)
     const frameRate = 30;

@@ -455,15 +455,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
     ctx.fillStyle = isLit ? meterColors[i] : '#1a1a1a';
     ctx.globalAlpha = isLit ? (0.7 + 0.3 * meterPulse) : 0.3;
     
-    // Add strong neon glow when the LED is lit
-    if (isLit) {
-      ctx.shadowColor = meterColors[i];
-      ctx.shadowBlur = 12;
-    } else {
-      ctx.shadowColor = 'transparent';
-      ctx.shadowBlur = 0;
-    }
-
     ctx.beginPath();
     ctx.roundRect(3 * s, my * s, 8 * s, 1.2 * s, 0.3 * s);
     ctx.fill();
@@ -482,8 +473,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
 
   // "WUB WUB WUB" text at mag well
   ctx.fillStyle = C.rgbPink;
-  ctx.shadowColor = C.rgbPink;
-  ctx.shadowBlur = 8; // Text glow
   ctx.globalAlpha = 0.7 + 0.3 * pulse;
   ctx.font = `bold ${2.8 * s}px monospace`;
   ctx.textAlign = 'center';
@@ -493,9 +482,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   
   // Restore normal shadow for the next elements
   ctx.globalAlpha = 1;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 2;
 
   // ─── Cooling Vents (horizontal slits in front of mag well) ───
   ctx.strokeStyle = '#555';
@@ -558,10 +544,17 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   ctx.lineWidth = 0.5 * s;
   ctx.stroke();
 
-  // Muzzle shockwave when shooting
   if (recoil > 0.1) {
-    ctx.shadowColor = C.cyan;
-    ctx.shadowBlur = 10;
+    // Outer thicker glow stroke
+    ctx.strokeStyle = `rgba(0, 255, 255, ${recoil * 0.25})`;
+    ctx.lineWidth = (6 + recoil * 6) * s;
+    for (let i = 0; i < 2; i++) {
+      ctx.beginPath();
+      ctx.arc((bumpX + 5 + i * 8 + (1 - recoil) * 15) * s, -1 * s, (12 + i * 5 + (1 - recoil) * 10) * s, -Math.PI / 2.2, Math.PI / 2.2);
+      ctx.stroke();
+    }
+    
+    // Core stroke
     ctx.strokeStyle = `rgba(0, 255, 255, ${recoil})`;
     ctx.lineWidth = (2 + recoil * 3) * s;
     for (let i = 0; i < 2; i++) {
@@ -569,7 +562,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
       ctx.arc((bumpX + 5 + i * 8 + (1 - recoil) * 15) * s, -1 * s, (12 + i * 5 + (1 - recoil) * 10) * s, -Math.PI / 2.2, Math.PI / 2.2);
       ctx.stroke();
     }
-    ctx.shadowBlur = 0;
   }
 
   // ─── Lower Speaker Box (Tweeters) ───
@@ -761,8 +753,6 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
       ctx.translate(note.x * s, note.y * s);
       ctx.rotate(note.rot);
       ctx.fillStyle = note.color;
-      ctx.shadowColor = note.color;
-      ctx.shadowBlur = 6;
       ctx.globalAlpha = Math.max(0, Math.min(1, note.life)); // smooth linear fade
       ctx.font = `bold ${28 * s}px sans-serif`;
       ctx.textAlign = 'center';

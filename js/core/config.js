@@ -8,6 +8,7 @@ import { tojiConfig } from '../configs/characters/tojiConfig.js';
 import { mahoragaConfig } from '../configs/characters/mahoragaConfig.js';
 import { todoConfig } from '../configs/characters/todoConfig.js';
 import { yujiConfig } from '../configs/characters/yujiConfig.js';
+import { laylaConfig } from '../configs/characters/laylaConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {
@@ -381,6 +382,10 @@ export const CONFIG = {
     // TUNING: Passive skill (damage multiplier chance)
     critChance: 0.20,         // chance (0-1) to deal critical damage
     critMultiplier: 1.8,      // damage multiplier on critical hit
+    critChanceIncrease: 0.05, // increase in crit chance (0-1) per crit hit
+    critMultiplierIncrease: 0.15, // increase in damage multiplier per crit hit
+    maxCritChance: 0.80,      // maximum crit chance cap (80%)
+    maxCritMultiplier: 3.5,   // maximum crit multiplier cap (3.5x)
 
     // TUNING: Active skill (rapid sync fire) - requires full magazine
     skillCooldown: 300,       // frames between skill uses (5 seconds at 60 fps)
@@ -595,6 +600,9 @@ export const CONFIG = {
 
   /** Yuji Itadori — Black Flash Brawler */
   yuji: yujiConfig,
+
+  /** Layla — Cosmic Marksman */
+  layla: laylaConfig,
 };
 
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1086,6 +1094,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Black Flash',
     desc: 'Attacks with black flash.',
+  },
+  {
+    id: 26,
+    name: 'Layla',
+    category: 'Sci-Fi & Modern',
+    color: '#00E5FF', // Vibrant Cyan Blue
+    startX: 300, startY: 250,
+    startVx: 1.1, startVy: 0.9,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'layla',
+    hp: 55,
+    damage: 12,
+    cooldown: 70,
+    moveSpeed: 4.5,
+    projectileSpeedMultiplier: 3.0,
+    ability: 'Ascending Power',
+    desc: 'Scaling marksman who gains damage and range with each hit. Uses Malefic Bomb, Void Dash, and Destruction Barrage ultimate.',
   }
 ];
 

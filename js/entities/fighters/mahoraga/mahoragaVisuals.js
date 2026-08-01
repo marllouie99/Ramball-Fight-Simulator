@@ -171,11 +171,7 @@ export function drawCursedPurpleFlames(ctx, fighter) {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(p.rot);
-
     if (p.isEmber) {
-      ctx.shadowColor = '#c77dff';
-      ctx.shadowBlur = 6;
-
       ctx.fillStyle = `rgba(243, 232, 255, ${p.life * 0.9})`;
       ctx.beginPath();
       ctx.arc(0, 0, Math.max(0.8, p.size * 0.4), 0, Math.PI * 2);
@@ -187,9 +183,6 @@ export function drawCursedPurpleFlames(ctx, fighter) {
     } else {
       const sz = p.size;
       const alpha = Math.min(1.0, p.life * 1.2);
-
-      ctx.shadowColor = '#c77dff';
-      ctx.shadowBlur = 8;
 
       ctx.beginPath();
       ctx.moveTo(0, sz * 0.9);
@@ -204,7 +197,7 @@ export function drawCursedPurpleFlames(ctx, fighter) {
       ctx.fillStyle = flameGrad;
       ctx.fill();
 
-      ctx.shadowBlur = 0;
+      // No shadowBlur
       ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.95})`;
       ctx.lineWidth = 0.8;
       ctx.lineCap = 'round';
@@ -353,15 +346,12 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
     ctx.arc(fighter.x, fighter.y, glowR, 0, Math.PI * 2);
     ctx.strokeStyle = '#FFD700';
     ctx.lineWidth = 3.5;
-    ctx.shadowColor = '#FFD700';
-    ctx.shadowBlur = 16;
     ctx.stroke();
 
     ctx.beginPath();
     ctx.arc(fighter.x, fighter.y, glowR - 1.2, 0, Math.PI * 2);
     ctx.strokeStyle = '#FFFFFF';
     ctx.lineWidth = 1.8;
-    ctx.shadowBlur = 0;
     ctx.stroke();
 
     ctx.restore();

@@ -246,7 +246,6 @@ export function drawTricksterStaff(ctx, fighter) {
   // Inner Bright Core
   ctx.globalAlpha = baseAlpha * 1.0;
   ctx.fillStyle = '#FFFFFF';
-  ctx.shadowBlur = 0;
   ctx.beginPath();
   ctx.moveTo(0, crystalCenterY - 12);
   ctx.lineTo(-4, crystalCenterY);
@@ -276,9 +275,7 @@ export function drawTricksterStaff(ctx, fighter) {
   ctx.restore();
 
   // 6. Glowing Arcane Runes etched on the shaft
-  const _isGPRune = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
   ctx.globalAlpha = baseAlpha;
-  if (!_isGPRune) { ctx.shadowBlur = 5; ctx.shadowColor = coreColor; }
   ctx.strokeStyle = coreColor;
   ctx.lineWidth = 1.5;
   
@@ -386,9 +383,6 @@ export function drawTricksterBolt(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(p.rotation || 0);
 
-  const _isGPProj = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-  if (!_isGPProj) { ctx.shadowBlur = 20; ctx.shadowColor = coreColor; }
-
   // Outer green aura (larger and more distinct to anchor the tail)
   ctx.fillStyle = `rgba(57, 255, 20, 0.95)`;
   ctx.beginPath();
@@ -400,7 +394,6 @@ export function drawTricksterBolt(ctx, p) {
   ctx.fill();
 
   // Inner bright white core (diamond shaped)
-  ctx.shadowBlur = 0;
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.moveTo(p.r * 2.0, 0);
@@ -434,13 +427,10 @@ export function drawTricksterChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
   const time = Date.now() / 80;
   
   // Central concentrated energy core
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = '#00ff00';
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.arc(tipDist, 0, 3 + chargeNorm * 5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
 
   // Expanding pulsing energy rings (Shockwaves at the tip)
   for (let i = 0; i < 3; i++) {

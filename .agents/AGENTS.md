@@ -51,3 +51,9 @@
   - **For absolute/full-screen coordinate effects** (like Domain Expansions that rely on exact `state.canvas` coordinates like `fighter.x` / `fighter.y`): You MUST use a strict 1:1 pixel mapping. The off-screen canvas MUST dynamically sync its width/height to exactly match `state.canvas.width/height`. Do NOT scale the PixiJS Sprite, as scaling will desync the visual positions from the game's coordinate system. When resizing the offscreen canvas, call `texture.update()` to refresh the GPU mapping.
 - Set correct WebGL blend modes dynamically: `window.PIXI.BLEND_MODES.ADD` for glowing elements (like Fuga flames) and `window.PIXI.BLEND_MODES.NORMAL` for elements with dark outlines or cores (like Gojo's Blue and Purple orbs).
 - Short-burst, transient visual effects (such as the 30-frame Black Flash impact, sparks, and blood splatters) SHOULD remain on the Canvas 2D layer. Re-rendering transient bursts in 2D maintains exact artistic pixel fidelity without requiring complex WebGL pooling or incurring GPU texture-upload bottlenecks.
+
+## 11. Prohibition of shadowBlur CPU Filters (Performance Preservation)
+- **NEVER** use HTML5 Canvas `ctx.shadowBlur` or `ctx.shadowColor` inside any rendering or drawing methods (such as projectiles, weapons, or fighter visuals) during gameplay.
+- Using `shadowBlur` forces the browser to calculate CPU-intensive Gaussian blurs, causing severe FPS drops during match gameplay.
+- **ALWAYS** simulate glowing effects by drawing slightly larger concentric shapes with transparent gradient colors or semi-transparent flat fills instead.
+

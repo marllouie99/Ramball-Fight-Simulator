@@ -116,6 +116,38 @@ export class PreviewProjectileSystem {
     this.addImpact(projectile.x, projectile.y, 'rgba(77, 255, 77, 0.9)', 0, 16);
   }
 
+  detonateLaylaBomb(projectile, fighter, target) {
+    // Spawn the Cyan Cosmic Blast visual effect entity
+    const blast = {
+      x: projectile.x,
+      y: projectile.y,
+      vx: 0,
+      vy: 0,
+      r: 75,
+      life: 35,
+      maxLife: 35,
+      visual: 'layla_cosmic_blast',
+      isExplosion: true,
+      color: projectile.color,
+    };
+    this.projectiles.push(blast);
+
+    // Apply slow and damage in preview
+    const dist = Math.hypot(target.x - projectile.x, target.y - projectile.y);
+    if (dist <= 75 + target.r) {
+      target.takeDamage(projectile.damage, fighter);
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(90, 0.6, { isLaylaBomb: true });
+      } else {
+        target.slowTimer = Math.max(target.slowTimer || 0, 90);
+        target.slowMultiplier = Math.min(target.slowMultiplier || 1.0, 0.6);
+      }
+      if (typeof fighter.triggerMaleficBombHitBuff === 'function') {
+        fighter.triggerMaleficBombHitBuff();
+      }
+    }
+  }
+
   addImpact(x, y, color, radius = 0, life = 14) {
     this.impacts.push({ x, y, radius, life, color });
   }
@@ -132,7 +164,25 @@ export class PreviewProjectileSystem {
         continue;
       }
 
-      if (projectile.isGrenade) {
+      if (projectile.visual === 'layla_bomb') {
+        projectile.x += projectile.vx;
+        projectile.y += projectile.vy;
+        projectile.life -= 1;
+
+        const dist = Math.hypot(projectile.x - target.x, projectile.y - target.y);
+        const expired = projectile.life <= 0;
+        const outOfBounds =
+          projectile.x < demoArea.x ||
+          projectile.x > demoArea.x + demoArea.width ||
+          projectile.y < demoArea.y ||
+          projectile.y > demoArea.y + demoArea.height;
+
+        if (dist < target.r + projectile.r || expired || outOfBounds) {
+          this.detonateLaylaBomb(projectile, fighter, target);
+          this.projectiles.splice(i, 1);
+          continue;
+        }
+      } else if (projectile.isGrenade) {
         if (!projectile.history) projectile.history = [];
         projectile.history.push({ x: projectile.x, y: projectile.y, z: projectile.z });
         if (projectile.history.length > 12) projectile.history.shift();

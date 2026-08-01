@@ -1391,8 +1391,15 @@ export class TricksterFighter extends Fighter {
         
         ctx.strokeStyle = w === 0 ? 'rgba(50, 255, 120, 0.8)' : 'rgba(50, 220, 255, 0.8)';
         ctx.lineWidth = 2;
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = ctx.strokeStyle;
+        
+        // Simulated Glow
+        ctx.save();
+        ctx.globalAlpha = 0.25;
+        ctx.lineWidth = 6;
+        ctx.stroke();
+        ctx.restore();
+
+        ctx.lineWidth = 2;
         ctx.stroke();
       }
       
@@ -1466,8 +1473,6 @@ export class TricksterFighter extends Fighter {
         let color = '#00FF64';
         
         ctx.globalAlpha = 1 - prog;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
         
         if (effect.type.startsWith('slash')) {
           const size = effect.size * (0.6 + 0.6 * prog);
@@ -1486,13 +1491,18 @@ export class TricksterFighter extends Fighter {
              ctx.closePath();
           };
 
-          ctx.shadowBlur = 25;
-          ctx.shadowColor = color;
+          // Simulated Glow
+          ctx.fillStyle = color;
+          ctx.save();
+          ctx.globalAlpha = (1 - prog) * 0.25;
+          drawCrescent(size * 1.15, thick * 1.5, 1.35);
+          ctx.fill();
+          ctx.restore();
+
           ctx.fillStyle = color;
           drawCrescent(size, thick, 1.3);
           ctx.fill();
 
-          ctx.shadowBlur = 0;
           ctx.fillStyle = '#0a0a0a';
           drawCrescent(size * 0.98, thick * 0.75, 1.15);
           ctx.fill();
@@ -1548,8 +1558,6 @@ export class TricksterFighter extends Fighter {
     ctx.save();
     
     // Outer huge bloom (green)
-    ctx.shadowColor = '#00ff64';
-    ctx.shadowBlur = (25 + pulse3 * 2) * fadeMultiplier;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
@@ -1559,8 +1567,6 @@ export class TricksterFighter extends Fighter {
     ctx.stroke();
 
     // Secondary wide glow (bright green)
-    ctx.shadowBlur = (15 + pulse2) * fadeMultiplier;
-    ctx.shadowColor = '#00ff00';
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
@@ -1568,7 +1574,6 @@ export class TricksterFighter extends Fighter {
     ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) + 4 + pulse2) * fadeMultiplier;
     ctx.lineCap = 'round';
     ctx.stroke();
-    ctx.shadowBlur = 0; 
 
     // Mid bright glow
     ctx.beginPath();
@@ -1580,8 +1585,6 @@ export class TricksterFighter extends Fighter {
     ctx.stroke();
 
     // Inner core (white)
-    ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 10 * fadeMultiplier;
     ctx.beginPath();
     ctx.moveTo(startX, startY);
     ctx.lineTo(endX, endY);
@@ -1594,9 +1597,7 @@ export class TricksterFighter extends Fighter {
     const numNodes = 6;
     const speed = 1.0;
     ctx.fillStyle = `rgba(255, 255, 255, ${fadeMultiplier})`;
-    ctx.shadowColor = '#00ff00';
-    ctx.shadowBlur = 15 * fadeMultiplier;
-
+    
     for (let i = 0; i < numNodes; i++) {
       let offset = ((time * speed) + (i / numNodes)) % 1.0;
       let nx = startX + Math.cos(angle) * (beamLen * offset);
@@ -1815,11 +1816,8 @@ export class TricksterFighter extends Fighter {
     }
 
     if (fillRatio > 0) {
-      ctx.shadowBlur = 10;
-      ctx.shadowColor = glowColor;
       ctx.fillStyle = fillColor;
       ctx.fillRect(-barWidth / 2, 0, barWidth * fillRatio, barHeight);
-      ctx.shadowBlur = 0;
     }
 
     // Border

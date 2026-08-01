@@ -17,6 +17,7 @@ import {
 } from '../weaponVisuals.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../weapons/musashiWeaponGraphics.js';
 import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
+import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -144,6 +145,9 @@ function drawWeaponMenu() {
     // Make card clickable
     _registerButton(cardX, cardY, cardW, cardH, () => {
       state.selectedWeapon = def;
+      state.showWeaponModel = false; // Start with weapon graphics only!
+      state.showSummonModel = false;
+      state.slashEditMode = false;
       state.gameState = 'weaponDetail';
     });
   });
@@ -325,9 +329,8 @@ function drawWeaponDetailScreen() {
 
   const hasSummon = ['yuta', 'doppleganger', 'Engineer', 'black'].includes(def.type);
 
-  if (!state.showSummonModel) {
-    state.showWeaponModel = true;
-    state.slashEditMode = false;
+  if (state.showWeaponModel === undefined) {
+    state.showWeaponModel = false;
   }
 
   // Reset context to prevent leaks from previous frames
@@ -597,12 +600,29 @@ function drawWeaponDetailScreen() {
   const actionY = 58;
   const buttonsToDraw = [];
 
+  // Toggle button between WEAPON ONLY graphics and FIGHTER MODEL
+  const modelToggleText = state.showWeaponModel ? '🗡 WEAPON ONLY' : '👤 FIGHTER MODEL';
+  buttonsToDraw.push({
+    text: modelToggleText,
+    width: 135,
+    action: () => {
+      state.showWeaponModel = !state.showWeaponModel;
+      if (state.showWeaponModel) {
+        state.showSummonModel = false;
+      } else {
+        state.slashEditMode = false;
+      }
+    }
+  });
+
   const isAttacking = isFighterDemoAttacking(state.previewFighter);
   const demoBtnText = isAttacking ? '⚔ SWINGING...' : '⚔ DEMO ATTACK';
   buttonsToDraw.push({
     text: demoBtnText,
     width: 125,
     action: () => { 
+      state.showWeaponModel = true;
+      state.showSummonModel = false;
       triggerWeaponDemoAttack(def); 
     }
   });
@@ -803,11 +823,16 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'ruby') offsetX = -75; // Massive scythe
   else if (type === 'toji') offsetX = -40; // Inverted Spear
   else if (type === 'yuta') offsetX = -40; // Katana
+  else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
   
   ctx.translate(offsetX, 0);
 
   try {
     switch (type) {
+      case 'layla':
+        drawLaylaGun(ctx, 0, 0, gunAngle, r, { isPreview: true });
+        return;
+
       case 'crimsonsniper':
       case 'normal':
         // Sniper rifle (uses color tint internally via stroke/fill)

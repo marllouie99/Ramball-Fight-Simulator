@@ -400,8 +400,6 @@ export class LaserFighter extends Fighter {
       const pulse3 = Math.sin(time * 0.8) * 3;
 
       // Outer huge bloom (orange)
-      ctx.shadowColor = '#ff6600';
-      ctx.shadowBlur = (25 + pulse3 * 2) * fadeMultiplier;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
@@ -411,8 +409,6 @@ export class LaserFighter extends Fighter {
       ctx.stroke();
 
       // Secondary wide glow (bright orange)
-      ctx.shadowBlur = (15 + pulse2) * fadeMultiplier;
-      ctx.shadowColor = '#ffaa00';
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
@@ -420,7 +416,6 @@ export class LaserFighter extends Fighter {
       ctx.lineWidth = ((CONFIG.laser.glowWidth || 12) + 4 + pulse2) * fadeMultiplier;
       ctx.lineCap = 'round';
       ctx.stroke();
-      ctx.shadowBlur = 0; // reset shadow for inner layers to keep it optimized
 
       // Mid bright glow
       ctx.beginPath();
@@ -432,8 +427,6 @@ export class LaserFighter extends Fighter {
       ctx.stroke();
 
       // Inner core (white)
-      ctx.shadowColor = '#ffffff';
-      ctx.shadowBlur = 10 * fadeMultiplier;
       ctx.beginPath();
       ctx.moveTo(startX, startY);
       ctx.lineTo(endX, endY);
@@ -446,8 +439,6 @@ export class LaserFighter extends Fighter {
       const numNodes = 6; // More nodes
       const speed = 1.0;  // Faster nodes
       ctx.fillStyle = `rgba(255, 255, 255, ${fadeMultiplier})`;
-      ctx.shadowColor = '#ffcc00';
-      ctx.shadowBlur = 15 * fadeMultiplier; // Brighter node glow
 
       for (let i = 0; i < numNodes; i++) {
         // Calculate offset (0 to 1) that wraps around

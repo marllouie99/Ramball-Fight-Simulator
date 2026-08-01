@@ -203,7 +203,7 @@ function drawFfaChampionReveal(winner, timer) {
   pCtx.save();
   pCtx.translate(200, 200);
   pCtx.shadowBlur = 24;
-  pCtx.shadowColor = winner.color;
+  pCtx.shadowColor = (def.type === 'layla') ? '#00E5FF' : (winner.color || '#fff');
   preview.draw(pCtx, null);
   pCtx.restore();
 
@@ -226,9 +226,11 @@ function drawFfaChampionReveal(winner, timer) {
   ctx.textBaseline = 'top';
   ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
 
-  ctx.fillStyle = '#ccc';
-  ctx.font = '14px Arial';
-  ctx.fillText('', cx, cy + winner.r * scale + 44);
+  if (def && def.desc) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.font = 'italic 14px Arial';
+    wrapText(ctx, def.desc, cx, cy + 144, 480, 18);
+  }
   ctx.restore();
 }
 
@@ -435,7 +437,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
 
     // Glow effect
     ctx.shadowBlur = 40;
-    ctx.shadowColor = wFighter.color || '#fff';
+    ctx.shadowColor = (def.type === 'layla') ? '#00E5FF' : (wFighter.color || '#fff');
 
     // Extra white glow ring behind the model
     ctx.beginPath();
@@ -478,6 +480,14 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     ctx.font = 'bold 24px Arial';
     ctx.fillStyle = winner.color || '#fff';
     ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
+    
+    const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner.characterId || d.id === winner.type);
+    if (def && def.desc) {
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.font = 'italic 14px Arial';
+      ctx.textBaseline = 'top';
+      wrapText(ctx, def.desc, cx, cy + 122, 480, 18);
+    }
   }
 
   ctx.restore();

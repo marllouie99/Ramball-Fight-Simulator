@@ -7,6 +7,7 @@ import { clearHealthHud } from '../hudManager.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { previewProjectileSystem, updateIndexDetailDemo, resetIndexDetailState } from '../preview.js';
+import { drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaUltimateBullet, drawLaylaBasicBullet } from '../renderers/projectileRenderer.js';
 
 let indexDetailAngle = 0;
 let indexDetailAnimFrame = 0;
@@ -523,6 +524,26 @@ function drawIndexDetailScreen() {
       ctx.strokeStyle = 'rgba(255,255,255,0.7)';
       ctx.lineWidth = 1.5;
       ctx.stroke();
+      ctx.restore();
+    } else if (p.visual === 'layla_bomb') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaBomb(ctx, p);
+      ctx.restore();
+    } else if (p.visual === 'layla_cosmic_blast') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaCosmicBlast(ctx, p);
+      ctx.restore();
+    } else if (p.visual === 'layla_ultimate_bullet') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaUltimateBullet(ctx, p);
+      ctx.restore();
+    } else if (p.visual === 'layla_basic_bullet') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaBasicBullet(ctx, p);
       ctx.restore();
     } else if (p.isGojoBlue) {
       // Gojo Blue Sphere with Glowing Aura

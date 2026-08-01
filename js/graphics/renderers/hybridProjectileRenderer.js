@@ -1,6 +1,6 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { drawSukunaFurnaceArrow, drawSukunaSlash, drawSukunaCleave, drawGhostBlade } from '../weapons/sukunaWeaponGraphics.js';
-import { drawGojoPurpleOrb } from './projectileRenderer.js';
+import { drawGojoPurpleOrb, drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaBasicBullet, drawLaylaUltimateBullet } from './projectileRenderer.js';
 
 const activeSprites = new Map();
 const canvasPool = [];
@@ -40,8 +40,9 @@ export function updateHybridProjectiles() {
     const isFuga = (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace);
     const isGojoProj = (p.visual === 'gojoBlue' || p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple');
     const isSukunaSlashProj = (p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'ghostBlade');
+    const isLaylaProj = (p.visual === 'layla_bomb' || p.visual === 'layla_cosmic_blast' || p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet');
     
-    if (!isFuga && !isGojoProj && !isSukunaSlashProj) continue;
+    if (!isFuga && !isGojoProj && !isSukunaSlashProj && !isLaylaProj) continue;
     
     // Slashes shouldn't render inside Gojo's domain visually
     if (isSukunaSlashProj) {
@@ -58,6 +59,11 @@ export function updateHybridProjectiles() {
       let size = 1200;
       if (isGojoProj) size = 800;
       else if (isSukunaSlashProj) size = 128;
+      else if (isLaylaProj) {
+        if (p.visual === 'layla_cosmic_blast') size = 400;
+        else if (p.visual === 'layla_ultimate_bullet') size = 384;
+        else size = 256;
+      }
       
       hybridData = getLocalCanvas(size);
       layer.addChild(hybridData.sprite);
@@ -69,10 +75,16 @@ export function updateHybridProjectiles() {
     ctx.clearRect(0, 0, size, size);
     ctx.save();
     
-    ctx.translate(size / 2 - p.x, size / 2 - p.y);
+    // Most draw functions handle their own p.x/p.y translation internally (canceling out the -p.x offset),
+    // but Layla's draw functions expect the caller to place them at (0,0) directly.
+    if (isLaylaProj) {
+      ctx.translate(size / 2, size / 2);
+    } else {
+      ctx.translate(size / 2 - p.x, size / 2 - p.y);
+    }
     
     if (isFuga) {
-      sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+      sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
       drawSukunaFurnaceArrow(ctx, p);
     } else if (isGojoProj) {
       sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
@@ -82,6 +94,12 @@ export function updateHybridProjectiles() {
       if (p.visual === 'sukunaSlash') drawSukunaSlash(ctx, p);
       else if (p.visual === 'sukunaCleave') drawSukunaCleave(ctx, p);
       else if (p.visual === 'ghostBlade') drawGhostBlade(ctx, p);
+    } else if (isLaylaProj) {
+      sprite.blendMode = window.PIXI.BLEND_MODES.ADD; // Glowing intense plasma
+      if (p.visual === 'layla_bomb') drawLaylaBomb(ctx, p);
+      else if (p.visual === 'layla_cosmic_blast') drawLaylaCosmicBlast(ctx, p);
+      else if (p.visual === 'layla_basic_bullet') drawLaylaBasicBullet(ctx, p);
+      else if (p.visual === 'layla_ultimate_bullet') drawLaylaUltimateBullet(ctx, p);
     }
     
     ctx.restore();

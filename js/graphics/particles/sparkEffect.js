@@ -48,12 +48,21 @@ export function spawnTojiWhirlingWindDebris(x, y, count = 2) {
  * @param {number} radius - Flash radius
  */
 export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
+  let pType = 'flash';
+  let color = 'rgba(255, 255, 255, 1)';
+  if (type === 'crimsonSniper') {
+    pType = 'crimsonSniperFlash';
+  } else if (type === 'layla') {
+    pType = 'flash_layla';
+    color = 'rgba(0, 229, 255, 0.85)';
+  }
+  
   ParticleSystem.spawn(x, y, 1, 'flash_default', {
     size: radius,
     decay: 0.15, // Fast fade
-    type: type === 'crimsonSniper' ? 'crimsonSniperFlash' : 'flash',
+    type: pType,
     isFlash: true,
-    color: 'rgba(255, 255, 255, 1)'
+    color: color
   });
 }
 
@@ -614,11 +623,6 @@ export function drawSparkEffects(layer = 'all') {
         ctx.lineWidth = effect.size * 0.8;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'miter';
-        if (!isGamePlay) {
-          ctx.shadowBlur = 5;
-          ctx.shadowColor = effect.color;
-        }
-        
         ctx.beginPath();
         ctx.moveTo(effect.x, effect.y);
         
@@ -731,34 +735,45 @@ export function drawSparkEffects(layer = 'all') {
       } else if (effect.type === 'arcaneAscendLine') {
         // Glowing vertical thin line ascending upwards
         ctx.globalCompositeOperation = 'lighter';
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
-        ctx.shadowBlur = 10;
-        ctx.shadowColor = effect.color;
-        ctx.lineWidth = effect.size;
         ctx.lineCap = 'round';
+        
+        // Simulated glow line
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life * 0.25})`);
+        ctx.lineWidth = effect.size * 2.5;
         ctx.beginPath();
         ctx.moveTo(effect.x, effect.y);
-        // Draw the line pointing downwards (opposite to vy) with a long stretch to form a beam
         ctx.lineTo(effect.x - effect.vx * 15, effect.y - effect.vy * 15); 
         ctx.stroke();
-        ctx.shadowBlur = 0;
+
+        // Main core line
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+        ctx.lineWidth = effect.size;
+        ctx.beginPath();
+        ctx.moveTo(effect.x, effect.y);
+        ctx.lineTo(effect.x - effect.vx * 15, effect.y - effect.vy * 15); 
+        ctx.stroke();
+        
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'arcaneShockwave') {
         // Expanding dark green shockwave ring
         effect.size += (effect.targetSize - effect.size) * 0.06; // Much slower, graceful expansion
         
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
-        ctx.lineWidth = 6 * effect.life; // Thins out as it expands
-        
-        ctx.shadowBlur = 20 * effect.life;
-        ctx.shadowColor = 'rgba(50, 255, 120, 1)';
         ctx.globalCompositeOperation = 'lighter'; // Neon additive edge
         
+        // Simulated glow ring
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life * 0.25})`);
+        ctx.lineWidth = 12 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Main ring
+        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
+        ctx.lineWidth = 6 * effect.life;
         ctx.beginPath();
         ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
         ctx.stroke();
         
-        ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'mahoragaShoutShockwave') {
         // Expanding golden & silver roar shockwave ring
@@ -849,9 +864,6 @@ export function drawSparkEffects(layer = 'all') {
         // ctx.globalCompositeOperation = 'lighter'; // Removed so it shows up on white backgrounds!
         ctx.globalCompositeOperation = 'source-over';
         ctx.fillStyle = effect.color.replace('1)', `${effect.life})`);
-        ctx.shadowBlur = 8;
-        ctx.shadowColor = effect.color;
-        
         const s = effect.size;
         ctx.beginPath();
         
@@ -877,15 +889,12 @@ export function drawSparkEffects(layer = 'all') {
         ctx.lineWidth = 1;
         ctx.stroke();
         
-        ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
         ctx.rotate(-effect.rotation);
         ctx.translate(-effect.x, -effect.y);
       } else if (effect.type === 'healing') {
         // Bright blue healing particles for Gojo's Reverse Cursed Technique
         ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = 'rgba(50, 150, 255, 1)';
         
         const gradient = ctx.createRadialGradient(
           effect.x, effect.y, 0,
@@ -900,7 +909,6 @@ export function drawSparkEffects(layer = 'all') {
         ctx.fillStyle = gradient;
         ctx.fill();
         
-        ctx.shadowBlur = 0;
         ctx.globalCompositeOperation = 'source-over';
       } else {
         // Default impact flash
@@ -961,12 +969,10 @@ export function drawSparkEffects(layer = 'all') {
         if (effect.type === 'arcaneSmokeAirborne') {
            // Draw neon glowing edges FIRST
            ctx.globalCompositeOperation = 'lighter';
-           if (!isGamePlay) { ctx.shadowBlur = 30; ctx.shadowColor = `rgba(50, 255, 120, ${effect.life})`; }
            ctx.strokeStyle = `rgba(50, 255, 120, ${effect.life * 0.9})`;
            ctx.lineWidth = 6; // Thick stroke so the edge peeks out
            ctx.stroke(); 
            
-           ctx.shadowBlur = 0; // Reset
            ctx.globalCompositeOperation = 'source-over'; // Reset
         }
         
@@ -1268,7 +1274,6 @@ export function drawSparkEffects(layer = 'all') {
       
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      if (!isGamePlay) { ctx.shadowBlur = 25 * effect.life; ctx.shadowColor = 'rgba(255, 215, 0, 1)'; }
 
       // Outer glowing golden shockwave ring
       ctx.strokeStyle = `rgba(255, 215, 0, ${effect.life * 0.95})`;
@@ -1285,63 +1290,34 @@ export function drawSparkEffects(layer = 'all') {
       ctx.stroke();
 
       // Inner white-hot core ring
-      ctx.shadowColor = 'rgba(255, 255, 255, 1)';
       ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
       ctx.lineWidth = 4 * effect.life;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
       ctx.stroke();
 
-      ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
     } else if (effect.type === 'rikaRoarShockwave') {
       // Expanding dark purple & hot pink cursed energy roar shockwave ring
       effect.size += (effect.targetSize - effect.size) * 0.18;
       
-      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
 
-      if (isGamePlay) {
-        // High-performance double-stroke glow without shadowBlur
-        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
-        ctx.lineWidth = 9 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
+      // High-performance double-stroke glow without shadowBlur
+      ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
+      ctx.lineWidth = 9 * effect.life;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+      ctx.stroke();
 
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
-        ctx.stroke();
-      } else {
-        // Original 3-layer drawing with shadowBlur
-        ctx.shadowBlur = 25 * effect.life;
-        ctx.shadowColor = 'rgba(255, 20, 147, 1)';
+      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+      ctx.lineWidth = 4 * effect.life;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.75), 0, Math.PI * 2);
+      ctx.stroke();
 
-        ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.95})`;
-        ctx.lineWidth = 12 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.strokeStyle = `rgba(138, 43, 226, ${effect.life * 0.8})`;
-        ctx.lineWidth = 6 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.82), 0, Math.PI * 2);
-        ctx.stroke();
-
-        ctx.shadowColor = 'rgba(255, 255, 255, 1)';
-        ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(1, effect.size * 0.65), 0, Math.PI * 2);
-        ctx.stroke();
-      }
-
-      ctx.shadowBlur = 0;
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
     } else if (effect.type === 'animeImpactFrame') {

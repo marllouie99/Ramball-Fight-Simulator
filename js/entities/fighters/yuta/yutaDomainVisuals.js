@@ -489,50 +489,11 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
   ctx.fillRect(-riftLen / 2, -30, riftLen, 60);
   ctx.restore();
 
-  // Core rift crack line — bright white with pink/crimson side glow
-  ctx.strokeStyle = `rgba(255, 255, 255, ${0.6 + Math.sin(time / 120) * 0.2})`;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-
-  const segments = 16;
-  for (let i = 0; i <= segments; i++) {
-    const t = i / segments - 0.5;
-    const px = midX + Math.cos(riftAngle) * t * riftLen;
-    const py = midY + Math.sin(riftAngle) * t * riftLen;
-    const jitter = Math.sin(time * 0.008 + i * 1.7) * 6;
-    const jx = px + Math.cos(domAngle) * jitter;
-    const jy = py + Math.sin(domAngle) * jitter;
-    if (i === 0) ctx.moveTo(jx, jy);
-    else ctx.lineTo(jx, jy);
-  }
-  ctx.stroke();
+  // Core rift crack line removed (resolved wiggling worm in arena)
 
   ctx.restore();
 
-  // ── 2. CRACKLING CURSED ENERGY LIGHTNING ARCS ACROSS THE RIFT ──
-  ctx.save();
-  ctx.globalCompositeOperation = 'lighter';
-
-  const arcCount = 3;
-  for (let a = 0; a < arcCount; a++) {
-    const arcSeed = time * 0.003 + a * 2.5;
-    const arcAlpha = 0.35 + Math.sin(arcSeed * 3) * 0.25;
-    if (arcAlpha < 0.15) continue; // skip when near-invisible for flicker effect
-
-    const arcT = (a / arcCount - 0.5 + Math.sin(arcSeed) * 0.15);
-    const arcStartX = midX + Math.cos(riftAngle) * arcT * riftLen;
-    const arcStartY = midY + Math.sin(riftAngle) * arcT * riftLen;
-
-    // Branch toward Yuta's side (pink)
-    ctx.strokeStyle = `rgba(255, 20, 147, ${arcAlpha})`;
-    ctx.lineWidth = 1.8;
-    _drawLightningBolt(ctx, arcStartX, arcStartY, arcStartX - Math.cos(domAngle) * (40 + Math.sin(arcSeed * 2) * 25), arcStartY - Math.sin(domAngle) * (40 + Math.sin(arcSeed * 2) * 25), 3, time + a * 100);
-
-    // Branch toward Sukuna's side (crimson)
-    ctx.strokeStyle = `rgba(255, 30, 30, ${arcAlpha})`;
-    _drawLightningBolt(ctx, arcStartX, arcStartY, arcStartX + Math.cos(domAngle) * (40 + Math.cos(arcSeed * 2) * 25), arcStartY + Math.sin(domAngle) * (40 + Math.cos(arcSeed * 2) * 25), 3, time + a * 200);
-  }
-  ctx.restore();
+  // Crackling lightning arcs removed (resolved wiggling worms in arena)
 
   // ── 3. FLOATING CLASH PARTICLES — Rose Petals (Yuta) vs Crimson Embers (Sukuna) ──
   ctx.save();

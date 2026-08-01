@@ -132,6 +132,21 @@ export class YutaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena, updateProjectiles = true) {
+    // Run Rika's AI and logic immediately before any of Yuta's early returns (like TimeStop, Ambush, RCT)
+    // so she doesn't accidentally get frozen when Yuta is disabled!
+    updateRika(this, arena || (typeof CONFIG !== 'undefined' ? CONFIG.arena : null));
+
+    // Allow visual trail and slash effects to decay even while frozen
+    if (this.swordTrail && this.swordTrail.length > 0) {
+      fastCleanArray(this.swordTrail, (t) => {
+        t.life -= 0.09;
+        return t.life > 0;
+      });
+    }
+    if (this.slashFadeTimer > 0) {
+      this.slashFadeTimer--;
+    }
+
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       this.interruptAttacks();
@@ -248,11 +263,12 @@ export class YutaFighter extends Fighter {
       }
 
       if (this.thinIceBreakerChargeTimer <= 0) {
-         this.isChannelingThinIceBreaker = false;
-         this.thinIceBreakerPunchTimer = 20;
-         executeThinIceBreaker(this, this.gunAngle);
+        this.isChannelingThinIceBreaker = false;
+        this.thinIceBreakerPunchTimer = 22; // 22 frames for punch follow-through
+        // Execute Thin Ice Breaker!
+        const angle = this.flurryTarget ? Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x) : (this.gunAngle || 0);
+        executeThinIceBreaker(this, angle);
       }
-      updateRika(this, arena || CONFIG.arena);
       return; // Freeze Yuta while he winds up
     }
     // Capture sword tip positions continuously after swinging to let the trail follow the sword tip
@@ -409,7 +425,6 @@ export class YutaFighter extends Fighter {
 
       this.x += this.vx;
       this.y += this.vy;
-      updateRika(this, arena || CONFIG.arena);
       return;
     }
 
@@ -459,24 +474,12 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    // Update Yuta's dynamic sword trail history
-    if (this.swordTrail && this.swordTrail.length > 0) {
-      fastCleanArray(this.swordTrail, (t) => {
-        t.life -= 0.09; // Faster decay (fades in ~11 frames) for a tighter, quicker tail
-        return t.life > 0;
-      });
-    }
-
     if (this.meleeCooldown > 0) {
       const maxCd = this.meleeCooldownMax;
       this.meleeCooldown--;
       if (this.meleeCooldown === maxCd - 15) {
         this.slashFadeTimer = 15;
       }
-    }
-
-    if (this.slashFadeTimer > 0) {
-      this.slashFadeTimer--;
     }
 
     if (this.techniqueCooldown > 0) this.techniqueCooldown--;
@@ -518,7 +521,6 @@ export class YutaFighter extends Fighter {
       if (this.domainChargeTimer >= this.domainChargeMax) {
         this.activateDomain();
       }
-      updateRika(this, arena || CONFIG.arena);
       return; // Stop other logic while channeling
     }
 
@@ -555,8 +557,6 @@ export class YutaFighter extends Fighter {
         }
       }
     }
-
-    updateRika(this, arena || CONFIG.arena);
 
     // Domain Trigger (Up to 2 activations per round): 1st at 25% HP, 2nd after domain cooldown when low HP/in battle
     const hpRatio = this.hp / (this.maxHp || 200);
@@ -677,8 +677,8 @@ export class YutaFighter extends Fighter {
           }
         }
 
-        // 2. Check for nearby enemies (if melee is on cooldown and we can't just swing at them)
-        if (!incomingThreat && this.meleeCooldown > 0) {
+        // 2. Check for nearby enemies
+        if (!incomingThreat) {
           for (let i = 0; i < state.fighters.length; i++) {
             const enemy = state.fighters[i];
             if (!enemy || enemy.hp <= 0 || enemy === this) continue;

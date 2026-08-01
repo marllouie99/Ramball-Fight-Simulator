@@ -23,6 +23,63 @@ export function createPreviewFighter(def, x, y, options = {}) {
   fighter.hideHpText = true;
   fighter.isDemoFighter = true;
 
+  if (def.type === 'layla') {
+    fighter._fireWeapon = function(ownerIndex, isUltimateShot = false) {
+      const visualType = isUltimateShot ? 'layla_ultimate_bullet' : 'layla_basic_bullet';
+      previewProjectileSystem.fireProjectile(
+        this,
+        ownerIndex,
+        this.damage,
+        false,
+        this._def?.projectileSpeedMultiplier ? CONFIG.projectile.speed * this._def.projectileSpeedMultiplier : undefined
+      );
+      const projectiles = previewProjectileSystem.getProjectiles();
+      const lastProj = projectiles[projectiles.length - 1];
+      if (lastProj) {
+        lastProj.visual = visualType;
+        if (isUltimateShot) {
+          lastProj.r = 15;
+        }
+      }
+      
+      const baseCooldown = CONFIG.layla.attackCooldown || 70;
+      this.shootCooldown = this.isInUltimate ? Math.floor(baseCooldown / 3) : baseCooldown;
+      this.gunRecoil = 1.0;
+    };
+
+    fighter._fireMaleficBomb = function(ownerIndex) {
+      const bombSpeed = CONFIG.layla.bombSpeed || 5;
+      const bombDamage = CONFIG.layla.bombDamage || 20;
+      const bombRange = CONFIG.layla.bombRange || 250;
+      
+      previewProjectileSystem.fireProjectile(
+        this,
+        ownerIndex,
+        bombDamage,
+        false,
+        bombSpeed
+      );
+      
+      const projectiles = previewProjectileSystem.getProjectiles();
+      const lastProj = projectiles[projectiles.length - 1];
+      if (lastProj) {
+        lastProj.visual = 'layla_bomb';
+        lastProj.r = 12;
+        lastProj.life = Math.ceil(bombRange / bombSpeed);
+        lastProj.maxLife = lastProj.life;
+      }
+      
+      this.maleficBombCooldown = CONFIG.layla.maleficBombCooldown || 180;
+      this.gunRecoil = 2.0;
+      this.bombFireAnimTimer = 22;
+      this.bombFireKickbackTimer = 14;
+      
+      if (typeof spawnFloatingText === 'function') {
+        spawnFloatingText(this.x, this.y - this.r - 15, 'MALEFIC BOMB!', '#00E5FF');
+      }
+    };
+  }
+
   fighter.x = x;
   fighter.y = y;
   fighter.vx = options.vx ?? Math.cos(options.initialAngle ?? 0.6) * (fighter.speed || 1.5);

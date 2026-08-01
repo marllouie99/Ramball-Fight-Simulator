@@ -26,6 +26,7 @@ import { TojiFighter } from '../fighters/TojiFighter.js';
 import { MahoragaFighter } from '../fighters/MahoragaFighter.js';
 import { TodoFighter } from '../fighters/TodoFighter.js';
 import { YujiFighter } from '../fighters/YujiFighter.js';
+import { LaylaFighter } from '../fighters/LaylaFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -56,4 +57,5 @@ export const FIGHTER_CLASS_MAP = {
   'mahoraga': MahoragaFighter,
   'todo': TodoFighter,
   'yuji': YujiFighter,
+  'layla': LaylaFighter,
 };

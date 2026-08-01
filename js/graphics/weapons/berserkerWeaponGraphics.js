@@ -370,12 +370,6 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.fill();
   ctx.stroke();
 
-  // Glowing vertical rune in the collar
-  ctx.fillStyle = isInRage ? '#fff' : bladeEdge;
-  if (!isTrail && !useUltraLOD) {
-    ctx.shadowColor = isInRage ? '#ff3333' : '#000000';
-    ctx.shadowBlur = 6 * scale;
-  }
   ctx.beginPath();
   ctx.moveTo(0, -14 * scale);
   ctx.lineTo(1.5 * scale, -10 * scale);
@@ -383,9 +377,6 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
   ctx.lineTo(-1.5 * scale, -10 * scale);
   ctx.closePath();
   ctx.fill();
-  if (!isTrail && !useUltraLOD) {
-    ctx.shadowBlur = 0; // reset
-  }
 
   // --- BLADE ---
   // Rage glow behind the blade (Flickering fiery energy aura)
@@ -418,11 +409,6 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
         i === 1 ? `rgba(220, 0, 0, ${0.25 * glowIntensity})` :
           `rgba(180, 0, 0, ${0.15 * glowIntensity})`;
 
-      // shadowBlur is very expensive, disable it for trails
-      if (!isTrail && !useUltraLOD) {
-        ctx.shadowColor = '#ff2000';
-        ctx.shadowBlur = (10 + i * 10) * glowIntensity;
-      }
       ctx.fill();
     }
     ctx.restore();
@@ -503,10 +489,6 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
     ctx.lineWidth = 6.0 * scale;
     ctx.globalAlpha = 0.5 * pulse;
     ctx.strokeStyle = isInRage ? '#ff0000' : '#000000';
-    if (!isTrail && !useUltraLOD) { 
-        ctx.shadowColor = isInRage ? '#ff0000' : '#000000'; 
-        ctx.shadowBlur = 15 * scale; 
-    }
     ctx.stroke();
     
     // Mid glow
@@ -519,7 +501,6 @@ function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, g
     ctx.globalAlpha = 1.0;
     ctx.lineWidth = 1.0 * scale;
     ctx.strokeStyle = isInRage ? '#ffcccc' : '#333333';
-    ctx.shadowBlur = 0;
     ctx.stroke();
     ctx.restore();
   ctx.restore();

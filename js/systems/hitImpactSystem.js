@@ -95,6 +95,22 @@ export const HitImpactSystem = {
       target.lastCrimsonAttacker = attacker;
       return false; // Pierce
     } 
+
+    // Layla Steampunk Cannon - custom cyan sparks and flash impact effects
+    const isLaylaBasic = projectile.visual === 'layla_basic_bullet';
+    const isLaylaUlt = projectile.visual === 'layla_ultimate_bullet';
+    const isLaylaBomb = projectile.visual === 'layla_bomb';
+    if (isLaylaBasic || isLaylaUlt || isLaylaBomb) {
+      const sparkCount = isLaylaUlt ? 15 : (isLaylaBomb ? 12 : 7);
+      const flashSize = isLaylaUlt ? 38 : (isLaylaBomb ? 28 : 18);
+      
+      spawnSparks(target.x, target.y, sparkCount, 'laylaSpark');
+      spawnImpactFlash(target.x, target.y, flashSize, 'layla');
+      
+      // Play high-tech energy impact sound
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/laserpew.mp3', 0.25);
+      return true; // Destroy bullet on hit
+    }
     
     if (projectile.isGojoPurple) {
       if (!projectile.hitFighters) projectile.hitFighters = new Set();

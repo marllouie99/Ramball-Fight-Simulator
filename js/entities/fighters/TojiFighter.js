@@ -741,29 +741,30 @@ export class TojiFighter extends Fighter {
               this.ultimateTarget.applyKnockback(kbVx, kbVy);
             }
           }
-          
-          this._clearTargetFreeze(this);
-          this.ultimateActive = false;
-          this.isChannelingDomain = false;
-          this.ultimatePhase = null;
-          this.ultimateTarget = null;
-          this.ambushPhase = null;
-          this.isAmbushing = false;
-          this.spearSwingTimer = 0;
-          this.katanaSlashTimer = 0;
-          this.katanaSlashFadeTimer = 0;
-          this._hasAttemptedChannelInterrupt = false;
-          this._channelInterruptCooldown = 0;
-          this.phantomStrikeCount = 0;
-          this.postUltimateRecoveryTimer = 0; // Immediate instant movement recovery!
-
-          this.vx = 0;
-          this.vy = 0;
-          this.stealthTimer = 40;
-          this.stealthCooldown = 40; // Triggers next ambush within 1 second after ultimate finishes!
-          this.isStealthed = true;
-          this.stealthActive = true;
         }
+        
+        // ALWAYS cleanup ultimate state, even if target was killed!
+        this._clearTargetFreeze(this);
+        this.ultimateActive = false;
+        this.isChannelingDomain = false;
+        this.ultimatePhase = null;
+        this.ultimateTarget = null;
+        this.ambushPhase = null;
+        this.isAmbushing = false;
+        this.spearSwingTimer = 0;
+        this.katanaSlashTimer = 0;
+        this.katanaSlashFadeTimer = 0;
+        this._hasAttemptedChannelInterrupt = false;
+        this._channelInterruptCooldown = 0;
+        this.phantomStrikeCount = 0;
+        this.postUltimateRecoveryTimer = 0; // Immediate instant movement recovery!
+
+        this.vx = 0;
+        this.vy = 0;
+        this.stealthTimer = 40;
+        this.stealthCooldown = 40; // Triggers next ambush within 1 second after ultimate finishes!
+        this.isStealthed = true;
+        this.stealthActive = true;
       }
       return;
     }
@@ -1912,8 +1913,13 @@ export class TojiFighter extends Fighter {
     // 5. Draw Active Front Weapon (Inverted Spear of Heaven or Split Soul Katana)
     ctx.save();
     if (this.channelSenseIndicatorTimer > 0 && !isKatanaDrawn) {
-      ctx.shadowBlur = 25 + Math.sin(Date.now() / 50) * 10;
-      ctx.shadowColor = 'rgba(255, 20, 100, 1)'; // Neon crimson glow indicating channel interrupt!
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 20, 100, 0.4)';
+      ctx.lineWidth = 6;
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, this.r + 3, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
 
     const isUltimateStriking = this.ultimateActive && this.ultimatePhase === 'STRIKING';
@@ -1963,8 +1969,6 @@ export class TojiFighter extends Fighter {
 
       // Sharp Razor Blade Edge Glow Overlay (Traces exact blade profile based on active weapon)
       ctx.save();
-      ctx.shadowBlur = 12 + chargeRatio * 18;
-      ctx.shadowColor = 'rgba(255, 20, 80, 0.95)';
       ctx.translate(this.x, this.y);
       ctx.rotate(renderAngle);
       const normRenderAngle = Math.atan2(Math.sin(renderAngle), Math.cos(renderAngle));
@@ -2028,16 +2032,18 @@ export class TojiFighter extends Fighter {
         ctx.closePath();
       }
 
-      // Dynamic Lore Colors: Split Soul Katana = Soft Atmospheric Purple Haze, Inverted Spear = Soft Crimson
-      const shadowBlurAmt = isKatanaActiveCharge ? (6 + chargeRatio * 10) : (12 + chargeRatio * 18);
       const glowColor = isKatanaActiveCharge ? 'rgba(140, 70, 220, 0.45)' : 'rgba(255, 20, 80, 0.95)';
       const strokeColor = isKatanaActiveCharge ? `rgba(180, 130, 240, ${0.45 + chargeRatio * 0.25})` : `rgba(255, 30, 75, ${0.75 + chargeRatio * 0.25})`;
       const strokeWidth = isKatanaActiveCharge ? 2.0 : 3.5;
       const shimmerColor = isKatanaActiveCharge ? `rgba(240, 230, 255, ${0.55 + Math.sin(Date.now() / 40) * 0.15})` : `rgba(255, 255, 255, ${0.85 + Math.sin(Date.now() / 40) * 0.15})`;
       const shimmerWidth = isKatanaActiveCharge ? 1.0 : 1.8;
 
-      ctx.shadowBlur = shadowBlurAmt;
-      ctx.shadowColor = glowColor;
+      // Outer Blade Edge Outline - Simulated Glow
+      ctx.save();
+      ctx.strokeStyle = glowColor.replace('0.95', '0.25').replace('0.45', '0.15');
+      ctx.lineWidth = strokeWidth * 2.5;
+      ctx.stroke();
+      ctx.restore();
 
       // Outer Blade Edge Outline
       ctx.strokeStyle = strokeColor;

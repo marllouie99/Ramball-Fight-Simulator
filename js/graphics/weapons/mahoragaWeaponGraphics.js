@@ -122,10 +122,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     shieldGrad.addColorStop(0.75, 'rgba(255, 180, 0, 0.55)');
     shieldGrad.addColorStop(1, 'rgba(255, 140, 0, 0.1)');
     ctx.fillStyle = shieldGrad;
-    const _isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-    if (!_isGamePlay) { ctx.shadowColor = '#FFDF00'; ctx.shadowBlur = 15; }
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Crisp white & gold energy border
     ctx.lineWidth = 2.2;
@@ -151,10 +148,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     arrowGrad.addColorStop(0.5, '#00E676'); // Vibrant emerald green
     arrowGrad.addColorStop(1, '#00C853');  // Deep green
     ctx.fillStyle = arrowGrad;
-    const _isGamePlay2 = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-    if (!_isGamePlay2) { ctx.shadowColor = '#00E676'; ctx.shadowBlur = 14; }
     ctx.fill();
-    ctx.shadowBlur = 0;
 
     // Crisp white outline on the green arrow
     ctx.lineWidth = 1.6;
@@ -749,10 +743,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2.8;
       ctx.lineCap = 'round';
-      const _isGP = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-      if (!_isGP) { ctx.shadowColor = '#FFFFFF'; ctx.shadowBlur = 10; }
       ctx.stroke();
-      ctx.shadowBlur = 0;
 
       // 2. Dynamic Trailing V-Speed Lines (REMOVED - User requested removal of web-like effects)
       /* 
@@ -847,10 +838,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       razorGrad.addColorStop(1, 'rgba(255, 235, 50, 0)'); // Fading needle tail
 
       ctx.fillStyle = razorGrad;
-      const _isGP2 = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-      if (!_isGP2) { ctx.shadowColor = '#FFEA00'; ctx.shadowBlur = 10; }
       ctx.fill();
-      ctx.shadowBlur = 0;
 
       // B. WHITE-HOT CORE NEEDLE LINE
       ctx.beginPath();
@@ -865,10 +853,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2.5;
       ctx.lineCap = 'round';
-      const _isGP3 = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-      if (!_isGP3) { ctx.shadowColor = '#FFFFFF'; ctx.shadowBlur = 8; }
       ctx.stroke();
-      ctx.shadowBlur = 0;
 
       // C. PARALLEL SECONDARY RAZOR WISPS
       for (let w = 0; w < 2; w++) {
@@ -909,10 +894,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     ctx.beginPath();
     ctx.arc(bladeLength - 2, 0, 5, 0, Math.PI * 2);
     ctx.fillStyle = '#FFFFFF';
-    const _isGP4 = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-    if (!_isGP4) { ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 12; }
     ctx.fill();
-    ctx.shadowBlur = 0;
   }
 
   ctx.restore();

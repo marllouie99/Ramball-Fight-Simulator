@@ -841,15 +841,11 @@ export class KnightFighter extends Fighter {
       ctx.lineJoin = 'round';
       
       // Faint ambient neon aura
-      ctx.shadowBlur = 15;
-      ctx.shadowColor = '#ff8800';
       ctx.strokeStyle = `rgba(255, 150, 0, ${0.4 * glowAlpha})`;
       ctx.lineWidth = 14;
       ctx.stroke();
 
       // Bright intense gold core
-      ctx.shadowBlur = 5;
-      ctx.shadowColor = '#ffcc00';
       ctx.strokeStyle = `rgba(255, 215, 0, ${0.7 * glowAlpha})`;
       ctx.lineWidth = 4;
       ctx.stroke();

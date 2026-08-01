@@ -203,16 +203,9 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
 
   ctx.restore();
 
-  // 9. Orange Side Panel
-  // Dynamic intense shadow when firing/charging
-  if (glowPulse > 0) {
-    ctx.shadowBlur = 10 * glowPulse;
-    ctx.shadowColor = orangeGlow;
-  }
   drawPoly([
     [-5, 2], [35, 2], [40, 10], [-5, 10]
   ], orange, outline);
-  ctx.shadowBlur = 0; // reset
   
   // Joint detail
   ctx.beginPath(); ctx.arc(0, 6 * s, 3 * s, 0, Math.PI*2);
@@ -228,16 +221,12 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
   ctx.beginPath(); ctx.arc(cx * s, cy * s, 16 * s, 0, Math.PI*2);
   ctx.fillStyle = black; ctx.fill(); ctx.stroke();
 
-  if (glowPulse > 0) {
-    ctx.shadowColor = orangeGlow;
-  }
   ctx.beginPath(); ctx.arc(cx * s, cy * s, 12 * s, 0, Math.PI*2);
   ctx.strokeStyle = isFiring ? hotCore : `rgba(255, 140, 0, ${0.6 + pulse * 0.4})`; 
   ctx.lineWidth = (isFiring ? 4 : 2.5) * s; ctx.stroke();
 
   ctx.beginPath(); ctx.arc(cx * s, cy * s, (isFiring ? 6 : 4) * s, 0, Math.PI*2);
   ctx.fillStyle = orange; ctx.fill();
-  ctx.shadowBlur = 0; // reset
 
   ctx.shadowColor = 'rgba(0,0,0,0.4)';
   ctx.shadowOffsetY = 2;
@@ -260,18 +249,12 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
     [42, -37], [50, -37], [45, -48], [42, -48]
   ], orange, null);
 
-  // 12. Orange Barrel Rings
-  if (glowPulse > 0) {
-    ctx.shadowBlur = 12 * glowPulse;
-    ctx.shadowColor = orangeGlow;
-  }
   ctx.fillStyle = orange;
   ctx.strokeStyle = outline;
   ctx.fillRect(100 * s, -4 * s, 6 * s, 16 * s);
   ctx.fillRect(115 * s, -4 * s, 6 * s, 16 * s);
   ctx.strokeRect(100 * s, -4 * s, 6 * s, 16 * s);
   ctx.strokeRect(115 * s, -4 * s, 6 * s, 16 * s);
-  ctx.shadowBlur = 0; // reset
 
   // 13. Muzzle Tip
   drawPoly([
@@ -279,13 +262,10 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
   ], charcoal, outline);
   
   // Glowing Emitter Opening
-  ctx.shadowColor = orangeGlow;
-  ctx.shadowOffsetY = 0;
   ctx.beginPath(); ctx.arc(160 * s, 2 * s, (isFiring ? 6 : 4) * s, 0, Math.PI*2);
   ctx.fillStyle = isFiring ? hotCore : `rgba(255, 100, 0, ${0.6 + pulse * 0.4})`; ctx.fill();
   ctx.beginPath(); ctx.arc(160 * s, 2 * s, 2 * s, 0, Math.PI*2);
   ctx.fillStyle = whiteBright; ctx.fill();
-  ctx.shadowBlur = 0; // reset
 
   // 14. Details & Text
   ctx.save();

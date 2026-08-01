@@ -437,7 +437,8 @@ export function drawProjectiles() {
 
     // Sukuna Furnace Arrow
     if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
-      // Defer to hybridProjectileRenderer.js
+      if (typeof state !== 'undefined' && state.pixiApp) return;
+      drawSukunaFurnaceArrow(ctx, p);
       return;
     }
 
@@ -482,6 +483,46 @@ export function drawProjectiles() {
     // Add rangerBullet handler
     if (p.visual === 'rangerBullet') {
       drawRangerBullet(ctx, p);
+      return;
+    }
+
+    // Layla Steampunk Cannon - Streamlined Cyan Laser Bolt (Compressed Plasma & Wind Drill)
+    if (p.visual === 'layla_basic_bullet') {
+      // Rendered on Canvas 2D (top layer over PixiJS WebGL)
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaBasicBullet(ctx, p);
+      ctx.restore();
+      return;
+    }
+
+    // Layla Steampunk Cannon - Ultimate Plasma Bolt (Massive Compressed Plasma & Wind Drill)
+    if (p.visual === 'layla_ultimate_bullet') {
+      // Rendered on Canvas 2D (top layer over PixiJS WebGL)
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaUltimateBullet(ctx, p);
+      ctx.restore();
+      return;
+    }
+
+    // Layla Steampunk Cannon - Compressed Sky-Blue Energy Missile (Malefic Bomb)
+    if (p.visual === 'layla_bomb') {
+      // Rendered on Canvas 2D (top layer over PixiJS WebGL)
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaBomb(ctx, p);
+      ctx.restore();
+      return;
+    }
+
+    // Layla Steampunk Cannon - Cyan Energy Cosmic Blast Pattern (Malefic Bomb Explosion)
+    if (p.visual === 'layla_cosmic_blast') {
+      // Rendered on Canvas 2D (top layer over PixiJS WebGL)
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      drawLaylaCosmicBlast(ctx, p);
+      ctx.restore();
       return;
     }
 
@@ -890,3 +931,263 @@ export function drawGojoPurpleOrb(ctx, p) {
   ctx.restore();
 }
 
+export function drawLaylaBomb(ctx, p) {
+  const angle = Math.atan2(p.vy, p.vx);
+  ctx.rotate(angle);
+  
+  const now = Date.now();
+  const radius = p.r || 12;
+  
+  // 1. Magenta trailing ribbon (3 short segments, no per-point math)
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 2;
+  const tailLen = radius * 3.5;
+  ctx.strokeStyle = '#FF00FF';
+  ctx.beginPath();
+  ctx.moveTo(0, -radius * 0.4);
+  ctx.lineTo(-tailLen, 0);
+  ctx.moveTo(0, radius * 0.4);
+  ctx.lineTo(-tailLen * 0.7, 0);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(-tailLen * 0.5, 0);
+  ctx.stroke();
+
+  // 2. Outer Soft Gold glow
+  ctx.fillStyle = 'rgba(255, 170, 0, 0.12)';
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 2.0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Rotating Golden Steampunk Cog (6 teeth for lower cost)
+  ctx.save();
+  ctx.rotate(now * 0.01);
+  ctx.fillStyle = '#FFAA00';
+  ctx.strokeStyle = '#D4AF37';
+  ctx.lineWidth = 1.5;
+  const gearTeeth = 6;
+  const outerR = radius * 1.35;
+  const innerR = radius * 0.85;
+  ctx.beginPath();
+  for (let i = 0; i < gearTeeth * 2; i++) {
+    const gAngle = (i * Math.PI) / gearTeeth;
+    const r = i % 2 === 0 ? outerR : innerR;
+    const gx = Math.cos(gAngle) * r;
+    const gy = Math.sin(gAngle) * r;
+    if (i === 0) ctx.moveTo(gx, gy);
+    else ctx.lineTo(gx, gy);
+  }
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  // 4. Magenta core: flat fill (no gradient per frame)
+  ctx.fillStyle = '#FF00FF';
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.85, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(-radius * 0.2, -radius * 0.2, radius * 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 5. White crosshair
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(-radius * 0.45, 0);
+  ctx.lineTo(radius * 0.45, 0);
+  ctx.moveTo(0, -radius * 0.45);
+  ctx.lineTo(0, radius * 0.45);
+  ctx.stroke();
+}
+
+export function drawLaylaCosmicBlast(ctx, p) {
+  const progress = 1 - (p.life / (p.maxLife || 35));
+  const fade = Math.sin((1 - progress) * (Math.PI / 2));
+  const maxR = p.r || 75;
+  const currentR = maxR * (0.35 + progress * 0.65);
+  
+  ctx.globalAlpha = fade;
+
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.1)';
+  ctx.beginPath();
+  ctx.arc(0, 0, currentR * 1.1, 0, Math.PI * 2);
+  ctx.fill();
+  
+  const waveGrad = ctx.createRadialGradient(0, 0, currentR * 0.5, 0, 0, currentR);
+  waveGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+  waveGrad.addColorStop(0.65, 'rgba(0, 229, 255, 0.5)');
+  waveGrad.addColorStop(0.9, '#00E5FF');
+  waveGrad.addColorStop(1, 'rgba(224, 255, 255, 0)');
+  
+  ctx.fillStyle = waveGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, currentR, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2.2 * (1 - progress);
+  ctx.beginPath();
+  ctx.arc(0, 0, currentR * 0.93, 0, Math.PI * 2);
+  ctx.stroke();
+
+  if (progress < 0.75) {
+    const starProgress = progress / 0.75;
+    const starR = maxR * (0.85 - starProgress * 0.35);
+    const rotation = progress * Math.PI * 0.8;
+    
+    ctx.save();
+    ctx.rotate(rotation);
+    ctx.beginPath();
+    const points = 8;
+    for (let i = 0; i < points * 2; i++) {
+      const angle = (i * Math.PI) / points;
+      const r = i % 2 === 0 ? starR : starR * 0.28;
+      const px = Math.cos(angle) * r;
+      const py = Math.sin(angle) * r;
+      if (i === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fillStyle = '#00E5FF';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(0, 0, starR * 0.28, 0, Math.PI * 2);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+    ctx.restore();
+  }
+
+  const shardCount = 8;
+  ctx.fillStyle = '#E0FFFF';
+  for (let i = 0; i < shardCount; i++) {
+    const shardAngle = (i * Math.PI * 2) / shardCount + progress * 1.5;
+    const dist = maxR * progress * (0.5 + (i % 2) * 0.45);
+    const sx = Math.cos(shardAngle) * dist;
+    const sy = Math.sin(shardAngle) * dist;
+    const size = Math.max(0.5, (3.2 - progress * 2.8) * ((i % 2) + 1));
+    
+    ctx.beginPath();
+    ctx.moveTo(sx, sy - size * 1.5);
+    ctx.lineTo(sx + size * 1.5, sy);
+    ctx.lineTo(sx, sy + size * 1.5);
+    ctx.lineTo(sx - size * 1.5, sy);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+export function drawLaylaUltimateBullet(ctx, p) {
+  const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+  const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+  const angle = Math.atan2(vy, vx);
+  ctx.rotate(angle);
+
+  // 1. Subtle outer aura (flat fill, no gradient)
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.15)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 22, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Tail: 2 straight tapered lines (no gradient, no sin wave per frame)
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#3AB4F2';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-6, -5); ctx.lineTo(-90, 0);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,229,255,0.4)';
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(-6, 0); ctx.lineTo(-70, 0);
+  ctx.stroke();
+
+  // 3. Core body: solid cyan teardrop (no gradient)
+  ctx.fillStyle = '#00E5FF';
+  ctx.beginPath();
+  ctx.moveTo(26, 0);
+  ctx.bezierCurveTo(12, -8, -6, -9, -22, -3);
+  ctx.lineTo(-26, 0);
+  ctx.lineTo(-22, 3);
+  ctx.bezierCurveTo(-6, 9, 12, 8, 26, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. Wind drill: 2 ellipses only (was 5)
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = '#3AB4F2';
+  ctx.beginPath();
+  ctx.ellipse(10, 0, 6, 10, Math.PI / 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(-4, 0, 6, 10, Math.PI / 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 5. White center beam
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(24, 0); ctx.lineTo(-14, 0);
+  ctx.stroke();
+}
+
+export function drawLaylaBasicBullet(ctx, p) {
+  const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
+  const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
+  const angle = Math.atan2(vy, vx);
+  ctx.rotate(angle);
+
+  // 1. Subtle aura (flat fill, no gradient)
+  ctx.fillStyle = 'rgba(0, 229, 255, 0.15)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 14, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Tail: 2 straight lines (no gradient, no sin wave per frame)
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = '#3AB4F2';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(-3, 3); ctx.lineTo(-60, 0);
+  ctx.moveTo(-3, -3); ctx.lineTo(-50, 0);
+  ctx.stroke();
+  ctx.strokeStyle = 'rgba(0,229,255,0.35)';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(-3, 0); ctx.lineTo(-40, 0);
+  ctx.stroke();
+
+  // 3. Core: solid cyan teardrop (no gradient)
+  ctx.fillStyle = '#00E5FF';
+  ctx.beginPath();
+  ctx.moveTo(18, 0);
+  ctx.bezierCurveTo(8, -5.5, -4, -6, -14, -2);
+  ctx.lineTo(-16, 0);
+  ctx.lineTo(-14, 2);
+  ctx.bezierCurveTo(-4, 6, 8, 5.5, 18, 0);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. 2 quick ellipse rings (was 4)
+  ctx.lineWidth = 1.5;
+  ctx.strokeStyle = '#3AB4F2';
+  ctx.beginPath();
+  ctx.ellipse(6, 0, 4, 7, Math.PI / 8, 0, Math.PI * 2);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.ellipse(-3, 0, 4, 7, Math.PI / 8, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 5. White center streak
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(15, 0); ctx.lineTo(-8, 0);
+  ctx.stroke();
+}

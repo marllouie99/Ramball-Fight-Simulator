@@ -660,8 +660,6 @@ export class MusashiFighter extends Fighter {
         if (effect.stance === 'void') color = '#8a2be2';
         
         ctx.globalAlpha = 1 - prog;
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 15;
         
         if (effect.type.startsWith('slash')) {
           // Anime-style tapered crescent slash
@@ -683,15 +681,19 @@ export class MusashiFighter extends Fighter {
              ctx.closePath();
           };
 
-          // 1. Large Stance Aura Glow
-          ctx.shadowBlur = 25;
-          ctx.shadowColor = color;
+          // 1. Large Stance Aura Glow - Simulated Glow
+          ctx.fillStyle = color;
+          ctx.save();
+          ctx.globalAlpha = (1 - prog) * 0.25;
+          drawCrescent(size * 1.15, thick * 1.5, 1.35);
+          ctx.fill();
+          ctx.restore();
+
           ctx.fillStyle = color;
           drawCrescent(size, thick, 1.3);
           ctx.fill();
 
           // 2. Sharp Black Ink Layer (for high-contrast anime impact)
-          ctx.shadowBlur = 0;
           ctx.fillStyle = '#0a0a0a';
           drawCrescent(size * 0.98, thick * 0.75, 1.15);
           ctx.fill();

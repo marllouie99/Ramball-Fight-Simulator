@@ -310,10 +310,6 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
   ctx.strokeStyle = colors.outline;
   ctx.lineWidth = 1;
   
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 4;
-  ctx.shadowOffsetY = 2;
-
   // ── Long Tapered Handle (Red) ──────────────────────────
   // The handle tapers: thinner at the grip end, wider near the head
   const handleGrad = ctx.createLinearGradient(0, -4, 0, 4);
@@ -337,8 +333,6 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
   ctx.closePath();
   ctx.fill();
   
-  ctx.shadowBlur = 0;
-  ctx.shadowOffsetY = 0;
   ctx.stroke();
   
   // ── Elongated Slot/Hole in handle ──────────────────────

@@ -3,6 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { renderGojoDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
 import { renderSukunaDomainBackground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
+import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
 
 let furnaceDimSprite = null;
@@ -606,6 +607,71 @@ export function updateHybridBerserkerRage() {
   for (let i = effects.length; i < berserkerSpritesPool.length; i++) {
     const sprite = berserkerSpritesPool[i];
     if (sprite.parent) sprite.parent.removeChild(sprite);
+  }
+
+  // Update Layla Malefic Surge Auras
+  updateLaylaHybridAuras(layer);
+}
+
+const laylaAuraSprites = new Map();
+const laylaAuraCanvasPool = [];
+
+function getLaylaAuraCanvas() {
+  let item = laylaAuraCanvasPool.find(c => !c.inUse);
+  if (!item) {
+    const size = 300;
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    const texture = window.PIXI.Texture.from(canvas);
+    const sprite = new window.PIXI.Sprite(texture);
+    sprite.anchor.set(0.5);
+    sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+    
+    item = { canvas, ctx, texture, sprite, size, inUse: true };
+    laylaAuraCanvasPool.push(item);
+  }
+  item.inUse = true;
+  return item;
+}
+
+function updateLaylaHybridAuras(layer) {
+  const currentIds = new Set();
+  
+  if (state.fighters) {
+    for (const f of state.fighters) {
+      if (!f || (f.characterId !== 'layla' && f.type !== 'layla')) continue;
+      if (!f.maleficBuffTimer || f.maleficBuffTimer <= 0) continue;
+      
+      currentIds.add(f.id);
+      
+      let hybridData = laylaAuraSprites.get(f.id);
+      if (!hybridData) {
+        hybridData = getLaylaAuraCanvas();
+        layer.addChild(hybridData.sprite);
+        laylaAuraSprites.set(f.id, hybridData);
+      }
+      
+      const { canvas, ctx, sprite, texture, size } = hybridData;
+      
+      ctx.clearRect(0, 0, size, size);
+      
+      drawLaylaMaleficSurgeGrid(ctx, size / 2, size / 2, f.r, f.maleficBuffTimer);
+      
+      texture.update();
+      sprite.x = f.x;
+      sprite.y = f.y;
+    }
+  }
+  
+  for (const [id, data] of laylaAuraSprites.entries()) {
+    if (!currentIds.has(id)) {
+      data.sprite.parent?.removeChild(data.sprite);
+      data.inUse = false;
+      laylaAuraSprites.delete(id);
+    }
   }
 }
 

@@ -35,6 +35,7 @@ export function initRika(fighter) {
     hasSummonedAt50Hp: false,
     hitStunTimer: 0,
     timeStopTimer: 0,
+    hitFlashTimer: 0,
     activeTrembleSound: null,
     trembleStopTimer: 0,
     applyHitStun: function(duration) {
@@ -53,6 +54,7 @@ export function initRika(fighter) {
     takeDamage: function(amount, attacker, opts = {}) {
       if (this.disappearing || !this.active || this.hp <= 0) return false;
       this.hp -= amount;
+      this.hitFlashTimer = 8;
       
       // Floating text
       if (typeof spawnFloatingText === 'function') {
@@ -507,6 +509,10 @@ export function updateRika(fighter, arena) {
     rk.vx = 0;
     rk.vy = 0;
     return; // Don't move or attack until she has fully arisen!
+  }
+
+  if (rk.hitFlashTimer > 0) {
+    rk.hitFlashTimer--;
   }
 
   // Handle paralysis / time stop (Gojo's Domain Expansion / Unlimited Void)

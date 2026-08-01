@@ -832,6 +832,12 @@ class ProjectileSystem {
           return true;
         }
 
+        // Layla's Malefic Bomb detonates in an AOE on contact with a fighter
+        if (projectile.visual === 'layla_bomb') {
+          this.detonateLaylaBomb(projectile, fighters);
+          return true;
+        }
+
         if (!projectile.isGrenade) {
           if (projectile.isFlame) {
             const intervalSeconds = Number(CONFIG.orange.flameContactIntervalSeconds ?? CONFIG.orange.flameHitCooldown ?? 0.2);
@@ -1167,6 +1173,90 @@ class ProjectileSystem {
 
     // Create the layered explosion visual effect
     this.createAlchemistExplosion({ x: p.x, y: p.y, radius, owner: p.owner });
+  }
+
+  /**
+   * Detonates Layla's Malefic Bomb (Skill 1), dealing 20 AOE damage and applying a 40% slow for 1.5s (90 frames).
+   */
+  detonateLaylaBomb(bomb, fighters) {
+    if (bomb._detonated) return;
+    bomb._detonated = true;
+
+    const attacker = fighters[bomb.owner] || (state.fighters && state.fighters[bomb.owner]);
+    const radius = bomb.aoeRadius || 75;
+    const damage = bomb.damage || CONFIG.layla?.bombDamage || 20;
+    const slowDuration = bomb.slowDuration || CONFIG.layla?.bombSlowDuration || 90;
+    const slowMultiplier = bomb.slowMultiplier || CONFIG.layla?.bombSlowMultiplier || 0.6;
+
+    // Rule 6: ALWAYS check both state.fighters AND state.illusions (excluding teammates, self, and invulnerable entities)
+    const aoeTargets = new Set();
+
+    // Check enemy fighters
+    for (let fi = 0; fi < fighters.length; fi++) {
+      if (bomb.owner === fi || areOnSameTeam(bomb.owner, fi)) continue;
+      const f = fighters[fi];
+      if (!f || f.hp <= 0) continue;
+      const d = Math.hypot(f.x - bomb.x, f.y - bomb.y);
+      if (d <= radius + f.r) {
+        aoeTargets.add(f);
+      }
+    }
+
+    // Check enemy illusions
+    for (const illusion of state.illusions || []) {
+      if (!illusion || illusion.hp <= 0) continue;
+      const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+      if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
+        if (bomb.owner === illusionOwnerIndex || areOnSameTeam(bomb.owner, illusionOwnerIndex)) continue;
+      }
+      const d = Math.hypot(illusion.x - bomb.x, illusion.y - bomb.y);
+      if (d <= radius + (illusion.r || 20)) {
+        aoeTargets.add(illusion);
+      }
+    }
+
+    // Apply 20 AOE damage & 40% slow for 90 frames to all caught targets!
+    for (const target of aoeTargets) {
+      if (typeof target.takeDamage === 'function') {
+        target.takeDamage(damage, attacker, { isAOE: true, projectile: bomb });
+      } else {
+        applyDamageToTarget(target, damage, attacker, { isAOE: true });
+      }
+      // Apply 40% slow (multiplier 0.6) for 90 frames (1.5 seconds)
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(slowDuration, slowMultiplier, { isLaylaBomb: true });
+      } else {
+        target.slowTimer = Math.max(target.slowTimer || 0, slowDuration);
+        target.slowMultiplier = Math.min(target.slowMultiplier || 1.0, slowMultiplier);
+      }
+    }
+
+    // If we connected with any enemy targets, trigger Layla's empowered visual buff!
+    if (aoeTargets.size > 0 && attacker && typeof attacker.triggerMaleficBombHitBuff === 'function') {
+      attacker.triggerMaleficBombHitBuff();
+    }
+
+    // Spawn the Cyan Cosmic Blast visual effect entity
+    const blast = this._getProjectile();
+    blast.x = bomb.x;
+    blast.y = bomb.y;
+    blast.vx = 0;
+    blast.vy = 0;
+    blast.r = radius;
+    blast.life = 35;
+    blast.maxLife = 35;
+    blast.visual = 'layla_cosmic_blast';
+    blast.isVisual = true;
+    blast.owner = bomb.owner;
+    this.projectiles.push(blast);
+
+    // Play energetic cosmic explosion feedback
+    spawnSparks(bomb.x, bomb.y, 25, 'laylaSpark');
+    spawnImpactFlash(bomb.x, bomb.y, radius * 1.3, 'layla');
+    playSound('Assets/Sound Effects/Attacks/laserpew.mp3', 0.45);
+    if (typeof triggerGlobalScreenShake === 'function') {
+      triggerGlobalScreenShake(3, 6);
+    }
   }
 
   /**
@@ -2448,6 +2538,10 @@ class ProjectileSystem {
       const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
+        if (p.visual === 'layla_bomb') {
+          this.detonateLaylaBomb(p, fighters);
+        }
+
         const isMahoragaRuinDebris = p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';
         if (isMahoragaRuinDebris) {
           // Shatter / break animation on wall impact or expiration!

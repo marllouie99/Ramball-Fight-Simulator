@@ -37,8 +37,7 @@ export class SukunaFighter extends Fighter {
     this.meleeComboTarget = 0;
     this.meleePunchCooldown = 0;
 
-    // Divine Flame / Furnace (Skill 2 - Active state)
-    this.divineFlameCooldown = 500; // Delay initial cast
+    this.divineFlameCooldown = CONFIG.sukuna.divineFlameCooldown || 1500; // Delay initial cast
     this.isChannelingDivineFlame = false;
     this.divineFlameChargeTimer = 0;
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 90;
@@ -130,7 +129,7 @@ export class SukunaFighter extends Fighter {
     this.meleeComboTarget = 0;
     this.meleePunchCooldown = 0;
 
-    this.divineFlameCooldown = 500;
+    this.divineFlameCooldown = CONFIG.sukuna.divineFlameCooldown || 1500;
     this.isChannelingDivineFlame = false;
     this.divineFlameChargeTimer = 0;
     this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 90;
@@ -1536,21 +1535,30 @@ export class SukunaFighter extends Fighter {
 
     // 2. Single-Hand Slash Swing Animation (Fast 10-frame single-hand chop across body when unleashing Cleave / Dismantle slashes)
     else if (this.slashSwingTimer > 0 || (this.rapidSlashHitsLeft > 0 && this.punchAnimTimer <= 0)) {
-      const swingMax = 10;
-      const rawT = (10 - Math.max(0, this.slashSwingTimer)) / swingMax; // 0 to 1 smooth progress over 10 frames
-      const swingProg = Math.pow(rawT, 0.4); // Fast snappy acceleration curve
-      const swingThrust = Math.sin(swingProg * Math.PI) * 35;
+      let rawT = 1.0; // Hold at the end of the swing between rapid slashes
+      if (this.slashSwingTimer > 0) {
+        rawT = (10 - Math.max(0, this.slashSwingTimer)) / 10;
+      }
+      
+      // Left hand (1) swings Left-to-Right (-90 to +90)
+      // Right hand (0) swings Right-to-Left (+90 to -90)
+      const startAngle = this.slashHand === 1 ? -Math.PI / 2 : Math.PI / 2;
+      const endAngle = this.slashHand === 1 ? Math.PI / 2 : -Math.PI / 2;
+      
+      const angle = startAngle + rawT * (endAngle - startAngle);
+      const swingX = Math.cos(angle) * 35; 
+      const swingY = Math.sin(angle) * 45;
 
       if (this.slashHand === 1) {
         // Left hand slashes across body! Hide right hand!
         hideFrontHand = true;
-        lx2 -= swingThrust * 1.2;
-        ly2 += swingThrust * 0.5; // Swipe across slightly towards camera
+        lx2 += swingX * 1.2;
+        ly2 += swingY; 
       } else {
         // Right hand slashes across body! Hide left hand!
         hideBackHand = true;
-        lx1 += swingThrust * 1.8; // Right hand flies over!
-        ly1 += swingThrust * 0.5;
+        lx1 += swingX * 1.2; 
+        ly1 += swingY; 
       }
     }
 

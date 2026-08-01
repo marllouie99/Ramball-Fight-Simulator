@@ -209,15 +209,17 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   ctx.quadraticCurveTo(74 * bladeScale, 4 * bladeScale, 40 * bladeScale, 4 * bladeScale);
   ctx.lineTo(6 * bladeScale, 4 * bladeScale);
   
-  // Neon aura around the edge
+  // Neon aura around the edge - Simulated Glow
   ctx.strokeStyle = blade.neonColor || '#00F3FF';
+  ctx.globalAlpha = 0.25;
+  ctx.lineWidth = (6.0 + pulse * 4.0) * bladeScale;
+  ctx.stroke();
+
+  ctx.globalAlpha = 1.0;
   ctx.lineWidth = (2.0 + pulse * 1.0) * bladeScale;
-  ctx.shadowColor = blade.neonColor || '#00F3FF';
-  ctx.shadowBlur = 10 + pulse * 10;
   ctx.stroke();
 
   // White hot core on the edge
-  ctx.shadowBlur = 0;
   ctx.strokeStyle = `rgba(255, 255, 255, ${0.7 + pulse * 0.3})`;
   ctx.lineWidth = 1.0 * bladeScale;
   ctx.stroke();

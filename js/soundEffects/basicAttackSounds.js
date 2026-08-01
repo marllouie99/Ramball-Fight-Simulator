@@ -206,6 +206,13 @@ export const BASIC_ATTACK_SOUNDS = {
     src: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
     volume: 0.6,
     delay: 0,
+  },
+
+  // ── Layla (ID 26) ────────────────────
+  26: {
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+    volume: 0.45,
+    delay: 0,
   }
 };
 
@@ -302,6 +309,13 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 2.5,
     delay: 0,
   },
+  
+  // Layla - Cosmic Marksman
+  'layla': {
+    src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
+    volume: 0.45,
+    delay: 0,
+  }
 };
 
 /**

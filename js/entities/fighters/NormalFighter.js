@@ -353,13 +353,10 @@ export class NormalFighter extends Fighter {
 
         // Energy Core Glass / Glow
         ctx.fillStyle = '#ff1111';
-        ctx.shadowBlur = 6 * cellProgress;
-        ctx.shadowColor = '#ff0000';
         ctx.fillRect(cx - w + 1.5, cy - h / 2 + 4 + yOffset, w * 2 - 3, currentH);
 
         // Inner white hot filament (vertical line)
         ctx.fillStyle = '#ffffff';
-        ctx.shadowBlur = 0;
         ctx.fillRect(cx - 0.5, cy - h / 2 + 4.5 + yOffset, 1, Math.max(0, currentH - 0.5));
 
         // Horizontal energy ribs over the filament
