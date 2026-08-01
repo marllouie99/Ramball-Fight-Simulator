@@ -148,6 +148,29 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     return;
   }
 
+  // Target is frozen via isTargetOfAmbush, so we must manually process their knockback physics here!
+  if (opponent.knockbackVx !== undefined && (Math.abs(opponent.knockbackVx) > 0.1 || Math.abs(opponent.knockbackVy) > 0.1)) {
+    opponent.x += opponent.knockbackVx;
+    opponent.y += opponent.knockbackVy;
+    
+    const arena = typeof CONFIG !== 'undefined' ? CONFIG.arena : null;
+    if (arena) {
+      let bounced = false;
+      const bounceMult = opponent.isFirstHitKnockback ? 0.35 : 0.82;
+      if (opponent.x - opponent.r < arena.x) { opponent.x = arena.x + opponent.r; opponent.knockbackVx = Math.abs(opponent.knockbackVx) * bounceMult; bounced = true; }
+      if (opponent.x + opponent.r > arena.x + arena.width) { opponent.x = arena.x + arena.width - opponent.r; opponent.knockbackVx = -Math.abs(opponent.knockbackVx) * bounceMult; bounced = true; }
+      if (opponent.y - opponent.r < arena.y) { opponent.y = arena.y + opponent.r; opponent.knockbackVy = Math.abs(opponent.knockbackVy) * bounceMult; bounced = true; }
+      if (opponent.y + opponent.r > arena.y + arena.height) { opponent.y = arena.y + arena.height - opponent.r; opponent.knockbackVy = -Math.abs(opponent.knockbackVy) * bounceMult; bounced = true; }
+    }
+    
+    const decay = opponent.knockbackDecay || 0.90;
+    opponent.knockbackVx *= decay;
+    opponent.knockbackVy *= decay;
+    
+    if (Math.abs(opponent.knockbackVx) <= 0.1) opponent.knockbackVx = 0;
+    if (Math.abs(opponent.knockbackVy) <= 0.1) opponent.knockbackVy = 0;
+  }
+
   opponent.isTargetOfAmbush = true;
 
   if (fighter.stealthAfterimages && fighter.stealthAfterimages.length > 0) {

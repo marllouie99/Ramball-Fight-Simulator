@@ -99,12 +99,17 @@ export class BerserkerFighter extends Fighter {
     this.rageFadeTimer = 45; // 45 frames of smooth fade out
   }
 
-  onDamageDealt(target, projectile, ownerIndex) {
+  onDamageDealt(target, projectile, ownerIndex, damageAmount) {
     // Lifesteal during rage
     if (this.isInRage) {
-      const healAmount = this.damage * CONFIG.berserker.lifestealPercent;
-      this.hp = Math.min(this.maxHp, this.hp + healAmount);
-      spawnFloatingText(this.x, this.y - this.r - 10, `+${Math.round(healAmount)}`, '#00ff00');
+      const amt = damageAmount || (CONFIG.berserker.axeDamage * CONFIG.berserker.rageDamageMultiplier);
+      const healAmount = amt * CONFIG.berserker.lifestealPercent;
+      
+      // Ensure healAmount is a valid number to prevent NaN propagation
+      if (!isNaN(healAmount) && healAmount > 0) {
+        this.hp = Math.min(this.maxHp, this.hp + healAmount);
+        spawnFloatingText(this.x, this.y - this.r - 10, `+${Math.round(healAmount)}`, '#00ff00');
+      }
     }
   }
 
@@ -157,7 +162,7 @@ export class BerserkerFighter extends Fighter {
     this._attackSoundConfig = sound;
 
     // Trigger onDamageDealt for lifesteal
-    this.onDamageDealt(opponent, null, ownerIndex);
+    this.onDamageDealt(opponent, null, ownerIndex, damage);
   }
 
   // Override resolveWallBounce to auto-lock toward enemy
