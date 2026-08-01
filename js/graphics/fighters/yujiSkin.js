@@ -5,13 +5,15 @@
 // ─────────────────────────────────────────────
 
 import { getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 /**
  * Main entry point — draws Yuji's body circle.
  */
 export function drawYujiSkin(ctx, fighter) {
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   // 1. Draw afterimages (Zone trails) at their absolute coordinates
-  if (fighter.afterImages && fighter.afterImages.length > 0) {
+  if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0) {
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];
       if (ai.timer <= 0) continue;
@@ -51,12 +53,13 @@ export function drawYujiSkin(ctx, fighter) {
   // Black Flash Zone Visual Indicator (crackling red/black sparks) - Optimized with batched stroke calls
   if (fighter.blackFlashTimer > 0) {
     const pulse = 0.6 + Math.sin(Date.now() * 0.015) * 0.4;
+    const sparkCount = isLowQuality ? 2 : 4;
     
     // Draw rotating black outline sparks
     ctx.strokeStyle = `rgba(0, 0, 0, ${pulse * 0.85})`;
     ctx.lineWidth = 3.2;
     ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < sparkCount; i++) {
       const a = (Math.PI / 2) * i + (Date.now() * 0.016);
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 14), Math.sin(a) * (r + 14));
@@ -67,27 +70,29 @@ export function drawYujiSkin(ctx, fighter) {
     ctx.strokeStyle = `rgba(179, 0, 0, ${pulse})`;
     ctx.lineWidth = 1.8;
     ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
+    for (let i = 0; i < sparkCount; i++) {
       const a = (Math.PI / 2) * i + (Date.now() * 0.016);
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 12), Math.sin(a) * (r + 12));
     }
     ctx.stroke();
 
-    // Draw rotating lilac-white inner highlights (#F3E8FF)
-    ctx.strokeStyle = `rgba(243, 232, 255, ${pulse * 0.9})`;
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    for (let i = 0; i < 4; i++) {
-      const a = (Math.PI / 2) * i + (Date.now() * 0.016);
-      ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
-      ctx.lineTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9));
+    if (!isLowQuality) {
+      // Draw rotating lilac-white inner highlights (#F3E8FF)
+      ctx.strokeStyle = `rgba(243, 232, 255, ${pulse * 0.9})`;
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      for (let i = 0; i < 4; i++) {
+        const a = (Math.PI / 2) * i + (Date.now() * 0.016);
+        ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
+        ctx.lineTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9));
+      }
+      ctx.stroke();
     }
-    ctx.stroke();
   }
 
   // ── Soul Swap Swirling Rotating Crimson Energy Rings - Optimized to eliminate nested save/restore ──
-  if (fighter.soulSwapActive) {
+  if (fighter.soulSwapActive && !isLowQuality) {
     const time = Date.now();
     const ringRotation = time * 0.005;
     const ringRadius = r * 1.35; // slightly larger than body
@@ -119,8 +124,9 @@ export function drawYujiSkin(ctx, fighter) {
   if (fighter.soulSwapTransitionTimer > 0) {
     const progress = 1.0 - (fighter.soulSwapTransitionTimer / 45); // 0 to 1
     
-    // Draw 3 expanding shockwaves
-    for (let i = 0; i < 3; i++) {
+    // Draw expanding shockwaves (fewer waves in performance/low quality mode)
+    const wavesCount = isLowQuality ? 1 : 3;
+    for (let i = 0; i < wavesCount; i++) {
       const p = (progress + i * 0.3) % 1.0;
       const radius = r + (p * 70); // expand up to r + 70px
       const alpha = 1.0 - p;
@@ -131,20 +137,22 @@ export function drawYujiSkin(ctx, fighter) {
       ctx.lineWidth = 4 + (1 - p) * 6;
       ctx.stroke();
       
-      // Draw crackling black electric sparks radiating outward along the wave radius
-      ctx.strokeStyle = `rgba(15, 15, 15, ${alpha * 0.9})`;
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      for (let j = 0; j < 8; j++) {
-        const angle = (Math.PI / 4) * j + p * 3.5;
-        const sx = Math.cos(angle) * (radius - 8);
-        const sy = Math.sin(angle) * (radius - 8);
-        const ex = Math.cos(angle) * (radius + 8);
-        const ey = Math.sin(angle) * (radius + 8);
-        ctx.moveTo(sx, sy);
-        ctx.lineTo(ex, ey);
+      // Draw crackling black electric sparks radiating outward along the wave radius (skipped in low quality)
+      if (!isLowQuality) {
+        ctx.strokeStyle = `rgba(15, 15, 15, ${alpha * 0.9})`;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        for (let j = 0; j < 8; j++) {
+          const angle = (Math.PI / 4) * j + p * 3.5;
+          const sx = Math.cos(angle) * (radius - 8);
+          const sy = Math.sin(angle) * (radius - 8);
+          const ex = Math.cos(angle) * (radius + 8);
+          const ey = Math.sin(angle) * (radius + 8);
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(ex, ey);
+        }
+        ctx.stroke();
       }
-      ctx.stroke();
     }
   }
 
@@ -497,7 +505,8 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
   const glow = Math.max(aura, (charge / chargeMax) * 0.85);
 
   // 1. CE glow around fist — standard blue or Black Flash zone crimson/black theme or red Sukuna theme
-  if (glow > 0.01 || fighter.blackFlashTimer > 0) {
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  if (!isLowQuality && (glow > 0.01 || fighter.blackFlashTimer > 0)) {
     const grad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 1.8);
     const activeGlow = fighter.blackFlashTimer > 0 ? 1.0 : glow;
     const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);

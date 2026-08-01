@@ -1060,7 +1060,8 @@ function drawWeaponPreview(ctx, type, color) {
 
 export { drawWeaponMenu, isFighterDemoAttacking, drawWeaponInfoCard, triggerWeaponDemoAttack, drawWeaponDetailScreen, drawYutaKatana, drawWeaponPreview };
 
-state.canvas.addEventListener('wheel', (e) => {
+const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
+eventTarget.addEventListener('wheel', (e) => {
   if (state.gameState === 'weaponDetail') {
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.3 : 0.3;

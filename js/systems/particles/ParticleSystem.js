@@ -4,6 +4,7 @@ import { ParticleRegistry } from './ParticleRegistry.js';
 // Object Pool to eliminate GC thrashing
 const SPARK_POOL_SIZE = 300;
 const sparkPool = [];
+const pixiSpritePool = []; // Pool for PixiJS Sprites
 
 for (let i = 0; i < SPARK_POOL_SIZE; i++) {
   sparkPool.push({});
@@ -17,7 +18,27 @@ export class ParticleSystem {
     return {};
   }
 
+  static getPixiSprite() {
+    if (pixiSpritePool.length > 0) {
+      const s = pixiSpritePool.pop();
+      s.visible = true;
+      return s;
+    }
+    if (!state.baseCircleTexture || !state.pixiLayers || !state.pixiLayers.particles) return null;
+    const s = new window.PIXI.Sprite(state.baseCircleTexture);
+    s.anchor.set(0.5);
+    // Additive blending for standard sparks so they glow intensely
+    s.blendMode = window.PIXI.BLEND_MODES.ADD;
+    state.pixiLayers.particles.addChild(s);
+    return s;
+  }
+
   static returnParticle(spark) {
+    if (spark.sprite) {
+      spark.sprite.visible = false;
+      pixiSpritePool.push(spark.sprite);
+      spark.sprite = null;
+    }
     // Reset properties to keep engine's hidden class optimized
     spark.x = 0;
     spark.y = 0;
@@ -39,6 +60,7 @@ export class ParticleSystem {
     spark.orbitAngle = 0;
     spark.orbitSpeed = 0;
     spark.isOrbit = false;
+    spark.isPixi = false; // Flag to skip 2D canvas drawing
     sparkPool.push(spark);
   }
 
@@ -100,17 +122,51 @@ export class ParticleSystem {
       }
       
       spark.size = config.size !== undefined ? config.size : 2;
-      spark.life = 1.0;
-      spark.decay = config.decay !== undefined ? config.decay : 0.05;
-      spark.friction = config.friction !== undefined ? config.friction : 0.92;
-      spark.type = type;
-      spark.color = config.color || 'white';
+      spark.life = config.life !== undefined ? config.life : 1.0;
+      spark.decay = config.decay !== undefined ? config.decay : 0.02;
+      spark.friction = config.friction !== undefined ? config.friction : 0.95;
+      spark.type = config.type || type;
+      spark.color = config.color || '#ff0000';
       spark.isFlash = config.isFlash || false;
       spark.isGlow = config.isGlow || false;
       spark.rotation = config.rotation || 0;
       spark.rotationSpeed = config.rotationSpeed || 0;
+      spark.isOrbit = config.isOrbit || false;
 
-      // Apply any overrides passed in (like forcing radius for impact flash)
+      // --- PIXIJS SYNC ---
+      // We only convert standard sparks to PixiJS Sprites.
+      // Complex procedural shapes (like scorch marks) remain on the 2D canvas.
+      const isStandardSpark = !spark.isFlash && !['thunderSpark', 'groundScorch', 'arcaneGroundScorch', 'telekinesisDebris'].includes(spark.type);
+      if (isStandardSpark) {
+        spark.isPixi = true;
+        spark.sprite = this.getPixiSprite();
+        if (spark.sprite) {
+          // Parse color e.g. "rgba(255, 0, 0, 1)" or "#ff0000"
+          let numColor = 0xffffff;
+          if (spark.color.startsWith('#')) {
+            numColor = parseInt(spark.color.replace('#', '0x'), 16);
+          } else if (spark.color.startsWith('rgba')) {
+            const parts = spark.color.match(/[\d.]+/g);
+            if (parts && parts.length >= 3) {
+              const r = parseInt(parts[0]);
+              const g = parseInt(parts[1]);
+              const b = parseInt(parts[2]);
+              numColor = (r << 16) + (g << 8) + b;
+            }
+          }
+          spark.sprite.tint = numColor;
+          spark.sprite.width = spark.size * 2;
+          spark.sprite.height = spark.size * 2;
+          spark.sprite.x = spark.x;
+          spark.sprite.y = spark.y;
+          spark.sprite.alpha = spark.life;
+        }
+      } else {
+        spark.isPixi = false;
+        spark.sprite = null;
+      }
+
+      // Apply overrides passed in (like forcing radius for impact flash)
       Object.assign(spark, overrideProps);
 
       if (insertIdx !== -1) {

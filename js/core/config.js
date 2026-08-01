@@ -261,10 +261,10 @@ export const CONFIG = {
     rageFromDamageScale: 2.5,
 
     rageDuration: 200,          // frames rage state lasts (5 seconds at 60 fps)
-    rageDamageMultiplier: 1.8, // damage multiplier during rage
+    rageDamageMultiplier: 1.5, // damage multiplier during rage
     rageAttackSpeedMultiplier: 1.1, // attack speed multiplier during rage (lower cooldown)
     rageMoveSpeedMultiplier: 2.0,  // movement speed multiplier during rage
-    lifestealPercent: 0.8,     // HP recovered as percentage of damage dealt during rage (0.3 = 30%)
+    lifestealPercent: 0.5,     // HP recovered as percentage of damage dealt during rage (0.3 = 30%)
 
     axeRange: 35,              // pixels from edge for axe swing attack
     axeCooldown: 25,          // frames between axe swings

@@ -97,7 +97,7 @@ export function updateRika(fighter, arena) {
     fighter.vy = 0;
     if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - 35, 'COME, RIKA!', '#FF1493');
     if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
-    if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(3, 8);
+    if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1, 6);
 
     if (CONFIG.yuta?.comeRikaSound) {
       audioSystem.playSFX(
@@ -123,6 +123,7 @@ export function updateRika(fighter, arena) {
       const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
       rk.spawnTimer = ariseMax; // Paused load/arise duration (180 frames = 3.0 seconds)
       rk.spawnScale = 0.05;
+      rk.isDomainSpawn = false;
 
       if (typeof state !== 'undefined') {
         if (!state.illusions) state.illusions = [];
@@ -157,9 +158,9 @@ export function updateRika(fighter, arena) {
       const easeOutBack = 1 + 2.70158 * Math.pow(effectiveProgress - 1, 3) + 1.70158 * Math.pow(effectiveProgress - 1, 2);
       rk.spawnScale = Math.max(0.05, Math.min(1.12, easeOutBack));
 
-      // Continuous screen rumble as she arises into physical reality
+      // Continuous screen rumble as she arises into physical reality (reduced intensity)
       if (typeof triggerGlobalScreenShake === 'function') {
-        const shakeIntensity = 2 + progress * 4;
+        const shakeIntensity = 0.5 + progress * 1.5;
         triggerGlobalScreenShake(shakeIntensity, 4);
       }
 
@@ -185,14 +186,18 @@ export function updateRika(fighter, arena) {
         }
       }
 
-      if (rk.spawnTimer % 3 === 0) {
+      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+
+      if (!isLowQuality && rk.spawnTimer % 3 === 0) {
         spawnSparks(rk.x + (Math.random() - 0.5) * 40 * rk.spawnScale, rk.y + (Math.random() - 0.5) * 40 * rk.spawnScale, 3, 'rikaCurse');
       }
 
       // Periodically blast roaring shockwaves & AOE roar damage as she arises
-      if (rk.spawnTimer % 12 === 0 && typeof spawnRikaRoarShockwave === 'function') {
+      if (rk.spawnTimer % 12 === 0 && !rk.isDomainSpawn) {
         const roarRadius = 100 + progress * 140;
-        spawnRikaRoarShockwave(rk.x, rk.y, roarRadius);
+        if (!isLowQuality && typeof spawnRikaRoarShockwave === 'function') {
+          spawnRikaRoarShockwave(rk.x, rk.y, roarRadius);
+        }
 
         if (typeof state !== 'undefined') {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
@@ -247,17 +252,25 @@ export function updateRika(fighter, arena) {
           rk.activeTrembleSound = null;
         }
         fadeOutSoundBySrc('groundTremble', 350);
-        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(14, 20);
-        if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.x, rk.y, 120, 'rgba(255, 20, 147, 0.8)');
-        if (typeof spawnRikaRoarShockwave === 'function') {
-          spawnRikaRoarShockwave(rk.x, rk.y, 180);
-          spawnRikaRoarShockwave(rk.x, rk.y, 250);
-          spawnRikaRoarShockwave(rk.x, rk.y, 320);
+        
+        if (!rk.isDomainSpawn) {
+          if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(5, 12);
+          if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.x, rk.y, 120, 'rgba(255, 20, 147, 0.8)');
+          if (typeof spawnRikaRoarShockwave === 'function') {
+            if (isLowQuality) {
+              spawnRikaRoarShockwave(rk.x, rk.y, 250);
+            } else {
+              spawnRikaRoarShockwave(rk.x, rk.y, 180);
+              spawnRikaRoarShockwave(rk.x, rk.y, 250);
+              spawnRikaRoarShockwave(rk.x, rk.y, 320);
+            }
+          }
         }
 
-        // Spawn a burst of 30 hot pink cursed sparks
+        // Spawn a burst of 30 hot pink cursed sparks (reduced in low quality)
         if (typeof spawnSparks === 'function') {
-          for (let i = 0; i < 30; i++) {
+          const sparkCount = isLowQuality ? 5 : 30;
+          for (let i = 0; i < sparkCount; i++) {
             spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
           }
         }
@@ -366,7 +379,8 @@ export function updateRika(fighter, arena) {
         if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.x, rk.y, 30, 'crimsonSniper');
         if (typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(rk.x, rk.y, 280);
         
-        for (let i = 0; i < 40; i++) {
+        const dispelSparks = isLowQuality ? 5 : 40;
+        for (let i = 0; i < dispelSparks; i++) {
           spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
           spawnSparks(rk.x, rk.y, 1, 'blood'); 
         }
@@ -430,12 +444,12 @@ export function updateRika(fighter, arena) {
         if (rk.hp <= 0) {
           // ENTER DYING STATE
           rk.isDying = true;
-          rk.deathTimer = 30; // 0.5 seconds of dying animation before explosion
+          rk.deathTimer = 10; // Extremely fast dying animation before explosion
         } else {
           // GRACEFUL SHRINK (Timer Expiration)
           rk.disappearing = true;
-          rk.disappearDuration = 30; // 30 frames
-          rk.disappearTimer = 30;
+          rk.disappearDuration = 20; // Faster shrink
+          rk.disappearTimer = 20;
           rk.startX = rk.x;
           rk.startY = rk.y;
         }
@@ -459,6 +473,7 @@ export function updateRika(fighter, arena) {
       const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
       rk.spawnTimer = ariseMax;
       rk.spawnScale = 0.05;
+      rk.isDomainSpawn = true; // Supress shockwaves for channeling/domain spawns
       
       // Play Rika Appearance sound (rikaAppearance.mp3) when Rika manifests!
       if (CONFIG.yuta?.rikaAppearanceSound) {
@@ -544,6 +559,7 @@ export function updateRika(fighter, arena) {
 
     // Melee attack when in range (but don't stop!)
     if (dist <= rk.r + rk.target.r + 5 && rk.attackTimer <= 0) {
+      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
       const aoeRadius = CONFIG.yuta?.rikaAoeRadius || 85;
       const contactX = (rk.x + rk.target.x) * 0.5;
       const contactY = (rk.y + rk.target.y) * 0.5;
@@ -618,7 +634,7 @@ export function updateRika(fighter, arena) {
 
       // 3. Heavy Impact Screen Shake, Flash & Sparks
       if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(8, 10);
-      if (typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(contactX, contactY, 110);
+      if (!isLowQuality && typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(contactX, contactY, 110);
       rk.attackTimer = CONFIG.yuta.rikaAttackRate || 40;
 
       // Play random demonic Rika attack noise (rikanoise1.mp3, rikanoise2.mp3, rikanoise3.mp3)

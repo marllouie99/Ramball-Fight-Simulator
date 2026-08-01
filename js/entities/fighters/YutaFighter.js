@@ -97,6 +97,8 @@ export class YutaFighter extends Fighter {
   }
 
   _spawnTeleportAfterimages(oldX, oldY, targetX, targetY, customAngle = null) {
+    if (this.flurryHitsLeft > 0) return; // Removed afterimages during flurry per user request
+    
     if (!this.afterImages) this.afterImages = [];
     const dx = targetX - oldX;
     const dy = targetY - oldY;
@@ -130,11 +132,38 @@ export class YutaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena, updateProjectiles = true) {
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush) {
+      this.interruptAttacks();
+      return;
+    }
+
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
       this.vy = 0;
       return; // Hold Yuta in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
+    }
+
+    // Freeze Yuta's movement for a moment while he calls for Rika (prevent during Domain Expansion)
+    if (this.domainActive || this.isChannelingDomain) {
+      this.rikaCallTimer = 0;
+    }
+
+    if (this.rikaCallTimer > 0 && !this.domainActive && !this.isChannelingDomain) {
+      this.rikaCallTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Spawn cursed energy gathering sparks at the blade tip & palm while summoning Rika
+      if (Math.random() < 0.6) {
+        const tipPos = this._getKatanaTipPositions();
+        spawnSparks(tipPos.outer.x, tipPos.outer.y, 2, 'silver', 'rgba(255, 20, 147, 1)');
+      }
+      if (this.rikaCallTimer % 5 === 0) {
+        spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
+      }
+      return; // Skip normal update & steering to freeze Yuta completely!
     }
 
     if (this.rctCooldown > 0) this.rctCooldown--;
@@ -178,37 +207,11 @@ export class YutaFighter extends Fighter {
 
     super.update(opponent, ownerIndex, arena, updateProjectiles);
 
-    // Freeze Yuta's movement for a moment while he calls for Rika (prevent during Domain Expansion)
-    if (this.domainActive || this.isChannelingDomain) {
-      this.rikaCallTimer = 0;
-    }
-
-    if (this.rikaCallTimer > 0 && !this.domainActive && !this.isChannelingDomain) {
-      this.rikaCallTimer--;
-      this.vx = 0;
-      this.vy = 0;
-
-      // Spawn cursed energy gathering sparks at the blade tip & palm while summoning Rika
-      if (Math.random() < 0.6) {
-        const tipPos = this._getKatanaTipPositions();
-        spawnSparks(tipPos.outer.x, tipPos.outer.y, 2, 'silver', 'rgba(255, 20, 147, 1)');
-      }
-      if (this.rikaCallTimer % 5 === 0) {
-        spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
-      }
-    }
-
     if (this.isChannelingDomain) {
       this.timeStopTimer = 0;
       this.electricStunTimer = 0;
       this.dubstepStunTimer = 0;
       this.hitStunTimer = 0;
-    }
-
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
-      return;
     }
 
     // Fade afterimages every frame (when not time-stopped)
@@ -249,6 +252,7 @@ export class YutaFighter extends Fighter {
          this.thinIceBreakerPunchTimer = 20;
          executeThinIceBreaker(this, this.gunAngle);
       }
+      updateRika(this, arena || CONFIG.arena);
       return; // Freeze Yuta while he winds up
     }
     // Capture sword tip positions continuously after swinging to let the trail follow the sword tip
@@ -405,6 +409,7 @@ export class YutaFighter extends Fighter {
 
       this.x += this.vx;
       this.y += this.vy;
+      updateRika(this, arena || CONFIG.arena);
       return;
     }
 
@@ -487,7 +492,6 @@ export class YutaFighter extends Fighter {
       }
 
       this.domainChargeTimer++;
-      triggerGlobalScreenShake(6, 120); // Strong continuous tremor matching Gojo & Sukuna
 
       // Spawn some charge particles
       if (this.domainChargeTimer % 3 === 0) {
@@ -580,7 +584,6 @@ export class YutaFighter extends Fighter {
         this.vy = 0;
         this._playedDeployAudio = false;
         
-        triggerGlobalScreenShake(6, 120); // Long screen shake matching Gojo/Sukuna
         if (CONFIG.yuta?.domainChannelSound) {
           audioSystem.playSFX(
             CONFIG.yuta.domainChannelSound,
@@ -954,27 +957,37 @@ export class YutaFighter extends Fighter {
     this.domainY = this.y;
     this.rikaCallTimer = 0; // Force clear any call freeze
 
-    // Refresh Rika so she is full HP when the domain opens (without re-triggering freeze if already active)
+    // Auto-summon Rika when domain activates
     if (this.rika) {
       const wasAlreadyActive = this.rika.active && !this.rika.isDying && !this.rika.disappearing;
+
       this.rika.killedInDomain = false;
       this.rika.isDying = false;
       this.rika.disappearing = false;
       this.rika.hp = this.rika.maxHp; // Restore HP to 100%
+      this.rika.active = true;
+      this.rika.cooldownTimer = 0;
+      this.rikaCallTimer = 0;
 
       if (!wasAlreadyActive) {
-        this.rika.active = false;
-        this.rika.cooldownTimer = 0;
+        // Keep the appear animation when she appears to domain just remove the shockwave
+        this.rika.x = this.x;
+        this.rika.y = this.y;
+        this.rika.spawnTimer = CONFIG.yuta?.rikaAriseDuration || 180;
+        this.rika.spawnScale = 0.05;
+        this.rika.playedComeRikaSound = false;
+        this.rika.playedAriseRoarSound = false;
+        this.rika.isDomainSpawn = true; // Flag for rikaLogic to suppress shockwaves
+        this.rikaAlpha = 0; // Will fade in over 20 frames just like normal
 
-        // Play Rika Appearance audio when Rika is summoned into domain!
-        if (CONFIG.yuta?.rikaAppearanceSound) {
-          audioSystem.playSFX(
-            CONFIG.yuta.rikaAppearanceSound,
-            CONFIG.yuta.rikaAppearanceVolume ?? 2.5,
-            1.0, 0,
-            CONFIG.yuta.rikaAppearanceDelay ?? 0
-          );
+        // Add her to illusions array if missing (so she renders correctly right away)
+        if (typeof state !== 'undefined') {
+          if (!state.illusions) state.illusions = [];
+          if (!state.illusions.includes(this.rika)) state.illusions.push(this.rika);
         }
+
+        // We'll let rikaLogic.js play the normal arise roar sounds so it perfectly matches a normal summon.
+        // We only manually play Yuta's "Come, Rika!" line.
         if (CONFIG.yuta?.comeRikaSound) {
           audioSystem.playSFX(
             CONFIG.yuta.comeRikaSound,
@@ -983,16 +996,17 @@ export class YutaFighter extends Fighter {
             CONFIG.yuta.comeRikaDelay ?? 0
           );
         }
+
       } else {
-        // If she was already active, keep her moving continuously without freezing Yuta or Rika!
-        this.rika.active = true;
+        // Skip animation if she's already active
         this.rika.spawnTimer = 0;
         this.rika.spawnScale = 1.0;
-        this.rikaCallTimer = 0;
+        this.rikaAlpha = 1.0;
+        this.rika.isDomainSpawn = false;
       }
     }
 
-    triggerGlobalScreenShake(14, 50); // Heavy impact shake matching Gojo/Sukuna
+    // triggerGlobalScreenShake(14, 50); // Heavy impact shake matching Gojo/Sukuna
     spawnFloatingText(this.x, this.y - 50, 'AUTHENTIC MUTUAL LOVE', '#ffb6c1');
 
     // Apply domain trap paralysis & tremor to trapped enemy fighters
@@ -2059,7 +2073,10 @@ export class YutaFighter extends Fighter {
       ctx.restore();
     }
   }
-  drawDomainBackground(ctx, isClashSecondary = false) { YutaRenderer.drawDomainBackground(ctx, this, isClashSecondary); }
+  drawDomainBackground(ctx, isClashSecondary = false) { 
+    if (typeof state !== 'undefined' && state.pixiApp) return;
+    YutaRenderer.drawDomainBackground(ctx, this, isClashSecondary); 
+  }
   draw(ctx, opponent) { YutaRenderer.draw(ctx, this, opponent); }
   _drawDomainChannelAura(ctx) { YutaRenderer._drawDomainChannelAura(ctx, this); }
   _drawRika(ctx, opponent, renderState = null) { YutaRenderer._drawRika(ctx, this, opponent, renderState); }

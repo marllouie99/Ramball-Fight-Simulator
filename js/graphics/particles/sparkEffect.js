@@ -485,6 +485,14 @@ export function updateSparkEffects(frozen = false) {
       }
     }
 
+    // --- PIXIJS SYNC ---
+    if (effect.isPixi && effect.sprite) {
+      effect.sprite.x = effect.x;
+      effect.sprite.y = effect.y;
+      effect.sprite.alpha = effect.life;
+      effect.sprite.rotation = effect.rotation;
+    }
+
     // Remove dead effects — return to pool instead of splice
     if (effect.life <= 0) {
       ParticleSystem.returnParticle(effect);
@@ -504,6 +512,9 @@ export function drawSparkEffects(layer = 'all') {
   const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
 
   for (const effect of state.sparkEffects) {
+    // PixiJS sparks are rendered in the WebGL scene graph, so we skip drawing them in 2D
+    if (effect.isPixi) continue;
+
     const isBackground = effect.type === 'groundScorch' || 
                          effect.type === 'arcaneGroundScorch';
     

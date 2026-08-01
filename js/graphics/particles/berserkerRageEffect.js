@@ -107,6 +107,7 @@ export function updateBerserkerRageEffects() {
  * Draws all berserker rage effects.
  */
 export function drawBerserkerRageEffects() {
+  if (typeof state !== 'undefined' && state.pixiApp) return;
   const { ctx } = state;
   
   for (const effect of state.berserkerRageEffects) {

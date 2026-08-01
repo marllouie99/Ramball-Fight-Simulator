@@ -828,7 +828,8 @@ let lastInspectedIndex = -1;
 
 export { drawIndexScreen, drawIndexDetailScreen, updatePreviewBalls };
 
-state.canvas.addEventListener('wheel', (e) => {
+const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
+eventTarget.addEventListener('wheel', (e) => {
   if (state.gameState === 'index') {
     e.preventDefault();
     const filteredDefs = FIGHTER_DEFS.filter(def => 

@@ -20,7 +20,7 @@ export const yujiConfig = {
   blackFlashKnockback: 20,      // Knockback on Black Flash hit
   blackFlashResetOnMiss: true,  // Charge resets if a punch whiffs
   blackFlashDuration: 300,      // Duration in frames Yuji maintains the Black Flash state (~5s)
-  blackFlashZoneMaxHits: 6,     // Maximum Black Flash punches allowed within the zone duration
+  blackFlashZoneMaxHits: 4,     // Maximum Black Flash punches allowed within the zone duration
   blackFlashZonePunchSpeed: 35, // Animation frames for a standard punch inside the Zone
   blackFlashZonePunchCooldown: 30, // Cooldown in frames between basic punches inside the Zone
 

@@ -90,7 +90,7 @@ export class YujiFighter extends Fighter {
       
       // Trigger a violent screen shake on first frame
       if (this.soulSwapTransitionTimer === 44) {
-        triggerGlobalScreenShake(7.5, 20);
+        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1.5, 20);
       }
       
       // Keep decaying other animations/timers

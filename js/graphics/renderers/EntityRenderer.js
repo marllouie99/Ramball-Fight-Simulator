@@ -69,16 +69,40 @@ export function drawFighters() {
     ctx.restore();
   };
 
-  // Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
+// Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
   // Exception: Fighters with an active domain expansion are forced to draw last (on top of everyone).
   if (!_sortedFightersBuffer || _sortedFightersBuffer.length !== fighters.length) {
     _sortedFightersBuffer = new Array(fighters.length);
     for (let i = 0; i < fighters.length; i++) _sortedFightersBuffer[i] = { f: null, i: 0 };
   }
   for (let i = 0; i < fighters.length; i++) {
-    _sortedFightersBuffer[i].f = fighters[i];
+    const f = fighters[i];
+    _sortedFightersBuffer[i].f = f;
     _sortedFightersBuffer[i].i = i;
+
+    // --- PIXIJS SYNC (Phase 2): Attach WebGL Containers to Fighters ---
+    if (f) {
+      if (!f.pixiContainer) {
+        f.pixiContainer = new window.PIXI.Container();
+        state.pixiLayers.fighters.addChild(f.pixiContainer);
+      }
+      f.pixiContainer.x = f.x;
+      f.pixiContainer.y = f.y;
+      f.pixiContainer.zIndex = f.y; // Sync Z-indexing if needed later
+      
+      // Clean up dead fighters
+      if (f.hp <= 0 && f.pixiContainer.parent) {
+         // Keep container alive slightly longer for death effects if needed, otherwise hide
+         f.pixiContainer.visible = false;
+      } else {
+         f.pixiContainer.visible = true;
+      }
+    }
   }
+  
+  // Sort the actual WebGL layer by Y for correct Z-indexing against other WebGL elements
+  state.pixiLayers.fighters.sortChildren();
+
   _sortedFightersBuffer.sort((a, b) => {
     if (!a.f) return -1;
     if (!b.f) return 1;
@@ -253,6 +277,16 @@ export function drawIllusions() {
   for (const illusion of illusions) {
     // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
     if (illusion.isRika) continue;
+
+    // --- PIXIJS SYNC (Phase 2): Attach WebGL Containers to Illusions ---
+    if (!illusion.pixiContainer) {
+      illusion.pixiContainer = new window.PIXI.Container();
+      state.pixiLayers.fighters.addChild(illusion.pixiContainer);
+    }
+    illusion.pixiContainer.x = illusion.x;
+    illusion.pixiContainer.y = illusion.y;
+    illusion.pixiContainer.zIndex = illusion.y;
+    illusion.pixiContainer.visible = illusion.hp > 0;
 
     ctx.save();
     ctx.globalAlpha = 0.85;

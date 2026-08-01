@@ -299,6 +299,10 @@ canvas {
   }
 }
 
+.toast.fade-out {
+  opacity: 0;
+}
+
 @media (max-width: 768px) {
   body {
     padding: 8px;
@@ -454,4 +458,105 @@ canvas {
   color: #ffffff;
   -webkit-text-stroke: 0.8px #000000;
   text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8), 0 0 8px rgba(0, 0, 0, 0.7);
+}
+
+/* ─────────────────────────────────────────────
+   Phase 4: HTML DOM UI Overlay
+───────────────────────────────────────────── */
+#ui-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none; /* Let clicks pass through except on active screens */
+  z-index: 20;
+}
+
+.ui-screen {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto; /* Catch clicks */
+  transition: opacity 0.3s ease;
+}
+
+.ui-screen.active {
+  display: flex;
+}
+
+.game-title {
+  font-family: 'Outfit', sans-serif;
+  font-size: 48px;
+  color: #fff;
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  margin-bottom: 40px;
+  text-shadow: 0 4px 15px rgba(0, 0, 0, 0.8), 0 0 20px rgba(255, 255, 255, 0.3);
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 280px;
+}
+
+.premium-btn {
+  background: rgba(25, 30, 40, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  color: #fff;
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  padding: 14px 24px;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-btn::before {
+  content: '';
+  position: absolute;
+  top: 0; left: -100%;
+  width: 50%; height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  transform: skewX(-20deg);
+  transition: all 0.5s ease;
+}
+
+.premium-btn:hover {
+  background: rgba(45, 55, 75, 0.8);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 255, 255, 0.1);
+}
+
+.premium-btn:hover::before {
+  left: 200%;
+}
+
+.premium-btn:active {
+  transform: translateY(1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.menu-footer {
+  position: absolute;
+  bottom: 30px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 14px;
+  color: rgba(220, 220, 230, 0.7);
+  letter-spacing: 1px;
 }

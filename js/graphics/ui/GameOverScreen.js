@@ -5,6 +5,7 @@ import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters, randomize1v2Fighters, goToTitle } from '../../core/gameFlow.js';
+import { MODE_SETTINGS } from '../../core/modeConfig.js';
 
 
 function drawRoundEndScreen() {
@@ -179,6 +180,10 @@ function drawFfaChampionReveal(winner, timer) {
   preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Yuta faces forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
+  if (preview.rika) {
+    preview.rika.active = false;
+    preview.rikaAlpha = 0;
+  }
   if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
@@ -416,6 +421,10 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Relaxed resting pose pointing downwards, but Yuta points forward to align his bag
     preview.shootCooldown = 0;
     preview._isWinnerReveal = true;
+    if (preview.rika) {
+      preview.rika.active = false;
+      preview.rikaAlpha = 0;
+    }
     if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
       preview.combatAuraOpacity = 1;
     }

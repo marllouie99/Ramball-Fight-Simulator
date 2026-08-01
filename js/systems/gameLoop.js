@@ -52,12 +52,16 @@ export function animate(timestamp) {
       state.qualityCheckTimer++;
       if (state.qualityCheckTimer >= state.qualityCheckInterval) {
         state.qualityCheckTimer = 0;
-        // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
-        if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
-          const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop faster when FPS is low
-          state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
-        } else if (state.fps >= state.targetFps - 2 && state.qualityLevel < 1.0) {
-          state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.1); // Recover quickly when FPS stabilizes
+        if (state.performanceMode) {
+          state.qualityLevel = 0.2;
+        } else {
+          // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
+          if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
+            const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop faster when FPS is low
+            state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
+          } else if (state.fps >= state.targetFps - 2 && state.qualityLevel < 1.0) {
+            state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.1); // Recover quickly when FPS stabilizes
+          }
         }
       }
 
@@ -162,6 +166,23 @@ export function animate(timestamp) {
     // The abstracted core updates and renders!
     updateGame();
     renderGame();
+
+    // Sync HTML UI Screens
+    if (state.lastGameState !== state.gameState) {
+      state.lastGameState = state.gameState;
+      const screens = document.querySelectorAll('.ui-screen');
+      if (screens && screens.length > 0) {
+        screens.forEach(s => s.classList.remove('active'));
+        const activeScreen = document.getElementById(state.gameState + '-screen');
+        if (activeScreen) activeScreen.classList.add('active');
+        
+        // Hide/show ui-layer container pointer events based on if an HTML screen is active
+        const uiLayer = document.getElementById('ui-layer');
+        if (uiLayer) {
+            uiLayer.style.pointerEvents = ['title'].includes(state.gameState) ? 'auto' : 'none';
+        }
+      }
+    }
 
   } catch (e) {
     console.error('Game loop error:', e);

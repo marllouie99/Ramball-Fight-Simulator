@@ -2803,6 +2803,7 @@ export class SukunaFighter extends Fighter {
 
   // PUBLIC: Draw domain liquid water floor BEFORE fighters so they aren't overlayed
   drawDomainBackground(ctx, isClashSecondary = false) {
+    if (typeof state !== 'undefined' && state.pixiApp) return;
     renderSukunaDomainBackground(this, ctx, isClashSecondary);
   }
 

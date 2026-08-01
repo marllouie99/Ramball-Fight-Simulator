@@ -12,6 +12,58 @@ export function registerProjectileSystem(ps) { _projectileSystem = ps; }
 const canvas = document.getElementById('arena');
 const ctx    = canvas.getContext('2d');
 
+// --- PIXI.JS SETUP ---
+// We initialize a Pixi Application that will replace the 2D canvas in the DOM.
+// The old 2D canvas is kept for offscreen rendering of complex fighters, 
+// then uploaded to Pixi as a texture.
+const pixiApp = new window.PIXI.Application({
+  width: 540,
+  height: 960,
+  backgroundColor: 0x000000,
+  resolution: window.devicePixelRatio || 1,
+  autoDensity: true,
+  antialias: true
+});
+
+// Create scene graph layers to preserve Z-indexing
+const pixiLayers = {
+  background: new window.PIXI.Container(),
+  arena: new window.PIXI.Container(),
+  shadows: new window.PIXI.Container(),
+  environment: new window.PIXI.Container(), // WebGL full-screen dim effects
+  fighters: new window.PIXI.Container(), // Where offscreen 2D canvas sprite goes
+  projectiles: new window.PIXI.Container(), // WebGL hybrid projectiles
+  particles: new window.PIXI.Container(),
+  effects: new window.PIXI.Container(),
+  ui: new window.PIXI.Container()
+};
+
+// Add layers to stage in correct order
+Object.values(pixiLayers).forEach(layer => pixiApp.stage.addChild(layer));
+
+// Create a Sprite for the entire 2D canvas to sit in the fighters layer
+const legacyCanvasTexture = window.PIXI.Texture.from(canvas);
+const legacyCanvasSprite = new window.PIXI.Sprite(legacyCanvasTexture);
+pixiLayers.fighters.addChild(legacyCanvasSprite);
+
+// Replace the DOM canvas with Pixi's WebGL canvas
+canvas.parentNode.insertBefore(pixiApp.view, canvas);
+canvas.style.display = 'none'; // Hide the old 2D canvas (used for offscreen rendering only)
+
+// --- GENERATE GLOBAL PIXI TEXTURES FOR PARTICLES ---
+const gCircle = new window.PIXI.Graphics();
+gCircle.beginFill(0xFFFFFF);
+gCircle.drawCircle(16, 16, 16);
+gCircle.endFill();
+const baseCircleTexture = pixiApp.renderer.generateTexture(gCircle);
+
+const gSquare = new window.PIXI.Graphics();
+gSquare.lineStyle(2, 0x000000, 0.7); // Dark stroke
+gSquare.beginFill(0xFFFFFF);
+gSquare.drawRect(0, 0, 16, 16);
+gSquare.endFill();
+const bloodSquareTexture = pixiApp.renderer.generateTexture(gSquare);
+
 // ─────────────────────────────────────────────
 // GAME STATE — single mutable object
 // All modules import this object and mutate its properties directly.
@@ -19,6 +71,11 @@ const ctx    = canvas.getContext('2d');
 export const state = {
   canvas,
   ctx,
+  pixiApp,
+  pixiLayers,
+  legacyCanvasSprite,
+  baseCircleTexture,
+  bloodSquareTexture,
   arena: CONFIG.arena,
 
   // Global screen shake
@@ -128,6 +185,7 @@ export const state = {
   fpsLogs: [],
   allFpsLogs: [],
   hideFpsLogs: true,
+  performanceMode: false,
 
   // Dynamic quality system for performance
   qualityLevel: 1.0, // 1.0 = full quality, 0.5 = half quality, etc.
@@ -200,6 +258,7 @@ export function clearProjectiles() {
 // ─────────────────────────────────────────────
 
 export function triggerGlobalScreenShake(intensity, duration) {
+  if (state.performanceMode) return;
   if (state.screenShake.timer < duration) {
     state.screenShake.timer = duration;
     state.screenShake.maxTimer = duration;

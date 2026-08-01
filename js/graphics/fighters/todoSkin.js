@@ -1,5 +1,6 @@
 import { getHandSize } from '../../core/config.js';
 import { GojoRenderer } from './gojoRenderer.js';
+import { state } from '../../core/state.js';
 
 /**
  * Visual Skin Renderer for Aoi Todo (Boogie Woogie Brawler)
@@ -318,8 +319,9 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   // 1. CE glow around fist — standard blue or Black Flash zone crimson/black theme
   const opacity = (fighter && fighter._isWinnerReveal) ? 1.0 : ((fighter && fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 0.0);
   const glow = Math.max(opacity, inBFState ? alpha : 0);
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
 
-  if (glow > 0.01) {
+  if (!isLowQuality && glow > 0.01) {
     const fistCeGrad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 1.75);
     
     if (inBFState) {
@@ -446,17 +448,20 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
   ctx.save();
 
   // 1. Outer Radial Glow Bloom (Deep Cyan & Electric Blue)
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const outerRadius = r * 1.85;
-  const glowGrad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, outerRadius);
+  if (!isLowQuality) {
+    const glowGrad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, outerRadius);
   glowGrad.addColorStop(0, 'rgba(0, 240, 255, 0.50)');
   glowGrad.addColorStop(0.35, 'rgba(0, 175, 255, 0.35)');
   glowGrad.addColorStop(0.70, 'rgba(0, 100, 255, 0.18)');
   glowGrad.addColorStop(1.0, 'rgba(0, 40, 180, 0)');
 
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
-  ctx.fill();
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // 2. Animated JJK Flame Tendrils (Rising & Waving Cyan CE Flames around Todo's body)
   const flameCount = 7;

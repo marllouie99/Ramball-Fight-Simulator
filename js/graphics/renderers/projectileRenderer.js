@@ -413,6 +413,7 @@ export function drawProjectiles() {
 
     // Sukuna slash visual
     if (p.visual === 'sukunaSlash') {
+      if (typeof state !== 'undefined' && state.pixiApp) return;
       if (isGojoDomainActive) return;
       drawSukunaSlash(ctx, p);
       return;
@@ -420,6 +421,7 @@ export function drawProjectiles() {
 
     // Ghost Blade visual
     if (p.visual === 'ghostBlade') {
+      if (typeof state !== 'undefined' && state.pixiApp) return;
       if (isGojoDomainActive) return;
       drawGhostBlade(ctx, p);
       return;
@@ -427,6 +429,7 @@ export function drawProjectiles() {
 
     // Sukuna Cleave visual
     if (p.visual === 'sukunaCleave') {
+      if (typeof state !== 'undefined' && state.pixiApp) return;
       if (isGojoDomainActive) return;
       drawSukunaCleave(ctx, p);
       return;
@@ -434,7 +437,7 @@ export function drawProjectiles() {
 
     // Sukuna Furnace Arrow
     if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
-      drawSukunaFurnaceArrow(ctx, p);
+      // Defer to hybridProjectileRenderer.js
       return;
     }
 
@@ -569,30 +572,7 @@ export function drawProjectiles() {
     }
 
     if (p.visual === 'gojoBlue' || p.isGojoPurple) {
-      ctx.save();
-      
-      const colorType = p.isGojoPurple ? 'purple' : 'blue';
-      const visualTime = p.visualTime || Date.now();
-      
-      // Calculate fade-out for purple orb when life is running out
-      if (p.isGojoPurple) {
-        const lifeRatio = p.life / p.maxLife;
-        // Start fading when life is below 30%, smooth fade from 30% to 0%
-        if (lifeRatio < 0.3) {
-          const fadeAlpha = lifeRatio / 0.3; // 0 to 1 as life goes from 0% to 30%
-          ctx.globalAlpha = fadeAlpha;
-        }
-      }
-      
-      // Draw custom trail for Purple orb - Hollow Purple effect
-      if (p.isGojoPurple && p.history && p.history.length > 1) {
-        drawPurpleOrbTrail(ctx, p, visualTime);
-      }
-      
-      // Draw the highly detailed orb
-      drawGojoOrb(ctx, p.x, p.y, p.r, visualTime, colorType, 0);
-      
-      ctx.restore();
+      // Defer to hybridProjectileRenderer.js
       return;
     }
 
@@ -886,6 +866,27 @@ export function drawBlackHoleVisual({
     ctx.fill();
   }
 
+  ctx.restore();
+}
+
+export function drawGojoPurpleOrb(ctx, p) {
+  ctx.save();
+  const colorType = p.isGojoPurple ? 'purple' : 'blue';
+  const visualTime = p.visualTime || Date.now();
+  
+  if (p.isGojoPurple) {
+    const lifeRatio = p.life / p.maxLife;
+    if (lifeRatio < 0.3) {
+      const fadeAlpha = lifeRatio / 0.3;
+      ctx.globalAlpha = fadeAlpha;
+    }
+  }
+  
+  if (p.isGojoPurple && p.history && p.history.length > 1) {
+    drawPurpleOrbTrail(ctx, p, visualTime);
+  }
+  
+  drawGojoOrb(ctx, p.x, p.y, p.r, visualTime, colorType, 0);
   ctx.restore();
 }
 

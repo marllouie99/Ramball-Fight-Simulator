@@ -90,7 +90,7 @@ export function reinitFighters() {
   state.roundEndTimer = 0;
 
   // Reset qualityLevel and screenShake on round init
-  state.qualityLevel = 1.0;
+  state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
   state.qualityCheckTimer = 0;
   state.screenShake = { timer: 0, maxTimer: 0, intensity: 0 };
 

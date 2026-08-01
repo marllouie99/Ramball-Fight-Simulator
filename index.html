@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@800;900&family=Rajdhani:wght@700;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css?v=8" />
+  <link rel="stylesheet" href="css/style.css?v=9" />
   <style>
     /* Optimize HTML & Body for Centered Canvas Preview */
     html, body {
@@ -65,6 +65,23 @@
       </div>
       
       <div id="healthHud" class="health-hud" aria-live="polite" style="display: none;"></div>
+      
+      <!-- Phase 4: HTML UI Layer -->
+      <div id="ui-layer">
+        <!-- TITLE SCREEN -->
+        <div id="title-screen" class="ui-screen active">
+          <h1 class="game-title">CIRCLE BATTLE</h1>
+          <div class="menu-buttons">
+            <button id="btn-battle" class="premium-btn">⚔ BATTLE</button>
+            <button id="btn-index" class="premium-btn">📖 FIGHTER INDEX</button>
+            <button id="btn-weapons" class="premium-btn">⚔ WEAPONS</button>
+            <button id="btn-performance" class="premium-btn">⚙ PERFORMANCE: OFF</button>
+            <button id="btn-testmode" class="premium-btn">🧪 TEST MODE: OFF</button>
+            <button id="btn-leaderboard" class="premium-btn">🏆 LEADERBOARD</button>
+          </div>
+          <div class="menu-footer">Press SPACE/ENTER, Click BATTLE</div>
+        </div>
+      </div>
     </div>
     <div id="healthHudRight" class="health-hud-side" aria-live="polite" style="display: none;"></div>
   </div>
@@ -79,6 +96,9 @@
     });
   </script>
 
+  <!-- PixiJS WebGL Engine -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+  
   <script type="module" src="js/core/main.js?v=3"></script>
 </body>
 

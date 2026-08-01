@@ -24,33 +24,13 @@ function drawTitleScreen() {
 
   // Animated background particles
   updatePreviewBalls();
-
-  // Primary buttons
-  drawButton('⚔ BATTLE', canvas.width / 2, 180 - 22, () => { state.gameState = 'select'; }, 200, 52);
-
-  drawButton('📖 FIGHTER INDEX', canvas.width / 2, 250, () => { state.gameState = 'index'; }, 240, 48);
-
-  drawButton('⚔ WEAPONS', canvas.width / 2, 310, () => { state.gameState = 'weapons'; }, 240, 48);
-
-  drawButton('🧪 TEST MODE: ' + (state.testMode ? 'ON' : 'OFF'), canvas.width / 2, 370, () => { state.testMode = !state.testMode; }, 240, 48);
-
-  drawButton('🏆 LEADERBOARD', canvas.width / 2, 435, () => {
-    clearHealthHud();
-    state.gameState = 'leaderboard';
-  }, 240, 48);
-
-  // Footer text
-  ctx.fillStyle = 'rgba(220, 220, 230, 0.7)';
-  ctx.font = '14px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.fillText('Press SPACE/ENTER, Click BATTLE, or use FIGHTER INDEX to inspect fighters', canvas.width / 2, 350);
+  
+  // Note: HTML DOM Overlay now handles buttons and text.
 }
 
 // ─────────────────────────────────────────────
 // LEADERBOARD SCREEN
 // ─────────────────────────────────────────────
-
 let leaderboardSortBy = 'wins'; // 'wins' | 'losses' | 'winRate'
 let isLeaderboardEditMode = false;
 

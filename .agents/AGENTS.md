@@ -42,6 +42,12 @@
 - **Mahoraga** is blocked and frozen initially, but after 2 Infinity freeze exposures, Mahoraga's Eight-Handled Sword Wheel clicks to adapt (`gojoInfinityImmune = true` & `adapted.melee = true`), granting total immunity to Infinity freeze thereafter.
 - Whenever an entity (fighter or illusion) has `timeStopTimer > 0` or `isFrozenByInfinity = true`, `draw.js` MUST render a deep electric cyan blue fill overlay (`rgba(0, 229, 255, 0.65)`) over the entity's body (matching frozen projectile visuals).
 
-
-
-
+## 10. WebGL / PixiJS Rendering & Performance Guidelines (Hybrid Rendering)
+- High-frequency or persistent heavy visual effects (such as Sukuna's Fuga fire arrow trail, Gojo's Hollow Purple/Lapse Blue moving orbs, and full-screen dim overlays) MUST be migrated to WebGL/PixiJS to maintain 60 FPS performance (especially during screen recording).
+- To preserve complex Canvas 2D designs exactly as originally drawn (preventing visual regressions), implement the **Hybrid Container Pattern**:
+  - Draw the effect onto an off-screen canvas.
+  - Bind that canvas as a WebGL texture to a `PIXI.Sprite` in the `state.pixiLayers.projectiles` or `state.pixiLayers.environment` container.
+  - **For relative/floating effects** (like Toji's ultimate or projectiles): Scale or position the sprite in WebGL coordinates (adjusting for camera offsets) rather than resizing the off-screen canvas.
+  - **For absolute/full-screen coordinate effects** (like Domain Expansions that rely on exact `state.canvas` coordinates like `fighter.x` / `fighter.y`): You MUST use a strict 1:1 pixel mapping. The off-screen canvas MUST dynamically sync its width/height to exactly match `state.canvas.width/height`. Do NOT scale the PixiJS Sprite, as scaling will desync the visual positions from the game's coordinate system. When resizing the offscreen canvas, call `texture.update()` to refresh the GPU mapping.
+- Set correct WebGL blend modes dynamically: `window.PIXI.BLEND_MODES.ADD` for glowing elements (like Fuga flames) and `window.PIXI.BLEND_MODES.NORMAL` for elements with dark outlines or cores (like Gojo's Blue and Purple orbs).
+- Short-burst, transient visual effects (such as the 30-frame Black Flash impact, sparks, and blood splatters) SHOULD remain on the Canvas 2D layer. Re-rendering transient bursts in 2D maintains exact artistic pixel fidelity without requiring complex WebGL pooling or incurring GPU texture-upload bottlenecks.

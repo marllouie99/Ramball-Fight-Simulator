@@ -1426,6 +1426,7 @@ export class GojoFighter extends Fighter {
 
   // PUBLIC: Draw Unlimited Void cosmic background BEFORE fighters so they aren't overlayed
   drawDomainBackground(ctx, isClashSecondary = false) {
+    if (typeof state !== 'undefined' && state.pixiApp) return;
     renderGojoDomainBackground(this, ctx, isClashSecondary);
   }
 
@@ -1447,7 +1448,6 @@ export class GojoFighter extends Fighter {
     if (opponent && arena) {
       this._teleportAwayFrom(opponent, arena);
     }
-
     // Start 2.5 second RCT Channeling state
     this.isChannelingRCT = true;
     this.rctChannelTimer = 150; // 2.5 seconds at 60fps

@@ -589,6 +589,7 @@ export function drawProjectiles() {
 // ──────────────────────────────────────────
 
 export function drawAllCronosSpheres(ctx) {
+  if (typeof state !== 'undefined' && state.pixiApp) return;
   const now = getNow();
   const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
   for (const fighter of allEntities) {

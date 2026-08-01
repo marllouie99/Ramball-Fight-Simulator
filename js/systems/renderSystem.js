@@ -20,8 +20,14 @@ import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaD
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
+import { updateHybridProjectiles, updateHybridRika } from '../graphics/renderers/hybridProjectileRenderer.js';
+import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 
 export function renderGame() {
+    // Clear the offscreen 2D canvas at the start of every frame so it's fully transparent
+    // PixiJS will render this transparent canvas over its own background/particle layers
+    state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
+
     // Apply global screen shake (dampened smoothly back to zero as timer expires)
     let shakeX = 0, shakeY = 0;
     if (state.screenShake && state.screenShake.timer > 0) {
@@ -78,20 +84,19 @@ export function renderGame() {
     } else if (state.gameState === 'weaponDetail') {
       drawWeaponDetailScreen();
     } else {
-      // Apply screen shake for game rendering
-      const previousTransform = state.ctx.getTransform();
-      try {
-        state.ctx.translate(shakeX, shakeY);
-
-        drawArena();
+      if (state.pixiApp) {
+        state.pixiApp.stage.position.set(shakeX, shakeY);
+      }
+      
+      drawArena();
 
         // ── GLOBAL ARENA CLIP ──
         // (Removed as per user request to allow visuals and dim screen effects to bleed outside the arena)
-      drawPurpleDimScreen(); // Draw purple dim screen overlay when Gojo's Hollow Purple is active
       drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
-      drawFurnaceDimScreen(); // Draw dark fiery dim screen overlay with flame lightning when Sukuna channels Furnace (Fuga)
+      
+      // Hook up hybrid environment renderer for WebGL full-screen dim effects
+      updateHybridEnvironment();
       drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
-      drawTojiUltimateOverlay(); // Draw pitch black overlay with Fly Heads when Toji uses Ultimate
       drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
       
       const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
@@ -154,6 +159,9 @@ export function renderGame() {
       drawIllusions(); // Draw Doppleganger illusions
       drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
       drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
+      updateHybridProjectiles();
+      updateHybridRika();
+      updateHybridCronospheres();
 
       const isDomainClash = state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
 
@@ -169,6 +177,7 @@ export function renderGame() {
         drawIllusionDeathEffects(); // Draw illusion death effects
         drawIllusionSpawnEffects(); // Draw illusion spawn effects
         drawBerserkerRageEffects(); // Draw berserker rage effects
+        updateHybridBerserkerRage();
       }
 
       if (!useAggressiveParticleMode && (!isDomainClash || Math.random() > 0.5) && !isGojoDomainActive) {
@@ -182,7 +191,7 @@ export function renderGame() {
         drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
       }
 
-      drawMahoragaAdaptationDimScreen(); // Draw dark golden cinematic dim screen overlay when Mahoraga adapts wheel
+      // drawMahoragaAdaptationDimScreen() handled by hybrid environment renderer
 
       // Composite flame canvas onto main canvas (clipped to arena bounds)
       compositeFlameCanvas();
@@ -235,11 +244,6 @@ export function renderGame() {
         drawHUD();
       }
 
-      } finally {
-        // Restore canvas transform exactly (end screen shake)
-        state.ctx.setTransform(previousTransform);
-      }
-
       if (state.gameState === 'countdown') {
         drawCountdown();
       } else if (state.gameState === 'paused') {
@@ -253,5 +257,11 @@ export function renderGame() {
         drawBloodEffects(); // Draw blood effects during match end
         drawSparkEffects(); // Draw spark effects during match end
       }
+    }
+    
+    // PIXIJS SYNC: Tell the GPU that the offscreen 2D canvas has updated this frame.
+    // This allows the 2D canvas (fighters, UI) to be rendered inside the WebGL scene graph.
+    if (state.legacyCanvasSprite && state.legacyCanvasSprite.texture) {
+      state.legacyCanvasSprite.texture.update();
     }
 }

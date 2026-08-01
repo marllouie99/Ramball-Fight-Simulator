@@ -5,33 +5,45 @@ import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 
 export function drawArena() {
-  const { ctx, canvas, arena } = state;
+  const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
+  // We draw the solid backgrounds using PixiJS so they sit behind the 2D canvas sprite
+  if (!state.arenaGraphics) {
+    state.arenaGraphics = new window.PIXI.Graphics();
+    pixiLayers.arena.addChild(state.arenaGraphics);
+  }
+  
+  const g = state.arenaGraphics;
+  g.clear();
+
   // Fill the entire canvas with black so it blends with the window background
-  ctx.fillStyle = '#000000';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  g.beginFill(0x000000);
+  g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
+  g.endFill();
 
   // Draw the white gameplay area that tightly hugs the arena and the HUD
   const whiteTop = arena.y - 20;
   const whiteBottom = 820;
-  ctx.fillStyle = '#f5f5f5';
-  ctx.fillRect(0, whiteTop, canvas.width, whiteBottom - whiteTop);
+  g.beginFill(0xf5f5f5);
+  g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+  g.endFill();
 
   if (!hasActiveDomain) {
     // Arena floor background
-    ctx.fillStyle = '#ffffff';
-    ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+    g.beginFill(0xffffff);
+    g.drawRect(arena.x, arena.y, arena.width, arena.height);
+    g.endFill();
   }
 
-  // Draw the arena boundary stroke (thinner, sleek wall border)
-  ctx.strokeStyle = '#000000ff';
-  ctx.lineWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
+  // Draw the arena boundary stroke
+  const wallWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
     ? state.config.arena.wallWidth 
     : 4;
-  ctx.strokeRect(arena.x, arena.y, arena.width, arena.height);
+  g.lineStyle(wallWidth, 0x000000, 1);
+  g.drawRect(arena.x, arena.y, arena.width, arena.height);
 
-  // Draw "CRONOSPHERE" transparent watermark in the middle of the arena
+  // Draw "CRONOSPHERE" transparent watermark on the 2D Canvas (since text is easier in Canvas2D)
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
 

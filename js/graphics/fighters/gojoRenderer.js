@@ -919,37 +919,7 @@ export class GojoRenderer {
     const r = overrideRadius !== null ? overrideRadius : fighter.r;
 
     // === Luminous Body Backlight (Soft Electric Blue Bloom - Matching Yuta) ===
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    const glowRadius = r + 90 + Math.sin(time * 0.005) * 8;
-    const backGlow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, glowRadius);
-    if (colorTheme === 'rct') {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
-      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.3 * progress})`);
-      backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
-    } else if (colorTheme === 'red') {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
-      backGlow.addColorStop(0.4, `rgba(255, 50, 0, ${0.4 * progress})`);
-      backGlow.addColorStop(1, 'rgba(255, 0, 0, 0)');
-    } else if (colorTheme === 'purple') {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
-      backGlow.addColorStop(0.4, `rgba(180, 50, 255, ${0.4 * progress})`);
-      backGlow.addColorStop(1, 'rgba(120, 0, 255, 0)');
-    } else if (colorTheme === 'pink') {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
-      backGlow.addColorStop(0.4, `rgba(255, 50, 150, ${0.4 * progress})`);
-      backGlow.addColorStop(1, 'rgba(255, 0, 100, 0)');
-    } else {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Soft white core
-      backGlow.addColorStop(0.35, `rgba(0, 212, 255, ${0.40 * progress})`); // Electric cyan bloom
-      backGlow.addColorStop(0.7, `rgba(0, 140, 255, ${0.18 * progress})`);  // Soft outer feathering
-      backGlow.addColorStop(1, 'rgba(0, 100, 255, 0)');
-    }
-    ctx.beginPath();
-    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-    ctx.fillStyle = backGlow;
-    ctx.fill();
-    ctx.restore();
+    // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     let mainColor = '#00D4CC';
     let fillColor = `rgba(0, 212, 204, ${0.70 * progress})`;

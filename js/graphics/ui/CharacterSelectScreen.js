@@ -681,10 +681,11 @@ function drawFfaSelectionPanel(x, y, title, selectedIndexProp) {
 
 export { drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, drawFfaSelectionPanel, selectingSlot, modalInspectIndex, modalPage };
 
-state.canvas.addEventListener('wheel', (e) => {
+const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
+eventTarget.addEventListener('wheel', (e) => {
   if (selectingSlot === null) return;
 
-  const rect = state.canvas.getBoundingClientRect();
+  const rect = eventTarget.getBoundingClientRect();
   const scaleX = state.canvas.width / rect.width;
   const scaleY = state.canvas.height / rect.height;
   const mouseX = (e.clientX - rect.left) * scaleX;

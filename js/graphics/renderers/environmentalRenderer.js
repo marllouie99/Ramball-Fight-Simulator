@@ -114,57 +114,5 @@ let currentRikaSummonDimOpacity = 0;
  * Draws a dark purple/pink cursed energy dim screen overlay when Yuta calls or summons Rika.
  */
 export function drawRikaSummonDimScreen() {
-  const { ctx, canvas, arena } = state;
-  if (!ctx || !canvas || !arena) return;
-
-  // Find Yuta fighters calling for Rika or when Rika is expanding on summon
-  const yutaSummoning = state.fighters?.find(f =>
-    f && (f._def?.type === 'yuta' || f._def?.id === 'yuta' || f._def?.id === 23 || f._def?.name === 'Yuta') &&
-    (f.rikaCallTimer > 0 || (f.rika && f.rika.active && f.rika.spawnTimer > 0))
-  );
-
-  let targetOpacity = 0;
-  let cx = canvas.width / 2;
-  let cy = canvas.height / 2;
-
-  if (yutaSummoning) {
-    cx = yutaSummoning.x;
-    cy = yutaSummoning.y;
-    if (yutaSummoning.rikaCallTimer > 0) {
-      // Fade in smoothly as Yuta channels
-      const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 40;
-      const progress = 1.0 - (yutaSummoning.rikaCallTimer / maxCharge);
-      targetOpacity = 0.25 + progress * 0.50; // Up to 0.75 opacity
-    } else if (yutaSummoning.rika && yutaSummoning.rika.spawnTimer > 0) {
-      // Hold high dim while Rika expands/arises
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
-      const progress = yutaSummoning.rika.spawnTimer / ariseMax;
-      targetOpacity = 0.75 * progress;
-    }
-  }
-
-  // Smooth interpolation for zero popping
-  currentRikaSummonDimOpacity += (targetOpacity - currentRikaSummonDimOpacity) * 0.15;
-  if (currentRikaSummonDimOpacity < 0.01) {
-    currentRikaSummonDimOpacity = 0;
-    return;
-  }
-
-  ctx.save();
-
-  // Dark flat overlay wash (optimized to bypass expensive radial gradient creation on large screens)
-  const opacity = currentRikaSummonDimOpacity;
-  ctx.fillStyle = `rgba(10, 0, 18, ${opacity * 0.82})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Pulsing Cursed Energy Ring around Yuta/Rika
-  ctx.globalCompositeOperation = 'screen';
-  ctx.beginPath();
-  const ringR = 85 + Math.sin(Date.now() * 0.01) * 15;
-  ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 20, 147, ${opacity * 0.45})`;
-  ctx.lineWidth = 14;
-  ctx.stroke();
-
-  ctx.restore();
+  // Handled by WebGL
 }

@@ -31,9 +31,9 @@ export const yutaConfig = {
   // Special Mechanic: Phantom Flurry (Parry Counterattack)
   flurryParryMin: 2,                       // Minimum successful parries required to activate Flurry
   flurryParryMax: 2,                       // Maximum random target threshold for Flurry activation
-  flurryHits: 5,                           // Number of rapid teleport slashes in Flurry execution
+  flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
   flurryDamage: 15,                         // Damage per slash during Flurry
-  flurryHitInterval: 10,                    // Frames delay between each Flurry slash
+  flurryHitInterval: 7,                    // Frames delay between each Flurry slash
 
   // Copied Techniques (Ranged Skill Cycle)
   cursedSpeechRadius: 150,                 // Impact shockwave radius in pixels for "DON'T MOVE!"
@@ -46,8 +46,8 @@ export const yutaConfig = {
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
   rikaCooldown: 600,                       // Cooldown between Rika actions/manifestations (frames)
   rikaSummonHpThreshold: 0.50,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
-  rikaSummonChargeDuration: 80,            // Channeling/pause duration when Yuta calls Rika (frames)
-  rikaAriseDuration: 120,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
+  rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
+  rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
   rikaDuration: 1000,                      // Frames Rika stays active when summoned (60 frames = 1 second)
   rikaSpeedMultiplier: 1.8,                // Movement speed multiplier relative to Yuta's base speed
   rikaDamage: 25,                          // Physical damage dealt per attack tick by Rika
@@ -137,7 +137,7 @@ export const yutaConfig = {
   domainChannelVolume: 3.5,
   domainChannelDelay: 0,
 
-  domainDeploySound: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
+  domainDeploySound: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
   domainDeployVolume: 3.5,
   domainDeployDelay: 0,
 

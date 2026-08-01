@@ -180,14 +180,16 @@ export class YutaRenderer {
         rk.angle = targetAngle;
       }
 
-      const renderState = { drawX, drawY, targetAngle, spawnScale };
+      if (!state.pixiApp || fighter.isDemoFighter) {
+        const renderState = { drawX, drawY, targetAngle, spawnScale };
 
-      ctx.save();
-      ctx.translate(tremorX, tremorY);
-      ctx.globalAlpha = fighter.rikaAlpha;
-      fighter._drawRikaCursedEnergyAura(ctx, opponent, renderState);
-      fighter._drawRika(ctx, opponent, renderState);
-      ctx.restore();
+        ctx.save();
+        ctx.translate(tremorX, tremorY);
+        ctx.globalAlpha = fighter.rikaAlpha;
+        fighter._drawRikaCursedEnergyAura(ctx, opponent, renderState);
+        fighter._drawRika(ctx, opponent, renderState);
+        ctx.restore();
+      }
     }
   }
 
@@ -370,12 +372,11 @@ export class YutaRenderer {
       ctx.restore();
     }
 
-    // 5. Crown Tendrils / Tubes (sweeping back over shoulders/spine)
-    // Reduce tendril count and segment math during active gameplay
-    const tendrilCount = isGamePlay ? 3 : 5;
-    const numSegments = isGamePlay ? 6 : 12;
-    const loopMin = isGamePlay ? -1 : -2;
-    const loopMax = isGamePlay ? 1 : 2;
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+    const tendrilCount = isLowQuality ? 1 : (isGamePlay ? 3 : 5);
+    const numSegments = isLowQuality ? 3 : (isGamePlay ? 6 : 12);
+    const loopMin = isLowQuality ? 0 : (isGamePlay ? -1 : -2);
+    const loopMax = isLowQuality ? 0 : (isGamePlay ? 1 : 2);
 
     for (let pass = 0; pass < 2; pass++) {
       ctx.save();
@@ -845,7 +846,7 @@ export class YutaRenderer {
     const rk = fighter.rika;
     if (!rk) return;
 
-    const showAura = (typeof state !== 'undefined' && state.previewShowCursedEnergy) || (fighter.cursedEnergyAlpha || 0) > 0.05 || fighter.domainActive;
+    const showAura = (typeof state !== 'undefined' && !state.performanceMode && (state.previewShowCursedEnergy || (fighter.cursedEnergyAlpha || 0) > 0.05 || fighter.domainActive));
     if (!showAura) return;
 
     const r = (rk.r !== undefined && rk.r !== null) ? Math.max(0.1, rk.r) : 30;
@@ -919,19 +920,7 @@ export class YutaRenderer {
     ctx.globalAlpha = (ctx.globalAlpha || 1.0) * ariseCeAlpha;
 
     // === 1. Luminous Backlight ===
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    const glowRadius = Math.max(0.1, r * 4.5 + Math.sin(time * 0.005) * (r * 0.3));
-    const backGlow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, glowRadius);
-    backGlow.addColorStop(0, 'rgba(255, 255, 255, 0.4)');
-    backGlow.addColorStop(0.3, 'rgba(255, 105, 180, 0.35)');
-    backGlow.addColorStop(0.7, 'rgba(255, 20, 147, 0.15)');
-    backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
-    ctx.beginPath();
-    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-    ctx.fillStyle = backGlow;
-    ctx.fill();
-    ctx.restore();
+    // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     // Helper: Draw a form-fitting Yuta-style flame path around points
     const drawFlamePath = (pts, fillAlpha = 0.75) => {
@@ -1465,26 +1454,7 @@ export class YutaRenderer {
     ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
     // === Luminous Body Backlight (Soft Natural Pink Glow) ===
-    ctx.globalCompositeOperation = 'screen';
-    const glowRadius = fighter.r + 90 + Math.sin(time * 0.005) * 8;
-    const backGlow = ctx.createRadialGradient(0, 0, fighter.r * 0.1, 0, 0, glowRadius);
-    if (isRCT) {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.8 * progress})`);
-      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.6 * progress})`);
-      backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
-    } else {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.8 * progress})`);
-      backGlow.addColorStop(0.35, `rgba(255, 105, 180, ${0.6 * progress})`);
-      backGlow.addColorStop(0.7, `rgba(255, 20, 147, ${0.3 * progress})`);
-      backGlow.addColorStop(1, 'rgba(255, 20, 147, 0)');
-    }
-
-    ctx.beginPath();
-    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-    ctx.fillStyle = backGlow;
-    ctx.fill();
-
-    ctx.globalCompositeOperation = 'source-over';
+    // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     // Hardware Accelerated Pre-Rendered Offscreen Sakuga Aura Canvas
     const frameCanvas = YutaRenderer._renderYutaAuraFrameCanvas(frameIndex, isRCT);

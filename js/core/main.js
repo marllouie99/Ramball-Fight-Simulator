@@ -79,8 +79,10 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
-state.canvas.addEventListener('mousemove', (e) => {
-  const rect = state.canvas.getBoundingClientRect();
+const inputTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
+
+inputTarget.addEventListener('mousemove', (e) => {
+  const rect = inputTarget.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
   const scaleX = state.canvas.width / rect.width;
   const scaleY = state.canvas.height / rect.height;
@@ -90,10 +92,10 @@ state.canvas.addEventListener('mousemove', (e) => {
   handleUIMove(mx, my);
 });
 
-state.canvas.addEventListener('click', (e) => {
+inputTarget.addEventListener('click', (e) => {
   unlockAudio();
 
-  const rect = state.canvas.getBoundingClientRect();
+  const rect = inputTarget.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
   const scaleX = state.canvas.width / rect.width;
   const scaleY = state.canvas.height / rect.height;
@@ -108,11 +110,11 @@ state.canvas.addEventListener('click', (e) => {
   }
 });
 
-state.canvas.addEventListener('touchstart', () => {
+inputTarget.addEventListener('touchstart', () => {
   unlockAudio();
 }, { passive: true });
 
-state.canvas.addEventListener('wheel', (e) => {
+inputTarget.addEventListener('wheel', (e) => {
   if (state.gameState === 'weapons') {
     e.preventDefault();
     const totalPages = Math.ceil(FIGHTER_DEFS.length / 5);
@@ -138,3 +140,41 @@ state.canvas.addEventListener('wheel', (e) => {
 
 import { startGameLoop } from '../systems/gameLoop.js';
 startGameLoop();
+
+// ─────────────────────────────────────────────
+// HTML UI DOM LISTENERS
+// ─────────────────────────────────────────────
+document.getElementById('btn-battle')?.addEventListener('click', () => {
+  stopAllSounds(); stopAllLoopingSounds();
+  state.gameState = 'select';
+});
+
+document.getElementById('btn-index')?.addEventListener('click', () => {
+  state.gameState = 'index';
+});
+
+document.getElementById('btn-weapons')?.addEventListener('click', () => {
+  state.gameState = 'weapons';
+});
+
+document.getElementById('btn-testmode')?.addEventListener('click', (e) => {
+  state.testMode = !state.testMode;
+  e.target.innerText = '🧪 TEST MODE: ' + (state.testMode ? 'ON' : 'OFF');
+});
+
+// Initialize Performance Mode from localStorage
+state.performanceMode = localStorage.getItem('performanceMode') === 'true';
+const perfBtn = document.getElementById('btn-performance');
+if (perfBtn) {
+  perfBtn.innerText = '⚙ PERFORMANCE: ' + (state.performanceMode ? 'ON' : 'OFF');
+}
+
+document.getElementById('btn-performance')?.addEventListener('click', (e) => {
+  state.performanceMode = !state.performanceMode;
+  localStorage.setItem('performanceMode', state.performanceMode);
+  e.target.innerText = '⚙ PERFORMANCE: ' + (state.performanceMode ? 'ON' : 'OFF');
+});
+
+document.getElementById('btn-leaderboard')?.addEventListener('click', () => {
+  state.gameState = 'leaderboard';
+});

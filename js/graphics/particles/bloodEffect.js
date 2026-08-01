@@ -1,5 +1,5 @@
 // ─────────────────────────────────────────────
-// BLOOD EFFECT
+// BLOOD EFFECT (PIXIJS WEBGL ACCELERATED)
 // Small particle effect when fighters take damage
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
@@ -7,67 +7,101 @@ import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
 import { CONFIG } from '../../core/config.js';
 
+// Object pool for PixiJS Sprites to prevent GC thrashing
+const bloodSpritePool = [];
+
+function getBloodSprite() {
+  if (bloodSpritePool.length > 0) {
+    const s = bloodSpritePool.pop();
+    s.visible = true;
+    return s;
+  }
+  const s = new window.PIXI.Sprite(state.bloodSquareTexture);
+  s.anchor.set(0.5); // Center origin
+  state.pixiLayers.particles.addChild(s);
+  return s;
+}
+
+function releaseBloodSprite(s) {
+  if (!s) return;
+  s.visible = false;
+  bloodSpritePool.push(s);
+}
+
 /**
  * Spawns a blood effect at the fighter's position.
- * Particles spray outward from the damage direction.
- * @param {Object} fighter - The fighter that took damage
- * @param {number} amount - Damage amount (affects particle count/size)
- * @param {number} damageAngle - Angle of the damage direction (radians), null for random
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
+  if (!state.bloodEffects) state.bloodEffects = [];
   const isFFA = state && state.mode === GAME_MODES.FFA;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
 
-  // Limit blood particles aggressively to prevent frame drops
   const qualityMultiplier = state.qualityLevel || 1.0;
   let MAX_BLOOD_PARTICLES = Math.floor((isFFA ? 30 : isMulti ? 60 : 100) * qualityMultiplier);
 
-  // OPTIMIZED: Reduce particle count based on quality level
   const baseParticleCount = Math.max(2, Math.floor(amount / (isFFA ? 6 : 3)));
   const particleCount = Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
 
   let color = fighter.color || '#e60000';
-  // Increase saturation/depth for standard team/fighter colors so they pop on white
   if (color === '#ff4d4d' || color === '#ff4444') color = '#e60000';
   else if (color === '#4da3ff') color = '#0066ff';
   else if (color === '#ffd700') color = '#ff9900';
   else if (color === '#4dff4d') color = '#00cc00';
 
+  const numericColor = parseInt(color.replace('#', '0x'), 16);
+
   for (let i = 0; i < particleCount; i++) {
-    // Random angle for each particle
     let angle = Math.random() * Math.PI * 2;
-    // Massive initial burst speed for a horizontal spray
     const speed = 12 + Math.random() * 20;
 
-    // If damage angle is provided, bias particles in the damage direction
     if (damageAngle !== null) {
-      // Create a sharp, directed cone spray ('<') away from the attacker
-      const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.6; // ~108 degree cone
+      const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.6;
       angle = damageAngle + spreadAngle;
     }
 
-    // Bigger particles (3-6 pixels) for more visibility
     const size = 3 + Math.random() * 3;
 
-    const newEffect = {
-      x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
-      y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
-      vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
-      size: size,
-      color: color,
-      life: 1.0,           
-      decay: 0.008 + Math.random() * 0.006, 
-      airResistance: 0.94, // Lighter air friction so they fly further
-      friction: 0.90,      // Ground friction
-    };
-
-    // Fast O(1) overwrite of random existing particle if over limit, avoiding O(N) shift()
+    // Fast O(1) overwrite of random existing particle if over limit
     if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
        const overwriteIdx = Math.floor(Math.random() * state.bloodEffects.length);
-       state.bloodEffects[overwriteIdx] = newEffect;
+       const old = state.bloodEffects[overwriteIdx];
+       if (old && old.sprite) releaseBloodSprite(old.sprite);
+       
+       const sprite = getBloodSprite();
+       sprite.tint = numericColor;
+       sprite.width = size;
+       sprite.height = size;
+       
+       state.bloodEffects[overwriteIdx] = {
+         x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
+         y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
+         vx: Math.cos(angle) * speed,
+         vy: Math.sin(angle) * speed,
+         size: size,
+         life: 1.0,           
+         decay: 0.008 + Math.random() * 0.006, 
+         airResistance: 0.94,
+         friction: 0.90,
+         sprite: sprite
+       };
     } else {
-       state.bloodEffects.push(newEffect);
+       const sprite = getBloodSprite();
+       sprite.tint = numericColor;
+       sprite.width = size;
+       sprite.height = size;
+
+       state.bloodEffects.push({
+         x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
+         y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
+         vx: Math.cos(angle) * speed,
+         vy: Math.sin(angle) * speed,
+         size: size,
+         life: 1.0,           
+         decay: 0.008 + Math.random() * 0.006, 
+         airResistance: 0.94,
+         friction: 0.90,
+         sprite: sprite
+       });
     }
   }
 }
@@ -76,59 +110,41 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
  * Updates all blood effects.
  */
 export function updateBloodEffects() {
+  if (!state.bloodEffects) return;
   const arenaBottom = CONFIG.arena.y + CONFIG.arena.height;
 
   fastCleanArray(state.bloodEffects, (effect) => {
-    // Air resistance slows the blood down slightly as it flies
     effect.vx *= effect.airResistance;
     effect.vy *= effect.airResistance;
-
-    // Apply low gravity so it shoots out straight before falling
     effect.vy += 0.15;
-
-    // Update position
     effect.x += effect.vx;
     effect.y += effect.vy;
 
-    // Check for floor collision
     if (effect.y >= arenaBottom - effect.size / 2) {
       effect.y = arenaBottom - effect.size / 2;
-      effect.vy *= -0.2; // Slight bounce
-      effect.vx *= effect.friction; // Slow down quickly when sliding on the floor
+      effect.vy *= -0.2;
+      effect.vx *= effect.friction;
     }
 
-    // Fade out
     effect.life -= effect.decay;
 
-    // Remove dead effects
-    return effect.life > 0;
+    if (effect.life > 0) {
+      // Sync to PixiJS Sprite
+      effect.sprite.x = effect.x;
+      effect.sprite.y = effect.y;
+      effect.sprite.alpha = effect.life;
+      effect.sprite.rotation = (effect.vx + effect.vy) * effect.life * 0.5;
+      return true;
+    } else {
+      releaseBloodSprite(effect.sprite);
+      return false;
+    }
   });
 }
 
 /**
- * Draws all blood effects.
+ * Deprecated: PixiJS automatically renders the sprites in the background scene graph.
  */
 export function drawBloodEffects() {
-  const { ctx } = state;
-  for (const effect of state.bloodEffects) {
-    ctx.save();
-    // Remove 'lighter' composite operation so blood stays red on white background
-    ctx.translate(effect.x, effect.y);
-
-    // Spin the tiny cubes/squares as they fly outward
-    const rotation = (effect.vx + effect.vy) * effect.life * 0.5;
-    ctx.rotate(rotation);
-
-    ctx.globalAlpha = effect.life;
-    ctx.fillStyle = effect.color;
-    // Render as sharp digital square/cube shards
-    ctx.fillRect(-effect.size / 2, -effect.size / 2, effect.size, effect.size);
-    
-    // Add dark stroke so it stands out against the white background
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(-effect.size / 2, -effect.size / 2, effect.size, effect.size);
-
-    ctx.restore();
-  }
+  // Empty - kept so `renderSystem.js` doesn't crash before being updated
 }
