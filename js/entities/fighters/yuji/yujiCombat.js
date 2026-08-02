@@ -45,7 +45,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
     : (CONFIG.yuji?.blackFlashThreshold || 4);
     
   if (!isZone && this.blackFlashCharge >= thresholdForAudio) {
-    if (CONFIG.yuji?.blackFlashEnterSound && !this.soulSwapActive) {
+    if (CONFIG.yuji?.blackFlashEnterSound && !this.soulSwapActive && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.35)) {
       audioSystem.playSFX(
         CONFIG.yuji.blackFlashEnterSound, 
         CONFIG.yuji.blackFlashEnterVolume ?? 1.5,
@@ -152,7 +152,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
         if (isBlackFlash) {
           spawnBlackFlash(target.x, target.y);
           const sound = getSkillSound(this.id, 'blackflash');
-          if (sound) {
+          if (sound && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.35)) {
             audioSystem.playSFX(sound.src, sound.volume);
             if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
           }

@@ -145,8 +145,8 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   };
 
   // Drop shadow for depth
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetX = 0;
   ctx.shadowOffsetY = 2;
   ctx.lineJoin = 'round';
@@ -341,8 +341,8 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 4. RGB LED STRIPS
   // ═══════════════════════════════════════════════
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
 
   // Bottom edge LED strip
@@ -374,7 +374,7 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   ctx.globalAlpha = 1;
 
   // Restore shadow
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  // OPTIMIZED: Removed shadowColor
   ctx.shadowOffsetY = 2;
 
   // ═══════════════════════════════════════════════
@@ -460,7 +460,7 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
     ctx.fill();
   }
   ctx.globalAlpha = 1;
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
 
   // Glass panel overlay on magazine
   ctx.fillStyle = 'rgba(100, 200, 255, 0.08)';
@@ -594,8 +594,8 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 8. EXPOSED WIRING / CABLES
   // ═══════════════════════════════════════════════
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
 
   // Orange cable: from tweeter box → looping under barrel → back into chassis
@@ -630,7 +630,7 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 9. TOP SOUNDBAR SCOPE
   // ═══════════════════════════════════════════════
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+  // OPTIMIZED: Removed shadowColor
   ctx.shadowOffsetY = 2;
 
   // Top rail
@@ -665,8 +665,8 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // ═══════════════════════════════════════════════
   // 10. ENERGY EFFECTS (Animated)
   // ═══════════════════════════════════════════════
-  ctx.shadowColor = 'transparent';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
 
   // ─── Glowing Orange Energy Ring around subwoofer ───
@@ -730,7 +730,7 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   // 11. FLOATING MUSIC NOTES
   // ═══════════════════════════════════════════════
   if (fighter && fighter._musicNotes && fighter._musicNotes.length > 0) {
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowBlur
     ctx.shadowOffsetY = 0;
     for (let i = fighter._musicNotes.length - 1; i >= 0; i--) {
       const note = fighter._musicNotes[i];

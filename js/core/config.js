@@ -425,15 +425,15 @@ export const CONFIG = {
     shotgunCooldown: 80,
     shotgunPellets: 8,        // Increased from 5
     shotgunSpread: 0.45,      // Spread angle in radians (wider)
-    shotgunDamage: 0.5,       // Lower per pellet, but more pellets total
+    shotgunDamage: 5.20,       // Lower per pellet, but more pellets total
     shotgunSpeed: 30,         // Extremely fast initial burst, slowed down by drag
-    shotgunRange: 400,        // Max distance to trigger shotgun attack
+    shotgunRange: 400,       // Max distance to trigger shotgun attack
 
     // Wrench stats (Melee)
     wrenchCooldown: 30,
     wrenchDamage: 15,
     wrenchRange: 85,          // Melee distance
-    wrenchSwipeDuration: 10,  // Animation duration
+    wrenchSwipeDuration: 16,  // Animation duration
 
     // Turret stats (Skill)
     skillCooldown: 1000,
@@ -441,7 +441,7 @@ export const CONFIG = {
     turretDamage: 0.2,
     turretFireRate: 7,
     turretRange: 350,
-    turretBulletSpeed: 12,
+    turretBulletSpeed: 15,
     turretAimSpeed: 0.08,     // Radians per frame
     turretBuildTime: 150,      // Frames to build turret (1.5 seconds)
     turretHealAmount: 30,     // Healing applied when bounced into
@@ -1099,7 +1099,7 @@ export const FIGHTER_DEFS = [
     id: 26,
     name: 'Layla',
     category: 'Sci-Fi & Modern',
-    color: '#00E5FF', // Vibrant Cyan Blue
+    color: '#00E5FF', // Blue Cosmic Theme
     startX: 300, startY: 250,
     startVx: 1.1, startVy: 0.9,
     radius: 25,

@@ -425,7 +425,7 @@ export class GojoRenderer {
 
     // 1. Snappy Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target)
     if (fighter.punchAnimTimer > 0) {
-      const maxT = 8.0;
+      const maxT = fighter.punchActiveMaxTime || 8.0;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
       const smoothP = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
       const lungeProgress = Math.sin(smoothP * Math.PI); // Smooth 0 -> 1 -> 0 bell curve

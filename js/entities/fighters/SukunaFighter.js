@@ -1842,30 +1842,7 @@ export class SukunaFighter extends Fighter {
     const isFuga = colorTheme === 'fuga';
 
     // === Luminous Body/Hand Backlight (Soft Volcanic Crimson Bloom) ===
-    ctx.save();
-    ctx.globalCompositeOperation = 'screen';
-    const glowRadius = overrideX !== null ? (r + 25) : (r + 90 + Math.sin(time * 0.005) * 8);
-    const backGlow = ctx.createRadialGradient(0, 0, r * 0.1, 0, 0, glowRadius);
-    if (isRCT) {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.5 * progress})`);
-      backGlow.addColorStop(0.5, `rgba(50, 205, 50, ${0.3 * progress})`);
-      backGlow.addColorStop(1, 'rgba(50, 205, 50, 0)');
-    } else if (isFuga) {
-      backGlow.addColorStop(0, `rgba(255, 255, 250, ${0.55 * progress})`);   // White-hot core
-      backGlow.addColorStop(0.35, `rgba(255, 120, 20, ${0.45 * progress})`); // Fiery orange bloom
-      backGlow.addColorStop(0.7, `rgba(220, 40, 0, ${0.22 * progress})`);   // Crimson outer feathering
-      backGlow.addColorStop(1, 'rgba(120, 10, 0, 0)');
-    } else {
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Soft white core
-      backGlow.addColorStop(0.35, `rgba(255, 30, 0, ${0.42 * progress})`);  // Crimson red bloom
-      backGlow.addColorStop(0.7, `rgba(180, 0, 0, ${0.20 * progress})`);    // Deep blood red feathering
-      backGlow.addColorStop(1, 'rgba(80, 0, 0, 0)');
-    }
-    ctx.beginPath();
-    ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-    ctx.fillStyle = backGlow;
-    ctx.fill();
-    ctx.restore();
+    // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     let mainColor = '#FF1100';
     let fillColor = `rgba(230, 20, 20, ${0.72 * progress})`;

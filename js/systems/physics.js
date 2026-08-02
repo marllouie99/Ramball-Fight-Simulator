@@ -619,10 +619,18 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          fighter.x -= nx * overlap * 0.5;
-          fighter.y -= ny * overlap * 0.5;
-          entity.x += nx * overlap * 0.5;
-          entity.y += ny * overlap * 0.5;
+          if (fighter.isTurret) {
+            entity.x += nx * overlap;
+            entity.y += ny * overlap;
+          } else if (entity.isTurret) {
+            fighter.x -= nx * overlap;
+            fighter.y -= ny * overlap;
+          } else {
+            fighter.x -= nx * overlap * 0.5;
+            fighter.y -= ny * overlap * 0.5;
+            entity.x += nx * overlap * 0.5;
+            entity.y += ny * overlap * 0.5;
+          }
         }
       }
     }

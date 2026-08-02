@@ -83,7 +83,7 @@ export function drawGunSlingerBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   ctx.fill();
   
   // Disable shadow for internal details to improve performance
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
 
   // Casing highlight (top edge) - manual rounded rect
   const hlX = -casingLength + bulletWidth * 0.1;
@@ -276,8 +276,8 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.lineCap = 'round';
 
     // Apply a slight shadow for depth
-    ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowColor
+    // OPTIMIZED: Removed shadowBlur
     ctx.shadowOffsetY = 2;
 
     // --- 1. Grip ---
@@ -295,7 +295,7 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     ctx.fill();
 
     // Disable shadow for internal details
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowBlur
     ctx.shadowOffsetY = 0;
 
     // Grip texture (checkering indication)
@@ -441,7 +441,7 @@ export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r,
     }
     
     // --- 9. Hand ---
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowBlur
     ctx.fillStyle = fighterColor;
     ctx.beginPath();
     ctx.arc(-8 * scale, 12 * scale, getHandSize(6 * scale), 0, Math.PI * 2);

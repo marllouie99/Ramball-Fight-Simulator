@@ -45,7 +45,9 @@ export class TurretEntity extends Fighter {
     this.isReloading = false;
   }
 
-  // Override to make turret immune to knockback physics
+  // Override to make turret immune to ALL knockback physics.
+  // Also zero out vx/vy directly so callers that bypass applyKnockback
+  // and set velocity directly still get neutralised on the next frame.
   applyKnockback(vx, vy) {
     this.knockbackVx = 0;
     this.knockbackVy = 0;
@@ -113,28 +115,41 @@ export class TurretEntity extends Fighter {
       return; // Freeze! No moving, aiming, or shooting
     }
 
-    const oldX = this.x;
-    const oldY = this.y;
+    // ── Position anchor lock ─────────────────────────────────────────────
+    // Many fighters bypass applyKnockback() and directly assign target.vx/vy
+    // or move target.x/y via collision-separation math.  To resist ALL of
+    // these, we:
+    //   1. Check if there is significant externally-applied velocity (i.e. a
+    //      black-hole is pulling us) — if so, allow movement and update anchor.
+    //   2. Otherwise zero velocity immediately and snap position back to the
+    //      saved anchor so the turret is truly immovable.
+    const isBlackholePull = (Math.abs(this.vx) > 0.5 || Math.abs(this.vy) > 0.5);
 
-    // Apply blackhole velocity and friction
-    this.x += this.vx;
-    this.y += this.vy;
-    this.vx *= 0.8;
-    this.vy *= 0.8;
-
-    // Absolute position lock to prevent ANY physics pushes
-    if (Math.abs(this.vx) < 0.1 && Math.abs(this.vy) < 0.1) {
-      if (this._fixedX === undefined) {
-        this._fixedX = this.x;
-        this._fixedY = this.y;
-      } else {
-        this.x = this._fixedX;
-        this.y = this._fixedY;
-      }
-    } else {
-      // It's moving via blackhole, update the fixed anchor point
+    if (isBlackholePull) {
+      // Allow genuine black-hole gravity to move the turret
+      this.x += this.vx;
+      this.y += this.vy;
+      this.vx *= 0.8;
+      this.vy *= 0.8;
+      // Update the anchor so it follows while being pulled
       this._fixedX = this.x;
       this._fixedY = this.y;
+    } else {
+      // Snap velocity to zero so nothing external can slide us
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      // Snap position back to anchor (undoes any collision-separation push
+      // or direct x/y assignment that happened since the last frame)
+      if (this._fixedX !== undefined) {
+        this.x = this._fixedX;
+        this.y = this._fixedY;
+      } else {
+        // First frame: record current position as the anchor
+        this._fixedX = this.x;
+        this._fixedY = this.y;
+      }
     }
 
     // Keep within arena bounds

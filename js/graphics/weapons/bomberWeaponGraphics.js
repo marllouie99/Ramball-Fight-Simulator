@@ -788,8 +788,8 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   const prevShadowColor = ctx.shadowColor;
   const prevShadowBlur = ctx.shadowBlur;
   const prevShadowOffsetY = ctx.shadowOffsetY;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
   ctx.beginPath();
   ctx.ellipse(0, radius * 0.9, radius * 0.85, radius * 0.25, 0, 0, Math.PI * 2);
@@ -807,8 +807,8 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   const prevBodyShadowColor = ctx.shadowColor;
   const prevBodyShadowBlur = ctx.shadowBlur;
   const prevBodyShadowOffsetY = ctx.shadowOffsetY;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 3;
 
   // Main body gradient (olive green with metallic sheen)
@@ -877,8 +877,8 @@ export function drawBomberGrenade(ctx, x, y, radius, options = {}) {
   const prevNeckShadowColor = ctx.shadowColor;
   const prevNeckShadowBlur = ctx.shadowBlur;
   const prevNeckShadowOffsetY = ctx.shadowOffsetY;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   // Neck base
@@ -1176,8 +1176,8 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   // Shadow for depth (OPTIMIZED: removed shadowBlur)
   const prevShadowColor = ctx.shadowColor;
   const prevShadowOffsetY = ctx.shadowOffsetY;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 4;
 
   // Main body gradient - tan/beige plastic with 3D effect
@@ -1268,8 +1268,8 @@ export function drawBomberC4(ctx, x, y, radius, options = {}) {
   // Shadow for depth (OPTIMIZED: removed shadowBlur)
   const prevCapShadowColor = ctx.shadowColor;
   const prevCapShadowOffsetY = ctx.shadowOffsetY;
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   const capWidth = radius * 0.5;

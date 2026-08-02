@@ -18,6 +18,7 @@ export class EngineerFighter extends Fighter {
     this.wrenchActive = false;
     this.wrenchTimer = 0;
     this.wrenchAngle = 0;
+    this.wrenchSlashFadeTimer = 0;
     
     this.turretEntity = null; // Reference to active turret
     
@@ -33,6 +34,7 @@ export class EngineerFighter extends Fighter {
     this.wrenchActive = false;
     this.wrenchTimer = 0;
     this.wrenchAngle = 0;
+    this.wrenchSlashFadeTimer = 0;
     
     // Destroy turret on reset
     if (this.turretEntity && state && state.fighters) {
@@ -82,7 +84,11 @@ export class EngineerFighter extends Fighter {
       this.wrenchTimer--;
       if (this.wrenchTimer <= 0) {
         this.wrenchActive = false;
+        this.wrenchSlashFadeTimer = 12; // Start the fadeout effect
       }
+    }
+    if (this.wrenchSlashFadeTimer > 0) {
+      this.wrenchSlashFadeTimer--;
     }
     
     if (this.shotgunRecoilTimer > 0) {
@@ -215,7 +221,7 @@ export class EngineerFighter extends Fighter {
           triggerGlobalScreenShake(8, 8);
           spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'WHACK!', '#FFD700');
           
-          const hitSound = getBasicAttackSound(this._def?.id, 'melee'); // Default melee or specific
+          const hitSound = getBasicAttackSound(null, 'engineer_melee'); // Default melee or specific
           if (hitSound) audioSystem.playSFX(hitSound.src, hitSound.volume);
         }
       } else if (dist <= CONFIG.Engineer.shotgunRange) {
@@ -306,28 +312,32 @@ export class EngineerFighter extends Fighter {
       wrenchActive: this.wrenchActive,
       wrenchTimer: this.wrenchTimer,
       wrenchAngle: this.wrenchAngle,
+      wrenchSlashFadeTimer: this.wrenchSlashFadeTimer || 0,
       shotgunRecoilTimer: this.shotgunRecoilTimer || 0,
-      lastWeaponUsed: this.lastWeaponUsed || 'shotgun'
+      lastWeaponUsed: this.lastWeaponUsed || 'shotgun',
+      color: this.color
     });
     
-    // Draw Hand holding the weapon
-    ctx.save();
-    ctx.translate(this.x, this.y);
-    ctx.rotate(this.gunAngle);
-    if (Math.abs(this.gunAngle) < Math.PI / 2) {
-      ctx.translate(this.r + 6, 0);
-    } else {
-      ctx.scale(1, -1);
-      ctx.translate(this.r + 6, 0);
+    // Draw Hand holding the weapon (only when holding shotgun)
+    if (this.lastWeaponUsed !== 'wrench') {
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.rotate(this.gunAngle);
+      if (Math.abs(this.gunAngle) < Math.PI / 2) {
+        ctx.translate(this.r + 6, 0);
+      } else {
+        ctx.scale(1, -1);
+        ctx.translate(this.r + 6, 0);
+      }
+      ctx.beginPath();
+      ctx.arc(0, 3, 6, 0, Math.PI * 2);
+      ctx.fillStyle = this.color;
+      ctx.fill();
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#000';
+      ctx.stroke();
+      ctx.restore();
     }
-    ctx.beginPath();
-    ctx.arc(0, 3, 6, 0, Math.PI * 2);
-    ctx.fillStyle = this.color;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000';
-    ctx.stroke();
-    ctx.restore();
     
     if (this.isBuildingTurret) {
       const barWidth = 40;

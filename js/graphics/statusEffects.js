@@ -530,4 +530,55 @@ export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
   ctx.restore();
 }
 
+export function drawVoidMarkEffect(ctx, baseRadius) {
+  ctx.save();
+  const time = Date.now();
+  const bounceY = -baseRadius - 16 + Math.sin(time * 0.015) * 3;
+  
+  // Floating magic mark crest
+  ctx.translate(0, bounceY);
+  
+  // Outer diamond lines (rotates opposite direction)
+  ctx.save();
+  ctx.rotate(-time * 0.002);
+  ctx.strokeStyle = '#00E5FF';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -7);
+  ctx.lineTo(5, 0);
+  ctx.lineTo(0, 7);
+  ctx.lineTo(-5, 0);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  // Inner rotating square (slow rotation)
+  ctx.save();
+  ctx.rotate(time * 0.003);
+  ctx.strokeStyle = '#DA70D6';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.moveTo(-3, -3);
+  ctx.lineTo(3, -3);
+  ctx.lineTo(3, 3);
+  ctx.lineTo(-3, 3);
+  ctx.closePath();
+  ctx.stroke();
+  ctx.restore();
+
+  // Inner soft glow
+  ctx.fillStyle = 'rgba(186, 85, 211, 0.4)';
+  ctx.beginPath();
+  ctx.arc(0, 0, 7, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Center bright dot
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
+  ctx.fill();
+  
+  ctx.restore();
+}
+
 

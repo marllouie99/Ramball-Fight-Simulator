@@ -17,7 +17,14 @@ import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
  * @param {string} type - 'crimson' for red/orange sparks, 'flash' for impact flash
  */
 export function spawnSparks(x, y, count = 8, type = 'crimson', customColor = null) {
-  const overrideProps = customColor ? { color: customColor } : {};
+  let overrideProps = {};
+  if (customColor) {
+    if (typeof customColor === 'object') {
+      overrideProps = { ...customColor };
+    } else {
+      overrideProps = { color: customColor };
+    }
+  }
   ParticleSystem.spawn(x, y, count, type, overrideProps);
 }
 

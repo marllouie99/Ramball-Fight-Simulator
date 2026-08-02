@@ -772,10 +772,10 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
         ctx.strokeStyle = line.color;
         ctx.lineWidth = line.width;
         ctx.lineCap = 'round';
-        ctx.shadowColor = '#FFD700';
-        ctx.shadowBlur = 6;
+        // OPTIMIZED: Removed shadowColor
+        // OPTIMIZED: Removed shadowBlur
         ctx.stroke();
-        ctx.shadowBlur = 0;
+        // OPTIMIZED: Removed shadowBlur
       }
       */
 

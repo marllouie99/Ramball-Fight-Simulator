@@ -974,25 +974,22 @@ export class GojoFighter extends Fighter {
     if (this.meleeComboCount === undefined) this.meleeComboCount = 0;
     if (this.meleeComboTarget === undefined) this.meleeComboTarget = Math.random() < 0.35 ? 3 : 1;
 
-    // Check if opponent is frozen by domain effect (timeStopTimer or hitStunTimer from domain)
-    const opponentIsFrozenByDomain = opponent && (
-      (opponent.timeStopTimer && opponent.timeStopTimer > 0) ||
-      (opponent.hitStunTimer && opponent.hitStunTimer > 0)
-    );
-
-    // Distance check: Teleport if opponent is not frozen by domain OR if out of melee reach
+    // Distance check: Teleport if out of melee reach, or if starting a new combo against a mobile target
     const distToOpponent = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     const attackReach = this.r + opponent.r + 35;
     const isOutOfReach = distToOpponent > attackReach;
 
-    const shouldTeleport = !opponentIsFrozenByDomain || isOutOfReach || (this.meleeComboCount % (this.meleeComboTarget || 1) === 0);
+    // The user designed Gojo to teleport randomly for every attack!
+    // We will teleport on every combo step (based on meleeComboTarget), even inside the domain!
+    const shouldTeleport = isOutOfReach || (this.meleeComboCount % (this.meleeComboTarget || 1) === 0);
+    
     if (shouldTeleport) {
       const oldX = this.x;
       const oldY = this.y;
 
       const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
       const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.35 : -Math.PI * 0.35);
-      const behindOffset = opponent.r + this.r + 10;
+      const behindOffset = opponent.r + this.r + 5; // Kept at 5 so he stays close enough to punch!
       
       let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
       let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
@@ -1027,8 +1024,6 @@ export class GojoFighter extends Fighter {
         this.meleeClashCooldown = 30; // ~0.5 second cooldown
       }
     }
-
-    // Removed hit pause to prevent blue freeze ring on opponent
 
     // Set cooldown for next punch
     this.meleePunchCooldown = punchCooldown;
@@ -1092,8 +1087,8 @@ export class GojoFighter extends Fighter {
     this.punchAnimTimer = 8;
     this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
-    // Gather all valid enemy targets (fighters & illusions) in Gojo's punch frontal arc (90 degrees, 65px reach)
-    const reach = this.r + 65;
+    // Gather all valid enemy targets (fighters & illusions) in Gojo's punch frontal arc (90 degrees, 80px reach)
+    const reach = this.r + 80; // Extended reach to ensure hits connect cleanly after teleport slide brakes!
     const arc = Math.PI * 0.5; // 90 degree frontal punch arc
     const punchAngle = (opponent && !opponent.isDead) ? Math.atan2(opponent.y - this.y, opponent.x - this.x) : (this.gunAngle || 0);
 

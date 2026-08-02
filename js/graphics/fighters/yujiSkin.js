@@ -448,6 +448,10 @@ export function drawYujiSkin(ctx, fighter) {
 // HAND RENDERER — skin-toned fists
 // ─────────────────────────────────────────────
 function drawYujiHands(ctx, fighter) {
+  if (typeof state !== 'undefined' && (state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+    return;
+  }
+  
   const isPunching = fighter.punchAnimTimer > 0;
   const isBF = fighter.blackFlashTimer > 0;
   const r = fighter.r;
@@ -468,7 +472,7 @@ function drawYujiHands(ctx, fighter) {
   // Cubic ease-in-out punch lunge (same as Todo)
   let rawProgress = 0;
   if (isPunching) {
-    const maxT = fighter.punchMaxTime || 16;
+    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
     rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
   }
   const smooth = rawProgress < 0.5

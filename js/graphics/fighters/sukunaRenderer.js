@@ -372,7 +372,7 @@ export class SukunaRenderer {
 
     // 1. Smooth Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target with recovery easing)
     if (fighter.punchAnimTimer > 0) {
-      const maxT = 16.0;
+      const maxT = fighter.punchActiveMaxTime || 16.0;
       fighter.currentSukunaPunchProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
     } else {
       fighter.currentSukunaPunchProgress = 0.0;

@@ -73,6 +73,7 @@ export const yujiConfig = {
   blackFlashEnterSound: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
   blackFlashEnterVolume: 2.0,
   blackFlashEnterDelay: -0.10, // Delay in milliseconds before playing the sound
+  blackFlashNoiseChance: 0.35, // 35% chance to play the voiceline on Black Flash
 
   // Transformation Audio
   transformationSound: 'Assets/Sound Effects/Skills/yuji-transformation.mp3',

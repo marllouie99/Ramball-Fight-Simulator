@@ -93,7 +93,7 @@ export function executeThinIceBreaker(fighter, angle) {
       }, maxDur);
     }
   }
-  const thinIceBreakerNoiseChance = CONFIG.yuta?.thinIceBreakerNoiseChance ?? 1.0;
+  const thinIceBreakerNoiseChance = CONFIG.yuta?.thinIceBreakerNoiseChance ?? 0.35;
   if (CONFIG.yuta?.thinIceBreakerNoiseSound && Math.random() < thinIceBreakerNoiseChance) {
     const handle = audioSystem.playSFX(
       CONFIG.yuta.thinIceBreakerNoiseSound,

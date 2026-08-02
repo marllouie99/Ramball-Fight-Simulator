@@ -130,6 +130,22 @@ export class Fighter {
     this._hp = value;
   }
 
+  get punchAnimTimer() {
+    return this._punchAnimTimer || 0;
+  }
+
+  set punchAnimTimer(value) {
+    const old = this._punchAnimTimer || 0;
+    this._punchAnimTimer = value;
+    if (value > 0) {
+      if (value > old) {
+        this.punchActiveMaxTime = value;
+      }
+    } else {
+      this.punchActiveMaxTime = 0;
+    }
+  }
+
   /** Default demo attack trigger for menu preview (can be overridden by subclasses). */
   triggerDemoAttack() {
     this.spearSwingTimer = 45;
@@ -187,6 +203,7 @@ export class Fighter {
     this.lastPoisonAttacker = null;
 
     this.slowTimer = 0;
+    this.voidMarkTimer = 0;
     this.slowMultiplier = 1;
     this.hitStunTimer = 0;
     this.hitStunMultiplier = 1;
@@ -212,6 +229,9 @@ export class Fighter {
     // Silence effect state
     this.silenceTimer = 0;
     this.blackFlashDebuffTimer = 0;
+
+    this.damageDealt = 0;
+    this.damageReceived = 0;
   }
 
   /** Returns true if this fighter is currently silenced by anti-technique effects (e.g. Inverted Spear of Heaven). */
@@ -436,6 +456,17 @@ export class Fighter {
 
     const prevHp = currentHp;
     this.hp = Math.max(0, Number((currentHp - amount).toFixed(2)));
+    const actualDamage = prevHp - this.hp;
+    if (actualDamage > 0) {
+      this.damageReceived = (this.damageReceived || 0) + actualDamage;
+      if (attacker) {
+        let actualAttacker = attacker;
+        if (attacker.isIllusion && attacker.owner) {
+          actualAttacker = attacker.owner;
+        }
+        actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
+      }
+    }
     // Spawn floating damage number when actual HP was reduced
     if (this.hp < prevHp && amount > 0) {
       const color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
@@ -832,6 +863,10 @@ export class Fighter {
 
     if (this.thunderRootsTimer > 0) {
       this.thunderRootsTimer--;
+    }
+
+    if (this.voidMarkTimer > 0) {
+      this.voidMarkTimer--;
     }
 
     // Time stop - freeze movement if time stopped

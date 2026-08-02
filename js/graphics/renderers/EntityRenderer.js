@@ -168,14 +168,8 @@ export function drawFighters() {
     // Unlimited Void freeze: do not apply blue fill overlay to enemies when hit inside Gojo's domain
     if (gojoDomainActive) return;
 
-    if (!isInfinityFreeze && !isGenericTimeStop) return;
-    if (
-      entity._def?.type === 'sukuna' || 
-      entity._def?.id === 'sukuna' || 
-      entity._def?.name === 'Sukuna' ||
-      entity.soulSwapActive ||
-      entity.soulSwapTransitionTimer > 0
-    ) return;
+    const isFrozen = isInfinityFreeze || isGenericTimeStop;
+    if (!isFrozen) return;
 
     // If Mahoraga paused time for adaptation (and it's not Gojo's infinity), don't draw an overlay
     if (isMahoragaFreeze && !isInfinityFreeze) return;

@@ -228,6 +228,11 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.45,
     delay: -1,
   },
+  'engineer_melee': {
+    src: 'Assets/Sound Effects/Skills/hammer.mp3',
+    volume: 1.2,
+    delay: 0,
+  },
   // Turret — Turret shot
   'turret': {
     src: 'Assets/Sound Effects/Skills/turretshot.mp3',

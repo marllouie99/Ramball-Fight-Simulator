@@ -381,6 +381,7 @@ export function updateRika(fighter, arena) {
         if (typeof spawnImpactFlash === 'function') spawnImpactFlash(rk.x, rk.y, 30, 'crimsonSniper');
         if (typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(rk.x, rk.y, 280);
         
+        const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
         const dispelSparks = isLowQuality ? 5 : 40;
         for (let i = 0; i < dispelSparks; i++) {
           spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
@@ -648,7 +649,7 @@ export function updateRika(fighter, arena) {
       const nowMs = performance.now();
       const isRoarActive = rk.roarEndTime && nowMs < rk.roarEndTime;
 
-      if (!isRoarActive) {
+      if (!isRoarActive && Math.random() < (CONFIG.yuta?.rikaNoiseChance ?? 0.35)) {
         const noises = CONFIG.yuta?.rikaNoises || [
           'Assets/Sound Effects/Attacks/rikanoise1.mp3',
           'Assets/Sound Effects/Attacks/rikanoise2.mp3',

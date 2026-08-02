@@ -119,6 +119,7 @@ export const yutaConfig = {
   rikaNoiseVolume: 1.5,
   rikaNoiseDelay: 0,
   rikaNoiseCooldown: 25,                 // Cooldown in frames between Rika attack roars
+  rikaNoiseChance: 0.35,
 
   // Thin Ice Breaker
   thinIceBreakerSound: 'Assets/Sound Effects/Skills/thin-ice-breaker.mp3',
@@ -129,7 +130,7 @@ export const yutaConfig = {
   thinIceBreakerNoiseSound: 'Assets/Sound Effects/Skills/yuta-thin-ice-breaker-noise.mp3',
   thinIceBreakerNoiseVolume: 1.5,
   thinIceBreakerNoiseDelay: 0,
-  thinIceBreakerNoiseChance: 0.5,
+  thinIceBreakerNoiseChance: 0.35,
   thinIceBreakerNoiseMaxDuration: 750, // Stop voice line after 750ms
 
   // Ultimate: Domain Expansion
@@ -145,5 +146,5 @@ export const yutaConfig = {
   phantomFlurryNoiseSound: 'Assets/Sound Effects/Skills/yuta-flurry-noise.mp3',
   phantomFlurryNoiseVolume: 2.0,
   phantomFlurryNoiseDelay: 0,
-  phantomFlurryNoiseChance: 0.5,
+  phantomFlurryNoiseChance: 0.35,
 };

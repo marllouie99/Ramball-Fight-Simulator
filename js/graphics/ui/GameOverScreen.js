@@ -13,12 +13,16 @@ function drawRoundEndScreen() {
   _clearButtons();
   drawHUD();
 
+  if (roundEndTimer <= 2) {
+    state._winnerEmbers = null;
+  }
+
   // Delay before winning display appears (in frames, ~1 second delay)
   const displayDelay = 60;
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Smooth fade-in effect (only after delay)
-  const fadeAlpha = Math.min(0.7, delayedTimer / 60);
+  const fadeAlpha = Math.min(0.96, (delayedTimer / 60) * 0.96);
   ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
   ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
 
@@ -81,20 +85,9 @@ function drawWinnerReveal(winner, timer, mode) {
   const cy = state.arena.y + state.arena.height / 2 - 10;
   const scale = 1.4 + Math.sin(timer * 0.08) * 0.08;
 
-  ctx.save();
-  ctx.translate(cx, cy);
 
-  // Draw pulsing rings
-  for (let i = 0; i < 4; i += 1) {
-    const radius = 74 + i * 18 + Math.sin(timer * 0.12 + i * 0.7) * 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,255,255,${0.18 - i * 0.03})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
 
-  ctx.restore();
+
 
   // Draw the actual fighter model at the center, scaled up for the reveal.
   const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
@@ -114,9 +107,12 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Yuta faces forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
-  if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
+  if (def.type === 'gojo' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
+
+  // Draw volumetric god rays behind the model
+  drawGodRays(ctx, cx, cy, timer, winner);
 
   ctx.save();
   ctx.translate(cx, cy);
@@ -126,15 +122,36 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.draw(ctx, null);
   ctx.restore();
 
-  ctx.fillStyle = '#fff';
+  ctx.save();
   ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = 4;
+  ctx.strokeText('WINNER', cx, cy - 116);
+  ctx.fillStyle = '#fff';
   ctx.fillText('WINNER', cx, cy - 116);
+  ctx.restore();
+
+  // Round Duration below WINNER text
+  const totalSeconds = Math.floor((state.matchTimer || 0) / 60);
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  ctx.save();
+  ctx.font = '14px Arial';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`Round Duration: ${minutes}:${seconds}`, cx, cy - 110);
+  ctx.restore();
 
   ctx.font = 'bold 24px Arial';
   ctx.textBaseline = 'top';
   ctx.fillText(winner.name.toUpperCase(), cx, cy + winner.r * scale + 18);
+
+  const isDuelMode = mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off';
+  if (isDuelMode) {
+    drawWinnerStats(ctx, cx, cy + winner.r * scale + 50, winner);
+  }
 }
 
 function drawFfaChampionReveal(winner, timer) {
@@ -147,20 +164,7 @@ function drawFfaChampionReveal(winner, timer) {
   // Smooth fade-in animation over 30 frames (0.5 seconds at 60fps)
   const fadeAlpha = Math.min(1, timer / 30);
 
-  ctx.save();
-  ctx.globalAlpha = fadeAlpha;
-  ctx.translate(cx, cy);
 
-  for (let i = 0; i < 4; i += 1) {
-    const radius = 74 + i * 18 + Math.sin(timer * 0.12 + i * 0.7) * 6;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,255,255,${0.18 - i * 0.03})`;
-    ctx.lineWidth = 2;
-    ctx.stroke();
-  }
-
-  ctx.restore();
 
   // Draw the actual fighter model at the center, scaled up for the reveal.
   const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
@@ -184,7 +188,7 @@ function drawFfaChampionReveal(winner, timer) {
     preview.rika.active = false;
     preview.rikaAlpha = 0;
   }
-  if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
+  if (def.type === 'gojo' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
 
@@ -207,6 +211,9 @@ function drawFfaChampionReveal(winner, timer) {
   preview.draw(pCtx, null);
   pCtx.restore();
 
+  // Draw volumetric god rays behind the model
+  drawGodRays(ctx, cx, cy, timer, winner);
+
   ctx.save();
   ctx.globalAlpha = fadeAlpha;
   ctx.translate(cx, cy);
@@ -216,31 +223,47 @@ function drawFfaChampionReveal(winner, timer) {
 
   ctx.save();
   ctx.globalAlpha = fadeAlpha;
-  ctx.fillStyle = '#fff';
   ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+  ctx.lineWidth = 4;
+  ctx.strokeText('CHAMPION', cx, cy - 116);
+  ctx.fillStyle = '#fff';
   ctx.fillText('CHAMPION', cx, cy - 116);
+  ctx.restore();
+
+  // Round Duration below CHAMPION text
+  const totalSeconds = Math.floor((state.matchTimer || 0) / 60);
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  ctx.save();
+  ctx.globalAlpha = fadeAlpha;
+  ctx.font = '14px Arial';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`Round Duration: ${minutes}:${seconds}`, cx, cy - 110);
+  ctx.restore();
 
   ctx.font = 'bold 24px Arial';
   ctx.textBaseline = 'top';
   ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
 
-  if (def && def.desc) {
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = 'italic 14px Arial';
-    wrapText(ctx, def.desc, cx, cy + 144, 480, 18);
-  }
+
   ctx.restore();
 }
 
 function drawMatchEndScreen() {
-  const { ctx, canvas, matchWinner, scores, fighters, mode } = state;
+  const { ctx, canvas, matchWinner, scores, fighters, mode, matchEndTimer } = state;
   _clearButtons();
   drawHUD();
 
+  if (matchEndTimer <= 2) {
+    state._winnerEmbers = null;
+  }
+
   // Fade in the dark background over 60 frames
-  const bgAlpha = Math.min(0.85, (state.matchEndTimer / 60) * 0.85);
+  const bgAlpha = Math.min(0.96, (state.matchEndTimer / 60) * 0.96);
   ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -358,49 +381,15 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   const scale = isMultiWinner ? 1.1 : 1.5;
   const offsets = isMultiWinner ? [-95, 95] : [0];
 
-  // ── Expanding & pulsing rings ──────────────────────────────────────────
-  ctx.save();
-  ctx.translate(cx, cy);
-  for (let i = 0; i < 6; i++) {
-    const radius = (isMultiWinner ? 130 : 80) + i * 24;
-    const alpha = 0.22 - i * 0.03;
-    ctx.beginPath();
-    ctx.arc(0, 0, radius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255,255,255,${alpha})`;
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-  }
-  ctx.restore();
 
-  // ── Particle burst effect ───────────────────────────────────────────────
-  const particleCount = isMultiWinner ? 36 : 24;
-  for (let i = 0; i < particleCount; i++) {
-    const angle = (i / particleCount) * Math.PI * 2;
-    const dist = (isMultiWinner ? 135 : 90) + i * 4;
-    const px = cx + Math.cos(angle) * dist;
-    const py = cy + Math.sin(angle) * dist;
-    const size = 2;
-    const alpha = Math.max(0, 0.7 - (dist - 90) / 200);
 
-    ctx.beginPath();
-    ctx.arc(px, py, size, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,220,80,${alpha})`;
-    ctx.fill();
-  }
 
-  // ── Secondary sparkle particles ─────────────────────────────────────────
-  for (let i = 0; i < 12; i++) {
-    const angle = (i / 12) * Math.PI * 2;
-    const dist = isMultiWinner ? 100 : 60;
-    const px = cx + Math.cos(angle) * dist;
-    const py = cy + Math.sin(angle) * dist;
-    const alpha = 0.5;
 
-    ctx.beginPath();
-    ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
-    ctx.fill();
-  }
+  // ── Draw volumetric god rays behind model(s) ────────────────────────────────
+  winningFighters.forEach((wFighter, idx) => {
+    const offsetX = offsets[idx] || 0;
+    drawGodRays(ctx, cx + offsetX, cy, timer, wFighter);
+  });
 
   // ── Draw the winner fighter model(s) ───────────────────────────────────────
   winningFighters.forEach((wFighter, idx) => {
@@ -427,7 +416,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
       preview.rika.active = false;
       preview.rikaAlpha = 0;
     }
-    if (def.type === 'gojo' || def.type === 'sukuna' || def.type === 'yuta') {
+    if (def.type === 'gojo' || def.type === 'yuta') {
       preview.combatAuraOpacity = 1;
     }
 
@@ -457,13 +446,31 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   // Text glow
   ctx.shadowBlur = 20;
   ctx.shadowColor = winner.color || '#fff';
-  ctx.fillStyle = '#fff';
   ctx.font = 'bold 36px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
-  ctx.fillText(isMultiWinner ? 'CHAMPIONS' : 'CHAMPION', cx, cy - 145);
+  
+  // High-contrast stroke outline
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+  ctx.lineWidth = 5;
+  const titleText = isMultiWinner ? 'CHAMPIONS' : 'CHAMPION';
+  ctx.strokeText(titleText, cx, cy - 145);
+  
+  ctx.fillStyle = '#fff';
+  ctx.fillText(titleText, cx, cy - 145);
 
   ctx.shadowBlur = 0;
+
+  // Round Duration below CHAMPION text
+  const totalSeconds = Math.floor((state.matchTimer || 0) / 60);
+  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
+  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
+  ctx.save();
+  ctx.font = '14px Arial';
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.textBaseline = 'top';
+  ctx.fillText(`Round Duration: ${minutes}:${seconds}`, cx, cy - 138);
+  ctx.restore();
   if (isMultiWinner && winningFighters.length === 2) {
     ctx.font = 'bold 20px Arial';
     ctx.fillStyle = winningFighters[0].color || '#fff';
@@ -481,16 +488,191 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     ctx.fillStyle = winner.color || '#fff';
     ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
     
-    const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner.characterId || d.id === winner.type);
-    if (def && def.desc) {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-      ctx.font = 'italic 14px Arial';
-      ctx.textBaseline = 'top';
-      wrapText(ctx, def.desc, cx, cy + 122, 480, 18);
+    const isDuelMode = mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off';
+    if (isDuelMode) {
+      drawWinnerStats(ctx, cx, cy + 144, winner);
     }
   }
 
   ctx.restore();
+}
+
+function drawWinnerStats(ctx, cx, yStart, winner) {
+  const winnerDealt = Math.round(winner.damageDealt || 0);
+  const winnerReceived = Math.round(winner.damageReceived || 0);
+
+
+
+  ctx.save();
+  
+  // Draw subtle horizontal separator
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(cx - 160, yStart);
+  ctx.lineTo(cx + 160, yStart);
+  ctx.stroke();
+
+  // Draw header
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+  ctx.font = 'bold 14px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillText('ROUND STATISTICS', cx, yStart + 12);
+
+  // Row helper: Left column (labels) starting at cx-110, Right column (values) ending at cx+110
+  const drawStatRow = (label, val, y) => {
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#bbb';
+    ctx.font = '15px Arial';
+    ctx.fillText(label, cx - 110, y);
+
+    ctx.font = 'bold 17px Arial';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'right';
+    ctx.fillText(val, cx + 110, y);
+  };
+
+  // Draw rows
+  drawStatRow('Damage Dealt', winnerDealt, yStart + 42);
+  drawStatRow('Damage Received', winnerReceived, yStart + 66);
+
+
+
+  ctx.restore();
+}
+
+function drawGodRays(ctx, cx, cy, timer, winner) {
+  const baseColor = winner.color || '#fff';
+  const arenaY = (state.arena && state.arena.y !== undefined) ? state.arena.y : 170;
+  const arenaH = (state.arena && state.arena.height !== undefined) ? state.arena.height : 460;
+
+  // The light source origin — high above the visible area, never drawn directly
+  const srcY = arenaY - 600;
+
+  // Helper: draw one shaft from the invisible source point downward
+  function drawShaft(destX, destY, halfAngle, alpha, width) {
+    // Calculate angles to the left and right edges of the shaft
+    const dx1 = destX - cx;
+    const baseAngle = Math.atan2(destY - srcY, dx1);
+    const leftAngle  = baseAngle - halfAngle;
+    const rightAngle = baseAngle + halfAngle;
+
+    const length = 900; // long enough to fill the whole canvas height
+
+    const lx = cx + Math.cos(leftAngle)  * length;
+    const ly = srcY + Math.sin(leftAngle)  * length;
+    const rx = cx + Math.cos(rightAngle) * length;
+    const ry = srcY + Math.sin(rightAngle) * length;
+
+    // Gradient along the shaft from source downward
+    const grad = ctx.createLinearGradient(cx, srcY, cx, srcY + length * 0.75);
+    grad.addColorStop(0,    'rgba(0,0,0,0)');
+    grad.addColorStop(0.10, colorToRgba(baseColor, alpha * 1.0));
+    grad.addColorStop(0.50, colorToRgba(baseColor, alpha * 0.35));
+    grad.addColorStop(1,    'rgba(0,0,0,0)');
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.moveTo(cx, srcY);
+    ctx.lineTo(lx, ly);
+    ctx.lineTo(rx, ry);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.globalCompositeOperation = 'screen';
+
+  // Clip to arena bounds so light doesn't spill outside the dark panel
+  ctx.beginPath();
+  ctx.rect(0, arenaY, (state.canvas && state.canvas.width) || 540, arenaH);
+  ctx.clip();
+
+  // 3 swaying spotlights — narrow angle for tight theatrical beams
+  const s1 = Math.sin(timer * 0.012) * 0.04;
+  drawShaft(cx - 90 + s1 * 300, arenaY + arenaH, 0.045, 0.18, 0.045);
+
+  const s2 = Math.cos(timer * 0.008) * 0.03;
+  drawShaft(cx      + s2 * 300, arenaY + arenaH, 0.065, 0.28, 0.065);
+
+  const s3 = Math.sin(timer * 0.01 + 1.5) * 0.04;
+  drawShaft(cx + 90 + s3 * 300, arenaY + arenaH, 0.045, 0.18, 0.045);
+
+  ctx.restore();
+
+  // 2. Render Floating Ember Sparks rising upwards (angled diagonal lines)
+  if (!state._winnerEmbers) {
+    state._winnerEmbers = [];
+    const count = 40;
+    for (let i = 0; i < count; i++) {
+      state._winnerEmbers.push({
+        x: (Math.random() - 0.5) * 400, // offset from cx
+        y: (Math.random() - 0.5) * 400, // offset from cy
+        vx: -0.15 - Math.random() * 0.35,  // slightly drift left to look diagonal
+        vy: -0.8 - Math.random() * 1.4,   // float upwards quickly
+        size: 1.2 + Math.random() * 1.8,
+        alpha: 0.15 + Math.random() * 0.45,
+        pulseSpeed: 0.018 + Math.random() * 0.02,
+        pulsePhase: Math.random() * Math.PI
+      });
+    }
+  }
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.globalCompositeOperation = 'screen';
+
+  state._winnerEmbers.forEach(p => {
+    // Float upwards & drift left
+    p.y += p.vy;
+    p.x += p.vx;
+    p.pulsePhase += p.pulseSpeed;
+
+    // Wrap around to bottom if they float off screen
+    if (p.y < -230) {
+      p.y = 230;
+      p.x = (Math.random() - 0.5) * 400;
+    }
+    if (p.x < -200 || p.x > 200) {
+      p.x = (Math.random() - 0.5) * 400;
+    }
+
+    const currentAlpha = p.alpha * (0.65 + 0.35 * Math.sin(p.pulsePhase));
+
+    // Draw glowing orange/gold ember spark line segment (tilted matching speed)
+    ctx.beginPath();
+    ctx.strokeStyle = colorToRgba('#ffaa33', currentAlpha);
+    ctx.lineWidth = p.size;
+    ctx.moveTo(p.x, p.y);
+    ctx.lineTo(p.x + p.vx * 3.5, p.y + p.vy * 3.5);
+    ctx.stroke();
+  });
+  
+  ctx.restore();
+}
+
+function colorToRgba(color, alpha) {
+  if (!color) return `rgba(255, 255, 255, ${alpha})`;
+  if (color.startsWith('rgba')) {
+    return color.replace(/[^,]+(?=\))/, alpha);
+  }
+  if (color.startsWith('rgb')) {
+    return color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
+  }
+  if (color.startsWith('#')) {
+    let hex = color.slice(1);
+    if (hex.length === 3) {
+      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    }
+    const num = parseInt(hex, 16);
+    const r = (num >> 16) & 255;
+    const g = (num >> 8) & 255;
+    const b = num & 255;
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  // Fallback
+  return `rgba(255, 255, 255, ${alpha})`;
 }
 
 // ─────────────────────────────────────────────

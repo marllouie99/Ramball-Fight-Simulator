@@ -115,7 +115,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       
       for (let i = 0; i < allTargets.length; i++) {
         const ent = allTargets[i];
-        if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+        if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
         
         const dx = ent.x - projectile.x;
@@ -147,7 +147,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     // Continuous slow + pull effect for all targets (fighters & illusions) in the purple orb's radius
     for (let i = 0; i < allTargets.length; i++) {
       const ent = allTargets[i];
-      if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+      if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
       
       const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';

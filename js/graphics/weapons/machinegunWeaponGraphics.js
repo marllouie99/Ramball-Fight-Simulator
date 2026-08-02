@@ -188,7 +188,7 @@ export function drawMachineGun(ctx, options) {
     // Heat glow from barrel vents (OPTIMIZED: removed shadowBlur - expensive operation)
     ctx.fillStyle = glowColor;
     ctx.shadowColor = colors.heatGlow;
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowBlur
     ctx.fillRect(pos.receiverWidth - 2, -pos.barrelAssemblyHeight / 2 + 2, 8, pos.barrelAssemblyHeight - 4);
     
     // Steam/vapor particles when hot
@@ -219,8 +219,8 @@ export function drawMachineGun(ctx, options) {
     
     // Main flash (OPTIMIZED: removed shadowBlur - expensive operation)
     ctx.fillStyle = colors.muzzleFlash;
-    ctx.shadowColor = '#ffffff';
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowColor
+    // OPTIMIZED: Removed shadowBlur
     ctx.beginPath();
     ctx.arc(flashX, 0, flashSize, 0, Math.PI * 2);
     ctx.fill();
@@ -294,8 +294,8 @@ export function drawMachineGunBullet(ctx, x, y, angle, scale = 1, lifeRatio = 1)
   
   // Bullet body (OPTIMIZED: removed shadowBlur - expensive operation)
   ctx.fillStyle = '#c0c0c0';
-  ctx.shadowColor = 'rgba(255, 200, 100, 0.5)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.beginPath();
   ctx.ellipse(0, 0, bulletLength / 2, bulletWidth / 2, 0, 0, Math.PI * 2);
   ctx.fill();

@@ -86,8 +86,8 @@ export function drawHUD() {
     const cx = state.arena.x + state.arena.width / 2;
     const topY = state.arena.y - 36;
 
-    // Draw round on top (hidden in Stand Off modes)
-    if (mode !== GAME_MODES.STAND_OFF && mode !== GAME_MODES.STAND_OFF_1V2 && mode !== 'Stand Off' && mode !== '1v2 Stand Off') {
+    // Draw round on top (hidden in 1v1 and Stand Off modes)
+    if (mode !== GAME_MODES.ONE_VS_ONE && mode !== '1v1' && mode !== GAME_MODES.STAND_OFF && mode !== GAME_MODES.STAND_OFF_1V2 && mode !== 'Stand Off' && mode !== '1v2 Stand Off') {
         drawPanel(cx - 90, topY, 180, 26, 0.7);
 
         ctx.fillStyle = '#fff';
@@ -149,6 +149,18 @@ function updateHealthHud() {
   if (!containerBottom) return;
 
   const { fighters, mode, scores, teamScores } = state;
+  if (!fighters) return;
+
+  // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
+  // We update the DOM immediately if any fighter's HP changes, otherwise we update once every 5 frames.
+  const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
+  const hpChanged = currentHpStr !== state._lastHpStr;
+  state._lastHpStr = currentHpStr;
+
+  state._hudFrameCount = (state._hudFrameCount || 0) + 1;
+  const shouldUpdate = hpChanged || (state._hudFrameCount % 5 === 0) || state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'countdown';
+  if (!shouldUpdate) return;
+
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
   const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
   const is1v1 = mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === 'TLFS';
@@ -171,7 +183,7 @@ function updateHealthHud() {
 
   const getSkillDataForFighter = (f) => {
     if (f.characterId === 'gojo' || f.type === 'gojo') {
-      const themeColor = f.color || '#00e5ff';
+      const themeColor = '#0055ff'; // Match the deep blue of Unlimited Void
       const domainMax = CONFIG.gojo?.domainCooldown || 2000;
       const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
       let domainPct;
@@ -307,23 +319,29 @@ function updateHealthHud() {
       ];
     }
     if (f.characterId === 'layla' || f.type === 'layla') {
-      const themeColor = f.color || '#00d5ff';
-      const bombMax = CONFIG.layla?.maleficBombCooldown || 400;
+      const themeColor = '#00E5FF'; // Blue theme for her HUD bars
+      const bombMax = CONFIG.layla?.maleficBombCooldown || 200;
       const bombTimer = f.maleficBombCooldown !== undefined ? f.maleficBombCooldown : bombMax;
       const bombPct = Math.max(0, Math.min(100, (1 - (bombTimer / bombMax)) * 100));
 
-      const dashMax = CONFIG.layla?.voidDashCooldown || 240;
+      const dashMax = CONFIG.layla?.voidDashCooldown || 120;
       const dashTimer = f.voidDashCooldown !== undefined ? f.voidDashCooldown : dashMax;
       const dashPct = Math.max(0, Math.min(100, (1 - (dashTimer / dashMax)) * 100));
 
-      const ultMax = CONFIG.layla?.destructionBarrageCooldown || 1200;
+      const ultMax = CONFIG.layla?.ultimateCooldown || 600;
       const ultTimer = f.destructionBarrageCooldown !== undefined ? f.destructionBarrageCooldown : ultMax;
-      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      
+      let ultPct;
+      if (f.isUltimateCharging || f.isUltimateFiring) {
+        ultPct = 0;
+      } else {
+        ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      }
 
       return [
         { id: 'bomb', pct: bombPct, ready: bombPct >= 99, color: themeColor, label: 'MALEFIC BOMB' },
-        { id: 'dash', pct: dashPct, ready: dashPct >= 99, color: themeColor, label: 'VOID DASH' },
-        { id: 'ult',  pct: ultPct,  ready: ultPct >= 99,  color: themeColor, label: 'DESTRUCTION BARRAGE' }
+        { id: 'dash', pct: dashPct, ready: dashPct >= 99, color: themeColor, label: 'VOID PROJECTILE' },
+        { id: 'ult',  pct: ultPct,  ready: ultPct >= 99,  color: '#00E5FF', label: 'DESTRUCTION RUSH' }
       ];
     }
     if (f.characterId === 'todo' || f.type === 'todo') {
@@ -342,18 +360,43 @@ function updateHealthHud() {
       ];
     }
     if (f.characterId === 'yuji' || f.type === 'yuji') {
-      const themeColor = f.color || '#ff69b4';
+      const themeColor = '#ff3366';
+      
+      // 1. Skill 1: comboRushCooldown / comboMax
       const comboMax = CONFIG.yuji?.comboRushCooldown || 600;
       const comboTimer = f.comboRushCooldown !== undefined ? f.comboRushCooldown : comboMax;
       const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
 
-      const rctMax = CONFIG.yuji?.rctCooldown || 900;
-      const rctTimer = f.rctCooldown !== undefined ? f.rctCooldown : rctMax;
-      const rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
+      // 2. blackFlashThreshold progress bar: blackFlashCharge / threshold
+      const bfThreshold = f.soulSwapActive 
+        ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
+        : (f.blackFlashThreshold || CONFIG.yuji?.blackFlashThreshold || 4);
+      const bfThresholdPct = Math.max(0, Math.min(100, ((f.blackFlashCharge || 0) / bfThreshold) * 100));
+
+      // 3. Ultimate Skill: Soul Swap (Sukuna takeover)
+      let ultPct = 0;
+      let ultLabel = 'SOUL SWAP';
+      let ultReady = false;
+      let ultColor = themeColor; // Pink-Red
+
+      if (f.soulSwapActive) {
+        const ultDuration = CONFIG.yuji?.soulSwapDuration || 500;
+        ultPct = Math.max(0, Math.min(100, ((f.soulSwapTimer || 0) / ultDuration) * 100));
+        ultLabel = 'SUKUNA ACTIVE';
+      } else if (f.hasSoulSwapped) {
+        ultPct = 0;
+        ultLabel = 'EXPIRED';
+      } else {
+        const ultThresholdHp = CONFIG.yuji?.soulSwapHpThreshold || 0.30;
+        // Fills from 0% to 100% as HP drops from 100% down to the threshold
+        ultPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - ultThresholdHp)) * 100));
+        ultReady = ultPct >= 99 && (f.hp / f.maxHp <= ultThresholdHp);
+      }
 
       return [
-        { id: 'combo', pct: comboPct, ready: comboPct >= 99, color: themeColor, label: 'DIVERGENT FIST' },
-        { id: 'rct',   pct: rctPct,   ready: rctPct >= 99,   color: themeColor, label: 'RCT HEAL' }
+        { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
+        { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' },
+        { id: 'ult',          pct: ultPct,         ready: ultReady,             color: ultColor,   label: ultLabel }
       ];
     }
     if (f.characterId === 'cronos' || f.type === 'cronos') {
@@ -377,7 +420,10 @@ function updateHealthHud() {
       let rikaPct = 0;
       let rikaLabel = 'RIKA SUMMON';
       const rk = f.rika;
-      if (rk && rk.active) {
+      if ((f.domainActive || f.isChannelingDomain) && rk && rk.active && !rk.killedInDomain) {
+        rikaPct = 100;
+        rikaLabel = 'RIKA (DOMAIN)';
+      } else if (rk && rk.active) {
         const duration = CONFIG.yuta?.rikaDuration || 1000;
         const remaining = rk.timer || 0;
         rikaPct = Math.max(0, Math.min(100, (remaining / duration) * 100));
@@ -467,9 +513,9 @@ function updateHealthHud() {
       
       if (f.domainActive && isRikaAlive) {
         const boostDmg = Math.round(baseDmg * ((CONFIG.yuta?.domainRikaDamageMultiplier || 2.0) - 1));
-        info.push(`<b>Damage:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
-        info.push(`<b>Damage:</b> ${baseDmg}`);
+        info.push(`<b>DMG:</b> ${baseDmg}`);
       }
 
       info.push(`<b>Parries:</b> ${f.parryCount || 0}/${f.targetParriesForFlurry || 5}`);
@@ -486,8 +532,20 @@ function updateHealthHud() {
         const regen = CONFIG.yuta?.regenRate || 0.05;
         info.push(`<b>Regen:</b> ${regen.toFixed(2)}+`);
       }
+    } else if (f.characterId === 'yuji' || f.type === 'yuji') {
+      const punchBase = CONFIG.yuji?.punchDamage || 18;
+      const hasDmgBoost = f.soulSwapActive || f.blackFlashTimer > 0;
+      if (hasDmgBoost) {
+        let currentDmg = punchBase;
+        if (f.soulSwapActive) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5));
+        if (f.blackFlashTimer > 0) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.blackFlashMultiplier || 1.5));
+        const boost = currentDmg - punchBase;
+        info.push(`<b>DMG:</b> ${punchBase} + ${boost} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${punchBase}`);
+      }
     } else {
-      info.push(`<b>Damage:</b> ${baseDmg}`);
+      info.push(`<b>DMG:</b> ${baseDmg}`);
       
       if (f.characterId === 'gojo' || f.type === 'gojo') {
         const infinityCooldown = f.infinityCooldown || 0;

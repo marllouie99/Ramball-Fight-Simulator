@@ -7,7 +7,8 @@ import {
   drawPoisonEffect,
   drawSilenceEffect,
   drawThunderRootsEffect,
-  drawBlackFlashDebuffEffect
+  drawBlackFlashDebuffEffect,
+  drawVoidMarkEffect
 } from '../statusEffects.js';
 
 export class FighterRenderer {
@@ -46,7 +47,7 @@ export class FighterRenderer {
     
     // Suppress white hit-flash during Yuji's soul-swap transformation; the
     // 'lighter' composite at full opacity would completely wash the body white.
-    const isSoulSwapTransitioning = (fighter.soulSwapTransitionTimer || 0) > 0;
+    const isSoulSwapTransitioning = (fighter.soulSwapTransitionTimer || 0) > 0 || fighter.soulSwapActive;
     if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
@@ -108,6 +109,10 @@ export class FighterRenderer {
 
     if (fighter.blackFlashDebuffTimer > 0) {
       drawBlackFlashDebuffEffect(ctx, baseRadius);
+    }
+
+    if (fighter.voidMarkTimer > 0) {
+      drawVoidMarkEffect(ctx, baseRadius);
     }
   }
 

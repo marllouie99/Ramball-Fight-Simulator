@@ -93,6 +93,7 @@ export function reinitFighters() {
   state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
   state.qualityCheckTimer = 0;
   state.screenShake = { timer: 0, maxTimer: 0, intensity: 0 };
+  state.matchTimer = 0;
 
   // Clear fuel pickups
   state.fuelPickups.length = 0;

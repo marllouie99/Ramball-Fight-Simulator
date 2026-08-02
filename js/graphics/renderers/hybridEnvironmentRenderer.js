@@ -8,6 +8,7 @@ import { drawCronosSphereVisual } from '../draw.js';
 
 let furnaceDimSprite = null;
 let currentFurnaceDimOpacity = 0;
+let domainUpdateTick = 0;
 
 let rikaSummonDimSprite = null;
 let currentRikaSummonDimOpacity = 0;
@@ -89,11 +90,17 @@ function getPurpleDimSprite() {
     
     const cx = size / 2;
     const cy = size / 2;
+    
+    // 1. Draw the dark base purple overlay to match the original Canvas 2D style
+    ctx.fillStyle = `rgba(18, 2, 32, 0.7)`;
+    ctx.fillRect(0, 0, size, size);
+    
+    // 2. Dynamic radial gradient centered on the orb (restored to original rich, high-contrast values)
     const grad = ctx.createRadialGradient(cx, cy, size * 0.05, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(147, 51, 234, 0.25)`);
-    grad.addColorStop(0.35, `rgba(88, 28, 135, 0.60)`);
-    grad.addColorStop(0.70, `rgba(30, 0, 50, 0.85)`);
-    grad.addColorStop(1.0, `rgba(10, 0, 20, 0.95)`);
+    grad.addColorStop(0, `rgba(147, 51, 234, 0.25)`);  // Bright electric purple center
+    grad.addColorStop(0.35, `rgba(88, 28, 135, 0.60)`); // Deep purple aura
+    grad.addColorStop(0.70, `rgba(30, 0, 50, 0.85)`);   // Dark void
+    grad.addColorStop(1.0, `rgba(10, 0, 20, 0.95)`);   // Outer dark edge
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -218,13 +225,20 @@ export function updateHybridEnvironment() {
   const yuta = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta') && f.domainActive);
   const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
 
+  domainUpdateTick++;
+  const updateGojo = (domainUpdateTick % 2 === 0);
+  const updateSukuna = (domainUpdateTick % 2 === 1);
+  const updateYuta = (domainUpdateTick % 2 === 0);
+
   if (gojo) {
     const data = getGojoDomainHybridData();
     if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
     // 1:1 rendering, no scaling of the sprite
-    data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-    renderGojoDomainBackground(gojo, data.ctx, isMultiDomain && gojo !== state.fighters.find(f => f.domainActive));
-    data.texture.update();
+    if (updateGojo) {
+      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+      renderGojoDomainBackground(gojo, data.ctx, isMultiDomain && gojo !== state.fighters.find(f => f.domainActive));
+      data.texture.update();
+    }
   } else if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent) {
     gojoDomainHybridData.sprite.parent.removeChild(gojoDomainHybridData.sprite);
   }
@@ -233,9 +247,11 @@ export function updateHybridEnvironment() {
     const data = getSukunaDomainHybridData();
     if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
     // 1:1 rendering, no scaling of the sprite
-    data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-    renderSukunaDomainBackground(sukuna, data.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
-    data.texture.update();
+    if (updateSukuna) {
+      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+      renderSukunaDomainBackground(sukuna, data.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
+      data.texture.update();
+    }
   } else if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent) {
     sukunaDomainHybridData.sprite.parent.removeChild(sukunaDomainHybridData.sprite);
   }
@@ -244,12 +260,14 @@ export function updateHybridEnvironment() {
     const data = getYutaDomainHybridData();
     if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
     // 1:1 rendering, no scaling of the sprite
-    data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-    renderYutaDomainBackground(yuta, data.ctx, isMultiDomain && yuta !== state.fighters.find(f => f.domainActive));
-    if (sukuna && isMultiDomain) {
-      renderYutaSukunaDomainClashRift(data.ctx, yuta, sukuna);
+    if (updateYuta) {
+      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+      renderYutaDomainBackground(yuta, data.ctx, isMultiDomain && yuta !== state.fighters.find(f => f.domainActive));
+      if (sukuna && isMultiDomain) {
+        renderYutaSukunaDomainClashRift(data.ctx, yuta, sukuna);
+      }
+      data.texture.update();
     }
-    data.texture.update();
   } else if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent) {
     yutaDomainHybridData.sprite.parent.removeChild(yutaDomainHybridData.sprite);
   }
@@ -288,13 +306,13 @@ export function updateHybridEnvironment() {
   let tOpPurple = 0, cxPurple = state.canvas.width / 2, cyPurple = state.canvas.height / 2;
   if (gojoPurple && gojoPurple.isChannelingPurple) {
     cxPurple = gojoPurple.x; cyPurple = gojoPurple.y - (gojoPurple.z || 0);
-    tOpPurple = 0.25 + Math.min(1.0, (gojoPurple.purpleChargeTimer || 0) / Math.max(1, gojoPurple.purpleChargeMax || 120)) * 0.55;
+    tOpPurple = 0.15 + Math.min(1.0, (gojoPurple.purpleChargeTimer || 0) / Math.max(1, gojoPurple.purpleChargeMax || 120)) * 0.35;
   } else if (purpleOrb) {
     cxPurple = purpleOrb.x; cyPurple = purpleOrb.y;
-    tOpPurple = 0.50 + Math.sin(Math.max(0, Math.min(1, (purpleOrb.life || 0) / (purpleOrb.maxLife || 300))) * Math.PI) * 0.20;
+    tOpPurple = 0.30 + Math.sin(Math.max(0, Math.min(1, (purpleOrb.life || 0) / (purpleOrb.maxLife || 300))) * Math.PI) * 0.15;
   } else if (gojoPurple && gojoPurple.purpleRecoveryTimer > 0) {
     cxPurple = gojoPurple.x; cyPurple = gojoPurple.y - (gojoPurple.z || 0);
-    tOpPurple = 0.45 * (gojoPurple.purpleRecoveryTimer / 30);
+    tOpPurple = 0.25 * (gojoPurple.purpleRecoveryTimer / 30);
   }
   currentPurpleDimOpacity += (tOpPurple > currentPurpleDimOpacity) ? (tOpPurple - currentPurpleDimOpacity) * 0.15 : (tOpPurple - currentPurpleDimOpacity) * 0.18;
   

@@ -126,12 +126,9 @@ export function drawBlackHoleEffects() {
 }
 
 export function drawFloatingTexts() {
-  const { ctx } = state;
-
   const texts = state.floatingTexts;
   if (!texts || texts.length === 0) return;
 
-  // Build new array without expired texts (avoids splice O(n) in loop)
   const activeTexts = [];
   for (let i = 0; i < texts.length; i++) {
     const t = texts[i];
@@ -150,27 +147,57 @@ export function drawFloatingTexts() {
     }
 
     if (t.timer < t.maxTimer) {
-      ctx.save();
-      ctx.globalAlpha = Math.max(0, alpha);
-      ctx.font = 'bold 16px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.lineWidth = 3;
-      ctx.lineJoin = 'round';
-      ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-      ctx.strokeText(t.text, t.x, t.y);
+      if (state.pixiApp && state.pixiLayers && state.pixiLayers.ui) {
+        if (!t.pixiText) {
+          t.pixiText = new window.PIXI.Text(t.text, {
+            fontFamily: 'Arial',
+            fontSize: 16,
+            fontWeight: 'bold',
+            fill: t.color,
+            stroke: 'rgba(0,0,0,0.9)',
+            strokeThickness: 3,
+            dropShadow: true,
+            dropShadowColor: 'rgba(255,255,255,0.95)',
+            dropShadowDistance: 1,
+            dropShadowBlur: 0,
+            lineJoin: 'round'
+          });
+          t.pixiText.anchor.set(0.5, 0.5);
+          state.pixiLayers.ui.addChild(t.pixiText);
+        }
+        t.pixiText.x = t.x;
+        t.pixiText.y = t.y;
+        t.pixiText.alpha = Math.max(0, alpha);
+      } else {
+        const { ctx } = state;
+        if (ctx) {
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, alpha);
+          ctx.font = 'bold 16px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.lineWidth = 3;
+          ctx.lineJoin = 'round';
+          ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+          ctx.strokeText(t.text, t.x, t.y);
 
-      ctx.fillStyle = 'rgba(255,255,255,0.95)';
-      ctx.fillText(t.text, t.x + 1, t.y + 1); // Subtle drop shadow
+          ctx.fillStyle = 'rgba(255,255,255,0.95)';
+          ctx.fillText(t.text, t.x + 1, t.y + 1); // Subtle drop shadow
 
-      ctx.fillStyle = t.color;
-      ctx.fillText(t.text, t.x, t.y);
-      ctx.restore();
+          ctx.fillStyle = t.color;
+          ctx.fillText(t.text, t.x, t.y);
+          ctx.restore();
+        }
+      }
       activeTexts.push(t);
+    } else {
+      if (t.pixiText && t.pixiText.parent) {
+        t.pixiText.parent.removeChild(t.pixiText);
+        t.pixiText.destroy();
+      }
     }
   }
 
-  // Replace array reference
   state.floatingTexts = activeTexts;
 }
 

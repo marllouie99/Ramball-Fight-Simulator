@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { state } from '../../core/state.js';
+import { CONFIG } from '../../core/config.js';
 
 export const Engineer_WEAPON_GRAPHICS = {
   colors: {
@@ -29,18 +30,20 @@ export function drawEngineer(ctx, options) {
     wrenchActive = false,
     wrenchTimer = 0,
     wrenchAngle = 0,
+    wrenchSlashFadeTimer = 0,
     shotgunRecoilTimer = 0,
-    lastWeaponUsed = 'shotgun'
+    lastWeaponUsed = 'shotgun',
+    color = '#ffcc00'
   } = options;
   
   if (lastWeaponUsed === 'wrench') {
     // Shotgun is stowed on back
     drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, 0, true);
     // Wrench is active
-    drawEngineerWrench(ctx, x, y, wrenchActive ? wrenchAngle : gunAngle, r, facingRight, wrenchActive ? wrenchTimer : 0, false);
+    drawEngineerWrench(ctx, x, y, wrenchActive ? wrenchAngle : gunAngle, r, facingRight, wrenchActive ? wrenchTimer : 0, false, color, wrenchSlashFadeTimer);
   } else {
     // Wrench is stowed on back
-    drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, 0, true);
+    drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, 0, true, color, 0);
     // Shotgun is active
     drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, shotgunRecoilTimer, false);
   }
@@ -249,7 +252,7 @@ function drawEngineerShotgunModel(ctx, recoilTimer) {
   ctx.restore();
 }
 
-export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, isStowed = false) {
+export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, isStowed = false, color = '#ffcc00', slashFadeTimer = 0) {
   ctx.save();
   ctx.translate(x, y);
   
@@ -269,23 +272,59 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
     let armAngleOffset = 0;
     let wristAngleOffset = 0;
     
+    let showSlash = false;
+    let slashProgress = 1.0;
+    let slashAlpha = 0.0;
+    
     if (timer > 0) {
-      // Max timer is 10 (from config)
-      const progress = 1 - (timer / 10);
+      const maxTimer = CONFIG.Engineer?.wrenchSwipeDuration || 16;
+      slashProgress = 1 - (timer / maxTimer);
+      slashAlpha = 1.0;
       
       // Arm swings from -72 deg to +72 deg
-      armAngleOffset = (-swipeArc / 2 + swipeArc * progress) * flipDir;
+      armAngleOffset = (-swipeArc / 2 + swipeArc * slashProgress) * flipDir;
       
       // Wrist flicks from -90 deg to 0 deg during the first half of the swing
-      if (progress < 0.5) {
-        wristAngleOffset = (-Math.PI / 2 + (progress * 2) * (Math.PI / 2)) * flipDir;
+      if (slashProgress < 0.5) {
+        wristAngleOffset = (-Math.PI / 2 + (slashProgress * 2) * (Math.PI / 2)) * flipDir;
       } else {
         wristAngleOffset = 0; // Follow through straight
       }
+      showSlash = true;
     } else {
       // Idle/Resting position — held forward like a sword, pointed at the target
       armAngleOffset = 0;
       wristAngleOffset = 0;
+      
+      if (slashFadeTimer > 0) {
+        showSlash = true;
+        slashProgress = 1.0; // Fully extended
+        slashAlpha = slashFadeTimer / 12; // Fades out
+      }
+    }
+    
+    // Crescent visual swing trail centered on wrench head
+    if (showSlash) {
+      ctx.save();
+      const angleStart = gunAngle + (-swipeArc / 2) * flipDir;
+      const angleEnd = gunAngle + (-swipeArc / 2 + swipeArc * slashProgress) * flipDir;
+      const trailRadius = r + 5 + 46;
+      
+      ctx.beginPath();
+      ctx.arc(0, 0, trailRadius + 9, angleStart, angleEnd, flipDir < 0);
+      ctx.arc(0, 0, trailRadius - 9, angleEnd, angleStart, flipDir > 0);
+      ctx.closePath();
+      
+      const trailGrad = ctx.createRadialGradient(0, 0, trailRadius - 10, 0, 0, trailRadius + 10);
+      trailGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
+      trailGrad.addColorStop(0.3, `rgba(255, 215, 0, ${0.6 * slashAlpha})`);
+      trailGrad.addColorStop(0.5, `rgba(255, 255, 255, ${0.95 * slashAlpha})`);
+      trailGrad.addColorStop(0.7, `rgba(255, 165, 0, ${0.45 * slashAlpha})`);
+      trailGrad.addColorStop(1, 'rgba(255, 165, 0, 0)');
+      
+      ctx.fillStyle = trailGrad;
+      ctx.fill();
+      ctx.restore();
     }
     
     // Rotate arm from shoulder
@@ -293,6 +332,17 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
     
     // Move to hand
     ctx.translate(r + 5, 0);
+
+    // Draw hand circle at active wrench joint
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(0, 3, 6, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+    ctx.restore();
 
     // Apply wrist rotation
     ctx.rotate(wristAngleOffset);

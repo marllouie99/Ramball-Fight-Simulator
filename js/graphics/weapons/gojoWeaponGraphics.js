@@ -189,7 +189,7 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
     ctx.arc(0, 0, baseR * 6, 0, Math.PI * 2);
     ctx.fill();
 
-    // 2. Soft, cloudy aura rings (Optimized)
+    // 2. Soft, cloudy aura rings (4 loops for detailed swirling texture)
     ctx.save();
     ctx.lineCap = 'round';
     for (let i = 0; i < 4; i++) {
@@ -208,7 +208,7 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
     }
     ctx.restore();
 
-    // 3. Small particle sparks (Optimized)
+    // 3. Small particle sparks (15 sparks for high-frequency details)
     ctx.save();
     for (let i = 0; i < 15; i++) {
         const seed = i * 1337.7331;
@@ -231,7 +231,7 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
     }
     ctx.restore();
 
-    // 4. Boiling Plasma Core Texture (Optimized)
+    // 4. Boiling Plasma Core Texture (5 loops with clipping for sharp high-detail containment)
     ctx.beginPath();
     ctx.arc(0, 0, baseR * 1.4, 0, Math.PI * 2);
     ctx.fillStyle = coreBase;
@@ -345,28 +345,31 @@ export function drawPurpleOrbTrail(ctx, p, time) {
         ctx.stroke();
         
         // Draw swirling particles along the trail
-        const particleCount = 3 + Math.floor(distance / 15);
-        for (let j = 0; j < particleCount; j++) {
-            const t = j / particleCount;
-            const px = prev.x + dx * t;
-            const py = prev.y + dy * t;
-            
-            // Swirl offset
-            const swirl = Math.sin(time * 0.003 + i * 0.5 + j) * 15;
-            const px2 = px + Math.cos(angle + Math.PI/2) * swirl;
-            const py2 = py + Math.sin(angle + Math.PI/2) * swirl;
-            
-            // Outer glow
-            ctx.beginPath();
-            ctx.arc(px2, py2, 12, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(180, 50, 255, ${trailAlpha * 0.7})`;
-            ctx.fill();
-            
-            // Inner bright particle
-            ctx.beginPath();
-            ctx.arc(px2, py2, 6, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(255, 220, 255, ${trailAlpha})`;
-            ctx.fill();
+        // OPTIMIZATION: Only draw particles on every 3rd segment, and limit particle density to save CPU
+        if (i % 3 === 0) {
+            const particleCount = 2 + Math.floor(distance / 25);
+            for (let j = 0; j < particleCount; j++) {
+                const t = j / particleCount;
+                const px = prev.x + dx * t;
+                const py = prev.y + dy * t;
+                
+                // Swirl offset
+                const swirl = Math.sin(time * 0.003 + i * 0.5 + j) * 15;
+                const px2 = px + Math.cos(angle + Math.PI/2) * swirl;
+                const py2 = py + Math.sin(angle + Math.PI/2) * swirl;
+                
+                // Outer glow
+                ctx.beginPath();
+                ctx.arc(px2, py2, 12, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(180, 50, 255, ${trailAlpha * 0.7})`;
+                ctx.fill();
+                
+                // Inner bright particle
+                ctx.beginPath();
+                ctx.arc(px2, py2, 6, 0, Math.PI * 2);
+                ctx.fillStyle = `rgba(255, 220, 255, ${trailAlpha})`;
+                ctx.fill();
+            }
         }
     }
     

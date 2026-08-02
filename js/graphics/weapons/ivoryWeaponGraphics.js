@@ -91,8 +91,8 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
     if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = Math.max(1, 1.5 * s); ctx.stroke(); }
   };
 
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   // 1. Stock Dark Base
@@ -212,7 +212,7 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
   ctx.fillStyle = charcoal; ctx.fill(); ctx.stroke();
 
   // 10. Central Circular Mechanism
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
   const cx = 65, cy = 10;
   ctx.beginPath(); ctx.arc(cx * s, cy * s, 22 * s, 0, Math.PI*2);
@@ -228,7 +228,7 @@ export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTim
   ctx.beginPath(); ctx.arc(cx * s, cy * s, (isFiring ? 6 : 4) * s, 0, Math.PI*2);
   ctx.fillStyle = orange; ctx.fill();
 
-  ctx.shadowColor = 'rgba(0,0,0,0.4)';
+  // OPTIMIZED: Removed shadowColor
   ctx.shadowOffsetY = 2;
 
   // 11. Complex Scope
@@ -338,13 +338,13 @@ export function drawWhiteChargeEffect(ctx, x, y, gunAngle, beamCharge, r) {
   const time = Date.now() / 80;
   
   // Central concentrated energy core
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = '#ff6600';
+  // OPTIMIZED: Removed shadowBlur
+  // OPTIMIZED: Removed shadowColor
   ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.arc(tipDist, 0, 3 + chargeNorm * 5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
 
   // Expanding pulsing energy rings (Shockwaves at the tip)
   for (let i = 0; i < 3; i++) {

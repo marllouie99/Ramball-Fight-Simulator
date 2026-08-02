@@ -55,6 +55,36 @@ function renderLaylaGogglesDirect(ctx, r) {
   ctx.fill();
 }
 
+export function drawLaylaAfterImages(ctx, fighter) {
+  if (!fighter.afterImages || fighter.afterImages.length === 0) return;
+  const r = fighter.r;
+  
+  ctx.save();
+  // We use lighter composite operation for energetic look
+  ctx.globalCompositeOperation = 'screen';
+  
+  for (let i = 0; i < fighter.afterImages.length; i++) {
+    const ai = fighter.afterImages[i];
+    const alpha = Math.max(0, ai.timer / ai.maxTimer) * 0.45; // Max 45% opacity
+    
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = ai.color || '#00E5FF';
+    
+    // Draw body silhouette
+    ctx.beginPath();
+    ctx.arc(ai.x, ai.y, r, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Draw slight glow/bloom
+    ctx.globalAlpha = alpha * 0.5;
+    ctx.beginPath();
+    ctx.arc(ai.x, ai.y, r * 1.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  
+  ctx.restore();
+}
+
 export function drawLaylaGoggles(ctx, fighter) {
   const r = fighter.r;
   const goggleY = fighter.y - r * 0.8; // Position above the head

@@ -65,7 +65,7 @@ export const gojoConfig = {
     infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
     infinityFreezeDuration: 50,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
     infinityMeleeFreezeDuration: 10,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
-    infinityMaxFrozenProjectiles: 15,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
+    infinityMaxFrozenProjectiles: 4,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
 
     // Anime Melee Combat Rhythm & Disengage
     forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round

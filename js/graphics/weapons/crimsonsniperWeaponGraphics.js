@@ -76,8 +76,8 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   };
 
   // Add shadow for depth (OPTIMIZED: using shadowOffsetY only, removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
   
   // --- 1. Long Dark Barrel ---
@@ -164,7 +164,7 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   ], colors.whiteMetal, colors.outline);
 
   // Panel lines / Details on Main Body
-  ctx.shadowBlur = 0; 
+  // OPTIMIZED: Removed shadowBlur 
   drawPoly([
     [24, 6],
     [28, -2],
@@ -227,7 +227,7 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
     ctx.fill();
   }
   ctx.restore();
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
 
   // --- 6.8 RELOAD FINISH FLASH ---
   if (flashTimer > 0) {
@@ -258,7 +258,7 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
     ctx.lineTo(36 * s, -4 * s);
     ctx.stroke();
 
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowBlur
     ctx.globalCompositeOperation = 'source-over';
   }
 
@@ -403,7 +403,7 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
 
   // --- 13. DYNAMIC LASER SIGHT & ENERGY ---
   ctx.globalCompositeOperation = 'source-over'; // Changed from 'lighter' so it is visible on white backgrounds
-  ctx.shadowBlur = 0; // Turn off shadow for lighter elements
+  // OPTIMIZED: Removed shadowBlur // Turn off shadow for lighter elements
   
   // Laser Sight Beam
   const beamLength = 1200 * s; // Extended to stretch across the arena

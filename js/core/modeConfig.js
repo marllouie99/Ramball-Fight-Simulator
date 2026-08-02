@@ -15,7 +15,8 @@ export const MODE_SETTINGS = {
   [GAME_MODES.ONE_VS_ONE]: {
     label: '1v1',
     rounds: 3,
-    hpMultiplier: 1.2,
+    hpMultiplier: 1.0,
+    fixedHp: 500,
     speedMultiplier: 1.5,
     initialFuelPickups: 2,
     supportFourFighters: false,

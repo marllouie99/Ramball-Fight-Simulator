@@ -210,7 +210,7 @@ function drawTodoHands(ctx, fighter, skinColor) {
   // Smooth progress calculation matching Mahoraga's cubic ease-in-out curve
   let rawProgress = 0;
   if (isPunching) {
-    const maxT = fighter.punchMaxTime || 16;
+    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
     rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
   }
   
@@ -354,8 +354,7 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
     ctx.fillStyle = innerGrad;
 
     // Glowing bloom shadow (shadowBlur) on the fill itself!
-    ctx.shadowColor = '#FF0000';
-    ctx.shadowBlur = 14;
+    // OPTIMIZED: Removed shadowColor and shadowBlur for performance
 
     ctx.beginPath();
     ctx.arc(x, y, radius, 0, Math.PI * 2);

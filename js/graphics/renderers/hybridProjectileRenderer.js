@@ -1,6 +1,6 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { drawSukunaFurnaceArrow, drawSukunaSlash, drawSukunaCleave, drawGhostBlade } from '../weapons/sukunaWeaponGraphics.js';
-import { drawGojoPurpleOrb, drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaBasicBullet, drawLaylaUltimateBullet } from './projectileRenderer.js';
+import { drawGojoPurpleOrb, drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaBasicBullet, drawLaylaUltimateBullet, drawLaylaVoidProjectile } from './projectileRenderer.js';
 
 const activeSprites = new Map();
 const canvasPool = [];
@@ -40,14 +40,17 @@ export function updateHybridProjectiles() {
     const isFuga = (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace);
     const isGojoProj = (p.visual === 'gojoBlue' || p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple');
     const isSukunaSlashProj = (p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'ghostBlade');
-    const isLaylaProj = (p.visual === 'layla_bomb' || p.visual === 'layla_cosmic_blast' || p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet');
+    const isLaylaProj = (p.visual === 'layla_bomb' || p.visual === 'layla_cosmic_blast' || p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet' || p.visual === 'layla_void_projectile');
     
-    if (!isFuga && !isGojoProj && !isSukunaSlashProj && !isLaylaProj) continue;
+    // OPTIMIZATION: Sukuna's slashes are high-frequency transient effects.
+    // Routing them through WebGL requires updating their textures every frame, stalling the GPU.
+    // We bypass WebGL and render them directly in Canvas 2D.
+    if (!isFuga && !isGojoProj && !isLaylaProj) continue;
     
-    // Slashes shouldn't render inside Gojo's domain visually
+    // Slashes shouldn't render inside Gojo's domain visually unless they are frozen by Infinity
     if (isSukunaSlashProj) {
       const isGojoDomainActive = state.fighters?.some(f => f && f.domainActive && f._def?.id === 'gojo' && f.domainChargeTimer >= f.domainChargeMax);
-      if (isGojoDomainActive) continue;
+      if (isGojoDomainActive && !p.isFrozenByInfinity) continue;
     }
     
     currentIds.add(p.id);
@@ -55,22 +58,27 @@ export function updateHybridProjectiles() {
     let hybridData = activeSprites.get(p.id);
     
     if (!hybridData) {
-      // Fuga gets a huge canvas for trail, Purple gets smaller, slashes get smallest.
+      // Restore full sizes for high visual quality.
+      // The other drawing optimizations will ensure 60 FPS performance.
       let size = 1200;
-      if (isGojoProj) size = 800;
-      else if (isSukunaSlashProj) size = 128;
+      let drawScale = 1.0;
+      
+      if (isFuga) { size = 1200; drawScale = 1.0; }
+      else if (isGojoProj) { size = 1200; drawScale = 1.0; }
+      else if (isSukunaSlashProj) { size = 128; drawScale = 1.0; }
       else if (isLaylaProj) {
-        if (p.visual === 'layla_cosmic_blast') size = 400;
-        else if (p.visual === 'layla_ultimate_bullet') size = 384;
-        else size = 256;
+        if (p.visual === 'layla_cosmic_blast') { size = 400; drawScale = 1.0; }
+        else if (p.visual === 'layla_ultimate_bullet') { size = 384; drawScale = 1.0; }
+        else { size = 256; drawScale = 1.0; }
       }
       
       hybridData = getLocalCanvas(size);
+      hybridData.drawScale = drawScale;
       layer.addChild(hybridData.sprite);
       activeSprites.set(p.id, hybridData);
     }
     
-    const { canvas, ctx, sprite, texture, size } = hybridData;
+    const { canvas, ctx, sprite, texture, size, drawScale = 1.0 } = hybridData;
     
     ctx.clearRect(0, 0, size, size);
     ctx.save();
@@ -80,7 +88,11 @@ export function updateHybridProjectiles() {
     if (isLaylaProj) {
       ctx.translate(size / 2, size / 2);
     } else {
-      ctx.translate(size / 2 - p.x, size / 2 - p.y);
+      ctx.translate(size / 2 - (p.x * drawScale), size / 2 - (p.y * drawScale));
+    }
+    
+    if (drawScale !== 1.0) {
+      ctx.scale(drawScale, drawScale);
     }
     
     if (isFuga) {
@@ -89,17 +101,13 @@ export function updateHybridProjectiles() {
     } else if (isGojoProj) {
       sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
       drawGojoPurpleOrb(ctx, p);
-    } else if (isSukunaSlashProj) {
-      sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
-      if (p.visual === 'sukunaSlash') drawSukunaSlash(ctx, p);
-      else if (p.visual === 'sukunaCleave') drawSukunaCleave(ctx, p);
-      else if (p.visual === 'ghostBlade') drawGhostBlade(ctx, p);
     } else if (isLaylaProj) {
       sprite.blendMode = window.PIXI.BLEND_MODES.ADD; // Glowing intense plasma
       if (p.visual === 'layla_bomb') drawLaylaBomb(ctx, p);
       else if (p.visual === 'layla_cosmic_blast') drawLaylaCosmicBlast(ctx, p);
       else if (p.visual === 'layla_basic_bullet') drawLaylaBasicBullet(ctx, p);
       else if (p.visual === 'layla_ultimate_bullet') drawLaylaUltimateBullet(ctx, p);
+      else if (p.visual === 'layla_void_projectile') drawLaylaVoidProjectile(ctx, p);
     }
     
     ctx.restore();
@@ -107,6 +115,10 @@ export function updateHybridProjectiles() {
     texture.update();
     sprite.x = p.x;
     sprite.y = p.y;
+    
+    if (drawScale !== 1.0) {
+      sprite.scale.set(1.0 / drawScale);
+    }
   }
   
   for (const [id, data] of activeSprites.entries()) {

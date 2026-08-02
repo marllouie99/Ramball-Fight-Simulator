@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
-import { state, registerProjectileSystem, triggerGlobalScreenShake } from '../core/state.js';
+import { state, registerProjectileSystem, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { playSound, playLoopingSound, stopLoopingSound, fadeOutLoopingSound, fadeOutSound, fadeOutSoundBySrc } from './soundSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
@@ -38,7 +38,7 @@ class ProjectileSystem {
     this.frozenProjectiles = []; // Decoupled: frozen projectiles are moved here, ignored by update loop
     this.stuckShurikens = []; // Array for shurikens stuck in the wall
     this.poolSize = 500; // Pre-allocate pool size
-    this.pool = Array.from({ length: this.poolSize }, () => ({}));
+    this.pool = Array.from({ length: this.poolSize }, (_, i) => ({ id: `proj_${i}` }));
     this.poolIndex = 0; // Circular pointer to reuse objects without array push/pop thrashing
     this.maxActiveProjectiles = 200; // Dynamic limit based on fighter count
     this._preallocatePool();
@@ -101,6 +101,8 @@ class ProjectileSystem {
     proj.transformed = false;
     proj.visual = null;
     proj.explosionType = null;
+    proj._detonated = false; // CRITICAL: Clear detonation flag so pool slots don't carry over to new projectiles
+    proj.isVoid = false;
     
     if (proj.soundKey) {
       fadeOutLoopingSound(proj.soundKey, 500); // Smooth fade out over 0.5s when projectile dies
@@ -838,6 +840,13 @@ class ProjectileSystem {
           return true;
         }
 
+        // Layla's Void Projectile detonates in an AOE on contact with a fighter
+        // Detonation is handled in the outer if(hit||expired) block to guarantee
+        // the blast projectile is spawned AFTER the void projectile's removal logic.
+        if (projectile.visual === 'layla_void_projectile') {
+          return true;
+        }
+
         if (!projectile.isGrenade) {
           if (projectile.isFlame) {
             const intervalSeconds = Number(CONFIG.orange.flameContactIntervalSeconds ?? CONFIG.orange.flameHitCooldown ?? 0.2);
@@ -1247,6 +1256,7 @@ class ProjectileSystem {
     blast.maxLife = 35;
     blast.visual = 'layla_cosmic_blast';
     blast.isVisual = true;
+    blast.isExplosion = true;
     blast.owner = bomb.owner;
     this.projectiles.push(blast);
 
@@ -1257,6 +1267,88 @@ class ProjectileSystem {
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(3, 6);
     }
+  }
+
+  detonateLaylaVoidProjectile(bomb, fighters) {
+    if (bomb._detonated) return;
+    bomb._detonated = true;
+
+    const attacker = fighters[bomb.owner] || (state.fighters && state.fighters[bomb.owner]);
+    const radius = bomb.aoeRadius || 55;
+    const damage = bomb.damage || CONFIG.layla?.voidProjectileDamage || 15;
+    const slowDuration = bomb.slowDuration || CONFIG.layla?.voidProjectileSlowDuration || 60;
+    const slowMultiplier = bomb.slowMultiplier || CONFIG.layla?.voidProjectileSlowMultiplier || 0.7;
+    const markDuration = CONFIG.layla?.voidMarkDuration || 180;
+
+    const aoeTargets = new Set();
+
+    // Check enemy fighters
+    for (let fi = 0; fi < fighters.length; fi++) {
+      if (bomb.owner === fi || areOnSameTeam(bomb.owner, fi)) continue;
+      const f = fighters[fi];
+      if (!f || f.hp <= 0) continue;
+      const d = Math.hypot(f.x - bomb.x, f.y - bomb.y);
+      if (d <= radius + f.r) {
+        aoeTargets.add(f);
+      }
+    }
+
+    // Check enemy illusions
+    for (const illusion of state.illusions || []) {
+      if (!illusion || illusion.hp <= 0) continue;
+      const illusionOwnerIndex = illusion.owner?.fighterIndex ?? state.fighters?.indexOf(illusion.owner);
+      if (illusionOwnerIndex !== undefined && illusionOwnerIndex !== -1) {
+        if (bomb.owner === illusionOwnerIndex || areOnSameTeam(bomb.owner, illusionOwnerIndex)) continue;
+      }
+      const d = Math.hypot(illusion.x - bomb.x, illusion.y - bomb.y);
+      if (d <= radius + (illusion.r || 20)) {
+        aoeTargets.add(illusion);
+      }
+    }
+
+    // Apply damage, slow, and Magic Mark to all caught targets!
+    for (const target of aoeTargets) {
+      if (typeof target.takeDamage === 'function') {
+        target.takeDamage(damage, attacker, { isAOE: true, projectile: bomb });
+      } else {
+        applyDamageToTarget(target, damage, attacker, { isAOE: true });
+      }
+      
+      // Apply slow
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(slowDuration, slowMultiplier);
+      } else {
+        target.slowTimer = Math.max(target.slowTimer || 0, slowDuration);
+        target.slowMultiplier = Math.min(target.slowMultiplier || 1.0, slowMultiplier);
+      }
+
+      // Apply Magic Mark!
+      target.voidMarkTimer = markDuration;
+      spawnFloatingText(target.x, target.y - target.r - 10, 'MARKED!', '#00E5FF');
+    }
+
+    // Spawn a purple visual-only cosmic blast
+    const blast = this._getProjectile();
+    if (blast) {
+      blast.x = bomb.x;
+      blast.y = bomb.y;
+      blast.vx = 0;
+      blast.vy = 0;
+      blast.r = radius;
+      blast.life = 25;
+      blast.maxLife = 25;
+      blast.visual = 'layla_cosmic_blast';
+      blast.isVoid = true;
+      blast.isVisual = true;
+      blast.isExplosion = true;
+      blast.owner = bomb.owner;
+      this.projectiles.push(blast);
+    }
+
+    // Sparks and impact flash
+    spawnSparks(bomb.x, bomb.y, 16, 'laylaSpark');
+    spawnImpactFlash(bomb.x, bomb.y, radius * 1.2, 'layla');
+    playSound('Assets/Sound Effects/Attacks/laserpew.mp3', 0.35);
   }
 
   /**
@@ -1818,59 +1910,6 @@ class ProjectileSystem {
         continue;
       }
 
-      // --- Gojo Limitless (Infinity) Spatial Projectile Interception ---
-      if (!p.isGojoBlue && !p.isGojoPurple && (!p.isVisual || p.isFrozenByInfinity) && p.life > 0) {
-        for (let fi = 0; fi < fighters.length; fi++) {
-          const f = fighters[fi];
-          if (!f || f.hp <= 0) continue;
-          const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
-          if (!isGojo) continue;
-          if (areOnSameTeam(p.owner, fi)) continue;
-
-          const infinityRadius = f.r + 30;
-          const dx = p.x - f.x;
-          const dy = p.y - (f.y - (f.z || 0));
-          const distSq = dx * dx + dy * dy;
-          const isLimitlessActive = (f.infinityCooldown <= 0 || f.infinityActive || f.infinityBlockTimer > 0 || p.targetIsGojoLimitless);
-          if (distSq <= infinityRadius * infinityRadius && isLimitlessActive) {
-            // Check configurable freeze chance (CONFIG.gojo.infinityFreezeChance)
-            const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 1.0;
-            if (!p.isFrozenByInfinity && Math.random() <= freezeChance) {
-              // Prune oldest frozen projectile if exceeding max limit to guarantee 60 FPS
-              const maxFrozen = CONFIG.gojo?.infinityMaxFrozenProjectiles ?? 12;
-              let activeFrozenCount = 0;
-              let oldestFrozenProj = null;
-              for (let k = 0; k < this.projectiles.length; k++) {
-                if (this.projectiles[k].isFrozenByInfinity && this.projectiles[k].infinityFreezeTimer > 15) {
-                  activeFrozenCount++;
-                  if (!oldestFrozenProj || this.projectiles[k].infinityFreezeTimer < oldestFrozenProj.infinityFreezeTimer) {
-                    oldestFrozenProj = this.projectiles[k];
-                  }
-                }
-              }
-              if (activeFrozenCount >= maxFrozen && oldestFrozenProj) {
-                oldestFrozenProj.infinityFreezeTimer = 15; // Smoothly dissolve oldest frozen projectile
-              }
-
-              p.isFrozenByInfinity = true;
-              const freezeDuration = CONFIG.gojo?.infinityFreezeDuration ?? 240;
-              p.infinityFreezeTimer = freezeDuration;
-              p.life = freezeDuration;
-              p.maxLife = freezeDuration;
-              p._resumeVx = p.vx;
-              p._resumeVy = p.vy;
-              p.vx = 0;
-              p.vy = 0;
-              p.damage = 0; // Nullify damage completely
-              p.isVisual = true; // Disable further damage collision
-              if (typeof f.triggerInfinityBlock === 'function') {
-                f.triggerInfinityBlock(p.x, p.y);
-              }
-            }
-          }
-        }
-      }
-
       // --- Gojo Blue Pull & Drag Logic ---
       if (p.isGojoBlue) {
         const pullRadius = CONFIG.gojo.blueRadius || 90; // Pull radius for Blue
@@ -1914,13 +1953,12 @@ class ProjectileSystem {
         const purpleScale = CONFIG.gojo.purpleScale || 1.0;
         const effectiveRadius = p.r * purpleScale; // Hit radius for damage/destruction
         const purplePullRadius = CONFIG.gojo.purplePullRadius || 280; // Pull/suction range
-        
-        // Continuous screen shake while purple orb is active
+        // Continuous screen shake while purple orb is active (optimized with HUD throttling)
         p.purpleShakeCounter = (p.purpleShakeCounter || 0) + 1;
-        if (p.purpleShakeCounter >= 5) { // Shake every 5 frames for continuous effect
+        if (p.purpleShakeCounter >= 5) {
           p.purpleShakeCounter = 0;
-          const shakeIntensity = CONFIG.gojo.purpleShakeIntensity || 2;
-          const shakeDuration = CONFIG.gojo.purpleShakeDuration || 30;
+          const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 2;
+          const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 30;
           triggerGlobalScreenShake(shakeIntensity, shakeDuration);
         }
         
@@ -2525,7 +2563,10 @@ class ProjectileSystem {
         if (p.fadingAlpha === undefined) p.fadingAlpha = 1.0;
         p.fadingAlpha -= 0.06; // About ~16 frames to fully fade to invisible
         
-        if (p.fadingAlpha <= 0 || (!p.history || p.history.length <= 1)) {
+        const isLaylaBullet = p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet';
+        const shouldRemove = isLaylaBullet ? (p.fadingAlpha <= 0) : (p.fadingAlpha <= 0 || (!p.history || p.history.length <= 1));
+        
+        if (shouldRemove) {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
@@ -2534,12 +2575,85 @@ class ProjectileSystem {
         continue;
       }
 
+      // --- Gojo Limitless (Infinity) Spatial Projectile Interception (Checked at new position before collision) ---
+      if (!p.isGojoBlue && !p.isGojoPurple && (!p.isVisual || p.isFrozenByInfinity) && p.life > 0) {
+        for (let fi = 0; fi < fighters.length; fi++) {
+          const f = fighters[fi];
+          if (!f || f.hp <= 0) continue;
+          const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo');
+          if (!isGojo) continue;
+          if (areOnSameTeam(p.owner, fi)) continue;
+
+          const infinityRadius = f.r + 30;
+          const dx = p.x - f.x;
+          const dy = p.y - (f.y - (f.z || 0));
+          const distSq = dx * dx + dy * dy;
+          const isLimitlessActive = (f.infinityCooldown <= 0 || f.infinityActive || f.infinityBlockTimer > 0 || p.targetIsGojoLimitless);
+          if (distSq <= infinityRadius * infinityRadius && isLimitlessActive) {
+            // Check configurable freeze chance (CONFIG.gojo.infinityFreezeChance)
+            const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 1.0;
+            if (!p.isFrozenByInfinity && Math.random() <= freezeChance) {
+              // Prune oldest frozen projectile if exceeding max limit to guarantee 60 FPS
+              const maxFrozen = CONFIG.gojo?.infinityMaxFrozenProjectiles ?? 12;
+              let activeFrozenCount = 0;
+              let oldestFrozenProj = null;
+              for (let k = 0; k < this.projectiles.length; k++) {
+                if (this.projectiles[k].isFrozenByInfinity && this.projectiles[k].infinityFreezeTimer > 15) {
+                  activeFrozenCount++;
+                  if (!oldestFrozenProj || this.projectiles[k].infinityFreezeTimer < oldestFrozenProj.infinityFreezeTimer) {
+                    oldestFrozenProj = this.projectiles[k];
+                  }
+                }
+              }
+              if (activeFrozenCount >= maxFrozen && oldestFrozenProj) {
+                oldestFrozenProj.infinityFreezeTimer = 15; // Smoothly dissolve oldest frozen projectile
+              }
+
+              p.isFrozenByInfinity = true;
+              const freezeDuration = CONFIG.gojo?.infinityFreezeDuration ?? 240;
+              p.infinityFreezeTimer = freezeDuration;
+              p.life = freezeDuration;
+              p.maxLife = freezeDuration;
+              p._resumeVx = p.vx;
+              p._resumeVy = p.vy;
+              p.vx = 0;
+              p.vy = 0;
+              p.damage = 0; // Nullify damage completely
+              p.isVisual = true; // Disable further damage collision
+              if (typeof f.triggerInfinityBlock === 'function') {
+                f.triggerInfinityBlock(p.x, p.y);
+              }
+            }
+          }
+        }
+      }
+
       const hit = this.checkProjectileHits(p, fighters);
       const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
         if (p.visual === 'layla_bomb') {
           this.detonateLaylaBomb(p, fighters);
+        } else if (p.visual === 'layla_void_projectile') {
+          this.detonateLaylaVoidProjectile(p, fighters);
+        } else if (p.visual === 'layla_basic_bullet') {
+          const mini = this.fireProjectile(fighters[p.owner] || null, p.owner, 0, false, 0, false, 'layla_cosmic_blast', p.x, p.y);
+          if (mini) {
+            mini.r = 24; // mini explosion
+            mini.life = 15;
+            mini.maxLife = 15;
+            mini.isVisual = true;
+            mini.isExplosion = true;
+          }
+        } else if (p.visual === 'layla_ultimate_bullet') {
+          const mini = this.fireProjectile(fighters[p.owner] || null, p.owner, 0, false, 0, false, 'layla_cosmic_blast', p.x, p.y);
+          if (mini) {
+            mini.r = 38; // medium explosion
+            mini.life = 20;
+            mini.maxLife = 20;
+            mini.isVisual = true;
+            mini.isExplosion = true;
+          }
         }
 
         const isMahoragaRuinDebris = p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';

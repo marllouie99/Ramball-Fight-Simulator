@@ -438,8 +438,8 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor =
   const scale = cfg.positioning.scale;
 
   // Setup generic shadow (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   // -- 1. Rear Fuel Tank / Base --
@@ -526,7 +526,7 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor =
   }
 
   // Glowing heat inside vents
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
   ctx.fillStyle = cfg.flamethrower.ventGlow;
   for (let i = 0; i < 3; i++) {
@@ -534,8 +534,8 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor =
     ctx.fillRect(vx, -1.5 * scale, 0.5 * scale, 4 * scale);
   }
   // Shadow for depth (OPTIMIZED: removed shadowBlur)
-  ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowColor
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 2;
 
   // -- 5. Muzzle Nozzle --
@@ -555,7 +555,7 @@ export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor =
   ctx.stroke();
 
   // -- 6. Pilot Light --
-  ctx.shadowBlur = 0;
+  // OPTIMIZED: Removed shadowBlur
   ctx.shadowOffsetY = 0;
   
   // Pilot light bracket

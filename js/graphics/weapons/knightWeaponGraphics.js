@@ -155,7 +155,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
 
   // Bloom effect for the core
   if (!useUltraLOD) {
-    ctx.shadowColor = '#ff8800';
+    // OPTIMIZED: Removed shadowColor
   }
 
   // Outer emitter ring
@@ -239,7 +239,7 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
 
     // Base state is a crisp, clean, thin-lined hologram without heavy glow
     if (!useUltraLOD) {
-      ctx.shadowColor = '#ffffff';
+      // OPTIMIZED: Removed shadowColor
     }
     
     ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + flashBoost * 0.5})`;
@@ -445,7 +445,7 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
     }
 
     // 3. Sharp inner edge
-    ctx.shadowBlur = 0;
+    // OPTIMIZED: Removed shadowBlur
     ctx.strokeStyle = neonEdge;
     ctx.lineWidth = 2.5 * swordScale;
     ctx.stroke();

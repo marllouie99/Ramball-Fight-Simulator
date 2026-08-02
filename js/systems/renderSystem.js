@@ -98,7 +98,8 @@ export function renderGame() {
       updateHybridEnvironment();
       drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
       drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
-      
+      // OPTIMIZED: Removed Canvas 2D dim screens for Purple and Fuga (now handled by hybridEnvironmentRenderer)
+
       const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 
       if (!isGojoDomainActive) {

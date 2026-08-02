@@ -13,6 +13,7 @@ import { modExecuteKatanaMelee, modGetKatanaTipPositions } from './yuta/yutaKata
 import { getNextCopiedTechnique, executeCopiedTechnique, executeThinIceBreaker } from './yuta/yutaCopyLogic.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
+import { drawYutaKatana } from '../../graphics/ui/WeaponIndexScreen.js';
 
 export class YutaFighter extends Fighter {
   constructor(def) {
@@ -173,7 +174,7 @@ export class YutaFighter extends Fighter {
       // Spawn cursed energy gathering sparks at the blade tip & palm while summoning Rika
       if (Math.random() < 0.6) {
         const tipPos = this._getKatanaTipPositions();
-        spawnSparks(tipPos.outer.x, tipPos.outer.y, 2, 'silver', 'rgba(255, 20, 147, 1)');
+        spawnSparks(tipPos.outer.x, tipPos.outer.y, 2, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
       }
       if (this.rikaCallTimer % 5 === 0) {
         spawnImpactFlash(this.x, this.y, 35 + Math.random() * 15, 'rgba(255, 20, 147, 0.4)');
@@ -362,7 +363,7 @@ export class YutaFighter extends Fighter {
 
           spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
           triggerGlobalScreenShake(6, 6);
-          spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', 'rgba(255, 20, 147, 1)');
+          spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
 
           const flurryAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
           this.flurryTarget.vx += Math.cos(flurryAngle) * 2;
@@ -498,7 +499,7 @@ export class YutaFighter extends Fighter {
 
       // Spawn some charge particles
       if (this.domainChargeTimer % 3 === 0) {
-        spawnSparks(this.x + (Math.random()-0.5)*30, this.y + (Math.random()-0.5)*30, 3, 'silver', 'rgba(255, 105, 180, 1)');
+        spawnSparks(this.x + (Math.random()-0.5)*30, this.y + (Math.random()-0.5)*30, 3, 'silver', { color: 'rgba(255, 105, 180, 1)', blendMode: 0 });
       }
       if (this.domainChargeTimer % 15 === 0) {
         spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 147, 0.4)');
@@ -731,7 +732,9 @@ export class YutaFighter extends Fighter {
         return 0; // Passively block damage during active counter to prevent interruption
       }
 
-      this.parryCount++;
+      if (this.parryCount < this.targetParriesForFlurry) {
+        this.parryCount++;
+      }
       if (this.parryCount >= this.targetParriesForFlurry && attacker && !attacker.isDead && !this.isChannelingDomain) {
         this.parryCount = 0;
         this.targetParriesForFlurry = this._getRandomParryThreshold();
@@ -766,7 +769,7 @@ export class YutaFighter extends Fighter {
           this.flurryTarget = attacker;
           const attackSound = getBasicAttackSound('musashi');
           if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
-          const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 1.0;
+          const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 0.35;
           if (CONFIG.yuta?.phantomFlurryNoiseSound && Math.random() < flurryNoiseChance) {
             audioSystem.playSFX(
               CONFIG.yuta.phantomFlurryNoiseSound,
@@ -815,8 +818,8 @@ export class YutaFighter extends Fighter {
         const sparkX = hiltX + Math.cos(bladeAngle) * bladeOffset;
         const sparkY = hiltY + Math.sin(bladeAngle) * bladeOffset;
 
-        // Pass pink color for Yuta's cursed energy parry sparks
-        spawnSparks(sparkX, sparkY, 1, 'silver', 'rgba(255, 20, 147, 1)');
+        // Pass pink color for Yuta's cursed energy parry sparks with NORMAL blend mode
+        spawnSparks(sparkX, sparkY, 1, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
       }
 
       // Spawn a main dark impact flash at the midpoint of Yuta's guard
@@ -1687,50 +1690,6 @@ export class YutaFighter extends Fighter {
       ctx.restore();
     }
 
-    // Draw Lore-Accurate Katana (Matching reference image)
-    if (isGamePlay) {
-      // 1. Tsuka (Black Hilt)
-      ctx.fillStyle = '#1A1A1A';
-      ctx.fillRect(-15, -2.5, 23, 5);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.0;
-      ctx.strokeRect(-15, -2.5, 23, 5);
-
-      // 2. Tsuba (Golden Guard)
-      ctx.fillStyle = '#C5A059';
-      ctx.fillRect(10.8, -6, 4, 12);
-      ctx.strokeRect(10.8, -6, 4, 12);
-
-      // 3. Habaki (Collar)
-      ctx.fillStyle = '#FFD700';
-      ctx.fillRect(14.8, -2, 4, 4);
-
-      // 4. Blade - Curved silver blade
-      ctx.beginPath();
-      ctx.moveTo(19, -1.8);
-      ctx.quadraticCurveTo(49, -4.2, 81, -8.0);
-      ctx.quadraticCurveTo(78, -3.5, 75, -2.2);
-      ctx.quadraticCurveTo(49, 1.2, 19, 2.2);
-      ctx.closePath();
-      ctx.fillStyle = '#E5E8E8';
-      ctx.fill();
-      if (auraOpacity > 0.05) {
-        ctx.fillStyle = `rgba(255, 20, 147, ${auraOpacity * 0.4})`;
-        ctx.fill();
-      }
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
-
-      // 5. Hand holding the hilt
-      ctx.beginPath();
-      ctx.arc(-2, 0.5, getHandSize(5, this), 0, Math.PI * 2);
-      ctx.fillStyle = this.color;
-      ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = '#000';
-      ctx.stroke();
-    } else {
       // 1. Kashira (Gold Pommel)
       ctx.fillStyle = '#D4AF37';
       ctx.fillRect(-18, -3, 3, 6);
@@ -1871,7 +1830,6 @@ export class YutaFighter extends Fighter {
       ctx.lineWidth = 1.2;
       ctx.strokeStyle = '#000';
       ctx.stroke();
-    }
 
     ctx.restore();
 

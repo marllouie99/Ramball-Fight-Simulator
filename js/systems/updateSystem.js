@@ -45,6 +45,7 @@ export function updateGame() {
     }
     
     if (state.gameState === 'playing') {
+      state.matchTimer = (state.matchTimer || 0) + 1;
       updateFighters();
       updateProjectiles();
       // Update flame particle system

@@ -53,7 +53,7 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
 
   // ─── Outer glow layer (electric blue bloom) ───
   ctx.save();
-  ctx.shadowColor = 'rgba(0, 191, 255, 0.5)';
+  // OPTIMIZED: Removed shadowColor
 
   ctx.beginPath();
   ctx.moveTo(upperEdge[0].x, upperEdge[0].y);
@@ -77,7 +77,7 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
   const innerLower = spine.map((p, i) => ({ x: p.x, y: p.y + getThickness(i) * innerScale })).reverse();
 
   ctx.save();
-  ctx.shadowColor = '#FFFFFF';
+  // OPTIMIZED: Removed shadowColor
 
   ctx.beginPath();
   ctx.moveTo(innerUpper[0].x, innerUpper[0].y);

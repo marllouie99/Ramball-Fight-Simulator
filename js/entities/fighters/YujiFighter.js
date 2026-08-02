@@ -82,29 +82,6 @@ export class YujiFighter extends Fighter {
       });
     }
 
-    // Ultimate transformation transition freeze (lock velocity, shake screen, skip actions)
-    if (this.soulSwapTransitionTimer > 0) {
-      this.soulSwapTransitionTimer--;
-      this.vx = 0;
-      this.vy = 0;
-      
-      // Trigger a violent screen shake on first frame
-      if (this.soulSwapTransitionTimer === 44) {
-        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1.5, 20);
-      }
-      
-      // Keep decaying other animations/timers
-      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
-      return;
-    }
-
-    // TimeStop & Freeze Guards (Rule #1)
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush || this.isParalyzed) {
-      this.interruptAttacks();
-      return;
-    }
-
     const isFightingSukuna = state.fighters.some(f => f && !f.isDead && f !== this && (f.characterId === 'sukuna' || f.type === 'sukuna'));
 
     // Auto-trigger Ultimate: Soul Swap — Sukuna Takes Over (Once per match, HP critically low)
@@ -124,6 +101,29 @@ export class YujiFighter extends Fighter {
           CONFIG.yuji.transformationDelay ?? 0
         );
       }
+    }
+
+    // TimeStop & Freeze Guards (Rule #1)
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.isTargetOfAmbush || this.isParalyzed) {
+      this.interruptAttacks();
+      return;
+    }
+
+    // Ultimate transformation transition freeze (lock velocity, shake screen, skip actions)
+    if (this.soulSwapTransitionTimer > 0) {
+      this.soulSwapTransitionTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      
+      // Trigger a violent screen shake on first frame
+      if (this.soulSwapTransitionTimer === 44) {
+        if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1.5, 20);
+      }
+      
+      // Keep decaying other animations/timers
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      return;
     }
 
     super.update(opponent, ownerIndex, arena);

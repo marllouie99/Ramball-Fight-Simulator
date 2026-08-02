@@ -169,6 +169,11 @@ export class ParticleSystem {
       // Apply overrides passed in (like forcing radius for impact flash)
       Object.assign(spark, overrideProps);
 
+      // If a custom blendMode was provided, apply it to the sprite now that overrides are assigned
+      if (spark.isPixi && spark.sprite && spark.blendMode !== undefined) {
+        spark.sprite.blendMode = spark.blendMode;
+      }
+
       if (insertIdx !== -1) {
         state.sparkEffects[insertIdx] = spark;
       } else {

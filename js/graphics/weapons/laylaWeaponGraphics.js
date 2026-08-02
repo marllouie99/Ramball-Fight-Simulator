@@ -23,7 +23,7 @@ export const LAYLA_WEAPON_COLORS = {
   cyanCore: '#00E5FF',
   cyanGlow: '#80F5FF',
   cyanLight: '#E0FFFF',
-  blackOutline: '#15100B',
+  blackOutline: '#000000',
 };
 
 // ─────────────────────────────────────────────
@@ -128,7 +128,7 @@ export function drawLaylaGun(ctx, x, y, gunAngle, r = 25, options = {}) {
   // Weapon pulsates with volatile energy visually indicating extended attack range!
   const empowerPulse = isEmpowered ? (1.2 + Math.sin(Date.now() * 0.015) * 0.3) : 1.0;
   const pulse = (Math.sin(time * 3) * 0.12 + 1.0) * empowerPulse;
-  const strokeW = 1.3;
+  const strokeW = 2.0;
 
   // Removed global shadowBlur here for extreme performance optimization.
   // We rely on the bright cyan glow colors on the vents and core to indicate the buff.
@@ -501,101 +501,103 @@ export function drawLaylaGun(ctx, x, y, gunAngle, r = 25, options = {}) {
   // ─────────────────────────────────────────────
   // 7. CRACKLING CYAN PLASMA LIGHTNING BEAM
   // ─────────────────────────────────────────────
-  ctx.save();
-  ctx.translate(67, 0);
-
-  // Firing Muzzle Blast/Attack Flare (When Recoil is active)
-  if (recoil > 0.05) {
+  if (!isPreview) {
     ctx.save();
-    ctx.translate(6, 0);
-    
-    const blastSize = recoil * 34; // Up to 34px radius blast
-    const blastAlpha = recoil;
-    
-    // Expanding shockwave ring
-    ctx.strokeStyle = `rgba(0, 229, 255, ${blastAlpha * 0.85})`;
-    ctx.lineWidth = 2.5 * recoil;
+    ctx.translate(67, 0);
+
+    // Firing Muzzle Blast/Attack Flare (When Recoil is active)
+    if (recoil > 0.05) {
+      ctx.save();
+      ctx.translate(6, 0);
+      
+      const blastSize = recoil * 34; // Up to 34px radius blast
+      const blastAlpha = recoil;
+      
+      // Expanding shockwave ring
+      ctx.strokeStyle = `rgba(0, 229, 255, ${blastAlpha * 0.85})`;
+      ctx.lineWidth = 2.5 * recoil;
+      ctx.beginPath();
+      ctx.arc(0, 0, blastSize * 0.7, 0, Math.PI * 2);
+      ctx.stroke();
+      
+      // Jagged 4-pointed energy star blast
+      ctx.fillStyle = `rgba(224, 255, 255, ${blastAlpha})`;
+      ctx.strokeStyle = `rgba(0, 229, 255, ${blastAlpha})`;
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(blastSize, 0);
+      ctx.quadraticCurveTo(0, 0, 0, -blastSize);
+      ctx.quadraticCurveTo(0, 0, -blastSize, 0);
+      ctx.quadraticCurveTo(0, 0, 0, blastSize);
+      ctx.quadraticCurveTo(0, 0, blastSize, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Hot-white core flash
+      ctx.fillStyle = `rgba(255, 255, 255, ${blastAlpha})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, blastSize * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // Muzzle Flare Soft Aura Glow
+    const glowGrad = ctx.createRadialGradient(0, 0, 1, 8, 0, 18);
+    glowGrad.addColorStop(0, lightCyan);
+    glowGrad.addColorStop(0.4, `rgba(0, 229, 255, 0.6)`);
+    glowGrad.addColorStop(1, 'rgba(0, 229, 255, 0)');
+    ctx.fillStyle = glowGrad;
     ctx.beginPath();
-    ctx.arc(0, 0, blastSize * 0.7, 0, Math.PI * 2);
-    ctx.stroke();
-    
-    // Jagged 4-pointed energy star blast
-    ctx.fillStyle = `rgba(224, 255, 255, ${blastAlpha})`;
-    ctx.strokeStyle = `rgba(0, 229, 255, ${blastAlpha})`;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(blastSize, 0);
-    ctx.quadraticCurveTo(0, 0, 0, -blastSize);
-    ctx.quadraticCurveTo(0, 0, -blastSize, 0);
-    ctx.quadraticCurveTo(0, 0, 0, blastSize);
-    ctx.quadraticCurveTo(0, 0, blastSize, 0);
-    ctx.closePath();
+    ctx.arc(6, 0, 18, 0, Math.PI * 2);
     ctx.fill();
+
+    const f1 = Math.sin(time * 9) * 3.5;
+    const f2 = Math.cos(time * 13) * 4.2;
+
+    // Outer Cyan Plasma Wave
+    ctx.strokeStyle = mainCyan;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(8, -3 + f1);
+    ctx.lineTo(16, 4 + f2);
+    ctx.lineTo(25, -2 + f1 * 0.6);
+    ctx.lineTo(36, 2 + f2 * 0.4);
+    ctx.lineTo(48, 0);
     ctx.stroke();
 
-    // Hot-white core flash
-    ctx.fillStyle = `rgba(255, 255, 255, ${blastAlpha})`;
+    // Inner Bright White-Cyan Core Beam
+    ctx.strokeStyle = lightCyan;
+    ctx.lineWidth = 1.2;
     ctx.beginPath();
-    ctx.arc(0, 0, blastSize * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(0, 0);
+    ctx.lineTo(8, -3 + f1);
+    ctx.lineTo(16, 4 + f2);
+    ctx.lineTo(25, -2 + f1 * 0.6);
+    ctx.lineTo(36, 2 + f2 * 0.4);
+    ctx.lineTo(48, 0);
+    ctx.stroke();
 
-    ctx.restore();
+    // Top Lightning Fork
+    ctx.strokeStyle = lightCyan;
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(8, -3 + f1);
+    ctx.lineTo(14, -8 + f2);
+    ctx.lineTo(20, -5 + f1);
+    ctx.stroke();
+
+    // Bottom Lightning Fork
+    ctx.beginPath();
+    ctx.moveTo(16, 4 + f2);
+    ctx.lineTo(22, 9 + f1);
+    ctx.lineTo(28, 6 + f2);
+    ctx.stroke();
+
+    ctx.restore(); // Restore lightning translate(67, 0) before drawing hands!
   }
-
-  // Muzzle Flare Soft Aura Glow
-  const glowGrad = ctx.createRadialGradient(0, 0, 1, 8, 0, 18);
-  glowGrad.addColorStop(0, lightCyan);
-  glowGrad.addColorStop(0.4, `rgba(0, 229, 255, 0.6)`);
-  glowGrad.addColorStop(1, 'rgba(0, 229, 255, 0)');
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath();
-  ctx.arc(6, 0, 18, 0, Math.PI * 2);
-  ctx.fill();
-
-  const f1 = Math.sin(time * 9) * 3.5;
-  const f2 = Math.cos(time * 13) * 4.2;
-
-  // Outer Cyan Plasma Wave
-  ctx.strokeStyle = mainCyan;
-  ctx.lineWidth = 2.2;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(8, -3 + f1);
-  ctx.lineTo(16, 4 + f2);
-  ctx.lineTo(25, -2 + f1 * 0.6);
-  ctx.lineTo(36, 2 + f2 * 0.4);
-  ctx.lineTo(48, 0);
-  ctx.stroke();
-
-  // Inner Bright White-Cyan Core Beam
-  ctx.strokeStyle = lightCyan;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.lineTo(8, -3 + f1);
-  ctx.lineTo(16, 4 + f2);
-  ctx.lineTo(25, -2 + f1 * 0.6);
-  ctx.lineTo(36, 2 + f2 * 0.4);
-  ctx.lineTo(48, 0);
-  ctx.stroke();
-
-  // Top Lightning Fork
-  ctx.strokeStyle = lightCyan;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(8, -3 + f1);
-  ctx.lineTo(14, -8 + f2);
-  ctx.lineTo(20, -5 + f1);
-  ctx.stroke();
-
-  // Bottom Lightning Fork
-  ctx.beginPath();
-  ctx.moveTo(16, 4 + f2);
-  ctx.lineTo(22, 9 + f1);
-  ctx.lineTo(28, 6 + f2);
-  ctx.stroke();
-
-  ctx.restore(); // Restore lightning translate(67, 0) before drawing hands!
 
   // ─────────────────────────────────────────────
   // 8. LAYLA'S GLOVED HANDS (Gripping Cannon)

@@ -204,6 +204,7 @@ export const state = {
   countdownTimer: 0,
   countdownDuration: 120, // 2 seconds at 60fps
   isCountdownActive: false,
+  matchTimer: 0,
 };
 
 // ─────────────────────────────────────────────
@@ -446,7 +447,11 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
 
   // Remove oldest texts if we're at the cap
   if (state.floatingTexts.length >= MAX_FLOATING_TEXTS) {
-    state.floatingTexts.shift();
+    const removed = state.floatingTexts.shift();
+    if (removed && removed.pixiText && removed.pixiText.parent) {
+      removed.pixiText.parent.removeChild(removed.pixiText);
+      removed.pixiText.destroy();
+    }
   }
 
   // Count active texts that spawned near the same position to avoid stacking
@@ -471,3 +476,5 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     opacity: 1,
   });
 }
+
+window.state = state;
