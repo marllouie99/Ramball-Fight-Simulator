@@ -10,6 +10,7 @@ import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTra
 import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike } from './toji/tojiWeapons.js';
 import { modSpawnTeleportAfterimages, modStartAmbushSequence, modUpdateAmbushSequence } from './toji/tojiAmbush.js';
 import { modUpdateChannelSense, modUpdateStealth } from './toji/tojiSkills.js';
+import { MODE_SPEED_MULTIPLIER } from '../../core/modeConfig.js';
 
 /**
  * Toji Fushiguro - The Sorcerer Killer
@@ -142,6 +143,7 @@ export class TojiFighter extends Fighter {
     this.stealthActive = true;
     this.stealthAfterimages = [];
     this.isAmbushing = false;
+    this.ambushTarget = null;
     this.ambushPhase = null;
     this.ambushTimer = 0;
     this.spearCooldown = 0;
@@ -175,6 +177,7 @@ export class TojiFighter extends Fighter {
   interruptAttacks() {
     super.interruptAttacks();
     this.isAmbushing = false;
+    this.ambushTarget = null;
     this.ambushPhase = null;
     this.ultimateActive = false;
     this.isChannelingDomain = false;
@@ -199,6 +202,41 @@ export class TojiFighter extends Fighter {
    */
   takeDamage(amount, attacker, opts = {}) {
     if (this.isDead || this.hp <= 0) return false;
+
+    // Stealth & Ultimate Dodge Chance: physically dodge incoming projectiles while in stealth or during ultimate
+    const isDodgeable = opts.isProjectile && !opts.isTrueDamage;
+    let dodgeChance = CONFIG.toji?.stealthDodgeChance || 0.10;
+    if (this.ultimateActive) {
+      dodgeChance *= (CONFIG.toji?.ultimateDodgeMultiplier || 3.0);
+    }
+    
+    const canDodge = isDodgeable && (this.isStealthed || this.ultimateActive);
+    if (canDodge && Math.random() < dodgeChance) {
+      spawnFloatingText(this.x, this.y - this.r - 5, 'DODGE!', '#a855f7');
+      audioSystem.playSFX('skill_parry', 0.65);
+      
+      // Spawn standard Toji stealth flash-step afterimages
+      if (!this.stealthAfterimages) this.stealthAfterimages = [];
+      const moveAngle = Math.hypot(this.vx, this.vy) > 0.1 ? Math.atan2(this.vy, this.vx) : (this.angle || 0);
+      const perpAngle = moveAngle + Math.PI / 2;
+      
+      for (let i = 0; i < 3; i++) {
+        const offsetDistance = (i + 1) * 8;
+        const zigzagDistance = (i % 2 === 0 ? 1 : -1) * (4 + i * 3);
+        const offsetX = -Math.cos(moveAngle) * offsetDistance + Math.cos(perpAngle) * zigzagDistance;
+        const offsetY = -Math.sin(moveAngle) * offsetDistance + Math.sin(perpAngle) * zigzagDistance;
+        pushTrailCap(this.stealthAfterimages, {
+          x: this.x + offsetX,
+          y: this.y + offsetY,
+          angle: this.gunAngle !== undefined ? this.gunAngle : this.angle,
+          alpha: 0.60 - i * 0.15,
+          initialAlpha: 0.60 - i * 0.15,
+          maxTimer: 14,
+          timer: 14
+        }, 30);
+      }
+      return false; // Damage dodged & negated!
+    }
 
     // Check if an enemy Domain Expansion is currently active in the arena
     const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
@@ -233,9 +271,12 @@ export class TojiFighter extends Fighter {
       audioSystem.playSFX('skill_parry', 0.85);
 
       // Trigger 3-Stage Ambush Counter-Attack with cooldown so it is not spammed continuously inside domains
-      let realTarget = (attacker && attacker.owner && !attacker.isTurret) ? attacker.owner : attacker;
-      if (realTarget && (realTarget.isRika || realTarget.type === 'rika' || realTarget._def?.type === 'rika')) {
-        realTarget = state.fighters.find(f => f && f !== this && f.hp > 0 && !f.isRika && f.type !== 'rika' && f._def?.type !== 'rika');
+      let realTarget = attacker;
+      if (attacker && attacker.owner) {
+        // If the attacker is a projectile (does not have hp property) or is a turret, target the owner
+        if (!attacker.hp || attacker.isTurret || attacker.owner.isTurret) {
+          realTarget = attacker.owner;
+        }
       }
       if (!this.isAmbushing && (this._parryAmbushCooldown || 0) <= 0 && realTarget && realTarget.hp > 0 && !realTarget.isDead) {
         this._parryAmbushCooldown = CONFIG.toji?.parryAmbushCooldownFrames || 360; // 6 second cooldown between parry counter-ambushes
@@ -798,6 +839,7 @@ export class TojiFighter extends Fighter {
     if ((this.redKnockbackTimer || 0) > 0) {
       this.redKnockbackTimer--;
       this.isAmbushing = false;
+      this.ambushTarget = null;
       this.ambushPhase = null;
       
       this.vx = this.redKnockbackVx || 0;
@@ -831,6 +873,15 @@ export class TojiFighter extends Fighter {
       this.slowTimer = Math.max(this.slowTimer || 0, 2);
     } else {
       this.slowTimer = 0;
+    }
+
+    // Update movement speed dynamically based on stealth state
+    const baseTojiSpeed = this.baseSpeed * (MODE_SPEED_MULTIPLIER[state.mode] || 1.0);
+    if (this.isStealthed) {
+      const stealthSpeedMult = CONFIG.toji?.stealthSpeedMultiplier || 1.3;
+      this.speed = baseTojiSpeed * stealthSpeedMult;
+    } else {
+      this.speed = baseTojiSpeed;
     }
 
     // Update motion trail afterimages during all states (including Ultimate and Ambushes)
@@ -881,7 +932,8 @@ export class TojiFighter extends Fighter {
 
     // Handle active ambush sequence
     if (this.isAmbushing) {
-      this.updateAmbushSequence(opponent, ownerIndex);
+      const target = this.ambushTarget || opponent;
+      this.updateAmbushSequence(target, ownerIndex);
       return;
     }
 
@@ -1032,45 +1084,52 @@ export class TojiFighter extends Fighter {
   draw(ctx) {
     ctx.save();
 
+    // Performance: cache expensive lookups once per frame
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+    const now = Date.now();
+
     // Keep chain physics updated during every render frame (including countdown / pause)
     this._updateChainPhysics();
 
     // Render Channel Sense Interrupt Indicator above Toji's head when triggered!
     if (this.channelSenseIndicatorTimer > 0) {
       this.channelSenseIndicatorTimer--;
-      const alpha = Math.min(1.0, this.channelSenseIndicatorTimer / 10);
-      ctx.save();
+      // Skip decorative indicator in low quality mode
+      if (!isLowQuality) {
+        const alpha = Math.min(1.0, this.channelSenseIndicatorTimer / 10);
+        ctx.save();
 
-      // Sharp Anime Eye Glint Spark / Lock-on Star above head
-      const headX = this.x;
-      const headY = this.y - this.r - 28;
+        // Sharp Anime Eye Glint Spark / Lock-on Star above head
+        const headX = this.x;
+        const headY = this.y - this.r - 28;
 
-      // Outer Crimson Pulse Circle
-      ctx.beginPath();
-      ctx.arc(headX, headY, 12 + (35 - this.channelSenseIndicatorTimer) * 0.6, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 20, 100, ${alpha * 0.8})`;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
+        // Outer Crimson Pulse Circle
+        ctx.beginPath();
+        ctx.arc(headX, headY, 12 + (35 - this.channelSenseIndicatorTimer) * 0.6, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 20, 100, ${alpha * 0.8})`;
+        ctx.lineWidth = 2.5;
+        ctx.stroke();
 
-      // Inner Bright Gold Star / Eye Glint
-      ctx.beginPath();
-      ctx.arc(headX, headY, 7, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
-      ctx.fill();
-      ctx.strokeStyle = `rgba(255, 0, 60, ${alpha})`;
-      ctx.lineWidth = 2;
-      ctx.stroke();
+        // Inner Bright Gold Star / Eye Glint
+        ctx.beginPath();
+        ctx.arc(headX, headY, 7, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 215, 0, ${alpha})`;
+        ctx.fill();
+        ctx.strokeStyle = `rgba(255, 0, 60, ${alpha})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-      // Crosshair Glint Spikes
-      ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
-      ctx.lineWidth = 2;
-      const glintLen = 16;
-      ctx.beginPath();
-      ctx.moveTo(headX - glintLen, headY); ctx.lineTo(headX + glintLen, headY);
-      ctx.moveTo(headX, headY - glintLen); ctx.lineTo(headX, headY + glintLen);
-      ctx.stroke();
+        // Crosshair Glint Spikes
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+        ctx.lineWidth = 2;
+        const glintLen = 16;
+        ctx.beginPath();
+        ctx.moveTo(headX - glintLen, headY); ctx.lineTo(headX + glintLen, headY);
+        ctx.moveTo(headX, headY - glintLen); ctx.lineTo(headX, headY + glintLen);
+        ctx.stroke();
 
-      ctx.restore();
+        ctx.restore();
+      }
     }
 
     // --- DOMAIN EXPANSION STYLE CHANNELING VISUALS (Floating Text, Isometric Ground Ring, Backlight Aura) ---
@@ -1079,16 +1138,6 @@ export class TojiFighter extends Fighter {
 
       ctx.save();
       ctx.translate(this.x, this.y);
-
-      // 1. Floating Text above Toji's head
-      ctx.font = 'bold 24px Arial';
-      ctx.fillStyle = `rgba(160, 64, 255, ${progress})`; // Neon Shadow Purple matching Toji's color theme
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -this.r - 55 - (Math.sin(Date.now() / 150) * 5); // Floating effect
-      ctx.strokeText('HEAVENLY RESTRICTION', 0, textY);
-      ctx.fillText('HEAVENLY RESTRICTION', 0, textY);
 
       // 2. Isometric Ground Summoning Ring
       ctx.save();
@@ -1102,31 +1151,39 @@ export class TojiFighter extends Fighter {
       ctx.strokeStyle = `rgba(160, 64, 255, ${progress})`;
       ctx.stroke();
 
-      // Inner rotating dashed dark violet ring
-      ctx.rotate(Date.now() / 300);
-      ctx.beginPath();
-      ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
-      ctx.setLineDash([15, 15]);
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = `rgba(75, 0, 130, ${progress * 1.2})`;
-      ctx.stroke();
-      ctx.setLineDash([]);
+      // Inner rotating dashed dark violet ring (skip in low quality)
+      if (!isLowQuality) {
+        ctx.rotate(now / 300);
+        ctx.beginPath();
+        ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
+        ctx.setLineDash([15, 15]);
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = `rgba(75, 0, 130, ${progress * 1.2})`;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
       ctx.restore();
 
-      // 3. Dark Shadow Purple Cursed Energy Backlight Bloom
-      ctx.save();
-      ctx.globalCompositeOperation = 'screen';
-      const glowRadius = this.r + 90 + Math.sin(Date.now() * 0.005) * 8;
-      const backGlow = ctx.createRadialGradient(0, 0, this.r * 0.1, 0, 0, glowRadius);
-      backGlow.addColorStop(0, `rgba(255, 255, 255, ${0.45 * progress})`);   // Bright core
-      backGlow.addColorStop(0.35, `rgba(160, 64, 255, ${0.42 * progress})`); // Neon purple bloom
-      backGlow.addColorStop(0.7, `rgba(75, 0, 130, ${0.20 * progress})`);   // Deep dark violet feathering
-      backGlow.addColorStop(1, 'rgba(40, 20, 56, 0)');
-      ctx.beginPath();
-      ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
-      ctx.fillStyle = backGlow;
-      ctx.fill();
-      ctx.restore();
+      // 3. Dark Shadow Purple Cursed Energy Backlight Bloom (flat fills instead of gradient for perf)
+      if (!isLowQuality) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        const glowRadius = this.r + 90 + Math.sin(now * 0.005) * 8;
+        // Concentric flat fills simulate the gradient without allocating a gradient object
+        ctx.beginPath();
+        ctx.arc(0, 0, glowRadius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(75, 0, 130, ${0.12 * progress})`;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, glowRadius * 0.55, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(160, 64, 255, ${0.25 * progress})`;
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(0, 0, glowRadius * 0.2, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.30 * progress})`;
+        ctx.fill();
+        ctx.restore();
+      }
 
       ctx.restore();
     }
@@ -1166,17 +1223,19 @@ export class TojiFighter extends Fighter {
       ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + chargeRatio * 0.3})`;
       ctx.fill();
 
-      // C. Radiating Energy Spikes / Rays
-      const rayCount = 8;
-      ctx.strokeStyle = `rgba(160, 90, 240, ${0.6 + chargeRatio * 0.4})`;
-      ctx.lineWidth = 2;
-      for (let r = 0; r < rayCount; r++) {
-        const rayAngle = (r / rayCount) * Math.PI * 2 + (Date.now() / 80);
-        const r1 = 6;
-        const r2 = 18 + chargeRatio * 18;
+      // C. Radiating Energy Spikes / Rays (reduced count in low quality)
+      if (!isLowQuality) {
+        const rayCount = 8;
+        ctx.strokeStyle = `rgba(160, 90, 240, ${0.6 + chargeRatio * 0.4})`;
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
-        ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
+        for (let r = 0; r < rayCount; r++) {
+          const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 80);
+          const r1 = 6;
+          const r2 = 18 + chargeRatio * 18;
+          ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
+          ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
+        }
         ctx.stroke();
       }
       ctx.restore();
@@ -1228,32 +1287,34 @@ export class TojiFighter extends Fighter {
       ctx.fillStyle = `rgba(240, 230, 255, ${0.5 + chargeRatio * 0.3})`;
       ctx.fill();
 
-      // Soft Radiating Energy Rays
-      const rayCount = 6;
-      ctx.strokeStyle = `rgba(160, 90, 240, ${0.3 + chargeRatio * 0.35})`;
-      ctx.lineWidth = 1.2;
-      for (let r = 0; r < rayCount; r++) {
-        const rayAngle = (r / rayCount) * Math.PI * 2 + (Date.now() / 80);
-        const r1 = 5;
-        const r2 = 12 + chargeRatio * 14;
+      // Soft Radiating Energy Rays (batched into single stroke, skip in low quality)
+      if (!isLowQuality) {
+        const rayCount = 6;
+        ctx.strokeStyle = `rgba(160, 90, 240, ${0.3 + chargeRatio * 0.35})`;
+        ctx.lineWidth = 1.2;
         ctx.beginPath();
-        ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
-        ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
+        for (let r = 0; r < rayCount; r++) {
+          const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 80);
+          const r1 = 5;
+          const r2 = 12 + chargeRatio * 14;
+          ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
+          ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
+        }
         ctx.stroke();
-      }
 
-      // Render Whirling Wind Air-Stream Arcs around Toji
-      const windTime = Date.now() / 120;
-      for (let w = 0; w < 4; w++) {
-        const windAngle = windTime * 2.8 + (w * Math.PI / 2);
-        const windRadius = this.r + 14 + w * 16 + Math.sin(windTime * 3 + w) * 6;
-        const windArcLen = 0.8 + Math.sin(windTime * 2 + w) * 0.3;
-        
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, windRadius, windAngle, windAngle + windArcLen);
-        ctx.strokeStyle = `rgba(220, 225, 230, ${0.25 + chargeRatio * 0.35})`;
-        ctx.lineWidth = 1.5 + (w % 2) * 0.8;
-        ctx.stroke();
+        // Render Whirling Wind Air-Stream Arcs around Toji
+        const windTime = now / 120;
+        for (let w = 0; w < 4; w++) {
+          const windAngle = windTime * 2.8 + (w * Math.PI / 2);
+          const windRadius = this.r + 14 + w * 16 + Math.sin(windTime * 3 + w) * 6;
+          const windArcLen = 0.8 + Math.sin(windTime * 2 + w) * 0.3;
+          
+          ctx.beginPath();
+          ctx.arc(this.x, this.y, windRadius, windAngle, windAngle + windArcLen);
+          ctx.strokeStyle = `rgba(220, 225, 230, ${0.25 + chargeRatio * 0.35})`;
+          ctx.lineWidth = 1.5 + (w % 2) * 0.8;
+          ctx.stroke();
+        }
       }
 
       ctx.restore();
@@ -1454,7 +1515,7 @@ export class TojiFighter extends Fighter {
       }
     } else {
       // Idle assassin stance breathing sway
-      offsetAngle += Math.sin(Date.now() / 250) * 0.05;
+      offsetAngle += Math.sin(now / 250) * 0.05;
     }
 
     const renderAngle = baseAngle + offsetAngle;
@@ -1486,10 +1547,9 @@ export class TojiFighter extends Fighter {
 
         ctx.save();
 
-        const lineHex = img.isDomainAfterimage ? '#A040FF' : '#8A2BE2';
-
-        // 1. Dash Trajectory Line (Teleport Beam matching Gojo & Sukuna)
-        if (img.fromX !== undefined && img.toX !== undefined) {
+        // 1. Dash Trajectory Line (skip in low quality for perf)
+        if (!isLowQuality && img.fromX !== undefined && img.toX !== undefined) {
+          const lineHex = img.isDomainAfterimage ? '#A040FF' : '#8A2BE2';
           ctx.save();
           ctx.globalAlpha = alpha * 0.6;
           ctx.strokeStyle = lineHex;
@@ -1511,19 +1571,20 @@ export class TojiFighter extends Fighter {
         ctx.translate(img.x, img.y);
         ctx.rotate(img.angle || 0);
 
-        // 2. High-Energy Radial Cursed Energy Aura Glow (Matching Gojo & Sukuna)
-        ctx.save();
-        ctx.globalCompositeOperation = 'screen';
-        const auraGrad = ctx.createRadialGradient(0, 0, this.r * 0.2, 0, 0, this.r * 1.8);
-        auraGrad.addColorStop(0, `rgba(255, 255, 255, ${alpha * 0.95})`);
-        auraGrad.addColorStop(0.4, `rgba(160, 64, 255, ${alpha * 0.75})`);
-        auraGrad.addColorStop(0.8, `rgba(75, 0, 130, ${alpha * 0.4})`);
-        auraGrad.addColorStop(1, 'rgba(40, 20, 56, 0)');
-        ctx.fillStyle = auraGrad;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.r * 1.8, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
+        // 2. Cursed Energy Aura Glow — flat concentric fills instead of radial gradient (perf: eliminates gradient allocation)
+        if (!isLowQuality) {
+          ctx.save();
+          ctx.globalCompositeOperation = 'screen';
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 1.4, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(160, 64, 255, ${alpha * 0.4})`;
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(0, 0, this.r * 0.6, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
+          ctx.fill();
+          ctx.restore();
+        }
 
         // 3. Body Circle Silhouette & Outer Glow Ring
         ctx.save();
@@ -1536,12 +1597,14 @@ export class TojiFighter extends Fighter {
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // 4. Anime Eye Glints
-        ctx.fillStyle = '#E0FFFF';
-        ctx.beginPath();
-        ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
-        ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
-        ctx.fill();
+        // 4. Anime Eye Glints (skip in low quality)
+        if (!isLowQuality) {
+          ctx.fillStyle = '#E0FFFF';
+          ctx.beginPath();
+          ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
+          ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.restore();
 
@@ -1554,7 +1617,7 @@ export class TojiFighter extends Fighter {
       ctx.save();
       
       // Pulse effect
-      const pulse = 1 + Math.sin(Date.now() / 150) * 0.15;
+      const pulse = 1 + Math.sin(now / 150) * 0.15;
       const ringRadius = (this.r + 8) * pulse;
       
       // Draw base glowing ring
@@ -1613,7 +1676,7 @@ export class TojiFighter extends Fighter {
 
         const outerR = this.r + thrustDistance + 122; // Dynamically tracks Katana blade tip!
         const maxThick = 22; // Slim, razor-sharp crescent thickness!
-        const steps = 32;
+        const steps = isLowQuality ? 18 : 32;
 
         // 1. Outer Neon Violet Glowing Aura (Slim & Crisp)
         ctx.beginPath();
@@ -1745,7 +1808,7 @@ export class TojiFighter extends Fighter {
           ctx.rotate(baseAngle + arcAngle);
           const tailAngle = -Math.PI * 0.85;
           const tipAngle = Math.PI * 0.15;
-          const steps = 30;
+          const steps = isLowQuality ? 16 : 30;
 
           ctx.beginPath();
           ctx.arc(0, 0, radius + 4, tailAngle, tipAngle, false);
@@ -1821,7 +1884,7 @@ export class TojiFighter extends Fighter {
         const bladeReach = isKatana ? 80 : 85;
         const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0); // Dynamically tracks active blade tip!
         const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0); // Slim razor-sharp crescent thickness!
-        const steps = 30;
+        const steps = isLowQuality ? 18 : 30;
 
         // 1. Outer Neon Violet Glowing Aura
         ctx.beginPath();
@@ -1967,100 +2030,118 @@ export class TojiFighter extends Fighter {
         chargeRatio = Math.min(1.0, 1 - (this.ambushTimer / maxPause));
       }
 
-      // Sharp Razor Blade Edge Glow Overlay (Traces exact blade profile based on active weapon)
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(renderAngle);
-      const normRenderAngle = Math.atan2(Math.sin(renderAngle), Math.cos(renderAngle));
-      if (Math.abs(normRenderAngle) > Math.PI / 2) {
-        ctx.scale(1, -1);
+      // Sharp Razor Blade Edge Glow Overlay (skip in low quality for perf)
+      if (!isLowQuality) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(renderAngle);
+        const normRenderAngle = Math.atan2(Math.sin(renderAngle), Math.cos(renderAngle));
+        if (Math.abs(normRenderAngle) > Math.PI / 2) {
+          ctx.scale(1, -1);
+        }
+
+        const isKatanaActiveCharge = isKatanaDrawn || isUltimateFinal || this.ambushPhase === 'KATANA_CHARGE';
+
+        if (isKatanaActiveCharge) {
+          ctx.translate(this.r + thrustDistance - 2, 0);
+          ctx.scale(0.95, 0.95);
+
+          const bStart = 44;
+          const bLen = 120;
+          const bWidth = 16;
+          const curveY = -35;
+          const spineStartX = bStart;
+          const spineStartY = -bWidth / 2;
+          const tipX = bStart + bLen;
+          const tipY = -bWidth / 2 + curveY;
+          const T_body = 0.82;
+          const bodyEndX = bStart + bLen * T_body;
+          const bodyEndY = bWidth / 2 + T_body * T_body * curveY;
+          const bodyStartX = bStart;
+          const bodyStartY = bWidth / 2;
+          const tipCtrlX = 153.2;
+          const tipCtrlY = -21.2;
+
+          ctx.beginPath();
+          ctx.moveTo(spineStartX, spineStartY);
+          ctx.quadraticCurveTo(bStart + bLen * 0.5, spineStartY, tipX, tipY);
+          ctx.quadraticCurveTo(tipCtrlX, tipCtrlY, bodyEndX, bodyEndY);
+          ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, bodyStartY, bodyStartX, bodyStartY);
+          ctx.closePath();
+        } else {
+          ctx.translate(this.r + thrustDistance - 4, 0);
+          ctx.scale(0.75, 0.75);
+
+          // Exact Inverted Spear Blade Profile Path
+          ctx.beginPath();
+          ctx.moveTo(44, -7);
+          ctx.lineTo(48, -7);
+          ctx.lineTo(48, -9);
+          ctx.lineTo(54, -9);
+          ctx.lineTo(54, -7);
+          ctx.lineTo(104, -7);
+          ctx.lineTo(118, 1);
+          ctx.lineTo(106, 7);
+          ctx.lineTo(80, 7);
+          ctx.lineTo(80, 2);
+          ctx.lineTo(58, 2);
+          ctx.arc(58, 4, 2, -Math.PI / 2, Math.PI / 2, true);
+          ctx.lineTo(74, 6);
+          ctx.lineTo(80, 14);
+          ctx.lineTo(66, 16);
+          ctx.lineTo(52, 11);
+          ctx.lineTo(48, 11);
+          ctx.lineTo(48, 8);
+          ctx.lineTo(44, 8);
+          ctx.closePath();
+        }
+
+        const glowColor = isKatanaActiveCharge ? 'rgba(140, 70, 220, 0.45)' : 'rgba(255, 20, 80, 0.95)';
+        const strokeColor = isKatanaActiveCharge ? `rgba(180, 130, 240, ${0.45 + chargeRatio * 0.25})` : `rgba(255, 30, 75, ${0.75 + chargeRatio * 0.25})`;
+        const strokeWidth = isKatanaActiveCharge ? 2.0 : 3.5;
+        const shimmerColor = isKatanaActiveCharge ? `rgba(240, 230, 255, ${0.55 + Math.sin(now / 40) * 0.15})` : `rgba(255, 255, 255, ${0.85 + Math.sin(now / 40) * 0.15})`;
+        const shimmerWidth = isKatanaActiveCharge ? 1.0 : 1.8;
+
+        // Outer Blade Edge Outline - Simulated Glow
+        ctx.save();
+        ctx.strokeStyle = glowColor.replace('0.95', '0.25').replace('0.45', '0.15');
+        ctx.lineWidth = strokeWidth * 2.5;
+        ctx.stroke();
+        ctx.restore();
+
+        // Outer Blade Edge Outline
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = strokeWidth;
+        ctx.stroke();
+
+        // Inner Razor Edge Shimmer Line
+        ctx.strokeStyle = shimmerColor;
+        ctx.lineWidth = shimmerWidth;
+        ctx.stroke();
+
+        ctx.restore();
       }
-
-      const isKatanaActiveCharge = isKatanaDrawn || isUltimateFinal || this.ambushPhase === 'KATANA_CHARGE';
-
-      if (isKatanaActiveCharge) {
-        ctx.translate(this.r + thrustDistance - 2, 0);
-        ctx.scale(0.95, 0.95);
-
-        const bStart = 44;
-        const bLen = 120;
-        const bWidth = 16;
-        const curveY = -35;
-        const spineStartX = bStart;
-        const spineStartY = -bWidth / 2;
-        const tipX = bStart + bLen;
-        const tipY = -bWidth / 2 + curveY;
-        const T_body = 0.82;
-        const bodyEndX = bStart + bLen * T_body;
-        const bodyEndY = bWidth / 2 + T_body * T_body * curveY;
-        const bodyStartX = bStart;
-        const bodyStartY = bWidth / 2;
-        const tipCtrlX = 153.2;
-        const tipCtrlY = -21.2;
-
-        ctx.beginPath();
-        ctx.moveTo(spineStartX, spineStartY);
-        ctx.quadraticCurveTo(bStart + bLen * 0.5, spineStartY, tipX, tipY);
-        ctx.quadraticCurveTo(tipCtrlX, tipCtrlY, bodyEndX, bodyEndY);
-        ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, bodyStartY, bodyStartX, bodyStartY);
-        ctx.closePath();
-      } else {
-        ctx.translate(this.r + thrustDistance - 4, 0);
-        ctx.scale(0.75, 0.75);
-
-        // Exact Inverted Spear Blade Profile Path
-        ctx.beginPath();
-        ctx.moveTo(44, -7);
-        ctx.lineTo(48, -7);
-        ctx.lineTo(48, -9);
-        ctx.lineTo(54, -9);
-        ctx.lineTo(54, -7);
-        ctx.lineTo(104, -7);
-        ctx.lineTo(118, 1);
-        ctx.lineTo(106, 7);
-        ctx.lineTo(80, 7);
-        ctx.lineTo(80, 2);
-        ctx.lineTo(58, 2);
-        ctx.arc(58, 4, 2, -Math.PI / 2, Math.PI / 2, true);
-        ctx.lineTo(74, 6);
-        ctx.lineTo(80, 14);
-        ctx.lineTo(66, 16);
-        ctx.lineTo(52, 11);
-        ctx.lineTo(48, 11);
-        ctx.lineTo(48, 8);
-        ctx.lineTo(44, 8);
-        ctx.closePath();
-      }
-
-      const glowColor = isKatanaActiveCharge ? 'rgba(140, 70, 220, 0.45)' : 'rgba(255, 20, 80, 0.95)';
-      const strokeColor = isKatanaActiveCharge ? `rgba(180, 130, 240, ${0.45 + chargeRatio * 0.25})` : `rgba(255, 30, 75, ${0.75 + chargeRatio * 0.25})`;
-      const strokeWidth = isKatanaActiveCharge ? 2.0 : 3.5;
-      const shimmerColor = isKatanaActiveCharge ? `rgba(240, 230, 255, ${0.55 + Math.sin(Date.now() / 40) * 0.15})` : `rgba(255, 255, 255, ${0.85 + Math.sin(Date.now() / 40) * 0.15})`;
-      const shimmerWidth = isKatanaActiveCharge ? 1.0 : 1.8;
-
-      // Outer Blade Edge Outline - Simulated Glow
-      ctx.save();
-      ctx.strokeStyle = glowColor.replace('0.95', '0.25').replace('0.45', '0.15');
-      ctx.lineWidth = strokeWidth * 2.5;
-      ctx.stroke();
-      ctx.restore();
-
-      // Outer Blade Edge Outline
-      ctx.strokeStyle = strokeColor;
-      ctx.lineWidth = strokeWidth;
-      ctx.stroke();
-
-      // Inner Razor Edge Shimmer Line
-      ctx.strokeStyle = shimmerColor;
-      ctx.lineWidth = shimmerWidth;
-      ctx.stroke();
-
-      ctx.restore();
     }
 
     // 6. Draw Health text on TOP of body, chain, and weapon
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
+    
+    // Draw Heavenly Restriction Floating Text at the end so it is never overlayed by body or visuals
+    if ((this.ultimatePhase === 'CHANNELING' || (this.isChannelingDomain && !this.ultimateActive)) && (this.timeStopTimer || 0) <= 0) {
+      const progress = Math.min(1.0, (this.ultimateChargeTimer || 0) / Math.max(1, this.ultimateChargeMax || 90));
+      ctx.save();
+      ctx.translate(this.x, this.y);
+      ctx.font = '30px "Glast Blitch", Arial';
+      ctx.fillStyle = `rgba(160, 64, 255, ${progress})`;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      const textY = -this.r - 55 - (Math.sin(now / 150) * 5);
+      ctx.strokeText('HEAVENLY RESTRICTION', 0, textY);
+      ctx.fillText('HEAVENLY RESTRICTION', 0, textY);
+      ctx.restore();
+    }
     
     ctx.restore();
   }

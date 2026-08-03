@@ -11,6 +11,66 @@ import {
   drawVoidMarkEffect
 } from '../statusEffects.js';
 
+// Cache of pre-computed sketchy circle paths keyed by "radius_seed"
+const _sketchyCircleCache = new Map();
+
+// Pre-compute a sketchy circle's path points (relative to 0,0) once, then replay them each frame.
+function _getSketchyCirclePaths(r, seed) {
+  const key = `${r}_${seed}`;
+  let cached = _sketchyCircleCache.get(key);
+  if (cached) return cached;
+
+  let currentSeed = seed;
+  const nextRand = () => {
+    const x = Math.sin(currentSeed++) * 10000;
+    return x - Math.floor(x);
+  };
+
+  const strokeCount = 3;
+  const paths = [];
+  for (let s = 0; s < strokeCount; s++) {
+    const lineWidthMul = 0.6 + nextRand() * 0.4;
+    const points = [];
+    const step = (Math.PI * 2) / 30;
+    const offsetX = (nextRand() - 0.5) * 1.5;
+    const offsetY = (nextRand() - 0.5) * 1.5;
+    const startAngle = (nextRand() - 0.5) * 0.5;
+    const overshoot = 0.2 + nextRand() * 0.3;
+    const endAngle = startAngle + Math.PI * 2 + overshoot;
+
+    for (let angle = startAngle; angle <= endAngle; angle += step) {
+      const rNoise = (nextRand() - 0.5) * 1.5;
+      const currentR = r + rNoise;
+      points.push(offsetX + Math.cos(angle) * currentR, offsetY + Math.sin(angle) * currentR);
+    }
+    paths.push({ lineWidthMul, points });
+  }
+
+  _sketchyCircleCache.set(key, paths);
+  return paths;
+}
+
+// Helper to draw wobbly sketched pencil circles (cached path replay)
+export function drawSketchyCircle(ctx, cx, cy, r, seed, color = 'rgba(15,15,18,0.85)', width = 2.5) {
+  const paths = _getSketchyCirclePaths(r, seed);
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  for (let s = 0; s < paths.length; s++) {
+    const { lineWidthMul, points } = paths[s];
+    ctx.lineWidth = width * lineWidthMul;
+    ctx.beginPath();
+    ctx.moveTo(cx + points[0], cy + points[1]);
+    for (let i = 2; i < points.length; i += 2) {
+      ctx.lineTo(cx + points[i], cy + points[i + 1]);
+    }
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 export class FighterRenderer {
   static drawBody(ctx, fighter) {
     ctx.save();
@@ -117,11 +177,14 @@ export class FighterRenderer {
   }
 
   static drawOutline(ctx, fighter) {
-    ctx.beginPath();
-    ctx.arc(fighter.x, fighter.y, fighter.r, 0, Math.PI * 2);
-    ctx.lineWidth = 2.5;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-    ctx.stroke();
+    let seed = 0;
+    const idStr = String(fighter.id || 'fighter');
+    for (let i = 0; i < idStr.length; i++) {
+      seed += idStr.charCodeAt(i);
+    }
+    
+    // Draw sketchy circle instead of solid line
+    drawSketchyCircle(ctx, fighter.x, fighter.y, fighter.r, seed, 'rgba(10, 10, 15, 0.9)', 3);
   }
 
   static drawGun(ctx, fighter) {
@@ -219,14 +282,7 @@ export class FighterRenderer {
 
     fighter.drawBody(ctx);
     fighter.drawOutline(ctx);
-
-    // Universal dark stroke
-    ctx.beginPath();
-    ctx.arc(fighter.x, fighter.y, fighter.r, 0, Math.PI * 2);
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = '#000000';
-    ctx.stroke();
-
+    
     fighter.drawGun(ctx);
     fighter.drawHealth(ctx);
     fighter.drawFreezeTimer(ctx);

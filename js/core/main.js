@@ -5,7 +5,7 @@
 import { state } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js';
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
-import { FIGHTER_DEFS } from './config.js';
+import { FIGHTER_DEFS, CONFIG } from './config.js';
 import { handleUIClick, handleUIMove } from '../graphics/ui.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { initGraphicsCache } from '../graphics/graphicsCache.js';
@@ -160,6 +160,21 @@ document.getElementById('btn-weapons')?.addEventListener('click', () => {
 document.getElementById('btn-testmode')?.addEventListener('click', (e) => {
   state.testMode = !state.testMode;
   e.target.innerText = '🧪 TEST MODE: ' + (state.testMode ? 'ON' : 'OFF');
+});
+
+// Initialize HUD Mode from localStorage or CONFIG default
+if (localStorage.getItem('hudShowFighterDescription') !== null) {
+  CONFIG.hudShowFighterDescription = localStorage.getItem('hudShowFighterDescription') === 'true';
+}
+const hudModeBtn = document.getElementById('btn-hudmode');
+if (hudModeBtn) {
+  hudModeBtn.innerText = '📋 HUD: ' + (CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS');
+}
+
+document.getElementById('btn-hudmode')?.addEventListener('click', (e) => {
+  CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
+  localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
+  e.target.innerText = '📋 HUD: ' + (CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS');
 });
 
 // Initialize Performance Mode from localStorage

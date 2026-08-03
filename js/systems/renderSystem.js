@@ -23,6 +23,10 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { updateHybridProjectiles, updateHybridRika } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 
+let _domHealthHud = null;
+let _domHealthHudLeft = null;
+let _domHealthHudRight = null;
+
 export function renderGame() {
     // Clear the offscreen 2D canvas at the start of every frame so it's fully transparent
     // PixiJS will render this transparent canvas over its own background/particle layers
@@ -49,13 +53,14 @@ export function renderGame() {
     }
 
     // Sync HTML DOM Health HUD containers with screen shake so DOM cards and Canvas Arena shake as one locked unit
-    const containerBottom = document.getElementById('healthHud');
-    const containerLeft = document.getElementById('healthHudLeft');
-    const containerRight = document.getElementById('healthHudRight');
+    if (!_domHealthHud) _domHealthHud = document.getElementById('healthHud');
+    if (!_domHealthHudLeft) _domHealthHudLeft = document.getElementById('healthHudLeft');
+    if (!_domHealthHudRight) _domHealthHudRight = document.getElementById('healthHudRight');
+    
     const hudTransform = (shakeX !== 0 || shakeY !== 0) ? `translate3d(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px, 0)` : '';
-    if (containerBottom) containerBottom.style.transform = hudTransform;
-    if (containerLeft) containerLeft.style.transform = hudTransform;
-    if (containerRight) containerRight.style.transform = hudTransform;
+    if (_domHealthHud) _domHealthHud.style.transform = hudTransform;
+    if (_domHealthHudLeft) _domHealthHudLeft.style.transform = hudTransform;
+    if (_domHealthHudRight) _domHealthHudRight.style.transform = hudTransform;
 
     // Draw Logic based on state
     if (state.gameState === 'title') {

@@ -329,6 +329,23 @@ export class SukunaRenderer {
     // Ensure Sukuna's HP text and freeze timer are always rendered on top of his hands and Cursed Energy aura
     fighter.drawHealth(ctx);
     fighter.drawFreezeTimer(ctx);
+
+    // Use already declared isParalyzed from the top of draw method
+    if (fighter.isChannelingDomainExpansion && !fighter.domainActive && !isParalyzed) {
+      const maxTime = CONFIG.sukuna?.domainChargeMax || 120;
+      const progress = Math.min(1.0, Math.max(0, fighter.domainChargeTimer / maxTime));
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y);
+      ctx.font = '30px "Glast Blitch", Arial';
+      ctx.fillStyle = `rgba(220, 20, 60, ${progress})`;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      const textY = -fighter.r - 50 - (Math.sin(Date.now() / 150) * 5);
+      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
+      ctx.fillText('DOMAIN EXPANSION', 0, textY);
+      ctx.restore();
+    }
   }
 
   // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands (Front POV style)
@@ -725,17 +742,6 @@ export class SukunaRenderer {
 
       // Draw persistent text and ground ring ONLY during main body channeling (not on hands or after domain deployment)
       if (overrideX === null && fighter.isChannelingDomainExpansion && !fighter.domainActive) {
-        ctx.save();
-        ctx.font = 'bold 24px Arial';
-        ctx.fillStyle = `rgba(220, 20, 60, ${progress})`; // Crimson text fading in
-        ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-        ctx.lineWidth = 4;
-        ctx.textAlign = 'center';
-        const textY = -r - 50 - (Math.sin(Date.now() / 150) * 5); // Floating effect
-        ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-        ctx.fillText('DOMAIN EXPANSION', 0, textY);
-        ctx.restore();
-
         // Draw graphic ring on the ground
         ctx.save();
         ctx.scale(1, 0.4); // Isometric perspective

@@ -571,11 +571,8 @@ export class ZeusFighter extends Fighter {
     ctx.restore();
     
     // Main fighter outline
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#00BFFF';
-    ctx.stroke();
+    // Main fighter outline (Sketchy stroke)
+    super.drawOutline(ctx);
   }
 
   drawGun(ctx) {

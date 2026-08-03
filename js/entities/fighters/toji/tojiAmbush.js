@@ -57,6 +57,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   if (!opponent || opponent.hp <= 0) return;
 
   fighter.isAmbushing = true;
+  fighter.ambushTarget = opponent;
   fighter.ambushPhase = 'FRONT_LAUNCH';
   fighter.ambushTimer = isInterrupt ? 4 : (CONFIG.toji?.ambushFirstTeleportFrames ?? CONFIG.toji?.ambushFrontPauseDuration ?? 18);
   fighter.katanaSlashTimer = 0;
@@ -139,6 +140,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
     }
     fighter.isAmbushing = false;
+    fighter.ambushTarget = null;
     fighter.ambushPhase = null;
     fighter.stealthCooldown = 0;
     const angle = Math.random() * Math.PI * 2;
@@ -508,6 +510,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.stealthActive = true;
 
         fighter.isAmbushing = false;
+        fighter.ambushTarget = null;
         fighter.ambushPhase = null;
         if (typeof state !== 'undefined') {
           if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });

@@ -2,6 +2,7 @@ import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
+import { drawSketchyCircle } from './fighterRenderer.js';
 
 let _sortedFightersBuffer = [];
 
@@ -80,24 +81,7 @@ export function drawFighters() {
     _sortedFightersBuffer[i].f = f;
     _sortedFightersBuffer[i].i = i;
 
-    // --- PIXIJS SYNC (Phase 2): Attach WebGL Containers to Fighters ---
-    if (f) {
-      if (!f.pixiContainer) {
-        f.pixiContainer = new window.PIXI.Container();
-        state.pixiLayers.fighters.addChild(f.pixiContainer);
-      }
-      f.pixiContainer.x = f.x;
-      f.pixiContainer.y = f.y;
-      f.pixiContainer.zIndex = f.y; // Sync Z-indexing if needed later
-      
-      // Clean up dead fighters
-      if (f.hp <= 0 && f.pixiContainer.parent) {
-         // Keep container alive slightly longer for death effects if needed, otherwise hide
-         f.pixiContainer.visible = false;
-      } else {
-         f.pixiContainer.visible = true;
-      }
-    }
+
   }
   
   // Sort the actual WebGL layer by Y for correct Z-indexing against other WebGL elements
@@ -272,15 +256,7 @@ export function drawIllusions() {
     // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
     if (illusion.isRika) continue;
 
-    // --- PIXIJS SYNC (Phase 2): Attach WebGL Containers to Illusions ---
-    if (!illusion.pixiContainer) {
-      illusion.pixiContainer = new window.PIXI.Container();
-      state.pixiLayers.fighters.addChild(illusion.pixiContainer);
-    }
-    illusion.pixiContainer.x = illusion.x;
-    illusion.pixiContainer.y = illusion.y;
-    illusion.pixiContainer.zIndex = illusion.y;
-    illusion.pixiContainer.visible = illusion.hp > 0;
+
 
     ctx.save();
     ctx.globalAlpha = 0.85;
@@ -327,11 +303,12 @@ export function drawIllusions() {
     }
 
     // Draw illusion outline (optional if you still want an outline over the custom skin)
-    ctx.beginPath();
-    ctx.arc(0, 0, illusion.r, 0, Math.PI * 2);
-    ctx.strokeStyle = '#111';
-    ctx.lineWidth = 2;
-    ctx.stroke();
+    let seed = 0;
+    const idStr = String(illusion.id || 'illusion');
+    for (let i = 0; i < idStr.length; i++) {
+      seed += idStr.charCodeAt(i);
+    }
+    drawSketchyCircle(ctx, 0, 0, illusion.r, seed, '#111', 2.5);
 
     // Draw illusion health
     ctx.rotate(-illusion.angle);

@@ -49,7 +49,9 @@ class SpatialGrid {
         const key = ((((cellX + dx) + 2000) & 0xFFFF) << 16) | (((cellY + dy) + 2000) & 0xFFFF);
         const cell = this.grid.get(key);
         if (cell) {
-          nearby.push(...cell);
+          for (let i = 0, len = cell.length; i < len; i++) {
+            nearby.push(cell[i]);
+          }
         }
       }
     }

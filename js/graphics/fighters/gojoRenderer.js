@@ -12,22 +12,12 @@ export class GojoRenderer {
   static draw(ctx, fighter) {
     if (fighter.isDead) return;
 
-    // Domain Expansion Channeling Visuals (Ground ring, Aura, and Header Text)
+    // Domain Expansion Channeling Visuals (Ground ring, Aura)
     if (fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
       const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax));
 
       ctx.save();
       ctx.translate(fighter.x, fighter.y);
-
-      // 1. Floating Text above Gojo's head
-      ctx.font = 'bold 24px Arial';
-      ctx.fillStyle = `rgba(0, 229, 255, ${progress})`; // Bright Cyan text fading in
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 55 - (Math.sin(Date.now() / 150) * 5); // Floating effect
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
 
       // 2. Isometric Ground Summoning Ring
       ctx.scale(1, 0.4); // Isometric perspective
@@ -354,6 +344,22 @@ export class GojoRenderer {
       drawOrbitingOrb('red', 0);
       drawOrbitingOrb('blue', (Math.PI * 2) / 3);
       drawOrbitingOrb('purple', (Math.PI * 4) / 3);
+    }
+
+    // Draw Domain Expansion Floating Text at the end so it is never overlayed by body or visuals
+    if (fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
+      const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax));
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y);
+      ctx.font = '30px "Glast Blitch", Arial';
+      ctx.fillStyle = `rgba(0, 229, 255, ${progress})`;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
+      ctx.lineWidth = 4;
+      ctx.textAlign = 'center';
+      const textY = -fighter.r - 55 - (Math.sin(Date.now() / 150) * 5);
+      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
+      ctx.fillText('DOMAIN EXPANSION', 0, textY);
+      ctx.restore();
     }
   }
 
@@ -1033,65 +1039,68 @@ export class GojoRenderer {
     ctx.restore();
 
     // Rough, thin black ink brush cuts & hatches moving along the border contour
-    ctx.globalAlpha = 0.9 * progress;
-    ctx.strokeStyle = '#000000';
-    ctx.lineCap = 'butt';
+    // Performance: Skip ink layers and flame wisps in low quality mode
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+    if (!isLowQuality) {
+      ctx.globalAlpha = 0.9 * progress;
+      ctx.strokeStyle = '#000000';
+      ctx.lineCap = 'butt';
 
-    // Draw 3 layers of thin, rough, broken/cut ink lines moving alongside the border
-    const insetScales = [0.84, 0.91, 0.96];
-    for (let layer = 0; layer < insetScales.length; layer++) {
-      const scale = insetScales[layer];
-      const speedDir = (layer % 2 === 0 ? 1 : -1);
-      const flowTime = time * 0.003 * speedDir;
+      // Draw 3 layers of thin, rough, broken/cut ink lines moving alongside the border
+      // PERF: Batch all segments per layer into ONE path, then stroke once (3 strokes total instead of 84)
+      const insetScales = [0.84, 0.91, 0.96];
+      for (let layer = 0; layer < insetScales.length; layer++) {
+        const scale = insetScales[layer];
+        const speedDir = (layer % 2 === 0 ? 1 : -1);
+        const flowTime = time * 0.003 * speedDir;
 
-      for (let i = 0; i < numPoints; i++) {
-        // Dynamic moving cuts & breaks traveling around the border over time
-        const cutSeed = Math.sin(i * 17.3 + layer * 31.7 + flowTime * 2.5);
-        if (cutSeed < -0.1) continue;
-
-        const p = points[i];
-        const next = points[(i + 1) % numPoints];
-        const prev = points[(i - 1 + numPoints) % numPoints];
-
-        // Dynamic animated ink jitter for flowing hand-drawn anime texture
-        const jitterX = Math.sin(i * 7.9 + layer * 5.3 + time * 0.005) * 1.8;
-        const jitterY = Math.cos(i * 11.3 - layer * 3.7 + time * 0.004) * 1.8;
-
-        const midX = (p.x * scale + next.x * scale) / 2 + jitterX;
-        const midY = (p.y * scale + next.y * scale) / 2 + jitterY;
-        const prevMidX = (prev.x * scale + p.x * scale) / 2 - jitterX * 0.5;
-        const prevMidY = (prev.y * scale + p.y * scale) / 2 - jitterY * 0.5;
-
-        // Thinner stroke width with pulsing pressure along the movement
-        const pressureNoise = Math.sin(time * 0.005 + i * 2.3 + layer * 5.1) * 0.5 + 0.5;
-        ctx.lineWidth = 0.6 + pressureNoise * 1.6;
-
+        // Use a uniform lineWidth per layer for batching (average pressure)
+        ctx.lineWidth = 0.9 + layer * 0.35;
         ctx.beginPath();
-        ctx.moveTo(prevMidX, prevMidY);
-        ctx.quadraticCurveTo(p.x * scale + jitterX, p.y * scale + jitterY, midX, midY);
+        for (let i = 0; i < numPoints; i++) {
+          // Dynamic moving cuts & breaks traveling around the border over time
+          const cutSeed = Math.sin(i * 17.3 + layer * 31.7 + flowTime * 2.5);
+          if (cutSeed < -0.1) continue;
+
+          const p = points[i];
+          const next = points[(i + 1) % numPoints];
+          const prev = points[(i - 1 + numPoints) % numPoints];
+
+          // Dynamic animated ink jitter for flowing hand-drawn anime texture
+          const jitterX = Math.sin(i * 7.9 + layer * 5.3 + time * 0.005) * 1.8;
+          const jitterY = Math.cos(i * 11.3 - layer * 3.7 + time * 0.004) * 1.8;
+
+          const midX = (p.x * scale + next.x * scale) / 2 + jitterX;
+          const midY = (p.y * scale + next.y * scale) / 2 + jitterY;
+          const prevMidX = (prev.x * scale + p.x * scale) / 2 - jitterX * 0.5;
+          const prevMidY = (prev.y * scale + p.y * scale) / 2 - jitterY * 0.5;
+
+          ctx.moveTo(prevMidX, prevMidY);
+          ctx.quadraticCurveTo(p.x * scale + jitterX, p.y * scale + jitterY, midX, midY);
+        }
         ctx.stroke();
       }
-    }
-    ctx.globalAlpha = 1.0;
+      ctx.globalAlpha = 1.0;
 
-    // Soft rising flame wisps (smooth curves, not sharp tendrils)
-    ctx.strokeStyle = mainColor;
-    ctx.lineWidth = 2;
-    ctx.globalAlpha = 0.6 * progress;
-    for (let k = 0; k < 3; k++) {
-      const baseAngle = -Math.PI * 0.5 + (k - 1) * 0.5;
-      const sway = Math.sin(time * 0.003 + k * 2.1) * 0.2;
-      const fa = baseAngle + sway;
-      const len = r + 18 + Math.sin(time * 0.004 + k * 1.7) * 5;
-
+      // Soft rising flame wisps (smooth curves, not sharp tendrils)
+      ctx.strokeStyle = mainColor;
+      ctx.lineWidth = 2;
+      ctx.globalAlpha = 0.6 * progress;
       ctx.beginPath();
-      ctx.moveTo(Math.cos(fa) * (r + 8), Math.sin(fa) * (r + 8));
-      ctx.quadraticCurveTo(
-        Math.cos(fa + sway * 0.5) * (len * 0.7),
-        Math.sin(fa + sway * 0.5) * (len * 0.7),
-        Math.cos(fa + sway) * len,
-        Math.sin(fa + sway) * len
-      );
+      for (let k = 0; k < 3; k++) {
+        const baseAngle = -Math.PI * 0.5 + (k - 1) * 0.5;
+        const sway = Math.sin(time * 0.003 + k * 2.1) * 0.2;
+        const fa = baseAngle + sway;
+        const len = r + 18 + Math.sin(time * 0.004 + k * 1.7) * 5;
+
+        ctx.moveTo(Math.cos(fa) * (r + 8), Math.sin(fa) * (r + 8));
+        ctx.quadraticCurveTo(
+          Math.cos(fa + sway * 0.5) * (len * 0.7),
+          Math.sin(fa + sway * 0.5) * (len * 0.7),
+          Math.cos(fa + sway) * len,
+          Math.sin(fa + sway) * len
+        );
+      }
       ctx.stroke();
     }
 

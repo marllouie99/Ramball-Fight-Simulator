@@ -50,8 +50,14 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
     ctx.fill();
     ctx.stroke();
     
-    // Draw badge
-    drawSmallFighterBadge(ctx, def, cellX + cellW / 2, cellY + cellH / 2, Math.min(cellW, cellH) * 0.7);
+    // Draw badge using cached pre-rendered preview image if available
+    const previewImg = getFighterPreview(idx);
+    if (previewImg) {
+      const badgeSize = Math.min(cellW, cellH) * 0.7;
+      ctx.drawImage(previewImg, cellX + cellW / 2 - badgeSize / 2, cellY + cellH / 2 - badgeSize / 2, badgeSize, badgeSize);
+    } else {
+      drawSmallFighterBadge(ctx, def, cellX + cellW / 2, cellY + cellH / 2, Math.min(cellW, cellH) * 0.7);
+    }
     
     // Draw X if not selected
     if (!isSelected) {

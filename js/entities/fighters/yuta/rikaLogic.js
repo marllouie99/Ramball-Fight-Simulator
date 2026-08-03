@@ -38,6 +38,11 @@ export function initRika(fighter) {
     hitFlashTimer: 0,
     activeTrembleSound: null,
     trembleStopTimer: 0,
+    knockbackVx: 0,
+    knockbackVy: 0,
+    isPerformingSkill: function() {
+      return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
+    },
     applyHitStun: function(duration) {
       if (duration > this.hitStunTimer) this.hitStunTimer = duration;
     },
@@ -45,8 +50,8 @@ export function initRika(fighter) {
       if (duration > this.timeStopTimer) this.timeStopTimer = duration;
     },
     applyKnockback: function(vx, vy) {
-      if (typeof vx === 'number') this.vx = (this.vx || 0) + vx;
-      if (typeof vy === 'number') this.vy = (this.vy || 0) + vy;
+      if (typeof vx === 'number') this.knockbackVx = (this.knockbackVx || 0) + vx;
+      if (typeof vy === 'number') this.knockbackVy = (this.knockbackVy || 0) + vy;
     },
     applyBurn: function() {},
     applyPoison: function() {},

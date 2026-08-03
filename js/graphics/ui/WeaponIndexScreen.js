@@ -377,14 +377,17 @@ function drawWeaponDetailScreen() {
   ctx.translate(0, Math.sin(Date.now() / 400) * 8);
   
   if (state.showSummonModel) {
-    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-    const previewFighter = new FighterClass({
-      ...def,
-      startX: 0,
-      startY: 0,
-      startVx: 0,
-      startVy: 0,
-    });
+    if (!state.previewSummonFighter || state.previewSummonFighter.type !== def.type) {
+      const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+      state.previewSummonFighter = new FighterClass({
+        ...def,
+        startX: 0,
+        startY: 0,
+        startVx: 0,
+        startVy: 0,
+      });
+    }
+    const previewFighter = state.previewSummonFighter;
     previewFighter.hideHpText = true;
     previewFighter.x = 0;
     previewFighter.y = 0;

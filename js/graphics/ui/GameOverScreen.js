@@ -1,4 +1,5 @@
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
+import { Fighter } from '../../entities/fighter.js';
 import { drawHUD } from '../hudManager.js';
 import { state } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
@@ -91,14 +92,17 @@ function drawWinnerReveal(winner, timer, mode) {
 
   // Draw the actual fighter model at the center, scaled up for the reveal.
   const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
-  const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-  const preview = new FighterClass({
-    ...def,
-    startX: 0,
-    startY: 0,
-    startVx: 0,
-    startVy: 0,
-  });
+  if (!state._winnerRevealFighter || state._winnerRevealFighter.type !== def.type) {
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    state._winnerRevealFighter = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+  }
+  const preview = state._winnerRevealFighter;
   preview.x = 0;
   preview.y = 0;
   preview.vx = 0;
@@ -133,18 +137,7 @@ function drawWinnerReveal(winner, timer, mode) {
   ctx.fillText('WINNER', cx, cy - 116);
   ctx.restore();
 
-  // Round Duration below WINNER text
-  const totalSeconds = Math.floor((state.matchTimer || 0) / 60);
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  ctx.save();
-  ctx.font = '14px Arial';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-  ctx.textBaseline = 'top';
-  ctx.fillText(`Round Duration: ${minutes}:${seconds}`, cx, cy - 110);
-  ctx.restore();
-
-  ctx.font = 'bold 24px Arial';
+  ctx.font = '32px "Glast Blitch", Arial';
   ctx.textBaseline = 'top';
   ctx.fillText(winner.name.toUpperCase(), cx, cy + winner.r * scale + 18);
 
@@ -168,14 +161,17 @@ function drawFfaChampionReveal(winner, timer) {
 
   // Draw the actual fighter model at the center, scaled up for the reveal.
   const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
-  const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-  const preview = new FighterClass({
-    ...def,
-    startX: 0,
-    startY: 0,
-    startVx: 0,
-    startVy: 0,
-  });
+  if (!state._winnerRevealFighter || state._winnerRevealFighter.type !== def.type) {
+    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+    state._winnerRevealFighter = new FighterClass({
+      ...def,
+      startX: 0,
+      startY: 0,
+      startVx: 0,
+      startVy: 0,
+    });
+  }
+  const preview = state._winnerRevealFighter;
   preview.x = 0;
   preview.y = 0;
   preview.vx = 0;
@@ -223,7 +219,7 @@ function drawFfaChampionReveal(winner, timer) {
 
   ctx.save();
   ctx.globalAlpha = fadeAlpha;
-  ctx.font = 'bold 28px Arial';
+  ctx.font = 'bold 36px "Glast Blitch", Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
@@ -233,19 +229,7 @@ function drawFfaChampionReveal(winner, timer) {
   ctx.fillText('CHAMPION', cx, cy - 116);
   ctx.restore();
 
-  // Round Duration below CHAMPION text
-  const totalSeconds = Math.floor((state.matchTimer || 0) / 60);
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  ctx.save();
-  ctx.globalAlpha = fadeAlpha;
-  ctx.font = '14px Arial';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-  ctx.textBaseline = 'top';
-  ctx.fillText(`Round Duration: ${minutes}:${seconds}`, cx, cy - 110);
-  ctx.restore();
-
-  ctx.font = 'bold 24px Arial';
+  ctx.font = '32px "Glast Blitch", Arial';
   ctx.textBaseline = 'top';
   ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
 
@@ -293,7 +277,7 @@ function drawMatchEndScreen() {
       ctx.shadowBlur = 20;
       ctx.shadowColor = '#ffd700';
       ctx.fillStyle = '#ffd700';
-      ctx.font = 'bold 48px Arial';
+      ctx.font = '48px "Glast Blitch", Arial';
       ctx.fillText('CHAMPION!', cx, cy - 40);
       
       ctx.fillStyle = '#fff';
@@ -304,7 +288,7 @@ function drawMatchEndScreen() {
       ctx.shadowBlur = 20;
       ctx.shadowColor = '#ff4d4d';
       ctx.fillStyle = '#ff4d4d';
-      ctx.font = 'bold 48px Arial';
+      ctx.font = '48px "Glast Blitch", Arial';
       ctx.fillText('CHAMPION FALLEN', cx, cy - 40);
       
       ctx.fillStyle = '#fff';
@@ -396,14 +380,18 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     const offsetX = offsets[idx] || 0;
     const def = wFighter._def || FIGHTER_DEFS.find(d => d.id === wFighter._def?.id);
     if (!def) return;
-    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-    const preview = new FighterClass({
-      ...def,
-      startX: 0,
-      startY: 0,
-      startVx: 0,
-      startVy: 0,
-    });
+    if (!state._winnerFightersCache) state._winnerFightersCache = {};
+    if (!state._winnerFightersCache[def.type]) {
+      const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
+      state._winnerFightersCache[def.type] = new FighterClass({
+        ...def,
+        startX: 0,
+        startY: 0,
+        startVx: 0,
+        startVy: 0,
+      });
+    }
+    const preview = state._winnerFightersCache[def.type];
     preview.x = 0;
     preview.y = 0;
     preview.vx = 0;
@@ -446,7 +434,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   // Text glow
   ctx.shadowBlur = 20;
   ctx.shadowColor = winner.color || '#fff';
-  ctx.font = 'bold 36px Arial';
+  ctx.font = '48px "Glast Blitch", Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
@@ -460,31 +448,20 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   ctx.fillText(titleText, cx, cy - 145);
 
   ctx.shadowBlur = 0;
-
-  // Round Duration below CHAMPION text
-  const totalSeconds = Math.floor((state.matchTimer || 0) / 60);
-  const minutes = Math.floor(totalSeconds / 60).toString().padStart(2, '0');
-  const seconds = (totalSeconds % 60).toString().padStart(2, '0');
-  ctx.save();
-  ctx.font = '14px Arial';
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.6)';
-  ctx.textBaseline = 'top';
-  ctx.fillText(`Round Duration: ${minutes}:${seconds}`, cx, cy - 138);
-  ctx.restore();
   if (isMultiWinner && winningFighters.length === 2) {
-    ctx.font = 'bold 20px Arial';
+    ctx.font = '32px "Glast Blitch", Arial';
     ctx.fillStyle = winningFighters[0].color || '#fff';
     ctx.fillText(winningFighters[0].name.toUpperCase(), cx - 95, cy + 115);
 
     ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = 'bold 16px Arial';
+    ctx.font = 'bold 24px Rajdhani, Arial';
     ctx.fillText('&', cx, cy + 114);
 
-    ctx.font = 'bold 20px Arial';
+    ctx.font = '32px "Glast Blitch", Arial';
     ctx.fillStyle = winningFighters[1].color || '#fff';
     ctx.fillText(winningFighters[1].name.toUpperCase(), cx + 95, cy + 115);
   } else {
-    ctx.font = 'bold 24px Arial';
+    ctx.font = '32px "Glast Blitch", Arial';
     ctx.fillStyle = winner.color || '#fff';
     ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
     
@@ -513,21 +490,22 @@ function drawWinnerStats(ctx, cx, yStart, winner) {
   ctx.lineTo(cx + 160, yStart);
   ctx.stroke();
 
-  // Draw header
+  // Draw header (Removed as requested)
+  /*
   ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.font = 'bold 14px Arial';
+  ctx.font = '20px "Glast Blitch", Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
   ctx.fillText('ROUND STATISTICS', cx, yStart + 12);
-
+  */
   // Row helper: Left column (labels) starting at cx-110, Right column (values) ending at cx+110
   const drawStatRow = (label, val, y) => {
     ctx.textAlign = 'left';
     ctx.fillStyle = '#bbb';
-    ctx.font = '15px Arial';
-    ctx.fillText(label, cx - 110, y);
+    ctx.font = '18px "Glast Blitch", Arial';
+    ctx.fillText(label.toUpperCase(), cx - 110, y);
 
-    ctx.font = 'bold 17px Arial';
+    ctx.font = 'bold 20px "Architects Daughter", Arial';
     ctx.fillStyle = '#fff';
     ctx.textAlign = 'right';
     ctx.fillText(val, cx + 110, y);
@@ -602,54 +580,7 @@ function drawGodRays(ctx, cx, cy, timer, winner) {
   ctx.restore();
 
   // 2. Render Floating Ember Sparks rising upwards (angled diagonal lines)
-  if (!state._winnerEmbers) {
-    state._winnerEmbers = [];
-    const count = 40;
-    for (let i = 0; i < count; i++) {
-      state._winnerEmbers.push({
-        x: (Math.random() - 0.5) * 400, // offset from cx
-        y: (Math.random() - 0.5) * 400, // offset from cy
-        vx: -0.15 - Math.random() * 0.35,  // slightly drift left to look diagonal
-        vy: -0.8 - Math.random() * 1.4,   // float upwards quickly
-        size: 1.2 + Math.random() * 1.8,
-        alpha: 0.15 + Math.random() * 0.45,
-        pulseSpeed: 0.018 + Math.random() * 0.02,
-        pulsePhase: Math.random() * Math.PI
-      });
-    }
-  }
-
-  ctx.save();
-  ctx.translate(cx, cy);
-  ctx.globalCompositeOperation = 'screen';
-
-  state._winnerEmbers.forEach(p => {
-    // Float upwards & drift left
-    p.y += p.vy;
-    p.x += p.vx;
-    p.pulsePhase += p.pulseSpeed;
-
-    // Wrap around to bottom if they float off screen
-    if (p.y < -230) {
-      p.y = 230;
-      p.x = (Math.random() - 0.5) * 400;
-    }
-    if (p.x < -200 || p.x > 200) {
-      p.x = (Math.random() - 0.5) * 400;
-    }
-
-    const currentAlpha = p.alpha * (0.65 + 0.35 * Math.sin(p.pulsePhase));
-
-    // Draw glowing orange/gold ember spark line segment (tilted matching speed)
-    ctx.beginPath();
-    ctx.strokeStyle = colorToRgba('#ffaa33', currentAlpha);
-    ctx.lineWidth = p.size;
-    ctx.moveTo(p.x, p.y);
-    ctx.lineTo(p.x + p.vx * 3.5, p.y + p.vy * 3.5);
-    ctx.stroke();
-  });
-  
-  ctx.restore();
+  // (Removed as requested)
 }
 
 function colorToRgba(color, alpha) {

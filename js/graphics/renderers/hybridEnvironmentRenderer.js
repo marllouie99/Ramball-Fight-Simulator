@@ -147,9 +147,10 @@ let currentTojiUltimateOpacity = 0;
 function getTojiHybridData() {
   if (!tojiHybridData) {
     const canvas = document.createElement('canvas');
-    // For Toji we map 1:1 with screen
-    canvas.width = 1920; 
-    canvas.height = 1080;
+    // Shrink offscreen canvas to 480x270 (93.75% reduction in pixel area)
+    // PixiJS will scale this up to fill the screen
+    canvas.width = 480; 
+    canvas.height = 270;
     const ctx = canvas.getContext('2d');
     
     const texture = window.PIXI.Texture.from(canvas);
@@ -350,9 +351,14 @@ export function updateHybridEnvironment() {
   // 4. Toji Ultimate
   const toji = state.fighters?.find(f => f && f.ultimateActive && (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING' || f.ultimatePhase === 'CRATER_FADEIN' || f.ultimatePhase === 'CRATER'));
   let tOpToji = 0;
+  
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+
   if (toji) {
     tOpToji = 0.85;
-    if (Math.random() < 0.4 && tojiFlyHeads.length < 40) {
+    // Reduce or skip fly head updates in low quality mode
+    const maxFlyHeads = isLowQuality ? 0 : 40;
+    if (maxFlyHeads > 0 && Math.random() < 0.4 && tojiFlyHeads.length < maxFlyHeads) {
       tojiFlyHeads.push({
         x: 1920 + Math.random() * 100,
         y: Math.random() * 1080,
@@ -374,28 +380,48 @@ export function updateHybridEnvironment() {
     tojiData.sprite.width = state.canvas.width;
     tojiData.sprite.height = state.canvas.height;
     
-    tojiData.ctx.clearRect(0, 0, 1920, 1080);
-    tojiData.ctx.fillStyle = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
-    tojiData.ctx.fillRect(0, 0, 1920, 1080);
-    
-    tojiData.ctx.fillStyle = `rgba(20, 20, 20, ${0.9 * currentTojiUltimateOpacity})`;
-    for (let i = tojiFlyHeads.length - 1; i >= 0; i--) {
-      const head = tojiFlyHeads[i];
-      tojiData.ctx.beginPath();
-      tojiData.ctx.arc(head.x, head.y, head.size, 0, Math.PI * 2);
-      tojiData.ctx.fill();
-      tojiData.ctx.fillStyle = `rgba(255, 0, 0, ${currentTojiUltimateOpacity})`;
-      tojiData.ctx.beginPath();
-      tojiData.ctx.arc(head.x - head.size * 0.3, head.y - head.size * 0.1, 2, 0, Math.PI * 2);
-      tojiData.ctx.arc(head.x + head.size * 0.1, head.y - head.size * 0.1, 2, 0, Math.PI * 2);
-      tojiData.ctx.fill();
-      tojiData.ctx.fillStyle = `rgba(20, 20, 20, ${0.9 * currentTojiUltimateOpacity})`;
+    if (isLowQuality) {
+      // In performance mode, skip updating texture if the opacity hasn't changed.
+      // Since opacity stabilizes at 0.85 quickly, this yields 0% CPU texture-upload overhead for ~95% of the ultimate!
+      tojiFlyHeads = [];
+      if (tojiData._lastOpacity !== currentTojiUltimateOpacity) {
+        tojiData.ctx.clearRect(0, 0, 480, 270);
+        tojiData.ctx.fillStyle = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
+        tojiData.ctx.fillRect(0, 0, 480, 270);
+        tojiData.texture.update();
+        tojiData._lastOpacity = currentTojiUltimateOpacity;
+      }
+    } else {
+      tojiData.ctx.clearRect(0, 0, 480, 270);
+      tojiData.ctx.fillStyle = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
+      tojiData.ctx.fillRect(0, 0, 480, 270);
       
-      head.x += head.vx; head.y += head.vy;
-      if (head.x < -100) tojiFlyHeads.splice(i, 1);
+      tojiData.ctx.fillStyle = `rgba(20, 20, 20, ${0.9 * currentTojiUltimateOpacity})`;
+      for (let i = tojiFlyHeads.length - 1; i >= 0; i--) {
+        const head = tojiFlyHeads[i];
+        
+        // Scale coordinates down to match the smaller 480x270 canvas texture size
+        const scaleFactor = 4;
+        const drawX = head.x / scaleFactor;
+        const drawY = head.y / scaleFactor;
+        const drawSize = head.size / scaleFactor;
+
+        tojiData.ctx.beginPath();
+        tojiData.ctx.arc(drawX, drawY, drawSize, 0, Math.PI * 2);
+        tojiData.ctx.fill();
+        tojiData.ctx.fillStyle = `rgba(255, 0, 0, ${currentTojiUltimateOpacity})`;
+        tojiData.ctx.beginPath();
+        tojiData.ctx.arc(drawX - drawSize * 0.3, drawY - drawSize * 0.1, 0.5, 0, Math.PI * 2);
+        tojiData.ctx.arc(drawX + drawSize * 0.1, drawY - drawSize * 0.1, 0.5, 0, Math.PI * 2);
+        tojiData.ctx.fill();
+        tojiData.ctx.fillStyle = `rgba(20, 20, 20, ${0.9 * currentTojiUltimateOpacity})`;
+        
+        head.x += head.vx; head.y += head.vy;
+        if (head.x < -100) tojiFlyHeads.splice(i, 1);
+      }
+      
+      tojiData.texture.update();
     }
-    
-    tojiData.texture.update();
   }
 
   // 5. Rika Summon Dim Screen & Pulsing Ring

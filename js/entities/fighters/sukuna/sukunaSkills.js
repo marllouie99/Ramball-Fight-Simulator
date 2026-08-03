@@ -275,25 +275,21 @@ export function applyDomainEffect(fighter, arena) {
           const rampMultiplier = 1 + (timeInside / 60) * 0.10;
           const finalDamage = domainDamage * rampMultiplier;
 
-          // Fire MULTIPLE visible ghostBlade projectiles directly from Malevolent Shrine towards the target!
+          // Fire a single visible ghostBlade projectile directly from Malevolent Shrine towards the target!
           const aimAngle = Math.atan2(f.y - (shrineY - 40), f.x - shrineX);
           if (projectileSystem) {
-            const numBlades = 3 + Math.floor(Math.random() * 2); // 3 to 4 blades per tick
-            for (let b = 0; b < numBlades; b++) {
-              const spread = (Math.random() - 0.5) * 0.4;
-              projectileSystem.fireProjectile(
-                fighter,
-                ownerIdx,
-                0, // 0 damage so the projectile is just a visual effect (domain deals instant damage below)
-                false,
-                55 + Math.random() * 20, // fast speed
-                false,
-                'ghostBlade',
-                shrineX + (Math.random() - 0.5) * 120,
-                shrineY - 60 + (Math.random() - 0.5) * 60,
-                aimAngle + spread
-              );
-            }
+            projectileSystem.fireProjectile(
+              fighter,
+              ownerIdx,
+              0, // 0 damage so the projectile is just a visual effect (domain deals instant damage below)
+              false,
+              55 + Math.random() * 20, // fast speed
+              false,
+              'ghostBlade',
+              shrineX + (Math.random() - 0.5) * 120,
+              shrineY - 60 + (Math.random() - 0.5) * 60,
+              aimAngle
+            );
           }
 
           f.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
@@ -340,25 +336,21 @@ export function applyDomainEffect(fighter, arena) {
             const rampMultiplier = 1 + (timeInside / 60) * 0.10;
             const finalDamage = domainDamage * rampMultiplier;
 
-            // Fire MULTIPLE visible ghostBlade projectiles directly from Malevolent Shrine towards the illusion!
+            // Fire a single visible ghostBlade projectile directly from Malevolent Shrine towards the illusion!
             const aimAngle = Math.atan2(ill.y - (shrineY - 40), ill.x - shrineX);
             if (projectileSystem) {
-              const numBlades = 3 + Math.floor(Math.random() * 2);
-              for (let b = 0; b < numBlades; b++) {
-                const spread = (Math.random() - 0.5) * 0.4;
-                projectileSystem.fireProjectile(
-                  fighter,
-                  ownerIdx,
-                  0, // 0 damage
-                  false,
-                  55 + Math.random() * 20, // fast speed
-                  false,
-                  'ghostBlade',
-                  shrineX + (Math.random() - 0.5) * 120,
-                  shrineY - 60 + (Math.random() - 0.5) * 60,
-                  aimAngle + spread
-                );
-              }
+              projectileSystem.fireProjectile(
+                fighter,
+                ownerIdx,
+                0, // 0 damage
+                false,
+                55 + Math.random() * 20, // fast speed
+                false,
+                'ghostBlade',
+                shrineX + (Math.random() - 0.5) * 120,
+                shrineY - 60 + (Math.random() - 0.5) * 60,
+                aimAngle
+              );
             }
 
             ill.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });

@@ -130,6 +130,9 @@ export function drawFloatingTexts() {
   if (!texts || texts.length === 0) return;
 
   const activeTexts = [];
+  const { ctx } = state;
+  if (!ctx) return;
+
   for (let i = 0; i < texts.length; i++) {
     const t = texts[i];
     t.timer++;
@@ -147,54 +150,24 @@ export function drawFloatingTexts() {
     }
 
     if (t.timer < t.maxTimer) {
-      if (state.pixiApp && state.pixiLayers && state.pixiLayers.ui) {
-        if (!t.pixiText) {
-          t.pixiText = new window.PIXI.Text(t.text, {
-            fontFamily: 'Arial',
-            fontSize: 16,
-            fontWeight: 'bold',
-            fill: t.color,
-            stroke: 'rgba(0,0,0,0.9)',
-            strokeThickness: 3,
-            dropShadow: true,
-            dropShadowColor: 'rgba(255,255,255,0.95)',
-            dropShadowDistance: 1,
-            dropShadowBlur: 0,
-            lineJoin: 'round'
-          });
-          t.pixiText.anchor.set(0.5, 0.5);
-          state.pixiLayers.ui.addChild(t.pixiText);
-        }
-        t.pixiText.x = t.x;
-        t.pixiText.y = t.y;
-        t.pixiText.alpha = Math.max(0, alpha);
-      } else {
-        const { ctx } = state;
-        if (ctx) {
-          ctx.save();
-          ctx.globalAlpha = Math.max(0, alpha);
-          ctx.font = 'bold 16px Arial';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
-          ctx.lineWidth = 3;
-          ctx.lineJoin = 'round';
-          ctx.strokeStyle = 'rgba(0,0,0,0.9)';
-          ctx.strokeText(t.text, t.x, t.y);
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, alpha);
+      ctx.font = t.isDamage ? 'bold 18px "Architects Daughter"' : 'normal 16px "Glast Blitch"';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.lineWidth = 3;
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = 'rgba(0,0,0,0.9)';
+      ctx.strokeText(t.text, t.x, t.y);
 
-          ctx.fillStyle = 'rgba(255,255,255,0.95)';
-          ctx.fillText(t.text, t.x + 1, t.y + 1); // Subtle drop shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillText(t.text, t.x + 1, t.y + 1); // Subtle drop shadow
 
-          ctx.fillStyle = t.color;
-          ctx.fillText(t.text, t.x, t.y);
-          ctx.restore();
-        }
-      }
+      ctx.fillStyle = t.color;
+      ctx.fillText(t.text, t.x, t.y);
+      ctx.restore();
+
       activeTexts.push(t);
-    } else {
-      if (t.pixiText && t.pixiText.parent) {
-        t.pixiText.parent.removeChild(t.pixiText);
-        t.pixiText.destroy();
-      }
     }
   }
 

@@ -26,9 +26,18 @@ export const CONFIG = {
     handSizeMultiplier: 1.5,                   // scale the size of all fighter hands globally (1.0 = default)
   },
   blackFlash: blackFlashConfig,
+  hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
+  basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
+  canvasBgColor: '#000000',        // Canvas background color (hex string or hex number)
+  arenaOuterBgColor: '#fbf6e5ff',    // Background color of the container area outside the arena (under HUD and sides)
+  arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
+  hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
+  hudTitleFontSize: 20,              // Font size for fighter name in HUD (px)
+  hudDescFontSize: 16,               // Font size for fighter description in HUD (px)
+  hudInfoFontSize: 16,               // Font size for fighter info (DMG, etc.) in HUD (px)
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-  // PER-FIGHTER TUNING
+  // PER-FIGHTER TUNINGs
   // All attack / behaviour numbers live here so you
   // never need to touch customFighters.js for balance.
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ

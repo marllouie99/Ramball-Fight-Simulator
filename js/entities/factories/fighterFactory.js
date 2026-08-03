@@ -1,3 +1,5 @@
+import { Fighter } from '../fighter.js';
+import { drawSketchyCircle } from '../../graphics/renderers/fighterRenderer.js';
 import { NormalFighter } from '../fighters/NormalFighter.js';
 import { AimbotFighter } from '../fighters/AimbotFighter.js';
 import { MeleeFighter } from '../fighters/MeleeFighter.js';
@@ -59,3 +61,77 @@ export const FIGHTER_CLASS_MAP = {
   'yuji': YujiFighter,
   'layla': LaylaFighter,
 };
+
+// Helper to wrap a class's draw method with the sketchy circle decorator globally
+function wrapFighterDraw(FighterClass) {
+  const originalDraw = FighterClass.prototype.draw;
+  if (!originalDraw) return;
+  
+  FighterClass.prototype.draw = function(ctx, opponent) {
+    const originalArc = ctx.arc;
+    const originalStroke = ctx.stroke;
+    const originalBeginPath = ctx.beginPath;
+    const originalFill = ctx.fill;
+    const originalClip = ctx.clip;
+    
+    let arcCalled = false;
+    let arcX = 0, arcY = 0, arcR = 0;
+    
+    const fighter = this;
+    
+    ctx.beginPath = function() {
+      arcCalled = false;
+      originalBeginPath.call(ctx);
+    };
+    
+    ctx.fill = function() {
+      arcCalled = false;
+      originalFill.call(ctx);
+    };
+    
+    ctx.clip = function() {
+      arcCalled = false;
+      originalClip.call(ctx);
+    };
+    
+    ctx.arc = function(x, y, radius, startAngle, endAngle, counterclockwise) {
+      originalArc.call(ctx, x, y, radius, startAngle, endAngle, counterclockwise);
+      if (Math.abs(radius - fighter.r) < 15) {
+        arcCalled = true;
+        arcX = x;
+        arcY = y;
+        arcR = radius;
+      }
+    };
+    
+    ctx.stroke = function() {
+      if (arcCalled) {
+        let seed = 0;
+        const idStr = String(fighter.id || 'fighter');
+        for (let i = 0; i < idStr.length; i++) {
+          seed += idStr.charCodeAt(i);
+        }
+        drawSketchyCircle(ctx, arcX, arcY, arcR, seed, ctx.strokeStyle, ctx.lineWidth || 2.5);
+        arcCalled = false;
+      } else {
+        originalStroke.call(ctx);
+      }
+    };
+    
+    try {
+      originalDraw.call(this, ctx, opponent);
+    } finally {
+      ctx.arc = originalArc;
+      ctx.stroke = originalStroke;
+      ctx.beginPath = originalBeginPath;
+      ctx.fill = originalFill;
+      ctx.clip = originalClip;
+    }
+  };
+}
+
+// Apply sketchy outlines globally to Fighter base class and all subclasses
+wrapFighterDraw(Fighter);
+for (const key in FIGHTER_CLASS_MAP) {
+  wrapFighterDraw(FIGHTER_CLASS_MAP[key]);
+}

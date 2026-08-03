@@ -12,6 +12,7 @@ import { state } from '../../core/state.js';
  */
 export function drawYujiSkin(ctx, fighter) {
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  const now = Date.now();
   // 1. Draw afterimages (Zone trails) at their absolute coordinates
   if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0) {
     for (let i = 0; i < fighter.afterImages.length; i++) {
@@ -52,7 +53,7 @@ export function drawYujiSkin(ctx, fighter) {
 
   // Black Flash Zone Visual Indicator (crackling red/black sparks) - Optimized with batched stroke calls
   if (fighter.blackFlashTimer > 0) {
-    const pulse = 0.6 + Math.sin(Date.now() * 0.015) * 0.4;
+    const pulse = 0.6 + Math.sin(now * 0.015) * 0.4;
     const sparkCount = isLowQuality ? 2 : 4;
     
     // Draw rotating black outline sparks
@@ -60,7 +61,7 @@ export function drawYujiSkin(ctx, fighter) {
     ctx.lineWidth = 3.2;
     ctx.beginPath();
     for (let i = 0; i < sparkCount; i++) {
-      const a = (Math.PI / 2) * i + (Date.now() * 0.016);
+      const a = (Math.PI / 2) * i + (now * 0.016);
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 14), Math.sin(a) * (r + 14));
     }
@@ -71,7 +72,7 @@ export function drawYujiSkin(ctx, fighter) {
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     for (let i = 0; i < sparkCount; i++) {
-      const a = (Math.PI / 2) * i + (Date.now() * 0.016);
+      const a = (Math.PI / 2) * i + (now * 0.016);
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 12), Math.sin(a) * (r + 12));
     }
@@ -83,7 +84,7 @@ export function drawYujiSkin(ctx, fighter) {
       ctx.lineWidth = 0.8;
       ctx.beginPath();
       for (let i = 0; i < 4; i++) {
-        const a = (Math.PI / 2) * i + (Date.now() * 0.016);
+        const a = (Math.PI / 2) * i + (now * 0.016);
         ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
         ctx.lineTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9));
       }
@@ -93,15 +94,16 @@ export function drawYujiSkin(ctx, fighter) {
 
   // ── Soul Swap Swirling Rotating Crimson Energy Rings - Optimized to eliminate nested save/restore ──
   if (fighter.soulSwapActive && !isLowQuality) {
-    const time = Date.now();
+    const time = now;
     const ringRotation = time * 0.005;
     const ringRadius = r * 1.35; // slightly larger than body
 
     ctx.save();
     ctx.rotate(ringRotation);
 
-    // Draw 3 counter-rotating crimson/red elliptical rings (using incremental rotation cascade)
-    for (let i = 0; i < 3; i++) {
+    // Draw 2-3 counter-rotating crimson/red elliptical rings (reduced in low quality)
+    const ringCount = isLowQuality ? 2 : 3;
+    for (let i = 0; i < ringCount; i++) {
       ctx.beginPath();
       ctx.ellipse(0, 0, ringRadius, ringRadius * (0.22 + i * 0.06), 0, 0, Math.PI * 2);
       

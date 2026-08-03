@@ -4,6 +4,85 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 
+// ──────────────────────────────────────────
+// SKETCHY BORDER HELPERS
+// ──────────────────────────────────────────
+function drawSketchyLine(ctx, x1, y1, x2, y2, seed, color = 'rgba(20,20,25,0.85)', width = 2) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+  
+  let currentSeed = seed;
+  const nextRand = () => {
+    const x = Math.sin(currentSeed++) * 10000;
+    return x - Math.floor(x);
+  };
+
+  // Base bow amount (always negative so it bows outwards, away from the arena center)
+  // A value of -14 to -22 pixels creates a very noticeable, aesthetic curve
+  const baseBowAmt = -14 - (nextRand() * 8);
+
+  const strokeCount = 4; // Extra strokes for a penciled look
+  for (let s = 0; s < strokeCount; s++) {
+    ctx.lineWidth = width * (0.5 + nextRand() * 0.4);
+    ctx.beginPath();
+    
+    const length = Math.hypot(x2 - x1, y2 - y1);
+    const segmentLength = 12;
+    const segments = Math.max(2, Math.floor(length / segmentLength));
+    
+    // Each pencil stroke gets a slightly different curve/displacement
+    const strokeBowVar = (nextRand() - 0.5) * 6;
+    const totalBow = baseBowAmt + strokeBowVar;
+    
+    ctx.moveTo(x1, y1);
+    for (let i = 1; i <= segments; i++) {
+      const t = i / segments;
+      let targetX = x1 + (x2 - x1) * t;
+      let targetY = y1 + (y2 - y1) * t;
+      
+      const angle = Math.atan2(y2 - y1, x2 - x1) + Math.PI / 2;
+      
+      // Calculate smooth quadratic/sine bow that peaks in the middle (t = 0.5)
+      const bowOffset = Math.sin(t * Math.PI) * totalBow;
+      
+      // Micro-wobbles for rough pencil texture
+      let noise = 0;
+      if (i < segments) {
+        noise = (nextRand() - 0.5) * 2.2;
+      }
+      
+      const totalOffset = bowOffset + noise;
+      targetX += Math.cos(angle) * totalOffset;
+      targetY += Math.sin(angle) * totalOffset;
+      
+      ctx.lineTo(targetX, targetY);
+    }
+    
+    // Corner overshoot for hand-drawn feel
+    const extendAngle = Math.atan2(y2 - y1, x2 - x1);
+    const extension = (nextRand() * 6) + 1;
+    ctx.lineTo(x2 + Math.cos(extendAngle) * extension, y2 + Math.sin(extendAngle) * extension);
+    
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
+function drawSketchyArenaBorders(ctx, arena, wallWidth) {
+  const x = arena.x;
+  const y = arena.y;
+  const w = arena.width;
+  const h = arena.height;
+
+  // Draw outside walls with pencil effect
+  drawSketchyLine(ctx, x, y, x + w, y, 100, 'rgba(15,15,18,0.85)', wallWidth);
+  drawSketchyLine(ctx, x + w, y, x + w, y + h, 200, 'rgba(15,15,18,0.85)', wallWidth);
+  drawSketchyLine(ctx, x + w, y + h, x, y + h, 300, 'rgba(15,15,18,0.85)', wallWidth);
+  drawSketchyLine(ctx, x, y + h, x, y, 400, 'rgba(15,15,18,0.85)', wallWidth);
+}
+
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
@@ -40,8 +119,23 @@ export function drawArena() {
   const wallWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
     ? state.config.arena.wallWidth 
     : 4;
-  g.lineStyle(wallWidth, 0x000000, 1);
-  g.drawRect(arena.x, arena.y, arena.width, arena.height);
+  
+  // Draw sketchy pencil-style borders on the 2D Canvas context
+  if (!state._arenaBorderCanvas || state._arenaBorderCanvas.arenaWidth !== arena.width || state._arenaBorderCanvas.arenaHeight !== arena.height || state._arenaBorderCanvas.wallWidth !== wallWidth) {
+    const padding = 60; // Extra padding for overshoots
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = arena.width + padding * 2;
+    offCanvas.height = arena.height + padding * 2;
+    const oc = offCanvas.getContext('2d');
+    
+    drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth);
+    
+    offCanvas.arenaWidth = arena.width;
+    offCanvas.arenaHeight = arena.height;
+    offCanvas.wallWidth = wallWidth;
+    state._arenaBorderCanvas = offCanvas;
+  }
+  ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
 
   // Draw "CRONOSPHERE" transparent watermark on the 2D Canvas (since text is easier in Canvas2D)
   const centerX = arena.x + arena.width / 2;
@@ -57,6 +151,122 @@ export function drawArena() {
   }
   ctx.fillText('CRONOSPHERE', centerX, centerY);
   ctx.restore();
+
+  // ── Cached Title Header (splatters + text) ──────────────────────────────
+  // Render the entire title visual (ink splatters + stroked text) once into an
+  // offscreen canvas, then blit it every frame. Custom font strokeText is very
+  // expensive to run 60 fps — caching eliminates the cost entirely.
+  if (!state._titleHeaderCanvas) {
+    const headerW = 540;
+    const headerH = 170;
+    const offCanvas = document.createElement('canvas');
+    offCanvas.width = headerW;
+    offCanvas.height = headerH;
+    const oc = offCanvas.getContext('2d');
+
+    // ── Ink Splatters ─────────────────────────────────────────────────────
+    // Seeded pseudo-random for deterministic splatters
+    let _seed = 42;
+    const sRand = () => { _seed = (_seed * 16807 + 0) % 2147483647; return (_seed & 0x7fffffff) / 0x7fffffff; };
+
+    // 1. Bold diagonal brush stroke behind title (dark red, subtle)
+    oc.save();
+    oc.globalAlpha = 0.25;
+    oc.fillStyle = '#8b0000';
+    oc.translate(headerW / 2, 95);
+    oc.rotate(-0.04);
+    for (let i = 0; i < 12; i++) {
+      const bx = (i - 6) * 28 + (sRand() - 0.5) * 10;
+      const by = (sRand() - 0.5) * 8;
+      const bw = 32 + sRand() * 14;
+      const bh = 14 + sRand() * 10;
+      oc.beginPath();
+      oc.ellipse(bx, by, bw, bh, (sRand() - 0.5) * 0.3, 0, Math.PI * 2);
+      oc.fill();
+    }
+    oc.restore();
+
+    // 2. Crimson ink splatters
+    const splatColors = ['#cc0000', '#ff1a1a', '#990000', '#ff4444', '#dd0033'];
+    for (let s = 0; s < 18; s++) {
+      const sx = 60 + sRand() * (headerW - 120);
+      const sy = 50 + sRand() * 100;
+      const sr = 2 + sRand() * 6;
+      oc.save();
+      oc.globalAlpha = 0.3 + sRand() * 0.35;
+      oc.fillStyle = splatColors[Math.floor(sRand() * splatColors.length)];
+      oc.beginPath();
+      oc.arc(sx, sy, sr, 0, Math.PI * 2);
+      oc.fill();
+      const dripCount = Math.floor(sRand() * 4) + 1;
+      for (let d = 0; d < dripCount; d++) {
+        const da = sRand() * Math.PI * 2;
+        const dd = sr + 2 + sRand() * 8;
+        const dr = 0.8 + sRand() * 2.2;
+        oc.beginPath();
+        oc.arc(sx + Math.cos(da) * dd, sy + Math.sin(da) * dd, dr, 0, Math.PI * 2);
+        oc.fill();
+      }
+      if (sRand() > 0.55) {
+        const dripLen = 6 + sRand() * 18;
+        oc.beginPath();
+        oc.moveTo(sx, sy + sr);
+        oc.lineTo(sx + (sRand() - 0.5) * 3, sy + sr + dripLen);
+        oc.lineWidth = 1 + sRand() * 1.5;
+        oc.strokeStyle = oc.fillStyle;
+        oc.globalAlpha *= 0.7;
+        oc.stroke();
+      }
+      oc.restore();
+    }
+
+    // 3. Small cyan/blue accent splatters
+    for (let s = 0; s < 6; s++) {
+      const sx = 80 + sRand() * (headerW - 160);
+      const sy = 60 + sRand() * 80;
+      const sr = 1.5 + sRand() * 3.5;
+      oc.save();
+      oc.globalAlpha = 0.2 + sRand() * 0.25;
+      oc.fillStyle = sRand() > 0.5 ? '#00ccff' : '#0088ff';
+      oc.beginPath();
+      oc.arc(sx, sy, sr, 0, Math.PI * 2);
+      oc.fill();
+      const da = sRand() * Math.PI * 2;
+      oc.beginPath();
+      oc.arc(sx + Math.cos(da) * (sr + 4), sy + Math.sin(da) * (sr + 4), sRand() * 1.5 + 0.5, 0, Math.PI * 2);
+      oc.fill();
+      oc.restore();
+    }
+
+    // ── Title Text (rendered once) ────────────────────────────────────────
+    const textCX = headerW / 2;
+    oc.fillStyle = '#ffffff';
+    oc.font = '900 42px "Haruto", Arial';
+    oc.textAlign = 'center';
+    oc.textBaseline = 'middle';
+    oc.strokeStyle = '#000000';
+    oc.lineWidth = 4;
+    oc.strokeText('Fight of Characters', textCX, 100);
+    oc.fillText('Fight of Characters', textCX, 100);
+
+    oc.font = '18px "Glast Blitch", Arial';
+    oc.lineWidth = 3;
+    oc.strokeText('Ball Fight Simulator', textCX, 135);
+    oc.fillText('Ball Fight Simulator', textCX, 135);
+
+    state._titleHeaderCanvas = offCanvas;
+
+    // Guard against font loading delay: invalidate cache once fonts are fully loaded
+    if (document.fonts && !state._titleFontListenerAdded) {
+      state._titleFontListenerAdded = true;
+      document.fonts.ready.then(() => {
+        state._titleHeaderCanvas = null;
+      });
+    }
+  }
+
+  // Blit the fully cached title header (splatters + text) in one drawImage call
+  ctx.drawImage(state._titleHeaderCanvas, centerX - state._titleHeaderCanvas.width / 2, 0);
 }
 
 let currentPurpleDimOpacity = 0;

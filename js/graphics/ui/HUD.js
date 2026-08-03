@@ -25,10 +25,10 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
   // Prepare name rendering - auto-scale font for long names
   const maxNameW = panelW - padding * 2 - 40; // Reserve space for HP text
   let nameFontSize = 14;
-  ctx.font = `bold ${nameFontSize}px Arial`;
+  ctx.font = `bold ${nameFontSize}px "Glast Blitch", Arial`;
   while (ctx.measureText(fighter.name).width > maxNameW && nameFontSize > 8) {
     nameFontSize--;
-    ctx.font = `bold ${nameFontSize}px Arial`;
+    ctx.font = `bold ${nameFontSize}px "Glast Blitch", Arial`;
   }
   ctx.fillStyle = fighter.color;
   ctx.textBaseline = 'alphabetic';
@@ -134,7 +134,7 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Arial';
+    ctx.font = '13px "Glast Blitch", Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fighter.name, rowX + 10, currentY + 6);

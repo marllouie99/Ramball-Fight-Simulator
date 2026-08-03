@@ -58,18 +58,19 @@ export function updateHybridProjectiles() {
     let hybridData = activeSprites.get(p.id);
     
     if (!hybridData) {
-      // Restore full sizes for high visual quality.
-      // The other drawing optimizations will ensure 60 FPS performance.
-      let size = 1200;
+      // Optimize sizes to prevent VRAM thrashing (previously 1200x1200 = 5.76MB per projectile)
+      // We render to a smaller canvas (e.g. 384x384) and scale it up via PixiJS.
+      // Glowing/chaotic effects look fine slightly upscaled and save ~90% VRAM.
+      let size = 384;
       let drawScale = 1.0;
       
-      if (isFuga) { size = 1200; drawScale = 1.0; }
-      else if (isGojoProj) { size = 1200; drawScale = 1.0; }
+      if (isFuga) { size = 384; drawScale = 384 / 1200; }
+      else if (isGojoProj) { size = 384; drawScale = 384 / 1200; }
       else if (isSukunaSlashProj) { size = 128; drawScale = 1.0; }
       else if (isLaylaProj) {
-        if (p.visual === 'layla_cosmic_blast') { size = 400; drawScale = 1.0; }
-        else if (p.visual === 'layla_ultimate_bullet') { size = 384; drawScale = 1.0; }
-        else { size = 256; drawScale = 1.0; }
+        if (p.visual === 'layla_cosmic_blast') { size = 256; drawScale = 256 / 400; }
+        else if (p.visual === 'layla_ultimate_bullet') { size = 256; drawScale = 256 / 384; }
+        else { size = 128; drawScale = 128 / 256; }
       }
       
       hybridData = getLocalCanvas(size);
@@ -136,8 +137,8 @@ let rikaCtx = null;
 let rikaTexture = null;
 
 export function updateHybridRika() {
-  if (!state.pixiApp || !state.pixiLayers?.projectiles) return;
-  const layer = state.pixiLayers.projectiles;
+  if (!state.pixiApp || !state.pixiLayers?.fighters) return;
+  const layer = state.pixiLayers.fighters;
 
   // Find Yuta fighter
   const yuta = state.fighters?.find(f => f && (f.type === 'yuta' || f._def?.type === 'yuta') && f.rika);

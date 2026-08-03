@@ -340,11 +340,7 @@ export class BerserkerFighter extends Fighter {
   }
 
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = this.isInRage ? '#ff0000' : '#8b0000';
-    ctx.stroke();
+    super.drawOutline(ctx);
 
     // Rage glow effect (extra outer ring when enraged)
     if (this.isInRage) {

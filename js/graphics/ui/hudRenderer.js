@@ -44,7 +44,7 @@ export function renderTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColo
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = 'bold 12px Arial';
+    ctx.font = '13px "Glast Blitch", Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillText(fighter.name, rowX + 10, currentY + 6);

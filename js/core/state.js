@@ -16,10 +16,22 @@ const ctx    = canvas.getContext('2d');
 // We initialize a Pixi Application that will replace the 2D canvas in the DOM.
 // The old 2D canvas is kept for offscreen rendering of complex fighters, 
 // then uploaded to Pixi as a texture.
+let parsedBgColor = 0x000000;
+if (CONFIG.canvasBgColor) {
+  if (typeof CONFIG.canvasBgColor === 'number') {
+    parsedBgColor = CONFIG.canvasBgColor;
+  } else if (typeof CONFIG.canvasBgColor === 'string') {
+    parsedBgColor = parseInt(CONFIG.canvasBgColor.replace('#', ''), 16);
+    if (isNaN(parsedBgColor)) {
+      parsedBgColor = 0x000000;
+    }
+  }
+}
+
 const pixiApp = new window.PIXI.Application({
   width: 540,
   height: 960,
-  backgroundColor: 0x000000,
+  backgroundColor: parsedBgColor,
   resolution: window.devicePixelRatio || 1,
   autoDensity: true,
   antialias: true
@@ -363,6 +375,7 @@ if (typeof window !== 'undefined') {
 const MAX_FLOATING_TEXTS = 10; // Aggressively lowered to avoid layouts inside recording hook
 const MINIMAL_FLOATING_TEXT = true; // Only show damage/heal numbers and key skill labels
 const SKILL_TEXT_WHITELIST = [
+  'BLACK FLASH',
   'BLACK HOLE!',
   'CHARGING...',
   'TIME STOP!',
@@ -465,6 +478,9 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     displayText = '-' + displayText;
   }
 
+  // Detect if this text contains numbers (needs readable font like Architects Daughter instead of Glast Blitch)
+  const isDamage = /\d/.test(displayText);
+
   state.floatingTexts.push({
     x: x + (Math.random() - 0.5) * 16,
     y: y - nearbyCount * 18,  // stack upward if siblings exist
@@ -474,6 +490,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     timer: 0,
     maxTimer: 65,
     opacity: 1,
+    isDamage,
   });
 }
 

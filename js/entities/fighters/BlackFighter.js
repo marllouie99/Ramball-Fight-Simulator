@@ -165,11 +165,7 @@ export class BlackFighter extends Fighter {
   }
 
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#9900ff';
-    ctx.stroke();
+    super.drawOutline(ctx);
   }
 
   drawGun(ctx) {

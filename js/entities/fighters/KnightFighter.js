@@ -628,11 +628,7 @@ export class KnightFighter extends Fighter {
 
   // â”€â”€ Drawing â”€â”€
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#aaaaaa';
-    ctx.stroke();
+    super.drawOutline(ctx);
 
     // Draw sword range radius
     ctx.beginPath();

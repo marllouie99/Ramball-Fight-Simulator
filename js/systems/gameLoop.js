@@ -13,6 +13,8 @@ export const TARGET_FPS = isMobile ? 30 : 60; // Lower FPS on mobile to reduce h
 export const FRAME_TIME = 1000 / TARGET_FPS;
 let lastFrameTime = 0;
 let isPageVisible = true;
+let _uiScreensCache = null;
+let _uiLayerCache = null;
 
 // Pause game loop when tab is hidden (mobile optimization)
 document.addEventListener('visibilitychange', () => {
@@ -78,17 +80,13 @@ export function animate(timestamp) {
 
       // FPS Drop Detection
       if (state.fps < 45 && state.gameState === 'playing') {
-        let issues = [];
+        // Collect diagnostic data synchronously (cheap integer checks)
+        const currentFps = state.fps;
         const projCount = getProjectiles().length;
-        if (projCount > 30) issues.push(`${projCount} Projectiles`);
+        const particleCount = totalParticles;
+        const explosionsCount = (bomberExplosionSystem && bomberExplosionSystem.explosions) ? bomberExplosionSystem.explosions.length : 0;
 
-        let particleCount = totalParticles;
-        if (particleCount > 80) issues.push(`${particleCount} Particles`);
-
-        let explosionsCount = (bomberExplosionSystem && bomberExplosionSystem.explosions) ? bomberExplosionSystem.explosions.length : 0;
-        if (explosionsCount > 3) issues.push(`${explosionsCount} Explosions`);
-
-        // OPTIMIZATION: Use spatial grid for clash detection instead of O(n²) loop
+        // Spatial grid clash detection (lightweight integer work)
         let closeFighters = 0;
         let clashingNames = new Set();
 
@@ -113,36 +111,47 @@ export function animate(timestamp) {
         // Divide by 2 since each pair is counted twice
         closeFighters = Math.floor(closeFighters / 2);
 
-        if (closeFighters > 0) {
-          let names = Array.from(clashingNames).join(', ');
-          issues.push(`Clash (${closeFighters} close) [${names}]`);
-        }
-
-        let logText = '';
-        if (issues.length > 0) {
-          if (closeFighters === 0) {
-            // Append alive fighters if no clash
-            let alive = state.fighters.filter(f => f && f.hp > 0).map(f => (f.fighterIndex !== undefined && FIGHTER_DEFS[f.fighterIndex]) ? FIGHTER_DEFS[f.fighterIndex].name : 'Unknown');
-            if (alive.length > 0) issues.push(`Active: [${alive.join(', ')}]`);
+        const aliveFighters = state.fighters.filter(f => f && f.hp > 0).map(f => (f.fighterIndex !== undefined && FIGHTER_DEFS[f.fighterIndex]) ? FIGHTER_DEFS[f.fighterIndex].name : 'Unknown');
+        
+        // Defer heavy string concatenation/array operations to idle time
+        const logTask = () => {
+          let issues = [];
+          if (projCount > 30) issues.push(`${projCount} Projectiles`);
+          if (particleCount > 80) issues.push(`${particleCount} Particles`);
+          if (explosionsCount > 3) issues.push(`${explosionsCount} Explosions`);
+  
+          if (closeFighters > 0) {
+            let names = Array.from(clashingNames).join(', ');
+            issues.push(`Clash (${closeFighters} close) [${names}]`);
           }
-          logText = `[FPS: ${state.fps}] ${issues.join(', ')}`;
+  
+          let logText = '';
+          if (issues.length > 0) {
+            if (closeFighters === 0 && aliveFighters.length > 0) {
+              issues.push(`Active: [${aliveFighters.join(', ')}]`);
+            }
+            logText = `[FPS: ${currentFps}] ${issues.join(', ')}`;
+          } else {
+            logText = `[FPS: ${currentFps}] Unknown Heavy Load [${aliveFighters.join(', ')}]`;
+          }
+  
+          state.fpsLogs.push({ text: logText, timer: 300 });
+          if (state.fpsLogs.length > 5) {
+            state.fpsLogs[0] = state.fpsLogs[state.fpsLogs.length - 1];
+            state.fpsLogs.pop();
+          }
+  
+          state.allFpsLogs.push(`[${new Date().toLocaleTimeString()}] ${logText}`);
+          const MAX_FPS_LOGS = 1000;
+          if (state.allFpsLogs.length > MAX_FPS_LOGS) {
+            state.allFpsLogs.splice(0, state.allFpsLogs.length - MAX_FPS_LOGS);
+          }
+        };
+
+        if (window.requestIdleCallback) {
+          window.requestIdleCallback(logTask);
         } else {
-          let alive = state.fighters.filter(f => f && f.hp > 0).map(f => (f.fighterIndex !== undefined && FIGHTER_DEFS[f.fighterIndex]) ? FIGHTER_DEFS[f.fighterIndex].name : 'Unknown');
-          logText = `[FPS: ${state.fps}] Unknown Heavy Load [${alive.join(', ')}]`;
-        }
-
-        state.fpsLogs.push({ text: logText, timer: 300 });
-        if (state.fpsLogs.length > 5) {
-          // Use swap-and-pop instead of shift() to avoid O(n) re-indexing
-          state.fpsLogs[0] = state.fpsLogs[state.fpsLogs.length - 1];
-          state.fpsLogs.pop();
-        }
-
-        state.allFpsLogs.push(`[${new Date().toLocaleTimeString()}] ${logText}`);
-        // Cap allFpsLogs to prevent unbounded memory growth
-        const MAX_FPS_LOGS = 1000;
-        if (state.allFpsLogs.length > MAX_FPS_LOGS) {
-          state.allFpsLogs.splice(0, state.allFpsLogs.length - MAX_FPS_LOGS);
+          setTimeout(logTask, 0);
         }
       }
     }
@@ -170,14 +179,15 @@ export function animate(timestamp) {
     // Sync HTML UI Screens
     if (state.lastGameState !== state.gameState) {
       state.lastGameState = state.gameState;
-      const screens = document.querySelectorAll('.ui-screen');
+      if (!_uiScreensCache) _uiScreensCache = document.querySelectorAll('.ui-screen');
+      const screens = _uiScreensCache;
       if (screens && screens.length > 0) {
         screens.forEach(s => s.classList.remove('active'));
         const activeScreen = document.getElementById(state.gameState + '-screen');
         if (activeScreen) activeScreen.classList.add('active');
         
-        // Hide/show ui-layer container pointer events based on if an HTML screen is active
-        const uiLayer = document.getElementById('ui-layer');
+        if (!_uiLayerCache) _uiLayerCache = document.getElementById('ui-layer');
+        const uiLayer = _uiLayerCache;
         if (uiLayer) {
             uiLayer.style.pointerEvents = ['title'].includes(state.gameState) ? 'auto' : 'none';
         }

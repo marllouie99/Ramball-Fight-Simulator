@@ -102,9 +102,6 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     target.blackFlashDebuffTimer = CONFIG.blackFlash?.debuff?.healReductionDuration ?? 270;
     
     // Todo enters the Zone!
-    if (!this.blackFlashTimer || this.blackFlashTimer <= 0) {
-      spawnFloatingText(this.x, this.y - this.r - 28, "THE ZONE 120%", "#D95C7E");
-    }
     this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
   } else {
     playTodoPunchSound();

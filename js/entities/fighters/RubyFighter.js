@@ -487,11 +487,7 @@ export class RubyFighter extends Fighter {
   }
 
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#E0115F';
-    ctx.stroke();
+    super.drawOutline(ctx);
 
     if (this.activePullCooldown <= 0) {
       const cfg = CONFIG.ruby || {};

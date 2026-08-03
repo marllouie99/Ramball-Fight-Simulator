@@ -186,11 +186,7 @@ export class BomberFighter extends Fighter {
   }
 
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = this.skinColor || '#4A2508';
-    ctx.stroke();
+    super.drawOutline(ctx);
 
     // Draw throw radius (max range — green dashed)
     const throwRadius = CONFIG.bomber.throwRadius;

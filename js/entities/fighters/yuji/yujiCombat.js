@@ -151,8 +151,11 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
 
         if (isBlackFlash) {
           spawnBlackFlash(target.x, target.y);
+          if (this.blackFlashTimer <= 0) {
+            spawnFloatingText(target.x, target.y - target.r - 25, "BLACK FLASH", "#ff0000");
+          }
           const sound = getSkillSound(this.id, 'blackflash');
-          if (sound && Math.random() < (CONFIG.yuji?.blackFlashNoiseChance ?? 0.35)) {
+          if (sound) {
             audioSystem.playSFX(sound.src, sound.volume);
             if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
           }
@@ -193,7 +196,6 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
       
       if (this.blackFlashTimer <= 0) {
         // Just entered the zone!
-        spawnFloatingText(this.x, this.y - this.r - 28, "THE ZONE 120%", "#D95C7E");
         this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
         this.blackFlashHitsLeft = CONFIG.yuji?.blackFlashZoneMaxHits || 4;
       } else {

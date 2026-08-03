@@ -60,6 +60,19 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
         spawnSparks(target.x, target.y, 6, 'crimsonSniper');
       }
 
+      // Apply global basic attack hit-pause if configured
+      const isBasicAttack = !opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && 
+                            !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
+                            !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
+                            !opts.isExplosion && !opts.isAOE;
+      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0) {
+        if (typeof target.isPerformingSkill !== 'function' || !target.isPerformingSkill()) {
+          if (typeof target.applyTimeStop === 'function') {
+            target.applyTimeStop(CONFIG.basicAttackHitPauseDuration);
+          }
+        }
+      }
+
       // No floating text for illusion damage
       if (target.hp <= 0) {
         spawnIllusionDeath(target);
@@ -197,6 +210,7 @@ export class Fighter {
 
     this.rctVisualTimer = 0;
     this.rctVisualMaxTimer = 60;
+    this.basicAttackHitPauseTimer = 0;
 
     this.poisonTicks = 0;
     this.poisonTimer = 0;
@@ -315,7 +329,40 @@ export class Fighter {
   }
 
   _handleTimeStop() {
+    if (this.basicAttackHitPauseTimer > 0) {
+      this.basicAttackHitPauseTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return true;
+    }
     return this.statusEffects.handleTimeStop();
+  }
+
+  isPerformingSkill() {
+    if (this.isRika) {
+      return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
+    }
+    return !!(
+      this.isAmbushing ||
+      this.ultimateActive ||
+      this.isChannelingDomain ||
+      this.isChannelingDomainExpansion ||
+      this.isChannelingDivineFlame ||
+      this.isChannelingPurple ||
+      this.isChannelingRCT ||
+      this.isChannelingStorm ||
+      this.isChanneling ||
+      this.meleeSwingActive ||
+      this.scytheSwingActive ||
+      this.swipeActive ||
+      this.axeSwingActive ||
+      this.flameActive ||
+      this.beamActive ||
+      this.skillActive ||
+      (this.flurryHitsLeft > 0) ||
+      (this.rapidSlashHitsLeft > 0) ||
+      (this.dashTimer > 0)
+    );
   }
 
   applyPoison(attacker) {
@@ -493,6 +540,17 @@ export class Fighter {
         spawnBloodEffect(this, bloodAmount, damageAngle);
       }
       
+      // Apply global basic attack hit-pause if configured
+      const isBasicAttack = !opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && 
+                            !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
+                            !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
+                            !opts.isExplosion && !opts.isAOE;
+      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !this.isTurret) {
+        if (!this.isPerformingSkill()) {
+          this.basicAttackHitPauseTimer = CONFIG.basicAttackHitPauseDuration;
+        }
+      }
+
       // Play hit sound and trigger hit flash unless it's a DPS/continuous effect
       // isPurpleDPS, isElectrified, isDomainDPS suppress rapid audio spam when multiple targets are hit simultaneously
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS) {

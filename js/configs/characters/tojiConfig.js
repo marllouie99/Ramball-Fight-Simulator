@@ -59,4 +59,8 @@ export const tojiConfig = {
     ultimateCraterChargeTime: 90,     // Frames spent hovering in the air winding up the katana
     ultimateCraterDiveTime: 15,       // Frames spent diving down to the ground
     ultimateCraterFadeInFrames: 30,   // Frames for Toji to fade in before the crater slam
+
+    // Dynamic multipliers
+    ultimateDodgeMultiplier: 3.0,     // Dodge chance multiplier during ultimate
+    stealthSpeedMultiplier: 1.3,      // Speed multiplier during stealth mode
 };

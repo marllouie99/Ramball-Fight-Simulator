@@ -606,11 +606,7 @@ export class DarkSlateGrayFighter extends Fighter {
       return;
     }
 
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#4a6a6a';
-    ctx.stroke();
+    super.drawOutline(ctx);
 
     // Draw melee attack radius when in melee mode
     if (this.weaponMode === 'melee') {
