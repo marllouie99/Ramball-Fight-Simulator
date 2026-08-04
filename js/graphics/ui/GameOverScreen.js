@@ -201,7 +201,7 @@ function drawFfaChampionReveal(winner, timer) {
   preview.vx = 0;
   preview.vy = 0;
   preview.angle = 0;
-  preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Yuta faces forward, others point weapons down
+  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji') ? 0 : Math.PI * 0.5; // Yuta and Toji face forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
   if (preview.rika) {
@@ -421,7 +421,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     preview.vx = 0;
     preview.vy = 0;
     preview.angle = 0;
-    preview.gunAngle = def.type === 'yuta' ? 0 : Math.PI * 0.5; // Relaxed resting pose pointing downwards, but Yuta points forward to align his bag
+    preview.gunAngle = (def.type === 'yuta' || def.type === 'toji') ? 0 : Math.PI * 0.5; // Relaxed resting pose pointing downwards, but Yuta and Toji point forward
     preview.shootCooldown = 0;
     preview._isWinnerReveal = true;
     if (preview.rika) {
