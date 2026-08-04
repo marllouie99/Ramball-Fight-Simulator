@@ -1718,8 +1718,9 @@ export class TojiFighter extends Fighter {
       ctx.save();
       // Use the world-space origin snapshotted at swing-start so the slash arc stays
       // fixed in place and does NOT follow Toji as he moves during or after the swing.
-      const _slashOriginX = this._slashOriginX !== undefined ? this._slashOriginX : this.x;
-      const _slashOriginY = this._slashOriginY !== undefined ? this._slashOriginY : this.y;
+      const isUltimateStriking = this.ultimateActive && this.ultimatePhase === 'STRIKING';
+      const _slashOriginX = (isUltimateStriking || this._slashOriginX === undefined) ? this.x : this._slashOriginX;
+      const _slashOriginY = (isUltimateStriking || this._slashOriginY === undefined) ? this.y : this._slashOriginY;
       ctx.translate(_slashOriginX, _slashOriginY);
 
       if (this.ambushPhase === 'KATANA_SLASH') {
