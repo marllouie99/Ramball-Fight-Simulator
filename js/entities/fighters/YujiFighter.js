@@ -173,7 +173,7 @@ export class YujiFighter extends Fighter {
             
             // Spawn hot-pink clash shockwave ring (Yuta style)
             const shockRadius = CONFIG.yuji?.shockwaveRadius || 40;
-            spawnMeleeClashShockwave(target.x, target.y, shockRadius, 'yuta');
+            spawnMeleeClashShockwave(target.x, target.y, shockRadius, 'gojo');
 
             // Play secondary impact sound
             audioSystem.playSFX('attack_fleshhit', 0.6);

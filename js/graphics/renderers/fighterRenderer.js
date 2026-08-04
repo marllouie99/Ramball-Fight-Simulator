@@ -88,7 +88,7 @@ export class FighterRenderer {
     ctx.rotate(fighter.angle);
     
     // Flip vertically if facing left to prevent being upside-down
-    if (Math.abs(fighter.angle) > Math.PI / 2) {
+    if (Math.abs(fighter.angle) > Math.PI / 2 && !fighter.isSpinning) {
       ctx.scale(1, -1);
     }
 

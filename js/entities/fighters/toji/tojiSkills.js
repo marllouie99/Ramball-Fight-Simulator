@@ -49,7 +49,6 @@ export function modUpdateChannelSense(fighter, opponent) {
           // Trigger visual & audio indicator for Channel Sense Interrupt!
           fighter.channelSenseIndicatorTimer = 35;
           spawnImpactFlash(fighter.x, fighter.y, 65, 'crimsonSniper');
-          spawnMeleeClashShockwave(fighter.x, fighter.y, 110, 'yuta');
           spawnCrimsonLightningImpact(fighter.x, fighter.y, 80);
           audioSystem.playSFX('skill_backstab', 1.0);
 

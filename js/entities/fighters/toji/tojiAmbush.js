@@ -42,10 +42,8 @@ export function tojiIsTargetDeadOrRemoved(fighter, target) {
 export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, startAngle, endAngle) {
   if (!fighter.stealthAfterimages) fighter.stealthAfterimages = [];
 
-  spawnMeleeClashShockwave(fromX, fromY, 85, 'yuta');
   spawnImpactFlash(fromX, fromY, 40, '#A040FF');
 
-  spawnMeleeClashShockwave(toX, toY, 115, 'yuta');
   spawnImpactFlash(toX, toY, 50, '#A040FF');
   spawnSparks(toX, toY, 8, 'crimsonSniper');
 
@@ -136,7 +134,6 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   
   if (isInterrupt || fighter.ambushTargetWasChanneling) {
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 35, 'INTERRUPTED!', '#FF1133', 35);
-    spawnMeleeClashShockwave(opponent.x, opponent.y, 130, 'yuta');
     spawnCrimsonLightningImpact(opponent.x, opponent.y, 90);
     spawnImpactFlash(opponent.x, opponent.y, 65, 'crimsonSniper');
   }
@@ -149,8 +146,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   modSpawnTeleportAfterimages(fighter, oldX, oldY, clampedFront.x, clampedFront.y, startAngle, fighter.gunAngle);
 
   spawnImpactFlash(oldX, oldY, 25, '#A040FF');
-  spawnImpactFlash(fighter.x, fighter.y, 30, '#A040FF');
-  spawnMeleeClashShockwave(fighter.x, fighter.y, 90, 'yuta'); 
+  spawnImpactFlash(fighter.x, fighter.y, 30, '#A040FF'); 
   const tpSound = getSkillEffectSound('toji', 'firstseqteleport');
   audioSystem.playSFX(tpSound?.src || 'Assets/Sound Effects/Skills/toji-firstseq-teleport.mp3', tpSound?.volume || 1.0, tpSound?.speed || 1.0, 0, tpSound?.delay || 0);
 }
@@ -278,7 +274,6 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
       spawnImpactFlash(frontX, frontY, 30, '#A040FF');
       spawnImpactFlash(clampedBack.x, clampedBack.y, 35, 'rgba(255, 30, 75, 0.8)');
-      spawnMeleeClashShockwave(clampedBack.x, clampedBack.y, 110, 'yuta');
       const strikeSound = getSkillEffectSound('toji', 'strike');
       if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
       audioSystem.playSFX('skill_backstab', 0.8);
@@ -311,10 +306,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       triggerGlobalScreenShake(4, 6);
 
       spawnImpactFlash(fighter.x, fighter.y, 110, 'rgba(255, 30, 75, 0.95)');
-      spawnMeleeClashShockwave(fighter.x, fighter.y, 140, 'yuta');
       spawnCrimsonLightningImpact(fighter.x, fighter.y, 80);
-
-      spawnMeleeClashShockwave(fighter.x, fighter.y, 160, 'yuta');
       spawnSparks(fighter.x, fighter.y, 25, 'crimsonSniper');
       spawnSparks(fighter.x, fighter.y, 20, 'crimson');
 
@@ -341,7 +333,6 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
       audioSystem.playSFX('attack_swordswing', 0.85);
       spawnImpactFlash(fighter.x, fighter.y, 45, '#E2E6EC');
-      spawnMeleeClashShockwave(fighter.x, fighter.y, 80, 'yuta');
       spawnSparks(fighter.x, fighter.y, 16, 'crimsonSniper');
     }
   } else if (fighter.ambushPhase === 'KATANA_DRAW') {
@@ -391,7 +382,6 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       const strikeSound = getSkillEffectSound('toji', 'strike');
       if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
       spawnImpactFlash(fighter.x, fighter.y, 35, 'rgba(255, 30, 75, 0.8)');
-      spawnMeleeClashShockwave(fighter.x, fighter.y, 120, 'yuta');
     }
   } else if (fighter.ambushPhase === 'KATANA_CHARGE') {
     fighter.vx = 0;
@@ -597,7 +587,6 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
         triggerGlobalScreenShake(isFinalStrike ? 8 : 4, isFinalStrike ? 8 : 4);
         spawnImpactFlash(contactX, contactY, isFinalStrike ? 75 : 40, '#E2E6EC');
-        spawnMeleeClashShockwave(contactX, contactY, isFinalStrike ? 110 : 80, 'yuta');
         spawnSparks(contactX, contactY, isFinalStrike ? 12 : 5, 'crimsonSniper');
         
         if (isFinalStrike) {

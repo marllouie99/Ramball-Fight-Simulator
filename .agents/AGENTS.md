@@ -86,3 +86,7 @@
     const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
     const thick = maxThick * taper;
     ```
+- **Ultimate Final Blow (360 Spin Dive):**
+  - **Locked Orientation during Charge:** To prevent the weapon from snappily flipping sides as the target moves during `CRATER_FADEIN` and `CRATER` charge phases, snapshot the initial facing angle and flip sign once at transition start (`_ultimateChargeAngle` and `_ultimateChargeFlipSign`) and hold them locked. Clear active weapon slash timers (`katanaSlashTimer = 0`) on transition to prevent leftover charging-phase purple outlines.
+  - **Clockwise Spin & Cutting Edge Alignment:** Always rotate Toji clockwise (`+ Math.PI * 2 * spinProgress`) so he spins downwards/rightwards towards the target. Disable vertical scale flipping for both Toji's body and weapon during the dive (`isSpinning = true`, `baseAngle = 0`, `_katanaFlipSign = 1`) to let the Katana draw in its default orientation, ensuring the cutting edge naturally leads the clockwise rotation.
+  - **Stretched Trail:** Set the crescent slash radius to match the weapon tip (`outerR = this.r + thrustDistance + 146`) and let the trail trailing-stretch counter-clockwise behind the clockwise spin up to a grand `3.8` radians, fading out in the final 30% of the dive.

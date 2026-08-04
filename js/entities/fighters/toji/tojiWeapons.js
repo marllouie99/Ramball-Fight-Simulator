@@ -232,8 +232,6 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
     }
 
     spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
-    spawnMeleeClashShockwave(target.x, target.y, 240, 'yuta');
-    spawnMeleeClashShockwave(target.x, target.y, 180, 'yuta');
     spawnCrimsonLightningImpact(target.x, target.y, 140);
     spawnSparks(target.x, target.y, 50, 'crimsonSniper');
   }
@@ -344,9 +342,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
         if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
       }
 
-      spawnMeleeClashShockwave(target.x, target.y, 190, 'yuta');
       spawnCrimsonLightningImpact(target.x, target.y, 110);
-      spawnMeleeClashShockwave(target.x, target.y, 140, 'yuta');
       spawnSparks(target.x, target.y, 40, 'crimsonSniper');
     }
   }

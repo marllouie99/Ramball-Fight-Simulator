@@ -448,7 +448,7 @@ export class Fighter {
           audioSystem.playSFX('attack_fleshhit', 0.9);
           spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
           spawnSparks(this.x, this.y, 14, 'crimsonSniper');
-          spawnMeleeClashShockwave(this.x, this.y, 100, 'yuta');
+          spawnMeleeClashShockwave(this.x, this.y, 100, 'gojo');
         }
       }
       

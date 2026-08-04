@@ -1121,7 +1121,7 @@ export function drawSparkEffects(layer = 'all') {
 
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(40, 10, 35, ${effect.life * 0.45})` : (isTojiClash ? `rgba(20, 22, 25, ${effect.life * 0.5})` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`)));
+      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`)));
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();

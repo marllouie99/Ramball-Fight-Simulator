@@ -1272,7 +1272,7 @@ export class GojoFighter extends Fighter {
 
             // Spawn ground impact sparks and dust wave along slide vector
             spawnSparks(f.x, f.y, 25, 'crimsonSniper');
-            spawnMeleeClashShockwave(f.x, f.y, 110, 'yuta');
+            spawnMeleeClashShockwave(f.x, f.y, 110, 'gojo');
 
             // Damage
             const redDamage = CONFIG.gojo.redDamage !== undefined ? CONFIG.gojo.redDamage : (this.damage * 2);
