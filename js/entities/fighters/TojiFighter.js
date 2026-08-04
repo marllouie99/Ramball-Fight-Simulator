@@ -41,6 +41,7 @@ export class TojiFighter extends Fighter {
     this.spearRange = CONFIG.toji?.spearRange || 50;
     this.spearDamage = CONFIG.toji?.spearDamage || 12;
     this.spearSwingTimer = 0;
+    this.spearSwingMax = 36;
 
     // Split Soul Katana
     // Physics Chain simulation
@@ -1204,6 +1205,8 @@ export class TojiFighter extends Fighter {
     let thrustDistance = 0;
     let slashArcAlpha = 0;
     let attackPhaseProgress = 0;
+    this._activeSlashProgress = 0; // Initialize active slash progress to 0
+    this._recoveryProgress = 0;    // Initialize recovery progress to 0
 
     if (this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH')) {
       const maxPause = CONFIG.toji?.ambushBackChargeDuration || 25;
@@ -1374,10 +1377,12 @@ export class TojiFighter extends Fighter {
       // Auto-detect max timer when a new swing starts (handles 50 for normal, 24 for ultimate rapid strikes)
       if (this.katanaSlashTimer > (this._lastKatanaTimer || 0)) {
         this._katanaMax = this.katanaSlashTimer;
-        // Snapshot the facing angle at the moment the swing starts so the crescent arc
-        // stays locked to the blade's initial direction and never drifts mid-swing.
+        // Snapshot the facing angle AND world-space origin at the moment the swing starts so the
+        // crescent arc stays locked in place and never drifts or follows Toji as he moves.
         this._slashStartAngle = baseAngle;
         this._slashStartFlipSign = _katanaFlipSign;
+        this._slashOriginX = this.x;
+        this._slashOriginY = this.y;
       }
       this._lastKatanaTimer = this.katanaSlashTimer;
 
@@ -1392,22 +1397,38 @@ export class TojiFighter extends Fighter {
         const p = t / 0.15;
         const easeP = p * p;
         thrustDistance = -14 * easeP;
-        offsetAngle = -0.85 * easeP * _katanaFlipSign; // Coil back for wide Katana slash (mirrored when facing left)
-        slashArcAlpha = 0; // Do not draw visual slash during wind-up
+        offsetAngle = -1.15 * easeP * _katanaFlipSign; // Coil back wider (-1.15)
+        slashArcAlpha = 0;
+        this._activeSlashProgress = 0;
+        this._recoveryProgress = 0;
       } else if (t < 0.65) {
         const p = (t - 0.15) / 0.50;
         const sweepCurve = Math.sin(p * Math.PI * 0.5);
         thrustDistance = -14 + 48 * sweepCurve;
-        offsetAngle = (-0.85 + 1.80 * sweepCurve) * _katanaFlipSign; // Sweep mirrored when facing left
-        slashArcAlpha = Math.sin(p * Math.PI); // Fades in and out perfectly during active strike
+        offsetAngle = (-1.15 + 2.40 * sweepCurve) * _katanaFlipSign; // Sweeps from -1.15 to +1.25 (wider, 137 degrees)
+        slashArcAlpha = Math.min(1.0, p * 4.0); // Fades in instantly and stays at 1.0
+        this._activeSlashProgress = p; // Store the progress on this for trailing erase effect
+        this._recoveryProgress = 0;
       } else {
         const p = (t - 0.65) / 0.35;
         const easeP = p * (2 - p);
         thrustDistance = 34 * (1 - easeP);
-        offsetAngle = 0.95 * (1 - easeP) * _katanaFlipSign; // Recovery mirrored when facing left
-        slashArcAlpha = 0; // Do not draw visual slash during recovery (no back-and-forth)
+        offsetAngle = 1.25 * (1 - easeP) * _katanaFlipSign; // Recovery from +1.25 to 0
+        slashArcAlpha = 1 - p; // Fades out during recovery phase
+        this._activeSlashProgress = 1.0;
+        this._recoveryProgress = p; // Store recovery progress
       }
     } else if (isAttacking) {
+      // Snapshot the facing angle AND world-space origin at the moment the spear swing starts so
+      // the crescent arc stays locked in place and never drifts or follows Toji as he moves.
+      if (this.spearSwingTimer > (this._lastSpearTimer || 0)) {
+        this._slashStartAngle = baseAngle;
+        this._slashStartFlipSign = _katanaFlipSign;
+        this._slashOriginX = this.x;
+        this._slashOriginY = this.y;
+      }
+      this._lastSpearTimer = this.spearSwingTimer;
+
       const maxTimer = this.spearSwingMax || (this.isAmbushThrust ? 50 : 55);
       const t = 1 - (this.spearSwingTimer / maxTimer); // 0 to 1 attack progress
       attackPhaseProgress = t;
@@ -1441,36 +1462,50 @@ export class TojiFighter extends Fighter {
           slashArcAlpha = 0;
         }
       } else {
-        // Standard Melee Swing (Basic Attack Inverted Spear)
+        // Standard Melee Swing (Basic Attack — Inverted Spear of Heaven)
+        // Motion: weapon snaps to upper-right (-0.80), sweeps downward arc through
+        // horizontal (0) to lower-right (+0.55), then recovers to idle (+0.42).
+        // Matches reference drawing: top-to-bottom chop, single clean arc.
+        //
+        // Phase layout: 5% instant cock-up | 47% downward arc sweep | 48% recovery
         if (t < 0.05) {
-          // Phase 1: Instant Wind-Up
+          // Phase 1: Ultra-fast snap to cocked upper-right position (reads as "already cocked")
           const p = t / 0.05;
-          thrustDistance = -6 * p;
-          offsetAngle = 0.42 - 0.90 * p;
-          slashArcAlpha = p * 0.4;
-        } else if (t < 0.70) {
-          // Phase 2: Smooth & Punchy Forward Slash Sweep (Smash DOWNWARDS)
-          const p = (t - 0.05) / 0.65;
-          const sweepCurve = Math.sin(p * Math.PI * 0.5);
-          thrustDistance = -6 + 42 * sweepCurve;
-          offsetAngle = -0.48 + 1.33 * sweepCurve; // Sweeps down from -0.48 to +0.85
-          slashArcAlpha = Math.sin(p * Math.PI); // Fades in and out perfectly during active strike
+          thrustDistance = -8 * p;
+          offsetAngle = 0.42 - 1.57 * p;   // 0.42 → -1.15 (upper-right, 11 o'clock)
+          slashArcAlpha = 0;
+          this._activeSlashProgress = 0;
+          this._recoveryProgress = 0;
+        } else if (t < 0.52) {
+          // Phase 2: Downward arc sweep — upper-right (-1.15) through horizontal to lower-right (+1.05)
+          const p = (t - 0.05) / 0.47;
+          const sweepCurve = 1 - Math.pow(1 - p, 2.2); // quadratic ease-out: fast snap, smooth landing
+          // thrustDistance: blade eases forward to a steady +12px and holds there during the arc.
+          // No sin-pulse lunge — that was causing the thrust look.
+          thrustDistance = -8 + 20 * Math.min(1.0, p * 3.0); // ramps to +12 in first 1/3, then holds
+          offsetAngle = -1.15 + 2.20 * sweepCurve;            // -1.15 → +1.05 (wider top-to-bottom arc, 126 degrees)
+          slashArcAlpha = Math.min(1.0, p * 4.0);              // Fades in instantly and stays at 1.0
+          this._activeSlashProgress = p; // Store the progress on this for trailing erase effect
+          this._recoveryProgress = 0;
 
-          if (p > 0.05 && p < 0.40 && this.chainNodes && this.chainNodes.length > 2) {
-            const whipForce = -5.0; // Negative whip force because swing is positive (downwards)
+          // Chain whips forward during early sweep burst
+          if (p > 0.04 && p < 0.40 && this.chainNodes && this.chainNodes.length > 2) {
+            const whipForce = -6.5;
             const sideAngle = baseAngle + offsetAngle;
             for (let i = 1; i < this.chainNodes.length; i++) {
-              this.chainNodes[i].vx += Math.cos(sideAngle - 1.2) * (whipForce / i);
-              this.chainNodes[i].vy += Math.sin(sideAngle - 1.2) * (whipForce / i);
+              this.chainNodes[i].vx += Math.cos(sideAngle - 0.9) * (whipForce / i);
+              this.chainNodes[i].vy += Math.sin(sideAngle - 0.9) * (whipForce / i);
             }
           }
         } else {
-          // Phase 3: Smooth Follow-Through Recovery (Pull back up to idle)
-          const p = (t - 0.70) / 0.30;
-          const easeP = p * (2 - p);
-          thrustDistance = 36 * (1 - easeP);
-          offsetAngle = 0.85 + (0.42 - 0.85) * easeP; // Returns from +0.85 back up to +0.42
-          slashArcAlpha = 0; // Do not draw visual slash during recovery (no back-and-forth)
+          // Phase 3: Smooth recovery — ease back from lower-right (+1.05) to idle (+0.42)
+          const p = (t - 0.52) / 0.48;
+          const easeP = p * (2 - p); // quadratic ease-out
+          thrustDistance = 12 * (1 - easeP);                   // eases back from +12 to 0
+          offsetAngle = 1.05 + (0.42 - 1.05) * easeP;          // +1.05 → +0.42
+          slashArcAlpha = 1 - p;                               // Fades out during recovery phase
+          this._activeSlashProgress = 1.0;
+          this._recoveryProgress = p; // Store recovery progress
         }
       }
     } else if (this.ambushPhase === 'PHANTOM_FLURRY' || (this.phantomSlashTimer && this.phantomSlashTimer > 0)) {
@@ -1680,22 +1715,44 @@ export class TojiFighter extends Fighter {
     // 4. HIGH-IMPACT ANIME SLASH VISUAL EFFECTS (Impact & Recovery Phase)
     if (slashArcAlpha > 0) {
       ctx.save();
-      ctx.translate(this.x, this.y);
+      // Use the world-space origin snapshotted at swing-start so the slash arc stays
+      // fixed in place and does NOT follow Toji as he moves during or after the swing.
+      const _slashOriginX = this._slashOriginX !== undefined ? this._slashOriginX : this.x;
+      const _slashOriginY = this._slashOriginY !== undefined ? this._slashOriginY : this.y;
+      ctx.translate(_slashOriginX, _slashOriginY);
 
       if (this.ambushPhase === 'KATANA_SLASH') {
         // Use the snapshotted angle from the moment the swing began so the crescent does NOT
         // follow the live gunAngle after 1 swing (which caused it to visually change direction).
+        // Crucially, do NOT add offsetAngle to ctx.rotate here — offsetAngle animates the weapon position,
+        // but the slash visual must stay locked at the frozen target direction for its full lifetime.
         const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
         const frozenFlip  = this._slashStartFlipSign !== undefined ? this._slashStartFlipSign : _katanaFlipSign;
-        ctx.rotate(frozenAngle + offsetAngle * frozenFlip);
+        ctx.rotate(frozenAngle);
         const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
         if (Math.abs(normAngle) > Math.PI / 2) {
           ctx.scale(1, -1);
         }
 
-        // --- SLIM, LONG, ELEGANT VOID-PURPLE ANIME CRESCENT SLASH WAVE ---
-        const tailAngle = -Math.PI * 0.90; // Long 165-degree trailing needle tail!
-        const tipAngle = Math.PI * 0.10;   // Leading razor head at the Katana blade tip!
+        // --- DYNAMIC SLIM, LONG, ELEGANT VOID-PURPLE ANIME CRESCENT SLASH WAVE ---
+        // tipAngle dynamically tracks the weapon tip (offsetAngle * frozenFlip).
+        // tailAngle stretches back to the start offset (-1.15) up to a max length of 1.8 radians.
+        const p = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
+        const recP = this._recoveryProgress !== undefined ? this._recoveryProgress : 0;
+
+        // Keep the tip locked at the end of the swing (+1.25) during recovery
+        const currentOffset = recP > 0 ? 1.25 : (offsetAngle * frozenFlip);
+        const startOffset = -1.15;
+        const maxTrailLength = 1.8;
+
+        let activeTrailLength = maxTrailLength;
+        // Erases from beginning to end during recovery phase
+        if (recP > 0) {
+          activeTrailLength = maxTrailLength * Math.pow(1 - recP, 1.4);
+        }
+
+        const tipAngle = currentOffset;
+        const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
 
         const outerR = this.r + thrustDistance + 122; // Dynamically tracks Katana blade tip!
         const maxThick = 22; // Slim, razor-sharp crescent thickness!
@@ -1707,7 +1764,8 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = (maxThick + 5) * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = (maxThick + 5) * taper;
           const r = (outerR + 4) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
@@ -1721,7 +1779,8 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = (maxThick + 2) * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = (maxThick + 2) * taper;
           const r = (outerR + 1.5) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
@@ -1735,7 +1794,8 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          let thick = maxThick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          let thick = maxThick * taper;
 
           // Subtle sharp inner teeth notches matching reference image
           const notchPattern = Math.sin(t * Math.PI * 10);
@@ -1755,7 +1815,8 @@ export class TojiFighter extends Fighter {
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = maxThick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = maxThick * taper;
           const r = outerR - thick * 0.25;
           const x = Math.cos(angle) * r;
           const y = Math.sin(angle) * r;
@@ -1771,7 +1832,8 @@ export class TojiFighter extends Fighter {
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = maxThick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = maxThick * taper;
           const r = outerR - thick * 0.25;
           const x = Math.cos(angle) * r;
           const y = Math.sin(angle) * r;
@@ -1782,7 +1844,9 @@ export class TojiFighter extends Fighter {
         ctx.lineWidth = 1.2;
         ctx.stroke();
       } else if (this.isAmbushThrust && this.ambushPhase !== 'PHANTOM_FLURRY') {
-        ctx.rotate(baseAngle);
+        // Lock thrust cone to the snapshotted direction at swing-start (never drifts mid-thrust)
+        const thrustFrozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
+        ctx.rotate(thrustFrozenAngle);
         // --- MASSIVE PIERCING THRUST CONE SHOCKWAVE ---
         const spearTipR = this.r + thrustDistance + 10;
         // A. Deep Purple Cursed Energy Outer Flare Cone
@@ -1835,8 +1899,32 @@ export class TojiFighter extends Fighter {
           if (Math.abs(normAngle) > Math.PI / 2) {
             ctx.scale(1, -1);
           }
-          const tailAngle = -Math.PI * 0.85;
-          const tipAngle = Math.PI * 0.15;
+
+          // Calculate swing progress: timer counts down from maxSlashFrames to 0
+          const animMult = (TOJI_WEAPON_CONFIG?.animationSpeed || 1.0) * (TOJI_WEAPON_CONFIG?.katanaSlashAnimSpeed || 1.0);
+          const maxSlashFrames = Math.max(1, (CONFIG.toji?.flurrySlashDuration || TOJI_WEAPON_CONFIG?.flurrySlashDuration || 12) / animMult);
+          const timer = this.phantomSlashTimer || 0;
+          const rawP = Math.min(1.0, Math.max(0, timer / maxSlashFrames));
+          const progress = 1 - rawP; // actual progress of swing from 0 to 1
+
+          const swingType = (this.phantomStrikeCount || 0) % 3;
+          const sweepDir = (swingType === 1) ? 1 : -1;
+
+          const maxTrailLength = Math.PI * 0.95;
+          let activeTrailLength = 0;
+
+          // Growing, sustained, and erasing trail phases
+          if (progress < 0.35) {
+            activeTrailLength = maxTrailLength * (progress / 0.35);
+          } else if (progress < 0.60) {
+            activeTrailLength = maxTrailLength;
+          } else {
+            const shrink = (progress - 0.60) / 0.40;
+            activeTrailLength = maxTrailLength * Math.pow(1 - shrink, 1.4);
+          }
+
+          const tailAngle = sweepDir === 1 ? -activeTrailLength : 0;
+          const tipAngle = sweepDir === 1 ? 0 : activeTrailLength;
           const steps = isLowQuality ? 16 : 30;
 
           ctx.beginPath();
@@ -1844,7 +1932,8 @@ export class TojiFighter extends Fighter {
           for (let i = steps; i >= 0; i--) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const th = (thick + 5) * Math.sin(Math.pow(t, 0.75) * Math.PI);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const th = (thick + 5) * taper;
             ctx.lineTo(Math.cos(angle) * (radius + 4 - th), Math.sin(angle) * (radius + 4 - th));
           }
           ctx.fillStyle = `rgba(${color1}, ${alpha * 0.70})`;
@@ -1855,7 +1944,8 @@ export class TojiFighter extends Fighter {
           for (let i = steps; i >= 0; i--) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const th = (thick + 2) * Math.sin(Math.pow(t, 0.75) * Math.PI);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const th = (thick + 2) * taper;
             ctx.lineTo(Math.cos(angle) * (radius + 1.5 - th), Math.sin(angle) * (radius + 1.5 - th));
           }
           ctx.fillStyle = `rgba(${color2}, ${alpha * 0.80})`;
@@ -1866,7 +1956,8 @@ export class TojiFighter extends Fighter {
           for (let i = steps; i >= 0; i--) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            let th = thick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            let th = thick * taper;
             const notch = Math.sin(t * Math.PI * 10);
             if (notch > 0.65 && t > 0.15 && t < 0.85) th += 4.5 * (notch - 0.65);
             ctx.lineTo(Math.cos(angle) * (radius - th), Math.sin(angle) * (radius - th));
@@ -1878,7 +1969,8 @@ export class TojiFighter extends Fighter {
           for (let i = 0; i <= steps; i++) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const th = thick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const th = thick * taper;
             const rEdge = radius - th * 0.25;
             if (i === 0) ctx.moveTo(Math.cos(angle) * rEdge, Math.sin(angle) * rEdge);
             else ctx.lineTo(Math.cos(angle) * rEdge, Math.sin(angle) * rEdge);
@@ -1905,15 +1997,42 @@ export class TojiFighter extends Fighter {
           slashArcAlpha = 1.0;
         }
 
-        ctx.rotate(baseAngle + offsetAngle);
-        const normAngle = Math.atan2(Math.sin(baseAngle), Math.cos(baseAngle));
-        if (Math.abs(normAngle) > Math.PI / 2) {
+        // Use the snapshotted angle from when the swing started so the slash arc does NOT
+        // drift mid-swing when Toji's gunAngle updates between frames (e.g. above/below enemy).
+        // Crucially, do NOT add offsetAngle here — offsetAngle animates the weapon position,
+        // but the slash visual must stay locked at the frozen target direction for its full lifetime.
+        const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
+        ctx.rotate(frozenAngle);
+        const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
+        const isKatana = (this.ambushPhase === 'KATANA_SLASH' || (typeof state !== 'undefined' && state.tojiWeaponIndex === 1));
+        // Only scale Y (mirror sweep direction) for the Katana since its update loop builds in _katanaFlipSign.
+        // The Inverted Spear basic swing always sweeps clockwise, so its slash visual must never scale Y.
+        if (isKatana && Math.abs(normAngle) > Math.PI / 2) {
           ctx.scale(1, -1);
         }
 
-        const isKatana = (this.ambushPhase === 'KATANA_SLASH' || (typeof state !== 'undefined' && state.tojiWeaponIndex === 1));
-        const tailAngle = isKatana ? -Math.PI * 0.75 : -Math.PI * 0.60;
-        const tipAngle = isKatana ? Math.PI * 0.10 : Math.PI * 0.05;
+        const frozenFlip = this._slashStartFlipSign !== undefined ? this._slashStartFlipSign : _katanaFlipSign;
+        
+        const p = this._activeSlashProgress !== undefined ? this._activeSlashProgress : 0;
+        const recP = this._recoveryProgress !== undefined ? this._recoveryProgress : 0;
+        if (recP > 0) slashArcAlpha *= (1 - recP);
+
+        // Keep the tip locked at the end of the swing (+1.25 for Katana, +1.05 for Inverted Spear) during recovery
+        const endOffset = isKatana ? 1.25 : 1.05;
+        const liveOffset = isKatana ? (offsetAngle * frozenFlip) : offsetAngle;
+        const currentOffset = recP > 0 ? endOffset : liveOffset;
+
+        const startOffset = -1.15; // Set starting offset to -1.15 for the wider sweep range
+        const maxTrailLength = isKatana ? 1.8 : 1.6; // Increased tail length to match wider arc
+
+        let activeTrailLength = maxTrailLength;
+        // Erases from beginning to end during recovery phase
+        if (recP > 0) {
+          activeTrailLength = maxTrailLength * Math.pow(1 - recP, 1.4);
+        }
+
+        const tipAngle = currentOffset;
+        const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
         const bladeReach = isKatana ? 80 : 85;
         const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0); // Dynamically tracks active blade tip!
         const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0); // Slim razor-sharp crescent thickness!
@@ -1925,7 +2044,8 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = (maxThick + 5) * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = (maxThick + 5) * taper;
           const r = (outerR + 4) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
@@ -1939,7 +2059,8 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = (maxThick + 2) * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = (maxThick + 2) * taper;
           const r = (outerR + 1.5) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
@@ -1953,7 +2074,8 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          let thick = maxThick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          let thick = maxThick * taper;
 
           const notchPattern = Math.sin(t * Math.PI * 10);
           if (notchPattern > 0.65 && t > 0.15 && t < 0.85) {
@@ -1972,7 +2094,8 @@ export class TojiFighter extends Fighter {
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = maxThick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = maxThick * taper;
           const r = outerR - thick * 0.25;
           const x = Math.cos(angle) * r;
           const y = Math.sin(angle) * r;
@@ -1989,7 +2112,8 @@ export class TojiFighter extends Fighter {
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const thick = maxThick * Math.sin(Math.pow(t, 0.75) * Math.PI);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const thick = maxThick * taper;
           const r = outerR - thick * 0.25;
           const x = Math.cos(angle) * r;
           const y = Math.sin(angle) * r;

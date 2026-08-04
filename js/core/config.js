@@ -40,8 +40,8 @@ export const CONFIG = {
   arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 20,              // Font size for fighter name in HUD (px)
-  hudDescFontSize: 15,               // Font size for fighter description in HUD (px)
-  hudInfoFontSize: 13,               // Font size for fighter info (DMG, etc.) in HUD (px)
+  hudDescFontSize: 17,               // Font size for fighter description in HUD (px)
+  hudInfoFontSize: 15,               // Font size for fighter info (DMG, etc.) in HUD (px)
   hudWidthModifier: 0.90,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ

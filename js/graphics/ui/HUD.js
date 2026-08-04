@@ -171,13 +171,12 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
 function drawPauseScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
-  ctx.fillStyle = 'rgba(0,0,0,0.75)';
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+  // Screen is NOT dimmed when paused, per user request.
   drawHUD(); // Keep HUD visible in background
 
-  const cx = state.arena.x + state.arena.width / 2;
-  const cy = state.arena.y + state.arena.height / 2;
+  const cx = canvas.width / 2;
+  const cy = canvas.height - 160; // Position pause menu at the bottom of the canvas
 
   const panelW = 260;
   const panelH = 280;

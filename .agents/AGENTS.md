@@ -70,3 +70,19 @@
 - **NEVER** apply global dim effects (such as Hollow Purple or Domain Expansions) by modifying the `document.body.style.backgroundColor`.
 - All dim overlays, flashes, and visual effects MUST be drawn exclusively on the canvas or within a strict `div.game-box` overlay so they remain physically clipped to the game container boundaries.
 - The outer HTML `body` background MUST remain completely untouched and hardcoded (e.g., `#000000`) so that letterbox margins during screen recording are never affected by in-game combat effects.
+
+## 15. Toji Fighter Weapon Swing & Slash Rendering Standards
+- **Chop-Down Animation (Basic Attack — Inverted Spear of Heaven):**
+  - **Motion Path:** The weapon must swing in a single, fluid downward arc with no back-swing or pre-swing. It snaps to the upper-right (`-1.15` rad / ~11 o'clock), sweeps downward through horizontal (`0`) to lower-right (`+1.05` rad / ~5 o'clock), then recovers back to the idle guard angle (`+0.42` rad).
+  - **Thrust Behavior:** Keep the weapon extension distance (`thrustDistance`) steady. Avoid any mid-swing in-and-out pulsing thrust curves during a rotational swing, as they distort the motion.
+- **Dynamic Trail Eraser Transformation:**
+  - **Suspended Crescent:** During the active swing, the crescent grows dynamically and remains fully drawn in the air.
+  - **Recovery Phase Wipe:** During the recovery phase (after the active swing), the crescent tip must remain locked in world space at the final swing offset angle (`+1.05` or `+1.25`), and the trailing tail edge must chase the tip angle (trail length decays to `0` using a power curve like `Math.pow(1 - recP, 1.4)`), erasing the crescent from start to finish.
+  - **Orientation-Specific Mirroring:** The Inverted Spear basic attack always sweeps clockwise in coordinate space, so its slash visual must **never** undergo Y-scale mirroring when facing left. The Split Soul Katana's basic attack and ambush slash *do* mirror sweep directions and *must* apply Y-scale mirroring (`ctx.scale(1, -1)`) when facing left.
+- **Sharp Needle-Thin Tapering:**
+  - Never use an offset power less than `1.0` (like `t^0.75`) to taper thickness, as it creates blunt or cut-off ends due to an infinite derivative at the boundaries.
+  - Always taper both tips of the crescent slash cleanly to zero using a smooth double-tapering function:
+    ```javascript
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+    const thick = maxThick * taper;
+    ```

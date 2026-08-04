@@ -501,6 +501,11 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
 
         fighter.phantomSlashTimer = flurryFrameRate;
         fighter._flurryHitApplied = false;
+        // Snapshot world-space position & aim angle for the slash visual so it stays
+        // fixed at the strike location and does NOT follow Toji if he moves next frame.
+        fighter._slashOriginX = fighter.x;
+        fighter._slashOriginY = fighter.y;
+        fighter._slashStartAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
 
         audioSystem.playSFX('attack_swordswing', 1.1);
         const strikeSound = getSkillEffectSound('toji', 'strike');
