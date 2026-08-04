@@ -243,7 +243,7 @@ function drawFfaChampionReveal(winner, timer) {
 
   ctx.save();
   ctx.globalAlpha = fadeAlpha;
-  ctx.font = 'bold 36px "Glast Blitch", Arial';
+  ctx.font = 'bold 36px "Conformity", Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
@@ -301,7 +301,7 @@ function drawMatchEndScreen() {
       ctx.shadowBlur = 20;
       ctx.shadowColor = '#ffd700';
       ctx.fillStyle = '#ffd700';
-      ctx.font = '48px "Glast Blitch", Arial';
+      ctx.font = '48px "Conformity", Arial';
       ctx.fillText('CHAMPION!', cx, cy - 40);
       
       ctx.fillStyle = '#fff';
@@ -312,7 +312,7 @@ function drawMatchEndScreen() {
       ctx.shadowBlur = 20;
       ctx.shadowColor = '#ff4d4d';
       ctx.fillStyle = '#ff4d4d';
-      ctx.font = '48px "Glast Blitch", Arial';
+      ctx.font = '48px "Conformity", Arial';
       ctx.fillText('CHAMPION FALLEN', cx, cy - 40);
       
       ctx.fillStyle = '#fff';
@@ -458,7 +458,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
   // Text glow
   ctx.shadowBlur = 20;
   ctx.shadowColor = winner.color || '#fff';
-  ctx.font = '48px "Glast Blitch", Arial';
+  ctx.font = '48px "Conformity", Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
   
