@@ -1,4 +1,5 @@
 import { state } from '../core/state.js';
+import { CONFIG } from '../core/config.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
   drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawHUD, 
@@ -32,6 +33,10 @@ export function renderGame() {
     // PixiJS will render this transparent canvas over its own background/particle layers
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
 
+    // Sync HTML HUD dimming with WebGL screen dimming
+    const dimOpacity = (state.gameState === 'playing' || state.gameState === 'countdown') ? (state.globalDimOpacity || 0) : 0;
+    document.documentElement.style.setProperty('--global-dim-opacity', dimOpacity);
+
     // Apply global screen shake (dampened smoothly back to zero as timer expires)
     let shakeX = 0, shakeY = 0;
     if (state.screenShake && state.screenShake.timer > 0) {
@@ -62,9 +67,7 @@ export function renderGame() {
     if (_domHealthHudLeft) _domHealthHudLeft.style.transform = hudTransform;
     if (_domHealthHudRight) _domHealthHudRight.style.transform = hudTransform;
 
-    // Draw Logic based on state
     if (state.gameState === 'title') {
-
       try {
         drawTitleScreen();
       } catch (screenError) {
@@ -93,6 +96,8 @@ export function renderGame() {
         state.pixiApp.stage.position.set(shakeX, shakeY);
       }
       
+      state.globalDimEdgeColor = null; // Reset every frame
+      
       drawArena();
 
         // ── GLOBAL ARENA CLIP ──
@@ -117,40 +122,7 @@ export function renderGame() {
       if (!isGojoDomainActive) {
         drawBlackHoleEffects(); // Draw blackhole effects BEFORE fighters so they appear behind
       }
-      // Draw Domain Expansions (Render all active domains, blending them gracefully during domain clashes)
-      if (state.fighters) {
-        const activeDomainFighters = state.fighters
-          .filter(f => f && (f.domainActive || (f.type === 'yuta' && f.rika && f.rika.active)))
-          .sort((a, b) => {
-            const aTime = (a && a.domainActive && a.domainActivationTime) ? a.domainActivationTime : 0;
-            const bTime = (b && b.domainActive && b.domainActivationTime) ? b.domainActivationTime : 0;
-            return aTime - bTime;
-          });
-
-        if (activeDomainFighters.length > 0) {
-
-          activeDomainFighters.forEach((fighter, index) => {
-            state.ctx.save();
-            const isClashSecondary = (index > 0);
-            if (isClashSecondary) {
-              state.ctx.globalAlpha = 0.65;
-            }
-            if (fighter.drawDomainBackground) fighter.drawDomainBackground(state.ctx, isClashSecondary);
-            if (fighter.drawDomainForeground) fighter.drawDomainForeground(state.ctx, isClashSecondary);
-            state.ctx.restore();
-          });
-
-          // Render Yuta vs Sukuna Domain Clash Rift overlay on top of both domains
-          if (activeDomainFighters.length > 1) {
-            const yutaDomain = activeDomainFighters.find(f => f.type === 'yuta' || (f._def && f._def.id === 'yuta'));
-            const sukunaDomain = activeDomainFighters.find(f => f.type === 'sukuna' || (f._def && f._def.id === 'sukuna'));
-            if (yutaDomain && sukunaDomain) {
-              renderYutaSukunaDomainClashRift(state.ctx, yutaDomain, sukunaDomain);
-            }
-          }
-          
-        }
-      }
+      // OPTIMIZED: Domain Expansions are now rendered exclusively in WebGL via updateHybridDomains() in hybridEnvironmentRenderer.js
 
       // Draw thermobaric explosion shockwaves (Fuga) on the ground, before fighters
       const qualityLevel = state.qualityLevel || 1.0;
@@ -209,7 +181,7 @@ export function renderGame() {
 
       // Draw FPS display and logs (if not hidden by user pressing H)
       if (!state.hideFpsLogs) {
-        state.ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        state.ctx.fillStyle = 'rgba(0, 0, 0, 0.85)'; // Black/dark grey FPS text
         state.ctx.font = '12px monospace';
         state.ctx.textAlign = 'left';
         state.ctx.fillText(`FPS: ${state.fps}`, 10, 20);
@@ -219,18 +191,19 @@ export function renderGame() {
           state.ctx.font = 'bold 12px monospace';
           state.ctx.textAlign = 'left';
 
-          let startY = state.canvas.height - 10 - (state.fpsLogs.length * 16);
+          // Position logs directly below the bottom of the arena
+          let startY = CONFIG.arena.y + CONFIG.arena.height + 25;
 
           // Draw copy and hide instructions if not copied recently
           if (!state.fpsLogsCopiedTimer || state.fpsLogsCopiedTimer <= 0) {
-            state.ctx.fillStyle = 'rgba(200, 200, 200, 0.7)';
-            state.ctx.fillText('Press C to copy logs | Press H to hide', 10, startY - 10);
+            state.ctx.fillStyle = 'rgba(0, 0, 0, 0.65)'; // Dark instruction text
+            state.ctx.fillText('Press C to copy logs | Press H to hide', 10, startY - 12);
           }
 
           for (let i = 0; i < state.fpsLogs.length; i++) {
             let log = state.fpsLogs[i];
             let alpha = Math.min(1, log.timer / 60); // Fade out
-            state.ctx.fillStyle = `rgba(255, 50, 50, ${alpha})`;
+            state.ctx.fillStyle = `rgba(0, 0, 0, ${alpha})`; // Black log list text
             state.ctx.fillText(log.text, 10, startY + (i * 16));
           }
         }
@@ -239,9 +212,9 @@ export function renderGame() {
         if (state.fpsLogsCopiedTimer > 0) {
           state.ctx.font = 'bold 12px monospace';
           state.ctx.textAlign = 'left';
-          let startY = state.canvas.height - 10 - ((state.fpsLogs ? state.fpsLogs.length : 0) * 16);
+          let startY = CONFIG.arena.y + CONFIG.arena.height + 25;
           state.ctx.fillStyle = `rgba(100, 255, 100, ${Math.min(1, state.fpsLogsCopiedTimer / 30)})`;
-          state.ctx.fillText('Copied to clipboard!', 10, startY - 10);
+          state.ctx.fillText('Copied to clipboard!', 10, startY - 12);
         }
       }
 
@@ -265,9 +238,12 @@ export function renderGame() {
       }
     }
     
-    // PIXIJS SYNC: Tell the GPU that the offscreen 2D canvas has updated this frame.
-    // This allows the 2D canvas (fighters, UI) to be rendered inside the WebGL scene graph.
+    // PIXIJS SYNC: Tell the GPU that the offscreen 2D canvas and floating text canvas have updated this frame.
+    // This allows the 2D canvas (fighters, UI) and floating texts to be rendered inside the WebGL scene graph.
     if (state.legacyCanvasSprite && state.legacyCanvasSprite.texture) {
       state.legacyCanvasSprite.texture.update();
+    }
+    if (state.floatingTextSprite && state.floatingTextSprite.texture) {
+      state.floatingTextSprite.texture.update();
     }
 }

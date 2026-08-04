@@ -469,12 +469,6 @@ export class TricksterFighter extends Fighter {
         }
         
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
-        
-        // Tremor screen shake during charge
-        const chargeRatio = this.beamCharge / CONFIG.laser.windupDuration;
-        if (chargeRatio > 0.4 && (!state.screenShake || state.screenShake.intensity < chargeRatio * 4)) {
-          state.screenShake = { timer: 2, intensity: chargeRatio * 4 };
-        }
 
         if (aligned && this.beamCharge >= CONFIG.laser.windupDuration) {
           this.beamTimer = CONFIG.laser.beamDuration;

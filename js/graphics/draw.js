@@ -634,5 +634,7 @@ export function drawThinIceBreakerDimScreen() {
   ctx.fillStyle = `rgba(3, 12, 20, ${opacity})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+  
+  state.globalDimEdgeColor = `rgba(3, 12, 20, ${opacity})`;
 }
 

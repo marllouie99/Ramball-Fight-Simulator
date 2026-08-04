@@ -8,38 +8,51 @@ export const ANNOUNCER_SOUNDS = {
     round1: {
         src: 'Assets/Sound Effects/Announcer/round1.mp3',
         volume: 1.0,
-        speed: 1.4,
+        speed: 1.1,
         offset: 0,
+        duration: 2.5,
     },
     round2: {
         src: 'Assets/Sound Effects/Announcer/round2.mp3',
         volume: 1.0,
         speed: 1.5,
         offset: 0,
+        duration: 3.0,
     },
     round3: {
         src: 'Assets/Sound Effects/Announcer/finalround.mp3',
         volume: 1.0,
         speed: 1.5,
         offset: 0,
+        duration: 2.4,
     },
     round4: {
         src: 'Assets/Sound Effects/Announcer/round4.mp3',
         volume: 1.0,
         speed: 1.5,
         offset: 0,
+        duration: 2.2,
     },
     finalround: {
         src: 'Assets/Sound Effects/Announcer/finalround.mp3',
         volume: 1.0,
         speed: 1.0,
         offset: 0,
+        duration: 2.5,
+    },
+    bestof3: {
+        src: 'Assets/Sound Effects/Announcer/bestof3.mp3',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0,
+        duration: 2.2,
     },
     faah: {
         src: 'Assets/Sound Effects/Announcer/faah.mp3',
-        volume: 0.4,
+        volume: 1.0,
         speed: 1.0,
-        offset: 0.2,
+        offset: 0.0,
+        duration: 1.0,
     }
 };
 

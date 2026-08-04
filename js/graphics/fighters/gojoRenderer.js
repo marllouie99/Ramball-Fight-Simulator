@@ -131,7 +131,9 @@ export class GojoRenderer {
     // Draw afterimages during dodge & teleports
     if (fighter.afterImages && fighter.afterImages.length > 0) {
       ctx.save();
-      fighter.afterImages.forEach(img => {
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
+      fighter.afterImages.forEach((img, i) => {
+        if (skipAlternate && i % 2 === 0) return;
         if (img && img.timer > 0) {
           const alpha = (img.timer / 8) * 0.5;
           ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
@@ -204,7 +206,9 @@ export class GojoRenderer {
 
     // Draw afterimages during teleports & high-speed moves
     if (fighter.afterImages && fighter.afterImages.length > 0) {
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
       for (let i = 0; i < fighter.afterImages.length; i++) {
+        if (skipAlternate && i % 2 === 0) continue;
         const img = fighter.afterImages[i];
         if (img && img.timer > 0) {
           const maxT = img.maxTimer || 20;

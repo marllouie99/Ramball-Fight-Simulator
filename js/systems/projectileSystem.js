@@ -526,14 +526,15 @@ class ProjectileSystem {
     if (typeof spawnSparks === 'function') spawnSparks(x, y, 18, 'orange', '#FF4500');
 
     // Generate organic curved ground cracks (bezier veins) radiating from impact
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
     const cracks = [];
-    const numCracks = 12;
+    const numCracks = isLowQuality ? 4 : 12;
     for (let c = 0; c < numCracks; c++) {
       const crackAngle = (c / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-      const crackLen = 55 + Math.random() * 70;
+      const crackLen = (isLowQuality ? 35 : 55) + Math.random() * 70;
       const points = [{ x: x, y: y }];
       let curX = x, curY = y, curAngle = crackAngle;
-      const numSegs = 6 + Math.floor(Math.random() * 3);
+      const numSegs = isLowQuality ? 4 : (6 + Math.floor(Math.random() * 3));
       for (let s = 0; s < numSegs; s++) {
         const segLen = crackLen / numSegs;
         curAngle += (Math.random() - 0.5) * 0.7; // organic wobble
@@ -547,7 +548,7 @@ class ProjectileSystem {
       cracks.push({ points, width: 2 + Math.random() * 3 });
 
       // Branch cracks (smaller forks off main vein)
-      if (Math.random() < 0.6) {
+      if (!isLowQuality && Math.random() < 0.6) {
         const branchStart = Math.floor(points.length * (0.3 + Math.random() * 0.4));
         const bp = points[branchStart];
         if (bp) {

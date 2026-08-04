@@ -1,6 +1,6 @@
 import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
-import { state, triggerGlobalScreenShake } from '../core/state.js';
+import { state, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact } from '../graphics/particles/sparkEffect.js';
@@ -168,6 +168,7 @@ export const HitImpactSystem = {
     } 
     
     if (projectile.isChainLightning) {
+      const isNewHit = !projectile.hitFighters || !projectile.hitFighters.has(target);
       if (!projectile.hitFighters) projectile.hitFighters = new Set();
       projectile.hitFighters.add(target);
       
@@ -175,8 +176,22 @@ export const HitImpactSystem = {
       if (Math.random() < (CONFIG.zeus.staticChance || 0)) {
         target.staticDebuffTimer = CONFIG.zeus.staticDuration || 120;
       }
-      if (Math.random() < (CONFIG.zeus.stunChance || 0)) {
-        target.electricStunTimer = Math.max(target.electricStunTimer || 0, CONFIG.zeus.stunDuration || 15);
+
+      const zeusAttacker = (typeof projectile.owner === 'number' && state.fighters) ? state.fighters[projectile.owner] : (attacker || null);
+
+      if (isNewHit && zeusAttacker) {
+        const currentStunChance = zeusAttacker.stunChance !== undefined ? zeusAttacker.stunChance : (CONFIG.zeus.baseStunChance || 0.10);
+        if (Math.random() < currentStunChance) {
+          target.electricStunTimer = Math.max(target.electricStunTimer || 0, CONFIG.zeus.stunDuration || 18);
+          spawnFloatingText(target.x, target.y - target.r - 5, 'STUNNED!', '#00F3FF');
+          // Reset stun chance to base after landing a stun
+          zeusAttacker.stunChance = zeusAttacker.baseStunChance || 0.10;
+        } else {
+          // Increase stun chance on hit
+          const inc = CONFIG.zeus.stunChanceIncrease || 0.10;
+          const maxCap = CONFIG.zeus.maxStunChance || 0.80;
+          zeusAttacker.stunChance = Math.min(maxCap, (zeusAttacker.stunChance || 0.10) + inc);
+        }
       }
       
       // Apply dramatic hit-pause and screen shake ONLY on the direct hit (not on bounces)

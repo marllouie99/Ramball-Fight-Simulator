@@ -6,6 +6,7 @@ import { CONFIG } from '../../../core/config.js';
 import { spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
+import { tojiIsTargetDeadOrRemoved } from './tojiAmbush.js';
 
 /**
  * Checks if target is channeling a skill and initiates channel-interrupt ambush sequence.
@@ -14,7 +15,7 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 export function modUpdateChannelSense(fighter, opponent) {
   if (fighter._channelInterruptCooldown > 0) fighter._channelInterruptCooldown--;
 
-  if (!fighter.isAmbushing && opponent && !opponent.isDead) {
+  if (!fighter.isAmbushing && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
     const isTargetChanneling = !!(
       opponent.isChannelingPurple ||
       opponent.isChannelingDomainExpansion ||
@@ -105,7 +106,7 @@ export function modUpdateStealth(fighter, opponent) {
     const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 45;
 
     // Check if stealth cooldown is about to end -> launch ambush move sequence!
-    if (!fighter.isAmbushing && fighter.stealthCooldown <= ambushTrigger && opponent && opponent.hp > 0) {
+    if (!fighter.isAmbushing && fighter.stealthCooldown <= ambushTrigger && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
       fighter.startAmbushSequence(opponent);
       return true; // Abort update loop
     }

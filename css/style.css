@@ -46,25 +46,22 @@ body {
    Layout
 ───────────────────────────────────────────── */
 .game-container {
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: 20px;
-  width: 100%;
-  max-width: 540px;
-  height: 100%;
-  max-height: 100vh;
+  width: 540px;
+  height: 960px;
   margin: auto;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .game-box {
   position: relative;
   text-align: center;
-  width: 100%;
-  max-width: 540px;
-  max-height: 94vh;
-  aspect-ratio: 540 / 1110;
+  width: 550px;
+  height: 1080px;
   background: #000000;
   display: flex;
   flex-direction: column;
@@ -76,11 +73,21 @@ body {
 }
 
 .health-hud-side {
+  position: absolute;
+  top: 16px;
   display: flex;
   flex-direction: column;
   gap: 14px;
   width: 200px;
-  margin-top: 16px;
+  box-sizing: border-box;
+}
+
+#healthHudLeft {
+  right: calc(100% + 20px);
+}
+
+#healthHudRight {
+  left: calc(100% + 20px);
 }
 
 .game-box h2 {
@@ -92,14 +99,15 @@ body {
 canvas {
   display: block;
   margin: 0 auto;
-  width: 100%;
-  height: auto;
-  max-width: 540px;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .health-hud {
   position: absolute;
-  top: 68.5%;
+  top: 79.2%;
   left: 0;
   right: 0;
   z-index: 10;
@@ -193,11 +201,41 @@ canvas {
 }
 
 .health-card__win-bullet {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid #222;
+  border-radius: 52% 48% 50% 52% / 48% 52% 50% 48%;
   display: inline-block;
   transition: all 0.2s ease;
+  box-sizing: border-box;
+  position: relative;
+  background: rgba(0, 0, 0, 0.05);
+  vertical-align: middle;
+}
+
+.health-card__win-bullet.filled {
+  background: #ffd700;
+  box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.15);
+}
+
+.health-card__win-bullet.filled::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border-radius: inherit;
+  background: repeating-linear-gradient(-55deg,
+      rgba(255, 255, 255, 0.45),
+      rgba(255, 255, 255, 0.45) 1px,
+      transparent 1px,
+      transparent 3px), repeating-linear-gradient(-55deg,
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.3) 1px,
+      transparent 1px,
+      transparent 2.5px);
+  pointer-events: none;
 }
 
 .health-card__bar {
@@ -207,7 +245,7 @@ canvas {
   background: rgba(0, 0, 0, 0.05);
   border: 1.5px solid #222;
   border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
-  box-shadow: 1px 1px 1px rgba(0,0,0,0.3), -1px -0.5px 0px rgba(0,0,0,0.2);
+  box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3), -1px -0.5px 0px rgba(0, 0, 0, 0.2);
   overflow: visible;
   margin: 8px 0 0;
   box-sizing: border-box;
@@ -239,21 +277,20 @@ canvas {
 .health-card__fill::after {
   content: '';
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   border-radius: inherit;
-  background: repeating-linear-gradient(
-    -55deg,
-    rgba(255, 255, 255, 0.4),
-    rgba(255, 255, 255, 0.4) 1px,
-    transparent 1px,
-    transparent 5px
-  ), repeating-linear-gradient(
-    -55deg,
-    rgba(0, 0, 0, 0.3),
-    rgba(0, 0, 0, 0.3) 1px,
-    transparent 1px,
-    transparent 4px
-  );
+  background: repeating-linear-gradient(-55deg,
+      rgba(255, 255, 255, 0.4),
+      rgba(255, 255, 255, 0.4) 1px,
+      transparent 1px,
+      transparent 5px), repeating-linear-gradient(-55deg,
+      rgba(0, 0, 0, 0.3),
+      rgba(0, 0, 0, 0.3) 1px,
+      transparent 1px,
+      transparent 4px);
   pointer-events: none;
   z-index: 1;
 }
@@ -342,31 +379,7 @@ canvas {
   aspect-ratio: 9 / 16;
 }
 
-/* ─────────────────────────────────────────────
-   Responsive (Mobile & Tablets)
-───────────────────────────────────────────── */
-@media (max-width: 1024px) {
-  .game-container {
-    flex-direction: row;
-    flex-wrap: wrap;
-    justify-content: center;
-    align-items: center;
-    gap: 12px;
-  }
 
-  .game-box {
-    order: -1;
-    /* Bring canvas to the top */
-    width: 100%;
-  }
-
-  .health-hud-side {
-    flex: 1 1 calc(50% - 12px);
-    max-width: calc(50% - 6px);
-    flex-direction: column;
-    margin-top: 0;
-  }
-}
 
 .toast.fade-out {
   opacity: 0;
@@ -407,7 +420,7 @@ canvas {
 ───────────────────────────────────────────── */
 .hud-top-container {
   position: absolute;
-  top: 13.5%;
+  top: 15.6%;
   /* Tightly above arena */
   left: 7.41%;
   right: 7.41%;
@@ -439,7 +452,7 @@ canvas {
 
 .hud-bottom-container {
   position: absolute;
-  top: 67.5%;
+  top: 78.0%;
   /* Tightly below arena without overlapping */
   left: 7.41%;
   right: 7.41%;
@@ -467,6 +480,8 @@ canvas {
   flex-direction: column;
   gap: 4px;
   width: 100%;
+  filter: brightness(calc(1 - var(--global-dim-opacity, 0) * 0.75));
+  transition: filter 120ms ease;
 }
 
 .health-card__info {
@@ -506,10 +521,29 @@ canvas {
   text-shadow: 0 0 8px rgba(185, 28, 28, 0.7);
 }
 
+/* ── Label-Only Skill Box (used for text indicators like Zeus Stun Chance) ── */
+.hud-skill-box.label-only {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  height: auto !important;
+  margin-top: 4px;
+}
+
+.hud-skill-box.label-only .hud-skill-box-text {
+  margin: 0 !important;
+  font-family: 'Glast Blitch', Arial, sans-serif !important;
+  font-size: 15px !important;
+  font-weight: normal !important;
+  color: inherit !important;
+  text-transform: none !important;
+  letter-spacing: normal !important;
+}
+
 .hud-skill-box {
   position: relative;
-  background: transparent;
-  border: 1.5px solid #000000;
+  background: rgba(0, 0, 0, 0.05);
+  border: 1.5px solid #222;
   width: 100%;
   height: 18px;
   display: flex;
@@ -517,13 +551,16 @@ canvas {
   justify-content: flex-start;
   overflow: hidden;
   box-sizing: border-box;
-  border-radius: 0;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3), -1px -0.5px 0px rgba(0, 0, 0, 0.2);
+  filter: brightness(calc(1 - var(--global-dim-opacity, 0) * 0.75));
+  transition: filter 120ms ease;
 }
 
 .hud-skill-box-text {
   position: relative;
   z-index: 2;
-  font-family: 'Conformity', Arial, sans-serif;
+  font-family: 'Glast Blitch', Arial, sans-serif;
   font-size: 13px;
   font-weight: bold;
   color: #000000;
@@ -538,7 +575,8 @@ canvas {
   top: 0;
   height: 100%;
   z-index: 1;
-  transition: width 0.12s ease;
+  border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
+  transition: width 180ms ease, box-shadow 120ms ease, filter 120ms ease;
 }
 
 .hud-damage-text {
@@ -565,7 +603,8 @@ canvas {
   left: 0;
   width: 100%;
   height: 100%;
-  pointer-events: none; /* Let clicks pass through except on active screens */
+  pointer-events: none;
+  /* Let clicks pass through except on active screens */
   z-index: 20;
 }
 
@@ -576,10 +615,11 @@ canvas {
   align-items: center;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgb(255, 255, 255);
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  pointer-events: auto; /* Catch clicks */
+  pointer-events: auto;
+  /* Catch clicks */
   transition: opacity 0.3s ease;
 }
 
@@ -625,9 +665,11 @@ canvas {
 .premium-btn::before {
   content: '';
   position: absolute;
-  top: 0; left: -100%;
-  width: 50%; height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
   transform: skewX(-20deg);
   transition: all 0.5s ease;
 }

@@ -131,62 +131,82 @@ export function drawThermobaricExplosions(ctx) {
 
     ctx.restore();
 
-    // â”€â”€ CURVED BEZIER CRACK VEINS â”€â”€
+    // ── CURVED BEZIER CRACK VEINS ──
     if (exp.cracks && exp.cracks.length > 0) {
+      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
       ctx.save();
       exp.cracks.forEach(crack => {
         const pts = crack.points;
         if (!pts || pts.length < 2) return;
 
-        ctx.strokeStyle = `rgba(255, 80, 0, ${0.8 * craterAlpha})`;
-        ctx.lineWidth = (crack.width + 3) * craterAlpha;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let p = 1; p < pts.length; p++) {
-          const pt = pts[p];
-          if (pt.cpx !== undefined) {
-            ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-          } else {
-            ctx.lineTo(pt.x, pt.y);
+        if (isLowQuality) {
+          // Fast path: draw only 1 stroke instead of 3
+          ctx.strokeStyle = `rgba(255, 100, 0, ${0.7 * craterAlpha})`;
+          ctx.lineWidth = (crack.width + 1) * craterAlpha;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let p = 1; p < pts.length; p++) {
+            const pt = pts[p];
+            if (pt.cpx !== undefined) {
+              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+            } else {
+              ctx.lineTo(pt.x, pt.y);
+            }
           }
-        }
-        ctx.stroke();
+          ctx.stroke();
+        } else {
+          ctx.strokeStyle = `rgba(255, 80, 0, ${0.8 * craterAlpha})`;
+          ctx.lineWidth = (crack.width + 3) * craterAlpha;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let p = 1; p < pts.length; p++) {
+            const pt = pts[p];
+            if (pt.cpx !== undefined) {
+              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+            } else {
+              ctx.lineTo(pt.x, pt.y);
+            }
+          }
+          ctx.stroke();
 
-        ctx.strokeStyle = `rgba(15, 5, 0, ${0.9 * craterAlpha})`;
-        ctx.lineWidth = crack.width * craterAlpha;
-        ctx.shadowBlur = 0;
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let p = 1; p < pts.length; p++) {
-          const pt = pts[p];
-          if (pt.cpx !== undefined) {
-            ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-          } else {
-            ctx.lineTo(pt.x, pt.y);
+          ctx.strokeStyle = `rgba(15, 5, 0, ${0.9 * craterAlpha})`;
+          ctx.lineWidth = crack.width * craterAlpha;
+          ctx.shadowBlur = 0;
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let p = 1; p < pts.length; p++) {
+            const pt = pts[p];
+            if (pt.cpx !== undefined) {
+              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+            } else {
+              ctx.lineTo(pt.x, pt.y);
+            }
           }
-        }
-        ctx.stroke();
+          ctx.stroke();
 
-        ctx.strokeStyle = `rgba(255, 200, 100, ${0.5 * craterAlpha})`;
-        ctx.lineWidth = Math.max(0.5, (crack.width - 1) * 0.5 * craterAlpha);
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let p = 1; p < pts.length; p++) {
-          const pt = pts[p];
-          if (pt.cpx !== undefined) {
-            ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
-          } else {
-            ctx.lineTo(pt.x, pt.y);
+          ctx.strokeStyle = `rgba(255, 200, 100, ${0.5 * craterAlpha})`;
+          ctx.lineWidth = Math.max(0.5, (crack.width - 1) * 0.5 * craterAlpha);
+          ctx.beginPath();
+          ctx.moveTo(pts[0].x, pts[0].y);
+          for (let p = 1; p < pts.length; p++) {
+            const pt = pts[p];
+            if (pt.cpx !== undefined) {
+              ctx.quadraticCurveTo(pt.cpx, pt.cpy, pt.x, pt.y);
+            } else {
+              ctx.lineTo(pt.x, pt.y);
+            }
           }
+          ctx.stroke();
         }
-        ctx.stroke();
       });
       ctx.restore();
     }
 
-    // â”€â”€ EXPLOSION FLASH â”€â”€
+    // ── EXPLOSION FLASH ──
     ctx.save();
     ctx.translate(cx, cy);
 

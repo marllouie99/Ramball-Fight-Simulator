@@ -12,7 +12,7 @@ import { laylaConfig } from '../configs/characters/laylaConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {
-  arena: { x: 40, y: 170, width: 460, height: 460, wallWidth: 4 },
+  arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
   spin: { rate: 0.06 },                        // angle increment per frame (├ù fighter.speed)
@@ -22,19 +22,27 @@ export const CONFIG = {
   hpBar: { height: 6, yOffset: 16 },
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
   globalFighter: {
-    sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
+    sizeMultiplier: 1.3,                       // scale the size of all fighters globally (1.0 = default)
     handSizeMultiplier: 1.5,                   // scale the size of all fighter hands globally (1.0 = default)
   },
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
-  canvasBgColor: '#000000',        // Canvas background color (hex string or hex number)
-  arenaOuterBgColor: '#fbf6e5ff',    // Background color of the container area outside the arena (under HUD and sides)
+  canvasWidth: 540,                 // Logical width of the game screen
+  canvasHeight: 1080,                // Logical height of the game screen
+  internalScale: 0.95,               // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
+  arenaXOffset: 0,                   // Horizontal offset shift (px) from center (negative = left, positive = right)
+  arenaYOffset: -110,                // Vertical offset shift (px) from center (negative = up, positive = down)
+  arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
+  arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
+  canvasBgColor: '#ffffffff',        // Canvas background color (hex string or hex number)
+  arenaOuterBgColor: '#fffff7ff',    // Background color of the container area outside the arena (under HUD and sides)
   arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 20,              // Font size for fighter name in HUD (px)
-  hudDescFontSize: 16,               // Font size for fighter description in HUD (px)
-  hudInfoFontSize: 16,               // Font size for fighter info (DMG, etc.) in HUD (px)
+  hudDescFontSize: 15,               // Font size for fighter description in HUD (px)
+  hudInfoFontSize: 13,               // Font size for fighter info (DMG, etc.) in HUD (px)
+  hudWidthModifier: 0.90,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // PER-FIGHTER TUNINGs
@@ -558,9 +566,12 @@ export const CONFIG = {
     chainDamageMultiplier: 0.8, // Decay per bounce
     attackCooldown: 150,
 
-    // Debuff system
-    stunChance: 0.0,
-    stunDuration: 10,
+    // Debuff & Stun Chance Progressive Mechanics (Tunable)
+    baseStunChance: 0.10,     // Starting stun chance (0.10 = 10%)
+    stunChanceIncrease: 0.10, // Stun chance added per landed basic attack hit (+0.10 = +10% per hit)
+    maxStunChance: 0.80,      // Maximum stun chance cap (0.80 = 80%)
+    stunChance: 0.50,         // Initial stun chance fallback
+    stunDuration: 30,         // Frames target is stunned on electric hit (18 frames = 0.3s)
     paralyzeChance: 0.3,
     paralyzeDuration: 60,
     paralyzeSlowMultiplier: 0.5,
@@ -578,7 +589,7 @@ export const CONFIG = {
     stormCooldown: 900,    // 15 seconds
     stormDuration: 130,    // 3 seconds
     stormStrikesPerSec: 3, // Per enemy
-    stormStrikeDamage: 25,
+    stormStrikeDamage: 35,
 
     // Storm Visuals & FX
     stormTelegraphFrames: 120,       // Duration of the channeling wind-up
@@ -1163,5 +1174,59 @@ export function getFighterById(id) {
 /** Helper function to scale hand radius globally */
 export function getHandSize(baseSize = 6) {
   return baseSize * (CONFIG.globalFighter?.handSizeMultiplier ?? 1.0);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DYNAMIC VIEWPORT & INTERNAL SCALE POST-PROCESSING
+// Dynamically centers the arena based on canvasWidth / canvasHeight,
+// and scales all active components if internalScale is configured.
+// ─────────────────────────────────────────────────────────────────────────────
+const scale = CONFIG.internalScale || 1.0;
+const canvasWidth = CONFIG.canvasWidth || 540;
+const canvasHeight = CONFIG.canvasHeight || 960;
+
+// 1. Scale arena width and height
+const originalWidth = CONFIG.arena.width || 460;
+const originalHeight = CONFIG.arena.height || 460;
+CONFIG.arena.width = Math.round(originalWidth * scale);
+CONFIG.arena.height = Math.round(originalHeight * scale);
+
+// 2. Dynamically center or override the arena position based on configs
+// occupied height = title header (170 * scale) + arena height + bottom HUD (~190 * scale)
+const occupiedHeight = (170 * scale) + CONFIG.arena.height + (190 * scale);
+const verticalMargin = (canvasHeight - occupiedHeight) / 2;
+
+// Check for absolute position overrides or apply dynamic centering + offsets
+if (typeof CONFIG.arenaXOverride === 'number') {
+  CONFIG.arena.x = CONFIG.arenaXOverride;
+} else {
+  CONFIG.arena.x = Math.round((canvasWidth - CONFIG.arena.width) / 2) + (CONFIG.arenaXOffset || 0);
+}
+
+if (typeof CONFIG.arenaYOverride === 'number') {
+  CONFIG.arena.y = CONFIG.arenaYOverride;
+} else {
+  CONFIG.arena.y = Math.max(20, Math.round(verticalMargin + (170 * scale))) + (CONFIG.arenaYOffset || 0);
+}
+
+// 3. Scale global fighter and hand size multipliers if scale is customized
+if (scale !== 1.0) {
+  if (CONFIG.globalFighter) {
+    CONFIG.globalFighter.sizeMultiplier = (CONFIG.globalFighter.sizeMultiplier || 1.2) * scale;
+    CONFIG.globalFighter.handSizeMultiplier = (CONFIG.globalFighter.handSizeMultiplier || 1.5) * scale;
+  }
+
+  // 4. Scale default projectile and specific character projectile radii
+  if (CONFIG.projectile) {
+    CONFIG.projectile.radius = Math.max(1, Math.round(CONFIG.projectile.radius * scale));
+  }
+  if (CONFIG.orange && CONFIG.orange.flameRadius) {
+    CONFIG.orange.flameRadius = Math.max(1, Math.round(CONFIG.orange.flameRadius * scale));
+  }
+
+  // 5. Scale DOM HUD Font Sizes
+  CONFIG.hudTitleFontSize = Math.round(CONFIG.hudTitleFontSize * scale);
+  CONFIG.hudDescFontSize = Math.round(CONFIG.hudDescFontSize * scale);
+  CONFIG.hudInfoFontSize = Math.round(CONFIG.hudInfoFontSize * scale);
 }
 

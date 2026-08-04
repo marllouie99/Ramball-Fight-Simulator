@@ -79,7 +79,9 @@ export class YutaRenderer {
 
     // Draw afterimages during flurry & teleports (Draw ON TOP of Sakuga Impact Frame so they are never covered!)
     if (fighter.afterImages && fighter.afterImages.length > 0) {
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
       for (let i = 0; i < fighter.afterImages.length; i++) {
+        if (skipAlternate && i % 2 === 0) continue;
         const ai = fighter.afterImages[i];
         const maxT = ai.maxTimer || 25;
         const progress = Math.max(0, Math.min(1, ai.timer / maxT));

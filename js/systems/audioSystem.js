@@ -18,9 +18,9 @@ class AudioEventEmitter {
     
     // Explicit event routing to the underlying low-level soundSystem
     if (event === 'playSFX') {
-      const [id, volume = 1.0, speed = 1.0, offset = 0, delay = 0] = args;
+      const [id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null] = args;
       const src = AUDIO_CONFIG[id] || id; // Fallback to string if not mapped
-      return playSound(src, volume, speed, offset, delay);
+      return playSound(src, volume, speed, offset, delay, onEnded);
     }
     
     if (event === 'playLoop') {
@@ -35,8 +35,8 @@ class AudioEventEmitter {
     }
   }
 
-  playSFX(id, volume = 1.0, speed = 1.0, offset = 0, delay = 0) {
-    return this.emit('playSFX', id, volume, speed, offset, delay);
+  playSFX(id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null) {
+    return this.emit('playSFX', id, volume, speed, offset, delay, onEnded);
   }
 
   playLoop(key, id, volume = 1.0, speed = 1.0) {

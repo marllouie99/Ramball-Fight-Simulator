@@ -281,12 +281,6 @@ export class LaserFighter extends Fighter {
           if (chargeSound) audioSystem.playSFX(chargeSound.src, chargeSound.volume);
         }
         this.beamCharge = Math.min(this.beamCharge + 1, CONFIG.laser.windupDuration);
-        
-        // Tremor screen shake during charge
-        const chargeRatio = this.beamCharge / CONFIG.laser.windupDuration;
-        if (chargeRatio > 0.4 && (!state.screenShake || state.screenShake.intensity < chargeRatio * 4)) {
-          state.screenShake = { timer: 2, intensity: chargeRatio * 4 };
-        }
       } else {
         this.beamCharge = Math.max(this.beamCharge - 1, 0);
       }

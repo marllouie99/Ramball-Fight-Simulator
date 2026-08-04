@@ -102,7 +102,9 @@ export class SukunaRenderer {
 
     // Draw afterimages during flurry, dodge & melee teleports
     if (fighter.afterImages && fighter.afterImages.length > 0) {
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
       for (let i = 0; i < fighter.afterImages.length; i++) {
+        if (skipAlternate && i % 2 === 0) continue;
         const img = fighter.afterImages[i];
         if (img && img.timer > 0) {
           const maxT = img.maxTimer || 20;

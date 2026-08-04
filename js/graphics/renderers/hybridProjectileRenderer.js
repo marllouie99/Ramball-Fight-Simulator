@@ -163,7 +163,7 @@ export function updateHybridRika() {
   }
 
   if (!rikaSprite.parent) {
-    layer.addChild(rikaSprite);
+    layer.addChildAt(rikaSprite, 0);
   }
 
   rikaCtx.clearRect(0, 0, size, size);
@@ -193,5 +193,11 @@ export function updateHybridRika() {
   rikaSprite.x = rk.x;
   rikaSprite.y = rk.y;
   rikaSprite.alpha = yuta.rikaAlpha;
+
+  // Enforce Z-order: Rika (bottom) -> Legacy 2D Canvas (top, containing Yuta's body circle and HP value)
+  if (state.legacyCanvasSprite && state.legacyCanvasSprite.parent === layer) {
+    layer.addChildAt(rikaSprite, 0);
+    layer.addChildAt(state.legacyCanvasSprite, 1);
+  }
 }
 

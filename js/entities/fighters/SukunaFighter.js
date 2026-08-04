@@ -78,6 +78,7 @@ export class SukunaFighter extends Fighter {
 
     // Sound cooldown to prevent audio stacking
     this._slashSoundCooldown = 0;
+    this.initialTeleportDone = false;
   }
 
   interruptAttacks() {
@@ -161,6 +162,7 @@ export class SukunaFighter extends Fighter {
     this.hitFlameWisps = [];
     this.combatAuraOpacity = 0;
     this.sakugaImpactTimer = 0;
+    this.initialTeleportDone = false;
   }
 
   triggerDemoAttack() {
@@ -301,6 +303,42 @@ export class SukunaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    // Intro Wall Rebound Stage
+    if (this.introReboundActive) {
+      if (this.introReboundTimer === undefined) {
+        this.introReboundTimer = 18;
+      }
+      this.introReboundTimer--;
+
+      if (opponent) {
+        this.aim(opponent);
+      }
+
+      this.applyMovementPhysics(0);
+      const didBounce = this.resolveWallBounce(arena);
+
+      // Spawn red afterimages for dramatic slide effect
+      if (this.afterImages && typeof this.afterImages.push === 'function') {
+        this.afterImages.push({
+          x: this.x,
+          y: this.y,
+          angle: this.angle,
+          timer: 10,
+          maxTimer: 10
+        });
+      }
+
+      if (didBounce) {
+        if (typeof audioSystem !== 'undefined') {
+          audioSystem.playSFX('skill_dash3', 0.8);
+        }
+        this.introReboundActive = false;
+      } else if (this.introReboundTimer <= 0) {
+        this.introReboundActive = false;
+      }
+      return;
+    }
+
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;

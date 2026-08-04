@@ -41,8 +41,8 @@ window.addEventListener('keydown', (e) => {
     }
   } else if (e.key === ' ' || e.key === 'Enter' || e.key.toLowerCase() === 's') {
     if (state.gameState === 'title') {
-      stopAllSounds();
-      stopAllLoopingSounds();
+      stopAllSounds(false, 0, 0);
+      stopAllLoopingSounds(0, 0);
       state.gameState = 'select';
     }
     else if (state.gameState === 'select') startGame();
@@ -104,8 +104,8 @@ inputTarget.addEventListener('click', (e) => {
 
   const clickedButton = handleUIClick(mx, my);
   if (!clickedButton && state.gameState === 'title') {
-    stopAllSounds();
-    stopAllLoopingSounds();
+    stopAllSounds(false, 0, 0);
+    stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   }
 });
@@ -145,7 +145,7 @@ startGameLoop();
 // HTML UI DOM LISTENERS
 // ─────────────────────────────────────────────
 document.getElementById('btn-battle')?.addEventListener('click', () => {
-  stopAllSounds(); stopAllLoopingSounds();
+  stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
   state.gameState = 'select';
 });
 
@@ -188,6 +188,18 @@ document.getElementById('btn-performance')?.addEventListener('click', (e) => {
   state.performanceMode = !state.performanceMode;
   localStorage.setItem('performanceMode', state.performanceMode);
   e.target.innerText = '⚙ PERFORMANCE: ' + (state.performanceMode ? 'ON' : 'OFF');
+});
+
+// Initialize FPS & Logs Toggle from localStorage
+const fpsBtn = document.getElementById('btn-fps');
+if (fpsBtn) {
+  fpsBtn.innerText = '📊 FPS & LOGS: ' + (state.hideFpsLogs ? 'OFF' : 'ON');
+}
+
+document.getElementById('btn-fps')?.addEventListener('click', (e) => {
+  state.hideFpsLogs = !state.hideFpsLogs;
+  localStorage.setItem('hideFpsLogs', state.hideFpsLogs);
+  e.target.innerText = '📊 FPS & LOGS: ' + (state.hideFpsLogs ? 'OFF' : 'ON');
 });
 
 document.getElementById('btn-leaderboard')?.addEventListener('click', () => {

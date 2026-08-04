@@ -21,16 +21,29 @@ export function fastCleanArray(arr, updateFn) {
   }
 }
 
-/**
- * Pushes a new item to a trail array while enforcing a strict maximum capacity.
- * If capacity is exceeded, the oldest element (index 0) is overwritten or removed without GC churn.
- * @param {Array} arr - The trail array
- * @param {Object} item - The new visual trail item to add
- * @param {number} [maxCap=25] - Maximum allowed items in the trail array
- */
 export function pushTrailCap(arr, item, maxCap = 25) {
   if (!arr) return;
-  if (arr.length >= maxCap) {
+
+  let effectiveCap = maxCap;
+  if (typeof window !== 'undefined' && window.state) {
+    const state = window.state;
+    const fps = state.fps || 60;
+    const quality = state.qualityLevel || 1.0;
+    
+    // Dynamically throttle the maximum trail size if the game loop drops below 55 FPS
+    if (fps < 52 || quality < 0.75) {
+      effectiveCap = Math.max(6, Math.floor(maxCap * 0.45)); // Reduce max trail size by 55%
+    } else if (fps < 56 || quality < 0.9) {
+      effectiveCap = Math.max(10, Math.floor(maxCap * 0.7)); // Reduce max trail size by 30%
+    }
+  }
+
+  // Quickly trim the array down to the new target capacity using pop() to prevent memory/GC churn
+  while (arr.length > effectiveCap) {
+    arr.pop();
+  }
+
+  if (arr.length >= effectiveCap) {
     // Fast O(N) shift or overwrite without growing memory footprint
     for (let i = 0; i < arr.length - 1; i++) {
       arr[i] = arr[i + 1];

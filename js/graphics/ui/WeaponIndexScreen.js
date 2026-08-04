@@ -286,7 +286,7 @@ function drawWeaponInfoCard(ctx, def) {
   statY += 28;
   drawPremiumStatBar(ctx, statX, statY, statW, 'DAMAGE', `${def.damage || 10} DMG`, Math.min(1.0, (def.damage || 10) / 40), '#ff4d4d');
   statY += 28;
-  drawPremiumStatBar(ctx, statX, statY, statW, 'MOVE SPEED', `${def.moveSpeed || 5} SPD`, Math.min(1.0, (def.moveSpeed || 5) / 10), '#55ff55');
+  drawPremiumStatBar(ctx, statX, statY, statW, 'SPD', `${def.moveSpeed || 5} SPD`, Math.min(1.0, (def.moveSpeed || 5) / 10), '#55ff55');
 
   ctx.restore();
 }

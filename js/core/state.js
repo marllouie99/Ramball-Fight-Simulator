@@ -10,6 +10,8 @@ let _projectileSystem = null;
 export function registerProjectileSystem(ps) { _projectileSystem = ps; }
 
 const canvas = document.getElementById('arena');
+canvas.width = CONFIG.canvasWidth || 540;
+canvas.height = CONFIG.canvasHeight || 960;
 const ctx    = canvas.getContext('2d');
 
 // --- PIXI.JS SETUP ---
@@ -21,7 +23,9 @@ if (CONFIG.canvasBgColor) {
   if (typeof CONFIG.canvasBgColor === 'number') {
     parsedBgColor = CONFIG.canvasBgColor;
   } else if (typeof CONFIG.canvasBgColor === 'string') {
-    parsedBgColor = parseInt(CONFIG.canvasBgColor.replace('#', ''), 16);
+    let hexStr = CONFIG.canvasBgColor.replace('#', '');
+    if (hexStr.length === 8) hexStr = hexStr.substring(0, 6);
+    parsedBgColor = parseInt(hexStr, 16);
     if (isNaN(parsedBgColor)) {
       parsedBgColor = 0x000000;
     }
@@ -29,8 +33,8 @@ if (CONFIG.canvasBgColor) {
 }
 
 const pixiApp = new window.PIXI.Application({
-  width: 540,
-  height: 960,
+  width: CONFIG.canvasWidth || 540,
+  height: CONFIG.canvasHeight || 960,
   backgroundColor: parsedBgColor,
   resolution: window.devicePixelRatio || 1,
   autoDensity: true,
@@ -57,6 +61,16 @@ Object.values(pixiLayers).forEach(layer => pixiApp.stage.addChild(layer));
 const legacyCanvasTexture = window.PIXI.Texture.from(canvas);
 const legacyCanvasSprite = new window.PIXI.Sprite(legacyCanvasTexture);
 pixiLayers.fighters.addChild(legacyCanvasSprite);
+
+// Create a separate offscreen canvas for floating texts to ensure they render on top of all WebGL layers
+const floatingTextCanvas = document.createElement('canvas');
+floatingTextCanvas.width = CONFIG.canvasWidth || 540;
+floatingTextCanvas.height = CONFIG.canvasHeight || 960;
+const floatingTextCtx = floatingTextCanvas.getContext('2d');
+
+const floatingTextTexture = window.PIXI.Texture.from(floatingTextCanvas);
+const floatingTextSprite = new window.PIXI.Sprite(floatingTextTexture);
+pixiLayers.ui.addChild(floatingTextSprite);
 
 // Replace the DOM canvas with Pixi's WebGL canvas
 canvas.parentNode.insertBefore(pixiApp.view, canvas);
@@ -86,6 +100,9 @@ export const state = {
   pixiApp,
   pixiLayers,
   legacyCanvasSprite,
+  floatingTextCanvas,
+  floatingTextCtx,
+  floatingTextSprite,
   baseCircleTexture,
   bloodSquareTexture,
   arena: CONFIG.arena,
@@ -196,7 +213,7 @@ export const state = {
   fpsLastTime: 0,
   fpsLogs: [],
   allFpsLogs: [],
-  hideFpsLogs: true,
+  hideFpsLogs: localStorage.getItem('hideFpsLogs') === 'true',
   performanceMode: false,
 
   // Dynamic quality system for performance
@@ -216,6 +233,9 @@ export const state = {
   countdownTimer: 0,
   countdownDuration: 120, // 2 seconds at 60fps
   isCountdownActive: false,
+  announcerPlayingSequence: false,
+  announcerTimeoutIds: [],
+  announcerSubtitle: '',
   matchTimer: 0,
 };
 

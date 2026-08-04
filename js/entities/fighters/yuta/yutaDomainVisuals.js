@@ -38,15 +38,23 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
     fighter._cachedYutaBgGrad.addColorStop(1, 'rgba(4, 1, 4, 0.96)');      // Deep black outer edge
   }
 
-  ctx.fillStyle = fighter._cachedYutaBgGrad;
   if (isMultiDomain) {
-    // During Domain Clash: Clip void to Yuta's domain zone so Sukuna's Shrine & blood water remain 100% visible!
+    // During Domain Clash: Clip void with a feathered radial gradient so Yuta's void blends smoothly into Sukuna's blood pool
     ctx.save();
+    const clashGrad = ctx.createRadialGradient(domX, domY, 40, domX, domY, domainRadius + 120);
+    clashGrad.addColorStop(0, 'rgba(55, 10, 32, 0.72)');   // Dark rose core
+    clashGrad.addColorStop(0.35, 'rgba(28, 6, 18, 0.82)'); // Deep magenta-black
+    clashGrad.addColorStop(0.70, 'rgba(12, 3, 9, 0.78)');  // Charcoal void
+    clashGrad.addColorStop(0.85, 'rgba(6, 1, 4, 0.35)');   // Feathering start
+    clashGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');          // Fully transparent outer edge
+
+    ctx.fillStyle = clashGrad;
     ctx.beginPath();
-    ctx.arc(domX, domY, domainRadius + 100, 0, Math.PI * 2);
+    ctx.arc(domX, domY, domainRadius + 120, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   } else if (!isClashSecondary) {
+    ctx.fillStyle = fighter._cachedYutaBgGrad;
     if (arena) {
       ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
     } else {
@@ -444,6 +452,9 @@ export function renderYutaDomainBackground(fighter, ctx, isClashSecondary = fals
 export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter) {
   if (!yutaFighter || !sukunaFighter || !yutaFighter.domainActive || !sukunaFighter.domainActive) return;
 
+  // Check if we should execute in optimized low quality/low FPS mode
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+
   const time = Date.now();
   const arena = CONFIG.arena;
   const centerX = arena ? (arena.x + arena.width / 2) : yutaFighter.x;
@@ -468,25 +479,32 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  // Broad atmospheric glow under the rift
   const riftLen = Math.max(arenaW, arenaH) * 0.7;
-  const riftGlow = ctx.createLinearGradient(
-    midX + Math.cos(riftAngle) * (-riftLen / 2),
-    midY + Math.sin(riftAngle) * (-riftLen / 2),
-    midX + Math.cos(riftAngle) * (riftLen / 2),
-    midY + Math.sin(riftAngle) * (riftLen / 2)
-  );
-  riftGlow.addColorStop(0, 'rgba(0, 0, 0, 0)');
-  riftGlow.addColorStop(0.3, `rgba(255, 20, 147, ${0.12 + Math.sin(time / 200) * 0.04})`);
-  riftGlow.addColorStop(0.5, `rgba(255, 255, 255, ${0.18 + Math.sin(time / 150) * 0.06})`);
-  riftGlow.addColorStop(0.7, `rgba(220, 20, 60, ${0.12 + Math.sin(time / 200 + 1) * 0.04})`);
-  riftGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
   ctx.save();
   ctx.translate(midX, midY);
   ctx.rotate(riftAngle);
-  ctx.fillStyle = riftGlow;
-  ctx.fillRect(-riftLen / 2, -30, riftLen, 60);
+
+  if (isLowQuality) {
+    // Fast path: draw a simple, semi-transparent flat-color glow block to avoid CPU gradient allocations
+    ctx.fillStyle = `rgba(255, 20, 147, ${0.15 + Math.sin(time / 200) * 0.05})`;
+    ctx.fillRect(-riftLen / 2, -10, riftLen, 20);
+  } else {
+    // Broad atmospheric glow under the rift
+    const riftGlow = ctx.createLinearGradient(
+      midX + Math.cos(riftAngle) * (-riftLen / 2),
+      midY + Math.sin(riftAngle) * (-riftLen / 2),
+      midX + Math.cos(riftAngle) * (riftLen / 2),
+      midY + Math.sin(riftAngle) * (riftLen / 2)
+    );
+    riftGlow.addColorStop(0, 'rgba(0, 0, 0, 0)');
+    riftGlow.addColorStop(0.3, `rgba(255, 20, 147, ${0.12 + Math.sin(time / 200) * 0.04})`);
+    riftGlow.addColorStop(0.5, `rgba(255, 255, 255, ${0.18 + Math.sin(time / 150) * 0.06})`);
+    riftGlow.addColorStop(0.7, `rgba(220, 20, 60, ${0.12 + Math.sin(time / 200 + 1) * 0.04})`);
+    riftGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = riftGlow;
+    ctx.fillRect(-riftLen / 2, -30, riftLen, 60);
+  }
   ctx.restore();
 
   // Core rift crack line removed (resolved wiggling worm in arena)
@@ -498,7 +516,7 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
   // ── 3. FLOATING CLASH PARTICLES — Rose Petals (Yuta) vs Crimson Embers (Sukuna) ──
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  const particleCount = 8;
+  const particleCount = isLowQuality ? 4 : 8; // Fewer particles in low quality/low FPS mode
   for (let p = 0; p < particleCount; p++) {
     const seed = p * 7.3 + 1.1;
     const isYutaSide = (p % 2 === 0);
@@ -529,8 +547,9 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
     const surgeRadius = (rk.r || 30) * 3.5 + Math.sin(time / 200) * 15;
     const surgeAlpha = 0.18 + Math.sin(time / 180) * 0.08;
 
-    const isGamePlay = (typeof state !== 'undefined' && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
-    if (isGamePlay) {
+    // Fixed: Included 'playing' state to correctly use flat circle pathing during battles instead of creating radial gradients every frame
+    const isGamePlay = (typeof state !== 'undefined' && ['playing', 'fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+    if (isGamePlay || isLowQuality) {
       ctx.fillStyle = `rgba(255, 20, 147, ${surgeAlpha * 1.2})`;
     } else {
       const surgeGrad = ctx.createRadialGradient(rk.x, rk.y, 0, rk.x, rk.y, surgeRadius);
@@ -544,18 +563,20 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
     ctx.arc(rk.x, rk.y, surgeRadius, 0, Math.PI * 2);
     ctx.fill();
 
-    // Flickering monstrous energy tendrils radiating outward from Rika
-    ctx.strokeStyle = `rgba(255, 20, 147, ${surgeAlpha * 2})`;
-    ctx.lineWidth = 1.5;
-    for (let t = 0; t < 4; t++) {
-      const tAngle = (t / 4) * Math.PI * 2 + time * 0.002;
-      const tLen = surgeRadius * (0.6 + Math.sin(time * 0.005 + t * 2) * 0.3);
-      ctx.beginPath();
-      ctx.moveTo(rk.x, rk.y);
-      const cpx = rk.x + Math.cos(tAngle + 0.3) * tLen * 0.5;
-      const cpy = rk.y + Math.sin(tAngle + 0.3) * tLen * 0.5;
-      ctx.quadraticCurveTo(cpx, cpy, rk.x + Math.cos(tAngle) * tLen, rk.y + Math.sin(tAngle) * tLen);
-      ctx.stroke();
+    // Flickering monstrous energy tendrils radiating outward from Rika (completely skipped in low quality to save rendering time)
+    if (!isLowQuality) {
+      ctx.strokeStyle = `rgba(255, 20, 147, ${surgeAlpha * 2})`;
+      ctx.lineWidth = 1.5;
+      for (let t = 0; t < 4; t++) {
+        const tAngle = (t / 4) * Math.PI * 2 + time * 0.002;
+        const tLen = surgeRadius * (0.6 + Math.sin(time * 0.005 + t * 2) * 0.3);
+        ctx.beginPath();
+        ctx.moveTo(rk.x, rk.y);
+        const cpx = rk.x + Math.cos(tAngle + 0.3) * tLen * 0.5;
+        const cpy = rk.y + Math.sin(tAngle + 0.3) * tLen * 0.5;
+        ctx.quadraticCurveTo(cpx, cpy, rk.x + Math.cos(tAngle) * tLen, rk.y + Math.sin(tAngle) * tLen);
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }

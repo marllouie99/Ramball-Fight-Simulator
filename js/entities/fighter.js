@@ -109,7 +109,8 @@ export class Fighter {
     this.color = def.color;
     
     const sizeMult = CONFIG.globalFighter?.sizeMultiplier ?? 1.0;
-    this.r = def.radius * sizeMult;
+    const internalScale = CONFIG.internalScale ?? 1.0;
+    this.r = def.radius * sizeMult * internalScale;
     this.aimbot = def.aimbot || false;
     this.maxHp = def.hp || 100;
     this.damage = def.damage || 10;
@@ -645,12 +646,16 @@ export class Fighter {
             state.roundWinner = winnerFighter;
             state.roundEndTimer = 0;
 
-            // Stop all sounds when round ends
-            stopAllSounds();
-            stopAllLoopingSounds();
-
             const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
-            if (state.teamScores[winningTeam] >= winThreshold) {
+            const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
+
+            // Stop all sounds when round ends, unless it is a match end (champion screen)
+            if (!isMatchEnd) {
+              stopAllSounds();
+              stopAllLoopingSounds();
+            }
+
+            if (isMatchEnd) {
               state.matchWinner = winnerFighter;
               state.gameState = 'matchEnd';
             } else {
@@ -664,13 +669,17 @@ export class Fighter {
           state.roundWinner = realAttacker;
           state.roundEndTimer = 0;
 
-          // Stop all sounds when round ends
-          stopAllSounds();
-          stopAllLoopingSounds();
-
           const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
           const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
-          if (realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold) {
+          const isMatchEnd = realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold;
+
+          // Stop all sounds when round ends, unless it is a match end (champion screen)
+          if (!isMatchEnd) {
+            stopAllSounds();
+            stopAllLoopingSounds();
+          }
+
+          if (isMatchEnd) {
             // Record win/loss for leaderboard (1v1 mode only) when they become champion
             if (state.mode === GAME_MODES.ONE_VS_ONE && realAttacker) {
               const winnerFighterIndex = typeof realAttacker.fighterIndex === 'number' ? realAttacker.fighterIndex : realAttackerIndex;
@@ -692,9 +701,11 @@ export class Fighter {
           state.roundEndTimer = 0;
           state.ffaMatchComplete = true; // Signals main.js to show leaderboards
 
-          // Stop all sounds when round ends
-          stopAllSounds();
-          stopAllLoopingSounds();
+          // Stop all sounds when round ends, unless it is a match end (champion screen)
+          if (!state.ffaMatchComplete) {
+            stopAllSounds();
+            stopAllLoopingSounds();
+          }
 
           state.gameState = 'roundEnd';
         }

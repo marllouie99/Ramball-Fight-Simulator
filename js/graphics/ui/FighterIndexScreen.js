@@ -386,7 +386,7 @@ function drawIndexDetailScreen() {
   curY += 32;
   drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'COOLDOWN', `${(def.cooldown / 60).toFixed(1)}s`, Math.max(0.1, 1 - (def.cooldown / 120)), '#ffd700');
   curY += 32;
-  drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'MOVE SPEED', `${fighterSpeed.toFixed(1)}`, Math.min(1.0, fighterSpeed / 10), '#55ff55');
+  drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'SPD', `${fighterSpeed.toFixed(1)} SPD`, Math.min(1.0, fighterSpeed / 10), '#55ff55');
   curY += 22;
 
   // Divider Line

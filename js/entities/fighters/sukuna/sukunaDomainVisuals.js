@@ -11,6 +11,9 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   const sx = fighter.domainX !== undefined ? fighter.domainX : fighter.x;
   const sy = fighter.domainY !== undefined ? fighter.domainY : fighter.y;
 
+  // Detect low quality / low FPS mode
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+
   ctx.save();
 
   // Detect if clashing with Yuta's domain specifically
@@ -34,13 +37,12 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
   }
 
   ctx.fillStyle = fighter._cachedLiquidGrad;
-  ctx.beginPath();
-  ctx.arc(sx, sy, domainRadius, 0, Math.PI * 2);
-  ctx.fill();
+  // Fill the entire canvas screen to prevent empty corners or borders when the screen is scaled/resized
+  ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
   ctx.restore();
 
-  // Horizontal liquid water wave sheen lines across the floor
-  const waveCount = isMultiDomain ? 4 : 12;
+  // Horizontal liquid water wave sheen lines across the floor (fewer waves in low quality)
+  const waveCount = isLowQuality ? 2 : (isMultiDomain ? 4 : 12);
   ctx.lineWidth = 1;
   for (let w = 0; w < waveCount; w++) {
     const wy = sy - 150 + w * 45 + Math.sin(time * 0.002 + w) * 8;
@@ -60,35 +62,41 @@ export function renderSukunaDomainBackground(fighter, ctx, isClashSecondary = fa
     const yDomY = yutaClashFighter.domainY !== undefined ? yutaClashFighter.domainY : yutaClashFighter.y;
     const dirAngle = Math.atan2(yDomY - sy, yDomX - sx);
 
-    // Radiate 5 concentric blood ripple arcs toward Yuta's domain
-    for (let r = 0; r < 5; r++) {
+    // Radiate fewer ripples in low quality (2 instead of 5)
+    const rippleCount = isLowQuality ? 2 : 5;
+    for (let r = 0; r < rippleCount; r++) {
       const rippleRadius = 80 + r * 55 + Math.sin(time * 0.003 + r * 1.2) * 15;
       const rippleAlpha = 0.18 + Math.sin(time * 0.004 + r * 2.5) * 0.1;
       ctx.strokeStyle = `rgba(180, 20, 20, ${rippleAlpha})`;
       ctx.lineWidth = 2.5 - r * 0.3;
-      // OPTIMIZED: Removed shadowBlur. Used an alpha layered stroke for glow effect
       ctx.beginPath();
       ctx.arc(sx, sy, rippleRadius, dirAngle - Math.PI * 0.4, dirAngle + Math.PI * 0.4);
       ctx.stroke();
-      ctx.lineWidth = (2.5 - r * 0.3) * 2;
-      ctx.strokeStyle = `rgba(255, 0, 0, ${rippleAlpha * 0.4})`;
-      ctx.stroke();
+      
+      // Skip double stroke glow to save canvas state costs in low quality mode
+      if (!isLowQuality) {
+        ctx.lineWidth = (2.5 - r * 0.3) * 2;
+        ctx.strokeStyle = `rgba(255, 0, 0, ${rippleAlpha * 0.4})`;
+        ctx.stroke();
+      }
     }
     ctx.restore();
   }
 
-  // ── 2. WATER REFLECTION OF THE SHRINE STRUCTURE ──
-  ctx.save();
-  ctx.translate(sx, sy - 40);
-  ctx.scale(1, -0.45);
-  ctx.globalAlpha = 0.32;
-  fighter._drawShrineBody(ctx);
-  ctx.fillStyle = 'rgba(20, 2, 6, 0.45)';
-  ctx.fillRect(-150, -150, 300, 300);
-  ctx.restore();
+  // ── 2. WATER REFLECTION OF THE SHRINE STRUCTURE (completely skipped in low quality to save CPU drawImage)
+  if (!isLowQuality) {
+    ctx.save();
+    ctx.translate(sx, sy - 40);
+    ctx.scale(1, -0.45);
+    ctx.globalAlpha = 0.32;
+    fighter._drawShrineBody(ctx);
+    ctx.fillStyle = 'rgba(20, 2, 6, 0.45)';
+    ctx.fillRect(-150, -150, 300, 300);
+    ctx.restore();
+  }
 
-  // ── 3. FIGHTER WATER REFLECTIONS ──
-  if (state.fighters) {
+  // ── 3. FIGHTER WATER REFLECTIONS (completely skipped in low quality)
+  if (!isLowQuality && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f.hp > 0) {
         ctx.save();
@@ -113,6 +121,9 @@ export function renderSukunaDomainForeground(fighter, ctx) {
   const sx = fighter.domainX !== undefined ? fighter.domainX : fighter.x;
   const sy = fighter.domainY !== undefined ? fighter.domainY : fighter.y;
 
+  // Detect low quality / low FPS mode
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+
   // Detect Yuta domain clash
   const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
   const yutaClashFighter = isMultiDomain ? state.fighters.find(f => f && f.domainActive && (f.type === 'yuta' || (f._def && f._def.id === 'yuta'))) : null;
@@ -131,8 +142,9 @@ export function renderSukunaDomainForeground(fighter, ctx) {
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
 
-    // 3 rotating cleave slash arcs around the Shrine roof horns
-    for (let s = 0; s < 3; s++) {
+    // 3 rotating cleave slash arcs (draw only 1 in low quality mode to save paths)
+    const slashCount = isLowQuality ? 1 : 3;
+    for (let s = 0; s < slashCount; s++) {
       const slashAngle = (s / 3) * Math.PI * 2 + time * 0.004;
       const slashRadius = 80 + Math.sin(time * 0.005 + s * 2) * 20;
       const slashAlpha = 0.4 + Math.sin(time * 0.006 + s * 3) * 0.25;
@@ -147,12 +159,14 @@ export function renderSukunaDomainForeground(fighter, ctx) {
       ctx.arc(sx, sy - 120, slashRadius, arcStart, arcEnd);
       ctx.stroke();
 
-      // Thin white edge highlight
-      ctx.strokeStyle = `rgba(255, 200, 200, ${slashAlpha * 0.7})`;
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(sx, sy - 120, slashRadius - 2, arcStart + 0.05, arcEnd - 0.05);
-      ctx.stroke();
+      // Thin white edge highlight (skipped in low quality mode)
+      if (!isLowQuality) {
+        ctx.strokeStyle = `rgba(255, 200, 200, ${slashAlpha * 0.7})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(sx, sy - 120, slashRadius - 2, arcStart + 0.05, arcEnd - 0.05);
+        ctx.stroke();
+      }
     }
 
     // Pulsing crimson energy border on Sukuna's domain edge

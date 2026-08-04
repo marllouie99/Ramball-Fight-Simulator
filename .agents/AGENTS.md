@@ -57,3 +57,16 @@
 - Using `shadowBlur` forces the browser to calculate CPU-intensive Gaussian blurs, causing severe FPS drops during match gameplay.
 - **ALWAYS** simulate glowing effects by drawing slightly larger concentric shapes with transparent gradient colors or semi-transparent flat fills instead.
 
+## 12. Prohibition of High-Frequency PIXI.Text Instantiation (VRAM/GC Optimization)
+- **NEVER** instantiate new `PIXI.Text` objects on a per-frame or high-frequency basis (such as for floating damage numbers or combo counters).
+- Each `PIXI.Text` internally allocates a hidden 2D canvas, renders text to it, uploads the result to a GPU texture, and forces garbage collection. This causes massive FPS drops and GC stuttering during rapid combat events.
+- **ALWAYS** route high-frequency dynamic texts to draw directly on the main 2D Canvas context (`state.ctx.fillText` / `strokeText`).
+
+## 13. UI & DOM Query Caching Requirement
+- **NEVER** query the DOM using `document.getElementById` or `document.querySelector` inside per-frame or frequent update loops (e.g., `updateHealthHud`).
+- **ALWAYS** cache these DOM references at the file level (e.g., `let _cachedTopLeft = null;`) and reuse the references to avoid extreme layout reflow lags and CPU stalling.
+
+## 14. Global Dim Effects & Screen Letterboxing Constraint
+- **NEVER** apply global dim effects (such as Hollow Purple or Domain Expansions) by modifying the `document.body.style.backgroundColor`.
+- All dim overlays, flashes, and visual effects MUST be drawn exclusively on the canvas or within a strict `div.game-box` overlay so they remain physically clipped to the game container boundaries.
+- The outer HTML `body` background MUST remain completely untouched and hardcoded (e.g., `#000000`) so that letterbox margins during screen recording are never affected by in-game combat effects.

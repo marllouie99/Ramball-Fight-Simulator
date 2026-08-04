@@ -62,6 +62,12 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
   }
 
   update(projectile, fighters, system) {
+    // If the round or match has ended, instantly destroy Hollow Purple to prevent lag and screen shakes during the victory screen
+    if (state.gameState !== 'playing') {
+      projectile.life = 0;
+      return true;
+    }
+
     // Advance visual time for animations so it freezes when caught in time sphere
     projectile.visualTime = (projectile.visualTime || Date.now()) + 16.667;
 

@@ -1,7 +1,7 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { renderGojoDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
-import { renderSukunaDomainBackground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
+import { renderSukunaDomainBackground, renderSukunaDomainForeground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
@@ -25,6 +25,7 @@ function getRikaSummonDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     rikaSummonDimSprite = new window.PIXI.Sprite(texture);
     rikaSummonDimSprite.anchor.set(0.5);
+    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
   }
   return rikaSummonDimSprite;
 }
@@ -72,6 +73,7 @@ function getFurnaceDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     furnaceDimSprite = new window.PIXI.Sprite(texture);
     furnaceDimSprite.anchor.set(0.5);
+    furnaceDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
     // It will be scaled to cover the screen
   }
   return furnaceDimSprite;
@@ -108,6 +110,7 @@ function getPurpleDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     purpleDimSprite = new window.PIXI.Sprite(texture);
     purpleDimSprite.anchor.set(0.5);
+    purpleDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
   }
   return purpleDimSprite;
 }
@@ -136,6 +139,7 @@ function getMahoragaDimSprite() {
     const texture = window.PIXI.Texture.from(canvas);
     mahoragaDimSprite = new window.PIXI.Sprite(texture);
     mahoragaDimSprite.anchor.set(0.5);
+    mahoragaDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
   }
   return mahoragaDimSprite;
 }
@@ -155,6 +159,7 @@ function getTojiHybridData() {
     
     const texture = window.PIXI.Texture.from(canvas);
     const sprite = new window.PIXI.Sprite(texture);
+    sprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
     
     tojiHybridData = { canvas, ctx, texture, sprite };
   }
@@ -165,6 +170,9 @@ function syncDomainHybridDataSize(data) {
   if (state.canvas && (data.canvas.width !== state.canvas.width || data.canvas.height !== state.canvas.height)) {
     data.canvas.width = state.canvas.width;
     data.canvas.height = state.canvas.height;
+    if (data.texture && data.texture.baseTexture) {
+      data.texture.baseTexture.setSize(state.canvas.width, state.canvas.height);
+    }
     data.texture.update();
   }
 }
@@ -199,6 +207,21 @@ function getSukunaDomainHybridData() {
   return sukunaDomainHybridData;
 }
 
+let sukunaForegroundHybridData = null;
+function getSukunaForegroundHybridData() {
+  if (!sukunaForegroundHybridData) {
+    const canvas = document.createElement('canvas');
+    canvas.width = state.canvas ? state.canvas.width : 1920;
+    canvas.height = state.canvas ? state.canvas.height : 1080;
+    const ctx = canvas.getContext('2d');
+    const texture = window.PIXI.Texture.from(canvas);
+    const sprite = new window.PIXI.Sprite(texture);
+    sukunaForegroundHybridData = { canvas, ctx, texture, sprite };
+  }
+  syncDomainHybridDataSize(sukunaForegroundHybridData);
+  return sukunaForegroundHybridData;
+}
+
 let yutaDomainHybridData = null;
 function getYutaDomainHybridData() {
   if (!yutaDomainHybridData) {
@@ -215,8 +238,9 @@ function getYutaDomainHybridData() {
 }
 
 export function updateHybridEnvironment() {
-  if (!state.pixiApp || !state.pixiLayers?.environment) return;
+  if (!state.pixiApp || !state.pixiLayers?.environment || !state.pixiLayers?.effects) return;
   const layer = state.pixiLayers.environment;
+  const dimLayer = state.pixiLayers.effects;
   const maxDim = Math.max(state.canvas.width, state.canvas.height);
   const scale = (maxDim * 2.5) / 512;
   
@@ -227,9 +251,15 @@ export function updateHybridEnvironment() {
   const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
 
   domainUpdateTick++;
-  const updateGojo = (domainUpdateTick % 2 === 0);
-  const updateSukuna = (domainUpdateTick % 2 === 1);
-  const updateYuta = (domainUpdateTick % 2 === 0);
+  
+  // Performance: Throttle & stagger domain texture updates to eliminate CPU-to-GPU VRAM bandwidth stalls (especially during Multi-Domain clashes)
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const baseInterval = isLowQuality ? 18 : 6;
+  const updateInterval = isMultiDomain ? baseInterval * 2 : baseInterval;
+
+  const updateGojo = (domainUpdateTick % updateInterval === 0);
+  const updateSukuna = (domainUpdateTick % updateInterval === Math.floor(updateInterval / 3));
+  const updateYuta = (domainUpdateTick % updateInterval === Math.floor(updateInterval * 2 / 3));
 
   if (gojo) {
     const data = getGojoDomainHybridData();
@@ -245,16 +275,28 @@ export function updateHybridEnvironment() {
   }
 
   if (sukuna) {
-    const data = getSukunaDomainHybridData();
-    if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
-    // 1:1 rendering, no scaling of the sprite
+    const bgData = getSukunaDomainHybridData();
+    if (!bgData.sprite.parent) layer.addChildAt(bgData.sprite, 0);
     if (updateSukuna) {
-      data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
-      renderSukunaDomainBackground(sukuna, data.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
-      data.texture.update();
+      bgData.ctx.clearRect(0, 0, bgData.canvas.width, bgData.canvas.height);
+      renderSukunaDomainBackground(sukuna, bgData.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
+      bgData.texture.update();
     }
-  } else if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent) {
-    sukunaDomainHybridData.sprite.parent.removeChild(sukunaDomainHybridData.sprite);
+
+    const fgData = getSukunaForegroundHybridData();
+    if (!fgData.sprite.parent) layer.addChildAt(fgData.sprite, 0);
+    if (updateSukuna) {
+      fgData.ctx.clearRect(0, 0, fgData.canvas.width, fgData.canvas.height);
+      renderSukunaDomainForeground(sukuna, fgData.ctx);
+      fgData.texture.update();
+    }
+  } else {
+    if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent) {
+      sukunaDomainHybridData.sprite.parent.removeChild(sukunaDomainHybridData.sprite);
+    }
+    if (sukunaForegroundHybridData && sukunaForegroundHybridData.sprite.parent) {
+      sukunaForegroundHybridData.sprite.parent.removeChild(sukunaForegroundHybridData.sprite);
+    }
   }
 
   if (yuta) {
@@ -272,6 +314,14 @@ export function updateHybridEnvironment() {
   } else if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent) {
     yutaDomainHybridData.sprite.parent.removeChild(yutaDomainHybridData.sprite);
   }
+
+  // Enforce deterministic domain Z-order sorting:
+  // Gojo (bottom) -> Sukuna Background (middle) -> Yuta Background/Crosses (top) -> Sukuna Shrine Foreground (top-most)
+  // This guarantees that Sukuna's physical Shrine building sits on top of Yuta's clashing void gradient and remains 100% visible!
+  if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
+  if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent === layer) layer.addChild(sukunaDomainHybridData.sprite);
+  if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent === layer) layer.addChild(yutaDomainHybridData.sprite);
+  if (sukunaForegroundHybridData && sukunaForegroundHybridData.sprite.parent === layer) layer.addChild(sukunaForegroundHybridData.sprite);
   
   // 1. Sukuna Furnace
   const sukunaFuga = state.fighters?.find(f => 
@@ -296,7 +346,7 @@ export function updateHybridEnvironment() {
   if (currentFurnaceDimOpacity < 0.01) {
     currentFurnaceDimOpacity = 0; if (spriteFuga.parent) spriteFuga.parent.removeChild(spriteFuga);
   } else {
-    if (!spriteFuga.parent) layer.addChild(spriteFuga);
+    if (!spriteFuga.parent) dimLayer.addChild(spriteFuga);
     spriteFuga.alpha = currentFurnaceDimOpacity; spriteFuga.x = cxFuga; spriteFuga.y = cyFuga; spriteFuga.scale.set(scale);
   }
 
@@ -323,6 +373,7 @@ export function updateHybridEnvironment() {
   } else {
     if (!spritePurple.parent) layer.addChild(spritePurple);
     spritePurple.alpha = currentPurpleDimOpacity; spritePurple.x = cxPurple; spritePurple.y = cyPurple; spritePurple.scale.set(scale);
+    state.globalDimEdgeColor = `rgba(10, 0, 20, ${currentPurpleDimOpacity * 0.95})`;
   }
   
   // 3. Mahoraga
@@ -340,7 +391,7 @@ export function updateHybridEnvironment() {
   if (opacityMaho <= 0.01) {
     if (spriteMaho.parent) spriteMaho.parent.removeChild(spriteMaho);
   } else {
-    if (!spriteMaho.parent) layer.addChild(spriteMaho);
+    if (!spriteMaho.parent) dimLayer.addChild(spriteMaho);
     spriteMaho.alpha = 1.0; // embedded in texture colors already? No, the texture has opacity. But we multiply by opacityMaho? Wait, in original, opacity was passed into gradient strings directly. Here we can just set sprite.alpha.
     // Since we used raw alpha in gradient, we'll set alpha to a scale.
     // The gradient has max 0.98 alpha. So we just use sprite.alpha = opacityMaho / 0.85 (normalized)
@@ -352,7 +403,7 @@ export function updateHybridEnvironment() {
   const toji = state.fighters?.find(f => f && f.ultimateActive && (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING' || f.ultimatePhase === 'CRATER_FADEIN' || f.ultimatePhase === 'CRATER'));
   let tOpToji = 0;
   
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+
 
   if (toji) {
     tOpToji = 0.85;
@@ -485,6 +536,15 @@ export function updateHybridEnvironment() {
     rikaRing.y = rikaCy;
     rikaRing.alpha = 1.0;
   }
+
+  // Calculate and store the maximum dim opacity to allow HTML DOM overlays to dim synchronously
+  state.globalDimOpacity = Math.max(
+    currentPurpleDimOpacity || 0,
+    currentFurnaceDimOpacity || 0,
+    opacityMaho || 0,
+    currentTojiUltimateOpacity || 0,
+    currentRikaSummonDimOpacity || 0
+  );
 }
 
 // ──────────────────────────────────────────────
@@ -718,4 +778,5 @@ function updateLaylaHybridAuras(layer) {
     }
   }
 }
+
 

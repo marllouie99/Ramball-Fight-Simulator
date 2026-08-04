@@ -9,6 +9,22 @@ import { fastCleanArray } from './visualTrailSystem.js';
 
 import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 
+// PERF: Radial gradients are defined at a fixed unit radius (centered at origin) so a single
+// cached gradient can be reused for every particle instance/position/size via ctx.translate()
+// + ctx.scale(), instead of calling ctx.createRadialGradient() fresh every frame per particle.
+// Color stops that fade with `effect.life` are quantized into 20 buckets (~5% steps, imperceptible)
+// so the cache stays small and bounded while still tracking the fade.
+const _unitGradientCache = new Map();
+function getUnitRadialGradient(ctx, key, stops) {
+  let gradient = _unitGradientCache.get(key);
+  if (!gradient) {
+    gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, 1);
+    for (const [offset, color] of stops) gradient.addColorStop(offset, color);
+    _unitGradientCache.set(key, gradient);
+  }
+  return gradient;
+}
+
 /**
  * Spawns spark effects at a position (visual-only, no collision).
  * @param {number} x - X position
@@ -726,19 +742,20 @@ export function drawSparkEffects(layer = 'all') {
         ctx.closePath();
         ctx.stroke();
       } else if (effect.type === 'crimsonSniperFlash') {
-        // Impact flash - radial gradient glow
-        const gradient = ctx.createRadialGradient(
-          effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size
-        );
-        // Deep crimson core, sharp black edge
-        gradient.addColorStop(0, 'rgba(0, 0, 0, 0.8)');
-        gradient.addColorStop(0.3, 'rgba(200, 0, 20, 0.6)');
-        gradient.addColorStop(1, 'rgba(50, 0, 0, 0)');
+        // Impact flash - radial gradient glow (cached: stops are life-independent, fade via ctx.globalAlpha)
+        const gradient = getUnitRadialGradient(ctx, 'crimsonSniperFlash', [
+          [0, 'rgba(0, 0, 0, 0.8)'],
+          [0.3, 'rgba(200, 0, 20, 0.6)'],
+          [1, 'rgba(50, 0, 0, 0)']
+        ]);
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.scale(effect.size, effect.size);
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
+        ctx.restore();
       } else if (effect.type === 'arcaneAscendLine') {
         // Glowing vertical thin line ascending upwards
         ctx.globalCompositeOperation = 'lighter';
@@ -846,21 +863,25 @@ export function drawSparkEffects(layer = 'all') {
       } else if (effect.type === 'arcaneFlash') {
         // Bright radial flash beneath feet on landing
         effect.size += (effect.targetSize - effect.size) * 0.06; // Slower size blooming
-        
-        const gradient = ctx.createRadialGradient(
-          effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size
-        );
-        gradient.addColorStop(0, `rgba(200, 255, 230, ${effect.life * 0.9})`);
-        gradient.addColorStop(0.3, `rgba(100, 255, 180, ${effect.life * 0.6})`);
-        gradient.addColorStop(0.7, `rgba(30, 200, 100, ${effect.life * 0.3})`);
-        gradient.addColorStop(1, 'rgba(30, 200, 100, 0)');
-        
+
+        // Cache gradient per quantized life step (unit radius, reused via translate+scale below)
+        const lifeStep = Math.round(effect.life * 20) / 20;
+        const gradient = getUnitRadialGradient(ctx, `arcaneFlash_${lifeStep}`, [
+          [0, `rgba(200, 255, 230, ${lifeStep * 0.9})`],
+          [0.3, `rgba(100, 255, 180, ${lifeStep * 0.6})`],
+          [0.7, `rgba(30, 200, 100, ${lifeStep * 0.3})`],
+          [1, 'rgba(30, 200, 100, 0)']
+        ]);
+
         ctx.globalCompositeOperation = 'lighter';
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.scale(effect.size, effect.size);
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
+        ctx.restore();
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'arcaneGlyph') {
         // Floating arcane glyph fragments - diamonds, triangles, squares
@@ -902,34 +923,39 @@ export function drawSparkEffects(layer = 'all') {
       } else if (effect.type === 'healing') {
         // Bright blue healing particles for Gojo's Reverse Cursed Technique
         ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
-        
-        const gradient = ctx.createRadialGradient(
-          effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size
-        );
-        gradient.addColorStop(0, `rgba(200, 240, 255, ${effect.life})`);
-        gradient.addColorStop(0.4, `rgba(50, 150, 255, ${effect.life * 0.8})`);
-        gradient.addColorStop(1, 'rgba(0, 100, 200, 0)');
-        
+
+        const lifeStep = Math.round(effect.life * 20) / 20;
+        const gradient = getUnitRadialGradient(ctx, `healing_${lifeStep}`, [
+          [0, `rgba(200, 240, 255, ${lifeStep})`],
+          [0.4, `rgba(50, 150, 255, ${lifeStep * 0.8})`],
+          [1, 'rgba(0, 100, 200, 0)']
+        ]);
+
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.scale(effect.size, effect.size);
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
-        
+        ctx.restore();
+
         ctx.globalCompositeOperation = 'source-over';
       } else {
-        // Default impact flash
-        const gradient = ctx.createRadialGradient(
-          effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size
-        );
-        gradient.addColorStop(0, 'rgba(255, 255, 200, 0.8)');
-        gradient.addColorStop(0.3, 'rgba(255, 180, 80, 0.5)');
-        gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        // Default impact flash (cached: stops are life-independent, fade via ctx.globalAlpha)
+        const gradient = getUnitRadialGradient(ctx, 'defaultImpactFlash', [
+          [0, 'rgba(255, 255, 200, 0.8)'],
+          [0.3, 'rgba(255, 180, 80, 0.5)'],
+          [1, 'rgba(255, 100, 0, 0)']
+        ]);
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.scale(effect.size, effect.size);
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
         ctx.fillStyle = gradient;
         ctx.fill();
+        ctx.restore();
       }
     } else if (effect.type === 'crimsonLightningArc' || effect.type === 'tricksterLightningArc') {
       // Lightning arc spark — draw as a short jagged line instead of a dot

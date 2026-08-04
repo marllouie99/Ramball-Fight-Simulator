@@ -11,6 +11,34 @@ import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js'
 import { fastCleanArray, pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { tojiGetTargetsInFrontalArc } from './tojiWeapons.js';
 
+export function tojiIsTargetDeadOrRemoved(fighter, target) {
+  if (!target) return true;
+
+  // Demo preview uses a fake target which is not in the state list
+  if (fighter && fighter.isDemoFighter) {
+    return target.hp <= 0;
+  }
+
+  // 1. Basic properties
+  if (target.hp <= 0 || target.isDead || target._hasDied) return true;
+
+  // 2. Special case for Yuta's Rika
+  if (target.isRika) {
+    if (!target.active || target.isDying || target.disappearing) return true;
+  }
+
+  // 3. Check if target is still in the active state lists
+  if (typeof state !== 'undefined') {
+    const inFighters = state.fighters && state.fighters.includes(target);
+    const inIllusions = state.illusions && state.illusions.includes(target);
+    if (!inFighters && !inIllusions) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
 export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, startAngle, endAngle) {
   if (!fighter.stealthAfterimages) fighter.stealthAfterimages = [];
 
@@ -54,7 +82,7 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
 }
 
 export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
-  if (!opponent || opponent.hp <= 0) return;
+  if (tojiIsTargetDeadOrRemoved(fighter, opponent)) return;
 
   fighter.isAmbushing = true;
   fighter.ambushTarget = opponent;
@@ -134,7 +162,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     return; // Freeze Toji mid-ambush 1-3 combo sequence during Mahoraga's wheel adaptation!
   }
 
-  if (!opponent || opponent.hp <= 0 || !fighter.isAmbushing) {
+  if (tojiIsTargetDeadOrRemoved(fighter, opponent) || !fighter.isAmbushing) {
     if (typeof state !== 'undefined') {
       if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
       if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });
@@ -519,7 +547,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       }
     }
 
-    if (fighter.ambushPhase === 'PHANTOM_FLURRY' && !fighter._flurryHitApplied && opponent && opponent.hp > 0) {
+    if (fighter.ambushPhase === 'PHANTOM_FLURRY' && !fighter._flurryHitApplied && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
       const hitDelayFrame = Math.max(1, flurryFrameRate - 2);
       if (fighter.phantomStrikeTimer <= hitDelayFrame) {
         fighter._flurryHitApplied = true;

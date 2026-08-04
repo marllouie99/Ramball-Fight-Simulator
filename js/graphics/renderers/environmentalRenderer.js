@@ -41,6 +41,8 @@ export function drawStormDimScreen() {
   // Fill the arena with a plain dark overlay
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity})`;
 }
 
 let currentFurnaceDimOpacity = 0;
@@ -106,6 +108,8 @@ export function drawFurnaceDimScreen() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+  
+  state.globalDimEdgeColor = `rgba(10, 2, 2, ${opacity * 0.95})`;
 }
 
 let currentRikaSummonDimOpacity = 0;

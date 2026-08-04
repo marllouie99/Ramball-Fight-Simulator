@@ -1,4 +1,5 @@
 import { state } from '../../core/state.js';
+import { fastCleanArray } from '../particles/visualTrailSystem.js';
 
 export function drawSukunaSlash(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
@@ -170,6 +171,9 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   const time = Date.now() * 0.012;
   const speed = Math.hypot(vx, vy);
 
+  // Performance: Detect low quality / low FPS mode
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+
   // Initialize trail history and particle systems
   if (!p._fugaFlameTimer) p._fugaFlameTimer = 0;
   p._fugaFlameTimer++;
@@ -178,13 +182,14 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   if (!p.flameParticles) p.flameParticles = [];
   if (!p.emberParticles) p.emberParticles = [];
 
-  // Record position trail for the long streaming fire wake
+  // Record position trail for the long streaming fire wake (shorter trail in low quality)
   p._trailHistory.push({ x: p.x, y: p.y, time: time });
-  const maxTrailLen = 48;
+  const maxTrailLen = isLowQuality ? 16 : 48;
   while (p._trailHistory.length > maxTrailLen) p._trailHistory.shift();
 
-  // ─── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched ───
-  for (let i = 0; i < 3; i++) {
+  // ─── SPAWN FLAME BLOBS: Dense, long-lived, velocity-stretched (fewer in low quality)
+  const spawnRate = isLowQuality ? 1 : 3;
+  for (let i = 0; i < spawnRate; i++) {
     const spawnOffset = -Math.random() * 20;
     p.flameParticles.push({
       x: spawnOffset,
@@ -195,7 +200,7 @@ export function drawSukunaFurnaceArrow(ctx, p) {
       maxSize: 22 + Math.random() * 18,
       life: 1.0,
       maxLife: 1.0,
-      decay: 0.018 + Math.random() * 0.014,
+      decay: isLowQuality ? (0.035 + Math.random() * 0.02) : (0.018 + Math.random() * 0.014), // Faster decay in low quality
       wobblePhase: Math.random() * Math.PI * 2,
       wobbleSpeed: 0.12 + Math.random() * 0.2,
       turbSeed: Math.random() * 100,
@@ -203,8 +208,9 @@ export function drawSukunaFurnaceArrow(ctx, p) {
     });
   }
 
-  // ─── SPAWN EMBERS: Glowing sparks that dissolve at trail end ───
-  if (Math.random() < 0.85) {
+  // ─── SPAWN EMBERS: Glowing sparks that dissolve at trail end (fewer in low quality)
+  const emberChance = isLowQuality ? 0.3 : 0.85;
+  if (Math.random() < emberChance) {
     p.emberParticles.push({
       x: 5 - Math.random() * 25,
       y: (Math.random() - 0.5) * 20,
@@ -213,14 +219,16 @@ export function drawSukunaFurnaceArrow(ctx, p) {
       size: 1.0 + Math.random() * 2.0,
       life: 1.0,
       maxLife: 1.0,
-      decay: 0.012 + Math.random() * 0.012,
+      decay: isLowQuality ? (0.024 + Math.random() * 0.02) : (0.012 + Math.random() * 0.012),
       trail: []
     });
   }
 
-  // Cap particles for 60 FPS performance
-  while (p.flameParticles.length > 25) p.flameParticles.shift();
-  while (p.emberParticles.length > 15) p.emberParticles.shift();
+  // Cap particles for 60 FPS performance (much tighter limits in low quality)
+  const maxFlames = isLowQuality ? 8 : 25;
+  const maxEmbers = isLowQuality ? 5 : 15;
+  while (p.flameParticles.length > maxFlames) p.flameParticles.shift();
+  while (p.emberParticles.length > maxEmbers) p.emberParticles.shift();
 
   ctx.save();
   ctx.translate(p.x, p.y);
@@ -251,8 +259,9 @@ export function drawSukunaFurnaceArrow(ctx, p) {
       localTrail[k].y = dx * sinA + dy * cosA;
     }
 
-    // Draw multiple layered turbulent fire tongues along the trail
-    for (let layer = 0; layer < 3; layer++) {
+    // Draw multiple layered turbulent fire tongues along the trail (draw only 1 layer in low quality mode)
+    const wakeLayers = isLowQuality ? 1 : 3;
+    for (let layer = 0; layer < wakeLayers; layer++) {
       const widthMul = layer === 0 ? 1.0 : layer === 1 ? 0.6 : 0.3;
       const baseWidth = (18 + speed * 0.5) * widthMul;
 
@@ -285,46 +294,51 @@ export function drawSukunaFurnaceArrow(ctx, p) {
       // Color cascade: white → yellow → golden orange → deep orange → crimson
       const trailStartX = localTrail[len - 1].x;
       const trailEndX = localTrail[0].x;
-      const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
 
-      if (p.isFrozenByInfinity) {
-        if (layer === 0) {
-          wakeGrad.addColorStop(0, `rgba(0, 120, 255, ${0.40})`);
-          wakeGrad.addColorStop(0.3, `rgba(0, 80, 220, ${0.30})`);
-          wakeGrad.addColorStop(0.7, `rgba(0, 40, 180, ${0.15})`);
-          wakeGrad.addColorStop(1, 'rgba(0, 10, 80, 0)');
-        } else if (layer === 1) {
-          wakeGrad.addColorStop(0, `rgba(0, 229, 255, ${0.60})`);
-          wakeGrad.addColorStop(0.25, `rgba(0, 160, 255, ${0.45})`);
-          wakeGrad.addColorStop(0.6, `rgba(0, 90, 220, ${0.25})`);
-          wakeGrad.addColorStop(1, 'rgba(0, 20, 100, 0)');
-        } else {
-          wakeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85})`);
-          wakeGrad.addColorStop(0.15, `rgba(224, 255, 255, ${0.70})`);
-          wakeGrad.addColorStop(0.4, `rgba(0, 229, 255, ${0.50})`);
-          wakeGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
-        }
+      if (isLowQuality) {
+        // Fast flat fill instead of allocating linear gradients on the CPU per frame
+        ctx.fillStyle = p.isFrozenByInfinity ? 'rgba(0, 160, 255, 0.4)' : 'rgba(255, 120, 0, 0.35)';
+        ctx.fill();
       } else {
-        if (layer === 0) {
-          wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
-          wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
-          wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
-          wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
-        } else if (layer === 1) {
-          wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
-          wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
-          wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
-          wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
+        const wakeGrad = ctx.createLinearGradient(trailStartX, 0, trailEndX, 0);
+        if (p.isFrozenByInfinity) {
+          if (layer === 0) {
+            wakeGrad.addColorStop(0, `rgba(0, 120, 255, ${0.40})`);
+            wakeGrad.addColorStop(0.3, `rgba(0, 80, 220, ${0.30})`);
+            wakeGrad.addColorStop(0.7, `rgba(0, 40, 180, ${0.15})`);
+            wakeGrad.addColorStop(1, 'rgba(0, 10, 80, 0)');
+          } else if (layer === 1) {
+            wakeGrad.addColorStop(0, `rgba(0, 229, 255, ${0.60})`);
+            wakeGrad.addColorStop(0.25, `rgba(0, 160, 255, ${0.45})`);
+            wakeGrad.addColorStop(0.6, `rgba(0, 90, 220, ${0.25})`);
+            wakeGrad.addColorStop(1, 'rgba(0, 20, 100, 0)');
+          } else {
+            wakeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85})`);
+            wakeGrad.addColorStop(0.15, `rgba(224, 255, 255, ${0.70})`);
+            wakeGrad.addColorStop(0.4, `rgba(0, 229, 255, ${0.50})`);
+            wakeGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+          }
         } else {
-          wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
-          wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
-          wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
-          wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
+          if (layer === 0) {
+            wakeGrad.addColorStop(0, `rgba(180, 30, 0, ${0.35})`);
+            wakeGrad.addColorStop(0.3, `rgba(200, 50, 0, ${0.25})`);
+            wakeGrad.addColorStop(0.7, `rgba(120, 15, 0, ${0.12})`);
+            wakeGrad.addColorStop(1, 'rgba(60, 5, 0, 0)');
+          } else if (layer === 1) {
+            wakeGrad.addColorStop(0, `rgba(255, 180, 30, ${0.5})`);
+            wakeGrad.addColorStop(0.25, `rgba(255, 120, 0, ${0.4})`);
+            wakeGrad.addColorStop(0.6, `rgba(200, 40, 0, ${0.2})`);
+            wakeGrad.addColorStop(1, 'rgba(100, 10, 0, 0)');
+          } else {
+            wakeGrad.addColorStop(0, `rgba(255, 255, 240, ${0.7})`);
+            wakeGrad.addColorStop(0.15, `rgba(255, 240, 140, ${0.55})`);
+            wakeGrad.addColorStop(0.4, `rgba(255, 180, 40, ${0.35})`);
+            wakeGrad.addColorStop(1, 'rgba(200, 60, 0, 0)');
+          }
         }
+        ctx.fillStyle = wakeGrad;
+        ctx.fill();
       }
-
-      ctx.fillStyle = wakeGrad;
-      ctx.fill();
     }
     ctx.restore();
   }
@@ -335,10 +349,10 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
 
-  for (let i = p.flameParticles.length - 1; i >= 0; i--) {
-    const fp = p.flameParticles[i];
+  // Optimized: Zero-GC swap-and-pop array cleanup
+  fastCleanArray(p.flameParticles, (fp) => {
     fp.life -= fp.decay;
-    if (fp.life <= 0) { p.flameParticles.splice(i, 1); continue; }
+    if (fp.life <= 0) return false;
 
     // Fluid curl motion: sine wobble + turbulence offset
     fp.wobblePhase += fp.wobbleSpeed;
@@ -354,7 +368,7 @@ export function drawSukunaFurnaceArrow(ctx, p) {
     const alpha = prog * prog; // quadratic falloff for smoother fade
     const wobY = Math.sin(fp.wobblePhase) * 3.0;
 
-    // Velocity-stretched ellipses (more elongated = more speed feel)
+    // Velocity-stretched ellipses
     const stretchX = curSize * (1.6 + speed * 0.03);
     const stretchY = curSize * (0.7 + ageRatio * 0.3);
 
@@ -374,17 +388,20 @@ export function drawSukunaFurnaceArrow(ctx, p) {
     ctx.beginPath();
     ctx.ellipse(fp.x, fp.y + wobY, stretchX, stretchY, -0.1, 0, Math.PI * 2);
     ctx.fill();
-  }
+    return true;
+  });
 
   // ═════════════════════════════════════════════════════════
   // LAYER 2: GLOWING EMBER SPARKS — dissolving at trail end
   // ═════════════════════════════════════════════════════════
-  for (let i = p.emberParticles.length - 1; i >= 0; i--) {
-    const ep = p.emberParticles[i];
+  // Optimized: Zero-GC swap-and-pop array cleanup
+  fastCleanArray(p.emberParticles, (ep) => {
     ep.life -= ep.decay;
-    if (ep.life <= 0) { p.emberParticles.splice(i, 1); continue; }
+    if (ep.life <= 0) return false;
+
     ep.trail.push({ x: ep.x, y: ep.y });
-    if (ep.trail.length > 8) ep.trail.shift();
+    const maxEmberTrail = isLowQuality ? 3 : 8;
+    while (ep.trail.length > maxEmberTrail) ep.trail.shift();
     ep.x += ep.vx;
     ep.y += ep.vy;
     ep.vy += (Math.random() - 0.5) * 0.4; // random drift
@@ -411,29 +428,31 @@ export function drawSukunaFurnaceArrow(ctx, p) {
       ? `rgba(224, 255, 255, ${prog})`
       : `rgba(255, ${200 + prog * 55}, ${120 + prog * 80}, ${prog})`;
     ctx.fill();
-  }
+    return true;
+  });
 
   ctx.restore(); // lighter
 
   // ═════════════════════════════════════════════════════════
-  // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES
-  // Thin velocity lines showing air being torn apart
+  // LAYER 3: TURBULENT AIR-RIP SHOCKWAVE LINES (completely skipped in low quality to save paths)
   // ═════════════════════════════════════════════════════════
-  ctx.save();
-  ctx.globalAlpha = 0.35;
-  ctx.strokeStyle = p.isFrozenByInfinity ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 200, 100, 0.4)';
-  ctx.lineWidth = 1.0;
-  ctx.lineCap = 'round';
-  for (let i = 0; i < 5; i++) {
-    const yOff = (i - 2) * 6 + Math.sin(time * 8 + i * 1.7) * 4;
-    const startX = -10 - Math.random() * 10;
-    const endX = startX - 25 - Math.random() * 35;
-    ctx.beginPath();
-    ctx.moveTo(startX, yOff);
-    ctx.lineTo(endX, yOff + Math.sin(time * 6 + i) * 3);
-    ctx.stroke();
+  if (!isLowQuality) {
+    ctx.save();
+    ctx.globalAlpha = 0.35;
+    ctx.strokeStyle = p.isFrozenByInfinity ? 'rgba(0, 255, 255, 0.7)' : 'rgba(255, 200, 100, 0.4)';
+    ctx.lineWidth = 1.0;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 5; i++) {
+      const yOff = (i - 2) * 6 + Math.sin(time * 8 + i * 1.7) * 4;
+      const startX = -10 - Math.random() * 10;
+      const endX = startX - 25 - Math.random() * 35;
+      ctx.beginPath();
+      ctx.moveTo(startX, yOff);
+      ctx.lineTo(endX, yOff + Math.sin(time * 6 + i) * 3);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
-  ctx.restore();
 
   ctx.restore(); // restore translate/rotate
 
@@ -454,6 +473,8 @@ export function drawDivineFlameArrowConstruct(ctx, {
   x, y, angle, scale = 1.0, progress = 1.0, isFlying = false, time = Date.now() * 0.012, isFrozenByInfinity = false
 }) {
   if (progress <= 0) return;
+
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
 
   ctx.save();
   ctx.translate(x, y);
@@ -493,7 +514,7 @@ export function drawDivineFlameArrowConstruct(ctx, {
   // 2. ROARING FLAME TONGUES — long, turbulent, curling backward
   // Uses traveling wave + multi-frequency turbulence for fluid motion
   // ═════════════════════════════════════════════════════════
-  const numTendrils = 16;
+  const numTendrils = isLowQuality ? 4 : 16;
   for (let i = 0; i < numTendrils; i++) {
     const side = i % 2 === 0 ? 1 : -1;
     const ratio = i / (numTendrils - 1);
@@ -532,44 +553,51 @@ export function drawDivineFlameArrowConstruct(ctx, {
     );
     ctx.closePath();
 
-    // Color cascade from white-hot to cyan/blue (if frozen) or crimson (if normal)
-    const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
-    if (isFrozenByInfinity) {
-      if (ratio < 0.3) {
-        tGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * progress})`);
-        tGrad.addColorStop(0.3, `rgba(224, 255, 255, ${0.8 * progress})`);
-        tGrad.addColorStop(0.6, `rgba(0, 229, 255, ${0.6 * progress})`);
-        tGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
-      } else if (ratio < 0.6) {
-        tGrad.addColorStop(0, `rgba(0, 229, 255, ${0.85 * progress})`);
-        tGrad.addColorStop(0.35, `rgba(0, 160, 255, ${0.65 * progress})`);
-        tGrad.addColorStop(0.7, `rgba(0, 80, 220, ${0.4 * progress})`);
-        tGrad.addColorStop(1, 'rgba(0, 30, 150, 0)');
-      } else {
-        tGrad.addColorStop(0, `rgba(0, 180, 255, ${0.75 * progress})`);
-        tGrad.addColorStop(0.3, `rgba(0, 100, 240, ${0.55 * progress})`);
-        tGrad.addColorStop(0.65, `rgba(0, 40, 180, ${0.3 * progress})`);
-        tGrad.addColorStop(1, 'rgba(0, 15, 100, 0)');
-      }
+    if (isLowQuality) {
+      // Fast path: reuse single flat fills instead of generating CPU linear gradients per tendril per frame
+      ctx.fillStyle = isFrozenByInfinity 
+        ? `rgba(0, ${150 + ratio * 105}, 255, ${progress * 0.7})` 
+        : `rgba(255, ${100 + ratio * 155}, 0, ${progress * 0.7})`;
     } else {
-      if (ratio < 0.3) {
-        tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
-        tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
-        tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
-        tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
-      } else if (ratio < 0.6) {
-        tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
-        tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
-        tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
-        tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
+      // Color cascade from white-hot to cyan/blue (if frozen) or crimson (if normal)
+      const tGrad = ctx.createLinearGradient(originX, 0, originX - flameLen, side * spread * 0.5);
+      if (isFrozenByInfinity) {
+        if (ratio < 0.3) {
+          tGrad.addColorStop(0, `rgba(255, 255, 255, ${0.95 * progress})`);
+          tGrad.addColorStop(0.3, `rgba(224, 255, 255, ${0.8 * progress})`);
+          tGrad.addColorStop(0.6, `rgba(0, 229, 255, ${0.6 * progress})`);
+          tGrad.addColorStop(1, 'rgba(0, 120, 255, 0)');
+        } else if (ratio < 0.6) {
+          tGrad.addColorStop(0, `rgba(0, 229, 255, ${0.85 * progress})`);
+          tGrad.addColorStop(0.35, `rgba(0, 160, 255, ${0.65 * progress})`);
+          tGrad.addColorStop(0.7, `rgba(0, 80, 220, ${0.4 * progress})`);
+          tGrad.addColorStop(1, 'rgba(0, 30, 150, 0)');
+        } else {
+          tGrad.addColorStop(0, `rgba(0, 180, 255, ${0.75 * progress})`);
+          tGrad.addColorStop(0.3, `rgba(0, 100, 240, ${0.55 * progress})`);
+          tGrad.addColorStop(0.65, `rgba(0, 40, 180, ${0.3 * progress})`);
+          tGrad.addColorStop(1, 'rgba(0, 15, 100, 0)');
+        }
       } else {
-        tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
-        tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
-        tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
-        tGrad.addColorStop(1, 'rgba(80, 5, 0, 0)');
+        if (ratio < 0.3) {
+          tGrad.addColorStop(0, `rgba(255, 255, 245, ${0.9 * progress})`);
+          tGrad.addColorStop(0.3, `rgba(255, 245, 160, ${0.75 * progress})`);
+          tGrad.addColorStop(0.6, `rgba(255, 180, 40, ${0.5 * progress})`);
+          tGrad.addColorStop(1, 'rgba(255, 100, 0, 0)');
+        } else if (ratio < 0.6) {
+          tGrad.addColorStop(0, `rgba(255, 220, 80, ${0.85 * progress})`);
+          tGrad.addColorStop(0.35, `rgba(255, 150, 10, ${0.7 * progress})`);
+          tGrad.addColorStop(0.7, `rgba(230, 60, 0, ${0.4 * progress})`);
+          tGrad.addColorStop(1, 'rgba(150, 15, 0, 0)');
+        } else {
+          tGrad.addColorStop(0, `rgba(255, 160, 30, ${0.75 * progress})`);
+          tGrad.addColorStop(0.3, `rgba(220, 70, 0, ${0.55 * progress})`);
+          tGrad.addColorStop(0.65, `rgba(160, 20, 0, ${0.3 * progress})`);
+          tGrad.addColorStop(1, 'rgba(80, 5, 0, 0)');
+        }
       }
+      ctx.fillStyle = tGrad;
     }
-    ctx.fillStyle = tGrad;
     ctx.fill();
   }
 
@@ -634,19 +662,21 @@ export function drawDivineFlameArrowConstruct(ctx, {
   ctx.lineCap = 'round';
   ctx.stroke();
 
-  // Intricate Magma / Lava Crack Patterns along shaft
-  ctx.strokeStyle = `rgba(255, 235, 130, ${0.95 * progress})`;
-  ctx.lineWidth = 1.3 * progress;
-  const numCracks = 6;
-  for (let c = 0; c < numCracks; c++) {
-    const cx = notchX + (c + 0.5) * ((headX - notchX) / numCracks);
-    const side = c % 2 === 0 ? 1 : -1;
-    const cWobble = Math.sin(time * 3 + c * 2) * 2;
+  // Intricate Magma / Lava Crack Patterns along shaft (skipped in low quality mode)
+  if (!isLowQuality) {
+    ctx.strokeStyle = `rgba(255, 235, 130, ${0.95 * progress})`;
+    ctx.lineWidth = 1.3 * progress;
+    const numCracks = 6;
+    for (let c = 0; c < numCracks; c++) {
+      const cx = notchX + (c + 0.5) * ((headX - notchX) / numCracks);
+      const side = c % 2 === 0 ? 1 : -1;
+      const cWobble = Math.sin(time * 3 + c * 2) * 2;
 
-    ctx.beginPath();
-    ctx.moveTo(cx - 6, side * 0.5);
-    ctx.quadraticCurveTo(cx, side * (4.5 + cWobble), cx + 7, side * 1.2);
-    ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(cx - 6, side * 0.5);
+      ctx.quadraticCurveTo(cx, side * (4.5 + cWobble), cx + 7, side * 1.2);
+      ctx.stroke();
+    }
   }
 
   // ═════════════════════════════════════════════════════════
@@ -708,24 +738,36 @@ export function drawDivineFlameArrowConstruct(ctx, {
     ctx.arc(dripX - 2 * progress, dripY, 2.2 * progress, 0, Math.PI * 2);
     ctx.closePath();
 
-    const dripGrad = ctx.createRadialGradient(dripX, dripY, 0, dripX, dripY, 4 * progress);
-    dripGrad.addColorStop(0, `rgba(255, 255, 220, ${progress})`);
-    dripGrad.addColorStop(0.5, `rgba(255, 140, 0, ${0.9 * progress})`);
-    dripGrad.addColorStop(1, 'rgba(180, 20, 0, 0)');
-    ctx.fillStyle = dripGrad;
-    ctx.fill();
+    if (isLowQuality) {
+      ctx.fillStyle = `rgba(255, 180, 0, ${0.9 * progress})`;
+      ctx.fill();
+    } else {
+      const dripGrad = ctx.createRadialGradient(dripX, dripY, 0, dripX, dripY, 4 * progress);
+      dripGrad.addColorStop(0, `rgba(255, 255, 220, ${progress})`);
+      dripGrad.addColorStop(0.5, `rgba(255, 140, 0, ${0.9 * progress})`);
+      dripGrad.addColorStop(1, 'rgba(180, 20, 0, 0)');
+      ctx.fillStyle = dripGrad;
+      ctx.fill();
+    }
   }
 
   // (D) Blinding White Nose Tip Flare
-  const tipGlow = ctx.createRadialGradient(tipApexX, 0, 0, tipApexX, 0, 16 * progress);
-  tipGlow.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
-  tipGlow.addColorStop(0.3, `rgba(255, 250, 200, ${0.9 * progress})`);
-  tipGlow.addColorStop(0.6, `rgba(255, 200, 80, ${0.5 * progress})`);
-  tipGlow.addColorStop(1, 'rgba(255, 90, 0, 0)');
-  ctx.fillStyle = tipGlow;
-  ctx.beginPath();
-  ctx.arc(tipApexX, 0, 16 * progress, 0, Math.PI * 2);
-  ctx.fill();
+  if (isLowQuality) {
+    ctx.fillStyle = `rgba(255, 250, 200, ${0.85 * progress})`;
+    ctx.beginPath();
+    ctx.arc(tipApexX, 0, 14 * progress, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    const tipGlow = ctx.createRadialGradient(tipApexX, 0, 0, tipApexX, 0, 16 * progress);
+    tipGlow.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
+    tipGlow.addColorStop(0.3, `rgba(255, 250, 200, ${0.9 * progress})`);
+    tipGlow.addColorStop(0.6, `rgba(255, 200, 80, ${0.5 * progress})`);
+    tipGlow.addColorStop(1, 'rgba(255, 90, 0, 0)');
+    ctx.fillStyle = tipGlow;
+    ctx.beginPath();
+    ctx.arc(tipApexX, 0, 16 * progress, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   ctx.restore(); // Restore globalCompositeOperation ('lighter')
   ctx.restore(); // Restore transform matrix

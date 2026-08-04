@@ -8,7 +8,7 @@ import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKat
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike } from './toji/tojiWeapons.js';
-import { modSpawnTeleportAfterimages, modStartAmbushSequence, modUpdateAmbushSequence } from './toji/tojiAmbush.js';
+import { modSpawnTeleportAfterimages, modStartAmbushSequence, modUpdateAmbushSequence, tojiIsTargetDeadOrRemoved } from './toji/tojiAmbush.js';
 import { modUpdateChannelSense, modUpdateStealth } from './toji/tojiSkills.js';
 import { MODE_SPEED_MULTIPLIER } from '../../core/modeConfig.js';
 
@@ -150,6 +150,10 @@ export class TojiFighter extends Fighter {
     this.spearSwingTimer = 0;
     this.katanaActiveTimer = 0;
     this.katanaCooldownTimer = 0;
+    this.katanaSlashTimer = 0;
+    this.katanaSlashFadeTimer = 0;
+    this._slashStartAngle = undefined;   // Frozen angle snapshot — cleared on reset
+    this._slashStartFlipSign = undefined;
     this.ultimateCooldownMax = CONFIG.toji?.ultimateCooldown || 2500;
     this.ultimateCooldown = this.ultimateCooldownMax;
     this.ultimateActive = false;
@@ -278,7 +282,7 @@ export class TojiFighter extends Fighter {
           realTarget = attacker.owner;
         }
       }
-      if (!this.isAmbushing && (this._parryAmbushCooldown || 0) <= 0 && realTarget && realTarget.hp > 0 && !realTarget.isDead) {
+      if (!this.isAmbushing && (this._parryAmbushCooldown || 0) <= 0 && !tojiIsTargetDeadOrRemoved(this, realTarget)) {
         this._parryAmbushCooldown = CONFIG.toji?.parryAmbushCooldownFrames || 360; // 6 second cooldown between parry counter-ambushes
         this.startAmbushSequence(realTarget);
       }
@@ -361,7 +365,7 @@ export class TojiFighter extends Fighter {
   updateUltimate(arena, ownerIndex) {
     if (!this.ultimateActive) return;
 
-    if (!this.ultimateTarget || this.ultimateTarget.isDead || this.ultimateTarget.hp <= 0) {
+    if (tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
       let nextTarget = null;
       let minDist = Infinity;
       const allTargets = [];
@@ -409,7 +413,7 @@ export class TojiFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       
-      if (this.ultimateTarget && !this.ultimateTarget.isDead) {
+      if (!tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
         this.aim(this.ultimateTarget);
       }
 
@@ -767,7 +771,7 @@ export class TojiFighter extends Fighter {
         applyDamageToTarget(this.ultimateTarget, CONFIG.toji?.ultimateCraterDamage || 65, this, { isMelee: true, isTrueDamage: true });
 
         // Unfreeze target & apply massive kinetic ricochet knockback launch!
-        if (this.ultimateTarget && !this.ultimateTarget.isDead) {
+        if (!tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
           this._clearTargetFreeze(this.ultimateTarget);
           if (!this.ultimateTarget.isTurret && !this.ultimateTarget.cannotBeKnockbacked) {
             this.ultimateTarget.isFirstHitKnockback = false; // Enable ricochet wall bouncing!
@@ -925,7 +929,7 @@ export class TojiFighter extends Fighter {
 
     // Auto-trigger ultimate when ready (AI logic)
     const isEnemyDomainActive = state.fighters && state.fighters.some(f => f && f !== this && f.hp > 0 && (f.domainActive || f.isChannelingDomainExpansion || f.isChannelingDomain));
-    if (this.ultimateCooldown <= 0 && !this.ultimateActive && !this.isAmbushing && opponent && !opponent.isDead && (this.forcedMeleeTimer || 0) <= 0 && !isEnemyDomainActive) {
+    if (this.ultimateCooldown <= 0 && !this.ultimateActive && !this.isAmbushing && opponent && !tojiIsTargetDeadOrRemoved(this, opponent) && (this.forcedMeleeTimer || 0) <= 0 && !isEnemyDomainActive) {
       this.triggerUltimate();
       return;
     }
@@ -975,7 +979,7 @@ export class TojiFighter extends Fighter {
     this.resolveWallBounce(arena, opponent);
 
     // Inverted Spear of Heaven Melee Strike Logic
-    if (opponent && opponent.hp > 0) {
+    if (!tojiIsTargetDeadOrRemoved(this, opponent)) {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
       const dist = Math.hypot(dx, dy);
@@ -998,7 +1002,7 @@ export class TojiFighter extends Fighter {
    * Aim logic: rotates Toji's weapon and body angle toward the opponent.
    */
   aim(opponent) {
-    if (opponent && opponent.hp > 0) {
+    if (!tojiIsTargetDeadOrRemoved(this, opponent)) {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
       const targetAngle = Math.atan2(dy, dx);
@@ -1191,6 +1195,11 @@ export class TojiFighter extends Fighter {
     const baseAngle = this.gunAngle !== undefined ? this.gunAngle : this.angle;
     const isAttacking = this.spearSwingTimer > 0;
     
+    // Compute facing flip sign: when Toji faces left, drawSplitSoulKatana internally applies
+    // ctx.scale(1,-1) to mirror the blade. The offsetAngle sweep must be negated to match.
+    const _normBaseAngle = Math.atan2(Math.sin(baseAngle), Math.cos(baseAngle));
+    const _katanaFlipSign = Math.abs(_normBaseAngle) > Math.PI / 2 ? -1 : 1;
+
     let offsetAngle = 0.42; // Lore low assassin side guard stance
     let thrustDistance = 0;
     let slashArcAlpha = 0;
@@ -1261,7 +1270,8 @@ export class TojiFighter extends Fighter {
       // Smoothly animate weapon coiling back from guard stance (0.42) to deep charge stance (-0.95)
       const easeCurve = Math.sin(chargeRatio * Math.PI * 0.5);
       thrustDistance = -22 * easeCurve;
-      offsetAngle = 0.42 + (-0.95 - 0.42) * easeCurve;
+      // Mirror the charge coil direction when Toji faces left so the weapon coils on the correct side
+      offsetAngle = (0.42 + (-0.95 - 0.42) * easeCurve) * _katanaFlipSign;
 
       // Subtle weapon vibration tremor as energy builds up
       const tremorVal = (Math.random() - 0.5) * 1.5 * chargeRatio;
@@ -1320,7 +1330,7 @@ export class TojiFighter extends Fighter {
       ctx.restore();
     } else if (this.ambushPhase === 'KATANA_DRAW' || this.ambushPhase === 'KATANA_CHASE') {
       thrustDistance = -8;
-      offsetAngle = 0.35;
+      offsetAngle = 0.35 * _katanaFlipSign; // Mirror guard stance when facing left
 
       if (this.ambushPhase === 'KATANA_DRAW') {
         const maxDraw = 12;
@@ -1364,6 +1374,10 @@ export class TojiFighter extends Fighter {
       // Auto-detect max timer when a new swing starts (handles 50 for normal, 24 for ultimate rapid strikes)
       if (this.katanaSlashTimer > (this._lastKatanaTimer || 0)) {
         this._katanaMax = this.katanaSlashTimer;
+        // Snapshot the facing angle at the moment the swing starts so the crescent arc
+        // stays locked to the blade's initial direction and never drifts mid-swing.
+        this._slashStartAngle = baseAngle;
+        this._slashStartFlipSign = _katanaFlipSign;
       }
       this._lastKatanaTimer = this.katanaSlashTimer;
 
@@ -1378,19 +1392,19 @@ export class TojiFighter extends Fighter {
         const p = t / 0.15;
         const easeP = p * p;
         thrustDistance = -14 * easeP;
-        offsetAngle = -0.85 * easeP; // Coil back for wide Katana slash
+        offsetAngle = -0.85 * easeP * _katanaFlipSign; // Coil back for wide Katana slash (mirrored when facing left)
         slashArcAlpha = 0; // Do not draw visual slash during wind-up
       } else if (t < 0.65) {
         const p = (t - 0.15) / 0.50;
         const sweepCurve = Math.sin(p * Math.PI * 0.5);
         thrustDistance = -14 + 48 * sweepCurve;
-        offsetAngle = -0.85 + 1.80 * sweepCurve; // Sweeps smoothly from -0.85 to +0.95!
+        offsetAngle = (-0.85 + 1.80 * sweepCurve) * _katanaFlipSign; // Sweep mirrored when facing left
         slashArcAlpha = Math.sin(p * Math.PI); // Fades in and out perfectly during active strike
       } else {
         const p = (t - 0.65) / 0.35;
         const easeP = p * (2 - p);
         thrustDistance = 34 * (1 - easeP);
-        offsetAngle = 0.95 * (1 - easeP);
+        offsetAngle = 0.95 * (1 - easeP) * _katanaFlipSign; // Recovery mirrored when facing left
         slashArcAlpha = 0; // Do not draw visual slash during recovery (no back-and-forth)
       }
     } else if (isAttacking) {
@@ -1535,7 +1549,9 @@ export class TojiFighter extends Fighter {
 
     // 1.4. High-Speed Stealth & Domain Motion Trail Afterimages (Matches Gojo & Sukuna teleport visual system)
     if (this.stealthAfterimages && this.stealthAfterimages.length > 0) {
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
       for (let i = 0; i < this.stealthAfterimages.length; i++) {
+        if (skipAlternate && i % 2 === 0) continue;
         const img = this.stealthAfterimages[i];
         if (!img || img.timer <= 0) continue;
 
@@ -1667,8 +1683,15 @@ export class TojiFighter extends Fighter {
       ctx.translate(this.x, this.y);
 
       if (this.ambushPhase === 'KATANA_SLASH') {
-        // Rotate directly by the active Katana blade angle so crescent is 100% locked to sword tip with ZERO delay!
-        ctx.rotate(baseAngle + offsetAngle);
+        // Use the snapshotted angle from the moment the swing began so the crescent does NOT
+        // follow the live gunAngle after 1 swing (which caused it to visually change direction).
+        const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
+        const frozenFlip  = this._slashStartFlipSign !== undefined ? this._slashStartFlipSign : _katanaFlipSign;
+        ctx.rotate(frozenAngle + offsetAngle * frozenFlip);
+        const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
+        if (Math.abs(normAngle) > Math.PI / 2) {
+          ctx.scale(1, -1);
+        }
 
         // --- SLIM, LONG, ELEGANT VOID-PURPLE ANIME CRESCENT SLASH WAVE ---
         const tailAngle = -Math.PI * 0.90; // Long 165-degree trailing needle tail!
@@ -1805,7 +1828,13 @@ export class TojiFighter extends Fighter {
         // --- DUAL-WIELD PHANTOM FLURRY SLASH ARCS ---
         const drawArc = (arcAngle, radius, thick, alpha, color1, color2, color3) => {
           ctx.save();
-          ctx.rotate(baseAngle + arcAngle);
+          // Use frozen angle so each flurry arc stays locked to the blade direction at strike-start
+          const frozenAngle = this._slashStartAngle !== undefined ? this._slashStartAngle : baseAngle;
+          ctx.rotate(frozenAngle + arcAngle);
+          const normAngle = Math.atan2(Math.sin(frozenAngle), Math.cos(frozenAngle));
+          if (Math.abs(normAngle) > Math.PI / 2) {
+            ctx.scale(1, -1);
+          }
           const tailAngle = -Math.PI * 0.85;
           const tipAngle = Math.PI * 0.15;
           const steps = isLowQuality ? 16 : 30;
@@ -1877,6 +1906,10 @@ export class TojiFighter extends Fighter {
         }
 
         ctx.rotate(baseAngle + offsetAngle);
+        const normAngle = Math.atan2(Math.sin(baseAngle), Math.cos(baseAngle));
+        if (Math.abs(normAngle) > Math.PI / 2) {
+          ctx.scale(1, -1);
+        }
 
         const isKatana = (this.ambushPhase === 'KATANA_SLASH' || (typeof state !== 'undefined' && state.tojiWeaponIndex === 1));
         const tailAngle = isKatana ? -Math.PI * 0.75 : -Math.PI * 0.60;
@@ -1991,22 +2024,22 @@ export class TojiFighter extends Fighter {
     if (isPhantomFlurry) {
       const isKatanaActive = (this.phantomStrikeCount % 2) === 0;
       if (isKatanaActive) {
-        drawSplitSoulKatana(ctx, this.x, this.y, baseAngle + 0.35 + (this.katanaOffset || 0), this.r + (this.katanaThrust || 0), this.color);
+        drawSplitSoulKatana(ctx, this.x, this.y, baseAngle + 0.35 + (this.katanaOffset || 0), this.r + (this.katanaThrust || 0), this.color, baseAngle);
       } else {
-        drawInvertedSpear(ctx, this.x, this.y, baseAngle - 0.35 + (this.spearOffset || 0), this.r + (this.spearThrust || 0), this.chainNodes, this.color);
+        drawInvertedSpear(ctx, this.x, this.y, baseAngle - 0.35 + (this.spearOffset || 0), this.r + (this.spearThrust || 0), this.chainNodes, this.color, baseAngle);
       }
     } else if (isUltimateStriking) {
       // Ultimate Sequence Strikes: Displayed 1 by 1 (ONLY 1 weapon drawn per strike, alternating Katana vs Spear!)
       const isKatanaActive = (this.phantomStrikeCount % 2) === 0;
       if (isKatanaActive) {
-        drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.color);
+        drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.color, baseAngle);
       } else {
-        drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, this.color);
+        drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, this.color, baseAngle);
       }
     } else if (isKatanaActiveInHand || isUltimateFinal) {
-      drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.color);
+      drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.color, baseAngle);
     } else {
-      drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, this.color);
+      drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, this.color, baseAngle);
     }
     ctx.restore();
 
@@ -2035,7 +2068,7 @@ export class TojiFighter extends Fighter {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(renderAngle);
-        const normRenderAngle = Math.atan2(Math.sin(renderAngle), Math.cos(renderAngle));
+        const normRenderAngle = Math.atan2(Math.sin(baseAngle), Math.cos(baseAngle));
         if (Math.abs(normRenderAngle) > Math.PI / 2) {
           ctx.scale(1, -1);
         }

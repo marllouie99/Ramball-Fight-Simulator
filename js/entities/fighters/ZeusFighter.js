@@ -18,6 +18,12 @@ export class ZeusFighter extends Fighter {
     this.stormActive = false;
     this.stormTimer = 0;
     
+    // Progressive Stun Chance Mechanic
+    this.baseStunChance = CONFIG.zeus?.baseStunChance ?? 0.10;
+    this.stunChance = this.baseStunChance;
+    this.maxStunChance = CONFIG.zeus?.maxStunChance ?? 0.80;
+    this.stunChanceIncrease = CONFIG.zeus?.stunChanceIncrease ?? 0.10;
+
     // Initial hovering state so clouds are positioned correctly in menus before update()
     this.z = 25;
     
@@ -35,6 +41,8 @@ export class ZeusFighter extends Fighter {
     this.stormCooldown = CONFIG.zeus.stormCooldown;
     this.stormActive = false;
     this.stormTimer = 0;
+    this.baseStunChance = CONFIG.zeus?.baseStunChance ?? 0.10;
+    this.stunChance = this.baseStunChance;
     this.auraPhase = 0;
     this._thunderCloudSoundPlayed = false;
   }

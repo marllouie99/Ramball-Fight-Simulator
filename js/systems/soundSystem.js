@@ -2,9 +2,12 @@
 // SOUND SYSTEM — lightweight audio manager
 // ─────────────────────────────────────────────
 
+import { state } from '../core/state.js';
+
 const _cache = new Map();
 const _loopingSounds = new Map();
 const _activeSounds = new Set();
+const _pendingSoundTimeouts = new Set();
 let _sharedAudioCtx = null;
 let _audioUnlocked = false;
 
@@ -261,23 +264,26 @@ export function resumeLoopingSound(key, volume = 1.0) {
 }
 
 /**
- * Stop all looping sounds and clear the registry.
+ * Stop all looping sounds with optional delay and smooth fade-out.
+ * @param {number} [fadeDelayMs=2000] - Delay in ms before starting fade-out (default 2 seconds).
+ * @param {number} [fadeDurationMs=500] - Fade duration in ms.
  */
-export function stopAllLoopingSounds() {
-  _loopingSounds.forEach((soundObj) => {
-    // Handle Web Audio API objects
-    if (soundObj.gainNode && soundObj.buffer) {
-      try { soundObj.source.stop(); } catch (e) {}
-      try { soundObj.gainNode.disconnect(); } catch (e) {}
-    } else {
-      // Handle HTML Audio elements
-      const audio = soundObj;
-      audio.pause();
-      audio.currentTime = 0;
-      audio.loop = false;
-    }
-  });
-  _loopingSounds.clear();
+export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
+  const keys = Array.from(_loopingSounds.keys());
+  if (fadeDelayMs > 0) {
+    keys.forEach((key) => {
+      const timerId = setTimeout(() => {
+        _pendingSoundTimeouts.delete(timerId);
+        fadeOutLoopingSound(key, fadeDurationMs);
+      }, fadeDelayMs);
+      _pendingSoundTimeouts.add(timerId);
+    });
+  } else {
+    keys.forEach((key) => {
+      stopLoopingSound(key);
+    });
+    _loopingSounds.clear();
+  }
 }
 
 /**
@@ -297,7 +303,7 @@ const SOUND_THROTTLE_MS = 15; // Prevent identical audio file from double-playin
 
 const _activeSoundHandles = new Set();
 
-export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0) {
+export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null) {
   if (!src) return null;
 
   // Support passing a sound config object directly: playSound({ src: '...', volume: 1.2, delay: -0.1 })
@@ -308,14 +314,26 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
     if (obj.speed !== undefined) speed = obj.speed;
     if (obj.offset !== undefined) offset = obj.offset;
     if (obj.delay !== undefined) delay = obj.delay;
+    if (obj.onEnded !== undefined) onEnded = obj.onEnded;
+  }
+
+  // Check if gameState is roundEnd/matchEnd to block non-announcer/UI combat sounds
+  const srcStr = String(src).toLowerCase();
+  const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui');
+  if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+    if (!isAnnouncerOrUi && typeof onEnded !== 'function') {
+      return null;
+    }
   }
 
   // Handle positive delay option (schedules playback after delayMs)
   if (delay > 0) {
     const delayMs = delay < 10 ? delay * 1000 : delay;
-    setTimeout(() => {
-      playSound(src, volume, speed, offset, 0);
+    const timerId = setTimeout(() => {
+      _pendingSoundTimeouts.delete(timerId);
+      playSound(src, volume, speed, offset, 0, onEnded);
     }, delayMs);
+    _pendingSoundTimeouts.add(timerId);
     return null;
   }
 
@@ -324,7 +342,7 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
     if (src.length === 0) return null;
     let lastResult = null;
     for (const singleSrc of src) {
-      const res = playSound(singleSrc, volume, speed, offset, 0);
+      const res = playSound(singleSrc, volume, speed, offset, 0, onEnded);
       if (res) lastResult = res;
     }
     return lastResult;
@@ -378,7 +396,15 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
         gainNode
       };
       _activeSoundHandles.add(handle);
-      setTimeout(() => { _activeSoundHandles.delete(handle); }, duration * 1000 + 100);
+      setTimeout(() => { 
+        try { source.stop(0); } catch(e) {}
+        try { source.disconnect(); } catch(e) {}
+        try { gainNode.disconnect(); } catch(e) {}
+        _activeSoundHandles.delete(handle); 
+        if (typeof onEnded === 'function') {
+          onEnded();
+        }
+      }, duration * 1000 + 10);
 
       return handle;
     } catch (e) {
@@ -408,6 +434,7 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
   const handle = {
     src,
     isPlaying: () => !clone.paused && !clone.ended,
+    duration: clone.duration || 0,
     audio: clone
   };
   _activeSoundHandles.add(handle);
@@ -417,6 +444,9 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0)
     _activeSoundHandles.delete(handle);
     if (_audioPool.length < MAX_POOL_SIZE && !_audioPool.includes(clone)) {
       _audioPool.push(clone);
+    }
+    if (typeof onEnded === 'function') {
+      onEnded();
     }
   };
 
@@ -541,25 +571,64 @@ export function stopSoundBySrc(src) {
 
 /**
  * Stop all non-looping sounds that are currently playing.
+ * @param {boolean} [keepAnnouncer=true] - If true, preserves announcer and death sounds like faah.mp3.
+ * @param {number} [fadeDelayMs=2000] - Delay in ms before starting fade-out (default 2 seconds).
+ * @param {number} [fadeDurationMs=500] - Fade-out duration in ms.
  */
-export function stopAllSounds() {
+export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDurationMs = 500) {
+  // 1. Clear all pending delayed sound timers
+  _pendingSoundTimeouts.forEach((timerId) => clearTimeout(timerId));
+  _pendingSoundTimeouts.clear();
+
+  // 2. Stop/fade active Web Audio API & HTML Audio handles
+  const handles = Array.from(_activeSoundHandles);
+  for (const handle of handles) {
+    if (keepAnnouncer && handle.src && String(handle.src).toLowerCase().includes('announcer')) {
+      continue;
+    }
+    if (fadeDelayMs > 0) {
+      const timerId = setTimeout(() => {
+        _pendingSoundTimeouts.delete(timerId);
+        fadeOutSound(handle, fadeDurationMs);
+      }, fadeDelayMs);
+      _pendingSoundTimeouts.add(timerId);
+    } else {
+      stopSound(handle);
+    }
+  }
+
+  // 3. Stop any fallback HTML Audio elements
   _activeSounds.forEach((audio) => {
     if (audio) {
-      audio.pause();
-      audio.currentTime = 0;
-      audio.src = '';
-      audio.load();
+      if (keepAnnouncer && audio.src && String(audio.src).toLowerCase().includes('announcer')) {
+        return;
+      }
+      if (fadeDelayMs > 0) {
+        const timerId = setTimeout(() => {
+          _pendingSoundTimeouts.delete(timerId);
+          try { audio.pause(); } catch(e) {}
+          audio.currentTime = 0;
+          audio.src = '';
+        }, fadeDelayMs);
+        _pendingSoundTimeouts.add(timerId);
+      } else {
+        try { audio.pause(); } catch(e) {}
+        audio.currentTime = 0;
+        audio.src = '';
+      }
     }
   });
-  _activeSounds.clear();
 }
 
 /**
  * Stop ALL sounds (both looping and non-looping) - call this when leaving the game.
+ * @param {boolean} [keepAnnouncer=false]
+ * @param {number} [fadeDelayMs=0]
+ * @param {number} [fadeDurationMs=350]
  */
-export function stopAllAudio() {
-  stopAllSounds();
-  stopAllLoopingSounds();
+export function stopAllAudio(keepAnnouncer = false, fadeDelayMs = 0, fadeDurationMs = 350) {
+  stopAllSounds(keepAnnouncer, fadeDelayMs, fadeDurationMs);
+  stopAllLoopingSounds(fadeDelayMs, fadeDurationMs);
 }
 
 // Auto-unlock AudioContext on first user interaction (click, keydown, touch)

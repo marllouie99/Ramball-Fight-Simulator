@@ -19,9 +19,8 @@ function drawSketchyLine(ctx, x1, y1, x2, y2, seed, color = 'rgba(20,20,25,0.85)
     return x - Math.floor(x);
   };
 
-  // Base bow amount (always negative so it bows outwards, away from the arena center)
-  // A value of -14 to -22 pixels creates a very noticeable, aesthetic curve
-  const baseBowAmt = -14 - (nextRand() * 8);
+  // Base bow amount (set to 0 for straight sketch lines)
+  const baseBowAmt = 0;
 
   const strokeCount = 4; // Extra strokes for a penciled look
   for (let s = 0; s < strokeCount; s++) {
@@ -32,8 +31,8 @@ function drawSketchyLine(ctx, x1, y1, x2, y2, seed, color = 'rgba(20,20,25,0.85)
     const segmentLength = 12;
     const segments = Math.max(2, Math.floor(length / segmentLength));
     
-    // Each pencil stroke gets a slightly different curve/displacement
-    const strokeBowVar = (nextRand() - 0.5) * 6;
+    // Each pencil stroke gets a slightly different curve/displacement (subtle wobbles instead of bowing)
+    const strokeBowVar = (nextRand() - 0.5) * 2.5;
     const totalBow = baseBowAmt + strokeBowVar;
     
     ctx.moveTo(x1, y1);
@@ -96,21 +95,37 @@ export function drawArena() {
   const g = state.arenaGraphics;
   g.clear();
 
-  // Fill the entire canvas with black so it blends with the window background
-  g.beginFill(0x000000);
+  // Helper to parse hex string into PIXI color and alpha
+  const parseColor = (c) => {
+    if (typeof c === 'number') return { color: c, alpha: 1 };
+    if (!c) return { color: 0x000000, alpha: 1 };
+    let hex = c.replace('#', '');
+    if (hex.length === 8) return { color: parseInt(hex.substring(0, 6), 16), alpha: parseInt(hex.substring(6, 8), 16) / 255 };
+    if (hex.length === 6) return { color: parseInt(hex, 16), alpha: 1 };
+    if (hex.length === 3) return { color: parseInt(hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2], 16), alpha: 1 };
+    return { color: 0x000000, alpha: 1 };
+  };
+
+  const canvasBg = parseColor(CONFIG.canvasBgColor || '#000000');
+  const outerBg = parseColor(CONFIG.arenaOuterBgColor || '#f5f5f5');
+  const innerBg = parseColor(CONFIG.arenaInnerBgColor || '#ffffff');
+
+  // Fill the entire canvas (global background)
+  g.beginFill(canvasBg.color, canvasBg.alpha);
   g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
   g.endFill();
 
-  // Draw the white gameplay area that tightly hugs the arena and the HUD
-  const whiteTop = arena.y - 20;
-  const whiteBottom = 820;
-  g.beginFill(0xf5f5f5);
+  // Draw the container area outside the arena (under HUD and sides)
+  // Set to fill the entire height of the canvas so there are no black bars at the top or bottom
+  const whiteTop = 0;
+  const whiteBottom = pixiApp.screen.height;
+  g.beginFill(outerBg.color, outerBg.alpha);
   g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
   g.endFill();
 
   if (!hasActiveDomain) {
-    // Arena floor background
-    g.beginFill(0xffffff);
+    // Arena floor background (inside the arena boundaries)
+    g.beginFill(innerBg.color, innerBg.alpha);
     g.drawRect(arena.x, arena.y, arena.width, arena.height);
     g.endFill();
   }
@@ -152,121 +167,52 @@ export function drawArena() {
   ctx.fillText('CRONOSPHERE', centerX, centerY);
   ctx.restore();
 
-  // ── Cached Title Header (splatters + text) ──────────────────────────────
-  // Render the entire title visual (ink splatters + stroked text) once into an
-  // offscreen canvas, then blit it every frame. Custom font strokeText is very
-  // expensive to run 60 fps — caching eliminates the cost entirely.
+  // ── Cached Title Header (text only) ──────────────────────────────
+  // Render the entire title text once into an offscreen canvas, then blit it every frame.
   if (!state._titleHeaderCanvas) {
-    const headerW = 540;
+    // Prevent Flash of Unstyled Text (FOUT) and visual jumping by waiting for custom fonts
+    if (document.fonts) {
+      const harutoReady = document.fonts.check('900 42px "Haruto"');
+      const glastReady = document.fonts.check('18px "Glast Blitch"');
+      if (!harutoReady || !glastReady) {
+        document.fonts.load('900 42px "Haruto"');
+        document.fonts.load('18px "Glast Blitch"');
+        return; // Skip rendering header completely until fonts are fully loaded
+      }
+    }
+
+    const headerW = CONFIG.canvasWidth || 540;
     const headerH = 170;
     const offCanvas = document.createElement('canvas');
     offCanvas.width = headerW;
     offCanvas.height = headerH;
     const oc = offCanvas.getContext('2d');
 
-    // ── Ink Splatters ─────────────────────────────────────────────────────
-    // Seeded pseudo-random for deterministic splatters
-    let _seed = 42;
-    const sRand = () => { _seed = (_seed * 16807 + 0) % 2147483647; return (_seed & 0x7fffffff) / 0x7fffffff; };
-
-    // 1. Bold diagonal brush stroke behind title (dark red, subtle)
-    oc.save();
-    oc.globalAlpha = 0.25;
-    oc.fillStyle = '#8b0000';
-    oc.translate(headerW / 2, 95);
-    oc.rotate(-0.04);
-    for (let i = 0; i < 12; i++) {
-      const bx = (i - 6) * 28 + (sRand() - 0.5) * 10;
-      const by = (sRand() - 0.5) * 8;
-      const bw = 32 + sRand() * 14;
-      const bh = 14 + sRand() * 10;
-      oc.beginPath();
-      oc.ellipse(bx, by, bw, bh, (sRand() - 0.5) * 0.3, 0, Math.PI * 2);
-      oc.fill();
-    }
-    oc.restore();
-
-    // 2. Crimson ink splatters
-    const splatColors = ['#cc0000', '#ff1a1a', '#990000', '#ff4444', '#dd0033'];
-    for (let s = 0; s < 18; s++) {
-      const sx = 60 + sRand() * (headerW - 120);
-      const sy = 50 + sRand() * 100;
-      const sr = 2 + sRand() * 6;
-      oc.save();
-      oc.globalAlpha = 0.3 + sRand() * 0.35;
-      oc.fillStyle = splatColors[Math.floor(sRand() * splatColors.length)];
-      oc.beginPath();
-      oc.arc(sx, sy, sr, 0, Math.PI * 2);
-      oc.fill();
-      const dripCount = Math.floor(sRand() * 4) + 1;
-      for (let d = 0; d < dripCount; d++) {
-        const da = sRand() * Math.PI * 2;
-        const dd = sr + 2 + sRand() * 8;
-        const dr = 0.8 + sRand() * 2.2;
-        oc.beginPath();
-        oc.arc(sx + Math.cos(da) * dd, sy + Math.sin(da) * dd, dr, 0, Math.PI * 2);
-        oc.fill();
-      }
-      if (sRand() > 0.55) {
-        const dripLen = 6 + sRand() * 18;
-        oc.beginPath();
-        oc.moveTo(sx, sy + sr);
-        oc.lineTo(sx + (sRand() - 0.5) * 3, sy + sr + dripLen);
-        oc.lineWidth = 1 + sRand() * 1.5;
-        oc.strokeStyle = oc.fillStyle;
-        oc.globalAlpha *= 0.7;
-        oc.stroke();
-      }
-      oc.restore();
-    }
-
-    // 3. Small cyan/blue accent splatters
-    for (let s = 0; s < 6; s++) {
-      const sx = 80 + sRand() * (headerW - 160);
-      const sy = 60 + sRand() * 80;
-      const sr = 1.5 + sRand() * 3.5;
-      oc.save();
-      oc.globalAlpha = 0.2 + sRand() * 0.25;
-      oc.fillStyle = sRand() > 0.5 ? '#00ccff' : '#0088ff';
-      oc.beginPath();
-      oc.arc(sx, sy, sr, 0, Math.PI * 2);
-      oc.fill();
-      const da = sRand() * Math.PI * 2;
-      oc.beginPath();
-      oc.arc(sx + Math.cos(da) * (sr + 4), sy + Math.sin(da) * (sr + 4), sRand() * 1.5 + 0.5, 0, Math.PI * 2);
-      oc.fill();
-      oc.restore();
-    }
-
     // ── Title Text (rendered once) ────────────────────────────────────────
     const textCX = headerW / 2;
-    oc.fillStyle = '#ffffff';
+    oc.fillStyle = '#000000';
     oc.font = '900 42px "Haruto", Arial';
     oc.textAlign = 'center';
     oc.textBaseline = 'middle';
-    oc.strokeStyle = '#000000';
-    oc.lineWidth = 4;
+    oc.strokeStyle = '#ffffff';
+    oc.lineWidth = 4.5;
     oc.strokeText('Fight of Characters', textCX, 100);
     oc.fillText('Fight of Characters', textCX, 100);
 
     oc.font = '18px "Glast Blitch", Arial';
-    oc.lineWidth = 3;
+    oc.lineWidth = 3.5;
     oc.strokeText('Ball Fight Simulator', textCX, 135);
     oc.fillText('Ball Fight Simulator', textCX, 135);
 
     state._titleHeaderCanvas = offCanvas;
-
-    // Guard against font loading delay: invalidate cache once fonts are fully loaded
-    if (document.fonts && !state._titleFontListenerAdded) {
-      state._titleFontListenerAdded = true;
-      document.fonts.ready.then(() => {
-        state._titleHeaderCanvas = null;
-      });
-    }
   }
 
-  // Blit the fully cached title header (splatters + text) in one drawImage call
-  ctx.drawImage(state._titleHeaderCanvas, centerX - state._titleHeaderCanvas.width / 2, 0);
+  // Blit the fully cached title header (text only) in one drawImage call
+  // Position it relative to the arena and scale it using CONFIG.internalScale
+  const scale = CONFIG.internalScale || 1.0;
+  const drawW = state._titleHeaderCanvas.width * scale;
+  const drawH = state._titleHeaderCanvas.height * scale;
+  ctx.drawImage(state._titleHeaderCanvas, centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
 }
 
 let currentPurpleDimOpacity = 0;
@@ -352,6 +298,8 @@ export function drawPurpleDimScreen() {
   ctx.fillStyle = state._cachedPurpleDimGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+  
+  state.globalDimEdgeColor = `rgba(10, 0, 20, ${opacity * 0.95})`;
 }
 
 let currentTojiUltimateOpacity = 0;
@@ -428,6 +376,8 @@ export function drawTojiUltimateOverlay() {
   }
 
   ctx.restore();
+  
+  state.globalDimEdgeColor = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
 }
 
 /**
@@ -467,6 +417,8 @@ export function drawMahoragaAdaptationDimScreen() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
+  
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
 }
 
 export function drawFuelPickups() {

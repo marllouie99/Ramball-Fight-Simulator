@@ -18,7 +18,8 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) 
 
   const pathAngle = Math.atan2(dy, dx);
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : pathAngle;
-  const steps = Math.max(4, Math.floor(dist / 12));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const steps = isLowQuality ? Math.max(2, Math.floor(dist / 36)) : Math.max(4, Math.floor(dist / 12));
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const maxTimer = 24 - Math.floor(t * 6);
@@ -121,7 +122,12 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   const attackReach = fighter.r + opponent.r + 35;
   const isOutOfReach = distToOpponent > attackReach;
   
-  const shouldTeleport = isOutOfReach || (fighter.meleeComboCount % (fighter.meleeComboTarget || 1) === 0);
+  const isInitialMove = !fighter.initialTeleportDone;
+  if (isInitialMove && !isOutOfReach) {
+    fighter.initialTeleportDone = true;
+  }
+
+  const shouldTeleport = !isInitialMove && (isOutOfReach || (fighter.meleeComboCount % (fighter.meleeComboTarget || 1) === 0));
 
   if (shouldTeleport) {
     const oldX = fighter.x;
@@ -149,6 +155,15 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     audioSystem.playSFX('skill_dash3', 0.6);
   } else {
     if (typeof fighter.aim === 'function') fighter.aim(opponent);
+    
+    // Fallback normal movement if out of reach but not teleporting (e.g. during initial round start)
+    if (isOutOfReach) {
+      const dx = opponent.x - fighter.x;
+      const dy = opponent.y - fighter.y;
+      const d = distToOpponent || 1;
+      fighter.vx = (dx / d) * (fighter.speed || 4.5);
+      fighter.vy = (dy / d) * (fighter.speed || 4.5);
+    }
   }
 
   fighter.meleeComboCount++;

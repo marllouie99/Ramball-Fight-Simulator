@@ -81,12 +81,13 @@ export function drawPhysicsChain(ctx, chainNodes) {
 /**
  * Draws Toji's Inverted Spear of Heaven (Accurate to anime reference)
  */
-export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null, handColor = '#242722') {
+export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null, handColor = '#242722', baseAngle = null) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
 
-  const normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
+  const flipAngle = baseAngle !== null ? baseAngle : angle;
+  const normAngle = Math.atan2(Math.sin(flipAngle), Math.cos(flipAngle));
   if (Math.abs(normAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
   }
@@ -304,12 +305,13 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
 /**
  * Draws Toji's Split Soul Katana (Accurate slender curved Katana reference)
  */
-export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#242722') {
+export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#242722', baseAngle = null) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.rotate(angle);
 
-  const normAngle = Math.atan2(Math.sin(angle), Math.cos(angle));
+  const flipAngle = baseAngle !== null ? baseAngle : angle;
+  const normAngle = Math.atan2(Math.sin(flipAngle), Math.cos(flipAngle));
   if (Math.abs(normAngle) > Math.PI / 2) {
     ctx.scale(1, -1);
   }

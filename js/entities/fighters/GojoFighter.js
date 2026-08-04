@@ -250,6 +250,42 @@ export class GojoFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     this._checkInfinityCollisions();
 
+    // Intro Wall Rebound Stage
+    if (this.introReboundActive) {
+      if (this.introReboundTimer === undefined) {
+        this.introReboundTimer = 18;
+      }
+      this.introReboundTimer--;
+
+      if (opponent) {
+        this.aim(opponent);
+      }
+
+      this.applyMovementPhysics(0);
+      const didBounce = this.resolveWallBounce(arena);
+
+      // Spawn blue afterimages for dramatic slide effect
+      if (this.afterImages && typeof this.afterImages.push === 'function') {
+        this.afterImages.push({
+          x: this.x,
+          y: this.y,
+          angle: this.angle,
+          timer: 10,
+          maxTimer: 10
+        });
+      }
+
+      if (didBounce) {
+        if (typeof audioSystem !== 'undefined') {
+          audioSystem.playSFX('skill_dash3', 0.8);
+        }
+        this.introReboundActive = false;
+      } else if (this.introReboundTimer <= 0) {
+        this.introReboundActive = false;
+      }
+      return;
+    }
+
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
@@ -299,32 +335,13 @@ export class GojoFighter extends Fighter {
     if (this.redEffectTimer > 0) {
       this.redEffectTimer--;
     }
-
-    // Snappy Opening Teleport with Blue Afterimages when Countdown Ends!
+    // Check if we reached the opponent to finalize initial round-start positioning
     if (!this.initialTeleportDone && opponent && !opponent.isDead && typeof state !== 'undefined' && state.gameState === 'playing') {
-      this.initialTeleportDone = true;
-      const oldX = this.x;
-      const oldY = this.y;
-
-      const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
-      const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.35 : -Math.PI * 0.35);
-      const approachDist = opponent.r + this.r + 14;
-
-      let targetX = opponent.x + Math.cos(flankAngle) * approachDist;
-      let targetY = opponent.y + Math.sin(flankAngle) * approachDist;
-
-      const activeArena = arena || (state && state.arena ? state.arena : CONFIG.arena);
-      if (activeArena) {
-        targetX = Math.max(activeArena.x + this.r + 5, Math.min(activeArena.x + activeArena.width - this.r - 5, targetX));
-        targetY = Math.max(activeArena.y + this.r + 5, Math.min(activeArena.y + activeArena.height - this.r - 5, targetY));
+      const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+      const reach = this.r + opponent.r + 15;
+      if (dist <= reach) {
+        this.initialTeleportDone = true;
       }
-
-      this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, activeArena);
-      this.aim(opponent);
-
-      spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
-      spawnImpactFlash(this.x, this.y, 30, 'lightningTrail');
-      audioSystem.playSFX('skill_dash3', 0.8);
     }
 
     if (this.domainActive) {

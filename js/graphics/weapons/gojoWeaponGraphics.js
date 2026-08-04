@@ -310,11 +310,17 @@ export function drawPurpleOrbTrail(ctx, p, time) {
         return;
     }
     
+    // Performance: check if we should run in optimized low-quality mode (e.g. FPS < 52 or performance mode active)
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+    
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
     
     // Draw trail as a glowing line with particles
     for (let i = 1; i < p.history.length; i++) {
+        // Optimize: Draw only alternate trail segments in low quality mode to save CPU draw calls
+        if (isLowQuality && i % 2 === 0) continue;
+        
         const prev = p.history[i - 1];
         const curr = p.history[i];
         
@@ -345,9 +351,10 @@ export function drawPurpleOrbTrail(ctx, p, time) {
         ctx.stroke();
         
         // Draw swirling particles along the trail
-        // OPTIMIZATION: Only draw particles on every 3rd segment, and limit particle density to save CPU
-        if (i % 3 === 0) {
-            const particleCount = 2 + Math.floor(distance / 25);
+        // OPTIMIZATION: Only draw particles on every 4th segment in low quality (every 3rd in high quality)
+        const modCheck = isLowQuality ? 4 : 3;
+        if (i % modCheck === 0) {
+            const particleCount = isLowQuality ? 1 : (2 + Math.floor(distance / 25));
             for (let j = 0; j < particleCount; j++) {
                 const t = j / particleCount;
                 const px = prev.x + dx * t;
@@ -358,29 +365,36 @@ export function drawPurpleOrbTrail(ctx, p, time) {
                 const px2 = px + Math.cos(angle + Math.PI/2) * swirl;
                 const py2 = py + Math.sin(angle + Math.PI/2) * swirl;
                 
-                // Outer glow
-                ctx.beginPath();
-                ctx.arc(px2, py2, 12, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(180, 50, 255, ${trailAlpha * 0.7})`;
-                ctx.fill();
-                
-                // Inner bright particle
-                ctx.beginPath();
-                ctx.arc(px2, py2, 6, 0, Math.PI * 2);
-                ctx.fillStyle = `rgba(255, 220, 255, ${trailAlpha})`;
-                ctx.fill();
+                if (isLowQuality) {
+                    // Single flat fill particle to avoid concentric fills
+                    ctx.beginPath();
+                    ctx.arc(px2, py2, 7, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(220, 180, 255, ${trailAlpha * 0.8})`;
+                    ctx.fill();
+                } else {
+                    // Outer glow
+                    ctx.beginPath();
+                    ctx.arc(px2, py2, 12, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(180, 50, 255, ${trailAlpha * 0.7})`;
+                    ctx.fill();
+                    
+                    // Inner bright particle
+                    ctx.beginPath();
+                    ctx.arc(px2, py2, 6, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(255, 220, 255, ${trailAlpha})`;
+                    ctx.fill();
+                }
             }
         }
     }
     
     // Add a central vortex effect at the orb's current position
-    // Use p.x and p.y directly since that's the current position
     const centerX = p.x;
     const centerY = p.y;
     
     // Draw swirling vortex rings
     const vortexRadius = 20 + Math.sin(time * 0.003) * 5;
-    const vortexCount = 8;
+    const vortexCount = isLowQuality ? 3 : 8; // Fewer rings in low quality mode
     
     for (let i = 0; i < vortexCount; i++) {
         const baseAngle = (i / vortexCount) * Math.PI * 2 + time * 0.002;
@@ -389,23 +403,30 @@ export function drawPurpleOrbTrail(ctx, p, time) {
         ctx.beginPath();
         ctx.arc(centerX, centerY, radius, baseAngle, baseAngle + Math.PI * 0.5);
         ctx.strokeStyle = `rgba(220, 100, 255, 0.8)`;
-        ctx.lineWidth = 4;
+        ctx.lineWidth = isLowQuality ? 2.5 : 4;
         ctx.stroke();
     }
     
     // Add a final purple glow at the end of the trail
-    // Use p.x and p.y directly since that's the current position
     const glowRadius = 40 + Math.sin(time * 0.002) * 10;
     
-    const trailGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius);
-    trailGlow.addColorStop(0, 'rgba(255, 180, 255, 0.8)');
-    trailGlow.addColorStop(0.5, 'rgba(200, 100, 255, 0.5)');
-    trailGlow.addColorStop(1, 'rgba(150, 0, 255, 0)');
-    
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
-    ctx.fillStyle = trailGlow;
-    ctx.fill();
+    if (isLowQuality) {
+        // Fast flat fill to avoid CPU-intensive radial gradient generation
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(180, 50, 255, ${0.25 + Math.sin(time * 0.002) * 0.05})`;
+        ctx.fill();
+    } else {
+        const trailGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius);
+        trailGlow.addColorStop(0, 'rgba(255, 180, 255, 0.8)');
+        trailGlow.addColorStop(0.5, 'rgba(200, 100, 255, 0.5)');
+        trailGlow.addColorStop(1, 'rgba(150, 0, 255, 0)');
+        
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
+        ctx.fillStyle = trailGlow;
+        ctx.fill();
+    }
     
     ctx.restore();
 }

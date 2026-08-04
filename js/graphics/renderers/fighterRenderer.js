@@ -223,7 +223,7 @@ export class FighterRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const hpText = Math.floor(fighter.hp).toString();
-    const drawY = fighter.y - (fighter.z || 0);
+    const drawY = fighter.y;
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.strokeText(hpText, fighter.x, drawY);
@@ -243,7 +243,7 @@ export class FighterRenderer {
     const seconds = Math.ceil(remainingFrames / 60);
     const text = `⏳ ${seconds}s`;
     
-    const drawY = (fighter.y - (fighter.z || 0)) - (fighter.r + 18);
+    const drawY = fighter.y - (fighter.r + 18);
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';

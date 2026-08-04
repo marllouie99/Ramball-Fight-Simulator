@@ -126,12 +126,16 @@ export function drawBlackHoleEffects() {
 }
 
 export function drawFloatingTexts() {
+  const { floatingTextCtx: ctx, floatingTextCanvas: canvas } = state;
+  if (!ctx || !canvas) return;
+
+  // Clear the dedicated floating text canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
   const texts = state.floatingTexts;
   if (!texts || texts.length === 0) return;
 
   const activeTexts = [];
-  const { ctx } = state;
-  if (!ctx) return;
 
   for (let i = 0; i < texts.length; i++) {
     const t = texts[i];

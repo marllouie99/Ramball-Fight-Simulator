@@ -108,7 +108,8 @@ export class YutaFighter extends Fighter {
 
     const pathAngle = Math.atan2(dy, dx);
     const facingAngle = (customAngle !== null) ? customAngle : (this.gunAngle !== undefined ? this.gunAngle : pathAngle);
-    const steps = Math.max(5, Math.floor(dist / 8)); // Dense afterimages every 8px
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+    const steps = isLowQuality ? Math.max(2, Math.floor(dist / 24)) : Math.max(5, Math.floor(dist / 8)); // Dense afterimages every 8px (spaced to 24px in low quality)
 
     for (let i = 0; i <= steps; i++) {
       const t = i / steps;
@@ -150,7 +151,13 @@ export class YutaFighter extends Fighter {
 
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
+      // Domain channeling & active domain have hyper-armor — do NOT cancel them via interruptAttacks().
+      // interruptAttacks() sets isChannelingDomain = false, which would silently abort the domain mid-charge.
+      // Gojo's Infinity freeze can still freeze Yuta's body (vx/vy are zeroed inside the channeling block),
+      // but the charge timer must survive the freeze so the domain actually activates.
+      if (!this.isChannelingDomain && !this.domainActive) {
+        this.interruptAttacks();
+      }
       return;
     }
 

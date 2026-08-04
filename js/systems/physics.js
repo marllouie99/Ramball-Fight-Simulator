@@ -363,9 +363,22 @@ function endRoundIfFFAEnded() {
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 
-  // Stop all sounds when round ends
-  stopAllSounds();
-  stopAllLoopingSounds();
+  let isMatchEnd = false;
+  if (winner) {
+    const winnerIndex = state.fighters.indexOf(winner);
+    if (winnerIndex >= 0) {
+      const winThreshold = 2;
+      if (state.scores[winnerIndex] + 1 >= winThreshold) {
+        isMatchEnd = true;
+      }
+    }
+  }
+
+  // Stop all sounds when round ends, unless it is a match end (champion screen)
+  if (!isMatchEnd) {
+    stopAllSounds();
+    stopAllLoopingSounds();
+  }
 
   if (winner) {
     const winnerIndex = state.fighters.indexOf(winner);
@@ -409,12 +422,16 @@ function endRoundIf2v2Ended() {
   state.roundWinner = winnerFighter;
   state.roundEndTimer = 0;
 
-  // Stop all sounds when round ends
-  stopAllSounds();
-  stopAllLoopingSounds();
-
   const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
-  if (state.teamScores[winningTeam] >= winThreshold) {
+  const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
+
+  // Stop all sounds when round ends, unless it is a match end (champion screen)
+  if (!isMatchEnd) {
+    stopAllSounds();
+    stopAllLoopingSounds();
+  }
+
+  if (isMatchEnd) {
     state.matchWinner = winnerFighter;
     state.matchEndTimer = 0;
     state.gameState = 'matchEnd';
@@ -433,9 +450,22 @@ function endRoundIf1v1Ended() {
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 
-  // Stop all sounds when round ends
-  stopAllSounds();
-  stopAllLoopingSounds();
+  let isMatchEnd = false;
+  if (winner) {
+    const winnerIndex = state.fighters.indexOf(winner);
+    if (winnerIndex >= 0) {
+      const winThreshold = MODE_SETTINGS[state.mode]?.rounds === 1 ? 1 : 2;
+      if (state.scores[winnerIndex] + 1 >= winThreshold) {
+        isMatchEnd = true;
+      }
+    }
+  }
+
+  // Stop all sounds when round ends, unless it is a match end (champion screen)
+  if (!isMatchEnd) {
+    stopAllSounds();
+    stopAllLoopingSounds();
+  }
 
   if (winner) {
     const winnerIndex = state.fighters.indexOf(winner);
@@ -492,10 +522,6 @@ function endRoundIfTlfsEnded() {
       state.matchWinner = player;
       state.matchEndTimer = 0;
       state.gameState = 'matchEnd';
-      
-      // Stop sounds
-      stopAllSounds();
-      stopAllLoopingSounds();
     } else {
       // Clean up dead enemy so they don't interact while we wait for next tick?
       // Actually, we can just instantly spawn a new one in their place!

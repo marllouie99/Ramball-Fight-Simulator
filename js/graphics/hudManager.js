@@ -33,30 +33,88 @@ function syncHudPosition() {
   if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas');
   if (!_cachedGameBox || !_cachedPixiView) return;
 
+  const canvasWidth = CONFIG.canvasWidth || 540;
+  const canvasHeight = CONFIG.canvasHeight || 960;
+
+  // Dynamically set aspect ratio, max-width, and background color on game-box from config
+  _cachedGameBox.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
+  _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
+  
+  const outerBgColor = CONFIG.arenaOuterBgColor || '#ffffff';
+  _cachedGameBox.style.backgroundColor = outerBgColor.replace(/ff$/, '');
+
   const boxRect = _cachedGameBox.getBoundingClientRect();
   const canvasRect = _cachedPixiView.getBoundingClientRect();
 
   if (boxRect.height <= 0 || canvasRect.height <= 0) return;
 
-  // Arena bottom in canvas coordinate space: y=170 + height=460 = 630
-  // Canvas internal resolution: 960
-  // So arena bottom is at 630/960 = 65.625% of the canvas height
-  const arenaBottomRatio = (CONFIG.arena.y + CONFIG.arena.height) / 960;
-  
-  // Calculate where the arena bottom actually falls within the game-box (in px from game-box top)
   const canvasTopInBox = canvasRect.top - boxRect.top;
+
+  const scale = CONFIG.internalScale || 1.0;
+  const hudScale = scale * 0.9;
+
+  const arenaWidth = CONFIG.arena.width;
+  const arenaX = CONFIG.arena.x;
+  
+  // Read from CONFIG so it can be tuned without touching engine code.
+  // 1.0 = raw arena width; internalScale (0.95) = aligns with arena side walls.
+  const widthModifier = CONFIG.hudWidthModifier ?? scale;
+
+  const hudCssWidth = (arenaWidth * widthModifier) / hudScale;
+  const visualWidthPercent = (hudCssWidth / canvasWidth) * 100;
+
+  const hudCssLeft = (arenaX + arenaWidth / 2) - hudCssWidth / 2;
+  const visualLeftPercent = (hudCssLeft / canvasWidth) * 100;
+
+  // 1. Position Top HUD Container (names, dynamically kept ~90px above arena top)
+  const topRatio = (CONFIG.arena.y - 90) / canvasHeight;
+  const topPx = canvasTopInBox + canvasRect.height * topRatio;
+  const topPercent = (topPx / boxRect.height) * 100;
+  
+  if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer');
+  if (_cachedTopContainer) {
+    _cachedTopContainer.style.top = `${topPercent.toFixed(3)}%`;
+    _cachedTopContainer.style.width = `${visualWidthPercent.toFixed(3)}%`;
+    _cachedTopContainer.style.maxWidth = 'none';
+    _cachedTopContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
+    _cachedTopContainer.style.right = 'auto';
+    _cachedTopContainer.style.transform = `scale(${hudScale})`;
+    _cachedTopContainer.style.transformOrigin = 'top center';
+  }
+
+  // 2. Position Bottom HUD Container (skills/descriptions, dynamically kept ~20px below arena bottom)
+  const bottomRatio = (CONFIG.arena.y + CONFIG.arena.height + 20) / canvasHeight;
+  const bottomPx = canvasTopInBox + canvasRect.height * bottomRatio;
+  const bottomPercent = (bottomPx / boxRect.height) * 100;
+
+  if (!_cachedBottomContainer) _cachedBottomContainer = document.getElementById('hudBottomContainer');
+  if (_cachedBottomContainer) {
+    _cachedBottomContainer.style.top = `${bottomPercent.toFixed(3)}%`;
+    _cachedBottomContainer.style.width = `${visualWidthPercent.toFixed(3)}%`;
+    _cachedBottomContainer.style.maxWidth = 'none';
+    _cachedBottomContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
+    _cachedBottomContainer.style.right = 'auto';
+    _cachedBottomContainer.style.transform = `scale(${hudScale})`;
+    _cachedBottomContainer.style.transformOrigin = 'top center';
+  }
+
+  // 3. Position Health HUD (health bars, dynamically positioned with a slight margin)
+  const arenaBottomRatio = (CONFIG.arena.y + CONFIG.arena.height) / canvasHeight;
   const arenaBottomInBox = canvasTopInBox + canvasRect.height * arenaBottomRatio;
-  
-  // Add a small margin below the arena edge for the HUD
-  const hudMargin = canvasRect.height * (20 / 960); // ~20px in canvas coords
+  const hudMargin = canvasRect.height * (20 / canvasHeight);
   const hudTopPx = arenaBottomInBox + hudMargin;
-  
-  // Convert to percentage of game-box height for stable CSS positioning
   const hudTopPercent = (hudTopPx / boxRect.height) * 100;
 
   const healthHud = document.getElementById('healthHud');
   if (healthHud) {
     healthHud.style.top = `${hudTopPercent.toFixed(3)}%`;
+    healthHud.style.width = `${visualWidthPercent.toFixed(3)}%`;
+    healthHud.style.maxWidth = 'none';
+    healthHud.style.left = `${visualLeftPercent.toFixed(3)}%`;
+    healthHud.style.right = 'auto';
+    healthHud.style.margin = '0';
+    healthHud.style.transform = `scale(${hudScale})`;
+    healthHud.style.transformOrigin = 'top center';
   }
 }
 
@@ -204,17 +262,16 @@ export function drawHUD() {
     ctx.restore();
   }
 }
-
-// Helper function to adjust color brightness
-function adjustColor(hex, amount) {
-  const num = parseInt(hex.replace('#', ''), 16);
-  const r = Math.max(0, Math.min(255, (num >> 16) + amount));
-  const g = Math.max(0, Math.min(255, ((num >> 8) & 0x00FF) + amount));
-  const b = Math.max(0, Math.min(255, (num & 0x0000FF) + amount));
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')}`;
-}
+// HUD Cache Map
+const _hudCache = {
+  teams: new Map(), // teamIndex -> cached team card elements
+  fighters: new Map(), // fighter -> cached fighter card elements
+};
 
 export function clearHealthHud() {
+  _hudCache.teams.clear();
+  _hudCache.fighters.clear();
+
   const containerBottom = document.getElementById('healthHud');
   const containerLeft = document.getElementById('healthHudLeft');
   const containerRight = document.getElementById('healthHudRight');
@@ -252,39 +309,52 @@ function updateHealthHud() {
   const { fighters, mode, scores, teamScores } = state;
   if (!fighters) return;
 
+  // OPTIMIZATION: Auto-rebuild if HUD display mode changed.
+  const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription;
+  state._lastHudShowFighterDescription = CONFIG.hudShowFighterDescription;
+  if (hudModeChanged) {
+    clearHealthHud();
+  }
+
   // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
-  // We update the DOM immediately if any fighter's HP changes, otherwise we update once every 5 frames.
+  // Fast-ticking cooldown timers change by ~1 every single frame, which used to defeat this
+  // throttle entirely. Quantizing them lets per-frame ticking fall through to the periodic
+  // refresh below instead of forcing a full HUD recompute on every single frame.
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
+  const q = (v) => Math.round((v || 0) / 4);
+  const currentSkillsStr = fighters.map(f => {
+    if (!f) return '';
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)}`;
+  }).join('|');
+
   const hpChanged = currentHpStr !== state._lastHpStr;
+  const skillsChanged = currentSkillsStr !== state._lastSkillsStr;
+
   state._lastHpStr = currentHpStr;
+  state._lastSkillsStr = currentSkillsStr;
 
   state._hudFrameCount = (state._hudFrameCount || 0) + 1;
-  const shouldUpdate = hpChanged || (state._hudFrameCount % 5 === 0) || state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'countdown';
-  if (!shouldUpdate) return;
+
+  // Performance: Throttle expensive HUD innerHTML writes to avoid layout reflow stalls
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const throttleInterval = isLowQuality ? 8 : 4;
+  const isCriticalState = ['roundEnd', 'matchEnd', 'countdown'].includes(state.gameState);
+  
+  if (!isCriticalState && (state._hudFrameCount % throttleInterval !== 0)) {
+    return; // Skip DOM update this frame to preserve CPU and lock 60 FPS
+  }
 
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
   const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
-  const is1v1 = mode === '1v1' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === 'TLFS';
   
-  const cardsLeft = [];
-  const cardsRight = [];
-  const cardsBottom = [];
-
   if (!_cachedTopLeft) _cachedTopLeft = document.getElementById('hudTopLeft');
   if (!_cachedTopRight) _cachedTopRight = document.getElementById('hudTopRight');
   if (!_cachedBottomLeft) _cachedBottomLeft = document.getElementById('hudBottomLeft');
   if (!_cachedBottomRight) _cachedBottomRight = document.getElementById('hudBottomRight');
-  
-  // Reset new HUDs
-  if (_cachedTopLeft) _cachedTopLeft.innerHTML = '';
-  if (_cachedTopRight) _cachedTopRight.innerHTML = '';
-  if (_cachedBottomLeft) _cachedBottomLeft.innerHTML = '';
-  if (_cachedBottomRight) _cachedBottomRight.innerHTML = '';
-
 
   const getSkillDataForFighter = (f) => {
     if (f.characterId === 'gojo' || f.type === 'gojo') {
-      const themeColor = '#0055ff'; // Match the deep blue of Unlimited Void
+      const themeColor = '#0055ff'; 
       const domainMax = CONFIG.gojo?.domainCooldown || 2000;
       const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
       let domainPct;
@@ -420,7 +490,7 @@ function updateHealthHud() {
       ];
     }
     if (f.characterId === 'layla' || f.type === 'layla') {
-      const themeColor = '#00E5FF'; // Blue theme for her HUD bars
+      const themeColor = '#00E5FF'; 
       const bombMax = CONFIG.layla?.maleficBombCooldown || 200;
       const bombTimer = f.maleficBombCooldown !== undefined ? f.maleficBombCooldown : bombMax;
       const bombPct = Math.max(0, Math.min(100, (1 - (bombTimer / bombMax)) * 100));
@@ -463,22 +533,19 @@ function updateHealthHud() {
     if (f.characterId === 'yuji' || f.type === 'yuji') {
       const themeColor = '#ff3366';
       
-      // 1. Skill 1: comboRushCooldown / comboMax
       const comboMax = CONFIG.yuji?.comboRushCooldown || 600;
       const comboTimer = f.comboRushCooldown !== undefined ? f.comboRushCooldown : comboMax;
       const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
 
-      // 2. blackFlashThreshold progress bar: blackFlashCharge / threshold
       const bfThreshold = f.soulSwapActive 
         ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
         : (f.blackFlashThreshold || CONFIG.yuji?.blackFlashThreshold || 4);
       const bfThresholdPct = Math.max(0, Math.min(100, ((f.blackFlashCharge || 0) / bfThreshold) * 100));
 
-      // 3. Ultimate Skill: Soul Swap (Sukuna takeover)
       let ultPct = 0;
       let ultLabel = 'SOUL SWAP';
       let ultReady = false;
-      let ultColor = themeColor; // Pink-Red
+      let ultColor = themeColor;
 
       if (f.soulSwapActive) {
         const ultDuration = CONFIG.yuji?.soulSwapDuration || 500;
@@ -489,7 +556,6 @@ function updateHealthHud() {
         ultLabel = 'EXPIRED';
       } else {
         const ultThresholdHp = CONFIG.yuji?.soulSwapHpThreshold || 0.30;
-        // Fills from 0% to 100% as HP drops from 100% down to the threshold
         ultPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - ultThresholdHp)) * 100));
         ultReady = ultPct >= 99 && (f.hp / f.maxHp <= ultThresholdHp);
       }
@@ -517,7 +583,6 @@ function updateHealthHud() {
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const themeColor = '#ff69b4';
 
-      // 1. Rika Summon Progress Bar
       let rikaPct = 0;
       let rikaLabel = 'RIKA SUMMON';
       const rk = f.rika;
@@ -539,7 +604,6 @@ function updateHealthHud() {
         rikaLabel = 'RIKA SUMMON';
       }
 
-      // 2. Authentic Love Progress Bar
       const domainMax = CONFIG.yuta?.domainCooldown || 1300;
       const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
       let domainPct;
@@ -576,7 +640,75 @@ function updateHealthHud() {
       ];
     }
 
-    // Default
+    if (f.characterId === 'laser' || f.type === 'laser') {
+      const themeColor = f.color || '#ffaa00';
+      const windupMax = CONFIG.laser?.windupDuration || 150;
+      const beamMax = CONFIG.laser?.beamDuration || 100;
+      const cooldownMax = f.shootCooldownMax || CONFIG.laser?.cooldown || 300;
+
+      let pct = 0;
+      let label = 'LASER BEAM';
+      let ready = false;
+
+      if (f.beamTimer > 0) {
+        pct = Math.max(0, Math.min(100, (f.beamTimer / beamMax) * 100));
+        label = 'FIRING BEAM';
+        ready = false;
+      } else if (f.beamCharge > 0) {
+        pct = Math.max(0, Math.min(100, (f.beamCharge / windupMax) * 100));
+        label = 'CHARGING BEAM';
+        ready = f.beamCharge >= windupMax;
+      } else if (f.shootCooldown > 0) {
+        pct = Math.max(0, Math.min(100, (1 - f.shootCooldown / cooldownMax) * 100));
+        label = 'RECHARGING';
+        ready = false;
+      } else {
+        pct = 100;
+        label = 'LASER READY';
+        ready = true;
+      }
+
+      return [
+        { id: 'laser_beam', pct: pct, ready: ready, color: themeColor, label: label }
+      ];
+    }
+
+    if (f.characterId === 'zeus' || f.type === 'zeus') {
+      const themeColor = f.color || '#00BFFF';
+      
+      const aegisMax = CONFIG.zeus?.aegisCooldown || 300;
+      const aegisTimer = f.aegisCooldown || 0;
+      const aegisPct = Math.max(0, Math.min(100, (1 - (aegisTimer / aegisMax)) * 100));
+      const aegisReady = aegisPct >= 99;
+
+      const stormMax = CONFIG.zeus?.stormCooldown || 900;
+      const stormTimer = f.stormCooldown !== undefined ? f.stormCooldown : stormMax;
+      let stormPct = 0;
+      let stormLabel = 'ULTIMATE STORM';
+      let stormReady = false;
+
+      if (f.isChargingStorm) {
+        const teleMax = CONFIG.zeus?.stormTelegraphFrames || 120;
+        stormPct = Math.max(0, Math.min(100, (1 - f.stormCooldown / teleMax) * 100));
+        stormLabel = 'CHARGING STORM';
+        stormReady = false;
+      } else if (f.stormActive) {
+        const durationMax = CONFIG.zeus?.stormDuration || 130;
+        stormPct = Math.max(0, Math.min(100, (f.stormTimer / durationMax) * 100));
+        stormLabel = 'STORM ACTIVE';
+        stormReady = false;
+      } else {
+        stormPct = Math.max(0, Math.min(100, (1 - (stormTimer / stormMax)) * 100));
+        stormReady = stormPct >= 99;
+        stormLabel = 'ULTIMATE STORM';
+      }
+
+      return [
+        { id: 'aegis', pct: aegisPct, ready: aegisReady, color: themeColor, label: 'AEGIS SHIELD' },
+        { id: 'storm', pct: stormPct, ready: stormReady, color: themeColor, label: stormLabel }
+      ];
+    }
+
     let current = 0;
     let max = 1;
     if (f.skillCooldown !== undefined) {
@@ -594,32 +726,16 @@ function updateHealthHud() {
     return [{ id: 'skill', pct: skillPct, ready: skillPct >= 99, color, label: ability.toUpperCase() }];
   };
 
-  const generateFighterSkillsHTML = (f, align) => {
-    const skills = getSkillDataForFighter(f);
-
-    return skills.map(s => `
-      <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}" data-skill-id="${s.id}" style="--skill-glow-color: ${s.color}; margin-top: 4px;">
-        <div class="hud-skill-box-fill" style="width: ${s.pct}%; background: ${s.color};"></div>
-        <div class="hud-skill-box-text" style="text-align: ${align};">${s.label}</div>
-      </div>
-    `).join('');
-  };
-
   const getAdditionalInfoForFighter = (f) => {
     const info = [];
     const baseDmg = Math.max(0, Number(f.damage) || 0);
-
-    // Speed calculation (for all fighters)
-    const baseSpeedVal = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
-    const currentSpeedVal = (f.speed !== undefined ? f.speed : baseSpeedVal) * (f.slowTimer > 0 ? f.slowMultiplier : 1.0);
-    const speedLine = `<b>Speed:</b> ${currentSpeedVal.toFixed(1)}`;
 
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
       
       if (f.domainActive && isRikaAlive) {
         const boostDmg = Math.round(baseDmg * ((CONFIG.yuta?.domainRikaDamageMultiplier || 2.0) - 1));
-        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg}`);
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>DMG:</b> ${baseDmg}`);
       }
@@ -630,9 +746,9 @@ function updateHealthHud() {
         const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.50;
         const domainRikaRegenMultiplier = CONFIG.yuta?.domainRikaRegenMultiplier || 1.2;
         if (isRikaAlive) {
-          info.push(`<b>Regen:</b> ${domainRctHealRate.toFixed(2)} * ${domainRikaRegenMultiplier.toFixed(2)}+`);
+          info.push(`<b>Regen:</b> ${domainRctHealRate.toFixed(2)} * ${domainRikaRegenMultiplier.toFixed(2)}+ <span style="color: #15803d; font-size: 10px;">▲</span>`);
         } else {
-          info.push(`<b>Regen:</b> ${domainRctHealRate.toFixed(2)}+`);
+          info.push(`<b>Regen:</b> ${domainRctHealRate.toFixed(2)}+ <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
       } else {
         const regen = CONFIG.yuta?.regenRate || 0.05;
@@ -646,22 +762,14 @@ function updateHealthHud() {
         if (f.soulSwapActive) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5));
         if (f.blackFlashTimer > 0) currentDmg = Math.round(currentDmg * (CONFIG.yuji?.blackFlashMultiplier || 1.5));
         const boost = currentDmg - punchBase;
-        info.push(`<b>DMG:</b> ${punchBase} + ${boost}`);
+        info.push(`<b>DMG:</b> ${punchBase} + ${boost} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>DMG:</b> ${punchBase}`);
       }
     } else {
       info.push(`<b>DMG:</b> ${baseDmg}`);
       
-      if (f.characterId === 'toji' || f.type === 'toji') {
-        let dodgeChance = CONFIG.toji?.stealthDodgeChance || 0.10;
-        if (f.ultimateActive) {
-          dodgeChance *= (CONFIG.toji?.ultimateDodgeMultiplier || 3.0);
-        }
-        const stealthDodgeVal = Math.round(dodgeChance * 100);
-        info.push(`<b>Dodge:</b> ${stealthDodgeVal}%`);
-        info.push(speedLine);
-      } else if (f.characterId === 'gojo' || f.type === 'gojo') {
+      if (f.characterId === 'gojo' || f.type === 'gojo') {
         const infinityCooldown = f.infinityCooldown || 0;
         const isLimitlessActive = (infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer || 0) > 0);
         if (isLimitlessActive) {
@@ -671,14 +779,14 @@ function updateHealthHud() {
         }
       } else if (f.characterId === 'layla' || f.type === 'layla') {
         if (f.powerStacks > 0) {
-          info.push(`<b>Power Stacks:</b> ${f.powerStacks}/${f.maxStacks || 10}`);
+          info.push(`<b>Power Stacks:</b> ${f.powerStacks}/${f.maxStacks || 10} <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
         if (f.isInUltimate) {
-          info.push(`<b>Ultimate:</b> Rapid Fire`);
+          info.push(`<b>Ultimate:</b> Rapid Fire <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
       } else if (f.characterId === 'todo' || f.type === 'todo') {
         if (f.blackFlashTimer > 0) {
-          info.push(`<b>The Zone:</b> 120% Potential`);
+          info.push(`<b>The Zone:</b> 120% Potential <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
       } else if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
         const baseChance = CONFIG.gunslinger?.critChance || 0.20;
@@ -703,38 +811,101 @@ function updateHealthHud() {
         
         info.push(`<b>Crit Rate:</b> ${critChanceStr}`);
         info.push(`<b>Crit DMG:</b> ${critMultStr}`);
+      } else if (f.characterId === 'toji' || f.type === 'toji') {
+        const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
+        const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
+        if (Math.abs(currentSpeed - baseSpeed) > 0.01) {
+          info.push(`<b>Speed:</b> ${currentSpeed.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Speed:</b> ${baseSpeed.toFixed(1)}`);
+        }
+        info.push(`<b>Dodge:</b> ${Math.round((CONFIG.toji?.stealthDodgeChance || 0.10) * 100)}%`);
+      } else if (f.characterId === 'cronos' || f.type === 'cronos') {
+        const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
+        const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
+        info.push(`<b>Speed:</b> ${currentSpeed.toFixed(1)}`);
+      } else if (f.characterId === 'musashi' || f.type === 'musashi') {
+        const stanceName = f.currentStance === 1 ? 'ICHI NO TACHI' : f.currentStance === 2 ? 'NI NO TACHI' : 'SAN NO TACHI';
+        info.push(`<b>Stance:</b> ${stanceName}`);
+      } else if (f.characterId === 'zeus' || f.type === 'zeus') {
+        if ((f.aegisTimer || 0) > 0) {
+          info.push(`<b>Aegis:</b> ACTIVE <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        }
+      } else if (f.characterId === 'dummy' || f.type === 'dummy') {
+        info.push(`<b>Stun Chance:</b> ${Math.round((CONFIG.dummy?.stunChance || 0.15) * 100)}%`);
+        const stunDir = f.stunDirection === 'left' ? '←' : f.stunDirection === 'right' ? '→' : f.stunDirection === 'up' ? '↑' : '–';
+        info.push(`<b>Stun Dir:</b> ${stunDir}`);
+      } else if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
+        if (f.gojoInfinityImmune) {
+          info.push(`<b>Adapt:</b> Infinity IMMUNE <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        }
+        info.push(`<b>Exposures:</b> ${f.gojoInfinityExposures || 0}/2`);
+      } else if (f.characterId === 'berserker' || f.type === 'berserker') {
+        const rage = Math.round((f.rage || 0) * 100);
+        const rageMax = Math.round((f.maxRage || 1) * 100);
+        info.push(`<b>Rage:</b> ${rage}/${rageMax}`);
+        if (f.isEnraged) {
+          info.push(`<b>ENRAGED:</b> Active <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        }
       }
     }
 
+    // Tick Damage
+    if (f.tickDamageTimer > 0 && f.tickDamage > 0) {
+      info.push(`<b>Tick DMG:</b> ${f.tickDamage}/tick <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+    }
+
     return info;
+  };
+
+  const generateFighterSkillsHTML = (f, align) => {
+    const skills = getSkillDataForFighter(f);
+    return skills.map(s => {
+      if (s.noFill) {
+        return `
+          <div class="hud-skill-box align-${align} label-only" data-skill-id="${s.id}" style="justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
+            <div class="hud-skill-box-fill" style="display: none;"></div>
+            <div class="hud-skill-box-text">${s.label}</div>
+          </div>
+        `;
+      }
+      const boxStyle = `--skill-glow-color: ${s.color}; margin-top: 4px;`;
+      const fillStyle = `width: ${Math.round(s.pct)}%; background: ${s.color};`;
+      return `
+        <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}" data-skill-id="${s.id}" style="${boxStyle}">
+          <div class="hud-skill-box-fill" style="${fillStyle}"></div>
+          <div class="hud-skill-box-text" style="text-align: ${align};">${s.label}</div>
+        </div>
+      `;
+    }).join('');
   };
 
   const generateFighterInfoHTML = (f) => {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>'));
     }
     if (info.length === 0) return '';
     
-    // Initialize tracking structures on fighter if not present
     if (!f._prevHudValues) {
       f._prevHudValues = {};
       f._hudGlowTimers = {};
     }
 
     const getLabelBoostArrow = (labelText, valStr, fighter) => {
-      // If valStr has explicit '+' or '*' signs, it is boosted!
+      if (valStr.includes('▲') || valStr.includes('▼')) {
+        return '';
+      }
       if (valStr.includes('+') || valStr.includes('*') || valStr.toLowerCase().includes('active') || valStr.toLowerCase().includes('boost') || valStr.toLowerCase().includes('potential') || valStr.toLowerCase().includes('fire')) {
         return ' <span style="color: #16a34a; font-size: 10px;">▲</span>';
       }
 
-      // Parse base/current numerical values for comparison
       const numVal = parseFloat(valStr.replace(/[^\d.]/g, ''));
       if (isNaN(numVal)) return '';
 
       let baseVal = null;
-      if (labelText === 'Speed') {
+      if (labelText === 'Speed' || labelText === 'SPD') {
         baseVal = (fighter.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
       } else if (labelText === 'DMG') {
         baseVal = fighter._def?.damage || (fighter.fighterIndex !== undefined && FIGHTER_DEFS[fighter.fighterIndex]?.damage) || 10;
@@ -746,6 +917,8 @@ function updateHealthHud() {
         baseVal = fighter._def?.type === 'yuta' ? (CONFIG.yuta?.regenRate || 0.05) : 0.05;
       } else if (labelText === 'Dodge') {
         baseVal = (CONFIG.toji?.stealthDodgeChance || 0.10) * 100;
+      } else if (labelText === 'Stun Chance') {
+        baseVal = (CONFIG.zeus?.baseStunChance || 0.10) * 100;
       }
 
       if (baseVal !== null) {
@@ -765,7 +938,6 @@ function updateHealthHud() {
     };
     
     const linesHTML = info.map(line => {
-      // Find the label text inside <b>...</b>
       let labelText = '';
       const labelStart = line.indexOf('<b>');
       const labelEnd = line.indexOf('</b>');
@@ -804,7 +976,6 @@ function updateHealthHud() {
           if (!isNaN(prevNum) && !isNaN(currNum) && prevNum !== currNum) {
             isIncrease = currNum > prevNum;
           } else {
-            // String deactivation checks
             if (textOnlyVal.includes('CD') || prevVal.includes('Active')) {
               isIncrease = false;
             }
@@ -813,10 +984,8 @@ function updateHealthHud() {
           f._hudGlowTimers[labelText] = isIncrease ? 45 : -45;
         }
         
-        // Save current value
         f._prevHudValues[labelText] = textOnlyVal;
         
-        // Tick timer towards 0
         const timer = f._hudGlowTimers[labelText] || 0;
         if (timer > 0) f._hudGlowTimers[labelText]--;
         else if (timer < 0) f._hudGlowTimers[labelText]++;
@@ -848,46 +1017,49 @@ function updateHealthHud() {
     `;
   };
 
+  // Hoisted to updateHealthHud scope so both buildCard and in-place updates can use it.
+  const getGlowStyles = (f) => {
+    if (!f) return { glowStyle: '', glowClass: '', boxShadow: '', filter: '', className: 'health-card__fill' };
+    // NOTE: fighter._tickCooldowns() already decrements these once per simulation frame;
+    // just read them here instead of re-deriving/decrementing (was double-decaying the glow).
+    const hitTimer = f._healthBarHitTimer || 0;
+    const healTimer = f._healthBarHealTimer || 0;
+
+    if (hitTimer > 0) {
+      const alpha = (hitTimer / 14).toFixed(2);
+      const intensity = (1 + 0.35 * (hitTimer / 14)).toFixed(2);
+      return {
+        glowStyle: `box-shadow: 0 0 14px 2px rgba(255, 30, 30, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha}); filter: brightness(${intensity});`,
+        glowClass: ' hit-glow',
+        boxShadow: `0 0 14px 2px rgba(255, 30, 30, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha})`,
+        filter: `brightness(${intensity})`,
+        className: 'health-card__fill hit-glow'
+      };
+    } else if (healTimer > 0) {
+      const alpha = (healTimer / 14).toFixed(2);
+      const intensity = (1 + 0.35 * (healTimer / 14)).toFixed(2);
+      return {
+        glowStyle: `box-shadow: 0 0 14px 2px rgba(34, 197, 94, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha}); filter: brightness(${intensity});`,
+        glowClass: ' heal-glow',
+        boxShadow: `0 0 14px 2px rgba(34, 197, 94, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha})`,
+        filter: `brightness(${intensity})`,
+        className: 'health-card__fill heal-glow'
+      };
+    }
+    return {
+      glowStyle: '',
+      glowClass: '',
+      boxShadow: '',
+      filter: '',
+      className: 'health-card__fill'
+    };
+  };
+
   const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left' }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
     const shakeStyle = shakeTimer > 0 ? `transform: translateX(${shakeAmount}px);` : '';
-    // Winner effect - no glow
     const winnerStyle = '';
-
-    const getGlowStyles = (f) => {
-      if (!f) return { glowStyle: '', glowClass: '' };
-      if (f._lastHp === undefined) {
-        f._lastHp = f.hp;
-      } else {
-        const delta = f.hp - f._lastHp;
-        if (delta < -0.1) f._healthBarHitTimer = 14;
-        else if (delta > 0.1) f._healthBarHealTimer = 14;
-        f._lastHp = f.hp;
-      }
-      if (f._healthBarHitTimer > 0) f._healthBarHitTimer--;
-      if (f._healthBarHealTimer > 0) f._healthBarHealTimer--;
-
-      const hitTimer = f._healthBarHitTimer || 0;
-      const healTimer = f._healthBarHealTimer || 0;
-
-      if (hitTimer > 0) {
-        const alpha = (hitTimer / 14).toFixed(2);
-        const intensity = (1 + 0.35 * (hitTimer / 14)).toFixed(2);
-        return {
-          glowStyle: `box-shadow: 0 0 14px 2px rgba(255, 30, 30, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha}); filter: brightness(${intensity});`,
-          glowClass: ' hit-glow'
-        };
-      } else if (healTimer > 0) {
-        const alpha = (healTimer / 14).toFixed(2);
-        const intensity = (1 + 0.35 * (healTimer / 14)).toFixed(2);
-        return {
-          glowStyle: `box-shadow: 0 0 14px 2px rgba(34, 197, 94, ${alpha}), inset 0 0 8px 2px rgba(255, 255, 255, ${alpha}); filter: brightness(${intensity});`,
-          glowClass: ' heal-glow'
-        };
-      }
-      return { glowStyle: '', glowClass: '' };
-    };
 
     let barsHTML = '';
     if (members && members.length > 0) {
@@ -895,14 +1067,13 @@ function updateHealthHud() {
         const ratio = m.maxHp > 0 ? Math.max(0, Number(m.hp) / Number(m.maxHp)) : 0;
         const percent = Math.round(ratio * 100);
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
-        const { glowStyle, glowClass } = getGlowStyles(m);
-        const fillStyle = `width:${percent}%; background:${barColor}; ${glowStyle}`;
+        const { className } = getGlowStyles(m);
         const hpText = `${Math.floor(Math.max(0, Number(m.hp) || 0))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
         return `
           <div class="health-card__member" style="margin-top: 6px;">
             <div style="font-size: 12px; margin-bottom: 4px; color: ${CONFIG.hudTextColor}; font-weight: bold;">${m.name || ('PLAYER ' + (state.fighters.indexOf(m) + 1))}</div>
-            <div class="health-card__bar${glowClass}">
-              <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
+            <div class="health-card__bar">
+              <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             </div>
           </div>
@@ -911,8 +1082,7 @@ function updateHealthHud() {
     } else {
       const percent = Math.round(safeRatio * 100);
       const barColor = safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444';
-      const { glowStyle, glowClass } = getGlowStyles(targetFighter);
-      const fillStyle = `width:${percent}%; background:${barColor}; ${glowStyle}`;
+      const { className } = getGlowStyles(targetFighter);
       
       const isDummy = targetFighter && (targetFighter.characterId === 'dummy' || targetFighter.type === 'dummy');
       const showDescription = CONFIG.hudShowFighterDescription || isDummy;
@@ -920,8 +1090,8 @@ function updateHealthHud() {
       const infoHTML = targetFighter ? generateFighterInfoHTML(targetFighter) : '';
 
       barsHTML = `
-        <div class="health-card__bar${glowClass}">
-          <div class="health-card__fill${glowClass}" style="${fillStyle}"></div>
+        <div class="health-card__bar">
+          <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
           <span class="health-card__bar-text">${metaValue}</span>
         </div>
         ${showDescription ? `
@@ -938,7 +1108,6 @@ function updateHealthHud() {
       `;
     }
 
-    // Auto-scale title font size for long names
     const baseFontSize = extraClass.includes('ffa-card') ? 13 : (CONFIG.hudTitleFontSize || 20);
     const maxChars = extraClass.includes('ffa-card') ? 10 : 12;
     const minFontSize = 9;
@@ -949,119 +1118,334 @@ function updateHealthHud() {
     const titleStyle = `font-size:${titleFontSize}px;`;
     const nameColor = CONFIG.hudTextColor || '#888888';
 
-    // Generate victory bullets (filled bullets for wins)
     const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
       const filled = i < wins;
-      return `<span class="health-card__win-bullet" style="background: ${filled ? '#ffd700' : 'rgba(0,0,0,0.2)'}; ${filled ? 'box-shadow: 0 0 6px rgba(255,215,0,0.6);' : ''}"></span>`;
+      return `<span class="health-card__win-bullet${filled ? ' filled' : ''}"></span>`;
     }).join('');
+
+    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 6px; align-items: center;">${winsBullets}</div>` : '';
+
+    const headerRowHTML = `
+      <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 6px;">
+        ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; font-weight: bold; margin: 0; text-align: ${titleAlign};">${title}</div>` : ''}
+        ${winsHTML}
+      </div>
+    `;
 
     return `
       <div class="health-card" style="${shakeStyle}${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
-        ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; display: block; margin-bottom: 2px; font-weight: bold; text-align: ${titleAlign};">${title}</div>` : ''}
-        ${maxBullets > 0 ? `<div class="health-card__wins" style="margin: 4px 0 6px; display: flex; gap: 6px; justify-content: ${titleAlign === 'right' ? 'flex-end' : 'flex-start'};">${winsBullets}</div>` : ''}
+        ${headerRowHTML}
         ${barsHTML}
       </div>
     `;
   };
 
-  if (teamMode) {
-    const teamLabels = is1v2 ? [
-      { title: '', color: '#ff4d4d', indexes: [0], key: 'red' },
-      { title: '', color: '#4da3ff', indexes: [1, 2], key: 'blue' },
-    ] : [
-      { title: 'RED TEAM', color: '#ff4d4d', indexes: [0, 1], key: 'red' },
-      { title: 'BLUE TEAM', color: '#4da3ff', indexes: [2, 3], key: 'blue' },
-    ];
+  const isCacheEmpty = teamMode ? (_hudCache.teams.size === 0) : (_hudCache.fighters.size === 0);
 
-    teamLabels.forEach((team, teamIndex) => {
-      const members = team.indexes.map((fighterIndex) => fighters[fighterIndex]).filter(Boolean);
-      const shakeTimer = members.reduce((max, fighter) => Math.max(max, fighter._healthBarShakeTimer || 0), 0);
-      const isWinner = state.roundWinner && team.indexes.some(idx => fighters[idx] === state.roundWinner);
+  if (isCacheEmpty) {
+    if (containerBottom) containerBottom.innerHTML = '';
+    if (containerLeft) containerLeft.innerHTML = '';
+    if (containerRight) containerRight.innerHTML = '';
 
-      const cardHTML = buildCard({
-        title: team.title,
-        scoreText: `${teamScores[teamIndex] || 0} WINS`,
-        fillColor: team.color,
-        members: members,
-        extraClass: team.key,
-        shakeTimer,
-        isWinner: isWinner,
-        borderColor: isWinner ? '#ffd700' : null,
-        kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
-        maxBullets: is1v2 ? 0 : 3,
-        titleAlign: teamIndex === 0 ? 'left' : 'right'
+    if (teamMode) {
+      const teamLabels = is1v2 ? [
+        { title: '', color: '#ff4d4d', indexes: [0], key: 'red' },
+        { title: '', color: '#4da3ff', indexes: [1, 2], key: 'blue' },
+      ] : [
+        { title: 'RED TEAM', color: '#ff4d4d', indexes: [0, 1], key: 'red' },
+        { title: 'BLUE TEAM', color: '#4da3ff', indexes: [2, 3], key: 'blue' },
+      ];
+
+      teamLabels.forEach((team, teamIndex) => {
+        const members = team.indexes.map((fighterIndex) => fighters[fighterIndex]).filter(Boolean);
+        const shakeTimer = members.reduce((max, fighter) => Math.max(max, fighter._healthBarShakeTimer || 0), 0);
+        const isWinner = state.roundWinner && team.indexes.some(idx => fighters[idx] === state.roundWinner);
+
+        const cardHTML = buildCard({
+          title: team.title,
+          scoreText: `${teamScores[teamIndex] || 0} WINS`,
+          fillColor: team.color,
+          members: members,
+          extraClass: team.key,
+          shakeTimer,
+          isWinner: isWinner,
+          borderColor: isWinner ? '#ffd700' : null,
+          kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
+          maxBullets: is1v2 ? 0 : 3,
+          titleAlign: teamIndex === 0 ? 'left' : 'right'
+        });
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cardHTML;
+        const cardElement = tempDiv.firstElementChild;
+        containerBottom.appendChild(cardElement);
+
+        const cachedMembers = [];
+        cardElement.querySelectorAll('.health-card__member').forEach((memberEl, i) => {
+          const fill = memberEl.querySelector('.health-card__fill');
+          const text = memberEl.querySelector('.health-card__bar-text');
+          const bar = memberEl.querySelector('.health-card__bar');
+          cachedMembers.push({ fill, text, bar, fighter: members[i] });
+        });
+
+        _hudCache.teams.set(teamIndex, {
+          cardElement,
+          members: cachedMembers
+        });
       });
-      cardsBottom.push(cardHTML);
+    } else {
+      fighters.forEach((fighter, index) => {
+        if (!fighter || fighter.isTurret) return;
+        const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
+        const color = fighter.color || '#fff';
+        const fighterName = fighter.name || `FIGHTER ${index + 1}`;
+        const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
+        const careerWins = fighterStats.wins;
+        const losses = fighterStats.losses;
+        const totalGames = careerWins + losses;
+        const winRate = totalGames > 0 ? Math.round((careerWins / totalGames) * 100) : 0;
+        const fighterDef = fighter.fighterIndex !== undefined ? FIGHTER_DEFS[fighter.fighterIndex] : null;
+        const shakeTimer = fighter._healthBarShakeTimer || 0;
+        const matchWins = scores[index] || 0;
+
+        let cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
+        if (fighterDef && fighterDef.type === 'dummy') {
+          const checkedStr = state.dummyAggressive ? 'checked' : '';
+          cardDesc = `
+              <div class="dummy-aggressive-toggle" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); cursor: pointer; pointer-events: auto;">
+                <span style="font-weight: bold; font-size: 11px; color: ${state.dummyAggressive ? '#ef4444' : '#aaa'}; pointer-events: none;">AGGRESSIVE MODE</span>
+                <label style="position: relative; display: inline-block; width: 34px; height: 18px; pointer-events: none;">
+                  <input type="checkbox" ${checkedStr} style="opacity: 0; width: 0; height: 0;">
+                  <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: ${state.dummyAggressive ? '#ef4444' : '#555'}; border-radius: 18px; transition: .2s;">
+                    <span style="position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; border-radius: 50%; transition: .2s; transform: ${state.dummyAggressive ? 'translateX(16px)' : 'none'};"></span>
+                  </span>
+                </label>
+              </div>
+            `;
+        }
+
+        const cardHTML = buildCard({
+          title: fighterName,
+          scoreText: totalGames > 0 ? `${winRate}% WR` : '',
+          fillColor: color,
+          fillRatio: ratio,
+          metaLabel: `DMG: ${Math.max(0, Number(fighter.damage) || 0)}`,
+          metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`,
+          extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : '',
+          borderColor: color,
+          wins: matchWins,
+          fighterColor: color,
+          shakeTimer,
+          isWinner: fighter === state.roundWinner,
+          description: cardDesc,
+          kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
+          maxBullets: mode === GAME_MODES.STAND_OFF ? 0 : 2,
+          targetFighter: fighter,
+          titleAlign: (mode === GAME_MODES.FFA) ? 'left' : (index % 2 === 0 ? 'left' : 'right')
+        });
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = cardHTML;
+        const cardElement = tempDiv.firstElementChild;
+
+        if (mode === GAME_MODES.FFA || mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'TLFS') {
+          containerBottom.appendChild(cardElement);
+        } else if (index % 2 === 0) {
+          containerLeft.appendChild(cardElement);
+        } else {
+          containerRight.appendChild(cardElement);
+        }
+
+        const hpBarFill = cardElement.querySelector('.health-card__fill');
+        const hpBarText = cardElement.querySelector('.health-card__bar-text');
+        const winBullets = Array.from(cardElement.querySelectorAll('.health-card__win-bullet'));
+        const infoContainer = cardElement.querySelector('.health-card__info');
+        const checkbox = cardElement.querySelector('input[type="checkbox"]');
+
+        const skillBars = new Map();
+        cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
+          const id = box.getAttribute('data-skill-id');
+          const fill = box.querySelector('.hud-skill-box-fill');
+          const text = box.querySelector('.hud-skill-box-text');
+          skillBars.set(id, { box, fill, text });
+        });
+
+        _hudCache.fighters.set(fighter, {
+          cardElement,
+          hpBarFill,
+          hpBarText,
+          winBullets,
+          infoContainer,
+          checkbox,
+          skillBars,
+          lastInfoHTML: ''
+        });
+      });
+    }
+  }
+
+  if (teamMode) {
+    _hudCache.teams.forEach((cachedCard, teamIndex) => {
+      cachedCard.members.forEach((m) => {
+        const fighter = m.fighter;
+        if (!fighter) return;
+
+        const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
+        const percent = Math.round(ratio * 100);
+        const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
+        const glow = getGlowStyles(fighter);
+        
+        m.fill.style.width = `${percent}%`;
+        m.fill.style.background = barColor;
+        m.fill.style.boxShadow = glow.boxShadow || '';
+        m.fill.style.filter = glow.filter || '';
+        m.fill.className = glow.className || 'health-card__fill';
+        
+        if (m.bar) {
+          m.bar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+        }
+
+        const hpText = `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
+        m.text.textContent = hpText;
+      });
+
+      const members = cachedCard.members.map(m => m.fighter).filter(Boolean);
+      const shakeTimer = members.reduce((max, fighter) => Math.max(max, fighter._healthBarShakeTimer || 0), 0);
+      const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
+      cachedCard.cardElement.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
     });
   } else {
     fighters.forEach((fighter, index) => {
       if (!fighter || fighter.isTurret) return;
-      const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
-      const color = fighter.color || '#fff';
-      const fighterName = fighter.name || `FIGHTER ${index + 1}`;
-      const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
-      const careerWins = fighterStats.wins;
-      const losses = fighterStats.losses;
-      const totalGames = careerWins + losses;
-      const winRate = totalGames > 0 ? Math.round((careerWins / totalGames) * 100) : 0;
-      const fighterDef = fighter.fighterIndex !== undefined ? FIGHTER_DEFS[fighter.fighterIndex] : null;
-      const className = fighterDef ? fighterDef.type.toUpperCase() : '';
-      const shakeTimer = fighter._healthBarShakeTimer || 0;
-      const matchWins = scores[index] || 0;
+      const cachedCard = _hudCache.fighters.get(fighter);
+      if (!cachedCard) return;
 
-      let cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
-      if (fighterDef && fighterDef.type === 'dummy') {
-        const checkedStr = state.dummyAggressive ? 'checked' : '';
-        cardDesc = `
-            <div class="dummy-aggressive-toggle" style="display: flex; align-items: center; justify-content: space-between; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.15); cursor: pointer; pointer-events: auto;">
-              <span style="font-weight: bold; font-size: 11px; color: ${state.dummyAggressive ? '#ef4444' : '#aaa'}; pointer-events: none;">AGGRESSIVE MODE</span>
-              <label style="position: relative; display: inline-block; width: 34px; height: 18px; pointer-events: none;">
-                <input type="checkbox" ${checkedStr} style="opacity: 0; width: 0; height: 0;">
-                <span style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; background-color: ${state.dummyAggressive ? '#ef4444' : '#555'}; border-radius: 18px; transition: .2s;">
-                  <span style="position: absolute; height: 14px; width: 14px; left: 2px; bottom: 2px; background-color: white; border-radius: 50%; transition: .2s; transform: ${state.dummyAggressive ? 'translateX(16px)' : 'none'};"></span>
-                </span>
-              </label>
-            </div>
-          `;
+      const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
+      const percent = Math.round(ratio * 100);
+      const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
+      const glow = getGlowStyles(fighter);
+
+      if (cachedCard.hpBarFill) {
+        cachedCard.hpBarFill.style.width = `${percent}%`;
+        cachedCard.hpBarFill.style.background = barColor;
+        cachedCard.hpBarFill.style.boxShadow = glow.boxShadow || '';
+        cachedCard.hpBarFill.style.filter = glow.filter || '';
+        cachedCard.hpBarFill.className = glow.className || 'health-card__fill';
+        
+        const parentBar = cachedCard.hpBarFill.parentElement;
+        if (parentBar) {
+          parentBar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+        }
       }
 
-      const cardHTML = buildCard({
-        title: fighterName,
-        scoreText: totalGames > 0 ? `${winRate}% WR` : '',
-        fillColor: color,
-        fillRatio: ratio,
-        metaLabel: `DMG: ${Math.max(0, Number(fighter.damage) || 0)}`,
-        metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`,
-        extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : '',
-        borderColor: color,
-        wins: matchWins,
-        fighterColor: color,
-        shakeTimer,
-        isWinner: fighter === state.roundWinner,
-        description: cardDesc,
-        kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
-        maxBullets: mode === GAME_MODES.STAND_OFF ? 0 : 2,
-        targetFighter: fighter,
-        titleAlign: (mode === GAME_MODES.FFA) ? 'left' : (index % 2 === 0 ? 'left' : 'right')
+      if (cachedCard.hpBarText) {
+        const metaValue = `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
+        cachedCard.hpBarText.textContent = metaValue;
+      }
+
+      const shakeTimer = fighter._healthBarShakeTimer || 0;
+      const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
+      cachedCard.cardElement.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
+
+      // 3. Wins bullets
+      const matchWins = scores[index] || 0;
+      cachedCard.winBullets.forEach((bullet, i) => {
+        const filled = i < matchWins;
+        if (filled) {
+          bullet.classList.add('filled');
+          bullet.style.background = fighter.color || '#ffd700';
+        } else {
+          bullet.classList.remove('filled');
+          bullet.style.background = '';
+        }
       });
 
-      if (mode === GAME_MODES.FFA || mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'TLFS') {
-        cardsBottom.push(cardHTML);
-      } else if (index % 2 === 0) {
-        cardsLeft.push(cardHTML);
-      } else {
-        cardsRight.push(cardHTML);
+      // 4. Skills updates (Optimized: Dirty-check variables and remove inline style resets to completely prevent layout reflows)
+      const isDummy = fighter.characterId === 'dummy' || fighter.type === 'dummy';
+      const showDescription = CONFIG.hudShowFighterDescription || isDummy;
+
+      if (!showDescription && cachedCard.skillBars.size > 0) {
+        const skills = getSkillDataForFighter(fighter);
+        skills.forEach(s => {
+          const cachedSkill = cachedCard.skillBars.get(s.id);
+          if (cachedSkill) {
+            const roundedPct = Math.round(s.pct);
+            const isReady = !!s.ready;
+
+            if (s.noFill) {
+              if (cachedSkill.lastDisplay !== 'none') {
+                cachedSkill.fill.style.display = 'none';
+                cachedSkill.lastDisplay = 'none';
+              }
+              if (!cachedSkill.lastLabelOnly) {
+                cachedSkill.box.classList.add('label-only');
+                cachedSkill.lastLabelOnly = true;
+              }
+              if (cachedSkill.lastLabel !== s.label) {
+                cachedSkill.text.innerHTML = s.label;
+                cachedSkill.lastLabel = s.label;
+              }
+            } else {
+              if (cachedSkill.lastDisplay !== 'block') {
+                cachedSkill.fill.style.display = 'block';
+                cachedSkill.lastDisplay = 'block';
+              }
+              if (cachedSkill.lastPct !== roundedPct) {
+                cachedSkill.fill.style.width = `${roundedPct}%`;
+                cachedSkill.lastPct = roundedPct;
+              }
+              if (cachedSkill.lastColor !== s.color) {
+                cachedSkill.fill.style.background = s.color;
+                cachedSkill.lastColor = s.color;
+              }
+              if (cachedSkill.lastLabelOnly) {
+                cachedSkill.box.classList.remove('label-only');
+                cachedSkill.lastLabelOnly = false;
+              }
+              if (cachedSkill.lastLabel !== s.label) {
+                cachedSkill.text.textContent = s.label;
+                cachedSkill.lastLabel = s.label;
+              }
+            }
+
+            if (cachedSkill.lastReady !== isReady) {
+              if (isReady) {
+                cachedSkill.box.classList.add('hud-skill-ready');
+              } else {
+                cachedSkill.box.classList.remove('hud-skill-ready');
+              }
+              cachedSkill.lastReady = isReady;
+            }
+          }
+        });
+      }
+
+      // 5. Additional Info (stats) — only write to DOM if text changed
+      if (cachedCard.infoContainer) {
+        const infoHTML = generateFighterInfoHTML(fighter);
+        if (cachedCard.lastInfoHTML !== infoHTML) {
+          cachedCard.infoContainer.innerHTML = infoHTML;
+          cachedCard.lastInfoHTML = infoHTML;
+        }
+      }
+
+      // 6. Checkbox / Aggressive mode toggle for dummy
+      if (isDummy && cachedCard.checkbox) {
+        cachedCard.checkbox.checked = state.dummyAggressive;
+        const slider = cachedCard.checkbox.nextElementSibling;
+        if (slider) {
+          slider.style.backgroundColor = state.dummyAggressive ? '#ef4444' : '#555';
+          const knob = slider.firstElementChild;
+          if (knob) {
+            knob.style.transform = state.dummyAggressive ? 'translateX(16px)' : 'none';
+          }
+        }
+        const toggleLabel = cachedCard.checkbox.closest('.dummy-aggressive-toggle')?.firstElementChild;
+        if (toggleLabel) {
+          toggleLabel.style.color = state.dummyAggressive ? '#ef4444' : '#aaa';
+        }
       }
     });
   }
-
-  const leftHTML = cardsLeft.join('');
-  if (containerLeft && containerLeft.innerHTML !== leftHTML) containerLeft.innerHTML = leftHTML;
-
-  const rightHTML = cardsRight.join('');
-  if (containerRight && containerRight.innerHTML !== rightHTML) containerRight.innerHTML = rightHTML;
-
-  const bottomHTML = cardsBottom.join('');
-  if (containerBottom && containerBottom.innerHTML !== bottomHTML) containerBottom.innerHTML = bottomHTML;
 }
 

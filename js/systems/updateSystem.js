@@ -18,16 +18,17 @@ import { FRAME_TIME } from './gameLoop.js';
 export function updateGame() {
     // Update Logic based on state
     if (state.gameState === 'countdown') {
-      // Countdown timer - increment until duration reached
-      state.countdownTimer++;
-      // Update fighters during countdown to aim guns at opponents
-      updateFighters();
-      // Update flame particle system
-      const dt = Math.min(FRAME_TIME / 1000, 0.1);
-      flamewardenFlameSystem.update(dt);
-
-      if (state.countdownTimer >= state.countdownDuration) {
+      const isAnnouncerPlaying = state.announcerPlayingSequence;
+      
+      if (isAnnouncerPlaying) {
+        // Update fighters during countdown to aim guns at opponents
+        updateFighters();
+        // Update flame particle system
+        const dt = Math.min(FRAME_TIME / 1000, 0.1);
+        flamewardenFlameSystem.update(dt);
+      } else {
         state.gameState = 'playing';
+        state.countdownTimer = state.countdownDuration; // Ensure countdown HUD clears/completes
         // Instant Battle Start Readiness: Clear initial spawn cooldowns so fighters attack & engage immediately when GO! hits!
         if (state.fighters) {
           state.fighters.forEach(f => {
@@ -38,6 +39,26 @@ export function updateGame() {
               f.forcedMeleeTimer = 0;
               f.hitStunTimer = 0;
               f.knockbackStunTimer = 0;
+
+              // Intro Wall Rebound: Push Gojo/Sukuna away from center to bounce off walls
+              const isGojoOrSukuna = f._def && (f._def.type === 'gojo' || f._def.type === 'sukuna');
+              if (isGojoOrSukuna) {
+                f.introReboundActive = true;
+                f.introReboundTimer = 18;
+                
+                const arena = state.arena;
+                const centerX = arena.x + arena.width / 2;
+                const centerY = arena.y + arena.height / 2;
+                
+                // Base angle away from the center of the arena
+                const baseAngle = Math.atan2(f.y - centerY, f.x - centerX);
+                // Add a random diagonal spread (up to +/- 45 degrees)
+                const randomSpread = (Math.random() - 0.5) * (Math.PI * 0.5);
+                const pushAngle = baseAngle + randomSpread;
+                
+                f.vx = Math.cos(pushAngle) * 35; // Kick back at high velocity diagonally
+                f.vy = Math.sin(pushAngle) * 35;
+              }
             }
           });
         }

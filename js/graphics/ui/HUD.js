@@ -213,10 +213,35 @@ function drawPauseScreen() {
 
 function drawCountdown() {
   drawHUD();
-  const { ctx, canvas, countdownTimer, countdownDuration } = state;
+  const { ctx, canvas, countdownTimer, countdownDuration, announcerPlayingSequence, announcerSubtitle } = state;
 
   const cx = state.arena.x + state.arena.width / 2;
   const cy = state.arena.y + state.arena.height / 2;
+
+  if (announcerPlayingSequence) {
+    if (announcerSubtitle) {
+      ctx.save();
+      // Use "Architects Daughter" if text contains numbers, otherwise use "Glast Blitch"
+      const hasNumber = /\d/.test(announcerSubtitle);
+      ctx.font = hasNumber ? 'bold 36px "Architects Daughter", Arial' : 'bold 38px "Glast Blitch", Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      
+      const subY = cy + 120;
+      
+      // Draw subtitle stroke outline
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 5;
+      ctx.strokeText(announcerSubtitle, cx, subY);
+      
+      // Draw subtitle fill
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillText(announcerSubtitle, cx, subY);
+      
+      ctx.restore();
+    }
+    return;
+  }
 
   // Calculate remaining time (in seconds)
   const remainingFrames = countdownDuration - countdownTimer;

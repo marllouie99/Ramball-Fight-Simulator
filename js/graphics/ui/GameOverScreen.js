@@ -25,10 +25,10 @@ function drawRoundEndScreen() {
   // Smooth fade-in effect (only after delay)
   const fadeAlpha = Math.min(0.96, (delayedTimer / 60) * 0.96);
   ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
-  ctx.fillRect(arena.x, arena.y, arena.width, arena.height);
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const cx = state.arena.x + state.arena.width / 2;
-  const cy = state.arena.y + state.arena.height / 2;
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
 
   // Check if winner has 2 victories (match win condition)
   const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
@@ -55,14 +55,27 @@ function drawRoundEndScreen() {
   const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || showModel;
 
   if (!isChampionReveal) {
-    ctx.font = 'bold 28px Arial';
-    ctx.textAlign = 'center';
-    ctx.fillText(winnerText, cx, cy - 10);
+    const textFadeAlpha = Math.min(1.0, delayedTimer / 30);
+    if (textFadeAlpha > 0) {
+      ctx.save();
+      ctx.globalAlpha = textFadeAlpha;
+      
+      // Slight vertical slide-up for a silky smooth entry
+      const yOffset = (1 - textFadeAlpha) * 10;
+      const textY = cy - 10 + yOffset;
 
-    ctx.fillStyle = '#aaa';
-    ctx.font = '16px Arial';
-    if (Math.floor(Date.now() / 500) % 2 === 0) {
-      ctx.fillText(``, cx, cy + 25);
+      // Choose font based on numerical character detection
+      const hasNumber = /\d/.test(winnerText);
+      ctx.font = hasNumber ? 'bold 36px "Architects Daughter", Arial' : 'bold 38px "Glast Blitch", Arial';
+      ctx.textAlign = 'center';
+      
+      // Draw outline for premium visibility
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 6;
+      ctx.strokeText(winnerText, cx, textY);
+      ctx.fillText(winnerText, cx, textY);
+
+      ctx.restore();
     }
   }
 
@@ -126,7 +139,10 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.draw(ctx, null);
   ctx.restore();
 
+  const textFadeAlpha = Math.min(1.0, timer / 30);
+
   ctx.save();
+  ctx.globalAlpha = textFadeAlpha;
   ctx.font = 'bold 28px Arial';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'bottom';
@@ -137,13 +153,21 @@ function drawWinnerReveal(winner, timer, mode) {
   ctx.fillText('WINNER', cx, cy - 116);
   ctx.restore();
 
+  ctx.save();
+  ctx.globalAlpha = textFadeAlpha;
   ctx.font = '32px "Glast Blitch", Arial';
+  ctx.textAlign = 'center';
   ctx.textBaseline = 'top';
+  ctx.fillStyle = winner.color || '#fff';
   ctx.fillText(winner.name.toUpperCase(), cx, cy + winner.r * scale + 18);
+  ctx.restore();
 
   const isDuelMode = mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off';
   if (isDuelMode) {
+    ctx.save();
+    ctx.globalAlpha = textFadeAlpha;
     drawWinnerStats(ctx, cx, cy + winner.r * scale + 50, winner);
+    ctx.restore();
   }
 }
 

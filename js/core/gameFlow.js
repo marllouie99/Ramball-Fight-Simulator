@@ -1,4 +1,4 @@
-import { stopAllSounds, stopAllLoopingSounds, preloadSound } from '../systems/soundSystem.js';
+import { stopAllSounds, stopAllLoopingSounds, preloadSound, stopSound } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // GAME FLOW — State transitions and round management
 // Extracted from main.js so that ui.js can import these without
@@ -16,6 +16,7 @@ import { getAnnouncerSoundPaths, getAnnouncerSound } from '../soundEffects/annou
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { clearAllPools } from '../graphics/objectPool.js';
+import { clearHealthHud } from '../graphics/hudManager.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -75,7 +76,92 @@ export function resetFighter(fighter) {
   fighter.reset();
 }
 
-export function reinitFighters() {
+export function reinitFighters(isNewMatch = false) {
+  // Save progressive properties of the current fighters if it's 1v1 mode
+  const savedStates = [];
+  const is1v1 = !isNewMatch && (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE);
+  if (is1v1 && state.fighters && state.fighters.length > 0) {
+    state.fighters.forEach((f, idx) => {
+      if (f) {
+        savedStates[idx] = {
+          // Cooldowns
+          shootCooldown: f.shootCooldown,
+          skillCooldown: f.skillCooldown,
+          cooldownTimer: f.cooldownTimer,
+          stolenSkillCooldown: f.stolenSkillCooldown,
+          boogieWoogieCooldown: f.boogieWoogieCooldown,
+          boogieWoogieCharges: f.boogieWoogieCharges,
+          comboRushCooldown: f.comboRushCooldown,
+          rockThrowCooldown: f.rockThrowCooldown,
+          divineFlameCooldown: f.divineFlameCooldown,
+          cleaveCooldown: f.cleaveCooldown,
+          shoutCooldown: f.shoutCooldown,
+          destructionBarrageCooldown: f.destructionBarrageCooldown,
+          voidDashCooldown: f.voidDashCooldown,
+          maleficBombCooldown: f.maleficBombCooldown,
+          ultimateCooldown: f.ultimateCooldown,
+          aegisCooldown: f.aegisCooldown,
+          stormCooldown: f.stormCooldown,
+          sphereCooldown: f.sphereCooldown,
+          flurryCooldown: f.flurryCooldown,
+          swordCooldown: f.swordCooldown,
+          c4Cooldown: f.c4Cooldown,
+          telekinesisCooldown: f.telekinesisCooldown,
+          spellStealCooldown: f.spellStealCooldown,
+
+          // Progressive/Passive stats
+          stunChance: f.stunChance,
+          baseStunChance: f.baseStunChance,
+          critChance: f.critChance,
+          critMultiplier: f.critMultiplier,
+          powerStacks: f.powerStacks,
+          blackFlashCharge: f.blackFlashCharge,
+          blackFlashThreshold: f.blackFlashThreshold,
+          hasSummonedAt50Hp: f.hasSummonedAt50Hp,
+          gojoInfinityImmune: f.gojoInfinityImmune,
+          parryCount: f.parryCount,
+          soulSwapActive: f.soulSwapActive,
+          hasSoulSwapped: f.hasSoulSwapped,
+          
+          // Mahoraga adaptation wheel rules
+          adapted: f.adapted ? { ...f.adapted } : undefined,
+          adaptedTypes: f.adaptedTypes ? new Set(f.adaptedTypes) : undefined,
+          adaptationProgress: f.adaptationProgress ? { ...f.adaptationProgress } : undefined,
+          adaptationStages: f.adaptationStages ? { ...f.adaptationStages } : undefined,
+          wheelRotations: f.wheelRotations,
+
+          // Active transformations/states/timers
+          isInUltimate: f.isInUltimate,
+          soulSwapTimer: f.soulSwapTimer,
+          domainActive: f.domainActive,
+          domainTimer: f.domainTimer,
+          isChannelingDomain: f.isChannelingDomain,
+          isChannelingDomainExpansion: f.isChannelingDomainExpansion,
+          stealthActive: f.stealthActive,
+          stealthTimer: f.stealthTimer,
+          ultimateActive: f.ultimateActive,
+          ultimateTimer: f.ultimateTimer,
+          combatAuraOpacity: f.combatAuraOpacity,
+          
+          // Rika state for Yuta
+          rikaActiveState: (f.rika && f.rika.active) ? {
+            active: f.rika.active,
+            timer: f.rika.timer,
+            cooldownTimer: f.rika.cooldownTimer,
+            hasSummonedAt50Hp: f.rika.hasSummonedAt50Hp,
+            killedInDomain: f.rika.killedInDomain
+          } : null,
+          
+          // Trickster stolen spell info
+          stolenType: f.stolenType,
+          stolenDef: f.stolenDef,
+          hasStolen: f.hasStolen,
+          spellStealTimer: f.spellStealTimer
+        };
+      }
+    });
+  }
+
   if (state.floatingTexts) state.floatingTexts.length = 0;
   if (state.bloodEffects) state.bloodEffects.length = 0;
   if (state.sparkEffects) state.sparkEffects.length = 0;
@@ -88,17 +174,17 @@ export function reinitFighters() {
   if (state.illusions) state.illusions.length = 0;
   state.roundWinner = null;
   state.roundEndTimer = 0;
-
+ 
   // Reset qualityLevel and screenShake on round init
   state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
   state.qualityCheckTimer = 0;
   state.screenShake = { timer: 0, maxTimer: 0, intensity: 0 };
   state.matchTimer = 0;
-
+ 
   // Clear fuel pickups
   state.fuelPickups.length = 0;
   state.fuelPickupSpawnTimer = 0;
-
+ 
   // Spawn initial fuel pickups immediately
   const initialFuelPickups = MODE_SETTINGS[state.mode]?.initialFuelPickups ?? 2;
   const hasOrange = state.fighters.some(f => f && f._def.type === 'orange');
@@ -107,10 +193,10 @@ export function reinitFighters() {
       spawnFuelPickup();
     }
   }
-
+ 
   // Clear any lingering last-kill badges from previous rounds
   state.fighters.forEach((f) => { if (f) f.lastKilledDef = null; });
-
+ 
   let fighterIndexes = [state.p1Index, state.p2Index];
   if (state.mode === GAME_MODES.FFA) {
     fighterIndexes.push(state.p3Index, state.p4Index);
@@ -122,13 +208,94 @@ export function reinitFighters() {
     // 1v2 mode: Team 0 is p1, Team 1 is p2 and p3
     fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
   }
-
+ 
   state.fighters.length = 0;
   for (const idx of fighterIndexes) {
     state.fighters.push(createFighterInstance(FIGHTER_DEFS[idx], idx));
   }
+ 
+  state.fighters.forEach((fighter, idx) => {
+    fighter.reset();
 
-  state.fighters.forEach((fighter) => fighter.reset());
+    // Restore states for 1v1 mode
+    if (is1v1 && savedStates[idx]) {
+      const saved = savedStates[idx];
+      
+      // Cooldowns
+      if (saved.shootCooldown !== undefined) fighter.shootCooldown = saved.shootCooldown;
+      if (saved.skillCooldown !== undefined) fighter.skillCooldown = saved.skillCooldown;
+      if (saved.cooldownTimer !== undefined) fighter.cooldownTimer = saved.cooldownTimer;
+      if (saved.stolenSkillCooldown !== undefined) fighter.stolenSkillCooldown = saved.stolenSkillCooldown;
+      if (saved.boogieWoogieCooldown !== undefined) fighter.boogieWoogieCooldown = saved.boogieWoogieCooldown;
+      if (saved.boogieWoogieCharges !== undefined) fighter.boogieWoogieCharges = saved.boogieWoogieCharges;
+      if (saved.comboRushCooldown !== undefined) fighter.comboRushCooldown = saved.comboRushCooldown;
+      if (saved.rockThrowCooldown !== undefined) fighter.rockThrowCooldown = saved.rockThrowCooldown;
+      if (saved.divineFlameCooldown !== undefined) fighter.divineFlameCooldown = saved.divineFlameCooldown;
+      if (saved.cleaveCooldown !== undefined) fighter.cleaveCooldown = saved.cleaveCooldown;
+      if (saved.shoutCooldown !== undefined) fighter.shoutCooldown = saved.shoutCooldown;
+      if (saved.destructionBarrageCooldown !== undefined) fighter.destructionBarrageCooldown = saved.destructionBarrageCooldown;
+      if (saved.voidDashCooldown !== undefined) fighter.voidDashCooldown = saved.voidDashCooldown;
+      if (saved.maleficBombCooldown !== undefined) fighter.maleficBombCooldown = saved.maleficBombCooldown;
+      if (saved.ultimateCooldown !== undefined) fighter.ultimateCooldown = saved.ultimateCooldown;
+      if (saved.aegisCooldown !== undefined) fighter.aegisCooldown = saved.aegisCooldown;
+      if (saved.stormCooldown !== undefined) fighter.stormCooldown = saved.stormCooldown;
+      if (saved.sphereCooldown !== undefined) fighter.sphereCooldown = saved.sphereCooldown;
+      if (saved.flurryCooldown !== undefined) fighter.flurryCooldown = saved.flurryCooldown;
+      if (saved.swordCooldown !== undefined) fighter.swordCooldown = saved.swordCooldown;
+      if (saved.c4Cooldown !== undefined) fighter.c4Cooldown = saved.c4Cooldown;
+      if (saved.telekinesisCooldown !== undefined) fighter.telekinesisCooldown = saved.telekinesisCooldown;
+      if (saved.spellStealCooldown !== undefined) fighter.spellStealCooldown = saved.spellStealCooldown;
+
+      // Passives & Stacks
+      if (saved.stunChance !== undefined) fighter.stunChance = saved.stunChance;
+      if (saved.baseStunChance !== undefined) fighter.baseStunChance = saved.baseStunChance;
+      if (saved.critChance !== undefined) fighter.critChance = saved.critChance;
+      if (saved.critMultiplier !== undefined) fighter.critMultiplier = saved.critMultiplier;
+      if (saved.powerStacks !== undefined) fighter.powerStacks = saved.powerStacks;
+      if (saved.blackFlashCharge !== undefined) fighter.blackFlashCharge = saved.blackFlashCharge;
+      if (saved.blackFlashThreshold !== undefined) fighter.blackFlashThreshold = saved.blackFlashThreshold;
+      if (saved.hasSummonedAt50Hp !== undefined) fighter.hasSummonedAt50Hp = saved.hasSummonedAt50Hp;
+      if (saved.gojoInfinityImmune !== undefined) fighter.gojoInfinityImmune = saved.gojoInfinityImmune;
+      if (saved.parryCount !== undefined) fighter.parryCount = saved.parryCount;
+      if (saved.soulSwapActive !== undefined) fighter.soulSwapActive = saved.soulSwapActive;
+      if (saved.hasSoulSwapped !== undefined) fighter.hasSoulSwapped = saved.hasSoulSwapped;
+
+      // Mahoraga adaptation wheel rules
+      if (saved.adapted !== undefined) fighter.adapted = saved.adapted;
+      if (saved.adaptedTypes !== undefined) fighter.adaptedTypes = saved.adaptedTypes;
+      if (saved.adaptationProgress !== undefined) fighter.adaptationProgress = saved.adaptationProgress;
+      if (saved.adaptationStages !== undefined) fighter.adaptationStages = saved.adaptationStages;
+      if (saved.wheelRotations !== undefined) fighter.wheelRotations = saved.wheelRotations;
+
+      // Active transformations/states/timers
+      if (saved.isInUltimate !== undefined) fighter.isInUltimate = saved.isInUltimate;
+      if (saved.soulSwapTimer !== undefined) fighter.soulSwapTimer = saved.soulSwapTimer;
+      if (saved.domainActive !== undefined) fighter.domainActive = saved.domainActive;
+      if (saved.domainTimer !== undefined) fighter.domainTimer = saved.domainTimer;
+      if (saved.isChannelingDomain !== undefined) fighter.isChannelingDomain = saved.isChannelingDomain;
+      if (saved.isChannelingDomainExpansion !== undefined) fighter.isChannelingDomainExpansion = saved.isChannelingDomainExpansion;
+      if (saved.stealthActive !== undefined) fighter.stealthActive = saved.stealthActive;
+      if (saved.stealthTimer !== undefined) fighter.stealthTimer = saved.stealthTimer;
+      if (saved.ultimateActive !== undefined) fighter.ultimateActive = saved.ultimateActive;
+      if (saved.ultimateTimer !== undefined) fighter.ultimateTimer = saved.ultimateTimer;
+      if (saved.combatAuraOpacity !== undefined) fighter.combatAuraOpacity = saved.combatAuraOpacity;
+
+      // Rika state for Yuta
+      if (saved.rikaActiveState && fighter.rika) {
+        fighter.rika.active = saved.rikaActiveState.active;
+        fighter.rika.timer = saved.rikaActiveState.timer;
+        fighter.rika.cooldownTimer = saved.rikaActiveState.cooldownTimer;
+        fighter.rika.hasSummonedAt50Hp = saved.rikaActiveState.hasSummonedAt50Hp;
+        fighter.rika.killedInDomain = saved.rikaActiveState.killedInDomain;
+      }
+
+      // Trickster stolen spell info
+      if (saved.stolenType !== undefined) fighter.stolenType = saved.stolenType;
+      if (saved.stolenDef !== undefined) fighter.stolenDef = saved.stolenDef;
+      if (saved.hasStolen !== undefined) fighter.hasStolen = saved.hasStolen;
+      if (saved.spellStealTimer !== undefined) fighter.spellStealTimer = saved.spellStealTimer;
+    }
+  });
 
   if (state.mode === 'TLFS' && state.fighters[0]) {
     const fixedHp = MODE_SETTINGS[state.mode]?.playerFixedHp || 500;
@@ -352,7 +519,14 @@ export function startNextRound() {
 
   state.roundNum++;
   state.illusions = []; // Clear all illusions on new round
-  stopAllLoopingSounds(); // Stop any lingering audio loops from previous round
+  if (state.announcerSoundHandle) {
+    stopSound(state.announcerSoundHandle);
+    state.announcerSoundHandle = null;
+  }
+  state.announcerSubtitle = '';
+  stopAllSounds(false, 0, 0);
+  stopAllLoopingSounds(0, 0); // Stop any lingering audio loops from previous round
+  clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
   reinitFighters();
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles from previous round
@@ -363,7 +537,14 @@ export function startNextRound() {
 
 export function restartCurrentRound() {
   state.illusions = []; // Clear all illusions
-  stopAllLoopingSounds();
+  if (state.announcerSoundHandle) {
+    stopSound(state.announcerSoundHandle);
+    state.announcerSoundHandle = null;
+  }
+  state.announcerSubtitle = '';
+  stopAllSounds(false, 0, 0);
+  stopAllLoopingSounds(0, 0);
+  clearHealthHud(); // Flush stale fighter-keyed DOM cache before new instances are created
   reinitFighters();
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
@@ -372,9 +553,49 @@ export function restartCurrentRound() {
   startCountdown();
 }
 
+
+
+function playAnnouncerSoundWithFallback(soundKey, onEndedCallback) {
+  const snd = getAnnouncerSound(soundKey);
+  if (!snd) {
+    onEndedCallback();
+    return null;
+  }
+
+  let endedCalled = false;
+  const safeEnded = () => {
+    if (endedCalled) return;
+    endedCalled = true;
+    onEndedCallback();
+  };
+
+  const handle = audioSystem.playSFX(snd.src, snd.volume, snd.speed, snd.offset || 0, 0, safeEnded);
+  
+  // Use config-defined duration (adjusted for playback speed) to cut off trailing silence immediately!
+  const speed = snd.speed || 1.0;
+  const duration = snd.duration ? (snd.duration / speed) : 1.5;
+  
+  const timeoutId = setTimeout(safeEnded, duration * 1000);
+  if (state.announcerTimeoutIds) {
+    state.announcerTimeoutIds.push(timeoutId);
+  }
+  
+  return handle;
+}
+
 export function startCountdown() {
+  stopAllSounds(false, 0, 0);
+  stopAllLoopingSounds(0, 0);
   state.countdownTimer = 0;
   state.gameState = 'countdown';
+  state.announcerSoundHandle = null;
+  state.announcerPlayingSequence = true;
+
+  if (!state.announcerTimeoutIds) {
+    state.announcerTimeoutIds = [];
+  }
+  state.announcerTimeoutIds.forEach(id => clearTimeout(id));
+  state.announcerTimeoutIds = [];
 
   // Initialize combat aura for Gojo/Sukuna during countdown
   state.fighters.forEach(f => {
@@ -402,9 +623,66 @@ export function startCountdown() {
     soundKey = 'round4';
   }
 
-  if (soundKey) {
-    const snd = getAnnouncerSound(soundKey);
-    if (snd) audioSystem.playSFX(snd.src, snd.volume, snd.speed, snd.offset || 0);
+  const is1v1 = (state.mode === '1v1' || state.mode === GAME_MODES.ONE_VS_ONE);
+
+  let subtitleText = '';
+  if (soundKey === 'round1') {
+    subtitleText = 'Round 1, Fight!';
+  } else if (soundKey === 'round2') {
+    subtitleText = 'Round 2, Fight!';
+  } else if (soundKey === 'round3') {
+    subtitleText = 'Round 3, Fight!';
+  } else if (soundKey === 'round4') {
+    subtitleText = 'Round 4, Fight!';
+  } else if (soundKey === 'finalround') {
+    subtitleText = 'Final Round, Fight!';
+  }
+
+  if (is1v1 && state.roundNum === 1) {
+    const hasBestOf3 = !!getAnnouncerSound('bestof3');
+    if (hasBestOf3) {
+      state.announcerSubtitle = "Best of 3";
+      state.announcerSoundHandle = playAnnouncerSoundWithFallback('bestof3', () => {
+        if (state.gameState !== 'countdown' || state.roundNum !== 1) return;
+        
+        if (soundKey) {
+          state.announcerSubtitle = subtitleText;
+          state.announcerSoundHandle = playAnnouncerSoundWithFallback(soundKey, () => {
+            if (state.gameState === 'countdown') {
+              state.announcerPlayingSequence = false;
+              state.announcerSubtitle = '';
+            }
+          });
+        } else {
+          state.announcerPlayingSequence = false;
+          state.announcerSubtitle = '';
+        }
+      });
+    } else if (soundKey) {
+      state.announcerSubtitle = subtitleText;
+      state.announcerSoundHandle = playAnnouncerSoundWithFallback(soundKey, () => {
+        if (state.gameState === 'countdown') {
+          state.announcerPlayingSequence = false;
+          state.announcerSubtitle = '';
+        }
+      });
+    } else {
+      state.announcerPlayingSequence = false;
+      state.announcerSubtitle = '';
+    }
+  } else {
+    if (soundKey) {
+      state.announcerSubtitle = subtitleText;
+      state.announcerSoundHandle = playAnnouncerSoundWithFallback(soundKey, () => {
+        if (state.gameState === 'countdown') {
+          state.announcerPlayingSequence = false;
+          state.announcerSubtitle = '';
+        }
+      });
+    } else {
+      state.announcerPlayingSequence = false;
+      state.announcerSubtitle = '';
+    }
   }
 }
 
@@ -426,11 +704,22 @@ export function resetMatch() {
   state.illusions = []; // Clear all illusions on match reset
   state.matchKills = [[], [], [], []];
 
-  // Stop all sounds when resetting match
-  stopAllSounds();
-  stopAllLoopingSounds();
+  if (state.announcerSoundHandle) {
+    stopSound(state.announcerSoundHandle);
+    state.announcerSoundHandle = null;
+  }
+  state.announcerSubtitle = '';
+  if (state.announcerTimeoutIds) {
+    state.announcerTimeoutIds.forEach(id => clearTimeout(id));
+    state.announcerTimeoutIds = [];
+  }
 
-  reinitFighters();
+  // Stop all sounds immediately when resetting match (no fade delay)
+  stopAllSounds(false, 0, 0);
+  stopAllLoopingSounds(0, 0);
+
+  clearHealthHud(); // Flush DOM and Map cache
+  reinitFighters(true); // Reinit with new match flag to clear cooldowns/stacks
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
@@ -439,17 +728,17 @@ export function resetMatch() {
 }
 
 export function goToTitle() {
-  // Stop all sounds when returning to title
-  stopAllSounds();
-  stopAllLoopingSounds();
+  if (state.announcerTimeoutIds) {
+    state.announcerTimeoutIds.forEach(id => clearTimeout(id));
+    state.announcerTimeoutIds = [];
+  }
+  state.announcerSubtitle = '';
+
+  // Stop all sounds immediately when returning to title (no fade delay)
+  stopAllSounds(false, 0, 0);
+  stopAllLoopingSounds(0, 0);
   
-  // Clear the persistent health HUDs from the DOM
-  const containerBottom = document.getElementById('healthHud');
-  if (containerBottom) containerBottom.innerHTML = '';
-  const containerLeft = document.getElementById('healthHudLeft');
-  if (containerLeft) containerLeft.innerHTML = '';
-  const containerRight = document.getElementById('healthHudRight');
-  if (containerRight) containerRight.innerHTML = '';
+  clearHealthHud(); // Flush DOM and Map cache cleanly
   
   state.gameState = 'title';
 }
