@@ -1755,7 +1755,8 @@ export class TojiFighter extends Fighter {
         const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
 
         const outerR = this.r + thrustDistance + 122; // Dynamically tracks Katana blade tip!
-        const maxThick = 22; // Slim, razor-sharp crescent thickness!
+        const thickScale = activeTrailLength / maxTrailLength; // Scale thickness proportionally with length
+        const maxThick = 22 * thickScale; // Slim, razor-sharp crescent thickness!
         const steps = isLowQuality ? 18 : 32;
 
         // 1. Outer Neon Violet Glowing Aura (Slim & Crisp)
@@ -1764,7 +1765,7 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           const thick = (maxThick + 5) * taper;
           const r = (outerR + 4) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
@@ -1779,7 +1780,7 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           const thick = (maxThick + 2) * taper;
           const r = (outerR + 1.5) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
@@ -1794,7 +1795,7 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           let thick = maxThick * taper;
 
           // Subtle sharp inner teeth notches matching reference image
@@ -1927,12 +1928,15 @@ export class TojiFighter extends Fighter {
           const tipAngle = sweepDir === 1 ? 0 : activeTrailLength;
           const steps = isLowQuality ? 16 : 30;
 
+          // Scale thickness proportionally with the trail length to prevent blunt bulkiness when short
+          thick = thick * (activeTrailLength / maxTrailLength);
+
           ctx.beginPath();
           ctx.arc(0, 0, radius + 4, tailAngle, tipAngle, false);
           for (let i = steps; i >= 0; i--) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
             const th = (thick + 5) * taper;
             ctx.lineTo(Math.cos(angle) * (radius + 4 - th), Math.sin(angle) * (radius + 4 - th));
           }
@@ -1944,7 +1948,7 @@ export class TojiFighter extends Fighter {
           for (let i = steps; i >= 0; i--) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
             const th = (thick + 2) * taper;
             ctx.lineTo(Math.cos(angle) * (radius + 1.5 - th), Math.sin(angle) * (radius + 1.5 - th));
           }
@@ -1969,7 +1973,7 @@ export class TojiFighter extends Fighter {
           for (let i = 0; i <= steps; i++) {
             const t = i / steps;
             const angle = tailAngle + (tipAngle - tailAngle) * t;
-            const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+            const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
             const th = thick * taper;
             const rEdge = radius - th * 0.25;
             if (i === 0) ctx.moveTo(Math.cos(angle) * rEdge, Math.sin(angle) * rEdge);
@@ -2035,7 +2039,8 @@ export class TojiFighter extends Fighter {
         const tailAngle = Math.max(startOffset, currentOffset - activeTrailLength);
         const bladeReach = isKatana ? 80 : 85;
         const outerR = (this.r + thrustDistance + bladeReach) * (editP ? editP.scale : 1.0); // Dynamically tracks active blade tip!
-        const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0); // Slim razor-sharp crescent thickness!
+        const thickScale = activeTrailLength / maxTrailLength; // Scale thickness proportionally with length
+        const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0) * thickScale; // Slim razor-sharp crescent thickness scaled!
         const steps = isLowQuality ? 18 : 30;
 
         // 1. Outer Neon Violet Glowing Aura
@@ -2044,7 +2049,7 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           const thick = (maxThick + 5) * taper;
           const r = (outerR + 4) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
@@ -2059,7 +2064,7 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           const thick = (maxThick + 2) * taper;
           const r = (outerR + 1.5) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
@@ -2074,7 +2079,7 @@ export class TojiFighter extends Fighter {
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           let thick = maxThick * taper;
 
           const notchPattern = Math.sin(t * Math.PI * 10);
@@ -2094,7 +2099,7 @@ export class TojiFighter extends Fighter {
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           const thick = maxThick * taper;
           const r = outerR - thick * 0.25;
           const x = Math.cos(angle) * r;
@@ -2112,7 +2117,7 @@ export class TojiFighter extends Fighter {
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
           const thick = maxThick * taper;
           const r = outerR - thick * 0.25;
           const x = Math.cos(angle) * r;

@@ -176,7 +176,7 @@ function drawPauseScreen() {
   drawHUD(); // Keep HUD visible in background
 
   const cx = canvas.width / 2;
-  const cy = canvas.height - 160; // Position pause menu at the bottom of the canvas
+  const cy = canvas.height - 200; // Position pause menu slightly higher in the lower half of the canvas
 
   const panelW = 260;
   const panelH = 280;
