@@ -1393,16 +1393,17 @@ export class TojiFighter extends Fighter {
       
       attackPhaseProgress = t;
 
-      if (t < 0.15) {
-        const p = t / 0.15;
-        const easeP = p * p;
-        thrustDistance = -14 * easeP;
-        offsetAngle = -1.15 * easeP * _katanaFlipSign; // Coil back wider (-1.15)
+      if (t < 0.05) {
+        // Phase 1: Ultra-fast snap to cocked upper-right position (snaps to -1.15 almost instantly)
+        const p = t / 0.05;
+        thrustDistance = -14 * p;
+        offsetAngle = (0.42 - 1.57 * p) * _katanaFlipSign;
         slashArcAlpha = 0;
         this._activeSlashProgress = 0;
         this._recoveryProgress = 0;
       } else if (t < 0.65) {
-        const p = (t - 0.15) / 0.50;
+        // Phase 2: Downward sweep
+        const p = (t - 0.05) / 0.60;
         const sweepCurve = Math.sin(p * Math.PI * 0.5);
         thrustDistance = -14 + 48 * sweepCurve;
         offsetAngle = (-1.15 + 2.40 * sweepCurve) * _katanaFlipSign; // Sweeps from -1.15 to +1.25 (wider, 137 degrees)
