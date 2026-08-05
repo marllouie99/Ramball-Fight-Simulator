@@ -630,6 +630,8 @@ export function drawThinIceBreakerDimScreen() {
   const opacity = 0.65 * Math.pow(progress, 1.8);
 
   ctx.save();
+  // Reset the transform temporarily to prevent edge gaps during screen shakes
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   // Deep dark spatial blue/gray overlay
   ctx.fillStyle = `rgba(3, 12, 20, ${opacity})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);

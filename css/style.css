@@ -481,7 +481,16 @@ canvas {
   gap: 4px;
   width: 100%;
   filter: brightness(calc(1 - var(--global-dim-opacity, 0) * 0.75));
-  transition: filter 120ms ease;
+  transition: filter 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
+}
+
+.health-card__header-row,
+.health-card__header,
+.health-card__title,
+.health-card__info,
+.health-card__desc {
+  filter: brightness(calc(1 - var(--global-dim-opacity, 0) * 0.75));
+  transition: filter 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .health-card__info {
@@ -554,7 +563,7 @@ canvas {
   border-radius: 255px 15px 225px 15px / 15px 225px 15px 255px;
   box-shadow: 1px 1px 1px rgba(0, 0, 0, 0.3), -1px -0.5px 0px rgba(0, 0, 0, 0.2);
   filter: brightness(calc(1 - var(--global-dim-opacity, 0) * 0.75));
-  transition: filter 120ms ease;
+  transition: filter 0.5s cubic-bezier(0.25, 0.8, 0.25, 1);
 }
 
 .hud-skill-box-text {

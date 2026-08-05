@@ -119,15 +119,33 @@ export function drawArena() {
   // Set to fill the entire height of the canvas so there are no black bars at the top or bottom
   const whiteTop = 0;
   const whiteBottom = pixiApp.screen.height;
-  g.beginFill(outerBg.color, outerBg.alpha);
-  g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
-  g.endFill();
+  if (!hasActiveDomain) {
+    g.beginFill(outerBg.color, outerBg.alpha);
+    g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+    g.endFill();
+  } else {
+    // Fill the arena background with solid black when a domain is active
+    // so any edge gaps during screen shakes blend seamlessly with the domain's dark borders
+    g.beginFill(canvasBg.color, canvasBg.alpha);
+    g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+    g.endFill();
+  }
 
   if (!hasActiveDomain) {
+    if (!state.floorGraphics) {
+      state.floorGraphics = new window.PIXI.Graphics();
+      pixiLayers.environment.addChildAt(state.floorGraphics, 0);
+    }
+    const fg = state.floorGraphics;
+    fg.clear();
     // Arena floor background (inside the arena boundaries)
-    g.beginFill(innerBg.color, innerBg.alpha);
-    g.drawRect(arena.x, arena.y, arena.width, arena.height);
-    g.endFill();
+    fg.beginFill(innerBg.color, innerBg.alpha);
+    fg.drawRect(arena.x, arena.y, arena.width, arena.height);
+    fg.endFill();
+  } else {
+    if (state.floorGraphics) {
+      state.floorGraphics.clear();
+    }
   }
 
   // Draw the arena boundary stroke
@@ -150,7 +168,12 @@ export function drawArena() {
     offCanvas.wallWidth = wallWidth;
     state._arenaBorderCanvas = offCanvas;
   }
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+  ctx.save();
+  ctx.translate(shakeX, shakeY);
   ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
+  ctx.restore();
 
   // Draw "CRONOSPHERE" transparent watermark on the 2D Canvas (since text is easier in Canvas2D)
   const centerX = arena.x + arena.width / 2;
@@ -212,7 +235,18 @@ export function drawArena() {
   const scale = CONFIG.internalScale || 1.0;
   const drawW = state._titleHeaderCanvas.width * scale;
   const drawH = state._titleHeaderCanvas.height * scale;
+  
+  ctx.save();
   ctx.drawImage(state._titleHeaderCanvas, centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
+  
+  // Overlay dimming if any ultimate domains/dims are active (using the smoothly interpolated value)
+  const dim = state.currentHUDDimOpacity || 0;
+  if (dim > 0) {
+    ctx.globalCompositeOperation = 'source-atop';
+    ctx.fillStyle = `rgba(0, 0, 0, ${dim * 0.8})`;
+    ctx.fillRect(centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
+  }
+  ctx.restore();
 }
 
 let currentPurpleDimOpacity = 0;

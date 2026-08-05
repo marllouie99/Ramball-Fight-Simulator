@@ -176,7 +176,7 @@ function drawPauseScreen() {
   drawHUD(); // Keep HUD visible in background
 
   const cx = canvas.width / 2;
-  const cy = canvas.height - 200; // Position pause menu slightly higher in the lower half of the canvas
+  const cy = canvas.height - 320; // Position pause menu slightly higher in the lower half of the canvas
 
   const panelW = 260;
   const panelH = 280;
@@ -218,7 +218,8 @@ function drawCountdown() {
   const cy = state.arena.y + state.arena.height / 2;
 
   if (announcerPlayingSequence) {
-    if (announcerSubtitle) {
+    const is1v1OrStandOff = (state.mode === '1v1' || state.mode === 'Stand Off' || state.mode === '1v2 Stand Off');
+    if (announcerSubtitle && !is1v1OrStandOff) {
       ctx.save();
       // Use "Architects Daughter" if text contains numbers, otherwise use "Glast Blitch"
       const hasNumber = /\d/.test(announcerSubtitle);

@@ -264,7 +264,10 @@ export function updateHybridEnvironment() {
   if (gojo) {
     const data = getGojoDomainHybridData();
     if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
-    // 1:1 rendering, no scaling of the sprite
+    data.sprite.x = -20;
+    data.sprite.y = -20;
+    data.sprite.width = state.canvas.width + 40;
+    data.sprite.height = state.canvas.height + 40;
     if (updateGojo) {
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
       renderGojoDomainBackground(gojo, data.ctx, isMultiDomain && gojo !== state.fighters.find(f => f.domainActive));
@@ -277,6 +280,10 @@ export function updateHybridEnvironment() {
   if (sukuna) {
     const bgData = getSukunaDomainHybridData();
     if (!bgData.sprite.parent) layer.addChildAt(bgData.sprite, 0);
+    bgData.sprite.x = -20;
+    bgData.sprite.y = -20;
+    bgData.sprite.width = state.canvas.width + 40;
+    bgData.sprite.height = state.canvas.height + 40;
     if (updateSukuna) {
       bgData.ctx.clearRect(0, 0, bgData.canvas.width, bgData.canvas.height);
       renderSukunaDomainBackground(sukuna, bgData.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
@@ -285,6 +292,10 @@ export function updateHybridEnvironment() {
 
     const fgData = getSukunaForegroundHybridData();
     if (!fgData.sprite.parent) layer.addChildAt(fgData.sprite, 0);
+    fgData.sprite.x = -20;
+    fgData.sprite.y = -20;
+    fgData.sprite.width = state.canvas.width + 40;
+    fgData.sprite.height = state.canvas.height + 40;
     if (updateSukuna) {
       fgData.ctx.clearRect(0, 0, fgData.canvas.width, fgData.canvas.height);
       renderSukunaDomainForeground(sukuna, fgData.ctx);
@@ -302,7 +313,10 @@ export function updateHybridEnvironment() {
   if (yuta) {
     const data = getYutaDomainHybridData();
     if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
-    // 1:1 rendering, no scaling of the sprite
+    data.sprite.x = -20;
+    data.sprite.y = -20;
+    data.sprite.width = state.canvas.width + 40;
+    data.sprite.height = state.canvas.height + 40;
     if (updateYuta) {
       data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
       renderYutaDomainBackground(yuta, data.ctx, isMultiDomain && yuta !== state.fighters.find(f => f.domainActive));
@@ -427,9 +441,13 @@ export function updateHybridEnvironment() {
   } else {
     if (!tojiData.sprite.parent) layer.addChild(tojiData.sprite);
     
-    // Scale sprite to fit the current screen size instead of resizing canvas
-    tojiData.sprite.width = state.canvas.width;
-    tojiData.sprite.height = state.canvas.height;
+    // Scale sprite to fit the current screen size instead of resizing canvas (negating shake)
+    const shakeX = state.shakeX || 0;
+    const shakeY = state.shakeY || 0;
+    tojiData.sprite.x = -20 - shakeX;
+    tojiData.sprite.y = -20 - shakeY;
+    tojiData.sprite.width = state.canvas.width + 40;
+    tojiData.sprite.height = state.canvas.height + 40;
     
     if (isLowQuality) {
       // In performance mode, skip updating texture if the opacity hasn't changed.
@@ -511,10 +529,12 @@ export function updateHybridEnvironment() {
   } else {
     // Render Summon Dim screen
     if (!rikaSummonDim.parent) layer.addChild(rikaSummonDim);
-    rikaSummonDim.x = state.canvas.width / 2;
-    rikaSummonDim.y = state.canvas.height / 2;
-    rikaSummonDim.width = state.canvas.width;
-    rikaSummonDim.height = state.canvas.height;
+    const shakeX = state.shakeX || 0;
+    const shakeY = state.shakeY || 0;
+    rikaSummonDim.x = state.canvas.width / 2 - shakeX;
+    rikaSummonDim.y = state.canvas.height / 2 - shakeY;
+    rikaSummonDim.width = state.canvas.width + 40;
+    rikaSummonDim.height = state.canvas.height + 40;
     rikaSummonDim.alpha = currentRikaSummonDimOpacity;
 
     // Render Pulsing Ring

@@ -722,24 +722,24 @@ export class SukunaRenderer {
     // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     let mainColor = '#FF1100';
-    let fillColor = `rgba(230, 20, 20, ${0.72 * progress})`;
-    let coreColor = `rgba(255, 120, 100, ${0.85 * progress})`;
+    let fillColor = `rgba(230, 20, 20, ${0.32 * progress})`;
+    let coreColor = `rgba(255, 120, 100, ${0.40 * progress})`;
     let wispColor = '#FF3300';
 
     if (isRCT) {
       mainColor = '#32CD32';
-      fillColor = `rgba(50, 205, 50, ${0.72 * progress})`;
-      coreColor = `rgba(144, 238, 144, ${0.85 * progress})`;
+      fillColor = `rgba(50, 205, 50, ${0.32 * progress})`;
+      coreColor = `rgba(144, 238, 144, ${0.40 * progress})`;
       wispColor = '#00FF7F';
     } else if (isFuga) {
       mainColor = '#FF4500';
-      fillColor = `rgba(255, 69, 0, ${0.75 * progress})`;
-      coreColor = `rgba(255, 200, 60, ${0.88 * progress})`;
+      fillColor = `rgba(255, 69, 0, ${0.35 * progress})`;
+      coreColor = `rgba(255, 200, 60, ${0.40 * progress})`;
       wispColor = '#FFD700';
     } else if (colorTheme === 'domain') {
       mainColor = '#4B0082'; // Indigo/Dark Purple
-      fillColor = `rgba(0, 0, 0, ${0.85 * progress})`; // Almost solid black
-      coreColor = `rgba(139, 0, 0, ${0.90 * progress})`; // Solid blood red core
+      fillColor = `rgba(0, 0, 0, ${0.40 * progress})`; // Add transparency
+      coreColor = `rgba(139, 0, 0, ${0.45 * progress})`; // Add transparency
       wispColor = '#8B0000';
 
       // Draw persistent text and ground ring ONLY during main body channeling (not on hands or after domain deployment)
@@ -816,6 +816,24 @@ export class SukunaRenderer {
       ctx.quadraticCurveTo(p.x, p.y, midX, midY);
     }
     ctx.closePath();
+
+    // === Soft Bloom/Glow Layer (Slightly larger concentric shape with flat fill) ===
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+    if (!isLowQuality) {
+      ctx.save();
+      ctx.scale(1.22, 1.22);
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      for (let i = 0; i < numPoints; i++) {
+        const p = points[i];
+        const next = points[(i + 1) % numPoints];
+        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = mainColor + '1C'; // ~11% opacity of the theme color
+      ctx.fill();
+      ctx.restore();
+    }
 
     // Fill with translucent cursed energy
     ctx.fillStyle = fillColor;

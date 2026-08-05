@@ -477,7 +477,6 @@ export class YutaFighter extends Fighter {
 
       // Visual feedback for passive healing (spawns 1-2 times per second)
       if (Math.random() < 0.03) {
-        spawnSparks(this.x, this.y, 1, '#88FF88', '#00FF00');
         spawnFloatingText(this.x, this.y - 20, '+1', '#00FF00');
       }
     }
@@ -557,7 +556,6 @@ export class YutaFighter extends Fighter {
           this.hp = Math.min(this.maxHp, this.hp + rctRate);
 
           if (Math.random() < 0.12) {
-            spawnSparks(this.x, this.y, isRikaAlive ? 4 : 2, '#32CD32', '#00FF7F');
             if (Math.random() < 0.25) {
               spawnFloatingText(this.x, this.y - 25, isRikaAlive ? '+RCT 2x' : '+RCT', '#00FF00');
             }

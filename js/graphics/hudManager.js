@@ -162,7 +162,8 @@ export function drawHUD() {
   // Calculate HUD opacity during champion reveal fade-in
   let hudOpacity = 1;
   if (gameState === 'matchEnd') {
-    const revealTimer = Math.max(0, matchEndTimer - 45); // match end delay
+    const displayDelay = 60; // match end delay before background overlay/transition starts
+    const revealTimer = Math.max(0, matchEndTimer - (displayDelay + 45)); // match end delay plus reveal offset
     hudOpacity = Math.max(0, 1 - (revealTimer / 30));
   } else if (gameState === 'roundEnd') {
     const winnerIndex = roundWinner ? fighters.indexOf(roundWinner) : -1;
@@ -604,17 +605,24 @@ function updateHealthHud() {
         rikaLabel = 'RIKA SUMMON';
       }
 
+      const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.25;
       const domainMax = CONFIG.yuta?.domainCooldown || 1300;
       const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
       let domainPct;
       if (f.isChannelingDomain) {
         domainPct = 100;
       } else if (f.domainActive) {
-        const domainDuration = CONFIG.yuta?.domainDuration || 800;
+        const domainDuration = CONFIG.yuta?.domainDuration || 400;
         const remaining = f.domainTimer || 0;
         domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
+      } else if (f.domainUseCount === 0) {
+        domainPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - domainHpThreshold)) * 100));
+      } else if (f.domainUseCount === 1) {
+        const cooldownPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
+        const hpPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - domainHpThreshold)) * 100));
+        domainPct = Math.max(cooldownPct, hpPct);
       } else {
-        domainPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
+        domainPct = 0; // Exhausted both domain uses
       }
 
       return [
@@ -743,16 +751,16 @@ function updateHealthHud() {
       info.push(`<b>Parries:</b> ${f.parryCount || 0}/${f.targetParriesForFlurry || 5}`);
       
       if (f.domainActive) {
-        const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.50;
-        const domainRikaRegenMultiplier = CONFIG.yuta?.domainRikaRegenMultiplier || 1.2;
-        if (isRikaAlive) {
-          info.push(`<b>Regen:</b> ${domainRctHealRate.toFixed(2)} * ${domainRikaRegenMultiplier.toFixed(2)}+ <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>Regen:</b> ${domainRctHealRate.toFixed(2)}+ <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        }
+        const baseRegen = CONFIG.yuta?.regenRate || 0.05;
+        const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
+        const domainRikaRegenMultiplier = CONFIG.yuta?.domainRikaRegenMultiplier || 2.0;
+        const regenMult = isRikaAlive ? domainRikaRegenMultiplier : 1.0;
+        const rctRate = domainRctHealRate * regenMult;
+        const bonusRegen = rctRate - baseRegen;
+        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)} + ${bonusRegen.toFixed(2)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         const regen = CONFIG.yuta?.regenRate || 0.05;
-        info.push(`<b>Regen:</b> ${regen.toFixed(2)}+`);
+        info.push(`<b>Regen:</b> ${regen.toFixed(2)}`);
       }
     } else if (f.characterId === 'yuji' || f.type === 'yuji') {
       const punchBase = CONFIG.yuji?.punchDamage || 18;
@@ -815,9 +823,10 @@ function updateHealthHud() {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
         const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
         if (Math.abs(currentSpeed - baseSpeed) > 0.01) {
-          info.push(`<b>Speed:</b> ${currentSpeed.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+          const bonusSpeed = currentSpeed - baseSpeed;
+          info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${bonusSpeed.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
         } else {
-          info.push(`<b>Speed:</b> ${baseSpeed.toFixed(1)}`);
+          info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)}`);
         }
         info.push(`<b>Dodge:</b> ${Math.round((CONFIG.toji?.stealthDodgeChance || 0.10) * 100)}%`);
       } else if (f.characterId === 'cronos' || f.type === 'cronos') {
@@ -860,12 +869,13 @@ function updateHealthHud() {
 
   const generateFighterSkillsHTML = (f, align) => {
     const skills = getSkillDataForFighter(f);
+    const textStyle = `font-size: ${CONFIG.hudSkillFontSize || 13}px; text-align: ${align};`;
     return skills.map(s => {
       if (s.noFill) {
         return `
           <div class="hud-skill-box align-${align} label-only" data-skill-id="${s.id}" style="justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
             <div class="hud-skill-box-fill" style="display: none;"></div>
-            <div class="hud-skill-box-text">${s.label}</div>
+            <div class="hud-skill-box-text" style="${textStyle}">${s.label}</div>
           </div>
         `;
       }
@@ -874,7 +884,7 @@ function updateHealthHud() {
       return `
         <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}" data-skill-id="${s.id}" style="${boxStyle}">
           <div class="hud-skill-box-fill" style="${fillStyle}"></div>
-          <div class="hud-skill-box-text" style="text-align: ${align};">${s.label}</div>
+          <div class="hud-skill-box-text" style="${textStyle}">${s.label}</div>
         </div>
       `;
     }).join('');
@@ -998,10 +1008,11 @@ function updateHealthHud() {
         else if (timer < 0) glowClass = ' glow-red';
       }
       
-      let valFontSize = 13;
+      const baseValSize = (CONFIG.hudInfoFontSize || 15) * 0.86;
+      let valFontSize = baseValSize;
       const textOnly = textOnlyVal;
       if (textOnly.length > 14) {
-        valFontSize = Math.max(11, 13 - (textOnly.length - 14) * 0.4);
+        valFontSize = Math.max(baseValSize * 0.8, baseValSize - (textOnly.length - 14) * 0.4);
       }
       
       if (splitIdx !== -1) {
@@ -1057,8 +1068,6 @@ function updateHealthHud() {
 
   const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left' }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
-    const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
-    const shakeStyle = shakeTimer > 0 ? `transform: translateX(${shakeAmount}px);` : '';
     const winnerStyle = '';
 
     let barsHTML = '';
@@ -1069,10 +1078,13 @@ function updateHealthHud() {
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
         const { className } = getGlowStyles(m);
         const hpText = `${Math.floor(Math.max(0, Number(m.hp) || 0))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
+        const memberShakeTimer = m._healthBarShakeTimer || 0;
+        const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
+        const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
         return `
           <div class="health-card__member" style="margin-top: 6px;">
             <div style="font-size: 12px; margin-bottom: 4px; color: ${CONFIG.hudTextColor}; font-weight: bold;">${m.name || ('PLAYER ' + (state.fighters.indexOf(m) + 1))}</div>
-            <div class="health-card__bar">
+            <div class="health-card__bar" style="${memberShakeStyle}">
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             </div>
@@ -1089,8 +1101,12 @@ function updateHealthHud() {
       const skillsHTML = targetFighter && !showDescription ? generateFighterSkillsHTML(targetFighter, 'left') : '';
       const infoHTML = targetFighter ? generateFighterInfoHTML(targetFighter) : '';
 
+      const barShakeTimer = targetFighter ? (targetFighter._healthBarShakeTimer || 0) : 0;
+      const barShakeAmount = barShakeTimer > 0 ? Math.sin((12 - barShakeTimer) * 0.75) * 3 : 0;
+      const barShakeStyle = barShakeTimer > 0 ? `transform: translateX(${barShakeAmount}px);` : '';
+
       barsHTML = `
-        <div class="health-card__bar">
+        <div class="health-card__bar" style="${barShakeStyle}">
           <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
           <span class="health-card__bar-text">${metaValue}</span>
         </div>
@@ -1133,7 +1149,7 @@ function updateHealthHud() {
     `;
 
     return `
-      <div class="health-card" style="${shakeStyle}${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
+      <div class="health-card" style="${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
         ${headerRowHTML}
         ${barsHTML}
       </div>
@@ -1256,6 +1272,7 @@ function updateHealthHud() {
           containerRight.appendChild(cardElement);
         }
 
+        const hpBar = cardElement.querySelector('.health-card__bar');
         const hpBarFill = cardElement.querySelector('.health-card__fill');
         const hpBarText = cardElement.querySelector('.health-card__bar-text');
         const winBullets = Array.from(cardElement.querySelectorAll('.health-card__win-bullet'));
@@ -1272,6 +1289,7 @@ function updateHealthHud() {
 
         _hudCache.fighters.set(fighter, {
           cardElement,
+          hpBar,
           hpBarFill,
           hpBarText,
           winBullets,
@@ -1303,16 +1321,16 @@ function updateHealthHud() {
         
         if (m.bar) {
           m.bar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+          const memberShakeTimer = fighter._healthBarShakeTimer || 0;
+          const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
+          m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
         const hpText = `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
         m.text.textContent = hpText;
       });
 
-      const members = cachedCard.members.map(m => m.fighter).filter(Boolean);
-      const shakeTimer = members.reduce((max, fighter) => Math.max(max, fighter._healthBarShakeTimer || 0), 0);
-      const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
-      cachedCard.cardElement.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
+      cachedCard.cardElement.style.transform = '';
     });
   } else {
     fighters.forEach((fighter, index) => {
@@ -1331,11 +1349,13 @@ function updateHealthHud() {
         cachedCard.hpBarFill.style.boxShadow = glow.boxShadow || '';
         cachedCard.hpBarFill.style.filter = glow.filter || '';
         cachedCard.hpBarFill.className = glow.className || 'health-card__fill';
-        
-        const parentBar = cachedCard.hpBarFill.parentElement;
-        if (parentBar) {
-          parentBar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
-        }
+      }
+
+      if (cachedCard.hpBar) {
+        cachedCard.hpBar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+        const shakeTimer = fighter._healthBarShakeTimer || 0;
+        const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
+        cachedCard.hpBar.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
       }
 
       if (cachedCard.hpBarText) {
@@ -1343,9 +1363,7 @@ function updateHealthHud() {
         cachedCard.hpBarText.textContent = metaValue;
       }
 
-      const shakeTimer = fighter._healthBarShakeTimer || 0;
-      const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
-      cachedCard.cardElement.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
+      cachedCard.cardElement.style.transform = '';
 
       // 3. Wins bullets
       const matchWins = scores[index] || 0;

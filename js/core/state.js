@@ -2,7 +2,7 @@
 // CANVAS & CONTEXT
 // ─────────────────────────────────────────────
 import { CONFIG } from './config.js';
-import { GAME_MODES } from './modeConfig.js';
+import { GAME_MODES, MODE_SETTINGS } from './modeConfig.js';
 
 // Late-bound reference – registered by projectileSystem after all modules load
 // to break the state ↔ projectileSystem circular dependency.
@@ -290,8 +290,27 @@ export function clearProjectiles() {
 // SCREEN SHAKE
 // ─────────────────────────────────────────────
 
+export function isChampionScreenActive() {
+  if (!state) return false;
+  if (state.gameState === 'matchEnd') return true;
+  if (state.ffaMatchComplete) return true;
+  
+  if (state.gameState === 'roundEnd') {
+    const roundWinner = state.roundWinner;
+    const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
+    const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+    const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
+    const hasTwoWins = winnerIndex >= 0 && state.scores && state.scores[winnerIndex] >= winThresholdForReveal;
+    if (hasTwoWins && roundWinner) {
+      return true;
+    }
+  }
+  return false;
+}
+
 export function triggerGlobalScreenShake(intensity, duration) {
   if (state.performanceMode) return;
+  if (isChampionScreenActive()) return;
   if (state.screenShake.timer < duration) {
     state.screenShake.timer = duration;
     state.screenShake.maxTimer = duration;
@@ -454,8 +473,97 @@ function fastHash(text, x, y) {
   return hash ^ (x & 0xFFFF) ^ ((y & 0xFFFF) << 16);
 }
 
+function hexToRgb(hex) {
+  const shorthandRegex = /^#?([a-f\d])([a-f\d])([a-f\d])$/i;
+  const fullHex = hex.replace(shorthandRegex, (m, r, g, b) => r + r + g + g + b + b);
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(fullHex);
+  return result ? {
+    r: parseInt(result[1], 16),
+    g: parseInt(result[2], 16),
+    b: parseInt(result[3], 16)
+  } : null;
+}
+
+function parseColorToRgb(colorStr) {
+  colorStr = colorStr.trim().toLowerCase();
+  if (colorStr.startsWith('#')) {
+    return hexToRgb(colorStr);
+  }
+  if (colorStr.startsWith('rgb')) {
+    const match = colorStr.match(/\d+/g);
+    if (match && match.length >= 3) {
+      return { r: parseInt(match[0]), g: parseInt(match[1]), b: parseInt(match[2]) };
+    }
+  }
+  const namedColors = {
+    white: {r: 255, g: 255, b: 255},
+    black: {r: 0, g: 0, b: 0},
+    red: {r: 255, g: 0, b: 0},
+    green: {r: 0, g: 255, b: 0},
+    blue: {r: 0, g: 0, b: 255},
+    yellow: {r: 255, g: 255, b: 0},
+    magenta: {r: 255, g: 0, b: 255},
+    cyan: {r: 0, g: 255, b: 255},
+    purple: {r: 128, g: 0, b: 128},
+    orange: {r: 255, g: 165, b: 0},
+    gold: {r: 255, g: 215, b: 0},
+    pink: {r: 255, g: 192, b: 203},
+    chocolate: {r: 210, g: 105, b: 30}
+  };
+  return namedColors[colorStr] || null;
+}
+
+function getContrastColor(colorStr, backgroundIsDark) {
+  const rgb = parseColorToRgb(colorStr);
+  if (!rgb) return colorStr;
+
+  let r = rgb.r / 255;
+  let g = rgb.g / 255;
+  let b = rgb.b / 255;
+
+  let max = Math.max(r, g, b), min = Math.min(r, g, b);
+  let h, s, l = (max + min) / 2;
+
+  if (max === min) {
+    h = s = 0;
+  } else {
+    let d = max - min;
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+    switch (max) {
+      case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+      case g: h = (b - r) / d + 2; break;
+      case b: h = (r - g) / d + 4; break;
+    }
+    h /= 6;
+  }
+
+  h = Math.round(h * 360);
+  s = Math.round(s * 100);
+  l = Math.round(l * 100);
+
+  if (backgroundIsDark) {
+    // If background is dark: ensure text is bright (lightness >= 78%)
+    if (l < 70) {
+      l = 78;
+      s = Math.max(s, 50); // maintain saturation
+    }
+  } else {
+    // If background is light: ensure text is dark enough (lightness <= 42%)
+    if (l > 55) {
+      l = 42;
+      s = Math.max(s, 50); // maintain saturation
+    }
+  }
+
+  return `hsl(${h}, ${s}%, ${l}%)`;
+}
+
 export function spawnFloatingText(x, y, text, color = '#ffffff') {
   if (MINIMAL_FLOATING_TEXT && !isAllowedFloatingText(text)) return;
+
+  const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive);
+  const backgroundIsDark = hasActiveDomain || (state.currentHUDDimOpacity && state.currentHUDDimOpacity > 0.3);
+  const adjustedColor = getContrastColor(color, backgroundIsDark);
 
   // Cap the global performance log to prevent infinite string allocation leaks
   if (state.allFpsLogs.length > 100) {
@@ -506,7 +614,7 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     y: y - nearbyCount * 18,  // stack upward if siblings exist
     vy: -1.6,
     text: displayText,
-    color,
+    color: adjustedColor,
     timer: 0,
     maxTimer: 65,
     opacity: 1,

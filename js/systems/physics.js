@@ -576,8 +576,8 @@ export function updateFighters() {
     return;
   }
 
-  // Continue movement during roundEnd for visual effect
-  if (state.gameState === 'roundEnd' || state.gameState === 'playing') {
+  // Continue movement during roundEnd and matchEnd for visual effect
+  if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'playing') {
     state.fighters.forEach((fighter, fi) => {
       if (!fighter) return;
       if (fighter.hp <= 0) {

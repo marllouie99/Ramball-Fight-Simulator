@@ -17,7 +17,7 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
-import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake } from '../core/state.js';
+import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
@@ -517,7 +517,10 @@ export class Fighter {
     }
     // Spawn floating damage number when actual HP was reduced
     if (this.hp < prevHp && amount > 0) {
-      const color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
+      let color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
+      if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji')) {
+        color = '#e9d5ff'; // Highly visible bright lavender for Toji
+      }
       const damageText = `${Math.round(amount)}`;
       this._healthBarShakeTimer = 12;
       this._healthBarHitTimer = 14;
@@ -861,6 +864,9 @@ export class Fighter {
   applyMovementPhysics(extraMultiplier = 1) {
     // Determine intended target speed
     let targetSpeed = this.speed;
+    if (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) {
+      targetSpeed = 0;
+    }
     if (this.blackFlashTimer > 0) {
       targetSpeed *= (CONFIG.blackFlash?.zone?.speedMultiplier ?? 1.20); // 120% speed inside "The Zone"
     }

@@ -543,8 +543,17 @@ export class TojiFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       
-      // Keep facing target
-      this.aim(this.ultimateTarget);
+      // Slow rotation on body tracking during ultimate charging phase
+      if (this.ultimateTarget) {
+        const targetAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+        const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        let diff = targetAngle - currentAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const turnRate = 0.035; // Sluggish slow tracking
+        this.gunAngle = currentAngle + diff * turnRate;
+        this.angle = this.gunAngle;
+      }
       
       // Spawn swirling wind debris (leaves & pebbles) around Toji as he materializes
       if (this.ultimateCycleTimer % 2 === 0) {
@@ -746,10 +755,15 @@ export class TojiFighter extends Fighter {
           spawnTojiWhirlingWindDebris(this.x, this.y, 2);
         }
         
-        // Aim straight down at the target while hovering
-        const aimAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
-        this.angle = aimAngle;
-        this.gunAngle = aimAngle;
+        // Slow rotation on body tracking during ultimate charging phase
+        const targetAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+        const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        let diff = targetAngle - currentAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const turnRate = 0.035; // Sluggish slow tracking
+        this.gunAngle = currentAngle + diff * turnRate;
+        this.angle = this.gunAngle;
       } else if (this.ultimateCycleTimer === diveTime) {
         this.ultimateCycleTimer--;
         
@@ -1325,40 +1339,48 @@ export class TojiFighter extends Fighter {
       offsetAngle += (Math.random() - 0.5) * 0.025 * chargeRatio;
 
       // Render Katana Charging Soul Flare at blade tip (intensifies as he coils back!)
-      ctx.save();
-      const renderAngle = baseAngle + offsetAngle;
-      const tipX = this.x + Math.cos(renderAngle) * (this.r + 32 + thrustDistance);
-      const tipY = this.y + Math.sin(renderAngle) * (this.r + 32 + thrustDistance);
+      // Skip during the ultimate's charging phase to keep the blade clean.
+      const isUltimateCharge = this.ultimateActive && (this.ultimatePhase === 'CRATER_FADEIN' || this.ultimatePhase === 'CRATER');
+      if (!isUltimateCharge) {
+        ctx.save();
+        const renderAngle = baseAngle + offsetAngle;
+        const tipX = this.x + Math.cos(renderAngle) * (this.r + 32 + thrustDistance);
+        const tipY = this.y + Math.sin(renderAngle) * (this.r + 32 + thrustDistance);
 
-      // Soft Purple Atmospheric Blade Tip Aura
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 6 + chargeRatio * 14, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(140, 70, 220, ${0.35 + chargeRatio * 0.35})`;
-      ctx.lineWidth = 2.0;
-      ctx.stroke();
-
-      // Soft Silver-Violet Core
-      ctx.beginPath();
-      ctx.arc(tipX, tipY, 3 + chargeRatio * 5, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(240, 230, 255, ${0.5 + chargeRatio * 0.3})`;
-      ctx.fill();
-
-      // Soft Radiating Energy Rays (batched into single stroke, skip in low quality)
-      if (!isLowQuality) {
-        const rayCount = 6;
-        ctx.strokeStyle = `rgba(160, 90, 240, ${0.3 + chargeRatio * 0.35})`;
-        ctx.lineWidth = 1.2;
+        // Soft Purple Atmospheric Blade Tip Aura
         ctx.beginPath();
-        for (let r = 0; r < rayCount; r++) {
-          const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 80);
-          const r1 = 5;
-          const r2 = 12 + chargeRatio * 14;
-          ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
-          ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
-        }
+        ctx.arc(tipX, tipY, 6 + chargeRatio * 14, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(140, 70, 220, ${0.35 + chargeRatio * 0.35})`;
+        ctx.lineWidth = 2.0;
         ctx.stroke();
 
-        // Render Whirling Wind Air-Stream Arcs around Toji
+        // Soft Silver-Violet Core
+        ctx.beginPath();
+        ctx.arc(tipX, tipY, 3 + chargeRatio * 5, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(240, 230, 255, ${0.5 + chargeRatio * 0.3})`;
+        ctx.fill();
+
+        // Soft Radiating Energy Rays (batched into single stroke, skip in low quality)
+        if (!isLowQuality) {
+          const rayCount = 6;
+          ctx.strokeStyle = `rgba(160, 90, 240, ${0.3 + chargeRatio * 0.35})`;
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          for (let r = 0; r < rayCount; r++) {
+            const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 80);
+            const r1 = 5;
+            const r2 = 12 + chargeRatio * 14;
+            ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
+            ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
+          }
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      // Render Whirling Wind Air-Stream Arcs around Toji (skip in low quality)
+      if (!isLowQuality) {
+        ctx.save();
         const windTime = now / 120;
         for (let w = 0; w < 4; w++) {
           const windAngle = windTime * 2.8 + (w * Math.PI / 2);
@@ -1371,9 +1393,8 @@ export class TojiFighter extends Fighter {
           ctx.lineWidth = 1.5 + (w % 2) * 0.8;
           ctx.stroke();
         }
+        ctx.restore();
       }
-
-      ctx.restore();
     } else if (this.ambushPhase === 'KATANA_DRAW' || this.ambushPhase === 'KATANA_CHASE') {
       thrustDistance = -8;
       offsetAngle = 0.35 * _katanaFlipSign; // Mirror guard stance when facing left
@@ -2276,7 +2297,8 @@ export class TojiFighter extends Fighter {
       }
 
       // Sharp Razor Blade Edge Glow Overlay (skip in low quality for perf)
-      if (!isLowQuality) {
+      const isUltimateCharge = this.ultimateActive && (this.ultimatePhase === 'CRATER_FADEIN' || this.ultimatePhase === 'CRATER');
+      if (!isLowQuality && !isUltimateCharge) {
         ctx.save();
         ctx.translate(this.x, this.y);
         ctx.rotate(renderAngle);

@@ -1,4 +1,4 @@
-import { state, spawnFloatingText } from '../core/state.js';
+import { state, spawnFloatingText, isChampionScreenActive } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { spatialGrid } from './physics.js';
@@ -7,7 +7,7 @@ import { spatialGrid } from './physics.js';
  * Update active illusions (clones, Rika, etc).
  */
 export function updateIllusions() {
-  if (state.gameState !== 'playing' && state.gameState !== 'roundEnd') return;
+  if (state.gameState !== 'playing' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
@@ -25,6 +25,26 @@ export function updateIllusions() {
       state.illusions[i] = state.illusions[state.illusions.length - 1];
       state.illusions.pop();
       spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
+      continue;
+    }
+
+    const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive());
+    if (isChampScreen) {
+      if (!illusion.isRika) {
+        illusion.vx = (illusion.vx || 0) * 0.96;
+        illusion.vy = (illusion.vy || 0) * 0.96;
+        illusion.x += illusion.vx;
+        illusion.y += illusion.vy;
+      }
+      const arena = state.arena;
+      const minX = arena.x + illusion.r;
+      const maxX = arena.x + arena.width - illusion.r;
+      const minY = arena.y + illusion.r;
+      const maxY = arena.y + arena.height - illusion.r;
+      if (illusion.x < minX) { illusion.x = minX; illusion.vx = -illusion.vx * 0.5; }
+      if (illusion.x > maxX) { illusion.x = maxX; illusion.vx = -illusion.vx * 0.5; }
+      if (illusion.y < minY) { illusion.y = minY; illusion.vy = -illusion.vy * 0.5; }
+      if (illusion.y > maxY) { illusion.y = maxY; illusion.vy = -illusion.vy * 0.5; }
       continue;
     }
 

@@ -932,25 +932,25 @@ export class GojoRenderer {
     // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     let mainColor = '#00D4CC';
-    let fillColor = `rgba(0, 212, 204, ${0.70 * progress})`;
-    let coreColor = `rgba(200, 255, 250, ${0.85 * progress})`;
+    let fillColor = `rgba(0, 212, 204, ${0.30 * progress})`;
+    let coreColor = `rgba(200, 255, 250, ${0.40 * progress})`;
 
     if (colorTheme === 'rct') {
       mainColor = '#32CD32';
-      fillColor = `rgba(50, 205, 50, ${0.70 * progress})`;
-      coreColor = `rgba(144, 238, 144, ${0.85 * progress})`;
+      fillColor = `rgba(50, 205, 50, ${0.30 * progress})`;
+      coreColor = `rgba(144, 238, 144, ${0.40 * progress})`;
     } else if (colorTheme === 'red') {
       mainColor = '#FF1100';
-      fillColor = `rgba(255, 17, 0, ${0.72 * progress})`;
-      coreColor = `rgba(255, 120, 100, ${0.85 * progress})`;
+      fillColor = `rgba(255, 17, 0, ${0.32 * progress})`;
+      coreColor = `rgba(255, 120, 100, ${0.40 * progress})`;
     } else if (colorTheme === 'purple') {
       mainColor = '#9900FF';
-      fillColor = `rgba(153, 0, 255, ${0.72 * progress})`;
-      coreColor = `rgba(204, 120, 255, ${0.85 * progress})`;
+      fillColor = `rgba(153, 0, 255, ${0.32 * progress})`;
+      coreColor = `rgba(204, 120, 255, ${0.40 * progress})`;
     } else if (colorTheme === 'pink') {
       mainColor = '#FF1493';
-      fillColor = `rgba(255, 20, 147, ${0.72 * progress})`;
-      coreColor = `rgba(255, 200, 220, ${0.85 * progress})`;
+      fillColor = `rgba(255, 20, 147, ${0.32 * progress})`;
+      coreColor = `rgba(255, 200, 220, ${0.40 * progress})`;
     }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 
@@ -1001,6 +1001,24 @@ export class GojoRenderer {
     }
     ctx.closePath();
 
+    // === Soft Bloom/Glow Layer (Slightly larger concentric shape with flat fill) ===
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+    if (!isLowQuality) {
+      ctx.save();
+      ctx.scale(1.22, 1.22);
+      ctx.beginPath();
+      ctx.moveTo(mx, my);
+      for (let i = 0; i < numPoints; i++) {
+        const p = points[i];
+        const next = points[(i + 1) % numPoints];
+        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = mainColor + '1C'; // ~11% opacity of the theme color
+      ctx.fill();
+      ctx.restore();
+    }
+
     // Fill with translucent cursed energy
     ctx.fillStyle = fillColor;
     ctx.fill();
@@ -1042,9 +1060,6 @@ export class GojoRenderer {
     ctx.fill();
     ctx.restore();
 
-    // Rough, thin black ink brush cuts & hatches moving along the border contour
-    // Performance: Skip ink layers and flame wisps in low quality mode
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
     if (!isLowQuality) {
       ctx.globalAlpha = 0.9 * progress;
       ctx.strokeStyle = '#000000';
@@ -1089,7 +1104,7 @@ export class GojoRenderer {
       // Soft rising flame wisps (smooth curves, not sharp tendrils)
       ctx.strokeStyle = mainColor;
       ctx.lineWidth = 2;
-      ctx.globalAlpha = 0.6 * progress;
+      ctx.globalAlpha = 0.3 * progress;
       ctx.beginPath();
       for (let k = 0; k < 3; k++) {
         const baseAngle = -Math.PI * 0.5 + (k - 1) * 0.5;

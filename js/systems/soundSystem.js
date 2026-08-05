@@ -317,11 +317,13 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
     if (obj.onEnded !== undefined) onEnded = obj.onEnded;
   }
 
-  // Check if gameState is roundEnd/matchEnd to block non-announcer/UI combat sounds
+  // Check if gameState is roundEnd/matchEnd to block non-announcer/UI combat sounds (after the initial action delay of 60 frames)
   const srcStr = String(src).toLowerCase();
   const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui');
   if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-    if (!isAnnouncerOrUi && typeof onEnded !== 'function') {
+    const isDuringActionDelay = (state.gameState === 'roundEnd' && state.roundEndTimer < 60) || 
+                                (state.gameState === 'matchEnd' && state.matchEndTimer < 60);
+    if (!isDuringActionDelay && !isAnnouncerOrUi && typeof onEnded !== 'function') {
       return null;
     }
   }

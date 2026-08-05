@@ -1,6 +1,6 @@
 import { fadeOutSound, fadeOutSoundBySrc } from '../../../systems/soundSystem.js';
 import { CONFIG } from '../../../core/config.js';
-import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake, isChampionScreenActive } from '../../../core/state.js';
 import { spawnSparks, spawnImpactFlash, spawnRikaRoarShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
@@ -509,6 +509,24 @@ export function updateRika(fighter, arena) {
 
   if (!rk.active) return;
   if (rk.isDying || rk.disappearing) return;
+
+  // Smooth slide to stop on champion screen
+  if (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) {
+    rk.vx = (rk.vx || 0) * 0.96;
+    rk.vy = (rk.vy || 0) * 0.96;
+    rk.x += rk.vx;
+    rk.y += rk.vy;
+    
+    const minX = arena.x + rk.r;
+    const maxX = arena.x + arena.width - rk.r;
+    const minY = arena.y + rk.r;
+    const maxY = arena.y + arena.height - rk.r;
+    if (rk.x < minX) { rk.x = minX; rk.vx = -rk.vx * 0.5; }
+    if (rk.x > maxX) { rk.x = maxX; rk.vx = -rk.vx * 0.5; }
+    if (rk.y < minY) { rk.y = minY; rk.vy = -rk.vy * 0.5; }
+    if (rk.y > maxY) { rk.y = maxY; rk.vy = -rk.vy * 0.5; }
+    return;
+  }
 
   // Freeze Rika in place for a moment while she is loading/arising (during spawnTimer)
   if (rk.spawnTimer > 0) {

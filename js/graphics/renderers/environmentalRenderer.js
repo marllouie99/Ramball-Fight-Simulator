@@ -38,9 +38,13 @@ export function drawStormDimScreen() {
   // Don't draw if opacity is too low
   if (opacity < 0.01) return;
   
-  // Fill the arena with a plain dark overlay
+  ctx.save();
+  // Reset the transform temporarily so the plain dark overlay is perfectly glued to the screen
+  // and does not expose edges or jitter during shakes
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity})`;
 }

@@ -95,8 +95,8 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.matchEndTimer++;
 
-      // Auto next match
-      if (state.matchEndTimer >= 300) {
+      // Auto next match (increased from 300 to 360 to account for the 60-frame action delay)
+      if (state.matchEndTimer >= 360) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();
         } else if (state.mode === '1v1' || state.mode === 'Stand Off') {

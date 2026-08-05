@@ -1,4 +1,4 @@
-import { state } from '../core/state.js';
+import { state, isChampionScreenActive } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
@@ -24,21 +24,70 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { updateHybridProjectiles, updateHybridRika } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 
-let _domHealthHud = null;
-let _domHealthHudLeft = null;
-let _domHealthHudRight = null;
+
 
 export function renderGame() {
     // Clear the offscreen 2D canvas at the start of every frame so it's fully transparent
     // PixiJS will render this transparent canvas over its own background/particle layers
     state.ctx.clearRect(0, 0, state.canvas.width, state.canvas.height);
 
+    // Toggle WebGL layers visibility based on game state to prevent leftover battle visuals
+    // and dim effects from glitching behind/above panels on menu/select/index screens.
+    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail'].includes(state.gameState);
+    if (state.pixiLayers) {
+      state.pixiLayers.background.visible = isBattleState;
+      state.pixiLayers.arena.visible = isBattleState;
+      state.pixiLayers.shadows.visible = isBattleState;
+      state.pixiLayers.environment.visible = isBattleState;
+      state.pixiLayers.projectiles.visible = isBattleState;
+      state.pixiLayers.particles.visible = isBattleState;
+      state.pixiLayers.effects.visible = isBattleState;
+    }
+
     // Sync HTML HUD dimming with WebGL screen dimming
-    const dimOpacity = (state.gameState === 'playing' || state.gameState === 'countdown') ? (state.globalDimOpacity || 0) : 0;
-    document.documentElement.style.setProperty('--global-dim-opacity', dimOpacity);
+    // Sync HTML HUD dimming with WebGL screen dimming and match/round endings
+    let domainDim = 0;
+    if (state.fighters) {
+      for (const f of state.fighters) {
+        if (f && (f.domainActive || ((f.isChannelingDomain || f.isChannelingDomainExpansion) && f.type !== 'toji' && f.characterId !== 'toji'))) {
+          domainDim = 0.85;
+          break;
+        }
+      }
+    }
+
+    let stateDim = 0;
+    if (state.gameState === 'matchEnd') {
+      const timer = state.matchEndTimer || 0;
+      const delayedTimer = Math.max(0, timer - 60);
+      stateDim = Math.min(0.96, (delayedTimer / 60) * 0.96);
+    } else if (state.gameState === 'roundEnd') {
+      const timer = state.roundEndTimer || 0;
+      const delayedTimer = Math.max(0, timer - 60);
+      stateDim = Math.min(0.96, (delayedTimer / 60) * 0.96);
+    }
+
+    const baseDim = state.globalDimOpacity || 0;
+    const targetDim = Math.max(baseDim, domainDim, stateDim);
+
+    // Smoothly interpolate current HUD dim opacity to eliminate sudden jumps
+    if (state.currentHUDDimOpacity === undefined) {
+      state.currentHUDDimOpacity = 0;
+    }
+    state.currentHUDDimOpacity += (targetDim - state.currentHUDDimOpacity) * 0.08;
+    if (Math.abs(state.currentHUDDimOpacity - targetDim) < 0.005) {
+      state.currentHUDDimOpacity = targetDim;
+    }
+
+    document.documentElement.style.setProperty('--global-dim-opacity', state.currentHUDDimOpacity);
 
     // Apply global screen shake (dampened smoothly back to zero as timer expires)
     let shakeX = 0, shakeY = 0;
+    if (isChampionScreenActive() && state.screenShake) {
+      state.screenShake.timer = 0;
+      state.screenShake.maxTimer = 0;
+      state.screenShake.intensity = 0;
+    }
     if (state.screenShake && state.screenShake.timer > 0) {
       const maxTimer = state.screenShake.maxTimer || state.screenShake.timer;
       const dampRatio = maxTimer > 0 ? (state.screenShake.timer / maxTimer) : 1.0;
@@ -53,19 +102,13 @@ export function renderGame() {
       }
     }
 
+    state.shakeX = shakeX;
+    state.shakeY = shakeY;
+
     if (state.thinIceBreakerDimTimer && state.thinIceBreakerDimTimer > 0) {
       state.thinIceBreakerDimTimer--;
     }
 
-    // Sync HTML DOM Health HUD containers with screen shake so DOM cards and Canvas Arena shake as one locked unit
-    if (!_domHealthHud) _domHealthHud = document.getElementById('healthHud');
-    if (!_domHealthHudLeft) _domHealthHudLeft = document.getElementById('healthHudLeft');
-    if (!_domHealthHudRight) _domHealthHudRight = document.getElementById('healthHudRight');
-    
-    const hudTransform = (shakeX !== 0 || shakeY !== 0) ? `translate3d(${shakeX.toFixed(2)}px, ${shakeY.toFixed(2)}px, 0)` : '';
-    if (_domHealthHud) _domHealthHud.style.transform = hudTransform;
-    if (_domHealthHudLeft) _domHealthHudLeft.style.transform = hudTransform;
-    if (_domHealthHudRight) _domHealthHudRight.style.transform = hudTransform;
 
     if (state.gameState === 'title') {
       try {
@@ -92,13 +135,26 @@ export function renderGame() {
     } else if (state.gameState === 'weaponDetail') {
       drawWeaponDetailScreen();
     } else {
+      if (state.pixiLayers) {
+        // Stop shaking the arena layer (keep outer background static)
+        state.pixiLayers.arena.position.set(0, 0);
+        state.pixiLayers.environment.position.set(shakeX, shakeY);
+        state.pixiLayers.projectiles.position.set(shakeX, shakeY);
+        state.pixiLayers.particles.position.set(shakeX, shakeY);
+        state.pixiLayers.effects.position.set(shakeX, shakeY);
+      }
       if (state.pixiApp) {
-        state.pixiApp.stage.position.set(shakeX, shakeY);
+        // Reset main stage position so external UI/elements do not shake
+        state.pixiApp.stage.position.set(0, 0);
       }
       
       state.globalDimEdgeColor = null; // Reset every frame
       
       drawArena();
+
+      // Translate 2D context for inside-arena shake
+      state.ctx.save();
+      state.ctx.translate(shakeX, shakeY);
 
         // ── GLOBAL ARENA CLIP ──
         // (Removed as per user request to allow visuals and dim screen effects to bleed outside the arena)
@@ -218,6 +274,9 @@ export function renderGame() {
         }
       }
 
+
+      // Restore 2D canvas context after drawing all inside-arena entities/particles
+      state.ctx.restore();
 
       if (state.gameState === 'playing' || state.gameState === 'countdown') {
         drawHUD();

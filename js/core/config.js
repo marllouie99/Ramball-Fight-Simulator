@@ -39,10 +39,11 @@ export const CONFIG = {
   arenaOuterBgColor: '#fffff7ff',    // Background color of the container area outside the arena (under HUD and sides)
   arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
-  hudTitleFontSize: 20,              // Font size for fighter name in HUD (px)
-  hudDescFontSize: 17,               // Font size for fighter description in HUD (px)
-  hudInfoFontSize: 15,               // Font size for fighter info (DMG, etc.) in HUD (px)
-  hudWidthModifier: 0.90,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
+  hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)
+  hudDescFontSize: 20,               // Font size for fighter description in HUD (px)
+  hudInfoFontSize: 20,               // Font size for fighter info (DMG, etc.) in HUD (px)
+  hudSkillFontSize: 20,              // Font size for skill bar labels in HUD (px)
+  hudWidthModifier: 1.0,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // PER-FIGHTER TUNINGs
@@ -1228,5 +1229,6 @@ if (scale !== 1.0) {
   CONFIG.hudTitleFontSize = Math.round(CONFIG.hudTitleFontSize * scale);
   CONFIG.hudDescFontSize = Math.round(CONFIG.hudDescFontSize * scale);
   CONFIG.hudInfoFontSize = Math.round(CONFIG.hudInfoFontSize * scale);
+  CONFIG.hudSkillFontSize = Math.round(CONFIG.hudSkillFontSize * scale);
 }
 

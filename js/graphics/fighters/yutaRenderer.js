@@ -941,16 +941,36 @@ export class YutaRenderer {
     // Disabled for FPS optimization (removed screen composite + radial gradient glow)
 
     // Helper: Draw a form-fitting Yuta-style flame path around points
-    const drawFlamePath = (pts, fillAlpha = 0.75) => {
+    const drawFlamePath = (pts, fillAlpha = 0.35) => {
       const numPts = pts.length;
       if (numPts < 3) return;
 
+      let mx = (pts[numPts - 1].x + pts[0].x) / 2;
+      let my = (pts[numPts - 1].y + pts[0].y) / 2;
+
       ctx.save();
+
+      // Soft concentric glow/bloom layer
+      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+      if (!isLowQuality) {
+        ctx.save();
+        ctx.scale(1.22, 1.22);
+        ctx.beginPath();
+        ctx.moveTo(mx, my);
+        for (let i = 0; i < numPts; i++) {
+          const p = pts[i];
+          const next = pts[(i + 1) % numPts];
+          ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255, 105, 180, ${0.11 * ariseCeAlpha})`;
+        ctx.fill();
+        ctx.restore();
+      }
+
       ctx.fillStyle = `rgba(255, 105, 180, ${fillAlpha})`;
 
       ctx.beginPath();
-      let mx = (pts[numPts - 1].x + pts[0].x) / 2;
-      let my = (pts[numPts - 1].y + pts[0].y) / 2;
       ctx.moveTo(mx, my);
       for (let i = 0; i < numPts; i++) {
         const p = pts[i];
@@ -982,7 +1002,7 @@ export class YutaRenderer {
       pts.forEach(p => { cx += p.x; cy += p.y; });
       cx /= numPts; cy /= numPts;
 
-      ctx.fillStyle = 'rgba(255, 192, 203, 0.85)';
+      ctx.fillStyle = 'rgba(255, 192, 203, 0.40)';
       ctx.beginPath();
       let mx2 = (pts[numPts - 1].x + pts[0].x) / 2;
       let my2 = (pts[numPts - 1].y + pts[0].y) / 2;
@@ -1346,8 +1366,8 @@ export class YutaRenderer {
     offCtx.save();
     offCtx.translate(cx, cy);
 
-    const fillColor = isRCT ? 'rgba(50, 205, 50, 0.95)' : 'rgba(255, 105, 180, 0.95)';
-    const coreColor = isRCT ? 'rgba(144, 238, 144, 1.0)' : 'rgba(255, 192, 203, 1.0)';
+    const fillColor = isRCT ? 'rgba(50, 205, 50, 0.40)' : 'rgba(255, 105, 180, 0.40)';
+    const coreColor = isRCT ? 'rgba(144, 238, 144, 0.45)' : 'rgba(255, 192, 203, 0.45)';
     const strokeColor = '#000000';
 
     const numPoints = 28;
@@ -1374,10 +1394,27 @@ export class YutaRenderer {
       points.push({ x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
     }
 
-    // Outer flame fill
-    offCtx.beginPath();
     let mx = (points[numPoints - 1].x + points[0].x) / 2;
     let my = (points[numPoints - 1].y + points[0].y) / 2;
+
+    // Soft outer concentric glow/bloom layer (pre-rendered so absolutely free)
+    offCtx.save();
+    offCtx.scale(1.22, 1.22);
+    offCtx.beginPath();
+    offCtx.moveTo(mx, my);
+    for (let i = 0; i < numPoints; i++) {
+      const p = points[i];
+      const next = points[(i + 1) % numPoints];
+      offCtx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+    }
+    offCtx.closePath();
+    const glowColor = isRCT ? 'rgba(50, 205, 50, 0.13)' : 'rgba(255, 105, 180, 0.13)';
+    offCtx.fillStyle = glowColor;
+    offCtx.fill();
+    offCtx.restore();
+
+    // Outer flame fill
+    offCtx.beginPath();
     offCtx.moveTo(mx, my);
     for (let i = 0; i < numPoints; i++) {
       const p = points[i];

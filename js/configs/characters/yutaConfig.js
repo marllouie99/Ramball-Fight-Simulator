@@ -29,8 +29,8 @@ export const yutaConfig = {
   parryPassiveChance: 0.25,                // Probability (0-1) of parrying passively when not guarding
 
   // Special Mechanic: Phantom Flurry (Parry Counterattack)
-  flurryParryMin: 2,                       // Minimum successful parries required to activate Flurry
-  flurryParryMax: 2,                       // Maximum random target threshold for Flurry activation
+  flurryParryMin: 1,                       // Minimum successful parries required to activate Flurry
+  flurryParryMax: 1,                       // Maximum random target threshold for Flurry activation
   flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
   flurryDamage: 15,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash

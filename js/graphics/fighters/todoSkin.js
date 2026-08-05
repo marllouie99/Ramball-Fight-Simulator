@@ -451,10 +451,10 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
   const outerRadius = r * 1.85;
   if (!isLowQuality) {
     const glowGrad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, outerRadius);
-  glowGrad.addColorStop(0, 'rgba(0, 240, 255, 0.50)');
-  glowGrad.addColorStop(0.35, 'rgba(0, 175, 255, 0.35)');
-  glowGrad.addColorStop(0.70, 'rgba(0, 100, 255, 0.18)');
-  glowGrad.addColorStop(1.0, 'rgba(0, 40, 180, 0)');
+    glowGrad.addColorStop(0, 'rgba(0, 240, 255, 0.25)');
+    glowGrad.addColorStop(0.35, 'rgba(0, 175, 255, 0.18)');
+    glowGrad.addColorStop(0.70, 'rgba(0, 100, 255, 0.09)');
+    glowGrad.addColorStop(1.0, 'rgba(0, 40, 180, 0)');
 
     ctx.fillStyle = glowGrad;
     ctx.beginPath();
@@ -476,9 +476,9 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
     const flameWidth = r * 0.32;
 
     const flameGrad = ctx.createLinearGradient(r * 0.7, 0, r * 0.7 + flameLength, 0);
-    flameGrad.addColorStop(0, 'rgba(0, 240, 255, 0.85)');
-    flameGrad.addColorStop(0.4, 'rgba(0, 160, 255, 0.65)');
-    flameGrad.addColorStop(0.8, 'rgba(0, 90, 255, 0.28)');
+    flameGrad.addColorStop(0, 'rgba(0, 240, 255, 0.40)');
+    flameGrad.addColorStop(0.4, 'rgba(0, 160, 255, 0.30)');
+    flameGrad.addColorStop(0.8, 'rgba(0, 90, 255, 0.14)');
     flameGrad.addColorStop(1, 'rgba(0, 40, 180, 0)');
 
     ctx.beginPath();
@@ -507,7 +507,7 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
   }
 
   // 3. Electric Cursed Energy Arcs / Rays
-  ctx.strokeStyle = 'rgba(0, 240, 255, 0.85)';
+  ctx.strokeStyle = 'rgba(0, 240, 255, 0.40)';
   ctx.lineWidth = 1.8;
   for (let i = 0; i < 4; i++) {
     const sparkAngle = (Math.PI / 2) * i + (time * 0.007);

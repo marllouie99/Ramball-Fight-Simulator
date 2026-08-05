@@ -270,13 +270,17 @@ function drawMatchEndScreen() {
     state._winnerEmbers = null;
   }
 
-  // Fade in the dark background over 60 frames
-  const bgAlpha = Math.min(0.96, (state.matchEndTimer / 60) * 0.96);
+  // Delay before winning display and black background overlay starts (in frames, ~1 second delay)
+  const displayDelay = 60;
+  const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
+
+  // Fade in the dark background over 60 frames (only after delay)
+  const bgAlpha = Math.min(0.96, (delayedTimer / 60) * 0.96);
   ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Delay showing the rest of the screen by 45 frames (0.75s)
-  const delay = 45;
+  // Delay showing the rest of the screen by 45 frames (0.75s) after the background starts fading
+  const delay = displayDelay + 45;
   if (state.matchEndTimer < delay) return;
 
   const revealTimer = state.matchEndTimer - delay;
@@ -339,7 +343,7 @@ function drawMatchEndScreen() {
   // Special champion reveal animation for match winner (1v1, 1v2 Stand Off, 2v2 & FFA)
   const effectiveWinner = matchWinner || (state.fighters ? state.fighters[0] : null);
   if (effectiveWinner) {
-    drawMatchWinnerReveal(effectiveWinner, state.matchEndTimer, mode);
+    drawMatchWinnerReveal(effectiveWinner, delayedTimer, mode);
   }
 
   if (mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off' || mode === '2v2' || mode === 'FFA') {
