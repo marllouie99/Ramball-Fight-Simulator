@@ -120,6 +120,8 @@ export const state = {
   bloodSquareTexture,
   arena: CONFIG.arena,
 
+
+
   // Global screen shake
   screenShake: { timer: 0, maxTimer: 0, intensity: 0 },
 

@@ -40,6 +40,12 @@ export function drawProjectiles() {
       return;
     }
 
+    // Hide enemy projectiles inside Gojo's domain (except Sukuna's domain/shrine slashes)
+    const isSukunaSlash = p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || p.isSukunaSlash;
+    if (isGojoDomainActive && p.owner && p.owner.characterId !== 'gojo' && !isSukunaSlash) {
+      return;
+    }
+
     // Black hole visuals are now drawn in drawBlackHoleEffects() which is called BEFORE fighters
     if (p.isBlackHole) {
       return;

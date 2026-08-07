@@ -1,7 +1,7 @@
 import { CONFIG } from '../../core/config.js';
 import { state, getProjectiles } from '../../core/state.js';
 import { updateEntityVisualScale } from './EntityRenderer.js';
-import { drawSukunaFurnaceArrow, drawSukunaSlash, drawSukunaCleave, drawGhostBlade } from '../weapons/sukunaWeaponGraphics.js';
+import { drawSukunaFurnaceArrow, drawSukunaSlash, drawSukunaCleave, drawGhostBlade, drawDivineFlameArrowConstruct } from '../weapons/sukunaWeaponGraphics.js';
 import { drawGojoPurpleOrb, drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaBasicBullet, drawLaylaUltimateBullet, drawLaylaVoidProjectile } from './projectileRenderer.js';
 
 const activeSprites = new Map();
@@ -216,3 +216,106 @@ export function updateHybridRika() {
   }
 }
 
+let fugaSprite = null;
+let fugaCanvas = null;
+let fugaCtx = null;
+let fugaTexture = null;
+let fugaUpdateTick = 0;
+
+export function updateHybridSukunaFuga() {
+  if (!state.pixiApp || !state.pixiLayers?.projectiles) return;
+  const layer = state.pixiLayers.projectiles;
+
+  const sukuna = state.fighters?.find(f => f && (f.type === 'sukuna' || f.characterId === 'sukuna') && f.isChannelingDivineFlame);
+  if (!sukuna || sukuna.hp <= 0 || state.gameState === 'matchEnd') {
+    if (fugaSprite && fugaSprite.parent) {
+      fugaSprite.parent.removeChild(fugaSprite);
+    }
+    return;
+  }
+
+  const size = 600;
+
+  if (!fugaSprite) {
+    fugaCanvas = document.createElement('canvas');
+    fugaCanvas.width = size;
+    fugaCanvas.height = size;
+    fugaCtx = fugaCanvas.getContext('2d');
+    fugaTexture = window.PIXI.Texture.from(fugaCanvas);
+    fugaSprite = new window.PIXI.Sprite(fugaTexture);
+    fugaSprite.anchor.set(0.5);
+    fugaSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+  }
+
+  if (!fugaSprite.parent) {
+    layer.addChild(fugaSprite);
+  }
+
+  // Update position every frame for buttery-smooth movement tracking
+  fugaSprite.x = sukuna.x;
+  fugaSprite.y = sukuna.y;
+
+  // OPTIMIZATION: Throttle expensive texture updates to prevent CPU-to-GPU bandwidth bottlenecks.
+  fugaUpdateTick++;
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  const updateInterval = isLowQuality ? 3 : 2;
+
+  if (fugaUpdateTick % updateInterval === 0) {
+    fugaCtx.clearRect(0, 0, size, size);
+    fugaCtx.save();
+    
+    // Center the drawing context
+    fugaCtx.translate(size / 2, size / 2);
+
+    const progress = sukuna.divineFlameChargeTimer / sukuna.divineFlameChargeMax;
+    const time = Date.now() * 0.012;
+
+    // ── 1. CHIAROSCURO: Blinding front-light vs deep back-shadow ──
+    fugaCtx.save();
+    fugaCtx.rotate(sukuna.gunAngle);
+    const shadowGrad = fugaCtx.createLinearGradient(sukuna.r * 1.4, 0, -sukuna.r * 1.2, 0);
+    shadowGrad.addColorStop(0, `rgba(255, 240, 170, ${0.6 * progress})`);
+    shadowGrad.addColorStop(0.35, 'rgba(255, 100, 0, 0)');
+    shadowGrad.addColorStop(0.65, `rgba(15, 5, 5, ${0.70 * progress})`);
+    shadowGrad.addColorStop(1, `rgba(5, 2, 2, ${0.92 * progress})`);
+    fugaCtx.fillStyle = shadowGrad;
+    fugaCtx.beginPath();
+    fugaCtx.arc(0, 0, sukuna.r + 1, 0, Math.PI * 2);
+    fugaCtx.fill();
+    fugaCtx.restore();
+
+    // ── 2. VOLCANIC MAGMA FLAME ARROW CONSTRUCT ──
+    drawDivineFlameArrowConstruct(fugaCtx, {
+      x: 0,
+      y: 0,
+      angle: sukuna.gunAngle,
+      scale: 1.0,
+      progress,
+      isFlying: false,
+      time
+    });
+
+    // Cursed Flame Origin Glow (Sukuna's channeling hands)
+    fugaCtx.save();
+    fugaCtx.rotate(sukuna.gunAngle);
+    const notchX = -32 * progress;
+    fugaCtx.beginPath();
+    fugaCtx.arc(notchX, 0, 18 * progress, 0, Math.PI * 2);
+    fugaCtx.fillStyle = `rgba(255, 50, 0, ${0.3 * progress})`;
+    fugaCtx.fill();
+
+    fugaCtx.beginPath();
+    fugaCtx.arc(notchX, 0, 10 * progress, 0, Math.PI * 2);
+    fugaCtx.fillStyle = `rgba(255, 140, 20, ${0.7 * progress})`;
+    fugaCtx.fill();
+
+    fugaCtx.beginPath();
+    fugaCtx.arc(notchX, 0, 5 * progress, 0, Math.PI * 2);
+    fugaCtx.fillStyle = `rgba(255, 255, 220, ${0.95 * progress})`;
+    fugaCtx.fill();
+    fugaCtx.restore();
+
+    fugaCtx.restore();
+    fugaTexture.update();
+  }
+}

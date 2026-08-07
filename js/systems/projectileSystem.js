@@ -128,8 +128,18 @@ class ProjectileSystem {
    * Called at the start of each update to adjust performance targets.
    */
   _updateDynamicLimits() {
-    const fighterCount = state.fighters.filter(f => f && f.hp > 0).length;
-    const illusionCount = state.illusions.filter(i => i && i.hp > 0).length;
+    let fighterCount = 0;
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (f && f.hp > 0) fighterCount++;
+    }
+    let illusionCount = 0;
+    if (state.illusions) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (ill && ill.hp > 0) illusionCount++;
+      }
+    }
     const totalEntities = fighterCount + illusionCount;
 
     // Reduce projectile limits in multi-player modes
@@ -137,6 +147,8 @@ class ProjectileSystem {
       this.maxActiveProjectiles = 100; // FFA with many entities
     } else if (totalEntities >= 4) {
       this.maxActiveProjectiles = 150; // 2v2 mode
+    } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+      this.maxActiveProjectiles = 130; // 1v2: 3 fighters, more DPS → tighten cap
     } else if (state.mode === 'Stand Off') {
       this.maxActiveProjectiles = 120; // Stand Off high HP duel optimization
     } else {
@@ -824,8 +836,8 @@ class ProjectileSystem {
 
     for (const fighter of nearbyFighters) {
       if (!fighter || fighter.hp <= 0 || fighter.isAmbushing) continue;
-      const fi = fighters.indexOf(fighter);
-      if (fi === -1) continue;
+      const fi = (typeof fighter.fighterIndex === 'number') ? fighter.fighterIndex : fighters.indexOf(fighter);
+      if (fi == null || fi === -1) continue;
 
       if (projectile.owner === fi) continue;
       // Skip teammates in 2v2 mode
@@ -1955,12 +1967,14 @@ class ProjectileSystem {
             const dx = p.x - f.x;
             const dy = p.y - f.y;
             const dist = Math.hypot(dx, dy);
-            if (dist > 0 && dist < pullRadius) {
-              // 1. Inward spatial attraction toward orb center
-              const pullStrength = 3.5;
-              const force = (pullRadius - dist) / pullRadius * pullStrength;
-              f.x += (dx / dist) * force;
-              f.y += (dy / dist) * force;
+            if (dist < pullRadius) {
+              if (dist > 0) {
+                // 1. Inward spatial attraction toward orb center
+                const pullStrength = 3.5;
+                const force = (pullRadius - dist) / pullRadius * pullStrength;
+                f.x += (dx / dist) * force;
+                f.y += (dy / dist) * force;
+              }
 
               // 2. Drag & carry target along with orb velocity toward the wall
               const dragSpeed = 0.55;
@@ -2031,7 +2045,7 @@ class ProjectileSystem {
 
           for (let i = 0; i < allTargets.length; i++) {
             const ent = allTargets[i];
-            if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+            if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
             if (ent.owner && ent.owner === ownerFighter) continue;
             
             const dx = ent.x - p.x;
@@ -2057,16 +2071,21 @@ class ProjectileSystem {
         // Continuous slow + pull effect for all targets (fighters & illusions) in the purple orb's radius
         for (let i = 0; i < allTargets.length; i++) {
           const ent = allTargets[i];
-          if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+          if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
           if (ent.owner && ent.owner === ownerFighter) continue;
           
-          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || (ent.characterId === 'mahoraga' && ent.gojoInfinityImmune);
+          const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
+          const isPurpleAdapted = isMahoraga && (
+            (ent.gojoAdapted && ent.gojoAdapted.purple) || 
+            (ent.adaptedSkills && ent.adaptedSkills['purple'])
+          );
+          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || isPurpleAdapted;
           if (!isImmune) {
             const dx = p.x - ent.x;
             const dy = p.y - ent.y;
             const dist = Math.hypot(dx, dy);
             
-            if (dist > 0 && dist < purplePullRadius) {
+            if (dist < purplePullRadius) {
               ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
               ent.isCaughtInPurple = true;
               // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
@@ -2082,15 +2101,17 @@ class ProjectileSystem {
                 ent.applyHitStun(12);
               }
               
-              const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
-              ent.vx *= 0.1;
-              ent.vy *= 0.1;
-              ent.x += (dx / dist) * pullStrength;
-              ent.y += (dy / dist) * pullStrength;
+              if (dist > 0) {
+                const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
+                ent.vx *= 0.1;
+                ent.vy *= 0.1;
+                
+                // Suppress existing knockback so they don't fling out of the orb
+                if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
+                if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
 
-              if (ent.knockbackVx !== undefined && ent.knockbackVy !== undefined) {
-                ent.knockbackVx += (dx / dist) * pullStrength;
-                ent.knockbackVy += (dy / dist) * pullStrength;
+                ent.x += (dx / dist) * pullStrength;
+                ent.y += (dy / dist) * pullStrength;
               }
             }
           }
@@ -2637,8 +2658,18 @@ class ProjectileSystem {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
             if (p.infinityEvaluated === undefined) {
               p.infinityEvaluated = true;
-              const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
-              p.infinityBypassed = Math.random() > freezeChance;
+              const ownerFighter = fighters[p.owner];
+              const isMahoragaAdapted = ownerFighter && ownerFighter.characterId === 'mahoraga' && ownerFighter.gojoInfinityImmune;
+              const isMahoragaDebris = p.isMahoragaThrow || p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';
+
+              if (isMahoragaAdapted) {
+                p.infinityBypassed = true;
+              } else if (isMahoragaDebris) {
+                p.infinityBypassed = false; // Mahoraga throw debris 100% freezes in Gojo's Limitless Infinity!
+              } else {
+                const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
+                p.infinityBypassed = Math.random() > freezeChance;
+              }
             }
 
             if (!p.infinityBypassed && !p.isFrozenByInfinity) {

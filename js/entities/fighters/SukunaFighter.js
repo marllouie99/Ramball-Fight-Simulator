@@ -1220,19 +1220,12 @@ export class SukunaFighter extends Fighter {
 
           ctx.save();
 
-          // 1. Dash Trajectory Line
+          // 1. Dash Trajectory Line (Faint White Motion Line)
           if (img.fromX !== undefined && img.toX !== undefined) {
             ctx.save();
-            ctx.globalAlpha = alpha * 0.5;
-            ctx.strokeStyle = '#FF1100';
-            ctx.lineWidth = 3;
-            ctx.beginPath();
-            ctx.moveTo(img.fromX, img.fromY);
-            ctx.lineTo(img.toX, img.toY);
-            ctx.stroke();
-
-            ctx.strokeStyle = '#FFFFFF';
-            ctx.lineWidth = 1.2;
+            ctx.globalAlpha = alpha * 0.45;
+            ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
+            ctx.lineWidth = 1.5;
             ctx.beginPath();
             ctx.moveTo(img.fromX, img.fromY);
             ctx.lineTo(img.toX, img.toY);
@@ -1243,43 +1236,16 @@ export class SukunaFighter extends Fighter {
           ctx.translate(img.x, img.y);
           ctx.rotate(img.angle || 0);
 
-          // 2. Volcanic Crimson Cursed Energy Glow
+          // 2. Flat Transparent Color Silhouette (Soft Red/Crimson)
           ctx.save();
-          // OPTIMIZED: Replaced expensive radial gradient with layered alpha circles
           ctx.beginPath();
-          ctx.arc(0, 0, this.r * 1.8, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(139, 0, 0, ${alpha * 0.3})`;
+          ctx.arc(0, 0, this.r * 1.05, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(255, 30, 0, ${alpha * 0.55})`;
           ctx.fill();
 
-          ctx.beginPath();
-          ctx.arc(0, 0, this.r * 1.2, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 30, 0, ${alpha * 0.5})`;
-          ctx.fill();
-
-          ctx.beginPath();
-          ctx.arc(0, 0, this.r * 0.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
-          ctx.fill();
-          ctx.restore();
-
-          // 3. Body Circle Silhouette
-          ctx.save();
-          ctx.globalAlpha = alpha;
-          ctx.beginPath();
-          ctx.arc(0, 0, this.r * 1.1, 0, Math.PI * 2);
-          ctx.fillStyle = '#8B0000';
-          ctx.fill();
-          ctx.strokeStyle = '#FF4500';
-          ctx.lineWidth = 2.5;
+          ctx.strokeStyle = `rgba(255, 220, 220, ${alpha * 0.85})`;
+          ctx.lineWidth = 2.0;
           ctx.stroke();
-
-          // 4. Crimson Eye Glints
-          ctx.fillStyle = '#FFD700';
-          ctx.beginPath();
-          ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
-          ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
-          ctx.fill();
-
           ctx.restore();
 
           ctx.restore();
@@ -1336,7 +1302,8 @@ export class SukunaFighter extends Fighter {
 
 
     // Draw Furnace (Fuga / Open) — Volcanic magma cursed flame arrow construct
-    if (this.isChannelingDivineFlame) {
+    // OPTIMIZATION: Rendered natively via WebGL in hybridProjectileRenderer.js. Only fallback to 2D if Pixi is disabled.
+    if (this.isChannelingDivineFlame && (typeof state === 'undefined' || !state.pixiApp)) {
       const progress = this.divineFlameChargeTimer / this.divineFlameChargeMax;
       const time = Date.now() * 0.012;
 

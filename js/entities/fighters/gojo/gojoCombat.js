@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
-import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
@@ -22,6 +22,13 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'INFINITY', '#E0FFFF');
   triggerGlobalScreenShake(3, 6);
+ 
+  // Spawn visual barrier rebound ring effect at the impact position
+  if (typeof spawnMeleeClashShockwave === 'function') {
+    const impactX = hitX !== undefined ? hitX : fighter.x;
+    const impactY = hitY !== undefined ? hitY : fighter.y;
+    spawnMeleeClashShockwave(impactX, impactY, 75, 'gojo_infinity');
+  }
 
   if (attacker && attacker !== fighter) {
     if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
@@ -31,16 +38,44 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
           // Mahoraga adapted to Limitless — bypasses Infinity block completely!
           return false;
         }
-        attacker.infinityFreezeTimer = CONFIG.gojo?.infinityFreezeDuration || 60;
       }
-      attacker.isFrozenByInfinity = true;
-      const duration = CONFIG.gojo?.infinityMeleeFreezeDuration ?? 45;
-      if (typeof attacker.applyTimeStop === 'function') {
-        attacker.applyTimeStop(duration);
+      
+      // Calculate push direction away from Gojo
+      const dx = attacker.x - fighter.x;
+      const dy = attacker.y - fighter.y;
+      const dist = Math.hypot(dx, dy) || 1;
+      
+      const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5; // Strong clean bounce impulse from config
+      const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
+
+      // Push the attacker back
+      attacker.vx = (dx / dist) * pushForce;
+      attacker.vy = (dy / dist) * pushForce;
+
+      // Push Gojo back in the opposite direction (if not performing major techniques/skills)
+      if (!isImmovable) {
+        fighter.vx = (-dx / dist) * pushForce;
+        fighter.vy = (-dy / dist) * pushForce;
       }
-      attacker.timeStopTimer = Math.max(attacker.timeStopTimer || 0, duration);
-      attacker.vx = 0;
-      attacker.vy = 0;
+      
+      // Resolve overlap instantly to slide them outside the barrier
+      const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
+      const minDist = attacker.r + barrierRadius;
+      const overlap = minDist - dist;
+      if (overlap > 0) {
+        if (!isImmovable) {
+          // Push both apart by half the overlap
+          const halfOverlap = overlap / 2;
+          attacker.x += (dx / dist) * halfOverlap;
+          attacker.y += (dy / dist) * halfOverlap;
+          fighter.x -= (dx / dist) * halfOverlap;
+          fighter.y -= (dy / dist) * halfOverlap;
+        } else {
+          // Push only the attacker if Gojo is immovable
+          attacker.x += (dx / dist) * overlap;
+          attacker.y += (dy / dist) * overlap;
+        }
+      }
     }
   }
   return true;
@@ -113,6 +148,9 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   }
 
   applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, arena);
+  if (attacker) {
+    fighter.aim(attacker);
+  }
 
   spawnFloatingText(oldX, oldY - fighter.r - 10, 'EVADE!', '#00BFFF');
   spawnImpactFlash(oldX, oldY, 22, 'lightningTrail');

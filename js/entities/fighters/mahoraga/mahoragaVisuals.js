@@ -323,8 +323,14 @@ export function drawAfterimages(ctx, fighter) {
  * cleave windup, sakuga impact, and health bar.
  */
 export function drawMahoragaFighter(ctx, fighter, opponent) {
+  const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+  );
+
   // 0. Render fading divine flash-dash afterimage ghosts
-  drawAfterimages(ctx, fighter);
+  if (!isGojoDomainActive) {
+    drawAfterimages(ctx, fighter);
+  }
 
   // UNDERLAY RINGS
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
@@ -379,7 +385,7 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
   ctx.restore();
 
   // 6. Draw Cleave Windup Visual
-  if (fighter.isCleaving) {
+  if (fighter.isCleaving && !isGojoDomainActive) {
     const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames || 30;
     const progress = fighter.cleaveWindupTimer / maxWindup;
     const radius = (CONFIG.mahoraga?.cleaveRadius || 150) * progress;
@@ -395,7 +401,9 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
   }
 
   if (fighter.sakugaImpactTimer > 0) {
-    drawSakugaImpactFrame(ctx, fighter);
+    if (!isGojoDomainActive) {
+      drawSakugaImpactFrame(ctx, fighter);
+    }
     fighter.sakugaImpactTimer--;
   }
 

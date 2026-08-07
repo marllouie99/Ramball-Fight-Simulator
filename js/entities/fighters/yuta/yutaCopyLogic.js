@@ -133,10 +133,7 @@ export function executeThinIceBreaker(fighter, angle) {
             target.vx = Math.cos(angle) * 35;
             target.vy = Math.sin(angle) * 35;
           }
-          
-          if (typeof target.applyHitStun === 'function') {
-            target.applyHitStun(30);
-          }
+          // Removed target.applyHitStun per user request to prevent freezing/locking targets
         }
       }
     }

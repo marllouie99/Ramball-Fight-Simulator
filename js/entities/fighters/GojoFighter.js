@@ -219,8 +219,8 @@ export class GojoFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    // If getting meleed or hit by physical attack, force switch into Melee Mode to punch back
-    if (opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= 160)) {
+    // If getting meleed or hit by physical attack, force switch into Melee Mode to punch back (only if separation cooldown is inactive)
+    if ((opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= 160)) && (this.meleeModeCooldown || 0) <= 0) {
       if (!this.isMeleeMode && this.forcedMeleeTimer <= 0) {
         this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 100;
       }
@@ -385,6 +385,9 @@ export class GojoFighter extends Fighter {
 
     if (this.redEffectTimer > 0) {
       this.redEffectTimer--;
+      if (this.redEffectTimer <= 0) {
+        this.orbTransition = 0; // Trigger smooth fade in of blue orb / hollow on hands
+      }
     }
     // Check if we reached the opponent to finalize initial round-start positioning
     if (!this.initialTeleportDone && opponent && !opponent.isDead && typeof state !== 'undefined' && state.gameState === 'playing') {
@@ -424,14 +427,7 @@ export class GojoFighter extends Fighter {
       }
       return;
     }
-
     if (this.redEffectTimer > 0) {
-      if (!this._hasPlayedRedChannelingSound) {
-        this._hasPlayedRedChannelingSound = true;
-        const sChan = getSkillSound(this._def?.id || 21, 'red_channeling') || getSkillSound(21, 'red_channeling');
-        audioSystem.playSFX(sChan?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sChan?.volume ?? 2.0);
-      }
-
       // Buildup phase: freeze nearby enemies in place (near-zero slow)
       const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 20;
       const redRemaining = this.redEffectTimer;
@@ -641,7 +637,13 @@ export class GojoFighter extends Fighter {
       if (this.domainTimer <= 0) {
         this.domainActive = false;
         this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
+        this.isMeleeMode = false; // Stop chasing in melee!
+        this.meleeModeCooldown = CONFIG.gojo.meleeModeSeparationCooldown ?? 240; // Enforce separation
         this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
+
+        if (opponent && !opponent.isDead) {
+          this._teleportAwayFrom(opponent, arena);
+        }
 
         // Unfreeze all enemy fighters when Gojo's domain expires
         if (state.fighters) {
@@ -774,7 +776,7 @@ export class GojoFighter extends Fighter {
 
       if (opponent && !opponent.isDead) {
         this.aim(opponent);
-        // Lapse Blue Gravitational Distortion: Slows opponent movement by 50% while mixing Red & Blue into Purple!
+        // Lapse Blue Gravitational Distortion: Slows opponent movement while mixing Red & Blue into Purple!
         if (!opponent.immuneToCC && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
           if (typeof opponent.applySlow === 'function') {
             opponent.applySlow(10, 0.50);
@@ -831,10 +833,8 @@ export class GojoFighter extends Fighter {
     if (this.isChannelingRCT) {
       this.rctChannelTimer--;
 
-      // Gradually heal over the 150 frames (2.5 seconds)
-      const healPercent = CONFIG.gojo.reverseCursedTechniqueHealPercent || 0.35;
-      const totalHealAmount = this.maxHp * healPercent;
-      const healPerFrame = totalHealAmount / 150;
+      // Gradually heal over the channel duration
+      const healPerFrame = this._rctHealPerFrame || ((this.maxHp * (CONFIG.gojo?.reverseCursedTechniqueHealPercent || 0.35)) / 90);
       this.takeDamage(-healPerFrame, this, { isHeal: true });
 
       // Spawn continuous green healing particles while channeling RCT
@@ -882,13 +882,29 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    // Handle Reversal Red Channeling & Buildup (Gojo stops self-steering to cast Red, but accepts external pushback)
+    // Handle Reversal Red Channeling & Buildup (Gojo stops completely to cast Red)
     if (this.redEffectTimer > 0) {
-      this.vx *= 0.85; // Decays self-velocity while allowing punch pushback impulses to move Gojo
-      this.vy *= 0.85;
-      this.applyMovementPhysics();
+      this.vx = 0;
+      this.vy = 0;
+      this.applyMovementPhysics(0);
       if (opponent && !opponent.isDead) {
         this.aim(opponent);
+      }
+      // Immobilize and interrupt nearby enemies during Red buildup so they cannot flurry/spin around Gojo
+      if (this.redBuildupPhase && state.fighters) {
+        state.fighters.forEach((f) => {
+          if (f && f !== this && f.hp > 0 && f.characterId !== 'toji' && f.type !== 'toji') {
+            const isEnemy = myTeam === null || state.getFighterTeam(state.fighters.indexOf(f)) !== myTeam;
+            if (isEnemy) {
+              const dist = Math.hypot(f.x - this.x, f.y - this.y);
+              if (dist < (CONFIG.gojo?.redRange || 100) + 180) {
+                f.vx = 0;
+                f.vy = 0;
+                if (typeof f.interruptAttacks === 'function') f.interruptAttacks();
+              }
+            }
+          }
+        });
       }
       this.resolveWallBounce(arena);
       return; // Stop basic attacks, melee punches, and mode switches until Red finishes!
@@ -959,9 +975,9 @@ export class GojoFighter extends Fighter {
       this.orbTransition = Math.min(1, (this.orbTransition !== undefined ? this.orbTransition : 0) + 0.1);
     }
 
-    // Handle Melee Mode (Hand-to-Hand Combat)
     const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && (this.purpleRecoveryTimer <= 0);
-    
+    let speedMult = 1.0;
+
     if (this.isMeleeMode) {
       if ((this.teleportSlideTimer || 0) <= 0 && canAct) {
         if (opponent && !opponent.isDead) {
@@ -972,19 +988,31 @@ export class GojoFighter extends Fighter {
             const dy = opponent.y - this.y;
             this.vx = (dx / dist) * (this.speed || 4.5);
             this.vy = (dy / dist) * (this.speed || 4.5);
+            speedMult = 1.0;
           } else {
             this.vx = 0; // Lock movement when in punching range
             this.vy = 0;
+            speedMult = 0;
           }
         } else {
           this.vx = 0;
           this.vy = 0;
+          speedMult = 0;
         }
+      } else {
+        speedMult = 0;
       }
       if (canAct && opponent && !opponent.isDead) {
         this._updateMeleeCombat(opponent, arena);
       }
     } else {
+      // Ranged Mode - Let base class physics handle movement naturally (allows natural bouncing and wall bounces)
+      if ((this.teleportSlideTimer || 0) <= 0) {
+        speedMult = 1.0;
+      } else {
+        speedMult = 0;
+      }
+
       // Ranged Mode - Basic attack with blue orbs
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
@@ -994,13 +1022,13 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    const isMovementLocked = (this.teleportSlideTimer > 0) || this.isMeleeMode || this.redBuildupPhase;
     // Hard-stop Gojo's velocity immediately when the orb starts building
     if (this.redBuildupPhase) {
       this.vx *= 0.05;
       this.vy *= 0.05;
+      speedMult = 0;
     }
-    this.applyMovementPhysics(isMovementLocked ? 0 : 1);
+    this.applyMovementPhysics(speedMult);
 
     if (opponent && !opponent.isDead && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0) {
       this.aim(opponent);
@@ -1149,6 +1177,7 @@ export class GojoFighter extends Fighter {
     }
 
     this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+    this.aim(opponent);
 
     // Apply a smooth breather pause before resuming Blue orb attacks (prevents snappy instant spam)
     const breatherDuration = CONFIG.gojo.modeSwitchBreatherDuration ?? 45;
@@ -1185,7 +1214,7 @@ export class GojoFighter extends Fighter {
     ];
 
     for (const ent of allEntities) {
-      if (!ent || ent.hp <= 0 || ent === this || (ent.invincibilityTimer || 0) > 0 || ent.isRika || ent.owner === this) continue;
+      if (!ent || ent.hp <= 0 || ent === this || (ent.invincibilityTimer || 0) > 0 || ent.owner === this) continue;
 
       if (ent.owner) {
         const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
@@ -1216,16 +1245,18 @@ export class GojoFighter extends Fighter {
     }
 
     for (const target of validTargets) {
-      target.takeDamage(punchDamage, this, { isMelee: true });
-      if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(20);
-      }
+      // Pass isSkill: true to bypass the basic attack hit-pause (which locks target updates)
+      target.takeDamage(punchDamage, this, { isMelee: true, isDomain: this.domainActive, isSkill: true });
+
+      const angle = Math.atan2(target.y - this.y, target.x - this.x);
+      
+      // Manga Spiky Crescent Impact Frame (matching Gojo's limitless blue/cursed theme)
+      spawnAnimePunchImpactFrame(target.x, target.y, 55, angle, 'blue');
 
       // Punch hit physics: crisp pushback impulse along punch vector (disabled inside Gojo's Domain Expansion)
       if (!this.domainActive) {
         const isFinalHit = this.meleeComboCount >= (this.meleeComboTarget || 1);
         const pushForce = isFinalHit ? 14 : 7.5;
-        const angle = Math.atan2(target.y - this.y, target.x - this.x);
 
         target.vx += Math.cos(angle) * pushForce;
         target.vy += Math.sin(angle) * pushForce;
@@ -1233,7 +1264,8 @@ export class GojoFighter extends Fighter {
         if (target.knockbackVx !== undefined && target.knockbackVy !== undefined) {
           target.knockbackVx += Math.cos(angle) * (pushForce * 0.8);
           target.knockbackVy += Math.sin(angle) * (pushForce * 0.8);
-          target.knockbackStunTimer = Math.max(target.knockbackStunTimer || 0, isFinalHit ? 10 : 4);
+          // Set to 0 so target can steer and move immediately
+          target.knockbackStunTimer = 0;
         }
       }
     }
@@ -1336,6 +1368,9 @@ export class GojoFighter extends Fighter {
         }
       }
     });
+
+    // Dissipate blast visual quickly (0.2s) so Gojo doesn't get stuck holding the orb post-blast
+    this.redEffectTimer = Math.min(this.redEffectTimer || 0, 12);
   }
 
   _firePurple(ownerIndex) {

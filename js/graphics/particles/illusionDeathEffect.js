@@ -11,7 +11,9 @@ import { illusionDeathPool } from '../objectPool.js';
  * @param {Object} illusion - The illusion that died
  */
 export function spawnIllusionDeath(illusion) {
-  const particleCount = 20;  // Number of ethereal particles
+  const scale = Math.max(0.25, illusion.r / 25);
+  const particleCount = Math.ceil(20 * scale);  // Number of ethereal particles
+  const wispCount = Math.ceil(8 * scale);
   const color = illusion.color || '#9966ff'; // Purple by default
 
   // Create dissolving particles that float upward
@@ -53,8 +55,8 @@ export function spawnIllusionDeath(illusion) {
   state.illusionDeathEffects.push(glow);
 
   // Add swirling wisps around the death point
-  for (let i = 0; i < 8; i++) {
-    const angle = (Math.PI * 2 * i) / 8;
+  for (let i = 0; i < wispCount; i++) {
+    const angle = (Math.PI * 2 * i) / Math.max(1, wispCount);
     const dist = illusion.r * 0.3;
 
     const wisp = illusionDeathPool.acquire();

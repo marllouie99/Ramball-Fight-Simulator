@@ -22,7 +22,7 @@ import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaD
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
-import { updateHybridProjectiles, updateHybridRika } from '../graphics/renderers/hybridProjectileRenderer.js';
+import { updateHybridProjectiles, updateHybridRika, updateHybridSukunaFuga } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
 
 
@@ -202,6 +202,7 @@ export function renderGame() {
         drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
         updateHybridProjectiles();
         updateHybridRika();
+        updateHybridSukunaFuga();
         updateHybridCronospheres();
 
         const isDomainClash = state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);

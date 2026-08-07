@@ -9,13 +9,17 @@ import { state } from '../../core/state.js';
  * @param {Object} illusion - The illusion that was spawned
  */
 export function spawnIllusionSpawn(illusion) {
-  const particleCount = 35; // Increased particle count
+  const scale = Math.max(0.2, illusion.r / 25);
+  const ringCount = Math.ceil(15 * scale);
+  const smokeCount = Math.ceil(20 * scale);
+  const sparkCount = Math.ceil(10 * scale);
+  
   const smokeColor = '#9b59b6'; // Deep purple
   const sparkColor = '#f1c40f'; // Bright yellow/gold for contrast
 
   // 1. Central Implosion/Explosion Ring
-  for (let i = 0; i < 15; i++) {
-    const angle = (Math.PI * 2 * i) / 15;
+  for (let i = 0; i < ringCount; i++) {
+    const angle = (Math.PI * 2 * i) / ringCount;
     const speed = 3 + Math.random() * 2;
     state.illusionSpawnEffects.push({
       x: illusion.x,
@@ -31,7 +35,7 @@ export function spawnIllusionSpawn(illusion) {
   }
 
   // 2. Smoky Burst
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < smokeCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 1 + Math.random() * 2.5;
     state.illusionSpawnEffects.push({
@@ -48,7 +52,7 @@ export function spawnIllusionSpawn(illusion) {
   }
   
   // 3. Sharp Sparks
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < sparkCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 4 + Math.random() * 3;
     state.illusionSpawnEffects.push({
@@ -97,7 +101,8 @@ export function updateIllusionSpawnEffects() {
     }
     
     if (p.life <= 0) {
-      state.illusionSpawnEffects.splice(i, 1);
+      state.illusionSpawnEffects[i] = state.illusionSpawnEffects[state.illusionSpawnEffects.length - 1];
+      state.illusionSpawnEffects.pop();
     }
   }
 }

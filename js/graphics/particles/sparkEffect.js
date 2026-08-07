@@ -1140,10 +1140,11 @@ export function drawSparkEffects(layer = 'all') {
       const isMahoragaClash = (effect.clashType === 'mahoraga');
       const isTodoClap = (effect.clashType === 'todo');
       const isGenosClash = (effect.clashType === 'genos' || effect.clashType === 'orange');
+      const isInfinityClash = (effect.clashType === 'gojo_infinity');
 
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`))));
+      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isInfinityClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`)))));
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1271,6 +1272,28 @@ export function drawSparkEffects(layer = 'all') {
         ctx.moveTo(0, -slashLen); ctx.lineTo(0, slashLen);
         ctx.stroke();
         ctx.restore();
+      } else if (isInfinityClash) {
+        // ── GOJO LIMITLESS BARRIER REBOUND SHOCKWAVE ──
+        // Outer Spatial Refraction Cyan Ring
+        ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.95})`;
+        ctx.lineWidth = 10 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+ 
+        // Middle Deep Cursed Blue Ring
+        ctx.strokeStyle = `rgba(0, 100, 255, ${effect.life * 0.85})`;
+        ctx.lineWidth = 6 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
+        ctx.stroke();
+ 
+        // Inner White-Hot Rebound Core Ring
+        ctx.strokeStyle = `rgba(224, 255, 255, ${effect.life * 0.98})`;
+        ctx.lineWidth = 3.5 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
       } else if (isTojiClash) {
         // ── TOJI PHYSICAL SHOCKWAVE ──
         // Outer Dark Slate Air Pressure Ring

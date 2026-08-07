@@ -78,7 +78,7 @@ export const yutaConfig = {
   domainDuration: 800,                     // Frames domain stays active (~6.67 seconds at 60fps)
   domainRadius: 350,                       // Radius of the domain boundary in pixels
   domainCooldownReduction: 0.8,            // Technique cooldown reduction ratio inside domain (80% faster)
-  domainRctHealRate: 0.50,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
+  domainRctHealRate: 0.05,                 // Accelerated Reverse Cursed Technique (RCT) healing rate inside domain
   domainRikaRegenMultiplier: 1.2,          // 2x RCT regen multiplier inside domain while Rika is alive
   domainRikaDamageMultiplier: 2.0,         // 1.5x damage dealt multiplier inside domain while Rika is alive
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)

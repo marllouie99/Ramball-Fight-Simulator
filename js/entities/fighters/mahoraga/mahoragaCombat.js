@@ -287,7 +287,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
   const throwVisuals = ['mahoragaBasaltMonolith', 'mahoragaRuinConcrete', 'mahoragaLavaRubble'];
   const visual = throwVisuals[Math.floor(Math.random() * throwVisuals.length)];
 
-  projectileSystem.fireProjectile(
+  const proj = projectileSystem.fireProjectile(
     fighter,
     ownerIndex,
     throwDamage,
@@ -299,6 +299,13 @@ export function shootBladeBarrage(fighter, ownerIndex) {
     undefined,
     customAngle
   );
+
+  if (proj) {
+    proj.isMahoragaThrow = true;
+    proj.isAdaptableSkillShot = true;
+    proj.skillShotId = 'throw';
+    proj.skillShotColor = '#8B4513';
+  }
 
   audioSystem.playSFX('attack_swordswing', 0.6);
 }

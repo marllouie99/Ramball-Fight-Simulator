@@ -118,8 +118,10 @@ export function updateGame() {
     // Update burn effects (always update, even between rounds)
     const dtGlobal = Math.min(FRAME_TIME / 1000, 0.1);
     if (state.gameState !== 'title' && state.gameState !== 'select' && state.gameState !== 'index' && state.gameState !== 'leaderboard') {
+      const burnFrame = (state.matchTimer || 0);
       state.fighters.forEach(fighter => {
-        if (fighter && fighter.hp > 0 && fighter.burnTimer > 0) {
+        if (fighter && fighter.hp > 0 && fighter.burnTimer > 0 &&
+            (burnFrame + (fighter.fighterIndex || 0)) % 2 === 0) {
           burnEffectSystem.spawnBurnParticles(fighter);
         }
       });

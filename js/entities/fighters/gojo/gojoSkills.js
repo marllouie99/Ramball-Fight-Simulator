@@ -28,6 +28,11 @@ export function activateRed(fighter) {
   fighter.meleeModeCooldown = Math.max(fighter.meleeModeCooldown || 0, totalFrames + 15);
   fighter.isMeleeMode = false;
 
+  // Instantly stop all movement when starting Red buildup
+  fighter.vx = 0;
+  fighter.vy = 0;
+
+
   // Find and lock target angle toward nearest enemy
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
   let targetF = null;
@@ -85,6 +90,14 @@ export function detonateRed(fighter) {
         const dist = Math.hypot(f.x - fighter.x, f.y - fighter.y);
         if (dist < redRange + f.r) {
           const angle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
+          
+          // Clear time-stop & infinity freeze so Red knockback actually launches target away
+          f.timeStopTimer = 0;
+          f.isFrozenByInfinity = false;
+          f.infinityFreezeTimer = 0;
+          f._timeStopFrozenAngle = null;
+          f._timeStopFrozenGunAngle = null;
+
           f.takeDamage(redDamage, fighter, { isRed: true, isAdaptableSkillShot: true, skillShotId: 'red' });
 
           const kbVx = Math.cos(angle) * redKnockback;
@@ -115,6 +128,9 @@ export function detonateRed(fighter) {
       }
     }
   });
+
+  // Dissipate blast visual quickly (0.2s) so Gojo doesn't get stuck holding the orb post-blast
+  fighter.redEffectTimer = Math.min(fighter.redEffectTimer || 0, 12);
 }
 
 export function firePurple(fighter, ownerIndex) {

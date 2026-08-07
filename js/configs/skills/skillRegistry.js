@@ -75,5 +75,18 @@ export const SKILL_REGISTRY = {
     adaptationWindowFrames: 900,
     adaptationDelayFrames: 45,
     dodgeType: 'behind', // Automatically dodge behind for massive sweeping beams
+  },
+
+  // Mahoraga's Debris Throw Barrage
+  'throw': {
+    id: 'throw',
+    name: 'Debris Throw',
+    ownerType: 'mahoraga',
+    skillShotColor: '#8B4513',
+    dodgeRadius: 100,
+    adaptationThresholdPct: 0.10,
+    adaptationWindowFrames: 300,
+    adaptationDelayFrames: 30,
+    dodgeType: 'perpendicular',
   }
 };

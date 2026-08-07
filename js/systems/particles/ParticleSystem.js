@@ -64,6 +64,21 @@ export class ParticleSystem {
     sparkPool.push(spark);
   }
 
+  static clearAll() {
+    if (typeof state !== 'undefined') {
+      if (state.sparkEffects) {
+        for (const spark of state.sparkEffects) {
+          if (spark) this.returnParticle(spark);
+        }
+      }
+      if (state.bloodEffects) {
+        for (const blood of state.bloodEffects) {
+          if (blood) this.returnParticle(blood);
+        }
+      }
+    }
+  }
+
   static getDynamicQuality(isDomainClash) {
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
     const qualityMultiplier = state.qualityLevel || 1.0;

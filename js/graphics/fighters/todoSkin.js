@@ -7,7 +7,10 @@ import { state } from '../../core/state.js';
  */
 export function drawTodoSkin(ctx, fighter) {
   // 1. Draw afterimages (Zone trails) at their absolute coordinates
-  if (fighter.afterImages && fighter.afterImages.length > 0) {
+  const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+  );
+  if (fighter.afterImages && fighter.afterImages.length > 0 && !isGojoDomainActive) {
     ctx.save();
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];

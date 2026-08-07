@@ -120,7 +120,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
 
       for (let i = 0; i < allTargets.length; i++) {
         const ent = allTargets[i];
-        if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
+        if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
         
         const dx = ent.x - projectile.x;
@@ -149,7 +149,12 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
       
-      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || (ent.characterId === 'mahoraga' && ent.gojoInfinityImmune);
+      const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
+      const isPurpleAdapted = isMahoraga && (
+        (ent.gojoAdapted && ent.gojoAdapted.purple) || 
+        (ent.adaptedSkills && ent.adaptedSkills['purple'])
+      );
+      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || isPurpleAdapted;
       if (!isImmune) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
@@ -174,13 +179,13 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
           ent.vx *= 0.1;
           ent.vy *= 0.1;
+          
+          // Suppress existing knockback so they don't fling out of the orb
+          if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
+          if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
+
           ent.x += (dx / dist) * pullStrength;
           ent.y += (dy / dist) * pullStrength;
-
-          if (ent.knockbackVx !== undefined && ent.knockbackVy !== undefined) {
-            ent.knockbackVx += (dx / dist) * pullStrength;
-            ent.knockbackVy += (dy / dist) * pullStrength;
-          }
         }
       }
     }

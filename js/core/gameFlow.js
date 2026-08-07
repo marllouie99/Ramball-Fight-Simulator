@@ -15,6 +15,8 @@ import { getSkillEffectSoundPaths } from '../soundEffects/skillEffectSounds.js';
 import { getAnnouncerSoundPaths, getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
+import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
+import { ParticleSystem } from '../systems/particles/ParticleSystem.js';
 import { clearAllPools } from '../graphics/objectPool.js';
 import { clearHealthHud } from '../graphics/hudManager.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
@@ -187,6 +189,12 @@ export function reinitFighters(isNewMatch = false) {
       }
     });
   }
+
+  // Proper cleanup of PixiJS Sprites before resetting lengths
+  ParticleSystem.clearAll();
+  burnEffectSystem.clear();
+  bomberExplosionSystem.clear();
+  flamewardenFlameSystem.clear();
 
   if (state.floatingTexts) state.floatingTexts.length = 0;
   if (state.bloodEffects) state.bloodEffects.length = 0;

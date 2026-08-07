@@ -294,17 +294,22 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   // --- REVERSE CURSED TECHNIQUE (RCT / DIVINE HEALING ON WHEEL CLICK ADAPTATION) ---
   const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
-  const healInterval = CONFIG.mahoraga?.rctHealLevelInterval ?? 3;
+  const healInterval = CONFIG.mahoraga?.rctHealLevelInterval ?? 1;
   
   if (enableRCT && fighter.hp > 0 && !fighter.isDead && totalStages > 0 && (totalStages % healInterval === 0)) {
-    const healPercent = CONFIG.mahoraga?.rctHealPerClickPercent ?? 0.08;
+    const healPercent = CONFIG.mahoraga?.rctHealAmountPercent ?? CONFIG.mahoraga?.rctHealPerClickPercent ?? 0.10;
     const healHp = Math.round(fighter.maxHp * healPercent);
     if (healHp > 0) {
-      fighter.hp = Math.min(fighter.maxHp, fighter.hp + healHp);
+      if (typeof fighter.takeDamage === 'function') {
+        fighter.takeDamage(-healHp, fighter, { isHeal: true });
+      } else {
+        fighter.hp = Math.min(fighter.maxHp, fighter.hp + healHp);
+      }
       spawnFloatingText(fighter.x, wheelY - 45, `✨ RCT HEAL! +${healHp}`, '#00FF66');
       spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
       spawnSparks(fighter.x, fighter.y, 30, 'arcane');
       spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
+      audioSystem.playSFX('skill_enhance', 0.85);
     }
   }
 

@@ -91,7 +91,12 @@ export class StatusEffectsManager {
     
     // Mahoraga adaptation logic bypass
     if (this.fighter.gojoInfinityImmune && this.fighter.characterId === 'mahoraga') {
-      return;
+      const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+        f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+      );
+      if (!isGojoDomainActive) {
+        return;
+      }
     }
 
     const currentRemaining = this.fighter.timeStopTimer || 0;
@@ -101,6 +106,16 @@ export class StatusEffectsManager {
     if (frames > currentRemaining) {
       this.fighter._timeStopOriginalDuration = frames;
       this.fighter.timeStopTimer = frames;
+      
+      // Snapshot angles on fresh timeStop to lock orientation in place
+      if (currentRemaining <= 0) {
+        if (typeof this.fighter._timeStopFrozenAngle !== 'number') {
+          this.fighter._timeStopFrozenAngle = this.fighter.angle;
+        }
+        if (typeof this.fighter._timeStopFrozenGunAngle !== 'number') {
+          this.fighter._timeStopFrozenGunAngle = this.fighter.gunAngle;
+        }
+      }
     }
   }
 

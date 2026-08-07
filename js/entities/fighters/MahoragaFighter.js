@@ -339,9 +339,6 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    // ── INSTANT DODGE INTERCEPT FOR SKILL SHOTS ──
-    // If we are hit by an adaptable skill shot that we've adapted to and are ready to dodge,
-    // we intercept it here to prevent frame-order bugs where the skill shot hits us before our update loop can dodge it!
     if (opts.isAdaptableSkillShot && opts.skillShotId !== 'tojiAmbush' && this.adaptedSkills && this.adaptedSkills[opts.skillShotId] && this.skillDodgeReady && this.skillDodgeReady[opts.skillShotId]) {
       const registryEntry = SKILL_REGISTRY[opts.skillShotId];
       const mockProj = opts.projectile || {
@@ -404,6 +401,15 @@ export class MahoragaFighter extends Fighter {
     }
     if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
 
+    if (this.skillExposureTimer > 0) {
+      this.skillExposureTimer--;
+      if (this.skillExposureTimer <= 0) {
+        this._triggerAdaptation(this.exposedSkillType || 'skill', this.exposedSkillAttacker);
+        this.exposedSkillType = null;
+        this.exposedSkillAttacker = null;
+      }
+    }
+
     const isFrozen = this._handleTimeStop();
     const isInfinityFrozen = handleInfinityFreeze(this);
 
@@ -415,15 +421,6 @@ export class MahoragaFighter extends Fighter {
       return; // MANDATORY: Stop update execution so fighter is frozen!
     }
 
-    if (this.skillExposureTimer > 0) {
-      this.skillExposureTimer--;
-      if (this.skillExposureTimer <= 0) {
-        this._triggerAdaptation(this.exposedSkillType || 'skill', this.exposedSkillAttacker);
-        this.exposedSkillType = null;
-        this.exposedSkillAttacker = null;
-      }
-    }
-
     // Calculate Dynamic Movement Speed based on Gold Adaptations
     const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.speed || 3.5;
     const goldStages = (this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0);
@@ -432,21 +429,31 @@ export class MahoragaFighter extends Fighter {
 
     // ── PROACTIVE GOJO ADAPTATION DODGE TRIGGERS ──
     const livePurpleOrb = (projectileSystem && projectileSystem.projectiles)
-      ? projectileSystem.projectiles.find(p => p && p.isGojoPurple && (p.life || 0) > 0)
+      ? projectileSystem.projectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') && (p.life || 0) > 0)
       : null;
 
-    if (this.gojoAdapted && this.gojoAdapted.purple) {
-      if (this.gojoPurpleDodgeReady && (this.adaptationDashTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
-        if (livePurpleOrb) {
-          const gojoFighter = state.fighters
-            ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0)
-            : null;
+    const gojoFighter = (opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo'))
+      ? opponent
+      : (state.fighters ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0) : null);
+
+    const isPurpleAdapted = (this.gojoAdapted && this.gojoAdapted.purple) || 
+                            (this.adaptedSkills && this.adaptedSkills['purple']) ||
+                            ((this.goldAdaptationStage?.skill || 0) >= 2) ||
+                            ((this.adaptationStage?.skill || 0) >= 2);
+
+    if (isPurpleAdapted) {
+      const isGojoChannelingPurple = gojoFighter && gojoFighter.isChannelingPurple;
+      const isCaughtInPurple = this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0);
+
+      // Do NOT teleport if currently caught and paralyzed inside an active Purple orb!
+      if (!isCaughtInPurple && this.gojoPurpleDodgeReady && (this.adaptationDashTimer || 0) <= 0) {
+        if (livePurpleOrb || isGojoChannelingPurple) {
           if (gojoFighter) {
             this._gojoPurpleTeleportDodge(gojoFighter, livePurpleOrb);
           }
         }
       }
-      if (!this.gojoPurpleDodgeReady && !livePurpleOrb) {
+      if (!this.gojoPurpleDodgeReady && !livePurpleOrb && !isGojoChannelingPurple && !isCaughtInPurple) {
         this.gojoPurpleDodgeReady = true;
       }
     }
@@ -727,7 +734,14 @@ export class MahoragaFighter extends Fighter {
     if (this.cleaveCooldown > 0) this.cleaveCooldown--;
     if (this.shoutCooldown > 0) this.shoutCooldown--;
     if (this.throwCooldown > 0) this.throwCooldown--;
-    if (this.fatalAdaptCooldown > 0) this.fatalAdaptCooldown--;
+    if (this.fatalAdaptCooldown > 0) {
+      this.fatalAdaptCooldown--;
+    } else {
+      const threshold = this.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.05);
+      if ((this.totalAccumDamage || 0) >= threshold) {
+        this._triggerAdaptation('skill', null);
+      }
+    }
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.leftPunchTimer > 0) this.leftPunchTimer--;
     if (this.infinityBlitzCooldownTimer > 0) this.infinityBlitzCooldownTimer--;
@@ -770,36 +784,9 @@ export class MahoragaFighter extends Fighter {
           this.isInfinityBlitz = false;
           this.infinityBlitzCooldownTimer = CONFIG.mahoraga?.infinityBlitzCooldownFrames || 600;
 
-          this.hitsTaken = { melee: 0, ranged: 0, skill: 0 };
-          this.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
-          this.adapted = { melee: false, ranged: false, skill: false };
-          this.wheelRotation = 0;
-          this.wheelTargetRotation = 0;
-          this.hasAnnouncedLevel2 = false;
-
-          this.gojoAdapted = { purple: false, red: false, blue: false };
-          this.gojoBlueDragImmune = false;
-          this.gojoPurpleDodgeReady = false;
-          this.gojoRedDodgeReady = false;
-          this.gojoInfinityImmune = false;
-          this.totalAccumDamage = 0;
-          this.accumTimer = 0;
-          this.infinityFreezeCount = 0;
-          this.gojoAdaptColorHistory = [];
-          this.wheelGlowColor = null;
-
-          this.sukunaAdapted = { divineFlame: false };
-          this.sukunaFugaDodgeReady = false;
-          this._lastSukunaHitType = null;
-
-          this.adaptedSkills = {};
-          this.skillDodgeReady = {};
-          this._lastSkillShotId = null;
-          this._lastSkillShotColor = null;
-
-          spawnFloatingText(this.x, this.y - this.r - 25, '🔄 LEVEL 8 EXPIRED: ADAPTATIONS RESET!', '#FFD700');
-          triggerGlobalScreenShake(8, 16);
-          audioSystem.playSFX('skill_machinebroken', 1.0);
+          spawnFloatingText(this.x, this.y - this.r - 25, '⚡ MAX ADAPTATION (LEVEL 8) PERMANENT!', '#FFD700');
+          triggerGlobalScreenShake(6, 14);
+          audioSystem.playSFX('skill_enhance', 1.0);
         }
       }
     }

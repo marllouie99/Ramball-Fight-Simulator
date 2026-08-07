@@ -85,9 +85,13 @@ export function updateIllusions() {
           spawnIllusionSpawn(child);
           if (owner) owner.illusionsSummoned++;
         }
-        spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'SPLIT!', '#d070ff');
+        if (illusion.r >= 15) {
+          spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'SPLIT!', '#d070ff');
+        }
       } else {
-        spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
+        if (illusion.r >= 15) {
+          spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
+        }
       }
 
       // High-performance swap-and-pop array cleanup instead of splice
@@ -235,6 +239,7 @@ export function updateIllusions() {
       if (!entity || entity === illusion) continue;
       if (!entity.isIllusion) continue; // Skip fighters here
       if (!entity.hp || entity.hp <= 0) continue;
+      if (illusion.isSplitChild && entity.isSplitChild) continue; // Skip collision between small clumped children
 
       const dx = illusion.x - entity.x;
       const dy = illusion.y - entity.y;

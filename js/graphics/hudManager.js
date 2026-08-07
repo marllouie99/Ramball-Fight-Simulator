@@ -322,13 +322,16 @@ function updateHealthHud() {
   // Fast-ticking cooldown timers change by ~1 every single frame, which used to defeat this
   // throttle entirely. Quantizing them lets per-frame ticking fall through to the periodic
   // refresh below instead of forcing a full HUD recompute on every single frame.
+  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
+  const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
+
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
-  const currentSkillsStr = fighters.map(f => {
+  const currentSkillsStr = teamMode ? '' : fighters.map(f => {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)}`;
   }).join('|');
 
   const hpChanged = currentHpStr !== state._lastHpStr;
@@ -348,8 +351,8 @@ function updateHealthHud() {
     return; // Skip DOM update this frame to preserve CPU and lock 60 FPS
   }
 
-  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
-  const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
+  // Already declared above: const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
+  // Already declared above: const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
   
   if (!_cachedTopLeft) _cachedTopLeft = document.getElementById('hudTopLeft');
   if (!_cachedTopRight) _cachedTopRight = document.getElementById('hudTopRight');
@@ -477,23 +480,50 @@ function updateHealthHud() {
       ];
     }
     if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
-      const themeColor = f.color || '#00ff66';
-      const cleaveMax = CONFIG.mahoraga?.cleaveCooldown || 600;
-      const cleaveTimer = f.cleaveCooldown !== undefined ? f.cleaveCooldown : cleaveMax;
-      const cleavePct = Math.max(0, Math.min(100, (1 - (cleaveTimer / cleaveMax)) * 100));
+      const themeColor = '#FFD700'; // All skill bars gold theme for Mahoraga!
 
-      const shoutMax = CONFIG.mahoraga?.shoutCooldown || 480;
-      const shoutTimer = f.shoutCooldown !== undefined ? f.shoutCooldown : shoutMax;
-      const shoutPct = Math.max(0, Math.min(100, (1 - (shoutTimer / shoutMax)) * 100));
+      // 1. Dharma Wheel Rotation Level Progress Bar (LVL 01 - LVL 08)
+      const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
+      const currentLevel = Math.min(8, Math.max(1, totalStages + 1));
+      const lvlStr = currentLevel < 10 ? `0${currentLevel}` : `${currentLevel}`;
 
+      const isLevel8 = totalStages >= 8 || currentLevel >= 8 || f.isInfinityBlitz;
+      const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.05);
+
+      let wheelPct = 0;
+      if (isLevel8 || f.isInfinityBlitz || (f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0) {
+        wheelPct = 100;
+      } else {
+        const accum = f.totalAccumDamage || 0;
+        wheelPct = Math.max(0, Math.min(100, (accum / windowThreshold) * 100));
+      }
+
+      // 2. Throw Cooldown Progress Bar
       const throwMax = CONFIG.mahoraga?.throwCooldown || 1000;
       const throwTimer = f.throwCooldown !== undefined ? f.throwCooldown : throwMax;
-      const throwPct = Math.max(0, Math.min(100, (1 - (throwTimer / throwMax)) * 100));
+      let throwPct = 0;
+      if (f.isThrowing) {
+        throwPct = 0;
+      } else {
+        throwPct = Math.max(0, Math.min(100, (1 - (throwTimer / throwMax)) * 100));
+      }
+
+      // 3. Divine Shout Cooldown Progress Bar
+      const shoutMax = CONFIG.mahoraga?.shoutCooldown || 480;
+      const shoutTimer = f.shoutCooldown !== undefined ? f.shoutCooldown : shoutMax;
+      let shoutPct = 0;
+      if (f.isShouting) {
+        shoutPct = 0;
+      } else {
+        shoutPct = Math.max(0, Math.min(100, (1 - (shoutTimer / shoutMax)) * 100));
+      }
+
+      const numHtml = `<span style="font-family: Arial, sans-serif; font-weight: 900; font-size: 13px; letter-spacing: 0.5px;">${lvlStr}</span>`;
 
       return [
-        { id: 'cleave', pct: cleavePct, ready: cleavePct >= 99, color: themeColor, label: 'SWORD CLEAVE' },
-        { id: 'shout',  pct: shoutPct,  ready: shoutPct >= 99,  color: themeColor, label: 'WORLD SHOUT' },
-        { id: 'throw',  pct: throwPct,  ready: throwPct >= 99,  color: themeColor, label: 'BLADE BARRAGE' }
+        { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `DHARMA WHEEL - LVL ${numHtml}` },
+        { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: 'THROW' },
+        { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
       ];
     }
     if (f.characterId === 'layla' || f.type === 'layla') {
@@ -896,10 +926,44 @@ function updateHealthHud() {
         const stunDir = f.stunDirection === 'left' ? 'LEFT' : f.stunDirection === 'right' ? 'RIGHT' : f.stunDirection === 'up' ? 'UP' : 'NONE';
         info.push(`<b>Stun Dir:</b> ${stunDir}`);
       } else if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
-        if (f.gojoInfinityImmune) {
-          info.push(`<b>Adapt:</b> Infinity IMMUNE <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        const totalGoldStages = (f.goldAdaptationStage?.melee || 0) + 
+                                (f.goldAdaptationStage?.ranged || 0) + 
+                                (f.goldAdaptationStage?.skill || 0);
+        const parryPerStage = CONFIG.mahoraga?.parryChancePerStage || 0.08;
+        const baseParry = Math.round((CONFIG.mahoraga?.baseParryChance || 0) * 100);
+        const bonusParry = Math.round(totalGoldStages * parryPerStage * 100);
+
+        if (bonusParry > 0) {
+          info.push(`<b>Parry Chance:</b> ${baseParry}% + ${bonusParry}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Parry Chance:</b> ${baseParry}% + ${bonusParry}%`);
         }
-        info.push(`<b>Exposures:</b> ${f.gojoInfinityExposures || 0}/2`);
+
+        const adaptedSet = new Set();
+        if (f.adaptedSkills) {
+          Object.keys(f.adaptedSkills).forEach(k => { if (f.adaptedSkills[k]) adaptedSet.add(k); });
+        }
+        if (f.gojoAdapted) {
+          if (f.gojoAdapted.purple) adaptedSet.add('purple');
+          if (f.gojoAdapted.red) adaptedSet.add('red');
+          if (f.gojoAdapted.blue) adaptedSet.add('blue');
+        }
+        if (f.gojoInfinityImmune) adaptedSet.add('infinity');
+        if (f.sukunaAdapted) {
+          if (f.sukunaAdapted.divineFlame) adaptedSet.add('divineFlame');
+        }
+        if (f.adapted) {
+          if (f.adapted.melee) adaptedSet.add('melee');
+          if (f.adapted.ranged) adaptedSet.add('ranged');
+          if (f.adapted.skill && adaptedSet.size === 0) adaptedSet.add('skill');
+        }
+        const adaptedCount = adaptedSet.size;
+
+        if (adaptedCount > 0) {
+          info.push(`<b>Skills Adapted:</b> ${adaptedCount} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Skills Adapted:</b> ${adaptedCount}`);
+        }
       } else if (f.characterId === 'berserker' || f.type === 'berserker') {
         const rage = Math.round((f.rage || 0) * 100);
         const rageMax = Math.round((f.maxRage || 1) * 100);
@@ -1435,7 +1499,7 @@ function updateHealthHud() {
                 cachedSkill.lastLabelOnly = false;
               }
               if (cachedSkill.lastLabel !== s.label) {
-                cachedSkill.text.textContent = s.label;
+                cachedSkill.text.innerHTML = s.label;
                 cachedSkill.lastLabel = s.label;
               }
             }

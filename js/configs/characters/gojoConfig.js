@@ -51,7 +51,7 @@ export const gojoConfig = {
     passiveRctHealRate: 0.08,                // Per-frame passive regen when damaged
     rctRevivalHealPercent: 0.30,             // Restores 30% max HP on emergency revival
     // Melee Mode (Hand-to-Hand Combat)
-    initialMeleeDuration: 30, // Forces hand-to-hand combat for the initial duration
+    initialMeleeDuration: 60, // Forces hand-to-hand combat for the initial duration
     meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
     closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
     meleePunchDamage: 10,     // Damage dealt by each punch
@@ -65,18 +65,16 @@ export const gojoConfig = {
     teleportDodgeDistance: 85,               // Distance teleported on dodge
 
     // Limitless Infinity Barrier Mechanics
-    infinityRadius: 55,                      // Distance (in pixels from Gojo's center) for Limitless Infinity barrier detection
-    infinityCooldown: 200,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
-    infinityActiveDuration: 50,              // Frames (1.0s) Infinity continues to block multiple attacks after first impact before going on cooldown
-    infinityFreezeChance: 0.3,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
+    infinityRadius: 120,                      // Distance (in pixels from Gojo's center) for Limitless Infinity barrier detection
+    infinityCooldown: 500,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
+    infinityActiveDuration: 500,              // Frames (1.0s) Infinity continues to block multiple attacks after first impact before going on cooldown
+    infinityFreezeChance: 0.2,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
     infinityFreezeDuration: 80,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
-    infinityMeleeFreezeDuration: 5,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
+    infinityMeleePushForce: 8.5,             // Physical velocity impulse (rebound force) applied to push melee attackers away
     infinityMaxFrozenProjectiles: 4,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
 
     // Anime Melee Combat Rhythm & Disengage
-    forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round
-    meleeModeSeparationCooldown: 240,        // Frames (4.0 seconds) mandatory ranged separation after combo disengage
+    forcedMeleeIntroDuration: 200,           // Frames (3.0 seconds) forced melee clash at start of round
+    meleeModeSeparationCooldown: 200,        // Frames (4.0 seconds) mandatory ranged separation after combo disengage
     comboDisengageDistance: 300,             // Distance (pixels) teleported away on combo finisher
-    purpleFollowupMeleeDuration: 120,        // Frames (2.0 seconds) forced melee combo after firing Hollow Purple
-    purpleFollowupComboPunches: 4,           // Number of rapid punch-teleports in Purple follow-up combo
 };

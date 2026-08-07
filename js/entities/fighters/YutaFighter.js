@@ -107,35 +107,7 @@ export class YutaFighter extends Fighter {
   }
 
   _spawnTeleportAfterimages(oldX, oldY, targetX, targetY, customAngle = null) {
-    if (this.flurryHitsLeft > 0) return; // Removed afterimages during flurry per user request
-    
-    if (!this.afterImages) this.afterImages = [];
-    const dx = targetX - oldX;
-    const dy = targetY - oldY;
-    const dist = Math.hypot(dx, dy);
-    if (dist < 1) return;
-
-    const pathAngle = Math.atan2(dy, dx);
-    const facingAngle = (customAngle !== null) ? customAngle : (this.gunAngle !== undefined ? this.gunAngle : pathAngle);
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
-    const steps = isLowQuality ? Math.max(2, Math.floor(dist / 24)) : Math.max(5, Math.floor(dist / 8)); // Dense afterimages every 8px (spaced to 24px in low quality)
-
-    for (let i = 0; i <= steps; i++) {
-      const t = i / steps;
-      const maxTimer = 24 - Math.floor(t * 6);
-      pushTrailCap(this.afterImages, {
-        x: oldX + dx * t,
-        y: oldY + dy * t,
-        angle: facingAngle,
-        timer: maxTimer,
-        maxTimer: maxTimer,
-        isFlurry: (this.flurryHitsLeft > 0),
-        fromX: oldX,
-        fromY: oldY,
-        toX: targetX,
-        toY: targetY
-      }, 30);
-    }
+    return; // Removed all afterimages on Yuta per user request
   }
 
   triggerDemoAttack() {
@@ -374,8 +346,8 @@ export class YutaFighter extends Fighter {
           const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
           const flurryDmg = (CONFIG.yuta.flurryDamage || 8) * dmgMult;
 
-          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true });
-          if (typeof this.flurryTarget.applyHitStun === 'function') this.flurryTarget.applyHitStun(15);
+          // Pass isSkill: true to bypass global basic attack hit-pause
+          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true });
 
           spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
           triggerGlobalScreenShake(6, 6);
@@ -431,8 +403,8 @@ export class YutaFighter extends Fighter {
             audioSystem.playSFX('attack_swordswing', 0.6);
           }
 
-          // Freeze target during the flurry slash (do NOT freeze Yuta himself!)
-          if (typeof this.flurryTarget.applyTimeStop === 'function') this.flurryTarget.applyTimeStop(8);
+          // Removed target time-stop/freeze during flurry per user request
+
         } else {
           this.flurryHitsLeft = 0;
           this.flurryGhost = null;
@@ -611,15 +583,16 @@ export class YutaFighter extends Fighter {
     }
 
     // --- Hyper-armor Melee Override ---
-    // Allow Yuta to swing his katana even while in hitstun if an enemy is close,
+    // Allow Yuta to swing his katana while in hitstun ONLY if not actively taking knockback,
     // so he doesn't get infinitely stun-locked by Gojo or Sukuna's rapid punches.
-    if (this.hitStunTimer > 0 && !this.isChannelingDomain && this.hp > 0 && this.meleeCooldown <= 0) {
+    const isKnockedBack = (this.knockbackStunTimer || 0) > 0;
+    if (this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && this.hp > 0 && this.meleeCooldown <= 0) {
       let enemyInMelee = false;
       const range = CONFIG.yuta.meleeRange || 95;
       const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
-      if (opponent) {
+      if (opponent && !isKnockedBack) {
         this.aim(opponent);
       }
 
@@ -667,7 +640,8 @@ export class YutaFighter extends Fighter {
     // he detects incoming threats and raises his guard visually.
     if (this.hp > 0 && !this.isChannelingDomain && !this.domainActive) {
       const isSwinging = (this.meleeCooldown > this.meleeCooldownMax - 15);
-      if (!isSwinging && (this.blockPoseTimer === undefined || this.blockPoseTimer <= 0)) {
+      const isKnockedBackOrStunned = (this.knockbackStunTimer || 0) > 0 || (this.hitStunTimer || 0) > 0;
+      if (!isSwinging && !isKnockedBackOrStunned && (this.blockPoseTimer === undefined || this.blockPoseTimer <= 0)) {
         let incomingThreat = false;
         let threatX = 0, threatY = 0;
         const myIndex = state.fighters.indexOf(this);
@@ -684,7 +658,7 @@ export class YutaFighter extends Fighter {
 
           const dist = Math.hypot(proj.x - this.x, proj.y - this.y);
           const threatRad = CONFIG.yuta.parryThreatRadius || 180;
-          if (dist < threatRad) { // Detection radius for projectiles
+          if (dist > 15 && dist < threatRad) { // Avoid snapping to threats that are on top of him (fixes spin jitter)
             incomingThreat = true;
             threatX = proj.x;
             threatY = proj.y;
@@ -700,8 +674,9 @@ export class YutaFighter extends Fighter {
             const enemyTeam = state.getFighterTeam(i);
             if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
 
+            const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
             const meleeThreatRad = CONFIG.yuta.parryMeleeThreatRadius || 120;
-            if (Math.hypot(enemy.x - this.x, enemy.y - this.y) < meleeThreatRad) {
+            if (dist > 15 && dist < meleeThreatRad) { // Avoid snapping to threats that are on top of him (fixes spin jitter)
               incomingThreat = true;
               threatX = enemy.x;
               threatY = enemy.y;
@@ -735,7 +710,7 @@ export class YutaFighter extends Fighter {
     const isSwinging = (this.meleeCooldown > maxCd - 15);
 
     // Ignore unblockable damage types (including Gojo's purple orb)
-    const unblockable = opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || (opts.projectile && opts.projectile.type === 'purple');
+    const unblockable = opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
 
     const isGuarding = this.blockPoseTimer > 0;
     const blockChance = this.getParryChance();
@@ -1136,10 +1111,15 @@ export class YutaFighter extends Fighter {
     this._drawYutaSwordStrap(ctx);
 
     // Determine swing state
+    // Determine swing state
+    // Restrict meleeCooldown check to strictly <= maxCd because interruptAttacks(true) 
+    // sets meleeCooldown to 270 (penalty cooldown), which would falsely trigger 
+    // a 4-second backwards spinning katana animation!
     const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
     const maxCd = this.meleeCooldownMax;
     const isFlurrySwinging = (this.flurrySlashTimer > 0);
-    let isSwinging = isFlurrySwinging || (this.meleeCooldown > maxCd - 15) || !!editP;
+    const isValidSwingRange = (this.meleeCooldown > maxCd - 15) && (this.meleeCooldown <= maxCd);
+    let isSwinging = isFlurrySwinging || isValidSwingRange || !!editP;
     let progress = 1.0;
     let fade = (this.slashFadeTimer || 0) / 15;
 
@@ -1170,7 +1150,10 @@ export class YutaFighter extends Fighter {
     }
 
     // --- DRAW DYNAMIC KATANA TIP TRAIL IN WORLD SPACE ---
-    if (this.swordTrail && this.swordTrail.length > 1) {
+    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+    );
+    if (this.swordTrail && this.swordTrail.length > 1 && !isGojoDomainActive) {
       ctx.save();
       ctx.globalCompositeOperation = 'source-over'; // Standard blending for visibility on white arenas
 

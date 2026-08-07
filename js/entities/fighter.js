@@ -876,7 +876,7 @@ export class Fighter {
 
   /** Controls how the gun is aimed. Default aims in direction of opponent with delayed reaction time if stealthed. */
   aim(opponent) {
-    if (!opponent || this.isTargetOfAmbush) {
+    if (!opponent || this.isTargetOfAmbush || (this.knockbackStunTimer > 0) || (this.hitStunTimer > 0) || (this.timeStopTimer > 0)) {
       return;
     }
 

@@ -46,30 +46,15 @@ export function drawGojoBody(ctx, fighter) {
       const pulse = Math.sin(time * 0.005) * 2;
       const barrierRadius = infinityR + pulse;
 
-      // 1. Crisp Spatial Refraction Barrier Ring (No solid filled cyan ball!)
-      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
-      ctx.lineWidth = 2.2;
+      // Soft Radial Spatial Gradient (glowing sphere bubble)
+      const bubbleGrad = ctx.createRadialGradient(0, 0, fighter.r * 0.8, 0, 0, barrierRadius);
+      bubbleGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+      bubbleGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.06)');
+      bubbleGrad.addColorStop(1, 'rgba(0, 229, 255, 0.18)');
+      ctx.fillStyle = bubbleGrad;
       ctx.beginPath();
       ctx.arc(0, 0, barrierRadius, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 3. Inner White Core Barrier Ring
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.arc(0, 0, barrierRadius - 3, 0, Math.PI * 2);
-      ctx.stroke();
-
-      // 4. Rotating Infinity Spatial Distortion Arcs (Infinite division of space)
-      const rot1 = time * 0.002;
-      ctx.strokeStyle = 'rgba(224, 255, 255, 0.65)';
-      ctx.lineWidth = 1.5;
-      for (let a = 0; a < 3; a++) {
-        const startA = rot1 + a * (Math.PI * 2 / 3);
-        ctx.beginPath();
-        ctx.arc(0, 0, barrierRadius - 1, startA, startA + Math.PI * 0.4);
-        ctx.stroke();
-      }
+      ctx.fill();
 
       ctx.restore();
     }

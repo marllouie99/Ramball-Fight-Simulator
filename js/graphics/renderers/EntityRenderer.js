@@ -321,8 +321,11 @@ export function drawFighters() {
     ctx.restore();
   });
 
+  const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
+
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || typeof fighter._drawAttackSlashEffects !== 'function') return;
+    if (isGojoDomainActive && fighter.characterId !== 'gojo') return; // Hide enemy slash effects in Gojo's domain
     try {
       fighter._drawAttackSlashEffects(ctx);
     } catch (e) {
@@ -333,6 +336,7 @@ export function drawFighters() {
   // Draw beam overlays (LaserFighter / Trickster laser beams) on top of fighters
   fighters.forEach((fighter) => {
     if (!fighter || fighter.hp <= 0 || typeof fighter.drawBeamOverlay !== 'function') return;
+    if (isGojoDomainActive && fighter.characterId !== 'gojo') return; // Hide enemy beam overlays in Gojo's domain
     try {
       fighter.drawBeamOverlay(ctx);
     } catch (e) {

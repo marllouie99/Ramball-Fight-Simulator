@@ -18,7 +18,7 @@ export const mahoragaConfig = {
     wheelRotationSpeed: 0.10,       // Passive visual rotation speed of the wheel
 
     // Level 8 Max Adaptation: Attack-Teleport Speed-Blitz Configs
-    infinityBlitzDurationFrames: 400,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
+    infinityBlitzDurationFrames: 800,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
     infinityBlitzInterval: 20,        // Frame interval between continuous attacks/strikes (smaller = faster strikes e.g. 6; larger = slower e.g. 20)
     infinityBlitzAttacksPerTeleport: 5, // Number of attacks executed before teleporting to a new angle (e.g. 2 attacks -> teleport -> 2 attacks)
     infinityBlitzDamage: 15,          // Damage per True Damage strike during Level 8 speed-blitz
@@ -74,17 +74,14 @@ export const mahoragaConfig = {
 
     // Reverse Cursed Technique (RCT / Divine Healing at Low HP & Adaptation)
     enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing
-    rctHealThresholdHpPercent: 0.10,  // Triggers RCT healing when HP drops to 25% or below
-    rctHealAmountPercent: 0.01,       // Heals 35% of max HP back upon trigger
-    rctHealCooldownFrames: 1500,      // Recharge cooldown (frames) between RCT heals (1200 frames = ~20s at 60fps)
-
-    rctHealLevelInterval: 3,          // How many adaptation levels (wheel clicks) before Mahoraga triggers a heal (e.g., every 3 levels)
-    rctHealPerClickPercent: 0.08,     // How much HP Mahoraga heals when the wheel click heal triggers (8% of max HP)
+    rctHealAmountPercent: 0.10,       // Fraction of max HP healed on each wheel rotation click (0.10 = 10%)
+    rctHealLevelInterval: 1,          // Heal on each adaptation level (every wheel rotation!)
+    rctHealPerClickPercent: 0.02,       // Heals 10% of max HP on each wheel rotation click
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
-    fatalAdaptWindowFrames: 500,     // Rolling window duration (frames) — damage from any attack must accumulate within this time (300 = 5 seconds at 60fps)
-    fatalDamageThresholdPct: 0.05,  // Fraction of maxHp that must accumulate within the window to trigger wheel click (10% = e.g. 15 HP for a 150 HP Mahoraga)
-    fatalAdaptCooldownFrames: 300,   // Cooldown (frames) between wheel clicks — prevents back-to-back rapid triggers (300 = 5 seconds at 60fps)
+    fatalAdaptWindowFrames: 600,     // Rolling window duration (frames) — 10 seconds window
+    fatalDamageThresholdPct: 0.10,  // 5% max HP damage threshold triggers wheel click
+    fatalAdaptCooldownFrames: 45,    // Cooldown (frames) between wheel clicks (45 = 0.75s)
 
     // Teleportation Speed & Afterimage Visibility Settings
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)

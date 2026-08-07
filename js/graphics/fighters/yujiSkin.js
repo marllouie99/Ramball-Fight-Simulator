@@ -14,7 +14,10 @@ export function drawYujiSkin(ctx, fighter) {
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const now = Date.now();
   // 1. Draw afterimages (Zone trails) at their absolute coordinates
-  if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0) {
+  const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+  );
+  if (!isLowQuality && fighter.afterImages && fighter.afterImages.length > 0 && !isGojoDomainActive) {
     for (let i = 0; i < fighter.afterImages.length; i++) {
       const ai = fighter.afterImages[i];
       if (ai.timer <= 0) continue;

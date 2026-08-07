@@ -433,7 +433,7 @@ export const CONFIG = {
     illusionHealthPercent: 0.02, // health percentage threshold for summoning illusion (every 2%)
     maxIllusions: 4,         // maximum number of illusions that can exist at once
     illusionDamagePercent: 0.5, // illusions deal 50% of original damage
-    illusionDamageReceivedMultiplier: 2.9, // illusions receive 2x damage
+    illusionDamageReceivedMultiplier: 3.5, // illusions receive 2x damage
     illusionDuration: 2000,    // frames illusions last before fading (10 seconds at 60 fps)
     illusionSpeedSync: true,  // if true, illusions spawn with current speed; if false, use base speed
   },
@@ -1021,7 +1021,7 @@ export const FIGHTER_DEFS = [
     hp: 200,
     damage: 12,
     cooldown: 80,
-    moveSpeed: 6.5,
+    moveSpeed: 5.5,
     projectileSpeedMultiplier: 6.0,
     ability: 'Limitless',
     desc: 'Uses Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
@@ -1040,7 +1040,7 @@ export const FIGHTER_DEFS = [
     hp: 200,
     damage: 15,
     cooldown: 80,
-    moveSpeed: 6.8,
+    moveSpeed: 5.8,
     projectileSpeedMultiplier: 3.0,
     ability: 'King of Curses',
     desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
@@ -1194,7 +1194,7 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
     spinRate: 0,
     type: 'mahoraga',
     hp: 250, // Tanky boss-like health
-    damage: 25,
+    damage: 15,
     cooldown: 60,
     moveSpeed: 6.5, // Slow but menacing
     projectileSpeedMultiplier: 1.0,

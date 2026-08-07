@@ -76,6 +76,14 @@ export function updateRika(fighter, arena) {
   if (!fighter.rika) return;
 
   const rk = fighter.rika;
+  
+  const isFrozen = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0) || 
+                   (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || 
+                   (fighter.crimsonElectrifiedTimer > 0) || (fighter.isFrozenByInfinity);
+                   
+  if (isFrozen && !rk.active) {
+    return;
+  }
 
   // Handle groundTremble audio timer countdown
   if (rk.trembleStopTimer > 0) {
