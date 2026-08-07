@@ -9,7 +9,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
-  if (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0) return false;
+  if (fighter.isMeleeMode || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0)) return false;
   
   if ((fighter.infinityActiveTimer || 0) <= 0) {
     fighter.infinityActiveTimer = CONFIG.gojo?.infinityActiveDuration ?? 60;
@@ -31,6 +31,10 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   }
 
   if (attacker && attacker !== fighter) {
+    if (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion) {
+      // Domain Channeling has supreme domain hyper-armor — bypasses Infinity block completely!
+      return false;
+    }
     if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
       if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
         const hasAdapted = attacker.adapted?.melee || attacker.gojoInfinityImmune || attacker.isMaxAdapted;
@@ -41,39 +45,48 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       }
       
       // Calculate push direction away from Gojo
-      const dx = attacker.x - fighter.x;
-      const dy = attacker.y - fighter.y;
-      const dist = Math.hypot(dx, dy) || 1;
-      
-      const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5; // Strong clean bounce impulse from config
-      const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
+      let dx = attacker.x - fighter.x;
+      let dy = (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0));
+      let dist = Math.hypot(dx, dy);
 
-      // Push the attacker back
-      attacker.vx = (dx / dist) * pushForce;
-      attacker.vy = (dy / dist) * pushForce;
-
-      // Push Gojo back in the opposite direction (if not performing major techniques/skills)
-      if (!isImmovable) {
-        fighter.vx = (-dx / dist) * pushForce;
-        fighter.vy = (-dy / dist) * pushForce;
+      if (dist < 0.1) {
+        const fallbackAngle = (fighter.gunAngle !== undefined) ? fighter.gunAngle + Math.PI : Math.random() * Math.PI * 2;
+        dx = Math.cos(fallbackAngle);
+        dy = Math.sin(fallbackAngle);
+        dist = 1.0;
       }
       
-      // Resolve overlap instantly to slide them outside the barrier
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 10.5; // Strong clean bounce impulse from config
+      const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
+
+      // Push the attacker back with strong outward velocity
+      attacker.vx = nx * pushForce;
+      attacker.vy = ny * pushForce;
+
+      // Push Gojo back slightly in the opposite direction (if not performing major techniques/skills)
+      if (!isImmovable) {
+        fighter.vx = -nx * (pushForce * 0.4);
+        fighter.vy = -ny * (pushForce * 0.4);
+      }
+      
+      // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
       const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
-      const minDist = attacker.r + barrierRadius;
+      const attRadius = attacker.r || 25;
+      const minDist = attRadius + barrierRadius;
       const overlap = minDist - dist;
+
       if (overlap > 0) {
         if (!isImmovable) {
-          // Push both apart by half the overlap
           const halfOverlap = overlap / 2;
-          attacker.x += (dx / dist) * halfOverlap;
-          attacker.y += (dy / dist) * halfOverlap;
-          fighter.x -= (dx / dist) * halfOverlap;
-          fighter.y -= (dy / dist) * halfOverlap;
+          attacker.x += nx * (halfOverlap + 2);
+          attacker.y += ny * (halfOverlap + 2);
+          fighter.x -= nx * halfOverlap;
+          fighter.y -= ny * halfOverlap;
         } else {
-          // Push only the attacker if Gojo is immovable
-          attacker.x += (dx / dist) * overlap;
-          attacker.y += (dy / dist) * overlap;
+          attacker.x += nx * (overlap + 3);
+          attacker.y += ny * (overlap + 3);
         }
       }
     }

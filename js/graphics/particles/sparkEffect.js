@@ -945,7 +945,7 @@ export function drawSparkEffects(layer = 'all') {
         if (effect.targetSize) {
           effect.size += (effect.targetSize - effect.size) * 0.15;
         }
-        const isGojo = effect.clashType === 'gojo';
+        const isGojo = effect.clashType === 'gojo' || effect.clashType === 'gojo_infinity';
         const mainColor = isGojo ? `rgba(0, 229, 255, ${effect.life * 0.85})` : `rgba(255, 60, 60, ${effect.life * 0.85})`;
         const innerColor = isGojo ? `rgba(200, 245, 255, ${effect.life * 0.95})` : `rgba(255, 200, 200, ${effect.life * 0.95})`;
 

@@ -852,8 +852,10 @@ function updateHealthHud() {
       
       if (f.characterId === 'gojo' || f.type === 'gojo') {
         const infinityCooldown = f.infinityCooldown || 0;
-        const isLimitlessActive = (infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer || 0) > 0);
-        if (isLimitlessActive) {
+        const isLimitlessActive = (!f.isMeleeMode && (infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer || 0) > 0));
+        if (f.isMeleeMode) {
+          info.push(`<b>Infinity:</b> Off`);
+        } else if (isLimitlessActive) {
           info.push(`<b>Infinity:</b> Active`);
         } else {
           info.push(`<b>Infinity:</b> CD`);

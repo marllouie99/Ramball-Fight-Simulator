@@ -295,7 +295,7 @@ export class GojoRenderer {
       // Aura suppressed during Hollow Purple orb fusion
     } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
       fighter._drawJJKCursedEnergyAura(ctx, 'rct');
-    } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+    } else if (!isFrozenByDomain && !isInOwnDomain && fighter.isMeleeMode && (fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
       fighter._drawJJKCursedEnergyAura(ctx, 'blue');
     }
 
@@ -422,12 +422,19 @@ export class GojoRenderer {
       return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
     }
 
-    // 4. Domain Expansion Hand Sign Gesture
+    // 4. Domain Expansion Hand Sign Gesture (Unlimited Void - Single Hand Sign near Collar)
     if (fighter.isChannelingDomainExpansion) {
-      const domainDist = r + 8;
-      const fHand = toGlobal(domainDist, 3);
-      const bHand = toGlobal(domainDist, -3);
-      return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
+      hideBackHand = true;
+      hideFrontHand = false;
+      const domainHand = toGlobal(0, r * 0.28);
+      return {
+        frontHandX: domainHand.x,
+        frontHandY: domainHand.y,
+        backHandX: domainHand.x,
+        backHandY: domainHand.y,
+        hideFrontHand,
+        hideBackHand
+      };
     }
 
     // Idle martial arts brawler guard stance & dynamic 1-2 flurry punches (matching Aoi Todo)
@@ -470,34 +477,9 @@ export class GojoRenderer {
     };
   }
 
-  // Render hand Cursed Energy flame aura BEHIND physical body
+  // Render hand Cursed Energy aura blobs (removed per user request)
   static _drawHandCursedEnergyAura(ctx, fighter) {
-    // Hide Cursed Energy aura on hands during domain activation and domain expansion
-    if (fighter.isChannelingDomainExpansion || fighter.domainActive) return;
-
-    const hands = fighter._getHandPositions();
-    if (!hands) return;
-
-    const isRCT = (fighter.isChannelingRCT || fighter.healingAuraTimer > 0);
-    const isPurple = (fighter.isChannelingPurple);
-    const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
-    const isActive = !isRCT && !isPurple && !isFrozenByDomain && ((fighter.combatAuraOpacity > 0.05) || (fighter.isMeleeMode) || (fighter.punchAnimTimer > 0) || (fighter.redEffectTimer > 0) || (state.gameState === 'countdown'));
-
-    if (isActive) {
-      // During Phase 1 (orb buildup), suppress the hand aura so the red orb stands alone.
-      // During Phase 2+ blast the hand aura can show.
-      const buildupFrames = (typeof CONFIG !== 'undefined' && CONFIG.gojo?.redBuildupFrames) || 20;
-      const totalFrames  = fighter.redEffectMaxTimer || 75;
-      const elapsed      = totalFrames - fighter.redEffectTimer;
-      const isOrbBuildup = (fighter.redEffectTimer > 0) && fighter.redBuildupPhase;
-      if (isOrbBuildup) return; // Suppress during buildup — orb renders on top
-
-      const theme = (fighter.redEffectTimer > 0 ? 'blue' : 'blue'); // always blue for hand aura
-      const blobRadius = (fighter.punchAnimTimer > 0) ? 15.0 : 12.0;
-
-      if (!hands.hideFrontHand) fighter._drawJJKCursedEnergyAura(ctx, theme, hands.frontHandX, hands.frontHandY, blobRadius);
-      if (!hands.hideBackHand) fighter._drawJJKCursedEnergyAura(ctx, theme, hands.backHandX, hands.backHandY, blobRadius);
-    }
+    return;
   }
 
   // Render physical circle hands (back layer behind body, front layer on top of body)
@@ -509,7 +491,7 @@ export class GojoRenderer {
     const handRadius = getHandSize(7.5, fighter);
 
     ctx.save();
-    ctx.fillStyle = fighter.color || '#FFE4C4';
+    ctx.fillStyle = fighter.skinColor || '#FFE0BD';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
 
@@ -527,43 +509,27 @@ export class GojoRenderer {
       ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
-    }
-    ctx.restore();
 
-    // Draw Cursed Energy fist glow around punching hand during punch animation ON TOP of fighters (suppressed during domain)
-    if ((layer === 'all' || layer === 'front') && fighter.punchAnimTimer > 0 && !fighter.domainActive && !fighter.isChannelingDomainExpansion) {
-      const strikingX = fighter.punchAnimHand === 0 ? frontHandX : backHandX;
-      const strikingY = fighter.punchAnimHand === 0 ? frontHandY : backHandY;
+      // Unlimited Void Hand Sign: crossed fingers near collar during domain channeling
+      if (fighter.isChannelingDomainExpansion) {
+        ctx.fillStyle = fighter.skinColor || '#FFE0BD';
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 1.8;
 
-      ctx.save();
-      ctx.translate(strikingX, strikingY);
-
-      // Glowing Cursed Energy aura around punching fist
-      const auraGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 16);
-      auraGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-      auraGrad.addColorStop(0.35, 'rgba(0, 229, 255, 0.85)');
-      auraGrad.addColorStop(0.7, 'rgba(0, 150, 255, 0.4)');
-      auraGrad.addColorStop(1, 'rgba(0, 100, 255, 0)');
-
-      ctx.fillStyle = auraGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, 16, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Sharp Cyan Cursed Energy Ray Flares
-      ctx.strokeStyle = '#00E5FF';
-      ctx.lineWidth = 2;
-      for (let i = 0; i < 4; i++) {
-        const rayAngle = (Math.PI / 2) * i + (Date.now() * 0.01);
+        // Index finger
         ctx.beginPath();
-        ctx.moveTo(Math.cos(rayAngle) * 3, Math.sin(rayAngle) * 3);
-        ctx.lineTo(Math.cos(rayAngle) * 12, Math.sin(rayAngle) * 12);
+        ctx.rect(frontHandX - 3, frontHandY - handRadius * 1.5, 4, handRadius * 1.5);
+        ctx.fill();
+        ctx.stroke();
+
+        // Middle finger crossed over
+        ctx.beginPath();
+        ctx.rect(frontHandX - 1, frontHandY - handRadius * 1.6, 4, handRadius * 1.6);
+        ctx.fill();
         ctx.stroke();
       }
-
-      ctx.restore();
     }
-
+    ctx.restore();
   }
 
   static drawOutline(ctx, fighter) {

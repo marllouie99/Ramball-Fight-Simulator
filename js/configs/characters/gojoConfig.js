@@ -65,9 +65,10 @@ export const gojoConfig = {
     teleportDodgeDistance: 85,               // Distance teleported on dodge
 
     // Limitless Infinity Barrier Mechanics
+    infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
     infinityRadius: 120,                      // Distance (in pixels from Gojo's center) for Limitless Infinity barrier detection
-    infinityCooldown: 500,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
-    infinityActiveDuration: 500,              // Frames (1.0s) Infinity continues to block multiple attacks after first impact before going on cooldown
+    infinityCooldown: 100,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
+    infinityActiveDuration: 100,              // Frames (1.0s) Infinity continues to block multiple attacks after first impact before going on cooldown
     infinityFreezeChance: 0.2,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
     infinityFreezeDuration: 80,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
     infinityMeleePushForce: 8.5,             // Physical velocity impulse (rebound force) applied to push melee attackers away

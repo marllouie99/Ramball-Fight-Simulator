@@ -271,6 +271,33 @@ export function drawArena() {
   ctx.restore();
 }
 
+export function excludeGojoInfinityFromDim(ctx) {
+  if (!state.fighters) return;
+  for (const f of state.fighters) {
+    if (!f || f.hp <= 0) continue;
+    const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
+    if (!isGojo) continue;
+    const isLimitlessActive = (!f.isMeleeMode && (f.infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer || 0) > 0));
+    if (!isLimitlessActive) continue;
+    
+    const infinityR = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
+    const cutoutRadius = infinityR + 25;
+    const drawY = f.y - (f.z || 0);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'destination-out';
+    const holeGrad = ctx.createRadialGradient(f.x, drawY, 0, f.x, drawY, cutoutRadius);
+    holeGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
+    holeGrad.addColorStop(0.70, 'rgba(0, 0, 0, 0.85)');
+    holeGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = holeGrad;
+    ctx.beginPath();
+    ctx.arc(f.x, drawY, cutoutRadius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+}
+
 let currentPurpleDimOpacity = 0;
 
 /**
@@ -355,6 +382,32 @@ export function drawPurpleDimScreen() {
   ctx.globalAlpha = opacity;
   ctx.fillStyle = state._cachedPurpleDimGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Rika from Gojo's Purple dim screen overlay so she stays fully bright & un-tinted
+  if (state.fighters) {
+    for (const f of state.fighters) {
+      if (!f || !f.rika || !f.rika.active || !f.rikaAlpha || f.rikaAlpha <= 0) continue;
+      const rk = f.rika;
+      const rScale = rk.spawnScale ?? 1.0;
+      const cutoutRadius = Math.max(90, (rk.r || 35) * rScale * 3.0 + 60);
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      const holeGrad = ctx.createRadialGradient(rk.x, rk.y, 0, rk.x, rk.y, cutoutRadius);
+      const alphaMult = Math.min(1.0, f.rikaAlpha || 1.0);
+      holeGrad.addColorStop(0, `rgba(0, 0, 0, ${alphaMult})`);
+      holeGrad.addColorStop(0.60, `rgba(0, 0, 0, ${alphaMult * 0.85})`);
+      holeGrad.addColorStop(1.0, `rgba(0, 0, 0, 0)`);
+      ctx.fillStyle = holeGrad;
+      ctx.beginPath();
+      ctx.arc(rk.x, rk.y, cutoutRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
+  // Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
@@ -433,6 +486,9 @@ export function drawTojiUltimateOverlay() {
     }
   }
 
+  // Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
@@ -474,6 +530,10 @@ export function drawMahoragaAdaptationDimScreen() {
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;

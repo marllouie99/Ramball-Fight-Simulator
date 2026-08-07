@@ -130,12 +130,16 @@ export class YutaFighter extends Fighter {
       this.slashFadeTimer--;
     }
 
+    if (this.isChannelingDomain) {
+      // Domain Channeling Hyper-Armor: Yuta is immune to timeStop, hitStun, & Gojo Infinity freeze while casting Authentic Mutual Love
+      this.timeStopTimer = 0;
+      this.isFrozenByInfinity = false;
+      this.hitStunTimer = 0;
+    }
+
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
       // Domain channeling & active domain have hyper-armor — do NOT cancel them via interruptAttacks().
-      // interruptAttacks() sets isChannelingDomain = false, which would silently abort the domain mid-charge.
-      // Gojo's Infinity freeze can still freeze Yuta's body (vx/vy are zeroed inside the channeling block),
-      // but the charge timer must survive the freeze so the domain actually activates.
       if (!this.isChannelingDomain && !this.domainActive) {
         this.interruptAttacks();
       }
@@ -1103,6 +1107,16 @@ export class YutaFighter extends Fighter {
     return modGetKatanaTipPositions(this);
   }
 
+
+  interruptAttacks(forceCancelAll = false) {
+    const wasChannelingDomain = this.isChannelingDomain;
+    const currentDomainCharge = this.domainChargeTimer;
+    super.interruptAttacks(forceCancelAll);
+    if (wasChannelingDomain && !forceCancelAll) {
+      this.isChannelingDomain = true;
+      this.domainChargeTimer = currentDomainCharge;
+    }
+  }
 
   drawGun(ctx) {
     const isGamePlay = (typeof state !== 'undefined' && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));

@@ -21,10 +21,13 @@ export class GojoFighter extends Fighter {
     super(def);
     this.characterId = 'gojo';
     this.type = 'gojo';
+    this.skinColor = '#FFE0BD';
+    this.color = '#FFE0BD';
     this.shootCooldownMax = CONFIG.gojo.blueCooldown ?? def.cooldown;
     this.cooldown = this.shootCooldownMax;
     this.infinityCooldown = 0;
     this.infinityActive = true;
+    this.infinityFadeOpacity = 0;
 
     this.redCooldown = CONFIG.gojo.redCooldown || 1200;
     this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1000; // Delay initial cast
@@ -239,7 +242,8 @@ export class GojoFighter extends Fighter {
     // Check Infinity Passive first (Domain sure-hit & bypassShield attacks bypass Limitless Infinity, self-damage cannot trigger Infinity)
     // Toji Fushiguro (ISOH lore exception): Inverted Spear of Heaven always pierces Limitless Infinity — skip block entirely
     const isToji = attacker && (attacker.characterId === 'toji' || attacker.type === 'toji');
-    if (!isToji && this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield && !attacker.domainActive) {
+    const isAttackerChannelingDomain = attacker && (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion);
+    if (!this.isMeleeMode && !isToji && !isAttackerChannelingDomain && this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
       if (attacker.characterId === 'mahoraga') {
         const totalStages = (attacker.adaptationStage?.melee || 0) + (attacker.adaptationStage?.ranged || 0) + (attacker.adaptationStage?.skill || 0);
@@ -428,6 +432,13 @@ export class GojoFighter extends Fighter {
       return;
     }
     if (this.redEffectTimer > 0) {
+      // Trigger Red channeling SFX once when channeling starts
+      if (!this._hasPlayedRedChannelingSound) {
+        this._hasPlayedRedChannelingSound = true;
+        const sChan = getSkillSound(this._def?.id, 'red_channeling');
+        audioSystem.playSFX(sChan?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sChan?.volume ?? 1.8);
+      }
+
       // Buildup phase: freeze nearby enemies in place (near-zero slow)
       const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 20;
       const redRemaining = this.redEffectTimer;
@@ -549,6 +560,14 @@ export class GojoFighter extends Fighter {
       if (this.infinityCooldown <= 0) {
         this.infinityActive = true;
       }
+    }
+
+    // Smooth fade-in & fade-out for Limitless Infinity barrier visuals
+    const barrierShouldBeActive = !this.isMeleeMode && (this.infinityActive || this.infinityCooldown <= 0) && !this.isChannelingPurple && !this.domainActive && this.hp > 0;
+    if (barrierShouldBeActive) {
+      this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05); // ~20 frames smooth fade-in
+    } else {
+      this.infinityFadeOpacity = Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
     }
 
     if (this.teleportSlideTimer > 0) {
@@ -1382,39 +1401,35 @@ export class GojoFighter extends Fighter {
   }
 
   _checkInfinityCollisions() {
-    if (this.infinityCooldown > 0 || this.hp <= 0 || this.isChannelingPurple || this.domainActive) return;
+    if (this.isMeleeMode || this.infinityCooldown > 0 || this.hp <= 0 || this.isChannelingPurple || this.domainActive) return;
 
     const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
-    const nearbyEntities = spatialGrid.getNearby(this.x, this.y, barrierRadius + 50);
-    for (const entity of nearbyEntities) {
-      if (!entity || entity === this || entity.hp <= 0) continue;
-      if (entity.owner === this) continue; // Don't block own summons/illusions
+    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
 
-      // Toji explicitly bypasses Infinity
+    for (const entity of allTargets) {
+      if (!entity || entity === this || entity.hp <= 0) continue;
+      if (entity.owner === this || (entity.team !== undefined && entity.team === this.team)) continue; // Don't block self, teammates, or own summons/illusions
+
+      // Toji & Domain channelers explicitly bypass Infinity
       if (entity.type === 'toji' || entity.characterId === 'toji') continue;
+      if (entity.isChannelingDomain || entity.isChannelingDomainExpansion) continue;
 
       // Adapted Mahoraga bypasses Infinity
       const isMahoragaAdapted = (entity.type === 'mahoraga' || entity.characterId === 'mahoraga') && 
                                 (entity.adapted?.melee || entity.gojoInfinityImmune || entity.isMaxAdapted);
       if (isMahoragaAdapted) continue;
 
+      const entY = entity.y - (entity.z || 0);
+      const gojoY = this.y - (this.z || 0);
       const dx = entity.x - this.x;
-      const dy = entity.y - this.y;
+      const dy = entY - gojoY;
       const distSq = dx * dx + dy * dy;
-      const minDist = entity.r + barrierRadius;
+      const entRadius = entity.r || 25;
+      const minDist = entRadius + barrierRadius;
 
-      if (distSq < minDist * minDist && distSq > 0) {
-        if (entity._infinitySpatialEvaluated === undefined) {
-          entity._infinitySpatialEvaluated = true;
-          const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
-          entity._infinitySpatialBypassed = Math.random() > freezeChance;
-          setTimeout(() => { if (entity) delete entity._infinitySpatialEvaluated; }, 800);
-        }
-
-        if (!entity._infinitySpatialBypassed) {
-          if (typeof this.triggerInfinityBlock === 'function') {
-            this.triggerInfinityBlock(entity.x, entity.y, entity);
-          }
+      if (distSq < minDist * minDist) {
+        if (typeof this.triggerInfinityBlock === 'function') {
+          this.triggerInfinityBlock(entity.x, entity.y, entity);
         }
       }
     }

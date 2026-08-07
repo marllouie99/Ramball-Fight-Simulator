@@ -545,21 +545,24 @@ export function drawBlueAimbotGun(ctx, x, y, gunAngle, r, fighter) {
   ctx.stroke();
 
   if (recoil > 0.1) {
+    const clampedRecoil = Math.max(0, Math.min(1.0, recoil));
     // Outer thicker glow stroke
-    ctx.strokeStyle = `rgba(0, 255, 255, ${recoil * 0.25})`;
-    ctx.lineWidth = (6 + recoil * 6) * s;
+    ctx.strokeStyle = `rgba(0, 255, 255, ${clampedRecoil * 0.25})`;
+    ctx.lineWidth = (6 + clampedRecoil * 6) * s;
     for (let i = 0; i < 2; i++) {
+      const arcR = Math.max(0.1, (12 + i * 5 + (1 - clampedRecoil) * 10) * s);
       ctx.beginPath();
-      ctx.arc((bumpX + 5 + i * 8 + (1 - recoil) * 15) * s, -1 * s, (12 + i * 5 + (1 - recoil) * 10) * s, -Math.PI / 2.2, Math.PI / 2.2);
+      ctx.arc((bumpX + 5 + i * 8 + (1 - clampedRecoil) * 15) * s, -1 * s, arcR, -Math.PI / 2.2, Math.PI / 2.2);
       ctx.stroke();
     }
     
     // Core stroke
-    ctx.strokeStyle = `rgba(0, 255, 255, ${recoil})`;
-    ctx.lineWidth = (2 + recoil * 3) * s;
+    ctx.strokeStyle = `rgba(0, 255, 255, ${clampedRecoil})`;
+    ctx.lineWidth = (2 + clampedRecoil * 3) * s;
     for (let i = 0; i < 2; i++) {
+      const arcR = Math.max(0.1, (12 + i * 5 + (1 - clampedRecoil) * 10) * s);
       ctx.beginPath();
-      ctx.arc((bumpX + 5 + i * 8 + (1 - recoil) * 15) * s, -1 * s, (12 + i * 5 + (1 - recoil) * 10) * s, -Math.PI / 2.2, Math.PI / 2.2);
+      ctx.arc((bumpX + 5 + i * 8 + (1 - clampedRecoil) * 15) * s, -1 * s, arcR, -Math.PI / 2.2, Math.PI / 2.2);
       ctx.stroke();
     }
   }

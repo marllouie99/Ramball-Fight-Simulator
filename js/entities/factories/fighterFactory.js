@@ -99,12 +99,13 @@ function wrapFighterDraw(FighterClass) {
     };
     
     ctx.arc = function(x, y, radius, startAngle, endAngle, counterclockwise) {
-      originalArc.call(ctx, x, y, radius, startAngle, endAngle, counterclockwise);
-      if (Math.abs(radius - fighter.r) < 3) {
+      const safeRadius = Math.max(0, radius || 0);
+      originalArc.call(ctx, x, y, safeRadius, startAngle, endAngle, counterclockwise);
+      if (Math.abs(safeRadius - fighter.r) < 3) {
         arcCalled = true;
         arcX = x;
         arcY = y;
-        arcR = radius;
+        arcR = safeRadius;
       }
     };
     

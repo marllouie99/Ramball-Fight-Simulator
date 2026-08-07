@@ -46,8 +46,9 @@ export function drawGojoWeapon(ctx, fighter) {
         }
     } else {
         // Melee Mode - Hands are drawn with full punch animation in GojoFighter._drawHandCursedEnergy
-        // Suppress the Blue Orb entirely while Reversal Red is active, or while channeling Domain Expansion / Domain is active
-        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal) {
+        // Suppress the Blue Orb entirely during countdown, Reversal Red, Domain Expansion, or victory screen
+        const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown) {
             ctx.restore();
             return;
         }

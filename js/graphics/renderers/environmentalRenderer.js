@@ -1,5 +1,6 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { excludeGojoInfinityFromDim } from './arenaRenderer.js';
 
 /**
  * Draws a dark dim screen overlay when Zeus is charging or casting his Storm ultimate.
@@ -44,6 +45,10 @@ export function drawStormDimScreen() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.fillStyle = `rgba(0, 0, 0, ${opacity})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Gojo's Limitless Infinity Barrier from screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity})`;
@@ -113,6 +118,10 @@ export function drawFurnaceDimScreen() {
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Gojo's Limitless Infinity Barrier from screen dimming
+  excludeGojoInfinityFromDim(ctx);
+
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
