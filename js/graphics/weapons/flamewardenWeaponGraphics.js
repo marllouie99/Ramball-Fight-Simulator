@@ -65,6 +65,27 @@ for (let i = 0; i < COLOR_LUT_SIZE; i++) {
   PRECOMPUTED_COLORS[i] = `rgba(${color.r},${color.g},${color.b},${color.a})`;
 }
 
+// Object pool for PixiJS Sprites to eliminate VRAM allocations and GC thrashing
+const pixiSpritePool = [];
+function getPixiSprite() {
+  if (pixiSpritePool.length > 0) {
+    const s = pixiSpritePool.pop();
+    s.visible = true;
+    return s;
+  }
+  if (!state.baseCircleTexture || !state.pixiLayers || !state.pixiLayers.particles) return null;
+  const s = new window.PIXI.Sprite(state.baseCircleTexture);
+  s.anchor.set(0.5);
+  state.pixiLayers.particles.addChild(s);
+  return s;
+}
+
+function releasePixiSprite(s) {
+  if (!s) return;
+  s.visible = false;
+  pixiSpritePool.push(s);
+}
+
 export class FlamethrowerParticleSystem {
   constructor() {
     this.active = false;
@@ -85,7 +106,8 @@ export class FlamethrowerParticleSystem {
         maxLife: 0,
         baseSize: 0,
         maxSize: 0,
-        turbulence: 0
+        turbulence: 0,
+        sprite: null
       };
     }
   }
@@ -143,12 +165,20 @@ export class FlamethrowerParticleSystem {
     p.baseSize = 8 + Math.random() * 6;     // Start larger
     p.maxSize = 25 + Math.random() * 15;    // Grow bigger
     p.turbulence = Math.random() * 3 - 1.5; // For wobbly flame movement
+
+    // WebGL PixiJS Sprite initialization
+    p.sprite = getPixiSprite();
+    if (p.sprite) {
+      p.sprite.x = p.x;
+      p.sprite.y = p.y;
+      p.sprite.alpha = 1.0;
+      p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+    }
   }
 
   // Update all particles (call every frame)
   update(dt) {
     // Pre-filter black holes once per frame to avoid O(particles * projectiles) cost
-    // OPTIMIZED: Cache black holes and skip if none exist
     let blackHoles = [];
     if (typeof projectileSystem !== 'undefined' && projectileSystem && projectileSystem.projectiles) {
       const hasBlackHoles = projectileSystem.projectiles.some(p => p.isBlackHole && p.transformed);
@@ -159,7 +189,6 @@ export class FlamethrowerParticleSystem {
 
     // Spawn more particles while active for denser flame
     if (this.active) {
-      // OPTIMIZED: Apply dynamic quality level to spawn rate with more aggressive reduction
       const qualityMultiplier = state.qualityLevel || 1.0;
       const baseSpawnCount = 3; // Spawn multiple particles per frame for dense fire
       const spawnCount = qualityMultiplier < 0.5 ? 1 : Math.max(1, Math.floor(baseSpawnCount * qualityMultiplier));
@@ -168,8 +197,6 @@ export class FlamethrowerParticleSystem {
       }
     }
 
-    // Update existing particles
-    // OPTIMIZED: Apply distance-based culling - skip particles far from arena center
     const arenaCenterX = state.arena.x + state.arena.width / 2;
     const arenaCenterY = state.arena.y + state.arena.height / 2;
     const maxDistance = Math.max(state.arena.width, state.arena.height) * 0.8;
@@ -178,9 +205,13 @@ export class FlamethrowerParticleSystem {
       const p = this.particles[i];
       if (!p.active) continue;
 
-      // OPTIMIZED: Distance-based culling - deactivate particles too far from action
+      // Distance-based culling - deactivate particles too far from action
       const distFromCenter = Math.hypot(p.x - arenaCenterX, p.y - arenaCenterY);
       if (distFromCenter > maxDistance) {
+        if (p.sprite) {
+          releasePixiSprite(p.sprite);
+          p.sprite = null;
+        }
         p.active = false;
         continue;
       }
@@ -188,6 +219,10 @@ export class FlamethrowerParticleSystem {
       // Update life
       p.life += dt;
       if (p.life >= p.maxLife) {
+        if (p.sprite) {
+          releasePixiSprite(p.sprite);
+          p.sprite = null;
+        }
         p.active = false;
         continue;
       }
@@ -204,162 +239,76 @@ export class FlamethrowerParticleSystem {
       p.vx *= (1 - 2.5 * dt);
       p.vy *= (1 - 2.5 * dt);
 
-      // OPTIMIZED: Skip black hole logic if no black holes exist
-      if (blackHoles.length === 0) continue;
+      // WebGL Sprite transform & color sync
+      if (p.sprite) {
+        p.sprite.x = p.x;
+        p.sprite.y = p.y;
+        
+        const lifeRatio = p.life / p.maxLife;
+        const size = p.baseSize + (p.maxSize * 1.6 - p.baseSize) * lifeRatio;
+        
+        p.sprite.width = size * 2.2;
+        p.sprite.height = size * 2.2;
+        
+        p.sprite.rotation = Math.atan2(p.vy, p.vx);
+        
+        const alphaScale = Math.max(0, lifeRatio > 0.8 ? 1.0 - ((lifeRatio - 0.8) / 0.2) : 1.0);
+        
+        if (lifeRatio < 0.2) {
+          p.sprite.tint = 0xFFFFFF; // white hot core
+          p.sprite.alpha = alphaScale;
+          p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+        } else if (lifeRatio < 0.5) {
+          p.sprite.tint = 0xFFBB22; // yellow-orange
+          p.sprite.alpha = alphaScale * 0.9;
+          p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+        } else if (lifeRatio < 0.8) {
+          p.sprite.tint = 0xFF5500; // deep orange
+          p.sprite.alpha = alphaScale * 0.75;
+          p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+        } else {
+          p.sprite.tint = 0x881100; // red ash / wispy smoke
+          p.sprite.alpha = alphaScale * 0.3;
+          p.sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+        }
+      }
 
       // Black Hole pull logic
-      for (const proj of blackHoles) {
-        const dx = proj.x - p.x;
-        const dy = proj.y - p.y;
-        const pullRadius = proj.r * 2.5; 
-        
-        if (Math.abs(dx) > pullRadius || Math.abs(dy) > pullRadius) continue;
+      if (blackHoles.length > 0) {
+        for (const proj of blackHoles) {
+          const dx = proj.x - p.x;
+          const dy = proj.y - p.y;
+          const pullRadius = proj.r * 2.5; 
+          
+          if (Math.abs(dx) > pullRadius || Math.abs(dy) > pullRadius) continue;
 
-        const dist = Math.hypot(dx, dy);
-        
-        if (dist < pullRadius) {
-              if (dist < proj.r * 0.5) {
-                p.active = false; // Destroy particle
-                break;
-              } else {
-                // Apply pull
-                const pullBase = CONFIG?.black?.blackHolePullStrength || 1.0;
-                // vx/vy here are pixels per second. Convert per-frame pull to per-second:
-                const pull = pullBase * 2.5 * (1 - dist / pullRadius) * (60 * dt) * 60;
-                const nx = dx / dist;
-                const ny = dy / dist;
-                p.vx += nx * pull;
-                p.vy += ny * pull;
+          const dist = Math.hypot(dx, dy);
+          
+          if (dist < pullRadius) {
+            if (dist < proj.r * 0.5) {
+              if (p.sprite) {
+                releasePixiSprite(p.sprite);
+                p.sprite = null;
               }
+              p.active = false; // Destroy particle
+              break;
+            } else {
+              const pullBase = CONFIG?.black?.blackHolePullStrength || 1.0;
+              const pull = pullBase * 2.5 * (1 - dist / pullRadius) * (60 * dt) * 60;
+              const nx = dx / dist;
+              const ny = dy / dist;
+              p.vx += nx * pull;
+              p.vy += ny * pull;
             }
           }
+        }
+      }
     }
   }
 
   // Draw all particles (call every frame)
   draw(ctx) {
-    // Collect active particles
-    const activeParticles = [];
-    for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
-      if (this.particles[i].active) {
-        activeParticles.push(this.particles[i]);
-      }
-    }
-    
-    if (activeParticles.length === 0) return;
-
-    // VERY IMPORTANT: Sort oldest (highest life) first, newest (hot white core) last
-    // This perfectly layers the volumetric gradients so the hot core stays solid on top
-    activeParticles.sort((a, b) => b.life - a.life);
-
-    ctx.save();
-    
-    // Use source-over blending since lighter blending becomes invisible on light arena backgrounds
-    ctx.globalCompositeOperation = 'source-over';
-
-    for (const p of activeParticles) {
-      const lifeRatio = p.life / p.maxLife;
-
-      // Draw smoke on the outermost edges for older particles
-      // Reduced opacity dramatically so it's wispy and doesn't compound into mud
-      if (lifeRatio > 0.5) {
-        const smokeSize = (p.baseSize + (p.maxSize * 1.6 - p.baseSize) * lifeRatio) * 1.3;
-        const smokeAlpha = Math.max(0, Math.sin((lifeRatio - 0.5) / 0.5 * Math.PI) * 0.15); // VERY transparent
-        const smokeWobble = Math.sin(p.life * 10 + p.turbulence) * Math.PI;
-
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(smokeWobble);
-
-        const smokeGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, smokeSize);
-        smokeGrad.addColorStop(0, `rgba(180, 0, 255, ${smokeAlpha})`);
-        smokeGrad.addColorStop(1, 'rgba(100, 0, 150, 0)');
-        
-        ctx.beginPath();
-        // Smoke can be perfectly circular/soft
-        ctx.arc(0, 0, smokeSize, 0, Math.PI * 2);
-        ctx.fillStyle = smokeGrad;
-        ctx.fill();
-        ctx.restore();
-      }
-
-      // Base size grows as the flame expands (tendrils)
-      const size = p.baseSize + (p.maxSize * 1.6 - p.baseSize) * lifeRatio;
-
-      // Calculate orientation and stretching for fluid flow
-      const speed = Math.hypot(p.vx, p.vy);
-      const angle = Math.atan2(p.vy, p.vx);
-      const stretch = Math.max(1.0, Math.min(3.5, speed / 60));
-      const wobble = Math.sin(p.life * 20 + p.turbulence) * 0.2;
-
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(angle + wobble);
-      ctx.scale(stretch, 1.0 + lifeRatio * 0.4); 
-
-      // Soft, purely radial gradient for volumetric blending
-      // MUST be created after transformation so the gradient moves/scales with the particle
-      const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, size);
-      
-      // Adjust colors for a bright, fiery look without getting muddy on light backgrounds
-      const alphaScale = Math.max(0, lifeRatio > 0.8 ? 1.0 - ((lifeRatio - 0.8) / 0.2) : 1.0);
-      
-      if (lifeRatio < 0.2) {
-        grad.addColorStop(0, `rgba(255, 255, 255, ${alphaScale})`);
-        grad.addColorStop(0.5, `rgba(255, 240, 100, ${alphaScale * 0.9})`);
-        grad.addColorStop(1, 'rgba(255, 150, 0, 0)');
-      } else if (lifeRatio < 0.6) {
-        grad.addColorStop(0, `rgba(255, 220, 50, ${alphaScale * 0.9})`);
-        grad.addColorStop(0.6, `rgba(255, 100, 0, ${alphaScale * 0.7})`);
-        grad.addColorStop(1, 'rgba(200, 40, 0, 0)');
-      } else {
-        grad.addColorStop(0, `rgba(255, 100, 0, ${alphaScale * 0.6})`);
-        grad.addColorStop(0.7, `rgba(180, 20, 0, ${alphaScale * 0.3})`);
-        grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-      }
-
-      ctx.beginPath();
-      // Restore the fluid, flowy procedural shape to define rolling tendrils and cuts
-      const numPoints = 12;
-      const points = [];
-      for (let j = 0; j < numPoints; j++) {
-        const theta = (j / numPoints) * Math.PI * 2;
-        let r = size;
-        
-        // Gentle billow for flowy smokey shape
-        const billow = Math.sin(theta * 2 - p.life * 12 + p.turbulence * 5);
-        // Soft rounded cuts
-        const cut = Math.pow(Math.sin(theta * 3 - p.life * 15 + p.turbulence * 3), 2);
-        
-        const deform = 0.15 + (lifeRatio * 0.5); 
-        r += size * deform * billow;
-        r -= size * deform * cut * 0.8; 
-        
-        r = Math.max(size * 0.2, r);
-        points.push({ x: Math.cos(theta) * r, y: Math.sin(theta) * r });
-      }
-      
-      // Draw smooth closed loop using quadratic curves through midpoints
-      const startX = (points[numPoints - 1].x + points[0].x) / 2;
-      const startY = (points[numPoints - 1].y + points[0].y) / 2;
-      ctx.moveTo(startX, startY);
-      
-      for (let j = 0; j < numPoints; j++) {
-        const curr = points[j];
-        const next = points[(j + 1) % numPoints];
-        const midX = (curr.x + next.x) / 2;
-        const midY = (curr.y + next.y) / 2;
-        ctx.quadraticCurveTo(curr.x, curr.y, midX, midY);
-      }
-      ctx.closePath();
-      
-      ctx.fillStyle = grad;
-      ctx.fill();
-      
-      ctx.restore();
-    }
-
-    ctx.restore();
+    // Deprecated: Rendering is automatically handled by the PixiJS WebGL scene graph.
   }
 
   // Check if there are any active particles
@@ -374,6 +323,10 @@ export class FlamethrowerParticleSystem {
   // Clear all particles
   clear() {
     for (let i = 0; i < MAX_FLAME_PARTICLES; i++) {
+      if (this.particles[i].sprite) {
+        releasePixiSprite(this.particles[i].sprite);
+        this.particles[i].sprite = null;
+      }
       this.particles[i].active = false;
     }
     this.active = false;

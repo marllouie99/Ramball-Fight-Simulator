@@ -784,6 +784,10 @@ function drawIndexDetailScreen() {
     animBtns.push(
       { id: 'lightning', label: '⚡ Lightning' }
     );
+  } else if (def.type === 'genos') {
+    animBtns.push(
+      { id: 'incinerate', label: '🔥 Incinerate' }
+    );
   } else {
     animBtns.push(
       { id: 'ability', label: `✨ ${(def.ability || 'Ability').slice(0, 10)}` }
@@ -821,6 +825,14 @@ function drawIndexDetailScreen() {
       else if (btn.id === 'clap') audioSystem.playSFX('skill_todoclap', 2.0);
       else if (btn.id === 'lightning') audioSystem.playSFX('skill_thunderstrike', 1.5);
       else if (btn.id === 'level8') audioSystem.playSFX('skill_dash5', 2.0);
+      else if (btn.id === 'incinerate' && def.type === 'genos') {
+        if (CONFIG.genos?.ultVoiceEnabled !== false) {
+          audioSystem.playSFX(CONFIG.genos?.ultVoiceSound || 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3', CONFIG.genos?.ultVoiceVolume ?? 3.5);
+        }
+        if (CONFIG.genos?.ultChargeEnabled) {
+          audioSystem.playSFX(CONFIG.genos?.ultChargeSound || 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3', CONFIG.genos?.ultChargeVolume ?? 2.0);
+        }
+      }
     }, bWidth, bHeight);
 
     if (isActive) {

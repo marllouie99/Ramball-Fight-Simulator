@@ -5,6 +5,7 @@ export const gojoConfig = {
     infinityCooldown: 240,    // Cooldown before Infinity block triggers again
     blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster
     modeSwitchBreatherDuration: 45, // Breather pause (frames) when Gojo switches to Ranged/Blue mode (~0.75s)
+    interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when its channeling is interrupted
     blueSpeed: 10.5,           // Speed of Blue orb projectile
     blueRadius: 50,           // Pull radius of Blue explosion
     bluePullForce: 0.5,       // Pull strength of Blue
@@ -18,39 +19,43 @@ export const gojoConfig = {
     redBuildupFrames: 100,     // Frames of orb manifestation before the BOOM (~0.33s)
     redSlowDuration: 120,     // Frames the post-detonation slow lasts (~2s at 60fps)
     redSlowMultiplier: 0.35,  // Speed multiplier while slowed by Red (35% of normal)
-    redShakeIntensity: 22,    // Heavy screen shake intensity on Red detonation
+    redShakeIntensity: 10,    // Heavy screen shake intensity on Red detonation
     redShakeDuration: 25,     // Duration of screen shake on Red detonation
     purpleCooldown: 1500,      // Cooldown of Hollow Purple
-    purpleChargeMax: 100,     // Frames required to mix Red and Blue into Purple (channeling duration)
+    purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
     purpleDamage: 20,         // Continuous piercing damage per tick
     purpleSpeed: 5,           // Speed of Purple orb
     purpleRadius: 50,         // Radius of Purple orb
     purpleLife: 250,         // How long Purple orb stays in arena (frames)
     purpleTravelTime: 20,    // Frames the orb travels before stopping (0 = stop immediately)
-    purpleScale: 10.0,        // Scale multiplier for hit radius (visual size)
     purpleDPS: 30,            // Damage per second dealt to enemies inside the orb
-    purpleDPSInterval: 20,   // Frames between DPS ticks (30 = 0.5s at 60fps)
+    purpleDPSInterval: 10,   // Frames between DPS ticks (30 = 0.5s at 60fps)
     purpleSlowDuration: 60,  // Frames the slow effect lasts (1 second at 60fps)
     purpleSlowMultiplier: 0.5, // Speed multiplier while slowed (0.5 = 50% speed)
     purplePullRadius: 280,   // Radius in pixels for gravitational pull field around Hollow Purple
     purplePullForce: 8.0,    // How strongly enemies and illusions are dragged toward the orb center
     purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
-    purpleShakeDuration: 30,  // Screen shake duration when purple orb fires
+    purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
     domainCooldown: 2000,     // 20s Ultimate cooldown
     domainChargeMax: 130,     // 2s Channeling duration before domain opens
     domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
     domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
     domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
-    // Reverse Cursed Technique - Self heal when at low HP
-    reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 25% or below
-    reverseCursedTechniqueHealPercent: 0.20,   // Heals 35% of max HP
-    reverseCursedTechniqueCooldown: 1200,      // 15 second cooldown before it can trigger again
+    // Reverse Cursed Technique (RCT) Healing Config
+    enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
+    reverseCursedTechniqueHpThreshold: 0.30, // Triggers RCT when HP drops to 30% or below
+    reverseCursedTechniqueHealPercent: 0.35, // Heals 35% of max HP per RCT trigger
+    reverseCursedTechniqueCooldown: 900,     // 15 second cooldown between RCT heals (frames at 60fps)
+    rctChannelDuration: 90,                  // 1.5 second channeling heal window
+    enablePassiveRctRegen: true,             // Continuous Six Eyes brain refresh passive regen
+    passiveRctHealRate: 0.08,                // Per-frame passive regen when damaged
+    rctRevivalHealPercent: 0.30,             // Restores 30% max HP on emergency revival
     // Melee Mode (Hand-to-Hand Combat)
     initialMeleeDuration: 30, // Forces hand-to-hand combat for the initial duration
     meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
     closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
     meleePunchDamage: 10,     // Damage dealt by each punch
-    meleePunchCooldown: 10,   // Frames between punches
+    meleePunchCooldown: 9,   // Frames between punches
     teleportDelay: 5,        // Frames delay before teleport after punch
     teleportSpeed: 15,        // Speed of teleport movement (pixels per frame)
 
@@ -60,11 +65,12 @@ export const gojoConfig = {
     teleportDodgeDistance: 85,               // Distance teleported on dodge
 
     // Limitless Infinity Barrier Mechanics
+    infinityRadius: 55,                      // Distance (in pixels from Gojo's center) for Limitless Infinity barrier detection
     infinityCooldown: 200,                   // Recharge cooldown in frames (240 = 4.0s) before Infinity barrier reactivates after blocking
-    infinityActiveDuration: 100,              // Frames (1.0s) Infinity continues to block multiple attacks after first impact before going on cooldown
-    infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
-    infinityFreezeDuration: 50,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
-    infinityMeleeFreezeDuration: 10,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
+    infinityActiveDuration: 50,              // Frames (1.0s) Infinity continues to block multiple attacks after first impact before going on cooldown
+    infinityFreezeChance: 0.3,               // Chance (0.0 to 1.0, e.g. 1.0 = 100%, 0.5 = 50%) to freeze incoming projectiles/slashes
+    infinityFreezeDuration: 80,             // Duration in frames (240 = 4.0s) projectiles stay suspended mid-air on barrier contact
+    infinityMeleeFreezeDuration: 5,         // Duration in frames (45 = 0.75s) melee attackers are spatially frozen on striking barrier
     infinityMaxFrozenProjectiles: 4,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
 
     // Anime Melee Combat Rhythm & Disengage

@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
@@ -18,7 +18,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) 
 
   const pathAngle = Math.atan2(dy, dx);
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : pathAngle;
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const steps = isLowQuality ? Math.max(2, Math.floor(dist / 36)) : Math.max(4, Math.floor(dist / 12));
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -121,20 +121,16 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   const distToOpponent = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
   const attackReach = fighter.r + opponent.r + 35;
   const isOutOfReach = distToOpponent > attackReach;
-  
-  const isInitialMove = !fighter.initialTeleportDone;
-  if (isInitialMove && !isOutOfReach) {
-    fighter.initialTeleportDone = true;
-  }
 
-  const shouldTeleport = !isInitialMove && (isOutOfReach || (fighter.meleeComboCount % (fighter.meleeComboTarget || 1) === 0));
+  // Flash-step teleport if out of reach OR periodically between rapid combo strikes
+  const shouldTeleport = isOutOfReach || (fighter.meleeComboCount > 0 && fighter.meleeComboCount % 2 === 0);
 
   if (shouldTeleport) {
     const oldX = fighter.x;
     const oldY = fighter.y;
 
     const angleToOpponent = Math.random() * Math.PI * 2;
-    const behindOffset = opponent.r + fighter.r + 8;
+    const behindOffset = opponent.r + fighter.r + 10;
     let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
     let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
 
@@ -155,15 +151,6 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     audioSystem.playSFX('skill_dash3', 0.6);
   } else {
     if (typeof fighter.aim === 'function') fighter.aim(opponent);
-    
-    // Fallback normal movement if out of reach but not teleporting (e.g. during initial round start)
-    if (isOutOfReach) {
-      const dx = opponent.x - fighter.x;
-      const dy = opponent.y - fighter.y;
-      const d = distToOpponent || 1;
-      fighter.vx = (dx / d) * (fighter.speed || 4.5);
-      fighter.vy = (dy / d) * (fighter.speed || 4.5);
-    }
   }
 
   fighter.meleeComboCount++;
@@ -209,43 +196,36 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     }
   }
 
-  if (validTargets.length === 0 && opponent && !opponent.isDead) {
-    validTargets.push(opponent);
-  }
+  if (validTargets.length === 0) return;
+
+  const isFinalHit = fighter.meleeComboCount >= (fighter.meleeComboTarget || 1);
+  const pushForce = isFinalHit ? 14 : 7.5;
 
   for (const target of validTargets) {
     target.takeDamage(slashDamage, fighter, { isMelee: true });
     if (typeof target.applyHitStun === 'function') target.applyHitStun(12);
-    spawnSparks(target.x, target.y, 15, 'crimsonSniper', '#8B0000');
 
-    const pushForce = 4;
-    target.vx += Math.cos(punchAngle) * pushForce;
-    target.vy += Math.sin(punchAngle) * pushForce;
+    // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
+    spawnAnimePunchImpactFrame(target.x, target.y, 55, punchAngle, 'crimson');
+
+    const gojoDomainActive = state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive);
+    if (!gojoDomainActive && !fighter.domainActive) {
+      target.vx += Math.cos(punchAngle) * pushForce;
+      target.vy += Math.sin(punchAngle) * pushForce;
+
+      if (target.knockbackVx !== undefined && target.knockbackVy !== undefined) {
+        target.knockbackVx += Math.cos(punchAngle) * (pushForce * 0.8);
+        target.knockbackVy += Math.sin(punchAngle) * (pushForce * 0.8);
+        target.knockbackStunTimer = Math.max(target.knockbackStunTimer || 0, isFinalHit ? 10 : 4);
+      }
+    }
   }
 
   triggerGlobalScreenShake(4, 5);
 
-  const primaryTarget = validTargets[0] || opponent;
-  if (primaryTarget) {
-    fighter.sakugaImpactTimer = 6;
-    fighter.sakugaImpactMaxTimer = 6;
-    fighter.sakugaImpactX = primaryTarget.x;
-    fighter.sakugaImpactY = primaryTarget.y;
-    fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
-    fighter.sakugaImpactSeed = Math.random();
-  }
-
   fighter.punchAnimTimer = 16;
+  fighter.punchAnimMaxTimer = 16;
   fighter.punchAnimHand = fighter.punchAnimHand === 1 ? 0 : 1;
-
-  if (!fighter.punchEffects) fighter.punchEffects = [];
-  fighter.punchEffects.push({
-    x: opponent.x,
-    y: opponent.y,
-    angle: punchAngle,
-    timer: 12,
-    maxTimer: 12
-  });
 
   if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter' || opponent._def.id === 'yuta' || opponent._def.name === 'YutaFighter' || opponent.type === 'yuta')) {
     if (!fighter.meleeClashCooldown) fighter.meleeClashCooldown = 0;

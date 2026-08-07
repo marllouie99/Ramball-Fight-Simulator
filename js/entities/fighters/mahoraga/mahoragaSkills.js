@@ -22,7 +22,7 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
   const orbX = purpleOrb ? purpleOrb.x : (gojo.x || fighter.x);
   const orbY = purpleOrb ? purpleOrb.y : (gojo.y || fighter.y);
   const angleToOrb = Math.atan2(orbY - fighter.y, orbX - fighter.x);
-  const purpleDamageRadius = (CONFIG.gojo?.purpleRadius || 20) * (CONFIG.gojo?.purpleScale || 10.0);
+  const purpleDamageRadius = CONFIG.gojo?.purpleRadius || 50;
 
   const dodgeDist = purpleDamageRadius + (fighter.r || 25) + 80;
   const perpAngleLeft  = angleToOrb + Math.PI / 2;

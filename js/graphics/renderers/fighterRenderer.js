@@ -118,7 +118,11 @@ export class FighterRenderer {
       ctx.restore();
     }
 
-    if (fighter.statusEffects && fighter.statusEffects.fighter.slowTimer > 0 || fighter.slowTimer > 0) {
+    if ((fighter.purpleHitTimer || 0) > 0) {
+      fighter.purpleHitTimer--;
+    }
+
+    if (!fighter.purpleHitTimer && ((fighter.statusEffects && fighter.statusEffects.fighter.slowTimer > 0) || fighter.slowTimer > 0)) {
       // Suppress the generic slow visual if they are currently trapped in Toji's cinematic ultimate
       const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
         f && f.ultimateActive && f.ultimateTarget === fighter && (f.type === 'toji' || f.characterId === 'toji')
@@ -223,6 +227,9 @@ export class FighterRenderer {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const hpText = Math.floor(fighter.hp).toString();
+    // fighter.y is correct here — the draw() wrapper already applies a ctx.translate
+    // offset of -z when the fighter has elevation (hasZ), so subtracting z again
+    // would push the text 2x too high above the body center.
     const drawY = fighter.y;
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
@@ -243,7 +250,7 @@ export class FighterRenderer {
     const seconds = Math.ceil(remainingFrames / 60);
     const text = `⏳ ${seconds}s`;
     
-    const drawY = fighter.y - (fighter.r + 18);
+    const drawY = (fighter.y - (fighter.z || 0)) - (fighter.r + 18);
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -257,9 +264,7 @@ export class FighterRenderer {
   }
 
   static draw(ctx, fighter) {
-    const scale = fighter.visualScale !== undefined ? fighter.visualScale : 1.0;
     const zOffset = fighter.z || 0;
-    const hasScale = scale !== 1.0 && scale > 0;
     const hasZ = zOffset > 0;
 
     if (hasZ) {
@@ -267,16 +272,13 @@ export class FighterRenderer {
       ctx.translate(fighter.x, fighter.y);
       ctx.scale(1, 0.5); 
       ctx.beginPath();
-      ctx.arc(0, 0, fighter.r * scale, 0, Math.PI * 2);
+      ctx.arc(0, 0, fighter.r, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(0,0,0,${Math.max(0.1, 0.6 - (zOffset / 150))})`;
       ctx.fill();
       ctx.restore();
-    }
 
-    if (hasScale || hasZ) {
       ctx.save();
       ctx.translate(fighter.x, fighter.y - zOffset);
-      if (hasScale) ctx.scale(scale, scale);
       ctx.translate(-fighter.x, -fighter.y);
     }
 
@@ -287,7 +289,7 @@ export class FighterRenderer {
     fighter.drawHealth(ctx);
     fighter.drawFreezeTimer(ctx);
 
-    if (hasScale || hasZ) {
+    if (hasZ) {
       ctx.restore();
     }
   }

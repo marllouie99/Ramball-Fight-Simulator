@@ -67,11 +67,24 @@ export function animate(timestamp) {
         }
       }
 
-      // OPTIMIZED: Enforce hard cap on total particles
+      // OPTIMIZED: Enforce hard cap on total particles (using simple zero-allocation loops/lengths)
+      let burnActive = 0;
+      if (burnEffectSystem && burnEffectSystem.particles) {
+        burnActive = burnEffectSystem.particles.length; // BurnEffectSystem already manages active-only particles in this array
+      }
+      let flameActive = 0;
+      if (flamewardenFlameSystem && flamewardenFlameSystem.particles) {
+        const parts = flamewardenFlameSystem.particles;
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] && parts[i].active) {
+            flameActive++;
+          }
+        }
+      }
+
       const totalParticles = state.bloodEffects.length + state.deathEffects.length +
         state.berserkerRageEffects.length + (state.sparkEffects ? state.sparkEffects.length : 0) +
-        (burnEffectSystem?.particles?.filter(p => p.active).length || 0) +
-        (flamewardenFlameSystem?.particles?.filter(p => p.active).length || 0);
+        burnActive + flameActive;
 
       if (totalParticles > state.maxTotalParticles) {
         // Aggressively reduce quality if over particle cap
@@ -84,7 +97,7 @@ export function animate(timestamp) {
         const currentFps = state.fps;
         const projCount = getProjectiles().length;
         const particleCount = totalParticles;
-        const explosionsCount = (bomberExplosionSystem && bomberExplosionSystem.explosions) ? bomberExplosionSystem.explosions.length : 0;
+        const explosionsCount = (bomberExplosionSystem && bomberExplosionSystem.particles) ? bomberExplosionSystem.particles.length : 0;
 
         // Spatial grid clash detection (lightweight integer work)
         let closeFighters = 0;

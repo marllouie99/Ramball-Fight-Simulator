@@ -453,7 +453,7 @@ export function renderYutaSukunaDomainClashRift(ctx, yutaFighter, sukunaFighter)
   if (!yutaFighter || !sukunaFighter || !yutaFighter.domainActive || !sukunaFighter.domainActive) return;
 
   // Check if we should execute in optimized low quality/low FPS mode
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
 
   const time = Date.now();
   const arena = CONFIG.arena;

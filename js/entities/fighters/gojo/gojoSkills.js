@@ -39,18 +39,8 @@ export function activateRed(fighter) {
         if (!targetF || dist < Math.hypot(targetF.x - fighter.x, targetF.y - fighter.y)) {
           targetF = f;
         }
-        // Immediately cancel any ongoing enemy flurry/teleport when Red begins charging
+        // Pause & immobilize enemy movement during Red buildup so they don't run into Gojo
         if (dist < (CONFIG.gojo?.redRange || 100) + 200) {
-          if (typeof f.interruptAttacks === 'function') f.interruptAttacks();
-          f.timeStopTimer = 0;
-          f.flurryHitsLeft = 0;
-          f.flurryTimer = 0;
-          f.rapidSlashHitsLeft = 0;
-          f.rapidSlashTimer = 0;
-          f.isTeleporting = false;
-          f.teleportSlideTimer = 0;
-          // Pause & immobilize enemy during Red buildup so they don't run into Gojo
-          if (typeof f.applyHitStun === 'function') f.applyHitStun(buildupFrames + 5);
           f.vx = 0;
           f.vy = 0;
         }
@@ -67,7 +57,7 @@ export function activateRed(fighter) {
   triggerGlobalScreenShake(4, 6);
 
   const sCharging = getSkillSound(fighter._def?.id, 'red_charging');
-  audioSystem.playSFX(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 2.0);
+  audioSystem.playSFX(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 0.85);
 }
 
 export function detonateRed(fighter) {
@@ -139,7 +129,7 @@ export function firePurple(fighter, ownerIndex) {
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 600;
   fighter.z = 35; // Start descent from hovering altitude
 
-  triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 25);
+  triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 20);
 
   if (projectileSystem && projectileSystem.fireGojoPurple) {
     projectileSystem.fireGojoPurple(fighter, ownerIndex, CONFIG.gojo?.purpleDamage || 10);
@@ -171,10 +161,10 @@ export function executePurpleRetreat(fighter) {
     const oldX = fighter.x;
     const oldY = fighter.y;
 
-    const angle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x) + (Math.random() < 0.5 ? 0.3 : -0.3);
+    const angleAway = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x);
     const retreatDist = CONFIG.gojo?.purpleRetreatDistance ?? 280;
-    let targetX = fighter.x + Math.cos(angle) * retreatDist;
-    let targetY = fighter.y + Math.sin(angle) * retreatDist;
+    let targetX = fighter.x + Math.cos(angleAway) * retreatDist;
+    let targetY = fighter.y + Math.sin(angleAway) * retreatDist;
 
     const arena = CONFIG.arena;
     if (arena) {
@@ -182,12 +172,15 @@ export function executePurpleRetreat(fighter) {
       targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
     }
 
-    if (typeof fighter._applyTeleportSlideBrake === 'function') {
-      fighter._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
-    } else {
-      fighter.x = targetX;
-      fighter.y = targetY;
-    }
+    fighter.x = targetX;
+    fighter.y = targetY;
+    fighter.vx = 0;
+    fighter.vy = 0;
+    if (typeof fighter.aim === 'function') fighter.aim(opponent);
+
+    const breatherDuration = CONFIG.gojo?.modeSwitchBreatherDuration ?? 45;
+    fighter.modeSwitchBreatherTimer = breatherDuration;
+    fighter.shootCooldown = Math.max(fighter.shootCooldown || 0, breatherDuration);
 
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'RETREAT!', '#00BFFF');
     spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');

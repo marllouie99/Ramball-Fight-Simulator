@@ -162,7 +162,7 @@ export function drawPoisonEffect(ctx, baseRadius) {
 export function drawBurnEffect(ctx, baseRadius, useAggressiveMode) {
   // OPTIMIZATION: Simplified burn effect at low quality
   if (useAggressiveMode) {
-    ctx.fillStyle = 'rgba(255, 100, 0, 0.5)';
+    ctx.fillStyle = 'rgba(255, 100, 0, 0.15)';
     ctx.beginPath();
     ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
     ctx.fill();
@@ -172,29 +172,29 @@ export function drawBurnEffect(ctx, baseRadius, useAggressiveMode) {
   // 1. Pulse heat glow outline
   const glowIntensity = Math.abs(Math.sin(Date.now() / 150));
   ctx.save();
-  ctx.strokeStyle = `rgba(255, 120, 0, ${0.4 + glowIntensity * 0.4})`;
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = `rgba(255, 120, 0, ${0.35 + glowIntensity * 0.25})`;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
-  ctx.arc(0, 0, baseRadius + 2 + glowIntensity * 2, 0, Math.PI * 2);
+  ctx.arc(0, 0, baseRadius + 1 + glowIntensity * 1.2, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 2. Translucent fiery inner core
-  ctx.fillStyle = `rgba(255, 50, 0, ${0.3 + glowIntensity * 0.2})`;
+  // 2. Subtle translucent fiery inner aura
+  ctx.fillStyle = `rgba(255, 50, 0, ${0.08 + glowIntensity * 0.06})`;
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
   ctx.fill();
 
   // 3. Embers popping off the body
-  ctx.fillStyle = 'rgba(255, 200, 0, 0.8)';
-  for (let i = 0; i < 3; i++) {
+  ctx.fillStyle = 'rgba(255, 200, 0, 0.7)';
+  for (let i = 0; i < 2; i++) {
     // Pseudo-random positions based on time to make them flicker/move
     const seed = (Date.now() / 80 + i * 13) % (Math.PI * 2);
-    const rOffset = baseRadius * (0.6 + 0.5 * Math.sin(seed * 2));
+    const rOffset = baseRadius * (0.6 + 0.4 * Math.sin(seed * 2));
     const x = Math.cos(seed) * rOffset;
     const y = Math.sin(seed) * rOffset;
     
     ctx.beginPath();
-    ctx.arc(x, y, 1.5 + Math.sin(seed * 3) * 0.5, 0, Math.PI * 2);
+    ctx.arc(x, y, 1.2 + Math.sin(seed * 3) * 0.3, 0, Math.PI * 2);
     ctx.fill();
   }
   ctx.restore();

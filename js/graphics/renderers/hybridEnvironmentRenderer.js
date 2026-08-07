@@ -31,19 +31,23 @@ function getRikaSummonDimSprite() {
 }
 
 let rikaRingSprite = null;
-let rikaRingCanvas = null;
-let rikaRingCtx = null;
-let rikaRingTexture = null;
 
 function getRikaRingSprite() {
-  if (!rikaRingSprite) {
+  if (!rikaRingSprite && state.pixiApp) {
     const size = 256;
-    rikaRingCanvas = document.createElement('canvas');
-    rikaRingCanvas.width = size;
-    rikaRingCanvas.height = size;
-    rikaRingCtx = rikaRingCanvas.getContext('2d');
-    rikaRingTexture = window.PIXI.Texture.from(rikaRingCanvas);
-    rikaRingSprite = new window.PIXI.Sprite(rikaRingTexture);
+    const canvas = document.createElement('canvas');
+    canvas.width = size;
+    canvas.height = size;
+    const ctx = canvas.getContext('2d');
+    
+    ctx.beginPath();
+    ctx.arc(size / 2, size / 2, 85, 0, Math.PI * 2);
+    ctx.strokeStyle = '#FF1493';
+    ctx.lineWidth = 14;
+    ctx.stroke();
+    
+    const texture = window.PIXI.Texture.from(canvas);
+    rikaRingSprite = new window.PIXI.Sprite(texture);
     rikaRingSprite.anchor.set(0.5);
     rikaRingSprite.blendMode = window.PIXI.BLEND_MODES.ADD;
   }
@@ -58,14 +62,21 @@ function getFurnaceDimSprite() {
     canvas.height = size;
     const ctx = canvas.getContext('2d');
     
-    // Create the exact same gradient from environmentalRenderer.js, but normalized to 0-1
     const cx = size / 2;
     const cy = size / 2;
-    const grad = ctx.createRadialGradient(cx, cy, size * 0.05, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(180, 20, 0, 0)`);
-    grad.addColorStop(0.35, `rgba(80, 10, 0, 0.4)`);
-    grad.addColorStop(0.65, `rgba(20, 5, 0, 0.75)`);
-    grad.addColorStop(1, `rgba(0, 0, 0, 0.95)`);
+    
+    // 1. Pitch black base overlay
+    ctx.fillStyle = `rgba(0, 0, 0, 0.98)`;
+    ctx.fillRect(0, 0, size, size);
+
+    // 2. Tight, high-contrast radial flame gradient centered on Sukuna/Arrow
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
+    grad.addColorStop(0, `rgba(255, 140, 0, 0.95)`);   // Bright intense fiery orange spot at Fuga cast center
+    grad.addColorStop(0.06, `rgba(255, 70, 0, 0.85)`);  // Concentrated orange-red flame ring
+    grad.addColorStop(0.15, `rgba(160, 25, 0, 0.70)`); // Deep crimson flame aura
+    grad.addColorStop(0.30, `rgba(25, 4, 2, 0.92)`);   // Quick falloff to dark void
+    grad.addColorStop(0.55, `rgba(5, 1, 1, 0.97)`);    // Deep dark background
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.99)`);    // Pitch black outer screen
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -74,7 +85,6 @@ function getFurnaceDimSprite() {
     furnaceDimSprite = new window.PIXI.Sprite(texture);
     furnaceDimSprite.anchor.set(0.5);
     furnaceDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
-    // It will be scaled to cover the screen
   }
   return furnaceDimSprite;
 }
@@ -93,16 +103,18 @@ function getPurpleDimSprite() {
     const cx = size / 2;
     const cy = size / 2;
     
-    // 1. Draw the dark base purple overlay to match the original Canvas 2D style
-    ctx.fillStyle = `rgba(18, 2, 32, 0.7)`;
+    // 1. Pitch black base overlay
+    ctx.fillStyle = `rgba(0, 0, 0, 0.98)`;
     ctx.fillRect(0, 0, size, size);
     
-    // 2. Dynamic radial gradient centered on the orb (restored to original rich, high-contrast values)
-    const grad = ctx.createRadialGradient(cx, cy, size * 0.05, cx, cy, size * 0.5);
-    grad.addColorStop(0, `rgba(147, 51, 234, 0.25)`);  // Bright electric purple center
-    grad.addColorStop(0.35, `rgba(88, 28, 135, 0.60)`); // Deep purple aura
-    grad.addColorStop(0.70, `rgba(30, 0, 50, 0.85)`);   // Dark void
-    grad.addColorStop(1.0, `rgba(10, 0, 20, 0.95)`);   // Outer dark edge
+    // 2. Tight, high-contrast electric purple radial gradient centered on Gojo's Purple cast/orb position
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
+    grad.addColorStop(0, `rgba(195, 80, 255, 0.95)`);   // Intense bright electric purple spot at Purple center
+    grad.addColorStop(0.06, `rgba(147, 51, 234, 0.85)`);  // Concentrated violet-purple aura ring
+    grad.addColorStop(0.15, `rgba(88, 28, 135, 0.70)`);   // Deep purple void aura
+    grad.addColorStop(0.30, `rgba(20, 2, 35, 0.92)`);    // Quick falloff to dark void
+    grad.addColorStop(0.55, `rgba(5, 1, 10, 0.97)`);     // Deep dark background
+    grad.addColorStop(1.0, `rgba(0, 0, 0, 0.99)`);     // Pitch black outer screen
     
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, size, size);
@@ -144,26 +156,48 @@ function getMahoragaDimSprite() {
   return mahoragaDimSprite;
 }
 
-let tojiFlyHeads = [];
-let tojiHybridData = null;
+let tojiUltimateContainer = null;
+let tojiDimSprite = null;
+let tojiFlyHeadContainer = null;
+const flyHeadSpritePool = [];
+let activeFlyHeads = [];
 let currentTojiUltimateOpacity = 0;
 
-function getTojiHybridData() {
-  if (!tojiHybridData) {
-    const canvas = document.createElement('canvas');
-    // Shrink offscreen canvas to 480x270 (93.75% reduction in pixel area)
-    // PixiJS will scale this up to fill the screen
-    canvas.width = 480; 
-    canvas.height = 270;
-    const ctx = canvas.getContext('2d');
+function getTojiUltimateContainer() {
+  if (!tojiUltimateContainer && state.pixiApp) {
+    tojiUltimateContainer = new window.PIXI.Container();
     
-    const texture = window.PIXI.Texture.from(canvas);
-    const sprite = new window.PIXI.Sprite(texture);
-    sprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    // Background dark dim sprite
+    tojiDimSprite = new window.PIXI.Sprite(state.baseCircleTexture);
+    tojiDimSprite.tint = 0x050505;
+    tojiDimSprite.anchor.set(0.5);
+    tojiUltimateContainer.addChild(tojiDimSprite);
     
-    tojiHybridData = { canvas, ctx, texture, sprite };
+    // Container for fly head sprites
+    tojiFlyHeadContainer = new window.PIXI.Container();
+    tojiUltimateContainer.addChild(tojiFlyHeadContainer);
   }
-  return tojiHybridData;
+  return tojiUltimateContainer;
+}
+
+function getFlyHeadSprite() {
+  if (flyHeadSpritePool.length > 0) {
+    const s = flyHeadSpritePool.pop();
+    s.visible = true;
+    return s;
+  }
+  if (!state.baseCircleTexture || !tojiFlyHeadContainer) return null;
+  const s = new window.PIXI.Sprite(state.baseCircleTexture);
+  s.anchor.set(0.5);
+  s.tint = 0x141414;
+  tojiFlyHeadContainer.addChild(s);
+  return s;
+}
+
+function releaseFlyHeadSprite(s) {
+  if (!s) return;
+  s.visible = false;
+  flyHeadSpritePool.push(s);
 }
 
 function syncDomainHybridDataSize(data) {
@@ -253,7 +287,7 @@ export function updateHybridEnvironment() {
   domainUpdateTick++;
   
   // Performance: Throttle & stagger domain texture updates to eliminate CPU-to-GPU VRAM bandwidth stalls (especially during Multi-Domain clashes)
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   const baseInterval = isLowQuality ? 18 : 6;
   const updateInterval = isMultiDomain ? baseInterval * 2 : baseInterval;
 
@@ -263,7 +297,7 @@ export function updateHybridEnvironment() {
 
   if (gojo) {
     const data = getGojoDomainHybridData();
-    if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
+    if (!data.sprite.parent) layer.addChild(data.sprite);
     data.sprite.x = -20;
     data.sprite.y = -20;
     data.sprite.width = state.canvas.width + 40;
@@ -279,7 +313,7 @@ export function updateHybridEnvironment() {
 
   if (sukuna) {
     const bgData = getSukunaDomainHybridData();
-    if (!bgData.sprite.parent) layer.addChildAt(bgData.sprite, 0);
+    if (!bgData.sprite.parent) layer.addChild(bgData.sprite);
     bgData.sprite.x = -20;
     bgData.sprite.y = -20;
     bgData.sprite.width = state.canvas.width + 40;
@@ -291,7 +325,7 @@ export function updateHybridEnvironment() {
     }
 
     const fgData = getSukunaForegroundHybridData();
-    if (!fgData.sprite.parent) layer.addChildAt(fgData.sprite, 0);
+    if (!fgData.sprite.parent) layer.addChild(fgData.sprite);
     fgData.sprite.x = -20;
     fgData.sprite.y = -20;
     fgData.sprite.width = state.canvas.width + 40;
@@ -307,6 +341,22 @@ export function updateHybridEnvironment() {
     }
     if (sukunaForegroundHybridData && sukunaForegroundHybridData.sprite.parent) {
       sukunaForegroundHybridData.sprite.parent.removeChild(sukunaForegroundHybridData.sprite);
+    }
+  }
+
+  // Ensure explicit Z-order sorting for Domain Clashes (Gojo vs Sukuna):
+  // 1. Sukuna Domain Background (Liquid Floor) -> Back (Index 0)
+  // 2. Gojo Unlimited Void Background (Dark starry void overlaying floor) -> Middle (Index 1)
+  // 3. Sukuna Malevolent Shrine Structure -> Front (Index 2 - Always on top of Gojo's void!)
+  if (gojo && sukuna && layer) {
+    const gojoSprite = gojoDomainHybridData?.sprite;
+    const sukunaBgSprite = sukunaDomainHybridData?.sprite;
+    const sukunaFgSprite = sukunaForegroundHybridData?.sprite;
+
+    if (gojoSprite && sukunaBgSprite && sukunaFgSprite && gojoSprite.parent === layer && sukunaBgSprite.parent === layer && sukunaFgSprite.parent === layer) {
+      layer.setChildIndex(sukunaBgSprite, 0);
+      layer.setChildIndex(gojoSprite, 1);
+      layer.setChildIndex(sukunaFgSprite, 2);
     }
   }
 
@@ -339,7 +389,7 @@ export function updateHybridEnvironment() {
   
   // 1. Sukuna Furnace
   const sukunaFuga = state.fighters?.find(f => 
-    f && (f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
+    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
   );
   const furnaceArrow = getProjectiles().find(p => (p.isSukunaFurnace || p.visual === 'sukunaFurnaceArrow') && p.life > 0);
 
@@ -347,7 +397,7 @@ export function updateHybridEnvironment() {
   if (sukunaFuga) {
     cxFuga = sukunaFuga.x; cyFuga = sukunaFuga.y;
     if (sukunaFuga.isChannelingDivineFlame) {
-      tOpFuga = 0.25 + Math.min(1.0, sukunaFuga.divineFlameChargeTimer / Math.max(1, sukunaFuga.divineFlameChargeMax)) * 0.55;
+      tOpFuga = 0.25 + Math.min(1.0, (sukunaFuga.divineFlameChargeTimer || 0) / Math.max(1, sukunaFuga.divineFlameChargeMax || 90)) * 0.55;
     } else if (sukunaFuga.divineFlameRecoveryTimer > 0) {
       tOpFuga = 0.55 * (sukunaFuga.divineFlameRecoveryTimer / (CONFIG.sukuna?.divineFlameRecoveryTime || 60));
     }
@@ -360,8 +410,9 @@ export function updateHybridEnvironment() {
   if (currentFurnaceDimOpacity < 0.01) {
     currentFurnaceDimOpacity = 0; if (spriteFuga.parent) spriteFuga.parent.removeChild(spriteFuga);
   } else {
-    if (!spriteFuga.parent) dimLayer.addChild(spriteFuga);
+    if (!spriteFuga.parent) layer.addChild(spriteFuga);
     spriteFuga.alpha = currentFurnaceDimOpacity; spriteFuga.x = cxFuga; spriteFuga.y = cyFuga; spriteFuga.scale.set(scale);
+    state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentFurnaceDimOpacity * 0.98})`;
   }
 
   // 2. Gojo Purple
@@ -387,7 +438,7 @@ export function updateHybridEnvironment() {
   } else {
     if (!spritePurple.parent) layer.addChild(spritePurple);
     spritePurple.alpha = currentPurpleDimOpacity; spritePurple.x = cxPurple; spritePurple.y = cyPurple; spritePurple.scale.set(scale);
-    state.globalDimEdgeColor = `rgba(10, 0, 20, ${currentPurpleDimOpacity * 0.95})`;
+    state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentPurpleDimOpacity * 0.98})`;
   }
   
   // 3. Mahoraga
@@ -413,83 +464,67 @@ export function updateHybridEnvironment() {
     spriteMaho.x = cxMaho; spriteMaho.y = cyMaho; spriteMaho.scale.set(scale);
   }
   
-  // 4. Toji Ultimate
+  // 4. Toji Ultimate (100% Pure WebGL Sprites - 0% CPU canvas upload overhead)
   const toji = state.fighters?.find(f => f && f.ultimateActive && (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING' || f.ultimatePhase === 'CRATER_FADEIN' || f.ultimatePhase === 'CRATER'));
   let tOpToji = 0;
-  
-
 
   if (toji) {
     tOpToji = 0.85;
-    // Reduce or skip fly head updates in low quality mode
-    const maxFlyHeads = isLowQuality ? 0 : 40;
-    if (maxFlyHeads > 0 && Math.random() < 0.4 && tojiFlyHeads.length < maxFlyHeads) {
-      tojiFlyHeads.push({
-        x: 1920 + Math.random() * 100,
-        y: Math.random() * 1080,
-        vx: -15 - Math.random() * 20,
-        vy: (Math.random() - 0.5) * 5,
-        size: 5 + Math.random() * 10
-      });
+    const maxFlyHeads = isLowQuality ? 0 : 35;
+    if (maxFlyHeads > 0 && Math.random() < 0.35 && activeFlyHeads.length < maxFlyHeads) {
+      const sprite = getFlyHeadSprite();
+      if (sprite) {
+        const size = 6 + Math.random() * 12;
+        sprite.width = size * 2;
+        sprite.height = size * 2;
+        sprite.x = state.canvas.width + 50 + Math.random() * 100;
+        sprite.y = Math.random() * state.canvas.height;
+        sprite.alpha = 0.9;
+        activeFlyHeads.push({
+          sprite,
+          vx: -12 - Math.random() * 18,
+          vy: (Math.random() - 0.5) * 4
+        });
+      }
     }
   }
-  currentTojiUltimateOpacity += (tOpToji > currentTojiUltimateOpacity) ? (tOpToji - currentTojiUltimateOpacity) * 0.15 : (tOpToji - currentTojiUltimateOpacity) * 0.18;
-  
-  const tojiData = getTojiHybridData();
-  if (currentTojiUltimateOpacity < 0.01) {
-    currentTojiUltimateOpacity = 0; tojiFlyHeads = []; if (tojiData.sprite.parent) tojiData.sprite.parent.removeChild(tojiData.sprite);
-  } else {
-    if (!tojiData.sprite.parent) layer.addChild(tojiData.sprite);
-    
-    // Scale sprite to fit the current screen size instead of resizing canvas (negating shake)
-    const shakeX = state.shakeX || 0;
-    const shakeY = state.shakeY || 0;
-    tojiData.sprite.x = -20 - shakeX;
-    tojiData.sprite.y = -20 - shakeY;
-    tojiData.sprite.width = state.canvas.width + 40;
-    tojiData.sprite.height = state.canvas.height + 40;
-    
-    if (isLowQuality) {
-      // In performance mode, skip updating texture if the opacity hasn't changed.
-      // Since opacity stabilizes at 0.85 quickly, this yields 0% CPU texture-upload overhead for ~95% of the ultimate!
-      tojiFlyHeads = [];
-      if (tojiData._lastOpacity !== currentTojiUltimateOpacity) {
-        tojiData.ctx.clearRect(0, 0, 480, 270);
-        tojiData.ctx.fillStyle = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
-        tojiData.ctx.fillRect(0, 0, 480, 270);
-        tojiData.texture.update();
-        tojiData._lastOpacity = currentTojiUltimateOpacity;
-      }
-    } else {
-      tojiData.ctx.clearRect(0, 0, 480, 270);
-      tojiData.ctx.fillStyle = `rgba(5, 5, 5, ${currentTojiUltimateOpacity})`;
-      tojiData.ctx.fillRect(0, 0, 480, 270);
-      
-      tojiData.ctx.fillStyle = `rgba(20, 20, 20, ${0.9 * currentTojiUltimateOpacity})`;
-      for (let i = tojiFlyHeads.length - 1; i >= 0; i--) {
-        const head = tojiFlyHeads[i];
-        
-        // Scale coordinates down to match the smaller 480x270 canvas texture size
-        const scaleFactor = 4;
-        const drawX = head.x / scaleFactor;
-        const drawY = head.y / scaleFactor;
-        const drawSize = head.size / scaleFactor;
 
-        tojiData.ctx.beginPath();
-        tojiData.ctx.arc(drawX, drawY, drawSize, 0, Math.PI * 2);
-        tojiData.ctx.fill();
-        tojiData.ctx.fillStyle = `rgba(255, 0, 0, ${currentTojiUltimateOpacity})`;
-        tojiData.ctx.beginPath();
-        tojiData.ctx.arc(drawX - drawSize * 0.3, drawY - drawSize * 0.1, 0.5, 0, Math.PI * 2);
-        tojiData.ctx.arc(drawX + drawSize * 0.1, drawY - drawSize * 0.1, 0.5, 0, Math.PI * 2);
-        tojiData.ctx.fill();
-        tojiData.ctx.fillStyle = `rgba(20, 20, 20, ${0.9 * currentTojiUltimateOpacity})`;
-        
-        head.x += head.vx; head.y += head.vy;
-        if (head.x < -100) tojiFlyHeads.splice(i, 1);
+  currentTojiUltimateOpacity += (tOpToji > currentTojiUltimateOpacity) ? (tOpToji - currentTojiUltimateOpacity) * 0.15 : (tOpToji - currentTojiUltimateOpacity) * 0.18;
+
+  const container = getTojiUltimateContainer();
+  if (currentTojiUltimateOpacity < 0.01) {
+    currentTojiUltimateOpacity = 0;
+    // Release active fly head sprites back to pool
+    for (const head of activeFlyHeads) {
+      releaseFlyHeadSprite(head.sprite);
+    }
+    activeFlyHeads.length = 0;
+    if (container && container.parent) container.parent.removeChild(container);
+  } else if (container) {
+    if (!container.parent) layer.addChild(container);
+
+    // Sync dim sprite position & dimensions to cover screen cleanly
+    tojiDimSprite.x = state.canvas.width / 2;
+    tojiDimSprite.y = state.canvas.height / 2;
+    tojiDimSprite.width = state.canvas.width * 2.5; // Circle texture expanded to cover rectangle
+    tojiDimSprite.height = state.canvas.height * 2.5;
+    tojiDimSprite.alpha = currentTojiUltimateOpacity * 0.92;
+
+    // Update active fly heads in WebGL space
+    for (let i = activeFlyHeads.length - 1; i >= 0; i--) {
+      const head = activeFlyHeads[i];
+      head.sprite.x += head.vx;
+      head.sprite.y += head.vy;
+      head.sprite.alpha = currentTojiUltimateOpacity * 0.85;
+
+      if (head.sprite.x < -60) {
+        releaseFlyHeadSprite(head.sprite);
+        // Fast swap-and-pop O(1) removal
+        const last = activeFlyHeads.pop();
+        if (i < activeFlyHeads.length) {
+          activeFlyHeads[i] = last;
+        }
       }
-      
-      tojiData.texture.update();
     }
   }
 
@@ -537,24 +572,14 @@ export function updateHybridEnvironment() {
     rikaSummonDim.height = state.canvas.height + 40;
     rikaSummonDim.alpha = currentRikaSummonDimOpacity;
 
-    // Render Pulsing Ring
+    // Render Pulsing Ring (100% GPU WebGL Matrix Scaling)
     if (!rikaRing.parent) layer.addChild(rikaRing);
-    
-    // Draw the pulsing cursed energy ring on the 256x256 canvas
-    const rSize = 256;
-    rikaRingCtx.clearRect(0, 0, rSize, rSize);
-    rikaRingCtx.beginPath();
-    const ringR = 85 + Math.sin(Date.now() * 0.01) * 15;
-    rikaRingCtx.arc(rSize / 2, rSize / 2, ringR, 0, Math.PI * 2);
-    rikaRingCtx.strokeStyle = `rgba(255, 20, 147, ${currentRikaSummonDimOpacity * 0.45})`;
-    rikaRingCtx.lineWidth = 14;
-    rikaRingCtx.stroke();
-    
-    rikaRingTexture.update();
-    
     rikaRing.x = rikaCx;
     rikaRing.y = rikaCy;
-    rikaRing.alpha = 1.0;
+    const pulseRadius = 85 + Math.sin(Date.now() * 0.01) * 15;
+    const scale = pulseRadius / 85.0;
+    rikaRing.scale.set(scale);
+    rikaRing.alpha = currentRikaSummonDimOpacity * 0.45;
   }
 
   // Calculate and store the maximum dim opacity to allow HTML DOM overlays to dim synchronously
@@ -761,8 +786,11 @@ function getLaylaAuraCanvas() {
   return item;
 }
 
+let laylaUpdateTick = 0;
+
 function updateLaylaHybridAuras(layer) {
   const currentIds = new Set();
+  laylaUpdateTick++;
   
   if (state.fighters) {
     for (const f of state.fighters) {
@@ -780,13 +808,15 @@ function updateLaylaHybridAuras(layer) {
       
       const { canvas, ctx, sprite, texture, size } = hybridData;
       
-      ctx.clearRect(0, 0, size, size);
-      
-      drawLaylaMaleficSurgeGrid(ctx, size / 2, size / 2, f.r, f.maleficBuffTimer);
-      
-      texture.update();
       sprite.x = f.x;
       sprite.y = f.y;
+
+      // Throttle texture updates to 30 FPS to eliminate VRAM bandwidth overhead
+      if (laylaUpdateTick % 2 === 0) {
+        ctx.clearRect(0, 0, size, size);
+        drawLaylaMaleficSurgeGrid(ctx, size / 2, size / 2, f.r, f.maleficBuffTimer);
+        texture.update();
+      }
     }
   }
   

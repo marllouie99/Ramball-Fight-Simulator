@@ -60,7 +60,7 @@ export function drawFurnaceDimScreen() {
 
   // Find Sukuna fighters channeling Furnace or in post-fire recovery
   const sukunaFuga = state.fighters?.find(f => 
-    f && (f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
+    f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.id === 'sukuna' || f._def?.type === 'sukuna' || f._def?.name === 'Sukuna') && (f.isChannelingDivineFlame || (f.divineFlameRecoveryTimer && f.divineFlameRecoveryTimer > 0))
   );
   
   // Also check if Furnace fire arrow is actively flying
@@ -103,17 +103,19 @@ export function drawFurnaceDimScreen() {
 
   // Dark fiery vignette gradient centered on Sukuna/Arrow
   const opacity = currentFurnaceDimOpacity;
-  const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, Math.max(canvas.width, canvas.height) * 0.95);
-  grad.addColorStop(0, `rgba(255, 60, 0, ${opacity * 0.25})`);
-  grad.addColorStop(0.3, `rgba(120, 20, 0, ${opacity * 0.65})`);
-  grad.addColorStop(0.7, `rgba(30, 5, 2, ${opacity * 0.85})`);
-  grad.addColorStop(1, `rgba(10, 2, 2, ${opacity * 0.95})`);
+  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(canvas.width, canvas.height) * 0.95);
+  grad.addColorStop(0, `rgba(255, 140, 0, ${opacity * 0.95})`);
+  grad.addColorStop(0.06, `rgba(255, 70, 0, ${opacity * 0.85})`);
+  grad.addColorStop(0.15, `rgba(160, 25, 0, ${opacity * 0.70})`);
+  grad.addColorStop(0.35, `rgba(25, 4, 2, ${opacity * 0.92})`);
+  grad.addColorStop(0.65, `rgba(5, 1, 1, ${opacity * 0.97})`);
+  grad.addColorStop(1, `rgba(0, 0, 0, ${opacity * 0.99})`);
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(10, 2, 2, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
 }
 
 let currentRikaSummonDimOpacity = 0;

@@ -56,7 +56,53 @@ export function drawTodoSkin(ctx, fighter) {
     ctx.restore();
   }
   
-  // Keep body statically facing the camera (upright, like Gojo & Yuji)
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  ctx.rotate(angle);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
+
+  // Smooth sinusoidal punch progress
+  const isPunching = fighter.punchAnimTimer > 0;
+  let rawProgress = 0;
+  if (isPunching) {
+    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 22;
+    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+  }
+
+  const easePunch = Math.sin(rawProgress * Math.PI);
+  const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
+  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25) : 0;
+
+  let frontHandX, frontHandY, backHandX, backHandY;
+
+  if (isPunching) {
+    frontHandX = -r * 0.55; frontHandY = r * 0.35;
+    backHandX  =  r * 0.55; backHandY  = r * 0.35;
+
+    if (fighter.isRightPunch) {
+      frontHandX += lungeExtension * 1.40;
+      frontHandY += (0.12 - frontHandY) * easePunch;
+      backHandX  += oppositeRecoil;
+    } else {
+      backHandX  += lungeExtension * 1.60;
+      backHandY  += (0.12 - backHandY) * easePunch;
+      frontHandX += oppositeRecoil;
+    }
+  } else {
+    // Idle brawler guard stance: outer hand extends forward toward enemy at shoulder height
+    frontHandX = r * 0.85; frontHandY = r * 0.15;
+    backHandX  = 0;        backHandY  = -r * 0.15;
+  }
+
+  const handRadius = getHandSize(7.5);
+
+  // 1. Render Back Hand (Back Layer - Behind Body Circle)
+  if (!fighter._isWinnerReveal) {
+    drawHandFist(ctx, backHandX, backHandY, handRadius, skinColor, fighter);
+  }
+
+  // Keep body facing camera
+  ctx.save();
   ctx.rotate(Math.PI / 2);
 
   // 1a. Naked Tone Skin Base (#EBBF9E)
@@ -181,129 +227,15 @@ export function drawTodoSkin(ctx, fighter) {
     ctx.arc(0, 0, r + 7, Math.PI * 1.2, Math.PI * 1.8);
     ctx.stroke();
   }
+  ctx.restore(); // restore body rotate (Math.PI / 2)
 
-  ctx.restore();
-
-  // 7. Draw Hands (Recolored hands matching #EBBF9E skin tone)
-  drawTodoHands(ctx, fighter, skinColor);
+  // 7. Draw Front Hand (Front Layer - On Top of Body Circle)
+  if (!fighter._isWinnerReveal) {
+    drawHandFist(ctx, frontHandX, frontHandY, handRadius, skinColor, fighter);
+  }
 
   // 8. Draw Cursed Rocks
   drawCursedRocks(ctx, fighter);
-}
-
-function drawTodoHands(ctx, fighter, skinColor) {
-  const isPunching = fighter.punchAnimTimer > 0;
-  const isClapping = (fighter.clapAnimTimer || 0) > 0;
-
-  const handRadius = getHandSize(7.5);
-  const r = fighter.r;
-
-  ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-  
-  // Force hands to point straight down (0 angle relative to body) on Champion Screen
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
-  ctx.rotate(angle);
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
-
-  // Smooth progress calculation matching Mahoraga's cubic ease-in-out curve
-  let rawProgress = 0;
-  if (isPunching) {
-    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
-    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-  }
-  
-  const smoothProgress = rawProgress < 0.5 
-    ? 4 * rawProgress * rawProgress * rawProgress 
-    : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
-    
-  const lungeExtension = Math.sin(smoothProgress * Math.PI) * 32; // Dynamic punch lunge forward
-
-  // In this Front POV frame: +X is towards enemy, +Y is towards camera
-  // Right shoulder is at -X, Left shoulder is at +X
-  let frontHandX = -r * 0.55;    // Right Arm (further from enemy)
-  let frontHandY = r * 0.35;     // Slightly forward to camera
-  
-  let backHandX = r * 0.55;      // Left Arm (closer to enemy)
-  let backHandY = r * 0.35;      // Slightly forward to camera
-
-  // Handle punch animations (extend along +X axis towards enemy)
-  if (isPunching) {
-    if (fighter.isRightPunch) {
-      // Right arm starts behind and FLIES OVER the body to reach the enemy!
-      frontHandX += lungeExtension * 2.2; 
-      frontHandY *= 0.4;
-    } else {
-      // Left arm punches forward normally
-      backHandX += lungeExtension * 1.2;
-      backHandY *= 0.4;
-    }
-  }
-
-  // Clapping animation override (Buttery smooth 3-phase clap curve: Windup -> Collision -> Retraction)
-  if (isClapping) {
-    const timer = fighter.clapAnimTimer || 0;
-    const maxT = 20;
-    const progress = Math.min(1.0, Math.max(0.0, 1.0 - (timer / maxT))); // 0 -> 1 over 20 frames
-
-    const restFX = -r * 0.55;
-    const restFY = r * 0.35;
-    const restBX = r * 0.55;
-    const restBY = r * 0.35;
-
-    const clapTargetX = 2.5;
-    const clapTargetY = r + 14;
-
-    if (progress < 0.35) {
-      // Phase 1: Smooth Windup (hands swing out in an arc and accelerate together to center)
-      const p1 = progress / 0.35;
-      const easeP1 = p1 * p1; // Smooth acceleration
-      frontHandX = restFX + ((-clapTargetX) - restFX) * easeP1;
-      frontHandY = restFY + (clapTargetY - restFY) * easeP1;
-      backHandX = restBX + (clapTargetX - restBX) * easeP1;
-      backHandY = restBY + (clapTargetY - restBY) * easeP1;
-    } else if (progress < 0.55) {
-      // Phase 2: Collision & Recoil (hands meet at center with subtle elastic vibration)
-      const p2 = (progress - 0.35) / 0.20;
-      const recoil = Math.sin(p2 * Math.PI) * 2.5;
-      frontHandX = -clapTargetX - recoil * 0.5;
-      frontHandY = clapTargetY + recoil * 0.3;
-      backHandX = clapTargetX + recoil * 0.5;
-      backHandY = clapTargetY + recoil * 0.3;
-    } else {
-      // Phase 3: Smooth Retraction (hands smoothly open back up to resting guard stance)
-      const p3 = (progress - 0.55) / 0.45;
-      const easeP3 = 1 - Math.pow(1 - p3, 2); // Smooth deceleration ease-out
-      frontHandX = (-clapTargetX) + (restFX - (-clapTargetX)) * easeP3;
-      frontHandY = clapTargetY + (restFY - clapTargetY) * easeP3;
-      backHandX = clapTargetX + (restBX - clapTargetX) * easeP3;
-      backHandY = clapTargetY + (restBY - clapTargetY) * easeP3;
-    }
-  }
-
-  // Draw both hands (ALWAYS visible in side-profile guard stance)
-  drawHandFist(ctx, backHandX, backHandY, handRadius, skinColor, fighter);
-  drawHandFist(ctx, frontHandX, frontHandY, handRadius, skinColor, fighter);
-
-  // Clap shockwave visual (bursts outward at exact moment of hand collision at progress = 0.35 / frame 13!)
-  if (isClapping && (fighter.clapAnimTimer || 0) <= 13) {
-    const shockProgress = (13 - (fighter.clapAnimTimer || 0)) / 13;
-    const shockAlpha = Math.max(0, 1 - shockProgress);
-    const shockRadius = 8 + shockProgress * 24;
-
-    ctx.strokeStyle = `rgba(255, 255, 255, ${shockAlpha})`;
-    ctx.lineWidth = 2.5;
-    ctx.beginPath();
-    ctx.arc(0, r + 14, shockRadius, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(77, 163, 255, ${shockAlpha * 0.85})`;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(0, r + 14, shockRadius + 6, 0, Math.PI * 2);
-    ctx.stroke();
-  }
 
   ctx.restore();
 }

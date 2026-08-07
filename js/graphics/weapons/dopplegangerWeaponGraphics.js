@@ -68,12 +68,15 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
   const sword = DOPPLEGANGER_WEAPON_GRAPHICS.sword;
   const time = timeOpt || Date.now();
 
+  const baseRadius = CONFIG.doppleganger?.r || 25;
+  const radiusScale = (r || 25) / baseRadius;
+
   ctx.save();
   ctx.translate(x, y);
 
-  const scale = DOPPLEGANGER_WEAPON_GRAPHICS.positioning.scale;
+  const scale = DOPPLEGANGER_WEAPON_GRAPHICS.positioning.scale * radiusScale;
   // Push the sword out slightly so the handle rests nicely in a "hand" area
-  const sideOffset = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset;
+  const sideOffset = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset * radiusScale;
 
   const defaultSwordRotation = swordSwingActive ? swordSwingAngle : gunAngle;
 
@@ -105,7 +108,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
       swingRot = endStrikeAngle * (1 - p) + restingAngle * p;
     }
 
-    drawDopplegangerSwingEffect(ctx, r, swingProgress, defaultSwordRotation, fighterColor);
+    drawDopplegangerSwingEffect(ctx, r, swingProgress, defaultSwordRotation, fighterColor, radiusScale);
   }
 
   // To make the hand grip look correct, we want to rotate around the body center first (defaultSwordRotation),
@@ -120,7 +123,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
   const fps = state.fps || 60;
   if (swordSwingActive && swingProgress > 0.1 && swingProgress < 0.8 && fps > 40) {
     ctx.save();
-    ctx.translate(sideOffset - 5, handOffsetY);
+    ctx.translate(sideOffset - 5 * radiusScale, handOffsetY);
     // Calculate a slight lag in rotation based on swing direction
     const lagAmount = 0.25 * Math.sin(swingProgress * Math.PI);
     ctx.rotate(swingRot - lagAmount);
@@ -131,7 +134,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
   }
 
   ctx.save();
-  ctx.translate(sideOffset - 5, handOffsetY);
+  ctx.translate(sideOffset - 5 * radiusScale, handOffsetY);
   ctx.rotate(swingRot);
 
   drawSingleSword(ctx, 0, scale, swordSwingActive, false);
@@ -140,7 +143,7 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
   ctx.restore();
 }
 
-function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor) {
+function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor, radiusScale = 1.0) {
   const fade = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
   if (fade <= 0) return;
 
@@ -153,44 +156,44 @@ function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor
   // Outer ethereal trail - wide and soft
   ctx.globalAlpha = fade * 0.4;
   ctx.strokeStyle = se.trailColor;
-  ctx.lineWidth = 20;
+  ctx.lineWidth = Math.max(1, 20 * radiusScale);
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.arc(0, 0, r + 38, -Math.PI / 2.2, Math.PI / 2.2);
+  ctx.arc(0, 0, r + 38 * radiusScale, -Math.PI / 2.2, Math.PI / 2.2);
   ctx.stroke();
 
   // Middle glow layer
   ctx.globalAlpha = fade * 0.6;
   ctx.strokeStyle = se.secondaryColor;
-  ctx.lineWidth = 12;
+  ctx.lineWidth = Math.max(1, 12 * radiusScale);
   ctx.beginPath();
-  ctx.arc(0, 0, r + 32, -Math.PI / 2.8, Math.PI / 2.8);
+  ctx.arc(0, 0, r + 32 * radiusScale, -Math.PI / 2.8, Math.PI / 2.8);
   ctx.stroke();
 
   // Primary swing arc
   ctx.globalAlpha = fade * 0.8;
   ctx.strokeStyle = se.primaryColor;
-  ctx.lineWidth = 7;
+  ctx.lineWidth = Math.max(1, 7 * radiusScale);
   ctx.beginPath();
-  ctx.arc(0, 0, r + 26, -Math.PI / 3.2, Math.PI / 3.2);
+  ctx.arc(0, 0, r + 26 * radiusScale, -Math.PI / 3.2, Math.PI / 3.2);
   ctx.stroke();
 
   // Bright inner arc
   ctx.globalAlpha = fade * 1.0;
   ctx.strokeStyle = se.tertiaryColor;
-  ctx.lineWidth = 4;
+  ctx.lineWidth = Math.max(1, 4 * radiusScale);
   ctx.beginPath();
-  ctx.arc(0, 0, r + 22, -Math.PI / 3.5, Math.PI / 3.5);
+  ctx.arc(0, 0, r + 22 * radiusScale, -Math.PI / 3.5, Math.PI / 3.5);
   ctx.stroke();
 
   // Energy particles along the arc
   const particleCount = 5; // Reduced for performance
   for (let i = 0; i < particleCount; i++) {
     const angle = -Math.PI / 3.5 + (Math.PI * 2 / 3.5) * (i / (particleCount - 1));
-    const px = Math.cos(angle) * (r + 26);
-    const py = Math.sin(angle) * (r + 26);
+    const px = Math.cos(angle) * (r + 26 * radiusScale);
+    const py = Math.sin(angle) * (r + 26 * radiusScale);
     const particleFade = fade * (0.5 + 0.5 * Math.sin(i * 1.5 + progress * 15));
-    const particleSize = 3 + fade * 4;
+    const particleSize = (3 + fade * 4) * radiusScale;
 
     ctx.globalAlpha = particleFade;
     ctx.fillStyle = se.tertiaryColor;
@@ -206,14 +209,14 @@ function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor
   ctx.rotate(facingAngle);
   
   // Position hand at the sword handle
-  const sideOffsetHand = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset;
+  const sideOffsetHand = r + DOPPLEGANGER_WEAPON_GRAPHICS.positioning.sideOffset * radiusScale;
   ctx.translate(sideOffsetHand, 0);
   
   ctx.fillStyle = fighterColor || '#7b2cbf';
   ctx.beginPath();
-  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2);
+  ctx.arc(0, 0, getHandSize(6) * radiusScale, 0, Math.PI * 2);
   ctx.fill();
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = Math.max(1, 1.5 * radiusScale);
   ctx.strokeStyle = '#000';
   ctx.stroke();
   

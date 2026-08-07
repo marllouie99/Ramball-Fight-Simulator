@@ -9,9 +9,13 @@ import { mahoragaConfig } from '../configs/characters/mahoragaConfig.js';
 import { todoConfig } from '../configs/characters/todoConfig.js';
 import { yujiConfig } from '../configs/characters/yujiConfig.js';
 import { laylaConfig } from '../configs/characters/laylaConfig.js';
+import { saitamaConfig } from '../configs/characters/saitamaConfig.js';
+import { genosConfig } from '../configs/characters/genosConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {
+  saitama: saitamaConfig,
+  genos: genosConfig,
   arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
@@ -28,6 +32,7 @@ export const CONFIG = {
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
+  globalScreenShakeIntensityMultiplier: 0.7, // Global multiplier for all hit effect & arena screen shake intensity (1.0 = normal, 0.5 = half shake, 0.0 = disable shake completely)
   canvasWidth: 540,                 // Logical width of the game screen
   canvasHeight: 1080,                // Logical height of the game screen
   internalScale: 0.95,               // Scale factor for active game elements (arena, fighters, projectiles, and HUD size) inside the container
@@ -205,7 +210,7 @@ export const CONFIG = {
   /** Black ΓÇö Black Hole fighter */
   black: {
     shotCooldown: 35,   // frames between shots (normal fire rate)
-    blackHoleChance: 0.01, // 100% chance for projectile to become black hole
+    blackHoleChance: 0.00, // 100% chance for projectile to become black hole
     blackHoleRadius: 95,   // radius of black hole effect
     blackHoleDuration: 200, // frames the black hole lasts (4 seconds at 60 fps)
     blackHoleDamage: 5,    // damage per second while in black hole
@@ -213,11 +218,11 @@ export const CONFIG = {
     skillCooldown: 300,    // frames between skill uses (5 seconds at 60 fps)
     skillSpawnRadius: 120, // radius around opponent to spawn black hole
     // Additional tuning values used by Black fighter implementation
-    enhancedBlackHoleChance: 0.1, // increased chance when enemy is already in black hole
-    enhancedShotsGranted: 1, // number of guaranteed enhanced projectiles granted when enemy is pulled in
+    enhancedBlackHoleChance: 0.0, // increased chance when enemy is already in black hole
+    enhancedShotsGranted: 0, // number of guaranteed enhanced projectiles granted when enemy is pulled in
     summonIndicatorFrames: 36, // frames for the summon fade-in/out indicator (Γëê0.6s)
     skillChargeDuration: 30, // frames to charge skill before summoning (1s)
-    projectileSpeed: 4.0, // default speed for black projectiles when specified
+    projectileSpeed: 10.0, // default speed for black projectiles when specified
   },
 
   /** DarkSlateGray ΓÇö Ninja fighter */
@@ -420,15 +425,15 @@ export const CONFIG = {
   doppleganger: {
     // TUNING: Melee attack (purple sword)
     swordRange: 40,           // pixels from edge for sword swing attack
-    swordCooldown: 45,        // frames between sword swings
+    swordCooldown: 30,        // frames between sword swings
     swordDamage: 15,         // damage per sword swing
     swordSwingDuration: 20,   // frames for visible sword swing animation
 
     // TUNING: Passive skill (illusion summoning)
-    illusionHealthPercent: 0.15, // health percentage threshold for summoning illusion (25%)
+    illusionHealthPercent: 0.02, // health percentage threshold for summoning illusion (every 2%)
     maxIllusions: 4,         // maximum number of illusions that can exist at once
     illusionDamagePercent: 0.5, // illusions deal 50% of original damage
-    illusionDamageReceivedMultiplier: 2.5, // illusions receive 2x damage
+    illusionDamageReceivedMultiplier: 2.9, // illusions receive 2x damage
     illusionDuration: 2000,    // frames illusions last before fading (10 seconds at 60 fps)
     illusionSpeedSync: true,  // if true, illusions spawn with current speed; if false, use base speed
   },
@@ -562,7 +567,7 @@ export const CONFIG = {
     // Basic Attack: Chain Lightning (fast projectile)
     lightningDamage: 20,
     lightningSpeed: 30,
-    chainCount: 3,         // How many times it bounces
+    chainCount: 6,         // How many times it bounces
     chainRange: 250,       // Range to find next target
     chainDamageMultiplier: 0.8, // Decay per bounce
     attackCooldown: 150,
@@ -1134,6 +1139,44 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 3.0,
     ability: 'Ascending Power',
     desc: 'Scaling marksman who gains damage and range with each hit. Uses Malefic Bomb, Void Dash, and Destruction Barrage ultimate.',
+  },
+  {
+    id: 27,
+    name: 'Saitama',
+    category: 'Anime',
+    color: '#F5C400', // Bright Safety Yellow
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'saitama',
+    hp: 420,
+    damage: 38,
+    cooldown: 39,
+    moveSpeed: 6.0,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'One Punch',
+    desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
+  },
+  {
+    id: 28,
+    name: 'Genos',
+    category: 'Anime',
+    color: '#FF5500', // Incineration Orange
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'genos',
+    hp: 320,
+    damage: 14,
+    cooldown: 27,
+    moveSpeed: 6.2,
+    projectileSpeedMultiplier: 1.4,
+    ability: 'Incinerate',
+    desc: 'Demon Cyborg. Zones with explosive basic blasts, Rocket Stomps to close in, and uses a devastating continuous fire beam. Explodes upon defeat.',
   }
 ];
 

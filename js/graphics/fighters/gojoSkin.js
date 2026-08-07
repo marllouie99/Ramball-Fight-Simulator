@@ -1,3 +1,5 @@
+import { CONFIG } from '../../core/config.js';
+
 export function drawGojoBody(ctx, fighter) {
     const z = fighter.z || 0;
     
@@ -40,7 +42,7 @@ export function drawGojoBody(ctx, fighter) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
 
-      const infinityR = fighter.r + 30;
+      const infinityR = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
       const pulse = Math.sin(time * 0.005) * 2;
       const barrierRadius = infinityR + pulse;
 
@@ -76,7 +78,8 @@ export function drawGojoBody(ctx, fighter) {
     if (fighter.infinityBlockTimer > 0) {
       const blockProg = 1 - (fighter.infinityBlockTimer / (fighter.infinityBlockMaxTimer || 25));
       const alpha = Math.sin((1 - blockProg) * Math.PI);
-      const rippleR = (fighter.r + 15) + blockProg * 40;
+      const barrierR = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
+      const rippleR = barrierR + blockProg * 30;
 
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';

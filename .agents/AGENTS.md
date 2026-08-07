@@ -90,3 +90,62 @@
   - **Locked Orientation during Charge:** To prevent the weapon from snappily flipping sides as the target moves during `CRATER_FADEIN` and `CRATER` charge phases, snapshot the initial facing angle and flip sign once at transition start (`_ultimateChargeAngle` and `_ultimateChargeFlipSign`) and hold them locked. Clear active weapon slash timers (`katanaSlashTimer = 0`) on transition to prevent leftover charging-phase purple outlines.
   - **Clockwise Spin & Cutting Edge Alignment:** Always rotate Toji clockwise (`+ Math.PI * 2 * spinProgress`) so he spins downwards/rightwards towards the target. Disable vertical scale flipping for both Toji's body and weapon during the dive (`isSpinning = true`, `baseAngle = 0`, `_katanaFlipSign = 1`) to let the Katana draw in its default orientation, ensuring the cutting edge naturally leads the clockwise rotation.
   - **Stretched Trail:** Set the crescent slash radius to match the weapon tip (`outerR = this.r + thrustDistance + 146`) and let the trail trailing-stretch counter-clockwise behind the clockwise spin up to a grand `3.8` radians, fading out in the final 30% of the dive.
+
+## 16. Manga Action Speed Line Effects — Construction & Angle Standards
+
+### Overview
+Manga action speed lines (motion lines) are compact clusters of razor-sharp, tapered needle streaks that stream **behind** a fighter during high-speed flurries, lunges, or rapid strike abilities. They visually convey supersonic momentum and strike direction. These standards apply to all existing and future fighters.
+
+### Architecture & Pipeline
+- Implement as a dedicated canvas 2D draw function in `effectsRenderer.js` (e.g., `draw<FighterName>SpeedLines()`).
+- Export via `draw.js` and call from `renderSystem.js` **before** `drawFighters()` so lines render underneath the fighter body.
+- Maintain a **pre-seeded static array** (e.g., `_speedLineSeeds`) initialized once and reset when the ability re-activates to eliminate per-frame GC allocations.
+
+### Needle Polygon Geometry (NOT strokes)
+- **ALWAYS** draw speed lines as **4-point filled needle polygons** — NEVER use uniform `ctx.stroke()` lines:
+  ```javascript
+  // 4 points forming a sharp double-tapered needle polygon
+  ctx.moveTo(startX, startY);     // sharp trailing tip (far behind fighter)
+  ctx.lineTo(topMidX, topMidY);  // top edge of needle body
+  ctx.lineTo(endX, endY);        // sharp leading tip (near fighter back)
+  ctx.lineTo(botMidX, botMidY); // bottom edge of needle body
+  ctx.closePath();
+  ctx.fill();
+  ```
+- Keep max thickness (`maxThick`) subtle: **1.0px – 2.5px max** for crisp ink fidelity.
+- Offset the bulge midpoint toward the leading edge (`midOff = halfLen * 0.15`) for sharp tapering.
+
+### Cluster Proportions & Scaling
+- Scale perpendicular cluster width to match the fighter's body radius: `±(fighter.r * 1.4)` (e.g., `±35px` for `r=25`).
+- Use a **parabolic length distribution** across the cluster (`normDist = 1 - Math.abs(norm)`), where center lines are longest (~90px) and edge lines are shortest (~35px).
+- Use a compact cluster density of **20–25 lines** total.
+
+### Trajectory Alignment & Direction (CRITICAL)
+- **Angle Alignment**: Speed lines MUST align strictly with the fighter's facing/aim angle (`aimAngle = fighter.gunAngle || fighter.angle || 0`).
+- **Backward Streaming**: Speed lines MUST trail **BEHIND** the fighter's body, opposite to the strike direction:
+  ```javascript
+  const backOffset = fighter.r * 1.2; // Offset behind fighter body
+  const cosA = Math.cos(aimAngle);
+  const sinA = Math.sin(aimAngle);
+  const perpX = -sinA;
+  const perpY =  cosA;
+
+  // NEGATIVE cosA/sinA positions cluster behind the fighter along the attack vector
+  const lineCenterX = fighter.x - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+  const lineCenterY = fighter.y - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+  ```
+- Keep travel range compact (e.g., `travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 100)`), keeping lines tightly anchored behind the fighter without flying off-screen.
+
+### Character Theme Palette Standard
+Structure color palettes using a 4-slot alternating pattern tailored to the fighter's lore theme:
+```javascript
+// Example 4-slot theme structure: [Primary Theme, Secondary Accent, White Core, Dark Ink Line]
+if (i % 4 === 0) color = primaryThemeColor;    // e.g. Fiery Orange (Genos), Cursed Pink (Yuta), Crimson (Sukuna)
+else if (i % 4 === 1) color = secondaryColor; // e.g. Hot Gold (Genos), Deep Purple (Yuta), Black Flame (Sukuna)
+else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White-hot core
+else color = 'rgba(15, 15, 22, 0.90)';        // Dark manga ink line
+```
+
+### Seed Memory & Re-activation Management
+- Cache seed arrays at module level.
+- Track ability state (e.g., `fighter._lastFlurryState`) and reset seed cache to `null` whenever a new activation begins so random offsets refresh cleanly.

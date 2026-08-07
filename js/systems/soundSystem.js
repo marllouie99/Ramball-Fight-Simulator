@@ -441,9 +441,15 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
   };
   _activeSoundHandles.add(handle);
 
+  let cleanedUp = false;
   const cleanup = () => {
+    if (cleanedUp) return;
+    cleanedUp = true;
     _activeSounds.delete(clone);
     _activeSoundHandles.delete(handle);
+    try {
+      clone.removeEventListener('ended', cleanup);
+    } catch (e) {}
     if (_audioPool.length < MAX_POOL_SIZE && !_audioPool.includes(clone)) {
       _audioPool.push(clone);
     }
@@ -452,12 +458,13 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
     }
   };
 
+  handle.cleanup = cleanup;
+
   _activeSounds.add(clone);
   clone.addEventListener('ended', cleanup, { once: true });
   
   clone.play().catch(() => {
-    _activeSounds.delete(clone);
-    _activeSoundHandles.delete(handle);
+    cleanup();
   });
   
   return handle;
@@ -486,6 +493,9 @@ export function stopSound(soundHandle) {
     if (typeof soundHandle.pause === 'function') {
       try { soundHandle.pause(); } catch(e) {}
       soundHandle.currentTime = 0;
+    }
+    if (typeof soundHandle.cleanup === 'function') {
+      try { soundHandle.cleanup(); } catch(e) {}
     }
   } catch (e) {}
   _activeSoundHandles.delete(soundHandle);
@@ -531,9 +541,7 @@ export function fadeOutSound(soundHandle, fadeMs = 350) {
       audio.volume = Math.max(0, startVol * (1 - progress));
       if (step >= steps) {
         clearInterval(interval);
-        try { audio.pause(); } catch(e) {}
-        audio.currentTime = 0;
-        _activeSoundHandles.delete(soundHandle);
+        stopSound(soundHandle);
       }
     }, stepDelay);
     return;

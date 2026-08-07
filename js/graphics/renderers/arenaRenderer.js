@@ -239,11 +239,33 @@ export function drawArena() {
   ctx.save();
   ctx.drawImage(state._titleHeaderCanvas, centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
   
-  // Overlay dimming if any ultimate domains/dims are active (using the smoothly interpolated value)
-  const dim = state.currentHUDDimOpacity || 0;
-  if (dim > 0) {
+  // Overlay dimming if any ultimate domains/dims or skill channelings are active (smooth fade-in)
+  let domainChannelProgress = 0;
+  if (state.fighters) {
+    state.fighters.forEach(f => {
+      if (!f || f.hp <= 0) return;
+      if (f.domainActive || f.ultimateActive) {
+        domainChannelProgress = Math.max(domainChannelProgress, 0.88);
+      } else if (f.isChannelingDomainExpansion || f.isChannelingDomain || f.isChannelingPurple || f.isChannelingDivineFlame || f.ultimatePhase === 'CHANNELING') {
+        const maxCharge = f.domainChargeMax || f.purpleChargeMax || f.divineFlameChargeMax || f.ultimateChargeMax || 120;
+        const currentCharge = f.domainChargeTimer || f.purpleChargeTimer || f.divineFlameChargeTimer || f.ultimateChargeTimer || 0;
+        const prog = Math.min(1.0, Math.max(0.0, currentCharge / Math.max(1, maxCharge)));
+        domainChannelProgress = Math.max(domainChannelProgress, prog * 0.85);
+      }
+    });
+  }
+
+  const purpleDim = typeof currentPurpleDimOpacity !== 'undefined' ? currentPurpleDimOpacity : 0;
+  const furnaceDim = typeof currentFurnaceDimOpacity !== 'undefined' ? currentFurnaceDimOpacity : 0;
+  
+  let activeDimOpacity = state.currentHUDDimOpacity || 0;
+  activeDimOpacity = Math.max(activeDimOpacity, domainChannelProgress);
+  if (purpleDim > 0) activeDimOpacity = Math.max(activeDimOpacity, purpleDim * 0.88);
+  if (furnaceDim > 0) activeDimOpacity = Math.max(activeDimOpacity, furnaceDim * 0.88);
+
+  if (activeDimOpacity > 0) {
     ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = `rgba(0, 0, 0, ${dim * 0.8})`;
+    ctx.fillStyle = `rgba(0, 0, 0, ${activeDimOpacity * 0.95})`;
     ctx.fillRect(centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
   }
   ctx.restore();
@@ -319,13 +341,15 @@ export function drawPurpleDimScreen() {
   if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {
     state._cachedPurpleDimKey = key;
     state._cachedPurpleDimGrad = ctx.createRadialGradient(
-      roundCx, roundCy, 40,
+      roundCx, roundCy, 0,
       roundCx, roundCy, maxDim
     );
-    state._cachedPurpleDimGrad.addColorStop(0, `rgba(147, 51, 234, 0.25)`);  // Bright electric purple center
-    state._cachedPurpleDimGrad.addColorStop(0.35, `rgba(88, 28, 135, 0.60)`); // Deep purple aura
-    state._cachedPurpleDimGrad.addColorStop(0.70, `rgba(30, 0, 50, 0.85)`);   // Dark void
-    state._cachedPurpleDimGrad.addColorStop(1.0, `rgba(10, 0, 20, 0.95)`);   // Outer dark edge
+    state._cachedPurpleDimGrad.addColorStop(0, `rgba(195, 80, 255, ${opacity * 0.95})`);
+    state._cachedPurpleDimGrad.addColorStop(0.06, `rgba(147, 51, 234, ${opacity * 0.85})`);
+    state._cachedPurpleDimGrad.addColorStop(0.15, `rgba(88, 28, 135, ${opacity * 0.70})`);
+    state._cachedPurpleDimGrad.addColorStop(0.35, `rgba(20, 2, 35, ${opacity * 0.92})`);
+    state._cachedPurpleDimGrad.addColorStop(0.65, `rgba(5, 1, 10, ${opacity * 0.97})`);
+    state._cachedPurpleDimGrad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.99})`);
   }
 
   ctx.globalAlpha = opacity;
@@ -333,7 +357,7 @@ export function drawPurpleDimScreen() {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   ctx.restore();
   
-  state.globalDimEdgeColor = `rgba(10, 0, 20, ${opacity * 0.95})`;
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
 }
 
 let currentTojiUltimateOpacity = 0;

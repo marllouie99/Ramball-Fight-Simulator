@@ -25,12 +25,14 @@ export const yutaConfig = {
   parryMeleeThreatRadius: 120,             // Detection radius in pixels for incoming melee threats
   parryAnticipationDuration: 45,           // Frames to raise guard posture when threat is detected
   parryGuardDuration: 90,                  // Frames to hold block pose after parrying an attack
-  parryActiveChance: 0.35,                 // Probability (0-1) of parrying while actively guarding
-  parryPassiveChance: 0.25,                // Probability (0-1) of parrying passively when not guarding
+  parryActiveChance: 0.90,                 // Probability (0-1) of parrying while actively guarding
+  parryPassiveChance: 0.90,                // Probability (0-1) of parrying passively when not guarding
+  parryChancePerStack: 0.05,               // +5% bonus parry probability per triggered Flurry / Thin Ice Breaker counter-attack stack
+  maxParryStacks: 5,                        // Maximum parry mastery stacks (+25% bonus parry chance cap)
 
   // Special Mechanic: Phantom Flurry (Parry Counterattack)
-  flurryParryMin: 1,                       // Minimum successful parries required to activate Flurry
-  flurryParryMax: 1,                       // Maximum random target threshold for Flurry activation
+  flurryParryMin: 2,                       // Minimum successful parries required to activate Flurry
+  flurryParryMax: 2,                       // Maximum random target threshold for Flurry activation
   flurryHits: 7,                           // Number of rapid teleport slashes in Flurry execution
   flurryDamage: 15,                         // Damage per slash during Flurry
   flurryHitInterval: 7,                    // Frames delay between each Flurry slash

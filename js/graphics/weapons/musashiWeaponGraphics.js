@@ -228,7 +228,7 @@ function _drawBrushSmokeTrail(ctx, bladeAngle, offset, alpha, bladeLen, isFlippe
     // Glow
     ctx.save();
     ctx.globalAlpha = partAlpha * 0.4;
-    ctx.shadowColor = stanceColors[colorIdx];
+    // ctx.shadowColor = stanceColors[colorIdx]; // Removed for performance
     ctx.beginPath();
     ctx.arc(px, py, size * 1.8, 0, Math.PI * 2);
     ctx.fillStyle = stanceColors[colorIdx];

@@ -1,5 +1,5 @@
 export { drawFuelPickups } from './renderers/arenaRenderer.js';
-export { drawBlackHoleEffects, drawFloatingTexts, drawFlames } from './renderers/effectsRenderer.js';
+export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines } from './renderers/effectsRenderer.js';
 export { drawFighters, drawIllusions } from './renderers/EntityRenderer.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA

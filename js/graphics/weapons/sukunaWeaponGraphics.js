@@ -168,11 +168,13 @@ export function drawSukunaFurnaceArrow(ctx, p) {
   const vx = p.vx === 0 && p.vy === 0 && p._resumeVx !== undefined ? p._resumeVx : p.vx;
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
   const angle = Math.atan2(vy, vx);
-  const time = Date.now() * 0.012;
+  // 30 FPS stepped animation time for anime Sakuga travel keyframes
+  const step30Frame = Math.floor(Date.now() / (1000 / 30));
+  const time = step30Frame * (1000 / 30) * 0.012;
   const speed = Math.hypot(vx, vy);
 
-  // Performance: Detect low quality / low FPS mode
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  // Performance: Detect low quality mode (explicit performance settings only)
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
 
   // Initialize trail history and particle systems
   if (!p._fugaFlameTimer) p._fugaFlameTimer = 0;
@@ -474,7 +476,7 @@ export function drawDivineFlameArrowConstruct(ctx, {
 }) {
   if (progress <= 0) return;
 
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.2)));
 
   ctx.save();
   ctx.translate(x, y);

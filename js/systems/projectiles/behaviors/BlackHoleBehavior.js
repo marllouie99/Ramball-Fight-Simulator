@@ -185,6 +185,13 @@ export class BlackHoleBehavior extends ProjectileBehavior {
       const distSq = dx * dx + dy * dy;
 
       if (distSq < effectiveRadius * effectiveRadius) {
+        const dist = Math.sqrt(distSq);
+        const minProjScale = CONFIG.black?.blackHoleProjShrinkMin ?? 0.15;
+        const targetScale = minProjScale + (1 - minProjScale) * Math.min(1, dist / effectiveRadius);
+        if (otherProj.visualScaleTarget === undefined || targetScale < otherProj.visualScaleTarget) {
+          otherProj.visualScaleTarget = targetScale;
+        }
+
         if (distSq < p.r * p.r * 0.25) {
           if (otherProj.isExplosion) {
             system._returnProjectile(otherProj);
@@ -195,13 +202,13 @@ export class BlackHoleBehavior extends ProjectileBehavior {
           }
 
           if (!otherProj.capturedByBlackHole) {
-            const dist = Math.sqrt(distSq);
             otherProj.capturedByBlackHole = p;
             otherProj.orbitRadius = dist;
             otherProj.orbitAngle = Math.atan2(otherProj.y - p.y, otherProj.x - p.x);
+            const currentSpeed = Math.hypot(otherProj.vx, otherProj.vy);
+            otherProj.originalSpeed = Math.max(currentSpeed, otherProj.speed || 0, CONFIG.black?.blackHoleReleaseSpeed || 7.0);
           }
         } else {
-          const dist = Math.sqrt(distSq);
           const nx = dx / dist;
           const ny = dy / dist;
           const pullStrength = CONFIG.black.blackHolePullStrength * 2.5 * (1 - dist / effectiveRadius);
@@ -221,9 +228,12 @@ export class BlackHoleBehavior extends ProjectileBehavior {
         const capturedProj = system.projectiles[k];
         if (capturedProj.capturedByBlackHole === p) {
           capturedProj.capturedByBlackHole = null;
-          const releaseSpeed = CONFIG.black?.blackHoleReleaseSpeed ?? 3.5;
+          const releaseSpeed = capturedProj.originalSpeed || CONFIG.black?.blackHoleReleaseSpeed || 7.0;
           capturedProj.vx = Math.cos(capturedProj.orbitAngle + Math.PI / 2) * releaseSpeed;
           capturedProj.vy = Math.sin(capturedProj.orbitAngle + Math.PI / 2) * releaseSpeed;
+          if (capturedProj.angle !== undefined) {
+            capturedProj.angle = Math.atan2(capturedProj.vy, capturedProj.vx);
+          }
         }
       }
       return true; // Mark as destroyed

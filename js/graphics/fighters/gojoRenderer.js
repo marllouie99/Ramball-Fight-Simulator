@@ -131,7 +131,7 @@ export class GojoRenderer {
     // Draw afterimages during dodge & teleports
     if (fighter.afterImages && fighter.afterImages.length > 0) {
       ctx.save();
-      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       fighter.afterImages.forEach((img, i) => {
         if (skipAlternate && i % 2 === 0) return;
         if (img && img.timer > 0) {
@@ -206,7 +206,7 @@ export class GojoRenderer {
 
     // Draw afterimages during teleports & high-speed moves
     if (fighter.afterImages && fighter.afterImages.length > 0) {
-      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       for (let i = 0; i < fighter.afterImages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;
         const img = fighter.afterImages[i];
@@ -301,6 +301,12 @@ export class GojoRenderer {
 
     // Draw hand Cursed Energy flame blobs BEHIND body
     fighter._drawHandCursedEnergyAura(ctx);
+    fighter._drawHandCursedEnergy(ctx, 'back');
+
+    // 1b. Champion/Victory Screen: Draw 3D orbiting orbs BEHIND body when zDepth < 0
+    if (fighter._isWinnerReveal) {
+      GojoRenderer._draw3DOrbitingOrbs(ctx, fighter, 'back');
+    }
 
     // 2. Draw fighter body
     drawGojoBody(ctx, fighter);
@@ -310,7 +316,7 @@ export class GojoRenderer {
     }
 
     // 3. Draw physical circle hands + flare ON TOP of body
-    fighter._drawHandCursedEnergy(ctx);
+    fighter._drawHandCursedEnergy(ctx, 'front');
 
     // Draw Hollow Purple Red & Blue fusing orbs ON TOP of hands so hands don't cover them
     if (fighter.isChannelingPurple) {
@@ -325,45 +331,44 @@ export class GojoRenderer {
     fighter.drawHealth(ctx);
     fighter.drawFreezeTimer(ctx);
 
-    // Draw Reversal Red slow countdown rings on any affected enemies
-    if (state.fighters) {
-      state.fighters.forEach(f => {
-        if (f && f !== fighter && f.redSlowTimer > 0) {
-          fighter._drawRedSlowRing(ctx, f);
-        }
-      });
-    }
-
+    // 3b. Champion/Victory Screen: Draw 3D orbiting orbs IN FRONT of body when zDepth >= 0
     if (fighter._isWinnerReveal) {
-      const t = Date.now();
-      const orbitRadius = fighter.r + 40; 
-      
-      const drawOrbitingOrb = (colorType, angleOffset) => {
-        const angle = (t / 600) + angleOffset;
-        const ox = fighter.x + Math.cos(angle) * orbitRadius;
-        const oy = fighter.y + Math.sin(angle) * orbitRadius * 0.4 - 10;
-        drawGojoOrb(ctx, ox, oy, 9, t, colorType, 0);
-      };
-      
-      drawOrbitingOrb('red', 0);
-      drawOrbitingOrb('blue', (Math.PI * 2) / 3);
-      drawOrbitingOrb('purple', (Math.PI * 4) / 3);
+      GojoRenderer._draw3DOrbitingOrbs(ctx, fighter, 'front');
     }
 
-    // Draw Domain Expansion Floating Text at the end so it is never overlayed by body or visuals
-    if (fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
-      const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y);
-      ctx.font = '30px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(0, 229, 255, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 55 - (Math.sin(Date.now() / 150) * 5);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+    // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
+  }
+
+  /**
+   * Renders the 3 Cursed Technique Orbs (Red, Blue, Purple) orbiting Gojo in 3D perspective.
+   * Split into 'back' (zDepth < 0) and 'front' (zDepth >= 0) layers for 3D occlusion around his body.
+   */
+  static _draw3DOrbitingOrbs(ctx, fighter, layer = 'front') {
+    const t = Date.now();
+    const orbitRadius = fighter.r + 38;
+    const orbs = [
+      { colorType: 'red',    angleOffset: 0 },
+      { colorType: 'blue',   angleOffset: (Math.PI * 2) / 3 },
+      { colorType: 'purple', angleOffset: (Math.PI * 4) / 3 }
+    ];
+
+    for (const orb of orbs) {
+      const angle = (t / 600) + orb.angleOffset;
+      const zDepth = Math.sin(angle); // -1.0 (far back behind Gojo) -> +1.0 (front)
+      const isBehind = zDepth < 0;
+
+      if ((layer === 'back' && isBehind) || (layer === 'front' && !isBehind)) {
+        const ox = fighter.x + Math.cos(angle) * orbitRadius;
+        const oy = fighter.y + zDepth * (orbitRadius * 0.42) - 6;
+        const orbR = 8.5 * (0.8 + 0.35 * ((zDepth + 1) / 2));
+        
+        ctx.save();
+        if (isBehind) {
+          ctx.globalAlpha = 0.75 + zDepth * 0.25; // Subtle depth fade when passing behind back
+        }
+        drawGojoOrb(ctx, ox, oy, orbR, t, orb.colorType, 0);
+        ctx.restore();
+      }
     }
   }
 
@@ -425,43 +430,38 @@ export class GojoRenderer {
       return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
     }
 
-    // Default rest positions in Front POV frame (+X is enemy, +Y is camera)
-    // Left shoulder is at +X (closest to enemy), Right shoulder is at -X (furthest)
-    let lx1 = -r * 0.55;    // Right Arm (frontHand/strikingX 0)
-    let ly1 = r * 0.35;     // Slightly forward to camera
-    
-    let lx2 = r * 0.55;     // Left Arm (backHand)
-    let ly2 = r * 0.35;     // Slightly forward to camera
+    // Idle martial arts brawler guard stance & dynamic 1-2 flurry punches (matching Aoi Todo)
+    let frontHandX, frontHandY, backHandX, backHandY;
 
-    // 1. Snappy Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target)
     if (fighter.punchAnimTimer > 0) {
-      const maxT = fighter.punchActiveMaxTime || 8.0;
+      const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-      const smoothP = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
-      const lungeProgress = Math.sin(smoothP * Math.PI); // Smooth 0 -> 1 -> 0 bell curve
+      const easePunch = Math.sin(rawProgress * Math.PI);
+      const lungeExtension = easePunch * (r * 1.5);
+      const oppositeRecoil = -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25);
 
-      let reachDist = 75;
-      const targetEnt = fighter.target || (fighter.flurryTarget && !fighter.flurryTarget.isDead ? fighter.flurryTarget : null);
-      if (targetEnt) {
-        const distToTarget = Math.hypot(targetEnt.x - fighter.x, targetEnt.y - fighter.y);
-        reachDist = Math.max(45, Math.min(105, distToTarget - fighter.r * 0.45));
-      }
-
-      const punchDist = lungeProgress * reachDist;
+      frontHandX = r * 0.85; frontHandY = r * 0.15;
+      backHandX  = 0;        backHandY  = -r * 0.15;
 
       if (fighter.punchAnimHand === 0) {
-        // --- RIGHT HAND PUNCH (Strikes along right flank and flies over body!) ---
-        lx1 += punchDist * 1.5; 
-        ly1 *= 0.4;
+        // --- LEAD HAND PUNCH ---
+        frontHandX += lungeExtension * 1.40;
+        frontHandY += (0.08 - frontHandY) * easePunch;
+        backHandX  += oppositeRecoil;
       } else {
-        // --- LEFT HAND PUNCH (Strikes along left flank) ---
-        lx2 += punchDist * 1.2; 
-        ly2 *= 0.4;
+        // --- REAR HAND PUNCH ---
+        backHandX  += lungeExtension * 1.60;
+        backHandY  += (0.08 - backHandY) * easePunch;
+        frontHandX += oppositeRecoil;
       }
+    } else {
+      // Idle brawler guard stance: outer hand extends forward toward enemy at shoulder height
+      frontHandX = r * 0.85; frontHandY = r * 0.15;
+      backHandX  = 0;        backHandY  = -r * 0.15;
     }
 
-    const fHand = toGlobal(lx1, ly1);
-    const bHand = toGlobal(lx2, ly2);
+    const fHand = toGlobal(frontHandX, frontHandY);
+    const bHand = toGlobal(backHandX, backHandY);
 
     return { 
       frontHandX: fHand.x, frontHandY: fHand.y, 
@@ -500,36 +500,38 @@ export class GojoRenderer {
     }
   }
 
-  // Render physical circle hands ON TOP of body
-  static _drawHandCursedEnergy(ctx, fighter) {
+  // Render physical circle hands (back layer behind body, front layer on top of body)
+  static _drawHandCursedEnergy(ctx, fighter, layer = 'all') {
     const hands = fighter._getHandPositions();
     if (!hands) return;
 
     const { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand } = hands;
+    const handRadius = getHandSize(7.5, fighter);
 
-    // Draw Physical Circle Hands ON TOP of body
     ctx.save();
     ctx.fillStyle = fighter.color || '#FFE4C4';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
 
-    if (!hideFrontHand) {
+    // Back hand (behind body circle)
+    if ((layer === 'all' || layer === 'back') && !hideBackHand) {
       ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, getHandSize(6.5, fighter), 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
 
-    if (!hideBackHand) {
+    // Front hand (on top of body circle)
+    if ((layer === 'all' || layer === 'front') && !hideFrontHand) {
       ctx.beginPath();
-      ctx.arc(backHandX, backHandY, getHandSize(6.5, fighter), 0, Math.PI * 2);
+      ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
     ctx.restore();
 
     // Draw Cursed Energy fist glow around punching hand during punch animation ON TOP of fighters (suppressed during domain)
-    if (fighter.punchAnimTimer > 0 && !fighter.domainActive && !fighter.isChannelingDomainExpansion) {
+    if ((layer === 'all' || layer === 'front') && fighter.punchAnimTimer > 0 && !fighter.domainActive && !fighter.isChannelingDomainExpansion) {
       const strikingX = fighter.punchAnimHand === 0 ? frontHandX : backHandX;
       const strikingY = fighter.punchAnimHand === 0 ? frontHandY : backHandY;
 
@@ -1372,7 +1374,7 @@ export class GojoRenderer {
    * The ring shrinks from full circumference to nothing as redSlowTimer counts down.
    */
   static _drawRedSlowRing(ctx, fighter, target) {
-    if (!target || !target.redSlowTimer || target.redSlowTimer <= 0) return;
+    return; // Red ring visual disabled as requested
     const prog     = target.redSlowTimer / (target.redSlowMaxTimer || 120); // 1 → 0
     const ringR    = target.r + 8 + (1 - prog) * 4;   // expands slightly as it fades
     const arcEnd   = prog * Math.PI * 2;               // full circle → zero arc

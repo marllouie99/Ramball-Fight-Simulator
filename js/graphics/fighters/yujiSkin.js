@@ -158,6 +158,53 @@ export function drawYujiSkin(ctx, fighter) {
     }
   }
 
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  ctx.rotate(angle);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) ctx.scale(1, -1);
+
+  // Smooth sinusoidal punch progress (eliminates sharp cubic snapping)
+  const isPunching = fighter.punchAnimTimer > 0;
+  let rawProgress = 0;
+  if (isPunching) {
+    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 22;
+    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+  }
+
+  const easePunch = Math.sin(rawProgress * Math.PI);
+  const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
+  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25) : 0;
+
+  let frontX, frontY, backX, backY;
+
+  if (isPunching) {
+    frontX = -r * 0.55; frontY = r * 0.35;
+    backX  =  r * 0.55; backY  = r * 0.35;
+
+    if (fighter.isRightPunch) {
+      frontX += lungeExtension * 1.40;
+      frontY += (0.12 - frontY) * easePunch;
+      backX  += oppositeRecoil;
+    } else {
+      backX  += lungeExtension * 1.60;
+      backY  += (0.12 - backY) * easePunch;
+      frontX += oppositeRecoil;
+    }
+  } else {
+    // Idle brawler guard stance: outer hand extends forward toward enemy at shoulder height
+    frontX = r * 0.85; frontY = r * 0.15;
+    backX  = 0;        backY  = -r * 0.15;
+  }
+
+  const handRadius = getHandSize(7.5);
+  const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
+  const skinColor = isSukunaForm ? '#C03030' : '#F0C090';
+
+  // 1. Render Back Hand (Back Layer - Behind Body Circle)
+  if (!fighter._isWinnerReveal) {
+    _drawFist(ctx, backX, backY, handRadius, skinColor, fighter);
+  }
+
   // ── Clip everything inside the circle ──
   ctx.save();
   ctx.beginPath();
@@ -165,7 +212,6 @@ export function drawYujiSkin(ctx, fighter) {
   ctx.clip();
 
   // 1. Skin base — warm peach (changes to Sukuna's pale crimson-tinged skin when Soul Swap is active/transitioning)
-  const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
   ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
@@ -440,66 +486,12 @@ export function drawYujiSkin(ctx, fighter) {
     fighter.drawStatusOverlays(ctx, r);
   }
 
-  ctx.restore(); // end translate
-
-  // ── Hands ──
-  drawYujiHands(ctx, fighter);
-}
-
-// ─────────────────────────────────────────────
-// HAND RENDERER — skin-toned fists
-// ─────────────────────────────────────────────
-function drawYujiHands(ctx, fighter) {
-  if (typeof state !== 'undefined' && (state.gameState === 'countdown' || fighter._isWinnerReveal)) {
-    return;
-  }
-  
-  const isPunching = fighter.punchAnimTimer > 0;
-  const isBF = fighter.blackFlashTimer > 0;
-  const r = fighter.r;
-  const handRadius = getHandSize(7.5);
-  
-  const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
-  const skinColor = isSukunaForm ? '#C03030' : '#F0C090';
-
-  ctx.save();
-  ctx.translate(fighter.x, fighter.y);
-
-  // Force hands to point straight down (0 angle relative to body) on Champion Screen so they sit at bottom left/right
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
-  ctx.rotate(angle);
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
-  if (facingLeft) ctx.scale(1, -1);
-
-  // Cubic ease-in-out punch lunge (same as Todo)
-  let rawProgress = 0;
-  if (isPunching) {
-    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
-    rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-  }
-  const smooth = rawProgress < 0.5
-    ? 4 * rawProgress * rawProgress * rawProgress
-    : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
-
-  const lunge = isPunching ? Math.sin(smooth * Math.PI) * 32 : 0;
-
-  let frontX = -r * 0.55, frontY = r * 0.35;
-  let backX  =  r * 0.55, backY  = r * 0.35;
-
-  if (isPunching) {
-    if (fighter.isRightPunch) {
-      frontX += lunge * 2.2;
-      frontY *= 0.4;
-    } else {
-      backX += lunge * 1.2;
-      backY *= 0.4;
-    }
+  // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
+  if (!fighter._isWinnerReveal) {
+    _drawFist(ctx, frontX, frontY, handRadius, skinColor, fighter);
   }
 
-  _drawFist(ctx, backX,  backY,  handRadius, skinColor, fighter);
-  _drawFist(ctx, frontX, frontY, handRadius, skinColor, fighter);
-
-  ctx.restore();
+  ctx.restore(); // end translate & rotate transform stream
 }
 
 function _drawFist(ctx, x, y, radius, skinColor, fighter) {

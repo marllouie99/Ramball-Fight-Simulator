@@ -1,7 +1,13 @@
 import { state, spawnFloatingText, isChampionScreenActive } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
+import { spawnIllusionSpawn } from '../graphics/particles/illusionSpawnEffect.js';
 import { spatialGrid } from './physics.js';
+import { applyDamageToTarget } from '../entities/fighter.js';
+
+// Minimum HP an illusion must have had to be eligible for splitting on death.
+// Low threshold — even weak illusions should split as long as children get > 0 HP.
+const ILLUSION_SPLIT_MIN_HP = 2;
 
 /**
  * Update active illusions (clones, Rika, etc).
@@ -21,10 +27,72 @@ export function updateIllusions() {
     if (illusion.hp <= 0) {
       if (illusion.isRika) continue; // Rika handles her own death animation
       spawnIllusionDeath(illusion); // Spawn ethereal death effect
+
+      // ── SPLIT ON DEATH MECHANIC (Doppelganger Illusions only) ──
+      // When an illusion dies, it splits into 2 child illusions each with
+      // 50% of the dying illusion's maxHp, provided it had enough HP to be worth splitting.
+      const maxIllusions = CONFIG.doppleganger?.maxIllusions || 10;
+      // Use isDoppelganger flag (stamped in DopplegangerFighter.summonIllusion) for reliable detection
+      const canSplit = illusion.isDoppelganger === true
+        && !illusion.isSplitChild                          // Only first-gen illusions split
+        && illusion.maxHp >= ILLUSION_SPLIT_MIN_HP         // Must have meaningful HP
+        && (state.illusions.length - 1) < maxIllusions;   // Room for at least 1 child
+
+      if (canSplit) {
+        const splitHp = illusion.maxHp * 0.5;
+        const splitR   = Math.max(Math.floor(illusion.r * 0.50), 7);  // half size — Minecraft slime style
+        const owner    = illusion.owner;
+        const ownerSpeed = ((owner && owner.hp > 0 ? owner.speed : null) || illusion.moveSpeed || 1.5) * 1.35; // faster to feel frenetic
+        const slotsLeft = maxIllusions - (state.illusions.length - 1); // how many slots remain after this dies
+        const spawnCount = Math.min(2, slotsLeft);
+
+        for (let s = 0; s < spawnCount; s++) {
+          // Burst outward in opposite directions
+          const burstAngle = (illusion.gunAngle || 0) + (s === 0 ? -Math.PI / 3 : Math.PI / 3);
+          const child = {
+            x: illusion.x + Math.cos(burstAngle) * (illusion.r + splitR + 2),
+            y: illusion.y + Math.sin(burstAngle) * (illusion.r + splitR + 2),
+            vx: Math.cos(burstAngle) * ownerSpeed,
+            vy: Math.sin(burstAngle) * ownerSpeed,
+            r: splitR,
+            color: illusion.color,
+            hp: splitHp,
+            maxHp: splitHp,
+            damage: illusion.damage * 0.75,  // children deal 75% of parent illusion damage
+            owner,
+            swordCooldown: 20,
+            swordSwingActive: false,
+            swordSwingTimer: 0,
+            swordSwingAngle: 0,
+            duration: CONFIG.doppleganger?.illusionDuration || 2000,
+            angle: illusion.angle || 0,
+            gunAngle: burstAngle,
+            moveSpeed: ownerSpeed,
+            isIllusion: true,
+            isDoppelganger: true,   // keeps team/targeting logic working
+            isSplitChild: true,     // children do NOT split again
+            hitFlashTimer: 0,
+            timeStopTimer: 0,
+            hitStunTimer: 0,
+            applyTimeStop(duration) { this.timeStopTimer = Math.max(this.timeStopTimer || 0, duration); },
+            applyHitStun(duration)  { this.hitStunTimer  = Math.max(this.hitStunTimer  || 0, duration); },
+            applyKnockback(vx, vy) { this.knockbackVx = vx; this.knockbackVy = vy; },
+            takeDamage(amount, attacker, opts = {}) {
+              return applyDamageToTarget(this, amount, attacker, opts);
+            },
+          };
+          state.illusions.push(child);
+          spawnIllusionSpawn(child);
+          if (owner) owner.illusionsSummoned++;
+        }
+        spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'SPLIT!', '#d070ff');
+      } else {
+        spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
+      }
+
       // High-performance swap-and-pop array cleanup instead of splice
       state.illusions[i] = state.illusions[state.illusions.length - 1];
       state.illusions.pop();
-      spawnFloatingText(illusion.x, illusion.y - illusion.r - 10, 'ILLUSION SHATTERED!', '#9b59b6');
       continue;
     }
 

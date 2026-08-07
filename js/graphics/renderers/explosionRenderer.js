@@ -3,20 +3,26 @@ import { state } from '../../core/state.js';
 export function drawThermobaricExplosions(ctx) {
   if (!state.thermobaricExplosions || state.thermobaricExplosions.length === 0) return;
 
-  const nowTime = Date.now();
+  // 30 FPS stepped timestamp for anime Sakuga keyframe animation
+  const step30Frame = Math.floor(Date.now() / (1000 / 30));
+  const nowTime = step30Frame * (1000 / 30);
 
   for (let i = state.thermobaricExplosions.length - 1; i >= 0; i--) {
     const exp = state.thermobaricExplosions[i];
     exp.life--;
 
-    const craterProgress = 1 - (exp.life / exp.maxLife);
+    // Quantize progress to 30 FPS stepped keyframes (changes every 2 frames at 60Hz)
+    const elapsed60 = exp.maxLife - exp.life;
+    const elapsed30 = Math.floor(elapsed60 / 2) * 2;
+    const craterProgress = Math.min(1.0, elapsed30 / exp.maxLife);
     const craterAlpha = Math.max(0, 1 - craterProgress);
 
     const explosionFrames = 50;
-    const explosionLife = Math.max(0, exp.life - (exp.maxLife - explosionFrames));
-    const explosionProgress = 1 - (explosionLife / explosionFrames);
+    const explosionElapsed60 = Math.min(explosionFrames, elapsed60);
+    const explosionElapsed30 = Math.floor(explosionElapsed60 / 2) * 2;
+    const explosionProgress = Math.min(1.0, explosionElapsed30 / explosionFrames);
     const expAlpha = Math.max(0, 1 - explosionProgress);
-    const radius = exp.radius + (exp.maxRadius - exp.radius) * Math.sin(Math.min(1, explosionProgress) * Math.PI * 0.5);
+    const radius = exp.radius + (exp.maxRadius - exp.radius) * Math.sin(explosionProgress * Math.PI * 0.5);
 
     const R = exp.maxRadius;
     const cx = exp.x;
@@ -133,7 +139,7 @@ export function drawThermobaricExplosions(ctx) {
 
     // ── CURVED BEZIER CRACK VEINS ──
     if (exp.cracks && exp.cracks.length > 0) {
-      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+      const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
       ctx.save();
       exp.cracks.forEach(crack => {
         const pts = crack.points;
@@ -291,24 +297,28 @@ export function drawThermobaricExplosions(ctx) {
 
     ctx.restore();
 
-    // ── DEBRIS, EMBERS & SMOKE ──
+    // ── DEBRIS, EMBERS & SMOKE (Stepped at 30 FPS Sakuga timing) ──
     if (exp.debris && exp.debris.length > 0) {
-      exp.debris.forEach((d, idx) => {
-        d.x += d.vx;
-        d.y += d.vy;
-        if (d.type === 'ember') {
-          d.vy -= 0.15;
-          d.vx *= 0.99;
-          d.x += Math.sin(nowTime * 0.004 + idx * 1.7) * 0.8;
-        } else if (d.type === 'smoke') {
-          d.vy -= 0.08;
-          d.vx *= 0.97;
-          d.vy *= 0.97;
-          d.size += 0.15;
-        } else {
-          d.vy += 0.35;
-        }
-        d.rot += d.rotSpeed;
+      if (elapsed60 % 2 === 0) {
+        exp.debris.forEach((d, idx) => {
+          d.x += d.vx * 2;
+          d.y += d.vy * 2;
+          if (d.type === 'ember') {
+            d.vy -= 0.30;
+            d.vx *= 0.98;
+            d.x += Math.sin(nowTime * 0.004 + idx * 1.7) * 1.6;
+          } else if (d.type === 'smoke') {
+            d.vy -= 0.16;
+            d.vx *= 0.94;
+            d.vy *= 0.94;
+            d.size += 0.30;
+          } else {
+            d.vy += 0.70;
+          }
+          d.rot += d.rotSpeed * 2;
+        });
+      }
+      exp.debris.forEach((d) => {
         ctx.save();
         ctx.translate(d.x - cx, d.y - cy);
         ctx.rotate(d.rot);

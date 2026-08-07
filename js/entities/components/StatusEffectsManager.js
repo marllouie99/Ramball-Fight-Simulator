@@ -108,6 +108,7 @@ export class StatusEffectsManager {
     const fighter = this.fighter;
     if (fighter.domainImmunity || fighter.characterId === 'toji' || fighter.type === 'toji') {
       fighter.timeStopTimer = 0;
+      fighter.isFrozenByInfinity = false;
       fighter.electricStunTimer = 0;
       fighter.crimsonElectrifiedTimer = 0;
       fighter.dubstepStunTimer = 0;
@@ -195,6 +196,16 @@ export class StatusEffectsManager {
       if (typeof fighter._timeStopFrozenGunAngle === 'number') {
         fighter.gunAngle = fighter._timeStopFrozenGunAngle;
       }
+
+      // Continuously decrement skill & ultimate cooldowns while frozen (EXCEPT inside Gojo's Unlimited Void Domain)
+      const isGojoDomainActive = state.fighters && state.fighters.some(f => 
+        f && (f.type === 'gojo' || f.characterId === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+      );
+
+      if (!isGojoDomainActive && typeof fighter._decrementSkillCooldowns === 'function') {
+        fighter._decrementSkillCooldowns();
+      }
+
       if (fighter.timeStopTimer <= 0) {
         fighter.timeStopTimer = 0;
         fighter.isFrozenByInfinity = false;
@@ -214,6 +225,8 @@ export class StatusEffectsManager {
         delete fighter._timeStopStartTime;
       }
       return true;
+    } else {
+      fighter.isFrozenByInfinity = false;
     }
     return false;
   }

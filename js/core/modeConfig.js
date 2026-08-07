@@ -35,7 +35,7 @@ export const MODE_SETTINGS = {
     rounds: 1,
     hpMultiplier: 1.0,
     fixedHp: 1000, // For the duo
-    soloFixedHp: 1500, // For the alone fighter
+    soloFixedHp: 1000, // For the alone fighter
     speedMultiplier: 1.6,
     initialFuelPickups: 2,
     supportFourFighters: false, // We will manually handle 3 fighters

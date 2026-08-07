@@ -1,6 +1,27 @@
 // js/graphics/particles/burnEffectVisuals.js
 import { state } from '../../core/state.js';
 
+// Object pool for PixiJS Sprites to eliminate VRAM allocations and GC thrashing
+const pixiSpritePool = [];
+function getPixiSprite() {
+  if (pixiSpritePool.length > 0) {
+    const s = pixiSpritePool.pop();
+    s.visible = true;
+    return s;
+  }
+  if (!state.baseCircleTexture || !state.pixiLayers || !state.pixiLayers.particles) return null;
+  const s = new window.PIXI.Sprite(state.baseCircleTexture);
+  s.anchor.set(0.5);
+  state.pixiLayers.particles.addChild(s);
+  return s;
+}
+
+function releasePixiSprite(s) {
+  if (!s) return;
+  s.visible = false;
+  pixiSpritePool.push(s);
+}
+
 class BurnParticle {
   constructor(x, y, type, size) {
     this.x = x;
@@ -15,6 +36,7 @@ class BurnParticle {
     this.friction = 0.96;
     this.color = '';
     this.history = [];
+    this.sprite = null;
   }
 }
 
@@ -48,10 +70,37 @@ class BurnEffectSystem {
     p.friction = 0.96;
     p.color = '';
     p.history = [];
+    
+    // Acquire a WebGL sprite for GPU rendering
+    p.sprite = getPixiSprite();
+    if (p.sprite) {
+      p.sprite.width = size * 2.5;
+      p.sprite.height = size * 2.5;
+      p.sprite.x = x;
+      p.sprite.y = y;
+      p.sprite.alpha = 1.0;
+      p.sprite.rotation = Math.random() * Math.PI * 2;
+      
+      // Select appropriate blending and colors based on particle type
+      if (type === 'fire') {
+        p.sprite.tint = 0xFF6600; // Orange core
+        p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+      } else if (type === 'spark') {
+        p.sprite.tint = 0xFFDD44; // Gold sparks
+        p.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+      } else { // smoke
+        p.sprite.tint = 0x302A38; // Dark purple-grey ash
+        p.sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+      }
+    }
     return p;
   }
 
   _returnParticle(p) {
+    if (p.sprite) {
+      releasePixiSprite(p.sprite);
+      p.sprite = null;
+    }
     if (this._pool.length < this._POOL_SIZE) {
       this._pool.push(p);
     }
@@ -74,13 +123,13 @@ class BurnEffectSystem {
     
     // OPTIMIZED: More aggressive limits for multi-fighter battles
     const maxBurn = isMulti ? 40 : 200;
-    const fpsBasedLimit = state.fps < 40 ? 25 : maxBurn;
+    const fpsBasedLimit = state.performanceMode ? 25 : maxBurn;
     if (this.particles.length > fpsBasedLimit) return;
     
     const r = fighter.r;
-    const fireChance = state.fps < 40 ? 0.2 : 0.4;
-    const sparkChance = state.fps < 40 ? 0.1 : 0.2;
-    const smokeChance = state.fps < 40 ? 0.08 : 0.15;
+    const fireChance = state.performanceMode ? 0.2 : 0.4;
+    const sparkChance = state.performanceMode ? 0.1 : 0.2;
+    const smokeChance = state.performanceMode ? 0.08 : 0.15;
 
     // Determine directional flow vector based on channeling angle or movement
     let flowVx = 0;
@@ -104,15 +153,15 @@ class BurnEffectSystem {
     // 1. Fire particles (dense center flame)
     if (Math.random() < fireChance) {
       const angle = Math.random() * Math.PI * 2;
-      const dist = Math.random() * r * 0.8;
+      const dist = Math.random() * r * 0.6;
       const px = fighter.x + Math.cos(angle) * dist;
       const py = fighter.y + Math.sin(angle) * dist;
       
-      const p = this._getParticle(px, py, 'fire', 4 + Math.random() * 6);
-      p.maxLife = 0.35 + Math.random() * 0.25;
+      const p = this._getParticle(px, py, 'fire', 1.5 + Math.random() * 2.0);
+      p.maxLife = 0.30 + Math.random() * 0.20;
       p.life = p.maxLife;
-      p.vx = flowVx + (Math.random() - 0.5) * 12;
-      p.vy = flowVy + (Math.random() - 0.5) * 12;
+      p.vx = flowVx + (Math.random() - 0.5) * 8;
+      p.vy = flowVy + (Math.random() - 0.5) * 8;
       p.gravity = gravity;
       this.particles.push(p);
     }
@@ -120,18 +169,18 @@ class BurnEffectSystem {
     // 2. Ember Sparks (crackles)
     if (Math.random() < sparkChance) {
       const angle = Math.random() * Math.PI * 2;
-      const px = fighter.x + Math.cos(angle) * r;
-      const py = fighter.y + Math.sin(angle) * r;
+      const px = fighter.x + Math.cos(angle) * r * 0.8;
+      const py = fighter.y + Math.sin(angle) * r * 0.8;
       
-      const p = this._getParticle(px, py, 'spark', 1.5 + Math.random() * 1.5);
+      const p = this._getParticle(px, py, 'spark', 1.0 + Math.random() * 1.0);
       p.maxLife = 0.15 + Math.random() * 0.15;
       p.life = p.maxLife;
       const sparkAngle = fighter.isChannelingDivineFlame 
-        ? ((fighter.gunAngle || 0) + Math.PI + (Math.random() - 0.5) * 0.8)
-        : Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5
-          ? (Math.atan2(-(fighter.vy || 0), -(fighter.vx || 0)) + (Math.random() - 0.5) * 0.8)
-          : (-Math.PI / 2 + (Math.random() - 0.5) * 1.5);
-      const speed = 40 + Math.random() * 40;
+          ? ((fighter.gunAngle || 0) + Math.PI + (Math.random() - 0.5) * 0.8)
+          : Math.hypot(fighter.vx || 0, fighter.vy || 0) > 0.5
+            ? (Math.atan2(-(fighter.vy || 0), -(fighter.vx || 0)) + (Math.random() - 0.5) * 0.8)
+            : (-Math.PI / 2 + (Math.random() - 0.5) * 1.5);
+      const speed = 25 + Math.random() * 25;
       p.vx = Math.cos(sparkAngle) * speed;
       p.vy = Math.sin(sparkAngle) * speed;
       p.gravity = gravity;
@@ -140,15 +189,15 @@ class BurnEffectSystem {
 
     // 3. Smoke (rising ash)
     if (Math.random() < smokeChance) {
-      const px = fighter.x + (Math.random() - 0.5) * r * 0.6;
+      const px = fighter.x + (Math.random() - 0.5) * r * 0.5;
       const py = fighter.y - r * 0.3;
       
-      const p = this._getParticle(px, py, 'smoke', 6 + Math.random() * 8);
-      p.maxLife = 0.6 + Math.random() * 0.4;
+      const p = this._getParticle(px, py, 'smoke', 2.0 + Math.random() * 2.5);
+      p.maxLife = 0.5 + Math.random() * 0.3;
       p.life = p.maxLife;
-      p.vx = flowVx * 0.5 + (Math.random() - 0.5) * 8;
-      p.vy = flowVy * 0.5 + (Math.random() - 0.5) * 8 - 10;
-      p.gravity = -10;
+      p.vx = flowVx * 0.5 + (Math.random() - 0.5) * 6;
+      p.vy = flowVy * 0.5 + (Math.random() - 0.5) * 6 - 8;
+      p.gravity = -8;
       p.friction = 0.98;
       this.particles.push(p);
     }
@@ -180,93 +229,49 @@ class BurnEffectSystem {
 
       // Type behaviors
       if (p.type === 'fire') {
-        p.size = Math.max(0.1, p.size - 4 * dt); // shrink
+        p.size = Math.max(0.1, p.size - 3 * dt); // shrink
       } else if (p.type === 'smoke') {
-        p.size += 8 * dt; // expand
+        p.size += 4 * dt; // expand
       } else if (p.type === 'spark') {
         p.history.push({ x: p.x, y: p.y });
         if (p.history.length > 3) p.history.shift();
+      }
+
+      // Update PixiJS Sprite in WebGL coordinates (GPU renders it)
+      if (p.sprite) {
+        p.sprite.x = p.x;
+        p.sprite.y = p.y;
+        
+        const progress = p.life / p.maxLife;
+        if (p.type === 'fire') {
+          // Fire scales dynamically: grows slightly, then fades out in colors
+          const size = p.size * (1.1 + (1 - progress) * 0.4);
+          p.sprite.width = size * 1.5;
+          p.sprite.height = size * 1.5;
+          p.sprite.alpha = progress * 0.75;
+          if (progress > 0.6) {
+            p.sprite.tint = 0xFFF2A3; // bright white/yellow core
+          } else if (progress > 0.35) {
+            p.sprite.tint = 0xFF8800; // hot orange
+          } else {
+            p.sprite.tint = 0xBB2200; // cooling red
+          }
+        } else if (p.type === 'spark') {
+          p.sprite.width = p.size * 1.2;
+          p.sprite.height = p.size * 1.2;
+          p.sprite.alpha = progress;
+          p.sprite.tint = progress > 0.55 ? 0xFFEE44 : 0xFF4400;
+        } else if (p.type === 'smoke') {
+          p.sprite.width = p.size * 1.4;
+          p.sprite.height = p.size * 1.4;
+          p.sprite.alpha = Math.sin(progress * Math.PI) * 0.12; // very faint translucent ash
+        }
       }
     }
   }
 
   draw(ctx) {
-    if (this.particles.length === 0) return;
-
-    // OPTIMIZED: Skip expensive composite operations during low FPS
-    const useSimpleRender = state.fps < 45 && state.gameState === 'playing';
-
-    ctx.save();
-
-    // Use source-over blending because lighter blending is invisible against light arena backgrounds
-    ctx.globalCompositeOperation = 'source-over';
-
-    for (const p of this.particles) {
-      if (p.type === 'fire') {
-        const progress = p.life / p.maxLife;
-        const size = p.size * (1.2 + (1 - progress) * 0.5); // Grows slightly as it lives
-
-        if (useSimpleRender) {
-          ctx.fillStyle = `rgba(255, 150, 50, ${progress * 0.7})`;
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-          ctx.fill();
-          continue;
-        }
-
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
-        
-        // Brighter colors that fade out cleanly without getting muddy
-        if (progress > 0.6) { // Young
-          grad.addColorStop(0, `rgba(255, 255, 255, ${progress})`);
-          grad.addColorStop(0.5, `rgba(255, 220, 50, ${progress * 0.9})`);
-          grad.addColorStop(1, `rgba(255, 100, 0, 0)`);
-        } else { // Older
-          grad.addColorStop(0, `rgba(255, 150, 20, ${progress * 0.8})`);
-          grad.addColorStop(0.7, `rgba(200, 40, 0, ${progress * 0.4})`);
-          grad.addColorStop(1, `rgba(100, 0, 0, 0)`);
-        }
-        
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      else if (p.type === 'spark') {
-        const progress = p.life / p.maxLife;
-        ctx.strokeStyle = `rgba(255, ${120 + progress * 135}, 40, ${progress})`;
-        ctx.lineWidth = p.size;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        if (p.history.length > 1) {
-          ctx.moveTo(p.history[0].x, p.history[0].y);
-          for (let i = 1; i < p.history.length; i++) {
-            ctx.lineTo(p.history[i].x, p.history[i].y);
-          }
-        } else {
-          ctx.moveTo(p.x, p.y);
-          ctx.lineTo(p.x - p.vx * 0.05, p.y - p.vy * 0.05);
-        }
-        ctx.stroke();
-      } 
-      else if (p.type === 'smoke') {
-        const progress = p.life / p.maxLife;
-        // Blend from dark purple/red to black based on progress - kept VERY faint to avoid muddy overlap
-        const alpha = Math.sin(progress * Math.PI) * 0.1;
-        
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size * 1.2);
-        grad.addColorStop(0, `rgba(40, 20, 50, ${alpha})`); 
-        grad.addColorStop(0.6, `rgba(20, 15, 25, ${alpha * 0.6})`);
-        grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    ctx.restore();
+    // Deprecated: PixiJS automatically renders the sprites in the background scene graph.
   }
 }
 

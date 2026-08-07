@@ -3,7 +3,7 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
-import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact } from '../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnAnimePunchImpactFrame } from '../graphics/particles/sparkEffect.js';
 
 export const HitImpactSystem = {
   /**
@@ -43,18 +43,7 @@ export const HitImpactSystem = {
         spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
         audioSystem.playSFX('attack_fleshhit', 0.5);
 
-        if (attacker) {
-          if (!attacker.slashHitVisuals) attacker.slashHitVisuals = [];
-          const hitAngle = Math.atan2(projectile.vy, projectile.vx);
-          attacker.slashHitVisuals.push({
-            x: target.x + (Math.random() - 0.5) * target.r * 0.4,
-            y: target.y + (Math.random() - 0.5) * target.r * 0.4,
-            angle: hitAngle + (Math.random() - 0.5) * 0.4,
-            timer: 12,
-            maxTimer: 12,
-            scale: 1.0 + Math.random() * 0.4
-          });
-        }
+
       }
 
       // Apply physical push backward on hit (using throwKnockback config for Mahoraga!)
@@ -95,6 +84,39 @@ export const HitImpactSystem = {
       target.lastCrimsonAttacker = attacker;
       return false; // Pierce
     } 
+
+    // Genos Incineration Palm Fireball — Physical push back knockback & slow movement effect on hit!
+    if (projectile.visual === 'genosFireball') {
+      const knockbackForce = CONFIG.genos?.blastKnockback || 8.5;
+      const hitAngle = Math.atan2(projectile.vy, projectile.vx);
+
+      // 1. Push back (physical directional knockback)
+      target.vx += Math.cos(hitAngle) * knockbackForce;
+      target.vy += Math.sin(hitAngle) * knockbackForce;
+      target.x += Math.cos(hitAngle) * (knockbackForce * 0.4);
+      target.y += Math.sin(hitAngle) * (knockbackForce * 0.4);
+
+      // 2. Slow movement effect (45% slow for 50 frames / ~0.8 seconds)
+      const slowDuration = CONFIG.genos?.blastSlowDuration || 50;
+      const slowMultiplier = CONFIG.genos?.blastSlowMultiplier || 0.55;
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(slowDuration, slowMultiplier);
+      } else {
+        target.slowTimer = Math.max(target.slowTimer || 0, slowDuration);
+        target.slowMultiplier = Math.min(target.slowMultiplier || 1.0, slowMultiplier);
+      }
+
+      // 3. Orange heat impact flash & fiery sparks
+      const expRadius = projectile.explosionRadius || 35;
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, expRadius, '#FF5500');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, 'orange');
+      }
+
+      return true; // Destroy fireball on hit
+    }
 
     // Layla Steampunk Cannon - custom cyan sparks and flash impact effects
     const isLaylaBasic = projectile.visual === 'layla_basic_bullet';

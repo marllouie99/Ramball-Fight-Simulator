@@ -357,6 +357,44 @@ export const SKILL_SOUNDS = {
       volume: 0.7,
       delay: 0
     }
+  },
+  // ── Genos ─────────────────────────────
+  genos: {
+    incinerate_blast: {
+      src: 'Assets/Sound Effects/Skills/genos-incenerate-blast.mp3',
+      volume: 1.5,
+      delay: 0
+    },
+    incinerate_charge: {
+      src: 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    incinerate_voice: {
+      src: 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3',
+      volume: 3.5,
+      delay: 0
+    },
+    ultimate_charge: {
+      src: 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
+      volume: 2.0,
+      delay: 0
+    },
+    ultimate_blast: {
+      src: 'Assets/Sound Effects/Skills/genos-ultimateblast.mp3',
+      volume: 2.0,
+      delay: 0
+    },
+    machinegun_voice: {
+      src: 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3',
+      volume: 2.5,
+      delay: 0
+    },
+    recovery: {
+      src: 'Assets/Sound Effects/Skills/genos-recovery.mp3',
+      volume: 1.5,
+      delay: 0
+    }
   }
 };
 
@@ -391,6 +429,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS[25];
     } else if (strKey.includes('mahoraga')) {
       fighterConfig = SKILL_SOUNDS[100];
+    } else if (strKey.includes('genos')) {
+      fighterConfig = SKILL_SOUNDS['genos'];
     }
   }
 

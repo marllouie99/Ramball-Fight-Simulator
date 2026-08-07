@@ -941,6 +941,27 @@ export function drawSparkEffects(layer = 'all') {
         ctx.restore();
 
         ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'meleeClashShockwave') {
+        if (effect.targetSize) {
+          effect.size += (effect.targetSize - effect.size) * 0.15;
+        }
+        const isGojo = effect.clashType === 'gojo';
+        const mainColor = isGojo ? `rgba(0, 229, 255, ${effect.life * 0.85})` : `rgba(255, 60, 60, ${effect.life * 0.85})`;
+        const innerColor = isGojo ? `rgba(200, 245, 255, ${effect.life * 0.95})` : `rgba(255, 200, 200, ${effect.life * 0.95})`;
+
+        ctx.save();
+        ctx.strokeStyle = mainColor;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size), 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = innerColor;
+        ctx.lineWidth = 2 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.75), 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
       } else {
         // Default impact flash (cached: stops are life-independent, fade via ctx.globalAlpha)
         const gradient = getUnitRadialGradient(ctx, 'defaultImpactFlash', [
@@ -1118,10 +1139,11 @@ export function drawSparkEffects(layer = 'all') {
       const isTojiClash = (effect.clashType === 'toji');
       const isMahoragaClash = (effect.clashType === 'mahoraga');
       const isTodoClap = (effect.clashType === 'todo');
+      const isGenosClash = (effect.clashType === 'genos' || effect.clashType === 'orange');
 
       // Ground impact shadow (dark circle at base for visibility on white)
       ctx.globalCompositeOperation = 'source-over';
-      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`)));
+      ctx.fillStyle = isTodoClap ? `rgba(0, 40, 80, ${effect.life * 0.45})` : (isYutaClash ? `rgba(0, 0, 0, 0)` : (isTojiClash ? `rgba(0, 0, 0, 0)` : (isGenosClash ? `rgba(0, 0, 0, 0)` : (isMahoragaClash ? `rgba(35, 30, 10, ${effect.life * 0.45})` : `rgba(30, 10, 40, ${effect.life * 0.4})`))));
       ctx.beginPath();
       ctx.ellipse(effect.x, effect.y + 5, effect.size * 1.1, effect.size * 0.35, 0, 0, Math.PI * 2);
       ctx.fill();
@@ -1163,6 +1185,28 @@ export function drawSparkEffects(layer = 'all') {
           ctx.lineTo(effect.x + Math.cos(rayAngle) * r2, effect.y + Math.sin(rayAngle) * r2);
           ctx.stroke();
         }
+      } else if (isGenosClash) {
+        // ── GENOS INCINERATION STOMP SHOCKWAVE ──
+        // Outer Incineration Fiery Orange Thermal Ring
+        ctx.strokeStyle = `rgba(255, 60, 0, ${effect.life * 0.95})`;
+        ctx.lineWidth = 12 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Middle Golden Heat Wave Ring
+        ctx.strokeStyle = `rgba(255, 170, 0, ${effect.life * 0.90})`;
+        ctx.lineWidth = 7 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.75, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Inner White-Hot Blast Core Ring
+        ctx.strokeStyle = `rgba(255, 245, 200, ${effect.life * 0.98})`;
+        ctx.lineWidth = 4 * effect.life;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 0.45, 0, Math.PI * 2);
+        ctx.stroke();
       } else if (isMahoragaClash) {
         // ── MAHORAGA DIVINE TELEPORT / IMPACT GROUND SHOCKWAVE ──
         // Outer Golden Divine Aura Ring
@@ -1391,6 +1435,9 @@ export function drawSparkEffects(layer = 'all') {
       // Draw radial speed/action lines projecting outward
       const isGold = (effect.color === 'gold');
       const isBlackPink = (effect.color === 'blackpink');
+      const isOrange = (effect.color === 'orange');
+      const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity');
+      const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
       const lineCount = 14;
       ctx.lineWidth = 1.8;
       for (let i = 0; i < lineCount; i++) {
@@ -1405,7 +1452,13 @@ export function drawSparkEffects(layer = 'all') {
         if (isGold) {
           ctx.strokeStyle = (i % 3 === 0) ? `rgba(0, 0, 0, ${alpha * 0.95})` : `rgba(255, 215, 0, ${alpha * 0.95})`;
         } else if (isBlackPink) {
-          ctx.strokeStyle = (i % 3 === 0) ? `rgba(15, 10, 15, ${alpha * 0.95})` : `rgba(255, 20, 147, ${alpha * 0.95})`; // black and hot pink
+          ctx.strokeStyle = (i % 3 === 0) ? `rgba(15, 10, 15, ${alpha * 0.95})` : `rgba(255, 20, 147, ${alpha * 0.95})`;
+        } else if (isOrange) {
+          ctx.strokeStyle = (i % 3 === 0) ? `rgba(255, 255, 255, ${alpha * 0.90})` : `rgba(255, 80, 0, ${alpha * 0.95})`;
+        } else if (isCyan) {
+          ctx.strokeStyle = (i % 3 === 0) ? `rgba(0, 20, 45, ${alpha * 0.95})` : `rgba(0, 229, 255, ${alpha * 0.95})`;
+        } else if (isCrimson) {
+          ctx.strokeStyle = (i % 3 === 0) ? `rgba(20, 2, 5, ${alpha * 0.95})` : `rgba(255, 36, 0, ${alpha * 0.95})`;
         } else {
           ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.9})`;
         }
@@ -1421,6 +1474,12 @@ export function drawSparkEffects(layer = 'all') {
           ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 0, 0, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 200, 0, ${Math.min(1.0, alpha * 1.25)})`;
         } else if (isBlackPink) {
           ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(15, 10, 15, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 20, 147, ${Math.min(1.0, alpha * 1.25)})`;
+        } else if (isOrange) {
+          ctx.fillStyle = (sIdx % 2 === 0) ? `rgba(255, 80, 0, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 180, 0, ${Math.min(1.0, alpha * 1.25)})`;
+        } else if (isCyan) {
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 20, 45, ${Math.min(1.0, alpha * 1.25)})` : `rgba(0, 229, 255, ${Math.min(1.0, alpha * 1.25)})`;
+        } else if (isCrimson) {
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(20, 2, 5, ${Math.min(1.0, alpha * 1.25)})` : `rgba(220, 20, 60, ${Math.min(1.0, alpha * 1.25)})`;
         } else {
           ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1.0, alpha * 1.25)})`;
         }
@@ -1460,6 +1519,12 @@ export function drawSparkEffects(layer = 'all') {
           ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 215, 0, ${Math.min(1.0, alpha * 0.8)})` : `rgba(0, 0, 0, ${Math.min(1.0, alpha * 0.85)})`;
         } else if (isBlackPink) {
           ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 20, 147, ${Math.min(1.0, alpha * 0.8)})` : `rgba(15, 10, 15, ${Math.min(1.0, alpha * 0.85)})`;
+        } else if (isOrange) {
+          ctx.strokeStyle = (sIdx % 2 === 0) ? `rgba(255, 220, 80, ${Math.min(1.0, alpha * 0.85)})` : `rgba(255, 60, 0, ${Math.min(1.0, alpha * 0.80)})`;
+        } else if (isCyan) {
+          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(224, 255, 255, ${Math.min(1.0, alpha * 0.95)})` : `rgba(0, 229, 255, ${Math.min(1.0, alpha * 0.85)})`;
+        } else if (isCrimson) {
+          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 220, 220, ${Math.min(1.0, alpha * 0.95)})` : `rgba(255, 36, 0, ${Math.min(1.0, alpha * 0.85)})`;
         } else {
           ctx.strokeStyle = `rgba(0, 0, 0, ${Math.min(1.0, alpha * 0.75)})`;
         }
@@ -1475,6 +1540,45 @@ export function drawSparkEffects(layer = 'all') {
           if (i === 0) ctx.moveTo(px, py);
           else         ctx.lineTo(px, py);
         }
+        ctx.stroke();
+      }
+
+      ctx.restore();
+    } else if (effect.type === 'punchWindSpeedLine') {
+      // ── SUPERSONIC PUNCH WIND SPEED LINE STREAK ──
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      const alpha = Math.min(1.0, effect.life * 1.4);
+      const lineAngle = effect.angle || 0;
+      const len = (effect.length || 150) * (0.6 + 0.4 * effect.life);
+      const halfLen = len / 2;
+
+      ctx.translate(effect.x, effect.y);
+      ctx.rotate(lineAngle);
+
+      // Gradient line stroke fading smoothly at both ends
+      const grad = ctx.createLinearGradient(-halfLen, 0, halfLen, 0);
+      const col = effect.color || '#FF8800';
+      grad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      grad.addColorStop(0.25, col);
+      grad.addColorStop(0.75, col);
+      grad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+
+      ctx.strokeStyle = grad;
+      ctx.lineWidth = (effect.size || 2.5) * effect.life;
+      ctx.beginPath();
+      ctx.moveTo(-halfLen, 0);
+      ctx.lineTo(halfLen, 0);
+      ctx.stroke();
+
+      // White-hot core center streak for supersonic punch feel
+      if (effect.isCore) {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${(alpha * 0.95).toFixed(2)})`;
+        ctx.lineWidth = Math.max(1, (effect.size || 2.5) * 0.45 * effect.life);
+        ctx.beginPath();
+        ctx.moveTo(-halfLen * 0.65, 0);
+        ctx.lineTo(halfLen * 0.65, 0);
         ctx.stroke();
       }
 
@@ -1703,6 +1807,124 @@ export function spawnMahoragaShoutBurst(x, y, radius = 180) {
       state.sparkEffects[insertIdx] = spark;
     } else {
       state.sparkEffects.push(spark);
+    }
+  }
+}
+
+/**
+ * Spawns an energetic cyborg rocket thruster dash visual when Genos ignites his jet boosters off a wall.
+ * @param {number} x - Launch X position at arena wall
+ * @param {number} y - Launch Y position at arena wall
+ * @param {number} dashAngle - Angle of the thruster dash trajectory (radians)
+ */
+export function spawnGenosThrusterDashVisual(x, y, dashAngle = 0) {
+  if (typeof spawnImpactFlash === 'function') {
+    spawnImpactFlash(x, y, 42, '#FF5500');
+  }
+  if (typeof spawnMeleeClashShockwave === 'function') {
+    spawnMeleeClashShockwave(x, y, 75, 'gojo');
+  }
+  if (typeof spawnSparks === 'function') {
+    spawnSparks(x, y, 12, 'orange');
+  }
+
+  // Thruster back-fire jet particles opposite to dash angle
+  const backAngle = dashAngle + Math.PI;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const fps = (state && state.fps) || 60;
+  const MAX_PARTICLES = isMulti ? (fps < 45 ? 50 : 100) : 150;
+
+  for (let i = 0; i < 8; i++) {
+    let insertIdx = -1;
+    if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
+      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const oldest = state.sparkEffects[insertIdx];
+      if (oldest) ParticleSystem.returnParticle(oldest);
+    }
+
+    const spread = backAngle + (Math.random() - 0.5) * 0.7;
+    const speed = 4 + Math.random() * 8;
+
+    const spark = ParticleSystem.getParticle();
+    spark.x = x;
+    spark.y = y;
+    spark.vx = Math.cos(spread) * speed;
+    spark.vy = Math.sin(spread) * speed;
+    spark.size = 3 + Math.random() * 4;
+    spark.life = 1.0;
+    spark.decay = 0.04 + Math.random() * 0.03;
+    spark.friction = 0.90;
+    spark.color = Math.random() < 0.6 ? '#FF5500' : '#FFD700';
+
+    if (state.sparkEffects) {
+      if (insertIdx !== -1) {
+        state.sparkEffects[insertIdx] = spark;
+      } else {
+        state.sparkEffects.push(spark);
+      }
+    }
+  }
+}
+
+/**
+ * Spawns directional wind speed line streaks streaming along punch trajectory for Machine Gun Blows.
+ * @param {number} x - Origin X
+ * @param {number} y - Origin Y
+ * @param {number} punchAngle - Trajectory angle in radians
+ * @param {number} length - Base speed line length
+ * @param {string} theme - Color theme ('orange' for Genos)
+ */
+export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, theme = 'orange') {
+  const lineCount = 7;
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const fps = (state && state.fps) || 60;
+  const MAX_PARTICLES = isMulti ? (fps < 45 ? 60 : 120) : 200;
+
+  for (let i = 0; i < lineCount; i++) {
+    let insertIdx = -1;
+    if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
+      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const oldest = state.sparkEffects[insertIdx];
+      if (oldest) ParticleSystem.returnParticle(oldest);
+    }
+
+    // Offset parallel lines perpendicular to punch angle
+    const perpAngle = punchAngle + Math.PI / 2;
+    const perpOffset = (Math.random() - 0.5) * 55;
+    const alongOffset = (Math.random() - 0.5) * 40;
+
+    const startX = x + Math.cos(perpAngle) * perpOffset + Math.cos(punchAngle) * alongOffset;
+    const startY = y + Math.sin(perpAngle) * perpOffset + Math.sin(punchAngle) * alongOffset;
+
+    const lineSpeed = 8 + Math.random() * 12;
+
+    const line = ParticleSystem.getParticle();
+    line.x = startX;
+    line.y = startY;
+    line.vx = Math.cos(punchAngle) * lineSpeed;
+    line.vy = Math.sin(punchAngle) * lineSpeed;
+    line.size = 1.8 + Math.random() * 2.5;
+    line.length = length * (0.7 + Math.random() * 0.6);
+    line.angle = punchAngle + (Math.random() - 0.5) * 0.08;
+    line.life = 1.0;
+    line.decay = 0.07 + Math.random() * 0.04;
+    line.friction = 0.96;
+    line.type = 'punchWindSpeedLine';
+    line.isCore = Math.random() < 0.6;
+
+    if (theme === 'orange') {
+      const colors = ['#FFFFFF', '#FF5500', '#FF9900', '#FFCC00', '#FF3300'];
+      line.color = colors[Math.floor(Math.random() * colors.length)];
+    } else {
+      line.color = Math.random() < 0.5 ? '#FFFFFF' : '#00E5FF';
+    }
+
+    if (state.sparkEffects) {
+      if (insertIdx !== -1) {
+        state.sparkEffects[insertIdx] = line;
+      } else {
+        state.sparkEffects.push(line);
+      }
     }
   }
 }

@@ -22,14 +22,19 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
   const badgeSize = fighter.lastKilledDef ? 14 : 0;
   const badgeSpacing = fighter.lastKilledDef ? 6 : 0;
 
-  // Prepare name rendering - auto-scale font for long names
+  // Prepare name rendering - auto-scale font for long names (cached to prevent per-frame measureText loops)
   const maxNameW = panelW - padding * 2 - 40; // Reserve space for HP text
-  let nameFontSize = 14;
-  ctx.font = `bold ${nameFontSize}px "Glast Blitch", Arial`;
-  while (ctx.measureText(fighter.name).width > maxNameW && nameFontSize > 8) {
-    nameFontSize--;
+  if (fighter._cachedNameFontSize === undefined || fighter._cachedNameWidthLimit !== maxNameW) {
+    let nameFontSize = 14;
     ctx.font = `bold ${nameFontSize}px "Glast Blitch", Arial`;
+    while (ctx.measureText(fighter.name).width > maxNameW && nameFontSize > 8) {
+      nameFontSize--;
+      ctx.font = `bold ${nameFontSize}px "Glast Blitch", Arial`;
+    }
+    fighter._cachedNameFontSize = nameFontSize;
+    fighter._cachedNameWidthLimit = maxNameW;
   }
+  ctx.font = `bold ${fighter._cachedNameFontSize}px "Glast Blitch", Arial`;
   ctx.fillStyle = fighter.color;
   ctx.textBaseline = 'alphabetic';
 

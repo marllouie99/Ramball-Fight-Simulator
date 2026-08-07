@@ -72,6 +72,16 @@ const floatingTextTexture = window.PIXI.Texture.from(floatingTextCanvas);
 const floatingTextSprite = new window.PIXI.Sprite(floatingTextTexture);
 pixiLayers.ui.addChild(floatingTextSprite);
 
+// Create a separate offscreen canvas for top-level UI (HUD, game over, round end, pause) to ensure they render on top of all WebGL layers and projectiles/particles
+const topLevelUiCanvas = document.createElement('canvas');
+topLevelUiCanvas.width = CONFIG.canvasWidth || 540;
+topLevelUiCanvas.height = CONFIG.canvasHeight || 960;
+const topLevelUiCtx = topLevelUiCanvas.getContext('2d');
+
+const topLevelUiTexture = window.PIXI.Texture.from(topLevelUiCanvas);
+const topLevelUiSprite = new window.PIXI.Sprite(topLevelUiTexture);
+pixiLayers.ui.addChild(topLevelUiSprite);
+
 // Replace the DOM canvas with Pixi's WebGL canvas
 canvas.parentNode.insertBefore(pixiApp.view, canvas);
 canvas.style.display = 'none'; // Hide the old 2D canvas (used for offscreen rendering only)
@@ -103,6 +113,9 @@ export const state = {
   floatingTextCanvas,
   floatingTextCtx,
   floatingTextSprite,
+  topLevelUiCanvas,
+  topLevelUiCtx,
+  topLevelUiSprite,
   baseCircleTexture,
   bloodSquareTexture,
   arena: CONFIG.arena,
@@ -311,12 +324,23 @@ export function isChampionScreenActive() {
 export function triggerGlobalScreenShake(intensity, duration) {
   if (state.performanceMode) return;
   if (isChampionScreenActive()) return;
-  if (state.screenShake.timer < duration) {
+
+  const mult = (typeof CONFIG !== 'undefined' && CONFIG.globalScreenShakeIntensityMultiplier !== undefined) 
+    ? CONFIG.globalScreenShakeIntensityMultiplier 
+    : 1.0;
+  if (mult <= 0) return;
+
+  const scaledIntensity = intensity * mult;
+
+  if (scaledIntensity >= state.screenShake.intensity || state.screenShake.timer <= 0) {
+    state.screenShake.intensity = scaledIntensity;
     state.screenShake.timer = duration;
     state.screenShake.maxTimer = duration;
-  }
-  if (state.screenShake.intensity < intensity) {
-    state.screenShake.intensity = intensity;
+  } else {
+    if (state.screenShake.timer < duration) {
+      state.screenShake.timer = duration;
+      state.screenShake.maxTimer = Math.max(state.screenShake.maxTimer, duration);
+    }
   }
 }
 
@@ -449,7 +473,16 @@ const SKILL_TEXT_WHITELIST = [
   'PHANTOM FLURRY!',
   'SOUL WOUNDED!',
   'SKILL INTERRUPTED!',
-  'COOLDOWN RESET!'
+  'COOLDOWN RESET!',
+  'SPIRAL INCINERATION CANNON!',
+  'INCINERATION CANNON!',
+  'INCINERATING...',
+  'MAXIMUM INCINERATION!',
+  'MACHINE GUN BLOWS!',
+  'MACHINE GUN BLOWS',
+  'ROCKET STOMP!',
+  'ROCKET STOMP',
+  'INCINERATE!'
 ];
 
 function isAllowedFloatingText(text) {
@@ -457,11 +490,11 @@ function isAllowedFloatingText(text) {
   const isNumeric = /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
   if (isNumeric) return true;
   if (normalizedText.startsWith('SHIELD ')) return true;
-  if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY')) return true;
+  if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY') || normalizedText.includes('INCINERAT') || normalizedText.includes('MACHINE GUN') || normalizedText.includes('CANNON') || normalizedText.includes('STOMP')) return true;
   return SKILL_TEXT_WHITELIST.includes(normalizedText);
 }
 
-const FLOATING_TEXT_SPAM_COOLDOWN = 180; // ms window to filter identical messages in close proximity
+const FLOATING_TEXT_SPAM_COOLDOWN = 50; // ms window to filter identical messages in close proximity
 const spamPreventionCache = new Map();
 
 // CRC32-like fast hashing helper to avoid string garbage generation in loops
@@ -595,10 +628,14 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
     }
   }
 
-  // Count active texts that spawned near the same position to avoid stacking
-  const nearbyCount = state.floatingTexts.filter(
-    t => Math.abs(t.originX - x) < 50 && Math.abs(t.originY - y) < 50
-  ).length;
+  // Count active texts that spawned near the same position to avoid stacking (using zero-allocation loop)
+  let nearbyCount = 0;
+  for (let i = 0; i < state.floatingTexts.length; i++) {
+    const t = state.floatingTexts[i];
+    if (Math.abs(t.originX - x) < 50 && Math.abs(t.originY - y) < 50) {
+      nearbyCount++;
+    }
+  }
 
   let displayText = String(text);
   // Add a minus sign if it's a raw number
@@ -610,15 +647,17 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   const isDamage = /\d/.test(displayText);
 
   state.floatingTexts.push({
-    x: x + (Math.random() - 0.5) * 16,
-    y: y - nearbyCount * 18,  // stack upward if siblings exist
-    vy: -1.6,
+    x: x + (Math.random() - 0.5) * 12,
+    y: y - Math.min(nearbyCount, 3) * 6,  // compact stacking near target
+    vy: isDamage ? -0.7 : -1.0,           // gentle upward drift so numbers stay close to target
     text: displayText,
     color: adjustedColor,
     timer: 0,
-    maxTimer: 65,
+    maxTimer: isDamage ? 40 : 60,         // crisp ~40 frame duration for damage numbers
     opacity: 1,
     isDamage,
+    originX: x,
+    originY: y
   });
 }
 

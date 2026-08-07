@@ -1,4 +1,5 @@
 import { getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 export function drawGojoWeapon(ctx, fighter) {
     const z = fighter.z || 0;
@@ -46,7 +47,7 @@ export function drawGojoWeapon(ctx, fighter) {
     } else {
         // Melee Mode - Hands are drawn with full punch animation in GojoFighter._drawHandCursedEnergy
         // Suppress the Blue Orb entirely while Reversal Red is active, or while channeling Domain Expansion / Domain is active
-        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive) {
+        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal) {
             ctx.restore();
             return;
         }
@@ -125,6 +126,11 @@ export function drawLapseBlueOrb(ctx, x, y, r, time, attackFlash = 0) {
  * Draws an advanced, highly detailed Gojo orb (Blue, Red, or Purple).
  */
 export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash = 0) {
+    // Performance check for low-quality mode
+    const isLowQuality = (typeof state !== 'undefined' && 
+                          (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)) &&
+                          state.gameState !== 'matchEnd' && state.gameState !== 'roundEnd');
+
     // Quantize time to 30 FPS to give the animation a stepped, stylized anime feel
     const msPerFrame = 1000 / 30;
     time = Math.floor(time / msPerFrame) * msPerFrame;
@@ -154,16 +160,16 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
         plasma2 = [255, 200, 200];
         overlay = [255, 150, 150];
     } else if (colorType === 'purple') {
-        aura0 = [150, 0, 255];
-        aura1 = [100, 0, 200];
-        aura2 = [50, 0, 100];
-        ring1 = [180, 50, 255];
-        ring2 = [200, 100, 255];
-        spark = [220, 150, 255];
-        coreBase = 'rgba(20, 0, 40, 0.4)'; // Reduced opacity to show fighters inside
-        plasma1 = [200, 100, 255];
-        plasma2 = [230, 200, 255];
-        overlay = [210, 150, 255];
+        aura0 = [180, 0, 255];
+        aura1 = [130, 0, 240];
+        aura2 = [60, 0, 140];
+        ring1 = [200, 80, 255];
+        ring2 = [220, 140, 255];
+        spark = [240, 180, 255];
+        coreBase = 'rgba(15, 0, 30, 0.40)'; // Semi-transparent void core so trapped enemies remain visible inside!
+        plasma1 = [210, 120, 255];
+        plasma2 = [255, 220, 255];
+        overlay = [225, 170, 255];
     } else { // blue
         aura0 = [0, 100, 255];
         aura1 = [0, 50, 255];
@@ -171,46 +177,55 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
         ring1 = [20, 100, 255];
         ring2 = [100, 150, 255];
         spark = [100, 200, 255];
-        coreBase = 'rgba(0, 10, 40, 1)'; // Nearly pitch black blue for high contrast
+        coreBase = 'rgba(0, 10, 40, 0.40)'; // Semi-transparent blue core so sucked enemies remain visible!
         plasma1 = [100, 180, 255];
         plasma2 = [255, 255, 255];
         overlay = [150, 220, 255];
     }
 
-    // 1. Massive Aura (reduced opacity for purple to show fighters inside)
-    const auraOpacity = colorType === 'purple' ? 0.3 : (0.8 + attackFlash * 0.2);
-    const glow = ctx.createRadialGradient(0, 0, baseR * 0.2, 0, 0, baseR * 6);
-    glow.addColorStop(0, `rgba(${aura0.join(',')}, ${auraOpacity})`);
-    glow.addColorStop(0.2, `rgba(${aura1.join(',')}, ${auraOpacity * 0.75})`);
-    glow.addColorStop(0.5, `rgba(${aura2.join(',')}, ${auraOpacity * 0.25})`);
-    glow.addColorStop(1, `rgba(${aura2.join(',')}, 0)`);
-    ctx.fillStyle = glow;
-    ctx.beginPath();
-    ctx.arc(0, 0, baseR * 6, 0, Math.PI * 2);
-    ctx.fill();
+    // 1. Massive Aura
+    const auraOpacity = 0.8 + attackFlash * 0.2;
+    if (isLowQuality) {
+        ctx.fillStyle = `rgba(${aura1.join(',')}, ${auraOpacity * 0.35})`;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR * 4.5, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        const glow = ctx.createRadialGradient(0, 0, baseR * 0.2, 0, 0, baseR * 6);
+        glow.addColorStop(0, `rgba(${aura0.join(',')}, ${auraOpacity})`);
+        glow.addColorStop(0.2, `rgba(${aura1.join(',')}, ${auraOpacity * 0.75})`);
+        glow.addColorStop(0.5, `rgba(${aura2.join(',')}, ${auraOpacity * 0.25})`);
+        glow.addColorStop(1, `rgba(${aura2.join(',')}, 0)`);
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR * 6, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
-    // 2. Soft, cloudy aura rings (4 loops for detailed swirling texture)
+    // 2. Soft, cloudy aura rings
     ctx.save();
     ctx.lineCap = 'round';
-    for (let i = 0; i < 4; i++) {
+    const ringCount = isLowQuality ? 2 : 4;
+    for (let i = 0; i < ringCount; i++) {
         ctx.rotate(time / (200 + i * 50));
         const ringR = baseR * (1.5 + i * 0.6);
         ctx.beginPath();
         ctx.arc(0, 0, ringR, 0, Math.PI * (1.5 + i * 0.1));
         
-        ctx.lineWidth = baseR * (0.6 - i * 0.1);
+        ctx.lineWidth = Math.max(0.75, baseR * (0.35 - i * 0.05));
         ctx.strokeStyle = `rgba(${ring1.join(',')}, ${0.4 - i * 0.08})`;
         ctx.stroke();
         
-        ctx.lineWidth = baseR * (0.3 - i * 0.05);
+        ctx.lineWidth = Math.max(0.5, baseR * (0.18 - i * 0.02));
         ctx.strokeStyle = `rgba(${ring2.join(',')}, ${0.2 - i * 0.04})`;
         ctx.stroke();
     }
     ctx.restore();
 
-    // 3. Small particle sparks (15 sparks for high-frequency details)
+    // 3. Small particle sparks
     ctx.save();
-    for (let i = 0; i < 15; i++) {
+    const sparkCount = isLowQuality ? 4 : 15;
+    for (let i = 0; i < sparkCount; i++) {
         const seed = i * 1337.7331;
         const angle = time / (80 + (seed % 100)) + seed;
         const dist = baseR * (1.2 + (seed % 10) / 5);
@@ -237,66 +252,85 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
     ctx.fillStyle = coreBase;
     ctx.fill();
 
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 0, baseR * 1.4, 0, Math.PI * 2);
-    ctx.clip();
-    
-    ctx.globalCompositeOperation = 'lighter';
-    
-    for (let i = 0; i < 5; i++) {
-        const seed = i * 999.99;
-        
-        const angle = time / (200 + (seed % 100)) + seed;
-        const dist = baseR * ((seed % 10) / 7); 
-        
-        const px = Math.cos(angle) * dist;
-        const py = Math.sin(angle) * dist;
-        
-        const blobR = baseR * (0.4 + (seed % 5) / 10 + Math.sin(time / 150 + seed) * 0.2);
-        
-        const blobGlow = ctx.createRadialGradient(px, py, 0, px, py, blobR);
-        blobGlow.addColorStop(0, `rgba(${plasma2.join(',')}, ${0.5 + (seed % 4) / 10})`);
-        blobGlow.addColorStop(0.4, `rgba(${plasma1.join(',')}, ${0.3 + (seed % 4) / 10})`);
-        blobGlow.addColorStop(1, `rgba(${plasma1.join(',')}, 0)`);
-        
+    if (!isLowQuality) {
+        ctx.save();
         ctx.beginPath();
-        ctx.arc(px, py, blobR, 0, Math.PI * 2);
-        ctx.fillStyle = blobGlow;
-        ctx.fill();
+        ctx.arc(0, 0, baseR * 1.4, 0, Math.PI * 2);
+        ctx.clip();
+        
+        ctx.globalCompositeOperation = 'lighter';
+        
+        for (let i = 0; i < 5; i++) {
+            const seed = i * 999.99;
+            
+            const angle = time / (200 + (seed % 100)) + seed;
+            const dist = baseR * ((seed % 10) / 7); 
+            
+            const px = Math.cos(angle) * dist;
+            const py = Math.sin(angle) * dist;
+            
+            const blobR = baseR * (0.4 + (seed % 5) / 10 + Math.sin(time / 150 + seed) * 0.2);
+            
+            const blobGlow = ctx.createRadialGradient(px, py, 0, px, py, blobR);
+            blobGlow.addColorStop(0, `rgba(${plasma2.join(',')}, ${0.5 + (seed % 4) / 10})`);
+            blobGlow.addColorStop(0.4, `rgba(${plasma1.join(',')}, ${0.3 + (seed % 4) / 10})`);
+            blobGlow.addColorStop(1, `rgba(${plasma1.join(',')}, 0)`);
+            
+            ctx.beginPath();
+            ctx.arc(px, py, blobR, 0, Math.PI * 2);
+            ctx.fillStyle = blobGlow;
+            ctx.fill();
+        }
+        ctx.restore();
     }
-    ctx.restore();
     
     // Overlay a final soft white glow
-    const centerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, baseR * 1.6);
-    centerGlow.addColorStop(0, 'rgba(255, 255, 255, 0.9)'); 
-    centerGlow.addColorStop(0.3, 'rgba(255, 255, 255, 0.6)'); 
-    centerGlow.addColorStop(0.6, `rgba(${overlay.join(',')}, 0.2)`); 
-    centerGlow.addColorStop(1, `rgba(${aura0.join(',')}, 0)`);
-    
-    ctx.fillStyle = centerGlow;
-    ctx.beginPath();
-    ctx.arc(0, 0, baseR * 1.6, 0, Math.PI * 2);
-    // Removed expensive shadowBlur, using a thick stroke for edge glow
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-    ctx.fill();
-    ctx.stroke();
+    if (isLowQuality) {
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR * 1.3, 0, Math.PI * 2);
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.fill();
+        ctx.stroke();
+    } else {
+        const centerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, baseR * 1.6);
+        centerGlow.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); 
+        centerGlow.addColorStop(0.4, 'rgba(255, 255, 255, 0.85)'); // Extended white core for higher contrast and pop at small scale
+        centerGlow.addColorStop(0.65, `rgba(${overlay.join(',')}, 0.35)`); 
+        centerGlow.addColorStop(1, `rgba(${aura0.join(',')}, 0)`);
+        
+        ctx.fillStyle = centerGlow;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR * 1.6, 0, Math.PI * 2);
+        ctx.lineWidth = Math.max(1.0, baseR * 0.22); // Dynamic line width instead of hardcoded 3px
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; // Brighter stroke outline
+        ctx.fill();
+        ctx.stroke();
+    }
     
     // Final Bloom Shine Effect (Fast, no shadowBlur)
-    ctx.globalCompositeOperation = 'lighter';
-    const bloom = ctx.createRadialGradient(0, 0, baseR * 0.5, 0, 0, baseR * 3.5);
-    bloom.addColorStop(0, `rgba(${overlay.join(',')}, 0.6)`);
-    bloom.addColorStop(0.4, `rgba(${aura1.join(',')}, 0.25)`);
-    bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = bloom;
-    ctx.beginPath();
-    ctx.arc(0, 0, baseR * 3.5, 0, Math.PI * 2);
-    ctx.fill();
+    if (isLowQuality) {
+        ctx.fillStyle = `rgba(${overlay.join(',')}, 0.18)`;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR * 2.2, 0, Math.PI * 2);
+        ctx.fill();
+    } else {
+        ctx.globalCompositeOperation = 'lighter';
+        const bloom = ctx.createRadialGradient(0, 0, baseR * 0.5, 0, 0, baseR * 3.5);
+        bloom.addColorStop(0, `rgba(${overlay.join(',')}, 0.6)`);
+        bloom.addColorStop(0.4, `rgba(${aura1.join(',')}, 0.25)`);
+        bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.fillStyle = bloom;
+        ctx.beginPath();
+        ctx.arc(0, 0, baseR * 3.5, 0, Math.PI * 2);
+        ctx.fill();
+    }
 
     ctx.restore();
 }
+
 
 /**
  * Draws the Hollow Purple trail effect for Gojo's ultimate - swirling vortex with red/blue/purple particles
@@ -310,8 +344,14 @@ export function drawPurpleOrbTrail(ctx, p, time) {
         return;
     }
     
+    // Quantize time to 30 FPS to give the animation a stepped, stylized anime feel
+    const msPerFrame = 1000 / 30;
+    time = Math.floor(time / msPerFrame) * msPerFrame;
+    
     // Performance: check if we should run in optimized low-quality mode (e.g. FPS < 52 or performance mode active)
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+    const isLowQuality = (typeof state !== 'undefined' && 
+                          (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)) &&
+                          state.gameState !== 'matchEnd' && state.gameState !== 'roundEnd');
     
     ctx.save();
     ctx.globalCompositeOperation = 'lighter';
@@ -491,7 +531,7 @@ export function drawAnamorphicLensFlare(ctx, x, y, flareP, colorType = 'purple')
     ctx.fillRect(-streakLength * 0.7, -softHeight * 0.5, streakLength * 1.4, softHeight);
 
     // 2. Bright Central White/Core Star Core
-    ctx.shadowColor = colorType === 'red' ? '#FF0033' : '#D033FF';
+    // ctx.shadowColor = colorType === 'red' ? '#FF0033' : '#D033FF'; // Removed for performance
 
     const coreR = 8.5 * alpha;
     const coreGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, coreR * 2.5);

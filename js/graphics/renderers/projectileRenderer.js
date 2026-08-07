@@ -1,6 +1,7 @@
 
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { updateEntityVisualScale } from './EntityRenderer.js';
 const getNow = () => Date.now();
 import { drawBomberExplosionGraphic, drawBomberC4, drawBomberGrenade } from '../weapons/bomberWeaponGraphics.js';
 import { drawShurikenProjectile, drawGraySwordProjectile, drawPoisonBottleCore, drawRedSniperGun, drawBlueAimbotGun } from '../weaponVisuals.js';
@@ -38,6 +39,32 @@ export function drawProjectiles() {
     if (p.x < minX || p.x > maxX || p.y < minY || p.y > maxY) {
       return;
     }
+
+    // Black hole visuals are now drawn in drawBlackHoleEffects() which is called BEFORE fighters
+    if (p.isBlackHole) {
+      return;
+    }
+
+    updateEntityVisualScale(p);
+    const scale = p.visualScale !== undefined ? p.visualScale : 1.0;
+    const hasScale = scale !== 1.0 && scale > 0;
+
+    if (hasScale) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.scale(scale, scale);
+      ctx.translate(-p.x, -p.y);
+    }
+
+    _drawSingleProjectile(ctx, p, now, isGojoDomainActive);
+
+    if (hasScale) {
+      ctx.restore();
+    }
+  });
+}
+
+function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     // === GOJO LIMITLESS INFINITY: Spatial Distortion Barrier Ring for Frozen Projectiles ===
     if (p.isFrozenByInfinity) {
       const fadeAlpha = (p.infinityFreezeTimer !== undefined && p.infinityFreezeTimer < 30) ? Math.max(0, p.infinityFreezeTimer / 30) : 1.0;
@@ -422,21 +449,18 @@ export function drawProjectiles() {
 
     // Sukuna slash visual
     if (p.visual === 'sukunaSlash') {
-      if (isGojoDomainActive && !p.isFrozenByInfinity) return;
       drawSukunaSlash(ctx, p);
       return;
     }
 
     // Ghost Blade visual
     if (p.visual === 'ghostBlade') {
-      if (isGojoDomainActive && !p.isFrozenByInfinity) return;
       drawGhostBlade(ctx, p);
       return;
     }
 
     // Sukuna Cleave visual
     if (p.visual === 'sukunaCleave') {
-      if (isGojoDomainActive && !p.isFrozenByInfinity) return;
       drawSukunaCleave(ctx, p);
       return;
     }
@@ -625,6 +649,11 @@ export function drawProjectiles() {
       return;
     }
 
+    if (p.visual === 'genosFireball') {
+      drawGenosFireball(ctx, p);
+      return;
+    }
+
     // Default projectile draw
     // Make projectile visuals depend on the owner projectile color/type.
     // RED: red-orange motion trail; BLUE: cyan â€œlaser-ishâ€ streak.
@@ -700,7 +729,6 @@ export function drawProjectiles() {
     ctx.fill();
 
     ctx.restore();
-  });
 }
 
 
@@ -716,198 +744,69 @@ export function drawBlackHoleVisual({
   eventHorizon,
   innerDiskR,
   outerDiskR,
-  progress,
+  progress = 1,
   rotateAngle = null,
   indicator = false,
 }) {
+  if (alpha <= 0) return;
+
   // Optional summon indicator ring
   if (indicator && p.indicatorTimer > 0) {
     const ip = p.indicatorTimer / (p.indicatorLife || 1);
     const ringProgress = 1 - ip;
-    const ringRadius = (outerDiskR * 0.9) * (1 + ringProgress * 0.8);
+    const ringRadius = outerDiskR * (1.1 + ringProgress * 0.8);
     ctx.save();
     ctx.globalAlpha = Math.max(0, ip * 0.95) * alpha;
+
     ctx.beginPath();
     ctx.arc(p.x, p.y, ringRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(204,102,255,${0.85 * ip})`;
-    ctx.lineWidth = Math.max(2, outerDiskR * 0.05) * (0.7 + ringProgress * 0.6);
+    ctx.strokeStyle = `rgba(186, 85, 211, ${0.9 * ip})`;
+    ctx.lineWidth = Math.max(2, outerDiskR * 0.05) * (0.6 + ringProgress * 1.2);
     ctx.stroke();
     ctx.restore();
   }
-
-  const pulse = 1 + Math.sin(now / 220) * 0.05;
 
   ctx.save();
   ctx.globalAlpha = alpha;
-  
   ctx.translate(p.x, p.y);
 
-  // If rotateAngle is provided, use it (usually for the projectile phase).
-  // Otherwise, a slight wobble to give it life without spinning like a pinwheel.
   let diskRot = rotateAngle;
   if (diskRot === null || diskRot === undefined) {
-    diskRot = Math.sin(now / 2500) * 0.15;
+    diskRot = Math.sin(now / 2200) * 0.12;
   }
   ctx.rotate(diskRot);
 
-  // High-frequency energy flickering/throbbing (feels more natural than position jitter)
-  const energyFlicker = 1 + (Math.sin(now / 15) * 0.03 + Math.cos(now / 23) * 0.02);
-
-  // 1. Large background nebula glow (purple)
-  const glowGrad = ctx.createRadialGradient(0, 0, eventHorizon * 0.5, 0, 0, outerDiskR * 2.8 * energyFlicker);
-  glowGrad.addColorStop(0, `rgba(180, 50, 255, 0.4)`);
-  glowGrad.addColorStop(0.3, `rgba(130, 20, 255, 0.25)`);
-  glowGrad.addColorStop(1, `rgba(80, 0, 180, 0)`);
-  ctx.fillStyle = glowGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, outerDiskR * 2.8 * energyFlicker, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 2. The Horizontal Accretion Disk Flare (Interstellar style)
-  ctx.globalCompositeOperation = 'screen';
-  
-  // Apply the intense flicker directly to the flare width/height
-  const streakWidth = outerDiskR * 3.5 * pulse * energyFlicker;
-  const streakHeight = eventHorizon * 0.35 * energyFlicker;
-  
+  // Swirling Accretion Rings (orbital spinning energy arcs)
   ctx.save();
-  ctx.scale(1, streakHeight / streakWidth);
-  
-  // Outer flare
-  ctx.beginPath();
-  ctx.arc(0, 0, streakWidth, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(140, 30, 255, 0.4)`;
-  ctx.fill();
-
-  // Mid flare
-  ctx.beginPath();
-  ctx.arc(0, 0, streakWidth * 0.6, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(200, 100, 255, 0.6)`;
-  ctx.fill();
-  
-  // Inner core flare
-  ctx.beginPath();
-  ctx.arc(0, 0, streakWidth * 0.3, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255, 180, 255, 0.8)`;
-  ctx.fill();
-  
-  ctx.restore();
-
-  // Very thin bright center line extending outwards
-  ctx.save();
-  ctx.scale(1, (streakHeight * 0.08) / (streakWidth * 1.5));
-  ctx.beginPath();
-  ctx.arc(0, 0, streakWidth * 1.5 * energyFlicker, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(255, 255, 255, 0.9)`;
-  ctx.fill();
-  ctx.restore();
-
-  // 3. The Photon Ring (Circular glow behind the event horizon)
-  const ringR = eventHorizon * 1.15;
-  ctx.beginPath();
-  ctx.arc(0, 0, ringR, 0, Math.PI * 2);
-  ctx.lineWidth = eventHorizon * 0.3;
-  ctx.strokeStyle = `rgba(160, 40, 255, 0.6)`;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, eventHorizon * 1.08, 0, Math.PI * 2);
-  ctx.lineWidth = eventHorizon * 0.12;
-  ctx.strokeStyle = `rgba(230, 130, 255, 0.9)`;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, eventHorizon * 1.03, 0, Math.PI * 2);
-  ctx.lineWidth = eventHorizon * 0.05;
-  ctx.strokeStyle = `rgba(255, 255, 255, 1)`;
-  ctx.stroke();
-  
-  ctx.globalCompositeOperation = 'source-over';
-
-  // 4. Orbital swirling lines (thick, bright, 3D perspective, outside event horizon)
-  ctx.globalCompositeOperation = 'screen'; 
-  const lineCount = 8;
-  for (let i = 0; i < lineCount; i++) {
-    const orbitSpeed = (i % 2 === 0 ? 1 : -1) * (600 + i * 150);
-    const orbitAngle = now / orbitSpeed + (i * Math.PI * 2) / lineCount;
+  ctx.globalCompositeOperation = 'lighter';
+  const ringCount = 12;
+  for (let i = 0; i < ringCount; i++) {
+    const orbitSpeed = (i % 2 === 0 ? 1 : -1) * (450 + i * 110);
+    const orbitAngle = now / orbitSpeed + (i * Math.PI * 2) / ringCount;
     
-    // X radius is large (accretion disk width)
-    const orbitRadiusX = eventHorizon * 1.6 + (outerDiskR * 0.8) * (i / lineCount);
-    
-    // Y radius must be strictly larger than eventHorizon so it NEVER crosses the black hole!
-    const orbitRadiusY = eventHorizon * 1.1 + (outerDiskR * 0.3) * (i / lineCount);
-    
-    const lineLength = Math.PI * 0.8 + 0.4 * Math.sin(now / 300 + i);
-    
+    // Radii for 3D perspective swirling rings
+    const radX = eventHorizon * 1.35 + (outerDiskR * 0.90) * (i / ringCount);
+    const radY = eventHorizon * 1.05 + (outerDiskR * 0.35) * (i / ringCount);
+    const arcLen = Math.PI * 0.9 + 0.3 * Math.sin(now / 200 + i);
+
     ctx.beginPath();
-    ctx.ellipse(0, 0, orbitRadiusX, orbitRadiusY, 0, orbitAngle, orbitAngle + lineLength);
+    ctx.ellipse(0, 0, radX, radY, 0, orbitAngle, orbitAngle + arcLen);
     
-    const lineAlpha = (0.6 + 0.4 * Math.sin(now / 200 + i)) * alpha;
-    ctx.strokeStyle = `rgba(255, 180, 255, ${lineAlpha})`;
-    ctx.lineWidth = Math.max(1, outerDiskR * 0.015); // Thinner elegant lines
+    const lineAlpha = (0.6 + 0.4 * Math.sin(now / 150 + i)) * alpha;
+    ctx.strokeStyle = (i % 3 === 0) 
+      ? `rgba(255, 230, 255, ${lineAlpha})` 
+      : (i % 2 === 0 ? `rgba(210, 100, 255, ${lineAlpha * 0.9})` : `rgba(160, 40, 255, ${lineAlpha * 0.8})`);
+    ctx.lineWidth = Math.max(1.5, outerDiskR * 0.025);
     ctx.lineCap = 'round';
     ctx.stroke();
   }
-  ctx.globalCompositeOperation = 'source-over'; 
+  ctx.restore();
 
-  // 5. Small debris/pebbles getting sucked in
-  const pebbleCount = Math.max(12, Math.min(25, Math.floor(outerDiskR * 0.25))); 
-  for (let i = 0; i < pebbleCount; i++) {
-    const timeOffset = i * 1337.5;
-    const life = ((now + timeOffset) % 2000) / 2000;
-    
-    const dist = outerDiskR * 2.2 * (1 - Math.pow(life, 2)) + eventHorizon * 1.05;
-    const ang = i * Math.PI * 2 / pebbleCount + life * Math.PI * 8 * (i % 2 === 0 ? 1 : -1);
-    
-    // Elliptical path that matches the swirling rings
-    const px = Math.cos(ang) * dist;
-    // Y is squished, but always maintains a safe distance from center
-    const py = Math.sin(ang) * (eventHorizon * 1.05 + (dist - eventHorizon * 1.05) * 0.35);
-
-    const fade = Math.sin(life * Math.PI); 
-
-    ctx.save();
-    ctx.translate(px, py);
-    ctx.rotate(life * Math.PI * 15 + i);
-    
-    ctx.beginPath();
-    const s = Math.max(2.5, outerDiskR * 0.035) * (1 - life * 0.3); 
-    ctx.moveTo(-s, -s * 0.5);
-    ctx.lineTo(s * 0.8, -s * 1.2);
-    ctx.lineTo(s * 1.1, s * 0.7);
-    ctx.lineTo(-s * 0.6, s);
-    ctx.closePath();
-    
-    ctx.fillStyle = `rgba(220, 180, 255, ${0.95 * fade * alpha})`;
-    ctx.fill();
-    ctx.strokeStyle = `rgba(255, 255, 255, ${0.8 * fade * alpha})`;
-    ctx.lineWidth = 1;
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // 6. The Event Horizon (Pure Black Hole in the center)
-  // Drawn last so it perfectly covers anything passing behind/into it
+  // Solid Black Core (Clean Pitch-Black Center)
   ctx.beginPath();
   ctx.arc(0, 0, eventHorizon, 0, Math.PI * 2);
-  ctx.fillStyle = `rgba(0, 0, 0, 1)`;
+  ctx.fillStyle = '#000000';
   ctx.fill();
-  
-  // 7. Some tiny stars/particles in the background glow for the "space" feel
-  const starCount = Math.floor(outerDiskR * 0.3);
-  for (let i = 0; i < starCount; i++) {
-    const rand1 = Math.sin(p.x * 12.9898 + i) * 43758.5453;
-    const rand2 = Math.cos(p.y * 78.233 + i) * 43758.5453;
-    const rDist = eventHorizon * 1.5 + (outerDiskR * 1.5) * (Math.abs(rand1) % 1);
-    const rAng = (Math.abs(rand2) % 1) * Math.PI * 2 + now / 2000;
-    
-    const twinkle = 0.5 + 0.5 * Math.sin(now / (200 + i * 50));
-    
-    ctx.beginPath();
-    ctx.arc(Math.cos(rAng) * rDist, Math.sin(rAng) * rDist, Math.max(0.5, outerDiskR * 0.01) * twinkle, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + 0.6 * twinkle})`;
-    ctx.fill();
-  }
 
   ctx.restore();
 }
@@ -1364,3 +1263,193 @@ export function drawLaylaVoidProjectile(ctx, p) {
   }
   ctx.stroke();
 }
+
+/**
+ * Renders Genos's Incineration Plasma Bolt — high-velocity energy blast with
+ * speed trails ripping backward, a jagged broken plasma shell, and a needle-sharp piercing tip.
+ */
+function drawGenosFireball(ctx, p) {
+  const angle = (p.vx !== undefined && p.vy !== undefined && (p.vx !== 0 || p.vy !== 0))
+    ? Math.atan2(p.vy, p.vx)
+    : (p.angle || 0);
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(angle);
+
+  const R          = p.r;           // base radius (~9px)
+  const bodyLen    = R * 3.8;       // length of the main glowing body
+  const tailLen    = R * 9.0;       // how far back the speed trails extend
+  const tipLen     = R * 2.2;       // needle tip protrusion beyond body front
+  const halfBody   = bodyLen / 2;
+  const flicker    = p.life || 0;   // deterministic per-frame flicker seed
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 1. LONG BACKWARD SPEED TRAILS — energy smear ripping off the rear
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Wide soft tail — broad orange heat bloom fading into nothing
+  const tailGrad = ctx.createLinearGradient(-halfBody - tailLen, 0, -halfBody, 0);
+  tailGrad.addColorStop(0,   'rgba(255, 60, 0, 0)');
+  tailGrad.addColorStop(0.55,'rgba(255, 100, 0, 0.22)');
+  tailGrad.addColorStop(1,   'rgba(255, 160, 0, 0.55)');
+  ctx.fillStyle = tailGrad;
+  // Taper: wide at body, needle-thin at tail tip
+  ctx.beginPath();
+  ctx.moveTo(-halfBody - tailLen, 0);
+  ctx.lineTo(-halfBody, -R * 1.4);
+  ctx.lineTo(-halfBody, R * 1.4);
+  ctx.closePath();
+  ctx.fill();
+
+  // Sharp thin speed streaks — 5 razor lines bleeding backward
+  const streakData = [
+    { yOff: 0,        alpha: 0.80, width: 0.9, lenMult: 1.00 },
+    { yOff: -R * 0.7, alpha: 0.55, width: 0.6, lenMult: 0.78 },
+    { yOff:  R * 0.7, alpha: 0.55, width: 0.6, lenMult: 0.78 },
+    { yOff: -R * 1.3, alpha: 0.30, width: 0.4, lenMult: 0.52 },
+    { yOff:  R * 1.3, alpha: 0.30, width: 0.4, lenMult: 0.52 },
+  ];
+  for (const s of streakData) {
+    const sLen = tailLen * s.lenMult;
+    const sg = ctx.createLinearGradient(-halfBody - sLen, 0, -halfBody, 0);
+    sg.addColorStop(0,   `rgba(255, 120, 0, 0)`);
+    sg.addColorStop(0.6, `rgba(255, 160, 30, ${s.alpha * 0.5})`);
+    sg.addColorStop(1,   `rgba(255, 210, 60, ${s.alpha})`);
+    ctx.beginPath();
+    ctx.moveTo(-halfBody - sLen, s.yOff);
+    ctx.lineTo(-halfBody,        s.yOff);
+    ctx.strokeStyle = sg;
+    ctx.lineWidth = s.width;
+    ctx.stroke();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 2. OUTER BROKEN PLASMA SHELL — jagged spikes letting core light bleed through
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Ambient halo around the body
+  const haloGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 2.6);
+  haloGrad.addColorStop(0,   'rgba(255, 200, 60, 0.55)');
+  haloGrad.addColorStop(0.45,'rgba(255, 100, 0,  0.30)');
+  haloGrad.addColorStop(1,   'rgba(255, 50,  0,  0)');
+  ctx.fillStyle = haloGrad;
+  ctx.beginPath();
+  ctx.ellipse(0, 0, halfBody + R * 0.6, R * 2.0, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Jagged spike crown — broken orange shell that the core bursts through
+  const spikeCount = 14;
+  for (let i = 0; i < spikeCount; i++) {
+    // deterministic spike placement spread along body, alternating top/bottom
+    const side   = (i % 2 === 0) ? 1 : -1;
+    const xPos   = -halfBody + (i / (spikeCount - 1)) * bodyLen;
+    const baseAmp = R * (0.8 + ((i * 5 + flicker * 2) % 5) / 5 * 0.9);  // 0.8–1.7 R
+    const spikeH = baseAmp * side;
+    // jagged x-jitter
+    const xJit  = (((i * 7 + flicker * 3) % 7) / 7 - 0.5) * R * 0.7;
+
+    // Inner base width — narrow so the spike looks sharp
+    const bw = R * (0.25 + ((i * 3 + flicker) % 4) / 4 * 0.15);
+
+    ctx.beginPath();
+    ctx.moveTo(xPos - bw + xJit, 0);
+    ctx.lineTo(xPos + xJit,      spikeH);
+    ctx.lineTo(xPos + bw + xJit, 0);
+    ctx.closePath();
+
+    // Color: outer spikes orange→yellow; core-burst spikes near center are white-yellow
+    const coreProx = 1 - Math.abs(xPos) / halfBody; // 0 = edge, 1 = center
+    const alpha = 0.6 + coreProx * 0.35;
+    const r2 = Math.round(255);
+    const g2 = Math.round(120 + coreProx * 135);
+    ctx.fillStyle = `rgba(${r2}, ${g2}, 0, ${alpha.toFixed(2)})`;
+    ctx.fill();
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 3. MAIN PLASMA BODY — solid glowing core capsule
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const bodyGrad = ctx.createLinearGradient(-halfBody, 0, halfBody, 0);
+  bodyGrad.addColorStop(0,    'rgba(255, 110, 0, 0.85)');
+  bodyGrad.addColorStop(0.35, 'rgba(255, 180, 20, 1)');
+  bodyGrad.addColorStop(0.65, 'rgba(255, 230, 80, 1)');
+  bodyGrad.addColorStop(1,    'rgba(255, 200, 40, 0.9)');
+
+  ctx.fillStyle = bodyGrad;
+  ctx.beginPath();
+  // Rear: rounded; Front: sharp taper toward needle
+  const bodyH = R * 0.95;
+  ctx.moveTo(-halfBody, 0);            // rear center
+  ctx.lineTo(-halfBody * 0.85, -bodyH);
+  ctx.lineTo( halfBody * 0.4,  -bodyH * 0.55);
+  ctx.lineTo( halfBody,         0);    // front — converging to point
+  ctx.lineTo( halfBody * 0.4,   bodyH * 0.55);
+  ctx.lineTo(-halfBody * 0.85,  bodyH);
+  ctx.closePath();
+  ctx.fill();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 4. SUPERHEATED WHITE INNER CORE — bright channel through the center
+  // ─────────────────────────────────────────────────────────────────────────
+
+  const whiteGrad = ctx.createLinearGradient(-halfBody, 0, halfBody, 0);
+  whiteGrad.addColorStop(0,    'rgba(255, 230, 180, 0.5)');
+  whiteGrad.addColorStop(0.25, 'rgba(255, 255, 255, 1)');
+  whiteGrad.addColorStop(0.6,  'rgba(255, 255, 255, 1)');
+  whiteGrad.addColorStop(0.88, 'rgba(255, 255, 210, 0.85)');
+  whiteGrad.addColorStop(1,    'rgba(255, 255, 180, 0)');
+  ctx.strokeStyle = whiteGrad;
+  ctx.lineWidth = R * 0.55;
+  ctx.beginPath();
+  ctx.moveTo(-halfBody * 0.7, 0);
+  ctx.lineTo( halfBody * 0.85, 0);
+  ctx.stroke();
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // 5. NEEDLE TIP — sharp piercing front point + atmospheric pressure cone
+  // ─────────────────────────────────────────────────────────────────────────
+
+  // Pressure cone (shock wave shape ahead of the tip)
+  const coneLen = tipLen * 1.4;
+  const coneSpreadAngle = 0.38; // radians — tight cone
+  ctx.beginPath();
+  ctx.moveTo(halfBody + coneLen, 0);                            // cone apex
+  ctx.lineTo(halfBody,  Math.sin(coneSpreadAngle) * R * 0.9);   // top base
+  ctx.lineTo(halfBody, -Math.sin(coneSpreadAngle) * R * 0.9);   // bottom base
+  ctx.closePath();
+  const coneGrad = ctx.createLinearGradient(halfBody, 0, halfBody + coneLen, 0);
+  coneGrad.addColorStop(0,   'rgba(255, 240, 180, 0.70)');
+  coneGrad.addColorStop(0.5, 'rgba(255, 180, 60, 0.30)');
+  coneGrad.addColorStop(1,   'rgba(255, 120, 0, 0)');
+  ctx.fillStyle = coneGrad;
+  ctx.fill();
+
+  // Needle shaft — extremely sharp bright tip line
+  const needleGrad = ctx.createLinearGradient(halfBody, 0, halfBody + tipLen, 0);
+  needleGrad.addColorStop(0,   'rgba(255, 255, 255, 1)');
+  needleGrad.addColorStop(0.5, 'rgba(255, 230, 100, 0.9)');
+  needleGrad.addColorStop(1,   'rgba(255, 180, 0, 0)');
+  ctx.strokeStyle = needleGrad;
+  ctx.lineWidth = R * 0.28;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(halfBody,          0);
+  ctx.lineTo(halfBody + tipLen, 0);
+  ctx.stroke();
+  ctx.lineCap = 'butt';
+
+  // Pinpoint flash at the very tip
+  const tipFlash = ctx.createRadialGradient(halfBody + tipLen, 0, 0, halfBody + tipLen, 0, R * 0.85);
+  tipFlash.addColorStop(0,   'rgba(255, 255, 255, 1)');
+  tipFlash.addColorStop(0.4, 'rgba(255, 230, 100, 0.75)');
+  tipFlash.addColorStop(1,   'rgba(255, 120, 0, 0)');
+  ctx.fillStyle = tipFlash;
+  ctx.beginPath();
+  ctx.arc(halfBody + tipLen, 0, R * 0.85, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+

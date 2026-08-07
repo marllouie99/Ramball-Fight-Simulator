@@ -42,29 +42,7 @@ export class YutaRenderer {
 
     Fighter.prototype.draw.call(fighter, ctx, opponent);
 
-    // Draw Domain Expansion Floating Text at the end so it is never overlayed by body or visuals
-    if (fighter.isChannelingDomain) {
-      const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 180));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y);
-      ctx.font = '32px "Glast Blitch", Arial';
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 55 - (Math.sin(Date.now() / 150) * 5);
-
-      // Fake glow for text
-      ctx.strokeStyle = `rgba(255, 20, 147, ${progress * 0.4})`;
-      ctx.lineWidth = 9;
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress * 0.9})`;
-      ctx.lineWidth = 5;
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-
-      ctx.fillStyle = `rgba(255, 255, 255, ${progress})`;
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
-    }
-
+    // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
     ctx.restore();
 
     // Draw spatial cracks (Thin Ice Breaker)
@@ -79,7 +57,7 @@ export class YutaRenderer {
 
     // Draw afterimages during flurry & teleports (Draw ON TOP of Sakuga Impact Frame so they are never covered!)
     if (fighter.afterImages && fighter.afterImages.length > 0) {
-      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       for (let i = 0; i < fighter.afterImages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;
         const ai = fighter.afterImages[i];

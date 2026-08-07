@@ -149,6 +149,9 @@ class ProjectileSystem {
    * Optionally accepts custom spawn position and angle for dual-wield fighters.
    */
   fireProjectile(fighter, ownerIndex, damage, isFollowUp = false, speedOverride, willBecomeBlackHole = false, visual, customSpawnX, customSpawnY, customAngle) {
+    if (typeof state !== 'undefined' && state.gameState !== 'playing') {
+      return null;
+    }
     // OPTIMIZATION: We used to drop projectiles here if we exceeded maxActiveProjectiles,
     // but that caused real bullets to fail to spawn when there were too many visual particles.
     // We now let the array exceed the limit temporarily, and update() will prune oldest/visual
@@ -390,7 +393,7 @@ class ProjectileSystem {
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
     proj.r = CONFIG.gojo.purpleRadius || 40;
-    proj.life = CONFIG.gojo.purpleLife || 300;
+    proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
     proj.color = '#8A2BE2'; // Purple
     proj.owner = ownerIndex;
@@ -415,8 +418,8 @@ class ProjectileSystem {
     this.projectiles.push(proj);
 
     // Screen shake when purple orb fires - massive impact!
-    const shakeIntensity = CONFIG.gojo.purpleShakeIntensity || 25;
-    const shakeDuration = CONFIG.gojo.purpleShakeDuration || 30;
+    const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 15;
+    const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 20;
     triggerGlobalScreenShake(shakeIntensity, shakeDuration);
 
     // Play Hollow Purple audio effect (play once per cast, non-looping)
@@ -520,91 +523,69 @@ class ProjectileSystem {
     const fugaExplodeSound = getSkillSound(attacker?._def?.id || 'sukuna', 'fuga_explode');
     if (fugaExplodeSound) playSound(fugaExplodeSound.src, fugaExplodeSound.volume);
     
-    triggerGlobalScreenShake(18, 25);
-    if (typeof spawnGroundScorch === 'function') spawnGroundScorch(x, y, 80);
-    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 60, 'orange');
-    if (typeof spawnSparks === 'function') spawnSparks(x, y, 18, 'orange', '#FF4500');
+    const impactShake = CONFIG.sukuna?.divineFlameShakeIntensity || 8;
+    const impactDuration = CONFIG.sukuna?.divineFlameShakeDuration || 14;
+    triggerGlobalScreenShake(impactShake, impactDuration);
+    if (typeof spawnGroundScorch === 'function') spawnGroundScorch(x, y, 60);
+    if (typeof spawnImpactFlash === 'function') spawnImpactFlash(x, y, 40, 'orange');
+    if (typeof spawnSparks === 'function') spawnSparks(x, y, 6, 'orange', '#FF4500');
 
     // Generate organic curved ground cracks (bezier veins) radiating from impact
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
     const cracks = [];
-    const numCracks = isLowQuality ? 4 : 12;
+    const numCracks = isLowQuality ? 3 : 5;
     for (let c = 0; c < numCracks; c++) {
       const crackAngle = (c / numCracks) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
-      const crackLen = (isLowQuality ? 35 : 55) + Math.random() * 70;
+      const crackLen = (isLowQuality ? 25 : 40) + Math.random() * 45;
       const points = [{ x: x, y: y }];
       let curX = x, curY = y, curAngle = crackAngle;
-      const numSegs = isLowQuality ? 4 : (6 + Math.floor(Math.random() * 3));
+      const numSegs = isLowQuality ? 3 : 4;
       for (let s = 0; s < numSegs; s++) {
         const segLen = crackLen / numSegs;
-        curAngle += (Math.random() - 0.5) * 0.7; // organic wobble
+        curAngle += (Math.random() - 0.5) * 0.5; // organic wobble
         curX += Math.cos(curAngle) * segLen;
         curY += Math.sin(curAngle) * segLen;
-        // control point for bezier curve
-        const cpx = curX + (Math.random() - 0.5) * 12;
-        const cpy = curY + (Math.random() - 0.5) * 12;
-        points.push({ x: curX, y: curY, cpx, cpy });
+        points.push({ x: curX, y: curY, cpx: curX + (Math.random() - 0.5) * 8, cpy: curY + (Math.random() - 0.5) * 8 });
       }
-      cracks.push({ points, width: 2 + Math.random() * 3 });
-
-      // Branch cracks (smaller forks off main vein)
-      if (!isLowQuality && Math.random() < 0.6) {
-        const branchStart = Math.floor(points.length * (0.3 + Math.random() * 0.4));
-        const bp = points[branchStart];
-        if (bp) {
-          const branchAngle = crackAngle + (Math.random() > 0.5 ? 1 : -1) * (0.5 + Math.random() * 0.8);
-          const branchPts = [{ x: bp.x, y: bp.y }];
-          let bx = bp.x, by = bp.y, ba = branchAngle;
-          const branchSegs = 3 + Math.floor(Math.random() * 2);
-          for (let b = 0; b < branchSegs; b++) {
-            ba += (Math.random() - 0.5) * 0.6;
-            bx += Math.cos(ba) * (crackLen / numSegs * 0.7);
-            by += Math.sin(ba) * (crackLen / numSegs * 0.7);
-            branchPts.push({ x: bx, y: by, cpx: bx + (Math.random()-0.5)*8, cpy: by + (Math.random()-0.5)*8 });
-          }
-          cracks.push({ points: branchPts, width: 1 + Math.random() * 1.5 });
-        }
-      }
+      cracks.push({ points, width: 2 + Math.random() * 2 });
     }
 
-    // Generate flying rock debris, glowing embers, and smoke wisps
+    // Generate flying rock debris & glowing embers (compact 8 particles for 60 FPS performance)
     const debris = [];
-    const numDebris = 28;
+    const numDebris = isLowQuality ? 4 : 8;
     for (let d = 0; d < numDebris; d++) {
       const angle = Math.random() * Math.PI * 2;
-      const speed = 3 + Math.random() * 10;
+      const speed = 2 + Math.random() * 6;
       const typeRoll = Math.random();
       let type, color, size;
-      if (typeRoll < 0.35) {
-        type = 'rock'; color = '#222'; size = 3 + Math.random() * 6;
-      } else if (typeRoll < 0.65) {
-        type = 'ember'; color = '#FF4500'; size = 2 + Math.random() * 3;
+      if (typeRoll < 0.5) {
+        type = 'rock'; color = '#222'; size = 2 + Math.random() * 4;
       } else {
-        type = 'smoke'; color = '#555'; size = 6 + Math.random() * 10;
+        type = 'ember'; color = '#FF4500'; size = 2 + Math.random() * 2.5;
       }
       debris.push({
-        x: x + Math.cos(angle) * 8,
-        y: y + Math.sin(angle) * 8,
-        vx: Math.cos(angle) * speed * (type === 'smoke' ? 0.3 : 1),
-        vy: Math.sin(angle) * speed * (type === 'smoke' ? 0.3 : 1) - (type === 'ember' ? 3 : 1),
+        x: x + Math.cos(angle) * 6,
+        y: y + Math.sin(angle) * 6,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 1.5,
         size, rot: Math.random() * Math.PI * 2,
-        rotSpeed: (Math.random() - 0.5) * 0.3,
+        rotSpeed: (Math.random() - 0.5) * 0.2,
         color, type
       });
     }
 
     // Pre-generate crater rim wobble points for organic shape
     const rimPoints = [];
-    const rimSegments = 32;
+    const rimSegments = 16;
     for (let r = 0; r < rimSegments; r++) {
       const a = (r / rimSegments) * Math.PI * 2;
-      const wobble = 0.85 + Math.random() * 0.3; // 0.85 to 1.15
+      const wobble = 0.88 + Math.random() * 0.24;
       rimPoints.push({ angle: a, wobble });
     }
 
     if (!state.thermobaricExplosions) state.thermobaricExplosions = [];
     state.thermobaricExplosions.push({
-      x, y, radius: 10, maxRadius: splashRadius, life: 180, maxLife: 180,
+      x, y, radius: 10, maxRadius: splashRadius, life: 90, maxLife: 90,
       cracks, debris, rimPoints, seed: Math.random()
     });
 
@@ -618,6 +599,12 @@ class ProjectileSystem {
           if (dist <= splashRadius) {
             const splashRatio = Math.max(0.4, 1 - (dist / splashRadius) * 0.5);
             const splashDmg = damage * splashRatio;
+
+            // 1. Interrupt and cancel any active skill channeling or attack
+            if (typeof f.interruptAttacks === 'function') {
+              f.interruptAttacks(true);
+            }
+
             f.takeDamage(splashDmg, attacker, { isExplosion: true, isDivineFlame: true });
             
             // Apply burn effect to targets hit by Fuga
@@ -627,10 +614,23 @@ class ProjectileSystem {
               f.lastBurnAttacker = attacker;
             }
             
-            const angle = Math.atan2(f.y - y, f.x - x);
-            const pushForce = 12 * (1 - dist / splashRadius);
+            // 2. Blast off target with strong outward kinetic blast knockback
+            const angle = dist > 0 ? Math.atan2(f.y - y, f.x - x) : Math.random() * Math.PI * 2;
+            const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
+            const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
+
             f.vx += Math.cos(angle) * pushForce;
             f.vy += Math.sin(angle) * pushForce;
+
+            if (f.knockbackVx !== undefined && f.knockbackVy !== undefined) {
+              f.knockbackVx += Math.cos(angle) * pushForce * 1.35;
+              f.knockbackVy += Math.sin(angle) * pushForce * 1.35;
+              f.knockbackStunTimer = Math.max(f.knockbackStunTimer || 0, 22);
+            }
+
+            if (typeof f.applyHitStun === 'function') {
+              f.applyHitStun(25); // 25 frames (~0.4s) hit stun while blasted outward
+            }
           }
         }
       });
@@ -643,7 +643,28 @@ class ProjectileSystem {
           if (illOwner !== ownerIndex) {
             const dist = Math.hypot(ill.x - x, ill.y - y);
             if (dist <= splashRadius) {
+              if (typeof ill.interruptAttacks === 'function') {
+                ill.interruptAttacks(true);
+              }
+
               applyDamageToTarget(ill, damage * 0.7, attacker, { isExplosion: true });
+
+              const angle = dist > 0 ? Math.atan2(ill.y - y, ill.x - x) : Math.random() * Math.PI * 2;
+              const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
+              const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
+
+              ill.vx += Math.cos(angle) * pushForce;
+              ill.vy += Math.sin(angle) * pushForce;
+
+              if (ill.knockbackVx !== undefined && ill.knockbackVy !== undefined) {
+                ill.knockbackVx += Math.cos(angle) * pushForce * 1.35;
+                ill.knockbackVy += Math.sin(angle) * pushForce * 1.35;
+                ill.knockbackStunTimer = Math.max(ill.knockbackStunTimer || 0, 22);
+              }
+
+              if (typeof ill.applyHitStun === 'function') {
+                ill.applyHitStun(25);
+              }
             }
           }
         }
@@ -1876,6 +1897,15 @@ class ProjectileSystem {
           p.angle = p.orbitAngle + Math.PI / 2;
         }
 
+        // Calculate visual shrink scale based on remaining orbitRadius relative to black hole radius
+        const bhR = p.capturedByBlackHole.r || (CONFIG.black ? CONFIG.black.blackHoleRadius : 100);
+        const minProjScale = CONFIG.black?.blackHoleProjShrinkMin ?? 0.15;
+        const ratio = Math.max(0, Math.min(1, p.orbitRadius / bhR));
+        const targetScale = minProjScale + (1 - minProjScale) * ratio;
+        if (p.visualScaleTarget === undefined || targetScale < p.visualScaleTarget) {
+          p.visualScaleTarget = targetScale;
+        }
+
         // Clear history so the trail doesn't stretch across the screen like a snake
         if (p.history) {
           p.history = [];
@@ -1951,15 +1981,14 @@ class ProjectileSystem {
         const purpleSlowDuration = CONFIG.gojo.purpleSlowDuration || 60;
         const purpleSlowMultiplier = CONFIG.gojo.purpleSlowMultiplier || 0.5;
         const purplePullForce = CONFIG.gojo.purplePullForce || 8.0;
-        const purpleScale = CONFIG.gojo.purpleScale || 1.0;
-        const effectiveRadius = p.r * purpleScale; // Hit radius for damage/destruction
+        const effectiveRadius = p.r || CONFIG.gojo?.purpleRadius || 50; // Hit radius for damage/destruction
         const purplePullRadius = CONFIG.gojo.purplePullRadius || 280; // Pull/suction range
         // Continuous screen shake while purple orb is active (optimized with HUD throttling)
         p.purpleShakeCounter = (p.purpleShakeCounter || 0) + 1;
         if (p.purpleShakeCounter >= 5) {
           p.purpleShakeCounter = 0;
           const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 2;
-          const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 30;
+          const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 20;
           triggerGlobalScreenShake(shakeIntensity, shakeDuration);
         }
         
@@ -1992,11 +2021,14 @@ class ProjectileSystem {
           ...(state.illusions || [])
         ];
 
-        // DPS tick - damage all valid targets (fighters & illusions) within the purple orb's radius
+        // DPS tick - damage all valid targets (fighters & illusions) trapped inside or pulled into the purple orb's radius for its entire purpleLife
         p.purpleLastDPSTick = (p.purpleLastDPSTick || 0) + 1;
         if (p.purpleLastDPSTick >= p.purpleDPSInterval) {
           p.purpleLastDPSTick = 0;
           
+          const damageRadius = Math.max(effectiveRadius * 1.8, purplePullRadius * 0.70);
+          const damageRadiusSq = damageRadius * damageRadius;
+
           for (let i = 0; i < allTargets.length; i++) {
             const ent = allTargets[i];
             if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
@@ -2005,17 +2037,11 @@ class ProjectileSystem {
             const dx = ent.x - p.x;
             const dy = ent.y - p.y;
             const distSq = dx * dx + dy * dy;
-            const radiusSq = effectiveRadius * effectiveRadius;
             
-            if (distSq < radiusSq) {
+            if (distSq < damageRadiusSq) {
               const dpsDamage = p.purpleDPS * (p.purpleDPSInterval / 60);
               if (typeof ent.takeDamage === 'function') {
                 ent.takeDamage(dpsDamage, ownerFighter, { isPurpleDPS: true, isProjectile: true, projectile: p });
-              }
-              
-              if (ent.slowTimer !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
-                ent.slowTimer = Math.max(ent.slowTimer, purpleSlowDuration);
-                ent.slowMultiplier = Math.min(ent.slowMultiplier || 1, purpleSlowMultiplier);
               }
               
               if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
@@ -2023,7 +2049,7 @@ class ProjectileSystem {
                 ent.vy *= 0.8;
               }
               
-              spawnSparks(ent.x, ent.y, 5, 'lightningTrail', '#8A2BE2');
+              spawnSparks(ent.x, ent.y, 4, 'lightningTrail', '#8A2BE2');
             }
           }
         }
@@ -2034,30 +2060,37 @@ class ProjectileSystem {
           if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
           if (ent.owner && ent.owner === ownerFighter) continue;
           
-          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
+          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || (ent.characterId === 'mahoraga' && ent.gojoInfinityImmune);
           if (!isImmune) {
             const dx = p.x - ent.x;
             const dy = p.y - ent.y;
             const dist = Math.hypot(dx, dy);
             
             if (dist > 0 && dist < purplePullRadius) {
-              if (ent.slowTimer !== undefined) {
-                ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
-                ent.slowMultiplier = Math.min(ent.slowMultiplier || 1, purpleSlowMultiplier);
+              ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
+              ent.isCaughtInPurple = true;
+              // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
+              if (typeof ent.interruptAttacks === 'function') {
+                ent.interruptAttacks(true);
+              }
+              if (typeof ent.applyTimeStop === 'function') {
+                ent.applyTimeStop(12);
+              } else {
+                ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
+              }
+              if (typeof ent.applyHitStun === 'function') {
+                ent.applyHitStun(12);
               }
               
               const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
+              ent.vx *= 0.1;
+              ent.vy *= 0.1;
               ent.x += (dx / dist) * pullStrength;
               ent.y += (dy / dist) * pullStrength;
 
               if (ent.knockbackVx !== undefined && ent.knockbackVy !== undefined) {
                 ent.knockbackVx += (dx / dist) * pullStrength;
                 ent.knockbackVy += (dy / dist) * pullStrength;
-              }
-              
-              if (ent.vx !== undefined && ent.vy !== undefined) {
-                ent.vx *= 0.7;
-                ent.vy *= 0.7;
               }
             }
           }
@@ -2374,6 +2407,13 @@ class ProjectileSystem {
 
           const distSq = dx * dx + dy * dy;
           if (distSq < effectiveRadius * effectiveRadius) {
+            const dist = Math.sqrt(distSq);
+            const minProjScale = CONFIG.black?.blackHoleProjShrinkMin ?? 0.15;
+            const targetScale = minProjScale + (1 - minProjScale) * Math.min(1, dist / effectiveRadius);
+            if (otherProj.visualScaleTarget === undefined || targetScale < otherProj.visualScaleTarget) {
+              otherProj.visualScaleTarget = targetScale;
+            }
+
             if (distSq < p.r * p.r * 0.25) {
               if (otherProj.isExplosion) {
                 // Sucked in! Destroy silently (no detonation)
@@ -2390,14 +2430,14 @@ class ProjectileSystem {
 
               // Capture the projectile instead of destroying it
               if (!otherProj.capturedByBlackHole) {
-                const dist = Math.sqrt(distSq);
                 otherProj.capturedByBlackHole = p;
                 otherProj.orbitRadius = dist;
                 otherProj.orbitAngle = Math.atan2(otherProj.y - p.y, otherProj.x - p.x);
+                const currentSpeed = Math.hypot(otherProj.vx, otherProj.vy);
+                otherProj.originalSpeed = Math.max(currentSpeed, otherProj.speed || 0, CONFIG.black?.blackHoleReleaseSpeed || 7.0);
               }
             } else {
               // Pull the projectile
-              const dist = Math.sqrt(distSq);
               const nx = dx / dist;
               const ny = dy / dist;
               // Stronger pull on projectiles so they realistically spiral in
@@ -2418,9 +2458,12 @@ class ProjectileSystem {
             const capturedProj = this.projectiles[k];
             if (capturedProj.capturedByBlackHole === p) {
               capturedProj.capturedByBlackHole = null;
-              const releaseSpeed = CONFIG.black?.blackHoleReleaseSpeed ?? 3.5;
+              const releaseSpeed = capturedProj.originalSpeed || CONFIG.black?.blackHoleReleaseSpeed || 7.0;
               capturedProj.vx = Math.cos(capturedProj.orbitAngle + Math.PI / 2) * releaseSpeed;
               capturedProj.vy = Math.sin(capturedProj.orbitAngle + Math.PI / 2) * releaseSpeed;
+              if (capturedProj.angle !== undefined) {
+                capturedProj.angle = Math.atan2(capturedProj.vy, capturedProj.vx);
+              }
             }
           }
           this._returnProjectile(p);
@@ -2585,15 +2628,20 @@ class ProjectileSystem {
           if (!isGojo) continue;
           if (areOnSameTeam(p.owner, fi)) continue;
 
-          const infinityRadius = f.r + 30;
+          const infinityRadius = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
           const isLimitlessActive = (f.infinityCooldown <= 0 || f.infinityActive || f.infinityBlockTimer > 0 || p.targetIsGojoLimitless);
           if (distSq <= infinityRadius * infinityRadius && isLimitlessActive) {
-            // Check configurable freeze chance (CONFIG.gojo.infinityFreezeChance)
-            const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 1.0;
-            if (!p.isFrozenByInfinity && Math.random() <= freezeChance) {
+            // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
+            if (p.infinityEvaluated === undefined) {
+              p.infinityEvaluated = true;
+              const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
+              p.infinityBypassed = Math.random() > freezeChance;
+            }
+
+            if (!p.infinityBypassed && !p.isFrozenByInfinity) {
               // Prune oldest frozen projectile if exceeding max limit to guarantee 60 FPS
               const maxFrozen = CONFIG.gojo?.infinityMaxFrozenProjectiles ?? 12;
               let activeFrozenCount = 0;
@@ -2707,6 +2755,21 @@ class ProjectileSystem {
               scale: Math.max(0.6, (fighters[p.owner] ? fighters[p.owner].r / 25 : 0.8))
             });
           }
+        }
+
+        if (p.isExplosive || p.visual === 'genosFireball') {
+          const expRadius = p.explosionRadius || 35;
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(p.x, p.y, expRadius, '#FF5500');
+          }
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(p.x, p.y, 8, 'orange');
+          }
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+          continue;
         }
 
         if (p.history && p.history.length > 1) {

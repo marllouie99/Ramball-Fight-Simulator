@@ -170,13 +170,15 @@ export class NormalFighter extends Fighter {
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
       const canShoot = (!this.isSniper || !this.isReloading);
 
-      if (aligned && !this.lastAimAligned && this.shootCooldown === 0 && canShoot) {
+      if (aligned && this.shootCooldown === 0 && canShoot) {
         if (this.isSniper && this.magazineBullets === 1) {
-          // Start the windup for the execution shot instead of firing immediately
-          this.executionWindupTimer = CONFIG.sharpshooter?.executeWindupFrames || 25;
-          spawnFloatingText(this.x, this.y - this.r - 20, 'CHARGING...', '#ffaa00');
+          // Only start execution windup once — guard against repeated triggering
+          if (!this.executionWindupTimer && this.lastAimAligned === false) {
+            this.executionWindupTimer = CONFIG.sharpshooter?.executeWindupFrames || 25;
+            spawnFloatingText(this.x, this.y - this.r - 20, 'CHARGING...', '#ffaa00');
+          }
         } else {
-          // Normal shot
+          // Normal shot — fire freely whenever aligned and cooldown is 0
           this._fireWeapon(ownerIndex, false);
         }
       }

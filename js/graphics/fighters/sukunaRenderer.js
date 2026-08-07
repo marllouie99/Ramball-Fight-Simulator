@@ -26,83 +26,22 @@ export class SukunaRenderer {
       fighter._drawSukunaCursedEnergyAura(ctx, 'red');
     }
 
-    // Malevolent Shrine is now drawn in drawDomainBackground so it renders behind all fighters
+    // 1. Draw Back Hand BEHIND body
+    fighter._drawHandCursedEnergy(ctx, 'back');
 
     Fighter.prototype.draw.call(fighter, ctx);
 
-    // Render small version of blobby cursed energy on Sukuna's both hands on opposite sides of his body
-    fighter._drawHandCursedEnergy(ctx);
+    // 2. Draw Front Hand ON TOP of body
+    fighter._drawHandCursedEnergy(ctx, 'front');
 
     // Draw Sakuga Anime Impact Frame (red/black ink impact)
     if (fighter.sakugaImpactTimer > 0) {
       fighter._drawSakugaImpactFrame(ctx);
     }
 
-    // Render residual hit flame wisps
-    if (fighter.hitFlameWisps && fighter.hitFlameWisps.length > 0) {
-      fighter._drawHitFlameWisps(ctx);
-    }
-
-    // Draw Punch Impact Effects (Gojo-style shockwave & star core in Crimson)
-    if (fighter.punchEffects && fighter.punchEffects.length > 0) {
-      fighter.punchEffects.forEach(effect => {
-        const prog = 1 - (effect.timer / effect.maxTimer);
-        const alpha = Math.sin((1 - prog) * Math.PI);
-
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(effect.angle);
-        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-
-        // 1. Outer Crimson Shockwave Ring
-        const ringRadius = (fighter.r + 5) * (0.8 + 1.2 * prog);
-        ctx.strokeStyle = '#FF1100';
-        ctx.lineWidth = 5 * (1 - prog * 0.5);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 2. High-contrast Black Ink Outline
-        ctx.strokeStyle = '#0a0a0a';
-        ctx.lineWidth = 2.5 * (1 - prog * 0.5);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringRadius * 0.94, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 3. Piercing White/Gold Impact Star Core
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        const numRays = 8;
-        const innerR = 6 * (1 - prog);
-        const outerR = 30 * (0.5 + 0.8 * prog);
-        for (let i = 0; i < numRays; i++) {
-          const a = (Math.PI * 2 / numRays) * i;
-          const ra = a + Math.PI / numRays;
-          ctx.lineTo(Math.cos(a) * outerR, Math.sin(a) * outerR);
-          ctx.lineTo(Math.cos(ra) * innerR, Math.sin(ra) * innerR);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // 4. Directional Crimson Impact Sparks
-        ctx.strokeStyle = '#FF4500';
-        ctx.lineWidth = 2.5;
-        for (let i = -2; i <= 2; i++) {
-          const sa = i * 0.3;
-          const sDist = ringRadius * 1.1;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(sa) * (sDist * 0.5), Math.sin(sa) * (sDist * 0.5));
-          ctx.lineTo(Math.cos(sa) * sDist, Math.sin(sa) * sDist);
-          ctx.stroke();
-        }
-
-        ctx.restore();
-      });
-    }
-
     // Draw afterimages during flurry, dodge & melee teleports
     if (fighter.afterImages && fighter.afterImages.length > 0) {
-      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
+      const skipAlternate = (typeof state !== 'undefined' && state.performanceMode);
       for (let i = 0; i < fighter.afterImages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;
         const img = fighter.afterImages[i];
@@ -226,50 +165,7 @@ export class SukunaRenderer {
     }
 
 
-    // Draw Slash Hit visuals on target (Ghost blade slash marks during rapid slash)
-    if (fighter.slashHitVisuals && fighter.slashHitVisuals.length > 0) {
-      fighter.slashHitVisuals.forEach(slash => {
-        const ratio = slash.timer / slash.maxTimer;
-        ctx.save();
-        ctx.translate(slash.x, slash.y);
-        ctx.rotate(slash.angle);
-        ctx.scale(slash.scale, slash.scale);
 
-        const r = 22;
-        // Crescent slash shape
-        ctx.globalAlpha = 0.85 * ratio;
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5, false);
-        ctx.arc(r * 0.45, 0, r * 0.8, Math.PI * 0.45, -Math.PI * 0.45, true);
-        ctx.closePath();
-        // Heavy black ink outline & deep crimson cursed energy blade arc
-        ctx.fillStyle = `rgba(10, 2, 2, ${0.9 * ratio})`;
-        ctx.fill();
-        ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * ratio})`;
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // Crimson cursed energy blade core
-        ctx.save();
-        ctx.scale(0.85, 0.85);
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5, false);
-        ctx.arc(r * 0.45, 0, r * 0.8, Math.PI * 0.45, -Math.PI * 0.45, true);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(220, 20, 20, ${0.95 * ratio})`;
-        ctx.fill();
-        ctx.restore();
-
-        // White-hot razor crescent edge line
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * ratio})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
-        ctx.stroke();
-
-        ctx.restore();
-      });
-    }
 
     // Draw Furnace (Fuga / Open) — Volcanic magma cursed flame arrow construct
     if (fighter.isChannelingDivineFlame) {
@@ -333,27 +229,12 @@ export class SukunaRenderer {
     fighter.drawFreezeTimer(ctx);
 
     // Use already declared isParalyzed from the top of draw method
-    if (fighter.isChannelingDomainExpansion && !fighter.domainActive && !isParalyzed) {
-      const maxTime = CONFIG.sukuna?.domainChargeMax || 120;
-      const progress = Math.min(1.0, Math.max(0, fighter.domainChargeTimer / maxTime));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y);
-      ctx.font = '30px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(220, 20, 60, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 50 - (Math.sin(Date.now() / 150) * 5);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
-    }
+    // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
   }
 
-  // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands (Front POV style)
-  static _drawHandCursedEnergy(ctx, fighter) {
+  // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands
+  static _drawHandCursedEnergy(ctx, fighter, layer = 'all') {
     const basePosY = (fighter.y - (fighter.z || 0));
-    const nowTime = Date.now();
 
     // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Target of Ambush: Hide hands completely
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
@@ -363,7 +244,10 @@ export class SukunaRenderer {
       return;
     }
 
-    const angle = fighter.gunAngle || 0;
+    let angle = fighter.gunAngle || 0;
+    if (fighter.isChannelingDomainExpansion && !fighter.domainActive) {
+      angle = 0; // Lock hand rotation during domain channeling so hands stay stationary
+    }
     const facingLeft = Math.abs(angle) > Math.PI / 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
@@ -381,105 +265,85 @@ export class SukunaRenderer {
     let hideBackHand = false;
     const r = fighter.r || 25;
 
-    // Default rest positions in Front POV frame (+X is enemy, +Y is camera)
-    // Left shoulder is at +X (closest to enemy), Right shoulder is at -X (furthest)
-    let lx1 = -r * 0.55;    // Right Arm (frontHand/strikingX 0)
-    let ly1 = r * 0.35;     // Slightly forward to camera
-    
-    let lx2 = r * 0.55;     // Left Arm (backHand)
-    let ly2 = r * 0.35;     // Slightly forward to camera
+    let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
 
-    // 1. Smooth Dynamic Melee Punch Animation (Alternating 1-2 punches extending to target with recovery easing)
+    // 1. Martial Arts Brawler Guard Stance & 1-2 Flurry Punch Animation (Matching Todo & Gojo)
     if (fighter.punchAnimTimer > 0) {
-      const maxT = fighter.punchActiveMaxTime || 16.0;
-      fighter.currentSukunaPunchProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-    } else {
-      fighter.currentSukunaPunchProgress = 0.0;
-    }
+      const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
+      const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
+      const easePunch = Math.sin(rawProgress * Math.PI);
+      const lungeExtension = easePunch * (r * 1.5);
+      const oppositeRecoil = -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25);
 
-    if (fighter.currentSukunaPunchProgress > 0) {
-      const rawProgress = fighter.currentSukunaPunchProgress;
-      const smoothP = rawProgress < 0.5 ? 4 * rawProgress * rawProgress * rawProgress : 1 - Math.pow(-2 * rawProgress + 2, 3) / 2;
-      const lungeProgress = Math.sin(smoothP * Math.PI); // Buttery smooth 0 -> 1 -> 0 bell curve
-
-      let reachDist = 85;
-      if (fighter.target) {
-        const distToTarget = Math.hypot(fighter.target.x - fighter.x, fighter.target.y - fighter.y);
-        reachDist = Math.max(50, Math.min(115, distToTarget - fighter.r * 0.45));
-      }
-
-      const punchDist = lungeProgress * reachDist; // Dynamic reach extension directly to opponent!
+      frontHandX_loc = r * 0.85; frontHandY_loc = r * 0.15;
+      backHandX_loc  = 0;        backHandY_loc  = -r * 0.15;
 
       if (fighter.punchAnimHand === 0) {
-        // --- RIGHT HAND PUNCH (Strikes along right flank and flies over body!) ---
-        lx1 += punchDist * 1.5; 
-        ly1 *= 0.4;
+        // --- LEAD HAND PUNCH ---
+        frontHandX_loc += lungeExtension * 1.40;
+        frontHandY_loc += (0.08 - frontHandY_loc) * easePunch;
+        backHandX_loc  += oppositeRecoil;
       } else {
-        // --- LEFT HAND PUNCH (Strikes along left flank) ---
-        lx2 += punchDist * 1.2;
-        ly2 *= 0.4;
+        // --- REAR HAND PUNCH ---
+        backHandX_loc  += lungeExtension * 1.60;
+        backHandY_loc  += (0.08 - backHandY_loc) * easePunch;
+        frontHandX_loc += oppositeRecoil;
       }
     }
 
-    // 2. Single-Hand Slash Swing Animation (Fast 10-frame single-hand chop across body when unleashing Cleave / Dismantle slashes)
+    // 2. Dynamic Slash Swing Chop Animation (Clean forward diagonal slicing chop for Cleave / Dismantle)
     else if (fighter.slashSwingTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) {
-      let rawT = 1.0; // Hold at the end of the swing between rapid slashes
+      let rawT = 1.0;
       if (fighter.slashSwingTimer > 0) {
         rawT = (10 - Math.max(0, fighter.slashSwingTimer)) / 10;
       }
-      
-      // Left hand (1) swings Left-to-Right (-90 to +90)
-      // Right hand (0) swings Right-to-Left (+90 to -90)
-      const startAngle = fighter.slashHand === 1 ? -Math.PI / 2 : Math.PI / 2;
-      const endAngle = fighter.slashHand === 1 ? Math.PI / 2 : -Math.PI / 2;
-      
-      const angle = startAngle + rawT * (endAngle - startAngle);
-      const swingX = Math.cos(angle) * 35; 
-      const swingY = Math.sin(angle) * 45;
+      const easeChop = Math.sin(rawT * Math.PI);
 
       if (fighter.slashHand === 1) {
-        // Left hand slashes across body! Hide right hand!
-        hideFrontHand = true;
-        lx2 += swingX * 1.2;
-        ly2 += swingY; 
+        // Left Hand Chop: Sweeps top-right -> bottom-right forward across target
+        frontHandX_loc = r * 0.2; frontHandY_loc = r * 0.15; // Lead hand in guard
+        backHandX_loc  = r * (0.6 + easeChop * 1.1);
+        backHandY_loc  = -r * 0.45 + rawT * r * 0.8;
       } else {
-        // Right hand slashes across body! Hide left hand!
-        hideBackHand = true;
-        lx1 += swingX * 1.2; 
-        ly1 += swingY; 
+        // Right Hand Chop: Sweeps top-left -> bottom-left forward across target
+        backHandX_loc  = 0;       backHandY_loc  = -r * 0.15; // Rear hand in guard
+        frontHandX_loc = r * (0.6 + easeChop * 1.1);
+        frontHandY_loc = r * 0.45 - rawT * r * 0.8;
       }
     }
 
-    // 3. Fuga (Divine Flame Arrow) Kamino Archer Bow Stance (Leading arm extends, trailing arm pulls back into archery drawback)
+    // 3. Fuga (Divine Flame Arrow) Kamino Archer Bow Stance
     else if (fighter.isChannelingDivineFlame) {
       const progress = Math.min(1.0, (fighter.divineFlameChargeTimer || 0) / Math.max(1, fighter.divineFlameChargeMax || 90));
 
       // Leading Bow Arm (Left Hand extending far forward along +X to hold bow riser):
-      lx2 = r * 0.5 + 24 + progress * 8; 
-      ly2 = 0; // Perfectly centered on aiming line
+      backHandX_loc  = r * 0.5 + 24 + progress * 8; 
+      backHandY_loc  = 0;
 
       // Trailing Draw String Arm (Right Hand pulling arrow notch deep behind body along -X):
-      lx1 = -r * 0.2 - (6 + progress * 24);
-      ly1 = 0; // Perfectly centered on aiming line
+      frontHandX_loc = -r * 0.2 - (6 + progress * 24);
+      frontHandY_loc = 0;
     }
 
-    const fHand = toGlobal(lx1, ly1);
-    const bHand = toGlobal(lx2, ly2);
+    // 4. Malevolent Shrine (Domain Expansion) Stationary Enmaten Hand Sign
+    else if (fighter.isChannelingDomainExpansion && !fighter.domainActive) {
+      frontHandX_loc = r * 0.60; frontHandY_loc = r * 0.10;
+      backHandX_loc  = r * 0.50; backHandY_loc  = -r * 0.10;
+    }
+
+    // Default rest: Martial Arts Brawler Guard Stance
+    else {
+      frontHandX_loc = r * 0.85; frontHandY_loc = r * 0.15;
+      backHandX_loc  = 0;        backHandY_loc  = -r * 0.15;
+    }
+
+    const fHand = toGlobal(frontHandX_loc, frontHandY_loc);
+    const bHand = toGlobal(backHandX_loc, backHandY_loc);
     
     let frontHandX = fHand.x;
     let frontHandY = fHand.y;
     let backHandX = bHand.x;
     let backHandY = bHand.y;
-
-    // Safety Clamp: Prevent idle hands from extending above the top boundary of body circle (-fighter.r + 6)
-    const isAttacking = (fighter.punchAnimTimer > 0) || (fighter.slashSwingTimer > 0) || (fighter.rapidSlashHitsLeft > 0) || (fighter.flurryHitsLeft > 0);
-    const maxTopY = basePosY - (fighter.r - 6);
-    if (!isAttacking && frontHandY < maxTopY && (frontOffset < 0 || Math.abs(frontAngleOffset) > 1.0)) {
-      frontHandY = maxTopY;
-    }
-    if (!isAttacking && backHandY < maxTopY && !fighter.isChannelingDivineFlame) {
-      backHandY = maxTopY;
-    }
 
     // 1. Draw Cursed Energy Aura BEHIND physical hands (skip during RCT and Fuga channeling)
     const isRCT = (fighter.rctVisualTimer > 0);
@@ -494,33 +358,37 @@ export class SukunaRenderer {
       }
       const blobRadius = (fighter.punchAnimTimer > 0 || fighter.slashGlowTimer > 0) ? 15.0 : 12.0;
 
-      if (!hideFrontHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
-      if (!hideBackHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
+      if ((layer === 'all' || layer === 'front') && !hideFrontHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, frontHandX, frontHandY, blobRadius);
+      if ((layer === 'all' || layer === 'back') && !hideBackHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
     }
 
-    // 2. Draw Physical Circle Hands ON TOP of aura
+    // 2. Draw Physical Circle Hands (back hand behind body, front hand on top of body)
+    const handRadius = getHandSize(7.5, fighter);
+
     ctx.save();
     ctx.fillStyle = fighter.color || '#e0a899';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
 
-    if (!hideFrontHand) {
+    // Back hand (behind body circle)
+    if ((layer === 'all' || layer === 'back') && !hideBackHand) {
       ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, getHandSize(6.5, fighter), 0, Math.PI * 2);
+      ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
 
-    if (!hideBackHand) {
+    // Front hand (on top of body circle)
+    if ((layer === 'all' || layer === 'front') && !hideFrontHand) {
       ctx.beginPath();
-      ctx.arc(backHandX, backHandY, getHandSize(6.5, fighter), 0, Math.PI * 2);
+      ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.stroke();
     }
     ctx.restore();
 
     // Clean crisp energy flash ring around punching fist during punch animation
-    if (fighter.punchAnimTimer > 0 && !fighter.domainActive && !fighter.isChannelingDomainExpansion) {
+    if ((layer === 'all' || layer === 'front') && fighter.punchAnimTimer > 0 && !fighter.domainActive && !fighter.isChannelingDomainExpansion) {
       const strikingX = fighter.punchAnimHand === 0 ? frontHandX : backHandX;
       const strikingY = fighter.punchAnimHand === 0 ? frontHandY : backHandY;
 

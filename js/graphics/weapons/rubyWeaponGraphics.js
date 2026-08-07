@@ -1,5 +1,5 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
-
+import { state } from '../../core/state.js';
 
 const RubyTheme = {
   glowShadow: 'rgba(255, 0, 100, 1)',
@@ -166,7 +166,7 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
     ctx.globalCompositeOperation = 'source-over';
     
     // Add canvas glow
-    ctx.shadowColor = theme.glowShadow;
+    // ctx.shadowColor = theme.glowShadow; // Removed for performance
 
     // Quantize time to 15fps (approx 66ms per frame) for that staccato, hand-drawn anime feel
     const msPerFrame = 1000 / 15;
@@ -671,6 +671,8 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   // --- Dark Crimson Living Aura (Semi-Realistic Energy Flames) ---
   const time = Date.now() / 600;
 
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+
   ctx.save();
   ctx.globalCompositeOperation = 'source-over';
 
@@ -738,36 +740,40 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
 
   // 1. Soft Dissipating Dark Volumetric Heat (Background)
   ctx.globalCompositeOperation = 'source-over';
-  for (let i = 0; i < 40; i++) {
-    const t = i / 39;
+  if (!isLowQuality) {
+    for (let i = 0; i < 40; i++) {
+      const t = i / 39;
 
-    // Animate size and position to make the dark heat billow and flow
-    const wave = Math.sin(t * 15 - time * 6);
-    // Less blur: tighter size
-    const size = 2 + t * 5 + wave * 2;
-    const offsetDist = 10 + wave * 10;
+      // Animate size and position to make the dark heat billow and flow
+      const wave = Math.sin(t * 15 - time * 6);
+      // Less blur: tighter size
+      const size = 2 + t * 5 + wave * 2;
+      const offsetDist = 10 + wave * 10;
 
-    // More transparency (lower alpha multiplier)
-    const alpha = (0.15 - t * 0.08) * (0.6 + 0.4 * wave);
+      // More transparency (lower alpha multiplier)
+      const alpha = (0.15 - t * 0.08) * (0.6 + 0.4 * wave);
 
-    // Use drawPlasma to stretch the smoke so it fades out as sharp directional mist rather than round bubbles
-    drawPlasma(t, offsetDist, 1.0, size,
-      `rgba(${theme.heatSoft1}, ${Math.max(0, alpha)})`, // Rose/Pink smoke
-      `rgba(${theme.heatSoft2}, ${Math.max(0, alpha * 0.8)})`,
-      2.5, 0.6
-    );
+      // Use drawPlasma to stretch the smoke so it fades out as sharp directional mist rather than round bubbles
+      drawPlasma(t, offsetDist, 1.0, size,
+        `rgba(${theme.heatSoft1}, ${Math.max(0, alpha)})`, // Rose/Pink smoke
+        `rgba(${theme.heatSoft2}, ${Math.max(0, alpha * 0.8)})`,
+        2.5, 0.6
+      );
+    }
   }
 
   // 2. Liquid Dark Plasma Flow (Background)
   // Bring back the sharp needles, but make the lengths flow smoothly
-  for (let i = 0; i < 60; i++) {
-    const t = i / 59;
-    // Smooth wave for length instead of modulo jumps
-    const wave = Math.sin(t * 15 - time * 6);
-    const dragDist = 15 + wave * 10;
+  if (!isLowQuality) {
+    for (let i = 0; i < 60; i++) {
+      const t = i / 59;
+      // Smooth wave for length instead of modulo jumps
+      const wave = Math.sin(t * 15 - time * 6);
+      const dragDist = 15 + wave * 10;
 
-    // Deep rose needles (razor sharp size=3)
-    drawPlasma(t, dragDist, 1.2, 3, theme.plasma1, theme.plasma2, 2.5, 0.4);
+      // Deep rose needles (razor sharp size=3)
+      drawPlasma(t, dragDist, 1.2, 3, theme.plasma1, theme.plasma2, 2.5, 0.4);
+    }
   }
 
   // 3. Dense Guard Origin
@@ -1004,22 +1010,24 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   ctx.globalCompositeOperation = 'source-over';
 
   // A few faint smoke wisps overlapping the blade
-  for (let i = 0; i < 8; i++) {
-    const t = i / 7;
-    const pt = getSpinePoint(t);
+  if (!isLowQuality) {
+    for (let i = 0; i < 8; i++) {
+      const t = i / 7;
+      const pt = getSpinePoint(t);
 
-    const size = 3 + t * 8;
-    const alpha = (0.3 - t * 0.1) * (0.8 + 0.2 * Math.sin(time * 4 + i));
+      const size = 3 + t * 8;
+      const alpha = (0.3 - t * 0.1) * (0.8 + 0.2 * Math.sin(time * 4 + i));
 
-    const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, size);
-    grad.addColorStop(0, `rgba(${theme.guard1}, ${alpha})`);     // Dark magenta
-    grad.addColorStop(0.5, `rgba(${theme.guard2}, ${alpha * 0.5})`);
-    grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      const grad = ctx.createRadialGradient(pt.x, pt.y, 0, pt.x, pt.y, size);
+      grad.addColorStop(0, `rgba(${theme.guard1}, ${alpha})`);     // Dark magenta
+      grad.addColorStop(0.5, `rgba(${theme.guard2}, ${alpha * 0.5})`);
+      grad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(pt.x, pt.y, size, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(pt.x, pt.y, size, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.globalCompositeOperation = 'source-over'; // Changed from lighter to show up on white backgrounds

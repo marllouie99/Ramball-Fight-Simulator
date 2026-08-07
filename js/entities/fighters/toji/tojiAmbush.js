@@ -91,6 +91,24 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   fighter._secondSeqAudioPlayed = false;
 
   opponent.isTargetOfAmbush = true;
+  if (typeof opponent.interruptAttacks === 'function') {
+    opponent.interruptAttacks();
+  }
+  opponent.slashSwingTimer = 0;
+  opponent.katanaSlashTimer = 0;
+  opponent.katanaSlashFadeTimer = 0;
+  opponent.punchAnimTimer = 0;
+  opponent.flurryHitsLeft = 0;
+  opponent.flurrySlashTimer = 0;
+  opponent.rapidSlashHitsLeft = 0;
+  opponent.thinIceBreakerPunchTimer = 0;
+  opponent.isChannelingThinIceBreaker = false;
+  if (opponent.swordTrail) opponent.swordTrail.length = 0;
+  if (opponent.afterImages) opponent.afterImages.length = 0;
+  if (opponent.hitFlameWisps) opponent.hitFlameWisps.length = 0;
+  if (opponent.punchEffects) opponent.punchEffects.length = 0;
+  if (opponent.slashHitVisuals) opponent.slashHitVisuals.length = 0;
+
   if (!opponent.domainActive) {
     opponent.vx = 0;
     opponent.vy = 0;
@@ -167,6 +185,11 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.ambushTarget = null;
     fighter.ambushPhase = null;
     fighter.stealthCooldown = 0;
+    fighter.katanaSlashTimer = 0;
+    fighter.katanaSlashFadeTimer = 0;
+    fighter._lastKatanaTimer = 0;
+    fighter.slashSwingTimer = 0;
+    if (fighter.swordTrail) fighter.swordTrail.length = 0;
     const angle = Math.random() * Math.PI * 2;
     fighter.vx = Math.cos(angle) * (fighter.speed || 3);
     fighter.vy = Math.sin(angle) * (fighter.speed || 3);
@@ -198,6 +221,15 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   }
 
   opponent.isTargetOfAmbush = true;
+  opponent.slashSwingTimer = 0;
+  opponent.katanaSlashTimer = 0;
+  opponent.katanaSlashFadeTimer = 0;
+  opponent.punchAnimTimer = 0;
+  opponent.flurryHitsLeft = 0;
+  opponent.flurrySlashTimer = 0;
+  opponent.rapidSlashHitsLeft = 0;
+  opponent.thinIceBreakerPunchTimer = 0;
+  opponent.isChannelingThinIceBreaker = false;
 
   if (fighter.stealthAfterimages && fighter.stealthAfterimages.length > 0) {
     fastCleanArray(fighter.stealthAfterimages, (img) => {
@@ -535,6 +567,11 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.isAmbushing = false;
         fighter.ambushTarget = null;
         fighter.ambushPhase = null;
+        fighter.katanaSlashTimer = 0;
+        fighter.katanaSlashFadeTimer = 0;
+        fighter._lastKatanaTimer = 0;
+        fighter.slashSwingTimer = 0;
+        if (fighter.swordTrail) fighter.swordTrail.length = 0;
         if (typeof state !== 'undefined') {
           if (state.fighters) state.fighters.forEach(f => { if (f) f.isTargetOfAmbush = false; });
           if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.isTargetOfAmbush = false; });

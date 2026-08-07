@@ -4,7 +4,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../../graphics/particles/sparkEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { drawDivineFlameArrowConstruct } from '../../graphics/draw.js';
@@ -28,10 +28,10 @@ export class SukunaFighter extends Fighter {
     // Martial Arts combo counter for close distance basic attack
     this.martialArtsComboCount = 0;
 
-    // Gojo-style Melee Combat Mode - Start round in Melee Mode for Epic Intro Clash!
-    this.isMeleeMode = true;
-    this.forcedMeleeTimer = 180;
-    this.wasForcedMelee = true;
+    // Gojo-style Melee Combat Mode - Start round in Ranged Mode first
+    this.isMeleeMode = false;
+    this.forcedMeleeTimer = 0;
+    this.wasForcedMelee = false;
     this.meleeModeCooldown = 0;
     this.meleeComboCount = 0;
     this.meleeComboTarget = 0;
@@ -81,14 +81,40 @@ export class SukunaFighter extends Fighter {
     this.initialTeleportDone = false;
   }
 
-  interruptAttacks() {
-    // Preserve Fuga channeling state when inside Malevolent Shrine OR when time-stopped by Gojo's domain!
+  interruptAttacks(forceCancelAll = false) {
+    const wasChannelingDomain = this.isChannelingDomainExpansion;
+    const savedDomainCharge = this.domainChargeTimer;
+
+    // Preserve Fuga channeling state when inside Malevolent Shrine OR when time-stopped by Gojo's domain (unless forceCancelAll is true)!
     const isDomainTimeStop = (this.timeStopTimer > 0);
-    const preserveFuga = (this.domainActive || isDomainTimeStop) && this.isChannelingDivineFlame;
+    const preserveFuga = !forceCancelAll && (this.domainActive || isDomainTimeStop) && this.isChannelingDivineFlame;
     const savedChargeTimer = this.divineFlameChargeTimer;
     const savedFugaKey = this.fugaSoundKey;
 
-    super.interruptAttacks();
+    super.interruptAttacks(forceCancelAll);
+
+    if (forceCancelAll) {
+      if (this.fugaSoundKey) {
+        stopLoopingSound(this.fugaSoundKey);
+        this.fugaSoundKey = null;
+      }
+      this.isChannelingDivineFlame = false;
+      this.divineFlameChargeTimer = 0;
+      this.isChannelingDomainExpansion = false;
+      this.domainChargeTimer = 0;
+      return;
+    }
+
+    // Domain Expansion Hyper Armor: ONLY Toji (ISOH ambush/silence) can interrupt domain expansion channeling!
+    if (wasChannelingDomain) {
+      if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
+        this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
+      } else {
+        this.isChannelingDomainExpansion = true;
+        this.domainChargeTimer = savedDomainCharge;
+      }
+    }
 
     if (preserveFuga) {
       // Restore Fuga channeling state that super.interruptAttacks() wiped
@@ -121,10 +147,10 @@ export class SukunaFighter extends Fighter {
     this.reverseCursedTechniqueTriggered = false;
     this.martialArtsComboCount = 0;
 
-    // Start round in Melee Mode for Epic Intro Clash!
-    this.isMeleeMode = true;
-    this.forcedMeleeTimer = CONFIG.sukuna.forcedMeleeIntroDuration ?? 180;
-    this.wasForcedMelee = true;
+    // Start round in Ranged Mode first
+    this.isMeleeMode = false;
+    this.forcedMeleeTimer = 0;
+    this.wasForcedMelee = false;
     this.meleeModeCooldown = 0;
     this.meleeComboCount = 0;
     this.meleeComboTarget = 0;
@@ -277,24 +303,15 @@ export class SukunaFighter extends Fighter {
     );
     spawnFloatingText(this.x, this.y - this.r - 20, 'DISMANTLE!', '#E0E8FF');
     if (this._slashSoundCooldown <= 0) {
-      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
-      playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
-      this._slashSoundCooldown = 15; // ~0.25 seconds at 60fps
+      playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
+      playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.7);
+      this._slashSoundCooldown = 12; // ~0.2 seconds at 60fps
     }
 
-    // Spawn slash visual on target & hand cursed energy flash
+    // Spawn hand cursed energy flash & swing animation
     this.slashGlowTimer = 25;
     this.slashSwingTimer = 10;
     this.slashHand = this.slashHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
-    if (!this.slashHitVisuals) this.slashHitVisuals = [];
-    pushTrailCap(this.slashHitVisuals, {
-      x: closestEnemy.x,
-      y: closestEnemy.y,
-      angle: this.gunAngle,
-      timer: 12,
-      maxTimer: 12,
-      scale: 1.0 + Math.random() * 0.3
-    }, 30);
 
     // Apply knockback to target
     const dismantleAngle = Math.atan2(closestEnemy.y - this.y, closestEnemy.x - this.x);
@@ -388,18 +405,31 @@ export class SukunaFighter extends Fighter {
       });
     }
 
+    if (this.isChannelingDomainExpansion && !this.isTargetOfAmbush && (this.silenceTimer || 0) <= 0) {
+      // Unstoppable Domain Channeling Hyper-Armor: Clear hitStun & status freezes so non-Toji attacks cannot interrupt!
+      this.hitStunTimer = 0;
+      this.electricStunTimer = 0;
+      this.dubstepStunTimer = 0;
+      this.crimsonElectrifiedTimer = 0;
+      this.timeStopTimer = 0;
+    }
+
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
-      // Cancel domain expansion channeling if paralyzed / time-stopped / ambushed
+      // Only Toji (ISOH ambush/silence) can interrupt domain expansion channeling!
       if (this.isChannelingDomainExpansion) {
-        this.isChannelingDomainExpansion = false;
-        this.domainChargeTimer = 0;
+        if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
+          this.isChannelingDomainExpansion = false;
+          this.domainChargeTimer = 0;
+        }
       }
       // Pause Fuga audio while frozen in Gojo's domain so audio stops until domain ends
       if (this.isChannelingDivineFlame && this.fugaSoundKey) {
         pauseLoopingSound(this.fugaSoundKey);
       }
-      return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop
+      if (isFrozen && (!this.isChannelingDomainExpansion || this.isTargetOfAmbush || (this.silenceTimer || 0) > 0)) {
+        return; // Freeze Sukuna completely while inside Gojo's Unlimited Void / time-stop unless channeling domain with hyper-armor
+      }
     }
 
     // Resume Fuga charge audio if channeling after unfreezing
@@ -465,7 +495,7 @@ export class SukunaFighter extends Fighter {
     // Switch modes dynamically based on distance (only when not in special states)
     if (!this.isChannelingDivineFlame && !this.domainActive && (this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0) {
       if (this.meleeModeCooldown > 0) {
-        // In mandatory ranged separation period after combo finisher
+        // Mandatory ranged separation period (240 frames / 4.0 seconds) after combo disengage
         this.isMeleeMode = false;
       } else if (opponent && (opponent.isStealthed || opponent.isAmbushing) && !this.domainActive) {
         // Disengage from melee combat while opponent is in stealth or ambushing
@@ -478,7 +508,7 @@ export class SukunaFighter extends Fighter {
       } else if (distToOpponent > 260) {
         if (this.isMeleeMode) {
           this.isMeleeMode = false;
-          this.meleeModeCooldown = 180;
+          this.meleeModeCooldown = CONFIG.sukuna?.meleeModeSeparationCooldown ?? 240;
         }
       }
     }
@@ -529,9 +559,29 @@ export class SukunaFighter extends Fighter {
     this.posHistory.push({ x: this.x, y: this.y });
     if (this.posHistory.length > 30) this.posHistory.shift();
 
+    // Stop attacking if round/match has ended or if target/opponent is dead!
+    // IMPORTANT: Never interrupt mid-channel (Divine Flame / Fuga) as it would silence the looping Fuga audio.
+    const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
+    const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
+
+    if (!isGamePlaying || !isTargetAlive) {
+      if (!this.isChannelingAnySkill()) {
+        this.interruptAttacks();
+      }
+      this.shootCooldown = 60;
+      return;
+    }
+
     // Handle Divine Flame Channeling
     if (this.isChannelingDivineFlame) {
       this.divineFlameChargeTimer++;
+
+      // Subtle arena tremor while channeling Fuga (reads from CONFIG.sukuna)
+      if (this.divineFlameChargeTimer % 6 === 0) {
+        const channelShake = CONFIG.sukuna?.divineFlameChannelShakeIntensity || 2.5;
+        const channelDuration = CONFIG.sukuna?.divineFlameChannelShakeDuration || 4;
+        triggerGlobalScreenShake(channelShake, channelDuration);
+      }
 
       // Play "Fuga" voice line exactly 45 frames (0.75s) before firing
       if (this.divineFlameChargeTimer === Math.max(1, this.divineFlameChargeMax - 100)) {
@@ -619,7 +669,7 @@ export class SukunaFighter extends Fighter {
       this.flurryHitsLeft = 0;
       this.rapidSlashHitsLeft = 0;
 
-      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
+      const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive));
 
       // Enable Sukuna to cast Divine Flame (Fuga: Open) INSIDE Malevolent Shrine!
       if (!isAmbushedOrStunned && (this.silenceTimer || 0) <= 0 && this.divineFlameCooldown <= 0 && !this.isChannelingDivineFlame && opponent && !opponent.isDead) {
@@ -728,6 +778,7 @@ export class SukunaFighter extends Fighter {
           this.applyBleed(this.flurryTarget, 1);
 
           this.punchAnimTimer = 16;
+          this.punchAnimMaxTimer = 16;
           this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1;
           this.slashGlowTimer = 20;
           this.slashHand = this.slashHand === 1 ? 0 : 1;
@@ -753,49 +804,13 @@ export class SukunaFighter extends Fighter {
           // Spawn afterimages along the teleport path
           this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
 
-          spawnImpactFlash(oldX, oldY, 15, 'crimsonSniper');
-          spawnImpactFlash(this.x, this.y, 20, 'crimsonSniper');
-
           // Dramatic hit pause on target to emphasize the strike
           if (typeof this.flurryTarget?.applyHitStun === 'function') this.flurryTarget.applyHitStun(8);
 
-          // Trigger Sakuga Anime Impact Frame (Gojo-style visual)
-          this.sakugaImpactTimer = 6;
-          this.sakugaImpactMaxTimer = 6;
-          this.sakugaImpactX = this.flurryTarget.x;
-          this.sakugaImpactY = this.flurryTarget.y;
-          this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-          this.sakugaImpactSeed = Math.random();
+          // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
+          spawnAnimePunchImpactFrame(this.flurryTarget.x, this.flurryTarget.y, 55, flurryAngle, 'crimson');
 
-          // Spawn Skill 1 slash visual arc on target
-          if (!this.flurrySlashVisuals) this.flurrySlashVisuals = [];
-          this.flurrySlashVisuals.push({
-            x: this.flurryTarget.x,
-            y: this.flurryTarget.y,
-            angle: Math.random() * Math.PI * 2,
-            timer: 14,
-            maxTimer: 14,
-            scale: 1.2 + Math.random() * 0.5
-          });
 
-          // Spawn residual small stretched cursed energy flame wisps at impact point (Gojo-style)
-          if (!this.hitFlameWisps) this.hitFlameWisps = [];
-          const impactAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
-          for (let k = 0; k < 5; k++) {
-            const spreadAngle = impactAngle + (Math.random() - 0.5) * 1.4;
-            const stretchSpeed = 5 + Math.random() * 7;
-            this.hitFlameWisps.push({
-              x: this.flurryTarget.x + (Math.random() - 0.5) * 12,
-              y: this.flurryTarget.y + (Math.random() - 0.5) * 12,
-              vx: Math.cos(spreadAngle) * stretchSpeed,
-              vy: Math.sin(spreadAngle) * stretchSpeed,
-              angle: spreadAngle,
-              timer: 18,
-              maxTimer: 18,
-              length: 14 + Math.random() * 18,
-              width: 1.5 + Math.random() * 1.5,
-            });
-          }
         } else {
           this.flurryHitsLeft = 0; // abort if target dies
         }
@@ -862,22 +877,11 @@ export class SukunaFighter extends Fighter {
           this.flurryTarget.vx += Math.cos(cleaveAngle) * 3;
           this.flurryTarget.vy += Math.sin(cleaveAngle) * 3;
 
-          // Spawn slash visual on target
-          if (!this.slashHitVisuals) this.slashHitVisuals = [];
-          this.slashHitVisuals.push({
-            x: this.flurryTarget.x,
-            y: this.flurryTarget.y,
-            angle: slashAngle,
-            timer: 12,
-            maxTimer: 12,
-            scale: 1.0 + Math.random() * 0.3
-          });
-
           // Play swordswing sound on rapid slash hit
           if (this._slashSoundCooldown <= 0) {
-            playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.6);
-            playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
-            this._slashSoundCooldown = 15; // ~0.25 seconds at 60fps
+            playSound('Assets/Sound Effects/Attacks/swordswing.mp3', 0.9);
+            playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.7);
+            this._slashSoundCooldown = 12; // ~0.2 seconds at 60fps
           }
 
           // Spawn impact flash at current position
@@ -989,7 +993,7 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive || opponent.isChannelingPurple));
+    const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive));
 
     // Check for Divine Flame (Skill 2 - disabled in demo mode)
     if (!this.isDemoFighter && !isAmbushedOrStunned && !this.isChannelingAnySkill() && this.divineFlameCooldown <= 0 && opponent && !opponent.isDead) {
@@ -1016,7 +1020,6 @@ export class SukunaFighter extends Fighter {
       this.isChannelingDomainExpansion = true;
       this.isChannelingDivineFlame = false; // Explicit mutual exclusion
       this.domainChargeTimer = 0;
-      triggerGlobalScreenShake(6, 90); // Tremble for the full 1.5 seconds
       if (!this._hasPlayedDomainChannelSound) {
         this._hasPlayedDomainChannelSound = true;
         const channelSound = getSkillSound(this._def.id, 'domain_channel');
@@ -1103,7 +1106,6 @@ export class SukunaFighter extends Fighter {
     this.divineFlameCooldown = 600;
 
     spawnFloatingText(this.domainX, this.domainY + 50, 'MALEVOLENT SHRINE', '#8B0000');
-    triggerGlobalScreenShake(10, 25);
 
     const sound = getSkillSound(this._def?.id, 'domain');
     if (sound) playSound(sound.src, sound.volume);
@@ -1205,68 +1207,6 @@ export class SukunaFighter extends Fighter {
     // Draw Sakuga Anime Impact Frame (red/black ink impact)
     if (this.sakugaImpactTimer > 0) {
       this._drawSakugaImpactFrame(ctx);
-    }
-
-    // Render residual hit flame wisps
-    if (this.hitFlameWisps && this.hitFlameWisps.length > 0) {
-      this._drawHitFlameWisps(ctx);
-    }
-
-    // Draw Punch Impact Effects (Gojo-style shockwave & star core in Crimson)
-    if (this.punchEffects && this.punchEffects.length > 0) {
-      this.punchEffects.forEach(effect => {
-        const prog = 1 - (effect.timer / effect.maxTimer);
-        const alpha = Math.sin((1 - prog) * Math.PI);
-
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.rotate(effect.angle);
-        ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
-
-        // 1. Outer Crimson Shockwave Ring
-        const ringRadius = (this.r + 5) * (0.8 + 1.2 * prog);
-        ctx.strokeStyle = '#FF1100';
-        ctx.lineWidth = 5 * (1 - prog * 0.5);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 2. High-contrast Black Ink Outline
-        ctx.strokeStyle = '#0a0a0a';
-        ctx.lineWidth = 2.5 * (1 - prog * 0.5);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringRadius * 0.94, 0, Math.PI * 2);
-        ctx.stroke();
-
-        // 3. Piercing White/Gold Impact Star Core
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        const numRays = 8;
-        const innerR = 6 * (1 - prog);
-        const outerR = 30 * (0.5 + 0.8 * prog);
-        for (let i = 0; i < numRays; i++) {
-          const a = (Math.PI * 2 / numRays) * i;
-          const ra = a + Math.PI / numRays;
-          ctx.lineTo(Math.cos(a) * outerR, Math.sin(a) * outerR);
-          ctx.lineTo(Math.cos(ra) * innerR, Math.sin(ra) * innerR);
-        }
-        ctx.closePath();
-        ctx.fill();
-
-        // 4. Directional Crimson Impact Sparks
-        ctx.strokeStyle = '#FF4500';
-        ctx.lineWidth = 2.5;
-        for (let i = -2; i <= 2; i++) {
-          const sa = i * 0.3;
-          const sDist = ringRadius * 1.1;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(sa) * (sDist * 0.5), Math.sin(sa) * (sDist * 0.5));
-          ctx.lineTo(Math.cos(sa) * sDist, Math.sin(sa) * sDist);
-          ctx.stroke();
-        }
-
-        ctx.restore();
-      });
     }
 
     // Draw afterimages during flurry, dodge & melee teleports
@@ -1393,50 +1333,7 @@ export class SukunaFighter extends Fighter {
     }
 
 
-    // Draw Slash Hit visuals on target (Ghost blade slash marks during rapid slash)
-    if (this.slashHitVisuals && this.slashHitVisuals.length > 0) {
-      this.slashHitVisuals.forEach(slash => {
-        const ratio = slash.timer / slash.maxTimer;
-        ctx.save();
-        ctx.translate(slash.x, slash.y);
-        ctx.rotate(slash.angle);
-        ctx.scale(slash.scale, slash.scale);
 
-        const r = 22;
-        // Crescent slash shape
-        ctx.globalAlpha = 0.85 * ratio;
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5, false);
-        ctx.arc(r * 0.45, 0, r * 0.8, Math.PI * 0.45, -Math.PI * 0.45, true);
-        ctx.closePath();
-        // Heavy black ink outline & deep crimson cursed energy blade arc
-        ctx.fillStyle = `rgba(10, 2, 2, ${0.9 * ratio})`;
-        ctx.fill();
-        ctx.strokeStyle = `rgba(0, 0, 0, ${0.95 * ratio})`;
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // Crimson cursed energy blade core
-        ctx.save();
-        ctx.scale(0.85, 0.85);
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.5, Math.PI * 0.5, false);
-        ctx.arc(r * 0.45, 0, r * 0.8, Math.PI * 0.45, -Math.PI * 0.45, true);
-        ctx.closePath();
-        ctx.fillStyle = `rgba(220, 20, 20, ${0.95 * ratio})`;
-        ctx.fill();
-        ctx.restore();
-
-        // White-hot razor crescent edge line
-        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * ratio})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.arc(0, 0, r * 0.95, -Math.PI * 0.48, Math.PI * 0.48, false);
-        ctx.stroke();
-
-        ctx.restore();
-      });
-    }
 
     // Draw Furnace (Fuga / Open) — Volcanic magma cursed flame arrow construct
     if (this.isChannelingDivineFlame) {
@@ -1500,21 +1397,7 @@ export class SukunaFighter extends Fighter {
     this.drawFreezeTimer(ctx);
 
     // Use already declared isParalyzed from the top of draw method
-    if (this.isChannelingDomainExpansion && !this.domainActive && !isParalyzed) {
-      const maxTime = CONFIG.sukuna?.domainChargeMax || 120;
-      const progress = Math.min(1.0, Math.max(0, this.domainChargeTimer / maxTime));
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.font = '30px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(220, 20, 60, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -this.r - 50 - (Math.sin(Date.now() / 150) * 5);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
-    }
+    // Domain Expansion Floating Text is drawn on top layer by drawUltimateChannelingTexts()
   }
 
   // Render physical circle hands + animated blobby Cursed Energy flame aura on Sukuna's front and back hands (Front POV style)

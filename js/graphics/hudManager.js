@@ -105,7 +105,8 @@ function syncHudPosition() {
   const hudTopPx = arenaBottomInBox + hudMargin;
   const hudTopPercent = (hudTopPx / boxRect.height) * 100;
 
-  const healthHud = document.getElementById('healthHud');
+  if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
+  const healthHud = _cachedContainerBottom;
   if (healthHud) {
     healthHud.style.top = `${hudTopPercent.toFixed(3)}%`;
     healthHud.style.width = `${visualWidthPercent.toFixed(3)}%`;
@@ -273,12 +274,12 @@ export function clearHealthHud() {
   _hudCache.teams.clear();
   _hudCache.fighters.clear();
 
-  const containerBottom = document.getElementById('healthHud');
-  const containerLeft = document.getElementById('healthHudLeft');
-  const containerRight = document.getElementById('healthHudRight');
-  if (containerBottom) containerBottom.innerHTML = '';
-  if (containerLeft) containerLeft.innerHTML = '';
-  if (containerRight) containerRight.innerHTML = '';
+  if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
+  if (!_cachedContainerLeft) _cachedContainerLeft = document.getElementById('healthHudLeft');
+  if (!_cachedContainerRight) _cachedContainerRight = document.getElementById('healthHudRight');
+  if (_cachedContainerBottom) _cachedContainerBottom.innerHTML = '';
+  if (_cachedContainerLeft) _cachedContainerLeft.innerHTML = '';
+  if (_cachedContainerRight) _cachedContainerRight.innerHTML = '';
   
   if (!_cachedTopLeft) _cachedTopLeft = document.getElementById('hudTopLeft');
   if (!_cachedTopRight) _cachedTopRight = document.getElementById('hudTopRight');
@@ -325,7 +326,9 @@ function updateHealthHud() {
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = fighters.map(f => {
     if (!f) return '';
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)}`;
+    const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
+      ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount}`;
   }).join('|');
 
   const hpChanged = currentHpStr !== state._lastHpStr;
@@ -337,7 +340,7 @@ function updateHealthHud() {
   state._hudFrameCount = (state._hudFrameCount || 0) + 1;
 
   // Performance: Throttle expensive HUD innerHTML writes to avoid layout reflow stalls
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
   const throttleInterval = isLowQuality ? 8 : 4;
   const isCriticalState = ['roundEnd', 'matchEnd', 'countdown'].includes(state.gameState);
   
@@ -423,18 +426,21 @@ function updateHealthHud() {
       const ultMax = f.ultimateCooldownMax || CONFIG.toji?.ultimateCooldown || 1500;
       const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
       let ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
       if (f.ultimateActive) {
-        let ap = 0;
-        if (f.ultimatePhase === 'CHANNELING') { ap = ((f.ultimateChargeTimer || 0) / (f.ultimateChargeMax || 90)) * 0.15; }
-        else if (f.ultimatePhase === 'VANISHED' || f.ultimatePhase === 'STRIKING') { ap = 0.15 + ((f.ultimateAssaultCount || 0) / (CONFIG.toji?.ultimateMaxStrikes || 6)) * 0.40; }
-        else if (f.ultimatePhase === 'CRATER_FADEIN') { ap = 0.55 + Math.max(0, 1 - ((f.ultimateCycleTimer || 0) / (f.craterFadeInTotal || 30))) * 0.05; }
-        else if (f.ultimatePhase === 'CRATER_CHARGE') { ap = 0.60 + Math.max(0, 1 - ((f.ultimateCycleTimer || 0) / (CONFIG.toji?.ultimateCraterChargeTime || 90))) * 0.35; }
-        else if (f.ultimatePhase === 'CRATER_DIVE') { ap = 0.95 + Math.max(0, 1 - ((f.ultimateCycleTimer || 0) / (CONFIG.toji?.ultimateCraterDiveTime || 15))) * 0.05; }
-        ultPct = Math.max(0, 100 - ap * 100);
+        if (f.ultimatePhase === 'CHANNELING') {
+          const chgMax = f.ultimateChargeMax || 90;
+          const remainingChg = Math.max(0, chgMax - (f.ultimateChargeTimer || 0));
+          ultPct = Math.max(0, Math.min(100, (remainingChg / chgMax) * 100));
+        } else {
+          const totalMax = CONFIG.toji?.ultimateSwarmDuration || 500;
+          const remainingSwarm = Math.max(0, f.ultimateTotalTimer !== undefined ? f.ultimateTotalTimer : totalMax);
+          ultPct = Math.max(0, Math.min(100, (remainingSwarm / totalMax) * 100));
+        }
       }
       return [
         { id: 'ambush', pct: ambushPct, ready: ambushPct >= 99, color: themeColor, label: 'STEALTH AMBUSH' },
-        { id: 'ult',    pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'HEAVENLY RESTRICTION' },
+        { id: 'ult',    pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'CURSE INVENTORY' },
       ];
     }
     if (f.characterId === 'sukuna' || f.type === 'sukuna') {
@@ -544,17 +550,13 @@ function updateHealthHud() {
       const bfThresholdPct = Math.max(0, Math.min(100, ((f.blackFlashCharge || 0) / bfThreshold) * 100));
 
       let ultPct = 0;
-      let ultLabel = 'SOUL SWAP';
       let ultReady = false;
-      let ultColor = themeColor;
 
       if (f.soulSwapActive) {
         const ultDuration = CONFIG.yuji?.soulSwapDuration || 500;
         ultPct = Math.max(0, Math.min(100, ((f.soulSwapTimer || 0) / ultDuration) * 100));
-        ultLabel = 'SUKUNA ACTIVE';
       } else if (f.hasSoulSwapped) {
         ultPct = 0;
-        ultLabel = 'EXPIRED';
       } else {
         const ultThresholdHp = CONFIG.yuji?.soulSwapHpThreshold || 0.30;
         ultPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - ultThresholdHp)) * 100));
@@ -564,7 +566,47 @@ function updateHealthHud() {
       return [
         { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
         { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' },
-        { id: 'ult',          pct: ultPct,         ready: ultReady,             color: ultColor,   label: ultLabel }
+        { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' }
+      ];
+    }
+    if (f.characterId === 'saitama' || f.type === 'saitama') {
+      const themeColor = '#F5C400';
+      const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
+      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
+      const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
+
+      const sideHopsMax = CONFIG.saitama?.sideHopsCooldown || 420;
+      const sideHopsTimer = f.sideHopsCooldown !== undefined ? f.sideHopsCooldown : sideHopsMax;
+      const sideHopsPct = Math.max(0, Math.min(100, (1 - (sideHopsTimer / sideHopsMax)) * 100));
+
+      const ultMax = CONFIG.saitama?.seriousPunchCooldown || 2700;
+      const ultTimer = f.seriousPunchCooldown !== undefined ? f.seriousPunchCooldown : ultMax;
+      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+      return [
+        { id: 'flurry',    pct: flurryPct,   ready: flurryPct >= 99,   color: themeColor, label: 'CONSECUTIVE NORMAL PUNCHES' },
+        { id: 'sideHops',  pct: sideHopsPct, ready: sideHopsPct >= 99, color: themeColor, label: 'SERIOUS SIDE HOPS' },
+        { id: 'ult',       pct: ultPct,      ready: ultPct >= 99,      color: themeColor, label: 'SERIOUS PUNCH' }
+      ];
+    }
+    if (f.characterId === 'genos' || f.type === 'genos') {
+      const themeColor = '#FF5500';
+      const flurryMax = CONFIG.genos?.flurryCooldown || 480;
+      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
+      const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
+
+      const dashMax = CONFIG.genos?.dashCooldown || 360;
+      const dashTimer = f.dashCooldown !== undefined ? f.dashCooldown : dashMax;
+      const dashPct = Math.max(0, Math.min(100, (1 - (dashTimer / dashMax)) * 100));
+
+      const ultMax = CONFIG.genos?.ultCooldown || 1680;
+      const ultTimer = f.ultCooldown !== undefined ? f.ultCooldown : ultMax;
+      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+      return [
+        { id: 'flurry', pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
+        { id: 'dash',   pct: dashPct,   ready: dashPct >= 99,   color: themeColor, label: 'ROCKET STOMP' },
+        { id: 'ult',    pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' }
       ];
     }
     if (f.characterId === 'cronos' || f.type === 'cronos') {
@@ -585,24 +627,19 @@ function updateHealthHud() {
       const themeColor = '#ff69b4';
 
       let rikaPct = 0;
-      let rikaLabel = 'RIKA SUMMON';
       const rk = f.rika;
       if ((f.domainActive || f.isChannelingDomain) && rk && rk.active && !rk.killedInDomain) {
         rikaPct = 100;
-        rikaLabel = 'RIKA (DOMAIN)';
       } else if (rk && rk.active) {
         const duration = CONFIG.yuta?.rikaDuration || 1000;
         const remaining = rk.timer || 0;
         rikaPct = Math.max(0, Math.min(100, (remaining / duration) * 100));
-        rikaLabel = 'RIKA (ACTIVE)';
       } else if (rk && rk.cooldownTimer > 0 && rk.hasSummonedAt50Hp) {
         const maxCd = CONFIG.yuta?.rikaCooldown || 1200;
         rikaPct = Math.max(0, Math.min(100, (1 - (rk.cooldownTimer / maxCd)) * 100));
-        rikaLabel = 'RIKA COOLDOWN';
       } else {
         const threshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
         rikaPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
-        rikaLabel = 'RIKA SUMMON';
       }
 
       const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.25;
@@ -626,25 +663,23 @@ function updateHealthHud() {
       }
 
       return [
-        { id: 'rika',   pct: rikaPct,   ready: rikaPct >= 99 && (!rk || !rk.active), color: themeColor, label: rikaLabel },
+        { id: 'rika',   pct: rikaPct,   ready: rikaPct >= 99 && (!rk || !rk.active), color: themeColor, label: 'RIKA SUMMON' },
         { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' }
       ];
     }
     if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
       const themeColor = f.color || '#eab308';
       let pct = 0;
-      let label = 'RAPID FIRE';
 
       if (f.isReloading) {
         const reloadTime = CONFIG.gunslinger?.reloadTime || 90;
         pct = Math.max(0, Math.min(100, (f.reloadTimer / reloadTime) * 100));
-        label = 'RELOADING...';
       } else {
         pct = Math.max(0, Math.min(100, (1 - (f.magazineBullets || 0) / (f.maxMagazine || 24)) * 100));
       }
 
       return [
-        { id: 'rapidfire', pct: pct, ready: pct >= 99 && !f.isReloading, color: themeColor, label: label }
+        { id: 'rapidfire', pct: pct, ready: pct >= 99 && !f.isReloading, color: themeColor, label: 'RAPID FIRE' }
       ];
     }
 
@@ -655,29 +690,24 @@ function updateHealthHud() {
       const cooldownMax = f.shootCooldownMax || CONFIG.laser?.cooldown || 300;
 
       let pct = 0;
-      let label = 'LASER BEAM';
       let ready = false;
 
       if (f.beamTimer > 0) {
         pct = Math.max(0, Math.min(100, (f.beamTimer / beamMax) * 100));
-        label = 'FIRING BEAM';
         ready = false;
       } else if (f.beamCharge > 0) {
         pct = Math.max(0, Math.min(100, (f.beamCharge / windupMax) * 100));
-        label = 'CHARGING BEAM';
         ready = f.beamCharge >= windupMax;
       } else if (f.shootCooldown > 0) {
         pct = Math.max(0, Math.min(100, (1 - f.shootCooldown / cooldownMax) * 100));
-        label = 'RECHARGING';
         ready = false;
       } else {
         pct = 100;
-        label = 'LASER READY';
         ready = true;
       }
 
       return [
-        { id: 'laser_beam', pct: pct, ready: ready, color: themeColor, label: label }
+        { id: 'laser_beam', pct: pct, ready: ready, color: themeColor, label: 'LASER BEAM' }
       ];
     }
 
@@ -692,29 +722,29 @@ function updateHealthHud() {
       const stormMax = CONFIG.zeus?.stormCooldown || 900;
       const stormTimer = f.stormCooldown !== undefined ? f.stormCooldown : stormMax;
       let stormPct = 0;
-      let stormLabel = 'ULTIMATE STORM';
       let stormReady = false;
 
       if (f.isChargingStorm) {
         const teleMax = CONFIG.zeus?.stormTelegraphFrames || 120;
         stormPct = Math.max(0, Math.min(100, (1 - f.stormCooldown / teleMax) * 100));
-        stormLabel = 'CHARGING STORM';
         stormReady = false;
       } else if (f.stormActive) {
         const durationMax = CONFIG.zeus?.stormDuration || 130;
         stormPct = Math.max(0, Math.min(100, (f.stormTimer / durationMax) * 100));
-        stormLabel = 'STORM ACTIVE';
         stormReady = false;
       } else {
         stormPct = Math.max(0, Math.min(100, (1 - (stormTimer / stormMax)) * 100));
         stormReady = stormPct >= 99;
-        stormLabel = 'ULTIMATE STORM';
       }
 
       return [
         { id: 'aegis', pct: aegisPct, ready: aegisReady, color: themeColor, label: 'AEGIS SHIELD' },
-        { id: 'storm', pct: stormPct, ready: stormReady, color: themeColor, label: stormLabel }
+        { id: 'storm', pct: stormPct, ready: stormReady, color: themeColor, label: 'ULTIMATE STORM' }
       ];
+    }
+
+    if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
+      return [];
     }
 
     let current = 0;
@@ -747,9 +777,22 @@ function updateHealthHud() {
       } else {
         info.push(`<b>DMG:</b> ${baseDmg}`);
       }
-
-      info.push(`<b>Parries:</b> ${f.parryCount || 0}/${f.targetParriesForFlurry || 5}`);
       
+      const isGuarding = (f.blockPoseTimer || 0) > 0;
+      const baseParryRatio = isGuarding ? (CONFIG.yuta?.parryActiveChance ?? 0.90) : (CONFIG.yuta?.parryPassiveChance ?? 0.90);
+      const parryStacks = f.parryStacks || 0;
+      const parryBonus = Math.round(parryStacks * (CONFIG.yuta?.parryChancePerStack ?? 0.05) * 100);
+      const baseParryVal = Math.round(baseParryRatio * 100);
+      const totalParryVal = Math.min(98, baseParryVal + parryBonus);
+
+      if (parryBonus > 0) {
+        info.push(`<b>Parry Chance:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else if (isGuarding) {
+        info.push(`<b>Parry Chance:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>Parry Chance:</b> ${totalParryVal}%`);
+      }
+
       if (f.domainActive) {
         const baseRegen = CONFIG.yuta?.regenRate || 0.05;
         const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
@@ -808,13 +851,19 @@ function updateHealthHud() {
         let critChanceStr = `${baseChanceVal}%`;
         if (currentChance > baseChance) {
           const boostChance = Math.round((currentChance - baseChance) * 100);
-          critChanceStr = `${baseChanceVal}% + ${boostChance}%`;
+          critChanceStr = `${baseChanceVal}% + ${boostChance}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        } else if (currentChance < baseChance) {
+          const debuffChance = Math.round((baseChance - currentChance) * 100);
+          critChanceStr = `${baseChanceVal}% - ${debuffChance}% <span style="color: #ef4444; font-size: 10px;">▼</span>`;
         }
         
         let critMultStr = `${baseMultVal}x`;
         if (currentMult > baseMult) {
           const boostMult = (currentMult - baseMult).toFixed(2);
-          critMultStr = `${baseMultVal} + ${boostMult}x`;
+          critMultStr = `${baseMultVal} + ${boostMult}x <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        } else if (currentMult < baseMult) {
+          const debuffMult = (baseMult - currentMult).toFixed(2);
+          critMultStr = `${baseMultVal} - ${debuffMult}x <span style="color: #ef4444; font-size: 10px;">▼</span>`;
         }
         
         info.push(`<b>Crit Rate:</b> ${critChanceStr}`);
@@ -822,9 +871,11 @@ function updateHealthHud() {
       } else if (f.characterId === 'toji' || f.type === 'toji') {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
         const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
-        if (Math.abs(currentSpeed - baseSpeed) > 0.01) {
-          const bonusSpeed = currentSpeed - baseSpeed;
-          info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${bonusSpeed.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        const speedDiff = currentSpeed - baseSpeed;
+        if (speedDiff > 0.01) {
+          info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${speedDiff.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else if (speedDiff < -0.01) {
+          info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} - ${Math.abs(speedDiff).toFixed(1)} <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else {
           info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)}`);
         }
@@ -842,7 +893,7 @@ function updateHealthHud() {
         }
       } else if (f.characterId === 'dummy' || f.type === 'dummy') {
         info.push(`<b>Stun Chance:</b> ${Math.round((CONFIG.dummy?.stunChance || 0.15) * 100)}%`);
-        const stunDir = f.stunDirection === 'left' ? '←' : f.stunDirection === 'right' ? '→' : f.stunDirection === 'up' ? '↑' : '–';
+        const stunDir = f.stunDirection === 'left' ? 'LEFT' : f.stunDirection === 'right' ? 'RIGHT' : f.stunDirection === 'up' ? 'UP' : 'NONE';
         info.push(`<b>Stun Dir:</b> ${stunDir}`);
       } else if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
         if (f.gojoInfinityImmune) {
@@ -856,6 +907,9 @@ function updateHealthHud() {
         if (f.isEnraged) {
           info.push(`<b>ENRAGED:</b> Active <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
+      } else if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
+        const liveCount = state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0;
+        info.push(`<b>Illusions:</b> ${liveCount}`);
       }
     }
 
@@ -894,7 +948,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>'));
     }
     if (info.length === 0) return '';
     
@@ -904,46 +958,6 @@ function updateHealthHud() {
     }
 
     const getLabelBoostArrow = (labelText, valStr, fighter) => {
-      if (valStr.includes('▲') || valStr.includes('▼')) {
-        return '';
-      }
-      if (valStr.includes('+') || valStr.includes('*') || valStr.toLowerCase().includes('active') || valStr.toLowerCase().includes('boost') || valStr.toLowerCase().includes('potential') || valStr.toLowerCase().includes('fire')) {
-        return ' <span style="color: #16a34a; font-size: 10px;">▲</span>';
-      }
-
-      const numVal = parseFloat(valStr.replace(/[^\d.]/g, ''));
-      if (isNaN(numVal)) return '';
-
-      let baseVal = null;
-      if (labelText === 'Speed' || labelText === 'SPD') {
-        baseVal = (fighter.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
-      } else if (labelText === 'DMG') {
-        baseVal = fighter._def?.damage || (fighter.fighterIndex !== undefined && FIGHTER_DEFS[fighter.fighterIndex]?.damage) || 10;
-      } else if (labelText === 'Crit Rate') {
-        baseVal = (CONFIG.gunslinger?.critChance || 0.20) * 100;
-      } else if (labelText === 'Crit DMG') {
-        baseVal = CONFIG.gunslinger?.critMultiplier || 1.8;
-      } else if (labelText === 'Regen') {
-        baseVal = fighter._def?.type === 'yuta' ? (CONFIG.yuta?.regenRate || 0.05) : 0.05;
-      } else if (labelText === 'Dodge') {
-        baseVal = (CONFIG.toji?.stealthDodgeChance || 0.10) * 100;
-      } else if (labelText === 'Stun Chance') {
-        baseVal = (CONFIG.zeus?.baseStunChance || 0.10) * 100;
-      }
-
-      if (baseVal !== null) {
-        const diff = numVal - baseVal;
-        if (diff > 0.01) {
-          return ' <span style="color: #16a34a; font-size: 10px;">▲</span>';
-        } else if (diff < -0.01) {
-          return ' <span style="color: #ef4444; font-size: 10px;">▼</span>';
-        }
-      }
-
-      if (labelText === 'Power Stacks' && fighter.powerStacks > 0) {
-        return ' <span style="color: #16a34a; font-size: 10px;">▲</span>';
-      }
-
       return '';
     };
     

@@ -24,7 +24,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.vx = vx;
     proj.vy = vy;
     proj.r = 45;
-    proj.life = CONFIG.gojo?.purpleLife || 300;
+    proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
     proj.color = '#8A2BE2'; // Purple
     proj.owner = ownerIndex;
@@ -38,8 +38,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
-    proj.purpleDPS = CONFIG.gojo?.purpleDPS || 15;
-    proj.purpleDPSInterval = 4;
+    proj.purpleDPS = CONFIG.gojo?.purpleDPS ?? 30;
+    proj.purpleDPSInterval = CONFIG.gojo?.purpleDPSInterval ?? 10;
     proj.purpleLastDPSTick = 0;
     proj.purpleDamagedFighters = new Set();
     
@@ -75,8 +75,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     const purpleSlowDuration = CONFIG.gojo?.purpleSlowDuration || 60;
     const purpleSlowMultiplier = CONFIG.gojo?.purpleSlowMultiplier || 0.5;
     const purplePullForce = CONFIG.gojo?.purplePullForce || 8.0;
-    const purpleScale = CONFIG.gojo?.purpleScale || 1.0;
-    const effectiveRadius = projectile.r * purpleScale; // Hit radius for damage/destruction
+    const effectiveRadius = projectile.r || CONFIG.gojo?.purpleRadius || 50; // Hit radius for damage/destruction
     const purplePullRadius = CONFIG.gojo?.purplePullRadius || 280; // Pull/suction range
     
     // Continuous screen shake while purple orb is active
@@ -84,13 +83,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     if (projectile.purpleShakeCounter >= 5) {
       projectile.purpleShakeCounter = 0;
       const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 2;
-      const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 30;
+      const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 20;
       triggerGlobalScreenShake(shakeIntensity, shakeDuration);
     }
     
-    // History is handled globally by projectileSystem now, but Hollow Purple has a special 20 length
-    // Wait, global sets maxHistory via p.historyMax. So it's fine.
-
     // Destroy incoming enemy projectiles (like Sukuna's slashes) that touch Purple
     for (let j = 0; j < system.projectiles.length; j++) {
         const otherProj = system.projectiles[j];
@@ -114,30 +110,27 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       ...(state.illusions || [])
     ];
 
-    // DPS tick - damage all valid targets (fighters & illusions) within the purple orb's radius
+    // DPS tick - damage all valid targets (fighters & illusions) trapped inside or pulled into the purple orb's radius for its entire purpleLife
     projectile.purpleLastDPSTick = (projectile.purpleLastDPSTick || 0) + 1;
     if (projectile.purpleLastDPSTick >= projectile.purpleDPSInterval) {
       projectile.purpleLastDPSTick = 0;
       
+      const damageRadius = Math.max(effectiveRadius * 1.8, purplePullRadius * 0.70);
+      const damageRadiusSq = damageRadius * damageRadius;
+
       for (let i = 0; i < allTargets.length; i++) {
         const ent = allTargets[i];
-        if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
+        if (!ent || ent.hp <= 0 || ent === ownerFighter || ent.isRika) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
         
         const dx = ent.x - projectile.x;
         const dy = ent.y - projectile.y;
         const distSq = dx * dx + dy * dy;
-        const radiusSq = effectiveRadius * effectiveRadius;
         
-        if (distSq < radiusSq) {
+        if (distSq < damageRadiusSq) {
           const dpsDamage = projectile.purpleDPS * (projectile.purpleDPSInterval / 60);
           if (typeof ent.takeDamage === 'function') {
             ent.takeDamage(dpsDamage, ownerFighter, { isPurpleDPS: true, isProjectile: true, projectile: projectile });
-          }
-          
-          if (ent.slowTimer !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
-            ent.slowTimer = Math.max(ent.slowTimer, purpleSlowDuration);
-            ent.slowMultiplier = Math.min(ent.slowMultiplier || 1, purpleSlowMultiplier);
           }
           
           if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
@@ -145,7 +138,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.vy *= 0.8;
           }
           
-          spawnSparks(ent.x, ent.y, 5, 'lightningTrail', '#8A2BE2');
+          spawnSparks(ent.x, ent.y, 4, 'lightningTrail', '#8A2BE2');
         }
       }
     }
@@ -156,32 +149,37 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
       
-      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
+      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || (ent.characterId === 'mahoraga' && ent.gojoInfinityImmune);
       if (!isImmune) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;
         const dist = Math.hypot(dx, dy);
         
         if (dist > 0 && dist < purplePullRadius) {
-          if (ent.slowTimer !== undefined) {
-            ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
-            ent.slowMultiplier = Math.min(ent.slowMultiplier || 1, purpleSlowMultiplier);
+          ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
+          ent.isCaughtInPurple = true;
+          // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
+          if (typeof ent.interruptAttacks === 'function') {
+            ent.interruptAttacks(true);
+          }
+          if (typeof ent.applyTimeStop === 'function') {
+            ent.applyTimeStop(12);
+          } else {
+            ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
+          }
+          if (typeof ent.applyHitStun === 'function') {
+            ent.applyHitStun(12);
           }
           
           const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
-          ent.vx += (dx / dist) * (pullStrength * 0.4);
-          ent.vy += (dy / dist) * (pullStrength * 0.4);
-          ent.x += (dx / dist) * (pullStrength * 0.6);
-          ent.y += (dy / dist) * (pullStrength * 0.6);
+          ent.vx *= 0.1;
+          ent.vy *= 0.1;
+          ent.x += (dx / dist) * pullStrength;
+          ent.y += (dy / dist) * pullStrength;
 
           if (ent.knockbackVx !== undefined && ent.knockbackVy !== undefined) {
             ent.knockbackVx += (dx / dist) * pullStrength;
             ent.knockbackVy += (dy / dist) * pullStrength;
-          }
-          
-          if (ent.vx !== undefined && ent.vy !== undefined) {
-            ent.vx *= 0.7;
-            ent.vy *= 0.7;
           }
         }
       }

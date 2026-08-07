@@ -6,6 +6,9 @@ import { state } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
 import { CONFIG } from '../../core/config.js';
+import { bomberExplosionSystem } from './bomberExplosionVisuals.js';
+import { burnEffectSystem } from './burnEffectVisuals.js';
+import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 
 // Object pool for PixiJS Sprites to prevent GC thrashing
 const bloodSpritePool = [];
@@ -148,3 +151,57 @@ export function updateBloodEffects() {
 export function drawBloodEffects() {
   // Empty - kept so `renderSystem.js` doesn't crash before being updated
 }
+
+/**
+ * Immediately clears ALL lingering battle visual effects so they vanish cleanly
+ * when the champion-screen black overlay starts fading in (matchEndTimer === 60).
+ * Properly releases PixiJS blood sprites back to the pool and clears every effect array.
+ */
+export function clearAllBattleEffects() {
+  // 1. Release PixiJS blood sprites back to pool before clearing the array
+  if (state.bloodEffects && state.bloodEffects.length > 0) {
+    for (let i = 0; i < state.bloodEffects.length; i++) {
+      const e = state.bloodEffects[i];
+      if (e && e.sprite) releaseBloodSprite(e.sprite);
+    }
+    state.bloodEffects.length = 0;
+  }
+
+  // 2. Clear 2D-canvas & PixiJS-drawn effect arrays
+  if (state.sparkEffects && state.sparkEffects.length > 0) {
+    // Safely return all spark particles & their PixiJS Sprites to object pools
+    for (let i = 0; i < state.sparkEffects.length; i++) {
+      const e = state.sparkEffects[i];
+      if (e) {
+        ParticleSystem.returnParticle(e);
+      }
+    }
+    state.sparkEffects.length = 0;
+  }
+  if (state.deathEffects) state.deathEffects.length = 0;
+  if (state.doppelgangerDeathEffects) state.doppelgangerDeathEffects.length = 0;
+  if (state.illusionDeathEffects) state.illusionDeathEffects.length = 0;
+  if (state.illusionSpawnEffects) state.illusionSpawnEffects.length = 0;
+  if (state.berserkerRageEffects) state.berserkerRageEffects.length = 0;
+  if (state.floatingTexts) state.floatingTexts.length = 0;
+  if (state.thermobaricExplosions) state.thermobaricExplosions.length = 0;
+
+  // Clear WebGL particles
+  bomberExplosionSystem.clear();
+  burnEffectSystem.clear();
+
+  // 3. Clear per-fighter attached visual effects (hitFlameWisps, afterImages, punchEffects, trails)
+  if (state.fighters) {
+    for (const f of state.fighters) {
+      if (!f) continue;
+      if (f.hitFlameWisps) f.hitFlameWisps.length = 0;
+      if (f.afterImages) f.afterImages.length = 0;
+      if (f.stealthAfterimages) f.stealthAfterimages.length = 0;
+      if (f.adaptationAfterimages) f.adaptationAfterimages.length = 0;
+      if (f.swordTrail) f.swordTrail.length = 0;
+      if (f.punchEffects) f.punchEffects.length = 0;
+      if (f.slashHitVisuals) f.slashHitVisuals.length = 0;
+      if (f.flurrySlashVisuals) f.flurrySlashVisuals.length = 0;
+    }
+  }
+}

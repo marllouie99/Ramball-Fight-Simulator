@@ -88,14 +88,23 @@ export class DopplegangerFighter extends Fighter {
 
     if (applied && amount > 0) {
       const healthPercent = this.hp / this.maxHp;
-      const threshold = CONFIG.doppleganger.illusionHealthPercent; // 0.25 (25%)
+      const threshold = CONFIG.doppleganger.illusionHealthPercent; // 0.02 (2%)
 
-      // Check if we've crossed a 25% threshold
+      // Check if we've crossed a 2% threshold
       const prevThreshold = Math.floor(prevHp / this.maxHp / threshold);
       const currentThreshold = Math.floor(healthPercent / threshold);
+      const thresholdCrosses = prevThreshold - currentThreshold;
 
-      if (currentThreshold < prevThreshold && this.illusionsSummoned < CONFIG.doppleganger.maxIllusions) {
-        this.summonIllusion();
+      if (thresholdCrosses > 0) {
+        const maxIllusions = CONFIG.doppleganger?.maxIllusions || 10;
+        for (let k = 0; k < thresholdCrosses; k++) {
+          const liveCount = state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0;
+          if (liveCount < maxIllusions) {
+            this.summonIllusion();
+          } else {
+            break;
+          }
+        }
       }
     }
 
@@ -103,9 +112,10 @@ export class DopplegangerFighter extends Fighter {
   }
 
   summonIllusion() {
-    // Check max illusion cap
-    const maxIllusions = CONFIG.doppleganger?.maxIllusions || 4;
-    if (this.illusionsSummoned >= maxIllusions) return;
+    // Check max illusion cap against LIVE active illusions (parents + split children)
+    const maxIllusions = CONFIG.doppleganger?.maxIllusions || 10;
+    const liveCount = state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0;
+    if (liveCount >= maxIllusions) return;
 
     // Spawn illusion at a random position near the Doppleganger
     const angle = Math.random() * Math.PI * 2;
@@ -160,6 +170,9 @@ export class DopplegangerFighter extends Fighter {
       gunAngle: 0,
       moveSpeed: illusionSpeed, // Store for speed normalization after bounce
       isIllusion: true,
+      isDoppelganger: true,  // reliable flag used by illusionSystem split-on-death
+      isSplitChild: false,   // first-gen illusion — eligible to split on death
+      hitFlashTimer: 0,
       timeStopTimer: 0,
       hitStunTimer: 0,
       applyTimeStop(duration) {

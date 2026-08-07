@@ -127,6 +127,10 @@ function drawWinnerReveal(winner, timer, mode) {
   if (def.type === 'gojo' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
+  if (def.type === 'gojo') {
+    preview.isMeleeMode = false;  // Force ranged mode so the Blue Lapse orb is visible
+    preview.orbTransition = 1;   // Fully show the orb (0=melee/hidden, 1=ranged/visible)
+  }
 
   // Draw volumetric god rays behind the model
   drawGodRays(ctx, cx, cy, timer, winner);
@@ -134,8 +138,19 @@ function drawWinnerReveal(winner, timer, mode) {
   ctx.save();
   ctx.translate(cx, cy);
   ctx.scale(scale, scale);
-  ctx.shadowBlur = 24;
-  ctx.shadowColor = winner.color;
+
+  // Draw a layered alpha glow ring BEFORE the fighter body (no shadowBlur — per perf rules,
+  // shadowBlur forces a CPU Gaussian blur on every fill call inside preview.draw)
+  const glowColor = winner.color || '#ffffff';
+  ctx.beginPath();
+  ctx.arc(0, 0, (winner.r || 25) + 30, 0, Math.PI * 2);
+  ctx.fillStyle = glowColor.startsWith('#') ? glowColor + '30' : 'rgba(255,255,255,0.19)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, 0, (winner.r || 25) + 14, 0, Math.PI * 2);
+  ctx.fillStyle = glowColor.startsWith('#') ? glowColor + '18' : 'rgba(255,255,255,0.09)';
+  ctx.fill();
+
   preview.draw(ctx, null);
   ctx.restore();
 
@@ -211,6 +226,10 @@ function drawFfaChampionReveal(winner, timer) {
   if (def.type === 'gojo' || def.type === 'yuta') {
     preview.combatAuraOpacity = 1;
   }
+  if (def.type === 'gojo') {
+    preview.isMeleeMode = false;  // Force ranged mode so the Blue Lapse orb is visible
+    preview.orbTransition = 1;   // Fully show the orb (0=melee/hidden, 1=ranged/visible)
+  }
 
   // Use an offscreen canvas to guarantee perfect fade-in composition
   // This prevents complex weapon rendering logic from overriding globalAlpha
@@ -226,8 +245,9 @@ function drawFfaChampionReveal(winner, timer) {
   
   pCtx.save();
   pCtx.translate(200, 200);
-  pCtx.shadowBlur = 24;
-  pCtx.shadowColor = (def.type === 'layla') ? '#00E5FF' : (winner.color || '#fff');
+  // No shadowBlur here — it forces CPU Gaussian blur on every fill inside preview.draw()
+  // (drawGojoOrb alone has ~10 fill calls per orb), causing severe lag spikes.
+  // The glow is provided by drawGojoOrb's own layered aura fills.
   preview.draw(pCtx, null);
   pCtx.restore();
 
@@ -435,16 +455,26 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     if (def.type === 'gojo' || def.type === 'yuta') {
       preview.combatAuraOpacity = 1;
     }
+    if (def.type === 'gojo') {
+      preview.isMeleeMode = false;  // Force ranged mode so the Blue Lapse orb is visible
+      preview.orbTransition = 1;   // Fully show the orb (0=melee/hidden, 1=ranged/visible)
+    }
 
     ctx.save();
     ctx.translate(cx + offsetX, cy);
     ctx.scale(scale, scale);
 
-    // Glow effect
-    ctx.shadowBlur = 40;
-    ctx.shadowColor = (def.type === 'layla') ? '#00E5FF' : (wFighter.color || '#fff');
-
-    // Extra white glow ring behind the model
+    // Draw layered alpha glow ring BEFORE the fighter (no shadowBlur — causes CPU lag spike
+    // because it blurs every single fill inside preview.draw, including all drawGojoOrb fills)
+    const fighterGlowColor = (def.type === 'layla') ? '#00E5FF' : (wFighter.color || '#ffffff');
+    ctx.beginPath();
+    ctx.arc(0, 0, (wFighter.r || 20) + 32, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,0.06)`;
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(0, 0, (wFighter.r || 20) + 16, 0, Math.PI * 2);
+    ctx.fillStyle = fighterGlowColor.startsWith('#') ? fighterGlowColor + '22' : 'rgba(255,255,255,0.13)';
+    ctx.fill();
     ctx.beginPath();
     ctx.arc(0, 0, (wFighter.r || 20) + 8, 0, Math.PI * 2);
     ctx.fillStyle = `rgba(255,255,255,0.08)`;

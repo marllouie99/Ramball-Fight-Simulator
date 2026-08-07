@@ -1,4 +1,4 @@
-import { fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';

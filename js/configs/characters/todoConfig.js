@@ -5,7 +5,7 @@ export const todoConfig = {
     // Basic Combat
     punchDamage: 15,              // Base damage per melee punch strike
     knockback: 6,                 // Moderate knockback impulse applied on hit
-    punchSpeed: 16,               // Animation frames for a standard punch
+    punchSpeed: 22,               // Animation frames for a smooth punch
     punchRange: 60,               // Additional melee reach distance for reliable basic attacks
     basicPunchCooldown: 20,       // Cooldown in frames between basic punches while waiting for skill sequence (~0.33s)
 

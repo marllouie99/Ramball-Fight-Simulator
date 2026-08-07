@@ -181,8 +181,10 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
-  // Keep the wheel statically positioned above his head (no rotation or flip scaling)
-  
+  const rotAngle = fighter.angle || 0;
+  ctx.rotate(rotAngle);
+  if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
+
   // Position wheel floating above Mahoraga's head with subtle floating animation along his body orientation
   const floatOffset = Math.sin(Date.now() * 0.003) * 2;
   const wheelOffset = -fighter.r - 28 + floatOffset;

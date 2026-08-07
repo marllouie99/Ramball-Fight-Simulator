@@ -1,7 +1,7 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
@@ -95,7 +95,8 @@ export class BlackFighter extends Fighter {
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;
 
       if (aligned) {
-        const speed = CONFIG.black.projectileSpeed || (CONFIG.projectile.speed * (this._def.projectileSpeedMultiplier || 1));
+        const baseSpeed = CONFIG.black?.projectileSpeed || CONFIG.projectile?.speed || 5.0;
+        const speed = baseSpeed * (this._def?.projectileSpeedMultiplier ?? 1.0);
         let isBlackHole = false;
 
         if (this.enhancedShotsRemaining > 0) {
@@ -134,6 +135,7 @@ export class BlackFighter extends Fighter {
     this.vx = 0;
     this.vy = 0;
 
+    triggerGlobalScreenShake(6, 15);
     spawnFloatingText(this.x, this.y - this.r - 15, 'CHARGING...', '#9900ff');
   }
 
@@ -156,6 +158,7 @@ export class BlackFighter extends Fighter {
     if (bhSound) audioSystem.playSFX(bhSound.src, bhSound.volume);
 
     this.skillCooldown = CONFIG.black.skillCooldown;
+    triggerGlobalScreenShake(14, 25);
     spawnFloatingText(spawnX, spawnY, 'BLACK HOLE!', '#9900ff');
 
     // Resume gentle movement after summoning

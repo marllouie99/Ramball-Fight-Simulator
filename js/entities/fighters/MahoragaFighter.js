@@ -210,27 +210,36 @@ export class MahoragaFighter extends Fighter {
   }
 
   /**
-   * Override aim() so Mahoraga's BODY never rotates.
-   * Only gunAngle tracks the target — his sword arm and left fist
-   * handle facing direction. this.angle stays at 0 (upright) always.
+   * Mahoraga rotates his body (this.angle) as he aims for the target.
+   * gunAngle matches this.angle so gunAngle and body orientation rotate together.
    */
   aim(opponent) {
-    if (!opponent) return;
-    const targetX = opponent.x ?? opponent.tx ?? this.x;
-    const targetY = opponent.y ?? opponent.ty ?? this.y;
+    if (!opponent || this.isTargetOfAmbush) {
+      return;
+    }
+
+    let targetX = opponent.x;
+    let targetY = opponent.y;
+    if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
+      targetX = opponent.flurryGhost.x;
+      targetY = opponent.flurryGhost.y;
+    }
+
+    const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
 
     if (opponent.isStealthed) {
-      const current = this.gunAngle !== undefined ? this.gunAngle : 0;
-      const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
-      let diff = targetAngle - current;
+      const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      let diff = targetAngle - currentAngle;
       while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff >  Math.PI) diff -= Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
       const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-      this.gunAngle = current + diff * turnRate;
-    } else {
-      this.gunAngle = Math.atan2(targetY - this.y, targetX - this.x);
+      this.gunAngle = currentAngle + diff * turnRate;
+      this.angle = this.gunAngle;
+      return;
     }
-    // Intentionally do NOT set this.angle — body stays upright (angle = 0)
+
+    this.gunAngle = targetAngle;
+    this.angle = targetAngle;
   }
 
   takeDamage(amount, attacker, opts = {}) {
@@ -1426,32 +1435,7 @@ export class MahoragaFighter extends Fighter {
     }
   }
 
-  aim(opponent) {
-    if (!opponent || this.isTargetOfAmbush) {
-      return;
-    }
 
-    let targetX = opponent.x;
-    let targetY = opponent.y;
-    if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
-      targetX = opponent.flurryGhost.x;
-      targetY = opponent.flurryGhost.y;
-    }
-
-    const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
-
-    if (opponent.isStealthed) {
-      const currentAngle = this.gunAngle !== undefined ? this.gunAngle : 0;
-      let diff = targetAngle - currentAngle;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-      this.gunAngle = currentAngle + diff * turnRate;
-      return;
-    }
-
-    this.gunAngle = targetAngle;
-  }
 
   drawGun(ctx) {
     if (this.isTargetOfAmbush) return;

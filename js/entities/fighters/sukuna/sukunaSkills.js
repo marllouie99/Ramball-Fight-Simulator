@@ -5,7 +5,7 @@
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { CONFIG } from '../../../core/config.js';
-import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnAnimePunchImpactFrame } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
@@ -160,7 +160,6 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     }
 
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');
-    triggerGlobalScreenShake(6, 8);
     spawnSparks(opponent.x, opponent.y, 4, 'crimsonSniper', '#8B0000');
     fighter.slashGlowTimer = 25;
     fighter.slashSwingTimer = 10;
@@ -170,20 +169,10 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     opponent.vx += Math.cos(cleaveAngle) * 3;
     opponent.vy += Math.sin(cleaveAngle) * 3;
 
-    if (!fighter.slashHitVisuals) fighter.slashHitVisuals = [];
-    fighter.slashHitVisuals.push({
-      x: opponent.x,
-      y: opponent.y,
-      angle: aimAngle,
-      timer: 12,
-      maxTimer: 12,
-      scale: 1.0 + Math.random() * 0.3
-    });
-
     if (fighter._slashSoundCooldown <= 0) {
-      audioSystem.playSFX('attack_swordswing', 0.6);
-      audioSystem.playSFX('skill_backstab', 0.5);
-      fighter._slashSoundCooldown = 15;
+      audioSystem.playSFX('attack_swordswing', 0.9);
+      audioSystem.playSFX('skill_backstab', 0.7);
+      fighter._slashSoundCooldown = 12;
     }
 
     spawnImpactFlash(fighter.x, fighter.y, 4, 'crimsonSniper');
@@ -255,7 +244,6 @@ export function applyDomainEffect(fighter, arena) {
       playedSwordSwing = true;
     }
 
-    if (!fighter.slashHitVisuals) fighter.slashHitVisuals = [];
     let hitEnemyThisTick = false;
     const ownerIdx = state.fighters.indexOf(fighter);
     const shrineX = fighter.domainX || fighter.x;
@@ -299,16 +287,6 @@ export function applyDomainEffect(fighter, arena) {
 
           spawnSparks(f.x, f.y, 6, 'crimsonSniper', '#8B0000');
           spawnImpactFlash(f.x, f.y, 22, 'crimsonSniper');
-          
-          // Spawn visual ghost blade slash directly on the enemy being shredded!
-          fighter.slashHitVisuals.push({
-            x: f.x + (Math.random() - 0.5) * f.r,
-            y: f.y + (Math.random() - 0.5) * f.r,
-            angle: aimAngle + (Math.random() - 0.5) * 0.6,
-            timer: 8 + Math.floor(Math.random() * 4),
-            maxTimer: 12,
-            scale: 0.8 + Math.random() * 0.5
-          });
         }
       }
     });
@@ -358,15 +336,6 @@ export function applyDomainEffect(fighter, arena) {
 
             spawnSparks(ill.x, ill.y, 6, 'crimsonSniper', '#8B0000');
             spawnImpactFlash(ill.x, ill.y, 22, 'crimsonSniper');
-
-            fighter.slashHitVisuals.push({
-              x: ill.x + (Math.random() - 0.5) * ill.r,
-              y: ill.y + (Math.random() - 0.5) * ill.r,
-              angle: aimAngle + (Math.random() - 0.5) * 0.6,
-              timer: 8 + Math.floor(Math.random() * 4),
-              maxTimer: 12,
-              scale: 0.8 + Math.random() * 0.5
-            });
           }
         }
       });

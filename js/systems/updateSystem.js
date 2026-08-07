@@ -7,7 +7,7 @@ import { updateIllusionDeathEffects } from '../graphics/particles/illusionDeathE
 import { updateDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
 import { updateIllusionSpawnEffects } from '../graphics/particles/illusionSpawnEffect.js';
 import { updateBerserkerRageEffects } from '../graphics/particles/berserkerRageEffect.js';
-import { updateBloodEffects } from '../graphics/particles/bloodEffect.js';
+import { updateBloodEffects, clearAllBattleEffects } from '../graphics/particles/bloodEffect.js';
 import { updateSparkEffects } from '../graphics/particles/sparkEffect.js';
 import { updateBlackFlashEffects } from '../graphics/particles/blackFlashEffect.js';
 import { updateLightningEffects } from '../graphics/particles/lightningEffects.js';
@@ -40,25 +40,6 @@ export function updateGame() {
               f.hitStunTimer = 0;
               f.knockbackStunTimer = 0;
 
-              // Intro Wall Rebound: Push Gojo/Sukuna away from center to bounce off walls
-              const isGojoOrSukuna = f._def && (f._def.type === 'gojo' || f._def.type === 'sukuna');
-              if (isGojoOrSukuna) {
-                f.introReboundActive = true;
-                f.introReboundTimer = 18;
-                
-                const arena = state.arena;
-                const centerX = arena.x + arena.width / 2;
-                const centerY = arena.y + arena.height / 2;
-                
-                // Base angle away from the center of the arena
-                const baseAngle = Math.atan2(f.y - centerY, f.x - centerX);
-                // Add a random diagonal spread (up to +/- 45 degrees)
-                const randomSpread = (Math.random() - 0.5) * (Math.PI * 0.5);
-                const pushAngle = baseAngle + randomSpread;
-                
-                f.vx = Math.cos(pushAngle) * 35; // Kick back at high velocity diagonally
-                f.vy = Math.sin(pushAngle) * 35;
-              }
             }
           });
         }
@@ -95,6 +76,13 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.matchEndTimer++;
 
+      // At frame 60 the black overlay starts fading in — clear ALL lingering visual
+      // effects at this exact moment so blood, sparks, wisps, and texts vanish
+      // together with the blackout instead of bleeding through on top of it.
+      if (state.matchEndTimer === 60) {
+        clearAllBattleEffects();
+      }
+
       // Auto next match (increased from 300 to 360 to account for the 60-frame action delay)
       if (state.matchEndTimer >= 360) {
         if (state.mode === '1v2 Stand Off') {
@@ -114,23 +102,15 @@ export function updateGame() {
     const useAggressiveParticleMode = fps < 35 || qualityLevel < 0.4;
 
     // Update death effects (always update, even between rounds)
-    if (!useAggressiveParticleMode || Math.random() > 0.5) {
-      updateDeathEffects();
-    }
-    if (!useAggressiveParticleMode) {
-      updateDoppelgangerDeathEffects();
-      updateIllusionDeathEffects();
-      updateIllusionSpawnEffects();
-      updateBerserkerRageEffects();
-    }
+    updateDeathEffects();
+    updateDoppelgangerDeathEffects();
+    updateIllusionDeathEffects();
+    updateIllusionSpawnEffects();
+    updateBerserkerRageEffects();
     // Update blood effects (always update, even between rounds)
-    if (!useAggressiveParticleMode || Math.random() > 0.7) {
-      updateBloodEffects();
-    }
+    updateBloodEffects();
     // Update spark effects (always update, even between rounds)
-    if (!useAggressiveParticleMode || Math.random() > 0.6) {
-      updateSparkEffects();
-    }
+    updateSparkEffects();
     // Update Black Flash effects (Todo's cursed energy strike)
     updateBlackFlashEffects();
     // Update lightning effects for Zeus storm strikes

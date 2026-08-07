@@ -5,7 +5,7 @@ export const AUDIO_CONFIG = {
 
   // Attacks
   'attack_explosion': 'Assets/Sound Effects/Attacks/explosion.mp3',
-  'attack_fireball': 'Assets/Sound Effects/Attacks/fireball.mp3',
+  'attack_fireball': 'Assets/Sound Effects/Skills/fugatravel.mp3',
   'attack_fleshhit': 'Assets/Sound Effects/Attacks/fleshhit.mp3',
   'attack_groundsmash': 'Assets/Sound Effects/Attacks/groundSmash.mp3',
   'attack_swordswing': 'Assets/Sound Effects/Attacks/swordswing.mp3',
@@ -16,7 +16,6 @@ export const AUDIO_CONFIG = {
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',
   'skill_comerika': 'Assets/Sound Effects/Skills/comerika.mp3',
-  'skill_cursedspeech': 'Assets/Sound Effects/Skills/cursedspeech.mp3',
   'skill_dash1': 'Assets/Sound Effects/Skills/dash1.mp3',
   'skill_dash3': 'Assets/Sound Effects/Skills/dash3.mp3',
   'skill_dash5': 'Assets/Sound Effects/Skills/dash5.mp3',
@@ -31,5 +30,14 @@ export const AUDIO_CONFIG = {
   'skill_shieldcharge': 'Assets/Sound Effects/Skills/shieldcharge.mp3',
   'skill_spinslash': 'Assets/Sound Effects/Skills/spinslash.mp3',
   'skill_thunderstrike': 'Assets/Sound Effects/Skills/thunderstrike.mp3',
-  'skill_todoclap': 'Assets/Sound Effects/Skills/todo-clap.mp3'
+  'skill_todoclap': 'Assets/Sound Effects/Skills/todo-clap.mp3',
+  'skill_genosinceneratevoice': 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3',
+  'skill_genosinceneratecharging': 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3',
+  'skill_genosincenerateblast': 'Assets/Sound Effects/Skills/genos-incenerate-blast.mp3',
+  'skill_genosultimatecharging': 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
+  'skill_genosultimateblast': 'Assets/Sound Effects/Skills/genos-ultimateblast.mp3',
+  'skill_genosmachinegunblowvoice': 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3',
+  'skill_genosrecovery': 'Assets/Sound Effects/Skills/genos-recovery.mp3',
+  'skill_genosrangeattack': 'Assets/Sound Effects/Attacks/genos-range-attack.mp3',
+  'skill_genosdashnoise': 'Assets/Sound Effects/Skills/genos-dash-noise.mp3'
 };

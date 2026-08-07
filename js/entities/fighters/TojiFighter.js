@@ -198,6 +198,11 @@ export class TojiFighter extends Fighter {
     this.isChannelingDomain = false;
     this.ultimatePhase = null;
     this.ultimateTarget = null;
+    this.katanaSlashTimer = 0;
+    this.katanaSlashFadeTimer = 0;
+    this._lastKatanaTimer = 0;
+    this.slashSwingTimer = 0;
+    if (this.swordTrail) this.swordTrail.length = 0;
     if (typeof state !== 'undefined') {
       if (state.fighters) {
         state.fighters.forEach(f => {
@@ -967,6 +972,15 @@ export class TojiFighter extends Fighter {
     if (this.phantomSlashTimer > 0) this.phantomSlashTimer--;
     if (this.ultimateCooldown > 0) this.ultimateCooldown--;
     if (this._parryAmbushCooldown > 0) this._parryAmbushCooldown--;
+    if (this.katanaSlashTimer > 0) {
+      this.katanaSlashTimer--;
+      if (this.katanaSlashTimer <= 0) {
+        this.katanaSlashTimer = 0;
+        this.katanaSlashFadeTimer = 10;
+      }
+    } else if (this.katanaSlashFadeTimer > 0) {
+      this.katanaSlashFadeTimer--;
+    }
 
     // Handle Ultimate Sequence
     if (this.ultimateActive) {
@@ -1265,7 +1279,54 @@ export class TojiFighter extends Fighter {
     this._activeSlashProgress = 0; // Initialize active slash progress to 0
     this._recoveryProgress = 0;    // Initialize recovery progress to 0
 
-    if (this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH')) {
+    if (this.ultimateActive && this.ultimatePhase === 'CHANNELING') {
+      const chargeRatio = Math.min(1.0, this.ultimateChargeTimer / (this.ultimateChargeMax || 90));
+      const easeCurve = Math.sin(chargeRatio * Math.PI * 0.5);
+      thrustDistance = -24 * easeCurve;
+      // Coil the Inverted Spear back from idle (0.42) to deep charge stance (-1.15 rad, rotating it back by ~90 degrees)
+      offsetAngle = (0.42 + (-1.15 - 0.42) * easeCurve) * _katanaFlipSign;
+
+      // Weapon vibration tremor as energy builds up
+      const tremorVal = (Math.random() - 0.5) * 1.5 * chargeRatio;
+      thrustDistance += tremorVal;
+      offsetAngle += (Math.random() - 0.5) * 0.025 * chargeRatio;
+
+      // Render Charging Energy Flare at spear tip held at shoulder
+      ctx.save();
+      const renderAngle = baseAngle + offsetAngle;
+      const tipX = this.x + Math.cos(renderAngle) * (this.r + 26 + thrustDistance);
+      const tipY = this.y + Math.sin(renderAngle) * (this.r + 26 + thrustDistance);
+
+      // A. Charging Energy Flare Outer Ring
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 12 + chargeRatio * 22, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(220, 30, 255, ${0.45 + chargeRatio * 0.45})`;
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+
+      // B. Hyper-Bright Inner Core
+      ctx.beginPath();
+      ctx.arc(tipX, tipY, 5 + chargeRatio * 9, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.7 + chargeRatio * 0.3})`;
+      ctx.fill();
+
+      // C. Radiating Energy Spikes / Rays
+      if (!isLowQuality) {
+        const rayCount = 8;
+        ctx.strokeStyle = `rgba(180, 50, 255, ${0.5 + chargeRatio * 0.5})`;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        for (let r = 0; r < rayCount; r++) {
+          const rayAngle = (r / rayCount) * Math.PI * 2 + (now / 75);
+          const r1 = 6;
+          const r2 = 18 + chargeRatio * 20;
+          ctx.moveTo(tipX + Math.cos(rayAngle) * r1, tipY + Math.sin(rayAngle) * r1);
+          ctx.lineTo(tipX + Math.cos(rayAngle) * r2, tipY + Math.sin(rayAngle) * r2);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    } else if (this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH')) {
       const maxPause = CONFIG.toji?.ambushBackChargeDuration || 25;
       const chargeRatio = Math.min(1.0, 1 - (this.ambushTimer / maxPause));
 
@@ -1658,7 +1719,7 @@ export class TojiFighter extends Fighter {
 
     // 1.4. High-Speed Stealth & Domain Motion Trail Afterimages (Matches Gojo & Sukuna teleport visual system)
     if (this.stealthAfterimages && this.stealthAfterimages.length > 0) {
-      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 52);
+      const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       for (let i = 0; i < this.stealthAfterimages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;
         const img = this.stealthAfterimages[i];
@@ -2394,22 +2455,7 @@ export class TojiFighter extends Fighter {
     this.drawHealth(ctx);
     this.drawFreezeTimer(ctx);
     
-    // Draw Heavenly Restriction Floating Text at the end so it is never overlayed by body or visuals
-    if ((this.ultimatePhase === 'CHANNELING' || (this.isChannelingDomain && !this.ultimateActive)) && (this.timeStopTimer || 0) <= 0) {
-      const progress = Math.min(1.0, (this.ultimateChargeTimer || 0) / Math.max(1, this.ultimateChargeMax || 90));
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.font = '30px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(160, 64, 255, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 4;
-      ctx.textAlign = 'center';
-      const textY = -this.r - 55 - (Math.sin(now / 150) * 5);
-      ctx.strokeText('HEAVENLY RESTRICTION', 0, textY);
-      ctx.fillText('HEAVENLY RESTRICTION', 0, textY);
-      ctx.restore();
-    }
-    
+    // Heavenly Restriction Floating Text is drawn on top layer by drawUltimateChannelingTexts()
     ctx.restore();
   }
 }

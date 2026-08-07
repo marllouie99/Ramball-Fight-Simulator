@@ -56,6 +56,7 @@ export class YutaFighter extends Fighter {
 
     // Phantom Flurry
     this.parryCount = 0;
+    this.parryStacks = 0;
     this.targetParriesForFlurry = this._getRandomParryThreshold();
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -71,6 +72,13 @@ export class YutaFighter extends Fighter {
     this.sakugaImpactSeed = 0;
   }
 
+  getParryChance() {
+    const isGuarding = this.blockPoseTimer > 0;
+    const baseChance = isGuarding ? (CONFIG.yuta.parryActiveChance ?? 0.90) : (CONFIG.yuta.parryPassiveChance ?? 0.90);
+    const stackBonus = (this.parryStacks || 0) * (CONFIG.yuta?.parryChancePerStack ?? 0.05);
+    return Math.min(0.98, baseChance + stackBonus);
+  }
+
   _getRandomParryThreshold() {
     const min = CONFIG.yuta.flurryParryMin || 5;
     const max = CONFIG.yuta.flurryParryMax || 7;
@@ -84,6 +92,7 @@ export class YutaFighter extends Fighter {
     this.rctCooldown = 0;
     this.damageWindow = [];
     this.parryCount = 0;
+    this.parryStacks = 0;
     this.targetParriesForFlurry = this._getRandomParryThreshold();
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -108,7 +117,7 @@ export class YutaFighter extends Fighter {
 
     const pathAngle = Math.atan2(dy, dx);
     const facingAngle = (customAngle !== null) ? customAngle : (this.gunAngle !== undefined ? this.gunAngle : pathAngle);
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 52)));
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
     const steps = isLowQuality ? Math.max(2, Math.floor(dist / 24)) : Math.max(5, Math.floor(dist / 8)); // Dense afterimages every 8px (spaced to 24px in low quality)
 
     for (let i = 0; i <= steps; i++) {
@@ -702,9 +711,13 @@ export class YutaFighter extends Fighter {
         }
 
         if (incomingThreat) {
-          this.blockPoseTimer = CONFIG.yuta.parryAnticipationDuration || 45; // Raise guard visually
-          // Turn to face the threat to make the block look intentional
-          this.gunAngle = Math.atan2(threatY - this.y, threatX - this.x);
+          // Only snap gunAngle when NEWLY entering block pose (not on re-entries)
+          const justEnteringBlockPose = (this.blockPoseTimer === undefined || this.blockPoseTimer <= 0);
+          if (justEnteringBlockPose) {
+            this.blockPoseTimer = CONFIG.yuta.parryAnticipationDuration || 45;
+            // Snap gunAngle to face the threat only once per block pose window
+            this.gunAngle = Math.atan2(threatY - this.y, threatX - this.x);
+          }
         }
       }
     }
@@ -725,7 +738,7 @@ export class YutaFighter extends Fighter {
     const unblockable = opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || (opts.projectile && opts.projectile.type === 'purple');
 
     const isGuarding = this.blockPoseTimer > 0;
-    const blockChance = isGuarding ? (CONFIG.yuta.parryActiveChance ?? 0.85) : (CONFIG.yuta.parryPassiveChance ?? 0.25);
+    const blockChance = this.getParryChance();
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
 
     if (!this.domainActive && !isStunned && !isSwinging && !unblockable && this.hp > 0 && Math.random() < blockChance) {
@@ -743,6 +756,12 @@ export class YutaFighter extends Fighter {
       if (this.parryCount >= this.targetParriesForFlurry && attacker && !attacker.isDead && !this.isChannelingDomain) {
         this.parryCount = 0;
         this.targetParriesForFlurry = this._getRandomParryThreshold();
+        
+        // Grant +1 Parry Mastery Stack (+5% parry chance bonus)
+        const maxParryStacks = CONFIG.yuta?.maxParryStacks ?? 5;
+        if ((this.parryStacks || 0) < maxParryStacks) {
+          this.parryStacks = (this.parryStacks || 0) + 1;
+        }
 
         const dx = attacker.x - this.x;
         const dy = attacker.y - this.y;

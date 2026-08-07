@@ -50,6 +50,34 @@ function createWindow () {
         app.relaunch();
         app.exit(0);
       }
+
+      // F11 or Alt+Enter: Toggle standard Fullscreen
+      if (input.key === 'F11' || (input.alt && input.key === 'Enter')) {
+        event.preventDefault();
+        const isFullScreen = win.isFullScreen();
+        win.setResizable(true);
+        win.setFullScreen(!isFullScreen);
+        if (isFullScreen) {
+          win.setResizable(false);
+        }
+      }
+
+      // F10: Toggle exactly 1920x1080 windowed size (centered)
+      if (input.key === 'F10') {
+        event.preventDefault();
+        if (win.isFullScreen()) {
+          win.setFullScreen(false);
+        }
+        const [width, height] = win.getSize();
+        win.setResizable(true);
+        if (Math.abs(width - 1920) < 5 && Math.abs(height - 1080) < 5) {
+          win.setSize(540, 960);
+        } else {
+          win.setSize(1920, 1080);
+        }
+        win.center();
+        win.setResizable(false);
+      }
     }
   });
 

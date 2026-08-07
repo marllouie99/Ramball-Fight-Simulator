@@ -1,4 +1,4 @@
-import { fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
 import { state, spawnFloatingText } from '../../core/state.js';
@@ -9,7 +9,7 @@ import { drawWhiteRailgun, drawWhiteChargeEffect } from '../../graphics/weaponVi
 import { spawnSparks, spawnLaserSmoke } from '../../graphics/particles/sparkEffect.js';
 
 /**
- * Laser Fighter (White)
+ * Laser Fighter (White / Hyperion)
  * Fires a continuous laser beam for 3 seconds when aligned with the enemy.
  * Stops moving while the beam is firing.
  * Deals initial high damage, then continuous damage over time.
@@ -187,15 +187,27 @@ export class LaserFighter extends Fighter {
     this.beamTimer = 0;
     this.beamCharge = 0;
     this.skillActive = false;
+    this.isFiringSkillShot = null;
     
     // Stop the laser sound immediately if it's playing
-    if (this._isLaserSoundPlaying && this._laserSoundKey) {
-      fadeOutLoopingSound(this._laserSoundKey, 100);
+    if (this._laserSoundKey) {
+      stopLoopingSound(this._laserSoundKey);
+      fadeOutLoopingSound(this._laserSoundKey, 50);
       this._isLaserSoundPlaying = false;
     }
   }
 
+  onDeath() {
+    this.interruptAttacks();
+    super.onDeath();
+  }
+
   update(opponent, ownerIndex, arena) {
+    if (this.hp <= 0) {
+      this.interruptAttacks();
+      return;
+    }
+
     this.handlePoison();
     this.handleBurn();
 

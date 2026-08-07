@@ -1,4 +1,6 @@
+import { CONFIG } from '../../core/config.js';
 import { state, getProjectiles } from '../../core/state.js';
+import { updateEntityVisualScale } from './EntityRenderer.js';
 import { drawSukunaFurnaceArrow, drawSukunaSlash, drawSukunaCleave, drawGhostBlade } from '../weapons/sukunaWeaponGraphics.js';
 import { drawGojoPurpleOrb, drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaBasicBullet, drawLaylaUltimateBullet, drawLaylaVoidProjectile } from './projectileRenderer.js';
 
@@ -36,6 +38,8 @@ export function updateHybridProjectiles() {
   
   for (const p of projectiles) {
     if (p.life <= 0) continue;
+
+    updateEntityVisualScale(p);
     
     const isFuga = (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace);
     const isGojoProj = (p.visual === 'gojoBlue' || p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple');
@@ -46,13 +50,6 @@ export function updateHybridProjectiles() {
     // Routing them through WebGL requires updating their textures every frame, stalling the GPU.
     // We bypass WebGL and render them directly in Canvas 2D.
     if (!isFuga && !isGojoProj && !isLaylaProj) continue;
-    
-    // Slashes shouldn't render inside Gojo's domain visually unless they are frozen by Infinity
-    if (isSukunaSlashProj) {
-      const isGojoDomainActive = state.fighters?.some(f => f && f.domainActive && f._def?.id === 'gojo' && f.domainChargeTimer >= f.domainChargeMax);
-      if (isGojoDomainActive && !p.isFrozenByInfinity) continue;
-    }
-    
     currentIds.add(p.id);
     
     let hybridData = activeSprites.get(p.id);
@@ -64,8 +61,15 @@ export function updateHybridProjectiles() {
       let size = 384;
       let drawScale = 1.0;
       
-      if (isFuga) { size = 384; drawScale = 384 / 1200; }
-      else if (isGojoProj) { size = 384; drawScale = 384 / 1200; }
+      if (isFuga) { size = 800; drawScale = 1.0; }
+      else if (isGojoProj) {
+        if (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple') {
+          size = 800;
+        } else {
+          size = 256;
+        }
+        drawScale = 1.0;        // 1:1 native resolution for Gojo's projectiles (Lapse Blue & Hollow Purple)
+      }
       else if (isSukunaSlashProj) { size = 128; drawScale = 1.0; }
       else if (isLaylaProj) {
         if (p.visual === 'layla_cosmic_blast') { size = 256; drawScale = 256 / 400; }
@@ -117,9 +121,8 @@ export function updateHybridProjectiles() {
     sprite.x = p.x;
     sprite.y = p.y;
     
-    if (drawScale !== 1.0) {
-      sprite.scale.set(1.0 / drawScale);
-    }
+    const visualScale = (p.visualScale !== undefined) ? p.visualScale : 1.0;
+    sprite.scale.set((1.0 / drawScale) * visualScale);
   }
   
   for (const [id, data] of activeSprites.entries()) {
@@ -135,6 +138,7 @@ let rikaSprite = null;
 let rikaCanvas = null;
 let rikaCtx = null;
 let rikaTexture = null;
+let rikaUpdateTick = 0;
 
 export function updateHybridRika() {
   if (!state.pixiApp || !state.pixiLayers?.fighters) return;
@@ -166,33 +170,44 @@ export function updateHybridRika() {
     layer.addChildAt(rikaSprite, 0);
   }
 
-  rikaCtx.clearRect(0, 0, size, size);
-  rikaCtx.save();
-  // Translate local context so Rika is drawn centered
-  rikaCtx.translate(size / 2 - rk.x, size / 2 - rk.y);
-
-  const opponent = state.fighters?.find(f => f && f !== yuta && f.hp > 0);
-  const spawnScale = rk.spawnScale ?? 1.0;
-  
-  // Custom renderState to bypass the WebGL check inside draw methods
-  const renderState = {
-    drawX: rk.x,
-    drawY: rk.y,
-    targetAngle: rk.angle || 0,
-    spawnScale: spawnScale,
-    isHybrid: true
-  };
-
-  rikaCtx.globalAlpha = yuta.rikaAlpha;
-  yuta._drawRikaCursedEnergyAura(rikaCtx, opponent, renderState);
-  yuta._drawRika(rikaCtx, opponent, renderState);
-
-  rikaCtx.restore();
-  rikaTexture.update();
-
+  // Update position and alpha every frame for buttery-smooth movement tracking
   rikaSprite.x = rk.x;
   rikaSprite.y = rk.y;
   rikaSprite.alpha = yuta.rikaAlpha;
+
+  // OPTIMIZATION: Throttle expensive texture updates to prevent CPU-to-GPU bandwidth bottlenecks.
+  // Rika's internal cursed energy animations are stepped to 30fps anyway.
+  rikaUpdateTick++;
+  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+  const updateInterval = isLowQuality ? 3 : 2; // 20fps or 30fps upload rate
+
+  const forceUpdate = (rk.spawnTimer && rk.spawnTimer >= (CONFIG.yuta?.rikaAriseDuration || 180) - 2) || (rikaUpdateTick === 1);
+
+  if (forceUpdate || (rikaUpdateTick % updateInterval === 0)) {
+    rikaCtx.clearRect(0, 0, size, size);
+    rikaCtx.save();
+    // Translate local context so Rika is drawn centered
+    rikaCtx.translate(size / 2 - rk.x, size / 2 - rk.y);
+
+    const opponent = state.fighters?.find(f => f && f !== yuta && f.hp > 0);
+    const spawnScale = rk.spawnScale ?? 1.0;
+    
+    // Custom renderState to bypass the WebGL check inside draw methods
+    const renderState = {
+      drawX: rk.x,
+      drawY: rk.y,
+      targetAngle: rk.angle || 0,
+      spawnScale: spawnScale,
+      isHybrid: true
+    };
+
+    rikaCtx.globalAlpha = yuta.rikaAlpha;
+    yuta._drawRikaCursedEnergyAura(rikaCtx, opponent, renderState);
+    yuta._drawRika(rikaCtx, opponent, renderState);
+
+    rikaCtx.restore();
+    rikaTexture.update();
+  }
 
   // Enforce Z-order: Rika (bottom) -> Legacy 2D Canvas (top, containing Yuta's body circle and HP value)
   if (state.legacyCanvasSprite && state.legacyCanvasSprite.parent === layer) {

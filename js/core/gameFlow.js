@@ -17,6 +17,7 @@ import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGra
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { clearAllPools } from '../graphics/objectPool.js';
 import { clearHealthHud } from '../graphics/hudManager.js';
+import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -34,8 +35,9 @@ const SOUND_ASSETS = {
 
 
 function preloadGameSounds() {
-  // Legacy assets + basic attack sounds + skill sounds + skill effect sounds
+  // Legacy assets + basic attack sounds + skill sounds + skill effect sounds + mapped audio config sounds
   const legacyPaths = Object.values(SOUND_ASSETS);
+  const mappedConfigPaths = Object.values(AUDIO_CONFIG);
   const basicAttackPaths = getBasicAttackSoundPaths();
   const skillPaths = getSkillSoundPaths();
   const skillEffectPaths = getSkillEffectSoundPaths();
@@ -65,7 +67,31 @@ function preloadGameSounds() {
     if (CONFIG.yuta.phantomFlurryNoiseSound) yutaSounds.push(CONFIG.yuta.phantomFlurryNoiseSound);
   }
 
-  const allPaths = [...new Set([...legacyPaths, ...basicAttackPaths, ...skillPaths, ...skillEffectPaths, ...announcerPaths, ...yujiSounds, ...yutaSounds])];
+  const genosSounds = [];
+  if (CONFIG.genos) {
+    if (CONFIG.genos.basicBlastSound) genosSounds.push(CONFIG.genos.basicBlastSound);
+    if (CONFIG.genos.basicChargeSound) genosSounds.push(CONFIG.genos.basicChargeSound);
+    if (CONFIG.genos.meleePunchSound) genosSounds.push(CONFIG.genos.meleePunchSound);
+    if (CONFIG.genos.dashSound) genosSounds.push(CONFIG.genos.dashSound);
+    if (CONFIG.genos.flurryVoiceSound) genosSounds.push(CONFIG.genos.flurryVoiceSound);
+    if (CONFIG.genos.ultVoiceSound) genosSounds.push(CONFIG.genos.ultVoiceSound);
+    if (CONFIG.genos.ultChargeSound) genosSounds.push(CONFIG.genos.ultChargeSound);
+    if (CONFIG.genos.ultBlastSound) genosSounds.push(CONFIG.genos.ultBlastSound);
+    if (CONFIG.genos.ultRecoverySound) genosSounds.push(CONFIG.genos.ultRecoverySound);
+    if (CONFIG.genos.selfDestructSound) genosSounds.push(CONFIG.genos.selfDestructSound);
+  }
+
+  const allPaths = [...new Set([
+    ...legacyPaths,
+    ...mappedConfigPaths,
+    ...basicAttackPaths,
+    ...skillPaths,
+    ...skillEffectPaths,
+    ...announcerPaths,
+    ...yujiSounds,
+    ...yutaSounds,
+    ...genosSounds
+  ])];
   return Promise.all(allPaths.map(preloadSound));
 }
 

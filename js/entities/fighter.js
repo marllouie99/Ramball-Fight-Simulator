@@ -1,4 +1,4 @@
-import { stopAllSounds, stopAllLoopingSounds } from '../systems/soundSystem.js';
+import { stopAllSounds, stopAllLoopingSounds, stopSound, fadeOutSound, stopLoopingSound } from '../systems/soundSystem.js';
 // ─────────────────────────────────────────────
 // BASE FIGHTER CLASS
 // ─────────────────────────────────────────────
@@ -46,9 +46,14 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       target.hitFlashTimer = 8;
 
       // Play flesh hit audio effect unless it's a continuous DPS/dot effect
-      // isPurpleDPS / isDomainDPS suppress rapid spam when multiple illusions are hit simultaneously
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified) {
         audioSystem.playSFX('attack_fleshhit', 0.6);
+      } else if (opts.isPurpleDPS || opts.isDomainDPS) {
+        const now = Date.now();
+        if (!target._lastPurpleHitSoundTime || (now - target._lastPurpleHitSoundTime > 130)) {
+          target._lastPurpleHitSoundTime = now;
+          audioSystem.playSFX('attack_fleshhit', 0.5);
+        }
       }
 
       // Spawn blood/impact particle visual effect in damage direction
@@ -73,15 +78,10 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
         }
       }
 
-      // No floating text for illusion damage
-      if (target.hp <= 0) {
-        spawnIllusionDeath(target);
-        const idx = state.illusions?.findIndex((illusion) => illusion === target);
-        if (idx >= 0) {
-          state.illusions[idx] = state.illusions[state.illusions.length - 1];
-          state.illusions.pop();
-        }
-      }
+      // No floating text for illusion damage.
+      // NOTE: Do NOT remove the illusion here — let illusionSystem.js detect hp <= 0
+      // next frame and handle death (split-on-death, particles, floating text).
+      // Removing here would bypass the split mechanic entirely.
       return true;
     }
 
@@ -275,13 +275,39 @@ export class Fighter {
     this.statusEffects.applyHitStun(frames);
   }
 
-  interruptAttacks() {
+  interruptAttacks(forceCancelAll = false) {
+    const isChanneling = this.isChannelingDivineFlame || this.isChannelingDomainExpansion || 
+                         this.isChannelingDomain || this.isChannelingPurple || 
+                         (this.purpleChargeTimer || 0) > 0 || (this.redEffectTimer || 0) > 0 || 
+                         this.redBuildupPhase || this.isChannelingRCT || 
+                         (this.divineFlameChargeTimer || 0) > 0 || (this.domainChargeTimer || 0) > 0;
+
+    // Apply universal 4.5s penalty cooldown (270 frames) to skill cooldowns if interrupted mid-channeling
+    if (isChanneling || forceCancelAll) {
+      const penaltyCD = 270;
+      for (const key in this) {
+        if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer')) {
+          if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer') continue;
+          if (typeof this[key] === 'number') {
+            this[key] = Math.max(this[key] || 0, penaltyCD);
+          }
+        }
+      }
+    }
+
+    // Stop active skill sound handles
+    if (this.soundHandle) { stopSound(this.soundHandle); this.soundHandle = null; }
+    if (this._purpleChargeSoundHandle) { fadeOutSound(this._purpleChargeSoundHandle, 150); this._purpleChargeSoundHandle = null; }
+    if (this.fugaSoundKey) { stopLoopingSound(this.fugaSoundKey); this.fugaSoundKey = null; }
+    if (this.channelSoundHandle) { stopSound(this.channelSoundHandle); this.channelSoundHandle = null; }
+    if (this.beamSoundHandle) { stopSound(this.beamSoundHandle); this.beamSoundHandle = null; }
+    if (this.chargeSoundHandle) { stopSound(this.chargeSoundHandle); this.chargeSoundHandle = null; }
+
     // Universal interrupts
     this.meleeSwingActive = false;
     this.meleeSwingTimer = 0;
     this.meleeSlashFadeTimer = 0;
     this.attackSwingTimer = 0;
-    // Removed this.isDashing = false; because it overwrites KnightFighter's isDashing() method
     this.dashTimer = 0;
     this.scytheSwingActive = false;
     this.scytheSwingTimer = 0;
@@ -319,9 +345,16 @@ export class Fighter {
     this.rapidSlashTimer = 0;
     this.meleeComboCount = 0;
     this.teleportSlideTimer = 0;
+    this.punchAnimTimer = 0;
+    this.slashSwingTimer = 0;
     this.isChannelingDivineFlame = false;
+    this.divineFlameChargeTimer = 0;
     this.isChannelingDomainExpansion = false;
     this.isChannelingDomain = false;
+    this.isChannelingPurple = false;
+    this.purpleChargeTimer = 0;
+    this.redEffectTimer = 0;
+    this.shootCooldown = 60;
   }
 
 
@@ -379,6 +412,7 @@ export class Fighter {
   }
 
   onDeath() {
+    this.interruptAttacks(true);
     // Default death effect
     spawnDeathShatter(this);
   }
@@ -402,6 +436,19 @@ export class Fighter {
 
   handleBurn() {
     this.statusEffects.handleBurn();
+  }
+
+  _decrementSkillCooldowns() {
+    // Universal helper to ensure skill and ultimate cooldowns continue counting down
+    // even while time-stopped, hit-stunned, or frozen by Limitless Infinity!
+    for (const key in this) {
+      if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer') || key === 'shootCooldown' || key === 'attackCooldown') {
+        if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer') continue;
+        if (typeof this[key] === 'number' && this[key] > 0) {
+          this[key]--;
+        }
+      }
+    }
   }
 
   /** Per-frame housekeeping for cooldowns. */
@@ -520,10 +567,13 @@ export class Fighter {
       let color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
       if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji')) {
         color = '#e9d5ff'; // Highly visible bright lavender for Toji
+      } else if (opts.isPurpleDPS) {
+        color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
       }
       const damageText = `${Math.round(amount)}`;
       this._healthBarShakeTimer = 12;
       this._healthBarHitTimer = 14;
+      
       if (!opts.fromBlackHole) {
         spawnFloatingText(this.x, this.y - this.r - 8, damageText, color);
       } else {
@@ -533,17 +583,25 @@ export class Fighter {
           this._bhTextCooldown = interval;
         }
       }
+
       // Calculate damage direction (from attacker to this fighter)
       let damageAngle = null;
       if (attacker) {
         damageAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
       }
-      // Spawn blood effect in the damage direction (unless it's a turret)
-      if (!this.isTurret) {
+      // Spawn blood effect in the damage direction (unless it's a turret or thermobaric/flame/domain DPS)
+      const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain;
+      if (!this.isTurret && !isExplosionOrFlame) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
         spawnBloodEffect(this, bloodAmount, damageAngle);
       }
       
+      // Global blast / knockback / explosion skill interruption & penalty cooldown
+      const isBlastOrKnockback = opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2);
+      if (isBlastOrKnockback && !this.isTurret) {
+        this.interruptAttacks(true);
+      }
+
       // Apply global basic attack hit-pause if configured
       const isBasicAttack = !opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && 
                             !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
@@ -555,17 +613,20 @@ export class Fighter {
         }
       }
 
-      // Play hit sound and trigger hit flash unless it's a DPS/continuous effect
-      // isPurpleDPS, isElectrified, isDomainDPS suppress rapid audio spam when multiple targets are hit simultaneously
+      // Play hit sound and trigger hit flash
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS) {
         if (!this.isTurret) {
           audioSystem.playSFX('attack_fleshhit', 0.6);
           this.hitFlashTimer = 8;
         }
       } else if (opts.isPurpleDPS || opts.isDomainDPS) {
-        // Still trigger visual hit flash for DPS effects — just no audio spam
         if (!this.isTurret) {
           this.hitFlashTimer = 6;
+          const now = Date.now();
+          if (!this._lastPurpleHitSoundTime || (now - this._lastPurpleHitSoundTime > 130)) {
+            this._lastPurpleHitSoundTime = now;
+            audioSystem.playSFX('attack_fleshhit', 0.5);
+          }
         }
       }
     }
@@ -736,6 +797,30 @@ export class Fighter {
 
   /** Resolves wall collision and bounces back with varied angles. */
   resolveWallBounce(arena) {
+    if (this.caughtInGenosBeamTimer > 0) {
+      // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
+      let clamped = false;
+      if (this.x - this.r < arena.x) {
+        this.x = arena.x + this.r;
+        this.vx = 0;
+        clamped = true;
+      } else if (this.x + this.r > arena.x + arena.width) {
+        this.x = arena.x + arena.width - this.r;
+        this.vx = 0;
+        clamped = true;
+      }
+      if (this.y - this.r < arena.y) {
+        this.y = arena.y + this.r;
+        this.vy = 0;
+        clamped = true;
+      } else if (this.y + this.r > arena.y + arena.height) {
+        this.y = arena.y + arena.height - this.r;
+        this.vy = 0;
+        clamped = true;
+      }
+      return clamped;
+    }
+
     let bounced = false;
     const restitution = CONFIG.collision.restitution;
     const angleJitter = 3.5;  // Increased for more random bounce angles
@@ -826,6 +911,9 @@ export class Fighter {
 
   /** Spawns a projectile using the projectile system. */
   shoot(ownerIndex) {
+    if (typeof state !== 'undefined' && state.gameState !== 'playing') {
+      return;
+    }
     if (projectileSystem) {
       projectileSystem.fireProjectile(this, ownerIndex, this.damage);
     }
@@ -944,8 +1032,22 @@ export class Fighter {
       this.voidMarkTimer--;
     }
 
+    if (this.caughtInGenosBeamTimer > 0) {
+      this.caughtInGenosBeamTimer--;
+    }
+
     // Time stop - freeze movement if time stopped
     if (this._handleTimeStop()) {
+      return;
+    }
+
+    // Stop attacking if round/match has ended or if target/opponent is dead!
+    const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
+    const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
+
+    if (!isGamePlaying || !isTargetAlive) {
+      this.interruptAttacks();
+      this.shootCooldown = 60;
       return;
     }
 

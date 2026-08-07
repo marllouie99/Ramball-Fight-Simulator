@@ -1,5 +1,46 @@
 import { state } from '../../core/state.js';
 
+// Object pool for PixiJS Sprites to eliminate VRAM allocations and GC thrashing
+const pixiSpritePool = [];
+let ringTexture = null;
+
+function getRingTexture() {
+  if (ringTexture) return ringTexture;
+  if (!state.pixiApp) return null;
+  const g = new window.PIXI.Graphics();
+  g.lineStyle(12, 0xFFFFFF, 1.0);
+  g.drawCircle(64, 64, 54);
+  ringTexture = state.pixiApp.renderer.generateTexture(g);
+  return ringTexture;
+}
+
+function getPixiSprite(type) {
+  if (pixiSpritePool.length > 0) {
+    const s = pixiSpritePool.pop();
+    s.visible = true;
+    if (type === 'shockwave') {
+      s.texture = getRingTexture();
+    } else {
+      s.texture = state.baseCircleTexture;
+    }
+    return s;
+  }
+  
+  if (!state.baseCircleTexture || !state.pixiLayers || !state.pixiLayers.particles) return null;
+  
+  const tex = type === 'shockwave' ? getRingTexture() : state.baseCircleTexture;
+  const s = new window.PIXI.Sprite(tex);
+  s.anchor.set(0.5);
+  state.pixiLayers.particles.addChild(s);
+  return s;
+}
+
+function releasePixiSprite(s) {
+  if (!s) return;
+  s.visible = false;
+  pixiSpritePool.push(s);
+}
+
 class Particle {
   constructor(x, y, type, radius) {
     this.x = x;
@@ -18,11 +59,22 @@ class Particle {
     this.color = '';
     this.history = []; // for sparks
     this.rotation = Math.random() * Math.PI * 2;
+    this.sprite = null;
   }
 }
 
 class HighFidelityExplosionSystem {
   constructor() {
+    this.particles = [];
+  }
+
+  clear() {
+    for (const p of this.particles) {
+      if (p.sprite) {
+        releasePixiSprite(p.sprite);
+        p.sprite = null;
+      }
+    }
     this.particles = [];
   }
 
@@ -32,12 +84,22 @@ class HighFidelityExplosionSystem {
     shockwave.life = 0.25;
     shockwave.maxLife = 0.25;
     shockwave.targetRadius = radius * 3.5; 
+    
+    shockwave.sprite = getPixiSprite('shockwave');
+    if (shockwave.sprite) {
+      shockwave.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+    }
     this.particles.push(shockwave);
 
     // 1. Core Flash (Instant)
     const flash = new Particle(x, y, 'flash', radius * 1.5);
     flash.life = 0.15;
     flash.maxLife = 0.15;
+    
+    flash.sprite = getPixiSprite('flash');
+    if (flash.sprite) {
+      flash.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+    }
     this.particles.push(flash);
 
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
@@ -56,6 +118,11 @@ class HighFidelityExplosionSystem {
       fire.life = 0.35 + Math.random() * 0.4;
       fire.maxLife = fire.life;
       fire.rotationSpeed = (Math.random() - 0.5) * 4;
+      
+      fire.sprite = getPixiSprite('fire');
+      if (fire.sprite) {
+        fire.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+      }
       this.particles.push(fire);
     }
 
@@ -71,6 +138,11 @@ class HighFidelityExplosionSystem {
       spark.gravity = 600; 
       spark.life = 0.3 + Math.random() * 0.4;
       spark.maxLife = spark.life;
+      
+      spark.sprite = getPixiSprite('spark');
+      if (spark.sprite) {
+        spark.sprite.blendMode = window.PIXI.BLEND_MODES.ADD;
+      }
       this.particles.push(spark);
     }
 
@@ -87,6 +159,11 @@ class HighFidelityExplosionSystem {
       smoke.life = 1.2 + Math.random() * 1.0;
       smoke.maxLife = smoke.life;
       smoke.rotationSpeed = (Math.random() - 0.5) * 2;
+      
+      smoke.sprite = getPixiSprite('smoke');
+      if (smoke.sprite) {
+        smoke.sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+      }
       this.particles.push(smoke);
     }
   }
@@ -106,8 +183,19 @@ class HighFidelityExplosionSystem {
           smoke.life = 0.8 + Math.random() * 0.6;
           smoke.maxLife = smoke.life;
           smoke.rotationSpeed = (Math.random() - 0.5) * 1.5;
+          
+          smoke.sprite = getPixiSprite('smoke');
+          if (smoke.sprite) {
+            smoke.sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+          }
           this.particles.push(smoke);
         }
+        
+        if (p.sprite) {
+          releasePixiSprite(p.sprite);
+          p.sprite = null;
+        }
+        
         this.particles.splice(i, 1);
         continue;
       }
@@ -139,100 +227,58 @@ class HighFidelityExplosionSystem {
         // Expand shockwave towards target radius
         p.radius += (p.targetRadius - p.radius) * 12 * dt;
       }
+
+      // Sync with PixiJS Sprite in WebGL coordinates (GPU renders it)
+      if (p.sprite) {
+        p.sprite.x = p.x;
+        p.sprite.y = p.y;
+        p.sprite.alpha = p.alpha;
+        
+        if (p.type === 'shockwave') {
+          p.sprite.width = p.radius * 2;
+          p.sprite.height = p.radius * 2;
+          p.sprite.tint = 0xFFD880; // glowing light orange/yellow
+          p.sprite.alpha = p.alpha * 0.85;
+        } else if (p.type === 'flash') {
+          p.sprite.width = p.radius * 2;
+          p.sprite.height = p.radius * 2;
+          p.sprite.tint = 0xFFA500;
+          p.sprite.alpha = p.alpha;
+        } else if (p.type === 'fire') {
+          p.sprite.width = p.radius * 2.2;
+          p.sprite.height = p.radius * 2.2;
+          p.sprite.rotation = p.rotation;
+          
+          // Flame colors: bright yellow -> orange -> dark red
+          if (p.alpha > 0.65) {
+            p.sprite.tint = 0xFFF5CC; // white-hot yellow core
+          } else if (p.alpha > 0.35) {
+            p.sprite.tint = 0xFF9900; // orange
+          } else {
+            p.sprite.tint = 0xBB2200; // red
+          }
+        } else if (p.type === 'spark') {
+          // Stretch spark along velocity vector (motion blur)
+          const speed = Math.hypot(p.vx, p.vy);
+          p.sprite.rotation = Math.atan2(p.vy, p.vx);
+          p.sprite.width = Math.max(4, speed * 0.08); // length
+          p.sprite.height = p.radius * 1.8; // thickness
+          
+          // Spark color shifts as it cools down
+          p.sprite.tint = p.alpha > 0.5 ? 0xFFEE44 : 0xFF3300;
+        } else if (p.type === 'smoke') {
+          p.sprite.width = p.radius * 2.0;
+          p.sprite.height = p.radius * 2.0;
+          p.sprite.rotation = p.rotation;
+          p.sprite.alpha = p.alpha * 0.25; // faint smoke cloud
+          p.sprite.tint = 0x2E2A2B;
+        }
+      }
     }
   }
 
   draw(ctx) {
-    if (this.particles.length === 0) return;
-    ctx.save();
-    
-    // Sort so smoke is drawn first, then shockwave, fire, flash, sparks
-    const drawOrder = { 'smoke': 0, 'shockwave': 1, 'fire': 2, 'flash': 3, 'spark': 4 };
-    const sorted = [...this.particles].sort((a, b) => drawOrder[a.type] - drawOrder[b.type]);
-
-    for (const p of sorted) {
-      if (p.type === 'shockwave') {
-        ctx.globalCompositeOperation = 'screen';
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.lineWidth = 10 * p.alpha;
-        ctx.strokeStyle = `rgba(255, 220, 150, ${p.alpha * 0.8})`;
-        ctx.stroke();
-        
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius * 0.9, 0, Math.PI * 2);
-        ctx.lineWidth = 4 * p.alpha;
-        ctx.strokeStyle = `rgba(255, 255, 255, ${p.alpha})`;
-        ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over';
-      }
-      else if (p.type === 'flash') {
-        ctx.globalCompositeOperation = 'lighter';
-        const grad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.radius);
-        grad.addColorStop(0, `rgba(255, 255, 255, ${p.alpha})`);
-        grad.addColorStop(0.3, `rgba(255, 230, 150, ${p.alpha * 0.9})`);
-        grad.addColorStop(1, `rgba(255, 100, 0, 0)`);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
-      } 
-      else if (p.type === 'fire') {
-        ctx.globalCompositeOperation = 'screen';
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation || 0);
-        
-        // Slightly squashed/irregular fireball
-        ctx.scale(1, 0.85); 
-        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, p.radius);
-        // Richer colors: White/Yellow core, Orange mid, Dark Red edge
-        grad.addColorStop(0, `rgba(255, 240, 180, ${p.alpha})`);
-        grad.addColorStop(0.3, `rgba(255, 150, 0, ${p.alpha * 0.9})`);
-        grad.addColorStop(0.7, `rgba(200, 40, 0, ${p.alpha * 0.6})`);
-        grad.addColorStop(1, `rgba(50, 0, 0, 0)`);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-        ctx.globalCompositeOperation = 'source-over';
-      }
-      else if (p.type === 'spark') {
-        ctx.globalCompositeOperation = 'lighter';
-        // Sparks shift from white/yellow to orange/red as they die
-        const r = 255;
-        const g = Math.floor(180 * p.alpha);
-        const b = Math.floor(50 * p.alpha);
-        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${p.alpha})`;
-        ctx.lineWidth = p.radius;
-        ctx.lineCap = 'round';
-        ctx.beginPath();
-        ctx.moveTo(p.x, p.y);
-        // Streak length based on current velocity (simulates motion blur)
-        const streakScale = 0.04;
-        ctx.lineTo(p.x - p.vx * streakScale, p.y - p.vy * streakScale);
-        ctx.stroke();
-        ctx.globalCompositeOperation = 'source-over';
-      }
-      else if (p.type === 'smoke') {
-        ctx.save();
-        ctx.translate(p.x, p.y);
-        ctx.rotate(p.rotation || 0);
-        const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, p.radius);
-        grad.addColorStop(0, `rgba(80, 75, 75, ${p.alpha * 0.4})`);
-        grad.addColorStop(0.6, `rgba(50, 45, 45, ${p.alpha * 0.2})`);
-        grad.addColorStop(1, `rgba(0, 0, 0, 0)`);
-        ctx.fillStyle = grad;
-        ctx.beginPath();
-        // Give smoke a simple circle shape to improve performance
-        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
-      }
-    }
-    ctx.restore();
+    // Deprecated: PixiJS automatically renders the sprites in the background scene graph.
   }
 }
 

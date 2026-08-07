@@ -6,6 +6,19 @@ import { drawSketchyCircle } from './fighterRenderer.js';
 
 let _sortedFightersBuffer = [];
 
+export function updateEntityVisualScale(entity, speed = 0.12) {
+  if (!entity) return;
+  if (entity.visualScale === undefined) entity.visualScale = 1.0;
+  if (entity.visualScaleTarget === undefined) entity.visualScaleTarget = 1.0;
+
+  if (Math.abs(entity.visualScale - entity.visualScaleTarget) > 0.005) {
+    entity.visualScale += (entity.visualScaleTarget - entity.visualScale) * speed;
+  } else {
+    entity.visualScale = entity.visualScaleTarget;
+  }
+  entity.visualScaleTarget = 1.0;
+}
+
 export function drawFighters() {
   const { ctx, fighters, mode } = state;
   // Removed debug overlay hiding to prevent DOM layout thrashing
@@ -70,7 +83,101 @@ export function drawFighters() {
     ctx.restore();
   };
 
-// Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
+  // Genos Ultimate Screen Dimming (drawn BEFORE fighters so Genos & opponents are never dimmed)
+  const genosUltFighter = fighters ? fighters.find(f => f && (f.characterId === 'genos' || f.type === 'genos') && (f.isChargingUlt || f.isFiringUlt || f.isUltRecovering)) : null;
+  if (genosUltFighter) {
+    let dimAlpha = 0;
+    if (genosUltFighter.isChargingUlt) {
+      const windupTotal = CONFIG.genos?.ultWindupFrames || 60;
+      const elapsed = windupTotal - (genosUltFighter.ultTimer || 0);
+      dimAlpha = 0.65 * Math.min(1.0, elapsed / 30); // Smooth 0.5s fade-in while channeling
+    } else if (genosUltFighter.isFiringUlt) {
+      dimAlpha = 0.65;
+    } else if (genosUltFighter.isUltRecovering) {
+      dimAlpha = 0.65 * Math.min(1.0, (genosUltFighter.ultRecoveryTimer || 0) / 30); // Smooth fade-out on recovery
+    }
+
+    if (dimAlpha > 0.005) {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      // Incineration thermal heat radial gradient centered on Genos (matching his beam's #FF5500 plasma color)
+      const gX = genosUltFighter.x;
+      const gY = genosUltFighter.y;
+      const maxDist = Math.max(ctx.canvas.width, ctx.canvas.height) * 1.2;
+      const heatGrad = ctx.createRadialGradient(gX, gY, 10, gX, gY, maxDist);
+
+      heatGrad.addColorStop(0,    `rgba(160, 35,  0, ${(dimAlpha * 0.45).toFixed(3)})`);
+      heatGrad.addColorStop(0.35, `rgba(75,  15,  0, ${(dimAlpha * 0.70).toFixed(3)})`);
+      heatGrad.addColorStop(0.70, `rgba(25,   5,  0, ${(dimAlpha * 0.88).toFixed(3)})`);
+      heatGrad.addColorStop(1.0,  `rgba(0,    0,  0, ${(dimAlpha * 0.95).toFixed(3)})`);
+
+      ctx.fillStyle = heatGrad;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+      ctx.restore();
+
+      // Ambient Beam Light Spill on surrounding environment (only active when the beam is actively firing!)
+      if (genosUltFighter.isFiringUlt) {
+        const beamAngle = (genosUltFighter.gunAngle !== undefined) ? genosUltFighter.gunAngle : (genosUltFighter.ultAngle || genosUltFighter.angle || 0);
+        const beamW = CONFIG.genos?.ultBeamWidth || 70;
+        const range = CONFIG.genos?.ultBeamRange || 1200;
+        const startOffset = genosUltFighter.r + 5;
+        const startX = genosUltFighter.x + Math.cos(beamAngle) * startOffset;
+        const startY = genosUltFighter.y + Math.sin(beamAngle) * startOffset;
+        const endX = startX + Math.cos(beamAngle) * range;
+        const endY = startY + Math.sin(beamAngle) * range;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        const lightMult = genosUltFighter.isFiringUlt ? 1.0 : (genosUltFighter.isChargingUlt ? 0.45 : 0.15);
+
+        // 1. Wide outer ambient fill — source-over so it actually PAINTS warm light on the dark bg
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.strokeStyle = `rgba(210, 70, 0, ${(0.45 * lightMult).toFixed(3)})`;
+        ctx.lineWidth = beamW * 2.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        // 2. Mid warm gold layer — source-over for visible warm colour
+        ctx.strokeStyle = `rgba(255, 140, 10, ${(0.50 * lightMult).toFixed(3)})`;
+        ctx.lineWidth = beamW * 1.6;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        // 3. Bright inner core — lighter blending adds luminance on top of the painted base
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.strokeStyle = `rgba(255, 220, 100, ${(0.60 * lightMult).toFixed(3)})`;
+        ctx.lineWidth = beamW * 0.7;
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+
+        // 4. Radial muzzle origin bloom — source-over base then lighter pop
+        ctx.globalCompositeOperation = 'source-over';
+        const bloomR = beamW * 2.0;
+        const originGlow = ctx.createRadialGradient(startX, startY, 2, startX, startY, bloomR);
+        originGlow.addColorStop(0,    `rgba(255, 240, 180, ${(0.80 * lightMult).toFixed(3)})`);
+        originGlow.addColorStop(0.35, `rgba(255, 130, 0,   ${(0.55 * lightMult).toFixed(3)})`);
+        originGlow.addColorStop(0.70, `rgba(180, 50,  0,   ${(0.25 * lightMult).toFixed(3)})`);
+        originGlow.addColorStop(1,    'rgba(0, 0, 0, 0)');
+        ctx.fillStyle = originGlow;
+        ctx.beginPath();
+        ctx.arc(startX, startY, bloomR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+      }
+    }
+  }
+
+  // Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
   // Exception: Fighters with an active domain expansion are forced to draw last (on top of everyone).
   if (!_sortedFightersBuffer || _sortedFightersBuffer.length !== fighters.length) {
     _sortedFightersBuffer = new Array(fighters.length);
@@ -111,6 +218,18 @@ export function drawFighters() {
     const fi = item.i;
     if (!fighter || fighter.hp <= 0) return;
 
+    updateEntityVisualScale(fighter);
+
+    const scale = fighter.visualScale !== undefined ? fighter.visualScale : 1.0;
+    const hasScale = scale !== 1.0 && scale > 0;
+
+    if (hasScale) {
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+      ctx.scale(scale, scale);
+      ctx.translate(-fighter.x, -(fighter.y - (fighter.z || 0)));
+    }
+
     // Draw underfoot team indicator ring base
     drawTeamRing(fighter, fi, false);
 
@@ -123,6 +242,10 @@ export function drawFighters() {
 
     // Draw crisp team indicator overlay ring AFTER fighter & CE aura draw, so CE aura never hides team indicator
     drawTeamRing(fighter, fi, true);
+
+    if (hasScale) {
+      ctx.restore();
+    }
   });
 
   // Draw time-stop visual effect (Cronos passive/sphere effect or Gojo Infinity freeze)
@@ -137,7 +260,7 @@ export function drawFighters() {
     // Suppress stasis overlays entirely when target is being ambushed by Toji
     if (entity.isTargetOfAmbush) return;
     
-    let isInfinityFreeze = entity.isFrozenByInfinity;
+    let isInfinityFreeze = entity.isFrozenByInfinity && (entity.timeStopTimer || 0) > 0;
     const isMahoragaFreeze = entity.mahoragaAdaptationFreezeTimer > 0;
     // Suppress golden visual for short hit-pauses (< 15 frames) used in flurries like Sukuna's
     const isGenericTimeStop = entity.timeStopTimer > 0 && (entity._timeStopOriginalDuration || 0) >= 15;
@@ -149,8 +272,8 @@ export function drawFighters() {
       if (gojo) gojoDomainActive = true;
     }
 
-    // Unlimited Void freeze: do not apply blue fill overlay to enemies when hit inside Gojo's domain
-    if (gojoDomainActive) return;
+    // Unlimited Void freeze & Hollow Purple hit: do not apply blue fill/ring overlay to enemies when hit by Purple or inside Gojo's domain
+    if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0)) return;
 
     const isFrozen = isInfinityFreeze || isGenericTimeStop;
     if (!isFrozen) return;
@@ -158,7 +281,8 @@ export function drawFighters() {
     // If Mahoraga paused time for adaptation (and it's not Gojo's infinity), don't draw an overlay
     if (isMahoragaFreeze && !isInfinityFreeze) return;
 
-    const isCyanOverlay = isInfinityFreeze || entity.characterId === 'gojo' || entity.type === 'gojo';
+    const isCronosFreeze = entity.frozenByCronos || entity.isCronosStasis;
+    const isCyanOverlay = !isCronosFreeze; // Cyan blue for Gojo / Limitless / stasis freeze, Gold ONLY for Cronos
     const colorFill = isCyanOverlay ? 'rgba(0, 229, 255, 0.65)' : 'rgba(255, 215, 0, 0.35)'; // Cyan for Gojo / Infinity, Gold for Cronos
     const colorRing = isCyanOverlay ? 'rgba(224, 255, 255, 0.9)' : 'rgba(255, 255, 150, 0.8)';
 
@@ -253,16 +377,22 @@ export function drawIllusions() {
   const { ctx, illusions } = state;
 
   for (const illusion of illusions) {
+    if (!illusion || illusion.hp <= 0) continue;
     // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
     if (illusion.isRika) continue;
 
-
+    updateEntityVisualScale(illusion);
+    const scale = illusion.visualScale !== undefined ? illusion.visualScale : 1.0;
+    const hasScale = scale !== 1.0 && scale > 0;
 
     ctx.save();
     ctx.globalAlpha = 0.85;
 
     // Draw illusion body
     ctx.translate(illusion.x, illusion.y);
+    if (hasScale) {
+      ctx.scale(scale, scale);
+    }
     ctx.rotate(illusion.angle || 0);
 
     // Purple ethereal glow

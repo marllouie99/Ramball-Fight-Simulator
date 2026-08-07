@@ -29,6 +29,8 @@ import { MahoragaFighter } from '../fighters/MahoragaFighter.js';
 import { TodoFighter } from '../fighters/TodoFighter.js';
 import { YujiFighter } from '../fighters/YujiFighter.js';
 import { LaylaFighter } from '../fighters/LaylaFighter.js';
+import { SaitamaFighter } from '../fighters/SaitamaFighter.js';
+import { GenosFighter } from '../fighters/GenosFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -60,6 +62,8 @@ export const FIGHTER_CLASS_MAP = {
   'todo': TodoFighter,
   'yuji': YujiFighter,
   'layla': LaylaFighter,
+  'saitama': SaitamaFighter,
+  'genos': GenosFighter,
 };
 
 // Helper to wrap a class's draw method with the sketchy circle decorator globally
@@ -96,7 +100,7 @@ function wrapFighterDraw(FighterClass) {
     
     ctx.arc = function(x, y, radius, startAngle, endAngle, counterclockwise) {
       originalArc.call(ctx, x, y, radius, startAngle, endAngle, counterclockwise);
-      if (Math.abs(radius - fighter.r) < 15) {
+      if (Math.abs(radius - fighter.r) < 3) {
         arcCalled = true;
         arcX = x;
         arcY = y;
@@ -105,7 +109,7 @@ function wrapFighterDraw(FighterClass) {
     };
     
     ctx.stroke = function() {
-      if (arcCalled) {
+      if (arcCalled && !fighter.suppressSketchyOutline) {
         let seed = 0;
         const idStr = String(fighter.id || 'fighter');
         for (let i = 0; i < idStr.length; i++) {

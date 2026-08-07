@@ -21,8 +21,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   fighter.infinityBlockY = hitY !== undefined ? hitY : fighter.y;
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'INFINITY', '#E0FFFF');
-  spawnImpactFlash(fighter.infinityBlockX, fighter.infinityBlockY, 40, 'lightningTrail');
-  spawnSparks(fighter.infinityBlockX, fighter.infinityBlockY, 15, 'lightningTrail', '#E0FFFF');
   triggerGlobalScreenShake(3, 6);
 
   if (attacker && attacker !== fighter) {
