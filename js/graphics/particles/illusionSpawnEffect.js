@@ -128,9 +128,9 @@ export function drawIllusionSpawnEffects() {
 
       case 'smoke':
         // Use a radial gradient for a soft, smoky feel
-        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
-        gradient.addColorStop(0, `${p.color}bf`); // Hex with alpha (75%)
-        gradient.addColorStop(1, `${p.color}00`); // Hex with alpha (0%)
+        const baseColor = (p.color && p.color.startsWith('#')) ? p.color.substring(0, 7) : (p.color || '#9b59b6');
+        gradient.addColorStop(0, `${baseColor}bf`); // Hex with alpha (75%)
+        gradient.addColorStop(1, `${baseColor}00`); // Hex with alpha (0%)
         ctx.fillStyle = gradient;
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);

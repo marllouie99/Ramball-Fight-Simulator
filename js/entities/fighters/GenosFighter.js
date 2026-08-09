@@ -65,11 +65,13 @@ export class GenosFighter extends Fighter {
     this.isSelfDestructing = false;
     this.selfDestructTimer = 0;
     this.hasExploded = false;
+    this.usedSelfDestruct = false;
 
     // Basic Attack Ammo & Stance System
     this.maxHeatAmmo = CONFIG.genos?.maxHeatAmmo || 6;
     this.heatAmmo = this.maxHeatAmmo;
     this.isMeleeStance = false;
+    this.meleeDashCount = 0; // Track thruster dashes performed during Melee Mode
     this.ammoReloadMax = CONFIG.genos?.ammoReloadFrames || 300; // 5s reload CD
     this.ammoReloadTimer = 0;
     this.meleeDashDelayTimer = 0; // Delay frames between Melee Mode thruster dashes
@@ -337,18 +339,31 @@ export class GenosFighter extends Fighter {
   takeDamage(amount, attacker, opts = {}) {
     if (this.isSelfDestructing) return false; // Immune to further damage during self-destruct countdown
 
-    const result = super.takeDamage(amount, attacker, opts);
+    // If Genos hasn't self-destructed yet, check if this incoming damage would drop him to 10% HP or below
+    const sdThreshold = this.maxHp * 0.10;
+    const nextHp = this.hp - amount;
 
-    // Passive: Core Overdrive (Self-Destruct Stasis on Fatal Damage)
-    if (this.hp <= 0 && !this.isSelfDestructing && !this.hasExploded) {
-      this.hp = 1; // Keep alive in stasis
+    // Trigger self-destruct ONLY if Genos survives the hit (nextHp > 0) but drops to 10% or below
+    if (nextHp > 0 && nextHp <= sdThreshold && !this.usedSelfDestruct) {
+      this.hp = nextHp;
       this.isSelfDestructing = true;
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
-      spawnFloatingText(this.x, this.y - this.r - 28, "CORE OVERLOAD", "#FF0000");
+      
+      this.interruptAttacks(true);
+      this.hitFlashTimer = 8;
+      audioSystem.playSFX('attack_fleshhit', 0.6);
+
+      if (typeof spawnFloatingText === 'function') {
+        // Spawn damage text for the amount taken
+        spawnFloatingText(this.x, this.y - this.r - 8, `${Math.round(amount)}`, attacker?.color || '#ff4444');
+        // Spawn overload warning
+        spawnFloatingText(this.x, this.y - this.r - 28, "CORE OVERLOAD", "#FF0000");
+      }
       return true;
     }
 
-    return result;
+    // Otherwise, apply damage normally via base class (if hit is fatal, he dies instantly)
+    return super.takeDamage(amount, attacker, opts);
   }
 
   triggerPunchAnimation() {
@@ -372,6 +387,7 @@ export class GenosFighter extends Fighter {
       // where heatAmmo reached 0 but isMeleeStance wasn't set yet.
       if (!this.isMeleeStance) {
         this.isMeleeStance = true;
+        this.meleeDashCount = 0;
         this.ammoReloadTimer = this.ammoReloadMax;
         if (typeof spawnFloatingText === 'function') {
           spawnFloatingText(this.x, this.y - this.r - 28, "MELEE MODE", "#FF4400");
@@ -430,6 +446,7 @@ export class GenosFighter extends Fighter {
 
       // Only commit animation, sound, and cooldown if we actually connected
       if (hitAny) {
+        this._basicHitConnectedTimer = 10; // Enable hand fire aura & punch impact visuals for 10 frames
         this.triggerPunchAnimation();
         this.shootCooldown = CONFIG.genos?.meleePunchCooldown || 18;
         if (typeof triggerGlobalScreenShake === 'function') {
@@ -514,6 +531,7 @@ export class GenosFighter extends Fighter {
     if (this.heatAmmo <= 0) {
       if (!this.isMeleeStance) {
         this.isMeleeStance = true;
+        this.meleeDashCount = 0;
         this.ammoReloadTimer = this.ammoReloadMax;
         this.isMeleeDashNext = true; // First wall action in Melee Mode is a DASH!
         this._justEnteredMeleeStance = true;
@@ -561,6 +579,17 @@ export class GenosFighter extends Fighter {
         timer: 10 + s * 2,
         maxTimer: 10 + s * 2
       });
+    }
+
+    // Immediately stop target enemy movement on Skill 1 activation
+    if (opponent && opponent.hp > 0) {
+      opponent.vx = 0;
+      opponent.vy = 0;
+      if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
+      if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
+      if (typeof opponent.applyTimeStop === 'function') {
+        opponent.applyTimeStop(25);
+      }
     }
 
     spawnFloatingText(this.x, this.y - this.r - 20, "MACHINE GUN BLOWS!", "#FF5500");
@@ -627,6 +656,9 @@ export class GenosFighter extends Fighter {
       this.isFiringUlt = false;
       this.ultTimer = 0;
     }
+    this.isFlurrying = false;
+    this.flurryHitsLeft = 0;
+    this.flurryTarget = null;
     super.interruptAttacks(forceCancelAll);
   }
 
@@ -659,8 +691,9 @@ export class GenosFighter extends Fighter {
   }
 
   performSelfDestructExplosion() {
-    this.hasExploded = true;
-    this.hp = 0;
+    this.isSelfDestructing = false;
+    this.usedSelfDestruct = true;
+    this.hp = Math.round(this.maxHp * 0.01); // Survives with exactly 1% HP!
 
     triggerGlobalScreenShake(2.0, 30);
     const sdSoundSrc = CONFIG.genos?.selfDestructSound || 'Assets/Sound Effects/Skills/fugaexplode.mp3';
@@ -703,7 +736,9 @@ export class GenosFighter extends Fighter {
       }
     }
 
-    this.onDeath();
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 28, "REBOOTING...", "#FF8800");
+    }
   }
 
   update(opponent, ownerIndex, arena) {
@@ -798,6 +833,14 @@ export class GenosFighter extends Fighter {
 
     if (this.dashSoundCooldownTimer > 0) {
       this.dashSoundCooldownTimer--;
+    }
+
+    if (this._flurryHitConnectedTimer > 0) {
+      this._flurryHitConnectedTimer--;
+    }
+
+    if (this._basicHitConnectedTimer > 0) {
+      this._basicHitConnectedTimer--;
     }
 
     // Decay ghost body after-images EVERY frame
@@ -993,8 +1036,25 @@ export class GenosFighter extends Fighter {
       if (this.ultRecoveryTimer <= 0) {
         this.isUltRecovering = false;
         this.isDashing = false;
+        this.isMeleeStance = false;
+        this.isMeleeDashNext = false;
+        this.meleeDashCount = 0;
         this.speedBoostTimer = 0;
         this._justEnteredMeleeStance = false;
+        
+        const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+        this.speed = (this.baseSpeed || 5.2) * modeMult;
+
+        if (opponent && opponent.hp > 0) {
+          const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y) || 1;
+          this.vx = ((opponent.x - this.x) / dist) * this.speed;
+          this.vy = ((opponent.y - this.y) / dist) * this.speed;
+        } else {
+          const moveAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+          this.vx = Math.cos(moveAngle) * this.speed;
+          this.vy = Math.sin(moveAngle) * this.speed;
+        }
+
         this._lastWallBounceFrame = (typeof state !== 'undefined' && state.frameCount) ? state.frameCount : Date.now();
         this.dashCooldown = Math.max(this.dashCooldown || 0, CONFIG.genos?.postUltDashCooldown || 60);
         this.flurryCooldown = Math.max(this.flurryCooldown || 0, CONFIG.genos?.postUltFlurryCooldown || 60);
@@ -1011,31 +1071,51 @@ export class GenosFighter extends Fighter {
 
     // 3. Skill 1: Machine Gun Blows Flurry Update
     if (this.isFlurrying) {
+      const currentTarget = (this.flurryTarget && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
+      if (currentTarget && currentTarget.hp > 0) {
+        this.aim(currentTarget);
+      }
+
       this.flurryTimer++;
+
+      const reach = CONFIG.genos?.flurryReach || 70;
+      const damage = CONFIG.genos?.flurryDamage || 10;
+      const halfArc = (CONFIG.genos?.flurryArcAngle || Math.PI * 0.5) / 2;
+      const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+
+      const targetsToScan = [];
+      if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0) targetsToScan.push(f); });
+      if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0) targetsToScan.push(ill); });
+
+      // Continuously stop enemy target movement every frame during Machine Gun Blows
+      for (const target of targetsToScan) {
+        const dist = Math.hypot(target.x - this.x, target.y - this.y);
+        if (dist <= this.r + reach + target.r) {
+          const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
+          let angleDiff = angleToTarget - aimAngle;
+          while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+          while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+
+          if (Math.abs(angleDiff) <= halfArc) {
+            if (this.flurryHitsLeft > 0) {
+              target.vx = 0;
+              target.vy = 0;
+              if (target.knockbackVx !== undefined) target.knockbackVx = 0;
+              if (target.knockbackVy !== undefined) target.knockbackVy = 0;
+              if (typeof target.applyTimeStop === 'function') {
+                target.applyTimeStop(10);
+              }
+            }
+          }
+        }
+      }
+
       if (this.flurryTimer % 5 === 0) {
         this.triggerPunchAnimation();
         this.flurryHitsLeft--;
 
-        const reach = CONFIG.genos?.flurryReach || 70;
-        const damage = CONFIG.genos?.flurryDamage || 10;
-        const halfArc = (CONFIG.genos?.flurryArcAngle || Math.PI * 0.5) / 2;
-        const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-        // Spawn supersonic punch wind speed line streaks extending from Genos's arms/fists
-        if (typeof spawnPunchWindSpeedLines === 'function') {
-          spawnPunchWindSpeedLines(this.x, this.y, aimAngle, 180, 'orange');
-        }
-
         const isFinalHit = this.flurryHitsLeft === 0;
-
-        // Arena Shake Effect on punch hit
-        if (typeof triggerGlobalScreenShake === 'function') {
-          triggerGlobalScreenShake(isFinalHit ? 3.2 : 1.5, isFinalHit ? 16 : 8);
-        }
-
-        const targetsToScan = [];
-        if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0) targetsToScan.push(f); });
-        if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0) targetsToScan.push(ill); });
+        let flurryHitAny = false;
 
         for (const target of targetsToScan) {
           const dist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -1046,23 +1126,33 @@ export class GenosFighter extends Fighter {
             while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
             if (Math.abs(angleDiff) <= halfArc) {
+              flurryHitAny = true;
               const hitDmg = isFinalHit ? damage * 2.2 : damage;
-              applyDamageToTarget(target, hitDmg, this, { isSkill: true });
+              applyDamageToTarget(target, hitDmg, this, { isSkill: true, isRanged: true, isMachineGunBlow: true });
 
-              // Hit-pause applied EXCLUSIVELY to target (Rule #5)
-              if (typeof target.applyTimeStop === 'function') {
-                target.applyTimeStop(isFinalHit ? 20 : 12);
-              }
-
-              // Heavy physical knockback push physics
-              const pushForce = isFinalHit ? 18.0 : 8.0;
-              const pushVx = Math.cos(angleToTarget) * pushForce;
-              const pushVy = Math.sin(angleToTarget) * pushForce;
-              if (typeof target.applyKnockback === 'function') {
-                target.applyKnockback(pushVx, pushVy);
+              if (isFinalHit) {
+                // Final hit: apply heavy finisher knockback push & extended hit-pause
+                if (typeof target.applyTimeStop === 'function') {
+                  target.applyTimeStop(20);
+                }
+                const pushForce = 18.0;
+                const pushVx = Math.cos(angleToTarget) * pushForce;
+                const pushVy = Math.sin(angleToTarget) * pushForce;
+                if (typeof target.applyKnockback === 'function') {
+                  target.applyKnockback(pushVx, pushVy);
+                } else {
+                  target.vx += pushVx;
+                  target.vy += pushVy;
+                }
               } else {
-                target.vx += pushVx;
-                target.vy += pushVy;
+                // Non-final hits: Stop movement & freeze enemy in place so they stay pinned during Machine Gun Blows!
+                target.vx = 0;
+                target.vy = 0;
+                if (target.knockbackVx !== undefined) target.knockbackVx = 0;
+                if (target.knockbackVy !== undefined) target.knockbackVy = 0;
+                if (typeof target.applyTimeStop === 'function') {
+                  target.applyTimeStop(12);
+                }
               }
 
               // Supersonic wind blast speed lines on impact
@@ -1086,11 +1176,23 @@ export class GenosFighter extends Fighter {
           }
         }
 
+        // Spawn screen shake, arm wind lines & hand aura ONLY when punches actually connect with a target
+        if (flurryHitAny) {
+          this._flurryHitConnectedTimer = 10;
+          if (typeof triggerGlobalScreenShake === 'function') {
+            triggerGlobalScreenShake(isFinalHit ? 3.2 : 1.5, isFinalHit ? 16 : 8);
+          }
+          if (typeof spawnPunchWindSpeedLines === 'function') {
+            spawnPunchWindSpeedLines(this.x, this.y, aimAngle, 180, 'orange');
+          }
+        }
+
         audioSystem.playSFX('Assets/Sound Effects/Attacks/punch.mp3', 1.0);
       }
 
       if (this.flurryHitsLeft <= 0) {
         this.isFlurrying = false;
+        this.flurryTarget = null;
       }
       return;
     }
@@ -1117,8 +1219,10 @@ export class GenosFighter extends Fighter {
         if (this._justEnteredMeleeStance || (wallBounced && canTriggerWallBounce)) {
           this._lastWallBounceFrame = currentFrame;
 
-          if (this._justEnteredMeleeStance || this.isMeleeDashNext) {
+          const maxDashes = CONFIG.genos?.maxMeleeDashes || 5;
+          if ((this._justEnteredMeleeStance || this.isMeleeDashNext) && (this.meleeDashCount || 0) < maxDashes) {
             // ── DASH PHASE: Launch explosive high-speed thruster dash burst towards enemy ──
+            this.meleeDashCount = (this.meleeDashCount || 0) + 1;
             this._justEnteredMeleeStance = false;
             this.isMeleeDashNext = false; // Next wall impact will be a REBOUNCE!
             this.isDashing = true;
@@ -1152,8 +1256,13 @@ export class GenosFighter extends Fighter {
               spawnSparks(backX, backY, 8, 'orange');
             }
           } else {
-            // ── REBOUNCE PHASE: Disappear speed lines the moment he impacts the wall & rebounces ──
-            this.isMeleeDashNext = true; // Next wall impact will be a DASH!
+            // ── REBOUNCE / MAX DASH LIMIT REACHED PHASE ──
+            if ((this.meleeDashCount || 0) < maxDashes) {
+              this.isMeleeDashNext = true; // Next wall impact will be a DASH!
+            } else {
+              this.isMeleeDashNext = false; // Cap of 5 dashes reached! No more thruster dashes in this Melee Mode instance.
+              this._justEnteredMeleeStance = false;
+            }
             this.speedBoostTimer = 0;
             this.isDashing = false;
             const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
@@ -1191,6 +1300,7 @@ export class GenosFighter extends Fighter {
         this.ammoReloadTimer--;
         if (this.ammoReloadTimer <= 0) {
           this.isMeleeStance = false;
+          this.meleeDashCount = 0;
           this.heatAmmo = this.maxHeatAmmo;
           if (typeof spawnFloatingText === 'function') {
             spawnFloatingText(this.x, this.y - this.r - 28, "RANGED READY", "#00FFDD");

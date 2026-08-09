@@ -8,16 +8,17 @@ export const genosConfig = {
   // Basic Attack: Incineration Palms (Ranged Fire Blasts)
   blastDamage: 14,
   blastRange: 350,
-  blastSpeed: 14,
+  blastSpeed: 20,
   blastAoeRadius: 35,
   blastCooldown: 27, // ~0.45s at 60fps
 
   // Basic Attack Ammo & Stance System (Ranged Incineration Fireballs -> Melee Punches)
   maxHeatAmmo: 20,          // Maximum ranged fireball capacity before switching to melee mode
-  ammoReloadFrames: 1000,    // Reload cooldown duration (300 frames = 5.0 seconds at 60fps)
+  ammoReloadFrames: 500,    // Reload cooldown duration (300 frames = 5.0 seconds at 60fps)
+  maxMeleeDashes: 10,        // Maximum thruster dashes allowed during Melee Mode
   meleePunchDamage: 16,    // Base damage per melee punch in Melee Mode
   meleePunchReach: 65,     // Melee punch reach distance (px)
-  meleePunchCooldown: 10,  // Cooldown between melee punches (~0.3s)
+  meleePunchCooldown: 15,  // Cooldown between melee punches (~0.3s)
 
   // Skill 1: Machine Gun Blows (Flurry)
   flurryDamage: 10,
@@ -58,8 +59,8 @@ export const genosConfig = {
   stompRadius: 75,
 
   // Ultimate: Spiral Incineration Cannon
-  initialUltCooldown: 1500, // Initial cooldown at match start (28s at 60fps)
-  ultCooldown: 1680, // 28 seconds at 60fps
+  initialUltCooldown: 800, // Initial cooldown at match start (28s at 60fps)
+  ultCooldown: 800, // 28 seconds at 60fps
   ultWindupFrames: 60, // 1.0s windup
   ultDurationFrames: 120, // 2.0s beam duration
   ultDamagePerTick: 15,

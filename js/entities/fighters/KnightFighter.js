@@ -231,7 +231,6 @@ export class KnightFighter extends Fighter {
         if (this.shieldHealth <= 0 && !this.shieldBroken) {
           this.shieldBroken = true;
           this.canThrowSword = true; // allow sword throw
-          spawnFloatingText(this.x, this.y - this.r - 25, 'SHIELD BREAK!', '#ff6633');
           // Attempt immediate throw so skill triggers even if stationary
           try {
             const ownerIndex = state.fighters.indexOf(this);
@@ -242,7 +241,6 @@ export class KnightFighter extends Fighter {
               this.swordBroken = true;
               this.swordHealth = 0;
               this.swordReturnTimer = CONFIG.knight.swordReturnFrames;
-              spawnFloatingText(this.x + Math.cos(this.gunAngle) * (this.r + 10), this.y + Math.sin(this.gunAngle) * (this.r + 10), 'THROW!', '#ffcc66');
             }
           } catch (e) {
             // ignore
@@ -276,7 +274,6 @@ export class KnightFighter extends Fighter {
     opponent.vx += Math.cos(kbAngle) * 6;
     opponent.vy += Math.sin(kbAngle) * 6;
 
-    spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SLASH!', '#e0e0e0');
     // Play sword swing sound
     const swipeSound = getBasicAttackSound(this._def.id, this._def.type);
     this._attackSoundTimer = swipeSound.delay;
@@ -305,7 +302,6 @@ export class KnightFighter extends Fighter {
     // Transition to charging state via FSM
     this.fsm.setState('KnightCharging');
     this.hasHitWithDash = false;
-    spawnFloatingText(this.x, this.y - this.r - 14, 'SWORD BREAK!', '#ff9933');
   }
 
   // â”€â”€ Shield dash launch â”€â”€
@@ -350,7 +346,6 @@ export class KnightFighter extends Fighter {
         const ny = dy / d;
         other.vx += nx * kb;
         other.vy += ny * kb;
-        spawnFloatingText(other.x, other.y - other.r - 6, 'KNOCKBACK!', '#ffd4b2');
       }
     }
   }
@@ -530,7 +525,6 @@ export class KnightFighter extends Fighter {
         if ((dx * dx + dy * dy) <= hitRadius * hitRadius) {
           opponent.takeDamage(CONFIG.knight.dashDamage, this, { isMelee: true });
           triggerGlobalScreenShake(12, 10);
-          spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'SHIELD BASH!', '#88bbff');
           // Knockback
           const dx = opponent.x - this.x;
           const dy = opponent.y - this.y;
@@ -584,7 +578,6 @@ export class KnightFighter extends Fighter {
         if (projectileSystem) {
           projectileSystem.fireProjectile(this, ownerIndex, CONFIG.knight.shieldThrowDamage, false, CONFIG.projectile.speed * 1.2, false, 'sword');
         }
-        spawnFloatingText(this.x + Math.cos(this.gunAngle) * (this.r + 10), this.y + Math.sin(this.gunAngle) * (this.r + 10), 'THROW!', '#ffcc66');
         this.swordThrown = true;
         this.canThrowSword = false;
         // Mark sword as broken/removed after throw

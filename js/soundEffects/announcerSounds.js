@@ -49,7 +49,7 @@ export const ANNOUNCER_SOUNDS = {
     },
     faah: {
         src: 'Assets/Sound Effects/Announcer/faah.mp3',
-        volume: 1.0,
+        volume: 0.5,
         speed: 1.0,
         offset: 0.0,
         duration: 1.0,

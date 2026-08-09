@@ -29,7 +29,7 @@ import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.j
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
-import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen } from './renderers/arenaRenderer.js';
+import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawSaitamaSeriousPunchDimScreen } from './renderers/arenaRenderer.js';
 import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } from './renderers/environmentalRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
@@ -57,7 +57,7 @@ export function getNow() {
 
 export { drawDivineFlameArrowConstruct };
 export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen };
-export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen };
+export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawSaitamaSeriousPunchDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 
 export function drawCronosSphereVisual({

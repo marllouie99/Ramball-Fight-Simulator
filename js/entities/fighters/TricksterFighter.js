@@ -68,14 +68,14 @@ export class TricksterFighter extends Fighter {
     for (let i = 0; i < 6; i++) {
       this.orbitingDebris.push({
         baseAngle: (i / 6) * Math.PI * 2,
-        dist: 35 + prng(i * 1.1) * 7,
-        speed: 0.02 + prng(i * 2.2) * 0.03,
+        dist: 50 + prng(i * 1.1) * 14, // 50px to 64px orbit radius (clears 25px body radius)
+        speed: 0.015 + prng(i * 2.2) * 0.02,
         size: 5 + prng(i * 3.3) * 4,
         baseRotation: prng(i * 4.4) * Math.PI * 2,
-        rotationSpeed: (prng(i * 5.5) - 0.5) * 0.05,
-        color: `rgba(${100 + prng(i * 6.6)*40}, ${110 + prng(i * 7.7)*30}, ${100 + prng(i * 8.8)*30}, 1)`,
+        rotationSpeed: (prng(i * 5.5) - 0.5) * 0.04,
+        color: `rgba(${40 + prng(i * 6.6) * 30}, ${220 + prng(i * 7.7) * 35}, ${120 + prng(i * 8.8) * 40}, 1)`,
         baseZPhase: prng(i * 9.9) * Math.PI * 2,
-        zSpeed: 0.03 + prng(i * 10.1) * 0.04
+        zSpeed: 0.02 + prng(i * 10.1) * 0.03
       });
     }
   }
@@ -1714,34 +1714,45 @@ export class TricksterFighter extends Fighter {
   }
 
   _drawDebrisLayer(ctx, drawBehind) {
+    if (!this.orbitingDebris || this.orbitingDebris.length === 0) return;
+
     ctx.save();
     ctx.translate(this.x, this.y);
     
     const time = performance.now() / 1000; // time in seconds
 
-    for (const debris of this.orbitingDebris) {
-      // 60 frames per second multiplier to match old speed
+    for (let i = 0; i < this.orbitingDebris.length; i++) {
+      const debris = this.orbitingDebris[i];
       const angle = debris.baseAngle + time * (debris.speed * 60);
       const rotation = debris.baseRotation + time * (debris.rotationSpeed * 60);
       const zPhase = debris.baseZPhase + time * (debris.zSpeed * 60);
 
+      // Math.sin(angle) < 0 is top half of 3D orbit (behind body)
       const isBehind = Math.sin(angle) < 0;
       if (isBehind !== drawBehind) continue;
       
-      const px = Math.cos(angle) * debris.dist;
-      const py = Math.sin(angle) * debris.dist * 0.5; // Oval orbit for isometric perspective
+      const dist = debris.dist;
+      const px = Math.cos(angle) * dist;
+      // Orbit Y center is centered at floating torso height (-this.z), with 3D perspective tilt
+      const py = -this.z + Math.sin(angle) * (dist * 0.38) + Math.sin(zPhase) * 5;
       
-      // Calculate floating height independently for each rock
-      const pz = this.z + Math.sin(zPhase) * 12;
+      // 3D Depth Scaling: Rocks behind are smaller (0.70), rocks in front are larger (1.06)
+      const depthScale = 0.88 + Math.sin(angle) * 0.18;
       
       ctx.save();
-      // Apply position and Z-height subtraction
-      ctx.translate(px, py - pz);
+      ctx.translate(px, py);
       ctx.rotate(rotation);
+      ctx.scale(depthScale, depthScale);
       
       const s = debris.size;
       
-      // Base dark rock polygon
+      // 1. Arcane Glow Aura (Green)
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 1.3, 0, Math.PI * 2);
+      ctx.fillStyle = isBehind ? 'rgba(0, 255, 120, 0.12)' : 'rgba(0, 255, 120, 0.25)';
+      ctx.fill();
+
+      // 2. Base Dark Basalt Rock Polygon
       ctx.beginPath();
       ctx.moveTo(-s, -s * 0.5);
       ctx.lineTo(-s * 0.3, -s * 0.9);
@@ -1750,28 +1761,27 @@ export class TricksterFighter extends Fighter {
       ctx.lineTo(s * 0.4, s * 0.8);
       ctx.lineTo(-s * 0.7, s * 0.7);
       ctx.closePath();
-      ctx.fillStyle = `rgba(15, 20, 15, 1)`;
+      ctx.fillStyle = '#111813';
       ctx.fill();
       
-      // Light texture polygon
+      // 3. Glowing Arcane Facet Texture
       ctx.beginPath();
-      ctx.moveTo(-s * 0.9, -s * 0.4);
-      ctx.lineTo(-s * 0.3, -s * 0.8);
-      ctx.lineTo(s * 0.6, -s * 0.5);
-      ctx.lineTo(s * 0.1, s * 0.1);
-      ctx.lineTo(-s * 0.5, 0);
+      ctx.moveTo(-s * 0.7, -s * 0.3);
+      ctx.lineTo(-s * 0.2, -s * 0.7);
+      ctx.lineTo(s * 0.5, -s * 0.4);
+      ctx.lineTo(s * 0.1, s * 0.2);
+      ctx.lineTo(-s * 0.4, 0);
       ctx.closePath();
       ctx.fillStyle = debris.color;
       ctx.fill();
       
-      // Magical edge outline
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = `rgba(0, 255, 100, 0.4)`;
+      // 4. Sharp Neon Green Edge Highlight
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = isBehind ? 'rgba(0, 255, 130, 0.5)' : 'rgba(0, 255, 150, 0.9)';
       ctx.stroke();
-      
+
       ctx.restore();
     }
-    
     ctx.restore();
   }
   drawRageBar(ctx) {

@@ -760,7 +760,8 @@ function drawPlayerCard(slotProp, title, x, y, w, h, borderColor, enabled, isLar
     ctx.save();
     ctx.globalCompositeOperation = 'screen';
     const pedGrad = ctx.createRadialGradient(avatarX, avatarY, 0, avatarX, avatarY, avatarSize / 2);
-    pedGrad.addColorStop(0, `${def.color}44`);
+    const baseColor = (def.color && def.color.startsWith('#')) ? def.color.substring(0, 7) : (def.color || '#ffffff');
+    pedGrad.addColorStop(0, `${baseColor}44`);
     pedGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = pedGrad;
     ctx.beginPath();

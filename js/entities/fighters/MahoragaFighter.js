@@ -1,6 +1,6 @@
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -288,7 +288,7 @@ export class MahoragaFighter extends Fighter {
 
         if (isParry) {
           spawnFloatingText(this.x, wheelY - 20, 'PARRIED!', '#FFD700');
-          spawnImpactFlash(this.x, this.y, 35, '#FFD700');
+          spawnParrySparksEffect(this.x, this.y);
 
           // Spawn Yuta-style golden sparks distributed along the length of his sword
           const swingAngle = Math.PI * 0.25; // Approximate starting angle of parry swing
@@ -318,8 +318,7 @@ export class MahoragaFighter extends Fighter {
         } else {
           // Guard / Block Pose (Crossed arms covering face)
           spawnFloatingText(this.x, wheelY - 20, 'BLOCKED!', '#EBEBE6');
-          spawnImpactFlash(this.x, this.y, 45, 'silver');
-          spawnSparks(this.x, this.y, 10, 'silver', '#EBEBE6');
+          spawnParrySparksEffect(this.x, this.y);
 
           // Spin the wheel slightly as a visual indicator
           this.wheelGlowTimer = 25;
@@ -332,6 +331,28 @@ export class MahoragaFighter extends Fighter {
           } else {
             audioSystem.playSFX('skill_dash5', 0.7);
           }
+        }
+
+        // Apply physical pushback / deflection bounce to attacker & Mahoraga
+        if (attacker && attacker !== this && !attacker.isDead) {
+          let dx = attacker.x - this.x;
+          let dy = (attacker.y - (attacker.z || 0)) - (this.y - (this.z || 0));
+          let dist = Math.hypot(dx, dy);
+          if (dist < 0.1) {
+            dx = Math.cos(this.gunAngle || 0);
+            dy = Math.sin(this.gunAngle || 0);
+            dist = 1.0;
+          }
+          const nx = dx / dist;
+          const ny = dy / dist;
+
+          const pushForce = isParry ? 5.5 : 4.0;
+          attacker.vx = nx * pushForce;
+          attacker.vy = ny * pushForce;
+
+          const recoilForce = isParry ? 2.0 : 1.5;
+          this.vx = -nx * recoilForce;
+          this.vy = -ny * recoilForce;
         }
 
         // Deal 0 damage to Mahoraga
@@ -538,11 +559,13 @@ export class MahoragaFighter extends Fighter {
     // ── HIGH-SPEED DIVINE FLASH-DASH TICK ──
     if (this.adaptationDashTimer > 0) {
       this.adaptationDashTimer--;
-      const maxDash = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
-      const progress = 1.0 - (this.adaptationDashTimer / maxDash);
+      const maxDash = this.adaptationDashMaxTimer || CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+      const progress = Math.min(1.0, Math.max(0.0, 1.0 - (this.adaptationDashTimer / maxDash)));
 
       this.x = this.dashFromX + (this.dashToX - this.dashFromX) * progress;
       this.y = this.dashFromY + (this.dashToY - this.dashFromY) * progress;
+      this.vx = 0;
+      this.vy = 0;
 
       if (this.adaptationDashTarget && !this.adaptationDashTarget.isDead) {
         this.aim(this.adaptationDashTarget);
@@ -802,19 +825,10 @@ export class MahoragaFighter extends Fighter {
       const interval = CONFIG.mahoraga?.infinityBlitzInterval || 12;
 
       if (opponent && opponent.hp > 0 && !opponent.isDead) {
-        // Track / chase opponent between speed-blitz strikes!
-        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-        const reach = this.r + opponent.r + 15;
-        if (dist > reach) {
-          const dx = opponent.x - this.x;
-          const dy = opponent.y - this.y;
-          const walkSpeed = (CONFIG.mahoraga?.speed || 4.2) * 1.5; // High-speed blitz chase
-          this.vx = (dx / dist) * walkSpeed;
-          this.vy = (dy / dist) * walkSpeed;
-        } else {
-          this.vx = 0;
-          this.vy = 0;
-        }
+        // Level 8 Max Adaptation: Mahoraga does NOT walk or chase on foot.
+        // He remains stationary until flash-teleporting directly into flanking range to strike.
+        this.vx = 0;
+        this.vy = 0;
 
         if (this.infinityBlitzTimer >= interval) {
           this.infinityBlitzTimer = 0;
@@ -847,21 +861,13 @@ export class MahoragaFighter extends Fighter {
               teleY = Math.max(activeArena.y + this.r + 5, Math.min(activeArena.y + activeArena.height - this.r - 5, teleY));
             }
 
-            // Set up smooth flash-dash travel scaling with the speed-blitz multiplier
-            this.dashFromX = oldX;
-            this.dashFromY = oldY;
-            this.dashToX = teleX;
-            this.dashToY = teleY;
-            
-            const baseFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
-            const blitzMult = CONFIG.mahoraga?.infinityBlitzTeleportSpeedMultiplier ?? 0.20;
-            const dashFrames = Math.max(1, Math.round(baseFrames * blitzMult));
-            
-            this.adaptationDashTimer = dashFrames;
-            this.adaptationDashTarget = opponent;
-            this.adaptationDashIsCounter = false;
- 
+            // Instant Level 8 Speed-Blitz Teleport (No floor sliding!)
             this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
+            this.x = teleX;
+            this.y = teleY;
+            this.vx = 0;
+            this.vy = 0;
+            this.aim(opponent);
             audioSystem.playSFX('skill_dash5', 1.0);
           }
 
@@ -929,6 +935,10 @@ export class MahoragaFighter extends Fighter {
         this.vy = 0;
       }
       this.applyMovementPhysics(0);
+
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
+      }
 
       const maxWindup = CONFIG.mahoraga?.shoutWindupFrames || 15;
       if (this.shoutWindupTimer >= maxWindup) {
@@ -1319,26 +1329,43 @@ export class MahoragaFighter extends Fighter {
           teleY = Math.max(activeArena.y + this.r + 5, Math.min(activeArena.y + activeArena.height - this.r - 5, teleY));
         }
 
-        // Set up smooth flash-dash travel using the adaptationDashSpeedFrames config
-        this.dashFromX = oldX;
-        this.dashFromY = oldY;
-        this.dashToX = teleX;
-        this.dashToY = teleY;
-        const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
-        this.adaptationDashTimer = dashFrames;
-        this.adaptationDashTarget = opponent;
-        this.adaptationDashIsCounter = false;
-        this.teleportCounterPending = true;
-
+        // Instant Stage 2+ Counter Teleport (No floor sliding!)
         this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
+        this.x = teleX;
+        this.y = teleY;
+        this.vx = 0;
+        this.vy = 0;
+        this.aim(opponent);
       }
 
-      // Standard Sword of Extermination chops & Left off-hand punches
+      // ── AI SKILL DECISION TREE ──
+      const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
       const frontTargetsForAttack = this._getFrontRadiusTargets(CONFIG.mahoraga?.swordRange || 110, Math.PI * 1.3);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
+      const canActSkills = !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isInfinityBlitz;
 
-      if (this.swordCooldown <= 0 && isAnyTargetInRange) {
-        this._performMeleeAttack(opponent);
+      if (canActSkills) {
+        // Priority 1: Divine Shout (AoE shockwave roar triggered when getting near to the enemy)
+        const shoutTriggerDist = shoutRadius + (opponent.r || 25);
+        if (this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
+          this.isShouting = true;
+          this.shoutWindupTimer = 0;
+        }
+        // Priority 2: Ruin Debris Throw (Ranged Barrage at medium-long range)
+        else if (this.throwCooldown <= 0 && (distToOpponent >= 140 || isEnemyChanneling)) {
+          this.isThrowing = true;
+          this.throwBarrageShotsLeft = CONFIG.mahoraga?.throwBarrageCount || 3;
+          this.throwBarrageTimer = 0;
+        }
+        // Priority 3: World Cleave (Heavy Cleave in close-medium range)
+        else if (this.cleaveCooldown <= 0 && distToOpponent <= meleeDist + 40) {
+          this.isCleaving = true;
+          this.cleaveWindupTimer = 0;
+        }
+        // Priority 4: Standard Sword of Extermination chops & Left off-hand punches
+        else if (this.swordCooldown <= 0 && isAnyTargetInRange) {
+          this._performMeleeAttack(opponent);
+        }
       }
     }
     this._bounceTarget = opponent; // Store for resolveWallBounce override

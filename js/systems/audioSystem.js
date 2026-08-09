@@ -20,12 +20,18 @@ class AudioEventEmitter {
     if (event === 'playSFX') {
       const [id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null] = args;
       const src = AUDIO_CONFIG[id] || id; // Fallback to string if not mapped
+      if (typeof src === 'string' && !src.includes('/') && !src.includes('.')) {
+        return null; // Skip unmapped sound key that is not a file path
+      }
       return playSound(src, volume, speed, offset, delay, onEnded);
     }
     
     if (event === 'playLoop') {
       const [key, id, volume = 1.0, speed = 1.0] = args;
       const src = AUDIO_CONFIG[id] || id;
+      if (typeof src === 'string' && !src.includes('/') && !src.includes('.')) {
+        return null;
+      }
       return playLoopingSound(key, src, volume, speed);
     }
 

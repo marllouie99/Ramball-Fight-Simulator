@@ -83,6 +83,13 @@ function preloadGameSounds() {
     if (CONFIG.genos.selfDestructSound) genosSounds.push(CONFIG.genos.selfDestructSound);
   }
 
+  const saitamaSounds = [];
+  if (CONFIG.saitama) {
+    if (CONFIG.saitama.counterPunchImpactSFX) saitamaSounds.push(CONFIG.saitama.counterPunchImpactSFX);
+    if (CONFIG.saitama.counterPunchVoiceSFX) saitamaSounds.push(CONFIG.saitama.counterPunchVoiceSFX);
+    if (CONFIG.saitama.counterPunchChargingSFX) saitamaSounds.push(CONFIG.saitama.counterPunchChargingSFX);
+  }
+
   const allPaths = [...new Set([
     ...legacyPaths,
     ...mappedConfigPaths,
@@ -92,7 +99,8 @@ function preloadGameSounds() {
     ...announcerPaths,
     ...yujiSounds,
     ...yutaSounds,
-    ...genosSounds
+    ...genosSounds,
+    ...saitamaSounds
   ])];
   return Promise.all(allPaths.map(preloadSound));
 }

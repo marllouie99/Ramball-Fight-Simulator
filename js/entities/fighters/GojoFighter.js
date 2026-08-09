@@ -155,7 +155,6 @@ export class GojoFighter extends Fighter {
       }
       this.isChannelingDomainExpansion = false;
       this.domainChargeTimer = 0;
-      this.isTargetOfAmbush = false;
       if (this._purpleChargeSoundHandle) {
         fadeOutSound(this._purpleChargeSoundHandle, 200);
         this._purpleChargeSoundHandle = null;
@@ -175,7 +174,6 @@ export class GojoFighter extends Fighter {
       }
     }
 
-    this.isTargetOfAmbush = false;
     if (this._purpleChargeSoundHandle) {
       fadeOutSound(this._purpleChargeSoundHandle, 200);
       this._purpleChargeSoundHandle = null;
@@ -243,24 +241,20 @@ export class GojoFighter extends Fighter {
     // Toji Fushiguro (ISOH lore exception): Inverted Spear of Heaven always pierces Limitless Infinity — skip block entirely
     const isToji = attacker && (attacker.characterId === 'toji' || attacker.type === 'toji');
     const isAttackerChannelingDomain = attacker && (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion);
-    if (!this.isMeleeMode && !isToji && !isAttackerChannelingDomain && this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
+    const isInsideDomain = this.domainActive || (state && (state.activeDomain || state.domainActive));
+    if (!this.isMeleeMode && !isInsideDomain && !isToji && !isAttackerChannelingDomain && this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
-      if (attacker.characterId === 'mahoraga') {
-        const totalStages = (attacker.adaptationStage?.melee || 0) + (attacker.adaptationStage?.ranged || 0) + (attacker.adaptationStage?.skill || 0);
-        const hasAdapted = (attacker.adapted?.melee) || (totalStages >= 1) || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.gojoInfinityImmune;
-        
-        if (!hasAdapted && Math.random() <= freezeChance) {
-          // Freeze Mahoraga!
+      const isMahoraga = attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga';
+      const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
+
+      if (!hasAdapted && Math.random() <= freezeChance) {
+        if (isMahoraga) {
           attacker.isFrozenByInfinity = true;
           attacker.infinityFreezeTimer = CONFIG.gojo?.infinityFreezeDuration || 120;
           attacker.vx = 0;
           attacker.vy = 0;
           if (typeof attacker.interruptAttacks === 'function') attacker.interruptAttacks();
-          
-          this.triggerInfinityBlock(attacker.x, attacker.y, attacker);
-          return false;
         }
-      } else if (Math.random() <= freezeChance) {
         this.triggerInfinityBlock(attacker.x || this.x, attacker.y || this.y, attacker);
         return false;
       }
@@ -414,7 +408,10 @@ export class GojoFighter extends Fighter {
       this.dubstepStunTimer = 0;
       this.crimsonElectrifiedTimer = 0;
       this.timeStopTimer = 0;
-    } else if (this._handleTimeStop()) {
+    }
+
+    const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity;
+    if (isFrozen) {
       if (this.isChannelingDomainExpansion && (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0)) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
@@ -429,8 +426,11 @@ export class GojoFighter extends Fighter {
         }
         fadeOutSoundBySrc('mixing', 200);
       }
-      return;
+      // Rule #1: Cancel active channeling/skills
+      this.interruptAttacks();
+      return; // MANDATORY: Stop update execution so fighter is frozen!
     }
+
     if (this.redEffectTimer > 0) {
       // Trigger Red channeling SFX once when channeling starts
       if (!this._hasPlayedRedChannelingSound) {
@@ -957,8 +957,6 @@ export class GojoFighter extends Fighter {
     if (!this.isTeleporting && !this.isChannelingPurple) {
       if (this.domainActive) {
         this.isMeleeMode = true; // Force melee mode in domain
-        this.vx = 0;
-        this.vy = 0;
       } else if (this.meleeModeCooldown > 0) {
         // Mandatory ranged separation period (240 frames / 4.0 seconds) after combo disengage
         this.isMeleeMode = false;
@@ -1001,15 +999,24 @@ export class GojoFighter extends Fighter {
       if ((this.teleportSlideTimer || 0) <= 0 && canAct) {
         if (opponent && !opponent.isDead) {
           const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-          const reach = this.r + opponent.r + 15;
-          if (dist > reach) {
+          const minDistance = this.r + opponent.r + 2;
+          const reach = this.r + opponent.r + 25;
+
+          if (dist < minDistance) {
+            // Contact Repulsion Buffer: Push Gojo back slightly ONLY if he physically clips inside target circle
+            const pushX = (this.x - opponent.x) / (dist || 1);
+            const pushY = (this.y - opponent.y) / (dist || 1);
+            this.vx = pushX * 2.0;
+            this.vy = pushY * 2.0;
+            speedMult = 1.0;
+          } else if (dist > reach) {
             const dx = opponent.x - this.x;
             const dy = opponent.y - this.y;
             this.vx = (dx / dist) * (this.speed || 4.5);
             this.vy = (dy / dist) * (this.speed || 4.5);
             speedMult = 1.0;
           } else {
-            this.vx = 0; // Lock movement when in punching range
+            this.vx = 0; // Lock movement when cleanly positioned in punching range
             this.vy = 0;
             speedMult = 0;
           }
@@ -1117,7 +1124,7 @@ export class GojoFighter extends Fighter {
 
       const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
       const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.45 : -Math.PI * 0.45);
-      const behindOffset = opponent.r + this.r + 5; // Kept at 5 so he stays close enough to punch!
+      const behindOffset = opponent.r + this.r + 12; // Perfect spacing: cleanly inside punch reach, safely outside clipping repulsion
       
       let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
       let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
@@ -1401,7 +1408,8 @@ export class GojoFighter extends Fighter {
   }
 
   _checkInfinityCollisions() {
-    if (this.isMeleeMode || this.infinityCooldown > 0 || this.hp <= 0 || this.isChannelingPurple || this.domainActive) return;
+    const isInsideDomain = this.domainActive || this.isChannelingDomainExpansion || (state && (state.activeDomain || state.domainActive));
+    if (this.isMeleeMode || isInsideDomain || this.infinityCooldown > 0 || this.hp <= 0 || this.isChannelingPurple) return;
 
     const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
     const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
@@ -1481,7 +1489,7 @@ export class GojoFighter extends Fighter {
             f.applyHitStun(15);
           }
           if (typeof f.applyTimeStop === 'function') {
-            f.applyTimeStop(15);
+            f.applyTimeStop(15, { isDomain: true, isUltimate: true });
           }
           f.vx = 0;
           f.vy = 0;

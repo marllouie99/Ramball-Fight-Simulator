@@ -12,6 +12,7 @@ export const AUDIO_CONFIG = {
   
   // Effects
   'effect_flare': 'Assets/Sound Effects/SkillEffects/flare.mp3',
+  'effect_infinity_collide': 'Assets/Sound Effects/SkillEffects/infinity-collide.mp3',
 
   // Skills
   'skill_backstab': 'Assets/Sound Effects/Skills/backstab.mp3',
@@ -20,6 +21,7 @@ export const AUDIO_CONFIG = {
   'skill_dash3': 'Assets/Sound Effects/Skills/dash3.mp3',
   'skill_dash5': 'Assets/Sound Effects/Skills/dash5.mp3',
   'skill_domainexpansion': 'Assets/Sound Effects/Skills/domainexpansion.mp3',
+  'skill_enhance': 'Assets/Sound Effects/Skills/enhance.mp3',
   'skill_fuga': 'Assets/Sound Effects/Skills/fuga.mp3',
   'skill_gojodomain': 'Assets/Sound Effects/Skills/gojodomain.mp3',
   'skill_machinebroken': 'Assets/Sound Effects/Skills/machinebroken.mp3',

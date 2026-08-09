@@ -76,12 +76,12 @@ export const mahoragaConfig = {
     enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing
     rctHealAmountPercent: 0.10,       // Fraction of max HP healed on each wheel rotation click (0.10 = 10%)
     rctHealLevelInterval: 1,          // Heal on each adaptation level (every wheel rotation!)
-    rctHealPerClickPercent: 0.02,       // Heals 10% of max HP on each wheel rotation click
+    rctHealPerClickPercent: 0.05,       // Heals 10% of max HP on each wheel rotation click
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
-    fatalAdaptWindowFrames: 600,     // Rolling window duration (frames) — 10 seconds window
-    fatalDamageThresholdPct: 0.10,  // 5% max HP damage threshold triggers wheel click
-    fatalAdaptCooldownFrames: 45,    // Cooldown (frames) between wheel clicks (45 = 0.75s)
+    fatalAdaptWindowFrames: 400,     // Rolling window duration (frames) — ~6.6 seconds window
+    fatalDamageThresholdPct: 0.08,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
+    fatalAdaptCooldownFrames: 30,    // Cooldown (frames) between wheel clicks (30 = 0.5s)
 
     // Teleportation Speed & Afterimage Visibility Settings
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)

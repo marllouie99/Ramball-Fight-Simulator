@@ -8,7 +8,7 @@ export const mahoragaAdaptationConfig = {
   // ── GOJO SATORU ──
   gojo: {
     infinity: {
-      requiredFreezes: 2, // Must be frozen by Limitless twice to adapt
+      requiredFreezes: 5, // Must collide with / be frozen by Limitless 10 times to adapt
       bypassesInfinity: true
     },
     red: { damageThresholdPct: 0.04, windowFrames: 400 },

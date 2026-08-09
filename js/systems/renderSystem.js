@@ -12,7 +12,7 @@ import {
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
-  drawGenosSpeedLines
+  drawGenosSpeedLines, drawSaitamaSeriousPunchDimScreen
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -172,6 +172,7 @@ export function renderGame() {
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
         drawMahoragaAdaptationDimScreen();
         drawTojiUltimateOverlay();
+        drawSaitamaSeriousPunchDimScreen();
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 

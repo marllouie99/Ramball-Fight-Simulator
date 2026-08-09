@@ -601,42 +601,47 @@ function updateHealthHud() {
     }
     if (f.characterId === 'saitama' || f.type === 'saitama') {
       const themeColor = '#F5C400';
-      const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
-      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
-      const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
-
-      const sideHopsMax = CONFIG.saitama?.sideHopsCooldown || 420;
-      const sideHopsTimer = f.sideHopsCooldown !== undefined ? f.sideHopsCooldown : sideHopsMax;
-      const sideHopsPct = Math.max(0, Math.min(100, (1 - (sideHopsTimer / sideHopsMax)) * 100));
-
-      const ultMax = CONFIG.saitama?.seriousPunchCooldown || 2700;
-      const ultTimer = f.seriousPunchCooldown !== undefined ? f.seriousPunchCooldown : ultMax;
-      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      const skillMax = CONFIG.saitama?.skillPunishCooldown || 2000;
+      const skillTimer = f.skillPunishCooldown !== undefined ? f.skillPunishCooldown : 0;
+      const skillPct = Math.max(0, Math.min(100, (1 - (skillTimer / skillMax)) * 100));
 
       return [
-        { id: 'flurry',    pct: flurryPct,   ready: flurryPct >= 99,   color: themeColor, label: 'CONSECUTIVE NORMAL PUNCHES' },
-        { id: 'sideHops',  pct: sideHopsPct, ready: sideHopsPct >= 99, color: themeColor, label: 'SERIOUS SIDE HOPS' },
-        { id: 'ult',       pct: ultPct,      ready: ultPct >= 99,      color: themeColor, label: 'SERIOUS PUNCH' }
+        { id: 'counter', pct: skillPct, ready: skillPct >= 99, color: themeColor, label: 'Serious Punch' }
       ];
     }
     if (f.characterId === 'genos' || f.type === 'genos') {
       const themeColor = '#FF5500';
+
+      // 1. Heat Ammo Bar
+      const maxAmmo = f.maxHeatAmmo || CONFIG.genos?.maxHeatAmmo || 20;
+      const currentAmmo = f.heatAmmo !== undefined ? f.heatAmmo : maxAmmo;
+      let ammoPct = 0;
+      let ammoReady = false;
+      let ammoLabel = 'HEAT AMMO';
+      if (f.ammoReloadTimer > 0) {
+        const reloadMax = f.ammoReloadMax || CONFIG.genos?.ammoReloadFrames || 300;
+        ammoPct = Math.max(0, Math.min(100, (1 - (f.ammoReloadTimer / reloadMax)) * 100));
+        ammoReady = false;
+        ammoLabel = 'RELOADING AMMO...';
+      } else {
+        ammoPct = Math.max(0, Math.min(100, (currentAmmo / maxAmmo) * 100));
+        ammoReady = currentAmmo > 0;
+      }
+
+      // 2. Machine Gun Blows
       const flurryMax = CONFIG.genos?.flurryCooldown || 480;
-      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
+      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : 0;
       const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
 
-      const dashMax = CONFIG.genos?.dashCooldown || 360;
-      const dashTimer = f.dashCooldown !== undefined ? f.dashCooldown : dashMax;
-      const dashPct = Math.max(0, Math.min(100, (1 - (dashTimer / dashMax)) * 100));
-
+      // 3. Incineration Cannon
       const ultMax = CONFIG.genos?.ultCooldown || 1680;
-      const ultTimer = f.ultCooldown !== undefined ? f.ultCooldown : ultMax;
+      const ultTimer = f.ultCooldown !== undefined ? f.ultCooldown : 0;
       const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
 
       return [
-        { id: 'flurry', pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
-        { id: 'dash',   pct: dashPct,   ready: dashPct >= 99,   color: themeColor, label: 'ROCKET STOMP' },
-        { id: 'ult',    pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' }
+        { id: 'ammo',    pct: ammoPct,   ready: ammoReady,       color: '#FF8800', label: ammoLabel },
+        { id: 'flurry',  pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
+        { id: 'ult',     pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' }
       ];
     }
     if (f.characterId === 'cronos' || f.type === 'cronos') {
@@ -919,6 +924,32 @@ function updateHealthHud() {
       } else if (f.characterId === 'musashi' || f.type === 'musashi') {
         const stanceName = f.currentStance === 1 ? 'ICHI NO TACHI' : f.currentStance === 2 ? 'NI NO TACHI' : 'SAN NO TACHI';
         info.push(`<b>Stance:</b> ${stanceName}`);
+      } else if (f.characterId === 'saitama' || f.type === 'saitama') {
+        const dodgeRate = Math.round((f.dodgeChance !== undefined ? f.dodgeChance : (CONFIG.saitama?.dodgeChance ?? 0.99)) * 100);
+        info.push(`<b>Dodge Chance:</b> ${dodgeRate}%`);
+        info.push(`<b>Push-ups:</b> 100`);
+        info.push(`<b>Sit-ups:</b> 100`);
+        info.push(`<b>Squats:</b> 100`);
+        info.push(`<b>Run:</b> 10 km`);
+      } else if (f.characterId === 'genos' || f.type === 'genos') {
+        const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+        const baseSpd = (f.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
+        const speedMult = CONFIG.genos?.dashes?.meleeThrusterDash?.speedMultiplier ?? 2.4;
+        
+        if (f.speedBoostTimer > 0) {
+          const boostVal = (baseSpd * (speedMult - 1)).toFixed(1);
+          info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)} + ${boostVal} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>SPD:</b> ${baseSpd.toFixed(1)}`);
+        }
+
+        const maxDashes = CONFIG.genos?.maxMeleeDashes || 10;
+        if (f.isMeleeStance) {
+          const remainingDashes = Math.max(0, maxDashes - (f.meleeDashCount || 0));
+          info.push(`<b>Dash:</b> ${remainingDashes}/${maxDashes}`);
+        } else {
+          info.push(`<b>Dash:</b> ${maxDashes}`);
+        }
       } else if (f.characterId === 'zeus' || f.type === 'zeus') {
         if ((f.aegisTimer || 0) > 0) {
           info.push(`<b>Aegis:</b> ACTIVE <span style="color: #15803d; font-size: 10px;">▲</span>`);
@@ -989,11 +1020,15 @@ function updateHealthHud() {
 
   const generateFighterSkillsHTML = (f, align) => {
     const skills = getSkillDataForFighter(f);
-    const textStyle = `font-size: ${CONFIG.hudSkillFontSize || 13}px; text-align: ${align};`;
     return skills.map(s => {
+      let fontSz = CONFIG.hudSkillFontSize || 13;
+      if (s.label && s.label.length > 32) fontSz = 9.5;
+      else if (s.label && s.label.length > 22) fontSz = 11;
+      const textStyle = `font-size: ${fontSz}px; text-align: ${align}; white-space: nowrap;`;
       if (s.noFill) {
+        const parentColor = s.color ? `color: ${s.color};` : '';
         return `
-          <div class="hud-skill-box align-${align} label-only" data-skill-id="${s.id}" style="justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
+          <div class="hud-skill-box align-${align} label-only" data-skill-id="${s.id}" style="${parentColor} justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
             <div class="hud-skill-box-fill" style="display: none;"></div>
             <div class="hud-skill-box-text" style="${textStyle}">${s.label}</div>
           </div>
@@ -1014,7 +1049,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>Push-ups:</b>') || line.includes('<b>Sit-ups:</b>') || line.includes('<b>Squats:</b>') || line.includes('<b>Run:</b>'));
     }
     if (info.length === 0) return '';
     
@@ -1153,11 +1188,11 @@ function updateHealthHud() {
     let barsHTML = '';
     if (members && members.length > 0) {
       barsHTML = members.map(m => {
-        const ratio = m.maxHp > 0 ? Math.max(0, Number(m.hp) / Number(m.maxHp)) : 0;
-        const percent = Math.round(ratio * 100);
+        const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
+        const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
         const { className } = getGlowStyles(m);
-        const hpText = `${Math.floor(Math.max(0, Number(m.hp) || 0))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
+        const hpText = `${Math.floor(Math.min(Number(m.maxHp), Math.max(0, Number(m.hp) || 0)))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
         const memberShakeTimer = m._healthBarShakeTimer || 0;
         const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
         const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
@@ -1292,7 +1327,7 @@ function updateHealthHud() {
     } else {
       fighters.forEach((fighter, index) => {
         if (!fighter || fighter.isTurret) return;
-        const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
+        const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const color = fighter.color || '#fff';
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
@@ -1388,8 +1423,8 @@ function updateHealthHud() {
         const fighter = m.fighter;
         if (!fighter) return;
 
-        const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
-        const percent = Math.round(ratio * 100);
+        const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
+        const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
         const glow = getGlowStyles(fighter);
         
@@ -1406,7 +1441,7 @@ function updateHealthHud() {
           m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
-        const hpText = `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
+        const hpText = `${Math.floor(Math.min(Number(fighter.maxHp), Math.max(0, Number(fighter.hp) || 0)))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
         m.text.textContent = hpText;
       });
 
@@ -1418,8 +1453,8 @@ function updateHealthHud() {
       const cachedCard = _hudCache.fighters.get(fighter);
       if (!cachedCard) return;
 
-      const ratio = fighter.maxHp > 0 ? Math.max(0, Number(fighter.hp) / Number(fighter.maxHp)) : 0;
-      const percent = Math.round(ratio * 100);
+      const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
+      const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
       const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
       const glow = getGlowStyles(fighter);
 
@@ -1439,7 +1474,7 @@ function updateHealthHud() {
       }
 
       if (cachedCard.hpBarText) {
-        const metaValue = `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
+        const metaValue = `${Math.floor(Math.min(Number(fighter.maxHp), Math.max(0, Number(fighter.hp) || 0)))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
         cachedCard.hpBarText.textContent = metaValue;
       }
 

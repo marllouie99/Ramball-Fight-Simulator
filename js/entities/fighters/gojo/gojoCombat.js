@@ -7,9 +7,11 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../cor
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
+import { triggerAdaptation } from '../mahoraga/mahoragaAdaptation.js';
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
-  if (fighter.isMeleeMode || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0)) return false;
+  const isInsideDomain = fighter.domainActive || fighter.isChannelingDomainExpansion || (state && (state.activeDomain || state.domainActive));
+  if (fighter.isMeleeMode || isInsideDomain || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0)) return false;
   
   if ((fighter.infinityActiveTimer || 0) <= 0) {
     fighter.infinityActiveTimer = CONFIG.gojo?.infinityActiveDuration ?? 60;
@@ -22,6 +24,12 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'INFINITY', '#E0FFFF');
   triggerGlobalScreenShake(3, 6);
+
+  const nowSound = Date.now();
+  if (!fighter._lastInfinityCollideSoundTime || nowSound - fighter._lastInfinityCollideSoundTime >= 250) {
+    fighter._lastInfinityCollideSoundTime = nowSound;
+    audioSystem.playSFX('effect_infinity_collide', 1.0);
+  }
  
   // Spawn visual barrier rebound ring effect at the impact position
   if (typeof spawnMeleeClashShockwave === 'function') {
@@ -37,10 +45,31 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     }
     if (attacker.characterId !== 'toji' && attacker.type !== 'toji' && !attacker.domainImmunity) {
       if (attacker.type === 'mahoraga' || attacker.characterId === 'mahoraga') {
-        const hasAdapted = attacker.adapted?.melee || attacker.gojoInfinityImmune || attacker.isMaxAdapted;
+        const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
         if (hasAdapted) {
           // Mahoraga adapted to Limitless — bypasses Infinity block completely!
           return false;
+        }
+
+        // Increment Limitless barrier collision counter on every contact
+        const now = Date.now();
+        if (!attacker._lastInfinityCollisionTime || now - attacker._lastInfinityCollisionTime >= 350) {
+          attacker._lastInfinityCollisionTime = now;
+          attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
+          const collisionsNeeded = 10;
+
+          if (!attacker.gojoInfinityImmune && attacker.infinityCollisionCount >= collisionsNeeded) {
+            attacker.gojoInfinityImmune = true;
+            attacker.adapted.melee = true;
+            attacker.adapted.skill = true;
+
+            if (typeof triggerAdaptation === 'function') {
+              triggerAdaptation(attacker, 'skill', fighter || null);
+            }
+            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, '⚡ LIMITLESS ADAPTED! (10/10)', '#00F3FF');
+          } else if (!attacker.gojoInfinityImmune) {
+            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚙️ LIMITLESS (${attacker.infinityCollisionCount}/10)`, '#A0C8FF');
+          }
         }
       }
       

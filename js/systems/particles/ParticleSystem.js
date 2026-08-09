@@ -169,7 +169,7 @@ export class ParticleSystem {
               numColor = (r << 16) + (g << 8) + b;
             }
           }
-          spark.sprite.tint = numColor;
+          spark.sprite.tint = (numColor & 0xFFFFFF);
           spark.sprite.width = spark.size * 2;
           spark.sprite.height = spark.size * 2;
           spark.sprite.x = spark.x;

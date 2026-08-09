@@ -73,9 +73,9 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
   // ── ROLLING SHARED FATAL DAMAGE ACCUMULATION WHEEL CLICK (General System) ──
   if (!fighter.isInfinityBlitz) {
-    let windowFrames  = CONFIG.mahoraga?.fatalAdaptWindowFrames   ?? 300;
-    let thresholdPct  = CONFIG.mahoraga?.fatalDamageThresholdPct  ?? 0.20;
-    const adaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 300;
+    let windowFrames  = CONFIG.mahoraga?.fatalAdaptWindowFrames   ?? 400;
+    let thresholdPct  = CONFIG.mahoraga?.fatalDamageThresholdPct  ?? 0.08;
+    const adaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
 
     // Check specific fighter config
     if (attacker) {
@@ -298,19 +298,27 @@ export function triggerAdaptation(fighter, type, attacker) {
   
   if (enableRCT && fighter.hp > 0 && !fighter.isDead && totalStages > 0 && (totalStages % healInterval === 0)) {
     const healPercent = CONFIG.mahoraga?.rctHealAmountPercent ?? CONFIG.mahoraga?.rctHealPerClickPercent ?? 0.10;
-    const healHp = Math.round(fighter.maxHp * healPercent);
-    if (healHp > 0) {
+    const healAmount = Math.round(fighter.maxHp * healPercent);
+    const targetHp = Math.min(fighter.maxHp, fighter.hp + healAmount);
+    const actualHealed = Math.max(0, targetHp - fighter.hp);
+
+    if (actualHealed > 0) {
       if (typeof fighter.takeDamage === 'function') {
-        fighter.takeDamage(-healHp, fighter, { isHeal: true });
+        fighter.takeDamage(-actualHealed, fighter, { isHeal: true, skipHealText: true });
       } else {
-        fighter.hp = Math.min(fighter.maxHp, fighter.hp + healHp);
+        fighter.hp = targetHp;
       }
-      spawnFloatingText(fighter.x, wheelY - 45, `✨ RCT HEAL! +${healHp}`, '#00FF66');
-      spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
-      spawnSparks(fighter.x, fighter.y, 30, 'arcane');
-      spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
-      audioSystem.playSFX('skill_enhance', 0.85);
     }
+
+    // Always trigger visual RCT Heal badge & green pop-up heal number on every wheel click!
+    fighter._healthBarHealTimer = 14;
+    spawnFloatingText(fighter.x, wheelY - 45, '✨ RCT HEAL!', '#00FF66');
+    const displayHeal = actualHealed > 0 ? actualHealed : healAmount;
+    spawnFloatingText(fighter.x + (Math.random() - 0.5) * 16, (fighter.y - (fighter.z || 0)) - fighter.r - 12, `+${displayHeal}`, '#00FF66');
+    spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
+    spawnSparks(fighter.x, fighter.y, 30, 'arcane');
+    spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
+    audioSystem.playSFX('skill_enhance', 0.85);
   }
 
   // Max Adaptation Awakening Check (Wheel 360° rotation complete at Stage 8)
@@ -423,7 +431,7 @@ export function handleInfinityFreeze(fighter) {
       fighter.infinityFreezeCount = (fighter.infinityFreezeCount || 0) + 1;
 
       const configCount = mahoragaAdaptationConfig.gojo?.infinity?.requiredFreezes;
-      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 2);
+      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 10);
       
       if (!fighter.gojoInfinityImmune && fighter.infinityFreezeCount >= freezesNeeded) {
         fighter._lastGojoHitType = 'infinity';
@@ -435,7 +443,9 @@ export function handleInfinityFreeze(fighter) {
           ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0)
           : null;
         triggerAdaptation(fighter, 'skill', gojoFighter || null);
-        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'LIMITLESS ADAPTED!', '#00F3FF');
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ LIMITLESS ADAPTED! (10/10)', '#00F3FF');
+      } else if (!fighter.gojoInfinityImmune) {
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚙️ LIMITLESS (${fighter.infinityFreezeCount}/10)`, '#A0C8FF');
       }
     }
 

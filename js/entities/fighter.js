@@ -18,7 +18,7 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive } from '../core/state.js';
-import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave } from '../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 
@@ -140,6 +140,9 @@ export class Fighter {
           }
         }
       }
+    }
+    if (Number.isFinite(value) && Number.isFinite(this.maxHp) && this.maxHp > 0) {
+      value = Math.min(this.maxHp, value);
     }
     this._hp = value;
   }
@@ -287,7 +290,7 @@ export class Fighter {
       const penaltyCD = 270;
       for (const key in this) {
         if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer')) {
-          if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer') continue;
+          if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer' || key === 'shootCooldown' || key === 'attackCooldown' || key === 'meleePunchCooldown') continue;
           if (typeof this[key] === 'number') {
             this[key] = Math.max(this[key] || 0, penaltyCD);
           }
@@ -379,6 +382,19 @@ export class Fighter {
     return !!(
       this.isAmbushing ||
       this.ultimateActive ||
+      this.isChargingUlt ||
+      this.isFiringUlt ||
+      this.isFlurrying ||
+      this.isDashing ||
+      this.isCharging ||
+      this.isChargingPurple ||
+      this.isFiringPurple ||
+      this.isCastingRed ||
+      this.isCastingBlue ||
+      this.isChargingFuga ||
+      this.isFiringFuga ||
+      this.isChargingSeriousPunch ||
+      this.isSideHopping ||
       this.isChannelingDomain ||
       this.isChannelingDomainExpansion ||
       this.isChannelingDivineFlame ||
@@ -386,6 +402,8 @@ export class Fighter {
       this.isChannelingRCT ||
       this.isChannelingStorm ||
       this.isChanneling ||
+      this.redBuildupPhase ||
+      this.blueBuildupPhase ||
       this.meleeSwingActive ||
       this.scytheSwingActive ||
       this.swipeActive ||
@@ -395,7 +413,15 @@ export class Fighter {
       this.skillActive ||
       (this.flurryHitsLeft > 0) ||
       (this.rapidSlashHitsLeft > 0) ||
-      (this.dashTimer > 0)
+      (this.dashTimer > 0) ||
+      (this.ultTimer > 0) ||
+      (this.flurryTimer > 0) ||
+      (this.purpleChargeTimer > 0) ||
+      (this.redEffectTimer > 0) ||
+      (this.domainChargeTimer > 0) ||
+      (this.ultimateChargeTimer > 0) ||
+      (this.divineFlameChargeTimer > 0) ||
+      (this.thinIceBreakerChargeTimer > 0)
     );
   }
 
@@ -453,6 +479,18 @@ export class Fighter {
 
   /** Per-frame housekeeping for cooldowns. */
   _tickCooldowns() {
+    if (this.purpleHitTimer > 0) {
+      this.purpleHitTimer--;
+      if (this.purpleHitTimer <= 0) {
+        this.isCaughtInPurple = false;
+      }
+    } else {
+      this.isCaughtInPurple = false;
+    }
+    if (this.hitStunTimer > 0) this.hitStunTimer--;
+    if (this.electricStunTimer > 0) this.electricStunTimer--;
+    if (this.dubstepStunTimer > 0) this.dubstepStunTimer--;
+    if (this.crimsonElectrifiedTimer > 0) this.crimsonElectrifiedTimer--;
     if (this._bhTextCooldown > 0) this._bhTextCooldown--;
     if (this._flameHitCooldown > 0) this._flameHitCooldown--;
     if (this.burnSpreadCooldown > 0) this.burnSpreadCooldown--;
@@ -483,19 +521,63 @@ export class Fighter {
         const currentSpeed = Math.hypot(this.knockbackVx, this.knockbackVy);
 
         // Silky Smooth Kinetic Ricochet Wall Bounce (0.82 smooth velocity reflection)
-        const bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
+        let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
+        if (this.preventKnockbackBounce) bounceMult = 0; // Stick to the wall instead of bouncing
 
         if (this.x - this.r < arena.x) { this.x = arena.x + this.r; this.knockbackVx = Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
         if (this.x + this.r > arena.x + arena.width) { this.x = arena.x + arena.width - this.r; this.knockbackVx = -Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
         if (this.y - this.r < arena.y) { this.y = arena.y + this.r; this.knockbackVy = Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
         if (this.y + this.r > arena.y + arena.height) { this.y = arena.y + arena.height - this.r; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
 
-        if (bounced && !this.isFirstHitKnockback && currentSpeed > 6) {
-          triggerGlobalScreenShake(5, 6); // Subtle micro camera punch for smooth motion!
-          audioSystem.playSFX('attack_fleshhit', 0.9);
-          spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
-          spawnSparks(this.x, this.y, 14, 'crimsonSniper');
-          spawnMeleeClashShockwave(this.x, this.y, 100, 'gojo');
+        if (bounced) {
+          if (this.preventKnockbackBounce) {
+            // They hit the wall while pinned! Stick them to the wall for a second (60 frames)
+            if (typeof this.applyTimeStop === 'function') {
+              this.applyTimeStop(60);
+            } else {
+              this.hitStunTimer = 60;
+            }
+            this.knockbackVx = 0;
+            this.knockbackVy = 0;
+            
+            // Forcefully interrupt any ongoing dashes, teleports, or abilities
+            if (typeof this.interruptAttacks === 'function') {
+              this.interruptAttacks(true);
+            }
+            
+            triggerGlobalScreenShake(8, 12);
+            audioSystem.playSFX('attack_fleshhit', 1.0);
+            spawnImpactFlash(this.x, this.y, 60, 'rgba(255, 50, 50, 0.9)');
+            spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
+            
+            // Create a persistent wall crack decal
+            if (typeof state !== 'undefined' && arena) {
+              if (!state.wallCracks) state.wallCracks = [];
+              let angle = 0;
+              let crackX = this.x;
+              let crackY = this.y;
+              
+              if (this.x - this.r <= arena.x + 5) { angle = 0; crackX = arena.x; } // Left wall (cracks expand left/outside)
+              else if (this.x + this.r >= arena.x + arena.width - 5) { angle = Math.PI; crackX = arena.x + arena.width; } // Right wall
+              else if (this.y - this.r <= arena.y + 5) { angle = Math.PI / 2; crackY = arena.y; } // Top wall
+              else if (this.y + this.r >= arena.y + arena.height - 5) { angle = -Math.PI / 2; crackY = arena.y + arena.height; } // Bottom wall
+              
+              state.wallCracks.push({
+                x: crackX,
+                y: crackY,
+                angle: angle,
+                life: 600, // 10 seconds
+                maxLife: 600,
+                seed: Math.random() * 1000
+              });
+            }
+          } else if (!this.isFirstHitKnockback && currentSpeed > 6) {
+            triggerGlobalScreenShake(5, 6); // Subtle micro camera punch for smooth motion!
+            audioSystem.playSFX('attack_fleshhit', 0.9);
+            spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
+            spawnSparks(this.x, this.y, 14, 'crimsonSniper');
+            spawnMeleeClashShockwave(this.x, this.y, 100, 'gojo');
+          }
         }
       }
       
@@ -506,6 +588,9 @@ export class Fighter {
       
       if (Math.abs(this.knockbackVx) <= 0.1) this.knockbackVx = 0;
       if (Math.abs(this.knockbackVy) <= 0.1) this.knockbackVy = 0;
+    } else {
+      // Clear flag when knockback completes
+      this.preventKnockbackBounce = false;
     }
   }
 
@@ -583,6 +668,13 @@ export class Fighter {
           this._bhTextCooldown = interval;
         }
       }
+    } else if (this.hp > prevHp || (opts.isHeal && amount < 0)) {
+      // Spawn floating green heal number when actual HP increases
+      const healAmount = Math.round(Math.abs(amount < 0 ? amount : (this.hp - prevHp)));
+      if (healAmount > 0 && !opts.skipHealText) {
+        spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 12, `+${healAmount}`, '#00FF66');
+      }
+    }
 
       // Calculate damage direction (from attacker to this fighter)
       let damageAngle = null;
@@ -629,7 +721,6 @@ export class Fighter {
           }
         }
       }
-    }
     if (this.hp === 0 && !this._hasDied) {
       this._hasDied = true;
       // Clear flame particles if the dying fighter is the Flamewarden
@@ -797,7 +888,7 @@ export class Fighter {
 
   /** Resolves wall collision and bounces back with varied angles. */
   resolveWallBounce(arena) {
-    if (this.caughtInGenosBeamTimer > 0) {
+    if (this.caughtInGenosBeamTimer > 0 || this.preventKnockbackBounce) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
       if (this.x - this.r < arena.x) {

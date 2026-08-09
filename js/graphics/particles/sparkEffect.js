@@ -1951,3 +1951,34 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
     }
   }
 }
+
+/**
+ * Spawns a high-contrast visual spark explosion on sword/guard parries.
+ * Uses a uniform bright gold & white-hot spark palette across all parries.
+ */
+export function spawnParrySparksEffect(x, y, count = 24) {
+  const mainColor = '#FFD700'; // Bright Gold
+  const coreColor = '#FFFFFF'; // White-hot core
+
+  // 1. High-velocity radial spark burst
+  for (let i = 0; i < count; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 6 + Math.random() * 13;
+    const sparkColor = (i % 2 === 0) ? coreColor : mainColor;
+    spawnSparks(x, y, 1, 'parrySpark', {
+      color: sparkColor,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2.2 + Math.random() * 3.2,
+      decay: 0.05 + Math.random() * 0.06
+    });
+  }
+
+  // 2. Central impact flash
+  spawnImpactFlash(x, y, 50, 'dark');
+
+  // 3. Shockwave clash ring
+  if (typeof spawnMeleeClashShockwave === 'function') {
+    spawnMeleeClashShockwave(x, y, 65, 'gojo');
+  }
+}

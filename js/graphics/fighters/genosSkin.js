@@ -404,19 +404,34 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
     backHandX  = r * 1.15 - (r * 1.15) * ease;
     backHandY  =  r * 0.12 - (r * 0.27) * ease;
   } else if (isPunching) {
-    // Skill 1 (Machine Gun Blows) & Melee Punches: High-speed alternating cybernetic fists
-    if (fighter.isRightPunch) {
-      // Right arm (back/top arm) punches forward smoothly towards target
-      backHandX  = r * 0.30 + lungeExtension * 1.35;
+    if (fighter.isFlurrying) {
+      // Machine Gun Blows (Skill 1): Continuous high-speed alternating Gatling cybernetic fists
+      const t = fighter.flurryTimer || 0;
+      const wave = Math.sin(t * Math.PI / 2.5); // Smooth 5-frame alternating cycle wave (-1 to +1)
+      
+      const rightReach = Math.max(0, wave);  // 0 -> 1 when Right arm punches
+      const leftReach  = Math.max(0, -wave); // 0 -> 1 when Left arm punches
+
+      backHandX  = r * 0.30 + rightReach * (r * 1.85);
       backHandY  = -r * 0.18;
-      frontHandX = r * 0.45 + oppositeRecoil;
+
+      frontHandX = r * 0.30 + leftReach  * (r * 1.85);
       frontHandY = r * 0.18;
     } else {
-      // Left arm (front/bottom arm) punches forward smoothly towards target
-      frontHandX = r * 0.45 + lungeExtension * 1.35;
-      frontHandY = r * 0.18;
-      backHandX  = r * 0.30 + oppositeRecoil;
-      backHandY  = -r * 0.18;
+      // Skill 1 (Machine Gun Blows) & Melee Punches: High-speed alternating cybernetic fists
+      if (fighter.isRightPunch) {
+        // Right arm (back/top arm) punches forward smoothly towards target
+        backHandX  = r * 0.30 + lungeExtension * 1.5;
+        backHandY  = -r * 0.18;
+        frontHandX = r * 0.45 + oppositeRecoil;
+        frontHandY = r * 0.18;
+      } else {
+        // Left arm (front/bottom arm) punches forward smoothly towards target
+        frontHandX = r * 0.45 + lungeExtension * 1.5;
+        frontHandY = r * 0.18;
+        backHandX  = r * 0.30 + oppositeRecoil;
+        backHandY  = -r * 0.18;
+      }
     }
   } else if (isBasicAttacking) {
     // Mode B: Side Profile (Basic Attack) - in pre-rotated local space
@@ -445,9 +460,26 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   const isBackFiring  = isBasicAttacking &&  fighter.isRightBlast;
   const isFrontFiring = isBasicAttacking && !fighter.isRightBlast;
 
-  // Punch glow intensity: peaks at sinusoidal mid-swing (easePunch), only on the active punching arm
-  const punchGlowFront = (isPunching && !fighter.isRightPunch) ? easePunch : 0;
-  const punchGlowBack  = (isPunching &&  fighter.isRightPunch) ? easePunch : 0;
+  // Punch glow intensity: peaks at sinusoidal mid-swing, active on punching arm ONLY when hitting an enemy target
+  let punchGlowFront = 0;
+  let punchGlowBack  = 0;
+  if (isPunching) {
+    if (fighter.isFlurrying) {
+      const isHitConnected = (fighter._flurryHitConnectedTimer && fighter._flurryHitConnectedTimer > 0);
+      if (isHitConnected) {
+        const t = fighter.flurryTimer || 0;
+        const wave = Math.sin(t * Math.PI / 2.5);
+        punchGlowBack  = Math.max(0, wave);
+        punchGlowFront = Math.max(0, -wave);
+      }
+    } else {
+      const isHitConnected = (fighter._basicHitConnectedTimer && fighter._basicHitConnectedTimer > 0);
+      if (isHitConnected) {
+        punchGlowFront = !fighter.isRightPunch ? easePunch : 0;
+        punchGlowBack  =  fighter.isRightPunch ? easePunch : 0;
+      }
+    }
+  }
 
   if (!hideBack)  _drawMechArm(ctx, backHandX,  backHandY,  hr, palmColor, isChargingUlt, isSelfDestructing, isBackFiring,  blastProgress, punchGlowBack);
   if (!hideFront) _drawMechArm(ctx, frontHandX, frontHandY, hr, palmColor, isChargingUlt, isSelfDestructing, isFrontFiring, blastProgress, punchGlowFront);

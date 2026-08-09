@@ -267,9 +267,11 @@ export function drawFighters() {
 
     // Check if Gojo's Domain Expansion (Unlimited Void) is currently active and freezing everyone
     let gojoDomainActive = false;
-    if (typeof state !== 'undefined' && state.fighters) {
-      const gojo = state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive);
-      if (gojo) gojoDomainActive = true;
+    if (typeof state !== 'undefined') {
+      if (state.domainActive || state.activeDomain) gojoDomainActive = true;
+      if (!gojoDomainActive && state.fighters) {
+        gojoDomainActive = state.fighters.some(f => f && f.domainActive);
+      }
     }
 
     // Unlimited Void freeze & Hollow Purple hit: do not apply blue fill/ring overlay to enemies when hit by Purple or inside Gojo's domain

@@ -110,7 +110,54 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       ...(state.illusions || [])
     ];
 
-    // DPS tick - damage all valid targets (fighters & illusions) trapped inside or pulled into the purple orb's radius for its entire purpleLife
+    // 1. Continuous slow + pull + paralysis effect for all targets (fighters & illusions) in the purple orb's radius
+    for (let i = 0; i < allTargets.length; i++) {
+      const ent = allTargets[i];
+      if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
+      if (ent.owner && ent.owner === ownerFighter) continue;
+      
+      const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
+      const isPurpleAdapted = isMahoraga && (
+        (ent.gojoAdapted && ent.gojoAdapted.purple) || 
+        (ent.adaptedSkills && ent.adaptedSkills['purple'])
+      );
+      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || isPurpleAdapted;
+      if (!isImmune) {
+        const dx = projectile.x - ent.x;
+        const dy = projectile.y - ent.y;
+        const dist = Math.hypot(dx, dy);
+        
+        if (dist > 0 && dist < purplePullRadius) {
+          ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
+          ent.isCaughtInPurple = true;
+          // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
+          if (typeof ent.interruptAttacks === 'function') {
+            ent.interruptAttacks(true);
+          }
+          if (typeof ent.applyTimeStop === 'function') {
+            ent.applyTimeStop(12, { isSkill: true, isUltimate: true, isPurple: true });
+          } else {
+            ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
+          }
+          if (typeof ent.applyHitStun === 'function') {
+            ent.applyHitStun(12);
+          }
+          
+          const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
+          ent.vx *= 0.1;
+          ent.vy *= 0.1;
+          
+          // Suppress existing knockback so they don't fling out of the orb
+          if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
+          if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
+
+          ent.x += (dx / dist) * pullStrength;
+          ent.y += (dy / dist) * pullStrength;
+        }
+      }
+    }
+
+    // 2. DPS tick - damage all valid targets (fighters & illusions) trapped inside or pulled into the purple orb's radius
     projectile.purpleLastDPSTick = (projectile.purpleLastDPSTick || 0) + 1;
     if (projectile.purpleLastDPSTick >= projectile.purpleDPSInterval) {
       projectile.purpleLastDPSTick = 0;
@@ -139,53 +186,6 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           }
           
           spawnSparks(ent.x, ent.y, 4, 'lightningTrail', '#8A2BE2');
-        }
-      }
-    }
-    
-    // Continuous slow + pull effect for all targets (fighters & illusions) in the purple orb's radius
-    for (let i = 0; i < allTargets.length; i++) {
-      const ent = allTargets[i];
-      if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
-      if (ent.owner && ent.owner === ownerFighter) continue;
-      
-      const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
-      const isPurpleAdapted = isMahoraga && (
-        (ent.gojoAdapted && ent.gojoAdapted.purple) || 
-        (ent.adaptedSkills && ent.adaptedSkills['purple'])
-      );
-      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || isPurpleAdapted;
-      if (!isImmune) {
-        const dx = projectile.x - ent.x;
-        const dy = projectile.y - ent.y;
-        const dist = Math.hypot(dx, dy);
-        
-        if (dist > 0 && dist < purplePullRadius) {
-          ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
-          ent.isCaughtInPurple = true;
-          // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
-          if (typeof ent.interruptAttacks === 'function') {
-            ent.interruptAttacks(true);
-          }
-          if (typeof ent.applyTimeStop === 'function') {
-            ent.applyTimeStop(12);
-          } else {
-            ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
-          }
-          if (typeof ent.applyHitStun === 'function') {
-            ent.applyHitStun(12);
-          }
-          
-          const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
-          ent.vx *= 0.1;
-          ent.vy *= 0.1;
-          
-          // Suppress existing knockback so they don't fling out of the orb
-          if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
-          if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
-
-          ent.x += (dx / dist) * pullStrength;
-          ent.y += (dy / dist) * pullStrength;
         }
       }
     }

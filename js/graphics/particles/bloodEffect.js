@@ -13,6 +13,42 @@ import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 // Object pool for PixiJS Sprites to prevent GC thrashing
 const bloodSpritePool = [];
 
+// Helper to safely convert any color input (hex, RGBA, 32-bit int) into a valid 24-bit RGB numeric tint for PixiJS (0..0xFFFFFF)
+function parseColorToHexNum(color) {
+  if (typeof color === 'number') {
+    return (color & 0xFFFFFF);
+  }
+  if (!color || typeof color !== 'string') return 0xe60000;
+
+  let str = color.trim();
+  if (str.startsWith('rgba') || str.startsWith('rgb')) {
+    const parts = str.match(/[\d.]+/g);
+    if (parts && parts.length >= 3) {
+      const r = Math.max(0, Math.min(255, parseInt(parts[0]) || 0));
+      const g = Math.max(0, Math.min(255, parseInt(parts[1]) || 0));
+      const b = Math.max(0, Math.min(255, parseInt(parts[2]) || 0));
+      return ((r << 16) + (g << 8) + b) & 0xFFFFFF;
+    }
+  }
+
+  if (str.startsWith('#')) str = str.substring(1);
+  else if (str.startsWith('0x')) str = str.substring(2);
+
+  // If 8-character hex (#RRGGBBAA), drop the AA alpha suffix
+  if (str.length === 8) {
+    str = str.substring(0, 6);
+  } else if (str.length === 3 || str.length === 4) {
+    str = str[0] + str[0] + str[1] + str[1] + str[2] + str[2];
+  }
+
+  const parsed = parseInt(str, 16);
+  if (!isNaN(parsed)) {
+    return (parsed & 0xFFFFFF);
+  }
+
+  return 0xe60000;
+}
+
 function getBloodSprite() {
   if (bloodSpritePool.length > 0) {
     const s = bloodSpritePool.pop();
@@ -51,7 +87,7 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
   else if (color === '#ffd700') color = '#ff9900';
   else if (color === '#4dff4d') color = '#00cc00';
 
-  const numericColor = parseInt(color.replace('#', '0x'), 16);
+  const numericColor = parseColorToHexNum(color);
 
   for (let i = 0; i < particleCount; i++) {
     let angle = Math.random() * Math.PI * 2;

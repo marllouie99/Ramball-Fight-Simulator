@@ -5,7 +5,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { initRika, updateRika } from './yuta/rikaLogic.js';
 import { renderYutaDomainBackground } from './yuta/yutaDomainVisuals.js';
@@ -828,9 +828,30 @@ export class YutaFighter extends Fighter {
       // Spawn a main dark impact flash at the midpoint of Yuta's guard
       const flashX = hiltX + Math.cos(bladeAngle) * 50;
       const flashY = hiltY + Math.sin(bladeAngle) * 50;
-      spawnImpactFlash(flashX, flashY, 55, 'dark');
-
+      spawnParrySparksEffect(flashX, flashY);
       triggerGlobalScreenShake(4, 10); // Parry shake
+
+      // Apply physical pushback / deflection bounce to attacker & Yuta
+      if (attacker && attacker !== this && !attacker.isDead) {
+        let dx = attacker.x - this.x;
+        let dy = (attacker.y - (attacker.z || 0)) - (this.y - (this.z || 0));
+        let dist = Math.hypot(dx, dy);
+        if (dist < 0.1) {
+          dx = Math.cos(this.gunAngle || 0);
+          dy = Math.sin(this.gunAngle || 0);
+          dist = 1.0;
+        }
+        const nx = dx / dist;
+        const ny = dy / dist;
+
+        // Push attacker backward from deflection impact
+        attacker.vx = nx * 5.0;
+        attacker.vy = ny * 5.0;
+
+        // Yuta recoils slightly backward from heavy clash
+        this.vx = -nx * 1.8;
+        this.vy = -ny * 1.8;
+      }
 
       // Play block sound
       const parrySnd = getSkillSound(this.id, 'parry');

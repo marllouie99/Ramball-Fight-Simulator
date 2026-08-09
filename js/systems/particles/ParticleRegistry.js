@@ -8,6 +8,18 @@ export const ParticleRegistry = {
     friction: 0.92,
     isFlash: false
   }),
+  parrySpark: () => {
+    const rand = Math.random();
+    const color = rand > 0.5 ? 'rgba(255, 255, 255, 1)' : (rand > 0.25 ? 'rgba(255, 215, 0, 1)' : 'rgba(255, 105, 180, 1)');
+    return {
+      color,
+      decay: 0.05 + Math.random() * 0.07,
+      size: 2.0 + Math.random() * 3.5,
+      speed: 4 + Math.random() * 10,
+      friction: 0.90,
+      isFlash: false
+    };
+  },
   crimsonSniper: () => {
     const rand = Math.random();
     const color = rand > 0.65 ? 'rgba(0, 0, 0, 1)' : (rand > 0.25 ? 'rgba(200, 0, 0, 1)' : 'rgba(255, 255, 255, 1)');

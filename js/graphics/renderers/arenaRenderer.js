@@ -76,10 +76,184 @@ function drawSketchyArenaBorders(ctx, arena, wallWidth) {
   const h = arena.height;
 
   // Draw outside walls with pencil effect
-  drawSketchyLine(ctx, x, y, x + w, y, 100, 'rgba(15,15,18,0.85)', wallWidth);
-  drawSketchyLine(ctx, x + w, y, x + w, y + h, 200, 'rgba(15,15,18,0.85)', wallWidth);
-  drawSketchyLine(ctx, x + w, y + h, x, y + h, 300, 'rgba(15,15,18,0.85)', wallWidth);
-  drawSketchyLine(ctx, x, y + h, x, y, 400, 'rgba(15,15,18,0.85)', wallWidth);
+  drawSketchyLine(ctx, x, y, x + w, y, 100, 'rgba(15,15,18,0.85)', wallWidth); // Top
+  drawSketchyLine(ctx, x + w, y, x + w, y + h, 200, 'rgba(15,15,18,0.85)', wallWidth); // Right
+  drawSketchyLine(ctx, x + w, y + h, x, y + h, 300, 'rgba(15,15,18,0.85)', wallWidth); // Bottom
+  drawSketchyLine(ctx, x, y + h, x, y, 400, 'rgba(15,15,18,0.85)', wallWidth); // Left
+}
+
+/**
+ * Renders a solid jet-black vector fissure crack (matching manga comic / PNG crack art).
+ */
+function drawSolidVectorCrack(ctx, crack) {
+  const alpha = Math.min(1.0, crack.life / 30); // fade out at end of lifetime
+  ctx.save();
+  ctx.translate(crack.x, crack.y);
+  ctx.rotate(crack.angle);
+
+  let r = crack.seed;
+  const rand = () => {
+    r = (r * 9301 + 49297) % 233280;
+    return r / 233280;
+  };
+
+  const fillStyle = `rgba(15, 15, 18, ${alpha * 0.95})`;
+
+  // Helper to draw a filled polygonal crack ribbon path with tapering thickness
+  const drawPolygonalRibbon = (spineNodes) => {
+    if (!spineNodes || spineNodes.length < 2) return;
+    const lefts = [];
+    const rights = [];
+
+    for (let i = 0; i < spineNodes.length; i++) {
+      const curr = spineNodes[i];
+      let dx = 0, dy = 0;
+      if (i === 0) {
+        dx = spineNodes[1].x - curr.x;
+        dy = spineNodes[1].y - curr.y;
+      } else if (i === spineNodes.length - 1) {
+        dx = curr.x - spineNodes[i - 1].x;
+        dy = curr.y - spineNodes[i - 1].y;
+      } else {
+        dx = spineNodes[i + 1].x - spineNodes[i - 1].x;
+        dy = spineNodes[i + 1].y - spineNodes[i - 1].y;
+      }
+      const len = Math.hypot(dx, dy) || 1;
+      const nx = -dy / len;
+      const ny = dx / len;
+      const halfW = Math.max(0.4, curr.w / 2);
+
+      lefts.push({ x: curr.x + nx * halfW, y: curr.y + ny * halfW });
+      rights.push({ x: curr.x - nx * halfW, y: curr.y - ny * halfW });
+    }
+
+    ctx.fillStyle = fillStyle;
+    ctx.beginPath();
+    ctx.moveTo(lefts[0].x, lefts[0].y);
+    for (let i = 1; i < lefts.length; i++) {
+      ctx.lineTo(lefts[i].x, lefts[i].y);
+    }
+    for (let i = rights.length - 1; i >= 0; i--) {
+      ctx.lineTo(rights[i].x, rights[i].y);
+    }
+    ctx.closePath();
+    ctx.fill();
+  };
+
+  // Generate 2 primary solid fissure branches splitting along the wall zone
+  const primaryCount = 2;
+  const primarySpines = [];
+
+  for (let p = 0; p < primaryCount; p++) {
+    const nodes = [];
+    let cx = 0;
+    let cy = 0;
+    let dir = (p === 0 ? -1 : 1);
+    let baseAngle = Math.PI + dir * (0.5 + rand() * 0.5); 
+    let currentAngle = baseAngle;
+    
+    let startThick = 18 + rand() * 10; // Bold thick core (18-28px)
+    const segCount = 6 + Math.floor(rand() * 4);
+
+    nodes.push({ x: cx, y: cy, w: startThick });
+
+    for (let s = 0; s < segCount; s++) {
+      const segLen = 14 + rand() * 22;
+      cx += Math.cos(currentAngle) * segLen;
+      cy += Math.sin(currentAngle) * segLen;
+
+      const progress = (s + 1) / segCount;
+      const w = Math.max(0.5, startThick * Math.pow(1 - progress, 1.2));
+
+      nodes.push({ x: cx, y: cy, w: w });
+
+      // Sharp step-wise zig-zag turns (like the PNG image)
+      const turnSign = (s % 2 === 0 ? 1 : -1);
+      currentAngle += turnSign * (0.4 + rand() * 0.7);
+
+      // Clamp so it stays outside the arena wall
+      const limit = 1.35;
+      if (currentAngle > Math.PI + limit) currentAngle = Math.PI + limit;
+      if (currentAngle < Math.PI - limit) currentAngle = Math.PI - limit;
+    }
+
+    drawPolygonalRibbon(nodes);
+    primarySpines.push(nodes);
+  }
+
+  // Generate sharp offshoot sub-branches splitting from the primary fissures
+  for (const spine of primarySpines) {
+    if (spine.length < 3) continue;
+    const branchCount = 2 + Math.floor(rand() * 3);
+    for (let b = 0; b < branchCount; b++) {
+      const nodeIdx = 1 + Math.floor(rand() * (spine.length - 2));
+      const parentNode = spine[nodeIdx];
+      const parentNext = spine[nodeIdx + 1];
+
+      const parentAngle = Math.atan2(parentNext.y - parentNode.y, parentNext.x - parentNode.x);
+      const sideSign = (b % 2 === 0 ? 1 : -1);
+      let branchAngle = parentAngle + sideSign * (0.8 + rand() * 0.6);
+
+      const branchNodes = [];
+      let cx = parentNode.x;
+      let cy = parentNode.y;
+      let branchStartThick = Math.min(parentNode.w * 0.75, 10 + rand() * 6);
+      const branchSegs = 3 + Math.floor(rand() * 4);
+
+      branchNodes.push({ x: cx, y: cy, w: branchStartThick });
+
+      for (let bs = 0; bs < branchSegs; bs++) {
+        const segLen = 10 + rand() * 16;
+        cx += Math.cos(branchAngle) * segLen;
+        cy += Math.sin(branchAngle) * segLen;
+
+        const progress = (bs + 1) / branchSegs;
+        const w = Math.max(0.4, branchStartThick * (1 - progress));
+
+        branchNodes.push({ x: cx, y: cy, w: w });
+
+        branchAngle += (bs % 2 === 0 ? 1 : -1) * (0.3 + rand() * 0.6);
+
+        const limit = 1.4;
+        if (branchAngle > Math.PI + limit) branchAngle = Math.PI + limit;
+        if (branchAngle < Math.PI - limit) branchAngle = Math.PI - limit;
+      }
+
+      drawPolygonalRibbon(branchNodes);
+    }
+  }
+
+  // Draw 1-2 small detached satellite cracks nearby for added detail
+  const satelliteCount = 1 + Math.floor(rand() * 2);
+  for (let sat = 0; sat < satelliteCount; sat++) {
+    const satOffsetAngle = Math.PI + (rand() - 0.5) * 1.8;
+    const satDist = 30 + rand() * 45;
+    let cx = Math.cos(satOffsetAngle) * satDist;
+    let cy = Math.sin(satOffsetAngle) * satDist;
+
+    const satNodes = [];
+    let satAngle = satOffsetAngle + (rand() - 0.5) * 1.2;
+    let satThick = 5 + rand() * 4;
+    const satSegs = 3 + Math.floor(rand() * 3);
+
+    satNodes.push({ x: cx, y: cy, w: satThick });
+
+    for (let ss = 0; ss < satSegs; ss++) {
+      const len = 8 + rand() * 14;
+      cx += Math.cos(satAngle) * len;
+      cy += Math.sin(satAngle) * len;
+
+      const progress = (ss + 1) / satSegs;
+      const w = Math.max(0.4, satThick * (1 - progress));
+
+      satNodes.push({ x: cx, y: cy, w: w });
+      satAngle += (ss % 2 === 0 ? 1 : -1) * (0.4 + rand() * 0.5);
+    }
+
+    drawPolygonalRibbon(satNodes);
+  }
+
+  ctx.restore();
 }
 
 export function drawArena() {
@@ -154,7 +328,7 @@ export function drawArena() {
     : 4;
   
   // Draw sketchy pencil-style borders on the 2D Canvas context
-  if (!state._arenaBorderCanvas || state._arenaBorderCanvas.arenaWidth !== arena.width || state._arenaBorderCanvas.arenaHeight !== arena.height || state._arenaBorderCanvas.wallWidth !== wallWidth) {
+  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._version !== 2 || state._arenaBorderCanvas.arenaWidth !== arena.width || state._arenaBorderCanvas.arenaHeight !== arena.height || state._arenaBorderCanvas.wallWidth !== wallWidth) {
     const padding = 60; // Extra padding for overshoots
     const offCanvas = document.createElement('canvas');
     offCanvas.width = arena.width + padding * 2;
@@ -163,16 +337,33 @@ export function drawArena() {
     
     drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth);
     
+    offCanvas._version = 2;
     offCanvas.arenaWidth = arena.width;
     offCanvas.arenaHeight = arena.height;
     offCanvas.wallWidth = wallWidth;
     state._arenaBorderCanvas = offCanvas;
   }
+
   const shakeX = state.shakeX || 0;
   const shakeY = state.shakeY || 0;
   ctx.save();
   ctx.translate(shakeX, shakeY);
   ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
+
+  // ── Draw Wall Cracks (Decals) ──
+  if (state.wallCracks && state.wallCracks.length > 0) {
+    for (let i = state.wallCracks.length - 1; i >= 0; i--) {
+      const crack = state.wallCracks[i];
+      crack.life--;
+      if (crack.life <= 0) {
+        state.wallCracks.splice(i, 1);
+        continue;
+      }
+      
+      drawSolidVectorCrack(ctx, crack);
+    }
+  }
+
   ctx.restore();
 
   // Draw "CRONOSPHERE" transparent watermark on the 2D Canvas (since text is easier in Canvas2D)
@@ -414,7 +605,25 @@ export function drawPurpleDimScreen() {
 }
 
 let currentTojiUltimateOpacity = 0;
+let currentSaitamaSeriousPunchOpacity = 0;
 let flyHeads = [];
+let seriousPunchImg = null;
+let seriousPunchImgLoading = false;
+
+function loadSeriousPunchImage() {
+  if (seriousPunchImg || seriousPunchImgLoading) return;
+  seriousPunchImgLoading = true;
+  seriousPunchImg = new Image();
+  seriousPunchImg.onload = () => {
+    seriousPunchImgLoading = false;
+  };
+  seriousPunchImg.onerror = (e) => {
+    console.error("Failed to load serious punch image:", e);
+    seriousPunchImgLoading = false;
+    seriousPunchImg = null;
+  };
+  seriousPunchImg.src = 'Assets/Overlays/serious-punch.png';
+}
 
 export function drawTojiUltimateOverlay() {
   const { ctx, canvas, arena } = state;
@@ -640,8 +849,7 @@ export function drawFuelPickups() {
     ctx.beginPath();
     roundedRect(ctx, nx - bw, ny - bh, bw * 2, bh * 2, br);
     ctx.stroke();
-
-    ctx.restore();
+    ctx.restore();
   });
 }
 
@@ -659,7 +867,318 @@ function roundedRect(ctx, x, y, w, h, r) {
   ctx.closePath();
 }
 
+export function drawSaitamaSeriousPunchDimScreen() {
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  // Active ONLY during the charging/wind-up phase before the punch lands (_counterPunchTimer > 0)
+  const saitama = state.fighters?.find(f => f && (f.type === 'saitama' || f.characterId === 'saitama' || f._def?.id === 'saitama') && f._counterPunchTimer > 0);
+
+  // Trigger preloading of the user's serious punch overlay image
+  if (!seriousPunchImg && !seriousPunchImgLoading) {
+    loadSeriousPunchImage();
+  }
+
+  // The moment the punch lands (_counterPunchTimer reaches 0), instantly snap opacity to 0!
+  if (!saitama) {
+    currentSaitamaSeriousPunchOpacity = 0;
+    return;
+  }
+
+  const targetOpacity = 0.98; // Dark cinematic dimming during charge
+  const totalTime = (CONFIG.saitama?.counterPunchPoseFrames ?? 90) + (CONFIG.saitama?.counterTeleportIdleFrames ?? 30);
+  const progress = Math.min(1.0, Math.max(0.0, 1.0 - (saitama._counterPunchTimer / totalTime)));
+
+  if (targetOpacity > currentSaitamaSeriousPunchOpacity) {
+    currentSaitamaSeriousPunchOpacity += (targetOpacity - currentSaitamaSeriousPunchOpacity) * 0.25;
+  } else {
+    currentSaitamaSeriousPunchOpacity = targetOpacity;
+  }
+
+  if (currentSaitamaSeriousPunchOpacity < 0.01) {
+    currentSaitamaSeriousPunchOpacity = 0;
+    return;
+  }
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.globalAlpha = currentSaitamaSeriousPunchOpacity;
+
+  // Center exactly in the middle of the arena
+  const cx = arena.x + arena.width / 2;
+  const cy = arena.y + arena.height / 2;
+
+  // 1. Solid pitch black dimming screen (OPM Death Punch style)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.99)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw a dramatic glowing red backdrop directly behind where the fist centers
+  const glowGrad = ctx.createRadialGradient(cx, cy, 20, cx, cy, Math.max(canvas.width, canvas.height) * 0.45);
+  glowGrad.addColorStop(0, 'rgba(255, 10, 10, 0.35)');
+  glowGrad.addColorStop(0.5, 'rgba(120, 0, 0, 0.12)');
+  glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = glowGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, Math.max(canvas.width, canvas.height) * 0.45, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Fixed Tapered Speed Lines (they stay at fixed angles while flowing/moving outwards)
+  const now = Date.now();
+  ctx.fillStyle = 'rgba(255, 30, 30, 0.22)';
+  const numLines = 24;
+  for (let i = 0; i < numLines; i++) {
+    const angle = (i / numLines) * Math.PI * 2; // Stay fixed (no rotation!)
+    
+    // Draw 2 rapid outward flowing segments along this fixed angle
+    for (let j = 0; j < 2; j++) {
+      const shift = j * 160;
+      const travel = ((now * 0.45 + i * 55 + shift) % 320);
+      const startDist = 120 + travel;
+      const endDist = startDist + 90 + Math.sin(i * 11) * 35;
+      
+      const wStart = 0.007;
+      const wEnd = 0.002;
+      
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(angle - wStart) * startDist, cy + Math.sin(angle - wStart) * startDist);
+      ctx.lineTo(cx + Math.cos(angle - wEnd) * endDist, cy + Math.sin(angle - wEnd) * endDist);
+      ctx.lineTo(cx + Math.cos(angle + wEnd) * endDist, cy + Math.sin(angle + wEnd) * endDist);
+      ctx.lineTo(cx + Math.cos(angle + wStart) * startDist, cy + Math.sin(angle + wStart) * startDist);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  // 3. Draw the giant red fist!
+  const poseFrames = CONFIG.saitama?.counterPunchPoseFrames ?? 90;
+  if (saitama._counterPunchTimer <= poseFrames) {
+    const punchProgress = (poseFrames - saitama._counterPunchTimer) / poseFrames;
+    
+    // Starts big (0.90) and slowly grows to peak (1.30)
+    const scale = 0.90 + Math.pow(punchProgress, 1.5) * 0.40;
+    
+    // Screen shaking intensity increases with progress
+    const shakeIntensity = 8 * punchProgress;
+    const fistX = cx + (Math.random() - 0.5) * shakeIntensity;
+    const fistY = cy + (Math.random() - 0.5) * shakeIntensity;
+    
+    ctx.save();
+    ctx.translate(fistX, fistY);
+    ctx.scale(scale, scale);
+    
+    // Smoothly fade in the fist over the first 25% of the punch progress
+    const fistFade = Math.min(1.0, punchProgress * 4.0);
+    ctx.globalAlpha = Math.min(0.45, currentSaitamaSeriousPunchOpacity * 0.45) * fistFade;
+    
+    if (seriousPunchImg && seriousPunchImg.complete && seriousPunchImg.naturalWidth > 0) {
+      // Scale PNG to occupy 70% of the canvas width at base scale = 1.0
+      const targetWidth = canvas.width * 0.70;
+      const imgScale = targetWidth / seriousPunchImg.naturalWidth;
+      
+      ctx.save();
+      ctx.scale(imgScale, imgScale);
+      ctx.drawImage(seriousPunchImg, -seriousPunchImg.naturalWidth / 2, -seriousPunchImg.naturalHeight / 2);
+      ctx.restore();
+    } else {
+      // High-quality vector fallback if the image hasn't finished loading yet
+      _drawSeriousRedFist(ctx, punchProgress);
+    }
+    
+    ctx.restore();
+  }
+
+  excludeGojoInfinityFromDim(ctx);
+  ctx.restore();
+}
+function _pathHandShape(ctx) {
+  ctx.beginPath();
+  // Wrist left
+  ctx.moveTo(-110, 190);
+  // Left pinky side curve
+  ctx.bezierCurveTo(-160, 110, -170, 20, -145, -45);
+  // Pinky knuckle bump
+  ctx.bezierCurveTo(-135, -85, -100, -95, -80, -85);
+  // Ring knuckle bump
+  ctx.bezierCurveTo(-60, -100, -30, -100, -10, -90);
+  // Middle knuckle bump
+  ctx.bezierCurveTo(10, -105, 45, -105, 65, -85);
+  // Index knuckle bump
+  ctx.bezierCurveTo(85, -75, 115, -65, 125, -25);
+  // Down the right side
+  ctx.bezierCurveTo(135, 15, 125, 110, 95, 190);
+  ctx.closePath();
+}
+
+function _drawSeriousRedFist(ctx, progress) {
+  ctx.save();
+  
+  // Tilt the fist slightly counter-clockwise to match the OPM impact frame angle
+  ctx.rotate(-0.12);
+
+  const now = Date.now();
+
+  // Spiky Aura Energy Flares radiating from the knuckle border (Rule #11 compliant)
+  ctx.save();
+  const numFlares = 80;
+  for (let i = 0; i < numFlares; i++) {
+    const angle = (i / numFlares) * Math.PI * 2 + (now / 200);
+    const rBase = 120 + Math.sin(angle * 7 + now / 80) * 15;
+    const length = 35 + Math.sin(angle * 13 + now / 40) * 45;
+    
+    ctx.strokeStyle = i % 2 === 0 ? 'rgba(255, 255, 255, 0.8)' : 'rgba(255, 30, 30, 0.6)';
+    ctx.lineWidth = i % 2 === 0 ? 1.5 : 3.5;
+    
+    ctx.beginPath();
+    ctx.moveTo(Math.cos(angle) * rBase, Math.sin(angle) * rBase);
+    ctx.lineTo(Math.cos(angle) * (rBase + length), Math.sin(angle) * (rBase + length));
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Glow Layers (Rule 11 compliant concentric shapes)
+  ctx.save();
+  ctx.scale(1.25, 1.25);
+  _pathHandShape(ctx);
+  ctx.fillStyle = 'rgba(255, 0, 0, 0.10)';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.scale(1.15, 1.15);
+  _pathHandShape(ctx);
+  ctx.fillStyle = 'rgba(255, 20, 20, 0.20)';
+  ctx.fill();
+  ctx.restore();
+
+  ctx.save();
+  ctx.scale(1.06, 1.06);
+  _pathHandShape(ctx);
+  ctx.fillStyle = 'rgba(255, 50, 50, 0.35)';
+  ctx.fill();
+  ctx.restore();
+
+  // Base Fist silhouette fill using a high-impact Radial Gradient (White-hot core to deep crimson)
+  const fistGrad = ctx.createRadialGradient(-5, -15, 10, -5, -15, 150);
+  fistGrad.addColorStop(0, '#ffffff'); // White-hot core
+  fistGrad.addColorStop(0.2, '#ffaaaa'); // Soft pink-white glow
+  fistGrad.addColorStop(0.45, '#ff232d'); // Vibrant anime red
+  fistGrad.addColorStop(0.8, '#8a0002'); // Deep crimson shadow
+  fistGrad.addColorStop(1.0, '#260001'); // Dark outer shadow
+  ctx.fillStyle = fistGrad;
+  _pathHandShape(ctx);
+  ctx.fill();
+
+  // Ink outline
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 11;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  _pathHandShape(ctx);
+  ctx.stroke();
+
+  // Knuckle Crease Separator Lines (expressing clenched fingers)
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 9;
+  
+  // Pinky / Ring separator
+  ctx.beginPath();
+  ctx.moveTo(-80, -85);
+  ctx.bezierCurveTo(-85, -20, -75, 40, -65, 75);
+  ctx.stroke();
+
+  // Ring / Middle separator
+  ctx.beginPath();
+  ctx.moveTo(-10, -90);
+  ctx.bezierCurveTo(-15, -25, -5, 35, 5, 80);
+  ctx.stroke();
+
+  // Middle / Index separator
+  ctx.beginPath();
+  ctx.moveTo(65, -85);
+  ctx.bezierCurveTo(55, -20, 50, 40, 55, 70);
+  ctx.stroke();
+
+  // Knuckle Crease Highlights
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+  ctx.lineWidth = 3.5;
+  
+  ctx.beginPath();
+  ctx.moveTo(-75, -75);
+  ctx.bezierCurveTo(-80, -20, -70, 40, -60, 65);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(-5, -80);
+  ctx.bezierCurveTo(-10, -25, 0, 35, 10, 70);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(70, -75);
+  ctx.bezierCurveTo(60, -20, 55, 40, 60, 60);
+  ctx.stroke();
+
+  // Thumb folded across bottom-left
+  ctx.save();
+  ctx.translate(-25, 75);
+  ctx.rotate(Math.PI * 0.05);
+
+  ctx.beginPath();
+  ctx.moveTo(-80, 0);
+  ctx.bezierCurveTo(-50, 35, 20, 35, 60, 10);
+  ctx.bezierCurveTo(90, -5, 100, -25, 95, -45);
+  ctx.bezierCurveTo(70, -20, 20, -10, -30, -10);
+  ctx.bezierCurveTo(-60, -10, -75, -10, -80, 0);
+  ctx.closePath();
+
+  const thumbGrad = ctx.createLinearGradient(-80, 0, 80, 0);
+  thumbGrad.addColorStop(0, '#2b0000');
+  thumbGrad.addColorStop(0.4, '#8a0002');
+  thumbGrad.addColorStop(0.8, '#ff232d');
+  thumbGrad.addColorStop(1.0, '#ffffff');
+  ctx.fillStyle = thumbGrad;
+  ctx.fill();
+
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 9;
+  ctx.stroke();
+
+  // Inner thumb crease highlight
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(-60, 5);
+  ctx.bezierCurveTo(-20, 15, 30, 15, 65, 0);
+  ctx.stroke();
+
+  ctx.restore();
+
+  // Manga Shading Hatching lines (Black wedges)
+  ctx.fillStyle = '#000000';
+  
+  ctx.beginPath();
+  ctx.moveTo(-70, 110);
+  ctx.lineTo(-50, 185);
+  ctx.lineTo(-75, 185);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(0, 95);
+  ctx.lineTo(5, 188);
+  ctx.lineTo(-10, 188);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(50, 115);
+  ctx.lineTo(55, 185);
+  ctx.lineTo(40, 185);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
 // ──────────────────────────────────────────
 // DRAW — FLOATING TEXT LABELS
 // ──────────────────────────────────────────
-
