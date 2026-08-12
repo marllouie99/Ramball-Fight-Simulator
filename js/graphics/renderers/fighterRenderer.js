@@ -8,7 +8,8 @@ import {
   drawSilenceEffect,
   drawThunderRootsEffect,
   drawBlackFlashDebuffEffect,
-  drawVoidMarkEffect
+  drawVoidMarkEffect,
+  drawParalyzeEffect
 } from '../statusEffects.js';
 
 // Cache of pre-computed sketchy circle paths keyed by "radius_seed"
@@ -177,6 +178,10 @@ export class FighterRenderer {
 
     if (fighter.voidMarkTimer > 0) {
       drawVoidMarkEffect(ctx, baseRadius);
+    }
+
+    if (fighter.paralyzeTimer > 0) {
+      drawParalyzeEffect(ctx, baseRadius);
     }
   }
 

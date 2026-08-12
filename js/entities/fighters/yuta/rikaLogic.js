@@ -10,7 +10,7 @@ export function initRika(fighter) {
   fighter.rika = {
     active: false,
     timer: 0,
-    cooldownTimer: 99999, // Disabled timer-based auto-summon (requires 50% HP or Domain Expansion)
+    cooldownTimer: 0, // Disabled timer-based auto-summon (requires 50% HP or Domain Expansion)
     x: fighter.x,
     y: fighter.y,
     vx: 0,
@@ -44,12 +44,18 @@ export function initRika(fighter) {
       return !!(this.rightArmTimer > 0 || this.leftArmTimer > 0 || this.spawnTimer > 0 || this.disappearing);
     },
     applyHitStun: function(duration) {
+      if (this.owner && (this.owner.isChannelingPureLoveBeam || this.owner.isFiringPureLoveBeam || (this.owner.rikaEmergingForBeamTimer > 0) || (this.owner.pureLoveBeamBreatherTimer > 0))) {
+        return; // Ignore hit stun during Pure Love Beam firing
+      }
       if (duration > this.hitStunTimer) this.hitStunTimer = duration;
     },
     applyTimeStop: function(duration) {
       if (duration > this.timeStopTimer) this.timeStopTimer = duration;
     },
     applyKnockback: function(vx, vy) {
+      if (this.owner && (this.owner.isChannelingPureLoveBeam || this.owner.isFiringPureLoveBeam || (this.owner.rikaEmergingForBeamTimer > 0) || (this.owner.pureLoveBeamBreatherTimer > 0))) {
+        return; // Ignore knockback push during Pure Love Beam firing
+      }
       if (typeof vx === 'number') this.knockbackVx = (this.knockbackVx || 0) + vx;
       if (typeof vy === 'number') this.knockbackVy = (this.knockbackVy || 0) + vy;
     },
@@ -81,6 +87,24 @@ export function updateRika(fighter, arena) {
                    (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || 
                    (fighter.crimsonElectrifiedTimer > 0) || (fighter.isFrozenByInfinity);
                    
+  if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || fighter.pureLoveBeamBreatherTimer > 0) {
+    // Glue Rika directly behind Yuta's back (facing forward over his shoulders)
+    const backAngle = fighter.gunAngle + Math.PI;
+    const backDist = (fighter.r || 22) + 24;
+    rk.x = fighter.x + Math.cos(backAngle) * backDist;
+    rk.y = fighter.y + Math.sin(backAngle) * backDist;
+    rk.angle = fighter.gunAngle;
+    rk.vx = 0;
+    rk.vy = 0;
+    rk.knockbackVx = 0;
+    rk.knockbackVy = 0;
+    rk.hitStunTimer = 0;
+    rk.rightArmTimer = 0;
+    rk.leftArmTimer = 0;
+    rk.attackTimer = 0;
+    return; // Skip normal Rika AI steering, attacks, and hit-reactions so she remains locked on Yuta's back!
+  }
+
   if (isFrozen && !rk.active) {
     return;
   }
@@ -97,13 +121,16 @@ export function updateRika(fighter, arena) {
     }
   }
 
-  // 50% HP Emergency Summon Trigger: Automatically call Rika for help when Yuta reaches 50% HP or lower
+  // 50% HP Emergency Summon Trigger: Automatically call Rika for help when Yuta reaches 50% HP or lower (First Summon)
   const hpRatio = fighter.hp / (fighter.maxHp || 200);
   const hpThreshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
-  if (!rk.active && !rk.hasSummonedAt50Hp && hpRatio <= hpThreshold && !fighter.isDying && fighter.hp > 0) {
-    rk.hasSummonedAt50Hp = true;
+  const isInsideDomain = fighter.domainActive || fighter.isChannelingDomain;
+
+  if (!rk.active && !rk.hasSummonedAt50Hp && hpRatio <= hpThreshold && !fighter.isDying && fighter.hp > 0 && !isInsideDomain) {
+    rk.hasSummonedAt50Hp = true; // Lockout further HP-threshold summons
+    fighter.rikaRechargeHpBaseline = undefined;
     const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 80;
-    rk.cooldownTimer = chargeDuration;
+    rk.chargeTimer = chargeDuration; // Use dedicated charge timer for the spawn animation delay
 
     // Trigger "Come, Rika!" audio (comerika.mp3) and freeze Yuta's movement
     rk.playedComeRikaSound = true;
@@ -122,13 +149,53 @@ export function updateRika(fighter, arena) {
         CONFIG.yuta.comeRikaDelay ?? 0
       );
     }
+  } else if (!rk.active && rk.hasSummonedAt50Hp && !fighter.isDying && fighter.hp > 0 && (rk.chargeTimer || 0) <= 0) {
+    // Re-summon Trigger: Fills up as Yuta takes damage (inside OR outside domain) after Rika died!
+    if (fighter.rikaRechargeHpBaseline === undefined) {
+      fighter.rikaRechargeHpBaseline = fighter.hp;
+    }
+    const reqDamage = (fighter.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.50);
+    const damageTaken = Math.max(0, fighter.rikaRechargeHpBaseline - fighter.hp);
+
+    if (damageTaken >= reqDamage) {
+      fighter.rikaRechargeHpBaseline = undefined;
+      rk.killedInDomain = false;
+      const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 80;
+      rk.chargeTimer = chargeDuration;
+      rk.playedComeRikaSound = true;
+      fighter.rikaCallTimer = chargeDuration;
+      fighter.vx = 0;
+      fighter.vy = 0;
+      if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - 35, 'COME, RIKA!', '#FF1493');
+      if (typeof spawnImpactFlash === 'function') spawnImpactFlash(fighter.x, fighter.y, 45, 'rgba(255, 20, 147, 0.4)');
+      if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(1, 6);
+
+      if (CONFIG.yuta?.comeRikaSound) {
+        audioSystem.playSFX(
+          CONFIG.yuta.comeRikaSound,
+          CONFIG.yuta.comeRikaVolume ?? 2.5,
+          1.0, 0,
+          CONFIG.yuta.comeRikaDelay ?? 0
+        );
+      }
+    }
   }
 
-  if (!rk.active && rk.cooldownTimer > 0) {
-    rk.cooldownTimer--;
+  // Handle the spawn delay (chargeTimer) independently from cooldown
+  if (!rk.active && rk.chargeTimer > 0) {
+    const isInsideDomain = fighter.domainActive || fighter.isChannelingDomain;
+    if (!isInsideDomain) {
+      rk.chargeTimer--;
+    }
 
-    if (rk.cooldownTimer <= 0) {
+    if (rk.chargeTimer <= 0 && !isInsideDomain) {
+      // NOTE: We do NOT reset hasSummonedAt50Hp here. The 50% HP summon is a one-time event!
       rk.active = true;
+      rk.isDying = false;
+      rk.disappearing = false;
+      rk.deathTimer = 0;
+      rk.disappearTimer = 0;
+      rk.isSacrificingForBeam = false;
       rk.timer = CONFIG.yuta.rikaDuration || 1000;
       rk.x = fighter.x;
       rk.y = fighter.y;
@@ -139,6 +206,7 @@ export function updateRika(fighter, arena) {
       rk.spawnTimer = ariseMax; // Paused load/arise duration (180 frames = 3.0 seconds)
       rk.spawnScale = 0.05;
       rk.isDomainSpawn = false;
+      fighter.rikaAlpha = 0;
 
       if (typeof state !== 'undefined') {
         if (!state.illusions) state.illusions = [];
@@ -412,7 +480,7 @@ export function updateRika(fighter, arena) {
         rk.active = false;
         rk.isDying = false;
         rk.disappearing = false;
-        rk.cooldownTimer = CONFIG.yuta.rikaCooldown;
+        rk.cooldownTimer = 0;
         rk.r = CONFIG.yuta.rikaRadius || 30;
 
         if (fighter.domainActive) {
@@ -442,33 +510,24 @@ export function updateRika(fighter, arena) {
         spawnSparks(rk.x, rk.y, 12, 'rikaCurse');
         rk.active = false;
         rk.disappearing = false;
-        rk.cooldownTimer = CONFIG.yuta.rikaCooldown;
+        rk.cooldownTimer = 0;
+        rk.hasSummonedAt50Hp = true;
         rk.r = baseR; // Reset radius for next summon
         rk.spawnScale = 0.05;
+        fighter.rikaAlpha = 0;
       }
     } else {
-      rk.timer--;
-      
-      // Handle death by HP or timer expiration
-      if ((rk.timer <= 0 && !fighter.domainActive) || rk.hp <= 0) {
+      // Rika stays active indefinitely as long as her HP > 0 (no duration timer limit)
+      if (rk.hp <= 0) {
         // Remove from global target arrays so AI instantly stops attacking her
         if (state.illusions) {
           const idx = state.illusions.indexOf(rk);
           if (idx >= 0) state.illusions.splice(idx, 1);
         }
 
-        if (rk.hp <= 0) {
-          // ENTER DYING STATE
-          rk.isDying = true;
-          rk.deathTimer = 10; // Extremely fast dying animation before explosion
-        } else {
-          // GRACEFUL SHRINK (Timer Expiration)
-          rk.disappearing = true;
-          rk.disappearDuration = 20; // Faster shrink
-          rk.disappearTimer = 20;
-          rk.startX = rk.x;
-          rk.startY = rk.y;
-        }
+        // ENTER DYING STATE
+        rk.isDying = true;
+        rk.deathTimer = 10; // Fast dying animation before explosion
       }
     }
   }
@@ -534,6 +593,22 @@ export function updateRika(fighter, arena) {
     if (rk.y < minY) { rk.y = minY; rk.vy = -rk.vy * 0.5; }
     if (rk.y > maxY) { rk.y = maxY; rk.vy = -rk.vy * 0.5; }
     return;
+  }
+
+  // Snap Rika to Yuta's back when channeling Pure Love Beam
+  if (fighter.isChannelingPureLoveBeam) {
+    const angle = fighter.gunAngle || 0;
+    const offsetDist = fighter.r + rk.r + 5;
+    rk.x = fighter.x - Math.cos(angle) * offsetDist;
+    rk.y = fighter.y - Math.sin(angle) * offsetDist;
+    rk.vx = 0;
+    rk.vy = 0;
+    
+    // Spawn energy gathering sparks on Rika too
+    if (fighter.pureLoveBeamChargeTimer % 3 === 0) {
+      spawnSparks(rk.x, rk.y, 2, 'rikaCurse', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
+    }
+    return; // Completely freeze AI during beam charge
   }
 
   // Freeze Rika in place for a moment while she is loading/arising (during spawnTimer)
@@ -803,13 +878,21 @@ export function updateRika(fighter, arena) {
     bounced = true;
   }
 
-  // On bounce — re-lock toward target (like illusions do)
+  // On bounce — re-lock toward target (unless target is Gojo with active Infinity)
   if (bounced && rk.target) {
-    const dx = rk.target.x - rk.x;
-    const dy = rk.target.y - rk.y;
-    const d = Math.hypot(dx, dy) || 1;
-    rk.vx = (dx / d) * speed;
-    rk.vy = (dy / d) * speed;
+    const isGojoInfinity =
+      (rk.target.characterId === 'gojo' || rk.target.type === 'gojo') &&
+      !rk.target.isMeleeMode &&
+      ((rk.target.infinityCooldown || 0) <= 0 || rk.target.infinityActive);
+
+    if (!isGojoInfinity) {
+      const dx = rk.target.x - rk.x;
+      const dy = rk.target.y - rk.y;
+      const d = Math.hypot(dx, dy) || 1;
+      rk.vx = (dx / d) * speed;
+      rk.vy = (dy / d) * speed;
+    }
+    // else: keep the natural reflected velocity (already set by the wall clamp above)
   }
 }
 

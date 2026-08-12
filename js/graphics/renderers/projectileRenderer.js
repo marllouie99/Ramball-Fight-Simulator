@@ -576,6 +576,181 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
+    // --- Yuta's Pure Love Beam ---
+    if (p.visual === 'yuta_pure_love_beam') {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.angle);
+      
+      const length = p.length || 2500;
+      const radius = p.r || 170;
+      const lifeRatio = Math.max(0, Math.min(1, p.life / (p.maxLife || 60)));
+      
+      // 20 FPS Quantized Frame Step (50ms interval)
+      const frameStep20 = Math.floor(Date.now() / 50);
+      const pseudoRand = (seed) => {
+        const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+        return x - Math.floor(x);
+      };
+
+      const throb = Math.sin(frameStep20 * 0.4) * 16;
+      const currentRadius = radius + throb;
+      
+      // Helper: Draw smooth expanding pill-cone path (narrow at Yuta, spreads wide as it extends, rounded pill tip)
+      const drawExpandingPillPath = (startR, endR, len) => {
+        ctx.beginPath();
+        // Round origin cap at Yuta (x = 0)
+        ctx.arc(0, 0, startR, Math.PI * 0.5, -Math.PI * 0.5, false);
+        // Top spreading edge line going out to len
+        ctx.lineTo(len, -endR);
+        // Round pill tip cap at the end of the beam (x = len)
+        ctx.arc(len, 0, endR, -Math.PI * 0.5, Math.PI * 0.5, false);
+        // Bottom spreading edge line returning to origin
+        ctx.lineTo(0, startR);
+        ctx.closePath();
+      };
+
+      const startBaseR = currentRadius * 0.25;
+      const endBaseR = currentRadius * 2.7;
+
+      // 1. Dark Void Outer Shell (Dark Black / Deep Violet Ink Containment)
+      ctx.globalAlpha = 0.85 * lifeRatio;
+      const outerVoidGrad = ctx.createLinearGradient(0, -endBaseR * 1.3, 0, endBaseR * 1.3);
+      outerVoidGrad.addColorStop(0, 'rgba(15, 0, 25, 0.95)');
+      outerVoidGrad.addColorStop(0.25, 'rgba(120, 0, 160, 0.8)');
+      outerVoidGrad.addColorStop(0.5, 'rgba(255, 0, 180, 0.4)');
+      outerVoidGrad.addColorStop(0.75, 'rgba(120, 0, 160, 0.8)');
+      outerVoidGrad.addColorStop(1, 'rgba(15, 0, 25, 0.95)');
+      
+      ctx.fillStyle = outerVoidGrad;
+      drawExpandingPillPath(startBaseR * 1.4, endBaseR * 1.4, length);
+      ctx.fill();
+
+      // Switch to lighter composite for additive energy layers
+      ctx.globalCompositeOperation = 'lighter';
+
+      // 2. Deep Violet / Purple Beam Body Gradient (Spreading Pill Shape)
+      ctx.globalAlpha = 0.95 * lifeRatio;
+      const beamGrad = ctx.createLinearGradient(0, -endBaseR, 0, endBaseR);
+      beamGrad.addColorStop(0, 'rgba(180, 0, 220, 0.95)');    // Top Edge Deep Purple
+      beamGrad.addColorStop(0.2, 'rgba(230, 0, 160, 0.95)');  // Inner Magenta
+      beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Blinding White Core
+      beamGrad.addColorStop(0.8, 'rgba(230, 0, 160, 0.95)');  // Inner Magenta
+      beamGrad.addColorStop(1, 'rgba(180, 0, 220, 0.95)');    // Bottom Edge Deep Purple
+      
+      ctx.fillStyle = beamGrad;
+      drawExpandingPillPath(startBaseR, endBaseR, length);
+      ctx.fill();
+
+      // Outer JJK Pitch-Black Calligraphy Ink Contour
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 3.5;
+      drawExpandingPillPath(startBaseR, endBaseR, length);
+      ctx.stroke();
+
+      // JJK Calligraphy Ink Brush Lines & Hatch Cuts (Pitch-black manga ink streaks streaming along the beam)
+      const numBlackLines = 8;
+      ctx.lineCap = 'square';
+      for (let i = 0; i < numBlackLines; i++) {
+        const side = (i % 2 === 0 ? -1 : 1);
+        const lineRatio = 0.25 + (i % 4) * 0.22;
+        ctx.strokeStyle = '#000000';
+        ctx.lineWidth = 2.0 + (i % 3) * 1.0;
+        ctx.beginPath();
+        let lx = 0;
+        let ly = side * startBaseR * lineRatio;
+        ctx.moveTo(lx, ly);
+        const steps = 16;
+        const stepLen = length / steps;
+        for (let s = 1; s <= steps; s++) {
+          const prog = s / steps;
+          const cutSeed = pseudoRand(frameStep20 * 79 + i * 37 + s * 13);
+          if (cutSeed < 0.28) {
+            // Skip broken gaps for JJK Calligraphy Ink Brush technique
+            lx = s * stepLen;
+            ly = side * (startBaseR + (endBaseR - startBaseR) * prog) * lineRatio;
+            ctx.moveTo(lx, ly);
+            continue;
+          }
+          const currentSpreadY = side * (startBaseR + (endBaseR - startBaseR) * prog) * lineRatio;
+          const jag = (pseudoRand(frameStep20 * 41 + s * 19 + i * 23) - 0.5) * (8 + prog * 12);
+          lx = s * stepLen;
+          ly = currentSpreadY + jag;
+          ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+      }
+
+      ctx.globalCompositeOperation = 'lighter';
+
+      // 3. High-Intensity Red & Pink Spreading Edge Lightning (20 FPS Stepped Electric Crackles)
+      const numEdgeLightning = 6;
+      for (let i = 0; i < numEdgeLightning; i++) {
+        const side = (i % 2 === 0 ? -1 : 1);
+        const ratio = 0.75 + (i % 3) * 0.15;
+        ctx.strokeStyle = (pseudoRand(frameStep20 * 7 + i * 13) > 0.4) ? '#FF0055' : '#FF1493';
+        ctx.lineWidth = 4.0;
+        ctx.beginPath();
+        let lx = 0;
+        let ly = side * startBaseR * ratio;
+        ctx.moveTo(lx, ly);
+        const steps = 14;
+        const stepLen = length / steps;
+        for (let s = 1; s <= steps; s++) {
+          const prog = s / steps;
+          const currentSpreadY = side * (startBaseR + (endBaseR - startBaseR) * prog) * ratio;
+          // 20 FPS stepped electric jitter
+          const jag = (pseudoRand(frameStep20 * 31 + s * 17 + i * 47) - 0.5) * (14 + prog * 18);
+          lx = s * stepLen;
+          ly = currentSpreadY + jag;
+          ctx.lineTo(lx, ly);
+        }
+        ctx.stroke();
+      }
+
+      // 4. Blinding White-Hot Laser Core Center (Expanding Pill Core)
+      ctx.globalAlpha = 1.0 * lifeRatio;
+      ctx.fillStyle = '#FFFFFF';
+      drawExpandingPillPath(startBaseR * 0.4, endBaseR * 0.4, length);
+      ctx.fill();
+
+      // 5. Massive Vibrant Pink Light Bloom & Flare at Origin
+      ctx.globalAlpha = 1.0 * lifeRatio;
+      ctx.globalCompositeOperation = 'lighter';
+      
+      const flareRadius = currentRadius * 1.8; // Generous 1.8x beam radius bright pink light bloom
+      const originGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, flareRadius);
+      originGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');       // White hot core
+      originGrad.addColorStop(0.25, 'rgba(255, 20, 147, 1.0)');     // High intensity neon pink
+      originGrad.addColorStop(0.55, 'rgba(255, 105, 180, 0.8)');    // Hot pink aura
+      originGrad.addColorStop(0.8, 'rgba(180, 0, 220, 0.45)');     // Violet outer glow
+      originGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      
+      ctx.fillStyle = originGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, flareRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 6. Streaming White Particle Spark Embers spreading along the beam length (20 FPS Stepped)
+      const numBeamEmbers = 35;
+      ctx.fillStyle = '#FFFFFF';
+      for (let i = 0; i < numBeamEmbers; i++) {
+        const seed = i * 47.11;
+        const emberX = ((frameStep20 * 18 + seed * 100) % length);
+        const spreadFactor = (emberX / length);
+        const maxSpreadY = startBaseR + (endBaseR - startBaseR) * spreadFactor;
+        const emberY = ((pseudoRand(frameStep20 * 13 + i * 29) - 0.5) * maxSpreadY * 1.7);
+        const emberR = 1.5 + (i % 3) * 1.2;
+        ctx.beginPath();
+        ctx.arc(emberX, emberY, emberR, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+      return;
+    }
+
     // Crimson Sniper bullet
     if (p.visual === 'crimsonSniperBullet') {
       drawCrimsonSniperBullet(ctx, p, false);

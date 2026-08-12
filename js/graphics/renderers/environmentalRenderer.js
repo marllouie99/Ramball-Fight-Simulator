@@ -104,11 +104,18 @@ export function drawFurnaceDimScreen() {
     return;
   }
 
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+
   ctx.save();
+  // Reset the transform temporarily to prevent edge gaps during screen shakes
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Dark fiery vignette gradient centered on Sukuna/Arrow
   const opacity = currentFurnaceDimOpacity;
-  const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(canvas.width, canvas.height) * 0.95);
+  const drawCx = cx + shakeX;
+  const drawCy = cy + shakeY;
+  const grad = ctx.createRadialGradient(drawCx, drawCy, 0, drawCx, drawCy, Math.max(canvas.width, canvas.height) * 0.95);
   grad.addColorStop(0, `rgba(255, 140, 0, ${opacity * 0.95})`);
   grad.addColorStop(0.06, `rgba(255, 70, 0, ${opacity * 0.85})`);
   grad.addColorStop(0.15, `rgba(160, 25, 0, ${opacity * 0.70})`);

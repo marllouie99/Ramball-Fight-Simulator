@@ -30,6 +30,9 @@ export function drawSukunaBody(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - z);
 
+  const angle = fighter.angle || 0;
+  ctx.rotate(angle);
+
   // Clip to fighter circle
   ctx.save();
   ctx.beginPath();

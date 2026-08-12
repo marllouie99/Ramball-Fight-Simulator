@@ -9,7 +9,7 @@ export const gojoConfig = {
     blueSpeed: 10.5,           // Speed of Blue orb projectile
     blueRadius: 50,           // Pull radius of Blue explosion
     bluePullForce: 0.5,       // Pull strength of Blue
-    redDamage: 50,            // Base damage dealt by Reversal Red blast
+    redDamage: 100,            // Base damage dealt by Reversal Red blast
     redKnockback: 25,         // Knockback force of Red
     redCooldown: 1000,         // Cooldown of Red
     redRange: 100,            // Base range
@@ -23,18 +23,18 @@ export const gojoConfig = {
     redShakeDuration: 25,     // Duration of screen shake on Red detonation
     purpleCooldown: 1500,      // Cooldown of Hollow Purple
     purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
-    purpleDamage: 20,         // Continuous piercing damage per tick
-    purpleSpeed: 5,           // Speed of Purple orb
+    purpleDamage: 70,         // Continuous piercing damage per tick
+    purpleSpeed: 6,           // Speed of Purple orb
     purpleRadius: 50,         // Radius of Purple orb
     purpleLife: 250,         // How long Purple orb stays in arena (frames)
     purpleTravelTime: 20,    // Frames the orb travels before stopping (0 = stop immediately)
-    purpleDPS: 30,            // Damage per second dealt to enemies inside the orb
+    purpleDPS: 150,            // Damage per second dealt to enemies inside the orb
     purpleDPSInterval: 10,   // Frames between DPS ticks (30 = 0.5s at 60fps)
     purpleSlowDuration: 60,  // Frames the slow effect lasts (1 second at 60fps)
     purpleSlowMultiplier: 0.5, // Speed multiplier while slowed (0.5 = 50% speed)
-    purplePullRadius: 280,   // Radius in pixels for gravitational pull field around Hollow Purple
+    purplePullRadius: 300,   // Radius in pixels for gravitational pull field around Hollow Purple
     purplePullForce: 8.0,    // How strongly enemies and illusions are dragged toward the orb center
-    purpleShakeIntensity: 5, // Screen shake intensity when purple orb fires
+    purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
     purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
     domainCooldown: 2000,     // 20s Ultimate cooldown
     domainChargeMax: 130,     // 2s Channeling duration before domain opens
@@ -43,18 +43,18 @@ export const gojoConfig = {
     domainExpansionAudioDelay: 10, // Frames after domain deployment when gojodomainexpansion.mp3 plays
     // Reverse Cursed Technique (RCT) Healing Config
     enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
-    reverseCursedTechniqueHpThreshold: 0.30, // Triggers RCT when HP drops to 30% or below
-    reverseCursedTechniqueHealPercent: 0.35, // Heals 35% of max HP per RCT trigger
-    reverseCursedTechniqueCooldown: 900,     // 15 second cooldown between RCT heals (frames at 60fps)
+    reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 30% or below
+    reverseCursedTechniqueHealPercent: 0.20, // Heals 35% of max HP per RCT trigger
+    reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals (frames at 60fps)
     rctChannelDuration: 90,                  // 1.5 second channeling heal window
-    enablePassiveRctRegen: true,             // Continuous Six Eyes brain refresh passive regen
-    passiveRctHealRate: 0.08,                // Per-frame passive regen when damaged
+    enablePassiveRctRegen: false,            // Passive continuous regen disabled (RCT triggers only on low HP threshold)
+    passiveRctHealRate: 0,                   // Disabled
     rctRevivalHealPercent: 0.30,             // Restores 30% max HP on emergency revival
     // Melee Mode (Hand-to-Hand Combat)
-    initialMeleeDuration: 60, // Forces hand-to-hand combat for the initial duration
+    initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
     meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
     closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
-    meleePunchDamage: 10,     // Damage dealt by each punch
+    meleePunchDamage: 14,     // Damage dealt by each punch
     meleePunchCooldown: 9,   // Frames between punches
     teleportDelay: 5,        // Frames delay before teleport after punch
     teleportSpeed: 15,        // Speed of teleport movement (pixels per frame)

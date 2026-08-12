@@ -581,4 +581,97 @@ export function drawVoidMarkEffect(ctx, baseRadius) {
   ctx.restore();
 }
 
+export function drawParalyzeEffect(ctx, baseRadius) {
+  ctx.save();
+  const time = Date.now() * 0.004;
+  const numRings = 2;
+  
+  // 1. Tilted 3D golden rings orbiting above head
+  for (let i = 0; i < numRings; i++) {
+    ctx.save();
+    
+    // Tilted orbit center above the head
+    const yOffset = -baseRadius - 12 + (i * 5);
+    ctx.translate(0, yOffset);
+    
+    // 3D Tilt perspective (squish Y axis)
+    ctx.scale(1.0, 0.35);
+    
+    // Rotate ring over time
+    const angleOffset = i * Math.PI + time;
+    ctx.rotate(angleOffset);
+    
+    // Orbit radius
+    const r = baseRadius * 0.7;
+    
+    // Draw the ring path
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + 0.3 * Math.sin(time * 1.5 + i)})`; // Glowing gold ring
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+    
+    // Draw 2 small stars/particles orbiting on opposite sides of the ring
+    const numStars = 2;
+    for (let s = 0; s < numStars; s++) {
+      const starAngle = (time * 1.8) + (s * Math.PI);
+      const sx = Math.cos(starAngle) * r;
+      const sy = Math.sin(starAngle) * r;
+      
+      // Draw 4-point star shape
+      ctx.save();
+      ctx.translate(sx, sy);
+      
+      // Un-scale Y axis to keep star drawn normally
+      ctx.scale(1.0, 1.0 / 0.35);
+      
+      ctx.beginPath();
+      // Draw 4-point star polygon
+      ctx.moveTo(0, -6);
+      ctx.lineTo(1.5, -1.5);
+      ctx.lineTo(6, 0);
+      ctx.lineTo(1.5, 1.5);
+      ctx.lineTo(0, 6);
+      ctx.lineTo(-1.5, 1.5);
+      ctx.lineTo(-6, 0);
+      ctx.lineTo(-1.5, -1.5);
+      ctx.closePath();
+      
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255, 235, 59, 0.9)'; // Bright yellow outline
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+      
+      ctx.restore();
+    }
+    
+    ctx.restore();
+  }
+  
+  // 2. Body crackling sparks (yellow electric discharges)
+  const seed = Math.floor(Date.now() / 60) % 5;
+  if (seed < 3) {
+    ctx.strokeStyle = '#FFEE58'; // Yellow electrical sparks
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    
+    // Generate a random lightning bolt on the body
+    const startAngle = Math.random() * Math.PI * 2;
+    const startR = Math.random() * baseRadius * 0.8;
+    let lx = Math.cos(startAngle) * startR;
+    let ly = Math.sin(startAngle) * startR;
+    
+    ctx.moveTo(lx, ly);
+    for (let j = 0; j < 3; j++) {
+      lx += (Math.random() - 0.5) * 16;
+      ly += (Math.random() - 0.5) * 16;
+      ctx.lineTo(lx, ly);
+    }
+    ctx.stroke();
+  }
+  
+  ctx.restore();
+}
+
 

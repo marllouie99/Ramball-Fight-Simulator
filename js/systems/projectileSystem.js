@@ -439,6 +439,7 @@ class ProjectileSystem {
     if (sound) {
       proj.purpleSoundHandle = playSound(sound.src, sound.volume);
     }
+    return proj;
   }
 
   /**
@@ -935,8 +936,28 @@ class ProjectileSystem {
           }
           // Flames should not be treated as dodgeable projectiles for DarkSlateGray.
           // They already have their own rapid-contact cadence; marking them as a projectile
-          // causes DarkSlateGray to dodge far too often ("100% dodge" feel).
-          const applied = fighter.takeDamage(damageAmount, attacker, { isFlame: !!projectile.isFlame, projectile });
+          let finalProjDmg = damageAmount;
+          let isSlashCrit = false;
+          const isSukunaSlashProj = projectile && (
+            projectile.isSukunaSlash ||
+            projectile.visual === 'sukunaSlash' ||
+            projectile.visual === 'sukunaCleave' ||
+            projectile.visual === 'sukunaDismantleGrid' ||
+            projectile.visual === 'ghostBlade'
+          );
+
+          if (isSukunaSlashProj && attacker && typeof attacker.evaluateSlashCrit === 'function') {
+            const critRes = attacker.evaluateSlashCrit(fighter, damageAmount, { isProjectile: true });
+            finalProjDmg = critRes.finalDamage;
+            isSlashCrit = critRes.isCrit;
+          }
+
+          const applied = fighter.takeDamage(finalProjDmg, attacker, {
+            isFlame: !!projectile.isFlame,
+            projectile,
+            isCrit: isSlashCrit,
+            skipStandardDamageText: false
+          });
           if (applied) {
             if (projectile.isFlame) {
               fighter._lastFlameHitTime = Date.now();
@@ -973,6 +994,11 @@ class ProjectileSystem {
             }
           }
 
+          // Damage was dodged/parried — register in hitFighters for piercing projectiles
+          // so they don't re-trigger parry/teleport every frame while overlapping.
+          if (!projectile.hitFighters) projectile.hitFighters = new Set();
+          projectile.hitFighters.add(fighter);
+          if (!projectile.dodgedFighters) projectile.dodgedFighters = new Set();
           projectile.dodgedFighters.add(fighter);
           continue; // projectile passes through on first dodge contact only
         }
@@ -1392,7 +1418,7 @@ class ProjectileSystem {
   createAlchemistExplosion({ x, y, radius, owner }) {
     const motion = { x, y, vx: 0, vy: 0, owner, explosionType: 'poison', isExplosion: true };
     const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = false;
+    const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
     const useUltraLOD = false;
 
     // Bright toxic flash
@@ -2079,7 +2105,7 @@ class ProjectileSystem {
             (ent.gojoAdapted && ent.gojoAdapted.purple) || 
             (ent.adaptedSkills && ent.adaptedSkills['purple'])
           );
-          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || isPurpleAdapted;
+          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
           if (!isImmune) {
             const dx = p.x - ent.x;
             const dy = p.y - ent.y;
@@ -2116,6 +2142,105 @@ class ProjectileSystem {
             }
           }
         }
+      }
+
+      // --- Yuta's Pure Love Beam Logic ---
+      if (p.visual === 'yuta_pure_love_beam') {
+        const ownerFighter = fighters[p.owner];
+        if (ownerFighter) {
+          // Beam stays glued to Yuta's hand position and angle
+          const beamOffset = (ownerFighter.r || 22) + 14;
+          p.angle = ownerFighter.gunAngle || 0;
+          p.x = ownerFighter.x + Math.cos(p.angle) * beamOffset;
+          p.y = ownerFighter.y + Math.sin(p.angle) * beamOffset;
+          p.vx = Math.cos(p.angle) * 20; // Maintain logical velocity just in case
+          p.vy = Math.sin(p.angle) * 20;
+
+          const allTargets = [
+            ...(state.fighters || []),
+            ...(state.illusions || [])
+          ];
+
+          // Calculate line segment for collision
+          const beamLength = p.length || 2500;
+          const beamRadius = p.r || 120;
+          const startX = p.x;
+          const startY = p.y;
+          const endX = p.x + Math.cos(p.angle) * beamLength;
+          const endY = p.y + Math.sin(p.angle) * beamLength;
+
+          // Process ticks
+          p.hitTickTimer = (p.hitTickTimer || 0) + 1;
+          const ticksPerHit = 5; // Hit every 5 frames
+          if (p.hitTickTimer >= ticksPerHit) {
+            p.hitTickTimer = 0;
+            p.hitTargets.clear(); // Clear targets so they can be hit again
+          }
+
+          const ownerTeam = state.getFighterTeam(p.owner);
+
+          for (let i = 0; i < allTargets.length; i++) {
+            const ent = allTargets[i];
+            if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
+            if (ent.owner && ent.owner === ownerFighter) continue;
+            
+            const entIdx = state.fighters.indexOf(ent);
+            const isEnemy = ownerTeam === null || (entIdx !== -1 ? state.getFighterTeam(entIdx) !== ownerTeam : state.getFighterTeam(state.fighters.indexOf(ent.owner)) !== ownerTeam);
+            if (!isEnemy) continue;
+            if (p.hitTargets.has(ent)) continue;
+
+            // Line-to-Circle Collision
+            const cx = ent.x;
+            const cy = ent.y;
+            const radius = ent.r || 20;
+            
+            const dx = endX - startX;
+            const dy = endY - startY;
+            const lengthSq = dx * dx + dy * dy;
+            
+            let t = Math.max(0, Math.min(1, ((cx - startX) * dx + (cy - startY) * dy) / lengthSq));
+            const closestX = startX + t * dx;
+            const closestY = startY + t * dy;
+            
+            const distSq = (cx - closestX) * (cx - closestX) + (cy - closestY) * (cy - closestY);
+            const currentBeamRadius = (beamRadius * 0.45) + (beamRadius * 2.25) * t;
+
+            if (distSq <= (currentBeamRadius + radius) * (currentBeamRadius + radius)) {
+              // HIT!
+              p.hitTargets.add(ent);
+              
+              if (typeof ent.takeDamage === 'function') {
+                ent.takeDamage(p.damage, ownerFighter, { isPureLoveBeam: true });
+              }
+              if (typeof ent.applyHitStun === 'function') {
+                ent.applyHitStun(8);
+              }
+              
+              const pushForce = p.knockback || 6;
+              const pushAngle = p.angle;
+              if (ent.applyKnockback) {
+                ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
+              } else {
+                ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
+                ent.vy = (ent.vy || 0) + Math.sin(pushAngle) * pushForce;
+              }
+              
+              spawnImpactFlash(ent.x, ent.y, 50, 'rgba(255, 20, 147, 0.7)');
+              spawnSparks(ent.x, ent.y, 4, 'rikaCurse');
+            }
+          }
+        }
+        
+        // Beam lifetime logic
+        p.life -= 1;
+        if (p.life <= 0) {
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+        }
+        
+        continue; // Skip the rest of the standard projectile update logic
       }
 
       if (p.isGrenade) {

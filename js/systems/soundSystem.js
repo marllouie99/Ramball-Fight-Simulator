@@ -18,6 +18,12 @@ const MAX_POOL_SIZE = 30;
 // Sound cache management to prevent unbounded memory growth
 const MAX_CACHE_SIZE = 250; // Maximum number of cached sounds
 
+// ── CONCURRENT SOUND LIMITING (prevents audio bus overload → crackling) ──
+const MAX_CONCURRENT_SOUNDS = 18; // Hard cap on simultaneous Web Audio sources
+// Micro-fade duration in seconds to prevent click/pop artifacts on start/stop
+const MICRO_FADE_IN = 0.008;  // 8ms fade-in
+const MICRO_FADE_OUT = 0.015; // 15ms fade-out
+
 function _pruneSoundCache() {
   if (_cache.size > MAX_CACHE_SIZE) {
     // Remove oldest entries (Map maintains insertion order)
@@ -31,10 +37,13 @@ function isAudioBufferLike(value) {
   return typeof AudioBuffer !== 'undefined' && value instanceof AudioBuffer;
 }
 
+let _masterLimiterNode = null;
+
 /** Get or create a shared AudioContext to avoid "too many contexts" errors. */
 function getAudioContext() {
   if (!_sharedAudioCtx || _sharedAudioCtx.state === 'closed') {
     _sharedAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    _masterLimiterNode = null;
   }
 
   // Only attempt resume after explicit unlock attempt from a user gesture.
@@ -42,6 +51,26 @@ function getAudioContext() {
     _sharedAudioCtx.resume().catch(() => {});
   }
   return _sharedAudioCtx;
+}
+
+/** Get or create a master DynamicsCompressor limiter to prevent digital clipping / crackling. */
+function getMasterAudioDestination() {
+  const audioCtx = getAudioContext();
+  if (!_masterLimiterNode && audioCtx) {
+    try {
+      _masterLimiterNode = audioCtx.createDynamicsCompressor();
+      // Relaxed limiter settings to prevent pumping artifacts while still clamping peaks
+      _masterLimiterNode.threshold.setValueAtTime(-6.0, audioCtx.currentTime);
+      _masterLimiterNode.knee.setValueAtTime(12.0, audioCtx.currentTime);
+      _masterLimiterNode.ratio.setValueAtTime(12.0, audioCtx.currentTime);
+      _masterLimiterNode.attack.setValueAtTime(0.003, audioCtx.currentTime);
+      _masterLimiterNode.release.setValueAtTime(0.15, audioCtx.currentTime);
+      _masterLimiterNode.connect(audioCtx.destination);
+    } catch (e) {
+      _masterLimiterNode = null;
+    }
+  }
+  return _masterLimiterNode || audioCtx.destination;
 }
 
 /**
@@ -131,10 +160,12 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0) {
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
-      // Web Audio API supports gain values above 1.0 for amplification/boosting
-      gainNode.gain.value = Math.max(0, Math.min(15, volume));
+      const targetGain = Math.max(0, Math.min(2.5, volume));
+      // Smooth fade-in to prevent click on loop start
+      gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + MICRO_FADE_IN);
       source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      gainNode.connect(getMasterAudioDestination());
       source.playbackRate.value = Math.max(0.1, speed);
       source.loop = true;
       source.start(0);
@@ -169,20 +200,23 @@ export function fadeOutLoopingSound(key, fadeMs = 300) {
   if (soundObj.gainNode && soundObj.buffer) {
     const gainNode = soundObj.gainNode;
     const source = soundObj.source;
-    const startVol = gainNode.gain.value;
-    const steps = 20;
-    const stepDelay = fadeMs / steps;
-    let step = 0;
-    const interval = setInterval(() => {
-      step++;
-      gainNode.gain.value = Math.max(0, startVol * (1 - step / steps));
-      if (step >= steps) {
-        clearInterval(interval);
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      const currentGain = gainNode.gain.value;
+      gainNode.gain.cancelScheduledValues(now);
+      gainNode.gain.setValueAtTime(currentGain, now);
+      gainNode.gain.linearRampToValueAtTime(0.001, now + (fadeMs / 1000));
+      setTimeout(() => {
         try { source.stop(); } catch (e) {}
         try { gainNode.disconnect(); } catch (e) {}
         _loopingSounds.delete(key);
-      }
-    }, stepDelay);
+      }, fadeMs + 30);
+    } catch (e) {
+      try { source.stop(); } catch (e2) {}
+      try { gainNode.disconnect(); } catch (e2) {}
+      _loopingSounds.delete(key);
+    }
     return;
   }
 
@@ -216,8 +250,20 @@ export function stopLoopingSound(key) {
 
   // Handle Web Audio API objects
   if (soundObj.gainNode && soundObj.buffer) {
-    try { soundObj.source.stop(); } catch (e) {}
-    try { soundObj.gainNode.disconnect(); } catch (e) {}
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      soundObj.gainNode.gain.cancelScheduledValues(now);
+      soundObj.gainNode.gain.setValueAtTime(soundObj.gainNode.gain.value, now);
+      soundObj.gainNode.gain.linearRampToValueAtTime(0.001, now + MICRO_FADE_OUT);
+      setTimeout(() => {
+        try { soundObj.source.stop(); } catch (e) {}
+        try { soundObj.gainNode.disconnect(); } catch (e) {}
+      }, MICRO_FADE_OUT * 1000 + 5);
+    } catch (e) {
+      try { soundObj.source.stop(); } catch (e2) {}
+      try { soundObj.gainNode.disconnect(); } catch (e2) {}
+    }
     _loopingSounds.delete(key);
     return;
   }
@@ -239,7 +285,13 @@ export function pauseLoopingSound(key) {
   if (!soundObj) return;
 
   if (soundObj.gainNode && soundObj.buffer) {
-    try { soundObj.gainNode.gain.value = 0; } catch (e) {}
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      soundObj.gainNode.gain.cancelScheduledValues(now);
+      soundObj.gainNode.gain.setValueAtTime(soundObj.gainNode.gain.value, now);
+      soundObj.gainNode.gain.linearRampToValueAtTime(0.001, now + MICRO_FADE_OUT);
+    } catch (e) {}
   } else if (typeof soundObj.pause === 'function') {
     soundObj.pause();
   }
@@ -255,7 +307,14 @@ export function resumeLoopingSound(key, volume = 1.0) {
   if (!soundObj) return;
 
   if (soundObj.gainNode && soundObj.buffer) {
-    try { soundObj.gainNode.gain.value = Math.max(0, Math.min(15, volume)); } catch (e) {}
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      const targetGain = Math.max(0, Math.min(15, volume));
+      soundObj.gainNode.gain.cancelScheduledValues(now);
+      soundObj.gainNode.gain.setValueAtTime(0.001, now);
+      soundObj.gainNode.gain.linearRampToValueAtTime(targetGain, now + MICRO_FADE_IN);
+    } catch (e) {}
   } else if (typeof soundObj.play === 'function') {
     if (soundObj.paused) {
       soundObj.play().catch(() => {});
@@ -284,6 +343,40 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
     });
     _loopingSounds.clear();
   }
+}
+
+/**
+ * Evict the oldest active sound handle to make room for a new one.
+ * Uses a micro-fade-out to prevent click/pop on eviction.
+ */
+function _evictOldestSound() {
+  // Find the oldest handle (first in the Set)
+  const iterator = _activeSoundHandles.values();
+  const oldest = iterator.next().value;
+  if (!oldest) return;
+
+  if (oldest.gainNode) {
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      oldest.gainNode.gain.cancelScheduledValues(now);
+      oldest.gainNode.gain.setValueAtTime(oldest.gainNode.gain.value, now);
+      oldest.gainNode.gain.linearRampToValueAtTime(0.001, now + MICRO_FADE_OUT);
+      setTimeout(() => {
+        try { if (oldest.source) oldest.source.stop(0); } catch(e) {}
+        try { if (oldest.source) oldest.source.disconnect(); } catch(e) {}
+        try { oldest.gainNode.disconnect(); } catch(e) {}
+      }, MICRO_FADE_OUT * 1000 + 5);
+    } catch(e) {
+      try { if (oldest.source) oldest.source.stop(0); } catch(e2) {}
+      try { if (oldest.source) oldest.source.disconnect(); } catch(e2) {}
+      try { if (oldest.gainNode) oldest.gainNode.disconnect(); } catch(e2) {}
+    }
+  } else if (oldest.audio) {
+    try { oldest.audio.pause(); } catch(e) {}
+    oldest.audio.currentTime = 0;
+  }
+  _activeSoundHandles.delete(oldest);
 }
 
 /**
@@ -364,6 +457,11 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
   }
   _lastPlayTimes.set(src, now);
 
+  // ── Evict oldest sounds if at concurrent limit to prevent audio bus overload ──
+  while (_activeSoundHandles.size >= MAX_CONCURRENT_SOUNDS) {
+    _evictOldestSound();
+  }
+
   const cached = _cache.get(src);
 
   // Fast path: AudioBuffer (fully decoded during preload) — zero latency
@@ -376,12 +474,12 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
-      // Web Audio API supports gain values above 1.0 for amplification/boosting
-      const targetGain = Math.max(0, Math.min(15, volume));
-      gainNode.gain.setValueAtTime(targetGain, audioCtx.currentTime);
-      gainNode.gain.value = targetGain;
+      const targetGain = Math.max(0, Math.min(2.5, volume));
+      // Micro-fade-in to prevent click/pop artifact on playback start
+      gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
+      gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + MICRO_FADE_IN);
       source.connect(gainNode);
-      gainNode.connect(audioCtx.destination);
+      gainNode.connect(getMasterAudioDestination());
       const safeSpeed = Math.max(0.1, speed);
       source.playbackRate.value = safeSpeed;
       const startTime = audioCtx.currentTime;
@@ -398,15 +496,25 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
         gainNode
       };
       _activeSoundHandles.add(handle);
-      setTimeout(() => { 
-        try { source.stop(0); } catch(e) {}
-        try { source.disconnect(); } catch(e) {}
-        try { gainNode.disconnect(); } catch(e) {}
-        _activeSoundHandles.delete(handle); 
-        if (typeof onEnded === 'function') {
-          onEnded();
-        }
-      }, duration * 1000 + 10);
+      setTimeout(() => {
+        // Micro-fade-out before stopping to prevent click/pop on natural end
+        try {
+          const ctx = getAudioContext();
+          const fadeStart = ctx.currentTime;
+          gainNode.gain.cancelScheduledValues(fadeStart);
+          gainNode.gain.setValueAtTime(gainNode.gain.value, fadeStart);
+          gainNode.gain.linearRampToValueAtTime(0.001, fadeStart + MICRO_FADE_OUT);
+        } catch(e) {}
+        setTimeout(() => {
+          try { source.stop(0); } catch(e) {}
+          try { source.disconnect(); } catch(e) {}
+          try { gainNode.disconnect(); } catch(e) {}
+          _activeSoundHandles.delete(handle); 
+          if (typeof onEnded === 'function') {
+            onEnded();
+          }
+        }, MICRO_FADE_OUT * 1000 + 5);
+      }, Math.max(0, duration * 1000 - MICRO_FADE_OUT * 1000));
 
       return handle;
     } catch (e) {
@@ -478,13 +586,27 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
 export function stopSound(soundHandle) {
   if (!soundHandle) return;
   try {
-    if (soundHandle.source && typeof soundHandle.source.stop === 'function') {
+    // Web Audio: micro-fade-out then disconnect to prevent click/pop
+    if (soundHandle.gainNode && typeof soundHandle.gainNode.gain === 'object') {
+      try {
+        const audioCtx = getAudioContext();
+        const now = audioCtx.currentTime;
+        soundHandle.gainNode.gain.cancelScheduledValues(now);
+        soundHandle.gainNode.gain.setValueAtTime(soundHandle.gainNode.gain.value, now);
+        soundHandle.gainNode.gain.linearRampToValueAtTime(0.001, now + MICRO_FADE_OUT);
+        setTimeout(() => {
+          try { if (soundHandle.source) soundHandle.source.stop(0); } catch(e) {}
+          try { if (soundHandle.source) soundHandle.source.disconnect(); } catch(e) {}
+          try { soundHandle.gainNode.disconnect(); } catch(e) {}
+        }, MICRO_FADE_OUT * 1000 + 5);
+      } catch(e) {
+        try { if (soundHandle.source) soundHandle.source.stop(0); } catch(e2) {}
+        try { if (soundHandle.source) soundHandle.source.disconnect(); } catch(e2) {}
+        try { soundHandle.gainNode.disconnect(); } catch(e2) {}
+      }
+    } else if (soundHandle.source && typeof soundHandle.source.stop === 'function') {
       try { soundHandle.source.stop(0); } catch(e) {}
       try { soundHandle.source.disconnect(); } catch(e) {}
-    }
-    if (soundHandle.gainNode && typeof soundHandle.gainNode.disconnect === 'function') {
-      try { soundHandle.gainNode.gain.setValueAtTime(0, getAudioContext().currentTime); } catch(e) {}
-      try { soundHandle.gainNode.disconnect(); } catch(e) {}
     }
     if (soundHandle.audio) {
       try { soundHandle.audio.pause(); } catch(e) {}
@@ -516,6 +638,7 @@ export function fadeOutSound(soundHandle, fadeMs = 350) {
       const audioCtx = getAudioContext();
       const now = audioCtx.currentTime;
       const currentGain = soundHandle.gainNode.gain.value;
+      soundHandle.gainNode.gain.cancelScheduledValues(now);
       soundHandle.gainNode.gain.setValueAtTime(currentGain, now);
       soundHandle.gainNode.gain.linearRampToValueAtTime(0.001, now + (fadeMs / 1000));
       setTimeout(() => {

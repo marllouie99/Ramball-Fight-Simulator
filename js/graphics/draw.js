@@ -1,5 +1,5 @@
 export { drawFuelPickups } from './renderers/arenaRenderer.js';
-export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines } from './renderers/effectsRenderer.js';
+export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines, drawMahoragaSpeedLines } from './renderers/effectsRenderer.js';
 export { drawFighters, drawIllusions } from './renderers/EntityRenderer.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA
@@ -29,8 +29,9 @@ import { drawCrimsonSniperBullet } from './weapons/crimsonsniperWeaponGraphics.j
 import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
-import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawSaitamaSeriousPunchDimScreen } from './renderers/arenaRenderer.js';
+import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen } from './renderers/arenaRenderer.js';
 import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } from './renderers/environmentalRenderer.js';
+import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
 
@@ -57,8 +58,9 @@ export function getNow() {
 
 export { drawDivineFlameArrowConstruct };
 export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen };
-export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawSaitamaSeriousPunchDimScreen };
+export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
+export { drawGenosSelfDestructDimScreen };
 
 export function drawCronosSphereVisual({
   ctx,
@@ -75,7 +77,7 @@ export function drawCronosSphereVisual({
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   // Set up default theme if none is provided
@@ -292,7 +294,7 @@ export function drawCronosPreActivateBarrier({
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
 
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
 
   const finalX = cx !== undefined ? cx : (x !== undefined ? x : 0);
   const finalY = cy !== undefined ? cy : (y !== undefined ? y : 0);

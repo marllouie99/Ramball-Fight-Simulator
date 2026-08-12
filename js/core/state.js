@@ -491,7 +491,7 @@ function isAllowedFloatingText(text) {
   const normalizedText = String(text).trim();
   const isNumeric = /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
   if (isNumeric) return true;
-  if (normalizedText.startsWith('SHIELD ')) return true;
+  if (normalizedText.startsWith('SHIELD ') || normalizedText.startsWith('CRIT!') || normalizedText.includes('CRIT')) return true;
   if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY') || normalizedText.includes('INCINERAT') || normalizedText.includes('MACHINE GUN') || normalizedText.includes('CANNON') || normalizedText.includes('STOMP')) return true;
   return SKILL_TEXT_WHITELIST.includes(normalizedText);
 }

@@ -59,7 +59,14 @@ export function activateSpiderweb(fighter) {
       if (isEnemy) {
         const dist = Math.hypot(fighter.x - f.x, fighter.y - f.y);
         if (dist <= spiderwebRange) {
-          f.takeDamage(spiderwebDamage, fighter, { isSpiderweb: true });
+          let dmg = spiderwebDamage;
+          let isCrit = false;
+          if (typeof fighter.evaluateSlashCrit === 'function') {
+            const res = fighter.evaluateSlashCrit(f, spiderwebDamage, { isSpiderweb: true });
+            dmg = res.finalDamage;
+            isCrit = res.isCrit;
+          }
+          f.takeDamage(dmg, fighter, { isSpiderweb: true, isSukunaSlash: true, isCrit });
           if (typeof f.applySlow === 'function') f.applySlow(slowDuration, slowMultiplier);
           spawnSparks(f.x, f.y, 8, 'crimsonSniper', '#8B0000');
         }
@@ -280,7 +287,14 @@ export function applyDomainEffect(fighter, arena) {
             );
           }
 
-          f.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
+          let dmg = finalDamage;
+          let isCrit = false;
+          if (typeof fighter.evaluateSlashCrit === 'function') {
+            const res = fighter.evaluateSlashCrit(f, finalDamage, { isDomain: true });
+            dmg = res.finalDamage;
+            isCrit = res.isCrit;
+          }
+          f.takeDamage(dmg, fighter, { isDomain: true, bypassShield: true, isSukunaSlash: true, isCrit });
           if (f.characterId !== 'toji' && f.type !== 'toji' && !f.domainImmunity && !f.immuneToCC) {
             if (typeof f.applyHitStun === 'function') f.applyHitStun(2);
           }
@@ -331,7 +345,14 @@ export function applyDomainEffect(fighter, arena) {
               );
             }
 
-            ill.takeDamage(finalDamage, fighter, { isDomain: true, bypassShield: true });
+            let dmg = finalDamage;
+            let isCrit = false;
+            if (typeof fighter.evaluateSlashCrit === 'function') {
+              const res = fighter.evaluateSlashCrit(ill, finalDamage, { isDomain: true });
+              dmg = res.finalDamage;
+              isCrit = res.isCrit;
+            }
+            ill.takeDamage(dmg, fighter, { isDomain: true, bypassShield: true, isSukunaSlash: true, isCrit });
             if (typeof ill.applyHitStun === 'function') ill.applyHitStun(6);
 
             spawnSparks(ill.x, ill.y, 6, 'crimsonSniper', '#8B0000');

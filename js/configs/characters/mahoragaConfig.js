@@ -4,7 +4,9 @@
 export const mahoragaConfig = {
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
-    adaptationSpeedBoostPerStage: 0.10, // +10% movement speed multiplier per gold adaptation stage
+    adaptationSpeedBoostPerStage: 0.15, // +10% movement speed multiplier per gold adaptation stage
+    rctRegenPerStage: 0.015,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
+    maxLevelRctRegen: 0.015,          // Base ultimate passive RCT HP regeneration per frame at Level 8 (0.80 HP/frame = +48 HP/sec)
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
     wheelClickDuration: 25,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
@@ -18,14 +20,14 @@ export const mahoragaConfig = {
     wheelRotationSpeed: 0.10,       // Passive visual rotation speed of the wheel
 
     // Level 8 Max Adaptation: Attack-Teleport Speed-Blitz Configs
-    infinityBlitzDurationFrames: 800,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
+    infinityBlitzDurationFrames: 400,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
     infinityBlitzInterval: 20,        // Frame interval between continuous attacks/strikes (smaller = faster strikes e.g. 6; larger = slower e.g. 20)
     infinityBlitzAttacksPerTeleport: 5, // Number of attacks executed before teleporting to a new angle (e.g. 2 attacks -> teleport -> 2 attacks)
     infinityBlitzDamage: 15,          // Damage per True Damage strike during Level 8 speed-blitz
     infinityBlitzTeleportDistance: 18, // Teleport offset distance around opponent
     infinityBlitzWheelSpinSpeed: 0.08,  // Continuous Wheel Rotation Speed during Level 8 Speed-Blitz stance (smaller = slower majestic spin e.g. 0.06; larger = faster e.g. 0.20)
     infinityBlitzCooldownFrames: 600,   // Cooldown (frames) before Level 8 Speed-Blitz can re-trigger (10 seconds)
-    infinityBlitzTeleportSpeedMultiplier: 0.20, // Travel duration speed multiplier during blitz stance teleports (smaller = faster, e.g. 0.20 * 15 frames = 3 frame travel)
+    infinityBlitzTeleportSpeedMultiplier: 0.05, // Travel duration speed multiplier during blitz stance teleports (smaller = faster, e.g. 0.20 * 15 frames = 3 frame travel)
     infinityBlitzStrikeSlowDurationFrames: 15, // Slow duration applied to enemy upon landing a speed-blitz strike (15 frames)
     infinityBlitzStrikeSlowMultiplier: 0.40,   // Slow movement multiplier (0.40 = 40% speed / 60% slow)
 
@@ -53,7 +55,7 @@ export const mahoragaConfig = {
     blitzTotalDurationFrames: 150,   // Total max duration for the entire H2H blitz state (~2.5s)
     blitzMinStayFrames: 20,          // Minimum duration (frames) Mahoraga stays at location before teleporting again (~0.83s)
     blitzHitsCount: 10,              // Total number of rapid melee hits in H2H flurry
-    blitzHitInterval: 13,            // RAPID ATTACK SPEED: Frame interval between each rapid melee hit (smaller = faster rapid strikes!)
+    blitzHitInterval: 15,            // RAPID ATTACK SPEED: Frame interval between each rapid melee hit (smaller = faster rapid strikes!)
     blitzAttackAnimDuration: 7,      // RAPID ATTACK ANIMATION SPEED: Frame duration for each punch/chop stroke animation
     blitzHitDamage: 15,              // Damage per rapid martial arts strike (Hits 1 to N-1)
     blitzHitPushbackForce: 4.5,      // HIT PHYSICS: Slow pushback distance per rapid hit (pushes enemy back gradually hit-by-hit!)
@@ -74,8 +76,8 @@ export const mahoragaConfig = {
 
     // Reverse Cursed Technique (RCT / Divine Healing at Low HP & Adaptation)
     enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing
-    rctHealAmountPercent: 0.10,       // Fraction of max HP healed on each wheel rotation click (0.10 = 10%)
-    rctHealLevelInterval: 1,          // Heal on each adaptation level (every wheel rotation!)
+    rctHealAmountPercent: 0.05,       // Fraction of max HP healed on each wheel rotation click (0.10 = 10%)
+    rctHealLevelInterval: 1,         // Heal on each adaptation level (every wheel rotation!)
     rctHealPerClickPercent: 0.05,       // Heals 10% of max HP on each wheel rotation click
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
@@ -85,11 +87,24 @@ export const mahoragaConfig = {
 
     // Teleportation Speed & Afterimage Visibility Settings
     afterimageOpacity: 0.50,         // Visibility / opacity of speed afterimage ghosts (0.10 faint to 1.0 solid)
-    adaptationDashSpeedFrames: 15,   // Teleportation travel speed / frames during flash-dash (smaller = faster instant teleport!)
+    adaptationDashSpeedFrames: 10,   // Teleportation travel speed / frames during flash-dash (smaller = faster instant teleport!)
 
     // Parry mechanic
     parryChancePerStage: 0.08,        // +8% parry chance per gold adaptation stage (max 75%)
     parryMaxChance: 0.75,             // Maximum parry/block chance cap (75%)
     parryDurationFrames: 25,          // Duration (frames) of snappy blade parry pose
     guardDurationFrames: 60,          // Duration (frames) of crossed-arm face guard pose
+
+    // Level 8 Wall Slam Throw Mechanics
+    wallSlamImpaleLiftHeight: 35,      // Visual height (z-axis) when opponent is lifted on sword
+    wallSlamImpaleHoldFrames: 50,      // Duration (frames) opponent is held in the air on the sword
+    wallSlamPunchHitpause: 30,          // Frames of freeze/hitpause when the punch lands before they are launched
+    wallSlamThrowSpeed: 45.0,          // Supersonic velocity at which opponent is hurled to the wall
+    wallSlamImpactDamage: 20,          // Damage taken upon slamming into the wall
+    wallSlamParalyzeDuration: 150,      // Duration (frames) opponent is paralyzed after hitting the wall
+    wallSlamMenacingStandoff: 50,      // Delay (frames) Mahoraga waits before dashing to the paralyzed opponent
+    wallSlamFollowupDamage: 25,        // Damage dealt on the initial execution strike upon reaching the wall-pinned target
+    wallSlamBlitzHitsCount: 10,        // Total rapid hits in the Wall Slam execution flurry
+    wallSlamBlitzHitInterval: 10,       // Frame interval between each rapid hit during Wall Slam flurry (smaller = faster)
+    wallSlamBlitzDuration: 120,        // Total duration (frames) of the Wall Slam execution flurry
 };

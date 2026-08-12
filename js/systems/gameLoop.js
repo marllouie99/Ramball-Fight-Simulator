@@ -124,7 +124,13 @@ export function animate(timestamp) {
         // Divide by 2 since each pair is counted twice
         closeFighters = Math.floor(closeFighters / 2);
 
-        const aliveFighters = state.fighters.filter(f => f && f.hp > 0).map(f => (f.fighterIndex !== undefined && FIGHTER_DEFS[f.fighterIndex]) ? FIGHTER_DEFS[f.fighterIndex].name : 'Unknown');
+        const aliveFighters = [];
+        for (let i = 0; i < state.fighters.length; i++) {
+          const f = state.fighters[i];
+          if (f && f.hp > 0) {
+            aliveFighters.push((f.fighterIndex !== undefined && FIGHTER_DEFS[f.fighterIndex]) ? FIGHTER_DEFS[f.fighterIndex].name : 'Unknown');
+          }
+        }
         
         // Defer heavy string concatenation/array operations to idle time
         const logTask = () => {

@@ -250,6 +250,17 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 2.8,
     delay: 0,
   },
+  // Saitama — Caped Baldy martial punches (matches Gojo punch attack audio)
+  'saitama': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.8,
+    delay: 0,
+  },
+  'saitama_punch': {
+    src: 'Assets/Sound Effects/Attacks/punch.mp3',
+    volume: 2.8,
+    delay: 0,
+  },
   // Zeus — chain lightning attack
   'zeus': {
     src: 'Assets/Sound Effects/Attacks/thunderstike.mp3',

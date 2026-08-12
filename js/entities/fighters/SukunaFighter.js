@@ -79,6 +79,11 @@ export class SukunaFighter extends Fighter {
     // Sound cooldown to prevent audio stacking
     this._slashSoundCooldown = 0;
     this.initialTeleportDone = false;
+
+    // Stacking Slash Crit Passive
+    this.slashHitCount = 0;
+    this.critChance = CONFIG.sukuna?.baseCritChance || 0.10;
+    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 1.50;
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -189,6 +194,44 @@ export class SukunaFighter extends Fighter {
     this.combatAuraOpacity = 0;
     this.sakugaImpactTimer = 0;
     this.initialTeleportDone = false;
+
+    // Reset Stacking Slash Crit Passive
+    this.slashHitCount = 0;
+    this.critChance = CONFIG.sukuna?.baseCritChance || 0.10;
+    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 1.50;
+  }
+
+  // ── STACKING SLASH CRIT PASSIVE ──
+  evaluateSlashCrit(target, baseDamage = 15, opts = {}) {
+    if (!target || target.hp <= 0 || target.isDead) {
+      return { finalDamage: baseDamage, isCrit: false };
+    }
+
+    // Increment landed slash hit count
+    this.slashHitCount = (this.slashHitCount || 0) + 1;
+
+    // Calculate dynamic Crit Rate & Crit DMG
+    const baseChance = CONFIG.sukuna?.baseCritChance || 0.10;
+    const chancePerHit = CONFIG.sukuna?.critChancePerSlashHit || 0.02;
+    const maxChance = CONFIG.sukuna?.maxCritChance || 0.80;
+    this.critChance = Math.min(maxChance, baseChance + this.slashHitCount * chancePerHit);
+
+    const baseMult = CONFIG.sukuna?.baseCritMultiplier || 1.50;
+    const multPerHit = CONFIG.sukuna?.critMultiplierPerSlashHit || 0.05;
+    const maxMult = CONFIG.sukuna?.maxCritMultiplier || 3.50;
+    this.critMultiplier = Math.min(maxMult, baseMult + this.slashHitCount * multPerHit);
+
+    // Roll for critical hit
+    const isCrit = !opts.isCrit && Math.random() < this.critChance;
+    const finalDamage = isCrit ? Math.round(baseDamage * this.critMultiplier) : baseDamage;
+
+    if (isCrit) {
+      const targetDrawY = target.y - (target.z || 0);
+      spawnSparks(target.x, targetDrawY, 18, 'crimsonSniper');
+      spawnImpactFlash(target.x, targetDrawY, 35, '#ff1144');
+    }
+
+    return { finalDamage, isCrit };
   }
 
   triggerDemoAttack() {
@@ -197,6 +240,17 @@ export class SukunaFighter extends Fighter {
     this.punchAnimTimer = 35;
     if (typeof this.performCleaveStrike === 'function') {
       this.performCleaveStrike(fakeTarget, 0);
+    }
+  }
+
+  aim(target) {
+    super.aim(target);
+
+    // When stationary, body facing matches gunAngle (target aim direction).
+    // When moving, body rotates dynamically via movement physics (spinRate).
+    const speed = Math.hypot(this.vx || 0, this.vy || 0);
+    if (speed <= 0.05) {
+      this.angle = this.gunAngle;
     }
   }
 
@@ -291,6 +345,12 @@ export class SukunaFighter extends Fighter {
     const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
     const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
 
+    // Trigger single-hand slicing chop animation with off-hand strictly hidden
+    this.slashSwingTimer = 11;
+    this.slashSwingMaxTimer = 11;
+    this.slashGlowTimer = 20;
+    this.slashHand = (this.slashHand === 1 ? 0 : 1); // Strict toggle: 0 = Right hand, 1 = Left hand
+
     // Ranged Attack: Dismantle Slash
     projectileSystem.fireProjectile(
       this,
@@ -307,11 +367,6 @@ export class SukunaFighter extends Fighter {
       playSound('Assets/Sound Effects/Skills/backstab.mp3', 0.7);
       this._slashSoundCooldown = 12; // ~0.2 seconds at 60fps
     }
-
-    // Spawn hand cursed energy flash & swing animation
-    this.slashGlowTimer = 25;
-    this.slashSwingTimer = 10;
-    this.slashHand = this.slashHand === 1 ? 0 : 1; // Strict toggle: 0 = Right hand, 1 = Left hand
 
     // Apply knockback to target
     const dismantleAngle = Math.atan2(closestEnemy.y - this.y, closestEnemy.x - this.x);
@@ -470,6 +525,7 @@ export class SukunaFighter extends Fighter {
       });
     }
 
+
     // Update punch effects
     if (this.punchEffects && this.punchEffects.length > 0) {
       fastCleanArray(this.punchEffects, (p) => {
@@ -617,22 +673,14 @@ export class SukunaFighter extends Fighter {
       }
       this.domainChargeTimer++;
 
-      // Stop all movement while channeling
+      // Immediately stop all movement while channeling domain expansion (holding Enma Ten hand seal)
       this.vx = 0;
       this.vy = 0;
+
       this.applyMovementPhysics(0);
 
-      // Track opponent while channeling (sluggish delayed reaction time if stealthed)
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
-      }
+      this.aim(opponent);
 
-      // ====================================================================
-      // AUDIO TIMING ADJUSTMENT FOR SHRINE.MP3
-      // Change '30' to adjust how many frames before the domain opens that the audio plays.
-      // 60 frames = 1 second. 
-      // If you want it to play right as the channel starts, set it to: this.domainChargeTimer === 1
-      // ====================================================================
       const audioTriggerFrame = Math.max(1, this.domainChargeMax - 50);
       if (this.domainChargeTimer === audioTriggerFrame) {
         const activateSound = getSkillSound(this._def.id, 'domain_activate');
@@ -641,6 +689,7 @@ export class SukunaFighter extends Fighter {
 
       if (this.domainChargeTimer >= this.domainChargeMax) {
         this.isChannelingDomainExpansion = false;
+        this.domainChargeTimer = 0;
         this._activateDomain(arena);
       }
 
@@ -771,15 +820,23 @@ export class SukunaFighter extends Fighter {
             this._slashSoundCooldown = 8; // Faster cooldown for Phase 1 barrage
           }
 
-          this.flurryTarget.takeDamage(CONFIG.sukuna.flurryDamage || 6, this, { isMelee: true });
+          const baseFlurryDmg = CONFIG.sukuna.flurryDamage || 6;
+          let flurryDmg = baseFlurryDmg;
+          let isCrit = false;
+          if (typeof this.evaluateSlashCrit === 'function') {
+            const res = this.evaluateSlashCrit(this.flurryTarget, baseFlurryDmg, { isMelee: true });
+            flurryDmg = res.finalDamage;
+            isCrit = res.isCrit;
+          }
+          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSukunaSlash: true, isCrit });
           this.flurryTarget.applyHitStun(15);
 
           // Apply bleed on flurry hits
           this.applyBleed(this.flurryTarget, 1);
 
-          this.punchAnimTimer = 16;
-          this.punchAnimMaxTimer = 16;
-          this.punchAnimHand = this.punchAnimHand === 1 ? 0 : 1;
+          this.punchAnimTimer = 0;
+          this.slashSwingTimer = 11;
+          this.slashSwingMaxTimer = 11;
           this.slashGlowTimer = 20;
           this.slashHand = this.slashHand === 1 ? 0 : 1;
 
@@ -1020,6 +1077,8 @@ export class SukunaFighter extends Fighter {
       this.isChannelingDomainExpansion = true;
       this.isChannelingDivineFlame = false; // Explicit mutual exclusion
       this.domainChargeTimer = 0;
+      this.vx = 0; // Immediately lock movement when domain channeling starts
+      this.vy = 0;
       if (!this._hasPlayedDomainChannelSound) {
         this._hasPlayedDomainChannelSound = true;
         const channelSound = getSkillSound(this._def.id, 'domain_channel');
@@ -1027,6 +1086,7 @@ export class SukunaFighter extends Fighter {
       }
       return; // Prevent melee/shoot in the same frame
     }
+
 
     // Handle Melee Combat Mode vs Ranged Mode
     if (this.isMeleeMode) {
@@ -1438,11 +1498,12 @@ export class SukunaFighter extends Fighter {
       }
     }
 
-    // 2. Single-Hand Slash Swing Animation (Fast 10-frame single-hand chop across body when unleashing Cleave / Dismantle slashes)
-    else if (this.slashSwingTimer > 0 || (this.rapidSlashHitsLeft > 0 && this.punchAnimTimer <= 0)) {
-      let rawT = 1.0; // Hold at the end of the swing between rapid slashes
+    // 2. Single-Hand Slash Swing Animation (Fast single-hand chop across body when unleashing Cleave / Dismantle slashes)
+    else if (this.slashSwingTimer > 0 || (this.slashGlowTimer > 0 && this.punchAnimTimer <= 0) || (this.rapidSlashHitsLeft > 0 && this.punchAnimTimer <= 0)) {
+      const maxT = this.slashSwingMaxTimer || 11;
+      let rawT = 1.0; // Hold at end of swing while slash glow lingers
       if (this.slashSwingTimer > 0) {
-        rawT = (10 - Math.max(0, this.slashSwingTimer)) / 10;
+        rawT = (maxT - Math.max(0, this.slashSwingTimer)) / maxT;
       }
       
       // Left hand (1) swings Left-to-Right (-90 to +90)
@@ -1457,11 +1518,13 @@ export class SukunaFighter extends Fighter {
       if (this.slashHand === 1) {
         // Left hand slashes across body! Hide right hand!
         hideFrontHand = true;
+        hideBackHand = false;
         lx2 += swingX * 1.2;
         ly2 += swingY; 
       } else {
         // Right hand slashes across body! Hide left hand!
         hideBackHand = true;
+        hideFrontHand = false;
         lx1 += swingX * 1.2; 
         ly1 += swingY; 
       }

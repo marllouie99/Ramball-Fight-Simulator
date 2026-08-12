@@ -2,8 +2,9 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { stopSound, stopSoundBySrc } from '../../systems/soundSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
-import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnGenosThrusterDashVisual, spawnLaserSmoke, spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnGenosThrusterDashVisual, spawnLaserSmoke, spawnGroundScorch, spawnGenosSelfDestructExplosion } from '../../graphics/particles/sparkEffect.js';
 import { drawGenosSkin, drawGenosHands } from '../../graphics/fighters/genosSkin.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 
@@ -39,7 +40,8 @@ export class GenosFighter extends Fighter {
     this.basicBlastAnimTimer = 0;
 
     // Skill 1: Machine Gun Blows
-    this.flurryCooldown = 0;
+    const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 480);
+    this.flurryCooldown = initFlurryCD;
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -82,6 +84,12 @@ export class GenosFighter extends Fighter {
 
     // Movement-driven body rotation
     this.bodyRotAngle = 0; // smoothly tracks velocity direction
+  }
+
+  reset() {
+    super.reset();
+    const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 480);
+    this.flurryCooldown = initFlurryCD;
   }
 
   draw(ctx) {
@@ -137,28 +145,31 @@ export class GenosFighter extends Fighter {
       ctx.restore();
     }
 
-    // Draw Genos skin + health + freeze via standard pipeline (drawBody -> drawGenosSkin)
-    super.draw(ctx);
-
-    // Self-Destruct Warning Radius (drawn on top of skin)
+    // 1. Self-Destruct Warning Radius (drawn UNDERNEATH Genos on the arena floor so his body remains crisp and clear)
     if (this.isSelfDestructing) {
       ctx.save();
       const radius = CONFIG.genos?.selfDestructRadius || 200;
       const progress = 1.0 - (this.selfDestructTimer / (CONFIG.genos?.selfDestructCountdownFrames || 150));
-      const pulseAlpha = 0.2 + Math.sin(Date.now() * 0.02) * 0.15;
+      const pulseAlpha = 0.25 + Math.sin(Date.now() * 0.02) * 0.15;
 
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, radius * progress, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(255, 30, 0, ${pulseAlpha})`;
-      ctx.fill();
-
+      // Outer Warning Perimeter Ring (Cyan / Orange Overload)
       ctx.beginPath();
       ctx.arc(this.x, this.y, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = 'rgba(255, 60, 0, 0.8)';
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
       ctx.lineWidth = 3.0;
+      ctx.stroke();
+
+      // Expanding Shockwave Warning Ring (Electric Cyan Glow)
+      ctx.beginPath();
+      ctx.arc(this.x, this.y, Math.max(10, radius * progress), 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(0, 255, 255, ${pulseAlpha + 0.45})`;
+      ctx.lineWidth = 4.0;
       ctx.stroke();
       ctx.restore();
     }
+
+    // 2. Draw Genos skin + health + freeze via standard pipeline (drawBody -> drawGenosSkin)
+    super.draw(ctx);
   }
 
   drawBody(ctx) {
@@ -337,7 +348,26 @@ export class GenosFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    if (this.isSelfDestructing) return false; // Immune to further damage during self-destruct countdown
+    if (this.isSelfDestructing) {
+      // Genos CAN now take damage while self-destructing!
+      const result = super.takeDamage(amount, attacker, opts);
+      if (this.hp <= 0 || this.isDead) {
+        // Failed to self-destruct before dying — stops charging sound and dies cleanly!
+        if (this._selfDestructChargeHandle) {
+          try { stopSound(this._selfDestructChargeHandle); } catch (e) {}
+          this._selfDestructChargeHandle = null;
+        }
+        const chargeSrc = CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
+        try { stopSoundBySrc(chargeSrc); } catch (e) {}
+
+        this.isSelfDestructing = false;
+        this.usedSelfDestruct = true;
+        if (typeof spawnFloatingText === 'function') {
+          spawnFloatingText(this.x, this.y - this.r - 28, "OVERLOAD DESTROYED!", "#FF2200");
+        }
+      }
+      return result;
+    }
 
     // If Genos hasn't self-destructed yet, check if this incoming damage would drop him to 10% HP or below
     const sdThreshold = this.maxHp * 0.10;
@@ -352,6 +382,13 @@ export class GenosFighter extends Fighter {
       this.interruptAttacks(true);
       this.hitFlashTimer = 8;
       audioSystem.playSFX('attack_fleshhit', 0.6);
+
+      // Play self-destruct charging audio
+      if (CONFIG.genos?.selfDestructChargeEnabled !== false) {
+        const chargeSrc = CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
+        const chargeVol = CONFIG.genos?.selfDestructChargeVolume ?? 2.0;
+        this._selfDestructChargeHandle = audioSystem.playSFX(chargeSrc, chargeVol);
+      }
 
       if (typeof spawnFloatingText === 'function') {
         // Spawn damage text for the amount taken
@@ -556,6 +593,10 @@ export class GenosFighter extends Fighter {
     this.flurryTarget = opponent;
     this.flurryCooldown = CONFIG.genos?.flurryCooldown || 480;
 
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 28, "MACHINE GUN BLOWS!", "#FF7700");
+    }
+
     const oldX = this.x;
     const oldY = this.y;
 
@@ -585,6 +626,7 @@ export class GenosFighter extends Fighter {
     if (opponent && opponent.hp > 0) {
       opponent.vx = 0;
       opponent.vy = 0;
+      opponent.caughtInGenosFlurry = true;
       if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
       if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
       if (typeof opponent.applyTimeStop === 'function') {
@@ -656,9 +698,33 @@ export class GenosFighter extends Fighter {
       this.isFiringUlt = false;
       this.ultTimer = 0;
     }
+    if (this.flurryTarget) {
+      this.flurryTarget.caughtInGenosFlurry = false;
+    }
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTarget = null;
+    this.flurryVoiceTimer = 0;
+
+    // Immediately stop ALL active audio handles & voice audio instances when interrupted
+    if (this.soundHandle) {
+      try { stopSound(this.soundHandle); } catch (e) {}
+      this.soundHandle = null;
+    }
+    if (this._ultChargeSoundHandle) {
+      try { stopSound(this._ultChargeSoundHandle); } catch (e) {}
+      this._ultChargeSoundHandle = null;
+    }
+    if (this._selfDestructChargeHandle) {
+      try { stopSound(this._selfDestructChargeHandle); } catch (e) {}
+      this._selfDestructChargeHandle = null;
+    }
+
+    try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-incenerate-voice.mp3'); } catch (e) {}
+    try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-ultimatecharging.mp3'); } catch (e) {}
+    try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3'); } catch (e) {}
+    try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3'); } catch (e) {}
+
     super.interruptAttacks(forceCancelAll);
   }
 
@@ -695,9 +761,17 @@ export class GenosFighter extends Fighter {
     this.usedSelfDestruct = true;
     this.hp = Math.round(this.maxHp * 0.01); // Survives with exactly 1% HP!
 
-    triggerGlobalScreenShake(2.0, 30);
-    const sdSoundSrc = CONFIG.genos?.selfDestructSound || 'Assets/Sound Effects/Skills/fugaexplode.mp3';
-    const sdSoundVol = CONFIG.genos?.selfDestructVolume ?? 2.0;
+    // Immediately kill charging audio handle & any active charging sound instance so it's completely gone!
+    if (this._selfDestructChargeHandle) {
+      try { stopSound(this._selfDestructChargeHandle); } catch (e) {}
+      this._selfDestructChargeHandle = null;
+    }
+    const chargeSrc = CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
+    try { stopSoundBySrc(chargeSrc); } catch (e) {}
+
+    triggerGlobalScreenShake(18, 50);
+    const sdSoundSrc = CONFIG.genos?.selfDestructSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3';
+    const sdSoundVol = CONFIG.genos?.selfDestructVolume ?? 2.5;
     audioSystem.playSFX(sdSoundSrc, sdSoundVol);
 
     const radius = CONFIG.genos?.selfDestructRadius || 200;
@@ -726,6 +800,11 @@ export class GenosFighter extends Fighter {
       }
     }
 
+    // ── VISUAL EFFECTS: Epic High-Fidelity Anime Self-Destruct Explosion ──
+    if (typeof spawnGenosSelfDestructExplosion === 'function') {
+      spawnGenosSelfDestructExplosion(this.x, this.y, radius);
+    }
+
     // Delete enemy projectiles caught in blast
     if (state.projectiles) {
       for (let i = state.projectiles.length - 1; i >= 0; i--) {
@@ -736,6 +815,24 @@ export class GenosFighter extends Fighter {
       }
     }
 
+    // Trigger post-explosion breather recovery pause & shattered piece reassembly (4.0s dramatic animation)
+    this.isSelfDestructRecovering = true;
+    this.selfDestructRecoveryMax = CONFIG.genos?.selfDestructRecoveryFrames || 240;
+    this.selfDestructRecoveryTimer = this.selfDestructRecoveryMax;
+
+    // Initialize shattered cybernetic pieces array for magnetic piece-by-piece reassembly (Wide dramatic scatter distance)
+    const r = this.r || 25;
+    this.shatteredPieces = [
+      { id: 'hair',          targetX: 0,        targetY: -r * 0.45, scatterX: -45 + (Math.random() - 0.5) * 25, scatterY: -95 - Math.random() * 30, rot: (Math.random() - 0.5) * 2.5, snapped: false },
+      { id: 'leftShoulder',  targetX: -r * 0.75, targetY: -r * 0.02, scatterX: -110 - Math.random() * 30, scatterY: -25 + (Math.random() - 0.5) * 40, rot: (Math.random() - 0.5) * 3.0, snapped: false },
+      { id: 'rightShoulder', targetX:  r * 0.75, targetY: -r * 0.02, scatterX:  110 + Math.random() * 30, scatterY: -25 + (Math.random() - 0.5) * 40, rot: (Math.random() - 0.5) * 3.0, snapped: false },
+      { id: 'leftVest',     targetX: -r * 0.42, targetY:  r * 0.08, scatterX: -85 - Math.random() * 25, scatterY:  75 + Math.random() * 30, rot: (Math.random() - 0.5) * 2.8, snapped: false },
+      { id: 'rightVest',    targetX:  r * 0.42, targetY:  r * 0.08, scatterX:  85 + Math.random() * 25, scatterY:  75 + Math.random() * 30, rot: (Math.random() - 0.5) * 2.8, snapped: false },
+      { id: 'bezelFrame',   targetX: 0,        targetY: -r * 0.02, scatterX:  50 + Math.random() * 35, scatterY: -75 - Math.random() * 25, rot: (Math.random() - 0.5) * 3.2, snapped: false },
+      { id: 'coreDisc',     targetX: 0,        targetY: -r * 0.02, scatterX: -45 - Math.random() * 30, scatterY:  65 + Math.random() * 25, rot: (Math.random() - 0.5) * 3.5, snapped: false },
+      { id: 'collar',       targetX: 0,        targetY: -r * 0.16, scatterX:   0 + (Math.random() - 0.5) * 40, scatterY: -110 - Math.random() * 25, rot: (Math.random() - 0.5) * 2.2, snapped: false }
+    ];
+
     if (typeof spawnFloatingText === 'function') {
       spawnFloatingText(this.x, this.y - this.r - 28, "REBOOTING...", "#FF8800");
     }
@@ -744,11 +841,105 @@ export class GenosFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
+    // Self-Destruct Post-Explosion Breather Recovery Phase
+    if (this.isSelfDestructRecovering) {
+      this.selfDestructRecoveryTimer--;
+      this.vx = 0;
+      this.vy = 0;
+
+      // Smooth facing rotation alignment toward opponent during final frames of reassembly
+      if (opponent && opponent.hp > 0 && this.selfDestructRecoveryTimer <= 35) {
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        let currentAngle = this.gunAngle || this.angle || 0;
+        let diff = targetAngle - currentAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const turnSpeed = 0.12; // Smooth natural turn interpolation
+        const newAngle = currentAngle + diff * turnSpeed;
+        this.gunAngle = newAngle;
+        this.angle = newAngle;
+      }
+
+      // Spawn cooling smoke & thermal sparks during breather pause
+      if (this.selfDestructRecoveryTimer % 3 === 0) {
+        if (typeof spawnLaserSmoke === 'function') {
+          spawnLaserSmoke(this.x + (Math.random() - 0.5) * 16, this.y + (Math.random() - 0.5) * 16, (Math.random() - 0.5) * 1.5, (Math.random() - 0.5) * 1.5);
+        }
+        if (typeof spawnSparks === 'function' && Math.random() < 0.5) {
+          spawnSparks(this.x, this.y, 2, 'laserHit');
+        }
+      }
+
+      if (this.selfDestructRecoveryTimer <= 0) {
+        if (this.hp > 0 && !this.isDead) {
+          this.isSelfDestructRecovering = false;
+          this.shatteredPieces = null; // Reassembly piece-by-piece complete! Whole model restored!
+          this.rebootAccelTimer = 22; // Smooth 22-frame acceleration ramp-up so movement doesn't snap!
+
+          // ── FULL RESET OF MOVEMENT & SKILLS UPON BODY REASSEMBLY ──
+          this.interruptAttacks(true); // Stop active audio handles & attack states
+          this.vx = 0;
+          this.vy = 0;
+          this.isDashing = false;
+          this.isFlurrying = false;
+          this.flurryHitsLeft = 0;
+          this.flurryTarget = null;
+          this.isChargingUlt = false;
+          this.isFiringUlt = false;
+          this.isUltRecovering = false;
+          this.ultTimer = 0;
+          this.isSelfDestructing = false;
+          this.speedBoostTimer = 0;
+
+          // Reset all skill & attack cooldowns to 0 so all skills are ready!
+          this.shootCooldown = 0;
+          this.flurryCooldown = 0;
+          this.dashCooldown = 0;
+          this.ultCooldown = 0;
+          this.meleeDashDelayTimer = 0;
+
+          // Restore Ranged Mode stance with 100% full Heat Ammo
+          this.isMeleeStance = false;
+          this.heatAmmo = this.maxHeatAmmo || 10;
+          this.ammoReloadTimer = 0;
+          this.meleeDashCount = 0;
+
+          // Clean motion trails & ghosts
+          if (this.afterImages) this.afterImages.length = 0;
+          if (this.rocketFlameTrail) this.rocketFlameTrail.length = 0;
+
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(this.x, this.y, 45, '#00E5FF');
+          }
+          if (typeof spawnFloatingText === 'function') {
+            spawnFloatingText(this.x, this.y - this.r - 28, "SYSTEMS REBOOTED!", "#00FFDD");
+          }
+        }
+      }
+      return; // Stop movement & attacks during breather recovery!
+    }
+
     // Core Self-Destruct Stasis Countdown
     if (this.isSelfDestructing) {
+      if (this.hp <= 0 || this.isDead) {
+        this.isSelfDestructing = false;
+        this.usedSelfDestruct = true;
+        return;
+      }
       this.selfDestructTimer--;
       this.vx = 0;
       this.vy = 0;
+
+      // High-frequency cyan core overload discharges & electrical sparks
+      if (this.selfDestructTimer % 2 === 0) {
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(this.x, this.y, 3, 'flash_layla', '#00FFFF');
+        }
+        if (typeof spawnMeleeClashShockwave === 'function' && this.selfDestructTimer % 10 === 0) {
+          spawnMeleeClashShockwave(this.x, this.y, this.r * 2.5, 'gojo');
+        }
+      }
+
       if (this.selfDestructTimer <= 0) {
         this.performSelfDestructExplosion();
       }
@@ -938,11 +1129,12 @@ export class GenosFighter extends Fighter {
           // Continuous beam trap lock: suppresses wall bounce reflection & angle jitter
           target.caughtInGenosBeamTimer = 10;
 
-          // Gently align target to the beam's central axis line
+          // Gently align target to the beam's central axis line (soft pull allows targets to move/steer)
+          const pullStrength = CONFIG.genos?.ultBeamCenterPull ?? 0.04;
           const centerProjX = this.x + Math.cos(this.ultAngle) * projDist;
           const centerProjY = this.y + Math.sin(this.ultAngle) * projDist;
-          target.x += (centerProjX - target.x) * 0.15;
-          target.y += (centerProjY - target.y) * 0.15;
+          target.x += (centerProjX - target.x) * pullStrength;
+          target.y += (centerProjY - target.y) * pullStrength;
         }
       }
 
@@ -959,15 +1151,18 @@ export class GenosFighter extends Fighter {
           if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r) {
             applyDamageToTarget(target, damage, this, { isSkill: true, isUltimate: true });
             
-            // 1. Heavy Incineration Slow Debuff (80% speed reduction for 25 frames)
+            // 1. Light Incineration Slow Debuff (allows enemy to move a little inside beam)
+            const slowMult = CONFIG.genos?.ultSlowMultiplier ?? 0.45;
             if (typeof target.applySlow === 'function') {
-              target.applySlow(25, 0.20);
+              target.applySlow(25, slowMult);
             }
 
-            // 2. Controlled Directional Incineration Beam Push (prevents compounding hyper-velocity)
+            // 2. Controlled Directional Incineration Beam Push (blends with user movement velocity)
             const pushForce = CONFIG.genos?.ultKnockbackForce || 8;
-            target.vx = Math.cos(this.ultAngle) * pushForce;
-            target.vy = Math.sin(this.ultAngle) * pushForce;
+            const pushVx = Math.cos(this.ultAngle) * pushForce;
+            const pushVy = Math.sin(this.ultAngle) * pushForce;
+            target.vx = target.vx * 0.4 + pushVx;
+            target.vy = target.vy * 0.4 + pushVy;
 
             // 3. Impact Flash & Laser Hit Sparks on Target
             if (typeof spawnSparks === 'function') {
@@ -1100,6 +1295,7 @@ export class GenosFighter extends Fighter {
             if (this.flurryHitsLeft > 0) {
               target.vx = 0;
               target.vy = 0;
+              target.caughtInGenosFlurry = true;
               if (target.knockbackVx !== undefined) target.knockbackVx = 0;
               if (target.knockbackVy !== undefined) target.knockbackVy = 0;
               if (typeof target.applyTimeStop === 'function') {
@@ -1131,6 +1327,7 @@ export class GenosFighter extends Fighter {
               applyDamageToTarget(target, hitDmg, this, { isSkill: true, isRanged: true, isMachineGunBlow: true });
 
               if (isFinalHit) {
+                target.caughtInGenosFlurry = false;
                 // Final hit: apply heavy finisher knockback push & extended hit-pause
                 if (typeof target.applyTimeStop === 'function') {
                   target.applyTimeStop(20);
@@ -1148,6 +1345,7 @@ export class GenosFighter extends Fighter {
                 // Non-final hits: Stop movement & freeze enemy in place so they stay pinned during Machine Gun Blows!
                 target.vx = 0;
                 target.vy = 0;
+                target.caughtInGenosFlurry = true;
                 if (target.knockbackVx !== undefined) target.knockbackVx = 0;
                 if (target.knockbackVy !== undefined) target.knockbackVy = 0;
                 if (typeof target.applyTimeStop === 'function') {
@@ -1309,21 +1507,41 @@ export class GenosFighter extends Fighter {
       }
     }
 
-    // AI & Combat Target Aiming: Continuously track target angle every frame
+    // Apply rebootAccelTimer smooth acceleration ramp-up post-reassembly so movement doesn't snap
+    if (this.rebootAccelTimer > 0) {
+      const accelFactor = (22 - this.rebootAccelTimer) / 22;
+      this.vx *= accelFactor;
+      this.vy *= accelFactor;
+      this.rebootAccelTimer--;
+    }
+
+    // AI & Combat Target Aiming: Continuously track target angle every frame with smooth easing post-reassembly
     if (canAct && opponent && opponent.hp > 0 && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
-      this.aim(opponent);
+      if (this.rebootAccelTimer > 0) {
+        const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        let currentAngle = this.gunAngle || this.angle || 0;
+        let diff = targetAngle - currentAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        const turnRate = 0.15; // Smooth natural turn rate
+        const newAngle = currentAngle + diff * turnRate;
+        this.gunAngle = newAngle;
+        this.angle = newAngle;
+      } else {
+        this.aim(opponent);
+      }
     }
 
     if (canAct && opponent && opponent.hp > 0 && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
 
-      // Ultimate Priority: Medium range (200px - 450px)
-      if (this.ultCooldown <= 0 && dist >= 180 && dist <= 450) {
-        this.executeSpiralIncinerationCannon(opponent);
-      }
-      // Skill 1 Priority: Close range (< 110px)
-      else if (this.flurryCooldown <= 0 && dist <= 110) {
+      // Skill 1 Priority: Machine Gun Blows (FIRST priority when available! Thruster dash engages up to 280px)
+      if (this.flurryCooldown <= 0 && dist <= 280) {
         this.executeMachineGunBlows(opponent);
+      }
+      // Ultimate Priority: Medium range (200px - 450px)
+      else if (this.ultCooldown <= 0 && dist >= 180 && dist <= 450) {
+        this.executeSpiralIncinerationCannon(opponent);
       }
       // Skill 2 Priority: Rocket Stomp (close-range smash <= 120px)
       else if (this.dashCooldown <= 0 && dist <= 120) {

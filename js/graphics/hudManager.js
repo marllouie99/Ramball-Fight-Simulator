@@ -194,6 +194,7 @@ export function drawHUD() {
   const bottomContainer = _cachedBottomContainer;
   
   if (containerBottom) {
+    containerBottom.classList.toggle('ffa-hud', mode === GAME_MODES.FFA);
     containerBottom.style.opacity = hudOpacity;
     if (hudOpacity <= 0) {
       containerBottom.style.visibility = 'hidden';
@@ -244,8 +245,8 @@ export function drawHUD() {
     const cx = state.arena.x + state.arena.width / 2;
     const topY = state.arena.y - 36;
 
-    // Draw round on top (hidden in 1v1 and Stand Off modes)
-    if (mode !== GAME_MODES.ONE_VS_ONE && mode !== '1v1' && mode !== GAME_MODES.STAND_OFF && mode !== GAME_MODES.STAND_OFF_1V2 && mode !== 'Stand Off' && mode !== '1v2 Stand Off') {
+    // Draw round on top (hidden in 1v1, FFA, and Stand Off modes)
+    if (mode !== GAME_MODES.ONE_VS_ONE && mode !== '1v1' && mode !== GAME_MODES.STAND_OFF && mode !== GAME_MODES.STAND_OFF_1V2 && mode !== 'Stand Off' && mode !== '1v2 Stand Off' && mode !== GAME_MODES.FFA && mode !== 'FFA') {
         drawPanel(cx - 90, topY, 180, 26, 0.7);
 
         ctx.fillStyle = '#fff';
@@ -397,10 +398,22 @@ function updateHealthHud() {
       const redTimer = f.redCooldown !== undefined ? f.redCooldown : redMax;
       const redPct = Math.max(0, Math.min(100, (1 - (redTimer / redMax)) * 100));
 
+      const rctMax = CONFIG.gojo?.reverseCursedTechniqueCooldown || 900;
+      const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
+      let rctPct = 0;
+      if (f.isChannelingRCT) {
+        const rctChannelMax = 90;
+        const remaining = f.rctHealTimer || 0;
+        rctPct = Math.max(0, Math.min(100, (remaining / rctChannelMax) * 100));
+      } else {
+        rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
+      }
+
       return [
         { id: 'uv',     pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'UNLIMITED VOID' },
         { id: 'purple', pct: purplePct, ready: purplePct >= 99, color: themeColor, label: 'HOLLOW PURPLE' },
         { id: 'red',    pct: redPct,    ready: redPct >= 99,    color: themeColor, label: 'REVERSAL RED' },
+        { id: 'rct',    pct: rctPct,    ready: rctPct >= 99 && !f.isChannelingRCT, color: themeColor, label: 'RCT' },
       ];
     }
     if (f.characterId === 'toji' || f.type === 'toji') {
@@ -508,6 +521,29 @@ function updateHealthHud() {
         throwPct = Math.max(0, Math.min(100, (1 - (throwTimer / throwMax)) * 100));
       }
 
+      // Check if renamed to WALL SLAM THROW when reaching Level 8
+      const rawThrowLabel = isLevel8 ? 'WALL SLAM THROW' : 'THROW';
+      if (!f._throwLabelAnimation) {
+        f._throwLabelAnimation = { prev: rawThrowLabel, active: false, timer: 0 };
+      }
+      if (f._throwLabelAnimation.prev !== rawThrowLabel) {
+        f._throwLabelAnimation.prev = rawThrowLabel;
+        f._throwLabelAnimation.active = true;
+        f._throwLabelAnimation.timer = 20; // 20 frames of simple cross-fade transition
+      }
+
+      let throwLabelHtml = rawThrowLabel;
+      if (f._throwLabelAnimation.active && f._throwLabelAnimation.timer > 0) {
+        f._throwLabelAnimation.timer--;
+        // Simple cross-fade: fade out the old text, then fade in the new text
+        const opacity = Math.abs(f._throwLabelAnimation.timer - 10) / 10;
+        const displayLabel = f._throwLabelAnimation.timer > 10 ? (isLevel8 ? 'THROW' : 'WALL SLAM THROW') : rawThrowLabel;
+        throwLabelHtml = `<span style="display: inline-block; opacity: ${opacity.toFixed(2)}; transition: opacity 0.1s ease-in-out;">${displayLabel}</span>`;
+        if (f._throwLabelAnimation.timer <= 0) {
+          f._throwLabelAnimation.active = false;
+        }
+      }
+
       // 3. Divine Shout Cooldown Progress Bar
       const shoutMax = CONFIG.mahoraga?.shoutCooldown || 480;
       const shoutTimer = f.shoutCooldown !== undefined ? f.shoutCooldown : shoutMax;
@@ -520,11 +556,28 @@ function updateHealthHud() {
 
       const numHtml = `<span style="font-family: Arial, sans-serif; font-weight: 900; font-size: 13px; letter-spacing: 0.5px;">${lvlStr}</span>`;
 
-      return [
+      const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
+      const minLevel8Regen = CONFIG.mahoraga?.maxLevelRctRegen || 0.80;
+      const currentRegenRate = isLevel8 ? Math.max(minLevel8Regen, totalStages * rctPerStage) : (totalStages * rctPerStage);
+      const currentRegenPerSec = Math.round(currentRegenRate * 60);
+
+      const skillList = [
         { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `DHARMA WHEEL - LVL ${numHtml}` },
-        { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: 'THROW' },
+        { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: throwLabelHtml },
         { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
       ];
+
+      if (totalStages > 0 || isLevel8) {
+        skillList.push({
+          id: 'rct',
+          pct: 100,
+          ready: true,
+          color: '#00FF66',
+          label: `RCT REGEN: +${currentRegenPerSec}%`
+        });
+      }
+
+      return skillList;
     }
     if (f.characterId === 'layla' || f.type === 'layla') {
       const themeColor = '#00E5FF'; 
@@ -638,10 +691,45 @@ function updateHealthHud() {
       const ultTimer = f.ultCooldown !== undefined ? f.ultCooldown : 0;
       const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
 
+      // 4. Core Overload (Self-Destruct)
+      let sdPct = 0;
+      let sdReady = false;
+      let sdColor = '#FF3300';
+      let sdLabel = 'CORE OVERLOAD';
+
+      if (f.isSelfDestructing) {
+        const sdMax = CONFIG.genos?.selfDestructCountdownFrames || 150;
+        const remaining = f.selfDestructTimer || 0;
+        sdPct = Math.max(0, Math.min(100, (remaining / sdMax) * 100));
+        sdReady = true;
+        sdColor = '#FF0000';
+        sdLabel = 'OVERLOAD DETONATING...';
+      } else if (f.usedSelfDestruct) {
+        sdPct = 0;
+        sdReady = false;
+        sdColor = '#555555';
+        sdLabel = 'OVERLOAD USED';
+      } else {
+        const threshold = 0.10;
+        const currentHpRatio = f.hp / f.maxHp;
+        if (currentHpRatio <= threshold) {
+          sdPct = 100;
+          sdReady = true;
+          sdColor = '#FF3300';
+          sdLabel = 'CORE OVERLOAD READY';
+        } else {
+          sdPct = Math.max(0, Math.min(100, ((1 - currentHpRatio) / (1 - threshold)) * 100));
+          sdReady = false;
+          sdColor = '#FF5500';
+          sdLabel = 'CORE OVERLOAD';
+        }
+      }
+
       return [
-        { id: 'ammo',    pct: ammoPct,   ready: ammoReady,       color: '#FF8800', label: ammoLabel },
-        { id: 'flurry',  pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
-        { id: 'ult',     pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' }
+        { id: 'ammo',         pct: ammoPct,   ready: ammoReady,       color: '#FF8800', label: ammoLabel },
+        { id: 'flurry',       pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
+        { id: 'ult',          pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' },
+        { id: 'selfdestruct', pct: sdPct,     ready: sdReady,        color: sdColor,   label: sdLabel }
       ];
     }
     if (f.characterId === 'cronos' || f.type === 'cronos') {
@@ -663,43 +751,74 @@ function updateHealthHud() {
 
       let rikaPct = 0;
       const rk = f.rika;
-      if ((f.domainActive || f.isChannelingDomain) && rk && rk.active && !rk.killedInDomain) {
+      const isInsideDomain = f.domainActive || f.isChannelingDomain;
+      const alreadySummoned = rk && rk.hasSummonedAt50Hp;
+
+      if (rk && rk.active && !rk.isDying && rk.hp > 0) {
+        // Rika is ALIVE & ACTIVE: bar = Rika's remaining HP %
+        const maxHp = rk.maxHp || CONFIG.yuta?.rikaMaxHp || 250;
+        rikaPct = Math.max(0, Math.min(100, (rk.hp / maxHp) * 100));
+      } else if (f.rikaCallTimer > 0) {
+        // Yuta is channeling the call: 100% full
         rikaPct = 100;
-      } else if (rk && rk.active) {
-        const duration = CONFIG.yuta?.rikaDuration || 1000;
-        const remaining = rk.timer || 0;
-        rikaPct = Math.max(0, Math.min(100, (remaining / duration) * 100));
-      } else if (rk && rk.cooldownTimer > 0 && rk.hasSummonedAt50Hp) {
-        const maxCd = CONFIG.yuta?.rikaCooldown || 1200;
-        rikaPct = Math.max(0, Math.min(100, (1 - (rk.cooldownTimer / maxCd)) * 100));
+      } else if (alreadySummoned) {
+        // Rika is DEAD (inside OR outside domain): Fills up smoothly as Yuta takes damage since Rika died!
+        const baseline = f.rikaRechargeHpBaseline !== undefined ? f.rikaRechargeHpBaseline : f.hp;
+        const reqDamage = (f.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.50);
+        const damageTaken = Math.max(0, baseline - f.hp);
+        rikaPct = Math.max(0, Math.min(100, (damageTaken / reqDamage) * 100));
       } else {
+        // First time filling: pure Yuta lost-HP based (0% at 100%HP → 100% at 50%HP)
         const threshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
         rikaPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
       }
 
-      const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.25;
-      const domainMax = CONFIG.yuta?.domainCooldown || 1300;
-      const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
+      // Smooth visual lerp — but snap instantly on big jumps or when actively calling Rika
+      if (typeof f._smoothRikaPct !== 'number' || Math.abs(f._smoothRikaPct - rikaPct) > 30 || f.rikaCallTimer > 0) {
+        f._smoothRikaPct = rikaPct;
+      } else {
+        f._smoothRikaPct += (rikaPct - f._smoothRikaPct) * 0.15;
+      }
+      rikaPct = Math.max(0, Math.min(100, f._smoothRikaPct));
+
+      const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.80;
       let domainPct;
       if (f.isChannelingDomain) {
         domainPct = 100;
       } else if (f.domainActive) {
-        const domainDuration = CONFIG.yuta?.domainDuration || 400;
+        const domainDuration = CONFIG.yuta?.domainDuration || 800;
         const remaining = f.domainTimer || 0;
         domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
       } else if (f.domainUseCount === 0) {
+        // Fills up as Yuta takes damage down to 80% HP for 1st Domain
         domainPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - domainHpThreshold)) * 100));
       } else if (f.domainUseCount === 1) {
-        const cooldownPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
-        const hpPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - domainHpThreshold)) * 100));
-        domainPct = Math.max(cooldownPct, hpPct);
+        // Fills up as Yuta takes new damage AFTER 1st domain ends for 2nd Domain
+        const hpNeeded = (f.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.20);
+        const hpLost = f.domain2DamageTaken || 0;
+        domainPct = Math.max(0, Math.min(100, (hpLost / hpNeeded) * 100));
       } else {
         domainPct = 0; // Exhausted both domain uses
       }
 
+      let beamPct = 0;
+      const beamCdTimer = f.pureLoveBeamCooldownTimer || 0;
+      const beamCdMax = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
+      if (f.isChannelingPureLoveBeam) {
+        beamPct = 100;
+      } else if (f.isFiringPureLoveBeam || (f.rikaEmergingForBeamTimer || 0) > 0) {
+        beamPct = 0; // Pure Love Beam is actively emerging/firing — bar stays 0%!
+      } else if (beamCdTimer > 0) {
+        beamPct = Math.max(0, Math.min(100, (1 - (beamCdTimer / beamCdMax)) * 100));
+      } else {
+        const beamThreshold = CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15;
+        beamPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - beamThreshold)) * 100));
+      }
+
       return [
         { id: 'rika',   pct: rikaPct,   ready: rikaPct >= 99 && (!rk || !rk.active), color: themeColor, label: 'RIKA SUMMON' },
-        { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' }
+        { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' },
+        { id: 'beam',   pct: beamPct,   ready: beamPct >= 99 && (rk && rk.active) && beamCdTimer <= 0, color: '#ff1493', label: 'PURE LOVE BEAM' }
       ];
     }
     if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
@@ -883,7 +1002,7 @@ function updateHealthHud() {
         const currentMult = f.critMultiplier !== undefined ? f.critMultiplier : baseMult;
         
         const baseChanceVal = Math.round(baseChance * 100);
-        const baseMultVal = baseMult.toFixed(2);
+        const baseMultVal = Math.round(baseMult * 100);
         
         let critChanceStr = `${baseChanceVal}%`;
         if (currentChance > baseChance) {
@@ -894,17 +1013,41 @@ function updateHealthHud() {
           critChanceStr = `${baseChanceVal}% - ${debuffChance}% <span style="color: #ef4444; font-size: 10px;">▼</span>`;
         }
         
-        let critMultStr = `${baseMultVal}x`;
+        let critMultStr = `${baseMultVal}%`;
         if (currentMult > baseMult) {
-          const boostMult = (currentMult - baseMult).toFixed(2);
-          critMultStr = `${baseMultVal} + ${boostMult}x <span style="color: #15803d; font-size: 10px;">▲</span>`;
+          const boostMult = Math.round((currentMult - baseMult) * 100);
+          critMultStr = `${baseMultVal}% + ${boostMult}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
         } else if (currentMult < baseMult) {
-          const debuffMult = (baseMult - currentMult).toFixed(2);
-          critMultStr = `${baseMultVal} - ${debuffMult}x <span style="color: #ef4444; font-size: 10px;">▼</span>`;
+          const debuffMult = Math.round((baseMult - currentMult) * 100);
+          critMultStr = `${baseMultVal}% - ${debuffMult}% <span style="color: #ef4444; font-size: 10px;">▼</span>`;
         }
         
         info.push(`<b>Crit Rate:</b> ${critChanceStr}`);
         info.push(`<b>Crit DMG:</b> ${critMultStr}`);
+      } else if (f.characterId === 'sukuna' || f.type === 'sukuna') {
+        const baseChance = CONFIG.sukuna?.baseCritChance || 0.10;
+        const baseMult = CONFIG.sukuna?.baseCritMultiplier || 1.50;
+        const currentChance = f.critChance !== undefined ? f.critChance : baseChance;
+        const currentMult = f.critMultiplier !== undefined ? f.critMultiplier : baseMult;
+
+        const baseChanceVal = Math.round(baseChance * 100);
+        const baseMultVal = Math.round(baseMult * 100);
+
+        let critChanceStr = `${baseChanceVal}%`;
+        if (currentChance > baseChance) {
+          const boostChance = Math.round((currentChance - baseChance) * 100);
+          critChanceStr = `${baseChanceVal}% + ${boostChance}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        }
+
+        let critMultStr = `${baseMultVal}%`;
+        if (currentMult > baseMult) {
+          const boostMult = Math.round((currentMult - baseMult) * 100);
+          critMultStr = `${baseMultVal}% + ${boostMult}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        }
+
+        info.push(`<b>Crit Rate:</b> ${critChanceStr}`);
+        info.push(`<b>Crit DMG:</b> ${critMultStr}`);
+        info.push(`<b>Slash Stacks:</b> ${f.slashHitCount || 0}`);
       } else if (f.characterId === 'toji' || f.type === 'toji') {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
         const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
@@ -972,6 +1115,19 @@ function updateHealthHud() {
           info.push(`<b>Parry Chance:</b> ${baseParry}% + ${bonusParry}%`);
         }
 
+        const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
+        const isLevel8 = totalStages >= 8 || f.isInfinityBlitz || f.isMaxAdapted;
+        const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
+        const minLevel8Regen = CONFIG.mahoraga?.maxLevelRctRegen || 0.80;
+        const currentRegenRate = isLevel8 ? Math.max(minLevel8Regen, totalStages * rctPerStage) : (totalStages * rctPerStage);
+        const currentRegenPerSec = Math.round(currentRegenRate * 60);
+
+        if (totalStages > 0 || isLevel8) {
+          info.push(`<b>Regen:</b> +${currentRegenPerSec}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Regen:</b> 0%`);
+        }
+
         const adaptedSet = new Set();
         if (f.adaptedSkills) {
           Object.keys(f.adaptedSkills).forEach(k => { if (f.adaptedSkills[k]) adaptedSet.add(k); });
@@ -1022,8 +1178,9 @@ function updateHealthHud() {
     const skills = getSkillDataForFighter(f);
     return skills.map(s => {
       let fontSz = CONFIG.hudSkillFontSize || 13;
-      if (s.label && s.label.length > 32) fontSz = 9.5;
-      else if (s.label && s.label.length > 22) fontSz = 11;
+      const plainTextLen = s.label ? s.label.replace(/<[^>]*>/g, '').length : 0;
+      if (plainTextLen > 32) fontSz = 9.5;
+      else if (plainTextLen > 24) fontSz = 11;
       const textStyle = `font-size: ${fontSz}px; text-align: ${align}; white-space: nowrap;`;
       if (s.noFill) {
         const parentColor = s.color ? `color: ${s.color};` : '';
@@ -1239,32 +1396,31 @@ function updateHealthHud() {
       `;
     }
 
-    const baseFontSize = extraClass.includes('ffa-card') ? 13 : (CONFIG.hudTitleFontSize || 20);
-    const maxChars = extraClass.includes('ffa-card') ? 10 : 12;
-    const minFontSize = 9;
-    let titleFontSize = baseFontSize;
-    if (title.length > maxChars) {
-      titleFontSize = Math.max(minFontSize, Math.floor(baseFontSize * maxChars / title.length));
+    const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
+    const maxChars = extraClass.includes('ffa-card') ? 14 : 12;
+    let nameColor = fighterColor || '#ffffff';
+    let truncatedTitle = title;
+    if (title && title.length > maxChars) {
+      truncatedTitle = title.substring(0, maxChars - 1) + '…';
     }
-    const titleStyle = `font-size:${titleFontSize}px;`;
-    const nameColor = CONFIG.hudTextColor || '#888888';
+
+    const titleStyle = `font-size: ${baseFontSize}px; text-transform: uppercase; font-family: 'Glast Blitch', Arial, sans-serif; letter-spacing: 0.5px; `;
 
     const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
       const filled = i < wins;
-      return `<span class="health-card__win-bullet${filled ? ' filled' : ''}"></span>`;
+      return `<div class="health-card__win-bullet ${filled ? 'filled' : ''}"></div>`;
     }).join('');
-
-    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 6px; align-items: center;">${winsBullets}</div>` : '';
+    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 4px; align-items: center;">${winsBullets}</div>` : '';
 
     const headerRowHTML = `
       <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 6px;">
-        ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; font-weight: bold; margin: 0; text-align: ${titleAlign};">${title}</div>` : ''}
+        ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; font-weight: bold; margin: 0; text-align: ${titleAlign};">${truncatedTitle}</div>` : ''}
         ${winsHTML}
       </div>
     `;
 
     return `
-      <div class="health-card" style="${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
+      <div class="health-card ${extraClass}" style="${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
         ${headerRowHTML}
         ${barsHTML}
       </div>
@@ -1329,6 +1485,11 @@ function updateHealthHud() {
         if (!fighter || fighter.isTurret) return;
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const color = fighter.color || '#fff';
+        let nameColor = color;
+        const fType = (fighter.type || fighter.characterId || (fighter._def && fighter._def.type) || '').toLowerCase();
+        if (fType === 'gojo') nameColor = '#00E5FF';        // Cyan name
+        else if (fType === 'yuta') nameColor = '#FF69B4';   // Pink name
+        else if (fType === 'mahoraga') nameColor = '#FFD700'; // Gold name
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
@@ -1337,7 +1498,7 @@ function updateHealthHud() {
         const winRate = totalGames > 0 ? Math.round((careerWins / totalGames) * 100) : 0;
         const fighterDef = fighter.fighterIndex !== undefined ? FIGHTER_DEFS[fighter.fighterIndex] : null;
         const shakeTimer = fighter._healthBarShakeTimer || 0;
-        const matchWins = scores[index] || 0;
+        const matchWins = (state.scores && state.scores[index]) ? state.scores[index] : 0;
 
         let cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
         if (fighterDef && fighterDef.type === 'dummy') {
@@ -1365,14 +1526,14 @@ function updateHealthHud() {
           extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : '',
           borderColor: color,
           wins: matchWins,
-          fighterColor: color,
+          fighterColor: nameColor,
           shakeTimer,
           isWinner: fighter === state.roundWinner,
           description: cardDesc,
           kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
-          maxBullets: mode === GAME_MODES.STAND_OFF ? 0 : 2,
+          maxBullets: (mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.FFA) ? 0 : 2,
           targetFighter: fighter,
-          titleAlign: (mode === GAME_MODES.FFA) ? 'left' : (index % 2 === 0 ? 'left' : 'right')
+          titleAlign: (index % 2 === 0 ? 'left' : 'right')
         });
 
         const tempDiv = document.createElement('div');

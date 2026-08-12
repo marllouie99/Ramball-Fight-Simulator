@@ -44,20 +44,19 @@ export const yutaConfig = {
   thinIceBreakerSpeed: 25,                 // Speed of Thin Ice Breaker projectile
 
   // Summon Companion: Rika Orimoto
-  rikaMaxHp: 500,                          // Maximum health pool when summoned
+  rikaMaxHp: 250,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
-  rikaCooldown: 600,                       // Cooldown between Rika actions/manifestations (frames)
-  rikaSummonHpThreshold: 0.50,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
+  rikaSummonHpThreshold: 0.95,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
   rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
-  rikaDuration: 1000,                      // Frames Rika stays active when summoned (60 frames = 1 second)
+  rikaDuration: 999999,                    // Rika stays active indefinitely as long as she is alive (HP > 0)
   rikaSpeedMultiplier: 1.8,                // Movement speed multiplier relative to Yuta's base speed
-  rikaDamage: 25,                          // Physical damage dealt per attack tick by Rika
+  rikaDamage: 20,                          // Physical damage dealt per attack tick by Rika
   rikaAttackRate: 30,                      // Frames between Rika's attacks (90 frames = 1.5s at 60fps)
 
   // Rika Full Emergence (#1) & Vengeful Death Dispersion (#8) Config Tuning
   rikaEmergenceDamage: 25,                 // AOE damage dealt when Rika completes full emergence (#1)
-  rikaEmergenceRadius: 250,                // AOE blast radius in pixels for Full Emergence (#1)
+  rikaEmergenceRadius: 400,                // AOE blast radius in pixels for Full Emergence (#1)
   rikaEmergenceKnockback: 8,               // Outward radial knockback force on Full Emergence (#1)
   rikaEmergenceHitStun: 15,                // Hitstun duration (frames) applied by Full Emergence (#1)
 
@@ -71,8 +70,9 @@ export const yutaConfig = {
   rikaDeathExplosionHitStun: 20,           // Hitstun duration (frames) applied by Death Dispersion (#8)
 
   // Ultimate Skill: Domain Expansion — Authentic Mutual Love
-  domainCooldown: 1300,                     // Cooldown before 2nd domain can trigger (~13 seconds)
-  domainHpThreshold: 0.25,                 // Triggers Yuta's Domain Expansion and Rika re-summon at 25% HP
+  domainCooldown: 0,                        // Domain is based on HP lost (no cooldown timer!)
+  domainHpThreshold: 0.90,                 // 1st Domain Expansion trigger threshold (80% HP)
+  domain2HpDamageRequired: 0.60,           // 2nd Domain requirement: Yuta MUST take 20% max HP damage AFTER 1st domain ends!
   domainMaxUses: 2,                        // Max number of Domain Expansion activations per round (allows 2 uses)
   domainChargeMax: 90,                     // Channeling duration before domain opens (1.5 seconds)
   domainDuration: 800,                     // Frames domain stays active (~6.67 seconds at 60fps)
@@ -83,6 +83,17 @@ export const yutaConfig = {
   domainRikaDamageMultiplier: 2.0,         // 1.5x damage dealt multiplier inside domain while Rika is alive
   domainSwordRows: 4,                      // Sword grid rows (optimized for 60 FPS)
   domainSwordCols: 5,                      // Sword grid columns (optimized for 60 FPS)
+
+  // Ultimate Skill: Pure Love Beam (Sacrificial Nuke)
+  pureLoveBeamHpThreshold: 0.80,           // HP ratio required to trigger beam (15%)
+  pureLoveBeamCooldown: 1200,              // Cooldown frames (20 seconds) before beam can be used again
+  pureLoveBeamChargeFrames: 120,            // Channeling duration before firing (1.5 seconds)
+  pureLoveBeamDuration: 180,               // Frames the beam stays active (3 seconds)
+  pureLoveBeamDamagePerTick: 12,           // Rapid multi-hit damage
+  pureLoveBeamWidth: 200,                  // Massive beam radius/width
+  pureLoveBeamLength: 2500,                // Screen spanning length
+  pureLoveBeamKnockback: 6,                // Outward push per tick
+
 
   //----------------------------------AUDIO CONFIG-----------------------------------------//
 

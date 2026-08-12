@@ -126,8 +126,9 @@ export function drawIllusionSpawnEffects() {
         ctx.fill();
         break;
 
-      case 'smoke':
+      case 'smoke': {
         // Use a radial gradient for a soft, smoky feel
+        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
         const baseColor = (p.color && p.color.startsWith('#')) ? p.color.substring(0, 7) : (p.color || '#9b59b6');
         gradient.addColorStop(0, `${baseColor}bf`); // Hex with alpha (75%)
         gradient.addColorStop(1, `${baseColor}00`); // Hex with alpha (0%)
@@ -136,6 +137,7 @@ export function drawIllusionSpawnEffects() {
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
         break;
+      }
         
       case 'spark':
         // Draw as a sharp, rotating line for a glint effect

@@ -21,11 +21,12 @@ export const genosConfig = {
   meleePunchCooldown: 15,  // Cooldown between melee punches (~0.3s)
 
   // Skill 1: Machine Gun Blows (Flurry)
+  initialFlurryCooldown: 1200,  // Starts on cooldown at match start (~8.0s at 60fps)
   flurryDamage: 10,
   flurryHitCount: 15,
   flurryReach: 65,
   flurryArcAngle: Math.PI * 0.5, // 90 degree arc
-  flurryCooldown: 1000, // 8 seconds at 60fps
+  flurryCooldown: 1200, // Cooldown duration between uses
 
   // Dash System (Unified tuning for all Genos thruster dashes)
   dashes: {
@@ -59,15 +60,17 @@ export const genosConfig = {
   stompRadius: 75,
 
   // Ultimate: Spiral Incineration Cannon
-  initialUltCooldown: 800, // Initial cooldown at match start (28s at 60fps)
+  initialUltCooldown: 1500, // Initial cooldown at match start (28s at 60fps)
   ultCooldown: 800, // 28 seconds at 60fps
   ultWindupFrames: 60, // 1.0s windup
   ultDurationFrames: 120, // 2.0s beam duration
-  ultDamagePerTick: 15,
+  ultDamagePerTick: 10,
   ultTickInterval: 6, // 10 ticks per second (300 total damage)
   ultBeamWidth: 60,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
   ultKnockbackForce: 8, // Directional beam push speed (prevents hyper-accel rebounce)
+  ultSlowMultiplier: 0.45, // Speed multiplier for targets caught in beam (0.45 = 45% speed allows moving a little)
+  ultBeamCenterPull: 0.04, // Axis alignment pull strength (0.04 allows enemies to steer/move inside beam)
 
   // Ultimate Screen Shake & Recovery Tuning
   ultWindupShakeIntensity: 0,   // Windup channeling shake intensity (0 = disabled)
@@ -109,21 +112,21 @@ export const genosConfig = {
 
   // Skill 1: Machine Gun Blows Voice
   flurryVoiceSound: 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3',
-  flurryVoiceVolume: 2.5,
+  flurryVoiceVolume: 2.0,
   flurryVoiceDelay: -0.15, // Timing delay in frames before voice plays (0 = immediate)
   flurryVoiceEnabled: true,
 
   // Ultimate: Spiral Incineration Cannon Audio
   ultVoiceSound: 'Assets/Sound Effects/Skills/genos-incenerate-voice.mp3',
-  ultVoiceVolume: 5.5,
+  ultVoiceVolume: 2.2,
   ultVoiceEnabled: true,
 
   ultChargeSound: 'Assets/Sound Effects/Skills/genos-ultimatecharging.mp3',
-  ultChargeVolume: 2.0,
+  ultChargeVolume: 1.8,
   ultChargeEnabled: true,
 
   ultBlastSound: 'Assets/Sound Effects/Skills/genos-ultimateblast.mp3',
-  ultBlastVolume: 2.0,
+  ultBlastVolume: 1.8,
   ultBlastEnabled: true,
 
   // Ultimate Recovery Cooling SFX
@@ -132,8 +135,12 @@ export const genosConfig = {
   ultRecoveryEnabled: true,
   ultRecoveryDelay: 0,
 
-  // Passive: Self-Destruct Explosion
-  selfDestructSound: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
+  // Passive: Self-Destruct Explosion & Charging Audio
+  selfDestructChargeSound: 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3',
+  selfDestructChargeVolume: 1.8,
+  selfDestructChargeEnabled: true,
+  selfDestructSound: 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3',
   selfDestructVolume: 2.0,
   selfDestructDelay: 0,
+  selfDestructRecoveryFrames: 90, // Breather recovery pause duration in frames (~1.5s) after exploding
 };

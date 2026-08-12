@@ -17,6 +17,9 @@ export function modUpdateChannelSense(fighter, opponent) {
 
   if (!fighter.isAmbushing && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {
     const isTargetChanneling = !!(
+      opponent.isChargingUlt ||
+      opponent.isFiringUlt ||
+      opponent.isCharging ||
       opponent.isChannelingPurple ||
       opponent.isChannelingDomainExpansion ||
       opponent.isChannelingDomain ||
@@ -24,17 +27,28 @@ export function modUpdateChannelSense(fighter, opponent) {
       (opponent.rctRevivalTimer || 0) > 0 ||
       opponent.isChannelingDivineFlame ||
       opponent.isChannelingStorm ||
-      (opponent.isChanneling === true)
+      opponent.isChargingFuga ||
+      opponent.isFiringFuga ||
+      opponent.isChargingSeriousPunch ||
+      (opponent.purpleChargeTimer || 0) > 0 ||
+      (opponent.basicPunchChargeTimer || 0) > 0 ||
+      (opponent._counterPunchTimer || 0) > 0 ||
+      (opponent.flurryHitsLeft || 0) > 0 ||
+      opponent.isFlurrying ||
+      opponent.isCastingRed ||
+      opponent.isCastingBlue ||
+      (opponent.isChanneling === true) ||
+      (typeof opponent.isPerformingSkill === 'function' && opponent.isPerformingSkill())
     );
 
     if (isTargetChanneling) {
-      const detectionRadius = CONFIG.toji?.channelDetectionRadius || 600;
+      const detectionRadius = CONFIG.toji?.channelDetectionRadius || 550;
       const dist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
 
       // 1. Initial Detection & Instant Reaction
       if (dist <= detectionRadius && !fighter._hasAttemptedChannelInterrupt && !(fighter._channelInterruptCooldown > 0)) {
         fighter._hasAttemptedChannelInterrupt = true;
-        const interruptChance = CONFIG.toji?.channelInterruptChance || 1.0;
+        const interruptChance = CONFIG.toji?.channelInterruptChance ?? 0.50;
 
         if (Math.random() <= interruptChance) {
           // Trigger reaction timer
@@ -52,8 +66,8 @@ export function modUpdateChannelSense(fighter, opponent) {
           spawnCrimsonLightningImpact(fighter.x, fighter.y, 80);
           audioSystem.playSFX('skill_backstab', 1.0);
 
-          // Set cooldown so it can trigger again after 3 seconds (180 frames)
-          fighter._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 180;
+          // Set cooldown based on configuration
+          fighter._channelInterruptCooldown = CONFIG.toji?.channelInterruptCooldownFrames || 800;
 
           // Forcefully break current state & launch Sequence 1 Ambush to interrupt!
           fighter.startAmbushSequence(opponent, true);

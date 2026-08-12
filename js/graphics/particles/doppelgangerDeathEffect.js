@@ -174,7 +174,8 @@ export function drawDoppelgangerDeathEffects() {
         }
         break;
         
-      case 'smoke':
+      case 'smoke': {
+        const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.size);
         const baseColor = (p.color && p.color.startsWith('#')) ? p.color.substring(0, 7) : (p.color || '#9b59b6');
         gradient.addColorStop(0, `${baseColor}99`);
         gradient.addColorStop(1, `${baseColor}00`);
@@ -183,6 +184,7 @@ export function drawDoppelgangerDeathEffects() {
         ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
         ctx.fill();
         break;
+      }
 
       case 'echo':
          ctx.globalAlpha = p.opacity;

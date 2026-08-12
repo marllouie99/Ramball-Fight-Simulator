@@ -16,7 +16,7 @@ export const yujiConfig = {
 
   // Core Mechanic: Black Flash Buildup
   blackFlashThreshold: 4,       // Hits required to trigger Black Flash
-  blackFlashMultiplier: 1.5,    // Damage multiplier on Black Flash trigger
+  blackFlashMultiplier: 2.5,    // Damage multiplier on Black Flash trigger
   blackFlashKnockback: 20,      // Knockback on Black Flash hit
   blackFlashResetOnMiss: true,  // Charge resets if a punch whiffs
   blackFlashDuration: 300,      // Duration in frames Yuji maintains the Black Flash state (~5s)

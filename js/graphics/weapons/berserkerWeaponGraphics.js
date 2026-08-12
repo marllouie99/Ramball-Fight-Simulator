@@ -168,7 +168,8 @@ function hexToTransparentRgba(hex, alpha = 0) {
  * a shockwave, and more aggressive visuals, especially in rage mode.
  */
 function drawBerserkerSwingEffect(ctx, r, progress, fade, isInRage, facingAngle) {
-    if (fade <= 0) return;
+    const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
+    if (fade <= 0 || isFFA) return; // Completely hide the giant swing slashes in FFA mode to reduce clutter!
 
     const glowAlpha = Math.pow(fade, 0.75);
     const se = BERSERKER_WEAPON_GRAPHICS.swingEffect;
@@ -207,7 +208,7 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
     const fps = state.fps || 60;
     const qualityLevel = state.qualityLevel || 1.0;
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-    const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+    const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
     const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
     ctx.save();
@@ -270,8 +271,8 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
     // --- Particle Burst ---
     // Particles are generated most intensely around the middle of the animation.
     const particleIntensity = Math.sin(slashProgress * Math.PI);
-    if (!useUltraLOD && particleIntensity > 0.5) {
-        const particleCount = useLOD ? (isInRage ? 4 : 2) : (isInRage ? 8 : 4);
+    if (!useLOD && particleIntensity > 0.5) {
+        const particleCount = isInRage ? 8 : 4;
         for (let i = 0; i < particleCount; i++) {
             const pAlpha = alpha * (0.5 + Math.random() * 0.5);
             const pSize = 1 + Math.random() * 2.5 * (isInRage ? 1.5 : 1);
@@ -293,265 +294,225 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
     ctx.restore();
 }
 
-/**
- * Helper: draws one axe at the given xOffset (relative to rotated origin).
- * Completely redesigned to feature an aggressive, jagged, forged bearded axe, heavy back spikes, and glowing runes.
- */
-function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, glowIntensity = 1.0, isTrail = false) {
-  const fps = state.fps || 60;
-  const qualityLevel = state.qualityLevel || 1.0;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
-  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+function _getBerserkerAxeCache(scale, isInRage, isRight, isFFA = false) {
+  const cacheKey = `${scale}_${isInRage}_${isRight}_${isFFA}`;
+  if (!window._berserkerAxeCaches) window._berserkerAxeCaches = {};
+  if (window._berserkerAxeCaches[cacheKey]) return window._berserkerAxeCaches[cacheKey];
 
-  ctx.save();
-  ctx.translate(xOffset, 0);
+  const c = document.createElement('canvas');
+  const size = 120 * scale;
+  c.width = size;
+  c.height = size;
+  const octx = c.getContext('2d');
+  octx.translate(size / 2, size / 2);
 
   const axe = BERSERKER_WEAPON_GRAPHICS.axe;
   const bladeDir = isRight ? 1 : -1;
-
-  // Colors
   const handleBase = isInRage ? axe.handleRage : axe.handleBase;
   const bladeCoreA = isInRage ? axe.bladeCoreARage : axe.bladeCoreA;
   const bladeCoreB = isInRage ? axe.bladeCoreBRage : axe.bladeCoreB;
   const bladeSpine = isInRage ? axe.bladeSpineRage : axe.bladeSpine;
   const bladeEdge = isInRage ? axe.bladeEdgeRage : axe.bladeEdge;
 
-  // --- HANDLE ---
-  ctx.fillStyle = handleBase;
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.beginPath();
-  ctx.rect(-2.5 * scale, -12 * scale, 5 * scale, 52 * scale);
-  ctx.fill();
-  ctx.stroke();
+  // Handle
+  octx.fillStyle = handleBase;
+  octx.strokeStyle = '#000000';
+  octx.lineWidth = 1.5 * scale;
+  octx.beginPath();
+  octx.rect(-2.5 * scale, -12 * scale, 5 * scale, 52 * scale);
+  octx.fill();
+  octx.stroke();
 
-  // Leather wrap (rugged, horizontal/angled strips on lower grip)
-  ctx.strokeStyle = axe.gripColor;
-  ctx.lineWidth = 1.5 * scale;
-  ctx.lineCap = 'butt';
+  octx.strokeStyle = axe.gripColor;
+  octx.lineWidth = 1.5 * scale;
+  octx.lineCap = 'butt';
   for (let i = 0; i < 13; i++) {
     const yy = 2 * scale + i * 3 * scale;
-    ctx.beginPath();
-    ctx.moveTo(-2.5 * scale, yy);
-    ctx.lineTo(2.5 * scale, yy + 1.5 * scale);
-    ctx.stroke();
+    octx.beginPath();
+    octx.moveTo(-2.5 * scale, yy);
+    octx.lineTo(2.5 * scale, yy + 1.5 * scale);
+    octx.stroke();
   }
 
-  // Pommel (Crushing mace head / heavy spike)
-  ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.beginPath();
-  ctx.moveTo(-4 * scale, 40 * scale);
-  ctx.lineTo(4 * scale, 40 * scale);
-  ctx.lineTo(5 * scale, 44 * scale);
-  ctx.lineTo(0, 50 * scale);
-  ctx.lineTo(-5 * scale, 44 * scale);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // Pommel
+  octx.fillStyle = '#111';
+  octx.strokeStyle = '#000000';
+  octx.lineWidth = 1.5 * scale;
+  octx.beginPath();
+  octx.moveTo(-4 * scale, 40 * scale);
+  octx.lineTo(4 * scale, 40 * scale);
+  octx.lineTo(5 * scale, 44 * scale);
+  octx.lineTo(0, 50 * scale);
+  octx.lineTo(-5 * scale, 44 * scale);
+  octx.closePath();
+  octx.fill();
+  octx.stroke();
 
-  // --- COLLAR (Forged Armor Housing) ---
-  ctx.fillStyle = '#111';
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.beginPath();
-  // Bulky rectangular clamp with angled corners
-  ctx.moveTo(-4 * scale, -18 * scale);
-  ctx.lineTo(4 * scale, -18 * scale);
-  ctx.lineTo(5 * scale, -14 * scale);
-  ctx.lineTo(5 * scale, 2 * scale);
-  ctx.lineTo(4 * scale, 6 * scale);
-  ctx.lineTo(-4 * scale, 6 * scale);
-  ctx.lineTo(-5 * scale, 2 * scale);
-  ctx.lineTo(-5 * scale, -14 * scale);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // Collar
+  octx.fillStyle = '#111';
+  octx.strokeStyle = '#000000';
+  octx.lineWidth = 1.5 * scale;
+  octx.beginPath();
+  octx.moveTo(-4 * scale, -18 * scale);
+  octx.lineTo(4 * scale, -18 * scale);
+  octx.lineTo(5 * scale, -14 * scale);
+  octx.lineTo(5 * scale, 2 * scale);
+  octx.lineTo(4 * scale, 6 * scale);
+  octx.lineTo(-4 * scale, 6 * scale);
+  octx.lineTo(-5 * scale, 2 * scale);
+  octx.lineTo(-5 * scale, -14 * scale);
+  octx.closePath();
+  octx.fill();
+  octx.stroke();
 
-  ctx.beginPath();
-  ctx.moveTo(0, -14 * scale);
-  ctx.lineTo(1.5 * scale, -10 * scale);
-  ctx.lineTo(0, -2 * scale);
-  ctx.lineTo(-1.5 * scale, -10 * scale);
-  ctx.closePath();
-  ctx.fill();
+  octx.beginPath();
+  octx.moveTo(0, -14 * scale);
+  octx.lineTo(1.5 * scale, -10 * scale);
+  octx.lineTo(0, -2 * scale);
+  octx.lineTo(-1.5 * scale, -10 * scale);
+  octx.closePath();
+  octx.fill();
 
-  // --- BLADE ---
-  // Rage glow behind the blade (Flickering fiery energy aura)
-  if (isInRage) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
-    const t = Date.now() / 70; // Fast flicker
-
-    // Draw fewer layers for trails to optimize FPS
-    const numLayers = isTrail ? 1 : (useUltraLOD ? 1 : (useLOD ? 2 : 3));
-
-    for (let i = 0; i < numLayers; i++) {
-      ctx.beginPath();
-      ctx.moveTo(bladeDir * 2 * scale, -16 * scale);
-
-      // Jitter function makes the aura spike out randomly
-      const jx = (val) => val + (Math.sin(t * (i + 1) + val) * 2 - 1) * (3 + i) * scale;
-      const jy = (val) => val + (Math.cos(t * (i + 2) + val) * 2 - 1) * (3 + i) * scale;
-
-      ctx.lineTo(jx(bladeDir * 18 * scale), jy(-22 * scale));
-      ctx.lineTo(jx(bladeDir * 25 * scale), jy(-10 * scale));
-      ctx.lineTo(jx(bladeDir * 22 * scale), jy(14 * scale));
-
-      // Wrap around the back hook
-      ctx.lineTo(jx(-bladeDir * 20 * scale), jy(5 * scale));
-      ctx.lineTo(jx(-bladeDir * 16 * scale), jy(-18 * scale));
-      ctx.closePath();
-
-      ctx.fillStyle = i === 0 ? `rgba(255, 0, 0, ${0.4 * glowIntensity})` :
-        i === 1 ? `rgba(220, 0, 0, ${0.25 * glowIntensity})` :
-          `rgba(180, 0, 0, ${0.15 * glowIntensity})`;
-
-      ctx.fill();
-    }
-    ctx.restore();
+  // Aura
+  if (isInRage && !isFFA) {
+    octx.save();
+    octx.globalCompositeOperation = 'lighter';
+    octx.beginPath();
+    octx.moveTo(bladeDir * 2 * scale, -16 * scale);
+    octx.lineTo(bladeDir * 25 * scale, -22 * scale);
+    octx.lineTo(bladeDir * 30 * scale, -10 * scale);
+    octx.lineTo(bladeDir * 28 * scale, 14 * scale);
+    octx.lineTo(-bladeDir * 20 * scale, 5 * scale);
+    octx.lineTo(-bladeDir * 16 * scale, -18 * scale);
+    octx.closePath();
+    octx.fillStyle = `rgba(255, 0, 0, 0.4)`;
+    octx.fill();
+    octx.restore();
   }
 
-  if (isTrail) {
-    ctx.restore();
-    return; // Do not draw the physical axe body if this is just a motion trail layer
-  }
+  // Main Blade
+  octx.beginPath();
+  octx.moveTo(bladeDir * 2 * scale, -16 * scale); 
+  octx.lineTo(bladeDir * 15 * scale, -18 * scale); 
+  octx.lineTo(bladeDir * 20 * scale, -10 * scale); 
+  octx.lineTo(bladeDir * 16 * scale, -7 * scale); 
+  octx.lineTo(bladeDir * 21 * scale, -4 * scale); 
+  octx.lineTo(bladeDir * 19 * scale, 10 * scale); 
+  octx.lineTo(bladeDir * 16 * scale, 14 * scale); 
+  octx.lineTo(bladeDir * 2 * scale, 4 * scale); 
+  octx.quadraticCurveTo(bladeDir * 10 * scale, -6 * scale, bladeDir * 2 * scale, -16 * scale); 
+  octx.closePath();
 
-  // Main Blade (Brutal Bearded Axe)
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(bladeDir * 2 * scale, -16 * scale); // Top attachment
-  ctx.lineTo(bladeDir * 15 * scale, -18 * scale); // Top outer spike
-  ctx.lineTo(bladeDir * 20 * scale, -10 * scale); // Mid outer 1 (chopping face)
-  ctx.lineTo(bladeDir * 16 * scale, -7 * scale); // Jagged notch inner
-  ctx.lineTo(bladeDir * 21 * scale, -4 * scale); // Jagged notch outer
-  ctx.lineTo(bladeDir * 19 * scale, 10 * scale); // Beard outer point
-  ctx.lineTo(bladeDir * 16 * scale, 14 * scale); // Bottom beard corner
-  ctx.lineTo(bladeDir * 2 * scale, 4 * scale); // Bottom attachment
-  ctx.quadraticCurveTo(bladeDir * 10 * scale, -6 * scale, bladeDir * 2 * scale, -16 * scale); // Inner cutout
-  ctx.closePath();
-
-  // Metallic gradient across the blade body
-  const bodyGrad = ctx.createLinearGradient(0, -18 * scale, bladeDir * 21 * scale, 14 * scale);
+  const bodyGrad = octx.createLinearGradient(0, -18 * scale, bladeDir * 21 * scale, 14 * scale);
   bodyGrad.addColorStop(0, bladeSpine);
   bodyGrad.addColorStop(0.5, bladeCoreA);
   bodyGrad.addColorStop(1, bladeCoreB);
-  ctx.fillStyle = bodyGrad;
-  ctx.fill();
+  octx.fillStyle = bodyGrad;
+  octx.fill();
 
-  const pulse = (0.7 + 0.3 * Math.sin(Date.now() / 150)) * glowIntensity;
+  octx.lineJoin = 'round';
+  octx.lineCap = 'round';
+  octx.lineWidth = 1.5 * scale;
+  octx.strokeStyle = '#000000';
+  octx.stroke();
 
-  // Spine outline (normal dark stroke)
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.strokeStyle = '#000000';
-  ctx.stroke();
-  ctx.restore();
+  // Inner Groove
+  octx.beginPath();
+  octx.moveTo(bladeDir * 6 * scale, -12 * scale);
+  octx.lineTo(bladeDir * 14 * scale, -12 * scale);
+  octx.lineTo(bladeDir * 12 * scale, -7 * scale);
+  octx.lineTo(bladeDir * 15 * scale, -4 * scale);
+  octx.lineTo(bladeDir * 14 * scale, 4 * scale);
+  octx.lineTo(bladeDir * 11 * scale, 6 * scale);
+  octx.lineTo(bladeDir * 6 * scale, 0 * scale);
+  octx.lineWidth = 1.5 * scale;
+  octx.strokeStyle = '#111111';
+  octx.fillStyle = '#222222';
+  octx.fill();
+  octx.stroke();
 
-  // Inner Groove (Dark indent)
-  ctx.beginPath();
-  ctx.moveTo(bladeDir * 6 * scale, -12 * scale);
-  ctx.lineTo(bladeDir * 14 * scale, -12 * scale);
-  ctx.lineTo(bladeDir * 12 * scale, -7 * scale);
-  ctx.lineTo(bladeDir * 15 * scale, -4 * scale);
-  ctx.lineTo(bladeDir * 14 * scale, 4 * scale);
-  ctx.lineTo(bladeDir * 11 * scale, 6 * scale);
-  ctx.lineTo(bladeDir * 6 * scale, 0 * scale);
+  // Edge Rim
+  octx.beginPath();
+  octx.moveTo(bladeDir * 15 * scale, -18 * scale);
+  octx.lineTo(bladeDir * 20 * scale, -10 * scale);
+  octx.lineTo(bladeDir * 16 * scale, -7 * scale);
+  octx.lineTo(bladeDir * 21 * scale, -4 * scale);
+  octx.lineTo(bladeDir * 19 * scale, 10 * scale);
+  octx.lineTo(bladeDir * 16 * scale, 14 * scale);
+  
+  octx.lineWidth = 6.0 * scale;
+  octx.globalAlpha = 0.5;
+  octx.strokeStyle = isInRage ? '#ff0000' : '#000000';
+  octx.stroke();
+  octx.lineWidth = 3.0 * scale;
+  octx.globalAlpha = 1.0;
+  octx.strokeStyle = isInRage ? '#ff3333' : '#111111';
+  octx.stroke();
+  octx.lineWidth = 1.0 * scale;
+  octx.strokeStyle = isInRage ? '#ffcccc' : '#333333';
+  octx.stroke();
+  
+  // Back Spike
+  octx.globalAlpha = 1.0;
+  octx.beginPath();
+  octx.moveTo(-bladeDir * 2 * scale, -12 * scale); 
+  octx.lineTo(-bladeDir * 14 * scale, -10 * scale); 
+  octx.lineTo(-bladeDir * 10 * scale, -7 * scale); 
+  octx.lineTo(-bladeDir * 18 * scale, 0 * scale); 
+  octx.lineTo(-bladeDir * 2 * scale, -4 * scale); 
+  octx.quadraticCurveTo(-bladeDir * 6 * scale, -8 * scale, -bladeDir * 2 * scale, -12 * scale); 
+  octx.closePath();
 
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.strokeStyle = '#111111';
-  ctx.fillStyle = '#222222';
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
-
-  // Bright edge rim (Glowing neon on the axe's blade chopping edge)
-  ctx.beginPath();
-  ctx.moveTo(bladeDir * 15 * scale, -18 * scale);
-  ctx.lineTo(bladeDir * 20 * scale, -10 * scale);
-  ctx.lineTo(bladeDir * 16 * scale, -7 * scale);
-  ctx.lineTo(bladeDir * 21 * scale, -4 * scale);
-  ctx.lineTo(bladeDir * 19 * scale, 10 * scale);
-  ctx.lineTo(bladeDir * 16 * scale, 14 * scale);
-
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-    
-    // Outer glow
-    ctx.lineWidth = 6.0 * scale;
-    ctx.globalAlpha = 0.5 * pulse;
-    ctx.strokeStyle = isInRage ? '#ff0000' : '#000000';
-    ctx.stroke();
-    
-    // Mid glow
-    ctx.lineWidth = 3.0 * scale;
-    ctx.globalAlpha = 1.0 * pulse;
-    ctx.strokeStyle = isInRage ? '#ff3333' : '#111111';
-    ctx.stroke();
-    
-    // Inner core
-    ctx.globalAlpha = 1.0;
-    ctx.lineWidth = 1.0 * scale;
-    ctx.strokeStyle = isInRage ? '#ffcccc' : '#333333';
-    ctx.stroke();
-    ctx.restore();
-  ctx.restore();
-
-  // --- BACK SPIKE (Forged Hook) ---
-  ctx.beginPath();
-  ctx.moveTo(-bladeDir * 2 * scale, -12 * scale); // Top attachment
-  ctx.lineTo(-bladeDir * 14 * scale, -10 * scale); // Top outer
-  ctx.lineTo(-bladeDir * 10 * scale, -7 * scale); // Notch inner
-  ctx.lineTo(-bladeDir * 18 * scale, 0 * scale); // Bottom outer hook
-  ctx.lineTo(-bladeDir * 2 * scale, -4 * scale); // Bottom attachment
-  ctx.quadraticCurveTo(-bladeDir * 6 * scale, -8 * scale, -bladeDir * 2 * scale, -12 * scale); // Inner curve
-  ctx.closePath();
-
-  const spikeGrad = ctx.createLinearGradient(0, -12 * scale, -bladeDir * 18 * scale, 0);
+  const spikeGrad = octx.createLinearGradient(0, -12 * scale, -bladeDir * 18 * scale, 0);
   spikeGrad.addColorStop(0, bladeCoreA);
   spikeGrad.addColorStop(1, bladeSpine);
-  ctx.fillStyle = spikeGrad;
-  ctx.fill();
+  octx.fillStyle = spikeGrad;
+  octx.fill();
 
-  // Stroke for back spike
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.strokeStyle = '#000000';
-  ctx.stroke();
-  ctx.restore();
+  octx.lineWidth = 1.5 * scale;
+  octx.strokeStyle = '#000000';
+  octx.stroke();
 
-  // Spike Edge highlight (metallic)
-  ctx.beginPath();
-  ctx.moveTo(-bladeDir * 14 * scale, -10 * scale);
-  ctx.lineTo(-bladeDir * 10 * scale, -7 * scale);
-  ctx.lineTo(-bladeDir * 18 * scale, 0 * scale);
-
-  ctx.save();
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 1.5 * scale;
-  ctx.strokeStyle = bladeCoreB;
-  ctx.stroke();
-  ctx.restore();
+  octx.beginPath();
+  octx.moveTo(-bladeDir * 14 * scale, -10 * scale);
+  octx.lineTo(-bladeDir * 10 * scale, -7 * scale);
+  octx.lineTo(-bladeDir * 18 * scale, 0 * scale);
+  octx.strokeStyle = bladeCoreB;
+  octx.stroke();
   
-  // Draw Hand (Grip)
-  ctx.beginPath();
-  ctx.arc(0, 15 * scale, getHandSize(6 * scale), 0, Math.PI * 2);
-  ctx.fillStyle = '#cc0000'; // Dark red matching Berserker
-  ctx.fill();
-  ctx.lineWidth = 1.5 * scale;
-  ctx.strokeStyle = '#000000';
-  ctx.stroke();
+  // Hand
+  octx.beginPath();
+  octx.arc(0, 15 * scale, getHandSize(6 * scale), 0, Math.PI * 2);
+  octx.fillStyle = '#cc0000'; 
+  octx.fill();
+  octx.strokeStyle = '#000000';
+  octx.stroke();
+
+  window._berserkerAxeCaches[cacheKey] = { canvas: c, size: size };
+  return window._berserkerAxeCaches[cacheKey];
+}
+
+function drawSingleAxe(ctx, xOffset, scale, isInRage, isRight, axeSwingActive, glowIntensity = 1.0, isTrail = false) {
+  if (isTrail) return;
+  
+  ctx.save();
+  ctx.translate(xOffset, 0);
+
+  const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
+
+  // If we are cross-fading from rage to normal
+  if (!isInRage && glowIntensity > 0 && !isFFA) {
+    const normalCache = _getBerserkerAxeCache(scale, false, isRight, isFFA);
+    ctx.drawImage(normalCache.canvas, -normalCache.size / 2, -normalCache.size / 2);
+    
+    ctx.globalAlpha = glowIntensity;
+    const rageCache = _getBerserkerAxeCache(scale, true, isRight, isFFA);
+    ctx.drawImage(rageCache.canvas, -rageCache.size / 2, -rageCache.size / 2);
+  } else {
+    const cache = _getBerserkerAxeCache(scale, isInRage, isRight, isFFA);
+    ctx.globalAlpha = isInRage ? glowIntensity : 1.0;
+    ctx.drawImage(cache.canvas, -cache.size / 2, -cache.size / 2);
+  }
 
   ctx.restore();
 }

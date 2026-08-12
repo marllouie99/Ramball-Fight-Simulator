@@ -145,7 +145,8 @@ export function drawDopplegangerPurpleSword(ctx, x, y, gunAngle, r, swordSwingAc
 
 function drawDopplegangerSwingEffect(ctx, r, progress, facingAngle, fighterColor, radiusScale = 1.0) {
   const fade = Math.sin(Math.max(0, Math.min(1, progress)) * Math.PI);
-  if (fade <= 0) return;
+  const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
+  if (fade <= 0 || isFFA) return;
 
   const se = DOPPLEGANGER_WEAPON_GRAPHICS.swingEffect;
 
@@ -230,8 +231,9 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
-  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+  const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
+  const useLOD = isFFA || (isMulti && (qualityLevel < 1.0 || fps < 55));
+  const useUltraLOD = isFFA || (isMulti && (qualityLevel <= 0.5 || fps < 40));
 
   if (isPhantom) {
     if (useUltraLOD) { return; } // OPTIMIZED: Disable phantom trace on ULTRA low FPS
@@ -264,6 +266,27 @@ function drawSingleSword(ctx, xOffset, scale, isSwinging, isPhantom = false) {
   const midX = bladeLength - tipLength;
   const bladeTop = baseY - bladeBaseWidth;
   const bladeBottom = baseY + bladeBaseWidth;
+
+  if (isFFA) {
+    ctx.fillStyle = sword.bladeCore;
+    ctx.beginPath();
+    ctx.moveTo(2 * scale, bladeTop);
+    ctx.lineTo(midX, bladeTop + 1.5 * scale);
+    ctx.lineTo(bladeLength, baseY);
+    ctx.lineTo(midX, bladeBottom - 1.5 * scale);
+    ctx.lineTo(2 * scale, bladeBottom);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = sword.bladeEdgeBright;
+    ctx.lineWidth = 1.5 * scale;
+    ctx.stroke();
+
+    ctx.fillStyle = sword.handleBase;
+    ctx.fillRect(-handleLength, baseY - 2.5 * scale, handleLength, 5 * scale);
+    
+    ctx.restore();
+    return;
+  }
 
   // Re-enabled Outer Aura, disabled only on Ultra LOD
   // OPTIMIZATION: Further reduce iterations for performance
@@ -510,7 +533,7 @@ export function drawDopplegangerBodyEffect(ctx, x, y, r, angle, layer = 'under',
 
   const qualityLevel = state.qualityLevel || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   const turbulence = (t, freq, amp) => Math.sin(t * freq) * amp;

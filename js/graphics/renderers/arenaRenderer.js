@@ -140,6 +140,9 @@ function drawSolidVectorCrack(ctx, crack) {
     ctx.fill();
   };
 
+  const crackScale = crack.scale !== undefined ? crack.scale : 0.45;
+  const crackThickMult = crack.thickness !== undefined ? crack.thickness : 0.35;
+
   // Generate 2 primary solid fissure branches splitting along the wall zone
   const primaryCount = 2;
   const primarySpines = [];
@@ -152,22 +155,22 @@ function drawSolidVectorCrack(ctx, crack) {
     let baseAngle = Math.PI + dir * (0.5 + rand() * 0.5); 
     let currentAngle = baseAngle;
     
-    let startThick = 18 + rand() * 10; // Bold thick core (18-28px)
+    let startThick = (18 + rand() * 10) * crackThickMult; // Scaled core thickness
     const segCount = 6 + Math.floor(rand() * 4);
 
     nodes.push({ x: cx, y: cy, w: startThick });
 
     for (let s = 0; s < segCount; s++) {
-      const segLen = 14 + rand() * 22;
+      const segLen = (14 + rand() * 22) * crackScale;
       cx += Math.cos(currentAngle) * segLen;
       cy += Math.sin(currentAngle) * segLen;
 
       const progress = (s + 1) / segCount;
-      const w = Math.max(0.5, startThick * Math.pow(1 - progress, 1.2));
+      const w = Math.max(0.3, startThick * Math.pow(1 - progress, 1.2));
 
       nodes.push({ x: cx, y: cy, w: w });
 
-      // Sharp step-wise zig-zag turns (like the PNG image)
+      // Sharp step-wise zig-zag turns
       const turnSign = (s % 2 === 0 ? 1 : -1);
       currentAngle += turnSign * (0.4 + rand() * 0.7);
 
@@ -197,18 +200,18 @@ function drawSolidVectorCrack(ctx, crack) {
       const branchNodes = [];
       let cx = parentNode.x;
       let cy = parentNode.y;
-      let branchStartThick = Math.min(parentNode.w * 0.75, 10 + rand() * 6);
+      let branchStartThick = Math.min(parentNode.w * 0.75, (10 + rand() * 6) * crackThickMult);
       const branchSegs = 3 + Math.floor(rand() * 4);
 
       branchNodes.push({ x: cx, y: cy, w: branchStartThick });
 
       for (let bs = 0; bs < branchSegs; bs++) {
-        const segLen = 10 + rand() * 16;
+        const segLen = (10 + rand() * 16) * crackScale;
         cx += Math.cos(branchAngle) * segLen;
         cy += Math.sin(branchAngle) * segLen;
 
         const progress = (bs + 1) / branchSegs;
-        const w = Math.max(0.4, branchStartThick * (1 - progress));
+        const w = Math.max(0.3, branchStartThick * (1 - progress));
 
         branchNodes.push({ x: cx, y: cy, w: w });
 
@@ -227,7 +230,7 @@ function drawSolidVectorCrack(ctx, crack) {
   const satelliteCount = 1 + Math.floor(rand() * 2);
   for (let sat = 0; sat < satelliteCount; sat++) {
     const satOffsetAngle = Math.PI + (rand() - 0.5) * 1.8;
-    const satDist = 30 + rand() * 45;
+    const satDist = (30 + rand() * 45) * crackScale;
     let cx = Math.cos(satOffsetAngle) * satDist;
     let cy = Math.sin(satOffsetAngle) * satDist;
 
@@ -430,40 +433,14 @@ export function drawArena() {
   ctx.save();
   ctx.drawImage(state._titleHeaderCanvas, centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
   
-  // Overlay dimming if any ultimate domains/dims or skill channelings are active (smooth fade-in)
-  let domainChannelProgress = 0;
-  if (state.fighters) {
-    state.fighters.forEach(f => {
-      if (!f || f.hp <= 0) return;
-      if (f.domainActive || f.ultimateActive) {
-        domainChannelProgress = Math.max(domainChannelProgress, 0.88);
-      } else if (f.isChannelingDomainExpansion || f.isChannelingDomain || f.isChannelingPurple || f.isChannelingDivineFlame || f.ultimatePhase === 'CHANNELING') {
-        const maxCharge = f.domainChargeMax || f.purpleChargeMax || f.divineFlameChargeMax || f.ultimateChargeMax || 120;
-        const currentCharge = f.domainChargeTimer || f.purpleChargeTimer || f.divineFlameChargeTimer || f.ultimateChargeTimer || 0;
-        const prog = Math.min(1.0, Math.max(0.0, currentCharge / Math.max(1, maxCharge)));
-        domainChannelProgress = Math.max(domainChannelProgress, prog * 0.85);
-      }
-    });
-  }
-
-  const purpleDim = typeof currentPurpleDimOpacity !== 'undefined' ? currentPurpleDimOpacity : 0;
-  const furnaceDim = typeof currentFurnaceDimOpacity !== 'undefined' ? currentFurnaceDimOpacity : 0;
-  
-  let activeDimOpacity = state.currentHUDDimOpacity || 0;
-  activeDimOpacity = Math.max(activeDimOpacity, domainChannelProgress);
-  if (purpleDim > 0) activeDimOpacity = Math.max(activeDimOpacity, purpleDim * 0.88);
-  if (furnaceDim > 0) activeDimOpacity = Math.max(activeDimOpacity, furnaceDim * 0.88);
-
-  if (activeDimOpacity > 0) {
-    ctx.globalCompositeOperation = 'source-atop';
-    ctx.fillStyle = `rgba(0, 0, 0, ${activeDimOpacity * 0.95})`;
-    ctx.fillRect(centerX - drawW / 2, arena.y - drawH - 10, drawW, drawH);
-  }
+  // The title header banner ("FIGHT OF CHARACTERS") is drawn bright and clear above the arena
   ctx.restore();
 }
 
 export function excludeGojoInfinityFromDim(ctx) {
   if (!state.fighters) return;
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
   for (const f of state.fighters) {
     if (!f || f.hp <= 0) continue;
     const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
@@ -473,17 +450,18 @@ export function excludeGojoInfinityFromDim(ctx) {
     
     const infinityR = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
     const cutoutRadius = infinityR + 25;
-    const drawY = f.y - (f.z || 0);
+    const drawX = f.x + shakeX;
+    const drawY = f.y - (f.z || 0) + shakeY;
 
     ctx.save();
     ctx.globalCompositeOperation = 'destination-out';
-    const holeGrad = ctx.createRadialGradient(f.x, drawY, 0, f.x, drawY, cutoutRadius);
+    const holeGrad = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, cutoutRadius);
     holeGrad.addColorStop(0, 'rgba(0, 0, 0, 1.0)');
     holeGrad.addColorStop(0.70, 'rgba(0, 0, 0, 0.85)');
     holeGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = holeGrad;
     ctx.beginPath();
-    ctx.arc(f.x, drawY, cutoutRadius, 0, Math.PI * 2);
+    ctx.arc(drawX, drawY, cutoutRadius, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }
@@ -542,18 +520,23 @@ export function drawPurpleDimScreen() {
     return;
   }
 
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+
   ctx.save();
+  // Reset transform to identity screen space so full-screen dim rect doesn't shake outer edges
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   const opacity = currentPurpleDimOpacity;
 
-  // Dark base purple overlay
-  ctx.fillStyle = `rgba(18, 2, 32, ${opacity * 0.7})`;
+  // Dark base black overlay (instead of purple)
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.92})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // Dynamic radial gradient centered on Gojo or Purple Orb
   const maxDim = Math.max(arena.width, arena.height) * 0.70;
-  const roundCx = Math.round(cx / 10) * 10;
-  const roundCy = Math.round(cy / 10) * 10;
+  const roundCx = Math.round((cx + shakeX) / 10) * 10;
+  const roundCy = Math.round((cy + shakeY) / 10) * 10;
   const key = `${roundCx}_${roundCy}_${maxDim}`;
 
   if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {
@@ -562,12 +545,13 @@ export function drawPurpleDimScreen() {
       roundCx, roundCy, 0,
       roundCx, roundCy, maxDim
     );
-    state._cachedPurpleDimGrad.addColorStop(0, `rgba(195, 80, 255, ${opacity * 0.95})`);
-    state._cachedPurpleDimGrad.addColorStop(0.06, `rgba(147, 51, 234, ${opacity * 0.85})`);
-    state._cachedPurpleDimGrad.addColorStop(0.15, `rgba(88, 28, 135, ${opacity * 0.70})`);
-    state._cachedPurpleDimGrad.addColorStop(0.35, `rgba(20, 2, 35, ${opacity * 0.92})`);
-    state._cachedPurpleDimGrad.addColorStop(0.65, `rgba(5, 1, 10, ${opacity * 0.97})`);
-    state._cachedPurpleDimGrad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.99})`);
+    // Concentrates a bright purple halo immediately around the Hollow Purple orb, fading to pitch black
+    state._cachedPurpleDimGrad.addColorStop(0, 'rgba(235, 180, 255, 1.0)'); // White-purple core
+    state._cachedPurpleDimGrad.addColorStop(0.02, 'rgba(192, 85, 255, 0.95)'); // Electric purple glow
+    state._cachedPurpleDimGrad.addColorStop(0.06, 'rgba(126, 34, 206, 0.65)'); // Cursed energy ring
+    state._cachedPurpleDimGrad.addColorStop(0.12, 'rgba(6, 0, 10, 0.90)'); // Falling off to black
+    state._cachedPurpleDimGrad.addColorStop(0.28, 'rgba(0, 0, 0, 1.0)'); // Dark outer space
+    state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)'); // Pitch black boundary
   }
 
   ctx.globalAlpha = opacity;
@@ -581,16 +565,18 @@ export function drawPurpleDimScreen() {
       const rk = f.rika;
       const rScale = rk.spawnScale ?? 1.0;
       const cutoutRadius = Math.max(90, (rk.r || 35) * rScale * 3.0 + 60);
+      const rkX = rk.x + shakeX;
+      const rkY = rk.y + shakeY;
       ctx.save();
       ctx.globalCompositeOperation = 'destination-out';
-      const holeGrad = ctx.createRadialGradient(rk.x, rk.y, 0, rk.x, rk.y, cutoutRadius);
+      const holeGrad = ctx.createRadialGradient(rkX, rkY, 0, rkX, rkY, cutoutRadius);
       const alphaMult = Math.min(1.0, f.rikaAlpha || 1.0);
       holeGrad.addColorStop(0, `rgba(0, 0, 0, ${alphaMult})`);
       holeGrad.addColorStop(0.60, `rgba(0, 0, 0, ${alphaMult * 0.85})`);
       holeGrad.addColorStop(1.0, `rgba(0, 0, 0, 0)`);
       ctx.fillStyle = holeGrad;
       ctx.beginPath();
-      ctx.arc(rk.x, rk.y, cutoutRadius, 0, Math.PI * 2);
+      ctx.arc(rkX, rkY, cutoutRadius, 0, Math.PI * 2);
       ctx.fill();
       ctx.restore();
     }
@@ -722,14 +708,20 @@ export function drawMahoragaAdaptationDimScreen() {
 
   if (opacity <= 0.01) return;
 
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+
   ctx.save();
+  // Reset transform to identity screen space so full-screen dim rect doesn't shake outer edges
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // Dark Golden Vignette Radial Gradient centered at Mahoraga's wheel
-  const wheelY = mahoraga.y - mahoraga.r - 28;
+  const drawX = mahoraga.x + shakeX;
+  const wheelY = mahoraga.y - mahoraga.r - 28 + shakeY;
   const maxRadius = Math.max(arena.width, arena.height) * 0.70;
   const grad = ctx.createRadialGradient(
-    mahoraga.x, wheelY, 15,
-    mahoraga.x, wheelY, maxRadius
+    drawX, wheelY, 15,
+    drawX, wheelY, maxRadius
   );
   // Dark cinematic vignette overlay (properly darkens the entire arena including Gojo and afterimages!)
   grad.addColorStop(0, `rgba(40, 30, 8, ${opacity * 0.65})`);
@@ -740,12 +732,125 @@ export function drawMahoragaAdaptationDimScreen() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
-  excludeGojoInfinityFromDim(ctx);
-
   ctx.restore();
   
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
+}
+
+let currentMahoLevel8DimOpacity = 0;
+
+export function drawMahoragaLevel8DimScreen() {
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const isPlaying = state.gameState === 'playing';
+  // Find any active Mahoraga fighter that is Level 8 (transformed)
+  const mahoraga = state.fighters?.find(f => {
+    if (!f || f.hp <= 0) return false;
+    const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
+    return totalStages >= 8 || f.isMaxAdapted || f.isInfinityBlitz || (f.goldStages >= 8);
+  });
+
+  const shouldDim = isPlaying && !!mahoraga;
+  const targetOpacity = shouldDim ? 1.0 : 0.0;
+
+  // Smooth cinematic interpolation over ~1.5 seconds
+  currentMahoLevel8DimOpacity += (targetOpacity - currentMahoLevel8DimOpacity) * 0.035;
+
+  if (currentMahoLevel8DimOpacity <= 0.005) {
+    currentMahoLevel8DimOpacity = 0;
+    return;
+  }
+
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Center the spotlight midway between Mahoraga and the closest opponent to highlight both
+  const activeMaho = mahoraga || state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')));
+  const opponent = state.fighters?.find(f => f && f !== activeMaho && f.hp > 0);
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+  if (activeMaho) {
+    if (opponent) {
+      cx = (activeMaho.x + opponent.x) / 2;
+      cy = (activeMaho.y + opponent.y) / 2;
+    } else {
+      cx = activeMaho.x;
+      cy = activeMaho.y;
+    }
+  }
+
+  const drawX = cx + shakeX;
+  const drawY = cy + shakeY;
+  const maxRadius = Math.max(arena.width, arena.height) * 1.1;
+  const grad = ctx.createRadialGradient(
+    drawX, drawY, 50, // Spotlight radius where both fighters remain fully lit
+    drawX, drawY, maxRadius
+  );
+  
+  // High intensity golden-brown dark cinematic vignette
+  const time = Date.now() * 0.0015;
+  const pulse = Math.sin(time) * 0.04;
+  const baseDimOpacity = 0.88 * currentMahoLevel8DimOpacity;
+  const opacity = baseDimOpacity + pulse * currentMahoLevel8DimOpacity;
+  
+  grad.addColorStop(0, 'rgba(0, 0, 0, 0.0)'); // Fully bright spotlight center
+  grad.addColorStop(0.2, `rgba(14, 8, 2, ${opacity * 0.4})`); // Golden-brown highlight transition
+  grad.addColorStop(0.5, `rgba(6, 3, 1, ${opacity * 0.88})`); // Very dark golden-brown
+  grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.99})`); // Absolute black border
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // ── AMBIENT GOLDEN LIGHT SPILL (illumination of surroundings) ──
+  if (activeMaho) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    
+    const pulseScale = 1.0 + Math.sin(Date.now() * 0.003) * 0.08; // Pulsing light intensity
+
+    // 1. Wheel Light Spill (glow centered at Dharma Wheel)
+    const wheelX = activeMaho.x + shakeX;
+    const wheelY = activeMaho.y - activeMaho.r - 28 + shakeY;
+    const wheelGlow = ctx.createRadialGradient(
+      wheelX, wheelY, 5,
+      wheelX, wheelY, 85 * pulseScale
+    );
+    wheelGlow.addColorStop(0, `rgba(255, 215, 0, ${0.35 * currentMahoLevel8DimOpacity})`); // Gold center
+    wheelGlow.addColorStop(0.3, `rgba(255, 179, 0, ${0.15 * currentMahoLevel8DimOpacity})`); // Amber mid
+    wheelGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    
+    ctx.fillStyle = wheelGlow;
+    ctx.beginPath();
+    ctx.arc(wheelX, wheelY, 85 * pulseScale, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Sword Light Spill (glow centered at extending blade)
+    const swordAngle = activeMaho.gunAngle !== undefined ? activeMaho.gunAngle : 0;
+    const swordDist = activeMaho.r + 30;
+    const swordX = activeMaho.x + Math.cos(swordAngle) * swordDist + shakeX;
+    const swordY = activeMaho.y + Math.sin(swordAngle) * swordDist + shakeY;
+
+    const swordGlow = ctx.createRadialGradient(
+      swordX, swordY, 10,
+      swordX, swordY, 110 * pulseScale
+    );
+    swordGlow.addColorStop(0, `rgba(255, 235, 59, ${0.30 * currentMahoLevel8DimOpacity})`); // Bright yellow-gold
+    swordGlow.addColorStop(0.4, `rgba(255, 152, 0, ${0.12 * currentMahoLevel8DimOpacity})`); // Soft orange
+    swordGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = swordGlow;
+    ctx.beginPath();
+    ctx.arc(swordX, swordY, 110 * pulseScale, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.restore();
+  }
+
+  ctx.restore();
 }
 
 export function drawFuelPickups() {

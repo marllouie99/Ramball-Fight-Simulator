@@ -2,6 +2,9 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
 export function drawGojoWeapon(ctx, fighter) {
+    if (fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0)) {
+        return;
+    }
     const z = fighter.z || 0;
     ctx.save();
     ctx.translate(fighter.x, fighter.y - z);
@@ -46,17 +49,21 @@ export function drawGojoWeapon(ctx, fighter) {
         }
     } else {
         // Melee Mode - Hands are drawn with full punch animation in GojoFighter._drawHandCursedEnergy
-        // Suppress the Blue Orb entirely during countdown, Reversal Red, Domain Expansion, or victory screen
+        // Suppress the Blue Orb during countdown, Reversal Red, Domain Expansion, victory screen, or active Purple travel
         const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
-        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown) {
+        const recoveryTimer = fighter.purpleRecoveryTimer || 0;
+        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown || recoveryTimer > 30) {
             ctx.restore();
             return;
         }
 
+        // Smoothly fade blue orb back in when Purple is about to expire (final 30 frames of recovery)
+        const recoveryFade = (recoveryTimer > 0 && recoveryTimer <= 30) ? (1.0 - (recoveryTimer / 30)) : 1.0;
+
         // Normal stance - Floating Blue orb in front with intense Bloom & prep charge
         if (transition > 0) {
             ctx.save();
-            ctx.globalAlpha = transition;
+            ctx.globalAlpha = transition * recoveryFade;
             
             let attackFlash = 0;
             let attackPush = 0;

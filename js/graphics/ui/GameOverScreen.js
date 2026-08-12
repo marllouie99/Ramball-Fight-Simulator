@@ -361,7 +361,7 @@ function drawMatchEndScreen() {
   }
 
   // Special champion reveal animation for match winner (1v1, 1v2 Stand Off, 2v2 & FFA)
-  const effectiveWinner = matchWinner || (state.fighters ? state.fighters[0] : null);
+  const effectiveWinner = matchWinner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
   if (effectiveWinner) {
     drawMatchWinnerReveal(effectiveWinner, delayedTimer, mode);
   }

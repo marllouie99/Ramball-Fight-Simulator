@@ -213,10 +213,7 @@ export class SukunaRenderer {
       return;
     }
 
-    let angle = fighter.gunAngle || 0;
-    if (fighter.isChannelingDomainExpansion && !fighter.domainActive) {
-      angle = 0; // Lock hand rotation during domain channeling so hands stay stationary
-    }
+    const angle = fighter.gunAngle || 0;
     const facingLeft = Math.abs(angle) > Math.PI / 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
@@ -237,7 +234,7 @@ export class SukunaRenderer {
     let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
 
     // 1. Martial Arts Brawler Guard Stance & 1-2 Flurry Punch Animation (Matching Todo & Gojo)
-    if (fighter.punchAnimTimer > 0) {
+    if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion) {
       const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
       const easePunch = Math.sin(rawProgress * Math.PI);
@@ -260,24 +257,25 @@ export class SukunaRenderer {
       }
     }
 
-    // 2. Dynamic Slash Swing Chop Animation (Clean forward diagonal slicing chop for Cleave / Dismantle)
-    else if (fighter.slashSwingTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) {
-      let rawT = 1.0;
-      if (fighter.slashSwingTimer > 0) {
-        rawT = (10 - Math.max(0, fighter.slashSwingTimer)) / 10;
-      }
-      const easeChop = Math.sin(rawT * Math.PI);
+    // 2. Dynamic Slash Swing Chop Animation (Clean single-hand slicing chop for Cleave / Dismantle, off-hand hidden)
+    else if ((fighter.slashSwingTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) && !fighter.isChannelingDomainExpansion) {
+      const maxT = fighter.slashSwingMaxTimer || 14;
+      const rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+      const easeChop = Math.sin(Math.pow(rawT, 0.85) * Math.PI);
+      const swingSweep = Math.sin(rawT * Math.PI * 0.95);
 
       if (fighter.slashHand === 1) {
-        // Left Hand Chop: Sweeps top-right -> bottom-right forward across target
-        frontHandX_loc = r * 0.2; frontHandY_loc = r * 0.15; // Lead hand in guard
-        backHandX_loc  = r * (0.6 + easeChop * 1.1);
-        backHandY_loc  = -r * 0.45 + rawT * r * 0.8;
+        // Left Hand Chop: Smooth arc sweep across target (Hide off-hand)
+        frontHandX_loc = 0; frontHandY_loc = 0;
+        backHandX_loc  = r * (0.1 + easeChop * 1.35);
+        backHandY_loc  = -r * 0.35 + swingSweep * r * 0.75;
+        hideFrontHand = true;
       } else {
-        // Right Hand Chop: Sweeps top-left -> bottom-left forward across target
-        backHandX_loc  = 0;       backHandY_loc  = -r * 0.15; // Rear hand in guard
-        frontHandX_loc = r * (0.6 + easeChop * 1.1);
-        frontHandY_loc = r * 0.45 - rawT * r * 0.8;
+        // Right Hand Chop: Smooth arc sweep across target (Hide off-hand)
+        backHandX_loc  = 0; backHandY_loc = 0;
+        frontHandX_loc = r * (0.1 + easeChop * 1.35);
+        frontHandY_loc = r * 0.35 - swingSweep * r * 0.75;
+        hideBackHand = true;
       }
     }
 
@@ -294,16 +292,23 @@ export class SukunaRenderer {
       frontHandY_loc = 0;
     }
 
-    // 4. Malevolent Shrine (Domain Expansion) Stationary Enmaten Hand Sign
-    else if (fighter.isChannelingDomainExpansion && !fighter.domainActive) {
-      frontHandX_loc = r * 0.60; frontHandY_loc = r * 0.10;
-      backHandX_loc  = r * 0.50; backHandY_loc  = -r * 0.10;
+    // 4. Malevolent Shrine Channeling Only — Enma Ten Hand Sign (Both hands pressed tight together on chest facing screen)
+    else if (fighter.isChannelingDomainExpansion) {
+      frontHandX_loc = r * 0.50; frontHandY_loc = r * 0.03;
+      backHandX_loc  = r * 0.50; backHandY_loc  = -r * 0.03;
     }
 
-    // Default rest: Martial Arts Brawler Guard Stance
+    // Default rest: Single-Hand Slash Stance (Off-hand strictly hidden so Sukuna NEVER displays 2 hands on body)
     else {
-      frontHandX_loc = r * 0.85; frontHandY_loc = r * 0.15;
-      backHandX_loc  = 0;        backHandY_loc  = -r * 0.15;
+      if (fighter.slashHand === 1) {
+        backHandX_loc  = r * 0.85; backHandY_loc  = -r * 0.15;
+        frontHandX_loc = 0;        frontHandY_loc = 0;
+        hideFrontHand  = true;
+      } else {
+        frontHandX_loc = r * 0.85; frontHandY_loc = r * 0.15;
+        backHandX_loc  = 0;        backHandY_loc  = 0;
+        hideBackHand   = true;
+      }
     }
 
     const fHand = toGlobal(frontHandX_loc, frontHandY_loc);

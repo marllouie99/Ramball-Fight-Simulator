@@ -1,6 +1,7 @@
 import { drawHUD } from '../hudManager.js';
 import { restartCurrentRound, goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawSmallFighterBadge } from './CharacterSelectScreen.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 
@@ -223,8 +224,8 @@ function drawCountdown() {
   const cy = state.arena.y + state.arena.height / 2;
 
   if (announcerPlayingSequence) {
-    const is1v1OrStandOff = (state.mode === '1v1' || state.mode === 'Stand Off' || state.mode === '1v2 Stand Off');
-    if (announcerSubtitle && !is1v1OrStandOff) {
+    const isSubtitleHidden = (state.mode === '1v1' || state.mode === 'Stand Off' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.FFA || state.mode === 'FFA');
+    if (announcerSubtitle && !isSubtitleHidden) {
       ctx.save();
       // Use "Architects Daughter" if text contains numbers, otherwise use "Glast Blitch"
       const hasNumber = /\d/.test(announcerSubtitle);

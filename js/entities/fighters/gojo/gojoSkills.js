@@ -141,15 +141,22 @@ export function firePurple(fighter, ownerIndex) {
     fighter._purpleChargeSoundHandle = null;
   }
   fadeOutSoundBySrc('mixing', 300);
-  fighter.purpleRecoveryTimer = 120; // 2s recovery stasis
+
+  let purpleLife = CONFIG.gojo?.purpleLife || 250;
+  if (projectileSystem && projectileSystem.fireGojoPurple) {
+    const proj = projectileSystem.fireGojoPurple(fighter, ownerIndex, CONFIG.gojo?.purpleDamage || 10);
+    if (proj && proj.life !== undefined) {
+      purpleLife = proj.life;
+    }
+  }
+
+  // Gojo's breather stasis after firing is based directly on purpleLife
+  fighter.purpleRecoveryTimer = purpleLife;
+  fighter.purpleRecoveryMaxTimer = purpleLife;
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 600;
   fighter.z = 35; // Start descent from hovering altitude
 
   triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 20);
-
-  if (projectileSystem && projectileSystem.fireGojoPurple) {
-    projectileSystem.fireGojoPurple(fighter, ownerIndex, CONFIG.gojo?.purpleDamage || 10);
-  }
 
   fighter.purpleRetreatTimer = CONFIG.gojo?.purpleRetreatDelay ?? 20;
 }

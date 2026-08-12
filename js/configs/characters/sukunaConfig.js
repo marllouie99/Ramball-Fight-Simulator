@@ -2,6 +2,14 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
+    // Stacking Slash Crit Passive
+    baseCritChance: 0.50,             // 10% base crit chance
+    baseCritMultiplier: 0.50,         // 1.50x base crit damage multiplier
+    critChancePerSlashHit: 0.02 ,      // +2% crit chance per landed slash hit
+    critMultiplierPerSlashHit: 0.02,  // +0.05x crit multiplier per landed slash hit
+    maxCritChance: 2.00,              // 80% max crit chance cap
+    maxCritMultiplier: 2.00,          // 3.50x max crit damage multiplier cap
+
     // Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 30% or below
     reverseCursedTechniqueHealPercent: 0.20,   // Heals 40% of max HP
@@ -40,7 +48,7 @@ export const sukunaConfig = {
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
-    divineFlameCooldown: 1700,      // Cooldown between Furnace uses (8.33 seconds)
+    divineFlameCooldown: 2000,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 120,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 100,         // Primary direct hit nuke damage
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
@@ -54,7 +62,7 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1800,     // Cooldown before domain can trigger (25 seconds at 60 fps)
+    domainCooldown: 1500,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
     domainDamage: 10,          // Base damage per slash tick

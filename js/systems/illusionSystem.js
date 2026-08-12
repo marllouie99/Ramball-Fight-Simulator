@@ -339,10 +339,15 @@ export function updateIllusions() {
       }
     }
 
-    // If bounded, steer directly towards the nearest target
+    // If bounded, steer directly towards the nearest target (unless target is Gojo with active Infinity)
     if (bounced) {
       const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null) || illusion.moveSpeed || 1.5;
-      if (nearestTarget && !insideSphere) {
+      const isGojoInfinity = nearestTarget &&
+        (nearestTarget.characterId === 'gojo' || nearestTarget.type === 'gojo') &&
+        !nearestTarget.isMeleeMode &&
+        ((nearestTarget.infinityCooldown || 0) <= 0 || nearestTarget.infinityActive);
+
+      if (nearestTarget && !insideSphere && !isGojoInfinity) {
         const dx = nearestTarget.x - illusion.x;
         const dy = nearestTarget.y - illusion.y;
         const dSq = dx * dx + dy * dy;
@@ -350,7 +355,7 @@ export function updateIllusions() {
         illusion.vx = dx * scale;
         illusion.vy = dy * scale;
       } else {
-        // Fallback if no target exists
+        // Natural bounce — reverse velocity along the wall axis
         const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
         const scale = targetSpeed / (speedSq > 0 ? Math.sqrt(speedSq) : 1);
         illusion.vx = -illusion.vx * scale;

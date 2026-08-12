@@ -221,10 +221,16 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.restore();
   }
 
+  const isGojoDomainActive = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
+  );
+
   // ----------------------------------------------------
   // RECOGNIZABLE ROTATION VISUAL EFFECT (DIVINE SHOCKWAVE HALO & SUNBURST RAYS)
   // ----------------------------------------------------
-  if (fighter.wheelClickTimer > 0) {
+  if (fighter.wheelClickTimer > 0 && !isGojoDomainActive) {
     const clickMax = CONFIG.mahoraga?.wheelClickDuration || 25;
     const clickProgress = 1.0 - (fighter.wheelClickTimer / clickMax); // 0.0 to 1.0
     const haloAlpha = Math.max(0, 1.0 - clickProgress);
@@ -592,6 +598,15 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
       swingAngle = -Math.PI * 0.25;
       extendDist = 10;
     }
+  } else if (fighterObj && fighterObj.isWallSlamActive && (fighterObj.wallSlamPhase === 'post_throw_delay' || fighterObj.wallSlamPhase === 'dash')) {
+    let p = 1.0;
+    if (fighterObj.wallSlamPhase === 'post_throw_delay') {
+      const standoffDuration = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wallSlamStandoffDuration) || 40;
+      p = Math.min(1.0, (fighterObj.wallSlamTimer || 0) / standoffDuration);
+    }
+    const easeP = p * p * (3 - 2 * p); // Smooth ease-in-out transition
+    swingAngle = easeP * (-Math.PI * 0.65); // Wide arm open wind-up
+    extendDist = easeP * 15; // Extend arm out widely
   } else {
     // Statically follow gunAngle when idle/resting
     swingAngle = 0;
@@ -609,11 +624,24 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   const rotatedShoulderX = shoulderX * cosB - shoulderY * sinB;
   const rotatedShoulderY = shoulderX * sinB + shoulderY * cosB;
 
+  let verticalLift = 0;
+  let liftTilt = 0;
+  if (fighterObj && fighterObj.isWallSlamActive && fighterObj.wallSlamPhase === 'grab') {
+    // Find the grab target
+    const opponentObj = state.fighters?.find(f => f && f !== fighterObj && f.hp > 0);
+    if (opponentObj) {
+      verticalLift = opponentObj.z || 0;
+      const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames || 35;
+      const liftP = Math.min(1.0, Math.max(0.0, (fighterObj.wallSlamTimer - 12) / (holdFrames - 12)));
+      liftTilt = -0.22 * liftP; // Upward tilt of arm (approx -12 degrees)
+    }
+  }
+
   ctx.save();
-  ctx.translate(rotatedShoulderX, rotatedShoulderY);
+  ctx.translate(rotatedShoulderX, rotatedShoulderY - verticalLift);
   
-  // Rotate by gunAngle and local swingAngle at the shoulder joint (do NOT rotate by body angle to prevent the sword hand from spinning!)
-  ctx.rotate(gunAngle + swingAngle);
+  // Rotate by gunAngle, swingAngle, and the upward lift tilt
+  ctx.rotate(gunAngle + swingAngle + liftTilt);
 
   // Flip Y when facing left so sword faces target correctly
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
@@ -676,6 +704,32 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     ctx.save();
     ctx.scale(retractScale, retractScale); // Smoothly slides back into forearm gauntlet ring!
 
+    const totalStages = fighterObj ? ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0)) : 0;
+    const isLevel8 = fighterObj && (totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted || (fighterObj.goldStages >= 8));
+
+    if (isLevel8) {
+      // Golden Level 8 Sword Outer Aura Glow (concentric golden shapes)
+      ctx.beginPath();
+      ctx.moveTo(-1, -bladeWidth / 2 - 3);
+      ctx.lineTo(bladeLength - 14, -bladeWidth / 2 - 2);
+      ctx.lineTo(bladeLength + 5, 0);
+      ctx.lineTo(bladeLength - 14, bladeWidth / 2 + 2);
+      ctx.lineTo(-1, bladeWidth / 2 + 3);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 215, 0, 0.40)';
+      ctx.fill();
+
+      ctx.beginPath();
+      ctx.moveTo(0, -bladeWidth / 2 - 1.5);
+      ctx.lineTo(bladeLength - 15, -bladeWidth / 2 - 1);
+      ctx.lineTo(bladeLength + 2.5, 0);
+      ctx.lineTo(bladeLength - 15, bladeWidth / 2 + 1);
+      ctx.lineTo(0, bladeWidth / 2 + 1.5);
+      ctx.closePath();
+      ctx.fillStyle = 'rgba(255, 238, 88, 0.70)';
+      ctx.fill();
+    }
+
     ctx.beginPath();
     ctx.moveTo(1, -bladeWidth / 2);
     ctx.lineTo(bladeLength - 16, -bladeWidth / 2 + 1);
@@ -685,14 +739,21 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     ctx.closePath();
 
     const bladeGrad = ctx.createLinearGradient(0, -bladeWidth / 2, 0, bladeWidth / 2);
-    bladeGrad.addColorStop(0, '#FFFFFF');
-    bladeGrad.addColorStop(0.3, '#E2E8F0');
-    bladeGrad.addColorStop(0.7, '#CBD5E1');
-    bladeGrad.addColorStop(1, '#94A3B8');
+    if (isLevel8) {
+      bladeGrad.addColorStop(0, '#FFFFFF');
+      bladeGrad.addColorStop(0.25, '#FFEE58');
+      bladeGrad.addColorStop(0.65, '#FFD54F');
+      bladeGrad.addColorStop(1, '#FFA000');
+    } else {
+      bladeGrad.addColorStop(0, '#FFFFFF');
+      bladeGrad.addColorStop(0.3, '#E2E8F0');
+      bladeGrad.addColorStop(0.7, '#CBD5E1');
+      bladeGrad.addColorStop(1, '#94A3B8');
+    }
     ctx.fillStyle = bladeGrad;
     ctx.fill();
 
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = isLevel8 ? '#B78103' : '#000000';
     ctx.lineWidth = 2.2 / Math.max(0.2, retractScale);
     ctx.stroke();
 
@@ -702,9 +763,9 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     ctx.lineTo(bladeLength * 0.62, 0);
     ctx.lineTo(1, bladeWidth * 0.28);
     ctx.closePath();
-    ctx.fillStyle = '#22252A';
+    ctx.fillStyle = isLevel8 ? '#4E342E' : '#22252A';
     ctx.fill();
-    ctx.strokeStyle = '#000000';
+    ctx.strokeStyle = isLevel8 ? '#FF8F00' : '#000000';
     ctx.lineWidth = 1.4 / Math.max(0.2, retractScale);
     ctx.stroke();
 
@@ -712,15 +773,21 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     ctx.beginPath();
     ctx.moveTo(1, 0);
     ctx.lineTo(bladeLength - 4, 0);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 1.5 / Math.max(0.2, retractScale);
+    ctx.strokeStyle = isLevel8 ? '#FFF8E1' : '#FFFFFF';
+    ctx.lineWidth = (isLevel8 ? 2.2 : 1.5) / Math.max(0.2, retractScale);
     ctx.stroke();
 
     ctx.restore();
   }
 
   // 5. ATTACK VISUAL EFFECTS (Differentiated for Thrust vs Slash!)
-  if (punchAnimTimer > 0 || isCleaving) {
+  const isGojoDomainActive = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
+  );
+
+  if ((punchAnimTimer > 0 || isCleaving) && !isGojoDomainActive) {
     const maxT = ((typeof CONFIG !== 'undefined' && CONFIG.mahoraga) ? CONFIG.mahoraga.blitzAttackAnimDuration : 10.0) || 10.0;
     const progress = Math.min(1.0, Math.max(0.0, 1.0 - (punchAnimTimer / maxT)));
     const comboIndex = swordCombo % 3;
@@ -1018,7 +1085,13 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
 
 
   // 3. ANIME HIGH-IMPACT PUNCH VISUAL: Distinguishable Conical Air Pressure Blast & Starburst Impact!
-  if (progress > 0.05 && progress < 0.95 && !isThrowing) {
+  const isGojoDomainActive = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
+  );
+
+  if (progress > 0.05 && progress < 0.95 && !isThrowing && !isGojoDomainActive) {
     const shockAlpha = Math.sin(progress * Math.PI);
 
     // 3a. Heavy Fist Motion Trail

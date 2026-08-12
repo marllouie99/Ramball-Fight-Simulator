@@ -323,8 +323,10 @@ export function drawAfterimages(ctx, fighter) {
  * cleave windup, sakuga impact, and health bar.
  */
 export function drawMahoragaFighter(ctx, fighter, opponent) {
-  const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
+  const isGojoDomainActive = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
   );
 
   // 0. Render fading divine flash-dash afterimage ghosts
@@ -335,33 +337,6 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
   // UNDERLAY RINGS
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const isLevel8 = totalStages >= 8 || fighter.isInfinityBlitz;
-
-  // A. LEVEL 8 MAX ADAPTATION: GOLDEN GLOW AROUND BODY
-  if (isLevel8) {
-    ctx.save();
-    const pulse = Math.sin(Date.now() * 0.008) * 2.5;
-    const glowR = fighter.r + 3 + pulse;
-
-    ctx.beginPath();
-    ctx.arc(fighter.x, fighter.y, glowR + 5, 0, Math.PI * 2);
-    ctx.strokeStyle = 'rgba(255, 215, 0, 0.45)';
-    ctx.lineWidth = 8;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(fighter.x, fighter.y, glowR, 0, Math.PI * 2);
-    ctx.strokeStyle = '#FFD700';
-    ctx.lineWidth = 3.5;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(fighter.x, fighter.y, glowR - 1.2, 0, Math.PI * 2);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-
-    ctx.restore();
-  }
 
 
 

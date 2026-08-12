@@ -16,10 +16,27 @@ class SpatialGrid {
   constructor(cellSize) {
     this.cellSize = cellSize;
     this.grid = new Map();
+    this.activeKeys = [];
+    this.pool = [];
+    this.poolIndex = 0;
+  }
+
+  getArray() {
+    if (this.poolIndex >= this.pool.length) {
+      this.pool.push([]);
+    }
+    const arr = this.pool[this.poolIndex++];
+    arr.length = 0;
+    return arr;
   }
 
   clear() {
-    this.grid.clear();
+    for (let i = 0; i < this.activeKeys.length; i++) {
+      const cell = this.grid.get(this.activeKeys[i]);
+      if (cell) cell.length = 0;
+    }
+    this.activeKeys.length = 0;
+    this.poolIndex = 0;
   }
 
   getKey(x, y) {
@@ -35,11 +52,14 @@ class SpatialGrid {
       cell = [];
       this.grid.set(key, cell);
     }
+    if (cell.length === 0) {
+      this.activeKeys.push(key);
+    }
     cell.push(entity);
   }
 
   getNearby(x, y, radius) {
-    const nearby = [];
+    const nearby = this.getArray();
     const cellRadius = Math.ceil(radius / this.cellSize);
     const cellX = (x / this.cellSize) | 0;
     const cellY = (y / this.cellSize) | 0;
@@ -140,7 +160,14 @@ export function updateFuelPickups() {
     }
 
     // Check collision with Orange fighters (fuel should only exist in arena when Orange is present)
-    const hasOrange = state.fighters.some(f => f && f.hp > 0 && f._def.type === 'orange');
+    let hasOrange = false;
+    for (let j = 0; j < state.fighters.length; j++) {
+      const f = state.fighters[j];
+      if (f && f.hp > 0 && f._def.type === 'orange') {
+        hasOrange = true;
+        break;
+      }
+    }
     if (!hasOrange) {
       pickup.active = false;
       continue;
@@ -220,19 +247,38 @@ export function resolveFighterCollision(a, b) {
   const ty = nx;
 
   const overlap = (minDist - distance) / 2;
+  const isTodoCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0);
+  const effectiveOverlap = isTodoCombo ? overlap * 0.1 : overlap;
   
-  const aIsGojoDomain = a.domainActive && a._def?.id === 'gojo';
-  const bIsGojoDomain = b.domainActive && b._def?.id === 'gojo';
+  const aIsGojoDomain = a.domainActive && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo');
+  const bIsGojoDomain = b.domainActive && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo');
   
   const teamA = state.getFighterTeam(state.fighters.indexOf(a));
   const teamB = state.getFighterTeam(state.fighters.indexOf(b));
   const isEnemy = teamA === null || teamB === null || teamA !== teamB;
 
-  const aIsImmovable = a.isTurret || (bIsGojoDomain && isEnemy);
-  const bIsImmovable = b.isTurret || (aIsGojoDomain && isEnemy);
+  // Inside Gojo's Unlimited Void domain: The frozen enemy MUST NOT be pushed back on physical contact
+  if (aIsGojoDomain && isEnemy) {
+    a.x -= nx * effectiveOverlap * 2;
+    a.y -= ny * effectiveOverlap * 2;
+    if (state && state.arena && typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
+    return;
+  }
+  if (bIsGojoDomain && isEnemy) {
+    b.x += nx * effectiveOverlap * 2;
+    b.y += ny * effectiveOverlap * 2;
+    if (state && state.arena && typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
+    return;
+  }
 
-  const isTodoCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0);
-  const effectiveOverlap = isTodoCombo ? overlap * 0.1 : overlap;
+  const aIsFlurrying = a.isFlurrying || b.caughtInGenosFlurry;
+  const bIsFlurrying = b.isFlurrying || a.caughtInGenosFlurry;
+
+  const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
+  const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
+
+  const aIsImmovable = a.isTurret || aIsFlurrying || aIsYutaBeam;
+  const bIsImmovable = b.isTurret || bIsFlurrying || bIsYutaBeam;
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -311,16 +357,18 @@ function getClosestOpponent(fighter) {
   let bestDistance = Infinity;
   const fighterIndex = state.fighters.indexOf(fighter);
   const fighterTeam = state.getFighterTeam(fighterIndex);
+  const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2);
 
   // Check regular fighters
-  state.fighters.forEach((other, otherIndex) => {
-    if (!other || other === fighter || other.hp <= 0) return;
-    if (other.invincibilityTimer > 0 || other.flashStepTimer > 0) return;
-    if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && fighterTeam !== null && state.getFighterTeam(otherIndex) === fighterTeam) return;
+  for (let i = 0; i < state.fighters.length; i++) {
+    const other = state.fighters[i];
+    if (!other || other === fighter || other.hp <= 0) continue;
+    if (other.invincibilityTimer > 0 || other.flashStepTimer > 0) continue;
+    if (isTeamMode && fighterTeam !== null && state.getFighterTeam(i) === fighterTeam) continue;
     
     // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa
-    if (other.owner === fighter || fighter.owner === other) return;
-    if (other.owner && other.owner === fighter.owner) return; // Same owner
+    if (other.owner === fighter || fighter.owner === other) continue;
+    if (other.owner && other.owner === fighter.owner) continue; // Same owner
 
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
@@ -329,24 +377,27 @@ function getClosestOpponent(fighter) {
       bestDistance = dSq;
       closest = other;
     }
-  });
+  }
 
   // Also check illusions - they are valid targets (but not the fighter's own illusions)
-  for (const illusion of state.illusions || []) {
-    if (!illusion || illusion.hp <= 0) continue;
-    // Skip if this illusion belongs to the fighter (Doppleganger shouldn't target own illusions)
-    if (illusion.owner === fighter) continue;
-    // Skip if this illusion belongs to a teammate
-    if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && fighterTeam !== null && illusion.owner) {
-      const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
-      if (ownerTeam === fighterTeam) continue;
-    }
-    const dx = illusion.x - fighter.x;
-    const dy = illusion.y - fighter.y;
-    const dSq = dx * dx + dy * dy;
-    if (dSq < bestDistance) {
-      bestDistance = dSq;
-      closest = illusion;
+  if (state.illusions) {
+    for (let i = 0; i < state.illusions.length; i++) {
+      const illusion = state.illusions[i];
+      if (!illusion || illusion.hp <= 0) continue;
+      // Skip if this illusion belongs to the fighter (Doppleganger shouldn't target own illusions)
+      if (illusion.owner === fighter) continue;
+      // Skip if this illusion belongs to a teammate
+      if (isTeamMode && fighterTeam !== null && illusion.owner) {
+        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
+        if (ownerTeam === fighterTeam) continue;
+      }
+      const dx = illusion.x - fighter.x;
+      const dy = illusion.y - fighter.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < bestDistance) {
+        bestDistance = dSq;
+        closest = illusion;
+      }
     }
   }
 
@@ -356,10 +407,19 @@ function getClosestOpponent(fighter) {
 function endRoundIfFFAEnded() {
   if (state.mode !== GAME_MODES.FFA || state.gameState !== 'playing') return;
 
-  const effectivelyAlive = state.fighters.filter((f) => isFighterEffectivelyAlive(f));
-  if (effectivelyAlive.length > 1) return;
+  let aliveCount = 0;
+  let winner = null;
+  for (let i = 0; i < state.fighters.length; i++) {
+    const f = state.fighters[i];
+    if (f && isFighterEffectivelyAlive(f)) {
+      aliveCount++;
+      winner = f;
+    }
+  }
 
-  const winner = effectivelyAlive[0] || null;
+  if (aliveCount > 1) return;
+
+  if (aliveCount === 0) winner = null;
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 
@@ -443,10 +503,19 @@ function endRoundIf2v2Ended() {
 function endRoundIf1v1Ended() {
   if ((state.mode !== GAME_MODES.ONE_VS_ONE && state.mode !== GAME_MODES.STAND_OFF) || state.gameState !== 'playing') return;
 
-  const effectivelyAlive = state.fighters.filter((f) => f && isFighterEffectivelyAlive(f));
-  if (effectivelyAlive.length > 1) return;
+  let aliveCount = 0;
+  let winner = null;
+  for (let i = 0; i < state.fighters.length; i++) {
+    const f = state.fighters[i];
+    if (f && isFighterEffectivelyAlive(f)) {
+      aliveCount++;
+      winner = f;
+    }
+  }
 
-  const winner = effectivelyAlive[0] || null;
+  if (aliveCount > 1) return;
+
+  if (aliveCount === 0) winner = null;
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 

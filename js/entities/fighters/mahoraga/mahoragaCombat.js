@@ -78,6 +78,16 @@ export function getFrontRadiusTargets(fighter, maxRangeOffset = 75, coneAngle = 
  * with teleportation every N attacks.
  */
 export function performMeleeAttack(fighter, opponent) {
+  const isInsideDomain = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
+  );
+  if (isInsideDomain || (fighter.timeStopTimer || 0) > 0) {
+    fighter.vx = 0;
+    fighter.vy = 0;
+    return;
+  }
   fighter.vx = 0;
   fighter.vy = 0;
 
@@ -237,8 +247,7 @@ export function performMeleeAttack(fighter, opponent) {
  */
 export function executeCleave(fighter, opponent) {
   triggerGlobalScreenShake(8, 15);
-  audioSystem.playSFX('attack_swordswing', 1.0);
-  audioSystem.playSFX('attack_explosion', 0.6);
+  audioSystem.playSFX('attack_swordswing', 0.9);
 
   const cleaveRadius = CONFIG.mahoraga?.cleaveRadius || 150;
   const damage = CONFIG.mahoraga?.cleaveDamage || 40;
@@ -307,7 +316,344 @@ export function shootBladeBarrage(fighter, ownerIndex) {
     proj.skillShotColor = '#8B4513';
   }
 
-  audioSystem.playSFX('attack_swordswing', 0.6);
+  audioSystem.playSFX('attack_swordswing', 0.35);
+}
+
+/**
+ * Level 8 Transformed Throw Skill: Wall Slam & Supersonic Dash Execute Combo.
+ */
+export function initiateLevel8WallSlam(fighter, opponent) {
+  if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
+
+  // Block initiation if Mahoraga is caught inside Gojo's active Hollow Purple
+  const activeOrbs = (projectileSystem && projectileSystem.projectiles)
+    ? projectileSystem.projectiles.filter(p => p && (p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple' || p.skillShotId === 'purple') && (p.life || 0) > 0)
+    : [];
+  for (const orb of activeOrbs) {
+    const purpleR = CONFIG.gojo?.purpleRadius || 140;
+    const distSq = (fighter.x - orb.x) ** 2 + (fighter.y - orb.y) ** 2;
+    if (distSq <= (purpleR + fighter.r) ** 2) {
+      if (typeof spawnFloatingText === 'function') {
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, 'BLOCKED BY PURPLE!', '#FF3D00');
+      }
+      return; // Block cast!
+    }
+  }
+
+  // Also block cast if frozen, stunned, or time-stopped
+  const isFrozen = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0) || fighter.isTargetOfAmbush ||
+                   (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || (fighter.isFrozenByInfinity);
+  if (isFrozen) return;
+
+  fighter.isWallSlamActive = true;
+  fighter.wallSlamPhase = 'grab';
+  fighter.wallSlamTimer = 0;
+  fighter.wallSlamTarget = opponent;
+
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, '⚡ LEVEL 8 WALL SLAM!', '#FFEE58');
+  audioSystem.playSFX('attack_fleshhit', 0.9);
+}
+
+export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
+  const target = fighter.wallSlamTarget || opponent;
+  if (!target || target.hp <= 0 || target.isDead) {
+    if (target) target.isGrabbedByMahoraga = false;
+    fighter.isWallSlamActive = false;
+    fighter.wallSlamPhase = null;
+    fighter.wallSlamTimer = 0;
+    return;
+  }
+
+  const arenaBounds = arena || CONFIG.arena || { x: 50, y: 50, width: 1100, height: 700 };
+  fighter.wallSlamTimer = (fighter.wallSlamTimer || 0) + 1;
+
+  const margin = Math.max(fighter.r, target.r) + 14;
+  const minX = arenaBounds.x + margin;
+  const maxX = arenaBounds.x + (arenaBounds.width || arenaBounds.w || 1100) - margin;
+  const minY = arenaBounds.y + margin;
+  const maxY = arenaBounds.y + (arenaBounds.height || arenaBounds.h || 700) - margin;
+
+  // ── PHASE 1: IMPALE & LIFT ──
+  if (fighter.wallSlamPhase === 'grab') {
+    if (fighter.wallSlamTimer === 1) {
+      // Snapshot target position and angle to prevent circular feedback drift
+      fighter.wallSlamGrabStartX = target.x;
+      fighter.wallSlamGrabStartY = target.y;
+      fighter.wallSlamGrabAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+
+      // Play lunge dash sound at start of grab lunge
+      audioSystem.playSFX('skill_dash5', 0.9);
+
+      // Clear target's active projectiles (like Gojo's Blue, Red, Purple) to hide all active attack visual effects
+      if (state.projectiles) {
+        const targetIndex = state.fighters ? state.fighters.indexOf(target) : -1;
+        for (let i = state.projectiles.length - 1; i >= 0; i--) {
+          const p = state.projectiles[i];
+          if (p && p.ownerIndex === targetIndex && (p.isGojoBlue || p.isGojoRed || p.isGojoPurple || p.isGojoPurpleOrb)) {
+            if (p.pixiSprite && p.pixiSprite.parent) {
+              p.pixiSprite.parent.removeChild(p.pixiSprite);
+            }
+            state.projectiles.splice(i, 1);
+          }
+        }
+      }
+    }
+    
+    if (fighter.wallSlamTimer === 12) {
+      // Play backstab sound upon contact/impale
+      audioSystem.playSFX('skill_backstab', 1.0);
+      spawnFloatingText(target.x, target.y - target.r - 28, '⚔️ IMPALED!', '#FFEE58');
+      spawnImpactFlash(target.x, target.y, 45, '#FF3333');
+      spawnSparks(target.x, target.y, 15, 'crimsonSniper', '#FFFFFF');
+    }
+    
+    const angle = fighter.wallSlamGrabAngle !== undefined ? fighter.wallSlamGrabAngle : Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    fighter.aim({ x: target.x, y: target.y });
+
+    const startX = fighter.wallSlamGrabStartX;
+    const startY = fighter.wallSlamGrabStartY;
+    const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames || 35;
+    const grabDist = 140; // Mahoraga lunges from this distance
+
+    const shoulderOffsetX = Math.cos(angle + Math.PI / 2) * (fighter.r * 0.20);
+    const shoulderOffsetY = Math.sin(angle + Math.PI / 2) * (fighter.r * 0.20);
+
+    // Calculate Mahoraga's final destination where the sword tip will touch the target's starting position
+    const endX = startX - Math.cos(angle) * (fighter.r + target.r + 32) - shoulderOffsetX;
+    const endY = startY - Math.sin(angle) * (fighter.r + target.r + 32) - shoulderOffsetY;
+
+    if (fighter.wallSlamTimer <= 12) {
+      // 1. Thrust/Lunge sub-phase: Mahoraga lunges forward; target remains completely still at start position
+      const p = Math.min(1.0, fighter.wallSlamTimer / 12);
+      fighter.x = Math.max(minX, Math.min(maxX, endX - Math.cos(angle) * (grabDist * (1 - p))));
+      fighter.y = Math.max(minY, Math.min(maxY, endY - Math.sin(angle) * (grabDist * (1 - p))));
+
+      // Play dynamic forward sword thrust swing (comboIndex 0, which corresponds to swordCombo = 3)
+      fighter.swordCombo = 3;
+      fighter.punchAnimMaxTimer = 12;
+      fighter.punchAnimTimer = 12 - fighter.wallSlamTimer; // Ticks down from 12 to 0 to play swing
+
+      target.x = startX;
+      target.y = startY;
+      target.z = 0;
+    } else {
+      // 2. Lift sub-phase: Mahoraga reaches target, pins them to sword tip, and hoists them into the air
+      fighter.x = Math.max(minX, Math.min(maxX, endX));
+      fighter.y = Math.max(minY, Math.min(maxY, endY));
+
+      // Lock the sword in its fully-extended thrust pose
+      fighter.swordCombo = 3;
+      fighter.punchAnimMaxTimer = 12;
+      fighter.punchAnimTimer = 1; // Frozen at peak extension
+
+      target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(angle) * (fighter.r + target.r + 32) + shoulderOffsetX));
+      target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(angle) * (fighter.r + target.r + 32) + shoulderOffsetY));
+
+      const liftProgress = Math.min(1.0, (fighter.wallSlamTimer - 12) / (holdFrames - 12));
+      target.z = liftProgress * (CONFIG.mahoraga?.wallSlamImpaleLiftHeight || 35);
+    }
+
+    target.vx = 0;
+    target.vy = 0;
+    target.isGrabbedByMahoraga = true;
+    if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
+
+    if (fighter.wallSlamTimer >= holdFrames) { // Hold completed
+      fighter.wallSlamPhase = 'punch'; 
+      fighter.wallSlamTimer = 0;
+    }
+  }
+  // ── PHASE 1.5: PUNCH & LAUNCH ──
+  else if (fighter.wallSlamPhase === 'punch') {
+    const angle = fighter.wallSlamGrabAngle !== undefined ? fighter.wallSlamGrabAngle : Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    
+    // KEEP sword frozen in extended thrust pose while other hand punches!
+    fighter.swordCombo = 3;
+    fighter.punchAnimMaxTimer = 12;
+    fighter.punchAnimTimer = 1;
+    
+    if (fighter.wallSlamTimer === 1) {
+      // Trigger massive left-hand punch!
+      fighter.leftPunchTimer = 25;
+      fighter.leftPunchMaxTimer = 25;
+      
+      spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 28, '💥 SMASH!', '#FFEE58');
+      spawnAnimePunchImpactFrame(target.x, target.y, 60, angle, 'gold');
+      spawnImpactFlash(target.x, target.y, 60, '#FFEE58');
+      triggerGlobalScreenShake(12, 15);
+      audioSystem.playSFX('attack_fleshhit', 1.0);
+    }
+    
+    // Keep target locked during the first few frames of the punch hitpause
+    const shoulderOffsetX = Math.cos(angle + Math.PI / 2) * (fighter.r * 0.20);
+    const shoulderOffsetY = Math.sin(angle + Math.PI / 2) * (fighter.r * 0.20);
+    target.x = Math.max(minX, Math.min(maxX, fighter.x + Math.cos(angle) * (fighter.r + target.r + 15) + shoulderOffsetX));
+    target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(angle) * (fighter.r + target.r + 15) + shoulderOffsetY));
+    target.vx = 0;
+    target.vy = 0;
+    target.isGrabbedByMahoraga = true;
+    if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
+
+    if (fighter.wallSlamTimer >= (CONFIG.mahoraga?.wallSlamPunchHitpause || 8)) { // After frames of punch hitpause, throw them!
+      fighter.wallSlamPhase = 'throw';
+      fighter.wallSlamTimer = 0;
+      target.isGrabbedByMahoraga = false;
+      target.z = 0; // Drop back to ground for the wall slam
+
+      // Find the absolute farthest wall based on current position in the arena
+      const leftDist = target.x - minX;
+      const rightDist = maxX - target.x;
+      const topDist = target.y - minY;
+      const botDist = maxY - target.y;
+      const maxDist = Math.max(leftDist, rightDist, topDist, botDist);
+
+      let wallAngle = angle;
+      if (maxDist === leftDist) wallAngle = Math.PI;
+      else if (maxDist === rightDist) wallAngle = 0;
+      else if (maxDist === topDist) wallAngle = -Math.PI / 2;
+      else if (maxDist === botDist) wallAngle = Math.PI / 2;
+
+      fighter.aim({ x: target.x + Math.cos(wallAngle) * 100, y: target.y + Math.sin(wallAngle) * 100 });
+
+      // Hurl opponent at supersonic throw speed towards the chosen wall
+      const throwSpeed = CONFIG.mahoraga?.wallSlamThrowSpeed || 48.0;
+      fighter.wallSlamTargetVelX = Math.cos(wallAngle) * throwSpeed;
+      fighter.wallSlamTargetVelY = Math.sin(wallAngle) * throwSpeed;
+
+      triggerGlobalScreenShake(8, 14);
+      audioSystem.playSFX('skill_dash5', 1.0);
+    }
+  }
+  // ── PHASE 2: SUPERSONIC WALL THROW ──
+  else if (fighter.wallSlamPhase === 'throw') {
+    target.isGrabbedByMahoraga = false;
+    
+    // Launch target at supersonic velocity toward arena wall
+    target.x += fighter.wallSlamTargetVelX * 0.5;
+    target.y += fighter.wallSlamTargetVelY * 0.5;
+    target.vx = fighter.wallSlamTargetVelX;
+    target.vy = fighter.wallSlamTargetVelY;
+
+    // Spawn streak sparks & motion lines behind thrown target
+    if (Math.random() < 0.8) {
+      spawnSparks(target.x, target.y, 6, 'crimsonSniper', '#FFEE58');
+    }
+
+    const hitLeft = (fighter.wallSlamTargetVelX < -0.1 && target.x <= minX);
+    const hitRight = (fighter.wallSlamTargetVelX > 0.1 && target.x >= maxX);
+    const hitTop = (fighter.wallSlamTargetVelY < -0.1 && target.y <= minY);
+    const hitBottom = (fighter.wallSlamTargetVelY > 0.1 && target.y >= maxY);
+    const hitWall = hitLeft || hitRight || hitTop || hitBottom;
+
+    if (hitWall || fighter.wallSlamTimer >= 30) {
+      // Clamp target within arena boundary at wall
+      target.x = Math.max(minX, Math.min(maxX, target.x));
+      target.y = Math.max(minY, Math.min(maxY, target.y));
+      target.vx = 0;
+      target.vy = 0;
+
+      // Deal heavy wall impact damage
+      const impactDamage = CONFIG.mahoraga?.wallSlamImpactDamage || 35;
+      target.takeDamage(impactDamage, fighter, { isMelee: true, isWallSlam: true });
+
+      // Wall crack shockwave & impact visuals
+      spawnMahoragaShoutBurst(target.x, target.y, 130);
+      spawnImpactFlash(target.x, target.y, 75, '#FFEE58');
+      triggerGlobalScreenShake(14, 20);
+      audioSystem.playSFX('attack_explosion', 1.0);
+      audioSystem.playSFX('attack_groundsmash', 1.0);
+
+      // APPLY PARALYZE STUN (freeze & hitstun on wall contact!)
+      const paralyzeDuration = CONFIG.mahoraga?.wallSlamParalyzeDuration || 90;
+      if (typeof target.applyHitStun === 'function') target.applyHitStun(paralyzeDuration);
+      target.paralyzeTimer = paralyzeDuration;
+      target.isParalyzedByMahoraga = true;
+
+      // Clear any remaining or newly spawned projectiles
+      if (state.projectiles) {
+        const targetIndex = state.fighters ? state.fighters.indexOf(target) : -1;
+        for (let i = state.projectiles.length - 1; i >= 0; i--) {
+          const p = state.projectiles[i];
+          if (p && p.ownerIndex === targetIndex && (p.isGojoBlue || p.isGojoRed || p.isGojoPurple || p.isGojoPurpleOrb)) {
+            if (p.pixiSprite && p.pixiSprite.parent) {
+              p.pixiSprite.parent.removeChild(p.pixiSprite);
+            }
+            state.projectiles.splice(i, 1);
+          }
+        }
+      }
+
+      spawnFloatingText(target.x, target.y - target.r - 28, '⚡ PARALYZED!', '#FFEE58');
+
+      fighter.wallSlamPhase = 'post_throw_delay';
+      fighter.wallSlamTimer = 0;
+    }
+  }
+  // ── PHASE 2.5: POST-THROW MENACING STANDOFF ──
+  else if (fighter.wallSlamPhase === 'post_throw_delay') {
+    fighter.aim(target);
+    fighter.vx = 0;
+    fighter.vy = 0;
+
+    const standoffFrames = CONFIG.mahoraga?.wallSlamMenacingStandoff || 40;
+    if (fighter.wallSlamTimer >= standoffFrames) { // Wait before dashing
+      fighter.wallSlamPhase = 'dash';
+      fighter.wallSlamTimer = 0;
+    }
+  }
+  // ── PHASE 3: SUPERSONIC DASH TO PARALYZED TARGET ──
+  else if (fighter.wallSlamPhase === 'dash') {
+    const oldX = fighter.x;
+    const oldY = fighter.y;
+    const dashRate = 0.40;
+
+    fighter.x += (target.x - fighter.x) * dashRate;
+    fighter.y += (target.y - fighter.y) * dashRate;
+    fighter.aim(target);
+
+    const dist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+    if (dist <= fighter.r + target.r + 25 || fighter.wallSlamTimer >= 14) {
+      fighter.wallSlamPhase = 'strike';
+      fighter.wallSlamTimer = 0;
+    }
+  }
+  // ── PHASE 4: HEAVY SWORD EXECUTE HIT & FLURRY TRANSITION ──
+  else if (fighter.wallSlamPhase === 'strike') {
+    fighter.aim(target);
+    fighter.punchAnimTimer = 10;
+    fighter.swordCombo = 1;
+
+    // Deal initial follow-up execution damage
+    const followupDamage = CONFIG.mahoraga?.wallSlamFollowupDamage || 25;
+    target.takeDamage(followupDamage, fighter, { isMelee: true, isCritical: true });
+
+    const angle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    spawnAnimePunchImpactFrame(target.x, target.y, 70, angle, 'gold');
+    spawnMeleeClashShockwave(target.x, target.y, 110, 'mahoraga');
+    spawnSparks(target.x, target.y, 20, 'gold', '#FFFFFF');
+    triggerGlobalScreenShake(12, 18);
+    audioSystem.playSFX('attack_swordswing', 1.0);
+    audioSystem.playSFX('attack_fleshhit', 1.0);
+
+    // End Wall Slam combo
+    target.isGrabbedByMahoraga = false;
+    fighter.isWallSlamActive = false;
+    fighter.wallSlamPhase = null;
+    fighter.wallSlamTimer = 0;
+    fighter.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 600;
+
+    // Smoothly transition and force-trigger his rapid H2H Blitz flurry on the paralyzed target!
+    fighter.isBlitzActive = true;
+    fighter.isWallSlamBlitz = true; // Tag this blitz as originating from Wall Slam for speed line rendering
+    fighter.wallSlamBlitzInterval = CONFIG.mahoraga?.wallSlamBlitzHitInterval || 5;
+    fighter.blitzWindupTimer = 0; // Start flurry instantly without windup delay
+    fighter.blitzHitsLeft = CONFIG.mahoraga?.wallSlamBlitzHitsCount || 14;
+    fighter.blitzTimer = 0;
+    fighter.blitzStayTimer = 999;
+    fighter.blitzTotalDuration = CONFIG.mahoraga?.wallSlamBlitzDuration || 120;
+    fighter.blitzTarget = target;
+    spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'EXECUTION FLURRY!', '#FFD700');
+  }
 }
 
 /**
@@ -319,8 +665,7 @@ export function executeShout(fighter, opponent, ownerIndex) {
   const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 18;
 
   triggerGlobalScreenShake(10, 20);
-  audioSystem.playSFX('attack_explosion', 0.8);
-  audioSystem.playSFX('skill_dash3', 0.9);
+  audioSystem.playSFX('attack_explosion', 0.85);
 
   // Spawn the improved Concentric Gold/Silver Shockwave and Outward Spark Burst
   spawnMahoragaShoutBurst(fighter.x, fighter.y, shoutRadius);

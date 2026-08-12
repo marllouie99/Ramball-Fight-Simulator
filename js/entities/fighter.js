@@ -191,7 +191,11 @@ export class Fighter {
     this.vx = Math.cos(angle) * moveSpeed;
     this.vy = Math.sin(angle) * moveSpeed;
 
-    this.maxHp = baseHp * (MODE_HP_MULTIPLIER[state.mode] || 1);
+    if (MODE_SETTINGS[state.mode]?.fixedHp) {
+      this.maxHp = MODE_SETTINGS[state.mode].fixedHp;
+    } else {
+      this.maxHp = baseHp * (MODE_HP_MULTIPLIER[state.mode] || 1);
+    }
     if (!Number.isFinite(this.maxHp) || this.maxHp <= 0) {
       console.warn('Invalid fighter maxHp, resetting to default', d, state.mode, this.maxHp);
       this.maxHp = 100;
@@ -247,6 +251,8 @@ export class Fighter {
     // Silence effect state
     this.silenceTimer = 0;
     this.blackFlashDebuffTimer = 0;
+    this.paralyzeTimer = 0;
+    this.isGrabbedByMahoraga = false;
 
     this.damageDealt = 0;
     this.damageReceived = 0;
@@ -366,6 +372,22 @@ export class Fighter {
   }
 
   _handleTimeStop() {
+    if (this.paralyzeTimer > 0) {
+      this.paralyzeTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      return true;
+    }
+    if (this.isGrabbedByMahoraga) {
+      this.vx = 0;
+      this.vy = 0;
+      return true;
+    }
+    if (this.isTargetOfAmbush) {
+      this.vx = 0;
+      this.vy = 0;
+      return true;
+    }
     if (this.basicAttackHitPauseTimer > 0) {
       this.basicAttackHitPauseTimer--;
       this.vx = 0;
@@ -501,6 +523,7 @@ export class Fighter {
     if (this.rctVisualTimer > 0) this.rctVisualTimer--;
     if (this.blackFlashDebuffTimer > 0) this.blackFlashDebuffTimer--;
     if (this.blackFlashTimer > 0) this.blackFlashTimer--;
+    if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
     
     // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
     if (this.knockbackStunTimer > 0) {
@@ -530,12 +553,31 @@ export class Fighter {
         if (this.y + this.r > arena.y + arena.height) { this.y = arena.y + arena.height - this.r; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
 
         if (bounced) {
-          if (this.preventKnockbackBounce) {
-            // They hit the wall while pinned! Stick them to the wall for a second (60 frames)
-            if (typeof this.applyTimeStop === 'function') {
-              this.applyTimeStop(60);
+          if (this._knockedBackBySaitamaBasicPunch) {
+            this._knockedBackBySaitamaBasicPunch = false;
+            const slowFrames = CONFIG.saitama?.wallBounceSlowFrames ?? 120;
+            const slowMult = CONFIG.saitama?.wallBounceSlowMultiplier ?? 0.35;
+            if (this.statusEffects && typeof this.statusEffects.applySlow === 'function') {
+              this.statusEffects.applySlow(slowFrames, slowMult);
             } else {
-              this.hitStunTimer = 60;
+              this.slowTimer = Math.max(this.slowTimer || 0, slowFrames);
+              this.slowMultiplier = slowMult;
+            }
+            if (typeof spawnFloatingText === 'function') {
+              spawnFloatingText(this.x, this.y - (this.r || 25) - 14, "SLOWED!", "#FFD700");
+            }
+          }
+
+          if (this.preventKnockbackBounce) {
+            // They hit the wall while pinned! Stick them to the wall for wallPinDurationFrames
+            const pinDuration = CONFIG.saitama?.wallPinDurationFrames ?? 60;
+            if (CONFIG.saitama?.disableWallPinCyanOverlay !== false) {
+              this.suppressFreezeOverlay = true;
+            }
+            if (typeof this.applyTimeStop === 'function') {
+              this.applyTimeStop(pinDuration);
+            } else {
+              this.hitStunTimer = pinDuration;
             }
             this.knockbackVx = 0;
             this.knockbackVy = 0;
@@ -545,7 +587,9 @@ export class Fighter {
               this.interruptAttacks(true);
             }
             
-            triggerGlobalScreenShake(8, 12);
+            const wallPinShakeIntensity = CONFIG.saitama?.wallPinScreenShakeIntensity ?? 8;
+            const wallPinShakeDuration = CONFIG.saitama?.wallPinScreenShakeDuration ?? 12;
+            triggerGlobalScreenShake(wallPinShakeIntensity, wallPinShakeDuration);
             audioSystem.playSFX('attack_fleshhit', 1.0);
             spawnImpactFlash(this.x, this.y, 60, 'rgba(255, 50, 50, 0.9)');
             spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
@@ -568,7 +612,9 @@ export class Fighter {
                 angle: angle,
                 life: 600, // 10 seconds
                 maxLife: 600,
-                seed: Math.random() * 1000
+                seed: Math.random() * 1000,
+                scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
+                thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
               });
             }
           } else if (!this.isFirstHitKnockback && currentSpeed > 6) {
@@ -588,9 +634,19 @@ export class Fighter {
       
       if (Math.abs(this.knockbackVx) <= 0.1) this.knockbackVx = 0;
       if (Math.abs(this.knockbackVy) <= 0.1) this.knockbackVy = 0;
+      if (this.knockbackVx === 0 && this.knockbackVy === 0) {
+        this._knockedBackBySaitamaBasicPunch = false;
+        if (this.timeStopTimer <= 0) {
+          this.suppressFreezeOverlay = false;
+        }
+      }
     } else {
       // Clear flag when knockback completes
       this.preventKnockbackBounce = false;
+      this._knockedBackBySaitamaBasicPunch = false;
+      if (this.timeStopTimer <= 0) {
+        this.suppressFreezeOverlay = false;
+      }
     }
   }
 
@@ -648,10 +704,14 @@ export class Fighter {
       }
     }
     // Spawn floating damage number when actual HP was reduced
-    if (this.hp < prevHp && amount > 0) {
+    if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText) {
       let color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
       if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji')) {
         color = '#e9d5ff'; // Highly visible bright lavender for Toji
+      } else if (attacker && (attacker.characterId === 'gojo' || attacker.type === 'gojo')) {
+        color = '#00E5FF'; // Electric Cyan for Gojo
+      } else if (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna')) {
+        color = '#ff4455'; // Bright Crimson Flame for Sukuna
       } else if (opts.isPurpleDPS) {
         color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
       }
@@ -818,15 +878,20 @@ export class Fighter {
             }
           }
         } else if (state.mode !== 'FFA' && roundEnds) {
-          if (realAttackerIndex >= 0) {
-            state.scores[realAttackerIndex]++;
+          // Identify the actual surviving opponent for 1v1 / Stand Off modes
+          const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
+          const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
+          const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
+
+          if (winnerIndex >= 0) {
+            state.scores[winnerIndex]++;
           }
-          state.roundWinner = realAttacker;
+          state.roundWinner = winnerFighter;
           state.roundEndTimer = 0;
 
           const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
           const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
-          const isMatchEnd = realAttackerIndex >= 0 && state.scores[realAttackerIndex] >= winThreshold;
+          const isMatchEnd = winnerIndex >= 0 && state.scores[winnerIndex] >= winThreshold;
 
           // Stop all sounds when round ends, unless it is a match end (champion screen)
           if (!isMatchEnd) {
@@ -834,10 +899,10 @@ export class Fighter {
             stopAllLoopingSounds();
           }
 
-          if (isMatchEnd) {
+          if (isMatchEnd && winnerFighter) {
             // Record win/loss for leaderboard (1v1 mode only) when they become champion
-            if (state.mode === GAME_MODES.ONE_VS_ONE && realAttacker) {
-              const winnerFighterIndex = typeof realAttacker.fighterIndex === 'number' ? realAttacker.fighterIndex : realAttackerIndex;
+            if (state.mode === GAME_MODES.ONE_VS_ONE && winnerFighter) {
+              const winnerFighterIndex = typeof winnerFighter.fighterIndex === 'number' ? winnerFighter.fighterIndex : winnerIndex;
               const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
               const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'
                 ? state.fighters[loserIndex].fighterIndex
@@ -846,7 +911,7 @@ export class Fighter {
               recordLoss(loserFighterIndex);
             }
 
-            state.matchWinner = realAttacker;
+            state.matchWinner = winnerFighter;
             state.gameState = 'matchEnd';
           } else {
             state.gameState = 'roundEnd';

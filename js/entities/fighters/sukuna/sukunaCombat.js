@@ -123,7 +123,8 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   const isOutOfReach = distToOpponent > attackReach;
 
   // Flash-step teleport if out of reach OR periodically between rapid combo strikes
-  const shouldTeleport = isOutOfReach || (fighter.meleeComboCount > 0 && fighter.meleeComboCount % 2 === 0);
+  const canTeleportChase = (fighter.teleportChaseDelayTimer || 0) <= 0;
+  const shouldTeleport = canTeleportChase && (isOutOfReach || (fighter.meleeComboCount > 0 && fighter.meleeComboCount % 2 === 0));
 
   if (shouldTeleport) {
     const oldX = fighter.x;
@@ -153,8 +154,19 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     if (typeof fighter.aim === 'function') fighter.aim(opponent);
   }
 
+  // Verify target is inside punch reach before striking (prevents punching empty air if target dodges away)
+  const currentDist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
+  const punchReach = fighter.r + opponent.r + 45;
+  if (currentDist > punchReach) {
+    return; // Do NOT punch the air when target is out of reach!
+  }
+
   fighter.meleeComboCount++;
   fighter.martialArtsComboCount = (fighter.martialArtsComboCount || 0) + 1;
+  fighter.punchAnimTimer = 16;
+  fighter.punchAnimMaxTimer = 16;
+  fighter.punchAnimHand = (fighter.punchAnimHand === 1 ? 0 : 1);
+  fighter.slashSwingTimer = 0;
 
   const slashDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
   const punchAngle = (opponent && !opponent.isDead) ? Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x) : (fighter.gunAngle || 0);
@@ -170,7 +182,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   ];
 
   for (const ent of allEntities) {
-    if (!ent || ent.hp <= 0 || ent === fighter || (ent.invincibilityTimer || 0) > 0 || ent.isRika || ent.owner === fighter) continue;
+    if (!ent || ent.hp <= 0 || ent === fighter || (ent.invincibilityTimer || 0) > 0 || ent.owner === fighter) continue;
 
     if (ent.owner) {
       const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
@@ -196,13 +208,23 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     }
   }
 
+  // Set melee punch cooldown to enforce proper combo timing and prevent 60 FPS teleport spam
+  fighter.meleePunchCooldown = punchCooldown;
+
   if (validTargets.length === 0) return;
 
   const isFinalHit = fighter.meleeComboCount >= (fighter.meleeComboTarget || 1);
   const pushForce = isFinalHit ? 14 : 7.5;
 
   for (const target of validTargets) {
-    target.takeDamage(slashDamage, fighter, { isMelee: true });
+    let finalDmg = slashDamage;
+    let isCrit = false;
+    if (typeof fighter.evaluateSlashCrit === 'function') {
+      const res = fighter.evaluateSlashCrit(target, slashDamage, { isMelee: true });
+      finalDmg = res.finalDamage;
+      isCrit = res.isCrit;
+    }
+    target.takeDamage(finalDmg, fighter, { isMelee: true, isSukunaSlash: true, isCrit });
     if (typeof target.applyHitStun === 'function') target.applyHitStun(12);
 
     // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
@@ -223,9 +245,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
 
   triggerGlobalScreenShake(4, 5);
 
-  fighter.punchAnimTimer = 16;
-  fighter.punchAnimMaxTimer = 16;
-  fighter.punchAnimHand = fighter.punchAnimHand === 1 ? 0 : 1;
+  // punchAnimTimer (set above) drives the 2-handed martial arts punch animation in melee mode, displaying both hands.
 
   if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter' || opponent._def.id === 'yuta' || opponent._def.name === 'YutaFighter' || opponent.type === 'yuta')) {
     if (!fighter.meleeClashCooldown) fighter.meleeClashCooldown = 0;

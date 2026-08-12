@@ -401,8 +401,8 @@ export function drawUltimateChannelingTexts() {
         ctx.lineWidth = 3.2;
         ctx.textAlign = 'center';
         const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-        ctx.strokeText('HEAVENLY RESTRICTION', 0, textY);
-        ctx.fillText('HEAVENLY RESTRICTION', 0, textY);
+        ctx.strokeText('CURSE INVENTORY', 0, textY);
+        ctx.fillText('CURSE INVENTORY', 0, textY);
         ctx.restore();
       }
     } else if (isGojo && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
@@ -472,3 +472,308 @@ export function drawUltimateChannelingTexts() {
 // ──────────────────────────────────────────
 // DRAW — ILLUSIONS (Doppleganger)
 // ──────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────
+// GENOS SELF-DESTRUCT: Screen Dim + Cyan Electric Starburst Explosion
+// ─────────────────────────────────────────────────────────────────────
+
+// Pre-seeded static needle arrays so no per-frame GC allocations (Rule 12)
+const _SD_LONG_SEEDS = Array.from({ length: 18 }, () => ({
+  angle: Math.random() * Math.PI * 2,
+  len: 80 + Math.random() * 140,
+  thick: 1.2 + Math.random() * 2.0,
+  speed: 0.4 + Math.random() * 0.9,
+  phase: Math.random() * Math.PI * 2,
+  color: Math.floor(Math.random() * 3), // 0=cyan, 1=white, 2=light-blue
+}));
+const _SD_SHORT_SEEDS = Array.from({ length: 26 }, () => ({
+  angle: Math.random() * Math.PI * 2,
+  len: 20 + Math.random() * 60,
+  thick: 0.8 + Math.random() * 1.4,
+  speed: 0.7 + Math.random() * 1.2,
+  phase: Math.random() * Math.PI * 2,
+  tilt: (Math.random() - 0.5) * 0.55, // slight scatter angle off main ray
+  color: Math.floor(Math.random() * 4),
+}));
+
+// Transient explosion flash state (short-burst 2D Canvas, Rule 10)
+let _genosSdFlashTimer = 0;
+let _genosSdFlashX = 0;
+let _genosSdFlashY = 0;
+
+export function triggerGenosSelfDestructFlash(x, y) {
+  _genosSdFlashTimer = 55; // ~0.9s burst on Canvas 2D
+  _genosSdFlashX = x;
+  _genosSdFlashY = y;
+}
+
+export function drawGenosSelfDestructDimScreen() {
+  const ctx = state.ctx;
+  if (!ctx || !state.fighters) return;
+
+  const now = Date.now();
+
+  // ── 1. Find Genos fighter ──
+  const genos = state.fighters.find(f =>
+    f && (f.characterId === 'genos' || f.type === 'genos' || (f._def && f._def.id === 'genos'))
+  );
+
+  // ── 2. Smooth screen dim while charging self-destruct (Pitch Dark Screen) ──
+  if (genos && genos.isSelfDestructing && genos.selfDestructTimer !== undefined) {
+    const maxT = CONFIG.genos?.selfDestructCountdownFrames || 150;
+    const elapsed = maxT - Math.max(0, genos.selfDestructTimer);
+    // Smoothly fade in to 0.92 pitch dark alpha over first 50 frames
+    const chargeP = Math.min(1.0, elapsed / 50);
+    const dimAlpha = chargeP * 0.92;
+
+    if (dimAlpha > 0.01) {
+      const shakeX = state.shakeX || 0;
+      const shakeY = state.shakeY || 0;
+      const drawX = genos.x + shakeX;
+      const drawY = genos.y + shakeY;
+
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      // Pitch-black screen dim overlay (Rule 14)
+      ctx.fillStyle = `rgba(0, 0, 0, ${dimAlpha.toFixed(3)})`;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      // Bright Electric Cyan radial charging bloom centered on Genos
+      const glowGrad = ctx.createRadialGradient(drawX, drawY, 0, drawX, drawY, 160);
+      glowGrad.addColorStop(0, `rgba(0, 255, 255, ${(chargeP * 0.90).toFixed(3)})`);
+      glowGrad.addColorStop(0.35, `rgba(0, 229, 255, ${(chargeP * 0.60).toFixed(3)})`);
+      glowGrad.addColorStop(0.70, `rgba(0, 180, 255, ${(chargeP * 0.25).toFixed(3)})`);
+      glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = glowGrad;
+      ctx.beginPath();
+      ctx.arc(drawX, drawY, 160, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
+  // ── 3. Tick down flash timer ──
+  if (_genosSdFlashTimer > 0) _genosSdFlashTimer--;
+
+  // ── 4. If no active flash, done ──
+  if (_genosSdFlashTimer <= 0) return;
+
+  const fx = _genosSdFlashX;
+  const fy = _genosSdFlashY;
+  const life = _genosSdFlashTimer / 55; // 1.0 → 0.0
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Maintain pitch dark backdrop during explosion starburst flash
+  ctx.fillStyle = `rgba(0, 0, 0, ${(life * 0.85).toFixed(3)})`;
+  ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+  // ── 4a. Initial Electric Cyan Core Bloom ──
+  const coreAlpha = Math.min(1.0, life * 2.2);
+  const coreR = 26 * (1.15 - life * 0.35);
+  const coreGrad = ctx.createRadialGradient(fx, fy, 0, fx, fy, coreR * 4.5);
+  coreGrad.addColorStop(0, `rgba(224, 255, 255, ${(coreAlpha * 1.0).toFixed(3)})`);
+  coreGrad.addColorStop(0.18, `rgba(0, 255, 255, ${(coreAlpha * 0.98).toFixed(3)})`);
+  coreGrad.addColorStop(0.48, `rgba(0, 229, 255, ${(coreAlpha * 0.75).toFixed(3)})`);
+  coreGrad.addColorStop(0.78, `rgba(0, 160, 255, ${(coreAlpha * 0.35).toFixed(3)})`);
+  coreGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = coreGrad;
+  ctx.beginPath();
+  ctx.arc(fx, fy, coreR * 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 4b. Long razor beam needles — sharp radiating streaks ──
+  for (let i = 0; i < _SD_LONG_SEEDS.length; i++) {
+    const s = _SD_LONG_SEEDS[i];
+    // Needle expands outward quickly, fades as life drops
+    const expand = 1 + (1 - life) * 2.8;
+    const rayLen = s.len * expand * life;
+    const flicker = 0.7 + Math.sin(now * 0.012 * s.speed + s.phase) * 0.3;
+    const alpha = life * flicker * 0.95;
+    if (alpha < 0.03) continue;
+
+    const cosA = Math.cos(s.angle);
+    const sinA = Math.sin(s.angle);
+    const perpX = -sinA;
+    const perpY = cosA;
+    const halfT = (s.thick * life * 0.9) / 2;
+    const midOff = rayLen * 0.12; // bulge toward tip
+
+    const sx = fx;
+    const sy = fy;
+    const ex = fx + cosA * rayLen;
+    const ey = fy + sinA * rayLen;
+    const mx = fx + cosA * midOff;
+    const my = fy + sinA * midOff;
+
+    let color;
+    if (s.color === 0) color = `rgba(0, 229, 255, ${alpha.toFixed(3)})`;
+    else if (s.color === 1) color = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
+    else color = `rgba(100, 220, 255, ${alpha.toFixed(3)})`;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(mx + perpX * halfT, my + perpY * halfT);
+    ctx.lineTo(ex, ey);
+    ctx.lineTo(mx - perpX * halfT, my - perpY * halfT);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // ── 4c. Short scattered fragment needles — chaotic flying debris sparks ──
+  for (let i = 0; i < _SD_SHORT_SEEDS.length; i++) {
+    const s = _SD_SHORT_SEEDS[i];
+    const scatter = s.angle + s.tilt + (1 - life) * s.tilt * 2.5;
+    const expand = 1 + (1 - life) * 3.5;
+    const rayLen = s.len * expand * life;
+    const flicker = 0.55 + Math.sin(now * 0.018 * s.speed + s.phase) * 0.45;
+    const alpha = life * flicker * 0.88;
+    if (alpha < 0.03) continue;
+
+    const cosA = Math.cos(scatter);
+    const sinA = Math.sin(scatter);
+    const perpX = -sinA;
+    const perpY = cosA;
+    const halfT = (s.thick * life * 0.75) / 2;
+    const midOff = rayLen * 0.10;
+
+    const sx = fx;
+    const sy = fy;
+    const ex = fx + cosA * rayLen;
+    const ey = fy + sinA * rayLen;
+    const mx = fx + cosA * midOff;
+    const my = fy + sinA * midOff;
+
+    let color;
+    if (s.color === 0) color = `rgba(0, 255, 240, ${alpha.toFixed(3)})`;
+    else if (s.color === 1) color = `rgba(255, 255, 255, ${alpha.toFixed(3)})`;
+    else if (s.color === 2) color = `rgba(60, 200, 255, ${alpha.toFixed(3)})`;
+    else color = `rgba(200, 245, 255, ${alpha.toFixed(3)})`;
+
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(mx + perpX * halfT, my + perpY * halfT);
+    ctx.lineTo(ex, ey);
+    ctx.lineTo(mx - perpX * halfT, my - perpY * halfT);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+let _mahoragaSpeedLineSeeds = null;
+
+function _initMahoragaSpeedLineSeeds() {
+  _mahoragaSpeedLineSeeds = [];
+  const totalLines = 25;
+
+  for (let i = 0; i < totalLines; i++) {
+    const norm = (i / (totalLines - 1)) * 2 - 1; // -1.0 to +1.0
+    // Perpendicular offset matching Mahoraga body size (~35px radius)
+    const perpOffset = norm * 45 + (Math.random() - 0.5) * 8;
+    
+    // Parabolic length distribution (center longest ~100px, edges ~40px)
+    const normDist = 1 - Math.abs(norm);
+    const len = 40 + normDist * 60 + Math.random() * 20;
+    
+    // Sharp needle thickness (1.2px to 2.5px max)
+    const maxThick = 1.0 + normDist * 1.5 + Math.random() * 0.4;
+
+    const speed = 16 + Math.random() * 12;
+    const phase = Math.random() * 120;
+
+    // 4-slot theme palette: [Golden-Yellow, Light Silver, White Core, Dark Ink Line]
+    let color;
+    if (i % 4 === 0) color = 'rgba(255, 215, 0, 0.95)';       // Mahoraga Gold Theme
+    else if (i % 4 === 1) color = 'rgba(212, 175, 55, 0.85)';  // Golden metallic
+    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White core
+    else color = 'rgba(15, 15, 22, 0.92)';                    // Crisp black ink line
+
+    _mahoragaSpeedLineSeeds.push({
+      perpOffset,
+      len,
+      maxThick,
+      speed,
+      phase,
+      color
+    });
+  }
+}
+
+export function drawMahoragaSpeedLines() {
+  if (!state.fighters) return;
+  const mahoraga = state.fighters.find(f => {
+    if (!f || f.hp <= 0 || (f.characterId !== 'mahoraga' && f.type !== 'mahoraga')) return false;
+    // Hide speed lines when frozen, time-stopped, hit-stunned, or ambushed
+    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush ||
+                     (f.electricStunTimer > 0) || (f.dubstepStunTimer > 0) || (f.isFrozenByInfinity);
+    if (isFrozen) return false;
+    // Draw speed lines during: Wall Slam Dash, Strike, AND the Wall Slam Execution Blitz Flurry only
+    const isDashOrStrike = f.isWallSlamActive && (f.wallSlamPhase === 'dash' || f.wallSlamPhase === 'strike');
+    return isDashOrStrike || (f.isBlitzActive && f.isWallSlamBlitz);
+  });
+  if (!mahoraga) return;
+
+  const ctx = state.ctx;
+  if (!ctx) return;
+
+  if (!_mahoragaSpeedLineSeeds) _initMahoragaSpeedLineSeeds();
+
+  // Direction: points towards the target
+  const lineAngle = mahoraga.gunAngle !== undefined ? mahoraga.gunAngle : (mahoraga.angle || 0);
+
+  const cosA = Math.cos(lineAngle);
+  const sinA = Math.sin(lineAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  const cx = mahoraga.x;
+  const cy = mahoraga.y;
+  const now = Date.now();
+
+  ctx.save();
+
+  for (let i = 0; i < _mahoragaSpeedLineSeeds.length; i++) {
+    const seed = _mahoragaSpeedLineSeeds[i];
+    // Stream behind Mahoraga
+    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 100);
+    const backOffset = mahoraga.r * 1.2;
+    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+
+    const halfLen = seed.len / 2;
+    const halfThick = seed.maxThick / 2;
+    const midOff = halfLen * 0.15;
+    
+    const startX = lineCenterX - cosA * halfLen;
+    const startY = lineCenterY - sinA * halfLen;
+
+    const midX = lineCenterX + cosA * midOff;
+    const midY = lineCenterY + sinA * midOff;
+
+    const endX = lineCenterX + cosA * halfLen;
+    const endY = lineCenterY + sinA * halfLen;
+
+    const topMidX = midX + perpX * halfThick;
+    const topMidY = midY + perpY * halfThick;
+
+    const botMidX = midX - perpX * halfThick;
+    const botMidY = midY - perpY * halfThick;
+
+    ctx.fillStyle = seed.color;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(topMidX, topMidY);
+    ctx.lineTo(endX, endY);
+    ctx.lineTo(botMidX, botMidY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}

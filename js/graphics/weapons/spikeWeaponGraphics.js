@@ -27,7 +27,7 @@ export const SPIKE_WEAPON_GRAPHICS = {
 export function drawSpikeWeapon(ctx, x, y, angle, r) {
   const cfg = SPIKE_WEAPON_GRAPHICS;
   const qualityLevel = state.qualityLevel || 1.0;
-  const useLOD = false;
+  const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
   const useUltraLOD = false;
 
   const numSpikes = useUltraLOD ? 3 : (useLOD ? 4 : cfg.positioning.numSpikes);

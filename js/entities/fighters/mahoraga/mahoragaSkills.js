@@ -168,6 +168,8 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
  */
 export function startAdaptationFlashDash(fighter, attacker) {
   if (!attacker || attacker.isDead || attacker === fighter) return;
+  const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
+  if (isInsideDomain) return;
 
   fighter.adaptationPauseTimer = 0;
   fighter.wheelGlowTimer = 0;
@@ -206,7 +208,10 @@ export function startAdaptationFlashDash(fighter, attacker) {
   fighter.dashFromY = fromY;
   fighter.dashToX = toX;
   fighter.dashToY = toY;
-  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const speedMult = fighter.isInfinityBlitz ? (CONFIG.mahoraga?.infinityBlitzTeleportSpeedMultiplier ?? 0.05) : 1.0;
+  const baseDashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const dashFrames = Math.max(1, Math.round(baseDashFrames * speedMult));
+  fighter.adaptationDashMaxTimer = dashFrames;
   fighter.adaptationDashTimer = dashFrames;
   fighter.adaptationDashTarget = attacker;
   fighter.adaptationDashIsCounter = true;
@@ -308,7 +313,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
  * and Mahoraga has adapted to it, Mahoraga instantly teleports away.
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
-  if (projectile && projectile.skillShotId === 'tojiAmbush') return;
+  if (projectile && (projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;

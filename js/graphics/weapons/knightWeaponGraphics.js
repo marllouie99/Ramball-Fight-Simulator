@@ -5,8 +5,9 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
-  const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
+  const isFFA = typeof state !== 'undefined' && state.mode === 'FFA';
+  const useLOD = isFFA || isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useUltraLOD = isFFA || isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   ctx.save();
   ctx.translate(x, y);
@@ -251,35 +252,65 @@ export function drawGrayShield(ctx, x, y, gunAngle, blockFlashTimer, dashState, 
     const hexH = 2 * hexSize;
     const yOffset = hexH * 0.75;
 
-    ctx.beginPath();
-    const drawHex = (cx, cy) => {
-      for (let i = 0; i < 6; i++) {
-        const angle = i * Math.PI / 3 + Math.PI / 6; // Pointy topped
-        const px = cx + Math.cos(angle) * hexSize;
-        const py = cy + Math.sin(angle) * hexSize;
-        if (i === 0) ctx.moveTo(px, py);
-        else ctx.lineTo(px, py);
-      }
+    if (isFFA) {
+      // Extremely low-clutter shield polygon for FFA
+      ctx.beginPath();
+      ctx.moveTo(0, -22 * shieldScale);
+      ctx.lineTo(16 * shieldScale, -12 * shieldScale);
+      ctx.lineTo(12 * shieldScale, 18 * shieldScale);
+      ctx.lineTo(0, 26 * shieldScale);
+      ctx.lineTo(-12 * shieldScale, 18 * shieldScale);
+      ctx.lineTo(-16 * shieldScale, -12 * shieldScale);
       ctx.closePath();
-    };
+      ctx.fillStyle = `rgba(255, 180, 0, ${0.15 + flashBoost * 0.4})`;
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + flashBoost * 0.5})`;
+      ctx.lineWidth = 1.5 * shieldScale;
+      ctx.stroke();
+    } else {
+      if (!window._knightHoneycombCache) {
+        const c = document.createElement('canvas');
+        const size = 80 * shieldScale;
+        c.width = size;
+        c.height = size;
+        const octx = c.getContext('2d');
+        octx.translate(size / 2, size / 2);
+        
+        octx.strokeStyle = `rgba(255, 215, 0, 1.0)`;
+        octx.lineWidth = 1.5 * shieldScale;
+        octx.fillStyle = `rgba(255, 180, 0, 0.4)`;
+        
+        octx.beginPath();
+        const drawHex = (cx, cy) => {
+          for (let i = 0; i < 6; i++) {
+            const angle = i * Math.PI / 3 + Math.PI / 6; 
+            const px = cx + Math.cos(angle) * hexSize;
+            const py = cy + Math.sin(angle) * hexSize;
+            if (i === 0) octx.moveTo(px, py);
+            else octx.lineTo(px, py);
+          }
+          octx.closePath();
+        };
 
-    // Draw the honeycomb grid tailored to the shield's shape
-    for (let row = -3; row <= 4; row++) {
-      let cols = Math.abs(row) % 2 === 0 ? 5 : 4; 
-      
-      // Taper grid width at the top and bottom to form a shield profile
-      if (row === -3) cols = 3;
-      if (row === 3) cols = 3;
-      if (row === 4) cols = 2;
-      
-      let startX = -(cols - 1) * hexW / 2;
-      for (let col = 0; col < cols; col++) {
-        drawHex(startX + col * hexW, row * yOffset + 2 * shieldScale); 
+        for (let row = -3; row <= 4; row++) {
+          let cols = Math.abs(row) % 2 === 0 ? 5 : 4; 
+          if (row === -3) cols = 3;
+          if (row === 3) cols = 3;
+          if (row === 4) cols = 2;
+          let startX = -(cols - 1) * hexW / 2;
+          for (let col = 0; col < cols; col++) {
+            drawHex(startX + col * hexW, row * yOffset + 2 * shieldScale); 
+          }
+        }
+        octx.fill();
+        octx.stroke();
+        window._knightHoneycombCache = { canvas: c, size: size };
       }
+
+      const cache = window._knightHoneycombCache;
+      ctx.globalAlpha = finalAlpha * 0.5; // adjust for baked opacity
+      ctx.drawImage(cache.canvas, -cache.size / 2, -cache.size / 2);
     }
-    
-    ctx.fill();
-    ctx.stroke();
     
     ctx.restore();
   }
@@ -291,7 +322,7 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
   const fps = state.fps || 60;
   const qualityLevel = state.qualityLevel || 1.0;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-  const useLOD = isMulti && (qualityLevel < 1.0 || fps < 55);
+  const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
   const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 
   // Sci-Fi Palette
@@ -458,13 +489,15 @@ function drawSwordBase(ctx, swordScale, isBroken, isTrail = false) {
     ctx.restore();
     
     // High-tech circuit notches on spine
-    ctx.strokeStyle = neonEdge;
-    ctx.lineWidth = 1 * swordScale;
-    for(let i = 15; i < 45; i += 8) {
-        ctx.beginPath();
-        ctx.moveTo(i * swordScale, -3 * swordScale);
-        ctx.lineTo((i + 3) * swordScale, 0);
-        ctx.stroke();
+    if (!useLOD) {
+      ctx.strokeStyle = neonEdge;
+      ctx.lineWidth = 1 * swordScale;
+      for(let i = 15; i < 45; i += 8) {
+          ctx.beginPath();
+          ctx.moveTo(i * swordScale, -3 * swordScale);
+          ctx.lineTo((i + 3) * swordScale, 0);
+          ctx.stroke();
+      }
     }
   }
 

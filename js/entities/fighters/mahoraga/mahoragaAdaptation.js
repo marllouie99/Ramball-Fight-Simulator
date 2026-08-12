@@ -61,6 +61,17 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   let finalAmount = amount;
   const currentStage = fighter.goldAdaptationStage?.[type] || 0;
 
+  // ── 50% Damage Reduction when Adapted to Hollow Purple ──
+  const isPurpleHit = opts.isPurpleDPS || (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb || opts.projectile.behaviorType === 'gojo_purple' || opts.projectile.skillShotId === 'purple')) || opts.isPurple;
+  const isPurpleAdapted = (fighter.gojoAdapted && fighter.gojoAdapted.purple) || 
+                          (fighter.adaptedSkills && fighter.adaptedSkills['purple']) || 
+                          (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#8A2BE2')) || 
+                          ((fighter.goldAdaptationStage?.skill || 0) >= 2);
+
+  if (isPurpleHit && isPurpleAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Purple!
+  }
+
 
   // ── Toji ISOH Bypass Check ──
   if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji') && opts.isIsoh) {
@@ -130,9 +141,19 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
       }
     }
 
+    const isPurple = gojoAttackType === 'purple' || skillShotId === 'purple' || (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb));
     const isAdaptableSkill = opts.isAdaptableSkillShot || (opts.projectile && opts.projectile.isAdaptableSkillShot);
     
-    if (isAdaptableSkill) {
+    if (isPurple) {
+      if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.pendingPurpleAdaptation) {
+        fighter.pendingPurpleAdaptation = true;
+        fighter.pendingPurpleAttacker = attacker;
+        fighter.pendingPurpleType = type;
+        fighter._lastGojoHitType = 'purple';
+        fighter._lastSkillShotId = 'purple';
+        fighter._lastSkillShotColor = '#8A2BE2';
+      }
+    } else if (isAdaptableSkill) {
       if ((fighter.fatalAdaptCooldown || 0) <= 0 && !fighter.skillExposureTimer) {
         const delay = (skillShotId && SKILL_REGISTRY[skillShotId]?.adaptationDelayFrames) || 60;
         fighter.skillExposureTimer = delay; // Timer to click the wheel!
@@ -165,7 +186,16 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
 
       const threshold = fighter.maxHp * thresholdPct;
       if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-        triggerAdaptation(fighter, type, attacker);
+        if (opts.isRed || fighter._lastGojoHitType === 'red') {
+          if (!fighter.pendingRedAdaptation) {
+            fighter.pendingRedAdaptation = true;
+            fighter.pendingRedAttacker = attacker;
+            fighter.pendingRedType = type;
+            fighter._lastGojoHitType = 'red';
+          }
+        } else {
+          triggerAdaptation(fighter, type, attacker);
+        }
       }
     }
   }
@@ -179,6 +209,31 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
  * freezes enemies, heals via RCT, and checks for Level 8 awakening.
  */
 export function triggerAdaptation(fighter, type, attacker) {
+  // Hold adaptation ticks while inside Gojo's Domain Expansion until domain expires!
+  const isInsideGojoDomain = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
+  );
+
+  if (isInsideGojoDomain) {
+    if (!fighter.pendingDomainAdaptation) {
+      fighter.pendingDomainAdaptation = {
+        type: type || 'skill',
+        attacker: attacker || null,
+        lastGojoHitType: fighter._lastGojoHitType,
+        lastSukunaHitType: fighter._lastSukunaHitType,
+        lastSkillShotId: fighter._lastSkillShotId,
+        lastSkillShotColor: fighter._lastSkillShotColor
+      };
+      spawnFloatingText(fighter.x, (fighter.y - (fighter.z || 0)) - fighter.r - 25, '⚙️ ADAPTATION HELD (DOMAIN)', '#A0C8FF');
+    }
+    return;
+  }
+
+  if (attacker && attacker !== fighter && attacker.hp > 0) {
+    fighter._pendingCounterTarget = attacker;
+  }
   if (!fighter.goldAdaptationStage) fighter.goldAdaptationStage = {};
 
   let addedNewGojoColor = false;
@@ -188,7 +243,7 @@ export function triggerAdaptation(fighter, type, attacker) {
     if (gojoType === 'purple') adaptColor = '#8A2BE2';
     else if (gojoType === 'red') adaptColor = '#FF1144';
     else if (gojoType === 'blue') adaptColor = '#00FFFF';
-    else if (gojoType === 'infinity') adaptColor = '#A0C8FF';
+    else if (gojoType === 'infinity') adaptColor = '#00E5FF';
     
     if (adaptColor) {
       if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
@@ -240,11 +295,15 @@ export function triggerAdaptation(fighter, type, attacker) {
   const speedBoostPct = Math.round((goldStage * speedBoostPerStage) * 100);
 
   const totalStages = (fighter.adaptationStage.melee || 0) + (fighter.adaptationStage.ranged || 0) + (fighter.adaptationStage.skill || 0);
-  const isLevel8 = totalStages >= 8 || currentStage >= 8 || fighter.isInfinityBlitz;
+  if (totalStages >= 8 || currentStage >= 8) {
+    fighter.isMaxAdapted = true;
+  }
+  const isLevel8 = totalStages >= 8 || currentStage >= 8 || fighter.isInfinityBlitz || fighter.isMaxAdapted;
 
-  // Only do the discrete 45-degree step click & cinematic pause if NOT at Level 8 (continuous spin)
-  if (!isLevel8) {
-    const pauseFrames = 40;
+  // Only do the discrete 45-degree step click & cinematic pause if NOT at Level 8 / Max Adaptation (continuous spin)
+  if (!isLevel8 && !fighter.isMaxAdapted) {
+    const isInfinityAdaptation = fighter.gojoInfinityImmune && fighter._lastGojoHitType === 'infinity';
+    const pauseFrames = isInfinityAdaptation ? 0 : 40;
     fighter.adaptationPauseTimer = pauseFrames;
     fighter.adaptationPauseMax = pauseFrames;
     fighter.wheelGlowTimer = 65;
@@ -271,8 +330,6 @@ export function triggerAdaptation(fighter, type, attacker) {
     });
 
     playSkillEffectSound('mahoraga', 'wheelclick');
-    audioSystem.playSFX('skill_dash5', 1.0);
-    audioSystem.playSFX('attack_swordswing', 1.0);
   } else {
     fighter.wheelGlowTimer = 40;
   }
@@ -286,7 +343,11 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   const wheelY = fighter.y - fighter.r - 28;
   if (!addedNewGojoColor) {
-    spawnFloatingText(fighter.x, wheelY - 25, `🏃 +${speedBoostPct}% MOVEMENT SPEED!`, '#FFD700');
+    if (isLevel8) {
+      spawnFloatingText(fighter.x, wheelY - 25, `🏃 +${speedBoostPct}% SPEED & ✨ RCT REGEN UNLOCKED!`, '#00FF66');
+    } else {
+      spawnFloatingText(fighter.x, wheelY - 25, `🏃 +${speedBoostPct}% MOVEMENT SPEED!`, '#FFD700');
+    }
   }
 
   // Trigger pop-out Divine Shield Badge & RCT Healing (+) Emblem Badge
@@ -313,7 +374,7 @@ export function triggerAdaptation(fighter, type, attacker) {
     // Always trigger visual RCT Heal badge & green pop-up heal number on every wheel click!
     fighter._healthBarHealTimer = 14;
     spawnFloatingText(fighter.x, wheelY - 45, '✨ RCT HEAL!', '#00FF66');
-    const displayHeal = actualHealed > 0 ? actualHealed : healAmount;
+    const displayHeal = Math.round(actualHealed > 0 ? actualHealed : healAmount);
     spawnFloatingText(fighter.x + (Math.random() - 0.5) * 16, (fighter.y - (fighter.z || 0)) - fighter.r - 12, `+${displayHeal}`, '#00FF66');
     spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
     spawnSparks(fighter.x, fighter.y, 30, 'arcane');
@@ -334,7 +395,6 @@ export function triggerAdaptation(fighter, type, attacker) {
       spawnFloatingText(fighter.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
       triggerGlobalScreenShake(14, 30);
       audioSystem.playSFX('skill_dash3', 1.0);
-      audioSystem.playSFX('attack_swordswing', 1.0);
     }
   } else if (totalStages >= 2 || currentStage >= 2) {
     if (!fighter.hasAnnouncedLevel2) {
@@ -399,9 +459,9 @@ export function applyGojoAdaptation(fighter, gojoType) {
       spawnFloatingText(fighter.x, wheelY - 35, '🛡️ ADAPTED: BLUE DRAG IMMUNITY!', '#00FFFF');
       break;
     case 'infinity':
-      adaptColor = '#A0C8FF';
+      adaptColor = '#00E5FF';
       fighter.gojoInfinityImmune = true;
-      spawnFloatingText(fighter.x, wheelY - 35, '⚡ ADAPTED: INFINITY BYPASS!', '#A0C8FF');
+      spawnFloatingText(fighter.x, wheelY - 35, '⚡ ADAPTED: INFINITY BYPASS!', '#00E5FF');
       spawnFloatingText(fighter.x, wheelY - 52, '∞ Limitless no longer works on Mahoraga!', '#FFFFFF');
       break;
   }
@@ -425,13 +485,21 @@ export function applyGojoAdaptation(fighter, gojoType) {
  * Returns true if Mahoraga is currently frozen by Infinity (should early-exit update).
  */
 export function handleInfinityFreeze(fighter) {
+  // If already adapted to Limitless Infinity, break out of all freezes instantly and never freeze
+  if (fighter.gojoInfinityImmune) {
+    fighter.infinityFreezeTimer = 0;
+    fighter.isFrozenByInfinity = false;
+    fighter._wasInfinityFrozenLastFrame = false;
+    return false; // Adapted — NOT frozen!
+  }
+
   if (fighter.infinityFreezeTimer > 0 || (fighter.isFrozenByInfinity && (fighter.timeStopTimer || 0) > 0)) {
     if (!fighter._wasInfinityFrozenLastFrame) {
       fighter._wasInfinityFrozenLastFrame = true;
       fighter.infinityFreezeCount = (fighter.infinityFreezeCount || 0) + 1;
 
       const configCount = mahoragaAdaptationConfig.gojo?.infinity?.requiredFreezes;
-      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 10);
+      const freezesNeeded = configCount ?? (CONFIG.mahoraga?.infinityAdaptFreezeCount ?? 5);
       
       if (!fighter.gojoInfinityImmune && fighter.infinityFreezeCount >= freezesNeeded) {
         fighter._lastGojoHitType = 'infinity';
@@ -443,7 +511,19 @@ export function handleInfinityFreeze(fighter) {
           ? state.fighters.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.hp > 0)
           : null;
         triggerAdaptation(fighter, 'skill', gojoFighter || null);
-        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ LIMITLESS ADAPTED! (10/10)', '#00F3FF');
+        spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ LIMITLESS ADAPTED! (5/5)', '#00F3FF');
+
+        // IMMEDIATELY BREAK OUT OF ALL FREEZES AND PAUSES ON THE FRAME HE ADAPTS (0 DELAY)!
+        fighter.infinityFreezeTimer = 0;
+        fighter.timeStopTimer = 0;
+        fighter.isFrozenByInfinity = false;
+        fighter._wasInfinityFrozenLastFrame = false;
+        fighter.adaptationPauseTimer = 0; // 0 pause frames — do not stop moving!
+        const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
+        if (gojoFighter && !isInsideDomain) {
+          startAdaptationFlashDash(fighter, gojoFighter);
+        }
+        return false; // Break out of freeze instantly!
       } else if (!fighter.gojoInfinityImmune) {
         spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚙️ LIMITLESS (${fighter.infinityFreezeCount}/10)`, '#A0C8FF');
       }

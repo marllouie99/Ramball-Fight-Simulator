@@ -95,8 +95,11 @@ export function drawSaitamaSkin(ctx, fighter) {
   const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) ||
                         !!fighter._isWinnerReveal;
 
-  // Calculate Serious Counter charging progress and scale (delayed start at 25% progress)
+  // Calculate Serious Counter or Basic Attack charging progress and scale
   const isChargingCounter = fighter._counterPunchTimer && fighter._counterPunchTimer > 0;
+  const isChargingBasic = fighter.basicPunchChargeTimer && fighter.basicPunchChargeTimer > 0;
+  const isChargingAny = isChargingCounter || isChargingBasic;
+
   let chargeScale = 0;
   let chargePullbackProgress = 0;
   if (isChargingCounter) {
@@ -106,10 +109,15 @@ export function drawSaitamaSkin(ctx, fighter) {
     if (progress > 0.25) {
       chargeScale = (progress - 0.25) / 0.75;
     }
+  } else if (isChargingBasic) {
+    const maxCharge = fighter.basicPunchChargeMaxTimer || 18;
+    const progress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicPunchChargeTimer / maxCharge)));
+    chargePullbackProgress = progress;
+    chargeScale = Math.min(1.0, progress * 1.2);
   }
 
   // Smoothly reposition the charging hand to the center of the body (drawing back to deliver the punch)
-  if (isChargingCounter) {
+  if (isChargingAny) {
     // Smooth ease-out curve for the pullback
     const easePullback = 1 - Math.pow(1 - chargePullbackProgress, 3);
     
@@ -291,9 +299,8 @@ export function drawSaitamaSkin(ctx, fighter) {
 
   // ── Render Back Hand (Back Layer - Behind Body Circle) ──
   if (!fighter.hideBackHand) {
-    const isChargingCounter = fighter._counterPunchTimer && fighter._counterPunchTimer > 0;
     const isPunchHandFront = fighter.isRightPunch;
-    if (isChargingCounter && !isPunchHandFront) {
+    if (isChargingAny && !isPunchHandFront) {
       drawSeriousChargeGlow(ctx, backHandX, backHandY, handRadius, chargeScale);
     }
     ctx.beginPath();
@@ -349,9 +356,8 @@ export function drawSaitamaSkin(ctx, fighter) {
 
   // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
   if (!fighter.hideFrontHand) {
-    const isChargingCounter = fighter._counterPunchTimer && fighter._counterPunchTimer > 0;
     const isPunchHandFront = fighter.isRightPunch;
-    if (isChargingCounter && isPunchHandFront) {
+    if (isChargingAny && isPunchHandFront) {
       drawSeriousChargeGlow(ctx, frontHandX, frontHandY, handRadius, chargeScale);
     }
     ctx.beginPath();

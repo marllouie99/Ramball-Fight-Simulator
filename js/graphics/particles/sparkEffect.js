@@ -3,9 +3,10 @@
 // Visual-only particles for bullet impacts (e.g., Crimson Sniper wall hits)
 // These bypass physics and collision entirely - pure visual decoration
 // ─────────────────────────────────────────────
-import { state } from '../../core/state.js';
+import { state, triggerGlobalScreenShake } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { fastCleanArray } from './visualTrailSystem.js';
+import { triggerGenosSelfDestructFlash } from '../renderers/effectsRenderer.js';
 
 import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 
@@ -1980,5 +1981,26 @@ export function spawnParrySparksEffect(x, y, count = 24) {
   // 3. Shockwave clash ring
   if (typeof spawnMeleeClashShockwave === 'function') {
     spawnMeleeClashShockwave(x, y, 65, 'gojo');
+  }
+}
+
+/**
+ * Spawns an epic high-fidelity anime self-destruction explosion visual sequence for Genos.
+ * Includes multi-layered shockwave rings, ground scorch decals, sakuga impact frames,
+ * thermal fireball spark bursts, radial wind lines, and smoke plumes.
+ */
+export function spawnGenosSelfDestructExplosion(x, y, radius = 220) {
+  // Trigger massive arena screen shake (24 intensity, 60 frames)
+  if (typeof triggerGlobalScreenShake === 'function') {
+    triggerGlobalScreenShake(24, 60);
+  }
+
+  // ✦ Cyan Electric Starburst Flash — matching the reference spark visual
+  triggerGenosSelfDestructFlash(x, y);
+
+  // Expanding shockwave rings (Cyan + white) to complement the electric starburst
+  if (typeof spawnMeleeClashShockwave === 'function') {
+    spawnMeleeClashShockwave(x, y, radius * 1.8, 'gojo');  // Outer glowing cyan ring
+    spawnMeleeClashShockwave(x, y, radius * 1.0, 'gojo');  // Inner tight cyan ring
   }
 }

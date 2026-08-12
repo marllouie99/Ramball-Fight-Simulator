@@ -10,9 +10,9 @@ import {
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
-  drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen,
+  drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
-  drawGenosSpeedLines, drawSaitamaSeriousPunchDimScreen
+  drawGenosSpeedLines, drawMahoragaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -171,8 +171,11 @@ export function renderGame() {
         drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
         drawMahoragaAdaptationDimScreen();
+        drawMahoragaLevel8DimScreen();
+        drawMahoragaSpeedLines();
         drawTojiUltimateOverlay();
         drawSaitamaSeriousPunchDimScreen();
+        drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 

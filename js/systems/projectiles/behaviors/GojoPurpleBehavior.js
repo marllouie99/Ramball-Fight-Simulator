@@ -119,9 +119,11 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
       const isPurpleAdapted = isMahoraga && (
         (ent.gojoAdapted && ent.gojoAdapted.purple) || 
-        (ent.adaptedSkills && ent.adaptedSkills['purple'])
+        (ent.adaptedSkills && ent.adaptedSkills['purple']) ||
+        (ent.gojoAdaptColorHistory && ent.gojoAdaptColorHistory.includes('#8A2BE2')) ||
+        ((ent.goldAdaptationStage?.skill || 0) >= 2)
       );
-      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji' || isPurpleAdapted;
+      const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
       if (!isImmune) {
         const dx = projectile.x - ent.x;
         const dy = projectile.y - ent.y;

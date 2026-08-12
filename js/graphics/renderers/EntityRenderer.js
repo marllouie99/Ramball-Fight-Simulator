@@ -236,6 +236,26 @@ export function drawFighters() {
     const opponent = mode === 'FFA' ? null : fighters[1 - fi];
     try {
       fighter.draw(ctx, opponent);
+      
+      // If Mahoraga is adapting (wheel clicking), dim the opponent so only Mahoraga is highlighted
+      const activeMaho = fighters.find(f => f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')) && (f.wheelClickTimer > 0 || f.adaptationPauseTimer > 0));
+      if (activeMaho && fighter !== activeMaho) {
+        const timer = (activeMaho.adaptationPauseTimer && activeMaho.adaptationPauseTimer > 0) ? activeMaho.adaptationPauseTimer : activeMaho.wheelClickTimer;
+        const clickMax = activeMaho.adaptationPauseMax || activeMaho.wheelClickMax || 25;
+        const progress = Math.min(1.0, Math.max(0.0, (clickMax - timer) / clickMax));
+        const maxDimAlpha = 0.75; 
+        const dimAlpha = Math.sin(progress * Math.PI) * maxDimAlpha;
+
+        if (dimAlpha > 0.01) {
+          ctx.save();
+          ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+          ctx.fillStyle = `rgba(0, 0, 0, ${dimAlpha.toFixed(3)})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, fighter.r + 20, 0, Math.PI * 2); // cover body and hands
+          ctx.fill();
+          ctx.restore();
+        }
+      }
     } catch (e) {
       console.error('fighter.draw error:', e);
     }
@@ -274,8 +294,8 @@ export function drawFighters() {
       }
     }
 
-    // Unlimited Void freeze & Hollow Purple hit: do not apply blue fill/ring overlay to enemies when hit by Purple or inside Gojo's domain
-    if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0)) return;
+    // Unlimited Void freeze & Hollow Purple hit & Wall Pin: do not apply blue fill/ring overlay
+    if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0) || entity.suppressFreezeOverlay || entity.isWallPinned) return;
 
     const isFrozen = isInfinityFreeze || isGenericTimeStop;
     if (!isFrozen) return;

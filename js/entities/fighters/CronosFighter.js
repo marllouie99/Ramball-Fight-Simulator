@@ -267,7 +267,7 @@ export class CronosFighter extends Fighter {
 
     const fps = state.fps || 60;
     const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = false;
+    const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
     const useUltraLOD = false;
 
     for (const effect of this.attackSlashEffects) {
@@ -1003,7 +1003,7 @@ export class CronosFighter extends Fighter {
     // OPTIMIZATION: Quality-based LOD for body drawing
     const qualityLevel = state.qualityLevel || 1.0;
     const isMulti = state && state.mode && state.mode !== '1v1';
-    const useLOD = false;
+    const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
 
     ctx.save();
     ctx.translate(this.x, this.y);
@@ -1179,7 +1179,7 @@ export class CronosFighter extends Fighter {
 
       const qualityLevel = state.qualityLevel || 1.0;
       const isMulti = state && state.mode && state.mode !== '1v1';
-      const useLOD = false;
+      const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
 
       if (this.meleeSwingActive || editP) {
         swingProgress = editP ? 0.5 : (1 - (this.meleeSwingTimer / CONFIG.cronos.meleeSwingDuration));

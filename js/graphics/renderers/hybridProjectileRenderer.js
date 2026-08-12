@@ -144,9 +144,18 @@ export function updateHybridRika() {
   if (!state.pixiApp || !state.pixiLayers?.fighters) return;
   const layer = state.pixiLayers.fighters;
 
-  // Find Yuta fighter
-  const yuta = state.fighters?.find(f => f && (f.type === 'yuta' || f._def?.type === 'yuta') && f.rika);
-  if (!yuta || !yuta.rika || !yuta.rika.active || yuta.rikaAlpha <= 0 || state.gameState === 'matchEnd') {
+  // Find Yuta fighter (robust lookup across type, characterId, _def.type, _def.id)
+  const yuta = state.fighters?.find(f => f && (f.type === 'yuta' || f.characterId === 'yuta' || f._def?.type === 'yuta' || f._def?.id === 'yuta' || f._def?.id === 18) && f.rika);
+  
+  const isRikaActive = yuta && yuta.rika && (
+    yuta.rika.active || 
+    (yuta.rikaEmergingForBeamTimer && yuta.rikaEmergingForBeamTimer > 0) || 
+    yuta.isChannelingPureLoveBeam || 
+    yuta.isFiringPureLoveBeam || 
+    (yuta.rikaAlpha !== undefined && yuta.rikaAlpha > 0)
+  );
+
+  if (!yuta || !yuta.rika || !isRikaActive || state.gameState === 'matchEnd') {
     if (rikaSprite && rikaSprite.parent) {
       rikaSprite.parent.removeChild(rikaSprite);
     }
@@ -154,7 +163,7 @@ export function updateHybridRika() {
   }
 
   const rk = yuta.rika;
-  const size = 600;
+  const size = 700;
 
   if (!rikaSprite) {
     rikaCanvas = document.createElement('canvas');
@@ -171,28 +180,31 @@ export function updateHybridRika() {
   }
 
   // Update position and alpha every frame for buttery-smooth movement tracking
+  const currentAlpha = (yuta.rikaAlpha !== undefined) ? yuta.rikaAlpha : 1.0;
   rikaSprite.x = rk.x;
   rikaSprite.y = rk.y;
-  rikaSprite.alpha = yuta.rikaAlpha;
+  rikaSprite.alpha = Math.max(0, Math.min(1.0, currentAlpha));
 
-  // OPTIMIZATION: Throttle expensive texture updates to prevent CPU-to-GPU bandwidth bottlenecks.
-  // Rika's internal cursed energy animations are stepped to 30fps anyway.
+  // Force texture updates on every frame while spawning, emerging, or fading in/out
   rikaUpdateTick++;
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-  const updateInterval = isLowQuality ? 3 : 2; // 20fps or 30fps upload rate
+  const updateInterval = isLowQuality ? 3 : 2;
 
-  const forceUpdate = (rk.spawnTimer && rk.spawnTimer >= (CONFIG.yuta?.rikaAriseDuration || 180) - 2) || (rikaUpdateTick === 1);
+  const isEmergingOrSpawning = (rk.spawnTimer && rk.spawnTimer > 0) || 
+                                (yuta.rikaEmergingForBeamTimer && yuta.rikaEmergingForBeamTimer > 0) || 
+                                (currentAlpha < 1.0) || 
+                                (rk.rightArmTimer && rk.rightArmTimer > 0) || 
+                                (rk.leftArmTimer && rk.leftArmTimer > 0);
+  const forceUpdate = isEmergingOrSpawning || (rikaUpdateTick === 1);
 
   if (forceUpdate || (rikaUpdateTick % updateInterval === 0)) {
     rikaCtx.clearRect(0, 0, size, size);
     rikaCtx.save();
-    // Translate local context so Rika is drawn centered
     rikaCtx.translate(size / 2 - rk.x, size / 2 - rk.y);
 
     const opponent = state.fighters?.find(f => f && f !== yuta && f.hp > 0);
     const spawnScale = rk.spawnScale ?? 1.0;
     
-    // Custom renderState to bypass the WebGL check inside draw methods
     const renderState = {
       drawX: rk.x,
       drawY: rk.y,
@@ -201,7 +213,7 @@ export function updateHybridRika() {
       isHybrid: true
     };
 
-    rikaCtx.globalAlpha = yuta.rikaAlpha;
+    rikaCtx.globalAlpha = Math.max(0, Math.min(1.0, currentAlpha));
     yuta._drawRikaCursedEnergyAura(rikaCtx, opponent, renderState);
     yuta._drawRika(rikaCtx, opponent, renderState);
 

@@ -602,15 +602,23 @@ export class MusashiFighter extends Fighter {
 
     if (bounced) {
       this.playWallBounceSound();
-      // Aggressive bounce towards the opponent
-      const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy) || this.speed;
-      const dx = opponent.x - this.x;
-      const dy = opponent.y - this.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+      const isTargetGojoInfinity = opponent && (opponent.characterId === 'gojo' || opponent.type === 'gojo') && !opponent.isMeleeMode && ((opponent.infinityCooldown || 0) <= 0 || opponent.infinityActive);
 
-      // Maintain speed but redirect velocity perfectly toward the enemy
-      this.vx = (dx / dist) * currentSpeed;
-      this.vy = (dy / dist) * currentSpeed;
+      if (!isTargetGojoInfinity) {
+        // Aggressive bounce towards the opponent
+        const currentSpeed = Math.sqrt(this.vx * this.vx + this.vy * this.vy) || this.speed;
+        const dx = opponent.x - this.x;
+        const dy = opponent.y - this.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+
+        // Maintain speed but redirect velocity perfectly toward the enemy
+        this.vx = (dx / dist) * currentSpeed;
+        this.vy = (dy / dist) * currentSpeed;
+      } else {
+        const restitution = CONFIG.collision.restitution || 0.8;
+        if (bouncedX) this.vx = -this.vx * restitution;
+        if (bouncedY) this.vy = -this.vy * restitution;
+      }
     }
   }
 

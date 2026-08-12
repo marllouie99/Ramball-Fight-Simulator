@@ -83,20 +83,15 @@ export class StatusEffectsManager {
   }
 
   // --- Freeze / Time Stop ---
-  applyTimeStop(frames) {
+  applyTimeStop(frames, opts = {}) {
     // Only apply if not immune
     if (this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') {
       return;
     }
     
-    // Mahoraga adaptation logic bypass
-    if (this.fighter.gojoInfinityImmune && this.fighter.characterId === 'mahoraga') {
-      const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-        f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
-      );
-      if (!isGojoDomainActive) {
-        return;
-      }
+    // Mahoraga Limitless Infinity barrier adaptation immunity (does NOT bypass Domain Expansion Unlimited Void!)
+    if (this.fighter.gojoInfinityImmune && (this.fighter.characterId === 'mahoraga' || this.fighter.type === 'mahoraga') && !opts?.isDomain) {
+      return;
     }
 
     const currentRemaining = this.fighter.timeStopTimer || 0;

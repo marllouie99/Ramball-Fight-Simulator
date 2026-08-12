@@ -137,6 +137,25 @@ canvas {
   will-change: transform;
 }
 
+.health-hud.ffa-hud {
+  gap: 10px 10px !important;
+}
+
+.health-card.ffa-card {
+  width: calc(50% - 6px) !important;
+  max-width: calc(50% - 6px) !important;
+  min-width: calc(50% - 6px) !important;
+  flex: 0 0 calc(50% - 6px) !important;
+  box-sizing: border-box;
+}
+
+.health-card.ffa-card .health-card__title {
+  font-size: 16px !important;
+  font-family: 'Glast Blitch', Arial, sans-serif !important;
+  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8) !important;
+  letter-spacing: 0.5px !important;
+}
+
 .damage-shake {
   animation: damage-shake 140ms ease infinite;
   border-color: rgba(255, 96, 96, 0.9);
@@ -443,7 +462,6 @@ canvas {
   letter-spacing: 1.5px;
   text-transform: uppercase;
   color: #ffffff;
-  -webkit-text-stroke: 1.2px #000000;
   text-shadow: 0 3px 6px rgba(0, 0, 0, 0.6), 0 0 12px rgba(0, 0, 0, 0.8);
 }
 

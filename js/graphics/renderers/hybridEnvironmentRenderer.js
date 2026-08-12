@@ -20,12 +20,12 @@ function getRikaSummonDimSprite() {
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(10, 0, 18, 0.82)';
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
     ctx.fillRect(0, 0, size, size);
     const texture = window.PIXI.Texture.from(canvas);
     rikaSummonDimSprite = new window.PIXI.Sprite(texture);
     rikaSummonDimSprite.anchor.set(0.5);
-    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
+    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
   }
   return rikaSummonDimSprite;
 }
@@ -528,31 +528,29 @@ export function updateHybridEnvironment() {
     }
   }
 
-  // 5. Rika Summon Dim Screen & Pulsing Ring
-  const yutaSummoning = state.fighters?.find(f =>
-    f && (f._def?.type === 'yuta' || f._def?.id === 'yuta' || f._def?.id === 23 || f._def?.name === 'Yuta') &&
-    (f.rikaCallTimer > 0 || (f.rika && f.rika.active && f.rika.spawnTimer > 0))
-  );
-
+  // 5. Rika Summon & Pure Love Beam Dim Screen & Pulsing Ring
   let targetRikaOpacity = 0;
   let rikaCx = state.canvas.width / 2;
   let rikaCy = state.canvas.height / 2;
 
-  if (yutaSummoning) {
-    rikaCx = yutaSummoning.x;
-    rikaCy = yutaSummoning.y;
-    if (yutaSummoning.rikaCallTimer > 0) {
+  const yutaFighter = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta' || f._def?.id === 'yuta'));
+  if (yutaFighter) {
+    rikaCx = yutaFighter.x;
+    rikaCy = yutaFighter.y;
+    if (yutaFighter.isChannelingPureLoveBeam || yutaFighter.isFiringPureLoveBeam) {
+      targetRikaOpacity = 0.95; // Deep pitch dark black dim during Pure Love Beam
+    } else if (yutaFighter.rikaCallTimer > 0) {
       const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 40;
-      const progress = 1.0 - (yutaSummoning.rikaCallTimer / maxCharge);
+      const progress = 1.0 - (yutaFighter.rikaCallTimer / maxCharge);
       targetRikaOpacity = 0.25 + progress * 0.50; // Up to 0.75 opacity
-    } else if (yutaSummoning.rika && yutaSummoning.rika.spawnTimer > 0) {
+    } else if (yutaFighter.rika && yutaFighter.rika.spawnTimer > 0) {
       const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
-      const progress = yutaSummoning.rika.spawnTimer / ariseMax;
+      const progress = yutaFighter.rika.spawnTimer / ariseMax;
       targetRikaOpacity = 0.75 * progress;
     }
   }
 
-  currentRikaSummonDimOpacity += (targetRikaOpacity - currentRikaSummonDimOpacity) * 0.15;
+  currentRikaSummonDimOpacity += (targetRikaOpacity - currentRikaSummonDimOpacity) * 0.30;
   
   const rikaSummonDim = getRikaSummonDimSprite();
   const rikaRing = getRikaRingSprite();

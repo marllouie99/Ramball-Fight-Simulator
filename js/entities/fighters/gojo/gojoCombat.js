@@ -10,6 +10,19 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 import { triggerAdaptation } from '../mahoraga/mahoragaAdaptation.js';
 
 export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
+  // Toji & Adapted Mahoraga immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
+  if (attacker && attacker !== fighter) {
+    const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
+    const isAdaptedMahoraga = (attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga') && 
+                              (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz);
+    if (isToji || isAdaptedMahoraga) {
+      attacker.infinityFreezeTimer = 0;
+      attacker.isFrozenByInfinity = false;
+      attacker.adaptationPauseTimer = 0;
+      return false;
+    }
+  }
+
   const isInsideDomain = fighter.domainActive || fighter.isChannelingDomainExpansion || (state && (state.activeDomain || state.domainActive));
   if (fighter.isMeleeMode || isInsideDomain || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0)) return false;
   
@@ -48,6 +61,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
         if (hasAdapted) {
           // Mahoraga adapted to Limitless — bypasses Infinity block completely!
+          attacker.infinityFreezeTimer = 0;
+          attacker.isFrozenByInfinity = false;
+          attacker.adaptationPauseTimer = 0;
           return false;
         }
 
@@ -56,7 +72,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         if (!attacker._lastInfinityCollisionTime || now - attacker._lastInfinityCollisionTime >= 350) {
           attacker._lastInfinityCollisionTime = now;
           attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
-          const collisionsNeeded = 10;
+          const collisionsNeeded = 5;
 
           if (!attacker.gojoInfinityImmune && attacker.infinityCollisionCount >= collisionsNeeded) {
             attacker.gojoInfinityImmune = true;
@@ -66,9 +82,14 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
             if (typeof triggerAdaptation === 'function') {
               triggerAdaptation(attacker, 'skill', fighter || null);
             }
-            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, '⚡ LIMITLESS ADAPTED! (10/10)', '#00F3FF');
+            attacker.infinityFreezeTimer = 0;
+            attacker.timeStopTimer = 0;
+            attacker.isFrozenByInfinity = false;
+            attacker.adaptationPauseTimer = 0;
+            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, '⚡ LIMITLESS ADAPTED! (5/5)', '#00F3FF');
+            return false; // Instantly bypass block on adaptation frame!
           } else if (!attacker.gojoInfinityImmune) {
-            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚙️ LIMITLESS (${attacker.infinityCollisionCount}/10)`, '#A0C8FF');
+            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚙️ LIMITLESS (${attacker.infinityCollisionCount}/5)`, '#A0C8FF');
           }
         }
       }
@@ -149,7 +170,7 @@ export function applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, a
 
   fighter.vx = nx * slideSpeed;
   fighter.vy = ny * slideSpeed;
-  fighter.teleportSlideTimer = 6;
+  fighter.teleportSlideTimer = 0;
 
   if (!fighter.afterImages) fighter.afterImages = [];
   const pathAngle = Math.atan2(dy, dx);

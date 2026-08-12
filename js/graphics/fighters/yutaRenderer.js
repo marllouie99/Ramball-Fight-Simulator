@@ -132,7 +132,7 @@ export class YutaRenderer {
       }
     }
 
-    if (fighter.rika && fighter.rikaAlpha > 0) {
+    if (fighter.rika && (fighter.rika.active || (fighter.rikaAlpha && fighter.rikaAlpha > 0) || (fighter.rikaEmergingForBeamTimer && fighter.rikaEmergingForBeamTimer > 0))) {
       if (fighter.hp <= 0) {
         // Trigger retracting/shrinking instantly if Yuta dies
         if (fighter.rika.active && !fighter.rika.disappearing) {

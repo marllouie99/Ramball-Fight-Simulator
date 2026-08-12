@@ -398,22 +398,28 @@ export class YujiFighter extends Fighter {
 
   resolveWallBounce(arena, opponent) {
     let bounced = false;
+    let bouncedX = false;
+    let bouncedY = false;
     const restitution = CONFIG.collision.restitution || 0.8;
 
     if (this.x - this.r < arena.x) {
       this.x = arena.x + this.r;
       bounced = true;
+      bouncedX = true;
     } else if (this.x + this.r > arena.x + arena.width) {
       this.x = arena.x + arena.width - this.r;
       bounced = true;
+      bouncedX = true;
     }
 
     if (this.y - this.r < arena.y) {
       this.y = arena.y + this.r;
       bounced = true;
+      bouncedY = true;
     } else if (this.y + this.r > arena.y + arena.height) {
       this.y = arena.y + arena.height - this.r;
       bounced = true;
+      bouncedY = true;
     }
 
     if (bounced) {
@@ -436,9 +442,11 @@ export class YujiFighter extends Fighter {
         target = nearest;
       }
 
+      const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive);
+
       const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 8;
 
-      if (target) {
+      if (target && !isTargetGojoInfinity) {
         const dx = target.x - this.x;
         const dy = target.y - this.y;
         const dist = Math.hypot(dx, dy) || 1;
@@ -446,12 +454,8 @@ export class YujiFighter extends Fighter {
         this.vy = (dy / dist) * currentSpeed * restitution;
         this.aim(target);
       } else {
-        if (this.x - this.r <= arena.x || this.x + this.r >= arena.x + arena.width) {
-          this.vx = -this.vx * restitution;
-        }
-        if (this.y - this.r <= arena.y || this.y + this.r >= arena.y + arena.height) {
-          this.vy = -this.vy * restitution;
-        }
+        if (bouncedX) this.vx = -this.vx * restitution;
+        if (bouncedY) this.vy = -this.vy * restitution;
       }
     }
   }

@@ -273,7 +273,7 @@ export class NormalFighter extends Fighter {
   drawMagazineBar(ctx) {
     // OPTIMIZATION: Quality-based LOD for magazine display
     const qualityLevel = state.qualityLevel || 1.0;
-    const useLOD = false;
+    const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
 
     const bullets = this.magazineBullets;
     const max = this.maxMagazine;

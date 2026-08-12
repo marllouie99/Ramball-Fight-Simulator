@@ -62,7 +62,7 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
 
   if ((isMoving || isDashing || isChargingUlt || isSelfDestructing) && !isLowQuality) {
     ctx.save();
-    const auraColor = isSelfDestructing ? 'rgba(255, 30, 0, ' : 'rgba(255, 100, 0, ';
+    const auraColor = isSelfDestructing ? 'rgba(0, 229, 255, ' : 'rgba(255, 100, 0, ';
     const pulseR = r + 3 + Math.sin(now * 0.01) * 2.5;
     const pulseCount = isSelfDestructing ? 3 : 2;
     for (let i = 0; i < pulseCount; i++) {
@@ -75,6 +75,15 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
     }
     ctx.restore();
   }
+  // ─────────────────────────────────────────────
+  // 1b. SHATTERED CYBERNETIC REASSEMBLY ANIMATION
+  // ─────────────────────────────────────────────
+  if (fighter.shatteredPieces && fighter.shatteredPieces.length > 0) {
+    _drawShatteredGenosSkin(ctx, fighter, r, now);
+    ctx.restore();
+    return;
+  }
+
   // ─────────────────────────────────────────────
   // 2. MAIN CIRCLE BODY (SLEEK COLOR THEME & HIGH-DETAIL CYBORG SUIT)
   // ─────────────────────────────────────────────
@@ -190,40 +199,81 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
   ctx.lineTo(r * 0.28, -r * 0.22);
   ctx.stroke();
 
-  // 2d. Incineration Chest Energy Core & Bezel Frame
+  // 2d. Incineration Chest Energy Core & Bezel Frame (Pulsing Glowing Cyan Core)
   const coreY = -r * 0.02;
   const coreR = r * 0.16;
   const bloomR = r * 0.46;
 
-  // Radial Bloom Gradient (Steady radiant glow)
-  const bloomGrad = ctx.createRadialGradient(0, coreY, 0, 0, coreY, bloomR);
+  // Dynamic cyan pulse math (faster, hyper-intense throb during self-destruction!)
+  const pulseFreq = isSelfDestructing ? 0.03 : 0.008;
+  const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
+  const activeCoreR = isSelfDestructing ? coreR * (1.25 + cyanPulse * 0.4) : coreR;
+  const dynamicBloomR = isSelfDestructing ? r * (0.70 + cyanPulse * 0.45) : bloomR * (0.85 + cyanPulse * 0.4);
+
+  // Radial Bloom Gradient (Pulsing glowing cyan core!)
+  const bloomGrad = ctx.createRadialGradient(0, coreY, 0, 0, coreY, dynamicBloomR);
   if (isSelfDestructing) {
     bloomGrad.addColorStop(0, '#FFFFFF');
-    bloomGrad.addColorStop(0.2, 'rgba(255, 50, 0, 0.95)');
-    bloomGrad.addColorStop(0.55, 'rgba(255, 100, 0, 0.45)');
-    bloomGrad.addColorStop(1, 'rgba(255, 30, 0, 0)');
+    bloomGrad.addColorStop(0.2, 'rgba(0, 255, 255, 1.0)');
+    bloomGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.85)');
+    bloomGrad.addColorStop(0.8, 'rgba(0, 180, 255, 0.45)');
+    bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
   } else if (isChargingUlt) {
     bloomGrad.addColorStop(0, '#FFFFFF');
-    bloomGrad.addColorStop(0.25, 'rgba(255, 220, 0, 0.95)');
-    bloomGrad.addColorStop(0.6, 'rgba(255, 85, 0, 0.5)');
-    bloomGrad.addColorStop(1, 'rgba(255, 60, 0, 0)');
+    bloomGrad.addColorStop(0.25, 'rgba(0, 255, 255, 0.95)');
+    bloomGrad.addColorStop(0.6, 'rgba(0, 200, 255, 0.55)');
+    bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
   } else {
     bloomGrad.addColorStop(0, '#FFFFFF');
-    bloomGrad.addColorStop(0.2, 'rgba(255, 215, 0, 0.9)');
-    bloomGrad.addColorStop(0.5, 'rgba(255, 85, 0, 0.4)');
-    bloomGrad.addColorStop(1, 'rgba(255, 85, 0, 0)');
+    bloomGrad.addColorStop(0.25, `rgba(0, 229, 255, ${0.85 + cyanPulse * 0.15})`);
+    bloomGrad.addColorStop(0.6, `rgba(0, 200, 255, ${0.45 + cyanPulse * 0.3})`);
+    bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
   }
 
   ctx.fillStyle = bloomGrad;
   ctx.beginPath();
-  ctx.arc(0, coreY, bloomR, 0, Math.PI * 2);
+  ctx.arc(0, coreY, dynamicBloomR, 0, Math.PI * 2);
   ctx.fill();
 
-  // Metallic Gold Bezel Frame around Chest Core
-  ctx.strokeStyle = '#D4AF37';
+  // Self-Destruct Concentric Cyan Overload Pulse Rings radiating from core
+  if (isSelfDestructing) {
+    ctx.save();
+    for (let c = 1; c <= 3; c++) {
+      const ringR = activeCoreR + ((now * 0.08 + c * 8) % (r * 0.65));
+      const ringAlpha = Math.max(0, 1.0 - (ringR / (r * 0.65)));
+      ctx.beginPath();
+      ctx.arc(0, coreY, ringR, 0, Math.PI * 2);
+      ctx.strokeStyle = `rgba(0, 255, 255, ${ringAlpha * 0.9})`;
+      ctx.lineWidth = 2.0;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Central Cyan Core Disc
+  ctx.fillStyle = '#00E5FF';
+  ctx.beginPath();
+  ctx.arc(0, coreY, activeCoreR, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Inner White Core Center
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(0, coreY, activeCoreR * 0.60, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Glowing Cyan Ring
+  ctx.strokeStyle = `rgba(0, 255, 255, ${0.85 + cyanPulse * 0.15})`;
   ctx.lineWidth = 2.2;
   ctx.beginPath();
-  ctx.arc(0, coreY, coreR + 2, 0, Math.PI * 2);
+  ctx.arc(0, coreY, activeCoreR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Metallic Gold Bezel Frame around Chest Core
+  ctx.strokeStyle = isSelfDestructing ? '#00FFFF' : '#D4AF37';
+  ctx.lineWidth = 2.2;
+  ctx.beginPath();
+  ctx.arc(0, coreY, activeCoreR + 2, 0, Math.PI * 2);
   ctx.stroke();
 
   // 4 Thermal Exhaust Slits around Bezel Frame
@@ -303,7 +353,7 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
     const now = Date.now();
     const pulseAlpha = 0.5 + Math.sin(now * 0.012) * 0.35;
     const energyColor = isSelfDestructing 
-      ? `rgba(255, 30, 0, ${pulseAlpha})` 
+      ? `rgba(0, 229, 255, ${pulseAlpha})` 
       : (isChargingUlt ? `rgba(255, 120, 0, ${pulseAlpha})` : `rgba(255, 85, 0, ${pulseAlpha * 0.7})`);
 
     ctx.strokeStyle = energyColor;
@@ -638,7 +688,7 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
   const conduitColor = isChargingUlt
     ? 'rgba(255, 200, 0, 0.85)'
     : isSelfDestructing
-      ? 'rgba(255, 50, 0, 0.9)'
+      ? 'rgba(0, 255, 255, 0.95)'
       : 'rgba(255, 120, 30, 0.70)';
 
   ctx.save();
@@ -722,9 +772,9 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
     cannonGrad.addColorStop(1, 'rgba(255, 60, 0, 0)');
   } else if (isSelfDestructing) {
     cannonGrad.addColorStop(0, '#FFFFFF');
-    cannonGrad.addColorStop(0.3, 'rgba(255, 60, 0, 0.95)');
-    cannonGrad.addColorStop(0.7, 'rgba(200, 0, 0, 0.60)');
-    cannonGrad.addColorStop(1, 'rgba(100, 0, 0, 0)');
+    cannonGrad.addColorStop(0.3, 'rgba(0, 255, 255, 0.95)');
+    cannonGrad.addColorStop(0.7, 'rgba(0, 200, 255, 0.60)');
+    cannonGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
   } else {
     cannonGrad.addColorStop(0, 'rgba(255, 255, 220, 0.90)');
     cannonGrad.addColorStop(0.35, 'rgba(255, 160, 20, 0.80)');
@@ -742,7 +792,7 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
   ctx.strokeStyle = isChargingUlt
     ? 'rgba(255, 220, 0, 0.75)'
     : isSelfDestructing
-      ? 'rgba(255, 40, 0, 0.85)'
+      ? 'rgba(0, 255, 255, 0.95)'
       : 'rgba(255, 100, 30, 0.55)';
   ctx.lineWidth = 1.8;
   ctx.stroke();
@@ -854,6 +904,142 @@ function drawGenosAmmoGauge(ctx, fighter) {
     ctx.font = 'bold 8px monospace';
     ctx.textAlign = 'center';
     ctx.fillText('MELEE', 0, -5);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Renders Shattered Cybernetic Debris and Magnetic Piece-by-Piece Reassembly Animation
+ */
+function _drawShatteredGenosSkin(ctx, fighter, r, now) {
+  ctx.save();
+
+  // 1. Calculate overall reassembly progress normP
+  let normP = 0;
+  if (fighter.hp <= 0 || fighter.isDead) {
+    normP = 0; // Remains shattered on ground if dead!
+  } else if (fighter._isWinnerReveal) {
+    normP = 1.0; // Fully whole on victory reveal!
+  } else if (fighter.selfDestructRecoveryTimer !== undefined) {
+    const maxT = fighter.selfDestructRecoveryMax || 240;
+    const elapsed = maxT - Math.max(0, fighter.selfDestructRecoveryTimer);
+    normP = Math.min(1.0, Math.max(0, elapsed / maxT));
+  }
+
+  // 2. Draw Inner Exposed Power Chassis Core
+  const coreY = -r * 0.02;
+  const pulseFreq = 0.03;
+  const cyanPulse = 0.5 + Math.sin(now * pulseFreq) * 0.5;
+
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#12141C'; // Dark metallic inner chassis
+  ctx.fill();
+  ctx.strokeStyle = `rgba(0, 255, 255, ${0.4 + cyanPulse * 0.3})`;
+  ctx.lineWidth = 2.0;
+  ctx.stroke();
+
+  // Exposed central power core
+  const bloomGrad = ctx.createRadialGradient(0, coreY, 0, 0, coreY, r * 0.65);
+  bloomGrad.addColorStop(0, '#FFFFFF');
+  bloomGrad.addColorStop(0.3, 'rgba(0, 255, 255, 0.95)');
+  bloomGrad.addColorStop(0.7, 'rgba(0, 200, 255, 0.5)');
+  bloomGrad.addColorStop(1, 'rgba(0, 150, 255, 0)');
+  ctx.fillStyle = bloomGrad;
+  ctx.beginPath();
+  ctx.arc(0, coreY, r * 0.65, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#00E5FF';
+  ctx.beginPath();
+  ctx.arc(0, coreY, r * 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Render Shattered Cybernetic Pieces magnetically pulling back piece-by-piece over 4 seconds
+  const pieces = fighter.shatteredPieces || [];
+  // First 20% of time: hold shattered position smoking & building energy
+  const reassembleP = Math.max(0, Math.min(1.0, (normP - 0.20) / 0.75));
+
+  for (let i = 0; i < pieces.length; i++) {
+    const p = pieces[i];
+    const stagger = i / pieces.length;
+    const rawP = Math.max(0, Math.min(1.0, (reassembleP - stagger * 0.40) / 0.60));
+    const smoothP = 1 - Math.pow(1 - rawP, 3.0); // Smooth magnetic snap curve
+
+    const currX = p.scatterX * (1 - smoothP) + p.targetX * smoothP;
+    const currY = p.scatterY * (1 - smoothP) + p.targetY * smoothP;
+    const currRot = p.rot * (1 - smoothP);
+
+    // Electric cyan tendrils connecting piece to power core during magnetic pull
+    if (smoothP > 0.05 && smoothP < 0.95) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(currX, currY);
+      ctx.lineTo(0, coreY);
+      ctx.strokeStyle = `rgba(0, 255, 255, ${(1 - smoothP) * 0.8})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Render individual cybernetic armor piece
+    ctx.save();
+    ctx.translate(currX, currY);
+    ctx.rotate(currRot);
+
+    if (p.id === 'hair') {
+      ctx.fillStyle = '#E5CC82';
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.5, -r * 0.2);
+      ctx.lineTo(0, -r * 0.4);
+      ctx.lineTo(r * 0.5, -r * 0.2);
+      ctx.lineTo(0, -r * 0.6);
+      ctx.closePath();
+      ctx.fill();
+    } else if (p.id === 'leftShoulder' || p.id === 'rightShoulder') {
+      ctx.fillStyle = '#C2CCD6';
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 0.22, r * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#22262E';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.09, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.id === 'leftVest' || p.id === 'rightVest') {
+      ctx.fillStyle = '#1A1D24';
+      ctx.beginPath();
+      ctx.rect(-r * 0.25, -r * 0.25, r * 0.5, r * 0.5);
+      ctx.fill();
+      ctx.strokeStyle = '#101217';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    } else if (p.id === 'bezelFrame') {
+      ctx.strokeStyle = '#D4AF37';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.22, 0, Math.PI * 2);
+      ctx.stroke();
+    } else if (p.id === 'coreDisc') {
+      ctx.fillStyle = '#00E5FF';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(0, 0, r * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+    } else if (p.id === 'collar') {
+      ctx.strokeStyle = '#B0B8C2';
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.25, 0);
+      ctx.lineTo(0, r * 0.12);
+      ctx.lineTo(r * 0.25, 0);
+      ctx.stroke();
+    }
+
+    ctx.restore();
   }
 
   ctx.restore();

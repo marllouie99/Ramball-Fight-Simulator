@@ -12,9 +12,9 @@ export const tojiConfig = {
     stealthCooldown: 500,        // Stealth cooldown in frames (420 frames = 7.0 seconds)
     stealthTurnRate: 0.08,       // Aim tracking reaction rate when enemies aim at stealthed Toji (delayed but functional!)
     channelDetectionRadius: 550, // Detection radius (px) to sense enemy skill/domain channeling
-    channelInterruptChance: 0.10, // 10% chance to force Sequence 1 ambush and interrupt channeling
-    channelInterruptCooldownFrames: 800, // Cooldown (frames) for the interrupt mechanic (900 frames = ~15s)
-    channelReactionFrames: 50,   // Delay in frames before Toji reacts to a channeled skill
+    channelInterruptChance: 0.25, // 50% chance to force Sequence 1 ambush and interrupt channeling
+    channelInterruptCooldownFrames: 800, // Cooldown (frames) for the interrupt mechanic (~13.3s)
+    channelReactionFrames: 10,   // Delay in frames before Toji reacts to a channeled skill (10 frames = ~0.16s)
 
     // Ambush Move Sequence (Stealth Cooldown Re-entry Ambush)
     ambushTriggerFrames: 55,       // Frames before stealth cooldown ends when ambush triggers
