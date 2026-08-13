@@ -323,13 +323,16 @@ function updateHealthHud() {
   // Fast-ticking cooldown timers change by ~1 every single frame, which used to defeat this
   // throttle entirely. Quantizing them lets per-frame ticking fall through to the periodic
   // refresh below instead of forcing a full HUD recompute on every single frame.
-  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2;
-  const teamMode = mode === GAME_MODES.TWO_VS_TWO || is1v2;
+  const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
+  const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2';
+  const teamMode = is2v2;
 
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
-  const currentSkillsStr = teamMode ? '' : fighters.map(f => {
+  const currentSkillsStr = fighters.map((f, i) => {
     if (!f) return '';
+    if (is2v2) return '';
+    if (is1v2 && i !== 0) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
     return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)}`;
@@ -1431,18 +1434,129 @@ function updateHealthHud() {
     `;
   };
 
-  const isCacheEmpty = teamMode ? (_hudCache.teams.size === 0) : (_hudCache.fighters.size === 0);
+  const isCacheEmpty = is1v2
+    ? (_hudCache.fighters.size === 0 || _hudCache.teams.size === 0)
+    : (is2v2 ? _hudCache.teams.size === 0 : _hudCache.fighters.size === 0);
 
   if (isCacheEmpty) {
     if (containerBottom) containerBottom.innerHTML = '';
     if (containerLeft) containerLeft.innerHTML = '';
     if (containerRight) containerRight.innerHTML = '';
 
-    if (teamMode) {
-      const teamLabels = is1v2 ? [
-        { title: '', color: '#ff4d4d', indexes: [0], key: 'red' },
-        { title: '', color: '#4da3ff', indexes: [1, 2], key: 'blue' },
-      ] : [
+    if (is1v2) {
+      // 1v2 Stand Off Mode: Solo player (fighters[0]) is rendered as individual card with skills & stats
+      const soloFighter = fighters[0];
+      if (soloFighter && !soloFighter.isTurret) {
+        const ratio = soloFighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(soloFighter.hp) / Number(soloFighter.maxHp))) : 0;
+        const color = soloFighter.color || '#fff';
+        let nameColor = color;
+        const fType = (soloFighter.type || soloFighter.characterId || (soloFighter._def && soloFighter._def.type) || '').toLowerCase();
+        if (fType === 'gojo') nameColor = '#00E5FF';        // Cyan name
+        else if (fType === 'yuta') nameColor = '#FF69B4';   // Pink name
+        else if (fType === 'mahoraga') nameColor = '#FFD700'; // Gold name
+        const fighterName = soloFighter.name || 'SOLO PLAYER';
+        const fighterStats = state.leaderboard[soloFighter.fighterIndex] || { wins: 0, losses: 0 };
+        const careerWins = fighterStats.wins;
+        const losses = fighterStats.losses;
+        const totalGames = careerWins + losses;
+        const winRate = totalGames > 0 ? Math.round((careerWins / totalGames) * 100) : 0;
+        const fighterDef = soloFighter.fighterIndex !== undefined ? FIGHTER_DEFS[soloFighter.fighterIndex] : null;
+        const shakeTimer = soloFighter._healthBarShakeTimer || 0;
+        const matchWins = (state.scores && state.scores[0]) ? state.scores[0] : 0;
+        const cardDesc = (fighterDef && mode !== GAME_MODES.FFA) ? fighterDef.desc : '';
+
+        const soloCardHTML = buildCard({
+          title: fighterName,
+          scoreText: totalGames > 0 ? `${winRate}% WR` : '',
+          fillColor: color,
+          fillRatio: ratio,
+          metaLabel: `DMG: ${Math.max(0, Number(soloFighter.damage) || 0)}`,
+          metaValue: `${Math.floor(Math.max(0, Number(soloFighter.hp) || 0))}/${Math.floor(Math.max(0, Number(soloFighter.maxHp) || 0))}`,
+          extraClass: 'red',
+          borderColor: color,
+          wins: matchWins,
+          fighterColor: nameColor,
+          shakeTimer,
+          isWinner: soloFighter === state.roundWinner,
+          description: cardDesc,
+          kills: state.matchKills ? state.matchKills[0] || [] : [],
+          maxBullets: 0,
+          targetFighter: soloFighter,
+          titleAlign: 'left'
+        });
+
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = soloCardHTML;
+        const soloCardElement = tempDiv.firstElementChild;
+        containerBottom.appendChild(soloCardElement);
+
+        const hpBar = soloCardElement.querySelector('.health-card__bar');
+        const hpBarFill = soloCardElement.querySelector('.health-card__fill');
+        const hpBarText = soloCardElement.querySelector('.health-card__bar-text');
+        const winBullets = Array.from(soloCardElement.querySelectorAll('.health-card__win-bullet'));
+        const infoContainer = soloCardElement.querySelector('.health-card__info');
+        const checkbox = soloCardElement.querySelector('input[type="checkbox"]');
+
+        const skillBars = new Map();
+        soloCardElement.querySelectorAll('.hud-skill-box').forEach(box => {
+          const id = box.getAttribute('data-skill-id');
+          const fill = box.querySelector('.hud-skill-box-fill');
+          const text = box.querySelector('.hud-skill-box-text');
+          skillBars.set(id, { box, fill, text });
+        });
+
+        _hudCache.fighters.set(soloFighter, {
+          cardElement: soloCardElement,
+          hpBar,
+          hpBarFill,
+          hpBarText,
+          winBullets,
+          infoContainer,
+          checkbox,
+          skillBars,
+          lastInfoHTML: ''
+        });
+      }
+
+      // Opponent Team (fighters[1], fighters[2])
+      const oppMembers = [fighters[1], fighters[2]].filter(Boolean);
+      const oppShakeTimer = oppMembers.reduce((max, fighter) => Math.max(max, fighter._healthBarShakeTimer || 0), 0);
+      const isOppWinner = state.roundWinner && oppMembers.includes(state.roundWinner);
+
+      const oppCardHTML = buildCard({
+        title: 'BLUE TEAM',
+        scoreText: `${teamScores[1] || 0} WINS`,
+        fillColor: '#4da3ff',
+        members: oppMembers,
+        extraClass: 'blue',
+        shakeTimer: oppShakeTimer,
+        isWinner: isOppWinner,
+        borderColor: isOppWinner ? '#ffd700' : null,
+        kills: oppMembers.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
+        maxBullets: 0,
+        titleAlign: 'right'
+      });
+
+      const tempDiv2 = document.createElement('div');
+      tempDiv2.innerHTML = oppCardHTML;
+      const oppCardElement = tempDiv2.firstElementChild;
+      containerBottom.appendChild(oppCardElement);
+
+      const cachedOppMembers = [];
+      oppCardElement.querySelectorAll('.health-card__member').forEach((memberEl, i) => {
+        const fill = memberEl.querySelector('.health-card__fill');
+        const text = memberEl.querySelector('.health-card__bar-text');
+        const bar = memberEl.querySelector('.health-card__bar');
+        cachedOppMembers.push({ fill, text, bar, fighter: oppMembers[i] });
+      });
+
+      _hudCache.teams.set(1, {
+        cardElement: oppCardElement,
+        members: cachedOppMembers
+      });
+    } else if (is2v2) {
+      // 2v2 Pure Team Mode
+      const teamLabels = [
         { title: 'RED TEAM', color: '#ff4d4d', indexes: [0, 1], key: 'red' },
         { title: 'BLUE TEAM', color: '#4da3ff', indexes: [2, 3], key: 'blue' },
       ];
@@ -1462,7 +1576,7 @@ function updateHealthHud() {
           isWinner: isWinner,
           borderColor: isWinner ? '#ffd700' : null,
           kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
-          maxBullets: is1v2 ? 0 : 3,
+          maxBullets: 3,
           titleAlign: teamIndex === 0 ? 'left' : 'right'
         });
 
@@ -1485,6 +1599,7 @@ function updateHealthHud() {
         });
       });
     } else {
+      // 1v1 / FFA Individual Mode
       fighters.forEach((fighter, index) => {
         if (!fighter || fighter.isTurret) return;
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
@@ -1582,7 +1697,7 @@ function updateHealthHud() {
     }
   }
 
-  if (teamMode) {
+  if (_hudCache.teams.size > 0) {
     _hudCache.teams.forEach((cachedCard, teamIndex) => {
       cachedCard.members.forEach((m) => {
         const fighter = m.fighter;
@@ -1612,11 +1727,8 @@ function updateHealthHud() {
 
       cachedCard.cardElement.style.transform = '';
     });
-  } else {
-    fighters.forEach((fighter, index) => {
-      if (!fighter || fighter.isTurret) return;
-      const cachedCard = _hudCache.fighters.get(fighter);
-      if (!cachedCard) return;
+  }
+  if (_hudCache.fighters.size > 0) {
 
       const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
