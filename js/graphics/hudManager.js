@@ -1729,6 +1729,10 @@ function updateHealthHud() {
     });
   }
   if (_hudCache.fighters.size > 0) {
+    fighters.forEach((fighter, index) => {
+      if (!fighter || fighter.isTurret) return;
+      const cachedCard = _hudCache.fighters.get(fighter);
+      if (!cachedCard) return;
 
       const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
