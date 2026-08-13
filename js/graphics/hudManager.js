@@ -662,6 +662,12 @@ function updateHealthHud() {
         ultReady = ultPct >= 99 && (f.hp / f.maxHp <= ultThresholdHp);
       }
 
+      if (checkHasTeammate(f)) {
+        return [
+          { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' }
+        ];
+      }
+
       return [
         { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
         { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' },
