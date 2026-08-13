@@ -58,7 +58,7 @@ function executeCursedSpeech(fighter) {
 
 export function executeThinIceBreaker(fighter, angle) {
   const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
-  const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+  const dmgMult = typeof fighter.getRikaDamageMultiplier === 'function' ? fighter.getRikaDamageMultiplier() : (isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0);
   const baseDmg = CONFIG.yuta.thinIceBreakerDamage || 45; // Massive burst
   const damage = baseDmg * dmgMult;
   
@@ -109,6 +109,17 @@ export function executeThinIceBreaker(fighter, angle) {
     }
   }
   
+  // Check if any opponent is Mahoraga and adapted to Thin Ice Breaker -> Auto-trigger Divine Shout!
+  state.fighters.forEach(target => {
+    if (target !== fighter && target.hp > 0 && (target.characterId === 'mahoraga' || target.type === 'mahoraga' || target._def?.id === 'mahoraga')) {
+      if (target.adaptedThinIceBreaker) {
+        if (typeof target._executeShout === 'function') {
+          target._executeShout(fighter);
+        }
+      }
+    }
+  });
+
   // Hit detection
   state.fighters.forEach(target => {
     if (target !== fighter && target.hp > 0) {
@@ -122,8 +133,8 @@ export function executeThinIceBreaker(fighter, angle) {
         while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
         
         if (Math.abs(angleDiff) < coneArc / 2) {
-          // Unblockable hit via 'fromBlackHole' trick which ignores parries
-          target.takeDamage(damage, fighter, { fromBlackHole: true }); 
+          // Unblockable hit via 'fromBlackHole' trick which ignores parries, plus isThinIceBreaker flag
+          target.takeDamage(damage, fighter, { fromBlackHole: true, isThinIceBreaker: true }); 
           state.thinIceBreakerDimTimer = 18; // Trigger quick screen dim effect
           
           // Apply massive knockback
@@ -133,7 +144,6 @@ export function executeThinIceBreaker(fighter, angle) {
             target.vx = Math.cos(angle) * 35;
             target.vy = Math.sin(angle) * 35;
           }
-          // Removed target.applyHitStun per user request to prevent freezing/locking targets
         }
       }
     }

@@ -1,11 +1,12 @@
 import { YutaRenderer } from '../../graphics/fighters/yutaRenderer.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
+import { fadeOutSound, fadeOutSoundBySrc } from '../../systems/soundSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnParrySparksEffect, spawnYutaBeamLingeringParticles } from '../../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { initRika, updateRika } from './yuta/rikaLogic.js';
 import { renderYutaDomainBackground } from './yuta/yutaDomainVisuals.js';
@@ -80,8 +81,16 @@ export class YutaFighter extends Fighter {
     this.sakugaImpactSeed = 0;
   }
 
+  isSummoningRika() {
+    if ((this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0) return true;
+    if (this.rika) {
+      if ((this.rika.chargeTimer || 0) > 0 || (this.rika.spawnTimer || 0) > 0) return true;
+    }
+    return false;
+  }
+
   getParryChance() {
-    if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0)) return 0;
+    if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0) || this.isSummoningRika()) return 0;
     const isGuarding = this.blockPoseTimer > 0;
     const baseChance = isGuarding ? (CONFIG.yuta.parryActiveChance ?? 0.90) : (CONFIG.yuta.parryPassiveChance ?? 0.90);
     const stackBonus = (this.parryStacks || 0) * (CONFIG.yuta?.parryChancePerStack ?? 0.05);
@@ -246,8 +255,31 @@ export class YutaFighter extends Fighter {
       }
       return;
     }
+    const originalSpeed = this.speed;
+    const shouldFreezeMove = this.isFiringPureLoveBeam || 
+                             this.isChannelingPureLoveBeam || 
+                             (this.rikaEmergingForBeamTimer > 0) || 
+                             (this.rikaCallTimer > 0) || 
+                             (this.pureLoveBeamBreatherTimer > 0) ||
+                             this.isChannelingDomain;
+
+    if (shouldFreezeMove) {
+      this.speed = 0;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
 
     super.update(opponent, ownerIndex, arena, updateProjectiles);
+
+    if (shouldFreezeMove) {
+      this.speed = originalSpeed;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+    }
 
     if (this.isChannelingDomain) {
       this.timeStopTimer = 0;
@@ -380,20 +412,48 @@ export class YutaFighter extends Fighter {
           this.meleeCooldown = this.meleeCooldownMax; // trigger swing animation
           this.flurryTimer = 18; // 18-frame interval per teleport hit for clean readability
 
-          const isRikaAlive = this.isRikaAliveInDomain();
-          const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+          const dmgMult = this.getRikaDamageMultiplier();
           const flurryDmg = (CONFIG.yuta.flurryDamage || 8) * dmgMult;
 
-          // Pass isSkill: true to bypass global basic attack hit-pause
-          this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true });
+          // 50% Auto-Block/Parry check if Mahoraga is adapted to Yuta's Flurry
+          let isFlurryParried = false;
+          if (this.flurryTarget && this.flurryTarget.adaptedYutaFlurry && Math.random() < 0.50) {
+            isFlurryParried = true;
+            spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 20, 'PARRIED!', '#FFD700');
+            spawnParrySparksEffect(this.flurryTarget.x, this.flurryTarget.y);
+            this.flurryTarget.defensePoseType = 'parry';
+            this.flurryTarget.defensePoseTimer = 15;
+            audioSystem.playSFX('attack_swordswing', 0.85);
+          }
 
-          spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
+          if (!isFlurryParried) {
+            this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
+            spawnFloatingText(this.flurryTarget.x, this.flurryTarget.y - 10, 'SLASH!', '#FF1493');
+            spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
+          } else {
+            // Register hit for adaptation tracking if not yet fully adapted
+            this.flurryTarget.takeDamage(0, this, { isMelee: true, isSkill: true, isYutaFlurry: true });
+          }
+
           triggerGlobalScreenShake(6, 6);
-          spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 30, 'silver', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
 
           const flurryAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
-          this.flurryTarget.vx += Math.cos(flurryAngle) * 2;
-          this.flurryTarget.vy += Math.sin(flurryAngle) * 2;
+          const pushForce = (this.flurryHitsLeft === 1) ? 18 : 11;
+          const pushVx = Math.cos(flurryAngle) * pushForce;
+          const pushVy = Math.sin(flurryAngle) * pushForce;
+
+          if (typeof this.flurryTarget.applyKnockback === 'function') {
+            this.flurryTarget.applyKnockback(pushVx, pushVy);
+            // Ensure knockbackStunTimer is NOT set so the enemy's aim rotation never freezes!
+            this.flurryTarget.knockbackStunTimer = 0;
+          } else {
+            this.flurryTarget.vx += pushVx;
+            this.flurryTarget.vy += pushVy;
+          }
+
+          if (typeof this.flurryTarget.applySlow === 'function') {
+            this.flurryTarget.applySlow(90, 0.30);
+          }
 
           // Teleport around target
           const angle = Math.random() * Math.PI * 2;
@@ -492,8 +552,13 @@ export class YutaFighter extends Fighter {
     if (this.meleeCooldown > 0) {
       const maxCd = this.meleeCooldownMax;
       this.meleeCooldown--;
-      if (this.meleeCooldown === maxCd - 15) {
+      if (this.meleeCooldown === maxCd - 25) {
         this.slashFadeTimer = 15;
+      }
+      this.slowTimer = 0;
+      this.slowMultiplier = 1.0;
+      if (this.statusEffects) {
+        this.statusEffects.slowTimer = 0;
       }
     }
 
@@ -509,8 +574,9 @@ export class YutaFighter extends Fighter {
       this.hitStunTimer = 0; // Pure Love Beam Hyper-Armor
 
       if (this.rika && this.rika.active && this.rika.hp > 0) {
-        const totalFrames = (CONFIG.yuta?.pureLoveBeamChargeFrames || 90) + (CONFIG.yuta?.pureLoveBeamDuration || 60);
-        const drainPerFrame = (this.rika.maxHp || 250) / totalFrames;
+        // Drain ALL of Rika's HP during charge phase — bar empties by the time beam fires
+        const chargeFrames = CONFIG.yuta?.pureLoveBeamChargeFrames || 90;
+        const drainPerFrame = (this.rika.maxHp || 250) / chargeFrames;
         this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
       }
 
@@ -529,16 +595,11 @@ export class YutaFighter extends Fighter {
         triggerGlobalScreenShake(5, 8);
       }
 
-      // Voice Line
+      // Rika Appearance SFX when Rika appears to charge the Pure Love Beam
       if (this.pureLoveBeamChargeTimer === 1) {
-        const chargeSound = getSkillSound(this._def?.id || 'yuta', 'pure_love_beam_charge');
-        if (chargeSound) {
-          audioSystem.playSFX(chargeSound.src, chargeSound.volume);
-        } else if (CONFIG.yuta?.pureLoveBeamChargeSound) {
-          audioSystem.playSFX(CONFIG.yuta.pureLoveBeamChargeSound, 3.0);
-        } else {
-          audioSystem.playSFX('skill_cursedspeech', 2.0); // Placeholder powerful sound
-        }
+        const soundSrc = CONFIG.yuta?.pureLoveBeamChargeSound || 'Assets/Sound Effects/Skills/rikaAppearance.mp3';
+        const soundVol = CONFIG.yuta?.pureLoveBeamChargeVolume ?? 3.0;
+        audioSystem.playSFX(soundSrc, soundVol, 1.0, CONFIG.yuta?.pureLoveBeamChargeOffset ?? 0);
       }
 
       const chargeMax = CONFIG.yuta.pureLoveBeamChargeFrames || 90;
@@ -555,26 +616,109 @@ export class YutaFighter extends Fighter {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
       this.hitStunTimer = 0; // Lock movement and hyper-armor until beam expires
-
-      if (this.rika && this.rika.active && this.rika.hp > 0) {
-        const totalFrames = (CONFIG.yuta?.pureLoveBeamChargeFrames || 90) + (CONFIG.yuta?.pureLoveBeamDuration || 60);
-        const drainPerFrame = (this.rika.maxHp || 250) / totalFrames;
-        this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
+      
+      if (this.pureLoveBeamLockedAngle !== undefined) {
+        this.gunAngle = this.pureLoveBeamLockedAngle;
+        this.angle = this.pureLoveBeamLockedAngle;
       }
+
+      // Continuous arena shake while beam is active — decays during final collapse
+      const beamDuration = CONFIG.yuta?.pureLoveBeamDuration || 60;
+      const lifeRatio = this.pureLoveBeamActiveTimer / beamDuration;
+      const baseShake = CONFIG.yuta?.pureLoveBeamShakeIntensity ?? 6;
+      const shakeIntensity = lifeRatio > 0.3 ? baseShake : Math.max(1, baseShake * (lifeRatio / 0.3));
+      // Directly set shake state every frame for persistent rumble (triggerGlobalScreenShake's dampRatio fights per-frame resets)
+      if (state.screenShake) {
+        state.screenShake.intensity = shakeIntensity;
+        state.screenShake.timer = 2;
+        state.screenShake.maxTimer = 2;
+      }
+
+      // Spawn lingering pink particles with white-hot cores along the beam path
+      const offsetDist = (this.r || 22) + 14;
+      const angle = this.pureLoveBeamLockedAngle !== undefined ? this.pureLoveBeamLockedAngle : (this.gunAngle || 0);
+      const startX = this.x + Math.cos(angle) * offsetDist;
+      const startY = this.y + Math.sin(angle) * offsetDist;
+      const beamLength = CONFIG.yuta?.pureLoveBeamLength || 2500;
+      const beamWidth = CONFIG.yuta?.pureLoveBeamWidth || 170;
+
+      if (this.pureLoveBeamActiveTimer % 2 === 0) {
+        spawnYutaBeamLingeringParticles(startX, startY, angle, beamLength, beamWidth, 3);
+      }
+
+      // Rika's HP already fully drained during charge phase — no additional drain needed here
       if (this.pureLoveBeamActiveTimer <= 0) {
         this.isFiringPureLoveBeam = false;
         this.pureLoveBeamBreatherTimer = 60; // 1-second post-beam breather recovery pause!
+
+        // Dense burst of lingering pink-whitecore particles along the beam path upon expiration!
+        spawnYutaBeamLingeringParticles(startX, startY, angle, beamLength, beamWidth, 80);
+
+        // If Mahoraga was caught in the beam, trigger Mahoraga adaptation when beam expires!
+        if (state.fighters) {
+          state.fighters.forEach(f => {
+            if (f && f.hp > 0 && (f.characterId === 'mahoraga' || f.type === 'mahoraga' || f._def?.id === 'mahoraga')) {
+              if (f.caughtInPureLoveBeam || f.pureLoveBeamRecoveryTimer > 0) {
+                if (typeof f.adaptToPureLoveBeam === 'function') {
+                  f.adaptToPureLoveBeam();
+                }
+              }
+            }
+          });
+        }
+        if (state.illusions) {
+          state.illusions.forEach(ill => {
+            if (ill && ill.hp > 0 && (ill.characterId === 'mahoraga' || ill.type === 'mahoraga')) {
+              if (ill.caughtInPureLoveBeam || ill.pureLoveBeamRecoveryTimer > 0) {
+                if (typeof ill.adaptToPureLoveBeam === 'function') {
+                  ill.adaptToPureLoveBeam();
+                }
+              }
+            }
+          });
+        }
+        
+        // Smoothly fade out the beam blast sound over 350ms when the beam expires
+        if (this.pureLoveBeamSoundHandle) {
+          fadeOutSound(this.pureLoveBeamSoundHandle, 350);
+          this.pureLoveBeamSoundHandle = null;
+        } else if (CONFIG.yuta?.pureLoveBeamFireSound) {
+          fadeOutSoundBySrc(CONFIG.yuta.pureLoveBeamFireSound, 350);
+        }
+
+        // Smoothly fade out the background charging sound
+        if (this.pureLoveBeamBgSoundHandle) {
+          fadeOutSound(this.pureLoveBeamBgSoundHandle, 350);
+          this.pureLoveBeamBgSoundHandle = null;
+        } else if (CONFIG.yuta?.pureLoveBeamBackgroundSound) {
+          fadeOutSoundBySrc(CONFIG.yuta.pureLoveBeamBackgroundSound, 350);
+        }
         
         // Despawn Rika now that beam has expired and she has faded out
         if (this.rika) {
           this.rika.hp = 0;
-          this.rika.isDying = true;
-          this.rika.deathTimer = 1;
-          this.rika.disappearing = true;
+          this.rika.isDying = false; // Disable normal death explosion since she was sacrificed
+          this.rika.deathTimer = 0;
+          this.rika.disappearing = false;
           this.rika.active = false;
           this.rika.isSacrificingForBeam = false;
           this.rika.cooldownTimer = 0;
           this.rika.hasSummonedAt50Hp = true;
+          this.rika.chargeTimer = 0; // Cancel any pending summons
+          this.rika.spawnTimer = 0;
+          this.rika.killedInDomain = false;
+          
+          // Reset the Rika summon skill bar so it starts filling from 0% again
+          this.rikaRechargeHpBaseline = this.hp;
+          this._rikaSummonedForBeam = false;
+          
+          // CRITICAL FIX: Remove Rika from the active illusions list so she stops colliding and drawing target lock
+          if (state.illusions) {
+            const idx = state.illusions.indexOf(this.rika);
+            if (idx >= 0) {
+              state.illusions.splice(idx, 1);
+            }
+          }
         }
       }
       return; // Stop movement & attacks while firing beam
@@ -661,17 +805,29 @@ export class YutaFighter extends Fighter {
         }
 
         // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
-        if (this.hp > 0 && this.hp < this.maxHp) {
-          const isRikaAlive = this.isRikaAliveInDomain();
-          const regenMult = isRikaAlive ? (CONFIG.yuta.domainRikaRegenMultiplier || 2.0) : 1.0;
+         if (this.hp > 0 && this.hp < this.maxHp) {
+          const regenMult = this.getRikaRegenMultiplier();
           const rctRate = (CONFIG.yuta.domainRctHealRate || 0.45) * regenMult;
           this.hp = Math.min(this.maxHp, this.hp + rctRate);
 
           if (Math.random() < 0.12) {
             if (Math.random() < 0.25) {
-              spawnFloatingText(this.x, this.y - 25, isRikaAlive ? '+RCT 2x' : '+RCT', '#00FF00');
+              spawnFloatingText(this.x, this.y - 25, regenMult > 2.0 ? '+RCT 4x' : (regenMult > 1.0 ? '+RCT 2x' : '+RCT'), '#00FF00');
             }
           }
+        }
+      }
+    }
+
+    // RCT healing outside domain when Rika is active on the battlefield
+    if (!this.domainActive && this.hp > 0 && this.hp < this.maxHp && this.isRikaAliveInDomain()) {
+      const regenMult = this.getRikaRegenMultiplier();
+      const rctRate = (CONFIG.yuta.domainRctHealRate || 0.05) * regenMult;
+      this.hp = Math.min(this.maxHp, this.hp + rctRate);
+
+      if (Math.random() < 0.12) {
+        if (Math.random() < 0.25) {
+          spawnFloatingText(this.x, this.y - 25, '+RCT', '#00FF00');
         }
       }
     }
@@ -730,14 +886,28 @@ export class YutaFighter extends Fighter {
         this.rika.spawnScale = Math.min(1.0, 0.1 + prog * 0.9);
         this.rikaAlpha = Math.min(1.0, prog);
 
-        // Glue Rika directly behind Yuta's back while she manifests
-        const backAngle = this.gunAngle + Math.PI;
+        // Glue Rika directly behind Yuta's back while she manifests (using smooth orbital follow delay)
+        if (this.rika.beamFollowAngle === undefined) {
+          this.rika.beamFollowAngle = this.gunAngle || 0;
+        }
+        let diff = (this.gunAngle || 0) - this.rika.beamFollowAngle;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        this.rika.beamFollowAngle += diff * 0.085;
+
+        const backAngle = this.rika.beamFollowAngle + Math.PI;
         const backDist = (this.r || 22) + 24;
         this.rika.x = this.x + Math.cos(backAngle) * backDist;
         this.rika.y = this.y + Math.sin(backAngle) * backDist;
-        this.rika.angle = this.gunAngle;
+        this.rika.angle = this.rika.beamFollowAngle;
         this.rika.vx = 0;
         this.rika.vy = 0;
+      }
+
+      // Transition to actual beam channeling once the emergence delay finishes
+      if (this.rikaEmergingForBeamTimer === 0) {
+        this.isChannelingPureLoveBeam = true;
+        this.pureLoveBeamChargeTimer = 0;
       }
       return; // Hold Yuta in emergence pose until Rika is fully manifested!
     }
@@ -759,10 +929,45 @@ export class YutaFighter extends Fighter {
       });
 
       if (hasEnemies) {
-        this.isChannelingPureLoveBeam = true;
-        this.pureLoveBeamChargeTimer = 0;
+        // Trigger pre-beam emergence phase (delay before channeling starts)
+        this.rikaEmergingForBeamTimer = 25;
         this.vx = 0;
         this.vy = 0;
+
+        // Play "Come, Rika!" summon sound effect if she was already active on the field.
+        // If she was just summoned specifically for this beam (meaning we were already under 15% HP when summoning),
+        // we bypass playing it again here to avoid duplicate callouts.
+        if (this._rikaSummonedForBeam) {
+          this._rikaSummonedForBeam = false; // Reset the flag
+        } else {
+          if (CONFIG.yuta?.comeRikaSound) {
+            audioSystem.playSFX(CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5);
+            this._lastComeRikaPlayTime = (typeof state !== 'undefined' ? state.frameCount : 0);
+          }
+        }
+
+        // Play Pure Love Beam background music/sound track
+        if (CONFIG.yuta?.pureLoveBeamBackgroundSound) {
+          this.pureLoveBeamBgSoundHandle = audioSystem.playSFX(
+            CONFIG.yuta.pureLoveBeamBackgroundSound, 
+            CONFIG.yuta.pureLoveBeamBackgroundVolume ?? 2.0
+          );
+        }
+
+        // Force Rika active and reset her summon state so she begins manifesting behind Yuta immediately
+        if (this.rika) {
+          this.rika.active = true;
+          this.rika.chargeTimer = 0;
+          this.rika.spawnTimer = 0;
+          this.rika.isDying = false;
+          this.rika.disappearing = false;
+          this.rika.hp = this.rika.maxHp;
+          this.rika.beamFollowAngle = this.gunAngle || 0; // Initialize follow angle to prevent snapping
+          
+          if (state.illusions && !state.illusions.includes(this.rika)) {
+            state.illusions.push(this.rika);
+          }
+        }
 
           // Teleport away from enemy to a safe distance (320px) before performing Pure Love Beam
           let targetEnemy = opponent;
@@ -944,7 +1149,7 @@ export class YutaFighter extends Fighter {
     const blockChance = this.getParryChance();
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
 
-    if (!this.domainActive && !isStunned && !isSwinging && !unblockable && this.hp > 0 && Math.random() < blockChance) {
+    if (!this.domainActive && !isStunned && !isSwinging && !unblockable && !this.isSummoningRika() && this.hp > 0 && Math.random() < blockChance) {
       // Successfully blocked!
       
       const isAlreadyCountering = (this.flurryHitsLeft > 0) || this.isChannelingThinIceBreaker || (this.thinIceBreakerPunchTimer > 0) || (this.flurrySlashTimer > 0);
@@ -1214,9 +1419,10 @@ export class YutaFighter extends Fighter {
     this.isFiringPureLoveBeam = true;
     this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 180;
     this.pureLoveBeamCooldownTimer = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
+    this.pureLoveBeamLockedAngle = this.gunAngle || 0; // Lock firing angle for the entire beam duration!
 
     if (CONFIG.yuta?.pureLoveBeamFireSound) {
-      audioSystem.playSFX(CONFIG.yuta.pureLoveBeamFireSound, 3.5);
+      this.pureLoveBeamSoundHandle = audioSystem.playSFX(CONFIG.yuta.pureLoveBeamFireSound, CONFIG.yuta.pureLoveBeamFireVolume ?? 3.5, 1.0, CONFIG.yuta.pureLoveBeamFireOffset ?? 0);
     } else {
       audioSystem.playSFX('skill_finalflash', 2.5); // Epic massive beam sound
     }
@@ -1224,6 +1430,20 @@ export class YutaFighter extends Fighter {
     // Keep Rika active during beam firing (she will fade out as the beam expires)
     if (this.rika) {
       this.rika.isSacrificingForBeam = true;
+      this.rika.active = true;
+      this.rika.chargeTimer = 0;
+      this.rika.spawnTimer = 0;
+      this.rika.isDying = false;
+      this.rika.disappearing = false;
+      // Rika's HP already drained to 0 during charge — don't reset it
+      
+      // Ensure she is in state.illusions
+      if (typeof state !== 'undefined') {
+        if (!state.illusions) state.illusions = [];
+        if (!state.illusions.includes(this.rika)) {
+          state.illusions.push(this.rika);
+        }
+      }
     }
 
     // Fire massive beam projectile originating in front of Yuta's hand
@@ -1302,6 +1522,7 @@ export class YutaFighter extends Fighter {
             1.0, 0,
             CONFIG.yuta.comeRikaDelay ?? 0
           );
+          this._lastComeRikaPlayTime = (typeof state !== 'undefined' ? state.frameCount : 0);
         }
 
       } else {
@@ -1336,7 +1557,21 @@ export class YutaFighter extends Fighter {
   }
 
   isRikaAliveInDomain() {
-    return (this.domainActive && this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0);
+    return !!(this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0);
+  }
+
+  // Returns the current damage multiplier: base mult when Rika is alive, doubled when domain is also active
+  getRikaDamageMultiplier() {
+    if (!this.isRikaAliveInDomain()) return 1.0;
+    const baseMult = CONFIG.yuta.domainRikaDamageMultiplier || 2.0;
+    return this.domainActive ? baseMult * 2 : baseMult;
+  }
+
+  // Returns the current regen multiplier: base mult when Rika is alive, doubled when domain is also active
+  getRikaRegenMultiplier() {
+    if (!this.isRikaAliveInDomain()) return 1.0;
+    const baseMult = CONFIG.yuta.domainRikaRegenMultiplier || 1.2;
+    return this.domainActive ? baseMult * 2 : baseMult;
   }
 
   shoot(ownerIndex) {
@@ -1510,12 +1745,18 @@ export class YutaFighter extends Fighter {
     const isFiring = this.isFiringPureLoveBeam;
     const pVal = isFiring ? 1.0 : progress;
 
-    // Smooth fade out & shrink as the beam is about to expire
+    // Smooth fade out when the beam is fired (orb smoothly disappears over the first 14 frames of firing)
     let fadeAlpha = 1.0;
-    if (isFiring && this.pureLoveBeamActiveTimer !== undefined) {
-      const fadeFrames = 30; // Final 30 frames before beam expires
-      if (this.pureLoveBeamActiveTimer < fadeFrames) {
-        fadeAlpha = Math.max(0, this.pureLoveBeamActiveTimer / fadeFrames);
+    if (isFiring) {
+      const maxBeamDuration = CONFIG.yuta?.pureLoveBeamDuration || 60;
+      const elapsedFiring = maxBeamDuration - (this.pureLoveBeamActiveTimer || 0);
+      const orbDisappearFrames = 14;
+      if (elapsedFiring >= 0 && elapsedFiring < orbDisappearFrames) {
+        // Smooth ease-out fade out as beam ignites
+        const t = elapsedFiring / orbDisappearFrames;
+        fadeAlpha = Math.max(0, 1.0 - Math.pow(t, 1.2));
+      } else {
+        fadeAlpha = 0; // Fully disappeared once beam is established
       }
     }
     
@@ -1753,8 +1994,10 @@ export class YutaFighter extends Fighter {
     // a 4-second backwards spinning katana animation!
     const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
     const maxCd = this.meleeCooldownMax;
+    const swingDuration = 15;
+    const recoveryDuration = 10;
     const isFlurrySwinging = (this.flurrySlashTimer > 0);
-    const isValidSwingRange = (this.meleeCooldown > maxCd - 15) && (this.meleeCooldown <= maxCd);
+    const isValidSwingRange = (this.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (this.meleeCooldown <= maxCd);
     let isSwinging = isFlurrySwinging || isValidSwingRange || !!editP;
     let progress = 1.0;
     let fade = (this.slashFadeTimer || 0) / 15;
@@ -1764,7 +2007,13 @@ export class YutaFighter extends Fighter {
       progress = (maxF - this.flurrySlashTimer) / maxF;
       fade = 1.0;
     } else if (isSwinging) {
-      progress = editP ? 0.5 : (maxCd - this.meleeCooldown) / 15;
+      const elapsed = maxCd - this.meleeCooldown;
+      if (elapsed <= swingDuration) {
+        progress = editP ? 0.5 : elapsed / swingDuration;
+      } else {
+        const recP = (elapsed - swingDuration) / recoveryDuration;
+        progress = 1.0 - Math.pow(Math.min(1.0, recP), 1.5) * 0.15;
+      }
       fade = 1.0;
     }
 

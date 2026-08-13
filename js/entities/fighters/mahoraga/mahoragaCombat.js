@@ -83,9 +83,15 @@ export function performMeleeAttack(fighter, opponent) {
     state.domainActive === 'unlimited_void' || 
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
   );
-  if (isInsideDomain || (fighter.timeStopTimer || 0) > 0) {
-    fighter.vx = 0;
-    fighter.vy = 0;
+
+  const isCaughtInBeam = (
+    fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0 ||
+    fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 || (fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry
+  );
+
+  if (isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam) {
+    fighter.neutralStanceTimer = 0;
+    fighter.adaptationDashTimer = 0;
     return;
   }
   fighter.vx = 0;
@@ -100,8 +106,8 @@ export function performMeleeAttack(fighter, opponent) {
   const isStanceEnabled = CONFIG.mahoraga?.enableCloseQuartersTeleport !== false;
   const isStanceOnCooldown = !isStanceEnabled || (fighter.neutralStanceCooldownTimer || 0) > 0;
 
-  // Initialize stance tracking timers on first entry
-  if (!fighter.neutralStanceTimer && !isStanceOnCooldown) {
+  // Initialize stance tracking timers when entering stance
+  if ((!fighter.neutralStanceTimer || fighter.neutralStanceTimer <= 0) && !isStanceOnCooldown) {
     fighter.neutralStanceTimer = CONFIG.mahoraga?.neutralStanceDurationFrames || 180;
     fighter.neutralStanceAttackCount = 0;
   }
@@ -131,16 +137,43 @@ export function performMeleeAttack(fighter, opponent) {
       }
     }
     const damage = CONFIG.mahoraga?.swordDamage || 25;
+    const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+    const knockbackChance = Math.min(0.65, 0.40 + totalStages * 0.04);
+    const isPunch = (fighter.attackCount % 2 === 0);
+    const rollKnockback = isPunch && (Math.random() < knockbackChance);
+
     for (const t of frontTargets) {
-      t.takeDamage(damage, fighter, { isMelee: true });
-      if (typeof t.applyHitStun === 'function') t.applyHitStun(8);
+      if (typeof t.takeDamage === 'function') {
+        t.takeDamage(damage, fighter, { isMelee: true });
+      }
       const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
-      t.vx += Math.cos(pushAngle) * 4;
-      t.vy += Math.sin(pushAngle) * 4;
+
+      if (rollKnockback) {
+        const kbForce = 18.0;
+        t.vx = (t.vx || 0) + Math.cos(pushAngle) * kbForce;
+        t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
+        t.x += Math.cos(pushAngle) * (kbForce * 0.35);
+        t.y += Math.sin(pushAngle) * (kbForce * 0.35);
+        if (typeof t.applyHitStun === 'function') t.applyHitStun(16);
+        spawnFloatingText(t.x, t.y - (t.r || 20) - 22, 'HEAVY PUNCH KNOCKBACK!', '#FFD700');
+        triggerGlobalScreenShake(9, 14);
+      } else {
+        t.vx += Math.cos(pushAngle) * 4;
+        t.vy += Math.sin(pushAngle) * 4;
+        if (typeof t.applyHitStun === 'function') t.applyHitStun(8);
+      }
+
+      if (state && state.arena) {
+        const minX = state.arena.x + (t.r || 20);
+        const maxX = state.arena.x + state.arena.width - (t.r || 20);
+        const minY = state.arena.y + (t.r || 20);
+        const maxY = state.arena.y + state.arena.height - (t.r || 20);
+        t.x = Math.max(minX, Math.min(maxX, t.x));
+        t.y = Math.max(minY, Math.min(maxY, t.y));
+      }
     }
     if (frontTargets.length > 0) {
       const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-      // Spawn golden spiky crescent effect for both punches and blade slash attacks!
       spawnAnimePunchImpactFrame(opponent.x, opponent.y, 55, angle, 'gold');
       spawnSparks(opponent.x, opponent.y, 12, 'silver', '#FFFFFF');
       triggerGlobalScreenShake(5, 8);
@@ -175,12 +208,40 @@ export function performMeleeAttack(fighter, opponent) {
     }
   }
   const damage = CONFIG.mahoraga?.swordDamage || 25;
+  const totalStagesStance = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+  const knockbackChanceStance = Math.min(0.65, 0.40 + totalStagesStance * 0.04);
+  const isPunchStance = (fighter.attackCount % 2 === 0);
+  const rollKnockbackStance = isPunchStance && (Math.random() < knockbackChanceStance);
+
   for (const t of frontTargets) {
-    t.takeDamage(damage, fighter, { isMelee: true });
-    if (typeof t.applyHitStun === 'function') t.applyHitStun(8);
+    if (typeof t.takeDamage === 'function') {
+      t.takeDamage(damage, fighter, { isMelee: true });
+    }
     const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
-    t.vx += Math.cos(pushAngle) * 4;
-    t.vy += Math.sin(pushAngle) * 4;
+
+    if (rollKnockbackStance) {
+      const kbForce = 18.0;
+      t.vx = (t.vx || 0) + Math.cos(pushAngle) * kbForce;
+      t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
+      t.x += Math.cos(pushAngle) * (kbForce * 0.35);
+      t.y += Math.sin(pushAngle) * (kbForce * 0.35);
+      if (typeof t.applyHitStun === 'function') t.applyHitStun(16);
+      spawnFloatingText(t.x, t.y - (t.r || 20) - 22, 'HEAVY PUNCH KNOCKBACK!', '#FFD700');
+      triggerGlobalScreenShake(9, 14);
+    } else {
+      t.vx += Math.cos(pushAngle) * 4;
+      t.vy += Math.sin(pushAngle) * 4;
+      if (typeof t.applyHitStun === 'function') t.applyHitStun(8);
+    }
+
+    if (state && state.arena) {
+      const minX = state.arena.x + (t.r || 20);
+      const maxX = state.arena.x + state.arena.width - (t.r || 20);
+      const minY = state.arena.y + (t.r || 20);
+      const maxY = state.arena.y + state.arena.height - (t.r || 20);
+      t.x = Math.max(minX, Math.min(maxX, t.x));
+      t.y = Math.max(minY, Math.min(maxY, t.y));
+    }
   }
   if (frontTargets.length > 0) {
     const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
@@ -203,6 +264,11 @@ export function performMeleeAttack(fighter, opponent) {
 
   // Teleport after every N attacks
   if (fighter.neutralStanceAttackCount >= attacksPerTeleport) {
+    const isBeamTeleportDisabled = (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0) && !fighter.adaptedPureLoveBeam;
+    if (isBeamTeleportDisabled) {
+      fighter.neutralStanceAttackCount = 0;
+      return; // Disable teleportation while caught in beam before adapting!
+    }
     fighter.neutralStanceAttackCount = 0;
 
     const oldX = fighter.x;
@@ -356,11 +422,24 @@ export function initiateLevel8WallSlam(fighter, opponent) {
 
 export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   const target = fighter.wallSlamTarget || opponent;
-  if (!target || target.hp <= 0 || target.isDead) {
-    if (target) target.isGrabbedByMahoraga = false;
+
+  const isInterrupted = (
+    fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
+    fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0 ||
+    (fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry
+  );
+
+  if (isInterrupted || !target || target.hp <= 0 || target.isDead) {
+    if (target) {
+      target.isGrabbedByMahoraga = false;
+      target.z = 0;
+    }
     fighter.isWallSlamActive = false;
     fighter.wallSlamPhase = null;
     fighter.wallSlamTimer = 0;
+    if (isInterrupted) {
+      spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, 'INTERRUPTED!', '#FF3D00');
+    }
     return;
   }
 
@@ -531,6 +610,11 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     // Launch target at supersonic velocity toward arena wall
     target.x += fighter.wallSlamTargetVelX * 0.5;
     target.y += fighter.wallSlamTargetVelY * 0.5;
+
+    // Per-frame strict clamping to prevent target from ever clipping outside arena boundaries
+    target.x = Math.max(minX, Math.min(maxX, target.x));
+    target.y = Math.max(minY, Math.min(maxY, target.y));
+
     target.vx = fighter.wallSlamTargetVelX;
     target.vy = fighter.wallSlamTargetVelY;
 
@@ -546,7 +630,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     const hitWall = hitLeft || hitRight || hitTop || hitBottom;
 
     if (hitWall || fighter.wallSlamTimer >= 30) {
-      // Clamp target within arena boundary at wall
+      // Final clamp target within arena boundary at wall
       target.x = Math.max(minX, Math.min(maxX, target.x));
       target.y = Math.max(minY, Math.min(maxY, target.y));
       target.vx = 0;
@@ -554,20 +638,23 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
 
       // Deal heavy wall impact damage
       const impactDamage = CONFIG.mahoraga?.wallSlamImpactDamage || 35;
-      target.takeDamage(impactDamage, fighter, { isMelee: true, isWallSlam: true });
-
+      if (typeof target.takeDamage === 'function') {
+        target.takeDamage(impactDamage, fighter, { isMelee: true, isWallSlam: true, isParalyzed: true });
+      }
       // Wall crack shockwave & impact visuals
       spawnMahoragaShoutBurst(target.x, target.y, 130);
       spawnImpactFlash(target.x, target.y, 75, '#FFEE58');
-      triggerGlobalScreenShake(14, 20);
-      audioSystem.playSFX('attack_explosion', 1.0);
-      audioSystem.playSFX('attack_groundsmash', 1.0);
 
       // APPLY PARALYZE STUN (freeze & hitstun on wall contact!)
       const paralyzeDuration = CONFIG.mahoraga?.wallSlamParalyzeDuration || 90;
       if (typeof target.applyHitStun === 'function') target.applyHitStun(paralyzeDuration);
       target.paralyzeTimer = paralyzeDuration;
       target.isParalyzedByMahoraga = true;
+      target.hitStunTimer = Math.max(target.hitStunTimer || 0, paralyzeDuration);
+
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(paralyzeDuration, 0.20, { isWallSlam: true });
+      }
 
       // Clear any remaining or newly spawned projectiles
       if (state.projectiles) {

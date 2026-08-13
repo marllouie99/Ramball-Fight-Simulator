@@ -16,6 +16,16 @@ export function modExecuteKatanaMelee(fighter, angle) {
   fighter.activeSlashType = (fighter.activeSlashType === undefined) ? 0 : (fighter.activeSlashType + 1) % 3;
   fighter.trailGenTimer = 40; // Generate trail at tip for 40 frames (~0.66s)
 
+  // Remove any active slow debuff on Yuta when swinging basic attack
+  fighter.slowTimer = 0;
+  fighter.slowMultiplier = 1.0;
+  if (fighter.statusEffects) {
+    fighter.statusEffects.slowTimer = 0;
+    if (fighter.statusEffects.fighter) {
+      fighter.statusEffects.fighter.slowTimer = 0;
+    }
+  }
+
   // Play swing sound (using Yuta's config and Fighter's standard delay queue)
   const swingSnd = {
     src: CONFIG.yuta?.katanaSwingSound || 'Assets/Sound Effects/Attacks/swordswing.mp3',
@@ -85,7 +95,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
   }
 
   const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
-  const dmgMult = isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0;
+  const dmgMult = typeof fighter.getRikaDamageMultiplier === 'function' ? fighter.getRikaDamageMultiplier() : (isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0);
   const finalDamage = damage * dmgMult;
 
   for (const enemy of validTargets) {
@@ -125,10 +135,12 @@ export function modExecuteKatanaMelee(fighter, angle) {
 
 export function modGetKatanaTipPositions(fighter) {
   const maxCd = fighter.meleeCooldownMax;
+  const swingDuration = 15;
+  const recoveryDuration = 10;
   const isFlurrySwinging = (fighter.flurrySlashTimer > 0);
-  const isSwinging = isFlurrySwinging || (fighter.meleeCooldown > maxCd - 15);
+  const isSwinging = isFlurrySwinging || (fighter.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (fighter.meleeCooldown <= maxCd);
 
-  let currentAngle = fighter.gunAngle;
+  let currentAngle = (isSwinging && fighter.targetAngle !== undefined) ? fighter.targetAngle : fighter.gunAngle;
   const comboIndex = fighter.activeSlashType || 0;
 
   if (isFlurrySwinging) {
@@ -151,7 +163,15 @@ export function modGetKatanaTipPositions(fighter) {
       currentAngle += (-Math.PI * 0.7) + (Math.PI * 0.9) * progress;
     }
   } else if (isSwinging) {
-    const progress = (maxCd - fighter.meleeCooldown) / 15;
+    const elapsed = maxCd - fighter.meleeCooldown;
+    let progress = 1.0;
+    if (elapsed <= swingDuration) {
+      progress = elapsed / swingDuration;
+    } else {
+      const recP = (elapsed - swingDuration) / recoveryDuration;
+      progress = 1.0 - Math.pow(Math.min(1.0, recP), 1.5) * 0.15; // Smooth follow-through hold
+    }
+
     if (comboIndex === 0) {
       currentAngle += (-Math.PI / 4) + (Math.PI / 2) * progress;
     } else if (comboIndex === 1) {

@@ -18,6 +18,7 @@ import {
 import { drawMusashiWeapons, drawMusashiSheaths } from '../weapons/musashiWeaponGraphics.js';
 import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
 import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
+import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -238,6 +239,20 @@ function drawWeaponInfoCard(ctx, def) {
   const panelW = Math.min(canvas.width - 30, 640);
   const panelX = (canvas.width - panelW) / 2;
 
+  let nameText = def.name;
+  let descText = def.desc;
+
+  if (def.type === 'ichigo') {
+    const skin = state.selectedIchigoSkin || 'bankai';
+    if (skin === 'shikai') {
+      nameText = 'Ichigo (Shikai)';
+      descText = 'Wields massive Zangetsu. Fires blue Getsuga Tensho waves. Awakes Hollow Mask under 30% HP for stats boost and blue Getsuga. Ultimate transforms into Vasto Lorde.';
+    } else {
+      nameText = 'Ichigo (Bankai)';
+      descText = 'Wields Tensa Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost and Black Getsuga. Ultimate transforms into Vasto Lorde.';
+    }
+  }
+
   // Glassmorphism Card Panel
   ctx.save();
   ctx.fillStyle = 'rgba(10, 14, 24, 0.92)';
@@ -262,7 +277,7 @@ function drawWeaponInfoCard(ctx, def) {
   ctx.font = 'bold 18px Arial';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText(def.name.toUpperCase(), panelX + 20, panelY + 16);
+  ctx.fillText(nameText.toUpperCase(), panelX + 20, panelY + 16);
 
   ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
   ctx.font = 'bold 11px Arial';
@@ -275,7 +290,7 @@ function drawWeaponInfoCard(ctx, def) {
   // Description snippet
   ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
   ctx.font = '11px Arial';
-  wrapText(ctx, def.desc || '', panelX + 20, panelY + 76, panelW - 240, 16);
+  wrapText(ctx, descText || '', panelX + 20, panelY + 76, panelW - 240, 16);
 
   // Stat Bars Column (Right Side of Info Card)
   const statW = 180;
@@ -578,6 +593,42 @@ function drawWeaponDetailScreen() {
     }, 35, 26);
   }
 
+  // Interactive Skin Selector for Ichigo (Shikai / Bankai)
+  if (def.type === 'ichigo') {
+    const selectY = canvas.height * 0.42;
+    const btnW = 90;
+    const btnH = 26;
+    const shikaiBtnX = canvas.width / 2 - 55;
+    const bankaiBtnX = canvas.width / 2 + 55;
+
+    // Draw Shikai button
+    drawButton('SHIKAI', shikaiBtnX, selectY, () => {
+      state.selectedIchigoSkin = 'shikai';
+      if (state.previewFighter) {
+        state.previewFighter.skin = 'shikai';
+      }
+    }, btnW, btnH);
+
+    // Draw Bankai button
+    drawButton('BANKAI', bankaiBtnX, selectY, () => {
+      state.selectedIchigoSkin = 'bankai';
+      if (state.previewFighter) {
+        state.previewFighter.skin = 'bankai';
+      }
+    }, btnW, btnH);
+
+    // Draw glowing golden outline on active skin
+    const activeSkin = state.selectedIchigoSkin || 'bankai';
+    const activeX = (activeSkin === 'shikai') ? shikaiBtnX : bankaiBtnX;
+    ctx.save();
+    ctx.strokeStyle = '#FFD700'; // Gold active outline
+    ctx.lineWidth = 3.0;
+    ctx.beginPath();
+    ctx.roundRect(activeX - btnW / 2, selectY - btnH / 2, btnW, btnH, 10);
+    ctx.stroke();
+    ctx.restore();
+  }
+
   // Fighter & Weapon Info Card HUD
   drawWeaponInfoCard(ctx, def);
 
@@ -618,6 +669,20 @@ function drawWeaponDetailScreen() {
     }
   });
 
+  // Toggle button to display ONLY the fighter's skin (without weapon)
+  const skinOnlyToggleText = state.showSkinOnly ? '👕 SKIN ONLY: ON' : '👕 SKIN ONLY: OFF';
+  buttonsToDraw.push({
+    text: skinOnlyToggleText,
+    width: 130,
+    action: () => {
+      state.showSkinOnly = !state.showSkinOnly;
+      if (state.showSkinOnly) {
+        state.showWeaponModel = true;
+        state.showSummonModel = false;
+      }
+    }
+  });
+
   const isAttacking = isFighterDemoAttacking(state.previewFighter);
   const demoBtnText = isAttacking ? '⚔ SWINGING...' : '⚔ DEMO ATTACK';
   buttonsToDraw.push({
@@ -640,6 +705,7 @@ function drawWeaponDetailScreen() {
         state.showSummonModel = !state.showSummonModel;
         if (state.showSummonModel) {
           state.showWeaponModel = false;
+          state.showSkinOnly = false;
           state.slashEditMode = false;
         }
       }
@@ -827,11 +893,24 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'toji') offsetX = -40; // Inverted Spear
   else if (type === 'yuta') offsetX = -40; // Katana
   else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
+  else if (type === 'ichigo') {
+    offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -45;
+  }
   
   ctx.translate(offsetX, 0);
 
   try {
     switch (type) {
+      case 'ichigo': {
+        const isShikaiActive = (state.selectedIchigoSkin === 'shikai');
+        if (isShikaiActive) {
+          drawShikaiZangetsu(ctx, 0, 0, gunAngle, r);
+        } else {
+          drawTensaZangetsu(ctx, 0, 0, gunAngle, r);
+        }
+        return;
+      }
+
       case 'layla':
         drawLaylaGun(ctx, 0, 0, gunAngle, r, { isPreview: true });
         return;

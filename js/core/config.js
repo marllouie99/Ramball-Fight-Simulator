@@ -11,6 +11,7 @@ import { yujiConfig } from '../configs/characters/yujiConfig.js';
 import { laylaConfig } from '../configs/characters/laylaConfig.js';
 import { saitamaConfig } from '../configs/characters/saitamaConfig.js';
 import { genosConfig } from '../configs/characters/genosConfig.js';
+import { ichigoConfig } from '../configs/characters/ichigoConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {
@@ -41,7 +42,7 @@ export const CONFIG = {
   arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
   arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
   canvasBgColor: '#ffffffff',        // Canvas background color (hex string or hex number)
-  arenaOuterBgColor: '#fffff7ff',    // Background color of the container area outside the arena (under HUD and sides)
+  arenaOuterBgColor: '#fffdf1ff',    // Background color of the container area outside the arena (under HUD and sides)
   arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)
@@ -629,6 +630,9 @@ export const CONFIG = {
 
   /** Layla — Cosmic Marksman */
   layla: laylaConfig,
+
+  /** Ichigo Kurosaki — Substitute Soul Reaper */
+  ichigo: ichigoConfig,
 };
 
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1177,6 +1181,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.4,
     ability: 'Incinerate',
     desc: 'Demon Cyborg. Zones with explosive basic blasts, Rocket Stomps to close in, and uses a devastating continuous fire beam. Explodes upon defeat.',
+  },
+  {
+    id: 29,
+    name: 'Ichigo',
+    category: 'Anime',
+    color: '#FF5500', // Orange details
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'ichigo',
+    hp: 240,
+    damage: 16,
+    cooldown: 30,
+    moveSpeed: 7.0,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Hollow Mask',
+    desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate transforms into Vasto Lorde.',
   }
 ];
 

@@ -372,6 +372,23 @@ export class Fighter {
   }
 
   _handleTimeStop() {
+    if (this.pureLoveBeamRecoveryTimer > 0) {
+      if (this.adaptedPureLoveBeam) {
+        this.pureLoveBeamRecoveryTimer = 0;
+      } else {
+        this.pureLoveBeamRecoveryTimer--;
+        // Paralyze attacks & skills: cancel active actions and lock ability execution
+        this.interruptAttacks();
+        this.hitStunTimer = Math.max(this.hitStunTimer || 0, 2);
+        this.shootCooldown = Math.max(this.shootCooldown || 0, 2);
+
+        // Heavy slow instead of full freeze — enemy is paralyzed from attacking but can crawl very slowly
+        const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.15;
+        this.vx *= slowMult;
+        this.vy *= slowMult;
+        // Don't return true — let the update loop continue so they can still move (very slowly)
+      }
+    }
     if (this.paralyzeTimer > 0) {
       this.paralyzeTimer--;
       this.vx = 0;
@@ -509,6 +526,14 @@ export class Fighter {
     } else {
       this.isCaughtInPurple = false;
     }
+    if (this.pureLoveBeamTimer > 0) {
+      this.pureLoveBeamTimer--;
+      if (this.pureLoveBeamTimer <= 0) {
+        this.caughtInPureLoveBeam = false;
+      }
+    } else {
+      this.caughtInPureLoveBeam = false;
+    }
     if (this.hitStunTimer > 0) this.hitStunTimer--;
     if (this.electricStunTimer > 0) this.electricStunTimer--;
     if (this.dubstepStunTimer > 0) this.dubstepStunTimer--;
@@ -553,6 +578,14 @@ export class Fighter {
         if (this.y + this.r > arena.y + arena.height) { this.y = arena.y + arena.height - this.r; this.knockbackVy = -Math.abs(this.knockbackVy) * bounceMult; bounced = true; }
 
         if (bounced) {
+          const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
+          if (isPureLoveBeamCaught) {
+            // Pin firmly to wall surface without sliding horizontally or vertically along wall
+            this.vx = 0;
+            this.vy = 0;
+            this.knockbackVx = 0;
+            this.knockbackVy = 0;
+          }
           if (this._knockedBackBySaitamaBasicPunch) {
             this._knockedBackBySaitamaBasicPunch = false;
             const slowFrames = CONFIG.saitama?.wallBounceSlowFrames ?? 120;
@@ -622,7 +655,8 @@ export class Fighter {
             audioSystem.playSFX('attack_fleshhit', 0.9);
             spawnImpactFlash(this.x, this.y, 45, 'rgba(255, 20, 80, 0.7)');
             spawnSparks(this.x, this.y, 14, 'crimsonSniper');
-            spawnMeleeClashShockwave(this.x, this.y, 100, 'gojo');
+            const isCaughtInBeam = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0);
+            spawnMeleeClashShockwave(this.x, this.y, 100, isCaughtInBeam ? 'yuta' : 'gojo');
           }
         }
       }
@@ -953,24 +987,29 @@ export class Fighter {
 
   /** Resolves wall collision and bounces back with varied angles. */
   resolveWallBounce(arena) {
-    if (this.caughtInGenosBeamTimer > 0 || this.preventKnockbackBounce) {
+    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce;
+    if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;
       if (this.x - this.r < arena.x) {
         this.x = arena.x + this.r;
         this.vx = 0;
+        this.vy = 0;
         clamped = true;
       } else if (this.x + this.r > arena.x + arena.width) {
         this.x = arena.x + arena.width - this.r;
         this.vx = 0;
+        this.vy = 0;
         clamped = true;
       }
       if (this.y - this.r < arena.y) {
         this.y = arena.y + this.r;
+        this.vx = 0;
         this.vy = 0;
         clamped = true;
       } else if (this.y + this.r > arena.y + arena.height) {
         this.y = arena.y + arena.height - this.r;
+        this.vx = 0;
         this.vy = 0;
         clamped = true;
       }

@@ -294,8 +294,9 @@ export function drawFighters() {
       }
     }
 
-    // Unlimited Void freeze & Hollow Purple hit & Wall Pin: do not apply blue fill/ring overlay
-    if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0) || entity.suppressFreezeOverlay || entity.isWallPinned) return;
+    // Unlimited Void freeze, Hollow Purple hit, Pure Love Beam, & Wall Pin: do not apply blue fill/ring overlay
+    const isPureLoveBeamTrapped = entity.caughtInPureLoveBeam || (entity.pureLoveBeamTimer && entity.pureLoveBeamTimer > 0) || (entity.pureLoveBeamRecoveryTimer && entity.pureLoveBeamRecoveryTimer > 0);
+    if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0) || isPureLoveBeamTrapped || entity.suppressFreezeOverlay || entity.isWallPinned) return;
 
     const isFrozen = isInfinityFreeze || isGenericTimeStop;
     if (!isFrozen) return;

@@ -443,28 +443,31 @@ export class GojoRenderer {
     if (fighter.punchAnimTimer > 0) {
       const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-      const easePunch = Math.sin(rawProgress * Math.PI);
-      const lungeExtension = easePunch * (r * 1.5);
-      const oppositeRecoil = -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25);
-
-      frontHandX = r * 0.85; frontHandY = r * 0.15;
-      backHandX  = 0;        backHandY  = -r * 0.15;
-
-      if (fighter.punchAnimHand === 0) {
-        // --- LEAD HAND PUNCH ---
-        frontHandX += lungeExtension * 1.40;
-        frontHandY += (0.08 - frontHandY) * easePunch;
-        backHandX  += oppositeRecoil;
+      let easePunch = 0;
+      if (rawProgress < 0.28) {
+        easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
       } else {
-        // --- REAR HAND PUNCH ---
-        backHandX  += lungeExtension * 1.60;
-        backHandY  += (0.08 - backHandY) * easePunch;
-        frontHandX += oppositeRecoil;
+        const retractT = (rawProgress - 0.28) / 0.72;
+        easePunch = Math.cos(retractT * (Math.PI / 2));
+      }
+      const lungeExtension = easePunch * (r * 1.5);
+      const oppositeRecoil = -Math.sin(rawProgress * Math.PI) * (r * 0.20);
+
+      frontHandX = 0; frontHandY = 0;
+      backHandX  = 0; backHandY  = 0;
+
+      const isRightPunch = (fighter.punchAnimHand === 0);
+      if (isRightPunch) {
+        frontHandX = r * 0.85 + lungeExtension * 1.40;
+        backHandX  = r * 1.05 + oppositeRecoil;
+      } else {
+        backHandX  = r * 1.05 + lungeExtension * 1.60;
+        frontHandX = oppositeRecoil;
       }
     } else {
-      // Idle brawler guard stance: outer hand extends forward toward enemy at shoulder height
-      frontHandX = r * 0.85; frontHandY = r * 0.15;
-      backHandX  = 0;        backHandY  = -r * 0.15;
+      // Idle brawler guard stance: front hand (top layer) centered at (0, 0), back hand (back layer) peeking out at (r * 1.05, 0)
+      frontHandX = 0;        frontHandY = 0;
+      backHandX  = r * 1.05; backHandY  = 0;
     }
 
     const fHand = toGlobal(frontHandX, frontHandY);

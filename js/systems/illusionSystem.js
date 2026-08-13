@@ -147,6 +147,19 @@ export function updateIllusions() {
       }
     }
 
+    if (illusion.hitStunTimer > 0) illusion.hitStunTimer--;
+    if (illusion.paralyzeTimer > 0) illusion.paralyzeTimer--;
+
+    const isIllusionParalyzed = (illusion.hitStunTimer || 0) > 0 || (illusion.paralyzeTimer || 0) > 0 || illusion.isParalyzedByMahoraga;
+    if (isIllusionParalyzed) {
+      if ((illusion.paralyzeTimer || 0) <= 0 && (illusion.hitStunTimer || 0) <= 0) {
+        illusion.isParalyzedByMahoraga = false;
+      }
+      illusion.vx = 0;
+      illusion.vy = 0;
+      continue; // Completely frozen by paralyze stun!
+    }
+
     // Apply velocity - illusions bounce naturally off walls (frozen inside sphere)
     if (!insideSphere) {
       // Process universal knockback

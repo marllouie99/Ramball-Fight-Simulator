@@ -136,6 +136,25 @@ export class FighterRenderer {
     if (fighter.electricStunTimer > 0) {
       drawElectricStunEffect(ctx, baseRadius, false);
     }
+
+    if (fighter.pureLoveBeamRecoveryTimer > 0) {
+      ctx.save();
+      // Draw neon pink body overlay
+      ctx.fillStyle = 'rgba(255, 20, 147, 0.45)';
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // Outer pink pulsing rings to show visual capture/stun
+      const time = Date.now();
+      const pulse = (Math.sin(time / 100) + 1) / 2;
+      ctx.strokeStyle = 'rgba(255, 105, 180, 0.85)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, baseRadius * (1.05 + pulse * 0.15), baseRadius * (1.05 + pulse * 0.15), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
     
     if (fighter.dubstepStunVisualTimer > 0) {
       drawDubstepStunEffect(ctx, baseRadius, fighter.dubstepStunVisualTimer);

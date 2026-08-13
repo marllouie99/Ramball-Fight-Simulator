@@ -16,6 +16,7 @@ import { drawRangerBullet } from '../weapons/rangerWeaponGraphics.js';
 import { drawCrimsonSniperBullet } from '../weapons/crimsonsniperWeaponGraphics.js';
 import { drawSukunaSlash, drawGhostBlade, drawSukunaCleave, drawSukunaFurnaceArrow, drawDivineFlameArrowConstruct } from '../weapons/sukunaWeaponGraphics.js';
 import { drawMahoragaThrow } from '../weapons/mahoragaWeaponGraphics.js';
+import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.js';
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 let _fugaLocalTrailPool = [];
 
@@ -459,6 +460,24 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       return;
     }
 
+    // Getsuga Tensho visual
+    if (p.visual === 'getsuga') {
+      drawGetsugaSlash(ctx, p, false);
+      return;
+    }
+
+    // Black Getsuga Tensho visual
+    if (p.visual === 'blackGetsuga') {
+      drawGetsugaSlash(ctx, p, true);
+      return;
+    }
+
+    // Cero Beam visual
+    if (p.visual === 'ceroBeam') {
+      drawCeroBeam(ctx, p);
+      return;
+    }
+
     // Ghost Blade visual
     if (p.visual === 'ghostBlade') {
       drawGhostBlade(ctx, p);
@@ -578,13 +597,22 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
 
     // --- Yuta's Pure Love Beam ---
     if (p.visual === 'yuta_pure_love_beam') {
+      const ownerFighter = (typeof state !== 'undefined' && state.fighters && p.owner !== undefined) ? state.fighters[p.owner] : null;
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(p.angle);
       
       const length = p.length || 2500;
       const radius = p.r || 170;
-      const lifeRatio = Math.max(0, Math.min(1, p.life / (p.maxLife || 60)));
+      
+      // Keep beam solid (100% size and opacity) for the first part of its life,
+      // then rapidly shrink and fade it out during the final 30 frames!
+      let beamAlpha = 0.80; // Added transparency so underlying arena & entities remain visible
+      let sizeScale = 1.0;
+      if (p.life < 30) {
+        beamAlpha = Math.max(0, (p.life / 30) * 0.80);
+        sizeScale = Math.max(0, p.life / 30);
+      }
       
       // 20 FPS Quantized Frame Step (50ms interval)
       const frameStep20 = Math.floor(Date.now() / 50);
@@ -594,7 +622,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       };
 
       const throb = Math.sin(frameStep20 * 0.4) * 16;
-      const currentRadius = radius + throb;
+      const currentRadius = (radius + throb) * sizeScale;
       
       // Helper: Draw smooth expanding pill-cone path (narrow at Yuta, spreads wide as it extends, rounded pill tip)
       const drawExpandingPillPath = (startR, endR, len) => {
@@ -614,13 +642,13 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       const endBaseR = currentRadius * 2.7;
 
       // 1. Dark Void Outer Shell (Dark Black / Deep Violet Ink Containment)
-      ctx.globalAlpha = 0.85 * lifeRatio;
+      ctx.globalAlpha = 0.60 * beamAlpha;
       const outerVoidGrad = ctx.createLinearGradient(0, -endBaseR * 1.3, 0, endBaseR * 1.3);
-      outerVoidGrad.addColorStop(0, 'rgba(15, 0, 25, 0.95)');
-      outerVoidGrad.addColorStop(0.25, 'rgba(120, 0, 160, 0.8)');
-      outerVoidGrad.addColorStop(0.5, 'rgba(255, 0, 180, 0.4)');
-      outerVoidGrad.addColorStop(0.75, 'rgba(120, 0, 160, 0.8)');
-      outerVoidGrad.addColorStop(1, 'rgba(15, 0, 25, 0.95)');
+      outerVoidGrad.addColorStop(0, 'rgba(15, 0, 25, 0.85)');
+      outerVoidGrad.addColorStop(0.25, 'rgba(120, 0, 160, 0.7)');
+      outerVoidGrad.addColorStop(0.5, 'rgba(255, 0, 180, 0.3)');
+      outerVoidGrad.addColorStop(0.75, 'rgba(120, 0, 160, 0.7)');
+      outerVoidGrad.addColorStop(1, 'rgba(15, 0, 25, 0.85)');
       
       ctx.fillStyle = outerVoidGrad;
       drawExpandingPillPath(startBaseR * 1.4, endBaseR * 1.4, length);
@@ -630,13 +658,13 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       ctx.globalCompositeOperation = 'lighter';
 
       // 2. Deep Violet / Purple Beam Body Gradient (Spreading Pill Shape)
-      ctx.globalAlpha = 0.95 * lifeRatio;
+      ctx.globalAlpha = 0.78 * beamAlpha;
       const beamGrad = ctx.createLinearGradient(0, -endBaseR, 0, endBaseR);
-      beamGrad.addColorStop(0, 'rgba(180, 0, 220, 0.95)');    // Top Edge Deep Purple
-      beamGrad.addColorStop(0.2, 'rgba(230, 0, 160, 0.95)');  // Inner Magenta
-      beamGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');  // Blinding White Core
-      beamGrad.addColorStop(0.8, 'rgba(230, 0, 160, 0.95)');  // Inner Magenta
-      beamGrad.addColorStop(1, 'rgba(180, 0, 220, 0.95)');    // Bottom Edge Deep Purple
+      beamGrad.addColorStop(0, 'rgba(150, 0, 180, 0.85)');    // Top Edge Deep Purple/Violet
+      beamGrad.addColorStop(0.25, 'rgba(255, 10, 140, 0.85)'); // Hot Pink
+      beamGrad.addColorStop(0.5, 'rgba(255, 20, 147, 0.90)');   // Bright Hot Pink Core
+      beamGrad.addColorStop(0.75, 'rgba(255, 10, 140, 0.85)'); // Hot Pink
+      beamGrad.addColorStop(1, 'rgba(150, 0, 180, 0.85)');    // Bottom Edge Deep Purple/Violet
       
       ctx.fillStyle = beamGrad;
       drawExpandingPillPath(startBaseR, endBaseR, length);
@@ -644,6 +672,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
 
       // Outer JJK Pitch-Black Calligraphy Ink Contour
       ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.65 * beamAlpha;
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 3.5;
       drawExpandingPillPath(startBaseR, endBaseR, length);
@@ -709,22 +738,120 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
         ctx.stroke();
       }
 
-      // 4. Blinding White-Hot Laser Core Center (Expanding Pill Core)
-      ctx.globalAlpha = 1.0 * lifeRatio;
-      ctx.fillStyle = '#FFFFFF';
-      drawExpandingPillPath(startBaseR * 0.4, endBaseR * 0.4, length);
+      // 4. JJK-Style Pitch Black Inner Core with Hot Pink Border Envelope
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.globalAlpha = 0.75 * beamAlpha;
+      
+      // A. Vibrant Neon Pink Inner Core Envelope
+      ctx.fillStyle = '#FF1493'; // Neon Pink
+      drawExpandingPillPath(startBaseR * 0.52, endBaseR * 0.52, length);
       ctx.fill();
 
-      // 5. Massive Vibrant Pink Light Bloom & Flare at Origin
-      ctx.globalAlpha = 1.0 * lifeRatio;
+      // B. Pitch-Black Core Center
+      ctx.globalAlpha = 0.65 * beamAlpha;
+      ctx.fillStyle = '#000000'; // Pitch-Black Inner Core
+      drawExpandingPillPath(startBaseR * 0.44, endBaseR * 0.44, length);
+      ctx.fill();
+
+      // C. Stream white-hot glowing particles inside the pitch-black core center
+      const numCoreParticles = 18;
+      for (let i = 0; i < numCoreParticles; i++) {
+        // Deterministic properties based on index
+        const pSpeed = 15 + (i % 3) * 6; // pixels per frame
+        const pOffsetPct = ((i % 5) / 5 - 0.5) * 0.82; // vertical offset percentage (-0.41 to 0.41)
+        const pLen = 20 + (i % 4) * 10; // particle streak length
+        const pThick = 1.2 + (i % 2) * 0.8; // particle thickness
+        
+        // Horizontal position moves along the beam over time
+        const travelSpeed = pSpeed * (Date.now() * 0.001 * 60); // frame-based travel distance
+        const startX = (i * (length / numCoreParticles) + travelSpeed) % length;
+        const endX = startX + pLen;
+        
+        // Calculate core radius at these positions to keep them inside the black core
+        const currentCoreR_start = startBaseR * 0.42 + (endBaseR * 0.42 - startBaseR * 0.42) * (startX / length);
+        const currentCoreR_end = startBaseR * 0.42 + (endBaseR * 0.42 - startBaseR * 0.42) * (endX / length);
+        
+        const startY = pOffsetPct * currentCoreR_start;
+        const endY = pOffsetPct * currentCoreR_end;
+        
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.lineWidth = pThick * sizeScale; // shrink thickness as beam collapses
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      }
+
+      // 5. Orbiting White/Pink Cursed Energy Rings (3D perspective elliptical loops)
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalAlpha = 0.8 * beamAlpha;
+      
+      const numRings = 6;
+      const ringTime = Date.now() * 0.0035; // speed of movement
+      
+      for (let i = 0; i < numRings; i++) {
+        // Move the rings along the beam over time
+        const basePct = (i / numRings);
+        const currentPct = (basePct + (ringTime * 0.15) % 1.0) % 1.0;
+        
+        // Don't draw too close to the origin or end to prevent harsh cuts
+        if (currentPct < 0.05 || currentPct > 0.95) continue;
+        
+        const ringX = currentPct * length;
+        const ringSpreadR = startBaseR + (endBaseR - startBaseR) * currentPct;
+        
+        // Ellipse dimensions
+        const radiusY = ringSpreadR * 1.5;
+        const radiusX = radiusY * 0.28; // gives 3D tilt look
+        
+        ctx.save();
+        ctx.translate(ringX, 0);
+        // Tilt the ring relative to the beam axis
+        ctx.rotate(0.35); // ~20 degrees tilt
+        
+        // Outer pink glow ring (simulating glow without shadowBlur)
+        ctx.strokeStyle = 'rgba(255, 20, 147, 0.6)';
+        ctx.lineWidth = 5.0;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Inner white ring
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, radiusX, radiusY, 0, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        ctx.restore();
+      }
+
+      // Re-draw owner Yuta & Rika before light flare overlay so the beam's bright energy illuminates both of them!
+      if (ownerFighter) {
+        ctx.restore(); // Restore back to world space
+        ctx.save();
+        if (ownerFighter.rika && ownerFighter.rika.active && typeof ownerFighter.rika.draw === 'function') {
+          ownerFighter.rika.draw(ctx);
+        }
+        if (typeof ownerFighter.draw === 'function') {
+          ownerFighter.draw(ctx);
+        }
+        ctx.restore();
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.angle);
+      }
+
+      // 6. Massive Vibrant Pink Light Bloom & Flare Overlay (Illuminates Yuta with additive energy)
+      ctx.globalAlpha = 0.85 * beamAlpha;
       ctx.globalCompositeOperation = 'lighter';
       
-      const flareRadius = currentRadius * 1.8; // Generous 1.8x beam radius bright pink light bloom
+      const flareRadius = currentRadius * 1.6; // Generous bright pink light bloom overlaying Yuta
       const originGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, flareRadius);
-      originGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');       // White hot core
-      originGrad.addColorStop(0.25, 'rgba(255, 20, 147, 1.0)');     // High intensity neon pink
-      originGrad.addColorStop(0.55, 'rgba(255, 105, 180, 0.8)');    // Hot pink aura
-      originGrad.addColorStop(0.8, 'rgba(180, 0, 220, 0.45)');     // Violet outer glow
+      originGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');       // White hot core overlay
+      originGrad.addColorStop(0.3, 'rgba(255, 20, 147, 0.75)');     // Neon pink glow over Yuta
+      originGrad.addColorStop(0.6, 'rgba(255, 105, 180, 0.4)');    // Hot pink aura
+      originGrad.addColorStop(0.85, 'rgba(180, 0, 220, 0.2)');     // Violet outer aura
       originGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
       
       ctx.fillStyle = originGrad;
@@ -732,7 +859,7 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       ctx.arc(0, 0, flareRadius, 0, Math.PI * 2);
       ctx.fill();
 
-      // 6. Streaming White Particle Spark Embers spreading along the beam length (20 FPS Stepped)
+      // 7. Streaming White Particle Spark Embers spreading along the beam length (20 FPS Stepped)
       const numBeamEmbers = 35;
       ctx.fillStyle = '#FFFFFF';
       for (let i = 0; i < numBeamEmbers; i++) {

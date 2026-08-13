@@ -665,8 +665,23 @@ export class GenosFighter extends Fighter {
     }
 
     const targetsToScan = [];
-    if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0) targetsToScan.push(f); });
-    if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0) targetsToScan.push(ill); });
+    if (state.fighters) {
+      state.fighters.forEach(f => {
+        if (f && f !== this && f.hp > 0) {
+          targetsToScan.push(f);
+          if (f.rika && f.rika.active && !f.rika.isDying && f.rika.hp > 0 && !targetsToScan.includes(f.rika)) {
+            targetsToScan.push(f.rika);
+          }
+        }
+      });
+    }
+    if (state.illusions) {
+      state.illusions.forEach(ill => {
+        if (ill && ill.hp > 0 && !targetsToScan.includes(ill)) {
+          targetsToScan.push(ill);
+        }
+      });
+    }
 
     for (const target of targetsToScan) {
       if (Math.hypot(target.x - this.x, target.y - this.y) <= radius + target.r) {
@@ -722,7 +737,9 @@ export class GenosFighter extends Fighter {
 
     try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-incenerate-voice.mp3'); } catch (e) {}
     try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-ultimatecharging.mp3'); } catch (e) {}
-    try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3'); } catch (e) {}
+    if (forceCancelAll) {
+      try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3'); } catch (e) {}
+    }
     try { stopSoundBySrc('Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3'); } catch (e) {}
 
     super.interruptAttacks(forceCancelAll);
@@ -777,16 +794,23 @@ export class GenosFighter extends Fighter {
     const radius = CONFIG.genos?.selfDestructRadius || 200;
     const damage = CONFIG.genos?.selfDestructDamage || 250;
 
-    // Scan all valid targets (fighters & illusions) in radius (Rule #6 compliant)
+    // Scan all valid targets (fighters, illusions & Rika) in radius (Rule #6 compliant)
     const targetsToScan = [];
     if (state.fighters) {
       state.fighters.forEach(f => {
-        if (f && f !== this && f.hp > 0) targetsToScan.push(f);
+        if (f && f !== this && f.hp > 0) {
+          targetsToScan.push(f);
+          if (f.rika && f.rika.active && !f.rika.isDying && f.rika.hp > 0 && !targetsToScan.includes(f.rika)) {
+            targetsToScan.push(f.rika);
+          }
+        }
       });
     }
     if (state.illusions) {
       state.illusions.forEach(ill => {
-        if (ill && ill.hp > 0) targetsToScan.push(ill);
+        if (ill && ill.hp > 0 && !targetsToScan.includes(ill)) {
+          targetsToScan.push(ill);
+        }
       });
     }
 
@@ -1114,8 +1138,23 @@ export class GenosFighter extends Fighter {
       const width = CONFIG.genos?.ultBeamWidth || 70;
 
       const targetsToScan = [];
-      if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0) targetsToScan.push(f); });
-      if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0) targetsToScan.push(ill); });
+      if (state.fighters) {
+        state.fighters.forEach(f => {
+          if (f && f !== this && f.hp > 0) {
+            targetsToScan.push(f);
+            if (f.rika && f.rika.active && !f.rika.isDying && f.rika.hp > 0 && !targetsToScan.includes(f.rika)) {
+              targetsToScan.push(f.rika);
+            }
+          }
+        });
+      }
+      if (state.illusions) {
+        state.illusions.forEach(ill => {
+          if (ill && ill.hp > 0 && !targetsToScan.includes(ill)) {
+            targetsToScan.push(ill);
+          }
+        });
+      }
 
       // ── Per-Frame Beam Pin & Axis Center Lock ──
       // Prevents targets caught in beam from rebouncing off arena walls or bouncing sideways
@@ -1279,8 +1318,23 @@ export class GenosFighter extends Fighter {
       const aimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
 
       const targetsToScan = [];
-      if (state.fighters) state.fighters.forEach(f => { if (f && f !== this && f.hp > 0) targetsToScan.push(f); });
-      if (state.illusions) state.illusions.forEach(ill => { if (ill && ill.hp > 0) targetsToScan.push(ill); });
+      if (state.fighters) {
+        state.fighters.forEach(f => {
+          if (f && f !== this && f.hp > 0) {
+            targetsToScan.push(f);
+            if (f.rika && f.rika.active && !f.rika.isDying && f.rika.hp > 0 && !targetsToScan.includes(f.rika)) {
+              targetsToScan.push(f.rika);
+            }
+          }
+        });
+      }
+      if (state.illusions) {
+        state.illusions.forEach(ill => {
+          if (ill && ill.hp > 0 && !targetsToScan.includes(ill)) {
+            targetsToScan.push(ill);
+          }
+        });
+      }
 
       // Continuously stop enemy target movement every frame during Machine Gun Blows
       for (const target of targetsToScan) {

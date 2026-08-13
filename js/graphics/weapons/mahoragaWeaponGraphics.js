@@ -613,9 +613,9 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     extendDist = 0;
   }
 
-  // Right shoulder is statically positioned on the right side of his chest
-  const shoulderX = r * 0.75;
-  const shoulderY = r * 0.20;
+  // Right shoulder is statically positioned on the right side of his chest (aligned for front hand convention)
+  const shoulderX = r * 0.55;
+  const shoulderY = 0;
 
   // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
   const bodyAngle = (fighterObj && fighterObj.angle) || 0;
@@ -1022,9 +1022,9 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     reachDist = Math.max(55, Math.min(125, targetDist - r * 0.45));
   }
 
-  // Left shoulder is statically positioned on the left side of his chest
-  const idleX = -r * 0.75;
-  const idleY = r * 0.20;
+  // Left shoulder is statically positioned on the left side of his chest (centered for martial arts guard)
+  const idleX = 0;
+  const idleY = 0;
 
   // Rotate idle shoulder position by bodyAngle (fighter.angle) so arm starts from the correct position on the spinning body
   const bodyAngle = fighter.angle || 0;

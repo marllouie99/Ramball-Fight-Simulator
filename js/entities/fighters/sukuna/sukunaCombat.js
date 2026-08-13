@@ -26,6 +26,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY) 
     pushTrailCap(fighter.afterImages, {
       x: oldX + dx * t,
       y: oldY + dy * t,
+      r: fighter.r || 25,
       angle: facingAngle,
       timer: maxTimer,
       maxTimer: maxTimer,

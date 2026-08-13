@@ -716,7 +716,7 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 2. Stop/fade active Web Audio API & HTML Audio handles
   const handles = Array.from(_activeSoundHandles);
   for (const handle of handles) {
-    if (keepAnnouncer && handle.src && String(handle.src).toLowerCase().includes('announcer')) {
+    if (keepAnnouncer && handle.src && (String(handle.src).toLowerCase().includes('announcer') || String(handle.src).toLowerCase().includes('machinegunblow'))) {
       continue;
     }
     if (fadeDelayMs > 0) {
@@ -733,7 +733,7 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 3. Stop any fallback HTML Audio elements
   _activeSounds.forEach((audio) => {
     if (audio) {
-      if (keepAnnouncer && audio.src && String(audio.src).toLowerCase().includes('announcer')) {
+      if (keepAnnouncer && audio.src && (String(audio.src).toLowerCase().includes('announcer') || String(audio.src).toLowerCase().includes('machinegunblow'))) {
         return;
       }
       if (fadeDelayMs > 0) {

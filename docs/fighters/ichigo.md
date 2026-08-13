@@ -38,3 +38,23 @@ Ichigo completely surrenders to his Inner Hollow, transforming into the terrifyi
 * **Spiritual Pressure Shockwave:** Upon activation, a massive shockwave erupts, knocking back all enemies and destroying incoming projectiles.
 * **Unstoppable Regeneration:** He becomes immune to crowd control and gains extreme high-speed health regeneration.
 * **Point-Blank Cero Finisher:** At the end of the duration (or upon reactivation), he grabs the nearest target, applying a time-stop freeze to them, and fires a devastating point-blank red **Cero** from his horns. This deals massive AOE damage in a wide beam before he reverts to his base form.
+
+---
+
+## Fighter Interactions & Lore Synergy
+
+### 👊 vs Yuji Itadori (Kindred Spirits)
+Both Ichigo and Yuji are high schoolers whose lives were drastically altered when they absorbed a supernatural entity (Rukia's powers / Sukuna's finger) to protect their friends. They share a mutual respect on the battlefield.
+* **Matchup Dynamic:** A fast-paced brawl. Yuji's Black Flash requires precise timing, but Ichigo's Shunpo allows him to constantly re-position, making it a high-speed game of cat and mouse. 
+
+### 👿 vs Ryomen Sukuna (The King of Curses vs The Inner Hollow)
+A clash of inner demons. While Yuji struggles to contain Sukuna, Ichigo actively fights alongside and utilizes the chaotic power of his Inner Hollow.
+* **Matchup Dynamic:** Sukuna's *Malevolent Shrine* fills the arena with unavoidable slashes, but Ichigo's Vasto Lorde ultimate form grants extreme health regeneration and super armor, allowing him to endure the Domain Expansion and fire a point-blank Cero right through Sukuna's defenses.
+
+### 🕶️ vs Satoru Gojo (Limitless vs Spiritual Pressure)
+Gojo's Infinity barrier is conceptually impenetrable, but Bleach lore dictates that a sufficiently massive burst of Spiritual Pressure can shatter hax abilities. 
+* **Matchup Dynamic:** Ichigo cannot easily pierce Infinity with his basic Bankai swings. However, if Ichigo fires his Vasto Lorde Cero—a blast of pure, condensed spiritual energy—it functions similarly to Toji's spear, briefly piercing Gojo's barrier and applying hit-pause.
+
+### 👊 vs Saitama (Physical Might vs The Unseen)
+As a Soul Reaper, Ichigo exists in a spiritual body that normal humans cannot see. However, Saitama's absurd physical stats allow him to perceive and interact with spiritual entities purely through sheer force.
+* **Matchup Dynamic:** Ichigo is initially bewildered that a "normal human" can parry Zangetsu barehanded. A clash between Saitama's "Serious Punch" and Ichigo's "Black Getsuga Tensho" creates a massive visual shockwave that knocks both fighters back.

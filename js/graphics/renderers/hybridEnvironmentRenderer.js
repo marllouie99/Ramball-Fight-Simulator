@@ -15,17 +15,34 @@ let currentRikaSummonDimOpacity = 0;
 
 function getRikaSummonDimSprite() {
   if (!rikaSummonDimSprite) {
-    const size = 128;
+    const size = 512;
     const canvas = document.createElement('canvas');
     canvas.width = size;
     canvas.height = size;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.88)';
+    
+    const cx = size / 2;
+    const cy = size / 2;
+    
+    // 1. Pitch black base overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.98)';
     ctx.fillRect(0, 0, size, size);
+    
+    // 2. High-contrast hot pink / deep violet radial gradient centered on Yuta
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, size * 0.5);
+    grad.addColorStop(0, 'rgba(255, 20, 147, 0.95)');   // Bright intense hot pink center
+    grad.addColorStop(0.06, 'rgba(230, 0, 160, 0.85)'); // Concentrated magenta/purple aura ring
+    grad.addColorStop(0.18, 'rgba(20, 2, 35, 0.92)');   // Falloff to deep dark violet
+    grad.addColorStop(0.55, 'rgba(5, 1, 6, 0.97)');     // Deep dark background
+    grad.addColorStop(1.0, 'rgba(0, 0, 0, 0.99)');      // Pitch black outer screen
+    
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
+    
     const texture = window.PIXI.Texture.from(canvas);
     rikaSummonDimSprite = new window.PIXI.Sprite(texture);
     rikaSummonDimSprite.anchor.set(0.5);
-    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+    rikaSummonDimSprite.blendMode = window.PIXI.BLEND_MODES.MULTIPLY;
   }
   return rikaSummonDimSprite;
 }
@@ -550,7 +567,8 @@ export function updateHybridEnvironment() {
     }
   }
 
-  currentRikaSummonDimOpacity += (targetRikaOpacity - currentRikaSummonDimOpacity) * 0.30;
+  const dimRate = (targetRikaOpacity > currentRikaSummonDimOpacity) ? 0.30 : 0.05; // Fast fade-in, slow smooth fade-out!
+  currentRikaSummonDimOpacity += (targetRikaOpacity - currentRikaSummonDimOpacity) * dimRate;
   
   const rikaSummonDim = getRikaSummonDimSprite();
   const rikaRing = getRikaRingSprite();
@@ -560,23 +578,21 @@ export function updateHybridEnvironment() {
     if (rikaSummonDim.parent) rikaSummonDim.parent.removeChild(rikaSummonDim);
     if (rikaRing.parent) rikaRing.parent.removeChild(rikaRing);
   } else {
-    // Render Summon Dim screen
+    // Render Summon Dim screen (centered on Yuta/Rika and scaled to cover the screen)
     if (!rikaSummonDim.parent) layer.addChild(rikaSummonDim);
-    const shakeX = state.shakeX || 0;
-    const shakeY = state.shakeY || 0;
-    rikaSummonDim.x = state.canvas.width / 2 - shakeX;
-    rikaSummonDim.y = state.canvas.height / 2 - shakeY;
-    rikaSummonDim.width = state.canvas.width + 40;
-    rikaSummonDim.height = state.canvas.height + 40;
     rikaSummonDim.alpha = currentRikaSummonDimOpacity;
+    rikaSummonDim.x = rikaCx;
+    rikaSummonDim.y = rikaCy;
+    rikaSummonDim.scale.set(scale);
+    state.globalDimEdgeColor = `rgba(0, 0, 0, ${currentRikaSummonDimOpacity * 0.98})`;
 
     // Render Pulsing Ring (100% GPU WebGL Matrix Scaling)
     if (!rikaRing.parent) layer.addChild(rikaRing);
     rikaRing.x = rikaCx;
     rikaRing.y = rikaCy;
     const pulseRadius = 85 + Math.sin(Date.now() * 0.01) * 15;
-    const scale = pulseRadius / 85.0;
-    rikaRing.scale.set(scale);
+    const ringScale = pulseRadius / 85.0;
+    rikaRing.scale.set(ringScale);
     rikaRing.alpha = currentRikaSummonDimOpacity * 0.45;
   }
 

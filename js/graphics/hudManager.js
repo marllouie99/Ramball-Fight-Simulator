@@ -754,8 +754,8 @@ function updateHealthHud() {
       const isInsideDomain = f.domainActive || f.isChannelingDomain;
       const alreadySummoned = rk && rk.hasSummonedAt50Hp;
 
-      if (rk && rk.active && !rk.isDying && rk.hp > 0) {
-        // Rika is ALIVE & ACTIVE: bar = Rika's remaining HP %
+      if (rk && rk.active && !rk.isDying) {
+        // Rika is ALIVE & ACTIVE: bar = Rika's remaining HP % (reaches 0% naturally during beam drain)
         const maxHp = rk.maxHp || CONFIG.yuta?.rikaMaxHp || 250;
         rikaPct = Math.max(0, Math.min(100, (rk.hp / maxHp) * 100));
       } else if (f.rikaCallTimer > 0) {
@@ -773,8 +773,9 @@ function updateHealthHud() {
         rikaPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
       }
 
-      // Smooth visual lerp — but snap instantly on big jumps or when actively calling Rika
-      if (typeof f._smoothRikaPct !== 'number' || Math.abs(f._smoothRikaPct - rikaPct) > 30 || f.rikaCallTimer > 0) {
+      // Smooth visual lerp — but snap instantly on big jumps, calling Rika, or during beam (so drain tracks in real-time)
+      const isBeamActive = f.isChannelingPureLoveBeam || f.isFiringPureLoveBeam || (f.rikaEmergingForBeamTimer || 0) > 0;
+      if (typeof f._smoothRikaPct !== 'number' || Math.abs(f._smoothRikaPct - rikaPct) > 30 || f.rikaCallTimer > 0 || isBeamActive) {
         f._smoothRikaPct = rikaPct;
       } else {
         f._smoothRikaPct += (rikaPct - f._smoothRikaPct) * 0.15;
@@ -818,7 +819,7 @@ function updateHealthHud() {
       return [
         { id: 'rika',   pct: rikaPct,   ready: rikaPct >= 99 && (!rk || !rk.active), color: themeColor, label: 'RIKA SUMMON' },
         { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' },
-        { id: 'beam',   pct: beamPct,   ready: beamPct >= 99 && (rk && rk.active) && beamCdTimer <= 0, color: '#ff1493', label: 'PURE LOVE BEAM' }
+        { id: 'beam',   pct: beamPct,   ready: beamPct >= 99 && (rk && rk.active) && beamCdTimer <= 0, color: themeColor, label: 'PURE LOVE BEAM' }
       ];
     }
     if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
@@ -925,8 +926,9 @@ function updateHealthHud() {
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
       
-      if (f.domainActive && isRikaAlive) {
-        const boostDmg = Math.round(baseDmg * ((CONFIG.yuta?.domainRikaDamageMultiplier || 2.0) - 1));
+      if (isRikaAlive) {
+        const dmgMult = typeof f.getRikaDamageMultiplier === 'function' ? f.getRikaDamageMultiplier() : (CONFIG.yuta?.domainRikaDamageMultiplier || 2.0);
+        const boostDmg = Math.round(baseDmg * (dmgMult - 1));
         info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>DMG:</b> ${baseDmg}`);
@@ -939,7 +941,11 @@ function updateHealthHud() {
       const baseParryVal = Math.round(baseParryRatio * 100);
       const totalParryVal = Math.min(98, baseParryVal + parryBonus);
 
-      if (parryBonus > 0) {
+      const isSummoningRika = typeof f.isSummoningRika === 'function' ? f.isSummoningRika() : ((f.rikaCallTimer || 0) > 0 || (f.rika && ((f.rika.chargeTimer || 0) > 0 || (f.rika.spawnTimer || 0) > 0)));
+
+      if (isSummoningRika) {
+        info.push(`<b>Parry Chance:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
+      } else if (parryBonus > 0) {
         info.push(`<b>Parry Chance:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else if (isGuarding) {
         info.push(`<b>Parry Chance:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
@@ -947,17 +953,15 @@ function updateHealthHud() {
         info.push(`<b>Parry Chance:</b> ${totalParryVal}%`);
       }
 
-      if (f.domainActive) {
-        const baseRegen = CONFIG.yuta?.regenRate || 0.05;
+      const baseRegen = CONFIG.yuta?.regenRate || 0.05;
+      if (f.domainActive || isRikaAlive) {
+        const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
         const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
-        const domainRikaRegenMultiplier = CONFIG.yuta?.domainRikaRegenMultiplier || 2.0;
-        const regenMult = isRikaAlive ? domainRikaRegenMultiplier : 1.0;
         const rctRate = domainRctHealRate * regenMult;
         const bonusRegen = rctRate - baseRegen;
-        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)} + ${bonusRegen.toFixed(2)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
-        const regen = CONFIG.yuta?.regenRate || 0.05;
-        info.push(`<b>Regen:</b> ${regen.toFixed(2)}`);
+        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
       }
     } else if (f.characterId === 'yuji' || f.type === 'yuji') {
       const punchBase = CONFIG.yuji?.punchDamage || 18;
@@ -1112,7 +1116,7 @@ function updateHealthHud() {
         if (bonusParry > 0) {
           info.push(`<b>Parry Chance:</b> ${baseParry}% + ${bonusParry}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
         } else {
-          info.push(`<b>Parry Chance:</b> ${baseParry}% + ${bonusParry}%`);
+          info.push(`<b>Parry Chance:</b> ${baseParry}%`);
         }
 
         const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);

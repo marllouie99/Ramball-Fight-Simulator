@@ -9,7 +9,7 @@ import { drawMahoragaSword } from '../../graphics/weapons/mahoragaWeaponGraphics
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 
 // ── Refactored Mahoraga Modules ──
-import { handleAdaptationDamage, triggerAdaptation, handleInfinityFreeze } from './mahoraga/mahoragaAdaptation.js';
+import { handleAdaptationDamage, triggerAdaptation, handleInfinityFreeze, adaptToPureLoveBeam, adaptToYutaFlurry, adaptToThinIceBreaker } from './mahoraga/mahoragaAdaptation.js';
 import { gojoPurpleTeleportDodge, gojoRedTeleportDodge, startAdaptationFlashDash, spawnTeleportAfterimages, sukunaFugaTeleportDodge, generalSkillShotTeleportDodge } from './mahoraga/mahoragaSkills.js';
 import { performMeleeAttack, executeCleave, shootBladeBarrage, executeShout, getFrontRadiusTargets, playRandomHeavyPunchSound, initiateLevel8WallSlam, updateLevel8WallSlam } from './mahoraga/mahoragaCombat.js';
 import { drawMahoragaFighter } from './mahoraga/mahoragaVisuals.js';
@@ -18,6 +18,9 @@ import { SKILL_REGISTRY } from '../../configs/skills/skillRegistry.js';
 export class MahoragaFighter extends Fighter {
   constructor(def) {
     super(def);
+    
+    this.baseSpeed = (def && def.speed !== undefined) ? def.speed : (CONFIG.mahoraga?.speed !== undefined ? CONFIG.mahoraga.speed : 6.5);
+    this.speed = this.baseSpeed;
     
     // Adaptation Tracking (Multi-stage up to 8 wheel turns!)
     this.hitsTaken = {
@@ -247,6 +250,14 @@ export class MahoragaFighter extends Fighter {
       return;
     }
 
+    // Do NOT rotate or snap facing direction while in hit stun, knockback, or beam paralysis!
+    const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
+                            (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 ||
+                            this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0;
+    if (isInHitReaction) {
+      return;
+    }
+
     let targetX = opponent.x;
     let targetY = opponent.y;
     if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
@@ -288,8 +299,14 @@ export class MahoragaFighter extends Fighter {
       return false;
     }
 
-    // Parry Check (only if not frozen by TimeStop/Infinity/Domain stasis or caught in Purple)
-    const isFrozen = this.timeStopTimer > 0 || this.isFrozenByInfinity || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0;
+    // Parry Check (only if not frozen by TimeStop/Infinity/Domain stasis, caught in Purple, or caught in Pure Love Beam)
+    const isFrozen = this.timeStopTimer > 0 || 
+                     this.isFrozenByInfinity || 
+                     this.isCaughtInPurple || 
+                     (this.purpleHitTimer || 0) > 0 ||
+                     this.caughtInPureLoveBeam ||
+                     (this.pureLoveBeamTimer || 0) > 0 ||
+                     (this.pureLoveBeamRecoveryTimer || 0) > 0;
     if (!isFrozen) {
       const totalGoldStages = (this.goldAdaptationStage?.melee || 0) + 
                               (this.goldAdaptationStage?.ranged || 0) + 
@@ -299,8 +316,8 @@ export class MahoragaFighter extends Fighter {
       const parryMaxChance = CONFIG.mahoraga?.parryMaxChance || 0.75;
       const parryChance = Math.min(parryMaxChance, totalGoldStages * parryChancePerStage);
 
-      // Slashes and attacks cannot be parried if they are unblockable dot ticks
-      const isActuallyUnblockable = isUnblockable || opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole;
+      // Slashes and attacks cannot be parried if they are unblockable dot ticks or Pure Love Beam
+      const isActuallyUnblockable = isUnblockable || opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isPureLoveBeam;
 
       if (!isActuallyUnblockable && totalGoldStages > 0 && Math.random() < parryChance) {
         // Roll 50% chance between active blade Parry and crossed-arm Guard
@@ -403,12 +420,53 @@ export class MahoragaFighter extends Fighter {
       return false; // Take 0 damage, dodge instantly!
     }
 
+    const isBeamDamage = (
+      opts.isPureLoveBeam || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
+      opts.isPurple || opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
+      opts.isGenosBeam || (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry
+    );
+
+    if (isBeamDamage) {
+      this.neutralStanceTimer = 0;
+      this.neutralStanceCooldownTimer = 300; // 5s stance lockout delay
+      this.adaptationDashTimer = 0;
+      this.adaptationPauseTimer = 0;
+      this.isInfinityBlitz = false;
+      this.isBlitzActive = false;
+      this.isWallSlamActive = false;
+      this.wallSlamPhase = null;
+      this.wallSlamTimer = 0;
+      this.blitzHitsLeft = 0;
+      this.interruptAttacks();
+    }
+
+    if (opts.isPureLoveBeam) {
+      this.caughtInPureLoveBeam = true;
+      this.pureLoveBeamTimer = 10;
+      this.defensePoseType = null;
+      this.defensePoseTimer = 0;
+    }
+
+    if (opts.isYutaFlurry && !this.adaptedYutaFlurry) {
+      this._yutaFlurryHitCount = (this._yutaFlurryHitCount || 0) + 1;
+      if (this._yutaFlurryHitCount >= 3) {
+        adaptToYutaFlurry(this);
+      }
+    }
+
+    if (opts.isThinIceBreaker && !this.adaptedThinIceBreaker) {
+      adaptToThinIceBreaker(this);
+    }
+
     const { finalAmount, type } = handleAdaptationDamage(this, amount, attacker, opts);
     const result = super.takeDamage(finalAmount, attacker, opts);
     return result;
   }
 
   // Delegating to module functions via thin wrappers
+  adaptToPureLoveBeam() { adaptToPureLoveBeam(this); }
+  adaptToYutaFlurry() { adaptToYutaFlurry(this); }
+  adaptToThinIceBreaker() { adaptToThinIceBreaker(this); }
   _triggerAdaptation(type, attacker) { triggerAdaptation(this, type, attacker); }
   _gojoPurpleTeleportDodge(gojo, purpleOrb) { gojoPurpleTeleportDodge(this, gojo, purpleOrb); }
   _gojoRedTeleportDodge(gojo) { gojoRedTeleportDodge(this, gojo); }
@@ -444,6 +502,17 @@ export class MahoragaFighter extends Fighter {
     this.handleBurn();
     this._tickCooldowns();
     this._tickAttackSound();
+
+    // ── Neutral Close-Quarters Attack-Teleport Stance Timers ──
+    if ((this.neutralStanceTimer || 0) > 0) {
+      this.neutralStanceTimer--;
+      if (this.neutralStanceTimer <= 0) {
+        this.neutralStanceCooldownTimer = CONFIG.mahoraga?.neutralStanceCooldownFrames || 180;
+      }
+    }
+    if ((this.neutralStanceCooldownTimer || 0) > 0) {
+      this.neutralStanceCooldownTimer--;
+    }
 
     // Wheel Rotation Tick (runs even if frozen by domains for lore accuracy!)
     const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
@@ -538,8 +607,12 @@ export class MahoragaFighter extends Fighter {
 
     const isFrozen = this._handleTimeStop();
     const isInfinityFrozen = handleInfinityFreeze(this);
+    const isBeamParalyzed = (
+      this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
+      this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 || (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry
+    );
 
-    if (isInsideGojoDomain || isFrozen || isInfinityFrozen || this.isTargetOfAmbush) {
+    if (isInsideGojoDomain || isFrozen || isInfinityFrozen || this.isTargetOfAmbush || isBeamParalyzed) {
       this.interruptAttacks();
       this.vx = 0;
       this.vy = 0;
@@ -550,15 +623,28 @@ export class MahoragaFighter extends Fighter {
       this.isInfinityBlitz = false;
       this.adaptationPauseTimer = 0;
       this.adaptationDashTimer = 0;
+      this.neutralStanceTimer = 0;
       this._pendingCounterTarget = null;
       this.applyMovementPhysics(0);
-      return; // MANDATORY: Complete immobilizing freeze while inside Gojo's Unlimited Void!
+      return; // MANDATORY: Complete paralyzing freeze while caught in Pure Love Beam, Purple, or Void!
     }
 
-    // ── LEVEL 8 TRANSFORMED THROW SKILL: WALL SLAM & DASH EXECUTE ──
-    if (this.isWallSlamActive) {
-      // Cancel wall slam immediately if caught in Gojo's Hollow Purple vortex
-      if (this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0) {
+    // ── MID-ACTION INTERRUPT FROM HOLLOW PURPLE, PURE LOVE BEAM, OR GENOS ULTIMATE ──
+    const isCaughtInUltimateBeam = (
+      this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
+      this.caughtInPureLoveBeam || (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
+      (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry
+    );
+
+    if (isCaughtInUltimateBeam) {
+      this.interruptAttacks();
+      this.neutralStanceTimer = 0;
+      this.adaptationDashTimer = 0;
+      this.adaptationPauseTimer = 0;
+      this.isInfinityBlitz = false;
+      this.isBlitzActive = false;
+
+      if (this.isWallSlamActive) {
         this.isWallSlamActive = false;
         this.wallSlamPhase = null;
         this.wallSlamTimer = 0;
@@ -567,21 +653,23 @@ export class MahoragaFighter extends Fighter {
           grabbed.isGrabbedByMahoraga = false;
           grabbed.z = 0;
         }
-        spawnFloatingText(this.x, this.y - this.r - 28, 'PURPLE INTERRUPT!', '#FF3D00');
-        // Fall through to normal update so Purple pull/drag physics apply
-      } else {
-        if ((this.knockbackStunTimer || 0) <= 0) {
-          this.vx = 0;
-          this.vy = 0;
-        }
-        this.applyMovementPhysics(0);
-        this.updateLevel8WallSlam(opponent, ownerIndex, arena);
-        return;
+        spawnFloatingText(this.x, this.y - this.r - 28, 'INTERRUPTED!', '#FF3D00');
       }
     }
 
+    // ── LEVEL 8 TRANSFORMED THROW SKILL: WALL SLAM & DASH EXECUTE ──
+    if (this.isWallSlamActive) {
+      if ((this.knockbackStunTimer || 0) <= 0) {
+        this.vx = 0;
+        this.vy = 0;
+      }
+      this.applyMovementPhysics(0);
+      this.updateLevel8WallSlam(opponent, ownerIndex, arena);
+      return;
+    }
+
     // Calculate Dynamic Movement Speed based on Gold Adaptations
-    const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.speed || 3.5;
+    const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.speed || 6.5;
     const goldStages = (this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0);
     const speedBoost = CONFIG.mahoraga?.adaptationSpeedBoostPerStage || 0.10;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
@@ -719,7 +807,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // ── HIGH-SPEED DIVINE FLASH-DASH TICK ──
-    if (this.adaptationDashTimer > 0) {
+    if (this.adaptationDashTimer > 0 && !isCaughtInUltimateBeam) {
       this.adaptationDashTimer--;
       const maxDash = this.adaptationDashMaxTimer || CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
       const progress = Math.min(1.0, Math.max(0.0, 1.0 - (this.adaptationDashTimer / maxDash)));
@@ -1321,11 +1409,34 @@ export class MahoragaFighter extends Fighter {
           this._playRandomHeavyPunchSound(0.9);
           audioSystem.playSFX('attack_swordswing', 0.8);
 
-          const pushForce = CONFIG.mahoraga?.blitzHitPushbackForce ?? 4.5;
-          target.vx = Math.cos(pushAngle) * pushForce;
-          target.vy = Math.sin(pushAngle) * pushForce;
-          target.x += target.vx;
-          target.y += target.vy;
+          const isPunchHit = (hitIndex % 2 === 1);
+          const rollBlitzKnockback = isPunchHit && (Math.random() < 0.45);
+
+          if (rollBlitzKnockback) {
+            const kbForce = 16.0;
+            target.vx = (target.vx || 0) + Math.cos(pushAngle) * kbForce;
+            target.vy = (target.vy || 0) + Math.sin(pushAngle) * kbForce;
+            target.x += Math.cos(pushAngle) * (kbForce * 0.35);
+            target.y += Math.sin(pushAngle) * (kbForce * 0.35);
+            if (typeof target.applyHitStun === 'function') target.applyHitStun(14);
+            spawnFloatingText(target.x, target.y - (target.r || 20) - 22, 'KINETIC KNOCKBACK!', '#FFD700');
+            triggerGlobalScreenShake(8, 12);
+          } else {
+            const pushForce = CONFIG.mahoraga?.blitzHitPushbackForce ?? 4.5;
+            target.vx = Math.cos(pushAngle) * pushForce;
+            target.vy = Math.sin(pushAngle) * pushForce;
+            target.x += target.vx;
+            target.y += target.vy;
+          }
+
+          if (typeof state !== 'undefined' && state.arena) {
+            const minX = state.arena.x + (target.r || 20);
+            const maxX = state.arena.x + state.arena.width - (target.r || 20);
+            const minY = state.arena.y + (target.r || 20);
+            const maxY = state.arena.y + state.arena.height - (target.r || 20);
+            target.x = Math.max(minX, Math.min(maxX, target.x));
+            target.y = Math.max(minY, Math.min(maxY, target.y));
+          }
 
         } else {
           // Final Hit: GRAND FINISHER CLEAVE!
@@ -1362,8 +1473,17 @@ export class MahoragaFighter extends Fighter {
           target.vx = Math.cos(kbAngle) * kbForce;
           target.vy = Math.sin(kbAngle) * kbForce;
           if (typeof target.applyKnockback === 'function') target.applyKnockback(target.vx, target.vy);
-          target.x += target.vx;
-          target.y += target.vy;
+          target.x += target.vx * 0.25;
+          target.y += target.vy * 0.25;
+
+          if (typeof state !== 'undefined' && state.arena) {
+            const minX = state.arena.x + (target.r || 20);
+            const maxX = state.arena.x + state.arena.width - (target.r || 20);
+            const minY = state.arena.y + (target.r || 20);
+            const maxY = state.arena.y + state.arena.height - (target.r || 20);
+            target.x = Math.max(minX, Math.min(maxX, target.x));
+            target.y = Math.max(minY, Math.min(maxY, target.y));
+          }
 
           spawnImpactFlash(target.x, target.y, 50, '#FFD700');
           spawnSparks(target.x, target.y, 30, 'gold', '#FFFFFF');
@@ -1429,9 +1549,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // ── Natural Bounce Movement (no direct-chase steering) ──
-    // Mahoraga uses natural wall-bounce physics like other fighters.
-    // His resolveWallBounce override biases bounce direction towards the enemy.
-    // Only apply friction if opponent is dead so he doesn't stop moving.
+    // Mahoraga uses natural wall-bounce physics, counter-teleports, and attack-blitzes.
     if (!opponent || opponent.isDead) {
       this.vx *= 0.9;
       this.vy *= 0.9;
@@ -1444,7 +1562,12 @@ export class MahoragaFighter extends Fighter {
     }
 
     if (opponent && !opponent.isDead) {
-      this.aim(opponent);
+      // Only update facing when NOT in hit stun or knockback — prevents erratic mid-air direction flipping
+      const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
+                              (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0;
+      if (!isInHitReaction) {
+        this.aim(opponent);
+      }
       const distToOpponent = Math.hypot(this.x - opponent.x, this.y - opponent.y);
       const swordRange = CONFIG.mahoraga?.swordRange || 60;
       const meleeDist = this.r + opponent.r + swordRange;
@@ -1480,7 +1603,7 @@ export class MahoragaFighter extends Fighter {
         (opponent.punchAnimTimer > 0 && Math.hypot(opponent.vx, opponent.vy) > 12)
       );
 
-      if (hasAdaptedToTeleport && isEnemyTeleportBlitzing && (this.teleportCounterCooldown || 0) <= 0 && !opponent.isAmbushing) {
+      if (hasAdaptedToTeleport && isEnemyTeleportBlitzing && (this.teleportCounterCooldown || 0) <= 0 && !opponent.isAmbushing && !isBeamParalyzed) {
         this.teleportCounterCooldown = 10;
 
         const oldX = this.x;
@@ -1572,10 +1695,41 @@ export class MahoragaFighter extends Fighter {
    * his post-bounce direction towards the current enemy.
    * This gives the "rebounce forward to the enemy" feel.
    */
-  resolveWallBounce(arena) {
+  /**
+   * Override wall bounce so Mahoraga bounces naturally but biases
+   * his post-bounce direction directly forward towards the current enemy.
+   */
+  resolveWallBounce(arena, opponent = null) {
+    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce;
+    if (isBeamTrapped) {
+      let clamped = false;
+      if (this.x - this.r < arena.x) {
+        this.x = arena.x + this.r;
+        this.vx = 0;
+        this.vy = 0;
+        clamped = true;
+      } else if (this.x + this.r > arena.x + arena.width) {
+        this.x = arena.x + arena.width - this.r;
+        this.vx = 0;
+        this.vy = 0;
+        clamped = true;
+      }
+      if (this.y - this.r < arena.y) {
+        this.y = arena.y + this.r;
+        this.vx = 0;
+        this.vy = 0;
+        clamped = true;
+      } else if (this.y + this.r > arena.y + arena.height) {
+        this.y = arena.y + arena.height - this.r;
+        this.vx = 0;
+        this.vy = 0;
+        clamped = true;
+      }
+      return clamped;
+    }
     let bounced = false;
-    const restitution = CONFIG.collision.restitution;
-    const angleJitter = 3.5;
+    const restitution = CONFIG.collision?.restitution || 0.9;
+    const angleJitter = 1.5;
 
     if (this.x - this.r < arena.x) {
       this.x = arena.x + this.r;
@@ -1602,27 +1756,32 @@ export class MahoragaFighter extends Fighter {
     }
 
     if (bounced) {
-      const target = this._bounceTarget;
-      const speed = Math.hypot(this.vx, this.vy) || this.speed;
-
+      const target = opponent || this._bounceTarget || (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !f.isDead) : null);
       const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !this.gojoInfinityImmune;
 
       if (target && !target.isDead && target.hp > 0 && !isTargetGojoInfinity) {
-        // Bias the bounce direction towards the enemy
+        // Redirect post-bounce velocity directly forward toward the enemy
         const dx = target.x - this.x;
         const dy = target.y - this.y;
         const dist = Math.hypot(dx, dy) || 1;
-        const toEnemyVx = (dx / dist) * speed;
-        const toEnemyVy = (dy / dist) * speed;
+        const bounceSpeed = Math.max(this.speed || 6.5, 7.5);
+        const toEnemyVx = (dx / dist) * bounceSpeed;
+        const toEnemyVy = (dy / dist) * bounceSpeed;
 
-        // Blend: 60% towards enemy, 40% natural bounce
-        const biasFactor = 0.6;
+        // 85% forward bias towards enemy on wall rebound
+        const biasFactor = 0.85;
         this.vx = this.vx * (1 - biasFactor) + toEnemyVx * biasFactor;
         this.vy = this.vy * (1 - biasFactor) + toEnemyVy * biasFactor;
-      }
 
-      // Re-normalize to configured speed
-      this.normalizeSpeed();
+        // Normalize speed to ensure crisp forward momentum
+        const currentSpeed = Math.hypot(this.vx, this.vy) || 1;
+        this.vx = (this.vx / currentSpeed) * bounceSpeed;
+        this.vy = (this.vy / currentSpeed) * bounceSpeed;
+
+        if (typeof this.aim === 'function') {
+          this.aim(target);
+        }
+      }
     }
   }
 

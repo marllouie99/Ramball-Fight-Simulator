@@ -72,6 +72,15 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Purple!
   }
 
+  // ── 50% Damage Reduction when Adapted to Yuta's Pure Love Beam ──
+  const isPureLoveBeamHit = opts.isPureLoveBeam || (opts.projectile && opts.projectile.isPureLoveBeam);
+  const isPureLoveBeamAdapted = fighter.adaptedPureLoveBeam || 
+                                (fighter.gojoAdaptColorHistory && fighter.gojoAdaptColorHistory.includes('#FF1493'));
+
+  if (isPureLoveBeamHit && isPureLoveBeamAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Pure Love Beam (same as Gojo's Purple)!
+  }
+
 
   // ── Toji ISOH Bypass Check ──
   if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji') && opts.isIsoh) {
@@ -621,4 +630,153 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
   audioSystem.playSFX('skill_dash3', 0.8);
+}
+
+/**
+ * Apply adaptation to Yuta's Pure Love Beam when caught in the beam after it expires.
+ * - Clicks the Eight-Handled Sword Wheel.
+ * - Turns wheel glow & sphere color pink (#FF1493).
+ * - Grants immunity to Pure Love Beam.
+ */
+export function adaptToPureLoveBeam(fighter) {
+  if (!fighter || fighter.hp <= 0) return;
+  if (fighter.adaptedPureLoveBeam) return; // Already adapted
+
+  fighter.adaptedPureLoveBeam = true;
+  fighter.caughtInPureLoveBeam = false;
+  fighter.pureLoveBeamTimer = 0;
+  fighter.pureLoveBeamRecoveryTimer = 0; // Clear recovery timer so Mahoraga isn't stuck after wheel click!
+  fighter.hitStunTimer = 0;
+  fighter.knockbackStunTimer = 0;
+  if (!fighter.adapted) fighter.adapted = {};
+  fighter.adapted.skill = true;
+
+  const adaptColor = '#FF1493'; // Pink for Yuta Pure Love Beam
+
+  if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+  if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+    fighter.gojoAdaptColorHistory.push(adaptColor);
+  }
+
+  fighter.wheelGlowColor = adaptColor;
+  fighter.wheelGlowTimer = 60;
+  fighter.wheelClickTimer = 35;
+  fighter.wheelRotation = (fighter.wheelRotation || 0) + (Math.PI * 0.25); // Click wheel rotation
+
+  const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: PURE LOVE BEAM!', adaptColor);
+  spawnFloatingText(fighter.x, wheelY - 52, '💗 Pure Love Beam no longer affects Mahoraga!', '#FFFFFF');
+
+  spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+  audioSystem.playSFX('skill_dash3', 0.9);
+  audioSystem.playSFX('attack_swordswing', 0.85);
+
+  // ── COUNTER BLITZ: TELEPORT BEHIND ENEMY ONLY WHEN ENEMY IS NOT ACTIVELY FIRING A BEAM ──
+  const opponent = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0) : null;
+  const isEnemyFiringBeam = opponent && (
+    opponent.isFiringPureLoveBeam || opponent.isChannelingPureLoveBeam ||
+    opponent.isChannelingDomain || opponent.domainActive
+  );
+
+  if (opponent && !isEnemyFiringBeam) {
+    const oldX = fighter.x;
+    const oldY = fighter.y;
+    const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    const teleDist = fighter.r + opponent.r + 35;
+    const teleX = opponent.x - Math.cos(angle) * teleDist;
+    const teleY = opponent.y - Math.sin(angle) * teleDist;
+
+    if (typeof fighter._spawnTeleportAfterimages === 'function') {
+      fighter._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, angle);
+    }
+    fighter.x = teleX;
+    fighter.y = teleY;
+    if (typeof fighter.aim === 'function') {
+      fighter.aim(opponent);
+    }
+
+    // Activate Close-Quarters Attack-Teleport Stance
+    fighter.neutralStanceTimer = CONFIG.mahoraga?.neutralStanceDurationFrames || 180;
+    fighter.neutralStanceCooldownTimer = 0;
+    fighter.neutralStanceAttackCount = 0;
+
+    // Trigger instant rapid attack strike
+    fighter.punchAnimTimer = 18;
+    fighter.leftPunchTimer = 18;
+    audioSystem.playSFX('skill_dash5', 1.0);
+    spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, '⚡ ADAPTATION COUNTER BLITZ!', adaptColor);
+  } else {
+    // If enemy is actively firing a beam, lock stance on 5s cooldown and DO NOT TELEPORT!
+    fighter.neutralStanceTimer = 0;
+    fighter.neutralStanceCooldownTimer = 300;
+  }
+}
+
+/**
+ * Apply adaptation to Yuta's Flurry attacks.
+ * - Wheel sphere glows Gold (#FFD700).
+ * - Gives 50% chance for Mahoraga to automatically block/parry flurry strikes.
+ */
+export function adaptToYutaFlurry(fighter) {
+  if (!fighter || fighter.hp <= 0) return;
+  if (fighter.adaptedYutaFlurry) return;
+
+  fighter.adaptedYutaFlurry = true;
+  if (!fighter.adapted) fighter.adapted = {};
+  fighter.adapted.melee = true;
+
+  const adaptColor = '#FFD700'; // Gold matching Katana basic theme
+
+  if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+  if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+    fighter.gojoAdaptColorHistory.push(adaptColor);
+  }
+
+  fighter.wheelGlowColor = adaptColor;
+  fighter.wheelGlowTimer = 60;
+  fighter.wheelClickTimer = 35;
+  fighter.wheelRotation = (fighter.wheelRotation || 0) + (Math.PI * 0.25);
+
+  const wheelY = fighter.y - fighter.r - 28;
+
+  spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+  audioSystem.playSFX('skill_dash3', 0.9);
+  audioSystem.playSFX('attack_swordswing', 0.85);
+}
+
+/**
+ * Apply adaptation to Yuta's Thin Ice Breaker skill.
+ * - Wheel sphere glows Cyan Blue (#00FFFF).
+ * - Automatically triggers Divine Shout when Yuta uses Thin Ice Breaker.
+ */
+export function adaptToThinIceBreaker(fighter) {
+  if (!fighter || fighter.hp <= 0) return;
+  if (fighter.adaptedThinIceBreaker) return;
+
+  fighter.adaptedThinIceBreaker = true;
+  if (!fighter.adapted) fighter.adapted = {};
+  fighter.adapted.skill = true;
+
+  const adaptColor = '#00FFFF'; // Cyan Blue matching Thin Ice Breaker theme
+
+  if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+  if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+    fighter.gojoAdaptColorHistory.push(adaptColor);
+  }
+
+  fighter.wheelGlowColor = adaptColor;
+  fighter.wheelGlowTimer = 60;
+  fighter.wheelClickTimer = 35;
+  fighter.wheelRotation = (fighter.wheelRotation || 0) + (Math.PI * 0.25);
+
+  const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: THIN ICE BREAKER!', adaptColor);
+  spawnFloatingText(fighter.x, wheelY - 52, '🦁 Auto-Triggers Divine Shout on activation!', '#FFFFFF');
+
+  spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+  audioSystem.playSFX('skill_dash3', 0.9);
+  audioSystem.playSFX('attack_swordswing', 0.85);
 }

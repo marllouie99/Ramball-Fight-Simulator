@@ -9,11 +9,18 @@ import { spawnSparks, spawnImpactFlash } from '../../../graphics/particles/spark
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
+function isTeleportDisabled(fighter) {
+  if (!fighter) return false;
+  const caughtInBeam = fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
+  return caughtInBeam && !fighter.adaptedPureLoveBeam;
+}
+
 /**
  * Gojo Purple Teleport Dodge: When Gojo fires Purple and Mahoraga has adapted,
  * Mahoraga instantly teleports away to a safe distance.
  */
 export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
+  if (isTeleportDisabled(fighter)) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
@@ -99,6 +106,7 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
  * Mahoraga teleport-dodges away.
  */
 export function gojoRedTeleportDodge(fighter, gojo) {
+  if (isTeleportDisabled(fighter)) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
@@ -167,6 +175,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
  * Start adaptation flash-dash toward the attacker after wheel click cinematic pause.
  */
 export function startAdaptationFlashDash(fighter, attacker) {
+  if (isTeleportDisabled(fighter)) return;
   if (!attacker || attacker.isDead || attacker === fighter) return;
   const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
   if (isInsideDomain) return;
@@ -228,6 +237,7 @@ export function startAdaptationFlashDash(fighter, attacker) {
  * Mahoraga instantly teleports away to a safe distance.
  */
 export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
+  if (isTeleportDisabled(fighter)) return;
   const fromX = fighter.x;
   const fromY = fighter.y;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
@@ -313,6 +323,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
  * and Mahoraga has adapted to it, Mahoraga instantly teleports away.
  */
 export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
+  if (isTeleportDisabled(fighter)) return;
   if (projectile && (projectile.skillShotId === 'tojiAmbush' || projectile.skillShotId === 'purple' || projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) return;
   const fromX = fighter.x;
   const fromY = fighter.y;

@@ -98,7 +98,7 @@ export const mahoragaConfig = {
     // Level 8 Wall Slam Throw Mechanics
     wallSlamImpaleLiftHeight: 35,      // Visual height (z-axis) when opponent is lifted on sword
     wallSlamImpaleHoldFrames: 50,      // Duration (frames) opponent is held in the air on the sword
-    wallSlamPunchHitpause: 30,          // Frames of freeze/hitpause when the punch lands before they are launched
+    wallSlamPunchHitpause: 20,          // Frames of freeze/hitpause when the punch lands before they are launched
     wallSlamThrowSpeed: 45.0,          // Supersonic velocity at which opponent is hurled to the wall
     wallSlamImpactDamage: 20,          // Damage taken upon slamming into the wall
     wallSlamParalyzeDuration: 150,      // Duration (frames) opponent is paralyzed after hitting the wall

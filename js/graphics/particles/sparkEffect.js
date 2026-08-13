@@ -91,6 +91,41 @@ export function spawnImpactFlash(x, y, radius = 20, type = 'default') {
 }
 
 /**
+ * Spawns lingering pink particles with white cores along Yuta's Pure Love Beam path when it expires.
+ * These particles float gently and slowly fade away.
+ */
+export function spawnYutaBeamLingeringParticles(startX, startY, angle, beamLength = 2000, beamWidth = 170, count = 75) {
+  const perpX = -Math.sin(angle);
+  const perpY = Math.cos(angle);
+
+  for (let i = 0; i < count; i++) {
+    const dist = Math.random() * beamLength;
+    const offsetW = (Math.random() - 0.5) * beamWidth * 1.2;
+    const px = startX + Math.cos(angle) * dist + perpX * offsetW;
+    const py = startY + Math.sin(angle) * dist + perpY * offsetW;
+
+    // Varied size distribution matching reference image (large glowing orbs + medium + small specs)
+    const rand = Math.random();
+    let size = 2.0 + Math.random() * 2.0;
+    if (rand > 0.75) size = 5.5 + Math.random() * 3.5;
+    else if (rand < 0.25) size = 1.2 + Math.random() * 1.0;
+
+    // Gentle upward float and lateral drift (floating like glowing embers in space)
+    const vx = (Math.random() - 0.5) * 0.9;
+    const vy = -0.3 - Math.random() * 0.9;
+
+    ParticleSystem.spawn(px, py, 1, 'yutaBeamPinkCore', {
+      vx,
+      vy,
+      size,
+      life: 0.85 + Math.random() * 0.3,
+      decay: 0.006 + Math.random() * 0.007, // Smooth slow decay over 80 - 160 frames (~1.5s - 2.8s)
+      friction: 0.97
+    });
+  }
+}
+
+/**
  * Spawns a massive crimson lightning shockwave impact effect.
  * Used when the enhanced execute bullet hits a wall or pierces through a target.
  * Creates expanding jagged rings + radial lightning arcs.
@@ -942,6 +977,38 @@ export function drawSparkEffects(layer = 'all') {
         ctx.restore();
 
         ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'yutaBeamPinkCore' || effect.isPinkCore) {
+        // Lingering pink/magenta orb with pure white-hot center core (Matching user reference image)
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
+        const lifeStep = Math.round(alpha * 20) / 20;
+
+        // 1. Smooth, glowing radial gradient halo (Magenta / Deep Pink Bloom)
+        const glowRadius = effect.size * 4.5;
+        const gradient = getUnitRadialGradient(ctx, `yutaPinkCore_${lifeStep}`, [
+          [0, `rgba(255, 255, 255, ${lifeStep})`],
+          [0.15, `rgba(255, 230, 255, ${lifeStep * 0.95})`],
+          [0.35, `rgba(235, 20, 190, ${lifeStep * 0.85})`],
+          [0.65, `rgba(180, 0, 160, ${lifeStep * 0.40})`],
+          [1, 'rgba(100, 0, 120, 0)']
+        ]);
+
+        ctx.globalCompositeOperation = 'lighter'; // Additive blending for overlapping glowing orbs
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.scale(glowRadius, glowRadius);
+        ctx.beginPath();
+        ctx.arc(0, 0, 1, 0, Math.PI * 2);
+        ctx.fillStyle = gradient;
+        ctx.fill();
+        ctx.restore();
+
+        // 2. Piercing crisp solid pure-white central dot
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.98})`;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(1.0, effect.size * 0.5), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'meleeClashShockwave') {
         if (effect.targetSize) {
           effect.size += (effect.targetSize - effect.size) * 0.15;
@@ -979,6 +1046,81 @@ export function drawSparkEffects(layer = 'all') {
         ctx.fill();
         ctx.restore();
       }
+    } else if (effect.type === 'parrySpark') {
+      // ── High-Velocity Metal Welding Spark Streak (Matching Reference Image) ──
+      const speed = Math.hypot(effect.vx || 0, effect.vy || 0);
+      const angle = Math.atan2(effect.vy || 0, effect.vx || 1);
+      const tailLen = Math.max(10, speed * (2.8 + (1 - effect.life) * 1.6));
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+
+      // 1. Outer Fiery Amber-Orange Glow Streak
+      ctx.strokeStyle = `rgba(255, 90, 0, ${effect.life * 0.55})`;
+      ctx.lineWidth = effect.size * 2.2;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(effect.x, effect.y);
+      ctx.lineTo(effect.x - Math.cos(angle) * tailLen, effect.y - Math.sin(angle) * tailLen);
+      ctx.stroke();
+
+      // 2. Hot Gold Inner Streak
+      ctx.strokeStyle = `rgba(255, 220, 80, ${effect.life * 0.85})`;
+      ctx.lineWidth = effect.size * 1.1;
+      ctx.beginPath();
+      ctx.moveTo(effect.x, effect.y);
+      ctx.lineTo(effect.x - Math.cos(angle) * (tailLen * 0.75), effect.y - Math.sin(angle) * (tailLen * 0.75));
+      ctx.stroke();
+
+      // 3. White-Hot Intense Needle Core
+      ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.98})`;
+      ctx.lineWidth = Math.max(1, effect.size * 0.45);
+      ctx.beginPath();
+      ctx.moveTo(effect.x, effect.y);
+      ctx.lineTo(effect.x - Math.cos(angle) * (tailLen * 0.45), effect.y - Math.sin(angle) * (tailLen * 0.45));
+      ctx.stroke();
+
+      // 4. Glowing White Head Tip Dot
+      ctx.fillStyle = `rgba(255, 255, 255, ${effect.life})`;
+      ctx.beginPath();
+      ctx.arc(effect.x, effect.y, Math.max(1.3, effect.size * 0.5), 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    } else if (effect.type === 'parryEmberStar') {
+      // ── Splintering Metal Welding Ember Sparkle (4-Point Star Glint) ──
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.translate(effect.x, effect.y);
+      if (effect.rotation !== undefined) {
+        effect.rotation += effect.rotationSpeed || 0.1;
+        ctx.rotate(effect.rotation);
+      }
+
+      const starSize = effect.size * (0.8 + Math.sin(effect.life * Math.PI) * 0.5);
+      const alpha = effect.life;
+
+      // Outer Fiery Orange Halo
+      ctx.fillStyle = `rgba(255, 140, 10, ${alpha * 0.6})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, starSize * 1.6, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 4-Point White-Hot Sparkle Cross
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.95})`;
+      ctx.beginPath();
+      ctx.moveTo(0, -starSize * 2.4);
+      ctx.lineTo(starSize * 0.35, -starSize * 0.35);
+      ctx.lineTo(starSize * 2.4, 0);
+      ctx.lineTo(starSize * 0.35, starSize * 0.35);
+      ctx.lineTo(0, starSize * 2.4);
+      ctx.lineTo(-starSize * 0.35, starSize * 0.35);
+      ctx.lineTo(-starSize * 2.4, 0);
+      ctx.lineTo(-starSize * 0.35, -starSize * 0.35);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.restore();
     } else if (effect.type === 'crimsonLightningArc' || effect.type === 'tricksterLightningArc') {
       // Lightning arc spark — draw as a short jagged line instead of a dot
       const len = effect.size * 4;
@@ -1957,30 +2099,43 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
  * Spawns a high-contrast visual spark explosion on sword/guard parries.
  * Uses a uniform bright gold & white-hot spark palette across all parries.
  */
-export function spawnParrySparksEffect(x, y, count = 24) {
+export function spawnParrySparksEffect(x, y, count = 28) {
   const mainColor = '#FFD700'; // Bright Gold
   const coreColor = '#FFFFFF'; // White-hot core
 
-  // 1. High-velocity radial spark burst
+  // 1. High-velocity directional metal welding needle spark streaks
   for (let i = 0; i < count; i++) {
     const angle = Math.random() * Math.PI * 2;
-    const speed = 6 + Math.random() * 13;
-    const sparkColor = (i % 2 === 0) ? coreColor : mainColor;
+    const speed = 7 + Math.random() * 17;
     spawnSparks(x, y, 1, 'parrySpark', {
-      color: sparkColor,
+      color: (i % 2 === 0) ? coreColor : mainColor,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      size: 2.2 + Math.random() * 3.2,
-      decay: 0.05 + Math.random() * 0.06
+      size: 2.0 + Math.random() * 3.0,
+      decay: 0.04 + Math.random() * 0.05
     });
   }
 
-  // 2. Central impact flash
-  spawnImpactFlash(x, y, 50, 'dark');
+  // 2. Splintering 4-point cross star ember sparkles
+  const emberCount = 14 + Math.floor(Math.random() * 6);
+  for (let i = 0; i < emberCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 3 + Math.random() * 11;
+    spawnSparks(x, y, 1, 'parryEmberStar', {
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 2.2 + Math.random() * 3.2,
+      decay: 0.035 + Math.random() * 0.045
+    });
+  }
 
-  // 3. Shockwave clash ring
+  // 3. Blinding White-Hot Center Flare Burst
+  spawnImpactFlash(x, y, 55, 'default');
+  spawnImpactFlash(x, y, 35, 'default');
+
+  // 4. Shockwave clash ring
   if (typeof spawnMeleeClashShockwave === 'function') {
-    spawnMeleeClashShockwave(x, y, 65, 'gojo');
+    spawnMeleeClashShockwave(x, y, 70, 'gojo');
   }
 }
 

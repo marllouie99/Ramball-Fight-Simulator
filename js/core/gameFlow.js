@@ -67,6 +67,9 @@ function preloadGameSounds() {
     if (CONFIG.yuta.domainChannelSound) yutaSounds.push(CONFIG.yuta.domainChannelSound);
     if (CONFIG.yuta.domainDeploySound) yutaSounds.push(CONFIG.yuta.domainDeploySound);
     if (CONFIG.yuta.phantomFlurryNoiseSound) yutaSounds.push(CONFIG.yuta.phantomFlurryNoiseSound);
+    if (CONFIG.yuta.pureLoveBeamChargeSound) yutaSounds.push(CONFIG.yuta.pureLoveBeamChargeSound);
+    if (CONFIG.yuta.pureLoveBeamFireSound) yutaSounds.push(CONFIG.yuta.pureLoveBeamFireSound);
+    if (CONFIG.yuta.pureLoveBeamBackgroundSound) yutaSounds.push(CONFIG.yuta.pureLoveBeamBackgroundSound);
   }
 
   const genosSounds = [];

@@ -2,7 +2,7 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
 export function drawGojoWeapon(ctx, fighter) {
-    if (fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0)) {
+    if (fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideWeapon) {
         return;
     }
     const z = fighter.z || 0;

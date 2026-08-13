@@ -145,6 +145,7 @@ export const state = {
   indexCategory: 'All',
   mode: GAME_MODES.ONE_VS_ONE,
   testMode: false, // Disables leaderboard recording
+  cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
   dummyAggressive: false, // Whether target dummies fight back
   dummyEnabled: true, // Whether Target Dummy appears in fighter selection
   scores: [0, 0, 0, 0],

@@ -1066,6 +1066,36 @@ class ProjectileSystem {
       }
     }
 
+    // ── Check Collision against Rika (Queen of Curses) ──
+    for (const f of fighters) {
+      if (f && f.rika && f.rika.active && f.rika.hp > 0) {
+        const rk = f.rika;
+        const ownerIdx = fighters.indexOf(f);
+        if (projectile.owner === ownerIdx || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, ownerIdx))) continue;
+        if (projectile.hitFighters && projectile.hitFighters.has(rk)) continue;
+
+        const hitRadius = (rk.r || 22) + projectile.r;
+        const rdx = rk.x - projectile.x;
+        const rdy = rk.y - projectile.y;
+        if (Math.abs(rdx) <= hitRadius && Math.abs(rdy) <= hitRadius) {
+          const distSq = rdx * rdx + rdy * rdy;
+          if (distSq <= hitRadius * hitRadius) {
+            const attacker = fighters[projectile.owner];
+            if (typeof rk.takeDamage === 'function') {
+              rk.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
+            }
+
+            const shouldDestroy = HitImpactSystem.processProjectileHit(rk, projectile, attacker, fighters);
+            if (!shouldDestroy) {
+              continue;
+            } else {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
     return false;
   }
 
@@ -2148,9 +2178,9 @@ class ProjectileSystem {
       if (p.visual === 'yuta_pure_love_beam') {
         const ownerFighter = fighters[p.owner];
         if (ownerFighter) {
-          // Beam stays glued to Yuta's hand position and angle
+          // Beam stays glued to Yuta's hand position and locked angle
           const beamOffset = (ownerFighter.r || 22) + 14;
-          p.angle = ownerFighter.gunAngle || 0;
+          p.angle = ownerFighter.pureLoveBeamLockedAngle !== undefined ? ownerFighter.pureLoveBeamLockedAngle : (ownerFighter.gunAngle || 0);
           p.x = ownerFighter.x + Math.cos(p.angle) * beamOffset;
           p.y = ownerFighter.y + Math.sin(p.angle) * beamOffset;
           p.vx = Math.cos(p.angle) * 20; // Maintain logical velocity just in case
@@ -2161,13 +2191,13 @@ class ProjectileSystem {
             ...(state.illusions || [])
           ];
 
-          // Calculate line segment for collision
+          // Calculate line segment for collision (starting 60px BEHIND Yuta's center so close-range enemies are always caught!)
           const beamLength = p.length || 2500;
           const beamRadius = p.r || 120;
-          const startX = p.x;
-          const startY = p.y;
-          const endX = p.x + Math.cos(p.angle) * beamLength;
-          const endY = p.y + Math.sin(p.angle) * beamLength;
+          const startX = ownerFighter.x - Math.cos(p.angle) * 60;
+          const startY = ownerFighter.y - Math.sin(p.angle) * 60;
+          const endX = ownerFighter.x + Math.cos(p.angle) * beamLength;
+          const endY = ownerFighter.y + Math.sin(p.angle) * beamLength;
 
           // Process ticks
           p.hitTickTimer = (p.hitTickTimer || 0) + 1;
@@ -2187,9 +2217,8 @@ class ProjectileSystem {
             const entIdx = state.fighters.indexOf(ent);
             const isEnemy = ownerTeam === null || (entIdx !== -1 ? state.getFighterTeam(entIdx) !== ownerTeam : state.getFighterTeam(state.fighters.indexOf(ent.owner)) !== ownerTeam);
             if (!isEnemy) continue;
-            if (p.hitTargets.has(ent)) continue;
 
-            // Line-to-Circle Collision
+            // Line-to-Circle Collision & Origin Proximity Check
             const cx = ent.x;
             const cy = ent.y;
             const radius = ent.r || 20;
@@ -2205,28 +2234,89 @@ class ProjectileSystem {
             const distSq = (cx - closestX) * (cx - closestX) + (cy - closestY) * (cy - closestY);
             const currentBeamRadius = (beamRadius * 0.45) + (beamRadius * 2.25) * t;
 
-            if (distSq <= (currentBeamRadius + radius) * (currentBeamRadius + radius)) {
-              // HIT!
-              p.hitTargets.add(ent);
+            const distToOrigin = Math.hypot(cx - ownerFighter.x, cy - ownerFighter.y);
+            const isAtBeamOrigin = distToOrigin <= ((ownerFighter.r || 22) + radius + beamRadius * 0.8);
+            const isInsideBeam = isAtBeamOrigin || (distSq <= (currentBeamRadius + radius) * (currentBeamRadius + radius));
+
+            if (isInsideBeam) {
+              if (!p.hitTargets.has(ent)) {
+                p.hitTargets.add(ent);
+                
+                if (typeof ent.takeDamage === 'function') {
+                  ent.takeDamage(p.damage, ownerFighter, { isPureLoveBeam: true });
+                }
+              }
+
+              ent.caughtInPureLoveBeam = true;
+              ent.wasCaughtInPureLoveBeam = true;
+              ent.pureLoveBeamTimer = 10;
+              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120; // Set recovery delay
+
+              // Explicitly cancel Mahoraga's Level 8 stance and teleports on hit!
+              if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
+                ent.neutralStanceTimer = 0;
+                ent.neutralStanceCooldownTimer = 300;
+                ent.adaptationDashTimer = 0;
+                ent.isInfinityBlitz = false;
+                ent.isBlitzActive = false;
+                ent.isWallSlamActive = false;
+              }
               
-              if (typeof ent.takeDamage === 'function') {
-                ent.takeDamage(p.damage, ownerFighter, { isPureLoveBeam: true });
+              if (typeof ent.interruptAttacks === 'function') {
+                ent.interruptAttacks();
               }
               if (typeof ent.applyHitStun === 'function') {
                 ent.applyHitStun(8);
               }
               
-              const pushForce = p.knockback || 6;
-              const pushAngle = p.angle;
-              if (ent.applyKnockback) {
-                ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
+              const arena = state.arena || CONFIG.arena;
+              const isTouchingWall = arena && (
+                (ent.x - ent.r <= arena.x + 5) ||
+                (ent.x + ent.r >= arena.x + arena.width - 5) ||
+                (ent.y - ent.r <= arena.y + 5) ||
+                (ent.y + ent.r >= arena.y + arena.height - 5)
+              );
+
+              if (isTouchingWall) {
+                // Pin target firmly to the wall point — zero out any wall-sliding velocity vectors
+                ent.vx = 0;
+                ent.vy = 0;
+                ent.knockbackVx = 0;
+                ent.knockbackVy = 0;
               } else {
-                ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
-                ent.vy = (ent.vy || 0) + Math.sin(pushAngle) * pushForce;
+                const pushForce = p.knockback || 6;
+                const pushAngle = p.angle;
+                if (ent.applyKnockback) {
+                  ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
+                } else {
+                  ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
+                  ent.vy = (ent.vy || 0) + Math.sin(pushAngle) * pushForce;
+                }
               }
               
               spawnImpactFlash(ent.x, ent.y, 50, 'rgba(255, 20, 147, 0.7)');
               spawnSparks(ent.x, ent.y, 4, 'rikaCurse');
+            } else if (ent.wasCaughtInPureLoveBeam || ent.caughtInPureLoveBeam) {
+              // ENEMY ESCAPED BEAM WIDTH BOUNDS — TRIGGER RECOVERY IMMEDIATELY!
+              ent.caughtInPureLoveBeam = false;
+              ent.wasCaughtInPureLoveBeam = false;
+              ent.pureLoveBeamTimer = 0;
+              
+              // Trigger recovery phase immediately upon escaping beam width!
+              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
+              if (typeof ent.interruptAttacks === 'function') {
+                ent.interruptAttacks();
+              }
+              if (typeof ent.applyHitStun === 'function') {
+                ent.applyHitStun(15);
+              }
+
+              // If enemy is Mahoraga, trigger Mahoraga adaptation on beam escape/recovery!
+              if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
+                if (typeof ent.adaptToPureLoveBeam === 'function') {
+                  ent.adaptToPureLoveBeam();
+                }
+              }
             }
           }
         }

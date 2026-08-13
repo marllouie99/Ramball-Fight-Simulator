@@ -33,18 +33,18 @@ export const yujiConfig = {
   comboInterval: 30,            // Frames between each combo punch (~0.17s)
   comboDashRange: 200,          // Max range from which Yuji will dash into the target
 
-  // Skill 2: Reverse Cursed Technique (RCT)
-  rctHealPercent: 0.15,         // Percentage of max HP restored on use
-  rctCooldown: 1500,             // Long cooldown in frames (15 seconds) — once per round effectively
-  rctChannelDuration: 45,       // Frames Yuji must stand still channeling (~0.75s)
-  rctHpThreshold: 0.20,         // Auto-trigger RCT when HP drops to or below 25%
+  // Skill 2: Reverse Cursed Technique (RCT) — Passive
+  rctHealPercent: 0.25,         // Percentage of max HP restored upon reverting from Sukuna transformation
 
   // Ultimate: Soul Swap — Sukuna Takes Over
-  soulSwapHpThreshold: 0.30,       // Triggers when HP drops to 25% or below
-  soulSwapDuration: 500,           // Duration of Soul Swap in frames (8 seconds at 60fps)
+  soulSwapHpThreshold: 0.30,       // Triggers when HP drops to 30% or below
+  soulSwapDuration: 800,           // Duration of Soul Swap in frames (8 seconds at 60fps)
   soulSwapDamageMultiplier: 1.5,   // All damage multiplied while active
   soulSwapBlackFlashThreshold: 2,  // Black Flash triggers after only 2 hits during Soul Swap
   soulSwapSpeedMultiplier: 1.3,    // Movement speed boost during Soul Swap
+  soulSwapRapidSlashHits: 16,      // Number of rapid 360° slash-teleport strikes Sukuna unleashes immediately on takeover
+  soulSwapRapidSlashCooldown: 26,  // Pacing frames between each slash-teleport strike (~0.27s, exact Sukuna flurry timing)
+  soulSwapHealPercent: 0.30,       // Percentage of max HP restored to Yuji upon swapping back after the 12 slashes
   soulSwapCooldown: 99999,         // Once per match only
 
 
@@ -67,13 +67,13 @@ export const yujiConfig = {
     'Assets/Sound Effects/Attacks/yuji-noise3.mp3'
   ],
   punchSoundsVolume: 1.5,
-  punchSoundsChance: 0.5, // 50% chance to play the voice noises on basic attack
+  punchSoundsChance: 0.10, // 5% chance to play voice noises on basic attack
 
   // Black Flash Entrance Audio
   blackFlashEnterSound: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
   blackFlashEnterVolume: 2.0,
   blackFlashEnterDelay: -0.10, // Delay in milliseconds before playing the sound
-  blackFlashNoiseChance: 0.35, // 35% chance to play the voiceline on Black Flash
+  blackFlashNoiseChance: 0.05, // 5% chance to play the voiceline on Black Flash
 
   // Transformation Audio
   transformationSound: 'Assets/Sound Effects/Skills/yuji-transformation.mp3',

@@ -26,7 +26,7 @@ export const HitImpactSystem = {
    */
   processProjectileHit(target, projectile, attacker, fighters) {
     const isSukunaSlash = projectile.visual === 'sukunaSlash' || projectile.visual === 'sukunaCleave' || projectile.visual === 'sukunaDismantleGrid' || projectile.visual === 'ghostBlade' || projectile.isSukunaSlash;
-    const isMahoragaThrow = projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
+    const isMahoragaThrow = projectile.isMahoragaThrow || projectile.visual === 'mahoragaBasaltMonolith' || projectile.visual === 'mahoragaRuinConcrete' || projectile.visual === 'mahoragaLavaRubble';
     
     if (isSukunaSlash || isMahoragaThrow) {
       if (!projectile.hitFighters) projectile.hitFighters = new Set();
@@ -42,20 +42,29 @@ export const HitImpactSystem = {
         spawnSparks(target.x, target.y, 10, 'crimsonSniper');
         spawnImpactFlash(target.x, target.y, 25, 'crimsonSniper');
         audioSystem.playSFX('attack_fleshhit', 0.5);
-
-
       }
 
       // Apply physical push backward on hit (using throwKnockback config for Mahoraga!)
-      const knockbackForce = (isMahoragaThrow && CONFIG.mahoraga?.throwKnockback !== undefined) ? CONFIG.mahoraga.throwKnockback : 6.0; 
-      const angle = Math.atan2(projectile.vy, projectile.vx);
-      target.vx += Math.cos(angle) * knockbackForce;
-      target.vy += Math.sin(angle) * knockbackForce;
-      target.x += Math.cos(angle) * (knockbackForce * 0.5);
-      target.y += Math.sin(angle) * (knockbackForce * 0.5);
-      if (typeof target.applyHitStun === 'function') target.applyHitStun(8);
+      const knockbackForce = (isMahoragaThrow && CONFIG.mahoraga?.throwKnockback !== undefined) ? CONFIG.mahoraga.throwKnockback : 12.0; 
+      const angle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
       
-      return false; // Pierce through every enemy
+      target.vx = (target.vx || 0) + Math.cos(angle) * knockbackForce;
+      target.vy = (target.vy || 0) + Math.sin(angle) * knockbackForce;
+      target.x += Math.cos(angle) * (knockbackForce * 0.4);
+      target.y += Math.sin(angle) * (knockbackForce * 0.4);
+
+      if (state && state.arena) {
+        const minX = state.arena.x + (target.r || 20);
+        const maxX = state.arena.x + state.arena.width - (target.r || 20);
+        const minY = state.arena.y + (target.r || 20);
+        const maxY = state.arena.y + state.arena.height - (target.r || 20);
+        target.x = Math.max(minX, Math.min(maxX, target.x));
+        target.y = Math.max(minY, Math.min(maxY, target.y));
+      }
+
+      if (typeof target.applyHitStun === 'function') target.applyHitStun(10);
+      
+      return isSukunaSlash ? false : true; // Debris breaks on target hit
     } 
     
     if (projectile.visual === 'crimsonSniperBullet_enhanced' || projectile.visual === 'tricksterSniperBullet_enhanced') {

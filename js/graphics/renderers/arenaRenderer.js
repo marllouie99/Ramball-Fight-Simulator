@@ -768,26 +768,54 @@ export function drawMahoragaLevel8DimScreen() {
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // Center the spotlight midway between Mahoraga and the closest opponent to highlight both
+  // Center the spotlight and expand radius to encompass Mahoraga, enemy fighters, Rika, AND illusion minions
   const activeMaho = mahoraga || state.fighters?.find(f => f && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga')));
-  const opponent = state.fighters?.find(f => f && f !== activeMaho && f.hp > 0);
+  const activeTargets = [];
+  if (activeMaho) activeTargets.push(activeMaho);
+  if (state.fighters) {
+    for (const f of state.fighters) {
+      if (f && f !== activeMaho && f.hp > 0) {
+        activeTargets.push(f);
+        if (f.rika && f.rika.active && !f.rika.isDying) {
+          activeTargets.push(f.rika);
+        }
+      }
+    }
+  }
+  if (state.illusions) {
+    for (const ill of state.illusions) {
+      if (ill && ill.hp > 0) {
+        activeTargets.push(ill);
+      }
+    }
+  }
+
   let cx = canvas.width / 2;
   let cy = canvas.height / 2;
-  if (activeMaho) {
-    if (opponent) {
-      cx = (activeMaho.x + opponent.x) / 2;
-      cy = (activeMaho.y + opponent.y) / 2;
-    } else {
-      cx = activeMaho.x;
-      cy = activeMaho.y;
+  let maxTargetDist = 80;
+
+  if (activeTargets.length > 0) {
+    let sumX = 0, sumY = 0;
+    for (const t of activeTargets) {
+      sumX += t.x;
+      sumY += t.y;
+    }
+    cx = sumX / activeTargets.length;
+    cy = sumY / activeTargets.length;
+
+    for (const t of activeTargets) {
+      const d = Math.hypot(t.x - cx, t.y - cy);
+      if (d > maxTargetDist) maxTargetDist = d;
     }
   }
 
   const drawX = cx + shakeX;
   const drawY = cy + shakeY;
-  const maxRadius = Math.max(arena.width, arena.height) * 1.1;
+  const spotlightInnerR = Math.max(140, Math.min(650, maxTargetDist + 90));
+  const maxRadius = Math.max(arena.width, arena.height) * 1.25;
+
   const grad = ctx.createRadialGradient(
-    drawX, drawY, 50, // Spotlight radius where both fighters remain fully lit
+    drawX, drawY, spotlightInnerR * 0.4,
     drawX, drawY, maxRadius
   );
   
@@ -798,8 +826,8 @@ export function drawMahoragaLevel8DimScreen() {
   const opacity = baseDimOpacity + pulse * currentMahoLevel8DimOpacity;
   
   grad.addColorStop(0, 'rgba(0, 0, 0, 0.0)'); // Fully bright spotlight center
-  grad.addColorStop(0.2, `rgba(14, 8, 2, ${opacity * 0.4})`); // Golden-brown highlight transition
-  grad.addColorStop(0.5, `rgba(6, 3, 1, ${opacity * 0.88})`); // Very dark golden-brown
+  grad.addColorStop(Math.min(0.7, (spotlightInnerR / maxRadius)), `rgba(14, 8, 2, ${opacity * 0.35})`); // Golden-brown highlight transition
+  grad.addColorStop(0.8, `rgba(6, 3, 1, ${opacity * 0.88})`); // Very dark golden-brown
   grad.addColorStop(1.0, `rgba(0, 0, 0, ${opacity * 0.99})`); // Absolute black border
 
   ctx.fillStyle = grad;

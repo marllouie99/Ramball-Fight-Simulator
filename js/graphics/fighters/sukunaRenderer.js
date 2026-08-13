@@ -235,25 +235,29 @@ export class SukunaRenderer {
 
     // 1. Martial Arts Brawler Guard Stance & 1-2 Flurry Punch Animation (Matching Todo & Gojo)
     if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion) {
-      const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 16;
+      const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
-      const easePunch = Math.sin(rawProgress * Math.PI);
+      let easePunch = 0;
+      if (rawProgress < 0.28) {
+        easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
+      } else {
+        const retractT = (rawProgress - 0.28) / 0.72;
+        easePunch = Math.cos(retractT * (Math.PI / 2));
+      }
       const lungeExtension = easePunch * (r * 1.5);
-      const oppositeRecoil = -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25);
+      const oppositeRecoil = -Math.sin(rawProgress * Math.PI) * (r * 0.20);
 
-      frontHandX_loc = r * 0.85; frontHandY_loc = r * 0.15;
-      backHandX_loc  = 0;        backHandY_loc  = -r * 0.15;
+      frontHandX_loc = 0; frontHandY_loc = 0;
+      backHandX_loc  = 0; backHandY_loc  = 0;
 
       if (fighter.punchAnimHand === 0) {
         // --- LEAD HAND PUNCH ---
-        frontHandX_loc += lungeExtension * 1.40;
-        frontHandY_loc += (0.08 - frontHandY_loc) * easePunch;
-        backHandX_loc  += oppositeRecoil;
+        frontHandX_loc = r * 0.85 + lungeExtension * 1.40;
+        backHandX_loc  = r * 1.05 + oppositeRecoil;
       } else {
         // --- REAR HAND PUNCH ---
-        backHandX_loc  += lungeExtension * 1.60;
-        backHandY_loc  += (0.08 - backHandY_loc) * easePunch;
-        frontHandX_loc += oppositeRecoil;
+        backHandX_loc  = r * 1.05 + lungeExtension * 1.60;
+        frontHandX_loc = oppositeRecoil;
       }
     }
 

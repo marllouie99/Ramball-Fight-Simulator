@@ -209,6 +209,8 @@ export function renderGame() {
         updateHybridSukunaFuga();
         updateHybridCronospheres();
 
+
+
         const isDomainClash = state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
 
         // WebGL particles are rendered automatically by the PixiJS scene graph.

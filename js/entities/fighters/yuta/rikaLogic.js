@@ -34,6 +34,8 @@ export function initRika(fighter) {
     owner: fighter,
     hasSummonedAt50Hp: false,
     hitStunTimer: 0,
+    paralyzeTimer: 0,
+    isParalyzedByMahoraga: false,
     timeStopTimer: 0,
     hitFlashTimer: 0,
     activeTrembleSound: null,
@@ -47,10 +49,10 @@ export function initRika(fighter) {
       if (this.owner && (this.owner.isChannelingPureLoveBeam || this.owner.isFiringPureLoveBeam || (this.owner.rikaEmergingForBeamTimer > 0) || (this.owner.pureLoveBeamBreatherTimer > 0))) {
         return; // Ignore hit stun during Pure Love Beam firing
       }
-      if (duration > this.hitStunTimer) this.hitStunTimer = duration;
+      if (duration > (this.hitStunTimer || 0)) this.hitStunTimer = duration;
     },
     applyTimeStop: function(duration) {
-      if (duration > this.timeStopTimer) this.timeStopTimer = duration;
+      if (duration > (this.timeStopTimer || 0)) this.timeStopTimer = duration;
     },
     applyKnockback: function(vx, vy) {
       if (this.owner && (this.owner.isChannelingPureLoveBeam || this.owner.isFiringPureLoveBeam || (this.owner.rikaEmergingForBeamTimer > 0) || (this.owner.pureLoveBeamBreatherTimer > 0))) {
@@ -64,11 +66,18 @@ export function initRika(fighter) {
     applyShock: function() {},
     takeDamage: function(amount, attacker, opts = {}) {
       if (this.disappearing || !this.active || this.hp <= 0) return false;
-      this.hp -= amount;
-      this.hitFlashTimer = 8;
+      this.hp = Math.max(0, this.hp - (amount || 0));
+      this.hitFlashTimer = 12;
+
+      if (opts && (opts.isWallSlam || opts.isParalyzed)) {
+        const stunDur = CONFIG.mahoraga?.wallSlamParalyzeDuration || 90;
+        this.hitStunTimer = Math.max(this.hitStunTimer || 0, stunDur);
+        this.paralyzeTimer = stunDur;
+        this.isParalyzedByMahoraga = true;
+      }
       
       // Floating text
-      if (typeof spawnFloatingText === 'function') {
+      if (typeof spawnFloatingText === 'function' && amount > 0) {
         const text = opts.isCrit ? `CRIT! ${Math.floor(amount)}` : Math.floor(amount);
         const color = opts.isCrit ? '#ff0000' : '#ffffff';
         spawnFloatingText(this.x, this.y - this.r - 10, text, color);
@@ -88,12 +97,30 @@ export function updateRika(fighter, arena) {
                    (fighter.crimsonElectrifiedTimer > 0) || (fighter.isFrozenByInfinity);
                    
   if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || (fighter.rikaEmergingForBeamTimer > 0) || fighter.pureLoveBeamBreatherTimer > 0) {
-    // Glue Rika directly behind Yuta's back (facing forward over his shoulders)
-    const backAngle = fighter.gunAngle + Math.PI;
+    // Glue Rika behind Yuta's back with a smooth orbital follow delay so her position lags naturally when Yuta aims
+    if (rk.beamFollowAngle === undefined) {
+      rk.beamFollowAngle = fighter.gunAngle || 0;
+    }
+    let diff = (fighter.gunAngle || 0) - rk.beamFollowAngle;
+    while (diff < -Math.PI) diff += Math.PI * 2;
+    while (diff > Math.PI) diff -= Math.PI * 2;
+    rk.beamFollowAngle += diff * 0.085; // Organic lag factor (~12 frames delay)
+
+    const backAngle = rk.beamFollowAngle + Math.PI;
     const backDist = (fighter.r || 22) + 24;
     rk.x = fighter.x + Math.cos(backAngle) * backDist;
     rk.y = fighter.y + Math.sin(backAngle) * backDist;
-    rk.angle = fighter.gunAngle;
+
+    // Strict clamping within arena boundaries so Rika never clips out
+    if (arena) {
+      const minX = (arena.x || 50) + rk.r;
+      const maxX = (arena.x || 50) + (arena.width || 1100) - rk.r;
+      const minY = (arena.y || 50) + rk.r;
+      const maxY = (arena.y || 50) + (arena.height || 700) - rk.r;
+      rk.x = Math.max(minX, Math.min(maxX, rk.x));
+      rk.y = Math.max(minY, Math.min(maxY, rk.y));
+    }
+    rk.angle = rk.beamFollowAngle;
     rk.vx = 0;
     rk.vy = 0;
     rk.knockbackVx = 0;
@@ -135,6 +162,10 @@ export function updateRika(fighter, arena) {
     // Trigger "Come, Rika!" audio (comerika.mp3) and freeze Yuta's movement
     rk.playedComeRikaSound = true;
     fighter.rikaCallTimer = chargeDuration; // Freeze Yuta's movement and hold Katana pose
+    const hpRatio = fighter.hp / (fighter.maxHp || 200);
+    if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15)) {
+      fighter._rikaSummonedForBeam = true;
+    }
     fighter.vx = 0;
     fighter.vy = 0;
     if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - 35, 'COME, RIKA!', '#FF1493');
@@ -148,6 +179,7 @@ export function updateRika(fighter, arena) {
         1.0, 0,
         CONFIG.yuta.comeRikaDelay ?? 0
       );
+      fighter._lastComeRikaPlayTime = state.frameCount;
     }
   } else if (!rk.active && rk.hasSummonedAt50Hp && !fighter.isDying && fighter.hp > 0 && (rk.chargeTimer || 0) <= 0) {
     // Re-summon Trigger: Fills up as Yuta takes damage (inside OR outside domain) after Rika died!
@@ -164,6 +196,10 @@ export function updateRika(fighter, arena) {
       rk.chargeTimer = chargeDuration;
       rk.playedComeRikaSound = true;
       fighter.rikaCallTimer = chargeDuration;
+      const hpRatio = fighter.hp / (fighter.maxHp || 200);
+      if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15)) {
+        fighter._rikaSummonedForBeam = true;
+      }
       fighter.vx = 0;
       fighter.vy = 0;
       if (typeof spawnFloatingText === 'function') spawnFloatingText(fighter.x, fighter.y - 35, 'COME, RIKA!', '#FF1493');
@@ -177,6 +213,7 @@ export function updateRika(fighter, arena) {
           1.0, 0,
           CONFIG.yuta.comeRikaDelay ?? 0
         );
+        fighter._lastComeRikaPlayTime = state.frameCount;
       }
     }
   }
@@ -622,18 +659,27 @@ export function updateRika(fighter, arena) {
     rk.hitFlashTimer--;
   }
 
-  // Handle paralysis / time stop (Gojo's Domain Expansion / Unlimited Void)
+  // Handle paralysis / time stop (Gojo's Domain Expansion / Unlimited Void / Mahoraga Wall Slam Paralyze)
   if (rk.timeStopTimer > 0) {
     rk.timeStopTimer--;
     rk.vx = 0;
     rk.vy = 0;
     return; // Completely frozen!
   }
-  if (rk.hitStunTimer > 0) {
-    rk.hitStunTimer--;
+
+  if (rk.paralyzeTimer > 0) {
+    rk.paralyzeTimer--;
+  }
+
+  const isRikaParalyzed = (rk.hitStunTimer || 0) > 0 || (rk.paralyzeTimer || 0) > 0 || rk.isParalyzedByMahoraga;
+  if (isRikaParalyzed) {
+    if (rk.hitStunTimer > 0) rk.hitStunTimer--;
+    if ((rk.paralyzeTimer || 0) <= 0 && (rk.hitStunTimer || 0) <= 0) {
+      rk.isParalyzedByMahoraga = false;
+    }
     rk.vx = 0;
     rk.vy = 0;
-    return; // Stunned!
+    return; // Completely frozen by hit stun or paralyze debuff!
   }
 
   // Find target for Rika

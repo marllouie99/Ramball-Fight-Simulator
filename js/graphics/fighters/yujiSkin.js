@@ -4,7 +4,7 @@
 // uniform — same simple block style as Gojo.
 // ─────────────────────────────────────────────
 
-import { getHandSize } from '../../core/config.js';
+import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
 /**
@@ -170,41 +170,96 @@ export function drawYujiSkin(ctx, fighter) {
   const isPunching = fighter.punchAnimTimer > 0;
   let rawProgress = 0;
   if (isPunching) {
-    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 22;
+    const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 14;
     rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
   }
 
-  const easePunch = Math.sin(rawProgress * Math.PI);
+  let easePunch = 0;
+  if (isPunching) {
+    if (rawProgress < 0.28) {
+      easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
+    } else {
+      const retractT = (rawProgress - 0.28) / 0.72;
+      easePunch = Math.cos(retractT * (Math.PI / 2));
+    }
+  }
   const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
-  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25) : 0;
+  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI) * (r * 0.20) : 0;
 
   let frontX, frontY, backX, backY;
+  let hideFrontHand = false;
+  let hideBackHand = false;
+  fighter.hideFrontHand = false;
+  fighter.hideBackHand = false;
 
-  if (isPunching) {
-    frontX = -r * 0.55; frontY = r * 0.35;
-    backX  =  r * 0.55; backY  = r * 0.35;
+  const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
+  const isSlashActive = (fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0);
+
+  // Single-Handed Sukuna Slash Swing Chop Animation (Matching Sukuna's rotational hand chop across body)
+  if (isSlashActive) {
+    const maxT = fighter.slashSwingMaxTimer || 14;
+    let rawT = 0;
+    if (fighter.slashSwingTimer > 0) {
+      rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+    } else if (fighter.punchAnimTimer > 0) {
+      const maxP = fighter.punchActiveMaxTime || fighter.punchMaxTime || 22;
+      rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxP)));
+    } else {
+      const slashCd = CONFIG.yuji?.soulSwapRapidSlashCooldown || 20;
+      const timerVal = fighter.rapidSlashTimer || 0;
+      rawT = Math.min(1.0, Math.max(0.0, 1.0 - (timerVal / slashCd)));
+    }
+
+    // Rotational slicing arc (Matching Sukuna's exact hand chop swing):
+    // Left hand (1) swings top-to-bottom (-90° to +90°).
+    // Right hand (0) swings bottom-to-top (+90° to -90°).
+    const startAngle = (fighter.slashHand === 1) ? -Math.PI / 2 : Math.PI / 2;
+    const endAngle   = (fighter.slashHand === 1) ?  Math.PI / 2 : -Math.PI / 2;
+    const chopAngle  = startAngle + rawT * (endAngle - startAngle);
+
+    const lungeOut = Math.sin(rawT * Math.PI) * (r * 1.5);
+    const chopX = Math.cos(chopAngle) * (r * 0.9) + lungeOut;
+    const chopY = Math.sin(chopAngle) * (r * 1.4);
+
+    if (fighter.slashHand === 1) {
+      // Left hand (back hand) chops across body! Hide right hand (front hand).
+      backX = chopX;
+      backY = chopY;
+      frontX = 0; frontY = 0;
+      hideFrontHand = true;
+    } else {
+      // Right hand (front hand) chops across body! Hide left hand (back hand).
+      frontX = chopX;
+      frontY = chopY;
+      backX = 0; backY = 0;
+      hideBackHand = true;
+    }
+  } else if (isPunching && !isSukunaForm) {
+    frontX = 0; frontY = 0;
+    backX  = 0; backY  = 0;
 
     if (fighter.isRightPunch) {
-      frontX += lungeExtension * 1.40;
-      frontY += (0.12 - frontY) * easePunch;
-      backX  += oppositeRecoil;
+      frontX = r * 0.85 + lungeExtension * 1.40;
+      backX  = r * 1.05 + oppositeRecoil;
     } else {
-      backX  += lungeExtension * 1.60;
-      backY  += (0.12 - backY) * easePunch;
-      frontX += oppositeRecoil;
+      backX  = r * 1.05 + lungeExtension * 1.60;
+      frontX = oppositeRecoil;
     }
+  } else if (isSukunaForm) {
+    // Idle brawler / cleave guard stance during Sukuna transformation (both hands ready)
+    frontX = r * 0.85; frontY =  r * 0.25;
+    backX  = r * 1.05; backY  = -r * 0.25;
   } else {
-    // Idle brawler guard stance: outer hand extends forward toward enemy at shoulder height
-    frontX = r * 0.85; frontY = r * 0.15;
-    backX  = 0;        backY  = -r * 0.15;
+    // Idle brawler guard stance: front hand (top layer) centered at (0, 0), back hand (back layer) peeking out at (r * 1.05, 0)
+    frontX = 0;        frontY = 0;
+    backX  = r * 1.05; backY  = 0;
   }
 
   const handRadius = getHandSize(7.5);
-  const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
   const skinColor = isSukunaForm ? '#C03030' : '#F0C090';
 
   // 1. Render Back Hand (Back Layer - Behind Body Circle)
-  if (!fighter._isWinnerReveal) {
+  if (!fighter._isWinnerReveal && !hideBackHand) {
     _drawFist(ctx, backX, backY, handRadius, skinColor, fighter);
   }
 
@@ -490,7 +545,7 @@ export function drawYujiSkin(ctx, fighter) {
   }
 
   // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
-  if (!fighter._isWinnerReveal) {
+  if (!fighter._isWinnerReveal && !hideFrontHand) {
     _drawFist(ctx, frontX, frontY, handRadius, skinColor, fighter);
   }
 

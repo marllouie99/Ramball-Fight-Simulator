@@ -35,8 +35,8 @@ function playYujiPunchSound(disableVoice = false) {
  * Performs a frontal-arc collision check against all enemies.
  */
 export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
-  // If already punching, don't restart (unless it's a combo flurry punch)
-  if (!isCombo && this.punchAnimTimer > 0) return;
+  // If already punching or slashing, don't restart (unless it's a combo flurry punch)
+  if (!isCombo && (this.punchAnimTimer > 0 || this.slashSwingTimer > 0)) return;
 
   const isZone = (this.blackFlashTimer > 0);
   
@@ -55,14 +55,21 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
     }
   }
 
-  // Start punch animation (combo punches are faster: 8 frames)
-  const normalSpeed = this.punchMaxTime || 25;
-  const zoneSpeed = CONFIG.yuji?.blackFlashZonePunchSpeed || 16;
-  this.punchAnimTimer = isCombo ? 8 : (isZone ? zoneSpeed : normalSpeed);
-  
-  this.isRightPunch = !this.isRightPunch;
-  this.hideFrontHand = false;
-  this.hideBackHand = false;
+  // Start attack animation (when transformed as Sukuna, use slash swing chop instead of punch)
+  if (this.soulSwapActive) {
+    this.punchAnimTimer = 0;
+    this.slashGlowTimer = 25;
+    this.slashSwingTimer = 14;
+    this.slashSwingMaxTimer = 14;
+    this.slashHand = this.slashHand === 1 ? 0 : 1;
+  } else {
+    const normalSpeed = this.punchMaxTime || 25;
+    const zoneSpeed = CONFIG.yuji?.blackFlashZonePunchSpeed || 16;
+    this.punchAnimTimer = isCombo ? 8 : (isZone ? zoneSpeed : normalSpeed);
+    this.isRightPunch = !this.isRightPunch;
+    this.hideFrontHand = false;
+    this.hideBackHand = false;
+  }
 
   // Set attack cooldown (none during combo)
   if (!isCombo) {

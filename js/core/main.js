@@ -202,6 +202,32 @@ document.getElementById('btn-fps')?.addEventListener('click', (e) => {
   e.target.innerText = '📊 FPS & LOGS: ' + (state.hideFpsLogs ? 'OFF' : 'ON');
 });
 
+// Function to sync Cinefilm overlay state
+export function updateCinefilmOverlay() {
+  const overlay = document.getElementById('cinefilm-overlay');
+  const btn = document.getElementById('btn-cinefilm');
+  if (overlay) {
+    if (state.cinefilmFilter) {
+      overlay.classList.add('active');
+    } else {
+      overlay.classList.remove('active');
+    }
+  }
+  if (btn) {
+    btn.innerText = '🎞️ CINEFILM FILTER: ' + (state.cinefilmFilter ? 'ON' : 'OFF');
+  }
+}
+
+// Initialize Cinefilm Filter from localStorage
+state.cinefilmFilter = localStorage.getItem('cinefilmFilter') === 'true';
+updateCinefilmOverlay();
+
+document.getElementById('btn-cinefilm')?.addEventListener('click', () => {
+  state.cinefilmFilter = !state.cinefilmFilter;
+  localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
+  updateCinefilmOverlay();
+});
+
 document.getElementById('btn-leaderboard')?.addEventListener('click', () => {
   state.gameState = 'leaderboard';
 });

@@ -1499,7 +1499,7 @@ export class YutaRenderer {
 
   static _drawYutaSwordBag(ctx, fighter) {
     ctx.save();
-    ctx.translate(fighter.x, fighter.y);
+    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
     ctx.rotate(fighter.gunAngle); // Align with his facing direction so the back stays opposite to his target
     ctx.scale(1.2, 1.2);       // Scale bag identically to the katana
 

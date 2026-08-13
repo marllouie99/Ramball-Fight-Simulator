@@ -10,13 +10,27 @@ export const ParticleRegistry = {
   }),
   parrySpark: () => {
     const rand = Math.random();
-    const color = rand > 0.5 ? 'rgba(255, 255, 255, 1)' : (rand > 0.25 ? 'rgba(255, 215, 0, 1)' : 'rgba(255, 105, 180, 1)');
+    const color = rand > 0.6 ? 'rgba(255, 255, 255, 1)' : (rand > 0.3 ? 'rgba(255, 220, 90, 1)' : 'rgba(255, 120, 20, 1)');
     return {
       color,
-      decay: 0.05 + Math.random() * 0.07,
-      size: 2.0 + Math.random() * 3.5,
-      speed: 4 + Math.random() * 10,
-      friction: 0.90,
+      decay: 0.04 + Math.random() * 0.05,
+      size: 1.8 + Math.random() * 2.8,
+      speed: 8 + Math.random() * 16,
+      friction: 0.89,
+      isFlash: false
+    };
+  },
+  parryEmberStar: () => {
+    const rand = Math.random();
+    const color = rand > 0.5 ? 'rgba(255, 255, 255, 1)' : (rand > 0.25 ? 'rgba(255, 220, 80, 1)' : 'rgba(255, 130, 30, 1)');
+    return {
+      color,
+      decay: 0.035 + Math.random() * 0.045,
+      size: 2.2 + Math.random() * 3.2,
+      speed: 3 + Math.random() * 10,
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.35,
+      friction: 0.92,
       isFlash: false
     };
   },
@@ -119,6 +133,15 @@ export const ParticleRegistry = {
       isFlash: false
     };
   },
+  yutaBeamPinkCore: () => ({
+    color: 'rgba(255, 20, 147, 1)',
+    decay: 0.008 + Math.random() * 0.008,
+    size: 3.0 + Math.random() * 5.0,
+    speed: 0.3 + Math.random() * 1.5,
+    friction: 0.96,
+    isFlash: false,
+    isPinkCore: true
+  }),
   paleStoneShatter: () => {
     const rand = Math.random();
     let color = 'rgba(254, 240, 138, 1)';
