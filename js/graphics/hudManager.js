@@ -363,6 +363,19 @@ function updateHealthHud() {
   if (!_cachedBottomLeft) _cachedBottomLeft = document.getElementById('hudBottomLeft');
   if (!_cachedBottomRight) _cachedBottomRight = document.getElementById('hudBottomRight');
 
+  const checkHasTeammate = (f) => {
+    if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
+      const myIndex = state.fighters.indexOf(f);
+      if (myIndex !== -1) {
+        const myTeam = state.getFighterTeam(myIndex);
+        if (myTeam !== null) {
+          return state.fighters.some((other, idx) => idx !== myIndex && other && !other.isTurret && state.getFighterTeam(idx) === myTeam);
+        }
+      }
+    }
+    return false;
+  };
+
   const getSkillDataForFighter = (f) => {
     if (f.characterId === 'gojo' || f.type === 'gojo') {
       const themeColor = '#0055ff'; 
@@ -819,6 +832,13 @@ function updateHealthHud() {
         beamPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - beamThreshold)) * 100));
       }
 
+      if (checkHasTeammate(f)) {
+        return [
+          { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' },
+          { id: 'beam',   pct: beamPct,   ready: beamPct >= 99 && (rk && rk.active) && beamCdTimer <= 0, color: themeColor, label: 'PURE LOVE BEAM' }
+        ];
+      }
+
       return [
         { id: 'rika',   pct: rikaPct,   ready: rikaPct >= 99 && (!rk || !rk.active), color: themeColor, label: 'RIKA SUMMON' },
         { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' },
@@ -928,43 +948,55 @@ function updateHealthHud() {
 
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
-      
-      if (isRikaAlive) {
-        const dmgMult = typeof f.getRikaDamageMultiplier === 'function' ? f.getRikaDamageMultiplier() : (CONFIG.yuta?.domainRikaDamageMultiplier || 2.0);
-        const boostDmg = Math.round(baseDmg * (dmgMult - 1));
-        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>DMG:</b> ${baseDmg}`);
-      }
-      
-      const isGuarding = (f.blockPoseTimer || 0) > 0;
-      const baseParryRatio = isGuarding ? (CONFIG.yuta?.parryActiveChance ?? 0.90) : (CONFIG.yuta?.parryPassiveChance ?? 0.90);
-      const parryStacks = f.parryStacks || 0;
-      const parryBonus = Math.round(parryStacks * (CONFIG.yuta?.parryChancePerStack ?? 0.05) * 100);
-      const baseParryVal = Math.round(baseParryRatio * 100);
-      const totalParryVal = Math.min(98, baseParryVal + parryBonus);
-
-      const isSummoningRika = typeof f.isSummoningRika === 'function' ? f.isSummoningRika() : ((f.rikaCallTimer || 0) > 0 || (f.rika && ((f.rika.chargeTimer || 0) > 0 || (f.rika.spawnTimer || 0) > 0)));
-
-      if (isSummoningRika) {
-        info.push(`<b>Parry Chance:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
-      } else if (parryBonus > 0) {
-        info.push(`<b>Parry Chance:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else if (isGuarding) {
-        info.push(`<b>Parry Chance:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>Parry Chance:</b> ${totalParryVal}%`);
-      }
-
       const baseRegen = CONFIG.yuta?.regenRate || 0.05;
-      if (f.domainActive || isRikaAlive) {
-        const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
-        const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
-        const rctRate = domainRctHealRate * regenMult;
-        const bonusRegen = rctRate - baseRegen;
-        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+
+      if (checkHasTeammate(f)) {
+        if (f.domainActive || isRikaAlive) {
+          const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
+          const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
+          const rctRate = domainRctHealRate * regenMult;
+          const bonusRegen = rctRate - baseRegen;
+          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
+        }
       } else {
-        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
+        if (isRikaAlive) {
+          const dmgMult = typeof f.getRikaDamageMultiplier === 'function' ? f.getRikaDamageMultiplier() : (CONFIG.yuta?.domainRikaDamageMultiplier || 2.0);
+          const boostDmg = Math.round(baseDmg * (dmgMult - 1));
+          info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>DMG:</b> ${baseDmg}`);
+        }
+        
+        const isGuarding = (f.blockPoseTimer || 0) > 0;
+        const baseParryRatio = isGuarding ? (CONFIG.yuta?.parryActiveChance ?? 0.90) : (CONFIG.yuta?.parryPassiveChance ?? 0.90);
+        const parryStacks = f.parryStacks || 0;
+        const parryBonus = Math.round(parryStacks * (CONFIG.yuta?.parryChancePerStack ?? 0.05) * 100);
+        const baseParryVal = Math.round(baseParryRatio * 100);
+        const totalParryVal = Math.min(98, baseParryVal + parryBonus);
+
+        const isSummoningRika = typeof f.isSummoningRika === 'function' ? f.isSummoningRika() : ((f.rikaCallTimer || 0) > 0 || (f.rika && ((f.rika.chargeTimer || 0) > 0 || (f.rika.spawnTimer || 0) > 0)));
+
+        if (isSummoningRika) {
+          info.push(`<b>Parry Chance:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
+        } else if (parryBonus > 0) {
+          info.push(`<b>Parry Chance:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else if (isGuarding) {
+          info.push(`<b>Parry Chance:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Parry Chance:</b> ${totalParryVal}%`);
+        }
+
+        if (f.domainActive || isRikaAlive) {
+          const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
+          const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
+          const rctRate = domainRctHealRate * regenMult;
+          const bonusRegen = rctRate - baseRegen;
+          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
+        }
       }
     } else if (f.characterId === 'yuji' || f.type === 'yuji') {
       const punchBase = CONFIG.yuji?.punchDamage || 18;
