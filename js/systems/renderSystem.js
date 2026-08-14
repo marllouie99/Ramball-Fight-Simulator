@@ -12,7 +12,8 @@ import {
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
-  drawGenosSpeedLines, drawMahoragaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen
+  drawGenosSpeedLines, drawMahoragaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
+  drawTodoTakadaIdolScreenOverlay
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -200,6 +201,7 @@ export function renderGame() {
         }
 
         drawGenosSpeedLines(); // Full-screen anime action speed lines during Machine Gun Blows
+        drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
         drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
         drawIllusions(); // Draw Doppleganger illusions
         drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions

@@ -20,32 +20,97 @@ export function drawGojoWeapon(ctx, fighter) {
     const transition = fighter.orbTransition !== undefined ? fighter.orbTransition : (fighter.isMeleeMode ? 0 : 1);
 
     if (fighter.isChannelingPurple) {
-        // Red orb on right hand, Blue orb on left hand merging in the center
         const mergeProgress = fighter.getPurpleChargeProgress(); // 0 to 1
-        
-        const rightY = handSpread * (1 - mergeProgress);
-        const leftY = -handSpread * (1 - mergeProgress);
-        
-        // Red Orb
-        const redR = handRadius * (1 + mergeProgress * 0.5);
-        drawGojoOrb(ctx, handDistance, rightY, redR, Date.now(), 'red', 0);
+        const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
-        // Blue Orb
-        const blueR = handRadius * (1 + mergeProgress * 0.5);
-        drawGojoOrb(ctx, handDistance, leftY, blueR, Date.now(), 'blue', 0);
-        
-        if (mergeProgress > 0.5) {
-            // Smooth fade-in progress for lens flare as Red & Blue fuse
-            const flareP = (mergeProgress - 0.5) / 0.5; // 0.0 to 1.0
-            
-            // Purple flash in center
-            if (mergeProgress > 0.75) {
-                const pScale = (mergeProgress - 0.75) / 0.25; // 0 to 1
-                drawGojoOrb(ctx, handDistance, 0, handRadius * 2.5 * pScale, Date.now(), 'purple', pScale * 5);
+        if (is200) {
+            // 200% Hollow Purple Custom Animation Sequence:
+            // 1. Red & Blue float high near top boundary of Limitless Infinity (-r * 2.8) with wide gap (r * 2.8)
+            const headX = -r * 2.8;
+
+            if (mergeProgress < 0.70) {
+                // Red & Blue float high with wide gap and move inward toward center above head
+                const moveP = mergeProgress / 0.70; // 0.0 -> 1.0
+                const easeMove = Math.sin(moveP * Math.PI * 0.5);
+                const handSpreadY = r * 2.8;
+                const spreadY = handSpreadY * (1 - easeMove);
+                const t = Date.now();
+
+                // Red Orb (floating high above right side - scaled up)
+                drawGojoOrb(ctx, headX, spreadY, handRadius * 2.8, t, 'red', 0);
+                // Blue Orb (floating high above left side - scaled up)
+                drawGojoOrb(ctx, headX, -spreadY, handRadius * 2.8, t, 'blue', 0);
+
+                // Electric energy arcs between Red and Blue orbs (intensify as they approach)
+                if (moveP > 0.15) {
+                    const arcIntensity = Math.min(1.0, (moveP - 0.15) / 0.55);
+                    const arcCount = 3 + Math.floor(arcIntensity * 3);
+                    ctx.save();
+                    ctx.lineWidth = 1.2 + arcIntensity * 1.0;
+                    ctx.lineCap = 'round';
+                    for (let a = 0; a < arcCount; a++) {
+                        const seed = a * 3141.59;
+                        const alpha = 0.25 + arcIntensity * 0.45 + Math.sin(t * 0.02 + seed) * 0.15;
+                        // Alternate red-purple and blue-purple arcs
+                        ctx.strokeStyle = a % 2 === 0
+                            ? `rgba(255, 120, 200, ${alpha})`
+                            : `rgba(120, 180, 255, ${alpha})`;
+                        ctx.beginPath();
+                        ctx.moveTo(headX, spreadY);
+                        // Jagged midpoint with jitter
+                        const midX = headX + Math.sin(t * 0.015 + seed) * 6;
+                        const midY = (Math.sin(t * 0.012 + seed * 0.7) * 12) * (a / arcCount - 0.5);
+                        ctx.quadraticCurveTo(midX, midY, headX, -spreadY);
+                        ctx.stroke();
+                    }
+                    ctx.restore();
+                }
+            } else {
+                // Fused into Purple orb above head, then glides forward as hands aim at enemy (0.70 -> 1.0)
+                const aimP = Math.min(1.0, (mergeProgress - 0.70) / 0.30);
+                const easeAim = Math.sin(aimP * Math.PI * 0.5);
+                const t = Date.now();
+
+                const orbX = headX + (handDistance + 15 - headX) * easeAim;
+                const orbR = handRadius * 3.8 * (1.0 + easeAim * 0.5); // Massive empowered 200% Purple orb!
+
+                // Pulsating energy ring around 200% Purple orb
+                ctx.save();
+                ctx.translate(orbX, 0);
+                ctx.rotate(t * 0.004);
+                ctx.strokeStyle = `rgba(200, 100, 255, ${0.35 + easeAim * 0.2})`;
+                ctx.lineWidth = 2.0;
+                ctx.beginPath();
+                ctx.arc(0, 0, orbR * 2.0 * (1.0 + Math.sin(t * 0.007) * 0.06), 0, Math.PI * 1.5);
+                ctx.stroke();
+                ctx.restore();
+
+                drawGojoOrb(ctx, orbX, 0, orbR, t, 'purple', 8 * easeAim);
+                drawAnamorphicLensFlare(ctx, orbX, 0, 1.0);
+                // Second smaller vertical flare for cross-flare effect
+                drawAnamorphicLensFlare(ctx, orbX, 0, 0.5, 'red');
             }
+        } else {
+            // Standard 100% Purple Animation
+            const rightY = handSpread * (1 - mergeProgress);
+            const leftY = -handSpread * (1 - mergeProgress);
 
-            // Draw Anamorphic Blue Lens Flare Beam (fades in smoothly as orbs fuse)
-            drawAnamorphicLensFlare(ctx, handDistance, 0, flareP);
+            // Red Orb
+            const redR = handRadius * (1 + mergeProgress * 0.5);
+            drawGojoOrb(ctx, handDistance, rightY, redR, Date.now(), 'red', 0);
+
+            // Blue Orb
+            const blueR = handRadius * (1 + mergeProgress * 0.5);
+            drawGojoOrb(ctx, handDistance, leftY, blueR, Date.now(), 'blue', 0);
+
+            if (mergeProgress > 0.5) {
+                const flareP = (mergeProgress - 0.5) / 0.5;
+                if (mergeProgress > 0.75) {
+                    const pScale = (mergeProgress - 0.75) / 0.25;
+                    drawGojoOrb(ctx, handDistance, 0, handRadius * 2.5 * pScale, Date.now(), 'purple', pScale * 5);
+                }
+                drawAnamorphicLensFlare(ctx, handDistance, 0, flareP);
+            }
         }
     } else {
         // Melee Mode - Hands are drawn with full punch animation in GojoFighter._drawHandCursedEnergy

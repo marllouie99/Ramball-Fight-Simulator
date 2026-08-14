@@ -405,7 +405,7 @@ export function updateIllusions() {
         const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
         if (entityTeam !== null && entityTeam === ownerTeam) continue;
       }
-      if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0) continue;
+      if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0 || (entity.vanishTimer && entity.vanishTimer > 0)) continue;
 
       const dx = entity.x - illusion.x;
       const dy = entity.y - illusion.y;

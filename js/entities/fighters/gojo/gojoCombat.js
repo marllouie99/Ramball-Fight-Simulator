@@ -23,8 +23,16 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     }
   }
 
-  const isInsideDomain = fighter.domainActive || fighter.isChannelingDomainExpansion || (state && (state.activeDomain || state.domainActive));
-  if (fighter.isMeleeMode || isInsideDomain || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0)) return false;
+  const isDomainChanneling = fighter.isDomainPreSlide || fighter.isChannelingDomainExpansion;
+  const isBreatherState = (fighter.purpleRecoveryTimer || 0) > 0 || (fighter.purpleRetreatTimer || 0) > 0;
+  if (isBreatherState || isDomainChanneling) {
+    fighter.infinityActive = true;
+    fighter.infinityCooldown = 0;
+    fighter.isMeleeMode = false;
+  }
+
+  const isInsideDomain = fighter.domainActive || (state && (state.activeDomain || state.domainActive));
+  if ((fighter.isMeleeMode && !isBreatherState && !isDomainChanneling) || isInsideDomain || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0 && !isBreatherState && !isDomainChanneling)) return false;
   
   if ((fighter.infinityActiveTimer || 0) <= 0) {
     fighter.infinityActiveTimer = CONFIG.gojo?.infinityActiveDuration ?? 60;

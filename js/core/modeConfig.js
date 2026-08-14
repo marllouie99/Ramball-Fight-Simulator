@@ -34,8 +34,8 @@ export const MODE_SETTINGS = {
     label: '1v2 Stand Off',
     rounds: 1,
     hpMultiplier: 1.0,
-    fixedHp: 1500, // For the duo
-    soloFixedHp: 1500, // For the alone fighter
+    fixedHp: 2000, // For the duo
+    soloFixedHp: 2500, // For the alone fighter
     speedMultiplier: 1.6,
     initialFuelPickups: 2,
     supportFourFighters: false, // We will manually handle 3 fighters
@@ -91,3 +91,5 @@ export const MODE_TEAM_COLORS = {
   [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO].teamColors,
   [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2].teamColors,
 };
+
+

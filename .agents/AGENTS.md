@@ -149,3 +149,22 @@ else color = 'rgba(15, 15, 22, 0.90)';        // Dark manga ink line
 ### Seed Memory & Re-activation Management
 - Cache seed arrays at module level.
 - Track ability state (e.g., `fighter._lastFlurryState`) and reset seed cache to `null` whenever a new activation begins so random offsets refresh cleanly.
+
+## 17. Domain Expansion Classification & High-Frequency Hazard Hit-Stun Standards
+
+### Domain Expansion Category Separation
+- **Paralyzing / Time-Stop Domains (Closed Barriers):** Domains that induce stasis/information overload (e.g. Gojo's *Unlimited Void*) explicitly apply `timeStopTimer` or paralyzing status effects to trapped targets.
+- **Damaging / Open-Barrier Domains:** Domains that unleash continuous spatial slashes or elemental hazard attacks (e.g. Sukuna's *Malevolent Shrine*) deal area-of-effect damage, physical push, and hit sparks over time, but MUST NOT freeze enemy update loops or trap entities in time-stop stasis.
+- **NEVER** use a generic `isEnemyDomainActive = f.domainActive` boolean check to freeze a fighter's update loop. Always verify if the active domain is explicitly a paralyzing domain (e.g. `f.characterId === 'gojo'`).
+
+### High-Frequency Hazard CC Prohibition
+- Recurring environmental or domain hazards that tick on rapid intervals (e.g. domain slashes every 8 frames) MUST NOT invoke `applyHitStun(duration)` on trapped fighters or illusions.
+- Applying multi-frame `hitStun` on rapid tick intervals refreshes the hit-stun timer faster than it decays, causing an unintended perma-freeze. High-frequency hazards must deal damage and impulse without applying CC hit-stun.
+
+### Minion / Companion AI Decoupling Standard
+- Companion entities, minions, and illusions (such as Rika, Doppelganger clones, or summons) MUST evaluate their own status effects (`rk.timeStopTimer`, `rk.electricStunTimer`) independently of their owner's transient `hitStunTimer`. An owner taking basic flinch hit-stun must never paralyze a companion's AI update loop.
+
+## 18. HUD Skill Bar Color Theme Consistency Standard
+- **Unified Character Palette**: All HUD skill progress bars for a given fighter (e.g. Basic Skill, Secondary Skill, Ultimate/Domain) MUST use the **exact same consistent color theme** (`themeColor = f.color || ...`).
+- **NEVER** assign mismatched, ad-hoc, or hardcoded accent colors to individual skill bars in `hudManager.js` (such as setting one bar to yellow and another to pink). Every skill bar returned in a fighter's HUD array MUST reference `themeColor` to preserve visual elegance and character identity.
+

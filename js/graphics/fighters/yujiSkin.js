@@ -56,15 +56,17 @@ export function drawYujiSkin(ctx, fighter) {
 
   // Black Flash Zone Visual Indicator (crackling red/black sparks) - Optimized with batched stroke calls
   if (fighter.blackFlashTimer > 0) {
-    const pulse = 0.6 + Math.sin(now * 0.015) * 0.4;
-    const sparkCount = isLowQuality ? 2 : 4;
+    const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
+    const pulse = isMatchEnded ? 0.90 : (0.6 + Math.sin(now * 0.015) * 0.4);
+    const sparkCount = isLowQuality ? 2 : (isMatchEnded ? 2 : 4);
+    const rotSpeed = isMatchEnded ? 0 : (now * 0.016);
     
     // Draw rotating black outline sparks
     ctx.strokeStyle = `rgba(0, 0, 0, ${pulse * 0.85})`;
     ctx.lineWidth = 3.2;
     ctx.beginPath();
     for (let i = 0; i < sparkCount; i++) {
-      const a = (Math.PI / 2) * i + (now * 0.016);
+      const a = (Math.PI / 2) * i + rotSpeed;
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 14), Math.sin(a) * (r + 14));
     }
@@ -75,7 +77,7 @@ export function drawYujiSkin(ctx, fighter) {
     ctx.lineWidth = 1.8;
     ctx.beginPath();
     for (let i = 0; i < sparkCount; i++) {
-      const a = (Math.PI / 2) * i + (now * 0.016);
+      const a = (Math.PI / 2) * i + rotSpeed;
       ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
       ctx.lineTo(Math.cos(a) * (r + 12), Math.sin(a) * (r + 12));
     }
@@ -86,8 +88,8 @@ export function drawYujiSkin(ctx, fighter) {
       ctx.strokeStyle = `rgba(243, 232, 255, ${pulse * 0.9})`;
       ctx.lineWidth = 0.8;
       ctx.beginPath();
-      for (let i = 0; i < 4; i++) {
-        const a = (Math.PI / 2) * i + (now * 0.016);
+      for (let i = 0; i < sparkCount; i++) {
+        const a = (Math.PI / 2) * i + rotSpeed;
         ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
         ctx.lineTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9));
       }
@@ -167,7 +169,8 @@ export function drawYujiSkin(ctx, fighter) {
   if (facingLeft) ctx.scale(1, -1);
 
   // Smooth sinusoidal punch progress (eliminates sharp cubic snapping)
-  const isPunching = fighter.punchAnimTimer > 0;
+  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
+  const isPunching = !isMatchEnded && fighter.punchAnimTimer > 0;
   let rawProgress = 0;
   if (isPunching) {
     const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 14;
@@ -193,7 +196,7 @@ export function drawYujiSkin(ctx, fighter) {
   fighter.hideBackHand = false;
 
   const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
-  const isSlashActive = (fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0);
+  const isSlashActive = !isMatchEnded && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));
 
   // Single-Handed Sukuna Slash Swing Chop Animation (Matching Sukuna's rotational hand chop across body)
   if (isSlashActive) {

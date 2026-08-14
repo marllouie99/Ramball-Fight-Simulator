@@ -11,9 +11,9 @@ export const sukunaConfig = {
     maxCritMultiplier: 2.00,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
-    reverseCursedTechniqueHpThreshold: 0.10,  // Triggers when HP drops to 30% or below
+    reverseCursedTechniqueHpThreshold: 0.25,  // Triggers when HP drops to 30% or below
     reverseCursedTechniqueHealPercent: 0.20,   // Heals 40% of max HP
-    reverseCursedTechniqueCooldown: 1200,      // 20 second cooldown before it can trigger again
+    reverseCursedTechniqueCooldown: 1500,      // 20 second cooldown before it can trigger again
 
     // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
     slashDamage: 15,          // Base damage per Dismantle / Martial Arts strike
@@ -50,7 +50,7 @@ export const sukunaConfig = {
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     divineFlameCooldown: 2000,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 120,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 100,         // Primary direct hit nuke damage
+    divineFlameDamage: 200,         // Primary direct hit nuke damage
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
     divineFlameChannelShakeIntensity: 3.0, // Channeling tremor
@@ -65,7 +65,7 @@ export const sukunaConfig = {
     domainCooldown: 1500,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
-    domainDamage: 10,          // Base damage per slash tick
+    domainDamage: 15,          // Base damage per slash tick
     domainDamageInterval: 20,  // Frames between slash ticks
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
     domainRadius: 240,        // Radius of the open-air death zone

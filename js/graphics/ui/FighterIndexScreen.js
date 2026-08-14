@@ -774,7 +774,8 @@ function drawIndexDetailScreen() {
   } else if (def.type === 'todo') {
     animBtns.push(
       { id: 'rock', label: '🪨 Rock' },
-      { id: 'clap', label: '👏 Clap' }
+      { id: 'clap', label: '👏 Clap' },
+      { id: 'takada', label: '♥ Takada' }
     );
   } else if (def.type === 'mahoraga') {
     animBtns.push(
@@ -823,6 +824,7 @@ function drawIndexDetailScreen() {
       else if (btn.id === 'stealth') audioSystem.playSFX('skill_dash5', 1.0);
       else if (btn.id === 'rock') audioSystem.playSFX('skill_dash1', 1.0);
       else if (btn.id === 'clap') audioSystem.playSFX('skill_todoclap', 2.0);
+      else if (btn.id === 'takada') audioSystem.playSFX(CONFIG.todo?.takadaVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3', 3.0);
       else if (btn.id === 'lightning') audioSystem.playSFX('skill_thunderstrike', 1.5);
       else if (btn.id === 'level8') audioSystem.playSFX('skill_dash5', 2.0);
       else if (btn.id === 'incinerate' && def.type === 'genos') {

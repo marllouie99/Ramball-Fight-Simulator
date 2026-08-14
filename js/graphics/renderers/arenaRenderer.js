@@ -537,7 +537,8 @@ export function drawPurpleDimScreen() {
   const maxDim = Math.max(arena.width, arena.height) * 0.70;
   const roundCx = Math.round((cx + shakeX) / 10) * 10;
   const roundCy = Math.round((cy + shakeY) / 10) * 10;
-  const key = `${roundCx}_${roundCy}_${maxDim}`;
+  const is200 = (purpleOrb && purpleOrb.is200Percent) || (gojoFighter && (gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1));
+  const key = `${roundCx}_${roundCy}_${maxDim}_${is200}`;
 
   if (!state._cachedPurpleDimGrad || state._cachedPurpleDimKey !== key) {
     state._cachedPurpleDimKey = key;
@@ -545,18 +546,90 @@ export function drawPurpleDimScreen() {
       roundCx, roundCy, 0,
       roundCx, roundCy, maxDim
     );
-    // Concentrates a bright purple halo immediately around the Hollow Purple orb, fading to pitch black
-    state._cachedPurpleDimGrad.addColorStop(0, 'rgba(235, 180, 255, 1.0)'); // White-purple core
-    state._cachedPurpleDimGrad.addColorStop(0.02, 'rgba(192, 85, 255, 0.95)'); // Electric purple glow
-    state._cachedPurpleDimGrad.addColorStop(0.06, 'rgba(126, 34, 206, 0.65)'); // Cursed energy ring
-    state._cachedPurpleDimGrad.addColorStop(0.12, 'rgba(6, 0, 10, 0.90)'); // Falling off to black
-    state._cachedPurpleDimGrad.addColorStop(0.28, 'rgba(0, 0, 0, 1.0)'); // Dark outer space
-    state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)'); // Pitch black boundary
+    const glowR = is200 ? 140 : 90;
+    const rRatio = glowR / maxDim;
+
+    // Concentrates a deep, highly saturated vibrant purple halo around the Hollow Purple orb, fading to pitch black
+    state._cachedPurpleDimGrad.addColorStop(0, 'rgba(210, 40, 255, 1.0)');           // Vibrant neon magenta-purple core
+    state._cachedPurpleDimGrad.addColorStop(rRatio * 0.20, 'rgba(160, 0, 255, 0.95)'); // Saturated electric royal purple
+    state._cachedPurpleDimGrad.addColorStop(rRatio * 0.55, 'rgba(120, 0, 220, 0.75)');  // Deep JJK cursed purple ring
+    state._cachedPurpleDimGrad.addColorStop(rRatio * 1.00, 'rgba(75, 0, 150, 0.45)');   // Dark violet halo bloom
+    state._cachedPurpleDimGrad.addColorStop(rRatio * 1.50, 'rgba(30, 0, 70, 0.20)');    // Deep night-purple transition
+    state._cachedPurpleDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
+    state._cachedPurpleDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
   }
 
   ctx.globalAlpha = opacity;
   ctx.fillStyle = state._cachedPurpleDimGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // ── Render vibrant Red & Blue radiant bloom halos during Hollow Purple mixing phase ──
+  if (gojoFighter && gojoFighter.isChannelingPurple) {
+    const chargeMax = gojoFighter.purpleChargeMax || 120;
+    const progress = Math.min(1.0, (gojoFighter.purpleChargeTimer || 0) / Math.max(1, chargeMax));
+    const is200 = !!(gojoFighter.is200PercentChannel || gojoFighter.purpleUseCount === 1);
+
+    if (progress < 0.70) {
+      const f = gojoFighter;
+      const angle = f.gunAngle || f.angle || 0;
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+      const moveP = progress / 0.70;
+      const easeMove = Math.sin(moveP * Math.PI * 0.5);
+
+      let headX, handSpreadY;
+      if (is200) {
+        headX = -f.r * 2.8;
+        handSpreadY = f.r * 2.8;
+      } else {
+        headX = f.r + 10;
+        handSpreadY = 14;
+      }
+      const spreadY = handSpreadY * (1 - easeMove);
+
+      // Red orb canvas center (right side)
+      const redLocalX = headX;
+      const redLocalY = spreadY;
+      const redCanvasX = f.x + (redLocalX * cosA - redLocalY * sinA) + shakeX;
+      const redCanvasY = (f.y - (f.z || 0)) + (redLocalX * sinA + redLocalY * cosA) + shakeY;
+
+      // Blue orb canvas center (left side)
+      const blueLocalX = headX;
+      const blueLocalY = -spreadY;
+      const blueCanvasX = f.x + (blueLocalX * cosA - blueLocalY * sinA) + shakeX;
+      const blueCanvasY = (f.y - (f.z || 0)) + (blueLocalX * sinA + blueLocalY * cosA) + shakeY;
+
+      // Render radiant Red & Blue bloom halos over pitch-black screen dim
+      const bloomRadius = is200 ? 110 : 80;
+      ctx.save();
+      ctx.globalCompositeOperation = 'screen';
+      ctx.globalAlpha = opacity * (1.0 - progress * 0.3);
+
+      // 1. Red Bloom Halo
+      const redGrad = ctx.createRadialGradient(redCanvasX, redCanvasY, 0, redCanvasX, redCanvasY, bloomRadius);
+      redGrad.addColorStop(0, 'rgba(255, 60, 60, 1.0)');
+      redGrad.addColorStop(0.25, 'rgba(255, 0, 0, 0.90)');
+      redGrad.addColorStop(0.60, 'rgba(180, 0, 0, 0.60)');
+      redGrad.addColorStop(1.0, 'rgba(80, 0, 0, 0)');
+      ctx.fillStyle = redGrad;
+      ctx.beginPath();
+      ctx.arc(redCanvasX, redCanvasY, bloomRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 2. Blue Bloom Halo
+      const blueGrad = ctx.createRadialGradient(blueCanvasX, blueCanvasY, 0, blueCanvasX, blueCanvasY, bloomRadius);
+      blueGrad.addColorStop(0, 'rgba(80, 220, 255, 1.0)');
+      blueGrad.addColorStop(0.25, 'rgba(0, 120, 255, 0.90)');
+      blueGrad.addColorStop(0.60, 'rgba(0, 50, 220, 0.60)');
+      blueGrad.addColorStop(1.0, 'rgba(0, 20, 140, 0)');
+      ctx.fillStyle = blueGrad;
+      ctx.beginPath();
+      ctx.arc(blueCanvasX, blueCanvasY, bloomRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
 
   // Exclude Rika from Gojo's Purple dim screen overlay so she stays fully bright & un-tinted
   if (state.fighters) {

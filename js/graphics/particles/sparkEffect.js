@@ -1009,6 +1009,65 @@ export function drawSparkEffects(layer = 'all') {
         ctx.fill();
 
         ctx.globalCompositeOperation = 'source-over';
+      } else if (effect.type === 'boogieWoogieSwapBeam') {
+        // ── AOI TODO BOOGIE WOOGIE INSTANTANEOUS SWAP BEAM & LIGHTNING ARCS ──
+        const x1 = effect.x;
+        const y1 = effect.y;
+        const x2 = effect.targetX || x1;
+        const y2 = effect.targetY || y1;
+        const life = effect.life;
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'lighter';
+
+        // 1. Broad Outer Deep Cyan Spatial Distortion Energy Beam
+        ctx.strokeStyle = `rgba(0, 150, 255, ${life * 0.75})`;
+        ctx.lineWidth = 14 * life;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 2. Vivid Electric Cyan Core Swap Beam
+        ctx.strokeStyle = `rgba(0, 240, 255, ${life * 0.95})`;
+        ctx.lineWidth = 6 * life;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 3. White-Hot Central Beam Core
+        ctx.strokeStyle = `rgba(255, 255, 255, ${life * 0.98})`;
+        ctx.lineWidth = 2.5 * life;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        // 4. Jagged Spatial Lightning Arc Overlay
+        ctx.strokeStyle = `rgba(0, 240, 255, ${life * 0.90})`;
+        ctx.lineWidth = 2.0 * life;
+        ctx.beginPath();
+        ctx.moveTo(x1, y1);
+        const dx = x2 - x1;
+        const dy = y2 - y1;
+        const dist = Math.hypot(dx, dy);
+        const segs = 6;
+        const perpX = -dy / (dist || 1);
+        const perpY = dx / (dist || 1);
+
+        for (let i = 1; i < segs; i++) {
+          const t = i / segs;
+          const side = (i % 2 === 0 ? 1 : -1);
+          const jitter = side * (12 + (Math.sin(i * 3 + life * 10) * 8)) * life;
+          const cx = x1 + dx * t + perpX * jitter;
+          const cy = y1 + dy * t + perpY * jitter;
+          ctx.lineTo(cx, cy);
+        }
+        ctx.lineTo(x2, y2);
+        ctx.stroke();
+
+        ctx.restore();
       } else if (effect.type === 'meleeClashShockwave') {
         if (effect.targetSize) {
           effect.size += (effect.targetSize - effect.size) * 0.15;
@@ -1751,24 +1810,28 @@ export function drawSparkEffects(layer = 'all') {
       ctx.restore();
     } else {
       // Standard spark - small glowing dot
+      const safeColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#00E5FF';
       const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
       if (isGamePlay) {
         // During gameplay: skip per-particle radial gradient (saves huge CPU time per frame)
-        ctx.fillStyle = effect.color;
+        ctx.fillStyle = safeColor;
       } else {
         const gradient = ctx.createRadialGradient(
           effect.x, effect.y, 0,
-          effect.x, effect.y, effect.size
+          effect.x, effect.y, Math.max(0.1, effect.size || 1)
         );
-        gradient.addColorStop(0, effect.color);
-        gradient.addColorStop(0.5, effect.color.replace('1)', '0.6)'));
+        gradient.addColorStop(0, safeColor);
+        const halfColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0.6)') : safeColor;
+        gradient.addColorStop(0.5, halfColor);
         
         if (effect.type === 'crimsonSniper') {
           gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
         } else if (effect.type === 'lightningTrail') {
-          gradient.addColorStop(1, effect.color.replace(/[\d.]+\)$/, '0)'));
+          const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace(/[\d.]+\)$/, '0)') : 'rgba(0, 229, 255, 0)';
+          gradient.addColorStop(1, zeroColor);
         } else if (effect.type === 'rikaCurse') {
-          gradient.addColorStop(1, effect.color.replace('1)', '0)'));
+          const zeroColor = (typeof safeColor === 'string' && safeColor.includes('1)')) ? safeColor.replace('1)', '0)') : 'rgba(0, 0, 0, 0)';
+          gradient.addColorStop(1, zeroColor);
         } else {
           gradient.addColorStop(1, 'rgba(255, 100, 0, 0)');
         }
@@ -1776,7 +1839,7 @@ export function drawSparkEffects(layer = 'all') {
       }
 
       ctx.beginPath();
-      ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+      ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size || 1), 0, Math.PI * 2);
       ctx.fill();
     }
 
@@ -2096,6 +2159,87 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
 }
 
 /**
+ * Spawns Jujutsu Kaisen Aoi Todo Boogie Woogie Cursed Energy (CE) particle burst
+ * and quick radial anime action speed lines when Todo claps his hands.
+ * @param {number} x - Clap origin X coordinate
+ * @param {number} y - Clap origin Y coordinate
+ * @param {number} angle - Aim or trajectory angle (optional)
+ */
+export function spawnTodoClapCEParticles(x, y, angle = 0) {
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const fps = (state && state.fps) || 60;
+  const MAX_PARTICLES = isMulti ? (fps < 45 ? 80 : 140) : 250;
+
+  // 1. Dense Electric Cyan & Cursed Indigo CE Particle Burst
+  const ceCount = 18;
+  const ceColors = ['#00E5FF', '#FFFFFF', '#0099FF', '#8A2BE2', '#00FFFF', '#3A86FF'];
+  
+  for (let i = 0; i < ceCount; i++) {
+    let insertIdx = -1;
+    if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
+      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const oldest = state.sparkEffects[insertIdx];
+      if (oldest) ParticleSystem.returnParticle(oldest);
+    }
+
+    const pAngle = Math.random() * Math.PI * 2;
+    const speed = 6 + Math.random() * 12;
+
+    const p = ParticleSystem.getParticle();
+    p.x = x;
+    p.y = y;
+    p.vx = Math.cos(pAngle) * speed;
+    p.vy = Math.sin(pAngle) * speed;
+    p.size = 2.5 + Math.random() * 3.5;
+    p.life = 1.0;
+    p.decay = 0.05 + Math.random() * 0.04;
+    p.friction = 0.90;
+    p.color = ceColors[Math.floor(Math.random() * ceColors.length)];
+    p.type = 'lightningTrail';
+
+    if (state.sparkEffects) {
+      if (insertIdx !== -1) state.sparkEffects[insertIdx] = p;
+      else state.sparkEffects.push(p);
+    }
+  }
+
+  // 2. Quick Anime Radial Speed Line Vibe (Supersonic needle streaks bursting radially from clap)
+  const lineCount = 12;
+  for (let i = 0; i < lineCount; i++) {
+    let insertIdx = -1;
+    if (state.sparkEffects && state.sparkEffects.length >= MAX_PARTICLES) {
+      insertIdx = Math.floor(Math.random() * state.sparkEffects.length);
+      const oldest = state.sparkEffects[insertIdx];
+      if (oldest) ParticleSystem.returnParticle(oldest);
+    }
+
+    const lineAngle = (i / lineCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.25;
+    const lineSpeed = 10 + Math.random() * 14;
+    const distOffset = 8 + Math.random() * 15;
+
+    const line = ParticleSystem.getParticle();
+    line.x = x + Math.cos(lineAngle) * distOffset;
+    line.y = y + Math.sin(lineAngle) * distOffset;
+    line.vx = Math.cos(lineAngle) * lineSpeed;
+    line.vy = Math.sin(lineAngle) * lineSpeed;
+    line.size = 2.0 + Math.random() * 2.2;
+    line.length = 150 + Math.random() * 80;
+    line.angle = lineAngle;
+    line.life = 1.0;
+    line.decay = 0.12 + Math.random() * 0.05; // Quick burst fade (~8-10 frames) for anime impact feel
+    line.friction = 0.91;
+    line.type = 'punchWindSpeedLine';
+    line.isCore = Math.random() < 0.7;
+    line.color = Math.random() < 0.5 ? '#FFFFFF' : (Math.random() < 0.5 ? '#00E5FF' : '#00A8FF');
+
+    if (state.sparkEffects) {
+      if (insertIdx !== -1) state.sparkEffects[insertIdx] = line;
+      else state.sparkEffects.push(line);
+    }
+  }
+}
+
+/**
  * Spawns a high-contrast visual spark explosion on sword/guard parries.
  * Uses a uniform bright gold & white-hot spark palette across all parries.
  */
@@ -2157,5 +2301,57 @@ export function spawnGenosSelfDestructExplosion(x, y, radius = 220) {
   if (typeof spawnMeleeClashShockwave === 'function') {
     spawnMeleeClashShockwave(x, y, radius * 1.8, 'gojo');  // Outer glowing cyan ring
     spawnMeleeClashShockwave(x, y, radius * 1.0, 'gojo');  // Inner tight cyan ring
+  }
+}
+
+/**
+ * Spawns an epic JJK Sakuga Boogie Woogie swap visual effect connecting two swapped positions (x1,y1) and (x2,y2).
+ * Includes electric cyan vector beams, spatial shockwaves, impact flashes, and lightning sparks.
+ */
+export function spawnBoogieWoogieSwapEffect(x1, y1, x2, y2) {
+  if (!state || !state.sparkEffects) return;
+
+  // 1. Swap Lightning Vector Beam (lasts ~25 frames)
+  const beam = ParticleSystem.getParticle();
+  beam.x = x1;
+  beam.y = y1;
+  beam.targetX = x2;
+  beam.targetY = y2;
+  beam.size = 50; // MUST be finite number so line 593 doesn't skip it!
+  beam.life = 1.0;
+  beam.decay = 0.04;
+  beam.type = 'boogieWoogieSwapBeam';
+  beam.isFlash = true; // MUST be true to route into flash particle renderer!
+  beam.isPixi = false; // MUST be false for 2D Canvas rendering!
+  state.sparkEffects.push(beam);
+
+  // 2. Dual Shockwaves at both Swap Positions
+  spawnMeleeClashShockwave(x1, y1, 85, 'todo');
+  spawnMeleeClashShockwave(x2, y2, 85, 'todo');
+
+  // 3. Dual Cyan Sakuga Impact Flashes
+  spawnImpactFlash(x1, y1, 35, '#00E5FF');
+  spawnImpactFlash(x2, y2, 35, '#00E5FF');
+
+  // 4. Dense Electric Cyan Sparks along the Swap Trajectory
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const dist = Math.hypot(dx, dy);
+  const steps = Math.min(22, Math.max(8, Math.floor(dist / 25)));
+
+  for (let i = 0; i <= steps; i++) {
+    const ratio = i / steps;
+    const px = x1 + dx * ratio;
+    const py = y1 + dy * ratio;
+
+    const sparkAngle = Math.random() * Math.PI * 2;
+    const sparkSpeed = 3 + Math.random() * 8;
+    spawnSparks(px, py, 1, 'lightningTrail', {
+      color: (i % 2 === 0) ? '#00E5FF' : '#FFFFFF',
+      vx: Math.cos(sparkAngle) * sparkSpeed,
+      vy: Math.sin(sparkAngle) * sparkSpeed,
+      size: 2.0 + Math.random() * 2.5,
+      decay: 0.04 + Math.random() * 0.03
+    });
   }
 }

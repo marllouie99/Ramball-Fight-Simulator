@@ -17,7 +17,7 @@ export class AimbotFighter extends Fighter {
 
   /** Overrides aimbot behavior to lock onto opponent's position. */
   aim(opponent) {
-    if (!opponent || opponent.invincibilityTimer > 0 || opponent.flashStepTimer > 0) return;
+    if (!opponent || opponent.invincibilityTimer > 0 || opponent.flashStepTimer > 0 || opponent.vanishTimer > 0) return;
 
     const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
 

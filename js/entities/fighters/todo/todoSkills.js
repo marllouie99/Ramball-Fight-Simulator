@@ -1,10 +1,12 @@
 import { CONFIG } from '../../../core/config.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
-import { state } from '../../../core/state.js';
-import { spawnImpactFlash, spawnMeleeClashShockwave, spawnSparks } from '../../../graphics/particles/sparkEffect.js';
+import { state, spawnFloatingText } from '../../../core/state.js';
+import { spawnImpactFlash, spawnMeleeClashShockwave, spawnSparks, spawnBoogieWoogieSwapEffect, spawnTodoClapCEParticles } from '../../../graphics/particles/sparkEffect.js';
 
 export function modUpdateBoogieWoogie(targets) {
+  if (this.isTakadaChanneling) return;
   // If no targets provided directly (player mode), use state fighters
   let potentialTargets = targets && targets.length > 0 ? targets : state.fighters.filter(f => f.id !== this.id && !f.isDead);
 
@@ -36,8 +38,30 @@ export function modUpdateBoogieWoogie(targets) {
   }
 }
 
+export function hasLiveTeammate(fighter) {
+  if (!state || !state.fighters) return false;
+  const myIndex = state.fighters.indexOf(fighter);
+  if (myIndex < 0) {
+    if (fighter.team !== undefined) {
+      return state.fighters.some(other => other && other !== fighter && !other.isDead && (other.hp || 0) > 0 && !other.isTurret && !other.isIllusion && other.team === fighter.team);
+    }
+    return false;
+  }
+  const myTeam = state.getFighterTeam ? state.getFighterTeam(myIndex) : null;
+  if (myTeam !== null && myTeam !== undefined) {
+    return state.fighters.some((other, idx) => idx !== myIndex && other && !other.isDead && (other.hp || 0) > 0 && !other.isTurret && !other.isIllusion && state.getFighterTeam(idx) === myTeam);
+  }
+  if (fighter.team !== undefined) {
+    return state.fighters.some(other => other && other !== fighter && !other.isDead && (other.hp || 0) > 0 && !other.isTurret && !other.isIllusion && other.team === fighter.team);
+  }
+  return false;
+}
+
 export function modThrowCursedRock(target) {
-  // Only 1 active rock allowed at a time
+  // Disable rock throw while Todo has an active live teammate (Todo swaps with teammate naturally!)
+  if (hasLiveTeammate(this)) return;
+
+  // Only 1 active rock allowed at a time when solo/teammate dead
   if (this.cursedRocks && this.cursedRocks.length >= (CONFIG.todo?.maxRocks || 1)) return;
 
   // Angle
@@ -49,13 +73,24 @@ export function modThrowCursedRock(target) {
   }
 
   const speed = CONFIG.todo?.rockSpeed || 12;
+  const rad = 8;
+  let spawnX = this.x + Math.cos(angle) * this.r;
+  let spawnY = this.y + Math.sin(angle) * this.r;
+
+  const arena = CONFIG.arena;
+  if (arena) {
+    const wallW = arena.wallWidth || 4;
+    spawnX = Math.max(arena.x + wallW + rad, Math.min(arena.x + arena.width - wallW - rad, spawnX));
+    spawnY = Math.max(arena.y + wallW + rad, Math.min(arena.y + arena.height - wallW - rad, spawnY));
+  }
+
   const newRock = {
-    x: this.x + Math.cos(angle) * this.r,
-    y: this.y + Math.sin(angle) * this.r,
+    x: spawnX,
+    y: spawnY,
     vx: Math.cos(angle) * speed,
     vy: Math.sin(angle) * speed,
     life: CONFIG.todo?.rockLife || 240,
-    radius: 8,
+    radius: rad,
     isRock: true,
     hasTriggeredTeleport: false
   };
@@ -84,7 +119,7 @@ export function modUpdateCursedRocks(targets) {
     if (rock.y - rock.radius < arena.y + arena.wallWidth) { rock.y = arena.y + arena.wallWidth + rock.radius; rock.vy *= -1; }
     if (rock.y + rock.radius > arena.y + arena.height - arena.wallWidth) { rock.y = arena.y + arena.height - arena.wallWidth - rock.radius; rock.vy *= -1; }
 
-    if (!this.isDemoFighter && !this.rockCounterComboLeft && !rock.hasTriggeredTeleport && !this.clapWindupTimer) {
+    if (!this.isDemoFighter && !this.rockCounterComboLeft && !rock.hasTriggeredTeleport && !this.clapWindupTimer && !this.clapHoldTimer) {
       for (const enemy of enemies) {
         const distToEnemy = Math.hypot(rock.x - enemy.x, rock.y - enemy.y);
         if (distToEnemy <= rockProximityTriggerDist) {
@@ -106,10 +141,8 @@ export function modUpdateCursedRocks(targets) {
 }
 
 export function modRepositionDisengage(target) {
-  // Advance windup frames: hands slam together before teleport!
-  this.clapAnimTimer = 20;
-  this.clapWindupTimer = 7;
-  this.pendingSwapData = { type: 'disengage', target };
+  // Self swap disengage escape disabled as requested
+  return;
 }
 
 export function modExecutePendingSwap() {
@@ -118,36 +151,157 @@ export function modExecutePendingSwap() {
   this.pendingSwapData = null;
 
   // CLAP SOUND & VISUAL EFFECT! Triggered at hands collision point
-  playSkillEffectSound('todo', 'clap');
+  let clapAudioHandle = null;
+  if (CONFIG.todo?.clapSound) {
+    clapAudioHandle = audioSystem.playSFX(CONFIG.todo.clapSound, CONFIG.todo.clapVolume ?? 2.0);
+  } else {
+    clapAudioHandle = playSkillEffectSound('todo', 'clap');
+  }
+
+  // Smooth fade-out effect on the clap audio tail
+  const fadeMs = CONFIG.todo?.clapFadeDurationMs ?? 400;
+  if (clapAudioHandle && fadeMs > 0) {
+    setTimeout(() => {
+      audioSystem.fadeOutSFX(clapAudioHandle, fadeMs);
+    }, 100);
+  }
+
   spawnMeleeClashShockwave(this.x, this.y, 90, 'todo');
   spawnSparks(this.x, this.y, 16, 'lightningTrail', '#00E5FF');
   spawnImpactFlash(this.x, this.y, 35, '#00E5FF');
+  spawnTodoClapCEParticles(this.x, this.y, this.gunAngle || 0);
+
+  const vanishFrames = CONFIG.todo?.vanishDurationFrames ?? 3;
 
   if (data.type === 'fake') {
+    this.vanishTimer = vanishFrames;
     return;
   }
 
   if (data.type === 'boogie') {
     const swapTarget = data.swapTarget;
-    if (swapTarget && swapTarget.hp > 0) {
-      spawnMeleeClashShockwave(swapTarget.x, swapTarget.y, 80, 'todo');
-      spawnSparks(swapTarget.x, swapTarget.y, 12, 'lightningTrail', '#00E5FF');
-      spawnImpactFlash(this.x, this.y, 15, '#4da3ff');
-      spawnImpactFlash(swapTarget.x, swapTarget.y, 15, '#4da3ff');
+    if (swapTarget && (swapTarget.hp > 0 || swapTarget.isRock)) {
+      const oldTodoX = this.x;
+      const oldTodoY = this.y;
+      const oldTargetX = swapTarget.x;
+      const oldTargetY = swapTarget.y;
 
-      const tempX = this.x;
-      const tempY = this.y;
+      spawnMeleeClashShockwave(oldTargetX, oldTargetY, 80, 'todo');
+      spawnSparks(oldTargetX, oldTargetY, 12, 'lightningTrail', '#00E5FF');
+      spawnImpactFlash(oldTodoX, oldTodoY, 15, '#4da3ff');
+      spawnImpactFlash(oldTargetX, oldTargetY, 15, '#4da3ff');
+      spawnTodoClapCEParticles(oldTargetX, oldTargetY, 0);
 
-      this.x = swapTarget.x;
-      this.y = swapTarget.y;
+      this.x = oldTargetX;
+      this.y = oldTargetY;
+      swapTarget.x = oldTodoX;
+      swapTarget.y = oldTodoY;
 
-      swapTarget.x = tempX;
-      swapTarget.y = tempY;
+      // Flash vanish delay where both entities become invisible during swap
+      this.vanishTimer = vanishFrames;
+      if (swapTarget.characterId || !swapTarget.isRock) {
+        swapTarget.vanishTimer = vanishFrames;
+      }
+
+      // Trigger full Boogie Woogie Swap Visual Beam ONLY for fighter/partner swaps (not rocks)
+      if (!swapTarget.isRock) {
+        spawnBoogieWoogieSwapEffect(oldTodoX, oldTodoY, oldTargetX, oldTargetY);
+      }
+
+      const arena = CONFIG.arena;
+      if (arena) {
+        const wallW = arena.wallWidth || 4;
+        const myR = this.r || 25;
+        this.x = Math.max(arena.x + wallW + myR, Math.min(arena.x + arena.width - wallW - myR, this.x));
+        this.y = Math.max(arena.y + wallW + myR, Math.min(arena.y + arena.height - wallW - myR, this.y));
+      }
 
       if (swapTarget.characterId) {
         this.aim(swapTarget);
       } else if (data.potentialTargets && data.potentialTargets.length > 0) {
         this.aim(data.potentialTargets[0]);
+      }
+
+      this.justSwappedTimer = CONFIG.todo?.blackFlashWindow || 45;
+      this.blackFlashGlowTimer = this.justSwappedTimer;
+    }
+  } else if (data.type === 'rescueTeammate') {
+    const teammate = data.swapTarget;
+    if (teammate && teammate.hp > 0) {
+      const distToTeammate = Math.hypot(this.x - teammate.x, this.y - teammate.y);
+      const minSwapDist = CONFIG.todo?.minTeammateSwapDistance || 120;
+      if (distToTeammate < minSwapDist) return;
+
+      const oldTodoX = this.x;
+      const oldTodoY = this.y;
+      const oldTeamX = teammate.x;
+      const oldTeamY = teammate.y;
+
+      this.x = oldTeamX;
+      this.y = oldTeamY;
+      teammate.x = oldTodoX;
+      teammate.y = oldTodoY;
+
+      // Flash vanish delay where both Todo and partner become invisible during rescue swap
+      this.vanishTimer = vanishFrames;
+      teammate.vanishTimer = vanishFrames;
+
+      // Spawn Expanding Boogie Woogie Shockwave Rings at BOTH swap positions!
+      spawnMeleeClashShockwave(oldTodoX, oldTodoY, 130, 'todo');
+      spawnMeleeClashShockwave(oldTeamX, oldTeamY, 130, 'todo');
+      spawnMeleeClashShockwave(oldTeamX, oldTeamY, 165, 'gojo'); // Partner rescue protection ring
+
+      spawnSparks(oldTodoX, oldTodoY, 18, 'lightningTrail', '#00E5FF');
+      spawnSparks(oldTeamX, oldTeamY, 18, 'lightningTrail', '#00E5FF');
+      spawnImpactFlash(oldTodoX, oldTodoY, 40, '#00E5FF');
+      spawnImpactFlash(oldTeamX, oldTeamY, 40, '#00E5FF');
+      spawnTodoClapCEParticles(oldTeamX, oldTeamY, 0);
+
+      // Trigger full Boogie Woogie Swap Visual Beam between original positions!
+      spawnBoogieWoogieSwapEffect(oldTodoX, oldTodoY, oldTeamX, oldTeamY);
+
+      const arena = CONFIG.arena;
+      if (arena) {
+        const wallW = arena.wallWidth || 4;
+        const myR = this.r || 25;
+        this.x = Math.max(arena.x + wallW + myR, Math.min(arena.x + arena.width - wallW - myR, this.x));
+        this.y = Math.max(arena.y + wallW + myR, Math.min(arena.y + arena.height - wallW - myR, this.y));
+        const teamR = teammate.r || 25;
+        teammate.x = Math.max(arena.x + wallW + teamR, Math.min(arena.x + arena.width - wallW - teamR, teammate.x));
+        teammate.y = Math.max(arena.y + wallW + teamR, Math.min(arena.y + arena.height - wallW - teamR, teammate.y));
+      }
+
+      // Rescued teammate gains invulnerability buffer to survive the fatal hit!
+      const invulnFrames = CONFIG.todo?.rescueInvulnerableFrames || 45;
+      teammate.invulnerableTimer = Math.max(teammate.invulnerableTimer || 0, invulnFrames);
+
+      // Aim Todo at nearest enemy to immediately step in and unleash combo flurry!
+      let nearestEnemy = data.targetEnemy;
+      if (!nearestEnemy || nearestEnemy.hp <= 0) {
+        let minDist = Infinity;
+        if (state && state.fighters) {
+          const myIdx = state.fighters.indexOf(this);
+          const myTeam = state.getFighterTeam ? state.getFighterTeam(myIdx) : null;
+          for (let i = 0; i < state.fighters.length; i++) {
+            const f = state.fighters[i];
+            if (f && f.hp > 0 && state.getFighterTeam(i) !== myTeam) {
+              const d = Math.hypot(f.x - this.x, f.y - this.y);
+              if (d < minDist) {
+                minDist = d;
+                nearestEnemy = f;
+              }
+            }
+          }
+        }
+      }
+
+      if (nearestEnemy) {
+        this.aim(nearestEnemy);
+        // Initiate Todo's Brawler Counter-Attack Flurry upon swapping in!
+        this.rockCounterComboLeft = CONFIG.todo?.rockCounterComboHits || 7;
+        this.rockCounterComboTarget = nearestEnemy;
+        this.rockCounterComboInterval = CONFIG.todo?.rockCounterComboInterval || 10;
+        this.rockCounterComboTimer = 0;
       }
 
       this.justSwappedTimer = CONFIG.todo?.blackFlashWindow || 45;
@@ -166,11 +320,27 @@ export function modExecutePendingSwap() {
 
       const approachAngle = Math.atan2(rock.y - enemy.y, rock.x - enemy.x);
       const attackDist = (this.r || 25) + (enemy.r || 25) + 5;
+
       this.x = enemy.x + Math.cos(approachAngle) * attackDist;
       this.y = enemy.y + Math.sin(approachAngle) * attackDist;
+      this.vanishTimer = vanishFrames;
 
-      enemy.vx *= 0.1;
-      enemy.vy *= 0.1;
+      const arena = CONFIG.arena;
+      if (arena) {
+        const wallW = arena.wallWidth || 4;
+        const myR = this.r || 25;
+        this.x = Math.max(arena.x + wallW + myR, Math.min(arena.x + arena.width - wallW - myR, this.x));
+        this.y = Math.max(arena.y + wallW + myR, Math.min(arena.y + arena.height - wallW - myR, this.y));
+      }
+
+      // Initial arrival physics pushback impulse on Rock Proximity swap arrival
+      const pushAngle = Math.atan2(enemy.y - rock.y, enemy.x - rock.x);
+      const arrivalPush = CONFIG.todo?.rockArrivalPushback || 8.0;
+      enemy.vx = Math.cos(pushAngle) * arrivalPush;
+      enemy.vy = Math.sin(pushAngle) * arrivalPush;
+      if (typeof enemy.applyKnockback === 'function') {
+        enemy.applyKnockback(Math.cos(pushAngle) * arrivalPush, Math.sin(pushAngle) * arrivalPush);
+      }
 
       const slowDur = CONFIG.todo?.slowDuration || 60;
       const slowMult = CONFIG.todo?.slowMultiplier || 0.25;
@@ -201,6 +371,8 @@ export function modExecutePendingSwap() {
     spawnImpactFlash(this.x, this.y, 25, '#4da3ff');
 
     let swappedWithRock = false;
+    const oldX = this.x;
+    const oldY = this.y;
 
     if (this.cursedRocks && this.cursedRocks.length > 0) {
       let bestIndex = -1;
@@ -227,25 +399,6 @@ export function modExecutePendingSwap() {
       }
     }
 
-    if (!swappedWithRock && target) {
-      const awayAngle = Math.atan2(this.y - target.y, this.x - target.x);
-      const disengageDist = CONFIG.todo?.disengageDistance || 180;
-
-      let destX = this.x + Math.cos(awayAngle) * disengageDist;
-      let destY = this.y + Math.sin(awayAngle) * disengageDist;
-
-      const arena = CONFIG.arena;
-      destX = Math.max(arena.x + arena.wallWidth + 30, Math.min(arena.x + arena.width - arena.wallWidth - 30, destX));
-      destY = Math.max(arena.y + arena.wallWidth + 30, Math.min(arena.y + arena.height - arena.wallWidth - 30, destY));
-
-      this.x = destX;
-      this.y = destY;
-      this.vx = Math.cos(awayAngle) * 3;
-      this.vy = Math.sin(awayAngle) * 3;
-
-      spawnImpactFlash(this.x, this.y, 30, '#4da3ff');
-    }
-
     if (target && !target.isDead) {
       this.aim(target);
       target.slowTimer = 0;
@@ -259,4 +412,154 @@ export function modExecutePendingSwap() {
     this.boogieWoogieCooldown = seqCd;
     this.rockThrowCooldown = seqCd;
   }
+}
+
+/**
+ * Monitors Todo's teammate in pair team modes (1v2, 2v2).
+ * Triggers Boogie Woogie rescue swap if teammate takes >= 35 damage or HP drops to <= 30% within a 2-second window.
+ */
+export function modCheckTeammateRescue() {
+  if (!state || !state.fighters) return false;
+  if (this.isTakadaChanneling) return false;
+  if (this.boogieWoogieCooldown > 0 || this.clapWindupTimer > 0 || this.clapHoldTimer > 0 || (this.rockCounterComboLeft || 0) > 0) return false;
+  if (this.timeStopTimer > 0 || this.electricStunTimer > 0 || this.isTargetOfAmbush) return false;
+
+  const myIndex = state.fighters.indexOf(this);
+  if (myIndex < 0) return false;
+  const myTeam = state.getFighterTeam ? state.getFighterTeam(myIndex) : null;
+  if (myTeam === null || myTeam === undefined) return false;
+
+  // Find live teammate
+  let teammate = null;
+  for (let i = 0; i < state.fighters.length; i++) {
+    const f = state.fighters[i];
+    if (f && f !== this && f.hp > 0 && !f.isIllusion) {
+      if (state.getFighterTeam(i) === myTeam) {
+        teammate = f;
+        break;
+      }
+    }
+  }
+
+  if (!teammate) return false;
+
+  // Do NOT swap if Todo and teammate are already very close to each other (e.g. within 120px)
+  const distToTeammate = Math.hypot(this.x - teammate.x, this.y - teammate.y);
+  const minSwapDist = CONFIG.todo?.minTeammateSwapDistance || 120;
+  if (distToTeammate < minSwapDist) return false;
+
+  // 1. Check if partner is in combat proximity to any active enemy
+  let closestEnemy = null;
+  let closestEnemyDist = Infinity;
+  for (let i = 0; i < state.fighters.length; i++) {
+    const f = state.fighters[i];
+    if (f && f.hp > 0 && !f.isIllusion && state.getFighterTeam(i) !== myTeam) {
+      const d = Math.hypot(f.x - teammate.x, f.y - teammate.y);
+      if (d < closestEnemyDist) {
+        closestEnemyDist = d;
+        closestEnemy = f;
+      }
+    }
+  }
+
+  // Teammate is in combat range of enemy (within 150px)
+  const isPartnerInCombat = closestEnemy && (closestEnemyDist <= (teammate.r || 25) + 125);
+
+  // 2. Track teammate damage taken in rolling 2-second window
+  const now = Date.now();
+  if (!teammate._rescueDamageHistory) {
+    teammate._rescueDamageHistory = [];
+  }
+  if (teammate._lastRescueHp === undefined) {
+    teammate._lastRescueHp = teammate.hp;
+  }
+
+  const hpLoss = teammate._lastRescueHp - teammate.hp;
+  if (hpLoss > 0) {
+    teammate._rescueDamageHistory.push({ time: now, damage: hpLoss });
+  }
+  teammate._lastRescueHp = teammate.hp;
+
+  teammate._rescueDamageHistory = teammate._rescueDamageHistory.filter(hit => now - hit.time <= 2000);
+
+  const damageIn2Sec = teammate._rescueDamageHistory.reduce((sum, hit) => sum + hit.damage, 0);
+  const hpRatio = teammate.hp / (teammate.maxHp || 100);
+
+  const isTakingDamage = hpLoss > 0 || damageIn2Sec >= 15 || hpRatio <= 0.45;
+
+  // Trigger natural Boogie Woogie teammate swap when partner is in combat or taking damage!
+  if (isPartnerInCombat || isTakingDamage) {
+    this.clapAnimTimer = 20;
+    this.clapWindupTimer = 7;
+    this.boogieWoogieCooldown = CONFIG.todo?.clapCooldown || 60;
+    this.pendingSwapData = { type: 'rescueTeammate', swapTarget: teammate, targetEnemy: closestEnemy };
+
+    // Play Todo's "Brother!" voiceline on teammate swap based on config chance
+    const brotherChance = CONFIG.todo?.brotherVoiceChance ?? 0.25;
+    if (Math.random() < brotherChance) {
+      const brotherSnd = CONFIG.todo?.brotherVoiceSound || 'Assets/Sound Effects/Skills/todo-brother-voiceline.mp3';
+      const brotherVol = CONFIG.todo?.brotherVoiceVolume ?? 2.5;
+      audioSystem.playSFX(brotherSnd, brotherVol);
+    }
+
+    teammate._rescueDamageHistory = [];
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Starts Aoi Todo's 3-second (180 frames) Takada-chan Imagination channeling phase.
+ * Plays his channeling voiceline and schedules the background song fade-in!
+ */
+export function modStartTakadaChanneling(force = false) {
+  if ((this.takadaUltCooldown || 0) > 0 || this.isTakadaChanneling || this.isTakadaUltActive) return false;
+
+  // Strict 50% HP threshold check: Cannot auto-trigger ultimate if HP is above 50%!
+  const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
+  const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
+  if (!force && hpUltEnabled && (this.hp / (this.maxHp || 100)) > hpThreshold) {
+    return false;
+  }
+
+  const channelFrames = CONFIG.todo?.channelDuration || 180;
+  this.isTakadaChanneling = true;
+  this.takadaChannelTimer = channelFrames;
+  this.takadaSongStarted = false;
+  this.takadaSongHandle = null;
+  this.takadaSongFadedOut = false;
+  this.takadaUltCooldown = CONFIG.todo?.ultCooldown || 1200;
+  this.pureLoveBeamRecoveryTimer = 0;
+  this.hitStunTimer = 0;
+
+  spawnImpactFlash(this.x, this.y, 45, '#ec4899');
+  spawnFloatingText(this.x, this.y - (this.r || 25) - 30, "530,000 IQ CPU THINKING...", "#ec4899");
+
+  // Play 3.0s channeling voice line
+  const channelVoice = CONFIG.todo?.takadaChannelingVoiceline || 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3';
+  const voiceVol = CONFIG.todo?.takadaChannelingVoiceVolume ?? 3.5;
+  audioSystem.playSFX('skill_todotadakachannelvoice', voiceVol);
+  audioSystem.playSFX(channelVoice, voiceVol);
+
+  return true;
+}
+
+/**
+ * Activates Takada-chan Idol Ultimate mode after the 3-second channeling phase finishes.
+ */
+export function modActivateTakadaUltimate() {
+  this.isTakadaChanneling = false;
+  const dur = CONFIG.todo?.ultDuration || 480;
+  this.isTakadaUltActive = true;
+  this.takadaUltTimer = dur;
+
+  spawnImpactFlash(this.x, this.y, 60, '#ec4899');
+  spawnMeleeClashShockwave(this.x, this.y, 140, 'pink');
+  spawnSparks(this.x, this.y, 30, 'lightningTrail', '#ff66cc');
+  spawnFloatingText(this.x, this.y - (this.r || 25) - 30, "TAKADA-CHAN 530,000 IQ!", "#ec4899");
+}
+
+export function modTriggerTakadaUltimate() {
+  return modStartTakadaChanneling.call(this, true);
 }

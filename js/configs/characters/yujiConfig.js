@@ -67,7 +67,7 @@ export const yujiConfig = {
     'Assets/Sound Effects/Attacks/yuji-noise3.mp3'
   ],
   punchSoundsVolume: 1.5,
-  punchSoundsChance: 0.10, // 5% chance to play voice noises on basic attack
+  punchSoundsChance: 0.15, // 5% chance to play voice noises on basic attack
 
   // Black Flash Entrance Audio
   blackFlashEnterSound: 'Assets/Sound Effects/Skills/yuji-blackflash.mp3',
@@ -79,4 +79,8 @@ export const yujiConfig = {
   transformationSound: 'Assets/Sound Effects/Skills/yuji-transformation.mp3',
   transformationVolume: 2.0,
   transformationDelay: 0,
+
+  // Victory Voice Line (Team victory with Todo)
+  victoryVoiceSound: 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3',
+  victoryVoiceVolume: 3.5,
 };

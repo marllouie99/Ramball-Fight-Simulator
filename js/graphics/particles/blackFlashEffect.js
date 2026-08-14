@@ -250,11 +250,24 @@ export function updateBlackFlashEffects(frozen = false) {
   }
 }
 
+export function clearBlackFlashEffects() {
+  for (let i = 0; i < _blackFlashParticles.length; i++) {
+    _returnBFParticle(_blackFlashParticles[i]);
+  }
+  _blackFlashParticles.length = 0;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // DRAW
 // ─────────────────────────────────────────────────────────────────────────────
 export function drawBlackFlashEffects(ctx) {
   if (!ctx || _blackFlashParticles.length === 0) return;
+
+  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd');
+  if (isMatchEnded) {
+    clearBlackFlashEffects();
+    return;
+  }
 
   _initCanvases();
   ctx.save();

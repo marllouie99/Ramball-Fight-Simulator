@@ -72,6 +72,10 @@ export class GojoFighter extends Fighter {
     this.infinityBlockMaxTimer = 25;
     this.teleportSlideTimer = 0;
     this.domainSlideTimer = 0;
+    this.isDomainPreSlide = false;
+    this.domainPreSlideTimer = 0;
+    this.purpleUseCount = 0;
+    this.is200PercentChannel = false;
   }
 
   reset() {
@@ -82,7 +86,9 @@ export class GojoFighter extends Fighter {
     this.infinityActive = true;
     this.redCooldown = CONFIG.gojo.redCooldown || 1200;
     this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1000;
+    this.purpleUseCount = 0;
     this.isChannelingPurple = false;
+    this.is200PercentChannel = false;
     this.purpleChargeTimer = 0;
     this.purpleChargeMax = CONFIG.gojo.purpleChargeMax || 120;
     this.domainCooldown = CONFIG.gojo.domainCooldown ?? 1000;
@@ -115,11 +121,14 @@ export class GojoFighter extends Fighter {
     this.infinityBlockTimer = 0;
     this.teleportSlideTimer = 0;
     this.domainSlideTimer = 0;
+    this.isDomainPreSlide = false;
+    this.domainPreSlideTimer = 0;
     this.initialTeleportDone = false;
   }
 
   isChannelingAnySkill() {
     return (
+      this.isDomainPreSlide ||
       this.isChannelingDomainExpansion ||
       this.isChannelingPurple ||
       (this.redEffectTimer || 0) > 0 ||
@@ -131,13 +140,15 @@ export class GojoFighter extends Fighter {
 
   interruptAttacks(forceCancelAll = false) {
     const wasChannelingDomain = this.isChannelingDomainExpansion;
-    const wasChannelingPurple = this.isChannelingPurple || (this.purpleChargeTimer || 0) > 0;
+    const wasChannelingPurple = this.isChannelingPurple;
     const savedPurpleCharge = this.purpleChargeTimer;
     const savedPurpleCooldown = this.purpleCooldown;
     const wasChannelingRed = (this.redEffectTimer || 0) > 0 || this.redBuildupPhase;
     const savedDomainCharge = this.domainChargeTimer;
 
     super.interruptAttacks(forceCancelAll);
+    this.isDomainPreSlide = false;
+    this.domainPreSlideTimer = 0;
     this.redEffectTimer = 0;
     this.redBuildupPhase = false;
     this.redDetonated = false;
@@ -268,8 +279,15 @@ export class GojoFighter extends Fighter {
     // Toji Fushiguro (ISOH lore exception): Inverted Spear of Heaven always pierces Limitless Infinity — skip block entirely
     const isToji = attacker && (attacker.characterId === 'toji' || attacker.type === 'toji');
     const isAttackerChannelingDomain = attacker && (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion);
+    const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
+    const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
+    if (isBreatherState || isDomainChanneling) {
+      this.infinityActive = true;
+      this.infinityCooldown = 0;
+      this.isMeleeMode = false;
+    }
     const isInsideDomain = this.domainActive || (state && (state.activeDomain || state.domainActive));
-    if (!this.isMeleeMode && !isInsideDomain && !isToji && !isAttackerChannelingDomain && this.infinityCooldown <= 0 && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
+    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling) && !isInsideDomain && !isToji && !isAttackerChannelingDomain && (this.infinityCooldown <= 0 || isBreatherState || isDomainChanneling) && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
       const isMahoraga = attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga';
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz;
@@ -446,6 +464,10 @@ export class GojoFighter extends Fighter {
 
     const isFrozen = this._handleTimeStop() || this.isTargetOfAmbush || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity;
     if (isFrozen) {
+      if (this.isDomainPreSlide) {
+        this.isDomainPreSlide = false;
+        this.domainPreSlideTimer = 0;
+      }
       if (this.isChannelingDomainExpansion && (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0)) {
         this.isChannelingDomainExpansion = false;
         this.domainChargeTimer = 0;
@@ -572,12 +594,21 @@ export class GojoFighter extends Fighter {
       }
     }
 
+    const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
+    const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
+    if (isBreatherState || isDomainChanneling) {
+      this.infinityActive = true;
+      this.infinityCooldown = 0;
+      this.isMeleeMode = false;
+    }
+
     // Smooth fade-in & fade-out for Limitless Infinity barrier visuals
-    const barrierShouldBeActive = !this.isMeleeMode && (this.infinityActive || this.infinityCooldown <= 0) && !this.isChannelingPurple && !this.domainActive && this.hp > 0;
+    const isUnderAmbush = this.isTargetOfAmbush;
+    const barrierShouldBeActive = !isUnderAmbush && (!this.isMeleeMode || isBreatherState || isDomainChanneling) && (this.infinityActive || this.infinityCooldown <= 0 || isBreatherState || isDomainChanneling) && !this.isChannelingPurple && !this.domainActive && this.hp > 0;
     if (barrierShouldBeActive) {
       this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05); // ~20 frames smooth fade-in
     } else {
-      this.infinityFadeOpacity = Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
+      this.infinityFadeOpacity = isUnderAmbush ? 0 : Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
     }
 
     if (this.teleportSlideTimer > 0) {
@@ -708,20 +739,83 @@ export class GojoFighter extends Fighter {
 
     // Check for Domain Expansion (Ultimate - disabled in demo preview mode)
     const isSilenced = (this.silenceTimer || 0) > 0;
-    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
-      this.isChannelingDomainExpansion = true;
-      this.domainChargeTimer = 0;
-      this.domainSlideTimer = 12; // 12-frame smooth friction slide before stopping to channel
-      this._domainChannelAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-      this._playedDeployAudio = false;
-      if (!this._hasPlayedDomainChannelSound) {
-        this._hasPlayedDomainChannelSound = true;
-        const channelSound = getSkillSound(this._def?.id, 'domain_channel');
-        if (channelSound) audioSystem.playSFX(channelSound.src, channelSound.volume);
+
+    // Handle Pre-Domain Slide Phase (smooth slide before stopping to channel)
+    if (this.isDomainPreSlide) {
+      this.hitStunTimer = 0; // Hyper-armor while preparing Domain Expansion
+      if (isSilenced && this.isTargetOfAmbush) {
+        this.isDomainPreSlide = false;
+        this.domainPreSlideTimer = 0;
+        this.domainCooldown = CONFIG.gojo?.domainCooldown || 1500;
+        return;
       }
+
+      this.domainPreSlideTimer--;
+
+      // Smooth friction deceleration towards full stop
+      this.vx *= 0.82;
+      this.vy *= 0.82;
+      this.x += this.vx;
+      this.y += this.vy;
+
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
+      }
+
+      if (this.afterImages && this.domainPreSlideTimer % 2 === 0) {
+        pushTrailCap(this.afterImages, {
+          x: this.x,
+          y: this.y,
+          angle: this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0),
+          timer: 12,
+          maxTimer: 12
+        }, CONFIG.gojo?.afterImageCap || 12);
+      }
+
+      if (Math.hypot(this.vx, this.vy) > 0.3 && typeof spawnSparks === 'function' && this.domainPreSlideTimer % 2 === 0) {
+        spawnSparks(this.x, this.y, 1, 'blue');
+      }
+
+      this.resolveWallBounce(arena);
+
+      if (this.domainPreSlideTimer <= 0) {
+        this.isDomainPreSlide = false;
+        this.vx = 0;
+        this.vy = 0;
+
+        // Slide complete -> Stop move -> Channel Domain
+        this.isChannelingDomainExpansion = true;
+        this.domainChargeTimer = 0;
+        this._domainChannelAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+        this._playedDeployAudio = false;
+        if (!this._hasPlayedDomainChannelSound) {
+          this._hasPlayedDomainChannelSound = true;
+          const channelSound = getSkillSound(this._def?.id, 'domain_channel');
+          if (channelSound) audioSystem.playSFX(channelSound.src, channelSound.volume);
+        }
+      }
+      return;
     }
 
-    // Handle Domain Expansion Channeling
+    if (!this.isDemoFighter && !isSilenced && !this.isChannelingAnySkill() && !this.domainActive && this.domainCooldown <= 0 && this.domainUseCount < 2 && opponent && !opponent.isDead && this.forcedMeleeTimer <= 0) {
+      // Initiate smooth Pre-Domain Slide Phase before stopping to channel
+      this.isDomainPreSlide = true;
+      this.domainPreSlideTimer = 18; // ~18 frames smooth glide deceleration
+
+      // Calculate directional slide vector towards/past opponent
+      const slideAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      const currentSpeed = Math.hypot(this.vx, this.vy);
+      const initialSpeed = Math.max(9.5, currentSpeed * 1.5);
+      this.vx = Math.cos(slideAngle) * initialSpeed;
+      this.vy = Math.sin(slideAngle) * initialSpeed;
+
+      if (typeof audioSystem !== 'undefined') {
+        audioSystem.playSFX('skill_dash3', 0.6);
+      }
+      return;
+    }
+
+    // Handle Domain Expansion Channeling (locked stance in hand sign pose after stopping)
     if (this.isChannelingDomainExpansion) {
       this.hitStunTimer = 0; // Absolute Hyper-Armor while channeling Unlimited Void!
       if (isSilenced && this.isTargetOfAmbush) {
@@ -732,20 +826,9 @@ export class GojoFighter extends Fighter {
       }
       this.domainChargeTimer++;
 
-      // Smooth friction slide deceleration before coming to a full stop for hand sign channeling
-      if ((this.domainSlideTimer || 0) > 0) {
-        this.domainSlideTimer--;
-        this.vx *= 0.75;
-        this.vy *= 0.75;
-        this.x += this.vx;
-        this.y += this.vy;
-        if (Math.hypot(this.vx, this.vy) > 0.5 && typeof spawnSparks === 'function' && this.domainSlideTimer % 2 === 0) {
-          spawnSparks(this.x, this.y, 1, 'blue');
-        }
-      } else {
-        this.vx = 0;
-        this.vy = 0;
-      }
+      // Complete stop during hand sign channeling stance
+      this.vx = 0;
+      this.vy = 0;
 
       // Lock stance and hand sign angle fixed in place while channeling domain expansion
       if (this._domainChannelAngle !== undefined) {
@@ -766,6 +849,10 @@ export class GojoFighter extends Fighter {
     // Don't cast if Sukuna is already channeling Fuga to prevent simultaneous freezes
     if (!this.isChannelingAnySkill() && this.purpleCooldown <= 0 && opponent && this.forcedMeleeTimer <= 0 && !opponent.isChannelingDivineFlame) {
       this.isChannelingPurple = true;
+      this.is200PercentChannel = (this.purpleUseCount === 1);
+      const baseCharge = CONFIG.gojo?.purpleChargeMax || 120;
+      const secondCastCharge = CONFIG.gojo?.purpleSecondCastChargeMax || 180;
+      this.purpleChargeMax = this.is200PercentChannel ? secondCastCharge : baseCharge;
       this.isMeleeMode = false; // Disengage melee mode while channeling Hollow Purple!
       this.purpleChargeTimer = 0;
       spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'HOLLOW PURPLE', '#8A2BE2');
@@ -816,7 +903,27 @@ export class GojoFighter extends Fighter {
       this.z = Math.sin(levitateProgress * Math.PI * 0.5) * maxLevitationHeight;
 
       if (opponent && !opponent.isDead) {
-        this.aim(opponent);
+        if (this.is200PercentChannel) {
+          const mergeProgress = this.purpleChargeTimer / this.purpleChargeMax;
+          if (mergeProgress < 0.75) {
+            // Cinematic 200% Purple: Lock facing angle straight towards the player / camera
+            this.gunAngle = Math.PI / 2;
+            this.angle = Math.PI / 2;
+          } else {
+            // Final Release Prep (0.75 -> 1.0): Smoothly turn body towards enemy to release the 200% blast
+            const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+            const aimP = (mergeProgress - 0.75) / 0.25;
+            let diff = targetAngle - (Math.PI / 2);
+            while (diff < -Math.PI) diff += Math.PI * 2;
+            while (diff > Math.PI) diff -= Math.PI * 2;
+            const currentAngle = (Math.PI / 2) + diff * Math.sin(aimP * Math.PI * 0.5);
+            this.gunAngle = currentAngle;
+            this.angle = currentAngle;
+          }
+        } else {
+          this.aim(opponent);
+        }
+
         // Lapse Blue Gravitational Distortion: Slows opponent movement while mixing Red & Blue into Purple!
         if (!opponent.immuneToCC && opponent.characterId !== 'toji' && opponent.type !== 'toji') {
           if (typeof opponent.applySlow === 'function') {
@@ -1410,8 +1517,15 @@ export class GojoFighter extends Fighter {
   }
 
   _checkInfinityCollisions() {
-    const isInsideDomain = this.domainActive || this.isChannelingDomainExpansion || (state && (state.activeDomain || state.domainActive));
-    if (this.isMeleeMode || isInsideDomain || this.infinityCooldown > 0 || this.hp <= 0 || this.isChannelingPurple) return;
+    const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
+    const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
+    if (isBreatherState || isDomainChanneling) {
+      this.infinityActive = true;
+      this.infinityCooldown = 0;
+      this.isMeleeMode = false;
+    }
+    const isInsideDomain = this.domainActive || (state && (state.activeDomain || state.domainActive));
+    if ((this.isMeleeMode && !isBreatherState && !isDomainChanneling) || isInsideDomain || (this.infinityCooldown > 0 && !isBreatherState && !isDomainChanneling) || this.hp <= 0 || this.isChannelingPurple) return;
 
     const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
     const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
@@ -1532,6 +1646,8 @@ export class GojoFighter extends Fighter {
       });
     }
   }
+
+
 
   // PUBLIC: Draw Unlimited Void cosmic background BEFORE fighters so they aren't overlayed
   drawDomainBackground(ctx, isClashSecondary = false) {

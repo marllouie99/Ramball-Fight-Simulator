@@ -55,7 +55,7 @@ export function drawGojoBody(ctx, fighter) {
     }
 
     // === ENHANCED GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER ===
-    const fadeOpacity = fighter.infinityFadeOpacity || 0;
+    const fadeOpacity = (fighter.isTargetOfAmbush) ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();
       const infinityR = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);

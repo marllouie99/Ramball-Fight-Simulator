@@ -76,7 +76,18 @@ export class YujiFighter extends Fighter {
   update(opponent, ownerIndex, arena) {
     if (this.isDead || this.isRespawning || this.hp <= 0) {
       this.afterImages = [];
+      this.punchAnimTimer = 0;
+      this.slashSwingTimer = 0;
+      this.trailGenTimer = 0;
+      this.rapidSlashHitsLeft = 0;
       return;
+    }
+
+    if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+      this.punchAnimTimer = 0;
+      this.slashSwingTimer = 0;
+      this.trailGenTimer = 0;
+      this.rapidSlashHitsLeft = 0;
     }
 
     // Update existing afterimages (placed before freeze guard so they fade even if frozen!)
@@ -128,6 +139,18 @@ export class YujiFighter extends Fighter {
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
 
     // TimeStop & Freeze Guards (Rule #1)
+    const isBeamTrapped = this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0) || (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0);
+    if (isBeamTrapped && (this.rapidSlashHitsLeft || 0) > 0) {
+      this.rapidSlashHitsLeft = 0;
+      this.rapidSlashTimer = 0;
+      this.flurryTarget = null;
+      if (this.soulSwapActive) {
+        this.soulSwapActive = false;
+        this.revertTransitionTimer = 0;
+      }
+      spawnFloatingText(this.x, this.y - this.r - 28, "CANCELED BY BEAM!", "#FF0055");
+    }
+
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush || this.isParalyzed) {
       this.interruptAttacks();
@@ -244,6 +267,19 @@ export class YujiFighter extends Fighter {
 
     // Sukuna Soul Takeover: Rapid 360° Cleave Slash Finisher after Flurry Combo
     if ((this.rapidSlashHitsLeft || 0) > 0) {
+      const isBeamTrapped = this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) || (this.pureLoveBeamRecoveryTimer && this.pureLoveBeamRecoveryTimer > 0) || (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0);
+      if (isBeamTrapped) {
+        this.rapidSlashHitsLeft = 0;
+        this.rapidSlashTimer = 0;
+        this.flurryTarget = null;
+        if (this.soulSwapActive) {
+          this.soulSwapActive = false;
+          this.revertTransitionTimer = 0;
+        }
+        spawnFloatingText(this.x, this.y - this.r - 28, "CANCELED BY BEAM!", "#FF0055");
+        return;
+      }
+
       // Freeze physical movement and cancel punch animations so only slash swings display
       this.vx = 0;
       this.vy = 0;

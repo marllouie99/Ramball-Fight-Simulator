@@ -1123,6 +1123,7 @@ export function drawGojoPurpleOrb(ctx, p) {
   ctx.save();
   const colorType = p.isGojoPurple ? 'purple' : 'blue';
   const visualTime = p.visualTime || Date.now();
+  const is200 = !!p.is200Percent;
   
   if (p.isGojoPurple) {
     const lifeRatio = p.life / p.maxLife;
@@ -1135,8 +1136,93 @@ export function drawGojoPurpleOrb(ctx, p) {
   if (p.isGojoPurple && p.history && p.history.length > 1) {
     drawPurpleOrbTrail(ctx, p, visualTime);
   }
+
+  // === 200% HOLLOW PURPLE ENHANCED VISUALS ===
+  if (is200 && p.isGojoPurple) {
+    const t = visualTime;
+    const orbR = p.r;
+
+    // 1. Massive pulsating outer void distortion field
+    const pulse = 1.0 + Math.sin(t * 0.008) * 0.12;
+    ctx.fillStyle = 'rgba(80, 0, 160, 0.12)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, orbR * 5.5 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Expanding/contracting energy rings (2 rings counter-rotating)
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 2; i++) {
+      const ringR = orbR * (2.8 + i * 1.2) * (1.0 + Math.sin(t * 0.006 + i * Math.PI) * 0.08);
+      const rotDir = i === 0 ? 1 : -1;
+      ctx.save();
+      ctx.rotate((t * 0.003 * rotDir) + i * 1.2);
+      ctx.strokeStyle = `rgba(200, 100, 255, ${0.35 - i * 0.1})`;
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR, 0, Math.PI * 1.4);
+      ctx.stroke();
+      ctx.strokeStyle = `rgba(255, 180, 255, ${0.25 - i * 0.08})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, ringR * 0.92, Math.PI * 0.3, Math.PI * 1.7);
+      ctx.stroke();
+      ctx.restore();
+    }
+    ctx.restore();
+
+    // 3. Electric purple lightning arcs (6 bolts radiating from orb center)
+    ctx.save();
+    ctx.translate(p.x, p.y);
+    ctx.lineWidth = 1.8;
+    ctx.lineCap = 'round';
+    const boltCount = 6;
+    for (let i = 0; i < boltCount; i++) {
+      const seed = i * 7919.3;
+      const baseAngle = (Math.PI * 2 / boltCount) * i + t * 0.002;
+      const boltLen = orbR * (1.8 + Math.sin(t * 0.01 + seed) * 0.6);
+      
+      ctx.strokeStyle = `rgba(220, 160, 255, ${0.5 + Math.sin(t * 0.015 + seed) * 0.3})`;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      
+      // Jagged 3-segment lightning path
+      let bx = 0, by = 0;
+      for (let s = 0; s < 3; s++) {
+        const segLen = boltLen / 3;
+        const jitter = (Math.sin(t * 0.02 + seed + s * 5) * 8) * (s === 1 ? 1 : 0.5);
+        bx += Math.cos(baseAngle + jitter * 0.05) * segLen;
+        by += Math.sin(baseAngle + jitter * 0.05) * segLen;
+        ctx.lineTo(bx + Math.sin(t * 0.03 + seed + s) * jitter, by + Math.cos(t * 0.03 + seed + s) * jitter);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+
+    // 4. Bright white-purple inner glow bloom
+    const bloomGrad = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, orbR * 2.2);
+    bloomGrad.addColorStop(0, 'rgba(255, 220, 255, 0.45)');
+    bloomGrad.addColorStop(0.4, 'rgba(180, 80, 255, 0.25)');
+    bloomGrad.addColorStop(1, 'rgba(120, 0, 200, 0)');
+    ctx.fillStyle = bloomGrad;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, orbR * 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
   
-  drawGojoOrb(ctx, p.x, p.y, p.r, visualTime, colorType, 0);
+  // Draw the main orb (standard or 200% scaled)
+  const drawR = is200 ? p.r * 1.35 : p.r;
+  drawGojoOrb(ctx, p.x, p.y, drawR, visualTime, colorType, 0);
+
+  // 200%: Extra white-hot core overlay for empowered feel
+  if (is200 && p.isGojoPurple) {
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, drawR * 0.6, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 

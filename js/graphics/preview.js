@@ -174,14 +174,16 @@ export function updateIndexDetailDemo(def, demoArea) {
 
     if (currentAnim === 'mixing' && def.type === 'gojo') {
       fighter.isChannelingPurple = true;
-      fighter.purpleChargeMax = 180;
+      fighter.is200PercentChannel = true;
+      const chargeMax = CONFIG.gojo?.purpleSecondCastChargeMax || 180;
+      fighter.purpleChargeMax = chargeMax;
       if (typeof fighter.getPurpleChargeProgress !== 'function') {
         fighter.getPurpleChargeProgress = function() {
-          return Math.min(1.0, (this.purpleChargeTimer || 0) / (this.purpleChargeMax || 180));
+          return Math.min(1.0, (this.purpleChargeTimer || 0) / (this.purpleChargeMax || chargeMax));
         };
       }
       if (demoSpeed > 0) {
-        fighter.purpleChargeTimer = ((fighter.purpleChargeTimer || 0) + 1) % 180;
+        fighter.purpleChargeTimer = ((fighter.purpleChargeTimer || 0) + 1) % chargeMax;
       }
       const lev = Math.sin(Math.min(1.0, (fighter.purpleChargeTimer || 0) / (180 * 0.4)) * Math.PI * 0.5);
       fighter.z = lev * 35;

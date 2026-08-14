@@ -295,9 +295,6 @@ export function applyDomainEffect(fighter, arena) {
             isCrit = res.isCrit;
           }
           f.takeDamage(dmg, fighter, { isDomain: true, bypassShield: true, isSukunaSlash: true, isCrit });
-          if (f.characterId !== 'toji' && f.type !== 'toji' && !f.domainImmunity && !f.immuneToCC) {
-            if (typeof f.applyHitStun === 'function') f.applyHitStun(2);
-          }
 
           spawnSparks(f.x, f.y, 6, 'crimsonSniper', '#8B0000');
           spawnImpactFlash(f.x, f.y, 22, 'crimsonSniper');
@@ -353,7 +350,6 @@ export function applyDomainEffect(fighter, arena) {
               isCrit = res.isCrit;
             }
             ill.takeDamage(dmg, fighter, { isDomain: true, bypassShield: true, isSukunaSlash: true, isCrit });
-            if (typeof ill.applyHitStun === 'function') ill.applyHitStun(6);
 
             spawnSparks(ill.x, ill.y, 6, 'crimsonSniper', '#8B0000');
             spawnImpactFlash(ill.x, ill.y, 22, 'crimsonSniper');

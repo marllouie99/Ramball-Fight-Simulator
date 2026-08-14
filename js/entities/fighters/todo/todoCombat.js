@@ -13,6 +13,7 @@ function playTodoPunchSound() {
 }
 
 export function modUpdateMeleeCombat(target, isCombo = false) {
+  if (this.isTakadaChanneling) return;
   // If we are currently punching and it's not a combo trigger, we can't start a new punch
   if (!isCombo && this.punchAnimTimer > 0) return;
 
@@ -25,7 +26,9 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
   this.hideBackHand = false;
 
   if (!isCombo) {
-    this.cooldownTimer = CONFIG.todo?.basicPunchCooldown || 28;
+    const baseCd = CONFIG.todo?.basicPunchCooldown || 28;
+    const cdMult = this.isTakadaUltActive ? (CONFIG.todo?.takadaPunchCooldownMult || 0.6) : 1.0;
+    this.cooldownTimer = baseCd * cdMult;
   }
 
   // If no target or enemy is outside punch reach distance, punch air and return (no damage or knockback)
@@ -49,6 +52,12 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
   let baseKnockback = CONFIG.todo?.knockback || 12;
   let isBlackFlash = false;
 
+  if (this.isTakadaUltActive) {
+    damage *= (CONFIG.todo?.takadaDamageMultiplier || 1.5);
+    isBlackFlash = true;
+    this.blackFlashGlowTimer = 35;
+  }
+
   if (this.justSwappedTimer > 0) {
     isBlackFlash = true;
     damage *= 2;
@@ -56,23 +65,25 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     this.blackFlashGlowTimer = 35; // Keep glowing fists during and briefly after the hit!
   }
 
-  // Knockback scaling: keep enemy locked in place on early combo hits, moderate push on final hit
+  // Knockback scaling: physical pushback on intermediate hits, explosive launcher push on final hit
   let knockback = baseKnockback;
   if (isCombo) {
     if (this.rockCounterComboLeft > 1) {
-      // Intermediate combo hit: cancel accumulated velocity so enemy stays right in front of Todo
-      target.vx *= 0.1;
-      target.vy *= 0.1;
-      knockback = 0.5; // Micro push for hit impact feel without pushing enemy away
+      // Intermediate combo hit: physics hit pushback per strike
+      knockback = CONFIG.todo?.rockCounterComboPushback || 4.5;
     } else {
-      // Final finisher hit: clean pushback
-      knockback = baseKnockback * 1.2;
+      // Final finisher hit: explosive physics hit pushback
+      knockback = CONFIG.todo?.rockCounterFinisherPushback || 24.0;
     }
   }
 
-  // Apply damage and knockback
+  // Apply velocity pushback impulse & universal physics knockback
   target.vx += Math.cos(angle) * knockback;
   target.vy += Math.sin(angle) * knockback;
+
+  if (typeof target.applyKnockback === 'function') {
+    target.applyKnockback(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
+  }
   
   applyDamageToTarget(target, damage, this);
 

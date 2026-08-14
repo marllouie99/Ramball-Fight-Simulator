@@ -90,7 +90,7 @@ export const yutaConfig = {
   pureLoveBeamCooldown: 1200,              // Cooldown frames (20 seconds) before beam can be used again
   pureLoveBeamChargeFrames: 150,            // Channeling duration before firing (1.5 seconds)
   pureLoveBeamDuration: 280,               // Frames the beam stays active (3 seconds)
-  pureLoveBeamDamagePerTick: 12,           // Rapid multi-hit damage
+  pureLoveBeamDamagePerTick: 10,           // Rapid multi-hit damage
   pureLoveBeamWidth: 200,                  // Massive beam radius/width
   pureLoveBeamLength: 2500,                // Screen spanning length
   pureLoveBeamKnockback: 6,                // Outward push per tick

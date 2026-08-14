@@ -777,3 +777,206 @@ export function drawMahoragaSpeedLines() {
 
   ctx.restore();
 }
+
+function _drawIdolHeartPath(ctx, x, y, size) {
+  ctx.beginPath();
+  const topH = size * 0.3;
+  ctx.moveTo(x, y + topH);
+  ctx.bezierCurveTo(x, y, x - size / 2, y, x - size / 2, y + topH);
+  ctx.bezierCurveTo(x - size / 2, y + (size + topH) / 2, x, y + size * 0.9, x, y + size);
+  ctx.bezierCurveTo(x, y + size * 0.9, x + size / 2, y + (size + topH) / 2, x + size / 2, y + topH);
+  ctx.bezierCurveTo(x + size / 2, y, x, y, x, y + topH);
+  ctx.closePath();
+  ctx.fill();
+}
+
+function _drawBatchedIdolSparkles(ctx, sparkles, screenW, screenH, now, baseAlpha) {
+  ctx.fillStyle = `rgba(255, 255, 255, ${baseAlpha * 0.90})`;
+  ctx.beginPath();
+  for (let i = 0; i < sparkles.length; i++) {
+    const sp = sparkles[i];
+    const sx = sp.relX * screenW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
+    const sy = sp.relY * screenH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
+    ctx.moveTo(sx + sp.size, sy);
+    ctx.arc(sx, sy, sp.size, 0, Math.PI * 2);
+  }
+  ctx.fill();
+
+  ctx.strokeStyle = `rgba(255, 240, 250, ${baseAlpha * 0.75})`;
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  for (let i = 0; i < sparkles.length; i++) {
+    const sp = sparkles[i];
+    const sx = sp.relX * screenW + Math.sin(now * 0.001 * sp.speed + sp.phase) * 15;
+    const sy = sp.relY * screenH + Math.cos(now * 0.001 * sp.speed + sp.phase) * 15;
+    const arm = sp.size * 2.2;
+    ctx.moveTo(sx - arm, sy); ctx.lineTo(sx + arm, sy);
+    ctx.moveTo(sx, sy - arm); ctx.lineTo(sx, sy + arm);
+  }
+  ctx.stroke();
+}
+
+let _todoIdolOverlayAlpha = 0;
+let _todoHeartSeeds = null;
+let _todoSparkleSeeds = null;
+let _cachedOverlayGrad = null;
+let _cachedGradW = 0;
+let _cachedGradH = 0;
+
+function _initTodoIdolSeeds() {
+  _todoHeartSeeds = [];
+  for (let i = 0; i < 10; i++) {
+    _todoHeartSeeds.push({
+      relX: (i + 0.5) / 10 + (Math.random() - 0.5) * 0.08,
+      speed: 0.7 + Math.random() * 0.4,
+      size: 11 + Math.random() * 8,
+      phase: Math.random() * Math.PI * 2,
+      color: i % 3 === 0 ? '#e62e5c' : (i % 3 === 1 ? '#ff5599' : '#ff77bc'),
+      yOffset: Math.random() * 600
+    });
+  }
+
+  _todoSparkleSeeds = [];
+  for (let i = 0; i < 14; i++) {
+    _todoSparkleSeeds.push({
+      relX: Math.random(),
+      relY: Math.random(),
+      speed: 0.5 + Math.random() * 0.5,
+      size: 1.5 + Math.random() * 2.0,
+      phase: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+export function drawTodoTakadaIdolScreenOverlay() {
+  if (!state || !state.fighters || !state.ctx || !state.canvas) return;
+
+  // Single pass fighter search
+  let todoFighter = null;
+  let yutaFighter = null;
+  const fighters = state.fighters;
+  for (let i = 0; i < fighters.length; i++) {
+    const f = fighters[i];
+    if (!f || f.hp <= 0) continue;
+    const charId = f.characterId || f.type || f._def?.type || f._def?.id;
+    if (charId === 'todo' && (f.isTakadaChanneling || f.isTakadaUltActive)) {
+      todoFighter = f;
+    } else if (charId === 'yuta' && f.rika) {
+      yutaFighter = f;
+    }
+  }
+
+  const targetAlpha = todoFighter ? 1.0 : 0.0;
+  if (targetAlpha > _todoIdolOverlayAlpha) {
+    _todoIdolOverlayAlpha = Math.min(1.0, _todoIdolOverlayAlpha + 0.06);
+  } else if (targetAlpha < _todoIdolOverlayAlpha) {
+    _todoIdolOverlayAlpha = Math.max(0.0, _todoIdolOverlayAlpha - 0.04);
+  }
+
+  if (_todoIdolOverlayAlpha <= 0.001) return;
+
+  const ctx = state.ctx;
+  const canvas = state.canvas;
+  const screenW = canvas.width;
+  const screenH = canvas.height;
+  const now = Date.now();
+  const isLowPerf = (state.performanceMode || (state.fps && state.fps < 50));
+
+  if (!_todoHeartSeeds) _initTodoIdolSeeds();
+
+  ctx.save();
+  ctx.globalAlpha = _todoIdolOverlayAlpha;
+
+  // 1. Cached Full-Screen Radial Background Gradient
+  if (!_cachedOverlayGrad || _cachedGradW !== screenW || _cachedGradH !== screenH) {
+    _cachedGradW = screenW;
+    _cachedGradH = screenH;
+    const cx = screenW / 2;
+    const cy = screenH / 2;
+    const maxR = Math.hypot(screenW, screenH) * 0.70;
+
+    _cachedOverlayGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, maxR);
+    _cachedOverlayGrad.addColorStop(0.0, 'rgba(255, 240, 250, 0.88)');
+    _cachedOverlayGrad.addColorStop(0.45, 'rgba(248, 205, 238, 0.75)');
+    _cachedOverlayGrad.addColorStop(0.80, 'rgba(235, 175, 225, 0.60)');
+    _cachedOverlayGrad.addColorStop(1.0, 'rgba(215, 145, 210, 0.45)');
+  }
+
+  ctx.fillStyle = _cachedOverlayGrad;
+  ctx.fillRect(0, 0, screenW, screenH);
+
+  // 2. Batched Full-Screen Shimmering White Sparks
+  const sparkleCount = isLowPerf ? 7 : _todoSparkleSeeds.length;
+  _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), screenW, screenH, now, _todoIdolOverlayAlpha);
+
+  // 3. Floating Pink & Red Hearts (drifting upward)
+  const heartCount = isLowPerf ? 5 : _todoHeartSeeds.length;
+  for (let i = 0; i < heartCount; i++) {
+    const h = _todoHeartSeeds[i];
+    const hx = h.relX * screenW + Math.sin(now * 0.0015 * h.speed + h.phase) * 25;
+    const rawY = screenH - ((now * 0.035 * h.speed + h.yOffset) % (screenH + 60));
+    const hy = rawY;
+    const heartAlpha = Math.min(1.0, Math.sin((rawY / screenH) * Math.PI)) * _todoIdolOverlayAlpha * 0.85;
+
+    ctx.fillStyle = h.color;
+    ctx.globalAlpha = heartAlpha;
+    _drawIdolHeartPath(ctx, hx, hy, h.size);
+  }
+  ctx.globalAlpha = _todoIdolOverlayAlpha;
+
+  // 4. Radial cutout around Rika and Pure Love Beam Corridor
+  if (yutaFighter && yutaFighter.rika) {
+    const rk = yutaFighter.rika;
+    const isRikaActive = rk.active || 
+      (yutaFighter.rikaEmergingForBeamTimer && yutaFighter.rikaEmergingForBeamTimer > 0) || 
+      yutaFighter.isChannelingPureLoveBeam || 
+      yutaFighter.isFiringPureLoveBeam || 
+      (yutaFighter.rikaAlpha !== undefined && yutaFighter.rikaAlpha > 0);
+
+    if (isRikaActive) {
+      const rkX = rk.x;
+      const rkY = rk.y;
+      const cutoutRadius = (rk.radius || rk.r || 65) + 110;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      const cutoutGrad = ctx.createRadialGradient(rkX, rkY, 20, rkX, rkY, cutoutRadius);
+      cutoutGrad.addColorStop(0.0, 'rgba(0, 0, 0, 1.0)');
+      cutoutGrad.addColorStop(0.55, 'rgba(0, 0, 0, 0.8)');
+      cutoutGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+
+      ctx.fillStyle = cutoutGrad;
+      ctx.beginPath();
+      ctx.arc(rkX, rkY, cutoutRadius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (yutaFighter.isFiringPureLoveBeam) {
+      const beamAngle = yutaFighter.pureLoveBeamLockedAngle !== undefined ? yutaFighter.pureLoveBeamLockedAngle : (yutaFighter.gunAngle || 0);
+      const beamOffset = (yutaFighter.r || 22) + 14;
+      const startX = yutaFighter.x + Math.cos(beamAngle) * beamOffset;
+      const startY = yutaFighter.y + Math.sin(beamAngle) * beamOffset;
+      const beamLen = 2500;
+      const beamWidth = 220;
+
+      ctx.save();
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.translate(startX, startY);
+      ctx.rotate(beamAngle);
+
+      const beamGrad = ctx.createLinearGradient(0, -beamWidth / 2, 0, beamWidth / 2);
+      beamGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.0)');
+      beamGrad.addColorStop(0.25, 'rgba(0, 0, 0, 0.9)');
+      beamGrad.addColorStop(0.5, 'rgba(0, 0, 0, 1.0)');
+      beamGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.9)');
+      beamGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
+
+      ctx.fillStyle = beamGrad;
+      ctx.fillRect(0, -beamWidth / 2, beamLen, beamWidth);
+      ctx.restore();
+    }
+  }
+
+  ctx.restore();
+}

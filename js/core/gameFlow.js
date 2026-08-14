@@ -51,6 +51,8 @@ function preloadGameSounds() {
     if (CONFIG.yuji.punchSounds) yujiSounds.push(...CONFIG.yuji.punchSounds);
     if (CONFIG.yuji.blackFlashEnterSound) yujiSounds.push(CONFIG.yuji.blackFlashEnterSound);
     if (CONFIG.yuji.transformationSound) yujiSounds.push(CONFIG.yuji.transformationSound);
+    if (CONFIG.yuji.victoryVoiceSound) yujiSounds.push(CONFIG.yuji.victoryVoiceSound);
+    yujiSounds.push('Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3');
   }
 
   const yutaSounds = [];
@@ -93,6 +95,17 @@ function preloadGameSounds() {
     if (CONFIG.saitama.counterPunchChargingSFX) saitamaSounds.push(CONFIG.saitama.counterPunchChargingSFX);
   }
 
+  const todoSounds = [];
+  if (CONFIG.todo) {
+    if (CONFIG.todo.punchSound) todoSounds.push(CONFIG.todo.punchSound);
+    if (CONFIG.todo.clapSound) todoSounds.push(CONFIG.todo.clapSound);
+    if (CONFIG.todo.victoryVoiceSound) todoSounds.push(CONFIG.todo.victoryVoiceSound);
+    if (CONFIG.todo.brotherVoiceSound) todoSounds.push(CONFIG.todo.brotherVoiceSound);
+    if (CONFIG.todo.takadaVoiceSound) todoSounds.push(CONFIG.todo.takadaVoiceSound);
+    if (CONFIG.todo.takadaChannelingVoiceline) todoSounds.push(CONFIG.todo.takadaChannelingVoiceline);
+    if (CONFIG.todo.takadaBackgroundSong) todoSounds.push(CONFIG.todo.takadaBackgroundSong);
+  }
+
   const allPaths = [...new Set([
     ...legacyPaths,
     ...mappedConfigPaths,
@@ -103,7 +116,8 @@ function preloadGameSounds() {
     ...yujiSounds,
     ...yutaSounds,
     ...genosSounds,
-    ...saitamaSounds
+    ...saitamaSounds,
+    ...todoSounds
   ])];
   return Promise.all(allPaths.map(preloadSound));
 }
@@ -746,6 +760,7 @@ export function resetMatch() {
   state.roundEndTimer = 0;
   state.matchEndTimer = 0;
   state.ffaMatchComplete = false;
+  state._hasPlayedChampionVictoryVoice = false;
   state.illusions = []; // Clear all illusions on match reset
   state.matchKills = [[], [], [], []];
 

@@ -1,4 +1,4 @@
-import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound } from './soundSystem.js';
+import { playSound, stopSound, stopLoopingSound, stopSoundBySrc, stopAllSounds, stopAllLoopingSounds, playLoopingSound, fadeOutSound, fadeOutLoopingSound, fadeInSound } from './soundSystem.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 
 class AudioEventEmitter {
@@ -27,17 +27,17 @@ class AudioEventEmitter {
     }
     
     if (event === 'playLoop') {
-      const [key, id, volume = 1.0, speed = 1.0] = args;
+      const [key, id, volume = 1.0, speed = 1.0, fadeMs = 0] = args;
       const src = AUDIO_CONFIG[id] || id;
       if (typeof src === 'string' && !src.includes('/') && !src.includes('.')) {
         return null;
       }
-      return playLoopingSound(key, src, volume, speed);
+      return playLoopingSound(key, src, volume, speed, fadeMs);
     }
 
     if (event === 'stopLoop') {
-      const [key] = args;
-      stopLoopingSound(key); // Assuming we import this, wait we didn't export stopLoopingSound in the import above!
+      const [key, fadeMs = 300] = args;
+      fadeOutLoopingSound(key, fadeMs);
     }
   }
 
@@ -45,8 +45,21 @@ class AudioEventEmitter {
     return this.emit('playSFX', id, volume, speed, offset, delay, onEnded);
   }
 
-  playLoop(key, id, volume = 1.0, speed = 1.0) {
-    return this.emit('playLoop', key, id, volume, speed);
+  fadeInSFX(id, targetVolume = 1.0, fadeMs = 1500) {
+    const src = AUDIO_CONFIG[id] || id;
+    return fadeInSound(src, targetVolume, fadeMs);
+  }
+
+  playLoop(key, id, volume = 1.0, speed = 1.0, fadeMs = 0) {
+    return this.emit('playLoop', key, id, volume, speed, fadeMs);
+  }
+
+  stopLoop(key, fadeMs = 300) {
+    return this.emit('stopLoop', key, fadeMs);
+  }
+
+  fadeOutSFX(handle, fadeMs = 400) {
+    fadeOutSound(handle, fadeMs);
   }
 
   stopAll() {

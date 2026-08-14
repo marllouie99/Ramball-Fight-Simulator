@@ -137,7 +137,7 @@ export async function preloadSound(src) {
  * @param {number} [speed=1.0] - Playback speed (1.0 is normal)
  * @returns {HTMLAudioElement}
  */
-export function playLoopingSound(key, src, volume = 1.0, speed = 1.0) {
+export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0) {
   if (_loopingSounds.has(key)) {
     const existing = _loopingSounds.get(key);
     if (existing.paused || existing.ended) {
@@ -161,9 +161,9 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0) {
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
       const targetGain = Math.max(0, Math.min(2.5, volume));
-      // Smooth fade-in to prevent click on loop start
+      const rampTime = fadeMs > 0 ? (fadeMs / 1000) : MICRO_FADE_IN;
       gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
-      gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + MICRO_FADE_IN);
+      gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + rampTime);
       source.connect(gainNode);
       gainNode.connect(getMasterAudioDestination());
       source.playbackRate.value = Math.max(0.1, speed);
@@ -179,10 +179,24 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0) {
   }
   // Fallback: standard Audio element
   const audio = /** @type {HTMLAudioElement} */ (cached?.cloneNode() ?? new Audio(src));
-  audio.volume = Math.max(0, Math.min(1, volume));
-  audio.playbackRate = Math.max(0.1, speed);
+  const targetVol = Math.max(0, Math.min(1, volume));
   audio.loop = true;
-  audio.play().catch(() => {});
+  audio.playbackRate = Math.max(0.1, speed);
+  if (fadeMs > 0) {
+    audio.volume = 0.001;
+    audio.play().catch(() => {});
+    const steps = 20;
+    const stepDelay = Math.max(10, fadeMs / steps);
+    let step = 0;
+    const interval = setInterval(() => {
+      step++;
+      audio.volume = Math.min(targetVol, targetVol * (step / steps));
+      if (step >= steps) clearInterval(interval);
+    }, stepDelay);
+  } else {
+    audio.volume = targetVol;
+    audio.play().catch(() => {});
+  }
   _loopingSounds.set(key, audio);
   return audio;
 }
@@ -412,7 +426,7 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
 
   // Check if gameState is roundEnd/matchEnd to block non-announcer/UI combat sounds (after the initial action delay of 60 frames)
   const srcStr = String(src).toLowerCase();
-  const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui');
+  const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui') || srcStr.includes('mybestfriend') || srcStr.includes('bestfriend') || srcStr.includes('voiceline') || srcStr.includes('tadaka') || srcStr.includes('imagination');
   if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
     const isDuringActionDelay = (state.gameState === 'roundEnd' && state.roundEndTimer < 60) || 
                                 (state.gameState === 'matchEnd' && state.matchEndTimer < 60);
@@ -671,6 +685,127 @@ export function fadeOutSound(soundHandle, fadeMs = 350) {
   }
 
   stopSound(soundHandle);
+}
+
+/**
+ * Smoothly play a sound and fade it in over fadeMs milliseconds up to targetVolume.
+ * @param {string} src - Sound source path
+ * @param {number} [targetVolume=1.0] - Target volume
+ * @param {number} [fadeMs=1500] - Fade-in duration in milliseconds
+ */
+export function fadeInSound(src, targetVolume = 1.0, fadeMs = 1500) {
+  const handle = playSound(src, 0.001, 1.0);
+  if (!handle) return null;
+
+  if (handle.gainNode) {
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      handle.gainNode.gain.cancelScheduledValues(now);
+      handle.gainNode.gain.setValueAtTime(0.001, now);
+      handle.gainNode.gain.linearRampToValueAtTime(targetVolume, now + (fadeMs / 1000));
+    } catch(e) {}
+  } else {
+    const audio = handle.audio || (typeof handle.pause === 'function' ? handle : null);
+    if (audio) {
+      audio.volume = 0.001;
+      const steps = 20;
+      const stepDelay = Math.max(10, fadeMs / steps);
+      let step = 0;
+      const interval = setInterval(() => {
+        step++;
+        audio.volume = Math.min(targetVolume, targetVolume * (step / steps));
+        if (step >= steps) clearInterval(interval);
+      }, stepDelay);
+    }
+  }
+  return handle;
+}
+
+/**
+ * Pause or mute an active sound instance (Web Audio API or HTMLAudioElement).
+ * @param {object|HTMLAudioElement} soundHandle 
+ */
+export function pauseSound(soundHandle) {
+  if (!soundHandle) return;
+  try {
+    // Web Audio API instance
+    if (soundHandle.gainNode && typeof soundHandle.gainNode.gain === 'object') {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      if (soundHandle._savedGain === undefined) {
+        soundHandle._savedGain = soundHandle.gainNode.gain.value;
+      }
+      soundHandle.gainNode.gain.cancelScheduledValues(now);
+      soundHandle.gainNode.gain.setValueAtTime(0.0001, now);
+      soundHandle._isPaused = true;
+      return;
+    }
+
+    // HTML5 Audio element instance
+    const audio = soundHandle.audio || (typeof soundHandle.pause === 'function' ? soundHandle : null);
+    if (audio && typeof audio.pause === 'function') {
+      try { audio.pause(); } catch (e) {}
+      soundHandle._isPaused = true;
+    }
+  } catch (e) {}
+}
+
+/**
+ * Resume a paused sound instance (Web Audio API or HTMLAudioElement).
+ * @param {object|HTMLAudioElement} soundHandle 
+ */
+export function resumeSound(soundHandle) {
+  if (!soundHandle) return;
+  try {
+    // Web Audio API instance
+    if (soundHandle.gainNode && typeof soundHandle.gainNode.gain === 'object') {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      const targetGain = soundHandle._savedGain !== undefined ? soundHandle._savedGain : 1.0;
+      soundHandle.gainNode.gain.cancelScheduledValues(now);
+      soundHandle.gainNode.gain.setValueAtTime(targetGain, now);
+      soundHandle._isPaused = false;
+      return;
+    }
+
+    // HTML5 Audio element instance
+    const audio = soundHandle.audio || (typeof soundHandle.play === 'function' ? soundHandle : null);
+    if (audio && typeof audio.play === 'function') {
+      if (audio.paused) {
+        audio.play().catch(() => {});
+      }
+      soundHandle._isPaused = false;
+    }
+  } catch (e) {}
+}
+
+/**
+ * Pause all active sound instances matching a sound file src string.
+ * @param {string} src 
+ */
+export function pauseSoundBySrc(src) {
+  if (!src) return;
+  const target = String(src).toLowerCase();
+  for (const handle of Array.from(_activeSoundHandles)) {
+    if (handle && handle.src && String(handle.src).toLowerCase().includes(target)) {
+      pauseSound(handle);
+    }
+  }
+}
+
+/**
+ * Resume all paused sound instances matching a sound file src string.
+ * @param {string} src 
+ */
+export function resumeSoundBySrc(src) {
+  if (!src) return;
+  const target = String(src).toLowerCase();
+  for (const handle of Array.from(_activeSoundHandles)) {
+    if (handle && handle.src && String(handle.src).toLowerCase().includes(target)) {
+      resumeSound(handle);
+    }
+  }
 }
 
 /**

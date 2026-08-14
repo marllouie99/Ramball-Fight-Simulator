@@ -207,8 +207,8 @@ export class TurretEntity extends Fighter {
       const evaluateTarget = (f) => {
         if (!f || f === this || f === this.owner || f.hp <= 0) return;
 
-        // Skip stealthed targets (or Toji's Heavenly Restriction stealth)
-        if (f.invincibilityTimer > 0 || f.flashStepTimer > 0 || f.isStealthed) return;
+        // Skip stealthed & vanished targets
+        if (f.invincibilityTimer > 0 || f.flashStepTimer > 0 || f.isStealthed || (f.vanishTimer && f.vanishTimer > 0)) return;
 
         let fOwnerIndex = -1;
         if (f.owner && state.fighters.includes(f.owner)) {

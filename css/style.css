@@ -582,7 +582,7 @@ canvas {
 .hud-skill-box-text {
   position: relative;
   z-index: 2;
-  font-family: 'Glast Blitch', Arial, sans-serif;
+  font-family: 'Glast Blitch', 'Rajdhani', 'Outfit', Arial, sans-serif;
   font-size: 13px;
   font-weight: bold;
   color: #000000;
@@ -592,6 +592,15 @@ canvas {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.hud-skill-box-text .hud-num {
+  font-family: 'Permanent Marker', 'Architects Daughter', 'Bangers', 'Rajdhani', sans-serif !important;
+  font-weight: bold !important;
+  font-size: 14px !important;
+  letter-spacing: 0.5px !important;
+  display: inline-block;
+  vertical-align: baseline;
 }
 
 .hud-skill-box-fill {

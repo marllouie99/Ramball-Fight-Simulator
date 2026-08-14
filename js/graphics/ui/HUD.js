@@ -178,11 +178,14 @@ function drawPauseScreen() {
   const { ctx, canvas } = state;
   _clearButtons();
 
-  // Screen is NOT dimmed when paused, per user request.
+  // Dark backdrop overlay to make the top pause panel pop over the top of the screen
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.50)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   drawHUD(); // Keep HUD visible in background
 
   const cx = canvas.width / 2;
-  const cy = canvas.height - 320; // Position pause menu slightly higher in the lower half of the canvas
+  const cy = 180; // Positioned near the top of the screen
 
   const panelW = 260;
   const panelH = 280;

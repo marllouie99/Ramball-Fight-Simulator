@@ -377,16 +377,10 @@ export class Fighter {
         this.pureLoveBeamRecoveryTimer = 0;
       } else {
         this.pureLoveBeamRecoveryTimer--;
-        // Paralyze attacks & skills: cancel active actions and lock ability execution
-        this.interruptAttacks();
-        this.hitStunTimer = Math.max(this.hitStunTimer || 0, 2);
-        this.shootCooldown = Math.max(this.shootCooldown || 0, 2);
-
-        // Heavy slow instead of full freeze — enemy is paralyzed from attacking but can crawl very slowly
-        const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.15;
+        // Heavy slow instead of full freeze — enemy is slowed during recovery but can move and recover
+        const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.40;
         this.vx *= slowMult;
         this.vy *= slowMult;
-        // Don't return true — let the update loop continue so they can still move (very slowly)
       }
     }
     if (this.paralyzeTimer > 0) {
@@ -504,6 +498,7 @@ export class Fighter {
   }
 
   _decrementSkillCooldowns() {
+    if (this.vanishTimer > 0) this.vanishTimer--;
     // Universal helper to ensure skill and ultimate cooldowns continue counting down
     // even while time-stopped, hit-stunned, or frozen by Limitless Infinity!
     for (const key in this) {
@@ -697,7 +692,7 @@ export class Fighter {
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
   takeDamage(amount, attacker, opts = {}) {
-    if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain)) return false;
+    if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain) || (this.vanishTimer && this.vanishTimer > 0) || (this.invincibilityTimer && this.invincibilityTimer > 0)) return false;
 
     // Base fighter doesn't block; sanitize inputs before applying damage.
     let currentHp = Number(this.hp);
@@ -1071,7 +1066,7 @@ export class Fighter {
 
   /** Controls how the gun is aimed. Default aims in direction of opponent with delayed reaction time if stealthed. */
   aim(opponent) {
-    if (!opponent || this.isTargetOfAmbush || (this.knockbackStunTimer > 0) || (this.hitStunTimer > 0) || (this.timeStopTimer > 0)) {
+    if (!opponent || opponent.vanishTimer > 0 || this.isTargetOfAmbush || (this.knockbackStunTimer > 0) || (this.hitStunTimer > 0) || (this.timeStopTimer > 0)) {
       return;
     }
 
@@ -1240,9 +1235,14 @@ export class Fighter {
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
     const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
 
-    if (!isGamePlaying || !isTargetAlive) {
+    if (!isGamePlaying) {
       this.interruptAttacks();
       this.shootCooldown = 60;
+      return;
+    }
+
+    if (!isTargetAlive) {
+      this.shootCooldown = this.shootCooldownMax || 0;
       return;
     }
 

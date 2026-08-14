@@ -41,5 +41,9 @@ export const AUDIO_CONFIG = {
   'skill_genosmachinegunblowvoice': 'Assets/Sound Effects/Skills/genos-machinegunblow-voice.mp3',
   'skill_genosrecovery': 'Assets/Sound Effects/Skills/genos-recovery.mp3',
   'skill_genosrangeattack': 'Assets/Sound Effects/Attacks/genos-range-attack.mp3',
-  'skill_genosdashnoise': 'Assets/Sound Effects/Skills/genos-dash-noise.mp3'
+  'skill_genosdashnoise': 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
+  'skill_todotadakachannelvoice': 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3',
+  'skill_todotadakabgsong': 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',
+  'skill_todomybestfriend': 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3',
+  'skill_yujibestfriend': 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3'
 };

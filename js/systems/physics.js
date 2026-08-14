@@ -6,6 +6,7 @@ import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { projectileSystem } from './projectileSystem.js';
 import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance } from '../core/state.js';
 import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
+import { audioSystem } from './audioSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { updateIllusions } from './illusionSystem.js';
 
@@ -363,7 +364,7 @@ function getClosestOpponent(fighter) {
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
     if (!other || other === fighter || other.hp <= 0) continue;
-    if (other.invincibilityTimer > 0 || other.flashStepTimer > 0) continue;
+    if (other.invincibilityTimer > 0 || other.flashStepTimer > 0 || (other.vanishTimer && other.vanishTimer > 0)) continue;
     if (isTeamMode && fighterTeam !== null && state.getFighterTeam(i) === fighterTeam) continue;
     
     // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa
@@ -383,7 +384,7 @@ function getClosestOpponent(fighter) {
   if (state.illusions) {
     for (let i = 0; i < state.illusions.length; i++) {
       const illusion = state.illusions[i];
-      if (!illusion || illusion.hp <= 0) continue;
+      if (!illusion || illusion.hp <= 0 || (illusion.vanishTimer && illusion.vanishTimer > 0)) continue;
       // Skip if this illusion belongs to the fighter (Doppleganger shouldn't target own illusions)
       if (illusion.owner === fighter) continue;
       // Skip if this illusion belongs to a teammate
@@ -489,6 +490,20 @@ function endRoundIf2v2Ended() {
   if (!isMatchEnd) {
     stopAllSounds();
     stopAllLoopingSounds();
+  }
+
+  // Play Todo's "MY BEST FRIEND!" victory voiceline when Todo's team wins!
+  if (state.fighters) {
+    const todoFighter = state.fighters.find(f => f && (f.characterId === 'todo' || f.type === 'todo'));
+    if (todoFighter) {
+      const todoIdx = state.fighters.indexOf(todoFighter);
+      const todoTeam = state.getFighterTeam ? state.getFighterTeam(todoIdx) : null;
+      if (todoTeam !== null && todoTeam === winningTeam) {
+        const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
+        const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
+        audioSystem.playSFX(todoSnd, vol);
+      }
+    }
   }
 
   if (isMatchEnd) {
@@ -649,6 +664,7 @@ export function updateFighters() {
   if (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || state.gameState === 'playing') {
     state.fighters.forEach((fighter, fi) => {
       if (!fighter) return;
+      if (fighter.vanishTimer > 0) fighter.vanishTimer--;
       if (fighter.hp <= 0) {
         if (typeof fighter._healthBarShakeTimer === 'number' && fighter._healthBarShakeTimer > 0) {
           fighter._healthBarShakeTimer--;

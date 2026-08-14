@@ -17,7 +17,7 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 
 export class GojoPurpleBehavior extends ProjectileBehavior {
-  static spawn(system, x, y, vx, vy, damage, ownerIndex) {
+  static spawn(system, x, y, vx, vy, damage, ownerIndex, dps) {
     const proj = system._getProjectile();
     proj.x = x;
     proj.y = y;
@@ -28,7 +28,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     proj.maxLife = proj.life;
     proj.color = '#8A2BE2'; // Purple
     proj.owner = ownerIndex;
-    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 10;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.gojo?.purpleDamage || 70);
     
     // Core visual/behavior properties
     proj.behaviorType = 'gojo_purple';
@@ -38,7 +38,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
-    proj.purpleDPS = CONFIG.gojo?.purpleDPS ?? 30;
+    proj.purpleDPS = Number.isFinite(Number(dps)) ? Number(dps) : (CONFIG.gojo?.purpleDPS || 150);
     proj.purpleDPSInterval = CONFIG.gojo?.purpleDPSInterval ?? 10;
     proj.purpleLastDPSTick = 0;
     proj.purpleDamagedFighters = new Set();
@@ -110,11 +110,14 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       ...(state.illusions || [])
     ];
 
-    // 1. Continuous slow + pull + paralysis effect for all targets (fighters & illusions) in the purple orb's radius
+    // 1. Continuous slow + pull + paralysis effect for targets trapped in the purple orb
+    const trapRadius = (effectiveRadius || 50) + 30; // ~80px direct hit trapping radius
     for (let i = 0; i < allTargets.length; i++) {
       const ent = allTargets[i];
       if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
       if (ent.owner && ent.owner === ownerFighter) continue;
+      const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+      if (entIdx !== -1 && areOnSameTeam(projectile.owner, entIdx)) continue;
       
       const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
       const isPurpleAdapted = isMahoraga && (
@@ -129,7 +132,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const dy = projectile.y - ent.y;
         const dist = Math.hypot(dx, dy);
         
-        if (dist > 0 && dist < purplePullRadius) {
+        if (dist > 0 && dist < trapRadius) {
           ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
           ent.isCaughtInPurple = true;
           // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
@@ -145,7 +148,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
             ent.applyHitStun(12);
           }
           
-          const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
+          const pullStrength = purplePullForce * (1 - dist / trapRadius);
           ent.vx *= 0.1;
           ent.vy *= 0.1;
           
@@ -155,6 +158,30 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
 
           ent.x += (dx / dist) * pullStrength;
           ent.y += (dy / dist) * pullStrength;
+        } else if (dist >= trapRadius && dist < purplePullRadius) {
+          // Outer gravitational vortex pull field (irresistible suction towards Purple core)
+          const falloff = 1 - (dist - trapRadius) / (purplePullRadius - trapRadius);
+          const outerPullSpeed = Math.max(1.8, (purplePullForce * 0.75) * Math.pow(falloff, 1.2));
+          const dirX = dx / dist;
+          const dirY = dy / dist;
+
+          // Apply heavy slow so enemy cannot walk away against the gravitational vortex
+          if (typeof ent.applySlow === 'function') {
+            ent.applySlow(10, 0.40, { isPurple: true });
+          } else {
+            ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
+            ent.slowMultiplier = 0.40;
+          }
+
+          // Direct positional suction displacement towards orb center
+          ent.x += dirX * outerPullSpeed;
+          ent.y += dirY * outerPullSpeed;
+
+          // Dampen existing velocity and pull velocity impulse towards core
+          ent.vx = ent.vx * 0.65 + dirX * (outerPullSpeed * 0.4);
+          ent.vy = ent.vy * 0.65 + dirY * (outerPullSpeed * 0.4);
+          if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.6;
+          if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.6;
         }
       }
     }

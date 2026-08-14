@@ -292,7 +292,9 @@ export class GojoRenderer {
     const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
     const isInOwnDomain = fighter.domainActive;
     if (fighter.isChannelingPurple) {
-      // Aura suppressed during Hollow Purple orb fusion
+      if (fighter.is200PercentChannel || fighter.purpleUseCount === 1) {
+        fighter._drawJJKCursedEnergyAura(ctx, 'purple');
+      }
     } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
       fighter._drawJJKCursedEnergyAura(ctx, 'rct');
     } else if (!isFrozenByDomain && !isInOwnDomain && fighter.isMeleeMode && (fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
@@ -414,12 +416,33 @@ export class GojoRenderer {
     // 2. Hollow Purple Fusion Gesture
     if (fighter.isChannelingPurple) {
       const mergeProgress = typeof fighter.getPurpleChargeProgress === 'function' ? fighter.getPurpleChargeProgress() : 0;
-      const handDistance = r + 10;
-      const handSpread = 14 * (1 - mergeProgress);
+      const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
-      const fHand = toGlobal(handDistance, handSpread);
-      const bHand = toGlobal(handDistance, -handSpread);
-      return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
+      if (is200) {
+        // 200% Purple: Hands wide open sideways (0.0 -> 0.75), then sweep forward to aim towards enemy (0.75 -> 1.0)
+        let handX, handY;
+        if (mergeProgress < 0.75) {
+          // Hands wide open on opposite sides of body
+          handX = 0;
+          handY = r * 2.2;
+        } else {
+          // Reposition both hands forward to aim towards enemy
+          const aimP = (mergeProgress - 0.75) / 0.25; // 0.0 -> 1.0
+          const easeAim = Math.sin(aimP * Math.PI * 0.5);
+          handX = (r + 12) * easeAim;
+          handY = (r * 2.2) * (1 - easeAim) + 6 * easeAim;
+        }
+        const fHand = toGlobal(handX, handY);
+        const bHand = toGlobal(handX, -handY);
+        return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
+      } else {
+        // Standard 100% Purple gesture
+        const handDistance = r + 10;
+        const handSpread = 14 * (1 - mergeProgress);
+        const fHand = toGlobal(handDistance, handSpread);
+        const bHand = toGlobal(handDistance, -handSpread);
+        return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
+      }
     }
 
     // 4. Domain Expansion Hand Sign Gesture (Unlimited Void - Single Hand Sign near Collar)

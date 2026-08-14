@@ -8,6 +8,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave } from '../../g
 import { spawnBloodEffect } from '../particles/bloodEffect.js';
 import { fastCleanArray, pushTrailCap } from '../particles/visualTrailSystem.js';
 import { renderYutaDomainBackground } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
+import { updateRika } from '../../entities/fighters/yuta/rikaLogic.js';
 
 const _yutaAuraCanvasCache = new Map();
 
@@ -235,6 +236,15 @@ export class YutaRenderer {
     if (!fighter.rika) return;
 
     const rk = fighter.rika;
+    const isGojoDomainActive = typeof state !== 'undefined' && (
+      state.domainActive || state.activeDomain ||
+      (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
+    );
+
+    if (rk.killedInDomain || (isGojoDomainActive && (rk.isDying || rk.hp <= 0 || !rk.active))) {
+      return; // Do NOT render Rika white corpse inside Gojo's domain
+    }
+
     const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
     const isGamePlay = renderState ? !!renderState.isHybrid : true;
 

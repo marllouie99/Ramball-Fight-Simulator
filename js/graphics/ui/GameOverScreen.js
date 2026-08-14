@@ -2,6 +2,7 @@ import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { Fighter } from '../../entities/fighter.js';
 import { drawHUD } from '../hudManager.js';
 import { state } from '../../core/state.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
@@ -416,6 +417,18 @@ function drawMatchWinnerReveal(winner, timer, mode) {
 
 
 
+
+  // Trigger Champion Victory Voiceline when champion screen is revealed
+  if (!state._hasPlayedChampionVictoryVoice && timer > 0) {
+    state._hasPlayedChampionVictoryVoice = true;
+
+    const hasTodo = winningFighters.some(f => f && (f.characterId === 'todo' || f.type === 'todo' || f._def?.id === 'todo'));
+    if (hasTodo) {
+      const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
+      const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
+      audioSystem.playSFX(todoSnd, vol);
+    }
+  }
 
   // ── Draw volumetric god rays behind model(s) ────────────────────────────────
   winningFighters.forEach((wFighter, idx) => {

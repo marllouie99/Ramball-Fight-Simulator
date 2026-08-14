@@ -393,7 +393,7 @@ class ProjectileSystem {
     this.projectiles.push(proj);
   }
 
-  fireGojoPurple(fighter, ownerIndex, damage) {
+  fireGojoPurple(fighter, ownerIndex, damage, dps) {
     const speed = CONFIG.gojo.purpleSpeed || 8;
     const tipDist = GUN_TIP_DIST(fighter.r) + 20;
     const dirX = Math.cos(fighter.gunAngle);
@@ -409,7 +409,7 @@ class ProjectileSystem {
     proj.maxLife = proj.life;
     proj.color = '#8A2BE2'; // Purple
     proj.owner = ownerIndex;
-    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : 10;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (CONFIG.gojo?.purpleDamage || 70);
     proj.isGojoPurple = true;
     proj.isGojoPurpleOrb = true;
     proj.behaviorType = 'gojo_purple';
@@ -418,8 +418,8 @@ class ProjectileSystem {
     proj.skillShotId = 'purple';
     proj.hitTargets = new Set();
     proj.hitFighters = new Set(); // Piercing
-    proj.purpleDPS = CONFIG.gojo.purpleDPS || 5;
-    proj.purpleDPSInterval = CONFIG.gojo.purpleDPSInterval || 30;
+    proj.purpleDPS = Number.isFinite(Number(dps)) ? Number(dps) : (CONFIG.gojo?.purpleDPS || 150);
+    proj.purpleDPSInterval = CONFIG.gojo?.purpleDPSInterval || 10;
     proj.purpleLastDPSTick = 0;
     proj.purpleDamagedFighters = new Set(); // Track who has been DPS'd
     
@@ -632,12 +632,16 @@ class ProjectileSystem {
             const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
             const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
 
-            f.vx += Math.cos(angle) * pushForce;
-            f.vy += Math.sin(angle) * pushForce;
+            const pushVx = Math.cos(angle) * pushForce * 1.35;
+            const pushVy = Math.sin(angle) * pushForce * 1.35;
 
-            if (f.knockbackVx !== undefined && f.knockbackVy !== undefined) {
-              f.knockbackVx += Math.cos(angle) * pushForce * 1.35;
-              f.knockbackVy += Math.sin(angle) * pushForce * 1.35;
+            if (typeof f.applyKnockback === 'function') {
+              f.applyKnockback(pushVx, pushVy);
+            } else {
+              f.knockbackVx = (f.knockbackVx || 0) + pushVx;
+              f.knockbackVy = (f.knockbackVy || 0) + pushVy;
+              f.vx += pushVx;
+              f.vy += pushVy;
               f.knockbackStunTimer = Math.max(f.knockbackStunTimer || 0, 22);
             }
 
@@ -666,12 +670,16 @@ class ProjectileSystem {
               const baseKnockback = CONFIG.sukuna?.divineFlameKnockback || 40;
               const pushForce = baseKnockback * Math.max(0.55, 1 - (dist / splashRadius) * 0.45);
 
-              ill.vx += Math.cos(angle) * pushForce;
-              ill.vy += Math.sin(angle) * pushForce;
+              const pushVx = Math.cos(angle) * pushForce * 1.35;
+              const pushVy = Math.sin(angle) * pushForce * 1.35;
 
-              if (ill.knockbackVx !== undefined && ill.knockbackVy !== undefined) {
-                ill.knockbackVx += Math.cos(angle) * pushForce * 1.35;
-                ill.knockbackVy += Math.sin(angle) * pushForce * 1.35;
+              if (typeof ill.applyKnockback === 'function') {
+                ill.applyKnockback(pushVx, pushVy);
+              } else {
+                ill.knockbackVx = (ill.knockbackVx || 0) + pushVx;
+                ill.knockbackVy = (ill.knockbackVy || 0) + pushVy;
+                ill.vx += pushVx;
+                ill.vy += pushVy;
                 ill.knockbackStunTimer = Math.max(ill.knockbackStunTimer || 0, 22);
               }
 
@@ -836,7 +844,7 @@ class ProjectileSystem {
     const nearbyFighters = spatialGrid.getNearby(projectile.x, projectile.y, projectile.r * 2 + 100);
 
     for (const fighter of nearbyFighters) {
-      if (!fighter || fighter.hp <= 0 || fighter.isAmbushing) continue;
+      if (!fighter || fighter.hp <= 0 || fighter.isAmbushing || (fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0)) continue;
       const fi = (typeof fighter.fighterIndex === 'number') ? fighter.fighterIndex : fighters.indexOf(fighter);
       if (fi == null || fi === -1) continue;
 
@@ -2124,11 +2132,14 @@ class ProjectileSystem {
           }
         }
         
-        // Continuous slow + pull effect for all targets (fighters & illusions) in the purple orb's radius
+        // Continuous slow + pull effect for targets trapped in the purple orb
+        const trapRadius = (effectiveRadius || 50) + 30; // ~80px direct hit trapping radius
         for (let i = 0; i < allTargets.length; i++) {
           const ent = allTargets[i];
           if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
           if (ent.owner && ent.owner === ownerFighter) continue;
+          const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+          if (entIdx !== -1 && areOnSameTeam(p.owner, entIdx)) continue;
           
           const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
           const isPurpleAdapted = isMahoraga && (
@@ -2141,7 +2152,7 @@ class ProjectileSystem {
             const dy = p.y - ent.y;
             const dist = Math.hypot(dx, dy);
             
-            if (dist < purplePullRadius) {
+            if (dist > 0 && dist < trapRadius) {
               ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
               ent.isCaughtInPurple = true;
               // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
@@ -2157,18 +2168,40 @@ class ProjectileSystem {
                 ent.applyHitStun(12);
               }
               
-              if (dist > 0) {
-                const pullStrength = purplePullForce * (1 - dist / purplePullRadius);
-                ent.vx *= 0.1;
-                ent.vy *= 0.1;
-                
-                // Suppress existing knockback so they don't fling out of the orb
-                if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
-                if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
+              const pullStrength = purplePullForce * (1 - dist / trapRadius);
+              ent.vx *= 0.1;
+              ent.vy *= 0.1;
+              
+              // Suppress existing knockback so they don't fling out of the orb
+              if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
+              if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
 
-                ent.x += (dx / dist) * pullStrength;
-                ent.y += (dy / dist) * pullStrength;
+              ent.x += (dx / dist) * pullStrength;
+              ent.y += (dy / dist) * pullStrength;
+            } else if (dist >= trapRadius && dist < purplePullRadius) {
+              // Outer gravitational vortex pull field (irresistible suction towards Purple core)
+              const falloff = 1 - (dist - trapRadius) / (purplePullRadius - trapRadius);
+              const outerPullSpeed = Math.max(1.8, (purplePullForce * 0.75) * Math.pow(falloff, 1.2));
+              const dirX = dx / dist;
+              const dirY = dy / dist;
+
+              // Apply heavy slow so enemy cannot walk away against the gravitational vortex
+              if (typeof ent.applySlow === 'function') {
+                ent.applySlow(10, 0.40, { isPurple: true });
+              } else {
+                ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
+                ent.slowMultiplier = 0.40;
               }
+
+              // Direct positional suction displacement towards orb center
+              ent.x += dirX * outerPullSpeed;
+              ent.y += dirY * outerPullSpeed;
+
+              // Dampen existing velocity and pull velocity impulse towards core
+              ent.vx = ent.vx * 0.65 + dirX * (outerPullSpeed * 0.4);
+              ent.vy = ent.vy * 0.65 + dirY * (outerPullSpeed * 0.4);
+              if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.6;
+              if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.6;
             }
           }
         }
@@ -2232,25 +2265,36 @@ class ProjectileSystem {
             const closestY = startY + t * dy;
             
             const distSq = (cx - closestX) * (cx - closestX) + (cy - closestY) * (cy - closestY);
-            const currentBeamRadius = (beamRadius * 0.45) + (beamRadius * 2.25) * t;
+            const distFromAxis = Math.sqrt(distSq);
+
+            // Dynamic Beam Width Radius at distance t along beam (matching visual expanding pill path)
+            const startR = (beamRadius * 0.40);
+            const endR = (beamRadius * 2.10);
+            const currentBeamRadius = startR + (endR - startR) * t;
 
             const distToOrigin = Math.hypot(cx - ownerFighter.x, cy - ownerFighter.y);
-            const isAtBeamOrigin = distToOrigin <= ((ownerFighter.r || 22) + radius + beamRadius * 0.8);
-            const isInsideBeam = isAtBeamOrigin || (distSq <= (currentBeamRadius + radius) * (currentBeamRadius + radius));
+            const isAtBeamOrigin = distToOrigin <= ((ownerFighter.r || 22) + radius + startR);
+            const isInsideBeam = isAtBeamOrigin || (distFromAxis <= (currentBeamRadius + radius));
 
             if (isInsideBeam) {
+              // Spread damage scaling based on target position within the dynamic beam width
+              // Targets in the core center axis get 100% damage, scaling smoothly to 65% near outer spreading edges
+              const normalizedOffAxis = Math.min(1.0, distFromAxis / Math.max(1, currentBeamRadius + radius));
+              const widthSpreadDamageMult = 1.0 - (normalizedOffAxis * 0.35);
+              const finalDamage = p.damage * widthSpreadDamageMult;
+
               if (!p.hitTargets.has(ent)) {
                 p.hitTargets.add(ent);
                 
                 if (typeof ent.takeDamage === 'function') {
-                  ent.takeDamage(p.damage, ownerFighter, { isPureLoveBeam: true });
+                  ent.takeDamage(finalDamage, ownerFighter, { isPureLoveBeam: true });
                 }
               }
 
               ent.caughtInPureLoveBeam = true;
               ent.wasCaughtInPureLoveBeam = true;
               ent.pureLoveBeamTimer = 10;
-              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120; // Set recovery delay
+              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15; // Crisp 15-frame (0.25s) recovery delay
 
               // Explicitly cancel Mahoraga's Level 8 stance and teleports on hit!
               if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
@@ -2303,7 +2347,7 @@ class ProjectileSystem {
               ent.pureLoveBeamTimer = 0;
               
               // Trigger recovery phase immediately upon escaping beam width!
-              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
+              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15;
               if (typeof ent.interruptAttacks === 'function') {
                 ent.interruptAttacks();
               }
@@ -2324,6 +2368,19 @@ class ProjectileSystem {
         // Beam lifetime logic
         p.life -= 1;
         if (p.life <= 0) {
+          // Clear caughtInPureLoveBeam flags for all entities when beam expires
+          const allTargets = [
+            ...(state.fighters || []),
+            ...(state.illusions || [])
+          ];
+          for (let k = 0; k < allTargets.length; k++) {
+            const ent = allTargets[k];
+            if (ent) {
+              ent.caughtInPureLoveBeam = false;
+              ent.wasCaughtInPureLoveBeam = false;
+              ent.pureLoveBeamTimer = 0;
+            }
+          }
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();

@@ -135,6 +135,7 @@ export function detonateRed(fighter) {
 
 export function firePurple(fighter, ownerIndex) {
   fighter.isChannelingPurple = false;
+  fighter.purpleChargeTimer = 0;
   fighter._hasPlayedPurpleChannelSound = false;
   if (fighter._purpleChargeSoundHandle) {
     fadeOutSound(fighter._purpleChargeSoundHandle, 300);
@@ -142,11 +143,38 @@ export function firePurple(fighter, ownerIndex) {
   }
   fadeOutSoundBySrc('mixing', 300);
 
+  fighter.purpleUseCount = (fighter.purpleUseCount || 0) + 1;
+  const enableBoost = CONFIG.gojo?.enablePurpleSecondCastBoost !== false;
+  const isSecondCast = enableBoost && (fighter.purpleUseCount === 2);
+  const damageMult = isSecondCast ? (CONFIG.gojo?.purpleSecondCastDamageMultiplier ?? 2.0) : 1.0;
+  const baseDamage = CONFIG.gojo?.purpleDamage || 70;
+  const baseDPS = CONFIG.gojo?.purpleDPS || 150;
+
+  if (isSecondCast && typeof spawnFloatingText === 'function') {
+    const bannerText = CONFIG.gojo?.purpleSecondCastTextBanner || '200% HOLLOW PURPLE!';
+    spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, bannerText, '#A020F0');
+  }
+
+  // Once the 2nd purple releases, reset purpleUseCount back to 0 so the next cast cycles back to 100%!
+  if (fighter.purpleUseCount >= 2) {
+    fighter.purpleUseCount = 0;
+  }
+
   let purpleLife = CONFIG.gojo?.purpleLife || 250;
   if (projectileSystem && projectileSystem.fireGojoPurple) {
-    const proj = projectileSystem.fireGojoPurple(fighter, ownerIndex, CONFIG.gojo?.purpleDamage || 10);
-    if (proj && proj.life !== undefined) {
-      purpleLife = proj.life;
+    const proj = projectileSystem.fireGojoPurple(
+      fighter, 
+      ownerIndex, 
+      baseDamage * damageMult, 
+      baseDPS * damageMult
+    );
+    if (proj) {
+      proj.purpleDPS = baseDPS * damageMult;
+      proj.damageMult = damageMult;
+      proj.is200Percent = isSecondCast;
+      if (proj.life !== undefined) {
+        purpleLife = proj.life;
+      }
     }
   }
 
@@ -155,6 +183,13 @@ export function firePurple(fighter, ownerIndex) {
   fighter.purpleRecoveryMaxTimer = purpleLife;
   fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 600;
   fighter.z = 35; // Start descent from hovering altitude
+
+  // Ensure Limitless Infinity barrier is IMMEDIATELY active during post-Purple breather state!
+  fighter.infinityCooldown = 0;
+  fighter.infinityActive = true;
+  fighter.infinityActiveTimer = purpleLife;
+  fighter.infinityFadeOpacity = 1.0;
+  fighter.isMeleeMode = false;
 
   triggerGlobalScreenShake(CONFIG.gojo?.purpleShakeIntensity || 15, CONFIG.gojo?.purpleShakeDuration || 20);
 

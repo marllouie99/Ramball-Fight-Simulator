@@ -10,6 +10,7 @@ import { spawnBloodEffect } from '../../../graphics/particles/bloodEffect.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
 
 export function modExecuteKatanaMelee(fighter, angle) {
+  if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam || fighter.isChannelingDomain) return;
   fighter.blockPoseTimer = 0; // Drop guard instantly if he swings
   fighter.meleeCooldown = fighter.meleeCooldownMax;
   fighter.targetAngle = angle;
@@ -49,7 +50,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
   if (state.fighters) {
     for (let i = 0; i < state.fighters.length; i++) {
       const enemy = state.fighters[i];
-      if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0) continue;
+      if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
 
       const enemyTeam = state.getFighterTeam(i);
       if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
@@ -60,9 +61,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
 
       if (dist <= fighter.r + enemy.r + range) {
         const enemyAngle = Math.atan2(dy, dx);
-        let angleDiff = Math.abs(enemyAngle - fighter.targetAngle);
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        angleDiff = Math.abs(angleDiff);
+        const angleDiff = Math.abs(Math.atan2(Math.sin(enemyAngle - fighter.targetAngle), Math.cos(enemyAngle - fighter.targetAngle)));
 
         if (angleDiff <= arc / 2) {
           validTargets.push(enemy);
@@ -74,7 +73,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
   // Collect all enemy illusions & minions in frontal Katana blade arc
   if (state.illusions) {
     for (const ill of state.illusions) {
-      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) continue;
+      if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika || (ill.vanishTimer && ill.vanishTimer > 0)) continue;
       if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) continue;
 
       const dx = ill.x - fighter.x;
@@ -83,9 +82,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
 
       if (dist <= fighter.r + (ill.r || 20) + range) {
         const enemyAngle = Math.atan2(dy, dx);
-        let angleDiff = Math.abs(enemyAngle - fighter.targetAngle);
-        while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
-        angleDiff = Math.abs(angleDiff);
+        const angleDiff = Math.abs(Math.atan2(Math.sin(enemyAngle - fighter.targetAngle), Math.cos(enemyAngle - fighter.targetAngle)));
 
         if (angleDiff <= arc / 2) {
           validTargets.push(ill);

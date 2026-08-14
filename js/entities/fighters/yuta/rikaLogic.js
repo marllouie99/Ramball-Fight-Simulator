@@ -92,7 +92,7 @@ export function updateRika(fighter, arena) {
 
   const rk = fighter.rika;
   
-  const isFrozen = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0) || 
+  const isFrozen = (fighter.timeStopTimer > 0) || 
                    (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || 
                    (fighter.crimsonElectrifiedTimer > 0) || (fighter.isFrozenByInfinity);
                    
@@ -326,7 +326,7 @@ export function updateRika(fighter, arena) {
           // Hit enemy fighters in roar radius
           if (state.fighters) {
             state.fighters.forEach((enemy, idx) => {
-              if (enemy && enemy !== fighter && enemy.hp > 0 && enemy.invincibilityTimer <= 0) {
+              if (enemy && enemy !== fighter && enemy.hp > 0 && enemy.invincibilityTimer <= 0 && !(enemy.vanishTimer > 0)) {
                 const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
                 if (isEnemy) {
                   const dx = enemy.x - rk.x;
@@ -408,7 +408,7 @@ export function updateRika(fighter, arena) {
 
           if (state.fighters) {
             state.fighters.forEach((enemy, idx) => {
-              if (enemy && enemy !== fighter && enemy.hp > 0 && enemy.invincibilityTimer <= 0) {
+              if (enemy && enemy !== fighter && enemy.hp > 0 && enemy.invincibilityTimer <= 0 && !(enemy.vanishTimer > 0)) {
                 const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
                 if (isEnemy) {
                   const dx = enemy.x - rk.x;
@@ -519,6 +519,7 @@ export function updateRika(fighter, arena) {
         rk.disappearing = false;
         rk.cooldownTimer = 0;
         rk.r = CONFIG.yuta.rikaRadius || 30;
+        fighter.rikaRechargeHpBaseline = fighter.hp;
 
         if (fighter.domainActive) {
           rk.killedInDomain = true;
@@ -552,6 +553,7 @@ export function updateRika(fighter, arena) {
         rk.r = baseR; // Reset radius for next summon
         rk.spawnScale = 0.05;
         fighter.rikaAlpha = 0;
+        fighter.rikaRechargeHpBaseline = fighter.hp;
       }
     } else {
       // Rika stays active indefinitely as long as her HP > 0 (no duration timer limit)
@@ -562,7 +564,33 @@ export function updateRika(fighter, arena) {
           if (idx >= 0) state.illusions.splice(idx, 1);
         }
 
-        // ENTER DYING STATE
+        const isGojoDomain = fighter.domainActive || fighter.isChannelingDomain || (typeof state !== 'undefined' && (state.domainActive || state.activeDomain));
+        if (isGojoDomain) {
+          // Instant particle puff when Rika dies inside Gojo's domain (no white corpse visual)
+          rk.active = false;
+          rk.isDying = false;
+          rk.disappearing = false;
+          rk.deathTimer = 0;
+          rk.cooldownTimer = 0;
+          rk.hasSummonedAt50Hp = true;
+          rk.killedInDomain = true;
+          fighter.rikaRechargeHpBaseline = fighter.hp;
+
+          if (typeof spawnSparks === 'function') {
+            for (let i = 0; i < 25; i++) {
+              spawnSparks(rk.x, rk.y, 1, 'rikaCurse');
+            }
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(rk.x, rk.y, 35, 'dark');
+          }
+          if (typeof spawnFloatingText === 'function') {
+            spawnFloatingText(rk.x, rk.y - 20, 'DISPELLED!', '#ff1a1a');
+          }
+          return;
+        }
+
+        // ENTER DYING STATE (outside domain)
         rk.isDying = true;
         rk.deathTimer = 10; // Fast dying animation before explosion
       }
@@ -731,7 +759,7 @@ export function updateRika(fighter, arena) {
       if (state.fighters) {
         for (let i = 0; i < state.fighters.length; i++) {
           const enemy = state.fighters[i];
-          if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0) continue;
+          if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
           const enemyTeam = state.getFighterTeam(i);
           if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
 
@@ -950,7 +978,7 @@ function findRikaTarget(fighter, rk) {
   // Check main enemy fighters
   for (let i = 0; i < state.fighters.length; i++) {
     const enemy = state.fighters[i];
-    if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || enemy.isStealthed) continue;
+    if (!enemy || enemy.hp <= 0 || enemy === fighter || enemy.invincibilityTimer > 0 || enemy.isStealthed || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
     
     const enemyTeam = state.getFighterTeam(i);
     if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;

@@ -329,10 +329,8 @@ function updateHealthHud() {
 
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
-  const currentSkillsStr = fighters.map((f, i) => {
+  const currentSkillsStr = fighters.map(f => {
     if (!f) return '';
-    if (is2v2) return '';
-    if (is1v2 && i !== 0) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
     return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)}`;
@@ -425,9 +423,12 @@ function updateHealthHud() {
         rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
       }
 
+      const label100 = CONFIG.gojo?.purpleSecondCastTextHeader100 || 'PURPLE 100%';
+      const label200 = CONFIG.gojo?.purpleSecondCastTextHeader200 || 'PURPLE 200%';
+      const purpleLabel = (f.purpleUseCount === 1) ? label200 : label100;
       return [
         { id: 'uv',     pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'UNLIMITED VOID' },
-        { id: 'purple', pct: purplePct, ready: purplePct >= 99, color: themeColor, label: 'HOLLOW PURPLE' },
+        { id: 'purple', pct: purplePct, ready: purplePct >= 99, color: themeColor, label: purpleLabel },
         { id: 'red',    pct: redPct,    ready: redPct >= 99,    color: themeColor, label: 'REVERSAL RED' },
         { id: 'rct',    pct: rctPct,    ready: rctPct >= 99 && !f.isChannelingRCT, color: themeColor, label: 'RCT' },
       ];
@@ -631,9 +632,36 @@ function updateHealthHud() {
       const rockTimer = f.rockThrowCooldown !== undefined ? f.rockThrowCooldown : rockMax;
       const rockPct = Math.max(0, Math.min(100, (1 - (rockTimer / rockMax)) * 100));
 
+      // 50% HP Auto-Trigger Ultimate: TAKADA-CHAN IDOL
+      const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
+      const hpRatio = (f.maxHp && f.maxHp > 0) ? (f.hp / f.maxHp) : 1.0;
+      let ultPct = 0;
+      let ultReady = false;
+
+      if (f.isTakadaUltActive) {
+        const remaining = f.takadaUltTimer || 0;
+        const dur = CONFIG.todo?.ultDuration || 1500;
+        ultPct = Math.max(0, Math.min(100, (remaining / dur) * 100));
+        ultReady = true;
+      } else if (f.isTakadaChanneling) {
+        const channelMax = CONFIG.todo?.channelDuration || 180;
+        const channelTimer = f.takadaChannelTimer || 0;
+        ultPct = Math.max(0, Math.min(100, (1 - (channelTimer / channelMax)) * 100));
+        ultReady = true;
+      } else if (f.hasTriggeredTakadaHpUlt) {
+        ultPct = 0; // Already used this match
+        ultReady = false;
+      } else {
+        // Progresses from 0% (at 100% HP) up to 100% (at <= 50% HP threshold)
+        const progressRatio = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / (1.0 - hpThreshold)));
+        ultPct = Math.round(progressRatio * 100);
+        ultReady = hpRatio <= hpThreshold;
+      }
+
       return [
         { id: 'clap', pct: clapPct, ready: clapPct >= 99, color: themeColor, label: 'BOOGIE WOOGIE' },
-        { id: 'rock', pct: rockPct, ready: rockPct >= 99, color: themeColor, label: 'CURSED ROCK' }
+        { id: 'rock', pct: rockPct, ready: rockPct >= 99, color: themeColor, label: 'CURSED ROCK' },
+        { id: 'takada', pct: ultPct, ready: ultReady, color: themeColor, label: 'TAKADA-CHAN IDOL' }
       ];
     }
     if (f.characterId === 'yuji' || f.type === 'yuji') {
@@ -780,9 +808,11 @@ function updateHealthHud() {
         // Rika is ALIVE & ACTIVE: bar = Rika's remaining HP % (reaches 0% naturally during beam drain)
         const maxHp = rk.maxHp || CONFIG.yuta?.rikaMaxHp || 250;
         rikaPct = Math.max(0, Math.min(100, (rk.hp / maxHp) * 100));
-      } else if (f.rikaCallTimer > 0) {
-        // Yuta is channeling the call: 100% full
+        f._maxRikaPct = 0;
+      } else if (f.rikaCallTimer > 0 || (rk && rk.chargeTimer > 0)) {
+        // Yuta is channeling the call / Rika is charging spawn: 100% full
         rikaPct = 100;
+        f._maxRikaPct = 100;
       } else if (alreadySummoned) {
         // Rika is DEAD (inside OR outside domain): Fills up smoothly as Yuta takes damage since Rika died!
         const baseline = f.rikaRechargeHpBaseline !== undefined ? f.rikaRechargeHpBaseline : f.hp;
@@ -792,7 +822,9 @@ function updateHealthHud() {
       } else {
         // First time filling: pure Yuta lost-HP based (0% at 100%HP → 100% at 50%HP)
         const threshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
-        rikaPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
+        const rawPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
+        f._maxRikaPct = Math.max(f._maxRikaPct || 0, rawPct);
+        rikaPct = f._maxRikaPct;
       }
 
       // Smooth visual lerp — but snap instantly on big jumps, calling Rika, or during beam (so drain tracks in real-time)
@@ -1016,6 +1048,29 @@ function updateHealthHud() {
       } else {
         info.push(`<b>DMG:</b> ${punchBase}`);
       }
+    } else if (f.characterId === 'todo' || f.type === 'todo') {
+      const punchBase = CONFIG.todo?.punchDamage || 15;
+      const hasTakadaBoost = f.isTakadaUltActive;
+      const hasJustSwappedBoost = (f.justSwappedTimer || 0) > 0;
+      const hasBlackFlashZone = (f.blackFlashTimer || 0) > 0 || (f.blackFlashGlowTimer || 0) > 0;
+      
+      const hasDmgBoost = hasTakadaBoost || hasJustSwappedBoost || hasBlackFlashZone;
+      if (hasDmgBoost) {
+        let currentDmg = punchBase;
+        if (hasTakadaBoost) {
+          currentDmg *= (CONFIG.todo?.takadaDamageMultiplier || 1.5);
+        }
+        if (hasJustSwappedBoost) {
+          currentDmg *= 2.0; // Black Flash hit on Boogie Woogie swap
+        } else if (hasBlackFlashZone) {
+          currentDmg *= (CONFIG.todo?.blackFlashMultiplier || 1.5);
+        }
+        currentDmg = Math.round(currentDmg);
+        const boost = currentDmg - punchBase;
+        info.push(`<b>DMG:</b> ${punchBase} + ${boost} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${punchBase}`);
+      }
     } else {
       info.push(`<b>DMG:</b> ${baseDmg}`);
       
@@ -1037,8 +1092,20 @@ function updateHealthHud() {
           info.push(`<b>Ultimate:</b> Rapid Fire <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
       } else if (f.characterId === 'todo' || f.type === 'todo') {
-        if (f.blackFlashTimer > 0) {
-          info.push(`<b>The Zone:</b> 120% Potential <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        const baseRed = Math.round((CONFIG.todo?.baseDamageReduction || 0.20) * 100);
+        let currentRed = baseRed;
+
+        if (f.rockCounterComboLeft > 0) {
+          currentRed = Math.round((CONFIG.todo?.counterStanceDamageReduction || 0.40) * 100);
+        } else if (f.justSwappedTimer > 0 || f.blackFlashGlowTimer > 0 || f.blackFlashTimer > 0) {
+          currentRed = Math.round((CONFIG.todo?.zoneDamageReduction || 0.35) * 100);
+        }
+
+        if (currentRed > baseRed) {
+          const boost = currentRed - baseRed;
+          info.push(`<b>DMG REDUCTION:</b> ${baseRed}% + ${boost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>DMG REDUCTION:</b> ${baseRed}%`);
         }
       } else if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
         const baseChance = CONFIG.gunslinger?.critChance || 0.20;
@@ -1219,6 +1286,11 @@ function updateHealthHud() {
     return info;
   };
 
+  const formatSkillLabel = (label) => {
+    if (!label) return '';
+    return String(label).replace(/(\d+%|\d+)/g, '<span class="hud-num">$1</span>');
+  };
+
   const generateFighterSkillsHTML = (f, align) => {
     const skills = getSkillDataForFighter(f);
     return skills.map(s => {
@@ -1227,12 +1299,13 @@ function updateHealthHud() {
       if (plainTextLen > 32) fontSz = 9.5;
       else if (plainTextLen > 24) fontSz = 11;
       const textStyle = `font-size: ${fontSz}px; text-align: ${align}; white-space: nowrap;`;
+      const formattedLabel = formatSkillLabel(s.label);
       if (s.noFill) {
         const parentColor = s.color ? `color: ${s.color};` : '';
         return `
           <div class="hud-skill-box align-${align} label-only" data-skill-id="${s.id}" style="${parentColor} justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
             <div class="hud-skill-box-fill" style="display: none;"></div>
-            <div class="hud-skill-box-text" style="${textStyle}">${s.label}</div>
+            <div class="hud-skill-box-text" style="${textStyle}">${formattedLabel}</div>
           </div>
         `;
       }
@@ -1241,7 +1314,7 @@ function updateHealthHud() {
       return `
         <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}" data-skill-id="${s.id}" style="${boxStyle}">
           <div class="hud-skill-box-fill" style="${fillStyle}"></div>
-          <div class="hud-skill-box-text" style="${textStyle}">${s.label}</div>
+          <div class="hud-skill-box-text" style="${textStyle}">${formattedLabel}</div>
         </div>
       `;
     }).join('');
@@ -1387,9 +1460,19 @@ function updateHealthHud() {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const winnerStyle = '';
 
+    const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
+    const maxChars = extraClass.includes('ffa-card') ? 14 : 12;
+    let nameColor = fighterColor || '#ffffff';
+    let truncatedTitle = title;
+    if (title && title.length > maxChars) {
+      truncatedTitle = title.substring(0, maxChars - 1) + '…';
+    }
+
+    const titleStyle = `font-size: ${baseFontSize}px; text-transform: uppercase; font-family: 'Glast Blitch', Arial, sans-serif; letter-spacing: 0.5px; `;
+
     let barsHTML = '';
     if (members && members.length > 0) {
-      barsHTML = members.map(m => {
+      barsHTML = members.map((m, mIndex) => {
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
@@ -1398,13 +1481,31 @@ function updateHealthHud() {
         const memberShakeTimer = m._healthBarShakeTimer || 0;
         const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
         const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
+        const isDummy = m && (m.characterId === 'dummy' || m.type === 'dummy');
+        const showDescription = CONFIG.hudShowFighterDescription || isDummy;
+        const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left') : '';
+        const memberInfoHTML = generateFighterInfoHTML(m);
+
+        let memberNameColor = m.color || '#ffffff';
+        const fType = (m.type || m.characterId || (m._def && m._def.type) || '').toLowerCase();
+        if (fType === 'gojo') memberNameColor = '#00E5FF';
+        else if (fType === 'yuta') memberNameColor = '#FF69B4';
+        else if (fType === 'mahoraga') memberNameColor = '#FFD700';
+        else if (fType === 'yuji') memberNameColor = '#FF3366';
+        else if (fType === 'toji') memberNameColor = '#A855F7';
+        else if (fType === 'sukuna') memberNameColor = '#FF4500';
+
+        const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
+
         return `
-          <div class="health-card__member" style="margin-top: 6px;">
-            <div style="font-size: 12px; margin-bottom: 4px; color: ${CONFIG.hudTextColor}; font-weight: bold;">${m.name || ('PLAYER ' + (state.fighters.indexOf(m) + 1))}</div>
+          <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
+            <div class="health-card__title" style="${titleStyle}color: ${memberNameColor}; font-weight: bold; margin: 0 0 4px 0; text-align: ${titleAlign || 'left'};">${memberName}</div>
             <div class="health-card__bar" style="${memberShakeStyle}">
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             </div>
+            ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
+            ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 15}px;">${memberInfoHTML}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -1441,28 +1542,18 @@ function updateHealthHud() {
       `;
     }
 
-    const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
-    const maxChars = extraClass.includes('ffa-card') ? 14 : 12;
-    let nameColor = fighterColor || '#ffffff';
-    let truncatedTitle = title;
-    if (title && title.length > maxChars) {
-      truncatedTitle = title.substring(0, maxChars - 1) + '…';
-    }
-
-    const titleStyle = `font-size: ${baseFontSize}px; text-transform: uppercase; font-family: 'Glast Blitch', Arial, sans-serif; letter-spacing: 0.5px; `;
-
     const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
       const filled = i < wins;
       return `<div class="health-card__win-bullet ${filled ? 'filled' : ''}"></div>`;
     }).join('');
     const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 4px; align-items: center;">${winsBullets}</div>` : '';
 
-    const headerRowHTML = `
+    const headerRowHTML = (title || maxBullets > 0) ? `
       <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 6px;">
         ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; font-weight: bold; margin: 0; text-align: ${titleAlign};">${truncatedTitle}</div>` : ''}
         ${winsHTML}
       </div>
-    `;
+    ` : '';
 
     return `
       <div class="health-card ${extraClass}" style="${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
@@ -1562,7 +1653,7 @@ function updateHealthHud() {
       const isOppWinner = state.roundWinner && oppMembers.includes(state.roundWinner);
 
       const oppCardHTML = buildCard({
-        title: 'BLUE TEAM',
+        title: '',
         scoreText: `${teamScores[1] || 0} WINS`,
         fillColor: '#4da3ff',
         members: oppMembers,
@@ -1572,7 +1663,7 @@ function updateHealthHud() {
         borderColor: isOppWinner ? '#ffd700' : null,
         kills: oppMembers.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
         maxBullets: 0,
-        titleAlign: 'right'
+        titleAlign: 'left'
       });
 
       const tempDiv2 = document.createElement('div');
@@ -1585,7 +1676,15 @@ function updateHealthHud() {
         const fill = memberEl.querySelector('.health-card__fill');
         const text = memberEl.querySelector('.health-card__bar-text');
         const bar = memberEl.querySelector('.health-card__bar');
-        cachedOppMembers.push({ fill, text, bar, fighter: oppMembers[i] });
+        const infoContainer = memberEl.querySelector('.health-card__info');
+        const skillBars = new Map();
+        memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
+          const id = box.getAttribute('data-skill-id');
+          const fillEl = box.querySelector('.hud-skill-box-fill');
+          const textEl = box.querySelector('.hud-skill-box-text');
+          skillBars.set(id, { box, fill: fillEl, text: textEl });
+        });
+        cachedOppMembers.push({ fill, text, bar, infoContainer, skillBars, fighter: oppMembers[i], lastInfoHTML: '' });
       });
 
       _hudCache.teams.set(1, {
@@ -1628,7 +1727,15 @@ function updateHealthHud() {
           const fill = memberEl.querySelector('.health-card__fill');
           const text = memberEl.querySelector('.health-card__bar-text');
           const bar = memberEl.querySelector('.health-card__bar');
-          cachedMembers.push({ fill, text, bar, fighter: members[i] });
+          const infoContainer = memberEl.querySelector('.health-card__info');
+          const skillBars = new Map();
+          memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
+            const id = box.getAttribute('data-skill-id');
+            const fillEl = box.querySelector('.hud-skill-box-fill');
+            const textEl = box.querySelector('.hud-skill-box-text');
+            skillBars.set(id, { box, fill: fillEl, text: textEl });
+          });
+          cachedMembers.push({ fill, text, bar, infoContainer, skillBars, fighter: members[i], lastInfoHTML: '' });
         });
 
         _hudCache.teams.set(teamIndex, {
@@ -1761,6 +1868,72 @@ function updateHealthHud() {
 
         const hpText = `${Math.floor(Math.min(Number(fighter.maxHp), Math.max(0, Number(fighter.hp) || 0)))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
         m.text.textContent = hpText;
+
+        // Skill Bars Update for Team Member
+        if (m.skillBars && m.skillBars.size > 0) {
+          const skills = getSkillDataForFighter(fighter);
+          skills.forEach(s => {
+            const cachedSkill = m.skillBars.get(s.id);
+            if (cachedSkill) {
+              const roundedPct = Math.round(s.pct);
+              const isReady = !!s.ready;
+
+              if (s.noFill) {
+                if (cachedSkill.lastDisplay !== 'none') {
+                  cachedSkill.fill.style.display = 'none';
+                  cachedSkill.lastDisplay = 'none';
+                }
+                if (!cachedSkill.lastLabelOnly) {
+                  cachedSkill.box.classList.add('label-only');
+                  cachedSkill.lastLabelOnly = true;
+                }
+                if (cachedSkill.lastLabel !== s.label) {
+                  cachedSkill.text.innerHTML = formatSkillLabel(s.label);
+                  cachedSkill.lastLabel = s.label;
+                }
+              } else {
+                if (cachedSkill.lastDisplay !== 'block') {
+                  cachedSkill.fill.style.display = 'block';
+                  cachedSkill.lastDisplay = 'block';
+                }
+                if (cachedSkill.lastPct !== roundedPct) {
+                  cachedSkill.fill.style.width = `${roundedPct}%`;
+                  cachedSkill.lastPct = roundedPct;
+                }
+                if (cachedSkill.lastColor !== s.color) {
+                  cachedSkill.fill.style.background = s.color;
+                  cachedSkill.lastColor = s.color;
+                }
+                if (cachedSkill.lastLabelOnly) {
+                  cachedSkill.box.classList.remove('label-only');
+                  cachedSkill.lastLabelOnly = false;
+                }
+                if (cachedSkill.lastLabel !== s.label) {
+                  cachedSkill.text.innerHTML = formatSkillLabel(s.label);
+                  cachedSkill.lastLabel = s.label;
+                }
+              }
+
+              if (cachedSkill.lastReady !== isReady) {
+                if (isReady) {
+                  cachedSkill.box.classList.add('hud-skill-ready');
+                } else {
+                  cachedSkill.box.classList.remove('hud-skill-ready');
+                }
+                cachedSkill.lastReady = isReady;
+              }
+            }
+          });
+        }
+
+        // Stats Info Update for Team Member
+        if (m.infoContainer) {
+          const infoHTML = generateFighterInfoHTML(fighter);
+          if (m.lastInfoHTML !== infoHTML) {
+            m.infoContainer.innerHTML = infoHTML;
+            m.lastInfoHTML = infoHTML;
+          }
+        }
       });
 
       cachedCard.cardElement.style.transform = '';
@@ -1834,7 +2007,7 @@ function updateHealthHud() {
                 cachedSkill.lastLabelOnly = true;
               }
               if (cachedSkill.lastLabel !== s.label) {
-                cachedSkill.text.innerHTML = s.label;
+                cachedSkill.text.innerHTML = formatSkillLabel(s.label);
                 cachedSkill.lastLabel = s.label;
               }
             } else {
@@ -1855,7 +2028,7 @@ function updateHealthHud() {
                 cachedSkill.lastLabelOnly = false;
               }
               if (cachedSkill.lastLabel !== s.label) {
-                cachedSkill.text.innerHTML = s.label;
+                cachedSkill.text.innerHTML = formatSkillLabel(s.label);
                 cachedSkill.lastLabel = s.label;
               }
             }

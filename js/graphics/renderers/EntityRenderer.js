@@ -27,7 +27,7 @@ export function drawFighters() {
   const isTeamMode = (mode === '2v2' || mode === '1v2 Stand Off' || mode === '1v2');
 
   const drawTeamRing = (fighter, fi, isOnTop = false) => {
-    if (!isTeamMode || !fighter || fighter.hp <= 0) return;
+    if (!isTeamMode || !fighter || fighter.hp <= 0 || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
     const team = state.getFighterTeam(fi);
     if (team === null) return;
 
@@ -216,7 +216,7 @@ export function drawFighters() {
   _sortedFightersBuffer.forEach((item) => {
     const fighter = item.f;
     const fi = item.i;
-    if (!fighter || fighter.hp <= 0) return;
+    if (!fighter || fighter.hp <= 0 || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
 
     updateEntityVisualScale(fighter);
 
