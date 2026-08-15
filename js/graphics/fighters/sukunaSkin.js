@@ -30,8 +30,14 @@ export function drawSukunaBody(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - z);
 
-  const angle = fighter.angle || 0;
+  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
   ctx.rotate(angle);
+
+  // Mirror Y-axis vertically so hair stays on top (-Y) and body on bottom (+Y) when moving/aiming left (Rule #19)
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
 
   // Clip to fighter circle
   ctx.save();

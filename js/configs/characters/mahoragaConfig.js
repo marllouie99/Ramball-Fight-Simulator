@@ -6,7 +6,7 @@ export const mahoragaConfig = {
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
     adaptationSpeedBoostPerStage: 0.15, // +10% movement speed multiplier per gold adaptation stage
     rctRegenPerStage: 0.015,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
-    maxLevelRctRegen: 0.015,          // Base ultimate passive RCT HP regeneration per frame at Level 8 (0.80 HP/frame = +48 HP/sec)
+    maxLevelRctRegen: 0.80,          // Base ultimate passive RCT HP regeneration per frame at Level 8 (0.80 HP/frame = +48 HP/sec)
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
     wheelClickDuration: 25,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
@@ -20,13 +20,13 @@ export const mahoragaConfig = {
     wheelRotationSpeed: 0.10,       // Passive visual rotation speed of the wheel
 
     // Level 8 Max Adaptation: Attack-Teleport Speed-Blitz Configs
-    infinityBlitzDurationFrames: 400,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
+    infinityBlitzDurationFrames: 300,   // Active duration (frames) for Level 8 Speed-Blitz stance (600 frames = 10 seconds at 60fps)
     infinityBlitzInterval: 20,        // Frame interval between continuous attacks/strikes (smaller = faster strikes e.g. 6; larger = slower e.g. 20)
     infinityBlitzAttacksPerTeleport: 5, // Number of attacks executed before teleporting to a new angle (e.g. 2 attacks -> teleport -> 2 attacks)
     infinityBlitzDamage: 15,          // Damage per True Damage strike during Level 8 speed-blitz
     infinityBlitzTeleportDistance: 18, // Teleport offset distance around opponent
     infinityBlitzWheelSpinSpeed: 0.08,  // Continuous Wheel Rotation Speed during Level 8 Speed-Blitz stance (smaller = slower majestic spin e.g. 0.06; larger = faster e.g. 0.20)
-    infinityBlitzCooldownFrames: 600,   // Cooldown (frames) before Level 8 Speed-Blitz can re-trigger (10 seconds)
+    infinityBlitzCooldownFrames: 800,   // Cooldown (frames) before Level 8 Speed-Blitz can re-trigger (10 seconds)
     infinityBlitzTeleportSpeedMultiplier: 0.05, // Travel duration speed multiplier during blitz stance teleports (smaller = faster, e.g. 0.20 * 15 frames = 3 frame travel)
     infinityBlitzStrikeSlowDurationFrames: 15, // Slow duration applied to enemy upon landing a speed-blitz strike (15 frames)
     infinityBlitzStrikeSlowMultiplier: 0.40,   // Slow movement multiplier (0.40 = 40% speed / 60% slow)
@@ -82,7 +82,7 @@ export const mahoragaConfig = {
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
     fatalAdaptWindowFrames: 400,     // Rolling window duration (frames) — ~6.6 seconds window
-    fatalDamageThresholdPct: 0.08,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
+    fatalDamageThresholdPct: 0.25,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
     fatalAdaptCooldownFrames: 30,    // Cooldown (frames) between wheel clicks (30 = 0.5s)
 
     // Teleportation Speed & Afterimage Visibility Settings
@@ -98,7 +98,7 @@ export const mahoragaConfig = {
     // Level 8 Wall Slam Throw Mechanics
     wallSlamImpaleLiftHeight: 35,      // Visual height (z-axis) when opponent is lifted on sword
     wallSlamImpaleHoldFrames: 50,      // Duration (frames) opponent is held in the air on the sword
-    wallSlamPunchHitpause: 20,          // Frames of freeze/hitpause when the punch lands before they are launched
+    wallSlamPunchHitpause: 15,          // Frames of freeze/hitpause when the punch lands before they are launched
     wallSlamThrowSpeed: 45.0,          // Supersonic velocity at which opponent is hurled to the wall
     wallSlamImpactDamage: 20,          // Damage taken upon slamming into the wall
     wallSlamParalyzeDuration: 150,      // Duration (frames) opponent is paralyzed after hitting the wall

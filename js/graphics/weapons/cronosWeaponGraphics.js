@@ -46,6 +46,7 @@ export const CRONOS_WEAPON_GRAPHICS = {
  * ★ SIZE ADJUST: Change bladeScale to resize the entire weapon
  */
 export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swingTimer, swingAngle, swingDuration, swingDirection, fighterColor = '#00f3ff') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   // OPTIMIZATION: Import state for quality check (need to add import at top)
   // For now, we'll check if state is available globally
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;

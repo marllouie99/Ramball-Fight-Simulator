@@ -390,6 +390,7 @@ export function shootBladeBarrage(fighter, ownerIndex) {
  */
 export function initiateLevel8WallSlam(fighter, opponent) {
   if (!opponent || opponent.hp <= 0 || opponent.isDead) return;
+  if (fighter.isWallSlamActive || (fighter.throwCooldown || 0) > 0) return;
 
   // Block initiation if Mahoraga is caught inside Gojo's active Hollow Purple
   const activeOrbs = (projectileSystem && projectileSystem.projectiles)
@@ -415,6 +416,7 @@ export function initiateLevel8WallSlam(fighter, opponent) {
   fighter.wallSlamPhase = 'grab';
   fighter.wallSlamTimer = 0;
   fighter.wallSlamTarget = opponent;
+  fighter.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 600;
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, '⚡ LEVEL 8 WALL SLAM!', '#FFEE58');
   audioSystem.playSFX('attack_fleshhit', 0.9);
@@ -437,6 +439,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     fighter.isWallSlamActive = false;
     fighter.wallSlamPhase = null;
     fighter.wallSlamTimer = 0;
+    fighter.throwCooldown = 180;
     if (isInterrupted) {
       spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, 'INTERRUPTED!', '#FF3D00');
     }

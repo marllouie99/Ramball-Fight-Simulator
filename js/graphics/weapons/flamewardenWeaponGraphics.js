@@ -376,6 +376,7 @@ export const FLAMEWARDEN_WEAPON_GRAPHICS = {
 };
 
 export function drawOrangeFlamethrowerGun(ctx, x, y, gunAngle, r, fighterColor = '#ff6a00') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);

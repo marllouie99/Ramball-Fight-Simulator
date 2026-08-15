@@ -572,6 +572,7 @@ export class GunSlingerFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     const isFiring = this.muzzleFlashTimer > 0;
 
     let gunSpinAngle = 0;

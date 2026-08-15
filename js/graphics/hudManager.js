@@ -333,7 +333,7 @@ function updateHealthHud() {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)}`;
   }).join('|');
 
   const hpChanged = currentHpStr !== state._lastHpStr;
@@ -504,24 +504,34 @@ function updateHealthHud() {
         flamePct = Math.max(0, Math.min(100, (1 - (flameTimer / flameMax)) * 100));
       }
 
+      const rctMax = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 900;
+      const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
+      let rctPct;
+      if ((f.rctVisualTimer || 0) > 0) {
+        rctPct = 100;
+      } else {
+        rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
+      }
+
       return [
         { id: 'ms',     pct: domainPct,  ready: domainPct >= 99,  color: themeColor, label: 'MALEVOLENT SHRINE' },
-        { id: 'fuga',   pct: flamePct,   ready: flamePct >= 99,   color: themeColor, label: 'FUGA (FURNACE)' }
+        { id: 'fuga',   pct: flamePct,   ready: flamePct >= 99,   color: themeColor, label: 'FUGA (FURNACE)' },
+        { id: 'rct',    pct: rctPct,     ready: rctPct >= 99,     color: themeColor, label: 'RCT' }
       ];
     }
     if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
       const themeColor = '#FFD700'; // All skill bars gold theme for Mahoraga!
 
-      // 1. Dharma Wheel Rotation Level Progress Bar (LVL 01 - LVL 08)
+      // 1. Dharma Wheel Rotation Level Progress Bar (LVL 01, LVL 02, etc. — no limits!)
       const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
-      const currentLevel = Math.min(8, Math.max(1, totalStages + 1));
-      const lvlStr = currentLevel < 10 ? `0${currentLevel}` : `${currentLevel}`;
+      const currentLevel = Math.max(1, totalStages + 1);
+      const lvlStr = `${currentLevel}`;
 
-      const isLevel8 = totalStages >= 8 || currentLevel >= 8 || f.isInfinityBlitz;
+      const isLevel8 = totalStages >= 8;
       const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.05);
 
       let wheelPct = 0;
-      if (isLevel8 || f.isInfinityBlitz || (f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0) {
+      if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0) {
         wheelPct = 100;
       } else {
         const accum = f.totalAccumDamage || 0;
@@ -571,25 +581,22 @@ function updateHealthHud() {
         shoutPct = Math.max(0, Math.min(100, (1 - (shoutTimer / shoutMax)) * 100));
       }
 
-      const numHtml = `<span style="font-family: Arial, sans-serif; font-weight: 900; font-size: 13px; letter-spacing: 0.5px;">${lvlStr}</span>`;
-
       const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
-      const minLevel8Regen = CONFIG.mahoraga?.maxLevelRctRegen || 0.80;
-      const currentRegenRate = isLevel8 ? Math.max(minLevel8Regen, totalStages * rctPerStage) : (totalStages * rctPerStage);
+      const currentRegenRate = totalStages * rctPerStage;
       const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
       const skillList = [
-        { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `DHARMA WHEEL - LVL ${numHtml}` },
+        { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `WHEEL OF ADAPTATION - LVL ${lvlStr}` },
         { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: throwLabelHtml },
         { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
       ];
 
-      if (totalStages > 0 || isLevel8) {
+      if (totalStages > 0) {
         skillList.push({
           id: 'rct',
           pct: 100,
           ready: true,
-          color: '#00FF66',
+          color: themeColor,
           label: `RCT REGEN: +${currentRegenPerSec}%`
         });
       }
@@ -667,8 +674,8 @@ function updateHealthHud() {
     if (f.characterId === 'yuji' || f.type === 'yuji') {
       const themeColor = '#ff3366';
       
-      const comboMax = CONFIG.yuji?.comboRushCooldown || 600;
-      const comboTimer = f.comboRushCooldown !== undefined ? f.comboRushCooldown : comboMax;
+      const comboMax = f.soulSwapActive ? 180 : (CONFIG.yuji?.comboCooldown || CONFIG.yuji?.comboRushCooldown || 400);
+      const comboTimer = f.comboRushCooldown !== undefined ? f.comboRushCooldown : 0;
       const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
 
       const bfThreshold = f.soulSwapActive 
@@ -690,16 +697,32 @@ function updateHealthHud() {
         ultReady = ultPct >= 99 && (f.hp / f.maxHp <= ultThresholdHp);
       }
 
-      if (checkHasTeammate(f)) {
-        return [
-          { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' }
-        ];
+      return [
+        { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
+        { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' },
+        { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' }
+      ];
+    }
+    if (f.characterId === 'mahito' || f.type === 'mahito') {
+      const themeColor = '#00A8CC';
+      let formPct = 0;
+      let formReady = false;
+      let formLabel = 'DISTORTED KILLING';
+
+      if (f.isTransformed) {
+        const maxDuration = CONFIG.mahito?.transformation?.duration || 600;
+        formPct = Math.max(0, Math.min(100, ((f.transformDuration || 0) / maxDuration) * 100));
+        formReady = true;
+        formLabel = 'ACTIVE FORM';
+      } else {
+        const maxCd = CONFIG.mahito?.transformation?.cooldown || 1200;
+        const currentCd = f.transformCooldown !== undefined ? f.transformCooldown : 0;
+        formPct = Math.max(0, Math.min(100, (1 - (currentCd / maxCd)) * 100));
+        formReady = formPct >= 99;
       }
 
       return [
-        { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
-        { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' },
-        { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' }
+        { id: 'isbodk', pct: formPct, ready: formReady, color: themeColor, label: formLabel }
       ];
     }
     if (f.characterId === 'saitama' || f.type === 'saitama') {
@@ -1048,6 +1071,18 @@ function updateHealthHud() {
       } else {
         info.push(`<b>DMG:</b> ${punchBase}`);
       }
+    } else if (f.characterId === 'mahito' || f.type === 'mahito') {
+      const baseDmg = CONFIG.mahito?.damage || 16;
+      if (f.isTransformed) {
+        const mult = CONFIG.mahito?.transformation?.damageMultiplier || 1.60;
+        const currentDmg = Math.round(baseDmg * mult);
+        const boost = currentDmg - baseDmg;
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boost} <span style="color: #00E5FF; font-size: 10px;">▲</span>`);
+        info.push(`<b>ARMOR:</b> +50%`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+        info.push(`<b>SOUL DEF:</b> 25%`);
+      }
     } else if (f.characterId === 'todo' || f.type === 'todo') {
       const punchBase = CONFIG.todo?.punchDamage || 15;
       const hasTakadaBoost = f.isTakadaUltActive;
@@ -1075,14 +1110,10 @@ function updateHealthHud() {
       info.push(`<b>DMG:</b> ${baseDmg}`);
       
       if (f.characterId === 'gojo' || f.type === 'gojo') {
-        const infinityCooldown = f.infinityCooldown || 0;
-        const isLimitlessActive = (!f.isMeleeMode && (infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer || 0) > 0));
         if (f.isMeleeMode) {
           info.push(`<b>Infinity:</b> Off`);
-        } else if (isLimitlessActive) {
-          info.push(`<b>Infinity:</b> Active`);
         } else {
-          info.push(`<b>Infinity:</b> CD`);
+          info.push(`<b>Infinity:</b> Active`);
         }
       } else if (f.characterId === 'layla' || f.type === 'layla') {
         if (f.powerStacks > 0) {
@@ -1159,7 +1190,6 @@ function updateHealthHud() {
 
         info.push(`<b>Crit Rate:</b> ${critChanceStr}`);
         info.push(`<b>Crit DMG:</b> ${critMultStr}`);
-        info.push(`<b>Slash Stacks:</b> ${f.slashHitCount || 0}`);
       } else if (f.characterId === 'toji' || f.type === 'toji') {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
         const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
@@ -1228,13 +1258,11 @@ function updateHealthHud() {
         }
 
         const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
-        const isLevel8 = totalStages >= 8 || f.isInfinityBlitz || f.isMaxAdapted;
         const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
-        const minLevel8Regen = CONFIG.mahoraga?.maxLevelRctRegen || 0.80;
-        const currentRegenRate = isLevel8 ? Math.max(minLevel8Regen, totalStages * rctPerStage) : (totalStages * rctPerStage);
+        const currentRegenRate = totalStages * rctPerStage;
         const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
-        if (totalStages > 0 || isLevel8) {
+        if (totalStages > 0) {
           info.push(`<b>Regen:</b> +${currentRegenPerSec}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
         } else {
           info.push(`<b>Regen:</b> 0%`);
@@ -1278,6 +1306,27 @@ function updateHealthHud() {
       }
     }
 
+    // Evade buff display for Todo and any fighter teamed up with Todo (in 1v2 Stand-Off, 2v2, etc.)
+    const isTodoOrTeamedWithTodo = (f.characterId === 'todo' || f.type === 'todo') || (
+      state && state.fighters && state.fighters.some((other, idx) => {
+        if (!other || other === f || other.hp <= 0) return false;
+        if (other.characterId !== 'todo' && other.type !== 'todo') return false;
+        const fIdx = state.fighters.indexOf(f);
+        const fTeam = (state.getFighterTeam && fIdx >= 0) ? state.getFighterTeam(fIdx) : f.team;
+        const otherTeam = (state.getFighterTeam && idx >= 0) ? state.getFighterTeam(idx) : other.team;
+        return fTeam !== null && fTeam !== undefined && fTeam === otherTeam;
+      })
+    );
+
+    if (isTodoOrTeamedWithTodo) {
+      if ((f.evadeBuffTimer || 0) > 0) {
+        const evadeRate = Math.round(((f.evadeChance !== undefined ? f.evadeChance : (CONFIG.todo?.evadeChance || 0.60))) * 100);
+        info.push(`<b>Evade:</b> ${evadeRate}% <span style="color: #00E5FF; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>Evade:</b> 0%`);
+      }
+    }
+
     // Tick Damage
     if (f.tickDamageTimer > 0 && f.tickDamage > 0) {
       info.push(`<b>Tick DMG:</b> ${f.tickDamage}/tick <span style="color: #ef4444; font-size: 10px;">▼</span>`);
@@ -1288,31 +1337,60 @@ function updateHealthHud() {
 
   const formatSkillLabel = (label) => {
     if (!label) return '';
+    if (String(label).includes('<')) {
+      return String(label).replace(/(<[^>]+>)|(\d+%|\d+)/g, (match, tag, num) => {
+        if (tag) return tag;
+        return `<span class="hud-num">${num}</span>`;
+      });
+    }
     return String(label).replace(/(\d+%|\d+)/g, '<span class="hud-num">$1</span>');
   };
 
   const generateFighterSkillsHTML = (f, align) => {
     const skills = getSkillDataForFighter(f);
-    return skills.map(s => {
-      let fontSz = CONFIG.hudSkillFontSize || 13;
+    if (!skills || skills.length === 0) return '';
+
+    return skills.map((s, index) => {
       const plainTextLen = s.label ? s.label.replace(/<[^>]*>/g, '').length : 0;
-      if (plainTextLen > 32) fontSz = 9.5;
-      else if (plainTextLen > 24) fontSz = 11;
+      
+      // Automatic Grid Span Detection:
+      // Long names (> 14 chars, e.g. "BLACK FLASH CHARGE", "TAKADA-CHAN IDOL", "MALEVOLENT SHRINE"),
+      // single-skill bars, or standalone odd skills span 2 columns (100% width).
+      // Short names (<= 14 chars, e.g. "BOOGIE WOOGIE", "CURSED ROCK") split into 2-columns (50% width).
+      const isLastOddSkill = (skills.length % 2 === 1 && index === skills.length - 1);
+      const isLongName = plainTextLen > 14;
+      const isSpan2 = skills.length === 1 || isLongName || isLastOddSkill || s.fullWidth;
+
+      let fontSz = 13.5;
+      if (isSpan2) {
+        if (plainTextLen > 36) fontSz = 11.0;
+        else if (plainTextLen > 28) fontSz = 12.0;
+        else if (plainTextLen > 22) fontSz = 13.0;
+        else fontSz = 14.0;
+      } else {
+        // Half-width column
+        if (plainTextLen > 12) fontSz = 11.5;
+        else if (plainTextLen > 9) fontSz = 12.5;
+        else fontSz = 13.5;
+      }
+
       const textStyle = `font-size: ${fontSz}px; text-align: ${align}; white-space: nowrap;`;
       const formattedLabel = formatSkillLabel(s.label);
+      const spanClass = isSpan2 ? ' span-2' : '';
+
       if (s.noFill) {
         const parentColor = s.color ? `color: ${s.color};` : '';
         return `
-          <div class="hud-skill-box align-${align} label-only" data-skill-id="${s.id}" style="${parentColor} justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
+          <div class="hud-skill-box align-${align} label-only${spanClass}" data-skill-id="${s.id}" style="${parentColor} justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
             <div class="hud-skill-box-fill" style="display: none;"></div>
             <div class="hud-skill-box-text" style="${textStyle}">${formattedLabel}</div>
           </div>
         `;
       }
-      const boxStyle = `--skill-glow-color: ${s.color}; margin-top: 4px;`;
+      const boxStyle = `--skill-glow-color: ${s.color};`;
       const fillStyle = `width: ${Math.round(s.pct)}%; background: ${s.color};`;
       return `
-        <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}" data-skill-id="${s.id}" style="${boxStyle}">
+        <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}${spanClass}" data-skill-id="${s.id}" style="${boxStyle}">
           <div class="hud-skill-box-fill" style="${fillStyle}"></div>
           <div class="hud-skill-box-text" style="${textStyle}">${formattedLabel}</div>
         </div>
@@ -1398,24 +1476,24 @@ function updateHealthHud() {
         else if (timer < 0) glowClass = ' glow-red';
       }
       
-      const baseValSize = (CONFIG.hudInfoFontSize || 15) * 0.86;
+      const baseValSize = (CONFIG.hudInfoFontSize || 13) * 0.90;
       let valFontSize = baseValSize;
       const textOnly = textOnlyVal;
       if (textOnly.length > 14) {
-        valFontSize = Math.max(baseValSize * 0.8, baseValSize - (textOnly.length - 14) * 0.4);
+        valFontSize = Math.max(baseValSize * 0.8, baseValSize - (textOnly.length - 14) * 0.35);
       }
-      
+
+      const plainLen = (labelText + ' ' + textOnlyVal).length;
+      const isSpan2 = info.length === 1 || plainLen > 24;
+      const spanClass = isSpan2 ? ' span-2' : '';
+
       if (splitIdx !== -1) {
-        return `<div class="${glowClass}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${label}<span style="font-size: ${valFontSize.toFixed(1)}px; margin-left: 2px;">${displayVal}</span></div>`;
+        return `<div class="${glowClass}${spanClass}">${label}<span style="font-size: ${valFontSize.toFixed(1)}px;">${displayVal.trim()}</span></div>`;
       }
-      return `<div class="${glowClass}" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${line}</div>`;
+      return `<div class="${glowClass}${spanClass}">${line}</div>`;
     }).join('');
 
-    return `
-      <div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 15}px;">
-        ${linesHTML}
-      </div>
-    `;
+    return linesHTML;
   };
 
   // Hoisted to updateHealthHud scope so both buildCard and in-place updates can use it.
@@ -1447,6 +1525,7 @@ function updateHealthHud() {
         className: 'health-card__fill heal-glow'
       };
     }
+
     return {
       glowStyle: '',
       glowClass: '',
@@ -1492,6 +1571,7 @@ function updateHealthHud() {
         else if (fType === 'yuta') memberNameColor = '#FF69B4';
         else if (fType === 'mahoraga') memberNameColor = '#FFD700';
         else if (fType === 'yuji') memberNameColor = '#FF3366';
+        else if (fType === 'mahito') memberNameColor = '#00A8CC';
         else if (fType === 'toji') memberNameColor = '#A855F7';
         else if (fType === 'sukuna') memberNameColor = '#FF4500';
 
@@ -1505,7 +1585,7 @@ function updateHealthHud() {
               <span class="health-card__bar-text">${hpText}</span>
             </div>
             ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
-            ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 15}px;">${memberInfoHTML}</div>` : ''}
+            ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 13.5}px;">${memberInfoHTML}</div>` : ''}
           </div>
         `;
       }).join('');
@@ -1529,7 +1609,7 @@ function updateHealthHud() {
           <span class="health-card__bar-text">${metaValue}</span>
         </div>
         ${showDescription ? `
-          ${infoHTML}
+          ${infoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 13.5}px;">${infoHTML}</div>` : ''}
           <div class="health-card__desc" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudDescFontSize || 16}px; line-height: 1.4; margin-top: 8px;">
             ${description.replace(/(\d+(?:\.\d+)?%?)/g, '<span class="hud-number">$1</span>')}
           </div>
@@ -1537,7 +1617,7 @@ function updateHealthHud() {
           <div class="health-card__skills">
             ${skillsHTML}
           </div>
-          ${infoHTML}
+          ${infoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 13.5}px;">${infoHTML}</div>` : ''}
         `}
       `;
     }

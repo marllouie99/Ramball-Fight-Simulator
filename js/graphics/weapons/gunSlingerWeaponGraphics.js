@@ -255,6 +255,7 @@ export const GUNSLINGER_WEAPON_GRAPHICS = {
 };
 
 export function drawGunSlingerDualRevolver(x, y, rightGunAngle, leftGunAngle, r, isFiring = false, flashFrame = 0, rightRecoilOffset = 0, rightRecoilTilt = 0, leftRecoilOffset = 0, leftRecoilTilt = 0, gunSpinAngle = 0, fighterColor = '#888', leftIsFiring = false, leftFlashFrame = 0) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const ctx = state.ctx;
   const scale = GUNSLINGER_WEAPON_GRAPHICS.positioning.scale;
   const gunOffset = r + GUNSLINGER_WEAPON_GRAPHICS.positioning.gunOffset;

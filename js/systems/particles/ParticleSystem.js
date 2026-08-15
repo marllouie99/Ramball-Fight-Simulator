@@ -80,14 +80,7 @@ export class ParticleSystem {
   }
 
   static getDynamicQuality(isDomainClash) {
-    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
-    const qualityMultiplier = state.qualityLevel || 1.0;
-    const fps = state.fps || 60;
-    
-    if ((isMulti || isDomainClash) && fps < 55) {
-      return Math.min(qualityMultiplier, 0.3);
-    }
-    return qualityMultiplier;
+    return state.qualityLevel || 1.0;
   }
 
   static spawn(x, y, count = 8, type = 'crimson', overrideProps = {}) {

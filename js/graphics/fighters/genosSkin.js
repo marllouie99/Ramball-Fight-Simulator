@@ -437,8 +437,8 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
   const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI * 0.8) * (r * 0.25) : 0;
 
   let frontHandX, frontHandY, backHandX, backHandY;
-  let hideFront = fighter.hideFrontHand || false;
-  let hideBack  = fighter.hideBackHand || false;
+  let hideFront = fighter.hideFrontHand || (typeof state !== 'undefined' && state.showSkinOnly) || false;
+  let hideBack  = fighter.hideBackHand || (typeof state !== 'undefined' && state.showSkinOnly) || false;
 
   const isUltRecovering = fighter.isUltRecovering;
 

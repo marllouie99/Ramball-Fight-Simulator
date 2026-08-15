@@ -646,6 +646,7 @@ export class MusashiFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     if (drawMusashiWeapons && !this.isSheathed) {
       drawMusashiWeapons(ctx, this);
     }

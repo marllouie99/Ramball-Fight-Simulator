@@ -1,6 +1,7 @@
 import { getHandSize } from '../../core/config.js';
 
 export function drawMusashiWeapons(ctx, fighter) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
   

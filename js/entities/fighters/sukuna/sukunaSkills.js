@@ -112,7 +112,7 @@ export function fireDivineFlame(fighter, ownerIndex) {
 }
 
 export function activateReverseCursedTechnique(fighter, attacker) {
-  fighter.reverseCursedTechniqueCooldown = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 1200;
+  fighter.reverseCursedTechniqueCooldown = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 900;
 
   const healPercent = CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.40;
   const healAmount = fighter.maxHp * healPercent;

@@ -301,7 +301,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   }
 
   // ── Render Back Hand (Back Layer - Behind Body Circle) ──
-  if (!fighter.hideBackHand) {
+  if (!fighter.hideBackHand && !(typeof state !== 'undefined' && state.showSkinOnly)) {
     const isPunchHandFront = fighter.isRightPunch;
     if (isChargingAny && !isPunchHandFront) {
       drawSeriousChargeGlow(ctx, backHandX, backHandY, handRadius, chargeScale);
@@ -358,7 +358,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   ctx.stroke();
 
   // ── Render Front Hand (Front Layer - On Top of Body Circle) ──
-  if (!fighter.hideFrontHand) {
+  if (!fighter.hideFrontHand && !(typeof state !== 'undefined' && state.showSkinOnly)) {
     const isPunchHandFront = fighter.isRightPunch;
     if (isChargingAny && isPunchHandFront) {
       drawSeriousChargeGlow(ctx, frontHandX, frontHandY, handRadius, chargeScale);

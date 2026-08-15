@@ -51,44 +51,6 @@ function drawTakadaIdolAura(ctx, fighter) {
  * Visual Skin Renderer for Aoi Todo (Boogie Woogie Brawler)
  */
 export function drawTodoSkin(ctx, fighter) {
-  // 1. Draw afterimages (Zone trails) at their absolute coordinates
-  const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-    f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive
-  );
-  if (fighter.afterImages && fighter.afterImages.length > 0 && !isGojoDomainActive) {
-    ctx.save();
-    for (let i = 0; i < fighter.afterImages.length; i++) {
-      const ai = fighter.afterImages[i];
-      if (ai.timer <= 0) continue;
-      const progress = ai.timer / ai.maxTimer;
-      const alpha = progress * 0.35; // Soft trail opacity
-
-      ctx.save();
-      ctx.globalAlpha = alpha;
-      ctx.translate(ai.x, ai.y);
-      ctx.rotate(ai.angle);
-
-      // Flip vertically if facing left
-      if (Math.abs(ai.angle) > Math.PI / 2) {
-        ctx.scale(1, -1);
-      }
-
-      // Draw Todo afterimage body circle (deep gold/bronze theme silhouette)
-      ctx.beginPath();
-      ctx.arc(0, 0, ai.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(210, 105, 30, 0.4)'; // Todo's chocolate theme silhouette
-      ctx.fill();
-
-      // Add a soft red glow outline
-      ctx.strokeStyle = 'rgba(230, 0, 30, 0.5)';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-
-      ctx.restore();
-    }
-    ctx.restore();
-  }
-
   const r = fighter.r;
   const skinColor = '#EBBF9E'; // Naked Tone skin base
 
@@ -425,6 +387,7 @@ export function drawTodoSkin(ctx, fighter) {
 
 /** Draws a brawler fist matching skin color (#EBBF9E) with optional Cursed Energy glow */
 function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   
   const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || (fighter && fighter._isWinnerReveal));

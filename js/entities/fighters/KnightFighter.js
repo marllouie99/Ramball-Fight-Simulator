@@ -646,6 +646,7 @@ export class KnightFighter extends Fighter {
 
   /** Draws the sword (right) and shield (left) around the body. */
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     const ga = this.gunAngle;
     const isDashing = this.isDashing();
 

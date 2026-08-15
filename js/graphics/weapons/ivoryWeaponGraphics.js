@@ -19,6 +19,7 @@ export const IVORY_WEAPON_GRAPHICS = {
 };
 
 export function drawWhiteRailgun(ctx, x, y, gunAngle, r, beamCharge = 0, beamTimer = 0) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);

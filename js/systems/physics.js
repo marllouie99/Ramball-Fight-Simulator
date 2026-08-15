@@ -364,7 +364,6 @@ function getClosestOpponent(fighter) {
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
     if (!other || other === fighter || other.hp <= 0) continue;
-    if (other.invincibilityTimer > 0 || other.flashStepTimer > 0 || (other.vanishTimer && other.vanishTimer > 0)) continue;
     if (isTeamMode && fighterTeam !== null && state.getFighterTeam(i) === fighterTeam) continue;
     
     // Ignore summoned entities (Turrets, etc) belonging to this fighter, and vice versa

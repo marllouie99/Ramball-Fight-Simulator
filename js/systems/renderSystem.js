@@ -192,11 +192,7 @@ export function renderGame() {
         // OPTIMIZED: Domain Expansions are now rendered exclusively in WebGL via updateHybridDomains() in hybridEnvironmentRenderer.js
 
         // Draw thermobaric explosion shockwaves (Fuga) on the ground, before fighters
-        const qualityLevel = state.qualityLevel || 1.0;
-        const fps = state.fps || 60;
-        const useAggressiveParticleMode = fps < 35 || qualityLevel < 0.4;
-
-        if (!useAggressiveParticleMode && !isGojoDomainActive) {
+        if (!isGojoDomainActive) {
           drawThermobaricExplosions(state.ctx); 
         }
 

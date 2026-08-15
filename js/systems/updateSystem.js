@@ -47,6 +47,7 @@ export function updateGame() {
     }
     
     if (state.gameState === 'playing') {
+      state.frameCount = (state.frameCount || 0) + 1;
       state.matchTimer = (state.matchTimer || 0) + 1;
       updateFighters();
       updateProjectiles();
@@ -95,11 +96,6 @@ export function updateGame() {
         }
       }
     }
-
-    // OPTIMIZATION: Quality-based particle system updates
-    const qualityLevel = state.qualityLevel || 1.0;
-    const fps = state.fps || 60;
-    const useAggressiveParticleMode = fps < 35 || qualityLevel < 0.4;
 
     // Update death effects (always update, even between rounds)
     updateDeathEffects();

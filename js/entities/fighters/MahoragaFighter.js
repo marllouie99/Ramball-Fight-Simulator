@@ -485,7 +485,7 @@ export class MahoragaFighter extends Fighter {
   shoot(ownerIndex) {
     const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
     const isLevel8 = totalStages >= 8 || this.isMaxAdapted || this.isInfinityBlitz || (this.goldStages >= 8);
-    if (isLevel8) {
+    if (isLevel8 && !this.isWallSlamActive && (this.throwCooldown || 0) <= 0) {
       const opponent = (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
       if (opponent) {
         this.initiateLevel8WallSlam(opponent);
@@ -515,21 +515,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // Wheel Rotation Tick (runs even if frozen by domains for lore accuracy!)
-    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
-    const isMaxLevel = totalStages >= 8 || this.isMaxAdapted || this.isInfinityBlitz;
-
-    if (isMaxLevel) {
-      // Max Level Adaptation: wheel spins continuously without discrete clicking!
-      const spinSpeed = CONFIG.mahoraga?.infinityBlitzWheelSpinSpeed || 0.08;
-      this.wheelRotation += spinSpeed;
-      this.wheelTargetRotation = this.wheelRotation;
-      this.wheelClickTimer = 0;
-    } else if ((this.infinityBlitzSpinSpeed || 0) > 0.001) {
-      this.wheelRotation += this.infinityBlitzSpinSpeed;
-      this.infinityBlitzSpinSpeed *= 0.96;
-      this.wheelTargetRotation = this.wheelRotation;
-      if (this.infinityBlitzSpinSpeed <= 0.001) this.infinityBlitzSpinSpeed = 0;
-    } else if (this.wheelClickTimer > 0) {
+    if (this.wheelClickTimer > 0) {
       this.wheelClickTimer--;
       this.wheelRotation += (this.wheelTargetRotation - this.wheelRotation) * 0.25;
     } else if (this.wheelTargetRotation !== undefined) {
@@ -621,10 +607,12 @@ export class MahoragaFighter extends Fighter {
       this.isThrowing = false;
       this.isBlitzActive = false;
       this.isInfinityBlitz = false;
-      this.adaptationPauseTimer = 0;
-      this.adaptationDashTimer = 0;
+      if (isInsideGojoDomain || isBeamParalyzed) {
+        this.adaptationPauseTimer = 0;
+        this.adaptationDashTimer = 0;
+        this._pendingCounterTarget = null;
+      }
       this.neutralStanceTimer = 0;
-      this._pendingCounterTarget = null;
       this.applyMovementPhysics(0);
       return; // MANDATORY: Complete paralyzing freeze while caught in Pure Love Beam, Purple, or Void!
     }
@@ -674,15 +662,10 @@ export class MahoragaFighter extends Fighter {
     const speedBoost = CONFIG.mahoraga?.adaptationSpeedBoostPerStage || 0.10;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
 
-    // ── PASSIVE RCT REGEN (Scales per adaptation level / wheel click, stacking continuously through Level 8+) ──
-    const isLevel8Regen = totalStages >= 8 || goldStages >= 8 || this.isMaxAdapted || this.isInfinityBlitz;
+    // ── PASSIVE RCT REGEN (Scales continuously per adaptation level / wheel click without cap!) ──
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
     const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
-    const minLevel8Regen = CONFIG.mahoraga?.maxLevelRctRegen || 0.80;
-    // Cap regen at the level-7 stacked amount (7 * rctPerStage) once level 8+ is reached — do NOT keep scaling
-    const level7Cap = 7 * rctPerStage;
-    const currentRegenRate = isLevel8Regen 
-      ? Math.max(minLevel8Regen, level7Cap)
-      : (totalStages * rctPerStage);
+    const currentRegenRate = totalStages * rctPerStage;
 
     if (currentRegenRate > 0 && this.hp > 0 && !this.isDead && this.hp < this.maxHp) {
       const oldHp = this.hp;
@@ -934,8 +917,8 @@ export class MahoragaFighter extends Fighter {
         
         this.adaptationDashIsCounter = false;
       }
+      return;
     }
-    return;
   }
 
     // ── ADAPTATION PAUSE TICK ──
@@ -953,16 +936,12 @@ export class MahoragaFighter extends Fighter {
         opponent.vy = 0;
       }
 
-      if (!this.isInfinityBlitz) {
-        const p = 1.0 - (this.adaptationPauseTimer / (this.adaptationPauseMax || 40));
-        const easeP = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
-        this.wheelRotation = (this.wheelStartRotation || 0) + easeP * (Math.PI / 4);
-      } else {
-        this.wheelRotation += (CONFIG.mahoraga?.infinityBlitzWheelSpinSpeed || 0.08);
-      }
+      const p = 1.0 - (this.adaptationPauseTimer / (this.adaptationPauseMax || 40));
+      const easeP = p < 0.5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+      this.wheelRotation = (this.wheelStartRotation || 0) + easeP * (Math.PI / 4);
 
       if (this.adaptationPauseTimer === 0) {
-        if (!this.isInfinityBlitz) this.wheelRotation = this.wheelTargetRotation;
+        this.wheelRotation = this.wheelTargetRotation;
         const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
         const targetToDash = this._pendingCounterTarget || opponent || (state.fighters ? state.fighters.find(f => f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f.characterId === 'sukuna' || f.type === 'sukuna') && f.hp > 0) : null);
         if (targetToDash && !targetToDash.isDead && !isInsideDomain) {
@@ -1021,48 +1000,41 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    // ── LEVEL 8 MAX ADAPTATION: SPEED-BLITZ DURATION & SMOOTH WHEEL DECELERATION ──
-    if (totalStages >= 8 && !this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0) {
-      this.isInfinityBlitz = true;
-      this.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames || 600;
-      this.isCleaving = false;
-      this.isShouting = false;
-      this.isThrowing = false;
-      this.isBlitzActive = false;
+    const isLevel8 = totalStages >= 8 || this.isMaxAdapted || ((this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0) >= 8);
 
-      const wheelY = this.y - this.r - 28;
-      spawnFloatingText(this.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
-      triggerGlobalScreenShake(14, 30);
-      audioSystem.playSFX('skill_dash5', 1.0);
-      audioSystem.playSFX('attack_swordswing', 1.0);
-    }
-
-    if (this.isInfinityBlitz || totalStages >= 8) {
+    if (isLevel8 && !this.isWallSlamActive) {
       if (Math.random() < 0.6) {
         spawnSparks(this.x + (Math.random() - 0.5) * this.r * 1.6, this.y + (Math.random() - 0.5) * this.r * 1.6, 2, 'arcane', '#9D4EDD');
       }
-    }
-
-    if (this.isInfinityBlitz) {
-      if (this.infinityBlitzDurationTimer > 0) {
-        this.infinityBlitzDurationTimer--;
-        if (this.infinityBlitzDurationTimer === 0) {
-          this.isInfinityBlitz = false;
-          this.infinityBlitzCooldownTimer = CONFIG.mahoraga?.infinityBlitzCooldownFrames || 600;
-
-          spawnFloatingText(this.x, this.y - this.r - 25, '⚡ MAX ADAPTATION (LEVEL 8) PERMANENT!', '#FFD700');
-          triggerGlobalScreenShake(6, 14);
-          audioSystem.playSFX('skill_enhance', 1.0);
-        }
+      if (!this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
+        this.isInfinityBlitz = true;
+        this.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames || 400;
+        this.infinityBlitzTimer = 0;
+        this.infinityBlitzAttacksInSeq = 0;
+        spawnFloatingText(this.x, this.y - this.r - 25, '⚡ LEVEL 8 SPEED BLITZ!', '#FFD700');
+        triggerGlobalScreenShake(6, 14);
+        audioSystem.playSFX('skill_enhance', 1.0);
       }
+    } else if (this.isWallSlamActive) {
+      this.isInfinityBlitz = false;
     }
 
     // ── LEVEL 8 INFINITY BLITZ COMBAT LOOP ──
-    if (this.isInfinityBlitz) {
+    if (this.isInfinityBlitz && !this.isWallSlamActive && (this.adaptationPauseTimer || 0) <= 0) {
       this.isCleaving = false;
       this.isShouting = false;
       this.isThrowing = false;
       this.isBlitzActive = false;
+
+      if (this.infinityBlitzDurationTimer > 0) {
+        this.infinityBlitzDurationTimer--;
+        if (this.infinityBlitzDurationTimer <= 0) {
+          this.isInfinityBlitz = false;
+          this.infinityBlitzCooldownTimer = CONFIG.mahoraga?.infinityBlitzCooldownFrames || 600;
+          spawnFloatingText(this.x, this.y - this.r - 25, '⏳ SPEED BLITZ COOLDOWN', '#AAAAAA');
+          triggerGlobalScreenShake(3, 8);
+        }
+      }
 
       this.infinityBlitzTimer = (this.infinityBlitzTimer || 0) + 1;
       const interval = CONFIG.mahoraga?.infinityBlitzInterval || 12;
@@ -1257,9 +1229,6 @@ export class MahoragaFighter extends Fighter {
       this.blitzTotalDuration = CONFIG.mahoraga?.blitzTotalDurationFrames || 150;
       this.blitzTarget = opponent;
       spawnFloatingText(this.x, this.y - this.r - 25, 'ADAPTED BLITZ DUEL!', '#FFD700');
-      if (!isMaxLevel) {
-        playSkillEffectSound('mahoraga', 'wheelclick');
-      }
       audioSystem.playSFX('skill_dash5', 1.0);
     }
 
@@ -1638,6 +1607,8 @@ export class MahoragaFighter extends Fighter {
 
       if (canActSkills) {
         const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;
+        const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+        const hasWallSlam = totalStages >= 8 || this.isMaxAdapted || (this.goldStages >= 8);
 
         // Priority 1: Divine Shout (AoE shockwave roar triggered when getting near to the enemy)
         const shoutTriggerDist = shoutRadius + (opponent.r || 25);
@@ -1651,8 +1622,8 @@ export class MahoragaFighter extends Fighter {
           this.cleaveWindupTimer = 0;
         }
         // Priority 3: Throw Skill (Debris Throw at Level 1-7 OR Wall Slam & Dash Execute at Level 8+)
-        else if (this.throwCooldown <= 0 && (distToOpponent >= minThrowDist || isMaxLevel) && !isAnyTargetInRange) {
-          if (isMaxLevel) {
+        else if (this.throwCooldown <= 0 && (distToOpponent >= minThrowDist || hasWallSlam) && !isAnyTargetInRange) {
+          if (hasWallSlam) {
             this.initiateLevel8WallSlam(opponent);
           } else {
             this.isThrowing = true;

@@ -168,3 +168,47 @@ else color = 'rgba(15, 15, 22, 0.90)';        // Dark manga ink line
 - **Unified Character Palette**: All HUD skill progress bars for a given fighter (e.g. Basic Skill, Secondary Skill, Ultimate/Domain) MUST use the **exact same consistent color theme** (`themeColor = f.color || ...`).
 - **NEVER** assign mismatched, ad-hoc, or hardcoded accent colors to individual skill bars in `hudManager.js` (such as setting one bar to yellow and another to pink). Every skill bar returned in a fighter's HUD array MUST reference `themeColor` to preserve visual elegance and character identity.
 
+## 19. Fighter Skin & Face Orientation Standards (Always Facing Camera / Viewer POV)
+
+### Upright Coordinate Layout (Front Profile POV)
+Fighter body models, heads, faces, hair, and uniforms MUST ALWAYS be drawn oriented upright facing directly towards the player/camera (front POV):
+- **`-Y` (Top)**: Hair, bangs, horns/crest, forehead, top of head.
+- **`Y ~ 0` (Center)**: Eyes, blindfolds, face markings, scars, stitches, nose bridge.
+- **`+Y` (Bottom)**: Collar, neck opening, torso, jacket/tunic/uniform, belt, clothing folds.
+- **`-X` / `+X` (Left / Right)**: Symmetrical ears, side hair locks, shoulders, arms.
+- **NEVER** draw faces or clothing oriented sideways along the X-axis (e.g. placing hair at `-X` and torso at `+X`). The character must never appear lying horizontally.
+
+### Local Space Transform & Vertical Mirroring
+All skin renderers must apply the standard transform so that facing direction aligns with `gunAngle` while keeping the character upright:
+```javascript
+const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+ctx.rotate(angle);
+
+// Mirror Y-axis vertically so hair stays on top (-Y) and body on bottom (+Y) when moving/aiming left
+const facingLeft = Math.abs(angle) > Math.PI / 2;
+if (facingLeft) {
+  ctx.scale(1, -1);
+}
+```
+
+### Brawler Hand Positioning & Layering
+Inside this local coordinate frame:
+- **`+X`** points directly toward the opponent target.
+- **Back Hand (Behind Body Circle Layer)**: Positioned on the forward/aim side at `(r * 1.05, 0)` in idle stance.
+- **Body Circle (Middle Layer)**: Drawn at `(0, 0)` with upright head (`-Y`) and torso (`+Y`).
+- **Front Hand (Front Layer — On Top of Body)**: Positioned at guard center `(0, 0)` in idle stance.
+- During punches, hands alternate lunging forward along `+X` (`r * 0.85 + lungeExtension * 1.40`) with opposite recoil (`oppositeRecoil = -Math.sin(...)`).
+
+## 20. Fighter Hand Visibility & Skin Only Guard Standard
+- All fighter skin renderers, custom brawler hand rendering methods, and weapon graphics MUST evaluate `fighter.hideFrontHand` / `fighter.hideBackHand` OR the global `state.showSkinOnly` state before rendering any hands, fists, or weapon grips.
+- Standard hand draw pattern across all existing and future fighter skin renderers:
+  ```javascript
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  if (!shouldHideHands && !fighter.hideFrontHand) {
+    // Draw front hand
+  }
+  ```
+- **Skin Only Button (`state.showSkinOnly`)**: When enabled in the weapon menu or preview, `state.showSkinOnly` MUST hide BOTH weapons and hands across ALL fighters automatically without exception.
+
+
+

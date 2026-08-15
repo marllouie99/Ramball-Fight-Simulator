@@ -25,6 +25,7 @@ export const SPIKE_WEAPON_GRAPHICS = {
  * Optimized: Uses a single path and a single radial gradient for all blades to minimize draw calls.
  */
 export function drawSpikeWeapon(ctx, x, y, angle, r) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const cfg = SPIKE_WEAPON_GRAPHICS;
   const qualityLevel = state.qualityLevel || 1.0;
   const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;

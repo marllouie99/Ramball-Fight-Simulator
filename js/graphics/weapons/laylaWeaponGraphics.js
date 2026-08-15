@@ -68,6 +68,7 @@ function _buildGradients(ctx) {
 }
 
 export function drawLaylaGun(ctx, x, y, gunAngle, r = 25, options = {}) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const recoil = options.recoil || 0;
   const isInUltimate = options.isInUltimate || false;
   const isPreview = options.isPreview || false;

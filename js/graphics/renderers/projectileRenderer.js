@@ -42,8 +42,10 @@ export function drawProjectiles() {
     }
 
     // Hide enemy projectiles inside Gojo's domain (except Sukuna's domain/shrine slashes)
-    const isSukunaSlash = p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || p.isSukunaSlash;
-    if (isGojoDomainActive && p.owner && p.owner.characterId !== 'gojo' && !isSukunaSlash) {
+    const isSukunaSlash = p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || p.isSukunaSlash || p.isSukunaDomainSlash;
+    const ownerFighter = (typeof p.owner === 'number' && state.fighters) ? state.fighters[p.owner] : p.owner;
+    const isOwnerGojo = ownerFighter && (ownerFighter.characterId === 'gojo' || ownerFighter.type === 'gojo');
+    if (isGojoDomainActive && ownerFighter && !isOwnerGojo && !isSukunaSlash) {
       return;
     }
 

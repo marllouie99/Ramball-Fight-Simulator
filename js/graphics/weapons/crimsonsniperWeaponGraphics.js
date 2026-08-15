@@ -24,6 +24,7 @@ export const CRIMSON_SNIPER_WEAPON_GRAPHICS = {
 };
 
 export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, maxAmmo = 4, reloadTimer = 0, isReloading = false, flashTimer = 0, tensionIntensity = 0, fighterColor = '#ff1111') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   

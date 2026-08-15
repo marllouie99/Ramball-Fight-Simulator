@@ -231,17 +231,8 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
     spawnAnimePunchImpactFrame(target.x, target.y, 55, punchAngle, 'crimson');
 
-    const gojoDomainActive = state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive);
-    if (!gojoDomainActive && !fighter.domainActive) {
-      target.vx += Math.cos(punchAngle) * pushForce;
-      target.vy += Math.sin(punchAngle) * pushForce;
+    // Melee hit physics: pushback disabled for basic/melee hits
 
-      if (target.knockbackVx !== undefined && target.knockbackVy !== undefined) {
-        target.knockbackVx += Math.cos(punchAngle) * (pushForce * 0.8);
-        target.knockbackVy += Math.sin(punchAngle) * (pushForce * 0.8);
-        target.knockbackStunTimer = Math.max(target.knockbackStunTimer || 0, isFinalHit ? 10 : 4);
-      }
-    }
   }
 
   triggerGlobalScreenShake(4, 5);
@@ -265,8 +256,11 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'MARTIAL ARTS', '#8B0000');
 
-  const attackSound = getBasicAttackSound(null, 'sukuna_melee');
-  if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume * 0.8);
+  if (!fighter._slashSoundCooldown || fighter._slashSoundCooldown <= 0) {
+    audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.65);
+    audioSystem.playSFX('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
+    fighter._slashSoundCooldown = 8;
+  }
 
   // Time stop removed here so it does not cancel ultimates / domain channeling via hard CC!
   fighter.meleePunchCooldown = punchCooldown;

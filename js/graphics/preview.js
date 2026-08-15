@@ -91,7 +91,7 @@ export function createPreviewFighter(def, x, y, options = {}) {
   fighter.shootCooldownMax = Math.max(18, Math.floor((def.cooldown || CONFIG.shoot.cooldown) / 3));
   fighter.meleeCooldown = 0;
 
-  const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
+  const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
 
   if (isMelee) {
     fighter.shoot = function() {};
@@ -261,7 +261,7 @@ export function updateIndexDetailDemo(def, demoArea) {
   }
 
   for (let s = 0; s < steps; s++) {
-    const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
+    const isMelee = (def.category === 'Melee') || ['saitama', 'yuji', 'mahito', 'todo', 'toji', 'mahoraga', 'musashi', 'berserker', 'knight', 'melee'].includes(def.type) || fighter.isMeleeFighter;
 
     // Force fighter to remain perfectly stationary in the center of the demo viewport
     fighter.x = demoArea.x + demoArea.width / 2;

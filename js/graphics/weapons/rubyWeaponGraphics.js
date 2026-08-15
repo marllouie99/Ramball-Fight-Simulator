@@ -25,6 +25,7 @@ const RubyTheme = {
 };
 
 export function drawRubyScythe(ctx, fighter, customTheme = null) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   const theme = customTheme || RubyTheme;
   const baseAlpha = ctx.globalAlpha;
   // --- Pre-calculate weapon transforms for trails and particles ---

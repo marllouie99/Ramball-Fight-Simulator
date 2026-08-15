@@ -297,7 +297,7 @@ export class GojoRenderer {
       }
     } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
       fighter._drawJJKCursedEnergyAura(ctx, 'rct');
-    } else if (!isFrozenByDomain && !isInOwnDomain && fighter.isMeleeMode && (fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+    } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
       fighter._drawJJKCursedEnergyAura(ctx, 'blue');
     }
 
@@ -325,8 +325,13 @@ export class GojoRenderer {
       fighter.drawGun(ctx);
     }
 
-    // Draw Reversal Red Orb + blast ON TOP of body and hands
-    if (fighter.redEffectTimer > 0) {
+    // Draw Reversal Red Orb + blast ON TOP of body and hands (hidden during Mahoraga wheel click pause)
+    const isMahoAdapting = (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga') || f.characterId === 'mahoraga') && 
+      ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0)
+    )) || ((fighter.mahoragaAdaptationFreezeTimer || 0) > 0);
+
+    if (fighter.redEffectTimer > 0 && !isMahoAdapting) {
       fighter._drawReversalRedEffect(ctx);
     }
 
@@ -419,19 +424,9 @@ export class GojoRenderer {
       const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
       if (is200) {
-        // 200% Purple: Hands wide open sideways (0.0 -> 0.75), then sweep forward to aim towards enemy (0.75 -> 1.0)
-        let handX, handY;
-        if (mergeProgress < 0.75) {
-          // Hands wide open on opposite sides of body
-          handX = 0;
-          handY = r * 2.2;
-        } else {
-          // Reposition both hands forward to aim towards enemy
-          const aimP = (mergeProgress - 0.75) / 0.25; // 0.0 -> 1.0
-          const easeAim = Math.sin(aimP * Math.PI * 0.5);
-          handX = (r + 12) * easeAim;
-          handY = (r * 2.2) * (1 - easeAim) + 6 * easeAim;
-        }
+        // 200% Purple: Hands wide open sideways throughout the entire ritual
+        const handX = 0;
+        const handY = r * 2.2;
         const fHand = toGlobal(handX, handY);
         const bHand = toGlobal(handX, -handY);
         return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
@@ -510,6 +505,7 @@ export class GojoRenderer {
 
   // Render physical circle hands (back layer behind body, front layer on top of body)
   static _drawHandCursedEnergy(ctx, fighter, layer = 'all') {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     const hands = fighter._getHandPositions();
     if (!hands) return;
 
@@ -1215,6 +1211,16 @@ export class GojoRenderer {
    *   Phase 3 (fade): Blast wave expands and dissipates.
    */
   static _drawReversalRedEffect(ctx, fighter) {
+    // Hide Gojo's Red blast and repulsion rings visual effect during Mahoraga's wheel click adaptation pause
+    const isMahoragaAdapting = (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga') || f.characterId === 'mahoraga') && 
+      ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0)
+    )) || ((fighter.mahoragaAdaptationFreezeTimer || 0) > 0);
+
+    if (isMahoragaAdapting) {
+      return;
+    }
+
     const totalFrames  = fighter.redEffectMaxTimer;           // e.g. 75
     const remaining    = fighter.redEffectTimer;              // counts down from totalFrames → 0
     const elapsed      = totalFrames - remaining;          // 0 → totalFrames

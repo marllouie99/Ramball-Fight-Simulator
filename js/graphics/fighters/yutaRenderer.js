@@ -1646,6 +1646,7 @@ export class YutaRenderer {
   }
 
   static _drawThinIceBreakerHand(ctx, fighter) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     ctx.save();
     ctx.translate(fighter.x, fighter.y);
     ctx.rotate(fighter.gunAngle);

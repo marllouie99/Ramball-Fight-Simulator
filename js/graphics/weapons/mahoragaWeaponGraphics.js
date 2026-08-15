@@ -198,15 +198,14 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   const sphereRadius = MAHORAGA_WEAPON_GRAPHICS.wheel.sphereRadius;
   const depthOffset = MAHORAGA_WEAPON_GRAPHICS.wheel.depthOffset;
 
-  // Glow Effect when adapting, adapted, or Level 8 Speed-Blitz (decays smoothly during slowdown)
-  const spinFactor = (fighter.infinityBlitzSpinSpeed || 0) / 0.35;
-  const isGlowing = (fighter.isInfinityBlitz) || (spinFactor > 0.05) || (fighter.wheelGlowTimer > 0) || (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill));
+  // Glow Effect when adapting or adapted
+  const isGlowing = (fighter.wheelGlowTimer > 0) || (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill));
   if (isGlowing) {
     ctx.save();
     ctx.scale(scaleX, scaleY);
     ctx.beginPath();
     ctx.arc(0, 0, spokeRadius + 12, 0, Math.PI * 2);
-    const glowAlpha = fighter.isInfinityBlitz ? 0.9 : Math.max(0.9 * spinFactor, fighter.wheelGlowTimer > 0 ? (fighter.wheelGlowTimer / 60) : 0.35);
+    const glowAlpha = fighter.wheelGlowTimer > 0 ? Math.min(1.0, fighter.wheelGlowTimer / 45) : 0.45;
     const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, spokeRadius + 14);
 
     // Use Gojo-adapted color if set, otherwise default gold

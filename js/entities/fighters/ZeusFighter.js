@@ -584,6 +584,7 @@ export class ZeusFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     let chargeProgress = 0;
     if (this.isChargingStorm) {
       chargeProgress = 1.0 - (this.stormCooldown / (CONFIG.zeus.stormTelegraphFrames || 120));

@@ -190,10 +190,10 @@ export function drawYujiSkin(ctx, fighter) {
   const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI) * (r * 0.20) : 0;
 
   let frontX, frontY, backX, backY;
-  let hideFrontHand = false;
-  let hideBackHand = false;
-  fighter.hideFrontHand = false;
-  fighter.hideBackHand = false;
+  let hideFrontHand = (typeof state !== 'undefined' && state.showSkinOnly);
+  let hideBackHand = (typeof state !== 'undefined' && state.showSkinOnly);
+  fighter.hideFrontHand = hideFrontHand;
+  fighter.hideBackHand = hideBackHand;
 
   const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
   const isSlashActive = !isMatchEnded && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));

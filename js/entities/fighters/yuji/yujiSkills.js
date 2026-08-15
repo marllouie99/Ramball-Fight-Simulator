@@ -19,7 +19,6 @@ export function modUpdateComboRush(target) {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
     const range = this.soulSwapActive ? 350 : (CONFIG.yuji?.comboDashRange || 200);
     
-    // Only dash if not already in standard melee range
     if (dist <= range && dist > (this.r + target.r + 30)) {
       this.isComboDashing = true;
       this.comboTarget = target;
@@ -27,6 +26,12 @@ export function modUpdateComboRush(target) {
       
       // Play a quick dash whoosh sound
       audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.85);
+    } else if (dist <= (this.r + target.r + 30)) {
+      // Already in close range: immediately trigger combo flurry!
+      this.comboTarget = target;
+      this.comboHitsLeft = this.soulSwapActive ? 6 : (CONFIG.yuji?.comboHits || 6);
+      this.comboIntervalTimer = 1;
+      this.comboRushCooldown = this.soulSwapActive ? 180 : (CONFIG.yuji?.comboCooldown || 400);
     }
   }
 
@@ -39,13 +44,27 @@ export function modUpdateComboRush(target) {
       return;
     }
 
+    const isTargetGojoInfinity = (t.characterId === 'gojo' || t.type === 'gojo') && !t.isMeleeMode && !t.domainActive;
+    const barrierRadius = isTargetGojoInfinity ? (CONFIG.gojo?.infinityRadius ?? (t.r + 30)) : (t.r + 35);
+    const dist = Math.hypot(t.x - this.x, t.y - this.y);
+
+    // Rebound immediately when contacting Gojo's Limitless Infinity barrier during dash!
+    if (isTargetGojoInfinity && dist <= (this.r + barrierRadius)) {
+      this.isComboDashing = false;
+      this.comboHitsLeft = 0;
+      this.comboTarget = null;
+      if (typeof t.triggerInfinityBlock === 'function') {
+        t.triggerInfinityBlock(this.x, this.y, this);
+      }
+      return;
+    }
+
     this.aim(t);
     const angle = Math.atan2(t.y - this.y, t.x - this.x);
     const dashSpeed = this.soulSwapActive ? 22.0 : 15.5;
     this.vx = Math.cos(angle) * dashSpeed;
     this.vy = Math.sin(angle) * dashSpeed;
 
-    const dist = Math.hypot(t.x - this.x, t.y - this.y);
     if (dist <= (this.r + t.r + 35)) {
       // Arrived at target: start punch / slash combo
       this.isComboDashing = false;
@@ -62,6 +81,17 @@ export function modUpdateComboRush(target) {
     if (!t || t.isDead || t.hp <= 0) {
       this.comboHitsLeft = 0;
       this.comboTarget = null;
+      return;
+    }
+
+    const isTargetGojoInfinity = (t.characterId === 'gojo' || t.type === 'gojo') && !t.isMeleeMode && !t.domainActive;
+    if (isTargetGojoInfinity) {
+      // Cancel combo and rebound when striking Gojo's Limitless Infinity barrier
+      this.comboHitsLeft = 0;
+      this.comboTarget = null;
+      if (typeof t.triggerInfinityBlock === 'function') {
+        t.triggerInfinityBlock(this.x, this.y, this);
+      }
       return;
     }
 

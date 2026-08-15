@@ -12,6 +12,7 @@ import { laylaConfig } from '../configs/characters/laylaConfig.js';
 import { saitamaConfig } from '../configs/characters/saitamaConfig.js';
 import { genosConfig } from '../configs/characters/genosConfig.js';
 import { ichigoConfig } from '../configs/characters/ichigoConfig.js';
+import { mahitoConfig } from '../configs/characters/mahitoConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {
@@ -633,6 +634,9 @@ export const CONFIG = {
 
   /** Ichigo Kurosaki — Substitute Soul Reaper */
   ichigo: ichigoConfig,
+
+  /** Mahito — Cursed Spirit of Human Hatred */
+  mahito: mahitoConfig,
 };
 
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1200,6 +1204,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Hollow Mask',
     desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate transforms into Vasto Lorde.',
+  },
+  {
+    id: 30,
+    name: 'Mahito',
+    category: 'Anime',
+    color: '#00A8CC', // Deep Grungy Cyan / Cursed Soul
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'mahito',
+    hp: 230,
+    damage: 16,
+    cooldown: 22,
+    moveSpeed: 6.8,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Idle Transfiguration',
+    desc: 'Reshapes souls and flesh with cursed strikes. Transforms into Instant Spirit Body of Distorted Killing with armored carapace and blade scythes.',
   }
 ];
 

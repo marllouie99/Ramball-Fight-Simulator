@@ -148,10 +148,12 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
         }
 
         // Apply damage & knockback
-        applyDamageToTarget(target, damage, this);
+        const didDamage = applyDamageToTarget(target, damage, this);
         
-        target.vx += Math.cos(angleToTarget) * knockback;
-        target.vy += Math.sin(angleToTarget) * knockback;
+        if (didDamage !== false) {
+          target.vx += Math.cos(angleToTarget) * knockback;
+          target.vy += Math.sin(angleToTarget) * knockback;
+        }
 
         // Visual effects
         spawnAnimePunchImpactFrame(target.x, target.y, isBlackFlash ? 80 : 55, angleToTarget, 'blackpink');
@@ -166,17 +168,19 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
             audioSystem.playSFX(sound.src, sound.volume);
             if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
           }
-          if (typeof target.applySlow === 'function') {
-            target.applySlow(
-              CONFIG.blackFlash?.debuff?.slowDuration ?? 70,
-              CONFIG.blackFlash?.debuff?.slowMultiplier ?? 0.45
-            );
+          if (didDamage !== false) {
+            if (typeof target.applySlow === 'function') {
+              target.applySlow(
+                CONFIG.blackFlash?.debuff?.slowDuration ?? 70,
+                CONFIG.blackFlash?.debuff?.slowMultiplier ?? 0.45
+              );
+            }
+            target.blackFlashDebuffTimer = CONFIG.blackFlash?.debuff?.healReductionDuration ?? 270;
           }
-          target.blackFlashDebuffTimer = CONFIG.blackFlash?.debuff?.healReductionDuration ?? 270;
         }
 
-        // Queue Divergent Fist delayed shockwave
-        if (this.delayedShockwaves) {
+        // Queue Divergent Fist delayed shockwave only if attack was not blocked
+        if (this.delayedShockwaves && didDamage !== false) {
           let swDamage = CONFIG.yuji?.shockwaveDamage || 10;
           if (this.soulSwapActive) {
             swDamage *= (CONFIG.yuji?.soulSwapDamageMultiplier || 1.5);

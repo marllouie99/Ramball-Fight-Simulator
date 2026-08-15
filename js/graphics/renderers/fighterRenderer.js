@@ -216,7 +216,7 @@ export class FighterRenderer {
   }
 
   static drawGun(ctx, fighter) {
-    if (fighter.isTargetOfAmbush) return;
+    if (fighter.isTargetOfAmbush || (typeof state !== 'undefined' && state.showSkinOnly)) return;
     ctx.save();
     ctx.translate(fighter.x, fighter.y);
     ctx.rotate(fighter.gunAngle);

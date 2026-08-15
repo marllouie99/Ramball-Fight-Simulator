@@ -33,6 +33,7 @@ export const ASSASSIN_WEAPON_GRAPHICS = {
  * ★ SIZE ADJUST: Change shurikenScale to resize the entire weapon
  */
 export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor = '#4a6a6a') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle);
@@ -115,6 +116,7 @@ export function drawDarkSlateGrayShuriken(ctx, x, y, gunAngle, r, fighterColor =
 }
 
 export function drawDarkSlateGrayMelee(ctx, x, y, gunAngle, r, animationOffsetScale = 1.0, flashIntensity = 0, fighterColor = '#4a6a6a') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(gunAngle + Math.PI / 2);

@@ -11,6 +11,8 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 
 export function activateRed(fighter) {
+  if ((fighter.redEffectTimer || 0) > 0 || fighter.redBuildupPhase) return;
+
   const buildupFrames = CONFIG.gojo?.redBuildupFrames || 20;
   const blastFadeFrames = 25;
   const totalFrames = buildupFrames + blastFadeFrames;
@@ -61,8 +63,18 @@ export function activateRed(fighter) {
   spawnSparks(fighter.x, fighter.y, 12, 'crimsonSniper');
   triggerGlobalScreenShake(4, 6);
 
-  const sCharging = getSkillSound(fighter._def?.id, 'red_charging');
-  audioSystem.playSFX(sCharging?.src || 'Assets/Sound Effects/Skills/redcharging.mp3', sCharging?.volume ?? 0.85);
+  const now = Date.now();
+  if (!fighter._hasPlayedRedChannelingSound || !fighter._lastRedSoundTime || (now - fighter._lastRedSoundTime) > 1800) {
+    fighter._lastRedSoundTime = now;
+    fighter._hasPlayedRedChannelingSound = true;
+    const sVoice = getSkillSound(fighter._def?.id, 'red_channeling');
+    audioSystem.playSFX(sVoice?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sVoice?.volume ?? 1.8);
+
+    const sCharging = getSkillSound(fighter._def?.id, 'red_charging');
+    if (sCharging) {
+      audioSystem.playSFX(sCharging.src, sCharging.volume);
+    }
+  }
 }
 
 export function detonateRed(fighter) {
@@ -161,6 +173,12 @@ export function firePurple(fighter, ownerIndex) {
   }
 
   let purpleLife = CONFIG.gojo?.purpleLife || 250;
+  const opponent = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0) : null;
+  if (opponent && !opponent.isDead) {
+    const fireAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
+    fighter.gunAngle = fireAngle;
+    fighter.angle = fireAngle;
+  }
   if (projectileSystem && projectileSystem.fireGojoPurple) {
     const proj = projectileSystem.fireGojoPurple(
       fighter, 

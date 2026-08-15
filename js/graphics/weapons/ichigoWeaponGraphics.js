@@ -90,6 +90,7 @@ export function drawCeroBeam(ctx, p) {
 }
 
 export function drawShikaiZangetsu(ctx, x, y, angle, r) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
@@ -258,6 +259,7 @@ export function drawShikaiZangetsu(ctx, x, y, angle, r) {
 }
 
 export function drawTensaZangetsu(ctx, x, y, angle, r) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);

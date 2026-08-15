@@ -544,6 +544,7 @@ export class Fighter {
     if (this.blackFlashDebuffTimer > 0) this.blackFlashDebuffTimer--;
     if (this.blackFlashTimer > 0) this.blackFlashTimer--;
     if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
+    if (this.evadeBuffTimer > 0) this.evadeBuffTimer--;
     
     // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
     if (this.knockbackStunTimer > 0) {
@@ -717,6 +718,19 @@ export class Fighter {
       state.getFighterTeam(attackerIndex) === state.getFighterTeam(targetIndex)
     ) {
       return false;
+    }
+
+    // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff)
+    if (this.evadeBuffTimer > 0 && amount > 0) {
+      const isBasicAttack = opts.isProjectile || opts.isMelee || opts.isBasicAttack || (!opts.isSkill && !opts.isUltimate && !opts.isDomain && !opts.isPureLoveBeam && !opts.isDivineFlame && !opts.isPurpleDPS);
+      if (isBasicAttack) {
+        const chance = this.evadeChance ?? (CONFIG.todo?.evadeChance || 0.60);
+        if (Math.random() < chance) {
+          spawnFloatingText(this.x, this.y - this.r - 10, 'MISS!', '#00E5FF');
+          spawnSparks(this.x, this.y, 8, 'lightningTrail', '#00E5FF');
+          return false;
+        }
+      }
     }
 
     const prevHp = currentHp;
@@ -1279,6 +1293,7 @@ export class Fighter {
 
   /** Draws standard grey weapon barrel. */
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     FighterRenderer.drawGun(ctx, this);
   }
 

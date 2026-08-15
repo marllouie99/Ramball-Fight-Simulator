@@ -36,21 +36,37 @@ export function drawGojoWeapon(ctx, fighter) {
                 const spreadY = handSpreadY * (1 - easeMove);
                 const t = Date.now();
 
-                // Red Orb (floating high above right side - scaled up)
-                drawGojoOrb(ctx, headX, spreadY, handRadius * 2.8, t, 'red', 0);
-                // Blue Orb (floating high above left side - scaled up)
-                drawGojoOrb(ctx, headX, -spreadY, handRadius * 2.8, t, 'blue', 0);
+                // Smooth fade-in (0.0 -> 0.22 of mergeProgress)
+                const fadeInP = Math.min(1.0, mergeProgress / 0.22);
+                const orbAlpha = Math.sin(fadeInP * Math.PI * 0.5);
 
-                // Electric energy arcs between Red and Blue orbs (intensify as they approach)
-                if (moveP > 0.15) {
-                    const arcIntensity = Math.min(1.0, (moveP - 0.15) / 0.55);
+                // Smooth size transition from small concentrated energy spark to full-sized massive orb (0.0 -> 0.35)
+                const growP = Math.min(1.0, mergeProgress / 0.35);
+                const easeGrow = Math.sin(growP * Math.PI * 0.5);
+                const scale = 0.15 + 0.85 * easeGrow;
+                const surgeScale = 1.0 + Math.sin(moveP * Math.PI) * 0.15;
+                const currentOrbR = handRadius * 2.8 * scale * surgeScale;
+
+                ctx.save();
+                ctx.globalAlpha *= orbAlpha;
+
+                // Red Orb (floating high above right side - scaled up smoothly)
+                drawGojoOrb(ctx, headX, spreadY, currentOrbR, t, 'red', 0);
+                // Blue Orb (floating high above left side - scaled up smoothly)
+                drawGojoOrb(ctx, headX, -spreadY, currentOrbR, t, 'blue', 0);
+
+                ctx.restore();
+
+                // Electric energy arcs between Red and Blue orbs (intensify smoothly as they approach)
+                if (moveP > 0.10) {
+                    const arcIntensity = Math.min(1.0, (moveP - 0.10) / 0.60) * orbAlpha;
                     const arcCount = 3 + Math.floor(arcIntensity * 3);
                     ctx.save();
                     ctx.lineWidth = 1.2 + arcIntensity * 1.0;
                     ctx.lineCap = 'round';
                     for (let a = 0; a < arcCount; a++) {
                         const seed = a * 3141.59;
-                        const alpha = 0.25 + arcIntensity * 0.45 + Math.sin(t * 0.02 + seed) * 0.15;
+                        const alpha = (0.25 + arcIntensity * 0.45 + Math.sin(t * 0.02 + seed) * 0.15) * orbAlpha;
                         // Alternate red-purple and blue-purple arcs
                         ctx.strokeStyle = a % 2 === 0
                             ? `rgba(255, 120, 200, ${alpha})`
@@ -66,26 +82,27 @@ export function drawGojoWeapon(ctx, fighter) {
                     ctx.restore();
                 }
             } else {
-                // Fused into Purple orb above head, then glides forward as hands aim at enemy (0.70 -> 1.0)
-                const aimP = Math.min(1.0, (mergeProgress - 0.70) / 0.30);
-                const easeAim = Math.sin(aimP * Math.PI * 0.5);
+                // Fused into massive 200% Purple orb above head — stays suspended high above head!
                 const t = Date.now();
-
-                const orbX = headX + (handDistance + 15 - headX) * easeAim;
-                const orbR = handRadius * 3.8 * (1.0 + easeAim * 0.5); // Massive empowered 200% Purple orb!
+                const orbX = headX; // Stays locked high above head at headX (-r * 2.8)!
+                const purpleGrowP = Math.min(1.0, (mergeProgress - 0.70) / 0.12);
+                const easePurpleGrow = Math.sin(purpleGrowP * Math.PI * 0.5);
+                const baseFusionR = handRadius * 2.8;
+                const maxEmpoweredR = handRadius * 4.2;
+                const orbR = baseFusionR + (maxEmpoweredR - baseFusionR) * easePurpleGrow;
 
                 // Pulsating energy ring around 200% Purple orb
                 ctx.save();
                 ctx.translate(orbX, 0);
                 ctx.rotate(t * 0.004);
-                ctx.strokeStyle = `rgba(200, 100, 255, ${0.35 + easeAim * 0.2})`;
-                ctx.lineWidth = 2.0;
+                ctx.strokeStyle = `rgba(200, 100, 255, 0.45)`;
+                ctx.lineWidth = 2.5;
                 ctx.beginPath();
-                ctx.arc(0, 0, orbR * 2.0 * (1.0 + Math.sin(t * 0.007) * 0.06), 0, Math.PI * 1.5);
+                ctx.arc(0, 0, orbR * 1.8 * (1.0 + Math.sin(t * 0.007) * 0.06), 0, Math.PI * 1.5);
                 ctx.stroke();
                 ctx.restore();
 
-                drawGojoOrb(ctx, orbX, 0, orbR, t, 'purple', 8 * easeAim);
+                drawGojoOrb(ctx, orbX, 0, orbR, t, 'purple', 5);
                 drawAnamorphicLensFlare(ctx, orbX, 0, 1.0);
                 // Second smaller vertical flare for cross-flare effect
                 drawAnamorphicLensFlare(ctx, orbX, 0, 0.5, 'red');

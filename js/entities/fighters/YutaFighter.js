@@ -2064,6 +2064,7 @@ export class YutaFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam) {
       this._drawPureLoveBeamChargePose(ctx);
       return;

@@ -69,6 +69,7 @@ export function drawBomberBody(ctx, r, angle, skinColor, skinAccentColor) {
 }
 
 export function drawBomberHeldGrenade(ctx, x, y, r, gunAngle) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   // Hand position is near the base of the grenade launcher, not at the muzzle tip.
   const handOffset = r + CONFIG.gun.baseOffset + 4;
   const handX = x + Math.cos(gunAngle) * handOffset;

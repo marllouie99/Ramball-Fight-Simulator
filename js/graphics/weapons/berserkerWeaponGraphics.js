@@ -36,6 +36,7 @@ export const BERSERKER_WEAPON_GRAPHICS = {
 };
 
 export function drawBerserkerDualAxes(ctx, x, y, gunAngle, r, isInRage, axeSwingActive = false, axeSwingTimer = 0, axeSwingAngle = 0, axeSwingDuration = CONFIG.berserker?.axeSwingDurationFrames ?? 24, axeSlashFadeTimer = 0, rageFadeTimer = 0, axeHistory = []) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
 
   const scale = BERSERKER_WEAPON_GRAPHICS.positioning.scale;

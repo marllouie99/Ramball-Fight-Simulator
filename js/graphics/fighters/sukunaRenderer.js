@@ -209,7 +209,7 @@ export class SukunaRenderer {
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
     const isWinnerScreen = fighter._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
 
-    if (isWinnerScreen || fighter.isTargetOfAmbush) {
+    if (isWinnerScreen || fighter.isTargetOfAmbush || (typeof state !== 'undefined' && state.showSkinOnly)) {
       return;
     }
 
@@ -233,8 +233,42 @@ export class SukunaRenderer {
 
     let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
 
-    // 1. Martial Arts Brawler Guard Stance & 1-2 Flurry Punch Animation (Matching Todo & Gojo)
-    if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion) {
+    // 1. Dynamic Slash Swing Chop Animation (Clean single-hand slicing chop for Cleave / Dismantle, off-hand strictly hidden - Rule #2 & #15)
+    if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) && !fighter.isChannelingDomainExpansion) {
+      const maxT = fighter.slashSwingMaxTimer || 14;
+      let rawT = 1.0;
+      if (fighter.slashSwingTimer > 0) {
+        rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+      } else if (fighter.rapidSlashHitsLeft > 0) {
+        const rapidMax = CONFIG.sukuna?.rapidSlashCooldown || 16;
+        rawT = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.rapidSlashTimer || 0) / rapidMax)));
+      }
+      const easeT = Math.sin(rawT * Math.PI); // 0 -> 1 -> 0 arc extension
+      const sweepAngle = (rawT - 0.5) * (Math.PI * 0.85); // Wide transverse arc sweep from -75° to +75°
+      const reach = r * 0.4 + easeT * (r * 1.05);
+
+      const chopX = reach * Math.cos(sweepAngle);
+      const chopY = reach * Math.sin(sweepAngle);
+
+      if (fighter.slashHand === 1) {
+        // Left Hand Chop: Sweeps diagonally across body from top to bottom (Hide front hand!)
+        frontHandX_loc = 0; frontHandY_loc = 0;
+        backHandX_loc  = chopX;
+        backHandY_loc  = -chopY;
+        hideFrontHand = true;
+        hideBackHand  = false;
+      } else {
+        // Right Hand Chop: Sweeps diagonally across body from bottom to top (Hide back hand!)
+        backHandX_loc  = 0; backHandY_loc = 0;
+        frontHandX_loc = chopX;
+        frontHandY_loc = chopY;
+        hideBackHand  = true;
+        hideFrontHand = false;
+      }
+    }
+
+    // 2. Martial Arts Brawler Guard Stance & 1-2 Flurry Punch Animation (Matching Todo & Gojo)
+    else if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion) {
       const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
       let easePunch = 0;
@@ -261,28 +295,6 @@ export class SukunaRenderer {
       }
     }
 
-    // 2. Dynamic Slash Swing Chop Animation (Clean single-hand slicing chop for Cleave / Dismantle, off-hand hidden)
-    else if ((fighter.slashSwingTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) && !fighter.isChannelingDomainExpansion) {
-      const maxT = fighter.slashSwingMaxTimer || 14;
-      const rawT = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
-      const easeChop = Math.sin(Math.pow(rawT, 0.85) * Math.PI);
-      const swingSweep = Math.sin(rawT * Math.PI * 0.95);
-
-      if (fighter.slashHand === 1) {
-        // Left Hand Chop: Smooth arc sweep across target (Hide off-hand)
-        frontHandX_loc = 0; frontHandY_loc = 0;
-        backHandX_loc  = r * (0.1 + easeChop * 1.35);
-        backHandY_loc  = -r * 0.35 + swingSweep * r * 0.75;
-        hideFrontHand = true;
-      } else {
-        // Right Hand Chop: Smooth arc sweep across target (Hide off-hand)
-        backHandX_loc  = 0; backHandY_loc = 0;
-        frontHandX_loc = r * (0.1 + easeChop * 1.35);
-        frontHandY_loc = r * 0.35 - swingSweep * r * 0.75;
-        hideBackHand = true;
-      }
-    }
-
     // 3. Fuga (Divine Flame Arrow) Kamino Archer Bow Stance
     else if (fighter.isChannelingDivineFlame) {
       const progress = Math.min(1.0, (fighter.divineFlameChargeTimer || 0) / Math.max(1, fighter.divineFlameChargeMax || 90));
@@ -302,7 +314,15 @@ export class SukunaRenderer {
       backHandX_loc  = r * 0.50; backHandY_loc  = -r * 0.03;
     }
 
-    // Default rest: Single-Hand Slash Stance (Off-hand strictly hidden so Sukuna NEVER displays 2 hands on body)
+    // 5. Idle Brawler Guard Stance when in Melee Mode (Both hands visible, matching Gojo, Todo, Yuji, Saitama - Rule #19)
+    else if (fighter.isMeleeMode) {
+      frontHandX_loc = 0;        frontHandY_loc = 0;
+      backHandX_loc  = r * 1.05; backHandY_loc  = 0;
+      hideFrontHand = false;
+      hideBackHand  = false;
+    }
+
+    // Default rest: Single-Hand Slash Stance (Off-hand strictly hidden for ranged Dismantle firing)
     else {
       if (fighter.slashHand === 1) {
         backHandX_loc  = r * 0.85; backHandY_loc  = -r * 0.15;
@@ -323,11 +343,12 @@ export class SukunaRenderer {
     let backHandX = bHand.x;
     let backHandY = bHand.y;
 
-    // 1. Draw Cursed Energy Aura BEHIND physical hands (skip during RCT and Fuga channeling)
+    // 1. Draw Cursed Energy Aura BEHIND physical hands (skip in melee mode, RCT, and Fuga channeling)
     const isRCT = (fighter.rctVisualTimer > 0);
     const isFuga = (fighter.isChannelingDivineFlame);
     const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
-    const isActive = !isRCT && !isFuga && !isFrozenByDomain && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.rapidSlashHitsLeft > 0) || (fighter.flurryHitsLeft > 0) || (fighter.domainActive) || (state.gameState === 'countdown') || (fighter.punchAnimTimer > 0));
+    const isMeleeMode = fighter.isMeleeMode || (fighter.punchAnimTimer > 0);
+    const isActive = !isMeleeMode && !isRCT && !isFuga && !isFrozenByDomain && ((fighter.combatAuraOpacity > 0.05) || (fighter.slashGlowTimer > 0) || (fighter.rapidSlashHitsLeft > 0) || (fighter.flurryHitsLeft > 0) || (fighter.domainActive) || (state.gameState === 'countdown'));
 
     if (isActive) {
       let theme = 'red';
@@ -364,24 +385,6 @@ export class SukunaRenderer {
       ctx.stroke();
     }
     ctx.restore();
-
-    // Clean crisp energy flash ring around punching fist during punch animation
-    if ((layer === 'all' || layer === 'front') && fighter.punchAnimTimer > 0 && !fighter.domainActive && !fighter.isChannelingDomainExpansion) {
-      const strikingX = fighter.punchAnimHand === 0 ? frontHandX : backHandX;
-      const strikingY = fighter.punchAnimHand === 0 ? frontHandY : backHandY;
-
-      ctx.save();
-      ctx.translate(strikingX, strikingY);
-
-      // Clean crisp Crimson Impact Ring
-      ctx.strokeStyle = '#FF2400';
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      ctx.arc(0, 0, 10, 0, Math.PI * 2);
-      ctx.stroke();
-
-      ctx.restore();
-    }
 
     // Taut glowing fiery Cursed Energy bowstring during Fuga charge!
     if (fighter.isChannelingDivineFlame && !hideFrontHand && !hideBackHand) {

@@ -500,6 +500,7 @@ export class RubyFighter extends Fighter {
   }
 
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     // Draw hook tether + target ring BEFORE the scythe so it layers behind
     this._drawHookEffects(ctx);
     drawRubyScythe(ctx, this);

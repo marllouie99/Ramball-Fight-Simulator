@@ -82,6 +82,7 @@ class ProjectileSystem {
     proj._resumeVy = undefined;
     proj.isFrozenByInfinity = false;
     proj.infinityFreezeTimer = undefined;
+    proj.isSukunaSlash = false;
     
     // Clear visual flags to fix recycle bugs (e.g., normal projectiles turning into green triangles)
     proj.isExplosion = false;
@@ -255,6 +256,7 @@ class ProjectileSystem {
     proj.isFrozenByInfinity = false;
     proj.infinityFreezeTimer = undefined;
     proj.visual = visualType;
+    proj.isSukunaSlash = (visualType === 'sukunaSlash' || visualType === 'sukunaCleave' || visualType === 'sukunaDismantleGrid' || visualType === 'ghostBlade' || (fighter && (fighter.characterId === 'sukuna' || fighter.type === 'sukuna')));
     if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
     proj.historyMax = 10;
 
@@ -1551,9 +1553,7 @@ class ProjectileSystem {
     const sphereRadius = CONFIG.cronos.sphereRadius;
     const sphereRadiusSq = sphereRadius * sphereRadius;
     const ownerIndex = state.fighters.indexOf(cronosFighter);
-    const maxFrozen = CONFIG.cronos.maxFrozenProjectiles || 40;
-    const qualityLevel = state.qualityLevel || 1.0;
-    const activeMaxFrozen = qualityLevel < 0.6 ? Math.min(15, maxFrozen) : maxFrozen;
+    const activeMaxFrozen = maxFrozen;
 
     // OPTIMIZATION: Use spatial grid to get only nearby projectiles instead of checking all
     const nearbyProjectiles = [];
@@ -1990,19 +1990,6 @@ class ProjectileSystem {
       }
 
       if (p.isExplosion) {
-        // OPTIMIZED: Skip update for visual-only particles on alternate frames when quality is low
-        if (p.isVisual && state.qualityLevel < 0.8 && visualUpdateFrame % 2 === 0) {
-          // Still decrement life but skip position update
-          p.life -= 1;
-          if (p.life <= 0) {
-            this._returnProjectile(p);
-            this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
-            this.projectiles.pop();
-            i--;
-          }
-          continue;
-        }
-
         if (typeof p.vx === 'number') p.x += p.vx;
         if (typeof p.vy === 'number') p.y += p.vy;
         if (typeof p.gravity === 'number') p.vy += p.gravity;
@@ -2925,7 +2912,7 @@ class ProjectileSystem {
           const dx = p.x - f.x;
           const dy = p.y - (f.y - (f.z || 0));
           const distSq = dx * dx + dy * dy;
-          const isLimitlessActive = (!f.isMeleeMode && (f.infinityCooldown <= 0 || f.infinityActive || f.infinityBlockTimer > 0 || p.targetIsGojoLimitless));
+          const isLimitlessActive = f.domainActive || (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0 || p.targetIsGojoLimitless);
           if (distSq <= infinityRadius * infinityRadius && isLimitlessActive) {
             // Evaluate freeze chance ONCE upon entering the barrier to prevent per-frame cumulative rolls
             if (p.infinityEvaluated === undefined) {
@@ -2933,11 +2920,12 @@ class ProjectileSystem {
               const ownerFighter = fighters[p.owner];
               const isMahoragaAdapted = ownerFighter && ownerFighter.characterId === 'mahoraga' && ownerFighter.gojoInfinityImmune;
               const isMahoragaDebris = p.isMahoragaThrow || p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';
+              const isSukunaSlash = p.isSukunaSlash || p.isSukunaDomainSlash || p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || (ownerFighter && (ownerFighter.characterId === 'sukuna' || ownerFighter.type === 'sukuna') && ownerFighter.domainActive);
 
-              if (isMahoragaAdapted) {
-                p.infinityBypassed = true;
-              } else if (isMahoragaDebris) {
-                p.infinityBypassed = false; // Mahoraga throw debris 100% freezes in Gojo's Limitless Infinity!
+              if (isMahoragaAdapted || isSukunaSlash) {
+                p.infinityBypassed = true; // Sukuna Shrine slashes & adapted Mahoraga bypass Infinity and travel freely!
+              } else if (isMahoragaDebris || f.domainActive) {
+                p.infinityBypassed = false; // 100% freeze inside Gojo's domain & Limitless barrier!
               } else {
                 const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
                 p.infinityBypassed = Math.random() > freezeChance;

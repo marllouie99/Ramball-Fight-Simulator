@@ -194,6 +194,7 @@ export function drawThunderboltShape(ctx, scale = 1, pulse = 1) {
 }
 
 export function drawZeusWeapon(ctx, x, y, gunAngle, r, auraPhase, attackProgress = 1, fighterColor = '#102040', isChannelingStorm = false, chargeProgress = 0) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
 

@@ -4,7 +4,7 @@ import { drawTodoSkin } from '../../graphics/fighters/todoSkin.js';
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { modUpdateMeleeCombat } from './todo/todoCombat.js';
-import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate } from './todo/todoSkills.js';
+import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff } from './todo/todoSkills.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 
@@ -38,24 +38,27 @@ export class TodoFighter extends Fighter {
     // Takada-chan Ultimate Variables
     this.isTakadaChanneling = false;
     this.takadaChannelTimer = 0;
+    this.takadaUltTimer = 0;
+    this.takadaUltCooldown = 0;
+    this.takadaUltCooldownMax = CONFIG.todo?.ultCooldown || 1200;
+    this.isTakadaUltActive = false;
     this.hasTriggeredTakadaHpUlt = false;
+    this.pendingTakadaHpUlt = false;
     this.takadaSongStarted = false;
-    this.takadaSongHandle = null;
     this.takadaSongFadedOut = false;
 
-    // Cursed Rock Skill (1v1 tool)
+    // Cursed Rocks
+    this.cursedRocks = [];
     this.rockThrowCooldown = 0;
     this.rockThrowCooldownMax = CONFIG.todo?.rockCooldown || 300;
-    this.cursedRocks = [];
-
-    // Rock Counter-Attack Combo state
     this.rockCounterComboLeft = 0;
     this.rockCounterComboTarget = null;
-    this.rockCounterComboInterval = CONFIG.todo?.rockCounterComboInterval || 12;
     this.rockCounterComboTimer = 0;
     this.disengageDelayTimer = 0;
 
-    this.postUltimateRecoveryTimer = 0;
+    // Teammate Rescue Tracker
+    this.recentTeammateDamage = 0;
+    this.teammateDamageResetTimer = 0;
   }
 
   reset() {
@@ -73,29 +76,8 @@ export class TodoFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    if (this.isDead || this.isRespawning || this.hp <= 0) {
-      this.afterImages = [];
-      this.punchAnimTimer = 0;
-      this.clapAnimTimer = 0;
-      return;
-    }
-
-    if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-      this.punchAnimTimer = 0;
-      this.clapAnimTimer = 0;
-      this.rockCounterComboLeft = 0;
-    }
-
-    // Update existing afterimages (placed before freeze guard so they fade even if frozen!)
-    if (this.afterImages && this.afterImages.length > 0) {
-      fastCleanArray(this.afterImages, (img) => {
-        img.timer--;
-        return img.timer > 0;
-      });
-    }
-
-    // Tick status cooldowns every frame so timers decay even during stasis/freeze returns
-    this._tickCooldowns();
+    // Prevent updating dead fighter
+    if (this.isDead || this.hp <= 0) return;
 
     // Beam & Purple Stasis Guard (Yuta Pure Love Beam / Gojo Hollow Purple)
     const isBeamOrPurpleTrapped = (
@@ -119,7 +101,13 @@ export class TodoFighter extends Fighter {
       return;
     }
 
+    const hadVanish = (this.vanishTimer > 0);
     super.update(opponent, ownerIndex, arena);
+    if (hadVanish && (!this.vanishTimer || this.vanishTimer <= 0)) {
+      // Reappeared in the arena from Boogie Woogie swap: apply attack reaction delay to enemies and evasion buff to team!
+      applyBoogieDisorientation(this);
+      applyBoogieEvadeBuff(this);
+    }
 
     // Smoothly transition Todo's Cursed Energy aura opacity
     const wantsAura = (this.clapAnimTimer > 0) || (this.clapWindupTimer > 0) || (this.rockCounterComboLeft > 0) || (this.punchAnimTimer > 0) || (this.justSwappedTimer > 0);
@@ -291,19 +279,6 @@ export class TodoFighter extends Fighter {
           modUpdateMeleeCombat.call(this, target, false);
         }
       }
-    }
-
-    if (this.blackFlashTimer > 0) {
-      if (!this.afterImages) this.afterImages = [];
-      pushTrailCap(this.afterImages, {
-        x: this.x,
-        y: this.y,
-        r: this.r,
-        angle: this.angle,
-        color: this.color || '#D2691E',
-        timer: 16,
-        maxTimer: 16
-      }, 12);
     }
   }
 

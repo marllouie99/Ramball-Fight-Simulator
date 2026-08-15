@@ -246,6 +246,7 @@ export class NormalFighter extends Fighter {
 
   /** Custom sniper-style gun for Red. */
   drawGun(ctx) {
+    if (typeof state !== 'undefined' && state.showSkinOnly) return;
     drawRedSniperGun(
       ctx,
       this.x,

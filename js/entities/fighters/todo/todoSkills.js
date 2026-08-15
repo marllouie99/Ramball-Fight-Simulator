@@ -145,6 +145,63 @@ export function modRepositionDisengage(target) {
   return;
 }
 
+/**
+ * Applies a global attack reaction delay to all enemies when Todo or his partner swaps.
+ */
+export function applyBoogieDisorientation(todoFighter) {
+  if (!state || !state.fighters) return;
+  const myIdx = state.fighters.indexOf(todoFighter);
+  const myTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : todoFighter.team;
+  const disorientFrames = CONFIG.todo?.swapDisorientationFrames ?? 20;
+
+  const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+  for (const enemy of allTargets) {
+    if (!enemy || enemy === todoFighter || enemy.hp <= 0) continue;
+    const isTeammate = (state.getFighterTeam && myIdx >= 0)
+      ? (state.getFighterTeam(state.fighters.indexOf(enemy)) === myTeam)
+      : (enemy.team === todoFighter.team);
+    if (isTeammate) continue;
+
+    // Apply basic attack reaction delay to all enemies
+    if ('shootCooldown' in enemy) enemy.shootCooldown = Math.max(enemy.shootCooldown || 0, disorientFrames);
+    if ('cooldown' in enemy) enemy.cooldown = Math.max(enemy.cooldown || 0, disorientFrames);
+    if ('cooldownTimer' in enemy) enemy.cooldownTimer = Math.max(enemy.cooldownTimer || 0, disorientFrames);
+    if ('meleePunchCooldown' in enemy) enemy.meleePunchCooldown = Math.max(enemy.meleePunchCooldown || 0, disorientFrames);
+    if ('swordCooldown' in enemy) enemy.swordCooldown = Math.max(enemy.swordCooldown || 0, disorientFrames);
+    if ('attackCooldown' in enemy) enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, disorientFrames);
+  }
+}
+
+/**
+ * Grants an evasion buff against basic attacks to Todo and his active teammate when swapping via Boogie Woogie.
+ */
+export function applyBoogieEvadeBuff(todoFighter) {
+  if (!state || !state.fighters) return;
+  const myIdx = state.fighters.indexOf(todoFighter);
+  const myTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : todoFighter.team;
+  const duration = CONFIG.todo?.evadeBuffDurationFrames ?? 75; // ~1.25s
+  const chance = CONFIG.todo?.evadeChance ?? 0.60;
+
+  // Apply to Todo
+  todoFighter.evadeBuffTimer = Math.max(todoFighter.evadeBuffTimer || 0, duration);
+  todoFighter.evadeChance = chance;
+  spawnSparks(todoFighter.x, todoFighter.y, 8, 'lightningTrail', '#00E5FF');
+
+  // Apply to living teammates
+  for (let i = 0; i < state.fighters.length; i++) {
+    const f = state.fighters[i];
+    if (!f || f === todoFighter || f.hp <= 0) continue;
+    const isTeammate = (state.getFighterTeam && myIdx >= 0)
+      ? (state.getFighterTeam(i) === myTeam)
+      : (f.team === todoFighter.team);
+    if (isTeammate) {
+      f.evadeBuffTimer = Math.max(f.evadeBuffTimer || 0, duration);
+      f.evadeChance = chance;
+      spawnSparks(f.x, f.y, 8, 'lightningTrail', '#00E5FF');
+    }
+  }
+}
+
 export function modExecutePendingSwap() {
   if (!this.pendingSwapData) return;
   const data = this.pendingSwapData;
@@ -224,6 +281,11 @@ export function modExecutePendingSwap() {
 
       this.justSwappedTimer = CONFIG.todo?.blackFlashWindow || 45;
       this.blackFlashGlowTimer = this.justSwappedTimer;
+
+      // Apply global attack reaction delay to enemies
+      applyBoogieDisorientation(this);
+      // Apply evasion buff to Todo and active teammate
+      applyBoogieEvadeBuff(this);
     }
   } else if (data.type === 'rescueTeammate') {
     const teammate = data.swapTarget;
@@ -306,6 +368,11 @@ export function modExecutePendingSwap() {
 
       this.justSwappedTimer = CONFIG.todo?.blackFlashWindow || 45;
       this.blackFlashGlowTimer = this.justSwappedTimer;
+
+      // Apply global attack reaction delay to enemies
+      applyBoogieDisorientation(this);
+      // Apply evasion buff to Todo and active teammate
+      applyBoogieEvadeBuff(this);
     }
   } else if (data.type === 'rock') {
     const { rock, enemy } = data;
@@ -334,27 +401,36 @@ export function modExecutePendingSwap() {
       }
 
       // Initial arrival physics pushback impulse on Rock Proximity swap arrival
-      const pushAngle = Math.atan2(enemy.y - rock.y, enemy.x - rock.x);
-      const arrivalPush = CONFIG.todo?.rockArrivalPushback || 8.0;
-      enemy.vx = Math.cos(pushAngle) * arrivalPush;
-      enemy.vy = Math.sin(pushAngle) * arrivalPush;
-      if (typeof enemy.applyKnockback === 'function') {
-        enemy.applyKnockback(Math.cos(pushAngle) * arrivalPush, Math.sin(pushAngle) * arrivalPush);
-      }
+      const isGojoInfinity = enemy && (enemy.characterId === 'gojo' || enemy.type === 'gojo') && (enemy.infinityCooldown <= 0 || enemy.infinityActive) && !enemy.isMeleeMode;
 
-      const slowDur = CONFIG.todo?.slowDuration || 60;
-      const slowMult = CONFIG.todo?.slowMultiplier || 0.25;
-      const hitStun = CONFIG.todo?.hitStunFrames || 20;
+      if (!isGojoInfinity) {
+        const pushAngle = Math.atan2(enemy.y - rock.y, enemy.x - rock.x);
+        const arrivalPush = CONFIG.todo?.rockArrivalPushback || 8.0;
+        enemy.vx = Math.cos(pushAngle) * arrivalPush;
+        enemy.vy = Math.sin(pushAngle) * arrivalPush;
+        if (typeof enemy.applyKnockback === 'function') {
+          enemy.applyKnockback(Math.cos(pushAngle) * arrivalPush, Math.sin(pushAngle) * arrivalPush);
+        }
 
-      if (typeof enemy.applySlow === 'function') {
-        enemy.applySlow(slowDur, slowMult);
+        const slowDur = CONFIG.todo?.slowDuration || 60;
+        const slowMult = CONFIG.todo?.slowMultiplier || 0.25;
+        const hitStun = CONFIG.todo?.hitStunFrames || 20;
+
+        if (typeof enemy.applySlow === 'function') {
+          enemy.applySlow(slowDur, slowMult);
+        } else {
+          enemy.slowTimer = slowDur;
+          enemy.slowMultiplier = slowMult;
+        }
+
+        if (typeof enemy.applyHitStun === 'function') {
+          enemy.applyHitStun(hitStun);
+        }
       } else {
-        enemy.slowTimer = slowDur;
-        enemy.slowMultiplier = slowMult;
-      }
-
-      if (typeof enemy.applyHitStun === 'function') {
-        enemy.applyHitStun(hitStun);
+        // Gojo blocks rock swap arrival with Limitless Infinity barrier!
+        if (typeof enemy.triggerInfinityBlock === 'function') {
+          enemy.triggerInfinityBlock(this.x, this.y, this);
+        }
       }
 
       this.aim(enemy);
@@ -365,6 +441,11 @@ export function modExecutePendingSwap() {
       this.rockCounterComboTarget = enemy;
       this.rockCounterComboInterval = CONFIG.todo?.rockCounterComboInterval || 12;
       this.rockCounterComboTimer = 0;
+
+      // Apply global attack reaction delay to enemies
+      applyBoogieDisorientation(this);
+      // Apply evasion buff to Todo and active teammate
+      applyBoogieEvadeBuff(this);
     }
   } else if (data.type === 'disengage') {
     const target = data.target;
@@ -443,29 +524,42 @@ export function modCheckTeammateRescue() {
 
   if (!teammate) return false;
 
-  // Do NOT swap if Todo and teammate are already very close to each other (e.g. within 120px)
+  // RULE 1: Do NOT swap if Todo and his partner are in close distance to each other!
   const distToTeammate = Math.hypot(this.x - teammate.x, this.y - teammate.y);
-  const minSwapDist = CONFIG.todo?.minTeammateSwapDistance || 120;
+  const minSwapDist = CONFIG.todo?.minTeammateSwapDistance || 140;
   if (distToTeammate < minSwapDist) return false;
 
-  // 1. Check if partner is in combat proximity to any active enemy
-  let closestEnemy = null;
-  let closestEnemyDist = Infinity;
+  // RULE 2: Todo should swap whenever his partner OR him is very close distance to the enemy!
+  const proximityThreshold = CONFIG.todo?.enemyProximitySwapDistance || 130;
+  
+  let closestEnemyToPartner = null;
+  let distPartnerToEnemy = Infinity;
+  let closestEnemyToTodo = null;
+  let distTodoToEnemy = Infinity;
+
   for (let i = 0; i < state.fighters.length; i++) {
     const f = state.fighters[i];
     if (f && f.hp > 0 && !f.isIllusion && state.getFighterTeam(i) !== myTeam) {
-      const d = Math.hypot(f.x - teammate.x, f.y - teammate.y);
-      if (d < closestEnemyDist) {
-        closestEnemyDist = d;
-        closestEnemy = f;
+      const dPartner = Math.hypot(f.x - teammate.x, f.y - teammate.y);
+      if (dPartner < distPartnerToEnemy) {
+        distPartnerToEnemy = dPartner;
+        closestEnemyToPartner = f;
+      }
+      const dTodo = Math.hypot(f.x - this.x, f.y - this.y);
+      if (dTodo < distTodoToEnemy) {
+        distTodoToEnemy = dTodo;
+        closestEnemyToTodo = f;
       }
     }
   }
 
-  // Teammate is in combat range of enemy (within 150px)
-  const isPartnerInCombat = closestEnemy && (closestEnemyDist <= (teammate.r || 25) + 125);
+  // Check if either partner is in close distance to an enemy OR Todo is in close distance to an enemy
+  const partnerCloseReach = (teammate.r || 25) + proximityThreshold;
+  const todoCloseReach = (this.r || 25) + proximityThreshold;
+  const isPartnerCloseToEnemy = closestEnemyToPartner && (distPartnerToEnemy <= partnerCloseReach);
+  const isTodoCloseToEnemy = closestEnemyToTodo && (distTodoToEnemy <= todoCloseReach);
 
-  // 2. Track teammate damage taken in rolling 2-second window
+  // Also track emergency damage taken by partner in rolling 2-second window
   const now = Date.now();
   if (!teammate._rescueDamageHistory) {
     teammate._rescueDamageHistory = [];
@@ -484,15 +578,15 @@ export function modCheckTeammateRescue() {
 
   const damageIn2Sec = teammate._rescueDamageHistory.reduce((sum, hit) => sum + hit.damage, 0);
   const hpRatio = teammate.hp / (teammate.maxHp || 100);
+  const isTakingHeavyDamage = hpLoss > 0 || damageIn2Sec >= 15 || hpRatio <= 0.45;
 
-  const isTakingDamage = hpLoss > 0 || damageIn2Sec >= 15 || hpRatio <= 0.45;
-
-  // Trigger natural Boogie Woogie teammate swap when partner is in combat or taking damage!
-  if (isPartnerInCombat || isTakingDamage) {
+  // Trigger natural Boogie Woogie teammate swap when partner OR Todo is close to an enemy!
+  if (isPartnerCloseToEnemy || isTodoCloseToEnemy || isTakingHeavyDamage) {
     this.clapAnimTimer = 20;
     this.clapWindupTimer = 7;
     this.boogieWoogieCooldown = CONFIG.todo?.clapCooldown || 60;
-    this.pendingSwapData = { type: 'rescueTeammate', swapTarget: teammate, targetEnemy: closestEnemy };
+    const targetEnemy = isPartnerCloseToEnemy ? closestEnemyToPartner : closestEnemyToTodo;
+    this.pendingSwapData = { type: 'rescueTeammate', swapTarget: teammate, targetEnemy };
 
     // Play Todo's "Brother!" voiceline on teammate swap based on config chance
     const brotherChance = CONFIG.todo?.brotherVoiceChance ?? 0.25;

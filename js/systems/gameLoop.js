@@ -50,24 +50,10 @@ export function animate(timestamp) {
       state.fpsFrames = 0;
       state.fpsLastTime = timestamp;
 
-      // Dynamic quality system - adjust based on FPS
-      state.qualityCheckTimer++;
-      if (state.qualityCheckTimer >= state.qualityCheckInterval) {
-        state.qualityCheckTimer = 0;
-        if (state.performanceMode) {
-          state.qualityLevel = 0.2;
-        } else {
-          // OPTIMIZED: Extremely aggressive quality reduction for severe FPS drops
-          if (state.fps < state.targetFps && state.qualityLevel > 0.2) {
-            const dropAmount = state.fps < 25 ? 0.3 : state.fps < 35 ? 0.2 : 0.15; // Drop faster when FPS is low
-            state.qualityLevel = Math.max(0.2, state.qualityLevel - dropAmount);
-          } else if (state.fps >= state.targetFps - 2 && state.qualityLevel < 1.0) {
-            state.qualityLevel = Math.min(1.0, state.qualityLevel + 0.1); // Recover quickly when FPS stabilizes
-          }
-        }
-      }
+      // Visual quality stays at 100% full quality (no dynamic degradation on FPS drop)
+      state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
 
-      // OPTIMIZED: Enforce hard cap on total particles (using simple zero-allocation loops/lengths)
+      // Track active particles
       let burnActive = 0;
       if (burnEffectSystem && burnEffectSystem.particles) {
         burnActive = burnEffectSystem.particles.length; // BurnEffectSystem already manages active-only particles in this array
@@ -85,11 +71,6 @@ export function animate(timestamp) {
       const totalParticles = state.bloodEffects.length + state.deathEffects.length +
         state.berserkerRageEffects.length + (state.sparkEffects ? state.sparkEffects.length : 0) +
         burnActive + flameActive;
-
-      if (totalParticles > state.maxTotalParticles) {
-        // Aggressively reduce quality if over particle cap
-        state.qualityLevel = Math.max(0.2, state.qualityLevel - 0.1);
-      }
 
       // FPS Drop Detection
       if (state.fps < 45 && state.gameState === 'playing') {

@@ -16,12 +16,16 @@ export const todoConfig = {
     clapCooldown: 120,            // Cooldown in frames between manual Boogie Woogie claps (1.0 second at 60fps)
     blackFlashWindow: 45,         // Window in frames after swapping where next punch triggers Black Flash (0.75 seconds)
     vanishDurationFrames: 15,     // Duration in frames (at 60fps) where Todo and swapped entities vanish during swap (~0.05s)
+    swapDisorientationFrames: 20, // Attack reaction delay in frames applied to enemies when Todo/partner reappears from a swap (~0.33s)
+    evadeBuffDurationFrames: 50,  // Duration in frames (~1.25s) where Todo and teammate gain evasion buff after swap
+    evadeChance: 0.60,            // 60% chance to completely evade/miss incoming enemy basic attacks
     disengageDistance: 180,       // Distance teleported away when clapping to take a breather after combo
     disengageDelayFrames: 18,     // Delay in frames after final punch before Todo claps away for breather (~0.3s pause)
     rescueDamageThreshold: 35,    // Cumulative damage taken by teammate in 2.0s window that triggers emergency rescue swap
     rescueHpRatioThreshold: 0.30, // Teammate HP ratio (30%) threshold that triggers emergency rescue swap
     rescueInvulnerableFrames: 45, // Invulnerability frames granted to rescued teammate upon swap (0.75s)
-    minTeammateSwapDistance: 120, // Minimum distance in pixels required between Todo and teammate to allow a swap
+    minTeammateSwapDistance: 140, // Minimum distance in pixels required between Todo and teammate to allow a swap (prevents swapping when close together)
+    enemyProximitySwapDistance: 130, // Distance to enemy at which Todo or partner triggers Boogie Woogie swap (swaps when either is very close to enemy)
 
     // Skill 2: Cursed Rock & Sequence Tuning
     maxRocks: 1,                  // Maximum active rocks allowed in arena at any time
@@ -46,7 +50,7 @@ export const todoConfig = {
     ultCooldown: 1200,            // Ultimate cooldown in frames (20.0 seconds at 60fps)
     ultDuration: 1500,             // Ultimate active duration in frames (8.0 seconds at 60fps)
     channelDuration: 180,         // Channeling windup duration in frames (3.0 seconds at 60fps)
-    hpThresholdUltTrigger: 0.50,  // HP ratio threshold (0.50 = 50% HP) that automatically triggers Takada-chan ultimate channeling
+    hpThresholdUltTrigger: 0.65,  // HP ratio threshold (0.50 = 50% HP) that automatically triggers Takada-chan ultimate channeling
     enableHpThresholdUlt: true,   // Toggle to enable/disable 50% HP threshold auto-activation
     takadaDamageMultiplier: 1.1,  // 1.5x damage output multiplier on all punches & attacks
     takadaSpeedMultiplier: 1.1,   // 1.5x movement speed boost multiplier

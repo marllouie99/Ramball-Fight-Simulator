@@ -445,7 +445,7 @@ export function excludeGojoInfinityFromDim(ctx) {
     if (!f || f.hp <= 0) continue;
     const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
     if (!isGojo) continue;
-    const isLimitlessActive = (!f.isMeleeMode && (f.infinityCooldown <= 0 || f.infinityActive || (f.infinityBlockTimer || 0) > 0));
+    const isLimitlessActive = (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0);
     if (!isLimitlessActive) continue;
     
     const infinityR = CONFIG.gojo?.infinityRadius ?? (f.r + 30);
@@ -600,10 +600,15 @@ export function drawPurpleDimScreen() {
       const blueCanvasY = (f.y - (f.z || 0)) + (blueLocalX * sinA + blueLocalY * cosA) + shakeY;
 
       // Render radiant Red & Blue bloom halos over pitch-black screen dim
-      const bloomRadius = is200 ? 110 : 80;
+      const fadeInP = Math.min(1.0, progress / 0.22);
+      const easeFade = Math.sin(fadeInP * Math.PI * 0.5);
+      const growP = Math.min(1.0, progress / 0.35);
+      const easeGrow = Math.sin(growP * Math.PI * 0.5);
+      const bloomScale = is200 ? (0.20 + 0.80 * easeGrow) : 1.0;
+      const bloomRadius = (is200 ? 110 : 80) * bloomScale;
       ctx.save();
       ctx.globalCompositeOperation = 'screen';
-      ctx.globalAlpha = opacity * (1.0 - progress * 0.3);
+      ctx.globalAlpha = opacity * (1.0 - progress * 0.3) * easeFade;
 
       // 1. Red Bloom Halo
       const redGrad = ctx.createRadialGradient(redCanvasX, redCanvasY, 0, redCanvasX, redCanvasY, bloomRadius);

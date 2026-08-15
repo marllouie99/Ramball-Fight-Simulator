@@ -13,8 +13,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   // Toji & Adapted Mahoraga immediately bypass Infinity — no barrier visuals, no freeze, no shockwave!
   if (attacker && attacker !== fighter) {
     const isToji = attacker.characterId === 'toji' || attacker.type === 'toji';
+    const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
     const isAdaptedMahoraga = (attacker.characterId === 'mahoraga' || attacker.type === 'mahoraga') && 
-                              (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz);
+                              (attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8);
     if (isToji || isAdaptedMahoraga) {
       attacker.infinityFreezeTimer = 0;
       attacker.isFrozenByInfinity = false;
@@ -31,32 +32,42 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     fighter.isMeleeMode = false;
   }
 
-  const isInsideDomain = fighter.domainActive || (state && (state.activeDomain || state.domainActive));
-  if ((fighter.isMeleeMode && !isBreatherState && !isDomainChanneling) || isInsideDomain || (fighter.infinityCooldown > 0 && (fighter.infinityActiveTimer || 0) <= 0 && !isBreatherState && !isDomainChanneling)) return false;
-  
-  if ((fighter.infinityActiveTimer || 0) <= 0) {
-    fighter.infinityActiveTimer = CONFIG.gojo?.infinityActiveDuration ?? 60;
+  const isInsideEnemyDomain = !fighter.domainActive && state.fighters && state.fighters.some(f => f && f !== fighter && f.domainActive && f.hp > 0);
+  if (isInsideEnemyDomain && !fighter.isMeleeMode) {
+    fighter.infinityActive = true;
+    fighter.infinityCooldown = 0;
   }
+  if (fighter.domainActive || (fighter.isMeleeMode && !isBreatherState && !isDomainChanneling)) return false;
 
   fighter.infinityBlockTimer = 25;
   fighter.infinityBlockMaxTimer = 25;
   fighter.infinityBlockX = hitX !== undefined ? hitX : fighter.x;
   fighter.infinityBlockY = hitY !== undefined ? hitY : fighter.y;
 
-  spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'INFINITY', '#E0FFFF');
-  triggerGlobalScreenShake(3, 6);
+  // Frame check guard: Prevent multiple barrier rebound rings and text spawns in the same frame!
+  const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((typeof state !== 'undefined' && state.matchTimer !== undefined) ? state.matchTimer : Date.now());
 
-  const nowSound = Date.now();
-  if (!fighter._lastInfinityCollideSoundTime || nowSound - fighter._lastInfinityCollideSoundTime >= 250) {
-    fighter._lastInfinityCollideSoundTime = nowSound;
-    audioSystem.playSFX('effect_infinity_collide', 1.0);
-  }
- 
-  // Spawn visual barrier rebound ring effect at the impact position
-  if (typeof spawnMeleeClashShockwave === 'function') {
-    const impactX = hitX !== undefined ? hitX : fighter.x;
-    const impactY = hitY !== undefined ? hitY : fighter.y;
-    spawnMeleeClashShockwave(impactX, impactY, 75, 'gojo_infinity');
+  // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces)
+  if (!fighter.domainActive) {
+    if (fighter._lastInfinityRingFrame !== currentFrame) {
+      fighter._lastInfinityRingFrame = currentFrame;
+
+      spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'INFINITY', '#E0FFFF');
+      triggerGlobalScreenShake(3, 6);
+
+      const nowSound = Date.now();
+      if (!fighter._lastInfinityCollideSoundTime || nowSound - fighter._lastInfinityCollideSoundTime >= 250) {
+        fighter._lastInfinityCollideSoundTime = nowSound;
+        audioSystem.playSFX('effect_infinity_collide', 1.0);
+      }
+     
+      // Spawn visual barrier rebound ring effect at the impact position
+      if (typeof spawnMeleeClashShockwave === 'function') {
+        const impactX = hitX !== undefined ? hitX : fighter.x;
+        const impactY = hitY !== undefined ? hitY : fighter.y;
+        spawnMeleeClashShockwave(impactX, impactY, 75, 'gojo_infinity');
+      }
+    }
   }
 
   if (attacker && attacker !== fighter) {
@@ -102,6 +113,8 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         }
       }
       
+
+
       // Calculate push direction away from Gojo
       let dx = attacker.x - fighter.x;
       let dy = (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0));
@@ -116,17 +129,31 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       
       const nx = dx / dist;
       const ny = dy / dist;
-      const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 10.5; // Strong clean bounce impulse from config
       const isImmovable = fighter.isChannelingPurple || fighter.isChannelingDomainExpansion || fighter.domainActive;
 
-      // Push the attacker back with strong outward velocity
-      attacker.vx = nx * pushForce;
-      attacker.vy = ny * pushForce;
+      // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
+      if (!fighter.domainActive) {
+        const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 10.5; // Strong clean bounce impulse from config
 
-      // Push Gojo back slightly in the opposite direction (if not performing major techniques/skills)
-      if (!isImmovable) {
-        fighter.vx = -nx * (pushForce * 0.4);
-        fighter.vy = -ny * (pushForce * 0.4);
+        // Push the attacker back with strong outward velocity
+        attacker.vx = nx * pushForce;
+        attacker.vy = ny * pushForce;
+
+        // Push Gojo back slightly in the opposite direction (if not performing major techniques/skills)
+        if (!isImmovable) {
+          fighter.vx = -nx * (pushForce * 0.4);
+          fighter.vy = -ny * (pushForce * 0.4);
+        }
+
+        // Apply brief movement slow on Limitless Infinity barrier collision
+        const slowDur = CONFIG.gojo?.infinitySlowDuration ?? 45;
+        const slowMult = CONFIG.gojo?.infinitySlowMultiplier ?? 0.50;
+        if (typeof attacker.applySlow === 'function') {
+          attacker.applySlow(slowDur, slowMult);
+        } else {
+          attacker.slowTimer = Math.max(attacker.slowTimer || 0, slowDur);
+          attacker.slowMultiplier = Math.min(attacker.slowMultiplier || 1.0, slowMult);
+        }
       }
       
       // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
@@ -135,7 +162,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       const minDist = attRadius + barrierRadius;
       const overlap = minDist - dist;
 
-      if (overlap > 0) {
+      if (overlap > 0 && !fighter.domainActive) {
         if (!isImmovable) {
           const halfOverlap = overlap / 2;
           attacker.x += nx * (halfOverlap + 2);

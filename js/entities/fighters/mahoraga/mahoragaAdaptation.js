@@ -307,41 +307,37 @@ export function triggerAdaptation(fighter, type, attacker) {
   if (totalStages >= 8 || currentStage >= 8) {
     fighter.isMaxAdapted = true;
   }
-  const isLevel8 = totalStages >= 8 || currentStage >= 8 || fighter.isInfinityBlitz || fighter.isMaxAdapted;
+  const isLevel8 = totalStages >= 8 || currentStage >= 8 || fighter.isMaxAdapted;
 
-  // Only do the discrete 45-degree step click & cinematic pause if NOT at Level 8 / Max Adaptation (continuous spin)
-  if (!isLevel8 && !fighter.isMaxAdapted) {
-    const isInfinityAdaptation = fighter.gojoInfinityImmune && fighter._lastGojoHitType === 'infinity';
-    const pauseFrames = isInfinityAdaptation ? 0 : 40;
-    fighter.adaptationPauseTimer = pauseFrames;
-    fighter.adaptationPauseMax = pauseFrames;
-    fighter.wheelGlowTimer = 65;
-    fighter.wheelClickTimer = pauseFrames;
-    fighter.wheelClickMax = pauseFrames;
-    fighter.wheelStartRotation = fighter.wheelRotation || 0;
-    fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+  // Discrete 45-degree step click & cinematic pause on every adaptation (no stage limits!)
+  const isInfinityAdaptation = fighter.gojoInfinityImmune && fighter._lastGojoHitType === 'infinity';
+  const pauseFrames = isInfinityAdaptation ? 0 : 40;
+  fighter.adaptationPauseTimer = pauseFrames;
+  fighter.adaptationPauseMax = pauseFrames;
+  fighter.wheelGlowTimer = 65;
+  fighter.wheelClickTimer = pauseFrames;
+  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelStartRotation = fighter.wheelRotation || 0;
+  fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
 
-    // Freeze all enemy targets on screen
-    const targetsToFreeze = [];
-    if (attacker && attacker !== fighter && attacker.hp > 0) targetsToFreeze.push(attacker);
-    if (typeof state !== 'undefined' && state.fighters) {
-      state.fighters.forEach(f => {
-        if (f && f !== fighter && f.hp > 0 && !targetsToFreeze.includes(f)) {
-          targetsToFreeze.push(f);
-        }
-      });
-    }
-
-    targetsToFreeze.forEach(f => {
-      f.mahoragaAdaptationFreezeTimer = pauseFrames;
-      f.vx = 0;
-      f.vy = 0;
+  // Freeze all enemy targets on screen
+  const targetsToFreeze = [];
+  if (attacker && attacker !== fighter && attacker.hp > 0) targetsToFreeze.push(attacker);
+  if (typeof state !== 'undefined' && state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f !== fighter && f.hp > 0 && !targetsToFreeze.includes(f)) {
+        targetsToFreeze.push(f);
+      }
     });
-
-    playSkillEffectSound('mahoraga', 'wheelclick');
-  } else {
-    fighter.wheelGlowTimer = 40;
   }
+
+  targetsToFreeze.forEach(f => {
+    f.mahoragaAdaptationFreezeTimer = pauseFrames;
+    f.vx = 0;
+    f.vy = 0;
+  });
+
+  playSkillEffectSound('mahoraga', 'wheelclick');
 
   triggerGlobalScreenShake(6, 18);
 
@@ -352,11 +348,7 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   const wheelY = fighter.y - fighter.r - 28;
   if (!addedNewGojoColor) {
-    if (isLevel8) {
-      spawnFloatingText(fighter.x, wheelY - 25, `🏃 +${speedBoostPct}% SPEED & ✨ RCT REGEN UNLOCKED!`, '#00FF66');
-    } else {
-      spawnFloatingText(fighter.x, wheelY - 25, `🏃 +${speedBoostPct}% MOVEMENT SPEED!`, '#FFD700');
-    }
+    spawnFloatingText(fighter.x, wheelY - 25, `🏃 +${speedBoostPct}% SPEED & ✨ RCT REGEN!`, '#00FF66');
   }
 
   // Trigger pop-out Divine Shield Badge & RCT Healing (+) Emblem Badge
@@ -364,21 +356,13 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   // --- REVERSE CURSED TECHNIQUE (RCT / DIVINE HEALING ON WHEEL CLICK ADAPTATION) ---
   const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
-  const healInterval = CONFIG.mahoraga?.rctHealLevelInterval ?? 1;
   
-  if (enableRCT && fighter.hp > 0 && !fighter.isDead && totalStages > 0 && (totalStages % healInterval === 0)) {
+  if (enableRCT && fighter.hp > 0 && !fighter.isDead) {
     const healPercent = CONFIG.mahoraga?.rctHealAmountPercent ?? CONFIG.mahoraga?.rctHealPerClickPercent ?? 0.10;
-    const healAmount = Math.round(fighter.maxHp * healPercent);
-    const targetHp = Math.min(fighter.maxHp, fighter.hp + healAmount);
-    const actualHealed = Math.max(0, targetHp - fighter.hp);
-
-    if (actualHealed > 0) {
-      if (typeof fighter.takeDamage === 'function') {
-        fighter.takeDamage(-actualHealed, fighter, { isHeal: true, skipHealText: true });
-      } else {
-        fighter.hp = targetHp;
-      }
-    }
+    const healAmount = Math.max(1, Math.round(fighter.maxHp * healPercent));
+    const oldHp = fighter.hp;
+    fighter.hp = Math.min(fighter.maxHp, fighter.hp + healAmount);
+    const actualHealed = Math.max(0, fighter.hp - oldHp);
 
     // Always trigger visual RCT Heal badge & green pop-up heal number on every wheel click!
     fighter._healthBarHealTimer = 14;
@@ -391,21 +375,7 @@ export function triggerAdaptation(fighter, type, attacker) {
     audioSystem.playSFX('skill_enhance', 0.85);
   }
 
-  // Max Adaptation Awakening Check (Wheel 360° rotation complete at Stage 8)
-  if (totalStages >= 8 || currentStage >= 8) {
-    if (!fighter.isInfinityBlitz && (fighter.infinityBlitzCooldownTimer || 0) <= 0) {
-      fighter.isInfinityBlitz = true;
-      fighter.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames || 600;
-      fighter.isCleaving = false;
-      fighter.isShouting = false;
-      fighter.isThrowing = false;
-      fighter.isBlitzActive = false;
-
-      spawnFloatingText(fighter.x, wheelY - 55, '⚡ LEVEL 8 MAX ADAPTATION: SPEED-BLITZ!', '#FFD700');
-      triggerGlobalScreenShake(14, 30);
-      audioSystem.playSFX('skill_dash3', 1.0);
-    }
-  } else if (totalStages >= 2 || currentStage >= 2) {
+  if (totalStages >= 2 || currentStage >= 2) {
     if (!fighter.hasAnnouncedLevel2) {
       fighter.hasAnnouncedLevel2 = true;
       spawnFloatingText(fighter.x, wheelY - 45, '⚡ ADAPTED TO TELEPORTATION & SPEED-BLITZ!', '#FFD700');
@@ -415,6 +385,9 @@ export function triggerAdaptation(fighter, type, attacker) {
   // Save attacker for smooth divine flash-dash counter
   if (attacker && !attacker.isDead && attacker !== fighter) {
     fighter._pendingCounterTarget = attacker;
+  } else if (typeof state !== 'undefined' && state.fighters) {
+    const liveEnemy = state.fighters.find(f => f && f !== fighter && !f.isDead && f.hp > 0);
+    if (liveEnemy) fighter._pendingCounterTarget = liveEnemy;
   }
 
   // ── Gojo-Specific Adaptation (Last Hit Priority) ──

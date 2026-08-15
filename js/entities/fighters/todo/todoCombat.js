@@ -77,15 +77,17 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     }
   }
 
-  // Apply velocity pushback impulse & universal physics knockback
-  target.vx += Math.cos(angle) * knockback;
-  target.vy += Math.sin(angle) * knockback;
+  const didDamage = applyDamageToTarget(target, damage, this);
 
-  if (typeof target.applyKnockback === 'function') {
-    target.applyKnockback(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
+  // Apply velocity pushback impulse & universal physics knockback only if attack wasn't blocked by Infinity
+  if (didDamage !== false) {
+    target.vx += Math.cos(angle) * knockback;
+    target.vy += Math.sin(angle) * knockback;
+
+    if (typeof target.applyKnockback === 'function') {
+      target.applyKnockback(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
+    }
   }
-  
-  applyDamageToTarget(target, damage, this);
 
   if (!isCombo) {
     this.cooldownTimer = CONFIG.todo?.basicPunchCooldown || 28;
@@ -104,13 +106,15 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
       audioSystem.playSFX(sound.src, sound.volume);
       if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
     }
-    if (typeof target.applySlow === 'function') {
-      target.applySlow(
-        CONFIG.blackFlash?.debuff?.slowDuration ?? 70,
-        CONFIG.blackFlash?.debuff?.slowMultiplier ?? 0.45
-      );
+    if (didDamage !== false) {
+      if (typeof target.applySlow === 'function') {
+        target.applySlow(
+          CONFIG.blackFlash?.debuff?.slowDuration ?? 70,
+          CONFIG.blackFlash?.debuff?.slowMultiplier ?? 0.45
+        );
+      }
+      target.blackFlashDebuffTimer = CONFIG.blackFlash?.debuff?.healReductionDuration ?? 270;
     }
-    target.blackFlashDebuffTimer = CONFIG.blackFlash?.debuff?.healReductionDuration ?? 270;
     
     // Todo enters the Zone!
     this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;

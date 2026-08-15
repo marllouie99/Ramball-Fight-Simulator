@@ -493,7 +493,7 @@ function isAllowedFloatingText(text) {
   const isNumeric = /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
   if (isNumeric) return true;
   if (normalizedText.startsWith('SHIELD ') || normalizedText.startsWith('CRIT!') || normalizedText.includes('CRIT')) return true;
-  if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY') || normalizedText.includes('INCINERAT') || normalizedText.includes('MACHINE GUN') || normalizedText.includes('CANNON') || normalizedText.includes('STOMP')) return true;
+  if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY') || normalizedText.includes('INCINERAT') || normalizedText.includes('MACHINE GUN') || normalizedText.includes('CANNON') || normalizedText.includes('STOMP') || normalizedText.includes('MISS') || normalizedText.includes('EVASION') || normalizedText.includes('EVADE')) return true;
   return SKILL_TEXT_WHITELIST.includes(normalizedText);
 }
 

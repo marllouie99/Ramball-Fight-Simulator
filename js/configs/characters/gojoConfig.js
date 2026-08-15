@@ -7,10 +7,12 @@ export const gojoConfig = {
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
   infinityRadius: 120,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
-  infinityFreezeChance: 0.2,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
-  infinityFreezeDuration: 80,             // Duration in frames projectiles stay suspended mid-air on barrier contact
+  infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
+  infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 8.5,             // Physical velocity impulse (rebound force) applied to push melee attackers away
-  infinityMaxFrozenProjectiles: 4,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
+  infinitySlowDuration: 45,                // Duration in frames (0.75s) of brief movement slow on barrier contact
+  infinitySlowMultiplier: 0.50,            // Movement speed multiplier while slowed by Infinity barrier (50% speed)
+  infinityMaxFrozenProjectiles: 2,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
 
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──
   blueCooldown: 40,         // Fire rate for basic attack (Blue orb) - Lower is faster
@@ -21,7 +23,7 @@ export const gojoConfig = {
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
-  redCooldown: 1000,         // Cooldown of Red (frames)
+  redCooldown: 500,         // Cooldown of Red (frames)
   redDamage: 100,            // Base damage dealt by Reversal Red blast
   redKnockback: 25,         // Knockback force of Red
   redRange: 100,            // Base range
@@ -35,7 +37,7 @@ export const gojoConfig = {
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
-  purpleCooldown: 2000,      // Cooldown of Hollow Purple
+  purpleCooldown: 1000,      // Cooldown of Hollow Purple
   purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleDamage: 70,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
@@ -59,7 +61,7 @@ export const gojoConfig = {
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
-  domainCooldown: 2000,     // 20s Ultimate cooldown
+  domainCooldown: 1500,     // 20s Ultimate cooldown
   domainChargeMax: 130,     // 2s Channeling duration before domain opens
   domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays
@@ -68,8 +70,8 @@ export const gojoConfig = {
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealPercent: 0.20, // Heals 20% of max HP per RCT trigger
-  reverseCursedTechniqueCooldown: 1500,     // 15 second cooldown between RCT heals
+  reverseCursedTechniqueHealPercent: 0.25, // Heals 20% of max HP per RCT trigger
+  reverseCursedTechniqueCooldown: 700,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled
@@ -77,8 +79,8 @@ export const gojoConfig = {
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
-  meleeModeCooldown: 600,   // 10 second cooldown before hand-to-hand combat mode can trigger again
-  closeRangeRadius: 120,    // Distance at which Gojo switches to melee mode
+  meleeModeCooldown: 300,   // 10 second cooldown before hand-to-hand combat mode can trigger again
+  closeRangeRadius: 180,    // Distance at which Gojo switches to melee mode
   meleePunchDamage: 14,     // Damage dealt by each punch
   meleePunchCooldown: 9,   // Frames between punches
   teleportDelay: 5,        // Frames delay before teleport after punch

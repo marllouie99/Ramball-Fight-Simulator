@@ -3,17 +3,17 @@
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
     // Stacking Slash Crit Passive
-    baseCritChance: 0.50,             // 10% base crit chance
-    baseCritMultiplier: 0.50,         // 1.50x base crit damage multiplier
+    baseCritChance: 0.25,             // 10% base crit chance
+    baseCritMultiplier: 0.25,         // 1.50x base crit damage multiplier
     critChancePerSlashHit: 0.02 ,      // +2% crit chance per landed slash hit
     critMultiplierPerSlashHit: 0.02,  // +0.05x crit multiplier per landed slash hit
-    maxCritChance: 2.00,              // 80% max crit chance cap
-    maxCritMultiplier: 2.00,          // 3.50x max crit damage multiplier cap
+    maxCritChance: 1.50,              // 80% max crit chance cap
+    maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
     reverseCursedTechniqueHpThreshold: 0.25,  // Triggers when HP drops to 30% or below
-    reverseCursedTechniqueHealPercent: 0.20,   // Heals 40% of max HP
-    reverseCursedTechniqueCooldown: 1500,      // 20 second cooldown before it can trigger again
+    reverseCursedTechniqueHealPercent: 0.25,   // Heals 40% of max HP
+    reverseCursedTechniqueCooldown: 700,      // 20 second cooldown before it can trigger again
 
     // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
     slashDamage: 15,          // Base damage per Dismantle / Martial Arts strike
@@ -48,9 +48,9 @@ export const sukunaConfig = {
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
-    divineFlameCooldown: 2000,      // Cooldown between Furnace uses (8.33 seconds)
+    divineFlameCooldown: 950,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 120,      // Charge up duration (1.5 seconds)
-    divineFlameDamage: 200,         // Primary direct hit nuke damage
+    divineFlameDamage: 250,         // Primary direct hit nuke damage
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
     divineFlameChannelShakeIntensity: 3.0, // Channeling tremor
@@ -62,7 +62,7 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1500,     // Cooldown before domain can trigger (25 seconds at 60 fps)
+    domainCooldown: 1450,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
     domainDamage: 15,          // Base damage per slash tick
