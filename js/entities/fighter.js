@@ -21,6 +21,7 @@ import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenSha
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
+import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -252,6 +253,7 @@ export class Fighter {
     this.silenceTimer = 0;
     this.blackFlashDebuffTimer = 0;
     this.paralyzeTimer = 0;
+    this.isParalyzedByMahito = false;
     this.isGrabbedByMahoraga = false;
 
     this.damageDealt = 0;
@@ -282,6 +284,10 @@ export class Fighter {
 
   applyHitStun(frames) {
     this.statusEffects.applyHitStun(frames);
+  }
+
+  applyParalyze(frames) {
+    this.statusEffects.applyParalyze(frames);
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -372,6 +378,7 @@ export class Fighter {
   }
 
   _handleTimeStop() {
+    this._tickCooldowns();
     if (this.pureLoveBeamRecoveryTimer > 0) {
       if (this.adaptedPureLoveBeam) {
         this.pureLoveBeamRecoveryTimer = 0;
@@ -384,7 +391,13 @@ export class Fighter {
       }
     }
     if (this.paralyzeTimer > 0) {
+      if (this.paralyzeTimer === 1 && this.isParalyzedByMahito) {
+        triggerMahitoParalyzeExplosion(this);
+      }
       this.paralyzeTimer--;
+      if (this.paralyzeTimer <= 0) {
+        this.isParalyzedByMahito = false;
+      }
       this.vx = 0;
       this.vy = 0;
       return true;
@@ -513,6 +526,10 @@ export class Fighter {
 
   /** Per-frame housekeeping for cooldowns. */
   _tickCooldowns() {
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+    if (this._lastCooldownTickFrame === currentFrame && currentFrame > 0) return;
+    this._lastCooldownTickFrame = currentFrame;
+
     if (this.purpleHitTimer > 0) {
       this.purpleHitTimer--;
       if (this.purpleHitTimer <= 0) {
@@ -726,8 +743,8 @@ export class Fighter {
       if (isBasicAttack) {
         const chance = this.evadeChance ?? (CONFIG.todo?.evadeChance || 0.60);
         if (Math.random() < chance) {
-          spawnFloatingText(this.x, this.y - this.r - 10, 'MISS!', '#00E5FF');
-          spawnSparks(this.x, this.y, 8, 'lightningTrail', '#00E5FF');
+          spawnFloatingText(this.x, this.y - this.r - 10, 'MISS!', '#A0AEC0');
+          spawnSparks(this.x, this.y, 8, 'lightningTrail', '#A0AEC0');
           return false;
         }
       }
@@ -1118,6 +1135,9 @@ export class Fighter {
     if (typeof state !== 'undefined' && state.gameState !== 'playing') {
       return;
     }
+    if ((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.hitStunTimer && this.hitStunTimer > 0)) {
+      return;
+    }
     if (projectileSystem) {
       projectileSystem.fireProjectile(this, ownerIndex, this.damage);
     }
@@ -1261,7 +1281,8 @@ export class Fighter {
     }
 
     // Shooting
-    const canAct = !this.hitStunTimer || this.hitStunTimer <= 0;
+    const isParalyzed = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed;
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed;
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
     } else if (this._def.type !== 'orange' && canAct) { // Prevent Orange from using this default shoot

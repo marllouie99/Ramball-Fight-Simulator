@@ -184,12 +184,23 @@ function drawPauseScreen() {
 
   drawHUD(); // Keep HUD visible in background
 
-  const cx = canvas.width / 2;
-  const cy = 180; // Positioned near the top of the screen
+  if (state.pauseMenuX === undefined) state.pauseMenuX = canvas.width / 2;
+  if (state.pauseMenuY === undefined) state.pauseMenuY = 180;
+
+  const cx = state.pauseMenuX;
+  const cy = state.pauseMenuY;
 
   const panelW = 260;
   const panelH = 280;
   drawPanel(cx - panelW / 2, cy - panelH / 2, panelW, panelH);
+
+  // Drag handle grip bar indicator at top of panel
+  ctx.save();
+  ctx.fillStyle = state.isDraggingPauseMenu ? '#ffd700' : 'rgba(255, 255, 255, 0.45)';
+  ctx.beginPath();
+  ctx.roundRect(cx - 24, cy - panelH / 2 + 10, 48, 4, 2);
+  ctx.fill();
+  ctx.restore();
 
   ctx.fillStyle = '#ffd700';
   ctx.font = 'bold 26px Arial';

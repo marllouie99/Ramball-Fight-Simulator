@@ -3,6 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
 import { drawSketchyCircle } from './fighterRenderer.js';
+import { drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes } from '../statusEffects.js';
 
 let _sortedFightersBuffer = [];
 
@@ -205,8 +206,20 @@ export function drawFighters() {
     if (!aDomain && bDomain) return -1;
 
     // Force active punchers/attackers/skill casters to render on top of their targets so punching hands & skill effects overlay opponent bodies
-    const aPunching = (a.f.punchAnimTimer && a.f.punchAnimTimer > 0) || (a.f.isChannelingPurple) || (a.f.redEffectTimer && a.f.redEffectTimer > 0);
-    const bPunching = (b.f.punchAnimTimer && b.f.punchAnimTimer > 0) || (b.f.isChannelingPurple) || (b.f.redEffectTimer && b.f.redEffectTimer > 0);
+    const isAttacking = (f) => Boolean(
+      (f.punchAnimTimer && f.punchAnimTimer > 0) ||
+      (f.slashSwingTimer && f.slashSwingTimer > 0) ||
+      (f.twinScissorAnimTimer && f.twinScissorAnimTimer > 0) ||
+      (f.fleshSurgeAnimTimer && f.fleshSurgeAnimTimer > 0) ||
+      (f.maceCannonAnimTimer && f.maceCannonAnimTimer > 0) ||
+      (f.isChannelingPurple) ||
+      (f.redEffectTimer && f.redEffectTimer > 0) ||
+      (f.lapisBlueAnimTimer && f.lapisBlueAnimTimer > 0) ||
+      (f.cleaveCutTimer && f.cleaveCutTimer > 0) ||
+      (f.fugaTimer && f.fugaTimer > 0)
+    );
+    const aPunching = isAttacking(a.f);
+    const bPunching = isAttacking(b.f);
     if (aPunching && !bPunching) return 1;
     if (!aPunching && bPunching) return -1;
 
@@ -232,6 +245,21 @@ export function drawFighters() {
 
     // Draw underfoot team indicator ring base
     drawTeamRing(fighter, fi, false);
+
+    // Shivering animation when paralyzed by Mahito (rapid soul reshaping vibration)
+    const isParalyzedByMahito = Boolean(fighter.isParalyzedByMahito || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0 && fighter.isParalyzedByMahito));
+    let shiverX = 0, shiverY = 0;
+    if (isParalyzedByMahito) {
+      const remainingProgress = Math.min(1.0, (fighter.paralyzeTimer || 45) / 45);
+      const tremorAmt = 2.0 + remainingProgress * 2.2;
+      shiverX = (Math.random() - 0.5) * tremorAmt;
+      shiverY = (Math.random() - 0.5) * tremorAmt;
+    }
+
+    if (shiverX !== 0 || shiverY !== 0) {
+      ctx.save();
+      ctx.translate(shiverX, shiverY);
+    }
 
     const opponent = mode === 'FFA' ? null : fighters[1 - fi];
     try {
@@ -260,8 +288,25 @@ export function drawFighters() {
       console.error('fighter.draw error:', e);
     }
 
+    if (shiverX !== 0 || shiverY !== 0) {
+      ctx.restore();
+    }
+
     // Draw crisp team indicator overlay ring AFTER fighter & CE aura draw, so CE aura never hides team indicator
     drawTeamRing(fighter, fi, true);
+
+    // Embedded Mahito Bone Spikes attached to body
+    if (fighter._embeddedMahitoSpikes && fighter._embeddedMahitoSpikes.length > 0) {
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+      drawEmbeddedMahitoSpikes(ctx, fighter.r, fighter);
+      ctx.restore();
+    }
+
+    // Floating Mahito Soul Disfigurement Stack Counter Badge (At top of body)
+    if ((fighter._soulDisfigurementStacks || 0) > 0 && (fighter._soulDisfigurementTimer || 0) > 0) {
+      drawSoulDisfigurementCounter(ctx, fighter.x, fighter.y - (fighter.z || 0), fighter.r, fighter._soulDisfigurementStacks, fighter._soulDisfigurementTimer);
+    }
 
     if (hasScale) {
       ctx.restore();
@@ -415,8 +460,17 @@ export function drawIllusions() {
     ctx.save();
     ctx.globalAlpha = 0.85;
 
+    // Shivering animation when paralyzed by Mahito
+    let shiverX = 0, shiverY = 0;
+    if (illusion.isParalyzedByMahito || (illusion.paralyzeTimer && illusion.paralyzeTimer > 0 && illusion.isParalyzedByMahito)) {
+      const remainingProgress = Math.min(1.0, (illusion.paralyzeTimer || 45) / 45);
+      const tremorAmt = 2.0 + remainingProgress * 2.2;
+      shiverX = (Math.random() - 0.5) * tremorAmt;
+      shiverY = (Math.random() - 0.5) * tremorAmt;
+    }
+
     // Draw illusion body
-    ctx.translate(illusion.x, illusion.y);
+    ctx.translate(illusion.x + shiverX, illusion.y + shiverY);
     if (hasScale) {
       ctx.scale(scale, scale);
     }
@@ -446,6 +500,10 @@ export function drawIllusions() {
     // Draw status overlays (shock, poison, burn)
     if (typeof illusion.drawStatusOverlays === 'function') {
       illusion.drawStatusOverlays(ctx, illusion.r);
+    }
+
+    if (illusion._embeddedMahitoSpikes && illusion._embeddedMahitoSpikes.length > 0) {
+      drawEmbeddedMahitoSpikes(ctx, illusion.r, illusion);
     }
 
     // Global hit flash visual effect
@@ -493,5 +551,10 @@ export function drawIllusions() {
       illusion.swordSwingDuration,
       animTime
     );
+
+    // Floating Mahito Soul Disfigurement Stack Counter Badge (At top of body)
+    if ((illusion._soulDisfigurementStacks || 0) > 0 && (illusion._soulDisfigurementTimer || 0) > 0) {
+      drawSoulDisfigurementCounter(ctx, illusion.x, illusion.y, illusion.r, illusion._soulDisfigurementStacks, illusion._soulDisfigurementTimer);
+    }
   }
 }

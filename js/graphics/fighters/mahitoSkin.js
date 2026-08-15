@@ -13,74 +13,103 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
+import { 
+  drawMahitoArmMorph, 
+  drawMahitoSubterraneanFleshSurge, 
+  drawMahitoFleshSurgeForegroundArm,
+  drawMahitoMaceCannon,
+  drawMahitoTwinScissor 
+} from '../weapons/mahitoWeaponGraphics.js';
+import { GojoRenderer } from './gojoRenderer.js';
 
 /**
- * Draws Mahito's cursed soul wisp aura (No shadowBlur, optimized canvas fills).
+ * Renders JJK-authentic Cursed Energy Flame Aura engulfing Mahito.
+ * Uses the exact same Sakuga JJK Cursed Energy engine as Gojo, Yuji, and Todo (recolored to Mahito's magenta/violet theme).
  */
-function drawCursedSoulAura(ctx, fighter) {
-  const r = fighter.r || 25;
-  const now = Date.now() * 0.003;
-  const isTransformed = fighter.isTransformed || fighter.isDistortedKilling;
-
-  ctx.save();
-  const wispCount = isTransformed ? 6 : 4;
-  const primaryColor = isTransformed ? 'rgba(0, 229, 255, 0.25)' : 'rgba(0, 168, 204, 0.20)';
-  const coreColor = isTransformed ? 'rgba(15, 23, 42, 0.35)' : 'rgba(123, 158, 175, 0.18)';
-
-  for (let i = 0; i < wispCount; i++) {
-    const angle = now * 1.2 + (i * Math.PI * 2 / wispCount);
-    const dist = r * 1.25 + Math.sin(now * 2.5 + i * 1.5) * 4;
-    const wx = Math.cos(angle) * dist;
-    const wy = Math.sin(angle) * dist;
-    const wispRadius = 3.5 + Math.sin(now * 3 + i) * 1.5;
-
-    // Outer aura blob
-    ctx.fillStyle = primaryColor;
-    ctx.beginPath();
-    ctx.arc(wx, wy, wispRadius * 1.8, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Inner soul core
-    ctx.fillStyle = coreColor;
-    ctx.beginPath();
-    ctx.arc(wx, wy, wispRadius, 0, Math.PI * 2);
-    ctx.fill();
+function drawMahitoCursedEnergyAura(ctx, fighter) {
+  if (typeof GojoRenderer !== 'undefined' && typeof GojoRenderer._drawJJKCursedEnergyAura === 'function') {
+    const opacity = (fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 1.0;
+    if (opacity <= 0.01) return;
+    ctx.save();
+    ctx.globalAlpha = opacity;
+    // Pass local coordinates (0, 0) since ctx is already translated to (fighter.x, fighter.y)
+    GojoRenderer._drawJJKCursedEnergyAura(ctx, fighter, 'mahito', 0, 0, fighter.r);
+    ctx.restore();
   }
-  ctx.restore();
 }
 
+
 /**
- * Draws surgical stitches with tiny cross-threads.
+ * Draws Mahito's authentic anime surgical stitches matching reference:
+ * - Natural dark incision cut line with slight cylindrical curvature.
+ * - Paired, bold surgical cross-stitch loops / staples (|| ... ||) crossing the cut.
+ * - Bold stitch thickness (2.2px) with subtle knot endpoint dots.
  */
-function drawStitchLine(ctx, x1, y1, x2, y2, stitchCount = 4, crossLength = 3.0, stitchColor = '#1F2937') {
+function drawStitchLine(ctx, x1, y1, x2, y2, stitchCount = 4, crossLength = 3.6, stitchColor = '#000000') {
   ctx.save();
   ctx.strokeStyle = stitchColor;
-  ctx.lineWidth = 1.3;
+  ctx.fillStyle = stitchColor;
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
 
-  // Main suture cut line
-  ctx.beginPath();
-  ctx.moveTo(x1, y1);
-  ctx.lineTo(x2, y2);
-  ctx.stroke();
-
-  // Cross stitch threads
   const dx = x2 - x1;
   const dy = y2 - y1;
   const len = Math.hypot(dx, dy);
-  if (len > 0) {
-    const nx = -dy / len;
-    const ny =  dx / len;
-
-    for (let i = 1; i <= stitchCount; i++) {
-      const t = i / (stitchCount + 1);
-      const px = x1 + dx * t;
-      const py = y1 + dy * t;
-      ctx.beginPath();
-      ctx.moveTo(px - nx * crossLength, py - ny * crossLength);
-      ctx.lineTo(px + nx * crossLength, py + ny * crossLength);
-      ctx.stroke();
-    }
+  if (len <= 0) {
+    ctx.restore();
+    return;
   }
+
+  const snx = -dy / len;
+  const sny =  dx / len;
+
+  // 1. Incision Cut Line (Clean dark surgical incision)
+  ctx.lineWidth = 1.35;
+  ctx.beginPath();
+  const midX = (x1 + x2) / 2 + snx * (len * 0.10);
+  const midY = (y1 + y2) / 2 + sny * (len * 0.10);
+  ctx.moveTo(x1, y1);
+  ctx.quadraticCurveTo(midX, midY, x2, y2);
+  ctx.stroke();
+
+  // 2. Cross-Stitches (3 lines: pair of 2 on one side, 1 isolated line on the other side: || ... |)
+  ctx.lineWidth = 2.0;
+
+  let tValues = [];
+  if (stitchCount === 2) {
+    tValues = [0.28, 0.72];
+  } else if (stitchCount === 3) {
+    // 2 lines close together on one side, 1 isolated line far away on the other side:
+    tValues = [0.22, 0.38, 0.80];
+  } else {
+    // Default 3 lines: pair + isolated single line
+    tValues = [0.22, 0.38, 0.80];
+  }
+
+  for (let i = 0; i < tValues.length; i++) {
+    const t = tValues[i];
+    const mt = 1 - t;
+    const px = mt * mt * x1 + 2 * mt * t * midX + t * t * x2;
+    const py = mt * mt * y1 + 2 * mt * t * midY + t * t * y2;
+
+    const tdx = 2 * (1 - t) * (midX - x1) + 2 * t * (x2 - midX);
+    const tdy = 2 * (1 - t) * (midY - y1) + 2 * t * (y2 - midY);
+    const tlen = Math.hypot(tdx, tdy) || 1;
+    const nx = -tdy / tlen;
+    const ny =  tdx / tlen;
+
+    ctx.beginPath();
+    ctx.moveTo(px - nx * crossLength, py - ny * crossLength);
+    ctx.lineTo(px + nx * crossLength, py + ny * crossLength);
+    ctx.stroke();
+
+    // Puncture knots
+    ctx.beginPath();
+    ctx.arc(px - nx * crossLength, py - ny * crossLength, 0.8, 0, Math.PI * 2);
+    ctx.arc(px + nx * crossLength, py + ny * crossLength, 0.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   ctx.restore();
 }
 
@@ -197,53 +226,286 @@ function drawMahitoFacialStitches(ctx, r) {
 }
 
 /**
- * Draws Mahito's brawler hand fist with surgical stitches or armored claws.
+ * Draws Mahito's brawler hand fist enveloped in authentic JJK Cursed Energy matching reference image.
+ * Features:
+ * - Anatomical clenched fist with 4 defined knuckle bulges, curled thumb & thumbnail bed
+ * - Dual-tone patchwork porcelain/grey skin with signature surgical sutures & cross-ticks
+ * - Subterranean Cursed Energy micro-veins
+ * - Transformed form: Segmented obsidian chitin exoskeleton with 3 glowing razor scythe talons
+ * - Flowing viscous magenta/violet Cursed Energy flame envelope & crackling soul sparks
  */
-function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
+export function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
 
-  if (isTransformed) {
-    // ── Transformed Form: Armored Obsidian Claw Fist with Cyan Edge ──
-    ctx.fillStyle = '#0E1322';
+  const isPunching = fighter && fighter.punchAnimTimer > 0;
+  const opacity = (fighter && fighter._isWinnerReveal) ? 1.0 : (fighter.combatAuraOpacity || (isPunching ? 1.0 : 0.0));
+  const showCE = opacity > 0.05 || isPunching;
+
+  // ── 1. JJK CURSED ENERGY FLAME ENVELOPE (Reference Anime Screenshot) ──
+  if (showCE) {
+    ctx.save();
+    const ceAlpha = isPunching ? 1.0 : opacity;
+    const now = Date.now() * 0.005;
+    const ceBlobRadius = handRadius * (isPunching ? 2.4 : 1.85);
+
+    // Dynamic 8-point viscous flame blob contour around the fist
+    const numFlamePts = 8;
+    const flamePts = [];
+    for (let i = 0; i < numFlamePts; i++) {
+      const ang = (Math.PI * 2 / numFlamePts) * i;
+      const wave = Math.sin(now * 3.5 + i * 1.8) * (handRadius * 0.35);
+      const stretch = (Math.cos(ang) > 0.2 ? handRadius * 0.45 : 0); // Stretch along +X punch vector
+      const curR = ceBlobRadius + wave + stretch;
+      flamePts.push({
+        x: Math.cos(ang) * curR,
+        y: Math.sin(ang) * curR
+      });
+    }
+
     ctx.beginPath();
-    ctx.arc(0, 0, handRadius * 1.05, 0, Math.PI * 2);
+    let fmx = (flamePts[numFlamePts - 1].x + flamePts[0].x) / 2;
+    let fmy = (flamePts[numFlamePts - 1].y + flamePts[0].y) / 2;
+    ctx.moveTo(fmx, fmy);
+    for (let i = 0; i < numFlamePts; i++) {
+      const p = flamePts[i];
+      const next = flamePts[(i + 1) % numFlamePts];
+      ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+    }
+    ctx.closePath();
+
+    // A. Concentric Soft Magenta Bloom (Zero shadowBlur - Rule #11)
+    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
+    if (!isLowQuality) {
+      ctx.save();
+      ctx.scale(1.25, 1.25);
+      ctx.beginPath();
+      ctx.moveTo(fmx, fmy);
+      for (let i = 0; i < numFlamePts; i++) {
+        const p = flamePts[i];
+        const next = flamePts[(i + 1) % numFlamePts];
+        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
+      }
+      ctx.closePath();
+      ctx.fillStyle = `rgba(217, 70, 239, ${(0.22 * ceAlpha).toFixed(3)})`;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    // B. Vibrant Radial Cursed Energy Gradient (Lilac Core -> Vivid Magenta Body -> Violet Plum Edge)
+    const ceGrad = ctx.createRadialGradient(0, 0, handRadius * 0.2, 0, 0, ceBlobRadius * 1.3);
+    ceGrad.addColorStop(0,    `rgba(245, 208, 254, ${(0.95 * ceAlpha).toFixed(3)})`); // Luminous Lilac-White Core
+    ceGrad.addColorStop(0.35, `rgba(217, 70, 239, ${(0.85 * ceAlpha).toFixed(3)})`); // Vibrant Magenta CE Body
+    ceGrad.addColorStop(0.70, `rgba(168, 85, 247, ${(0.65 * ceAlpha).toFixed(3)})`); // Violet Mid-Tone
+    ceGrad.addColorStop(1.0,  `rgba(59, 7, 100, ${(0.15 * ceAlpha).toFixed(3)})`);  // Deep Violet-Plum Edge
+
+    ctx.fillStyle = ceGrad;
     ctx.fill();
 
-    // Cyan energy rim highlight
-    ctx.strokeStyle = '#00E5FF';
-    ctx.lineWidth = 1.6;
+    // C. Deep Violet-Plum Ink Stroke Outline (Authentic JJK Ink Brush Effect)
+    ctx.strokeStyle = `rgba(59, 7, 100, ${(0.95 * ceAlpha).toFixed(3)})`;
+    ctx.lineWidth = 1.9;
     ctx.stroke();
 
-    // Sharp claw knuckle plates
-    ctx.fillStyle = '#1E293B';
-    ctx.beginPath();
-    ctx.arc(handRadius * 0.35, 0, handRadius * 0.55, 0, Math.PI * 2);
-    ctx.fill();
+    // D. Tiny Crackling Cursed Soul Sparks
+    if (isPunching) {
+      ctx.strokeStyle = `rgba(245, 208, 254, 0.90)`;
+      ctx.lineWidth = 1.2;
+      for (let s = 0; s < 3; s++) {
+        const sang = now * 4 + s * 2.1;
+        const sr1 = handRadius * 0.8;
+        const sr2 = handRadius * 1.5;
+        ctx.beginPath();
+        ctx.moveTo(Math.cos(sang) * sr1, Math.sin(sang) * sr1);
+        ctx.lineTo(Math.cos(sang + 0.3) * sr2, Math.sin(sang + 0.3) * sr2);
+        ctx.stroke();
+      }
+    }
 
-    // Cyan claw tip
-    ctx.fillStyle = '#00F0FF';
+    ctx.restore();
+  }
+
+  // ── 2. PHYSICAL HAND / FIST ──
+  if (isTransformed) {
+    // ── Transformed Form: Armored Obsidian Chitin Fist with Scythe Claws ──
+    ctx.save();
+
+    // 1. Armored Chitin Exoskeleton Base (Segmented Plates)
+    ctx.fillStyle = '#0E1322';
     ctx.beginPath();
-    ctx.moveTo(handRadius * 0.7, -handRadius * 0.3);
-    ctx.lineTo(handRadius * 1.35, 0);
-    ctx.lineTo(handRadius * 0.7, handRadius * 0.3);
+    ctx.moveTo(-handRadius * 0.85, -handRadius * 0.75);
+    ctx.lineTo(handRadius * 0.45, -handRadius * 0.85);
+    ctx.lineTo(handRadius * 1.05, 0);
+    ctx.lineTo(handRadius * 0.45, handRadius * 0.85);
+    ctx.lineTo(-handRadius * 0.85, handRadius * 0.75);
     ctx.closePath();
     ctx.fill();
-  } else {
-    // ── Base Form: Pale Stitched Human Fist ──
-    ctx.fillStyle = '#E2E8F0';
+
+    // 2. Chitin Carapace Plates with Deep Violet Bevels
+    ctx.fillStyle = '#1E1528';
     ctx.beginPath();
-    ctx.arc(0, 0, handRadius, 0, Math.PI * 2);
+    ctx.moveTo(-handRadius * 0.4, -handRadius * 0.55);
+    ctx.lineTo(handRadius * 0.35, -handRadius * 0.65);
+    ctx.lineTo(handRadius * 0.65, 0);
+    ctx.lineTo(handRadius * 0.35, handRadius * 0.65);
+    ctx.lineTo(-handRadius * 0.4, handRadius * 0.55);
+    ctx.closePath();
     ctx.fill();
 
-    // Dark outline
-    ctx.strokeStyle = '#1F2937';
+    // Specular Carapace Edges
+    ctx.strokeStyle = '#D946EF';
     ctx.lineWidth = 1.4;
     ctx.stroke();
 
-    // Cross-stitch across the wrist/knuckle
-    drawStitchLine(ctx, -handRadius * 0.4, -handRadius * 0.5, -handRadius * 0.4, handRadius * 0.5, 2, 2.2, '#1F2937');
+    // 3. 3 Razor Scythe Claws / Talons extending from knuckle plates
+    const clawCount = 3;
+    for (let c = 0; c < clawCount; c++) {
+      const cy = -handRadius * 0.45 + c * (handRadius * 0.45);
+      const cx = handRadius * 0.65;
+      const clawLen = handRadius * (0.85 + (c === 1 ? 0.3 : 0)); // Middle talon is longer
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - handRadius * 0.16);
+      ctx.lineTo(cx + clawLen, cy); // Needle-sharp talon tip
+      ctx.lineTo(cx, cy + handRadius * 0.16);
+      ctx.closePath();
+
+      // Lilac-White Razor Edge with Magenta Core
+      ctx.fillStyle = '#F5D0FE';
+      ctx.fill();
+      ctx.strokeStyle = '#D946EF';
+      ctx.lineWidth = 1.3;
+      ctx.stroke();
+
+      // Glow core line
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(cx + 2, cy);
+      ctx.lineTo(cx + clawLen - 2, cy);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. Outer Ink & Neon Violet Edge
+    ctx.strokeStyle = '#3B0764';
+    ctx.lineWidth = 1.8;
+    ctx.stroke();
+
+    // 5. Glowing Soul Slits (Chitin Vents)
+    ctx.strokeStyle = 'rgba(245, 208, 254, 0.9)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.moveTo(-handRadius * 0.5, -handRadius * 0.3);
+    ctx.lineTo(-handRadius * 0.1, -handRadius * 0.3);
+    ctx.moveTo(-handRadius * 0.5, handRadius * 0.3);
+    ctx.lineTo(-handRadius * 0.1, handRadius * 0.3);
+    ctx.stroke();
+
+    ctx.restore();
+  } else {
+    // ── Base Form: Pale Stitched Human Fist with Anatomical Knuckles & Patchwork Suture ──
+    ctx.save();
+
+    // 1. Dual-tone patchwork skin base
+    ctx.beginPath();
+    ctx.moveTo(-handRadius * 0.75, -handRadius * 0.65);
+    ctx.lineTo(handRadius * 0.45, -handRadius * 0.75); // Top/thumb root
+    ctx.quadraticCurveTo(handRadius * 1.05, -handRadius * 0.45, handRadius * 1.05, 0); // Knuckle ridge apex
+    ctx.quadraticCurveTo(handRadius * 1.05, handRadius * 0.55, handRadius * 0.45, handRadius * 0.75); // Bottom pinky base
+    ctx.lineTo(-handRadius * 0.75, handRadius * 0.65); // Wrist base
+    ctx.closePath();
+
+    // Dual-tone patchwork split:
+    ctx.fillStyle = '#EEF3F7'; // Pale porcelain skin tone
+    ctx.fill();
+
+    // Secondary stitched patch on bottom/wrist half
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(-handRadius * 0.75, 0);
+    ctx.lineTo(handRadius * 1.05, 0);
+    ctx.lineTo(handRadius * 0.45, handRadius * 0.75);
+    ctx.lineTo(-handRadius * 0.75, handRadius * 0.65);
+    ctx.closePath();
+    ctx.fillStyle = '#E2E8F0'; // Slightly darker stitched skin patch
+    ctx.fill();
+    ctx.restore();
+
+    // 2. 4 Defined Knuckle Bulges on +X edge
+    const numKnuckles = 4;
+    for (let k = 0; k < numKnuckles; k++) {
+      const ky = -handRadius * 0.52 + k * (handRadius * 0.35);
+      const kx = handRadius * (0.88 + Math.cos((k - 1.5) * 0.7) * 0.18);
+      const kr = handRadius * 0.22;
+
+      // Knuckle highlight cap
+      ctx.fillStyle = '#F8FAFC';
+      ctx.beginPath();
+      ctx.arc(kx, ky, kr, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Subtle finger crease line
+      ctx.strokeStyle = '#94A3B8';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(kx - kr * 0.8, ky);
+      ctx.lineTo(kx + kr * 0.3, ky);
+      ctx.stroke();
+    }
+
+    // 3. Folded Thumb & Thumbnail across the upper edge
+    ctx.save();
+    ctx.fillStyle = '#F1F5F9';
+    ctx.strokeStyle = '#181C26';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-handRadius * 0.35, -handRadius * 0.55);
+    ctx.quadraticCurveTo(handRadius * 0.25, -handRadius * 0.85, handRadius * 0.45, -handRadius * 0.35);
+    ctx.quadraticCurveTo(handRadius * 0.15, -handRadius * 0.25, -handRadius * 0.35, -handRadius * 0.25);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Pale lilac thumbnail bed
+    ctx.fillStyle = 'rgba(216, 180, 254, 0.75)';
+    ctx.beginPath();
+    ctx.ellipse(handRadius * 0.28, -handRadius * 0.45, handRadius * 0.12, handRadius * 0.08, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // 4. Dark Ink Silhouette Contour
+    ctx.strokeStyle = '#181C26';
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(-handRadius * 0.75, -handRadius * 0.65);
+    ctx.lineTo(handRadius * 0.45, -handRadius * 0.75);
+    ctx.quadraticCurveTo(handRadius * 1.05, -handRadius * 0.45, handRadius * 1.05, 0);
+    ctx.quadraticCurveTo(handRadius * 1.05, handRadius * 0.55, handRadius * 0.45, handRadius * 0.75);
+    ctx.lineTo(-handRadius * 0.75, handRadius * 0.65);
+    ctx.closePath();
+    ctx.stroke();
+
+    // 5. Mahito's Signature Cross-Stitches & Suture Lines (Paired anime surgical staples)
+    // Diagonal main suture seam
+    drawStitchLine(ctx, -handRadius * 0.45, -handRadius * 0.6, -handRadius * 0.15, handRadius * 0.65, 4, 3.4, '#000000');
+    // Secondary wrist suture
+    drawStitchLine(ctx, -handRadius * 0.75, -handRadius * 0.35, -handRadius * 0.75, handRadius * 0.35, 2, 3.0, '#000000');
+
+    // 6. Micro Cursed Energy Veins branching across dorsal skin
+    ctx.strokeStyle = 'rgba(192, 38, 211, 0.55)';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.moveTo(-handRadius * 0.5, -handRadius * 0.1);
+    ctx.lineTo(-handRadius * 0.1, -handRadius * 0.15);
+    ctx.lineTo(handRadius * 0.3, -handRadius * 0.05);
+    ctx.moveTo(-handRadius * 0.1, -handRadius * 0.15);
+    ctx.lineTo(handRadius * 0.2, -handRadius * 0.35);
+    ctx.stroke();
+
+    ctx.restore();
   }
 
   ctx.restore();
@@ -256,7 +518,7 @@ function drawTransformedCarapace(ctx, r) {
   // 1. Segmented Bladed Tail extending from behind the lower body
   ctx.save();
   ctx.fillStyle = '#0E1322';
-  ctx.strokeStyle = '#00E5FF';
+  ctx.strokeStyle = '#D946EF';
   ctx.lineWidth = 1.4;
 
   let currX = 0;
@@ -273,7 +535,7 @@ function drawTransformedCarapace(ctx, r) {
   ctx.stroke();
 
   // Tail scythe blade tip
-  ctx.fillStyle = '#00E5FF';
+  ctx.fillStyle = '#D946EF';
   ctx.beginPath();
   ctx.moveTo(currX - 5, currY);
   ctx.lineTo(currX, currY + 11);
@@ -285,7 +547,7 @@ function drawTransformedCarapace(ctx, r) {
   // 2. Large Curved Elbow/Forearm Scythe Blades (Left & Right)
   ctx.save();
   ctx.fillStyle = '#0E1322';
-  ctx.strokeStyle = '#00E5FF';
+  ctx.strokeStyle = '#D946EF';
   ctx.lineWidth = 1.6;
 
   // Left Scythe Blade
@@ -310,7 +572,7 @@ function drawTransformedCarapace(ctx, r) {
   // 3. Top Head Crest / Armored Horns (Upward at -y)
   ctx.save();
   ctx.fillStyle = '#0E1322';
-  ctx.strokeStyle = '#00E5FF';
+  ctx.strokeStyle = '#D946EF';
   ctx.lineWidth = 1.5;
 
   // Left Horn
@@ -338,7 +600,7 @@ function drawTransformedCarapace(ctx, r) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.strokeStyle = '#00E5FF';
+  ctx.strokeStyle = '#D946EF';
   ctx.lineWidth = 1.8;
   ctx.stroke();
 
@@ -349,7 +611,7 @@ function drawTransformedCarapace(ctx, r) {
   ctx.clip();
 
   // Torso Rib Plating (Bottom +y)
-  ctx.fillStyle = '#1E293B';
+  ctx.fillStyle = '#2A1B3D';
   ctx.beginPath();
   ctx.moveTo(-r, r * 0.3);
   ctx.lineTo(-r * 0.3, r * 0.15);
@@ -362,7 +624,7 @@ function drawTransformedCarapace(ctx, r) {
   ctx.fill();
 
   // Plating seams
-  ctx.strokeStyle = '#00E5FF';
+  ctx.strokeStyle = '#D946EF';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(-r * 0.6, r * 0.5);
@@ -371,8 +633,8 @@ function drawTransformedCarapace(ctx, r) {
   ctx.lineTo(r * 0.4, r * 0.75);
   ctx.stroke();
 
-  // Glowing Cyan Horizontal Eye Slits
-  ctx.fillStyle = '#00F0FF';
+  // Glowing Magenta/Violet Horizontal Eye Slits
+  ctx.fillStyle = '#E879F9';
   // Left eye slit
   ctx.beginPath();
   ctx.ellipse(-r * 0.28, -r * 0.15, r * 0.24, r * 0.07, -Math.PI * 0.08, 0, Math.PI * 2);
@@ -650,18 +912,64 @@ function drawBaseMahito(ctx, r) {
 }
 
 /**
+ * Renders Phantom Soul Slip Cursed Energy afterimages in world space.
+ */
+function drawMahitoDashAfterimages(ctx, fighter) {
+  if (!fighter._dashAfterimages || fighter._dashAfterimages.length === 0) return;
+  const r = fighter.r || 25;
+
+  for (let i = 0; i < fighter._dashAfterimages.length; i++) {
+    const img = fighter._dashAfterimages[i];
+    if (!img || img.alpha <= 0.02) continue;
+
+    ctx.save();
+    ctx.globalAlpha = img.alpha * 0.45;
+    ctx.translate(img.x, img.y);
+    ctx.rotate(img.angle || 0);
+
+    const facingLeft = Math.abs(img.angle || 0) > Math.PI / 2;
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+
+    // Semi-transparent phantom silhouette in glowing Cursed Energy violet
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = img.isTransformed ? 'rgba(217, 70, 239, 0.65)' : 'rgba(192, 38, 211, 0.55)';
+    ctx.fill();
+    ctx.strokeStyle = img.isTransformed ? '#F5D0FE' : '#D946EF';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+
+    ctx.restore();
+  }
+}
+
+/**
  * Main Skin Drawing Entry Point for Mahito.
  * Adheres strictly to docs/fighter_hand_positioning_guide.md and Rule #2.
  */
 export function drawMahitoSkin(ctx, fighter) {
+  // 1. Render Phantom Soul Slip afterimages in world space
+  drawMahitoDashAfterimages(ctx, fighter);
+
+  // 2. Render Subterranean Flesh Surge tendrils in world coordinates
+  drawMahitoSubterraneanFleshSurge(ctx, fighter);
+
+  // 3. Render Mutated Mace Cannon (Stretch Arm Spiked Ball Shrapnel) in world coordinates
+  drawMahitoMaceCannon(ctx, fighter);
+
+  // 4. Render Dual Scythe Pincer Guillotine (Twin Stretched Blade Ambush - Back Arm) in world coordinates
+  drawMahitoTwinScissor(ctx, fighter, 'back');
+
   const r = fighter.r || 25;
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-  // 1. Draw Cursed Soul Aura around Mahito
-  drawCursedSoulAura(ctx, fighter);
+  // 1. Draw JJK Cursed Energy Aura around Mahito
+  drawMahitoCursedEnergyAura(ctx, fighter);
 
   // 2. Aim & Orientation Transform (Core Stance Coordinate Frame)
   const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
@@ -683,42 +991,56 @@ export function drawMahitoSkin(ctx, fighter) {
 
   let easePunch = 0;
   if (isPunching) {
-    if (rawProgress < 0.28) {
-      easePunch = Math.sin((rawProgress / 0.28) * (Math.PI / 2));
+    if (rawProgress < 0.12) {
+      // Instant snap forward in first 12% of animation
+      easePunch = Math.sin((rawProgress / 0.12) * (Math.PI / 2));
+    } else if (rawProgress < 0.46) {
+      // Hold extended snap strike through the apex
+      easePunch = 1.0;
     } else {
-      const retract = (rawProgress - 0.28) / 0.72;
+      // Clean smooth retraction
+      const retract = (rawProgress - 0.46) / 0.54;
       easePunch = Math.cos(retract * (Math.PI / 2));
     }
   }
 
-  const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
-  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI) * (r * 0.20) : 0;
+  const lungeExtension = isPunching ? easePunch * (r * 0.25) : 0;
+  const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI) * (r * 0.08) : 0;
 
-  // 4. Standard Brawler Guard Stance Calculations (Section 2 of Guide)
+  // 4. Compact Brawler Guard Stance Calculations (Hands anchored tightly to body rim)
   let frontHandX = 0, frontHandY = 0;
   let backHandX = 0, backHandY = 0;
 
   if (isPunching) {
     if (fighter.isRightPunch) {
-      frontHandX = r * 0.85 + lungeExtension * 1.40;
-      backHandX  = r * 1.05 + oppositeRecoil;
+      frontHandX = r * 0.70 + lungeExtension;
+      frontHandY = r * 0.12;
+      backHandX  = r * 0.40 + oppositeRecoil;
+      backHandY  = -r * 0.15;
     } else {
-      backHandX  = r * 1.05 + lungeExtension * 1.60;
-      frontHandX = oppositeRecoil;
+      backHandX  = r * 0.70 + lungeExtension;
+      backHandY  = -r * 0.12;
+      frontHandX = r * 0.40 + oppositeRecoil;
+      frontHandY = r * 0.15;
     }
   } else {
-    // Idle brawler guard stance: front hand (top layer) at (0, 0), back hand (back layer) at (r * 1.05, 0)
-    frontHandX = 0;
-    frontHandY = 0;
-    backHandX  = r * 1.05;
-    backHandY  = 0;
+    // Idle brawler guard stance: front hand at (r * 0.45, r * 0.18), back hand at (r * 0.70, -r * 0.18)
+    frontHandX = r * 0.45;
+    frontHandY = r * 0.18;
+    backHandX  = r * 0.70;
+    backHandY  = -r * 0.18;
   }
 
   const handRadius = getHandSize(7.5);
+  const morphType = fighter.morphType || 'blade';
 
-  // 5. Render Back Hand Layer (Behind Body Circle) - Rule #2
+  // 5. Render Back Hand Layer (Behind Body Circle) - Rule #2 & #20
   if (!fighter._isWinnerReveal && !fighter.hideBackHand) {
-    drawHandFist(ctx, backHandX, backHandY, handRadius, isTransformed, fighter);
+    if (isPunching && !fighter.isRightPunch) {
+      drawMahitoArmMorph(ctx, fighter, isTransformed, false, morphType, rawProgress, backHandX, backHandY);
+    } else {
+      drawHandFist(ctx, backHandX, backHandY, handRadius, isTransformed, fighter);
+    }
   }
 
   // 6. Render Body Circle
@@ -728,9 +1050,23 @@ export function drawMahitoSkin(ctx, fighter) {
     drawBaseMahito(ctx, r);
   }
 
-  // 7. Render Front Hand Layer (On Top of Body Circle) - Rule #2
-  if (!fighter._isWinnerReveal && !fighter.hideFrontHand) {
-    drawHandFist(ctx, frontHandX, frontHandY, handRadius, isTransformed, fighter);
+  // 7. Render Front Hand Layer (On Top of Body Circle) - Rule #2 & #20
+  if (!fighter._isWinnerReveal && (!fighter.twinScissorAnimTimer || fighter.twinScissorAnimTimer <= 0)) {
+    if (fighter.fleshSurgeAnimTimer > 0) {
+      // Draw Front Hand Stretch Socket & Foreground Arm in world space on top of body and aura
+      ctx.save();
+      if (facingLeft) ctx.scale(1, -1);
+      ctx.rotate(-angle);
+      ctx.translate(-fighter.x, -(fighter.y - (fighter.z || 0)));
+      drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed);
+      ctx.restore();
+    } else if (!fighter.hideFrontHand) {
+      if (isPunching && fighter.isRightPunch) {
+        drawMahitoArmMorph(ctx, fighter, isTransformed, true, morphType, rawProgress, frontHandX, frontHandY);
+      } else {
+        drawHandFist(ctx, frontHandX, frontHandY, handRadius, isTransformed, fighter);
+      }
+    }
   }
 
   // 8. Gojo Infinity Freeze / Time Stop Overlay Standard (Rule #9)
@@ -741,5 +1077,15 @@ export function drawMahitoSkin(ctx, fighter) {
     ctx.fill();
   }
 
+  // Draw status overlays (slow, electric stun, black flash, etc.)
+  if (typeof fighter.drawStatusOverlays === 'function') {
+    fighter.drawStatusOverlays(ctx, r);
+  }
+
   ctx.restore();
+
+  // 9. Render Front Stretch Arm, Socket & Scythe in world space (ON TOP of body circle)
+  if (!fighter._isWinnerReveal && fighter.twinScissorAnimTimer > 0) {
+    drawMahitoTwinScissor(ctx, fighter, 'front');
+  }
 }

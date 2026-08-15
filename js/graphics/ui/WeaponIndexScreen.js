@@ -13,7 +13,8 @@ import {
   drawGrayShield, drawGraySword, drawGrayBrokenSword, drawBerserkerDualAxes,
   drawCronosCrescentBlade, drawSpikeWeapon, drawSingleSpike, drawGunSlingerDualRevolver,
   drawEngineer, drawZeusWeapon, drawInvertedSpear, drawSplitSoulKatana,
-  drawMahoragaSword, drawMahoraga3DWheel, drawMahoragaChestNecklace, drawMahoragaLeftPunch
+  drawMahoragaSword, drawMahoraga3DWheel, drawMahoragaChestNecklace, drawMahoragaLeftPunch,
+  drawMahitoClawWeapon
 } from '../weaponVisuals.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../weapons/musashiWeaponGraphics.js';
 import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
@@ -388,8 +389,8 @@ function drawWeaponDetailScreen() {
   ctx.save();
   ctx.translate(canvas.width / 2, heroY);
   ctx.scale(currentScale, currentScale);
-  // Bobbing animation
-  ctx.translate(0, Math.sin(Date.now() / 400) * 8);
+  // Bobbing animation - disabled during claw edit mode to keep handles static/aligned
+  ctx.translate(0, state.clawEditMode ? 0 : Math.sin(Date.now() / 400) * 8);
   
   if (state.showSummonModel) {
     if (!state.previewSummonFighter || state.previewSummonFighter.type !== def.type) {
@@ -635,6 +636,7 @@ function drawWeaponDetailScreen() {
   // Navigation Bar (Row 1 at Y = 25: Left = Arsenal, Right = Prev/Next)
   const navY = 22; 
   drawButton('← ARSENAL', 60, navY, () => {
+    state.clawEditMode = false;
     state.gameState = 'weapons';
   }, 95, 28);
 
@@ -735,12 +737,21 @@ function drawWeaponDetailScreen() {
       state.previewShowCursedEnergy = !state.previewShowCursedEnergy;
     }, 140, 28);
   }
+
+
 }
 
 function drawYutaKatana(ctx, x, y, angle) {
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
+
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.yuta) ? state.weaponCustomizations.yuta : null;
+  if (custom) {
+    ctx.translate(custom.offsetX, custom.offsetY);
+    ctx.scale(custom.scale, custom.scale);
+    ctx.rotate(custom.angleOffset);
+  }
 
   // 1. Kashira (Gold Pommel)
   ctx.fillStyle = '#D4AF37';
@@ -876,7 +887,7 @@ function drawWeaponPreview(ctx, type, color) {
   // Important: weapon previews should NOT spin in the WEAPON menu.
   // Keep them at a stable angle based on the current render time,
   // but quantize to avoid visible rotation.
-  const gunAngle = 0;
+  const gunAngle = (state.gameState === 'weaponDetail' && state.weaponPreviewAngle !== undefined) ? state.weaponPreviewAngle : 0;
 
   // We map the type to the same underlying visual functions.
   // The in-game visuals expect absolute positions, but our preview draws around (0,0)
@@ -1140,6 +1151,11 @@ function drawWeaponPreview(ctx, type, color) {
         drawMahoragaSword(ctx, 0, 0, gunAngle, r);
         return;
 
+      case 'mahito':
+        // Mahito's 5-Blade Scalpel Claws
+        drawMahitoClawWeapon(ctx, 0, 0, gunAngle, r, false);
+        return;
+
       default:
         // Fallback: draw the default gray gun used by base fighters
         ctx.save();
@@ -1186,3 +1202,104 @@ eventTarget.addEventListener('wheel', (e) => {
     return;
   }
 }, { passive: false });
+
+// Interactive Claw Editor Drag & Resize Logic
+let isDraggingClaw = false;
+
+if (typeof window !== 'undefined') {
+  eventTarget.addEventListener('mousedown', (e) => {
+    if (state.gameState !== 'weaponDetail' || !state.clawEditMode || !state.selectedWeapon || state.selectedWeapon.type !== 'mahito') return;
+
+    const rect = eventTarget.getBoundingClientRect();
+    const scaleX = state.canvas.width / rect.width;
+    const scaleY = state.canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    const currentScale = state.weaponPreviewScale || 2.4;
+    const heroY = state.canvas.height * 0.30;
+    const offsetX = -40;
+    const handX = 25;
+
+    // Convert mouse coordinates back to local space of preview display
+    const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
+    const localY = (my - heroY) / currentScale;
+
+    const blades = state.mahitoClawCustomBlades;
+    if (!blades) return;
+
+    for (let i = 0; i < blades.length; i++) {
+      const b = blades[i];
+      const kx = handX + b.knuckleX;
+      const ky = b.knuckleY;
+
+      const cosAngle = Math.cos(b.fanAngle);
+      const sinAngle = Math.sin(b.fanAngle);
+      const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
+      const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
+
+      // 1. Detect Knuckle Click (10px local radius hit box)
+      if (Math.hypot(localX - kx, localY - ky) < 10) {
+        isDraggingClaw = true;
+        activeDragFinger = i;
+        activeDragType = 'knuckle';
+        return;
+      }
+
+      // 2. Detect Tip Click (10px local radius hit box)
+      if (Math.hypot(localX - tx, localY - ty) < 10) {
+        isDraggingClaw = true;
+        activeDragFinger = i;
+        activeDragType = 'tip';
+        return;
+      }
+    }
+  });
+
+  window.addEventListener('mousemove', (e) => {
+    if (!isDraggingClaw || state.gameState !== 'weaponDetail' || !state.clawEditMode) return;
+
+    const rect = eventTarget.getBoundingClientRect();
+    const scaleX = state.canvas.width / rect.width;
+    const scaleY = state.canvas.height / rect.height;
+    const mx = (e.clientX - rect.left) * scaleX;
+    const my = (e.clientY - rect.top) * scaleY;
+
+    const currentScale = state.weaponPreviewScale || 2.4;
+    const heroY = state.canvas.height * 0.30;
+    const offsetX = -40;
+    const handX = 25;
+
+    const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
+    const localY = (my - heroY) / currentScale;
+
+    const blades = state.mahitoClawCustomBlades;
+    if (!blades || activeDragFinger < 0 || activeDragFinger >= blades.length) return;
+
+    const b = blades[activeDragFinger];
+
+    if (activeDragType === 'knuckle') {
+      b.knuckleX = localX - handX;
+      b.knuckleY = localY;
+    } else if (activeDragType === 'tip') {
+      const dx = localX - (handX + b.knuckleX);
+      const dy = localY - b.knuckleY;
+      const dist = Math.hypot(dx, dy);
+      
+      // Calculate length and rotation angle with correct trigonometric offset for b.tipY
+      if (dist > Math.abs(b.tipY)) {
+        b.length = Math.sqrt(dist * dist - b.tipY * b.tipY);
+        b.fanAngle = Math.atan2(dy, dx) - Math.atan2(b.tipY, b.length);
+      } else {
+        b.length = 15;
+        b.fanAngle = Math.atan2(dy, dx);
+      }
+    }
+  });
+
+  window.addEventListener('mouseup', () => {
+    isDraggingClaw = false;
+    activeDragFinger = -1;
+    activeDragType = null;
+  });
+}

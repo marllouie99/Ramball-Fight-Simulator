@@ -100,6 +100,13 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
   const scale = 0.75;
   ctx.scale(scale, scale);
 
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.toji) ? state.weaponCustomizations.toji : null;
+  if (custom) {
+    ctx.translate(custom.offsetX, custom.offsetY);
+    ctx.scale(custom.scale, custom.scale);
+    ctx.rotate(custom.angleOffset);
+  }
+
   // 1. Draw static chain fallback if physics nodes not passed (UI / preview cards)
   if (!chainNodes) {
     const staticNodes = [];

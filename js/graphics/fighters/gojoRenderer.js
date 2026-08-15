@@ -424,9 +424,23 @@ export class GojoRenderer {
       const is200 = !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
       if (is200) {
-        // 200% Purple: Hands wide open sideways throughout the entire ritual
-        const handX = 0;
-        const handY = r * 2.2;
+        // 200% Purple Custom Animation Sequence:
+        // Frame 1 (mergeProgress < 0.65): Hands wide open sideways as Red and Blue float high above
+        // Frame 2 & 3 (mergeProgress >= 0.65 -> 1.00): When about to launch 200% Purple, both hands smoothly move forward and get close together in front of the body
+        let handX = 0;
+        let handY = r * 2.2;
+
+        if (mergeProgress >= 0.65) {
+          const launchP = Math.min(1.0, (mergeProgress - 0.65) / 0.35); // 0.0 -> 1.0
+          // Smooth S-curve easing for natural organic hand movement
+          const easeClasp = 0.5 - 0.5 * Math.cos(launchP * Math.PI);
+          
+          // Move from 0 (side alignment) forward to front edge of body circle (r * 0.88)
+          handX = easeClasp * (r * 0.88);
+          // Move from wide open (r * 2.2) inward until both hands are touching side-by-side (r * 0.30)
+          handY = (r * 2.2) * (1 - easeClasp) + (r * 0.30) * easeClasp;
+        }
+
         const fHand = toGlobal(handX, handY);
         const bHand = toGlobal(handX, -handY);
         return { frontHandX: fHand.x, frontHandY: fHand.y, backHandX: bHand.x, backHandY: bHand.y, hideFrontHand, hideBackHand };
@@ -511,26 +525,41 @@ export class GojoRenderer {
 
     const { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand } = hands;
     const handRadius = getHandSize(7.5, fighter);
+    const is200Purple = fighter.isChannelingPurple && !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
 
     ctx.save();
     ctx.fillStyle = fighter.skinColor || '#FFE0BD';
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2.5;
 
-    // Back hand (behind body circle)
-    if ((layer === 'all' || layer === 'back') && !hideBackHand) {
-      ctx.beginPath();
-      ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+    // Back hand: drawn on 'back' layer for normal stances, but for 200% Purple both hands render in front on top of body
+    if (!is200Purple) {
+      if ((layer === 'all' || layer === 'back') && !hideBackHand) {
+        ctx.beginPath();
+        ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
     }
 
     // Front hand (on top of body circle)
-    if ((layer === 'all' || layer === 'front') && !hideFrontHand) {
-      ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+    if (layer === 'all' || layer === 'front') {
+      if (is200Purple) {
+        // Draw both hands on top of the body circle during 200% purple launch preparation
+        if (!hideBackHand) {
+          ctx.beginPath();
+          ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+      }
+
+      if (!hideFrontHand) {
+        ctx.beginPath();
+        ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      }
 
       // Unlimited Void Hand Sign: crossed fingers near collar during domain channeling
       if (fighter.isChannelingDomainExpansion) {
@@ -941,6 +970,10 @@ export class GojoRenderer {
       mainColor = '#FF1493';
       fillColor = `rgba(255, 20, 147, ${0.32 * progress})`;
       coreColor = `rgba(255, 200, 220, ${0.40 * progress})`;
+    } else if (colorTheme === 'mahito' || colorTheme === 'magenta') {
+      mainColor = '#D946EF';
+      fillColor = `rgba(217, 70, 239, ${0.32 * progress})`;
+      coreColor = `rgba(245, 208, 254, ${0.40 * progress})`;
     }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 
@@ -948,10 +981,11 @@ export class GojoRenderer {
 
     // Generate smooth flame contour points (Viscous Liquid Fire Silhouette - stretching Sakuga tongues)
     const numPoints = 28;
-    const baseRadius = overrideX !== null ? (r + 9.0) : (r + 15);
+    const isHandBlob = (overrideRadius !== null && overrideRadius < (r * 0.8));
+    const baseRadius = isHandBlob ? (r + 9.0) : (r + 15);
     const points = [];
     const moveOffset = (fighter.x + fighter.y) * 0.015;
-    const stretchMult = overrideX !== null ? 0.2 : 1.0;
+    const stretchMult = isHandBlob ? 0.2 : 1.0;
 
     for (let i = 0; i < numPoints; i++) {
       const angle = (Math.PI * 2 / numPoints) * i;

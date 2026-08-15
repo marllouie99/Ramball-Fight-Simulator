@@ -27,6 +27,9 @@ import {
   drawYutaKatana 
 } from './ui/WeaponIndexScreen.js';
 import { 
+  drawWeaponStudioScreen 
+} from './ui/WeaponStudioScreen.js';
+import { 
   drawSelectScreen 
 } from './ui/CharacterSelectScreen.js';
 import { 
@@ -54,6 +57,7 @@ export {
   drawWeaponInfoCard,
   triggerWeaponDemoAttack,
   drawWeaponDetailScreen,
+  drawWeaponStudioScreen,
   drawYutaKatana,
   drawIndexDetailScreen,
   drawSelectScreen,

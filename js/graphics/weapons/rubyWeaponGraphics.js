@@ -417,6 +417,13 @@ export function drawRubyScythe(ctx, fighter, customTheme = null) {
   // Shift the weapon back so she is holding the pommel and middle of the shaft
   ctx.translate(fighter.r + gripOffset, 0);
 
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.ruby) ? state.weaponCustomizations.ruby : null;
+  if (custom) {
+    ctx.translate(custom.offsetX, custom.offsetY);
+    ctx.scale(custom.scale, custom.scale);
+    ctx.rotate(custom.angleOffset);
+  }
+
   // Draw Hands (they stay with the fighter, even if the weapon is thrown)
   ctx.save();
   

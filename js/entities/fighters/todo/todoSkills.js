@@ -644,7 +644,7 @@ export function modStartTakadaChanneling(force = false) {
  */
 export function modActivateTakadaUltimate() {
   this.isTakadaChanneling = false;
-  const dur = CONFIG.todo?.ultDuration || 480;
+  const dur = CONFIG.todo?.ultDuration ?? 5000;
   this.isTakadaUltActive = true;
   this.takadaUltTimer = dur;
 

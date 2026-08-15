@@ -250,6 +250,7 @@ export class GojoFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if ((this.paralyzeTimer || 0) > 0 || this.isParalyzed) return;
     if (projectileSystem && projectileSystem.fireGojoBlue) {
       projectileSystem.fireGojoBlue(this, ownerIndex, this.damage);
     }

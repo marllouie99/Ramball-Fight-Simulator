@@ -210,5 +210,81 @@ Inside this local coordinate frame:
   ```
 - **Skin Only Button (`state.showSkinOnly`)**: When enabled in the weapon menu or preview, `state.showSkinOnly` MUST hide BOTH weapons and hands across ALL fighters automatically without exception.
 
+## 21. Weapon Studio System — Customization Architecture & Standards
+
+### Overview
+The **Weapon Studio** (`js/graphics/ui/WeaponStudioScreen.js`) is a dedicated interactive screen accessible from the main menu that allows users to visually customize weapon geometry, positioning, scale, and render layering. All customizations persist via `localStorage` through the `saveWeaponCustomizations()` / `loadWeaponCustomizations()` functions in `state.js`.
+
+### State Structure (`state.weaponCustomizations`)
+The unified customization object lives at `state.weaponCustomizations` and is initialized by `initCustomizations()` in `WeaponStudioScreen.js`:
+```javascript
+state.weaponCustomizations = {
+  mahito: {
+    blades: [
+      { idx: 0, knuckleX, knuckleY, fanAngle, length, heelWidth, topArchY, tipY },
+      { idx: 1, ... }, { idx: 2, ... }, { idx: 3, ... }
+    ],
+    drawOrder: [0, 1, 2, 3],  // Z-layer ordering (index 0 = backmost drawn first)
+    weaponScale: 1.0           // Global scale multiplier for entire claw weapon
+  },
+  yuta:   { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+  toji:   { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+  cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+  ruby:   { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+};
+```
+
+### Mahito Claw Adjustable Properties
+Mahito's claw weapon has **per-finger** and **global** adjustable properties:
+
+#### Per-Finger (4 blades: Finger 1–3 + Thumb)
+| Property | Description | Adjusted Via |
+|----------|-------------|--------------|
+| `knuckleX`, `knuckleY` | Knuckle joint position relative to hand | Drag the **teal handle** on the preview canvas |
+| `fanAngle` | Blade fan rotation angle | Drag the **crimson tip handle** (derived from angle to knuckle) |
+| `length` | Blade length from knuckle to tip | Drag the **crimson tip handle** (derived from distance) |
+| `topArchY` | Curvature arch of the blade spine | `+`/`-` buttons in the **Arch** control when finger is selected |
+| `tipY` | Vertical tip offset (blade curvature endpoint) | `+`/`-` buttons in the **Tip** control when finger is selected |
+
+#### Global Mahito Properties
+| Property | Description | Range |
+|----------|-------------|-------|
+| `drawOrder` | Array controlling which finger renders in front/behind. ▲/▼ arrows on each finger card swap layer positions. | `[0,1,2,3]` permutation |
+| `weaponScale` | Uniform scale multiplier applied to the entire claw (hand + all blades). | `0.30x` – `3.00x`, step `0.05` |
+
+### Non-Mahito Weapon Adjustable Properties (Yuta, Toji, Cronos, Ruby)
+These weapons share a common transform customization interface:
+
+| Property | Description | Detail Card | Range |
+|----------|-------------|-------------|-------|
+| `offsetX` | Horizontal position offset | 📍 POSITION (X, Y) | Unlimited, step `2.0` |
+| `offsetY` | Vertical position offset | 📍 POSITION (X, Y) | Unlimited, step `2.0` |
+| `scale` | Uniform scale multiplier | 📐 SCALE & ANGLE | `0.30x` – `3.00x`, step `0.05` |
+| `angleOffset` | Rotation angle offset (radians) | 📐 SCALE & ANGLE | Unlimited, step `0.08 rad` (~4.6°) |
+
+### Studio UI Components
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| **Left Panel** | Left sidebar | Weapon selector (Mahito, Yuta, Toji, Cronos, Ruby) |
+| **Right Panel** | Right sidebar | Detail cards (finger selection / position / scale-angle), layer ordering ▲▼ buttons, scale controls |
+| **Preview Area** | Center canvas | Live weapon preview with interactive drag handles |
+| **Zoom Controls** | Below preview | `−`/`+` buttons, progress bar, `%` label, `⟲` reset. Mouse wheel zoom supported. Range: `0.8x`–`6.0x` |
+| **Drag Handles** | On preview (conditional) | **Teal circle**: grip/knuckle position. **Crimson circle**: tip/scale-angle endpoint. Only visible when a detail card is selected. |
+| **Reset Button** | Bottom center | Resets ALL properties for the selected weapon to defaults (including `drawOrder`, `weaponScale`) |
+
+### Rendering Integration Standards
+- **Mahito Claws (`mahitoWeaponGraphics.js`)**: Both `drawClawMorphArm()` (in-game) and `drawMahitoClawWeapon()` (preview) MUST:
+  1. Read `state.weaponCustomizations.mahito.weaponScale` and multiply it into `clawScale` and `handRadius`.
+  2. Read `state.weaponCustomizations.mahito.drawOrder` and sort blades by this order before iterating to draw: `const orderedBlades = drawOrder.map(i => blades[i]).filter(Boolean);`
+- **Non-Mahito Weapons** (Toji, Yuta, Cronos, Ruby): Each weapon's drawing function reads `state.weaponCustomizations[type]` and applies `ctx.translate(custom.offsetX, custom.offsetY)`, `ctx.scale(custom.scale, custom.scale)`, and `ctx.rotate(custom.angleOffset)` after standard weapon transforms.
+- **Persistence**: `saveWeaponCustomizations()` writes to `localStorage('ramball_weaponCustomizations')`. `loadWeaponCustomizations()` reads and hydrates `state.weaponCustomizations` on startup. Always call `saveWeaponCustomizations()` after any mutation (button clicks, drag mouseup events).
+
+### Adding New Weapons to the Studio
+To support a new weapon in the Weapon Studio:
+1. Add the weapon key and label to the `weapons` array in `WeaponStudioScreen.js`.
+2. Add a default customization entry in `initCustomizations()` under `state.weaponCustomizations` (use the standard `{ offsetX, offsetY, scale, angleOffset }` template for single-piece weapons).
+3. Add a `case` in `drawWeaponPreview()` in `WeaponIndexScreen.js` to call the weapon's drawing function.
+4. In the weapon's drawing function, read `state.weaponCustomizations[key]` and apply the transform offsets.
+5. Add a centering `offsetX` in the switch at the top of `drawWeaponPreview()` if the weapon needs horizontal offset adjustment for proper preview centering.
 
 

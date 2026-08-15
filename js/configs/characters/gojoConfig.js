@@ -23,7 +23,7 @@ export const gojoConfig = {
   interruptCooldown: 270,   // Penalty cooldown in frames (~4.5s) applied to a skill when interrupted
 
   // ── 3. Skill: Cursed Technique Reversal: Red ──
-  redCooldown: 500,         // Cooldown of Red (frames)
+  redCooldown: 1000,         // Cooldown of Red (frames)
   redDamage: 100,            // Base damage dealt by Reversal Red blast
   redKnockback: 25,         // Knockback force of Red
   redRange: 100,            // Base range
@@ -37,7 +37,7 @@ export const gojoConfig = {
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
-  purpleCooldown: 1000,      // Cooldown of Hollow Purple
+  purpleCooldown: 1800,      // Cooldown of Hollow Purple
   purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleDamage: 70,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
@@ -48,7 +48,7 @@ export const gojoConfig = {
   purpleDPSInterval: 10,   // Frames between DPS ticks
   purpleSlowDuration: 60,  // Frames the slow effect lasts
   purpleSlowMultiplier: 0.5, // Speed multiplier while slowed
-  purplePullRadius: 360,   // Radius in pixels for gravitational pull field around Hollow Purple
+  purplePullRadius: 300,   // Radius in pixels for gravitational pull field around Hollow Purple
   purplePullForce: 9.5,    // How strongly enemies and illusions are dragged toward orb center
   purpleShakeIntensity: 4, // Screen shake intensity when purple orb fires
   purpleShakeDuration: 20,  // Screen shake duration when purple orb fires
@@ -61,7 +61,7 @@ export const gojoConfig = {
   purpleSecondCastTextHeader200: 'PURPLE 200%',     // Skill HUD bar label for 200% cast
 
   // ── 5. Ultimate: Domain Expansion (Unlimited Void) ──
-  domainCooldown: 1500,     // 20s Ultimate cooldown
+  domainCooldown: 2000,     // 20s Ultimate cooldown
   domainChargeMax: 130,     // 2s Channeling duration before domain opens
   domainDuration: 400,      // Domain lasts 3 seconds (paralyzes enemies)
   domainDeployAudioFrame: 80, // Frame during channeling when gojodomaindeploy.mp3 plays

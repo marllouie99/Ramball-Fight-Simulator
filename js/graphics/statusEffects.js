@@ -576,12 +576,10 @@ export function drawVoidMarkEffect(ctx, baseRadius) {
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
   ctx.arc(0, 0, 1.8, 0, Math.PI * 2);
-  ctx.fill();
-  
   ctx.restore();
 }
 
-export function drawParalyzeEffect(ctx, baseRadius) {
+export function drawParalyzeEffect(ctx, baseRadius, isMahito = false) {
   ctx.save();
   const time = Date.now() * 0.004;
   const numRings = 2;
@@ -607,7 +605,9 @@ export function drawParalyzeEffect(ctx, baseRadius) {
     // Draw the ring path
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + 0.3 * Math.sin(time * 1.5 + i)})`; // Glowing gold ring
+    ctx.strokeStyle = isMahito 
+      ? `rgba(0, 229, 255, ${0.5 + 0.3 * Math.sin(time * 1.5 + i)})`
+      : `rgba(255, 215, 0, ${0.4 + 0.3 * Math.sin(time * 1.5 + i)})`;
     ctx.lineWidth = 2.0;
     ctx.stroke();
     
@@ -636,10 +636,9 @@ export function drawParalyzeEffect(ctx, baseRadius) {
       ctx.lineTo(-6, 0);
       ctx.lineTo(-1.5, -1.5);
       ctx.closePath();
-      
-      ctx.fillStyle = '#FFFFFF';
+       ctx.fillStyle = '#FFFFFF';
       ctx.fill();
-      ctx.strokeStyle = 'rgba(255, 235, 59, 0.9)'; // Bright yellow outline
+      ctx.strokeStyle = isMahito ? 'rgba(217, 70, 239, 0.95)' : 'rgba(255, 235, 59, 0.9)';
       ctx.lineWidth = 1.0;
       ctx.stroke();
       
@@ -649,21 +648,24 @@ export function drawParalyzeEffect(ctx, baseRadius) {
     ctx.restore();
   }
   
-  // 2. Body crackling sparks (yellow electric discharges)
+  // 2. Body crackling sparks (yellow or Mahito magenta/violet cursed energy discharges)
   const seed = Math.floor(Date.now() / 60) % 5;
-  if (seed < 3) {
-    ctx.strokeStyle = '#FFEE58'; // Yellow electrical sparks
-    ctx.lineWidth = 1.8;
+  if (seed < 4) {
+    ctx.strokeStyle = isMahito ? '#D946EF' : '#FFEE58';
+    ctx.lineWidth = isMahito ? 2.0 : 1.8;
     ctx.beginPath();
     
     // Generate a random lightning bolt on the body
     const startAngle = Math.random() * Math.PI * 2;
-    const startR = Math.random() * baseRadius * 0.8;
+    const startR = Math.random() * (baseRadius * 0.7);
     let lx = Math.cos(startAngle) * startR;
     let ly = Math.sin(startAngle) * startR;
     
     ctx.moveTo(lx, ly);
-    for (let j = 0; j < 3; j++) {
+    
+    // Add 2-3 zig-zag segments
+    const segments = 2 + Math.floor(Math.random() * 2);
+    for (let j = 0; j < segments; j++) {
       lx += (Math.random() - 0.5) * 16;
       ly += (Math.random() - 0.5) * 16;
       ctx.lineTo(lx, ly);
@@ -674,4 +676,359 @@ export function drawParalyzeEffect(ctx, baseRadius) {
   ctx.restore();
 }
 
+/**
+ * Draws Mahito's Soul Disfigurement debuff overlay on afflicted targets.
+ * Features orbiting cursed soul distortion wisps and a pulsating resonance ring.
+ * Strictly adheres to Rule #11 (Zero shadowBlur).
+ */
+export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
+  if (stacks <= 0) return;
+  ctx.save();
+
+  const now = Date.now() * 0.005;
+  const pulse = Math.sin(now * 2) * 0.5 + 0.5;
+
+  // 1. Subtle Soul Distortion Rim Ripple on Target Body
+  ctx.strokeStyle = `rgba(217, 70, 239, ${(0.40 + pulse * 0.30).toFixed(3)})`;
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius + 3 + pulse * 2, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 2. Orbiting Cursed Soul Distortion Wisps
+  const wispCount = Math.min(stacks, 2);
+  const orbitR = baseRadius * 1.35;
+
+  for (let i = 0; i < wispCount; i++) {
+    const angle = now * 1.5 + (i * Math.PI);
+    const wx = Math.cos(angle) * orbitR;
+    const wy = Math.sin(angle) * orbitR;
+
+    // Outer magenta soul aura
+    ctx.fillStyle = 'rgba(217, 70, 239, 0.55)';
+    ctx.beginPath();
+    ctx.arc(wx, wy, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner bright soul core
+    ctx.fillStyle = '#FAF5FF';
+    ctx.beginPath();
+    ctx.arc(wx, wy, 2.0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws the Mahito-Themed Floating Soul Disfigurement Counter Badge.
+ * Positioned right at the top of the enemy's body circle (not the head).
+ * Features:
+ * - Surgical suture-stitched dark soul plaque container
+ * - 3 distinct soul vessel pips with vivid magenta/violet cursed energy
+ * - Connected suture threads tethered to the target body
+ * - Dynamic critical resonance flare when reaching max stacks
+ * Strictly adheres to Rule #11 (Zero shadowBlur) & Rule #12 (Main Canvas 2D Text).
+ */
+export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, timer = 300) {
+  if (stacks <= 0) return;
+
+  ctx.save();
+  const now = Date.now() * 0.004;
+  const hoverY = Math.sin(now * 2.5) * 1.6;
+  const badgeX = x;
+  const badgeY = y - baseRadius - 22 + hoverY;
+
+  ctx.translate(badgeX, badgeY);
+
+  const isCritical = stacks >= 3;
+  const badgeW = 46;
+  const badgeH = 17;
+  const halfW = badgeW / 2;
+  const halfH = badgeH / 2;
+
+  // 1. Suture Tether Threads extending down to the top of the body
+  ctx.save();
+  ctx.strokeStyle = '#181C26';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-12, halfH);
+  ctx.lineTo(-8, halfH + 7);
+  ctx.moveTo(12, halfH);
+  ctx.lineTo(8, halfH + 7);
+  ctx.stroke();
+
+  // Tiny cross-ticks on tether sutures
+  ctx.beginPath();
+  ctx.moveTo(-12, halfH + 3.5);
+  ctx.lineTo(-8, halfH + 3.5);
+  ctx.moveTo(8, halfH + 3.5);
+  ctx.lineTo(12, halfH + 3.5);
+  ctx.stroke();
+  ctx.restore();
+
+  // 2. Main Cursed Soul Talisman Plaque (Rounded capsule)
+  ctx.fillStyle = '#0E121C';
+  ctx.beginPath();
+  ctx.roundRect(-halfW, -halfH, badgeW, badgeH, 6);
+  ctx.fill();
+
+  // Outer Talisman Border with Cursed Soul Rim Accent
+  ctx.strokeStyle = isCritical ? '#FF007F' : '#1F293D';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  if (isCritical) {
+    // Pulsing Critical Danger Rim
+    const critPulse = (Math.sin(now * 8) + 1) / 2;
+    ctx.strokeStyle = `rgba(217, 70, 239, ${(0.5 + critPulse * 0.5).toFixed(3)})`;
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.roundRect(-halfW - 1.5, -halfH - 1.5, badgeW + 3, badgeH + 3, 7.5);
+    ctx.stroke();
+  }
+
+  // 3. Iconic Horizontal Facial Stitches Motif across Plaque
+  ctx.save();
+  ctx.strokeStyle = '#181C26';
+  ctx.lineWidth = 1.1;
+  ctx.beginPath();
+  ctx.moveTo(-halfW + 4, 0);
+  ctx.lineTo(halfW - 4, 0);
+  ctx.stroke();
+
+  // Cross stitch marks across suture cut
+  const stitchPositions = [-17, -8, 0, 8, 17];
+  for (const sx of stitchPositions) {
+    ctx.beginPath();
+    ctx.moveTo(sx, -2.2);
+    ctx.lineTo(sx, 2.2);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // 4. Three Soul Vessel Pips (Soul Shards)
+  const slotX = [-13, 0, 13];
+  const maxSlots = 3;
+
+  for (let i = 0; i < maxSlots; i++) {
+    const px = slotX[i];
+    const py = 0;
+    const isActive = i < stacks;
+    const isThisMax = isCritical && isActive;
+
+    if (!isActive) {
+      // Inactive / Sunken Empty Soul Socket
+      ctx.fillStyle = '#161B27';
+      ctx.beginPath();
+      ctx.arc(px, py, 4.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.strokeStyle = '#252F44';
+      ctx.lineWidth = 1.0;
+      ctx.stroke();
+
+      // Dark cross-stitch thread inside socket
+      ctx.strokeStyle = '#181C26';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(px - 1.8, py);
+      ctx.lineTo(px + 1.8, py);
+      ctx.moveTo(px, py - 1.8);
+      ctx.lineTo(px, py + 1.8);
+      ctx.stroke();
+    } else {
+      // Active Cursed Soul Pip
+      ctx.save();
+
+      if (isThisMax) {
+        // Critical Max Slot: Blazing Magenta & Hot Pink Flare
+        const flarePulse = Math.sin(now * 10 + i) * 1.5;
+        ctx.fillStyle = 'rgba(255, 0, 127, 0.40)';
+        ctx.beginPath();
+        ctx.arc(px, py, 6.8 + flarePulse, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = '#FF007F';
+        ctx.beginPath();
+        ctx.moveTo(px, py - 4.5);
+        ctx.lineTo(px + 4.0, py);
+        ctx.lineTo(px, py + 4.5);
+        ctx.lineTo(px - 4.0, py);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        // Standard Active Soul Droplet (Vivid Magenta/Violet Glow)
+        const pipPulse = (Math.sin(now * 4 + i * 1.2) + 1) / 2;
+        ctx.fillStyle = `rgba(217, 70, 239, ${(0.35 + pipPulse * 0.25).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(px, py, 6.0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Diamond Cursed Soul Crystal
+        ctx.fillStyle = '#D946EF';
+        ctx.beginPath();
+        ctx.moveTo(px, py - 4.2);
+        ctx.lineTo(px + 3.6, py);
+        ctx.lineTo(px, py + 4.2);
+        ctx.lineTo(px - 3.6, py);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#F5D0FE';
+        ctx.lineWidth = 0.9;
+        ctx.stroke();
+
+        // White-hot core
+        ctx.fillStyle = '#FFFFFF';
+        ctx.beginPath();
+        ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // 5. Connecting Cursed Energy Suture between active pips
+  if (stacks >= 2) {
+    ctx.save();
+    ctx.strokeStyle = isCritical ? 'rgba(255, 0, 127, 0.85)' : 'rgba(217, 70, 239, 0.85)';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(slotX[0], 0);
+    ctx.lineTo(slotX[1], 0);
+    if (stacks >= 3) {
+      ctx.lineTo(slotX[2], 0);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // 6. Crisp Top Micro-Label (Main Canvas 2D Text - Rule #12)
+  ctx.font = 'bold 9px Arial';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'bottom';
+
+  let labelText = `SOUL Ⅰ`;
+  let labelColor = '#D946EF';
+
+  if (stacks === 2) {
+    labelText = `SOUL Ⅱ`;
+    labelColor = '#D946EF';
+  } else if (stacks >= 3) {
+    labelText = `SOUL CRITICAL!`;
+    labelColor = '#FF2A8D';
+  }
+
+  const labelY = -halfH - 2;
+  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
+  ctx.strokeText(labelText, 0, labelY);
+  ctx.fillStyle = labelColor;
+  ctx.fillText(labelText, 0, labelY);
+
+  ctx.restore();
+}
+
+/**
+ * Renders embedded Mahito bone/flesh spikes impaled into an enemy's body.
+ * Features bruised blood puncture sockets, dual-facet two-tone bone shading, and fading cursed energy dissolution.
+ */
+export function drawEmbeddedMahitoSpikes(ctx, baseRadius, entity) {
+  const spikes = entity._embeddedMahitoSpikes;
+  if (!spikes || spikes.length === 0) return;
+
+  for (let i = spikes.length - 1; i >= 0; i--) {
+    const spk = spikes[i];
+    spk.duration--;
+    if (spk.duration <= 0) {
+      spikes.splice(i, 1);
+      continue;
+    }
+
+    const alpha = Math.min(1.0, spk.duration / 25);
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.translate(spk.relX, spk.relY);
+    ctx.rotate(spk.angle);
+
+    const sLen = (spk.length || 18) * 0.90;
+    const halfW = (spk.width || 4.5) * 0.52;
+    const pDepth = spk.penetrationDepth || 0.35;
+    const rootX = -sLen * pDepth;
+    const tipX = sLen * (1.0 - pDepth * 0.4);
+
+    // 1. Bruised blood & Cursed Energy puncture entry socket
+    ctx.beginPath();
+    ctx.ellipse(0, 0, halfW * 2.0, halfW * 1.4, 0, 0, Math.PI * 2);
+    ctx.fillStyle = spk.isTransformed ? 'rgba(217, 70, 239, 0.85)' : 'rgba(185, 28, 28, 0.88)';
+    ctx.fill();
+
+    // 2. Impaled Bone Spike Polygon (Piercing outward from inside/across the body)
+    if (spk.isTransformed) {
+      ctx.beginPath();
+      ctx.moveTo(rootX, 0); // embedded root deep inside flesh
+      ctx.lineTo(0, -halfW);
+      ctx.lineTo(tipX, 0);  // sharp protruding tip
+      ctx.lineTo(0, halfW);
+      ctx.closePath();
+      ctx.fillStyle = '#0E1322';
+      ctx.fill();
+      ctx.strokeStyle = '#D946EF';
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+
+      // Glowing core spine line
+      ctx.beginPath();
+      ctx.moveTo(rootX * 0.5, 0);
+      ctx.lineTo(tipX * 0.85, 0);
+      ctx.strokeStyle = '#F5D0FE';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    } else {
+      // Left facet (Highlight side)
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.moveTo(0, -halfW);
+      ctx.lineTo(tipX, 0);
+      ctx.lineTo(0, 0);
+      ctx.closePath();
+      ctx.fill();
+
+      // Right facet (Shadow side)
+      ctx.fillStyle = '#64748B';
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(tipX, 0);
+      ctx.lineTo(0, halfW);
+      ctx.closePath();
+      ctx.fill();
+
+      // Sharp ink outline
+      ctx.strokeStyle = '#181C26';
+      ctx.lineWidth = 1.3;
+      ctx.beginPath();
+      ctx.moveTo(rootX, 0);
+      ctx.lineTo(0, -halfW);
+      ctx.lineTo(tipX, 0);
+      ctx.lineTo(0, halfW);
+      ctx.closePath();
+      ctx.stroke();
+
+      // Crimson blood stain dripping around embedded root
+      ctx.fillStyle = '#DC2626';
+      ctx.beginPath();
+      ctx.arc(0, 0, halfW * 1.0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+}
 

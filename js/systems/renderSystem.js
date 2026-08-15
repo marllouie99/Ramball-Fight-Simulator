@@ -2,7 +2,7 @@ import { state, isChampionScreenActive } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
-  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawHUD, 
+  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawHUD, 
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown
 } from '../graphics/ui.js';
 import {
@@ -129,6 +129,8 @@ export function renderGame() {
       drawWeaponMenu();
     } else if (state.gameState === 'weaponDetail') {
       drawWeaponDetailScreen();
+    } else if (state.gameState === 'weaponStudio') {
+      drawWeaponStudioScreen();
     } else {
       if (state.pixiLayers) {
         // Stop shaking the arena layer (keep outer background static)

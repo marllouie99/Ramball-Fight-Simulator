@@ -4,6 +4,7 @@ import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js
 import { spawnIllusionSpawn } from '../graphics/particles/illusionSpawnEffect.js';
 import { spatialGrid } from './physics.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
+import { triggerMahitoParalyzeExplosion } from '../entities/fighters/mahito/mahitoCombat.js';
 
 // Minimum HP an illusion must have had to be eligible for splitting on death.
 // Low threshold — even weak illusions should split as long as children get > 0 HP.
@@ -148,12 +149,21 @@ export function updateIllusions() {
     }
 
     if (illusion.hitStunTimer > 0) illusion.hitStunTimer--;
-    if (illusion.paralyzeTimer > 0) illusion.paralyzeTimer--;
+    if (illusion.paralyzeTimer > 0) {
+      if (illusion.paralyzeTimer === 1 && illusion.isParalyzedByMahito) {
+        triggerMahitoParalyzeExplosion(illusion);
+      }
+      illusion.paralyzeTimer--;
+      if (illusion.paralyzeTimer <= 0) {
+        illusion.isParalyzedByMahito = false;
+      }
+    }
 
     const isIllusionParalyzed = (illusion.hitStunTimer || 0) > 0 || (illusion.paralyzeTimer || 0) > 0 || illusion.isParalyzedByMahoraga;
     if (isIllusionParalyzed) {
       if ((illusion.paralyzeTimer || 0) <= 0 && (illusion.hitStunTimer || 0) <= 0) {
         illusion.isParalyzedByMahoraga = false;
+        illusion.isParalyzedByMahito = false;
       }
       illusion.vx = 0;
       illusion.vy = 0;
@@ -219,8 +229,8 @@ export function updateIllusions() {
       if (!entity || entity === illusion) continue;
       if (entity.isIllusion) continue; // Skip illusions here, handled separately
       if (!entity.hp || entity.hp <= 0) continue;
-      // Cronos phases through illusions while inside his own sphere
-      if (entity._isInsideOwnSphere?.()) continue;
+      // Cronos phases through illusions while inside his own sphere; Mahito phases during Phantom Soul Slip
+      if (entity._isInsideOwnSphere?.() || (entity.soulPhaseDashTimer && entity.soulPhaseDashTimer > 0)) continue;
 
       const dx = illusion.x - entity.x;
       const dy = illusion.y - entity.y;

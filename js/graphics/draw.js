@@ -61,6 +61,7 @@ export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen };
 export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 export { drawGenosSelfDestructDimScreen };
+export { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter } from './statusEffects.js';
 
 export function drawCronosSphereVisual({
   ctx,

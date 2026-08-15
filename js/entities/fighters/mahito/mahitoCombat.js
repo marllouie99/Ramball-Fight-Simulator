@@ -1,0 +1,1947 @@
+// ─────────────────────────────────────────────
+// MAHITO COMBAT MODULE
+// Basic Attack: Idle Transfiguration (Melee Morph)
+// Frontal Arc Standard (120°–160° multi-target)
+// Soul Disfigurement Stacking & True Damage Burst
+// Adheres strictly to:
+// - Rule #1: Freeze / TimeStop Early Exits
+// - Rule #5: Attacker vs Target Freeze (Never freeze attacker)
+// - Rule #6: Unified Target Queries (Fighters & Illusions)
+// - Rule #7 & #8: Frontal Arc Radius AOE (Multi-target cone)
+// ─────────────────────────────────────────────
+
+import { CONFIG } from '../../../core/config.js';
+import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
+import { applyDamageToTarget } from '../../fighter.js';
+import { spawnBloodEffect } from '../../../graphics/particles/bloodEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahitoClawScratchImpact } from '../../../graphics/particles/sparkEffect.js';
+import { audioSystem } from '../../../systems/audioSystem.js';
+
+/**
+ * Helper: Clamps a coordinate (x, y) to inside the active arena boundaries.
+ */
+function clampToArena(x, y, pad = 0) {
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  if (!arena) return { x, y };
+
+  if (arena.shape === 'circle') {
+    const cx = arena.x + arena.width / 2;
+    const cy = arena.y + arena.height / 2;
+    const r = (arena.radius || (arena.width / 2)) - pad;
+    const dx = x - cx;
+    const dy = y - cy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > r && dist > 0) {
+      return {
+        x: cx + (dx / dist) * r,
+        y: cy + (dy / dist) * r
+      };
+    }
+    return { x, y };
+  } else {
+    // Rectangle
+    const minX = arena.x + pad;
+    const maxX = arena.x + arena.width - pad;
+    const minY = arena.y + pad;
+    const maxY = arena.y + arena.height - pad;
+    return {
+      x: Math.max(minX, Math.min(maxX, x)),
+      y: Math.max(minY, Math.min(maxY, y))
+    };
+  }
+}
+
+/**
+ * Helper: Find all valid enemy targets (fighters & illusions) in Mahito's frontal arc.
+ */
+export function getMahitoFrontRadiusTargets(fighter, reachOffset = 75, coneAngle = (135 * Math.PI / 180)) {
+  const targets = [];
+  if (typeof state === 'undefined' || !state || !state.fighters) return targets;
+
+  const myIndex = state.fighters.indexOf(fighter);
+  const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : fighter.team;
+  const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+
+  const candidates = [...state.fighters, ...(state.illusions || [])];
+  for (let i = 0; i < candidates.length; i++) {
+    const ent = candidates[i];
+    if (!ent || ent === fighter || ent.hp <= 0 || ent.isDead) continue;
+
+    // Check team alignment
+    const idx = state.fighters.indexOf(ent);
+    if (idx !== -1) {
+      const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(idx) : ent.team;
+      if (myTeam !== null && enemyTeam === myTeam) continue;
+    } else if (ent.owner) {
+      const ownerIdx = state.fighters.indexOf(ent.owner);
+      const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+      if (myTeam !== null && ownerTeam === myTeam) continue;
+    } else if (ent.team !== undefined && myTeam !== null && ent.team === myTeam) {
+      continue;
+    }
+
+    const dx = ent.x - fighter.x;
+    const dy = ent.y - fighter.y;
+    const dist = Math.hypot(dx, dy);
+    const maxHitDist = fighter.r + ent.r + reachOffset;
+
+    if (dist <= maxHitDist) {
+      const angleToTarget = Math.atan2(dy, dx);
+      let diff = angleToTarget - facingAngle;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+
+      if (Math.abs(diff) <= coneAngle / 2) {
+        targets.push({ entity: ent, dist, angle: angleToTarget });
+      }
+    }
+  }
+
+  return targets;
+}
+
+/**
+ * Executes Idle Transfiguration (Melee Morph) Basic Attack.
+ * Alternates between Giant Blade and Spiked Mace morphs.
+ */
+export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
+  const cfg = CONFIG.mahito || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  fighter.punchAnimTimer = fighter.punchMaxTime || cfg.punchSpeed || 20;
+  fighter.isRightPunch = !fighter.isRightPunch;
+  fighter.morphAttackCount = (fighter.morphAttackCount || 0) + 1;
+  fighter.morphType = 'claw';
+  fighter.cooldownTimer = cfg.basicPunchCooldown || 22;
+
+  const reach = cfg.punchRange || 75;
+  const arcAngle = cfg.arcAngle || (135 * Math.PI / 180);
+  const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+
+  let baseDamage = cfg.damage || 16;
+  if (isTransformed) {
+    const damageMult = cfg.transformation?.damageMultiplier ?? 1.60;
+    baseDamage *= damageMult;
+  }
+
+  // Gather all valid enemy targets in 135° frontal cone (Rule #6, #7, #8)
+  const validHits = getMahitoFrontRadiusTargets(fighter, reach, arcAngle);
+  const hitAny = validHits.length > 0;
+
+  for (let i = 0; i < validHits.length; i++) {
+    const { entity: ent, angle: targetAngle } = validHits[i];
+
+    // 1. Apply Base Damage
+    applyDamageToTarget(ent, baseDamage, fighter, { isMelee: true, isBasicAttack: true });
+
+    // 2. Physical Knockback Impulse
+    const baseKb = cfg.knockbackForce || 8;
+    const kbForce = isTransformed ? baseKb * (cfg.transformation?.knockbackMultiplier ?? 1.75) : baseKb;
+    const kx = Math.cos(targetAngle) * kbForce;
+    const ky = Math.sin(targetAngle) * kbForce;
+    ent.vx = (ent.vx || 0) + kx;
+    ent.vy = (ent.vy || 0) + ky;
+
+    // 3. Apply Hit-Stun to Target ONLY (Rule #5)
+    const baseStun = cfg.hitStunDuration || 8;
+    const hitStunFrames = isTransformed ? Math.round(baseStun * (cfg.transformation?.hitStunMultiplier ?? 1.5)) : baseStun;
+    if (typeof ent.applyHitStun === 'function') {
+      ent.applyHitStun(hitStunFrames);
+    }
+
+    // 4. Blood & Claw Scratch Impact Visuals
+    const impactX = (fighter.x + ent.x) / 2;
+    const impactY = (fighter.y + ent.y) / 2;
+    if (typeof spawnBloodEffect === 'function') {
+      spawnBloodEffect(ent, Math.max(1, Math.round(baseDamage * 0.2)), targetAngle);
+    }
+    spawnMahitoClawScratchImpact(impactX, impactY, targetAngle, isTransformed);
+
+    // 5. Soul Disfigurement Mechanic
+    const soulCfg = cfg.soulDisfigurement || {};
+    const maxStacks = soulCfg.maxStacks || 3;
+    const curStacks = (ent._soulDisfigurementStacks || 0) + 1;
+    ent._soulDisfigurementStacks = curStacks;
+    ent._soulDisfigurementTimer = soulCfg.duration || 300;
+
+    if (curStacks < maxStacks) {
+      // Stack Notification
+      spawnFloatingText(
+        ent.x,
+        ent.y - ent.r - 22,
+        `SOUL RESHAPED [${curStacks}/${maxStacks}]`,
+        isTransformed ? '#D946EF' : '#C026D3'
+      );
+    } else {
+      // ── MAX STACKS: VIOLENT SOUL RESHAPING (TRUE DAMAGE BURST) ──
+      ent._soulDisfigurementStacks = 0;
+      ent._soulDisfigurementTimer = 0;
+
+      let burstDmg = soulCfg.burstDamage || 38;
+      if (isTransformed) {
+        burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+      }
+
+      // True unmitigated soul damage
+      applyDamageToTarget(ent, burstDmg, fighter, {
+        isTrueDamage: true,
+        isSoulDamage: true,
+        isSkill: true,
+        damageAngle: targetAngle
+      });
+
+      // Soul Shatter Visual & Audio Effects
+      spawnFloatingText(ent.x, ent.y - ent.r - 28, "SOUL DISFIGURED!", "#FF2A8D");
+      spawnImpactFlash(ent.x, ent.y, 60, 'rgba(217, 70, 239, 0.95)');
+      spawnMeleeClashShockwave(ent.x, ent.y, 45, '#D946EF');
+      spawnSparks(ent.x, ent.y, '#D946EF', 16);
+
+      const burstKb = soulCfg.burstKnockback || 12;
+      ent.vx = (ent.vx || 0) + Math.cos(targetAngle) * burstKb;
+      ent.vy = (ent.vy || 0) + Math.sin(targetAngle) * burstKb;
+
+      if (typeof ent.applyHitStun === 'function') {
+        ent.applyHitStun(soulCfg.burstHitStun || 14);
+      }
+
+      // Apply Paralyze Debuff to Target (Rule #5: applied exclusively to target)
+      const paralyzeDur = soulCfg.paralyzeDuration || 45;
+      ent.isParalyzedByMahito = true;
+      if (typeof ent.applyParalyze === 'function') {
+        ent.applyParalyze(paralyzeDur);
+      } else {
+        ent.paralyzeTimer = Math.max(ent.paralyzeTimer || 0, paralyzeDur);
+      }
+
+      triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
+      audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', 1.6);
+      audioSystem.playSFX(cfg.sounds?.fleshHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3', 2.0);
+    }
+  }
+
+  // Audio Dispatcher
+  if (hitAny) {
+    triggerGlobalScreenShake(isTransformed ? 6 : 3);
+    if (fighter.morphType === 'mace') {
+      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 1.8);
+    } else {
+      audioSystem.playSFX(cfg.sounds?.bladeSwing || 'Assets/Sound Effects/Attacks/syctheattack.mp3', 1.8);
+    }
+  } else {
+    audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.2);
+  }
+}
+
+/**
+ * Triggers violent Soul Rupture explosion right when Mahito's paralyze debuff is about to expire.
+ */
+export function triggerMahitoParalyzeExplosion(entity) {
+  if (!entity || entity.hp <= 0 || entity.isDead) return;
+
+  const cfg = CONFIG.mahito || {};
+  const soulCfg = cfg.soulDisfigurement || {};
+  const ruptureDmg = soulCfg.ruptureDamage || 24;
+
+  // 1. Visceral Soul Explosion Visuals
+  spawnImpactFlash(entity.x, entity.y, 80, 'rgba(217, 70, 239, 0.95)');
+  spawnMeleeClashShockwave(entity.x, entity.y, 65, '#D946EF');
+  spawnMeleeClashShockwave(entity.x, entity.y, 35, '#FFFFFF');
+  spawnSparks(entity.x, entity.y, '#D946EF', 22);
+  spawnSparks(entity.x, entity.y, '#FAF5FF', 12);
+  spawnBloodEffect(entity.x, entity.y, 10, 'normal');
+  spawnFloatingText(entity.x, entity.y - entity.r - 28, "SOUL RUPTURE!", "#D946EF");
+
+  // 2. Damage application (Attributed to Mahito)
+  let mahitoFighter = null;
+  if (typeof state !== 'undefined' && state.fighters) {
+    mahitoFighter = state.fighters.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito'));
+  }
+
+  applyDamageToTarget(entity, ruptureDmg, mahitoFighter, {
+    isTrueDamage: true,
+    isSoulDamage: true,
+    isSkill: true
+  });
+
+  // 3. Outward velocity explosion kick
+  const randomAngle = Math.random() * Math.PI * 2;
+  const burstKb = soulCfg.ruptureKnockback || 14;
+  entity.vx = (entity.vx || 0) + Math.cos(randomAngle) * burstKb;
+  entity.vy = (entity.vy || 0) + Math.sin(randomAngle) * burstKb;
+
+  if (typeof entity.applyHitStun === 'function') {
+    entity.applyHitStun(10);
+  }
+
+  triggerGlobalScreenShake(soulCfg.ruptureScreenShake || 10);
+  audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', 1.8);
+  audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.8);
+  audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 2.0);
+}
+
+/**
+ * Helper: Applies +1 Soul Disfigurement stack to a target entity.
+ * Handles max stack detonation (soul burst + paralyze) inline.
+ */
+function applySoulDisfigurementStack(ent, fighter) {
+  const cfg = CONFIG.mahito || {};
+  const soulCfg = cfg.soulDisfigurement || {};
+  const maxStacks = soulCfg.maxStacks || 3;
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  const curStacks = (ent._soulDisfigurementStacks || 0) + 1;
+  ent._soulDisfigurementStacks = curStacks;
+  ent._soulDisfigurementTimer = soulCfg.duration || 300;
+
+  if (curStacks < maxStacks) {
+    spawnFloatingText(
+      ent.x,
+      ent.y - (ent.r || 25) - 22,
+      `SOUL RESHAPED [${curStacks}/${maxStacks}]`,
+      isTransformed ? '#D946EF' : '#C026D3'
+    );
+  } else {
+    // MAX STACKS: VIOLENT SOUL RESHAPING (TRUE DAMAGE BURST)
+    ent._soulDisfigurementStacks = 0;
+    ent._soulDisfigurementTimer = 0;
+
+    let burstDmg = soulCfg.burstDamage || 38;
+    if (isTransformed) {
+      burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+    }
+
+    applyDamageToTarget(ent, burstDmg, fighter, {
+      isTrueDamage: true,
+      isSoulDamage: true,
+      isSkill: true
+    });
+
+    spawnFloatingText(ent.x, ent.y - (ent.r || 25) - 28, "SOUL DISFIGURED!", "#FF2A8D");
+    spawnImpactFlash(ent.x, ent.y, 60, 'rgba(217, 70, 239, 0.95)');
+    spawnMeleeClashShockwave(ent.x, ent.y, 45, '#D946EF');
+    spawnSparks(ent.x, ent.y, '#D946EF', 16);
+
+    if (typeof ent.applyHitStun === 'function') {
+      ent.applyHitStun(soulCfg.burstHitStun || 14);
+    }
+
+    triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
+    audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', 1.6);
+  }
+}
+
+/**
+ * Executes Idle Transfiguration: Subterranean Flesh Surge (Underground Arm Eruption).
+ * Initializes the 3-phase staggered animation sequence:
+ * 1. Phase 1 (Frames 0–8): Momentum stop & slide to ground.
+ * 2. Phase 2 (Frames 8–18): Ground plunge punch animation & plunge fissure.
+ * 3. Phase 3 (Frames 18–42): Sequential tendril eruptions in frontal fan array.
+ */
+/**
+ * Executes Idle Transfiguration: Subterranean Flesh Surge (Underground Arm Eruption).
+ * Initializes the 3-phase staggered animation sequence with dynamic enemy chasing:
+ * 1. Phase 1 (Frames 0–8): Momentum stop & slide to ground.
+ * 2. Phase 2 (Frames 8–18): Ground plunge punch animation & plunge fissure.
+ * 3. Phase 3 (Frames 18–90+): Sequential tendril eruptions dynamically chasing the enemy 1-by-1.
+ */
+export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
+  const cfg = CONFIG.mahito || {};
+  const surgeCfg = cfg.fleshSurge || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  const slideFrames = surgeCfg.slideFrames || 8;
+  const plungeFrames = surgeCfg.plungeFrames || 10;
+  const staggerDelay = surgeCfg.staggerDelay || 8; // Smooth delay between hump eruptions
+  
+  // Dynamic hump count based on form
+  const tendrilCount = isTransformed ? (surgeCfg.tendrilCountTransformed || 5) : (surgeCfg.tendrilCountBase || 4); 
+  const reachMin = surgeCfg.reachMin || 15;
+  const reachMax = surgeCfg.reachMax || 360;
+
+  // Single hump growth duration & timing
+  const humpGrowthDuration = 14;
+  const growthDuration = (tendrilCount - 1) * staggerDelay + humpGrowthDuration;
+  const lingerDuration = surgeCfg.lingerDuration || 18;
+
+  const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  fighter._fleshSurgePlungeAngle = baseAngle;
+  const plungeEndFrame = slideFrames + plungeFrames;
+
+  // Ground plunge impact point (~55px below body)
+  const plungeDistance = (fighter.r || 25) + 30;
+  const plungeX = fighter.x;
+  const plungeY = fighter.y + plungeDistance;
+
+  // Find initial enemy target to track
+  let target = targetHint;
+  if (!target && typeof fighter._findClosestEnemy === 'function') {
+    target = fighter._findClosestEnemy();
+  }
+
+  // Distance Guard: Do NOT trigger subterranean surge if enemy is too close (< minDistance)
+  const minSurgeDist = surgeCfg.minDistance || 140;
+  if (target && !target.isDead && target.hp > 0) {
+    const distToTarget = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+    if (distToTarget < minSurgeDist && !fighter.playerControlled) {
+      // Enemy is in close quarters! Switch to close-quarters melee strike instead
+      if ((fighter.cooldownTimer || 0) <= 0) {
+        executeIdleTransfigurationStrike(fighter, target);
+      }
+      return;
+    }
+  }
+
+  // Initialize with the first dynamic chasing hump (Hump 0)
+  const loops = [];
+  const loop0 = {
+    index: 0,
+    startFrame: plungeEndFrame,
+    growthDuration: humpGrowthDuration,
+    maxHeight: 45,
+    entryX: plungeX,
+    entryY: plungeY,
+    peakX: plungeX + Math.cos(baseAngle) * 40,
+    peakY: plungeY + Math.sin(baseAngle) * 40,
+    exitX: plungeX + Math.cos(baseAngle) * 80,
+    exitY: plungeY + Math.sin(baseAngle) * 80,
+    dirAngle: baseAngle,
+    hitApplied: false,
+    isLocked: false
+  };
+
+  updateSingleHumpTrajectory(loop0, 0, plungeX, plungeY, target, 1, baseAngle);
+  loops.push(loop0);
+
+  let totalStretchDist = Math.hypot(plungeX - fighter.x, plungeY - fighter.y) + Math.hypot(loop0.exitX - loop0.entryX, loop0.exitY - loop0.entryY) * 1.25;
+
+  // Dynamic distance-based retraction: scales smoothly with how far the arm stretched across the arena
+  const retractSpeed = surgeCfg.retractSpeed || 14.0; // ~14px per frame retraction rate
+  const retractDuration = Math.max(12, Math.min(70, Math.round(totalStretchDist / retractSpeed) + 6));
+  const animDuration = slideFrames + plungeFrames + growthDuration + lingerDuration + retractDuration + 4;
+
+  fighter.fleshSurgeAnimTimer = animDuration;
+  fighter.fleshSurgeCooldown = surgeCfg.cooldown || 180;
+
+  // Store active surge state on fighter
+  fighter._fleshSurgeData = {
+    startX: plungeX,
+    startY: plungeY,
+    baseAngle,
+    target,
+    loops,
+    hasHitEnemy: false,
+    totalStretchDistance: totalStretchDist,
+    elapsedFrames: 0,
+    maxTimer: animDuration,
+    slideEndFrame: slideFrames,
+    plungeEndFrame: plungeEndFrame,
+    staggerDelay: staggerDelay,
+    growthDuration,
+    lingerDuration,
+    retractDuration,
+    hasPlunged: false,
+    reachMax
+  };
+
+  // Hide front hand circle during the stretch arm animation
+  fighter.hideFrontHand = true;
+
+  // Dampen momentum for initial slide
+  fighter.vx *= 0.25;
+  fighter.vy *= 0.25;
+}
+
+/**
+ * Helper to compute the dynamic trajectory and ground coordinates for a hump chasing the target.
+ */
+function updateSingleHumpTrajectory(loop, index, prevExitX, prevExitY, target, tendrilCount, fallbackAngle) {
+  let targetX = prevExitX + Math.cos(fallbackAngle) * 80;
+  let targetY = prevExitY + Math.sin(fallbackAngle) * 80;
+
+  if (target && !target.isDead && target.hp > 0) {
+    targetX = target.x;
+    targetY = target.y;
+  }
+
+  const dx = targetX - prevExitX;
+  const dy = targetY - prevExitY;
+  const distToTarget = Math.hypot(dx, dy) || 1;
+  const dirAngle = Math.atan2(dy, dx);
+
+  // Step length: bounds aggressively toward target, or directly onto them if within strike range
+  let stepDist = Math.max(60, Math.min(100, distToTarget * 0.65));
+  if (distToTarget <= 90) {
+    stepDist = distToTarget; // Lands right on target!
+  }
+
+  // Serpentine zigzag lateral offset
+  const latOffset = (index % 2 === 0 ? 1 : -1) * (distToTarget <= 90 ? 0 : 18);
+  const perpX = -Math.sin(dirAngle);
+  const perpY =  Math.cos(dirAngle);
+
+  loop.entryX = prevExitX;
+  loop.entryY = prevExitY;
+  loop.peakX = prevExitX + Math.cos(dirAngle) * (stepDist * 0.5) + perpX * latOffset;
+  loop.peakY = prevExitY + Math.sin(dirAngle) * (stepDist * 0.5) + perpY * latOffset;
+  loop.exitX = prevExitX + Math.cos(dirAngle) * stepDist;
+  loop.exitY = prevExitY + Math.sin(dirAngle) * stepDist;
+  loop.dirAngle = dirAngle;
+  loop.stepDist = stepDist;
+}
+
+/**
+ * Updates the 3-phase staggered Subterranean Flesh Surge sequence each frame.
+ * Dynamically chases the enemy target 1-by-1 as each hump emerges.
+ */
+export function updateMahitoFleshSurge(fighter) {
+  const data = fighter._fleshSurgeData;
+  if (!data || fighter.fleshSurgeAnimTimer <= 0) return;
+
+  data.elapsedFrames++;
+  const cfg = CONFIG.mahito || {};
+  const surgeCfg = cfg.fleshSurge || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  const explosionR = surgeCfg.explosionRadius || 48;
+  let baseDamage = surgeCfg.damage || 24;
+  if (isTransformed) {
+    const damageMult = cfg.transformation?.damageMultiplier ?? 1.60;
+    baseDamage *= damageMult;
+  }
+
+  // Phase 1: Slide & Halt (Frames 0 to slideEndFrame)
+  if (data.elapsedFrames <= data.slideEndFrame) {
+    fighter.vx *= 0.3;
+    fighter.vy *= 0.3;
+  }
+
+  // Phase 2: Ground Plunge Punch (Frames slideEndFrame to plungeEndFrame)
+  if (data.elapsedFrames > data.slideEndFrame && data.elapsedFrames <= data.plungeEndFrame) {
+    fighter.vx = 0;
+    fighter.vy = 0;
+
+    if (!data.hasPlunged && data.elapsedFrames >= data.slideEndFrame + 2) {
+      data.hasPlunged = true;
+      fighter.punchAnimTimer = 16; // Trigger ground plunge fist animation
+
+      // Plunge ground impact SFX & particles
+      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 2.0);
+      audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.8);
+      spawnMeleeClashShockwave(fighter.x, fighter.y, 40, '#D946EF');
+      spawnSparks(fighter.x, fighter.y, '#D946EF', 15);
+      triggerGlobalScreenShake(surgeCfg.screenShake || 6);
+    }
+  }
+
+  // Phase 3: Sequential Staggered Tendril Eruptions with Dynamic Homing (Frames plungeEndFrame to maxTimer)
+  if (data.elapsedFrames > data.plungeEndFrame) {
+    fighter.vx = 0;
+    fighter.vy = 0;
+
+    // Target Re-acquisition (if target is dead or missing)
+    if (!data.target || data.target.isDead || data.target.hp <= 0) {
+      if (typeof fighter._findClosestEnemy === 'function') {
+        data.target = fighter._findClosestEnemy();
+      }
+    }
+
+    const candidates = [...(state.fighters || []), ...(state.illusions || [])];
+    const myIndex = state.fighters.indexOf(fighter);
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : fighter.team;
+
+    // 1. Dynamically update trajectory for upcoming un-erupted humps towards the target
+    if (!data.hasHitEnemy) {
+      let chainPrevX = data.startX;
+      let chainPrevY = data.startY;
+
+      for (let i = 0; i < data.loops.length; i++) {
+        const lp = data.loops[i];
+
+        if (!lp.isLocked) {
+          if (data.elapsedFrames < lp.startFrame) {
+            // Still subterranean & preparing to emerge: dynamically steer towards enemy
+            updateSingleHumpTrajectory(lp, i, chainPrevX, chainPrevY, data.target, data.tendrilCount, data.baseAngle);
+          } else {
+            // Active: lock ground entry/exit coordinates permanently into the earth
+            lp.isLocked = true;
+          }
+        }
+
+        chainPrevX = lp.exitX;
+        chainPrevY = lp.exitY;
+      }
+    }
+
+    // 2. Evaluate Eruption Hit & Damage for each Hump as it emerges
+    for (let i = 0; i < data.loops.length; i++) {
+      const lp = data.loops[i];
+
+      if (data.elapsedFrames >= lp.startFrame + 4 && !lp.hitApplied) {
+        lp.hitApplied = true;
+
+        // Visceral Eruption SFX & Cursed Energy Shockwaves at the Peak location
+        spawnImpactFlash(lp.peakX, lp.peakY, 48, 'rgba(217, 70, 239, 0.90)');
+        spawnMeleeClashShockwave(lp.peakX, lp.peakY, 42, '#D946EF');
+        spawnMeleeClashShockwave(lp.peakX, lp.peakY, 20, '#FAF5FF');
+        spawnSparks(lp.peakX, lp.peakY, '#D946EF', 16);
+        spawnSparks(lp.peakX, lp.peakY, '#F5D0FE', 10);
+        triggerGlobalScreenShake(surgeCfg.screenShake || 5);
+        audioSystem.playSFX(cfg.sounds?.fleshHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3', 1.9);
+
+        // AOE Hit Evaluation around this hump's eruption center
+        let hitAnyEnemy = false;
+
+        for (let c = 0; c < candidates.length; c++) {
+          const ent = candidates[c];
+          if (!ent || ent === fighter || ent.hp <= 0 || ent.isDead) continue;
+
+          // Check team alignment
+          const idx = state.fighters.indexOf(ent);
+          if (idx !== -1) {
+            const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(idx) : ent.team;
+            if (myTeam !== null && enemyTeam === myTeam) continue;
+          } else if (ent.owner) {
+            const ownerIdx = state.fighters.indexOf(ent.owner);
+            const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+            if (myTeam !== null && ownerTeam === myTeam) continue;
+          } else if (ent.team !== undefined && myTeam !== null && ent.team === myTeam) {
+            continue;
+          }
+
+          const dist = Math.hypot(ent.x - lp.peakX, ent.y - lp.peakY);
+          if (dist <= explosionR + (ent.r || 25)) {
+            hitAnyEnemy = true;
+
+            // Apply True/Soul Damage & Hit Effects
+            applyDamageToTarget(ent, baseDamage, fighter, {
+              isTrueDamage: false,
+              isSoulDamage: true,
+              isSkill: true
+            });
+
+            // Physical upward/outward knockback
+            const hitAngle = Math.atan2(ent.y - lp.peakY, ent.x - lp.peakX);
+            const kb = surgeCfg.knockbackForce || 8;
+            ent.vx = (ent.vx || 0) + Math.cos(hitAngle) * kb;
+            ent.vy = (ent.vy || 0) + Math.sin(hitAngle) * kb;
+
+            if (typeof ent.applyHitStun === 'function') {
+              ent.applyHitStun(surgeCfg.hitStun || 12);
+            }
+
+            // Apply Soul Disfigurement stack (+1 stack)
+            applySoulDisfigurementStack(ent, fighter);
+            spawnBloodEffect(ent.x, ent.y, 8, 'normal');
+          }
+        }
+
+        // 3. TARGET HIT CONNECTED: Stop chasing further; this hump is the final impact tip!
+        if (hitAnyEnemy && !data.hasHitEnemy) {
+          data.hasHitEnemy = true;
+          // Trim any un-erupted future loops so the arm ends cleanly at the target
+          data.loops = data.loops.slice(0, i + 1);
+          data.retractStartFrame = data.elapsedFrames + data.lingerDuration;
+          break;
+        }
+      }
+    }
+
+    // 4. UNLIMITED CHASE: If we haven't hit the enemy yet, dynamically spawn the NEXT chasing hump!
+    if (!data.hasHitEnemy) {
+      const lastLoop = data.loops[data.loops.length - 1];
+
+      // If the last queued loop is already active/erupting and hasn't hit, spawn the next hunting hump
+      if (lastLoop && data.elapsedFrames >= lastLoop.startFrame) {
+        const nextIndex = data.loops.length;
+        const nextStartFrame = lastLoop.startFrame + data.staggerDelay;
+        const nextMaxHeight = Math.min(75, 42 + nextIndex * 6);
+
+        const newLoop = {
+          index: nextIndex,
+          startFrame: nextStartFrame,
+          growthDuration: 14,
+          maxHeight: nextMaxHeight,
+          entryX: lastLoop.exitX,
+          entryY: lastLoop.exitY,
+          peakX: lastLoop.exitX,
+          peakY: lastLoop.exitY,
+          exitX: lastLoop.exitX,
+          exitY: lastLoop.exitY,
+          dirAngle: lastLoop.dirAngle,
+          hitApplied: false,
+          isLocked: false
+        };
+
+        updateSingleHumpTrajectory(newLoop, nextIndex, lastLoop.exitX, lastLoop.exitY, data.target, nextIndex + 1, data.baseAngle);
+        data.loops.push(newLoop);
+      }
+    }
+
+    // 5. Distance-Based Retraction Synchronization:
+    // Compute total stretch distance along the active chain
+    let currentTotalDist = Math.hypot(data.startX - fighter.x, data.startY - fighter.y);
+    for (let i = 0; i < data.loops.length; i++) {
+      const lp = data.loops[i];
+      const len = Math.hypot(lp.exitX - lp.entryX, lp.exitY - lp.entryY) * 1.25;
+      currentTotalDist += len;
+    }
+    data.totalStretchDistance = currentTotalDist;
+
+    const retractSpeed = surgeCfg.retractSpeed || 14.0; // ~14px per frame retraction rate
+    data.retractDuration = Math.max(12, Math.min(70, Math.round(currentTotalDist / retractSpeed) + 6));
+
+    if (data.retractStartFrame === undefined) {
+      // While still hunting, keep anim timer active so Mahito stays anchored in ground plunge stance
+      fighter.fleshSurgeAnimTimer = 30;
+    } else {
+      // Hit connected: countdown to finish retraction
+      data.maxTimer = data.retractStartFrame + data.retractDuration + 4;
+      const totalRemainingFrames = data.maxTimer - data.elapsedFrames;
+      if (totalRemainingFrames > 0) {
+        fighter.fleshSurgeAnimTimer = totalRemainingFrames;
+      }
+    }
+  }
+}
+
+/**
+ * Decays active Soul Disfigurement timers on all fighters and illusions.
+ * Also checks and triggers Soul Rupture explosion right when paralysis is about to expire.
+ */
+export function updateSoulDisfigurementDecay() {
+  if (typeof state === 'undefined' || !state) return;
+  const entities = [...(state.fighters || []), ...(state.illusions || [])];
+  for (let i = 0; i < entities.length; i++) {
+    const ent = entities[i];
+    if (!ent) continue;
+
+    // Decay soul disfigurement timer
+    if (ent._soulDisfigurementTimer > 0) {
+      ent._soulDisfigurementTimer--;
+      if (ent._soulDisfigurementTimer <= 0) {
+        ent._soulDisfigurementStacks = 0;
+      }
+    }
+
+    // Check paralyze explosion right when paralyze is about to expire (at 1 frame remaining)
+    if (ent.isParalyzedByMahito && ent.paralyzeTimer === 1) {
+      triggerMahitoParalyzeExplosion(ent);
+    }
+  }
+}
+
+/**
+ * Passive Skill: Phantom Soul Slip (Phase-Through Claw Dash).
+ * Mahito phases high-speed directly through the opponent, crossing through them and slicing with his claws.
+ */
+export function executeMahitoSoulPhaseSlip(fighter, target) {
+  if (!fighter || !target || fighter.hp <= 0 || target.hp <= 0) return;
+  if ((fighter.paralyzeTimer || 0) > 0 || fighter.isParalyzed || fighter.fleshSurgeAnimTimer > 0) return;
+
+  const cfg = CONFIG.mahito || {};
+  const dashCfg = cfg.soulPhaseSlip || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  const dx = target.x - fighter.x;
+  const dy = target.y - fighter.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const dirX = dx / dist;
+  const dirY = dy / dist;
+  const angle = Math.atan2(dy, dx);
+
+  const dashDuration = dashCfg.dashDuration || 12;
+  const totalPassDist = dist + target.r + fighter.r + (dashCfg.passThroughDistance || 70);
+  const stepSpeed = totalPassDist / dashDuration;
+
+  fighter.soulPhaseDashTimer = dashDuration;
+  fighter.soulPhaseDashMax = dashDuration;
+  fighter.soulPhaseDashCooldown = dashCfg.cooldown || 180;
+  fighter.soulPhaseDashTarget = target;
+  fighter.soulPhaseDashHit = false;
+  fighter.soulPhaseDashVector = { x: dirX * stepSpeed, y: dirY * stepSpeed };
+  fighter.gunAngle = angle;
+  fighter.angle = angle;
+
+  // Trigger claw attack animation during the pass
+  fighter.punchAnimTimer = Math.max(16, dashDuration + 4);
+  fighter.morphType = 'claw';
+  fighter.isRightPunch = !fighter.isRightPunch;
+
+  // Audio & Burst FX
+  audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.85);
+  spawnImpactFlash(fighter.x, fighter.y, 40, isTransformed ? '#D946EF' : '#C026D3');
+}
+
+/**
+ * Updates active Phantom Soul Slip motion, physics, hit check, and afterimage trailing.
+ */
+export function updateMahitoSoulPhaseSlip(fighter) {
+  if (!fighter) return;
+
+  // Age existing shadow afterimages
+  if (fighter._dashAfterimages && fighter._dashAfterimages.length > 0) {
+    for (let i = fighter._dashAfterimages.length - 1; i >= 0; i--) {
+      fighter._dashAfterimages[i].alpha -= 0.08;
+      if (fighter._dashAfterimages[i].alpha <= 0) {
+        fighter._dashAfterimages.splice(i, 1);
+      }
+    }
+  }
+
+  if ((fighter.soulPhaseDashTimer || 0) <= 0) return;
+
+  fighter.soulPhaseDashTimer--;
+  const vec = fighter.soulPhaseDashVector;
+  if (!vec) return;
+
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+  const cfg = CONFIG.mahito || {};
+  const dashCfg = cfg.soulPhaseSlip || {};
+
+  // Store afterimage
+  if (!fighter._dashAfterimages) fighter._dashAfterimages = [];
+  fighter._dashAfterimages.push({
+    x: fighter.x,
+    y: fighter.y,
+    alpha: 0.85,
+    angle: fighter.gunAngle || 0,
+    isTransformed
+  });
+
+  // Step movement
+  fighter.x += vec.x;
+  fighter.y += vec.y;
+
+  // Arena bound clamp
+  if (typeof state !== 'undefined' && state.arena) {
+    const arena = state.arena;
+    fighter.x = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, fighter.x));
+    fighter.y = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, fighter.y));
+  }
+
+  const target = fighter.soulPhaseDashTarget;
+  if (target && !fighter.soulPhaseDashHit && target.hp > 0 && !target.isDead) {
+    const dTarget = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+    const hitReach = fighter.r + target.r + 35;
+
+    if (dTarget <= hitReach) {
+      fighter.soulPhaseDashHit = true;
+
+      // 1. Slash Damage
+      let slashDmg = dashCfg.slashDamage || 22;
+      if (isTransformed) {
+        slashDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+      }
+      applyDamageToTarget(target, slashDmg, fighter, { isMelee: true, isBasicAttack: true });
+
+      // 2. Hit-Stun & Knockback
+      const stunDur = dashCfg.hitStunDuration || 14;
+      if (typeof target.applyHitStun === 'function') {
+        target.applyHitStun(stunDur);
+      }
+
+      const kb = dashCfg.knockbackForce || 6;
+      const passAngle = Math.atan2(vec.y, vec.x);
+      target.vx = (target.vx || 0) + Math.cos(passAngle) * kb;
+      target.vy = (target.vy || 0) + Math.sin(passAngle) * kb;
+
+      // 3. Blood & 5-Blade Razor Claw Slash Laceration Impact Visuals
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(target, Math.max(2, Math.round(slashDmg * 0.25)), passAngle);
+      }
+      spawnMahitoClawScratchImpact(target.x, target.y, passAngle, isTransformed);
+
+      // 4. Soul Disfigurement Stacking
+      applySoulDisfigurementStack(target, fighter);
+
+      // Audio & Impact Shake
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', 0.95);
+      triggerGlobalScreenShake(4, 6);
+    }
+  }
+
+  // Dash completed: Snap facing angle back to target from behind! (Rule #3 compliant)
+  if (fighter.soulPhaseDashTimer <= 0) {
+    if (target && target.hp > 0 && !target.isDead) {
+      fighter.aim(target);
+    }
+  }
+}
+
+/**
+ * Third Skill: Idle Transfiguration — Mutated Mace Cannon (Stretch Arm Spiked Ball Shrapnel Explosion).
+ * Launches direct stretching flesh arm straight at target. As it gets close, the fist swells into a spiked mace ball
+ * and detonates into a violent spike shrapnel explosion!
+ */
+export function executeMahitoMaceCannon(fighter, targetHint = null) {
+  if (!fighter || fighter.hp <= 0 || fighter.isDead) return;
+  if ((fighter.paralyzeTimer || 0) > 0 || fighter.isParalyzed || fighter.fleshSurgeAnimTimer > 0 || (fighter.soulPhaseDashTimer || 0) > 0) return;
+
+  const cfg = CONFIG.mahito || {};
+  const cannonCfg = cfg.maceCannon || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  let target = targetHint;
+  if (!target && typeof fighter._findClosestEnemy === 'function') {
+    target = fighter._findClosestEnemy();
+  }
+  if (!target || target.hp <= 0 || target.isDead) return;
+
+  const dx = target.x - fighter.x;
+  const dy = target.y - fighter.y;
+  const dist = Math.hypot(dx, dy) || 1;
+  const angle = Math.atan2(dy, dx);
+
+  const reachMax = cannonCfg.reachMax || 380;
+  const targetDist = Math.min(dist, reachMax);
+
+  // Clamp target coordinates inside the arena boundaries
+  const maceR = isTransformed ? (cannonCfg.maceRadiusTransformed || 29) : (cannonCfg.maceRadiusBase || 22);
+  const pad = maceR + 8; // Small extra pad for spikes
+  const rawTargetX = fighter.x + Math.cos(angle) * targetDist;
+  const rawTargetY = fighter.y + Math.sin(angle) * targetDist;
+  const clampedTarget = clampToArena(rawTargetX, rawTargetY, pad);
+
+  // Re-adjust target distance and angle to target clamped target coordinates
+  const dxClamped = clampedTarget.x - fighter.x;
+  const dyClamped = clampedTarget.y - fighter.y;
+  const finalTargetDist = Math.hypot(dxClamped, dyClamped) || 1;
+  const finalAngle = Math.atan2(dyClamped, dxClamped);
+
+  fighter.gunAngle = finalAngle;
+  fighter.angle = finalAngle;
+
+  fighter.maceCannonCooldown = cannonCfg.cooldown || 360;
+  fighter.maceCannonAnimTimer = 180; // Ample buffer; updateMahitoMaceCannon clears timer on retract finish
+  fighter.hideFrontHand = true;
+
+  // Generate organic, non-uniform spikes around the forward/side perimeter (excluding rear neck connection)
+  const spikeCount = 8;
+  const angleSpan = Math.PI * 1.45; // ~260° forward/side perimeter arc
+  const startAng = -angleSpan / 2;
+  const spkStep = angleSpan / (spikeCount - 1);
+  const spikes = [];
+
+  for (let i = 0; i < spikeCount; i++) {
+    // Non-uniform organic angle with natural random jitter
+    const angJitter = (Math.random() - 0.5) * (spkStep * 0.45);
+    const spkAng = startAng + (i * spkStep) + angJitter;
+    const lenMult = 0.75 + Math.random() * 0.55; // 0.75x to 1.30x varied length
+    const widthMult = 0.80 + Math.random() * 0.40;
+    const curveOffset = (Math.random() - 0.5) * 0.25; // Subtle organic curve tilt
+    const popDelay = Math.random() * 0.04; // Micro stagger on eruption
+
+    spikes.push({
+      angle: spkAng,
+      lenMult,
+      widthMult,
+      curveOffset,
+      popDelay,
+      isSurface: false
+    });
+  }
+
+  // 3 Organic surface spikes on the front face of the ball for 3D depth
+  const surfaceAngles = [-0.6, 0.2, 0.8];
+  for (let s = 0; s < surfaceAngles.length; s++) {
+    const sAng = surfaceAngles[s] + (Math.random() - 0.5) * 0.3;
+    const sDist = 0.30 + Math.random() * 0.35;
+    spikes.push({
+      angle: sAng,
+      surfaceDist: sDist,
+      lenMult: 0.70 + Math.random() * 0.40,
+      widthMult: 0.85 + Math.random() * 0.30,
+      curveOffset: (Math.random() - 0.5) * 0.20,
+      popDelay: 0.01 + Math.random() * 0.03,
+      isSurface: true
+    });
+  }
+
+  const r = fighter.r || 25;
+  const facingAngle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const facingLeft = Math.abs(facingAngle) > Math.PI / 2;
+  const localBackX = r * 0.70;
+  const localBackY = facingLeft ? (r * 0.18) : (-r * 0.18);
+  const cosA = Math.cos(facingAngle);
+  const sinA = Math.sin(facingAngle);
+  const backHandX = fighter.x + (localBackX * cosA - localBackY * sinA);
+  const backHandY = fighter.y + (localBackX * sinA + localBackY * cosA);
+
+  fighter.hideBackHand = true;
+  fighter.hideFrontHand = false;
+
+  const numArmNodes = 16;
+  const armNodes = [];
+  for (let i = 0; i < numArmNodes; i++) {
+    armNodes.push({
+      x: backHandX,
+      y: backHandY,
+      oldX: backHandX,
+      oldY: backHandY
+    });
+  }
+
+  fighter._maceCannonData = {
+    startX: backHandX,
+    startY: backHandY,
+    currentTipX: backHandX,
+    currentTipY: backHandY,
+    target,
+    dirX: Math.cos(finalAngle),
+    dirY: Math.sin(finalAngle),
+    angle: finalAngle,
+    targetDist: finalTargetDist,
+    currentDist: 0,
+    maceProgress: 0.0, // Swells from 0 (fist) to 1.0 (giant spiked mace)
+    phase: 'launch',   // 'launch' -> 'morph' -> 'explode' -> 'retract'
+    elapsedFrames: 0,
+    morphStartFrame: 0,
+    morphDuration: cannonCfg.morphDuration || 45,
+    hasDetonated: false,
+    hasSpikesPopped: false,
+    spikes,
+    shrapnelSpikes: [],
+    retractRatio: 0.0,
+    retractDuration: 12,
+    armNodes
+  };
+
+  // Launch audio & impact spark
+  audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.9);
+  spawnImpactFlash(backHandX, backHandY, 35, isTransformed ? '#D946EF' : '#C026D3');
+}
+
+/**
+ * Updates active Mutated Mace Cannon arm extension, hover suspension, spiked ball transition, shrapnel explosion, and pullback.
+ */
+export function updateMahitoMaceCannon(fighter) {
+  const data = fighter._maceCannonData;
+  if (!data || fighter.maceCannonAnimTimer <= 0) return;
+
+  data.elapsedFrames++;
+  const cfg = CONFIG.mahito || {};
+  const cannonCfg = cfg.maceCannon || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  const target = data.target;
+
+  // ── Dynamic Back Hand Socket Coordinates in World Space ──
+  const r = fighter.r || 25;
+  const facingAngle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const facingLeft = Math.abs(facingAngle) > Math.PI / 2;
+  const localBackX = r * 0.70;
+  const localBackY = facingLeft ? (r * 0.18) : (-r * 0.18);
+  const cosA = Math.cos(facingAngle);
+  const sinA = Math.sin(facingAngle);
+  const backHandX = fighter.x + (localBackX * cosA - localBackY * sinA);
+  const backHandY = fighter.y + (localBackX * sinA + localBackY * cosA);
+
+  // ── Natural Loose Thread / Rope Verlet Physics Simulation ──
+  const curTipX = data.currentTipX;
+  const curTipY = data.currentTipY;
+  const numNodes = 16;
+
+  if (!data.armNodes || data.armNodes.length !== numNodes) {
+    data.armNodes = [];
+    for (let i = 0; i < numNodes; i++) {
+      const p = i / (numNodes - 1);
+      const px = backHandX + (curTipX - backHandX) * p;
+      const py = backHandY + (curTipY - backHandY) * p;
+      data.armNodes.push({
+        x: px,
+        y: py,
+        oldX: px,
+        oldY: py
+      });
+    }
+  }
+
+  const nodes = data.armNodes;
+
+  // 1. Verlet Integration with air damping: nodes retain their world positions and trail naturally behind movement
+  for (let i = 1; i < numNodes - 1; i++) {
+    const node = nodes[i];
+    const vx = (node.x - node.oldX) * 0.72; // Air friction / thread damping
+    const vy = (node.y - node.oldY) * 0.72;
+    node.oldX = node.x;
+    node.oldY = node.y;
+    node.x += vx;
+    node.y += vy;
+  }
+
+  // 2. Pin shoulder/back-hand endpoint (Node 0) to Mahito's back hand and ball endpoint (Node N-1) to suspended tip
+  nodes[0].x = backHandX;
+  nodes[0].y = backHandY;
+  nodes[0].oldX = backHandX - (fighter.vx || 0) * 0.5;
+  nodes[0].oldY = backHandY - (fighter.vy || 0) * 0.5;
+
+  nodes[numNodes - 1].x = curTipX;
+  nodes[numNodes - 1].y = curTipY;
+  nodes[numNodes - 1].oldX = curTipX;
+  nodes[numNodes - 1].oldY = curTipY;
+
+  // 3. Relax distance constraints between thread segments (Loose trailing thread kinematics)
+  const totalLinearDist = Math.hypot(curTipX - backHandX, curTipY - backHandY) || 1;
+  const targetSegDist = totalLinearDist / (numNodes - 1);
+
+  const iterations = 5;
+  for (let iter = 0; iter < iterations; iter++) {
+    // Re-pin ends every iteration
+    nodes[0].x = backHandX;
+    nodes[0].y = backHandY;
+    nodes[numNodes - 1].x = curTipX;
+    nodes[numNodes - 1].y = curTipY;
+
+    for (let i = 0; i < numNodes - 1; i++) {
+      const pA = nodes[i];
+      const pB = nodes[i + 1];
+      const dx = pB.x - pA.x;
+      const dy = pB.y - pA.y;
+      const dist = Math.hypot(dx, dy) || 0.001;
+
+      // Allow gentle slack / stretch elasticity
+      const diff = (dist - targetSegDist) / dist;
+
+      if (i === 0) {
+        pB.x -= dx * diff * 0.85;
+        pB.y -= dy * diff * 0.85;
+      } else if (i + 1 === numNodes - 1) {
+        pA.x += dx * diff * 0.85;
+        pA.y += dy * diff * 0.85;
+      } else {
+        pA.x += dx * diff * 0.45;
+        pA.y += dy * diff * 0.45;
+        pB.x -= dx * diff * 0.45;
+        pB.y -= dy * diff * 0.45;
+      }
+    }
+  }
+
+  // 4. Quantize / Snapshot Stepped Nodes for 24-30 FPS Anime Sakuga Frame Cadence (Stepped on 2s)
+  if (!data.steppedNodes || data.elapsedFrames % 2 === 0) {
+    data.steppedNodes = nodes.map(n => ({ x: n.x, y: n.y }));
+  }
+
+  // 1. Update active flying shrapnel spikes
+  if (data.shrapnelSpikes.length > 0) {
+    for (let i = data.shrapnelSpikes.length - 1; i >= 0; i--) {
+      const spk = data.shrapnelSpikes[i];
+      spk.x += spk.vx;
+      spk.y += spk.vy;
+      spk.life--;
+
+      // Check if spike is outside the arena boundaries
+      const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+      if (arena) {
+        if (arena.shape === 'circle') {
+          const cx = arena.x + arena.width / 2;
+          const cy = arena.y + arena.height / 2;
+          const ar = arena.radius || (arena.width / 2);
+          if (Math.hypot(spk.x - cx, spk.y - cy) > ar) {
+            spk.life = 0;
+          }
+        } else {
+          if (spk.x < arena.x || spk.x > arena.x + arena.width || spk.y < arena.y || spk.y > arena.y + arena.height) {
+            spk.life = 0;
+          }
+        }
+      }
+
+      // Hit detection against all valid enemies & illusions (Rule #6 compliant)
+      if (!spk.hasHit && (typeof state !== 'undefined' && state.fighters)) {
+        const candidates = [...state.fighters, ...(state.illusions || [])];
+        const myIdx = state.fighters.indexOf(fighter);
+        const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : fighter.team;
+
+        for (let j = 0; j < candidates.length; j++) {
+          const ent = candidates[j];
+          if (!ent || ent === fighter || ent.isDead || ent.hp <= 0) continue;
+
+          // Team check
+          const entIdx = state.fighters.indexOf(ent);
+          if (entIdx !== -1) {
+            const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
+            if (myTeam !== null && enemyTeam === myTeam) continue;
+          } else if (ent.owner) {
+            const ownerIdx = state.fighters.indexOf(ent.owner);
+            const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+            if (myTeam !== null && ownerTeam === myTeam) continue;
+          }
+
+          const dToSpike = Math.hypot(ent.x - spk.x, ent.y - spk.y);
+          if (dToSpike <= ent.r + 18) {
+            spk.hasHit = true;
+            spk.life = 0; // Consume spike
+
+            let shrapnelDmg = cannonCfg.shrapnelDamage || 12;
+            if (isTransformed) shrapnelDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+            applyDamageToTarget(ent, shrapnelDmg, fighter, { isSkill: true });
+
+            if (typeof ent.applyHitStun === 'function') {
+              ent.applyHitStun(cannonCfg.shrapnelHitStun || 14);
+            }
+            ent.vx = (ent.vx || 0) + Math.cos(spk.angle) * 6;
+            ent.vy = (ent.vy || 0) + Math.sin(spk.angle) * 6;
+
+            if (typeof spawnBloodEffect === 'function') {
+              spawnBloodEffect(ent, 3, spk.angle);
+            }
+            spawnImpactFlash(spk.x, spk.y, 25, isTransformed ? '#F5D0FE' : '#D946EF');
+
+            // Attach impaled bone spike visual to enemy body (Randomized across/inside body)
+            ent._embeddedMahitoSpikes = ent._embeddedMahitoSpikes || [];
+            if (ent._embeddedMahitoSpikes.length < 8) {
+              const bodyR = ent.r || 25;
+              const randAng = Math.random() * Math.PI * 2;
+              const randDist = Math.sqrt(Math.random()) * (bodyR * 0.88);
+              const piercingAng = spk.angle + (Math.random() - 0.5) * 0.75;
+              ent._embeddedMahitoSpikes.push({
+                relX: Math.cos(randAng) * randDist,
+                relY: Math.sin(randAng) * randDist,
+                angle: piercingAng,
+                length: (isTransformed ? 25 : 19) * (0.80 + Math.random() * 0.40),
+                width: isTransformed ? 6.0 : 4.8,
+                penetrationDepth: 0.25 + Math.random() * 0.50,
+                isTransformed: Boolean(spk.isTransformed),
+                duration: 180, // 3 full seconds
+                maxDuration: 180
+              });
+            }
+            break;
+          }
+        }
+      }
+
+      if (spk.life <= 0) {
+        data.shrapnelSpikes.splice(i, 1);
+      }
+    }
+  }
+
+  // 2. Launch Phase (Fires straight toward aimed coordinates)
+  if (data.phase === 'launch') {
+    const stretchSpeed = cannonCfg.stretchSpeed || 24.0;
+    data.currentDist += stretchSpeed;
+
+    const rawTipX = fighter.x + data.dirX * data.currentDist;
+    const rawTipY = fighter.y + data.dirY * data.currentDist;
+    const maceR = isTransformed ? (cannonCfg.maceRadiusTransformed || 29) : (cannonCfg.maceRadiusBase || 22);
+    const pad = maceR + 8;
+    const clampedTip = clampToArena(rawTipX, rawTipY, pad);
+    data.currentTipX = clampedTip.x;
+    data.currentTipY = clampedTip.y;
+
+    // Check if tip reached aimed destination or maximum reach
+    if (data.currentDist >= data.targetDist) {
+      // Arrived at destination! Stay suspended in the air at this fixed point and begin transforming
+      data.phase = 'morph';
+      data.morphStartFrame = data.elapsedFrames;
+      data.morphDuration = cannonCfg.morphDuration || 45;
+      data.maceProgress = 0.0;
+      data.lockTipX = data.currentTipX;
+      data.lockTipY = data.currentTipY;
+
+      audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.4);
+    }
+  }
+
+  // 3. Hover Suspension & Spiked Ball Morph Phase (Suspended at fixed point in mid-air, allowing enemies to evade)
+  else if (data.phase === 'morph') {
+    const morphDur = data.morphDuration || 45;
+    const morphProg = Math.min(1.0, (data.elapsedFrames - data.morphStartFrame) / morphDur);
+    data.maceProgress = morphProg;
+
+    // Lock position strictly to fixed coordinates in the air (no sticking / tracking enemies)
+    data.currentTipX = data.lockTipX;
+    data.currentTipY = data.lockTipY;
+
+    // Crackling Cursed Energy sparks around the growing flesh head
+    if (data.elapsedFrames % 6 === 0) {
+      spawnSparks(data.currentTipX, data.currentTipY, isTransformed ? '#D946EF' : '#C026D3', 3);
+    }
+
+    // Instant Spike Pop-Out Cue at 68% growth
+    if (morphProg >= 0.68 && !data.hasSpikesPopped) {
+      data.hasSpikesPopped = true;
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', 1.8);
+      spawnImpactFlash(data.currentTipX, data.currentTipY, 45, isTransformed ? '#D946EF' : '#C026D3');
+      spawnSparks(data.currentTipX, data.currentTipY, isTransformed ? '#F5D0FE' : '#D946EF', 12);
+    }
+
+    // When transformation into the giant spiked mace ball is fully complete, trigger violent explosion!
+    if (morphProg >= 1.0) {
+      data.phase = 'explode';
+    }
+  }
+
+  // 4. Explosion Phase (Violent Spiked Ball Shrapnel Detonation)
+  if (data.phase === 'explode') {
+    data.hasDetonated = true;
+    data.maceProgress = 1.0;
+    data.explodeFrame = data.elapsedFrames;
+
+    const impactX = data.currentTipX;
+    const impactY = data.currentTipY;
+    const blastRadius = cannonCfg.explosionRadius || 85;
+
+    // Check all valid enemy fighters & illusions inside the explosion radius (Rule #6 compliant)
+    if (typeof state !== 'undefined' && state.fighters) {
+      const candidates = [...state.fighters, ...(state.illusions || [])];
+      const myIdx = state.fighters.indexOf(fighter);
+      const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : fighter.team;
+
+      for (let j = 0; j < candidates.length; j++) {
+        const ent = candidates[j];
+        if (!ent || ent === fighter || ent.isDead || ent.hp <= 0) continue;
+
+        const entIdx = state.fighters.indexOf(ent);
+        if (entIdx !== -1) {
+          const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
+          if (myTeam !== null && enemyTeam === myTeam) continue;
+        } else if (ent.owner) {
+          const ownerIdx = state.fighters.indexOf(ent.owner);
+          const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+          if (myTeam !== null && ownerTeam === myTeam) continue;
+        }
+
+        const distToExplosion = Math.hypot(ent.x - impactX, ent.y - impactY);
+        if (distToExplosion <= ent.r + blastRadius) {
+          // Primary Target Damage & Heavy Impact
+          let impactDmg = cannonCfg.impactDamage || 30;
+          if (isTransformed) impactDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+          applyDamageToTarget(ent, impactDmg, fighter, { isMelee: true, isSkill: true });
+
+          const hitAngle = Math.atan2(ent.y - impactY, ent.x - impactX) || data.angle;
+          const kb = (cannonCfg.knockbackForce || 13) * (isTransformed ? 1.4 : 1.0);
+          ent.vx = (ent.vx || 0) + Math.cos(hitAngle) * kb;
+          ent.vy = (ent.vy || 0) + Math.sin(hitAngle) * kb;
+
+          if (typeof ent.applyHitStun === 'function') {
+            ent.applyHitStun(18);
+          }
+
+          if (typeof spawnBloodEffect === 'function') {
+            spawnBloodEffect(ent, Math.max(3, Math.round(impactDmg * 0.25)), hitAngle);
+          }
+
+          // Attach 4 randomized embedded bone spikes across and inside enemy body
+          ent._embeddedMahitoSpikes = ent._embeddedMahitoSpikes || [];
+          const numToAttach = 4;
+          for (let p = 0; p < numToAttach; p++) {
+            if (ent._embeddedMahitoSpikes.length >= 8) break;
+            const bodyR = ent.r || 25;
+            // Fully randomized distribution in 2D body disk (inside core and outer contours)
+            const randAng = Math.random() * Math.PI * 2;
+            const randDist = Math.sqrt(Math.random()) * (bodyR * 0.90);
+            const randPiercingAng = Math.random() * Math.PI * 2; // Organic randomized piercing angle
+            const randLen = (isTransformed ? 26 : 20) * (0.75 + Math.random() * 0.55);
+            const randW = (isTransformed ? 6.2 : 4.8) * (0.80 + Math.random() * 0.40);
+            const penetrationDepth = 0.20 + Math.random() * 0.55;
+
+            ent._embeddedMahitoSpikes.push({
+              relX: Math.cos(randAng) * randDist,
+              relY: Math.sin(randAng) * randDist,
+              angle: randPiercingAng,
+              length: randLen,
+              width: randW,
+              penetrationDepth,
+              isTransformed: Boolean(isTransformed),
+              duration: 180, // 3 full seconds
+              maxDuration: 180
+            });
+          }
+
+          // Stacks Soul Disfigurement
+          applySoulDisfigurementStack(ent, fighter);
+        }
+      }
+    }
+
+    // Explosion Visuals & Shockwaves
+    spawnImpactFlash(impactX, impactY, 75, isTransformed ? '#D946EF' : '#C026D3');
+    spawnMeleeClashShockwave(impactX, impactY, 60, isTransformed ? '#F5D0FE' : '#D946EF');
+    spawnMeleeClashShockwave(impactX, impactY, 35, '#FFFFFF');
+    spawnSparks(impactX, impactY, isTransformed ? '#D946EF' : '#C026D3', 20);
+    triggerGlobalScreenShake(cannonCfg.screenShake || 8, 8);
+
+    // Audio
+    audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.6);
+    audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 1.8);
+
+    // Spawn Razor Bone Spikes Flying in all organic directions (Natural Shrapnel Spread)
+    const shrapnelSpeed = cannonCfg.shrapnelSpeed || 14.0;
+    const spikeDefs = data.spikes || [];
+    for (let s = 0; s < spikeDefs.length; s++) {
+      const spkDef = spikeDefs[s];
+      const spikeAng = (data.angle || 0) + spkDef.angle + (spkDef.curveOffset || 0);
+      const spkSpeed = shrapnelSpeed * (0.85 + Math.random() * 0.35) * (spkDef.lenMult || 1.0);
+      data.shrapnelSpikes.push({
+        x: impactX,
+        y: impactY,
+        vx: Math.cos(spikeAng) * spkSpeed,
+        vy: Math.sin(spikeAng) * spkSpeed,
+        angle: spikeAng,
+        length: (isTransformed ? 24 : 18) * (spkDef.lenMult || 1.0),
+        width: (isTransformed ? 6.0 : 4.5) * (spkDef.widthMult || 1.0),
+        life: 20,
+        maxLife: 20,
+        hasHit: false,
+        isTransformed
+      });
+    }
+
+    data.retractStartX = impactX;
+    data.retractStartY = impactY;
+    data.phase = 'retract';
+  }
+
+  // 5. Retract Phase (Smooth pullback along straight line into chest)
+  if (data.phase === 'retract') {
+    const elapsedSinceExplosion = data.elapsedFrames - data.explodeFrame;
+    const rDur = data.retractDuration || 12;
+    data.retractRatio = Math.min(1.0, elapsedSinceExplosion / rDur);
+
+    const pullP = data.retractRatio * data.retractRatio * (3 - 2 * data.retractRatio);
+    const fromX = data.retractStartX !== undefined ? data.retractStartX : (fighter.x + data.dirX * data.currentDist);
+    const fromY = data.retractStartY !== undefined ? data.retractStartY : (fighter.y + data.dirY * data.currentDist);
+
+    const rawTipX = fromX * (1.0 - pullP) + fighter.x * pullP;
+    const rawTipY = fromY * (1.0 - pullP) + fighter.y * pullP;
+    const maceR = isTransformed ? (cannonCfg.maceRadiusTransformed || 29) : (cannonCfg.maceRadiusBase || 22);
+    const pad = maceR + 8;
+    const clampedTip = clampToArena(rawTipX, rawTipY, pad * (1.0 - pullP));
+    data.currentTipX = clampedTip.x;
+    data.currentTipY = clampedTip.y;
+
+    if (data.retractRatio >= 1.0 && data.shrapnelSpikes.length === 0) {
+      fighter.maceCannonAnimTimer = 0;
+      fighter.hideBackHand = false;
+      fighter.hideFrontHand = false;
+      fighter._maceCannonData = null;
+    }
+  }
+}
+
+/**
+ * Executes Fourth Skill: Idle Transfiguration — Dual Scythe Pincer Guillotine (Twin Stretched Blade Ambush).
+ * - Stretches both arms wide on left and right sides of the enemy.
+ * - Morphs giant 4-blade needle claw scythes at both tips.
+ * - Inward scissor clamp cross-slash across the target.
+ */
+export function executeMahitoTwinScissor(fighter, target = null) {
+  const cfg = CONFIG.mahito || {};
+  const scissorCfg = cfg.twinScissor || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  fighter.twinScissorCooldown = scissorCfg.cooldown || 360;
+  fighter.twinScissorAnimTimer = 180; // Safety anim duration
+  fighter.hideFrontHand = true;
+  fighter.hideBackHand = true;
+
+  // Aim towards enemy or facing angle
+  let angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  let targetX = fighter.x + Math.cos(angle) * (scissorCfg.reachMax || 280);
+  let targetY = fighter.y + Math.sin(angle) * (scissorCfg.reachMax || 280);
+
+  if (target && target.hp > 0 && !target.isDead) {
+    const dx = target.x - fighter.x;
+    const dy = target.y - fighter.y;
+    angle = Math.atan2(dy, dx);
+    const distToTarget = Math.hypot(dx, dy);
+    const maxReach = scissorCfg.reachMax || 360;
+    const clampedDist = Math.min(maxReach, Math.max(scissorCfg.minDistance || 90, distToTarget));
+    targetX = fighter.x + Math.cos(angle) * clampedDist;
+    targetY = fighter.y + Math.sin(angle) * clampedDist;
+  }
+
+  const flankW = scissorCfg.flankWidth || 95;
+  const perpX = -Math.sin(angle);
+  const perpY =  Math.cos(angle);
+
+  // Left and Right Flanking Target Coordinates (Wide caliper positions around enemy)
+  const leftFlankX = targetX + perpX * flankW;
+  const leftFlankY = targetY + perpY * flankW;
+  const rightFlankX = targetX - perpX * flankW;
+  const rightFlankY = targetY - perpY * flankW;
+
+  // Compute shoulder / hand origins
+  const r = fighter.r || 25;
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const leftOriginX = fighter.x + (r * 0.70 * Math.cos(angle) - (facingLeft ? r * 0.18 : -r * 0.18) * Math.sin(angle));
+  const leftOriginY = fighter.y + (r * 0.70 * Math.sin(angle) + (facingLeft ? r * 0.18 : -r * 0.18) * Math.cos(angle));
+  const rightOriginX = fighter.x + (r * 0.45 * Math.cos(angle) - (facingLeft ? -r * 0.18 : r * 0.18) * Math.sin(angle));
+  const rightOriginY = fighter.y + (r * 0.45 * Math.sin(angle) + (facingLeft ? -r * 0.18 : r * 0.18) * Math.cos(angle));
+
+  // Initialize trailing rope nodes for both arms
+  const numNodes = 14;
+  const leftNodes = [];
+  const rightNodes = [];
+  for (let i = 0; i < numNodes; i++) {
+    leftNodes.push({ x: leftOriginX, y: leftOriginY, oldX: leftOriginX, oldY: leftOriginY });
+    rightNodes.push({ x: rightOriginX, y: rightOriginY, oldX: rightOriginX, oldY: rightOriginY });
+  }
+
+  fighter._twinScissorData = {
+    target,
+    angle,
+    perpX,
+    perpY,
+    targetX,
+    targetY,
+    leftFlankX,
+    leftFlankY,
+    rightFlankX,
+    rightFlankY,
+    leftOriginX,
+    leftOriginY,
+    rightOriginX,
+    rightOriginY,
+    leftTipX: leftOriginX,
+    leftTipY: leftOriginY,
+    rightTipX: rightOriginX,
+    rightTipY: rightOriginY,
+    leftNodes,
+    rightNodes,
+    steppedLeftNodes: null,
+    steppedRightNodes: null,
+    phase: 'launch', // 'launch' -> 'morph' -> 'clamp' -> 'retract'
+    elapsedFrames: 0,
+    launchProgress: 0.0,
+    morphStartFrame: 0,
+    morphDuration: scissorCfg.morphDuration || 24,
+    morphProgress: 0.0,
+    clampStartFrame: 0,
+    clampProgress: 0.0,
+    hasClamped: false,
+    hasDealtDamage: false,
+    retractRatio: 0.0,
+    retractDuration: 14
+  };
+
+  audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+  spawnImpactFlash(fighter.x, fighter.y, 40, isTransformed ? '#D946EF' : '#C026D3');
+}
+
+/**
+ * Updates active Dual Scythe Pincer Guillotine phases, physics, clamp collision, and retraction.
+ */
+export function updateMahitoTwinScissor(fighter) {
+  const data = fighter._twinScissorData;
+  if (!data || fighter.twinScissorAnimTimer <= 0) return;
+
+  data.elapsedFrames++;
+  const cfg = CONFIG.mahito || {};
+  const scissorCfg = cfg.twinScissor || {};
+  const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
+
+  const angle = data.angle;
+  const r = fighter.r || 25;
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const leftOriginX = fighter.x + (r * 0.70 * Math.cos(angle) - (facingLeft ? r * 0.18 : -r * 0.18) * Math.sin(angle));
+  const leftOriginY = fighter.y + (r * 0.70 * Math.sin(angle) + (facingLeft ? r * 0.18 : -r * 0.18) * Math.cos(angle));
+  const rightOriginX = fighter.x + (r * 0.45 * Math.cos(angle) - (facingLeft ? -r * 0.18 : r * 0.18) * Math.sin(angle));
+  const rightOriginY = fighter.y + (r * 0.45 * Math.sin(angle) + (facingLeft ? -r * 0.18 : r * 0.18) * Math.cos(angle));
+
+  data.leftOriginX = leftOriginX;
+  data.leftOriginY = leftOriginY;
+  data.rightOriginX = rightOriginX;
+  data.rightOriginY = rightOriginY;
+
+  // Dynamically update target position during tracking phases so moving enemies don't slip out
+  if (data.target && data.target.hp > 0 && !data.target.isDead && (data.phase === 'launch' || data.phase === 'morph')) {
+    const curDx = data.target.x - fighter.x;
+    const curDy = data.target.y - fighter.y;
+    const curAngle = Math.atan2(curDy, curDx);
+    const curDist = Math.hypot(curDx, curDy);
+    const maxReach = scissorCfg.reachMax || 360;
+    const clampedDist = Math.min(maxReach, Math.max(scissorCfg.minDistance || 90, curDist));
+    
+    data.targetX = fighter.x + Math.cos(curAngle) * clampedDist;
+    data.targetY = fighter.y + Math.sin(curAngle) * clampedDist;
+    data.angle = curAngle;
+    data.perpX = -Math.sin(curAngle);
+    data.perpY =  Math.cos(curAngle);
+
+    const flankW = scissorCfg.flankWidth || 95;
+    data.leftFlankX = data.targetX + data.perpX * flankW;
+    data.leftFlankY = data.targetY + data.perpY * flankW;
+    data.rightFlankX = data.targetX - data.perpX * flankW;
+    data.rightFlankY = data.targetY - data.perpY * flankW;
+  }
+
+  // 1. Launch Phase (Both arms stretch outward along flanking pincer arcs)
+  if (data.phase === 'launch') {
+    const stretchSpeed = scissorCfg.stretchSpeed || 22.0;
+    const distToLeftFlank = Math.hypot(data.leftFlankX - leftOriginX, data.leftFlankY - leftOriginY) || 1;
+    const totalFramesNeeded = Math.max(6, Math.round(distToLeftFlank / stretchSpeed));
+    data.launchProgress = Math.min(1.0, data.elapsedFrames / totalFramesNeeded);
+
+    const lProgEased = Math.sin(data.launchProgress * (Math.PI * 0.5));
+    // Bowing control point for wide flanking curve
+    const bowAmt = (scissorCfg.flankWidth || 95) * 0.6;
+    const midX = (leftOriginX + data.leftFlankX) * 0.5 + data.perpX * bowAmt;
+    const midY = (leftOriginY + data.leftFlankY) * 0.5 + data.perpY * bowAmt;
+    const invT = 1.0 - lProgEased;
+
+    data.leftTipX = invT * invT * leftOriginX + 2 * invT * lProgEased * midX + lProgEased * lProgEased * data.leftFlankX;
+    data.leftTipY = invT * invT * leftOriginY + 2 * invT * lProgEased * midY + lProgEased * lProgEased * data.leftFlankY;
+
+    const rMidX = (rightOriginX + data.rightFlankX) * 0.5 - data.perpX * bowAmt;
+    const rMidY = (rightOriginY + data.rightFlankY) * 0.5 - data.perpY * bowAmt;
+    data.rightTipX = invT * invT * rightOriginX + 2 * invT * lProgEased * rMidX + lProgEased * lProgEased * data.rightFlankX;
+    data.rightTipY = invT * invT * rightOriginY + 2 * invT * lProgEased * rMidY + lProgEased * lProgEased * data.rightFlankY;
+
+    if (data.launchProgress >= 1.0) {
+      data.phase = 'reachPause';
+      data.pauseStartFrame = data.elapsedFrames;
+      data.pauseDuration = 8; // Brief tense pause/freeze on reach
+      data.morphProgress = 0.0;
+      data.leftTipX = data.leftFlankX;
+      data.leftTipY = data.leftFlankY;
+      data.rightTipX = data.rightFlankX;
+      data.rightTipY = data.rightFlankY;
+    }
+  }
+
+  // 2A. Reach Pause Phase (Hands freeze at enemy flanks with NO blades yet for a tense pause)
+  else if (data.phase === 'reachPause') {
+    data.morphProgress = 0.0;
+    data.leftTipX = data.leftFlankX;
+    data.leftTipY = data.leftFlankY;
+    data.rightTipX = data.rightFlankX;
+    data.rightTipY = data.rightFlankY;
+
+    const pauseDur = data.pauseDuration || 8;
+    if (data.elapsedFrames - data.pauseStartFrame >= pauseDur) {
+      data.phase = 'popOut';
+      data.popStartFrame = data.elapsedFrames;
+      data.popDuration = 10; // Snappy, smooth pop-out duration
+      audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.5);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', 1.8);
+      spawnImpactFlash(data.leftTipX, data.leftTipY, 45, isTransformed ? '#D946EF' : '#FFFFFF');
+      spawnImpactFlash(data.rightTipX, data.rightTipY, 45, isTransformed ? '#D946EF' : '#FFFFFF');
+      spawnSparks(data.leftTipX, data.leftTipY, '#D946EF', 10);
+      spawnSparks(data.rightTipX, data.rightTipY, '#D946EF', 10);
+    }
+  }
+
+  // 2B. Pop-Out Phase (Blades erupt and shoot out from the hands like spikes)
+  else if (data.phase === 'popOut') {
+    const popDur = data.popDuration || 8; // Snappy 8-frame spike thrust
+    const pProg = Math.min(1.0, (data.elapsedFrames - data.popStartFrame) / popDur);
+    // Spike eruption power curve (fast explosive burst decelerating cleanly to full size)
+    const spikeEased = pProg >= 1.0 ? 1.0 : (1 - Math.pow(1 - pProg, 3.5));
+    data.morphProgress = Math.max(0.0, Math.min(1.0, spikeEased));
+    data.leftTipX = data.leftFlankX;
+    data.leftTipY = data.leftFlankY;
+    data.rightTipX = data.rightFlankX;
+    data.rightTipY = data.rightFlankY;
+
+    if (data.elapsedFrames % 2 === 0) {
+      spawnSparks(data.leftTipX, data.leftTipY, isTransformed ? '#D946EF' : '#C026D3', 4);
+      spawnSparks(data.rightTipX, data.rightTipY, isTransformed ? '#D946EF' : '#C026D3', 4);
+    }
+
+    if (pProg >= 1.0) {
+      data.morphProgress = 1.0;
+      data.phase = 'clamp';
+      data.clampStartFrame = data.elapsedFrames;
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 1.8);
+    }
+  }
+
+  // 3. Clamp Phase (High-Speed Inward Scissor Guillotine Strike - Single Chop)
+  else if (data.phase === 'clamp') {
+    const clampDur = 14;
+    const cProg = Math.min(1.0, (data.elapsedFrames - data.clampStartFrame) / clampDur);
+    data.clampProgress = cProg;
+
+    // Powerful snap acceleration curve
+    const clampEased = 1.0 - Math.pow(1.0 - cProg, 3.2);
+
+    // Tips travel inward past center crossing over each other deeply to form a distinct X-shape
+    const crossOver = (scissorCfg.flankWidth || 95) * 0.65;
+    const targetLeftX = data.targetX - data.perpX * crossOver;
+    const targetLeftY = data.targetY - data.perpY * crossOver;
+    const targetRightX = data.targetX + data.perpX * crossOver;
+    const targetRightY = data.targetY + data.perpY * crossOver;
+
+    const rawLeftX = data.leftFlankX + (targetLeftX - data.leftFlankX) * clampEased;
+    const rawLeftY = data.leftFlankY + (targetLeftY - data.leftFlankY) * clampEased;
+    const rawRightX = data.rightFlankX + (targetRightX - data.rightFlankX) * clampEased;
+    const rawRightY = data.rightFlankY + (targetRightY - data.rightFlankY) * clampEased;
+
+    // Add a forward arcing bulge to simulate a deep chop-down sweep
+    const arcBulge = Math.sin(cProg * Math.PI) * 45;
+    data.leftTipX = rawLeftX + Math.cos(angle) * arcBulge;
+    data.leftTipY = rawLeftY + Math.sin(angle) * arcBulge;
+    data.rightTipX = rawRightX + Math.cos(angle) * arcBulge;
+    data.rightTipY = rawRightY + Math.sin(angle) * arcBulge;
+
+    // Collision check at the scissor intersection apex (Rule #6 compliant)
+    if (!data.hasDealtDamage && cProg >= 0.50) {
+      data.hasDealtDamage = true;
+      const strikeCenterX = data.targetX;
+      const strikeCenterY = data.targetY;
+      const strikeRadius = 75;
+
+      if (typeof state !== 'undefined' && state.fighters) {
+        const candidates = [...state.fighters, ...(state.illusions || [])];
+        const myIdx = state.fighters.indexOf(fighter);
+        const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : fighter.team;
+
+        for (let j = 0; j < candidates.length; j++) {
+          const ent = candidates[j];
+          if (!ent || ent === fighter || ent.isDead || ent.hp <= 0) continue;
+
+          const entIdx = state.fighters.indexOf(ent);
+          if (entIdx !== -1) {
+            const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
+            if (myTeam !== null && enemyTeam === myTeam) continue;
+          } else if (ent.owner) {
+            const ownerIdx = state.fighters.indexOf(ent.owner);
+            const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+            if (myTeam !== null && ownerTeam === myTeam) continue;
+          }
+
+          const distToCut = Math.hypot(ent.x - strikeCenterX, ent.y - strikeCenterY);
+          if (distToCut <= ent.r + strikeRadius) {
+            let dmg = scissorCfg.damage || 34;
+            if (isTransformed) dmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+            applyDamageToTarget(ent, dmg, fighter, { isMelee: true, isSkill: true });
+
+            // Inward Hook Pull: Pull the target towards Mahito (caster) instead of knocking them away
+            const angleToCaster = Math.atan2(fighter.y - ent.y, fighter.x - ent.x);
+            const hookForce = scissorCfg.knockbackForce || 10;
+            if (typeof ent.applyKnockback === 'function') {
+              ent.applyKnockback(Math.cos(angleToCaster) * hookForce, Math.sin(angleToCaster) * hookForce);
+            } else {
+              ent.vx = (ent.vx || 0) + Math.cos(angleToCaster) * hookForce;
+              ent.vy = (ent.vy || 0) + Math.sin(angleToCaster) * hookForce;
+            }
+
+            if (typeof ent.applyHitStun === 'function') {
+              ent.applyHitStun(scissorCfg.hitStun || 16);
+            }
+
+            if (typeof spawnBloodEffect === 'function') {
+              spawnBloodEffect(ent, 8, data.angle);
+            }
+
+            // Stacks Soul Disfigurement
+            applySoulDisfigurementStack(ent, fighter);
+          }
+        }
+      }
+
+      // Visuals & Screen Shake
+      spawnImpactFlash(strikeCenterX, strikeCenterY, 70, isTransformed ? '#D946EF' : '#C026D3');
+      spawnMeleeClashShockwave(strikeCenterX, strikeCenterY, 55, '#F5D0FE');
+      spawnMeleeClashShockwave(strikeCenterX, strikeCenterY, 35, '#FFFFFF');
+      spawnSparks(strikeCenterX, strikeCenterY, '#D946EF', 20);
+      triggerGlobalScreenShake(scissorCfg.screenShake || 8, 8);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 2.0);
+    }
+
+    if (cProg >= 1.0) {
+      data.phase = 'flipHold';
+      data.holdStartFrame = data.elapsedFrames;
+      data.holdDuration = 14;
+      data.releaseLeftStartX = data.leftTipX;
+      data.releaseLeftStartY = data.leftTipY;
+      data.releaseRightStartX = data.rightTipX;
+      data.releaseRightStartY = data.rightTipY;
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 1.4);
+    }
+  }
+
+  // 4. Stop Frame / Blade Flip Hold Phase (Arms pause in crossed X position while scythes flip outward)
+  else if (data.phase === 'flipHold') {
+    const holdDur = data.holdDuration || 14;
+    const holdProg = Math.min(1.0, (data.elapsedFrames - data.holdStartFrame) / holdDur);
+    data.flipProgress = holdProg;
+
+    // Hold arms strictly locked in crossed X position
+    data.leftTipX = data.releaseLeftStartX;
+    data.leftTipY = data.releaseLeftStartY;
+    data.rightTipX = data.releaseRightStartX;
+    data.rightTipY = data.releaseRightStartY;
+
+    if (holdProg >= 1.0) {
+      data.phase = 'release';
+      data.releaseStartFrame = data.elapsedFrames;
+    }
+  }
+
+  // 5. Cross-Out / Release Phase (Uncrosses extra wide to flanking sides before pulling back)
+  else if (data.phase === 'release') {
+    const releaseDur = 14;
+    const relProg = Math.min(1.0, (data.elapsedFrames - data.releaseStartFrame) / releaseDur);
+    data.releaseProgress = relProg;
+
+    // Shrink the blades as they uncross
+    data.morphProgress = 1.0 - relProg;
+
+    const relEased = Math.sin(relProg * (Math.PI * 0.5));
+
+    // Wide uncrossing destination (1.45x width for expansive outward flare)
+    const wideMult = 1.45;
+    const wideLeftX = data.targetX + data.perpX * (scissorCfg.flankWidth * wideMult);
+    const wideLeftY = data.targetY + data.perpY * (scissorCfg.flankWidth * wideMult);
+    const wideRightX = data.targetX - data.perpX * (scissorCfg.flankWidth * wideMult);
+    const wideRightY = data.targetY - data.perpY * (scissorCfg.flankWidth * wideMult);
+
+    // Uncross: Left arm sweeps back from crossed right side -> back to extra-wide left flank
+    // Right arm sweeps back from crossed left side -> back to extra-wide right flank
+    data.leftTipX = data.releaseLeftStartX + (wideLeftX - data.releaseLeftStartX) * relEased;
+    data.leftTipY = data.releaseLeftStartY + (wideLeftY - data.releaseLeftStartY) * relEased;
+    data.rightTipX = data.releaseRightStartX + (wideRightX - data.releaseRightStartX) * relEased;
+    data.rightTipY = data.releaseRightStartY + (wideRightY - data.releaseRightStartY) * relEased;
+
+    if (relProg >= 1.0) {
+      data.phase = 'retract';
+      data.retractStartFrame = data.elapsedFrames;
+      data.retractLeftStartX = data.leftTipX;
+      data.retractLeftStartY = data.leftTipY;
+      data.releaseLeftStartX = undefined;
+      data.retractRightStartX = data.rightTipX;
+      data.retractRightStartY = data.rightTipY;
+      data.releaseRightStartX = undefined;
+    }
+  }
+
+  // 5. Retract Phase (Smooth high-speed pullback into shoulder sockets)
+  else if (data.phase === 'retract') {
+    const elapsedSinceRetract = data.elapsedFrames - data.retractStartFrame;
+    const rDur = data.retractDuration || 14;
+    data.retractRatio = Math.min(1.0, elapsedSinceRetract / rDur);
+
+    // Keep the blades fully shrunk during hand retraction
+    data.morphProgress = 0.0;
+
+    const pullP = data.retractRatio * data.retractRatio * (3 - 2 * data.retractRatio);
+    data.leftTipX = data.retractLeftStartX * (1.0 - pullP) + leftOriginX * pullP;
+    data.leftTipY = data.retractLeftStartY * (1.0 - pullP) + leftOriginY * pullP;
+    data.rightTipX = data.retractRightStartX * (1.0 - pullP) + rightOriginX * pullP;
+    data.rightTipY = data.retractRightStartY * (1.0 - pullP) + rightOriginY * pullP;
+
+    if (data.retractRatio >= 1.0) {
+      fighter.twinScissorAnimTimer = 0;
+      fighter.hideFrontHand = false;
+      fighter.hideBackHand = false;
+      fighter._twinScissorData = null;
+    }
+  }
+
+  // Update physical trailing thread nodes for both arms
+  const numNodes = 14;
+  const leftNodes = data.leftNodes;
+  const rightNodes = data.rightNodes;
+
+  if (leftNodes && rightNodes) {
+    const guideStrength = (data.phase === 'release' || data.phase === 'retract') ? 0.38 : 0.08;
+
+    for (let i = 1; i < numNodes - 1; i++) {
+      const lNode = leftNodes[i];
+      const rNode = rightNodes[i];
+
+      // Calculate straight-line reference segment coordinates
+      const t = i / (numNodes - 1);
+      const targetLX = leftOriginX + (data.leftTipX - leftOriginX) * t;
+      const targetLY = leftOriginY + (data.leftTipY - leftOriginY) * t;
+      const targetRX = rightOriginX + (data.rightTipX - rightOriginX) * t;
+      const targetRY = rightOriginY + (data.rightTipY - rightOriginY) * t;
+
+      // Verlet inertia update
+      const lvx = (lNode.x - lNode.oldX) * 0.72;
+      const lvy = (lNode.y - lNode.oldY) * 0.72;
+      lNode.oldX = lNode.x;
+      lNode.oldY = lNode.y;
+      lNode.x += lvx + (targetLX - lNode.x) * guideStrength;
+      lNode.y += lvy + (targetLY - lNode.y) * guideStrength;
+
+      const rvx = (rNode.x - rNode.oldX) * 0.72;
+      const rvy = (rNode.y - rNode.oldY) * 0.72;
+      rNode.oldX = rNode.x;
+      rNode.oldY = rNode.y;
+      rNode.x += rvx + (targetRX - rNode.x) * guideStrength;
+      rNode.y += rvy + (targetRY - rNode.y) * guideStrength;
+    }
+
+    leftNodes[0].x = leftOriginX;
+    leftNodes[0].y = leftOriginY;
+    leftNodes[numNodes - 1].x = data.leftTipX;
+    leftNodes[numNodes - 1].y = data.leftTipY;
+
+    rightNodes[0].x = rightOriginX;
+    rightNodes[0].y = rightOriginY;
+    rightNodes[numNodes - 1].x = data.rightTipX;
+    rightNodes[numNodes - 1].y = data.rightTipY;
+
+    const leftDist = Math.hypot(data.leftTipX - leftOriginX, data.leftTipY - leftOriginY) || 1;
+    const rightDist = Math.hypot(data.rightTipX - rightOriginX, data.rightTipY - rightOriginY) || 1;
+    const lSeg = leftDist / (numNodes - 1);
+    const rSeg = rightDist / (numNodes - 1);
+
+    for (let iter = 0; iter < 4; iter++) {
+      leftNodes[0].x = leftOriginX;
+      leftNodes[0].y = leftOriginY;
+      leftNodes[numNodes - 1].x = data.leftTipX;
+      leftNodes[numNodes - 1].y = data.leftTipY;
+
+      rightNodes[0].x = rightOriginX;
+      rightNodes[0].y = rightOriginY;
+      rightNodes[numNodes - 1].x = data.rightTipX;
+      rightNodes[numNodes - 1].y = data.rightTipY;
+
+      for (let i = 0; i < numNodes - 1; i++) {
+        const lA = leftNodes[i];
+        const lB = leftNodes[i + 1];
+        const ldx = lB.x - lA.x;
+        const ldy = lB.y - lA.y;
+        const ld = Math.hypot(ldx, ldy) || 0.001;
+        const ldiff = (ld - lSeg) / ld;
+
+        if (i === 0) {
+          lB.x -= ldx * ldiff * 0.85;
+          lB.y -= ldy * ldiff * 0.85;
+        } else if (i + 1 === numNodes - 1) {
+          lA.x += ldx * ldiff * 0.85;
+          lA.y += ldy * ldiff * 0.85;
+        } else {
+          lA.x += ldx * ldiff * 0.45;
+          lA.y += ldy * ldiff * 0.45;
+          lB.x -= ldx * ldiff * 0.45;
+          lB.y -= ldy * ldiff * 0.45;
+        }
+
+        const rA = rightNodes[i];
+        const rB = rightNodes[i + 1];
+        const rdx = rB.x - rA.x;
+        const rdy = rB.y - rA.y;
+        const rd = Math.hypot(rdx, rdy) || 0.001;
+        const rdiff = (rd - rSeg) / rd;
+
+        if (i === 0) {
+          rB.x -= rdx * rdiff * 0.85;
+          rB.y -= rdy * rdiff * 0.85;
+        } else if (i + 1 === numNodes - 1) {
+          rA.x += rdx * rdiff * 0.85;
+          rA.y += rdy * rdiff * 0.85;
+        } else {
+          rA.x += rdx * rdiff * 0.45;
+          rA.y += rdy * rdiff * 0.45;
+          rB.x -= rdx * rdiff * 0.45;
+          rB.y -= rdy * rdiff * 0.45;
+        }
+      }
+    }
+
+    // 30 FPS Sakuga Stepped Nodes snapshot
+    if (!data.steppedLeftNodes || data.elapsedFrames % 2 === 0) {
+      data.steppedLeftNodes = leftNodes.map(n => ({ x: n.x, y: n.y }));
+      data.steppedRightNodes = rightNodes.map(n => ({ x: n.x, y: n.y }));
+    }
+  }
+}
+

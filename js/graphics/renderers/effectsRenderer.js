@@ -868,9 +868,9 @@ export function drawTodoTakadaIdolScreenOverlay() {
 
   const targetAlpha = todoFighter ? 1.0 : 0.0;
   if (targetAlpha > _todoIdolOverlayAlpha) {
-    _todoIdolOverlayAlpha = Math.min(1.0, _todoIdolOverlayAlpha + 0.06);
+    _todoIdolOverlayAlpha = Math.min(1.0, _todoIdolOverlayAlpha + 0.05);
   } else if (targetAlpha < _todoIdolOverlayAlpha) {
-    _todoIdolOverlayAlpha = Math.max(0.0, _todoIdolOverlayAlpha - 0.04);
+    _todoIdolOverlayAlpha = Math.max(0.0, _todoIdolOverlayAlpha - 0.025);
   }
 
   if (_todoIdolOverlayAlpha <= 0.001) return;

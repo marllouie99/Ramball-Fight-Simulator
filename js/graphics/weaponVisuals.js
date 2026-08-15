@@ -37,6 +37,7 @@ export { drawVoidmasterWeapon } from './weapons/voidmasterWeaponGraphics.js';
 export { drawZeusWeapon } from './weapons/zeusWeaponGraphics.js';
 export { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch, MAHORAGA_WEAPON_GRAPHICS } from './weapons/mahoragaWeaponGraphics.js';
 export { drawMahoragaFaceWings, drawMahoragaChestNecklace } from './fighters/mahoragaSkin.js';
+export { drawMahitoClawWeapon, drawMahitoMaceCannon } from './weapons/mahitoWeaponGraphics.js';
 
 // ─────────────────────────────────────────────
 // GRAY KNIGHT WEAPONS (Shield & Sword)

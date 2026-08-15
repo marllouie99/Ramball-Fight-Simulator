@@ -379,6 +379,11 @@ export function drawTodoSkin(ctx, fighter) {
     }
   }
 
+  // Draw status overlays (slow, electric stun, black flash, etc.)
+  if (typeof fighter.drawStatusOverlays === 'function') {
+    fighter.drawStatusOverlays(ctx, r);
+  }
+
   ctx.restore();
 
   // 8. Draw Cursed Rocks (drawn in absolute world space outside fighter transform)

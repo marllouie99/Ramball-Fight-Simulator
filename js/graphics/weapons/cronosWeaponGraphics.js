@@ -102,6 +102,13 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   // Increase = farther away, Decrease = closer to body
   ctx.translate(r + CRONOS_WEAPON_GRAPHICS.positioning.offset, 0);
 
+  const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.cronos) ? state.weaponCustomizations.cronos : null;
+  if (custom) {
+    ctx.translate(custom.offsetX, custom.offsetY);
+    ctx.scale(custom.scale, custom.scale);
+    ctx.rotate(custom.angleOffset);
+  }
+
   const blade = CRONOS_WEAPON_GRAPHICS.blade;
 
   // Handle/grip pommel

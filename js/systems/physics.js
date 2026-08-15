@@ -214,6 +214,9 @@ export function resolveFighterCollision(a, b) {
   if (a.ultimateActive && (a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
   if (b.ultimateActive && (b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
 
+  // Mahito phases directly through fighters during Phantom Soul Slip claw dash
+  if ((a.soulPhaseDashTimer && a.soulPhaseDashTimer > 0) || (b.soulPhaseDashTimer && b.soulPhaseDashTimer > 0)) return;
+
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const distSq = dx * dx + dy * dy;
@@ -278,8 +281,8 @@ export function resolveFighterCollision(a, b) {
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsImmovable = a.isTurret || aIsFlurrying || aIsYutaBeam;
-  const bIsImmovable = b.isTurret || bIsFlurrying || bIsYutaBeam;
+  const aIsImmovable = a.isTurret || aIsFlurrying || aIsYutaBeam || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
+  const bIsImmovable = b.isTurret || bIsFlurrying || bIsYutaBeam || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -707,8 +710,8 @@ export function updateFighters() {
     // 2. Fighter-Illusion Collisions
     for (const fighter of state.fighters) {
       if (!fighter || fighter.hp <= 0) continue;
-      // Cronos phases through illusions while inside his own sphere
-      if (fighter._isInsideOwnSphere?.()) continue;
+      // Cronos phases through illusions while inside his own sphere; Mahito phases during Phantom Soul Slip
+      if (fighter._isInsideOwnSphere?.() || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0)) continue;
 
       const nearbyEntities = spatialGrid.getNearby(fighter.x, fighter.y, fighter.r * 2 + 50);
       for (const entity of nearbyEntities) {
@@ -731,7 +734,7 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          if (fighter.isTurret) {
+          if (fighter.isTurret || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0)) {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
           } else if (entity.isTurret) {

@@ -515,7 +515,7 @@ canvas {
 .health-card__info {
   margin-top: 6px;
   font-family: 'Glast Blitch', Arial, sans-serif;
-  font-size: 13.5px;
+  font-size: 14.5px;
   font-weight: normal;
   color: #111111;
   text-align: left;
@@ -534,15 +534,52 @@ canvas {
   justify-content: flex-start;
   text-align: left;
   gap: 3px;
+  font-size: 14.5px;
 }
 
 .health-card__info > div.span-2 {
   grid-column: span 2;
 }
 
+/* ── 1v2 Mode Solo Player 1-Column HUD Layout ── */
+.health-card.solo-1v2-card .health-card__skills,
+.health-card.solo-1v2-card .health-card__info,
+.health-card__skills.single-column,
+.health-card__info.single-column {
+  grid-template-columns: 1fr !important;
+}
+
+.health-card.solo-1v2-card .hud-skill-box,
+.health-card.solo-1v2-card .health-card__info > div,
+.health-card__skills.single-column .hud-skill-box,
+.health-card__info.single-column > div {
+  grid-column: 1 / -1 !important;
+}
+
+/* ── Solo & Team HUD Stats Font Sizing (Matches Skill Label Font Size) ── */
+.health-card__member .health-card__info,
+.health-card.team-card .health-card__info,
+.health-card.solo-1v2-card .health-card__info {
+  font-size: 14.5px !important;
+  gap: 2px 6px;
+}
+
+.health-card__member .health-card__info > div,
+.health-card.team-card .health-card__info > div,
+.health-card.solo-1v2-card .health-card__info > div {
+  font-size: 14.5px !important;
+}
+
+.health-card__member .health-card__info span,
+.health-card.team-card .health-card__info span,
+.health-card.solo-1v2-card .health-card__info span {
+  font-size: 14px !important;
+}
+
 .health-card__info span {
   font-family: 'Rajdhani', Arial, sans-serif;
   font-weight: bold;
+  font-size: 14px;
 }
 
 .hud-number {
@@ -551,17 +588,7 @@ canvas {
 }
 
 .health-card__info div b {
-  transition: color 0.3s ease, text-shadow 0.3s ease;
-}
-
-.health-card__info div.glow-green b {
-  color: #15803d;
-  text-shadow: 0 0 8px rgba(21, 128, 61, 0.7);
-}
-
-.health-card__info div.glow-red b {
-  color: #b91c1c;
-  text-shadow: 0 0 8px rgba(185, 28, 28, 0.7);
+  font-weight: bold;
 }
 
 /* ── Label-Only Skill Box (used for text indicators like Zeus Stun Chance) ── */
@@ -575,7 +602,7 @@ canvas {
 .hud-skill-box.label-only .hud-skill-box-text {
   margin: 0 !important;
   font-family: 'Rajdhani', 'Outfit', Arial, sans-serif !important;
-  font-size: 14px !important;
+  font-size: 15px !important;
   font-weight: bold !important;
   color: inherit !important;
   text-transform: none !important;
@@ -602,7 +629,7 @@ canvas {
   position: relative;
   z-index: 2;
   font-family: 'Glast Blitch', 'Rajdhani', 'Outfit', Arial, sans-serif;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: bold;
   color: #000000;
   text-transform: uppercase;
@@ -813,4 +840,4 @@ canvas {
   z-index: 1000;
   pointer-events: none;
   user-select: none;
-}
+}

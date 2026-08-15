@@ -896,6 +896,46 @@ export function drawSparkEffects(layer = 'all') {
           ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
           ctx.stroke();
         }
+      } else if (effect.type === 'mahitoClawScratchBurst') {
+        // 5-Blade Razor Claw Slash Lacerations cutting across target
+        const ang = effect.angle || 0;
+        const radius = effect.size || 35;
+        const alpha = Math.sin(effect.life * Math.PI);
+        const slashOffsets = [-14, -7, 0, 7, 14];
+
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(ang);
+
+        slashOffsets.forEach((offY, idx) => {
+          const cutLen = radius * (1.1 + (2 - Math.abs(idx - 2)) * 0.25);
+          const startX = -cutLen * 0.5;
+          const endX = cutLen * 0.5;
+          const thick = (idx === 2 ? 3.5 : 2.5) * alpha;
+
+          // Double-tapered razor laceration streak
+          ctx.beginPath();
+          ctx.moveTo(startX, offY);
+          ctx.quadraticCurveTo(0, offY - thick, endX, offY);
+          ctx.quadraticCurveTo(0, offY + thick, startX, offY);
+          ctx.closePath();
+
+          // Crimson + Magenta Cursed Energy fill
+          ctx.fillStyle = (idx % 2 === 0)
+            ? `rgba(220, 38, 38, ${(0.92 * alpha).toFixed(3)})`
+            : `rgba(217, 70, 239, ${(0.88 * alpha).toFixed(3)})`;
+          ctx.fill();
+
+          // White-hot core streak
+          ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+          ctx.lineWidth = 1.0;
+          ctx.beginPath();
+          ctx.moveTo(startX, offY);
+          ctx.lineTo(endX, offY);
+          ctx.stroke();
+        });
+
+        ctx.restore();
       } else if (effect.type === 'arcaneFlash') {
         // Bright radial flash beneath feet on landing
         effect.size += (effect.targetSize - effect.size) * 0.06; // Slower size blooming
@@ -2354,4 +2394,34 @@ export function spawnBoogieWoogieSwapEffect(x1, y1, x2, y2) {
       decay: 0.04 + Math.random() * 0.03
     });
   }
+}
+
+/**
+ * Spawns Mahito's 5-Blade Razor Claw laceration slash impact burst across the struck entity.
+ */
+export function spawnMahitoClawScratchImpact(x, y, angle = 0, isTransformed = false) {
+  if (!state || !state.sparkEffects) return;
+
+  const slash = ParticleSystem.getParticle();
+  slash.x = x;
+  slash.y = y;
+  slash.angle = angle + Math.PI * 0.5 + (Math.random() - 0.5) * 0.35;
+  slash.size = isTransformed ? 48 : 36;
+  slash.life = 1.0;
+  slash.decay = 0.08;
+  slash.type = 'mahitoClawScratchBurst';
+  slash.isFlash = true;
+  slash.isPixi = false;
+  state.sparkEffects.push(slash);
+
+  // Spurt of crimson blood splatters & neon magenta Cursed Energy sparks
+  spawnSparks(x, y, isTransformed ? 12 : 8, 'basic', {
+    color: isTransformed ? '#D946EF' : '#DC2626',
+    speed: 6.0,
+    size: 2.2,
+    decay: 0.06
+  });
+
+  // Impact Shockwave
+  spawnMeleeClashShockwave(x, y, isTransformed ? 45 : 32, isTransformed ? '#D946EF' : '#C026D3');
 }

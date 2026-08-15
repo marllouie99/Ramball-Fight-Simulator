@@ -141,7 +141,24 @@ export const state = {
     arcEnd: 0.85,
     speedMult: 1.0
   },
-  
+
+  // Unified Weapon Customizer / Studio State
+  weaponCustomizations: {
+    mahito: {
+      blades: [
+        { idx: 0, knuckleX: 3.0, knuckleY: -6.5, fanAngle: -0.32, length: 82, heelWidth: 14.0, topArchY: -14.0, tipY: 16.0 },
+        { idx: 1, knuckleX: 5.0, knuckleY: -3.8, fanAngle: -0.22, length: 88, heelWidth: 15.5, topArchY: -9.0, tipY: 18.0 },
+        { idx: 2, knuckleX: 6.0, knuckleY: -0.8, fanAngle: -0.06, length: 84, heelWidth: 15.0, topArchY: -3.0, tipY: 24.0 },
+        { idx: 3, knuckleX: 1.5, knuckleY: 9.0, fanAngle: 0.48, length: 80, heelWidth: 14.5, topArchY: 18.0, tipY: -22.0 }
+      ]
+    },
+    yuta: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+    toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+    cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+    ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+  },
+  mahitoClawCustomBlades: null,
+
   indexCategory: 'All',
   mode: GAME_MODES.ONE_VS_ONE,
   testMode: false, // Disables leaderboard recording
@@ -424,8 +441,34 @@ export function loadLeaderboard() {
   }
 }
 
-// Initialize leaderboard on load
+// Save weapon customizations to localStorage
+export function saveWeaponCustomizations() {
+  try {
+    localStorage.setItem('circleMiniBattleWeaponCustomizations', JSON.stringify(state.weaponCustomizations));
+  } catch (e) {
+    console.warn('Could not save weapon customizations:', e);
+  }
+}
+
+// Load weapon customizations from localStorage
+export function loadWeaponCustomizations() {
+  try {
+    const saved = localStorage.getItem('circleMiniBattleWeaponCustomizations');
+    if (saved) {
+      state.weaponCustomizations = JSON.parse(saved);
+      // Sync mahitoClawCustomBlades with the loaded data
+      if (state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.blades) {
+        state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load weapon customizations:', e);
+  }
+}
+
+// Initialize on load
 loadLeaderboard();
+loadWeaponCustomizations();
 
 // Debug hook: expose internal state for browser inspection
 if (typeof window !== 'undefined') {
@@ -577,6 +620,16 @@ function getContrastColor(colorStr, backgroundIsDark) {
   s = Math.round(s * 100);
   l = Math.round(l * 100);
 
+  if (s === 0) {
+    // True grayscale / monochrome color: maintain 0% saturation so gray stays pure gray / silver
+    if (backgroundIsDark) {
+      if (l < 70) l = 78;
+    } else {
+      if (l > 55) l = 42;
+    }
+    return `hsl(0, 0%, ${l}%)`;
+  }
+
   if (backgroundIsDark) {
     // If background is dark: ensure text is bright (lightness >= 78%)
     if (l < 70) {
@@ -596,6 +649,11 @@ function getContrastColor(colorStr, backgroundIsDark) {
 
 export function spawnFloatingText(x, y, text, color = '#ffffff') {
   if (MINIMAL_FLOATING_TEXT && !isAllowedFloatingText(text)) return;
+
+  const normalizedUpper = String(text).trim().toUpperCase();
+  if (normalizedUpper === 'MISS!' || normalizedUpper === 'MISS' || normalizedUpper === 'NEAR MISS!' || normalizedUpper.includes('MISS')) {
+    color = '#A0AEC0'; // Combat Gray / Silver
+  }
 
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive);
   const backgroundIsDark = hasActiveDomain || (state.currentHUDDimOpacity && state.currentHUDDimOpacity > 0.3);
@@ -664,4 +722,5 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   });
 }
 
+state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
 window.state = state;

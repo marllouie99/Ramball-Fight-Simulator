@@ -18,6 +18,16 @@ import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 export const CONFIG = {
   saitama: saitamaConfig,
   genos: genosConfig,
+  mahito: mahitoConfig,
+  gojo: gojoConfig,
+  sukuna: sukunaConfig,
+  yuta: yutaConfig,
+  toji: tojiConfig,
+  mahoraga: mahoragaConfig,
+  todo: todoConfig,
+  yuji: yujiConfig,
+  layla: laylaConfig,
+  ichigo: ichigoConfig,
   arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
@@ -48,8 +58,8 @@ export const CONFIG = {
   hudTextColor: '#131313ff',         // Font color for all HUD text (title, stats, description)
   hudTitleFontSize: 22,              // Font size for fighter name in HUD (px)
   hudDescFontSize: 20,               // Font size for fighter description in HUD (px)
-  hudInfoFontSize: 20,               // Font size for fighter info (DMG, etc.) in HUD (px)
-  hudSkillFontSize: 20,              // Font size for skill bar labels in HUD (px)
+  hudInfoFontSize: 14.5,             // Font size for fighter info (DMG, etc.) in HUD (px)
+  hudSkillFontSize: 15,              // Font size for skill bar labels in HUD (px)
   hudWidthModifier: 1.0,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -941,7 +951,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 17,
-    name: 'Musashi',
+    name: 'Musashi Miyamoto',
     category: 'Japanese',
     color: '#34495e',
     startX: 290, startY: 240,
@@ -1017,7 +1027,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 21,
-    name: 'Gojo',
+    name: 'Satoru Gojo',
     category: 'Anime',
     color: '#E0FFFF', // Light Cyan
     startX: 300, startY: 250,
@@ -1036,7 +1046,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 22,
-    name: 'Sukuna',
+    name: 'Ryomen Sukuna',
     category: 'Anime',
     color: '#8B0000', // Dark Crimson
     startX: 300, startY: 250,
@@ -1055,7 +1065,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 23,
-    name: 'Yuta',
+    name: 'Yuta Okkotsu',
     category: 'Anime',
     color: '#EEEEEE', // Soft Silver / White
     startX: 400, startY: 250,
@@ -1074,7 +1084,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 99,
-    name: 'Toji',
+    name: 'Toji Fushiguro',
     category: 'Anime',
     color: '#281438', // Dark Shadow Purple
     startX: 350, startY: 250,
@@ -1093,7 +1103,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 24, // Assuming 24 is next after Yuta (23) before Toji (99)
-    name: 'Todo',
+    name: 'Aoi Todo',
     category: 'Anime',
     color: '#D2691E', // Chocolate / Brown
     startX: 300, startY: 250,
@@ -1188,7 +1198,7 @@ export const FIGHTER_DEFS = [
   },
   {
     id: 29,
-    name: 'Ichigo',
+    name: 'Ichigo Kurosaki',
     category: 'Anime',
     color: '#FF5500', // Orange details
     startX: 300, startY: 250,
@@ -1209,7 +1219,7 @@ export const FIGHTER_DEFS = [
     id: 30,
     name: 'Mahito',
     category: 'Anime',
-    color: '#00A8CC', // Deep Grungy Cyan / Cursed Soul
+    color: '#C026D3', // Vivid Magenta-Violet / Cursed Energy
     startX: 300, startY: 250,
     startVx: 1.2, startVy: 1.0,
     radius: 25,
@@ -1221,8 +1231,8 @@ export const FIGHTER_DEFS = [
     cooldown: 22,
     moveSpeed: 6.8,
     projectileSpeedMultiplier: 1.0,
-    ability: 'Idle Transfiguration',
-    desc: 'Reshapes souls and flesh with cursed strikes. Transforms into Instant Spirit Body of Distorted Killing with armored carapace and blade scythes.',
+    ability: 'Soul Scalpel Claws',
+    desc: 'Wields 4 curved scythe-talon claws. Passive: Phantom Soul Slip phases directly through enemies with a high-speed claw cross-slice. Secondary skill unleashes Subterranean Flesh Surge; transforms into Distorted Killing form.',
   }
 ];
 

@@ -81,6 +81,28 @@ window.addEventListener('keydown', (e) => {
 
 const inputTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
 
+inputTarget.addEventListener('mousedown', (e) => {
+  const rect = inputTarget.getBoundingClientRect();
+  const scaleX = state.canvas.width / rect.width;
+  const scaleY = state.canvas.height / rect.height;
+  const mx = (e.clientX - rect.left) * scaleX;
+  const my = (e.clientY - rect.top) * scaleY;
+
+  if (state.gameState === 'paused') {
+    const cx = state.pauseMenuX !== undefined ? state.pauseMenuX : state.canvas.width / 2;
+    const cy = state.pauseMenuY !== undefined ? state.pauseMenuY : 180;
+    const panelW = 260;
+    const panelH = 280;
+    const px = cx - panelW / 2;
+    const py = cy - panelH / 2;
+
+    if (mx >= px && mx <= px + panelW && my >= py && my <= py + panelH) {
+      state.isDraggingPauseMenu = true;
+      state.pauseMenuDragOffset = { x: mx - cx, y: my - cy };
+    }
+  }
+});
+
 inputTarget.addEventListener('mousemove', (e) => {
   const rect = inputTarget.getBoundingClientRect();
   // Handle scaling if CSS sizes canvas differently
@@ -89,7 +111,34 @@ inputTarget.addEventListener('mousemove', (e) => {
   const mx = (e.clientX - rect.left) * scaleX;
   const my = (e.clientY - rect.top) * scaleY;
 
+  if (state.isDraggingPauseMenu && state.gameState === 'paused') {
+    const offsetX = state.pauseMenuDragOffset ? state.pauseMenuDragOffset.x : 0;
+    const offsetY = state.pauseMenuDragOffset ? state.pauseMenuDragOffset.y : 0;
+    state.pauseMenuX = Math.max(130, Math.min(state.canvas.width - 130, mx - offsetX));
+    state.pauseMenuY = Math.max(140, Math.min(state.canvas.height - 140, my - offsetY));
+    state.canvas.style.cursor = 'grabbing';
+    return;
+  }
+
   handleUIMove(mx, my);
+
+  if (state.gameState === 'paused' && !state.isDraggingPauseMenu) {
+    const cx = state.pauseMenuX !== undefined ? state.pauseMenuX : state.canvas.width / 2;
+    const cy = state.pauseMenuY !== undefined ? state.pauseMenuY : 180;
+    const panelW = 260;
+    const panelH = 280;
+    const px = cx - panelW / 2;
+    const py = cy - panelH / 2;
+    if (mx >= px && mx <= px + panelW && my >= py && my <= py + panelH) {
+      if (state.canvas.style.cursor === 'default') {
+        state.canvas.style.cursor = 'grab';
+      }
+    }
+  }
+});
+
+window.addEventListener('mouseup', () => {
+  state.isDraggingPauseMenu = false;
 });
 
 inputTarget.addEventListener('click', (e) => {
@@ -155,6 +204,10 @@ document.getElementById('btn-index')?.addEventListener('click', () => {
 
 document.getElementById('btn-weapons')?.addEventListener('click', () => {
   state.gameState = 'weapons';
+});
+
+document.getElementById('btn-weapon-studio')?.addEventListener('click', () => {
+  state.gameState = 'weaponStudio';
 });
 
 document.getElementById('btn-testmode')?.addEventListener('click', (e) => {

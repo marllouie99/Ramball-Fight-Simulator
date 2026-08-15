@@ -25,13 +25,14 @@ export function drawProjectiles() {
   const projectiles = getProjectiles();
   const now = getNow(); // Cache time once for all projectiles
 
-  // View culling - define arena bounds with padding
-  const arena = CONFIG.arena;
-  const cullPadding = 50;
-  const minX = arena.x - cullPadding;
-  const maxX = arena.x + arena.width + cullPadding;
-  const minY = arena.y - cullPadding;
-  const maxY = arena.y + arena.height + cullPadding;
+  // View culling - define canvas bounds with generous padding so projectiles never clip out on screen
+  const canvasW = (state.canvas && state.canvas.width) ? state.canvas.width : 540;
+  const canvasH = (state.canvas && state.canvas.height) ? state.canvas.height : 960;
+  const cullPadding = 250;
+  const minX = -cullPadding;
+  const maxX = canvasW + cullPadding;
+  const minY = -cullPadding;
+  const maxY = canvasH + cullPadding;
 
   const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 

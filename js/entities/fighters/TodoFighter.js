@@ -76,10 +76,21 @@ export class TodoFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    // Prevent updating dead fighter
-    if (this.isDead || this.hp <= 0) return;
+    // Prevent updating dead fighter (and ensure death audio handling is triggered once)
+    if (this.isDead || this.hp <= 0) {
+      if (this.isTakadaChanneling || this.isTakadaUltActive) {
+        this.onDeath();
+      }
+      return;
+    }
 
-    // Beam & Purple Stasis Guard (Yuta Pure Love Beam / Gojo Hollow Purple)
+    this.handlePoison();
+    this.handleBurn();
+    this._tickCooldowns();
+    this._tickAttackSound();
+
+    // TimeStop & Freeze Guards (Rule 1)
+    const isFrozen = this._handleTimeStop();
     const isBeamOrPurpleTrapped = (
       this.caughtInPureLoveBeam ||
       (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
@@ -87,9 +98,27 @@ export class TodoFighter extends Fighter {
       (this.purpleHitTimer && this.purpleHitTimer > 0)
     );
 
-    // TimeStop & Freeze Guards (Rule 1)
-    const isFrozen = this._handleTimeStop();
+    const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+    );
+
     if (isFrozen || this.isTargetOfAmbush || this.isParalyzed || isBeamOrPurpleTrapped) {
+      // If Todo is caught / frozen in Gojo's domain, continue ticking down his Takada Ultimate timer each frame!
+      if (isGojoDomainActive && this.isTakadaUltActive) {
+        this.takadaUltTimer = Math.max(0, (this.takadaUltTimer || 0) - 1);
+        if (this.takadaUltTimer <= 120 && !this.takadaSongFadedOut) {
+          this.takadaSongFadedOut = true;
+          const fadeOutMs = CONFIG.todo?.takadaSongFadeOutMs ?? 2500;
+          const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
+          audioSystem.stopLoop(loopKey, fadeOutMs);
+        }
+        if (this.takadaUltTimer <= 0) {
+          this.isTakadaUltActive = false;
+          this.takadaSongStarted = false;
+          this.takadaSongFadedOut = false;
+        }
+      }
+
       const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
       const hpUltEnabled = CONFIG.todo?.enableHpThresholdUlt !== false;
       if (!this.isDemoFighter && hpUltEnabled && !this.hasTriggeredTakadaHpUlt && this.hp > 0 && (this.hp / (this.maxHp || 100)) <= hpThreshold) {
@@ -346,11 +375,39 @@ export class TodoFighter extends Fighter {
     this.pendingSwapData = null;
   }
 
+  onDeath() {
+    super.onDeath();
+    const isLastSurvivor = !hasLiveTeammate(this);
+
+    // If Todo has living teammates when he dies (match continues), smoothly fade out the song.
+    // BUT if Todo dies last (teammates already dead, triggering the round-end / champion screen),
+    // let the music continue playing in the background as the champion / victory screen displays!
+    if (this.isTakadaChanneling || this.isTakadaUltActive || this.takadaSongStarted) {
+      if (!isLastSurvivor) {
+        this.isTakadaChanneling = false;
+        this.isTakadaUltActive = false;
+        this.takadaChannelTimer = 0;
+        this.takadaUltTimer = 0;
+        this.takadaSongStarted = false;
+        this.takadaSongFadedOut = true;
+        const loopKey = `todo_takada_bg_${this.id || 'todo'}`;
+        const fadeOutMs = CONFIG.todo?.takadaDeathSongFadeOutMs ?? 1200;
+        audioSystem.stopLoop(loopKey, fadeOutMs);
+      } else {
+        // Todo died last: keep background music playing for champion / round-end reveal screen!
+        this.isTakadaChanneling = false;
+        this.isTakadaUltActive = false;
+        this.takadaChannelTimer = 0;
+        this.takadaUltTimer = 0;
+      }
+    }
+  }
+
   takeDamage(amount, attacker, opts = {}) {
     let reduction = CONFIG.todo?.baseDamageReduction ?? 0.20;
 
-    // Enhanced damage reduction while in the Zone (just swapped / Black Flash window active)
-    if (this.justSwappedTimer > 0 || this.blackFlashGlowTimer > 0) {
+    // Enhanced damage reduction while in the Zone / Takada Ultimate (just swapped / Black Flash window active / Takada active)
+    if (this.justSwappedTimer > 0 || this.blackFlashGlowTimer > 0 || this.isTakadaUltActive) {
       reduction = Math.max(reduction, CONFIG.todo?.zoneDamageReduction ?? 0.35);
     }
 

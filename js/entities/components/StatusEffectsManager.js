@@ -24,6 +24,13 @@ export class StatusEffectsManager {
     }
   }
 
+  applyParalyze(frames) {
+    if (this.fighter.immuneToCC || this.fighter.domainImmunity || this.fighter.characterId === 'toji' || this.fighter.type === 'toji') return;
+    if (!this.fighter.paralyzeTimer || this.fighter.paralyzeTimer < frames) {
+      this.fighter.paralyzeTimer = frames;
+    }
+  }
+
   // --- Poison ---
   applyPoison(attacker) {
     const grenadierCfg = CONFIG.grenadier || {};

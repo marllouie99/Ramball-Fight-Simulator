@@ -246,7 +246,7 @@ export class DarkSlateGrayFighter extends Fighter {
     this.flashStepTimer = CONFIG.darkslategray.dodgeFlashDuration;
     this.speed = this.baseSpeed * CONFIG.darkslategray.speedBoostMultiplier;
     this.startWeaponSwitch('melee');
-    spawnFloatingText(this.x, this.y - this.r - 10, 'NEAR MISS!', '#88ff88');
+    spawnFloatingText(this.x, this.y - this.r - 10, 'NEAR MISS!', '#A0AEC0');
 
     if (this.dodgeCount >= CONFIG.darkslategray.dodgesToActivate) {
       this.activateInvincibility();

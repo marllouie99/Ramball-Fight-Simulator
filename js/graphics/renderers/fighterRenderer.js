@@ -9,7 +9,9 @@ import {
   drawThunderRootsEffect,
   drawBlackFlashDebuffEffect,
   drawVoidMarkEffect,
-  drawParalyzeEffect
+  drawParalyzeEffect,
+  drawSoulDisfigurementEffect,
+  drawEmbeddedMahitoSpikes
 } from '../statusEffects.js';
 
 // Cache of pre-computed sketchy circle paths keyed by "radius_seed"
@@ -119,10 +121,6 @@ export class FighterRenderer {
       ctx.restore();
     }
 
-    if ((fighter.purpleHitTimer || 0) > 0) {
-      fighter.purpleHitTimer--;
-    }
-
     if (!fighter.purpleHitTimer && ((fighter.statusEffects && fighter.statusEffects.fighter.slowTimer > 0) || fighter.slowTimer > 0)) {
       // Suppress the generic slow visual if they are currently trapped in Toji's cinematic ultimate
       const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
@@ -200,7 +198,15 @@ export class FighterRenderer {
     }
 
     if (fighter.paralyzeTimer > 0) {
-      drawParalyzeEffect(ctx, baseRadius);
+      drawParalyzeEffect(ctx, baseRadius, Boolean(fighter.isParalyzedByMahito));
+    }
+
+    if ((fighter._soulDisfigurementStacks || 0) > 0 && (fighter._soulDisfigurementTimer || 0) > 0) {
+      drawSoulDisfigurementEffect(ctx, baseRadius, fighter._soulDisfigurementStacks);
+    }
+
+    if (fighter._embeddedMahitoSpikes && fighter._embeddedMahitoSpikes.length > 0) {
+      drawEmbeddedMahitoSpikes(ctx, baseRadius, fighter);
     }
   }
 
