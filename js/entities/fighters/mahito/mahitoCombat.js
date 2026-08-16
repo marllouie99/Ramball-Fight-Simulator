@@ -14,8 +14,9 @@ import { CONFIG } from '../../../core/config.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../../../core/state.js';
 import { applyDamageToTarget } from '../../fighter.js';
 import { spawnBloodEffect } from '../../../graphics/particles/bloodEffect.js';
-import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahitoClawScratchImpact } from '../../../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahitoClawScratchImpact, spawnMahitoSoulExplosion } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
+import { projectileSystem } from '../../../systems/projectileSystem.js';
 
 /**
  * Helper: Clamps a coordinate (x, y) to inside the active arena boundaries.
@@ -49,6 +50,34 @@ function clampToArena(x, y, pad = 0) {
       y: Math.max(minY, Math.min(maxY, y))
     };
   }
+}
+
+/**
+ * Helper: Clamps a target coordinate (x, y) to remain OUTSIDE Gojo's active Limitless Infinity barrier circle.
+ */
+function clampOutsideGojoInfinity(x, y, target, pad = 0) {
+  if (!target) return { x, y };
+
+  const isGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo') &&
+    !target.isMeleeMode &&
+    ((target.infinityCooldown || 0) <= 0 || target.infinityActive);
+
+  if (!isGojoInfinity) return { x, y };
+
+  const barrierR = (target.r || 25) + 35 + pad;
+  const dx = x - target.x;
+  const dy = y - target.y;
+  const dist = Math.hypot(dx, dy);
+
+  if (dist < barrierR) {
+    const angle = dist > 0.1 ? Math.atan2(dy, dx) : Math.random() * Math.PI * 2;
+    return {
+      x: target.x + Math.cos(angle) * barrierR,
+      y: target.y + Math.sin(angle) * barrierR
+    };
+  }
+
+  return { x, y };
 }
 
 /**
@@ -158,65 +187,7 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
     spawnMahitoClawScratchImpact(impactX, impactY, targetAngle, isTransformed);
 
     // 5. Soul Disfigurement Mechanic
-    const soulCfg = cfg.soulDisfigurement || {};
-    const maxStacks = soulCfg.maxStacks || 3;
-    const curStacks = (ent._soulDisfigurementStacks || 0) + 1;
-    ent._soulDisfigurementStacks = curStacks;
-    ent._soulDisfigurementTimer = soulCfg.duration || 300;
-
-    if (curStacks < maxStacks) {
-      // Stack Notification
-      spawnFloatingText(
-        ent.x,
-        ent.y - ent.r - 22,
-        `SOUL RESHAPED [${curStacks}/${maxStacks}]`,
-        isTransformed ? '#D946EF' : '#C026D3'
-      );
-    } else {
-      // ── MAX STACKS: VIOLENT SOUL RESHAPING (TRUE DAMAGE BURST) ──
-      ent._soulDisfigurementStacks = 0;
-      ent._soulDisfigurementTimer = 0;
-
-      let burstDmg = soulCfg.burstDamage || 38;
-      if (isTransformed) {
-        burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
-      }
-
-      // True unmitigated soul damage
-      applyDamageToTarget(ent, burstDmg, fighter, {
-        isTrueDamage: true,
-        isSoulDamage: true,
-        isSkill: true,
-        damageAngle: targetAngle
-      });
-
-      // Soul Shatter Visual & Audio Effects
-      spawnFloatingText(ent.x, ent.y - ent.r - 28, "SOUL DISFIGURED!", "#FF2A8D");
-      spawnImpactFlash(ent.x, ent.y, 60, 'rgba(217, 70, 239, 0.95)');
-      spawnMeleeClashShockwave(ent.x, ent.y, 45, '#D946EF');
-      spawnSparks(ent.x, ent.y, '#D946EF', 16);
-
-      const burstKb = soulCfg.burstKnockback || 12;
-      ent.vx = (ent.vx || 0) + Math.cos(targetAngle) * burstKb;
-      ent.vy = (ent.vy || 0) + Math.sin(targetAngle) * burstKb;
-
-      if (typeof ent.applyHitStun === 'function') {
-        ent.applyHitStun(soulCfg.burstHitStun || 14);
-      }
-
-      // Apply Paralyze Debuff to Target (Rule #5: applied exclusively to target)
-      const paralyzeDur = soulCfg.paralyzeDuration || 45;
-      ent.isParalyzedByMahito = true;
-      if (typeof ent.applyParalyze === 'function') {
-        ent.applyParalyze(paralyzeDur);
-      } else {
-        ent.paralyzeTimer = Math.max(ent.paralyzeTimer || 0, paralyzeDur);
-      }
-
-      triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
-      audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', 1.6);
-      audioSystem.playSFX(cfg.sounds?.fleshHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3', 2.0);
-    }
+    applySoulDisfigurementStack(ent, fighter);
   }
 
   // Audio Dispatcher
@@ -243,12 +214,10 @@ export function triggerMahitoParalyzeExplosion(entity) {
   const ruptureDmg = soulCfg.ruptureDamage || 24;
 
   // 1. Visceral Soul Explosion Visuals
-  spawnImpactFlash(entity.x, entity.y, 80, 'rgba(217, 70, 239, 0.95)');
-  spawnMeleeClashShockwave(entity.x, entity.y, 65, '#D946EF');
-  spawnMeleeClashShockwave(entity.x, entity.y, 35, '#FFFFFF');
-  spawnSparks(entity.x, entity.y, '#D946EF', 22);
-  spawnSparks(entity.x, entity.y, '#FAF5FF', 12);
-  spawnBloodEffect(entity.x, entity.y, 10, 'normal');
+  spawnMahitoSoulExplosion(entity.x, entity.y, 120);
+  if (typeof spawnBloodEffect === 'function') {
+    spawnBloodEffect(entity, 12, Math.random() * Math.PI * 2);
+  }
   spawnFloatingText(entity.x, entity.y - entity.r - 28, "SOUL RUPTURE!", "#D946EF");
 
   // 2. Damage application (Attributed to Mahito)
@@ -265,25 +234,40 @@ export function triggerMahitoParalyzeExplosion(entity) {
 
   // 3. Outward velocity explosion kick
   const randomAngle = Math.random() * Math.PI * 2;
-  const burstKb = soulCfg.ruptureKnockback || 14;
-  entity.vx = (entity.vx || 0) + Math.cos(randomAngle) * burstKb;
-  entity.vy = (entity.vy || 0) + Math.sin(randomAngle) * burstKb;
+  const ruptureKb = soulCfg.ruptureKnockback || 14;
+  const rupVx = Math.cos(randomAngle) * ruptureKb;
+  const rupVy = Math.sin(randomAngle) * ruptureKb;
+  if (typeof entity.applyKnockback === 'function') {
+    entity.applyKnockback(rupVx, rupVy);
+  } else {
+    entity.knockbackVx = rupVx;
+    entity.knockbackVy = rupVy;
+    entity.vx = (entity.vx || 0) + rupVx;
+    entity.vy = (entity.vy || 0) + rupVy;
+  }
 
   if (typeof entity.applyHitStun === 'function') {
     entity.applyHitStun(10);
   }
 
   triggerGlobalScreenShake(soulCfg.ruptureScreenShake || 10);
-  audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', 1.8);
-  audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.8);
-  audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 2.0);
+  audioSystem.playSFX(cfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', cfg.sounds?.bodyExplodeVolume ?? 2.0);
 }
 
-/**
- * Helper: Applies +1 Soul Disfigurement stack to a target entity.
- * Handles max stack detonation (soul burst + paralyze) inline.
- */
-function applySoulDisfigurementStack(ent, fighter) {
+export function applySoulDisfigurementStack(ent, fighter) {
+  if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga') {
+    if (ent.adaptedSoulDisfigurement) {
+      // Immune to any debuff - no stacks, no paralyze!
+      return;
+    }
+    ent._soulDisfigurementHitCount = (ent._soulDisfigurementHitCount || 0) + 1;
+    if (ent._soulDisfigurementHitCount >= 3) {
+      if (typeof ent.adaptToSoulDisfigurement === 'function') {
+        ent.adaptToSoulDisfigurement(fighter);
+      }
+    }
+  }
+
   const cfg = CONFIG.mahito || {};
   const soulCfg = cfg.soulDisfigurement || {};
   const maxStacks = soulCfg.maxStacks || 3;
@@ -310,23 +294,59 @@ function applySoulDisfigurementStack(ent, fighter) {
       burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
     }
 
+    const hpRatio = ent.hp / ent.maxHp;
+    let isExecute = false;
+    const execThreshold = soulCfg.executeThreshold ?? 0.10;
+    const execDmgPct = soulCfg.executeDamagePercent ?? 0.20;
+    if (hpRatio <= execThreshold) {
+      burstDmg = ent.maxHp * execDmgPct;
+      isExecute = true;
+    }
+
     applyDamageToTarget(ent, burstDmg, fighter, {
       isTrueDamage: true,
       isSoulDamage: true,
-      isSkill: true
+      isSkill: true,
+      isSoulDisfigurement: true
     });
 
-    spawnFloatingText(ent.x, ent.y - (ent.r || 25) - 28, "SOUL DISFIGURED!", "#FF2A8D");
-    spawnImpactFlash(ent.x, ent.y, 60, 'rgba(217, 70, 239, 0.95)');
-    spawnMeleeClashShockwave(ent.x, ent.y, 45, '#D946EF');
-    spawnSparks(ent.x, ent.y, '#D946EF', 16);
+    if (isExecute) {
+      spawnFloatingText(ent.x, ent.y - (ent.r || 25) - 28, "👤 SOUL EXECUTION!", "#FF0055");
+    } else {
+      spawnFloatingText(ent.x, ent.y - (ent.r || 25) - 28, "SOUL DISFIGURED!", "#FF2A8D");
+    }
+    spawnMahitoSoulExplosion(ent.x, ent.y, 100);
 
-    if (typeof ent.applyHitStun === 'function') {
+    const angle = Math.atan2(ent.y - fighter.y, ent.x - fighter.x);
+    const burstKb = soulCfg.burstKnockback || 20;
+    const kbVx = Math.cos(angle) * burstKb;
+    const kbVy = Math.sin(angle) * burstKb;
+    if (typeof ent.applyKnockback === 'function') {
+      ent.applyKnockback(kbVx, kbVy);
+    } else {
+      ent.knockbackVx = kbVx;
+      ent.knockbackVy = kbVy;
+      ent.vx = (ent.vx || 0) + kbVx;
+      ent.vy = (ent.vy || 0) + kbVy;
+    }
+
+    if (typeof ent.applyHitStun === 'function' && !ent.adaptedSoulDisfigurement) {
       ent.applyHitStun(soulCfg.burstHitStun || 14);
     }
 
+    // Apply Paralyze Debuff to Target (Rule #5: applied exclusively to target)
+    if (!ent.adaptedSoulDisfigurement) {
+      const paralyzeDur = soulCfg.paralyzeDuration || 45;
+      ent.isParalyzedByMahito = true;
+      if (typeof ent.applyParalyze === 'function') {
+        ent.applyParalyze(paralyzeDur);
+      } else {
+        ent.paralyzeTimer = Math.max(ent.paralyzeTimer || 0, paralyzeDur);
+      }
+    }
+
     triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
-    audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', 1.6);
+    audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', cfg.sounds?.soulDetonateVolume ?? 1.6);
   }
 }
 
@@ -379,12 +399,14 @@ export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
   }
 
   // Distance Guard: Do NOT trigger subterranean surge if enemy is too close (< minDistance)
-  const minSurgeDist = surgeCfg.minDistance || 140;
+  const minSurgeDist = surgeCfg.minDistance || 240;
   if (target && !target.isDead && target.hp > 0) {
     const distToTarget = Math.hypot(target.x - fighter.x, target.y - fighter.y);
-    if (distToTarget < minSurgeDist && !fighter.playerControlled) {
-      // Enemy is in close quarters! Switch to close-quarters melee strike instead
-      if ((fighter.cooldownTimer || 0) <= 0) {
+    if (distToTarget < minSurgeDist) {
+      // Enemy is in close quarters! Stop from triggering and switch to close-quarters melee strike if in reach
+      const reach = cfg.punchRange || 75;
+      const maxReach = (fighter.r || 25) + (target.r || 25) + reach;
+      if (distToTarget <= maxReach && (fighter.cooldownTimer || 0) <= 0) {
         executeIdleTransfigurationStrike(fighter, target);
       }
       return;
@@ -419,8 +441,12 @@ export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
   const retractDuration = Math.max(12, Math.min(70, Math.round(totalStretchDist / retractSpeed) + 6));
   const animDuration = slideFrames + plungeFrames + growthDuration + lingerDuration + retractDuration + 4;
 
+  const sharedCd = cfg.sharedSkillCooldown || surgeCfg.cooldown || 300;
   fighter.fleshSurgeAnimTimer = animDuration;
-  fighter.fleshSurgeCooldown = surgeCfg.cooldown || 180;
+  fighter.sharedSkillCooldown = sharedCd;
+  fighter.fleshSurgeCooldown = sharedCd;
+  fighter.maceCannonCooldown = sharedCd;
+  fighter.twinScissorCooldown = sharedCd;
 
   // Store active surge state on fighter
   fighter._fleshSurgeData = {
@@ -440,7 +466,8 @@ export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
     lingerDuration,
     retractDuration,
     hasPlunged: false,
-    reachMax
+    reachMax,
+    tendrilCount
   };
 
   // Hide front hand circle during the stretch arm animation
@@ -462,6 +489,10 @@ function updateSingleHumpTrajectory(loop, index, prevExitX, prevExitY, target, t
     targetX = target.x;
     targetY = target.y;
   }
+
+  const clamped = clampOutsideGojoInfinity(targetX, targetY, target, 12);
+  targetX = clamped.x;
+  targetY = clamped.y;
 
   const dx = targetX - prevExitX;
   const dy = targetY - prevExitY;
@@ -608,8 +639,31 @@ export function updateMahitoFleshSurge(fighter) {
             continue;
           }
 
+          const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
+            !ent.isMeleeMode && 
+            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
           const dist = Math.hypot(ent.x - lp.peakX, ent.y - lp.peakY);
           if (dist <= explosionR + (ent.r || 25)) {
+            if (isGojoInfinity) {
+              if (!lp.isFrozenByInfinity) {
+                lp.isFrozenByInfinity = true;
+                data.isFrozenByInfinity = true;
+                if (typeof ent.triggerInfinityBlock === 'function') {
+                  ent.triggerInfinityBlock(lp.peakX, lp.peakY);
+                }
+                spawnImpactFlash(lp.peakX, lp.peakY, 45, 'rgba(0, 229, 255, 0.95)');
+                spawnSparks(lp.peakX, lp.peakY, '#00F3FF', 14);
+                audioSystem.playSFX('effect_infinity_collide', 1.0);
+              }
+              // Stop chasing and lock humps: freeze at barrier then retract after brief pause
+              if (!data.hasHitEnemy) {
+                data.hasHitEnemy = true;
+                data.loops = data.loops.slice(0, i + 1);
+                data.retractStartFrame = data.elapsedFrames + 28; // ~0.5s freeze pause at barrier
+              }
+              continue;
+            }
             hitAnyEnemy = true;
 
             // Apply True/Soul Damage & Hit Effects
@@ -651,7 +705,7 @@ export function updateMahitoFleshSurge(fighter) {
       const lastLoop = data.loops[data.loops.length - 1];
 
       // If the last queued loop is already active/erupting and hasn't hit, spawn the next hunting hump
-      if (lastLoop && data.elapsedFrames >= lastLoop.startFrame) {
+      if (lastLoop && data.elapsedFrames >= lastLoop.startFrame && data.loops.length < (data.tendrilCount || 4)) {
         const nextIndex = data.loops.length;
         const nextStartFrame = lastLoop.startFrame + data.staggerDelay;
         const nextMaxHeight = Math.min(75, 42 + nextIndex * 6);
@@ -674,6 +728,12 @@ export function updateMahitoFleshSurge(fighter) {
 
         updateSingleHumpTrajectory(newLoop, nextIndex, lastLoop.exitX, lastLoop.exitY, data.target, nextIndex + 1, data.baseAngle);
         data.loops.push(newLoop);
+      } else if (lastLoop && data.elapsedFrames >= lastLoop.startFrame + (lastLoop.growthDuration || 14)) {
+        // We have reached the maximum tendril count and finished the final hump's growth: begin retraction!
+        if (data.retractStartFrame === undefined) {
+          data.retractStartFrame = data.elapsedFrames;
+          data.hasHitEnemy = true;
+        }
       }
     }
 
@@ -887,20 +947,33 @@ export function executeMahitoMaceCannon(fighter, targetHint = null) {
   }
   if (!target || target.hp <= 0 || target.isDead) return;
 
+  const minMaceDist = cannonCfg.minDistance || 240;
+  const distToTarget = Math.hypot(target.x - fighter.x, target.y - fighter.y);
+  if (distToTarget < minMaceDist) {
+    // Enemy is in close quarters! Stop from triggering and switch to close-quarters melee strike if in reach
+    const reach = cfg.punchRange || 75;
+    const maxReach = (fighter.r || 25) + (target.r || 25) + reach;
+    if (distToTarget <= maxReach && (fighter.cooldownTimer || 0) <= 0) {
+      executeIdleTransfigurationStrike(fighter, target);
+    }
+    return;
+  }
+
   const dx = target.x - fighter.x;
   const dy = target.y - fighter.y;
-  const dist = Math.hypot(dx, dy) || 1;
+  const dist = distToTarget || 1;
   const angle = Math.atan2(dy, dx);
 
   const reachMax = cannonCfg.reachMax || 380;
   const targetDist = Math.min(dist, reachMax);
 
-  // Clamp target coordinates inside the arena boundaries
+  // Clamp target coordinates inside Gojo's Infinity & the arena boundaries
   const maceR = isTransformed ? (cannonCfg.maceRadiusTransformed || 29) : (cannonCfg.maceRadiusBase || 22);
   const pad = maceR + 8; // Small extra pad for spikes
   const rawTargetX = fighter.x + Math.cos(angle) * targetDist;
   const rawTargetY = fighter.y + Math.sin(angle) * targetDist;
-  const clampedTarget = clampToArena(rawTargetX, rawTargetY, pad);
+  const clampedInf = clampOutsideGojoInfinity(rawTargetX, rawTargetY, target, 15);
+  const clampedTarget = clampToArena(clampedInf.x, clampedInf.y, pad);
 
   // Re-adjust target distance and angle to target clamped target coordinates
   const dxClamped = clampedTarget.x - fighter.x;
@@ -911,7 +984,11 @@ export function executeMahitoMaceCannon(fighter, targetHint = null) {
   fighter.gunAngle = finalAngle;
   fighter.angle = finalAngle;
 
-  fighter.maceCannonCooldown = cannonCfg.cooldown || 360;
+  const sharedCd = cfg.sharedSkillCooldown || cannonCfg.cooldown || 300;
+  fighter.sharedSkillCooldown = sharedCd;
+  fighter.fleshSurgeCooldown = sharedCd;
+  fighter.maceCannonCooldown = sharedCd;
+  fighter.twinScissorCooldown = sharedCd;
   fighter.maceCannonAnimTimer = 180; // Ample buffer; updateMahitoMaceCannon clears timer on retract finish
   fighter.hideFrontHand = true;
 
@@ -1126,8 +1203,10 @@ export function updateMahitoMaceCannon(fighter) {
   if (data.shrapnelSpikes.length > 0) {
     for (let i = data.shrapnelSpikes.length - 1; i >= 0; i--) {
       const spk = data.shrapnelSpikes[i];
-      spk.x += spk.vx;
-      spk.y += spk.vy;
+      if (!spk.isFrozenByInfinity) {
+        spk.x += spk.vx;
+        spk.y += spk.vy;
+      }
       spk.life--;
 
       // Check if spike is outside the arena boundaries
@@ -1168,7 +1247,18 @@ export function updateMahitoMaceCannon(fighter) {
             if (myTeam !== null && ownerTeam === myTeam) continue;
           }
 
+          const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
+            !ent.isMeleeMode && 
+            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
           const dToSpike = Math.hypot(ent.x - spk.x, ent.y - spk.y);
+          if (isGojoInfinity && dToSpike <= ent.r + 38) {
+            spk.isFrozenByInfinity = true;
+            spk.vx = 0;
+            spk.vy = 0;
+            continue;
+          }
+
           if (dToSpike <= ent.r + 18) {
             spk.hasHit = true;
             spk.life = 0; // Consume spike
@@ -1218,6 +1308,53 @@ export function updateMahitoMaceCannon(fighter) {
     }
   }
 
+  // Check for Gojo Infinity barrier contact during stretch / morph
+  if (typeof state !== 'undefined' && state.fighters && (data.phase === 'launch' || data.phase === 'morph')) {
+    const candidates = [...state.fighters, ...(state.illusions || [])];
+    const myIdx = state.fighters.indexOf(fighter);
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : fighter.team;
+
+    for (let j = 0; j < candidates.length; j++) {
+      const ent = candidates[j];
+      if (!ent || ent === fighter || ent.isDead || ent.hp <= 0) continue;
+
+      const entIdx = state.fighters.indexOf(ent);
+      if (entIdx !== -1) {
+        const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
+        if (myTeam !== null && enemyTeam === myTeam) continue;
+      } else if (ent.owner) {
+        const ownerIdx = state.fighters.indexOf(ent.owner);
+        const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+        if (myTeam !== null && ownerTeam === myTeam) continue;
+      }
+
+      const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
+        !ent.isMeleeMode && 
+        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
+      if (isGojoInfinity) {
+        const distToTip = Math.hypot(ent.x - data.currentTipX, ent.y - data.currentTipY);
+        if (distToTip <= (ent.r || 25) + 42) {
+          if (!data.isFrozenByInfinity) {
+            data.isFrozenByInfinity = true;
+            data.phase = 'infinityFrozen';
+            data.freezeStartFrame = data.elapsedFrames;
+            data.freezeDuration = 32; // ~0.5s freeze duration at barrier
+            data.lockTipX = data.currentTipX;
+            data.lockTipY = data.currentTipY;
+            if (typeof ent.triggerInfinityBlock === 'function') {
+              ent.triggerInfinityBlock(data.currentTipX, data.currentTipY);
+            }
+            spawnImpactFlash(data.currentTipX, data.currentTipY, 50, 'rgba(0, 229, 255, 0.95)');
+            spawnSparks(data.currentTipX, data.currentTipY, '#00F3FF', 16);
+            audioSystem.playSFX('effect_infinity_collide', 1.0);
+          }
+          break;
+        }
+      }
+    }
+  }
+
   // 2. Launch Phase (Fires straight toward aimed coordinates)
   if (data.phase === 'launch') {
     const stretchSpeed = cannonCfg.stretchSpeed || 24.0;
@@ -1242,6 +1379,25 @@ export function updateMahitoMaceCannon(fighter) {
       data.lockTipY = data.currentTipY;
 
       audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.4);
+    }
+  }
+
+  // 2B. Infinity Frozen Phase (Stretched arm frozen suspended at Gojo's Infinity barrier)
+  else if (data.phase === 'infinityFrozen') {
+    data.currentTipX = data.lockTipX;
+    data.currentTipY = data.lockTipY;
+
+    if (data.elapsedFrames % 6 === 0) {
+      spawnSparks(data.currentTipX, data.currentTipY, '#00F3FF', 3);
+    }
+
+    const freezeDur = data.freezeDuration || 32;
+    if (data.elapsedFrames - data.freezeStartFrame >= freezeDur) {
+      data.retractStartX = data.currentTipX;
+      data.retractStartY = data.currentTipY;
+      data.explodeFrame = data.elapsedFrames;
+      data.retractDuration = 14;
+      data.phase = 'retract';
     }
   }
 
@@ -1304,8 +1460,13 @@ export function updateMahitoMaceCannon(fighter) {
           if (myTeam !== null && ownerTeam === myTeam) continue;
         }
 
+        const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
+          !ent.isMeleeMode && 
+          ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
         const distToExplosion = Math.hypot(ent.x - impactX, ent.y - impactY);
         if (distToExplosion <= ent.r + blastRadius) {
+          if (isGojoInfinity) continue;
           // Primary Target Damage & Heavy Impact
           let impactDmg = cannonCfg.impactDamage || 30;
           if (isTransformed) impactDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
@@ -1433,7 +1594,30 @@ export function executeMahitoTwinScissor(fighter, target = null) {
   const scissorCfg = cfg.twinScissor || {};
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
-  fighter.twinScissorCooldown = scissorCfg.cooldown || 360;
+  let tgt = target;
+  if (!tgt && typeof fighter._findClosestEnemy === 'function') {
+    tgt = fighter._findClosestEnemy();
+  }
+
+  const minScissorDist = scissorCfg.minDistance || 240;
+  if (tgt && tgt.hp > 0 && !tgt.isDead) {
+    const distToTarget = Math.hypot(tgt.x - fighter.x, tgt.y - fighter.y);
+    if (distToTarget < minScissorDist) {
+      // Enemy is in close quarters! Stop from triggering and switch to close-quarters melee strike if in reach
+      const reach = cfg.punchRange || 75;
+      const maxReach = (fighter.r || 25) + (tgt.r || 25) + reach;
+      if (distToTarget <= maxReach && (fighter.cooldownTimer || 0) <= 0) {
+        executeIdleTransfigurationStrike(fighter, tgt);
+      }
+      return;
+    }
+  }
+
+  const sharedCd = cfg.sharedSkillCooldown || scissorCfg.cooldown || 300;
+  fighter.sharedSkillCooldown = sharedCd;
+  fighter.fleshSurgeCooldown = sharedCd;
+  fighter.maceCannonCooldown = sharedCd;
+  fighter.twinScissorCooldown = sharedCd;
   fighter.twinScissorAnimTimer = 180; // Safety anim duration
   fighter.hideFrontHand = true;
   fighter.hideBackHand = true;
@@ -1443,15 +1627,20 @@ export function executeMahitoTwinScissor(fighter, target = null) {
   let targetX = fighter.x + Math.cos(angle) * (scissorCfg.reachMax || 280);
   let targetY = fighter.y + Math.sin(angle) * (scissorCfg.reachMax || 280);
 
-  if (target && target.hp > 0 && !target.isDead) {
-    const dx = target.x - fighter.x;
-    const dy = target.y - fighter.y;
+  if (tgt && tgt.hp > 0 && !tgt.isDead) {
+    const dx = tgt.x - fighter.x;
+    const dy = tgt.y - fighter.y;
     angle = Math.atan2(dy, dx);
     const distToTarget = Math.hypot(dx, dy);
     const maxReach = scissorCfg.reachMax || 360;
-    const clampedDist = Math.min(maxReach, Math.max(scissorCfg.minDistance || 90, distToTarget));
-    targetX = fighter.x + Math.cos(angle) * clampedDist;
-    targetY = fighter.y + Math.sin(angle) * clampedDist;
+    const clampedDist = Math.min(maxReach, Math.max(scissorCfg.minDistance || 240, distToTarget));
+    
+    const rawTX = fighter.x + Math.cos(angle) * clampedDist;
+    const rawTY = fighter.y + Math.sin(angle) * clampedDist;
+    const clampedInf = clampOutsideGojoInfinity(rawTX, rawTY, tgt, 20);
+
+    targetX = clampedInf.x;
+    targetY = clampedInf.y;
   }
 
   const flankW = scissorCfg.flankWidth || 95;
@@ -1554,19 +1743,78 @@ export function updateMahitoTwinScissor(fighter) {
     const curAngle = Math.atan2(curDy, curDx);
     const curDist = Math.hypot(curDx, curDy);
     const maxReach = scissorCfg.reachMax || 360;
-    const clampedDist = Math.min(maxReach, Math.max(scissorCfg.minDistance || 90, curDist));
+    const clampedDist = Math.min(maxReach, Math.max(scissorCfg.minDistance || 240, curDist));
     
-    data.targetX = fighter.x + Math.cos(curAngle) * clampedDist;
-    data.targetY = fighter.y + Math.sin(curAngle) * clampedDist;
-    data.angle = curAngle;
-    data.perpX = -Math.sin(curAngle);
-    data.perpY =  Math.cos(curAngle);
+    const rawTX = fighter.x + Math.cos(curAngle) * clampedDist;
+    const rawTY = fighter.y + Math.sin(curAngle) * clampedDist;
+    const clampedInf = clampOutsideGojoInfinity(rawTX, rawTY, data.target, 20);
+
+    data.targetX = clampedInf.x;
+    data.targetY = clampedInf.y;
+
+    const adjDx = data.targetX - fighter.x;
+    const adjDy = data.targetY - fighter.y;
+    const adjAngle = Math.atan2(adjDy, adjDx);
+    data.angle = adjAngle;
+    data.perpX = -Math.sin(adjAngle);
+    data.perpY =  Math.cos(adjAngle);
 
     const flankW = scissorCfg.flankWidth || 95;
     data.leftFlankX = data.targetX + data.perpX * flankW;
     data.leftFlankY = data.targetY + data.perpY * flankW;
     data.rightFlankX = data.targetX - data.perpX * flankW;
     data.rightFlankY = data.targetY - data.perpY * flankW;
+  }
+
+  // Check for Gojo Infinity barrier contact during Twin Scissor stretch / clamp
+  if (typeof state !== 'undefined' && state.fighters && (data.phase === 'launch' || data.phase === 'reachPause' || data.phase === 'popOut' || data.phase === 'clamp')) {
+    const candidates = [...state.fighters, ...(state.illusions || [])];
+    const myIdx = state.fighters.indexOf(fighter);
+    const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIdx) : fighter.team;
+
+    for (let j = 0; j < candidates.length; j++) {
+      const ent = candidates[j];
+      if (!ent || ent === fighter || ent.isDead || ent.hp <= 0) continue;
+
+      const entIdx = state.fighters.indexOf(ent);
+      if (entIdx !== -1) {
+        const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(entIdx) : ent.team;
+        if (myTeam !== null && enemyTeam === myTeam) continue;
+      } else if (ent.owner) {
+        const ownerIdx = state.fighters.indexOf(ent.owner);
+        const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+        if (myTeam !== null && ownerTeam === myTeam) continue;
+      }
+
+      const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
+        !ent.isMeleeMode && 
+        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
+      if (isGojoInfinity) {
+        const barrierR = (ent.r || 25) + 38;
+        const dLeft = Math.hypot(ent.x - data.leftTipX, ent.y - data.leftTipY);
+        const dRight = Math.hypot(ent.x - data.rightTipX, ent.y - data.rightTipY);
+        const dTarget = Math.hypot(ent.x - data.targetX, ent.y - data.targetY);
+
+        if (dLeft <= barrierR || dRight <= barrierR || dTarget <= barrierR) {
+          if (!data.isFrozenByInfinity) {
+            data.isFrozenByInfinity = true;
+            data.phase = 'infinityFrozen';
+            data.freezeStartFrame = data.elapsedFrames;
+            data.freezeDuration = 32;
+            if (typeof ent.triggerInfinityBlock === 'function') {
+              ent.triggerInfinityBlock(data.targetX, data.targetY);
+            }
+            spawnImpactFlash(data.leftTipX, data.leftTipY, 45, 'rgba(0, 229, 255, 0.95)');
+            spawnImpactFlash(data.rightTipX, data.rightTipY, 45, 'rgba(0, 229, 255, 0.95)');
+            spawnSparks(data.leftTipX, data.leftTipY, '#00F3FF', 14);
+            spawnSparks(data.rightTipX, data.rightTipY, '#00F3FF', 14);
+            audioSystem.playSFX('effect_infinity_collide', 1.0);
+          }
+          break;
+        }
+      }
+    }
   }
 
   // 1. Launch Phase (Both arms stretch outward along flanking pincer arcs)
@@ -1649,7 +1897,25 @@ export function updateMahitoTwinScissor(fighter) {
       audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 1.8);
     }
   }
+  // 2C. Infinity Frozen Phase (Both scissor arms/blades frozen suspended at Gojo's barrier)
+  else if (data.phase === 'infinityFrozen') {
+    if (data.elapsedFrames % 6 === 0) {
+      spawnSparks(data.leftTipX, data.leftTipY, '#00F3FF', 3);
+      spawnSparks(data.rightTipX, data.rightTipY, '#00F3FF', 3);
+    }
 
+    const freezeDur = data.freezeDuration || 32;
+    if (data.elapsedFrames - data.freezeStartFrame >= freezeDur) {
+      data.retractLeftStartX = data.leftTipX;
+      data.retractLeftStartY = data.leftTipY;
+      data.retractRightStartX = data.rightTipX;
+      data.retractRightStartY = data.rightTipY;
+      data.retractStartFrame = data.elapsedFrames;
+      data.retractDuration = 14;
+      data.morphProgress = 0.0;
+      data.phase = 'retract';
+    }
+  }
   // 3. Clamp Phase (High-Speed Inward Scissor Guillotine Strike - Single Chop)
   else if (data.phase === 'clamp') {
     const clampDur = 14;
@@ -1704,8 +1970,13 @@ export function updateMahitoTwinScissor(fighter) {
             if (myTeam !== null && ownerTeam === myTeam) continue;
           }
 
+          const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && 
+            !ent.isMeleeMode && 
+            ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
           const distToCut = Math.hypot(ent.x - strikeCenterX, ent.y - strikeCenterY);
           if (distToCut <= ent.r + strikeRadius) {
+            if (isGojoInfinity) continue;
             let dmg = scissorCfg.damage || 34;
             if (isTransformed) dmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
             applyDamageToTarget(ent, dmg, fighter, { isMelee: true, isSkill: true });
@@ -1720,9 +1991,18 @@ export function updateMahitoTwinScissor(fighter) {
               ent.vy = (ent.vy || 0) + Math.sin(angleToCaster) * hookForce;
             }
 
+            // Apply Stun to Target
+            const stunDur = scissorCfg.stunDuration || scissorCfg.hitStun || 45;
             if (typeof ent.applyHitStun === 'function') {
-              ent.applyHitStun(scissorCfg.hitStun || 16);
+              ent.applyHitStun(stunDur);
+            } else {
+              ent.hitStunTimer = Math.max(ent.hitStunTimer || 0, stunDur);
             }
+            if (typeof ent.interruptAttacks === 'function') {
+              ent.interruptAttacks();
+            }
+
+            spawnFloatingText(ent.x, ent.y - ent.r - 18, "STUNNED!", "#C026D3");
 
             if (typeof spawnBloodEffect === 'function') {
               spawnBloodEffect(ent, 8, data.angle);
@@ -1944,4 +2224,138 @@ export function updateMahitoTwinScissor(fighter) {
     }
   }
 }
+
+/**
+ * Executes Mahito's Fifth Skill: Soul Multiplicity (Transfigured Humans) or Alt Cast: Body Repel.
+ * If the target is close (distance <= minDistanceAlt), Mahito summons 3 swarming Transfigured Humans.
+ * If the target is far (distance > minDistanceAlt), Mahito fires the high-knockback Body Repel projectile.
+ */
+export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
+  const cfg = CONFIG.mahito || {};
+  const skillCfg = cfg.soulMultiplicity || {};
+
+  // Find target
+  const target = targetHint || (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
+
+  // Set cooldown immediately
+  fighter.soulMultiplicityCooldown = skillCfg.cooldown || 400;
+
+  let dx = 0;
+  let dy = 0;
+  let distance = 0; // Default to close distance so we summon if target is null
+
+  if (target) {
+    dx = target.x - fighter.x;
+    dy = target.y - fighter.y;
+    distance = Math.hypot(dx, dy);
+  }
+
+  const minDistanceAlt = skillCfg.minDistanceAlt || 250;
+
+  if (!target || distance <= minDistanceAlt) {
+    // Summon swarming Transfigured Humans!
+    spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "SOUL MULTIPLICITY!", "#C026D3");
+    triggerGlobalScreenShake(6, 12);
+
+    const ownerIndex = (typeof fighter.fighterIndex === 'number')
+      ? fighter.fighterIndex
+      : (state.fighters ? state.fighters.indexOf(fighter) : 0);
+
+    const summonCount = skillCfg.summonCount || 1;
+    const minionHp = skillCfg.minionHp || 25;
+    const minionDamage = skillCfg.minionDamage || 10;
+    const minionSpeed = skillCfg.minionSpeed || 1.8;
+    const minionSize = skillCfg.minionSize || 16;
+
+    for (let s = 0; s < summonCount; s++) {
+      const angle = (fighter.gunAngle || 0) + (Math.random() * 0.8 - 0.4);
+      const distOffset = fighter.r + minionSize + 5 + Math.random() * 15;
+      
+      const child = {
+        x: fighter.x + Math.cos(angle) * distOffset,
+        y: fighter.y + Math.sin(angle) * distOffset,
+        vx: Math.cos(angle) * minionSpeed,
+        vy: Math.sin(angle) * minionSpeed,
+        r: minionSize,
+        hp: minionHp,
+        maxHp: minionHp,
+        damage: minionDamage,
+        owner: fighter,
+        ownerIndex: ownerIndex,
+        isIllusion: true,
+        isDoppelganger: true, // Acts as doppelganger illusion
+        isTransfiguredHuman: true, // Custom visual skin renderer
+        isSplitChild: true,  // Do not split on death
+        angle: angle,
+        gunAngle: angle,
+        moveSpeed: minionSpeed,
+        hitFlashTimer: 0,
+        timeStopTimer: 0,
+        hitStunTimer: 0,
+        swordCooldown: 30,
+        swordSwingActive: false,
+        swordSwingTimer: 0,
+        swordSwingAngle: 0,
+        applyTimeStop(dur) { this.timeStopTimer = Math.max(this.timeStopTimer || 0, dur); },
+        applyHitStun(dur)  { this.hitStunTimer  = Math.max(this.hitStunTimer  || 0, dur); },
+        applyKnockback(vx, vy) { this.knockbackVx = vx; this.knockbackVy = vy; },
+        takeDamage(amount, attacker, opts = {}) {
+          return applyDamageToTarget(this, amount, attacker, opts);
+        },
+      };
+
+      state.illusions.push(child);
+    }
+
+    const summonSounds = cfg.sounds?.minionSummons || [
+      cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
+      cfg.sounds?.minionSummonAlt || 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
+      cfg.sounds?.minionSummonAlt2 || 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3'
+    ];
+    const chosenSound = summonSounds[Math.floor(Math.random() * summonSounds.length)];
+    audioSystem.playSFX(chosenSound, cfg.sounds?.minionSummonVolume ?? 1.8);
+  } else {
+    // Alt Cast: Body Repel projectile!
+    spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "BODY REPEL!", "#C026D3");
+    triggerGlobalScreenShake(8, 15);
+    spawnImpactFlash(fighter.x, fighter.y, 60, '#C026D3');
+
+    const bodyRepelDamage = skillCfg.bodyRepelDamage || 50;
+    const bodyRepelSpeed = skillCfg.bodyRepelSpeed || 10.0;
+    const bodyRepelRadius = skillCfg.bodyRepelRadius || 50;
+    const bodyRepelLife = skillCfg.bodyRepelLife || 90;
+    const bodyRepelKnockback = skillCfg.bodyRepelKnockback || 20;
+
+    const ownerIndex = (typeof fighter.fighterIndex === 'number')
+      ? fighter.fighterIndex
+      : (state.fighters ? state.fighters.indexOf(fighter) : 0);
+
+    const angle = Math.atan2(dy, dx);
+    const proj = projectileSystem.fireProjectile(
+      fighter,
+      ownerIndex,
+      bodyRepelDamage,
+      false, // isFollowUp
+      bodyRepelSpeed,
+      false, // willBecomeBlackHole
+      'mahito_body_repel',
+      fighter.x,
+      fighter.y,
+      angle
+    );
+
+    if (proj) {
+      proj.isMahitoBodyRepel = true;
+      proj.ownerFighter = fighter;
+      proj.owner = ownerIndex;
+      proj.r = bodyRepelRadius;
+      proj.life = bodyRepelLife;
+      proj.maxLife = bodyRepelLife;
+      proj.knockbackForce = bodyRepelKnockback;
+    }
+
+    audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.5);
+  }
+}
+
 

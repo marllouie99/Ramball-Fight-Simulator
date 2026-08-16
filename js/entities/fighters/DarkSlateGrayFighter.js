@@ -441,7 +441,7 @@ export class DarkSlateGrayFighter extends Fighter {
       }
     } else if (this.shootCooldown > 0) {
       this.shootCooldown--;
-    } else if (opponent) {
+    } else if (opponent && !this.isCaughtInBeam()) {
       const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
       const delta = this.normalizeAngle(targetAngle - this.angle);
       const aligned = Math.abs(delta) < CONFIG.normal.aimThreshold;

@@ -1,4 +1,4 @@
-import { fadeOutLoopingSound } from '../../systems/soundSystem.js';
+import { fadeOutLoopingSound, playLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
@@ -35,19 +35,19 @@ export class OrangeFighter extends Fighter {
   }
 
   shoot(ownerIndex, opponent) {
-    if (!projectileSystem) return;
-    if (!opponent) return;
+    if (!projectileSystem || this.isCaughtInBeam()) return false;
+    if (!opponent) return false;
 
     const distance = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     const maxRange = CONFIG.orange.flameRange;
 
     if (distance > maxRange + this.r + opponent.r) {
-      return; // Opponent too far to hit with flame
+      return false; // Opponent too far to hit with flame
     }
 
     // Check if has enough fuel
     if (this.fuel < CONFIG.orange.fuelPerBurst) {
-      return; // Cannot shoot if out of fuel
+      return false; // Cannot shoot if out of fuel
     }
 
     // Consume fuel
@@ -250,14 +250,14 @@ export class OrangeFighter extends Fighter {
     const frozenBySphere = this.isInsideCronosSphere();
 
     // Override shooting behavior for continuous fire within range
-    const isFiring = !frozenBySphere && this.shoot(ownerIndex, opponent);
+    const isFiring = !frozenBySphere && !this.isCaughtInBeam() && this.shoot(ownerIndex, opponent);
     if (isFiring) {
       if (!this._flameSoundKey) {
         this._flameSoundKey = `orange-flame-${ownerIndex}`;
       }
       if (!this._isFlameSoundPlaying) {
-        const sound = getBasicAttackSound(this._def?.id);
-        audioSystem.playLoop(this._flameSoundKey, sound.src, sound.volume);
+        const sound = getBasicAttackSound(this._def?.id, this._def?.type);
+        playLoopingSound(this._flameSoundKey, sound.src, sound.volume);
         this._isFlameSoundPlaying = true;
       }
 
@@ -280,7 +280,7 @@ export class OrangeFighter extends Fighter {
   }
 
   drawGun(ctx) {
-    drawOrangeFlamethrowerGun(ctx, this.x, this.y, this.gunAngle, this.r, this.color);
+    drawOrangeFlamethrowerGun(ctx, this.x, this.y, this.gunAngle, this.r);
   }
 
   drawFuelBar(ctx) {
@@ -336,11 +336,14 @@ export class OrangeFighter extends Fighter {
     ctx.stroke();
 
     // Draw glow effect
+    ctx.shadowColor = startColor;
+    ctx.shadowBlur = 10;
     ctx.beginPath();
     ctx.arc(0, 0, meterRadius, filledAngle, startAngle);
     ctx.strokeStyle = `rgba(255, 150, 0, ${0.3 + fuelRatio * 0.4})`;
     ctx.lineWidth = meterThickness + 2;
     ctx.stroke();
+    ctx.shadowBlur = 0;
 
     // Draw fuel text in center
     ctx.fillStyle = '#ffffff00';

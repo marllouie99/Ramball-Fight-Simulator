@@ -108,11 +108,40 @@ export function drawWeaponStudioScreen() {
 
   // 5. Draw Weapon Hero Preview
   const currentScale = state.studioPreviewScale;
-  ctx.save();
-  ctx.translate(canvas.width / 2, heroY);
-  ctx.scale(currentScale, currentScale);
-  drawWeaponPreview(ctx, activeWeaponKey, themeColor);
-  ctx.restore();
+  
+  if (state.studioPixelArtMode) {
+    const pixelFactor = 0.30; // Lower = chunkier pixels
+    const pw = Math.ceil(canvas.width * pixelFactor);
+    const ph = Math.ceil(canvas.height * pixelFactor);
+    
+    if (!state._studioPixelCanvas) {
+       state._studioPixelCanvas = document.createElement('canvas');
+    }
+    const pc = state._studioPixelCanvas;
+    if (pc.width !== pw || pc.height !== ph) {
+      pc.width = pw;
+      pc.height = ph;
+    }
+    const pctx = pc.getContext('2d');
+    pctx.clearRect(0, 0, pw, ph);
+    
+    pctx.save();
+    pctx.translate(pw / 2, heroY * pixelFactor);
+    pctx.scale(currentScale * pixelFactor, currentScale * pixelFactor);
+    drawWeaponPreview(pctx, activeWeaponKey, themeColor);
+    pctx.restore();
+    
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(pc, 0, 0, pw, ph, 0, 0, canvas.width, canvas.height);
+    ctx.restore();
+  } else {
+    ctx.save();
+    ctx.translate(canvas.width / 2, heroY);
+    ctx.scale(currentScale, currentScale);
+    drawWeaponPreview(ctx, activeWeaponKey, themeColor);
+    ctx.restore();
+  }
 
   // 5b. Zoom Controls (Below Preview)
   const zoomBarY = heroY + 155;
@@ -212,6 +241,31 @@ export function drawWeaponStudioScreen() {
       activeDragFinger = -1;
       activeDragType = null;
     });
+  });
+
+  // 6b. Pixel Art Toggle
+  if (state.studioPixelArtMode === undefined) state.studioPixelArtMode = false;
+  
+  const pxBtnY = leftY + leftH + 22;
+  const pxBtnW = 125;
+  const pxBtnH = 24;
+  const pxBtnX = leftX + leftW / 2;
+  
+  ctx.fillStyle = state.studioPixelArtMode ? 'rgba(0, 255, 128, 0.15)' : 'rgba(255, 255, 255, 0.04)';
+  ctx.strokeStyle = state.studioPixelArtMode ? '#00ff80' : 'rgba(255, 255, 255, 0.15)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(pxBtnX - pxBtnW / 2, pxBtnY - pxBtnH / 2, pxBtnW, pxBtnH, 4);
+  ctx.fill();
+  ctx.stroke();
+  
+  ctx.fillStyle = state.studioPixelArtMode ? '#00ff80' : 'rgba(255, 255, 255, 0.6)';
+  ctx.font = 'bold 9px Arial';
+  ctx.textAlign = 'center';
+  ctx.fillText(state.studioPixelArtMode ? '👾 PIXEL ART: ON' : '👾 PIXEL ART: OFF', pxBtnX, pxBtnY + 3);
+  
+  _registerButton(pxBtnX - pxBtnW / 2, pxBtnY - pxBtnH / 2, pxBtnW, pxBtnH, () => {
+    state.studioPixelArtMode = !state.studioPixelArtMode;
   });
 
   // 7. Right Panel: Precise Curvature & Transform Controls

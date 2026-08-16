@@ -81,6 +81,11 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Pure Love Beam (same as Gojo's Purple)!
   }
 
+  // ── 50% Damage Reduction when Adapted to Soul Disfigurement ──
+  if (opts.isSoulDisfigurement && fighter.adaptedSoulDisfigurement) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Soul Disfigurement!
+  }
+
 
   // ── Toji ISOH Bypass Check ──
   if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji') && opts.isIsoh) {
@@ -623,6 +628,8 @@ export function adaptToPureLoveBeam(fighter) {
   fighter.knockbackStunTimer = 0;
   if (!fighter.adapted) fighter.adapted = {};
   fighter.adapted.skill = true;
+  if (!fighter.adaptationStage) fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+  fighter.adaptationStage.skill = (fighter.adaptationStage.skill || 0) + 1;
 
   const adaptColor = '#FF1493'; // Pink for Yuta Pure Love Beam
 
@@ -632,9 +639,27 @@ export function adaptToPureLoveBeam(fighter) {
   }
 
   fighter.wheelGlowColor = adaptColor;
-  fighter.wheelGlowTimer = 60;
-  fighter.wheelClickTimer = 35;
-  fighter.wheelRotation = (fighter.wheelRotation || 0) + (Math.PI * 0.25); // Click wheel rotation
+  fighter.wheelGlowTimer = 65;
+  const pauseFrames = 40;
+  fighter.adaptationPauseTimer = pauseFrames;
+  fighter.adaptationPauseMax = pauseFrames;
+  fighter.wheelClickTimer = pauseFrames;
+  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelStartRotation = fighter.wheelRotation || 0;
+  fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  if (typeof state !== 'undefined' && state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f !== fighter && f.hp > 0) {
+        f.mahoragaAdaptationFreezeTimer = pauseFrames;
+        f.vx = 0;
+        f.vy = 0;
+      }
+    });
+  }
+
+  playSkillEffectSound('mahoraga', 'wheelclick');
+  triggerGlobalScreenShake(6, 18);
 
   const wheelY = fighter.y - fighter.r - 28;
   spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: PURE LOVE BEAM!', adaptColor);
@@ -642,8 +667,6 @@ export function adaptToPureLoveBeam(fighter) {
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
-  audioSystem.playSFX('skill_dash3', 0.9);
-  audioSystem.playSFX('attack_swordswing', 0.85);
 
   // ── COUNTER BLITZ: TELEPORT BEHIND ENEMY ONLY WHEN ENEMY IS NOT ACTIVELY FIRING A BEAM ──
   const opponent = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0) : null;
@@ -698,6 +721,8 @@ export function adaptToYutaFlurry(fighter) {
   fighter.adaptedYutaFlurry = true;
   if (!fighter.adapted) fighter.adapted = {};
   fighter.adapted.melee = true;
+  if (!fighter.adaptationStage) fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+  fighter.adaptationStage.melee = (fighter.adaptationStage.melee || 0) + 1;
 
   const adaptColor = '#FFD700'; // Gold matching Katana basic theme
 
@@ -707,16 +732,33 @@ export function adaptToYutaFlurry(fighter) {
   }
 
   fighter.wheelGlowColor = adaptColor;
-  fighter.wheelGlowTimer = 60;
-  fighter.wheelClickTimer = 35;
-  fighter.wheelRotation = (fighter.wheelRotation || 0) + (Math.PI * 0.25);
+  fighter.wheelGlowTimer = 65;
+  const pauseFrames = 40;
+  fighter.adaptationPauseTimer = pauseFrames;
+  fighter.adaptationPauseMax = pauseFrames;
+  fighter.wheelClickTimer = pauseFrames;
+  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelStartRotation = fighter.wheelRotation || 0;
+  fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  if (typeof state !== 'undefined' && state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f !== fighter && f.hp > 0) {
+        f.mahoragaAdaptationFreezeTimer = pauseFrames;
+        f.vx = 0;
+        f.vy = 0;
+      }
+    });
+  }
+
+  playSkillEffectSound('mahoraga', 'wheelclick');
+  triggerGlobalScreenShake(6, 18);
 
   const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: YUTA KATANA FLURRY!', adaptColor);
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
-  audioSystem.playSFX('skill_dash3', 0.9);
-  audioSystem.playSFX('attack_swordswing', 0.85);
 }
 
 /**
@@ -731,6 +773,8 @@ export function adaptToThinIceBreaker(fighter) {
   fighter.adaptedThinIceBreaker = true;
   if (!fighter.adapted) fighter.adapted = {};
   fighter.adapted.skill = true;
+  if (!fighter.adaptationStage) fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+  fighter.adaptationStage.skill = (fighter.adaptationStage.skill || 0) + 1;
 
   const adaptColor = '#00FFFF'; // Cyan Blue matching Thin Ice Breaker theme
 
@@ -740,9 +784,27 @@ export function adaptToThinIceBreaker(fighter) {
   }
 
   fighter.wheelGlowColor = adaptColor;
-  fighter.wheelGlowTimer = 60;
-  fighter.wheelClickTimer = 35;
-  fighter.wheelRotation = (fighter.wheelRotation || 0) + (Math.PI * 0.25);
+  fighter.wheelGlowTimer = 65;
+  const pauseFrames = 40;
+  fighter.adaptationPauseTimer = pauseFrames;
+  fighter.adaptationPauseMax = pauseFrames;
+  fighter.wheelClickTimer = pauseFrames;
+  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelStartRotation = fighter.wheelRotation || 0;
+  fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  if (typeof state !== 'undefined' && state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f !== fighter && f.hp > 0) {
+        f.mahoragaAdaptationFreezeTimer = pauseFrames;
+        f.vx = 0;
+        f.vy = 0;
+      }
+    });
+  }
+
+  playSkillEffectSound('mahoraga', 'wheelclick');
+  triggerGlobalScreenShake(6, 18);
 
   const wheelY = fighter.y - fighter.r - 28;
   spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: THIN ICE BREAKER!', adaptColor);
@@ -750,6 +812,63 @@ export function adaptToThinIceBreaker(fighter) {
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
-  audioSystem.playSFX('skill_dash3', 0.9);
-  audioSystem.playSFX('attack_swordswing', 0.85);
+}
+
+/**
+ * Adapt Mahoraga to Mahito's Soul Disfigurement mechanic.
+ * - Grants 50% damage reduction on Soul Disfigurement hits.
+ * - Grants total immunity to Soul Disfigurement stacks, shivering, and paralyze debuffs.
+ */
+export function adaptToSoulDisfigurement(fighter) {
+  if (!fighter || fighter.hp <= 0) return;
+  if (fighter.adaptedSoulDisfigurement) return; // Already adapted
+
+  fighter.adaptedSoulDisfigurement = true;
+  fighter._soulDisfigurementStacks = 0;
+  fighter._soulDisfigurementTimer = 0;
+  fighter.isParalyzedByMahito = false;
+  fighter.paralyzeTimer = 0;
+  fighter.hitStunTimer = 0;
+
+  if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
+  fighter.adaptedSkills['soulDisfigurement'] = true;
+  if (!fighter.adaptationStage) fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+  fighter.adaptationStage.skill = (fighter.adaptationStage.skill || 0) + 1;
+
+  const adaptColor = '#C026D3'; // Vivid Magenta-Violet
+
+  if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+  if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+    fighter.gojoAdaptColorHistory.push(adaptColor);
+  }
+
+  fighter.wheelGlowColor = adaptColor;
+  fighter.wheelGlowTimer = 65;
+  const pauseFrames = 40;
+  fighter.adaptationPauseTimer = pauseFrames;
+  fighter.adaptationPauseMax = pauseFrames;
+  fighter.wheelClickTimer = pauseFrames;
+  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelStartRotation = fighter.wheelRotation || 0;
+  fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  if (typeof state !== 'undefined' && state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f !== fighter && f.hp > 0) {
+        f.mahoragaAdaptationFreezeTimer = pauseFrames;
+        f.vx = 0;
+        f.vy = 0;
+      }
+    });
+  }
+
+  playSkillEffectSound('mahoraga', 'wheelclick');
+  triggerGlobalScreenShake(6, 18);
+
+  const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SOUL DISFIGUREMENT!', adaptColor);
+  spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Immune to Soul Disfigurement debuffs!', '#FFFFFF');
+
+  spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
 }

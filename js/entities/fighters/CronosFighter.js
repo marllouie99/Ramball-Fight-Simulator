@@ -464,7 +464,7 @@ export class CronosFighter extends Fighter {
 
   // Try melee attack with crescent blade (hits all targets within front radius)
   _tryMeleeAttack(opponent, ownerIndex) {
-    if (this.meleeCooldown > 0) return;
+    if (this.meleeCooldown > 0 || this.isCaughtInBeam()) return;
 
     const meleeReach = CONFIG.cronos.meleeRange || 110;
     const maxRange = this.r + (opponent ? opponent.r : 20) + meleeReach;

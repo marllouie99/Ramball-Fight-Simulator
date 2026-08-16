@@ -541,7 +541,11 @@ canvas {
   grid-column: span 2;
 }
 
-/* ── 1v2 Mode Solo Player 1-Column HUD Layout ── */
+/* ── 1v1 & Stand Off Mode 1-Column HUD Layout ── */
+.health-hud.single-column-hud .health-card__skills,
+.health-hud.single-column-hud .health-card__info,
+.health-card.single-column .health-card__skills,
+.health-card.single-column .health-card__info,
 .health-card.solo-1v2-card .health-card__skills,
 .health-card.solo-1v2-card .health-card__info,
 .health-card__skills.single-column,
@@ -549,6 +553,10 @@ canvas {
   grid-template-columns: 1fr !important;
 }
 
+.health-hud.single-column-hud .hud-skill-box,
+.health-hud.single-column-hud .health-card__info > div,
+.health-card.single-column .hud-skill-box,
+.health-card.single-column .health-card__info > div,
 .health-card.solo-1v2-card .hud-skill-box,
 .health-card.solo-1v2-card .health-card__info > div,
 .health-card__skills.single-column .hud-skill-box,

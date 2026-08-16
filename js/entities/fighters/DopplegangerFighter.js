@@ -200,7 +200,7 @@ export class DopplegangerFighter extends Fighter {
   }
 
   _trySwordSwing(opponent, ownerIndex) {
-    if (!opponent || this.swordCooldown > 0) return;
+    if (!opponent || this.swordCooldown > 0 || this.isCaughtInBeam()) return;
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const maxRange = this.r + opponent.r + CONFIG.doppleganger.swordRange;

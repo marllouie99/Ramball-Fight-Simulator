@@ -896,6 +896,67 @@ export function drawSparkEffects(layer = 'all') {
           ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.92), 0, Math.PI * 2);
           ctx.stroke();
         }
+      } else if (effect.type === 'mahitoSoulShockwave') {
+        // Expanding nested magenta & cyan soul disfigurement shockwave rings
+        if (effect.targetSize) {
+          effect.size += (effect.targetSize - effect.size) * 0.16;
+        }
+
+        if (effect.color === 'magenta') {
+          // Outer glow ring (hot purple/magenta)
+          ctx.strokeStyle = `rgba(217, 70, 239, ${effect.life * 0.8})`;
+          ctx.lineWidth = 6 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Dark ink contrast ring
+          ctx.strokeStyle = `rgba(15, 5, 20, ${effect.life * 0.85})`;
+          ctx.lineWidth = 2.5 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.96), 0, Math.PI * 2);
+          ctx.stroke();
+        } else {
+          // Inner glow ring (electric cyan/white)
+          ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.85})`;
+          ctx.lineWidth = 4 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Bright white core ring
+          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.lineWidth = 1.8 * effect.life;
+          ctx.beginPath();
+          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
+          ctx.stroke();
+        }
+      } else if (effect.type === 'mahitoSoulCoreFlash') {
+        // Jagged, unstable starburst flash representing organic soul shifting
+        effect.size += (effect.targetSize - effect.size) * 0.22;
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.beginPath();
+        const points = 16;
+        for (let p = 0; p < points; p++) {
+          const angle = (p / points) * Math.PI * 2;
+          const factor = (p % 4 === 0) ? 1.0 : (p % 2 === 0 ? 0.65 : 0.35);
+          const r = effect.size * factor;
+          const px = effect.x + Math.cos(angle) * r;
+          const py = effect.y + Math.sin(angle) * r;
+          if (p === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Neon magenta halo
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(217, 70, 239, ${effect.life * 0.5})`;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, effect.size * 1.35, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'mahitoClawScratchBurst') {
         // 5-Blade Razor Claw Slash Lacerations cutting across target
         const ang = effect.angle || 0;
@@ -2424,4 +2485,80 @@ export function spawnMahitoClawScratchImpact(x, y, angle = 0, isTransformed = fa
 
   // Impact Shockwave
   spawnMeleeClashShockwave(x, y, isTransformed ? 45 : 32, isTransformed ? '#D946EF' : '#C026D3');
+}
+
+/**
+ * Spawns Mahito's JJK Soul Disfigurement Detonation explosion.
+ * Features:
+ * - Nested expanding shockwave rings of neon magenta & electric cyan
+ * - Blinding starburst core flash with jagged edges representing unstable soul transformation
+ * - A flurry of high-speed flying soul/blood sparks (crimson, magenta, cyan)
+ */
+export function spawnMahitoSoulExplosion(x, y, radius = 95) {
+  if (!state || !state.sparkEffects) return;
+
+  // 1. Core Blinding Starburst Flash
+  const coreFlash = ParticleSystem.getParticle();
+  coreFlash.x = x;
+  coreFlash.y = y;
+  coreFlash.vx = 0;
+  coreFlash.vy = 0;
+  coreFlash.size = radius * 0.4;
+  coreFlash.targetSize = radius * 0.95;
+  coreFlash.life = 1.0;
+  coreFlash.decay = 0.065; // ~15 frames
+  coreFlash.type = 'mahitoSoulCoreFlash';
+  coreFlash.isFlash = true;
+  coreFlash.isPixi = false;
+  state.sparkEffects.push(coreFlash);
+
+  // 2. Primary Expanding Shockwave (Outer Magenta/Indigo)
+  const outerSw = ParticleSystem.getParticle();
+  outerSw.x = x;
+  outerSw.y = y;
+  outerSw.vx = 0;
+  outerSw.vy = 0;
+  outerSw.size = 10;
+  outerSw.targetSize = radius;
+  outerSw.life = 1.0;
+  outerSw.decay = 0.045; // ~22 frames
+  outerSw.type = 'mahitoSoulShockwave';
+  outerSw.isFlash = true;
+  outerSw.isPixi = false;
+  outerSw.color = 'magenta';
+  state.sparkEffects.push(outerSw);
+
+  // 3. Secondary Expanding Shockwave (Inner Cyan/White, faster decay)
+  const innerSw = ParticleSystem.getParticle();
+  innerSw.x = x;
+  innerSw.y = y;
+  innerSw.vx = 0;
+  innerSw.vy = 0;
+  innerSw.size = 15;
+  innerSw.targetSize = radius * 0.7;
+  innerSw.life = 1.0;
+  innerSw.decay = 0.055; // ~18 frames
+  innerSw.type = 'mahitoSoulShockwave';
+  innerSw.isFlash = true;
+  innerSw.isPixi = false;
+  innerSw.color = 'cyan';
+  state.sparkEffects.push(innerSw);
+
+  // 4. Violent explosion sparks flying in all directions
+  // Crimson (blood), Magenta (Idle Transfiguration cursed energy), Cyan (Soul Spark/Core)
+  const sparkColors = ['#DC2626', '#D946EF', '#00E5FF', '#F5D0FE'];
+  const sparkCount = 28;
+  for (let i = 0; i < sparkCount; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 4 + Math.random() * 10;
+    const color = sparkColors[i % sparkColors.length];
+    
+    spawnSparks(x, y, 1, 'basic', {
+      color: color,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      size: 1.5 + Math.random() * 2.2,
+      decay: 0.035 + Math.random() * 0.035
+    });
+  }
 }

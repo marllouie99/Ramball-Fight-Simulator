@@ -195,6 +195,8 @@ export function drawHUD() {
   
   if (containerBottom) {
     containerBottom.classList.toggle('ffa-hud', mode === GAME_MODES.FFA);
+    const isSingleColMode = (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off');
+    containerBottom.classList.toggle('single-column-hud', isSingleColMode);
     containerBottom.style.opacity = hudOpacity;
     if (hudOpacity <= 0) {
       containerBottom.style.visibility = 'hidden';
@@ -323,8 +325,12 @@ function updateHealthHud() {
   // Fast-ticking cooldown timers change by ~1 every single frame, which used to defeat this
   // throttle entirely. Quantizing them lets per-frame ticking fall through to the periodic
   // refresh below instead of forcing a full HUD recompute on every single frame.
+  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1';
+  const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off';
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2';
+  const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
+  const isSingleColumnMode = is1v1 || isStandOff;
   const teamMode = is2v2;
 
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
@@ -712,7 +718,7 @@ function updateHealthHud() {
       ];
     }
     if (f.characterId === 'mahito' || f.type === 'mahito') {
-      const themeColor = '#C026D3';
+      const themeColor = f.color || '#C026D3';
       let formPct = 0;
       let formReady = false;
       let formLabel = 'DISTORTED KILLING';
@@ -729,26 +735,43 @@ function updateHealthHud() {
         formReady = formPct >= 99;
       }
 
-      const maxSurgeCd = CONFIG.mahito?.fleshSurge?.cooldown || 180;
-      const surgeCd = f.fleshSurgeCooldown !== undefined ? f.fleshSurgeCooldown : 0;
-      const surgePct = Math.max(0, Math.min(100, (1 - (surgeCd / maxSurgeCd)) * 100));
-      const surgeReady = surgePct >= 99;
+      const maxSkillCd = CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.fleshSurge?.cooldown || 300;
+      const skillCd = Math.max(
+        f.sharedSkillCooldown !== undefined ? f.sharedSkillCooldown : 0,
+        f.fleshSurgeCooldown || 0,
+        f.maceCannonCooldown || 0,
+        f.twinScissorCooldown || 0
+      );
+      const skillPct = Math.max(0, Math.min(100, (1 - (skillCd / maxSkillCd)) * 100));
+      const skillReady = skillPct >= 99;
 
-      const maxCannonCd = CONFIG.mahito?.maceCannon?.cooldown || 360;
-      const cannonCd = f.maceCannonCooldown !== undefined ? f.maceCannonCooldown : 0;
-      const cannonPct = Math.max(0, Math.min(100, (1 - (cannonCd / maxCannonCd)) * 100));
-      const cannonReady = cannonPct >= 99;
+      const maxMultiplicityCd = CONFIG.mahito?.soulMultiplicity?.cooldown || 400;
+      const multiplicityCd = f.soulMultiplicityCooldown !== undefined ? f.soulMultiplicityCooldown : 0;
+      const multiplicityPct = Math.max(0, Math.min(100, (1 - (multiplicityCd / maxMultiplicityCd)) * 100));
+      const multiplicityReady = multiplicityPct >= 99;
 
-      const maxScissorCd = CONFIG.mahito?.twinScissor?.cooldown || 360;
-      const scissorCd = f.twinScissorCooldown !== undefined ? f.twinScissorCooldown : 0;
-      const scissorPct = Math.max(0, Math.min(100, (1 - (scissorCd / maxScissorCd)) * 100));
-      const scissorReady = scissorPct >= 99;
+      // 4. Soul Evasion Status Bar
+      let evasionPct = 0;
+      let evasionReady = false;
+      let evasionLabel = 'SOUL EVASION (USED)';
+
+      if (f.isEvading) {
+        const maxDuration = CONFIG.mahito?.evasion?.duration || 300;
+        evasionPct = Math.max(0, Math.min(100, ((f.evasionTimer || 0) / maxDuration) * 100));
+        evasionReady = false;
+        evasionLabel = `SOUL EVASION (${((f.evasionTimer || 0) / 60).toFixed(1)}s)`;
+      } else if (!f.hasTriggeredEvasion) {
+        const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.35;
+        evasionPct = Math.max(0, Math.min(100, (1 - (f.hp / f.maxHp)) * 100));
+        evasionReady = (f.hp / f.maxHp) <= evasionThreshold;
+        evasionLabel = 'SOUL EVASION';
+      }
 
       return [
-        { id: 'twin_scissor', pct: scissorPct, ready: scissorReady, color: themeColor, label: 'PINCER BLADE' },
-        { id: 'flesh_surge',  pct: surgePct,   ready: surgeReady,   color: themeColor, label: 'FLESH SURGE' },
-        { id: 'mace_cannon',  pct: cannonPct,  ready: cannonReady,  color: themeColor, label: 'SPIKED CANNON' },
-        { id: 'isbodk',       pct: formPct,    ready: formReady,    color: themeColor, label: formLabel }
+        { id: 'idle_transfiguration', pct: skillPct, ready: skillReady, color: themeColor, label: 'IDLE TRANSFIGURATION' },
+        { id: 'soul_multiplicity',    pct: multiplicityPct, ready: multiplicityReady, color: themeColor, label: 'SOUL MULTIPLICITY' },
+        { id: 'soul_evasion',         pct: evasionPct, ready: evasionReady, color: themeColor, label: evasionLabel },
+        { id: 'isbodk',               pct: formPct,  ready: formReady,  color: themeColor, label: formLabel }
       ];
     }
     if (f.characterId === 'saitama' || f.type === 'saitama') {
@@ -1103,11 +1126,13 @@ function updateHealthHud() {
         const mult = CONFIG.mahito?.transformation?.damageMultiplier || 1.60;
         const currentDmg = Math.round(baseDmg * mult);
         const boost = currentDmg - baseDmg;
+        const defVal = Math.round((1 - (CONFIG.mahito?.transformation?.defenseMultiplier ?? 0.50)) * 100);
         info.push(`<b>DMG:</b> ${baseDmg} + ${boost} <span style="color: #00E5FF; font-size: 10px;">▲</span>`);
-        info.push(`<b>ARMOR:</b> +50%`);
+        info.push(`<b>DEF:</b> ${defVal}%`);
       } else {
+        const defVal = Math.round((CONFIG.mahito?.soulDurabilityReduction ?? 0.25) * 100);
         info.push(`<b>DMG:</b> ${baseDmg}`);
-        info.push(`<b>SOUL DEF:</b> 25%`);
+        info.push(`<b>DEF:</b> ${defVal}%`);
       }
     } else if (f.characterId === 'todo' || f.type === 'todo') {
       // 1. ATK Speed
@@ -1546,8 +1571,9 @@ function updateHealthHud() {
         const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
         const isDummy = m && (m.characterId === 'dummy' || m.type === 'dummy');
         const showDescription = CONFIG.hudShowFighterDescription || isDummy;
-        const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left') : '';
-        const memberInfoHTML = generateFighterInfoHTML(m, false, true);
+        const isSingleCol = singleColumn;
+        const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
+        const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
 
         let memberNameColor = m.color || '#ffffff';
         const fType = (m.type || m.characterId || (m._def && m._def.type) || '').toLowerCase();
@@ -1850,6 +1876,7 @@ function updateHealthHud() {
             `;
         }
 
+        const isSingleCol = isSingleColumnMode && mode !== GAME_MODES.FFA;
         const cardHTML = buildCard({
           title: fighterName,
           scoreText: totalGames > 0 ? `${winRate}% WR` : '',
@@ -1857,7 +1884,7 @@ function updateHealthHud() {
           fillRatio: ratio,
           metaLabel: `DMG: ${Math.max(0, Number(fighter.damage) || 0)}`,
           metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`,
-          extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : '',
+          extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : (isSingleCol ? 'single-column' : ''),
           borderColor: color,
           wins: matchWins,
           fighterColor: nameColor,
@@ -1867,7 +1894,8 @@ function updateHealthHud() {
           kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
           maxBullets: (mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.FFA) ? 0 : 2,
           targetFighter: fighter,
-          titleAlign: (index % 2 === 0 ? 'left' : 'right')
+          titleAlign: (index % 2 === 0 ? 'left' : 'right'),
+          singleColumn: isSingleCol
         });
 
         const tempDiv = document.createElement('div');
@@ -1998,7 +2026,8 @@ function updateHealthHud() {
 
         // Stats Info Update for Team Member
         if (m.infoContainer) {
-          const infoHTML = generateFighterInfoHTML(fighter, false, true);
+          const isSingleCol = isSingleColumnMode && mode !== GAME_MODES.FFA;
+          const infoHTML = generateFighterInfoHTML(fighter, isSingleCol, true);
           if (m.lastInfoHTML !== infoHTML) {
             m.infoContainer.innerHTML = infoHTML;
             m.lastInfoHTML = infoHTML;
@@ -2117,8 +2146,8 @@ function updateHealthHud() {
 
       // 5. Additional Info (stats) — only write to DOM if text changed
       if (cachedCard.infoContainer) {
-        const isSolo1v2 = is1v2 && index === 0;
-        const infoHTML = generateFighterInfoHTML(fighter, isSolo1v2);
+        const isSingleCol = (isSingleColumnMode && mode !== GAME_MODES.FFA) || (is1v2 && index === 0);
+        const infoHTML = generateFighterInfoHTML(fighter, isSingleCol);
         if (cachedCard.lastInfoHTML !== infoHTML) {
           cachedCard.infoContainer.innerHTML = infoHTML;
           cachedCard.lastInfoHTML = infoHTML;

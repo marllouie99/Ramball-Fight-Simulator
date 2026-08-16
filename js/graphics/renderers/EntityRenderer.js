@@ -3,7 +3,8 @@ import { CONFIG } from '../../core/config.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
 import { drawSketchyCircle } from './fighterRenderer.js';
-import { drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes } from '../statusEffects.js';
+import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal } from '../statusEffects.js';
+import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 
 let _sortedFightersBuffer = [];
 
@@ -445,11 +446,575 @@ export function drawFighters() {
   });
 }
 
+let _patchworkBallCache = null;
+
+function getPatchworkBallCanvas(r, variant = 0, progress = 0) {
+  // Quantize progress to ~20 discrete steps to prevent infinite cache explosion
+  const qProgress = Math.round(progress * 20) / 20;
+  
+  const baseSize = Math.ceil(r * 2) + 20; // Extra padding for horns/tendrils/protrusions
+  // Allow extra padding for swelling bubbles when dying
+  const size = qProgress > 0 ? Math.ceil(baseSize * 1.5) : baseSize;
+
+  if (!_patchworkBallCache) {
+    _patchworkBallCache = new Map();
+  }
+  const cacheKey = `${size}_${variant}_${qProgress.toFixed(2)}`;
+  if (_patchworkBallCache.has(cacheKey)) {
+    return _patchworkBallCache.get(cacheKey);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  
+  const center = size / 2;
+  ctx.translate(center, center);
+
+  if (qProgress > 0) {
+    // 1. Draw swelling cursed energy bubbles protruding from sides (pre-explosion)
+    ctx.save();
+    const bubbleColor = variant === 1 ? 'rgba(80, 120, 180, ' + (0.5 + qProgress * 0.4) + ')' : 
+                        variant === 2 ? 'rgba(160, 50, 50, ' + (0.5 + qProgress * 0.4) + ')' :
+                                        'rgba(120, 40, 180, ' + (0.5 + qProgress * 0.4) + ')';
+    ctx.fillStyle = bubbleColor;
+    ctx.strokeStyle = '#0A0610';
+    ctx.lineWidth = 1.5;
+
+    // Left bubble
+    const b1Radius = r * 0.7 * qProgress;
+    const b1X = -r * 0.8;
+    const b1Y = r * 0.3;
+    if (b1Radius > 2) {
+      ctx.beginPath();
+      ctx.arc(b1X, b1Y, b1Radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Inner cursed glow
+      ctx.fillStyle = variant === 1 ? 'rgba(160, 200, 255, ' + (0.3 + qProgress * 0.3) + ')' :
+                      variant === 2 ? 'rgba(255, 120, 120, ' + (0.3 + qProgress * 0.3) + ')' :
+                                      'rgba(200, 100, 255, ' + (0.3 + qProgress * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(b1X - b1Radius * 0.2, b1Y - b1Radius * 0.2, b1Radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Right bubble
+    ctx.fillStyle = bubbleColor;
+    const b2Radius = r * 0.8 * qProgress;
+    const b2X = r * 0.7;
+    const b2Y = r * 0.2;
+    if (b2Radius > 2) {
+      ctx.beginPath();
+      ctx.arc(b2X, b2Y, b2Radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = variant === 1 ? 'rgba(160, 200, 255, ' + (0.3 + qProgress * 0.3) + ')' :
+                      variant === 2 ? 'rgba(255, 120, 120, ' + (0.3 + qProgress * 0.3) + ')' :
+                                      'rgba(200, 100, 255, ' + (0.3 + qProgress * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(b2X - b2Radius * 0.2, b2Y - b2Radius * 0.2, b2Radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Top bubble
+    ctx.fillStyle = bubbleColor;
+    const b3Radius = r * 0.5 * qProgress;
+    const b3X = -r * 0.5;
+    const b3Y = -r * 0.7;
+    if (b3Radius > 2) {
+      ctx.beginPath();
+      ctx.arc(b3X, b3Y, b3Radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = variant === 1 ? 'rgba(160, 200, 255, ' + (0.3 + qProgress * 0.3) + ')' :
+                      variant === 2 ? 'rgba(255, 120, 120, ' + (0.3 + qProgress * 0.3) + ')' :
+                                      'rgba(200, 100, 255, ' + (0.3 + qProgress * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(b3X - b3Radius * 0.2, b3Y - b3Radius * 0.2, b3Radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+  
+  // 2. Draw the main cursed spirit body (with dying intensification)
+  drawCursedSpiritBody(ctx, r, qProgress, variant); // progress determines face distortion
+
+  // 3. Overlay intensifying cursed energy glow as it's about to explode
+  if (qProgress > 0.3) {
+    const glowAlpha = (qProgress - 0.3) * 0.6;
+    const glowGrad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.15);
+    const colorStart = variant === 1 ? 'rgba(160, 200, 255, ' + (glowAlpha * 0.65) + ')' :
+                       variant === 2 ? 'rgba(255, 120, 120, ' + (glowAlpha * 0.65) + ')' :
+                                       'rgba(220, 100, 255, ' + (glowAlpha * 0.65) + ')';
+    const colorMid = variant === 1 ? 'rgba(70, 130, 200, ' + (glowAlpha * 0.3) + ')' :
+                     variant === 2 ? 'rgba(200, 50, 50, ' + (glowAlpha * 0.3) + ')' :
+                                     'rgba(140, 30, 200, ' + (glowAlpha * 0.3) + ')';
+    glowGrad.addColorStop(0, colorStart);
+    glowGrad.addColorStop(0.6, colorMid);
+    glowGrad.addColorStop(1, 'rgba(140, 30, 200, 0.0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  _patchworkBallCache.set(cacheKey, canvas);
+  return canvas;
+}
+
+/**
+ * Draws a grotesque cursed spirit body — the redesigned Mahito transfigured human minion.
+ * Supports multiple design variants:
+ * - Variant 0: Brown skull-like head emerging from green spiky collar lined with teeth, stubby arms, hollow black eyes.
+ * - Variant 1: Pale blue-grey deformed skin with one giant central void eye, small crying eyes, horizontal teeth mouth, wriggling dark tendrils.
+ * - Variant 2: Split-face pinkish-red skull divided by stitch sutures, one hollow eye, one stitched eye, rock base with white spikes.
+ * @param {CanvasRenderingContext2D} ctx
+ * @param {number} r - body radius
+ * @param {number} progress - 0 = alive, 0->1 = dying/about to explode
+ * @param {number} variant - variant index (0, 1, or 2)
+ */
+function drawCursedSpiritBody(ctx, r, progress, variant = 0) {
+  ctx.save();
+
+  const colorVoid = '#0E0B11';     // Gaping black voids
+
+  if (variant === 0) {
+    const colorSkin = '#B27A60';     // Fleshy tan/brown skin
+    const colorGreen = '#3B6E4C';    // Deep green outer collar
+    const colorTeeth = '#F5F5F0';    // Sharp bone white teeth
+
+    // 1. Green collar/sleeve base (deformed organic spiky shape with wavy folds)
+    ctx.fillStyle = colorGreen;
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.8;
+    
+    ctx.beginPath();
+    const numCollarPoints = 16;
+    const collarPoints = [];
+    for (let i = 0; i < numCollarPoints; i++) {
+      const angle = (i / numCollarPoints) * Math.PI * 2;
+      const baseR = r * 1.08;
+      const wave = r * 0.08 * Math.sin(angle * 5) + r * 0.05 * Math.cos(angle * 3);
+      const dist = baseR + wave;
+      const px = Math.cos(angle) * dist;
+      const py = r * 0.22 + Math.sin(angle) * dist;
+      collarPoints.push({ x: px, y: py });
+    }
+    
+    ctx.moveTo(collarPoints[0].x, collarPoints[0].y);
+    for (let i = 0; i < numCollarPoints; i++) {
+      const p1 = collarPoints[i];
+      const p2 = collarPoints[(i + 1) % numCollarPoints];
+      const midX = (p1.x + p2.x) / 2;
+      const midY = (p1.y + p2.y) / 2;
+      ctx.quadraticCurveTo(p1.x, p1.y, midX, midY);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 2. White teeth/spikes lining the green sleeve pointing inwards/upwards
+    ctx.fillStyle = colorTeeth;
+    const numSleeveTeeth = 12;
+    for (let i = 0; i < numSleeveTeeth; i++) {
+      const angle = Math.PI * 0.05 + (i / (numSleeveTeeth - 1)) * Math.PI * 1.9;
+      ctx.save();
+      ctx.rotate(angle);
+      const waveOffset = r * 0.08 * Math.sin(angle * 5) + r * 0.05 * Math.cos(angle * 3);
+      ctx.translate(r * 0.98 + waveOffset, 0);
+      ctx.beginPath();
+      ctx.moveTo(0, -r * 0.12);
+      ctx.lineTo(-r * 0.28, 0); // pointing inward
+      ctx.lineTo(0, r * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Stubby outstretched arms on the sides
+    ctx.fillStyle = colorSkin;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.5, r * 0.2);
+    ctx.quadraticCurveTo(-r * 0.9, r * 0.1, -r * 1.25, r * 0.3); // upper edge
+    ctx.lineTo(-r * 1.2, r * 0.45); // hand tip
+    ctx.quadraticCurveTo(-r * 0.8, r * 0.35, -r * 0.5, r * 0.45); // lower edge
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    
+    ctx.beginPath();
+    ctx.arc(-r * 1.25, r * 0.35, r * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(r * 0.5, r * 0.2);
+    ctx.quadraticCurveTo(r * 0.9, r * 0.1, r * 1.25, r * 0.3); // upper edge
+    ctx.lineTo(r * 1.2, r * 0.45); // hand tip
+    ctx.quadraticCurveTo(r * 0.8, r * 0.35, r * 0.5, r * 0.45); // lower edge
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.arc(r * 1.25, r * 0.35, r * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 4. Main fleshy head
+    ctx.fillStyle = colorSkin;
+    ctx.beginPath();
+    const numHeadPoints = 12;
+    const headPoints = [];
+    for (let i = 0; i < numHeadPoints; i++) {
+      const angle = (i / numHeadPoints) * Math.PI * 2;
+      const rx = r * 0.84;
+      const ry = r * 0.94;
+      const baseR = Math.sqrt(Math.pow(rx * Math.cos(angle), 2) + Math.pow(ry * Math.sin(angle), 2));
+      let bump = 0;
+      if (angle > -Math.PI * 0.25 && angle < Math.PI * 0.35) {
+        bump = r * 0.07 * Math.sin(angle * 3.5); // cheek/jaw lumps
+      } else if (angle > Math.PI * 0.6 && angle < Math.PI * 1.2) {
+        bump = -r * 0.06 * Math.cos(angle * 2.0); // forehead dent
+      } else {
+        bump = r * 0.04 * Math.sin(angle * 4.0);
+      }
+      const dist = baseR + bump;
+      headPoints.push({ x: Math.cos(angle) * dist, y: -r * 0.05 + Math.sin(angle) * dist });
+    }
+    ctx.moveTo(headPoints[0].x, headPoints[0].y);
+    for (let i = 0; i < numHeadPoints; i++) {
+      const p1 = headPoints[i];
+      const p2 = headPoints[(i + 1) % numHeadPoints];
+      ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Wrinkles
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.4, -r * 0.7);
+    ctx.quadraticCurveTo(0, -r * 0.75, r * 0.4, -r * 0.7);
+    ctx.moveTo(-r * 0.3, -r * 0.6);
+    ctx.quadraticCurveTo(0, -r * 0.65, r * 0.3, -r * 0.6);
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.6, -r * 0.15);
+    ctx.lineTo(-r * 0.55, r * 0.15);
+    ctx.moveTo(r * 0.6, -r * 0.15);
+    ctx.lineTo(r * 0.55, r * 0.15);
+    ctx.stroke();
+
+    // 5. Hollow eyes
+    ctx.fillStyle = colorVoid;
+    const leftEyeX = -r * 0.32;
+    const leftEyeY = -r * 0.35;
+    const rightEyeX = r * 0.32;
+    const rightEyeY = -r * 0.35;
+    const eyeRad = r * 0.22 + progress * (r * 0.12);
+
+    ctx.beginPath();
+    ctx.arc(leftEyeX, leftEyeY, eyeRad, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(rightEyeX, rightEyeY, eyeRad, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Nose
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.22);
+    ctx.lineTo(-r * 0.08, -r * 0.14);
+    ctx.lineTo(0, -r * 0.10);
+    ctx.lineTo(r * 0.08, -r * 0.14);
+    ctx.closePath();
+    ctx.fill();
+
+    // 6. Gaping mouth void
+    const mouthY = r * 0.22;
+    const mouthW = r * 0.45;
+    const mouthH = r * 0.30 + progress * r * 0.25;
+
+    ctx.fillStyle = colorVoid;
+    ctx.beginPath();
+    ctx.ellipse(0, mouthY, mouthW, mouthH, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Ridges
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.6;
+    const mouthLinesCount = 9;
+    for (let i = 0; i < mouthLinesCount; i++) {
+      const t = (i / (mouthLinesCount - 1)) * 2 - 1;
+      const mx = t * mouthW * 0.95;
+      ctx.beginPath();
+      ctx.moveTo(mx, mouthY - mouthH * 0.6);
+      ctx.lineTo(mx * 1.15, mouthY - mouthH * 1.25);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(mx, mouthY + mouthH * 0.6);
+      ctx.lineTo(mx * 1.15, mouthY + mouthH * 1.25);
+      ctx.stroke();
+    }
+  } 
+  else if (variant === 1) {
+    const colorSkin = '#7E92A2';     // Pale blue-grey skin
+    const colorCollar = '#2B233C';   // Dark violet shroud base
+
+    // 1. Shroud base
+    ctx.fillStyle = colorCollar;
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    const numCollarPoints = 14;
+    const collarPoints = [];
+    for (let i = 0; i < numCollarPoints; i++) {
+      const angle = (i / numCollarPoints) * Math.PI * 2;
+      const baseR = r * 1.05;
+      const wave = r * 0.10 * Math.sin(angle * 6);
+      const dist = baseR + wave;
+      collarPoints.push({ x: Math.cos(angle) * dist, y: r * 0.25 + Math.sin(angle) * dist });
+    }
+    ctx.moveTo(collarPoints[0].x, collarPoints[0].y);
+    for (let i = 0; i < numCollarPoints; i++) {
+      const p1 = collarPoints[i];
+      const p2 = collarPoints[(i + 1) % numCollarPoints];
+      ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Wriggling tendrils at bottom
+    ctx.strokeStyle = '#2B233C';
+    ctx.lineWidth = 3.0;
+    const tendrilTime = Date.now() * 0.005;
+    for (let j = 0; j < 4; j++) {
+      const tx = -r * 0.6 + j * r * 0.4;
+      ctx.beginPath();
+      ctx.moveTo(tx, r * 0.5);
+      ctx.quadraticCurveTo(
+        tx + Math.sin(tendrilTime + j) * 4, 
+        r * 0.9, 
+        tx + Math.sin(tendrilTime + j) * 8, 
+        r * 1.22
+      );
+      ctx.stroke();
+    }
+
+    // 2. Main deformed skull head (lumpy vertical oval)
+    ctx.fillStyle = colorSkin;
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    const numHeadPoints = 12;
+    const headPoints = [];
+    for (let i = 0; i < numHeadPoints; i++) {
+      const angle = (i / numHeadPoints) * Math.PI * 2;
+      const rx = r * 0.80;
+      const ry = r * 0.98;
+      const baseR = Math.sqrt(Math.pow(rx * Math.cos(angle), 2) + Math.pow(ry * Math.sin(angle), 2));
+      let bump = 0;
+      if (angle > Math.PI * 0.5 && angle < Math.PI * 1.0) {
+        bump = r * 0.12 * Math.sin(angle * 2.0); // forehead bulge
+      } else {
+        bump = r * 0.05 * Math.cos(angle * 4.0); // surface bumps
+      }
+      const dist = baseR + bump;
+      headPoints.push({ x: Math.cos(angle) * dist, y: -r * 0.05 + Math.sin(angle) * dist });
+    }
+    ctx.moveTo(headPoints[0].x, headPoints[0].y);
+    for (let i = 0; i < numHeadPoints; i++) {
+      const p1 = headPoints[i];
+      const p2 = headPoints[(i + 1) % numHeadPoints];
+      ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // 3. Eye sockets
+    ctx.fillStyle = colorVoid;
+    const mainEyeR = r * 0.28 + progress * r * 0.15;
+    ctx.beginPath();
+    ctx.arc(0, -r * 0.35, mainEyeR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Two small crying eyes below
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.1, r * 0.08, 0, Math.PI * 2);
+    ctx.arc(r * 0.35, -r * 0.1, r * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 4. Wide horizontal mouth
+    const mouthW = r * 0.65;
+    const mouthH = r * 0.15 + progress * r * 0.2;
+    ctx.fillStyle = colorVoid;
+    ctx.beginPath();
+    ctx.ellipse(0, r * 0.25, mouthW, mouthH, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Messy teeth inside mouth
+    ctx.fillStyle = '#E8E4D8';
+    const numTeeth = 8;
+    for (let i = 0; i < numTeeth; i++) {
+      const t = -0.85 + (i / (numTeeth - 1)) * 1.7;
+      const tx = t * mouthW;
+      ctx.beginPath();
+      ctx.arc(tx, r * 0.25 - mouthH * 0.3, 1.8, 0, Math.PI * 2);
+      ctx.arc(tx + 2, r * 0.25 + mouthH * 0.3, 1.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  } 
+  else if (variant === 2) {
+    const colorSkin = '#C26B6B';     // Pinkish red flesh skin
+    const colorCollar = '#4A4A4A';   // Dark grey rock base
+
+    // 1. Rock-like collar base
+    ctx.fillStyle = colorCollar;
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    const numCollarPoints = 12;
+    const collarPoints = [];
+    for (let i = 0; i < numCollarPoints; i++) {
+      const angle = (i / numCollarPoints) * Math.PI * 2;
+      const baseR = r * 1.1;
+      const jag = (i % 2 === 0) ? r * 0.08 : -r * 0.05;
+      const dist = baseR + jag;
+      collarPoints.push({ x: Math.cos(angle) * dist, y: r * 0.28 + Math.sin(angle) * dist });
+    }
+    ctx.moveTo(collarPoints[0].x, collarPoints[0].y);
+    for (let i = 0; i < numCollarPoints; i++) {
+      const p1 = collarPoints[i];
+      const p2 = collarPoints[(i + 1) % numCollarPoints];
+      ctx.lineTo((p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Small horns pointing outwards from the rock collar
+    ctx.fillStyle = '#FFFFFF';
+    for (let i = 0; i < 4; i++) {
+      const angle = Math.PI * 0.2 + i * Math.PI * 0.22;
+      ctx.save();
+      ctx.rotate(angle);
+      ctx.translate(r * 1.05, 0);
+      ctx.beginPath();
+      ctx.moveTo(0, -3);
+      ctx.lineTo(r * 0.22, 0);
+      ctx.lineTo(0, 3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 2. Main split head
+    ctx.fillStyle = colorSkin;
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    const numHeadPoints = 12;
+    const headPoints = [];
+    for (let i = 0; i < numHeadPoints; i++) {
+      const angle = (i / numHeadPoints) * Math.PI * 2;
+      const rx = r * 0.88;
+      const ry = r * 0.92;
+      const baseR = Math.sqrt(Math.pow(rx * Math.cos(angle), 2) + Math.pow(ry * Math.sin(angle), 2));
+      let bump = (angle > Math.PI * 0.5) ? r * 0.06 : -r * 0.06;
+      const dist = baseR + bump;
+      headPoints.push({ x: Math.cos(angle) * dist, y: -r * 0.05 + Math.sin(angle) * dist });
+    }
+    ctx.moveTo(headPoints[0].x, headPoints[0].y);
+    for (let i = 0; i < numHeadPoints; i++) {
+      const p1 = headPoints[i];
+      const p2 = headPoints[(i + 1) % numHeadPoints];
+      ctx.quadraticCurveTo(p1.x, p1.y, (p1.x + p2.x) / 2, (p1.y + p2.y) / 2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    // Vertical suture/split line dividing the head in half
+    ctx.strokeStyle = '#0E0B11';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.moveTo(0, -r * 0.9);
+    ctx.quadraticCurveTo(r * 0.1, 0, 0, r * 0.8);
+    ctx.stroke();
+
+    // Cross stitches along the division line
+    ctx.beginPath();
+    for (let j = 0; j < 5; j++) {
+      const sy = -r * 0.7 + j * r * 0.35;
+      const sx = r * 0.1 * Math.sin(j);
+      ctx.moveTo(sx - 4, sy - 2);
+      ctx.lineTo(sx + 4, sy + 2);
+    }
+    ctx.stroke();
+
+    // Left side: Large hollow eye socket
+    ctx.fillStyle = colorVoid;
+    ctx.beginPath();
+    ctx.arc(-r * 0.35, -r * 0.35, r * 0.24 + progress * r * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Right side: Stitched-closed eye
+    ctx.beginPath();
+    const ex = r * 0.35;
+    const ey = -r * 0.35;
+    ctx.moveTo(ex - 6, ey - 4);
+    ctx.lineTo(ex + 6, ey + 4);
+    ctx.moveTo(ex + 6, ey - 4);
+    ctx.lineTo(ex - 6, ey + 4);
+    ctx.stroke();
+
+    // Left side: Half gaping screaming mouth
+    const mouthW = r * 0.45;
+    const mouthH = r * 0.24 + progress * r * 0.2;
+    ctx.fillStyle = colorVoid;
+    ctx.beginPath();
+    ctx.ellipse(-r * 0.22, r * 0.25, mouthW * 0.6, mouthH, 0.2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
+function drawStitchedPatchworkBall(ctx, illusion) {
+  const r = illusion.r || 25;
+  const isDying = !!illusion.isDying;
+  
+  if (illusion.variant === undefined) {
+    illusion.variant = Math.floor(Math.random() * 3); // 3 variants (0, 1, 2)
+  }
+  const variant = illusion.variant;
+
+  let progress = 0;
+  if (isDying) {
+    progress = 1.0 - (illusion.deathTimer / (illusion.maxDeathTimer || 20));
+  }
+
+  const cachedCanvas = getPatchworkBallCanvas(r, variant, progress);
+  ctx.drawImage(cachedCanvas, -cachedCanvas.width / 2, -cachedCanvas.height / 2);
+}
+
 export function drawIllusions() {
   const { ctx, illusions } = state;
 
   for (const illusion of illusions) {
-    if (!illusion || illusion.hp <= 0) continue;
+    if (!illusion || (illusion.hp <= 0 && !illusion.isDying)) continue;
     // Skip Rika - she is injected into the illusions array for AI targeting, but draws herself!
     if (illusion.isRika) continue;
 
@@ -457,17 +1022,80 @@ export function drawIllusions() {
     const scale = illusion.visualScale !== undefined ? illusion.visualScale : 1.0;
     const hasScale = scale !== 1.0 && scale > 0;
 
-    ctx.save();
-    ctx.globalAlpha = 0.85;
-
-    // Shivering animation when paralyzed by Mahito
+    // Shivering animation when paralyzed by Mahito OR when dying (about to explode)
     let shiverX = 0, shiverY = 0;
     if (illusion.isParalyzedByMahito || (illusion.paralyzeTimer && illusion.paralyzeTimer > 0 && illusion.isParalyzedByMahito)) {
       const remainingProgress = Math.min(1.0, (illusion.paralyzeTimer || 45) / 45);
       const tremorAmt = 2.0 + remainingProgress * 2.2;
       shiverX = (Math.random() - 0.5) * tremorAmt;
       shiverY = (Math.random() - 0.5) * tremorAmt;
+    } else if (illusion.isDying) {
+      // Shiver/tremor intensity increases violently as the pop timer approaches zero!
+      const maxTimer = illusion.maxDeathTimer || 20;
+      const progress = 1.0 - (illusion.deathTimer / maxTimer);
+      const tremorAmt = 1.0 + progress * 5.0; // scales up to 6px shake
+      shiverX = (Math.random() - 0.5) * tremorAmt;
+      shiverY = (Math.random() - 0.5) * tremorAmt;
     }
+
+    if (illusion.isEvasionMinion) {
+      drawMahitoSkin(ctx, illusion);
+      continue;
+    }
+
+    if (illusion.isTransfiguredHuman) {
+      ctx.save();
+      // Draw transfigured human body at location
+      ctx.translate(illusion.x + shiverX, illusion.y + shiverY);
+      if (hasScale) {
+        ctx.scale(scale, scale);
+      }
+      
+      // Deformed transfigured humans roll/rotate continuously over time while moving
+      if (illusion._rollRotation === undefined) {
+        illusion._rollRotation = 0;
+      }
+      if (!illusion.isDying && !illusion.timeStopTimer && !illusion.hitStunTimer) {
+        const speed = Math.sqrt((illusion.vx || 0) * (illusion.vx || 0) + (illusion.vy || 0) * (illusion.vy || 0)) || 0;
+        // Roll speed proportional to their actual movement speed
+        illusion._rollRotation += speed * 0.05;
+      }
+      
+      const drawAngle = (illusion.angle || 0) + (illusion._rollRotation || 0);
+      ctx.rotate(drawAngle);
+
+      drawStitchedPatchworkBall(ctx, illusion);
+
+      if (illusion.isParalyzedByMahito) {
+        drawMahitoFleshBubblyDeformLocal(ctx, illusion.r, illusion.paralyzeTimer, '#A855F7', illusion);
+      }
+
+      // Draw health text over Mahito skin (rotate back by the total drawing angle so text stays upright)
+      ctx.rotate(-drawAngle);
+      ctx.font = 'bold 18px Arial';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      const hpText = Math.floor(illusion.hp).toString();
+      ctx.lineWidth = 4;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
+      ctx.strokeText(hpText, 0, 0);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(hpText, 0, 0);
+      ctx.restore();
+
+      // Mahito Soul Disfigurement Stitches on Illusions
+      if ((illusion._soulDisfigurementStacks || 0) > 0 && (illusion._soulDisfigurementTimer || 0) > 0) {
+        ctx.save();
+        ctx.translate(illusion.x, illusion.y);
+        drawSoulDisfigurementEffect(ctx, illusion.r, illusion._soulDisfigurementStacks);
+        ctx.restore();
+        drawSoulDisfigurementCounter(ctx, illusion.x, illusion.y, illusion.r, illusion._soulDisfigurementStacks, illusion._soulDisfigurementTimer);
+      }
+      continue; // Skip standard doppelganger loop
+    }
+
+    ctx.save();
+    ctx.globalAlpha = 0.85;
 
     // Draw illusion body
     ctx.translate(illusion.x + shiverX, illusion.y + shiverY);
@@ -475,6 +1103,8 @@ export function drawIllusions() {
       ctx.scale(scale, scale);
     }
     ctx.rotate(illusion.angle || 0);
+
+
 
     // Purple ethereal glow
     ctx.save();
@@ -493,6 +1123,10 @@ export function drawIllusions() {
 
     // Custom body skin
     drawDoppelgangerSkin(ctx, 0, 0, illusion.r, 0, animTime);
+
+    if (illusion.isParalyzedByMahito) {
+      drawMahitoFleshBubblyDeformLocal(ctx, illusion.r, illusion.paralyzeTimer, '#A855F7', illusion);
+    }
 
     // Draw the swirling violet smoke OVER the body
     drawDopplegangerBodyEffect(ctx, 0, 0, illusion.r, 0, 'over', animTime);

@@ -1229,7 +1229,7 @@ export const FIGHTER_DEFS = [
     hp: 230,
     damage: 16,
     cooldown: 22,
-    moveSpeed: 6.8,
+    moveSpeed: 5.8,
     projectileSpeedMultiplier: 1.0,
     ability: 'Soul Scalpel Claws',
     desc: 'Wields 4 curved scythe-talon claws. Passive: Phantom Soul Slip phases directly through enemies with a high-speed claw cross-slice. Secondary skill unleashes Subterranean Flesh Surge; transforms into Distorted Killing form.',

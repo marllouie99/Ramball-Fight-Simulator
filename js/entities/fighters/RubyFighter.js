@@ -108,7 +108,7 @@ export class RubyFighter extends Fighter {
   // ── basic attack ────────────────────────────────────
 
   _tryScytheSwing(opponent, ownerIndex) {
-    if (!opponent || this.scytheCooldown > 0) return;
+    if (!opponent || this.scytheCooldown > 0 || this.isCaughtInBeam()) return;
 
     const cfg = CONFIG.ruby || {};
     const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);

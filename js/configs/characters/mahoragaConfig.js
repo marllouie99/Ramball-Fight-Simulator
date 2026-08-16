@@ -5,7 +5,7 @@ export const mahoragaConfig = {
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
     adaptationSpeedBoostPerStage: 0.15, // +10% movement speed multiplier per gold adaptation stage
-    rctRegenPerStage: 0.015,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
+    rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
     maxLevelRctRegen: 0.80,          // Base ultimate passive RCT HP regeneration per frame at Level 8 (0.80 HP/frame = +48 HP/sec)
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
@@ -72,7 +72,7 @@ export const mahoragaConfig = {
     neutralTeleportDelay: 5,        // Frame delay after teleporting before starting the next attack sequence (~0.20s)
     neutralTeleportDistance: 100,     // Teleport distance offset around opponent
     neutralStanceDurationFrames: 200, // Total duration (frames) close-quarters attack-teleport stance lasts before ending (~3.33s at 60fps)
-    neutralStanceCooldownFrames: 550, // Recharge cooldown (frames) before close-quarters attack-teleport stance can re-trigger (~3.0s at 60fps)
+    neutralStanceCooldownFrames: 150, // Recharge cooldown (frames) before close-quarters attack-teleport stance can re-trigger (~3.0s at 60fps)
 
     // Reverse Cursed Technique (RCT / Divine Healing at Low HP & Adaptation)
     enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing
@@ -82,7 +82,7 @@ export const mahoragaConfig = {
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
     fatalAdaptWindowFrames: 400,     // Rolling window duration (frames) — ~6.6 seconds window
-    fatalDamageThresholdPct: 0.25,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
+    fatalDamageThresholdPct: 0.10,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
     fatalAdaptCooldownFrames: 30,    // Cooldown (frames) between wheel clicks (30 = 0.5s)
 
     // Teleportation Speed & Afterimage Visibility Settings

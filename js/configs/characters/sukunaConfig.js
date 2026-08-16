@@ -48,8 +48,8 @@ export const sukunaConfig = {
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
 
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
-    divineFlameCooldown: 950,      // Cooldown between Furnace uses (8.33 seconds)
-    divineFlameChargeMax: 120,      // Charge up duration (1.5 seconds)
+    divineFlameCooldown: 1500,      // Cooldown between Furnace uses (8.33 seconds)
+    divineFlameChargeMax: 100,      // Charge up duration (1.5 seconds)
     divineFlameDamage: 250,         // Primary direct hit nuke damage
     divineFlameSpeed: 15,          // Speed of Furnace fire arrow
     divineFlameRecoveryTime: 60,   // Recovery delay after firing (1 second)
@@ -62,7 +62,7 @@ export const sukunaConfig = {
     divineFlameBurnDuration: 180,  // Frames burn effect lasts on targets hit by Fuga (3 seconds)
 
     // Ultimate Skill: Domain Expansion — Malevolent Shrine
-    domainCooldown: 1450,     // Cooldown before domain can trigger (25 seconds at 60 fps)
+    domainCooldown: 1950,     // Cooldown before domain can trigger (25 seconds at 60 fps)
     domainChargeMax: 120,      // Charge up duration before domain opens (1.5 seconds)
     domainDuration: 500,      // Domain duration (3 seconds)
     domainDamage: 15,          // Base damage per slash tick

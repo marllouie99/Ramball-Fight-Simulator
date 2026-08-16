@@ -250,6 +250,10 @@ export class GojoFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if (this.isCaughtInBeam()) {
+      this.interruptAttacks();
+      return;
+    }
     if ((this.paralyzeTimer || 0) > 0 || this.isParalyzed) return;
     if (projectileSystem && projectileSystem.fireGojoBlue) {
       projectileSystem.fireGojoBlue(this, ownerIndex, this.damage);
@@ -673,15 +677,12 @@ export class GojoFighter extends Fighter {
       if (this.infinityCooldown <= 0) this.infinityActive = true;
     }
 
-    // Freeze all skill cooldowns (Red, Purple, RCT, Blue) while inside Domain Expansion
-    const isInsideDomain = this.domainActive || this.isChannelingDomainExpansion || this.isDomainPreSlide;
-    if (!isInsideDomain) {
-      if (this.cooldown > 0) this.cooldown--;
-      if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
-      if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
-      if (this.domainCooldown > 0) this.domainCooldown--;
-      if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
-    }
+    // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain) every frame without freezing inside domain
+    if (this.cooldown > 0) this.cooldown--;
+    if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
+    if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
+    if (this.domainCooldown > 0) this.domainCooldown--;
+    if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.healingAuraTimer > 0) this.healingAuraTimer--;
 
     // Completely immobilize Gojo if Toji is actively performing his ambush sequence on him
@@ -1203,10 +1204,12 @@ export class GojoFighter extends Fighter {
    * Handle melee combat - teleports, then 1 punch (65% chance) or 3 rapid punches (35% chance)
    */
   _updateMeleeCombat(opponent, arena) {
-    if (this.isChannelingPurple || this.isChannelingDomainExpansion || this.redBuildupPhase) {
+    if (this.isChannelingPurple || this.isChannelingDomainExpansion || this.redBuildupPhase || this.isCaughtInBeam()) {
       this.vx = 0;
       this.vy = 0;
-      return; // Do NOT melee punch or teleport while channeling Hollow Purple or Domain Expansion!
+      this.punchAnimTimer = 0;
+      this.punchActiveMaxTime = 0;
+      return; // Do NOT melee punch or teleport while channeling Hollow Purple or Domain Expansion or caught in beam!
     }
 
     // Dynamic target selection in 1v2 / multi-enemy mode: always prioritize the closest living enemy

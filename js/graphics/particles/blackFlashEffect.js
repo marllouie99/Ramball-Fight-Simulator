@@ -142,87 +142,97 @@ function _buildLightningGeometry(geom, startX, startY, baseAngle, totalLength, b
 let _lastBFSpawnTime = 0;
 
 export function spawnBlackFlash(x, y) {
-  const fps = (state && state.fps) || 60;
-  const isLowPerf = (typeof state !== 'undefined' && state.performanceMode) || fps < 55;
-  
-  // Throttle Black Flash spawns to a maximum of 1 per frame to prevent extreme lag spikes 
-  // when Yuji's AOE punches hit multiple stacked targets simultaneously.
-  const now = Date.now();
-  if (now - _lastBFSpawnTime < 16) { 
-    return;
-  }
-  _lastBFSpawnTime = now;
-  
-  if (fps < 30 && Math.random() < 0.6) return;
-
-  // 1. IMPACT CORE (Void)
-  const core = _getBFParticle();
-  core.type = 'bfCore';
-  core.x = x; core.y = y;
-  core.size = 6;
-  core.maxSize = 45;
-  core.life = 1.0;
-  core.decay = 0.035; 
-  _blackFlashParticles.push(core);
-
-  // 2. JAGGED LIGHTNING BURST
-  // We generate multiple bolts into a single highly-optimized particle draw call
-  const lightning = _getBFParticle();
-  lightning.type = 'bfLightning';
-  lightning.x = x; lightning.y = y;
-  lightning.size = 1.0; 
-  lightning.life = 1.0;
-  lightning.decay = 0.05; // Quick flash (20 frames)
-  
-  // Calculate static geometry once at spawn
-  const boltCount = isLowPerf ? 3 : 7;
-  let offsetIndex = 0;
-  
-  for (let b = 0; b < boltCount; b++) {
-    const angle = (b / boltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-    const length = (isLowPerf ? 60 : 90) + Math.random() * 50;
-    const branches = isLowPerf ? 1 : 3;
+  try {
+    const fps = (state && state.fps) || 60;
+    const isLowPerf = (typeof state !== 'undefined' && state.performanceMode) || fps < 55;
     
-    const written = _buildLightningGeometry(
-      lightning.geom.subarray(offsetIndex), 
-      0, 0, angle, length, branches
-    );
-    offsetIndex += written;
-    if (offsetIndex >= 295) break; 
-  }
-  lightning.geomCount = offsetIndex;
-  
-  _blackFlashParticles.push(lightning);
+    // Bulletproof check for 1v2 mode
+    const is1v2 = typeof state !== 'undefined' && 
+                  state.mode && 
+                  typeof state.mode === 'string' && 
+                  (state.mode === '1v2' || state.mode.includes('1v2'));
+    
+    // Throttle Black Flash spawns to prevent extreme lag spikes
+    const now = Date.now();
+    const throttleTime = is1v2 ? 32 : 16; // Fix: Reduce throttle to 32ms in 1v2 mode to allow rapid multi-target triggers
+    if (now - _lastBFSpawnTime < throttleTime) { 
+      return;
+    }
+    _lastBFSpawnTime = now;
+    
+    if (fps < 30 && Math.random() < 0.6) return;
 
-  // 3. SHOCKWAVE RING (Optimized)
-  if (!isLowPerf) {
-    const ring = _getBFParticle();
-    ring.type = 'bfRing';
-    ring.x = x; ring.y = y;
-    ring.size = 10;
-    ring.maxSize = 120;
-    ring.life = 1.0;
-    ring.decay = 0.04;
-    _blackFlashParticles.push(ring);
-  }
+    // 1. IMPACT CORE (Void)
+    const core = _getBFParticle();
+    core.type = 'bfCore';
+    core.x = x; core.y = y;
+    core.size = 6;
+    core.maxSize = 45;
+    core.life = 1.0;
+    core.decay = is1v2 ? 0.018 : 0.035; // Fix: Slower decay in 1v2 mode to match normal duration (~55 frames)
+    _blackFlashParticles.push(core);
 
-  // 4. SHARDS
-  const shardCount = isLowPerf ? 3 : 8;
-  for (let i = 0; i < shardCount; i++) {
-    const angle = Math.random() * Math.PI * 2;
-    const speed = 4 + Math.random() * 6;
-    const shard = _getBFParticle();
-    shard.type = 'bfShard';
-    shard.x = x; shard.y = y;
-    shard.vx = Math.cos(angle) * speed;
-    shard.vy = Math.sin(angle) * speed;
-    shard.size = 3 + Math.random() * 5;
-    shard.life = 1.0;
-    shard.decay = 0.03 + Math.random() * 0.02; 
-    shard.friction = 0.92;
-    const palette = ['#000000', '#1a0000', '#ff0000'];
-    shard.color = palette[Math.floor(Math.random() * palette.length)];
-    _blackFlashParticles.push(shard);
+    // 2. JAGGED LIGHTNING BURST
+    const lightning = _getBFParticle();
+    lightning.type = 'bfLightning';
+    lightning.x = x; lightning.y = y;
+    lightning.size = 1.0; 
+    lightning.life = 1.0;
+    lightning.decay = is1v2 ? 0.025 : 0.05; // Fix: Slower decay in 1v2 mode to match normal duration (~40 frames)
+    
+    // Calculate static geometry once at spawn
+    const boltCount = isLowPerf ? 2 : is1v2 ? 4 : 7; // Fix: Slightly more bolts (4 vs 3) in 1v2 for better visibility
+    const branches = isLowPerf ? 0 : is1v2 ? 2 : 3;  // Fix: Slightly more branches (2 vs 1) in 1v2 for fullness
+    const lengthMult = is1v2 ? 0.9 : 1.0;             // Fix: Slightly larger length multiplier (0.9 vs 0.8)
+    let offsetIndex = 0;
+    
+    for (let b = 0; b < boltCount; b++) {
+      const angle = (b / boltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
+      const length = ((isLowPerf ? 60 : 90) + Math.random() * 50) * lengthMult;
+      
+      const written = _buildLightningGeometry(
+        lightning.geom.subarray(offsetIndex), 
+        0, 0, angle, length, branches
+      );
+      offsetIndex += written;
+      if (offsetIndex >= 295) break; 
+    }
+    lightning.geomCount = offsetIndex;
+    
+    _blackFlashParticles.push(lightning);
+
+    // 3. SHOCKWAVE RING (Optimized/Simplified in 1v2)
+    if (!isLowPerf) {
+      const ring = _getBFParticle();
+      ring.type = 'bfRing';
+      ring.x = x; ring.y = y;
+      ring.size = 10;
+      ring.maxSize = is1v2 ? 90 : 120;
+      ring.life = 1.0;
+      ring.decay = is1v2 ? 0.02 : 0.04; // Fix: Slower decay in 1v2 mode (~50 frames)
+      _blackFlashParticles.push(ring);
+    }
+
+    // 4. SHARDS
+    const shardCount = isLowPerf ? 2 : is1v2 ? 4 : 8;
+    for (let i = 0; i < shardCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const speed = (4 + Math.random() * 6) * (is1v2 ? 0.8 : 1.0);
+      const shard = _getBFParticle();
+      shard.type = 'bfShard';
+      shard.x = x; shard.y = y;
+      shard.vx = Math.cos(angle) * speed;
+      shard.vy = Math.sin(angle) * speed;
+      shard.size = 3 + Math.random() * 5;
+      shard.life = 1.0;
+      shard.decay = (is1v2 ? 0.015 : 0.03) + Math.random() * (is1v2 ? 0.01 : 0.02); // Fix: Slower decay in 1v2 mode (~40-66 frames)
+      shard.friction = 0.92;
+      const palette = ['#000000', '#1a0000', '#ff0000'];
+      shard.color = palette[Math.floor(Math.random() * palette.length)];
+      _blackFlashParticles.push(shard);
+    }
+  } catch (err) {
+    console.error("Error in spawnBlackFlash:", err);
   }
 }
 
@@ -230,23 +240,27 @@ export function spawnBlackFlash(x, y) {
 // UPDATE
 // ─────────────────────────────────────────────────────────────────────────────
 export function updateBlackFlashEffects(frozen = false) {
-  for (let i = _blackFlashParticles.length - 1; i >= 0; i--) {
-    const p = _blackFlashParticles[i];
-    if (!frozen) {
-      p.life -= p.decay;
-      if (p.vx !== 0 || p.vy !== 0) {
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.friction < 1) {
-          p.vx *= p.friction;
-          p.vy *= p.friction;
+  try {
+    for (let i = _blackFlashParticles.length - 1; i >= 0; i--) {
+      const p = _blackFlashParticles[i];
+      if (!frozen) {
+        p.life -= p.decay;
+        if (p.vx !== 0 || p.vy !== 0) {
+          p.x += p.vx;
+          p.y += p.vy;
+          if (p.friction < 1) {
+            p.vx *= p.friction;
+            p.vy *= p.friction;
+          }
         }
       }
+      if (p.life <= 0) {
+        _blackFlashParticles.splice(i, 1);
+        _returnBFParticle(p);
+      }
     }
-    if (p.life <= 0) {
-      _blackFlashParticles.splice(i, 1);
-      _returnBFParticle(p);
-    }
+  } catch (err) {
+    console.error("Error in updateBlackFlashEffects:", err);
   }
 }
 
@@ -268,6 +282,8 @@ export function drawBlackFlashEffects(ctx) {
     clearBlackFlashEffects();
     return;
   }
+
+  const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
 
   _initCanvases();
   ctx.save();
@@ -295,10 +311,6 @@ export function drawBlackFlashEffects(ctx) {
       ctx.scale(jitterScale, jitterScale);
 
       // Build the single unified path for each thickness level to massively optimize stroke calls
-      // 0 = main bolt (thickest)
-      // 1 = branch (medium)
-      // 2 = micro branch (thin)
-      
       const drawLayer = (color, baseWidth) => {
         ctx.strokeStyle = color;
         
@@ -338,20 +350,19 @@ export function drawBlackFlashEffects(ctx) {
       
       // Layer 1: Crimson Red Glow / Spatial Distortion (Outer)
       ctx.globalCompositeOperation = 'source-over'; 
-      // User requested bright red or dark crimson brush-like outline
       drawLayer(`rgba(255, 10, 20, ${activeLife * 0.85})`, 16);
-      drawLayer(`rgba(160, 0, 10, ${activeLife * 0.6})`, 24); // Extended soft glow
+      
+      // Skip the second, larger red glow pass in 1v2 mode to cut down stroke calls by 33%
+      if (!is1v2) {
+        drawLayer(`rgba(160, 0, 10, ${activeLife * 0.6})`, 24); // Extended soft glow
+      }
       
       // Layer 2: Solid Stark Black Ink Core (Inner)
-      // Crisp, geometric solid black lightning
       drawLayer(`rgba(0, 0, 0, ${activeLife})`, 8);
 
     } else if (p.type === 'bfCore') {
       p.size = p.size + (p.maxSize - p.size) * 0.25;
       
-      // OPTIMIZATION: Removed 'multiply' composite operation which causes massive GPU pipeline 
-      // stalls and FPS drops during OBS screen recording. Replaced with 'source-over' which 
-      // produces the exact same visual result for black gradients but is 10x faster.
       ctx.globalCompositeOperation = 'source-over';
       
       if (coreCanvas) {
@@ -373,17 +384,19 @@ export function drawBlackFlashEffects(ctx) {
       
       // Outer dark red expanding ring
       ctx.strokeStyle = `rgba(168, 0, 10, ${p.life * 0.7})`;
-      ctx.lineWidth = 12 * p.life;
+      ctx.lineWidth = (is1v2 ? 6 : 12) * p.life;
       ctx.beginPath();
       ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Inner sharp red line
-      ctx.strokeStyle = `rgba(255, 30, 30, ${p.life})`;
-      ctx.lineWidth = 3 * p.life;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * 0.95, 0, Math.PI * 2);
-      ctx.stroke();
+      if (!is1v2) {
+        // Inner sharp red line (skip in 1v2 mode to save fill/stroke complexity)
+        ctx.strokeStyle = `rgba(255, 30, 30, ${p.life})`;
+        ctx.lineWidth = 3 * p.life;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * 0.95, 0, Math.PI * 2);
+        ctx.stroke();
+      }
 
     } else if (p.type === 'bfShard') {
       ctx.globalCompositeOperation = 'source-over';

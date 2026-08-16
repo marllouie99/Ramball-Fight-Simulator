@@ -824,7 +824,7 @@ export class GojoRenderer {
     ctx.restore();
 
     // === LAYER 9: FLOATING CURSED ENERGY PARTICLES ===
-    const particleCount = 30;
+    const particleCount = 20; // Reduced from 30 for performance
     for (let i = 0; i < particleCount; i++) {
       const seed = i * 1337.7331;
       const angle = (time * 0.002) + seed;
@@ -838,21 +838,15 @@ export class GojoRenderer {
       const particleSize = 2 + (seed % 5);
       const alpha = 0.5 + Math.sin(time * 0.01 + seed) * 0.3;
 
-      // Particle glow - bright blue for visibility
-      const particleGrad = ctx.createRadialGradient(px, py, 0, px, py, particleSize * 4);
-      particleGrad.addColorStop(0, `rgba(150, 220, 255, ${alpha * progress})`);
-      particleGrad.addColorStop(0.5, `rgba(120, 200, 255, ${alpha * 0.8 * progress})`);
-      particleGrad.addColorStop(1, 'rgba(100, 180, 255, 0)');
-
+      // OPTIMIZED: Replaced expensive radial gradient with 2 simple filled circles
       ctx.beginPath();
-      ctx.arc(px, py, particleSize * 4, 0, Math.PI * 2);
-      ctx.fillStyle = particleGrad;
+      ctx.arc(px, py, particleSize * 2, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(120, 200, 255, ${alpha * 0.7 * progress})`;
       ctx.fill();
 
-      // Bright core - bright cyan
       ctx.beginPath();
-      ctx.arc(px, py, particleSize * 0.5, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(200, 240, 255, ${alpha * progress})`;
+      ctx.arc(px, py, particleSize, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(180, 230, 255, ${alpha * progress})`;
       ctx.fill();
     }
 

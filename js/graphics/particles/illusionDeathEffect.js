@@ -12,8 +12,9 @@ import { illusionDeathPool } from '../objectPool.js';
  */
 export function spawnIllusionDeath(illusion) {
   const scale = Math.max(0.25, illusion.r / 25);
-  const particleCount = Math.ceil(20 * scale);  // Number of ethereal particles
-  const wispCount = Math.ceil(8 * scale);
+  const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
+  const particleCount = Math.ceil((is1v2 ? 10 : 20) * scale);  // Number of ethereal particles
+  const wispCount = Math.ceil((is1v2 ? 4 : 8) * scale);
   const color = illusion.color || '#9966ff'; // Purple by default
 
   // Create dissolving particles that float upward

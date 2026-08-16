@@ -198,7 +198,7 @@ export class FighterRenderer {
     }
 
     if (fighter.paralyzeTimer > 0) {
-      drawParalyzeEffect(ctx, baseRadius, Boolean(fighter.isParalyzedByMahito));
+      drawParalyzeEffect(ctx, baseRadius, Boolean(fighter.isParalyzedByMahito), fighter.paralyzeTimer, '#A855F7', fighter);
     }
 
     if ((fighter._soulDisfigurementStacks || 0) > 0 && (fighter._soulDisfigurementTimer || 0) > 0) {

@@ -37,7 +37,9 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       amount = 0;
     }
 
-    const multiplier = Number(CONFIG.doppleganger?.illusionDamageReceivedMultiplier || 1);
+    const multiplier = target.isTransfiguredHuman
+      ? 1.0
+      : Number(CONFIG.doppleganger?.illusionDamageReceivedMultiplier || 1);
     const effectiveAmount = amount * multiplier;
     const prevHp = currentHp;
     target.hp = Math.max(0, Number((currentHp - effectiveAmount).toFixed(2)));
@@ -278,6 +280,22 @@ export class Fighter {
     return false;
   }
 
+  /** Returns true if this fighter is caught in any active beam (e.g. Yuta's Pure Love Beam, Genos's Beam, Laser Beam, Hollow Purple, Layla Beam). */
+  isCaughtInBeam() {
+    return !!(
+      this.caughtInPureLoveBeam ||
+      this.wasCaughtInPureLoveBeam ||
+      (this.pureLoveBeamTimer || 0) > 0 ||
+      (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
+      (this.caughtInGenosBeamTimer || 0) > 0 ||
+      this.caughtInGenosFlurry ||
+      (this.caughtInLaserBeamTimer || 0) > 0 ||
+      (this.caughtInLaylaBeamTimer || 0) > 0 ||
+      this.isCaughtInPurple ||
+      (this.purpleHitTimer || 0) > 0
+    );
+  }
+
   applySlow(frames, multiplier) {
     this.statusEffects.applySlow(frames, multiplier);
   }
@@ -361,7 +379,13 @@ export class Fighter {
     this.meleeComboCount = 0;
     this.teleportSlideTimer = 0;
     this.punchAnimTimer = 0;
+    this.punchActiveMaxTime = 0;
+    this.spearSwingTimer = 0;
     this.slashSwingTimer = 0;
+    this.katanaSlashTimer = 0;
+    this.recoilTimer = 0;
+    this.cleaveSwingTimer = 0;
+    this.basicAttackHitPauseTimer = 0;
     this.isChannelingDivineFlame = false;
     this.divineFlameChargeTimer = 0;
     this.isChannelingDomainExpansion = false;
@@ -379,6 +403,7 @@ export class Fighter {
 
   _handleTimeStop() {
     this._tickCooldowns();
+    this._processKnockbackPhysics();
     if (this.pureLoveBeamRecoveryTimer > 0) {
       if (this.adaptedPureLoveBeam) {
         this.pureLoveBeamRecoveryTimer = 0;
@@ -547,6 +572,8 @@ export class Fighter {
       this.caughtInPureLoveBeam = false;
     }
     if (this.hitStunTimer > 0) this.hitStunTimer--;
+    if (this.caughtInLaserBeamTimer > 0) this.caughtInLaserBeamTimer--;
+    if (this.caughtInLaylaBeamTimer > 0) this.caughtInLaylaBeamTimer--;
     if (this.electricStunTimer > 0) this.electricStunTimer--;
     if (this.dubstepStunTimer > 0) this.dubstepStunTimer--;
     if (this.crimsonElectrifiedTimer > 0) this.crimsonElectrifiedTimer--;
@@ -569,6 +596,14 @@ export class Fighter {
       this.vx = 0;
       this.vy = 0;
     }
+
+    this._processKnockbackPhysics();
+  }
+
+  _processKnockbackPhysics() {
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+    if (this._lastKnockbackFrame === currentFrame && currentFrame > 0) return;
+    this._lastKnockbackFrame = currentFrame;
 
     // Universal knockback physics (processed for all custom fighters without breaking their steering logic)
     if (this.knockbackVx !== undefined && (Math.abs(this.knockbackVx) > 0.1 || Math.abs(this.knockbackVy) > 0.1)) {
@@ -857,13 +892,17 @@ export class Fighter {
       const faah = getAnnouncerSound('faah');
       if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
 
-      // Helper: a Doppelganger with surviving illusions is still "in play"
+      // Helper: a Doppelganger with surviving illusions is still "in play", same for evading Mahito
       const _isEffectivelyAlive = (f) => {
         if (!f || f.isTurret) return false;
         if (f.hp > 0) return true;
         const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
         if (isDoppel) {
           return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.hp > 0);
+        }
+        const isMahitoEvading = (f.characterId === 'mahito' || f.type === 'mahito') && f.isEvading;
+        if (isMahitoEvading) {
+          return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.isEvasionMinion && ill.hp > 0);
         }
         return false;
       };
@@ -879,10 +918,12 @@ export class Fighter {
         }
       };
 
-      // If the dying fighter is a Doppelganger with surviving illusions, don't end the round
+      // If the dying fighter is a Doppelganger or evading Mahito with surviving copies, don't end the round
       const isThisDoppel = this.type === 'doppleganger' || this._def?.type === 'doppleganger' || this.characterId === 'doppleganger';
-      if (isThisDoppel && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) {
-        // Doppelganger died but illusions are still fighting — round continues
+      const isThisMahitoEvading = (this.characterId === 'mahito' || this.type === 'mahito') && this.isEvading;
+      if ((isThisDoppel && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) ||
+          (isThisMahitoEvading && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.isEvasionMinion && ill.hp > 0))) {
+        // Round continues
         recordKill();
         return true;
       }
@@ -1135,6 +1176,10 @@ export class Fighter {
     if (typeof state !== 'undefined' && state.gameState !== 'playing') {
       return;
     }
+    if (this.isCaughtInBeam()) {
+      this.interruptAttacks();
+      return;
+    }
     if ((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.hitStunTimer && this.hitStunTimer > 0)) {
       return;
     }
@@ -1265,6 +1310,10 @@ export class Fighter {
       return;
     }
 
+    if (this.isCaughtInBeam()) {
+      this.interruptAttacks();
+    }
+
     // Stop attacking if round/match has ended or if target/opponent is dead!
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
     const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
@@ -1282,7 +1331,7 @@ export class Fighter {
 
     // Shooting
     const isParalyzed = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed;
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed;
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed && !this.isCaughtInBeam();
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
     } else if (this._def.type !== 'orange' && canAct) { // Prevent Orange from using this default shoot

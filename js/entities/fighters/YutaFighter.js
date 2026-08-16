@@ -1606,6 +1606,10 @@ export class YutaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if (this.isCaughtInBeam()) {
+      this.interruptAttacks();
+      return;
+    }
     if (this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer || 0) > 0 || (this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0) return;
     if (this.timeStopTimer > 0) return;
     if (this.hp <= 0) return;

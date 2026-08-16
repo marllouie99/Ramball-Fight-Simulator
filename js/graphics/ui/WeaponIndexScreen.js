@@ -1205,6 +1205,8 @@ eventTarget.addEventListener('wheel', (e) => {
 
 // Interactive Claw Editor Drag & Resize Logic
 let isDraggingClaw = false;
+let activeDragFinger = -1;
+let activeDragType = null;
 
 if (typeof window !== 'undefined') {
   eventTarget.addEventListener('mousedown', (e) => {

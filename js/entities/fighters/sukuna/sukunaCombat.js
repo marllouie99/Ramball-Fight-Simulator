@@ -97,6 +97,13 @@ export function teleportAwayFrom(fighter, opponent, arena) {
 }
 
 export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
+  if (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) {
+    fighter.vx = 0;
+    fighter.vy = 0;
+    fighter.punchAnimTimer = 0;
+    fighter.punchActiveMaxTime = 0;
+    return;
+  }
   const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 12;
 
   if (fighter.meleePunchCooldown > 0) {

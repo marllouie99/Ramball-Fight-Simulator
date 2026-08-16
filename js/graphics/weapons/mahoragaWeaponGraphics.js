@@ -198,8 +198,10 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   const sphereRadius = MAHORAGA_WEAPON_GRAPHICS.wheel.sphereRadius;
   const depthOffset = MAHORAGA_WEAPON_GRAPHICS.wheel.depthOffset;
 
-  // Glow Effect when adapting or adapted
-  const isGlowing = (fighter.wheelGlowTimer > 0) || (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill));
+  // Glow Effect when actively adapting (click timer) or when FULLY adapted (8 stages / max adapted)
+  const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+  const isFullyAdapted = totalStages >= 8 || fighter.isMaxAdapted;
+  const isGlowing = (fighter.wheelGlowTimer > 0) || isFullyAdapted;
   if (isGlowing) {
     ctx.save();
     ctx.scale(scaleX, scaleY);
@@ -412,13 +414,14 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   ctx.lineWidth = 1.5;
   ctx.stroke();
 
-  // Calculate total adaptation levels reached across all damage types
+  // Calculate total adaptation levels reached across all damage types & color history
   let activeStages = 0;
+  const historyCount = fighter.gojoAdaptColorHistory ? fighter.gojoAdaptColorHistory.length : 0;
   if (fighter.adaptationStage) {
     const totalClicks = (fighter.adaptationStage.melee || 0) + (fighter.adaptationStage.ranged || 0) + (fighter.adaptationStage.skill || 0);
-    activeStages = Math.min(8, totalClicks);
+    activeStages = Math.min(8, Math.max(totalClicks, historyCount));
   } else if (fighter.adapted && (fighter.adapted.melee || fighter.adapted.ranged || fighter.adapted.skill)) {
-    activeStages = 1;
+    activeStages = Math.min(8, Math.max(1, historyCount));
   }
 
   // 5. 8 Handle Spheres (Glow color adapts to Gojo attack type when adapted!)

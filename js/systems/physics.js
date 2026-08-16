@@ -257,8 +257,8 @@ export function resolveFighterCollision(a, b) {
   const aIsGojoDomain = a.domainActive && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo');
   const bIsGojoDomain = b.domainActive && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo');
   
-  const teamA = state.getFighterTeam(state.fighters.indexOf(a));
-  const teamB = state.getFighterTeam(state.fighters.indexOf(b));
+  const teamA = state.getFighterTeam(a._stateIdx !== undefined ? a._stateIdx : state.fighters.indexOf(a));
+  const teamB = state.getFighterTeam(b._stateIdx !== undefined ? b._stateIdx : state.fighters.indexOf(b));
   const isEnemy = teamA === null || teamB === null || teamA !== teamB;
 
   // Inside Gojo's Unlimited Void domain: The frozen enemy MUST NOT be pushed back on physical contact
@@ -359,7 +359,7 @@ export function updateProjectiles() {
 function getClosestOpponent(fighter) {
   let closest = null;
   let bestDistance = Infinity;
-  const fighterIndex = state.fighters.indexOf(fighter);
+  const fighterIndex = fighter._stateIdx !== undefined ? fighter._stateIdx : state.fighters.indexOf(fighter);
   const fighterTeam = state.getFighterTeam(fighterIndex);
   const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2);
 
@@ -391,7 +391,8 @@ function getClosestOpponent(fighter) {
       if (illusion.owner === fighter) continue;
       // Skip if this illusion belongs to a teammate
       if (isTeamMode && fighterTeam !== null && illusion.owner) {
-        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
+        const _illOwnerIdx = illusion.owner._stateIdx !== undefined ? illusion.owner._stateIdx : state.fighters.indexOf(illusion.owner);
+        const ownerTeam = state.getFighterTeam(_illOwnerIdx);
         if (ownerTeam === fighterTeam) continue;
       }
       const dx = illusion.x - fighter.x;
@@ -691,6 +692,10 @@ export function updateFighters() {
     }
 
     // 1. Fighter-Fighter Collisions
+    // Stamp _stateIdx on each fighter so downstream functions avoid indexOf scans
+    for (let si = 0; si < state.fighters.length; si++) {
+      if (state.fighters[si]) state.fighters[si]._stateIdx = si;
+    }
     for (let i = 0; i < state.fighters.length; i++) {
       const a = state.fighters[i];
       if (!a || a.hp <= 0) continue;
@@ -698,7 +703,7 @@ export function updateFighters() {
       const nearbyEntities = spatialGrid.getNearby(a.x, a.y, a.r * 2 + 50);
       for (const b of nearbyEntities) {
         if (b.isIllusion) continue; // Skip illusions in this loop
-        const j = state.fighters.indexOf(b);
+        const j = b._stateIdx !== undefined ? b._stateIdx : state.fighters.indexOf(b);
         if (j <= i) continue; // Only check each pair once
         if (!b || b.hp <= 0) continue;
         // Skip teammates in 2v2 mode

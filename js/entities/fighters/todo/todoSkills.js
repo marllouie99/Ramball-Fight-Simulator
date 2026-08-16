@@ -154,21 +154,42 @@ export function applyBoogieDisorientation(todoFighter) {
   const myTeam = (state.getFighterTeam && myIdx >= 0) ? state.getFighterTeam(myIdx) : todoFighter.team;
   const disorientFrames = CONFIG.todo?.swapDisorientationFrames ?? 20;
 
-  const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
-  for (const enemy of allTargets) {
+  // Process fighters first (use loop index for team check — no indexOf needed)
+  for (let fi = 0; fi < state.fighters.length; fi++) {
+    const enemy = state.fighters[fi];
     if (!enemy || enemy === todoFighter || enemy.hp <= 0) continue;
     const isTeammate = (state.getFighterTeam && myIdx >= 0)
-      ? (state.getFighterTeam(state.fighters.indexOf(enemy)) === myTeam)
+      ? (state.getFighterTeam(fi) === myTeam)
       : (enemy.team === todoFighter.team);
     if (isTeammate) continue;
 
-    // Apply basic attack reaction delay to all enemies
     if ('shootCooldown' in enemy) enemy.shootCooldown = Math.max(enemy.shootCooldown || 0, disorientFrames);
     if ('cooldown' in enemy) enemy.cooldown = Math.max(enemy.cooldown || 0, disorientFrames);
     if ('cooldownTimer' in enemy) enemy.cooldownTimer = Math.max(enemy.cooldownTimer || 0, disorientFrames);
     if ('meleePunchCooldown' in enemy) enemy.meleePunchCooldown = Math.max(enemy.meleePunchCooldown || 0, disorientFrames);
     if ('swordCooldown' in enemy) enemy.swordCooldown = Math.max(enemy.swordCooldown || 0, disorientFrames);
     if ('attackCooldown' in enemy) enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, disorientFrames);
+  }
+
+  // Process illusions separately (derive team from owner — no indexOf on illusions)
+  if (state.illusions) {
+    for (let ii = 0; ii < state.illusions.length; ii++) {
+      const enemy = state.illusions[ii];
+      if (!enemy || enemy === todoFighter || enemy.hp <= 0) continue;
+      // Check if illusion's owner is a teammate
+      if (enemy.owner && myTeam !== null && myTeam !== undefined) {
+        const ownerIdx = state.fighters.indexOf(enemy.owner);
+        const ownerTeam = (state.getFighterTeam && ownerIdx >= 0) ? state.getFighterTeam(ownerIdx) : enemy.owner.team;
+        if (ownerTeam === myTeam) continue;
+      }
+
+      if ('shootCooldown' in enemy) enemy.shootCooldown = Math.max(enemy.shootCooldown || 0, disorientFrames);
+      if ('cooldown' in enemy) enemy.cooldown = Math.max(enemy.cooldown || 0, disorientFrames);
+      if ('cooldownTimer' in enemy) enemy.cooldownTimer = Math.max(enemy.cooldownTimer || 0, disorientFrames);
+      if ('meleePunchCooldown' in enemy) enemy.meleePunchCooldown = Math.max(enemy.meleePunchCooldown || 0, disorientFrames);
+      if ('swordCooldown' in enemy) enemy.swordCooldown = Math.max(enemy.swordCooldown || 0, disorientFrames);
+      if ('attackCooldown' in enemy) enemy.attackCooldown = Math.max(enemy.attackCooldown || 0, disorientFrames);
+    }
   }
 }
 

@@ -65,6 +65,7 @@ export class ZeusFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if (this.isCaughtInBeam()) return;
     if (projectileSystem && projectileSystem.fireChainLightning) {
       const damage = CONFIG.zeus.lightningDamage;
       const chains = CONFIG.zeus.chainCount;

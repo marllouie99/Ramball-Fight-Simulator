@@ -10,32 +10,46 @@
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 
+// ── Pre-allocated Static Buffers (Zero per-frame heap allocations) ──
+const _clawFlamePts = Array.from({ length: 10 }, () => ({ x: 0, y: 0 }));
+const _fleshLoopLeft = [];
+const _fleshLoopRight = [];
+const _surgeHumpPoints = [];
+const _maceSplinePoints = [];
+const _scissorLeftPoints = [];
+const _scissorRightPoints = [];
+
+const _T_VALS_2 = [0.28, 0.72];
+const _T_VALS_3 = [0.22, 0.38, 0.80];
+
+const _mappedBlades = [
+  { idx: 0, knuckleX: 0, knuckleY: 0, fanAngle: 0, length: 0, heelWidth: 0, topArchY: 0, tipY: 0 },
+  { idx: 1, knuckleX: 0, knuckleY: 0, fanAngle: 0, length: 0, heelWidth: 0, topArchY: 0, tipY: 0 },
+  { idx: 2, knuckleX: 0, knuckleY: 0, fanAngle: 0, length: 0, heelWidth: 0, topArchY: 0, tipY: 0 },
+  { idx: 3, knuckleX: 0, knuckleY: 0, fanAngle: 0, length: 0, heelWidth: 0, topArchY: 0, tipY: 0 }
+];
+const _orderedBlades = [null, null, null, null];
+
 /**
  * Helper: Draws authentic anime surgical suture lines with paired bold cross-stitches / staples.
- * Matches reference:
- * - Natural dark incision cut line with slight cylindrical curvature
- * - Paired, bold surgical cross-stitch loops / staples (|| ... ||) crossing the cut
- * - Bold stitch thickness (2.2px) with subtle knot endpoint dots
+ * Batched for 60 FPS performance.
  */
 function drawSuture(ctx, x1, y1, x2, y2, stitchCount = 4, crossH = 3.6, color = '#000000') {
+  const dx = x2 - x1;
+  const dy = y2 - y1;
+  const len = Math.hypot(dx, dy);
+  if (len <= 0) return;
+
   ctx.save();
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const len = Math.hypot(dx, dy);
-  if (len <= 0) {
-    ctx.restore();
-    return;
-  }
-
   const snx = -dy / len;
   const sny =  dx / len;
 
-  // 1. Incision Cut Line (Clean dark surgical incision)
+  // 1. Incision Cut Line
   ctx.lineWidth = 1.35;
   ctx.beginPath();
   const midX = (x1 + x2) / 2 + snx * (len * 0.10);
@@ -44,15 +58,11 @@ function drawSuture(ctx, x1, y1, x2, y2, stitchCount = 4, crossH = 3.6, color = 
   ctx.quadraticCurveTo(midX, midY, x2, y2);
   ctx.stroke();
 
-  // 2. Cross-Stitches (3 lines: pair of 2 close lines + 1 isolated line far away: || ... |)
+  // 2. Cross-Stitches (Batched path)
   ctx.lineWidth = 2.0;
-  let tValues = [0.22, 0.38, 0.80];
-  if (stitchCount === 2) {
-    tValues = [0.28, 0.72];
-  } else if (stitchCount === 3) {
-    tValues = [0.22, 0.38, 0.80];
-  }
+  const tValues = (stitchCount === 2) ? _T_VALS_2 : _T_VALS_3;
 
+  ctx.beginPath();
   for (let i = 0; i < tValues.length; i++) {
     const t = tValues[i];
     const mt = 1 - t;
@@ -65,38 +75,36 @@ function drawSuture(ctx, x1, y1, x2, y2, stitchCount = 4, crossH = 3.6, color = 
     const nx = -tdy / tlen;
     const ny =  tdx / tlen;
 
-    ctx.beginPath();
     ctx.moveTo(px - nx * crossH, py - ny * crossH);
     ctx.lineTo(px + nx * crossH, py + ny * crossH);
-    ctx.stroke();
+  }
+  ctx.stroke();
 
-    // Puncture knots
-    ctx.beginPath();
+  // Puncture knots (Batched fill)
+  ctx.beginPath();
+  for (let i = 0; i < tValues.length; i++) {
+    const t = tValues[i];
+    const mt = 1 - t;
+    const px = mt * mt * x1 + 2 * mt * t * midX + t * t * x2;
+    const py = mt * mt * y1 + 2 * mt * t * midY + t * t * y2;
+
+    const tdx = 2 * (1 - t) * (midX - x1) + 2 * t * (x2 - midX);
+    const tdy = 2 * (1 - t) * (midY - y1) + 2 * t * (y2 - midY);
+    const tlen = Math.hypot(tdx, tdy) || 1;
+    const nx = -tdy / tlen;
+    const ny =  tdx / tlen;
+
     ctx.arc(px - nx * crossH, py - ny * crossH, 0.8, 0, Math.PI * 2);
     ctx.arc(px + nx * crossH, py + ny * crossH, 0.8, 0, Math.PI * 2);
-    ctx.fill();
   }
+  ctx.fill();
+
   ctx.restore();
 }
 
 /**
- * Draws Mahito's 4-Blade Needle Claw Morph (Idle Transfiguration: Transmuted Blade Claw Hand).
- * Accurately matches the anime reference:
- * - 4 elongated needle-sharp bone blades extending from knuckles
- * - Metallic silver two-tone bevel facet shading with bright spine gleam
- * - Distinctive crimson-red dipped needle points and diagonal accent notch stripes
- * - Quadruple razor scratch crescent slash trails
- * - Transformed mode: Obsidian chitin blades with glowing magenta CE edge
- */
-/**
  * Draws Mahito's 4-Blade Needle Claw Morph in authentic 3D Side-Profile Perspective.
- * Exact 1:1 match to the reference artwork:
- * - 4 elegantly curved scythe-talon bone blades fanned out with clear air gaps
- * - Articulated 3D knuckle socket brackets with pivot joints
- * - Longitudinally beveled facets: polished silver spine highlight + dark steel underside shadow
- * - Sharp crimson dipped needle points + dual diagonal crimson accent pinstripes (//)
- * - Billowing purple Cursed Energy aura behind the knuckle spread
- * - Rotational chop-down dynamics with backhand flip support
+ * High-performance optimized.
  */
 function drawClawMorphArm(ctx, r, handX, handY, isTransformed, progress, isRightPunch, fighter) {
   const cfg = CONFIG.mahito || {};
@@ -105,31 +113,26 @@ function drawClawMorphArm(ctx, r, handX, handY, isTransformed, progress, isRight
   const clawScale = baseClawScale * customScale;
   const handRadius = 7.0 * customScale;
 
-  // 1. Snappy Rotational Chop/Slash Dynamics (Instant Snap Wind-up & Lightning Whip Arc)
+  // 1. Snappy Rotational Chop/Slash Dynamics
   let swingAngle = 0;
   let isSlashing = false;
   let slashProgress = 0;
   let recoveryProgress = 0;
 
   if (progress < 0.08) {
-    // Stage 1: Instant Snap to High Wind-up Angle (-1.20 rad / ~11 o'clock)
     const p = progress / 0.08;
     const snapUp = Math.sin(p * Math.PI * 0.5);
     swingAngle = -0.30 - 0.90 * snapUp;
   } else if (progress < 0.44) {
-    // Stage 2: Lightning Whip Slash (Snaps powerfully from -1.20 rad -> +1.20 rad)
     isSlashing = true;
     slashProgress = (progress - 0.08) / 0.36;
-    // Cubic power snap curve: explosive acceleration with crisp apex snap
     const snapWhip = 1.0 - Math.pow(1.0 - slashProgress, 3.2);
     swingAngle = -1.20 + 2.40 * snapWhip;
   } else if (progress < 0.54) {
-    // Stage 3: Apex Impact Hold (Crisp hit-pause apex snap)
     isSlashing = true;
     slashProgress = 1.0;
     swingAngle = 1.20;
   } else {
-    // Stage 4: Clean Smooth Guard Recovery (+1.20 rad -> +0.35 rad)
     recoveryProgress = (progress - 0.54) / 0.46;
     const easedRec = recoveryProgress * recoveryProgress * (3 - 2 * recoveryProgress);
     swingAngle = 1.20 - 0.85 * easedRec;
@@ -138,7 +141,7 @@ function drawClawMorphArm(ctx, r, handX, handY, isTransformed, progress, isRight
   ctx.save();
   ctx.translate(handX, handY);
   if (!isRightPunch) {
-    ctx.scale(1, -1); // Flips to other side for backhand reverse chop!
+    ctx.scale(1, -1);
   }
   ctx.rotate(swingAngle);
 
@@ -149,24 +152,24 @@ function drawClawMorphArm(ctx, r, handX, handY, isTransformed, progress, isRight
 
   const ceRadius = handRadius * 2.6;
   const numFlamePts = 10;
-  const flamePts = [];
   for (let i = 0; i < numFlamePts; i++) {
     const ang = (Math.PI * 2 / numFlamePts) * i;
     const wave = Math.sin(now * 3.2 + i * 1.6) * (handRadius * 0.4);
     const stretch = Math.cos(ang) > 0.1 ? handRadius * 0.8 : -handRadius * 0.3;
     const curR = ceRadius + wave + stretch;
-    flamePts.push({ x: Math.cos(ang) * curR, y: Math.sin(ang) * curR });
+    _clawFlamePts[i].x = Math.cos(ang) * curR;
+    _clawFlamePts[i].y = Math.sin(ang) * curR;
   }
 
   ctx.beginPath();
-  let fmx = (flamePts[numFlamePts - 1].x + flamePts[0].x) / 2;
-  let fmy = (flamePts[numFlamePts - 1].y + flamePts[0].y) / 2;
+  let fmx = (_clawFlamePts[numFlamePts - 1].x + _clawFlamePts[0].x) / 2;
+  let fmy = (_clawFlamePts[numFlamePts - 1].y + _clawFlamePts[0].y) / 2;
   ctx.moveTo(fmx, fmy);
   for (let i = 0; i < numFlamePts; i++) {
     const nextIdx = (i + 1) % numFlamePts;
-    const midX = (flamePts[i].x + flamePts[nextIdx].x) / 2;
-    const midY = (flamePts[i].y + flamePts[nextIdx].y) / 2;
-    ctx.quadraticCurveTo(flamePts[i].x, flamePts[i].y, midX, midY);
+    const midX = (_clawFlamePts[i].x + _clawFlamePts[nextIdx].x) / 2;
+    const midY = (_clawFlamePts[i].y + _clawFlamePts[nextIdx].y) / 2;
+    ctx.quadraticCurveTo(_clawFlamePts[i].x, _clawFlamePts[i].y, midX, midY);
   }
   ctx.closePath();
   ctx.fillStyle = isTransformed ? 'rgba(217, 70, 239, 0.55)' : 'rgba(147, 51, 234, 0.45)';
@@ -273,11 +276,8 @@ function drawClawMorphArm(ctx, r, handX, handY, isTransformed, progress, isRight
       ctx.lineWidth = 1.3;
       ctx.stroke();
     } else {
-      const capGrad = ctx.createLinearGradient(-5.0 * clawScale, -halfHw * 0.6, 0, halfHw * 0.6);
-      capGrad.addColorStop(0, '#FFFFFF');
-      capGrad.addColorStop(0.4, '#CBD5E1');
-      capGrad.addColorStop(1.0, '#475569');
-      ctx.fillStyle = capGrad;
+      // OPTIMIZED: Replaced per-blade createLinearGradient with flat fill
+      ctx.fillStyle = '#CBD5E1';
       ctx.fill();
       ctx.strokeStyle = '#181C26';
       ctx.lineWidth = 1.3;
@@ -894,9 +894,9 @@ export function drawMahitoSubterraneanFleshSurge(ctx, fighter) {
       if (humpProgress <= 0.05) continue;
 
       // Generate smooth quadratic spline points from entry -> peak -> exit
-      const numSamples = 22;
+      const numSamples = 10;
       const activeSamples = Math.max(2, Math.floor(numSamples * humpProgress));
-      const loopPoints = [];
+      _surgeHumpPoints.length = 0;
 
       for (let s = 0; s <= activeSamples; s++) {
         const t = s / numSamples;
@@ -911,7 +911,7 @@ export function drawMahitoSubterraneanFleshSurge(ctx, fighter) {
         const py = gy - h;
 
         const baseThickness = (isTransformed ? 12 : 9) * (1.0 - (i / tendrilCount) * 0.40);
-        loopPoints.push({
+        _surgeHumpPoints.push({
           x: gx,
           y: py,
           isUnderground: false,
@@ -920,9 +920,9 @@ export function drawMahitoSubterraneanFleshSurge(ctx, fighter) {
         });
       }
 
-      if (loopPoints.length >= 2) {
+      if (_surgeHumpPoints.length >= 2) {
         // 1 suture band per hump -> strictly exactly 4 suture bands total across the 4 subterranean humps
-        drawFleshLoop(ctx, loopPoints, isTransformed, fadeOutAlpha * humpAlpha, 1);
+        drawFleshLoop(ctx, _surgeHumpPoints, isTransformed, fadeOutAlpha * humpAlpha, 1, lp.isFrozenByInfinity);
       }
     }
 
@@ -1004,11 +1004,7 @@ export function drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed) {
   ctx.stroke();
 
   // C. Deep subterranean dark void core inside socket
-  const coreGrad = ctx.createRadialGradient(currentX, currentY, 1, currentX, currentY, socketRadius * 0.75);
-  coreGrad.addColorStop(0, '#050508');
-  coreGrad.addColorStop(0.7, '#1E122B');
-  coreGrad.addColorStop(1.0, isTransformed ? '#0E1322' : '#CBD5E1');
-  ctx.fillStyle = coreGrad;
+  ctx.fillStyle = '#050508';
   ctx.beginPath();
   ctx.arc(currentX, currentY, socketRadius * 0.65, 0, Math.PI * 2);
   ctx.fill();
@@ -1037,16 +1033,16 @@ export function drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed) {
       const handX = currentX;
       const handY = currentY + liftY;
       const dist = Math.hypot(handX - currentX, handY - currentY) || 1;
-      const windupPoints = [];
+      _surgeHumpPoints.length = 0;
       for (let d = 0; d <= dist; d += 2) {
         const pct = d / dist;
         const px = currentX + (handX - currentX) * pct;
         const py = currentY + (handY - currentY) * pct;
         const thick = baseThick * (1.0 + 0.35 * Math.sin(Math.PI * pct) * windupProg);
-        windupPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
+        _surgeHumpPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
       }
-      if (windupPoints.length >= 2) {
-        drawFleshLoop(ctx, windupPoints, isTransformed, 1.0);
+      if (_surgeHumpPoints.length >= 2) {
+        drawFleshLoop(ctx, _surgeHumpPoints, isTransformed, 1.0);
       }
       const fistR = (isTransformed ? 10 : 8.5) * (1.0 + 0.35 * windupProg);
       drawArticulatedFist(ctx, handX, handY, fistR, isTransformed, -Math.PI / 2, true);
@@ -1058,16 +1054,16 @@ export function drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed) {
       const tipY = currentY + (startY - currentY) * stretchRatio;
       const dist = Math.hypot(tipX - currentX, tipY - currentY);
       if (dist > 1.0) {
-        const slamPoints = [];
+        _surgeHumpPoints.length = 0;
         for (let d = 0; d <= dist; d += 3) {
           const pct = d / dist;
           const px = currentX + (tipX - currentX) * pct;
           const py = currentY + (tipY - currentY) * pct;
           const thick = baseThick * (1.0 - 0.20 * pct);
-          slamPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
+          _surgeHumpPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
         }
-        if (slamPoints.length >= 2) {
-          drawFleshLoop(ctx, slamPoints, isTransformed, 1.0, 1);
+        if (_surgeHumpPoints.length >= 2) {
+          drawFleshLoop(ctx, _surgeHumpPoints, isTransformed, 1.0, 1);
         }
         const fistR = (isTransformed ? 12 : 10) * (0.85 + 0.35 * (1.0 - slamProg));
         drawArticulatedFist(ctx, tipX, tipY, fistR, isTransformed, Math.PI / 2, true);
@@ -1075,13 +1071,12 @@ export function drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed) {
     }
   } else {
     // Frames >= animStartFrame: Stretch arm connecting chest socket into ground plunge hole
-    // Pulls back smoothly along the direct straight plunge vector into the chest socket
     const stretchEndX = startX + (currentX - startX) * armPullbackRatio;
     const stretchEndY = startY + (currentY - startY) * armPullbackRatio;
     const distToAnchor = Math.hypot(stretchEndX - currentX, stretchEndY - currentY);
 
     if (distToAnchor > 1.0 && armPullbackRatio < 1.0) {
-      const stretchPoints = [];
+      _surgeHumpPoints.length = 0;
       const step = 3;
       for (let d = 0; d <= distToAnchor; d += step) {
         const pct = d / distToAnchor;
@@ -1093,11 +1088,11 @@ export function drawMahitoFleshSurgeForegroundArm(ctx, fighter, isTransformed) {
           const taper = 1.0 - (armPullbackRatio - 0.5) * 0.40;
           thickness *= taper;
         }
-        stretchPoints.push({ x: px, y: py, isUnderground: false, thickness });
+        _surgeHumpPoints.push({ x: px, y: py, isUnderground: false, thickness });
       }
 
-      if (stretchPoints.length >= 2) {
-        drawFleshLoop(ctx, stretchPoints, isTransformed, 1.0, 1);
+      if (_surgeHumpPoints.length >= 2) {
+        drawFleshLoop(ctx, _surgeHumpPoints, isTransformed, 1.0, 1);
       }
 
       // Smooth reforming articulated fist as arm arrives back into chest socket
@@ -1144,12 +1139,17 @@ function drawArticulatedFist(ctx, x, y, handRadius, isTransformed, angle = 0, is
   }
   ctx.closePath();
 
-  const ceGrad = ctx.createRadialGradient(0, 0, handRadius * 0.2, 0, 0, ceBlobRadius * 1.2);
-  ceGrad.addColorStop(0, 'rgba(245, 208, 254, 0.95)');
-  ceGrad.addColorStop(0.35, 'rgba(217, 70, 239, 0.85)');
-  ceGrad.addColorStop(0.70, 'rgba(168, 85, 247, 0.60)');
-  ceGrad.addColorStop(1.0, 'rgba(59, 7, 100, 0.15)');
-  ctx.fillStyle = ceGrad;
+  // OPTIMIZED: Replaced per-frame createRadialGradient with layered flat concentric fills
+  ctx.fillStyle = 'rgba(59, 7, 100, 0.15)';
+  ctx.fill();
+  // Brighter inner core overlay
+  ctx.beginPath();
+  ctx.arc(0, 0, ceBlobRadius * 0.7, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(168, 85, 247, 0.45)';
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(0, 0, handRadius * 0.6, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(245, 208, 254, 0.65)';
   ctx.fill();
 
   ctx.strokeStyle = 'rgba(59, 7, 100, 0.9)';
@@ -1257,6 +1257,10 @@ function drawArticulatedFist(ctx, x, y, handRadius, isTransformed, angle = 0, is
  * Draws the background void and deep shadow of the ground crater hole
  * (rendered UNDERNEATH the flesh tendril so it emerges from within).
  */
+/**
+ * Draws the background void and deep shadow of the ground crater hole
+ * (rendered UNDERNEATH the flesh tendril so it emerges from within).
+ */
 function drawGroundHoleBack(ctx, tx, ty, baseAngle, isTransformed, fadeOutAlpha) {
   ctx.save();
   ctx.globalAlpha = fadeOutAlpha;
@@ -1272,13 +1276,8 @@ function drawGroundHoleBack(ctx, tx, ty, baseAngle, isTransformed, fadeOutAlpha)
   ctx.ellipse(0, 0, holeRx * 1.5, holeRy * 1.5, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Deep subterranean void cavity (Pitch black / deep dark violet center)
-  const voidGrad = ctx.createRadialGradient(0, -1, 2, 0, 0, holeRx);
-  voidGrad.addColorStop(0.0, '#050508');
-  voidGrad.addColorStop(0.65, '#12091E');
-  voidGrad.addColorStop(1.0, '#1E122B');
-
-  ctx.fillStyle = voidGrad;
+  // 2. Deep subterranean void cavity (Pitch black center)
+  ctx.fillStyle = '#050508';
   ctx.beginPath();
   ctx.ellipse(0, 0, holeRx, holeRy, 0, 0, Math.PI * 2);
   ctx.fill();
@@ -1320,26 +1319,21 @@ function drawGroundHoleFront(ctx, tx, ty, baseAngle, isTransformed, fadeOutAlpha
   ctx.ellipse(0, 1.2, holeRx * 0.9, holeRy * 0.75, 0, 0.15 * Math.PI, 0.85 * Math.PI);
   ctx.stroke();
 
-  // 3. Jagged concrete fissure cracks radiating from the crater
+  // 3. Jagged concrete fissure cracks radiating from the crater (Batched)
   ctx.strokeStyle = 'rgba(25, 25, 30, 0.85)';
   ctx.lineWidth = 1.5;
+  ctx.beginPath();
   for (let k = 0; k < 6; k++) {
     const crackAngle = (Math.PI * 2 / 6) * k + 0.35;
     const length = 10 + (k % 2) * 5;
-    ctx.beginPath();
-    ctx.moveTo(Math.cos(crackAngle) * (holeRx * 0.8), Math.sin(crackAngle) * (holeRy * 0.8));
-    let curX = Math.cos(crackAngle) * (holeRx * 0.8);
-    let curY = Math.sin(crackAngle) * (holeRy * 0.8);
-    const segs = 3;
-    const segLen = length / segs;
-    for (let s = 0; s < segs; s++) {
-      const jitter = (s === 0 ? 0 : Math.sin(s * 2 + k) * 0.28);
-      curX += Math.cos(crackAngle + jitter) * segLen;
-      curY += Math.sin(crackAngle + jitter) * segLen;
-      ctx.lineTo(curX, curY);
-    }
-    ctx.stroke();
+    const startX = Math.cos(crackAngle) * (holeRx * 0.8);
+    const startY = Math.sin(crackAngle) * (holeRy * 0.8);
+    const endX = Math.cos(crackAngle) * (holeRx * 0.8 + length);
+    const endY = Math.sin(crackAngle) * (holeRy * 0.8 + length);
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(endX, endY);
   }
+  ctx.stroke();
 
   // 4. Shattered concrete stones scattered around the crater rim
   ctx.fillStyle = 'rgba(50, 50, 58, 0.95)';
@@ -1364,99 +1358,101 @@ function drawGroundHoleFront(ctx, tx, ty, baseAngle, isTransformed, fadeOutAlpha
 /**
  * Helper to draw a single fleshy arm hump polygon along loop points.
  * Features organic curvature, upper spine highlights, surgical sutures, and Cursed Energy bloom.
+ * Optimized with static module-level buffers.
  */
-function drawFleshLoop(ctx, points, isTransformed, fadeOutAlpha = 1.0, maxBands = 4) {
-  if (points.length < 2) return;
+function drawFleshLoop(ctx, points, isTransformed, fadeOutAlpha = 1.0, maxBands = 2, isFrozenByInfinity = false) {
+  const pCount = points.length;
+  if (pCount < 2) return;
 
-  const leftPoints = [];
-  const rightPoints = [];
+  _fleshLoopLeft.length = 0;
+  _fleshLoopRight.length = 0;
 
-  for (let i = 0; i < points.length; i++) {
+  for (let i = 0; i < pCount; i++) {
     const pt = points[i];
-    const prev = points[Math.max(0, i - 1)];
-    const next = points[Math.min(points.length - 1, i + 1)];
+    const prev = points[i > 0 ? i - 1 : 0];
+    const next = points[i < pCount - 1 ? i + 1 : pCount - 1];
 
-    // Tangent angle
     const dx = next.x - prev.x;
     const dy = next.y - prev.y;
     const len = Math.hypot(dx, dy) || 1;
     const nx = -dy / len;
     const ny =  dx / len;
 
-    // Organic thickness modulation (slight muscular swell in the hump middle)
-    const midFactor = Math.sin((i / (points.length - 1)) * Math.PI);
+    const midFactor = Math.sin((i / (pCount - 1)) * Math.PI);
     const swollenThick = pt.thickness * (1.0 + midFactor * 0.15);
 
-    leftPoints.push({ x: pt.x + nx * swollenThick, y: pt.y + ny * swollenThick });
-    rightPoints.unshift({ x: pt.x - nx * swollenThick, y: pt.y - ny * swollenThick });
+    _fleshLoopLeft.push({ x: pt.x + nx * swollenThick, y: pt.y + ny * swollenThick });
+    _fleshLoopRight.push({ x: pt.x - nx * swollenThick, y: pt.y - ny * swollenThick });
   }
-
-  const poly = [...leftPoints, ...rightPoints];
 
   ctx.save();
   ctx.globalAlpha = fadeOutAlpha;
 
   // B. Flesh / Obsidian Body Fill
   ctx.beginPath();
-  ctx.moveTo(poly[0].x, poly[0].y);
-  for (let p = 1; p < poly.length; p++) {
-    ctx.lineTo(poly[p].x, poly[p].y);
+  ctx.moveTo(_fleshLoopLeft[0].x, _fleshLoopLeft[0].y);
+  for (let p = 1; p < _fleshLoopLeft.length; p++) {
+    ctx.lineTo(_fleshLoopLeft[p].x, _fleshLoopLeft[p].y);
+  }
+  for (let p = _fleshLoopRight.length - 1; p >= 0; p--) {
+    ctx.lineTo(_fleshLoopRight[p].x, _fleshLoopRight[p].y);
   }
   ctx.closePath();
-  ctx.fillStyle = isTransformed ? '#0E1322' : '#EEF3F7';
-  ctx.fill();
 
-  // C. Natural Side Edge Contour Strokes (Draw only the top and bottom ridges, NOT flat ends)
-  ctx.save();
-  ctx.strokeStyle = isTransformed ? '#2A1B3D' : '#000000';
-  ctx.lineWidth = 1.9;
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  if (isFrozenByInfinity) {
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+  } else {
+    ctx.fillStyle = isTransformed ? '#0E1322' : '#EEF3F7';
+    ctx.fill();
 
-  // Left ridge
-  ctx.beginPath();
-  ctx.moveTo(leftPoints[0].x, leftPoints[0].y);
-  for (let p = 1; p < leftPoints.length; p++) {
-    ctx.lineTo(leftPoints[p].x, leftPoints[p].y);
-  }
-  ctx.stroke();
-
-  // Right ridge
-  ctx.beginPath();
-  const rLen = rightPoints.length;
-  ctx.moveTo(rightPoints[0].x, rightPoints[0].y);
-  for (let p = 1; p < rLen; p++) {
-    ctx.lineTo(rightPoints[p].x, rightPoints[p].y);
-  }
-  ctx.stroke();
-  ctx.restore();
-
-  // D. Volumetric Top Spine Highlight (Gives round cylindrical 3D flesh volume)
-  if (points.length >= 4) {
-    ctx.save();
-    ctx.strokeStyle = isTransformed ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.60)';
-    ctx.lineWidth = isTransformed ? 2.5 : 2.0;
+    // C. Natural Side Edge Contour Strokes
+    ctx.strokeStyle = isTransformed ? '#2A1B3D' : '#000000';
+    ctx.lineWidth = 1.9;
     ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
     ctx.beginPath();
-    const startIdx = Math.floor(points.length * 0.15);
-    const endIdx = Math.floor(points.length * 0.85);
-    ctx.moveTo(points[startIdx].x, points[startIdx].y - 2);
-    for (let i = startIdx + 1; i <= endIdx; i++) {
-      ctx.lineTo(points[i].x, points[i].y - 2);
+    ctx.moveTo(_fleshLoopLeft[0].x, _fleshLoopLeft[0].y);
+    for (let p = 1; p < _fleshLoopLeft.length; p++) {
+      ctx.lineTo(_fleshLoopLeft[p].x, _fleshLoopLeft[p].y);
     }
     ctx.stroke();
-    ctx.restore();
-  }
 
-  // E. Surgical Cross-Stitches along the stretch arm (Strictly maxBands suture bands)
-  if (!isTransformed && points.length >= 4 && maxBands > 0) {
-    const numBands = maxBands;
-    for (let s = 1; s <= numBands; s++) {
-      const idx = Math.floor((points.length / (numBands + 1)) * s);
-      const lp = leftPoints[idx];
-      const rp = rightPoints[rightPoints.length - 1 - idx];
-      if (lp && rp) {
-        drawSuture(ctx, lp.x, lp.y, rp.x, rp.y, 3, 3.8, '#000000');
+    ctx.beginPath();
+    ctx.moveTo(_fleshLoopRight[0].x, _fleshLoopRight[0].y);
+    for (let p = 1; p < _fleshLoopRight.length; p++) {
+      ctx.lineTo(_fleshLoopRight[p].x, _fleshLoopRight[p].y);
+    }
+    ctx.stroke();
+
+    // D. Volumetric Top Spine Highlight
+    if (pCount >= 4) {
+      ctx.strokeStyle = isTransformed ? 'rgba(99, 102, 241, 0.25)' : 'rgba(255, 255, 255, 0.60)';
+      ctx.lineWidth = isTransformed ? 2.5 : 2.0;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      const startIdx = Math.floor(pCount * 0.15);
+      const endIdx = Math.floor(pCount * 0.85);
+      ctx.moveTo(points[startIdx].x, points[startIdx].y - 2);
+      for (let i = startIdx + 1; i <= endIdx; i++) {
+        ctx.lineTo(points[i].x, points[i].y - 2);
+      }
+      ctx.stroke();
+    }
+
+    // E. Surgical Cross-Stitches
+    if (!isTransformed && pCount >= 4 && maxBands > 0) {
+      for (let s = 1; s <= maxBands; s++) {
+        const idx = Math.floor((pCount / (maxBands + 1)) * s);
+        const lp = _fleshLoopLeft[idx];
+        const rp = _fleshLoopRight[idx];
+        if (lp && rp) {
+          drawSuture(ctx, lp.x, lp.y, rp.x, rp.y, 3, 3.8, '#000000');
+        }
       }
     }
   }
@@ -1487,24 +1483,24 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
 
   const ceRadius = handRadius * 2.6;
   const numFlamePts = 10;
-  const flamePts = [];
   for (let i = 0; i < numFlamePts; i++) {
     const ang = (Math.PI * 2 / numFlamePts) * i;
     const wave = Math.sin(now * 3.2 + i * 1.6) * (handRadius * 0.4);
     const stretch = Math.cos(ang) > 0.1 ? handRadius * 0.8 : -handRadius * 0.3;
     const curR = ceRadius + wave + stretch;
-    flamePts.push({ x: Math.cos(ang) * curR, y: Math.sin(ang) * curR });
+    _clawFlamePts[i].x = Math.cos(ang) * curR;
+    _clawFlamePts[i].y = Math.sin(ang) * curR;
   }
 
   ctx.beginPath();
-  let fmx = (flamePts[numFlamePts - 1].x + flamePts[0].x) / 2;
-  let fmy = (flamePts[numFlamePts - 1].y + flamePts[0].y) / 2;
+  let fmx = (_clawFlamePts[numFlamePts - 1].x + _clawFlamePts[0].x) / 2;
+  let fmy = (_clawFlamePts[numFlamePts - 1].y + _clawFlamePts[0].y) / 2;
   ctx.moveTo(fmx, fmy);
   for (let i = 0; i < numFlamePts; i++) {
     const nextIdx = (i + 1) % numFlamePts;
-    const midX = (flamePts[i].x + flamePts[nextIdx].x) / 2;
-    const midY = (flamePts[i].y + flamePts[nextIdx].y) / 2;
-    ctx.quadraticCurveTo(flamePts[i].x, flamePts[i].y, midX, midY);
+    const midX = (_clawFlamePts[i].x + _clawFlamePts[nextIdx].x) / 2;
+    const midY = (_clawFlamePts[i].y + _clawFlamePts[nextIdx].y) / 2;
+    ctx.quadraticCurveTo(_clawFlamePts[i].x, _clawFlamePts[i].y, midX, midY);
   }
   ctx.closePath();
   ctx.fillStyle = isTransformed ? 'rgba(217, 70, 239, 0.55)' : 'rgba(147, 51, 234, 0.45)';
@@ -1535,39 +1531,43 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     drawSuture(ctx, handX - handRadius * 0.6, handY, handX + handRadius * 0.6, handY, 2, 2.0, '#181C26');
   }
 
-  if (state.weaponCustomizations && state.weaponCustomizations.mahito) {
-    state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
-  }
-  // Initialize default custom blades if not already present in global state
-  if (!state.mahitoClawCustomBlades) {
-    state.mahitoClawCustomBlades = [
-      { idx: 0, knuckleX: 3.0, knuckleY: -6.5, fanAngle: -0.32, length: 82, heelWidth: 14.0, topArchY: -14.0, tipY: 16.0 },
-      { idx: 1, knuckleX: 5.0, knuckleY: -3.8, fanAngle: -0.22, length: 88, heelWidth: 15.5, topArchY: -9.0, tipY: 18.0 },
-      { idx: 2, knuckleX: 6.0, knuckleY: -0.8, fanAngle: -0.06, length: 84, heelWidth: 15.0, topArchY: -3.0, tipY: 24.0 },
-      { idx: 3, knuckleX: 1.5, knuckleY: 9.0, fanAngle: 0.48, length: 80, heelWidth: 14.5, topArchY: 18.0, tipY: -22.0 }
-    ];
+  // Draw morph blades with static buffer
+  drawMahitoStaticClawBlades(ctx, r, handX, handY, isTransformed, 1.0, true, null);
+
+  ctx.restore();
+}
+
+/**
+ * Draws Mahito's 4-Blade Needle Claw Morph with high-performance static caching.
+ */
+export function drawMahitoStaticClawBlades(ctx, r, handX, handY, isTransformed, progress, isRightPunch, fighter) {
+  const baseClawScale = isTransformed ? 0.90 : 0.70;
+  const customScale = (state.weaponCustomizations && state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.weaponScale !== undefined) ? state.weaponCustomizations.mahito.weaponScale : 1.0;
+  const clawScale = baseClawScale * customScale;
+  const s = clawScale / 0.70;
+
+  const rawBlades = (state.weaponCustomizations && state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.blades) || state.mahitoClawCustomBlades;
+
+  for (let i = 0; i < 4; i++) {
+    const src = (rawBlades && rawBlades[i]) ? rawBlades[i] : { idx: i, knuckleX: 3, knuckleY: -6, fanAngle: 0, length: 82, heelWidth: 14, topArchY: -14, tipY: 16 };
+    const dst = _mappedBlades[i];
+    dst.idx = src.idx !== undefined ? src.idx : i;
+    dst.knuckleX = handX + (src.knuckleX || 0) * s;
+    dst.knuckleY = handY + (src.knuckleY || 0) * s;
+    dst.fanAngle = src.fanAngle || 0;
+    dst.length = (src.length || 80) * clawScale;
+    dst.heelWidth = (src.heelWidth || 14) * clawScale;
+    dst.topArchY = (src.topArchY || 0) * clawScale;
+    dst.tipY = (src.tipY || 0) * clawScale;
   }
 
-  // Map blades dynamically from global customizable state
-  const blades = state.mahitoClawCustomBlades.map(b => {
-    const s = clawScale / 0.70;
-    return {
-      idx: b.idx,
-      knuckleX: handX + b.knuckleX * s,
-      knuckleY: handY + b.knuckleY * s,
-      fanAngle: b.fanAngle,
-      length: b.length * clawScale,
-      heelWidth: b.heelWidth * clawScale,
-      topArchY: b.topArchY * clawScale,
-      tipY: b.tipY * clawScale
-    };
-  });
-
-  // Sort blades by customizable draw order (back-to-front layering)
   const drawOrder = (state.weaponCustomizations && state.weaponCustomizations.mahito && state.weaponCustomizations.mahito.drawOrder) || [0, 1, 2, 3];
-  const orderedBlades = drawOrder.map(i => blades[i]).filter(Boolean);
 
-  orderedBlades.forEach(b => {
+  for (let d = 0; d < 4; d++) {
+    const bIdx = drawOrder[d] !== undefined ? drawOrder[d] : d;
+    const b = _mappedBlades[bIdx];
+    if (!b) continue;
+
     ctx.save();
     ctx.translate(b.knuckleX, b.knuckleY);
     ctx.rotate(b.fanAngle);
@@ -1576,9 +1576,7 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     const hw = b.heelWidth;
     const halfHw = hw * 0.5;
 
-    // ── 1. ARTICULATED 3D KNUCKLE SOCKET CAP & C-COLLAR ──
-    ctx.save();
-    // A. C-Shaped Bracket Collar
+    // 1. Knuckle Socket Cap & Collar
     ctx.beginPath();
     ctx.ellipse(-2.5 * clawScale, 0, 3.5 * clawScale, halfHw * 0.75, 0, -Math.PI * 0.6, Math.PI * 0.6);
     ctx.lineTo(-4.5 * clawScale, 0);
@@ -1589,7 +1587,6 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     ctx.lineWidth = 1.3;
     ctx.stroke();
 
-    // B. Cylindrical Pivot Hinge
     ctx.beginPath();
     ctx.arc(-2.0 * clawScale, 0, halfHw * 0.45, 0, Math.PI * 2);
     ctx.fillStyle = isTransformed ? '#2A1B3D' : '#94A3B8';
@@ -1598,34 +1595,15 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     ctx.lineWidth = 1.1;
     ctx.stroke();
 
-    // C. Dome/Mushroom Knuckle Cap on Top
     ctx.beginPath();
     ctx.ellipse(-2.8 * clawScale, 0, 2.8 * clawScale, halfHw * 0.65, 0, 0, Math.PI * 2);
-    if (isTransformed) {
-      ctx.fillStyle = '#0E1322';
-      ctx.fill();
-      ctx.strokeStyle = '#D946EF';
-      ctx.lineWidth = 1.3;
-      ctx.stroke();
-    } else {
-      const capGrad = ctx.createLinearGradient(-5.0 * clawScale, -halfHw * 0.6, 0, halfHw * 0.6);
-      capGrad.addColorStop(0, '#FFFFFF');
-      capGrad.addColorStop(0.4, '#CBD5E1');
-      capGrad.addColorStop(1.0, '#475569');
-      ctx.fillStyle = capGrad;
-      ctx.fill();
-      ctx.strokeStyle = '#181C26';
-      ctx.lineWidth = 1.3;
-      ctx.stroke();
+    ctx.fillStyle = isTransformed ? '#0E1322' : '#CBD5E1';
+    ctx.fill();
+    ctx.strokeStyle = isTransformed ? '#D946EF' : '#181C26';
+    ctx.lineWidth = 1.3;
+    ctx.stroke();
 
-      ctx.beginPath();
-      ctx.ellipse(-3.5 * clawScale, -halfHw * 0.2, 1.0 * clawScale, halfHw * 0.35, -0.2, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-      ctx.fill();
-    }
-    ctx.restore();
-
-    // ── 2. BLADE HEEL STEPPED NOTCH & RICASSO ──
+    // 2. Blade Geometry Coordinates
     const neckTopY  = -halfHw * 0.35;
     const neckBotY  = halfHw * 0.35;
     const heelTopX  = 5.0 * clawScale;
@@ -1639,7 +1617,7 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     const midSpineY = b.topArchY - halfHw * 0.35;
     const midBellyY = b.topArchY + halfHw * 0.55;
 
-    // ── 3. UPPER SPINE FACET (Gleaming Polished Silver Bevel) ──
+    // 3. Upper Spine Facet (Gleaming Polished Silver)
     ctx.beginPath();
     ctx.moveTo(0, neckTopY);
     ctx.lineTo(heelTopX, heelTopY);
@@ -1647,20 +1625,10 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     ctx.quadraticCurveTo(blen * 0.50, b.topArchY, heelTopX, 0);
     ctx.lineTo(0, 0);
     ctx.closePath();
+    ctx.fillStyle = isTransformed ? '#2A1B3D' : '#F8FAFC';
+    ctx.fill();
 
-    if (isTransformed) {
-      ctx.fillStyle = '#2A1B3D';
-      ctx.fill();
-    } else {
-      const topGrad = ctx.createLinearGradient(0, heelTopY, 0, 0);
-      topGrad.addColorStop(0, '#FFFFFF');
-      topGrad.addColorStop(0.7, '#F1F5F9');
-      topGrad.addColorStop(1.0, '#E2E8F0');
-      ctx.fillStyle = topGrad;
-      ctx.fill();
-    }
-
-    // ── 4. LOWER UNDERSIDE FACET & STEPPED RICASSO NOTCH ──
+    // 4. Lower Underside Facet (Dark Steel Shadow)
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(heelTopX, 0);
@@ -1669,28 +1637,20 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     ctx.lineTo(notchInX, notchInY);
     ctx.lineTo(0, neckBotY);
     ctx.closePath();
+    ctx.fillStyle = isTransformed ? '#0E1322' : '#334155';
+    ctx.fill();
 
-    if (isTransformed) {
-      ctx.fillStyle = '#0E1322';
-      ctx.fill();
-    } else {
-      const botGrad = ctx.createLinearGradient(0, 0, 0, heelBotY);
-      botGrad.addColorStop(0, '#475569');
-      botGrad.addColorStop(0.4, '#1E293B');
-      botGrad.addColorStop(1.0, '#0F172A');
-      ctx.fillStyle = botGrad;
-      ctx.fill();
-
-      // Lower cutting edge razor highlight
+    // Lower cutting edge razor highlight
+    if (!isTransformed) {
       ctx.beginPath();
       ctx.moveTo(heelBotX, heelBotY);
       ctx.quadraticCurveTo(blen * 0.48, midBellyY, tipX, tipY);
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
       ctx.lineWidth = 0.9;
       ctx.stroke();
     }
 
-    // ── 5. HEAVY MANGA INK CONTOUR OUTLINE ──
+    // 5. Ink Outline
     ctx.beginPath();
     ctx.moveTo(0, neckTopY);
     ctx.lineTo(heelTopX, heelTopY);
@@ -1699,95 +1659,67 @@ export function drawMahitoClawWeapon(ctx, x = 0, y = 0, gunAngle = 0, r = 25, is
     ctx.lineTo(notchInX, notchInY);
     ctx.lineTo(0, neckBotY);
     ctx.closePath();
-
     ctx.strokeStyle = isTransformed ? '#D946EF' : '#181C26';
     ctx.lineWidth = isTransformed ? 1.4 : 1.2;
-    ctx.lineJoin = 'miter';
     ctx.stroke();
 
-    // ── Quadratic Bezier Curve Helper Functions for Exact Surface Point Alignment ──
-    const getSpinePt = (t) => {
-      const mt = 1 - t;
-      return {
-        x: mt * mt * heelTopX + 2 * mt * t * (blen * 0.45) + t * t * tipX,
-        y: mt * mt * heelTopY + 2 * mt * t * midSpineY + t * t * tipY
-      };
-    };
-
-    const getBellyPt = (t) => {
-      const mt = 1 - t;
-      return {
-        x: mt * mt * heelBotX + 2 * mt * t * (blen * 0.48) + t * t * tipX,
-        y: mt * mt * heelBotY + 2 * mt * t * midBellyY + t * t * tipY
-      };
-    };
-
-    const getCreasePt = (t) => {
-      const mt = 1 - t;
-      return {
-        x: mt * mt * heelTopX + 2 * mt * t * (blen * 0.50) + t * t * tipX,
-        y: mt * mt * 0 + 2 * mt * t * b.topArchY + t * t * tipY
-      };
-    };
-
     // Center Crease Dividing Line
-    const cEnd = getCreasePt(0.82);
     ctx.beginPath();
     ctx.moveTo(0, 0);
     ctx.lineTo(heelTopX, 0);
-    ctx.quadraticCurveTo(blen * 0.50, b.topArchY, cEnd.x, cEnd.y);
+    ctx.quadraticCurveTo(blen * 0.50, b.topArchY, blen * 0.82, b.topArchY * 0.82 + tipY * 0.18);
     ctx.strokeStyle = isTransformed ? '#F5D0FE' : '#94A3B8';
     ctx.lineWidth = 0.9;
     ctx.stroke();
 
-    // ── 6. CRIMSON RED DIPPED NEEDLE TIP ──
-    const tipStart = 0.80;
-    const ptTopTip = getSpinePt(tipStart);
-    const ptBotTip = getBellyPt(tipStart);
+    // 6. Crimson Dipped Tip
+    const tStart = 0.80;
+    const mtS = 1 - tStart;
+    const pTopTipX = mtS * mtS * heelTopX + 2 * mtS * tStart * (blen * 0.45) + tStart * tStart * tipX;
+    const pTopTipY = mtS * mtS * heelTopY + 2 * mtS * tStart * midSpineY + tStart * tStart * tipY;
+    const pBotTipX = mtS * mtS * heelBotX + 2 * mtS * tStart * (blen * 0.48) + tStart * tStart * tipX;
+    const pBotTipY = mtS * mtS * heelBotY + 2 * mtS * tStart * midBellyY + tStart * tStart * tipY;
 
     ctx.beginPath();
-    ctx.moveTo(ptTopTip.x, ptTopTip.y);
+    ctx.moveTo(pTopTipX, pTopTipY);
     ctx.lineTo(tipX, tipY);
-    ctx.lineTo(ptBotTip.x, ptBotTip.y);
+    ctx.lineTo(pBotTipX, pBotTipY);
     ctx.closePath();
-
-    if (isTransformed) {
-      ctx.fillStyle = '#F5D0FE';
-      ctx.fill();
-    } else {
-      ctx.fillStyle = '#DC2626';
-      ctx.fill();
+    ctx.fillStyle = isTransformed ? '#F5D0FE' : '#DC2626';
+    ctx.fill();
+    if (!isTransformed) {
       ctx.strokeStyle = '#991B1B';
       ctx.lineWidth = 0.9;
       ctx.stroke();
-    }
 
-    // ── 7. DUAL DIAGONAL CRIMSON ACCENT PINSTRIPES (//) ──
-    if (!isTransformed) {
-      const drawStripe = (startFrac, endFrac) => {
-        const pTop1 = getSpinePt(startFrac);
-        const pTop2 = getSpinePt(endFrac);
-        const pBot1 = getBellyPt(startFrac);
-        const pBot2 = getBellyPt(endFrac);
+      // 7. Dual Diagonal Crimson Accent Stripes
+      for (let s = 0; s < 2; s++) {
+        const s1 = s === 0 ? 0.58 : 0.66;
+        const s2 = s === 0 ? 0.63 : 0.71;
+        const mt1 = 1 - s1, mt2 = 1 - s2;
+        const pt1X = mt1 * mt1 * heelTopX + 2 * mt1 * s1 * (blen * 0.45) + s1 * s1 * tipX;
+        const pt1Y = mt1 * mt1 * heelTopY + 2 * mt1 * s1 * midSpineY + s1 * s1 * tipY;
+        const pt2X = mt2 * mt2 * heelTopX + 2 * mt2 * s2 * (blen * 0.45) + s2 * s2 * tipX;
+        const pt2Y = mt2 * mt2 * heelTopY + 2 * mt2 * s2 * midSpineY + s2 * s2 * tipY;
+
+        const pb1X = mt1 * mt1 * heelBotX + 2 * mt1 * s1 * (blen * 0.48) + s1 * s1 * tipX;
+        const pb1Y = mt1 * mt1 * heelBotY + 2 * mt1 * s1 * midBellyY + s1 * s1 * tipY;
+        const pb2X = mt2 * mt2 * heelBotX + 2 * mt2 * s2 * (blen * 0.48) + s2 * s2 * tipX;
+        const pb2Y = mt2 * mt2 * heelBotY + 2 * mt2 * s2 * midBellyY + s2 * s2 * tipY;
 
         ctx.beginPath();
-        ctx.moveTo(pTop1.x, pTop1.y);
-        ctx.lineTo(pTop2.x, pTop2.y);
-        ctx.lineTo(pBot2.x - 1.5 * clawScale, pBot2.y);
-        ctx.lineTo(pBot1.x - 1.5 * clawScale, pBot1.y);
+        ctx.moveTo(pt1X, pt1Y);
+        ctx.lineTo(pt2X, pt2Y);
+        ctx.lineTo(pb2X - 1.5 * clawScale, pb2Y);
+        ctx.lineTo(pb1X - 1.5 * clawScale, pb1Y);
         ctx.closePath();
         ctx.fillStyle = '#DC2626';
         ctx.fill();
-      };
-
-      drawStripe(0.58, 0.63);
-      drawStripe(0.66, 0.71);
+      }
     }
 
     ctx.restore();
-  });
-
-  ctx.restore();
+  }
 }
 
 /**
@@ -1857,7 +1789,13 @@ export function drawMahitoMaceCannon(ctx, fighter) {
       ctx.lineTo(0, halfW);             // bottom edge
       ctx.closePath();
 
-      if (spk.isTransformed) {
+      if (spk.isFrozenByInfinity) {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)';
+        ctx.lineWidth = 1.4;
+        ctx.stroke();
+      } else if (spk.isTransformed) {
         ctx.fillStyle = '#0E1322';
         ctx.fill();
         ctx.strokeStyle = '#D946EF';
@@ -1872,11 +1810,7 @@ export function drawMahitoMaceCannon(ctx, fighter) {
         ctx.lineWidth = 1.0;
         ctx.stroke();
       } else {
-        const spkGrad = ctx.createLinearGradient(0, -halfW, 0, halfW);
-        spkGrad.addColorStop(0, '#FFFFFF');
-        spkGrad.addColorStop(0.5, '#CBD5E1');
-        spkGrad.addColorStop(1.0, '#1E293B');
-        ctx.fillStyle = spkGrad;
+        ctx.fillStyle = '#CBD5E1';
         ctx.fill();
         ctx.strokeStyle = '#181C26';
         ctx.lineWidth = 1.3;
@@ -1908,10 +1842,10 @@ export function drawMahitoMaceCannon(ctx, fighter) {
 
   const nodes = data.steppedNodes || data.armNodes;
   if (distToTip > 2.0) {
-    const stretchPoints = [];
+    _maceSplinePoints.length = 0;
 
     if (nodes && nodes.length >= 2) {
-      const numSamples = 28;
+      const numSamples = 12;
       for (let s = 0; s <= numSamples; s++) {
         const pct = s / numSamples;
         const floatIdx = pct * (nodes.length - 1);
@@ -1919,7 +1853,6 @@ export function drawMahitoMaceCannon(ctx, fighter) {
         const i1 = Math.min(nodes.length - 1, i0 + 1);
         const t = floatIdx - i0;
 
-        // Smooth Catmull-Rom cubic spline through loose trailing thread nodes
         const p0 = nodes[Math.max(0, i0 - 1)];
         const p1 = nodes[i0];
         const p2 = nodes[i1];
@@ -1932,7 +1865,6 @@ export function drawMahitoMaceCannon(ctx, fighter) {
         const py = 0.5 * ((2 * p1.y) + (-p0.y + p2.y) * t + (2 * p0.y - 5 * p1.y + 4 * p2.y - p3.y) * t2 + (-p0.y + 3 * p1.y - 3 * p2.y + p3.y) * t3);
 
         let thick = baseThick;
-        // Smooth flaring as the arm approaches the expanding head
         if (pct > 0.50 && mProg > 0.15) {
           const flareP = (pct - 0.50) / 0.50;
           const targetNeckThick = currentHeadR * 0.90;
@@ -1941,16 +1873,15 @@ export function drawMahitoMaceCannon(ctx, fighter) {
           thick = baseThick * (1.0 - 0.08 * pct);
         }
 
-        stretchPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
+        _maceSplinePoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
       }
     } else {
-      // Direct connection fallback
-      stretchPoints.push({ x: currentX, y: currentY, isUnderground: false, thickness: baseThick });
-      stretchPoints.push({ x: tipX, y: tipY, isUnderground: false, thickness: mProg > 0.15 ? currentHeadR * 0.90 : baseThick });
+      _maceSplinePoints.push({ x: currentX, y: currentY, isUnderground: false, thickness: baseThick });
+      _maceSplinePoints.push({ x: tipX, y: tipY, isUnderground: false, thickness: mProg > 0.15 ? currentHeadR * 0.90 : baseThick });
     }
 
-    if (stretchPoints.length >= 2) {
-      drawFleshLoop(ctx, stretchPoints, isTransformed, 1.0);
+    if (_maceSplinePoints.length >= 2) {
+      drawFleshLoop(ctx, _maceSplinePoints, isTransformed, 1.0, 2, data.isFrozenByInfinity);
     }
   }
 
@@ -2288,18 +2219,24 @@ export function drawMahitoMaceCannon(ctx, fighter) {
       }
     }
 
+    if (data.isFrozenByInfinity) {
+      ctx.save();
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
+      ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(0, 0, currentHeadR + 4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
     ctx.restore();
   }
 
   ctx.restore();
 }
 
-/**
-
-    if (rightPoints.length >= 2) {
-      drawFleshLoop(ctx, rightPoints, isTransformed, 1.0);
-    }
-  }
 /**
  * Renders a massive Gothic Grim Reaper Scythe Blade on Mahito's arm tip (Matching reference image).
  * - Aggressively arched convex back spine extending into a downward/inward hooked razor needle beak tip
@@ -2310,7 +2247,7 @@ export function drawMahitoMaceCannon(ctx, fighter) {
  * - Crimson dipped needle beak tip and diagonal blood stripes
  * - Patchwork surgical suture flesh collar socket
  */
-function drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, isMirrored) {
+function drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, isMirrored, isFrozenByInfinity = false) {
   const blen = 94 * scytheScale;
   const baseW = 18 * scytheScale; // Ultra-slim, razor-sharp crescent base width
 
@@ -2509,6 +2446,26 @@ function drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, isMirrored)
     drawStripe(0.64);
   }
 
+  if (isFrozenByInfinity) {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
+    ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(0, 13);
+    ctx.quadraticCurveTo(-9, 0, 0, -13);
+    ctx.lineTo(0, -baseW * 0.6);
+    ctx.bezierCurveTo(spineCtrlX1, spineCtrlY1, spineCtrlX2, spineCtrlY2, tipX, tipY);
+    ctx.bezierCurveTo(bellyCtrlX2, bellyCtrlY2, bellyCtrlX1, bellyCtrlY1, throatX + 11 * scytheScale, throatY + 3 * scytheScale);
+    ctx.lineTo(throatX + 5 * scytheScale, throatY + 9 * scytheScale);
+    ctx.lineTo(throatX, throatY);
+    ctx.lineTo(0, 13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
@@ -2567,8 +2524,8 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
     const leftNodes = data.steppedLeftNodes || data.leftNodes;
     const distToLeft = Math.hypot(data.leftTipX - leftOriginX, data.leftTipY - leftOriginY);
     if (distToLeft > 2.0 && leftNodes && leftNodes.length >= 2) {
-      const leftPoints = [];
-      const numSamples = 24;
+      _scissorLeftPoints.length = 0;
+      const numSamples = 10;
       for (let s = 0; s <= numSamples; s++) {
         const pct = s / numSamples;
         const floatIdx = pct * (leftNodes.length - 1);
@@ -2594,11 +2551,11 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
         } else {
           thick = baseThick * (1.0 - 0.08 * pct);
         }
-        leftPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
+        _scissorLeftPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
       }
 
-      if (leftPoints.length >= 2) {
-        drawFleshLoop(ctx, leftPoints, isTransformed, 1.0);
+      if (_scissorLeftPoints.length >= 2) {
+        drawFleshLoop(ctx, _scissorLeftPoints, isTransformed, 1.0, 2, data.isFrozenByInfinity);
       }
     }
   }
@@ -2608,8 +2565,8 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
     const rightNodes = data.steppedRightNodes || data.rightNodes;
     const distToRight = Math.hypot(data.rightTipX - rightOriginX, data.rightTipY - rightOriginY);
     if (distToRight > 2.0 && rightNodes && rightNodes.length >= 2) {
-      const rightPoints = [];
-      const numSamples = 24;
+      _scissorRightPoints.length = 0;
+      const numSamples = 10;
       for (let s = 0; s <= numSamples; s++) {
         const pct = s / numSamples;
         const floatIdx = pct * (rightNodes.length - 1);
@@ -2635,19 +2592,33 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
         } else {
           thick = baseThick * (1.0 - 0.08 * pct);
         }
-        rightPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
+        _scissorRightPoints.push({ x: px, y: py, isUnderground: false, thickness: thick });
       }
 
-      if (rightPoints.length >= 2) {
-        drawFleshLoop(ctx, rightPoints, isTransformed, 1.0);
+      if (_scissorRightPoints.length >= 2) {
+        drawFleshLoop(ctx, _scissorRightPoints, isTransformed, 1.0, 2, data.isFrozenByInfinity);
       }
     }
   }
 
   // 3. Draw Giant Left & Right Inward Hooked Grim Reaper Scythes at the Tips
   const morphProg = Math.min(1.15, data.morphProgress || 0.0);
-  const leftBaseAngle = Math.atan2(data.targetY - data.leftFlankY, data.targetX - data.leftFlankX);
-  const rightBaseAngle = Math.atan2(data.targetY - data.rightFlankY, data.targetX - data.rightFlankX);
+
+  // Compute blade aim angles:
+  // During non-crossing phases, aim from flank toward target.
+  // During crossing phases (clamp/flipHold/release), aim from current tip toward target
+  // to prevent sudden angle flips when arms cross past each other.
+  const isCrossing = data.phase === 'clamp' || data.phase === 'flipHold' || data.phase === 'release';
+
+  let leftBaseAngle, rightBaseAngle;
+  if (isCrossing) {
+    // Use the angle from the current tip toward the target — stays stable during crossing
+    leftBaseAngle = Math.atan2(data.targetY - data.leftTipY, data.targetX - data.leftTipX);
+    rightBaseAngle = Math.atan2(data.targetY - data.rightTipY, data.targetX - data.rightTipX);
+  } else {
+    leftBaseAngle = Math.atan2(data.targetY - data.leftFlankY, data.targetX - data.leftFlankX);
+    rightBaseAngle = Math.atan2(data.targetY - data.rightFlankY, data.targetX - data.rightFlankX);
+  }
 
   // When no blade has popped out yet (during launch & reachPause), draw flesh fists at the tips
   if (morphProg <= 0.05) {
@@ -2666,6 +2637,13 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
       if (!isTransformed) {
         drawSuture(ctx, -handRadius * 0.35, -handRadius * 0.5, -handRadius * 0.35, handRadius * 0.5, 2, 1.8, '#000000');
       }
+      if (data.isFrozenByInfinity) {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+      }
       ctx.restore();
     }
     if (drawRightArm) {
@@ -2682,6 +2660,13 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
       if (!isTransformed) {
         drawSuture(ctx, -handRadius * 0.35, -handRadius * 0.5, -handRadius * 0.35, handRadius * 0.5, 2, 1.8, '#000000');
       }
+      if (data.isFrozenByInfinity) {
+        ctx.fillStyle = 'rgba(0, 229, 255, 0.65)';
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(224, 255, 255, 0.95)';
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+      }
       ctx.restore();
     }
   } else {
@@ -2696,7 +2681,9 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
       clampP = 0.0;
     }
 
-    const leftMirrored = true;
+    // Lock mirror state: during crossing phases, do NOT flip the blade
+    // so the scythe maintains consistent visual orientation throughout the entire animation
+    const leftMirrored = isCrossing ? false : true;
     const rightMirrored = false;
 
     // Left Tip Scythe (Back Arm)
@@ -2716,7 +2703,7 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
       }
       ctx.translate(data.leftTipX, data.leftTipY);
       ctx.rotate(leftSwing);
-      drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, leftMirrored);
+      drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, leftMirrored, data.isFrozenByInfinity);
       ctx.restore();
     }
 
@@ -2737,7 +2724,7 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
       }
       ctx.translate(data.rightTipX, data.rightTipY);
       ctx.rotate(rightSwing);
-      drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, rightMirrored);
+      drawMahitoGrimReaperScythe(ctx, isTransformed, scytheScale, rightMirrored, data.isFrozenByInfinity);
       ctx.restore();
     }
   }
@@ -2763,3 +2750,146 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
   }
   ctx.restore();
 }
+
+/**
+ * Draws Mahito's Body Repel projectile (a grotesque consolidated mass of transfigured humans).
+ * Rendered using the Hybrid WebGL / PixiJS pipeline.
+ */
+export function drawMahitoBodyRepelProjectile(ctx, p) {
+  const r = p.r || 28;
+  const time = Date.now();
+
+  // 1. Draw trailing energy path using trajectory history
+  if (p.history && p.history.length > 1) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    for (let i = 1; i < p.history.length; i++) {
+      const pct = i / p.history.length;
+      const p0 = p.history[i - 1];
+      const p1 = p.history[i];
+      ctx.strokeStyle = `rgba(192, 38, 211, ${pct * 0.35})`; // Magenta theme
+      ctx.lineWidth = r * 1.5 * pct;
+      ctx.beginPath();
+      ctx.moveTo(p0.x, p0.y);
+      ctx.lineTo(p1.x, p1.y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 2. Draw consolidated flesh body at projectile position
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate((p.angle || 0) + (time * 0.003)); // Slowly rotate as it flies
+
+  // Sickly pale grey/blue flesh base
+  ctx.fillStyle = '#CBD5E1';
+  ctx.strokeStyle = '#181C26';
+  ctx.lineWidth = 2.0;
+
+  // Main mass
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Draw 4 smaller overlapping flesh lumps to make it look lumpy, distorted, and asymmetric
+  const lumps = [
+    { dx: -r * 0.4, dy: -r * 0.3, lr: r * 0.6 },
+    { dx: r * 0.5, dy: -r * 0.2, lr: r * 0.5 },
+    { dx: -r * 0.2, dy: r * 0.5, lr: r * 0.55 },
+    { dx: r * 0.3, dy: r * 0.4, lr: r * 0.65 }
+  ];
+
+  for (const lump of lumps) {
+    ctx.beginPath();
+    ctx.arc(lump.dx, lump.dy, lump.lr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // Draw stitching suture lines across the lumps
+  ctx.strokeStyle = '#181C26';
+  ctx.lineWidth = 1.5;
+  for (let i = 0; i < 3; i++) {
+    ctx.beginPath();
+    const startAngle = i * 2.0;
+    ctx.arc(0, 0, r * 0.75, startAngle, startAngle + 1.2);
+    ctx.stroke();
+    
+    // Draw cross hatches along the sutures
+    ctx.save();
+    ctx.lineWidth = 1.0;
+    for (let j = 0; j < 3; j++) {
+      const a = startAngle + 0.2 + j * 0.4;
+      const sx = Math.cos(a) * r * 0.75;
+      const sy = Math.sin(a) * r * 0.75;
+      ctx.beginPath();
+      ctx.moveTo(sx - 3, sy - 3); ctx.lineTo(sx + 3, sy + 3);
+      ctx.moveTo(sx + 3, sy - 3); ctx.lineTo(sx - 3, sy + 3);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Draw grotesque faces embedded in the body mass
+  // Face 1 (Left-top): Empty hollow eyes, gaping mouth
+  ctx.save();
+  ctx.translate(-r * 0.3, -r * 0.35);
+  ctx.fillStyle = '#0F172A'; // Slate-900 hollow black
+  ctx.beginPath();
+  ctx.arc(-4, -3, 2, 0, Math.PI * 2);
+  ctx.arc(4, -3, 2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(0, 3, 3, 5, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.restore();
+
+  // Face 2 (Right-bottom): Mismatched red eye, stitch mouth
+  ctx.save();
+  ctx.translate(r * 0.3, r * 0.35);
+  ctx.fillStyle = '#DC2626'; // Red pupil
+  ctx.beginPath();
+  ctx.arc(3, -2, 2.5, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#181C26';
+  ctx.lineWidth = 1.2;
+  ctx.beginPath();
+  ctx.moveTo(-5, 4); ctx.lineTo(5, 2);
+  ctx.stroke();
+  ctx.restore();
+
+  // Face 3 (Center): Screaming mouth
+  ctx.save();
+  ctx.translate(0, -r * 0.1);
+  ctx.fillStyle = '#0F172A';
+  ctx.beginPath();
+  ctx.ellipse(0, 4, 4, 7, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 1.0;
+  // Jagged upper teeth
+  ctx.beginPath();
+  ctx.moveTo(-3, 1); ctx.lineTo(-2, 3); ctx.lineTo(-1, 1); ctx.lineTo(0, 3); ctx.lineTo(1, 1); ctx.lineTo(2, 3); ctx.lineTo(3, 1);
+  ctx.stroke();
+  ctx.restore();
+
+  // 3. Pulsating Cursed Energy Aura
+  const pulse = 1.0 + Math.sin(time * 0.01) * 0.08;
+  ctx.strokeStyle = 'rgba(192, 38, 211, 0.45)'; // Magenta theme color
+  ctx.lineWidth = 3.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.15 * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(217, 70, 239, 0.2)'; // Light pink border
+  ctx.lineWidth = 5.0;
+  ctx.beginPath();
+  ctx.arc(0, 0, r * 1.25 * pulse, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.restore();
+}
+

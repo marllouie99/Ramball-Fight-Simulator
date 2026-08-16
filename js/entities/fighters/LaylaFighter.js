@@ -420,6 +420,7 @@ export class LaylaFighter extends Fighter {
         // Apply damage
         const hits = this.getBeamHitFighters(allTargets);
         for (const target of hits) {
+          target.caughtInLaylaBeamTimer = 20;
           const dmg = CONFIG.layla.ultimateLaserDamage || 80;
           if (typeof target.takeDamage === 'function') {
             target.takeDamage(dmg, this);

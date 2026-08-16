@@ -3,6 +3,7 @@ import { state, getProjectiles } from '../../core/state.js';
 import { updateEntityVisualScale } from './EntityRenderer.js';
 import { drawSukunaFurnaceArrow, drawSukunaSlash, drawSukunaCleave, drawGhostBlade, drawDivineFlameArrowConstruct } from '../weapons/sukunaWeaponGraphics.js';
 import { drawGojoPurpleOrb, drawLaylaBomb, drawLaylaCosmicBlast, drawLaylaBasicBullet, drawLaylaUltimateBullet, drawLaylaVoidProjectile } from './projectileRenderer.js';
+import { drawMahitoBodyRepelProjectile } from '../weapons/mahitoWeaponGraphics.js';
 
 const activeSprites = new Map();
 const canvasPool = [];
@@ -45,11 +46,12 @@ export function updateHybridProjectiles() {
     const isGojoProj = (p.visual === 'gojoBlue' || p.isGojoPurple || p.isGojoPurpleOrb || p.behaviorType === 'gojo_purple');
     const isSukunaSlashProj = (p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'ghostBlade');
     const isLaylaProj = (p.visual === 'layla_bomb' || p.visual === 'layla_cosmic_blast' || p.visual === 'layla_basic_bullet' || p.visual === 'layla_ultimate_bullet' || p.visual === 'layla_void_projectile');
+    const isMahitoProj = (p.visual === 'mahito_body_repel' || p.isMahitoBodyRepel);
     
     // OPTIMIZATION: Sukuna's slashes are high-frequency transient effects.
     // Routing them through WebGL requires updating their textures every frame, stalling the GPU.
     // We bypass WebGL and render them directly in Canvas 2D.
-    if (!isFuga && !isGojoProj && !isLaylaProj) continue;
+    if (!isFuga && !isGojoProj && !isLaylaProj && !isMahitoProj) continue;
     currentIds.add(p.id);
     
     let hybridData = activeSprites.get(p.id);
@@ -75,6 +77,10 @@ export function updateHybridProjectiles() {
         if (p.visual === 'layla_cosmic_blast') { size = 256; drawScale = 256 / 400; }
         else if (p.visual === 'layla_ultimate_bullet') { size = 256; drawScale = 256 / 384; }
         else { size = 128; drawScale = 128 / 256; }
+      }
+      else if (isMahitoProj) {
+        size = 256;
+        drawScale = 1.0;
       }
       
       hybridData = getLocalCanvas(size);
@@ -113,6 +119,9 @@ export function updateHybridProjectiles() {
       else if (p.visual === 'layla_basic_bullet') drawLaylaBasicBullet(ctx, p);
       else if (p.visual === 'layla_ultimate_bullet') drawLaylaUltimateBullet(ctx, p);
       else if (p.visual === 'layla_void_projectile') drawLaylaVoidProjectile(ctx, p);
+    } else if (isMahitoProj) {
+      sprite.blendMode = window.PIXI.BLEND_MODES.NORMAL;
+      drawMahitoBodyRepelProjectile(ctx, p);
     }
     
     ctx.restore();

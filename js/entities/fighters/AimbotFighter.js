@@ -64,6 +64,7 @@ export class AimbotFighter extends Fighter {
 
   /** Override shoot to spawn projectiles at the custom gun tip */
   shoot(ownerIndex) {
+    if (this.isCaughtInBeam()) return;
     if (projectileSystem) {
       const customTipDist = this.r + CONFIG.gun.baseOffset + 24;
       const customSpawnX = this.x + Math.cos(this.gunAngle) * customTipDist;

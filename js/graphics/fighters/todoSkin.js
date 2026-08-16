@@ -546,8 +546,8 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
     ctx.fill();
   }
 
-  // 2. Animated JJK Flame Tendrils (Rising & Waving Cyan CE Flames around Todo's body)
-  const flameCount = 7;
+  // 2. Animated JJK Flame Tendrils (OPTIMIZED: reduced count 7->5, segments 8->5, flat fill instead of per-flame gradient)
+  const flameCount = 5;
   for (let i = 0; i < flameCount; i++) {
     const baseAngle = (Math.PI * 2 / flameCount) * i;
     const rotation = time * 0.003;
@@ -559,16 +559,13 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
     const flameLength = r * (0.75 + Math.sin(time * 0.01 + i * 1.2) * 0.25);
     const flameWidth = r * 0.32;
 
-    const flameGrad = ctx.createLinearGradient(r * 0.7, 0, r * 0.7 + flameLength, 0);
-    flameGrad.addColorStop(0, 'rgba(0, 240, 255, 0.40)');
-    flameGrad.addColorStop(0.4, 'rgba(0, 160, 255, 0.30)');
-    flameGrad.addColorStop(0.8, 'rgba(0, 90, 255, 0.14)');
-    flameGrad.addColorStop(1, 'rgba(0, 40, 180, 0)');
+    // OPTIMIZED: Use flat semi-transparent fill instead of creating a new LinearGradient per flame
+    ctx.fillStyle = 'rgba(0, 200, 255, 0.28)';
 
     ctx.beginPath();
     ctx.moveTo(r * 0.7, 0);
 
-    const segments = 8;
+    const segments = 5;
     for (let j = 0; j <= segments; j++) {
       const t = j / segments;
       const x = r * 0.7 + flameLength * t;
@@ -585,16 +582,15 @@ function drawTodoCursedEnergyAura(ctx, fighter) {
       ctx.lineTo(x, waveOffset + width * 0.5);
     }
 
-    ctx.fillStyle = flameGrad;
     ctx.fill();
     ctx.restore();
   }
 
-  // 3. Electric Cursed Energy Arcs / Rays
+  // 3. Electric Cursed Energy Arcs / Rays (OPTIMIZED: reduced 4->3)
   ctx.strokeStyle = 'rgba(0, 240, 255, 0.40)';
   ctx.lineWidth = 1.8;
-  for (let i = 0; i < 4; i++) {
-    const sparkAngle = (Math.PI / 2) * i + (time * 0.007);
+  for (let i = 0; i < 3; i++) {
+    const sparkAngle = (Math.PI * 2 / 3) * i + (time * 0.007);
     const startR = r * 1.0;
     const endR = r * (1.3 + Math.sin(time * 0.01 + i) * 0.2);
 

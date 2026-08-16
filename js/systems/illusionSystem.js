@@ -1,10 +1,13 @@
-import { state, spawnFloatingText, isChampionScreenActive } from '../core/state.js';
+import { state, spawnFloatingText, isChampionScreenActive, triggerGlobalScreenShake } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { spawnIllusionSpawn } from '../graphics/particles/illusionSpawnEffect.js';
 import { spatialGrid } from './physics.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
-import { triggerMahitoParalyzeExplosion } from '../entities/fighters/mahito/mahitoCombat.js';
+import { triggerMahitoParalyzeExplosion, applySoulDisfigurementStack } from '../entities/fighters/mahito/mahitoCombat.js';
+import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
+import { spawnMahitoSoulExplosion } from '../graphics/particles/sparkEffect.js';
+import { audioSystem } from './audioSystem.js';
 
 // Minimum HP an illusion must have had to be eligible for splitting on death.
 // Low threshold — even weak illusions should split as long as children get > 0 HP.
@@ -15,9 +18,111 @@ const ILLUSION_SPLIT_MIN_HP = 2;
  */
 export function updateIllusions() {
   if (state.gameState !== 'playing' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
+  const arena = state.arena;
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
+
+    // Transfigured Human expanding death animation & explosion
+    if (illusion.isDying) {
+      illusion.deathTimer--;
+      illusion.vx = 0;
+      illusion.vy = 0;
+      if (illusion.knockbackVx !== undefined) {
+        illusion.knockbackVx = 0;
+        illusion.knockbackVy = 0;
+      }
+      
+      const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
+      const multCfg = mahitoCfg.soulMultiplicity || {};
+      const maxScale = multCfg.minionExpandMaxScale ?? 2.2;
+      const deathDur = multCfg.minionDeathDuration ?? 20;
+
+      const progress = 1.0 - (illusion.deathTimer / (illusion.maxDeathTimer || deathDur));
+      // Explode visually by swelling up to maxScale
+      illusion.visualScale = 1.0 + progress * (maxScale - 1.0);
+      illusion.visualScaleTarget = illusion.visualScale;
+
+      if (illusion.deathTimer <= 0) {
+        if (typeof spawnMahitoSoulExplosion === 'function') {
+          spawnMahitoSoulExplosion(illusion.x, illusion.y, illusion.r * 1.8);
+        }
+        // Spawn burst of red blood particles (optimized to 30 to prevent FPS drop)
+        if (typeof spawnBloodEffect === 'function') {
+          spawnBloodEffect({ x: illusion.x, y: illusion.y, r: illusion.r, color: '#e60000' }, 30);
+        }
+
+        // Apply AOE damage and knockback to all valid enemies (Rule #6 compliant)
+        const explosionRadius = multCfg.minionExplosionRadius || 100;
+        const explosionDamage = multCfg.minionExplosionDamage || 24;
+        const explosionKnockback = multCfg.minionExplosionKnockback || 12;
+        const owner = illusion.owner;
+        const ownerStateIdx = owner ? state.fighters.indexOf(owner) : -1;
+        const myTeam = owner ? (typeof state.getFighterTeam === 'function' ? state.getFighterTeam(ownerStateIdx) : owner.team) : null;
+
+        // Iterate fighters and illusions without allocating a merged copy
+        const _fighters = state.fighters;
+        const _illusions = state.illusions;
+        const _candidateCount = _fighters.length + _illusions.length;
+        for (let ci = 0; ci < _candidateCount; ci++) {
+          const target = ci < _fighters.length ? _fighters[ci] : _illusions[ci - _fighters.length];
+          if (!target || target === illusion || target === owner || target.hp <= 0 || target.isDead) continue;
+          
+          // Team check to make sure we don't hurt teammates or ourselves
+          if (myTeam !== null) {
+            let targetTeam;
+            if (target.isIllusion) {
+              // Illusion — derive team from its owner
+              targetTeam = target.owner ? (typeof state.getFighterTeam === 'function' ? state.getFighterTeam(state.fighters.indexOf(target.owner)) : target.owner.team) : null;
+            } else {
+              // Fighter — use loop index directly (ci < _fighters.length)
+              targetTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ci) : target.team;
+            }
+            if (targetTeam === myTeam) continue;
+          }
+
+          const dist = Math.hypot(target.x - illusion.x, target.y - illusion.y);
+          if (dist <= target.r + explosionRadius) {
+            if (typeof applyDamageToTarget === 'function') {
+              applyDamageToTarget(target, explosionDamage, owner, { isSkill: true });
+            } else if (typeof target.takeDamage === 'function') {
+              target.takeDamage(explosionDamage, owner, { isSkill: true });
+            }
+
+            const angle = Math.atan2(target.y - illusion.y, target.x - illusion.x);
+            const kbX = Math.cos(angle) * explosionKnockback;
+            const kbY = Math.sin(angle) * explosionKnockback;
+            if (typeof target.applyKnockback === 'function') {
+              target.applyKnockback(kbX, kbY);
+            } else {
+              target.vx = (target.vx || 0) + kbX;
+              target.vy = (target.vy || 0) + kbY;
+            }
+
+            if (typeof target.applyHitStun === 'function') {
+              target.applyHitStun(8);
+            }
+
+            // Apply +1 stack of Soul Disfigurement (JJK Idle Transfiguration mechanic)
+            if (typeof applySoulDisfigurementStack === 'function' && owner) {
+              applySoulDisfigurementStack(target, owner);
+            }
+          }
+        }
+
+        // Screen Shake & SFX
+        if (typeof triggerGlobalScreenShake === 'function') {
+          triggerGlobalScreenShake(6, 12);
+        }
+
+        // Play soul explosion sound
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX(mahitoCfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', mahitoCfg.sounds?.minionExplosionVolume ?? 1.8);
+        }
+        state.illusions.splice(i, 1);
+      }
+      continue;
+    }
 
     // Always decrement hit flash even if dying, so they don't get stuck white
     if (illusion.hitFlashTimer > 0) {
@@ -27,6 +132,19 @@ export function updateIllusions() {
     // Illusions only disappear when they die (HP <= 0), not by duration
     if (illusion.hp <= 0) {
       if (illusion.isRika) continue; // Rika handles her own death animation
+      
+      if (illusion.isTransfiguredHuman && !illusion.isDying) {
+        const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
+        const multCfg = mahitoCfg.soulMultiplicity || {};
+        const deathDur = multCfg.minionDeathDuration ?? 20;
+
+        illusion.isDying = true;
+        illusion.deathTimer = deathDur;
+        illusion.maxDeathTimer = deathDur;
+        illusion.hp = 0; // lock hp to 0
+        continue; // Wait for expansion to finish before deleting/splitting
+      }
+
       spawnIllusionDeath(illusion); // Spawn ethereal death effect
 
       // ── SPLIT ON DEATH MECHANIC (Doppelganger Illusions only) ──
@@ -71,6 +189,7 @@ export function updateIllusions() {
             moveSpeed: ownerSpeed,
             isIllusion: true,
             isDoppelganger: true,   // keeps team/targeting logic working
+            isTransfiguredHuman: illusion.isTransfiguredHuman === true,
             isSplitChild: true,     // children do NOT split again
             hitFlashTimer: 0,
             timeStopTimer: 0,
@@ -121,6 +240,16 @@ export function updateIllusions() {
       continue;
     }
 
+    // Process knockback displacement on illusions
+    if (illusion.knockbackVx !== undefined && (Math.abs(illusion.knockbackVx) > 0.1 || Math.abs(illusion.knockbackVy) > 0.1)) {
+      illusion.x += illusion.knockbackVx;
+      illusion.y += illusion.knockbackVy;
+      illusion.knockbackVx *= 0.88;
+      illusion.knockbackVy *= 0.88;
+      if (Math.abs(illusion.knockbackVx) <= 0.1) illusion.knockbackVx = 0;
+      if (Math.abs(illusion.knockbackVy) <= 0.1) illusion.knockbackVy = 0;
+    }
+
     // MANDATORY RULE 1: TimeStop & HitStun Freeze Guard
     if (illusion.timeStopTimer > 0) {
       illusion.timeStopTimer--;
@@ -145,6 +274,57 @@ export function updateIllusions() {
       if ((dx * dx + dy * dy) <= radius * radius) {
         insideSphere = true;
         break;
+      }
+    }
+
+    // Fetch arena, spatial grid and nearest targets early for steering/attacks
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    const nearbyEntities = spatialGrid.getNearby(illusion.x, illusion.y, illusion.r * 2 + 100);
+    let nearestTarget = null;
+    // Cache owner's team index once for this illusion's entire update tick
+    const _isTeamMode = (state.mode === '2v2' || state.mode === '1v2 Stand Off');
+    const _ownerStateIdx = (_isTeamMode && illusion.owner) ? state.fighters.indexOf(illusion.owner) : -1;
+    const _ownerTeam = _ownerStateIdx >= 0 ? state.getFighterTeam(_ownerStateIdx) : null;
+    if (!insideSphere) {
+      let nearestDist = Infinity;
+      const isTargetValid = (entity) => {
+        if (!entity || !entity.hp || entity.hp <= 0) return false;
+        if (entity === illusion) return false;
+        
+        const targetOwner = entity.isIllusion ? entity.owner : entity;
+        if (!targetOwner || targetOwner === illusion.owner) return false;
+        
+        if (_isTeamMode && illusion.owner) {
+          const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
+          if (entityTeam !== null && entityTeam === _ownerTeam) return false;
+        }
+        return true;
+      };
+
+      for (const entity of nearbyEntities) {
+        if (!isTargetValid(entity)) continue;
+        const dx = entity.x - illusion.x;
+        const dy = entity.y - illusion.y;
+        const dSq = dx * dx + dy * dy;
+        if (dSq < nearestDist) {
+          nearestDist = dSq;
+          nearestTarget = entity;
+        }
+      }
+      if (!nearestTarget) {
+        for (const fighter of state.fighters) {
+          if (!isTargetValid(fighter)) continue;
+          const dx = fighter.x - illusion.x;
+          const dy = fighter.y - illusion.y;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < nearestDist) {
+            nearestDist = dSq;
+            nearestTarget = fighter;
+          }
+        }
+      }
+      if (nearestTarget) {
+        illusion.gunAngle = Math.atan2(nearestTarget.y - illusion.y, nearestTarget.x - illusion.x);
       }
     }
 
@@ -206,6 +386,41 @@ export function updateIllusions() {
         }
       }
 
+      if (illusion.isEvasionMinion) {
+        illusion.swordCooldown = 9999;
+        if (illusion.evasionBounceTimer > 0) {
+          illusion.evasionBounceTimer--;
+        } else if (nearestTarget) {
+          const dx = illusion.x - nearestTarget.x;
+          const dy = illusion.y - nearestTarget.y;
+
+          // Wall avoidance force
+          const pad = 50;
+          let avoidX = 0;
+          let avoidY = 0;
+          if (arena) {
+            if (illusion.x - illusion.r - arena.x < pad) avoidX = 1.2;
+            else if (arena.x + arena.width - (illusion.x + illusion.r) < pad) avoidX = -1.2;
+            if (illusion.y - illusion.r - arena.y < pad) avoidY = 1.2;
+            else if (arena.y + arena.height - (illusion.y + illusion.r) < pad) avoidY = -1.2;
+          }
+
+          const fleeAngle = Math.atan2(dy, dx);
+          let targetAngle = fleeAngle;
+          if (avoidX !== 0 || avoidY !== 0) {
+            const avoidAngle = Math.atan2(avoidY, avoidX);
+            targetAngle = fleeAngle * 0.4 + avoidAngle * 0.6;
+          }
+
+          const finalAngle = targetAngle + (Math.random() * 0.3 - 0.15);
+          const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null) || illusion.moveSpeed || 5.8;
+          illusion.vx = Math.cos(finalAngle) * targetSpeed;
+          illusion.vy = Math.sin(finalAngle) * targetSpeed;
+          illusion.angle = finalAngle;
+          illusion.gunAngle = finalAngle;
+        }
+      }
+
       // Normalize speed every frame to match owner's movement speed
       const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
       let targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
@@ -221,8 +436,7 @@ export function updateIllusions() {
       }
     }
 
-    // OPTIMIZED: Use spatial grid for collision detection
-    const nearbyEntities = spatialGrid.getNearby(illusion.x, illusion.y, illusion.r * 2 + 50);
+    // Spatial grid was fetched early
 
     // Check collision with fighters and bump them
     for (const entity of nearbyEntities) {
@@ -296,71 +510,25 @@ export function updateIllusions() {
     }
 
     // Wall bounce for illusions - auto-lock onto nearest target upon bounce
-    const arena = CONFIG.arena;
-    let bounced = false;
+    let bouncedX = false;
+    let bouncedY = false;
 
     if (illusion.x - illusion.r < arena.x) {
       illusion.x = arena.x + illusion.r;
-      bounced = true;
+      bouncedX = true;
     } else if (illusion.x + illusion.r > arena.x + arena.width) {
       illusion.x = arena.x + arena.width - illusion.r;
-      bounced = true;
+      bouncedX = true;
     }
     if (illusion.y - illusion.r < arena.y) {
       illusion.y = arena.y + illusion.r;
-      bounced = true;
+      bouncedY = true;
     } else if (illusion.y + illusion.r > arena.y + arena.height) {
       illusion.y = arena.y + arena.height - illusion.r;
-      bounced = true;
+      bouncedY = true;
     }
 
-    // Auto-aim at nearest target (excluding owner) - only if not frozen in sphere
-    let nearestTarget = null;
-    if (!insideSphere) {
-      let nearestDist = Infinity;
-      const isTargetValid = (entity) => {
-        if (!entity || !entity.hp || entity.hp <= 0) return false;
-        if (entity === illusion) return false;
-        
-        const targetOwner = entity.isIllusion ? entity.owner : entity;
-        if (!targetOwner || targetOwner === illusion.owner) return false;
-        
-        if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner) {
-          const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
-          const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
-          if (entityTeam !== null && entityTeam === ownerTeam) return false;
-        }
-        return true;
-      };
-
-      // OPTIMIZED: Only check nearby fighters instead of all fighters
-      for (const entity of nearbyEntities) {
-        if (!isTargetValid(entity)) continue;
-        const dx = entity.x - illusion.x;
-        const dy = entity.y - illusion.y;
-        const dSq = dx * dx + dy * dy;
-        if (dSq < nearestDist) {
-          nearestDist = dSq;
-          nearestTarget = entity;
-        }
-      }
-      // Fallback: if no nearby targets, check all fighters
-      if (!nearestTarget) {
-        for (const fighter of state.fighters) {
-          if (!isTargetValid(fighter)) continue;
-          const dx = fighter.x - illusion.x;
-          const dy = fighter.y - illusion.y;
-          const dSq = dx * dx + dy * dy;
-          if (dSq < nearestDist) {
-            nearestDist = dSq;
-            nearestTarget = fighter;
-          }
-        }
-      }
-      if (nearestTarget) {
-        illusion.gunAngle = Math.atan2(nearestTarget.y - illusion.y, nearestTarget.x - illusion.x);
-      }
-    }
+    const bounced = bouncedX || bouncedY;
 
     // If bounded, steer directly towards the nearest target (unless target is Gojo with active Infinity)
     if (bounced) {
@@ -370,7 +538,24 @@ export function updateIllusions() {
         !nearestTarget.isMeleeMode &&
         ((nearestTarget.infinityCooldown || 0) <= 0 || nearestTarget.infinityActive);
 
-      if (nearestTarget && !insideSphere && !isGojoInfinity) {
+      if (illusion.isEvasionMinion) {
+        // Natural bounce — reverse velocity along hit axis
+        if (bouncedX) illusion.vx = -illusion.vx;
+        if (bouncedY) illusion.vy = -illusion.vy;
+        
+        // Jitter bounce angle slightly if we get stuck or to make movement organic
+        if (Math.abs(illusion.vx) < 0.1 && Math.abs(illusion.vy) < 0.1) {
+          const randAngle = Math.random() * Math.PI * 2;
+          illusion.vx = Math.cos(randAngle) * targetSpeed;
+          illusion.vy = Math.sin(randAngle) * targetSpeed;
+        } else {
+          const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
+          const scale = targetSpeed / (speedSq > 0 ? Math.sqrt(speedSq) : 1);
+          illusion.vx *= scale;
+          illusion.vy *= scale;
+        }
+        illusion.evasionBounceTimer = 18; // Let natural bounce travel out
+      } else if (nearestTarget && !insideSphere && !isGojoInfinity) {
         const dx = nearestTarget.x - illusion.x;
         const dy = nearestTarget.y - illusion.y;
         const dSq = dx * dx + dy * dy;
@@ -378,11 +563,13 @@ export function updateIllusions() {
         illusion.vx = dx * scale;
         illusion.vy = dy * scale;
       } else {
-        // Natural bounce — reverse velocity along the wall axis
+        // Natural bounce — reverse velocity along the hit wall axis
+        if (bouncedX) illusion.vx = -illusion.vx;
+        if (bouncedY) illusion.vy = -illusion.vy;
         const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
         const scale = targetSpeed / (speedSq > 0 ? Math.sqrt(speedSq) : 1);
-        illusion.vx = -illusion.vx * scale;
-        illusion.vy = -illusion.vy * scale;
+        illusion.vx *= scale;
+        illusion.vy *= scale;
       }
     }
 
@@ -402,7 +589,10 @@ export function updateIllusions() {
     // Skip attack if frozen inside Cronos sphere
     if (insideSphere) continue;
 
-    // Try to attack nearby fighters (independent targeting, not following owner)
+
+
+    // Try to attack nearby fighters (independent targeting, not following owner) (Bypassed for evasion clones)
+    if (illusion.isEvasionMinion) continue;
     for (const entity of nearbyEntities) {
       if (!entity || !entity.hp || entity.hp <= 0) continue;
       if (entity === illusion) continue;
@@ -410,10 +600,9 @@ export function updateIllusions() {
       const targetOwner = entity.isIllusion ? entity.owner : entity;
       if (!targetOwner || targetOwner === illusion.owner) continue;
 
-      if ((state.mode === '2v2' || state.mode === '1v2 Stand Off') && illusion.owner) {
+      if (_isTeamMode && illusion.owner) {
         const entityTeam = state.getFighterTeam(state.fighters.indexOf(targetOwner));
-        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(illusion.owner));
-        if (entityTeam !== null && entityTeam === ownerTeam) continue;
+        if (entityTeam !== null && entityTeam === _ownerTeam) continue;
       }
       if (entity.invincibilityTimer > 0 || entity.flashStepTimer > 0 || (entity.vanishTimer && entity.vanishTimer > 0)) continue;
 
@@ -427,7 +616,9 @@ export function updateIllusions() {
         illusion.swordSwingTimer = CONFIG.doppleganger.swordSwingDuration;
         illusion.swordCooldown = CONFIG.doppleganger.swordCooldown;
         entity.takeDamage(illusion.damage, illusion.owner || illusion, { isMelee: true });
-        spawnFloatingText(entity.x, entity.y - entity.r - 5, 'ILLUSION SLASH!', '#9b59b6');
+        if (!illusion.isTransfiguredHuman) {
+          spawnFloatingText(entity.x, entity.y - entity.r - 5, 'ILLUSION SLASH!', '#9b59b6');
+        }
         break;
       }
     }

@@ -87,11 +87,12 @@ export class ParticleSystem {
     if (!state.sparkEffects) state.sparkEffects = [];
 
     const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+    const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
     const isDomainClash = state && state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
     
     const dynamicQuality = this.getDynamicQuality(isDomainClash);
-    const MAX_PARTICLES = isDomainClash ? 30 : Math.floor((isMulti ? 100 : 200) * dynamicQuality);
-    const adjustedCount = Math.max(1, Math.floor(count * (isDomainClash ? 0.3 : dynamicQuality)));
+    const MAX_PARTICLES = isDomainClash ? 30 : is1v2 ? 45 : Math.floor((isMulti ? 100 : 200) * dynamicQuality);
+    const adjustedCount = Math.max(1, Math.floor(count * (isDomainClash ? 0.3 : is1v2 ? 0.45 * dynamicQuality : dynamicQuality)));
 
     const generator = ParticleRegistry[type] || ParticleRegistry['default'];
 

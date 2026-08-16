@@ -74,11 +74,12 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
   if (!state.bloodEffects) state.bloodEffects = [];
   const isFFA = state && state.mode === GAME_MODES.FFA;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
 
   const qualityMultiplier = state.qualityLevel || 1.0;
-  let MAX_BLOOD_PARTICLES = Math.floor((isFFA ? 30 : isMulti ? 60 : 100) * qualityMultiplier);
+  let MAX_BLOOD_PARTICLES = Math.floor((is1v2 ? 30 : isFFA ? 30 : isMulti ? 60 : 100) * qualityMultiplier);
 
-  const baseParticleCount = Math.max(2, Math.floor(amount / (isFFA ? 6 : 3)));
+  const baseParticleCount = Math.max(2, Math.floor(amount / (is1v2 ? 6 : isFFA ? 6 : 3)));
   const particleCount = Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
 
   let color = fighter.color || '#e60000';

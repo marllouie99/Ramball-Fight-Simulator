@@ -10,7 +10,7 @@ import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
-import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch } from '../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch, spawnMahitoSoulExplosion } from '../graphics/particles/sparkEffect.js';
 import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
 
@@ -103,6 +103,8 @@ class ProjectileSystem {
     proj.visual = null;
     proj.explosionType = null;
     proj._detonated = false; // CRITICAL: Clear detonation flag so pool slots don't carry over to new projectiles
+    proj.isMahitoBodyRepel = false;
+    proj.ownerFighter = null;
     proj.isVoid = false;
     
     if (proj.soundKey) {
@@ -976,7 +978,7 @@ class ProjectileSystem {
                 fighter.applyBurn(attacker);
               }
             }
-            if (typeof attacker.onDamageDealt === 'function') {
+            if (attacker && typeof attacker.onDamageDealt === 'function') {
               attacker.onDamageDealt(fighter, projectile, projectile.owner);
             }
             if (projectile.visual === 'EngineerBullet') {
@@ -1282,6 +1284,85 @@ class ProjectileSystem {
 
     // Create the layered explosion visual effect
     this.createAlchemistExplosion({ x: p.x, y: p.y, radius, owner: p.owner });
+  }
+
+  /**
+   * Detonates Mahito's Body Repel projectile, spawning 3 swarming Transfigured Human minions on impact/expiration.
+   */
+  triggerMahitoBodyRepelSummon(p) {
+    if (p._detonated) return;
+    p._detonated = true;
+
+    const owner = p.ownerFighter || (state.fighters && (typeof p.owner === 'number' ? state.fighters[p.owner] : null)) || (state.fighters && state.fighters.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito'))) || null;
+    if (!owner) return;
+
+    const ownerIndex = (typeof p.owner === 'number') ? p.owner : (state.fighters ? state.fighters.indexOf(owner) : 0);
+
+    const cfg = CONFIG.mahito || {};
+    const skillCfg = cfg.soulMultiplicity || {};
+
+    const summonCount = skillCfg.summonCount || 1;
+    const minionHp = skillCfg.minionHp || 25;
+    const minionDamage = skillCfg.minionDamage || 10;
+    const minionSpeed = skillCfg.minionSpeed || 1.8;
+    const minionSize = skillCfg.minionSize || 16;
+
+    // Spawn visual effects at the projectile's position
+    if (typeof spawnImpactFlash === 'function') {
+      spawnImpactFlash(p.x, p.y, skillCfg.bodyRepelRadius || 50, '#C026D3');
+    }
+    if (typeof spawnMahitoSoulExplosion === 'function') {
+      spawnMahitoSoulExplosion(p.x, p.y, (skillCfg.bodyRepelRadius || 50) * 1.5);
+    }
+
+    for (let s = 0; s < summonCount; s++) {
+      const angle = (p.angle || 0) + (Math.random() * 0.8 - 0.4);
+      const distOffset = minionSize * 0.5 + Math.random() * 10;
+      
+      const child = {
+        x: p.x + Math.cos(angle) * distOffset,
+        y: p.y + Math.sin(angle) * distOffset,
+        vx: Math.cos(angle) * minionSpeed,
+        vy: Math.sin(angle) * minionSpeed,
+        r: minionSize,
+        hp: minionHp,
+        maxHp: minionHp,
+        damage: minionDamage,
+        owner: owner,
+        ownerIndex: ownerIndex,
+        isIllusion: true,
+        isDoppelganger: true,
+        isTransfiguredHuman: true,
+        isSplitChild: true,
+        angle: angle,
+        gunAngle: angle,
+        moveSpeed: minionSpeed,
+        hitFlashTimer: 0,
+        timeStopTimer: 0,
+        hitStunTimer: 0,
+        swordCooldown: 30,
+        swordSwingActive: false,
+        swordSwingTimer: 0,
+        swordSwingAngle: 0,
+        applyTimeStop(dur) { this.timeStopTimer = Math.max(this.timeStopTimer || 0, dur); },
+        applyHitStun(dur)  { this.hitStunTimer  = Math.max(this.hitStunTimer  || 0, dur); },
+        applyKnockback(vx, vy) { this.knockbackVx = vx; this.knockbackVy = vy; },
+        takeDamage(amount, attacker, opts = {}) {
+          return applyDamageToTarget(this, amount, attacker, opts);
+        },
+      };
+
+      if (!state.illusions) state.illusions = [];
+      state.illusions.push(child);
+    }
+
+    const summonSounds = cfg.sounds?.minionSummons || [
+      cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
+      cfg.sounds?.minionSummonAlt || 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
+      cfg.sounds?.minionSummonAlt2 || 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3'
+    ];
+    const chosenSound = summonSounds[Math.floor(Math.random() * summonSounds.length)];
+    playSound(chosenSound, cfg.sounds?.minionSummonVolume ?? 1.8);
   }
 
   /**
@@ -2919,16 +3000,12 @@ class ProjectileSystem {
               p.infinityEvaluated = true;
               const ownerFighter = fighters[p.owner];
               const isMahoragaAdapted = ownerFighter && ownerFighter.characterId === 'mahoraga' && ownerFighter.gojoInfinityImmune;
-              const isMahoragaDebris = p.isMahoragaThrow || p.visual === 'mahoragaBasaltMonolith' || p.visual === 'mahoragaRuinConcrete' || p.visual === 'mahoragaLavaRubble';
-              const isSukunaSlash = p.isSukunaSlash || p.isSukunaDomainSlash || p.visual === 'sukunaSlash' || p.visual === 'sukunaCleave' || p.visual === 'sukunaDismantleGrid' || p.visual === 'ghostBlade' || (ownerFighter && (ownerFighter.characterId === 'sukuna' || ownerFighter.type === 'sukuna') && ownerFighter.domainActive);
+              const isToji = ownerFighter && (ownerFighter.characterId === 'toji' || ownerFighter.type === 'toji');
 
-              if (isMahoragaAdapted || isSukunaSlash) {
-                p.infinityBypassed = true; // Sukuna Shrine slashes & adapted Mahoraga bypass Infinity and travel freely!
-              } else if (isMahoragaDebris || f.domainActive) {
-                p.infinityBypassed = false; // 100% freeze inside Gojo's domain & Limitless barrier!
+              if (isMahoragaAdapted || isToji) {
+                p.infinityBypassed = true; // Adapted Mahoraga and Toji ISOH bypass Infinity!
               } else {
-                const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
-                p.infinityBypassed = Math.random() > freezeChance;
+                p.infinityBypassed = false; // Frozen by Gojo's Limitless Infinity barrier (Rule #9 compliant)
               }
             }
 
@@ -2972,6 +3049,14 @@ class ProjectileSystem {
       const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
+        if (p.isMahitoBodyRepel) {
+          this.triggerMahitoBodyRepelSummon(p);
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+          continue;
+        }
         if (p.visual === 'layla_bomb') {
           this.detonateLaylaBomb(p, fighters);
         } else if (p.visual === 'layla_void_projectile') {

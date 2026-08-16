@@ -1065,7 +1065,10 @@ export class TojiFighter extends Fighter {
     this.resolveWallBounce(arena, opponent);
 
     // Inverted Spear of Heaven Melee Strike Logic
-    if (!tojiIsTargetDeadOrRemoved(this, opponent)) {
+    if (this.isCaughtInBeam()) {
+      this.spearSwingTimer = 0;
+      this.katanaSlashTimer = 0;
+    } else if (!tojiIsTargetDeadOrRemoved(this, opponent)) {
       const dx = opponent.x - this.x;
       const dy = opponent.y - this.y;
       const dist = Math.hypot(dx, dy);

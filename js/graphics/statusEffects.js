@@ -579,7 +579,122 @@ export function drawVoidMarkEffect(ctx, baseRadius) {
   ctx.restore();
 }
 
-export function drawParalyzeEffect(ctx, baseRadius, isMahito = false) {
+/**
+ * Draws a wet, glistening, bubbling/swelling flesh cyst animation on the target body.
+ * Triggered when the target is paralyzed by Mahito and about to explode (Soul Rupture).
+ * Boils protrude from the EDGE of the body circle outward, starting as tiny bumps
+ * and slowly growing grotesquely large before detonation.
+ */
+export function drawMahitoFleshBubblyDeformLocal(ctx, r, paralyzeTimer = 45, color = '#A855F7', entity = null) {
+  // progress: 0 at start of paralysis -> 1 at detonation
+  const maxDuration = 45;
+  const progress = 1.0 - Math.max(0.0, Math.min(1.0, (paralyzeTimer || maxDuration) / maxDuration));
+  if (progress <= 0.005) return;
+
+  // Clear seeds when paralysis expires
+  if (paralyzeTimer <= 2 && entity) {
+    entity._mahitoFleshDeformSeeds = null;
+  }
+
+  // Generate persistent random mutation seeds per entity
+  let seeds = null;
+  if (entity) {
+    if (!entity._mahitoFleshDeformSeeds) {
+      entity._mahitoFleshDeformSeeds = [];
+      const count = 4 + Math.floor(Math.random() * 4); // 4 to 7 random boils
+      for (let i = 0; i < count; i++) {
+        entity._mahitoFleshDeformSeeds.push({
+          angle: Math.random() * Math.PI * 2,            // random position around the body edge
+          maxSizeMult: 0.30 + Math.random() * 0.55,      // max boil radius relative to body r (0.30 to 0.85)
+          phase: Math.random() * Math.PI * 2,             // animation wobble offset
+          speed: 1.0 + Math.random() * 1.8,               // pulsation speed
+          edgeOffset: 0.75 + Math.random() * 0.25         // how far along the edge (0.75 to 1.0 of r)
+        });
+      }
+    }
+    seeds = entity._mahitoFleshDeformSeeds;
+  } else {
+    // Fallback static seeds for previews
+    seeds = [
+      { angle: 2.3,  maxSizeMult: 0.65, phase: 0,   speed: 1.5, edgeOffset: 0.85 },
+      { angle: -0.8, maxSizeMult: 0.80, phase: 1.8, speed: 2.0, edgeOffset: 0.90 },
+      { angle: 3.8,  maxSizeMult: 0.45, phase: 3.5, speed: 1.2, edgeOffset: 0.80 },
+      { angle: 0.9,  maxSizeMult: 0.35, phase: 5.2, speed: 2.5, edgeOffset: 0.95 },
+      { angle: 5.1,  maxSizeMult: 0.55, phase: 2.0, speed: 1.8, edgeOffset: 0.88 }
+    ];
+  }
+
+  ctx.save();
+
+  const now = Date.now() * 0.006;
+
+  // Slow growth curve: starts very small, accelerates near the end (easeInQuad)
+  // progress^1.6 makes them tiny for most of the duration then balloon rapidly near detonation
+  const growthCurve = Math.pow(progress, 1.6);
+
+  for (let i = 0; i < seeds.length; i++) {
+    const seed = seeds[i];
+
+    // Subtle pulsating wobble that intensifies as detonation approaches
+    const wobbleIntensity = 0.05 + progress * 0.15;
+    const wave = Math.sin(now * seed.speed + seed.phase) * wobbleIntensity;
+
+    // Boil radius: starts near 0, slowly grows to full maxSizeMult * r
+    const boilR = Math.max(1.5, r * seed.maxSizeMult * growthCurve * (1.0 + wave));
+
+    // Position: on the EDGE of the body circle, protruding outward
+    // The boil center sits at the body rim so half protrudes outward
+    const edgeDist = r * seed.edgeOffset;
+    const bx = Math.cos(seed.angle) * edgeDist;
+    const by = Math.sin(seed.angle) * edgeDist;
+
+    // Main boil body — vibrant cursed purple fill
+    ctx.fillStyle = '#A855F7';
+    ctx.strokeStyle = '#3B0764';
+    ctx.lineWidth = 1.8;
+    ctx.beginPath();
+    ctx.arc(bx, by, boilR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Wet glare highlight (shifted toward upper-left for 3D depth)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+    ctx.beginPath();
+    ctx.arc(bx - boilR * 0.28, by - boilR * 0.28, boilR * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Surgical stitch lines across larger swelling cysts
+    if (boilR > 5) {
+      ctx.strokeStyle = '#3B0764';
+      ctx.lineWidth = 1.2;
+      // Stitch line perpendicular to the radial direction
+      const cosA = Math.cos(seed.angle + Math.PI / 2);
+      const sinA = Math.sin(seed.angle + Math.PI / 2);
+      ctx.beginPath();
+      ctx.moveTo(bx - cosA * boilR * 0.55, by - sinA * boilR * 0.55);
+      ctx.lineTo(bx + cosA * boilR * 0.55, by + sinA * boilR * 0.55);
+      ctx.stroke();
+
+      // Cross hatches along stitch
+      ctx.beginPath();
+      const numHatches = 3;
+      for (let j = 0; j < numHatches; j++) {
+        const t = -0.35 + (j / (numHatches - 1)) * 0.70;
+        const hx = bx + cosA * boilR * 0.55 * t;
+        const hy = by + sinA * boilR * 0.55 * t;
+        const px = -sinA * 3;
+        const py = cosA * 3;
+        ctx.moveTo(hx - px, hy - py);
+        ctx.lineTo(hx + px, hy + py);
+      }
+      ctx.stroke();
+    }
+  }
+
+  ctx.restore();
+}
+
+export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTimer = 45, color = '#A855F7', entity = null) {
   ctx.save();
   const time = Date.now() * 0.004;
   const numRings = 2;
@@ -672,48 +787,139 @@ export function drawParalyzeEffect(ctx, baseRadius, isMahito = false) {
     }
     ctx.stroke();
   }
+
+  if (isMahito) {
+    drawMahitoFleshBubblyDeformLocal(ctx, baseRadius, paralyzeTimer, color, entity);
+  }
   
   ctx.restore();
 }
 
+// Pre-allocated static arrays for Soul Disfigurement suture positions (Zero GC churn)
+const _S1_STK1 = [0.35, 0.45];
+const _S1_STK2 = [0.35, 0.45, 0.70, 0.80];
+const _S1_STK3 = [0.35, 0.45, 0.70, 0.80, 0.15];
+const _S2_STK4 = [0.30, 0.40];
+const _S2_STK6 = [0.30, 0.40, 0.70, 0.80];
+const _S2_STK8 = [0.30, 0.40, 0.70, 0.80, 0.15];
+const _S3_STK7 = [0.40, 0.50];
+const _S3_STK9 = [0.40, 0.50, 0.20, 0.80];
+
 /**
- * Draws Mahito's Soul Disfigurement debuff overlay on afflicted targets.
- * Features orbiting cursed soul distortion wisps and a pulsating resonance ring.
- * Strictly adheres to Rule #11 (Zero shadowBlur).
+ * Draws Mahito's Soul Disfigurement Stitches on an afflicted enemy's body.
+ * Features surgical suture cuts with paired cross-stitches, knot dots, and cursed energy seepage.
+ * High-performance optimized (Zero per-frame allocations).
  */
 export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
   if (stacks <= 0) return;
-  ctx.save();
 
+  ctx.save();
+  const r = baseRadius || 25;
   const now = Date.now() * 0.005;
-  const pulse = Math.sin(now * 2) * 0.5 + 0.5;
+  const pulse = Math.sin(now * 2.5) * 0.5 + 0.5;
 
   // 1. Subtle Soul Distortion Rim Ripple on Target Body
-  ctx.strokeStyle = `rgba(217, 70, 239, ${(0.40 + pulse * 0.30).toFixed(3)})`;
-  ctx.lineWidth = 1.6;
+  ctx.strokeStyle = `rgba(217, 70, 239, ${(0.35 + pulse * 0.25).toFixed(3)})`;
+  ctx.lineWidth = 1.4;
   ctx.beginPath();
-  ctx.arc(0, 0, baseRadius + 3 + pulse * 2, 0, Math.PI * 2);
+  ctx.arc(0, 0, r + 2.5 + pulse * 1.5, 0, Math.PI * 2);
   ctx.stroke();
 
-  // 2. Orbiting Cursed Soul Distortion Wisps
-  const wispCount = Math.min(stacks, 2);
-  const orbitR = baseRadius * 1.35;
+  // Helper to draw a surgical suture cut with cross-stitches on the enemy's body
+  const drawSutureSeam = (x1, y1, x2, y2, stitchPositions, crossLen = 3.2) => {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len;
+    const uy = dy / len;
+    const px = -uy;
+    const py = ux;
 
+    // A. Cursed Energy Seepage Underlay (Magenta/Violet Soul Glow)
+    ctx.strokeStyle = `rgba(217, 70, 239, ${(0.45 + pulse * 0.35).toFixed(3)})`;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // B. Dark Incision Suture Line
+    ctx.strokeStyle = '#181C26';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x1, y1);
+    ctx.lineTo(x2, y2);
+    ctx.stroke();
+
+    // C. Cross-Stitch Loops / Staples Crossing the Cut (|| ... ||)
+    ctx.strokeStyle = '#10141D';
+    ctx.fillStyle = '#10141D';
+    ctx.lineWidth = 1.4;
+
+    ctx.beginPath();
+    for (let i = 0; i < stitchPositions.length; i++) {
+      const t = stitchPositions[i];
+      const cx = x1 + dx * t;
+      const cy = y1 + dy * t;
+      const sx1 = cx - px * crossLen;
+      const sy1 = cy - py * crossLen;
+      const sx2 = cx + px * crossLen;
+      const sy2 = cy + py * crossLen;
+
+      ctx.moveTo(sx1, sy1);
+      ctx.lineTo(sx2, sy2);
+    }
+    ctx.stroke();
+
+    // Subtle knot endpoint dots
+    ctx.beginPath();
+    for (let i = 0; i < stitchPositions.length; i++) {
+      const t = stitchPositions[i];
+      const cx = x1 + dx * t;
+      const cy = y1 + dy * t;
+      const sx1 = cx - px * crossLen;
+      const sy1 = cy - py * crossLen;
+      const sx2 = cx + px * crossLen;
+      const sy2 = cy + py * crossLen;
+
+      ctx.arc(sx1, sy1, 0.8, 0, Math.PI * 2);
+      ctx.arc(sx2, sy2, 0.8, 0, Math.PI * 2);
+    }
+    ctx.fill();
+  };
+
+  // Suture 1: Transverse Diagonal Suture across the upper-mid body (1+ stacks)
+  const s1Stitches = (stacks >= 3) ? _S1_STK3 : (stacks >= 2 ? _S1_STK2 : _S1_STK1);
+  drawSutureSeam(-r * 0.70, -r * 0.25, r * 0.65, r * 0.15, s1Stitches, 3.4);
+
+  // Suture 2: Vertical / Curved Suture down the left flank (4+ stacks)
+  if (stacks >= 4) {
+    const s2Stitches = (stacks >= 8) ? _S2_STK8 : (stacks >= 6 ? _S2_STK6 : _S2_STK4);
+    drawSutureSeam(-r * 0.25, -r * 0.70, -r * 0.15, r * 0.65, s2Stitches, 3.0);
+  }
+
+  // Suture 3: Forehead / Crest Accent Suture (7+ stacks)
+  if (stacks >= 7) {
+    const s3Stitches = (stacks >= 9) ? _S3_STK9 : _S3_STK7;
+    drawSutureSeam(r * 0.10, -r * 0.65, r * 0.55, -r * 0.30, s3Stitches, 2.6);
+  }
+
+  // Orbiting subtle soul distortion wisps (scales smoothly with stacks)
+  const wispCount = Math.min(3, Math.ceil(stacks / 3));
+  const orbitR = r * 1.30;
   for (let i = 0; i < wispCount; i++) {
-    const angle = now * 1.5 + (i * Math.PI);
+    const angle = now * 1.5 + (i * (Math.PI * 2 / wispCount));
     const wx = Math.cos(angle) * orbitR;
     const wy = Math.sin(angle) * orbitR;
 
-    // Outer magenta soul aura
-    ctx.fillStyle = 'rgba(217, 70, 239, 0.55)';
+    ctx.fillStyle = 'rgba(217, 70, 239, 0.50)';
     ctx.beginPath();
-    ctx.arc(wx, wy, 4.5, 0, Math.PI * 2);
+    ctx.arc(wx, wy, 3.5, 0, Math.PI * 2);
     ctx.fill();
 
-    // Inner bright soul core
     ctx.fillStyle = '#FAF5FF';
     ctx.beginPath();
-    ctx.arc(wx, wy, 2.0, 0, Math.PI * 2);
+    ctx.arc(wx, wy, 1.4, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -721,217 +927,173 @@ export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
 }
 
 /**
- * Draws the Mahito-Themed Floating Soul Disfigurement Counter Badge.
- * Positioned right at the top of the enemy's body circle (not the head).
+ * Draws Mahito's Floating Surgical Stitch Indicator above an afflicted enemy's head.
  * Features:
- * - Surgical suture-stitched dark soul plaque container
- * - 3 distinct soul vessel pips with vivid magenta/violet cursed energy
- * - Connected suture threads tethered to the target body
- * - Dynamic critical resonance flare when reaching max stacks
- * Strictly adheres to Rule #11 (Zero shadowBlur) & Rule #12 (Main Canvas 2D Text).
+ * - NO card background, NO pill container (purely transparent floating surgical stitches)
+ * - Dynamically scales to any maxStacks (e.g. 10 stacks)
+ * - Active stacks glow with vivid magenta/violet cursed energy sutures and staple knots
+ * - Inactive remaining stacks show as dim suture marks
+ * - Optimized with zero per-frame context allocations and batched path draw calls.
  */
 export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, timer = 300) {
   if (stacks <= 0) return;
 
   ctx.save();
+  const r = baseRadius || 25;
   const now = Date.now() * 0.004;
-  const hoverY = Math.sin(now * 2.5) * 1.6;
+  const hoverY = Math.sin(now * 2.5) * 1.5;
   const badgeX = x;
-  const badgeY = y - baseRadius - 22 + hoverY;
+  const badgeY = y - r - 16 + hoverY;
 
   ctx.translate(badgeX, badgeY);
 
-  const isCritical = stacks >= 3;
-  const badgeW = 46;
-  const badgeH = 17;
-  const halfW = badgeW / 2;
-  const halfH = badgeH / 2;
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
+  const maxStacks = cfg.soulDisfigurement?.maxStacks || 10;
+  const isCritical = stacks >= maxStacks;
+  const pulse = Math.sin(now * 4) * 0.5 + 0.5;
 
-  // 1. Suture Tether Threads extending down to the top of the body
-  ctx.save();
+  const gap = 5.6; // Horizontal spacing per stitch staple
+  const halfTrack = ((maxStacks - 1) * gap) / 2;
+
+  // 1. Suture Tether Threads extending down toward the head
   ctx.strokeStyle = '#181C26';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.moveTo(-12, halfH);
-  ctx.lineTo(-8, halfH + 7);
-  ctx.moveTo(12, halfH);
-  ctx.lineTo(8, halfH + 7);
-  ctx.stroke();
-
+  ctx.moveTo(-halfTrack * 0.45, 0);
+  ctx.lineTo(-halfTrack * 0.30, 7.5);
+  ctx.moveTo(halfTrack * 0.45, 0);
+  ctx.lineTo(halfTrack * 0.30, 7.5);
   // Tiny cross-ticks on tether sutures
-  ctx.beginPath();
-  ctx.moveTo(-12, halfH + 3.5);
-  ctx.lineTo(-8, halfH + 3.5);
-  ctx.moveTo(8, halfH + 3.5);
-  ctx.lineTo(12, halfH + 3.5);
-  ctx.stroke();
-  ctx.restore();
-
-  // 2. Main Cursed Soul Talisman Plaque (Rounded capsule)
-  ctx.fillStyle = '#0E121C';
-  ctx.beginPath();
-  ctx.roundRect(-halfW, -halfH, badgeW, badgeH, 6);
-  ctx.fill();
-
-  // Outer Talisman Border with Cursed Soul Rim Accent
-  ctx.strokeStyle = isCritical ? '#FF007F' : '#1F293D';
-  ctx.lineWidth = 1.5;
+  ctx.moveTo(-halfTrack * 0.45 - 2.0, 3.8);
+  ctx.lineTo(-halfTrack * 0.30 + 2.0, 3.8);
+  ctx.moveTo(halfTrack * 0.30 - 2.0, 3.8);
+  ctx.lineTo(halfTrack * 0.45 + 2.0, 3.8);
   ctx.stroke();
 
-  if (isCritical) {
-    // Pulsing Critical Danger Rim
-    const critPulse = (Math.sin(now * 8) + 1) / 2;
-    ctx.strokeStyle = `rgba(217, 70, 239, ${(0.5 + critPulse * 0.5).toFixed(3)})`;
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.roundRect(-halfW - 1.5, -halfH - 1.5, badgeW + 3, badgeH + 3, 7.5);
-    ctx.stroke();
-  }
+  // 2. Main Suture Cut Seam Line
+  // Magenta glow underlay
+  ctx.strokeStyle = isCritical ? `rgba(255, 0, 127, ${(0.6 + pulse * 0.4).toFixed(3)})` : `rgba(217, 70, 239, ${(0.35 + pulse * 0.3).toFixed(3)})`;
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.moveTo(-halfTrack - 4, 0);
+  ctx.lineTo(halfTrack + 4, 0);
+  ctx.stroke();
 
-  // 3. Iconic Horizontal Facial Stitches Motif across Plaque
-  ctx.save();
+  // Dark surgical incision cut
   ctx.strokeStyle = '#181C26';
-  ctx.lineWidth = 1.1;
+  ctx.lineWidth = 1.3;
   ctx.beginPath();
-  ctx.moveTo(-halfW + 4, 0);
-  ctx.lineTo(halfW - 4, 0);
+  ctx.moveTo(-halfTrack - 3.5, 0);
+  ctx.lineTo(halfTrack + 3.5, 0);
   ctx.stroke();
 
-  // Cross stitch marks across suture cut
-  const stitchPositions = [-17, -8, 0, 8, 17];
-  for (const sx of stitchPositions) {
+  // 3. Batched Draw for Inactive Stitches (Dim Suture Marks)
+  if (stacks < maxStacks) {
+    ctx.strokeStyle = '#252F44';
+    ctx.fillStyle = '#161B27';
+    ctx.lineWidth = 1.0;
+
     ctx.beginPath();
-    ctx.moveTo(sx, -2.2);
-    ctx.lineTo(sx, 2.2);
+    for (let i = stacks; i < maxStacks; i++) {
+      const sx = -halfTrack + i * gap;
+      ctx.moveTo(sx, -2.6);
+      ctx.lineTo(sx, 2.6);
+    }
     ctx.stroke();
+
+    ctx.beginPath();
+    for (let i = stacks; i < maxStacks; i++) {
+      const sx = -halfTrack + i * gap;
+      ctx.arc(sx, -2.6, 0.65, 0, Math.PI * 2);
+      ctx.arc(sx, 2.6, 0.65, 0, Math.PI * 2);
+    }
+    ctx.fill();
   }
-  ctx.restore();
 
-  // 4. Three Soul Vessel Pips (Soul Shards)
-  const slotX = [-13, 0, 13];
-  const maxSlots = 3;
-
-  for (let i = 0; i < maxSlots; i++) {
-    const px = slotX[i];
-    const py = 0;
-    const isActive = i < stacks;
-    const isThisMax = isCritical && isActive;
-
-    if (!isActive) {
-      // Inactive / Sunken Empty Soul Socket
-      ctx.fillStyle = '#161B27';
+  // 4. Batched Draw for Active Stitches (Glowing Cursed Energy Sutures)
+  const activeCount = Math.min(maxStacks, stacks);
+  if (activeCount > 0) {
+    if (isCritical) {
+      // Critical Max Stack: Blazing Magenta & Hot Pink Flare
+      ctx.fillStyle = 'rgba(255, 0, 127, 0.40)';
       ctx.beginPath();
-      ctx.arc(px, py, 4.0, 0, Math.PI * 2);
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        const flarePulse = Math.sin(now * 10 + i * 0.8) * 1.2;
+        ctx.arc(sx, 0, 4.5 + flarePulse, 0, Math.PI * 2);
+      }
       ctx.fill();
 
-      ctx.strokeStyle = '#252F44';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
+      ctx.strokeStyle = '#FF007F';
+      ctx.fillStyle = '#FF007F';
+      ctx.lineWidth = 1.6;
 
-      // Dark cross-stitch thread inside socket
-      ctx.strokeStyle = '#181C26';
-      ctx.lineWidth = 0.9;
       ctx.beginPath();
-      ctx.moveTo(px - 1.8, py);
-      ctx.lineTo(px + 1.8, py);
-      ctx.moveTo(px, py - 1.8);
-      ctx.lineTo(px, py + 1.8);
-      ctx.stroke();
-    } else {
-      // Active Cursed Soul Pip
-      ctx.save();
-
-      if (isThisMax) {
-        // Critical Max Slot: Blazing Magenta & Hot Pink Flare
-        const flarePulse = Math.sin(now * 10 + i) * 1.5;
-        ctx.fillStyle = 'rgba(255, 0, 127, 0.40)';
-        ctx.beginPath();
-        ctx.arc(px, py, 6.8 + flarePulse, 0, Math.PI * 2);
-        ctx.fill();
-
-        ctx.fillStyle = '#FF007F';
-        ctx.beginPath();
-        ctx.moveTo(px, py - 4.5);
-        ctx.lineTo(px + 4.0, py);
-        ctx.lineTo(px, py + 4.5);
-        ctx.lineTo(px - 4.0, py);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(px, py, 1.8, 0, Math.PI * 2);
-        ctx.fill();
-      } else {
-        // Standard Active Soul Droplet (Vivid Magenta/Violet Glow)
-        const pipPulse = (Math.sin(now * 4 + i * 1.2) + 1) / 2;
-        ctx.fillStyle = `rgba(217, 70, 239, ${(0.35 + pipPulse * 0.25).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(px, py, 6.0, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Diamond Cursed Soul Crystal
-        ctx.fillStyle = '#D946EF';
-        ctx.beginPath();
-        ctx.moveTo(px, py - 4.2);
-        ctx.lineTo(px + 3.6, py);
-        ctx.lineTo(px, py + 4.2);
-        ctx.lineTo(px - 3.6, py);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#F5D0FE';
-        ctx.lineWidth = 0.9;
-        ctx.stroke();
-
-        // White-hot core
-        ctx.fillStyle = '#FFFFFF';
-        ctx.beginPath();
-        ctx.arc(px, py, 1.5, 0, Math.PI * 2);
-        ctx.fill();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.moveTo(sx, -4.6);
+        ctx.lineTo(sx, 4.6);
       }
+      ctx.stroke();
 
-      ctx.restore();
+      ctx.beginPath();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.arc(sx, -4.6, 1.0, 0, Math.PI * 2);
+        ctx.arc(sx, 4.6, 1.0, 0, Math.PI * 2);
+      }
+      ctx.fill();
+
+      // White core dots
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.arc(sx, 0, 1.0, 0, Math.PI * 2);
+      }
+      ctx.fill();
+    } else {
+      // Active Vivid Magenta/Violet Stitch Staples
+      ctx.fillStyle = `rgba(217, 70, 239, ${(0.30 + pulse * 0.25).toFixed(3)})`;
+      ctx.beginPath();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.arc(sx, 0, 3.8, 0, Math.PI * 2);
+      }
+      ctx.fill();
+
+      // Cross stitch vertical staples
+      ctx.strokeStyle = '#D946EF';
+      ctx.fillStyle = '#D946EF';
+      ctx.lineWidth = 1.4;
+
+      ctx.beginPath();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.moveTo(sx, -4.0);
+        ctx.lineTo(sx, 4.0);
+      }
+      ctx.stroke();
+
+      // Knot endpoint dots
+      ctx.beginPath();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.arc(sx, -4.0, 0.9, 0, Math.PI * 2);
+        ctx.arc(sx, 4.0, 0.9, 0, Math.PI * 2);
+      }
+      ctx.fill();
+
+      // White core highlights
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      for (let i = 0; i < activeCount; i++) {
+        const sx = -halfTrack + i * gap;
+        ctx.arc(sx, 0, 0.8, 0, Math.PI * 2);
+      }
+      ctx.fill();
     }
   }
-
-  // 5. Connecting Cursed Energy Suture between active pips
-  if (stacks >= 2) {
-    ctx.save();
-    ctx.strokeStyle = isCritical ? 'rgba(255, 0, 127, 0.85)' : 'rgba(217, 70, 239, 0.85)';
-    ctx.lineWidth = 1.3;
-    ctx.beginPath();
-    ctx.moveTo(slotX[0], 0);
-    ctx.lineTo(slotX[1], 0);
-    if (stacks >= 3) {
-      ctx.lineTo(slotX[2], 0);
-    }
-    ctx.stroke();
-    ctx.restore();
-  }
-
-  // 6. Crisp Top Micro-Label (Main Canvas 2D Text - Rule #12)
-  ctx.font = 'bold 9px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-
-  let labelText = `SOUL Ⅰ`;
-  let labelColor = '#D946EF';
-
-  if (stacks === 2) {
-    labelText = `SOUL Ⅱ`;
-    labelColor = '#D946EF';
-  } else if (stacks >= 3) {
-    labelText = `SOUL CRITICAL!`;
-    labelColor = '#FF2A8D';
-  }
-
-  const labelY = -halfH - 2;
-  ctx.lineWidth = 2.5;
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-  ctx.strokeText(labelText, 0, labelY);
-  ctx.fillStyle = labelColor;
-  ctx.fillText(labelText, 0, labelY);
 
   ctx.restore();
 }

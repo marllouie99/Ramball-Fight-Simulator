@@ -55,7 +55,8 @@ export function getFrontRadiusTargets(fighter, maxRangeOffset = 75, coneAngle = 
 
     const dx = f.x - fighter.x;
     const dy = f.y - fighter.y;
-    const dist = Math.hypot(dx, dy);
+    const dz = (f.z || 0) - (fighter.z || 0);
+    const dist = Math.hypot(dx, dy, dz);
     const maxHitDist = fighter.r + f.r + maxRangeOffset;
 
     if (dist <= maxHitDist) {
@@ -94,8 +95,20 @@ export function performMeleeAttack(fighter, opponent) {
     fighter.adaptationDashTimer = 0;
     return;
   }
-  fighter.vx = 0;
-  fighter.vy = 0;
+
+  if (opponent && fighter.neutralStanceTimer > 0) {
+    const dx = opponent.x - fighter.x;
+    const dy = opponent.y - fighter.y;
+    const dz = (opponent.z || 0) - (fighter.z || 0);
+    const dist = Math.hypot(dx, dy, dz);
+    const maxReach = fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110);
+
+    if (dist > maxReach) {
+      return; // Stop/cancel stance attacks if enemy gets out of range
+    }
+  }
+
+
 
   const attackInterval = CONFIG.mahoraga?.neutralAttackInterval || 20;
   const attacksPerTeleport = CONFIG.mahoraga?.neutralAttacksPerTeleport || 2;
@@ -131,7 +144,7 @@ export function performMeleeAttack(fighter, opponent) {
     const range = CONFIG.mahoraga?.swordRange || 110;
     const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
     if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
-      const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y);
+      const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
       if (dist <= range + fighter.r + opponent.r) {
         frontTargets.push(opponent);
       }
@@ -202,7 +215,7 @@ export function performMeleeAttack(fighter, opponent) {
   const range = CONFIG.mahoraga?.swordRange || 110;
   const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
   if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
-    const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y);
+    const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
     if (dist <= range + fighter.r + opponent.r) {
       frontTargets.push(opponent);
     }

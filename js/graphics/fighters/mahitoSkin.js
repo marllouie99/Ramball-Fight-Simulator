@@ -11,7 +11,7 @@
 //    back hand on forward edge, lunging along +X attack vector).
 // ─────────────────────────────────────────────
 
-import { getHandSize } from '../../core/config.js';
+import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { 
   drawMahitoArmMorph, 
@@ -28,6 +28,9 @@ import { GojoRenderer } from './gojoRenderer.js';
  */
 function drawMahitoCursedEnergyAura(ctx, fighter) {
   if (typeof GojoRenderer !== 'undefined' && typeof GojoRenderer._drawJJKCursedEnergyAura === 'function') {
+    // OPTIMIZATION: Do not render massive expensive aura on tiny evasion soul slip worms!
+    if (fighter.isEvading || fighter.isEvasionMinion) return;
+
     const opacity = (fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 1.0;
     if (opacity <= 0.01) return;
     ctx.save();
@@ -121,118 +124,101 @@ function drawStitchLine(ctx, x1, y1, x2, y2, stitchCount = 4, crossLength = 3.6,
  * 3. Forehead diagonal suture with 3 cross-stitches in the open upper-left forehead.
  * 4. Clean horizontal neck suture across the collar opening.
  */
+// Pre-allocated static buffers for Mahito skin rendering (Zero per-frame heap allocations)
+const _handFlamePts = Array.from({ length: 8 }, () => ({ x: 0, y: 0 }));
+
+/**
+ * Draws Mahito's exact facial surgical stitches matching the anime screenshot.
+ * Batched for 60 FPS performance (single path stroke).
+ */
 function drawMahitoFacialStitches(ctx, r) {
   ctx.save();
   ctx.strokeStyle = '#181C26';
-  ctx.fillStyle = '#181C26';
   ctx.lineWidth = 1.25;
   ctx.lineCap = 'round';
 
   const crossH = 3.2; // Half-length of cross stitches
-
-  // 1. ── MAIN HORIZONTAL TRANSVERSE SUTURE ACROSS NOSE & CHEEKS ──
   const hy = -r * 0.04;
+
   ctx.beginPath();
+
+  // 1. MAIN HORIZONTAL TRANSVERSE SUTURE ACROSS NOSE & CHEEKS
   ctx.moveTo(-r * 0.70, hy);
   ctx.lineTo(r * 0.70, hy);
-  ctx.stroke();
 
-  // Vertical stitch loops on Right Cheek (Viewer's Right: Two clean pairs matching anime)
+  // Vertical stitch loops on Right Cheek
   const rightStitches = [r * 0.36, r * 0.43, r * 0.55, r * 0.62];
-  for (const sx of rightStitches) {
-    ctx.beginPath();
+  for (let i = 0; i < rightStitches.length; i++) {
+    const sx = rightStitches[i];
     ctx.moveTo(sx, hy - crossH);
     ctx.lineTo(sx, hy + crossH);
-    ctx.stroke();
   }
 
-  // Vertical stitch loops on Left Cheek (Viewer's Left: Pair near nose)
+  // Vertical stitch loops on Left Cheek
   const leftStitches = [-r * 0.16, -r * 0.23];
-  for (const sx of leftStitches) {
-    ctx.beginPath();
+  for (let i = 0; i < leftStitches.length; i++) {
+    const sx = leftStitches[i];
     ctx.moveTo(sx, hy - crossH);
     ctx.lineTo(sx, hy + crossH);
-    ctx.stroke();
   }
 
-  // 2. ── LEFT CHEEK VERTICAL SUTURE CUT & LOWER CHEEK STITCHES (Viewer's Left) ──
+  // 2. LEFT CHEEK VERTICAL SUTURE CUT & LOWER CHEEK STITCHES
   const vx = -r * 0.38;
-  ctx.beginPath();
   ctx.moveTo(vx, -r * 0.20);
   ctx.lineTo(vx, hy);
   ctx.lineTo(-r * 0.34, r * 0.22);
-  ctx.stroke();
 
   // Two horizontal cross-stitches on lower left cheek cut
-  const lowerCrosses = [
-    { x: -r * 0.37, y: +r * 0.05 },
-    { x: -r * 0.35, y: +r * 0.14 }
-  ];
-  for (const cross of lowerCrosses) {
-    ctx.beginPath();
-    ctx.moveTo(cross.x - crossH, cross.y);
-    ctx.lineTo(cross.x + crossH, cross.y);
-    ctx.stroke();
-  }
+  ctx.moveTo(-r * 0.37 - crossH, r * 0.05);
+  ctx.lineTo(-r * 0.37 + crossH, r * 0.05);
+  ctx.moveTo(-r * 0.35 - crossH, r * 0.14);
+  ctx.lineTo(-r * 0.35 + crossH, r * 0.14);
 
-  // 3. ── FOREHEAD DIAGONAL SUTURE (Viewer's Upper Left Forehead) ──
+  // 3. FOREHEAD DIAGONAL SUTURE
   const fx1 = -r * 0.50, fy1 = -r * 0.48;
   const fx2 = -r * 0.28, fy2 = -r * 0.22;
-  ctx.beginPath();
   ctx.moveTo(fx1, fy1);
   ctx.lineTo(fx2, fy2);
-  ctx.stroke();
 
-  // 3 perpendicular cross stitches along forehead diagonal cut
   const fdx = fx2 - fx1, fdy = fy2 - fy1;
-  const flen = Math.hypot(fdx, fdy);
+  const flen = Math.hypot(fdx, fdy) || 1;
   const fnx = -fdy / flen, fny = fdx / flen;
   for (let i = 1; i <= 3; i++) {
     const t = i / 4;
     const px = fx1 + fdx * t;
     const py = fy1 + fdy * t;
-    ctx.beginPath();
     ctx.moveTo(px - fnx * (crossH * 0.85), py - fny * (crossH * 0.85));
     ctx.lineTo(px + fnx * (crossH * 0.85), py + fny * (crossH * 0.85));
-    ctx.stroke();
   }
 
-  // Delicate faint vertical incision trace dropping towards brow
-  ctx.save();
+  // 4. NECK SUTURE
+  const ny = r * 0.26;
+  ctx.moveTo(-r * 0.28, ny);
+  ctx.lineTo(r * 0.28, ny);
+
+  const neckStitches = [-r * 0.18, 0, r * 0.18];
+  for (let i = 0; i < neckStitches.length; i++) {
+    const nx = neckStitches[i];
+    ctx.moveTo(nx, ny - (crossH * 0.75));
+    ctx.lineTo(nx, ny + (crossH * 0.75));
+  }
+
+  ctx.stroke();
+
+  // Faint brow incision line
   ctx.lineWidth = 0.9;
   ctx.strokeStyle = 'rgba(24, 28, 38, 0.60)';
   ctx.beginPath();
   ctx.moveTo(fx2, fy2);
   ctx.lineTo(-r * 0.32, -r * 0.12);
   ctx.stroke();
-  ctx.restore();
-
-  // 4. ── NECK SUTURE (Throat across collar opening) ──
-  const ny = r * 0.26;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.28, ny);
-  ctx.lineTo(r * 0.28, ny);
-  ctx.stroke();
-
-  const neckStitches = [-r * 0.18, 0, r * 0.18];
-  for (const nx of neckStitches) {
-    ctx.beginPath();
-    ctx.moveTo(nx, ny - (crossH * 0.75));
-    ctx.lineTo(nx, ny + (crossH * 0.75));
-    ctx.stroke();
-  }
 
   ctx.restore();
 }
 
 /**
  * Draws Mahito's brawler hand fist enveloped in authentic JJK Cursed Energy matching reference image.
- * Features:
- * - Anatomical clenched fist with 4 defined knuckle bulges, curled thumb & thumbnail bed
- * - Dual-tone patchwork porcelain/grey skin with signature surgical sutures & cross-ticks
- * - Subterranean Cursed Energy micro-veins
- * - Transformed form: Segmented obsidian chitin exoskeleton with 3 glowing razor scythe talons
- * - Flowing viscous magenta/violet Cursed Energy flame envelope & crackling soul sparks
+ * High performance optimized.
  */
 export function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
@@ -243,87 +229,64 @@ export function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
   const opacity = (fighter && fighter._isWinnerReveal) ? 1.0 : (fighter.combatAuraOpacity || (isPunching ? 1.0 : 0.0));
   const showCE = opacity > 0.05 || isPunching;
 
-  // ── 1. JJK CURSED ENERGY FLAME ENVELOPE (Reference Anime Screenshot) ──
+  // ── 1. JJK CURSED ENERGY FLAME ENVELOPE ──
   if (showCE) {
-    ctx.save();
     const ceAlpha = isPunching ? 1.0 : opacity;
     const now = Date.now() * 0.005;
     const ceBlobRadius = handRadius * (isPunching ? 2.4 : 1.85);
 
-    // Dynamic 8-point viscous flame blob contour around the fist
+    // Reusable static flame buffer (Zero allocations)
     const numFlamePts = 8;
-    const flamePts = [];
     for (let i = 0; i < numFlamePts; i++) {
       const ang = (Math.PI * 2 / numFlamePts) * i;
       const wave = Math.sin(now * 3.5 + i * 1.8) * (handRadius * 0.35);
-      const stretch = (Math.cos(ang) > 0.2 ? handRadius * 0.45 : 0); // Stretch along +X punch vector
+      const stretch = (Math.cos(ang) > 0.2 ? handRadius * 0.45 : 0);
       const curR = ceBlobRadius + wave + stretch;
-      flamePts.push({
-        x: Math.cos(ang) * curR,
-        y: Math.sin(ang) * curR
-      });
+      _handFlamePts[i].x = Math.cos(ang) * curR;
+      _handFlamePts[i].y = Math.sin(ang) * curR;
     }
 
+    let fmx = (_handFlamePts[numFlamePts - 1].x + _handFlamePts[0].x) / 2;
+    let fmy = (_handFlamePts[numFlamePts - 1].y + _handFlamePts[0].y) / 2;
+
     ctx.beginPath();
-    let fmx = (flamePts[numFlamePts - 1].x + flamePts[0].x) / 2;
-    let fmy = (flamePts[numFlamePts - 1].y + flamePts[0].y) / 2;
     ctx.moveTo(fmx, fmy);
     for (let i = 0; i < numFlamePts; i++) {
-      const p = flamePts[i];
-      const next = flamePts[(i + 1) % numFlamePts];
+      const p = _handFlamePts[i];
+      const next = _handFlamePts[(i + 1) % numFlamePts];
       ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
     }
     ctx.closePath();
 
-    // A. Concentric Soft Magenta Bloom (Zero shadowBlur - Rule #11)
-    const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-    if (!isLowQuality) {
-      ctx.save();
-      ctx.scale(1.25, 1.25);
-      ctx.beginPath();
-      ctx.moveTo(fmx, fmy);
-      for (let i = 0; i < numFlamePts; i++) {
-        const p = flamePts[i];
-        const next = flamePts[(i + 1) % numFlamePts];
-        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-      }
-      ctx.closePath();
-      ctx.fillStyle = `rgba(217, 70, 239, ${(0.22 * ceAlpha).toFixed(3)})`;
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // B. Vibrant Radial Cursed Energy Gradient (Lilac Core -> Vivid Magenta Body -> Violet Plum Edge)
-    const ceGrad = ctx.createRadialGradient(0, 0, handRadius * 0.2, 0, 0, ceBlobRadius * 1.3);
-    ceGrad.addColorStop(0,    `rgba(245, 208, 254, ${(0.95 * ceAlpha).toFixed(3)})`); // Luminous Lilac-White Core
-    ceGrad.addColorStop(0.35, `rgba(217, 70, 239, ${(0.85 * ceAlpha).toFixed(3)})`); // Vibrant Magenta CE Body
-    ceGrad.addColorStop(0.70, `rgba(168, 85, 247, ${(0.65 * ceAlpha).toFixed(3)})`); // Violet Mid-Tone
-    ceGrad.addColorStop(1.0,  `rgba(59, 7, 100, ${(0.15 * ceAlpha).toFixed(3)})`);  // Deep Violet-Plum Edge
-
-    ctx.fillStyle = ceGrad;
+    // Magenta CE Body Fill
+    ctx.fillStyle = `rgba(217, 70, 239, ${(0.80 * ceAlpha).toFixed(3)})`;
     ctx.fill();
 
-    // C. Deep Violet-Plum Ink Stroke Outline (Authentic JJK Ink Brush Effect)
-    ctx.strokeStyle = `rgba(59, 7, 100, ${(0.95 * ceAlpha).toFixed(3)})`;
-    ctx.lineWidth = 1.9;
+    // Inner Lilac-White Core
+    ctx.beginPath();
+    ctx.arc(handRadius * 0.15, 0, handRadius * 0.9, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(245, 208, 254, ${(0.85 * ceAlpha).toFixed(3)})`;
+    ctx.fill();
+
+    // Deep Violet-Plum Ink Outline
+    ctx.strokeStyle = `rgba(59, 7, 100, ${(0.90 * ceAlpha).toFixed(3)})`;
+    ctx.lineWidth = 1.8;
     ctx.stroke();
 
-    // D. Tiny Crackling Cursed Soul Sparks
+    // Tiny Crackling Cursed Soul Sparks
     if (isPunching) {
-      ctx.strokeStyle = `rgba(245, 208, 254, 0.90)`;
+      ctx.strokeStyle = 'rgba(245, 208, 254, 0.90)';
       ctx.lineWidth = 1.2;
+      ctx.beginPath();
       for (let s = 0; s < 3; s++) {
         const sang = now * 4 + s * 2.1;
         const sr1 = handRadius * 0.8;
         const sr2 = handRadius * 1.5;
-        ctx.beginPath();
         ctx.moveTo(Math.cos(sang) * sr1, Math.sin(sang) * sr1);
         ctx.lineTo(Math.cos(sang + 0.3) * sr2, Math.sin(sang + 0.3) * sr2);
-        ctx.stroke();
       }
+      ctx.stroke();
     }
-
-    ctx.restore();
   }
 
   // ── 2. PHYSICAL HAND / FIST ──
@@ -962,11 +925,21 @@ export function drawMahitoSkin(ctx, fighter) {
   // 4. Render Dual Scythe Pincer Guillotine (Twin Stretched Blade Ambush - Back Arm) in world coordinates
   drawMahitoTwinScissor(ctx, fighter, 'back');
 
-  const r = fighter.r || 25;
+  const isEvading = !!fighter.isEvading;
+  const isEvasionMinion = !!fighter.isEvasionMinion;
+  const r = (isEvading || isEvasionMinion) ? 25 : (fighter.r || 25);
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+
+  const evasionScale = (typeof CONFIG !== 'undefined' && CONFIG.mahito?.evasion?.scale) !== undefined 
+    ? CONFIG.mahito.evasion.scale 
+    : 0.32;
+
+  if (isEvading || isEvasionMinion) {
+    ctx.scale(evasionScale, evasionScale);
+  }
 
   // 1. Draw JJK Cursed Energy Aura around Mahito
   drawMahitoCursedEnergyAura(ctx, fighter);
@@ -1080,6 +1053,29 @@ export function drawMahitoSkin(ctx, fighter) {
   // Draw status overlays (slow, electric stun, black flash, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
     fighter.drawStatusOverlays(ctx, r);
+  }
+
+  // Evasion Clones HP Text Overlay
+  if (isEvading || isEvasionMinion) {
+    ctx.save();
+    // Rotate/mirror back to draw text upright relative to the screen
+    if (facingLeft) ctx.scale(1, -1);
+    ctx.rotate(-angle);
+    
+    // Draw the HP text centered inside the body (scaled dynamically to maintain a stable ~11.5px size on screen)
+    const fontSize = Math.max(12, Math.round(11.5 / evasionScale));
+    const strokeWidth = Math.max(2, Math.round(2.5 / evasionScale));
+    
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const hpText = Math.floor(fighter.hp).toString();
+    ctx.lineWidth = strokeWidth;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.strokeText(hpText, 0, 0);
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(hpText, 0, 0);
+    ctx.restore();
   }
 
   ctx.restore();

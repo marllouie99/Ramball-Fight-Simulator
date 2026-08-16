@@ -112,6 +112,8 @@ export class LaserFighter extends Fighter {
   applyBeamEffectsToTarget(target, ownerIndex) {
     if (!target || target === this) return;
 
+    target.caughtInLaserBeamTimer = 10;
+
     let hitState = this.beamHitState.get(target);
     if (!hitState) {
       hitState = { initialHitDone: false, continuousDamageTimer: 0 };

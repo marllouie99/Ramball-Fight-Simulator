@@ -255,7 +255,7 @@ export class KnightFighter extends Fighter {
 
   // â”€â”€ Sword swipe â”€â”€
   _trySwordSwipe(opponent, ownerIndex) {
-    if (!opponent || this.swipeCooldown > 0 || this.swordBroken) return;
+    if (!opponent || this.swipeCooldown > 0 || this.swordBroken || this.isCaughtInBeam()) return;
     const dx = opponent.x - this.x;
     const dy = opponent.y - this.y;
     const maxDist = this.r + opponent.r + CONFIG.knight.swordRange;

@@ -7,7 +7,7 @@ export const gojoConfig = {
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact
   infinityOnlyActiveInRangedMode: true,     // Infinity barrier is ONLY active in Ranged Mode; disabled in Melee Mode
   infinityRadius: 120,                      // Distance (in pixels from center) for Limitless Infinity barrier detection
-  infinityFreezeChance: 0.5,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
+  infinityFreezeChance: 0.9,               // Chance (0.0 to 1.0) to freeze incoming projectiles/slashes
   infinityFreezeDuration: 100,             // Duration in frames projectiles stay suspended mid-air on barrier contact
   infinityMeleePushForce: 8.5,             // Physical velocity impulse (rebound force) applied to push melee attackers away
   infinitySlowDuration: 45,                // Duration in frames (0.75s) of brief movement slow on barrier contact
@@ -37,7 +37,7 @@ export const gojoConfig = {
   redShakeDuration: 25,     // Duration of screen shake on Red detonation
 
   // ── 4. Secret Technique: Hollow Purple (100% & 200% Empowered Cast) ──
-  purpleCooldown: 1800,      // Cooldown of Hollow Purple
+  purpleCooldown: 1500,      // Cooldown of Hollow Purple
   purpleChargeMax: 120,     // Frames required to mix Red and Blue into Purple (channeling duration)
   purpleDamage: 70,         // Continuous piercing damage per tick
   purpleSpeed: 6,           // Speed of Purple orb
@@ -79,14 +79,14 @@ export const gojoConfig = {
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
-  meleeModeCooldown: 300,   // 10 second cooldown before hand-to-hand combat mode can trigger again
+  meleeModeCooldown: 100,   // 10 second cooldown before hand-to-hand combat mode can trigger again
   closeRangeRadius: 180,    // Distance at which Gojo switches to melee mode
   meleePunchDamage: 14,     // Damage dealt by each punch
   meleePunchCooldown: 9,   // Frames between punches
   teleportDelay: 5,        // Frames delay before teleport after punch
   teleportSpeed: 15,        // Speed of teleport movement
   forcedMeleeIntroDuration: 200,           // Forced melee clash at start of round
-  meleeModeSeparationCooldown: 200,        // Mandatory ranged separation after combo disengage
+  meleeModeSeparationCooldown: 100,        // Mandatory ranged separation after combo disengage
   comboDisengageDistance: 300,             // Distance teleported away on combo finisher
 
   // ── 8. Teleport Dodge & Evasion Mechanics ──

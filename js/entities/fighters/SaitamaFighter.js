@@ -896,7 +896,10 @@ export class SaitamaFighter extends Fighter {
     const isExecutingCounter = (this._counterWindupTimer && this._counterWindupTimer > 0) ||
                                (this._counterPunchTimer && this._counterPunchTimer > 0) ||
                                (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0);
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isExecutingCounter;
+    if (this.isCaughtInBeam()) {
+      this.basicPunchChargeTimer = 0;
+    }
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isExecutingCounter && !this.isCaughtInBeam();
     if (canAct && (this.punchCooldownTimer <= 0 || !this.punchCooldownTimer)) {
       let bestTarget = opponent;
       // In FFA/1v1 modes, opponent might be null but there are other enemies, so fallback to finding the nearest

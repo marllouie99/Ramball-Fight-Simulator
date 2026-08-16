@@ -114,7 +114,7 @@ export class BerserkerFighter extends Fighter {
   }
 
   _tryAxeSwing(opponent, ownerIndex) {
-    if (!opponent || this.axeCooldown > 0) return;
+    if (!opponent || this.axeCooldown > 0 || this.isCaughtInBeam()) return;
     const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     if (dist > this.r + opponent.r + CONFIG.berserker.axeRange) return;
 
