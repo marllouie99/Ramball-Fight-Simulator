@@ -262,6 +262,16 @@ export const ParticleRegistry = {
     };
   },
   
+  // ─── MAHITO SOUL FRAGMENT SPARKS ───
+  soulFragment: () => ({
+    color: Math.random() > 0.4 ? 'rgba(217, 70, 239, 1)' : (Math.random() > 0.5 ? 'rgba(192, 38, 211, 1)' : 'rgba(245, 208, 254, 1)'),
+    decay: 0.04 + Math.random() * 0.06,
+    size: 2.0 + Math.random() * 3.5,
+    speed: 3 + Math.random() * 6,
+    friction: 0.90,
+    isFlash: false
+  }),
+  
   // ─── LAYLA BULLET SPARKS & FLASH ───
   laylaSpark: () => ({
     color: Math.random() > 0.4 ? 'rgba(0, 229, 255, 1)' : 'rgba(224, 255, 255, 1)',

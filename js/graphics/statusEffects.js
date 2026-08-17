@@ -888,24 +888,27 @@ export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
     ctx.fill();
   };
 
+  const cfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
+  const maxStacks = cfg.soulDisfigurement?.maxStacks || 5;
+
   // Suture 1: Transverse Diagonal Suture across the upper-mid body (1+ stacks)
   const s1Stitches = (stacks >= 3) ? _S1_STK3 : (stacks >= 2 ? _S1_STK2 : _S1_STK1);
   drawSutureSeam(-r * 0.70, -r * 0.25, r * 0.65, r * 0.15, s1Stitches, 3.4);
 
-  // Suture 2: Vertical / Curved Suture down the left flank (4+ stacks)
-  if (stacks >= 4) {
-    const s2Stitches = (stacks >= 8) ? _S2_STK8 : (stacks >= 6 ? _S2_STK6 : _S2_STK4);
+  // Suture 2: Vertical / Curved Suture down the left flank (3+ stacks)
+  if (stacks >= 3 || stacks >= Math.ceil(maxStacks * 0.6)) {
+    const s2Stitches = (stacks >= maxStacks) ? _S2_STK8 : (stacks >= 4 ? _S2_STK6 : _S2_STK4);
     drawSutureSeam(-r * 0.25, -r * 0.70, -r * 0.15, r * 0.65, s2Stitches, 3.0);
   }
 
-  // Suture 3: Forehead / Crest Accent Suture (7+ stacks)
-  if (stacks >= 7) {
-    const s3Stitches = (stacks >= 9) ? _S3_STK9 : _S3_STK7;
+  // Suture 3: Forehead / Crest Accent Suture (Max Stacks)
+  if (stacks >= maxStacks) {
+    const s3Stitches = _S3_STK9;
     drawSutureSeam(r * 0.10, -r * 0.65, r * 0.55, -r * 0.30, s3Stitches, 2.6);
   }
 
   // Orbiting subtle soul distortion wisps (scales smoothly with stacks)
-  const wispCount = Math.min(3, Math.ceil(stacks / 3));
+  const wispCount = Math.min(3, Math.ceil(stacks / 2));
   const orbitR = r * 1.30;
   for (let i = 0; i < wispCount; i++) {
     const angle = now * 1.5 + (i * (Math.PI * 2 / wispCount));
@@ -930,7 +933,7 @@ export function drawSoulDisfigurementEffect(ctx, baseRadius, stacks = 1) {
  * Draws Mahito's Floating Surgical Stitch Indicator above an afflicted enemy's head.
  * Features:
  * - NO card background, NO pill container (purely transparent floating surgical stitches)
- * - Dynamically scales to any maxStacks (e.g. 10 stacks)
+ * - Dynamically scales to any maxStacks (e.g. 5 stacks)
  * - Active stacks glow with vivid magenta/violet cursed energy sutures and staple knots
  * - Inactive remaining stacks show as dim suture marks
  * - Optimized with zero per-frame context allocations and batched path draw calls.
@@ -942,13 +945,16 @@ export function drawSoulDisfigurementCounter(ctx, x, y, baseRadius, stacks = 1, 
   const r = baseRadius || 25;
   const now = Date.now() * 0.004;
   const hoverY = Math.sin(now * 2.5) * 1.5;
-  const badgeX = x;
-  const badgeY = y - r - 16 + hoverY;
-
-  ctx.translate(badgeX, badgeY);
 
   const cfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
-  const maxStacks = cfg.soulDisfigurement?.maxStacks || 10;
+  const indicatorScale = cfg.soulDisfigurement?.stitchIndicatorScale ?? 1.70;
+  const badgeX = x;
+  const badgeY = y - r - (16 * indicatorScale) + hoverY;
+
+  ctx.translate(badgeX, badgeY);
+  ctx.scale(indicatorScale, indicatorScale);
+
+  const maxStacks = cfg.soulDisfigurement?.maxStacks || 5;
   const isCritical = stacks >= maxStacks;
   const pulse = Math.sin(now * 4) * 0.5 + 0.5;
 
@@ -1192,5 +1198,94 @@ export function drawEmbeddedMahitoSpikes(ctx, baseRadius, entity) {
 
     ctx.restore();
   }
+}
+
+/**
+ * Renders a sleek floating pill health bar above a minion/illusion's head (Rika style).
+ */
+export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100, maxHp = 100) {
+  if (hp <= 0) return;
+  const pct = Math.max(0, Math.min(1.0, hp / (maxHp || 1)));
+  const w = width || 38;
+  const h = height || 7;
+  const hw = w / 2;
+  const hh = h / 2;
+  const cornerR = hh; // Perfect pill capsule rounded ends
+
+  ctx.save();
+  ctx.translate(x, y);
+
+  // 1. Sleek Outer Drop Shadow
+  ctx.shadowColor = 'rgba(0, 0, 0, 0.65)';
+  ctx.shadowBlur = 4;
+  ctx.shadowOffsetY = 1.5;
+
+  // 2. Dark Obsidian Pill Background Track & Border
+  ctx.fillStyle = 'rgba(15, 17, 26, 0.92)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.30)';
+  ctx.lineWidth = 1.0;
+
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(-hw, -hh, w, h, cornerR);
+  } else {
+    ctx.arc(-hw + cornerR, 0, cornerR, Math.PI / 2, -Math.PI / 2);
+    ctx.arc(hw - cornerR, 0, cornerR, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+  }
+  ctx.fill();
+
+  // Clear shadow before stroke & fill
+  ctx.shadowColor = 'transparent';
+  ctx.shadowBlur = 0;
+  ctx.shadowOffsetY = 0;
+  ctx.stroke();
+
+  // 3. Depleted Red Track & Active Green Fill Inside Clipped Pill
+  ctx.save();
+  ctx.beginPath();
+  if (typeof ctx.roundRect === 'function') {
+    ctx.roundRect(-hw + 1, -hh + 1, w - 2, h - 2, Math.max(1, cornerR - 1));
+  } else {
+    ctx.arc(-hw + 1 + cornerR, 0, cornerR - 1, Math.PI / 2, -Math.PI / 2);
+    ctx.arc(hw - 1 - cornerR, 0, cornerR - 1, -Math.PI / 2, Math.PI / 2);
+    ctx.closePath();
+  }
+  ctx.clip();
+
+  // Depleted Crimson Red Fill
+  ctx.fillStyle = 'rgba(185, 28, 28, 0.85)';
+  ctx.fillRect(-hw + 1, -hh + 1, w - 2, h - 2);
+
+  // Active Green Health Fill Bar
+  if (pct > 0) {
+    const fillW = Math.max(2, (w - 2) * pct);
+    const startX = -hw + 1;
+
+    let mainColor = '#22C55E';
+    let endColor = '#16A34A';
+
+    if (pct < 0.25) {
+      mainColor = '#EF4444';
+      endColor = '#B91C1C';
+    } else if (pct < 0.50) {
+      mainColor = '#F59E0B';
+      endColor = '#D97706';
+    }
+
+    const grad = ctx.createLinearGradient(startX, 0, startX + fillW, 0);
+    grad.addColorStop(0, mainColor);
+    grad.addColorStop(1, endColor);
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(startX, -hh + 1, fillW, h - 2);
+
+    // Sleek White Gloss Top Highlight Line
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.fillRect(startX, -hh + 1, fillW, Math.max(1, (h - 2) * 0.35));
+  }
+
+  ctx.restore();
+  ctx.restore();
 }
 

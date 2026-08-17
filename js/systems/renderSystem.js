@@ -10,7 +10,7 @@ import {
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
-  drawRikaSummonDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
+  drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaIdolScreenOverlay
@@ -173,6 +173,12 @@ export function renderGame() {
         drawFurnaceDimScreen(); // 2D Sukuna Fuga Furnace radial dim overlay
         drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
+        
+        // Draw Mahito's Domain Expansion: Self-Embodiment of Perfection
+        const mahitoFighter = state.fighters.find(f => f && f.characterId === 'mahito');
+        if (mahitoFighter) {
+          drawMahitoDomainOverlay(mahitoFighter);
+        }
         drawMahoragaAdaptationDimScreen();
         drawMahoragaLevel8DimScreen();
         drawMahoragaSpeedLines();

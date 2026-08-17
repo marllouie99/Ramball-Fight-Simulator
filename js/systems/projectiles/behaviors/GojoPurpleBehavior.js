@@ -219,6 +219,14 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       }
     }
     
+    projectile.life -= 1;
+    if (projectile.life <= 0) return true;
+
+    projectile.x += projectile.vx;
+    projectile.y += projectile.vy;
+
+    this.checkExpire(projectile, system);
+
     return false; // Not destroyed
   }
 

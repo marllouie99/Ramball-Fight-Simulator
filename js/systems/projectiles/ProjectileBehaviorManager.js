@@ -13,12 +13,21 @@ export class ProjectileBehaviorManager {
   }
 
   /**
+   * Check if a behavior type is registered
+   * @param {string} behaviorType
+   * @returns {boolean}
+   */
+  static has(behaviorType) {
+    return !!(behaviorType && this.behaviors[behaviorType]);
+  }
+
+  /**
    * Apply behavior update logic
    * @param {Object} projectile 
    * @param {Array} fighters 
    * @param {Object} system The ProjectileSystem instance
    * @param {Object} ctx Any additional loop context (e.g., ownerHasEnemyInHole array)
-   * @returns {boolean} true if destroyed/handled, false if not handled
+   * @returns {boolean} true if destroyed, false if active
    */
   static update(projectile, fighters, system, ctx = {}) {
     if (projectile.behaviorType && this.behaviors[projectile.behaviorType]) {

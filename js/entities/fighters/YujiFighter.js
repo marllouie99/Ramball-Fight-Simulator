@@ -457,10 +457,7 @@ export class YujiFighter extends Fighter {
   }
 
   shoot() {
-    if (this.isCaughtInBeam()) {
-      this.interruptAttacks();
-      return;
-    }
+    if (!this.canPerformBasicAttack()) return false;
     // Block all attacks and manual input during Soul Swap ultimate sequence
     if (this.soulSwapTransitionTimer > 0 || this.revertTransitionTimer > 0 || (this.rapidSlashHitsLeft || 0) > 0) return;
 

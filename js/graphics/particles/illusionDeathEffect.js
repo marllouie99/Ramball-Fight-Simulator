@@ -130,9 +130,9 @@ export function drawIllusionDeathEffects() {
         effect.x, effect.y, 0,
         effect.x, effect.y, effect.size
       );
-      gradient.addColorStop(0, `rgba(180, 130, 255, ${effect.life * 0.6})`);
-      gradient.addColorStop(0.5, `rgba(150, 80, 220, ${effect.life * 0.3})`);
-      gradient.addColorStop(1, `rgba(100, 50, 180, 0)`);
+      gradient.addColorStop(0, `rgba(217, 70, 239, ${effect.life * 0.65})`);
+      gradient.addColorStop(0.5, `rgba(192, 38, 211, ${effect.life * 0.35})`);
+      gradient.addColorStop(1, `rgba(147, 51, 234, 0)`);
       
       ctx.globalAlpha = effect.life;
       ctx.beginPath();
@@ -141,11 +141,11 @@ export function drawIllusionDeathEffects() {
       ctx.fill();
       
     } else if (effect.type === 'wisp') {
-      // Draw small white wisps
+      // Draw small wisps
       ctx.globalAlpha = effect.life * 0.8;
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-      ctx.fillStyle = effect.color;
+      ctx.fillStyle = effect.color || '#D946EF';
       ctx.fill();
       
     } else {
@@ -157,9 +157,9 @@ export function drawIllusionDeathEffects() {
         effect.x, effect.y, 0,
         effect.x, effect.y, effect.size
       );
-      gradient.addColorStop(0, effect.color);
-      gradient.addColorStop(0.6, `rgba(150, 100, 220, ${effect.life * 0.5})`);
-      gradient.addColorStop(1, `rgba(100, 50, 180, 0)`);
+      gradient.addColorStop(0, effect.color || '#C026D3');
+      gradient.addColorStop(0.6, `rgba(192, 38, 211, ${effect.life * 0.5})`);
+      gradient.addColorStop(1, `rgba(147, 51, 234, 0)`);
       
       ctx.beginPath();
       ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);

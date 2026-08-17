@@ -59,7 +59,8 @@ function executeCursedSpeech(fighter) {
 export function executeThinIceBreaker(fighter, angle) {
   const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
   const dmgMult = typeof fighter.getRikaDamageMultiplier === 'function' ? fighter.getRikaDamageMultiplier() : (isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0);
-  const baseDmg = CONFIG.yuta.thinIceBreakerDamage || 45; // Massive burst
+  const bonusDmg = fighter.pureLoveBeamBonusDamage || 0;
+  const baseDmg = (CONFIG.yuta.thinIceBreakerDamage || 45) + bonusDmg; // Massive burst
   const damage = baseDmg * dmgMult;
   
   // Spatial Crack Effect tracking

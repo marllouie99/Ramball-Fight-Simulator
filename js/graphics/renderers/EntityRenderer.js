@@ -3,7 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
 import { drawSketchyCircle } from './fighterRenderer.js';
-import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal } from '../statusEffects.js';
+import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawMinionHealthBar } from '../statusEffects.js';
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
 
 let _sortedFightersBuffer = [];
@@ -1039,7 +1039,10 @@ export function drawIllusions() {
     }
 
     if (illusion.isEvasionMinion) {
+      ctx.save();
+      ctx.globalAlpha = (illusion.isDying || illusion.isDyingEvasion) ? 1.0 : (illusion.opacity !== undefined ? Math.max(0, Math.min(1.0, illusion.opacity)) : 1.0);
       drawMahitoSkin(ctx, illusion);
+      ctx.restore();
       continue;
     }
 
@@ -1070,17 +1073,9 @@ export function drawIllusions() {
         drawMahitoFleshBubblyDeformLocal(ctx, illusion.r, illusion.paralyzeTimer, '#A855F7', illusion);
       }
 
-      // Draw health text over Mahito skin (rotate back by the total drawing angle so text stays upright)
+      // Draw floating minion healthbar above head
       ctx.rotate(-drawAngle);
-      ctx.font = 'bold 18px Arial';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      const hpText = Math.floor(illusion.hp).toString();
-      ctx.lineWidth = 4;
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-      ctx.strokeText(hpText, 0, 0);
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(hpText, 0, 0);
+      drawMinionHealthBar(ctx, 0, -illusion.r - 14, Math.max(32, illusion.r * 1.4), 6, illusion.hp, illusion.maxHp || 100, illusion.color || '#D946EF');
       ctx.restore();
 
       // Mahito Soul Disfigurement Stitches on Illusions
@@ -1159,18 +1154,9 @@ export function drawIllusions() {
     }
     drawSketchyCircle(ctx, 0, 0, illusion.r, seed, '#111', 2.5);
 
-    // Draw illusion health
+    // Draw floating minion healthbar above head
     ctx.rotate(-illusion.angle);
-    ctx.font = 'bold 18px Arial';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const hpText = Math.floor(illusion.hp).toString();
-    ctx.lineWidth = 4;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-    ctx.strokeText(hpText, 0, 0);
-    ctx.fillStyle = '#ffffff';
-    ctx.fillText(hpText, 0, 0);
-
+    drawMinionHealthBar(ctx, 0, -illusion.r - 14, Math.max(32, illusion.r * 1.4), 6, illusion.hp, illusion.maxHp || 100, illusion.color || '#A855F7');
     ctx.restore();
 
     // Draw illusion sword (always visible, not just during swings)

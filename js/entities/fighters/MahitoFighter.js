@@ -6,9 +6,11 @@ import { Fighter, applyDamageToTarget } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { drawMahitoSkin } from '../../graphics/fighters/mahitoSkin.js';
-import { spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnSparks, spawnMahitoSoulBubbles, spawnMahitoSoulExplosion } from '../../graphics/particles/sparkEffect.js';
 import { spawnIllusionSpawn } from '../../graphics/particles/illusionSpawnEffect.js';
+import { spawnIllusionDeath } from '../../graphics/particles/illusionDeathEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { triggerHudHealBubble } from '../../graphics/hudManager.js';
 import { 
   executeIdleTransfigurationStrike, 
   executeSubterraneanFleshSurge, 
@@ -20,7 +22,9 @@ import {
   updateMahitoTwinScissor,
   updateMahitoFleshSurge, 
   updateSoulDisfigurementDecay,
-  executeMahitoSoulMultiplicity
+  executeMahitoSoulMultiplicity,
+  executeMahitoDomainExpansion,
+  updateMahitoDomainExpansion
 } from './mahito/mahitoCombat.js';
 
 export class MahitoFighter extends Fighter {
@@ -75,12 +79,21 @@ export class MahitoFighter extends Fighter {
     this.transformCooldown = CONFIG.mahito?.transformation?.cooldown || 1200;
     this.hasTransformed = false;
     this.noDamageTimer = 0;
+
+    // Ultimate: Domain Expansion — Self-Embodiment of Perfection
+    this.domainCooldown = CONFIG.mahito?.domainExpansion?.cooldown || 2000;
+    this.domainActive = false;
+    this.domainTimer = 0;
+    this.domainChargeTimer = 0;
+    this.domainChargeMax = CONFIG.mahito?.domainExpansion?.chargeMax || 120;
+
     
     // Evasion Mechanic State
     this.hasTriggeredEvasion = false;
     this.isEvading = false;
     this.evasionTimer = 0;
     this.evasionBounceTimer = 0;
+    this.cloneNoiseTimer = 0;
     this.originalRadius = this.r;
   }
 
@@ -109,6 +122,10 @@ export class MahitoFighter extends Fighter {
     this.transformDuration = 0;
     this.transformCooldown = CONFIG.mahito?.transformation?.cooldown || 1200;
     this.hasTransformed = false;
+    this.domainCooldown = CONFIG.mahito?.domainExpansion?.cooldown || 2000;
+    this.domainActive = false;
+    this.domainTimer = 0;
+    this.domainChargeTimer = 0;
     this.hasTriggeredEvasion = false;
     this.isEvading = false;
     this.evasionTimer = 0;
@@ -125,7 +142,8 @@ export class MahitoFighter extends Fighter {
    * Triggers Instant Spirit Body of Distorted Killing transformation.
    */
   activateDistortedKilling() {
-    if (this.isTransformed || this.isEvading) return;
+    const isEnabled = CONFIG.mahito?.transformation?.enabled ?? true;
+    if (!isEnabled || this.isTransformed || this.isEvading) return;
     this.isTransformed = true;
     this.isDistortedKilling = true;
     this.transformDuration = CONFIG.mahito?.transformation?.duration || 600;
@@ -139,8 +157,8 @@ export class MahitoFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 12, `+${healAmount} HP`, "#22c55e");
     triggerGlobalScreenShake(12, 12);
     spawnImpactFlash(this.x, this.y, 90, '#D946EF');
-    audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 2.0);
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 1.8);
+    const mahitoCfg = CONFIG.mahito || {};
+    audioSystem.playSFX(mahitoCfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 2.0);
   }
 
   /**
@@ -150,6 +168,7 @@ export class MahitoFighter extends Fighter {
     this.isTransformed = false;
     this.isDistortedKilling = false;
     this.transformDuration = 0;
+    this.clawRevertTimer = 18; // Trigger shivering & boiling claw hide animation!
     this.transformCooldown = CONFIG.mahito?.transformation?.cooldown || 1200;
 
     spawnFloatingText(this.x, this.y - this.r - 28, "FORM REVERTED", "#A855F7");
@@ -176,9 +195,10 @@ export class MahitoFighter extends Fighter {
       this.noDamageTimer = 0;
     }
 
-    // Auto-trigger transformation when low HP in combat if available
+    // Auto-trigger transformation when low HP in combat if enabled
+    const isTransEnabled = CONFIG.mahito?.transformation?.enabled ?? true;
     const threshold = CONFIG.mahito?.transformation?.autoTransformThreshold ?? 0.10;
-    if (!this.hasTransformed && (this.hp / this.maxHp) <= threshold && !this.isTransformed) {
+    if (isTransEnabled && !this.hasTransformed && (this.hp / this.maxHp) <= threshold && !this.isTransformed) {
       this.hasTransformed = true;
       this.activateDistortedKilling();
     }
@@ -221,7 +241,7 @@ export class MahitoFighter extends Fighter {
    * Overrides aim to disable body & gunAngle rotation during active skill channeling until finished.
    */
   aim(opponent) {
-    if (this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
+    if (this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0 || this.domainChargeTimer > 0) return;
     super.aim(opponent);
   }
 
@@ -229,7 +249,7 @@ export class MahitoFighter extends Fighter {
    * Prevents pushback, flinches, or minor damage from interrupting Twin Scythe Guillotine channeling (Hyper-Armor).
    */
   interruptAttacks(forceCancelAll = false) {
-    if (this.twinScissorAnimTimer > 0 && !forceCancelAll) {
+    if ((this.twinScissorAnimTimer > 0 || this.domainChargeTimer > 0) && !forceCancelAll) {
       return;
     }
     super.interruptAttacks(forceCancelAll);
@@ -241,45 +261,123 @@ export class MahitoFighter extends Fighter {
       return;
     }
 
+    // Handle Pre-Split Boiling & Shivering Animation before split
+    if (this.isPreSplitting) {
+      this.preSplitTimer--;
+
+      if (this.preSplitTimer <= 0) {
+        this.isPreSplitting = false;
+        this.executeActualSplit();
+      }
+
+      super.update(opponent, ownerIndex, arena);
+      return;
+    }
+
     if (this.isEvading) {
-      if (this.evasionBounceTimer > 0) {
-        this.evasionBounceTimer--;
+      // Enforce evasion speedMultiplier (1.25x) from CONFIG on main body
+      const evaSpeedMult = CONFIG.mahito?.evasion?.speedMultiplier || 1.25;
+      const targetSpeed = (this.baseSpeed || CONFIG.mahito?.moveSpeed || 5.8) * evaSpeedMult;
+      const currentSpeed = Math.hypot(this.vx, this.vy);
+      if (currentSpeed > 0) {
+        this.vx = (this.vx / currentSpeed) * targetSpeed;
+        this.vy = (this.vy / currentSpeed) * targetSpeed;
+        const moveAngle = Math.atan2(this.vy, this.vx);
+        this.gunAngle = moveAngle;
+        this.angle = moveAngle;
+      }
+
+      // ── Evasion Health Regeneration Buff ──
+      const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.40;
+      if (this.hp > 0 && this.hp < this.maxHp) {
+        this.hp = Math.min(this.maxHp, Number((this.hp + evaRegenRate).toFixed(2)));
+        this._evadeRegenTick = (this._evadeRegenTick || 0) + 1;
+        if (this._evadeRegenTick % 30 === 0 && typeof spawnFloatingText === 'function') {
+          spawnFloatingText(this.x, this.y - this.r - 18, `+${(evaRegenRate * 30).toFixed(0)} HP`, '#4ADE80');
+        }
+      }
+
+      // ── Periodic Ambient Clone Noise throughout Evasion Duration ──
+      if (this.cloneNoiseTimer === undefined || this.cloneNoiseTimer === null) {
+        this.cloneNoiseTimer = 50;
+      }
+      if (this.cloneNoiseTimer > 0) {
+        this.cloneNoiseTimer--;
       } else {
-        // AI / Player: Force fleeing steering away from nearest enemy
-        const target = this._findClosestEnemy(opponent);
-        if (target) {
-          const dx = this.x - target.x;
-          const dy = this.y - target.y;
-
-          // Wall avoidance force
-          const pad = 50;
-          let avoidX = 0;
-          let avoidY = 0;
-          if (arena) {
-            if (this.x - this.r - arena.x < pad) avoidX = 1.2;
-            else if (arena.x + arena.width - (this.x + this.r) < pad) avoidX = -1.2;
-            if (this.y - this.r - arena.y < pad) avoidY = 1.2;
-            else if (arena.y + arena.height - (this.y + this.r) < pad) avoidY = -1.2;
-          }
-
-          const fleeAngle = Math.atan2(dy, dx);
-          let targetAngle = fleeAngle;
-          if (avoidX !== 0 || avoidY !== 0) {
-            const avoidAngle = Math.atan2(avoidY, avoidX);
-            targetAngle = fleeAngle * 0.4 + avoidAngle * 0.6;
-          }
-
-          const finalAngle = targetAngle + (Math.random() * 0.3 - 0.15);
-          // Ensure high evasion run speed
-          const runSpeed = (CONFIG.mahito?.moveSpeed || 5.8) * (CONFIG.mahito?.evasion?.speedMultiplier || 1.25);
-          this.vx = Math.cos(finalAngle) * runSpeed;
-          this.vy = Math.sin(finalAngle) * runSpeed;
-          this.gunAngle = finalAngle;
-          this.angle = finalAngle;
+        const mahitoCfg = CONFIG.mahito || {};
+        const interval = mahitoCfg.sounds?.cloneNoiseInterval || 50;
+        this.cloneNoiseTimer = interval + Math.floor((Math.random() - 0.5) * 20); // Dynamic jitter (~40-60 frames)
+        const cloneSounds = [
+          mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3',
+          mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3'
+        ];
+        const chosenSound = cloneSounds[Math.floor(Math.random() * cloneSounds.length)];
+        const vol = mahitoCfg.sounds?.cloneNoiseVolume ?? 1.5;
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX(chosenSound, vol);
         }
       }
 
       this.evasionTimer--;
+
+      // Expansion / Reconsolidation Phase when duration is about to end (last 60 frames)
+      const expansionFrames = 60;
+      if (this.evasionTimer <= expansionFrames) {
+        this.isEvasionExpanding = true;
+        const progress = Math.min(1.0, Math.max(0.0, 1.0 - (this.evasionTimer / expansionFrames)));
+        const easeProgress = Math.sin(progress * (Math.PI / 2));
+
+        const evaCfg = CONFIG.mahito?.evasion || {};
+        const smallR = evaCfg.radius || 8;
+        const normalR = this.originalRadius || 25;
+
+        // Select the chosen clone/body with highest HP for reconsolidation once
+        if (!this.chosenReconsolidationTarget) {
+          let bestEntity = this;
+          let highestHp = this.hp > 0 ? this.hp : 0;
+          if (typeof state !== 'undefined' && state.illusions) {
+            const minions = state.illusions.filter(il => il && il.isEvasionMinion && il.owner === this);
+            for (const minion of minions) {
+              if (minion.hp > highestHp) {
+                highestHp = minion.hp;
+                bestEntity = minion;
+              }
+            }
+          }
+          this.chosenReconsolidationTarget = bestEntity;
+        }
+
+        const target = this.chosenReconsolidationTarget;
+        if (target) {
+          target.isChosenForReconsolidation = true;
+          target.r = smallR + (normalR - smallR) * easeProgress;
+          target.evasionExpandProgress = progress;
+        }
+
+        // Non-chosen clones stop moving, shiver & expand pre-explosion
+        if (typeof state !== 'undefined' && state.illusions) {
+          const minions = state.illusions.filter(il => il && il.isEvasionMinion && il.owner === this);
+          for (const minion of minions) {
+            if (minion !== target) {
+              minion.isChosenForReconsolidation = false;
+              minion.isDyingEvasion = true;
+              minion.evasionExpandProgress = progress;
+              minion.vx = 0; // STOP MOVING!
+              minion.vy = 0; // STOP MOVING!
+              minion.r = smallR + (normalR - smallR) * easeProgress; // Body expands/swells to full size!
+            }
+          }
+        }
+        if (this !== target) {
+          this.isChosenForReconsolidation = false;
+          this.isDyingEvasion = true;
+          this.evasionExpandProgress = progress;
+          this.vx = 0; // STOP MOVING!
+          this.vy = 0; // STOP MOVING!
+          this.r = smallR + (normalR - smallR) * easeProgress;
+        }
+      }
+
       if (this.evasionTimer <= 0) {
         this.endEvasion();
       }
@@ -298,8 +396,8 @@ export class MahitoFighter extends Fighter {
     // ── 2. Health Regeneration Mechanic ──
     this.noDamageTimer = (this.noDamageTimer || 0) + 1;
     const regenCfg = CONFIG.mahito?.regen || {};
-    const regenDelay = regenCfg.delay || 60;
-    const regenRate = regenCfg.rate || 0.16;
+    const regenDelay = regenCfg.delay ?? 100;
+    const regenRate = regenCfg.rate ?? 0.10;
 
     if (this.noDamageTimer >= regenDelay && this.hp > 0 && this.hp < this.maxHp) {
       const oldHp = this.hp;
@@ -328,6 +426,28 @@ export class MahitoFighter extends Fighter {
     }
 
     if (this.soulMultiplicityCooldown > 0) this.soulMultiplicityCooldown--;
+    if (this.domainCooldown > 0 && !this.domainActive && this.domainChargeTimer <= 0) this.domainCooldown--;
+
+    // Update Domain Expansion (Channeling & Active Barrier)
+    updateMahitoDomainExpansion(this);
+    if (this.domainChargeTimer > 0) {
+      this.punchAnimTimer = 0;
+      this.fleshSurgeAnimTimer = 0;
+      this.maceCannonAnimTimer = 0;
+      this.twinScissorAnimTimer = 0;
+      this.hideFrontHand = false;
+      this.hideBackHand = false;
+      this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.18);
+      // Halt velocities completely while channeling domain
+      this.vx = 0;
+      this.vy = 0;
+      // Skip normal steering/movement updates and just resolve boundary bounds
+      this.resolveWallBounce(arena);
+      // Decay status effect timers during channeling
+      if (this.knockbackStunTimer > 0) this.knockbackStunTimer--;
+      if (this.hitStunTimer > 0) this.hitStunTimer--;
+      return;
+    }
 
     // Update active Mutated Mace Cannon (3rd Skill)
     if (this.maceCannonCooldown > 0) this.maceCannonCooldown--;
@@ -514,19 +634,49 @@ export class MahitoFighter extends Fighter {
       return;
     }
 
+    // Evasion Reconsolidation Transformation Delay: Stand still & play fusion morph animation before moving!
+    if (this.evasionReconsolidateTimer > 0) {
+      this.evasionReconsolidateTimer--;
+      this.vx = 0;
+      this.vy = 0;
+      const t = this._findClosestEnemy(opponent);
+      if (t) this.aim(t);
+      if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+      if (this.cooldownTimer > 0) this.cooldownTimer--;
+      this.combatAuraOpacity = Math.min(1.0, (this.combatAuraOpacity || 0) + 0.15);
+      return;
+    }
+
     super.update(opponent, ownerIndex, arena);
 
-    // Cooldown management
-    if (this.punchAnimTimer > 0) this.punchAnimTimer--;
+    // Cooldown management & Claw Reversion animation
+    if (this.punchAnimTimer > 0) {
+      if (this.punchAnimTimer === 1) {
+        this.clawRevertTimer = 16; // Trigger shivering & boiling claw hide animation!
+      }
+      this.punchAnimTimer--;
+    }
+    if (this.clawRevertTimer > 0) {
+      this.clawRevertTimer--;
+    }
     if (this.cooldownTimer > 0) this.cooldownTimer--;
-    if (this.fleshSurgeAnimTimer > 0) this.fleshSurgeAnimTimer--;
+    if (this.fleshSurgeAnimTimer > 0) {
+      if (this.fleshSurgeAnimTimer === 1) {
+        this.clawRevertTimer = 16;
+      }
+      this.fleshSurgeAnimTimer--;
+    }
     if (this.fleshSurgeAnimTimer <= 0) {
       this.hideFrontHand = false;
     }
-    if (this.sharedSkillCooldown > 0) this.sharedSkillCooldown--;
-    if (this.fleshSurgeCooldown > 0) this.fleshSurgeCooldown--;
-    if (this.maceCannonCooldown > 0) this.maceCannonCooldown--;
-    if (this.twinScissorCooldown > 0) this.twinScissorCooldown--;
+    if (!this.isEvading && !this.isPreSplitting) {
+      if (this.sharedSkillCooldown > 0) this.sharedSkillCooldown--;
+      if (this.fleshSurgeCooldown > 0) this.fleshSurgeCooldown--;
+      if (this.maceCannonCooldown > 0) this.maceCannonCooldown--;
+      if (this.twinScissorCooldown > 0) this.twinScissorCooldown--;
+      if (this.domainCooldown > 0) this.domainCooldown--;
+      if (this.ultimateCooldown > 0) this.ultimateCooldown--;
+    }
 
     // Dynamic Cursed Energy combat aura opacity management
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
@@ -563,7 +713,16 @@ export class MahitoFighter extends Fighter {
       if (target) {
         this.aim(target);
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        const reach = CONFIG.mahito?.punchRange || 75;
+        let reach = CONFIG.mahito?.punchRange || 75;
+        if (this.domainActive) {
+          const isAnyDist = CONFIG.mahito?.domainExpansion?.anyDistanceBasicAttack ?? true;
+          if (isAnyDist) {
+            reach = 99999;
+          } else {
+            const domainReachMult = CONFIG.mahito?.domainExpansion?.punchRangeMultiplier ?? 2.00;
+            reach *= domainReachMult;
+          }
+        }
         const maxReach = this.r + target.r + reach;
         const minSurgeDist = CONFIG.mahito?.fleshSurge?.minDistance || 240;
         const maxSurgeDist = CONFIG.mahito?.fleshSurge?.reachMax || 420;
@@ -580,34 +739,11 @@ export class MahitoFighter extends Fighter {
           this.twinScissorCooldown || 0
         );
 
-        // 1. Passive Trigger: Phantom Soul Slip (Phase-Through Claw Dash) in Mid-Range
-        if (dist >= dashRangeMin && dist <= dashRangeMax && (this.soulPhaseDashCooldown || 0) <= 0) {
-          this.executeSoulPhaseSlip(target);
-        }
-        // 2. Soul Multiplicity & Body Repel (Fifth Skill - Independent Cooldown)
-        //    Block summoning if previous transfigured human minions are still alive
-        else if ((this.soulMultiplicityCooldown || 0) <= 0) {
-          const hasLivingMinions = state.illusions && state.illusions.some(
-            il => il && il.isTransfiguredHuman && il.owner === this && il.hp > 0
-          );
-          if (!hasLivingMinions) {
-            this.executeSoulMultiplicity(target);
-          }
-        }
-        // 3. Close-Range Combat: If enemy is near, execute Melee Strikes
-        else if (dist <= maxReach) {
-          if ((this.cooldownTimer || 0) <= 0) {
-            this.executeIdleTransfigurationStrike(target);
-          }
-        }
-        // 3. Special Morph Skills (Skills 2, 3, and 4): Single Shared Cooldown, Random Choice at Long Range (>= 240px)
-        else if (dist >= 240 && sharedSkillCd <= 0) {
-          const availableSkills = [];
-          if (dist <= maxSurgeDist) availableSkills.push('fleshSurge');
-          if (dist <= maceMaxDist) availableSkills.push('maceCannon');
-          if (dist <= scissorMaxDist) availableSkills.push('twinScissor');
-
-          if (availableSkills.length > 0) {
+        if (this.domainActive) {
+          // Inside Domain (Sure-Hit Domain Effect): Trigger Idle Transfiguration skills at ANY distance across the screen!
+          this.aim(target);
+          if (sharedSkillCd <= 0) {
+            const availableSkills = ['fleshSurge', 'maceCannon', 'twinScissor'];
             const chosenSkill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
             if (chosenSkill === 'twinScissor') {
               this.executeTwinScissor(target);
@@ -615,6 +751,51 @@ export class MahitoFighter extends Fighter {
               this.executeMaceCannon(target);
             } else {
               this.executeSubterraneanFleshSurge(target);
+            }
+          } else if ((this.cooldownTimer || 0) <= 0) {
+            this.executeIdleTransfigurationStrike(target);
+          }
+        } else {
+          // 0. Ultimate: Domain Expansion — Self-Embodiment of Perfection
+          if ((this.domainCooldown || 0) <= 0 && !this.domainActive && this.domainChargeTimer <= 0) {
+            this.executeDomainExpansion(target);
+          }
+          // 1. Passive Trigger: Phantom Soul Slip (Phase-Through Claw Dash) in Mid-Range
+          else if (dist >= dashRangeMin && dist <= dashRangeMax && (this.soulPhaseDashCooldown || 0) <= 0) {
+            this.executeSoulPhaseSlip(target);
+          }
+          // 2. Soul Multiplicity & Body Repel (Fifth Skill - Independent Cooldown)
+          //    Block summoning if previous transfigured human minions are still alive
+          else if ((this.soulMultiplicityCooldown || 0) <= 0) {
+            const hasLivingMinions = state.illusions && state.illusions.some(
+              il => il && il.isTransfiguredHuman && il.owner === this && il.hp > 0
+            );
+            if (!hasLivingMinions) {
+              this.executeSoulMultiplicity(target);
+            }
+          }
+          // 3. Close-Range Combat: If enemy is near, execute Melee Strikes
+          else if (dist <= maxReach) {
+            if ((this.cooldownTimer || 0) <= 0) {
+              this.executeIdleTransfigurationStrike(target);
+            }
+          }
+          // 3. Special Morph Skills (Skills 2, 3, and 4): Single Shared Cooldown, Random Choice at Long Range (>= 240px)
+          else if (dist >= 240 && sharedSkillCd <= 0) {
+            const availableSkills = [];
+            if (dist <= maxSurgeDist) availableSkills.push('fleshSurge');
+            if (dist <= maceMaxDist) availableSkills.push('maceCannon');
+            if (dist <= scissorMaxDist) availableSkills.push('twinScissor');
+
+            if (availableSkills.length > 0) {
+              const chosenSkill = availableSkills[Math.floor(Math.random() * availableSkills.length)];
+              if (chosenSkill === 'twinScissor') {
+                this.executeTwinScissor(target);
+              } else if (chosenSkill === 'maceCannon') {
+                this.executeMaceCannon(target);
+              } else {
+                this.executeSubterraneanFleshSurge(target);
+              }
             }
           }
         }
@@ -678,6 +859,7 @@ export class MahitoFighter extends Fighter {
    * Executes Passive: Phantom Soul Slip (Phase-Through Claw Dash).
    */
   executeSoulPhaseSlip(target = null) {
+    if (this.domainActive) return;
     const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.35;
     const canEvade = (typeof state !== 'undefined' && state.gameState === 'playing') && 
                      this.hp > 0 && this.maxHp > 0 && 
@@ -734,11 +916,34 @@ export class MahitoFighter extends Fighter {
    * Executes Fifth Skill: Soul Multiplicity (Transfigured Humans) or Alt Cast: Body Repel.
    */
   executeSoulMultiplicity(target = null) {
-    if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
+    if (this.domainActive) return;
+    if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0 || this.domainChargeTimer > 0) return;
     executeMahitoSoulMultiplicity(this, target);
   }
 
+  /**
+   * Executes Ultimate: Domain Expansion — Self-Embodiment of Perfection.
+   */
+  executeDomainExpansion(target = null) {
+    if (this.domainActive) return;
+    if (this.isEvading || (this.paralyzeTimer || 0) > 0 || this.isParalyzed || this.fleshSurgeAnimTimer > 0 || this.maceCannonAnimTimer > 0 || this.twinScissorAnimTimer > 0) return;
+    this.punchAnimTimer = 0;
+    this.fleshSurgeAnimTimer = 0;
+    this._fleshSurgePlungeAngle = null;
+    this.maceCannonAnimTimer = 0;
+    this._maceCannonData = null;
+    this.twinScissorAnimTimer = 0;
+    this._twinScissorData = null;
+    this.hideFrontHand = false;
+    this.hideBackHand = false;
+    executeMahitoDomainExpansion(this, target);
+  }
+
   triggerDemoAttack() {
+    if (this.domainActive) {
+      this.executeIdleTransfigurationStrike();
+      return;
+    }
     if (this._demoToggle === undefined) {
       this._demoToggle = 0;
     }
@@ -754,22 +959,25 @@ export class MahitoFighter extends Fighter {
     }
   }
 
-  triggerEvasion() {
-    const evaCfg = CONFIG.mahito?.evasion || {};
-    this.hasTriggeredEvasion = true;
-    this.isEvading = true;
-    this.evasionTimer = evaCfg.duration || 300;
+  _decrementSkillCooldowns() {
+    if (this.isEvading || this.isPreSplitting) return; // Freeze ALL skill cooldowns during Evasion state!
+    super._decrementSkillCooldowns();
+  }
 
-    // Clear active stuns/hitstuns to let him slip out of combos
+  triggerEvasion() {
+    if (this.hasTriggeredEvasion || this.isEvading || this.isPreSplitting) return;
+    this.hasTriggeredEvasion = true;
+    this.isPreSplitting = true;
+    this.preSplitTimer = 35; // 35 frames (~0.6s) boiling & shivering charge animation before split
+
+    // Clear active stuns/hitstuns
     this.hitStunTimer = 0;
     this.paralyzeTimer = 0;
     this.isParalyzed = false;
 
-    // Shrink hurtbox
+    // Store original properties
     this.originalRadius = this.r || 25;
     this._originalMaxHp = this.maxHp;
-    const evasionRadius = evaCfg.radius || 8;
-    this.r = evasionRadius;
 
     // Interrupt any active morph animations
     this.punchAnimTimer = 0;
@@ -779,65 +987,149 @@ export class MahitoFighter extends Fighter {
     this._twinScissorData = null;
     this._maceCannonData = null;
 
+    spawnFloatingText(this.x, this.y - this.r - 28, "👤 SOUL DISTORTION...", "#C026D3");
+    triggerGlobalScreenShake(4, 8);
+    const mahitoCfg = CONFIG.mahito || {};
+    audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+  }
+
+  executeActualSplit() {
+    const evaCfg = CONFIG.mahito?.evasion || {};
+    this.isEvading = true;
+    this.evasionTimer = evaCfg.duration || 300;
+
+    const evasionRadius = evaCfg.radius || 8;
+    this.r = evasionRadius;
+
     // Spawn small evasion illusions
     const cloneCount = evaCfg.cloneCount || 3;
     const numCopies = Math.max(1, cloneCount - 1); // Spawn clones so total small versions is exactly cloneCount
-    const speed = this.speed || 5.8;
+    const launchSpeed = (CONFIG.mahito?.moveSpeed || 5.8) * (CONFIG.mahito?.evasion?.speedMultiplier || 1.25);
     const color = this.color || '#C026D3';
 
     // Split current HP & maxHP equally among all copies (divided by cloneCount)
     const splitHp = Math.max(1, Math.round((this.hp / cloneCount) * 100) / 100);
-    const splitMaxHp = Math.max(1, Math.round((this.maxHp / cloneCount) * 100) / 100);
+    const splitMaxHp = Math.max(1, Math.round(((this._originalMaxHp || 2000) / cloneCount) * 100) / 100);
 
     this.hp = splitHp;
-    this.maxHp = splitMaxHp;
+    this.maxHp = this._originalMaxHp || 2000;
+
+    const baseAngle = Math.random() * Math.PI * 2;
+    this.vx = Math.cos(baseAngle) * launchSpeed;
+    this.vy = Math.sin(baseAngle) * launchSpeed;
+    this.gunAngle = baseAngle;
+    this.angle = baseAngle;
 
     for (let i = 0; i < numCopies; i++) {
-      const angle = (Math.PI * 2 / cloneCount) * (i + 1);
+      const angle = baseAngle + (Math.PI * 2 / cloneCount) * (i + 1);
+      const ownerStateIdx = this._stateIdx !== undefined ? this._stateIdx : (typeof state !== 'undefined' && state.fighters ? state.fighters.indexOf(this) : -1);
       const copy = {
         x: this.x + Math.cos(angle) * (this.originalRadius + 10),
         y: this.y + Math.sin(angle) * (this.originalRadius + 10),
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed,
+        vx: Math.cos(angle) * launchSpeed,
+        vy: Math.sin(angle) * launchSpeed,
         r: evasionRadius,
         color: color,
         hp: splitHp,
         maxHp: splitMaxHp,
         damage: 0,
         owner: this,
+        ownerIndex: ownerStateIdx,
         isIllusion: true,
         isEvasionMinion: true,
         isTransfiguredHuman: false,
         angle: angle,
         gunAngle: angle,
-        moveSpeed: speed,
+        moveSpeed: launchSpeed,
         hitFlashTimer: 0,
         timeStopTimer: 0,
         hitStunTimer: 0,
+        slowTimer: 0,
+        slowMultiplier: 1.0,
+        knockbackVx: 0,
+        knockbackVy: 0,
+        hideFrontHand: true,
+        hideBackHand: true,
+        hideHands: true,
+        punchAnimTimer: 0,
+        fleshSurgeAnimTimer: 0,
+        maceCannonAnimTimer: 0,
+        twinScissorAnimTimer: 0,
         swordCooldown: 9999,
         takeDamage(amount, attacker, opts = {}) {
+          if (this.isEvasionMinion && !opts?.bypassEvade) {
+            const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
+            if (Math.random() < dodgeChance) {
+              const now = Date.now();
+              if (!this._lastEvadeTextTime || now - this._lastEvadeTextTime > 200) {
+                this._lastEvadeTextTime = now;
+                spawnFloatingText(this.x, this.y - this.r - 12, 'EVADE!', '#F5D0FE');
+                audioSystem.playSFX('effect_dash', 0.5);
+              }
+              return false; // Attack dodged completely!
+            }
+          }
           return applyDamageToTarget(this, amount, attacker, opts);
-        }
+        },
+        applyHitStun(duration) {
+          if (this.isEvasionMinion) return; // Never freeze evasion clone movement when attacked!
+          this.hitStunTimer = Math.max(this.hitStunTimer || 0, duration);
+        },
+        applySlow(duration, multiplier) {
+          this.slowTimer = Math.max(this.slowTimer || 0, duration);
+          if (multiplier !== undefined) this.slowMultiplier = multiplier;
+        },
+        applyTimeStop(duration) {
+          this.timeStopTimer = Math.max(this.timeStopTimer || 0, duration);
+        },
+        isPerformingSkill() { return false; },
+        isCaughtInBeam() { return false; },
+        normalizeSpeed() {}
       };
       if (typeof state !== 'undefined' && state.illusions) {
         state.illusions.push(copy);
-        spawnIllusionSpawn(copy);
       }
     }
 
     spawnFloatingText(this.x, this.y - this.r - 28, "👤 SOUL SPLIT EVASION!", "#C026D3");
     triggerGlobalScreenShake(6, 10);
-    audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+    const mahitoCfg = CONFIG.mahito || {};
+    audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    this.cloneNoiseTimer = 50; // Initial interval before recurring clone chatter begins
+  }
+
+  getDisplayHp() {
+    if (this.isEvading || this.isPreSplitting) {
+      let totalHp = Math.max(0, this.hp);
+      if (typeof state !== 'undefined' && state.illusions) {
+        const minions = state.illusions.filter(il => il && il.isEvasionMinion && il.owner === this);
+        for (const minion of minions) {
+          if (minion.hp > 0) totalHp += minion.hp;
+        }
+      }
+      return Math.round(totalHp);
+    }
+    return Math.round(this.hp);
   }
 
   endEvasion() {
     this.isEvading = false;
+    this.isPreSplitting = false;
+    this.isEvasionExpanding = false;
+    this.cloneNoiseTimer = 0; // Stop clone chatter immediately when evasion ends
+    delete this.evasionExpandProgress;
+    const targetEntity = this.chosenReconsolidationTarget;
+    delete this.chosenReconsolidationTarget;
+    delete this.opacity;
+    delete this.isChosenForReconsolidation;
     this.r = this.originalRadius || 25;
     if (this._originalMaxHp) {
       this.maxHp = this._originalMaxHp;
     }
 
-    let bestEntity = this;
+    let bestEntity = targetEntity || this;
     let highestHp = this.hp > 0 ? this.hp : 0;
     let totalSurvivingHp = Math.max(0, this.hp);
 
@@ -846,15 +1138,45 @@ export class MahitoFighter extends Fighter {
       for (const minion of minions) {
         if (minion.hp > 0) {
           totalSurvivingHp += minion.hp;
-          if (minion.hp > highestHp) {
+          if (!targetEntity && minion.hp > highestHp) {
             highestHp = minion.hp;
             bestEntity = minion;
           }
         }
       }
 
-      // Reconstitute at the location of the best surviving entity
+      // Non-chosen clones enter body swell & boil expansion phase before exploding!
+      for (const minion of minions) {
+        if (minion !== bestEntity && !minion.isDying) {
+          minion.isDying = true;
+          minion.deathTimer = 24;
+          minion.maxDeathTimer = 24;
+          minion.hp = 0;
+        }
+      }
+
+      // If Mahito's original body was NOT chosen, trigger smooth dissolve explosion at old main body location
       if (bestEntity !== this) {
+        const oldX = this.x;
+        const oldY = this.y;
+        if (typeof spawnIllusionDeath === 'function') {
+          spawnIllusionDeath({ x: oldX, y: oldY, r: this.r || 25, color: '#D946EF' });
+        }
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(oldX, oldY, 35, '#D946EF');
+        }
+        if (typeof spawnMahitoSoulBubbles === 'function') {
+          spawnMahitoSoulBubbles(oldX, oldY, 4, '#D946EF');
+        }
+        if (typeof spawnMahitoSoulExplosion === 'function') {
+          spawnMahitoSoulExplosion(oldX, oldY, 35, true);
+        }
+        const mahitoCfg = CONFIG.mahito || {};
+        if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+          audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+          audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+        }
+
         this.x = bestEntity.x;
         this.y = bestEntity.y;
         this.aim(this._findClosestEnemy());
@@ -864,46 +1186,65 @@ export class MahitoFighter extends Fighter {
       if (totalSurvivingHp > 0) {
         this.isDead = false;
         this.hp = Math.min(this.maxHp, totalSurvivingHp);
+        this._healthBarHealTimer = 16;
+        const healVal = Math.round(this.hp);
+        if (typeof spawnFloatingText === 'function') {
+          spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 15, `+${healVal}`, '#00FF66');
+        }
       } else {
         // All copies died - Mahito stays dead
         this.hp = 0;
         this.isDead = true;
       }
 
-      // Remove evasion minions
-      state.illusions = state.illusions.filter(il => !(il && il.isEvasionMinion && il.owner === this));
+      // Remove the chosen clone from state.illusions, allowing non-chosen dying clones to finish their swell phase
+      state.illusions = state.illusions.filter(il => !(il && il.isEvasionMinion && il.owner === this && (il === bestEntity || !il.isDying)));
     }
 
-    spawnFloatingText(this.x, this.y - this.r - 28, "👤 SOUL RECONSOLIDATION!", "#C026D3");
+    this.evasionReconsolidateTimer = 24; // 24 frames (~0.4s) reconsolidation delay before moving!
+    this.evasionReconsolidateMax = 24;
+
+    spawnFloatingText(this.x, this.y - this.r - 32, "👤 SOUL RECONSOLIDATION!", "#C026D3");
     triggerGlobalScreenShake(6, 12);
     spawnImpactFlash(this.x, this.y, 45, '#C026D3');
-    audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
+    const mahitoCfg = CONFIG.mahito || {};
+    audioSystem.playFighterVoiceline(this, mahitoCfg.sounds?.transformBackVoiceline || 'Assets/Sound Effects/Skills/mahito-transformback-voiceline.mp3', mahitoCfg.sounds?.transformBackVoicelineVolume ?? 2.0);
   }
 
   resolveWallBounce(arena, opponent) {
     const bounced = super.resolveWallBounce(arena, opponent);
     if (bounced && this.isEvading) {
-      // Temporarily pause flee steering so the natural bounce velocity can execute cleanly
-      this.evasionBounceTimer = 18;
+      const bAngle = Math.atan2(this.vy, this.vx) + (Math.random() - 0.5) * 0.20;
+      const curB = Math.hypot(this.vx, this.vy);
+      this.vx = Math.cos(bAngle) * curB;
+      this.vy = Math.sin(bAngle) * curB;
+      this.gunAngle = bAngle;
+      this.angle = bAngle;
     }
     return bounced;
   }
 
   shoot(ownerIndex) {
-    if (this.isCaughtInBeam()) {
-      this.interruptAttacks();
-      return;
-    }
-    if ((this.paralyzeTimer || 0) > 0 || this.isParalyzed) return;
+    if (!this.canPerformBasicAttack()) return false;
 
-    // If called automatically by Fighter.js base loop for AI, do not swing unless strictly in range
+    // If called automatically by Fighter.js base loop for AI
     if (!this.playerControlled) {
       const target = this._findClosestEnemy();
       if (target) {
+        let reach = CONFIG.mahito?.punchRange || 75;
+        if (this.domainActive) {
+          const isAnyDist = CONFIG.mahito?.domainExpansion?.anyDistanceBasicAttack ?? true;
+          if (isAnyDist) {
+            reach = 99999;
+          } else {
+            const domainReachMult = CONFIG.mahito?.domainExpansion?.punchRangeMultiplier ?? 2.00;
+            reach *= domainReachMult;
+          }
+        }
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        const reach = CONFIG.mahito?.punchRange || 75;
         const maxReach = this.r + target.r + reach;
         if (dist <= maxReach && (this.cooldownTimer || 0) <= 0) {
+          this.aim(target);
           this.executeIdleTransfigurationStrike(target);
         }
       }
@@ -912,7 +1253,25 @@ export class MahitoFighter extends Fighter {
 
     // Player-controlled manual click
     if ((this.cooldownTimer || 0) > 0) return;
-    this.executeIdleTransfigurationStrike();
+    const manualTarget = this._findClosestEnemy();
+    if (manualTarget) this.aim(manualTarget);
+    this.executeIdleTransfigurationStrike(manualTarget);
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    if (this.isEvading && !opts?.bypassEvade) {
+      const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
+      if (Math.random() < dodgeChance) {
+        const now = Date.now();
+        if (!this._lastEvadeTextTime || now - this._lastEvadeTextTime > 200) {
+          this._lastEvadeTextTime = now;
+          spawnFloatingText(this.x, this.y - this.r - 12, 'EVADE!', '#E0FFFF');
+          audioSystem.playSFX('effect_dash', 0.5);
+        }
+        return false; // Attack dodged completely!
+      }
+    }
+    return super.takeDamage(amount, attacker, opts);
   }
 
   draw(ctx) {

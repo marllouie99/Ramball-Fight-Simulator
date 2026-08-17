@@ -240,6 +240,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
 }
 
 export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, isAmbushThrust = false) {
+  if (!fighter.canPerformBasicAttack()) return;
   fighter.spearCooldown = fighter.spearCooldownMax;
   fighter.isAmbushThrust = isAmbushThrust;
   const speedMult = TOJI_WEAPON_CONFIG?.spearSwingAnimSpeed || 1.0;

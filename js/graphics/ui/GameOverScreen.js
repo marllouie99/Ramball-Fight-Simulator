@@ -1,6 +1,6 @@
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { Fighter } from '../../entities/fighter.js';
-import { drawHUD } from '../hudManager.js';
+import { drawHUD } from '../hudManager.js?v=6';
 import { state } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';

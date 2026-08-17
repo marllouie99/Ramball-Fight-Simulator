@@ -30,7 +30,7 @@ import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
 import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen } from './renderers/arenaRenderer.js';
-import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen } from './renderers/environmentalRenderer.js';
+import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay } from './renderers/environmentalRenderer.js';
 import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
@@ -57,7 +57,7 @@ export function getNow() {
 }
 
 export { drawDivineFlameArrowConstruct };
-export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen };
+export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay };
 export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 export { drawGenosSelfDestructDimScreen };

@@ -7,6 +7,7 @@ import { CONFIG } from '../../../core/config.js';
 import { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch } from '../../../graphics/weapons/mahoragaWeaponGraphics.js';
 import { drawMahoragaFaceWings, drawMahoragaChestNecklace } from '../../../graphics/fighters/mahoragaSkin.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
+import { isChampionScreenActive } from '../../../core/state.js';
 
 /**
  * Draw Sakuga Anime Impact Frame (anime speed lines + multi-strike phantom flurry + ink-brush burst)
@@ -352,7 +353,9 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
   drawMahoragaChestNecklace(ctx, fighter);
 
   // 4. Draw Left Off-Hand ON TOP OF BODY & NECKLACE
-  drawMahoragaLeftPunch(ctx, fighter);
+  if (typeof isChampionScreenActive !== 'function' || !isChampionScreenActive()) {
+    drawMahoragaLeftPunch(ctx, fighter);
+  }
 
   // 5. Draw 3D Wheel of Adaptation & Surrounding Golden Ring Highlight
   drawMahoraga3DWheel(ctx, fighter);

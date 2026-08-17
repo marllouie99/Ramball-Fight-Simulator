@@ -18,7 +18,7 @@ import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { ParticleSystem } from '../systems/particles/ParticleSystem.js';
 import { clearAllPools } from '../graphics/objectPool.js';
-import { clearHealthHud } from '../graphics/hudManager.js';
+import { clearHealthHud } from '../graphics/hudManager.js?v=6';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 
 // ─────────────────────────────────────────────

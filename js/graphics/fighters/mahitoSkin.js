@@ -21,6 +21,7 @@ import {
   drawMahitoTwinScissor 
 } from '../weapons/mahitoWeaponGraphics.js';
 import { GojoRenderer } from './gojoRenderer.js';
+import { drawMinionHealthBar, drawMahitoFleshBubblyDeformLocal } from '../statusEffects.js';
 
 /**
  * Renders JJK-authentic Cursed Energy Flame Aura engulfing Mahito.
@@ -124,9 +125,6 @@ function drawStitchLine(ctx, x1, y1, x2, y2, stitchCount = 4, crossLength = 3.6,
  * 3. Forehead diagonal suture with 3 cross-stitches in the open upper-left forehead.
  * 4. Clean horizontal neck suture across the collar opening.
  */
-// Pre-allocated static buffers for Mahito skin rendering (Zero per-frame heap allocations)
-const _handFlamePts = Array.from({ length: 8 }, () => ({ x: 0, y: 0 }));
-
 /**
  * Draws Mahito's exact facial surgical stitches matching the anime screenshot.
  * Batched for 60 FPS performance (single path stroke).
@@ -217,77 +215,13 @@ function drawMahitoFacialStitches(ctx, r) {
 }
 
 /**
- * Draws Mahito's brawler hand fist enveloped in authentic JJK Cursed Energy matching reference image.
+ * Draws Mahito's brawler hand fist matching reference image.
  * High performance optimized.
  */
 export function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
-
-  const isPunching = fighter && fighter.punchAnimTimer > 0;
-  const opacity = (fighter && fighter._isWinnerReveal) ? 1.0 : (fighter.combatAuraOpacity || (isPunching ? 1.0 : 0.0));
-  const showCE = opacity > 0.05 || isPunching;
-
-  // ── 1. JJK CURSED ENERGY FLAME ENVELOPE ──
-  if (showCE) {
-    const ceAlpha = isPunching ? 1.0 : opacity;
-    const now = Date.now() * 0.005;
-    const ceBlobRadius = handRadius * (isPunching ? 2.4 : 1.85);
-
-    // Reusable static flame buffer (Zero allocations)
-    const numFlamePts = 8;
-    for (let i = 0; i < numFlamePts; i++) {
-      const ang = (Math.PI * 2 / numFlamePts) * i;
-      const wave = Math.sin(now * 3.5 + i * 1.8) * (handRadius * 0.35);
-      const stretch = (Math.cos(ang) > 0.2 ? handRadius * 0.45 : 0);
-      const curR = ceBlobRadius + wave + stretch;
-      _handFlamePts[i].x = Math.cos(ang) * curR;
-      _handFlamePts[i].y = Math.sin(ang) * curR;
-    }
-
-    let fmx = (_handFlamePts[numFlamePts - 1].x + _handFlamePts[0].x) / 2;
-    let fmy = (_handFlamePts[numFlamePts - 1].y + _handFlamePts[0].y) / 2;
-
-    ctx.beginPath();
-    ctx.moveTo(fmx, fmy);
-    for (let i = 0; i < numFlamePts; i++) {
-      const p = _handFlamePts[i];
-      const next = _handFlamePts[(i + 1) % numFlamePts];
-      ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) / 2, (p.y + next.y) / 2);
-    }
-    ctx.closePath();
-
-    // Magenta CE Body Fill
-    ctx.fillStyle = `rgba(217, 70, 239, ${(0.80 * ceAlpha).toFixed(3)})`;
-    ctx.fill();
-
-    // Inner Lilac-White Core
-    ctx.beginPath();
-    ctx.arc(handRadius * 0.15, 0, handRadius * 0.9, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(245, 208, 254, ${(0.85 * ceAlpha).toFixed(3)})`;
-    ctx.fill();
-
-    // Deep Violet-Plum Ink Outline
-    ctx.strokeStyle = `rgba(59, 7, 100, ${(0.90 * ceAlpha).toFixed(3)})`;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-
-    // Tiny Crackling Cursed Soul Sparks
-    if (isPunching) {
-      ctx.strokeStyle = 'rgba(245, 208, 254, 0.90)';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      for (let s = 0; s < 3; s++) {
-        const sang = now * 4 + s * 2.1;
-        const sr1 = handRadius * 0.8;
-        const sr2 = handRadius * 1.5;
-        ctx.moveTo(Math.cos(sang) * sr1, Math.sin(sang) * sr1);
-        ctx.lineTo(Math.cos(sang + 0.3) * sr2, Math.sin(sang + 0.3) * sr2);
-      }
-      ctx.stroke();
-    }
-  }
 
   // ── 2. PHYSICAL HAND / FIST ──
   if (isTransformed) {
@@ -457,17 +391,6 @@ export function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
     // Secondary wrist suture
     drawStitchLine(ctx, -handRadius * 0.75, -handRadius * 0.35, -handRadius * 0.75, handRadius * 0.35, 2, 3.0, '#000000');
 
-    // 6. Micro Cursed Energy Veins branching across dorsal skin
-    ctx.strokeStyle = 'rgba(192, 38, 211, 0.55)';
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.moveTo(-handRadius * 0.5, -handRadius * 0.1);
-    ctx.lineTo(-handRadius * 0.1, -handRadius * 0.15);
-    ctx.lineTo(handRadius * 0.3, -handRadius * 0.05);
-    ctx.moveTo(-handRadius * 0.1, -handRadius * 0.15);
-    ctx.lineTo(handRadius * 0.2, -handRadius * 0.35);
-    ctx.stroke();
-
     ctx.restore();
   }
 
@@ -477,7 +400,7 @@ export function drawHandFist(ctx, x, y, handRadius, isTransformed, fighter) {
 /**
  * Draws the Instant Spirit Body of Distorted Killing (ISBoDK) Carapace in Upright Orientation.
  */
-function drawTransformedCarapace(ctx, r) {
+function drawTransformedCarapace(ctx, r, hideElbowBlades = false) {
   // 1. Segmented Bladed Tail extending from behind the lower body
   ctx.save();
   ctx.fillStyle = '#0E1322';
@@ -507,30 +430,32 @@ function drawTransformedCarapace(ctx, r) {
   ctx.fill();
   ctx.restore();
 
-  // 2. Large Curved Elbow/Forearm Scythe Blades (Left & Right)
-  ctx.save();
-  ctx.fillStyle = '#0E1322';
-  ctx.strokeStyle = '#D946EF';
-  ctx.lineWidth = 1.6;
+  // 2. Large Curved Elbow/Forearm Scythe Blades (Left & Right) - Hidden during Domain Expansion channeling
+  if (!hideElbowBlades) {
+    ctx.save();
+    ctx.fillStyle = '#0E1322';
+    ctx.strokeStyle = '#D946EF';
+    ctx.lineWidth = 1.6;
 
-  // Left Scythe Blade
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.75, 0);
-  ctx.quadraticCurveTo(-r * 1.5, -r * 0.5, -r * 1.35, -r * 1.1);
-  ctx.quadraticCurveTo(-r * 0.9, -r * 0.4, -r * 0.70, -r * 0.3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+    // Left Scythe Blade
+    ctx.beginPath();
+    ctx.moveTo(-r * 0.75, 0);
+    ctx.quadraticCurveTo(-r * 1.5, -r * 0.5, -r * 1.35, -r * 1.1);
+    ctx.quadraticCurveTo(-r * 0.9, -r * 0.4, -r * 0.70, -r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-  // Right Scythe Blade
-  ctx.beginPath();
-  ctx.moveTo(r * 0.75, 0);
-  ctx.quadraticCurveTo(r * 1.5, -r * 0.5, r * 1.35, -r * 1.1);
-  ctx.quadraticCurveTo(r * 0.9, -r * 0.4, r * 0.70, -r * 0.3);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.restore();
+    // Right Scythe Blade
+    ctx.beginPath();
+    ctx.moveTo(r * 0.75, 0);
+    ctx.quadraticCurveTo(r * 1.5, -r * 0.5, r * 1.35, -r * 1.1);
+    ctx.quadraticCurveTo(r * 0.9, -r * 0.4, r * 0.70, -r * 0.3);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+  }
 
   // 3. Top Head Crest / Armored Horns (Upward at -y)
   ctx.save();
@@ -624,7 +549,7 @@ function drawTransformedCarapace(ctx, r) {
  * - Sickly pale skin with iconic facial and neck surgical stitches (NO eyes)
  * - Detailed dark patchwork poncho tunic with stitched square grid pattern
  */
-function drawBaseMahito(ctx, r) {
+function drawBaseMahito(ctx, r, fighter) {
   // ── 1. BACK HAIR VOLUME & TIED HAIR BUNDLES (Drawn behind body circle) ──
   ctx.save();
   ctx.fillStyle = '#9EB7C6';
@@ -802,7 +727,9 @@ function drawBaseMahito(ctx, r) {
   ctx.restore();
 
   // ── 4. EXACT FACIAL SURGICAL SUTURES & STITCHES (Anime Reference) ──
-  drawMahitoFacialStitches(ctx, r);
+  if (!fighter || !fighter.isDying) {
+    drawMahitoFacialStitches(ctx, r);
+  }
 
   // ── 5. FLOWING GREY-BLUE HAIR (Anime Fringe with Long Center & Curving Side Locks) ──
   ctx.fillStyle = '#9EB7C6';
@@ -913,31 +840,101 @@ function drawMahitoDashAfterimages(ctx, fighter) {
  * Adheres strictly to docs/fighter_hand_positioning_guide.md and Rule #2.
  */
 export function drawMahitoSkin(ctx, fighter) {
+  const isChannelingDomain = Boolean(fighter && (fighter.domainChargeTimer > 0 || fighter.isChannelingDomainExpansion));
+
+  // 0. Isometric Ground Summoning Ring during Domain Expansion Channeling
+  if (isChannelingDomain && (fighter.timeStopTimer || 0) <= 0) {
+    const maxCharge = fighter.domainChargeMax || CONFIG.mahito?.domainExpansion?.chargeMax || 120;
+    const progress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.domainChargeTimer / maxCharge)));
+
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y);
+    ctx.scale(1, 0.4); // Isometric perspective
+    const ringRadius = 160 * progress;
+
+    // Outer glowing deep lavender/purple ring
+    ctx.beginPath();
+    ctx.arc(0, 0, ringRadius, 0, Math.PI * 2);
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = `rgba(192, 38, 211, ${progress})`; // Deep Magenta/Lavender
+    ctx.stroke();
+
+    // Inner rotating dashed light greyish-blue stitch-like ring
+    ctx.rotate(Date.now() / 300);
+    ctx.beginPath();
+    ctx.arc(0, 0, ringRadius * 0.85, 0, Math.PI * 2);
+    ctx.setLineDash([15, 10]);
+    ctx.lineWidth = 4;
+    ctx.strokeStyle = `rgba(158, 183, 198, ${progress * 1.2})`; // Light greyish blue
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.restore();
+  }
+
   // 1. Render Phantom Soul Slip afterimages in world space
   drawMahitoDashAfterimages(ctx, fighter);
 
-  // 2. Render Subterranean Flesh Surge tendrils in world coordinates
-  drawMahitoSubterraneanFleshSurge(ctx, fighter);
+  if (!isChannelingDomain) {
+    // 2. Render Subterranean Flesh Surge tendrils in world coordinates
+    drawMahitoSubterraneanFleshSurge(ctx, fighter);
 
-  // 3. Render Mutated Mace Cannon (Stretch Arm Spiked Ball Shrapnel) in world coordinates
-  drawMahitoMaceCannon(ctx, fighter);
+    // 3. Render Mutated Mace Cannon (Stretch Arm Spiked Ball Shrapnel) in world coordinates
+    drawMahitoMaceCannon(ctx, fighter);
 
-  // 4. Render Dual Scythe Pincer Guillotine (Twin Stretched Blade Ambush - Back Arm) in world coordinates
-  drawMahitoTwinScissor(ctx, fighter, 'back');
+    // 4. Render Dual Scythe Pincer Guillotine (Twin Stretched Blade Ambush - Back Arm) in world coordinates
+    drawMahitoTwinScissor(ctx, fighter, 'back');
+  }
 
   const isEvading = !!fighter.isEvading;
   const isEvasionMinion = !!fighter.isEvasionMinion;
-  const r = (isEvading || isEvasionMinion) ? 25 : (fighter.r || 25);
+  const isPreSplitting = !!fighter.isPreSplitting;
+  const isChosenForReconsolidation = !!fighter.isChosenForReconsolidation;
+  const r = (isEvading || isEvasionMinion || isPreSplitting) ? 25 : (fighter.r || 25);
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
-  ctx.save();
-  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+  // ── Shivering / Tremor Displacement for Pre-Split & Reconsolidation Boiling ──
+  let shiverX = 0;
+  let shiverY = 0;
+  if (isPreSplitting) {
+    const tremorAmt = 3.5 + (1.0 - Math.max(0, (fighter.preSplitTimer || 0) / 35)) * 5.5; // 3.5px to 9px shivering shake
+    shiverX = (Math.random() - 0.5) * tremorAmt;
+    shiverY = (Math.random() - 0.5) * tremorAmt;
+  } else if (isChosenForReconsolidation || fighter.isDyingEvasion) {
+    const expandP = fighter.evasionExpandProgress || 0;
+    const tremorAmt = 2.5 + expandP * 7.5; // 2.5px to 10px shivering shake on expanding/boiling clones
+    shiverX = (Math.random() - 0.5) * tremorAmt;
+    shiverY = (Math.random() - 0.5) * tremorAmt;
+  }
 
-  const evasionScale = (typeof CONFIG !== 'undefined' && CONFIG.mahito?.evasion?.scale) !== undefined 
+  ctx.save();
+  if (fighter.opacity !== undefined) {
+    ctx.globalAlpha = Math.max(0, Math.min(1.0, fighter.opacity));
+  }
+  ctx.translate(fighter.x + shiverX, fighter.y - (fighter.z || 0) + shiverY);
+
+  const baseEvasionScale = (typeof CONFIG !== 'undefined' && CONFIG.mahito?.evasion?.scale) !== undefined 
     ? CONFIG.mahito.evasion.scale 
     : 0.32;
+  let evasionScale = baseEvasionScale;
 
-  if (isEvading || isEvasionMinion) {
+  if (isPreSplitting) {
+    const shrinkProgress = 1.0 - Math.max(0, (fighter.preSplitTimer || 0) / 35);
+    const easeP = Math.sin(shrinkProgress * (Math.PI / 2));
+    evasionScale = 1.0 - (1.0 - baseEvasionScale) * easeP;
+    ctx.scale(evasionScale, evasionScale);
+  } else if (isEvading || isEvasionMinion) {
+    if (isChosenForReconsolidation) {
+      const expandProgress = fighter.evasionExpandProgress || 0;
+      const easeP = Math.sin(expandProgress * (Math.PI / 2));
+      evasionScale = baseEvasionScale + (1.0 - baseEvasionScale) * easeP;
+    } else if (fighter.isDyingEvasion) {
+      const expandProgress = fighter.evasionExpandProgress || 0;
+      const easeP = Math.sin(expandProgress * (Math.PI / 2));
+      evasionScale = baseEvasionScale + (0.95 - baseEvasionScale) * easeP; // Body expands/swells as it shivers!
+    } else {
+      evasionScale = baseEvasionScale;
+    }
     ctx.scale(evasionScale, evasionScale);
   }
 
@@ -945,17 +942,38 @@ export function drawMahitoSkin(ctx, fighter) {
   drawMahitoCursedEnergyAura(ctx, fighter);
 
   // 2. Aim & Orientation Transform (Core Stance Coordinate Frame)
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  let angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  const isSpinning = (isEvading || isEvasionMinion) && !fighter.isDyingEvasion && !fighter.isChosenForReconsolidation && !isPreSplitting;
+
+  if (isChannelingDomain) {
+    angle = 0; // Force Mahito to face directly towards the camera/viewer during domain channeling!
+  } else if (isEvading || isEvasionMinion || isPreSplitting) {
+    if (fighter.isDyingEvasion || fighter.isChosenForReconsolidation || isPreSplitting) {
+      // Lock facing angle during pre-split charge and pre-explosion swell so it stays still while frozen!
+      if (fighter._evasionLockAngle === undefined) {
+        fighter._evasionLockAngle = (Math.abs(angle) > Math.PI / 2) ? Math.PI : 0;
+      }
+      angle = fighter._evasionLockAngle;
+    } else {
+      delete fighter._evasionLockAngle;
+      // Spin continuously while moving across the arena!
+      fighter._spinAngle = (fighter._spinAngle || 0) + 0.22;
+      angle = fighter._spinAngle;
+    }
+  } else {
+    delete fighter._evasionLockAngle;
+    delete fighter._spinAngle;
+  }
   ctx.rotate(angle);
 
-  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const facingLeft = !isChannelingDomain && !isSpinning && Math.abs(angle) > Math.PI / 2;
   if (facingLeft) {
     ctx.scale(1, -1);
   }
 
   // 3. Smooth Punch Animation Dynamics (Ease curve for lunges/recoils)
   const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
-  const isPunching = !isMatchEnded && fighter.punchAnimTimer > 0;
+  const isPunching = !isMatchEnded && !isChannelingDomain && !isEvading && !isEvasionMinion && !isPreSplitting && fighter.punchAnimTimer > 0;
   let rawProgress = 0;
   if (isPunching) {
     const maxT = fighter.punchMaxTime || 16;
@@ -984,7 +1002,28 @@ export function drawMahitoSkin(ctx, fighter) {
   let frontHandX = 0, frontHandY = 0;
   let backHandX = 0, backHandY = 0;
 
-  if (isPunching) {
+  if (isChannelingDomain) {
+    // Domain Expansion Channeling Hand Animation (Frame 1 -> Frame 2 matching user diagram):
+    // Frame 1: Hands start on left & right sides (-r * 0.90, +r * 0.28) and (+r * 0.90, +r * 0.28)
+    // Frame 2: Hands smoothly glide inward to meet & overlap at chest center (-r * 0.22, +r * 0.28) and (+r * 0.22, +r * 0.28)
+    const maxCharge = fighter.domainChargeMax || CONFIG.mahito?.domainExpansion?.chargeMax || 120;
+    const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.domainChargeTimer / maxCharge)));
+    
+    // Smooth transition from Frame 1 to Frame 2 over the first 40% of channeling:
+    const animT = Math.min(1.0, rawProgress / 0.40);
+    const easeT = Math.sin(animT * (Math.PI / 2)); // Smooth cubic ease-out
+
+    const startSpreadX = r * 0.90;
+    const endSpreadX = r * 0.22;
+    const currentSpreadX = startSpreadX + (endSpreadX - startSpreadX) * easeT;
+    const handY = r * 0.28;
+
+    backHandX = -currentSpreadX;
+    backHandY = handY;
+
+    frontHandX = currentSpreadX;
+    frontHandY = handY;
+  } else if (isPunching) {
     if (fighter.isRightPunch) {
       frontHandX = r * 0.70 + lungeExtension;
       frontHandY = r * 0.12;
@@ -1006,26 +1045,66 @@ export function drawMahitoSkin(ctx, fighter) {
 
   const handRadius = getHandSize(7.5);
   const morphType = fighter.morphType || 'blade';
+  const drawTransformedHands = isTransformed && !isChannelingDomain;
+
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isEvading || isEvasionMinion || isPreSplitting;
 
   // 5. Render Back Hand Layer (Behind Body Circle) - Rule #2 & #20
-  if (!fighter._isWinnerReveal && !fighter.hideBackHand) {
+  // During Domain Expansion channeling, both hands render on the front layer (on top of body)
+  if (!fighter._isWinnerReveal && !fighter.hideBackHand && !isChannelingDomain && !shouldHideHands) {
     if (isPunching && !fighter.isRightPunch) {
       drawMahitoArmMorph(ctx, fighter, isTransformed, false, morphType, rawProgress, backHandX, backHandY);
+    } else if (fighter.clawRevertTimer > 0) {
+      const maxRevert = 18;
+      const revertProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.clawRevertTimer / maxRevert)));
+      const shiverAmp = (1.0 - revertProgress) * 5.5;
+      const shiverX = (Math.random() - 0.5) * shiverAmp;
+      const shiverY = (Math.random() - 0.5) * shiverAmp;
+
+      ctx.save();
+      ctx.translate(backHandX + shiverX, backHandY + shiverY);
+
+      // Expanding boiling cursed energy aura around hand socket
+      const boilRadius = (handRadius || 7) * (1.0 + Math.sin(revertProgress * Math.PI) * 1.5);
+      const boilAlpha = (1.0 - revertProgress) * 0.80;
+      const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, boilRadius);
+      gradient.addColorStop(0, `rgba(245, 208, 254, ${boilAlpha})`);
+      gradient.addColorStop(0.5, `rgba(217, 70, 239, ${(boilAlpha * 0.75).toFixed(2)})`);
+      gradient.addColorStop(1, 'rgba(147, 51, 234, 0)');
+
+      ctx.fillStyle = gradient;
+      ctx.beginPath();
+      ctx.arc(0, 0, boilRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      drawHandFist(ctx, 0, 0, handRadius, drawTransformedHands, fighter);
+      ctx.restore();
     } else {
-      drawHandFist(ctx, backHandX, backHandY, handRadius, isTransformed, fighter);
+      drawHandFist(ctx, backHandX, backHandY, handRadius, drawTransformedHands, fighter);
     }
   }
 
   // 6. Render Body Circle
   if (isTransformed) {
-    drawTransformedCarapace(ctx, r);
+    drawTransformedCarapace(ctx, r, isChannelingDomain);
   } else {
-    drawBaseMahito(ctx, r);
+    drawBaseMahito(ctx, r, fighter);
   }
 
   // 7. Render Front Hand Layer (On Top of Body Circle) - Rule #2 & #20
-  if (!fighter._isWinnerReveal && (!fighter.twinScissorAnimTimer || fighter.twinScissorAnimTimer <= 0)) {
-    if (fighter.fleshSurgeAnimTimer > 0) {
+  if (!fighter._isWinnerReveal && (!fighter.twinScissorAnimTimer || fighter.twinScissorAnimTimer <= 0) && !shouldHideHands) {
+    if (isChannelingDomain) {
+      // Draw both hands on top of body (Left hand first, then Right hand overlapping on top)
+      // Left Hand (knuckles pointing inwards to the right):
+      drawHandFist(ctx, backHandX, backHandY, handRadius, drawTransformedHands, fighter);
+      
+      // Right Hand (mirrored horizontally so knuckles point inwards to the left, overlapping Left Hand):
+      ctx.save();
+      ctx.translate(frontHandX, frontHandY);
+      ctx.scale(-1, 1);
+      drawHandFist(ctx, 0, 0, handRadius, drawTransformedHands, fighter);
+      ctx.restore();
+    } else if (!isChannelingDomain && fighter.fleshSurgeAnimTimer > 0) {
       // Draw Front Hand Stretch Socket & Foreground Arm in world space on top of body and aura
       ctx.save();
       if (facingLeft) ctx.scale(1, -1);
@@ -1036,8 +1115,33 @@ export function drawMahitoSkin(ctx, fighter) {
     } else if (!fighter.hideFrontHand) {
       if (isPunching && fighter.isRightPunch) {
         drawMahitoArmMorph(ctx, fighter, isTransformed, true, morphType, rawProgress, frontHandX, frontHandY);
+      } else if (fighter.clawRevertTimer > 0) {
+        const maxRevert = 18;
+        const revertProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.clawRevertTimer / maxRevert)));
+        const shiverAmp = (1.0 - revertProgress) * 5.5;
+        const shiverX = (Math.random() - 0.5) * shiverAmp;
+        const shiverY = (Math.random() - 0.5) * shiverAmp;
+
+        ctx.save();
+        ctx.translate(frontHandX + shiverX, frontHandY + shiverY);
+
+        // Expanding boiling cursed energy aura around hand socket
+        const boilRadius = (handRadius || 7) * (1.0 + Math.sin(revertProgress * Math.PI) * 1.5);
+        const boilAlpha = (1.0 - revertProgress) * 0.80;
+        const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, boilRadius);
+        gradient.addColorStop(0, `rgba(245, 208, 254, ${boilAlpha})`);
+        gradient.addColorStop(0.5, `rgba(217, 70, 239, ${(boilAlpha * 0.75).toFixed(2)})`);
+        gradient.addColorStop(1, 'rgba(147, 51, 234, 0)');
+
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(0, 0, boilRadius, 0, Math.PI * 2);
+        ctx.fill();
+
+        drawHandFist(ctx, 0, 0, handRadius, drawTransformedHands, fighter);
+        ctx.restore();
       } else {
-        drawHandFist(ctx, frontHandX, frontHandY, handRadius, isTransformed, fighter);
+        drawHandFist(ctx, frontHandX, frontHandY, handRadius, drawTransformedHands, fighter);
       }
     }
   }
@@ -1055,33 +1159,64 @@ export function drawMahitoSkin(ctx, fighter) {
     fighter.drawStatusOverlays(ctx, r);
   }
 
-  // Evasion Clones HP Text Overlay
-  if (isEvading || isEvasionMinion) {
+  // 8.5. Grotesque Flesh Deformation & Swelling Cursed Aura Overlay (Renders on clone body when about to explode)
+  const isDyingPop = fighter.isDying || fighter.isDyingEvasion || (fighter.evasionReconsolidateTimer > 0);
+  if (isDyingPop) {
+    const maxDur = fighter.maxDeathTimer || fighter.evasionReconsolidateMax || 18;
+    const currentTimer = fighter.deathTimer ?? fighter.evasionReconsolidateTimer ?? 18;
+    const progress = Math.min(1.0, Math.max(0.0, 1.0 - (currentTimer / maxDur)));
+
     ctx.save();
-    // Rotate/mirror back to draw text upright relative to the screen
+    
+    // Shivering tremor
+    const shiverAmp = (1.0 + progress * 4.5);
+    const shiverX = (Math.random() - 0.5) * shiverAmp;
+    const shiverY = (Math.random() - 0.5) * shiverAmp;
+    ctx.translate(shiverX, shiverY);
+
+    // 1. Sleek Cursed Energy Outer Glow Ring
+    const auraRadius = r * (1.0 + progress * 0.40);
+    ctx.strokeStyle = `rgba(217, 70, 239, ${(0.60 + progress * 0.35).toFixed(2)})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(0, 0, auraRadius + 4, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 2. Authentic Grotesque Bubbly Deformed Expanding Flesh Lobes (Mahito's Signature Minion Death Expansion)
+    // Starts displaying IMMEDIATELY the moment clones stop moving (0.35 initial size up to 1.0 max)
+    const immediateProgress = 0.35 + progress * 0.65;
+    const deformTimer = Math.max(1, Math.floor((1.0 - immediateProgress) * 45));
+    if (typeof drawMahitoFleshBubblyDeformLocal === 'function') {
+      drawMahitoFleshBubblyDeformLocal(ctx, r, deformTimer, '#D946EF', fighter);
+    }
+
+    // 3. Swirling Cursed Soul Tendrils
+    ctx.strokeStyle = `rgba(245, 208, 254, ${(0.70 + progress * 0.25).toFixed(2)})`;
+    ctx.lineWidth = 2.0;
+    for (let i = 0; i < 3; i++) {
+      const rot = progress * Math.PI * 4 + (i * Math.PI * 0.66);
+      ctx.beginPath();
+      ctx.arc(0, 0, (r + 6) * (1.0 - progress * 0.2), rot, rot + 1.1);
+      ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // Evasion Clones Floating HP Healthbar Overlay
+  if ((isEvading || isEvasionMinion) && !fighter.isDying && !fighter.isDyingEvasion) {
+    ctx.save();
+    // Rotate/mirror back to draw healthbar upright relative to the screen
     if (facingLeft) ctx.scale(1, -1);
     ctx.rotate(-angle);
-    
-    // Draw the HP text centered inside the body (scaled dynamically to maintain a stable ~11.5px size on screen)
-    const fontSize = Math.max(12, Math.round(11.5 / evasionScale));
-    const strokeWidth = Math.max(2, Math.round(2.5 / evasionScale));
-    
-    ctx.font = `bold ${fontSize}px Arial`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    const hpText = Math.floor(fighter.hp).toString();
-    ctx.lineWidth = strokeWidth;
-    ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.strokeText(hpText, 0, 0);
-    ctx.fillStyle = '#FFFFFF';
-    ctx.fillText(hpText, 0, 0);
+    drawMinionHealthBar(ctx, 0, -(r || 25) - 14, Math.max(32, (r || 25) * 1.4), 6, fighter.hp, fighter.maxHp || 100, '#D946EF');
     ctx.restore();
   }
 
   ctx.restore();
 
   // 9. Render Front Stretch Arm, Socket & Scythe in world space (ON TOP of body circle)
-  if (!fighter._isWinnerReveal && fighter.twinScissorAnimTimer > 0) {
+  if (!fighter._isWinnerReveal && !isChannelingDomain && fighter.twinScissorAnimTimer > 0) {
     drawMahitoTwinScissor(ctx, fighter, 'front');
   }
 }

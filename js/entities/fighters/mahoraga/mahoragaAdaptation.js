@@ -86,6 +86,14 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Soul Disfigurement!
   }
 
+  // ── General Defense Buff per Wheel Click ──
+  // Each wheel click (adaptation stage) increases defense by 5% (reduces incoming damage by 5% per stage), capped at 50%.
+  const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent || 0.05;
+  const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent || 0.50;
+  const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+  const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
+  finalAmount *= (1.0 - defReduction);
+
 
   // ── Toji ISOH Bypass Check ──
   if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji') && opts.isIsoh) {
@@ -182,33 +190,36 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
         }
       }
     } else {
-      fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + amount;
-      fighter.accumTimer = windowFrames;
+      // Prevent Yuta's Pure Love Beam or Genos's beam tick damage from triggering mid-beam wheel clicks
+      if (!opts.isPureLoveBeam && !opts.isGenosBeam) {
+        fighter.totalAccumDamage = (fighter.totalAccumDamage || 0) + amount;
+        fighter.accumTimer = windowFrames;
 
-      if (gojoAttackType) {
-        fighter._lastGojoHitType = gojoAttackType;
-      }
+        if (gojoAttackType) {
+          fighter._lastGojoHitType = gojoAttackType;
+        }
 
-      if (sukunaAttackType) {
-        fighter._lastSukunaHitType = sukunaAttackType;
-      }
+        if (sukunaAttackType) {
+          fighter._lastSukunaHitType = sukunaAttackType;
+        }
 
-      if (skillShotId) {
-        fighter._lastSkillShotId = skillShotId;
-        fighter._lastSkillShotColor = skillShotColor;
-      }
+        if (skillShotId) {
+          fighter._lastSkillShotId = skillShotId;
+          fighter._lastSkillShotColor = skillShotColor;
+        }
 
-      const threshold = fighter.maxHp * thresholdPct;
-      if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
-        if (opts.isRed || fighter._lastGojoHitType === 'red') {
-          if (!fighter.pendingRedAdaptation) {
-            fighter.pendingRedAdaptation = true;
-            fighter.pendingRedAttacker = attacker;
-            fighter.pendingRedType = type;
-            fighter._lastGojoHitType = 'red';
+        const threshold = fighter.maxHp * thresholdPct;
+        if (fighter.totalAccumDamage >= threshold && (fighter.fatalAdaptCooldown || 0) <= 0) {
+          if (opts.isRed || fighter._lastGojoHitType === 'red') {
+            if (!fighter.pendingRedAdaptation) {
+              fighter.pendingRedAdaptation = true;
+              fighter.pendingRedAttacker = attacker;
+              fighter.pendingRedType = type;
+              fighter._lastGojoHitType = 'red';
+            }
+          } else {
+            triggerAdaptation(fighter, type, attacker);
           }
-        } else {
-          triggerAdaptation(fighter, type, attacker);
         }
       }
     }
@@ -223,6 +234,16 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
  * freezes enemies, heals via RCT, and checks for Level 8 awakening.
  */
 export function triggerAdaptation(fighter, type, attacker) {
+  // Block any general adaptation wheel clicks while caught in beam paralysis
+  const isCaughtInBeam = fighter.caughtInPureLoveBeam || 
+                         (fighter.pureLoveBeamTimer || 0) > 0 || 
+                         (fighter.pureLoveBeamRecoveryTimer || 0) > 0 ||
+                         (fighter.caughtInGenosBeamTimer || 0) > 0 || 
+                         fighter.caughtInGenosFlurry;
+  if (isCaughtInBeam) {
+    return;
+  }
+
   // Hold adaptation ticks while inside Gojo's Domain Expansion until domain expires!
   const isInsideGojoDomain = typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
@@ -359,26 +380,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   // Trigger pop-out Divine Shield Badge & RCT Healing (+) Emblem Badge
   fighter.shieldIconTimer = 90;
 
-  // --- REVERSE CURSED TECHNIQUE (RCT / DIVINE HEALING ON WHEEL CLICK ADAPTATION) ---
-  const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
-  
-  if (enableRCT && fighter.hp > 0 && !fighter.isDead) {
-    const healPercent = CONFIG.mahoraga?.rctHealAmountPercent ?? CONFIG.mahoraga?.rctHealPerClickPercent ?? 0.10;
-    const healAmount = Math.max(1, Math.round(fighter.maxHp * healPercent));
-    const oldHp = fighter.hp;
-    fighter.hp = Math.min(fighter.maxHp, fighter.hp + healAmount);
-    const actualHealed = Math.max(0, fighter.hp - oldHp);
-
-    // Always trigger visual RCT Heal badge & green pop-up heal number on every wheel click!
-    fighter._healthBarHealTimer = 14;
-    spawnFloatingText(fighter.x, wheelY - 45, '✨ RCT HEAL!', '#00FF66');
-    const displayHeal = Math.round(actualHealed > 0 ? actualHealed : healAmount);
-    spawnFloatingText(fighter.x + (Math.random() - 0.5) * 16, (fighter.y - (fighter.z || 0)) - fighter.r - 12, `+${displayHeal}`, '#00FF66');
-    spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
-    spawnSparks(fighter.x, fighter.y, 30, 'arcane');
-    spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
-    audioSystem.playSFX('skill_enhance', 0.85);
-  }
+  applyRCTHeal(fighter);
 
   if (totalStages >= 2 || currentStage >= 2) {
     if (!fighter.hasAnnouncedLevel2) {
@@ -662,11 +664,11 @@ export function adaptToPureLoveBeam(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   const wheelY = fighter.y - fighter.r - 28;
-  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: PURE LOVE BEAM!', adaptColor);
-  spawnFloatingText(fighter.x, wheelY - 52, '💗 Pure Love Beam no longer affects Mahoraga!', '#FFFFFF');
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+
+  applyRCTHeal(fighter);
 
   // ── COUNTER BLITZ: TELEPORT BEHIND ENEMY ONLY WHEN ENEMY IS NOT ACTIVELY FIRING A BEAM ──
   const opponent = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== fighter && f.hp > 0) : null;
@@ -697,11 +699,11 @@ export function adaptToPureLoveBeam(fighter) {
     fighter.neutralStanceCooldownTimer = 0;
     fighter.neutralStanceAttackCount = 0;
 
-    // Trigger instant rapid attack strike
+    // Trigger instant rapid blade swing strike with Sword of Extermination
+    fighter.swordCombo = (fighter.swordCombo || 0) + 1;
     fighter.punchAnimTimer = 18;
-    fighter.leftPunchTimer = 18;
+    fighter.leftPunchTimer = 0;
     audioSystem.playSFX('skill_dash5', 1.0);
-    spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, '⚡ ADAPTATION COUNTER BLITZ!', adaptColor);
   } else {
     // If enemy is actively firing a beam, lock stance on 5s cooldown and DO NOT TELEPORT!
     fighter.neutralStanceTimer = 0;
@@ -755,10 +757,11 @@ export function adaptToYutaFlurry(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   const wheelY = fighter.y - fighter.r - 28;
-  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: YUTA KATANA FLURRY!', adaptColor);
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+
+  applyRCTHeal(fighter);
 }
 
 /**
@@ -807,11 +810,11 @@ export function adaptToThinIceBreaker(fighter) {
   triggerGlobalScreenShake(6, 18);
 
   const wheelY = fighter.y - fighter.r - 28;
-  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: THIN ICE BREAKER!', adaptColor);
-  spawnFloatingText(fighter.x, wheelY - 52, '🦁 Auto-Triggers Divine Shout on activation!', '#FFFFFF');
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+
+  applyRCTHeal(fighter);
 }
 
 /**
@@ -871,4 +874,22 @@ export function adaptToSoulDisfigurement(fighter) {
 
   spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+
+  applyRCTHeal(fighter);
+}
+
+function applyRCTHeal(fighter) {
+  const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
+  if (enableRCT && fighter.hp > 0 && !fighter.isDead) {
+    const flatHeal = CONFIG.mahoraga?.rctHealFlatAmount ?? 35;
+    const healAmount = Math.max(1, Math.round(flatHeal));
+    console.log('[Mahoraga RCT Debug] flatHeal config:', CONFIG.mahoraga?.rctHealFlatAmount, 'healAmount:', healAmount);
+    fighter.takeDamage(-healAmount, fighter, { isHeal: true });
+
+    fighter._healthBarHealTimer = 14;
+    spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
+    spawnSparks(fighter.x, fighter.y, 30, 'arcane');
+    spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
+    audioSystem.playSFX('skill_enhance', 0.85);
+  }
 }

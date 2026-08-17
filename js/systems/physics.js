@@ -708,6 +708,10 @@ export function updateFighters() {
         if (!b || b.hp <= 0) continue;
         // Skip teammates in 2v2 mode
         if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
+        
+        // Skip physical collision resolution during Wall Slam grabs to prevent stuttering/zigzag physics feedback loops
+        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga) continue;
+
         resolveFighterCollision(a, b);
       }
     }
@@ -715,6 +719,8 @@ export function updateFighters() {
     // 2. Fighter-Illusion Collisions
     for (const fighter of state.fighters) {
       if (!fighter || fighter.hp <= 0) continue;
+      // Skip during Wall Slam grab
+      if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga) continue;
       // Cronos phases through illusions while inside his own sphere; Mahito phases during Phantom Soul Slip
       if (fighter._isInsideOwnSphere?.() || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0)) continue;
 

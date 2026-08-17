@@ -86,11 +86,25 @@ export function performMeleeAttack(fighter, opponent) {
   );
 
   const isCaughtInBeam = (
-    fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0 ||
-    fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 || (fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry
+    (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamTimer || 0) > 0 || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
+    fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
+    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry))
   );
 
-  if (isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam) {
+  let isParalyzed = isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam;
+  if (isParalyzed) {
+    const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+    const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
+    const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
+    const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+    const inMeleeRange = opponent && Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y) < (fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+    
+    if (ccTenacity > 0 && inMeleeRange) {
+      isParalyzed = false; // Allow attacking under CC!
+    }
+  }
+
+  if (isParalyzed) {
     fighter.neutralStanceTimer = 0;
     fighter.adaptationDashTimer = 0;
     return;
@@ -130,7 +144,7 @@ export function performMeleeAttack(fighter, opponent) {
     // Single attack outside of stance (basic sword swing)
     fighter.swordCooldown = attackInterval;
     fighter.attackCount = (fighter.attackCount || 0) + 1;
-    if (fighter.attackCount % 2 === 0) {
+    if (fighter.attackCount % 5 === 0) {
       fighter.leftPunchTimer = 18;
       fighter.leftPunchMaxTimer = 18;
       playRandomHeavyPunchSound(1.0);
@@ -152,7 +166,7 @@ export function performMeleeAttack(fighter, opponent) {
     const damage = CONFIG.mahoraga?.swordDamage || 25;
     const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
     const knockbackChance = Math.min(0.65, 0.40 + totalStages * 0.04);
-    const isPunch = (fighter.attackCount % 2 === 0);
+    const isPunch = (fighter.attackCount % 5 === 0);
     const rollKnockback = isPunch && (Math.random() < knockbackChance);
 
     for (const t of frontTargets) {
@@ -199,8 +213,8 @@ export function performMeleeAttack(fighter, opponent) {
   fighter.neutralStanceAttackCount = (fighter.neutralStanceAttackCount || 0) + 1;
   fighter.attackCount = (fighter.attackCount || 0) + 1;
 
-  // Alternating sword chop vs left fist punch
-  if (fighter.attackCount % 2 === 0) {
+  // Sword of Extermination blade swings during Close-Quarters Attack-Teleport Stance (86% sword swings!)
+  if (fighter.attackCount % 7 === 0) {
     fighter.leftPunchTimer = 18;
     fighter.leftPunchMaxTimer = 18;
     playRandomHeavyPunchSound(1.0);
@@ -223,7 +237,7 @@ export function performMeleeAttack(fighter, opponent) {
   const damage = CONFIG.mahoraga?.swordDamage || 25;
   const totalStagesStance = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const knockbackChanceStance = Math.min(0.65, 0.40 + totalStagesStance * 0.04);
-  const isPunchStance = (fighter.attackCount % 2 === 0);
+  const isPunchStance = (fighter.attackCount % 7 === 0);
   const rollKnockbackStance = isPunchStance && (Math.random() < knockbackChanceStance);
 
   for (const t of frontTargets) {
@@ -265,7 +279,7 @@ export function performMeleeAttack(fighter, opponent) {
   }
 
   // Sakuga impact visuals on main opponent (only for sword combo hits, not punches)
-  const isPunch = (fighter.attackCount % 2 === 0);
+  const isPunch = (fighter.attackCount % 5 === 0);
   if (!isPunch) {
     fighter.sakugaImpactTimer = 8;
     fighter.sakugaImpactMaxTimer = 8;
@@ -440,8 +454,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
 
   const isInterrupted = (
     fighter.isCaughtInPurple || (fighter.purpleHitTimer || 0) > 0 ||
-    fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0 ||
-    (fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry
+    (!fighter.adaptedPureLoveBeam && (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0)) ||
+    (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry))
   );
 
   if (isInterrupted || !target || target.hp <= 0 || target.isDead) {
@@ -595,18 +609,23 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       target.isGrabbedByMahoraga = false;
       target.z = 0; // Drop back to ground for the wall slam
 
-      // Find the absolute farthest wall based on current position in the arena
-      const leftDist = target.x - minX;
-      const rightDist = maxX - target.x;
-      const topDist = target.y - minY;
-      const botDist = maxY - target.y;
-      const maxDist = Math.max(leftDist, rightDist, topDist, botDist);
+      // Calculate distances to left, right, top, and bottom walls to find the farthest wall
+      const distLeft = target.x - minX;
+      const distRight = maxX - target.x;
+      const distTop = target.y - minY;
+      const distBottom = maxY - target.y;
 
-      let wallAngle = angle;
-      if (maxDist === leftDist) wallAngle = Math.PI;
-      else if (maxDist === rightDist) wallAngle = 0;
-      else if (maxDist === topDist) wallAngle = -Math.PI / 2;
-      else if (maxDist === botDist) wallAngle = Math.PI / 2;
+      let wallAngle = angle; // Fallback to lunge direction if check fails
+      const maxDist = Math.max(distLeft, distRight, distTop, distBottom);
+      if (maxDist === distLeft) {
+        wallAngle = Math.PI; // Throw to the far left wall
+      } else if (maxDist === distRight) {
+        wallAngle = 0;       // Throw to the far right wall
+      } else if (maxDist === distTop) {
+        wallAngle = -Math.PI / 2; // Throw to the far top wall
+      } else {
+        wallAngle = Math.PI / 2;  // Throw to the far bottom wall
+      }
 
       fighter.aim({ x: target.x + Math.cos(wallAngle) * 100, y: target.y + Math.sin(wallAngle) * 100 });
 
@@ -805,7 +824,7 @@ export function executeShout(fighter, opponent, ownerIndex) {
         f.applyHitStun(18);
 
         // Apply brief slow movement debuff
-        const slowDur = CONFIG.mahoraga?.shoutSlowDurationFrames || 90;
+        const slowDur = CONFIG.mahoraga?.shoutSlowDurationFrames || 120;
         const slowMult = CONFIG.mahoraga?.shoutSlowMultiplier || 0.50;
         if (typeof f.applySlow === 'function') {
           f.applySlow(slowDur, slowMult, { isMahoragaShout: true });
@@ -815,8 +834,14 @@ export function executeShout(fighter, opponent, ownerIndex) {
         }
 
         const pushAngle = Math.atan2(f.y - fighter.y, f.x - fighter.x);
-        f.vx += Math.cos(pushAngle) * shoutKnockback;
-        f.vy += Math.sin(pushAngle) * shoutKnockback;
+        const kbX = Math.cos(pushAngle) * shoutKnockback;
+        const kbY = Math.sin(pushAngle) * shoutKnockback;
+        if (typeof f.applyKnockback === 'function') {
+          f.applyKnockback(kbX, kbY);
+        } else {
+          f.vx += kbX;
+          f.vy += kbY;
+        }
       }
     });
   }

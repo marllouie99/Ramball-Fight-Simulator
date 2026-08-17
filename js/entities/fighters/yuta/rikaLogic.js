@@ -321,7 +321,8 @@ export function updateRika(fighter, arena) {
 
         if (typeof state !== 'undefined') {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-          const roarPulseDamage = CONFIG.yuta?.rikaArisePulseDamage || 10;
+          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
+          const roarPulseDamage = (CONFIG.yuta?.rikaArisePulseDamage || 10) + damageGain;
 
           // Hit enemy fighters in roar radius
           if (state.fighters) {
@@ -401,8 +402,9 @@ export function updateRika(fighter, arena) {
         // --- Emergence Blast Damage & Radial Knockback for Fighters & Illusions ---
         if (typeof state !== 'undefined') {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
           const emergenceRadius = CONFIG.yuta?.rikaEmergenceRadius || 260;
-          const emergenceDamage = CONFIG.yuta?.rikaEmergenceDamage || 35;
+          const emergenceDamage = (CONFIG.yuta?.rikaEmergenceDamage || 35) + damageGain;
           const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback || 18;
           const emergenceHitStun = CONFIG.yuta?.rikaEmergenceHitStun || 20;
 
@@ -469,8 +471,9 @@ export function updateRika(fighter, arena) {
         // --- Vengeful Death Dispersion Damage & Knockback (#8) ---
         if (typeof state !== 'undefined' && state.fighters) {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
+          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
           const dispersionRadius = CONFIG.yuta?.rikaDeathExplosionRadius || 280;
-          const dispersionDamage = CONFIG.yuta?.rikaDeathExplosionDamage || 35;
+          const dispersionDamage = (CONFIG.yuta?.rikaDeathExplosionDamage || 35) + damageGain;
           const dispersionKnockback = CONFIG.yuta?.rikaDeathExplosionKnockback || 10;
           const dispersionHitStun = CONFIG.yuta?.rikaDeathExplosionHitStun || 20;
 
@@ -660,8 +663,8 @@ export function updateRika(fighter, arena) {
     return;
   }
 
-  // Snap Rika to Yuta's back when channeling Pure Love Beam
-  if (fighter.isChannelingPureLoveBeam) {
+  // Snap Rika to Yuta's back when channeling or firing Pure Love Beam
+  if (fighter.isChannelingPureLoveBeam || fighter.isFiringPureLoveBeam) {
     const angle = fighter.gunAngle || 0;
     const offsetDist = fighter.r + rk.r + 5;
     rk.x = fighter.x - Math.cos(angle) * offsetDist;
@@ -669,11 +672,11 @@ export function updateRika(fighter, arena) {
     rk.vx = 0;
     rk.vy = 0;
     
-    // Spawn energy gathering sparks on Rika too
-    if (fighter.pureLoveBeamChargeTimer % 3 === 0) {
+    // Spawn energy gathering sparks on Rika too during charge phase
+    if (fighter.isChannelingPureLoveBeam && fighter.pureLoveBeamChargeTimer % 3 === 0) {
       spawnSparks(rk.x, rk.y, 2, 'rikaCurse', { color: 'rgba(255, 20, 147, 1)', blendMode: 0 });
     }
-    return; // Completely freeze AI during beam charge
+    return; // Completely freeze AI during beam charge & firing phases
   }
 
   // Freeze Rika in place for a moment while she is loading/arising (during spawnTimer)
@@ -783,7 +786,8 @@ export function updateRika(fighter, arena) {
         }
       }
 
-      const rikaDmg = CONFIG.yuta.rikaDamage || 25;
+      const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
+      const rikaDmg = (CONFIG.yuta.rikaDamage || 25) + damageGain;
       const knockbackForce = CONFIG.yuta?.rikaHitKnockback || 16;
       const recoilForce = CONFIG.yuta?.rikaHitRecoil || 6;
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;

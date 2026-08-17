@@ -142,3 +142,99 @@ let currentRikaSummonDimOpacity = 0;
 export function drawRikaSummonDimScreen() {
   // Handled by WebGL
 }
+
+let currentMahitoDomainOpacity = 0;
+let mahitoDomainImg = null;
+let mahitoDomainImgLoading = false;
+
+function loadMahitoDomainImage() {
+  if (mahitoDomainImg || mahitoDomainImgLoading) return;
+  mahitoDomainImgLoading = true;
+  mahitoDomainImg = new Image();
+  mahitoDomainImg.onload = () => {
+    mahitoDomainImgLoading = false;
+  };
+  mahitoDomainImg.onerror = (e) => {
+    console.error("Failed to load Mahito domain expansion image:", e);
+    mahitoDomainImgLoading = false;
+    mahitoDomainImg = null;
+  };
+  mahitoDomainImg.src = 'Assets/Overlays/mahitos-de.png';
+}
+
+/**
+ * Draws Mahito's Domain Expansion: Self-Embodiment of Perfection.
+ * Overlays the entire screen with mahitos-de.png at reduced opacity over a dark purple dim effect.
+ */
+export function drawMahitoDomainOverlay(fighter) {
+  if (typeof state === 'undefined' || !state || !state.canvas || !state.ctx) return;
+  const canvas = state.canvas;
+  const ctx = state.ctx;
+
+  if (!mahitoDomainImg && !mahitoDomainImgLoading) {
+    loadMahitoDomainImage();
+  }
+
+  const isActive = fighter.domainActive;
+
+  if (isActive) {
+    currentMahitoDomainOpacity = 1.0; // Snap in immediately when active after channeling
+  } else {
+    currentMahitoDomainOpacity = Math.max(0, currentMahitoDomainOpacity - 0.05); // Fade out smoothly
+    if (currentMahitoDomainOpacity <= 0) return;
+  }
+
+  const op = currentMahitoDomainOpacity;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0); // Absolute screen space
+
+  // 1. Dark Purple Dim Effect
+  const cx = canvas.width / 2;
+  const cy = canvas.height / 2;
+  const maxR = Math.max(canvas.width, canvas.height) * 0.75;
+
+  const dimGrad = ctx.createRadialGradient(cx, cy, 40, cx, cy, maxR);
+  dimGrad.addColorStop(0.0, `rgba(0, 0, 0, ${op * 0.95})`);       // Pure black center
+  dimGrad.addColorStop(0.6, `rgba(36, 8, 54, ${op * 0.90})`);     // Dark transitional purple
+  dimGrad.addColorStop(1.0, `rgba(88, 28, 135, ${op * 0.85})`);   // Rich purple edge vignette
+
+  ctx.fillStyle = dimGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // 2. PNG Overlay (Clipped to Arena) with Decreased Opacity
+  if (mahitoDomainImg && mahitoDomainImg.complete && mahitoDomainImg.naturalWidth > 0) {
+    ctx.save();
+    
+    // Set clipping path to the arena bounds
+    const arena = state.arena || CONFIG.arena;
+    if (arena) {
+      ctx.beginPath();
+      if (arena.shape === 'circle') {
+        const acx = arena.x + arena.width / 2;
+        const acy = arena.y + arena.height / 2;
+        const ar = arena.radius || (arena.width / 2);
+        ctx.arc(acx, acy, ar, 0, Math.PI * 2);
+      } else {
+        ctx.rect(arena.x, arena.y, arena.width, arena.height);
+      }
+      ctx.clip();
+    }
+
+    // Decrease opacity so fighters, spells, and arena remain clearly visible
+    ctx.globalAlpha = op * 0.45;
+
+    // Draw the image to fit the arena dimensions exactly so that the flat cut-off edges
+    // of the PNG align perfectly with (and are hidden by) the arena walls.
+    ctx.drawImage(mahitoDomainImg, arena.x, arena.y, arena.width, arena.height);
+    ctx.restore();
+  }
+
+  // 3. Exclude Gojo Limitless Infinity Barrier from dark overlay (Rule #9)
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(18, 5, 26, ${op * 0.95})`;
+}
+

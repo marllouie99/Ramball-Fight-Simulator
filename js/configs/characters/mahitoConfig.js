@@ -9,9 +9,8 @@ export const mahitoConfig = {
   moveSpeed: 5.8,
   
   // Basic Attack: Idle Transfiguration (Melee Morph)
-  punchRange: 75,                  // Reach distance beyond body radius
   arcAngle: (135 * Math.PI) / 180, // 135° frontal cone sweep (Rule #7 & #8 compliant)
-  basicPunchCooldown: 50,          // Frames between attack attempts
+  basicPunchCooldown: 70,          // Frames between attack attempts
   punchSpeed: 50,                  // Duration in frames of the attack animation
   knockbackForce: 8,               // Base physical knockback impulse
   hitStunDuration: 8,              // Base hit-stun frames applied to target
@@ -27,7 +26,7 @@ export const mahitoConfig = {
 
   // ── 2. PASSIVE: PHANTOM SOUL SLIP (Phase-Through Claw Dash) ────────────────
   soulPhaseSlip: {
-    cooldown: 180,                 // 3 seconds cooldown between passive dashes
+    cooldown: 100,                 // 3 seconds cooldown between passive dashes
     triggerRangeMin: 70,           // Minimum distance to target to trigger dash
     triggerRangeMax: 300,          // Maximum distance to target to trigger dash
     dashSpeed: 24.0,               // High supersonic dash speed
@@ -95,16 +94,16 @@ export const mahitoConfig = {
 
   // ── 6. SKILL 5: SOUL MULTIPLICITY & BODY REPEL ─────────────────────────────
   soulMultiplicity: {
-    cooldown: 500,                 // Cooldown in frames (approx. 8.3s)
+    cooldown: 1000,                 // Cooldown in frames (approx. 8.3s)
     minDistanceAlt: 250,           // Below this: summon minions. Above this: fire Body Repel projectile.
     summonCount: 1,                // Summons Transfigured Humans
-    minionHp: 25,                  // HP per summoned Transfigured Human
+    minionHp: 50,                  // HP per summoned Transfigured Human
     minionDamage: 10,              // Base bite damage
     minionSpeed: 1.8,              // Active homing chase speed
     minionBiteCooldown: 10,        // Frames cooldown between bite attacks
-    minionSize: 16,                // Minion body circle radius
+    minionSize: 30,                // Minion body circle radius
     minionDeathDuration: 50,       // Swelling/expansion animation duration in frames
-    minionExpandMaxScale: 1.2,     // Maximum visual scale expansion before popping
+    minionExpandMaxScale: 1.5,     // Maximum visual scale expansion before popping
     minionExplosionRadius: 100,    // AOE explosion radius
     minionExplosionDamage: 50,     // AOE explosion damage
     minionExplosionKnockback: 12,  // AOE knockback push force
@@ -132,7 +131,8 @@ export const mahitoConfig = {
     stackShiverIntensity: 0,       // Shivering vibration intensity scaling per Soul Disfigurement stack
     shiverFramesBeforeExplosion: 50,// Frame threshold before the paralyze explosion when shivering starts
     executeThreshold: 0.10,        // Target HP percentage threshold for soul execution
-    executeDamagePercent: 0.20     // Executing true damage percent of target's max HP
+    executeDamagePercent: 0.20,    // Executing true damage percent of target's max HP
+    stitchIndicatorScale: 1.70     // Visual size/scale of the stitch stack indicator above enemy heads (1.70 = 170% size)
   },
   
   // Shivering Tremor Intensity (Configurable Enemy Vibration)
@@ -148,16 +148,19 @@ export const mahitoConfig = {
   },
 
   evasion: {
-    threshold: 0.35,               // HP percentage below which Evasion triggers on next dash
+    threshold: 0.75,               // HP percentage below which Evasion triggers on next dash
     duration: 300,                 // Evasion state duration in frames (5s)
     cloneCount: 3,                 // Number of small evasion clones spawned
     radius: 16,                    // Shrunk hurtbox radius for the clones and main body
     scale: 1.00,                   // Visual scale of the miniature models
-    speedMultiplier: 1.25,         // Speed boost multiplier while fleeing in evasion state
+    speedMultiplier: 1.50,         // Speed boost multiplier while fleeing in evasion state
+    regenRate: 1.00,               // Health regenerated per frame during evasion (~24 HP/sec)
+    dodgeChance: 0.60              // Dodge chance to completely evade incoming attacks during evasion (60%)
   },
 
   // ── 9. TRANSFORMATION: INSTANT SPIRIT BODY OF DISTORTED KILLING (ISBoDK) ───
   transformation: {
+    enabled: false,                 // Master toggle to enable or disable Distorted Killing transformation (set to false to disable)
     duration: 600,                 // 10 seconds active duration
     cooldown: 1200,                // 20 seconds cooldown
     defenseMultiplier: 0.50,       // Takes 50% less damage (high armor)
@@ -190,31 +193,87 @@ export const mahitoConfig = {
   ceCoreColor: '#F5D0FE',          // Luminous lilac-white core highlight
   ceBorderColor: '#3B0764',        // Dark purple ink contour
 
-  // ── 11. SOUND EFFECTS & AUDIO VOLUME ADJUSTMENTS ───────────────────────────
+  // ── 11. ULTIMATE: DOMAIN EXPANSION ──────────────────────────────
+  domainExpansion: {
+    cooldown: 2000,                // 33 seconds cooldown
+    chargeMax: 120,                // 2 seconds channeling duration before domain opens
+    duration: 500,                 // 6.6 seconds of paralyzing stasis
+    radius: 9999,                  // Closed barrier - covers the whole screen
+    executionDamageMultiplier: 0,// Execution strike deals 50% max HP true damage
+    executionHitStun: 60,          // Massive hit stun on execution
+    executionKnockback: 35,        // Massive knockback on execution
+    executionScreenShake: 16,      // Massive screen shake
+    slowMultiplier: 0.15,          // Move speed multiplier for trapped targets inside domain (85% slow)
+    velocityDampening: 0.85,       // Velocity damping rate per frame inside domain
+    basicAttackCooldownMultiplier: 1.00, // Basic attack speed & cooldown multiplier inside domain (1.00 = normal speed, 0.50 = twice as fast)
+    attacksToTriggerDisfigurement: 3,    // Basic attack hits required inside domain to trigger Soul Disfigurement & Rupture
+    disfigurementDamageMultiplier: 1.50, // Damage multiplier for Soul Disfigurement burst damage inside domain (1.50 = +50% damage)
+    ruptureDamageMultiplier: 2.0,       // Damage multiplier for Soul Rupture explosion damage inside domain (1.50 = +50% damage)
+    anyDistanceBasicAttack: true,       // Inside domain, Idle Transfiguration basic attack triggers at ANY distance (Sure-Hit domain effect)
+    punchRangeMultiplier: 99999,        // Reach multiplier inside domain (99999 = unlimited reach across entire screen)
+    domainRangeBoost: 200,              // Displayed attack reach boost inside domain (+200px reach)
+  },
+
+  // ── 12. SOUND EFFECTS & AUDIO VOLUME ADJUSTMENTS ───────────────────────────
   sounds: {
     // Basic Attack & Weapon Morphs
-    bladeSwing: 'Assets/Sound Effects/Attacks/syctheattack.mp3',
+    bladeSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     bladeSwingAlt: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     bladeSwingVolume: 1.6,
 
-    maceSmash: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-    maceSmashAlt: 'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+    maceSmash: 'Assets/Sound Effects/Attacks/groundsmash.mp3',
+    maceSmashAlt: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     maceSmashVolume: 1.8,
 
     fleshHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     fleshHitVolume: 1.8,
 
+    subterraneanHumpSound: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+
     whiff: 'Assets/Sound Effects/Skills/woosh.mp3',
     whiffVolume: 1.2,
 
     // Soul Disfigurement & Detonation
-    soulDetonate: 'Assets/Sound Effects/Skills/enhance.mp3',
-    soulDetonateVolume: 1.6,
+    soulDetonate: null,
+    soulDetonateVolume: 1.8,
+
+    farewellVoiceline: 'Assets/Sound Effects/Skills/mahito-farewell-voiceline.mp3',
+    farewellVoicelineVolume: 2.2,
+    farewellVoicelineChance: 0.10, // Occasional trigger on Soul Disfigurement paralysis
 
     bodyExplode: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
     bodyExplodeVolume: 2.0,
 
+    // Domain Expansion & Ultimates
+    domainChannelSound: 'Assets/Sound Effects/Skills/mahito-domainchanneling-voiceline.mp3',
+    domainChannelVolume: 3.5,
+    domainDeploySound: 'Assets/Sound Effects/Skills/mahito-domaindeploy-voiceline.mp3',
+    domainDeployAltSound: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
+    domainDeployVolume: 3.0,
+    domainExecuteSound: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
+    domainExecuteVolume: 3.5,
+
+    // Clone Split & Evasion SFX
+    splitClone: 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3',
+    splitCloneAlt: 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3',
+    transformBackVoiceline: 'Assets/Sound Effects/Skills/mahito-transformback-voiceline.mp3',
+    transformBackVoicelineVolume: 2.0,
+    splitCloneVolume: 1.8,
+    cloneNoiseVolume: 1.5,
+    cloneNoiseInterval: 50,
+
+    // Passive Dash & Skill Voicelines
+    dashVoiceline: 'Assets/Sound Effects/Skills/mahito-dash-voiceline.mp3',
+    dashVoicelineVolume: 2.0,
+    dashVoicelineChance: 0.30, // Occasional trigger on passive dash
+
+    skillVoiceline: 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3',
+    skillVoicelineVolume: 2.2,
+    skillVoicelineChance: 0.05, // 25% chance to play on skill 2, 3, or 4
+
     // Minion Summoning & Explosions
+    minionsThrowVoiceline: 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3',
+    minionsThrowVoicelineVolume: 2.0,
     minionSummon: 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
     minionSummonAlt: 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
     minionSummonAlt2: 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3',
@@ -224,7 +283,9 @@ export const mahitoConfig = {
       'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3',
     ],
     minionSummonVolume: 1.8,
-    minionExplosionVolume: 1.8,
+    minionNoiseVolume: 1.5,
+    minionNoiseInterval: 55,
+    minionExplosionVolume: 0.5,
 
     // Skill & Stance SFX Volumes
     subterraneanSurgeVolume: 1.8,
@@ -235,6 +296,6 @@ export const mahitoConfig = {
   },
 
   // Legacy Punch Sound Aliases
-  punchSound: 'Assets/Sound Effects/Attacks/syctheattack.mp3',
+  punchSound: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
   punchVolume: 1.8,
 };

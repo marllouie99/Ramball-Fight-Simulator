@@ -35,8 +35,9 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
     fighter._cachedNameFontSize = nameFontSize;
     fighter._cachedNameWidthLimit = maxNameW;
   }
+
   ctx.font = `bold ${fighter._cachedNameFontSize}px "Glast Blitch", Arial`;
-  ctx.fillStyle = fighter.color;
+  ctx.fillStyle = fighter.color || '#ffffff';
   ctx.textBaseline = 'alphabetic';
 
   const nameXBase = alignRight ? px + panelW - padding : px + padding;
@@ -56,8 +57,10 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
   ctx.fillText(fighter.name, nameXBase, y + 18);
 
   // HP Text
-  const displayHp = Number.isInteger(fighter.hp) ? `${fighter.hp}` : fighter.hp.toFixed(1);
-  const displayMaxHp = Number.isInteger(fighter.maxHp) ? `${fighter.maxHp}` : fighter.maxHp.toFixed(1);
+  const curHpVal = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
+  const maxHpVal = fighter._originalMaxHp || fighter.maxHp;
+  const displayHp = Number.isInteger(curHpVal) ? `${curHpVal}` : curHpVal.toFixed(1);
+  const displayMaxHp = Number.isInteger(maxHpVal) ? `${maxHpVal}` : maxHpVal.toFixed(1);
   ctx.fillStyle = '#fff';
   ctx.font = 'bold 11px Arial';
   ctx.textAlign = alignRight ? 'left' : 'right';
@@ -70,7 +73,7 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
   ctx.fill();
 
   // Bar Fill
-  const hpRatio = Math.max(0, fighter.hp / fighter.maxHp);
+  const hpRatio = Math.max(0, curHpVal / maxHpVal);
   const hue = hpRatio * 120;
   ctx.fillStyle = `hsl(${hue}, 90%, 48%)`;
   ctx.beginPath();
@@ -145,8 +148,10 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
     ctx.textBaseline = 'top';
     ctx.fillText(fighter.name, rowX + 10, currentY + 6);
 
-    const displayHp = Number.isInteger(fighter.hp) ? `${fighter.hp}` : fighter.hp.toFixed(1);
-    const displayMaxHp = Number.isInteger(fighter.maxHp) ? `${fighter.maxHp}` : fighter.maxHp.toFixed(1);
+    const curHpVal = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
+    const maxHpVal = fighter._originalMaxHp || fighter.maxHp;
+    const displayHp = Number.isInteger(curHpVal) ? `${curHpVal}` : curHpVal.toFixed(1);
+    const displayMaxHp = Number.isInteger(maxHpVal) ? `${maxHpVal}` : maxHpVal.toFixed(1);
     ctx.font = '11px Arial';
     ctx.fillStyle = 'rgba(255,255,255,0.9)';
     ctx.fillText(`${displayHp}/${displayMaxHp}`, rowX + rowW - 10, currentY + 6);
@@ -155,7 +160,7 @@ function drawTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColor, teamNa
     const barY = currentY + rowH - 14;
     const barW = rowW - 20;
     const barH = 8;
-    const hpRatio = Math.max(0, fighter.hp / fighter.maxHp);
+    const hpRatio = Math.max(0, curHpVal / maxHpVal);
 
     ctx.fillStyle = 'rgba(255,255,255,0.15)';
     ctx.beginPath();

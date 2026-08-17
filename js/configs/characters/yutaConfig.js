@@ -15,7 +15,7 @@ export const yutaConfig = {
   teleportDodgeDistance: 85,               // Distance teleported on dodge
 
   // Basic Attack: Katana Melee
-  meleeCooldown: 30,                       // Frames between katana strikes
+  meleeCooldown: 36,                       // Frames between katana strikes
   meleeRange: 70,                          // Katana blade length reach distance in pixels
   meleeDamage: 15,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
@@ -46,7 +46,7 @@ export const yutaConfig = {
   // Summon Companion: Rika Orimoto
   rikaMaxHp: 500,                          // Maximum health pool when summoned
   rikaRadius: 30,                          // Physical body collision radius for Rika in pixels
-  rikaSummonHpThreshold: 0.80,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
+  rikaSummonHpThreshold: 0.60,             // Triggers Rika summon for help when Yuta reaches 50% HP or lower
   rikaRechargeHpRatio: 0.20,               // HP ratio in damage required to re-summon Rika (20% of max HP)
   rikaSummonChargeDuration: 30,            // Channeling/pause duration when Yuta calls Rika (frames)
   rikaAriseDuration: 45,                  // Paused load/arise duration when Rika emerges (180 frames = 3.0 seconds)
@@ -97,6 +97,10 @@ export const yutaConfig = {
   pureLoveBeamSlowMultiplier: 0.20,        // Speed reduction multiplier applied during beam recovery phase
   pureLoveBeamStunDuration: 120,           // Recovery stun duration frames after beam exposure
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)
+  pureLoveBeamRegenDebuffDuration: 1500,      // Duration (600 frames = 10s) of reduced healing/regen after beam exposure
+  pureLoveBeamRegenDebuffMultiplier: 0.50,  // Healing received multiplier (0.25 = 75% reduction) during the debuff
+  pureLoveBeamDamageStackPerTick: 0.5,      // Permanent base damage increase per beam hit tick
+  pureLoveBeamLifestealPct: 0.5,            // Lifesteal percentage (0.1 = 10% of damage dealt) recovered as HP per beam hit tick
 
 
   //----------------------------------AUDIO CONFIG-----------------------------------------//

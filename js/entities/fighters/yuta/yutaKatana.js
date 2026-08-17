@@ -39,7 +39,8 @@ export function modExecuteKatanaMelee(fighter, angle) {
   }
 
   const range = CONFIG.yuta.meleeRange || 95;
-  const damage = CONFIG.yuta.meleeDamage || 15;
+  const bonusDmg = fighter.pureLoveBeamBonusDamage || 0;
+  const damage = (CONFIG.yuta.meleeDamage || 15) + bonusDmg;
   const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
 
   let hitSomeone = false;
@@ -108,9 +109,15 @@ export function modExecuteKatanaMelee(fighter, angle) {
     spawnImpactFlash(enemy.x, enemy.y, 25);
     spawnBloodEffect(enemy, 10, fighter.targetAngle);
 
-    const pushForce = 6;
-    enemy.vx += Math.cos(fighter.targetAngle) * pushForce;
-    enemy.vy += Math.sin(fighter.targetAngle) * pushForce;
+    const pushForce = 6.5;
+    const kbX = Math.cos(fighter.targetAngle) * pushForce;
+    const kbY = Math.sin(fighter.targetAngle) * pushForce;
+    if (typeof enemy.applyKnockback === 'function') {
+      enemy.applyKnockback(kbX, kbY);
+    } else {
+      enemy.vx += kbX;
+      enemy.vy += kbY;
+    }
     if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(12);
 
     // Check for clash with Gojo or Sukuna
@@ -132,131 +139,131 @@ export function modExecuteKatanaMelee(fighter, angle) {
 
 export function modGetKatanaTipPositions(fighter) {
   const maxCd = fighter.meleeCooldownMax;
-  const swingDuration = 15;
-  const recoveryDuration = 10;
+  const swingDuration = 20;
+  const recoveryDuration = 16;
   const isFlurrySwinging = (fighter.flurrySlashTimer > 0);
-  const isSwinging = isFlurrySwinging || (fighter.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (fighter.meleeCooldown <= maxCd);
+  const isSwinging = isFlurrySwinging || ((fighter.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (fighter.meleeCooldown <= maxCd));
 
-  let currentAngle = (isSwinging && fighter.targetAngle !== undefined) ? fighter.targetAngle : fighter.gunAngle;
+  const targetOrGun = (isSwinging && fighter.targetAngle !== undefined) ? fighter.targetAngle : (fighter.gunAngle || 0);
+  const facingLeft = Math.abs(targetOrGun) > Math.PI / 2;
+  const baseAngle = facingLeft ? Math.PI : 0;
+  let diff = targetOrGun - baseAngle;
+  let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  if (facingLeft) {
+    normDiff = -normDiff;
+  }
+
+  let localWeaponAngle = 0;
   const comboIndex = fighter.activeSlashType || 0;
+  const easeOutCubic = (t) => 1.0 - Math.pow(1.0 - t, 3);
 
   if (isFlurrySwinging) {
-    // flurrySlashTimer starts at 18. We want a fast 5-frame swing, then hold the pose!
-    const maxF = 18;
-    const swingFrames = 5;
-    
-    // progress goes from 0.0 to 1.0 during the first 5 frames, then stays at 1.0!
-    let progress = (maxF - fighter.flurrySlashTimer) / swingFrames;
-    if (progress > 1.0) progress = 1.0; 
-
+    const maxF = 14;
+    const p = Math.min(1.0, Math.max(0, (maxF - fighter.flurrySlashTimer) / maxF));
+    const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
     if (comboIndex === 0) {
-      // 1. Horizontal Left-to-Right Slash
-      currentAngle += (-Math.PI * 0.6) + (Math.PI * 1.2) * progress;
+      localWeaponAngle = (-Math.PI * 0.45) + (Math.PI * 0.90) * easedP;
     } else if (comboIndex === 1) {
-      // 2. Backhand Right-to-Left Slash
-      currentAngle += (Math.PI * 0.6) - (Math.PI * 1.2) * progress;
-    } else if (comboIndex === 2) {
-      // 3. Overhead Vertical Downward Chop
-      currentAngle += (-Math.PI * 0.7) + (Math.PI * 0.9) * progress;
+      localWeaponAngle = (Math.PI * 0.45) - (Math.PI * 0.90) * easedP;
+    } else {
+      localWeaponAngle = (-Math.PI * 0.65) + (Math.PI * 1.30) * easedP;
     }
   } else if (isSwinging) {
     const elapsed = maxCd - fighter.meleeCooldown;
-    let progress = 1.0;
     if (elapsed <= swingDuration) {
-      progress = elapsed / swingDuration;
-    } else {
-      const recP = (elapsed - swingDuration) / recoveryDuration;
-      progress = 1.0 - Math.pow(Math.min(1.0, recP), 1.5) * 0.15; // Smooth follow-through hold
-    }
+      const p = Math.min(1.0, elapsed / swingDuration);
 
-    if (comboIndex === 0) {
-      currentAngle += (-Math.PI / 4) + (Math.PI / 2) * progress;
-    } else if (comboIndex === 1) {
-      currentAngle += (Math.PI / 4) - (Math.PI / 2) * progress;
-    } else if (comboIndex === 2) {
-      currentAngle += (-Math.PI * 0.6) + (Math.PI * 1.2) * progress;
+      if (comboIndex === 0) {
+        if (p < 0.20) {
+          const w = p / 0.20;
+          localWeaponAngle = normDiff + (-Math.PI * 0.45 - normDiff) * Math.sin(w * Math.PI * 0.5);
+        } else {
+          const s = (p - 0.20) / 0.80;
+          const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
+          localWeaponAngle = (-Math.PI * 0.45) + (Math.PI * 1.10) * easedS;
+        }
+      } else if (comboIndex === 1) {
+        const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
+        localWeaponAngle = (Math.PI * 0.65) - (Math.PI * 1.20) * easedP;
+      } else if (comboIndex === 2) {
+        if (p < 0.15) {
+          const w = p / 0.15;
+          localWeaponAngle = (-Math.PI * 0.55) + (-Math.PI * 0.30) * Math.sin(w * Math.PI * 0.5);
+        } else {
+          const s = (p - 0.15) / 0.85;
+          const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
+          localWeaponAngle = (-Math.PI * 0.85) + (Math.PI * 1.70) * easedS;
+        }
+      }
+    } else {
+      const recP = Math.min(1.0, (elapsed - swingDuration) / recoveryDuration);
+      const easeRec = recP * (2 - recP);
+      let endAngle = Math.PI * 0.65;
+      if (comboIndex === 1) endAngle = -Math.PI * 0.55;
+      else if (comboIndex === 2) endAngle = Math.PI * 0.85;
+
+      localWeaponAngle = endAngle * (1.0 - easeRec) + normDiff * easeRec;
     }
+  } else {
+    localWeaponAngle = normDiff;
   }
 
-  let tipX, tipY, innerX, innerY;
+  // Project local coordinates (lx, ly) to world space matching drawGun
+  const projectLocal = (lx, ly) => {
+    const cosL = Math.cos(localWeaponAngle);
+    const sinL = Math.sin(localWeaponAngle);
+    let rx = lx * cosL - ly * sinL;
+    let ry = lx * sinL + ly * cosL;
+
+    if (facingLeft) {
+      ry = -ry;
+    }
+
+    const cosB = Math.cos(baseAngle);
+    const sinB = Math.sin(baseAngle);
+    return {
+      x: fighter.x + rx * cosB - ry * sinB,
+      y: fighter.y + rx * sinB + ry * cosB
+    };
+  };
+
+  let tipPos, innerPos;
 
   if (fighter.rikaCallTimer > 0) {
     // Raised summoning pose for Katana when calling Rika
     const humAngle = Math.sin(Date.now() * 0.08) * 0.08;
     const humShift = Math.cos(Date.now() * 0.1) * 2;
-    const callAngle = currentAngle - Math.PI * 0.35 + humAngle;
+    const callAngle = -Math.PI * 0.35 + humAngle;
 
     const L = (fighter.r - 8 + humShift) + 81 * 1.2;
-    tipX = fighter.x + Math.cos(callAngle) * L;
-    tipY = fighter.y + Math.sin(callAngle) * L;
+    const innerL = L - 14;
 
-    const innerL = L - 25;
-    innerX = fighter.x + Math.cos(callAngle) * innerL;
-    innerY = fighter.y + Math.sin(callAngle) * innerL;
+    const cosC = Math.cos(callAngle);
+    const sinC = Math.sin(callAngle);
+    tipPos = projectLocal(cosC * L, sinC * L);
+    innerPos = projectLocal(cosC * innerL, sinC * innerL);
   } else if (fighter.blockPoseTimer > 0 && !isSwinging) {
-    const parryType = fighter.parryType || 'guard';
-    if (parryType === 'deflect') {
-      const totalDur = CONFIG.yuta.parryGuardDuration || 90;
-      const swingDur = 8; // Super fast deflect swing (8 frames)
-
-      let swingProgress = Math.min(1.0, (totalDur - fighter.blockPoseTimer) / swingDur);
-      let returnProgress = Math.max(0, (12 - fighter.blockPoseTimer) / 12); // Snappy return (12 frames)
-
-      let deflectAngle = 0;
-      let currentTranslateX = fighter.r - 10;
-
-      if (swingProgress < 1.0) {
-        deflectAngle = (Math.PI / 3.5) - (Math.PI * 0.6) * swingProgress;
-        currentTranslateX = (fighter.r - 10) + 15 * swingProgress;
-      } else {
-        deflectAngle = (-Math.PI / 4) * (1 - returnProgress);
-        currentTranslateX = (fighter.r - 10) + 15 * (1 - returnProgress);
-      }
-
-      const L = currentTranslateX + 81 * 1.2;
-      const finalAngle = currentAngle + deflectAngle;
-
-      tipX = fighter.x + Math.cos(finalAngle) * L;
-      tipY = fighter.y + Math.sin(finalAngle) * L;
-
-      const innerL = L - 25;
-      innerX = fighter.x + Math.cos(finalAngle) * innerL;
-      innerY = fighter.y + Math.sin(finalAngle) * innerL;
-    } else {
-      // Static Guard Pose: perpendicular guard
-      const bladeAngle = currentAngle + Math.PI / 2;
-      const baseDist = fighter.r - 18;
-      const hiltX = fighter.x + Math.cos(currentAngle) * baseDist;
-      const hiltY = fighter.y + Math.sin(currentAngle) * baseDist;
-
-      const L = 81 * 1.2;
-      tipX = hiltX + Math.cos(bladeAngle) * L;
-      tipY = hiltY + Math.sin(bladeAngle) * L;
-
-      const innerL = L - 25;
-      innerX = hiltX + Math.cos(bladeAngle) * innerL;
-      innerY = hiltY + Math.sin(bladeAngle) * innerL;
-    }
+    const stanceAngle = Math.PI / 2;
+    const baseDist = fighter.r - 18;
+    const L = 81 * 1.2;
+    const innerL = L - 14;
+    const cosS = Math.cos(stanceAngle);
+    const sinS = Math.sin(stanceAngle);
+    tipPos = projectLocal(baseDist + cosS * L, sinS * L);
+    innerPos = projectLocal(baseDist + cosS * innerL, sinS * innerL);
   } else {
     // Normal / Swing position
-    const flipY = (Math.abs(currentAngle) > Math.PI / 2) ? -1 : 1;
-
-    // Exact transformed coordinates matching drawGun transforms
     const px = (fighter.r - 10) + 81 * 1.2;
-    const py = -8.0 * 1.2 * flipY;
+    const py = 0;
+    tipPos = projectLocal(px, py);
 
-    tipX = fighter.x + Math.cos(currentAngle) * px - Math.sin(currentAngle) * py;
-    tipY = fighter.y + Math.sin(currentAngle) * px + Math.cos(currentAngle) * py;
-
-    const innerPx = (fighter.r - 10) + 52 * 1.2;
-    const innerPy = -2.2 * 1.2 * flipY;
-
-    innerX = fighter.x + Math.cos(currentAngle) * innerPx - Math.sin(currentAngle) * innerPy;
-    innerY = fighter.y + Math.sin(currentAngle) * innerPx + Math.cos(currentAngle) * innerPy;
+    const innerPx = (fighter.r - 10) + 67.5 * 1.2;
+    const innerPy = 0;
+    innerPos = projectLocal(innerPx, innerPy);
   }
 
   return {
-    outer: { x: tipX, y: tipY },
-    inner: { x: innerX, y: innerY }
+    outer: tipPos,
+    inner: innerPos
   };
 }

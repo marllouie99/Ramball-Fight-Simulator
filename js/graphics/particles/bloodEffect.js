@@ -71,6 +71,7 @@ function releaseBloodSprite(s) {
  * Spawns a blood effect at the fighter's position.
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
+  if (amount <= 0) return;
   if (!state.bloodEffects) state.bloodEffects = [];
   const isFFA = state && state.mode === GAME_MODES.FFA;
   const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';

@@ -1510,7 +1510,18 @@ export class YutaRenderer {
   static _drawYutaSwordBag(ctx, fighter) {
     ctx.save();
     ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-    ctx.rotate(fighter.gunAngle); // Align with his facing direction so the back stays opposite to his target
+    const facingLeft = Math.abs(fighter.gunAngle) > Math.PI / 2;
+    const baseAngle = facingLeft ? Math.PI : 0;
+    let diff = (fighter.gunAngle || 0) - baseAngle;
+    let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    if (facingLeft) {
+      normDiff = -normDiff;
+    }
+    ctx.rotate(baseAngle);
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(normDiff * 0.7);
     ctx.scale(1.2, 1.2);       // Scale bag identically to the katana
 
     // Calculate the bag vector based on our start and end coordinates
@@ -1564,7 +1575,18 @@ export class YutaRenderer {
   static _drawYutaSwordStrap(ctx, fighter) {
     ctx.save();
     ctx.translate(fighter.x, fighter.y);
-    ctx.rotate(fighter.gunAngle); // Align with his facing direction
+    const facingLeft = Math.abs(fighter.gunAngle) > Math.PI / 2;
+    const baseAngle = facingLeft ? Math.PI : 0;
+    let diff = (fighter.gunAngle || 0) - baseAngle;
+    let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    if (facingLeft) {
+      normDiff = -normDiff;
+    }
+    ctx.rotate(baseAngle);
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(normDiff * 0.7);
 
     // Draw a thick strap over his right shoulder (+Y) and under his left arm (-Y)
     ctx.strokeStyle = '#1A1A1A'; // Thick black leather strap
@@ -1649,7 +1671,18 @@ export class YutaRenderer {
     if (typeof state !== 'undefined' && state.showSkinOnly) return;
     ctx.save();
     ctx.translate(fighter.x, fighter.y);
-    ctx.rotate(fighter.gunAngle);
+    const facingLeft = Math.abs(fighter.gunAngle) > Math.PI / 2;
+    const baseAngle = facingLeft ? Math.PI : 0;
+    let diff = (fighter.gunAngle || 0) - baseAngle;
+    let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    if (facingLeft) {
+      normDiff = -normDiff;
+    }
+    ctx.rotate(baseAngle);
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(normDiff);
 
     let extension = 0;
     if (fighter.thinIceBreakerChargeTimer > 0) {

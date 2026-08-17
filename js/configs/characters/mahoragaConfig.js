@@ -5,7 +5,7 @@ export const mahoragaConfig = {
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
     adaptationSpeedBoostPerStage: 0.15, // +10% movement speed multiplier per gold adaptation stage
-    rctRegenPerStage: 0.02,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
+    rctRegenPerStage: 0.03,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
     maxLevelRctRegen: 0.80,          // Base ultimate passive RCT HP regeneration per frame at Level 8 (0.80 HP/frame = +48 HP/sec)
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
@@ -37,7 +37,7 @@ export const mahoragaConfig = {
     shoutRadius: 180,               // Shockwave blast radius
     shoutDamage: 30,                // Damage dealt to enemies caught in shockwave
     shoutKnockback: 18,             // Knockback force applied to enemies
-    shoutSlowDurationFrames: 90,     // Slow duration in frames applied to caught enemies (90 = 1.5 seconds)
+    shoutSlowDurationFrames: 120,     // Slow duration in frames applied to caught enemies (120 = 2.0 seconds)
     shoutSlowMultiplier: 0.50,       // Slow speed multiplier (0.50 = 50% slow movement)
 
     // Cursed Energy Throw (Rapid Barrage Ranged Skill)
@@ -76,13 +76,16 @@ export const mahoragaConfig = {
 
     // Reverse Cursed Technique (RCT / Divine Healing at Low HP & Adaptation)
     enableRCTHeal: true,              // Toggle on/off Reverse Cursed Technique healing
-    rctHealAmountPercent: 0.05,       // Fraction of max HP healed on each wheel rotation click (0.10 = 10%)
+    rctHealFlatAmount: 100,            // Heals a flat 35 HP on each wheel rotation click
     rctHealLevelInterval: 1,         // Heal on each adaptation level (every wheel rotation!)
-    rctHealPerClickPercent: 0.05,       // Heals 10% of max HP on each wheel rotation click
+    defBuffPerClickPercent: 0.01,       // Defense boost per wheel click (0.05 = 5% damage reduction per stage)
+    maxDefBuffPercent: 0.50,            // Maximum defense damage reduction cap (0.50 = 50% max reduction)
+    ccTenacityPerClickPercent: 0.075,    // CC tenacity speed factor per wheel click (0.075 = 7.5% speed/KB resistance per stage)
+    maxCcTenacityPercent: 0.60,         // Maximum speed/KB resistance factor under stasis (0.60 = 60% max)
 
     // Fatal Damage Adaptation (General rolling damage window wheel click)
     fatalAdaptWindowFrames: 400,     // Rolling window duration (frames) — ~6.6 seconds window
-    fatalDamageThresholdPct: 0.10,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
+    fatalDamageThresholdPct: 0.15,  // 8% max HP damage threshold triggers wheel click (ensures all 8 wheel clicks & RCT heals occur)
     fatalAdaptCooldownFrames: 30,    // Cooldown (frames) between wheel clicks (30 = 0.5s)
 
     // Teleportation Speed & Afterimage Visibility Settings

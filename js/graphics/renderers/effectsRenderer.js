@@ -207,6 +207,19 @@ export function drawFloatingTexts() {
         currentFont = targetFont;
       }
 
+      // Glow effect for green healing numbers (Rule #11 compliant)
+      const isGreenHeal = t.text.startsWith('+') && (t.color === '#39FF14' || t.color === '#00FF66' || t.color === '#22c55e');
+      if (isGreenHeal) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(57, 255, 20, 0.35)'; // Semi-transparent electric green outer glow
+        ctx.lineWidth = 8.5;
+        ctx.strokeText(t.text, t.x, t.y);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)'; // White inner core glow
+        ctx.lineWidth = 5.5;
+        ctx.strokeText(t.text, t.x, t.y);
+        ctx.restore();
+      }
+
       ctx.lineWidth = t.isDamage ? 3.2 : 3.0;
       ctx.strokeStyle = 'rgba(0,0,0,0.92)';
       ctx.strokeText(t.text, t.x, t.y);
@@ -389,6 +402,7 @@ export function drawUltimateChannelingTexts() {
     const isGojo = fighter.characterId === 'gojo' || fighter.type === 'gojo' || fighter._def?.id === 'gojo';
     const isSukuna = fighter.characterId === 'sukuna' || fighter.type === 'sukuna' || fighter._def?.id === 'sukuna';
     const isYuta = fighter.characterId === 'yuta' || fighter.type === 'yuta' || fighter._def?.id === 'yuta';
+    const isMahito = fighter.characterId === 'mahito' || fighter.type === 'mahito' || fighter._def?.id === 'mahito';
 
     if (isToji) {
       if ((fighter.ultimatePhase === 'CHANNELING' || (fighter.isChannelingDomain && !fighter.ultimateActive)) && (fighter.timeStopTimer || 0) <= 0) {
@@ -405,6 +419,19 @@ export function drawUltimateChannelingTexts() {
         ctx.fillText('CURSE INVENTORY', 0, textY);
         ctx.restore();
       }
+    } else if (isMahito && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
+      const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 120));
+      ctx.save();
+      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+      ctx.font = 'bold 21px "Glast Blitch", Arial';
+      ctx.fillStyle = `rgba(217, 70, 239, ${progress})`;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
+      ctx.lineWidth = 3.2;
+      ctx.textAlign = 'center';
+      const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
+      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
+      ctx.fillText('DOMAIN EXPANSION', 0, textY);
+      ctx.restore();
     } else if (isGojo && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
       const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax || 120));
       ctx.save();
@@ -848,12 +875,17 @@ function _initTodoIdolSeeds() {
   }
 }
 
+export function isTodoTakadaOverlayActive() {
+  return _todoIdolOverlayAlpha > 0.01;
+}
+
 export function drawTodoTakadaIdolScreenOverlay() {
   if (!state || !state.fighters || !state.ctx || !state.canvas) return;
 
   // Single pass fighter search
   let todoFighter = null;
   let yutaFighter = null;
+  let isMahitoDomainActive = false;
   const fighters = state.fighters;
   for (let i = 0; i < fighters.length; i++) {
     const f = fighters[i];
@@ -863,6 +895,8 @@ export function drawTodoTakadaIdolScreenOverlay() {
       todoFighter = f;
     } else if (charId === 'yuta' && f.rika) {
       yutaFighter = f;
+    } else if (charId === 'mahito' && f.domainActive) {
+      isMahitoDomainActive = true;
     }
   }
 
@@ -887,29 +921,31 @@ export function drawTodoTakadaIdolScreenOverlay() {
   ctx.save();
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
-  // 1. Cached Full-Screen Radial Background Gradient
-  if (!_cachedOverlayGrad || _cachedGradW !== screenW || _cachedGradH !== screenH) {
-    _cachedGradW = screenW;
-    _cachedGradH = screenH;
-    const cx = screenW / 2;
-    const cy = screenH / 2;
-    const maxR = Math.hypot(screenW, screenH) * 0.70;
+  // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain is active so domain visual & dim are not overlayed)
+  if (!isMahitoDomainActive) {
+    if (!_cachedOverlayGrad || _cachedGradW !== screenW || _cachedGradH !== screenH) {
+      _cachedGradW = screenW;
+      _cachedGradH = screenH;
+      const cx = screenW / 2;
+      const cy = screenH / 2;
+      const maxR = Math.hypot(screenW, screenH) * 0.70;
 
-    _cachedOverlayGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, maxR);
-    _cachedOverlayGrad.addColorStop(0.0, 'rgba(255, 240, 250, 0.88)');
-    _cachedOverlayGrad.addColorStop(0.45, 'rgba(248, 205, 238, 0.75)');
-    _cachedOverlayGrad.addColorStop(0.80, 'rgba(235, 175, 225, 0.60)');
-    _cachedOverlayGrad.addColorStop(1.0, 'rgba(215, 145, 210, 0.45)');
+      _cachedOverlayGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, maxR);
+      _cachedOverlayGrad.addColorStop(0.0, 'rgba(255, 240, 250, 0.88)');
+      _cachedOverlayGrad.addColorStop(0.45, 'rgba(248, 205, 238, 0.75)');
+      _cachedOverlayGrad.addColorStop(0.80, 'rgba(235, 175, 225, 0.60)');
+      _cachedOverlayGrad.addColorStop(1.0, 'rgba(215, 145, 210, 0.45)');
+    }
+
+    ctx.fillStyle = _cachedOverlayGrad;
+    ctx.fillRect(0, 0, screenW, screenH);
   }
 
-  ctx.fillStyle = _cachedOverlayGrad;
-  ctx.fillRect(0, 0, screenW, screenH);
-
-  // 2. Batched Full-Screen Shimmering White Sparks
+  // 2. Batched Full-Screen Shimmering White Sparks (Always render)
   const sparkleCount = isLowPerf ? 7 : _todoSparkleSeeds.length;
   _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), screenW, screenH, now, _todoIdolOverlayAlpha);
 
-  // 3. Floating Pink & Red Hearts (drifting upward)
+  // 3. Floating Pink & Red Hearts (Always render, drifting upward)
   const heartCount = isLowPerf ? 5 : _todoHeartSeeds.length;
   for (let i = 0; i < heartCount; i++) {
     const h = _todoHeartSeeds[i];
@@ -925,7 +961,7 @@ export function drawTodoTakadaIdolScreenOverlay() {
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
   // 4. Radial cutout around Rika and Pure Love Beam Corridor
-  if (yutaFighter && yutaFighter.rika) {
+  if (!isMahitoDomainActive && yutaFighter && yutaFighter.rika) {
     const rk = yutaFighter.rika;
     const isRikaActive = rk.active || 
       (yutaFighter.rikaEmergingForBeamTimer && yutaFighter.rikaEmergingForBeamTimer > 0) || 

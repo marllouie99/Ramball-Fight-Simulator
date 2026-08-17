@@ -250,11 +250,7 @@ export class GojoFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (this.isCaughtInBeam()) {
-      this.interruptAttacks();
-      return;
-    }
-    if ((this.paralyzeTimer || 0) > 0 || this.isParalyzed) return;
+    if (!this.canPerformBasicAttack()) return false;
     if (projectileSystem && projectileSystem.fireGojoBlue) {
       projectileSystem.fireGojoBlue(this, ownerIndex, this.damage);
     }
@@ -282,9 +278,9 @@ export class GojoFighter extends Fighter {
       this.meleeModeCooldown = 0;
     }
 
-    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled when targeted by Toji's ambush!)
-    const isTargetOfAmbush = (attacker && attacker.isAmbushing) || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (this.isTargetOfAmbush === true);
-    if (!isTargetOfAmbush && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled when targeted by Toji's ambush or trapped in Pure Love Beam!)
+    const isTargetOfAmbush = (attacker && attacker.isAmbushing) || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (this.isTargetOfAmbush === true) || (this.caughtInPureLoveBeam === true);
+    if (!isTargetOfAmbush && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm && !opts.isPureLoveBeam) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.gojo.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage

@@ -572,10 +572,63 @@ canvas {
   gap: 2px 6px;
 }
 
-.health-card__member .health-card__info > div,
-.health-card.team-card .health-card__info > div,
 .health-card.solo-1v2-card .health-card__info > div {
   font-size: 14.5px !important;
+}
+
+/* ── Screen Dimmed Mode: Pure White HUD Font Text (Excludes Fighter Title/Name) ── */
+.hud-dimmed .health-card__text,
+.hud-dimmed .hud-skill-box-text,
+.hud-dimmed .health-card__info,
+.hud-dimmed .health-card__info > div,
+.hud-dimmed .health-card__desc,
+.hud-dimmed .health-card__bar-text,
+.health-card.hud-dimmed .health-card__text,
+.health-card.hud-dimmed .hud-skill-box-text,
+.health-card.hud-dimmed .health-card__info,
+.health-card.hud-dimmed .health-card__info > div,
+.health-card.hud-dimmed .health-card__desc,
+.health-card.hud-dimmed .health-card__bar-text {
+  color: #FFFFFF !important;
+  font-weight: normal !important;
+  text-shadow: 0 0 5px rgba(0, 0, 0, 0.90), 0 1px 2px #000000 !important;
+}
+
+/* ── DOM Floating Health Bubble Overlay on HUD Health Bar ── */
+.hud-heal-bubble {
+  position: absolute;
+  top: -20px;
+  right: 8px;
+  font-family: 'Architects Daughter', cursive, sans-serif;
+  font-size: 16px;
+  font-weight: bold;
+  color: #00FF66;
+  text-shadow: 
+    0 0 8px rgba(57, 255, 20, 0.85),
+    0 0 4px #FFFFFF,
+    -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000;
+  pointer-events: none;
+  z-index: 99;
+  animation: hudHealFloat 2.2s ease-out forwards;
+}
+
+@keyframes hudHealFloat {
+  0% {
+    opacity: 0;
+    transform: translateY(6px) scale(0.8);
+  }
+  15% {
+    opacity: 1;
+    transform: translateY(0) scale(1.2);
+  }
+  80% {
+    opacity: 1;
+    transform: translateY(-16px) scale(1.0);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-28px) scale(0.9);
+  }
 }
 
 .health-card__member .health-card__info span,
@@ -848,4 +901,39 @@ canvas {
   z-index: 1000;
   pointer-events: none;
   user-select: none;
+}
+
+/* HUD Floating Heal Bubble Animation */
+.hud-heal-bubble {
+  position: absolute;
+  left: 50%;
+  top: -8px;
+  transform: translateX(-50%);
+  color: #16a34a; /* Vibrant green */
+  font-family: 'Bangers', Arial, sans-serif;
+  font-size: 22px;
+  letter-spacing: 1px;
+  pointer-events: none;
+  text-shadow: 0 0 3px #000, 0 0 6px rgba(34, 197, 94, 0.95);
+  animation: hudHealFloatUp 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  z-index: 100;
+}
+
+@keyframes hudHealFloatUp {
+  0% {
+    transform: translate(-50%, 0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    transform: translate(-50%, -10px) scale(1.15);
+    opacity: 1;
+  }
+  30% {
+    transform: translate(-50%, -12px) scale(1.0);
+    opacity: 1;
+  }
+  100% {
+    transform: translate(-50%, -32px) scale(0.9);
+    opacity: 0;
+  }
 }

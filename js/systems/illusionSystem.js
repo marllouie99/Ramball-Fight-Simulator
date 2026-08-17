@@ -6,7 +6,7 @@ import { spatialGrid } from './physics.js';
 import { applyDamageToTarget } from '../entities/fighter.js';
 import { triggerMahitoParalyzeExplosion, applySoulDisfigurementStack } from '../entities/fighters/mahito/mahitoCombat.js';
 import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
-import { spawnMahitoSoulExplosion } from '../graphics/particles/sparkEffect.js';
+import { spawnMahitoSoulExplosion, spawnBiteAttackEffect } from '../graphics/particles/sparkEffect.js';
 import { audioSystem } from './audioSystem.js';
 
 // Minimum HP an illusion must have had to be eligible for splitting on death.
@@ -23,7 +23,7 @@ export function updateIllusions() {
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
 
-    // Transfigured Human expanding death animation & explosion
+    // Transfigured Human & Evasion Minion expanding death animation & explosion
     if (illusion.isDying) {
       illusion.deathTimer--;
       illusion.vx = 0;
@@ -35,15 +35,35 @@ export function updateIllusions() {
       
       const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
       const multCfg = mahitoCfg.soulMultiplicity || {};
-      const maxScale = multCfg.minionExpandMaxScale ?? 2.2;
-      const deathDur = multCfg.minionDeathDuration ?? 20;
+      const maxScale = illusion.isEvasionMinion ? 1.65 : (multCfg.minionExpandMaxScale ?? 2.2);
+      const deathDur = illusion.isEvasionMinion ? 24 : (multCfg.minionDeathDuration ?? 20);
 
       const progress = 1.0 - (illusion.deathTimer / (illusion.maxDeathTimer || deathDur));
       // Explode visually by swelling up to maxScale
       illusion.visualScale = 1.0 + progress * (maxScale - 1.0);
       illusion.visualScaleTarget = illusion.visualScale;
 
+      // Spawn subtle boiling soul bubbles during the body swell phase
+      if (illusion.isEvasionMinion && Math.random() < 0.45) {
+        if (typeof spawnMahitoSoulBubbles === 'function') {
+          spawnMahitoSoulBubbles(illusion.x, illusion.y, 1, '#D946EF');
+        }
+      }
+
       if (illusion.deathTimer <= 0) {
+        if (illusion.isEvasionMinion) {
+          spawnIllusionDeath({ ...illusion, color: '#D946EF' });
+          if (typeof spawnMahitoSoulExplosion === 'function') {
+            spawnMahitoSoulExplosion(illusion.x, illusion.y, 35, true);
+          }
+          if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+            audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+          }
+          state.illusions.splice(i, 1);
+          continue;
+        }
+
         if (typeof spawnMahitoSoulExplosion === 'function') {
           spawnMahitoSoulExplosion(illusion.x, illusion.y, illusion.r * 1.8);
         }
@@ -133,19 +153,25 @@ export function updateIllusions() {
     if (illusion.hp <= 0) {
       if (illusion.isRika) continue; // Rika handles her own death animation
       
-      if (illusion.isTransfiguredHuman && !illusion.isDying) {
+      if ((illusion.isTransfiguredHuman || illusion.isEvasionMinion) && !illusion.isDying) {
         const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
         const multCfg = mahitoCfg.soulMultiplicity || {};
-        const deathDur = multCfg.minionDeathDuration ?? 20;
+        const deathDur = illusion.isEvasionMinion ? 24 : (multCfg.minionDeathDuration ?? 20);
 
         illusion.isDying = true;
         illusion.deathTimer = deathDur;
         illusion.maxDeathTimer = deathDur;
         illusion.hp = 0; // lock hp to 0
-        continue; // Wait for expansion to finish before deleting/splitting
+        continue; // Wait for expansion to finish before deleting
       }
 
-      spawnIllusionDeath(illusion); // Spawn ethereal death effect
+      const deathColor = illusion.isEvasionMinion ? '#D946EF' : (illusion.color || '#9966ff');
+      spawnIllusionDeath({ ...illusion, color: deathColor });
+      if (illusion.isEvasionMinion) {
+        if (typeof spawnMahitoSoulExplosion === 'function') {
+          spawnMahitoSoulExplosion(illusion.x, illusion.y, 35, true);
+        }
+      }
 
       // ── SPLIT ON DEATH MECHANIC (Doppelganger Illusions only) ──
       // When an illusion dies, it splits into 2 child illusions each with
@@ -339,7 +365,11 @@ export function updateIllusions() {
       }
     }
 
-    const isIllusionParalyzed = (illusion.hitStunTimer || 0) > 0 || (illusion.paralyzeTimer || 0) > 0 || illusion.isParalyzedByMahoraga;
+    if (illusion.isEvasionMinion) {
+      illusion.hitStunTimer = 0;
+    }
+
+    const isIllusionParalyzed = !illusion.isEvasionMinion && ((illusion.hitStunTimer || 0) > 0 || (illusion.paralyzeTimer || 0) > 0 || illusion.isParalyzedByMahoraga);
     if (isIllusionParalyzed) {
       if ((illusion.paralyzeTimer || 0) <= 0 && (illusion.hitStunTimer || 0) <= 0) {
         illusion.isParalyzedByMahoraga = false;
@@ -367,7 +397,7 @@ export function updateIllusions() {
       illusion.animationTime = (illusion.animationTime || 0) + 16.666;
 
       // Wake up illusions if they were frozen by an ambush and are now free
-      if (!illusion.isTargetOfAmbush && illusion.vx === 0 && illusion.vy === 0 && !illusion.isRika) {
+      if (!illusion.isTargetOfAmbush && illusion.vx === 0 && illusion.vy === 0 && !illusion.isRika && !illusion.isDyingEvasion) {
         const randomAngle = Math.random() * Math.PI * 2;
         illusion.vx = Math.cos(randomAngle);
         illusion.vy = Math.sin(randomAngle);
@@ -388,51 +418,73 @@ export function updateIllusions() {
 
       if (illusion.isEvasionMinion) {
         illusion.swordCooldown = 9999;
-        if (illusion.evasionBounceTimer > 0) {
-          illusion.evasionBounceTimer--;
-        } else if (nearestTarget) {
-          const dx = illusion.x - nearestTarget.x;
-          const dy = illusion.y - nearestTarget.y;
-
-          // Wall avoidance force
-          const pad = 50;
-          let avoidX = 0;
-          let avoidY = 0;
-          if (arena) {
-            if (illusion.x - illusion.r - arena.x < pad) avoidX = 1.2;
-            else if (arena.x + arena.width - (illusion.x + illusion.r) < pad) avoidX = -1.2;
-            if (illusion.y - illusion.r - arena.y < pad) avoidY = 1.2;
-            else if (arena.y + arena.height - (illusion.y + illusion.r) < pad) avoidY = -1.2;
+        
+        // ── Evasion Health Regeneration Buff for minion clones ──
+        const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.40;
+        if (illusion.hp > 0 && illusion.hp < illusion.maxHp) {
+          illusion.hp = Math.min(illusion.maxHp, Number((illusion.hp + evaRegenRate).toFixed(2)));
+          illusion._evadeRegenTick = (illusion._evadeRegenTick || 0) + 1;
+          if (illusion._evadeRegenTick % 30 === 0 && typeof spawnFloatingText === 'function') {
+            spawnFloatingText(illusion.x, illusion.y - illusion.r - 18, `+${(evaRegenRate * 30).toFixed(0)} HP`, '#4ADE80');
           }
+        }
+        
+        // Enforce evasion speedMultiplier (1.25x) from CONFIG on clones
+        const evaSpeedMult = CONFIG.mahito?.evasion?.speedMultiplier || 1.25;
+        const baseSpeed = (illusion.owner && illusion.owner.baseSpeed) || CONFIG.mahito?.moveSpeed || 5.8;
+        let targetSpeed = baseSpeed * evaSpeedMult;
 
-          const fleeAngle = Math.atan2(dy, dx);
-          let targetAngle = fleeAngle;
-          if (avoidX !== 0 || avoidY !== 0) {
-            const avoidAngle = Math.atan2(avoidY, avoidX);
-            targetAngle = fleeAngle * 0.4 + avoidAngle * 0.6;
-          }
+        if (illusion.slowTimer !== undefined && illusion.slowTimer > 0) {
+          illusion.slowTimer--;
+          targetSpeed *= (illusion.slowMultiplier || 0.5);
+        }
 
-          const finalAngle = targetAngle + (Math.random() * 0.3 - 0.15);
-          const targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null) || illusion.moveSpeed || 5.8;
-          illusion.vx = Math.cos(finalAngle) * targetSpeed;
-          illusion.vy = Math.sin(finalAngle) * targetSpeed;
-          illusion.angle = finalAngle;
-          illusion.gunAngle = finalAngle;
+        const currentSpeed = Math.hypot(illusion.vx, illusion.vy);
+        if (currentSpeed > 0 && !illusion.isDyingEvasion) {
+          illusion.vx = (illusion.vx / currentSpeed) * targetSpeed;
+          illusion.vy = (illusion.vy / currentSpeed) * targetSpeed;
+          const moveAngle = Math.atan2(illusion.vy, illusion.vx);
+          illusion.angle = moveAngle;
+          illusion.gunAngle = moveAngle;
+        } else if (currentSpeed <= 0.1 && !illusion.isDyingEvasion) {
+          // Re-launch evasion clone if velocity dropped to 0 while taking hits!
+          const randAngle = Math.random() * Math.PI * 2;
+          illusion.vx = Math.cos(randAngle) * targetSpeed;
+          illusion.vy = Math.sin(randAngle) * targetSpeed;
+        }
+      } else {
+        // Normalize speed every frame to match owner's movement speed (non-evasion illusions)
+        const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
+        let targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
+          || illusion.moveSpeed || 1.5;
+        if (illusion.slowTimer !== undefined && illusion.slowTimer > 0) {
+          illusion.slowTimer--;
+          targetSpeed *= (illusion.slowMultiplier || 0.5);
+        }
+        if (speedSq > 0) {
+          const scale = targetSpeed / Math.sqrt(speedSq);
+          illusion.vx *= scale;
+          illusion.vy *= scale;
         }
       }
 
-      // Normalize speed every frame to match owner's movement speed
-      const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
-      let targetSpeed = (illusion.owner && illusion.owner.hp > 0 ? illusion.owner.speed : null)
-        || illusion.moveSpeed || 1.5;
-      if (illusion.slowTimer !== undefined && illusion.slowTimer > 0) {
-        illusion.slowTimer--;
-        targetSpeed *= (illusion.slowMultiplier || 0.5);
-      }
-      if (speedSq > 0) {
-        const scale = targetSpeed / Math.sqrt(speedSq);
-        illusion.vx *= scale;
-        illusion.vy *= scale;
+      // ── Transfigured Human Minion Periodic Chatter / Noise ──
+      if (illusion.isTransfiguredHuman && !illusion.isDying && illusion.hp > 0) {
+        if (illusion.minionNoiseTimer === undefined || illusion.minionNoiseTimer === null) {
+          illusion.minionNoiseTimer = 45 + Math.floor(Math.random() * 30);
+        }
+        if (illusion.minionNoiseTimer > 0) {
+          illusion.minionNoiseTimer--;
+        } else {
+          const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
+          const interval = mahitoCfg.sounds?.minionNoiseInterval || 55;
+          illusion.minionNoiseTimer = interval + Math.floor((Math.random() - 0.5) * 25);
+          const soundToPlay = illusion.minionSound || mahitoCfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3';
+          const vol = mahitoCfg.sounds?.minionNoiseVolume ?? 1.5;
+          if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+            audioSystem.playSFX(soundToPlay, vol);
+          }
+        }
       }
     }
 
@@ -539,22 +591,16 @@ export function updateIllusions() {
         ((nearestTarget.infinityCooldown || 0) <= 0 || nearestTarget.infinityActive);
 
       if (illusion.isEvasionMinion) {
-        // Natural bounce — reverse velocity along hit axis
+        // Pure natural wall bounce — reverse velocity along hit axis
         if (bouncedX) illusion.vx = -illusion.vx;
         if (bouncedY) illusion.vy = -illusion.vy;
         
-        // Jitter bounce angle slightly if we get stuck or to make movement organic
-        if (Math.abs(illusion.vx) < 0.1 && Math.abs(illusion.vy) < 0.1) {
-          const randAngle = Math.random() * Math.PI * 2;
-          illusion.vx = Math.cos(randAngle) * targetSpeed;
-          illusion.vy = Math.sin(randAngle) * targetSpeed;
-        } else {
-          const speedSq = illusion.vx * illusion.vx + illusion.vy * illusion.vy;
-          const scale = targetSpeed / (speedSq > 0 ? Math.sqrt(speedSq) : 1);
-          illusion.vx *= scale;
-          illusion.vy *= scale;
-        }
-        illusion.evasionBounceTimer = 18; // Let natural bounce travel out
+        const bounceAngle = Math.atan2(illusion.vy, illusion.vx) + (Math.random() - 0.5) * 0.20;
+        const curB = Math.hypot(illusion.vx, illusion.vy);
+        illusion.vx = Math.cos(bounceAngle) * curB;
+        illusion.vy = Math.sin(bounceAngle) * curB;
+        illusion.angle = bounceAngle;
+        illusion.gunAngle = bounceAngle;
       } else if (nearestTarget && !insideSphere && !isGojoInfinity) {
         const dx = nearestTarget.x - illusion.x;
         const dy = nearestTarget.y - illusion.y;
@@ -611,12 +657,19 @@ export function updateIllusions() {
       const maxAttackRange = illusion.r + entity.r + CONFIG.doppleganger.swordRange;
       if ((dx * dx + dy * dy) <= maxAttackRange * maxAttackRange && illusion.swordCooldown === 0) {
         // Attack!
-        illusion.swordSwingAngle = Math.atan2(entity.y - illusion.y, entity.x - illusion.x);
+        const biteAngle = Math.atan2(entity.y - illusion.y, entity.x - illusion.x);
+        illusion.swordSwingAngle = biteAngle;
         illusion.swordSwingActive = true;
         illusion.swordSwingTimer = CONFIG.doppleganger.swordSwingDuration;
         illusion.swordCooldown = CONFIG.doppleganger.swordCooldown;
         entity.takeDamage(illusion.damage, illusion.owner || illusion, { isMelee: true });
-        if (!illusion.isTransfiguredHuman) {
+        
+        if (illusion.isTransfiguredHuman) {
+          if (typeof spawnBiteAttackEffect === 'function') {
+            spawnBiteAttackEffect(entity.x, entity.y, biteAngle, '#D946EF');
+          }
+          spawnFloatingText(entity.x, entity.y - entity.r - 12, 'CRUNCH! 🦷', '#D946EF');
+        } else {
           spawnFloatingText(entity.x, entity.y - entity.r - 5, 'ILLUSION SLASH!', '#9b59b6');
         }
         break;

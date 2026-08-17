@@ -112,6 +112,13 @@ export function getMahitoFrontRadiusTargets(fighter, reachOffset = 75, coneAngle
     const dx = ent.x - fighter.x;
     const dy = ent.y - fighter.y;
     const dist = Math.hypot(dx, dy);
+
+    if (fighter.domainActive || reachOffset >= 9999) {
+      // Inside Domain Expansion (Sure-Hit Domain Effect): Hits valid enemies at ANY distance & angle!
+      targets.push({ entity: ent, dist, angle: Math.atan2(dy, dx) });
+      continue;
+    }
+
     const maxHitDist = fighter.r + ent.r + reachOffset;
 
     if (dist <= maxHitDist) {
@@ -137,13 +144,32 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
   const cfg = CONFIG.mahito || {};
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
-  fighter.punchAnimTimer = fighter.punchMaxTime || cfg.punchSpeed || 20;
+  let animDur = cfg.punchSpeed || 20;
+  let cd = cfg.basicPunchCooldown || 22;
+
+  if (fighter.domainActive) {
+    const cdMult = cfg.domainExpansion?.basicAttackCooldownMultiplier ?? 1.00;
+    cd = Math.round(cd * cdMult);
+    animDur = Math.max(8, Math.round(animDur * cdMult));
+  }
+
+  fighter.punchMaxTime = animDur;
+  fighter.punchAnimTimer = animDur;
   fighter.isRightPunch = !fighter.isRightPunch;
   fighter.morphAttackCount = (fighter.morphAttackCount || 0) + 1;
   fighter.morphType = 'claw';
-  fighter.cooldownTimer = cfg.basicPunchCooldown || 22;
+  fighter.cooldownTimer = cd;
 
-  const reach = cfg.punchRange || 75;
+  let reach = cfg.punchRange || 75;
+  if (fighter.domainActive) {
+    const isAnyDist = cfg.domainExpansion?.anyDistanceBasicAttack ?? true;
+    if (isAnyDist) {
+      reach = 99999;
+    } else {
+      const domainReachMult = cfg.domainExpansion?.punchRangeMultiplier ?? 2.00;
+      reach *= domainReachMult;
+    }
+  }
   const arcAngle = cfg.arcAngle || (135 * Math.PI / 180);
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
 
@@ -155,10 +181,12 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
 
   // Gather all valid enemy targets in 135° frontal cone (Rule #6, #7, #8)
   const validHits = getMahitoFrontRadiusTargets(fighter, reach, arcAngle);
-  const hitAny = validHits.length > 0;
+  let hitAny = validHits.length > 0;
 
   for (let i = 0; i < validHits.length; i++) {
     const { entity: ent, angle: targetAngle } = validHits[i];
+
+
 
     // 1. Apply Base Damage
     applyDamageToTarget(ent, baseDamage, fighter, { isMelee: true, isBasicAttack: true });
@@ -179,12 +207,15 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
     }
 
     // 4. Blood & Claw Scratch Impact Visuals
-    const impactX = (fighter.x + ent.x) / 2;
-    const impactY = (fighter.y + ent.y) / 2;
+    const impactX = ent.x;
+    const impactY = ent.y;
     if (typeof spawnBloodEffect === 'function') {
       spawnBloodEffect(ent, Math.max(1, Math.round(baseDamage * 0.2)), targetAngle);
     }
     spawnMahitoClawScratchImpact(impactX, impactY, targetAngle, isTransformed);
+    if (fighter.domainActive) {
+      spawnImpactFlash(ent.x, ent.y, 45, '#D946EF');
+    }
 
     // 5. Soul Disfigurement Mechanic
     applySoulDisfigurementStack(ent, fighter);
@@ -194,9 +225,9 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
   if (hitAny) {
     triggerGlobalScreenShake(isTransformed ? 6 : 3);
     if (fighter.morphType === 'mace') {
-      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 1.8);
+      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundsmash.mp3', 1.8);
     } else {
-      audioSystem.playSFX(cfg.sounds?.bladeSwing || 'Assets/Sound Effects/Attacks/syctheattack.mp3', 1.8);
+      audioSystem.playSFX(cfg.sounds?.bladeSwing || 'Assets/Sound Effects/Attacks/swordswing.mp3', 1.8);
     }
   } else {
     audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.2);
@@ -208,6 +239,10 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
  */
 export function triggerMahitoParalyzeExplosion(entity) {
   if (!entity || entity.hp <= 0 || entity.isDead) return;
+
+  // Reset soul disfigurement stacks and timer upon rupture explosion
+  entity._soulDisfigurementStacks = 0;
+  entity._soulDisfigurementTimer = 0;
 
   const cfg = CONFIG.mahito || {};
   const soulCfg = cfg.soulDisfigurement || {};
@@ -226,7 +261,13 @@ export function triggerMahitoParalyzeExplosion(entity) {
     mahitoFighter = state.fighters.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito'));
   }
 
-  applyDamageToTarget(entity, ruptureDmg, mahitoFighter, {
+  let finalRuptureDmg = ruptureDmg;
+  if (mahitoFighter && mahitoFighter.domainActive) {
+    const domainRuptureMult = cfg.domainExpansion?.ruptureDamageMultiplier ?? 1.50;
+    finalRuptureDmg *= domainRuptureMult;
+  }
+
+  applyDamageToTarget(entity, finalRuptureDmg, mahitoFighter, {
     isTrueDamage: true,
     isSoulDamage: true,
     isSkill: true
@@ -270,14 +311,26 @@ export function applySoulDisfigurementStack(ent, fighter) {
 
   const cfg = CONFIG.mahito || {};
   const soulCfg = cfg.soulDisfigurement || {};
-  const maxStacks = soulCfg.maxStacks || 3;
+  const maxStacks = soulCfg.maxStacks || 5;
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
-  const curStacks = (ent._soulDisfigurementStacks || 0) + 1;
-  ent._soulDisfigurementStacks = curStacks;
+  let curStacks;
+  if (fighter && fighter.domainActive) {
+    const hitsNeeded = Math.max(1, cfg.domainExpansion?.attacksToTriggerDisfigurement ?? 1);
+    ent._domainDisfigurementHitCount = (ent._domainDisfigurementHitCount || 0) + 1;
+    if (ent._domainDisfigurementHitCount >= hitsNeeded) {
+      ent._domainDisfigurementHitCount = 0;
+      curStacks = maxStacks;
+    } else {
+      curStacks = Math.floor((ent._domainDisfigurementHitCount / hitsNeeded) * maxStacks);
+    }
+  } else {
+    curStacks = (ent._soulDisfigurementStacks || 0) + 1;
+  }
   ent._soulDisfigurementTimer = soulCfg.duration || 300;
 
   if (curStacks < maxStacks) {
+    ent._soulDisfigurementStacks = curStacks;
     spawnFloatingText(
       ent.x,
       ent.y - (ent.r || 25) - 22,
@@ -286,12 +339,23 @@ export function applySoulDisfigurementStack(ent, fighter) {
     );
   } else {
     // MAX STACKS: VIOLENT SOUL RESHAPING (TRUE DAMAGE BURST)
-    ent._soulDisfigurementStacks = 0;
-    ent._soulDisfigurementTimer = 0;
+    // Set to maxStacks so the stitch visual indicator properly fills up (5/5) with critical glowing effects
+    ent._soulDisfigurementStacks = maxStacks;
+    
+    spawnFloatingText(
+      ent.x,
+      ent.y - (ent.r || 25) - 22,
+      `SOUL RESHAPED [${maxStacks}/${maxStacks}]`,
+      '#FF007F'
+    );
 
     let burstDmg = soulCfg.burstDamage || 38;
     if (isTransformed) {
       burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
+    }
+    if (fighter && fighter.domainActive) {
+      const domainDisfigurementMult = cfg.domainExpansion?.disfigurementDamageMultiplier ?? 1.50;
+      burstDmg *= domainDisfigurementMult;
     }
 
     const hpRatio = ent.hp / ent.maxHp;
@@ -343,10 +407,20 @@ export function applySoulDisfigurementStack(ent, fighter) {
       } else {
         ent.paralyzeTimer = Math.max(ent.paralyzeTimer || 0, paralyzeDur);
       }
+
+      // Play Mahito's farewell voiceline when the enemy is paralyzed and about to explode from Soul Rupture (occasional trigger)
+      if (fighter) {
+        const farewellChance = cfg.sounds?.farewellVoicelineChance ?? 0.30;
+        if (Math.random() < farewellChance) {
+          audioSystem.playFighterVoiceline(fighter, cfg.sounds?.farewellVoiceline || 'Assets/Sound Effects/Skills/mahito-farewell-voiceline.mp3', cfg.sounds?.farewellVoicelineVolume ?? 2.2);
+        }
+      }
     }
 
     triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
-    audioSystem.playSFX(cfg.sounds?.soulDetonate || 'Assets/Sound Effects/Skills/enhance.mp3', cfg.sounds?.soulDetonateVolume ?? 1.6);
+    if (cfg.sounds?.soulDetonate) {
+      audioSystem.playSFX(cfg.sounds.soulDetonate, cfg.sounds?.soulDetonateVolume ?? 1.8);
+    }
   }
 }
 
@@ -476,6 +550,12 @@ export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
   // Dampen momentum for initial slide
   fighter.vx *= 0.25;
   fighter.vy *= 0.25;
+
+  // Voiceline for Skill 2 (occasional trigger)
+  const skillVoiceChance = cfg.sounds?.skillVoicelineChance ?? 0.25;
+  if (Math.random() < skillVoiceChance) {
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', cfg.sounds?.skillVoicelineVolume ?? 2.2);
+  }
 }
 
 /**
@@ -556,7 +636,7 @@ export function updateMahitoFleshSurge(fighter) {
       fighter.punchAnimTimer = 16; // Trigger ground plunge fist animation
 
       // Plunge ground impact SFX & particles
-      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', 2.0);
+      audioSystem.playSFX(cfg.sounds?.maceSmash || 'Assets/Sound Effects/Attacks/groundsmash.mp3', 2.0);
       audioSystem.playSFX(cfg.sounds?.whiff || 'Assets/Sound Effects/Skills/woosh.mp3', 1.8);
       spawnMeleeClashShockwave(fighter.x, fighter.y, 40, '#D946EF');
       spawnSparks(fighter.x, fighter.y, '#D946EF', 15);
@@ -617,7 +697,7 @@ export function updateMahitoFleshSurge(fighter) {
         spawnSparks(lp.peakX, lp.peakY, '#D946EF', 16);
         spawnSparks(lp.peakX, lp.peakY, '#F5D0FE', 10);
         triggerGlobalScreenShake(surgeCfg.screenShake || 5);
-        audioSystem.playSFX(cfg.sounds?.fleshHit || 'Assets/Sound Effects/Attacks/fleshhit.mp3', 1.9);
+        audioSystem.playSFX(cfg.sounds?.subterraneanHumpSound || 'Assets/Sound Effects/Attacks/heavypunch1.mp3', cfg.sounds?.subterraneanSurgeVolume ?? 1.8);
 
         // AOE Hit Evaluation around this hump's eruption center
         let hitAnyEnemy = false;
@@ -830,6 +910,12 @@ export function executeMahitoSoulPhaseSlip(fighter, target) {
   // Audio & Burst FX
   audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.85);
   spawnImpactFlash(fighter.x, fighter.y, 40, isTransformed ? '#D946EF' : '#C026D3');
+
+  // Voiceline on Passive Dash (played occasionally, e.g. 30% chance)
+  const dashVoiceChance = cfg.sounds?.dashVoicelineChance ?? 0.30;
+  if (Math.random() < dashVoiceChance) {
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.dashVoiceline || 'Assets/Sound Effects/Skills/mahito-dash-voiceline.mp3', cfg.sounds?.dashVoicelineVolume ?? 2.0);
+  }
 }
 
 /**
@@ -915,7 +1001,7 @@ export function updateMahitoSoulPhaseSlip(fighter) {
       applySoulDisfigurementStack(target, fighter);
 
       // Audio & Impact Shake
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', 0.95);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.95);
       triggerGlobalScreenShake(4, 6);
     }
   }
@@ -949,7 +1035,7 @@ export function executeMahitoMaceCannon(fighter, targetHint = null) {
 
   const minMaceDist = cannonCfg.minDistance || 240;
   const distToTarget = Math.hypot(target.x - fighter.x, target.y - fighter.y);
-  if (distToTarget < minMaceDist) {
+  if (!fighter.domainActive && distToTarget < minMaceDist) {
     // Enemy is in close quarters! Stop from triggering and switch to close-quarters melee strike if in reach
     const reach = cfg.punchRange || 75;
     const maxReach = (fighter.r || 25) + (target.r || 25) + reach;
@@ -991,6 +1077,12 @@ export function executeMahitoMaceCannon(fighter, targetHint = null) {
   fighter.twinScissorCooldown = sharedCd;
   fighter.maceCannonAnimTimer = 180; // Ample buffer; updateMahitoMaceCannon clears timer on retract finish
   fighter.hideFrontHand = true;
+
+  // Voiceline for Skill 3 (occasional trigger)
+  const skillVoiceChance = cfg.sounds?.skillVoicelineChance ?? 0.25;
+  if (Math.random() < skillVoiceChance) {
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', cfg.sounds?.skillVoicelineVolume ?? 2.2);
+  }
 
   // Generate organic, non-uniform spikes around the forward/side perimeter (excluding rear neck connection)
   const spikeCount = 8;
@@ -1378,7 +1470,7 @@ export function updateMahitoMaceCannon(fighter) {
       data.lockTipX = data.currentTipX;
       data.lockTipY = data.currentTipY;
 
-      audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.4);
+      audioSystem.playSFX('Assets/Sound Effects/Skills/mahito-stretch-arm.mp3', 1.4);
     }
   }
 
@@ -1419,7 +1511,7 @@ export function updateMahitoMaceCannon(fighter) {
     // Instant Spike Pop-Out Cue at 68% growth
     if (morphProg >= 0.68 && !data.hasSpikesPopped) {
       data.hasSpikesPopped = true;
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', 1.8);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.8);
       spawnImpactFlash(data.currentTipX, data.currentTipY, 45, isTransformed ? '#D946EF' : '#C026D3');
       spawnSparks(data.currentTipX, data.currentTipY, isTransformed ? '#F5D0FE' : '#D946EF', 12);
     }
@@ -1527,7 +1619,7 @@ export function updateMahitoMaceCannon(fighter) {
 
     // Audio
     audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 1.6);
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 1.8);
+    audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 1.6);
 
     // Spawn Razor Bone Spikes Flying in all organic directions (Natural Shrapnel Spread)
     const shrapnelSpeed = cannonCfg.shrapnelSpeed || 14.0;
@@ -1600,7 +1692,7 @@ export function executeMahitoTwinScissor(fighter, target = null) {
   }
 
   const minScissorDist = scissorCfg.minDistance || 240;
-  if (tgt && tgt.hp > 0 && !tgt.isDead) {
+  if (!fighter.domainActive && tgt && tgt.hp > 0 && !tgt.isDead) {
     const distToTarget = Math.hypot(tgt.x - fighter.x, tgt.y - fighter.y);
     if (distToTarget < minScissorDist) {
       // Enemy is in close quarters! Stop from triggering and switch to close-quarters melee strike if in reach
@@ -1621,6 +1713,12 @@ export function executeMahitoTwinScissor(fighter, target = null) {
   fighter.twinScissorAnimTimer = 180; // Safety anim duration
   fighter.hideFrontHand = true;
   fighter.hideBackHand = true;
+
+  // Voiceline for Skill 4 (occasional trigger)
+  const skillVoiceChance = cfg.sounds?.skillVoicelineChance ?? 0.25;
+  if (Math.random() < skillVoiceChance) {
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', cfg.sounds?.skillVoicelineVolume ?? 2.2);
+  }
 
   // Aim towards enemy or facing angle
   let angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
@@ -1707,7 +1805,7 @@ export function executeMahitoTwinScissor(fighter, target = null) {
     retractDuration: 14
   };
 
-  audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 1.0);
+  audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', cfg.sounds?.twinScissorVolume ?? 1.8);
   spawnImpactFlash(fighter.x, fighter.y, 40, isTransformed ? '#D946EF' : '#C026D3');
 }
 
@@ -1864,8 +1962,8 @@ export function updateMahitoTwinScissor(fighter) {
       data.phase = 'popOut';
       data.popStartFrame = data.elapsedFrames;
       data.popDuration = 10; // Snappy, smooth pop-out duration
-      audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.5);
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', 1.8);
+      audioSystem.playSFX('Assets/Sound Effects/Skills/mahito-stretch-arm.mp3', 1.2);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 1.8);
       spawnImpactFlash(data.leftTipX, data.leftTipY, 45, isTransformed ? '#D946EF' : '#FFFFFF');
       spawnImpactFlash(data.rightTipX, data.rightTipY, 45, isTransformed ? '#D946EF' : '#FFFFFF');
       spawnSparks(data.leftTipX, data.leftTipY, '#D946EF', 10);
@@ -1894,7 +1992,7 @@ export function updateMahitoTwinScissor(fighter) {
       data.morphProgress = 1.0;
       data.phase = 'clamp';
       data.clampStartFrame = data.elapsedFrames;
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 1.8);
+      audioSystem.playSFX('Assets/Sound Effects/Skills/hookchain.mp3', cfg.sounds?.twinScissorVolume ?? 1.8);
     }
   }
   // 2C. Infinity Frozen Phase (Both scissor arms/blades frozen suspended at Gojo's barrier)
@@ -2020,7 +2118,7 @@ export function updateMahitoTwinScissor(fighter) {
       spawnMeleeClashShockwave(strikeCenterX, strikeCenterY, 35, '#FFFFFF');
       spawnSparks(strikeCenterX, strikeCenterY, '#D946EF', 20);
       triggerGlobalScreenShake(scissorCfg.screenShake || 8, 8);
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch1.mp3', 2.0);
+      audioSystem.playSFX('Assets/Sound Effects/Attacks/syctheattack.mp3', cfg.sounds?.twinScissorVolume ?? 1.8);
     }
 
     if (cProg >= 1.0) {
@@ -2256,6 +2354,7 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
     // Summon swarming Transfigured Humans!
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "SOUL MULTIPLICITY!", "#C026D3");
     triggerGlobalScreenShake(6, 12);
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.minionsThrowVoiceline || 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3', cfg.sounds?.minionsThrowVoicelineVolume ?? 2.0);
 
     const ownerIndex = (typeof fighter.fighterIndex === 'number')
       ? fighter.fighterIndex
@@ -2266,6 +2365,13 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
     const minionDamage = skillCfg.minionDamage || 10;
     const minionSpeed = skillCfg.minionSpeed || 1.8;
     const minionSize = skillCfg.minionSize || 16;
+
+    const summonSounds = cfg.sounds?.minionSummons || [
+      cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
+      cfg.sounds?.minionSummonAlt || 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
+      cfg.sounds?.minionSummonAlt2 || 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3'
+    ];
+    const chosenSound = summonSounds[Math.floor(Math.random() * summonSounds.length)];
 
     for (let s = 0; s < summonCount; s++) {
       const angle = (fighter.gunAngle || 0) + (Math.random() * 0.8 - 0.4);
@@ -2286,6 +2392,8 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
         isDoppelganger: true, // Acts as doppelganger illusion
         isTransfiguredHuman: true, // Custom visual skin renderer
         isSplitChild: true,  // Do not split on death
+        minionSound: chosenSound,
+        minionNoiseTimer: 45 + Math.floor(Math.random() * 30),
         angle: angle,
         gunAngle: angle,
         moveSpeed: minionSpeed,
@@ -2307,18 +2415,13 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
       state.illusions.push(child);
     }
 
-    const summonSounds = cfg.sounds?.minionSummons || [
-      cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
-      cfg.sounds?.minionSummonAlt || 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
-      cfg.sounds?.minionSummonAlt2 || 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3'
-    ];
-    const chosenSound = summonSounds[Math.floor(Math.random() * summonSounds.length)];
     audioSystem.playSFX(chosenSound, cfg.sounds?.minionSummonVolume ?? 1.8);
   } else {
     // Alt Cast: Body Repel projectile!
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "BODY REPEL!", "#C026D3");
     triggerGlobalScreenShake(8, 15);
     spawnImpactFlash(fighter.x, fighter.y, 60, '#C026D3');
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.minionsThrowVoiceline || 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3', cfg.sounds?.minionsThrowVoicelineVolume ?? 2.0);
 
     const bodyRepelDamage = skillCfg.bodyRepelDamage || 50;
     const bodyRepelSpeed = skillCfg.bodyRepelSpeed || 10.0;
@@ -2358,4 +2461,123 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
   }
 }
 
+// ============================================================================
+// 12. ULTIMATE: DOMAIN EXPANSION — Self-Embodiment of Perfection
+// ============================================================================
 
+export function executeMahitoDomainExpansion(fighter, targetHint = null) {
+  const cfg = CONFIG.mahito || {};
+  
+  // Set domain charge max and start channeling
+  fighter.domainChargeMax = cfg.domainExpansion?.chargeMax || 120;
+  fighter.domainChargeTimer = fighter.domainChargeMax;
+  fighter.isChannelingDomainExpansion = true;
+
+  // Cancel and interrupt all active morph animations, punches, and skills
+  fighter.punchAnimTimer = 0;
+  fighter.fleshSurgeAnimTimer = 0;
+  fighter._fleshSurgePlungeAngle = null;
+  fighter.maceCannonAnimTimer = 0;
+  fighter._maceCannonData = null;
+  fighter.twinScissorAnimTimer = 0;
+  fighter._twinScissorData = null;
+  fighter.hideFrontHand = false;
+  fighter.hideBackHand = false;
+  
+  // Apply full cooldown immediately
+  fighter.domainCooldown = cfg.domainExpansion?.cooldown || 2000;
+  
+  audioSystem.playFighterVoiceline(fighter, cfg.sounds?.domainChannelSound || 'Assets/Sound Effects/Skills/mahito-domainchanneling-voiceline.mp3', cfg.sounds?.domainChannelVolume || 3.5);
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, "DOMAIN EXPANSION...", "#D946EF");
+}
+
+export function updateMahitoDomainExpansion(fighter) {
+  const cfg = CONFIG.mahito || {};
+  const domainDuration = cfg.domainExpansion?.duration || 400;
+
+  // Channeling Phase
+  if (fighter.domainChargeTimer > 0) {
+    fighter.domainChargeTimer--;
+
+    // Domain Expansion Hyper Armor: only Toji can interrupt (or death)
+    if (fighter.hp <= 0 || fighter.isDead) {
+      fighter.domainChargeTimer = 0;
+      fighter.isChannelingDomainExpansion = false;
+      return;
+    }
+
+    // Continuous Arena Screen Shake while Channeling (Rumbling build-up)
+    const chargeProgress = 1.0 - (fighter.domainChargeTimer / (fighter.domainChargeMax || 120));
+    const shakeIntensity = 3.0 + chargeProgress * 5.0; // Shakes arena from 3.0 up to 8.0 intensity
+    triggerGlobalScreenShake(shakeIntensity, 6);
+
+    // Channeling Visuals
+    if (fighter.domainChargeTimer % 6 === 0) {
+      spawnImpactFlash(fighter.x, fighter.y, 100, 'rgba(217, 70, 239, 0.4)');
+      spawnSparks(fighter.x, fighter.y, '#D946EF', 8);
+    }
+
+    // Deployment moment
+    if (fighter.domainChargeTimer <= 0) {
+      fighter.isChannelingDomainExpansion = false;
+      fighter.domainActive = true;
+      fighter.domainTimer = domainDuration;
+      
+      audioSystem.playFighterVoiceline(fighter, cfg.sounds?.domainDeploySound || 'Assets/Sound Effects/Skills/mahito-domaindeploy-voiceline.mp3', cfg.sounds?.domainDeployVolume || 3.0);
+      audioSystem.playSFX(cfg.sounds?.domainDeployAltSound || 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3', cfg.sounds?.domainDeployVolume || 3.0);
+      spawnFloatingText(fighter.x, fighter.y - fighter.r - 40, "SELF-EMBODIMENT OF PERFECTION!", "#FF007F");
+      triggerGlobalScreenShake(14, 20);
+
+      // Instantly Paralyze (TimeStop) all enemies within radius (Rule #1, #5, #6)
+      // Mahito's domain covers the whole screen (9999 radius)
+      if (typeof state !== 'undefined' && state.fighters) {
+        const candidates = [...state.fighters, ...(state.illusions || [])];
+        const myIndex = state.fighters.indexOf(fighter);
+        const myTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myIndex) : fighter.team;
+
+        for (let i = 0; i < candidates.length; i++) {
+          const ent = candidates[i];
+          if (!ent || ent === fighter || ent.isDead || ent.hp <= 0) continue;
+
+          // Check team alignment
+          let isEnemy = false;
+          const idx = state.fighters.indexOf(ent);
+          if (idx !== -1) {
+            const enemyTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(idx) : ent.team;
+            if (myTeam === null || enemyTeam !== myTeam) isEnemy = true;
+          } else if (ent.owner) {
+            const ownerIdx = state.fighters.indexOf(ent.owner);
+            const ownerTeam = (typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : ent.owner.team;
+            if (myTeam === null || ownerTeam !== myTeam) isEnemy = true;
+          } else if (ent.team !== undefined) {
+            if (myTeam === null || ent.team !== myTeam) isEnemy = true;
+          }
+
+          if (isEnemy) {
+            // Apply domain specific slow flag (slows them down instead of complete freeze/timeStop)
+            ent.isFrozenByMahitoDomain = true;
+          }
+        }
+      }
+    }
+    return;
+  }
+
+  // Active Phase
+  if (fighter.domainActive) {
+    fighter.domainTimer--;
+    if (fighter.domainTimer <= 0) {
+      fighter.domainActive = false;
+      // When domain expires naturally, unfreeze targets
+      if (typeof state !== 'undefined' && state.fighters) {
+        const candidates = [...state.fighters, ...(state.illusions || [])];
+        for (let i = 0; i < candidates.length; i++) {
+          const ent = candidates[i];
+          if (ent && ent.isFrozenByMahitoDomain) {
+            ent.isFrozenByMahitoDomain = false;
+          }
+        }
+      }
+    }
+  }
+}

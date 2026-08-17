@@ -13,6 +13,7 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGroundScorch, spawnMahitoSoulExplosion } from '../graphics/particles/sparkEffect.js';
 import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
+import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManager.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -389,6 +390,7 @@ class ProjectileSystem {
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
     
     proj.isGojoBlue = true;
+    proj.behaviorType = 'gojo_blue';
     proj.visual = 'gojoBlue'; // Distinct visual
     proj.hitTargets = new Set();
     
@@ -992,9 +994,8 @@ class ProjectileSystem {
               projectile.hitTargets.add(fi);
             }
             
-            if (projectile.isSukunaFurnace) {
-              this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
-              return true;
+            if (projectile.behaviorType && ProjectileBehaviorManager.has(projectile.behaviorType)) {
+              return ProjectileBehaviorManager.onHit(projectile, fighter, attacker, fighters, this);
             }
             
             // Delegate visual and piercing logic to HitImpactSystem
@@ -1315,6 +1316,13 @@ class ProjectileSystem {
       spawnMahitoSoulExplosion(p.x, p.y, (skillCfg.bodyRepelRadius || 50) * 1.5);
     }
 
+    const summonSounds = cfg.sounds?.minionSummons || [
+      cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
+      cfg.sounds?.minionSummonAlt || 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
+      cfg.sounds?.minionSummonAlt2 || 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3'
+    ];
+    const chosenSound = summonSounds[Math.floor(Math.random() * summonSounds.length)];
+
     for (let s = 0; s < summonCount; s++) {
       const angle = (p.angle || 0) + (Math.random() * 0.8 - 0.4);
       const distOffset = minionSize * 0.5 + Math.random() * 10;
@@ -1334,6 +1342,8 @@ class ProjectileSystem {
         isDoppelganger: true,
         isTransfiguredHuman: true,
         isSplitChild: true,
+        minionSound: chosenSound,
+        minionNoiseTimer: 45 + Math.floor(Math.random() * 30),
         angle: angle,
         gunAngle: angle,
         moveSpeed: minionSpeed,
@@ -1356,12 +1366,6 @@ class ProjectileSystem {
       state.illusions.push(child);
     }
 
-    const summonSounds = cfg.sounds?.minionSummons || [
-      cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
-      cfg.sounds?.minionSummonAlt || 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
-      cfg.sounds?.minionSummonAlt2 || 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3'
-    ];
-    const chosenSound = summonSounds[Math.floor(Math.random() * summonSounds.length)];
     playSound(chosenSound, cfg.sounds?.minionSummonVolume ?? 1.8);
   }
 
@@ -1909,41 +1913,12 @@ class ProjectileSystem {
    * Returns true if the projectile has expired or left the arena.
    */
   isProjectileExpired(p) {
+    const behaviorExpire = ProjectileBehaviorManager.checkExpire(p, this);
+    if (behaviorExpire !== null) {
+      return behaviorExpire;
+    }
+
     const arena = CONFIG.arena;
-    
-    // Sukuna Furnace Arrow: triggers thermobaric explosion on wall hit or max range expiration
-    if (p.isSukunaFurnace) {
-      if (
-        p.life <= 0 ||
-        p.x - p.r < arena.x ||
-        p.x + p.r > arena.x + arena.width ||
-        p.y - p.r < arena.y ||
-        p.y + p.r > arena.y + arena.height
-      ) {
-        if (!p.isFrozenByInfinity) {
-          this.triggerThermobaricExplosion(p.x, p.y, p.owner, p.damage);
-        }
-        return true;
-      }
-      return false;
-    }
-
-    // Gojo Purple orb: don't expire on wall hit, instead stick to the wall
-    if (p.isGojoPurple) {
-      if (p.life <= 0) return true;
-
-      // Clamp position to arena boundaries so it sticks to walls
-      // Zero BOTH velocity components on wall contact so the orb stops completely
-      // instead of sliding along the wall edge
-      const halfR = p.r / 2;
-      if (p.x - halfR < arena.x) { p.x = arena.x + halfR; p.vx = 0; p.vy = 0; }
-      if (p.x + halfR > arena.x + arena.width) { p.x = arena.x + arena.width - halfR; p.vx = 0; p.vy = 0; }
-      if (p.y - halfR < arena.y) { p.y = arena.y + halfR; p.vx = 0; p.vy = 0; }
-      if (p.y + halfR > arena.y + arena.height) { p.y = arena.y + arena.height - halfR; p.vx = 0; p.vy = 0; }
-
-      return false; // Never expire from wall collision
-    }
-    
     return (
       p.life <= 0 ||
       p.x - p.r < arena.x ||
@@ -2084,378 +2059,19 @@ class ProjectileSystem {
         }
         continue;
       }
-
-      // --- Gojo Blue Pull & Drag Logic ---
-      if (p.isGojoBlue) {
-        const pullRadius = CONFIG.gojo.blueRadius || 90; // Pull radius for Blue
-        const ownerTeam = state.getFighterTeam(p.owner);
-        for (let fi = 0; fi < fighters.length; fi++) {
-          if (fi === p.owner) continue;
-          const f = fighters[fi];
-          if (!f || f.hp <= 0) continue;
-          
-          const isEnemy = ownerTeam === null || state.getFighterTeam(fi) !== ownerTeam;
-          if (isEnemy && !f.immuneToCC && !f.gojoBlueDragImmune) {
-            const dx = p.x - f.x;
-            const dy = p.y - f.y;
-            const dist = Math.hypot(dx, dy);
-            if (dist < pullRadius) {
-              if (dist > 0) {
-                // 1. Inward spatial attraction toward orb center
-                const pullStrength = 3.5;
-                const force = (pullRadius - dist) / pullRadius * pullStrength;
-                f.x += (dx / dist) * force;
-                f.y += (dy / dist) * force;
-              }
-
-              // 2. Drag & carry target along with orb velocity toward the wall
-              const dragSpeed = 0.55;
-              f.vx = f.vx * 0.4 + p.vx * dragSpeed;
-              f.vy = f.vy * 0.4 + p.vy * dragSpeed;
-            }
-          }
-        }
-        // Allow it to fall through to standard movement and hit logic!
-      }
-
-      // --- Gojo Purple DPS + Slow + Pull Logic ---
-      if (p.isGojoPurple) {
-        // Advance visual time for animations so it freezes when caught in time sphere
-        p.visualTime = (p.visualTime || Date.now()) + 16.667;
-
-        const ownerTeam = state.getFighterTeam(p.owner);
-        const purpleSlowDuration = CONFIG.gojo.purpleSlowDuration || 60;
-        const purpleSlowMultiplier = CONFIG.gojo.purpleSlowMultiplier || 0.5;
-        const purplePullForce = CONFIG.gojo.purplePullForce || 8.0;
-        const effectiveRadius = p.r || CONFIG.gojo?.purpleRadius || 50; // Hit radius for damage/destruction
-        const purplePullRadius = CONFIG.gojo.purplePullRadius || 280; // Pull/suction range
-        // Continuous screen shake while purple orb is active (optimized with HUD throttling)
-        p.purpleShakeCounter = (p.purpleShakeCounter || 0) + 1;
-        if (p.purpleShakeCounter >= 5) {
-          p.purpleShakeCounter = 0;
-          const shakeIntensity = CONFIG.gojo?.purpleShakeIntensity || 2;
-          const shakeDuration = CONFIG.gojo?.purpleShakeDuration || 20;
-          triggerGlobalScreenShake(shakeIntensity, shakeDuration);
-        }
-        
-        // Record history for trail effect - Hollow Purple swirling vortex
-        p.history.push({ x: p.x, y: p.y });
-        if (p.history.length > 20) p.history.shift(); // Keep last 20 positions for trail
-        
-        // Destroy incoming enemy projectiles (like Sukuna's slashes) that touch Purple
-        for (let j = 0; j < this.projectiles.length; j++) {
-            const otherProj = this.projectiles[j];
-            if (otherProj === p || otherProj.isVisual || otherProj.life <= 0) continue;
-            // Only destroy enemy projectiles (and exclude Sukuna's Fuga thermobaric arrow)
-            if (areOnSameTeam(p.owner, otherProj.owner)) continue;
-            if (otherProj.isSukunaFurnace || otherProj.visual === 'sukunaFurnaceArrow') continue;
-            
-            // Check distance to see if the enemy projectile touches the Purple Orb
-            const dx = p.x - otherProj.x;
-            const dy = p.y - otherProj.y;
-            const distSq = dx * dx + dy * dy;
-            if (distSq <= effectiveRadius * effectiveRadius) {
-                // Sucked into Hollow Purple and erased from existence
-                otherProj.life = 0;
-                spawnSparks(otherProj.x, otherProj.y, 3, 'purpleTrail', '#8A2BE2');
-            }
-        }
-        
-        const ownerFighter = fighters[p.owner];
-        const allTargets = [
-          ...(state.fighters || []),
-          ...(state.illusions || [])
-        ];
-
-        // DPS tick - damage all valid targets (fighters & illusions) trapped inside or pulled into the purple orb's radius for its entire purpleLife
-        p.purpleLastDPSTick = (p.purpleLastDPSTick || 0) + 1;
-        if (p.purpleLastDPSTick >= p.purpleDPSInterval) {
-          p.purpleLastDPSTick = 0;
-          
-          const damageRadius = Math.max(effectiveRadius * 1.8, purplePullRadius * 0.70);
-          const damageRadiusSq = damageRadius * damageRadius;
-
-          for (let i = 0; i < allTargets.length; i++) {
-            const ent = allTargets[i];
-            if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
-            if (ent.owner && ent.owner === ownerFighter) continue;
-            
-            const dx = ent.x - p.x;
-            const dy = ent.y - p.y;
-            const distSq = dx * dx + dy * dy;
-            
-            if (distSq < damageRadiusSq) {
-              const dpsDamage = p.purpleDPS * (p.purpleDPSInterval / 60);
-              if (typeof ent.takeDamage === 'function') {
-                ent.takeDamage(dpsDamage, ownerFighter, { isPurpleDPS: true, isProjectile: true, projectile: p });
-              }
-              
-              if (ent.vx !== undefined && ent.vy !== undefined && !ent.immuneToCC && ent.characterId !== 'toji' && ent.type !== 'toji') {
-                ent.vx *= 0.8;
-                ent.vy *= 0.8;
-              }
-              
-              spawnSparks(ent.x, ent.y, 4, 'lightningTrail', '#8A2BE2');
-            }
-          }
-        }
-        
-        // Continuous slow + pull effect for targets trapped in the purple orb
-        const trapRadius = (effectiveRadius || 50) + 30; // ~80px direct hit trapping radius
-        for (let i = 0; i < allTargets.length; i++) {
-          const ent = allTargets[i];
-          if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
-          if (ent.owner && ent.owner === ownerFighter) continue;
-          const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
-          if (entIdx !== -1 && areOnSameTeam(p.owner, entIdx)) continue;
-          
-          const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
-          const isPurpleAdapted = isMahoraga && (
-            (ent.gojoAdapted && ent.gojoAdapted.purple) || 
-            (ent.adaptedSkills && ent.adaptedSkills['purple'])
-          );
-          const isImmune = ent.immuneToCC || ent.characterId === 'toji' || ent.type === 'toji';
-          if (!isImmune) {
-            const dx = p.x - ent.x;
-            const dy = p.y - ent.y;
-            const dist = Math.hypot(dx, dy);
-            
-            if (dist > 0 && dist < trapRadius) {
-              ent.purpleHitTimer = 30; // Refresh purpleHitTimer to suppress blue cyan rings while caught in Purple
-              ent.isCaughtInPurple = true;
-              // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
-              if (typeof ent.interruptAttacks === 'function') {
-                ent.interruptAttacks(true);
-              }
-              if (typeof ent.applyTimeStop === 'function') {
-                ent.applyTimeStop(12);
-              } else {
-                ent.timeStopTimer = Math.max(ent.timeStopTimer || 0, 12);
-              }
-              if (typeof ent.applyHitStun === 'function') {
-                ent.applyHitStun(12);
-              }
-              
-              const pullStrength = purplePullForce * (1 - dist / trapRadius);
-              ent.vx *= 0.1;
-              ent.vy *= 0.1;
-              
-              // Suppress existing knockback so they don't fling out of the orb
-              if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
-              if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.5;
-
-              ent.x += (dx / dist) * pullStrength;
-              ent.y += (dy / dist) * pullStrength;
-            } else if (dist >= trapRadius && dist < purplePullRadius) {
-              // Outer gravitational vortex pull field (irresistible suction towards Purple core)
-              const falloff = 1 - (dist - trapRadius) / (purplePullRadius - trapRadius);
-              const outerPullSpeed = Math.max(1.8, (purplePullForce * 0.75) * Math.pow(falloff, 1.2));
-              const dirX = dx / dist;
-              const dirY = dy / dist;
-
-              // Apply heavy slow so enemy cannot walk away against the gravitational vortex
-              if (typeof ent.applySlow === 'function') {
-                ent.applySlow(10, 0.40, { isPurple: true });
-              } else {
-                ent.slowTimer = Math.max(ent.slowTimer || 0, 10);
-                ent.slowMultiplier = 0.40;
-              }
-
-              // Direct positional suction displacement towards orb center
-              ent.x += dirX * outerPullSpeed;
-              ent.y += dirY * outerPullSpeed;
-
-              // Dampen existing velocity and pull velocity impulse towards core
-              ent.vx = ent.vx * 0.65 + dirX * (outerPullSpeed * 0.4);
-              ent.vy = ent.vy * 0.65 + dirY * (outerPullSpeed * 0.4);
-              if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.6;
-              if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.6;
-            }
-          }
-        }
-      }
-
-      // --- Yuta's Pure Love Beam Logic ---
-      if (p.visual === 'yuta_pure_love_beam') {
-        const ownerFighter = fighters[p.owner];
-        if (ownerFighter) {
-          // Beam stays glued to Yuta's hand position and locked angle
-          const beamOffset = (ownerFighter.r || 22) + 14;
-          p.angle = ownerFighter.pureLoveBeamLockedAngle !== undefined ? ownerFighter.pureLoveBeamLockedAngle : (ownerFighter.gunAngle || 0);
-          p.x = ownerFighter.x + Math.cos(p.angle) * beamOffset;
-          p.y = ownerFighter.y + Math.sin(p.angle) * beamOffset;
-          p.vx = Math.cos(p.angle) * 20; // Maintain logical velocity just in case
-          p.vy = Math.sin(p.angle) * 20;
-
-          const allTargets = [
-            ...(state.fighters || []),
-            ...(state.illusions || [])
-          ];
-
-          // Calculate line segment for collision (starting 60px BEHIND Yuta's center so close-range enemies are always caught!)
-          const beamLength = p.length || 2500;
-          const beamRadius = p.r || 120;
-          const startX = ownerFighter.x - Math.cos(p.angle) * 60;
-          const startY = ownerFighter.y - Math.sin(p.angle) * 60;
-          const endX = ownerFighter.x + Math.cos(p.angle) * beamLength;
-          const endY = ownerFighter.y + Math.sin(p.angle) * beamLength;
-
-          // Process ticks
-          p.hitTickTimer = (p.hitTickTimer || 0) + 1;
-          const ticksPerHit = 5; // Hit every 5 frames
-          if (p.hitTickTimer >= ticksPerHit) {
-            p.hitTickTimer = 0;
-            p.hitTargets.clear(); // Clear targets so they can be hit again
-          }
-
-          const ownerTeam = state.getFighterTeam(p.owner);
-
-          for (let i = 0; i < allTargets.length; i++) {
-            const ent = allTargets[i];
-            if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
-            if (ent.owner && ent.owner === ownerFighter) continue;
-            
-            const entIdx = state.fighters.indexOf(ent);
-            const isEnemy = ownerTeam === null || (entIdx !== -1 ? state.getFighterTeam(entIdx) !== ownerTeam : state.getFighterTeam(state.fighters.indexOf(ent.owner)) !== ownerTeam);
-            if (!isEnemy) continue;
-
-            // Line-to-Circle Collision & Origin Proximity Check
-            const cx = ent.x;
-            const cy = ent.y;
-            const radius = ent.r || 20;
-            
-            const dx = endX - startX;
-            const dy = endY - startY;
-            const lengthSq = dx * dx + dy * dy;
-            
-            let t = Math.max(0, Math.min(1, ((cx - startX) * dx + (cy - startY) * dy) / lengthSq));
-            const closestX = startX + t * dx;
-            const closestY = startY + t * dy;
-            
-            const distSq = (cx - closestX) * (cx - closestX) + (cy - closestY) * (cy - closestY);
-            const distFromAxis = Math.sqrt(distSq);
-
-            // Dynamic Beam Width Radius at distance t along beam (matching visual expanding pill path)
-            const startR = (beamRadius * 0.40);
-            const endR = (beamRadius * 2.10);
-            const currentBeamRadius = startR + (endR - startR) * t;
-
-            const distToOrigin = Math.hypot(cx - ownerFighter.x, cy - ownerFighter.y);
-            const isAtBeamOrigin = distToOrigin <= ((ownerFighter.r || 22) + radius + startR);
-            const isInsideBeam = isAtBeamOrigin || (distFromAxis <= (currentBeamRadius + radius));
-
-            if (isInsideBeam) {
-              // Spread damage scaling based on target position within the dynamic beam width
-              // Targets in the core center axis get 100% damage, scaling smoothly to 65% near outer spreading edges
-              const normalizedOffAxis = Math.min(1.0, distFromAxis / Math.max(1, currentBeamRadius + radius));
-              const widthSpreadDamageMult = 1.0 - (normalizedOffAxis * 0.35);
-              const finalDamage = p.damage * widthSpreadDamageMult;
-
-              if (!p.hitTargets.has(ent)) {
-                p.hitTargets.add(ent);
-                
-                if (typeof ent.takeDamage === 'function') {
-                  ent.takeDamage(finalDamage, ownerFighter, { isPureLoveBeam: true });
-                }
-              }
-
-              ent.caughtInPureLoveBeam = true;
-              ent.wasCaughtInPureLoveBeam = true;
-              ent.pureLoveBeamTimer = 10;
-              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15; // Crisp 15-frame (0.25s) recovery delay
-
-              // Explicitly cancel Mahoraga's Level 8 stance and teleports on hit!
-              if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
-                ent.neutralStanceTimer = 0;
-                ent.neutralStanceCooldownTimer = 300;
-                ent.adaptationDashTimer = 0;
-                ent.isInfinityBlitz = false;
-                ent.isBlitzActive = false;
-                ent.isWallSlamActive = false;
-              }
-              
-              if (typeof ent.interruptAttacks === 'function') {
-                ent.interruptAttacks();
-              }
-              if (typeof ent.applyHitStun === 'function') {
-                ent.applyHitStun(8);
-              }
-              
-              const arena = state.arena || CONFIG.arena;
-              const isTouchingWall = arena && (
-                (ent.x - ent.r <= arena.x + 5) ||
-                (ent.x + ent.r >= arena.x + arena.width - 5) ||
-                (ent.y - ent.r <= arena.y + 5) ||
-                (ent.y + ent.r >= arena.y + arena.height - 5)
-              );
-
-              if (isTouchingWall) {
-                // Pin target firmly to the wall point — zero out any wall-sliding velocity vectors
-                ent.vx = 0;
-                ent.vy = 0;
-                ent.knockbackVx = 0;
-                ent.knockbackVy = 0;
-              } else {
-                const pushForce = p.knockback || 6;
-                const pushAngle = p.angle;
-                if (ent.applyKnockback) {
-                  ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
-                } else {
-                  ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
-                  ent.vy = (ent.vy || 0) + Math.sin(pushAngle) * pushForce;
-                }
-              }
-              
-              spawnImpactFlash(ent.x, ent.y, 50, 'rgba(255, 20, 147, 0.7)');
-              spawnSparks(ent.x, ent.y, 4, 'rikaCurse');
-            } else if (ent.wasCaughtInPureLoveBeam || ent.caughtInPureLoveBeam) {
-              // ENEMY ESCAPED BEAM WIDTH BOUNDS — TRIGGER RECOVERY IMMEDIATELY!
-              ent.caughtInPureLoveBeam = false;
-              ent.wasCaughtInPureLoveBeam = false;
-              ent.pureLoveBeamTimer = 0;
-              
-              // Trigger recovery phase immediately upon escaping beam width!
-              ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15;
-              if (typeof ent.interruptAttacks === 'function') {
-                ent.interruptAttacks();
-              }
-              if (typeof ent.applyHitStun === 'function') {
-                ent.applyHitStun(15);
-              }
-
-              // If enemy is Mahoraga, trigger Mahoraga adaptation on beam escape/recovery!
-              if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
-                if (typeof ent.adaptToPureLoveBeam === 'function') {
-                  ent.adaptToPureLoveBeam();
-                }
-              }
-            }
-          }
-        }
-        
-        // Beam lifetime logic
-        p.life -= 1;
-        if (p.life <= 0) {
-          // Clear caughtInPureLoveBeam flags for all entities when beam expires
-          const allTargets = [
-            ...(state.fighters || []),
-            ...(state.illusions || [])
-          ];
-          for (let k = 0; k < allTargets.length; k++) {
-            const ent = allTargets[k];
-            if (ent) {
-              ent.caughtInPureLoveBeam = false;
-              ent.wasCaughtInPureLoveBeam = false;
-              ent.pureLoveBeamTimer = 0;
-            }
-          }
+      // --- Delegated Projectile Behaviors ---
+      if (p.behaviorType && ProjectileBehaviorManager.has(p.behaviorType)) {
+        const isDestroyed = ProjectileBehaviorManager.update(p, fighters, this, { ownerHasEnemyInHole });
+        if (isDestroyed) {
           this._returnProjectile(p);
           this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
           this.projectiles.pop();
           i--;
+          continue;
         }
-        
-        continue; // Skip the rest of the standard projectile update logic
+        if (p.behaviorType === 'gojo_purple' || p.behaviorType === 'yuta_pure_love_beam' || p.behaviorType === 'black_hole') {
+          continue;
+        }
       }
 
       if (p.isGrenade) {

@@ -4,7 +4,7 @@ import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
-import { clearHealthHud } from '../hudManager.js';
+import { clearHealthHud } from '../hudManager.js?v=6';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import {
@@ -303,6 +303,15 @@ function drawWeaponInfoCard(ctx, def) {
   drawPremiumStatBar(ctx, statX, statY, statW, 'DAMAGE', `${def.damage || 10} DMG`, Math.min(1.0, (def.damage || 10) / 40), '#ff4d4d');
   statY += 28;
   drawPremiumStatBar(ctx, statX, statY, statW, 'SPD', `${def.moveSpeed || 5} SPD`, Math.min(1.0, (def.moveSpeed || 5) / 10), '#55ff55');
+  statY += 28;
+
+  // ATK RANGE stat for applicable fighters
+  if (def.type === 'mahito') {
+    const baseReach = CONFIG.mahito?.punchRange || 75;
+    const bodyR = def.radius || 25;
+    const totalRange = bodyR + baseReach;
+    drawPremiumStatBar(ctx, statX, statY, statW, 'ATK RANGE', `${bodyR} + ${baseReach}`, Math.min(1.0, totalRange / 200), '#D946EF');
+  }
 
   ctx.restore();
 }
@@ -744,7 +753,18 @@ function drawWeaponDetailScreen() {
 function drawYutaKatana(ctx, x, y, angle) {
   ctx.save();
   ctx.translate(x, y);
-  ctx.rotate(angle);
+  const facingLeft = Math.abs(angle) > Math.PI / 2;
+  const baseAngle = facingLeft ? Math.PI : 0;
+  let diff = angle - baseAngle;
+  let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+  if (facingLeft) {
+    normDiff = -normDiff;
+  }
+  ctx.rotate(baseAngle);
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+  ctx.rotate(normDiff);
 
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.yuta) ? state.weaponCustomizations.yuta : null;
   if (custom) {

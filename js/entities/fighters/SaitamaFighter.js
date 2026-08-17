@@ -565,6 +565,7 @@ export class SaitamaFighter extends Fighter {
    * Starts Serious charge wind-up animation before firing basic punch attack.
    */
   startBasicPunchCharge(target) {
+    if (typeof this.canPerformBasicAttack === 'function' && !this.canPerformBasicAttack()) return false;
     if ((this._counterWindupTimer && this._counterWindupTimer > 0) ||
         (this._counterPunchTimer && this._counterPunchTimer > 0) ||
         (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0) ||
@@ -586,6 +587,7 @@ export class SaitamaFighter extends Fighter {
    * Multi-target 90-degree frontal arc (Rule #8 & Rule #6 compliant).
    */
   executeNormalPunch(opponent) {
+    if (!this.canPerformBasicAttack()) return false;
     // Disable basic attack while Serious Skill Counter is active
     if ((this._counterWindupTimer && this._counterWindupTimer > 0) ||
         (this._counterPunchTimer && this._counterPunchTimer > 0) ||

@@ -623,14 +623,28 @@ export function drawSparkEffects(layer = 'all') {
         ctx.arc(effect.x, effect.y, effect.size * 1.5, 0, Math.PI * 2);
         ctx.fill();
         ctx.globalCompositeOperation = 'source-over';
-      } else if (effect.type === 'spellStealWisp') {
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = effect.color || '#39FF14';
-        ctx.globalAlpha = effect.life * 0.8;
+      } else if (effect.type === 'mahitoSoulBubble') {
+        ctx.globalCompositeOperation = 'source-over';
+        const col = effect.bubbleColor || { fill: 'rgba(217, 70, 239, 0.65)', stroke: '#F5D0FE' };
+        const curSize = effect.size + (effect.targetSize - effect.size) * (1 - effect.life);
+        const wobbleX = Math.sin((effect.wobblePhase || 0) + (1 - effect.life) * 8) * 4;
+        const px = effect.x + wobbleX;
+        const py = effect.y;
+
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 1.8, 0, Math.PI * 2);
+        ctx.arc(px, py, Math.max(1, curSize), 0, Math.PI * 2);
+        ctx.fillStyle = col.fill;
         ctx.fill();
-        ctx.globalAlpha = 1.0;
+
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = col.stroke;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(px - curSize * 0.35, py - curSize * 0.35, Math.max(0.5, curSize * 0.28), 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.85})`;
+        ctx.fill();
+
         ctx.globalCompositeOperation = 'source-over';
       } else if (effect.type === 'groundScorch') {
         // Massive, highly-detailed organic scorch mark burned into the ground
@@ -995,6 +1009,72 @@ export function drawSparkEffects(layer = 'all') {
           ctx.lineTo(endX, offY);
           ctx.stroke();
         });
+
+        ctx.restore();
+      } else if (effect.type === 'cursedBiteMaw') {
+        // Cursed Jaw Bite Attack Visual (Fanged jaws snapping shut over target)
+        const ang = effect.angle || 0;
+        const progress = 1.0 - effect.life;
+        const snapProgress = Math.min(1.0, progress / 0.50);
+        const easeSnap = Math.pow(snapProgress, 2.5);
+        const currentJawAngle = (1.0 - easeSnap) * 0.70 + 0.03;
+
+        const jawRadius = effect.size || 28;
+        const mainColor = effect.color || '#D946EF';
+
+        ctx.save();
+        ctx.translate(effect.x, effect.y);
+        ctx.rotate(ang);
+
+        for (let side = -1; side <= 1; side += 2) {
+          ctx.save();
+          ctx.rotate(side * currentJawAngle);
+
+          // Cursed Dark Jaw Frame
+          ctx.fillStyle = '#181C26';
+          ctx.strokeStyle = mainColor;
+          ctx.lineWidth = 2.2;
+
+          ctx.beginPath();
+          ctx.arc(0, 0, jawRadius, -Math.PI * 0.35, Math.PI * 0.35);
+          ctx.lineTo(jawRadius * 0.2, 0);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // Sharp Fanged Teeth (3 large white fangs per jaw)
+          ctx.fillStyle = '#FFFFFF';
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 1.0;
+
+          const teethAngles = [-Math.PI * 0.22, 0, Math.PI * 0.22];
+          teethAngles.forEach(tAng => {
+            const fangBaseX = Math.cos(tAng) * jawRadius;
+            const fangBaseY = Math.sin(tAng) * jawRadius;
+            const fangTipX = Math.cos(tAng) * (jawRadius * 0.55);
+            const fangTipY = Math.sin(tAng) * (jawRadius * 0.55);
+            const perpX = -Math.sin(tAng) * 3.5;
+            const perpY = Math.cos(tAng) * 3.5;
+
+            ctx.beginPath();
+            ctx.moveTo(fangBaseX + perpX, fangBaseY + perpY);
+            ctx.lineTo(fangTipX, fangTipY);
+            ctx.lineTo(fangBaseX - perpX, fangBaseY - perpY);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+          });
+
+          ctx.restore();
+        }
+
+        // Central Impact Crunch Flash when jaws snap shut
+        if (snapProgress >= 0.8) {
+          ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+          ctx.beginPath();
+          ctx.arc(0, 0, jawRadius * 0.45, 0, Math.PI * 2);
+          ctx.fill();
+        }
 
         ctx.restore();
       } else if (effect.type === 'arcaneFlash') {
@@ -2494,7 +2574,7 @@ export function spawnMahitoClawScratchImpact(x, y, angle = 0, isTransformed = fa
  * - Blinding starburst core flash with jagged edges representing unstable soul transformation
  * - A flurry of high-speed flying soul/blood sparks (crimson, magenta, cyan)
  */
-export function spawnMahitoSoulExplosion(x, y, radius = 95) {
+export function spawnMahitoSoulExplosion(x, y, radius = 95, isCompact = false) {
   if (!state || !state.sparkEffects) return;
 
   // 1. Core Blinding Starburst Flash
@@ -2529,25 +2609,26 @@ export function spawnMahitoSoulExplosion(x, y, radius = 95) {
   state.sparkEffects.push(outerSw);
 
   // 3. Secondary Expanding Shockwave (Inner Cyan/White, faster decay)
-  const innerSw = ParticleSystem.getParticle();
-  innerSw.x = x;
-  innerSw.y = y;
-  innerSw.vx = 0;
-  innerSw.vy = 0;
-  innerSw.size = 15;
-  innerSw.targetSize = radius * 0.7;
-  innerSw.life = 1.0;
-  innerSw.decay = 0.055; // ~18 frames
-  innerSw.type = 'mahitoSoulShockwave';
-  innerSw.isFlash = true;
-  innerSw.isPixi = false;
-  innerSw.color = 'cyan';
-  state.sparkEffects.push(innerSw);
+  if (!isCompact) {
+    const innerSw = ParticleSystem.getParticle();
+    innerSw.x = x;
+    innerSw.y = y;
+    innerSw.vx = 0;
+    innerSw.vy = 0;
+    innerSw.size = 15;
+    innerSw.targetSize = radius * 0.7;
+    innerSw.life = 1.0;
+    innerSw.decay = 0.055;
+    innerSw.type = 'mahitoSoulShockwave';
+    innerSw.isFlash = true;
+    innerSw.isPixi = false;
+    innerSw.color = 'cyan';
+    state.sparkEffects.push(innerSw);
+  }
 
   // 4. Violent explosion sparks flying in all directions
-  // Crimson (blood), Magenta (Idle Transfiguration cursed energy), Cyan (Soul Spark/Core)
   const sparkColors = ['#DC2626', '#D946EF', '#00E5FF', '#F5D0FE'];
-  const sparkCount = 28;
+  const sparkCount = isCompact ? 6 : 24;
   for (let i = 0; i < sparkCount; i++) {
     const angle = Math.random() * Math.PI * 2;
     const speed = 4 + Math.random() * 10;
@@ -2560,5 +2641,66 @@ export function spawnMahitoSoulExplosion(x, y, radius = 95) {
       size: 1.5 + Math.random() * 2.2,
       decay: 0.035 + Math.random() * 0.035
     });
+  }
+}
+
+/**
+ * Spawns organic cursed energy soul bubbles that swell, float upward, and pop around Mahito.
+ * Used during his Evasion Reconsolidation / Body Expansion phase.
+ */
+export function spawnMahitoSoulBubbles(x, y, count = 3) {
+  if (!state || !state.sparkEffects) return;
+
+  const bubbleColors = [
+    { fill: 'rgba(217, 70, 239, 0.65)', stroke: '#F5D0FE' },
+    { fill: 'rgba(192, 38, 211, 0.60)', stroke: '#D946EF' },
+    { fill: 'rgba(168, 85, 247, 0.60)', stroke: '#E879F9' }
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const p = ParticleSystem.getParticle();
+    p.x = x + (Math.random() - 0.5) * 28;
+    p.y = y + (Math.random() - 0.5) * 28;
+    p.vx = (Math.random() - 0.5) * 1.4;
+    p.vy = -1.0 - Math.random() * 1.8;
+    p.size = 4 + Math.random() * 5;
+    p.targetSize = p.size * (1.8 + Math.random() * 0.8);
+    p.life = 1.0;
+    p.decay = 0.03 + Math.random() * 0.02;
+    p.type = 'mahitoSoulBubble';
+    p.isFlash = false;
+    p.isPixi = false;
+    p.bubbleColor = bubbleColors[i % bubbleColors.length];
+    p.wobblePhase = Math.random() * Math.PI * 2;
+    state.sparkEffects.push(p);
+  }
+}
+
+/**
+ * Spawns a visceral cursed jaw bite attack effect.
+ * Features upper and lower fanged jaws snapping shut over the target with blood & cursed spark flash.
+ */
+export function spawnBiteAttackEffect(x, y, angle = 0, color = '#D946EF') {
+  if (!state || !state.sparkEffects) return;
+
+  const jaw = ParticleSystem.getParticle();
+  jaw.x = x;
+  jaw.y = y;
+  jaw.vx = 0;
+  jaw.vy = 0;
+  jaw.angle = angle;
+  jaw.color = color;
+  jaw.size = 28;
+  jaw.life = 1.0;
+  jaw.decay = 0.075; // ~13 frames
+  jaw.type = 'cursedBiteMaw';
+  jaw.isFlash = false;
+  jaw.isPixi = false;
+  state.sparkEffects.push(jaw);
+
+  // Impact flash & blood splatters
+  spawnImpactFlash(x, y, 36, color);
+  if (typeof spawnBloodEffect === 'function') {
+    spawnBloodEffect({ x, y, r: 12, color: '#DC2626' }, 8);
   }
 }

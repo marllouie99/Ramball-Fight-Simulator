@@ -329,12 +329,8 @@ export class SukunaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if (!this.canPerformBasicAttack()) return false;
     if (!projectileSystem) return;
-    if (this.isCaughtInBeam()) {
-      this.interruptAttacks();
-      return;
-    }
-    if ((this.paralyzeTimer || 0) > 0 || this.isParalyzed) return;
 
     // Find closest valid enemy target
     let closestEnemy = null;

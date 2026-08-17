@@ -81,7 +81,7 @@ export const todoConfig = {
     takadaChannelingVoiceline: 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3', // 3.0s channeling voice line
     takadaChannelingVoiceVolume: 1.0,                              // Channeling voice line volume
     takadaBackgroundSong: 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',           // Takada idol BGM (fades in & out)
-    takadaBackgroundSongVolume: 0.2,                               // Background song volume
+    takadaBackgroundSongVolume: 0.1,                               // Background song volume
     takadaSongFadeInMs: 4500,     // Ultra smooth fade-in duration in ms (3.5s) so music swells gently under voiceline
     takadaSongFadeOutMs: 2500,    // Smooth fade-out duration in ms (2.5s) at end of ultimate
     takadaDeathSongFadeOutMs: 1200 // Smooth fade-out duration in ms (1.2s) when Todo dies during ultimate/channeling

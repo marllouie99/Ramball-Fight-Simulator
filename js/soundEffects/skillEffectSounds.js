@@ -234,6 +234,17 @@ export function getSkillEffectSound(fighterName, effectName) {
 export function playSkillEffectSound(fighterName, effectName) {
   const sound = getSkillEffectSound(fighterName, effectName);
   if (!sound) return null;
+
+  if (effectName === 'wheelclick') {
+    const now = Date.now();
+    if (typeof window !== 'undefined') {
+      if (window._lastMahoragaWheelClickTime && (now - window._lastMahoragaWheelClickTime < 300)) {
+        return null; // Throttle duplicate wheel clicks within 300ms
+      }
+      window._lastMahoragaWheelClickTime = now;
+    }
+  }
+
   return playSound(sound);
 }
 

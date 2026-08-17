@@ -4,12 +4,64 @@ import { GAME_MODES, MODE_SETTINGS, MODE_SPEED_MULTIPLIER } from '../core/modeCo
 import { drawBlueAimbotGun } from './weaponVisuals.js';
 import { drawPanel } from './ui.js';
 
-// ─────────────────────────────────────────────
-// HUD POSITION SYNC — keeps HUD locked to the canvas
-// regardless of browser zoom (Ctrl+/Ctrl-)
-// ─────────────────────────────────────────────
-let _hudSyncInitialized = false;
-let _cachedGameBox = null;
+import { syncHudPosition, initHudSync } from './ui/hudLayout.js';
+import { getSkillDataForFighter } from './ui/hudSkillProviders.js';
+
+export { syncHudPosition, initHudSync };
+
+// Initialize immediately
+initHudSync();
+
+/**
+ * Checks if the screen is currently dimmed by an active Domain Expansion or visual dim effect.
+ * Excludes skill channeling / windup phases per explicit requirement.
+ */
+export function isScreenDimmedActive() {
+  if (typeof state === 'undefined' || !state.fighters) return false;
+
+  // 1. Any active Domain Expansion (active phase, NOT during channeling/windup)
+  const isAnyDomainActive = state.fighters.some(f => f && f.domainActive && !f.isChannelingDomainExpansion && !f.isChannelingDomain && (f.domainChargeTimer || 0) <= 0);
+  if (isAnyDomainActive) return true;
+
+  // 2. Global full-screen dim flags (excluding active channeling windups)
+  if (state.isScreenDimmed || state.activeDimScreen) {
+    const isChanneling = state.fighters.some(f => f && (
+      f.isChannelingPurple ||
+      f.isChannelingDomain ||
+      f.isChannelingDomainExpansion ||
+      f.isChannelingFuga ||
+      f.isChannelingUlt ||
+      (f.domainChargeTimer || 0) > 0 ||
+      (f.purpleChargeTimer || 0) > 0
+    ));
+    if (!isChanneling) return true;
+  }
+
+  // 3. Active Dim Effect States (active beam/strike phase)
+  const hasActiveDimEffect = state.fighters.some(f => f && (
+    (f.isFiringPurple || (f.purpleHitTimer || 0) > 0) ||
+    f.isSaitamaPunchActive ||
+    f.tojiUltimateActive ||
+    (f.furnaceFireArrowTimer || 0) > 0
+  ));
+  if (hasActiveDimEffect) return true;
+
+  return false;
+}
+
+export function triggerHudHealBubble(hpBarElement, healAmount) {
+  if (!hpBarElement) return;
+  const bubble = document.createElement('div');
+  bubble.className = 'hud-heal-bubble';
+  bubble.textContent = `+${Math.round(healAmount)}`;
+  console.log('[HUD Bubble DOM Debug] Created DOM element with text:', bubble.textContent);
+  hpBarElement.appendChild(bubble);
+  setTimeout(() => {
+    if (bubble.parentNode) {
+      bubble.parentNode.removeChild(bubble);
+    }
+  }, 2200);
+}
 
 // ── Cached DOM references for per-frame HUD functions ──
 let _cachedContainerBottom = null;
@@ -17,143 +69,10 @@ let _cachedContainerLeft = null;
 let _cachedContainerRight = null;
 let _cachedTopContainer = null;
 let _cachedBottomContainer = null;
-let _cachedPixiView = null;
 let _cachedTopLeft = null;
 let _cachedTopRight = null;
 let _cachedBottomLeft = null;
 let _cachedBottomRight = null;
-
-/**
- * Dynamically recalculates the HUD container positions based on the actual
- * PixiJS canvas element's bounding rect relative to the game-box.
- * This prevents HUD drift during browser zoom changes.
- */
-function syncHudPosition() {
-  if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
-  if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas');
-  if (!_cachedGameBox || !_cachedPixiView) return;
-
-  const canvasWidth = CONFIG.canvasWidth || 540;
-  const canvasHeight = CONFIG.canvasHeight || 960;
-
-  // Dynamically set aspect ratio, max-width, and background color on game-box from config
-  _cachedGameBox.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
-  _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
-  
-  const outerBgColor = CONFIG.arenaOuterBgColor || '#ffffff';
-  _cachedGameBox.style.backgroundColor = outerBgColor.replace(/ff$/, '');
-
-  const boxRect = _cachedGameBox.getBoundingClientRect();
-  const canvasRect = _cachedPixiView.getBoundingClientRect();
-
-  if (boxRect.height <= 0 || canvasRect.height <= 0) return;
-
-  const canvasTopInBox = canvasRect.top - boxRect.top;
-
-  const scale = CONFIG.internalScale || 1.0;
-  const hudScale = scale * 0.9;
-
-  const arenaWidth = CONFIG.arena.width;
-  const arenaX = CONFIG.arena.x;
-  
-  // Read from CONFIG so it can be tuned without touching engine code.
-  // 1.0 = raw arena width; internalScale (0.95) = aligns with arena side walls.
-  const widthModifier = CONFIG.hudWidthModifier ?? scale;
-
-  const hudCssWidth = (arenaWidth * widthModifier) / hudScale;
-  const visualWidthPercent = (hudCssWidth / canvasWidth) * 100;
-
-  const hudCssLeft = (arenaX + arenaWidth / 2) - hudCssWidth / 2;
-  const visualLeftPercent = (hudCssLeft / canvasWidth) * 100;
-
-  // 1. Position Top HUD Container (names, dynamically kept ~90px above arena top)
-  const topRatio = (CONFIG.arena.y - 90) / canvasHeight;
-  const topPx = canvasTopInBox + canvasRect.height * topRatio;
-  const topPercent = (topPx / boxRect.height) * 100;
-  
-  if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer');
-  if (_cachedTopContainer) {
-    _cachedTopContainer.style.top = `${topPercent.toFixed(3)}%`;
-    _cachedTopContainer.style.width = `${visualWidthPercent.toFixed(3)}%`;
-    _cachedTopContainer.style.maxWidth = 'none';
-    _cachedTopContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
-    _cachedTopContainer.style.right = 'auto';
-    _cachedTopContainer.style.transform = `scale(${hudScale})`;
-    _cachedTopContainer.style.transformOrigin = 'top center';
-  }
-
-  // 2. Position Bottom HUD Container (skills/descriptions, dynamically kept ~20px below arena bottom)
-  const bottomRatio = (CONFIG.arena.y + CONFIG.arena.height + 20) / canvasHeight;
-  const bottomPx = canvasTopInBox + canvasRect.height * bottomRatio;
-  const bottomPercent = (bottomPx / boxRect.height) * 100;
-
-  if (!_cachedBottomContainer) _cachedBottomContainer = document.getElementById('hudBottomContainer');
-  if (_cachedBottomContainer) {
-    _cachedBottomContainer.style.top = `${bottomPercent.toFixed(3)}%`;
-    _cachedBottomContainer.style.width = `${visualWidthPercent.toFixed(3)}%`;
-    _cachedBottomContainer.style.maxWidth = 'none';
-    _cachedBottomContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
-    _cachedBottomContainer.style.right = 'auto';
-    _cachedBottomContainer.style.transform = `scale(${hudScale})`;
-    _cachedBottomContainer.style.transformOrigin = 'top center';
-  }
-
-  // 3. Position Health HUD (health bars, dynamically positioned with a slight margin)
-  const arenaBottomRatio = (CONFIG.arena.y + CONFIG.arena.height) / canvasHeight;
-  const arenaBottomInBox = canvasTopInBox + canvasRect.height * arenaBottomRatio;
-  const hudMargin = canvasRect.height * (20 / canvasHeight);
-  const hudTopPx = arenaBottomInBox + hudMargin;
-  const hudTopPercent = (hudTopPx / boxRect.height) * 100;
-
-  if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
-  const healthHud = _cachedContainerBottom;
-  if (healthHud) {
-    healthHud.style.top = `${hudTopPercent.toFixed(3)}%`;
-    healthHud.style.width = `${visualWidthPercent.toFixed(3)}%`;
-    healthHud.style.maxWidth = 'none';
-    healthHud.style.left = `${visualLeftPercent.toFixed(3)}%`;
-    healthHud.style.right = 'auto';
-    healthHud.style.margin = '0';
-    healthHud.style.transform = `scale(${hudScale})`;
-    healthHud.style.transformOrigin = 'top center';
-  }
-}
-
-function initHudSync() {
-  if (_hudSyncInitialized) return;
-  _hudSyncInitialized = true;
-
-  // Sync on initial load
-  syncHudPosition();
-
-  // Sync on window resize
-  window.addEventListener('resize', syncHudPosition);
-
-  // Sync on browser zoom changes (devicePixelRatio changes)
-  // matchMedia fires when the effective DPR changes due to browser zoom
-  const dprMediaQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-  const onDprChange = () => {
-    syncHudPosition();
-    // Re-register with the new DPR value
-    const newQuery = window.matchMedia(`(resolution: ${window.devicePixelRatio}dppx)`);
-    newQuery.addEventListener('change', onDprChange, { once: true });
-  };
-  dprMediaQuery.addEventListener('change', onDprChange, { once: true });
-
-  // Use ResizeObserver for game-box size changes
-  const gameBox = document.querySelector('.game-box');
-  if (gameBox && typeof ResizeObserver !== 'undefined') {
-    const ro = new ResizeObserver(() => {
-      // Invalidate cached elements in case canvas was replaced
-      _cachedPixiView = null;
-      syncHudPosition();
-    });
-    ro.observe(gameBox);
-  }
-}
-
-// Initialize immediately
-initHudSync();
 
 
 export function drawHUD() {
@@ -380,688 +299,25 @@ function updateHealthHud() {
     return false;
   };
 
-  const getSkillDataForFighter = (f) => {
-    if (f.characterId === 'gojo' || f.type === 'gojo') {
-      const themeColor = '#00E5FF'; 
-      const domainMax = CONFIG.gojo?.domainCooldown || 2000;
-      const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
-      let domainPct;
-      if (f.isChannelingDomainExpansion) {
-        domainPct = 100;
-      } else if (f.domainActive) {
-        const domainDuration = CONFIG.gojo?.domainDuration || 400;
-        const remaining = f.domainTimer || 0;
-        domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
-      } else {
-        domainPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
-      }
-
-      const activeProjectiles = typeof getProjectiles === 'function' ? getProjectiles() : [];
-      const purpleOrb = activeProjectiles.find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0 && p.owner === state.fighters?.indexOf(f));
-      const purpleMax = CONFIG.gojo?.purpleCooldown || 1500;
-      const purpleTimer = f.purpleCooldown !== undefined ? f.purpleCooldown : purpleMax;
-      let purplePct;
-      if (f.isChannelingPurple) {
-        const chargeMax = CONFIG.gojo?.purpleChargeMax || 100;
-        const chargeTimer = f.purpleChargeTimer || 0;
-        purplePct = Math.max(0, Math.min(100, (1 - chargeTimer / chargeMax) * 100));
-      } else if (purpleOrb) {
-        const orbMaxLife = CONFIG.gojo?.purpleLife || 250;
-        purplePct = Math.max(0, Math.min(100, (purpleOrb.life / orbMaxLife) * 100));
-      } else if ((f.purpleRecoveryTimer || 0) > 0) {
-        purplePct = 0;
-      } else {
-        purplePct = Math.max(0, Math.min(100, (1 - (purpleTimer / purpleMax)) * 100));
-      }
-
-      const redMax = CONFIG.gojo?.redCooldown || 1000;
-      const redTimer = f.redCooldown !== undefined ? f.redCooldown : redMax;
-      const redPct = Math.max(0, Math.min(100, (1 - (redTimer / redMax)) * 100));
-
-      const rctMax = CONFIG.gojo?.reverseCursedTechniqueCooldown || 900;
-      const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
-      let rctPct = 0;
-      if (f.isChannelingRCT) {
-        const rctChannelMax = 90;
-        const remaining = f.rctHealTimer || 0;
-        rctPct = Math.max(0, Math.min(100, (remaining / rctChannelMax) * 100));
-      } else {
-        rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
-      }
-
-      const label100 = CONFIG.gojo?.purpleSecondCastTextHeader100 || 'PURPLE 100%';
-      const label200 = CONFIG.gojo?.purpleSecondCastTextHeader200 || 'PURPLE 200%';
-      const purpleLabel = (f.purpleUseCount === 1) ? label200 : label100;
-      return [
-        { id: 'uv',     pct: domainPct, ready: domainPct >= 99, color: themeColor, label: 'UNLIMITED VOID' },
-        { id: 'purple', pct: purplePct, ready: purplePct >= 99, color: themeColor, label: purpleLabel },
-        { id: 'red',    pct: redPct,    ready: redPct >= 99,    color: themeColor, label: 'REVERSAL RED' },
-        { id: 'rct',    pct: rctPct,    ready: rctPct >= 99 && !f.isChannelingRCT, color: themeColor, label: 'RCT' },
-      ];
-    }
-    if (f.characterId === 'toji' || f.type === 'toji') {
-      const themeColor = '#a855f7';
-      const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
-      const ambushMax = (CONFIG.toji?.stealthCooldown || 500) - ambushTrigger;
-      const rawAmbushTimer = f.stealthCooldown !== undefined ? f.stealthCooldown : 0;
-      let ambushPct = 0;
-      if (f.stealthTimer > 0) { ambushPct = 0; }
-      else {
-        const cooldownRemaining = Math.max(0, rawAmbushTimer - ambushTrigger);
-        ambushPct = Math.max(0, Math.min(100, (1 - (cooldownRemaining / ambushMax)) * 100));
-      }
-      if (f.isAmbushing) {
-        let ap = 0;
-        const ph = f.ambushPhase;
-        if (ph === 'FRONT_PAUSE' || ph === 'FRONT_LAUNCH') { ap = 0.05; }
-        else if (ph === 'BACK_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushBackChargeDuration || 25))); ap = 0.10 + p * 0.20; }
-        else if (ph === 'BACK_STAB' || ph === 'KATANA_DRAW') { ap = 0.35; }
-        else if (ph === 'KATANA_CHASE' || ph === 'KATANA_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushKatanaChargeDuration || 30))); ap = 0.40 + p * 0.20; }
-        else if (ph === 'KATANA_SLASH') { ap = 0.65; }
-        else if (ph === 'PHANTOM_FLURRY') { ap = 0.65 + ((f.phantomStrikeCount || 0) / (CONFIG.toji?.ambushPhantomFlurryStrikes || 10)) * 0.25; }
-        else if (ph === 'FINISHER_DASH' || ph === 'FINISHER_SLASH') { ap = 0.95; }
-        ambushPct = Math.max(0, 100 - ap * 100);
-      }
-      const ultMax = f.ultimateCooldownMax || CONFIG.toji?.ultimateCooldown || 1500;
-      const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
-      let ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
-
-      if (f.ultimateActive) {
-        if (f.ultimatePhase === 'CHANNELING') {
-          const chgMax = f.ultimateChargeMax || 90;
-          const remainingChg = Math.max(0, chgMax - (f.ultimateChargeTimer || 0));
-          ultPct = Math.max(0, Math.min(100, (remainingChg / chgMax) * 100));
-        } else {
-          const totalMax = CONFIG.toji?.ultimateSwarmDuration || 500;
-          const remainingSwarm = Math.max(0, f.ultimateTotalTimer !== undefined ? f.ultimateTotalTimer : totalMax);
-          ultPct = Math.max(0, Math.min(100, (remainingSwarm / totalMax) * 100));
-        }
-      }
-      return [
-        { id: 'ambush', pct: ambushPct, ready: ambushPct >= 99, color: themeColor, label: 'STEALTH AMBUSH' },
-        { id: 'ult',    pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'CURSE INVENTORY' },
-      ];
-    }
-    if (f.characterId === 'sukuna' || f.type === 'sukuna') {
-      const themeColor = f.color || '#ff4500';
-      const domainMax = CONFIG.sukuna?.domainCooldown || 1200;
-      const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
-      let domainPct;
-      if (f.isChannelingDomainExpansion) {
-        domainPct = 100;
-      } else if (f.domainActive) {
-        const domainDuration = CONFIG.sukuna?.domainDuration || 500;
-        const remaining = f.domainTimer || 0;
-        domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
-      } else {
-        domainPct = Math.max(0, Math.min(100, (1 - (domainTimer / domainMax)) * 100));
-      }
-
-      const flameMax = CONFIG.sukuna?.divineFlameCooldown || 1500;
-      const flameTimer = f.divineFlameCooldown !== undefined ? f.divineFlameCooldown : flameMax;
-      let flamePct;
-      if (f.isChannelingDivineFlame) {
-        const chargeMax = f.divineFlameChargeMax || 150;
-        const chargeTimer = f.divineFlameChargeTimer || 0;
-        flamePct = Math.max(0, Math.min(100, (chargeTimer / chargeMax) * 100));
-      } else if ((f.divineFlameRecoveryTimer || 0) > 0) {
-        flamePct = 0;
-      } else {
-        flamePct = Math.max(0, Math.min(100, (1 - (flameTimer / flameMax)) * 100));
-      }
-
-      const rctMax = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 900;
-      const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
-      let rctPct;
-      if ((f.rctVisualTimer || 0) > 0) {
-        rctPct = 100;
-      } else {
-        rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
-      }
-
-      return [
-        { id: 'ms',     pct: domainPct,  ready: domainPct >= 99,  color: themeColor, label: 'MALEVOLENT SHRINE' },
-        { id: 'fuga',   pct: flamePct,   ready: flamePct >= 99,   color: themeColor, label: 'FUGA (FURNACE)' },
-        { id: 'rct',    pct: rctPct,     ready: rctPct >= 99,     color: themeColor, label: 'RCT' }
-      ];
-    }
-    if (f.characterId === 'mahoraga' || f.type === 'mahoraga') {
-      const themeColor = '#FFD700'; // All skill bars gold theme for Mahoraga!
-
-      // 1. Dharma Wheel Rotation Level Progress Bar (LVL 01, LVL 02, etc. — no limits!)
-      const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
-      const currentLevel = Math.max(1, totalStages + 1);
-      const lvlStr = `${currentLevel}`;
-
-      const isLevel8 = totalStages >= 8;
-      const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.05);
-
-      let wheelPct = 0;
-      if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0) {
-        wheelPct = 100;
-      } else {
-        const accum = f.totalAccumDamage || 0;
-        wheelPct = Math.max(0, Math.min(100, (accum / windowThreshold) * 100));
-      }
-
-      // 2. Throw Cooldown Progress Bar
-      const throwMax = CONFIG.mahoraga?.throwCooldown || 1000;
-      const throwTimer = f.throwCooldown !== undefined ? f.throwCooldown : throwMax;
-      let throwPct = 0;
-      if (f.isThrowing) {
-        throwPct = 0;
-      } else {
-        throwPct = Math.max(0, Math.min(100, (1 - (throwTimer / throwMax)) * 100));
-      }
-
-      // Check if renamed to WALL SLAM THROW when reaching Level 8
-      const rawThrowLabel = isLevel8 ? 'WALL SLAM THROW' : 'THROW';
-      if (!f._throwLabelAnimation) {
-        f._throwLabelAnimation = { prev: rawThrowLabel, active: false, timer: 0 };
-      }
-      if (f._throwLabelAnimation.prev !== rawThrowLabel) {
-        f._throwLabelAnimation.prev = rawThrowLabel;
-        f._throwLabelAnimation.active = true;
-        f._throwLabelAnimation.timer = 20; // 20 frames of simple cross-fade transition
-      }
-
-      let throwLabelHtml = rawThrowLabel;
-      if (f._throwLabelAnimation.active && f._throwLabelAnimation.timer > 0) {
-        f._throwLabelAnimation.timer--;
-        // Simple cross-fade: fade out the old text, then fade in the new text
-        const opacity = Math.abs(f._throwLabelAnimation.timer - 10) / 10;
-        const displayLabel = f._throwLabelAnimation.timer > 10 ? (isLevel8 ? 'THROW' : 'WALL SLAM THROW') : rawThrowLabel;
-        throwLabelHtml = `<span style="display: inline-block; opacity: ${opacity.toFixed(2)}; transition: opacity 0.1s ease-in-out;">${displayLabel}</span>`;
-        if (f._throwLabelAnimation.timer <= 0) {
-          f._throwLabelAnimation.active = false;
-        }
-      }
-
-      // 3. Divine Shout Cooldown Progress Bar
-      const shoutMax = CONFIG.mahoraga?.shoutCooldown || 480;
-      const shoutTimer = f.shoutCooldown !== undefined ? f.shoutCooldown : shoutMax;
-      let shoutPct = 0;
-      if (f.isShouting) {
-        shoutPct = 0;
-      } else {
-        shoutPct = Math.max(0, Math.min(100, (1 - (shoutTimer / shoutMax)) * 100));
-      }
-
-      const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
-      const currentRegenRate = totalStages * rctPerStage;
-      const currentRegenPerSec = Math.round(currentRegenRate * 60);
-
-      const skillList = [
-        { id: 'wheel', pct: wheelPct, ready: wheelPct >= 99, color: themeColor, label: `WHEEL OF ADAPTATION - LVL ${lvlStr}` },
-        { id: 'throw', pct: throwPct, ready: throwPct >= 99, color: themeColor, label: throwLabelHtml },
-        { id: 'shout', pct: shoutPct, ready: shoutPct >= 99, color: themeColor, label: 'DIVINE SHOUT' }
-      ];
-
-      if (totalStages > 0) {
-        skillList.push({
-          id: 'rct',
-          pct: 100,
-          ready: true,
-          color: themeColor,
-          label: `RCT REGEN: +${currentRegenPerSec}%`
-        });
-      }
-
-      return skillList;
-    }
-    if (f.characterId === 'layla' || f.type === 'layla') {
-      const themeColor = '#00E5FF'; 
-      const bombMax = CONFIG.layla?.maleficBombCooldown || 200;
-      const bombTimer = f.maleficBombCooldown !== undefined ? f.maleficBombCooldown : bombMax;
-      const bombPct = Math.max(0, Math.min(100, (1 - (bombTimer / bombMax)) * 100));
-
-      const dashMax = CONFIG.layla?.voidDashCooldown || 120;
-      const dashTimer = f.voidDashCooldown !== undefined ? f.voidDashCooldown : dashMax;
-      const dashPct = Math.max(0, Math.min(100, (1 - (dashTimer / dashMax)) * 100));
-
-      const ultMax = CONFIG.layla?.ultimateCooldown || 600;
-      const ultTimer = f.destructionBarrageCooldown !== undefined ? f.destructionBarrageCooldown : ultMax;
-      
-      let ultPct;
-      if (f.isUltimateCharging || f.isUltimateFiring) {
-        ultPct = 0;
-      } else {
-        ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
-      }
-
-      return [
-        { id: 'bomb', pct: bombPct, ready: bombPct >= 99, color: themeColor, label: 'MALEFIC BOMB' },
-        { id: 'dash', pct: dashPct, ready: dashPct >= 99, color: themeColor, label: 'VOID PROJECTILE' },
-        { id: 'ult',  pct: ultPct,  ready: ultPct >= 99,  color: '#00E5FF', label: 'DESTRUCTION RUSH' }
-      ];
-    }
-    if (f.characterId === 'todo' || f.type === 'todo') {
-      const themeColor = f.color || '#eab308';
-      const clapMax = CONFIG.todo?.clapCooldown || 60;
-      const clapTimer = f.boogieWoogieCooldown !== undefined ? f.boogieWoogieCooldown : clapMax;
-      const clapPct = Math.max(0, Math.min(100, (1 - (clapTimer / clapMax)) * 100));
-
-      const rockMax = CONFIG.todo?.rockCooldown || 300;
-      const rockTimer = f.rockThrowCooldown !== undefined ? f.rockThrowCooldown : rockMax;
-      const rockPct = Math.max(0, Math.min(100, (1 - (rockTimer / rockMax)) * 100));
-
-      // 50% HP Auto-Trigger Ultimate: TAKADA-CHAN IDOL
-      const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
-      const hpRatio = (f.maxHp && f.maxHp > 0) ? (f.hp / f.maxHp) : 1.0;
-      let ultPct = 0;
-      let ultReady = false;
-
-      const isGojoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(g => 
-        g && (g.characterId === 'gojo' || g.type === 'gojo' || g._def?.id === 'gojo') && g.domainActive && g.hp > 0
-      );
-
-      if (f.isTakadaUltActive) {
-        const remaining = f.takadaUltTimer || 0;
-        const dur = CONFIG.todo?.ultDuration ?? 5000;
-        ultPct = Math.max(0, Math.min(100, (remaining / dur) * 100));
-        ultReady = !isGojoDomainActive && remaining > 0;
-      } else if (f.isTakadaChanneling) {
-        const channelMax = CONFIG.todo?.channelDuration || 180;
-        const channelTimer = f.takadaChannelTimer || 0;
-        ultPct = Math.max(0, Math.min(100, (1 - (channelTimer / channelMax)) * 100));
-        ultReady = !isGojoDomainActive;
-      } else if (f.hasTriggeredTakadaHpUlt) {
-        ultPct = 0; // Already used this match
-        ultReady = false;
-      } else if (isGojoDomainActive && (f.timeStopTimer > 0 || f.isFrozenByInfinity)) {
-        // In Unlimited Void, brain overload completely suppresses Takada Idol motivation
-        ultPct = 0;
-        ultReady = false;
-      } else {
-        // Progresses from 0% (at 100% HP) up to 100% (at <= 50% HP threshold)
-        const progressRatio = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / (1.0 - hpThreshold)));
-        ultPct = Math.round(progressRatio * 100);
-        ultReady = hpRatio <= hpThreshold;
-      }
-
-      return [
-        { id: 'clap', pct: clapPct, ready: clapPct >= 99, color: themeColor, label: 'BOOGIE WOOGIE' },
-        { id: 'rock', pct: rockPct, ready: rockPct >= 99, color: themeColor, label: 'CURSED ROCK' },
-        { id: 'takada', pct: ultPct, ready: ultReady, color: themeColor, label: 'TAKADA-CHAN IDOL' }
-      ];
-    }
-    if (f.characterId === 'yuji' || f.type === 'yuji') {
-      const themeColor = '#ff3366';
-      
-      const comboMax = f.soulSwapActive ? 180 : (CONFIG.yuji?.comboCooldown || CONFIG.yuji?.comboRushCooldown || 400);
-      const comboTimer = f.comboRushCooldown !== undefined ? f.comboRushCooldown : 0;
-      const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
-
-      const bfThreshold = f.soulSwapActive 
-        ? (CONFIG.yuji?.soulSwapBlackFlashThreshold || 2)
-        : (f.blackFlashThreshold || CONFIG.yuji?.blackFlashThreshold || 4);
-      const bfThresholdPct = Math.max(0, Math.min(100, ((f.blackFlashCharge || 0) / bfThreshold) * 100));
-
-      let ultPct = 0;
-      let ultReady = false;
-
-      if (f.soulSwapActive) {
-        const ultDuration = CONFIG.yuji?.soulSwapDuration || 500;
-        ultPct = Math.max(0, Math.min(100, ((f.soulSwapTimer || 0) / ultDuration) * 100));
-      } else if (f.hasSoulSwapped) {
-        ultPct = 0;
-      } else {
-        const ultThresholdHp = CONFIG.yuji?.soulSwapHpThreshold || 0.30;
-        ultPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - ultThresholdHp)) * 100));
-        ultReady = ultPct >= 99 && (f.hp / f.maxHp <= ultThresholdHp);
-      }
-
-      return [
-        { id: 'combo',        pct: comboPct,       ready: comboPct >= 99,       color: themeColor, label: 'DIVERGENT FIST' },
-        { id: 'ult',          pct: ultPct,         ready: ultReady,             color: themeColor, label: 'SOUL SWAP' },
-        { id: 'bf_threshold', pct: bfThresholdPct, ready: bfThresholdPct >= 99, color: themeColor, label: 'BLACK FLASH CHARGE' }
-      ];
-    }
-    if (f.characterId === 'mahito' || f.type === 'mahito') {
-      const themeColor = f.color || '#C026D3';
-      let formPct = 0;
-      let formReady = false;
-      let formLabel = 'DISTORTED KILLING';
-
-      if (f.isTransformed) {
-        const maxDuration = CONFIG.mahito?.transformation?.duration || 600;
-        formPct = Math.max(0, Math.min(100, ((f.transformDuration || 0) / maxDuration) * 100));
-        formReady = true;
-        formLabel = 'ACTIVE FORM';
-      } else {
-        const maxCd = CONFIG.mahito?.transformation?.cooldown || 1200;
-        const currentCd = f.transformCooldown !== undefined ? f.transformCooldown : 0;
-        formPct = Math.max(0, Math.min(100, (1 - (currentCd / maxCd)) * 100));
-        formReady = formPct >= 99;
-      }
-
-      const maxSkillCd = CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.fleshSurge?.cooldown || 300;
-      const skillCd = Math.max(
-        f.sharedSkillCooldown !== undefined ? f.sharedSkillCooldown : 0,
-        f.fleshSurgeCooldown || 0,
-        f.maceCannonCooldown || 0,
-        f.twinScissorCooldown || 0
-      );
-      const skillPct = Math.max(0, Math.min(100, (1 - (skillCd / maxSkillCd)) * 100));
-      const skillReady = skillPct >= 99;
-
-      const maxMultiplicityCd = CONFIG.mahito?.soulMultiplicity?.cooldown || 400;
-      const multiplicityCd = f.soulMultiplicityCooldown !== undefined ? f.soulMultiplicityCooldown : 0;
-      const multiplicityPct = Math.max(0, Math.min(100, (1 - (multiplicityCd / maxMultiplicityCd)) * 100));
-      const multiplicityReady = multiplicityPct >= 99;
-
-      // 4. Soul Evasion Status Bar
-      let evasionPct = 0;
-      let evasionReady = false;
-      let evasionLabel = 'SOUL EVASION (USED)';
-
-      if (f.isEvading) {
-        const maxDuration = CONFIG.mahito?.evasion?.duration || 300;
-        evasionPct = Math.max(0, Math.min(100, ((f.evasionTimer || 0) / maxDuration) * 100));
-        evasionReady = false;
-        evasionLabel = `SOUL EVASION (${((f.evasionTimer || 0) / 60).toFixed(1)}s)`;
-      } else if (!f.hasTriggeredEvasion) {
-        const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.35;
-        evasionPct = Math.max(0, Math.min(100, (1 - (f.hp / f.maxHp)) * 100));
-        evasionReady = (f.hp / f.maxHp) <= evasionThreshold;
-        evasionLabel = 'SOUL EVASION';
-      }
-
-      return [
-        { id: 'idle_transfiguration', pct: skillPct, ready: skillReady, color: themeColor, label: 'IDLE TRANSFIGURATION' },
-        { id: 'soul_multiplicity',    pct: multiplicityPct, ready: multiplicityReady, color: themeColor, label: 'SOUL MULTIPLICITY' },
-        { id: 'soul_evasion',         pct: evasionPct, ready: evasionReady, color: themeColor, label: evasionLabel },
-        { id: 'isbodk',               pct: formPct,  ready: formReady,  color: themeColor, label: formLabel }
-      ];
-    }
-    if (f.characterId === 'saitama' || f.type === 'saitama') {
-      const themeColor = '#F5C400';
-      const skillMax = CONFIG.saitama?.skillPunishCooldown || 2000;
-      const skillTimer = f.skillPunishCooldown !== undefined ? f.skillPunishCooldown : 0;
-      const skillPct = Math.max(0, Math.min(100, (1 - (skillTimer / skillMax)) * 100));
-
-      return [
-        { id: 'counter', pct: skillPct, ready: skillPct >= 99, color: themeColor, label: 'Serious Punch' }
-      ];
-    }
-    if (f.characterId === 'genos' || f.type === 'genos') {
-      const themeColor = '#FF5500';
-
-      // 1. Heat Ammo Bar
-      const maxAmmo = f.maxHeatAmmo || CONFIG.genos?.maxHeatAmmo || 20;
-      const currentAmmo = f.heatAmmo !== undefined ? f.heatAmmo : maxAmmo;
-      let ammoPct = 0;
-      let ammoReady = false;
-      let ammoLabel = 'HEAT AMMO';
-      if (f.ammoReloadTimer > 0) {
-        const reloadMax = f.ammoReloadMax || CONFIG.genos?.ammoReloadFrames || 300;
-        ammoPct = Math.max(0, Math.min(100, (1 - (f.ammoReloadTimer / reloadMax)) * 100));
-        ammoReady = false;
-        ammoLabel = 'RELOADING AMMO...';
-      } else {
-        ammoPct = Math.max(0, Math.min(100, (currentAmmo / maxAmmo) * 100));
-        ammoReady = currentAmmo > 0;
-      }
-
-      // 2. Machine Gun Blows
-      const flurryMax = CONFIG.genos?.flurryCooldown || 480;
-      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : 0;
-      const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
-
-      // 3. Incineration Cannon
-      const ultMax = CONFIG.genos?.ultCooldown || 1680;
-      const ultTimer = f.ultCooldown !== undefined ? f.ultCooldown : 0;
-      const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
-
-      // 4. Core Overload (Self-Destruct)
-      let sdPct = 0;
-      let sdReady = false;
-      let sdColor = '#FF3300';
-      let sdLabel = 'CORE OVERLOAD';
-
-      if (f.isSelfDestructing) {
-        const sdMax = CONFIG.genos?.selfDestructCountdownFrames || 150;
-        const remaining = f.selfDestructTimer || 0;
-        sdPct = Math.max(0, Math.min(100, (remaining / sdMax) * 100));
-        sdReady = true;
-        sdColor = '#FF0000';
-        sdLabel = 'OVERLOAD DETONATING...';
-      } else if (f.usedSelfDestruct) {
-        sdPct = 0;
-        sdReady = false;
-        sdColor = '#555555';
-        sdLabel = 'OVERLOAD USED';
-      } else {
-        const threshold = 0.10;
-        const currentHpRatio = f.hp / f.maxHp;
-        if (currentHpRatio <= threshold) {
-          sdPct = 100;
-          sdReady = true;
-          sdColor = '#FF3300';
-          sdLabel = 'CORE OVERLOAD READY';
-        } else {
-          sdPct = Math.max(0, Math.min(100, ((1 - currentHpRatio) / (1 - threshold)) * 100));
-          sdReady = false;
-          sdColor = '#FF5500';
-          sdLabel = 'CORE OVERLOAD';
-        }
-      }
-
-      return [
-        { id: 'ammo',         pct: ammoPct,   ready: ammoReady,       color: '#FF8800', label: ammoLabel },
-        { id: 'flurry',       pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
-        { id: 'ult',          pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' },
-        { id: 'selfdestruct', pct: sdPct,     ready: sdReady,        color: sdColor,   label: sdLabel }
-      ];
-    }
-    if (f.characterId === 'cronos' || f.type === 'cronos') {
-      const themeColor = f.color || '#00e5ff';
-      const sphereMax = CONFIG.cronos?.sphereCooldown || 1200;
-      const sphereTimer = f.sphereCooldown !== undefined ? f.sphereCooldown : sphereMax;
-      const spherePct = Math.max(0, Math.min(100, (1 - (sphereTimer / sphereMax)) * 100));
-      return [{ id: 'sphere', pct: spherePct, ready: spherePct >= 99, color: themeColor, label: 'TIME SPHERE' }];
-    }
-    if (f.characterId === 'musashi' || f.type === 'musashi') {
-      const themeColor = f.color || '#3cb371';
-      const flurryMax = CONFIG.musashi?.flurryCooldown || 900;
-      const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
-      const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
-      return [{ id: 'flurry', pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'NITEN ICHIRYU FLURRY' }];
-    }
-    if (f.characterId === 'yuta' || f.type === 'yuta') {
-      const themeColor = '#ff69b4';
-
-      let rikaPct = 0;
-      const rk = f.rika;
-      const isInsideDomain = f.domainActive || f.isChannelingDomain;
-      const alreadySummoned = rk && rk.hasSummonedAt50Hp;
-
-      if (rk && rk.active && !rk.isDying) {
-        // Rika is ALIVE & ACTIVE: bar = Rika's remaining HP % (reaches 0% naturally during beam drain)
-        const maxHp = rk.maxHp || CONFIG.yuta?.rikaMaxHp || 250;
-        rikaPct = Math.max(0, Math.min(100, (rk.hp / maxHp) * 100));
-        f._maxRikaPct = 0;
-      } else if (f.rikaCallTimer > 0 || (rk && rk.chargeTimer > 0)) {
-        // Yuta is channeling the call / Rika is charging spawn: 100% full
-        rikaPct = 100;
-        f._maxRikaPct = 100;
-      } else if (alreadySummoned) {
-        // Rika is DEAD (inside OR outside domain): Fills up smoothly as Yuta takes damage since Rika died!
-        const baseline = f.rikaRechargeHpBaseline !== undefined ? f.rikaRechargeHpBaseline : f.hp;
-        const reqDamage = (f.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.50);
-        const damageTaken = Math.max(0, baseline - f.hp);
-        rikaPct = Math.max(0, Math.min(100, (damageTaken / reqDamage) * 100));
-      } else {
-        // First time filling: pure Yuta lost-HP based (0% at 100%HP → 100% at 50%HP)
-        const threshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
-        const rawPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
-        f._maxRikaPct = Math.max(f._maxRikaPct || 0, rawPct);
-        rikaPct = f._maxRikaPct;
-      }
-
-      // Smooth visual lerp — but snap instantly on big jumps, calling Rika, or during beam (so drain tracks in real-time)
-      const isBeamActive = f.isChannelingPureLoveBeam || f.isFiringPureLoveBeam || (f.rikaEmergingForBeamTimer || 0) > 0;
-      if (typeof f._smoothRikaPct !== 'number' || Math.abs(f._smoothRikaPct - rikaPct) > 30 || f.rikaCallTimer > 0 || isBeamActive) {
-        f._smoothRikaPct = rikaPct;
-      } else {
-        f._smoothRikaPct += (rikaPct - f._smoothRikaPct) * 0.15;
-      }
-      rikaPct = Math.max(0, Math.min(100, f._smoothRikaPct));
-
-      const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.80;
-      let domainPct;
-      if (f.isChannelingDomain) {
-        domainPct = 100;
-      } else if (f.domainActive) {
-        const domainDuration = CONFIG.yuta?.domainDuration || 800;
-        const remaining = f.domainTimer || 0;
-        domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
-      } else if (f.domainUseCount === 0) {
-        // Fills up as Yuta takes damage down to 80% HP for 1st Domain
-        domainPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - domainHpThreshold)) * 100));
-      } else if (f.domainUseCount === 1) {
-        // Fills up as Yuta takes new damage AFTER 1st domain ends for 2nd Domain
-        const hpNeeded = (f.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.20);
-        const hpLost = f.domain2DamageTaken || 0;
-        domainPct = Math.max(0, Math.min(100, (hpLost / hpNeeded) * 100));
-      } else {
-        domainPct = 0; // Exhausted both domain uses
-      }
-
-      let beamPct = 0;
-      const beamCdTimer = f.pureLoveBeamCooldownTimer || 0;
-      const beamCdMax = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
-      if (f.isChannelingPureLoveBeam) {
-        beamPct = 100;
-      } else if (f.isFiringPureLoveBeam || (f.rikaEmergingForBeamTimer || 0) > 0) {
-        beamPct = 0; // Pure Love Beam is actively emerging/firing — bar stays 0%!
-      } else if (beamCdTimer > 0) {
-        beamPct = Math.max(0, Math.min(100, (1 - (beamCdTimer / beamCdMax)) * 100));
-      } else {
-        const beamThreshold = CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15;
-        beamPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - beamThreshold)) * 100));
-      }
-
-      if (checkHasTeammate(f)) {
-        return [
-          { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' },
-          { id: 'beam',   pct: beamPct,   ready: beamPct >= 99 && (rk && rk.active) && beamCdTimer <= 0, color: themeColor, label: 'PURE LOVE BEAM' }
-        ];
-      }
-
-      return [
-        { id: 'rika',   pct: rikaPct,   ready: rikaPct >= 99 && (!rk || !rk.active), color: themeColor, label: 'RIKA SUMMON' },
-        { id: 'domain', pct: domainPct, ready: domainPct >= 99 && !f.domainActive,   color: themeColor, label: 'AUTHENTIC MUTUAL LOVE' },
-        { id: 'beam',   pct: beamPct,   ready: beamPct >= 99 && (rk && rk.active) && beamCdTimer <= 0, color: themeColor, label: 'PURE LOVE BEAM' }
-      ];
-    }
-    if (f.characterId === 'gunslinger' || f.type === 'gunslinger') {
-      const themeColor = f.color || '#eab308';
-      let pct = 0;
-
-      if (f.isReloading) {
-        const reloadTime = CONFIG.gunslinger?.reloadTime || 90;
-        pct = Math.max(0, Math.min(100, (f.reloadTimer / reloadTime) * 100));
-      } else {
-        pct = Math.max(0, Math.min(100, (1 - (f.magazineBullets || 0) / (f.maxMagazine || 24)) * 100));
-      }
-
-      return [
-        { id: 'rapidfire', pct: pct, ready: pct >= 99 && !f.isReloading, color: themeColor, label: 'RAPID FIRE' }
-      ];
-    }
-
-    if (f.characterId === 'laser' || f.type === 'laser') {
-      const themeColor = f.color || '#ffaa00';
-      const windupMax = CONFIG.laser?.windupDuration || 150;
-      const beamMax = CONFIG.laser?.beamDuration || 100;
-      const cooldownMax = f.shootCooldownMax || CONFIG.laser?.cooldown || 300;
-
-      let pct = 0;
-      let ready = false;
-
-      if (f.beamTimer > 0) {
-        pct = Math.max(0, Math.min(100, (f.beamTimer / beamMax) * 100));
-        ready = false;
-      } else if (f.beamCharge > 0) {
-        pct = Math.max(0, Math.min(100, (f.beamCharge / windupMax) * 100));
-        ready = f.beamCharge >= windupMax;
-      } else if (f.shootCooldown > 0) {
-        pct = Math.max(0, Math.min(100, (1 - f.shootCooldown / cooldownMax) * 100));
-        ready = false;
-      } else {
-        pct = 100;
-        ready = true;
-      }
-
-      return [
-        { id: 'laser_beam', pct: pct, ready: ready, color: themeColor, label: 'LASER BEAM' }
-      ];
-    }
-
-    if (f.characterId === 'zeus' || f.type === 'zeus') {
-      const themeColor = f.color || '#00BFFF';
-      
-      const aegisMax = CONFIG.zeus?.aegisCooldown || 300;
-      const aegisTimer = f.aegisCooldown || 0;
-      const aegisPct = Math.max(0, Math.min(100, (1 - (aegisTimer / aegisMax)) * 100));
-      const aegisReady = aegisPct >= 99;
-
-      const stormMax = CONFIG.zeus?.stormCooldown || 900;
-      const stormTimer = f.stormCooldown !== undefined ? f.stormCooldown : stormMax;
-      let stormPct = 0;
-      let stormReady = false;
-
-      if (f.isChargingStorm) {
-        const teleMax = CONFIG.zeus?.stormTelegraphFrames || 120;
-        stormPct = Math.max(0, Math.min(100, (1 - f.stormCooldown / teleMax) * 100));
-        stormReady = false;
-      } else if (f.stormActive) {
-        const durationMax = CONFIG.zeus?.stormDuration || 130;
-        stormPct = Math.max(0, Math.min(100, (f.stormTimer / durationMax) * 100));
-        stormReady = false;
-      } else {
-        stormPct = Math.max(0, Math.min(100, (1 - (stormTimer / stormMax)) * 100));
-        stormReady = stormPct >= 99;
-      }
-
-      return [
-        { id: 'aegis', pct: aegisPct, ready: aegisReady, color: themeColor, label: 'AEGIS SHIELD' },
-        { id: 'storm', pct: stormPct, ready: stormReady, color: themeColor, label: 'ULTIMATE STORM' }
-      ];
-    }
-
-    if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
-      return [];
-    }
-
-    let current = 0;
-    let max = 1;
-    if (f.skillCooldown !== undefined) {
-      current = f.skillCooldown;
-      max = (CONFIG[f.type] && CONFIG[f.type].skillCooldown) || 100;
-    } else if (f.cooldownTimer !== undefined) {
-      current = f.cooldownTimer;
-      max = f.cooldown || f.shootCooldownMax || 100;
-    }
-    const skillPct = Math.max(0, Math.min(100, (1 - (current / max)) * 100));
-    
-    const color = f.color || '#a491d3';
-    const def = f.fighterIndex !== undefined ? FIGHTER_DEFS[f.fighterIndex] : null;
-    const ability = def ? (def.ability || def.name) : 'Skill';
-    return [{ id: 'skill', pct: skillPct, ready: skillPct >= 99, color, label: ability.toUpperCase() }];
-  };
+  // getSkillDataForFighter is imported from ./ui/hudSkillProviders.js
 
   const getAdditionalInfoForFighter = (f) => {
     const info = [];
-    const baseDmg = Math.max(0, Number(f.damage) || 0);
+    const baseDmg = parseFloat(Math.max(0, Number(f.damage) || 0).toFixed(1));
 
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
       const baseRegen = CONFIG.yuta?.regenRate || 0.05;
 
       if (checkHasTeammate(f)) {
-        if (f.domainActive || isRikaAlive) {
+        if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
+          info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+        } else if (f.pureLoveBeamRegenDebuffTimer > 0) {
+          const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.45) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : 2.0) : baseRegen;
+          const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+          const debuffedRegen = currentRegen * debuffMult;
+          info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+        } else if (f.domainActive || isRikaAlive) {
           const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
           const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
           const rctRate = domainRctHealRate * regenMult;
@@ -1089,16 +345,23 @@ function updateHealthHud() {
         const isSummoningRika = typeof f.isSummoningRika === 'function' ? f.isSummoningRika() : ((f.rikaCallTimer || 0) > 0 || (f.rika && ((f.rika.chargeTimer || 0) > 0 || (f.rika.spawnTimer || 0) > 0)));
 
         if (isSummoningRika) {
-          info.push(`<b>Parry Chance:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
+          info.push(`<b>Parry:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
         } else if (parryBonus > 0) {
-          info.push(`<b>Parry Chance:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+          info.push(`<b>Parry:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
         } else if (isGuarding) {
-          info.push(`<b>Parry Chance:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+          info.push(`<b>Parry:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
         } else {
-          info.push(`<b>Parry Chance:</b> ${totalParryVal}%`);
+          info.push(`<b>Parry:</b> ${totalParryVal}%`);
         }
 
-        if (f.domainActive || isRikaAlive) {
+        if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
+          info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+        } else if (f.pureLoveBeamRegenDebuffTimer > 0) {
+          const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.45) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : 2.0) : baseRegen;
+          const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+          const debuffedRegen = currentRegen * debuffMult;
+          info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+        } else if (f.domainActive || isRikaAlive) {
           const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
           const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
           const rctRate = domainRctHealRate * regenMult;
@@ -1122,17 +385,28 @@ function updateHealthHud() {
       }
     } else if (f.characterId === 'mahito' || f.type === 'mahito') {
       const baseDmg = CONFIG.mahito?.damage || 16;
-      if (f.isTransformed) {
+      const baseReach = CONFIG.mahito?.punchRange || 75;
+
+      if (f.domainActive) {
+        const addVal = CONFIG.mahito?.domainExpansion?.domainRangeBoost ?? 200;
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+        info.push(`<b>DEF:</b> 10%`);
+        info.push(`<b>ATK RANGE:</b> ${baseReach} + ${addVal} <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+      } else if (f.isTransformed) {
         const mult = CONFIG.mahito?.transformation?.damageMultiplier || 1.60;
         const currentDmg = Math.round(baseDmg * mult);
-        const boost = currentDmg - baseDmg;
+        const boostDmg = currentDmg - baseDmg;
         const defVal = Math.round((1 - (CONFIG.mahito?.transformation?.defenseMultiplier ?? 0.50)) * 100);
-        info.push(`<b>DMG:</b> ${baseDmg} + ${boost} <span style="color: #00E5FF; font-size: 10px;">▲</span>`);
+        const transReach = Math.round(baseReach * 1.25);
+        const addReach = transReach - baseReach;
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #00FF66; font-size: 10px;">▲</span>`);
         info.push(`<b>DEF:</b> ${defVal}%`);
+        info.push(`<b>ATK RANGE:</b> ${baseReach} + ${addReach} <span style="color: #00FF66; font-size: 10px;">▲</span>`);
       } else {
         const defVal = Math.round((CONFIG.mahito?.soulDurabilityReduction ?? 0.25) * 100);
         info.push(`<b>DMG:</b> ${baseDmg}`);
         info.push(`<b>DEF:</b> ${defVal}%`);
+        info.push(`<b>ATK RANGE:</b> ${baseReach}`);
       }
     } else if (f.characterId === 'todo' || f.type === 'todo') {
       // 1. ATK Speed
@@ -1301,9 +575,9 @@ function updateHealthHud() {
         const bonusParry = Math.round(totalGoldStages * parryPerStage * 100);
 
         if (bonusParry > 0) {
-          info.push(`<b>Parry Chance:</b> ${baseParry}% + ${bonusParry}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+          info.push(`<b>Parry:</b> ${baseParry}% + ${bonusParry}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
         } else {
-          info.push(`<b>Parry Chance:</b> ${baseParry}%`);
+          info.push(`<b>Parry:</b> ${baseParry}%`);
         }
 
         const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
@@ -1311,10 +585,38 @@ function updateHealthHud() {
         const currentRegenRate = totalStages * rctPerStage;
         const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
-        if (totalStages > 0) {
+        if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
+          info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+        } else if (f.pureLoveBeamRegenDebuffTimer > 0) {
+          const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+          const debuffedRegenPerSec = Math.round(currentRegenPerSec * debuffMult);
+          info.push(`<b>Regen:</b> +${debuffedRegenPerSec}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+        } else if (totalStages > 0) {
           info.push(`<b>Regen:</b> +${currentRegenPerSec}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
         } else {
           info.push(`<b>Regen:</b> 0%`);
+        }
+
+        // DEF (Damage Reduction) stat
+        const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent || 0.05;
+        const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent || 0.50;
+        const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
+        const defPercent = Math.round(defReduction * 100);
+        if (defPercent > 0) {
+          info.push(`<b>DEF:</b> +${defPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>DEF:</b> 0%`);
+        }
+
+        // CC (Stun/Paralyze/Slow Resistance) stat
+        const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.05;
+        const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.40;
+        const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+        const tenacityPercent = Math.round(ccTenacity * 100);
+        if (tenacityPercent > 0) {
+          info.push(`<b>CC:</b> +${tenacityPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>CC:</b> 0%`);
         }
 
         const adaptedSet = new Set();
@@ -1455,7 +757,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>Push-ups:</b>') || line.includes('<b>Sit-ups:</b>') || line.includes('<b>Squats:</b>') || line.includes('<b>Run:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>Push-ups:</b>') || line.includes('<b>Sit-ups:</b>') || line.includes('<b>Squats:</b>') || line.includes('<b>Run:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>Regen:</b>'));
     }
     if (info.length === 0) return '';
     
@@ -1693,7 +995,7 @@ function updateHealthHud() {
           scoreText: totalGames > 0 ? `${winRate}% WR` : '',
           fillColor: color,
           fillRatio: ratio,
-          metaLabel: `DMG: ${Math.max(0, Number(soloFighter.damage) || 0)}`,
+          metaLabel: `DMG: ${parseFloat(Math.max(0, Number(soloFighter.damage) || 0).toFixed(1))}`,
           metaValue: `${Math.floor(Math.max(0, Number(soloFighter.hp) || 0))}/${Math.floor(Math.max(0, Number(soloFighter.maxHp) || 0))}`,
           extraClass: 'red solo-1v2-card',
           borderColor: color,
@@ -1882,7 +1184,7 @@ function updateHealthHud() {
           scoreText: totalGames > 0 ? `${winRate}% WR` : '',
           fillColor: color,
           fillRatio: ratio,
-          metaLabel: `DMG: ${Math.max(0, Number(fighter.damage) || 0)}`,
+          metaLabel: `DMG: ${parseFloat(Math.max(0, Number(fighter.damage) || 0).toFixed(1))}`,
           metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`,
           extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : (isSingleCol ? 'single-column' : ''),
           borderColor: color,
@@ -1945,6 +1247,12 @@ function updateHealthHud() {
       cachedCard.members.forEach((m) => {
         const fighter = m.fighter;
         if (!fighter) return;
+
+        if (fighter._lastHealAmount && fighter._lastHealAmount > 0 && m.bar) {
+          console.log(`[HUD Manager Team Debug] ${fighter.name} triggering heal bubble with value:`, fighter._lastHealAmount);
+          triggerHudHealBubble(m.bar, fighter._lastHealAmount);
+          fighter._lastHealAmount = 0;
+        }
 
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
@@ -2043,6 +1351,12 @@ function updateHealthHud() {
       if (!fighter || fighter.isTurret) return;
       const cachedCard = _hudCache.fighters.get(fighter);
       if (!cachedCard) return;
+
+      if (fighter._lastHealAmount && fighter._lastHealAmount > 0 && cachedCard.hpBar) {
+        console.log(`[HUD Manager Solo Debug] ${fighter.name} triggering heal bubble with value:`, fighter._lastHealAmount);
+        triggerHudHealBubble(cachedCard.hpBar, fighter._lastHealAmount);
+        fighter._lastHealAmount = 0;
+      }
 
       const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
@@ -2171,6 +1485,17 @@ function updateHealthHud() {
         }
       }
     });
+
+    // 7. Dynamic Screen Dim Mode: Automatically turn ALL HUD text white during active dim effects (excluding skill channeling)
+    const isDimmed = isScreenDimmedActive();
+    const gameContainer = document.querySelector('.game-container') || document.body;
+    if (gameContainer) {
+      if (isDimmed) {
+        gameContainer.classList.add('hud-dimmed');
+      } else {
+        gameContainer.classList.remove('hud-dimmed');
+      }
+    }
   }
 }
 

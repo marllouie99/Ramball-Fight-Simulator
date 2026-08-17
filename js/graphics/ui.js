@@ -4,7 +4,7 @@
 
 import { renderFpsDebugOverlay } from './ui/debugOverlay.js';
 import { renderTeamHpCard } from './ui/hudRenderer.js';
-import { drawHUD, clearHealthHud } from './hudManager.js';
+import { drawHUD, clearHealthHud } from './hudManager.js?v=6';
 import { 
   handleUIMove, 
   handleUIClick, 

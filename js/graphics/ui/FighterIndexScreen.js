@@ -3,7 +3,7 @@ import { unlockAudio } from '../../systems/soundSystem.js';
 import { goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
-import { clearHealthHud } from '../hudManager.js';
+import { clearHealthHud } from '../hudManager.js?v=6';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { previewProjectileSystem, updateIndexDetailDemo, resetIndexDetailState } from '../preview.js';
@@ -387,7 +387,18 @@ function drawIndexDetailScreen() {
   drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'COOLDOWN', `${(def.cooldown / 60).toFixed(1)}s`, Math.max(0.1, 1 - (def.cooldown / 120)), '#ffd700');
   curY += 32;
   drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'SPD', `${fighterSpeed.toFixed(1)} SPD`, Math.min(1.0, fighterSpeed / 10), '#55ff55');
-  curY += 22;
+  curY += 32;
+
+  // ATK RANGE stat for applicable fighters
+  if (def.type === 'mahito') {
+    const baseReach = CONFIG.mahito?.punchRange || 75;
+    const bodyR = def.radius || 25;
+    const totalRange = bodyR + baseReach;
+    drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'ATK RANGE', `${bodyR} + ${baseReach} (${totalRange}px)`, Math.min(1.0, totalRange / 200), '#D946EF');
+    curY += 22;
+  } else {
+    curY += 22;
+  }
 
   // Divider Line
   ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';

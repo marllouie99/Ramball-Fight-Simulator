@@ -412,7 +412,8 @@ export class GenosFighter extends Fighter {
    * Overrides base Fighter shoot method to fire Genos's signature Incineration Palm fire blast.
    */
   shoot(ownerIndex) {
-    if (this.hp <= 0 || this.isSelfDestructing || this.isChargingUlt || this.isFiringUlt || this.isDashing || this.isFlurrying) {
+    if (!this.canPerformBasicAttack()) return false;
+    if (this.isSelfDestructing || this.isChargingUlt || this.isFiringUlt || this.isDashing || this.isFlurrying) {
       return;
     }
 
@@ -1188,7 +1189,7 @@ export class GenosFighter extends Fighter {
           const perpDist = Math.abs(-dx * Math.sin(this.ultAngle) + dy * Math.cos(this.ultAngle));
 
           if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r) {
-            applyDamageToTarget(target, damage, this, { isSkill: true, isUltimate: true });
+            applyDamageToTarget(target, damage, this, { isSkill: true, isUltimate: true, isGenosBeam: true });
             
             // 1. Light Incineration Slow Debuff (allows enemy to move a little inside beam)
             const slowMult = CONFIG.genos?.ultSlowMultiplier ?? 0.45;

@@ -130,7 +130,20 @@ export class Fighter {
   set hp(value) {
     const oldHp = this._hp;
     if (oldHp !== undefined && value > oldHp) {
-      if (this.blackFlashDebuffTimer > 0) {
+      if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0) {
+        value = oldHp; // Disable all healing while caught inside Yuta's Pure Love Beam
+      } else if (this.pureLoveBeamRegenDebuffTimer > 0) {
+        const healingAmount = value - oldHp;
+        const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+        const reducedHealing = healingAmount * debuffMult;
+        value = oldHp + reducedHealing;
+
+        const now = Date.now();
+        if (!this._lastRegenDebuffTextTime || now - this._lastRegenDebuffTextTime > 600) {
+          spawnFloatingText(this.x, this.y - this.r - 28, "Regen Debuffed", "#FF3366");
+          this._lastRegenDebuffTextTime = now;
+        }
+      } else if (this.blackFlashDebuffTimer > 0) {
         if (state && state.gameState === 'playing') {
           const healingAmount = value - oldHp;
           const reducedHealing = healingAmount * (CONFIG.blackFlash?.debuff?.healReductionMultiplier ?? 0.5);
@@ -254,6 +267,7 @@ export class Fighter {
     // Silence effect state
     this.silenceTimer = 0;
     this.blackFlashDebuffTimer = 0;
+    this.pureLoveBeamRegenDebuffTimer = 0;
     this.paralyzeTimer = 0;
     this.isParalyzedByMahito = false;
     this.isGrabbedByMahoraga = false;
@@ -265,6 +279,26 @@ export class Fighter {
   /** Returns true if this fighter is currently silenced by anti-technique effects (e.g. Inverted Spear of Heaven). */
   isSilenced() {
     return this.statusEffects.isSilenced();
+  }
+
+  /** Returns true if this fighter is affected by Mahito's Soul Disfigurement or Soul Rupture debuffs. */
+  isAffectedBySoulDisfigurement() {
+    const hasStacks = (this._soulDisfigurementStacks || 0) > 0 && (this._soulDisfigurementTimer || 0) > 0;
+    const isParalyzedBySoul = !!this.isParalyzedByMahito || ((this.paralyzeTimer || 0) > 0 && (this._soulDisfigurementStacks || 0) > 0);
+    return hasStacks || isParalyzedBySoul;
+  }
+
+  /**
+   * Central Source of Truth for Basic Attack Gating across ALL fighters.
+   * Evaluates HP, stuns, beam caught, time stops, paralyze, ambush, and Soul Disfigurement/Rupture.
+   * Any future basic attack restriction added here automatically applies across the entire game.
+   */
+  canPerformBasicAttack() {
+    if (this.hp <= 0 || this.isDead) return false;
+    if (this.timeStopTimer > 0 || (this.hitStunTimer || 0) > 0 || (this.paralyzeTimer || 0) > 0 || this.isParalyzed) return false;
+    if (this.isTargetOfAmbush || this.isCaughtInBeam()) return false;
+    if (this.isAffectedBySoulDisfigurement()) return false;
+    return true;
   }
 
   /** Returns true if this fighter is currently inside any active Cronos time-stop sphere. */
@@ -321,6 +355,7 @@ export class Fighter {
       for (const key in this) {
         if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer')) {
           if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer' || key === 'shootCooldown' || key === 'attackCooldown' || key === 'meleePunchCooldown') continue;
+          if (key === 'pureLoveBeamCooldownTimer' && !this.isChannelingPureLoveBeam) continue;
           if (typeof this[key] === 'number') {
             this[key] = Math.max(this[key] || 0, penaltyCD);
           }
@@ -536,6 +571,9 @@ export class Fighter {
   }
 
   _decrementSkillCooldowns() {
+    if (this.isEvading || this.isPreSplitting || (this.owner && (this.owner.isEvading || this.owner.isPreSplitting))) {
+      return; // Freeze ALL skill cooldowns during Evasion state!
+    }
     if (this.vanishTimer > 0) this.vanishTimer--;
     // Universal helper to ensure skill and ultimate cooldowns continue counting down
     // even while time-stopped, hit-stunned, or frozen by Limitless Infinity!
@@ -563,13 +601,16 @@ export class Fighter {
     } else {
       this.isCaughtInPurple = false;
     }
-    if (this.pureLoveBeamTimer > 0) {
+     if (this.pureLoveBeamTimer > 0) {
       this.pureLoveBeamTimer--;
       if (this.pureLoveBeamTimer <= 0) {
         this.caughtInPureLoveBeam = false;
       }
     } else {
       this.caughtInPureLoveBeam = false;
+    }
+    if (this.pureLoveBeamRegenDebuffTimer > 0) {
+      this.pureLoveBeamRegenDebuffTimer--;
     }
     if (this.hitStunTimer > 0) this.hitStunTimer--;
     if (this.caughtInLaserBeamTimer > 0) this.caughtInLaserBeamTimer--;
@@ -745,7 +786,12 @@ export class Fighter {
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
   takeDamage(amount, attacker, opts = {}) {
-    if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain) || (this.vanishTimer && this.vanishTimer > 0) || (this.invincibilityTimer && this.invincibilityTimer > 0)) return false;
+    const isHeal = opts.isHeal || amount < 0;
+    if (isHeal) {
+      if (this.hp <= 0) return false;
+    } else {
+      if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain) || (this.vanishTimer && this.vanishTimer > 0) || (this.invincibilityTimer && this.invincibilityTimer > 0)) return false;
+    }
 
     // Base fighter doesn't block; sanitize inputs before applying damage.
     let currentHp = Number(this.hp);
@@ -786,7 +832,7 @@ export class Fighter {
     }
 
     const prevHp = currentHp;
-    this.hp = Math.max(0, Number((currentHp - amount).toFixed(2)));
+    this.hp = Math.max(0, Math.min(this.maxHp || 200, Number((currentHp - amount).toFixed(2))));
     const actualDamage = prevHp - this.hp;
     if (actualDamage > 0) {
       this.damageReceived = (this.damageReceived || 0) + actualDamage;
@@ -807,6 +853,8 @@ export class Fighter {
         color = '#00E5FF'; // Electric Cyan for Gojo
       } else if (attacker && (attacker.characterId === 'sukuna' || attacker.type === 'sukuna')) {
         color = '#ff4455'; // Bright Crimson Flame for Sukuna
+      } else if (attacker && (attacker.characterId === 'yuta' || attacker.type === 'yuta' || attacker.isRika || (attacker.isIllusion && attacker.owner && (attacker.owner.characterId === 'yuta' || attacker.owner.type === 'yuta')))) {
+        color = '#FF1493'; // Deep Pink for Yuta and Rika
       } else if (opts.isPurpleDPS) {
         color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
       }
@@ -826,8 +874,9 @@ export class Fighter {
     } else if (this.hp > prevHp || (opts.isHeal && amount < 0)) {
       // Spawn floating green heal number when actual HP increases
       const healAmount = Math.round(Math.abs(amount < 0 ? amount : (this.hp - prevHp)));
-      if (healAmount > 0 && !opts.skipHealText) {
-        spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 12, `+${healAmount}`, '#00FF66');
+      if (healAmount > 0) {
+        this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
+        console.log(`[Fighter Heal Debug] ${this.name} amount=${amount} prevHp=${prevHp} hp=${this.hp} healAmount=${healAmount} accumulated=${this._lastHealAmount}`);
       }
     }
 
@@ -861,7 +910,7 @@ export class Fighter {
       }
 
       // Play hit sound and trigger hit flash
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS) {
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam) {
         if (!this.isTurret) {
           audioSystem.playSFX('attack_fleshhit', 0.6);
           this.hitFlashTimer = 8;
@@ -1044,7 +1093,7 @@ export class Fighter {
     if (actualHealed > 0) {
       this._healthBarHealTimer = 14;
       if (!opts.silent) {
-        const color = opts.color || '#22c55e';
+        const color = opts.color || '#39FF14';
         spawnFloatingText(this.x, this.y - this.r - 8, `+${Math.round(actualHealed)}`, color);
       }
       return true;
@@ -1242,6 +1291,15 @@ export class Fighter {
     // Crimson electrified visual timer
     if (this.crimsonElectrifiedTimer > 0) {
       this.crimsonElectrifiedTimer--;
+    }
+    
+    // Mahito's domain slow (heavy slow instead of complete freeze)
+    if (this.isFrozenByMahitoDomain) {
+      const slowMult = CONFIG.mahito?.domainExpansion?.slowMultiplier ?? 0.15;
+      const dampMult = CONFIG.mahito?.domainExpansion?.velocityDampening ?? 0.85;
+      targetSpeed *= slowMult;
+      this.vx *= dampMult;
+      this.vy *= dampMult;
     }
     
     targetSpeed *= extraMultiplier;

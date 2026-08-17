@@ -5,7 +5,7 @@ import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { drawModeSelection } from './MainMenuScreen.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
-import { clearHealthHud } from '../hudManager.js';
+import { clearHealthHud } from '../hudManager.js?v=6';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { spawnFloatingText } from '../../core/state.js';

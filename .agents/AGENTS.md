@@ -287,4 +287,20 @@ To support a new weapon in the Weapon Studio:
 4. In the weapon's drawing function, read `state.weaponCustomizations[key]` and apply the transform offsets.
 5. Add a centering `offsetX` in the switch at the top of `drawWeaponPreview()` if the weapon needs horizontal offset adjustment for proper preview centering.
 
+## 22. Dynamic Screen Dimming & Entity Healing Visual Standards
+
+### Screen Dimmed Mode HUD Font Standards
+- **Automatic White Color Shift**: Whenever full-screen dimming is active (Domain Expansions, Hollow Purple firing, Furnace blast, Serious Punch, etc.), all HUD font elements (Fighter Names, Skill Bar Labels, Info Stats) MUST automatically transition to crisp white (`#FFFFFF`) with a high-contrast dark drop-shadow (`0 0 5px rgba(0, 0, 0, 0.90)`).
+- **Non-Bold Constraint**: Font text MUST enforce `font-weight: normal !important;` during dimmed mode to prevent text from appearing overly heavy or bolded against the dark overlay.
+- **Exclusion of Skill Channeling Windups**: `isScreenDimmedActive()` MUST return `false` during skill channeling/windup states (`isChannelingDomain`, `domainChargeTimer > 0`, `isChannelingPurple`) so HUD fonts remain in their standard default state during windups.
+- **Automatic Restoration**: When full-screen dimming finishes, the `.hud-dimmed` CSS class is removed, instantly reverting all HUD fonts back to their character theme colors (`#D946EF`, `#00E5FF`, `#FFD700`, etc.).
+
+### Floating Heal Text Standard (Mahoraga Format)
+- **Unified Text & Palette Format**: All HP regeneration, RCT healing, and clone reconsolidation heal text MUST follow the Mahoraga standard format: `+<amount>` in bright neon emerald green (`#00FF66`) with subtle horizontal position jitter (`(Math.random() - 0.5) * 16`) rendered directly over the entity's body. Avoid appending unnecessary suffix strings like `HP`.
+- **HUD Bar Glow Pulse**: Any major heal event MUST set `this._healthBarHealTimer = 16` (or `14`) to trigger the green pulsing box-shadow glow animation on the fighter's top HUD health card fill bar.
+
+### Clean HUD Skill Bar Label Standard
+- **No Parenthetical Suffixes or Countdown Timers**: All HUD skill bar labels returned in `hudSkillProviders.js` MUST contain ONLY the clean skill title (e.g., `SOUL EVASION`, `IDLE TRANSFIGURATION`, `SOUL MULTIPLICITY`).
+- **NEVER** append status suffixes (such as `(USED)`, `(ACTIVE)`, `(READY)`) or countdown timer strings (such as `(1.9s)`) onto skill bar labels. The fill progress percentage (`pct`) and ready state (`ready`) handle all visual feedback automatically.
+
 

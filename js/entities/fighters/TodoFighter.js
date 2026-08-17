@@ -7,6 +7,7 @@ import { modUpdateMeleeCombat } from './todo/todoCombat.js';
 import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff } from './todo/todoSkills.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 
 /**
  * Aoi Todo - The Boogie Woogie Brawler
@@ -177,9 +178,26 @@ export class TodoFighter extends Fighter {
       // Cancel any active attack or swap animations
       this.interruptAttacks();
 
+      // Check if in 1v1 mode or Stand Off mode (background song is disabled in these modes)
+      const is1v1OrStandOff = Boolean(
+        typeof state !== 'undefined' && state.mode && (
+          state.mode === '1v1' || 
+          state.mode === 'Stand Off' || 
+          state.mode === '1v2 Stand Off' ||
+          state.mode === GAME_MODES.ONE_VS_ONE ||
+          state.mode === GAME_MODES.STAND_OFF ||
+          state.mode === GAME_MODES.STAND_OFF_1V2 ||
+          (typeof state.mode === 'string' && (
+            state.mode.toLowerCase() === '1v1' || 
+            state.mode.toLowerCase().includes('stand off') || 
+            state.mode.toLowerCase().includes('standoff')
+          ))
+        )
+      );
+
       // Start background song loop fade-in right as channeling starts!
       // Uses a continuous audio loop so music plays for the ENTIRE ultDuration (e.g. 1500 frames / 25 seconds)
-      if (!this.takadaSongStarted && this.takadaChannelTimer <= 175) {
+      if (!is1v1OrStandOff && !this.takadaSongStarted && this.takadaChannelTimer <= 175) {
         this.takadaSongStarted = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
         const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 2.2;
@@ -203,8 +221,24 @@ export class TodoFighter extends Fighter {
     if (this.isTakadaUltActive) {
       this.takadaUltTimer--;
 
+      const is1v1OrStandOff = Boolean(
+        typeof state !== 'undefined' && state.mode && (
+          state.mode === '1v1' || 
+          state.mode === 'Stand Off' || 
+          state.mode === '1v2 Stand Off' ||
+          state.mode === GAME_MODES.ONE_VS_ONE ||
+          state.mode === GAME_MODES.STAND_OFF ||
+          state.mode === GAME_MODES.STAND_OFF_1V2 ||
+          (typeof state.mode === 'string' && (
+            state.mode.toLowerCase() === '1v1' || 
+            state.mode.toLowerCase().includes('stand off') || 
+            state.mode.toLowerCase().includes('standoff')
+          ))
+        )
+      );
+
       // If background song hasn't started yet, trigger looping fade-in
-      if (!this.takadaSongStarted) {
+      if (!is1v1OrStandOff && !this.takadaSongStarted) {
         this.takadaSongStarted = true;
         const bgSong = CONFIG.todo?.takadaBackgroundSong || 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3';
         const songVol = CONFIG.todo?.takadaBackgroundSongVolume ?? 2.2;
@@ -312,6 +346,7 @@ export class TodoFighter extends Fighter {
   }
 
   shoot() {
+    if (!this.canPerformBasicAttack()) return false;
     // Basic Attack: Melee Punch (blocked while channeling ultimate!)
     if (this.isTakadaChanneling || (this.cooldownTimer || 0) > 0 || (this.rockCounterComboLeft || 0) > 0) return;
 

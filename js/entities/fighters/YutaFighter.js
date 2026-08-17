@@ -87,7 +87,7 @@ export class YutaFighter extends Fighter {
   }
 
   isSummoningRika() {
-    if ((this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0) return true;
+    if ((this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0 || (this.beamRetreatSlideTimer || 0) > 0) return true;
     if (this.rika) {
       if ((this.rika.chargeTimer || 0) > 0 || (this.rika.spawnTimer || 0) > 0) return true;
     }
@@ -142,6 +142,7 @@ export class YutaFighter extends Fighter {
     this.pureLoveBeamCooldownTimer = 0;
     this.pureLoveBeamBreatherTimer = 0;
     this.rikaEmergingForBeamTimer = 0;
+    this.pureLoveBeamBonusDamage = 0;
     this.domain2HpBaseline = undefined;
     this._stopBeamAudio();
     this.pureLoveBeamBgSoundHandle = null;
@@ -167,7 +168,7 @@ export class YutaFighter extends Fighter {
     // Allow visual trail and slash effects to decay even while frozen
     if (this.swordTrail && this.swordTrail.length > 0) {
       fastCleanArray(this.swordTrail, (t) => {
-        t.life -= 0.09;
+        t.life -= 0.08;
         return t.life > 0;
       });
     }
@@ -183,7 +184,7 @@ export class YutaFighter extends Fighter {
       return isEnemy && isParalyzingDomain;
     });
 
-    if (this.isChannelingDomain || this.isChannelingPureLoveBeam || (this.rikaCallTimer > 0) || (this.rikaEmergingForBeamTimer > 0)) {
+    if (!this.isGrabbedByMahoraga && (this.isChannelingDomain || this.isChannelingPureLoveBeam || (this.rikaCallTimer > 0) || (this.rikaEmergingForBeamTimer > 0))) {
       // Hyper-Armor: Yuta has hyper-armor against basic hitStun & knockback, BUT active Domain Expansion from an enemy overrules hyper-armor!
       if (!isEnemyDomainActive) {
         this.timeStopTimer = 0;
@@ -358,51 +359,55 @@ export class YutaFighter extends Fighter {
         // Execute Thin Ice Breaker!
         const angle = this.flurryTarget ? Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x) : (this.gunAngle || 0);
         executeThinIceBreaker(this, angle);
+        this.flurryTarget = null; // Clear flurry target after executing Thin Ice Breaker!
       }
       return; // Freeze Yuta while he winds up
     }
-    // Capture sword tip positions continuously after swinging to let the trail follow the sword tip
     if (this.trailGenTimer > 0) {
       this.trailGenTimer--;
+    }
 
-      const pos = this._getKatanaTipPositions();
-
-      let shouldAdd = true;
-      if (this.swordTrail.length > 0) {
-        const last = this.swordTrail[this.swordTrail.length - 1];
-        const dist = Math.hypot(pos.outer.x - last.outer.x, pos.outer.y - last.outer.y);
-        if (dist < 1.0) {
-          shouldAdd = false; // Don't stack points if standing still
-        }
-      }
-
-      if (shouldAdd) {
-        pushTrailCap(this.swordTrail, {
-          outer: pos.outer,
-          inner: pos.inner,
-          life: 1.0
-        }, 30);
-      }
-
-      // Keep trail capped for performance and styling
-      if (this.swordTrail.length > 16) {
-        this.swordTrail.shift();
+    // --- POSITION SNAP GUARD: Clear sword trail on teleport ---
+    if (this._prevX !== undefined && this._prevY !== undefined) {
+      const moveDist = Math.hypot(this.x - this._prevX, this.y - this._prevY);
+      if (moveDist > 45) {
+        this.swordTrail = [];
       }
     }
+    this._prevX = this.x;
+    this._prevY = this.y;
 
     // Phantom Flurry Execution Logic
     if (this.flurrySlashTimer > 0) this.flurrySlashTimer--;
 
-    if (this.flurryHitsLeft > 0) {
+    const isFlurryActive = (this.flurryHitsLeft > 0) || (this.flurryTimer > 0) || (this.flurryHitsLeft === 0 && this.flurryTarget !== null);
+    if (isFlurryActive) {
       this.flurryGhost = this.posHistory[0] || { x: this.x, y: this.y };
       this.vx *= 0.1;
       this.vy *= 0.1;
+
+      if (this.flurryTarget && !this.flurryTarget.isDead) {
+        this.aim(this.flurryTarget);
+      }
 
       if (this.flurryTimer > 0) this.flurryTimer--;
       if (this.flurryTimer <= 0) {
         if (this.flurryHitsLeft <= 0) {
           this.flurryGhost = null;
-          this.flurryTarget = null;
+          const target = this.flurryTarget;
+
+          // Immediately follow up completed Flurry with Thin Ice Breaker!
+          if (target && !target.isDead && Math.hypot(target.x - this.x, target.y - this.y) < 350) {
+            this.aim(target);
+            this.isChannelingThinIceBreaker = true;
+            this.thinIceBreakerChargeTimer = 14;
+            audioSystem.playSFX('skill_dash5', 0.9);
+            spawnFloatingText(this.x, this.y - 25, 'THIN ICE BREAKER!', '#00FFFF');
+          } else {
+            this.flurryTarget = null; // Clear if not transitioning
+          }
+          this.flurryHitsLeft = 0;
+          this.flurryTimer = 0;
           return; // Flurry finished
         }
 
@@ -443,8 +448,9 @@ export class YutaFighter extends Fighter {
           this.meleeCooldown = this.meleeCooldownMax; // trigger swing animation
           this.flurryTimer = 18; // 18-frame interval per teleport hit for clean readability
 
+          const bonusDmg = this.pureLoveBeamBonusDamage || 0;
           const dmgMult = this.getRikaDamageMultiplier();
-          const flurryDmg = (CONFIG.yuta.flurryDamage || 8) * dmgMult;
+          const flurryDmg = ((CONFIG.yuta.flurryDamage || 8) + bonusDmg) * dmgMult;
 
           // 50% Auto-Block/Parry check if Mahoraga is adapted to Yuta's Flurry
           let isFlurryParried = false;
@@ -493,7 +499,7 @@ export class YutaFighter extends Fighter {
           const oldY = this.y;
           this.x = this.flurryTarget.x + Math.cos(angle) * dist;
           this.y = this.flurryTarget.y + Math.sin(angle) * dist;
-          this.gunAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
+          this.aim(this.flurryTarget);
           this.swordTrail = []; // Reset trail so it doesn't streak across the screen
 
           this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y, this.gunAngle);
@@ -872,7 +878,7 @@ export class YutaFighter extends Fighter {
     const hpDamageNeededFor2ndDomain = (this.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.20);
     const hpLostSince1stDomain = this.domain2DamageTaken || 0;
 
-    const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0);
+    const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0 && this.rika && this.rika.active && this.rika.hp > 0);
     const isFirstTrigger = (this.domainUseCount === 0 && hpRatio <= domainHpThreshold1);
     const isSecondTrigger = (this.domainUseCount === 1 && hpLostSince1stDomain >= hpDamageNeededFor2ndDomain);
 
@@ -902,6 +908,49 @@ export class YutaFighter extends Fighter {
           );
         }
       }
+    }
+
+    // Handle Pre-Beam Retreat Slide Phase (Yuta slides backward smoothly away from enemy, stops, then triggers beam)
+    if (this.beamRetreatSlideTimer > 0) {
+      this.beamRetreatSlideTimer--;
+      const slideTotalFrames = 16;
+      const t = 1.0 - (this.beamRetreatSlideTimer / slideTotalFrames);
+      const easeOut = 1 - Math.pow(1 - t, 3);
+
+      this.x = this.beamRetreatStartX + (this.beamRetreatTargetX - this.beamRetreatStartX) * easeOut;
+      this.y = this.beamRetreatStartY + (this.beamRetreatTargetY - this.beamRetreatStartY) * easeOut;
+
+      const deriv = 3 * Math.pow(1 - t, 2);
+      this.vx = ((this.beamRetreatTargetX - this.beamRetreatStartX) / slideTotalFrames) * deriv;
+      this.vy = ((this.beamRetreatTargetY - this.beamRetreatStartY) / slideTotalFrames) * deriv;
+
+      if (this.beamRetreatTargetEnemy && !this.beamRetreatTargetEnemy.isDead) {
+        this.aim(this.beamRetreatTargetEnemy);
+      }
+
+      // Spawn slide dust particles and pink afterimages every 2 frames
+      if (this.beamRetreatSlideTimer % 2 === 0) {
+        this._spawnTeleportAfterimages(this.x, this.y, this.x, this.y, this.gunAngle || 0);
+        spawnImpactFlash(this.x, this.y, 25, 'rgba(255, 20, 147, 0.6)');
+      }
+
+      if (this.beamRetreatSlideTimer === 0) {
+        // Complete stop at retreat destination!
+        this.x = this.beamRetreatTargetX;
+        this.y = this.beamRetreatTargetY;
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+
+        if (this.beamRetreatTargetEnemy && !this.beamRetreatTargetEnemy.isDead) {
+          this.aim(this.beamRetreatTargetEnemy);
+        }
+
+        // Trigger pre-beam Rika emergence phase once retreat slide has fully stopped!
+        this.rikaEmergingForBeamTimer = 25;
+      }
+      return; // Hold Yuta in retreat slide state until complete stop!
     }
 
     // Handle Pre-Beam Rika Emergence Phase (Rika appears in the arena first before Yuta channels the beam)
@@ -945,7 +994,7 @@ export class YutaFighter extends Fighter {
 
     // Pure Love Beam Trigger: Automatically triggers when HP <= 15%
     const pureLoveBeamThreshold = CONFIG.yuta.pureLoveBeamHpThreshold ?? 0.15;
-    if (!this.isDemoFighter && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold) {
+    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold) {
       const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
 
       if (!isRikaActive) {
@@ -960,16 +1009,48 @@ export class YutaFighter extends Fighter {
       });
 
       if (hasEnemies) {
-        // Trigger pre-beam emergence phase (delay before channeling starts)
-        this.rikaEmergingForBeamTimer = 25;
-        this.vx = 0;
-        this.vy = 0;
+        let targetEnemy = opponent;
+        if (!targetEnemy || targetEnemy.isDead) {
+          const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+          targetEnemy = state.fighters.find((f, idx) => {
+            if (!f || f.hp <= 0 || f === this) return false;
+            const eTeam = state.getFighterTeam(idx);
+            return myTeam === null || eTeam === null || myTeam !== eTeam;
+          });
+        }
 
-        // Play "Come, Rika!" summon sound effect if she was already active on the field.
-        // If she was just summoned specifically for this beam (meaning we were already under 15% HP when summoning),
-        // we bypass playing it again here to avoid duplicate callouts.
+        const oldX = this.x;
+        const oldY = this.y;
+        let awayAngle = targetEnemy ? Math.atan2(this.y - targetEnemy.y, this.x - targetEnemy.x) : (Math.random() * Math.PI * 2);
+        if (targetEnemy && Math.hypot(this.x - targetEnemy.x, this.y - targetEnemy.y) < 1) {
+          awayAngle = Math.random() * Math.PI * 2;
+        }
+        const retreatDist = 320;
+        let destX = (targetEnemy ? targetEnemy.x : this.x) + Math.cos(awayAngle) * retreatDist;
+        let destY = (targetEnemy ? targetEnemy.y : this.y) + Math.sin(awayAngle) * retreatDist;
+
+        // Clamp destination inside arena boundaries
+        if (arena) {
+          const margin = (this.r || 22) + 25;
+          destX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, destX));
+          destY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, destY));
+        }
+
+        // Initiate 16-frame smooth retreat slide away from enemy!
+        this.beamRetreatSlideTimer = 16;
+        this.beamRetreatStartX = oldX;
+        this.beamRetreatStartY = oldY;
+        this.beamRetreatTargetX = destX;
+        this.beamRetreatTargetY = destY;
+        this.beamRetreatTargetEnemy = targetEnemy;
+
+        if (targetEnemy) {
+          this.aim(targetEnemy);
+        }
+
+        // Play "Come, Rika!" summon sound effect
         if (this._rikaSummonedForBeam) {
-          this._rikaSummonedForBeam = false; // Reset the flag
+          this._rikaSummonedForBeam = false;
         } else {
           if (CONFIG.yuta?.comeRikaSound) {
             this.comeRikaSoundHandle = audioSystem.playSFX(CONFIG.yuta.comeRikaSound, CONFIG.yuta.comeRikaVolume ?? 2.5);
@@ -977,7 +1058,7 @@ export class YutaFighter extends Fighter {
           }
         }
 
-        // Play Pure Love Beam background music/sound track
+        // Play Pure Love Beam background music
         if (CONFIG.yuta?.pureLoveBeamBackgroundSound) {
           this.pureLoveBeamBgSoundHandle = audioSystem.playSFX(
             CONFIG.yuta.pureLoveBeamBackgroundSound, 
@@ -985,7 +1066,7 @@ export class YutaFighter extends Fighter {
           );
         }
 
-        // Force Rika active and reset her summon state so she begins manifesting behind Yuta immediately
+        // Force Rika active so she manifests as Yuta slides
         if (this.rika) {
           this.rika.active = true;
           this.rika.chargeTimer = 0;
@@ -993,57 +1074,18 @@ export class YutaFighter extends Fighter {
           this.rika.isDying = false;
           this.rika.disappearing = false;
           this.rika.hp = this.rika.maxHp;
-          this.rika.beamFollowAngle = this.gunAngle || 0; // Initialize follow angle to prevent snapping
+          this.rika.beamFollowAngle = this.gunAngle || 0;
           
           if (state.illusions && !state.illusions.includes(this.rika)) {
             state.illusions.push(this.rika);
           }
         }
 
-          // Teleport away from enemy to a safe distance (320px) before performing Pure Love Beam
-          let targetEnemy = opponent;
-          if (!targetEnemy || targetEnemy.isDead) {
-            const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-            targetEnemy = state.fighters.find((f, idx) => {
-              if (!f || f.hp <= 0 || f === this) return false;
-              const eTeam = state.getFighterTeam(idx);
-              return myTeam === null || eTeam === null || myTeam !== eTeam;
-            });
-          }
-
-          if (targetEnemy) {
-            const oldX = this.x;
-            const oldY = this.y;
-            let awayAngle = Math.atan2(this.y - targetEnemy.y, this.x - targetEnemy.x);
-            if (Math.hypot(this.x - targetEnemy.x, this.y - targetEnemy.y) < 1) {
-              awayAngle = Math.random() * Math.PI * 2;
-            }
-            const retreatDist = 320;
-            let destX = targetEnemy.x + Math.cos(awayAngle) * retreatDist;
-            let destY = targetEnemy.y + Math.sin(awayAngle) * retreatDist;
-
-            // Clamp destination inside arena boundaries
-            if (arena) {
-              const margin = (this.r || 22) + 25;
-              destX = Math.max(arena.x + margin, Math.min(arena.x + arena.width - margin, destX));
-              destY = Math.max(arena.y + margin, Math.min(arena.y + arena.height - margin, destY));
-            }
-
-            this.x = destX;
-            this.y = destY;
-
-            // Rule #3: ALWAYS update aim(target) immediately after position change so gunAngle aligns relative to target
-            this.aim(targetEnemy);
-
-            // Spawns teleport afterimages, pink flashes, and teleport SFX
-            this._spawnTeleportAfterimages(oldX, oldY, destX, destY, this.gunAngle);
-            spawnImpactFlash(oldX, oldY, 35, '#FF1493');
-            spawnImpactFlash(destX, destY, 35, '#FF1493');
-            audioSystem.playSFX('teleport', 1.2);
-          }
-
-          triggerGlobalScreenShake(10, 60); // Initial massive tremor
-        }
+        // Initial dash slide sound & tremor
+        audioSystem.playSFX('skill_dash5', 1.2);
+        spawnImpactFlash(oldX, oldY, 35, '#FF1493');
+        triggerGlobalScreenShake(8, 30);
+      }
       }
 
     // --- Hyper-armor Melee Override ---
@@ -1221,36 +1263,24 @@ export class YutaFighter extends Fighter {
         audioSystem.playSFX('skill_dash3', 0.8);
         triggerGlobalScreenShake(8, 10);
 
-        // Determine counter type based on strict alternation
-        const triggerFlurry = (this.lastParryCounterType !== 'flurry');
-
-        if (triggerFlurry) {
-          this.lastParryCounterType = 'flurry';
-          this.blockPoseTimer = 0; // Clear block pose so he actually swings!
-          this.flurryHitsLeft = CONFIG.yuta.flurryHits || 5;
-          this.flurryTimer = 0;
-          this.flurryTarget = attacker;
-          const attackSound = getBasicAttackSound('musashi');
-          if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
-          const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 0.35;
-          if (CONFIG.yuta?.phantomFlurryNoiseSound && Math.random() < flurryNoiseChance) {
-            audioSystem.playSFX(
-              CONFIG.yuta.phantomFlurryNoiseSound,
-              CONFIG.yuta.phantomFlurryNoiseVolume ?? 2.0,
-              1.0, 0,
-              CONFIG.yuta.phantomFlurryNoiseDelay ?? 0
-            );
-          }
-        } else {
-          this.lastParryCounterType = 'thin_ice';
-          this.blockPoseTimer = 0; // Clear block pose for Thin Ice Breaker punch too!
-          this.isChannelingThinIceBreaker = true;
-          this.thinIceBreakerChargeTimer = 15;
-          this.flurryTarget = attacker;
-          audioSystem.playSFX('skill_dash5', 0.9); // Generic charge sound for now
+        // Trigger Phantom Flurry counter (which automatically completes into Thin Ice Breaker!)
+        this.blockPoseTimer = 0; // Clear block pose so he swings!
+        this.flurryHitsLeft = CONFIG.yuta.flurryHits || 5;
+        this.flurryTimer = 0;
+        this.flurryTarget = attacker;
+        const attackSound = getBasicAttackSound('musashi');
+        if (attackSound) audioSystem.playSFX(attackSound.src, attackSound.volume);
+        const flurryNoiseChance = CONFIG.yuta?.phantomFlurryNoiseChance ?? 0.35;
+        if (CONFIG.yuta?.phantomFlurryNoiseSound && Math.random() < flurryNoiseChance) {
+          audioSystem.playSFX(
+            CONFIG.yuta.phantomFlurryNoiseSound,
+            CONFIG.yuta.phantomFlurryNoiseVolume ?? 2.0,
+            1.0, 0,
+            CONFIG.yuta.phantomFlurryNoiseDelay ?? 0
+          );
         }
 
-        return 0; // Return early, damage blocked, flurry/ice breaker started
+        return 0; // Return early, damage blocked, flurry + thin ice breaker combo started
       }
 
       if (attacker && !attacker.isDead) this.aim(attacker);
@@ -1493,6 +1523,7 @@ export class YutaFighter extends Fighter {
       life: CONFIG.yuta.pureLoveBeamDuration || 60,
       maxLife: CONFIG.yuta.pureLoveBeamDuration || 60,
       visual: 'yuta_pure_love_beam',
+      behaviorType: 'yuta_pure_love_beam',
       piercing: true,
       hitTargets: new Set() // Will track hit targets per tick or clear out to hit multiple times
     });
@@ -1606,13 +1637,8 @@ export class YutaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
-    if (this.isCaughtInBeam()) {
-      this.interruptAttacks();
-      return;
-    }
-    if (this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer || 0) > 0 || (this.rikaCallTimer || 0) > 0 || (this.rikaEmergingForBeamTimer || 0) > 0) return;
-    if (this.timeStopTimer > 0) return;
-    if (this.hp <= 0) return;
+    if (!this.canPerformBasicAttack()) return false;
+    if (this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer || 0) > 0 || this.isSummoningRika()) return;
 
     // Check if an enemy is in melee range
     let enemyInMelee = false;
@@ -1722,6 +1748,7 @@ export class YutaFighter extends Fighter {
 
     if (forceCancelAll) {
       this._stopBeamAudio();
+      this.beamRetreatSlideTimer = 0;
       this.isChannelingDomain = false;
       this.domainChargeTimer = 0;
       this.isChannelingPureLoveBeam = false;
@@ -1739,6 +1766,7 @@ export class YutaFighter extends Fighter {
     // ONLY Toji ISOH ambush or explicit silence can break Yuta's ultimate hyper-armor.
     if (this.isTargetOfAmbush || (this.silenceTimer || 0) > 0) {
       this._stopBeamAudio();
+      this.beamRetreatSlideTimer = 0;
       this.isChannelingDomain = false;
       this.domainChargeTimer = 0;
       this.isChannelingPureLoveBeam = false;
@@ -1811,14 +1839,10 @@ export class YutaFighter extends Fighter {
       fadeOutSound(this.pureLoveBeamBgSoundHandle, 200);
       this.pureLoveBeamBgSoundHandle = null;
     }
-    if (this._pureLoveBeamChargeSoundHandle) {
-      fadeOutSound(this._pureLoveBeamChargeSoundHandle, 200);
-      this._pureLoveBeamChargeSoundHandle = null;
-    }
-    if (this.comeRikaSoundHandle) {
-      fadeOutSound(this.comeRikaSoundHandle, 200);
-      this.comeRikaSoundHandle = null;
-    }
+    // Allow Rika's appearance roar SFX to play out completely without fade-out truncation
+    this._pureLoveBeamChargeSoundHandle = null;
+    this.comeRikaSoundHandle = null;
+
     if (this.pureLoveBeamAudioHandle) {
       fadeOutSound(this.pureLoveBeamAudioHandle, 200);
       this.pureLoveBeamAudioHandle = null;
@@ -1829,7 +1853,11 @@ export class YutaFighter extends Fighter {
   _drawPureLoveBeamChargePose(ctx) {
     ctx.save();
     ctx.translate(this.x, this.y);
+    const facingLeft = Math.abs(this.gunAngle) > Math.PI / 2;
     ctx.rotate(this.gunAngle);
+    if (facingLeft) {
+      ctx.scale(1, -1);
+    }
     
     const chargeFrames = CONFIG.yuta?.pureLoveBeamChargeFrames || 90;
     const progress = Math.max(0, Math.min(1, (this.pureLoveBeamChargeTimer || 0) / chargeFrames));
@@ -2080,14 +2108,13 @@ export class YutaFighter extends Fighter {
     this._drawYutaSwordStrap(ctx);
 
     // Determine swing state
-    // Determine swing state
     // Restrict meleeCooldown check to strictly <= maxCd because interruptAttacks(true) 
     // sets meleeCooldown to 270 (penalty cooldown), which would falsely trigger 
     // a 4-second backwards spinning katana animation!
     const editP = (typeof state !== 'undefined' && state.slashEditMode && state.slashEditParams) ? state.slashEditParams : null;
     const maxCd = this.meleeCooldownMax;
-    const swingDuration = 15;
-    const recoveryDuration = 10;
+    const swingDuration = 20;
+    const recoveryDuration = 16;
     const isFlurrySwinging = (this.flurrySlashTimer > 0);
     const isValidSwingRange = (this.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (this.meleeCooldown <= maxCd);
     let isSwinging = isFlurrySwinging || isValidSwingRange || !!editP;
@@ -2101,10 +2128,16 @@ export class YutaFighter extends Fighter {
     } else if (isSwinging) {
       const elapsed = maxCd - this.meleeCooldown;
       if (elapsed <= swingDuration) {
-        progress = editP ? 0.5 : elapsed / swingDuration;
+        // Smooth ease-out swing (fast start, decelerating finish)
+        const rawP = editP ? 0.5 : elapsed / swingDuration;
+        progress = 1.0 - Math.pow(1.0 - rawP, 2.5);
       } else {
-        const recP = (elapsed - swingDuration) / recoveryDuration;
-        progress = 1.0 - Math.pow(Math.min(1.0, recP), 1.5) * 0.15;
+        // Smooth ease-in-out recovery back to idle
+        const recP = Math.min(1.0, (elapsed - swingDuration) / recoveryDuration);
+        const easedRec = recP < 0.5
+          ? 2 * recP * recP
+          : 1 - Math.pow(-2 * recP + 2, 2) / 2;
+        progress = 1.0 - easedRec * 0.15;
       }
       fade = 1.0;
     }
@@ -2139,232 +2172,136 @@ export class YutaFighter extends Fighter {
       return; // Disable all active weapon slash visuals when inside Gojo's domain
     }
 
+    // --- GENERATE DYNAMIC SWORD TRAIL IN RENDERING LOOP ---
+    if (!editP && !isGojoDomainActive) {
+      const elapsed = maxCd - this.meleeCooldown;
+      const windupDuration = 3;
+      const isBasicSlashActive = (this.meleeCooldown > 0 && elapsed > windupDuration && elapsed <= swingDuration);
+      const isActiveSwing = isFlurrySwinging || isBasicSlashActive;
+
+      if (isBasicSlashActive && !this._wasSlashActiveLastFrame) {
+        this.swordTrail = [];
+        this.trailFadeAlpha = 1.0;
+      }
+      this._wasSlashActiveLastFrame = isBasicSlashActive;
+
+      if (isActiveSwing) {
+        this.trailFadeAlpha = 1.0;
+        const pos = this._getKatanaTipPositions();
+        let shouldAdd = true;
+        if (this.swordTrail.length > 0) {
+          const last = this.swordTrail[this.swordTrail.length - 1];
+          const dist = Math.hypot(pos.outer.x - last.outer.x, pos.outer.y - last.outer.y);
+          if (dist < 1.0) {
+            shouldAdd = false; // Don't stack points if standing still
+          }
+        }
+
+        if (shouldAdd) {
+          pushTrailCap(this.swordTrail, {
+            outer: pos.outer,
+            inner: pos.inner,
+            life: 1.0
+          }, 24); // Increased to 24 capacity for ultimate smoothness!
+        }
+      } else {
+        // Fast snappy fade out when not swinging (disappears in 5 frames)
+        if (this.trailFadeAlpha === undefined) this.trailFadeAlpha = 1.0;
+        this.trailFadeAlpha = Math.max(0, this.trailFadeAlpha - 0.20);
+        if (this.trailFadeAlpha <= 0) {
+          this.swordTrail = [];
+        }
+      }
+    }
+
     if (this.swordTrail && this.swordTrail.length > 1) {
       ctx.save();
       ctx.globalCompositeOperation = 'source-over'; // Standard blending for visibility on white arenas
 
-      // Fades out smoothly only in the last 12 frames of the duration
-      const trailAlpha = editP ? 1.0 : Math.min(1.0, (this.trailGenTimer || 0) / 12);
+      // Fades out smoothly in the air post-swing
+      const fadeAlpha = (this.trailFadeAlpha !== undefined) ? this.trailFadeAlpha : 1.0;
+      const trailAlpha = editP ? 1.0 : Math.min(1.0, (this.trailGenTimer || 0) / 12) * fadeAlpha;
       ctx.globalAlpha = trailAlpha;
 
-      const numSegments = this.swordTrail.length;
+      const trail = this.swordTrail;
+      const N = trail.length;
 
-      // Helper function to draw a smoothed Bezier path through a list of points
-      const smoothPath = (pts, selectFn) => {
-        const p0 = selectFn(pts[0], 0);
+      // Helper to render a single, continuous, double-tapered crescent arc polygon
+      const drawCrescentPolygon = (widthMult = 1.0, isGlow = false) => {
+        ctx.beginPath();
+        // Outer arc: from tail (i=0) to leading tip (i=N-1)
+        const p0 = trail[0].outer;
         ctx.moveTo(p0.x, p0.y);
-        for (let i = 1; i < pts.length - 1; i++) {
-          const pi = selectFn(pts[i], i);
-          const pi1 = selectFn(pts[i + 1], i + 1);
+        for (let i = 1; i < N - 1; i++) {
+          const pi = trail[i].outer;
+          const pi1 = trail[i + 1].outer;
           const xc = (pi.x + pi1.x) / 2;
           const yc = (pi.y + pi1.y) / 2;
           ctx.quadraticCurveTo(pi.x, pi.y, xc, yc);
         }
-        const plast = selectFn(pts[pts.length - 1], pts.length - 1);
-        ctx.lineTo(plast.x, plast.y);
-      };
+        const pLast = trail[N - 1].outer;
+        ctx.lineTo(pLast.x, pLast.y);
 
-      // Allocation-free reverse path tracer to avoid cloning/reversing arrays
-      const smoothPathReversed = (pts, selectFn) => {
-        const lastIdx = pts.length - 1;
-        const p0 = selectFn(pts[lastIdx], lastIdx);
-        ctx.lineTo(p0.x, p0.y);
-        for (let i = lastIdx - 1; i > 0; i--) {
-          const pi = selectFn(pts[i], i);
-          const pi1 = selectFn(pts[i - 1], i - 1);
-          const xc = (pi.x + pi1.x) / 2;
-          const yc = (pi.y + pi1.y) / 2;
-          ctx.quadraticCurveTo(pi.x, pi.y, xc, yc);
-        }
-        const pFirst = selectFn(pts[0], 0);
-        ctx.lineTo(pFirst.x, pFirst.y);
-      };
+        // Inner returning arc: from leading tip (i=N-1, attached to sword tip) back to tail (i=0)
+        // Rule 15 Compliant Double Tapering Function (taper to zero at both ends)
+        for (let i = N - 1; i >= 0; i--) {
+          const t = N > 1 ? i / (N - 1) : 1.0;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+          const p = trail[i];
+          const alphaFactor = Math.min(1.0, p.life * 1.4) * taper * widthMult;
 
-      // Selectors for outer, inner, and core coordinates along the trail
-      const getOuter = (p) => p.outer;
-      const getInner = (p) => {
-        const fadeRatio = p.life;
-        return {
-          x: p.outer.x + (p.inner.x - p.outer.x) * fadeRatio,
-          y: p.outer.y + (p.inner.y - p.outer.y) * fadeRatio
-        };
-      };
-      const getCoreInner = (p) => {
-        const fadeRatio = p.life * 0.35; // Thinner white core
-        return {
-          x: p.outer.x + (p.inner.x - p.outer.x) * fadeRatio,
-          y: p.outer.y + (p.inner.y - p.outer.y) * fadeRatio
-        };
-      };
-
-      // 1. Soft back-glow (saturated pink for volumetric aura feel)
-      ctx.strokeStyle = 'rgba(230, 0, 120, 0.25)';
-      ctx.lineWidth = 24;
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
-      ctx.beginPath();
-      smoothPath(this.swordTrail, getOuter);
-      ctx.stroke();
-
-      // 2. Main pink crescent body fill (smooth, curved polygon) - Optimized: Allocation-free backward loop
-      ctx.fillStyle = 'rgba(255, 20, 147, 0.45)'; // Vibrant deep hot pink
-      ctx.beginPath();
-      smoothPath(this.swordTrail, getOuter);
-      smoothPathReversed(this.swordTrail, getInner);
-      ctx.closePath();
-      ctx.fill();
-
-      // 3. Searing white-pink core fill - Optimized: Allocation-free backward loop
-      ctx.fillStyle = 'rgba(255, 220, 235, 0.85)';
-      ctx.beginPath();
-      smoothPath(this.swordTrail, getOuter);
-      smoothPathReversed(this.swordTrail, getCoreInner);
-      ctx.closePath();
-      ctx.fill();
-
-      // 4. JJK calligraphy ink outlines
-      if (isGamePlay) {
-        // High-performance gameplay drawing path:
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // Outer outline (single continuous path)
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        smoothPath(this.swordTrail, getOuter);
-        ctx.stroke();
-
-        // Inner outline (single continuous path)
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        smoothPath(this.swordTrail, getInner);
-        ctx.stroke();
-      } else {
-        // Original detailed calligraphy outlines with varying pressure
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-
-        // Outer calligraphy outline
-        if (numSegments > 2) {
-          for (let i = 1; i < numSegments - 1; i++) {
-            const p = this.swordTrail[i];
-            const prev = this.swordTrail[i - 1];
-            const next = this.swordTrail[i + 1];
-
-            const prevMidX = (prev.outer.x + p.outer.x) / 2;
-            const prevMidY = (prev.outer.y + p.outer.y) / 2;
-            const midX = (p.outer.x + next.outer.x) / 2;
-            const midY = (p.outer.y + next.outer.y) / 2;
-
-            const pressureNoise = Math.sin(Date.now() * 0.005 + i * 1.7) * 0.5 + 0.5;
-            ctx.lineWidth = (0.7 + pressureNoise * 1.5) * p.life;
-
-            ctx.beginPath();
-            ctx.moveTo(prevMidX, prevMidY);
-            ctx.quadraticCurveTo(p.outer.x, p.outer.y, midX, midY);
-            ctx.stroke();
+          let inX, inY;
+          if (isGlow) {
+            const dx = p.outer.x - p.inner.x;
+            const dy = p.outer.y - p.inner.y;
+            inX = p.outer.x - dx * (alphaFactor + 0.60);
+            inY = p.outer.y - dy * (alphaFactor + 0.60);
+          } else {
+            inX = p.outer.x + (p.inner.x - p.outer.x) * alphaFactor;
+            inY = p.outer.y + (p.inner.y - p.outer.y) * alphaFactor;
           }
 
-          // Connect start segment
-          const p0 = this.swordTrail[0];
-          const p1 = this.swordTrail[1];
-          const startMidX = (p0.outer.x + p1.outer.x) / 2;
-          const startMidY = (p0.outer.y + p1.outer.y) / 2;
-          ctx.lineWidth = 0.8 * p0.life;
-          ctx.beginPath();
-          ctx.moveTo(p0.outer.x, p0.outer.y);
-          ctx.lineTo(startMidX, startMidY);
-          ctx.stroke();
-
-          // Connect end segment
-          const pLast = this.swordTrail[numSegments - 1];
-          const pPenult = this.swordTrail[numSegments - 2];
-          const endMidX = (pLast.outer.x + pPenult.outer.x) / 2;
-          const endMidY = (pLast.outer.y + pPenult.outer.y) / 2;
-          ctx.lineWidth = 0.8 * pLast.life;
-          ctx.beginPath();
-          ctx.moveTo(endMidX, endMidY);
-          ctx.lineTo(pLast.outer.x, pLast.outer.y);
-          ctx.stroke();
-        } else {
-          // Fallback for short trails
-          ctx.lineWidth = 2.0;
-          ctx.beginPath();
-          smoothPath(this.swordTrail, getOuter);
-          ctx.stroke();
-        }
-
-        // Inner calligraphy outline
-        if (numSegments > 2) {
-          for (let i = 1; i < numSegments - 1; i++) {
-            const p = this.swordTrail[i];
-            const prev = this.swordTrail[i - 1];
-            const next = this.swordTrail[i + 1];
-
-            const pInner = getInner(p);
-            const prevInner = getInner(prev);
-            const nextInner = getInner(next);
-
-            const prevMidX = (prevInner.x + pInner.x) / 2;
-            const prevMidY = (prevInner.y + pInner.y) / 2;
-            const midX = (pInner.x + nextInner.x) / 2;
-            const midY = (pInner.y + nextInner.y) / 2;
-
-            const pressureNoise = Math.sin(Date.now() * 0.005 + i * 1.7 + Math.PI) * 0.5 + 0.5;
-            ctx.lineWidth = (0.4 + pressureNoise * 1.0) * p.life;
-
-            ctx.beginPath();
-            ctx.moveTo(prevMidX, prevMidY);
-            ctx.quadraticCurveTo(pInner.x, pInner.y, midX, midY);
-            ctx.stroke();
+          if (i === N - 1) {
+            ctx.lineTo(inX, inY);
+          } else if (i > 0) {
+            const pPrev = trail[i - 1];
+            const tPrev = (i - 1) / (N - 1);
+            const taperPrev = Math.pow(Math.sin(tPrev * Math.PI), 1.15) * (0.3 + 0.7 * tPrev);
+            const alphaPrev = Math.min(1.0, pPrev.life * 1.4) * taperPrev * widthMult;
+            let prevInX, prevInY;
+            if (isGlow) {
+              const dxP = pPrev.outer.x - pPrev.inner.x;
+              const dyP = pPrev.outer.y - pPrev.inner.y;
+              prevInX = pPrev.outer.x - dxP * (alphaPrev + 0.60);
+              prevInY = pPrev.outer.y - dyP * (alphaPrev + 0.60);
+            } else {
+              prevInX = pPrev.outer.x + (pPrev.inner.x - pPrev.outer.x) * alphaPrev;
+              prevInY = pPrev.outer.y + (pPrev.inner.y - pPrev.outer.y) * alphaPrev;
+            }
+            const xc = (inX + prevInX) / 2;
+            const yc = (inY + prevInY) / 2;
+            ctx.quadraticCurveTo(inX, inY, xc, yc);
+          } else {
+            ctx.lineTo(inX, inY);
           }
-
-          // Connect start segment
-          const p0 = getInner(this.swordTrail[0]);
-          const p1 = getInner(this.swordTrail[1]);
-          const startMidX = (p0.x + p1.x) / 2;
-          const startMidY = (p0.y + p1.y) / 2;
-          ctx.lineWidth = 0.5 * this.swordTrail[0].life;
-          ctx.beginPath();
-          ctx.moveTo(p0.x, p0.y);
-          ctx.lineTo(startMidX, startMidY);
-          ctx.stroke();
-
-          // Connect end segment
-          const pLast = getInner(this.swordTrail[numSegments - 1]);
-          const pPenult = getInner(this.swordTrail[numSegments - 2]);
-          const endMidX = (pLast.x + pPenult.x) / 2;
-          const endMidY = (pLast.y + pPenult.y) / 2;
-          ctx.lineWidth = 0.5 * this.swordTrail[numSegments - 1].life;
-          ctx.beginPath();
-          ctx.moveTo(endMidX, endMidY);
-          ctx.lineTo(pLast.x, pLast.y);
-          ctx.stroke();
-        } else {
-          // Fallback for short trails
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          smoothPathReversed(this.swordTrail, getInner);
-          ctx.stroke();
         }
-      }
+        ctx.closePath();
+      };
 
-      // 5. Continuous interior ink speed lines (flowing along the trail center)
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.65)';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      smoothPath(this.swordTrail, (p) => {
-        const fadeRatio = p.life;
-        const innerPt = getInner(p);
-        // Returns the midpoint between the outer and inner edge of the trail
-        return {
-          x: p.outer.x + (innerPt.x - p.outer.x) * 0.5,
-          y: p.outer.y + (innerPt.y - p.outer.y) * 0.5
-        };
-      });
-      ctx.stroke();
+      // 1. Soft back-glow (saturated pink volumetric aura)
+      ctx.fillStyle = 'rgba(230, 0, 120, 0.25)';
+      drawCrescentPolygon(1.2, true);
+      ctx.fill();
+
+      // 2. Main pink crescent body fill (smooth, single curved polygon)
+      ctx.fillStyle = 'rgba(255, 20, 147, 0.85)';
+      drawCrescentPolygon(1.0, false);
+      ctx.fill();
+
+      // 3. Searing white-pink core fill
+      ctx.fillStyle = 'rgba(255, 235, 245, 0.98)';
+      drawCrescentPolygon(0.40, false);
+      ctx.fill();
 
       ctx.restore();
     }
@@ -2372,34 +2309,83 @@ export class YutaFighter extends Fighter {
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    let currentAngle = this.gunAngle;
-    const comboIndex = this.activeSlashType || 0;
-
-    if (isFlurrySwinging) {
-      if (comboIndex === 0) {
-        // 1. Horizontal Left-to-Right Slash
-        currentAngle += (-Math.PI * 0.55) + (Math.PI * 1.1) * progress;
-      } else if (comboIndex === 1) {
-        // 2. Backhand Right-to-Left Slash
-        currentAngle += (Math.PI * 0.55) - (Math.PI * 1.1) * progress;
-      } else if (comboIndex === 2) {
-        // 3. Overhead Vertical Downward Chop
-        currentAngle += (-Math.PI * 0.85) + (Math.PI * 1.0) * progress;
-      }
-    } else if (isSwinging) {
-      if (comboIndex === 0) {
-        currentAngle += (-Math.PI / 4) + (Math.PI / 2) * progress;
-      } else if (comboIndex === 1) {
-        currentAngle += (Math.PI / 4) - (Math.PI / 2) * progress;
-      } else if (comboIndex === 2) {
-        currentAngle += (-Math.PI * 0.6) + (Math.PI * 1.2) * progress;
-      }
+    const facingLeft = Math.abs(this.gunAngle) > Math.PI / 2;
+    const baseAngle = facingLeft ? Math.PI : 0;
+    let diff = (this.gunAngle || 0) - baseAngle;
+    let normDiff = Math.atan2(Math.sin(diff), Math.cos(diff));
+    if (facingLeft) {
+      normDiff = -normDiff;
     }
 
-    ctx.rotate(currentAngle);
-    if (Math.abs(currentAngle) > Math.PI / 2) {
+    // Apply base facing transform with vertical mirroring
+    ctx.rotate(baseAngle);
+    if (facingLeft) {
       ctx.scale(1, -1);
     }
+
+    let localWeaponAngle = 0;
+    const comboIndex = this.activeSlashType || 0;
+
+    // Smooth easing helper: ease-out cubic for fluid sword arcs
+    const easeOutCubic = (t) => 1.0 - Math.pow(1.0 - t, 3);
+
+    if (isFlurrySwinging) {
+      const maxF = 14;
+      const p = Math.min(1.0, Math.max(0, (maxF - this.flurrySlashTimer) / maxF));
+      const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
+      if (comboIndex === 0) {
+        localWeaponAngle = (-Math.PI * 0.45) + (Math.PI * 0.90) * easedP;
+      } else if (comboIndex === 1) {
+        localWeaponAngle = (Math.PI * 0.45) - (Math.PI * 0.90) * easedP;
+      } else {
+        localWeaponAngle = (-Math.PI * 0.65) + (Math.PI * 1.30) * easedP;
+      }
+    } else if (isSwinging) {
+      const elapsed = maxCd - this.meleeCooldown;
+      if (elapsed <= swingDuration) {
+        const p = editP ? 0.5 : Math.min(1.0, elapsed / swingDuration);
+
+        if (comboIndex === 0) {
+          // Combo 0: Smooth windup back from idle (0 -> -0.45), then slash forward (-0.45 -> +0.65)
+          if (p < 0.20) {
+            const w = p / 0.20;
+            localWeaponAngle = normDiff + (-Math.PI * 0.45 - normDiff) * Math.sin(w * Math.PI * 0.5);
+          } else {
+            const s = (p - 0.20) / 0.80;
+            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
+            localWeaponAngle = (-Math.PI * 0.45) + (Math.PI * 1.10) * easedS;
+          }
+        } else if (comboIndex === 1) {
+          // Combo 1: Backhand Slash from +0.65 back to -0.55
+          const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
+          localWeaponAngle = (Math.PI * 0.65) - (Math.PI * 1.20) * easedP;
+        } else if (comboIndex === 2) {
+          // Combo 2: Overhead Finisher Chop (Raise -0.55 -> -0.85, then heavy chop -0.85 -> +0.85)
+          if (p < 0.15) {
+            const w = p / 0.15;
+            localWeaponAngle = (-Math.PI * 0.55) + (-Math.PI * 0.30) * Math.sin(w * Math.PI * 0.5);
+          } else {
+            const s = (p - 0.15) / 0.85;
+            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
+            localWeaponAngle = (-Math.PI * 0.85) + (Math.PI * 1.70) * easedS;
+          }
+        }
+      } else {
+        // Recovery: Smoothly return from end of swing to idle guard angle (normDiff)
+        const recP = Math.min(1.0, (elapsed - swingDuration) / recoveryDuration);
+        const easeRec = recP * (2 - recP);
+        let endAngle = Math.PI * 0.65;
+        if (comboIndex === 1) endAngle = -Math.PI * 0.55;
+        else if (comboIndex === 2) endAngle = Math.PI * 0.85;
+
+        localWeaponAngle = endAngle * (1.0 - easeRec) + normDiff * easeRec;
+      }
+    } else {
+      // Idle: Rotate body & weapon to aim directly at target angle
+      localWeaponAngle = normDiff;
+    }
+
+    ctx.rotate(localWeaponAngle);
 
     let parryPoseActive = (this.blockPoseTimer > 0 && !isSwinging);
 
@@ -2423,32 +2409,32 @@ export class YutaFighter extends Fighter {
       // Base stance position and angle for each of the 4 positions
       let baseOffsetX = this.r - 12;
       let baseOffsetY = 0;
-      let baseAngle = Math.PI / 2;
+      let stanceAngle = Math.PI / 2;
       let strikeAngleOffset = 0;
 
       if (stanceIndex === 0) {
         // Stance 0: High Slash Deflect (Upper diagonal riposte)
         baseOffsetX = this.r - 10;
         baseOffsetY = -10;
-        baseAngle = -Math.PI * 0.42;
+        stanceAngle = -Math.PI * 0.42;
         strikeAngleOffset = Math.PI * 0.35 * strikeFactor;
       } else if (stanceIndex === 1) {
         // Stance 1: Low Sweep Deflect (Bottom diagonal parry)
         baseOffsetX = this.r - 8;
         baseOffsetY = 12;
-        baseAngle = Math.PI * 0.68;
+        stanceAngle = Math.PI * 0.68;
         strikeAngleOffset = -Math.PI * 0.38 * strikeFactor;
       } else if (stanceIndex === 2) {
         // Stance 2: Center Vertical Shield Guard
         baseOffsetX = this.r - 18;
         baseOffsetY = 0;
-        baseAngle = Math.PI / 2;
+        stanceAngle = Math.PI / 2;
         strikeAngleOffset = (Math.sin(strikeFactor * Math.PI) * 0.28);
       } else if (stanceIndex === 3) {
         // Stance 3: Backhand Reverse Deflect
         baseOffsetX = this.r - 14;
         baseOffsetY = -12;
-        baseAngle = -Math.PI * 0.75;
+        stanceAngle = -Math.PI * 0.75;
         strikeAngleOffset = Math.PI * 0.45 * strikeFactor;
       }
 
@@ -2457,7 +2443,7 @@ export class YutaFighter extends Fighter {
       const vibrationY = hitTimer > 0 ? (Math.cos(hitTimer * 3.1) * 2.0 * (hitTimer / 22)) : 0;
 
       ctx.translate(baseOffsetX + vibrationX, baseOffsetY + vibrationY);
-      ctx.rotate(baseAngle + strikeAngleOffset);
+      ctx.rotate(stanceAngle + strikeAngleOffset);
     } else if (this.rikaCallTimer > 0) {
       // Rika Summoning Channeling Pose: Raise Katana upward with ritual micro-vibration
       const humAngle = Math.sin(Date.now() * 0.08) * 0.08;
@@ -2826,203 +2812,7 @@ export class YutaFighter extends Fighter {
 
     ctx.restore();
 
-    // --- DRAW DYNAMIC SLASH TRAIL ---
-    if (fade > 0) {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.gunAngle); // Base angle to align the arc
-
-      const arcRadius = this.r + 38; // Trail extends a bit past the blade
-      let fullStartAngle, fullEndAngle;
-      if (comboIndex === 0) {
-        fullStartAngle = -Math.PI * 0.42;
-        fullEndAngle = Math.PI * 0.42;
-      } else if (comboIndex === 1) {
-        fullStartAngle = Math.PI * 0.42;
-        fullEndAngle = -Math.PI * 0.42;
-      } else if (comboIndex === 2) {
-        fullStartAngle = -Math.PI * 0.75;
-        fullEndAngle = Math.PI * 0.75;
-      }
-
-      const currentEndAngle = fullStartAngle + (fullEndAngle - fullStartAngle) * progress;
-      const isAnticlockwise = fullStartAngle > fullEndAngle;
-      const glowAlpha = Math.pow(fade, 0.8);
-
-      // Clip region
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      const clipOffset = isAnticlockwise ? 0.1 : -0.1;
-      ctx.arc(0, 0, arcRadius + 20, fullStartAngle + clipOffset, currentEndAngle, isAnticlockwise);
-      ctx.closePath();
-      ctx.clip();
-
-      // Fading tail gradient using Yuta's hot pink theme
-      const fullStartY = Math.sin(fullStartAngle) * arcRadius;
-      const currentY = Math.sin(currentEndAngle) * arcRadius;
-
-      const tailGrad = ctx.createLinearGradient(0, fullStartY, 0, currentY + (fullStartY === currentY ? 0.1 : 0));
-      tailGrad.addColorStop(0, 'rgba(255, 20, 147, 0.0)'); // Transparent hot pink
-      tailGrad.addColorStop(0.7, 'rgba(255, 105, 180, 0.85)'); // Hot pink body
-      tailGrad.addColorStop(1, 'rgba(255, 240, 245, 0.95)'); // Searing white-pink head
-
-      ctx.globalCompositeOperation = 'source-over';
-      ctx.globalAlpha = glowAlpha;
-
-      const numSegments = isGamePlay ? 10 : 30;
-      const arcWidth = currentEndAngle - fullStartAngle;
-
-      // =====================================================
-      // --- SHARP CRESCENT SLASH (Anime-style, pointed tips)
-      // =====================================================
-      const maxThickness = 28; // Half-width of the crescent at its widest
-      const outerOffset = 8; // Outer crescent is puffed outward from arcRadius
-      const innerOffset = 6; // Inner crescent cuts inward from arcRadius
-
-      // Helper: crescent thickness weight at normalised position
-      const crescentWeight = (t) => Math.pow(Math.sin(t * Math.PI), 1.5);
-
-      // ------ 1. Main pink crescent body ------
-      ctx.fillStyle = tailGrad;
-      ctx.beginPath();
-      // Forward pass — outer edge
-      for (let i = 0; i <= numSegments; i++) {
-        const t = i / numSegments;
-        const angle = fullStartAngle + arcWidth * t;
-        const w = crescentWeight(t);
-        const r = arcRadius + outerOffset + maxThickness * w;
-        if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-      }
-      // Reverse pass — inner edge (creates closed crescent polygon)
-      for (let i = numSegments; i >= 0; i--) {
-        const t = i / numSegments;
-        const angle = fullStartAngle + arcWidth * t;
-        const w = crescentWeight(t);
-        const r = arcRadius - innerOffset - maxThickness * w;
-        ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // ------ 2. Bright white-pink core edge (thin inner blade highlight) ------
-      const coreGrad = ctx.createLinearGradient(
-        Math.cos(fullStartAngle) * arcRadius, Math.sin(fullStartAngle) * arcRadius,
-        Math.cos(fullStartAngle + arcWidth) * arcRadius, Math.sin(fullStartAngle + arcWidth) * arcRadius
-      );
-      coreGrad.addColorStop(0, 'rgba(255, 180, 220, 0.0)');
-      coreGrad.addColorStop(0.5, 'rgba(255, 255, 255, 1.0)');
-      coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0.9)');
-      ctx.fillStyle = coreGrad;
-      ctx.beginPath();
-      const coreMax = 7;
-      for (let i = 0; i <= numSegments; i++) {
-        const t = i / numSegments;
-        const angle = fullStartAngle + arcWidth * t;
-        const w = crescentWeight(t);
-        const r = arcRadius + outerOffset + maxThickness * w - 1;
-        if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-      }
-      for (let i = numSegments; i >= 0; i--) {
-        const t = i / numSegments;
-        const angle = fullStartAngle + arcWidth * t;
-        const w = crescentWeight(t);
-        const r = arcRadius + outerOffset + maxThickness * w - 1 - coreMax * w;
-        ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-      }
-      ctx.closePath();
-      ctx.fill();
-
-      // ------ 3. Sharp outer glow stroke (crescent rim glow) ------
-      ctx.globalCompositeOperation = 'screen';
-      ctx.strokeStyle = 'rgba(255, 100, 200, 0.65)';
-      ctx.lineWidth = 4;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      for (let i = 0; i <= numSegments; i++) {
-        const t = i / numSegments;
-        const angle = fullStartAngle + arcWidth * t;
-        const w = crescentWeight(t);
-        const r = arcRadius + outerOffset + maxThickness * w;
-        if (i === 0) ctx.moveTo(Math.cos(angle) * r, Math.sin(angle) * r);
-        else ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
-      }
-      ctx.stroke();
-      ctx.globalCompositeOperation = 'source-over';
-
-      if (isGamePlay) {
-        // ------ 4. Radial speed-line spikes near the leading tip (Grouped into 1 path/stroke!) ------
-        ctx.strokeStyle = 'rgba(255, 200, 240, 0.85)';
-        ctx.lineCap = 'round';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        for (let i = 0; i < 5; i++) {
-          const spikeRatio = 0.62 + i * 0.09;
-          if (spikeRatio > 1.0) continue;
-          const spikeAngle = fullStartAngle + arcWidth * spikeRatio;
-          if (isAnticlockwise ? (spikeAngle < currentEndAngle) : (spikeAngle > currentEndAngle)) continue;
-          const w = crescentWeight(spikeRatio);
-          const baseR = arcRadius + outerOffset + maxThickness * w;
-          const spikeLen = 10 + Math.abs(Math.sin(spikeRatio * 32.1 + Date.now() * 0.01)) * 18;
-          const spikeSeed = Math.sin(spikeRatio * 32.1 + Date.now() * 0.01);
-          ctx.moveTo(Math.cos(spikeAngle) * baseR, Math.sin(spikeAngle) * baseR);
-          ctx.lineTo(
-            Math.cos(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen),
-            Math.sin(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen)
-          );
-        }
-        ctx.stroke();
-      } else {
-        // ------ 4. Ink calligraphy strokes (sparse, interior detail) ------
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.75)';
-        ctx.lineCap = 'butt';
-        const inkRadii = [arcRadius - 4, arcRadius + outerOffset * 0.5];
-        for (let layer = 0; layer < inkRadii.length; layer++) {
-          const radius = inkRadii[layer];
-          const segments = 10;
-          for (let s = 0; s < segments; s++) {
-            const ratio = s / segments;
-            const angle = fullStartAngle + arcWidth * ratio;
-            if (isAnticlockwise ? (angle < currentEndAngle) : (angle > currentEndAngle)) break;
-            const inkSeed = Math.sin(ratio * 14.5 + Date.now() * 0.015 + layer * 23.3);
-            if (inkSeed < 0.1) continue;
-            const nextAngle = fullStartAngle + arcWidth * ((s + 1) / segments);
-            const drawEndAngle = isAnticlockwise
-              ? Math.max(nextAngle, currentEndAngle)
-              : Math.min(nextAngle, currentEndAngle);
-            ctx.lineWidth = 0.8 + (inkSeed + 1) * 1.5;
-            ctx.beginPath();
-            ctx.arc(0, 0, radius + Math.sin(s * 19.7) * 2, angle, drawEndAngle, isAnticlockwise);
-            ctx.stroke();
-          }
-        }
-
-        // ------ 5. Radial speed-line spikes near the leading tip ------
-        ctx.strokeStyle = 'rgba(255, 200, 240, 0.85)';
-        ctx.lineCap = 'round';
-        for (let i = 0; i < 5; i++) {
-          const spikeRatio = 0.62 + i * 0.09;
-          if (spikeRatio > 1.0) continue;
-          const spikeAngle = fullStartAngle + arcWidth * spikeRatio;
-          if (isAnticlockwise ? (spikeAngle < currentEndAngle) : (spikeAngle > currentEndAngle)) continue;
-          const w = crescentWeight(spikeRatio);
-          const baseR = arcRadius + outerOffset + maxThickness * w;
-          const spikeLen = 10 + Math.abs(Math.sin(spikeRatio * 32.1 + Date.now() * 0.01)) * 18;
-          const spikeSeed = Math.sin(spikeRatio * 32.1 + Date.now() * 0.01);
-          ctx.lineWidth = 1.5 - i * 0.2;
-          ctx.beginPath();
-          ctx.moveTo(Math.cos(spikeAngle) * baseR, Math.sin(spikeAngle) * baseR);
-          ctx.lineTo(
-            Math.cos(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen),
-            Math.sin(spikeAngle + spikeSeed * 0.08) * (baseR + spikeLen)
-          );
-          ctx.stroke();
-        }
-      }
-
-      ctx.restore();
-    }
+    // --- DYNAMIC SLASH TRAIL REMOVED ---
   }
   drawDomainBackground(ctx, isClashSecondary = false) { 
     if (typeof state !== 'undefined' && state.pixiApp) return;

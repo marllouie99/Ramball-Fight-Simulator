@@ -109,6 +109,7 @@ export class MahoragaFighter extends Fighter {
     this.blitzTarget = null;
     this.blitzStayTimer = 0;
     this.blitzTotalDuration = 0;
+    this.swordTrail = [];
   }
 
   get goldStages() {
@@ -291,6 +292,12 @@ export class MahoragaFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    const isHeal = opts.isHeal || amount < 0;
+    if (isHeal) {
+      if (this.hp <= 0) return false;
+      return super.takeDamage(amount, attacker, opts);
+    }
+
     if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain)) return false;
 
     // Add dodge i-frame invincibility check!
@@ -324,8 +331,12 @@ export class MahoragaFighter extends Fighter {
       const parryMaxChance = CONFIG.mahoraga?.parryMaxChance || 0.75;
       const parryChance = Math.min(parryMaxChance, totalGoldStages * parryChancePerStage);
 
-      // Slashes and attacks cannot be parried if they are unblockable dot ticks or Pure Love Beam
-      const isActuallyUnblockable = isUnblockable || opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isPureLoveBeam;
+      // Energy beams, lasers, AOEs, dot ticks, and adapted beams CANNOT be parried
+      const isBeamOrLaser = opts.isPureLoveBeam || opts.isGenosBeam || opts.isBeam || opts.isLaser || opts.isLaserBeam || opts.isLaylaBeam || opts.isPurple || opts.isPurpleDPS || opts.isThinIceBreaker;
+      const isAOEOrExplosion = opts.isAOE || opts.isExplosion || opts.isDivineFlame || opts.fromBlackHole || opts.isBurn || opts.isPoison || opts.isFlame;
+      const isAlreadyAdaptedBeam = (opts.isPureLoveBeam && this.adaptedPureLoveBeam) || (opts.isGenosBeam && this.adaptedGenosBeam);
+
+      const isActuallyUnblockable = isUnblockable || isBeamOrLaser || isAOEOrExplosion || isAlreadyAdaptedBeam;
 
       if (!isActuallyUnblockable && totalGoldStages > 0 && Math.random() < parryChance) {
         // Roll 50% chance between active blade Parry and crossed-arm Guard
@@ -429,9 +440,9 @@ export class MahoragaFighter extends Fighter {
     }
 
     const isBeamDamage = (
-      opts.isPureLoveBeam || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
-      opts.isPurple || opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
-      opts.isGenosBeam || (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry
+      (!this.adaptedPureLoveBeam && (opts.isPureLoveBeam || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
+      (opts.isPurple || opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0) ||
+      (!this.adaptedGenosBeam && (opts.isGenosBeam || (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
     );
 
     if (isBeamDamage) {
@@ -448,7 +459,7 @@ export class MahoragaFighter extends Fighter {
       this.interruptAttacks();
     }
 
-    if (opts.isPureLoveBeam) {
+    if (opts.isPureLoveBeam && !this.adaptedPureLoveBeam) {
       this.caughtInPureLoveBeam = true;
       this.pureLoveBeamTimer = 10;
       this.defensePoseType = null;
@@ -490,6 +501,65 @@ export class MahoragaFighter extends Fighter {
   _getFrontRadiusTargets(maxRangeOffset, coneAngle) { return getFrontRadiusTargets(this, maxRangeOffset, coneAngle); }
   initiateLevel8WallSlam(opponent) { initiateLevel8WallSlam(this, opponent); }
   updateLevel8WallSlam(opponent, ownerIndex, arena) { updateLevel8WallSlam(this, opponent, ownerIndex, arena); }
+
+  applySlow(frames, multiplier) {
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+    const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.05;
+    const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.40;
+    const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+
+    if (ccTenacity > 0) {
+      frames = Math.max(1, Math.round(frames * (1.0 - ccTenacity)));
+      multiplier = multiplier + (1.0 - multiplier) * ccTenacity;
+    }
+    super.applySlow(frames, multiplier);
+  }
+
+  applyKnockback(vx, vy) {
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+    const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
+    const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
+    const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+
+    if (ccTenacity > 0) {
+      vx = vx * (1.0 - ccTenacity);
+      vy = vy * (1.0 - ccTenacity);
+    }
+    
+    super.applyKnockback(vx, vy);
+
+    if (ccTenacity > 0 && this.knockbackStunTimer > 0) {
+      this.knockbackStunTimer = Math.max(1, Math.round(this.knockbackStunTimer * (1.0 - ccTenacity)));
+    }
+  }
+
+  interruptAttacks(forceCancelAll = false) {
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+    const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
+    const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
+    const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+    const opponent = this._bounceTarget || (typeof state !== 'undefined' && state.fighters
+      ? state.fighters.find(f => f && f !== this && f.hp > 0)
+      : null);
+    const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+    const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
+
+    if (canAttackUnderCC && !forceCancelAll) {
+      const backupMeleeSwingActive = this.meleeSwingActive;
+      const backupMeleeSwingTimer = this.meleeSwingTimer;
+      const backupPunchAnimTimer = this.punchAnimTimer;
+      const backupLeftPunchTimer = this.leftPunchTimer;
+
+      super.interruptAttacks(forceCancelAll);
+
+      this.meleeSwingActive = backupMeleeSwingActive;
+      this.meleeSwingTimer = backupMeleeSwingTimer;
+      this.punchAnimTimer = backupPunchAnimTimer;
+      this.leftPunchTimer = backupLeftPunchTimer;
+    } else {
+      super.interruptAttacks(forceCancelAll);
+    }
+  }
 
   resolveWallBounce(arena, targetOpponent) {
     const bounced = super.resolveWallBounce(arena, targetOpponent);
@@ -553,14 +623,21 @@ export class MahoragaFighter extends Fighter {
   }
 
   shoot(ownerIndex) {
+    if (!this.canPerformBasicAttack()) return false;
+    const opponent = (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+    if (opponent && !opponent.isDead) {
+      this.aim(opponent);
+    }
     if (this.isCaughtInBeam() && !this.adaptedPureLoveBeam && !this.adaptedGenosBeam) {
-      this.interruptAttacks();
-      return;
+      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+      if (!inMeleeRange) {
+        this.interruptAttacks();
+        return;
+      }
     }
     const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
     const isLevel8 = totalStages >= 8 || this.isMaxAdapted || this.isInfinityBlitz || (this.goldStages >= 8);
     if (isLevel8 && !this.isWallSlamActive && (this.throwCooldown || 0) <= 0) {
-      const opponent = (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
       if (opponent) {
         this.initiateLevel8WallSlam(opponent);
         return;
@@ -570,6 +647,25 @@ export class MahoragaFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
+    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
+    // --- POSITION SNAP GUARD: Clear sword trail on teleport ---
+    if (this._prevX !== undefined && this._prevY !== undefined) {
+      const moveDist = Math.hypot(this.x - this._prevX, this.y - this._prevY);
+      if (moveDist > 45) {
+        this.swordTrail = [];
+      }
+    }
+    this._prevX = this.x;
+    this._prevY = this.y;
+
+    // --- UPDATE MAHORAGA SWORD TRAIL (DECAY ONLY) ---
+    if (this.swordTrail && this.swordTrail.length > 0) {
+      this.swordTrail.forEach(t => {
+        t.life = Math.max(0, t.life - 0.08);
+      });
+      this.swordTrail = this.swordTrail.filter(t => t.life > 0);
+    }
+
     if (this.dodgeIFrames > 0) this.dodgeIFrames--;
 
     this.handlePoison();
@@ -668,25 +764,68 @@ export class MahoragaFighter extends Fighter {
     const isFrozen = this._handleTimeStop();
     const isInfinityFrozen = handleInfinityFreeze(this);
     const isBeamParalyzed = (
-      this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
-      this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 || (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry
+      (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
+      this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
+      (!this.adaptedGenosBeam && ((this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
     );
 
     if (isInsideGojoDomain || isFrozen || isInfinityFrozen || this.isTargetOfAmbush || isBeamParalyzed) {
-      this.interruptAttacks();
-      this.vx = 0;
-      this.vy = 0;
-      this.isCleaving = false;
-      this.isShouting = false;
-      this.isThrowing = false;
-      this.isBlitzActive = false;
-      this.isInfinityBlitz = false;
+      const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
+      const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
+      const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+      const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
+
+      if (!canAttackUnderCC) {
+        this.interruptAttacks();
+        this.isCleaving = false;
+        this.isShouting = false;
+        this.isThrowing = false;
+        this.isBlitzActive = false;
+        this.isInfinityBlitz = false;
+      }
+
       if (isInsideGojoDomain || isBeamParalyzed) {
         this.adaptationPauseTimer = 0;
         this.adaptationDashTimer = 0;
         this._pendingCounterTarget = null;
       }
       this.neutralStanceTimer = 0;
+
+      if (ccTenacity > 0 && opponent && !opponent.isDead) {
+        const steerAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+        const moveSpeed = this.speed * ccTenacity;
+
+        // Combine steer velocity and knockback push so he slowly gets pushed back but keeps marching forward!
+        const steerVx = Math.cos(steerAngle) * moveSpeed;
+        const steerVy = Math.sin(steerAngle) * moveSpeed;
+        this.vx = steerVx + (this.knockbackVx || 0);
+        this.vy = steerVy + (this.knockbackVy || 0);
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Constrain within arena boundary
+        const arenaBounds = arena || CONFIG.arena || { x: 50, y: 50, width: 1100, height: 700 };
+        const margin = this.r || 30;
+        const minX = arenaBounds.x + margin;
+        const maxX = arenaBounds.x + (arenaBounds.width || arenaBounds.w || 1100) - margin;
+        const minY = arenaBounds.y + margin;
+        const maxY = arenaBounds.y + (arenaBounds.height || arenaBounds.h || 700) - margin;
+        this.x = Math.max(minX, Math.min(maxX, this.x));
+        this.y = Math.max(minY, Math.min(maxY, this.y));
+
+        this.aim(opponent);
+
+        // Execute melee attack if cooldown is ready and we are close enough under CC
+        if (canAttackUnderCC && (this.swordCooldown || 0) <= 0) {
+          this._performMeleeAttack(opponent);
+        }
+      } else {
+        this.vx = 0;
+        this.vy = 0;
+      }
+
       this.applyMovementPhysics(0);
       return; // MANDATORY: Complete paralyzing freeze while caught in Pure Love Beam, Purple, or Void!
     }
@@ -694,17 +833,25 @@ export class MahoragaFighter extends Fighter {
     // ── MID-ACTION INTERRUPT FROM HOLLOW PURPLE, PURE LOVE BEAM, OR GENOS ULTIMATE ──
     const isCaughtInUltimateBeam = (
       this.isCaughtInPurple || (this.purpleHitTimer || 0) > 0 ||
-      this.caughtInPureLoveBeam || (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
-      (this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry
+      (!this.adaptedPureLoveBeam && (this.caughtInPureLoveBeam || (this.pureLoveBeamRecoveryTimer || 0) > 0)) ||
+      (!this.adaptedGenosBeam && ((this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
     );
 
     if (isCaughtInUltimateBeam) {
-      this.interruptAttacks();
-      this.neutralStanceTimer = 0;
-      this.adaptationDashTimer = 0;
-      this.adaptationPauseTimer = 0;
-      this.isInfinityBlitz = false;
-      this.isBlitzActive = false;
+      const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
+      const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
+      const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
+      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+      const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
+
+      if (!canAttackUnderCC) {
+        this.interruptAttacks();
+        this.neutralStanceTimer = 0;
+        this.adaptationDashTimer = 0;
+        this.adaptationPauseTimer = 0;
+        this.isInfinityBlitz = false;
+        this.isBlitzActive = false;
+      }
 
       if (this.isWallSlamActive) {
         this.isWallSlamActive = false;
@@ -737,7 +884,6 @@ export class MahoragaFighter extends Fighter {
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
 
     // ── PASSIVE RCT REGEN (Scales continuously per adaptation level / wheel click without cap!) ──
-    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
     const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
     const currentRegenRate = totalStages * rctPerStage;
 
@@ -1249,13 +1395,14 @@ export class MahoragaFighter extends Fighter {
 
       if (opponent && !opponent.isDead) {
         const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        const turnSpeed = CONFIG.mahoraga?.throwAimRotationSpeed ?? 0.06;
+        const turnSpeed = CONFIG.mahoraga?.throwAimRotationSpeed ?? 0.18;
         
-        let diff = targetAngle - this.gunAngle;
+        let diff = targetAngle - (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0));
         while (diff < -Math.PI) diff += Math.PI * 2;
         while (diff > Math.PI) diff -= Math.PI * 2;
 
-        this.gunAngle += diff * turnSpeed;
+        this.gunAngle = (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0)) + diff * turnSpeed;
+        this.angle = this.gunAngle;
       }
 
       this.throwBarrageTimer++;
@@ -1843,6 +1990,146 @@ export class MahoragaFighter extends Fighter {
         }
       }
     }
+  }
+
+  _getSwordTipPositions() {
+    const r = this.r || 30;
+    const bladeLength = 58;
+
+    let swingAngle = 0;
+    let extendDist = 0;
+
+    const punchAnimTimer = this.punchAnimTimer || 0;
+    const maxAnimTimer = this.punchAnimMaxTimer || 18;
+    const swordCombo = this.swordCombo || 0;
+    const isCleaving = this.isCleaving || false;
+    const isThrowing = this.isThrowing || false;
+    const bladeRetractProgress = this.bladeRetractProgress !== undefined ? this.bladeRetractProgress : 1.0;
+
+    const isParrying = (this.defensePoseType === 'parry' && (this.defensePoseTimer || 0) > 0);
+    const isGuarding = (this.defensePoseType === 'guard' && (this.defensePoseTimer || 0) > 0);
+
+    if (punchAnimTimer > 0) {
+      const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
+      const swingDuration = 12.0;
+      const elapsed = maxTimer - punchAnimTimer;
+      const comboIndex = this.isInfinityBlitz ? (1 + (swordCombo % 2)) : (swordCombo % 3);
+
+      if (elapsed <= swingDuration) {
+        const p = Math.min(1.0, elapsed / swingDuration);
+
+        if (comboIndex === 1) {
+          // Combo 1: Sweeps backhand from +0.65 to -0.55
+          const easedP = 1.0 - Math.pow(1.0 - p, 2.2);
+          swingAngle = (Math.PI * 0.65) - (Math.PI * 1.20) * easedP;
+          extendDist = Math.sin(p * Math.PI) * 28;
+        } else if (comboIndex === 2) {
+          // Combo 2: Heavy Overhead Chop (Windup -0.55 -> -0.85, then heavy chop -0.85 -> +0.85)
+          if (p < 0.15) {
+            const w = p / 0.15;
+            swingAngle = (-Math.PI * 0.55) + (-Math.PI * 0.30) * Math.sin(w * Math.PI * 0.5);
+          } else {
+            const s = (p - 0.15) / 0.85;
+            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
+            swingAngle = (-Math.PI * 0.85) + (Math.PI * 1.70) * easedS;
+          }
+          extendDist = Math.sin(p * Math.PI) * 30;
+        } else {
+          // Combo 0: Smooth windup back from idle (0 -> -0.45), then slash forward (-0.45 -> +0.65)
+          if (p < 0.20) {
+            const w = p / 0.20;
+            swingAngle = (-Math.PI * 0.45) * Math.sin(w * Math.PI * 0.5);
+          } else {
+            const s = (p - 0.20) / 0.80;
+            const easedS = 1.0 - Math.pow(1.0 - s, 2.2);
+            swingAngle = (-Math.PI * 0.45) + (Math.PI * 1.10) * easedS;
+          }
+          extendDist = Math.sin(p * Math.PI) * 28;
+        }
+      } else {
+        // Recovery phase: Smoothly return from swing end angle to 0 idle guard
+        const recP = Math.min(1.0, (elapsed - swingDuration) / (maxTimer - swingDuration));
+        const easeRec = recP * (2 - recP);
+        let endAngle = Math.PI * 0.65;
+        if (comboIndex === 1) endAngle = -Math.PI * 0.55;
+        else if (comboIndex === 2) endAngle = Math.PI * 0.85;
+
+        swingAngle = endAngle * (1.0 - easeRec);
+        extendDist = (1.0 - easeRec) * 12;
+      }
+    } else if (isParrying) {
+      const maxT = this.defensePoseMaxTimer || 25;
+      const t = 1.0 - (this.defensePoseTimer / maxT);
+      const p = Math.sin(t * Math.PI);
+      swingAngle = Math.PI * 0.25 - p * (Math.PI * 0.45);
+      extendDist = 18 + p * 15;
+    } else if (isGuarding) {
+      swingAngle = -Math.PI * 0.35;
+      extendDist = -12;
+    } else if (isThrowing) {
+      const shotsLeft = this.throwBarrageShotsLeft || 0;
+      const isRightArmTurn = (shotsLeft % 2 === 0);
+      if (isRightArmTurn) {
+        const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 5;
+        const t = (this.throwBarrageTimer || 0) / interval;
+        const p = Math.sin(t * Math.PI);
+        swingAngle = -Math.PI * 0.25 + p * 0.45;
+        extendDist = 10 + p * 38;
+      } else {
+        swingAngle = -Math.PI * 0.25;
+        extendDist = 10;
+      }
+    } else if (this.isWallSlamActive && (this.wallSlamPhase === 'post_throw_delay' || this.wallSlamPhase === 'dash')) {
+      let p = 1.0;
+      if (this.wallSlamPhase === 'post_throw_delay') {
+        const standoffDuration = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wallSlamStandoffDuration) || 40;
+        p = Math.min(1.0, (this.wallSlamTimer || 0) / standoffDuration);
+      }
+      const easeP = p * p * (3 - 2 * p);
+      swingAngle = easeP * (-Math.PI * 0.65);
+      extendDist = easeP * 15;
+    }
+
+    const shoulderX = r * 0.55;
+    const shoulderY = 0;
+    const bodyAngle = this.angle || 0;
+    const cosB = Math.cos(bodyAngle);
+    const sinB = Math.sin(bodyAngle);
+    const rotatedShoulderX = shoulderX * cosB - shoulderY * sinB;
+    const rotatedShoulderY = shoulderX * sinB + shoulderY * cosB;
+
+    let verticalLift = 0;
+    let liftTilt = 0;
+    if (this.isWallSlamActive && this.wallSlamPhase === 'grab') {
+      const opponentObj = (typeof state !== 'undefined' && state.fighters) ? state.fighters.find(f => f && f !== this && f.hp > 0) : null;
+      if (opponentObj) {
+        verticalLift = opponentObj.z || 0;
+        const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames || 35;
+        const liftP = Math.min(1.0, Math.max(0.0, (this.wallSlamTimer - 12) / (holdFrames - 12)));
+        liftTilt = -0.22 * liftP;
+      }
+    }
+
+    const gunAngle = this.gunAngle || 0;
+    const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
+    const effectiveSwingAngle = (facingLeft && !this.isSpinning) ? -swingAngle : swingAngle;
+    const totalAngle = gunAngle + effectiveSwingAngle + liftTilt;
+
+    const retractScale = isGuarding ? 0.45 : (isParrying ? 1.0 : (bladeRetractProgress !== undefined ? Math.max(0, Math.min(1, bladeRetractProgress)) : (isThrowing ? 0.0 : 1.0)));
+
+    const localTipX = r * 0.3 + extendDist + bladeLength * retractScale;
+    const localBaseX = localTipX - 16 * retractScale;
+
+    const worldTipX = this.x + rotatedShoulderX + Math.cos(totalAngle) * localTipX;
+    const worldTipY = this.y + rotatedShoulderY - verticalLift + Math.sin(totalAngle) * localTipX;
+
+    const worldBaseX = this.x + rotatedShoulderX + Math.cos(totalAngle) * localBaseX;
+    const worldBaseY = this.y + rotatedShoulderY - verticalLift + Math.sin(totalAngle) * localBaseX;
+
+    return {
+      outer: { x: worldTipX, y: worldTipY },
+      inner: { x: worldBaseX, y: worldBaseY }
+    };
   }
 
 

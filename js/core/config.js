@@ -1,18 +1,18 @@
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
 // CONFIG ΓÇö tweak all game values here
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
-import { gojoConfig } from '../configs/characters/gojoConfig.js?v=2';
-import { sukunaConfig } from '../configs/characters/sukunaConfig.js';
-import { yutaConfig } from '../configs/characters/yutaConfig.js';
-import { tojiConfig } from '../configs/characters/tojiConfig.js';
-import { mahoragaConfig } from '../configs/characters/mahoragaConfig.js';
-import { todoConfig } from '../configs/characters/todoConfig.js';
-import { yujiConfig } from '../configs/characters/yujiConfig.js';
-import { laylaConfig } from '../configs/characters/laylaConfig.js';
-import { saitamaConfig } from '../configs/characters/saitamaConfig.js';
-import { genosConfig } from '../configs/characters/genosConfig.js';
-import { ichigoConfig } from '../configs/characters/ichigoConfig.js';
-import { mahitoConfig } from '../configs/characters/mahitoConfig.js';
+import { gojoConfig } from '../configs/characters/gojoConfig.js?v=4';
+import { sukunaConfig } from '../configs/characters/sukunaConfig.js?v=4';
+import { yutaConfig } from '../configs/characters/yutaConfig.js?v=4';
+import { tojiConfig } from '../configs/characters/tojiConfig.js?v=4';
+import { mahoragaConfig } from '../configs/characters/mahoragaConfig.js?v=4';
+import { todoConfig } from '../configs/characters/todoConfig.js?v=4';
+import { yujiConfig } from '../configs/characters/yujiConfig.js?v=4';
+import { laylaConfig } from '../configs/characters/laylaConfig.js?v=4';
+import { saitamaConfig } from '../configs/characters/saitamaConfig.js?v=4';
+import { genosConfig } from '../configs/characters/genosConfig.js?v=4';
+import { ichigoConfig } from '../configs/characters/ichigoConfig.js?v=4';
+import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 
 export const CONFIG = {

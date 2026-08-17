@@ -62,6 +62,32 @@ class AudioEventEmitter {
     fadeOutSound(handle, fadeMs);
   }
 
+  /**
+   * Play a voiceline for a specific fighter, cutting off any previously playing voiceline
+   * on that same fighter. This ensures only one voiceline plays per fighter at a time.
+   * @param {object} fighter - The fighter object (used as the key to track active voiceline)
+   * @param {string} id - Audio source path or config key
+   * @param {number} [volume=1.0] - Volume level
+   * @param {number} [speed=1.0] - Playback speed
+   * @param {number} [offset=0] - Start offset in seconds
+   * @param {number} [delay=0] - Delay before playing
+   * @returns {object|null} The sound handle
+   */
+  playFighterVoiceline(fighter, id, volume = 1.0, speed = 1.0, offset = 0, delay = 0) {
+    if (!fighter) return this.playSFX(id, volume, speed, offset, delay);
+
+    // Stop the fighter's currently playing voiceline (if any)
+    if (fighter._activeVoicelineHandle) {
+      stopSound(fighter._activeVoicelineHandle);
+      fighter._activeVoicelineHandle = null;
+    }
+
+    // Play the new voiceline and store the handle on the fighter
+    const handle = this.playSFX(id, volume, speed, offset, delay);
+    fighter._activeVoicelineHandle = handle;
+    return handle;
+  }
+
   stopAll() {
     stopAllSounds();
     stopAllLoopingSounds();
