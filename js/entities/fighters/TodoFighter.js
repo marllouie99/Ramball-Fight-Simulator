@@ -2,9 +2,8 @@ import { Fighter } from '../fighter.js';
 import { CONFIG } from '../../core/config.js';
 import { drawTodoSkin } from '../../graphics/fighters/todoSkin.js';
 import { GojoRenderer } from '../../graphics/fighters/gojoRenderer.js';
-import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { modUpdateMeleeCombat } from './todo/todoCombat.js';
-import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff } from './todo/todoSkills.js';
+import { modUpdateBoogieWoogie, modThrowCursedRock, modUpdateCursedRocks, modRepositionDisengage, modExecutePendingSwap, modCheckTeammateRescue, modCheckRockSwap, hasLiveTeammate, modTriggerTakadaUltimate, modStartTakadaChanneling, modActivateTakadaUltimate, applyBoogieDisorientation, applyBoogieEvadeBuff } from './todo/todoSkills.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { state, spawnFloatingText } from '../../core/state.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
@@ -55,6 +54,7 @@ export class TodoFighter extends Fighter {
     this.rockCounterComboLeft = 0;
     this.rockCounterComboTarget = null;
     this.rockCounterComboTimer = 0;
+    this.rockCounterCooldown = 0;
     this.disengageDelayTimer = 0;
 
     // Teammate Rescue Tracker
@@ -76,7 +76,24 @@ export class TodoFighter extends Fighter {
     this.hasTriggeredTakadaHpUlt = false;
   }
 
+  updateCursedRocks(targets) {
+    modUpdateCursedRocks.call(this, targets);
+  }
+
   update(opponent, ownerIndex, arena) {
+    // Provide targets array for AI logic by extracting them from state or fallback to opponent array
+    let targets = [];
+    if (Array.isArray(opponent)) {
+       targets = opponent;
+    } else if (opponent) {
+       targets = [opponent];
+    } else if (typeof state !== 'undefined' && state.fighters) {
+       targets = state.fighters.filter(f => f && f !== this && !f.isDead && f.hp > 0);
+    }
+
+    // ALWAYS update active cursed rocks FIRST so rocks continue traveling regardless of freezes, time-stops, stuns, or channelings!
+    this.updateCursedRocks(targets);
+
     // Prevent updating dead fighter (and ensure death audio handling is triggered once)
     if (this.isDead || this.hp <= 0) {
       if (this.isTakadaChanneling || this.isTakadaUltActive) {
@@ -147,13 +164,7 @@ export class TodoFighter extends Fighter {
       this.combatAuraOpacity = Math.max(0.0, this.combatAuraOpacity - 0.05); // Smooth fade-out
     }
 
-    // Provide targets array for AI logic by extracting them from state or fallback to opponent array if that's what opponent represents
-    let targets = [];
-    if (Array.isArray(opponent)) {
-       targets = opponent;
-    } else if (opponent) {
-       targets = [opponent];
-    }
+    // Targets already extracted at top of update() for cursed rock updates
 
     // Decrease cooldowns (operating at 120% potential inside the Zone)
     const decay = (this.blackFlashTimer > 0) ? (CONFIG.blackFlash?.zone?.cooldownDecayMultiplier ?? 1.20) : 1.0;
@@ -264,6 +275,7 @@ export class TodoFighter extends Fighter {
 
     if (this.boogieWoogieCooldown > 0) this.boogieWoogieCooldown = Math.max(0, this.boogieWoogieCooldown - decay);
     if (this.rockThrowCooldown > 0) this.rockThrowCooldown = Math.max(0, this.rockThrowCooldown - decay);
+    if (this.rockCounterCooldown > 0) this.rockCounterCooldown = Math.max(0, this.rockCounterCooldown - decay);
     if (this.takadaUltCooldown > 0) this.takadaUltCooldown = Math.max(0, this.takadaUltCooldown - decay);
     if (this.justSwappedTimer > 0) this.justSwappedTimer--;
     if (this.blackFlashGlowTimer > 0) this.blackFlashGlowTimer--;
@@ -284,24 +296,34 @@ export class TodoFighter extends Fighter {
       }
     }
 
-    // Update active cursed rocks (pass targets so proximity detection works)
-    modUpdateCursedRocks.call(this, targets);
-
-    // Pair Team Modes (1v2, 2v2): Check if teammate needs Boogie Woogie emergency rescue swap!
-    modCheckTeammateRescue.call(this);
+    // Boogie Woogie Tactical Swaps (Teammate Rescue & Cursed Rock Swaps):
+    // Strictly prevent any swaps until the rock counter combo is 100% finished!
+    if ((this.rockCounterComboLeft || 0) <= 0) {
+      const swappedTeammate = modCheckTeammateRescue.call(this);
+      if (!swappedTeammate) {
+        modCheckRockSwap.call(this);
+      }
+    }
 
     // Drive rock counter-attack combo punches (stay planted in place while punching)
     if (this.rockCounterComboLeft > 0) {
       const comboTarget = this.rockCounterComboTarget;
-      const maxReach = (this.r || 25) + (comboTarget?.r || 25) + (CONFIG.todo?.punchRange || 60) + 30;
-      const distToTarget = comboTarget ? Math.hypot(comboTarget.x - this.x, comboTarget.y - this.y) : Infinity;
 
-      // Stop combo immediately if target is dead, invalid, or no longer in melee range!
-      if (!comboTarget || comboTarget.isDead || comboTarget.hp <= 0 || distToTarget > maxReach) {
+      // Stop combo ONLY if target is truly dead or invalid
+      if (!comboTarget || comboTarget.isDead || comboTarget.hp <= 0) {
         this.rockCounterComboLeft = 0;
         this.rockCounterComboTarget = null;
         this.disengageDelayTimer = 0;
       } else {
+        // Track and stay glued within strike range so intermediate knockback never cancels the combo!
+        const distToTarget = Math.hypot(comboTarget.x - this.x, comboTarget.y - this.y);
+        const desiredDist = (this.r || 25) + (comboTarget.r || 25) + 20;
+        if (distToTarget > desiredDist) {
+          const moveSpeed = this.speed || 3.5;
+          const moveAngle = Math.atan2(comboTarget.y - this.y, comboTarget.x - this.x);
+          this.x += Math.cos(moveAngle) * Math.min(distToTarget - desiredDist, moveSpeed);
+          this.y += Math.sin(moveAngle) * Math.min(distToTarget - desiredDist, moveSpeed);
+        }
         this.vx = 0;
         this.vy = 0;
         this.rockCounterComboTimer--;
@@ -320,7 +342,7 @@ export class TodoFighter extends Fighter {
     }
 
     // AI/Skill execution
-    if (!this.playerControlled && targets.length > 0) {
+    if (!this.playerControlled && targets.length > 0 && (this.rockCounterComboLeft || 0) <= 0) {
       let target = targets[0];
       if (target) {
         this.aim(target);
@@ -329,8 +351,8 @@ export class TodoFighter extends Fighter {
         
         // AI Logic: Skills skipped in demo preview mode (only basic attacks!)
         if (!this.isDemoFighter) {
-          // When solo or teammate is dead: Todo throws rocks at range to set up clap combo
-          if (!hasLiveTeammate(this) && dist > 60 && this.rockThrowCooldown <= 0 && this.cursedRocks.length === 0) {
+          // Todo throws cursed rocks at range to set up Boogie Woogie swaps
+          if (dist > 60 && this.rockThrowCooldown <= 0 && this.cursedRocks.length === 0) {
             modThrowCursedRock.call(this, target);
           }
         }
@@ -392,7 +414,7 @@ export class TodoFighter extends Fighter {
 
   triggerSecondarySkill() {
     if (this.isTakadaChanneling) return;
-    if (this.rockThrowCooldown <= 0 && !hasLiveTeammate(this)) {
+    if (this.rockThrowCooldown <= 0) {
       modThrowCursedRock.call(this, null);
     }
   }
@@ -462,8 +484,13 @@ export class TodoFighter extends Fighter {
   }
 
   draw(ctx) {
-    // Only skip drawing if the fighter is dead (HP <= 0)
-    if (this.hp <= 0) return;
+    // If dead (HP <= 0), still render any active in-flight cursed rocks before returning
+    if (this.hp <= 0) {
+      if (this.cursedRocks && this.cursedRocks.length > 0) {
+        drawTodoSkin(ctx, this);
+      }
+      return;
+    }
     
     // Draw exact JJK Cursed Energy Sakuga Flame Aura (matching Gojo and Sukuna)
     GojoRenderer._drawJJKCursedEnergyAura(ctx, this, 'blue');

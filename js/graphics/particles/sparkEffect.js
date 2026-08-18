@@ -459,7 +459,7 @@ export function spawnArcaneGlyphs(x, y, count = 12) {
 
 export function spawnSpellStealWisps(trickster, target, color, count = 20) {
   for (let i = 0; i < count; i++) {
-    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
     if (state.sparkEffects.length >= (isMulti ? 250 : 500)) return;
     
     const spark = ParticleSystem.getParticle();
@@ -946,10 +946,10 @@ export function drawSparkEffects(layer = 'all') {
           ctx.stroke();
         }
       } else if (effect.type === 'mahitoSoulCoreFlash') {
-        // Jagged, unstable starburst flash representing organic soul shifting
+        // Jagged, unstable starburst flash representing organic soul shifting & blood rupture
         effect.size += (effect.targetSize - effect.size) * 0.22;
 
-        ctx.fillStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
+        ctx.save();
         ctx.beginPath();
         const points = 16;
         for (let p = 0; p < points; p++) {
@@ -962,15 +962,29 @@ export function drawSparkEffects(layer = 'all') {
           else ctx.lineTo(px, py);
         }
         ctx.closePath();
+
+        // Visceral Crimson Blood + Cursed Magenta Fill
+        ctx.fillStyle = `rgba(220, 38, 38, ${(effect.life * 0.85).toFixed(3)})`;
         ctx.fill();
 
-        // Neon magenta halo
+        ctx.strokeStyle = `rgba(217, 70, 239, ${(effect.life * 0.90).toFixed(3)})`;
+        ctx.lineWidth = 2.0;
+        ctx.stroke();
+
+        // Neon magenta outer aura halo
         ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = `rgba(217, 70, 239, ${effect.life * 0.5})`;
+        ctx.fillStyle = `rgba(217, 70, 239, ${(effect.life * 0.4).toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 1.35, 0, Math.PI * 2);
+        ctx.arc(effect.x, effect.y, effect.size * 1.25, 0, Math.PI * 2);
         ctx.fill();
-        ctx.globalCompositeOperation = 'source-over';
+
+        // Small tight bright inner core
+        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.65).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(effect.x, effect.y, Math.max(2, effect.size * 0.18), 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
       } else if (effect.type === 'mahitoClawScratchBurst') {
         // 5-Blade Razor Claw Slash Lacerations cutting across target
         const ang = effect.angle || 0;
@@ -1011,6 +1025,132 @@ export function drawSparkEffects(layer = 'all') {
         });
 
         ctx.restore();
+      } else if (effect.type === 'mahitoDomainSoulTendrilStrike') {
+        // Long-range Transfigured Flesh Tendril / Soul Arm reaching from Mahito to target
+        const startX = effect.startX !== undefined ? effect.startX : effect.x;
+        const startY = effect.startY !== undefined ? effect.startY : effect.y;
+        const targetX = effect.targetX !== undefined ? effect.targetX : effect.x;
+        const targetY = effect.targetY !== undefined ? effect.targetY : effect.y;
+        const dx = targetX - startX;
+        const dy = targetY - startY;
+        const totalDist = Math.hypot(dx, dy) || 1;
+        const baseAngle = Math.atan2(dy, dx);
+        const cosA = Math.cos(baseAngle);
+        const sinA = Math.sin(baseAngle);
+        const perpX = -sinA;
+        const perpY = cosA;
+
+        const progress = 1.0 - effect.life; // 0 to 1
+        const reachRatio = Math.min(1.0, progress / 0.20);
+        const easeReach = Math.sin(reachRatio * (Math.PI / 2));
+        const currentDist = totalDist * easeReach;
+        const currentEndX = startX + cosA * currentDist;
+        const currentEndY = startY + sinA * currentDist;
+
+        const alpha = Math.sin(effect.life * Math.PI);
+        if (alpha > 0.01) {
+          ctx.save();
+
+          // 1. Outer Cursed Energy Aura Glow Stream (Magenta/Violet)
+          ctx.strokeStyle = effect.isTransformed
+            ? `rgba(217, 70, 239, ${(0.65 * alpha).toFixed(3)})`
+            : `rgba(192, 38, 211, ${(0.60 * alpha).toFixed(3)})`;
+          ctx.lineWidth = 14.0 * alpha;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          const segments = Math.max(6, Math.floor(currentDist / 22));
+          for (let s = 1; s <= segments; s++) {
+            const t = s / segments;
+            const px = startX + (currentEndX - startX) * t;
+            const py = startY + (currentEndY - startY) * t;
+            const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (6.0 * (1 - t * 0.4));
+            ctx.lineTo(px + perpX * wave, py + perpY * wave);
+          }
+          ctx.stroke();
+
+          // 2. Dense Transfigured Flesh Tendril Body (Dark violet / organic muscle sinew)
+          ctx.strokeStyle = effect.isTransformed ? '#4A044E' : '#3B0764';
+          ctx.lineWidth = 7.5 * alpha;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          for (let s = 1; s <= segments; s++) {
+            const t = s / segments;
+            const px = startX + (currentEndX - startX) * t;
+            const py = startY + (currentEndY - startY) * t;
+            const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (5.0 * (1 - t * 0.4));
+            ctx.lineTo(px + perpX * wave, py + perpY * wave);
+          }
+          ctx.stroke();
+
+          // 3. Inner Luminous Lilac-White Soul Channel
+          ctx.strokeStyle = `rgba(245, 208, 254, ${(0.92 * alpha).toFixed(3)})`;
+          ctx.lineWidth = 2.2 * alpha;
+          ctx.beginPath();
+          ctx.moveTo(startX, startY);
+          for (let s = 1; s <= segments; s++) {
+            const t = s / segments;
+            const px = startX + (currentEndX - startX) * t;
+            const py = startY + (currentEndY - startY) * t;
+            const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (3.5 * (1 - t * 0.4));
+            ctx.lineTo(px + perpX * wave, py + perpY * wave);
+          }
+          ctx.stroke();
+
+          // 4. Black Surgical Stitches crossing the tendril at segment joints
+          ctx.strokeStyle = `rgba(15, 15, 20, ${(0.95 * alpha).toFixed(3)})`;
+          ctx.lineWidth = 1.8 * alpha;
+          for (let s = 1; s < segments; s++) {
+            if (s % 2 === 0) {
+              const t = s / segments;
+              const px = startX + (currentEndX - startX) * t;
+              const py = startY + (currentEndY - startY) * t;
+              const wave = Math.sin(t * Math.PI * 3 + (effect.wobblePhase || 0) + progress * 12) * (4.0 * (1 - t * 0.4));
+              const cx = px + perpX * wave;
+              const cy = py + perpY * wave;
+              ctx.beginPath();
+              ctx.moveTo(cx - perpX * 5.0, cy - perpY * 5.0);
+              ctx.lineTo(cx + perpX * 5.0, cy + perpY * 5.0);
+              ctx.stroke();
+            }
+          }
+
+          // 5. Giant Transfigured Claw at Tip (materializing as it reaches target)
+          if (reachRatio >= 0.5) {
+            ctx.save();
+            ctx.translate(currentEndX, currentEndY);
+            ctx.rotate(baseAngle);
+
+            const clawTalons = [-10, -3.5, 3.5, 10];
+            clawTalons.forEach((offY, cIdx) => {
+              const talonLen = (cIdx === 1 || cIdx === 2) ? 26 : 19;
+              ctx.fillStyle = effect.isTransformed ? '#C026D3' : '#F5D0FE';
+              ctx.beginPath();
+              ctx.moveTo(-4, offY);
+              ctx.lineTo(talonLen, offY * 0.6);
+              ctx.lineTo(-4, offY + (offY >= 0 ? 2.5 : -2.5));
+              ctx.closePath();
+              ctx.fill();
+
+              ctx.strokeStyle = '#181C26';
+              ctx.lineWidth = 1.2;
+              ctx.stroke();
+            });
+
+            // Hand knuckle node
+            ctx.fillStyle = effect.isTransformed ? '#3B0764' : '#581C87';
+            ctx.beginPath();
+            ctx.arc(-2, 0, 9, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.strokeStyle = '#F5D0FE';
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+
+            ctx.restore();
+          }
+
+          ctx.restore();
+        }
       } else if (effect.type === 'cursedBiteMaw') {
         // Cursed Jaw Bite Attack Visual (Fanged jaws snapping shut over target)
         const ang = effect.angle || 0;
@@ -2037,7 +2177,7 @@ export function drawSparkEffects(layer = 'all') {
  * @param {string} clashType - 'gojo' or 'yuta'
  */
 export function spawnMeleeClashShockwave(x, y, radius = 80, clashType = 'gojo') {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 20;
   let insertIdx = -1;
@@ -2092,7 +2232,7 @@ export function spawnAnimePunchImpactFrame(x, y, radius = 55, hitAngle = 0, colo
  * @param {number} radius - Target radius of shockwave
  */
 export function spawnRikaRoarShockwave(x, y, radius = 180) {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
   let insertIdx = -1;
@@ -2128,7 +2268,7 @@ export function spawnRikaRoarShockwave(x, y, radius = 180) {
  * @param {number} radius - Target radius of shockwave
  */
 export function spawnMahoragaShoutShockwave(x, y, radius = 180) {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_SHOCKWAVES = isMulti ? (fps < 45 ? 5 : 10) : 25;
   let insertIdx = -1;
@@ -2164,7 +2304,7 @@ export function spawnMahoragaShoutShockwave(x, y, radius = 180) {
  * @param {number} radius - Target radius of shockwave
  */
 export function spawnMahoragaShoutBurst(x, y, radius = 180) {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = state.fps || 60;
   const MAX_PARTICLES = isMulti ? (fps < 45 ? 100 : 250) : 400;
 
@@ -2240,7 +2380,7 @@ export function spawnGenosThrusterDashVisual(x, y, dashAngle = 0) {
 
   // Thruster back-fire jet particles opposite to dash angle
   const backAngle = dashAngle + Math.PI;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = (state && state.fps) || 60;
   const MAX_PARTICLES = isMulti ? (fps < 45 ? 50 : 100) : 150;
 
@@ -2286,7 +2426,7 @@ export function spawnGenosThrusterDashVisual(x, y, dashAngle = 0) {
  */
 export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, theme = 'orange') {
   const lineCount = 7;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = (state && state.fps) || 60;
   const MAX_PARTICLES = isMulti ? (fps < 45 ? 60 : 120) : 200;
 
@@ -2347,7 +2487,7 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
  * @param {number} angle - Aim or trajectory angle (optional)
  */
 export function spawnTodoClapCEParticles(x, y, angle = 0) {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const fps = (state && state.fps) || 60;
   const MAX_PARTICLES = isMulti ? (fps < 45 ? 80 : 140) : 250;
 
@@ -2703,4 +2843,58 @@ export function spawnBiteAttackEffect(x, y, angle = 0, color = '#D946EF') {
   if (typeof spawnBloodEffect === 'function') {
     spawnBloodEffect({ x, y, r: 12, color: '#DC2626' }, 8);
   }
+}
+
+/**
+ * Spawns Mahito's Domain Expansion Long-Range Sure-Hit Soul Tendril Strike.
+ * Stretches a high-speed transfigured fleshy stitched arm directly from Mahito to the distant target.
+ */
+export function spawnMahitoDomainSoulTendrilStrike(startX, startY, targetX, targetY, isTransformed = false) {
+  if (!state || !state.sparkEffects) return;
+
+  const tendril = ParticleSystem.getParticle();
+  tendril.x = (startX + targetX) / 2;
+  tendril.y = (startY + targetY) / 2;
+  tendril.startX = startX;
+  tendril.startY = startY;
+  tendril.targetX = targetX;
+  tendril.targetY = targetY;
+  tendril.isTransformed = isTransformed;
+  tendril.wobblePhase = Math.random() * Math.PI * 2;
+  tendril.size = 20;
+  tendril.life = 1.0;
+  tendril.decay = 0.065; // ~15 frames duration
+  tendril.type = 'mahitoDomainSoulTendrilStrike';
+  tendril.isFlash = true;
+  tendril.isPixi = false;
+  state.sparkEffects.push(tendril);
+
+  // Burst of soul sparks & bubbles at point of origin
+  spawnSparks(startX, startY, 4, 'basic', {
+    color: isTransformed ? '#C026D3' : '#D946EF',
+    speed: 4.0,
+    size: 2.0,
+    decay: 0.08
+  });
+
+  // Spawn claw scratch impact burst at target position
+  const strikeAngle = Math.atan2(targetY - startY, targetX - startX);
+  spawnMahitoClawScratchImpact(targetX, targetY, strikeAngle, isTransformed);
+
+  // Expanding magenta soul shockwave ring at target
+  const sw = ParticleSystem.getParticle();
+  sw.x = targetX;
+  sw.y = targetY;
+  sw.size = 8;
+  sw.targetSize = 48;
+  sw.life = 1.0;
+  sw.decay = 0.06;
+  sw.type = 'mahitoSoulShockwave';
+  sw.isFlash = true;
+  sw.isPixi = false;
+  sw.color = 'magenta';
+  state.sparkEffects.push(sw);
+
+  // Organic soul bubbles floating from impact
+  spawnMahitoSoulBubbles(targetX, targetY, 2);
 }

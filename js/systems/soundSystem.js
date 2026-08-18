@@ -7,6 +7,7 @@ import { state } from '../core/state.js';
 const _cache = new Map();
 const _loopingSounds = new Map();
 const _activeSounds = new Set();
+const _activeSoundHandles = new Set();
 const _pendingSoundTimeouts = new Set();
 let _sharedAudioCtx = null;
 let _audioUnlocked = false;
@@ -19,7 +20,7 @@ const MAX_POOL_SIZE = 30;
 const MAX_CACHE_SIZE = 250; // Maximum number of cached sounds
 
 // ── CONCURRENT SOUND LIMITING (prevents audio bus overload → crackling) ──
-const MAX_CONCURRENT_SOUNDS = 18; // Hard cap on simultaneous Web Audio sources
+const MAX_CONCURRENT_SOUNDS = 24; // Hard cap on simultaneous Web Audio sources
 // Micro-fade duration in seconds to prevent click/pop artifacts on start/stop
 const MICRO_FADE_IN = 0.008;  // 8ms fade-in
 const MICRO_FADE_OUT = 0.015; // 15ms fade-out
@@ -407,8 +408,6 @@ function _evictOldestSound() {
  */
 const _lastPlayTimes = new Map();
 const SOUND_THROTTLE_MS = 15; // Prevent identical audio file from double-playing within same frame (15ms)
-
-const _activeSoundHandles = new Set();
 
 export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null) {
   if (!src) return null;

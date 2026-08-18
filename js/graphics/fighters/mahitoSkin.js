@@ -29,15 +29,18 @@ import { drawMinionHealthBar, drawMahitoFleshBubblyDeformLocal } from '../status
  */
 function drawMahitoCursedEnergyAura(ctx, fighter) {
   if (typeof GojoRenderer !== 'undefined' && typeof GojoRenderer._drawJJKCursedEnergyAura === 'function') {
-    // OPTIMIZATION: Do not render massive expensive aura on tiny evasion soul slip worms!
-    if (fighter.isEvading || fighter.isEvasionMinion) return;
+    // When split into clones, only the chosen clone with hasCursedEnergyAura renders the CE aura!
+    if (fighter.isEvading || fighter.isEvasionMinion) {
+      if (!fighter.hasCursedEnergyAura) return;
+    }
 
     const opacity = (fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 1.0;
     if (opacity <= 0.01) return;
     ctx.save();
     ctx.globalAlpha = opacity;
     // Pass local coordinates (0, 0) since ctx is already translated to (fighter.x, fighter.y)
-    GojoRenderer._drawJJKCursedEnergyAura(ctx, fighter, 'mahito', 0, 0, fighter.r);
+    const auraR = (fighter.isEvading || fighter.isEvasionMinion) ? 25 : (fighter.r || 25);
+    GojoRenderer._drawJJKCursedEnergyAura(ctx, fighter, 'mahito', 0, 0, auraR);
     ctx.restore();
   }
 }
@@ -805,6 +808,8 @@ function drawBaseMahito(ctx, r, fighter) {
  * Renders Phantom Soul Slip Cursed Energy afterimages in world space.
  */
 function drawMahitoDashAfterimages(ctx, fighter) {
+  const isChannelingDomain = Boolean(fighter && (fighter.domainChargeTimer > 0 || fighter.isChannelingDomainExpansion));
+  if (isChannelingDomain) return;
   if (!fighter._dashAfterimages || fighter._dashAfterimages.length === 0) return;
   const r = fighter.r || 25;
 
@@ -1159,11 +1164,11 @@ export function drawMahitoSkin(ctx, fighter) {
     fighter.drawStatusOverlays(ctx, r);
   }
 
-  // 8.5. Grotesque Flesh Deformation & Swelling Cursed Aura Overlay (Renders on clone body when about to explode)
-  const isDyingPop = fighter.isDying || fighter.isDyingEvasion || (fighter.evasionReconsolidateTimer > 0);
-  if (isDyingPop) {
-    const maxDur = fighter.maxDeathTimer || fighter.evasionReconsolidateMax || 18;
-    const currentTimer = fighter.deathTimer ?? fighter.evasionReconsolidateTimer ?? 18;
+  // 8.5. Grotesque Flesh Deformation & Swelling Cursed Aura Overlay (Renders ONLY on dying small minion clones, NEVER on Mahito's main fighter body!)
+  const isDyingMinionClone = Boolean(fighter.isEvasionMinion && (fighter.isDying || fighter.isDyingEvasion));
+  if (isDyingMinionClone) {
+    const maxDur = fighter.maxDeathTimer || 18;
+    const currentTimer = fighter.deathTimer ?? 18;
     const progress = Math.min(1.0, Math.max(0.0, 1.0 - (currentTimer / maxDur)));
 
     ctx.save();
@@ -1201,6 +1206,8 @@ export function drawMahitoSkin(ctx, fighter) {
     }
 
     ctx.restore();
+  } else if (fighter && !fighter.isEvasionMinion && fighter._mahitoFleshDeformSeeds) {
+    fighter._mahitoFleshDeformSeeds = null;
   }
 
   // Evasion Clones Floating HP Healthbar Overlay

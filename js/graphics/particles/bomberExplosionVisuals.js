@@ -102,7 +102,7 @@ class HighFidelityExplosionSystem {
     }
     this.particles.push(flash);
 
-    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
     const particleScale = isMulti ? 0.4 : 1.0;
 
     // 2. Organic Fireball 

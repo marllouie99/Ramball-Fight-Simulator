@@ -9,6 +9,9 @@ import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
 import { audioSystem } from './audioSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { updateIllusions } from './illusionSystem.js';
+import { triggerMahitoParalyzeExplosion } from '../entities/fighters/mahito/mahitoCombat.js';
+import { spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
+import { clampRikaToArena } from '../entities/fighters/yuta/rikaLogic.js';
 
 // ─────────────────────────────────────────────
 // SPATIAL PARTITIONING GRID
@@ -95,11 +98,19 @@ export { spatialGrid };
  */
 export function isFighterEffectivelyAlive(fighter) {
   if (!fighter) return false;
+  // If an entity is paralyzed by Mahito's Soul Disfigurement build-up, they remain in play until the rupture explosion detonates!
+  if (fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
+    return true;
+  }
   if (fighter.hp > 0) return true;
   // Dead doppelganger with surviving illusions is still in play
   const isDoppel = fighter.type === 'doppleganger' || fighter._def?.type === 'doppleganger' || fighter.characterId === 'doppleganger';
   if (isDoppel) {
     return state.illusions && state.illusions.some(ill => ill && ill.owner === fighter && ill.hp > 0);
+  }
+  const isMahitoEvading = (fighter.characterId === 'mahito' || fighter.type === 'mahito') && fighter.isEvading;
+  if (isMahitoEvading) {
+    return state.illusions && state.illusions.some(ill => ill && ill.owner === fighter && ill.isEvasionMinion && ill.hp > 0);
   }
   return false;
 }
@@ -591,7 +602,7 @@ function endRoundIfTlfsEnded() {
   const player = state.fighters[0];
   let enemy = state.fighters[1];
 
-  if (!player || player.hp <= 0) {
+  if (!player || !isFighterEffectivelyAlive(player)) {
     // Player died - show Champion Screen
     state.matchWinner = enemy;
     state.matchEndTimer = 0;
@@ -600,7 +611,7 @@ function endRoundIfTlfsEnded() {
   }
 
   // Check if enemy died
-  if (enemy && enemy.hp <= 0) {
+  if (enemy && !isFighterEffectivelyAlive(enemy)) {
     // Enemy died - increment defeated count
     state.tlfsDefeatedEnemies = (state.tlfsDefeatedEnemies || 0) + 1;
 
@@ -671,6 +682,22 @@ export function updateFighters() {
       if (fighter.hp <= 0) {
         if (typeof fighter._healthBarShakeTimer === 'number' && fighter._healthBarShakeTimer > 0) {
           fighter._healthBarShakeTimer--;
+        }
+        // If fighter is paralyzed by Mahito's Soul Disfigurement, let shivering finish and explode before match ends!
+        if (fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
+          if (fighter.paralyzeTimer % 3 === 0 && typeof spawnMahitoSoulBubbles === 'function') {
+            spawnMahitoSoulBubbles(fighter.x, fighter.y, 2);
+          }
+          if (fighter.paralyzeTimer === 1) {
+            triggerMahitoParalyzeExplosion(fighter);
+          }
+          fighter.paralyzeTimer--;
+          if (fighter.paralyzeTimer <= 0) {
+            fighter.isParalyzedByMahito = false;
+            if (typeof fighter.checkRoundOrMatchEnd === 'function') {
+              fighter.checkRoundOrMatchEnd();
+            }
+          }
         }
         return;
       }
@@ -756,6 +783,21 @@ export function updateFighters() {
             fighter.y -= ny * overlap * 0.5;
             entity.x += nx * overlap * 0.5;
             entity.y += ny * overlap * 0.5;
+          }
+
+          // Re-clamp entity and fighter to arena so physics push never ejects them outside the wall
+          const arena = state.arena || CONFIG.arena;
+          if (arena) {
+            if (entity.isRika) {
+              clampRikaToArena(entity, arena);
+            } else {
+              const eR = entity.r || 20;
+              entity.x = Math.max(arena.x + eR, Math.min(arena.x + arena.width - eR, entity.x));
+              entity.y = Math.max(arena.y + eR, Math.min(arena.y + arena.height - eR, entity.y));
+            }
+            const fR = fighter.r || 25;
+            fighter.x = Math.max(arena.x + fR, Math.min(arena.x + arena.width - fR, fighter.x));
+            fighter.y = Math.max(arena.y + fR, Math.min(arena.y + arena.height - fR, fighter.y));
           }
         }
       }

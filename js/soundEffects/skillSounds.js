@@ -332,7 +332,7 @@ export const SKILL_SOUNDS = {
     blackflash: {
       src: 'Assets/Sound Effects/Skills/blackflash1.mp3',
       src2: 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3',
-      volume: 0.5,
+      volume: 1.5,
       delay: 0
     }
   },
@@ -341,7 +341,7 @@ export const SKILL_SOUNDS = {
     blackflash: {
       src: 'Assets/Sound Effects/Skills/blackflash1.mp3',
       src2: 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3',
-      volume: 0.5,
+      volume: 1.5,
       delay: 0
     }
   },

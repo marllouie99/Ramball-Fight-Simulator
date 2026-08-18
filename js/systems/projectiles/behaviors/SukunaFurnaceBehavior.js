@@ -39,12 +39,54 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
   }
 
   update(projectile, fighters, system) {
-    // Basic trail history (common pattern, could be abstracted later)
+    // Basic trail history
     projectile.history.unshift({ x: projectile.x, y: projectile.y });
     if (projectile.history.length > projectile.historyMax) {
       projectile.history.pop();
     }
-    return false; // Let the standard movement/expire logic handle the rest
+
+    // If no living enemies exist on the battlefield, detonate immediately at current or enemy position
+    const ownerIdx = projectile.owner;
+    const allFighters = fighters || (typeof state !== 'undefined' ? state.fighters : []) || [];
+    const allIllusions = (typeof state !== 'undefined' ? state.illusions : []) || [];
+    const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(ownerIdx) : null;
+
+    const hasLivingEnemy = allFighters.some((f, idx) => {
+      if (!f || f.hp <= 0 || f.isDead || idx === ownerIdx) return false;
+      const fTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(idx) : null;
+      return myTeam === null || fTeam === null || myTeam !== fTeam;
+    }) || allIllusions.some(ill => {
+      if (!ill || ill.hp <= 0 || ill.isDead) return false;
+      if (ill.owner) {
+        const oIdx = allFighters.indexOf(ill.owner);
+        const oTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(oIdx) : null;
+        return myTeam === null || oTeam === null || myTeam !== oTeam;
+      }
+      return true;
+    });
+
+    if (!hasLivingEnemy) {
+      let detonateX = projectile.x;
+      let detonateY = projectile.y;
+      let closestDeadDist = Infinity;
+
+      for (const f of allFighters) {
+        if (!f || f === allFighters[ownerIdx]) continue;
+        const d = Math.hypot(f.x - projectile.x, f.y - projectile.y);
+        if (d < closestDeadDist) {
+          closestDeadDist = d;
+          detonateX = f.x;
+          detonateY = f.y;
+        }
+      }
+
+      const explosionX = (closestDeadDist < 120) ? detonateX : projectile.x;
+      const explosionY = (closestDeadDist < 120) ? detonateY : projectile.y;
+      system.triggerThermobaricExplosion(explosionX, explosionY, projectile.owner, projectile.damage);
+      return true; // Destroy projectile immediately!
+    }
+
+    return false;
   }
 
   onHit(projectile, target, attacker, fighters, system) {

@@ -467,7 +467,7 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   ctx.restore();
 }
 
-function drawCursedRocks(ctx, fighter) {
+export function drawCursedRocks(ctx, fighter) {
   if (!fighter.cursedRocks || fighter.cursedRocks.length === 0) return;
 
   for (let rock of fighter.cursedRocks) {

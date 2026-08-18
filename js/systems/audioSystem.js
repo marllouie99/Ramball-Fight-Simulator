@@ -65,16 +65,42 @@ class AudioEventEmitter {
   /**
    * Play a voiceline for a specific fighter, cutting off any previously playing voiceline
    * on that same fighter. This ensures only one voiceline plays per fighter at a time.
+   * If a protected voiceline is playing (e.g. Domain Expansion channeling & deployment),
+   * normal skill/attack/dash voicelines will NOT cut it off.
+   *
    * @param {object} fighter - The fighter object (used as the key to track active voiceline)
    * @param {string} id - Audio source path or config key
    * @param {number} [volume=1.0] - Volume level
    * @param {number} [speed=1.0] - Playback speed
    * @param {number} [offset=0] - Start offset in seconds
    * @param {number} [delay=0] - Delay before playing
+   * @param {object} [options={}] - Options e.g. { isProtected: true, durationMs: 4000 }
    * @returns {object|null} The sound handle
    */
-  playFighterVoiceline(fighter, id, volume = 1.0, speed = 1.0, offset = 0, delay = 0) {
+  playFighterVoiceline(fighter, id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, options = {}) {
     if (!fighter) return this.playSFX(id, volume, speed, offset, delay);
+
+    const now = Date.now();
+    const newPriority = options.priority || (options.isProtected ? 'protected' : 'normal');
+
+    // Priority levels: 'domain' (highest, level 3) > 'protected' (level 2) > 'normal' (level 1)
+    const priorityValue = {
+      'domain': 3,
+      'protected': 2,
+      'normal': 1
+    };
+
+    const currentPriority = fighter._activeVoicelinePriority || (fighter._activeVoicelineIsProtected ? 'protected' : 'normal');
+    const isCurrentActive = Boolean(
+      fighter._activeVoicelineHandle &&
+      fighter._activeVoicelineEndTime &&
+      now < fighter._activeVoicelineEndTime
+    );
+
+    // If a strictly higher priority voiceline is currently playing and not expired, block lower priority incoming lines
+    if (isCurrentActive && (priorityValue[newPriority] || 1) < (priorityValue[currentPriority] || 1)) {
+      return null;
+    }
 
     // Stop the fighter's currently playing voiceline (if any)
     if (fighter._activeVoicelineHandle) {
@@ -85,6 +111,15 @@ class AudioEventEmitter {
     // Play the new voiceline and store the handle on the fighter
     const handle = this.playSFX(id, volume, speed, offset, delay);
     fighter._activeVoicelineHandle = handle;
+    fighter._activeVoicelinePriority = newPriority;
+    fighter._activeVoicelineIsProtected = (newPriority === 'domain' || newPriority === 'protected');
+    if (fighter._activeVoicelineIsProtected) {
+      const durationMs = (options && options.durationMs) || 4000;
+      fighter._activeVoicelineEndTime = now + durationMs;
+    } else {
+      delete fighter._activeVoicelineEndTime;
+    }
+
     return handle;
   }
 

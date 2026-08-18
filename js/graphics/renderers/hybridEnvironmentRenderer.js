@@ -3,6 +3,7 @@ import { CONFIG } from '../../core/config.js';
 import { renderGojoDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
 import { renderSukunaDomainBackground, renderSukunaDomainForeground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
+import { renderMahitoDomainBackground } from './environmentalRenderer.js';
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
 import { drawCronosSphereVisual } from '../draw.js';
 
@@ -288,6 +289,21 @@ function getYutaDomainHybridData() {
   return yutaDomainHybridData;
 }
 
+let mahitoDomainHybridData = null;
+function getMahitoDomainHybridData() {
+  if (!mahitoDomainHybridData) {
+    const canvas = document.createElement('canvas');
+    canvas.width = state.canvas ? state.canvas.width : 1920;
+    canvas.height = state.canvas ? state.canvas.height : 1080;
+    const ctx = canvas.getContext('2d');
+    const texture = window.PIXI.Texture.from(canvas);
+    const sprite = new window.PIXI.Sprite(texture);
+    mahitoDomainHybridData = { canvas, ctx, texture, sprite };
+  }
+  syncDomainHybridDataSize(mahitoDomainHybridData);
+  return mahitoDomainHybridData;
+}
+
 export function updateHybridEnvironment() {
   if (!state.pixiApp || !state.pixiLayers?.environment || !state.pixiLayers?.effects) return;
   const layer = state.pixiLayers.environment;
@@ -299,6 +315,7 @@ export function updateHybridEnvironment() {
   const gojo = state.fighters?.find(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive);
   const sukuna = state.fighters?.find(f => f && (f.characterId === 'sukuna' || f.type === 'sukuna' || f._def?.type === 'sukuna') && f.domainActive);
   const yuta = state.fighters?.find(f => f && (f.characterId === 'yuta' || f.type === 'yuta' || f._def?.type === 'yuta') && f.domainActive);
+  const mahito = state.fighters?.find(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && (f.domainActive || f._mahitoDomainActive));
   const isMultiDomain = (state.fighters && state.fighters.filter(f => f && f.domainActive).length > 1);
 
   domainUpdateTick++;
@@ -396,9 +413,23 @@ export function updateHybridEnvironment() {
     yutaDomainHybridData.sprite.parent.removeChild(yutaDomainHybridData.sprite);
   }
 
+  if (mahito) {
+    const data = getMahitoDomainHybridData();
+    if (!data.sprite.parent) layer.addChildAt(data.sprite, 0);
+    data.sprite.x = -20;
+    data.sprite.y = -20;
+    data.sprite.width = state.canvas.width + 40;
+    data.sprite.height = state.canvas.height + 40;
+    data.ctx.clearRect(0, 0, data.canvas.width, data.canvas.height);
+    renderMahitoDomainBackground(mahito, data.ctx, data.canvas);
+    data.texture.update();
+  } else if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent) {
+    mahitoDomainHybridData.sprite.parent.removeChild(mahitoDomainHybridData.sprite);
+  }
+
   // Enforce deterministic domain Z-order sorting:
-  // Gojo (bottom) -> Sukuna Background (middle) -> Yuta Background/Crosses (top) -> Sukuna Shrine Foreground (top-most)
-  // This guarantees that Sukuna's physical Shrine building sits on top of Yuta's clashing void gradient and remains 100% visible!
+  // Mahito/Gojo (bottom) -> Sukuna Background (middle) -> Yuta Background/Crosses (top) -> Sukuna Shrine Foreground (top-most)
+  if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent === layer) layer.addChild(mahitoDomainHybridData.sprite);
   if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
   if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent === layer) layer.addChild(sukunaDomainHybridData.sprite);
   if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent === layer) layer.addChild(yutaDomainHybridData.sprite);

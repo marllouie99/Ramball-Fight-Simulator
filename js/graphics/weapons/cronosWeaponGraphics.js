@@ -51,7 +51,7 @@ export function drawCronosCrescentBlade(ctx, x, y, gunAngle, r, swingActive, swi
   // For now, we'll check if state is available globally
   const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
   const fps = (typeof state !== 'undefined' && state.fps) || 60;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || false;
 
   // OPTIMIZATION: Skip entire weapon drawing at very low FPS

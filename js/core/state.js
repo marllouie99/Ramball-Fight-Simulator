@@ -94,9 +94,8 @@ gCircle.endFill();
 const baseCircleTexture = pixiApp.renderer.generateTexture(gCircle);
 
 const gSquare = new window.PIXI.Graphics();
-gSquare.lineStyle(2, 0x000000, 0.7); // Dark stroke
 gSquare.beginFill(0xFFFFFF);
-gSquare.drawRect(0, 0, 16, 16);
+gSquare.drawRect(0, 0, 16, 16); // Crisp pixel square blood droplet (solid white for pure vivid RGB tinting)
 gSquare.endFill();
 const bloodSquareTexture = pixiApp.renderer.generateTexture(gSquare);
 

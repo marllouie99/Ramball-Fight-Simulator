@@ -118,7 +118,7 @@ export const mahitoConfig = {
   soulDisfigurement: {
     maxStacks: 5,                  // Stacks required for violent soul reshape detonation
     duration: 300,                 // Stacks linger for 300 frames (5s) before resetting
-    burstDamage: 80,               // True unmitigated soul damage at max stacks
+    burstDamage: 100,               // True unmitigated soul damage at max stacks
     burstHitStun: 300,             // Heavy stagger stun upon soul detonation
     paralyzeDuration: 45,          // Paralyze debuff duration in frames (0.75s) upon reaching max stacks
     burstKnockback: 20,            // Massive physical explosion push
@@ -139,7 +139,7 @@ export const mahitoConfig = {
   shiverIntensity: 4.2,
   
   // Soul / Defense Mechanics
-  soulDurabilityReduction: 0.10,   // Passive damage reduction vs regular attacks
+  soulDurabilityReduction: 0.02,   // Passive damage reduction vs regular attacks
 
   // ── 8. SURVIVAL & REGENERATION MECHANICS ───────────────────────────────────
   regen: {
@@ -154,7 +154,7 @@ export const mahitoConfig = {
     radius: 16,                    // Shrunk hurtbox radius for the clones and main body
     scale: 1.00,                   // Visual scale of the miniature models
     speedMultiplier: 1.50,         // Speed boost multiplier while fleeing in evasion state
-    regenRate: 1.00,               // Health regenerated per frame during evasion (~24 HP/sec)
+    regenRate: 0.05,               // Health regenerated per frame during evasion (~24 HP/sec)
     dodgeChance: 0.60              // Dodge chance to completely evade incoming attacks during evasion (60%)
   },
 
@@ -197,7 +197,7 @@ export const mahitoConfig = {
   domainExpansion: {
     cooldown: 2000,                // 33 seconds cooldown
     chargeMax: 120,                // 2 seconds channeling duration before domain opens
-    duration: 500,                 // 6.6 seconds of paralyzing stasis
+    duration: 600,                 // 6.6 seconds of paralyzing stasis
     radius: 9999,                  // Closed barrier - covers the whole screen
     executionDamageMultiplier: 0,// Execution strike deals 50% max HP true damage
     executionHitStun: 60,          // Massive hit stun on execution
@@ -205,10 +205,10 @@ export const mahitoConfig = {
     executionScreenShake: 16,      // Massive screen shake
     slowMultiplier: 0.15,          // Move speed multiplier for trapped targets inside domain (85% slow)
     velocityDampening: 0.85,       // Velocity damping rate per frame inside domain
-    basicAttackCooldownMultiplier: 1.00, // Basic attack speed & cooldown multiplier inside domain (1.00 = normal speed, 0.50 = twice as fast)
-    attacksToTriggerDisfigurement: 3,    // Basic attack hits required inside domain to trigger Soul Disfigurement & Rupture
+    basicAttackCooldownMultiplier: 1.50, // Basic attack speed multiplier inside domain (1.50 = 1.5x faster hit & damage rate, 2.0 = 2x faster, 3.0 = 3x faster)
+    attacksToTriggerDisfigurement: 5,    // Basic attack hits required inside domain to trigger Soul Disfigurement & Rupture
     disfigurementDamageMultiplier: 1.50, // Damage multiplier for Soul Disfigurement burst damage inside domain (1.50 = +50% damage)
-    ruptureDamageMultiplier: 2.0,       // Damage multiplier for Soul Rupture explosion damage inside domain (1.50 = +50% damage)
+    ruptureDamageMultiplier: 5.0,       // Damage multiplier for Soul Rupture explosion damage inside domain (1.50 = +50% damage)
     anyDistanceBasicAttack: true,       // Inside domain, Idle Transfiguration basic attack triggers at ANY distance (Sure-Hit domain effect)
     punchRangeMultiplier: 99999,        // Reach multiplier inside domain (99999 = unlimited reach across entire screen)
     domainRangeBoost: 200,              // Displayed attack reach boost inside domain (+200px reach)
@@ -238,7 +238,7 @@ export const mahitoConfig = {
     soulDetonateVolume: 1.8,
 
     farewellVoiceline: 'Assets/Sound Effects/Skills/mahito-farewell-voiceline.mp3',
-    farewellVoicelineVolume: 2.2,
+    farewellVoicelineVolume: 3.2,
     farewellVoicelineChance: 0.10, // Occasional trigger on Soul Disfigurement paralysis
 
     bodyExplode: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
@@ -248,8 +248,9 @@ export const mahitoConfig = {
     domainChannelSound: 'Assets/Sound Effects/Skills/mahito-domainchanneling-voiceline.mp3',
     domainChannelVolume: 3.5,
     domainDeploySound: 'Assets/Sound Effects/Skills/mahito-domaindeploy-voiceline.mp3',
+    domainDeployVolume: 3.5,
     domainDeployAltSound: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
-    domainDeployVolume: 3.0,
+    domainDeployAltVolume: 1.0,
     domainExecuteSound: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
     domainExecuteVolume: 3.5,
 
@@ -265,11 +266,11 @@ export const mahitoConfig = {
     // Passive Dash & Skill Voicelines
     dashVoiceline: 'Assets/Sound Effects/Skills/mahito-dash-voiceline.mp3',
     dashVoicelineVolume: 2.0,
-    dashVoicelineChance: 0.30, // Occasional trigger on passive dash
+    dashVoicelineChance: 0.05, // Rare/infrequent trigger on passive dash (15%)
 
     skillVoiceline: 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3',
     skillVoicelineVolume: 2.2,
-    skillVoicelineChance: 0.05, // 25% chance to play on skill 2, 3, or 4
+    skillVoicelineChance: 0.20, // 20% chance to play on skill 2, 3, or 4
 
     // Minion Summoning & Explosions
     minionsThrowVoiceline: 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3',

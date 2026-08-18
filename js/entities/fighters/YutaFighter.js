@@ -1390,7 +1390,9 @@ export class YutaFighter extends Fighter {
       const totalDamageIn3s = this.damageWindow.reduce((sum, d) => sum + d.amount, 0);
       const rctDamageThreshold = this.maxHp * 0.20; // 20% of max HP taken within 3 seconds
 
-      if (totalDamageIn3s >= rctDamageThreshold && (this.rctCooldown || 0) <= 0 && this.rctRevivalTimer <= 0) {
+      // Only trigger non-fatal RCT revival if the damage would NOT be lethal (lethal damage goes to super.takeDamage to trigger death cleanly!)
+      const isLethal = (this.hp - amount) <= 0;
+      if (!isLethal && totalDamageIn3s >= rctDamageThreshold && (this.rctCooldown || 0) <= 0 && this.rctRevivalTimer <= 0) {
         const duration = CONFIG.yuta.rctRevivalDuration || 150;
         this.rctRevivalTimer = duration;
         this.invincibilityTimer = duration;
@@ -1640,11 +1642,12 @@ export class YutaFighter extends Fighter {
     if (!this.canPerformBasicAttack()) return false;
     if (this.isChannelingDomain || this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer || 0) > 0 || this.isSummoningRika()) return;
 
-    // Check if an enemy is in melee range
+    // Check if an enemy or clone is in melee range
     let enemyInMelee = false;
+    let closestEnemy = null;
+    let closestDist = Infinity;
     const range = CONFIG.yuta.meleeRange || 95;
-    const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+    const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
 
     const allTargets = [
       ...(state.fighters || []),
@@ -1656,10 +1659,10 @@ export class YutaFighter extends Fighter {
       if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isRika || enemy.owner === this || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
 
       if (enemy.owner) {
-        const ownerTeam = state.getFighterTeam(state.fighters.indexOf(enemy.owner));
+        const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
         if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
       } else {
-        const enemyTeam = state.getFighterTeam(state.fighters.indexOf(enemy));
+        const enemyTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy)) : enemy.team;
         if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
       }
 
@@ -1667,22 +1670,15 @@ export class YutaFighter extends Fighter {
       const dy = enemy.y - this.y;
       const dist = Math.hypot(dx, dy);
 
-      if (dist <= range + this.r + (enemy.r || 20)) {
-        if (dist <= this.r + (enemy.r || 20) + 25) {
-          enemyInMelee = true;
-          break;
-        }
-        const enemyAngle = Math.atan2(dy, dx);
-        const angleDiff = Math.abs(Math.atan2(Math.sin(enemyAngle - this.gunAngle), Math.cos(enemyAngle - this.gunAngle)));
-
-        if (angleDiff <= arc / 2) {
-          enemyInMelee = true;
-          break;
-        }
+      if (dist <= range + this.r + (enemy.r || 20) && dist < closestDist) {
+        closestDist = dist;
+        closestEnemy = enemy;
+        enemyInMelee = true;
       }
     }
 
-    if (enemyInMelee) {
+    if (enemyInMelee && closestEnemy) {
+      this.aim(closestEnemy);
       if (this.meleeCooldown <= 0) {
         this.executeKatanaMelee(this.gunAngle);
       }
@@ -1691,6 +1687,27 @@ export class YutaFighter extends Fighter {
 
     // Ranged attack (Copied Technique)
     if (this.techniqueCooldown <= 0) {
+      let closestRanged = null;
+      let closestRangedDist = Infinity;
+      for (let i = 0; i < allTargets.length; i++) {
+        const enemy = allTargets[i];
+        if (!enemy || enemy.hp <= 0 || enemy === this || enemy.invincibilityTimer > 0 || enemy.isRika || enemy.owner === this || (enemy.vanishTimer && enemy.vanishTimer > 0)) continue;
+        if (enemy.owner) {
+          const ownerTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy.owner)) : enemy.owner.team;
+          if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+        } else {
+          const enemyTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(enemy)) : enemy.team;
+          if (myTeam !== null && enemyTeam !== null && myTeam === enemyTeam) continue;
+        }
+        const dist = Math.hypot(enemy.x - this.x, enemy.y - this.y);
+        if (dist < closestRangedDist) {
+          closestRangedDist = dist;
+          closestRanged = enemy;
+        }
+      }
+      if (closestRanged) {
+        this.aim(closestRanged);
+      }
       this.targetAngle = this.gunAngle;
       executeCopiedTechnique(this, this.gunAngle);
       this.techniqueCooldown = this.cooldown;
@@ -1801,6 +1818,46 @@ export class YutaFighter extends Fighter {
       this.isChannelingThinIceBreaker = true;
       this.thinIceBreakerChargeTimer = currentIceCharge;
     }
+  }
+
+  onDeath() {
+    this._stopBeamAudio();
+    this.isFiringPureLoveBeam = false;
+    this.pureLoveBeamActiveTimer = 0;
+    this.isChannelingPureLoveBeam = false;
+    this.pureLoveBeamChargeTimer = 0;
+    this.rikaEmergingForBeamTimer = 0;
+    this.rikaCallTimer = 0;
+    this.isChannelingDomain = false;
+    this.domainChargeTimer = 0;
+    this.isChannelingThinIceBreaker = false;
+    this.thinIceBreakerChargeTimer = 0;
+
+    // Immediately extinguish and remove active Pure Love Beam projectile from projectileSystem
+    if (typeof projectileSystem !== 'undefined' && projectileSystem.projectiles) {
+      const myIdx = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+      for (let i = projectileSystem.projectiles.length - 1; i >= 0; i--) {
+        const p = projectileSystem.projectiles[i];
+        if (p && (p.visual === 'yuta_pure_love_beam' || p.behaviorType === 'yuta_pure_love_beam') && (p.owner === myIdx || p.owner === undefined)) {
+          projectileSystem.projectiles.splice(i, 1);
+        }
+      }
+    }
+
+    // Immediately despawn Rika cleanly
+    if (this.rika) {
+      this.rika.active = false;
+      this.rika.hp = 0;
+      this.rika.isSacrificingForBeam = false;
+      this.rika.isDying = false;
+      this.rika.disappearing = false;
+      if (typeof state !== 'undefined' && state.illusions) {
+        const idx = state.illusions.indexOf(this.rika);
+        if (idx >= 0) state.illusions.splice(idx, 1);
+      }
+    }
+
+    super.onDeath();
   }
 
   _pauseBeamAudio() {

@@ -163,19 +163,19 @@ function loadMahitoDomainImage() {
 }
 
 /**
- * Draws Mahito's Domain Expansion: Self-Embodiment of Perfection.
+ * Draws Mahito's Domain Expansion: Self-Embodiment of Perfection background.
  * Overlays the entire screen with mahitos-de.png at reduced opacity over a dark purple dim effect.
  */
-export function drawMahitoDomainOverlay(fighter) {
-  if (typeof state === 'undefined' || !state || !state.canvas || !state.ctx) return;
-  const canvas = state.canvas;
-  const ctx = state.ctx;
+export function renderMahitoDomainBackground(fighter, ctx, targetCanvas = null) {
+  if (typeof state === 'undefined' || !state || !ctx) return;
+  const canvas = targetCanvas || state.canvas;
+  if (!canvas) return;
 
   if (!mahitoDomainImg && !mahitoDomainImgLoading) {
     loadMahitoDomainImage();
   }
 
-  const isActive = fighter.domainActive;
+  const isActive = Boolean(fighter && fighter.domainActive);
 
   if (isActive) {
     currentMahitoDomainOpacity = 1.0; // Snap in immediately when active after channeling
@@ -187,7 +187,6 @@ export function drawMahitoDomainOverlay(fighter) {
   const op = currentMahitoDomainOpacity;
 
   ctx.save();
-  ctx.setTransform(1, 0, 0, 1, 0, 0); // Absolute screen space
 
   // 1. Dark Purple Dim Effect
   const cx = canvas.width / 2;
@@ -224,8 +223,7 @@ export function drawMahitoDomainOverlay(fighter) {
     // Decrease opacity so fighters, spells, and arena remain clearly visible
     ctx.globalAlpha = op * 0.45;
 
-    // Draw the image to fit the arena dimensions exactly so that the flat cut-off edges
-    // of the PNG align perfectly with (and are hidden by) the arena walls.
+    // Draw the image to fit the arena dimensions exactly
     ctx.drawImage(mahitoDomainImg, arena.x, arena.y, arena.width, arena.height);
     ctx.restore();
   }
@@ -236,5 +234,12 @@ export function drawMahitoDomainOverlay(fighter) {
   ctx.restore();
 
   state.globalDimEdgeColor = `rgba(18, 5, 26, ${op * 0.95})`;
+}
+
+export function drawMahitoDomainOverlay(fighter) {
+  // Legacy fallback if WebGL is disabled
+  if (!state.pixiApp || !state.pixiLayers?.environment) {
+    renderMahitoDomainBackground(fighter, state.ctx);
+  }
 }
 

@@ -83,16 +83,30 @@ export class ParticleSystem {
     return state.qualityLevel || 1.0;
   }
 
+  static isStandOffMode() {
+    return Boolean(
+      typeof state !== 'undefined' && state.mode && (
+        state.mode === 'Stand Off' ||
+        state.mode === '1v2 Stand Off' ||
+        state.mode === 'StandOff' ||
+        (typeof state.mode === 'string' && state.mode.toLowerCase().includes('stand off'))
+      )
+    );
+  }
+
   static spawn(x, y, count = 8, type = 'crimson', overrideProps = {}) {
     if (!state.sparkEffects) state.sparkEffects = [];
 
-    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+    const isStandOff = this.isStandOffMode();
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
     const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
     const isDomainClash = state && state.fighters && (state.fighters.filter(f => f && f.domainActive).length > 1);
     
     const dynamicQuality = this.getDynamicQuality(isDomainClash);
-    const MAX_PARTICLES = isDomainClash ? 30 : is1v2 ? 45 : Math.floor((isMulti ? 100 : 200) * dynamicQuality);
-    const adjustedCount = Math.max(1, Math.floor(count * (isDomainClash ? 0.3 : is1v2 ? 0.45 * dynamicQuality : dynamicQuality)));
+    // Stand Off mode has high-frequency clashes across 2000-2500 HP: limit max active particles to prevent FPS drop
+    const MAX_PARTICLES = isDomainClash ? 25 : isStandOff ? 40 : is1v2 ? 45 : Math.floor((isMulti ? 80 : 160) * dynamicQuality);
+    const countScale = isDomainClash ? 0.30 : isStandOff ? 0.35 : is1v2 ? 0.45 : isMulti ? 0.60 : 1.0;
+    const adjustedCount = Math.max(1, Math.floor(count * countScale * dynamicQuality));
 
     const generator = ParticleRegistry[type] || ParticleRegistry['default'];
 
@@ -132,7 +146,7 @@ export class ParticleSystem {
       
       spark.size = config.size !== undefined ? config.size : 2;
       spark.life = config.life !== undefined ? config.life : 1.0;
-      spark.decay = config.decay !== undefined ? config.decay : 0.02;
+      spark.decay = isStandOff ? Math.max(config.decay || 0.02, 0.035 + Math.random() * 0.02) : (config.decay !== undefined ? config.decay : 0.02);
       spark.friction = config.friction !== undefined ? config.friction : 0.95;
       spark.type = config.type || type;
       spark.color = config.color || '#ff0000';

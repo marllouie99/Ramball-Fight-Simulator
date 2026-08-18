@@ -54,7 +54,6 @@ export function triggerHudHealBubble(hpBarElement, healAmount) {
   const bubble = document.createElement('div');
   bubble.className = 'hud-heal-bubble';
   bubble.textContent = `+${Math.round(healAmount)}`;
-  console.log('[HUD Bubble DOM Debug] Created DOM element with text:', bubble.textContent);
   hpBarElement.appendChild(bubble);
   setTimeout(() => {
     if (bubble.parentNode) {
@@ -1249,12 +1248,13 @@ function updateHealthHud() {
         if (!fighter) return;
 
         if (fighter._lastHealAmount && fighter._lastHealAmount > 0 && m.bar) {
-          console.log(`[HUD Manager Team Debug] ${fighter.name} triggering heal bubble with value:`, fighter._lastHealAmount);
           triggerHudHealBubble(m.bar, fighter._lastHealAmount);
           fighter._lastHealAmount = 0;
         }
 
-        const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
+        const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
+        const maxHp = fighter._originalMaxHp || fighter.maxHp;
+        const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
         const glow = getGlowStyles(fighter);
@@ -1272,7 +1272,7 @@ function updateHealthHud() {
           m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
-        const hpText = `${Math.floor(Math.min(Number(fighter.maxHp), Math.max(0, Number(fighter.hp) || 0)))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
+        const hpText = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
         m.text.textContent = hpText;
 
         // Skill Bars Update for Team Member
@@ -1353,12 +1353,13 @@ function updateHealthHud() {
       if (!cachedCard) return;
 
       if (fighter._lastHealAmount && fighter._lastHealAmount > 0 && cachedCard.hpBar) {
-        console.log(`[HUD Manager Solo Debug] ${fighter.name} triggering heal bubble with value:`, fighter._lastHealAmount);
         triggerHudHealBubble(cachedCard.hpBar, fighter._lastHealAmount);
         fighter._lastHealAmount = 0;
       }
 
-      const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
+      const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
+      const maxHp = fighter._originalMaxHp || fighter.maxHp;
+      const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
       const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
       const glow = getGlowStyles(fighter);
@@ -1379,7 +1380,7 @@ function updateHealthHud() {
       }
 
       if (cachedCard.hpBarText) {
-        const metaValue = `${Math.floor(Math.min(Number(fighter.maxHp), Math.max(0, Number(fighter.hp) || 0)))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`;
+        const metaValue = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
         cachedCard.hpBarText.textContent = metaValue;
       }
 

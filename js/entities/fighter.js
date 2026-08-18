@@ -8,7 +8,7 @@ import { projectileSystem } from '../systems/projectileSystem.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSound } from '../soundEffects/basicAttackSounds.js';
 import { spawnDeathShatter } from '../graphics/particles/deathShatterEffect.js';
-import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
+import { spawnBloodEffect, spawnFatalBloodSplash } from '../graphics/particles/bloodEffect.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { getAnnouncerSound } from '../soundEffects/announcerSounds.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
@@ -18,7 +18,7 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
 import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive } from '../core/state.js';
-import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../graphics/particles/sparkEffect.js';
+import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahitoSoulExplosion, spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
@@ -281,11 +281,10 @@ export class Fighter {
     return this.statusEffects.isSilenced();
   }
 
-  /** Returns true if this fighter is affected by Mahito's Soul Disfigurement or Soul Rupture debuffs. */
+  /** Returns true if this fighter is actively paralyzed by Mahito's Soul Disfigurement rupture. */
   isAffectedBySoulDisfigurement() {
-    const hasStacks = (this._soulDisfigurementStacks || 0) > 0 && (this._soulDisfigurementTimer || 0) > 0;
     const isParalyzedBySoul = !!this.isParalyzedByMahito || ((this.paralyzeTimer || 0) > 0 && (this._soulDisfigurementStacks || 0) > 0);
-    return hasStacks || isParalyzedBySoul;
+    return isParalyzedBySoul;
   }
 
   /**
@@ -451,6 +450,9 @@ export class Fighter {
       }
     }
     if (this.paralyzeTimer > 0) {
+      if (this.isParalyzedByMahito && this.paralyzeTimer % 3 === 0 && typeof spawnMahitoSoulBubbles === 'function') {
+        spawnMahitoSoulBubbles(this.x, this.y, 2);
+      }
       if (this.paralyzeTimer === 1 && this.isParalyzedByMahito) {
         triggerMahitoParalyzeExplosion(this);
       }
@@ -545,8 +547,29 @@ export class Fighter {
 
   onDeath() {
     this.interruptAttacks(true);
-    // Default death effect
-    spawnDeathShatter(this);
+    this.hitFlashTimer = 0; // Clear residual white hit-flash so corpses don't render white
+
+    // If the fighter is currently building up in Mahito's Soul Disfigurement paralysis, defer death shatter and fatal blood splash until the soul rupture explosion detonates!
+    if (this.isParalyzedByMahito && (this.paralyzeTimer || 0) > 0) {
+      return;
+    }
+
+    // Check if Mahito's domain is active
+    const isMahitoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && f.domainActive);
+
+    // Fatal Blood Splash explosion! Splashes to death with visceral blood
+    if (typeof spawnFatalBloodSplash === 'function' && !this.isTurret) {
+      spawnFatalBloodSplash(this);
+    }
+
+    if (isMahitoDomainActive && typeof spawnMahitoSoulExplosion === 'function') {
+      spawnMahitoSoulExplosion(this.x, this.y, (this.r || 25) * 2.2);
+    }
+
+    // Death shatter shard explosion (body physically shatters into pieces)
+    if (typeof spawnDeathShatter === 'function' && !this.isTurret) {
+      spawnDeathShatter(this);
+    }
   }
 
   // Knockback is now applied directly to fighter's position, so physics engines of custom fighters can't interfere.
@@ -876,7 +899,6 @@ export class Fighter {
       const healAmount = Math.round(Math.abs(amount < 0 ? amount : (this.hp - prevHp)));
       if (healAmount > 0) {
         this._lastHealAmount = (this._lastHealAmount || 0) + healAmount;
-        console.log(`[Fighter Heal Debug] ${this.name} amount=${amount} prevHp=${prevHp} hp=${this.hp} healAmount=${healAmount} accumulated=${this._lastHealAmount}`);
       }
     }
 
@@ -967,121 +989,141 @@ export class Fighter {
         }
       };
 
-      // If the dying fighter is a Doppelganger or evading Mahito with surviving copies, don't end the round
+      // If the dying fighter is a Doppelganger or evading Mahito with surviving copies, or paralyzed in Soul Disfigurement, don't end the round yet
       const isThisDoppel = this.type === 'doppleganger' || this._def?.type === 'doppleganger' || this.characterId === 'doppleganger';
       const isThisMahitoEvading = (this.characterId === 'mahito' || this.type === 'mahito') && this.isEvading;
+      const isThisParalyzedBySoul = Boolean(this.isParalyzedByMahito && (this.paralyzeTimer || 0) > 0);
+
       if ((isThisDoppel && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) ||
-          (isThisMahitoEvading && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.isEvasionMinion && ill.hp > 0))) {
-        // Round continues
+          (isThisMahitoEvading && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.isEvasionMinion && ill.hp > 0)) ||
+          isThisParalyzedBySoul) {
+        // Round continues until explosion triggers!
         recordKill();
         return true;
       }
 
       recordKill();
 
-      // Only check for round/match transitions if we are still playing
-      if (state.gameState === 'playing') {
-        const aliveCount = state.fighters.filter((f) => f && _isEffectivelyAlive(f)).length;
-        // Use realAttacker (owner of the turret/illusion) to properly track scores and wins
-        const realAttackerIndex = state.fighters.indexOf(realAttacker);
-        const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
+      // Check for round/match transitions
+      this.checkRoundOrMatchEnd(realAttacker);
+    }
+    return true;
+  }
 
-        if (state.mode === '2v2' || state.mode === '1v2 Stand Off') {
-          // 2v2 & 1v2: check if a team is eliminated (including doppelganger illusions)
-          let team0Alive = false;
-          let team1Alive = false;
+  /**
+   * Evaluates whether all opponents/teams have been eliminated and triggers roundEnd or matchEnd.
+   * Delays round/match end if any enemy is currently shivering in Mahito's Soul Disfigurement build-up.
+   */
+  checkRoundOrMatchEnd(attacker = null) {
+    if (!state || state.gameState !== 'playing') return;
 
-          if (state.mode === '1v2 Stand Off') {
-            team0Alive = _isEffectivelyAlive(state.fighters[0]);
-            team1Alive = _isEffectivelyAlive(state.fighters[1]) || _isEffectivelyAlive(state.fighters[2]);
-          } else {
-            team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
-            team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
-          }
-          
-          if (!team0Alive || !team1Alive) {
-            // A team has been eliminated - round ends
-            const winningTeam = team0Alive ? 0 : 1;
-            state.teamScores[winningTeam]++;
+    // Helper: an entity is "in play" if alive, a doppelganger with copies, evading Mahito, or shivering in Soul Disfigurement
+    const _isEffectivelyAlive = (f) => {
+      if (!f || f.isTurret) return false;
+      if (f.isParalyzedByMahito && (f.paralyzeTimer || 0) > 0) return true;
+      if (f.hp > 0) return true;
+      const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
+      if (isDoppel) {
+        return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.hp > 0);
+      }
+      const isMahitoEvading = (f.characterId === 'mahito' || f.type === 'mahito') && f.isEvading;
+      if (isMahitoEvading) {
+        return state.illusions && state.illusions.some(ill => ill && ill.owner === f && ill.isEvasionMinion && ill.hp > 0);
+      }
+      return false;
+    };
 
-            const winnerFighter = state.fighters.find((f, idx) => f && _isEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam)
-              || state.fighters.find((f, idx) => f && state.getFighterTeam(idx) === winningTeam)
-              || state.fighters[0];
+    const aliveCount = state.fighters.filter((f) => f && _isEffectivelyAlive(f)).length;
+    const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
+    const realAttackerIndex = state.fighters.indexOf(realAttacker);
+    const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
 
-            state.roundWinner = winnerFighter;
-            state.roundEndTimer = 0;
+    if (state.mode === '2v2' || state.mode === '1v2 Stand Off') {
+      let team0Alive = false;
+      let team1Alive = false;
 
-            const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
-            const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
+      if (state.mode === '1v2 Stand Off') {
+        team0Alive = _isEffectivelyAlive(state.fighters[0]);
+        team1Alive = _isEffectivelyAlive(state.fighters[1]) || _isEffectivelyAlive(state.fighters[2]);
+      } else {
+        team0Alive = _isEffectivelyAlive(state.fighters[0]) || _isEffectivelyAlive(state.fighters[1]);
+        team1Alive = _isEffectivelyAlive(state.fighters[2]) || _isEffectivelyAlive(state.fighters[3]);
+      }
+      
+      if (!team0Alive || !team1Alive) {
+        const winningTeam = team0Alive ? 0 : 1;
+        state.teamScores[winningTeam]++;
 
-            // Stop all sounds when round ends, unless it is a match end (champion screen)
-            if (!isMatchEnd) {
-              stopAllSounds();
-              stopAllLoopingSounds();
-            }
+        const winnerFighter = state.fighters.find((f, idx) => f && _isEffectivelyAlive(f) && state.getFighterTeam(idx) === winningTeam)
+          || state.fighters.find((f, idx) => f && state.getFighterTeam(idx) === winningTeam)
+          || state.fighters[0];
 
-            if (isMatchEnd) {
-              state.matchWinner = winnerFighter;
-              state.gameState = 'matchEnd';
-            } else {
-              state.gameState = 'roundEnd';
-            }
-          }
-        } else if (state.mode !== 'FFA' && roundEnds) {
-          // Identify the actual surviving opponent for 1v1 / Stand Off modes
-          const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
-          const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
-          const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
+        state.roundWinner = winnerFighter;
+        state.roundEndTimer = 0;
 
-          if (winnerIndex >= 0) {
-            state.scores[winnerIndex]++;
-          }
-          state.roundWinner = winnerFighter;
-          state.roundEndTimer = 0;
+        const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
+        const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
 
-          const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
-          const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
-          const isMatchEnd = winnerIndex >= 0 && state.scores[winnerIndex] >= winThreshold;
+        if (!isMatchEnd) {
+          stopAllSounds();
+          stopAllLoopingSounds();
+        }
 
-          // Stop all sounds when round ends, unless it is a match end (champion screen)
-          if (!isMatchEnd) {
-            stopAllSounds();
-            stopAllLoopingSounds();
-          }
-
-          if (isMatchEnd && winnerFighter) {
-            // Record win/loss for leaderboard (1v1 mode only) when they become champion
-            if (state.mode === GAME_MODES.ONE_VS_ONE && winnerFighter) {
-              const winnerFighterIndex = typeof winnerFighter.fighterIndex === 'number' ? winnerFighter.fighterIndex : winnerIndex;
-              const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
-              const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'
-                ? state.fighters[loserIndex].fighterIndex
-                : loserIndex;
-              recordWin(winnerFighterIndex);
-              recordLoss(loserFighterIndex);
-            }
-
-            state.matchWinner = winnerFighter;
-            state.gameState = 'matchEnd';
-          } else {
-            state.gameState = 'roundEnd';
-          }
-        } else if (state.mode === 'FFA' && roundEnds) {
-          state.roundWinner = realAttacker;
-          state.roundEndTimer = 0;
-          state.ffaMatchComplete = true; // Signals main.js to show leaderboards
-
-          // Stop all sounds when round ends, unless it is a match end (champion screen)
-          if (!state.ffaMatchComplete) {
-            stopAllSounds();
-            stopAllLoopingSounds();
-          }
-
+        if (isMatchEnd) {
+          state.matchWinner = winnerFighter;
+          state.gameState = 'matchEnd';
+        } else {
           state.gameState = 'roundEnd';
         }
       }
+    } else if (state.mode !== 'FFA' && roundEnds) {
+      const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
+      const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
+      const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
+
+      if (winnerIndex >= 0) {
+        state.scores[winnerIndex]++;
+      }
+      state.roundWinner = winnerFighter;
+      state.roundEndTimer = 0;
+
+      const modeRounds = MODE_SETTINGS[state.mode]?.rounds || CONFIG.rounds.max;
+      const winThreshold = modeRounds === 1 ? 1 : Math.ceil(CONFIG.rounds.max / 2);
+      const isMatchEnd = winnerIndex >= 0 && state.scores[winnerIndex] >= winThreshold;
+
+      if (!isMatchEnd) {
+        stopAllSounds();
+        stopAllLoopingSounds();
+      }
+
+      if (isMatchEnd && winnerFighter) {
+        if (state.mode === GAME_MODES.ONE_VS_ONE && winnerFighter) {
+          const winnerFighterIndex = typeof winnerFighter.fighterIndex === 'number' ? winnerFighter.fighterIndex : winnerIndex;
+          const loserIndex = winnerFighterIndex === 0 ? 1 : 0;
+          const loserFighterIndex = typeof state.fighters[loserIndex]?.fighterIndex === 'number'
+            ? state.fighters[loserIndex].fighterIndex
+            : loserIndex;
+          recordWin(winnerFighterIndex);
+          recordLoss(loserFighterIndex);
+        }
+
+        state.matchWinner = winnerFighter;
+        state.gameState = 'matchEnd';
+      } else {
+        state.gameState = 'roundEnd';
+      }
+    } else if (state.mode === 'FFA' && roundEnds) {
+      state.roundWinner = realAttacker;
+      state.roundEndTimer = 0;
+      state.ffaMatchComplete = true;
+
+      if (!state.ffaMatchComplete) {
+        stopAllSounds();
+        stopAllLoopingSounds();
+      }
+
+      state.gameState = 'roundEnd';
     }
-    return true;
   }
 
   /** Heals the fighter by a given amount and triggers the green health bar edge glow effect. */

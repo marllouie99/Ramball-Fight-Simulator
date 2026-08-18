@@ -14,8 +14,10 @@ import { genosConfig } from '../configs/characters/genosConfig.js?v=4';
 import { ichigoConfig } from '../configs/characters/ichigoConfig.js?v=4';
 import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
+import { bloodConfig } from '../configs/bloodConfig.js';
 
 export const CONFIG = {
+  blood: bloodConfig,
   saitama: saitamaConfig,
   genos: genosConfig,
   mahito: mahitoConfig,

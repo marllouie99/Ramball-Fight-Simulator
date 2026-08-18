@@ -3,8 +3,9 @@ import { CONFIG } from '../../core/config.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
 import { drawSketchyCircle } from './fighterRenderer.js';
-import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawMinionHealthBar } from '../statusEffects.js';
+import { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter, drawEmbeddedMahitoSpikes, drawMahitoFleshBubblyDeformLocal, drawParalyzeEffect, drawMinionHealthBar } from '../statusEffects.js';
 import { drawMahitoSkin } from '../fighters/mahitoSkin.js';
+import { drawCursedRocks } from '../fighters/todoSkin.js';
 
 let _sortedFightersBuffer = [];
 
@@ -230,7 +231,8 @@ export function drawFighters() {
   _sortedFightersBuffer.forEach((item) => {
     const fighter = item.f;
     const fi = item.i;
-    if (!fighter || fighter.hp <= 0 || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
+    const isParalyzedInSoulDisfigurement = Boolean(fighter && fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0);
+    if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement) || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
 
     updateEntityVisualScale(fighter);
 
@@ -247,12 +249,12 @@ export function drawFighters() {
     // Draw underfoot team indicator ring base
     drawTeamRing(fighter, fi, false);
 
-    // Shivering animation when paralyzed by Mahito (rapid soul reshaping vibration)
-    const isParalyzedByMahito = Boolean(fighter.isParalyzedByMahito || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0 && fighter.isParalyzedByMahito));
+    // Shivering animation when paralyzed by Mahito (violent soul reshaping vibration)
+    const isParalyzedByMahito = Boolean(fighter.isParalyzedByMahito || ((fighter.paralyzeTimer || 0) > 0 && fighter.isParalyzedByMahito));
     let shiverX = 0, shiverY = 0;
     if (isParalyzedByMahito) {
-      const remainingProgress = Math.min(1.0, (fighter.paralyzeTimer || 45) / 45);
-      const tremorAmt = 2.0 + remainingProgress * 2.2;
+      const progress = 1.0 - Math.min(1.0, Math.max(0.0, (fighter.paralyzeTimer || 0) / 45));
+      const tremorAmt = 4.5 + progress * 9.5; // Vibrates violently from ±4.5px up to ±14px before detonation
       shiverX = (Math.random() - 0.5) * tremorAmt;
       shiverY = (Math.random() - 0.5) * tremorAmt;
     }
@@ -296,6 +298,15 @@ export function drawFighters() {
     // Draw crisp team indicator overlay ring AFTER fighter & CE aura draw, so CE aura never hides team indicator
     drawTeamRing(fighter, fi, true);
 
+    // Draw Mahito Paralyze Bubbly Flesh Deform & Orbiting Rings directly on top of fighter
+    if (isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
+      ctx.save();
+      ctx.translate(fighter.x + shiverX, (fighter.y - (fighter.z || 0)) + shiverY);
+      drawMahitoFleshBubblyDeformLocal(ctx, fighter.r || 25, fighter.paralyzeTimer, '#A855F7', fighter);
+      drawParalyzeEffect(ctx, fighter.r || 25, true, fighter.paralyzeTimer, '#A855F7', fighter);
+      ctx.restore();
+    }
+
     // Embedded Mahito Bone Spikes attached to body
     if (fighter._embeddedMahitoSpikes && fighter._embeddedMahitoSpikes.length > 0) {
       ctx.save();
@@ -313,6 +324,16 @@ export function drawFighters() {
       ctx.restore();
     }
   });
+
+  // Render in-flight cursed rocks from any defeated Todo fighters
+  if (state.fighters) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (f && f.hp <= 0 && f.cursedRocks && f.cursedRocks.length > 0 && typeof drawCursedRocks === 'function') {
+        drawCursedRocks(ctx, f);
+      }
+    }
+  }
 
   // Draw time-stop visual effect (Cronos passive/sphere effect or Gojo Infinity freeze)
   const allStasisEntities = [
@@ -336,7 +357,7 @@ export function drawFighters() {
     if (typeof state !== 'undefined') {
       if (state.domainActive || state.activeDomain) gojoDomainActive = true;
       if (!gojoDomainActive && state.fighters) {
-        gojoDomainActive = state.fighters.some(f => f && f.domainActive);
+        gojoDomainActive = state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive);
       }
     }
 

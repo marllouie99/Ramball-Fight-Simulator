@@ -585,71 +585,71 @@ export function drawVoidMarkEffect(ctx, baseRadius) {
  * Boils protrude from the EDGE of the body circle outward, starting as tiny bumps
  * and slowly growing grotesquely large before detonation.
  */
-export function drawMahitoFleshBubblyDeformLocal(ctx, r, paralyzeTimer = 45, color = '#A855F7', entity = null) {
+export function drawMahitoFleshBubblyDeformLocal(ctx, r = 25, paralyzeTimer = 45, color = '#A855F7', entity = null) {
   // progress: 0 at start of paralysis -> 1 at detonation
   const maxDuration = 45;
   const progress = 1.0 - Math.max(0.0, Math.min(1.0, (paralyzeTimer || maxDuration) / maxDuration));
-  if (progress <= 0.005) return;
 
   // Clear seeds when paralysis expires
   if (paralyzeTimer <= 2 && entity) {
     entity._mahitoFleshDeformSeeds = null;
   }
 
-  // Generate persistent random mutation seeds per entity
+  // Generate persistent random mutation seeds per entity (6 to 9 boils)
   let seeds = null;
   if (entity) {
-    if (!entity._mahitoFleshDeformSeeds) {
+    if (!entity._mahitoFleshDeformSeeds || entity._mahitoFleshDeformSeeds.length < 6) {
       entity._mahitoFleshDeformSeeds = [];
-      const count = 4 + Math.floor(Math.random() * 4); // 4 to 7 random boils
+      const count = 6 + Math.floor(Math.random() * 4); // 6 to 9 random boils
+      const boilColors = ['#D946EF', '#A855F7', '#C026D3', '#9333EA', '#E879F9'];
       for (let i = 0; i < count; i++) {
         entity._mahitoFleshDeformSeeds.push({
-          angle: Math.random() * Math.PI * 2,            // random position around the body edge
-          maxSizeMult: 0.30 + Math.random() * 0.55,      // max boil radius relative to body r (0.30 to 0.85)
+          angle: (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.45, // evenly distributed around body edge
+          maxSizeMult: 0.40 + Math.random() * 0.65,      // max boil radius relative to body r (0.40 to 1.05)
           phase: Math.random() * Math.PI * 2,             // animation wobble offset
-          speed: 1.0 + Math.random() * 1.8,               // pulsation speed
-          edgeOffset: 0.75 + Math.random() * 0.25         // how far along the edge (0.75 to 1.0 of r)
+          speed: 1.2 + Math.random() * 2.0,               // pulsation speed
+          edgeOffset: 0.70 + Math.random() * 0.30,        // how far along the edge
+          color: boilColors[i % boilColors.length]
         });
       }
     }
     seeds = entity._mahitoFleshDeformSeeds;
   } else {
-    // Fallback static seeds for previews
+    // Fallback static seeds
     seeds = [
-      { angle: 2.3,  maxSizeMult: 0.65, phase: 0,   speed: 1.5, edgeOffset: 0.85 },
-      { angle: -0.8, maxSizeMult: 0.80, phase: 1.8, speed: 2.0, edgeOffset: 0.90 },
-      { angle: 3.8,  maxSizeMult: 0.45, phase: 3.5, speed: 1.2, edgeOffset: 0.80 },
-      { angle: 0.9,  maxSizeMult: 0.35, phase: 5.2, speed: 2.5, edgeOffset: 0.95 },
-      { angle: 5.1,  maxSizeMult: 0.55, phase: 2.0, speed: 1.8, edgeOffset: 0.88 }
+      { angle: 2.3,  maxSizeMult: 0.75, phase: 0,   speed: 1.5, edgeOffset: 0.85, color: '#D946EF' },
+      { angle: -0.8, maxSizeMult: 0.90, phase: 1.8, speed: 2.0, edgeOffset: 0.90, color: '#A855F7' },
+      { angle: 3.8,  maxSizeMult: 0.65, phase: 3.5, speed: 1.2, edgeOffset: 0.80, color: '#C026D3' },
+      { angle: 0.9,  maxSizeMult: 0.55, phase: 5.2, speed: 2.5, edgeOffset: 0.95, color: '#9333EA' },
+      { angle: 5.1,  maxSizeMult: 0.70, phase: 2.0, speed: 1.8, edgeOffset: 0.88, color: '#E879F9' },
+      { angle: 1.6,  maxSizeMult: 0.60, phase: 4.1, speed: 1.6, edgeOffset: 0.82, color: '#D946EF' }
     ];
   }
 
   ctx.save();
 
-  const now = Date.now() * 0.006;
+  const now = Date.now() * 0.007;
 
-  // Slow growth curve: starts very small, accelerates near the end (easeInQuad)
-  // progress^1.6 makes them tiny for most of the duration then balloon rapidly near detonation
-  const growthCurve = Math.pow(progress, 1.6);
+  // Immediate swelling curve: starts visibly at 35% size and balloons rapidly to full size
+  const growthCurve = 0.35 + 0.65 * Math.pow(progress, 1.1);
 
   for (let i = 0; i < seeds.length; i++) {
     const seed = seeds[i];
 
-    // Subtle pulsating wobble that intensifies as detonation approaches
-    const wobbleIntensity = 0.05 + progress * 0.15;
+    // Pulsating wobble that intensifies as detonation approaches
+    const wobbleIntensity = 0.10 + progress * 0.25;
     const wave = Math.sin(now * seed.speed + seed.phase) * wobbleIntensity;
 
-    // Boil radius: starts near 0, slowly grows to full maxSizeMult * r
-    const boilR = Math.max(1.5, r * seed.maxSizeMult * growthCurve * (1.0 + wave));
+    // Boil radius: starts noticeably and balloons to full size
+    const boilR = Math.max(2.5, r * seed.maxSizeMult * growthCurve * (1.0 + wave));
 
     // Position: on the EDGE of the body circle, protruding outward
-    // The boil center sits at the body rim so half protrudes outward
     const edgeDist = r * seed.edgeOffset;
     const bx = Math.cos(seed.angle) * edgeDist;
     const by = Math.sin(seed.angle) * edgeDist;
 
-    // Main boil body — vibrant cursed purple fill
-    ctx.fillStyle = '#A855F7';
+    // Outer Cursed Energy Glow
+    ctx.fillStyle = seed.color || '#A855F7';
     ctx.strokeStyle = '#3B0764';
     ctx.lineWidth = 1.8;
     ctx.beginPath();
@@ -657,17 +657,22 @@ export function drawMahitoFleshBubblyDeformLocal(ctx, r, paralyzeTimer = 45, col
     ctx.fill();
     ctx.stroke();
 
-    // Wet glare highlight (shifted toward upper-left for 3D depth)
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.40)';
+    // 3D Wet Glare Specular Highlight (upper-left)
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
     ctx.beginPath();
-    ctx.arc(bx - boilR * 0.28, by - boilR * 0.28, boilR * 0.22, 0, Math.PI * 2);
+    ctx.arc(bx - boilR * 0.28, by - boilR * 0.28, Math.max(1.0, boilR * 0.25), 0, Math.PI * 2);
     ctx.fill();
 
-    // Surgical stitch lines across larger swelling cysts
+    // Secondary specular rim
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.30)';
+    ctx.beginPath();
+    ctx.arc(bx + boilR * 0.20, by + boilR * 0.20, Math.max(0.8, boilR * 0.12), 0, Math.PI * 2);
+    ctx.fill();
+
+    // Surgical stitch lines across swelling cysts
     if (boilR > 5) {
-      ctx.strokeStyle = '#3B0764';
+      ctx.strokeStyle = '#181C26';
       ctx.lineWidth = 1.2;
-      // Stitch line perpendicular to the radial direction
       const cosA = Math.cos(seed.angle + Math.PI / 2);
       const sinA = Math.sin(seed.angle + Math.PI / 2);
       ctx.beginPath();
@@ -675,19 +680,19 @@ export function drawMahitoFleshBubblyDeformLocal(ctx, r, paralyzeTimer = 45, col
       ctx.lineTo(bx + cosA * boilR * 0.55, by + sinA * boilR * 0.55);
       ctx.stroke();
 
-      // Cross hatches along stitch
-      ctx.beginPath();
+      // Cross stitches along seam
       const numHatches = 3;
       for (let j = 0; j < numHatches; j++) {
         const t = -0.35 + (j / (numHatches - 1)) * 0.70;
         const hx = bx + cosA * boilR * 0.55 * t;
         const hy = by + sinA * boilR * 0.55 * t;
-        const px = -sinA * 3;
-        const py = cosA * 3;
+        const px = -sinA * 2.8;
+        const py = cosA * 2.8;
+        ctx.beginPath();
         ctx.moveTo(hx - px, hy - py);
         ctx.lineTo(hx + px, hy + py);
+        ctx.stroke();
       }
-      ctx.stroke();
     }
   }
 
@@ -788,7 +793,7 @@ export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTi
     ctx.stroke();
   }
 
-  if (isMahito) {
+  if (isMahito && entity && entity.characterId !== 'mahito' && entity.type !== 'mahito' && !entity.isEvasionMinion) {
     drawMahitoFleshBubblyDeformLocal(ctx, baseRadius, paralyzeTimer, color, entity);
   }
   

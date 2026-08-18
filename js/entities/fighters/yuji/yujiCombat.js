@@ -163,11 +163,14 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
           if (this.blackFlashTimer <= 0) {
             spawnFloatingText(target.x, target.y - target.r - 25, "BLACK FLASH", "#ff0000");
           }
+          const bfAudioCfg = CONFIG.blackFlash?.audio || {};
           const sound = getSkillSound(this.id, 'blackflash');
-          if (sound) {
-            audioSystem.playSFX(sound.src, sound.volume);
-            if (sound.src2) audioSystem.playSFX(sound.src2, sound.volume);
-          }
+          const bfVol = bfAudioCfg.volume ?? sound?.volume ?? 1.5;
+          const bfElecVol = bfAudioCfg.electricVolume ?? bfVol;
+          const bfSrc = bfAudioCfg.src || sound?.src || 'Assets/Sound Effects/Skills/blackflash1.mp3';
+          const bfSrc2 = bfAudioCfg.src2 || sound?.src2 || 'Assets/Sound Effects/SkillEffects/blackflash-electric.mp3';
+          if (bfSrc) audioSystem.playSFX(bfSrc, bfVol);
+          if (bfSrc2) audioSystem.playSFX(bfSrc2, bfElecVol);
           if (didDamage !== false) {
             if (typeof target.applySlow === 'function') {
               target.applySlow(

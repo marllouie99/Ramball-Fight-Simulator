@@ -850,7 +850,7 @@ class ProjectileSystem {
     const nearbyFighters = spatialGrid.getNearby(projectile.x, projectile.y, projectile.r * 2 + 100);
 
     for (const fighter of nearbyFighters) {
-      if (!fighter || fighter.hp <= 0 || fighter.isAmbushing || (fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0)) continue;
+      if (!fighter || fighter.isAmbushing || (fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0)) continue;
       const fi = (typeof fighter.fighterIndex === 'number') ? fighter.fighterIndex : fighters.indexOf(fighter);
       if (fi == null || fi === -1) continue;
 
@@ -859,6 +859,22 @@ class ProjectileSystem {
       if (areOnSameTeam(projectile.owner, fi)) continue;
       // Skip if this projectile has piercing and already hit this fighter
       if (projectile.hitFighters && projectile.hitFighters.has(fighter)) continue;
+
+      // Special handling for Sukuna's Fuga arrow:
+      // If the enemy is dead (e.g. killed by domain slashes), detonate immediately on impact with their body
+      const isDead = fighter.hp <= 0 || fighter.isDead;
+      if (isDead) {
+        if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
+          const hitRadius = fighter.r + projectile.r + 15;
+          const dx = fighter.x - projectile.x;
+          const dy = fighter.y - projectile.y;
+          if (dx * dx + dy * dy < hitRadius * hitRadius) {
+            this.triggerThermobaricExplosion(projectile.x, projectile.y, projectile.owner, projectile.damage);
+            return true;
+          }
+        }
+        continue;
+      }
 
       // ── Bounding-box culling: skip expensive Math.hypot when projectile is far ──
       const hitRadius = fighter.r + projectile.r;
@@ -1949,7 +1965,7 @@ class ProjectileSystem {
     // PERFORMANCE OPTIMIZATION: Hard limit on active projectiles
     // 2v2 and FFA can spawn a massive amount of particles (especially flames) leading to lag.
     if (this.projectiles.length > 0) {
-      const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+      const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
       // OPTIMIZED: Use dynamic limits instead of fixed values
       const maxProjectiles = this.maxActiveProjectiles;
 

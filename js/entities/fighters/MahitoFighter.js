@@ -431,6 +431,10 @@ export class MahitoFighter extends Fighter {
     // Update Domain Expansion (Channeling & Active Barrier)
     updateMahitoDomainExpansion(this);
     if (this.domainChargeTimer > 0) {
+      if (this._dashAfterimages) this._dashAfterimages.length = 0;
+      if (this.afterImages) this.afterImages.length = 0;
+      this.soulPhaseDashTimer = 0;
+      this.soulPhaseDashVector = null;
       this.punchAnimTimer = 0;
       this.fleshSurgeAnimTimer = 0;
       this.maceCannonAnimTimer = 0;
@@ -652,7 +656,7 @@ export class MahitoFighter extends Fighter {
     // Cooldown management & Claw Reversion animation
     if (this.punchAnimTimer > 0) {
       if (this.punchAnimTimer === 1) {
-        this.clawRevertTimer = 16; // Trigger shivering & boiling claw hide animation!
+        this.clawRevertTimer = this.domainActive ? 0 : 16; // Skip revert delay in domain for rapid continuous claw swings!
       }
       this.punchAnimTimer--;
     }
@@ -1013,13 +1017,17 @@ export class MahitoFighter extends Fighter {
     const splitMaxHp = Math.max(1, Math.round(((this._originalMaxHp || 2000) / cloneCount) * 100) / 100);
 
     this.hp = splitHp;
-    this.maxHp = this._originalMaxHp || 2000;
+    this.maxHp = splitMaxHp;
 
     const baseAngle = Math.random() * Math.PI * 2;
     this.vx = Math.cos(baseAngle) * launchSpeed;
     this.vy = Math.sin(baseAngle) * launchSpeed;
     this.gunAngle = baseAngle;
     this.angle = baseAngle;
+
+    // Exactly ONE clone (main body or one of the split copies) has Cursed Energy (CE) aura!
+    const chosenCeIndex = Math.floor(Math.random() * cloneCount); // 0 = main body, 1..numCopies = copy
+    this.hasCursedEnergyAura = (chosenCeIndex === 0);
 
     for (let i = 0; i < numCopies; i++) {
       const angle = baseAngle + (Math.PI * 2 / cloneCount) * (i + 1);
@@ -1038,6 +1046,7 @@ export class MahitoFighter extends Fighter {
         ownerIndex: ownerStateIdx,
         isIllusion: true,
         isEvasionMinion: true,
+        hasCursedEnergyAura: (chosenCeIndex === (i + 1)),
         isTransfiguredHuman: false,
         angle: angle,
         gunAngle: angle,
@@ -1058,7 +1067,8 @@ export class MahitoFighter extends Fighter {
         twinScissorAnimTimer: 0,
         swordCooldown: 9999,
         takeDamage(amount, attacker, opts = {}) {
-          if (this.isEvasionMinion && !opts?.bypassEvade) {
+          // Dodge chance ONLY applies while active in small clone state
+          if (this.isEvasionMinion && !this.isDying && !opts?.bypassEvade) {
             const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
             if (Math.random() < dodgeChance) {
               const now = Date.now();
@@ -1124,6 +1134,7 @@ export class MahitoFighter extends Fighter {
     delete this.chosenReconsolidationTarget;
     delete this.opacity;
     delete this.isChosenForReconsolidation;
+    delete this.hasCursedEnergyAura;
     this.r = this.originalRadius || 25;
     if (this._originalMaxHp) {
       this.maxHp = this._originalMaxHp;
@@ -1182,14 +1193,16 @@ export class MahitoFighter extends Fighter {
         this.aim(this._findClosestEnemy());
       }
 
-      // If Mahito's original body died but clones survived, revive him
+      // If Mahito's original body died but clones survived (or all survived), sum up all surviving HP and revive/heal
       if (totalSurvivingHp > 0) {
         this.isDead = false;
-        this.hp = Math.min(this.maxHp, totalSurvivingHp);
-        this._healthBarHealTimer = 16;
-        const healVal = Math.round(this.hp);
+        this.hp = Math.min(this.maxHp, Number(totalSurvivingHp.toFixed(1)));
+        this._healthBarHealTimer = 24;
+        const finalDisplayHp = Math.round(this.hp);
+        this._lastHealAmount = finalDisplayHp; // Trigger floating heal bubble on HUD bar!
+
         if (typeof spawnFloatingText === 'function') {
-          spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 15, `+${healVal}`, '#00FF66');
+          spawnFloatingText(this.x + (Math.random() - 0.5) * 16, (this.y - (this.z || 0)) - this.r - 18, `+${finalDisplayHp} HP`, '#00FF66');
         }
       } else {
         // All copies died - Mahito stays dead
@@ -1259,7 +1272,9 @@ export class MahitoFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    if (this.isEvading && !opts?.bypassEvade) {
+    // Dodge chance ONLY works while actively in small clone evasion state!
+    const isActivelyInCloneState = Boolean(this.isEvading && (this.evasionTimer || 0) > 0);
+    if (isActivelyInCloneState && !opts?.bypassEvade) {
       const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
       if (Math.random() < dodgeChance) {
         const now = Date.now();

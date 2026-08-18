@@ -10,46 +10,59 @@ import { GAME_MODES } from '../../core/modeConfig.js';
  * @param {Object} fighter - The fighter that died
  */
 export function spawnDeathShatter(fighter) {
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
   
   // OPTIMIZED: Apply quality level to death effect limits
   const qualityMultiplier = state.qualityLevel || 1.0;
   const MAX_DEATH_EFFECTS = Math.floor((isMulti ? 20 : 50) * qualityMultiplier);
   
   // OPTIMIZED: Reduce shard count based on quality level
-  const baseShardCount = isMulti ? 6 : 12;
-  const shardCount = Math.max(3, Math.floor(baseShardCount * qualityMultiplier));
-  const baseSpeed = 3;    // Base outward velocity
-  const color = fighter.color || '#ff4444';
+  const baseShardCount = isMulti ? 8 : 14;
+  const shardCount = Math.max(4, Math.floor(baseShardCount * qualityMultiplier));
+  const baseSpeed = 4.5;    // Outward explosive velocity
+  const isYuta = fighter.characterId === 'yuta' || fighter.type === 'yuta';
+  let primaryColor = fighter.color || '#ff4444';
+  if (isYuta) {
+    primaryColor = '#FFFFFF';
+  } else if (primaryColor === '#ffffff' || primaryColor === '#fff' || primaryColor === '#FFFFFF') {
+    primaryColor = fighter.secondaryColor || '#64748b';
+  }
+  const secondaryColor = isYuta ? '#1E293B' : (fighter.secondaryColor || '#881337');
   
   for (let i = 0; i < shardCount; i++) {
     // If we reached the global limit, remove the oldest death effect using swap-and-pop
     if (state.deathEffects.length >= MAX_DEATH_EFFECTS) {
-      // Swap-and-pop is O(1) instead of O(n) shift()
       state.deathEffects[0] = state.deathEffects[state.deathEffects.length - 1];
       state.deathEffects.pop();
     }
     
     // Random angle for each shard
     const angle = (Math.PI * 2 * i) / shardCount + (Math.random() - 0.5) * 0.5;
-    const speed = baseSpeed + Math.random() * 2;
+    const speed = baseSpeed + Math.random() * 4.0;
     
     // Random size for each shard
-    const size = fighter.r * (0.15 + Math.random() * 0.25);
+    const size = fighter.r * (0.18 + Math.random() * 0.28);
+    let shardColor;
+    if (isYuta) {
+      const roll = i % 3;
+      shardColor = (roll === 0) ? '#FFFFFF' : ((roll === 1) ? '#1E293B' : '#FF1493');
+    } else {
+      shardColor = i % 2 === 0 ? primaryColor : secondaryColor;
+    }
     
     state.deathEffects.push({
       x: fighter.x,
       y: fighter.y,
       vx: Math.cos(angle) * speed,
-      vy: Math.sin(angle) * speed,
+      vy: Math.sin(angle) * speed - (1.0 + Math.random() * 2.0), // Explosive vertical kick
       rotation: Math.random() * Math.PI * 2,
-      rotationSpeed: (Math.random() - 0.5) * 0.3,
+      rotationSpeed: (Math.random() - 0.5) * 0.45,
       size: size,
-      color: color,
+      color: shardColor,
       life: 1.0,           // 1.0 = full life, 0 = dead
       maxLife: 1.0,
-      decay: 0.02 + Math.random() * 0.01, // How fast it fades
-      gravity: 0.05,       // Slight downward pull
+      decay: 0.015 + Math.random() * 0.008, // Smooth fade-out
+      gravity: 0.12,       // Downward gravity pull to floor
     });
   }
 }

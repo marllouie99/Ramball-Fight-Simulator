@@ -67,40 +67,82 @@ function releaseBloodSprite(s) {
   bloodSpritePool.push(s);
 }
 
+export function isStandOffMode() {
+  return Boolean(
+    typeof state !== 'undefined' && state.mode && (
+      state.mode === 'Stand Off' ||
+      state.mode === '1v2 Stand Off' ||
+      state.mode === GAME_MODES.STAND_OFF ||
+      state.mode === GAME_MODES.STAND_OFF_1V2 ||
+      (typeof state.mode === 'string' && state.mode.toLowerCase().includes('stand off'))
+    )
+  );
+}
+
 /**
- * Spawns a blood effect at the fighter's position.
+ * Spawns a standard blood effect at the fighter's position upon taking damage.
  */
 export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
-  if (amount <= 0) return;
+  if (amount <= 0 || !fighter) return;
   if (!state.bloodEffects) state.bloodEffects = [];
+  const isStandOff = isStandOffMode();
   const isFFA = state && state.mode === GAME_MODES.FFA;
-  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
   const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+
+  const bloodCfg = (CONFIG && CONFIG.blood) || {};
+  const limitsCfg = bloodCfg.limits || {};
+  const hitCfg = bloodCfg.hit || {};
+  const physCfg = bloodCfg.physics || {};
+  const bloodPalette = bloodCfg.palette || [0xE60000, 0xDC2626, 0x990000, 0x800000, 0xCC0000, 0xB91C1C];
 
   const qualityMultiplier = state.qualityLevel || 1.0;
-  let MAX_BLOOD_PARTICLES = Math.floor((is1v2 ? 30 : isFFA ? 30 : isMulti ? 60 : 100) * qualityMultiplier);
+  const maxLimit = isStandOff
+    ? (limitsCfg.maxParticlesStandOff ?? 25)
+    : is1v2
+      ? (limitsCfg.maxParticles1v2 ?? 25)
+      : isFFA
+        ? (limitsCfg.maxParticlesFFA ?? 30)
+        : isMulti
+          ? (limitsCfg.maxParticlesMulti ?? 35)
+          : (limitsCfg.maxParticles1v1 ?? 40);
+  const MAX_BLOOD_PARTICLES = Math.floor(maxLimit * qualityMultiplier);
 
-  const baseParticleCount = Math.max(2, Math.floor(amount / (is1v2 ? 6 : isFFA ? 6 : 3)));
+  // Scaled down: standard punch hits spawn 1-2 droplets, heavy hits spawn up to maxDroplets
+  const divisor = hitCfg.damageDivisor ?? 12.0;
+  const minDrops = hitCfg.minDroplets ?? 1;
+  const maxDrops = hitCfg.maxDroplets ?? 3;
+  const baseParticleCount = Math.max(minDrops, Math.min(maxDrops, Math.floor(amount / divisor) || minDrops));
   const particleCount = Math.max(1, Math.floor(baseParticleCount * qualityMultiplier));
 
-  let color = fighter.color || '#e60000';
-  if (color === '#ff4d4d' || color === '#ff4444') color = '#e60000';
-  else if (color === '#4da3ff') color = '#0066ff';
-  else if (color === '#ffd700') color = '#ff9900';
-  else if (color === '#4dff4d') color = '#00cc00';
+  // Blood MUST be authentic crimson red / dark blood, never washed-out white
+  const fx = typeof fighter.x === 'number' ? fighter.x : 0;
+  const fy = typeof fighter.y === 'number' ? fighter.y : 0;
+  const fr = typeof fighter.r === 'number' ? fighter.r : 25;
 
-  const numericColor = parseColorToHexNum(color);
+  const baseDecay = isStandOff ? (physCfg.floorDecayRateStandOff ?? 0.014) : (physCfg.floorDecayRate1v1 ?? 0.010);
+  const decayRate = baseDecay + Math.random() * (baseDecay * 0.5);
+
+  const baseSpeed = hitCfg.baseSpeed ?? 4.0;
+  const speedVar = hitCfg.speedVariance ?? 8.0;
+  const spreadRad = (hitCfg.spreadAngle ?? 0.5) * Math.PI;
+  const minSize = hitCfg.minSize ?? 2.0;
+  const maxSize = hitCfg.maxSize ?? 3.4;
+  const upImpulse = hitCfg.upwardImpulse ?? 0.5;
+  const upImpulseVar = hitCfg.upwardImpulseVariance ?? 1.5;
 
   for (let i = 0; i < particleCount; i++) {
     let angle = Math.random() * Math.PI * 2;
-    const speed = 12 + Math.random() * 20;
+    const speed = baseSpeed + Math.random() * speedVar;
 
     if (damageAngle !== null) {
-      const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.6;
+      const spreadAngle = (Math.random() - 0.5) * spreadRad;
       angle = damageAngle + spreadAngle;
     }
 
-    const size = 3 + Math.random() * 3;
+    // Compact, crisp retro pixel square blood droplets
+    const size = minSize + Math.random() * (maxSize - minSize);
+    const numericColor = bloodPalette[i % bloodPalette.length];
 
     // Fast O(1) overwrite of random existing particle if over limit
     if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
@@ -114,15 +156,16 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
        sprite.height = size;
        
        state.bloodEffects[overwriteIdx] = {
-         x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
-         y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
+         x: fx + (Math.random() - 0.5) * fr * 0.4,
+         y: fy + (Math.random() - 0.5) * fr * 0.4,
          vx: Math.cos(angle) * speed,
-         vy: Math.sin(angle) * speed,
+         vy: Math.sin(angle) * speed - (upImpulse + Math.random() * upImpulseVar), // Natural slight upward/radial burst arc
          size: size,
          life: 1.0,           
-         decay: 0.008 + Math.random() * 0.006, 
-         airResistance: 0.94,
-         friction: 0.90,
+         decay: decayRate, 
+         airResistance: physCfg.airResistance ?? 0.95,
+         friction: physCfg.floorFriction ?? 0.85,
+         onGround: false,
          sprite: sprite
        };
     } else {
@@ -132,15 +175,16 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
        sprite.height = size;
 
        state.bloodEffects.push({
-         x: fighter.x + (Math.random() - 0.5) * fighter.r * 0.5,
-         y: fighter.y + (Math.random() - 0.5) * fighter.r * 0.5,
+         x: fx + (Math.random() - 0.5) * fr * 0.4,
+         y: fy + (Math.random() - 0.5) * fr * 0.4,
          vx: Math.cos(angle) * speed,
-         vy: Math.sin(angle) * speed,
+         vy: Math.sin(angle) * speed - (upImpulse + Math.random() * upImpulseVar), // Natural slight upward/radial burst arc
          size: size,
          life: 1.0,           
-         decay: 0.008 + Math.random() * 0.006, 
-         airResistance: 0.94,
-         friction: 0.90,
+         decay: decayRate, 
+         airResistance: physCfg.airResistance ?? 0.95,
+         friction: physCfg.floorFriction ?? 0.85,
+         onGround: false,
          sprite: sprite
        });
     }
@@ -148,37 +192,182 @@ export function spawnBloodEffect(fighter, amount = 10, damageAngle = null) {
 }
 
 /**
- * Updates all blood effects.
+ * Spawns a visceral blood splash explosion when a fighter is killed / splashed to death.
+ * Erupts with high-velocity blood droplets and outward splatter arcs across the arena floor.
+ */
+export function spawnFatalBloodSplash(fighter, opts = {}) {
+  if (!fighter) return;
+  if (!state.bloodEffects) state.bloodEffects = [];
+  const isStandOff = isStandOffMode();
+  const isFFA = state && state.mode === GAME_MODES.FFA;
+  const is1v2 = typeof state !== 'undefined' && state.mode && (state.mode === '1v2' || state.mode.includes('1v2'));
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+
+  const bloodCfg = (CONFIG && CONFIG.blood) || {};
+  const fatalCfg = bloodCfg.fatal || {};
+  const physCfg = bloodCfg.physics || {};
+  const bloodColors = bloodCfg.palette || [0xE60000, 0xDC2626, 0xCC0000, 0x990000, 0x800000, 0xB91C1C];
+
+  const qualityMultiplier = state.qualityLevel || 1.0;
+  const maxLimit = isStandOff
+    ? (fatalCfg.maxActiveLimitStandOff ?? 45)
+    : is1v2
+      ? (fatalCfg.maxActiveLimit1v2 ?? 45)
+      : isFFA
+        ? (fatalCfg.maxActiveLimitFFA ?? 50)
+        : isMulti
+          ? (fatalCfg.maxActiveLimitMulti ?? 55)
+          : (fatalCfg.maxActiveLimit1v1 ?? 65);
+  const MAX_BLOOD_PARTICLES = Math.floor(maxLimit * qualityMultiplier);
+
+  const rawSplashCount = isStandOff
+    ? (fatalCfg.countStandOff ?? 14)
+    : is1v2
+      ? (fatalCfg.count1v2 ?? 16)
+      : isFFA
+        ? (fatalCfg.countFFA ?? 16)
+        : isMulti
+          ? (fatalCfg.countMulti ?? 18)
+          : (fatalCfg.count1v1 ?? 22);
+  const splashCount = Math.floor(rawSplashCount * qualityMultiplier);
+
+  const baseDecay = isStandOff ? (physCfg.floorDecayRateStandOff ?? 0.012) : (physCfg.floorDecayRate1v1 ?? 0.008);
+  const decayRate = baseDecay + Math.random() * (baseDecay * 0.5);
+
+  const fx = typeof fighter.x === 'number' ? fighter.x : 0;
+  const fy = typeof fighter.y === 'number' ? fighter.y : 0;
+  const fr = typeof fighter.r === 'number' ? fighter.r : 25;
+
+  const baseSpeed = fatalCfg.baseSpeed ?? 6.0;
+  const speedVar = fatalCfg.speedVariance ?? 12.0;
+  const minSize = fatalCfg.minSize ?? 3.0;
+  const maxSize = fatalCfg.maxSize ?? 5.0;
+
+  for (let i = 0; i < splashCount; i++) {
+    const angle = (Math.PI * 2 * i) / splashCount + (Math.random() - 0.5) * 0.45;
+    const speed = baseSpeed + Math.random() * speedVar;
+    const size = minSize + Math.random() * (maxSize - minSize);
+
+    const color = bloodColors[i % bloodColors.length];
+
+    if (state.bloodEffects.length >= MAX_BLOOD_PARTICLES) {
+      const overwriteIdx = Math.floor(Math.random() * state.bloodEffects.length);
+      const old = state.bloodEffects[overwriteIdx];
+      if (old && old.sprite) releaseBloodSprite(old.sprite);
+
+      const sprite = getBloodSprite();
+      sprite.tint = color;
+      sprite.width = size;
+      sprite.height = size;
+
+      state.bloodEffects[overwriteIdx] = {
+        x: fx + (Math.random() - 0.5) * fr * 0.7,
+        y: fy + (Math.random() - 0.5) * fr * 0.7,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed * 0.85 - (2 + Math.random() * 4), // Visceral radial burst arc
+        size: size,
+        life: 1.0,
+        decay: decayRate,
+        airResistance: physCfg.airResistance ?? 0.95,
+        friction: physCfg.floorFriction ?? 0.85,
+        onGround: false,
+        sprite: sprite
+      };
+    } else {
+      const sprite = getBloodSprite();
+      sprite.tint = color;
+      sprite.width = size;
+      sprite.height = size;
+
+      state.bloodEffects.push({
+        x: fx + (Math.random() - 0.5) * fr * 0.7,
+        y: fy + (Math.random() - 0.5) * fr * 0.7,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed * 0.85 - (2 + Math.random() * 4), // Visceral radial burst arc
+        size: size,
+        life: 1.0,
+        decay: decayRate,
+        airResistance: physCfg.airResistance ?? 0.95,
+        friction: physCfg.floorFriction ?? 0.85,
+        onGround: false,
+        sprite: sprite
+      });
+    }
+  }
+
+  // Also trigger physical meaty flesh burst sound
+  if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+    audioSystem.playSFX('attack_fleshhit', 1.4);
+  }
+}
+
+/**
+ * Updates all blood effects with natural gravity arcs and bottom arena border landing.
  */
 export function updateBloodEffects() {
   if (!state.bloodEffects) return;
-  const arenaBottom = CONFIG.arena.y + CONFIG.arena.height;
+  const arena = CONFIG.arena;
+  const wallW = (arena && arena.wallWidth) || 4;
+  const arenaBottom = (arena ? arena.y + arena.height : 800) - wallW;
+  const arenaLeft = (arena ? arena.x : 0) + wallW;
+  const arenaRight = (arena ? arena.x + arena.width : 1200) - wallW;
+  const gravity = (CONFIG && CONFIG.blood && CONFIG.blood.physics && CONFIG.blood.physics.gravity) ?? 0.38;
 
   fastCleanArray(state.bloodEffects, (effect) => {
-    effect.vx *= effect.airResistance;
-    effect.vy *= effect.airResistance;
-    effect.vy += 0.15;
-    effect.x += effect.vx;
-    effect.y += effect.vy;
+    if (!effect.onGround) {
+      // 1. Natural fluid gravity arc in the air
+      effect.vx *= effect.airResistance;
+      effect.vy *= effect.airResistance;
+      effect.vy += gravity; // Smooth, weighted fluid gravity falling down towards bottom floor
+      effect.x += effect.vx;
+      effect.y += effect.vy;
 
-    if (effect.y >= arenaBottom - effect.size / 2) {
-      effect.y = arenaBottom - effect.size / 2;
-      effect.vy *= -0.2;
-      effect.vx *= effect.friction;
-    }
+      // Left / right arena wall bounces
+      if (effect.x <= arenaLeft + effect.size / 2) {
+        effect.x = arenaLeft + effect.size / 2;
+        effect.vx = Math.abs(effect.vx) * 0.3;
+      } else if (effect.x >= arenaRight - effect.size / 2) {
+        effect.x = arenaRight - effect.size / 2;
+        effect.vx = -Math.abs(effect.vx) * 0.3;
+      }
 
-    effect.life -= effect.decay;
+      // Check collision with the bottom border of the arena
+      if (effect.y >= arenaBottom - effect.size / 2) {
+        effect.y = arenaBottom - effect.size / 2;
+        effect.onGround = true;
+        effect.vy = 0;
+      }
 
-    if (effect.life > 0) {
-      // Sync to PixiJS Sprite
+      // Droplet remains 100% visible while falling to the floor
       effect.sprite.x = effect.x;
       effect.sprite.y = effect.y;
+      effect.sprite.width = effect.size;
+      effect.sprite.height = effect.size;
       effect.sprite.alpha = effect.life;
-      effect.sprite.rotation = (effect.vx + effect.vy) * effect.life * 0.5;
+      effect.sprite.rotation = 0; // Keep crisp pixel square alignment
       return true;
     } else {
-      releaseBloodSprite(effect.sprite);
-      return false;
+      // 2. Resting on the bottom border of the arena (splatter puddle stain)
+      effect.vx *= effect.friction;
+      effect.x += effect.vx;
+      effect.y = arenaBottom - effect.size / 3;
+
+      // Decays ONLY after it has dropped to the bottom floor
+      effect.life -= effect.decay;
+
+      if (effect.life > 0) {
+        // Flatten into a floor blood puddle stain
+        effect.sprite.x = effect.x;
+        effect.sprite.y = effect.y;
+        effect.sprite.width = effect.size * 1.45;
+        effect.sprite.height = effect.size * 0.65;
+        effect.sprite.alpha = effect.life;
+        effect.sprite.rotation = 0;
+        return true;
+      } else {
+        releaseBloodSprite(effect.sprite);
+        return false;
+      }
     }
   });
 }

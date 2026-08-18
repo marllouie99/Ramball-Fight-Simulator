@@ -208,7 +208,7 @@ function drawImpactfulSlash(ctx, r, slashProgress, totalAlpha, isLeft, isInRage,
 
     const fps = state.fps || 60;
     const qualityLevel = state.qualityLevel || 1.0;
-    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Stand Off' && state.mode !== 'Training';
+    const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
     const useLOD = (typeof state !== 'undefined' && state.mode === 'FFA') || isMulti && (qualityLevel < 1.0 || fps < 55);
     const useUltraLOD = isMulti && (qualityLevel <= 0.5 || fps < 40);
 

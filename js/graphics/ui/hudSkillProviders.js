@@ -276,7 +276,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
   if (f.characterId === 'todo' || f.type === 'todo') {
     const themeColor = f.color || '#eab308';
-    const clapMax = CONFIG.todo?.clapCooldown || 60;
+    const isUltActive = Boolean(f.isTakadaUltActive);
+    const cdMult = isUltActive ? (CONFIG.todo?.takadaClapCooldownMult ?? 0.5) : 1.0;
+    const clapMax = Math.round((CONFIG.todo?.clapCooldown || 120) * cdMult);
     const clapTimer = f.boogieWoogieCooldown !== undefined ? f.boogieWoogieCooldown : clapMax;
     const clapPct = Math.max(0, Math.min(100, (1 - (clapTimer / clapMax)) * 100));
 

@@ -883,7 +883,6 @@ function applyRCTHeal(fighter) {
   if (enableRCT && fighter.hp > 0 && !fighter.isDead) {
     const flatHeal = CONFIG.mahoraga?.rctHealFlatAmount ?? 35;
     const healAmount = Math.max(1, Math.round(flatHeal));
-    console.log('[Mahoraga RCT Debug] flatHeal config:', CONFIG.mahoraga?.rctHealFlatAmount, 'healAmount:', healAmount);
     fighter.takeDamage(-healAmount, fighter, { isHeal: true });
 
     fighter._healthBarHealTimer = 14;

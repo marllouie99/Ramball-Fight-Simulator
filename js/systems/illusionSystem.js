@@ -8,6 +8,7 @@ import { triggerMahitoParalyzeExplosion, applySoulDisfigurementStack } from '../
 import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
 import { spawnMahitoSoulExplosion, spawnBiteAttackEffect } from '../graphics/particles/sparkEffect.js';
 import { audioSystem } from './audioSystem.js';
+import { clampRikaToArena } from '../entities/fighters/yuta/rikaLogic.js';
 
 // Minimum HP an illusion must have had to be eligible for splitting on death.
 // Low threshold — even weak illusions should split as long as children get > 0 HP.
@@ -18,7 +19,7 @@ const ILLUSION_SPLIT_MIN_HP = 2;
  */
 export function updateIllusions() {
   if (state.gameState !== 'playing' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
-  const arena = state.arena;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {
     const illusion = state.illusions[i];
@@ -254,15 +255,16 @@ export function updateIllusions() {
         illusion.x += illusion.vx;
         illusion.y += illusion.vy;
       }
-      const arena = state.arena;
-      const minX = arena.x + illusion.r;
-      const maxX = arena.x + arena.width - illusion.r;
-      const minY = arena.y + illusion.r;
-      const maxY = arena.y + arena.height - illusion.r;
-      if (illusion.x < minX) { illusion.x = minX; illusion.vx = -illusion.vx * 0.5; }
-      if (illusion.x > maxX) { illusion.x = maxX; illusion.vx = -illusion.vx * 0.5; }
-      if (illusion.y < minY) { illusion.y = minY; illusion.vy = -illusion.vy * 0.5; }
-      if (illusion.y > maxY) { illusion.y = maxY; illusion.vy = -illusion.vy * 0.5; }
+      if (arena) {
+        const minX = arena.x + illusion.r;
+        const maxX = arena.x + arena.width - illusion.r;
+        const minY = arena.y + illusion.r;
+        const maxY = arena.y + arena.height - illusion.r;
+        if (illusion.x < minX) { illusion.x = minX; illusion.vx = -illusion.vx * 0.5; }
+        if (illusion.x > maxX) { illusion.x = maxX; illusion.vx = -illusion.vx * 0.5; }
+        if (illusion.y < minY) { illusion.y = minY; illusion.vy = -illusion.vy * 0.5; }
+        if (illusion.y > maxY) { illusion.y = maxY; illusion.vy = -illusion.vy * 0.5; }
+      }
       continue;
     }
 
@@ -274,6 +276,17 @@ export function updateIllusions() {
       illusion.knockbackVy *= 0.88;
       if (Math.abs(illusion.knockbackVx) <= 0.1) illusion.knockbackVx = 0;
       if (Math.abs(illusion.knockbackVy) <= 0.1) illusion.knockbackVy = 0;
+
+      // Always clamp illusion to arena boundaries even during knockback
+      if (arena) {
+        if (illusion.isRika) {
+          clampRikaToArena(illusion, arena);
+        } else {
+          const eR = illusion.r || 20;
+          illusion.x = Math.max(arena.x + eR, Math.min(arena.x + arena.width - eR, illusion.x));
+          illusion.y = Math.max(arena.y + eR, Math.min(arena.y + arena.height - eR, illusion.y));
+        }
+      }
     }
 
     // MANDATORY RULE 1: TimeStop & HitStun Freeze Guard
@@ -303,8 +316,7 @@ export function updateIllusions() {
       }
     }
 
-    // Fetch arena, spatial grid and nearest targets early for steering/attacks
-    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+    // Fetch spatial grid and nearest targets early for steering/attacks
     const nearbyEntities = spatialGrid.getNearby(illusion.x, illusion.y, illusion.r * 2 + 100);
     let nearestTarget = null;
     // Cache owner's team index once for this illusion's entire update tick

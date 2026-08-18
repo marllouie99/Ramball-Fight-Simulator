@@ -87,10 +87,76 @@ export function initRika(fighter) {
   };
 }
 
+export function clampRikaToArena(rk, arena = (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena) {
+  if (!rk || !arena) return false;
+  const radius = rk.r || 30;
+  let bounced = false;
+
+  if (arena.shape === 'circle') {
+    const acx = arena.x + arena.width / 2;
+    const acy = arena.y + arena.height / 2;
+    const ar = Math.max(10, (arena.radius || (arena.width / 2)) - radius);
+    const dx = rk.x - acx;
+    const dy = rk.y - acy;
+    const dist = Math.hypot(dx, dy);
+    if (dist > ar && dist > 0) {
+      rk.x = acx + (dx / dist) * ar;
+      rk.y = acy + (dy / dist) * ar;
+      bounced = true;
+      const nx = dx / dist;
+      const ny = dy / dist;
+      const dot = (rk.vx || 0) * nx + (rk.vy || 0) * ny;
+      if (dot > 0) {
+        rk.vx -= 2 * dot * nx;
+        rk.vy -= 2 * dot * ny;
+      }
+      if (rk.knockbackVx || rk.knockbackVy) {
+        const kbDot = (rk.knockbackVx || 0) * nx + (rk.knockbackVy || 0) * ny;
+        if (kbDot > 0) {
+          rk.knockbackVx -= 2 * kbDot * nx;
+          rk.knockbackVy -= 2 * kbDot * ny;
+        }
+      }
+    }
+  } else {
+    const minX = arena.x + radius;
+    const maxX = arena.x + arena.width - radius;
+    const minY = arena.y + radius;
+    const maxY = arena.y + arena.height - radius;
+
+    if (rk.x < minX) {
+      rk.x = minX;
+      rk.vx = Math.abs(rk.vx || 0);
+      if (rk.knockbackVx && rk.knockbackVx < 0) rk.knockbackVx = 0;
+      bounced = true;
+    } else if (rk.x > maxX) {
+      rk.x = maxX;
+      rk.vx = -Math.abs(rk.vx || 0);
+      if (rk.knockbackVx && rk.knockbackVx > 0) rk.knockbackVx = 0;
+      bounced = true;
+    }
+
+    if (rk.y < minY) {
+      rk.y = minY;
+      rk.vy = Math.abs(rk.vy || 0);
+      if (rk.knockbackVy && rk.knockbackVy < 0) rk.knockbackVy = 0;
+      bounced = true;
+    } else if (rk.y > maxY) {
+      rk.y = maxY;
+      rk.vy = -Math.abs(rk.vy || 0);
+      if (rk.knockbackVy && rk.knockbackVy > 0) rk.knockbackVy = 0;
+      bounced = true;
+    }
+  }
+  return bounced;
+}
+
 export function updateRika(fighter, arena) {
   if (!fighter.rika) return;
 
   const rk = fighter.rika;
+  const currentArena = arena || (typeof state !== 'undefined' ? state.arena : null) || CONFIG.arena;
+  clampRikaToArena(rk, currentArena);
   
   const isFrozen = (fighter.timeStopTimer > 0) || 
                    (fighter.electricStunTimer > 0) || (fighter.dubstepStunTimer > 0) || 
@@ -112,14 +178,7 @@ export function updateRika(fighter, arena) {
     rk.y = fighter.y + Math.sin(backAngle) * backDist;
 
     // Strict clamping within arena boundaries so Rika never clips out
-    if (arena) {
-      const minX = (arena.x || 50) + rk.r;
-      const maxX = (arena.x || 50) + (arena.width || 1100) - rk.r;
-      const minY = (arena.y || 50) + rk.r;
-      const maxY = (arena.y || 50) + (arena.height || 700) - rk.r;
-      rk.x = Math.max(minX, Math.min(maxX, rk.x));
-      rk.y = Math.max(minY, Math.min(maxY, rk.y));
-    }
+    clampRikaToArena(rk, currentArena);
     rk.angle = rk.beamFollowAngle;
     rk.vx = 0;
     rk.vy = 0;
@@ -133,6 +192,7 @@ export function updateRika(fighter, arena) {
   }
 
   if (isFrozen && !rk.active) {
+    clampRikaToArena(rk, currentArena);
     return;
   }
 
@@ -683,6 +743,7 @@ export function updateRika(fighter, arena) {
   if (rk.spawnTimer > 0) {
     rk.vx = 0;
     rk.vy = 0;
+    clampRikaToArena(rk, currentArena);
     return; // Don't move or attack until she has fully arisen!
   }
 
@@ -695,6 +756,7 @@ export function updateRika(fighter, arena) {
     rk.timeStopTimer--;
     rk.vx = 0;
     rk.vy = 0;
+    clampRikaToArena(rk, currentArena);
     return; // Completely frozen!
   }
 
@@ -710,6 +772,7 @@ export function updateRika(fighter, arena) {
     }
     rk.vx = 0;
     rk.vy = 0;
+    clampRikaToArena(rk, currentArena);
     return; // Completely frozen by hit stun or paralyze debuff!
   }
 
@@ -933,28 +996,8 @@ export function updateRika(fighter, arena) {
     rk.leftArmTimer--;
   }
 
-  // Wall bounce — same as arena fighters / illusions
-  let bounced = false;
-
-  if (rk.x < arena.x + rk.r) {
-    rk.x = arena.x + rk.r;
-    rk.vx = Math.abs(rk.vx);
-    bounced = true;
-  } else if (rk.x > arena.x + arena.width - rk.r) {
-    rk.x = arena.x + arena.width - rk.r;
-    rk.vx = -Math.abs(rk.vx);
-    bounced = true;
-  }
-
-  if (rk.y < arena.y + rk.r) {
-    rk.y = arena.y + rk.r;
-    rk.vy = Math.abs(rk.vy);
-    bounced = true;
-  } else if (rk.y > arena.y + arena.height - rk.r) {
-    rk.y = arena.y + arena.height - rk.r;
-    rk.vy = -Math.abs(rk.vy);
-    bounced = true;
-  }
+  // Wall bounce & arena boundary clamping — same as arena fighters / illusions
+  const bounced = clampRikaToArena(rk, currentArena);
 
   // On bounce — re-lock toward target (unless target is Gojo with active Infinity)
   if (bounced && rk.target) {
