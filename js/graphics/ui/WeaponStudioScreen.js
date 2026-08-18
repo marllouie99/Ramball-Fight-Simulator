@@ -36,7 +36,8 @@ function initCustomizations() {
       yuta: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-      ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+      ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
@@ -195,7 +196,7 @@ export function drawWeaponStudioScreen() {
   const leftX = 18;
   const leftY = 85;
   const leftW = 145;
-  const leftH = 205;
+  const leftH = 215;
   drawPanel(leftX, leftY, leftW, leftH, 0.85, 8);
 
   ctx.fillStyle = '#FFD700';
@@ -208,7 +209,8 @@ export function drawWeaponStudioScreen() {
     { key: 'yuta', label: 'YUTA KATANA' },
     { key: 'toji', label: 'TOJI SPEAR' },
     { key: 'cronos', label: 'CRONOS BLADE' },
-    { key: 'ruby', label: 'RUBY SCYTHE' }
+    { key: 'ruby', label: 'RUBY SCYTHE' },
+    { key: 'nanami', label: 'NANAMI CLEAVER' }
   ];
 
   weapons.forEach((w, idx) => {

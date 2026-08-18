@@ -1,4 +1,5 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
 import {
   drawSlowEffect,
   drawElectricStunEffect,
@@ -108,10 +109,11 @@ export class FighterRenderer {
   static drawStatusOverlays(ctx, fighter) {
     const baseRadius = fighter.r;
     
-    // Suppress white hit-flash during Yuji's soul-swap transformation; the
+    // Suppress white hit-flash during Yuji's soul-swap transformation or on match end / winner reveal; the
     // 'lighter' composite at full opacity would completely wash the body white.
     const isSoulSwapTransitioning = (fighter.soulSwapTransitionTimer || 0) > 0 || fighter.soulSwapActive;
-    if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning) {
+    const isMatchEnded = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) || Boolean(fighter._isWinnerReveal);
+    if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning && !isMatchEnded) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.beginPath();
@@ -172,6 +174,31 @@ export class FighterRenderer {
     
     if (fighter.thunderRootsTimer > 0) {
       drawThunderRootsEffect(ctx, baseRadius);
+    }
+
+    if (fighter.nanamiArmorFractureTimer > 0) {
+      ctx.save();
+      const fracTime = Date.now() * 0.005;
+      const pulse = 0.5 + 0.5 * Math.sin(fracTime * 3);
+      ctx.strokeStyle = `rgba(255, 215, 0, ${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = 1.4;
+
+      // Golden fractured hairline cracks across the body
+      ctx.beginPath();
+      ctx.moveTo(-baseRadius * 0.6, -baseRadius * 0.3);
+      ctx.lineTo(-baseRadius * 0.1, 0);
+      ctx.lineTo(baseRadius * 0.5, -baseRadius * 0.4);
+      ctx.moveTo(-baseRadius * 0.1, 0);
+      ctx.lineTo(baseRadius * 0.2, baseRadius * 0.6);
+      ctx.stroke();
+
+      // Subtle golden glow perimeter
+      ctx.strokeStyle = `rgba(212, 175, 55, ${0.35 * pulse})`;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius * 1.04, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
     }
 
     if (fighter.burnTimer > 0) {
@@ -250,6 +277,7 @@ export class FighterRenderer {
   }
 
   static drawHealth(ctx, fighter) {
+    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
     if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter.hideHpText) return;
 
     ctx.save();
@@ -293,6 +321,53 @@ export class FighterRenderer {
     ctx.restore();
   }
 
+  static drawArmorFracture(ctx, fighter) {
+    if (!fighter || (fighter.nanamiArmorFractureTimer || 0) <= 0 || fighter.isDead || fighter.hp <= 0) return;
+
+    const r = fighter.r || 25;
+    const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+    const pulse = Math.sin(now * 0.008) * 0.5 + 0.5;
+
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+
+    // 1. Golden hairline fracture cracks on the fighter body
+    ctx.strokeStyle = `rgba(255, 215, 0, ${0.75 + pulse * 0.25})`;
+    ctx.lineWidth = 1.4;
+    ctx.beginPath();
+    // Crack 1
+    ctx.moveTo(-r * 0.65, -r * 0.35);
+    ctx.lineTo(-r * 0.15, 0);
+    ctx.lineTo(r * 0.10, -r * 0.40);
+    ctx.lineTo(r * 0.55, -r * 0.20);
+    // Crack 2
+    ctx.moveTo(-r * 0.15, 0);
+    ctx.lineTo(-r * 0.25, r * 0.55);
+    // Crack 3
+    ctx.moveTo(r * 0.10, -r * 0.40);
+    ctx.lineTo(r * 0.45, r * 0.45);
+    ctx.stroke();
+
+    // 2. Glowing fractured diamond at intersection
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(-r * 0.15, 0, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Status Badge above health bar
+    const drawY = -(r + 30);
+    ctx.font = 'bold 9px Outfit, Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    ctx.lineWidth = 2.5;
+    ctx.strokeStyle = 'rgba(15, 23, 42, 0.90)';
+    ctx.strokeText('FRACTURED (+20%)', 0, drawY);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('FRACTURED (+20%)', 0, drawY);
+
+    ctx.restore();
+  }
+
   static draw(ctx, fighter) {
     const zOffset = fighter.z || 0;
     const hasZ = zOffset > 0;
@@ -318,6 +393,7 @@ export class FighterRenderer {
     fighter.drawGun(ctx);
     fighter.drawHealth(ctx);
     fighter.drawFreezeTimer(ctx);
+    FighterRenderer.drawArmorFracture(ctx, fighter);
 
     if (hasZ) {
       ctx.restore();

@@ -58,8 +58,9 @@ export function updateIllusions() {
             spawnMahitoSoulExplosion(illusion.x, illusion.y, 35, true);
           }
           if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
-            audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
-            audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+            const cloneVol = mahitoCfg.soundVolumes?.splitClone !== undefined ? mahitoCfg.soundVolumes.splitClone : (mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+            audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', cloneVol);
+            audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', cloneVol);
           }
           state.illusions.splice(i, 1);
           continue;
@@ -75,7 +76,7 @@ export function updateIllusions() {
 
         // Apply AOE damage and knockback to all valid enemies (Rule #6 compliant)
         const explosionRadius = multCfg.minionExplosionRadius || 100;
-        const explosionDamage = multCfg.minionExplosionDamage || 24;
+        const explosionDamage = multCfg.minionExplosionDamage || 50;
         const explosionKnockback = multCfg.minionExplosionKnockback || 12;
         const owner = illusion.owner;
         const ownerStateIdx = owner ? state.fighters.indexOf(owner) : -1;
@@ -138,7 +139,8 @@ export function updateIllusions() {
 
         // Play soul explosion sound
         if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
-          audioSystem.playSFX(mahitoCfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', mahitoCfg.sounds?.minionExplosionVolume ?? 1.8);
+          const expVol = mahitoCfg.soundVolumes?.minionExplosion !== undefined ? mahitoCfg.soundVolumes.minionExplosion : (mahitoCfg.sounds?.minionExplosionVolume ?? 1.8);
+          audioSystem.playSFX(mahitoCfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', expVol);
         }
         state.illusions.splice(i, 1);
       }
@@ -157,7 +159,7 @@ export function updateIllusions() {
       if ((illusion.isTransfiguredHuman || illusion.isEvasionMinion) && !illusion.isDying) {
         const mahitoCfg = (typeof CONFIG !== 'undefined' && CONFIG.mahito) ? CONFIG.mahito : {};
         const multCfg = mahitoCfg.soulMultiplicity || {};
-        const deathDur = illusion.isEvasionMinion ? 24 : (multCfg.minionDeathDuration ?? 20);
+        const deathDur = illusion.isEvasionMinion ? 24 : (multCfg.minionDeathDuration ?? 50);
 
         illusion.isDying = true;
         illusion.deathTimer = deathDur;
@@ -432,7 +434,7 @@ export function updateIllusions() {
         illusion.swordCooldown = 9999;
         
         // ── Evasion Health Regeneration Buff for minion clones ──
-        const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.40;
+        const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.05;
         if (illusion.hp > 0 && illusion.hp < illusion.maxHp) {
           illusion.hp = Math.min(illusion.maxHp, Number((illusion.hp + evaRegenRate).toFixed(2)));
           illusion._evadeRegenTick = (illusion._evadeRegenTick || 0) + 1;
@@ -441,8 +443,8 @@ export function updateIllusions() {
           }
         }
         
-        // Enforce evasion speedMultiplier (1.25x) from CONFIG on clones
-        const evaSpeedMult = CONFIG.mahito?.evasion?.speedMultiplier || 1.25;
+        // Enforce evasion speedMultiplier (1.50x) from CONFIG on clones
+        const evaSpeedMult = CONFIG.mahito?.evasion?.speedMultiplier || 1.50;
         const baseSpeed = (illusion.owner && illusion.owner.baseSpeed) || CONFIG.mahito?.moveSpeed || 5.8;
         let targetSpeed = baseSpeed * evaSpeedMult;
 
@@ -492,7 +494,7 @@ export function updateIllusions() {
           const interval = mahitoCfg.sounds?.minionNoiseInterval || 55;
           illusion.minionNoiseTimer = interval + Math.floor((Math.random() - 0.5) * 25);
           const soundToPlay = illusion.minionSound || mahitoCfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3';
-          const vol = mahitoCfg.sounds?.minionNoiseVolume ?? 1.5;
+          const vol = mahitoCfg.soundVolumes?.minionNoise !== undefined ? mahitoCfg.soundVolumes.minionNoise : (mahitoCfg.sounds?.minionNoiseVolume ?? 1.5);
           if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
             audioSystem.playSFX(soundToPlay, vol);
           }

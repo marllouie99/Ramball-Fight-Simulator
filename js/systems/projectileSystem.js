@@ -358,7 +358,7 @@ class ProjectileSystem {
   }
 
   fireGojoBlue(fighter, ownerIndex, damage, customSpawnX, customSpawnY, customAngle) {
-    const radius = CONFIG.gojo.blueRadius || 80;
+    const radius = CONFIG.gojo.blueRadius || 50;
     const speed = CONFIG.gojo.blueSpeed || (CONFIG.projectile.speed * (fighter.projectileSpeedMultiplier || 1.5));
     const projDamage = Number(damage);
 
@@ -400,7 +400,7 @@ class ProjectileSystem {
   }
 
   fireGojoPurple(fighter, ownerIndex, damage, dps) {
-    const speed = CONFIG.gojo.purpleSpeed || 8;
+    const speed = CONFIG.gojo.purpleSpeed || 6;
     const tipDist = GUN_TIP_DIST(fighter.r) + 20;
     const dirX = Math.cos(fighter.gunAngle);
     const dirY = Math.sin(fighter.gunAngle);
@@ -410,7 +410,7 @@ class ProjectileSystem {
     proj.y = fighter.y + dirY * tipDist;
     proj.vx = dirX * speed;
     proj.vy = dirY * speed;
-    proj.r = CONFIG.gojo.purpleRadius || 40;
+    proj.r = CONFIG.gojo.purpleRadius || 50;
     proj.life = CONFIG.gojo?.purpleLife || 250;
     proj.maxLife = proj.life;
     proj.color = '#8A2BE2'; // Purple
@@ -1319,10 +1319,10 @@ class ProjectileSystem {
     const skillCfg = cfg.soulMultiplicity || {};
 
     const summonCount = skillCfg.summonCount || 1;
-    const minionHp = skillCfg.minionHp || 25;
+    const minionHp = skillCfg.minionHp || 50;
     const minionDamage = skillCfg.minionDamage || 10;
     const minionSpeed = skillCfg.minionSpeed || 1.8;
-    const minionSize = skillCfg.minionSize || 16;
+    const minionSize = skillCfg.minionSize || 30;
 
     // Spawn visual effects at the projectile's position
     if (typeof spawnImpactFlash === 'function') {

@@ -1029,23 +1029,17 @@ export function drawMahitoSkin(ctx, fighter) {
     frontHandX = currentSpreadX;
     frontHandY = handY;
   } else if (isPunching) {
-    if (fighter.isRightPunch) {
-      frontHandX = r * 0.70 + lungeExtension;
-      frontHandY = r * 0.12;
-      backHandX  = r * 0.40 + oppositeRecoil;
-      backHandY  = -r * 0.15;
-    } else {
-      backHandX  = r * 0.70 + lungeExtension;
-      backHandY  = -r * 0.12;
-      frontHandX = r * 0.40 + oppositeRecoil;
-      frontHandY = r * 0.15;
-    }
+    // All punches executed with the front hand extending forward from right edge
+    frontHandX = r * 0.95 + lungeExtension * 1.40;
+    frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
+    backHandX  = 0;
+    backHandY  = 0;
   } else {
-    // Idle brawler guard stance: front hand at (r * 0.45, r * 0.18), back hand at (r * 0.70, -r * 0.18)
-    frontHandX = r * 0.45;
-    frontHandY = r * 0.18;
-    backHandX  = r * 0.70;
-    backHandY  = -r * 0.18;
+    // Idle brawler guard stance: front hand at the right edge of body circle
+    frontHandX = r * 0.95;
+    frontHandY = 0;
+    backHandX  = 0;
+    backHandY  = 0;
   }
 
   const handRadius = getHandSize(7.5);
@@ -1054,10 +1048,10 @@ export function drawMahitoSkin(ctx, fighter) {
 
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isEvading || isEvasionMinion || isPreSplitting;
 
-  // 5. Render Back Hand Layer (Behind Body Circle) - Rule #2 & #20
+  // 5. Render Back Hand Layer (Behind Body Circle) - Hidden for single front hand stance
   // During Domain Expansion channeling, both hands render on the front layer (on top of body)
-  if (!fighter._isWinnerReveal && !fighter.hideBackHand && !isChannelingDomain && !shouldHideHands) {
-    if (isPunching && !fighter.isRightPunch) {
+  if (!fighter._isWinnerReveal && !fighter.hideBackHand && isChannelingDomain && !shouldHideHands) {
+    if (isPunching) {
       drawMahitoArmMorph(ctx, fighter, isTransformed, false, morphType, rawProgress, backHandX, backHandY);
     } else if (fighter.clawRevertTimer > 0) {
       const maxRevert = 18;

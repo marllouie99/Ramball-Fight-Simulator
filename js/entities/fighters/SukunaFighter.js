@@ -20,7 +20,7 @@ export class SukunaFighter extends Fighter {
     this.characterId = 'sukuna';
 
     // Bind basic attack cooldown to the specific Sukuna config
-    this.shootCooldownMax = CONFIG.sukuna.slashCooldown || 100;
+    this.shootCooldownMax = CONFIG.sukuna.slashCooldown || 50;
 
     // Reverse Cursed Technique (Passive)
     this.reverseCursedTechniqueCooldown = 0;
@@ -41,16 +41,16 @@ export class SukunaFighter extends Fighter {
     this.divineFlameCooldown = CONFIG.sukuna.divineFlameCooldown || 1500; // Delay initial cast
     this.isChannelingDivineFlame = false;
     this.divineFlameChargeTimer = 0;
-    this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 90;
+    this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 100;
     this.divineFlameRecoveryTimer = 0;
 
     // Domain Expansion: Malevolent Shrine (Ultimate)
-    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000; // Delay initial cast reads from CONFIG
+    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1950; // Delay initial cast reads from CONFIG
     this.domainActive = false;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
     this.domainChargeTimer = 0;
-    this.domainChargeMax = CONFIG.sukuna.domainChargeMax || 90; // 1.5 seconds channel
+    this.domainChargeMax = CONFIG.sukuna.domainChargeMax || 120; // 2 seconds channel
     this.domainUseCount = 0; // Allows domain to be cast up to 2 times per round
     this.domainTimeInsideMap = new Map(); // Tracks enemy frames inside domain for ramping damage
 
@@ -83,8 +83,8 @@ export class SukunaFighter extends Fighter {
 
     // Stacking Slash Crit Passive
     this.slashHitCount = 0;
-    this.critChance = CONFIG.sukuna?.baseCritChance || 0.10;
-    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 1.50;
+    this.critChance = CONFIG.sukuna?.baseCritChance || 0.25;
+    this.critMultiplier = CONFIG.sukuna?.baseCritMultiplier || 0.25;
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -153,7 +153,7 @@ export class SukunaFighter extends Fighter {
       this.fugaSoundKey = null;
     }
 
-    this.reverseCursedTechniqueCooldown = CONFIG.sukuna.reverseCursedTechniqueCooldown || 900;
+    this.reverseCursedTechniqueCooldown = CONFIG.sukuna.reverseCursedTechniqueCooldown || 700;
     this.reverseCursedTechniqueTriggered = false;
     this.martialArtsComboCount = 0;
 
@@ -169,10 +169,10 @@ export class SukunaFighter extends Fighter {
     this.divineFlameCooldown = CONFIG.sukuna.divineFlameCooldown || 1500;
     this.isChannelingDivineFlame = false;
     this.divineFlameChargeTimer = 0;
-    this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 90;
+    this.divineFlameChargeMax = CONFIG.sukuna.divineFlameChargeMax || 100;
     this.divineFlameRecoveryTimer = 0;
 
-    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1000;
+    this.domainCooldown = CONFIG.sukuna.domainCooldown ?? 1950;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
     this.domainChargeTimer = 0;
@@ -783,7 +783,7 @@ export class SukunaFighter extends Fighter {
             spawnImpactFlash(this.x, this.y, 20, 'crimsonSniper');
 
             // Transition to rapid slash state
-            this.rapidSlashHitsLeft = 12; // Unleash 12 rapid ghost slashes
+            this.rapidSlashHitsLeft = CONFIG.sukuna?.flurryHits || 10; // Unleash rapid ghost slashes
             this.rapidSlashTimer = 0;
           } else {
             this.flurryTarget = null;
@@ -793,7 +793,7 @@ export class SukunaFighter extends Fighter {
 
         // Find all valid targets within range
         let possibleTargets = [];
-        const flurryRange = CONFIG.sukuna.flurryRange || 450;
+        const flurryRange = CONFIG.sukuna.flurryRange || 150;
         const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
         state.fighters.forEach((f, idx) => {
@@ -833,7 +833,7 @@ export class SukunaFighter extends Fighter {
             this._slashSoundCooldown = 8; // Faster cooldown for Phase 1 barrage
           }
 
-          const baseFlurryDmg = CONFIG.sukuna.flurryDamage || 6;
+          const baseFlurryDmg = CONFIG.sukuna.flurryDamage || 15;
           let flurryDmg = baseFlurryDmg;
           let isCrit = false;
           if (typeof this.evaluateSlashCrit === 'function') {
@@ -842,7 +842,7 @@ export class SukunaFighter extends Fighter {
             isCrit = res.isCrit;
           }
           this.flurryTarget.takeDamage(flurryDmg, this, { isMelee: true, isSukunaSlash: true, isCrit });
-          this.flurryTarget.applyHitStun(15);
+          if (typeof this.flurryTarget.applyHitStun === 'function') this.flurryTarget.applyHitStun(12);
 
           // Apply bleed on flurry hits
           this.applyBleed(this.flurryTarget, 1);
@@ -991,7 +991,7 @@ export class SukunaFighter extends Fighter {
             if (typeof this.flurryTarget?.applyHitStun === 'function') this.flurryTarget.applyHitStun(8);
 
             // Set timer for next slash (readable rhythmic pacing)
-            this.rapidSlashTimer = CONFIG.sukuna.rapidSlashCooldown || 16;
+            this.rapidSlashTimer = CONFIG.sukuna.rapidSlashCooldown || 20;
           }
         } else {
           // Target is dead, end the rapid slash sequence
@@ -1040,8 +1040,8 @@ export class SukunaFighter extends Fighter {
       const distSq = (this.x - opponent.x) ** 2 + (this.y - opponent.y) ** 2;
       const flurryRange = CONFIG.sukuna.flurryRange || 150;
       if (distSq <= flurryRange ** 2) {
-        this.flurryCooldown = CONFIG.sukuna.flurryCooldown || 300;
-        this.flurryHitsLeft = CONFIG.sukuna.flurryHits || 5;
+        this.flurryCooldown = CONFIG.sukuna.flurryCooldown || 700;
+        this.flurryHitsLeft = CONFIG.sukuna.flurryHits || 10;
         this.flurryTimer = 0;
         this.flurryTarget = opponent;
 

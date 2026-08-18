@@ -145,8 +145,8 @@ export function executeIdleTransfigurationStrike(fighter, targetHint = null) {
   const cfg = CONFIG.mahito || {};
   const isTransformed = Boolean(fighter.isTransformed || fighter.isDistortedKilling);
 
-  let animDur = cfg.punchSpeed || 20;
-  let cd = cfg.basicPunchCooldown || 22;
+  let animDur = cfg.punchSpeed || 50;
+  let cd = cfg.basicPunchCooldown || 70;
 
   if (fighter.domainActive) {
     const rawMult = cfg.domainExpansion?.basicAttackCooldownMultiplier ?? 1.00;
@@ -312,7 +312,8 @@ export function triggerMahitoParalyzeExplosion(entity) {
   }
 
   triggerGlobalScreenShake(soulCfg.ruptureScreenShake || 10);
-  audioSystem.playSFX(cfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', cfg.sounds?.bodyExplodeVolume ?? 2.0);
+  const expVol = cfg.soundVolumes?.bodyExplode !== undefined ? cfg.soundVolumes.bodyExplode : (cfg.sounds?.bodyExplodeVolume ?? 2.0);
+  audioSystem.playSFX(cfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', expVol);
 
   // If entity is defeated after this explosion, now evaluate round/match end before showing champion screen
   if (entity.hp <= 0 && typeof entity.checkRoundOrMatchEnd === 'function') {
@@ -374,7 +375,7 @@ export function applySoulDisfigurementStack(ent, fighter) {
       '#FF007F'
     );
 
-    let burstDmg = soulCfg.burstDamage || 38;
+    let burstDmg = soulCfg.burstDamage || 100;
     if (isTransformed) {
       burstDmg *= (cfg.transformation?.damageMultiplier ?? 1.60);
     }
@@ -433,7 +434,7 @@ export function applySoulDisfigurementStack(ent, fighter) {
     }
 
     if (typeof ent.applyHitStun === 'function' && !ent.adaptedSoulDisfigurement) {
-      ent.applyHitStun(soulCfg.burstHitStun || 14);
+      ent.applyHitStun(soulCfg.burstHitStun || 300);
     }
 
     // Calculate if this Soul Disfigurement & impending Rupture is a guaranteed / sure kill on the enemy
@@ -449,14 +450,16 @@ export function applySoulDisfigurementStack(ent, fighter) {
       (ent.hp <= ruptureDmg)
     );
 
-    // Play Mahito's farewell voiceline based on configured chance in CONFIG.mahito.sounds.farewellVoicelineChance
-    const voiceChance = (typeof cfg.sounds?.farewellVoicelineChance === 'number')
-      ? cfg.sounds.farewellVoicelineChance
-      : 0.05;
+    // Play Mahito's farewell voiceline based on configured chance in CONFIG.mahito.soundChances.farewellVoiceline
+    const voiceChance = (typeof cfg.soundChances?.farewellVoiceline === 'number')
+      ? cfg.soundChances.farewellVoiceline
+      : (typeof cfg.sounds?.farewellVoicelineChance === 'number' ? cfg.sounds.farewellVoicelineChance : 0.10);
 
     if (fighter && !ent.adaptedSoulDisfigurement && Math.random() < voiceChance) {
       const voiceSrc = cfg.sounds?.farewellVoiceline || 'Assets/Sound Effects/Skills/mahito-farewell-voiceline.mp3';
-      const voiceVol = (typeof cfg.sounds?.farewellVoicelineVolume === 'number') ? cfg.sounds.farewellVoicelineVolume : 3.2;
+      const voiceVol = (typeof cfg.soundVolumes?.farewellVoiceline === 'number')
+        ? cfg.soundVolumes.farewellVoiceline
+        : (typeof cfg.sounds?.farewellVoicelineVolume === 'number' ? cfg.sounds.farewellVoicelineVolume : 3.2);
       audioSystem.playFighterVoiceline(
         fighter,
         voiceSrc,
@@ -470,7 +473,8 @@ export function applySoulDisfigurementStack(ent, fighter) {
 
     triggerGlobalScreenShake(soulCfg.burstScreenShake || 8);
     if (cfg.sounds?.soulDetonate) {
-      audioSystem.playSFX(cfg.sounds.soulDetonate, cfg.sounds?.soulDetonateVolume ?? 1.8);
+      const detVol = cfg.soundVolumes?.soulDetonate !== undefined ? cfg.soundVolumes.soulDetonate : (cfg.sounds?.soulDetonateVolume ?? 1.8);
+      audioSystem.playSFX(cfg.sounds.soulDetonate, detVol);
     }
   }
 }
@@ -501,7 +505,7 @@ export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
   // Dynamic hump count based on form
   const tendrilCount = isTransformed ? (surgeCfg.tendrilCountTransformed || 5) : (surgeCfg.tendrilCountBase || 4); 
   const reachMin = surgeCfg.reachMin || 15;
-  const reachMax = surgeCfg.reachMax || 360;
+  const reachMax = surgeCfg.reachMax || 420;
 
   // Single hump growth duration & timing
   const humpGrowthDuration = 14;
@@ -603,9 +607,10 @@ export function executeSubterraneanFleshSurge(fighter, targetHint = null) {
   fighter.vy *= 0.25;
 
   // Voiceline for Skill 2 (occasional trigger)
-  const skillVoiceChance = cfg.sounds?.skillVoicelineChance ?? 0.25;
+  const skillVoiceChance = cfg.soundChances?.skillVoiceline !== undefined ? cfg.soundChances.skillVoiceline : (cfg.sounds?.skillVoicelineChance ?? 0.20);
   if (Math.random() < skillVoiceChance) {
-    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', cfg.sounds?.skillVoicelineVolume ?? 2.2);
+    const skillVoiceVol = cfg.soundVolumes?.skillVoiceline !== undefined ? cfg.soundVolumes.skillVoiceline : (cfg.sounds?.skillVoicelineVolume ?? 2.2);
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', skillVoiceVol);
   }
 }
 
@@ -941,12 +946,12 @@ export function executeMahitoSoulPhaseSlip(fighter, target) {
   const angle = Math.atan2(dy, dx);
 
   const dashDuration = dashCfg.dashDuration || 12;
-  const totalPassDist = dist + target.r + fighter.r + (dashCfg.passThroughDistance || 70);
+  const totalPassDist = dist + target.r + fighter.r + (dashCfg.passThroughDistance || 100);
   const stepSpeed = totalPassDist / dashDuration;
 
   fighter.soulPhaseDashTimer = dashDuration;
   fighter.soulPhaseDashMax = dashDuration;
-  fighter.soulPhaseDashCooldown = dashCfg.cooldown || 180;
+  fighter.soulPhaseDashCooldown = dashCfg.cooldown || 100;
   fighter.soulPhaseDashTarget = target;
   fighter.soulPhaseDashHit = false;
   fighter.soulPhaseDashVector = { x: dirX * stepSpeed, y: dirY * stepSpeed };
@@ -962,10 +967,11 @@ export function executeMahitoSoulPhaseSlip(fighter, target) {
   audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.85);
   spawnImpactFlash(fighter.x, fighter.y, 40, isTransformed ? '#D946EF' : '#C026D3');
 
-  // Voiceline on Passive Dash (played occasionally, e.g. 15% chance)
-  const dashVoiceChance = cfg.sounds?.dashVoicelineChance ?? 0.15;
+  // Voiceline on Passive Dash (played occasionally, e.g. 5% chance)
+  const dashVoiceChance = cfg.soundChances?.dashVoiceline !== undefined ? cfg.soundChances.dashVoiceline : (cfg.sounds?.dashVoicelineChance ?? 0.05);
   if (Math.random() < dashVoiceChance) {
-    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.dashVoiceline || 'Assets/Sound Effects/Skills/mahito-dash-voiceline.mp3', cfg.sounds?.dashVoicelineVolume ?? 2.0);
+    const dashVoiceVol = cfg.soundVolumes?.dashVoiceline !== undefined ? cfg.soundVolumes.dashVoiceline : (cfg.sounds?.dashVoicelineVolume ?? 2.0);
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.dashVoiceline || 'Assets/Sound Effects/Skills/mahito-dash-voiceline.mp3', dashVoiceVol);
   }
 }
 
@@ -1130,9 +1136,10 @@ export function executeMahitoMaceCannon(fighter, targetHint = null) {
   fighter.hideFrontHand = true;
 
   // Voiceline for Skill 3 (occasional trigger)
-  const skillVoiceChance = cfg.sounds?.skillVoicelineChance ?? 0.25;
+  const skillVoiceChance = cfg.soundChances?.skillVoiceline !== undefined ? cfg.soundChances.skillVoiceline : (cfg.sounds?.skillVoicelineChance ?? 0.20);
   if (Math.random() < skillVoiceChance) {
-    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', cfg.sounds?.skillVoicelineVolume ?? 2.2);
+    const skillVoiceVol = cfg.soundVolumes?.skillVoiceline !== undefined ? cfg.soundVolumes.skillVoiceline : (cfg.sounds?.skillVoicelineVolume ?? 2.2);
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', skillVoiceVol);
   }
 
   // Generate organic, non-uniform spikes around the forward/side perimeter (excluding rear neck connection)
@@ -1766,15 +1773,16 @@ export function executeMahitoTwinScissor(fighter, target = null) {
   fighter.hideBackHand = true;
 
   // Voiceline for Skill 4 (occasional trigger)
-  const skillVoiceChance = cfg.sounds?.skillVoicelineChance ?? 0.25;
+  const skillVoiceChance = cfg.soundChances?.skillVoiceline !== undefined ? cfg.soundChances.skillVoiceline : (cfg.sounds?.skillVoicelineChance ?? 0.20);
   if (Math.random() < skillVoiceChance) {
-    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', cfg.sounds?.skillVoicelineVolume ?? 2.2);
+    const skillVoiceVol = cfg.soundVolumes?.skillVoiceline !== undefined ? cfg.soundVolumes.skillVoiceline : (cfg.sounds?.skillVoicelineVolume ?? 2.2);
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.skillVoiceline || 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3', skillVoiceVol);
   }
 
   // Aim towards enemy or facing angle
   let angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
-  let targetX = fighter.x + Math.cos(angle) * (scissorCfg.reachMax || 280);
-  let targetY = fighter.y + Math.sin(angle) * (scissorCfg.reachMax || 280);
+  let targetX = fighter.x + Math.cos(angle) * (scissorCfg.reachMax || 360);
+  let targetY = fighter.y + Math.sin(angle) * (scissorCfg.reachMax || 360);
 
   if (tgt && tgt.hp > 0 && !tgt.isDead) {
     const dx = tgt.x - fighter.x;
@@ -1968,7 +1976,7 @@ export function updateMahitoTwinScissor(fighter) {
 
   // 1. Launch Phase (Both arms stretch outward along flanking pincer arcs)
   if (data.phase === 'launch') {
-    const stretchSpeed = scissorCfg.stretchSpeed || 22.0;
+    const stretchSpeed = scissorCfg.stretchSpeed || 25.0;
     const distToLeftFlank = Math.hypot(data.leftFlankX - leftOriginX, data.leftFlankY - leftOriginY) || 1;
     const totalFramesNeeded = Math.max(6, Math.round(distToLeftFlank / stretchSpeed));
     data.launchProgress = Math.min(1.0, data.elapsedFrames / totalFramesNeeded);
@@ -2387,7 +2395,7 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
   const target = targetHint || (typeof fighter._findClosestEnemy === 'function' ? fighter._findClosestEnemy() : null);
 
   // Set cooldown immediately
-  fighter.soulMultiplicityCooldown = skillCfg.cooldown || 400;
+  fighter.soulMultiplicityCooldown = skillCfg.cooldown || 1000;
 
   let dx = 0;
   let dy = 0;
@@ -2405,17 +2413,18 @@ export function executeMahitoSoulMultiplicity(fighter, targetHint = null) {
     // Summon swarming Transfigured Humans!
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, "SOUL MULTIPLICITY!", "#C026D3");
     triggerGlobalScreenShake(6, 12);
-    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.minionsThrowVoiceline || 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3', cfg.sounds?.minionsThrowVoicelineVolume ?? 2.0);
+    const minionVoiceVol = cfg.soundVolumes?.minionsThrowVoiceline !== undefined ? cfg.soundVolumes.minionsThrowVoiceline : (cfg.sounds?.minionsThrowVoicelineVolume ?? 2.0);
+    audioSystem.playFighterVoiceline(fighter, cfg.sounds?.minionsThrowVoiceline || 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3', minionVoiceVol);
 
     const ownerIndex = (typeof fighter.fighterIndex === 'number')
       ? fighter.fighterIndex
       : (state.fighters ? state.fighters.indexOf(fighter) : 0);
 
     const summonCount = skillCfg.summonCount || 1;
-    const minionHp = skillCfg.minionHp || 25;
+    const minionHp = skillCfg.minionHp || 50;
     const minionDamage = skillCfg.minionDamage || 10;
     const minionSpeed = skillCfg.minionSpeed || 1.8;
-    const minionSize = skillCfg.minionSize || 16;
+    const minionSize = skillCfg.minionSize || 30;
 
     const summonSounds = cfg.sounds?.minionSummons || [
       cfg.sounds?.minionSummon || 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
@@ -2542,13 +2551,14 @@ export function executeMahitoDomainExpansion(fighter, targetHint = null) {
   // Apply full cooldown immediately
   fighter.domainCooldown = cfg.domainExpansion?.cooldown || 2000;
   
-  audioSystem.playFighterVoiceline(fighter, cfg.sounds?.domainChannelSound || 'Assets/Sound Effects/Skills/mahito-domainchanneling-voiceline.mp3', cfg.sounds?.domainChannelVolume || 3.5, 1.0, 0, 0, { priority: 'domain', isProtected: true, durationMs: 2500 });
+  const domChanVol = cfg.soundVolumes?.domainChannelSound !== undefined ? cfg.soundVolumes.domainChannelSound : (cfg.sounds?.domainChannelVolume || 3.5);
+  audioSystem.playFighterVoiceline(fighter, cfg.sounds?.domainChannelSound || 'Assets/Sound Effects/Skills/mahito-domainchanneling-voiceline.mp3', domChanVol, 1.0, 0, 0, { priority: 'domain', isProtected: true, durationMs: 2500 });
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, "DOMAIN EXPANSION...", "#D946EF");
 }
 
 export function updateMahitoDomainExpansion(fighter) {
   const cfg = CONFIG.mahito || {};
-  const domainDuration = cfg.domainExpansion?.duration || 400;
+  const domainDuration = cfg.domainExpansion?.duration || 600;
 
   // Channeling Phase
   if (fighter.domainChargeTimer > 0) {
@@ -2584,9 +2594,11 @@ export function updateMahitoDomainExpansion(fighter) {
       fighter.domainActive = true;
       fighter.domainTimer = domainDuration;
       
-      audioSystem.playFighterVoiceline(fighter, cfg.sounds?.domainDeploySound || 'Assets/Sound Effects/Skills/mahito-domaindeploy-voiceline.mp3', cfg.sounds?.domainDeployVolume || 3.5, 1.0, 0, 0, { priority: 'domain', isProtected: true, durationMs: 4500 });
+      const domDeployVol = cfg.soundVolumes?.domainDeploySound !== undefined ? cfg.soundVolumes.domainDeploySound : (cfg.sounds?.domainDeployVolume || 3.5);
+      audioSystem.playFighterVoiceline(fighter, cfg.sounds?.domainDeploySound || 'Assets/Sound Effects/Skills/mahito-domaindeploy-voiceline.mp3', domDeployVol, 1.0, 0, 0, { priority: 'domain', isProtected: true, durationMs: 4500 });
       if (cfg.sounds?.domainDeployAltSound) {
-        audioSystem.playSFX(cfg.sounds.domainDeployAltSound, cfg.sounds?.domainDeployAltVolume ?? 1.2);
+        const domAltVol = cfg.soundVolumes?.domainDeployAltSound !== undefined ? cfg.soundVolumes.domainDeployAltSound : (cfg.sounds?.domainDeployAltVolume ?? 1.2);
+        audioSystem.playSFX(cfg.sounds.domainDeployAltSound, domAltVol);
       }
       spawnFloatingText(fighter.x, fighter.y - fighter.r - 40, "SELF-EMBODIMENT OF PERFECTION!", "#FF007F");
       triggerGlobalScreenShake(14, 20);

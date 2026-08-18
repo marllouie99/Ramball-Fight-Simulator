@@ -20,6 +20,7 @@ import { drawMusashiWeapons, drawMusashiSheaths } from '../weapons/musashiWeapon
 import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
 import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
+import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -1174,6 +1175,11 @@ function drawWeaponPreview(ctx, type, color) {
       case 'mahito':
         // Mahito's 5-Blade Scalpel Claws
         drawMahitoClawWeapon(ctx, 0, 0, gunAngle, r, false);
+        return;
+
+      case 'nanami':
+        // Nanami's Wrapped Blunt Cleaver
+        drawNanamiCleaver(ctx, 0, 0, gunAngle, r, false);
         return;
 
       default:

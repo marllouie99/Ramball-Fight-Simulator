@@ -97,7 +97,7 @@ export function performMeleeAttack(fighter, opponent) {
     const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
     const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
     const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-    const inMeleeRange = opponent && Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y) < (fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+    const inMeleeRange = opponent && Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y) < (fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 20));
     
     if (ccTenacity > 0 && inMeleeRange) {
       isParalyzed = false; // Allow attacking under CC!

@@ -303,4 +303,27 @@ To support a new weapon in the Weapon Studio:
 - **No Parenthetical Suffixes or Countdown Timers**: All HUD skill bar labels returned in `hudSkillProviders.js` MUST contain ONLY the clean skill title (e.g., `SOUL EVASION`, `IDLE TRANSFIGURATION`, `SOUL MULTIPLICITY`).
 - **NEVER** append status suffixes (such as `(USED)`, `(ACTIVE)`, `(READY)`) or countdown timer strings (such as `(1.9s)`) onto skill bar labels. The fill progress percentage (`pct`) and ready state (`ready`) handle all visual feedback automatically.
 
+## 23. Configuration-Driven Architecture & Prohibition of Hardcoded Combat Values
+
+### Strict Config Derivation Requirement
+- **ALL** character attributes, core stats, skill cooldowns, channeling timers, animation durations, damage numbers, damage multipliers, hit-stun frames, reach/range limits, knockback impulses, projectile velocities/radii, evasion thresholds, and minion/illusion stats MUST strictly derive from their corresponding character configuration file in `js/configs/characters/` (e.g., `mahitoConfig.js`, `gojoConfig.js`, `sukunaConfig.js`, `tojiConfig.js`, `nanamiConfig.js`, `mahoragaConfig.js`, `yutaConfig.js`, `genosConfig.js`, etc.) accessible through `CONFIG.<characterId>`.
+
+### Prohibition of Arbitrary In-Code Constants
+- **NEVER** hardcode arbitrary magic numbers (such as `cd = 400`, `damage = 25`, `reach = 360`, `minionHp = 25`, `hitStun = 14`, `threshold = 0.35`) inside:
+  - Fighter class definitions (`*Fighter.js`)
+  - Combat execution modules (`*Combat.js`)
+  - Projectile system handlers (`projectileSystem.js`)
+  - Minion and illusion managers (`illusionSystem.js`)
+  - Status effect & entity renderers (`statusEffects.js`, `EntityRenderer.js`)
+  - HUD skill providers (`hudSkillProviders.js`)
+  - UI stat sheets and index screens (`FighterIndexScreen.js`, `WeaponIndexScreen.js`)
+
+### Defensive Fallback Value Alignment
+- Whenever using fallback expressions (such as `CONFIG.mahito?.soulMultiplicity?.cooldown || 1000` or `CONFIG.mahito?.evasion?.threshold ?? 0.75`), the fallback value **MUST EXACTLY MATCH** the default constant value defined in the fighter's config file.
+- **NEVER** provide an arbitrary, stale, or guessed value as a fallback.
+
+### Full UI & HUD Gauge Synchronization
+- HUD skill progress bars (`hudSkillProviders.js`), cooldown clocks, and stat displays MUST read from the exact same configuration keys as the combat logic so that visual meters and physical gameplay timers remain 100% synchronized at all times.
+
+
 

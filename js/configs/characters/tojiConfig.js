@@ -26,10 +26,12 @@ export const tojiConfig = {
     ambushKatanaChargeDuration: 30, // 2nd Sequence: Katana windup charging duration (frames) before Soul Slash
     ambushKatanaFreezeDuration: 70, // 2nd Sequence: Target freeze duration (frames) for Katana execution
     ambushKnockbackForce: 48,      // Extreme high-speed knockback force launching target flying & bouncing across arena!
+    ambushSpearThrustKnockback: 28, // Physical velocity impulse on Inverted Spear backstab
     ambushPhantomFlurryStrikes: 10,   // 3rd Sequence: Number of rapid phantom afterimage flurry slashes
     ambushPhantomFlurryFrameRate: 8, // 3rd Sequence: Slower readable attack speed between each phantom strike (42 frames = 0.7s)
     ambushPhantomFlurryDamage: 15,    // 3rd Sequence: True Damage per phantom strike
     ambushPhantomFlurryDistance: 8,   // 3rd Sequence: Tight teleport distance (px) from target during flurry slashes
+    ambushFlurryFinalRecoil: 38,     // Final finisher blast knockback push on target
 
     // Primary Melee: Inverted Spear of Heaven
     spearRange: 50,              // Distance required to land melee hit
@@ -42,6 +44,8 @@ export const tojiConfig = {
     katanaRange: 75,             // Wide sweep range
     katanaCooldown: 300,         // Cooldown between Soul Slashes (5 seconds at 60fps)
     katanaDamage: 35,            // Massive True Damage
+    katanaSlowDuration: 90,      // Slow duration frames applied on Katana slash
+    katanaSlowMultiplier: 0.40,  // Slow movement speed multiplier (40% speed)
     soulWoundDuration: 180,      // Frames target is afflicted with Soul Wound anti-heal (3 seconds)
 
     ultimateCooldown: 1500,

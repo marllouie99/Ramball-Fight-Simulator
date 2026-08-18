@@ -91,7 +91,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
         if (!attacker._lastInfinityCollisionTime || now - attacker._lastInfinityCollisionTime >= 350) {
           attacker._lastInfinityCollisionTime = now;
           attacker.infinityCollisionCount = (attacker.infinityCollisionCount || 0) + 1;
-          const collisionsNeeded = 5;
+          const collisionsNeeded = CONFIG.mahoraga?.maxAdaptationStages || 5;
 
           if (!attacker.gojoInfinityImmune && attacker.infinityCollisionCount >= collisionsNeeded) {
             attacker.gojoInfinityImmune = true;
@@ -105,7 +105,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
             attacker.timeStopTimer = 0;
             attacker.isFrozenByInfinity = false;
             attacker.adaptationPauseTimer = 0;
-            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, '⚡ LIMITLESS ADAPTED! (5/5)', '#00F3FF');
+            spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚡ LIMITLESS ADAPTED! (${collisionsNeeded}/${collisionsNeeded})`, '#00F3FF');
             return false; // Instantly bypass block on adaptation frame!
           } else if (!attacker.gojoInfinityImmune) {
             spawnFloatingText(attacker.x, attacker.y - attacker.r - 25, `⚙️ LIMITLESS (${attacker.infinityCollisionCount}/5)`, '#A0C8FF');
@@ -133,7 +133,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
 
       // Inside Gojo's own domain: no physical pushback (Unlimited Void uses time-stop paralysis instead)
       if (!fighter.domainActive) {
-        const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 10.5; // Strong clean bounce impulse from config
+        const pushForce = CONFIG.gojo?.infinityMeleePushForce ?? 8.5; // Strong clean bounce impulse from config
 
         // Push the attacker back with strong outward velocity
         attacker.vx = nx * pushForce;
@@ -235,7 +235,7 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 
   // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
   const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
-  const dist = (CONFIG.gojo?.teleportDodgeDistance ?? 75) + Math.random() * 15;
+  const dist = (CONFIG.gojo?.teleportDodgeDistance ?? 85) + Math.random() * 15;
 
   let targetX = fighter.x + Math.cos(angle) * dist;
   let targetY = fighter.y + Math.sin(angle) * dist;

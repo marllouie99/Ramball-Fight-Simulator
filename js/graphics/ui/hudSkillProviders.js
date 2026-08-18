@@ -46,7 +46,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const purpleTimer = f.purpleCooldown !== undefined ? f.purpleCooldown : purpleMax;
     let purplePct;
     if (f.isChannelingPurple) {
-      const chargeMax = CONFIG.gojo?.purpleChargeMax || 100;
+      const chargeMax = CONFIG.gojo?.purpleChargeMax || 120;
       const chargeTimer = f.purpleChargeTimer || 0;
       purplePct = Math.max(0, Math.min(100, (1 - chargeTimer / chargeMax) * 100));
     } else if (purpleOrb) {
@@ -62,7 +62,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const redTimer = f.redCooldown !== undefined ? f.redCooldown : redMax;
     const redPct = Math.max(0, Math.min(100, (1 - (redTimer / redMax)) * 100));
 
-    const rctMax = CONFIG.gojo?.reverseCursedTechniqueCooldown || 900;
+    const rctMax = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
     const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
     let rctPct = 0;
     if (f.isChannelingRCT) {
@@ -98,7 +98,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       let ap = 0;
       const ph = f.ambushPhase;
       if (ph === 'FRONT_PAUSE' || ph === 'FRONT_LAUNCH') { ap = 0.05; }
-      else if (ph === 'BACK_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushBackChargeDuration || 25))); ap = 0.10 + p * 0.20; }
+      else if (ph === 'BACK_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushBackChargeDuration || 30))); ap = 0.10 + p * 0.20; }
       else if (ph === 'BACK_STAB' || ph === 'KATANA_DRAW') { ap = 0.35; }
       else if (ph === 'KATANA_CHASE' || ph === 'KATANA_CHARGE') { const p = Math.max(0, 1 - ((f.ambushTimer || 0) / (CONFIG.toji?.ambushKatanaChargeDuration || 30))); ap = 0.40 + p * 0.20; }
       else if (ph === 'KATANA_SLASH') { ap = 0.65; }
@@ -128,7 +128,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
   }
   if (f.characterId === 'sukuna' || f.type === 'sukuna') {
     const themeColor = f.color || '#ff4500';
-    const domainMax = CONFIG.sukuna?.domainCooldown || 1200;
+    const domainMax = CONFIG.sukuna?.domainCooldown || 1950;
     const domainTimer = f.domainCooldown !== undefined ? f.domainCooldown : domainMax;
     let domainPct;
     if (f.isChannelingDomainExpansion) {
@@ -145,7 +145,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const flameTimer = f.divineFlameCooldown !== undefined ? f.divineFlameCooldown : flameMax;
     let flamePct;
     if (f.isChannelingDivineFlame) {
-      const chargeMax = f.divineFlameChargeMax || 150;
+      const chargeMax = f.divineFlameChargeMax || CONFIG.sukuna?.divineFlameChargeMax || 100;
       const chargeTimer = f.divineFlameChargeTimer || 0;
       flamePct = Math.max(0, Math.min(100, (chargeTimer / chargeMax) * 100));
     } else if ((f.divineFlameRecoveryTimer || 0) > 0) {
@@ -154,7 +154,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       flamePct = Math.max(0, Math.min(100, (1 - (flameTimer / flameMax)) * 100));
     }
 
-    const rctMax = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 900;
+    const rctMax = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700;
     const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
     let rctPct;
     if ((f.rctVisualTimer || 0) > 0) {
@@ -177,7 +177,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const lvlStr = `${currentLevel}`;
 
     const isLevel8 = totalStages >= 8;
-    const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.05);
+    const windowThreshold = f.maxHp * (CONFIG.mahoraga?.fatalDamageThresholdPct || 0.15);
 
     let wheelPct = 0;
     if ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0) {
@@ -217,7 +217,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       }
     }
 
-    const shoutMax = CONFIG.mahoraga?.shoutCooldown || 480;
+    const shoutMax = CONFIG.mahoraga?.shoutCooldown || 1000;
     const shoutTimer = f.shoutCooldown !== undefined ? f.shoutCooldown : shoutMax;
     let shoutPct = 0;
     if (f.isShouting) {
@@ -226,7 +226,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       shoutPct = Math.max(0, Math.min(100, (1 - (shoutTimer / shoutMax)) * 100));
     }
 
-    const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
+    const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.03;
     const currentRegenRate = totalStages * rctPerStage;
     const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
@@ -282,11 +282,11 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const clapTimer = f.boogieWoogieCooldown !== undefined ? f.boogieWoogieCooldown : clapMax;
     const clapPct = Math.max(0, Math.min(100, (1 - (clapTimer / clapMax)) * 100));
 
-    const rockMax = CONFIG.todo?.rockCooldown || 300;
+    const rockMax = CONFIG.todo?.rockCooldown || 180;
     const rockTimer = f.rockThrowCooldown !== undefined ? f.rockThrowCooldown : rockMax;
     const rockPct = Math.max(0, Math.min(100, (1 - (rockTimer / rockMax)) * 100));
 
-    const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.50;
+    const hpThreshold = CONFIG.todo?.hpThresholdUltTrigger ?? 0.65;
     const hpRatio = (f.maxHp && f.maxHp > 0) ? (f.hp / f.maxHp) : 1.0;
     let ultPct = 0;
     let ultReady = false;
@@ -297,7 +297,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     if (f.isTakadaUltActive) {
       const remaining = f.takadaUltTimer || 0;
-      const dur = CONFIG.todo?.ultDuration ?? 5000;
+      const dur = CONFIG.todo?.ultDuration ?? 3000;
       ultPct = Math.max(0, Math.min(100, (remaining / dur) * 100));
       ultReady = !isGojoDomainActive && remaining > 0;
     } else if (f.isTakadaChanneling) {
@@ -339,7 +339,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     let ultReady = false;
 
     if (f.soulSwapActive) {
-      const ultDuration = CONFIG.yuji?.soulSwapDuration || 500;
+      const ultDuration = CONFIG.yuji?.soulSwapDuration || 800;
       ultPct = Math.max(0, Math.min(100, ((f.soulSwapTimer || 0) / ultDuration) * 100));
     } else if (f.hasSoulSwapped) {
       ultPct = 0;
@@ -383,7 +383,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const skillPct = Math.max(0, Math.min(100, (1 - (skillCd / maxSkillCd)) * 100));
     const skillReady = skillPct >= 99;
 
-    const maxMultiplicityCd = CONFIG.mahito?.soulMultiplicity?.cooldown || 400;
+    const maxMultiplicityCd = CONFIG.mahito?.soulMultiplicity?.cooldown || 1000;
     const multiplicityCd = f.soulMultiplicityCooldown !== undefined ? f.soulMultiplicityCooldown : 0;
     const multiplicityPct = Math.max(0, Math.min(100, (1 - (multiplicityCd / maxMultiplicityCd)) * 100));
     const multiplicityReady = multiplicityPct >= 99;
@@ -395,8 +395,12 @@ export function getSkillDataForFighter(f, getProjectiles) {
     let domainReady = false;
     let domainLabel = 'SELF-EMBODIMENT OF PERFECTION';
 
-    if (f.domainActive) {
-      const domainDuration = CONFIG.mahito?.domainExpansion?.duration || 400;
+    if (f.isChannelingDomainExpansion) {
+      domainPct = 100;
+      domainReady = true;
+      domainLabel = 'SELF-EMBODIMENT OF PERFECTION';
+    } else if (f.domainActive) {
+      const domainDuration = CONFIG.mahito?.domainExpansion?.duration || 600;
       const remaining = f.domainTimer || 0;
       domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
       domainReady = true;
@@ -409,7 +413,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     let evasionPct = 0;
     let evasionReady = false;
     const evasionLabel = 'SOUL EVASION';
-    const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.35;
+    const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.75;
 
     if (f.isEvading) {
       const maxDuration = CONFIG.mahito?.evasion?.duration || 300;
@@ -437,6 +441,64 @@ export function getSkillDataForFighter(f, getProjectiles) {
       skills.push({ id: 'isbodk', pct: formPct, ready: formReady, color: themeColor, label: formLabel });
     }
     return skills;
+  }
+  if (f.characterId === 'nanami' || f.type === 'nanami') {
+    const themeColor = f.color || '#D4AF37';
+
+    // Skill 1: Decisive Strike (Ratio Lunge)
+    const baseLungeMax = f.lungeCooldownMax || CONFIG.nanami?.lungeCooldown || 200;
+    const lungeTimer = f.lungeCooldown !== undefined ? f.lungeCooldown : 0;
+    let lungePct = 0;
+    let lungeReady = false;
+
+    if (f.isLunging) {
+      const lungeDuration = f.lungeMaxTimer || CONFIG.nanami?.lungeDuration || 16;
+      const remainingLunge = f.lungeTimer !== undefined ? f.lungeTimer : 0;
+      lungePct = Math.max(0, Math.min(100, (1 - (remainingLunge / lungeDuration)) * 100));
+      lungeReady = true;
+    } else if (f.ratioHitPauseTimer && f.ratioHitPauseTimer > 0) {
+      lungePct = 100;
+      lungeReady = true;
+    } else {
+      const refundMult = CONFIG.nanami?.lungeCooldownRefundMultiplier || 0.50;
+      const isRefunded = (lungeTimer <= Math.round(baseLungeMax * refundMult) && lungeTimer > 0 && f.isOvertimeActive);
+      const effectiveMax = isRefunded ? Math.round(baseLungeMax * refundMult) : baseLungeMax;
+
+      lungePct = Math.max(0, Math.min(100, (1 - (lungeTimer / effectiveMax)) * 100));
+      lungeReady = lungePct >= 99;
+    }
+
+    // Skill 2: Collapse (Falling Rubble)
+    const collapseMax = f.collapseCooldownMax || CONFIG.nanami?.collapseCooldown || 600;
+    const collapseTimer = f.collapseCooldown !== undefined ? f.collapseCooldown : 0;
+    const collapsePct = Math.max(0, Math.min(100, (1 - (collapseTimer / collapseMax)) * 100));
+
+    // Ultimate: 4-Fold Black Flash Blitz
+    const ultMax = f.ultimateCooldownMax || CONFIG.nanami?.ultimateCooldown || 2000;
+    const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
+    const ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+
+    // Overtime Passive Gauge
+    let overtimePct = 0;
+    let overtimeReady = f.isOvertimeActive;
+    let overtimeLabel = f.isOvertimeActive ? 'OVERTIME (120%)' : 'WORK SHIFT (85%)';
+
+    if (f.isOvertimeActive) {
+      overtimePct = 100;
+      overtimeReady = true;
+    } else {
+      const elapsed = f.roundElapsedFrames || 0;
+      const targetFrames = (CONFIG.nanami?.overtimeThresholdSeconds || 25) * 60;
+      overtimePct = Math.max(0, Math.min(100, (elapsed / targetFrames) * 100));
+      overtimeReady = overtimePct >= 99;
+    }
+
+    return [
+      { id: 'lunge',    pct: lungePct,    ready: lungeReady,        color: themeColor, label: 'DECISIVE STRIKE' },
+      { id: 'collapse', pct: collapsePct, ready: collapsePct >= 99, color: themeColor, label: 'COLLAPSE' },
+      { id: 'blitz',    pct: ultPct,      ready: ultPct >= 99,      color: themeColor, label: '4-FOLD BLACK FLASH' },
+      { id: 'overtime', pct: overtimePct, ready: overtimeReady,     color: themeColor, label: overtimeLabel }
+    ];
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
     const themeColor = '#F5C400';
@@ -537,7 +599,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const alreadySummoned = rk && rk.hasSummonedAt50Hp;
 
     if (rk && rk.active && !rk.isDying) {
-      const maxHp = rk.maxHp || CONFIG.yuta?.rikaMaxHp || 250;
+      const maxHp = rk.maxHp || CONFIG.yuta?.rikaMaxHp || 500;
       rikaPct = Math.max(0, Math.min(100, (rk.hp / maxHp) * 100));
       f._maxRikaPct = 0;
     } else if (f.rikaCallTimer > 0 || (rk && rk.chargeTimer > 0)) {
@@ -545,11 +607,11 @@ export function getSkillDataForFighter(f, getProjectiles) {
       f._maxRikaPct = 100;
     } else if (alreadySummoned) {
       const baseline = f.rikaRechargeHpBaseline !== undefined ? f.rikaRechargeHpBaseline : f.hp;
-      const reqDamage = (f.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.50);
+      const reqDamage = (f.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.20);
       const damageTaken = Math.max(0, baseline - f.hp);
       rikaPct = Math.max(0, Math.min(100, (damageTaken / reqDamage) * 100));
     } else {
-      const threshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
+      const threshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.60;
       const rawPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - threshold)) * 100));
       f._maxRikaPct = Math.max(f._maxRikaPct || 0, rawPct);
       rikaPct = f._maxRikaPct;
@@ -563,18 +625,18 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
     rikaPct = Math.max(0, Math.min(100, f._smoothRikaPct));
 
-    const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.80;
+    const domainHpThreshold = CONFIG.yuta?.domainHpThreshold ?? 0.60;
     let domainPct;
     if (f.isChannelingDomain) {
       domainPct = 100;
     } else if (f.domainActive) {
-      const domainDuration = CONFIG.yuta?.domainDuration || 800;
+      const domainDuration = CONFIG.yuta?.domainDuration || 500;
       const remaining = f.domainTimer || 0;
       domainPct = Math.max(0, Math.min(100, (remaining / domainDuration) * 100));
     } else if (f.domainUseCount === 0) {
       domainPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - domainHpThreshold)) * 100));
     } else if (f.domainUseCount === 1) {
-      const hpNeeded = (f.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.20);
+      const hpNeeded = (f.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.75);
       const hpLost = f.domain2DamageTaken || 0;
       domainPct = Math.max(0, Math.min(100, (hpLost / hpNeeded) * 100));
     } else {
@@ -599,7 +661,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       beamPct = Math.max(0, Math.min(100, (1 - (beamCdTimer / beamCdMax)) * 100));
     } else {
       // First fill before first cast: monotonically fills up as Yuta takes damage down to 15% HP
-      const beamThreshold = CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15;
+      const beamThreshold = CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.60;
       const rawBeamPct = Math.max(0, Math.min(100, ((1 - (f.hp / f.maxHp)) / (1 - beamThreshold)) * 100));
       f._maxBeamPct = Math.max(f._maxBeamPct || 0, rawBeamPct);
       beamPct = f._maxBeamPct;

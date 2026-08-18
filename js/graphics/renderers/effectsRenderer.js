@@ -1016,3 +1016,113 @@ export function drawTodoTakadaIdolScreenOverlay() {
 
   ctx.restore();
 }
+
+// ─────────────────────────────────────────────
+// Kento Nanami — Manga Action Speed Lines (Rule 16 Compliant)
+// ─────────────────────────────────────────────
+let _nanamiSpeedLineSeeds = null;
+
+function _initNanamiSpeedLineSeeds() {
+  _nanamiSpeedLineSeeds = [];
+  const count = 24;
+  const clusterWidth = 40; // ±(r * 1.4) around body
+  for (let i = 0; i < count; i++) {
+    const norm = (i / (count - 1)) * 2 - 1; // -1 to +1
+    const perpOffset = norm * clusterWidth;
+    const normDist = 1 - Math.abs(norm); // Parabolic length: center lines longest
+    const len = 40 + normDist * 55;
+    const maxThick = 1.0 + Math.random() * 1.4; // 1.0px - 2.4px
+    const speed = 1.2 + Math.random() * 0.8;
+    const phase = Math.random() * 100;
+
+    // 4-slot theme: [Radiant Gold, Amber Gold, White Core, Deep Antique Gold]
+    let color;
+    if (i % 4 === 0) color = '#FFD700'; // Radiant Gold
+    else if (i % 4 === 1) color = '#FBBF24'; // Amber Gold
+    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White Core
+    else color = '#D4AF37'; // Deep Antique Gold
+
+    _nanamiSpeedLineSeeds.push({
+      perpOffset,
+      len,
+      maxThick,
+      speed,
+      phase,
+      color
+    });
+  }
+}
+
+export function drawNanamiSpeedLines() {
+  if (!state.fighters) return;
+  const nanami = state.fighters.find(f => {
+    if (!f || f.hp <= 0 || (f.characterId !== 'nanami' && f.type !== 'nanami')) return false;
+    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush || (f.isFrozenByInfinity);
+    if (isFrozen) return false;
+    return f.isBlitzing || f.isLunging;
+  });
+  if (!nanami) return;
+
+  const ctx = state.ctx;
+  if (!ctx) return;
+
+  const activeState = nanami.isBlitzing ? 'blitz' : (nanami.isLunging ? 'lunge' : false);
+  if (!activeState) return;
+
+  if (nanami._lastSpeedLineState !== activeState) {
+    _nanamiSpeedLineSeeds = null;
+  }
+  nanami._lastSpeedLineState = activeState;
+
+  if (!_nanamiSpeedLineSeeds) _initNanamiSpeedLineSeeds();
+
+  const lineAngle = nanami.gunAngle !== undefined ? nanami.gunAngle : (nanami.angle || 0);
+  const cosA = Math.cos(lineAngle);
+  const sinA = Math.sin(lineAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  const cx = nanami.x;
+  const cy = nanami.y;
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+
+  ctx.save();
+
+  for (let i = 0; i < _nanamiSpeedLineSeeds.length; i++) {
+    const seed = _nanamiSpeedLineSeeds[i];
+    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 85);
+    const backOffset = (nanami.r || 25) * 1.2;
+    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+
+    const halfLen = seed.len / 2;
+    const halfThick = seed.maxThick / 2;
+    const midOff = halfLen * 0.15;
+
+    const startX = lineCenterX - cosA * halfLen;
+    const startY = lineCenterY - sinA * halfLen;
+
+    const midX = lineCenterX + cosA * midOff;
+    const midY = lineCenterY + sinA * midOff;
+
+    const endX = lineCenterX + cosA * halfLen;
+    const endY = lineCenterY + sinA * halfLen;
+
+    const topMidX = midX + perpX * halfThick;
+    const topMidY = midY + perpY * halfThick;
+
+    const botMidX = midX - perpX * halfThick;
+    const botMidY = midY - perpY * halfThick;
+
+    ctx.fillStyle = seed.color;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(topMidX, topMidY);
+    ctx.lineTo(endX, endY);
+    ctx.lineTo(botMidX, botMidY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}

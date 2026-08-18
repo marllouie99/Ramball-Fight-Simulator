@@ -36,7 +36,7 @@ export class MahitoFighter extends Fighter {
     // Core combat & morph state
     this.isMeleeFighter = true;
     this.punchAnimTimer = 0;
-    this.punchMaxTime = CONFIG.mahito?.punchSpeed || 20;
+    this.punchMaxTime = CONFIG.mahito?.punchSpeed || 50;
     this.cooldownTimer = 0;
     this.isRightPunch = true;
     this.morphType = 'claw';
@@ -47,7 +47,7 @@ export class MahitoFighter extends Fighter {
 
     // Passive Skill: Phantom Soul Slip (Phase-Through Claw Dash)
     this.soulPhaseDashTimer = 0;
-    this.soulPhaseDashCooldown = CONFIG.mahito?.soulPhaseSlip?.cooldown || 180;
+    this.soulPhaseDashCooldown = CONFIG.mahito?.soulPhaseSlip?.cooldown || 100;
     this.soulPhaseDashTarget = null;
     this.soulPhaseDashHit = false;
     this._dashAfterimages = [];
@@ -56,7 +56,7 @@ export class MahitoFighter extends Fighter {
     this.sharedSkillCooldown = 0;
     this.fleshSurgeCooldown = CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.fleshSurge?.cooldown || 300;
     this.fleshSurgeAnimTimer = 0;
-    this.fleshSurgeMaxTime = CONFIG.mahito?.fleshSurge?.animDuration || 24;
+    this.fleshSurgeMaxTime = CONFIG.mahito?.fleshSurge?.slideFrames ? (CONFIG.mahito.fleshSurge.slideFrames + CONFIG.mahito.fleshSurge.plungeFrames) : 18;
     this._fleshSurgePlungeAngle = null;
 
     // Third Skill: Mutated Mace Cannon (Stretch Arm Spiked Ball Shrapnel)
@@ -70,7 +70,7 @@ export class MahitoFighter extends Fighter {
     this._twinScissorData = null;
 
     // Fifth Skill: Soul Multiplicity & Body Repel (Independent Cooldown)
-    this.soulMultiplicityCooldown = CONFIG.mahito?.soulMultiplicity?.cooldown || 400;
+    this.soulMultiplicityCooldown = CONFIG.mahito?.soulMultiplicity?.cooldown || 1000;
 
     // Transformation: Instant Spirit Body of Distorted Killing (ISBoDK)
     this.isTransformed = false;
@@ -102,7 +102,7 @@ export class MahitoFighter extends Fighter {
     this.punchAnimTimer = 0;
     this.cooldownTimer = 0;
     this.soulPhaseDashTimer = 0;
-    this.soulPhaseDashCooldown = CONFIG.mahito?.soulPhaseSlip?.cooldown || 180;
+    this.soulPhaseDashCooldown = CONFIG.mahito?.soulPhaseSlip?.cooldown || 100;
     this.soulPhaseDashTarget = null;
     this.soulPhaseDashHit = false;
     this._dashAfterimages = [];
@@ -116,7 +116,7 @@ export class MahitoFighter extends Fighter {
     this.twinScissorCooldown = CONFIG.mahito?.sharedSkillCooldown || CONFIG.mahito?.twinScissor?.cooldown || 300;
     this.twinScissorAnimTimer = 0;
     this._twinScissorData = null;
-    this.soulMultiplicityCooldown = CONFIG.mahito?.soulMultiplicity?.cooldown || 400;
+    this.soulMultiplicityCooldown = CONFIG.mahito?.soulMultiplicity?.cooldown || 1000;
     this.isTransformed = false;
     this.isDistortedKilling = false;
     this.transformDuration = 0;
@@ -158,7 +158,8 @@ export class MahitoFighter extends Fighter {
     triggerGlobalScreenShake(12, 12);
     spawnImpactFlash(this.x, this.y, 90, '#D946EF');
     const mahitoCfg = CONFIG.mahito || {};
-    audioSystem.playSFX(mahitoCfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', 2.0);
+    const expVol = mahitoCfg.soundVolumes?.bodyExplode ?? (mahitoCfg.sounds?.bodyExplodeVolume ?? 2.0);
+    audioSystem.playSFX(mahitoCfg.sounds?.bodyExplode || 'Assets/Sound Effects/Skills/mahito-body-explode.mp3', expVol);
   }
 
   /**
@@ -275,8 +276,8 @@ export class MahitoFighter extends Fighter {
     }
 
     if (this.isEvading) {
-      // Enforce evasion speedMultiplier (1.25x) from CONFIG on main body
-      const evaSpeedMult = CONFIG.mahito?.evasion?.speedMultiplier || 1.25;
+      // Enforce evasion speedMultiplier (1.50x) from CONFIG on main body
+      const evaSpeedMult = CONFIG.mahito?.evasion?.speedMultiplier || 1.50;
       const targetSpeed = (this.baseSpeed || CONFIG.mahito?.moveSpeed || 5.8) * evaSpeedMult;
       const currentSpeed = Math.hypot(this.vx, this.vy);
       if (currentSpeed > 0) {
@@ -288,7 +289,7 @@ export class MahitoFighter extends Fighter {
       }
 
       // ── Evasion Health Regeneration Buff ──
-      const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.40;
+      const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.05;
       if (this.hp > 0 && this.hp < this.maxHp) {
         this.hp = Math.min(this.maxHp, Number((this.hp + evaRegenRate).toFixed(2)));
         this._evadeRegenTick = (this._evadeRegenTick || 0) + 1;
@@ -312,7 +313,7 @@ export class MahitoFighter extends Fighter {
           mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3'
         ];
         const chosenSound = cloneSounds[Math.floor(Math.random() * cloneSounds.length)];
-        const vol = mahitoCfg.sounds?.cloneNoiseVolume ?? 1.5;
+        const vol = mahitoCfg.soundVolumes?.cloneNoise ?? (mahitoCfg.sounds?.cloneNoiseVolume ?? 1.5);
         if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
           audioSystem.playSFX(chosenSound, vol);
         }
@@ -678,7 +679,6 @@ export class MahitoFighter extends Fighter {
       if (this.fleshSurgeCooldown > 0) this.fleshSurgeCooldown--;
       if (this.maceCannonCooldown > 0) this.maceCannonCooldown--;
       if (this.twinScissorCooldown > 0) this.twinScissorCooldown--;
-      if (this.domainCooldown > 0) this.domainCooldown--;
       if (this.ultimateCooldown > 0) this.ultimateCooldown--;
     }
 
@@ -731,7 +731,7 @@ export class MahitoFighter extends Fighter {
         const minSurgeDist = CONFIG.mahito?.fleshSurge?.minDistance || 240;
         const maxSurgeDist = CONFIG.mahito?.fleshSurge?.reachMax || 420;
         const dashRangeMin = CONFIG.mahito?.soulPhaseSlip?.triggerRangeMin || 70;
-        const dashRangeMax = CONFIG.mahito?.soulPhaseSlip?.triggerRangeMax || 220;
+        const dashRangeMax = CONFIG.mahito?.soulPhaseSlip?.triggerRangeMax || 300;
         const maceMinDist = CONFIG.mahito?.maceCannon?.minDistance || 240;
         const maceMaxDist = CONFIG.mahito?.maceCannon?.reachMax || 380;
         const scissorMinDist = CONFIG.mahito?.twinScissor?.minDistance || 240;
@@ -864,7 +864,7 @@ export class MahitoFighter extends Fighter {
    */
   executeSoulPhaseSlip(target = null) {
     if (this.domainActive) return;
-    const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.35;
+    const evasionThreshold = CONFIG.mahito?.evasion?.threshold || 0.75;
     const canEvade = (typeof state !== 'undefined' && state.gameState === 'playing') && 
                      this.hp > 0 && this.maxHp > 0 && 
                      (this.hp / this.maxHp) <= evasionThreshold && 
@@ -994,8 +994,9 @@ export class MahitoFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 28, "👤 SOUL DISTORTION...", "#C026D3");
     triggerGlobalScreenShake(4, 8);
     const mahitoCfg = CONFIG.mahito || {};
-    audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
-    audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    const cloneVol = mahitoCfg.soundVolumes?.splitClone !== undefined ? mahitoCfg.soundVolumes.splitClone : (mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', cloneVol);
+    audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', cloneVol);
   }
 
   executeActualSplit() {
@@ -1009,7 +1010,7 @@ export class MahitoFighter extends Fighter {
     // Spawn small evasion illusions
     const cloneCount = evaCfg.cloneCount || 3;
     const numCopies = Math.max(1, cloneCount - 1); // Spawn clones so total small versions is exactly cloneCount
-    const launchSpeed = (CONFIG.mahito?.moveSpeed || 5.8) * (CONFIG.mahito?.evasion?.speedMultiplier || 1.25);
+    const launchSpeed = (CONFIG.mahito?.moveSpeed || 5.8) * (CONFIG.mahito?.evasion?.speedMultiplier || 1.50);
     const color = this.color || '#C026D3';
 
     // Split current HP & maxHP equally among all copies (divided by cloneCount)
@@ -1105,8 +1106,9 @@ export class MahitoFighter extends Fighter {
     spawnFloatingText(this.x, this.y - this.r - 28, "👤 SOUL SPLIT EVASION!", "#C026D3");
     triggerGlobalScreenShake(6, 10);
     const mahitoCfg = CONFIG.mahito || {};
-    audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
-    audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    const cloneVol = mahitoCfg.soundVolumes?.splitClone !== undefined ? mahitoCfg.soundVolumes.splitClone : (mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+    audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', cloneVol);
+    audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', cloneVol);
     this.cloneNoiseTimer = 50; // Initial interval before recurring clone chatter begins
   }
 
@@ -1183,9 +1185,10 @@ export class MahitoFighter extends Fighter {
           spawnMahitoSoulExplosion(oldX, oldY, 35, true);
         }
         const mahitoCfg = CONFIG.mahito || {};
+        const cloneVol = mahitoCfg.soundVolumes?.splitClone !== undefined ? mahitoCfg.soundVolumes.splitClone : (mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
         if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
-          audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
-          audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', mahitoCfg.sounds?.splitCloneVolume ?? 1.8);
+          audioSystem.playSFX(mahitoCfg.sounds?.splitClone || 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3', cloneVol);
+          audioSystem.playSFX(mahitoCfg.sounds?.splitCloneAlt || 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3', cloneVol);
         }
 
         this.x = bestEntity.x;
@@ -1221,7 +1224,8 @@ export class MahitoFighter extends Fighter {
     triggerGlobalScreenShake(6, 12);
     spawnImpactFlash(this.x, this.y, 45, '#C026D3');
     const mahitoCfg = CONFIG.mahito || {};
-    audioSystem.playFighterVoiceline(this, mahitoCfg.sounds?.transformBackVoiceline || 'Assets/Sound Effects/Skills/mahito-transformback-voiceline.mp3', mahitoCfg.sounds?.transformBackVoicelineVolume ?? 2.0);
+    const tbVol = mahitoCfg.soundVolumes?.transformBackVoiceline !== undefined ? mahitoCfg.soundVolumes.transformBackVoiceline : (mahitoCfg.sounds?.transformBackVoicelineVolume ?? 2.0);
+    audioSystem.playFighterVoiceline(this, mahitoCfg.sounds?.transformBackVoiceline || 'Assets/Sound Effects/Skills/mahito-transformback-voiceline.mp3', tbVol);
   }
 
   resolveWallBounce(arena, opponent) {

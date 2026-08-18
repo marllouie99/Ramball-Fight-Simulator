@@ -12,8 +12,8 @@ import {
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
-  drawGenosSpeedLines, drawMahoragaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
-  drawTodoTakadaIdolScreenOverlay
+  drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
+  drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -199,6 +199,7 @@ export function renderGame() {
         }
 
         drawGenosSpeedLines(); // Full-screen anime action speed lines during Machine Gun Blows
+        drawNanamiSpeedLines(); // Supersonic manga action speed lines during Nanami blitz/lunges
         drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
         drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
         drawIllusions(); // Draw Doppleganger illusions
@@ -226,6 +227,9 @@ export function renderGame() {
         drawSparkEffects(); // Draw spark effects on top of everything
         drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact
         drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
+
+        // Nanami 7:3 Ratio Ruler & Blood Rupture overlay renders ON TOP of all fighters & entities
+        drawNanamiRatioCritDimScreen();
 
         // Composite flame canvas onto main canvas (clipped to arena bounds)
         compositeFlameCanvas();

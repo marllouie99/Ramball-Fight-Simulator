@@ -396,6 +396,12 @@ function drawIndexDetailScreen() {
     const totalRange = bodyR + baseReach;
     drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'ATK RANGE', `${bodyR} + ${baseReach} (${totalRange}px)`, Math.min(1.0, totalRange / 200), '#D946EF');
     curY += 22;
+  } else if (def.type === 'nanami') {
+    const baseReach = CONFIG.nanami?.cleaverRange || 65;
+    const bodyR = def.radius || 25;
+    const totalRange = bodyR + baseReach;
+    drawPremiumStatBar(ctx, leftX + 18, curY, statBarW, 'ATK RANGE', `${bodyR} + ${baseReach} (${totalRange}px)`, Math.min(1.0, totalRange / 200), '#D4AF37');
+    curY += 22;
   } else {
     curY += 22;
   }

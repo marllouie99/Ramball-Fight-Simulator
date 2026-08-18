@@ -468,40 +468,31 @@ export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
       frontHandX = r * 0.30 + leftReach  * (r * 1.85);
       frontHandY = r * 0.18;
     } else {
-      // Skill 1 (Machine Gun Blows) & Melee Punches: High-speed alternating cybernetic fists
-      if (fighter.isRightPunch) {
-        // Right arm (back/top arm) punches forward smoothly towards target
-        backHandX  = r * 0.30 + lungeExtension * 1.5;
-        backHandY  = -r * 0.18;
-        frontHandX = r * 0.45 + oppositeRecoil;
-        frontHandY = r * 0.18;
-      } else {
-        // Left arm (front/bottom arm) punches forward smoothly towards target
-        frontHandX = r * 0.45 + lungeExtension * 1.5;
-        frontHandY = r * 0.18;
-        backHandX  = r * 0.30 + oppositeRecoil;
-        backHandY  = -r * 0.18;
-      }
+      // Melee Punches: Single cybernetic front hand punch from right edge
+      frontHandX = r * 0.95 + lungeExtension * 1.5;
+      frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.15);
+      backHandX  = 0;
+      backHandY  = 0;
+      hideBack   = true;
     }
   } else if (isBasicAttacking) {
     // Mode B: Side Profile (Basic Attack) - in pre-rotated local space
     const blastMaxT = 30;
     const blastProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.basicBlastAnimTimer / blastMaxT)));
     const primaryLunge = Math.sin(blastProgress * Math.PI) * (r * 0.95);
-    const secondaryPhase = Math.sin(Math.min(Math.PI, blastProgress * Math.PI * 1.4));
-    const secondaryLunge = - (r * 0.35) * secondaryPhase;
 
-    if (fighter.isRightBlast) {
-      backHandX  = r * 0.85 + primaryLunge;   backHandY  = r * 0.15;
-      frontHandX = 0 + secondaryLunge;        frontHandY = -r * 0.15;
-    } else {
-      frontHandX = r * 0.85 + primaryLunge;   frontHandY = r * 0.15;
-      backHandX  = 0 + secondaryLunge;        backHandY  = -r * 0.15;
-    }
+    frontHandX = r * 0.95 + primaryLunge;
+    frontHandY = 0;
+    backHandX  = 0;
+    backHandY  = 0;
+    hideBack   = true;
   } else {
-    // Mode B: Side Profile (Idle) - in pre-rotated local space
-    frontHandX = r * 0.85;  frontHandY = r * 0.15;
-    backHandX  = 0;         backHandY  = -r * 0.15;
+    // Mode B: Side Profile (Idle) - Front hand at right edge of body
+    frontHandX = r * 0.95;
+    frontHandY = 0;
+    backHandX  = 0;
+    backHandY  = 0;
+    hideBack   = true;
   }
 
   const palmColor = isSelfDestructing ? '#FF2200' : '#FF5500';

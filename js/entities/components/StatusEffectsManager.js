@@ -226,6 +226,7 @@ export class StatusEffectsManager {
       if (fighter.timeStopTimer <= 0) {
         fighter.timeStopTimer = 0;
         fighter.isFrozenByInfinity = false;
+        fighter.suppressFreezeOverlay = false;
         delete fighter._suppressFreezeTimer;
         // Restore any saved velocities (from counter or sphere freezes)
         if (typeof fighter._resumeVx === 'number') {

@@ -90,11 +90,11 @@ export function fireDivineFlame(fighter, ownerIndex) {
   if (sound) audioSystem.playSFX(sound.src, sound.volume);
 
   const isDomainFuga = fighter.domainActive;
-  const normalCd = CONFIG.sukuna?.divineFlameCooldown || 500;
+  const normalCd = CONFIG.sukuna?.divineFlameCooldown || 1500;
   fighter.divineFlameRecoveryTimer = CONFIG.sukuna?.divineFlameRecoveryTime || 60;
   fighter.divineFlameCooldown = normalCd;
-  const shakeIntensity = isDomainFuga ? 18 : (CONFIG.sukuna?.divineFlameShakeIntensity || 10);
-  const shakeDuration = isDomainFuga ? 30 : (CONFIG.sukuna?.divineFlameShakeDuration || 15);
+  const shakeIntensity = isDomainFuga ? 18 : (CONFIG.sukuna?.divineFlameShakeIntensity || 30);
+  const shakeDuration = isDomainFuga ? 30 : (CONFIG.sukuna?.divineFlameShakeDuration || 25);
   triggerGlobalScreenShake(shakeIntensity, shakeDuration);
 
   if (isDomainFuga) {
@@ -103,7 +103,7 @@ export function fireDivineFlame(fighter, ownerIndex) {
     audioSystem.playSFX('attack_explosion', 1.0);
   }
 
-  const baseDamage = CONFIG.sukuna?.divineFlameDamage || 25;
+  const baseDamage = CONFIG.sukuna?.divineFlameDamage || 250;
   const damage = isDomainFuga ? Math.round(baseDamage * 1.5) : baseDamage;
 
   if (projectileSystem && projectileSystem.fireSukunaDivineFlame) {
@@ -112,9 +112,9 @@ export function fireDivineFlame(fighter, ownerIndex) {
 }
 
 export function activateReverseCursedTechnique(fighter, attacker) {
-  fighter.reverseCursedTechniqueCooldown = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 900;
+  fighter.reverseCursedTechniqueCooldown = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700;
 
-  const healPercent = CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.40;
+  const healPercent = CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.25;
   const healAmount = fighter.maxHp * healPercent;
 
   if (fighter.hp <= 0) {
@@ -209,7 +209,7 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
       spawnImpactFlash(fighter.x, fighter.y, 5, 'crimsonSniper');
     }
 
-    fighter.rapidSlashTimer = CONFIG.sukuna?.domainRapidSlashCooldown || 10;
+    fighter.rapidSlashTimer = CONFIG.sukuna?.domainRapidSlashCooldown || 20;
   } else {
     fighter.rapidSlashTimer--;
   }
@@ -237,8 +237,8 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
 
 export function applyDomainEffect(fighter, arena) {
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-  const domainDamage = CONFIG.sukuna?.domainDamage || 4;
-  const domainDamageInterval = CONFIG.sukuna?.domainDamageInterval || 8;
+  const domainDamage = CONFIG.sukuna?.domainDamage || 15;
+  const domainDamageInterval = CONFIG.sukuna?.domainDamageInterval || 20;
 
   if (!fighter.domainTimeInsideMap) fighter.domainTimeInsideMap = new Map();
   fighter._domainFrame = (fighter._domainFrame || 0) + 1;

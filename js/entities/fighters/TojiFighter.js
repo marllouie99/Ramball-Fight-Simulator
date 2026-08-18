@@ -42,16 +42,16 @@ export class TojiFighter extends Fighter {
 
     // Inverted Spear of Heaven (Basic Attack)
     this.spearCooldown = 0;
-    this.spearCooldownMax = CONFIG.toji?.spearCooldown || 40;
+    this.spearCooldownMax = CONFIG.toji?.spearCooldown || 75;
     this.spearRange = CONFIG.toji?.spearRange || 50;
-    this.spearDamage = CONFIG.toji?.spearDamage || 12;
+    this.spearDamage = CONFIG.toji?.spearDamage || 15;
     this.spearSwingTimer = 0;
     this.spearSwingMax = 36;
 
     // Split Soul Katana
     // Physics Chain simulation
     this.chainNodes = [];
-    this.ultimateCooldownMax = CONFIG.toji?.ultimateCooldown || 2500;
+    this.ultimateCooldownMax = CONFIG.toji?.ultimateCooldown || 1500;
     this.ultimateCooldown = this.ultimateCooldownMax;
     this.ultimateActive = false;
     this.ultimatePhase = null;
@@ -142,7 +142,7 @@ export class TojiFighter extends Fighter {
     this.domainImmunity = true;
     this.postUltimateRecoveryTimer = 0;
     this.stealthMaxDuration = CONFIG.toji?.stealthDuration || 240;
-    this.stealthMaxCooldown = CONFIG.toji?.stealthCooldown || 420;
+    this.stealthMaxCooldown = CONFIG.toji?.stealthCooldown || 500;
     this.stealthTimer = this.stealthMaxDuration;
     this.stealthCooldown = 0;
     this.isStealthed = true;

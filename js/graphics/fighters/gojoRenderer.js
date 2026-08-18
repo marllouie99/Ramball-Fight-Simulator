@@ -469,8 +469,9 @@ export class GojoRenderer {
       };
     }
 
-    // Idle martial arts brawler guard stance & dynamic 1-2 flurry punches (matching Aoi Todo)
-    let frontHandX, frontHandY, backHandX, backHandY;
+    // Idle martial arts brawler guard stance & dynamic front hand punches
+    let frontHandX, frontHandY, backHandX = 0, backHandY = 0;
+    hideBackHand = true; // Hide back hand for brawler single front hand stance
 
     if (fighter.punchAnimTimer > 0) {
       const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
@@ -483,23 +484,14 @@ export class GojoRenderer {
         easePunch = Math.cos(retractT * (Math.PI / 2));
       }
       const lungeExtension = easePunch * (r * 1.5);
-      const oppositeRecoil = -Math.sin(rawProgress * Math.PI) * (r * 0.20);
 
-      frontHandX = 0; frontHandY = 0;
-      backHandX  = 0; backHandY  = 0;
-
-      const isRightPunch = (fighter.punchAnimHand === 0);
-      if (isRightPunch) {
-        frontHandX = r * 0.85 + lungeExtension * 1.40;
-        backHandX  = r * 1.05 + oppositeRecoil;
-      } else {
-        backHandX  = r * 1.05 + lungeExtension * 1.60;
-        frontHandX = oppositeRecoil;
-      }
+      // All punches executed with the front hand extending forward from right edge
+      frontHandX = r * 0.95 + lungeExtension * 1.40;
+      frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
     } else {
-      // Idle brawler guard stance: front hand (top layer) centered at (0, 0), back hand (back layer) peeking out at (r * 1.05, 0)
-      frontHandX = 0;        frontHandY = 0;
-      backHandX  = r * 1.05; backHandY  = 0;
+      // Idle brawler guard stance: front hand at the right edge of body circle
+      frontHandX = r * 0.95;
+      frontHandY = 0;
     }
 
     const fHand = toGlobal(frontHandX, frontHandY);
@@ -919,7 +911,7 @@ export class GojoRenderer {
     // Calculate smooth fade-in & fade-out progress
     let progress = 1.0;
     if (overrideX !== null) {
-      progress = 1.0;
+      progress = (fighter && fighter.combatAuraOpacity !== undefined) ? Math.min(1, Math.max(0, fighter.combatAuraOpacity)) : 1.0;
     } else if (colorTheme === 'rct') {
       progress = Math.min(1, (fighter.healingAuraTimer / 180) || (fighter.rctChannelTimer / 150) || 1);
     } else {
@@ -968,6 +960,10 @@ export class GojoRenderer {
       mainColor = '#D946EF';
       fillColor = `rgba(217, 70, 239, ${0.32 * progress})`;
       coreColor = `rgba(245, 208, 254, ${0.40 * progress})`;
+    } else if (colorTheme === 'nanami' || colorTheme === 'gold' || colorTheme === 'golden') {
+      mainColor = '#D4AF37'; // Warm Ochre / Golden Sand
+      fillColor = `rgba(212, 175, 55, ${0.36 * progress})`;
+      coreColor = `rgba(255, 235, 120, ${0.48 * progress})`;
     }
     const strokeColor = '#000000'; // Pure pitch black JJK ink contour
 

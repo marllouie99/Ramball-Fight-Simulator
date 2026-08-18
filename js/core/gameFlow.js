@@ -106,6 +106,30 @@ function preloadGameSounds() {
     if (CONFIG.todo.takadaBackgroundSong) todoSounds.push(CONFIG.todo.takadaBackgroundSong);
   }
 
+  const nanamiSounds = [];
+  if (CONFIG.nanami && CONFIG.nanami.sounds) {
+    for (const key of Object.keys(CONFIG.nanami.sounds)) {
+      const val = CONFIG.nanami.sounds[key];
+      if (Array.isArray(val)) {
+        nanamiSounds.push(...val);
+      } else if (typeof val === 'string') {
+        nanamiSounds.push(val);
+      }
+    }
+  }
+
+  const mahitoSounds = [];
+  if (CONFIG.mahito && CONFIG.mahito.sounds) {
+    for (const key of Object.keys(CONFIG.mahito.sounds)) {
+      const val = CONFIG.mahito.sounds[key];
+      if (Array.isArray(val)) {
+        mahitoSounds.push(...val);
+      } else if (typeof val === 'string') {
+        mahitoSounds.push(val);
+      }
+    }
+  }
+
   const allPaths = [...new Set([
     ...legacyPaths,
     ...mappedConfigPaths,
@@ -117,7 +141,9 @@ function preloadGameSounds() {
     ...yutaSounds,
     ...genosSounds,
     ...saitamaSounds,
-    ...todoSounds
+    ...todoSounds,
+    ...nanamiSounds,
+    ...mahitoSounds
   ])];
   return Promise.all(allPaths.map(preloadSound));
 }

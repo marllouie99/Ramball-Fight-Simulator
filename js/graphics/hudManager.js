@@ -512,6 +512,31 @@ function updateHealthHud() {
 
         info.push(`<b>Crit Rate:</b> ${critChanceStr}`);
         info.push(`<b>Crit DMG:</b> ${critMultStr}`);
+      } else if (f.characterId === 'nanami' || f.type === 'nanami') {
+        const isOvertime = Boolean(f.isOvertimeActive);
+        const isGuaranteedCrit = isOvertime && ((f.overtimeGuaranteedCritTimer || 0) <= 0);
+
+        const baseCritRate = Math.round((CONFIG.nanami?.ratioBaseCritChance || 0.30) * 100);
+        const currentCritRate = isGuaranteedCrit ? 100 : (isOvertime ? Math.round((CONFIG.nanami?.overtimeBaseCritChance || 0.45) * 100) : baseCritRate);
+
+        let critRateStr = `${baseCritRate}%`;
+        if (isGuaranteedCrit) {
+          critRateStr = `100% <span style="color: #D4AF37; font-size: 10px; font-weight: bold;">(GUARANTEED) ▲</span>`;
+        } else if (isOvertime) {
+          const boost = currentCritRate - baseCritRate;
+          critRateStr = `${baseCritRate}% + ${boost}% <span style="color: #15803d; font-size: 10px;">▲</span>`;
+        }
+
+        const baseCritMult = Math.round((CONFIG.nanami?.ratioCritMultiplier || 2.0) * 100);
+        const overtimeCritMult = Math.round((CONFIG.nanami?.overtimeRatioCritMultiplier || 1.80) * 100);
+
+        let critDmgStr = `${baseCritMult}% (True DMG)`;
+        if (isOvertime) {
+          critDmgStr = `${overtimeCritMult}% (True DMG) <span style="color: #D4AF37; font-size: 10px;">⚡</span>`;
+        }
+
+        info.push(`<b>Crit Rate:</b> ${critRateStr}`);
+        info.push(`<b>Crit DMG:</b> ${critDmgStr}`);
       } else if (f.characterId === 'toji' || f.type === 'toji') {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
         const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;

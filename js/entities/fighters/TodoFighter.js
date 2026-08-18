@@ -30,7 +30,7 @@ export class TodoFighter extends Fighter {
 
     // Boogie Woogie Skill
     this.boogieWoogieCooldown = 0;
-    this.boogieWoogieCooldownMax = CONFIG.todo?.clapCooldown || 60;
+    this.boogieWoogieCooldownMax = CONFIG.todo?.clapCooldown || 120;
     this.justSwappedTimer = 0; // Window for Black Flash
     this.blackFlashGlowTimer = 0; // Visual lingering glow timer
     this.afterImages = []; // Zone trails afterimages array
@@ -50,7 +50,7 @@ export class TodoFighter extends Fighter {
     // Cursed Rocks
     this.cursedRocks = [];
     this.rockThrowCooldown = 0;
-    this.rockThrowCooldownMax = CONFIG.todo?.rockCooldown || 300;
+    this.rockThrowCooldownMax = CONFIG.todo?.rockCooldown || 180;
     this.rockCounterComboLeft = 0;
     this.rockCounterComboTarget = null;
     this.rockCounterComboTimer = 0;

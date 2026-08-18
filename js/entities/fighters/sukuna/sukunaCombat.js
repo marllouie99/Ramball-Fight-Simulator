@@ -45,7 +45,7 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 
   // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
   const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
-  const dist = (CONFIG.sukuna?.teleportDodgeDistance ?? 75) + Math.random() * 15;
+  const dist = (CONFIG.sukuna?.teleportDodgeDistance ?? 85) + Math.random() * 15;
 
   let targetX = fighter.x + Math.cos(angle) * dist;
   let targetY = fighter.y + Math.sin(angle) * dist;
@@ -104,7 +104,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     fighter.punchActiveMaxTime = 0;
     return;
   }
-  const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 12;
+  const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 15;
 
   if (fighter.meleePunchCooldown > 0) {
     fighter.meleePunchCooldown--;
@@ -264,8 +264,7 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'MARTIAL ARTS', '#8B0000');
 
   if (!fighter._slashSoundCooldown || fighter._slashSoundCooldown <= 0) {
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.65);
-    audioSystem.playSFX('Assets/Sound Effects/Skills/backstab.mp3', 0.5);
+    audioSystem.playSFX('Assets/Sound Effects/Attacks/punch.mp3', 2.8);
     fighter._slashSoundCooldown = 8;
   }
 

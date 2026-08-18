@@ -201,30 +201,32 @@ export function renderMahitoDomainBackground(fighter, ctx, targetCanvas = null) 
   ctx.fillStyle = dimGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // 2. PNG Overlay (Clipped to Arena) with Decreased Opacity
+  // 2. PNG Overlay (Clipped strictly inside Arena Inner Bounds)
   if (mahitoDomainImg && mahitoDomainImg.complete && mahitoDomainImg.naturalWidth > 0) {
     ctx.save();
     
-    // Set clipping path to the arena bounds
+    // Set clipping path strictly to the arena inner bounds
     const arena = state.arena || CONFIG.arena;
     if (arena) {
       ctx.beginPath();
       if (arena.shape === 'circle') {
         const acx = arena.x + arena.width / 2;
         const acy = arena.y + arena.height / 2;
-        const ar = arena.radius || (arena.width / 2);
-        ctx.arc(acx, acy, ar, 0, Math.PI * 2);
+        const ar = (arena.radius !== undefined ? arena.radius : (arena.width / 2)) - (arena.wallWidth || 0);
+        ctx.arc(acx, acy, Math.max(0, ar), 0, Math.PI * 2);
       } else {
-        ctx.rect(arena.x, arena.y, arena.width, arena.height);
+        const ww = arena.wallWidth || 0;
+        ctx.rect(arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
       }
       ctx.clip();
+
+      // Decrease opacity so fighters, spells, and arena remain clearly visible
+      ctx.globalAlpha = op * 0.50;
+
+      // Draw the image to fit the arena inner dimensions exactly
+      const ww = arena.wallWidth || 0;
+      ctx.drawImage(mahitoDomainImg, arena.x + ww / 2, arena.y + ww / 2, arena.width - ww, arena.height - ww);
     }
-
-    // Decrease opacity so fighters, spells, and arena remain clearly visible
-    ctx.globalAlpha = op * 0.45;
-
-    // Draw the image to fit the arena dimensions exactly
-    ctx.drawImage(mahitoDomainImg, arena.x, arena.y, arena.width, arena.height);
     ctx.restore();
   }
 

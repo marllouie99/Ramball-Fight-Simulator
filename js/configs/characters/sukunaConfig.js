@@ -47,6 +47,14 @@ export const sukunaConfig = {
     flurryCleaveBonusMultiplier: 2.0, // Bonus Dismantle/Cleave damage multiplier on flurry finish
     rapidSlashCooldown: 20,     // Frames between rapid slashes after flurry (lower = faster)
 
+    // Passive / Defensive Skill: Spiderweb (Cleave / Dismantle Grid)
+    spiderwebRange: 100,      // Detection radius to trigger Spiderweb against surrounding enemies
+    spiderwebCooldown: 300,   // Cooldown between Spiderweb activations (5.0 seconds at 60fps)
+    spiderwebDamage: 15,      // Damage dealt by Spiderweb slashes
+    spiderwebSlowDuration: 120, // Duration in frames of movement slow on targets caught in Spiderweb
+    spiderwebSlowMultiplier: 0.30, // Movement speed multiplier while slowed (30% speed)
+    spiderwebMinEnemies: 2,   // Minimum surrounding enemies required to trigger Spiderweb
+
     // Skill 2: Furnace (Divine Flame / Fuga) — Thermobaric Nuke
     divineFlameCooldown: 1500,      // Cooldown between Furnace uses (8.33 seconds)
     divineFlameChargeMax: 100,      // Charge up duration (1.5 seconds)

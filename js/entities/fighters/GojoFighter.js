@@ -29,24 +29,24 @@ export class GojoFighter extends Fighter {
     this.infinityActive = true;
     this.infinityFadeOpacity = 0;
 
-    this.redCooldown = CONFIG.gojo.redCooldown || 1200;
-    this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1000; // Delay initial cast
+    this.redCooldown = CONFIG.gojo.redCooldown || 1000;
+    this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1500; // Delay initial cast
     this.isChannelingPurple = false;
     this.purpleChargeTimer = 0;
     this.purpleChargeMax = CONFIG.gojo.purpleChargeMax || 120;
     this._hasPlayedPurpleChannelSound = false;
     this._purpleChargeSoundHandle = null;
 
-    this.domainCooldown = CONFIG.gojo.domainCooldown ?? 1000; // Initial cast delay reads from CONFIG
+    this.domainCooldown = CONFIG.gojo.domainCooldown ?? 2000; // Initial cast delay reads from CONFIG
     this.domainActive = false;
     this.domainTimer = 0;
     this.domainChargeTimer = 0;
-    this.domainChargeMax = CONFIG.gojo.domainChargeMax || 120;
+    this.domainChargeMax = CONFIG.gojo.domainChargeMax || 130;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
     this.domainUseCount = 0; // Allows domain to be cast up to 2 times per round
 
-    this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 900;
+    this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
     this.reverseCursedTechniqueTriggered = false;
     this.healingAuraTimer = 0;  // Timer for healing aura visual effect
     this.isChannelingRCT = false;
@@ -84,23 +84,23 @@ export class GojoFighter extends Fighter {
     this.cooldown = this.shootCooldownMax;
     this.infinityCooldown = 0;
     this.infinityActive = true;
-    this.redCooldown = CONFIG.gojo.redCooldown || 1200;
-    this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1000;
+    this.redCooldown = CONFIG.gojo.redCooldown || 1000;
+    this.purpleCooldown = CONFIG.gojo.purpleCooldown || 1500;
     this.purpleUseCount = 0;
     this.isChannelingPurple = false;
     this.is200PercentChannel = false;
     this.purpleChargeTimer = 0;
     this.purpleChargeMax = CONFIG.gojo.purpleChargeMax || 120;
-    this.domainCooldown = CONFIG.gojo.domainCooldown ?? 1000;
+    this.domainCooldown = CONFIG.gojo.domainCooldown ?? 2000;
     this.domainActive = false;
     this.domainTimer = 0;
     this.domainChargeTimer = 0;
-    this.domainChargeMax = CONFIG.gojo.domainChargeMax || 120;
+    this.domainChargeMax = CONFIG.gojo.domainChargeMax || 130;
     this.isChannelingDomainExpansion = false;
     this._hasPlayedDomainChannelSound = false;
     this.domainExpansionAudioDelay = 0;
     this.domainUseCount = 0;
-    this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 900;
+    this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
     this.reverseCursedTechniqueTriggered = false;
     this.healingAuraTimer = 0;
     this.isChannelingRCT = false;
@@ -280,7 +280,7 @@ export class GojoFighter extends Fighter {
 
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled when targeted by Toji's ambush or trapped in Pure Love Beam!)
     const isTargetOfAmbush = (attacker && attacker.isAmbushing) || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (this.isTargetOfAmbush === true) || (this.caughtInPureLoveBeam === true);
-    if (!isTargetOfAmbush && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm && !opts.isPureLoveBeam) {
+    if (!isTargetOfAmbush && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.10) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm && !opts.isPureLoveBeam) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.gojo.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage
@@ -299,7 +299,7 @@ export class GojoFighter extends Fighter {
     }
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && f.hp > 0);
     if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !isToji && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
-      const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.5;
+      const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
 
@@ -342,7 +342,7 @@ export class GojoFighter extends Fighter {
     // The cooldown sentinel is set immediately inside _activateReverseCursedTechnique before any logic runs,
     // so back-to-back hits in the same frame cannot double-trigger.
     if (!opts.isHeal && (CONFIG.gojo?.enableRCTHeal !== false) && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
-      const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.30;
+      const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
       if (this.hp / this.maxHp <= threshold) {
         const opponent = attacker || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
         this._activateReverseCursedTechnique(opponent, CONFIG.arena);
@@ -503,7 +503,7 @@ export class GojoFighter extends Fighter {
 
     if (this.redEffectTimer > 0) {
       // Buildup phase: freeze nearby enemies in place (near-zero slow)
-      const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 20;
+      const RED_BUILDUP_FRAMES = CONFIG.gojo.redBuildupFrames || 100;
       const redRemaining = this.redEffectTimer;
       const redMax = this.redEffectMaxTimer;
       if (this.redBuildupPhase && redRemaining > redMax - RED_BUILDUP_FRAMES) {
@@ -766,7 +766,7 @@ export class GojoFighter extends Fighter {
       if (isSilenced && this.isTargetOfAmbush) {
         this.isDomainPreSlide = false;
         this.domainPreSlideTimer = 0;
-        this.domainCooldown = CONFIG.gojo?.domainCooldown || 1500;
+        this.domainCooldown = CONFIG.gojo?.domainCooldown || 2000;
         return;
       }
 

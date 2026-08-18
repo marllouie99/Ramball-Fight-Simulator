@@ -42,8 +42,8 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
   this.hideBackHand = false;
 
   if (!isCombo) {
-    const baseCd = CONFIG.todo?.basicPunchCooldown || 28;
-    const cdMult = this.isTakadaUltActive ? (CONFIG.todo?.takadaPunchCooldownMult || 0.6) : 1.0;
+    const baseCd = CONFIG.todo?.basicPunchCooldown || 20;
+    const cdMult = this.isTakadaUltActive ? (CONFIG.todo?.takadaPunchCooldownMult || 0.2) : 1.0;
     this.cooldownTimer = baseCd * cdMult;
   }
 
@@ -65,7 +65,7 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
 
   // Black Flash mechanic & Knockback scaling
   let damage = CONFIG.todo?.punchDamage || 15;
-  let baseKnockback = CONFIG.todo?.knockback || 12;
+  let baseKnockback = CONFIG.todo?.knockback || 6;
   let isBlackFlash = false;
 
   if (this.isTakadaUltActive) {
@@ -92,7 +92,7 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
       if (typeof target.applyHitStun === 'function') target.applyHitStun(holdFrames);
     } else {
       // Final finisher hit: explosive physics hit pushback
-      knockback = CONFIG.todo?.rockCounterFinisherPushback || 24.0;
+      knockback = CONFIG.todo?.rockCounterFinisherPushback || 30.0;
     }
   }
 
@@ -123,11 +123,11 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     // Arena Screen Shake Dispatcher
     if (typeof triggerGlobalScreenShake === 'function') {
       if (isBlackFlash) {
-        const shake = CONFIG.todo?.blackFlashScreenShake || 16.0;
+        const shake = CONFIG.todo?.blackFlashScreenShake || 2.0;
         triggerGlobalScreenShake(shake, 14);
       } else if (isCombo) {
         if (this.rockCounterComboLeft <= 1) {
-          const shake = CONFIG.todo?.finisherScreenShake || 14.0;
+          const shake = CONFIG.todo?.finisherScreenShake || 2.0;
           triggerGlobalScreenShake(shake, 10);
         } else {
           const shake = CONFIG.todo?.comboPunchScreenShake || 4.5;
@@ -140,9 +140,6 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     }
   }
 
-  if (!isCombo) {
-    this.cooldownTimer = CONFIG.todo?.basicPunchCooldown || 28;
-  }
 
   // Spiky Crescent Impact — centered on target so inner arc hugs the target circle
   spawnAnimePunchImpactFrame(target.x, target.y, isBlackFlash ? 80 : 55, angle);

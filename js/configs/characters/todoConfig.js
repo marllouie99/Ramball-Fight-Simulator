@@ -15,7 +15,7 @@ export const todoConfig = {
     basicPunchSlowDuration: 20,   // Movement stop duration in frames on basic punch hit
     basicPunchSlowMultiplier: 0.0, // 0.0 = 100% stop movement on basic punch hit
     punchScreenShake: 3.5,        // Base arena screen shake intensity on melee punch hit
-    blackFlashScreenShake: 16.0,  // Massive arena screen shake on Black Flash punch
+    blackFlashScreenShake: 2.0,  // Massive arena screen shake on Black Flash punch
 
     // Skill 1: Boogie Woogie (Clap Teleport & Teammate Rescue)
     clapCooldown: 120,            // Cooldown in frames between Boogie Woogie claps (2.0 seconds at 60fps)
@@ -47,11 +47,11 @@ export const todoConfig = {
     rockCounterComboHits: 6,      // Number of rapid punches delivered upon teleporting in
     rockCounterComboInterval: 15, // Frames between combo punches during the attack sequence
     rockArrivalPushback: 8.0,     // Initial physics hit pushback applied upon rock proximity arrival
-    rockArrivalScreenShake: 6.0,  // Arena screen shake on rock proximity arrival
+    rockArrivalScreenShake: 2.0,  // Arena screen shake on rock proximity arrival
     rockCounterComboPushback: 4.5, // Intermediate punch physics hit pushback per strike during sequence
     comboPunchScreenShake: 4.5,   // Arena screen shake on intermediate combo flurry punches
     rockCounterFinisherPushback: 30.0, // Final finisher punch physics hit pushback launching enemy back
-    finisherScreenShake: 14.0,    // Explosive arena screen shake on final launcher finisher punch
+    finisherScreenShake: 2.0,    // Explosive arena screen shake on final launcher finisher punch
     slowDuration: 60,             // Duration in frames enemy is heavily slowed when Todo teleports to them (1.0 second)
     slowMultiplier: 0.25,         // Speed multiplier during slow (0.25 = 75% movement slow)
     hitStunFrames: 20,            // Hitstun frames applied to enemy on arrival

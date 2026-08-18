@@ -189,16 +189,17 @@ export function drawYujiSkin(ctx, fighter) {
   const lungeExtension = isPunching ? easePunch * (r * 1.5) : 0;
   const oppositeRecoil = isPunching ? -Math.sin(rawProgress * Math.PI) * (r * 0.20) : 0;
 
-  let frontX, frontY, backX, backY;
+  let frontX = r * 0.95, frontY = 0;
+  let backX = 0, backY = 0;
   let hideFrontHand = (typeof state !== 'undefined' && state.showSkinOnly);
-  let hideBackHand = (typeof state !== 'undefined' && state.showSkinOnly);
+  let hideBackHand = true; // Back hand hidden for brawler single front hand stance
   fighter.hideFrontHand = hideFrontHand;
   fighter.hideBackHand = hideBackHand;
 
   const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
   const isSlashActive = !isMatchEnded && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));
 
-  // Single-Handed Sukuna Slash Swing Chop Animation (Matching Sukuna's rotational hand chop across body)
+  // Single-Handed Sukuna Slash Swing Chop Animation
   if (isSlashActive) {
     const maxT = fighter.slashSwingMaxTimer || 14;
     let rawT = 0;
@@ -213,9 +214,6 @@ export function drawYujiSkin(ctx, fighter) {
       rawT = Math.min(1.0, Math.max(0.0, 1.0 - (timerVal / slashCd)));
     }
 
-    // Rotational slicing arc (Matching Sukuna's exact hand chop swing):
-    // Left hand (1) swings top-to-bottom (-90° to +90°).
-    // Right hand (0) swings bottom-to-top (+90° to -90°).
     const startAngle = (fighter.slashHand === 1) ? -Math.PI / 2 : Math.PI / 2;
     const endAngle   = (fighter.slashHand === 1) ?  Math.PI / 2 : -Math.PI / 2;
     const chopAngle  = startAngle + rawT * (endAngle - startAngle);
@@ -224,44 +222,24 @@ export function drawYujiSkin(ctx, fighter) {
     const chopX = Math.cos(chopAngle) * (r * 0.9) + lungeOut;
     const chopY = Math.sin(chopAngle) * (r * 1.4);
 
-    if (fighter.slashHand === 1) {
-      // Left hand (back hand) chops across body! Hide right hand (front hand).
-      backX = chopX;
-      backY = chopY;
-      frontX = 0; frontY = 0;
-      hideFrontHand = true;
-    } else {
-      // Right hand (front hand) chops across body! Hide left hand (back hand).
-      frontX = chopX;
-      frontY = chopY;
-      backX = 0; backY = 0;
-      hideBackHand = true;
-    }
+    frontX = chopX;
+    frontY = chopY;
+    hideBackHand = true;
   } else if (isPunching && !isSukunaForm) {
-    frontX = 0; frontY = 0;
-    backX  = 0; backY  = 0;
-
-    if (fighter.isRightPunch) {
-      frontX = r * 0.85 + lungeExtension * 1.40;
-      backX  = r * 1.05 + oppositeRecoil;
-    } else {
-      backX  = r * 1.05 + lungeExtension * 1.60;
-      frontX = oppositeRecoil;
-    }
+    // All punches executed with the front hand extending forward from right edge
+    frontX = r * 0.95 + lungeExtension * 1.40;
+    frontY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
   } else if (isSukunaForm) {
-    // Idle brawler / cleave guard stance during Sukuna transformation (both hands ready)
-    frontX = r * 0.85; frontY =  r * 0.25;
-    backX  = r * 1.05; backY  = -r * 0.25;
+    frontX = r * 0.95; frontY = 0;
   } else {
-    // Idle brawler guard stance: front hand (top layer) centered at (0, 0), back hand (back layer) peeking out at (r * 1.05, 0)
-    frontX = 0;        frontY = 0;
-    backX  = r * 1.05; backY  = 0;
+    // Idle brawler guard stance: front hand at the right edge of body circle
+    frontX = r * 0.95; frontY = 0;
   }
 
   const handRadius = getHandSize(7.5);
   const skinColor = isSukunaForm ? '#C03030' : '#F0C090';
 
-  // 1. Render Back Hand (Back Layer - Behind Body Circle)
+  // 1. Render Back Hand (Back Layer - Hidden for brawlers)
   if (!fighter._isWinnerReveal && !hideBackHand) {
     _drawFist(ctx, backX, backY, handRadius, skinColor, fighter);
   }
@@ -555,6 +533,56 @@ export function drawYujiSkin(ctx, fighter) {
   ctx.restore(); // end translate & rotate transform stream
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PRE-RENDERED FIST CE GLOW CANVASES (Zero-GC GPU Blitting)
+// ─────────────────────────────────────────────────────────────────────────────
+let _bfGlowCanvas = null;
+let _sukunaGlowCanvas = null;
+let _blueGlowCanvas = null;
+
+function _initYujiGlowCanvases() {
+  if (typeof document === 'undefined' || _bfGlowCanvas) return;
+
+  // 1. Black Flash Zone Glow: Lilac-white core -> Deep Crimson red -> Stark Black edge
+  _bfGlowCanvas = document.createElement('canvas');
+  _bfGlowCanvas.width = 64;
+  _bfGlowCanvas.height = 64;
+  const bfCtx = _bfGlowCanvas.getContext('2d');
+  const bfGrad = bfCtx.createRadialGradient(32, 32, 5, 32, 32, 32);
+  bfGrad.addColorStop(0,    'rgba(243, 232, 255, 0.95)');
+  bfGrad.addColorStop(0.35, 'rgba(179, 0, 0, 0.85)');
+  bfGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.75)');
+  bfGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+  bfCtx.fillStyle = bfGrad;
+  bfCtx.fillRect(0, 0, 64, 64);
+
+  // 2. Red Sukuna CE glow
+  _sukunaGlowCanvas = document.createElement('canvas');
+  _sukunaGlowCanvas.width = 64;
+  _sukunaGlowCanvas.height = 64;
+  const sCtx = _sukunaGlowCanvas.getContext('2d');
+  const sGrad = sCtx.createRadialGradient(32, 32, 5, 32, 32, 32);
+  sGrad.addColorStop(0,    'rgba(255, 255, 255, 0.85)');
+  sGrad.addColorStop(0.35, 'rgba(255, 30,  0,   0.75)');
+  sGrad.addColorStop(0.75, 'rgba(180, 0,   0,   0.40)');
+  sGrad.addColorStop(1.0,  'rgba(150, 0,   0,   0)');
+  sCtx.fillStyle = sGrad;
+  sCtx.fillRect(0, 0, 64, 64);
+
+  // 3. Blue standard JJK CE glow
+  _blueGlowCanvas = document.createElement('canvas');
+  _blueGlowCanvas.width = 64;
+  _blueGlowCanvas.height = 64;
+  const bCtx = _blueGlowCanvas.getContext('2d');
+  const bGrad = bCtx.createRadialGradient(32, 32, 5, 32, 32, 32);
+  bGrad.addColorStop(0,    'rgba(255, 255, 255, 0.85)');
+  bGrad.addColorStop(0.35, 'rgba(0, 229,  255, 0.68)');
+  bGrad.addColorStop(0.75, 'rgba(0, 140,   255, 0.32)');
+  bGrad.addColorStop(1.0,  'rgba(0, 100, 255, 0)');
+  bCtx.fillStyle = bGrad;
+  bCtx.fillRect(0, 0, 64, 64);
+}
+
 function _drawFist(ctx, x, y, radius, skinColor, fighter) {
   ctx.save();
 
@@ -563,40 +591,23 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
   const aura = (fighter._isWinnerReveal) ? 1.0 : (fighter.combatAuraOpacity || 0);
   const glow = Math.max(aura, (charge / chargeMax) * 0.85);
 
-  // 1. CE glow around fist — standard blue or Black Flash zone crimson/black theme or red Sukuna theme
+  // 1. CE glow around fist — fast texture blit instead of per-frame createRadialGradient
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
   if (!isLowQuality && (glow > 0.01 || fighter.blackFlashTimer > 0)) {
-    const grad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 1.8);
+    _initYujiGlowCanvases();
     const activeGlow = fighter.blackFlashTimer > 0 ? 1.0 : glow;
     const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
-    
-    if (fighter.blackFlashTimer > 0) {
-      // Crimson Zone Glow: Lilac-white core -> Deep Crimson red -> Stark Black edge
-      grad.addColorStop(0,    `rgba(243, 232, 255, ${0.95 * activeGlow})`);
-      grad.addColorStop(0.35, `rgba(179, 0, 0, ${0.85 * activeGlow})`);
-      grad.addColorStop(0.75, `rgba(0, 0, 0, ${0.75 * activeGlow})`);
-      grad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
-    } else if (isSukunaForm) {
-      // Red Sukuna CE glow
-      grad.addColorStop(0,   `rgba(255, 255, 255, ${0.85 * activeGlow})`);
-      grad.addColorStop(0.35,`rgba(255, 30,  0,   ${0.75 * activeGlow})`);
-      grad.addColorStop(0.75,`rgba(180, 0,   0,   ${0.40 * activeGlow})`);
-      grad.addColorStop(1.0, 'rgba(150, 0,   0,   0)');
-    } else {
-      // Blue standard JJK CE glow
-      grad.addColorStop(0,   `rgba(255, 255, 255, ${0.85 * activeGlow})`);
-      grad.addColorStop(0.35,`rgba(0, 229,  255, ${0.68 * activeGlow})`);
-      grad.addColorStop(0.75,`rgba(0, 140,   255, ${0.32 * activeGlow})`);
-      grad.addColorStop(1.0, 'rgba(0, 100, 255, 0)');
+    const glowCanvas = fighter.blackFlashTimer > 0 ? _bfGlowCanvas : (isSukunaForm ? _sukunaGlowCanvas : _blueGlowCanvas);
+
+    if (glowCanvas) {
+      const glowR = radius * 1.8;
+      ctx.globalAlpha = Math.max(0, Math.min(1.0, activeGlow));
+      ctx.drawImage(glowCanvas, x - glowR, y - glowR, glowR * 2, glowR * 2);
     }
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 1.8, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   // 2. Fist body
-  // 2. Fist body
+  ctx.globalAlpha = 1.0;
   ctx.fillStyle = skinColor;
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);

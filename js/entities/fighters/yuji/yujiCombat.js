@@ -74,8 +74,8 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
   // Set attack cooldown (none during combo)
   if (!isCombo) {
     this.cooldownTimer = isZone
-      ? (CONFIG.yuji?.blackFlashZonePunchCooldown || 14)
-      : (CONFIG.yuji?.basicPunchCooldown || 25);
+      ? (CONFIG.yuji?.blackFlashZonePunchCooldown || 30)
+      : (CONFIG.yuji?.basicPunchCooldown || 35);
   }
 
   // Query all valid targets (fighters & illusions) in the arena
@@ -105,7 +105,7 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
   }
 
   let hitAny = false;
-  const punchReach = CONFIG.yuji?.punchRange || 65;
+  const punchReach = CONFIG.yuji?.punchRange || 50;
   const maxReach = this.r + punchReach; // base reach plus reach distance
   const arcAngle = Math.PI / 4; // 45 degrees either side (90 degree frontal cone)
 
@@ -133,12 +133,12 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
 
         // Calculate stats
         let damage = isCombo 
-          ? (CONFIG.yuji?.comboDamage || 14)
+          ? (CONFIG.yuji?.comboDamage || 12)
           : (CONFIG.yuji?.punchDamage || 18);
         let knockback = CONFIG.yuji?.knockback || 7;
 
         if (isBlackFlash) {
-          damage *= (CONFIG.yuji?.blackFlashMultiplier || 3.0);
+          damage *= (CONFIG.yuji?.blackFlashMultiplier || 2.5);
           knockback = CONFIG.yuji?.blackFlashKnockback || 20;
         }
 

@@ -78,20 +78,15 @@ export function drawSaitamaSkin(ctx, fighter) {
   let frontHandX, frontHandY, backHandX, backHandY;
 
   if (isPunching) {
-    frontHandX = 0; frontHandY = 0;
+    // All punches executed with the front hand extending forward from right edge
+    frontHandX = r * 0.95 + lungeExtension * 1.40;
+    frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
     backHandX  = 0; backHandY  = 0;
-
-    if (fighter.isRightPunch) {
-      frontHandX = r * 0.85 + lungeExtension * 1.40;
-      backHandX  = r * 1.05 + oppositeRecoil;
-    } else {
-      backHandX  = r * 1.05 + lungeExtension * 1.60;
-      frontHandX = oppositeRecoil;
-    }
   } else {
-    // Idle brawler guard stance: front hand (top layer) centered at (0, 0), back hand (back layer) peeking out at (r * 1.05, 0)
-    frontHandX = 0;        frontHandY = 0;
-    backHandX  = r * 1.05; backHandY  = 0;
+    // Idle brawler guard stance: front hand at the right edge of body circle
+    frontHandX = r * 0.95;
+    frontHandY = 0;
+    backHandX  = 0; backHandY  = 0;
   }
 
   const handRadius = Math.max(r * 0.38, getHandSize(8.5));
@@ -128,13 +123,8 @@ export function drawSaitamaSkin(ctx, fighter) {
     const targetX = -r * 0.4;
     const targetY = 0;
     
-    if (fighter.isRightPunch) {
-      frontHandX = frontHandX + (targetX - frontHandX) * easePullback;
-      frontHandY = frontHandY + (targetY - frontHandY) * easePullback;
-    } else {
-      backHandX = backHandX + (targetX - backHandX) * easePullback;
-      backHandY = backHandY + (targetY - backHandY) * easePullback;
-    }
+    frontHandX = frontHandX + (targetX - frontHandX) * easePullback;
+    frontHandY = frontHandY + (targetY - frontHandY) * easePullback;
   }
 
   // ─────────────────────────────────────────────
@@ -300,20 +290,7 @@ export function drawSaitamaSkin(ctx, fighter) {
     ctx.restore();
   }
 
-  // ── Render Back Hand (Back Layer - Behind Body Circle) ──
-  if (!fighter.hideBackHand && !(typeof state !== 'undefined' && state.showSkinOnly)) {
-    const isPunchHandFront = fighter.isRightPunch;
-    if (isChargingAny && !isPunchHandFront) {
-      drawSeriousChargeGlow(ctx, backHandX, backHandY, handRadius, chargeScale);
-    }
-    ctx.beginPath();
-    ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#C80000';
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3.0;
-    ctx.stroke();
-  }
+  // ── Render Back Hand (Back Layer - Hidden for brawler single front hand stance) ──
 
   // ─────────────────────────────────────────────
   // 4. MAIN CIRCLE BODY (EXACT USER DRAWING LAYOUT)
@@ -471,6 +448,9 @@ function drawSaitamaGhostModel(ctx, r) {
   ctx.stroke();
 
   // Front Hand
+  if (isChargingAny) {
+    drawSeriousChargeGlow(ctx, frontHandX, frontHandY, handRadius, chargeScale);
+  }
   ctx.beginPath();
   ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
   ctx.fillStyle = '#C80000';

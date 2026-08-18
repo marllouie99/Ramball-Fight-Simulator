@@ -17,12 +17,12 @@ export function modUpdateComboRush(target) {
   // ── 1. TRIGGER CHECK ──
   if (!this.isComboDashing && (this.comboHitsLeft || 0) <= 0 && (this.comboRushCooldown || 0) <= 0 && target) {
     const dist = Math.hypot(target.x - this.x, target.y - this.y);
-    const range = this.soulSwapActive ? 350 : (CONFIG.yuji?.comboDashRange || 200);
+    const range = this.soulSwapActive ? (CONFIG.yuji?.soulSwapComboDashRange || 350) : (CONFIG.yuji?.comboDashRange || 200);
     
     if (dist <= range && dist > (this.r + target.r + 30)) {
       this.isComboDashing = true;
       this.comboTarget = target;
-      this.comboRushCooldown = this.soulSwapActive ? 180 : (CONFIG.yuji?.comboCooldown || 400);
+      this.comboRushCooldown = this.soulSwapActive ? (CONFIG.yuji?.soulSwapComboRushCooldown || 180) : (CONFIG.yuji?.comboCooldown || 400);
       
       // Play a quick dash whoosh sound
       audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.85);
@@ -31,7 +31,7 @@ export function modUpdateComboRush(target) {
       this.comboTarget = target;
       this.comboHitsLeft = this.soulSwapActive ? 6 : (CONFIG.yuji?.comboHits || 6);
       this.comboIntervalTimer = 1;
-      this.comboRushCooldown = this.soulSwapActive ? 180 : (CONFIG.yuji?.comboCooldown || 400);
+      this.comboRushCooldown = this.soulSwapActive ? (CONFIG.yuji?.soulSwapComboRushCooldown || 180) : (CONFIG.yuji?.comboCooldown || 400);
     }
   }
 
@@ -61,7 +61,7 @@ export function modUpdateComboRush(target) {
 
     this.aim(t);
     const angle = Math.atan2(t.y - this.y, t.x - this.x);
-    const dashSpeed = this.soulSwapActive ? 22.0 : 15.5;
+    const dashSpeed = this.soulSwapActive ? (CONFIG.yuji?.soulSwapDashSpeed || 22.0) : (CONFIG.yuji?.baseComboDashSpeed || 15.5);
     this.vx = Math.cos(angle) * dashSpeed;
     this.vy = Math.sin(angle) * dashSpeed;
 
@@ -186,11 +186,11 @@ export function modUpdateComboRush(target) {
         audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.75);
 
         this.comboHitsLeft--;
-        this.comboIntervalTimer = 6; // 6 frames rapid pacing for slash-teleport sequence!
+        this.comboIntervalTimer = CONFIG.yuji?.soulSwapRapidSlashCooldown || 26; // Rapid pacing for slash-teleport sequence!
 
-        // Transition to 12-hit rapid finisher when combo slashes finish
+        // Transition to rapid finisher when combo slashes finish
         if (this.comboHitsLeft <= 0) {
-          this.rapidSlashHitsLeft = 12;
+          this.rapidSlashHitsLeft = CONFIG.yuji?.soulSwapRapidSlashHits || 16;
           this.rapidSlashTimer = 0;
           this.flurryTarget = t;
         }
@@ -198,7 +198,7 @@ export function modUpdateComboRush(target) {
         // Standard Yuji brawler punch combo
         modUpdateMeleeCombat.call(this, t, true);
         this.comboHitsLeft--;
-        this.comboIntervalTimer = CONFIG.yuji?.comboInterval || 10;
+        this.comboIntervalTimer = CONFIG.yuji?.comboInterval || 30;
       }
     }
   }

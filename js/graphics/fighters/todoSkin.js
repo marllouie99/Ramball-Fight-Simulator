@@ -134,25 +134,19 @@ export function drawTodoSkin(ctx, fighter) {
     clapRightHandX = r * 0.88;
     clapRightHandY = +spread;
   } else if (isPunching) {
-    if (fighter.isRightPunch) {
-      frontHandX = r * 0.85 + lungeExtension * 1.40;
-      backHandX  = r * 1.05 + oppositeRecoil;
-    } else {
-      backHandX  = r * 1.05 + lungeExtension * 1.60;
-      frontHandX = oppositeRecoil;
-    }
+    // All punches executed with the front hand extending forward from right edge
+    frontHandX = r * 0.95 + lungeExtension * 1.40;
+    frontHandY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
   } else {
-    // Idle brawler guard stance: front hand (top layer) centered at (0, 0), back hand (back layer) peeking out at (r * 1.05, 0)
-    frontHandX = 0;        frontHandY = 0;
-    backHandX  = r * 1.05; backHandY  = 0;
+    // Idle brawler guard stance: front hand at the right edge of body circle
+    frontHandX = r * 0.95;
+    frontHandY = 0;
   }
 
   const handRadius = getHandSize(7.5);
 
-  // 1. Render Back Hand (Back Layer - Behind Body Circle)
-  if (!fighter._isWinnerReveal && !isClapping) {
-    drawHandFist(ctx, backHandX, backHandY, handRadius, skinColor, fighter);
-  }
+  // 1. Render Back Hand (Back Layer - Hidden for single front hand stance)
+  // (Back hand strictly hidden when not clapping)
 
   // Keep body facing camera
   ctx.save();
@@ -390,6 +384,42 @@ export function drawTodoSkin(ctx, fighter) {
   drawCursedRocks(ctx, fighter);
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// PRE-RENDERED TODO CE GLOW CANVASES (Zero-GC GPU Blitting)
+// ─────────────────────────────────────────────────────────────────────────────
+let _todoBfGlowCanvas = null;
+let _todoBlueGlowCanvas = null;
+
+function _initTodoGlowCanvases() {
+  if (typeof document === 'undefined' || _todoBfGlowCanvas) return;
+
+  // 1. Black Flash Zone Glow: Lilac-white core -> Deep Crimson red -> Stark Black edge
+  _todoBfGlowCanvas = document.createElement('canvas');
+  _todoBfGlowCanvas.width = 64;
+  _todoBfGlowCanvas.height = 64;
+  const bfCtx = _todoBfGlowCanvas.getContext('2d');
+  const bfGrad = bfCtx.createRadialGradient(32, 32, 5, 32, 32, 32);
+  bfGrad.addColorStop(0,    'rgba(243, 232, 255, 0.95)');
+  bfGrad.addColorStop(0.35, 'rgba(179, 0, 0, 0.85)');
+  bfGrad.addColorStop(0.75, 'rgba(0, 0, 0, 0.75)');
+  bfGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+  bfCtx.fillStyle = bfGrad;
+  bfCtx.fillRect(0, 0, 64, 64);
+
+  // 2. Blue standard JJK CE glow
+  _todoBlueGlowCanvas = document.createElement('canvas');
+  _todoBlueGlowCanvas.width = 64;
+  _todoBlueGlowCanvas.height = 64;
+  const bCtx = _todoBlueGlowCanvas.getContext('2d');
+  const bGrad = bCtx.createRadialGradient(32, 32, 5, 32, 32, 32);
+  bGrad.addColorStop(0,    'rgba(255, 255, 255, 0.85)');
+  bGrad.addColorStop(0.35, 'rgba(0, 235, 255, 0.70)');
+  bGrad.addColorStop(0.75, 'rgba(0, 140, 255, 0.35)');
+  bGrad.addColorStop(1.0,  'rgba(0, 80, 255, 0)');
+  bCtx.fillStyle = bGrad;
+  bCtx.fillRect(0, 0, 64, 64);
+}
+
 /** Draws a brawler fist matching skin color (#EBBF9E) with optional Cursed Energy glow */
 function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
@@ -400,69 +430,37 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
   const bfVal = fighter ? Math.max(fighter.justSwappedTimer || 0, fighter.blackFlashGlowTimer || 0) : 0;
   const alpha = isMatchEnded ? 0.90 : (bfVal / 45);
 
-  // 1. CE glow around fist — standard blue or Black Flash zone crimson/black theme
+  // 1. CE glow around fist — fast texture blit instead of per-frame createRadialGradient
   const opacity = (fighter && fighter._isWinnerReveal) ? 0 : ((fighter && fighter.combatAuraOpacity !== undefined) ? fighter.combatAuraOpacity : 0.0);
   const glow = Math.max(opacity, inBFState ? alpha : 0);
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
 
   if (!isLowQuality && glow > 0.01) {
-    const fistCeGrad = ctx.createRadialGradient(x, y, radius * 0.3, x, y, radius * 1.75);
-    
-    if (inBFState) {
-      // Crimson Zone Glow: Lilac-white core -> Deep Crimson red -> Stark Black edge
-      fistCeGrad.addColorStop(0,    `rgba(243, 232, 255, ${0.95 * alpha})`);
-      fistCeGrad.addColorStop(0.35, `rgba(179, 0, 0, ${0.85 * alpha})`);
-      fistCeGrad.addColorStop(0.75, `rgba(0, 0, 0, ${0.75 * alpha})`);
-      fistCeGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
-    } else {
-      fistCeGrad.addColorStop(0, `rgba(255, 255, 255, ${0.85 * glow})`);
-      fistCeGrad.addColorStop(0.35, `rgba(0, 235, 255, ${0.70 * glow})`);
-      fistCeGrad.addColorStop(0.75, `rgba(0, 140, 255, ${0.35 * glow})`);
-      fistCeGrad.addColorStop(1.0, 'rgba(0, 80, 255, 0)');
+    _initTodoGlowCanvases();
+    const glowCanvas = inBFState ? _todoBfGlowCanvas : _todoBlueGlowCanvas;
+    if (glowCanvas) {
+      const glowR = radius * 1.75;
+      ctx.globalAlpha = Math.max(0, Math.min(1.0, inBFState ? alpha : glow));
+      ctx.drawImage(glowCanvas, x - glowR, y - glowR, glowR * 2, glowR * 2);
     }
-
-    ctx.fillStyle = fistCeGrad;
-    ctx.beginPath();
-    ctx.arc(x, y, radius * 1.75, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   // 2. Fist body
-  if (inBFState) {
-    ctx.save();
-    // Inner blooming gradient inside the hand itself
-    const innerGrad = ctx.createRadialGradient(x, y, radius * 0.15, x, y, radius);
-    innerGrad.addColorStop(0,   `rgba(255, 230, 235, ${0.7 * alpha})`);  // hot white core
-    innerGrad.addColorStop(0.5, `rgba(230, 0, 30, ${0.45 * alpha})`);   // bright blooming crimson
-    innerGrad.addColorStop(1,   `rgba(120, 0, 10, ${0.15 * alpha})`);     // transparent deep crimson edge
-    ctx.fillStyle = innerGrad;
-
-    // Glowing bloom shadow (shadowBlur) on the fill itself!
-    // OPTIMIZED: Removed shadowColor and shadowBlur for performance
-
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
-  } else {
-    ctx.fillStyle = '#EBBF9E';
-    ctx.beginPath();
-    ctx.arc(x, y, radius, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.globalAlpha = 1.0;
+  ctx.fillStyle = inBFState ? '#D88A75' : '#EBBF9E';
+  ctx.beginPath();
+  ctx.arc(x, y, radius, 0, Math.PI * 2);
+  ctx.fill();
 
   // 3. Solid black fist outline (or glowing crimson if in BF state)
   if (inBFState) {
-    ctx.save();
-    ctx.strokeStyle = `rgba(230, 0, 30, ${0.65 * alpha})`;
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
-    ctx.restore();
+    ctx.strokeStyle = `rgba(230, 0, 30, ${0.85 * alpha})`;
+    ctx.lineWidth = 2.0;
   } else {
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 2;
-    ctx.stroke();
   }
+  ctx.stroke();
 
   ctx.restore();
 }

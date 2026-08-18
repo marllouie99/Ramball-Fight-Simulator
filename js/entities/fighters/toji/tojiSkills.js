@@ -48,7 +48,7 @@ export function modUpdateChannelSense(fighter, opponent) {
       // 1. Initial Detection & Instant Reaction
       if (dist <= detectionRadius && !fighter._hasAttemptedChannelInterrupt && !(fighter._channelInterruptCooldown > 0)) {
         fighter._hasAttemptedChannelInterrupt = true;
-        const interruptChance = CONFIG.toji?.channelInterruptChance ?? 0.50;
+        const interruptChance = CONFIG.toji?.channelInterruptChance ?? 0.25;
 
         if (Math.random() <= interruptChance) {
           // Trigger reaction timer
@@ -116,7 +116,7 @@ export function modUpdateStealth(fighter, opponent) {
       fighter._channelInterruptCooldown = 0;
     }
   } else if (fighter.stealthCooldown > 0) {
-    const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 45;
+    const ambushTrigger = CONFIG.toji?.ambushTriggerFrames || 55;
 
     // Check if stealth cooldown is about to end -> launch ambush move sequence!
     if (!fighter.isAmbushing && fighter.stealthCooldown <= ambushTrigger && !tojiIsTargetDeadOrRemoved(fighter, opponent)) {

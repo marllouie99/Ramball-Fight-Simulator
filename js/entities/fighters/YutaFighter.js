@@ -20,14 +20,14 @@ export class YutaFighter extends Fighter {
   constructor(def) {
     super(def);
     this.type = 'yuta';
-    this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 50;
+    this.meleeCooldownMax = CONFIG.yuta.meleeCooldown || 36;
     this.meleeCooldown = 0;
     this.swordTrail = [];
     this.trailGenTimer = 0;
     this.swordGlowAlpha = 0;
 
     // Domain Expansion
-    this.domainCooldown = CONFIG.yuta.domainCooldown || 1500;
+    this.domainCooldown = CONFIG.yuta.domainCooldown || 0;
     this.domainActive = false;
     this.domainTimer = 0;
     this.domainChargeTimer = 0;
@@ -97,7 +97,7 @@ export class YutaFighter extends Fighter {
   getParryChance() {
     if (this.isChannelingPureLoveBeam || this.isFiringPureLoveBeam || (this.pureLoveBeamBreatherTimer > 0) || this.isSummoningRika()) return 0;
     const isGuarding = this.blockPoseTimer > 0;
-    const baseChance = isGuarding ? (CONFIG.yuta.parryActiveChance ?? 0.90) : (CONFIG.yuta.parryPassiveChance ?? 0.90);
+    const baseChance = isGuarding ? (CONFIG.yuta.parryActiveChance ?? 0.50) : (CONFIG.yuta.parryPassiveChance ?? 0.50);
     const stackBonus = (this.parryStacks || 0) * (CONFIG.yuta?.parryChancePerStack ?? 0.05);
     return Math.min(0.98, baseChance + stackBonus);
   }
@@ -111,7 +111,7 @@ export class YutaFighter extends Fighter {
 
   _getRandomParryThreshold() {
     const min = CONFIG.yuta.flurryParryMin || 5;
-    const max = CONFIG.yuta.flurryParryMax || 7;
+    const max = CONFIG.yuta.flurryParryMax || 5;
     return Math.floor(Math.random() * (max - min + 1)) + min;
   }
 
@@ -2173,6 +2173,7 @@ export class YutaFighter extends Fighter {
     const swingDuration = 20;
     const recoveryDuration = 16;
     const isFlurrySwinging = (this.flurrySlashTimer > 0);
+    const comboIndex = this.activeSlashType || 0;
     const isValidSwingRange = (this.meleeCooldown > maxCd - (swingDuration + recoveryDuration)) && (this.meleeCooldown <= maxCd);
     let isSwinging = isFlurrySwinging || isValidSwingRange || !!editP;
     let progress = 1.0;
@@ -2216,151 +2217,125 @@ export class YutaFighter extends Fighter {
       }
     }
 
-    // --- DRAW DYNAMIC KATANA TIP TRAIL IN WORLD SPACE ---
+    // --- DRAW DYNAMIC RULE 15 CRESCENT SWORD SLASH ARC ---
     const isGojoDomainActive = typeof state !== 'undefined' && (
       state.domainActive || state.activeDomain ||
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
     );
-    if (isGojoDomainActive) {
-      this.swordTrail = [];
-      this.trailGenTimer = 0;
-      this.slashFadeTimer = 0;
-      this.flurrySlashTimer = 0;
-      return; // Disable all active weapon slash visuals when inside Gojo's domain
-    }
 
-    // --- GENERATE DYNAMIC SWORD TRAIL IN RENDERING LOOP ---
-    if (!editP && !isGojoDomainActive) {
-      const elapsed = maxCd - this.meleeCooldown;
-      const windupDuration = 3;
-      const isBasicSlashActive = (this.meleeCooldown > 0 && elapsed > windupDuration && elapsed <= swingDuration);
-      const isActiveSwing = isFlurrySwinging || isBasicSlashActive;
+    if (!isGojoDomainActive && isSwinging) {
+      const r = this.r || 22;
+      const facingLeft = Math.abs(this.gunAngle || 0) > Math.PI / 2;
+      const baseAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
 
-      if (isBasicSlashActive && !this._wasSlashActiveLastFrame) {
-        this.swordTrail = [];
-        this.trailFadeAlpha = 1.0;
+      let startOffset = -1.25;
+      let endOffset = 1.15;
+      if (comboIndex === 1) {
+        startOffset = 1.15;
+        endOffset = -1.20;
+      } else if (comboIndex === 2) {
+        startOffset = -1.45;
+        endOffset = 1.35;
       }
-      this._wasSlashActiveLastFrame = isBasicSlashActive;
 
-      if (isActiveSwing) {
-        this.trailFadeAlpha = 1.0;
-        const pos = this._getKatanaTipPositions();
-        let shouldAdd = true;
-        if (this.swordTrail.length > 0) {
-          const last = this.swordTrail[this.swordTrail.length - 1];
-          const dist = Math.hypot(pos.outer.x - last.outer.x, pos.outer.y - last.outer.y);
-          if (dist < 1.0) {
-            shouldAdd = false; // Don't stack points if standing still
-          }
-        }
+      let currentTipOffset = startOffset;
+      let currentTailOffset = startOffset;
+      let trailAlpha = 1.0;
 
-        if (shouldAdd) {
-          pushTrailCap(this.swordTrail, {
-            outer: pos.outer,
-            inner: pos.inner,
-            life: 1.0
-          }, 24); // Increased to 24 capacity for ultimate smoothness!
-        }
+      if (progress < 0.65) {
+        const t = progress / 0.65;
+        const eased = 1.0 - Math.pow(1.0 - t, 2.2);
+        currentTipOffset = startOffset + eased * (endOffset - startOffset);
+        currentTailOffset = startOffset;
+        trailAlpha = Math.min(1.0, t * 2.5);
       } else {
-        // Fast snappy fade out when not swinging (disappears in 5 frames)
-        if (this.trailFadeAlpha === undefined) this.trailFadeAlpha = 1.0;
-        this.trailFadeAlpha = Math.max(0, this.trailFadeAlpha - 0.20);
-        if (this.trailFadeAlpha <= 0) {
-          this.swordTrail = [];
-        }
+        const recP = (progress - 0.65) / 0.35;
+        const easedRec = Math.pow(1.0 - recP, 1.4);
+        currentTipOffset = endOffset;
+        currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
+        trailAlpha = Math.max(0.0, 1.0 - recP * 1.3);
       }
-    }
 
-    if (this.swordTrail && this.swordTrail.length > 1) {
-      ctx.save();
-      ctx.globalCompositeOperation = 'source-over'; // Standard blending for visibility on white arenas
-
-      // Fades out smoothly in the air post-swing
-      const fadeAlpha = (this.trailFadeAlpha !== undefined) ? this.trailFadeAlpha : 1.0;
-      const trailAlpha = editP ? 1.0 : Math.min(1.0, (this.trailGenTimer || 0) / 12) * fadeAlpha;
-      ctx.globalAlpha = trailAlpha;
-
-      const trail = this.swordTrail;
-      const N = trail.length;
-
-      // Helper to render a single, continuous, double-tapered crescent arc polygon
-      const drawCrescentPolygon = (widthMult = 1.0, isGlow = false) => {
-        ctx.beginPath();
-        // Outer arc: from tail (i=0) to leading tip (i=N-1)
-        const p0 = trail[0].outer;
-        ctx.moveTo(p0.x, p0.y);
-        for (let i = 1; i < N - 1; i++) {
-          const pi = trail[i].outer;
-          const pi1 = trail[i + 1].outer;
-          const xc = (pi.x + pi1.x) / 2;
-          const yc = (pi.y + pi1.y) / 2;
-          ctx.quadraticCurveTo(pi.x, pi.y, xc, yc);
+      if (trailAlpha > 0.01 && Math.abs(currentTipOffset - currentTailOffset) >= 0.05) {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(baseAngle);
+        if (facingLeft) {
+          ctx.scale(1, -1);
         }
-        const pLast = trail[N - 1].outer;
-        ctx.lineTo(pLast.x, pLast.y);
 
-        // Inner returning arc: from leading tip (i=N-1, attached to sword tip) back to tail (i=0)
-        // Rule 15 Compliant Double Tapering Function (taper to zero at both ends)
-        for (let i = N - 1; i >= 0; i--) {
-          const t = N > 1 ? i / (N - 1) : 1.0;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-          const p = trail[i];
-          const alphaFactor = Math.min(1.0, p.life * 1.4) * taper * widthMult;
+        const outerRadius = r + 82;
+        const maxThick = 24.0;
+        const numSteps = 24;
 
-          let inX, inY;
-          if (isGlow) {
-            const dx = p.outer.x - p.inner.x;
-            const dy = p.outer.y - p.inner.y;
-            inX = p.outer.x - dx * (alphaFactor + 0.60);
-            inY = p.outer.y - dy * (alphaFactor + 0.60);
-          } else {
-            inX = p.outer.x + (p.inner.x - p.outer.x) * alphaFactor;
-            inY = p.outer.y + (p.inner.y - p.outer.y) * alphaFactor;
-          }
-
-          if (i === N - 1) {
-            ctx.lineTo(inX, inY);
-          } else if (i > 0) {
-            const pPrev = trail[i - 1];
-            const tPrev = (i - 1) / (N - 1);
-            const taperPrev = Math.pow(Math.sin(tPrev * Math.PI), 1.15) * (0.3 + 0.7 * tPrev);
-            const alphaPrev = Math.min(1.0, pPrev.life * 1.4) * taperPrev * widthMult;
-            let prevInX, prevInY;
-            if (isGlow) {
-              const dxP = pPrev.outer.x - pPrev.inner.x;
-              const dyP = pPrev.outer.y - pPrev.inner.y;
-              prevInX = pPrev.outer.x - dxP * (alphaPrev + 0.60);
-              prevInY = pPrev.outer.y - dyP * (alphaPrev + 0.60);
-            } else {
-              prevInX = pPrev.outer.x + (pPrev.inner.x - pPrev.outer.x) * alphaPrev;
-              prevInY = pPrev.outer.y + (pPrev.inner.y - pPrev.outer.y) * alphaPrev;
-            }
-            const xc = (inX + prevInX) / 2;
-            const yc = (inY + prevInY) / 2;
-            ctx.quadraticCurveTo(inX, inY, xc, yc);
-          } else {
-            ctx.lineTo(inX, inY);
-          }
+        // 1. Soft Cursed Energy Volumetric Glow Arc
+        ctx.beginPath();
+        for (let i = 0; i <= numSteps; i++) {
+          const t = i / numSteps;
+          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+          const rad = outerRadius + taper * 4.5;
+          const px = Math.cos(ang) * rad;
+          const py = Math.sin(ang) * rad;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        for (let i = numSteps; i >= 0; i--) {
+          const t = i / numSteps;
+          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+          const rad = outerRadius - (maxThick * taper) - taper * 3.5;
+          const px = Math.cos(ang) * rad;
+          const py = Math.sin(ang) * rad;
+          ctx.lineTo(px, py);
         }
         ctx.closePath();
-      };
+        ctx.fillStyle = `rgba(230, 0, 120, ${0.40 * trailAlpha * fade})`;
+        ctx.fill();
 
-      // 1. Soft back-glow (saturated pink volumetric aura)
-      ctx.fillStyle = 'rgba(230, 0, 120, 0.25)';
-      drawCrescentPolygon(1.2, true);
-      ctx.fill();
+        // 2. Main Neon Pink / Violet Crescent Core Body
+        ctx.beginPath();
+        for (let i = 0; i <= numSteps; i++) {
+          const t = i / numSteps;
+          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+          const rad = outerRadius + taper * 1.5;
+          const px = Math.cos(ang) * rad;
+          const py = Math.sin(ang) * rad;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        for (let i = numSteps; i >= 0; i--) {
+          const t = i / numSteps;
+          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+          const rad = outerRadius - (maxThick * taper);
+          const px = Math.cos(ang) * rad;
+          const py = Math.sin(ang) * rad;
+          ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255, 20, 147, ${0.90 * trailAlpha * fade})`;
+        ctx.fill();
 
-      // 2. Main pink crescent body fill (smooth, single curved polygon)
-      ctx.fillStyle = 'rgba(255, 20, 147, 0.85)';
-      drawCrescentPolygon(1.0, false);
-      ctx.fill();
+        // 3. Sharp White-Hot Cutting Edge
+        ctx.beginPath();
+        for (let i = 0; i <= numSteps; i++) {
+          const t = i / numSteps;
+          const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+          const rad = outerRadius + taper * 1.5;
+          const px = Math.cos(ang) * rad;
+          const py = Math.sin(ang) * rad;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.strokeStyle = `rgba(255, 240, 250, ${0.98 * trailAlpha * fade})`;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
 
-      // 3. Searing white-pink core fill
-      ctx.fillStyle = 'rgba(255, 235, 245, 0.98)';
-      drawCrescentPolygon(0.40, false);
-      ctx.fill();
-
-      ctx.restore();
+        ctx.restore();
+      }
     }
 
     ctx.save();
@@ -2381,7 +2356,6 @@ export class YutaFighter extends Fighter {
     }
 
     let localWeaponAngle = 0;
-    const comboIndex = this.activeSlashType || 0;
 
     // Smooth easing helper: ease-out cubic for fluid sword arcs
     const easeOutCubic = (t) => 1.0 - Math.pow(1.0 - t, 3);

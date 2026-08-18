@@ -233,7 +233,7 @@ export class SukunaRenderer {
 
     let frontHandX_loc, frontHandY_loc, backHandX_loc, backHandY_loc;
 
-    // 1. Dynamic Slash Swing Chop Animation (Clean single-hand slicing chop for Cleave / Dismantle, off-hand strictly hidden - Rule #2 & #15)
+    // 1. Dynamic Slash Swing Chop Animation
     if ((fighter.slashSwingTimer > 0 || fighter.slashGlowTimer > 0 || (fighter.rapidSlashHitsLeft > 0 && fighter.punchAnimTimer <= 0)) && !fighter.isChannelingDomainExpansion) {
       const maxT = fighter.slashSwingMaxTimer || 14;
       let rawT = 1.0;
@@ -250,24 +250,14 @@ export class SukunaRenderer {
       const chopX = reach * Math.cos(sweepAngle);
       const chopY = reach * Math.sin(sweepAngle);
 
-      if (fighter.slashHand === 1) {
-        // Left Hand Chop: Sweeps diagonally across body from top to bottom (Hide front hand!)
-        frontHandX_loc = 0; frontHandY_loc = 0;
-        backHandX_loc  = chopX;
-        backHandY_loc  = -chopY;
-        hideFrontHand = true;
-        hideBackHand  = false;
-      } else {
-        // Right Hand Chop: Sweeps diagonally across body from bottom to top (Hide back hand!)
-        backHandX_loc  = 0; backHandY_loc = 0;
-        frontHandX_loc = chopX;
-        frontHandY_loc = chopY;
-        hideBackHand  = true;
-        hideFrontHand = false;
-      }
+      backHandX_loc  = 0; backHandY_loc = 0;
+      frontHandX_loc = chopX;
+      frontHandY_loc = chopY;
+      hideBackHand  = true;
+      hideFrontHand = false;
     }
 
-    // 2. Martial Arts Brawler Guard Stance & 1-2 Flurry Punch Animation (Matching Todo & Gojo)
+    // 2. Martial Arts Brawler Guard Stance & Front Hand Punch Animation
     else if (fighter.punchAnimTimer > 0 && !fighter.isChannelingDomainExpansion) {
       const maxT = fighter.punchAnimMaxTimer || fighter.punchActiveMaxTime || fighter.punchMaxTime || 12;
       const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.punchAnimTimer / maxT)));
@@ -279,20 +269,13 @@ export class SukunaRenderer {
         easePunch = Math.cos(retractT * (Math.PI / 2));
       }
       const lungeExtension = easePunch * (r * 1.5);
-      const oppositeRecoil = -Math.sin(rawProgress * Math.PI) * (r * 0.20);
 
-      frontHandX_loc = 0; frontHandY_loc = 0;
+      // All punches executed with the front hand extending forward from right edge
+      frontHandX_loc = r * 0.95 + lungeExtension * 1.40;
+      frontHandY_loc = Math.sin(rawProgress * Math.PI) * (r * 0.20);
       backHandX_loc  = 0; backHandY_loc  = 0;
-
-      if (fighter.punchAnimHand === 0) {
-        // --- LEAD HAND PUNCH ---
-        frontHandX_loc = r * 0.85 + lungeExtension * 1.40;
-        backHandX_loc  = r * 1.05 + oppositeRecoil;
-      } else {
-        // --- REAR HAND PUNCH ---
-        backHandX_loc  = r * 1.05 + lungeExtension * 1.60;
-        frontHandX_loc = oppositeRecoil;
-      }
+      hideBackHand  = true;
+      hideFrontHand = false;
     }
 
     // 3. Fuga (Divine Flame Arrow) Kamino Archer Bow Stance
@@ -314,25 +297,20 @@ export class SukunaRenderer {
       backHandX_loc  = r * 0.50; backHandY_loc  = -r * 0.03;
     }
 
-    // 5. Idle Brawler Guard Stance when in Melee Mode (Both hands visible, matching Gojo, Todo, Yuji, Saitama - Rule #19)
+    // 5. Idle Brawler Guard Stance when in Melee Mode (Front hand at right edge of body circle)
     else if (fighter.isMeleeMode) {
-      frontHandX_loc = 0;        frontHandY_loc = 0;
-      backHandX_loc  = r * 1.05; backHandY_loc  = 0;
+      frontHandX_loc = r * 0.95; frontHandY_loc = 0;
+      backHandX_loc  = 0;        backHandY_loc  = 0;
       hideFrontHand = false;
-      hideBackHand  = false;
+      hideBackHand  = true;
     }
 
-    // Default rest: Single-Hand Slash Stance (Off-hand strictly hidden for ranged Dismantle firing)
+    // Default rest: Single-Hand Slash Stance
     else {
-      if (fighter.slashHand === 1) {
-        backHandX_loc  = r * 0.85; backHandY_loc  = -r * 0.15;
-        frontHandX_loc = 0;        frontHandY_loc = 0;
-        hideFrontHand  = true;
-      } else {
-        frontHandX_loc = r * 0.85; frontHandY_loc = r * 0.15;
-        backHandX_loc  = 0;        backHandY_loc  = 0;
-        hideBackHand   = true;
-      }
+      frontHandX_loc = r * 0.95; frontHandY_loc = 0;
+      backHandX_loc  = 0;        backHandY_loc  = 0;
+      hideBackHand   = true;
+      hideFrontHand  = false;
     }
 
     const fHand = toGlobal(frontHandX_loc, frontHandY_loc);

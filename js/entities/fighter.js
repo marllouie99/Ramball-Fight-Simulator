@@ -40,7 +40,10 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     const multiplier = target.isTransfiguredHuman
       ? 1.0
       : Number(CONFIG.doppleganger?.illusionDamageReceivedMultiplier || 1);
-    const effectiveAmount = amount * multiplier;
+    const armorMultiplier = (!opts.isTrueDamage && target.nanamiArmorFractureTimer > 0)
+      ? (1.0 + (target.nanamiArmorFractureAmount || 0.20))
+      : 1.0;
+    const effectiveAmount = amount * multiplier * armorMultiplier;
     const prevHp = currentHp;
     target.hp = Math.max(0, Number((currentHp - effectiveAmount).toFixed(2)));
 
@@ -59,12 +62,17 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
         }
       }
 
-      // Spawn blood/impact particle visual effect in damage direction
-      const damageAngle = opts.damageAngle ?? (attacker ? Math.atan2(target.y - attacker.y, target.x - attacker.x) : Math.random() * Math.PI * 2);
-      if (typeof spawnBloodEffect === 'function') {
+      const isRatioPauseActive = (target.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
+      let damageAngle = null;
+      if (attacker && typeof attacker.x === 'number' && typeof attacker.y === 'number') {
+        damageAngle = Math.atan2(target.y - attacker.y, target.x - attacker.x);
+      } else if (opts.damageAngle !== undefined) {
+        damageAngle = opts.damageAngle;
+      }
+      if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(effectiveAmount * 0.16)) : effectiveAmount;
         spawnBloodEffect(target, bloodAmount, damageAngle);
-      } else if (typeof spawnSparks === 'function') {
+      } else if (typeof spawnSparks === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive) {
         spawnSparks(target.x, target.y, 6, 'crimsonSniper');
       }
 
@@ -653,6 +661,7 @@ export class Fighter {
     if (this.blackFlashTimer > 0) this.blackFlashTimer--;
     if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
     if (this.evadeBuffTimer > 0) this.evadeBuffTimer--;
+    if (this.nanamiArmorFractureTimer > 0) this.nanamiArmorFractureTimer--;
     
     // Knockback Stun: Disable AI steering velocity during knockback so ricochet executes cleanly
     if (this.knockbackStunTimer > 0) {
@@ -907,11 +916,13 @@ export class Fighter {
       if (attacker) {
         damageAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
       }
-      // Spawn blood effect in the damage direction (unless it's a turret or thermobaric/flame/domain DPS)
-      const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain;
+      const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
+      const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
       if (!this.isTurret && !isExplosionOrFlame) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
-        spawnBloodEffect(this, bloodAmount, damageAngle);
+        if (typeof spawnBloodEffect === 'function') {
+          spawnBloodEffect(this, bloodAmount, damageAngle);
+        }
       }
       
       // Global blast / knockback / explosion skill interruption & penalty cooldown

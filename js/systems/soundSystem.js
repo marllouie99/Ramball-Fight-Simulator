@@ -161,7 +161,7 @@ export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
-      const targetGain = Math.max(0, Math.min(2.5, volume));
+      const targetGain = Math.max(0, Math.min(25.0, volume));
       const rampTime = fadeMs > 0 ? (fadeMs / 1000) : MICRO_FADE_IN;
       gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
       gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + rampTime);
@@ -487,7 +487,7 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
       const source = audioCtx.createBufferSource();
       source.buffer = cached;
       const gainNode = audioCtx.createGain();
-      const targetGain = Math.max(0, Math.min(2.5, volume));
+      const targetGain = Math.max(0, Math.min(25.0, volume));
       // Micro-fade-in to prevent click/pop artifact on playback start
       gainNode.gain.setValueAtTime(0.001, audioCtx.currentTime);
       gainNode.gain.linearRampToValueAtTime(targetGain, audioCtx.currentTime + MICRO_FADE_IN);

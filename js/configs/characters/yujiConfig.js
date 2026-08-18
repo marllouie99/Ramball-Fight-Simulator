@@ -32,6 +32,10 @@ export const yujiConfig = {
   comboDamage: 12,              // Damage per combo punch (each also triggers Divergent Fist)
   comboInterval: 30,            // Frames between each combo punch (~0.17s)
   comboDashRange: 200,          // Max range from which Yuji will dash into the target
+  baseComboDashSpeed: 15.5,     // Velocity speed during standard Divergent Fist dash
+  soulSwapComboDashRange: 350,  // Extended dash engagement range while in Soul Swap mode
+  soulSwapComboRushCooldown: 180, // Cooldown in frames for combo rush while in Soul Swap mode
+  soulSwapDashSpeed: 22.0,      // Supersonic dash speed while in Soul Swap mode
 
   // Skill 2: Reverse Cursed Technique (RCT) — Passive
   rctHealPercent: 0.25,         // Percentage of max HP restored upon reverting from Sukuna transformation

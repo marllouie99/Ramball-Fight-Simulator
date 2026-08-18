@@ -253,8 +253,11 @@ export function drawFighters() {
     const isParalyzedByMahito = Boolean(fighter.isParalyzedByMahito || ((fighter.paralyzeTimer || 0) > 0 && fighter.isParalyzedByMahito));
     let shiverX = 0, shiverY = 0;
     if (isParalyzedByMahito) {
-      const progress = 1.0 - Math.min(1.0, Math.max(0.0, (fighter.paralyzeTimer || 0) / 45));
-      const tremorAmt = 4.5 + progress * 9.5; // Vibrates violently from ±4.5px up to ±14px before detonation
+      const paralyzeMax = CONFIG.mahito?.soulDisfigurement?.paralyzeDuration || 45;
+      const progress = 1.0 - Math.min(1.0, Math.max(0.0, (fighter.paralyzeTimer || 0) / paralyzeMax));
+      const baseTremor = CONFIG.mahito?.soulDisfigurement?.paralyzeShiverIntensity ?? CONFIG.mahito?.shiverIntensity ?? 4.5;
+      const maxTremor = CONFIG.mahito?.soulDisfigurement?.shiverIntensity ?? 14.0;
+      const tremorAmt = baseTremor + progress * (maxTremor - baseTremor); // Vibrates violently up before detonation
       shiverX = (Math.random() - 0.5) * tremorAmt;
       shiverY = (Math.random() - 0.5) * tremorAmt;
     }
@@ -1046,13 +1049,14 @@ export function drawIllusions() {
     // Shivering animation when paralyzed by Mahito OR when dying (about to explode)
     let shiverX = 0, shiverY = 0;
     if (illusion.isParalyzedByMahito || (illusion.paralyzeTimer && illusion.paralyzeTimer > 0 && illusion.isParalyzedByMahito)) {
-      const remainingProgress = Math.min(1.0, (illusion.paralyzeTimer || 45) / 45);
+      const paralyzeMax = CONFIG.mahito?.soulDisfigurement?.paralyzeDuration || 45;
+      const remainingProgress = Math.min(1.0, (illusion.paralyzeTimer || paralyzeMax) / paralyzeMax);
       const tremorAmt = 2.0 + remainingProgress * 2.2;
       shiverX = (Math.random() - 0.5) * tremorAmt;
       shiverY = (Math.random() - 0.5) * tremorAmt;
     } else if (illusion.isDying) {
       // Shiver/tremor intensity increases violently as the pop timer approaches zero!
-      const maxTimer = illusion.maxDeathTimer || 20;
+      const maxTimer = illusion.maxDeathTimer || CONFIG.mahito?.soulMultiplicity?.minionDeathDuration || 50;
       const progress = 1.0 - (illusion.deathTimer / maxTimer);
       const tremorAmt = 1.0 + progress * 5.0; // scales up to 6px shake
       shiverX = (Math.random() - 0.5) * tremorAmt;

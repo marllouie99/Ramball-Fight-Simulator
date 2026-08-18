@@ -246,7 +246,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
   const orbX = fugaOrb ? fugaOrb.x : (sukuna.x || fighter.x);
   const orbY = fugaOrb ? fugaOrb.y : (sukuna.y || fighter.y);
   const angleToOrb = Math.atan2(orbY - fighter.y, orbX - fighter.x);
-  const fugaDamageRadius = 140;
+  const fugaDamageRadius = CONFIG.sukuna?.thermobaricSplashRadius || 150;
 
   const dodgeDist = fugaDamageRadius + (fighter.r || 25) + 80;
   const perpAngleLeft  = angleToOrb + Math.PI / 2;

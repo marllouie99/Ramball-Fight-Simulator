@@ -38,7 +38,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
     fighter._attackSoundConfig = swingSnd;
   }
 
-  const range = CONFIG.yuta.meleeRange || 95;
+  const range = CONFIG.yuta.meleeRange || 70;
   const bonusDmg = fighter.pureLoveBeamBonusDamage || 0;
   const damage = (CONFIG.yuta.meleeDamage || 15) + bonusDmg;
   const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
@@ -109,7 +109,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
     spawnImpactFlash(enemy.x, enemy.y, 25);
     spawnBloodEffect(enemy, 10, fighter.targetAngle);
 
-    const pushForce = 6.5;
+    const pushForce = CONFIG.yuta?.meleeKnockback || 6.5;
     const kbX = Math.cos(fighter.targetAngle) * pushForce;
     const kbY = Math.sin(fighter.targetAngle) * pushForce;
     if (typeof enemy.applyKnockback === 'function') {
@@ -118,7 +118,7 @@ export function modExecuteKatanaMelee(fighter, angle) {
       enemy.vx += kbX;
       enemy.vy += kbY;
     }
-    if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(12);
+    if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(CONFIG.yuta?.meleeHitStun || 12);
 
     // Check for clash with Gojo or Sukuna
     if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {

@@ -13,11 +13,11 @@ import { getSkillSound } from '../../../soundEffects/skillSounds.js';
 export function activateRed(fighter) {
   if ((fighter.redEffectTimer || 0) > 0 || fighter.redBuildupPhase) return;
 
-  const buildupFrames = CONFIG.gojo?.redBuildupFrames || 20;
+  const buildupFrames = CONFIG.gojo?.redBuildupFrames || 100;
   const blastFadeFrames = 25;
   const totalFrames = buildupFrames + blastFadeFrames;
 
-  fighter.redCooldown = CONFIG.gojo?.redCooldown || 300;
+  fighter.redCooldown = CONFIG.gojo?.redCooldown || 1000;
   fighter.redEffectTimer = totalFrames;
   fighter.redEffectMaxTimer = totalFrames;
   fighter.redBuildupPhase = true;
@@ -82,8 +82,8 @@ export function detonateRed(fighter) {
   fighter.redDetonated = true;
 
   const redRange = CONFIG.gojo?.redRange || 100;
-  const redDamage = CONFIG.gojo?.redDamage || 22;
-  const redKnockback = CONFIG.gojo?.redKnockback || 22;
+  const redDamage = CONFIG.gojo?.redDamage || 100;
+  const redKnockback = CONFIG.gojo?.redKnockback || 25;
 
   // Heavy blast sparks & screen shake
   spawnSparks(fighter.x, fighter.y, 35, 'crimsonSniper');
@@ -130,8 +130,8 @@ export function detonateRed(fighter) {
             f.vy = kbVy;
           }
 
-          const slowDuration = CONFIG.gojo?.redSlowDuration || 90;
-          const slowMultiplier = CONFIG.gojo?.redSlowMultiplier || 0.6;
+          const slowDuration = CONFIG.gojo?.redSlowDuration || 120;
+          const slowMultiplier = CONFIG.gojo?.redSlowMultiplier || 0.35;
           if (typeof f.applySlow === 'function') {
             f.applySlow(slowDuration, slowMultiplier, { isRed: true });
           }
@@ -199,7 +199,7 @@ export function firePurple(fighter, ownerIndex) {
   // Gojo's breather stasis after firing is based directly on purpleLife
   fighter.purpleRecoveryTimer = purpleLife;
   fighter.purpleRecoveryMaxTimer = purpleLife;
-  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 600;
+  fighter.purpleCooldown = CONFIG.gojo?.purpleCooldown || 1500;
   fighter.z = 35; // Start descent from hovering altitude
 
   // Ensure Limitless Infinity barrier is IMMEDIATELY active during post-Purple breather state!
@@ -276,7 +276,7 @@ export function deleteEnemyProjectilesInPurple(fighter) {
           const isEnemy = myTeam === null || state.getFighterTeam(ep.owner) !== myTeam;
           if (isEnemy && !ep.isVisual) {
             const dist = Math.hypot(p.x - ep.x, p.y - ep.y);
-            const suctionRange = (CONFIG.gojo?.purpleRadius || 60) + 180;
+            const suctionRange = (CONFIG.gojo?.purpleRadius || 50) + 180;
             if (dist < suctionRange) {
               ep.toRemove = true;
               spawnSparks(ep.x, ep.y, 4, '#A020F0');

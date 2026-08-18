@@ -205,13 +205,13 @@ export const mahitoConfig = {
     executionScreenShake: 16,      // Massive screen shake
     slowMultiplier: 0.15,          // Move speed multiplier for trapped targets inside domain (85% slow)
     velocityDampening: 0.85,       // Velocity damping rate per frame inside domain
-    basicAttackCooldownMultiplier: 1.50, // Basic attack speed multiplier inside domain (1.50 = 1.5x faster hit & damage rate, 2.0 = 2x faster, 3.0 = 3x faster)
+    basicAttackCooldownMultiplier: 1.50, // Basic attack speed multiplier inside domain (1.50 = 1.5x faster hit & damage rate)
     attacksToTriggerDisfigurement: 5,    // Basic attack hits required inside domain to trigger Soul Disfigurement & Rupture
-    disfigurementDamageMultiplier: 1.50, // Damage multiplier for Soul Disfigurement burst damage inside domain (1.50 = +50% damage)
-    ruptureDamageMultiplier: 5.0,       // Damage multiplier for Soul Rupture explosion damage inside domain (1.50 = +50% damage)
-    anyDistanceBasicAttack: true,       // Inside domain, Idle Transfiguration basic attack triggers at ANY distance (Sure-Hit domain effect)
-    punchRangeMultiplier: 99999,        // Reach multiplier inside domain (99999 = unlimited reach across entire screen)
-    domainRangeBoost: 200,              // Displayed attack reach boost inside domain (+200px reach)
+    disfigurementDamageMultiplier: 1.50, // Damage multiplier for Soul Disfigurement burst damage inside domain (+50% damage)
+    ruptureDamageMultiplier: 5.0,        // Damage multiplier for Soul Rupture explosion damage inside domain
+    anyDistanceBasicAttack: true,        // Inside domain, Idle Transfiguration basic attack triggers at ANY distance
+    punchRangeMultiplier: 99999,         // Reach multiplier inside domain
+    domainRangeBoost: 200,               // Displayed attack reach boost inside domain (+200px reach)
   },
 
   // ── 12. SOUND EFFECTS & AUDIO VOLUME ADJUSTMENTS ───────────────────────────
@@ -219,62 +219,35 @@ export const mahitoConfig = {
     // Basic Attack & Weapon Morphs
     bladeSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     bladeSwingAlt: 'Assets/Sound Effects/Attacks/swordswing.mp3',
-    bladeSwingVolume: 1.6,
-
     maceSmash: 'Assets/Sound Effects/Attacks/groundsmash.mp3',
     maceSmashAlt: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-    maceSmashVolume: 1.8,
-
     fleshHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-    fleshHitVolume: 1.8,
-
     subterraneanHumpSound: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-
+    stretchArm: 'Assets/Sound Effects/Skills/mahito-stretch-arm.mp3',
     whiff: 'Assets/Sound Effects/Skills/woosh.mp3',
-    whiffVolume: 1.2,
 
-    // Soul Disfigurement & Detonation
+    // Soul Disfigurement & Ruptures
     soulDetonate: null,
-    soulDetonateVolume: 1.8,
-
     farewellVoiceline: 'Assets/Sound Effects/Skills/mahito-farewell-voiceline.mp3',
-    farewellVoicelineVolume: 3.2,
-    farewellVoicelineChance: 0.10, // Occasional trigger on Soul Disfigurement paralysis
-
     bodyExplode: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
-    bodyExplodeVolume: 2.0,
 
     // Domain Expansion & Ultimates
     domainChannelSound: 'Assets/Sound Effects/Skills/mahito-domainchanneling-voiceline.mp3',
-    domainChannelVolume: 3.5,
     domainDeploySound: 'Assets/Sound Effects/Skills/mahito-domaindeploy-voiceline.mp3',
-    domainDeployVolume: 3.5,
     domainDeployAltSound: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
-    domainDeployAltVolume: 1.0,
     domainExecuteSound: 'Assets/Sound Effects/Skills/mahito-body-explode.mp3',
-    domainExecuteVolume: 3.5,
 
     // Clone Split & Evasion SFX
     splitClone: 'Assets/Sound Effects/Skills/mahito-split-clone2.mp3',
     splitCloneAlt: 'Assets/Sound Effects/Skills/mahito-split-clone1.mp3',
     transformBackVoiceline: 'Assets/Sound Effects/Skills/mahito-transformback-voiceline.mp3',
-    transformBackVoicelineVolume: 2.0,
-    splitCloneVolume: 1.8,
-    cloneNoiseVolume: 1.5,
-    cloneNoiseInterval: 50,
 
     // Passive Dash & Skill Voicelines
     dashVoiceline: 'Assets/Sound Effects/Skills/mahito-dash-voiceline.mp3',
-    dashVoicelineVolume: 2.0,
-    dashVoicelineChance: 0.05, // Rare/infrequent trigger on passive dash (15%)
-
     skillVoiceline: 'Assets/Sound Effects/Skills/mahito-skill2-voiceline.mp3',
-    skillVoicelineVolume: 2.2,
-    skillVoicelineChance: 0.20, // 20% chance to play on skill 2, 3, or 4
 
     // Minion Summoning & Explosions
     minionsThrowVoiceline: 'Assets/Sound Effects/Skills/mahito-minionsthrow-voiceline.mp3',
-    minionsThrowVoicelineVolume: 2.0,
     minionSummon: 'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
     minionSummonAlt: 'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
     minionSummonAlt2: 'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3',
@@ -282,18 +255,73 @@ export const mahitoConfig = {
       'Assets/Sound Effects/Skills/mahito-minion-summon.mp3',
       'Assets/Sound Effects/Skills/mahito-minion-summon1.mp3',
       'Assets/Sound Effects/Skills/mahito-minion-summo2.mp3',
-    ],
-    minionSummonVolume: 1.8,
-    minionNoiseVolume: 1.5,
-    minionNoiseInterval: 55,
-    minionExplosionVolume: 0.5,
+    ]
+  },
 
-    // Skill & Stance SFX Volumes
-    subterraneanSurgeVolume: 1.8,
-    twinScissorVolume: 1.8,
-    drillChargeVolume: 1.8,
-    domainVolume: 3.5,
-    transformationVolume: 2.2,
+  soundVolumes: {
+    bladeSwing: 1.6,
+    bladeSwingAlt: 1.6,
+    maceSmash: 1.8,
+    maceSmashAlt: 1.8,
+    fleshHit: 1.8,
+    subterraneanHumpSound: 1.8,
+    stretchArm: 1.4,
+    whiff: 1.2,
+    soulDetonate: 1.8,
+    farewellVoiceline: 3.2,
+    bodyExplode: 2.0,
+    domainChannelSound: 3.0,
+    domainDeploySound: 3.0,
+    domainDeployAltSound: 1.2,
+    domainExecuteSound: 3.5,
+    splitClone: 1.8,
+    splitCloneAlt: 1.8,
+    transformBackVoiceline: 3.5,
+    cloneNoise: 1.5,
+    dashVoiceline: 3.0,
+    skillVoiceline: 3.2,
+    minionsThrowVoiceline: 3.5,
+    minionSummon: 1.8,
+    minionSummonAlt: 1.8,
+    minionSummonAlt2: 1.8,
+    minionSummons: 1.8,
+    minionNoise: 1.5,
+    minionExplosion: 1.8,
+    subterraneanSurge: 1.8,
+    twinScissor: 1.8,
+    drillCharge: 1.8,
+    domain: 3.5,
+    transformation: 2.2,
+    punch: 1.8
+  },
+
+  soundChances: {
+    farewellVoiceline: 0.15,  // 10% chance on Soul Disfigurement paralysis
+    dashVoiceline: 0.05,      // 5% chance on passive dash
+    skillVoiceline: 0.20      // 20% chance on skills 2, 3, 4
+  },
+
+  soundDelays: {
+    bladeSwing: 0,
+    bladeSwingAlt: 0,
+    maceSmash: 0,
+    maceSmashAlt: 0,
+    fleshHit: 0,
+    subterraneanHumpSound: 0,
+    stretchArm: 0,
+    whiff: 0,
+    farewellVoiceline: 0,
+    bodyExplode: 0,
+    domainChannelSound: 0,
+    domainDeploySound: 0,
+    domainDeployAltSound: 0,
+    domainExecuteSound: 0,
+    splitClone: 0,
+    transformBackVoiceline: 0,
+    dashVoiceline: 0,
+    skillVoiceline: 0,
+    minionsThrowVoiceline: 0,
+    minionSummon: 0
   },
 
   // Legacy Punch Sound Aliases

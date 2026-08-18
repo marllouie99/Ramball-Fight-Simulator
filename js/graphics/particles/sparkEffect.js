@@ -26,6 +26,18 @@ function getUnitRadialGradient(ctx, key, stops) {
   return gradient;
 }
 
+// Pre-allocated static segment geometry for animeImpactFrame (Zero Per-Frame Allocations)
+const ANIME_IMPACT_SEGMENTS = [
+  { t0: 0.00, t1: 0.09, maxSpike: 1.12 },
+  { t0: 0.14, t1: 0.25, maxSpike: 1.30 },
+  { t0: 0.29, t1: 0.44, maxSpike: 1.38 },
+  { t0: 0.48, t1: 0.56, maxSpike: 1.15 },
+  { t0: 0.60, t1: 0.72, maxSpike: 1.32 },
+  { t0: 0.76, t1: 0.84, maxSpike: 1.20 },
+  { t0: 0.88, t1: 0.94, maxSpike: 1.25 },
+  { t0: 0.97, t1: 0.99, maxSpike: 1.10 },
+];
+
 /**
  * Spawns spark effects at a position (visual-only, no collision).
  * @param {number} x - X position
@@ -1944,7 +1956,7 @@ export function drawSparkEffects(layer = 'all') {
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
     } else if (effect.type === 'animeImpactFrame') {
-      // ── SPIKY CRESCENT IMPACT (Chopped in 8 Pieces + Action Lines) ──
+      // ── SPIKY CRESCENT IMPACT (Chopped in 8 Pieces + Action Lines) — Optimized ──
       ctx.save();
       // Explicitly clear shadows to prevent circular black shadows from rendering
       ctx.shadowColor = 'transparent';
@@ -1966,19 +1978,7 @@ export function drawSparkEffects(layer = 'all') {
       const halfArc = Math.PI * 0.72; // ±130° → 260° total arc
       const totalArc = halfArc * 2;   // 260° arc span
 
-      // ── 8 SLIM CHOPPED CRESCENT PIECES (DIFFERENT LENGTHS & WIDE GAPS) ──
-      const segments = [
-        { t0: 0.00, t1: 0.09, maxSpike: 1.12 },
-        { t0: 0.14, t1: 0.25, maxSpike: 1.30 },
-        { t0: 0.29, t1: 0.44, maxSpike: 1.38 },
-        { t0: 0.48, t1: 0.56, maxSpike: 1.15 },
-        { t0: 0.60, t1: 0.72, maxSpike: 1.32 },
-        { t0: 0.76, t1: 0.84, maxSpike: 1.20 },
-        { t0: 0.88, t1: 0.94, maxSpike: 1.25 },
-        { t0: 0.97, t1: 0.99, maxSpike: 1.10 },
-      ];
-
-      // Draw radial speed/action lines projecting outward
+      // Draw radial speed/action lines projecting outward — BATCHED by color group
       const isGold = (effect.color === 'gold');
       const isBlackPink = (effect.color === 'blackpink');
       const isOrange = (effect.color === 'orange');
@@ -1986,48 +1986,62 @@ export function drawSparkEffects(layer = 'all') {
       const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
       const lineCount = 14;
       ctx.lineWidth = 1.8;
+      const startRad = innerR * 0.85;
+
+      // Resolve the two alternating stroke colors once
+      let lineColorA, lineColorB;
+      if (isGold) { lineColorA = `rgba(0, 0, 0, ${alpha * 0.95})`; lineColorB = `rgba(255, 215, 0, ${alpha * 0.95})`; }
+      else if (isBlackPink) { lineColorA = `rgba(15, 10, 15, ${alpha * 0.95})`; lineColorB = `rgba(255, 20, 147, ${alpha * 0.95})`; }
+      else if (isOrange) { lineColorA = `rgba(255, 255, 255, ${alpha * 0.90})`; lineColorB = `rgba(255, 80, 0, ${alpha * 0.95})`; }
+      else if (isCyan) { lineColorA = `rgba(0, 20, 45, ${alpha * 0.95})`; lineColorB = `rgba(0, 229, 255, ${alpha * 0.95})`; }
+      else if (isCrimson) { lineColorA = `rgba(20, 2, 5, ${alpha * 0.95})`; lineColorB = `rgba(255, 36, 0, ${alpha * 0.95})`; }
+      else { lineColorA = `rgba(0, 0, 0, ${alpha * 0.9})`; lineColorB = lineColorA; }
+
+      // Batch pass 1: Dark/primary accent lines (every 3rd)
+      ctx.strokeStyle = lineColorA;
+      ctx.beginPath();
       for (let i = 0; i < lineCount; i++) {
+        if (i % 3 !== 0) continue;
         const a = -halfArc + (i / (lineCount - 1)) * totalArc + (Math.sin(i * 1.7) * 0.06);
         const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
-        const startRad = innerR * 0.85;
-        ctx.beginPath();
         ctx.moveTo(Math.cos(a) * startRad, Math.sin(a) * startRad);
         ctx.lineTo(Math.cos(a) * (startRad + len), Math.sin(a) * (startRad + len));
-        
-        // Alternating colors based on theme
-        if (isGold) {
-          ctx.strokeStyle = (i % 3 === 0) ? `rgba(0, 0, 0, ${alpha * 0.95})` : `rgba(255, 215, 0, ${alpha * 0.95})`;
-        } else if (isBlackPink) {
-          ctx.strokeStyle = (i % 3 === 0) ? `rgba(15, 10, 15, ${alpha * 0.95})` : `rgba(255, 20, 147, ${alpha * 0.95})`;
-        } else if (isOrange) {
-          ctx.strokeStyle = (i % 3 === 0) ? `rgba(255, 255, 255, ${alpha * 0.90})` : `rgba(255, 80, 0, ${alpha * 0.95})`;
-        } else if (isCyan) {
-          ctx.strokeStyle = (i % 3 === 0) ? `rgba(0, 20, 45, ${alpha * 0.95})` : `rgba(0, 229, 255, ${alpha * 0.95})`;
-        } else if (isCrimson) {
-          ctx.strokeStyle = (i % 3 === 0) ? `rgba(20, 2, 5, ${alpha * 0.95})` : `rgba(255, 36, 0, ${alpha * 0.95})`;
-        } else {
-          ctx.strokeStyle = `rgba(0, 0, 0, ${alpha * 0.9})`;
-        }
-        ctx.stroke();
       }
+      ctx.stroke();
 
-      for (let sIdx = 0; sIdx < segments.length; sIdx++) {
-        const seg = segments[sIdx];
+      // Batch pass 2: Theme accent lines (non-3rd)
+      ctx.strokeStyle = lineColorB;
+      ctx.beginPath();
+      for (let i = 0; i < lineCount; i++) {
+        if (i % 3 === 0) continue;
+        const a = -halfArc + (i / (lineCount - 1)) * totalArc + (Math.sin(i * 1.7) * 0.06);
+        const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
+        ctx.moveTo(Math.cos(a) * startRad, Math.sin(a) * startRad);
+        ctx.lineTo(Math.cos(a) * (startRad + len), Math.sin(a) * (startRad + len));
+      }
+      ctx.stroke();
+
+      // ── 8 SLIM CHOPPED CRESCENT PIECES — using hoisted ANIME_IMPACT_SEGMENTS ──
+      const alphaFill = Math.min(1.0, alpha * 1.25);
+
+      for (let sIdx = 0; sIdx < ANIME_IMPACT_SEGMENTS.length; sIdx++) {
+        const seg = ANIME_IMPACT_SEGMENTS[sIdx];
         const segN = 10;
+        const segPeakIdx = 5; // Math.round(segN * 0.5)
 
         // Draw main colored segment
         if (isGold) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 0, 0, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 200, 0, ${Math.min(1.0, alpha * 1.25)})`;
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 0, 0, ${alphaFill})` : `rgba(255, 200, 0, ${alphaFill})`;
         } else if (isBlackPink) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(15, 10, 15, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 20, 147, ${Math.min(1.0, alpha * 1.25)})`;
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(15, 10, 15, ${alphaFill})` : `rgba(255, 20, 147, ${alphaFill})`;
         } else if (isOrange) {
-          ctx.fillStyle = (sIdx % 2 === 0) ? `rgba(255, 80, 0, ${Math.min(1.0, alpha * 1.25)})` : `rgba(255, 180, 0, ${Math.min(1.0, alpha * 1.25)})`;
+          ctx.fillStyle = (sIdx % 2 === 0) ? `rgba(255, 80, 0, ${alphaFill})` : `rgba(255, 180, 0, ${alphaFill})`;
         } else if (isCyan) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 20, 45, ${Math.min(1.0, alpha * 1.25)})` : `rgba(0, 229, 255, ${Math.min(1.0, alpha * 1.25)})`;
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 20, 45, ${alphaFill})` : `rgba(0, 229, 255, ${alphaFill})`;
         } else if (isCrimson) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(20, 2, 5, ${Math.min(1.0, alpha * 1.25)})` : `rgba(220, 20, 60, ${Math.min(1.0, alpha * 1.25)})`;
+          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(20, 2, 5, ${alphaFill})` : `rgba(220, 20, 60, ${alphaFill})`;
         } else {
-          ctx.fillStyle = `rgba(0, 0, 0, ${Math.min(1.0, alpha * 1.25)})`;
+          ctx.fillStyle = `rgba(0, 0, 0, ${alphaFill})`;
         }
         ctx.beginPath();
 
@@ -2039,11 +2053,10 @@ export function drawSparkEffects(layer = 'all') {
           let r;
           if (i === 0 || i === segN) {
             r = outerR * 0.80; // sharp tapered tips at piece edges
-          } else if (i === Math.round(segN * 0.5)) {
+          } else if (i === segPeakIdx) {
             r = outerR * seg.maxSpike; // peak spike of segment
           } else {
-            const tooth = (i % 2 === 0) ? 0.88 : 1.06;
-            r = outerR * tooth;
+            r = outerR * ((i % 2 === 0) ? 0.88 : 1.06);
           }
 
           const px = Math.cos(a) * r;

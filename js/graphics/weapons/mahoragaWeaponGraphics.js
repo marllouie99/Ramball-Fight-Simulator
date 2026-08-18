@@ -540,144 +540,140 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     worldCuttingTimer = f.worldCuttingTimer || 0;
   }
 
-  // --- DRAW DYNAMIC SWORD TRAIL IN WORLD SPACE (SINGLE CRESCENT SHAPE) ---
+  // --- DRAW DYNAMIC RULE 15 CRESCENT SWORD SLASH ARC ---
   const isGojoDomainActive = typeof state !== 'undefined' && (
     state.domainActive || state.activeDomain ||
     (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive))
   );
 
-  if (fighterObj && !isGojoDomainActive) {
-    if (!fighterObj.swordTrail) fighterObj.swordTrail = [];
-    const isMoving = Math.hypot(fighterObj.vx, fighterObj.vy) > 0.15 || (fighterObj._prevX !== undefined && Math.hypot(fighterObj.x - fighterObj._prevX, fighterObj.y - fighterObj._prevY) > 0.5);
-    const isMahoragaSwinging = (fighterObj.punchAnimTimer > 0) || (fighterObj.isCleaving && (fighterObj.cleaveWindupTimer > 0)) || isMoving;
+  const isSwinging = (punchAnimTimer > 0) || (isCleaving && (fighterObj?.cleaveWindupTimer > 0));
 
-    if (isMahoragaSwinging) {
-      fighterObj.trailFadeAlpha = 1.0;
-      const pos = fighterObj._getSwordTipPositions();
-      let shouldAdd = true;
-      if (fighterObj.swordTrail.length > 0) {
-        const last = fighterObj.swordTrail[fighterObj.swordTrail.length - 1];
-        const dist = Math.hypot(pos.outer.x - last.outer.x, pos.outer.y - last.outer.y);
-        if (dist < 1.0) shouldAdd = false;
-      }
-      if (shouldAdd) {
-        fighterObj.swordTrail.push({
-          outer: pos.outer,
-          inner: pos.inner,
-          life: 1.0
-        });
-      }
-      if (fighterObj.swordTrail.length > 24) { // Increased to 24 capacity for ultimate smoothness!
-        fighterObj.swordTrail.shift();
-      }
-    } else {
-      // Fast snappy fade out post-swing (disappears cleanly in 5 frames)
-      if (fighterObj.trailFadeAlpha === undefined) fighterObj.trailFadeAlpha = 1.0;
-      fighterObj.trailFadeAlpha = Math.max(0, fighterObj.trailFadeAlpha - 0.20);
-      if (fighterObj.trailFadeAlpha <= 0) {
-        fighterObj.swordTrail = [];
-      }
+  if (fighterObj && !isGojoDomainActive && isSwinging) {
+    const maxTimer = (maxAnimTimer && maxAnimTimer > 0) ? maxAnimTimer : 18.0;
+    const elapsed = maxTimer - punchAnimTimer;
+    const rawP = Math.min(1.0, Math.max(0.0, elapsed / maxTimer));
+    const comboIndex = (fighterObj.isInfinityBlitz) ? (1 + ((swordCombo || 0) % 2)) : ((swordCombo || 0) % 3);
+
+    const baseAngle = gunAngle !== undefined ? gunAngle : (fighterObj.angle || 0);
+    const facingLeft = Math.abs(baseAngle) > Math.PI / 2;
+
+    let startOffset = -1.15;
+    let endOffset = 1.15;
+    if (comboIndex === 1) {
+      startOffset = 1.20;
+      endOffset = -1.15;
+    } else if (comboIndex === 2) {
+      startOffset = -1.40;
+      endOffset = 1.35;
     }
-  }
 
-  if (fighterObj && fighterObj.swordTrail && fighterObj.swordTrail.length > 1) {
-    ctx.save();
-    ctx.globalCompositeOperation = 'source-over';
-    
-    const trail = fighterObj.swordTrail;
-    const N = trail.length;
+    let currentTipOffset = startOffset;
+    let currentTailOffset = startOffset;
+    let trailAlpha = 1.0;
 
-    // Smooth fade out based on the latest point's life and post-swing fade alpha
-    const fadeAlpha = (fighterObj.trailFadeAlpha !== undefined) ? fighterObj.trailFadeAlpha : 1.0;
-    const latestLife = trail[N - 1].life;
-    ctx.globalAlpha = Math.max(0, Math.min(1, latestLife * fadeAlpha));
+    if (rawP < 0.65) {
+      const t = rawP / 0.65;
+      const eased = 1.0 - Math.pow(1.0 - t, 2.2);
+      currentTipOffset = startOffset + eased * (endOffset - startOffset);
+      currentTailOffset = startOffset;
+      trailAlpha = Math.min(1.0, t * 2.5);
+    } else {
+      const recP = (rawP - 0.65) / 0.35;
+      const easedRec = Math.pow(1.0 - recP, 1.4);
+      currentTipOffset = endOffset;
+      currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
+      trailAlpha = Math.max(0.0, 1.0 - recP * 1.3);
+    }
 
-    const totalStages = fighterObj ? ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0)) : 0;
-    const isLevel8 = totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted;
-
-    // Define colors based on adaptation level
-    const glowColor = isLevel8 ? 'rgba(255, 110, 0, 0.45)' : 'rgba(255, 191, 0, 0.35)';
-    const fillColor = isLevel8 ? 'rgba(255, 165, 0, 0.85)' : 'rgba(255, 215, 0, 0.80)';
-    const coreColor = isLevel8 ? 'rgba(255, 250, 240, 0.98)' : 'rgba(255, 255, 230, 0.95)';
-
-    // Helper to render a single, continuous, double-tapered crescent arc polygon
-    const drawCrescentPolygon = (widthMult = 1.0, isGlow = false) => {
-      ctx.beginPath();
-      // Outer arc: from tail (i=0) to leading tip (i=N-1)
-      const p0 = trail[0].outer;
-      ctx.moveTo(p0.x, p0.y);
-      for (let i = 1; i < N - 1; i++) {
-        const pi = trail[i].outer;
-        const pi1 = trail[i + 1].outer;
-        const xc = (pi.x + pi1.x) / 2;
-        const yc = (pi.y + pi1.y) / 2;
-        ctx.quadraticCurveTo(pi.x, pi.y, xc, yc);
+    if (trailAlpha > 0.01 && Math.abs(currentTipOffset - currentTailOffset) >= 0.05) {
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.rotate(baseAngle);
+      if (facingLeft) {
+        ctx.scale(1, -1);
       }
-      const pLast = trail[N - 1].outer;
-      ctx.lineTo(pLast.x, pLast.y);
 
-      // Inner returning arc: from leading tip (i=N-1, attached to sword tip) back to tail (i=0)
-      // Rule 15 Compliant Double Tapering Function (taper to zero at both ends)
-      for (let i = N - 1; i >= 0; i--) {
-        const t = N > 1 ? i / (N - 1) : 1.0;
-        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
-        const p = trail[i];
-        const alphaFactor = Math.min(1.0, p.life * 1.4) * taper * widthMult;
+      const totalStages = ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0));
+      const isLevel8 = totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted;
 
-        let inX, inY;
-        if (isGlow) {
-          const dx = p.outer.x - p.inner.x;
-          const dy = p.outer.y - p.inner.y;
-          inX = p.outer.x - dx * (alphaFactor + 0.60);
-          inY = p.outer.y - dy * (alphaFactor + 0.60);
-        } else {
-          inX = p.outer.x + (p.inner.x - p.outer.x) * alphaFactor;
-          inY = p.outer.y + (p.inner.y - p.outer.y) * alphaFactor;
-        }
+      const outerRadius = r + 68;
+      const maxThick = 24.0;
+      const numSteps = 24;
 
-        if (i === N - 1) {
-          ctx.lineTo(inX, inY);
-        } else if (i > 0) {
-          const pPrev = trail[i - 1];
-          const tPrev = (i - 1) / (N - 1);
-          const taperPrev = Math.pow(Math.sin(tPrev * Math.PI), 1.15) * (0.3 + 0.7 * tPrev);
-          const alphaPrev = Math.min(1.0, pPrev.life * 1.4) * taperPrev * widthMult;
-          let prevInX, prevInY;
-          if (isGlow) {
-            const dxP = pPrev.outer.x - pPrev.inner.x;
-            const dyP = pPrev.outer.y - pPrev.inner.y;
-            prevInX = pPrev.outer.x - dxP * (alphaPrev + 0.60);
-            prevInY = pPrev.outer.y - dyP * (alphaPrev + 0.60);
-          } else {
-            prevInX = pPrev.outer.x + (pPrev.inner.x - pPrev.outer.x) * alphaPrev;
-            prevInY = pPrev.outer.y + (pPrev.inner.y - pPrev.outer.y) * alphaPrev;
-          }
-          const xc = (inX + prevInX) / 2;
-          const yc = (inY + prevInY) / 2;
-          ctx.quadraticCurveTo(inX, inY, xc, yc);
-        } else {
-          ctx.lineTo(inX, inY);
-        }
+      // 1. Soft Divine Radiance Volumetric Glow Arc
+      ctx.beginPath();
+      for (let i = 0; i <= numSteps; i++) {
+        const t = i / numSteps;
+        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+        const rad = outerRadius + taper * 4.5;
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      for (let i = numSteps; i >= 0; i--) {
+        const t = i / numSteps;
+        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+        const rad = outerRadius - (maxThick * taper) - taper * 3.5;
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        ctx.lineTo(px, py);
       }
       ctx.closePath();
-    };
+      ctx.fillStyle = isLevel8
+        ? `rgba(255, 110, 0, ${0.48 * trailAlpha})`
+        : `rgba(255, 191, 0, ${0.38 * trailAlpha})`;
+      ctx.fill();
 
-    // 1. Soft Outer Aura Glow
-    ctx.fillStyle = glowColor;
-    drawCrescentPolygon(1.2, true);
-    ctx.fill();
+      // 2. Main Divine Gold / Fiery Crescent Core Body
+      ctx.beginPath();
+      for (let i = 0; i <= numSteps; i++) {
+        const t = i / numSteps;
+        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+        const rad = outerRadius + taper * 1.5;
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      for (let i = numSteps; i >= 0; i--) {
+        const t = i / numSteps;
+        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+        const rad = outerRadius - (maxThick * taper);
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        ctx.lineTo(px, py);
+      }
+      ctx.closePath();
+      ctx.fillStyle = isLevel8
+        ? `rgba(255, 140, 0, ${0.92 * trailAlpha})`
+        : `rgba(255, 215, 0, ${0.88 * trailAlpha})`;
+      ctx.fill();
 
-    // 2. Main Divine Gold Crescent Body Fill
-    ctx.fillStyle = fillColor;
-    drawCrescentPolygon(1.0, false);
-    ctx.fill();
+      // 3. Searing White-Gold Cutting Edge Line
+      ctx.beginPath();
+      for (let i = 0; i <= numSteps; i++) {
+        const t = i / numSteps;
+        const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.18) * (0.28 + 0.72 * t);
+        const rad = outerRadius + taper * 1.5;
+        const px = Math.cos(ang) * rad;
+        const py = Math.sin(ang) * rad;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.strokeStyle = isLevel8
+        ? `rgba(255, 255, 255, ${0.98 * trailAlpha})`
+        : `rgba(255, 255, 230, ${0.96 * trailAlpha})`;
+      ctx.lineWidth = 1.8;
+      ctx.stroke();
 
-    // 3. Searing White-Gold Core Line
-    ctx.fillStyle = coreColor;
-    drawCrescentPolygon(0.45, false);
-    ctx.fill();
-
-    ctx.restore();
+      ctx.restore();
+    }
   }
 
   ctx.save();
@@ -1013,57 +1009,37 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     reachDist = Math.max(55, Math.min(125, targetDist - r * 0.45));
   }
 
-  // Left shoulder is statically positioned on the left side of his chest (centered for martial arts guard)
-  const idleX = 0;
-  const idleY = 0;
+  // Left shoulder / hand is positioned symmetrically opposite to the sword on the left side of his body circle
+  const leftShoulderX = -r * 0.55;
+  const leftShoulderY = 0;
 
-  // Rotate idle shoulder position by bodyAngle (fighter.angle) so arm starts from the correct position on the spinning body
+  // Rotate shoulder position by bodyAngle (fighter.angle) so arm stays attached to the spinning body
   const bodyAngle = fighter.angle || 0;
   const cosB = Math.cos(bodyAngle);
   const sinB = Math.sin(bodyAngle);
-  const rotatedIdleX = idleX * cosB - idleY * sinB;
-  const rotatedIdleY = idleX * sinB + idleY * cosB;
+  const rotatedShoulderX = leftShoulderX * cosB - leftShoulderY * sinB;
+  const rotatedShoulderY = leftShoulderX * sinB + leftShoulderY * cosB;
 
-  // Punch lunges out in the gunAngle direction
-  const punchX = Math.cos(gunAngle) * (r * 0.6 + reachDist);
-  const punchY = Math.sin(gunAngle) * (r * 0.6 + reachDist);
-
-  // Position left arm: when idle, rest on the rotated left side. When punching, lunge toward target!
   const punchLunge = lungeProgress * reachDist;
 
-  let armX = rotatedIdleX + lungeProgress * (punchX - rotatedIdleX);
-  let armY = rotatedIdleY + lungeProgress * (punchY - rotatedIdleY);
-
-  if (isGuarding) {
-    armX = -r * 0.25;
-    armY = -r * 0.45;
-  }
-
   ctx.save();
-  ctx.translate(armX, armY);
+  ctx.translate(rotatedShoulderX, rotatedShoulderY);
   
   // Rotate the fist & visual trails by gunAngle toward target
   if (isGuarding) {
-    ctx.rotate(gunAngle - Math.PI * 0.3);
+    ctx.rotate(gunAngle - Math.PI * 0.35);
+    ctx.translate(-r * 0.15, 0);
   } else {
     ctx.rotate(gunAngle);
+    // When idle: rests on left side edge (-r * 0.35). When punching: lunges forward toward target (+punchLunge)
+    ctx.translate(-r * 0.35 + punchLunge, 0);
   }
 
   // Flip Y when facing left
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
-  // Calculate shoulder attachment point in body space and vector back from fist to shoulder
-  const shoulderX = -r * 0.5;
-  const shoulderY = r * 0.25;
-  const dx = shoulderX - armX;
-  const dy = shoulderY - armY;
-  const armDist = Math.hypot(dx, dy);
-  const armAngle = Math.atan2(dy, dx);
-
-  // 1. (Rubber arm stretching removed completely! Fist flies forward cleanly for punch animation)
-
-  // 2. CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
+  // 1. CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
   const fistRadius = 14.0;
   ctx.beginPath();
   ctx.arc(0, 0, fistRadius, 0, Math.PI * 2);

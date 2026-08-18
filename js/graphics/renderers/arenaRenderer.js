@@ -815,6 +815,217 @@ export function drawMahoragaAdaptationDimScreen() {
   state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Nanami Classic Graphic Paint Splatter (Faithful to Reference Image)
+// ─────────────────────────────────────────────────────────────────────────────
+// PRE-SEEDED STATIC SPLATTER ARRAYS (Zero Per-Frame GC Allocations)
+// ─────────────────────────────────────────────────────────────────────────────
+const _SPLATTER_CORE_CIRCLES = [
+  { x: 0, y: 0, r: 22 }, { x: -8, y: -12, r: 16 }, { x: 12, y: -6, r: 18 },
+  { x: 5, y: 15, r: 15 }, { x: -14, y: 8, r: 14 }, { x: -18, y: -5, r: 12 },
+  { x: 18, y: 12, r: 14 }, { x: 20, y: -18, r: 12 }, { x: -10, y: 22, r: 10 },
+  { x: 15, y: 20, r: 9 }, { x: 0, y: -22, r: 13 }, { x: -22, y: 12, r: 9 }
+];
+
+const _SPLATTER_STREAKS = [
+  { x1: 15, y1: -15, x2: 22, y2: -8, tipX: 95, tipY: -55 },
+  { x1: -15, y1: -10, x2: -8, y2: -18, tipX: -75, tipY: -65 },
+  { x1: -20, y1: 0, x2: -15, y2: 15, tipX: -55, tipY: 10 },
+  { x1: -15, y1: 15, x2: -5, y2: 20, tipX: -30, tipY: 45 },
+  { x1: 5, y1: 20, x2: 15, y2: 15, tipX: 10, tipY: 60, bulbR: 6 },
+  { x1: 15, y1: 10, x2: 22, y2: 5, tipX: 60, tipY: 25 },
+  { x1: -5, y1: -20, x2: 5, y2: -20, tipX: -2, tipY: -45 },
+  { x1: 20, y1: -5, x2: 20, y2: 5, tipX: 45, tipY: -10 },
+  { x1: -20, y1: -15, x2: -15, y2: -10, tipX: -45, tipY: -25 }
+];
+
+const _SPLATTER_DOTS = [
+  { x: -55, y: -15, r: 3.5 },
+  { x: 85, y: 10, r: 4 },
+  { x: -45, y: 65, r: 5 },
+  { x: -65, y: 68, r: 2.5 },
+  { x: -85, y: 35, r: 2 },
+  { x: 35, y: 55, r: 2.5 },
+  { x: -20, y: -75, r: 3 },
+  { x: 65, y: -45, r: 2 },
+  { x: 45, y: -70, r: 2.5 }
+];
+
+function _drawPaintSplatter(ctx, cx, cy, scale = 1.0, color = '#E50018', bgDark = '#78000A') {
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.scale(scale, scale);
+
+  function drawInkSplat(c, drawColor) {
+    c.fillStyle = drawColor;
+    
+    // 1. Irregular Core (overlapping circles to form a bumpy, solid blob)
+    for (let i = 0; i < _SPLATTER_CORE_CIRCLES.length; i++) {
+      const d = _SPLATTER_CORE_CIRCLES[i];
+      c.beginPath();
+      c.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      c.fill();
+    }
+
+    // 2. Sharp, irregular streaks/spikes shooting outward
+    for (let i = 0; i < _SPLATTER_STREAKS.length; i++) {
+      const s = _SPLATTER_STREAKS[i];
+      c.beginPath();
+      c.moveTo(s.x1, s.y1);
+      c.lineTo(s.tipX, s.tipY);
+      c.lineTo(s.x2, s.y2);
+      c.closePath();
+      c.fill();
+      
+      if (s.bulbR) {
+        c.beginPath();
+        c.arc(s.tipX, s.tipY, s.bulbR, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+
+    // 3. Floating, detached dots
+    for (let i = 0; i < _SPLATTER_DOTS.length; i++) {
+      const d = _SPLATTER_DOTS[i];
+      c.beginPath();
+      c.arc(d.x, d.y, d.r, 0, Math.PI * 2);
+      c.fill();
+    }
+  }
+
+  // Pass 1: Dark Burgundy undercoat for depth
+  ctx.save();
+  ctx.scale(1.15, 1.15);
+  drawInkSplat(ctx, bgDark);
+  ctx.restore();
+
+  // Pass 2: Vivid anime crimson body
+  drawInkSplat(ctx, color);
+
+  ctx.restore();
+}
+
+/**
+ * Draws a high-contrast 7:3 Ratio ruler and graphic paint splatter overlay when Nanami lands a 7:3 Ratio Crit.
+ */
+export function drawNanamiRatioCritDimScreen() {
+  if (CONFIG.nanami?.enableRatioDimScreen === false) return;
+
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const nanami = state.fighters?.find(f => f && (f.characterId === 'nanami' || f.type === 'nanami' || f._def?.id === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+  if (!nanami) return;
+
+  const timer = nanami.ratioHitPauseTimer || 0;
+  const maxTimer = nanami.ratioHitPauseMax || CONFIG.nanami?.ratioCritHitPauseFrames || 35;
+  const rawProgress = Math.min(1.0, Math.max(0.0, (maxTimer - timer) / maxTimer));
+  const maxOpacity = CONFIG.nanami?.ratioDimOpacity ?? 0.94;
+  const opacity = Math.sin(rawProgress * Math.PI) * maxOpacity;
+
+  if (opacity <= 0.01) return;
+
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+
+  // 1. Full Screen Cinematic Black Background
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.fillStyle = `rgba(3, 3, 6, ${opacity * 0.96})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.restore();
+
+  // 2. Tilted 7:3 Measurement Ruler & Graphic Paint Splatter Overlay
+  if (CONFIG.nanami?.enableRatioRulerOverlay !== false) {
+    const target = nanami.ratioHitPauseTarget || nanami._chopTarget;
+    const impactX = target ? target.x : (nanami.x + Math.cos(nanami.gunAngle || 0) * (nanami.r + 30));
+    const impactY = target ? target.y : (nanami.y + Math.sin(nanami.gunAngle || 0) * (nanami.r + 30));
+
+    const baseAngle = nanami.gunAngle || 0;
+    const targetAngle = baseAngle - 0.20; // Final locked severance cut angle
+
+    // ── Phase 1: Ruler Smooth 360° Spin & Expansion (0.0 to 0.30 Progress) ──
+    const spinP = Math.min(1.0, rawProgress / 0.30);
+    const easeSpin = 1.0 - Math.pow(1.0 - spinP, 3.0); // Smooth cubic ease-out
+    // Spins exactly once (360° / 2*PI) and smoothly settles into target angle
+    const currentAngle = targetAngle + (1.0 - easeSpin) * (Math.PI * 2);
+    // Smoothly expands from small (0.10x) to full size (1.0x) as it spins
+    const rulerScale = 0.10 + 0.90 * easeSpin;
+
+    ctx.save();
+    ctx.translate(impactX + shakeX, impactY + shakeY);
+    ctx.rotate(currentAngle);
+    ctx.scale(rulerScale, rulerScale);
+
+    const rulerLength = 360;
+    const halfL = rulerLength * 0.5;
+    const step = rulerLength / 10;
+    const alpha = Math.sin(rawProgress * Math.PI);
+
+    // ── 2A. DRAW WHITE 10-DIVISION RULER LINE ──
+    ctx.save();
+    ctx.globalAlpha = Math.min(1.0, alpha * 1.1);
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 4.0;
+    ctx.lineCap = 'butt';
+
+    // Main horizontal measurement bar
+    ctx.beginPath();
+    ctx.moveTo(-halfL, 0);
+    ctx.lineTo(halfL, 0);
+    ctx.stroke();
+
+    // Measurement Ticks
+    for (let k = 0; k <= 10; k++) {
+      const tx = -halfL + k * step;
+      if (k === 0 || k === 10) {
+        // End T-Caps
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 5.0;
+        ctx.beginPath();
+        ctx.moveTo(tx, -18);
+        ctx.lineTo(tx, 18);
+        ctx.stroke();
+      } else if (k === 7) {
+        // The 7:3 Division Point (Crimson Red Highlight)
+        ctx.strokeStyle = '#FF1E27';
+        ctx.lineWidth = 5.0;
+        ctx.beginPath();
+        ctx.moveTo(tx, -16);
+        ctx.lineTo(tx, 16);
+        ctx.stroke();
+      } else {
+        // Standard White Ticks
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 3.2;
+        ctx.beginPath();
+        ctx.moveTo(tx, -10);
+        ctx.lineTo(tx, 10);
+        ctx.stroke();
+      }
+    }
+    ctx.restore();
+
+    // ── 2B. DRAW GRAPHIC PAINT SPLATTER (After 360 Spin Finishes) ──
+    const ruptureX = -halfL + 7 * step; // Exactly at the 7:3 division tick (+72px along ruler)
+    if (rawProgress >= 0.30) {
+      const snapP = Math.min(1.0, (rawProgress - 0.30) / 0.70);
+      const dropT = Math.min(1.0, snapP / 0.08); // 2-frame downward drop slam
+      const dropY = -25 * (1.0 - dropT);
+      const impactScale = 1.0 + 0.06 * (1.0 - dropT);
+
+      ctx.save();
+      ctx.globalAlpha = Math.min(1.0, alpha * 1.35);
+      _drawPaintSplatter(ctx, ruptureX, dropY, impactScale * 1.15, '#E50018', '#78000A');
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.98})`;
+}
+
 let currentMahoLevel8DimOpacity = 0;
 
 export function drawMahoragaLevel8DimScreen() {

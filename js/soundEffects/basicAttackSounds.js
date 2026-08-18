@@ -282,7 +282,7 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   },
   'sukuna_melee': {
     src: 'Assets/Sound Effects/Attacks/punch.mp3',
-    volume: 0.8,
+    volume: 2.8,
     delay: 0,
   },
   // Mahoraga — Heavy martial punches & rapid strikes

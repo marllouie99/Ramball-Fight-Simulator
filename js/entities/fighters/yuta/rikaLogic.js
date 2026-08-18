@@ -210,20 +210,20 @@ export function updateRika(fighter, arena) {
 
   // 50% HP Emergency Summon Trigger: Automatically call Rika for help when Yuta reaches 50% HP or lower (First Summon)
   const hpRatio = fighter.hp / (fighter.maxHp || 200);
-  const hpThreshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.5;
+  const hpThreshold = CONFIG.yuta?.rikaSummonHpThreshold ?? 0.60;
   const isInsideDomain = fighter.domainActive || fighter.isChannelingDomain;
 
   if (!rk.active && !rk.hasSummonedAt50Hp && hpRatio <= hpThreshold && !fighter.isDying && fighter.hp > 0 && !isInsideDomain) {
     rk.hasSummonedAt50Hp = true; // Lockout further HP-threshold summons
     fighter.rikaRechargeHpBaseline = undefined;
-    const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 80;
+    const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 30;
     rk.chargeTimer = chargeDuration; // Use dedicated charge timer for the spawn animation delay
 
     // Trigger "Come, Rika!" audio (comerika.mp3) and freeze Yuta's movement
     rk.playedComeRikaSound = true;
     fighter.rikaCallTimer = chargeDuration; // Freeze Yuta's movement and hold Katana pose
     const hpRatio = fighter.hp / (fighter.maxHp || 200);
-    if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15)) {
+    if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.60)) {
       fighter._rikaSummonedForBeam = true;
     }
     fighter.vx = 0;
@@ -246,18 +246,18 @@ export function updateRika(fighter, arena) {
     if (fighter.rikaRechargeHpBaseline === undefined) {
       fighter.rikaRechargeHpBaseline = fighter.hp;
     }
-    const reqDamage = (fighter.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.50);
+    const reqDamage = (fighter.maxHp || 200) * (CONFIG.yuta?.rikaRechargeHpRatio ?? 0.20);
     const damageTaken = Math.max(0, fighter.rikaRechargeHpBaseline - fighter.hp);
 
     if (damageTaken >= reqDamage) {
       fighter.rikaRechargeHpBaseline = undefined;
       rk.killedInDomain = false;
-      const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 80;
+      const chargeDuration = CONFIG.yuta?.rikaSummonChargeDuration || 30;
       rk.chargeTimer = chargeDuration;
       rk.playedComeRikaSound = true;
       fighter.rikaCallTimer = chargeDuration;
       const hpRatio = fighter.hp / (fighter.maxHp || 200);
-      if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.15)) {
+      if (hpRatio <= (CONFIG.yuta?.pureLoveBeamHpThreshold ?? 0.60)) {
         fighter._rikaSummonedForBeam = true;
       }
       fighter.vx = 0;
@@ -293,14 +293,14 @@ export function updateRika(fighter, arena) {
       rk.deathTimer = 0;
       rk.disappearTimer = 0;
       rk.isSacrificingForBeam = false;
-      rk.timer = CONFIG.yuta.rikaDuration || 1000;
+      rk.timer = CONFIG.yuta.rikaDuration || 999999;
       rk.x = fighter.x;
       rk.y = fighter.y;
       rk.hp = rk.maxHp;
       rk.playedComeRikaSound = false;
       rk.playedAriseRoarSound = false;
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
-      rk.spawnTimer = ariseMax; // Paused load/arise duration (180 frames = 3.0 seconds)
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
+      rk.spawnTimer = ariseMax; // Paused load/arise duration
       rk.spawnScale = 0.05;
       rk.isDomainSpawn = false;
       fighter.rikaAlpha = 0;
@@ -319,7 +319,7 @@ export function updateRika(fighter, arena) {
     // Dynamic Size Expansion on Summon (grows from 0.05 with a dramatic pause moment midway through rise)
     if (rk.spawnTimer > 0) {
       rk.spawnTimer--;
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       const progress = 1 - (rk.spawnTimer / ariseMax);
 
       // Dramatic Pause Moment:

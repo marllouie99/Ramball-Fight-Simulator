@@ -93,7 +93,7 @@ export class MahoragaFighter extends Fighter {
     this.adaptationPauseTimer = 0;
     this._pendingCounterTarget = null;
 
-    this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown || 480;
+    this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown || 1000;
     this.isShouting = false;
     this.shoutWindupTimer = 0;
 
@@ -196,7 +196,7 @@ export class MahoragaFighter extends Fighter {
     this.adaptationPauseTimer = 0;
     this._pendingCounterTarget = null;
 
-    this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown || 480;
+    this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown || 1000;
     this.isShouting = false;
     this.shoutWindupTimer = 0;
 

@@ -406,8 +406,21 @@ export function drawSilenceEffect(ctx, baseRadius) {
   ctx.restore();
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// BLACK FLASH DEBUFF — Static zero-allocation buffers & configuration
+// ─────────────────────────────────────────────────────────────────────────────
+const BF_DEBUFF_BANDS = [
+  { rxMult: 1.62, ryMult: 0.72, tilt: 0.5, speed: 0.006, cosTilt: Math.cos(0.5), sinTilt: Math.sin(0.5) },
+  { rxMult: 1.62, ryMult: 0.72, tilt: -0.6, speed: -0.007, cosTilt: Math.cos(-0.6), sinTilt: Math.sin(-0.6) },
+  { rxMult: 1.50, ryMult: 0.85, tilt: 1.2, speed: 0.005, cosTilt: Math.cos(1.2), sinTilt: Math.sin(1.2) }
+];
+const _bfDebuffPtsX = new Float32Array(8);
+const _bfDebuffPtsY = new Float32Array(8);
+const _bfDebuffPtsOcc = new Uint8Array(8);
+
 /**
  * Renders the snappy, 3D orbiting Black Flash visual debuff on the enemy.
+ * High-performance implementation with pre-allocated coordinate buffers.
  */
 export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
   ctx.save();
@@ -416,38 +429,26 @@ export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
   // High speed phase for stroboscopic crackle
   const pulse = Math.sin(t * 0.04) * 0.15 + 0.75;
   ctx.globalAlpha = pulse;
-
   ctx.lineCap = 'round';
   ctx.lineJoin = 'miter';
 
-  // We draw 3 tilted orbiting electric bands (enlarged for visibility)
-  const bands = [
-    { rx: baseRadius * 1.62, ry: baseRadius * 0.72, tilt: 0.5, speed: 0.006 },
-    { rx: baseRadius * 1.62, ry: baseRadius * 0.72, tilt: -0.6, speed: -0.007 },
-    { rx: baseRadius * 1.50, ry: baseRadius * 0.85, tilt: 1.2, speed: 0.005 }
-  ];
+  const steps = 6;
+  const hasPath2D = typeof Path2D !== 'undefined';
+  const occThreshold = (baseRadius - 1.5) * (baseRadius - 1.5);
 
-  for (let b = 0; b < bands.length; b++) {
-    const band = bands[b];
-    // Base angle orbits around body
+  for (let b = 0; b < 3; b++) {
+    const band = BF_DEBUFF_BANDS[b];
+    const rx = baseRadius * band.rxMult;
+    const ry = baseRadius * band.ryMult;
     const baseAngle = t * band.speed + b * 2.1;
-    // Disjointed, snapping electric arcs
-    const arcLen = 0.5 + Math.sin(t * 0.045 + b * 11) * 0.35; // fluctuating length
-    
-    const startTheta = baseAngle;
-    const endTheta = baseAngle + arcLen;
-    
-    const steps = 6;
-    const segments = [];
+    const arcLen = 0.5 + Math.sin(t * 0.045 + b * 11) * 0.35;
     
     for (let i = 0; i <= steps; i++) {
-      const theta = startTheta + (i / steps) * arcLen;
-      
-      const x0 = band.rx * Math.cos(theta);
-      const y0 = band.ry * Math.sin(theta);
-      const z = Math.sin(theta); // depth indicator: negative is behind
+      const theta = baseAngle + (i / steps) * arcLen;
+      const x0 = rx * Math.cos(theta);
+      const y0 = ry * Math.sin(theta);
+      const z = Math.sin(theta);
 
-      // Aggressive zig-zag displacement (highly snappy)
       let jx = 0;
       let jy = 0;
       if (i > 0 && i < steps) {
@@ -456,73 +457,60 @@ export function drawBlackFlashDebuffEffect(ctx, baseRadius) {
         jy = (Math.random() - 0.5) * displace;
       }
 
-      // Rotate coordinates
-      const rx_rot = (x0 + jx) * Math.cos(band.tilt) - (y0 + jy) * Math.sin(band.tilt);
-      const ry_rot = (x0 + jx) * Math.sin(band.tilt) + (y0 + jy) * Math.cos(band.tilt);
+      const xMod = x0 + jx;
+      const yMod = y0 + jy;
+      const rx_rot = xMod * band.cosTilt - yMod * band.sinTilt;
+      const ry_rot = xMod * band.sinTilt + yMod * band.cosTilt;
       
-      // Occlusion test: behind the sphere and inside radius
-      const dist = Math.hypot(rx_rot, ry_rot);
-      const occluded = (z < 0 && dist < baseRadius - 1.5);
-
-      segments.push({
-        x: rx_rot,
-        y: ry_rot,
-        occluded
-      });
+      const distSq = rx_rot * rx_rot + ry_rot * ry_rot;
+      _bfDebuffPtsX[i] = rx_rot;
+      _bfDebuffPtsY[i] = ry_rot;
+      _bfDebuffPtsOcc[i] = (z < 0 && distSq < occThreshold) ? 1 : 0;
     }
 
-    // Render layers
-    const drawLayer = (width, style) => {
-      ctx.lineWidth = width;
-      ctx.strokeStyle = style;
-      ctx.beginPath();
-      
+    if (hasPath2D) {
+      const bandPath = new Path2D();
       let drawing = false;
-      for (let i = 0; i < segments.length; i++) {
-        const pt = segments[i];
-        if (!pt.occluded) {
+      for (let i = 0; i <= steps; i++) {
+        if (_bfDebuffPtsOcc[i] === 0) {
           if (!drawing) {
-            ctx.moveTo(pt.x, pt.y);
+            bandPath.moveTo(_bfDebuffPtsX[i], _bfDebuffPtsY[i]);
             drawing = true;
           } else {
-            ctx.lineTo(pt.x, pt.y);
+            bandPath.lineTo(_bfDebuffPtsX[i], _bfDebuffPtsY[i]);
           }
         } else {
-          if (drawing) {
-            ctx.stroke();
-            ctx.beginPath();
-            drawing = false;
-          }
+          drawing = false;
         }
       }
-      if (drawing) ctx.stroke();
-    };
 
-    // Draw layers: black backing -> crimson core -> lilac highlight
-    drawLayer(3.0, '#000000');
-    drawLayer(1.5, '#B30000');
-    drawLayer(0.65, '#F3E8FF');
+      // Draw 3 layers with pre-compiled bandPath
+      ctx.lineWidth = 3.0;
+      ctx.strokeStyle = '#000000';
+      ctx.stroke(bandPath);
 
-    // Add tiny branching spark discharge from a node
-    if (Math.random() < 0.35 && segments.length > 3) {
-      const node = segments[3];
-      if (!node.occluded) {
-        const len = 5 + Math.random() * 9;
+      ctx.lineWidth = 1.5;
+      ctx.strokeStyle = '#B30000';
+      ctx.stroke(bandPath);
+
+      ctx.lineWidth = 0.65;
+      ctx.strokeStyle = '#F3E8FF';
+      ctx.stroke(bandPath);
+
+      // Branching spark discharge
+      if (Math.random() < 0.25 && _bfDebuffPtsOcc[3] === 0) {
+        const len = 5 + Math.random() * 8;
         const ba = Math.random() * Math.PI * 2;
-        const bx = node.x + Math.cos(ba) * len;
-        const by = node.y + Math.sin(ba) * len;
+        const bx = _bfDebuffPtsX[3] + Math.cos(ba) * len;
+        const by = _bfDebuffPtsY[3] + Math.sin(ba) * len;
 
-        ctx.lineWidth = 2.0;
-        ctx.strokeStyle = '#000000';
-        ctx.beginPath(); ctx.moveTo(node.x, node.y); ctx.lineTo(bx, by); ctx.stroke();
+        const sparkPath = new Path2D();
+        sparkPath.moveTo(_bfDebuffPtsX[3], _bfDebuffPtsY[3]);
+        sparkPath.lineTo(bx, by);
 
-        ctx.lineWidth = 1.0;
-        ctx.strokeStyle = '#B30000';
-        ctx.beginPath(); ctx.moveTo(node.x, node.y); ctx.lineTo(bx, by); ctx.stroke();
-
-        ctx.lineWidth = 0.45;
-        ctx.strokeStyle = '#F3E8FF';
-        ctx.beginPath(); ctx.moveTo(node.x, node.y); ctx.lineTo(bx, by); ctx.stroke();
+        ctx.lineWidth = 2.0; ctx.strokeStyle = '#000000'; ctx.stroke(sparkPath);
+        ctx.lineWidth = 1.0; ctx.strokeStyle = '#B30000'; ctx.stroke(sparkPath);
+        ctx.lineWidth = 0.45; ctx.strokeStyle = '#F3E8FF'; ctx.stroke(sparkPath);
       }
     }
   }

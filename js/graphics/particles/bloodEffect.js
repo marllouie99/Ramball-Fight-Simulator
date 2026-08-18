@@ -9,6 +9,7 @@ import { CONFIG } from '../../core/config.js';
 import { bomberExplosionSystem } from './bomberExplosionVisuals.js';
 import { burnEffectSystem } from './burnEffectVisuals.js';
 import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
+import { spawnSparks } from './sparkEffect.js';
 
 // Object pool for PixiJS Sprites to prevent GC thrashing
 const bloodSpritePool = [];
@@ -298,6 +299,57 @@ export function spawnFatalBloodSplash(fighter, opts = {}) {
   // Also trigger physical meaty flesh burst sound
   if (typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
     audioSystem.playSFX('attack_fleshhit', 1.4);
+  }
+}
+
+/**
+ * Spawns a visceral, directional crimson blood burst when Nanami unpauses from a 7:3 Ratio Severance.
+ */
+export function spawnNanamiRatioBloodBurst(target, count = 16, angle = null) {
+  if (!target) return;
+  if (!state.bloodEffects) state.bloodEffects = [];
+
+  const bloodColors = [0xE50018, 0xDC2626, 0x990000, 0x78000A, 0xFF1E27, 0xB91C1C];
+  const tx = typeof target.x === 'number' ? target.x : 0;
+  const ty = typeof target.y === 'number' ? target.y : 0;
+  const tr = typeof target.r === 'number' ? target.r : 25;
+  const dirAngle = (angle !== null && angle !== undefined) ? angle : Math.random() * Math.PI * 2;
+
+  // 1. Spawn directional high-velocity PixiJS blood droplets
+  const particleCount = Math.max(8, count);
+  for (let i = 0; i < particleCount; i++) {
+    const spread = (Math.random() - 0.5) * (Math.PI * 0.65);
+    const particleAngle = dirAngle + spread;
+    const speed = 5.0 + Math.random() * 8.5;
+    const size = 3.2 + Math.random() * 3.5;
+    const color = bloodColors[i % bloodColors.length];
+
+    const sprite = getBloodSprite();
+    if (sprite) {
+      sprite.tint = color;
+      sprite.width = size;
+      sprite.height = size;
+    }
+
+    state.bloodEffects.push({
+      x: tx + (Math.random() - 0.5) * tr * 0.6,
+      y: ty + (Math.random() - 0.5) * tr * 0.6,
+      vx: Math.cos(particleAngle) * speed,
+      vy: Math.sin(particleAngle) * speed - (1.2 + Math.random() * 2.5),
+      size: size,
+      life: 1.0,
+      decay: 0.008 + Math.random() * 0.006,
+      airResistance: 0.94,
+      friction: 0.85,
+      onGround: false,
+      sprite: sprite
+    });
+  }
+
+  // 2. Also spawn 2D Canvas visceral crimson impact sparks for guaranteed immediate visual bursting!
+  if (typeof spawnSparks === 'function') {
+    spawnSparks(tx, ty, 14, 'crimson', '#DC2626');
+    spawnSparks(tx, ty, 8, 'crimson', '#78000A');
   }
 }
 

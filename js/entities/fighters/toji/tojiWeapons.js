@@ -201,10 +201,12 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
     target.soulWoundTimer = soulWoundDuration;
 
     if (typeof target.applySlow === 'function') {
-      target.applySlow(90, 0.40);
+      const slowDur = CONFIG.toji?.katanaSlowDuration || 90;
+      const slowMult = CONFIG.toji?.katanaSlowMultiplier ?? 0.40;
+      target.applySlow(slowDur, slowMult);
     } else {
-      target.slowTimer = 90;
-      target.slowMultiplier = 0.40;
+      target.slowTimer = CONFIG.toji?.katanaSlowDuration || 90;
+      target.slowMultiplier = CONFIG.toji?.katanaSlowMultiplier ?? 0.40;
     }
 
     if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
@@ -255,7 +257,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
   // 120 degree frontal arc cone for Inverted Spear thrust/stab!
   const targets = tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, reach, Math.PI * 0.67);
 
-  const thrustDamage = isAmbushThrust ? (CONFIG.toji?.ambushBackThrustDamage ?? 25) : fighter.spearDamage;
+  const thrustDamage = isAmbushThrust ? (CONFIG.toji?.ambushBackThrustDamage ?? 50) : fighter.spearDamage;
 
   for (const target of targets) {
     let wasInfinityActive = false;
@@ -297,7 +299,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
     const wasChanneling = isAmbushThrust && (fighter.ambushTargetWasChanneling || wasPurple || wasDomain || wasRCT || wasDivineFlame || wasStorm || wasGeneric);
 
     if (wasChanneling) {
-      const silenceFrames = CONFIG.toji?.silenceDuration || 90;
+      const silenceFrames = CONFIG.toji?.silenceDuration || 180;
       target.silenceTimer = silenceFrames;
 
       target.isChannelingPurple = false;
@@ -333,7 +335,7 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       if (!target.isTurret && !target.cannotBeKnockbacked) {
         target.isFirstHitKnockback = true;
         const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-        const knockbackSpeed = 28;
+        const knockbackSpeed = CONFIG.toji?.ambushSpearThrustKnockback || 28;
         
         const kbVx = Math.cos(pushAngle) * knockbackSpeed;
         const kbVy = Math.sin(pushAngle) * knockbackSpeed;

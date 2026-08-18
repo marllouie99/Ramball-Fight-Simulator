@@ -154,7 +154,8 @@ export const state = {
     yuta: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
     toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
     cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-    ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+    ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+    nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
   },
   mahitoClawCustomBlades: null,
 

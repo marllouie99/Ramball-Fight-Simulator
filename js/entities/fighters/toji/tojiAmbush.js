@@ -148,7 +148,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
 
   fighter.aim(opponent);
 
-  const freezeDuration = CONFIG.toji?.ambushTargetFreezeDuration || 60;
+  const freezeDuration = CONFIG.toji?.ambushTargetFreezeDuration || 70;
   
   if (isInterrupt || fighter.ambushTargetWasChanneling) {
     spawnFloatingText(opponent.x, opponent.y - opponent.r - 35, 'INTERRUPTED!', '#FF1133', 35);
@@ -252,7 +252,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.ambushTimer--;
     if (fighter.ambushTimer <= 0) {
       fighter.ambushPhase = 'BACK_CHARGE';
-      fighter.ambushTimer = CONFIG.toji?.ambushBackChargeDuration || 25;
+      fighter.ambushTimer = CONFIG.toji?.ambushBackChargeDuration || 30;
 
       const frontX = fighter.x;
       const frontY = fighter.y;
@@ -395,7 +395,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.vx = 0;
     fighter.vy = 0;
 
-    const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 40;
+    const katanaFreeze = CONFIG.toji?.ambushKatanaFreezeDuration || 70;
     if (typeof opponent.applyTimeStop === 'function') {
       opponent.applyTimeStop(katanaFreeze);
     }
@@ -409,7 +409,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.ambushTimer--;
     if (fighter.ambushTimer <= 0) {
       fighter.ambushPhase = 'KATANA_CHARGE';
-      fighter.ambushTimer = CONFIG.toji?.ambushKatanaChargeDuration || 20;
+      fighter.ambushTimer = CONFIG.toji?.ambushKatanaChargeDuration || 30;
 
       const strikeSound = getSkillEffectSound('toji', 'strike');
       if (strikeSound) audioSystem.playSFX(strikeSound.src, strikeSound.volume);
@@ -464,7 +464,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       fighter.ambushPhase = 'PHANTOM_FLURRY';
       fighter.isAmbushThrust = false;
       fighter.phantomStrikeCount = 0;
-      fighter.phantomMaxStrikes = CONFIG.toji?.ambushPhantomFlurryStrikes || 6;
+      fighter.phantomMaxStrikes = CONFIG.toji?.ambushPhantomFlurryStrikes || 10;
       fighter.phantomStrikeTimer = 3; 
 
 
@@ -477,7 +477,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         -Math.PI * 0.25,
       ];
 
-      const totalFlurryFrames = fighter.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 4) + 10;
+      const totalFlurryFrames = fighter.phantomMaxStrikes * (CONFIG.toji?.ambushPhantomFlurryFrameRate || 8) + 10;
       if (typeof opponent.applyHitStun === 'function') opponent.applyHitStun(totalFlurryFrames);
       if (!opponent.domainActive) {
         opponent.vx = 0;
@@ -488,14 +488,14 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     fighter.vx = 0;
     fighter.vy = 0;
 
-    const flurryFrameRate = CONFIG.toji?.ambushPhantomFlurryFrameRate || 4;
+    const flurryFrameRate = CONFIG.toji?.ambushPhantomFlurryFrameRate || 8;
 
     fighter.phantomStrikeTimer--;
     if (fighter.phantomStrikeTimer <= 0) {
       fighter.phantomStrikeCount++;
       fighter.phantomStrikeTimer = flurryFrameRate; 
 
-      const maxStrikes = fighter.phantomMaxStrikes || 6;
+      const maxStrikes = fighter.phantomMaxStrikes || 10;
       if (fighter.phantomStrikeCount <= maxStrikes) {
         const idx = (fighter.phantomStrikeCount - 1) % fighter.phantomAngles.length;
         const strikeAngle = fighter.phantomAngles[idx] + (Math.random() - 0.5) * 0.15;
@@ -536,7 +536,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         // Apply the big final knockback blast before releasing the target
         if (opponent && opponent.hp > 0 && !opponent.isTurret && !opponent.cannotBeKnockbacked) {
           const finalPushAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-          const finalRecoil = 38;
+          const finalRecoil = CONFIG.toji?.ambushFlurryFinalRecoil || 38;
           opponent.vx = Math.cos(finalPushAngle) * finalRecoil;
           opponent.vy = Math.sin(finalPushAngle) * finalRecoil;
           
@@ -559,7 +559,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
         fighter.vy = Math.sin(escapeAngle) * (fighter.speed || 3);
         fighter.normalizeSpeed();
 
-        fighter.stealthTimer = 120;
+        fighter.stealthTimer = CONFIG.toji?.stealthDuration || 240;
         fighter.stealthCooldown = 0;
         fighter.isStealthed = true;
         fighter.stealthActive = true;

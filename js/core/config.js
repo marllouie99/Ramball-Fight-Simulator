@@ -13,6 +13,7 @@ import { saitamaConfig } from '../configs/characters/saitamaConfig.js?v=4';
 import { genosConfig } from '../configs/characters/genosConfig.js?v=4';
 import { ichigoConfig } from '../configs/characters/ichigoConfig.js?v=4';
 import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
+import { nanamiConfig } from '../configs/characters/nanamiConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 
@@ -21,6 +22,7 @@ export const CONFIG = {
   saitama: saitamaConfig,
   genos: genosConfig,
   mahito: mahitoConfig,
+  nanami: nanamiConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
   yuta: yutaConfig,
@@ -1235,6 +1237,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Soul Scalpel Claws',
     desc: 'Wields 4 curved scythe-talon claws. Passive: Phantom Soul Slip phases directly through enemies with a high-speed claw cross-slice. Secondary skill unleashes Subterranean Flesh Surge; transforms into Distorted Killing form.',
+  },
+  {
+    id: 31,
+    name: 'Kento Nanami',
+    category: 'Anime',
+    color: '#D4AF37', // Refined Golden Sand / Warm Ochre
+    startX: 300, startY: 250,
+    startVx: 1.1, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'nanami',
+    hp: 420,
+    damage: 22,
+    cooldown: 55,
+    moveSpeed: 5.5,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Ratio Technique (7:3)',
+    desc: 'Wields a cloth-wrapped blunt cleaver. Passive: 7:3 Ratio Technique deals guaranteed True Damage critical strikes and fractures enemy defense. Enters Overtime under 40% HP or after 25s for a 120% cursed energy surge.',
   }
 ];
 

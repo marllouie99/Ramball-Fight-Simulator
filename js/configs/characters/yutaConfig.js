@@ -19,6 +19,8 @@ export const yutaConfig = {
   meleeRange: 70,                          // Katana blade length reach distance in pixels
   meleeDamage: 15,                         // Base damage per katana swing
   meleeArc: Math.PI * 0.75,                // 135-degree frontal arc radius cone for multi-enemy cleave
+  meleeKnockback: 6.5,                     // Outward push force on katana melee strike
+  meleeHitStun: 12,                        // Hit stun frames on katana melee strike
 
   // Defensive / Counter Mechanic: Parry & Guard Stance
   parryThreatRadius: 180,                  // Detection radius in pixels for incoming projectile threats
@@ -42,6 +44,8 @@ export const yutaConfig = {
   cursedSpeechFreezeTime: 45,              // Frames enemies are frozen in place (0.75 seconds)
   thinIceBreakerDamage: 25,                // Damage dealt by Thin Ice Breaker spatial distortion
   thinIceBreakerSpeed: 25,                 // Speed of Thin Ice Breaker projectile
+  thinIceBreakerRange: 250,                // Effective range of Thin Ice Breaker spatial blast
+  thinIceBreakerKnockback: 35,             // Extreme knockback blast force applied on Thin Ice Breaker hit
 
   // Summon Companion: Rika Orimoto
   rikaMaxHp: 500,                          // Maximum health pool when summoned

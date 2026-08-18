@@ -60,7 +60,7 @@ export function executeThinIceBreaker(fighter, angle) {
   const isRikaAlive = typeof fighter.isRikaAliveInDomain === 'function' && fighter.isRikaAliveInDomain();
   const dmgMult = typeof fighter.getRikaDamageMultiplier === 'function' ? fighter.getRikaDamageMultiplier() : (isRikaAlive ? (CONFIG.yuta.domainRikaDamageMultiplier || 1.5) : 1.0);
   const bonusDmg = fighter.pureLoveBeamBonusDamage || 0;
-  const baseDmg = (CONFIG.yuta.thinIceBreakerDamage || 45) + bonusDmg; // Massive burst
+  const baseDmg = (CONFIG.yuta.thinIceBreakerDamage || 25) + bonusDmg; // Massive burst
   const damage = baseDmg * dmgMult;
   
   // Spatial Crack Effect tracking
@@ -77,7 +77,7 @@ export function executeThinIceBreaker(fighter, angle) {
     maxTimer: 25
   });
 
-  const range = 250;
+  const range = CONFIG.yuta?.thinIceBreakerRange || 250;
   const coneArc = Math.PI * 0.8; // 144 degrees
   
   if (CONFIG.yuta?.thinIceBreakerSound) {
@@ -139,11 +139,12 @@ export function executeThinIceBreaker(fighter, angle) {
           state.thinIceBreakerDimTimer = 18; // Trigger quick screen dim effect
           
           // Apply massive knockback
+          const knockbackForce = CONFIG.yuta?.thinIceBreakerKnockback || 35;
           if (typeof target.applyKnockback === 'function') {
-            target.applyKnockback(Math.cos(angle) * 35, Math.sin(angle) * 35);
+            target.applyKnockback(Math.cos(angle) * knockbackForce, Math.sin(angle) * knockbackForce);
           } else {
-            target.vx = Math.cos(angle) * 35;
-            target.vy = Math.sin(angle) * 35;
+            target.vx = Math.cos(angle) * knockbackForce;
+            target.vy = Math.sin(angle) * knockbackForce;
           }
         }
       }
