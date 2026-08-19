@@ -37,23 +37,13 @@ export function isScreenDimmedActive() {
     if (!isChanneling) return true;
   }
 
-  // 3. Active Dim Effect States (active beam/strike phase / Saitama Serious Counter passive)
+  // 3. Active Dim Effect States (active beam/strike phase — excludes Saitama Serious Counter per requirement)
   const hasActiveDimEffect = state.fighters.some(f => f && (
     (f.isFiringPurple || (f.purpleHitTimer || 0) > 0) ||
-    f.isSaitamaPunchActive ||
-    (f._counterPunchTimer && f._counterPunchTimer > 0) ||
-    (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) ||
-    f.isCountering ||
-    f._counterPunchTarget ||
     f.tojiUltimateActive ||
     (f.furnaceFireArrowTimer || 0) > 0
   ));
   if (hasActiveDimEffect) return true;
-
-  // 4. Check if Saitama's serious punch dim screen in arenaRenderer has active opacity
-  if (typeof state._saitamaSeriousPunchOpacity === 'number' && state._saitamaSeriousPunchOpacity > 0.05) {
-    return true;
-  }
 
   return false;
 }
@@ -278,11 +268,10 @@ function updateHealthHud() {
   state._hudFrameCount = (state._hudFrameCount || 0) + 1;
 
   // ── INSTANT Dim Class Toggle (runs EVERY frame, before throttle) ──
-  // This ensures the HUD text color reverts to normal immediately when Saitama's passive ends.
   {
     const isDimmedNow = isScreenDimmedActive();
 
-    // Detect Saitama's counter punch impact flash (HUD text snaps from white → black during bright white screen flash)
+    // Detect Saitama's counter punch impact flash (HUD text snaps to black during bright white screen flash)
     const isSaitamaPunchImpactFlash = state.fighters && state.fighters.some(f =>
       f && (f.characterId === 'saitama' || f.type === 'saitama') &&
       f._counterPunchImpactFlashTimer && f._counterPunchImpactFlashTimer > 0

@@ -252,6 +252,9 @@ export const state = {
   // Spark effects (visual-only particles for bullet impacts)
   sparkEffects: [],
 
+  // Wall crack decals (from knockback collisions)
+  wallCracks: [],
+
   // Illusions (for Doppleganger fighter)
   illusions: [],
 

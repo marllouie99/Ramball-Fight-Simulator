@@ -355,6 +355,20 @@ export function drawArena() {
 
   // ── Draw Wall Cracks (Decals) ──
   if (state.wallCracks && state.wallCracks.length > 0) {
+    ctx.save();
+    // Strict boundary clipping: prevent wall cracks from ever overlaying the top title header/HUD or bottom health/skill HUD cards
+    ctx.beginPath();
+    const clipMarginTop = 10;
+    const clipMarginBottom = 12;
+    const clipMarginSides = 35;
+    ctx.rect(
+      arena.x - clipMarginSides,
+      arena.y - clipMarginTop,
+      arena.width + clipMarginSides * 2,
+      arena.height + clipMarginTop + clipMarginBottom
+    );
+    ctx.clip();
+
     for (let i = state.wallCracks.length - 1; i >= 0; i--) {
       const crack = state.wallCracks[i];
       crack.life--;
@@ -365,6 +379,7 @@ export function drawArena() {
       
       drawSolidVectorCrack(ctx, crack);
     }
+    ctx.restore();
   }
 
   ctx.restore();

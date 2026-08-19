@@ -321,7 +321,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   }
 
   // ── Render Back Hand (Back Layer - Active during Consecutive Normal Punches Flurry) ──
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isChampScreen;
   if (!shouldHideHands && !fighter.hideBackHand && isFlurrying) {
     drawSaitamaArm(ctx, r, backHandX, backHandY, handRadius, -r * 0.28, false);
   }
@@ -393,7 +393,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   }
 
   // Draw counter punch charging overlay effects (spark arcs, star lines)
-  if (isChargingCounter) {
+  if (isChargingCounter && !shouldHideHands) {
     const isPunchHandFront = fighter.isRightPunch;
     const activeHandX = isPunchHandFront ? frontHandX : backHandX;
     const activeHandY = isPunchHandFront ? frontHandY : backHandY;

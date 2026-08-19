@@ -257,6 +257,7 @@ export function reinitFighters(isNewMatch = false) {
   if (state.berserkerRageEffects) state.berserkerRageEffects.length = 0;
   if (state.effects) state.effects.length = 0;
   if (state.illusions) state.illusions.length = 0;
+  if (state.wallCracks) state.wallCracks.length = 0;
   state.roundWinner = null;
   state.roundEndTimer = 0;
  
@@ -604,6 +605,7 @@ export function startNextRound() {
 
   state.roundNum++;
   state.illusions = []; // Clear all illusions on new round
+  state.wallCracks = []; // Clear all wall crack decals on new round
   if (state.announcerSoundHandle) {
     stopSound(state.announcerSoundHandle);
     state.announcerSoundHandle = null;
@@ -622,6 +624,7 @@ export function startNextRound() {
 
 export function restartCurrentRound() {
   state.illusions = []; // Clear all illusions
+  state.wallCracks = []; // Clear all wall crack decals
   if (state.announcerSoundHandle) {
     stopSound(state.announcerSoundHandle);
     state.announcerSoundHandle = null;
@@ -788,6 +791,7 @@ export function resetMatch() {
   state.ffaMatchComplete = false;
   state._hasPlayedChampionVictoryVoice = false;
   state.illusions = []; // Clear all illusions on match reset
+  state.wallCracks = []; // Clear all wall crack decals on match reset
   state.matchKills = [[], [], [], []];
 
   if (state.announcerSoundHandle) {
@@ -824,6 +828,7 @@ export function goToTitle() {
   stopAllSounds(false, 0, 0);
   stopAllLoopingSounds(0, 0);
   
+  state.wallCracks = []; // Clear all wall crack decals on return to title
   clearHealthHud(); // Flush DOM and Map cache cleanly
   
   state.gameState = 'title';
