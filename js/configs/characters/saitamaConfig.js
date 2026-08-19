@@ -1,4 +1,8 @@
-﻿export const saitamaConfig = {
+﻿// ─────────────────────────────────────────────
+// Saitama — The Caped Baldy Config
+// ─────────────────────────────────────────────
+
+export const saitamaConfig = {
   // Base stats
   hp: 420,
   moveSpeed: 6.0,
@@ -26,35 +30,24 @@
   punchScreenShakeDuration: 10,    // Arena screen shake duration (frames) on basic attack punch hit
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
-  punchImpactSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3', // Audio played when basic punch hits enemy
-  punchImpactVolume: 2.0,
-  punchImpactFadeDelayMs: 350,      // Delay (ms) after punch impact before audio fade out starts
-  punchImpactFadeDurationMs: 900,   // Smooth fade out duration (ms) for basic attack impact audio
 
   // Skill 1: Consecutive Normal Punches
   flurryDamage: 24,                 // Damage per rapid punch hit
   flurryHitCount: 10,               // 10 rapid consecutive normal punches
   flurryHitInterval: 4,             // Frames between consecutive punch hits (~0.066s)
-  flurryReach: 85,                  // Range of flurry punches
+  flurryReach: 95,                  // Range of flurry punches
   flurryArcAngle: Math.PI * 0.65,   // ~117-degree frontal cone (Rule #8)
   flurryDashOffset: 25,             // Distance offset when dashing to target
+  flurryForwardSlideSpeed: 4.5,     // Forward slide step (px) Saitama advances on each punch
+  flurryPushbackPerHit: 7.0,        // Backward push distance (px) applied to enemy on each punch
   flurryFinalSlamDamage: 85,        // Final devastating finisher punch
   flurryFinalSlamKnockback: 65,     // Heavy knockback on final blow
-  flurryCooldown: 540,              // 9 seconds at 60fps
+  flurryCooldown: 1500,              // Cooldown frames at 60fps
   flurryTriggerDistance: 260,       // AI trigger distance threshold
   flurryInitialHitPauseFrames: 20,  // Target hit-pause on flurry start
   flurryHoldHitPauseFrames: 8,      // Target hit-pause during flurry cycle
   flurryScreenShakeIntensity: 14,   // Screen shake on final punch
   flurryScreenShakeDuration: 10,
-  flurryPunchSFX: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-  flurryHeavyPunchSFXList: [
-    'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-    'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-    'Assets/Sound Effects/Attacks/heavypunch3.mp3'
-  ],
-  flurryPunchVolume: 2.0,
-  flurryFinalImpactSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3',
-  flurryFinalImpactVolume: 2.2,
 
   // Skill 2: Serious Side Hops
   sideHopsCooldown: 420, // 7 seconds at 60fps
@@ -72,12 +65,13 @@
   boredomDamagePerStack: 0.15, // +15% per stack
 
   // Passive: Caped Baldy Reflexes (Dodge Teleport)
-  dodgeChance: 0.70, // probability (0-1) of successfully dodging incoming attacks
-  dodgeDistance: 70, // Short sidestep distance (left/right)
+  dodgeChance: 0.50, // probability (0-1) of successfully dodging incoming attacks
+  dodgeDistance: 50, // Short sidestep distance (left/right)
   dodgeCooldown: 1, // Minimum frames (~0.06s) between dodge sidesteps
   attackerTeleportChaseDelayFrames: 5, // Delay (frames) applied to teleporting chasers (Gojo/Sukuna) when Saitama dodges (~0.5s)
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
+  counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
   counterPunchDamage: 1000,        // Damage dealt by the counter punch
   counterWindupFrames: 50,        // Frames Saitama waits before teleporting (reaction delay)
   counterTeleportIdleFrames: 10,  // Frames Saitama stands completely still (staring) after teleporting before starting the charge
@@ -93,17 +87,107 @@
   initialSkillPunishCooldown: 2000, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
-
-  // Passive: Serious Skill Counter Audio Config
-  counterPunchImpactSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3',
-  counterPunchImpactVolume: 1.0,
+  counterPunchVoiceEnabled: true,
+  counterPunchChargingEnabled: true,
   counterPunchImpactEnabled: true,
 
+  // Audio configuration, volume & timing delay adjustments (delays measured in frames @ 60fps)
+  sounds: {
+    punchSwing: 'Assets/Sound Effects/Attacks/punch.mp3',
+    attackNoiseSounds: [
+      'Assets/Sound Effects/Attacks/saitama-attack-noise1.mp3',
+      'Assets/Sound Effects/Attacks/saitama-attack-noise2.mp3',
+      'Assets/Sound Effects/Attacks/saitama-attack-noise3.mp3'
+    ],
+    punchImpact: 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3',
+    dodgeSFX: 'skill_dash3',
+    dodgeNoiseSounds: [
+      'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
+    ],
+    flurryPunchSFX: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    flurryHeavyPunchSFXList: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    flurryFinalImpactSFX: 'Assets/Sound Effects/Attacks/explosion.mp3',
+    flurryDashSFX: 'skill_dash3',
+    counterDashSFX: 'skill_dash5',
+    counterPunchVoiceSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3',
+    counterPunchChargingSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-charging.mp3',
+    counterPunchImpactSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3',
+    championVoiceline: 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3'
+  },
+  soundVolumes: {
+    punchSwing: 2.8,
+    attackNoise: 2.5,
+    punchImpact: 2.0,
+    dodgeSFX: 0.85,
+    dodgeNoise: 2.5,
+    flurryPunch: 2.0,
+    flurryFinalImpact: 2.2,
+    flurryDash: 0.9,
+    counterDash: 1.0,
+    counterPunchVoice: 3.0,
+    counterPunchCharging: 1.0,
+    counterPunchImpact: 1.0,
+    championVoiceline: 2.0
+  },
+  soundChances: {
+    attackNoise: 0.40, // 40% chance to play attack grunt/noise on basic punch
+    dodgeNoise: 0.35   // 35% chance to play dodge grunt/noise on dodge teleport
+  },
+  soundDelays: {
+    attackNoise: 0,
+    dodgeNoise: 0,
+    punchSwing: 0,
+    dodgeSFX: 0,
+    flurryDash: 0,
+    counterDash: 0,
+    counterPunchVoice: 0,
+    counterPunchCharging: 0,
+    counterPunchImpact: 0,
+    championVoiceline: 0,
+    punchImpactFadeDelayMs: 350,
+    punchImpactFadeDurationMs: 900
+  },
+
+  // Flat backward-compatibility audio mappings
+  championVoiceline: 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3',
+  championVoiceVolume: 3.5,
+  punchImpactSFX: 'Assets/Sound Effects/Attacks/explosion.mp3',
+  punchImpactVolume: 2.0,
+  punchImpactFadeDelayMs: 350,
+  punchImpactFadeDurationMs: 900,
+  flurryPunchSFX: 'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+  flurryHeavyPunchSFXList: [
+    'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+    'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+    'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+  ],
+  flurryPunchVolume: 2.0,
+  flurryFinalImpactSFX: 'Assets/Sound Effects/Attacks/explosion.mp3',
+  flurryFinalImpactVolume: 2.2,
+  counterPunchImpactSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3',
+  counterPunchImpactVolume: 1.0,
   counterPunchVoiceSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3',
   counterPunchVoiceVolume: 3.0,
-  counterPunchVoiceEnabled: true,
-
   counterPunchChargingSFX: 'Assets/Sound Effects/Skills/saitama-seriouspunch-charging.mp3',
   counterPunchChargingVolume: 1.0,
-  counterPunchChargingEnabled: true,
+  attackNoiseSounds: [
+    'Assets/Sound Effects/Attacks/saitama-attack-noise1.mp3',
+    'Assets/Sound Effects/Attacks/saitama-attack-noise2.mp3',
+    'Assets/Sound Effects/Attacks/saitama-attack-noise3.mp3'
+  ],
+  attackNoiseChance: 0.40,
+  attackNoiseVolume: 2.5,
+  dodgeNoiseSounds: [
+    'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
+    'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
+    'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
+  ],
+  dodgeNoiseChance: 0.35,
+  dodgeNoiseVolume: 2.5
 };

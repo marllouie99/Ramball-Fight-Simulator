@@ -340,6 +340,10 @@ export function performMeleeAttack(fighter, opponent) {
 export function executeCleave(fighter, opponent) {
   triggerGlobalScreenShake(8, 15);
   audioSystem.playSFX('attack_swordswing', 0.9);
+  fighter.punchAnimTimer = 18;
+  fighter.punchAnimMaxTimer = 18;
+  fighter.swordCombo = (fighter.swordCombo || 0) + 1;
+  spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'WORLD CLEAVE!', '#FFD700');
 
   const cleaveRadius = CONFIG.mahoraga?.cleaveRadius ?? 150;
   const damage = CONFIG.mahoraga?.cleaveDamage ?? 40;

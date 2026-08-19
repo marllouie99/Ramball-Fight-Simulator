@@ -260,15 +260,16 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const isExecuting = Boolean((f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || f.isCountering);
     const punishPct = isExecuting ? 100 : Math.max(0, Math.min(100, (1 - (punishTimer / punishMax)) * 100));
 
-    const maxStacks = CONFIG.saitama?.boredomMaxStacks || 5;
-    const stacks = f.boredomStacks || 0;
-    const boredomPct = (stacks / maxStacks) * 100;
-    const bonusPct = Math.round(stacks * (CONFIG.saitama?.boredomDamagePerStack || 0.15) * 100);
+    // Basic Attack: Normal Punch cooldown bar
+    const punchMax = CONFIG.saitama?.punchCooldown || 500;
+    const punchTimer = f.punchCooldownTimer !== undefined ? f.punchCooldownTimer : 0;
+    const punchPct = Math.max(0, Math.min(100, (1 - (punchTimer / punchMax)) * 100));
+    const punchReady = punchPct >= 99;
 
     return [
+      { id: 'punch',   pct: punchPct,   ready: punchReady,      color: themeColor, label: 'NORMAL PUNCH' },
       { id: 'punish',  pct: punishPct,  ready: punishPct >= 99,  color: themeColor, label: 'SERIOUS COUNTER' },
-      { id: 'flurry',  pct: flurryPct,  ready: flurryPct >= 99,  color: themeColor, label: 'CONSECUTIVE PUNCHES' },
-      { id: 'boredom', pct: boredomPct, ready: boredomPct >= 99, color: themeColor, label: `BOREDOM: +${bonusPct}%` }
+      { id: 'flurry',  pct: flurryPct,  ready: flurryPct >= 99,  color: themeColor, label: 'CONSECUTIVE PUNCHES' }
     ];
   }
   if (f.characterId === 'layla' || f.type === 'layla') {
@@ -566,7 +567,13 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const skillTimer = f.skillPunishCooldown !== undefined ? f.skillPunishCooldown : 0;
     const skillPct = Math.max(0, Math.min(100, (1 - (skillTimer / skillMax)) * 100));
 
+    // Basic Attack: Normal Punch cooldown bar
+    const punchMax = CONFIG.saitama?.punchCooldown || 500;
+    const punchTimer = f.punchCooldownTimer !== undefined ? f.punchCooldownTimer : 0;
+    const punchPct = Math.max(0, Math.min(100, (1 - (punchTimer / punchMax)) * 100));
+
     return [
+      { id: 'punch',   pct: punchPct,   ready: punchPct >= 99,  color: themeColor, label: 'NORMAL PUNCH' },
       { id: 'flurry',  pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'CONSECUTIVE NORMAL PUNCHES' },
       { id: 'counter', pct: skillPct,  ready: skillPct >= 99,  color: themeColor, label: 'SERIOUS COUNTER' }
     ];

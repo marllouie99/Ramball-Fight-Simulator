@@ -576,22 +576,38 @@ canvas {
   font-size: 14.5px !important;
 }
 
-/* ── Screen Dimmed Mode: Pure White HUD Font Text (Excludes Fighter Title/Name) ── */
+/* ── Screen Dimmed Mode: Pure White HUD Font Text ── */
+.hud-dimmed .health-card__title,
 .hud-dimmed .health-card__text,
 .hud-dimmed .hud-skill-box-text,
 .hud-dimmed .health-card__info,
 .hud-dimmed .health-card__info > div,
+.hud-dimmed .health-card__info b,
+.hud-dimmed .health-card__info span,
 .hud-dimmed .health-card__desc,
+.hud-dimmed .health-card__desc span,
 .hud-dimmed .health-card__bar-text,
+.hud-dimmed .hud-name-box,
+.hud-dimmed .health-card__score,
+.hud-dimmed .health-card__meta,
+.hud-dimmed .hud-number,
+.hud-dimmed .hud-skill-box,
+.health-card.hud-dimmed .health-card__title,
 .health-card.hud-dimmed .health-card__text,
 .health-card.hud-dimmed .hud-skill-box-text,
 .health-card.hud-dimmed .health-card__info,
 .health-card.hud-dimmed .health-card__info > div,
+.health-card.hud-dimmed .health-card__info b,
+.health-card.hud-dimmed .health-card__info span,
 .health-card.hud-dimmed .health-card__desc,
-.health-card.hud-dimmed .health-card__bar-text {
+.health-card.hud-dimmed .health-card__desc span,
+.health-card.hud-dimmed .health-card__bar-text,
+.health-card.hud-dimmed .hud-name-box,
+.health-card.hud-dimmed .health-card__score,
+.health-card.hud-dimmed .health-card__meta,
+.health-card.hud-dimmed .hud-number {
   color: #FFFFFF !important;
-  font-weight: normal !important;
-  text-shadow: 0 0 5px rgba(0, 0, 0, 0.90), 0 1px 2px #000000 !important;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 1px 3px #000000 !important;
 }
 
 /* ── DOM Floating Health Bubble Overlay on HUD Health Bar ── */

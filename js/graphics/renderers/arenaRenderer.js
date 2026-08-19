@@ -1304,6 +1304,7 @@ export function drawSaitamaSeriousPunchDimScreen() {
   // The moment the punch lands (_counterPunchTimer reaches 0), instantly snap opacity to 0!
   if (!saitama) {
     currentSaitamaSeriousPunchOpacity = 0;
+    if (typeof state !== 'undefined') state._saitamaSeriousPunchOpacity = 0;
     return;
   }
 
@@ -1316,9 +1317,11 @@ export function drawSaitamaSeriousPunchDimScreen() {
   } else {
     currentSaitamaSeriousPunchOpacity = targetOpacity;
   }
+  if (typeof state !== 'undefined') state._saitamaSeriousPunchOpacity = currentSaitamaSeriousPunchOpacity;
 
   if (currentSaitamaSeriousPunchOpacity < 0.01) {
     currentSaitamaSeriousPunchOpacity = 0;
+    if (typeof state !== 'undefined') state._saitamaSeriousPunchOpacity = 0;
     return;
   }
 

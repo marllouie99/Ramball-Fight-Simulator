@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 export const mahoragaConfig = {
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
+    moveSpeed: 6.5,                 // Base movement speed (before adaptation speed boosts)
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)
     adaptationSpeedBoostPerStage: 0.15, // +10% movement speed multiplier per gold adaptation stage
     rctRegenPerStage: 0.03,          // Passive RCT HP regeneration per frame per adaptation level (0.10 HP/frame = +6 HP/sec per stage)
@@ -16,7 +17,7 @@ export const mahoragaConfig = {
     cleaveCooldown: 600,            // 10 seconds cooldown for Active AoE Cleave
     cleaveRadius: 150,              // Range of the AoE Cleave
     cleaveDamage: 40,               // True damage of the AoE Cleave
-    cleaveWindupFrames: 30,         // Windup time for active skill
+    cleaveWindupFrames: 0,          // Instant execution without pausing/standing still
     wheelRotationSpeed: 0.10,       // Passive visual rotation speed of the wheel
 
     // Level 8 Max Adaptation: Attack-Teleport Speed-Blitz Configs
@@ -33,7 +34,7 @@ export const mahoragaConfig = {
 
     // Divine Shout (AoE Shockwave Roar)
     shoutCooldown: 1000,             // 8 seconds cooldown between divine shouts
-    shoutWindupFrames: 15,          // Windup stance plant frames before shockwave release
+    shoutWindupFrames: 0,           // Instant shockwave release without stopping or standing still
     shoutRadius: 180,               // Shockwave blast radius
     shoutDamage: 30,                // Damage dealt to enemies caught in shockwave
     shoutKnockback: 18,             // Knockback force applied to enemies

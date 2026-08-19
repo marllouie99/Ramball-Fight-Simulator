@@ -37,14 +37,23 @@ export function isScreenDimmedActive() {
     if (!isChanneling) return true;
   }
 
-  // 3. Active Dim Effect States (active beam/strike phase)
+  // 3. Active Dim Effect States (active beam/strike phase / Saitama Serious Counter passive)
   const hasActiveDimEffect = state.fighters.some(f => f && (
     (f.isFiringPurple || (f.purpleHitTimer || 0) > 0) ||
     f.isSaitamaPunchActive ||
+    (f._counterPunchTimer && f._counterPunchTimer > 0) ||
+    (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) ||
+    f.isCountering ||
+    f._counterPunchTarget ||
     f.tojiUltimateActive ||
     (f.furnaceFireArrowTimer || 0) > 0
   ));
   if (hasActiveDimEffect) return true;
+
+  // 4. Check if Saitama's serious punch dim screen in arenaRenderer has active opacity
+  if (typeof state._saitamaSeriousPunchOpacity === 'number' && state._saitamaSeriousPunchOpacity > 0.05) {
+    return true;
+  }
 
   return false;
 }
@@ -267,6 +276,26 @@ function updateHealthHud() {
   state._lastSkillsStr = currentSkillsStr;
 
   state._hudFrameCount = (state._hudFrameCount || 0) + 1;
+
+  // ── INSTANT Dim Class Toggle (runs EVERY frame, before throttle) ──
+  // This ensures the HUD text color reverts to normal immediately when Saitama's passive ends.
+  {
+    const isDimmedNow = isScreenDimmedActive();
+    const _dimEls = [
+      document.querySelector('.game-container'),
+      document.querySelector('.game-box'),
+      document.getElementById('hudBottomContainer'),
+      document.getElementById('hudTopContainer'),
+      document.getElementById('healthHud'),
+      document.body
+    ];
+    _dimEls.forEach(el => {
+      if (el) {
+        if (isDimmedNow) el.classList.add('hud-dimmed');
+        else el.classList.remove('hud-dimmed');
+      }
+    });
+  }
 
   // Performance: Throttle expensive HUD innerHTML writes to avoid layout reflow stalls
   const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)));
@@ -1508,16 +1537,7 @@ function updateHealthHud() {
       }
     });
 
-    // 7. Dynamic Screen Dim Mode: Automatically turn ALL HUD text white during active dim effects (excluding skill channeling)
-    const isDimmed = isScreenDimmedActive();
-    const gameContainer = document.querySelector('.game-container') || document.body;
-    if (gameContainer) {
-      if (isDimmed) {
-        gameContainer.classList.add('hud-dimmed');
-      } else {
-        gameContainer.classList.remove('hud-dimmed');
-      }
-    }
+    // 7. (Dim class toggle is now handled every frame before the throttle guard above.)
   }
 }
 

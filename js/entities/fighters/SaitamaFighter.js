@@ -54,7 +54,7 @@ export class SaitamaFighter extends Fighter {
     this._postCounterRecoveryTimer = 0; // Brief post-punch stall after landing
 
     // Skill 1: Consecutive Normal Punches
-    this.flurryCooldown = 0;
+    this.flurryCooldown = CONFIG.saitama?.flurryCooldown || 540; // Start at full CD so bar ticks down from match start
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -250,7 +250,28 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Crisp dash audio effect
-    audioSystem.playSFX('skill_dash3', 0.85);
+    const dashSFX = CONFIG.saitama?.sounds?.dodgeSFX || 'skill_dash3';
+    const dashVol = CONFIG.saitama?.soundVolumes?.dodgeSFX ?? 0.85;
+    audioSystem.playSFX(dashSFX, dashVol);
+
+    // Play Saitama Dodge Grunt / Noise with configurable chance & volume (organized like Nanami)
+    const dodgeNoiseSounds = CONFIG.saitama?.sounds?.dodgeNoiseSounds || [
+      'Assets/Sound Effects/Skills/saitama-dodge-noise1.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise2.mp3',
+      'Assets/Sound Effects/Skills/saitama-dodge-noise3.mp3'
+    ];
+    const dodgeNoiseChance = (typeof CONFIG.saitama?.soundChances?.dodgeNoise === 'number')
+      ? CONFIG.saitama.soundChances.dodgeNoise
+      : ((typeof CONFIG.saitama?.dodgeNoiseChance === 'number') ? CONFIG.saitama.dodgeNoiseChance : 0.35);
+
+    if (dodgeNoiseSounds && dodgeNoiseSounds.length > 0 && Math.random() < dodgeNoiseChance) {
+      const selectedDodgeNoise = dodgeNoiseSounds[Math.floor(Math.random() * dodgeNoiseSounds.length)];
+      const noiseVol = CONFIG.saitama?.soundVolumes?.dodgeNoise !== undefined 
+        ? CONFIG.saitama.soundVolumes.dodgeNoise 
+        : (CONFIG.saitama?.dodgeNoiseVolume !== undefined ? CONFIG.saitama.dodgeNoiseVolume : 2.5);
+      // Play full audio clip without cutting off on subsequent rapid teleports
+      audioSystem.playSFX(selectedDodgeNoise, noiseVol);
+    }
 
     // Apply a subtle micro-glide velocity sideways along perpAngle so Saitama moves a little smoothly after dodging
     const microGlideSpeed = 2.2;
@@ -285,6 +306,13 @@ export class SaitamaFighter extends Fighter {
           return false; // Same team — skip
         }
       }
+    }
+
+    // Range guard: Prevent triggering passive counter if target is not within counter range
+    const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
+    const currentDist = Math.hypot(target.x - this.x, target.y - this.y);
+    if (currentDist > maxRange) {
+      return false; // Target is out of range
     }
 
     const oldX = this.x;
@@ -349,6 +377,13 @@ export class SaitamaFighter extends Fighter {
       }
     }
 
+    // Verify the teleport destination is within melee reach of the target
+    const punchReach = this.r + target.r + (CONFIG.saitama?.punchReach || 80);
+    const destDist = Math.hypot(chosenX - target.x, chosenY - target.y);
+    if (destDist > punchReach + 40) {
+      return false; // Chosen teleport position is not within reach
+    }
+
     // Teleport Saitama behind the target with clean physical spacing
     this.x = chosenX;
     this.y = chosenY;
@@ -386,7 +421,9 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Teleport SFX
-    audioSystem.playSFX('skill_dash5', 1.0);
+    const counterDashSFX = CONFIG.saitama?.sounds?.counterDashSFX || 'skill_dash5';
+    const counterDashVol = CONFIG.saitama?.soundVolumes?.counterDash ?? 1.0;
+    audioSystem.playSFX(counterDashSFX, counterDashVol);
 
     // Interrupt the enemy's skill channel immediately
     if (typeof target.interruptAttacks === 'function') {
@@ -411,8 +448,10 @@ export class SaitamaFighter extends Fighter {
       target.timeStopTimer = counterFreezeDuration;
     }
 
-    // Force the counter punch to use the FRONT hand (rendered on top) and reset active punch animation
-    this.isRightPunch = true;
+    // Aim face at target
+    if (typeof this.aim === 'function') {
+      this.aim(target);
+    }
     this.punchAnimTimer = 0;
 
     // Impact flash at teleport origin and behind enemy
@@ -428,15 +467,15 @@ export class SaitamaFighter extends Fighter {
     // Play charging voice line and background audio
     const voiceEnabled = CONFIG.saitama?.counterPunchVoiceEnabled !== false;
     if (voiceEnabled) {
-      const voiceSrc = CONFIG.saitama?.counterPunchVoiceSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3';
-      const voiceVol = CONFIG.saitama?.counterPunchVoiceVolume ?? 2.0;
+      const voiceSrc = CONFIG.saitama?.sounds?.counterPunchVoiceSFX || CONFIG.saitama?.counterPunchVoiceSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3';
+      const voiceVol = CONFIG.saitama?.soundVolumes?.counterPunchVoice ?? (CONFIG.saitama?.counterPunchVoiceVolume ?? 3.0);
       audioSystem.playSFX(voiceSrc, voiceVol);
     }
 
     const chargingEnabled = CONFIG.saitama?.counterPunchChargingEnabled !== false;
     if (chargingEnabled) {
-      const chargingSrc = CONFIG.saitama?.counterPunchChargingSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-charging.mp3';
-      const chargingVol = CONFIG.saitama?.counterPunchChargingVolume ?? 2.0;
+      const chargingSrc = CONFIG.saitama?.sounds?.counterPunchChargingSFX || CONFIG.saitama?.counterPunchChargingSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-charging.mp3';
+      const chargingVol = CONFIG.saitama?.soundVolumes?.counterPunchCharging ?? (CONFIG.saitama?.counterPunchChargingVolume ?? 1.0);
       this._counterPunchChargeSound = audioSystem.playSFX(chargingSrc, chargingVol);
     }
 
@@ -479,8 +518,8 @@ export class SaitamaFighter extends Fighter {
       // Play impact sound effect
       const impactEnabled = CONFIG.saitama?.counterPunchImpactEnabled !== false;
       if (impactEnabled) {
-        const impactSrc = CONFIG.saitama?.counterPunchImpactSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3';
-        const impactVol = CONFIG.saitama?.counterPunchImpactVolume ?? 2.0;
+        const impactSrc = CONFIG.saitama?.sounds?.counterPunchImpactSFX || CONFIG.saitama?.counterPunchImpactSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3';
+        const impactVol = CONFIG.saitama?.soundVolumes?.counterPunchImpact ?? (CONFIG.saitama?.counterPunchImpactVolume ?? 1.0);
         audioSystem.playSFX(impactSrc, impactVol);
       }
 
@@ -637,7 +676,9 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Dash sound effect
-    audioSystem.playSFX('skill_dash3', 0.9);
+    const flurryDashSFX = CONFIG.saitama?.sounds?.flurryDashSFX || 'skill_dash3';
+    const flurryDashVol = CONFIG.saitama?.soundVolumes?.flurryDash ?? 0.9;
+    audioSystem.playSFX(flurryDashSFX, flurryDashVol);
 
     // Immediately stop enemy movement and apply initial hit-pause (Rule #5: ONLY target, never attacker)
     if (opponent && opponent.hp > 0) {
@@ -697,9 +738,13 @@ export class SaitamaFighter extends Fighter {
     // If incoming damage is from a skill/ultimate/channeling attack and counter is ready, execute counter punch!
     const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isMachineGunBlow || opts.isChanneling;
     if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0) {
-      const countered = this.executeSkillCounterPunish(attacker);
-      if (countered) {
-        return false;
+      const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
+      const distToAttacker = Math.hypot(attacker.x - this.x, attacker.y - this.y);
+      if (distToAttacker <= maxRange) {
+        const countered = this.executeSkillCounterPunish(attacker);
+        if (countered) {
+          return false;
+        }
       }
     }
 
@@ -785,7 +830,28 @@ export class SaitamaFighter extends Fighter {
     
     // Play punch sound (matching Gojo's melee punch attack audio at volume 2.8)
     if (typeof audioSystem !== 'undefined') {
-      audioSystem.playSFX('Assets/Sound Effects/Attacks/punch.mp3', 2.8);
+      const swingSFX = CONFIG.saitama?.sounds?.punchSwing || 'Assets/Sound Effects/Attacks/punch.mp3';
+      const swingVol = CONFIG.saitama?.soundVolumes?.punchSwing ?? 2.8;
+      audioSystem.playSFX(swingSFX, swingVol);
+
+      // Play Saitama Attack Grunt / Noise with configurable chance & volume (organized like Nanami)
+      const attackNoiseSounds = CONFIG.saitama?.sounds?.attackNoiseSounds || [
+        'Assets/Sound Effects/Attacks/saitama-attack-noise1.mp3',
+        'Assets/Sound Effects/Attacks/saitama-attack-noise2.mp3',
+        'Assets/Sound Effects/Attacks/saitama-attack-noise3.mp3'
+      ];
+      const attackNoiseChance = (typeof CONFIG.saitama?.soundChances?.attackNoise === 'number')
+        ? CONFIG.saitama.soundChances.attackNoise
+        : ((typeof CONFIG.saitama?.attackNoiseChance === 'number') ? CONFIG.saitama.attackNoiseChance : 0.40);
+
+      if (attackNoiseSounds && attackNoiseSounds.length > 0 && Math.random() < attackNoiseChance) {
+        const selectedAttackNoise = attackNoiseSounds[Math.floor(Math.random() * attackNoiseSounds.length)];
+        const noiseVol = CONFIG.saitama?.soundVolumes?.attackNoise !== undefined 
+          ? CONFIG.saitama.soundVolumes.attackNoise 
+          : (CONFIG.saitama?.attackNoiseVolume !== undefined ? CONFIG.saitama.attackNoiseVolume : 2.5);
+        // Play full audio clip without cutting off on subsequent rapid actions
+        audioSystem.playSFX(selectedAttackNoise, noiseVol);
+      }
     }
 
     // Query all valid targets (fighters & illusions) in the arena (Rule #6)
@@ -879,7 +945,7 @@ export class SaitamaFighter extends Fighter {
 
       // Play serious punch impact audio on hit with smooth fade out
       if (typeof audioSystem !== 'undefined') {
-        const impactSFX = CONFIG.saitama?.punchImpactSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3';
+        const impactSFX = CONFIG.saitama?.punchImpactSFX || 'Assets/Sound Effects/Attacks/explosion.mp3';
         const impactVol = CONFIG.saitama?.punchImpactVolume ?? 2.0;
         const soundHandle = audioSystem.playSFX(impactSFX, impactVol);
 
@@ -938,7 +1004,7 @@ export class SaitamaFighter extends Fighter {
     this.boredomStacks = 0;
     this.boredomTimer = 0;
     this.afterImages = [];
-    this.flurryCooldown = 0;
+    this.flurryCooldown = CONFIG.saitama?.flurryCooldown || 540; // Start at full CD so bar ticks down from match start
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -984,6 +1050,7 @@ export class SaitamaFighter extends Fighter {
 
       let bestTarget = null;
       let minDist = Infinity;
+      const maxCounterRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
       for (const target of targetsToScan) {
         if (typeof state !== 'undefined' && state.getFighterTeam && state.fighters) {
           const myIdx = state.fighters.indexOf(this);
@@ -995,7 +1062,8 @@ export class SaitamaFighter extends Fighter {
           }
         }
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
-        if (dist < minDist) {
+        // Only target enemies strictly within Saitama's passive counter range
+        if (dist <= maxCounterRange && dist < minDist) {
           minDist = dist;
           bestTarget = target;
         }
@@ -1144,15 +1212,31 @@ export class SaitamaFighter extends Fighter {
 
         const isFinalHit = this.flurryHitsLeft === 0;
 
+        // Saitama slides forward with each punch
+        const forwardStep = CONFIG.saitama?.flurryForwardSlideSpeed ?? 4.5;
+        this.x += Math.cos(aimAngle) * forwardStep;
+        this.y += Math.sin(aimAngle) * forwardStep;
+
+        // Arena boundary clamp for Saitama
+        const arena = CONFIG.arena;
+        if (arena) {
+          const minX = arena.x + this.r + 10;
+          const maxX = arena.x + arena.width - this.r - 10;
+          const minY = arena.y + this.r + 10;
+          const maxY = arena.y + arena.height - this.r - 10;
+          this.x = Math.max(minX, Math.min(maxX, this.x));
+          this.y = Math.max(minY, Math.min(maxY, this.y));
+        }
+
         // Play heavy punch audio on each hit
         if (typeof audioSystem !== 'undefined') {
           let punchSFX;
           let vol;
           if (isFinalHit) {
-            punchSFX = CONFIG.saitama?.flurryFinalImpactSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3';
-            vol = CONFIG.saitama?.flurryFinalImpactVolume ?? 2.2;
+            punchSFX = CONFIG.saitama?.sounds?.flurryFinalImpactSFX || CONFIG.saitama?.flurryFinalImpactSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-impact.mp3';
+            vol = CONFIG.saitama?.soundVolumes?.flurryFinalImpact ?? (CONFIG.saitama?.flurryFinalImpactVolume ?? 2.2);
           } else {
-            const heavyList = CONFIG.saitama?.flurryHeavyPunchSFXList || [
+            const heavyList = CONFIG.saitama?.sounds?.flurryHeavyPunchSFXList || CONFIG.saitama?.flurryHeavyPunchSFXList || [
               'Assets/Sound Effects/Attacks/heavypunch1.mp3',
               'Assets/Sound Effects/Attacks/heavypunch2.mp3',
               'Assets/Sound Effects/Attacks/heavypunch3.mp3'
@@ -1160,9 +1244,9 @@ export class SaitamaFighter extends Fighter {
             if (Array.isArray(heavyList) && heavyList.length > 0) {
               punchSFX = heavyList[Math.floor(Math.random() * heavyList.length)];
             } else {
-              punchSFX = CONFIG.saitama?.flurryPunchSFX || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
+              punchSFX = CONFIG.saitama?.sounds?.flurryPunchSFX || CONFIG.saitama?.flurryPunchSFX || 'Assets/Sound Effects/Attacks/heavypunch1.mp3';
             }
-            vol = CONFIG.saitama?.flurryPunchVolume ?? 2.0;
+            vol = CONFIG.saitama?.soundVolumes?.flurryPunch ?? (CONFIG.saitama?.flurryPunchVolume ?? 2.0);
           }
           const handle = audioSystem.playSFX(punchSFX, vol);
           if (isFinalHit && handle && typeof fadeOutSound === 'function') {
@@ -1225,6 +1309,21 @@ export class SaitamaFighter extends Fighter {
                   spawnImpactFlash(target.x, target.y, 45, 'default');
                 }
               } else {
+                // Non-final rapid punch: push enemy back a little on each punch
+                const pushbackDist = CONFIG.saitama?.flurryPushbackPerHit ?? 7.0;
+                target.x += Math.cos(angleToTarget) * pushbackDist;
+                target.y += Math.sin(angleToTarget) * pushbackDist;
+
+                // Arena clamp for target
+                if (arena) {
+                  const tMinX = arena.x + target.r + 10;
+                  const tMaxX = arena.x + arena.width - target.r - 10;
+                  const tMinY = arena.y + target.r + 10;
+                  const tMaxY = arena.y + arena.height - target.r - 10;
+                  target.x = Math.max(tMinX, Math.min(tMaxX, target.x));
+                  target.y = Math.max(tMinY, Math.min(tMaxY, target.y));
+                }
+
                 // Non-final rapid punch visual feedback
                 if (typeof spawnSparks === 'function') {
                   spawnSparks(target.x, target.y, 6, 'crimson', '#F5C400');

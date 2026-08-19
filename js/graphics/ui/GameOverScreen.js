@@ -197,7 +197,24 @@ function drawFfaChampionReveal(winner, timer) {
   // Smooth fade-in animation over 30 frames (0.5 seconds at 60fps)
   const fadeAlpha = Math.min(1, timer / 30);
 
+  // Trigger Champion Victory Voiceline when FFA champion screen is revealed
+  if (!state._hasPlayedChampionVictoryVoice && timer > 0) {
+    state._hasPlayedChampionVictoryVoice = true;
 
+    const isTodo = winner && (winner.characterId === 'todo' || winner.type === 'todo' || winner._def?.id === 'todo');
+    if (isTodo) {
+      const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
+      const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
+      audioSystem.playSFX(todoSnd, vol);
+    }
+
+    const isSaitama = winner && (winner.characterId === 'saitama' || winner.type === 'saitama' || winner._def?.id === 'saitama');
+    if (isSaitama) {
+      const saitamaSnd = CONFIG.saitama?.sounds?.championVoiceline || CONFIG.saitama?.championVoiceline || 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3';
+      const vol = CONFIG.saitama?.soundVolumes?.championVoiceline ?? (CONFIG.saitama?.championVoiceVolume ?? 3.5);
+      audioSystem.playSFX(saitamaSnd, vol);
+    }
+  }
 
   // Draw the actual fighter model at the center, scaled up for the reveal.
   const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
@@ -427,6 +444,13 @@ function drawMatchWinnerReveal(winner, timer, mode) {
       const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
       const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
       audioSystem.playSFX(todoSnd, vol);
+    }
+
+    const hasSaitama = winningFighters.some(f => f && (f.characterId === 'saitama' || f.type === 'saitama' || f._def?.id === 'saitama'));
+    if (hasSaitama) {
+      const saitamaSnd = CONFIG.saitama?.sounds?.championVoiceline || CONFIG.saitama?.championVoiceline || 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3';
+      const vol = CONFIG.saitama?.soundVolumes?.championVoiceline ?? (CONFIG.saitama?.championVoiceVolume ?? 3.5);
+      audioSystem.playSFX(saitamaSnd, vol);
     }
   }
 

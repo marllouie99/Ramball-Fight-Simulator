@@ -45,5 +45,6 @@ export const AUDIO_CONFIG = {
   'skill_todotadakachannelvoice': 'Assets/Sound Effects/Skills/todo-tadakaimagination-voiceline.mp3',
   'skill_todotadakabgsong': 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',
   'skill_todomybestfriend': 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3',
-  'skill_yujibestfriend': 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3'
+  'skill_yujibestfriend': 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3',
+  'skill_saitamachampion': 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3'
 };

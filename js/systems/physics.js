@@ -516,7 +516,7 @@ function endRoundIf2v2Ended() {
     stopAllLoopingSounds();
   }
 
-  // Play Todo's "MY BEST FRIEND!" victory voiceline when Todo's team wins!
+  // Play victory voicelines when winning team wins
   if (state.fighters) {
     const todoFighter = state.fighters.find(f => f && (f.characterId === 'todo' || f.type === 'todo'));
     if (todoFighter) {
@@ -526,6 +526,19 @@ function endRoundIf2v2Ended() {
         const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
         const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
         audioSystem.playSFX(todoSnd, vol);
+      }
+    }
+
+    if (isMatchEnd) {
+      const saitamaFighter = state.fighters.find(f => f && (f.characterId === 'saitama' || f.type === 'saitama'));
+      if (saitamaFighter) {
+        const saitamaIdx = state.fighters.indexOf(saitamaFighter);
+        const saitamaTeam = state.getFighterTeam ? state.getFighterTeam(saitamaIdx) : null;
+        if (saitamaTeam !== null && saitamaTeam === winningTeam) {
+          const saitamaSnd = CONFIG.saitama?.sounds?.championVoiceline || CONFIG.saitama?.championVoiceline || 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3';
+          const vol = CONFIG.saitama?.soundVolumes?.championVoiceline ?? (CONFIG.saitama?.championVoiceVolume ?? 3.5);
+          audioSystem.playSFX(saitamaSnd, vol);
+        }
       }
     }
   }

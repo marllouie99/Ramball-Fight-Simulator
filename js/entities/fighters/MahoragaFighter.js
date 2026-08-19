@@ -19,7 +19,7 @@ export class MahoragaFighter extends Fighter {
   constructor(def) {
     super(def);
     
-    this.baseSpeed = (def && def.speed !== undefined) ? def.speed : (CONFIG.mahoraga?.speed !== undefined ? CONFIG.mahoraga.speed : 6.5);
+    this.baseSpeed = (def && def.moveSpeed !== undefined) ? def.moveSpeed : (CONFIG.mahoraga?.moveSpeed ?? 6.5);
     this.speed = this.baseSpeed;
     
     // Adaptation Tracking (Multi-stage up to 8 wheel turns!)
@@ -909,7 +909,7 @@ export class MahoragaFighter extends Fighter {
     }
 
     // Calculate Dynamic Movement Speed based on Gold Adaptations
-    const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.speed || 6.5;
+    const baseSpeed = this.baseSpeed || CONFIG.mahoraga?.moveSpeed || 6.5;
     const goldStages = (this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0);
     const speedBoost = CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? 0.15;
     this.speed = baseSpeed * (1.0 + (goldStages * speedBoost));
@@ -1402,27 +1402,12 @@ export class MahoragaFighter extends Fighter {
       return;
     }
 
-    // ── Divine Shout Windup ──
+    // ── Divine Shout (Instant Release on the Move) ──
     if (this.isShouting) {
-      this.shoutWindupTimer++;
-      if ((this.knockbackStunTimer || 0) <= 0) {
-        this.vx = 0;
-        this.vy = 0;
-      }
-      this.applyMovementPhysics(0);
-
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
-      }
-
-      const maxWindup = CONFIG.mahoraga?.shoutWindupFrames ?? 15;
-      if (this.shoutWindupTimer >= maxWindup) {
-        this._executeShout(opponent, ownerIndex);
-        this.isShouting = false;
-        this.shoutWindupTimer = 0;
-        this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
-      }
-      return;
+      this._executeShout(opponent, ownerIndex);
+      this.isShouting = false;
+      this.shoutWindupTimer = 0;
+      this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
     }
 
     // ── Conditional Rapid Barrage Throw ──
@@ -1756,23 +1741,12 @@ export class MahoragaFighter extends Fighter {
       return;
     }
 
-    // ── Active Cleave Skill ──
+    // ── Active Cleave Skill (Instant Execution on the Move) ──
     if (this.isCleaving) {
-      this.cleaveWindupTimer++;
-      if ((this.knockbackStunTimer || 0) <= 0) {
-        this.vx = 0;
-        this.vy = 0;
-      }
-      this.applyMovementPhysics(0);
-
-      const maxWindup = CONFIG.mahoraga?.cleaveWindupFrames ?? 30;
-      if (this.cleaveWindupTimer >= maxWindup) {
-        this._executeCleave(opponent);
-        this.isCleaving = false;
-        this.cleaveWindupTimer = 0;
-        this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown ?? 600;
-      }
-      return; 
+      this._executeCleave(opponent);
+      this.isCleaving = false;
+      this.cleaveWindupTimer = 0;
+      this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown ?? 600;
     }
 
     // ── Natural Bounce Movement (no direct-chase steering) ──
@@ -1872,14 +1846,18 @@ export class MahoragaFighter extends Fighter {
             this._performMeleeAttack(opponent);
           }
         }
-        // Priority 1: Divine Shout (AoE shockwave roar triggered when getting near to the enemy)
+        // Priority 1: Divine Shout (Instant AoE shockwave roar without stopping or windup pause)
         else if (this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
-          this.isShouting = true;
+          this._executeShout(opponent, ownerIndex);
+          this.shoutCooldown = CONFIG.mahoraga?.shoutCooldown ?? 1000;
+          this.isShouting = false;
           this.shoutWindupTimer = 0;
         }
-        // Priority 2: World Cleave (Heavy Cleave in close-medium range)
+        // Priority 2: World Cleave (Heavy Cleave in close-medium range - Instant AoE execute on the move)
         else if (this.cleaveCooldown <= 0 && distToOpponent <= meleeDist + 40) {
-          this.isCleaving = true;
+          this._executeCleave(opponent);
+          this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown ?? 600;
+          this.isCleaving = false;
           this.cleaveWindupTimer = 0;
         }
         // Priority 3: Throw Skill (Debris Throw at Level 1-7 OR Wall Slam & Dash Execute at Level 8+)
