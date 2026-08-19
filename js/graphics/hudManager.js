@@ -281,6 +281,13 @@ function updateHealthHud() {
   // This ensures the HUD text color reverts to normal immediately when Saitama's passive ends.
   {
     const isDimmedNow = isScreenDimmedActive();
+
+    // Detect Saitama's counter punch impact flash (HUD text snaps from white → black during bright white screen flash)
+    const isSaitamaPunchImpactFlash = state.fighters && state.fighters.some(f =>
+      f && (f.characterId === 'saitama' || f.type === 'saitama') &&
+      f._counterPunchImpactFlashTimer && f._counterPunchImpactFlashTimer > 0
+    );
+
     const _dimEls = [
       document.querySelector('.game-container'),
       document.querySelector('.game-box'),
@@ -293,6 +300,10 @@ function updateHealthHud() {
       if (el) {
         if (isDimmedNow) el.classList.add('hud-dimmed');
         else el.classList.remove('hud-dimmed');
+
+        // Snap HUD text to black during punch impact white flash
+        if (isSaitamaPunchImpactFlash) el.classList.add('hud-punch-impact');
+        else el.classList.remove('hud-punch-impact');
       }
     });
   }
@@ -935,6 +946,7 @@ function updateHealthHud() {
         else if (fType === 'mahito') memberNameColor = '#D946EF';
         else if (fType === 'toji') memberNameColor = '#A855F7';
         else if (fType === 'sukuna') memberNameColor = '#FF4500';
+        else if (fType === 'saitama') memberNameColor = '#FF2A2A';
 
         const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
@@ -1028,6 +1040,9 @@ function updateHealthHud() {
         else if (fType === 'yuta') nameColor = '#FF69B4';   // Pink name
         else if (fType === 'mahoraga') nameColor = '#FFD700'; // Gold name
         else if (fType === 'mahito') nameColor = '#D946EF';   // Vivid Magenta-Violet name
+        else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
+        else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
+        else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
         const fighterName = soloFighter.name || 'SOLO PLAYER';
         const fighterStats = state.leaderboard[soloFighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
@@ -1201,6 +1216,9 @@ function updateHealthHud() {
         else if (fType === 'yuta') nameColor = '#FF69B4';   // Pink name
         else if (fType === 'mahoraga') nameColor = '#FFD700'; // Gold name
         else if (fType === 'mahito') nameColor = '#D946EF';   // Vivid Magenta-Violet name
+        else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
+        else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
+        else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;

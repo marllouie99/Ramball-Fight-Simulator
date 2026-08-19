@@ -904,6 +904,8 @@ export class Fighter {
         color = '#ff4455'; // Bright Crimson Flame for Sukuna
       } else if (attacker && (attacker.characterId === 'yuta' || attacker.type === 'yuta' || attacker.isRika || (attacker.isIllusion && attacker.owner && (attacker.owner.characterId === 'yuta' || attacker.owner.type === 'yuta')))) {
         color = '#FF1493'; // Deep Pink for Yuta and Rika
+      } else if (attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama')) {
+        color = '#FF2A2A'; // Red for Saitama
       } else if (opts.isPurpleDPS) {
         color = '#bf5af2'; // Bright electric purple for Hollow Purple DPS
       }

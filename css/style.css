@@ -610,6 +610,41 @@ canvas {
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 1px 3px #000000 !important;
 }
 
+/* ── Saitama Counter Punch Impact: Snap HUD Text White → Black ── */
+/* Overrides hud-dimmed white text during the bright white screen flash when the punch lands */
+.hud-punch-impact .health-card__title,
+.hud-punch-impact .health-card__text,
+.hud-punch-impact .hud-skill-box-text,
+.hud-punch-impact .health-card__info,
+.hud-punch-impact .health-card__info > div,
+.hud-punch-impact .health-card__info b,
+.hud-punch-impact .health-card__info span,
+.hud-punch-impact .health-card__desc,
+.hud-punch-impact .health-card__desc span,
+.hud-punch-impact .health-card__bar-text,
+.hud-punch-impact .hud-name-box,
+.hud-punch-impact .health-card__score,
+.hud-punch-impact .health-card__meta,
+.hud-punch-impact .hud-number,
+.hud-punch-impact .hud-skill-box,
+.health-card.hud-punch-impact .health-card__title,
+.health-card.hud-punch-impact .health-card__text,
+.health-card.hud-punch-impact .hud-skill-box-text,
+.health-card.hud-punch-impact .health-card__info,
+.health-card.hud-punch-impact .health-card__info > div,
+.health-card.hud-punch-impact .health-card__info b,
+.health-card.hud-punch-impact .health-card__info span,
+.health-card.hud-punch-impact .health-card__desc,
+.health-card.hud-punch-impact .health-card__desc span,
+.health-card.hud-punch-impact .health-card__bar-text,
+.health-card.hud-punch-impact .hud-name-box,
+.health-card.hud-punch-impact .health-card__score,
+.health-card.hud-punch-impact .health-card__meta,
+.health-card.hud-punch-impact .hud-number {
+  color: #000000 !important;
+  text-shadow: 0 0 6px rgba(255, 255, 255, 0.95), 0 1px 3px #FFFFFF !important;
+}
+
 /* ── DOM Floating Health Bubble Overlay on HUD Health Bar ── */
 .hud-heal-bubble {
   position: absolute;

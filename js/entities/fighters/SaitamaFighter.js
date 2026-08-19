@@ -249,6 +249,11 @@ export class SaitamaFighter extends Fighter {
       spawnImpactFlash(this.x, this.y, 25, '#FFFFFF');
     }
 
+    // Spawn floating text "MISS!" on successful dodge
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 18, 'MISS!', '#A0AEC0');
+    }
+
     // Crisp dash audio effect
     const dashSFX = CONFIG.saitama?.sounds?.dodgeSFX || 'skill_dash3';
     const dashVol = CONFIG.saitama?.soundVolumes?.dodgeSFX ?? 0.85;
@@ -587,6 +592,9 @@ export class SaitamaFighter extends Fighter {
         spawnImpactFlash(target.x, target.y, 45, '#FFFFFF');
       }
 
+      // HUD Text Snap: White → Black on punch impact (screen flashes bright white)
+      this._counterPunchImpactFlashTimer = CONFIG.saitama?.counterPunchImpactFlashFrames ?? 25;
+
       // Saitama stops and stares briefly after landing the punch
       this.vx = 0;
       this.vy = 0;
@@ -619,6 +627,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryTimer = 0;
     this.flurryTarget = opponent;
     this.flurryCooldown = CONFIG.saitama?.flurryCooldown || 540;
+    this._flurryAccumulatedDamage = 0;
 
     // Cancel any charging basic punch
     this.basicPunchChargeTimer = 0;
@@ -712,6 +721,7 @@ export class SaitamaFighter extends Fighter {
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
+    this._flurryAccumulatedDamage = 0;
 
     if (this._counterPunchChargeSound) {
       fadeOutSound(this._counterPunchChargeSound, 150);
@@ -1099,6 +1109,11 @@ export class SaitamaFighter extends Fighter {
       }
     }
 
+    // Tick down the HUD text impact flash timer (white → black snap on punch land)
+    if (this._counterPunchImpactFlashTimer > 0) {
+      this._counterPunchImpactFlashTimer--;
+    }
+
     // Passive: Boredom Threshold counter (5 seconds without dealing damage = +1 stack)
     const interval = CONFIG.saitama?.boredomStackInterval || 300;
     const maxStacks = CONFIG.saitama?.boredomMaxStacks || 5;
@@ -1264,6 +1279,11 @@ export class SaitamaFighter extends Fighter {
         // Boredom passive bonus
         const boredomMult = 1 + (this.boredomStacks || 0) * (CONFIG.saitama?.boredomDamagePerStack || 0.15);
 
+        // ── ACCUMULATED DAMAGE MECHANIC ──
+        // Non-final hits: accumulate damage silently (only visual sparks, no HP loss or pushback).
+        // Final hit: release ALL accumulated damage + final slam damage in one devastating blow.
+        if (!this._flurryAccumulatedDamage) this._flurryAccumulatedDamage = 0;
+
         for (const target of targetsToScan) {
           const dist = Math.hypot(target.x - this.x, target.y - this.y);
           if (dist <= maxReach + target.r) {
@@ -1273,12 +1293,14 @@ export class SaitamaFighter extends Fighter {
             while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
             if (Math.abs(angleDiff) <= halfArc) {
-              const baseDmg = isFinalHit ? (CONFIG.saitama?.flurryFinalSlamDamage || 85) : (CONFIG.saitama?.flurryDamage || 24);
-              const finalDamage = Math.round(baseDmg * boredomMult);
-
-              applyDamageToTarget(target, finalDamage, this, { isSkill: true, isMelee: true, isMachineGunBlow: true });
-
               if (isFinalHit) {
+                // ── FINAL BLOW: Release ALL accumulated + final slam damage at once ──
+                const slamDmg = CONFIG.saitama?.flurryFinalSlamDamage || 85;
+                const totalDamage = Math.round((this._flurryAccumulatedDamage + slamDmg) * boredomMult);
+                this._flurryAccumulatedDamage = 0;
+
+                applyDamageToTarget(target, totalDamage, this, { isSkill: true, isMelee: true, isMachineGunBlow: true });
+
                 target.caughtInSaitamaFlurry = false;
                 target.timeStopTimer = 0;
                 target.hitStunTimer = 0;
@@ -1309,22 +1331,11 @@ export class SaitamaFighter extends Fighter {
                   spawnImpactFlash(target.x, target.y, 45, 'default');
                 }
               } else {
-                // Non-final rapid punch: push enemy back a little on each punch
-                const pushbackDist = CONFIG.saitama?.flurryPushbackPerHit ?? 7.0;
-                target.x += Math.cos(angleToTarget) * pushbackDist;
-                target.y += Math.sin(angleToTarget) * pushbackDist;
+                // ── NON-FINAL HIT: Accumulate damage silently, NO pushback ──
+                const baseDmg = CONFIG.saitama?.flurryDamage || 24;
+                this._flurryAccumulatedDamage += baseDmg;
 
-                // Arena clamp for target
-                if (arena) {
-                  const tMinX = arena.x + target.r + 10;
-                  const tMaxX = arena.x + arena.width - target.r - 10;
-                  const tMinY = arena.y + target.r + 10;
-                  const tMaxY = arena.y + arena.height - target.r - 10;
-                  target.x = Math.max(tMinX, Math.min(tMaxX, target.x));
-                  target.y = Math.max(tMinY, Math.min(tMaxY, target.y));
-                }
-
-                // Non-final rapid punch visual feedback
+                // Visual-only sparks feedback (no HP loss, no pushback)
                 if (typeof spawnSparks === 'function') {
                   spawnSparks(target.x, target.y, 6, 'crimson', '#F5C400');
                 }
@@ -1342,6 +1353,7 @@ export class SaitamaFighter extends Fighter {
 
         // Conclude flurry on final hit
         if (isFinalHit) {
+          this._flurryAccumulatedDamage = 0;
           if (this.flurryTarget) {
             this.flurryTarget.caughtInSaitamaFlurry = false;
           }

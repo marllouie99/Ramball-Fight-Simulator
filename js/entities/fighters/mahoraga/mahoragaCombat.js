@@ -116,10 +116,11 @@ export function performMeleeAttack(fighter, opponent) {
     const dy = opponent.y - fighter.y;
     const dz = (opponent.z || 0) - (fighter.z || 0);
     const dist = Math.hypot(dx, dy, dz);
-    const maxReach = fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 20);
+    const maxReach = fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110);
 
     if (dist > maxReach) {
-      return; // Stop/cancel stance attacks if enemy gets out of range
+      fighter.neutralStanceTimer = 0; // Reset stance if target moves outside reach so normal attack AI resumes
+      return;
     }
   }
 
@@ -154,7 +155,7 @@ export function performMeleeAttack(fighter, opponent) {
       audioSystem.playSFX('attack_swordswing', 1.0);
     }
 
-    const range = CONFIG.mahoraga?.swordRange ?? 20;
+    const range = CONFIG.mahoraga?.swordRange || 110;
     const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
     if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
       const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
@@ -225,7 +226,7 @@ export function performMeleeAttack(fighter, opponent) {
   }
 
   // AOE frontal arc damage to ALL targets
-  const range = CONFIG.mahoraga?.swordRange ?? 20;
+  const range = CONFIG.mahoraga?.swordRange || 110;
   const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
   if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
     const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));

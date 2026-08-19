@@ -249,7 +249,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     return skillList;
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
-    const themeColor = f.color || '#F5C400';
+    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || '#FF2A2A';
 
     const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
     const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
@@ -268,7 +268,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     return [
       { id: 'punch',   pct: punchPct,   ready: punchReady,      color: themeColor, label: 'NORMAL PUNCH' },
-      { id: 'punish',  pct: punishPct,  ready: punishPct >= 99,  color: themeColor, label: 'SERIOUS COUNTER' },
+      { id: 'punish',  pct: punishPct,  ready: punishPct >= 99,  color: themeColor, label: 'SERIOUS PUNCH' },
       { id: 'flurry',  pct: flurryPct,  ready: flurryPct >= 99,  color: themeColor, label: 'CONSECUTIVE PUNCHES' }
     ];
   }
@@ -557,7 +557,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
-    const themeColor = '#F5C400';
+    const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || '#FF2A2A';
 
     const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
     const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : 0;

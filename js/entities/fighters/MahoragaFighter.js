@@ -110,6 +110,7 @@ export class MahoragaFighter extends Fighter {
     this.blitzStayTimer = 0;
     this.blitzTotalDuration = 0;
     this.swordTrail = [];
+    this.wallBounceCount = 0;
   }
 
   get goldStages() {
@@ -231,6 +232,7 @@ export class MahoragaFighter extends Fighter {
     this.isThrowing = false;
     this.throwBarrageShotsLeft = 0;
     this.throwBarrageTimer = 0;
+    this.wallBounceCount = 0;
   }
 
   interruptAttacks() {
@@ -478,8 +480,9 @@ export class MahoragaFighter extends Fighter {
     }
 
     if ((opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'))) && !this.adaptedSaitamaCounter) {
-      const slowFrames = CONFIG.saitama?.counterPunchSlowFrames ?? 120;
-      this.saitamaCounterDebuffTimer = slowFrames;
+      // Wheel clicks immediately after the punch lands (tiny beat for impact to register)
+      const adaptDelay = CONFIG.mahoraga?.saitamaCounterAdaptDelay ?? 8; // ~0.13s — near-instant
+      this.saitamaCounterDebuffTimer = adaptDelay;
       this.saitamaCounterAttacker = attacker;
     }
 
@@ -548,7 +551,7 @@ export class MahoragaFighter extends Fighter {
     const opponent = this._bounceTarget || (typeof state !== 'undefined' && state.fighters
       ? state.fighters.find(f => f && f !== this && f.hp > 0)
       : null);
-    const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 20));
+    const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
     const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
 
     if (canAttackUnderCC && !forceCancelAll) {
@@ -568,10 +571,45 @@ export class MahoragaFighter extends Fighter {
     }
   }
 
+  _findClosestEnemy(preferredOpponent = null) {
+    if (preferredOpponent && preferredOpponent !== this && preferredOpponent.hp > 0 && !preferredOpponent.isDead) {
+      return preferredOpponent;
+    }
+    let closest = null;
+    let minDist = Infinity;
+    const myIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : -1;
+    const myTeam = (typeof state !== 'undefined' && state.getFighterTeam) ? state.getFighterTeam(myIndex) : this.team;
+
+    const allTargets = [];
+    if (typeof state !== 'undefined') {
+      if (state.fighters) allTargets.push(...state.fighters);
+      if (state.illusions) allTargets.push(...state.illusions);
+    }
+
+    for (const ent of allTargets) {
+      if (!ent || ent === this || ent.hp <= 0 || ent.isDead || ent.isInvulnerable) continue;
+      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+      if (ent.owner === this) continue;
+      if (myTeam !== null && myTeam !== undefined) {
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && state.getFighterTeam(entIdx) === myTeam) continue;
+        if (ent.team !== undefined && ent.team === myTeam) continue;
+      }
+
+      const dist = Math.hypot(ent.x - this.x, ent.y - this.y);
+      if (dist < minDist) {
+        minDist = dist;
+        closest = ent;
+      }
+    }
+
+    return closest;
+  }
+
   /**
-   * Pure natural physics wall bounce for Mahoraga.
-   * Inverts velocity along collided wall axes with restitution and subtle natural jitter,
-   * with no artificial forward bias or forced teleport towards the opponent.
+   * Resolves arena boundary collisions.
+   * When Mahoraga collides with any arena wall, he triggers a divine flash-dash / teleport
+   * directly towards the enemy with high-speed afterimages and forward momentum.
    */
   resolveWallBounce(arena, opponent = null) {
     if (!arena) return false;
@@ -631,6 +669,66 @@ export class MahoragaFighter extends Fighter {
       bounced = true;
     }
 
+    if (bounced) {
+      this.wallBounceCount = (this.wallBounceCount || 0) + 1;
+
+      // On the 2nd consecutive wall collision, trigger forward dash surge directly toward enemy
+      if (this.wallBounceCount >= 2) {
+        this.wallBounceCount = 0;
+
+        const target = this._findClosestEnemy(opponent || this._bounceTarget);
+        const isTargetGojoInfinity = target && (target.characterId === 'gojo' || target.type === 'gojo') && !target.isMeleeMode && ((target.infinityCooldown || 0) <= 0 || target.infinityActive) && !this.gojoInfinityImmune;
+
+        if (target && !target.isDead && target.hp > 0 && !isTargetGojoInfinity) {
+          const dx = target.x - this.x;
+          const dy = target.y - this.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const angleToTarget = Math.atan2(dy, dx);
+
+          // Turn and face the enemy immediately
+          this.aim(target);
+
+          // Clear any residual knockback/stun so Mahoraga immediately surges into the dash
+          this.knockbackVx = 0;
+          this.knockbackVy = 0;
+          this.knockbackStunTimer = 0;
+          this.swordCooldown = 0;
+
+          // Apply high-speed physical forward dash surge directly toward the target
+          const currentSpeed = Math.hypot(this.vx, this.vy) || this.speed || 6.5;
+          const dashSpeed = Math.max(currentSpeed * 1.5, (this.speed || 6.5) * 1.8, 14.0);
+          this.vx = (dx / dist) * dashSpeed;
+          this.vy = (dy / dist) * dashSpeed;
+
+          // Visual dash burst: impact sparks, flash at wall rebound point, and motion trail afterimages
+          spawnImpactFlash(this.x, this.y, 30, '#FFD700');
+          spawnSparks(this.x, this.y, 12, 'silver', '#FFFFFF');
+          this._spawnTeleportAfterimages(this.x, this.y, this.x + this.vx * 3.5, this.y + this.vy * 3.5, angleToTarget);
+          audioSystem.playSFX('skill_dash5', 0.9);
+
+          // Rate-limited floating text indicator
+          const now = performance.now();
+          if (!this._lastWallBounceDashTime || (now - this._lastWallBounceDashTime > 1500)) {
+            this._lastWallBounceDashTime = now;
+            spawnFloatingText(this.x, this.y - this.r - 25, '⚡ WALL REBOUND DASH!', '#FFD700');
+          }
+
+          // Trigger Hand-to-Hand Blitz Sequence if available
+          const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0);
+          const canTriggerBlitz = !this.isBlitzActive && !this.isInfinityBlitz && !this.isWallSlamActive && !this.isShouting && !this.isCleaving && !this.isThrowing && !isBeamTrapped && (this.blitzCooldownTimer || 0) <= 0;
+          if (canTriggerBlitz) {
+            this.isBlitzActive = true;
+            this.blitzWindupTimer = 2;
+            this.blitzHitsLeft = CONFIG.mahoraga?.blitzHitsCount ?? 10;
+            this.blitzTimer = 0;
+            this.blitzStayTimer = 999;
+            this.blitzTotalDuration = CONFIG.mahoraga?.blitzTotalDurationFrames ?? 150;
+            this.blitzTarget = target;
+          }
+        }
+      }
+    }
+
     return bounced;
   }
 
@@ -641,7 +739,7 @@ export class MahoragaFighter extends Fighter {
       this.aim(opponent);
     }
     if (this.isCaughtInBeam() && !this.adaptedPureLoveBeam && !this.adaptedGenosBeam) {
-      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 20));
+      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
       if (!inMeleeRange) {
         this.interruptAttacks();
         return;
@@ -773,6 +871,16 @@ export class MahoragaFighter extends Fighter {
       (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
     );
 
+    // Saitama Serious Counter adaptation: wheel clicks shortly after the punch lands
+    // MUST tick BEFORE freeze guards — otherwise hit-stun/CC from the punch blocks the timer from counting down!
+    if (this.saitamaCounterDebuffTimer > 0) {
+      this.saitamaCounterDebuffTimer--;
+      if (this.saitamaCounterDebuffTimer <= 0 && this.hp > 0 && !this.isDead && !this.adaptedSaitamaCounter) {
+        adaptToSaitamaCounter(this, this.saitamaCounterAttacker);
+        this.saitamaCounterAttacker = null;
+      }
+    }
+
     const isFrozen = this._handleTimeStop();
     const isInfinityFrozen = handleInfinityFreeze(this);
     const isBeamParalyzed = (
@@ -804,7 +912,7 @@ export class MahoragaFighter extends Fighter {
       const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
       const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
       const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 75));
+      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
       const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
 
       if (!canAttackUnderCC) {
@@ -872,7 +980,7 @@ export class MahoragaFighter extends Fighter {
       const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
       const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
       const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 20));
+      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
       const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
 
       if (!canAttackUnderCC) {
@@ -1252,14 +1360,6 @@ export class MahoragaFighter extends Fighter {
       }
     }
 
-    // Saitama Serious Counter debuff recovery: wheel clicks after Mahoraga recovers from stagger / slow
-    if (this.saitamaCounterDebuffTimer > 0) {
-      this.saitamaCounterDebuffTimer--;
-      if (this.saitamaCounterDebuffTimer <= 0 && this.hp > 0 && !this.isDead && !this.adaptedSaitamaCounter) {
-        adaptToSaitamaCounter(this, this.saitamaCounterAttacker);
-        this.saitamaCounterAttacker = null;
-      }
-    }
 
     const isLevel8 = totalStages >= 8 || this.isMaxAdapted || ((this.goldAdaptationStage?.melee || 0) + (this.goldAdaptationStage?.ranged || 0) + (this.goldAdaptationStage?.skill || 0) >= 8);
 
@@ -1310,7 +1410,7 @@ export class MahoragaFighter extends Fighter {
           this.infinityBlitzTimer = 0;
 
           const distToEnemy = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-          const maxMeleeRange = this.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 20);
+          const maxMeleeRange = this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110);
 
           const reqAttacks = CONFIG.mahoraga?.infinityBlitzAttacksPerTeleport ?? 5;
           const enemyEscaped = distToEnemy > maxMeleeRange;
@@ -1398,7 +1498,7 @@ export class MahoragaFighter extends Fighter {
       }
 
       this.applyMovementPhysics();
-      if (arena) this.resolveWallBounce(arena);
+      if (arena) this.resolveWallBounce(arena, opponent);
       return;
     }
 
@@ -1526,7 +1626,7 @@ export class MahoragaFighter extends Fighter {
         const hitIndex = totalHits - this.blitzHitsLeft;
 
         const distToTarget = Math.hypot(this.x - target.x, this.y - target.y);
-        const maxMeleeDist = CONFIG.mahoraga?.blitzTeleportDistanceThreshold || (this.r + target.r + (CONFIG.mahoraga?.swordRange ?? 20) + 40);
+        const maxMeleeDist = CONFIG.mahoraga?.blitzTeleportDistanceThreshold || (this.r + target.r + (CONFIG.mahoraga?.swordRange || 110) + 40);
         const minStayFrames = CONFIG.mahoraga?.blitzMinStayFrames ?? 20;
 
         const isTargetBlitzing = target && (
@@ -1712,7 +1812,7 @@ export class MahoragaFighter extends Fighter {
 
           this.aim(opponent);
           const damage = CONFIG.mahoraga?.infinityBlitzDamage ?? (CONFIG.mahoraga?.swordDamage ?? 15);
-          const maxDist = (this.r + target.r + (CONFIG.mahoraga?.swordRange ?? 20) + 40) + 50;
+          const maxDist = (this.r + target.r + (CONFIG.mahoraga?.swordRange || 110) + 40) + 50;
           const blitzTargets = this._getFrontRadiusTargets(maxDist, Math.PI * 1.3);
           if (opponent && opponent.hp > 0 && !opponent.isDead && !blitzTargets.includes(opponent)) {
             const dist = Math.hypot(this.x - opponent.x, this.y - opponent.y);
@@ -1764,12 +1864,21 @@ export class MahoragaFighter extends Fighter {
                               (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0;
       if (!isInHitReaction) {
         this.aim(opponent);
+
+        // Natural movement approach steering: Mahoraga tracks and closes in on his target
+        const currentSpeed = Math.hypot(this.vx, this.vy);
+        if (currentSpeed < (this.speed || 6.5)) {
+          const dx = opponent.x - this.x;
+          const dy = opponent.y - this.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          const steerForce = 0.45;
+          this.vx += (dx / dist) * steerForce;
+          this.vy += (dy / dist) * steerForce;
+        }
       }
       const distToOpponent = Math.hypot(this.x - opponent.x, this.y - opponent.y, (this.z || 0) - (opponent.z || 0));
-      const swordRange = CONFIG.mahoraga?.swordRange ?? 20;
+      const swordRange = CONFIG.mahoraga?.swordRange || 110;
       const meleeDist = this.r + opponent.r + swordRange;
-
-
 
       const isEnemyChanneling = (
         opponent.isChanneling ||
@@ -1829,7 +1938,7 @@ export class MahoragaFighter extends Fighter {
 
       // ── AI SKILL DECISION TREE ──
       const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
-      const frontTargetsForAttack = this._getFrontRadiusTargets(CONFIG.mahoraga?.swordRange ?? 20, Math.PI * 1.3);
+      const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, Math.PI * 1.3);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
       const canActSkills = !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz;
 
@@ -1840,11 +1949,9 @@ export class MahoragaFighter extends Fighter {
 
         const shoutTriggerDist = shoutRadius + (opponent.r || 25);
 
-        // Priority 0: Active Close-Quarters Attack-Teleport Stance (Only continues if enemy is within range!)
-        if (this.neutralStanceTimer > 0) {
-          if (this.swordCooldown <= 0 && isAnyTargetInRange) {
-            this._performMeleeAttack(opponent);
-          }
+        // Priority 0: Close-Quarters Proximity Attack (Instantly strikes when in melee contact/reach)
+        if (isAnyTargetInRange && this.swordCooldown <= 0) {
+          this._performMeleeAttack(opponent);
         }
         // Priority 1: Divine Shout (Instant AoE shockwave roar without stopping or windup pause)
         else if (this.shoutCooldown <= 0 && (distToOpponent <= shoutTriggerDist || isEnemyChanneling)) {
@@ -1870,14 +1977,14 @@ export class MahoragaFighter extends Fighter {
             this.throwBarrageTimer = 0;
           }
         }
-        // Priority 4: Standard Sword of Extermination chops & Left off-hand punches
-        else if (this.swordCooldown <= 0 && isAnyTargetInRange) {
+        // Priority 4: Active Close-Quarters Attack-Teleport Stance
+        else if (this.neutralStanceTimer > 0 && this.swordCooldown <= 0 && isAnyTargetInRange) {
           this._performMeleeAttack(opponent);
         }
       }
     }
     this._bounceTarget = opponent; // Store for resolveWallBounce override
-    if (arena) this.resolveWallBounce(arena);
+    if (arena) this.resolveWallBounce(arena, opponent);
   }
 
   triggerDemoAttack() {
