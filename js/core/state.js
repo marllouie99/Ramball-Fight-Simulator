@@ -32,72 +32,96 @@ if (CONFIG.canvasBgColor) {
   }
 }
 
-const pixiApp = new window.PIXI.Application({
-  width: CONFIG.canvasWidth || 540,
-  height: CONFIG.canvasHeight || 960,
-  backgroundColor: parsedBgColor,
-  resolution: window.devicePixelRatio || 1,
-  autoDensity: true,
-  antialias: true
-});
+// Check if PixiJS is loaded (from local libs/pixi.min.js or CDN)
+const hasPixi = typeof window.PIXI !== 'undefined' && typeof window.PIXI.Application === 'function';
 
-// Create scene graph layers to preserve Z-indexing
-const pixiLayers = {
-  background: new window.PIXI.Container(),
-  arena: new window.PIXI.Container(),
-  shadows: new window.PIXI.Container(),
-  environment: new window.PIXI.Container(), // WebGL full-screen dim effects
-  fighters: new window.PIXI.Container(), // Where offscreen 2D canvas sprite goes
-  projectiles: new window.PIXI.Container(), // WebGL hybrid projectiles
-  particles: new window.PIXI.Container(),
-  effects: new window.PIXI.Container(),
-  ui: new window.PIXI.Container()
+let pixiApp = null;
+let pixiLayers = {
+  background: null,
+  arena: null,
+  shadows: null,
+  environment: null,
+  fighters: null,
+  projectiles: null,
+  particles: null,
+  effects: null,
+  ui: null
 };
+let legacyCanvasSprite = null;
 
-// Add layers to stage in correct order
-Object.values(pixiLayers).forEach(layer => pixiApp.stage.addChild(layer));
-
-// Create a Sprite for the entire 2D canvas to sit in the fighters layer
-const legacyCanvasTexture = window.PIXI.Texture.from(canvas);
-const legacyCanvasSprite = new window.PIXI.Sprite(legacyCanvasTexture);
-pixiLayers.fighters.addChild(legacyCanvasSprite);
-
-// Create a separate offscreen canvas for floating texts to ensure they render on top of all WebGL layers
 const floatingTextCanvas = document.createElement('canvas');
 floatingTextCanvas.width = CONFIG.canvasWidth || 540;
 floatingTextCanvas.height = CONFIG.canvasHeight || 960;
 const floatingTextCtx = floatingTextCanvas.getContext('2d');
+let floatingTextSprite = null;
 
-const floatingTextTexture = window.PIXI.Texture.from(floatingTextCanvas);
-const floatingTextSprite = new window.PIXI.Sprite(floatingTextTexture);
-pixiLayers.ui.addChild(floatingTextSprite);
-
-// Create a separate offscreen canvas for top-level UI (HUD, game over, round end, pause) to ensure they render on top of all WebGL layers and projectiles/particles
 const topLevelUiCanvas = document.createElement('canvas');
 topLevelUiCanvas.width = CONFIG.canvasWidth || 540;
 topLevelUiCanvas.height = CONFIG.canvasHeight || 960;
 const topLevelUiCtx = topLevelUiCanvas.getContext('2d');
+let topLevelUiSprite = null;
 
-const topLevelUiTexture = window.PIXI.Texture.from(topLevelUiCanvas);
-const topLevelUiSprite = new window.PIXI.Sprite(topLevelUiTexture);
-pixiLayers.ui.addChild(topLevelUiSprite);
+let baseCircleTexture = null;
+let bloodSquareTexture = null;
 
-// Replace the DOM canvas with Pixi's WebGL canvas
-canvas.parentNode.insertBefore(pixiApp.view, canvas);
-canvas.style.display = 'none'; // Hide the old 2D canvas (used for offscreen rendering only)
+if (hasPixi) {
+  pixiApp = new window.PIXI.Application({
+    width: CONFIG.canvasWidth || 540,
+    height: CONFIG.canvasHeight || 960,
+    backgroundColor: parsedBgColor,
+    resolution: window.devicePixelRatio || 1,
+    autoDensity: true,
+    antialias: true
+  });
 
-// --- GENERATE GLOBAL PIXI TEXTURES FOR PARTICLES ---
-const gCircle = new window.PIXI.Graphics();
-gCircle.beginFill(0xFFFFFF);
-gCircle.drawCircle(16, 16, 16);
-gCircle.endFill();
-const baseCircleTexture = pixiApp.renderer.generateTexture(gCircle);
+  pixiLayers = {
+    background: new window.PIXI.Container(),
+    arena: new window.PIXI.Container(),
+    shadows: new window.PIXI.Container(),
+    environment: new window.PIXI.Container(),
+    fighters: new window.PIXI.Container(),
+    projectiles: new window.PIXI.Container(),
+    particles: new window.PIXI.Container(),
+    effects: new window.PIXI.Container(),
+    ui: new window.PIXI.Container()
+  };
 
-const gSquare = new window.PIXI.Graphics();
-gSquare.beginFill(0xFFFFFF);
-gSquare.drawRect(0, 0, 16, 16); // Crisp pixel square blood droplet (solid white for pure vivid RGB tinting)
-gSquare.endFill();
-const bloodSquareTexture = pixiApp.renderer.generateTexture(gSquare);
+  // Add layers to stage in correct order
+  Object.values(pixiLayers).forEach(layer => pixiApp.stage.addChild(layer));
+
+  // Create a Sprite for the entire 2D canvas to sit in the fighters layer
+  const legacyCanvasTexture = window.PIXI.Texture.from(canvas);
+  legacyCanvasSprite = new window.PIXI.Sprite(legacyCanvasTexture);
+  pixiLayers.fighters.addChild(legacyCanvasSprite);
+
+  const floatingTextTexture = window.PIXI.Texture.from(floatingTextCanvas);
+  floatingTextSprite = new window.PIXI.Sprite(floatingTextTexture);
+  pixiLayers.ui.addChild(floatingTextSprite);
+
+  const topLevelUiTexture = window.PIXI.Texture.from(topLevelUiCanvas);
+  topLevelUiSprite = new window.PIXI.Sprite(topLevelUiTexture);
+  pixiLayers.ui.addChild(topLevelUiSprite);
+
+  // Replace the DOM canvas with Pixi's WebGL canvas
+  canvas.parentNode.insertBefore(pixiApp.view, canvas);
+  canvas.style.display = 'none'; // Hide the old 2D canvas (used for offscreen rendering only)
+
+  // --- GENERATE GLOBAL PIXI TEXTURES FOR PARTICLES ---
+  const gCircle = new window.PIXI.Graphics();
+  gCircle.beginFill(0xFFFFFF);
+  gCircle.drawCircle(16, 16, 16);
+  gCircle.endFill();
+  baseCircleTexture = pixiApp.renderer.generateTexture(gCircle);
+
+  const gSquare = new window.PIXI.Graphics();
+  gSquare.beginFill(0xFFFFFF);
+  gSquare.drawRect(0, 0, 16, 16);
+  gSquare.endFill();
+  bloodSquareTexture = pixiApp.renderer.generateTexture(gSquare);
+} else {
+  console.warn('PixiJS is not available. Falling back to native Canvas 2D mode.');
+  canvas.style.display = 'block';
+}
 
 // ─────────────────────────────────────────────
 // GAME STATE — single mutable object

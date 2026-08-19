@@ -9,6 +9,7 @@ import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunc
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
 import { getBasicAttackSound } from '../../../soundEffects/basicAttackSounds.js';
+import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { spawnTeleportAfterimages } from './mahoragaSkills.js';
 
 /**
@@ -97,7 +98,7 @@ export function performMeleeAttack(fighter, opponent) {
     const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
     const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
     const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-    const inMeleeRange = opponent && Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y) < (fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 20));
+    const inMeleeRange = opponent && Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y) < (fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 110));
     
     if (ccTenacity > 0 && inMeleeRange) {
       isParalyzed = false; // Allow attacking under CC!
@@ -115,19 +116,17 @@ export function performMeleeAttack(fighter, opponent) {
     const dy = opponent.y - fighter.y;
     const dz = (opponent.z || 0) - (fighter.z || 0);
     const dist = Math.hypot(dx, dy, dz);
-    const maxReach = fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110);
+    const maxReach = fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 20);
 
     if (dist > maxReach) {
       return; // Stop/cancel stance attacks if enemy gets out of range
     }
   }
 
-
-
-  const attackInterval = CONFIG.mahoraga?.neutralAttackInterval || 20;
-  const attacksPerTeleport = CONFIG.mahoraga?.neutralAttacksPerTeleport || 2;
-  const teleportDelay = CONFIG.mahoraga?.neutralTeleportDelay || 12;
-  const teleportDist = CONFIG.mahoraga?.neutralTeleportDistance || 55;
+  const attackInterval = CONFIG.mahoraga?.neutralAttackInterval ?? 15;
+  const attacksPerTeleport = CONFIG.mahoraga?.neutralAttacksPerTeleport ?? 3;
+  const teleportDelay = CONFIG.mahoraga?.neutralTeleportDelay ?? 5;
+  const teleportDist = CONFIG.mahoraga?.neutralTeleportDistance ?? 100;
 
   // Track stance duration window and cooldown
   const isStanceEnabled = CONFIG.mahoraga?.enableCloseQuartersTeleport !== false;
@@ -135,7 +134,7 @@ export function performMeleeAttack(fighter, opponent) {
 
   // Initialize stance tracking timers when entering stance
   if ((!fighter.neutralStanceTimer || fighter.neutralStanceTimer <= 0) && !isStanceOnCooldown) {
-    fighter.neutralStanceTimer = CONFIG.mahoraga?.neutralStanceDurationFrames || 180;
+    fighter.neutralStanceTimer = CONFIG.mahoraga?.neutralStanceDurationFrames ?? 200;
     fighter.neutralStanceAttackCount = 0;
   }
 
@@ -155,7 +154,7 @@ export function performMeleeAttack(fighter, opponent) {
       audioSystem.playSFX('attack_swordswing', 1.0);
     }
 
-    const range = CONFIG.mahoraga?.swordRange || 110;
+    const range = CONFIG.mahoraga?.swordRange ?? 20;
     const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
     if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
       const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
@@ -163,7 +162,7 @@ export function performMeleeAttack(fighter, opponent) {
         frontTargets.push(opponent);
       }
     }
-    const damage = CONFIG.mahoraga?.swordDamage || 25;
+    const damage = CONFIG.mahoraga?.swordDamage ?? 15;
     const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
     const knockbackChance = Math.min(0.65, 0.40 + totalStages * 0.04);
     const isPunch = (fighter.attackCount % 5 === 0);
@@ -176,7 +175,7 @@ export function performMeleeAttack(fighter, opponent) {
       const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
 
       if (rollKnockback) {
-        const kbForce = 18.0;
+        const kbForce = CONFIG.mahoraga?.heavyPunchKnockbackForce ?? 18.0;
         t.vx = (t.vx || 0) + Math.cos(pushAngle) * kbForce;
         t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
         t.x += Math.cos(pushAngle) * (kbForce * 0.35);
@@ -226,7 +225,7 @@ export function performMeleeAttack(fighter, opponent) {
   }
 
   // AOE frontal arc damage to ALL targets
-  const range = CONFIG.mahoraga?.swordRange || 110;
+  const range = CONFIG.mahoraga?.swordRange ?? 20;
   const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
   if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
     const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
@@ -234,7 +233,7 @@ export function performMeleeAttack(fighter, opponent) {
       frontTargets.push(opponent);
     }
   }
-  const damage = CONFIG.mahoraga?.swordDamage || 25;
+  const damage = CONFIG.mahoraga?.swordDamage ?? 15;
   const totalStagesStance = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const knockbackChanceStance = Math.min(0.65, 0.40 + totalStagesStance * 0.04);
   const isPunchStance = (fighter.attackCount % 7 === 0);
@@ -247,7 +246,7 @@ export function performMeleeAttack(fighter, opponent) {
     const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
 
     if (rollKnockbackStance) {
-      const kbForce = 18.0;
+      const kbForce = CONFIG.mahoraga?.heavyPunchKnockbackForce ?? 18.0;
       t.vx = (t.vx || 0) + Math.cos(pushAngle) * kbForce;
       t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
       t.x += Math.cos(pushAngle) * (kbForce * 0.35);
@@ -320,7 +319,7 @@ export function performMeleeAttack(fighter, opponent) {
     fighter.dashFromY = oldY;
     fighter.dashToX = teleX;
     fighter.dashToY = teleY;
-    const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+    const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
     fighter.adaptationDashTimer = dashFrames;
     fighter.adaptationDashTarget = opponent;
     fighter.adaptationDashIsCounter = false;
@@ -342,8 +341,8 @@ export function executeCleave(fighter, opponent) {
   triggerGlobalScreenShake(8, 15);
   audioSystem.playSFX('attack_swordswing', 0.9);
 
-  const cleaveRadius = CONFIG.mahoraga?.cleaveRadius || 150;
-  const damage = CONFIG.mahoraga?.cleaveDamage || 40;
+  const cleaveRadius = CONFIG.mahoraga?.cleaveRadius ?? 150;
+  const damage = CONFIG.mahoraga?.cleaveDamage ?? 40;
 
   const facingAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
   const arcX = fighter.x + Math.cos(facingAngle) * (cleaveRadius * 0.4);
@@ -380,8 +379,8 @@ export function executeCleave(fighter, opponent) {
 export function shootBladeBarrage(fighter, ownerIndex) {
   if (!projectileSystem) return;
 
-  const throwDamage = CONFIG.mahoraga?.throwDamage || 14;
-  const throwSpeed = CONFIG.mahoraga?.throwSpeed || 25;
+  const throwDamage = CONFIG.mahoraga?.throwDamage ?? 14;
+  const throwSpeed = CONFIG.mahoraga?.throwSpeed ?? 20;
 
   const spreadAngle = (Math.random() - 0.5) * (CONFIG.mahoraga?.throwSpreadAngle || 0.28);
   const customAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : 0) + spreadAngle;
@@ -521,7 +520,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
 
     const startX = fighter.wallSlamGrabStartX;
     const startY = fighter.wallSlamGrabStartY;
-    const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames || 35;
+    const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
     const grabDist = 140; // Mahoraga lunges from this distance
 
     const shoulderOffsetX = Math.cos(angle + Math.PI / 2) * (fighter.r * 0.20);
@@ -559,7 +558,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       target.y = Math.max(minY, Math.min(maxY, fighter.y + Math.sin(angle) * (fighter.r + target.r + 32) + shoulderOffsetY));
 
       const liftProgress = Math.min(1.0, (fighter.wallSlamTimer - 12) / (holdFrames - 12));
-      target.z = liftProgress * (CONFIG.mahoraga?.wallSlamImpaleLiftHeight || 35);
+      target.z = liftProgress * (CONFIG.mahoraga?.wallSlamImpaleLiftHeight ?? 35);
     }
 
     target.vx = 0;
@@ -603,7 +602,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     target.isGrabbedByMahoraga = true;
     if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
 
-    if (fighter.wallSlamTimer >= (CONFIG.mahoraga?.wallSlamPunchHitpause || 8)) { // After frames of punch hitpause, throw them!
+    const hitpause = CONFIG.mahoraga?.wallSlamPunchHitpause ?? 15;
+    if (fighter.wallSlamTimer >= hitpause) { // After frames of punch hitpause, throw them!
       fighter.wallSlamPhase = 'throw';
       fighter.wallSlamTimer = 0;
       target.isGrabbedByMahoraga = false;
@@ -630,7 +630,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       fighter.aim({ x: target.x + Math.cos(wallAngle) * 100, y: target.y + Math.sin(wallAngle) * 100 });
 
       // Hurl opponent at supersonic throw speed towards the chosen wall
-      const throwSpeed = CONFIG.mahoraga?.wallSlamThrowSpeed || 48.0;
+      const throwSpeed = CONFIG.mahoraga?.wallSlamThrowSpeed ?? 45.0;
       fighter.wallSlamTargetVelX = Math.cos(wallAngle) * throwSpeed;
       fighter.wallSlamTargetVelY = Math.sin(wallAngle) * throwSpeed;
 
@@ -672,7 +672,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       target.vy = 0;
 
       // Deal heavy wall impact damage
-      const impactDamage = CONFIG.mahoraga?.wallSlamImpactDamage || 35;
+      const impactDamage = CONFIG.mahoraga?.wallSlamImpactDamage ?? 20;
       if (typeof target.takeDamage === 'function') {
         target.takeDamage(impactDamage, fighter, { isMelee: true, isWallSlam: true, isParalyzed: true });
       }
@@ -681,7 +681,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       spawnImpactFlash(target.x, target.y, 75, '#FFEE58');
 
       // APPLY PARALYZE STUN (freeze & hitstun on wall contact!)
-      const paralyzeDuration = CONFIG.mahoraga?.wallSlamParalyzeDuration || 90;
+      const paralyzeDuration = CONFIG.mahoraga?.wallSlamParalyzeDuration ?? 150;
       if (typeof target.applyHitStun === 'function') target.applyHitStun(paralyzeDuration);
       target.paralyzeTimer = paralyzeDuration;
       target.isParalyzedByMahoraga = true;
@@ -717,7 +717,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     fighter.vx = 0;
     fighter.vy = 0;
 
-    const standoffFrames = CONFIG.mahoraga?.wallSlamMenacingStandoff || 40;
+    const standoffFrames = CONFIG.mahoraga?.wallSlamMenacingStandoff ?? 50;
     if (fighter.wallSlamTimer >= standoffFrames) { // Wait before dashing
       fighter.wallSlamPhase = 'dash';
       fighter.wallSlamTimer = 0;
@@ -746,7 +746,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     fighter.swordCombo = 1;
 
     // Deal initial follow-up execution damage
-    const followupDamage = CONFIG.mahoraga?.wallSlamFollowupDamage || 25;
+    const followupDamage = CONFIG.mahoraga?.wallSlamFollowupDamage ?? 25;
     target.takeDamage(followupDamage, fighter, { isMelee: true, isCritical: true });
 
     const angle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
@@ -767,12 +767,12 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     // Smoothly transition and force-trigger his rapid H2H Blitz flurry on the paralyzed target!
     fighter.isBlitzActive = true;
     fighter.isWallSlamBlitz = true; // Tag this blitz as originating from Wall Slam for speed line rendering
-    fighter.wallSlamBlitzInterval = CONFIG.mahoraga?.wallSlamBlitzHitInterval || 5;
+    fighter.wallSlamBlitzInterval = CONFIG.mahoraga?.wallSlamBlitzHitInterval ?? 10;
     fighter.blitzWindupTimer = 0; // Start flurry instantly without windup delay
-    fighter.blitzHitsLeft = CONFIG.mahoraga?.wallSlamBlitzHitsCount || 14;
+    fighter.blitzHitsLeft = CONFIG.mahoraga?.wallSlamBlitzHitsCount ?? 10;
     fighter.blitzTimer = 0;
     fighter.blitzStayTimer = 999;
-    fighter.blitzTotalDuration = CONFIG.mahoraga?.wallSlamBlitzDuration || 120;
+    fighter.blitzTotalDuration = CONFIG.mahoraga?.wallSlamBlitzDuration ?? 120;
     fighter.blitzTarget = target;
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'EXECUTION FLURRY!', '#FFD700');
   }
@@ -787,6 +787,10 @@ export function executeShout(fighter, opponent, ownerIndex) {
   const shoutKnockback = CONFIG.mahoraga?.shoutKnockback || 18;
 
   triggerGlobalScreenShake(10, 20);
+  
+  // Play heavy ground impact and shockwave burst SFX
+  playSkillEffectSound('mahoraga', 'shout');
+  audioSystem.playSFX('attack_groundsmash', 1.8);
   audioSystem.playSFX('attack_explosion', 0.85);
 
   // Spawn the improved Concentric Gold/Silver Shockwave and Outward Spark Burst

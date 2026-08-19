@@ -201,6 +201,18 @@ export function drawFighters() {
     if (!a.f) return -1;
     if (!b.f) return 1;
 
+    // Target of ambush / counter MUST always render underneath the ambush/counter attacker
+    const aIsTarget = a.f.isTargetOfAmbush;
+    const bIsTarget = b.f.isTargetOfAmbush;
+    if (aIsTarget && !bIsTarget) return -1;
+    if (!aIsTarget && bIsTarget) return 1;
+
+    // Ambush, Serious Counter, or Flurry attacker MUST always render on top of their targets
+    const aIsCountering = (a.f._counterPunchTimer && a.f._counterPunchTimer > 0) || (a.f.isAmbushing) || (a.f.isFlurrying);
+    const bIsCountering = (b.f._counterPunchTimer && b.f._counterPunchTimer > 0) || (b.f.isAmbushing) || (b.f.isFlurrying);
+    if (aIsCountering && !bIsCountering) return 1;
+    if (!aIsCountering && bIsCountering) return -1;
+
     // Force active domain expansions to the top layer
     const aDomain = a.f.domainActive;
     const bDomain = b.f.domainActive;
@@ -218,7 +230,9 @@ export function drawFighters() {
       (f.redEffectTimer && f.redEffectTimer > 0) ||
       (f.lapisBlueAnimTimer && f.lapisBlueAnimTimer > 0) ||
       (f.cleaveCutTimer && f.cleaveCutTimer > 0) ||
-      (f.fugaTimer && f.fugaTimer > 0)
+      (f.fugaTimer && f.fugaTimer > 0) ||
+      (f._counterPunchTimer && f._counterPunchTimer > 0) ||
+      (f.isFlurrying)
     );
     const aPunching = isAttacking(a.f);
     const bPunching = isAttacking(b.f);

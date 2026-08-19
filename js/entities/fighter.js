@@ -198,6 +198,22 @@ export class Fighter {
     } catch (e) {}
   }
 
+  /** Check if another fighter/entity is on the same team. */
+  isTeammate(other) {
+    if (!other || other === this) return false;
+    if (this.team !== undefined && other.team !== undefined && this.team === other.team) return true;
+    if (typeof state !== 'undefined' && state && typeof state.getFighterTeam === 'function' && state.fighters) {
+      const myIdx = state.fighters.indexOf(this);
+      const otherIdx = state.fighters.indexOf(other);
+      if (myIdx !== -1 && otherIdx !== -1) {
+        const myTeam = state.getFighterTeam(myIdx);
+        const otherTeam = state.getFighterTeam(otherIdx);
+        if (myTeam !== null && otherTeam !== null && myTeam === otherTeam) return true;
+      }
+    }
+    return false;
+  }
+
   /** Restores all dynamic values to their initial states. */
   reset() {
     const d = this._def;
@@ -330,6 +346,7 @@ export class Fighter {
       (this.pureLoveBeamRecoveryTimer || 0) > 0 ||
       (this.caughtInGenosBeamTimer || 0) > 0 ||
       this.caughtInGenosFlurry ||
+      this.caughtInSaitamaFlurry ||
       (this.caughtInLaserBeamTimer || 0) > 0 ||
       (this.caughtInLaylaBeamTimer || 0) > 0 ||
       this.isCaughtInPurple ||

@@ -11,6 +11,7 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 function isTeleportDisabled(fighter) {
   if (!fighter) return false;
+  if (fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return true;
   const caughtInBeam = fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
   return caughtInBeam && !fighter.adaptedPureLoveBeam;
 }
@@ -86,7 +87,7 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
   fighter.dashFromY = fromY;
   fighter.dashToX = toX;
   fighter.dashToY = toY;
-  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
   fighter.adaptationDashTimer = dashFrames;
   fighter.adaptationDashTarget = gojo;
   fighter.adaptationDashIsCounter = false;
@@ -128,7 +129,7 @@ export function gojoRedTeleportDodge(fighter, gojo) {
   fighter.dashFromY = fromY;
   fighter.dashToX = toX;
   fighter.dashToY = toY;
-  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
   fighter.adaptationDashTimer = dashFrames;
   fighter.adaptationDashTarget = gojo;
   fighter.adaptationDashIsCounter = false;
@@ -150,7 +151,7 @@ export function spawnTeleportAfterimages(fighter, oldX, oldY, newX, newY, custom
   if (!fighter.adaptationAfterimages) fighter.adaptationAfterimages = [];
   const dist = Math.hypot(newX - oldX, newY - oldY);
   const steps = Math.max(3, Math.floor(dist / 14));
-  const lifetime = CONFIG.mahoraga?.afterimageLifetimeFrames || 14;
+  const lifetime = CONFIG.mahoraga?.afterimageLifetimeFrames ?? 12;
 
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -218,7 +219,7 @@ export function startAdaptationFlashDash(fighter, attacker) {
   fighter.dashToX = toX;
   fighter.dashToY = toY;
   const speedMult = fighter.isInfinityBlitz ? (CONFIG.mahoraga?.infinityBlitzTeleportSpeedMultiplier ?? 0.05) : 1.0;
-  const baseDashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const baseDashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
   const dashFrames = Math.max(1, Math.round(baseDashFrames * speedMult));
   fighter.adaptationDashMaxTimer = dashFrames;
   fighter.adaptationDashTimer = dashFrames;
@@ -303,7 +304,7 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
   fighter.dashFromY = fromY;
   fighter.dashToX = toX;
   fighter.dashToY = toY;
-  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
   fighter.adaptationDashTimer = dashFrames;
   fighter.adaptationDashTarget = sukuna;
   fighter.adaptationDashIsCounter = false;
@@ -406,7 +407,7 @@ export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
   fighter.dashFromY = fromY;
   fighter.dashToX = toX;
   fighter.dashToY = toY;
-  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames || 4;
+  const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
   fighter.adaptationDashTimer = dashFrames;
   fighter.adaptationDashTarget = attacker;
   fighter.adaptationDashIsCounter = false;

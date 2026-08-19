@@ -870,6 +870,11 @@ export class NanamiFighter extends Fighter {
       isSkill: true,
       isMelee: true,
       isTrueDamage: true, // Always True Damage per specification!
+      isRatioCrit: true,
+      isNanamiPause: true,
+      bypassShield: true,
+      undodgeable: true,
+      bypassEvade: true,
       knockback: knockbackForce,
       knockbackAngle: this.gunAngle
     });
@@ -1208,8 +1213,14 @@ export class NanamiFighter extends Fighter {
           // Primary Target: Guaranteed 7:3 Critical Damage (95 True Damage) & 0.5s hit-stun (30 frames)
           const critDamage = cfg.lungeCritDamage || 95;
           applyDamageToTarget(ent, critDamage, this, {
+            isSkill: true,
             isMelee: true,
             isTrueDamage: true,
+            isRatioCrit: true,
+            isNanamiPause: true,
+            bypassShield: true,
+            undodgeable: true,
+            bypassEvade: true,
             noBlood: true,
             suppressBlood: true,
             knockback: cfg.lungeKnockback || 16,
@@ -1463,6 +1474,11 @@ export class NanamiFighter extends Fighter {
     applyDamageToTarget(target, finalDmg, this, {
       isMelee: true,
       isTrueDamage: isRatioCrit || isTargetMahito,
+      isRatioCrit: isRatioCrit,
+      isNanamiPause: isRatioCrit,
+      bypassShield: isRatioCrit,
+      undodgeable: isRatioCrit,
+      bypassEvade: isRatioCrit,
       noBlood: isRatioCrit,
       suppressBlood: isRatioCrit,
       knockback: (cfg.cleaverKnockback || 14) * (isOvertime ? 1.2 : 1.0),

@@ -248,6 +248,29 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     return skillList;
   }
+  if (f.characterId === 'saitama' || f.type === 'saitama') {
+    const themeColor = f.color || '#F5C400';
+
+    const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
+    const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : flurryMax;
+    const flurryPct = f.isFlurrying ? 100 : Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
+
+    const punishMax = CONFIG.saitama?.skillPunishCooldown || 2000;
+    const punishTimer = f.skillPunishCooldown !== undefined ? f.skillPunishCooldown : punishMax;
+    const isExecuting = Boolean((f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || f.isCountering);
+    const punishPct = isExecuting ? 100 : Math.max(0, Math.min(100, (1 - (punishTimer / punishMax)) * 100));
+
+    const maxStacks = CONFIG.saitama?.boredomMaxStacks || 5;
+    const stacks = f.boredomStacks || 0;
+    const boredomPct = (stacks / maxStacks) * 100;
+    const bonusPct = Math.round(stacks * (CONFIG.saitama?.boredomDamagePerStack || 0.15) * 100);
+
+    return [
+      { id: 'punish',  pct: punishPct,  ready: punishPct >= 99,  color: themeColor, label: 'SERIOUS COUNTER' },
+      { id: 'flurry',  pct: flurryPct,  ready: flurryPct >= 99,  color: themeColor, label: 'CONSECUTIVE PUNCHES' },
+      { id: 'boredom', pct: boredomPct, ready: boredomPct >= 99, color: themeColor, label: `BOREDOM: +${bonusPct}%` }
+    ];
+  }
   if (f.characterId === 'layla' || f.type === 'layla') {
     const themeColor = '#00E5FF'; 
     const bombMax = CONFIG.layla?.maleficBombCooldown || 200;
@@ -500,14 +523,52 @@ export function getSkillDataForFighter(f, getProjectiles) {
       { id: 'overtime', pct: overtimePct, ready: overtimeReady,     color: themeColor, label: overtimeLabel }
     ];
   }
+  if (f.characterId === 'nobara' || f.type === 'nobara') {
+    const themeColor = f.color || '#D94E68';
+
+    // Skill 1: Hairpin (Kanzashi)
+    const hairpinMax = f.hairpinCooldownMax || CONFIG.nobara?.hairpinCooldown || 330;
+    const hairpinTimer = f.hairpinCooldown !== undefined ? f.hairpinCooldown : 0;
+    const hairpinPct = Math.max(0, Math.min(100, (1 - (hairpinTimer / hairpinMax)) * 100));
+
+    // Skill 2: Straw Doll Technique: Resonance (Tomonari)
+    const resonanceMax = f.resonanceCooldownMax || CONFIG.nobara?.resonanceCooldown || 600;
+    const resonanceTimer = f.resonanceCooldown !== undefined ? f.resonanceCooldown : 0;
+    let resonancePct = Math.max(0, Math.min(100, (1 - (resonanceTimer / resonanceMax)) * 100));
+    if (f.isResonating) resonancePct = 100;
+
+    // Ultimate: Black Flash: Supreme Resonance
+    const ultMax = f.ultimateCooldownMax || CONFIG.nobara?.ultimateCooldown || 1920;
+    const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
+    let ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+    if (f.isBlitzing) ultPct = 100;
+
+    // Passive Gauge: Unflinching Ecstasy
+    const isEcstasy = Boolean(f.isEcstasyActive || ((f.hp / (f.maxHp || 400)) <= 0.50));
+    const ecstasyPct = isEcstasy ? 100 : Math.max(0, Math.min(100, (1 - (f.hp / (f.maxHp || 400))) * 200));
+    const ecstasyLabel = isEcstasy ? 'ECSTASY (ACTIVE)' : 'BATTLE FOCUS';
+
+    return [
+      { id: 'hairpin',   pct: hairpinPct,   ready: hairpinPct >= 99,   color: themeColor, label: 'KANZASHI (HAIRPIN)' },
+      { id: 'resonance', pct: resonancePct, ready: resonancePct >= 99, color: themeColor, label: 'RESONANCE' },
+      { id: 'blitz',     pct: ultPct,       ready: ultPct >= 99,       color: themeColor, label: 'BLACK FLASH' },
+      { id: 'ecstasy',   pct: ecstasyPct,   ready: isEcstasy,          color: themeColor, label: ecstasyLabel }
+    ];
+  }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
     const themeColor = '#F5C400';
+
+    const flurryMax = CONFIG.saitama?.flurryCooldown || 540;
+    const flurryTimer = f.flurryCooldown !== undefined ? f.flurryCooldown : 0;
+    const flurryPct = Math.max(0, Math.min(100, (1 - (flurryTimer / flurryMax)) * 100));
+
     const skillMax = CONFIG.saitama?.skillPunishCooldown || 2000;
     const skillTimer = f.skillPunishCooldown !== undefined ? f.skillPunishCooldown : 0;
     const skillPct = Math.max(0, Math.min(100, (1 - (skillTimer / skillMax)) * 100));
 
     return [
-      { id: 'counter', pct: skillPct, ready: skillPct >= 99, color: themeColor, label: 'Serious Punch' }
+      { id: 'flurry',  pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'CONSECUTIVE NORMAL PUNCHES' },
+      { id: 'counter', pct: skillPct,  ready: skillPct >= 99,  color: themeColor, label: 'SERIOUS COUNTER' }
     ];
   }
   if (f.characterId === 'genos' || f.type === 'genos') {

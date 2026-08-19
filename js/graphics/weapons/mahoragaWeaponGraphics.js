@@ -753,7 +753,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     const isRightArmTurn = (shotsLeft % 2 === 0);
     
     if (isRightArmTurn && fighterObj) {
-      const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 5;
+      const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 10;
       const t = (fighterObj.throwBarrageTimer || 0) / interval;
       const p = Math.sin(t * Math.PI); // Smooth 0 -> 1 -> 0 lunge
       
@@ -766,7 +766,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
   } else if (fighterObj && fighterObj.isWallSlamActive && (fighterObj.wallSlamPhase === 'post_throw_delay' || fighterObj.wallSlamPhase === 'dash')) {
     let p = 1.0;
     if (fighterObj.wallSlamPhase === 'post_throw_delay') {
-      const standoffDuration = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.wallSlamStandoffDuration) || 40;
+      const standoffDuration = (typeof CONFIG !== 'undefined' && (CONFIG.mahoraga?.wallSlamStandoffDuration || CONFIG.mahoraga?.wallSlamMenacingStandoff)) || 50;
       p = Math.min(1.0, (fighterObj.wallSlamTimer || 0) / standoffDuration);
     }
     const easeP = p * p * (3 - 2 * p); // Smooth ease-in-out transition
@@ -796,7 +796,7 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
     const opponentObj = state.fighters?.find(f => f && f !== fighterObj && f.hp > 0);
     if (opponentObj) {
       verticalLift = opponentObj.z || 0;
-      const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames || 35;
+      const holdFrames = CONFIG.mahoraga?.wallSlamImpaleHoldFrames ?? 50;
       const liftP = Math.min(1.0, Math.max(0.0, (fighterObj.wallSlamTimer - 12) / (holdFrames - 12)));
       liftTilt = -0.22 * liftP; // Upward tilt of arm (approx -12 degrees)
     }
@@ -976,7 +976,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
     const shotsLeft = fighter.throwBarrageShotsLeft || 0;
     const isLeftArmTurn = (shotsLeft % 2 === 1);
     if (isLeftArmTurn) {
-      const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 5;
+      const interval = (typeof CONFIG !== 'undefined' && CONFIG.mahoraga?.throwBarrageInterval) || 10;
       const t = (fighter.throwBarrageTimer || 0) / interval;
       lungeProgress = Math.sin(t * Math.PI); // Smooth 0 -> 1 -> 0 lunge
     }

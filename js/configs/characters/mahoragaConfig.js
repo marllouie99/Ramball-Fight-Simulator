@@ -10,8 +10,8 @@ export const mahoragaConfig = {
     enableGoldenScreenDim: true,     // Toggle on/off the dark golden cinematic screen dimming overlay on wheel rotation
     goldenDimOpacity: 0.92,          // Maximum opacity of the golden dimming screen overlay (high darkness cinematic contrast)
     wheelClickDuration: 25,          // Frame duration for 1-spoke wheel click rotation animation & flare (smaller = faster rotation e.g. 10; larger = slower rotation e.g. 40)
-    swordRange: 20,                 // Melee range for Sword of Extermination
-    swordCooldown: 60,              // Frames between sword strikes (1 second at 60fps)
+    swordRange: 110,                // Melee reach (110px frontal arc) for Sword of Extermination
+    swordCooldown: 30,              // Frames between sword strikes (1 second at 60fps)
     swordDamage: 15,                // True damage dealt by Sword of Extermination
     cleaveCooldown: 600,            // 10 seconds cooldown for Active AoE Cleave
     cleaveRadius: 150,              // Range of the AoE Cleave
@@ -97,6 +97,16 @@ export const mahoragaConfig = {
     parryMaxChance: 0.75,             // Maximum parry/block chance cap (75%)
     parryDurationFrames: 25,          // Duration (frames) of snappy blade parry pose
     guardDurationFrames: 60,          // Duration (frames) of crossed-arm face guard pose
+    parryDeflectionPushForce: 5.5,    // Pushback force applied to attacker upon blade parry
+    guardDeflectionPushForce: 4.0,    // Pushback force applied to attacker upon guard block
+    parryDeflectionRecoilForce: 2.0,  // Recoil force applied to Mahoraga upon blade parry
+    guardDeflectionRecoilForce: 1.5,  // Recoil force applied to Mahoraga upon guard block
+
+    // Counter & Melee Knockback Physics
+    teleportCounterDamage: 22,        // Damage dealt by Stage 2+ Teleport Adaptation counter strike
+    heavyPunchKnockbackForce: 18.0,   // Knockback force for heavy off-hand punch impacts
+    adaptationStrikeKnockbackForce: 42.0, // Knockback launch force for Adaptation Strike counter
+    blitzKineticKnockbackForce: 16.0, // Knockback force for random kinetic punch procs during blitz
 
     // Level 8 Wall Slam Throw Mechanics
     wallSlamImpaleLiftHeight: 35,      // Visual height (z-axis) when opponent is lifted on sword
@@ -106,8 +116,13 @@ export const mahoragaConfig = {
     wallSlamImpactDamage: 20,          // Damage taken upon slamming into the wall
     wallSlamParalyzeDuration: 150,      // Duration (frames) opponent is paralyzed after hitting the wall
     wallSlamMenacingStandoff: 50,      // Delay (frames) Mahoraga waits before dashing to the paralyzed opponent
+    wallSlamStandoffDuration: 50,      // Alias for menacing standoff duration (visual sync)
     wallSlamFollowupDamage: 25,        // Damage dealt on the initial execution strike upon reaching the wall-pinned target
     wallSlamBlitzHitsCount: 10,        // Total rapid hits in the Wall Slam execution flurry
     wallSlamBlitzHitInterval: 10,       // Frame interval between each rapid hit during Wall Slam flurry (smaller = faster)
     wallSlamBlitzDuration: 120,        // Total duration (frames) of the Wall Slam execution flurry
+
+    // Divine Shout Audio
+    shoutSFX: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+    shoutVolume: 2.2,
 };

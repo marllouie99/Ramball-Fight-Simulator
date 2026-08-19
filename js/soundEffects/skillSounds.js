@@ -356,6 +356,16 @@ export const SKILL_SOUNDS = {
       src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
       volume: 0.7,
       delay: 0
+    },
+    shout: {
+      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      volume: 2.2,
+      delay: 0
+    },
+    divineshout: {
+      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      volume: 2.2,
+      delay: 0
     }
   },
   // ── Genos ─────────────────────────────

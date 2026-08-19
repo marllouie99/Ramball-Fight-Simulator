@@ -156,6 +156,16 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 1.5,
       speed: 1.0,
     },
+    shout: {
+      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      volume: 2.2,
+      speed: 1.0,
+    },
+    shout_impact: {
+      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+      volume: 1.8,
+      speed: 1.0,
+    },
     punch: {
       src: [
         'Assets/Sound Effects/Attacks/heavypunch1.mp3',

@@ -388,6 +388,131 @@ export function drawGenosSpeedLines() {
   ctx.restore();
 }
 
+// ──────────────────────────────────────────
+// DRAW — MANGA ACTION SPEED LINES CLUSTER (Saitama Consecutive Normal Punches)
+// ──────────────────────────────────────────
+let _saitamaSpeedLineSeeds = null;
+
+function _initSaitamaSpeedLineSeeds() {
+  _saitamaSpeedLineSeeds = [];
+  const totalLines = 24;
+
+  for (let i = 0; i < totalLines; i++) {
+    const norm = (i / (totalLines - 1)) * 2 - 1; // -1.0 to +1.0
+    // Compact perpendicular distribution matching Saitama's body size (~70px total width)
+    const perpOffset = norm * 36 + (Math.random() - 0.5) * 6;
+    
+    // Manga speed line length (center ~100px, edges ~40px)
+    const normDist = 1 - Math.abs(norm);
+    const len = 40 + normDist * 60 + Math.random() * 15;
+    
+    // Sharp needle thickness (1.0px to 2.3px max)
+    const maxThick = 1.0 + normDist * 1.3 + Math.random() * 0.4;
+
+    // Movement speed along direction
+    const speed = 16 + Math.random() * 10;
+    const phase = Math.random() * 120;
+
+    // 4-slot character theme palette (Rule #16)
+    let color;
+    if (i % 4 === 0) color = 'rgba(245, 196, 0, 0.95)';       // Saitama Bright Yellow
+    else if (i % 4 === 1) color = 'rgba(255, 235, 148, 0.95)'; // Hero Suit Cream Gold
+    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White-hot core
+    else color = 'rgba(200, 0, 0, 0.90)';                     // Crimson Glove Accent
+
+    _saitamaSpeedLineSeeds.push({
+      perpOffset,
+      len,
+      maxThick,
+      speed,
+      phase,
+      color
+    });
+  }
+}
+
+export function drawSaitamaSpeedLines() {
+  if (!state.fighters) return;
+  const saitamaFighter = state.fighters.find(f => {
+    if (!f || f.hp <= 0 || (f.characterId !== 'saitama' && f.type !== 'saitama')) return false;
+    // Hide speed lines when frozen, time-stopped, hit-stunned, or ambushed
+    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush ||
+                     (f.electricStunTimer > 0) || (f.dubstepStunTimer > 0) || (f.isFrozenByInfinity);
+    if (isFrozen) return false;
+    return f.isFlurrying;
+  });
+  if (!saitamaFighter) return;
+
+  const ctx = state.ctx;
+  if (!ctx) return;
+
+  const activeState = saitamaFighter.isFlurrying ? 'flurry' : false;
+  if (!activeState) return;
+
+  if (saitamaFighter._lastSpeedLineState !== activeState) {
+    _saitamaSpeedLineSeeds = null;
+  }
+  saitamaFighter._lastSpeedLineState = activeState;
+
+  if (!_saitamaSpeedLineSeeds) _initSaitamaSpeedLineSeeds();
+
+  const lineAngle = saitamaFighter.gunAngle !== undefined ? saitamaFighter.gunAngle : (saitamaFighter.angle || 0);
+
+  const cosA = Math.cos(lineAngle);
+  const sinA = Math.sin(lineAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  const cx = saitamaFighter.x;
+  const cy = saitamaFighter.y;
+  const now = Date.now();
+
+  ctx.save();
+
+  for (let i = 0; i < _saitamaSpeedLineSeeds.length; i++) {
+    const seed = _saitamaSpeedLineSeeds[i];
+    // Travel in the BACKWARD direction (opposite to punch aim) — lines stream behind Saitama
+    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 100);
+    
+    // Cluster centered slightly BEHIND Saitama (opposite punch direction)
+    const backOffset = 30;
+    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+
+    const halfLen = seed.len / 2;
+    const halfThick = seed.maxThick / 2;
+
+    // Needle polygon points: sharp start point, top mid, sharp end point, bot mid
+    const midOff = halfLen * 0.15;
+    
+    const startX = lineCenterX - cosA * halfLen;
+    const startY = lineCenterY - sinA * halfLen;
+
+    const midX = lineCenterX + cosA * midOff;
+    const midY = lineCenterY + sinA * midOff;
+
+    const endX = lineCenterX + cosA * halfLen;
+    const endY = lineCenterY + sinA * halfLen;
+
+    const topMidX = midX + perpX * halfThick;
+    const topMidY = midY + perpY * halfThick;
+
+    const botMidX = midX - perpX * halfThick;
+    const botMidY = midY - perpY * halfThick;
+
+    ctx.fillStyle = seed.color;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(topMidX, topMidY);
+    ctx.lineTo(endX, endY);
+    ctx.lineTo(botMidX, botMidY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
 export function drawUltimateChannelingTexts() {
   const ctx = state.ctx;
   const fighters = state.fighters;
@@ -886,6 +1011,7 @@ export function drawTodoTakadaIdolScreenOverlay() {
   let todoFighter = null;
   let yutaFighter = null;
   let isMahitoDomainActive = false;
+  let isSaitamaSeriousPunchActive = false;
   const fighters = state.fighters;
   for (let i = 0; i < fighters.length; i++) {
     const f = fighters[i];
@@ -897,6 +1023,13 @@ export function drawTodoTakadaIdolScreenOverlay() {
       yutaFighter = f;
     } else if (charId === 'mahito' && f.domainActive) {
       isMahitoDomainActive = true;
+    } else if (charId === 'saitama' && (
+      (f._counterPunchTimer && f._counterPunchTimer > 0) ||
+      (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) ||
+      f.isChargingSeriousPunch ||
+      f.isCountering
+    )) {
+      isSaitamaSeriousPunchActive = true;
     }
   }
 
@@ -921,8 +1054,8 @@ export function drawTodoTakadaIdolScreenOverlay() {
   ctx.save();
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
-  // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain is active so domain visual & dim are not overlayed)
-  if (!isMahitoDomainActive) {
+  // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain OR Saitama's Serious Punch is active so domain/punch visuals & dim are not overlayed)
+  if (!isMahitoDomainActive && !isSaitamaSeriousPunchActive) {
     if (!_cachedOverlayGrad || _cachedGradW !== screenW || _cachedGradH !== screenH) {
       _cachedGradW = screenW;
       _cachedGradH = screenH;

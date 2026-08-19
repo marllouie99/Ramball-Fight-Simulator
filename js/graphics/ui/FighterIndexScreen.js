@@ -806,6 +806,11 @@ function drawIndexDetailScreen() {
     animBtns.push(
       { id: 'incinerate', label: '🔥 Incinerate' }
     );
+  } else if (def.type === 'saitama') {
+    animBtns.push(
+      { id: 'flurry', label: '🥊 Punches' },
+      { id: 'counter', label: '💥 Counter' }
+    );
   } else {
     animBtns.push(
       { id: 'ability', label: `✨ ${(def.ability || 'Ability').slice(0, 10)}` }
@@ -836,6 +841,8 @@ function drawIndexDetailScreen() {
       else if (btn.id === 'domain' && def.type === 'gojo') audioSystem.playSFX('skill_gojodomain', 5.0);
       else if (btn.id === 'fuga') audioSystem.playSFX('skill_fuga', 3.5);
       else if (btn.id === 'domain' && def.type === 'sukuna') audioSystem.playSFX('skill_domainexpansion', 5.5);
+      else if (btn.id === 'flurry' && def.type === 'saitama') audioSystem.playSFX('skill_dash3', 1.0);
+      else if (btn.id === 'counter' && def.type === 'saitama') audioSystem.playSFX(CONFIG.saitama?.counterPunchVoiceSFX || 'Assets/Sound Effects/Skills/saitama-seriouspunch-voiceline.mp3', 3.0);
       else if (btn.id === 'flurry') audioSystem.playSFX('skill_spinslash', 2.0);
       else if (btn.id === 'spear') audioSystem.playSFX('attack_swordswing', 1.0);
       else if (btn.id === 'stealth') audioSystem.playSFX('skill_dash5', 1.0);

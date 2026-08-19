@@ -148,8 +148,9 @@ export class MusashiFighter extends Fighter {
       return false; 
     }
 
-    // Void Stance: 100% dodge chance (unless time stopped or stunned)
-    if (this.currentStance === 'void' && !(this.timeStopTimer > 0) && !(this.electricStunTimer > 0)) {
+    // Void Stance: 100% dodge chance (unless guaranteed hit, time stopped or stunned)
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
+    if (this.currentStance === 'void' && !isGuaranteedHit && !(this.timeStopTimer > 0) && !(this.electricStunTimer > 0)) {
       if (Math.random() < CONFIG.musashi.voidDodgeChance) {
         spawnFloatingText(this.x, this.y - this.r - 5, 'DODGE', '#8a2be2');
         return false;

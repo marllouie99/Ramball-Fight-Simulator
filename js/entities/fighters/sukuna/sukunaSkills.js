@@ -112,17 +112,13 @@ export function fireDivineFlame(fighter, ownerIndex) {
 }
 
 export function activateReverseCursedTechnique(fighter, attacker) {
+  if (fighter.isDead) return;
   fighter.reverseCursedTechniqueCooldown = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700;
 
   const healPercent = CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.25;
   const healAmount = fighter.maxHp * healPercent;
 
-  if (fighter.hp <= 0) {
-    fighter.hp = healAmount;
-    fighter.isDead = false;
-  } else {
-    fighter.hp = Math.min(fighter.maxHp, fighter.hp + healAmount);
-  }
+  fighter.hp = Math.min(fighter.maxHp, Math.max(fighter.hp, 0) + healAmount);
 
   fighter.rctVisualMaxTimer = 150;
   fighter.rctVisualTimer = 150;

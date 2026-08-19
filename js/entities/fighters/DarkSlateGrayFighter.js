@@ -140,7 +140,8 @@ export class DarkSlateGrayFighter extends Fighter {
     // still occasionally trigger stealth/dodge mode without becoming
     // nearly immune to the flamethrower.
     const flameDodgeChance = Math.max(0.08, CONFIG.darkslategray.dodgeChance * 0.6);
-    const isDodgeable = (opts.isProjectile || opts.isMelee);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
+    const isDodgeable = (opts.isProjectile || opts.isMelee) && !isGuaranteedHit;
 
     // Block dodge/flash-step if inside Cronos's sphere
     const insideCronosSphere = this._isInsideCronosSphere();

@@ -286,14 +286,21 @@ export function resolveFighterCollision(a, b) {
     return;
   }
 
-  const aIsFlurrying = a.isFlurrying || b.caughtInGenosFlurry;
-  const bIsFlurrying = b.isFlurrying || a.caughtInGenosFlurry;
+  const aIsFlurrying = a.isFlurrying || b.caughtInGenosFlurry || b.caughtInSaitamaFlurry;
+  const bIsFlurrying = b.isFlurrying || a.caughtInGenosFlurry || a.caughtInSaitamaFlurry;
 
   const aIsYutaBeam = a.isChannelingPureLoveBeam || a.isFiringPureLoveBeam;
   const bIsYutaBeam = b.isChannelingPureLoveBeam || b.isFiringPureLoveBeam;
 
-  const aIsImmovable = a.isTurret || aIsFlurrying || aIsYutaBeam || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
-  const bIsImmovable = b.isTurret || bIsFlurrying || bIsYutaBeam || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
+  const aIsAmbushLocked = a.isTargetOfAmbush || (a._counterPunchTimer && a._counterPunchTimer > 0);
+  const bIsAmbushLocked = b.isTargetOfAmbush || (b._counterPunchTimer && b._counterPunchTimer > 0);
+
+  if (aIsAmbushLocked && bIsAmbushLocked) {
+    return; // Neither moves or bounces during ambush/counter execution
+  }
+
+  const aIsImmovable = a.isTurret || aIsFlurrying || aIsYutaBeam || aIsAmbushLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0);
+  const bIsImmovable = b.isTurret || bIsFlurrying || bIsYutaBeam || bIsAmbushLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0);
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -315,6 +322,9 @@ export function resolveFighterCollision(a, b) {
     if (typeof a.resolveWallBounce === 'function') a.resolveWallBounce(state.arena);
     if (typeof b.resolveWallBounce === 'function') b.resolveWallBounce(state.arena);
   }
+
+  // Prevent bounce impulse during ambush/counter execution
+  if (aIsAmbushLocked || bIsAmbushLocked) return;
 
   // Only apply impulse if fighters are moving toward each other
   const dvx = b.vx - a.vx;

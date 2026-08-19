@@ -25,6 +25,7 @@ export class SukunaFighter extends Fighter {
     // Reverse Cursed Technique (Passive)
     this.reverseCursedTechniqueCooldown = 0;
     this.reverseCursedTechniqueTriggered = false;
+    this.hasUsedRCTRevival = false;
 
     // Martial Arts combo counter for close distance basic attack
     this.martialArtsComboCount = 0;
@@ -155,6 +156,7 @@ export class SukunaFighter extends Fighter {
 
     this.reverseCursedTechniqueCooldown = CONFIG.sukuna.reverseCursedTechniqueCooldown || 700;
     this.reverseCursedTechniqueTriggered = false;
+    this.hasUsedRCTRevival = false;
     this.martialArtsComboCount = 0;
 
     // Start round in Ranged Mode first
@@ -295,24 +297,51 @@ export class SukunaFighter extends Fighter {
       this.meleeModeCooldown = 0;
     }
 
-    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready)
+    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready, disabled on guaranteed hits / Nanami 7:3 Ratio crit)
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
-    if (!this.isTargetOfAmbush && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
+    if (!this.isTargetOfAmbush && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.sukuna.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage
     }
 
+    // Snapshot HP before damage so the overpowering check is accurate
+    const hpBefore = this.hp;
+
     const result = super.takeDamage(amount, attacker, opts);
 
-    // Check for Reverse Cursed Technique trigger on fatal hit or low HP
-    if (!opts.isHeal && this.reverseCursedTechniqueCooldown <= 0 && !this.isDead) {
+    // Fatal Overpowering Override (matching Gojo):
+    // If the attack is a sure kill (opts.isSaitamaCounter, opts.isSeriousPunch, or amount >= hpBefore fatal one-shot),
+    // RCT is overwhelmed and does NOT trigger/revive.
+    const isOverpoweredKill = (amount >= hpBefore) || Boolean(opts.isSaitamaCounter) || Boolean(opts.isSeriousPunch);
+
+    // Emergency RCT Revival check on fatal damage (once per match, matching Gojo)
+    if (!this.hasUsedRCTRevival && this.hp <= 0 && amount > 0 && !opts.isStorm && !opts.isHeal) {
+      if (isOverpoweredKill) {
+        // Hit was strong enough to kill him outright (e.g. Saitama counter) — no revival
+        return result;
+      }
+
+      this.hasUsedRCTRevival = true;
+      this.isDead = false;
+      this.hp = Math.max(1, this.maxHp * (CONFIG.sukuna?.rctRevivalHealPercent || CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.25));
+      this.invincibilityTimer = 60; // 1.0s invincibility during emergency revival
+      this._activateReverseCursedTechnique(attacker);
+      if (typeof spawnFloatingText === 'function') {
+        spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 45, 'RCT REVIVAL!', '#00FF66');
+      }
+      return false; // Prevent death
+    }
+
+    // Low-HP RCT Healing Auto-Trigger (Non-fatal)
+    if (!opts.isHeal && !isOverpoweredKill && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
       const threshold = CONFIG.sukuna.reverseCursedTechniqueHpThreshold || 0.30;
       const hpPercent = this.hp / this.maxHp;
 
-      // Trigger if HP drops below threshold OR if this was a fatal hit
-      if ((hpPercent <= threshold && hpPercent > 0) || (this.hp <= 0 && amount > 0)) {
+      // Trigger if HP drops below threshold
+      if (hpPercent <= threshold && hpPercent > 0) {
         this._activateReverseCursedTechnique(attacker);
       }
     }

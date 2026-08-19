@@ -229,7 +229,8 @@ export class TojiFighter extends Fighter {
     if (this.isDead || this.hp <= 0) return false;
 
     // Stealth & Ultimate Dodge Chance: physically dodge incoming projectiles while in stealth or during ultimate
-    const isDodgeable = opts.isProjectile && !opts.isTrueDamage;
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
+    const isDodgeable = opts.isProjectile && !opts.isTrueDamage && !isGuaranteedHit;
     let dodgeChance = CONFIG.toji?.stealthDodgeChance || 0.10;
     if (this.ultimateActive) {
       dodgeChance *= (CONFIG.toji?.ultimateDodgeMultiplier || 3.0);

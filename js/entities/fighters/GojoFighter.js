@@ -278,17 +278,24 @@ export class GojoFighter extends Fighter {
       this.meleeModeCooldown = 0;
     }
 
-    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled when targeted by Toji's ambush or trapped in Pure Love Beam!)
+    // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled on guaranteed hits, Toji ambush, or Pure Love Beam)
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
     const isTargetOfAmbush = (attacker && attacker.isAmbushing) || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (this.isTargetOfAmbush === true) || (this.caughtInPureLoveBeam === true);
-    if (!isTargetOfAmbush && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.10) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm && !opts.isPureLoveBeam) {
+    if (!isTargetOfAmbush && !isGuaranteedHit && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.10) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm && !opts.isPureLoveBeam) {
       this._executeTeleportDodge(attacker, CONFIG.arena);
       this.dodgeCooldown = CONFIG.gojo.teleportDodgeCooldown ?? 90; // 1.5 second cooldown between dodges
       return false; // Negate damage
     }
 
     // Check Infinity Passive first (Domain sure-hit & bypassShield attacks bypass Limitless Infinity, self-damage cannot trigger Infinity)
-    // Toji Fushiguro (ISOH lore exception): Inverted Spear of Heaven always pierces Limitless Infinity — skip block entirely
+    // Toji Fushiguro (ISOH lore exception), Nanami 7:3 Ratio strike & Saitama Serious Counter: pierces Limitless Infinity — skip block entirely
     const isToji = attacker && (attacker.characterId === 'toji' || attacker.type === 'toji');
+    const isSaitamaCountering = attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama') &&
+      ((attacker._counterPunchTimer && attacker._counterPunchTimer > 0) ||
+       (attacker._counterWindupTimer && attacker._counterWindupTimer > 0) ||
+       (attacker._postCounterRecoveryTimer && attacker._postCounterRecoveryTimer > 0) ||
+       opts.isCounter ||
+       attacker.isCountering);
     const isAttackerChannelingDomain = attacker && (attacker.isChannelingDomain || attacker.isChannelingDomainExpansion);
     const isDomainChanneling = this.isDomainPreSlide || this.isChannelingDomainExpansion;
     const isBreatherState = (this.purpleRecoveryTimer || 0) > 0 || (this.purpleRetreatTimer || 0) > 0;
@@ -298,7 +305,7 @@ export class GojoFighter extends Fighter {
       this.isMeleeMode = false;
     }
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && f.hp > 0);
-    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !isToji && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
+    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !isToji && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
@@ -319,9 +326,9 @@ export class GojoFighter extends Fighter {
 
     // Emergency RCT Revival check on fatal damage (once per match)
     // FATAL OVERRIDE: If the single hit alone was enough to kill Gojo (amount >= his HP before the hit),
-    // the attack is too powerful — RCT is overwhelmed and he dies properly.
+    // or if the attack is a sure kill (Saitama counter / Serious punch), RCT is overwhelmed and he dies properly.
     if (!this.hasUsedRCTRevival && this.hp <= 0 && amount > 0 && !opts.isStorm && !opts.isHeal) {
-      if (amount >= hpBefore) {
+      if (amount >= hpBefore || opts.isSaitamaCounter || opts.isSeriousPunch) {
         // Hit was strong enough to kill him outright — no revival
         return result;
       }
@@ -341,7 +348,7 @@ export class GojoFighter extends Fighter {
     // Low-HP RCT Healing Auto-Trigger
     // The cooldown sentinel is set immediately inside _activateReverseCursedTechnique before any logic runs,
     // so back-to-back hits in the same frame cannot double-trigger.
-    if (!opts.isHeal && (CONFIG.gojo?.enableRCTHeal !== false) && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
+    if (!opts.isHeal && !opts.isSaitamaCounter && !opts.isSeriousPunch && (CONFIG.gojo?.enableRCTHeal !== false) && (this.reverseCursedTechniqueCooldown || 0) <= 0 && !this.isDead && this.hp > 0) {
       const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
       if (this.hp / this.maxHp <= threshold) {
         const opponent = attacker || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
@@ -1579,6 +1586,14 @@ export class GojoFighter extends Fighter {
       // Toji & Domain channelers explicitly bypass Infinity
       if (entity.type === 'toji' || entity.characterId === 'toji') continue;
       if (entity.isChannelingDomain || entity.isChannelingDomainExpansion) continue;
+
+      // Saitama during Serious Skill Counter explicitly bypasses Infinity
+      const isSaitamaCountering = (entity.type === 'saitama' || entity.characterId === 'saitama') &&
+        ((entity._counterPunchTimer && entity._counterPunchTimer > 0) ||
+         (entity._counterWindupTimer && entity._counterWindupTimer > 0) ||
+         (entity._postCounterRecoveryTimer && entity._postCounterRecoveryTimer > 0) ||
+         entity.isCountering);
+      if (isSaitamaCountering) continue;
 
       // Adapted Mahoraga bypasses Infinity
       const totalMahoragaStages = entity.adaptationStage ? ((entity.adaptationStage.melee || 0) + (entity.adaptationStage.ranged || 0) + (entity.adaptationStage.skill || 0)) : 0;

@@ -557,12 +557,8 @@ function updateHealthHud() {
         const stanceName = f.currentStance === 1 ? 'ICHI NO TACHI' : f.currentStance === 2 ? 'NI NO TACHI' : 'SAN NO TACHI';
         info.push(`<b>Stance:</b> ${stanceName}`);
       } else if (f.characterId === 'saitama' || f.type === 'saitama') {
-        const dodgeRate = Math.round((f.dodgeChance !== undefined ? f.dodgeChance : (CONFIG.saitama?.dodgeChance ?? 0.99)) * 100);
-        info.push(`<b>Dodge Chance:</b> ${dodgeRate}%`);
-        info.push(`<b>Push-ups:</b> 100`);
-        info.push(`<b>Sit-ups:</b> 100`);
-        info.push(`<b>Squats:</b> 100`);
-        info.push(`<b>Run:</b> 10 km`);
+        const dodgeRate = Math.round((f.dodgeChance !== undefined ? f.dodgeChance : (CONFIG.saitama?.dodgeChance ?? 0.95)) * 100);
+        info.push(`<b>DODGE:</b> ${dodgeRate}%`);
       } else if (f.characterId === 'genos' || f.type === 'genos') {
         const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
         const baseSpd = (f.baseSpeed || CONFIG.genos?.moveSpeed || 5.2) * modeMult;
@@ -605,7 +601,7 @@ function updateHealthHud() {
         }
 
         const totalStages = (f.adaptationStage?.melee || 0) + (f.adaptationStage?.ranged || 0) + (f.adaptationStage?.skill || 0);
-        const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.10;
+        const rctPerStage = CONFIG.mahoraga?.rctRegenPerStage || 0.03;
         const currentRegenRate = totalStages * rctPerStage;
         const currentRegenPerSec = Math.round(currentRegenRate * 60);
 
@@ -622,7 +618,7 @@ function updateHealthHud() {
         }
 
         // DEF (Damage Reduction) stat
-        const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent || 0.05;
+        const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent || 0.01;
         const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent || 0.50;
         const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
         const defPercent = Math.round(defReduction * 100);
@@ -633,8 +629,8 @@ function updateHealthHud() {
         }
 
         // CC (Stun/Paralyze/Slow Resistance) stat
-        const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.05;
-        const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.40;
+        const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
+        const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
         const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
         const tenacityPercent = Math.round(ccTenacity * 100);
         if (tenacityPercent > 0) {
@@ -781,7 +777,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>Push-ups:</b>') || line.includes('<b>Sit-ups:</b>') || line.includes('<b>Squats:</b>') || line.includes('<b>Run:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>Regen:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>Regen:</b>'));
     }
     if (info.length === 0) return '';
     

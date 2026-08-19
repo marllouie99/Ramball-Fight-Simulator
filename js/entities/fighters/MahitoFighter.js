@@ -1069,7 +1069,8 @@ export class MahitoFighter extends Fighter {
         swordCooldown: 9999,
         takeDamage(amount, attacker, opts = {}) {
           // Dodge chance ONLY applies while active in small clone state
-          if (this.isEvasionMinion && !this.isDying && !opts?.bypassEvade) {
+          const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts?.bypassEvade);
+          if (this.isEvasionMinion && !this.isDying && !isGuaranteedHit) {
             const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
             if (Math.random() < dodgeChance) {
               const now = Date.now();
@@ -1277,8 +1278,9 @@ export class MahitoFighter extends Fighter {
 
   takeDamage(amount, attacker, opts = {}) {
     // Dodge chance ONLY works while actively in small clone evasion state!
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts?.bypassEvade);
     const isActivelyInCloneState = Boolean(this.isEvading && (this.evasionTimer || 0) > 0);
-    if (isActivelyInCloneState && !opts?.bypassEvade) {
+    if (isActivelyInCloneState && !isGuaranteedHit) {
       const dodgeChance = CONFIG.mahito?.evasion?.dodgeChance ?? 0.60;
       if (Math.random() < dodgeChance) {
         const now = Date.now();

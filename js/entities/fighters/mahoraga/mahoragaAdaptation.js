@@ -86,10 +86,16 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
     finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Soul Disfigurement!
   }
 
+  // ── 50% Damage Reduction when Adapted to Saitama's Serious Counter ──
+  const isSaitamaCounterHit = opts.isSaitamaCounter || (opts.isCounter && attacker && (attacker.characterId === 'saitama' || attacker.type === 'saitama'));
+  if (isSaitamaCounterHit && fighter.adaptedSaitamaCounter) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Saitama's Serious Counter!
+  }
+
   // ── General Defense Buff per Wheel Click ──
-  // Each wheel click (adaptation stage) increases defense by 5% (reduces incoming damage by 5% per stage), capped at 50%.
-  const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent || 0.05;
-  const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent || 0.50;
+  // Each wheel click (adaptation stage) increases defense by defBuffPerClickPercent (reduces incoming damage), capped at maxDefBuffPercent.
+  const defBuffPerStage = CONFIG.mahoraga?.defBuffPerClickPercent ?? 0.01;
+  const maxDefBuff = CONFIG.mahoraga?.maxDefBuffPercent ?? 0.50;
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const defReduction = Math.min(maxDefBuff, totalStages * defBuffPerStage);
   finalAmount *= (1.0 - defReduction);
@@ -107,7 +113,7 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   // ── ROLLING SHARED FATAL DAMAGE ACCUMULATION WHEEL CLICK (General System) ──
   if (!fighter.isInfinityBlitz) {
     let windowFrames  = CONFIG.mahoraga?.fatalAdaptWindowFrames   ?? 400;
-    let thresholdPct  = CONFIG.mahoraga?.fatalDamageThresholdPct  ?? 0.08;
+    let thresholdPct  = CONFIG.mahoraga?.fatalDamageThresholdPct  ?? 0.15;
     const adaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
 
     // Check specific fighter config
@@ -326,7 +332,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   }
   
   const goldStage = fighter.goldAdaptationStage[type] || 0;
-  const speedBoostPerStage = CONFIG.mahoraga?.adaptationSpeedBoostPerStage || 0.10;
+  const speedBoostPerStage = CONFIG.mahoraga?.adaptationSpeedBoostPerStage ?? 0.15;
   const speedBoostPct = Math.round((goldStage * speedBoostPerStage) * 100);
 
   const totalStages = (fighter.adaptationStage.melee || 0) + (fighter.adaptationStage.ranged || 0) + (fighter.adaptationStage.skill || 0);
@@ -337,7 +343,7 @@ export function triggerAdaptation(fighter, type, attacker) {
 
   // Discrete 45-degree step click & cinematic pause on every adaptation (no stage limits!)
   const isInfinityAdaptation = fighter.gojoInfinityImmune && fighter._lastGojoHitType === 'infinity';
-  const pauseFrames = isInfinityAdaptation ? 0 : 40;
+  const pauseFrames = isInfinityAdaptation ? 0 : (CONFIG.mahoraga?.wheelClickDuration ?? 25);
   fighter.adaptationPauseTimer = pauseFrames;
   fighter.adaptationPauseMax = pauseFrames;
   fighter.wheelGlowTimer = 65;
@@ -368,7 +374,7 @@ export function triggerAdaptation(fighter, type, attacker) {
   triggerGlobalScreenShake(6, 18);
 
   // Global Cooldown and Accumulation Resets
-  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 300;
+  fighter.fatalAdaptCooldown = CONFIG.mahoraga?.fatalAdaptCooldownFrames ?? 30;
   fighter.totalAccumDamage = 0;
   fighter.accumTimer = 0;
 
@@ -642,7 +648,7 @@ export function adaptToPureLoveBeam(fighter) {
 
   fighter.wheelGlowColor = adaptColor;
   fighter.wheelGlowTimer = 65;
-  const pauseFrames = 40;
+  const pauseFrames = CONFIG.mahoraga?.wheelClickDuration ?? 25;
   fighter.adaptationPauseTimer = pauseFrames;
   fighter.adaptationPauseMax = pauseFrames;
   fighter.wheelClickTimer = pauseFrames;
@@ -695,7 +701,7 @@ export function adaptToPureLoveBeam(fighter) {
     }
 
     // Activate Close-Quarters Attack-Teleport Stance
-    fighter.neutralStanceTimer = CONFIG.mahoraga?.neutralStanceDurationFrames || 180;
+    fighter.neutralStanceTimer = CONFIG.mahoraga?.neutralStanceDurationFrames ?? 200;
     fighter.neutralStanceCooldownTimer = 0;
     fighter.neutralStanceAttackCount = 0;
 
@@ -735,7 +741,7 @@ export function adaptToYutaFlurry(fighter) {
 
   fighter.wheelGlowColor = adaptColor;
   fighter.wheelGlowTimer = 65;
-  const pauseFrames = 40;
+  const pauseFrames = CONFIG.mahoraga?.wheelClickDuration ?? 25;
   fighter.adaptationPauseTimer = pauseFrames;
   fighter.adaptationPauseMax = pauseFrames;
   fighter.wheelClickTimer = pauseFrames;
@@ -788,7 +794,7 @@ export function adaptToThinIceBreaker(fighter) {
 
   fighter.wheelGlowColor = adaptColor;
   fighter.wheelGlowTimer = 65;
-  const pauseFrames = 40;
+  const pauseFrames = CONFIG.mahoraga?.wheelClickDuration ?? 25;
   fighter.adaptationPauseTimer = pauseFrames;
   fighter.adaptationPauseMax = pauseFrames;
   fighter.wheelClickTimer = pauseFrames;
@@ -847,7 +853,7 @@ export function adaptToSoulDisfigurement(fighter) {
 
   fighter.wheelGlowColor = adaptColor;
   fighter.wheelGlowTimer = 65;
-  const pauseFrames = 40;
+  const pauseFrames = CONFIG.mahoraga?.wheelClickDuration ?? 25;
   fighter.adaptationPauseTimer = pauseFrames;
   fighter.adaptationPauseMax = pauseFrames;
   fighter.wheelClickTimer = pauseFrames;
@@ -878,10 +884,69 @@ export function adaptToSoulDisfigurement(fighter) {
   applyRCTHeal(fighter);
 }
 
+/**
+ * Adapt Mahoraga to Saitama's Serious Skill Counter (Teleport Behind Punch).
+ * - Triggers wheel click when Mahoraga recovers from Saitama's counter stagger / slow debuff.
+ * - Grants 50% damage reduction on Serious Counter hits.
+ * - Wheel sphere glows fiery crimson red (#FF3300).
+ */
+export function adaptToSaitamaCounter(fighter, attacker) {
+  if (!fighter || fighter.hp <= 0 || fighter.isDead) return;
+  if (fighter.adaptedSaitamaCounter) return; // Already adapted
+
+  fighter.adaptedSaitamaCounter = true;
+  if (!fighter.adaptedSkills) fighter.adaptedSkills = {};
+  fighter.adaptedSkills['saitamaCounter'] = true;
+
+  if (!fighter.adaptationStage) fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+  fighter.adaptationStage.skill = (fighter.adaptationStage.skill || 0) + 1;
+  if (!fighter.goldAdaptationStage) fighter.goldAdaptationStage = { melee: 0, ranged: 0, skill: 0 };
+  fighter.goldAdaptationStage.skill = (fighter.goldAdaptationStage.skill || 0) + 1;
+
+  const adaptColor = '#FF3300'; // Fiery Crimson Red
+
+  if (!fighter.gojoAdaptColorHistory) fighter.gojoAdaptColorHistory = [];
+  if (!fighter.gojoAdaptColorHistory.includes(adaptColor)) {
+    fighter.gojoAdaptColorHistory.push(adaptColor);
+  }
+
+  fighter.wheelGlowColor = adaptColor;
+  fighter.wheelGlowTimer = 65;
+  const pauseFrames = CONFIG.mahoraga?.wheelClickDuration ?? 25;
+  fighter.adaptationPauseTimer = pauseFrames;
+  fighter.adaptationPauseMax = pauseFrames;
+  fighter.wheelClickTimer = pauseFrames;
+  fighter.wheelClickMax = pauseFrames;
+  fighter.wheelStartRotation = fighter.wheelRotation || 0;
+  fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  if (typeof state !== 'undefined' && state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f !== fighter && f.hp > 0) {
+        f.mahoragaAdaptationFreezeTimer = pauseFrames;
+        f.vx = 0;
+        f.vy = 0;
+      }
+    });
+  }
+
+  playSkillEffectSound('mahoraga', 'wheelclick');
+  triggerGlobalScreenShake(6, 18);
+
+  const wheelY = fighter.y - fighter.r - 28;
+  spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: SERIOUS COUNTER!', adaptColor);
+  spawnFloatingText(fighter.x, wheelY - 52, '🛡️ Adapted to Saitama\'s Serious Strike!', '#FFFFFF');
+
+  spawnImpactFlash(fighter.x, fighter.y, 50, 'lightningTrail');
+  spawnSparks(fighter.x, fighter.y, 25, 'arcane', adaptColor);
+
+  applyRCTHeal(fighter);
+}
+
 function applyRCTHeal(fighter) {
   const enableRCT = CONFIG.mahoraga?.enableRCTHeal ?? true;
   if (enableRCT && fighter.hp > 0 && !fighter.isDead) {
-    const flatHeal = CONFIG.mahoraga?.rctHealFlatAmount ?? 35;
+    const flatHeal = CONFIG.mahoraga?.rctHealFlatAmount ?? 100;
     const healAmount = Math.max(1, Math.round(flatHeal));
     fighter.takeDamage(-healAmount, fighter, { isHeal: true });
 

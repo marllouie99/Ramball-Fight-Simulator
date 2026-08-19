@@ -14,6 +14,7 @@ import { genosConfig } from '../configs/characters/genosConfig.js?v=4';
 import { ichigoConfig } from '../configs/characters/ichigoConfig.js?v=4';
 import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js?v=4';
+import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 
@@ -23,6 +24,7 @@ export const CONFIG = {
   genos: genosConfig,
   mahito: mahitoConfig,
   nanami: nanamiConfig,
+  nobara: nobaraConfig,
   gojo: gojoConfig,
   sukuna: sukunaConfig,
   yuta: yutaConfig,
@@ -1256,6 +1258,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Ratio Technique (7:3)',
     desc: 'Wields a cloth-wrapped blunt cleaver. Passive: 7:3 Ratio Technique deals guaranteed True Damage critical strikes and fractures enemy defense. Enters Overtime under 40% HP or after 25s for a 120% cursed energy surge.',
+  },
+  {
+    id: 32,
+    name: 'Nobara Kugisaki',
+    category: 'Anime',
+    color: '#D94E68', // Deep Rose Crimson
+    startX: 300, startY: 250,
+    startVx: 1.1, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'nobara',
+    hp: 400,
+    damage: 24,
+    cooldown: 42,
+    moveSpeed: 5.4,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Straw Doll Technique',
+    desc: 'Wields a steel claw hammer and cursed nails. Embeds nails in enemies and environment. Passive: Unflinching Ecstasy surges under 50% HP. Skill 1: Hairpin detonates all active nails. Skill 2: Resonance pierces soul across any distance.',
   }
 ];
 

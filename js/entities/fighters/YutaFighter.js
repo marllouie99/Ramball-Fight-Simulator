@@ -1215,8 +1215,9 @@ export class YutaFighter extends Fighter {
     const maxCd = this.meleeCooldownMax;
     const isSwinging = (this.meleeCooldown > maxCd - 15);
 
-    // Ignore unblockable damage types (including Gojo's purple orb)
-    const unblockable = opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
+    // Ignore unblockable damage types (including Gojo's purple orb & Nanami 7:3 Ratio Crit)
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield);
+    const unblockable = isGuaranteedHit || opts.isPoison || opts.isBurn || opts.isFlame || opts.fromBlackHole || opts.isRed || opts.isPurpleDPS || (opts.projectile && (opts.projectile.type === 'purple' || opts.projectile.isGojoPurple));
 
     const isGuarding = this.blockPoseTimer > 0;
     const blockChance = this.getParryChance();
@@ -1362,8 +1363,8 @@ export class YutaFighter extends Fighter {
     this.blockPoseTimer = 0; // Guard is broken/dropped on hit!
 
     // Check for fatal blow to trigger RCT Revival
-    if (!this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0) {
-      if (this.hp - amount <= 0 && this.hp > 0) {
+    if (!this.hasUsedRCTRevival && this.invincibilityTimer <= 0 && amount > 0 && !opts.isSaitamaCounter && !opts.isSeriousPunch && !opts.isStorm && !opts.isHeal) {
+      if (amount < this.hp && this.hp - amount <= 0 && this.hp > 0) {
         this.hasUsedRCTRevival = true;
         const duration = CONFIG.yuta.rctRevivalDuration || 150; // 2.5 seconds by default
         this.rctRevivalTimer = duration;

@@ -109,8 +109,13 @@
     });
   </script>
 
-  <!-- PixiJS WebGL Engine -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"></script>
+  <!-- PixiJS WebGL Engine (Offline-ready local bundle with CDN fallback) -->
+  <script src="libs/pixi.min.js"></script>
+  <script>
+    if (typeof window.PIXI === 'undefined') {
+      document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"><\/script>');
+    }
+  </script>
 
   <script type="module" src="js/core/main.js?v=77"></script>
 </body>

@@ -70,7 +70,7 @@ export function initRika(fighter) {
       this.hitFlashTimer = 12;
 
       if (opts && (opts.isWallSlam || opts.isParalyzed)) {
-        const stunDur = CONFIG.mahoraga?.wallSlamParalyzeDuration || 90;
+        const stunDur = CONFIG.mahoraga?.wallSlamParalyzeDuration ?? 150;
         this.hitStunTimer = Math.max(this.hitStunTimer || 0, stunDur);
         this.paralyzeTimer = stunDur;
         this.isParalyzedByMahoraga = true;
