@@ -27,10 +27,24 @@ export const mahoragaConfig = {
     afterimageLifetimeFrames: 12,    // Lifetime frames for teleport afterimage ghosts (12 frames = ~0.20s)
     adaptationDashSpeedFrames: 10,   // Supersonic flash-dash travel frame duration (smaller = faster)
 
-    // ── Sword of Extermination (Melee) ──
+    // ── Sword of Extermination & Basic Melee Attacks ──
     swordRange: 110,                // Melee reach (110px frontal arc) for Sword of Extermination
-    swordCooldown: 30,              // Frames between sword strikes (0.5s at 60fps)
+    swordCooldown: 50,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 15,                // True damage dealt by Sword of Extermination
+    swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
+    swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation
+    punchAnimFrames: 18,            // Duration (frames) of off-hand heavy punch animation
+    punchFrequencyStance: 7,        // Every Nth basic attack is a heavy punch inside stance
+    punchFrequencyNormal: 5,        // Every Nth basic attack is a heavy punch outside stance
+    punchBaseKnockbackChance: 0.40, // Base chance (40%) for heavy punch to trigger explosive knockback
+    punchKnockbackChancePerStage: 0.04, // +4% knockback chance per adaptation stage
+    punchMaxKnockbackChance: 0.65,  // Maximum knockback chance cap (65%)
+    punchHitStunFrames: 16,         // Hit stun frames applied to targets hit by heavy punch knockback
+    swordHitStunFrames: 8,          // Hit stun frames applied to targets hit by normal sword strikes
+    swordBasePushForce: 4.0,        // Normal pushback velocity for basic strikes
+    heavyPunchKnockbackForce: 18.0, // Knockback force for heavy off-hand punch impacts
+    sakugaImpactDurationFrames: 8,  // Duration (frames) of Sakuga anime impact frame on sword combo hits
+    approachSteerForce: 0.45,       // Approach steering force towards opponent in melee combat
 
     // ── Blade Parry & Guard Mechanics ──
     parryChancePerStage: 0.08,       // +8% parry/block chance per gold adaptation stage
@@ -82,7 +96,7 @@ export const mahoragaConfig = {
     // ── Neutral Close-Quarters Attack-Teleport Stance ──
     enableCloseQuartersTeleport: true, // Toggle on/off close-quarters teleporting
     neutralAttacksPerTeleport: 3,    // Number of attacks before teleporting to a flank angle
-    neutralAttackInterval: 15,       // Frame interval between consecutive attacks (~0.25s)
+    neutralAttackInterval: 50,       // Frame interval between consecutive attacks (matches swordCooldown: 50)
     neutralTeleportDelay: 5,         // Frame delay after teleporting before starting next attack sequence
     neutralTeleportDistance: 100,    // Teleport distance offset around opponent
     neutralStanceDurationFrames: 200,// Total active duration (frames) of close-quarters stance (~3.33s)

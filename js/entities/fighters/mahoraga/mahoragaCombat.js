@@ -80,6 +80,8 @@ export function getFrontRadiusTargets(fighter, maxRangeOffset = 75, coneAngle = 
  * with teleportation every N attacks.
  */
 export function performMeleeAttack(fighter, opponent) {
+  if (!fighter) return;
+
   const isInsideDomain = typeof state !== 'undefined' && (
     state.activeDomain === 'unlimited_void' || 
     state.domainActive === 'unlimited_void' || 
@@ -111,6 +113,11 @@ export function performMeleeAttack(fighter, opponent) {
     return;
   }
 
+  // Ensure aim alignment before attacking so sword/punch arc faces target accurately
+  if (opponent && !opponent.isDead) {
+    fighter.aim(opponent);
+  }
+
   if (opponent && fighter.neutralStanceTimer > 0) {
     const dx = opponent.x - fighter.x;
     const dy = opponent.y - fighter.y;
@@ -119,15 +126,11 @@ export function performMeleeAttack(fighter, opponent) {
     const maxReach = fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110);
 
     if (dist > maxReach) {
-      fighter.neutralStanceTimer = 0; // Reset stance if target moves outside reach so normal attack AI resumes
-      return;
+      fighter.neutralStanceTimer = 0; // Reset stance if target moved outside reach, but still proceed to strike!
     }
   }
 
-  const attackInterval = CONFIG.mahoraga?.neutralAttackInterval ?? 15;
-  const attacksPerTeleport = CONFIG.mahoraga?.neutralAttacksPerTeleport ?? 3;
-  const teleportDelay = CONFIG.mahoraga?.neutralTeleportDelay ?? 5;
-  const teleportDist = CONFIG.mahoraga?.neutralTeleportDistance ?? 100;
+  const attackCooldown = CONFIG.mahoraga?.swordCooldown ?? CONFIG.mahoraga?.neutralAttackInterval ?? 50;
 
   // Track stance duration window and cooldown
   const isStanceEnabled = CONFIG.mahoraga?.enableCloseQuartersTeleport !== false;
@@ -139,106 +142,84 @@ export function performMeleeAttack(fighter, opponent) {
     fighter.neutralStanceAttackCount = 0;
   }
 
-  // If stance expired or on cooldown, do NOT start new stance (just single attacks)
-  if (isStanceOnCooldown) {
-    // Single attack outside of stance (basic sword swing)
-    fighter.swordCooldown = attackInterval;
-    fighter.attackCount = (fighter.attackCount || 0) + 1;
-    if (fighter.attackCount % 5 === 0) {
-      fighter.leftPunchTimer = 18;
-      fighter.leftPunchMaxTimer = 18;
-      playRandomHeavyPunchSound(1.0);
-    } else {
-      fighter.swordCombo = (fighter.swordCombo || 0) + 1;
-      fighter.punchAnimTimer = 18;
-      fighter.punchAnimMaxTimer = 18;
-      audioSystem.playSFX('attack_swordswing', 1.0);
-    }
-
-    const range = CONFIG.mahoraga?.swordRange || 110;
-    const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
-    if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
-      const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
-      if (dist <= range + fighter.r + opponent.r) {
-        frontTargets.push(opponent);
-      }
-    }
-    const damage = CONFIG.mahoraga?.swordDamage ?? 15;
-    const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
-    const knockbackChance = Math.min(0.65, 0.40 + totalStages * 0.04);
-    const isPunch = (fighter.attackCount % 5 === 0);
-    const rollKnockback = isPunch && (Math.random() < knockbackChance);
-
-    for (const t of frontTargets) {
-      if (typeof t.takeDamage === 'function') {
-        t.takeDamage(damage, fighter, { isMelee: true });
-      }
-      const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
-
-      if (rollKnockback) {
-        const kbForce = CONFIG.mahoraga?.heavyPunchKnockbackForce ?? 18.0;
-        t.vx = (t.vx || 0) + Math.cos(pushAngle) * kbForce;
-        t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
-        t.x += Math.cos(pushAngle) * (kbForce * 0.35);
-        t.y += Math.sin(pushAngle) * (kbForce * 0.35);
-        if (typeof t.applyHitStun === 'function') t.applyHitStun(16);
-        spawnFloatingText(t.x, t.y - (t.r || 20) - 22, 'HEAVY PUNCH KNOCKBACK!', '#FFD700');
-        triggerGlobalScreenShake(9, 14);
-      } else {
-        t.vx += Math.cos(pushAngle) * 4;
-        t.vy += Math.sin(pushAngle) * 4;
-        if (typeof t.applyHitStun === 'function') t.applyHitStun(8);
-      }
-
-      if (state && state.arena) {
-        const minX = state.arena.x + (t.r || 20);
-        const maxX = state.arena.x + state.arena.width - (t.r || 20);
-        const minY = state.arena.y + (t.r || 20);
-        const maxY = state.arena.y + state.arena.height - (t.r || 20);
-        t.x = Math.max(minX, Math.min(maxX, t.x));
-        t.y = Math.max(minY, Math.min(maxY, t.y));
-      }
-    }
-    if (frontTargets.length > 0) {
-      const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-      spawnAnimePunchImpactFrame(opponent.x, opponent.y, 55, angle, 'gold');
-      spawnSparks(opponent.x, opponent.y, 12, 'silver', '#FFFFFF');
-      triggerGlobalScreenShake(5, 8);
-    }
-    return;
+  fighter.swordCooldown = attackCooldown;
+  fighter.attackCount = (fighter.attackCount || 0) + 1;
+  if (!isStanceOnCooldown) {
+    fighter.neutralStanceAttackCount = (fighter.neutralStanceAttackCount || 0) + 1;
   }
 
-  // INSIDE ACTIVE STANCE: Attack-Teleport loop
-  fighter.swordCooldown = attackInterval;
-  fighter.neutralStanceAttackCount = (fighter.neutralStanceAttackCount || 0) + 1;
-  fighter.attackCount = (fighter.attackCount || 0) + 1;
+  // Alternating sword chops (majority) and left heavy punches
+  const punchFreqStance = CONFIG.mahoraga?.punchFrequencyStance ?? 7;
+  const punchFreqNormal = CONFIG.mahoraga?.punchFrequencyNormal ?? 5;
+  const punchFrequency = isStanceOnCooldown ? punchFreqNormal : punchFreqStance;
+  const isPunch = (fighter.attackCount % punchFrequency === 0);
 
-  // Sword of Extermination blade swings during Close-Quarters Attack-Teleport Stance (86% sword swings!)
-  if (fighter.attackCount % 7 === 0) {
-    fighter.leftPunchTimer = 18;
-    fighter.leftPunchMaxTimer = 18;
+  const punchAnimDuration = CONFIG.mahoraga?.punchAnimFrames ?? 18;
+  const swordAnimDuration = CONFIG.mahoraga?.swordAnimFrames ?? 18;
+
+  if (isPunch) {
+    fighter.leftPunchTimer = punchAnimDuration;
+    fighter.leftPunchMaxTimer = punchAnimDuration;
     playRandomHeavyPunchSound(1.0);
   } else {
     fighter.swordCombo = (fighter.swordCombo || 0) + 1;
-    fighter.punchAnimTimer = 18;
-    fighter.punchAnimMaxTimer = 18;
+    fighter.punchAnimTimer = swordAnimDuration;
+    fighter.punchAnimMaxTimer = swordAnimDuration;
     audioSystem.playSFX('attack_swordswing', 1.0);
   }
 
-  // AOE frontal arc damage to ALL targets
-  const range = CONFIG.mahoraga?.swordRange || 110;
-  const frontTargets = getFrontRadiusTargets(fighter, range, Math.PI * 1.3);
+  // AOE frontal arc query (Sword reach & arc angle from config)
+  const range = CONFIG.mahoraga?.swordRange ?? 110;
+  const arcRadians = CONFIG.mahoraga?.swordArcRadians ?? (Math.PI * 1.3);
+  const frontTargets = getFrontRadiusTargets(fighter, range, arcRadians);
+
+  // Guarantee all valid point-blank or reachable enemies are included in the melee hit
   if (opponent && opponent.hp > 0 && !opponent.isDead && !frontTargets.includes(opponent)) {
     const dist = Math.hypot(fighter.x - opponent.x, fighter.y - opponent.y, (opponent.z || 0) - (fighter.z || 0));
     if (dist <= range + fighter.r + opponent.r) {
       frontTargets.push(opponent);
     }
   }
+
+  // Also catch any nearby overlapping entities at point-blank collision range
+  if (typeof state !== 'undefined') {
+    const allEntities = [...(state.fighters || []), ...(state.illusions || [])];
+    const myIndex = state.fighters ? state.fighters.indexOf(fighter) : -1;
+    const myTeam = state.getFighterTeam ? state.getFighterTeam(myIndex) : fighter.team;
+
+    for (const ent of allEntities) {
+      if (!ent || ent === fighter || ent.hp <= 0 || ent.isDead || ent.isInvulnerable) continue;
+      if (ent.vanishTimer && ent.vanishTimer > 0) continue;
+      if (ent.owner === fighter) continue;
+      if (myTeam !== null && myTeam !== undefined) {
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && state.getFighterTeam(entIdx) === myTeam) continue;
+        if (ent.team !== undefined && ent.team === myTeam) continue;
+        if (ent.owner) {
+          const ownerIdx = state.fighters.indexOf(ent.owner);
+          if (ownerIdx !== -1 && state.getFighterTeam(ownerIdx) === myTeam) continue;
+        }
+      }
+      if (!frontTargets.includes(ent)) {
+        const d = Math.hypot(ent.x - fighter.x, ent.y - fighter.y, (ent.z || 0) - (fighter.z || 0));
+        if (d <= fighter.r + ent.r + 20) {
+          frontTargets.push(ent);
+        }
+      }
+    }
+  }
+
   const damage = CONFIG.mahoraga?.swordDamage ?? 15;
-  const totalStagesStance = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
-  const knockbackChanceStance = Math.min(0.65, 0.40 + totalStagesStance * 0.04);
-  const isPunchStance = (fighter.attackCount % 7 === 0);
-  const rollKnockbackStance = isPunchStance && (Math.random() < knockbackChanceStance);
+  const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
+  const baseKnockbackChance = CONFIG.mahoraga?.punchBaseKnockbackChance ?? 0.40;
+  const knockbackPerStage = CONFIG.mahoraga?.punchKnockbackChancePerStage ?? 0.04;
+  const maxKnockbackChance = CONFIG.mahoraga?.punchMaxKnockbackChance ?? 0.65;
+  const knockbackChance = Math.min(maxKnockbackChance, baseKnockbackChance + totalStages * knockbackPerStage);
+  const rollKnockback = isPunch && (Math.random() < knockbackChance);
+
+  const punchHitStun = CONFIG.mahoraga?.punchHitStunFrames ?? 16;
+  const swordHitStun = CONFIG.mahoraga?.swordHitStunFrames ?? 8;
+  const swordBasePush = CONFIG.mahoraga?.swordBasePushForce ?? 4.0;
 
   for (const t of frontTargets) {
     if (typeof t.takeDamage === 'function') {
@@ -246,19 +227,19 @@ export function performMeleeAttack(fighter, opponent) {
     }
     const pushAngle = Math.atan2(t.y - fighter.y, t.x - fighter.x);
 
-    if (rollKnockbackStance) {
+    if (rollKnockback) {
       const kbForce = CONFIG.mahoraga?.heavyPunchKnockbackForce ?? 18.0;
       t.vx = (t.vx || 0) + Math.cos(pushAngle) * kbForce;
       t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
       t.x += Math.cos(pushAngle) * (kbForce * 0.35);
       t.y += Math.sin(pushAngle) * (kbForce * 0.35);
-      if (typeof t.applyHitStun === 'function') t.applyHitStun(16);
+      if (typeof t.applyHitStun === 'function') t.applyHitStun(punchHitStun);
       spawnFloatingText(t.x, t.y - (t.r || 20) - 22, 'HEAVY PUNCH KNOCKBACK!', '#FFD700');
       triggerGlobalScreenShake(9, 14);
     } else {
-      t.vx += Math.cos(pushAngle) * 4;
-      t.vy += Math.sin(pushAngle) * 4;
-      if (typeof t.applyHitStun === 'function') t.applyHitStun(8);
+      t.vx += Math.cos(pushAngle) * swordBasePush;
+      t.vy += Math.sin(pushAngle) * swordBasePush;
+      if (typeof t.applyHitStun === 'function') t.applyHitStun(swordHitStun);
     }
 
     if (state && state.arena) {
@@ -270,68 +251,24 @@ export function performMeleeAttack(fighter, opponent) {
       t.y = Math.max(minY, Math.min(maxY, t.y));
     }
   }
+
   if (frontTargets.length > 0) {
-    const angle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-    // Spawn golden spiky crescent effect for both punches and blade slash attacks!
-    spawnAnimePunchImpactFrame(opponent.x, opponent.y, 55, angle, 'gold');
-    spawnSparks(opponent.x, opponent.y, 12, 'silver', '#FFFFFF');
+    const targetObj = opponent || frontTargets[0];
+    const angle = targetObj ? Math.atan2(targetObj.y - fighter.y, targetObj.x - fighter.x) : (fighter.gunAngle || 0);
+    spawnAnimePunchImpactFrame(targetObj.x, targetObj.y, 55, angle, 'gold');
+    spawnSparks(targetObj.x, targetObj.y, 12, 'silver', '#FFFFFF');
     triggerGlobalScreenShake(5, 8);
   }
 
   // Sakuga impact visuals on main opponent (only for sword combo hits, not punches)
-  const isPunch = (fighter.attackCount % 5 === 0);
-  if (!isPunch) {
-    fighter.sakugaImpactTimer = 8;
-    fighter.sakugaImpactMaxTimer = 8;
+  if (!isPunch && opponent) {
+    const sakugaDuration = CONFIG.mahoraga?.sakugaImpactDurationFrames ?? 8;
+    fighter.sakugaImpactTimer = sakugaDuration;
+    fighter.sakugaImpactMaxTimer = sakugaDuration;
     fighter.sakugaImpactX = opponent.x;
     fighter.sakugaImpactY = opponent.y;
     fighter.sakugaImpactAngle = Math.random() * Math.PI * 2;
     fighter.sakugaImpactSeed = Math.random();
-  }
-
-  // Teleport after every N attacks
-  if (fighter.neutralStanceAttackCount >= attacksPerTeleport) {
-    const isBeamTeleportDisabled = (fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0) && !fighter.adaptedPureLoveBeam;
-    if (isBeamTeleportDisabled) {
-      fighter.neutralStanceAttackCount = 0;
-      return; // Disable teleportation while caught in beam before adapting!
-    }
-    fighter.neutralStanceAttackCount = 0;
-
-    const oldX = fighter.x;
-    const oldY = fighter.y;
-
-    // Teleport behind opponent
-    const approachAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-    const backAngle = approachAngle + Math.PI + (Math.random() - 0.5) * 1.0;
-    const teleDist = fighter.r + opponent.r + teleportDist;
-
-    let teleX = opponent.x + Math.cos(backAngle) * teleDist;
-    let teleY = opponent.y + Math.sin(backAngle) * teleDist;
-
-    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    if (arena) {
-      teleX = Math.max(arena.x + fighter.r + 5, Math.min(arena.x + arena.width - fighter.r - 5, teleX));
-      teleY = Math.max(arena.y + fighter.r + 5, Math.min(arena.y + arena.height - fighter.r - 5, teleY));
-    }
-
-    // Set up smooth flash-dash travel using the adaptationDashSpeedFrames config
-    fighter.dashFromX = oldX;
-    fighter.dashFromY = oldY;
-    fighter.dashToX = teleX;
-    fighter.dashToY = teleY;
-    const dashFrames = CONFIG.mahoraga?.adaptationDashSpeedFrames ?? 10;
-    fighter.adaptationDashTimer = dashFrames;
-    fighter.adaptationDashTarget = opponent;
-    fighter.adaptationDashIsCounter = false;
-
-    spawnTeleportAfterimages(fighter, oldX, oldY, teleX, teleY, fighter.gunAngle);
-
-    audioSystem.playSFX('skill_dash5', 1.0);
-    spawnImpactFlash(fighter.x, fighter.y, 25, 'silver');
-
-    // Post-teleport cooldown delay
-    fighter.swordCooldown = teleportDelay;
   }
 }
 
