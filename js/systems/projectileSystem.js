@@ -532,6 +532,56 @@ class ProjectileSystem {
   }
 
   /**
+   * Fires Ichigo's signature Getsuga Tensho piercing crescent wave.
+   */
+  fireGetsugaTensho(fighter, ownerIndex, damage, speedOverride, form = 'shikai') {
+    const isMask = form === 'hollow';
+    const isBankai = form === 'bankai';
+    const isShikai = form === 'shikai';
+
+    const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 16;
+    const defaultSpeed = isMask
+      ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 22)
+      : (isBankai
+        ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22)
+        : baseSpeed);
+    const speed = speedOverride ?? defaultSpeed;
+
+    const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+    const tipDist = GUN_TIP_DIST(fighter.r) + 12;
+    const dirX = Math.cos(angle);
+    const dirY = Math.sin(angle);
+
+    const projRadius = isMask ? 42 : (isBankai ? 36 : 38);
+    const maxLife = 240; // Extended lifetime so wave flies all the way past window boundaries
+
+    const proj = this._getProjectile();
+    proj.x = fighter.x + dirX * tipDist;
+    proj.y = fighter.y + dirY * tipDist;
+    proj.vx = dirX * speed;
+    proj.vy = dirY * speed;
+    proj.r = projRadius;
+    proj.life = maxLife;
+    proj.maxLife = maxLife;
+    proj.color = isMask ? '#FF1E00' : (isBankai ? '#00E5FF' : '#00D5FF');
+    proj.owner = ownerIndex;
+    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (isMask ? 50 : (isBankai ? 45 : 30));
+    proj.isGetsuga = true;
+    proj.getsugaForm = form;
+    proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';
+    proj.behaviorType = 'getsuga_tensho';
+    proj.isAdaptableSkillShot = true;
+    proj.skillShotId = 'getsugaTensho';
+    proj.hitTargets = new Map();
+    proj.history = [];
+    proj.history.push({ x: proj.x, y: proj.y });
+    proj.historyMax = 10;
+
+    this.projectiles.push(proj);
+    return proj;
+  }
+
+  /**
    * Triggers a thermobaric explosion upon Furnace arrow impact.
    */
   triggerThermobaricExplosion(x, y, ownerIndex, damage) {
@@ -845,6 +895,7 @@ class ProjectileSystem {
     if (projectile.isExplosion) return false;
     if (projectile.isPoisonSpill) return false;
     if (projectile.isVisual) return false; // Visual-only particles skip all collision
+    if (projectile.isGetsuga || projectile.behaviorType === 'getsuga_tensho') return false; // Getsuga handles multi-target piercing in GetsugaBehavior
 
     // OPTIMIZED: Use spatial grid to get only nearby fighters instead of checking all
     const nearbyFighters = spatialGrid.getNearby(projectile.x, projectile.y, projectile.r * 2 + 100);

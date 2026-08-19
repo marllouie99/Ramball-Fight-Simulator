@@ -1604,6 +1604,56 @@ function _drawSeriousRedFist(ctx, progress) {
   ctx.restore();
 }
 
+/**
+ * Draws a short dramatic black-crimson dim screen vignette on Bankai sky lightning ground impact.
+ */
+export function drawBankaiImpactDimScreen() {
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  const ichigo = state.fighters?.find(f => 
+    f && (f.characterId === 'ichigo' || f.type === 'ichigo') && f.isChannelingBankai
+  );
+  if (!ichigo) return;
+
+  const maxB = ichigo.bankaiChargeMax || 50;
+  const curB = ichigo.bankaiChargeTimer || 0;
+  const bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
+
+  const lightningThreshold = 0.12;
+  const dimEndThreshold = 0.60;
+
+  if (bankaiProg < lightningThreshold || bankaiProg > dimEndThreshold) return;
+
+  const dimProg = (bankaiProg - lightningThreshold) / (dimEndThreshold - lightningThreshold);
+  // Rich bell curve: Fast rise on impact, smooth graceful decay
+  const easeCurve = Math.sin(dimProg * Math.PI);
+  const opacity = easeCurve * 0.78;
+
+  if (opacity <= 0.01) return;
+
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+  const cx = ichigo.x + shakeX;
+  const cy = ichigo.y + shakeY;
+  const maxR = Math.max(canvas.width, canvas.height) * 0.85;
+
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  // Radial Black-Crimson Vignette (Centered on Ichigo's Impact Point)
+  const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, maxR);
+  grad.addColorStop(0.0, `rgba(40, 4, 8, ${opacity * 0.45})`);       // Translucent crimson center
+  grad.addColorStop(0.35, `rgba(18, 2, 4, ${opacity * 0.75})`);      // Deep dark crimson ring
+  grad.addColorStop(0.75, `rgba(6, 1, 2, ${opacity * 0.92})`);       // Pitch black-crimson edge
+  grad.addColorStop(1.0, `rgba(2, 0, 1, ${opacity * 0.98})`);        // Absolute void boundary
+
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  ctx.restore();
+}
+
 // ──────────────────────────────────────────
 // DRAW — FLOATING TEXT LABELS
 // ──────────────────────────────────────────

@@ -13,7 +13,7 @@ import {
   drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
-  drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen
+  drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -179,6 +179,7 @@ export function renderGame() {
         drawTojiUltimateOverlay();
         drawSaitamaSeriousPunchDimScreen();
         drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
+        drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 

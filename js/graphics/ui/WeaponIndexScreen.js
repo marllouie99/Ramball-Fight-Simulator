@@ -245,13 +245,13 @@ function drawWeaponInfoCard(ctx, def) {
   let descText = def.desc;
 
   if (def.type === 'ichigo') {
-    const skin = state.selectedIchigoSkin || 'bankai';
+    const skin = state.selectedIchigoSkin || 'shikai';
     if (skin === 'shikai') {
       nameText = 'Ichigo (Shikai)';
-      descText = 'Wields massive Zangetsu. Fires blue Getsuga Tensho waves. Awakes Hollow Mask under 30% HP for stats boost and blue Getsuga. Ultimate transforms into Vasto Lorde.';
+      descText = 'Wields massive Zangetsu with trailing white cloth ribbons. Unleashes Getsuga Tensho energy waves, 2-strike Shunpo flurry, and Hollow Mask under 30% HP. Ultimate unleashes Bankai: Tensa Zangetsu!';
     } else {
       nameText = 'Ichigo (Bankai)';
-      descText = 'Wields Tensa Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost and Black Getsuga. Ultimate transforms into Vasto Lorde.';
+      descText = 'Wields sleek Tensa Zangetsu with fast frontal-arc sword slashes. Fires Kuroi Getsuga waves and dashes with Shunpo flurry. Ultimate unleashes Bankai: Tensa Zangetsu!';
     }
   }
 
@@ -482,10 +482,10 @@ function drawWeaponDetailScreen() {
       previewFighter.meleeCooldown = 42;
       previewFighter.slashGlowTimer = 20;
     } else {
-      // Tick demo attack animation timers normally
       if (previewFighter.spearSwingTimer > 0) previewFighter.spearSwingTimer--;
       if (previewFighter.katanaSlashTimer > 0) previewFighter.katanaSlashTimer--;
       if (previewFighter.punchAnimTimer > 0) previewFighter.punchAnimTimer--;
+      if (previewFighter.slashSwingTimer > 0) previewFighter.slashSwingTimer--;
       if (previewFighter.recoilTimer > 0) previewFighter.recoilTimer--;
       if (previewFighter.slashGlowTimer > 0) previewFighter.slashGlowTimer--;
       if (previewFighter.meleeCooldown > 0) previewFighter.meleeCooldown--;
@@ -629,7 +629,7 @@ function drawWeaponDetailScreen() {
     }, btnW, btnH);
 
     // Draw glowing golden outline on active skin
-    const activeSkin = state.selectedIchigoSkin || 'bankai';
+    const activeSkin = state.selectedIchigoSkin || 'shikai';
     const activeX = (activeSkin === 'shikai') ? shikaiBtnX : bankaiBtnX;
     ctx.save();
     ctx.strokeStyle = '#FFD700'; // Gold active outline

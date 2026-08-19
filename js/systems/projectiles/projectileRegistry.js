@@ -4,6 +4,7 @@ import { SukunaFurnaceBehavior } from './behaviors/SukunaFurnaceBehavior.js';
 import { GojoPurpleBehavior } from './behaviors/GojoPurpleBehavior.js';
 import { GojoBlueBehavior } from './behaviors/GojoBlueBehavior.js';
 import { YutaPureLoveBeamBehavior } from './behaviors/YutaPureLoveBeamBehavior.js';
+import { GetsugaBehavior } from './behaviors/GetsugaBehavior.js';
 
 export function registerProjectileBehaviors() {
   ProjectileBehaviorManager.register('black_hole', BlackHoleBehavior);
@@ -11,4 +12,5 @@ export function registerProjectileBehaviors() {
   ProjectileBehaviorManager.register('gojo_purple', GojoPurpleBehavior);
   ProjectileBehaviorManager.register('gojo_blue', GojoBlueBehavior);
   ProjectileBehaviorManager.register('yuta_pure_love_beam', YutaPureLoveBeamBehavior);
+  ProjectileBehaviorManager.register('getsuga_tensho', GetsugaBehavior);
 }

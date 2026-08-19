@@ -5,47 +5,136 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   const vy = p.vx === 0 && p.vy === 0 && p._resumeVy !== undefined ? p._resumeVy : p.vy;
   const angle = Math.atan2(vy, vx);
   const owner = state.fighters && state.fighters[p.owner];
-  const scale = owner ? Math.max(0.9, owner.r / 20) : 1.1;
+  const form = p.getsugaForm || (isBlack ? (owner && owner.hollowMaskActive ? 'hollow' : 'bankai') : 'shikai');
+  
+  const isMask = form === 'hollow';
+  const isBankai = form === 'bankai';
+  const isShikai = form === 'shikai';
+
+  const scale = owner ? Math.max(0.9, owner.r / 22) : 1.0;
   const lifeRatio = Math.max(0.2, (p.life || 30) / (p.maxLife || 30));
+  const alpha = Math.min(1.0, lifeRatio * 1.2);
 
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
-  ctx.scale(scale, scale);
+  ctx.scale(scale * (isMask ? 1.50 : 1.35), scale * (isMask ? 1.50 : 1.35));
 
-  const r = 26;
-  
-  // Outer crescent shape
+  const r = isMask ? 54 : (isBankai ? 46 : 48);
+  const maxThick = isMask ? 20 : (isBankai ? 16 : 17);
+  const halfSpan = isMask ? (0.78 * Math.PI) : (0.76 * Math.PI); // ~137° - 144° sweep
+  const numSteps = 32;
+
+  // 1. Pass 1: Outer Reiatsu Spiritual Pressure Bloom Wave
   ctx.beginPath();
-  ctx.arc(0, 0, r, -Math.PI * 0.6, Math.PI * 0.6, false);
-  ctx.arc(r * 0.42, 0, r * 0.82, Math.PI * 0.55, -Math.PI * 0.55, true);
+  // Front leading curve
+  for (let i = 0; i <= numSteps; i++) {
+    const t = (i / numSteps) * 2 - 1; // -1 to +1
+    const ang = t * halfSpan;
+    const taper = Math.cos(t * (Math.PI / 2));
+    const dist = r + taper * 5.5;
+    const px = Math.cos(ang) * dist;
+    const py = Math.sin(ang) * dist;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  // Inner trailing curve
+  for (let i = numSteps; i >= 0; i--) {
+    const t = (i / numSteps) * 2 - 1;
+    const ang = t * halfSpan;
+    const taper = Math.cos(t * (Math.PI / 2));
+    const dist = r - (maxThick * taper) - taper * 7.0;
+    const px = Math.cos(ang) * dist;
+    const py = Math.sin(ang) * dist;
+    ctx.lineTo(px, py);
+  }
   ctx.closePath();
 
-  // Color theme: Black/Crimson for Black Getsuga, Light Cyan/White for standard Getsuga
-  ctx.fillStyle = isBlack ? `rgba(15, 5, 5, ${0.9 * lifeRatio})` : `rgba(0, 110, 255, ${0.5 * lifeRatio})`;
+  if (isMask) ctx.fillStyle = `rgba(255, 40, 0, ${0.50 * alpha})`;
+  else if (isBankai) ctx.fillStyle = `rgba(0, 229, 255, ${0.45 * alpha})`;
+  else ctx.fillStyle = `rgba(0, 191, 255, ${0.45 * alpha})`;
   ctx.fill();
-  
-  ctx.strokeStyle = isBlack ? `rgba(139, 0, 0, ${0.95 * lifeRatio})` : `rgba(0, 191, 255, ${0.8 * lifeRatio})`;
-  ctx.lineWidth = 3.5;
+
+  // 2. Pass 2: Dense Core Crescent Wave Polygon
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = (i / numSteps) * 2 - 1;
+    const ang = t * halfSpan;
+    const taper = Math.cos(t * (Math.PI / 2));
+    const dist = r + taper * 2.0;
+    const px = Math.cos(ang) * dist;
+    const py = Math.sin(ang) * dist;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  for (let i = numSteps; i >= 0; i--) {
+    const t = (i / numSteps) * 2 - 1;
+    const ang = t * halfSpan;
+    const taper = Math.cos(t * (Math.PI / 2));
+    const dist = r - (maxThick * taper);
+    const px = Math.cos(ang) * dist;
+    const py = Math.sin(ang) * dist;
+    ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+
+  if (isMask) ctx.fillStyle = `rgba(15, 4, 4, ${0.96 * alpha})`;
+  else if (isBankai) ctx.fillStyle = `rgba(10, 10, 14, ${0.96 * alpha})`;
+  else ctx.fillStyle = `rgba(240, 248, 255, ${0.95 * alpha})`;
+  ctx.fill();
+
+  // 3. Pass 3: Brilliant Leading Cutting Edge Highlight
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = (i / numSteps) * 2 - 1;
+    const ang = t * halfSpan;
+    const taper = Math.cos(t * (Math.PI / 2));
+    const dist = r - (maxThick * taper * 0.1);
+    const px = Math.cos(ang) * dist;
+    const py = Math.sin(ang) * dist;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+
+  if (isMask) {
+    ctx.strokeStyle = `rgba(255, 120, 0, ${0.92 * alpha})`;
+    ctx.lineWidth = 2.6;
+  } else if (isBankai) {
+    ctx.strokeStyle = `rgba(0, 240, 255, ${0.95 * alpha})`;
+    ctx.lineWidth = 2.4;
+  } else {
+    ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * alpha})`;
+    ctx.lineWidth = 2.6;
+  }
   ctx.stroke();
 
-  // Glow core
+  // 4. Pass 4: Trailing Reiatsu Streamers / Speed Needles
+  const streamerCount = isMask ? 7 : 6;
   ctx.save();
-  ctx.scale(0.85, 0.85);
-  ctx.beginPath();
-  ctx.arc(0, 0, r, -Math.PI * 0.55, Math.PI * 0.55, false);
-  ctx.arc(r * 0.42, 0, r * 0.82, Math.PI * 0.5, -Math.PI * 0.5, true);
-  ctx.closePath();
-  ctx.fillStyle = isBlack ? `rgba(220, 10, 10, ${0.95 * lifeRatio})` : `rgba(255, 255, 255, ${0.9 * lifeRatio})`;
-  ctx.fill();
-  ctx.restore();
+  for (let s = 0; s < streamerCount; s++) {
+    const stNorm = (s / (streamerCount - 1)) * 2 - 1; // -1 to +1
+    const stAng = stNorm * (halfSpan * 0.85);
+    const taper = Math.cos(stNorm * (Math.PI / 2));
+    const startRad = r - (maxThick * taper * 0.8);
+    const trailLen = (isMask ? 24 : 20) + taper * 25;
 
-  // Center white line core
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, r * 0.9, -Math.PI * 0.52, Math.PI * 0.52, false);
-  ctx.stroke();
+    const sx1 = Math.cos(stAng) * startRad;
+    const sy1 = Math.sin(stAng) * startRad;
+    const sx2 = sx1 - trailLen;
+    const sy2 = sy1 + (stNorm * 6);
+
+    ctx.beginPath();
+    ctx.moveTo(sx1, sy1);
+    ctx.lineTo(sx2, sy2);
+
+    if (isMask) ctx.strokeStyle = `rgba(255, 60, 0, ${0.75 * alpha})`;
+    else if (isBankai) ctx.strokeStyle = `rgba(0, 229, 255, ${0.75 * alpha})`;
+    else ctx.strokeStyle = `rgba(135, 206, 250, ${0.80 * alpha})`;
+
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+  ctx.restore();
 
   ctx.restore();
 }
@@ -326,3 +415,195 @@ export function drawTensaZangetsu(ctx, x, y, angle, r) {
 
   ctx.restore();
 }
+
+/**
+ * Draws Ichigo's signature Crescent Blade Slash Arc (Rule 15 Compliant).
+ * Renders in world coordinates underneath/around the blade during active basic chops.
+ * Form-specific palettes:
+ *  - Shikai: Silver steel with sky-blue/cyan Reiatsu glow
+ *  - Bankai: Deep Getsuga black void core with electric cyan Reiatsu edge
+ *  - Hollow Mask: Black void core with flaming crimson/orange edge
+ *  - Vasto Lorde: Demonic pitch-black core with blazing blood-red trim
+ */
+export function drawIchigoSlashArc(ctx, fighter) {
+  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isFrozenByInfinity || (fighter.timeStopTimer && fighter.timeStopTimer > 0) || (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0)) return;
+
+  const maxT = fighter.slashSwingMaxTimer || 22;
+  const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
+
+  const r = fighter.r || 25;
+  const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  const facingLeft = Math.abs(baseAngle) > Math.PI / 2;
+
+  const isMask = Boolean(fighter.hollowMaskActive);
+  const isBankai = Boolean(fighter.bankaiActive || fighter.skin === 'bankai');
+  const isShikai = !isBankai;
+
+  // Arc angles matching the exact sword rotation span (top-to-bottom downward power chop)
+  const startOffset = -1.35; // ~ -77 degrees (upper-left chamber)
+  const endOffset = 1.20;   // ~ +69 degrees (lower-right follow-through)
+
+  let currentTipOffset = startOffset;
+  let currentTailOffset = startOffset;
+  let trailAlpha = 1.0;
+
+  const windupCutoff = 0.10;
+  const cutCutoff = 0.55;
+
+  if (rawProgress < windupCutoff) {
+    // Brief windup anticipation (trail hidden)
+    return;
+  } else if (rawProgress < cutCutoff) {
+    // Active Cutting Phase: crescent expands with buttery cubic Hermite ease
+    const t = (rawProgress - windupCutoff) / (cutCutoff - windupCutoff);
+    const eased = t * t * (3 - 2 * t);
+    currentTipOffset = startOffset + eased * (endOffset - startOffset);
+    currentTailOffset = startOffset;
+    trailAlpha = Math.sin(Math.min(1.0, t * 1.5) * (Math.PI / 2));
+  } else {
+    // Recovery Phase: Tip stays locked at final follow-through angle while tail cleanly erases
+    const recP = (rawProgress - cutCutoff) / (1.0 - cutCutoff);
+    const easedRec = 0.5 + 0.5 * Math.cos(recP * Math.PI);
+    currentTipOffset = endOffset;
+    currentTailOffset = endOffset - (endOffset - startOffset) * easedRec;
+    trailAlpha = Math.sin((1.0 - recP) * (Math.PI / 2));
+  }
+
+  if (trailAlpha <= 0.01 || Math.abs(currentTipOffset - currentTailOffset) < 0.04) return;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y);
+  ctx.rotate(baseAngle);
+
+  // Mirror vertically when aiming left so swing remains top-to-bottom
+  if (facingLeft) {
+    ctx.scale(1, -1);
+  }
+
+  const outerRadius = r + (isMask ? 76 : (isShikai ? 80 : 70));
+  const maxThick = isMask ? 25.0 : (isShikai ? 27.0 : 23.0);
+  const numSteps = 32;
+
+  // 1. Pass 1: Spiritual Pressure / Reiatsu Outer Soft Glow Bloom
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = i / numSteps;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
+    const rad = outerRadius + taper * 5.5;
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  for (let i = numSteps; i >= 0; i--) {
+    const t = i / numSteps;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
+    const rad = outerRadius - (maxThick * taper) - taper * 4.5;
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+
+  if (isMask) {
+    ctx.fillStyle = `rgba(255, 40, 0, ${0.50 * trailAlpha})`;
+  } else if (isShikai) {
+    ctx.fillStyle = `rgba(0, 191, 255, ${0.45 * trailAlpha})`;
+  } else {
+    ctx.fillStyle = `rgba(0, 229, 255, ${0.46 * trailAlpha})`;
+  }
+  ctx.fill();
+
+  // 2. Pass 2: High-Density Core Blade Crescent Polygon
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = i / numSteps;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
+    const rad = outerRadius + taper * 1.5;
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+  for (let i = numSteps; i >= 0; i--) {
+    const t = i / numSteps;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
+    const rad = outerRadius - (maxThick * taper);
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    ctx.lineTo(px, py);
+  }
+  ctx.closePath();
+
+  if (isMask) {
+    ctx.fillStyle = `rgba(18, 5, 5, ${0.95 * trailAlpha})`;
+  } else if (isShikai) {
+    ctx.fillStyle = `rgba(242, 246, 255, ${0.96 * trailAlpha})`;
+  } else {
+    ctx.fillStyle = `rgba(10, 10, 14, ${0.95 * trailAlpha})`;
+  }
+  ctx.fill();
+
+  // 3. Pass 3: Brilliant Cutting Edge Highlight Line
+  ctx.beginPath();
+  for (let i = 0; i <= numSteps; i++) {
+    const t = i / numSteps;
+    const ang = currentTailOffset + t * (currentTipOffset - currentTailOffset);
+    const taper = Math.pow(Math.sin(t * Math.PI), 1.12) * (0.26 + 0.74 * t);
+    const rad = outerRadius - (maxThick * taper * 0.15);
+    const px = Math.cos(ang) * rad;
+    const py = Math.sin(ang) * rad;
+    if (i === 0) ctx.moveTo(px, py);
+    else ctx.lineTo(px, py);
+  }
+
+  if (isMask) {
+    ctx.strokeStyle = `rgba(255, 120, 0, ${0.88 * trailAlpha})`;
+    ctx.lineWidth = 2.0;
+  } else if (isShikai) {
+    ctx.strokeStyle = `rgba(255, 255, 255, ${1.0 * trailAlpha})`;
+    ctx.lineWidth = 2.0;
+  } else {
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.90 * trailAlpha})`;
+    ctx.lineWidth = 1.8;
+  }
+  ctx.stroke();
+
+  // 4. Pass 4: Dynamic Reiatsu Speed Needles flying from cutting tip
+  if (rawProgress >= 0.15 && rawProgress <= 0.50) {
+    const sparkT = (rawProgress - 0.15) / 0.35;
+    const tipAngle = currentTipOffset;
+    const sparkCount = 3;
+    ctx.save();
+    for (let s = 0; s < sparkCount; s++) {
+      const spOffset = (s - 1) * 0.08;
+      const spAng = tipAngle + spOffset;
+      const spDist = outerRadius + 4 + (s * 3);
+      const spLen = 12 + (1 - sparkT) * 10;
+      
+      const spX1 = Math.cos(spAng) * spDist;
+      const spY1 = Math.sin(spAng) * spDist;
+      const spX2 = spX1 + Math.cos(spAng + 0.4) * spLen;
+      const spY2 = spY1 + Math.sin(spAng + 0.4) * spLen;
+
+      ctx.beginPath();
+      ctx.moveTo(spX1, spY1);
+      ctx.lineTo(spX2, spY2);
+
+      if (isMask) ctx.strokeStyle = `rgba(255, 160, 20, ${0.85 * trailAlpha})`;
+      else if (isShikai) ctx.strokeStyle = `rgba(255, 255, 255, ${0.90 * trailAlpha})`;
+      else ctx.strokeStyle = `rgba(100, 240, 255, ${0.85 * trailAlpha})`;
+
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  ctx.restore();
+}
+

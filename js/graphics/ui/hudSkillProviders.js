@@ -824,6 +824,58 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  if (f.characterId === 'ichigo' || f.type === 'ichigo') {
+    const themeColor = f.color || '#FF5500';
+
+    // Skill 1: Getsuga Tensho (100% ready when off-cooldown/channeling, recharges over getsugaCooldown)
+    const getsugaMax = CONFIG.ichigo?.getsugaCooldown || 360;
+    const getsugaTimer = f.getsugaCooldown !== undefined ? f.getsugaCooldown : 0;
+    let getsugaPct = 0;
+    let getsugaReady = false;
+
+    if (f.isChannelingGetsuga || getsugaTimer <= 0) {
+      getsugaPct = 100;
+      getsugaReady = true;
+    } else {
+      getsugaPct = Math.max(0, Math.min(100, (1 - (getsugaTimer / getsugaMax)) * 100));
+      getsugaReady = getsugaPct >= 99;
+    }
+
+    // Skill 2: Flash Step (Shunpo) 2-Strike Flurry
+    const shunpoMax = CONFIG.ichigo?.shunpoCooldown || 240;
+    const shunpoTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
+    let shunpoPct = Math.max(0, Math.min(100, (1 - (shunpoTimer / shunpoMax)) * 100));
+    if (f.isShunpoDashing || f.shunpoComboActive) shunpoPct = 100;
+
+    // Ultimate: Bankai Awakening (Tensa Zangetsu) - EXCLUSIVELY based on ultimateThreshold
+    const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.50;
+    const curHp = f.hp !== undefined ? f.hp : (f.maxHp || 100);
+    const maxHp = f.maxHp || 100;
+    const hpRatio = Math.max(0, Math.min(1, curHp / maxHp));
+    
+    let ultPct = 0;
+    let ultReady = false;
+
+    if (f.isChannelingBankai || f.bankaiActive) {
+      ultPct = 100;
+      ultReady = true;
+    } else {
+      // Exclusively based on ultimateThreshold (e.g. 0.50):
+      // Full HP (100%) -> 0% (NO ticking over time)
+      // Dropping towards threshold -> fills steadily based on HP lost towards threshold
+      // At or below threshold (HP <= 50%) -> 100% (READY)
+      const progress = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / Math.max(0.01, (1.0 - ultThreshold))));
+      ultPct = progress * 100;
+      ultReady = hpRatio <= ultThreshold;
+    }
+
+    return [
+      { id: 'getsuga', pct: getsugaPct, ready: getsugaReady, color: themeColor, label: 'GETSUGA TENSHO' },
+      { id: 'shunpo',  pct: shunpoPct,  ready: shunpoPct >= 99,  color: themeColor, label: 'FLASH STEP FLURRY' },
+      { id: 'bankai',  pct: ultPct,      ready: ultReady,         color: themeColor, label: 'BANKAI' }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

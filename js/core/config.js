@@ -1219,7 +1219,7 @@ export const FIGHTER_DEFS = [
     moveSpeed: 7.0,
     projectileSpeedMultiplier: 1.0,
     ability: 'Hollow Mask',
-    desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate transforms into Vasto Lorde.',
+    desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
   },
   {
     id: 30,
