@@ -349,8 +349,19 @@ export class GenosFighter extends Fighter {
 
   takeDamage(amount, attacker, opts = {}) {
     if (this.isSelfDestructing) {
-      // Genos CAN now take damage while self-destructing!
-      const result = super.takeDamage(amount, attacker, opts);
+      // Genos gains massive DEF (Damage Reduction) while charging self-destruct!
+      const isTrueDamage = Boolean(opts && (opts.isTrueDamage || opts.trueDamage || opts.isPureLoveBeam || opts.isPurpleDPS));
+      let finalAmount = amount;
+      const defReduction = CONFIG.genos?.selfDestructDamageReduction ?? 0.75;
+      if (!isTrueDamage && defReduction > 0) {
+        finalAmount *= (1 - defReduction);
+        // Deflection sparks on reinforced cybernetic armor
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(this.x, this.y, 4, 'flash_layla', '#00E5FF');
+        }
+      }
+
+      const result = super.takeDamage(finalAmount, attacker, opts);
       if (this.hp <= 0 || this.isDead) {
         // Failed to self-destruct before dying — stops charging sound and dies cleanly!
         if (this._selfDestructChargeHandle) {

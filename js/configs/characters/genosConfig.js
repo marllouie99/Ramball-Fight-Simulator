@@ -94,6 +94,7 @@ export const genosConfig = {
   // Passive: Core Overdrive (Self-Destruct)
   selfDestructHpThreshold: 0.10,    // HP percentage threshold (0.10 = 10% HP) below which Genos initiates Core Overdrive Self-Destruct
   selfDestructCountdownFrames: 150, // 2.5 seconds
+  selfDestructDamageReduction: 0.75, // 75% Damage Reduction (DEF) while charging core overload self-destruct
   selfDestructRadius: 200,
   selfDestructDamage: 250, // True damage explosion
   selfDestructKnockback: 20, // Push velocity applied to targets caught in blast
@@ -105,7 +106,7 @@ export const genosConfig = {
 
   // Basic Attack: Incineration Palms (Ranged Fireball)
   basicBlastSound: 'Assets/Sound Effects/Attacks/genos-range-attack.mp3',
-  basicBlastVolume: 2.0,
+  basicBlastVolume: 0.9,
   basicBlastEnabled: true,
 
   basicChargeSound: 'Assets/Sound Effects/Skills/genos-incenerate-charging.mp3',
@@ -114,12 +115,12 @@ export const genosConfig = {
 
   // Melee Mode Basic Attack (Close Quarters Martial Punch - Same punch sound Gojo uses)
   meleePunchSound: 'Assets/Sound Effects/Attacks/punch.mp3',
-  meleePunchVolume: 2.8,
+  meleePunchVolume: 1.0,
   meleePunchEnabled: true,
 
   // Thruster Dash Audio (plays on high-speed thruster dash with cooldown to prevent frequency spam)
   dashSound: 'Assets/Sound Effects/Skills/genos-dash-noise.mp3',
-  dashSoundVolume: 1.8,
+  dashSoundVolume: 1.0,
   dashSoundEnabled: true,
   dashSoundCooldownFrames: 180, // 3.0s cooldown between dash noise plays
 

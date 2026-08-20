@@ -256,7 +256,7 @@ function updateHealthHud() {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false}`;
   }).join('|');
 
   const hpChanged = currentHpStr !== state._lastHpStr;
@@ -606,6 +606,16 @@ function updateHealthHud() {
           info.push(`<b>Dash:</b> ${remainingDashes}/${maxDashes}`);
         } else {
           info.push(`<b>Dash:</b> ${maxDashes}`);
+        }
+
+        // DEF (Damage Reduction): Increased during Core Overdrive Self-Destruct charging
+        const isSelfDestructing = Boolean(f.isSelfDestructing);
+        const baseDef = 0;
+        const sdDef = Math.round((CONFIG.genos?.selfDestructDamageReduction ?? 0.75) * 100);
+        if (isSelfDestructing) {
+          info.push(`<b>DEF:</b> ${baseDef}% + ${sdDef}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>DEF:</b> ${baseDef}%`);
         }
       } else if (f.characterId === 'zeus' || f.type === 'zeus') {
         if ((f.aegisTimer || 0) > 0) {
