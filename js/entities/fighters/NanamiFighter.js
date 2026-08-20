@@ -551,8 +551,7 @@ export class NanamiFighter extends Fighter {
     if (this.overtimeGuaranteedCritTimer > 0) this.overtimeGuaranteedCritTimer--;
 
     // 3. Debuff and Cooldown Housekeeping
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 

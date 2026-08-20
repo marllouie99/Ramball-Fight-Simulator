@@ -256,7 +256,7 @@ function updateHealthHud() {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)}`;
   }).join('|');
 
   const hpChanged = currentHpStr !== state._lastHpStr;
@@ -610,6 +610,30 @@ function updateHealthHud() {
       } else if (f.characterId === 'zeus' || f.type === 'zeus') {
         if ((f.aegisTimer || 0) > 0) {
           info.push(`<b>Aegis:</b> ACTIVE <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        }
+      } else if (f.characterId === 'john_wick' || f.type === 'john_wick') {
+        const isExcommunicado = (f.currentEquippedWeapon === 'rifle');
+        const baseDef = CONFIG.john_wick?.ballisticSuitDamageReduction || 0.40;
+        const defMult = isExcommunicado ? (CONFIG.john_wick?.excommunicadoDefMultiplier || 1.50) : 1.0;
+        const finalDef = Math.round(Math.min(0.85, baseDef * defMult) * 100);
+        info.push(`<b>DEF:</b> ${finalDef}%${isExcommunicado ? ' <span style="color: #15803d; font-size: 10px;">▲</span>' : ''}`);
+
+        const baseEvadeActive = (f.isEvadeAlwaysActive !== undefined) 
+          ? Boolean(f.isEvadeAlwaysActive) 
+          : Boolean(CONFIG.john_wick?.evadeAlwaysActive || f.isRolling || ((f.evadeBuffTimer || 0) > 0));
+        const isEvading = Boolean(isExcommunicado || baseEvadeActive);
+
+        if (isEvading) {
+          const defaultEvade = (f.evadeChance !== undefined) ? f.evadeChance : (CONFIG.john_wick?.evadeChance ?? 1.0);
+          const evadeVal = Math.round((isExcommunicado ? (CONFIG.john_wick?.excommunicadoEvadeChance ?? 1.0) : defaultEvade) * 100);
+          info.push(`<b>Evade:</b> ${evadeVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>Evade:</b> 0%`);
+        }
+
+        if (isExcommunicado) {
+          const spdBonus = Math.round(((CONFIG.john_wick?.excommunicadoSpeedMultiplier || 1.40) - 1.0) * 100);
+          info.push(`<b>SPD:</b> +${spdBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
         }
       } else if (f.characterId === 'dummy' || f.type === 'dummy') {
         info.push(`<b>Stun Chance:</b> ${Math.round((CONFIG.dummy?.stunChance || 0.15) * 100)}%`);

@@ -180,6 +180,55 @@ export function drawFighters() {
     }
   }
 
+  // John Wick CQC Assassination Highlight Spotlight & Arena Dim Effect
+  const wickFighter = fighters ? fighters.find(f => f && (f.characterId === 'john_wick' || f.type === 'john_wick') && f.cqcComboPhase) : null;
+  if (wickFighter && (wickFighter.cqcComboPhase === 'PUNCH_1' || wickFighter.cqcComboPhase === 'PUNCH_2' || wickFighter.cqcComboPhase === 'PENCIL_STAB' || wickFighter.cqcComboPhase === 'BACKWARD_ROLL')) {
+    const target = wickFighter.cqcComboTarget;
+    const wCfg = (typeof CONFIG !== 'undefined' && CONFIG.john_wick) ? CONFIG.john_wick : {};
+    const maxDimAlpha = wCfg.cqcSpotlightDimAlpha || 0.68;
+    const spotR = wCfg.cqcSpotlightRadius || 360;
+    const bloomR = wCfg.cqcSpotlightBloomRadius || 150;
+
+    let dimAlpha = maxDimAlpha;
+    if (wickFighter.cqcComboPhase === 'BACKWARD_ROLL') {
+      const rollMax = wickFighter.rollMaxTimer || 20;
+      dimAlpha = maxDimAlpha * Math.max(0, (wickFighter.rollTimer || 0) / rollMax); // Smooth fade-out during disengage roll
+    }
+
+    if (dimAlpha > 0.01) {
+      const focusX = target ? (wickFighter.x + target.x) * 0.5 : wickFighter.x;
+      const focusY = target ? ((wickFighter.y - (wickFighter.z || 0)) + (target.y - (target.z || 0))) * 0.5 : (wickFighter.y - (wickFighter.z || 0));
+      const maxDimDist = Math.max(ctx.canvas.width, ctx.canvas.height) * 1.1;
+
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+      // 1. Full Arena Radial Vignette with crystal-clear spotlight cutout on John Wick & Victim
+      const spotGrad = ctx.createRadialGradient(focusX, focusY, 40, focusX, focusY, Math.min(spotR, maxDimDist));
+      spotGrad.addColorStop(0,    'rgba(0, 0, 0, 0)'); // Crystal clear on John Wick & Victim
+      spotGrad.addColorStop(0.25, `rgba(0, 0, 0, ${(dimAlpha * 0.12).toFixed(3)})`);
+      spotGrad.addColorStop(0.55, `rgba(0, 0, 0, ${(dimAlpha * 0.62).toFixed(3)})`);
+      spotGrad.addColorStop(1.0,  `rgba(0, 0, 0, ${(dimAlpha * 0.95).toFixed(3)})`);
+
+      ctx.fillStyle = spotGrad;
+      ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+      // 2. Warm Continental Gold Underfoot Spotlight Bloom
+      ctx.globalCompositeOperation = 'lighter';
+      const floorGlow = ctx.createRadialGradient(focusX, focusY, 10, focusX, focusY, bloomR);
+      floorGlow.addColorStop(0,    `rgba(245, 158, 11, ${(0.32 * dimAlpha).toFixed(3)})`);
+      floorGlow.addColorStop(0.50, `rgba(212, 175, 55, ${(0.16 * dimAlpha).toFixed(3)})`);
+      floorGlow.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = floorGlow;
+      ctx.beginPath();
+      ctx.arc(focusX, focusY, bloomR, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+  }
+
   // Sort fighters by depth (y-coordinate) so characters lower on screen draw on top.
   // Exception: Fighters with an active domain expansion are forced to draw last (on top of everyone).
   if (!_sortedFightersBuffer || _sortedFightersBuffer.length !== fighters.length) {
@@ -366,8 +415,6 @@ export function drawFighters() {
     
     let isInfinityFreeze = entity.isFrozenByInfinity && (entity.timeStopTimer || 0) > 0;
     const isMahoragaFreeze = entity.mahoragaAdaptationFreezeTimer > 0;
-    // Suppress golden visual for short hit-pauses (< 15 frames) used in flurries like Sukuna's
-    const isGenericTimeStop = entity.timeStopTimer > 0 && (entity._timeStopOriginalDuration || 0) >= 15;
 
     // Check if Gojo's Domain Expansion (Unlimited Void) is currently active and freezing everyone
     let gojoDomainActive = false;
@@ -382,14 +429,14 @@ export function drawFighters() {
     const isPureLoveBeamTrapped = entity.caughtInPureLoveBeam || (entity.pureLoveBeamTimer && entity.pureLoveBeamTimer > 0) || (entity.pureLoveBeamRecoveryTimer && entity.pureLoveBeamRecoveryTimer > 0);
     if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0) || isPureLoveBeamTrapped || entity.suppressFreezeOverlay || entity.isWallPinned) return;
 
-    const isFrozen = isInfinityFreeze || isGenericTimeStop;
+    const isCronosFreeze = entity.frozenByCronos || entity.isCronosStasis;
+    const isFrozen = isInfinityFreeze || isCronosFreeze;
     if (!isFrozen) return;
 
     // If Mahoraga paused time for adaptation (and it's not Gojo's infinity), don't draw an overlay
     if (isMahoragaFreeze && !isInfinityFreeze) return;
 
-    const isCronosFreeze = entity.frozenByCronos || entity.isCronosStasis;
-    const isCyanOverlay = !isCronosFreeze; // Cyan blue for Gojo / Limitless / stasis freeze, Gold ONLY for Cronos
+    const isCyanOverlay = isInfinityFreeze; // Cyan blue ONLY for Gojo's Limitless Infinity freeze, Gold for Cronos
     const colorFill = isCyanOverlay ? 'rgba(0, 229, 255, 0.65)' : 'rgba(255, 215, 0, 0.35)'; // Cyan for Gojo / Infinity, Gold for Cronos
     const colorRing = isCyanOverlay ? 'rgba(224, 255, 255, 0.9)' : 'rgba(255, 255, 150, 0.8)';
 

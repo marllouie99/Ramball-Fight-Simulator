@@ -15,6 +15,7 @@ import { ichigoConfig } from '../configs/characters/ichigoConfig.js?v=4';
 import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js?v=4';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
+import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 
@@ -34,6 +35,8 @@ export const CONFIG = {
   yuji: yujiConfig,
   layla: laylaConfig,
   ichigo: ichigoConfig,
+  john_wick: johnWickConfig,
+  johnWick: johnWickConfig,
   arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
@@ -45,7 +48,14 @@ export const CONFIG = {
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
   globalFighter: {
     sizeMultiplier: 1.3,                       // scale the size of all fighters globally (1.0 = default)
-    handSizeMultiplier: 1.5,                   // scale the size of all fighter hands globally (1.0 = default)
+    handSizeMultiplier: 1.4,                   // scale the size of all fighter hands globally (1.0 = default)
+  },
+  /** Global Bleed Debuff Settings */
+  bleed: {
+    defaultDuration: 180,                      // default duration in frames (3.0s at 60fps)
+    defaultIntervalFrames: 30,                 // frames between bleed damage ticks (30 frames = 0.5s)
+    defaultDamagePerTick: 4,                   // true damage per bleed tick
+    dripParticleIntervalFrames: 5,             // frames between dripping blood particles
   },
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
@@ -653,6 +663,10 @@ export const CONFIG = {
 
   /** Mahito — Cursed Spirit of Human Hatred */
   mahito: mahitoConfig,
+
+  /** John Wick — The Baba Yaga */
+  john_wick: johnWickConfig,
+  johnWick: johnWickConfig,
 };
 
 // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
@@ -1197,7 +1211,7 @@ export const FIGHTER_DEFS = [
     hp: 320,
     damage: 14,
     cooldown: 27,
-    moveSpeed: 6.2,
+    moveSpeed: genosConfig.moveSpeed || 5.2,
     projectileSpeedMultiplier: 1.4,
     ability: 'Incinerate',
     desc: 'Demon Cyborg. Zones with explosive basic blasts, Rocket Stomps to close in, and uses a devastating continuous fire beam. Explodes upon defeat.',
@@ -1277,6 +1291,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 1.0,
     ability: 'Straw Doll Technique',
     desc: 'Wields a steel claw hammer and cursed nails. Embeds nails in enemies and environment. Passive: Unflinching Ecstasy surges under 50% HP. Skill 1: Hairpin detonates all active nails. Skill 2: Resonance pierces soul across any distance.',
+  },
+  {
+    id: 33,
+    name: 'John Wick',
+    category: 'Pop Culture & Action',
+    color: '#2b2d31', // Tactical Charcoal Gunmetal
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'john_wick',
+    hp: 420,
+    damage: 22,
+    cooldown: 35,
+    moveSpeed: johnWickConfig.speed || 6.4,
+    projectileSpeedMultiplier: 6.2,
+    ability: 'C.A.R. Gun-Fu & The Pencil',
+    desc: 'The Baba Yaga. Master of Center Axis Relock Gun-Fu and ruthless CQC. Passive: Ballistic Tailored Suit resists ranged damage. Wields the custom TTI Pit Viper 9mm and the infamous No. 2 Pencil for armor-piercing assassination takedowns.',
   }
 ];
 

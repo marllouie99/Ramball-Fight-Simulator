@@ -355,8 +355,7 @@ export class DarkSlateGrayFighter extends Fighter {
       return; // Hold Assassin in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
     }
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
 
     // Time stop - freeze ALL movement, spinning, and actions

@@ -171,12 +171,22 @@ else color = 'rgba(15, 15, 22, 0.90)';        // Dark manga ink line
 ## 19. Fighter Skin & Face Orientation Standards (Always Facing Camera / Viewer POV)
 
 ### Upright Coordinate Layout (Front Profile POV)
-Fighter body models, heads, faces, hair, and uniforms MUST ALWAYS be drawn oriented upright facing directly towards the player/camera (front POV):
-- **`-Y` (Top)**: Hair, bangs, horns/crest, forehead, top of head.
-- **`Y ~ 0` (Center)**: Eyes, blindfolds, face markings, scars, stitches, nose bridge.
+Fighter body models, heads, hair, and uniforms MUST ALWAYS be drawn oriented upright facing directly towards the player/camera (front POV):
+- **`-Y` (Top)**: Hair, bangs, horns/crest, forehead, head accessories, top of head.
+- **`Y ~ 0` (Center)**: Headwear/eyewear (blindfolds, goggles, masks, eye patches), iconic markings/scars/stitches, stubble/beard shadow silhouettes.
 - **`+Y` (Bottom)**: Collar, neck opening, torso, jacket/tunic/uniform, belt, clothing folds.
 - **`-X` / `+X` (Left / Right)**: Symmetrical ears, side hair locks, shoulders, arms.
 - **NEVER** draw faces or clothing oriented sideways along the X-axis (e.g. placing hair at `-X` and torso at `+X`). The character must never appear lying horizontally.
+
+### Facial Features Standard: Prohibition of Eyes, Mouth, and Nose (Minimalist Aesthetic)
+- **STRICT PROHIBITION**: **NEVER** draw eyes, pupils, sclera, irises, eyelashes, mouths, lips, or nose bridges on fighter skins.
+- Character identity and expressiveness MUST be conveyed exclusively through:
+  - Distinctive hair silhouettes, bangs, and side locks.
+  - Signature eyewear or headwear (e.g., Gojo's blindfold, Nanami's 7:3 goggles).
+  - Iconic thematic markings, scars, and stitches (e.g., Sukuna's cursed marks, Mahito's face stitches, Toji's lip scar silhouette).
+  - Beard, mustache, or stubble shadow silhouettes / tonal gradients.
+  - Tailored clothing, collars, ties, robes, and armor.
+- Maintaining clean, faceless circle bodies preserves the stylized 2D minimalist Ramball aesthetic and eliminates visual clutter during high-speed arena combat.
 
 ### Local Space Transform & Vertical Mirroring
 All skin renderers must apply the standard transform so that facing direction aligns with `gunAngle` while keeping the character upright:

@@ -42,8 +42,7 @@ export class BlackFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
 
     // Time stop - freeze ALL movement, spinning, and actions

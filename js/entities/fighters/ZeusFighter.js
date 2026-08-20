@@ -132,8 +132,7 @@ export class ZeusFighter extends Fighter {
     // Visual hovering effect: float like Trickster
     this.z = 25 + Math.sin(Date.now() / 200) * 6;
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 

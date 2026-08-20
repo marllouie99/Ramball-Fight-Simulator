@@ -1,9 +1,21 @@
 import { CONFIG } from '../../core/config.js';
 import { fastCleanArray } from '../../graphics/particles/visualTrailSystem.js';
+import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 
 export class StatusEffectsManager {
+  // Static registry for global debuff / status effect processors
+  static _debuffProcessors = [];
+
+  /** Registers a global status effect / debuff processor */
+  static registerDebuff(processor) {
+    if (typeof processor === 'function' && !StatusEffectsManager._debuffProcessors.includes(processor)) {
+      StatusEffectsManager._debuffProcessors.push(processor);
+    }
+  }
+
   constructor(fighter) {
     this.fighter = fighter;
+    this._lastStatusTickFrame = -1;
   }
 
   isSilenced() {
@@ -89,6 +101,50 @@ export class StatusEffectsManager {
     }
   }
 
+  // --- Bleed ---
+  applyBleed(attacker, duration, damagePerTick, intervalFrames) {
+    const bleedCfg = CONFIG.bleed || {};
+    const finalDuration = duration ?? bleedCfg.defaultDuration ?? 180;
+    const finalDamage = damagePerTick ?? bleedCfg.defaultDamagePerTick ?? 4;
+    const finalInterval = intervalFrames ?? bleedCfg.defaultIntervalFrames ?? 30;
+
+    this.fighter.bleedTimer = Math.max(this.fighter.bleedTimer || 0, finalDuration);
+    this.fighter.bleedDamageTimer = 0;
+    this.fighter.bleedDamagePerTick = finalDamage;
+    this.fighter.bleedIntervalFrames = finalInterval;
+    this.fighter.lastBleedAttacker = attacker;
+  }
+
+  handleBleed() {
+    if (this.fighter.bleedTimer > 0) {
+      this.fighter.bleedTimer--;
+      this.fighter.bleedDamageTimer = (this.fighter.bleedDamageTimer || 0) + 1;
+
+      const bleedCfg = CONFIG.bleed || {};
+      const intervalFrames = this.fighter.bleedIntervalFrames || bleedCfg.defaultIntervalFrames || 30;
+      const damage = this.fighter.bleedDamagePerTick || bleedCfg.defaultDamagePerTick || 4;
+      const dripFreq = bleedCfg.dripParticleIntervalFrames || 5;
+
+      if (this.fighter.bleedDamageTimer >= intervalFrames) {
+        if (typeof this.fighter.takeDamage === 'function') {
+          this.fighter.takeDamage(damage, this.fighter.lastBleedAttacker, true, { isBleed: true });
+        }
+        this.fighter.bleedDamageTimer = 0;
+      }
+
+      // Continuous dripping blood particles (drops every dripFreq frames while bleeding!)
+      if (this.fighter.bleedTimer % dripFreq === 0) {
+        const dropX = this.fighter.x + (Math.random() - 0.5) * (this.fighter.r || 25);
+        const dropY = (this.fighter.y - (this.fighter.z || 0)) + (Math.random() - 0.2) * (this.fighter.r || 25);
+        spawnBloodEffect({ x: dropX, y: dropY, z: 0, r: 4 }, 1, Math.PI / 2, {
+          minSize: 2.2,
+          maxSize: 4.0,
+          count: 2
+        });
+      }
+    }
+  }
+
   // --- Freeze / Time Stop ---
   applyTimeStop(frames, opts = {}) {
     // Only apply if not immune
@@ -102,9 +158,6 @@ export class StatusEffectsManager {
     }
 
     const currentRemaining = this.fighter.timeStopTimer || 0;
-    // Overwrite only if the new duration is greater than what's left, 
-    // or if we are applying a fresh freeze.
-    // We do NOT want to overwrite a 60-frame remaining freeze with a 2-frame hit-pause.
     if (frames > currentRemaining) {
       this.fighter._timeStopOriginalDuration = frames;
       this.fighter.timeStopTimer = frames;
@@ -215,9 +268,9 @@ export class StatusEffectsManager {
       }
 
       // Continuously decrement skill & ultimate cooldowns while frozen (EXCEPT inside Gojo's Unlimited Void Domain)
-      const isGojoDomainActive = state.fighters && state.fighters.some(f => 
+      const isGojoDomainActive = (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
         f && (f.type === 'gojo' || f.characterId === 'gojo' || f._def?.id === 'gojo') && f.domainActive
-      );
+      ));
 
       if (!isGojoDomainActive && typeof fighter._decrementSkillCooldowns === 'function') {
         fighter._decrementSkillCooldowns();
@@ -249,10 +302,45 @@ export class StatusEffectsManager {
     return false;
   }
 
-  // --- Main Update ---
-  update() {
+  /**
+   * Unified master handler for all global status effects and debuffs.
+   * Frame-safe: executes all registered debuff processors once per tick.
+   */
+  handleStatusEffects() {
+    const currentFrame = (typeof state !== 'undefined' && typeof state.frameCount === 'number') ? state.frameCount : (this._lastStatusTickFrame + 1);
+    if (this._lastStatusTickFrame === currentFrame && typeof state !== 'undefined' && typeof state.frameCount === 'number') {
+      return; // Already processed this frame!
+    }
+    this._lastStatusTickFrame = currentFrame;
+
     this.handlePoison();
     this.handleBurn();
+    this.handleBleed();
+
+    // Execute any dynamically registered debuff processors
+    for (let i = 0; i < StatusEffectsManager._debuffProcessors.length; i++) {
+      StatusEffectsManager._debuffProcessors[i](this.fighter, this);
+    }
+  }
+
+  /** Unified dispatch method for applying any status effect by name */
+  applyStatusEffect(effectName, ...args) {
+    switch (effectName) {
+      case 'bleed': return this.applyBleed(...args);
+      case 'poison': return this.applyPoison(...args);
+      case 'burn': return this.applyBurn(...args);
+      case 'slow': return this.applySlow(...args);
+      case 'hitStun': return this.applyHitStun(...args);
+      case 'paralyze': return this.applyParalyze(...args);
+      case 'timeStop': return this.applyTimeStop(...args);
+      default:
+        console.warn(`[StatusEffectsManager] Unknown status effect: ${effectName}`);
+    }
+  }
+
+  // --- Main Update ---
+  update() {
+    this.handleStatusEffects();
     return this.handleTimeStop();
   }
 }

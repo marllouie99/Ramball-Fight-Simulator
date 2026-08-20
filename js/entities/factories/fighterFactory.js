@@ -35,6 +35,7 @@ import { IchigoFighter } from '../fighters/IchigoFighter.js';
 import { MahitoFighter } from '../fighters/MahitoFighter.js';
 import { NanamiFighter } from '../fighters/NanamiFighter.js';
 import { NobaraFighter } from '../fighters/NobaraFighter.js';
+import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -72,6 +73,8 @@ export const FIGHTER_CLASS_MAP = {
   'mahito': MahitoFighter,
   'nanami': NanamiFighter,
   'nobara': NobaraFighter,
+  'john_wick': JohnWickFighter,
+  'johnwick':  JohnWickFighter,
 };
 
 // Helper to wrap a class's draw method with the sketchy circle decorator globally

@@ -898,6 +898,14 @@ export class TojiFighter extends Fighter {
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
+    // Check John Wick CQC Combo / Ambush Target Freeze (bypasses Heavenly Restriction)
+    if (this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
+      this.vx = 0;
+      this.vy = 0;
+      this.interruptAttacks();
+      return; // Stop Toji's movement and actions completely while John Wick rolls/attacks!
+    }
+
     // Check Mahoraga Divine Adaptation Freeze first (bypasses Heavenly Restriction immunity)
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
@@ -959,20 +967,19 @@ export class TojiFighter extends Fighter {
     this._updateAfterImages();
 
     // 1. Handle base cooldowns and debuffs
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Toji Heavenly Restriction Immunity: Immune to time-stop, domain freeze, hit stun, and CC (EXCEPT Genos Machine Gun Blows!)
-    if (this.caughtInGenosFlurry) {
+    // Toji Heavenly Restriction Immunity: Immune to time-stop, domain freeze, hit stun, and CC (EXCEPT Genos Machine Gun Blows & John Wick CQC Ambush!)
+    if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
       this.vx = 0;
       this.vy = 0;
       this.interruptAttacks();
       if (this.statusEffects && typeof this.statusEffects.applyTimeStop === 'function') {
         this.statusEffects.applyTimeStop(10);
       }
-      return; // Stop update execution so Toji is 100% frozen in place during Machine Gun Blows!
+      return; // Stop update execution so Toji is 100% frozen in place!
     } else {
       this.timeStopTimer = 0;
       if (this.statusEffects) this.statusEffects.timeStopTimer = 0;

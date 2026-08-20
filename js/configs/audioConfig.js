@@ -46,5 +46,17 @@ export const AUDIO_CONFIG = {
   'skill_todotadakabgsong': 'Assets/Sound Effects/Skills/todo-tadaka-background-song.mp3',
   'skill_todomybestfriend': 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3',
   'skill_yujibestfriend': 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3',
-  'skill_saitamachampion': 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3'
+  'skill_saitamachampion': 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3',
+  'skill_johnwick_shell_drop': 'Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3',
+  'skill_johnwick_gun_drop': 'Assets/Sound Effects/Skills/johnwick-gundrop.mp3',
+  'skill_johnwick_gun_switch': 'Assets/Sound Effects/Skills/johnwick-gunswitch.mp3',
+  'skill_johnwick_m4_reload': 'Assets/Sound Effects/Skills/johnwick-m4-reload.mp3',
+  'skill_johnwick_m4_shot': 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
+  'skill_johnwick_pencil_stab': 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+  'skill_johnwick_pistol_reload': 'Assets/Sound Effects/Skills/johnwick-pistol-reload.mp3',
+  'skill_johnwick_pistol_shot': 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
+  'skill_johnwick_shotgun_crack': 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3',
+  'skill_johnwick_shotgun_reload': 'Assets/Sound Effects/Skills/johnwick-shotgun-reload.mp3',
+  'skill_johnwick_switchgun_voice': 'Assets/Sound Effects/Skills/johnwick-switchgun-voiceline.mp3',
+  'skill_johnwick_rollback_voice': 'Assets/Sound Effects/Skills/Johnwick-rollback-voiceline.mp3'
 };

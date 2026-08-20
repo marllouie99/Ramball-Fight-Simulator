@@ -187,6 +187,9 @@ class ProjectileSystem {
       dirY = Math.sin(angle);
     } else {
       let tipDist = GUN_TIP_DIST(fighter.r);
+      if (fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
+        tipDist = fighter.r * 0.85 + 28 * 1.25;
+      }
       dirX = Math.cos(fighter.gunAngle);
       dirY = Math.sin(fighter.gunAngle);
       
@@ -240,6 +243,9 @@ class ProjectileSystem {
     if (!visualType && fighter._def && (fighter._def.type === 'sukuna' || fighter._def.name === 'Sukuna' || fighter._def.name === 'Ryomen Sukuna')) {
       visualType = 'sukunaSlash';
     }
+    if (!visualType && fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
+      visualType = 'johnWickBullet';
+    }
 
     const proj = this._getProjectile();
     proj.x = spawnX;
@@ -262,6 +268,14 @@ class ProjectileSystem {
     proj.isSukunaSlash = (visualType === 'sukunaSlash' || visualType === 'sukunaCleave' || visualType === 'sukunaDismantleGrid' || visualType === 'ghostBlade' || (fighter && (fighter.characterId === 'sukuna' || fighter.type === 'sukuna')));
     if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
     proj.historyMax = 10;
+
+    if (visualType === 'johnWickBullet' && CONFIG.john_wick) {
+      if (CONFIG.john_wick.bulletRadius) proj.r = CONFIG.john_wick.bulletRadius;
+      if (CONFIG.john_wick.bulletLife) {
+        proj.life = CONFIG.john_wick.bulletLife;
+        proj.maxLife = CONFIG.john_wick.bulletLife;
+      }
+    }
 
     if (willBecomeBlackHole) {
       proj.isBlackHole = true;
@@ -2798,6 +2812,51 @@ class ProjectileSystem {
             // Massive arena shake
             triggerGlobalScreenShake(25, 20);
           }
+        }
+
+        const isJohnWickPistol = p.visual === 'johnWickBullet';
+        const isJohnWickShotgun = p.visual === 'johnWickShotgunPellet';
+        const isJohnWickRifle = p.visual === 'johnWickRifleBullet';
+
+        if ((isJohnWickPistol || isJohnWickShotgun || isJohnWickRifle) && expired && !hit) {
+          const arena = CONFIG.arena;
+          const wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+          const wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+
+          if (isJohnWickRifle) {
+            // Supersonic M4 5.56 NATO penetrator impact: Cyan-blue shockwave vapor + gold penetration sparks + bright flash
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 8, 'cyan', '#38BDF8');
+              spawnSparks(wallX, wallY, 6, 'gold', '#FEF08A');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 22, '#38BDF8');
+            }
+          } else if (isJohnWickShotgun) {
+            // Heavy 12-gauge lead buckshot splatter: fiery orange sparks + silver lead dust + flame impact flash
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 6, 'flame', '#F97316');
+              spawnSparks(wallX, wallY, 4, 'silverStreak', '#E2E8F0');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 20, '#F97316');
+            }
+          } else {
+            // TTI Pit Viper 9mm brass/copper bullet disintegration: golden ricochet sparks + silver streaks + amber flash
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(wallX, wallY, 8, 'gold', '#F59E0B');
+              spawnSparks(wallX, wallY, 4, 'silverStreak', '#CBD5E1');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(wallX, wallY, 16, '#F59E0B');
+            }
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+          continue;
         }
 
         if (p.visual === 'shuriken' && expired && !hit && p.life > 0) {

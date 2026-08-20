@@ -433,8 +433,7 @@ export class GojoFighter extends Fighter {
       return;
     }
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 

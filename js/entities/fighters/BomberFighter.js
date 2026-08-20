@@ -74,8 +74,7 @@ export class BomberFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 

@@ -178,8 +178,7 @@ export class MusashiFighter extends Fighter {
     }
 
     this.distToTargetSq = Infinity;
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 

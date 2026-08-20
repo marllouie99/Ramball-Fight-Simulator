@@ -579,7 +579,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
   if (f.characterId === 'genos' || f.type === 'genos') {
-    const themeColor = '#FF5500';
+    const themeColor = CONFIG.genos?.themeColor || CONFIG.genos?.color || f.color || '#FF5500';
 
     const maxAmmo = f.maxHeatAmmo || CONFIG.genos?.maxHeatAmmo || 20;
     const currentAmmo = f.heatAmmo !== undefined ? f.heatAmmo : maxAmmo;
@@ -606,42 +606,37 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
     let sdPct = 0;
     let sdReady = false;
-    let sdColor = '#FF3300';
-    let sdLabel = 'CORE OVERLOAD';
+    let sdLabel = 'SELF DESTRUCT';
 
     if (f.isSelfDestructing) {
       const sdMax = CONFIG.genos?.selfDestructCountdownFrames || 150;
       const remaining = f.selfDestructTimer || 0;
       sdPct = Math.max(0, Math.min(100, (remaining / sdMax) * 100));
       sdReady = true;
-      sdColor = '#FF0000';
       sdLabel = 'OVERLOAD DETONATING...';
     } else if (f.usedSelfDestruct) {
       sdPct = 0;
       sdReady = false;
-      sdColor = '#555555';
       sdLabel = 'OVERLOAD USED';
     } else {
-      const threshold = 0.10;
+      const threshold = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
       const currentHpRatio = f.hp / f.maxHp;
       if (currentHpRatio <= threshold) {
         sdPct = 100;
         sdReady = true;
-        sdColor = '#FF3300';
-        sdLabel = 'CORE OVERLOAD READY';
+        sdLabel = 'SELF DESTRUCT READY';
       } else {
         sdPct = Math.max(0, Math.min(100, ((1 - currentHpRatio) / (1 - threshold)) * 100));
         sdReady = false;
-        sdColor = '#FF5500';
-        sdLabel = 'CORE OVERLOAD';
+        sdLabel = 'SELF DESTRUCT';
       }
     }
 
     return [
-      { id: 'ammo',         pct: ammoPct,   ready: ammoReady,       color: '#FF8800', label: ammoLabel },
+      { id: 'ammo',         pct: ammoPct,   ready: ammoReady,       color: themeColor, label: ammoLabel },
       { id: 'flurry',       pct: flurryPct, ready: flurryPct >= 99, color: themeColor, label: 'MACHINE GUN BLOWS' },
       { id: 'ult',          pct: ultPct,    ready: ultPct >= 99,    color: themeColor, label: 'INCINERATION CANNON' },
-      { id: 'selfdestruct', pct: sdPct,     ready: sdReady,        color: sdColor,   label: sdLabel }
+      { id: 'selfdestruct', pct: sdPct,     ready: sdReady,         color: themeColor, label: sdLabel }
     ];
   }
   if (f.characterId === 'cronos' || f.type === 'cronos') {
@@ -873,6 +868,72 @@ export function getSkillDataForFighter(f, getProjectiles) {
       { id: 'getsuga', pct: getsugaPct, ready: getsugaReady, color: themeColor, label: 'GETSUGA TENSHO' },
       { id: 'shunpo',  pct: shunpoPct,  ready: shunpoPct >= 99,  color: themeColor, label: 'FLASH STEP FLURRY' },
       { id: 'bankai',  pct: ultPct,      ready: ultReady,         color: themeColor, label: 'BANKAI' }
+    ];
+  }
+
+  if (f.characterId === 'john_wick' || f.type === 'john_wick' || f.characterId === 'johnwick' || f.type === 'johnwick') {
+    const cfg = CONFIG.john_wick || {};
+    const themeColor = cfg.themeColor || '#64748B'; // Tactical Gunmetal Slate
+    const maxMag = f.maxMagazine || cfg.magazineSize || 12;
+    const bullets = f.magazineBullets !== undefined ? f.magazineBullets : maxMag;
+    
+    // 1. Weapon Ammo / Reload Progress
+    let magPct = 0;
+    let magReady = false;
+    let weaponName = 'PISTOL';
+    if (f.currentEquippedWeapon === 'shotgun') {
+      weaponName = 'SHOTGUN';
+    } else if (f.currentEquippedWeapon === 'rifle') {
+      weaponName = 'RIFLE';
+    }
+
+    if (f.weaponSwitchTimer && f.weaponSwitchTimer > 0) {
+      const swMax = f.weaponSwitchMaxTime || cfg.weaponSwitchDuration || 36;
+      const swProgress = Math.max(0, Math.min(1.0, 1 - (f.weaponSwitchTimer / swMax)));
+      magPct = swProgress * 100;
+      magReady = false;
+    } else if (f.isReloading) {
+      let reloadMax = cfg.reloadTime || 75;
+      if (f.currentEquippedWeapon === 'shotgun') {
+        reloadMax = cfg.shotgunReloadTime || 96;
+        magPct = Math.max(0, Math.min(100, (bullets / maxMag) * 100));
+        magReady = false;
+      } else {
+        if (f.currentEquippedWeapon === 'rifle') {
+          reloadMax = cfg.rifleReloadTime || 85;
+        }
+        const reloadProgress = Math.max(0, Math.min(1.0, 1 - (f.reloadTimer / reloadMax)));
+        magPct = reloadProgress * 100;
+        magReady = false;
+      }
+    } else {
+      magPct = Math.max(0, Math.min(100, (bullets / maxMag) * 100));
+      magReady = bullets > 0;
+    }
+
+    // 2. Ultimate: Excommunicado (Weapon Cycle Progression toward M4 Rifle)
+    const currentWeapon = f.currentEquippedWeapon || 'pistol';
+    const rollbacks = f.rollbackCount || 0;
+    let ultPct = 0;
+    let ultReady = false;
+    let ultLabel = 'EXCOMMUNICADO';
+
+    if (currentWeapon === 'pistol') {
+      // Pistol phase: 0% base + rollback progress toward shotgun (0–33%)
+      ultPct = (rollbacks / 3) * 33.33;
+    } else if (currentWeapon === 'shotgun') {
+      // Shotgun phase: 33% base + rollback progress toward rifle (33–66%)
+      ultPct = 33.33 + (rollbacks / 3) * 33.33;
+    } else if (currentWeapon === 'rifle') {
+      // Rifle reached: Excommunicado ACTIVE (100%)
+      ultPct = 100;
+      ultReady = true;
+    }
+    ultPct = Math.max(0, Math.min(100, ultPct));
+
+    return [
+      { id: 'magazine', pct: magPct, ready: magReady, color: themeColor, label: weaponName },
+      { id: 'ultimate', pct: ultPct, ready: ultReady, color: themeColor, label: ultLabel }
     ];
   }
 

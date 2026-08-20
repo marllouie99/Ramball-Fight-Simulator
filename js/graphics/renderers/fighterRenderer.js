@@ -1,19 +1,6 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import {
-  drawSlowEffect,
-  drawElectricStunEffect,
-  drawDubstepStunEffect,
-  drawCrimsonElectrifiedEffect,
-  drawPoisonEffect,
-  drawSilenceEffect,
-  drawThunderRootsEffect,
-  drawBlackFlashDebuffEffect,
-  drawVoidMarkEffect,
-  drawParalyzeEffect,
-  drawSoulDisfigurementEffect,
-  drawEmbeddedMahitoSpikes
-} from '../statusEffects.js';
+import { STATUS_OVERLAY_REGISTRY } from '../statusEffects.js';
 
 // Cache of pre-computed sketchy circle paths keyed by "radius_seed"
 const _sketchyCircleCache = new Map();
@@ -123,117 +110,12 @@ export class FighterRenderer {
       ctx.restore();
     }
 
-    if (!fighter.purpleHitTimer && ((fighter.statusEffects && fighter.statusEffects.fighter.slowTimer > 0) || fighter.slowTimer > 0)) {
-      // Suppress the generic slow visual if they are currently trapped in Toji's cinematic ultimate
-      const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-        f && f.ultimateActive && f.ultimateTarget === fighter && (f.type === 'toji' || f.characterId === 'toji')
-      );
-      if (!trappedInTojiUltimate) {
-        drawSlowEffect(ctx, baseRadius);
+    // Process all declarative status overlays from registry
+    for (let i = 0; i < STATUS_OVERLAY_REGISTRY.length; i++) {
+      const entry = STATUS_OVERLAY_REGISTRY[i];
+      if (entry.isActive(fighter)) {
+        entry.render(ctx, baseRadius, fighter);
       }
-    }
-
-    if (fighter.electricStunTimer > 0) {
-      drawElectricStunEffect(ctx, baseRadius, false);
-    }
-
-    if (fighter.pureLoveBeamRecoveryTimer > 0) {
-      ctx.save();
-      // Draw neon pink body overlay
-      ctx.fillStyle = 'rgba(255, 20, 147, 0.45)';
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
-      
-      // Outer pink pulsing rings to show visual capture/stun
-      const time = Date.now();
-      const pulse = (Math.sin(time / 100) + 1) / 2;
-      ctx.strokeStyle = 'rgba(255, 105, 180, 0.85)';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, baseRadius * (1.05 + pulse * 0.15), baseRadius * (1.05 + pulse * 0.15), 0, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-    
-    if (fighter.dubstepStunVisualTimer > 0) {
-      drawDubstepStunEffect(ctx, baseRadius, fighter.dubstepStunVisualTimer);
-    }
-    
-    if (fighter.crimsonElectrifiedTimer > 0) {
-      drawCrimsonElectrifiedEffect(ctx, baseRadius, fighter.crimsonElectrifiedTrickster);
-    }
-
-    if (fighter.poisonTicks > 0) {
-      drawPoisonEffect(ctx, baseRadius);
-    }
-    
-    if (fighter.silenceTimer > 0) {
-      drawSilenceEffect(ctx, baseRadius);
-    }
-    
-    if (fighter.thunderRootsTimer > 0) {
-      drawThunderRootsEffect(ctx, baseRadius);
-    }
-
-    if (fighter.nanamiArmorFractureTimer > 0) {
-      ctx.save();
-      const fracTime = Date.now() * 0.005;
-      const pulse = 0.5 + 0.5 * Math.sin(fracTime * 3);
-      ctx.strokeStyle = `rgba(255, 215, 0, ${0.55 + 0.35 * pulse})`;
-      ctx.lineWidth = 1.4;
-
-      // Golden fractured hairline cracks across the body
-      ctx.beginPath();
-      ctx.moveTo(-baseRadius * 0.6, -baseRadius * 0.3);
-      ctx.lineTo(-baseRadius * 0.1, 0);
-      ctx.lineTo(baseRadius * 0.5, -baseRadius * 0.4);
-      ctx.moveTo(-baseRadius * 0.1, 0);
-      ctx.lineTo(baseRadius * 0.2, baseRadius * 0.6);
-      ctx.stroke();
-
-      // Subtle golden glow perimeter
-      ctx.strokeStyle = `rgba(212, 175, 55, ${0.35 * pulse})`;
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius * 1.04, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    if (fighter.burnTimer > 0) {
-      const offset = baseRadius * 0.15;
-      const grad = ctx.createRadialGradient(-offset, -offset, 0, 0, 0, baseRadius);
-      const pulse = 0.05 * Math.sin(Date.now() / 100);
-      grad.addColorStop(0, 'rgba(255, 255, 220, 0.65)'); // Hot-white/yellow center
-      grad.addColorStop(0.35, `rgba(255, 130, 0, ${0.5 + pulse})`);
-      grad.addColorStop(0.75, `rgba(200, 30, 0, ${0.35 + pulse})`);
-      grad.addColorStop(1, 'rgba(100, 0, 0, 0)');
-
-      ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-    if (fighter.blackFlashDebuffTimer > 0) {
-      drawBlackFlashDebuffEffect(ctx, baseRadius);
-    }
-
-    if (fighter.voidMarkTimer > 0) {
-      drawVoidMarkEffect(ctx, baseRadius);
-    }
-
-    if (fighter.paralyzeTimer > 0) {
-      drawParalyzeEffect(ctx, baseRadius, Boolean(fighter.isParalyzedByMahito), fighter.paralyzeTimer, '#A855F7', fighter);
-    }
-
-    if ((fighter._soulDisfigurementStacks || 0) > 0 && (fighter._soulDisfigurementTimer || 0) > 0) {
-      drawSoulDisfigurementEffect(ctx, baseRadius, fighter._soulDisfigurementStacks);
-    }
-
-    if (fighter._embeddedMahitoSpikes && fighter._embeddedMahitoSpikes.length > 0) {
-      drawEmbeddedMahitoSpikes(ctx, baseRadius, fighter);
     }
   }
 

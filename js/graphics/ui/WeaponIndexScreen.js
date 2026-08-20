@@ -21,6 +21,7 @@ import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
 import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
+import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -252,6 +253,23 @@ function drawWeaponInfoCard(ctx, def) {
     } else {
       nameText = 'Ichigo (Bankai)';
       descText = 'Wields sleek Tensa Zangetsu with fast frontal-arc sword slashes. Fires Kuroi Getsuga waves and dashes with Shunpo flurry. Ultimate unleashes Bankai: Tensa Zangetsu!';
+    }
+  }
+
+  if (def.type === 'john_wick' || def.type === 'johnwick') {
+    const activeIndex = (state.gameState === 'weaponDetail') ? (state.johnWickWeaponIndex || 0) : 0;
+    if (activeIndex === 0) {
+      nameText = 'John Wick (TTI Pit Viper 9mm)';
+      descText = 'Wields the customized TTI Pit Viper 9mm Combat Master. Fires 12 high-velocity match rounds before entering the lethal 5-phase Gun-Fu Assassination Combo.';
+    } else if (activeIndex === 1) {
+      nameText = 'John Wick (Benelli M4 Shotgun)';
+      descText = 'Wields the tactical Benelli M4 Super 90 shotgun with dynamic pump-racking. Fires 6 heavy buckshot spread blasts (6 pellets each) dealing massive close-range knockback.';
+    } else if (activeIndex === 2) {
+      nameText = 'John Wick (M4A1 Carbine)';
+      descText = 'Wields the iconic M4A1 Carbine with classic carrying handle, ribbed handguard, triangular A-frame front sight, and 30-round STANAG curved magazine. Fires 30 rapid-fire supersonic 5.56 green-tip armor-piercing tracer rounds.';
+    } else {
+      nameText = 'John Wick (The No. 2 Pencil)';
+      descText = 'Equips the legendary sharpened No. 2 cedar graphite pencil in a reverse grip during close-quarters assassination grab-and-stab combos, inflicting a stacking bleed debuff.';
     }
   }
 
@@ -601,6 +619,63 @@ function drawWeaponDetailScreen() {
     drawButton('►', canvas.width / 2 + 140, pagY - 7, () => {
       state.tojiWeaponIndex = (state.tojiWeaponIndex === 0) ? 1 : 0;
       state.previewFighter = null;
+    }, 35, 26);
+  }
+
+  // Interactive Pagination for Multi-Weapon Fighters (John Wick: Pit Viper / Shotgun / M4 Rifle / Pencil)
+  if (def.type === 'john_wick' || def.type === 'johnwick') {
+    state.johnWickWeaponIndex = state.johnWickWeaponIndex || 0;
+    const labels = [
+      '1/4: TTI PIT VIPER 9MM',
+      '2/4: BENELLI M4 SHOTGUN',
+      '3/4: M4A1 CARBINE RIFLE',
+      '4/4: THE NO. 2 PENCIL'
+    ];
+    const currentWeaponLabel = labels[state.johnWickWeaponIndex] || labels[0];
+
+    const pagY = canvas.height * 0.42;
+
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 14px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
+
+    const updatePreviewState = () => {
+      if (state.previewFighter) {
+        if (state.johnWickWeaponIndex === 0) {
+          state.previewFighter.currentEquippedWeapon = 'pistol';
+          state.previewFighter.pencilAttackTimer = 0;
+          state.previewFighter.isPencilEquipped = false;
+        } else if (state.johnWickWeaponIndex === 1) {
+          state.previewFighter.currentEquippedWeapon = 'shotgun';
+          state.previewFighter.pencilAttackTimer = 0;
+          state.previewFighter.isPencilEquipped = false;
+        } else if (state.johnWickWeaponIndex === 2) {
+          state.previewFighter.currentEquippedWeapon = 'rifle';
+          state.previewFighter.pencilAttackTimer = 0;
+          state.previewFighter.isPencilEquipped = false;
+        } else {
+          state.previewFighter.currentEquippedWeapon = 'pistol';
+          state.previewFighter.isPencilEquipped = true;
+          state.previewFighter.pencilAttackTimer = 999999;
+        }
+      }
+    };
+
+    // Left Arrow Button
+    drawButton('◄', canvas.width / 2 - 130, pagY - 7, () => {
+      state.johnWickWeaponIndex = (state.johnWickWeaponIndex + 3) % 4;
+      updatePreviewState();
+      audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-gunswitch.mp3', 0.9);
+      audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-switchgun-voiceline.mp3', 1.0);
+    }, 35, 26);
+
+    // Right Arrow Button
+    drawButton('►', canvas.width / 2 + 130, pagY - 7, () => {
+      state.johnWickWeaponIndex = (state.johnWickWeaponIndex + 1) % 4;
+      updatePreviewState();
+      audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-gunswitch.mp3', 0.9);
+      audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-switchgun-voiceline.mp3', 1.0);
     }, 35, 26);
   }
 
@@ -1181,6 +1256,25 @@ function drawWeaponPreview(ctx, type, color) {
         // Nanami's Wrapped Blunt Cleaver
         drawNanamiCleaver(ctx, 0, 0, gunAngle, r, false);
         return;
+
+      case 'john_wick':
+      case 'johnwick': {
+        const isDetail = (state.gameState === 'weaponDetail');
+        const activeIndex = isDetail 
+          ? (state.johnWickWeaponIndex || 0) 
+          : 0;
+        
+        if (activeIndex === 0) {
+          drawJohnWickPistol(ctx, 0, 0, gunAngle, r);
+        } else if (activeIndex === 1) {
+          drawJohnWickShotgun(ctx, 0, 0, gunAngle, r);
+        } else if (activeIndex === 2) {
+          drawJohnWickRifle(ctx, 0, 0, gunAngle, r);
+        } else {
+          drawJohnWickPencil(ctx, 0, 0, gunAngle, r);
+        }
+        return;
+      }
 
       default:
         // Fallback: draw the default gray gun used by base fighters

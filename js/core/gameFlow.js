@@ -20,6 +20,7 @@ import { ParticleSystem } from '../systems/particles/ParticleSystem.js';
 import { clearAllPools } from '../graphics/objectPool.js';
 import { clearHealthHud } from '../graphics/hudManager.js?v=6';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
+import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -618,6 +619,7 @@ export function startNextRound() {
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles from previous round
   burnEffectSystem.clear();
+  clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -637,6 +639,7 @@ export function restartCurrentRound() {
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
+  clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -813,6 +816,7 @@ export function resetMatch() {
   clearProjectiles();
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
+  clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -830,6 +834,7 @@ export function goToTitle() {
   
   state.wallCracks = []; // Clear all wall crack decals on return to title
   clearHealthHud(); // Flush DOM and Map cache cleanly
+  clearDroppedMagazines(); // Clear all John Wick debris
   
   state.gameState = 'title';
 }

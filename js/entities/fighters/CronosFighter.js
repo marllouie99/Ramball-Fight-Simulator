@@ -600,8 +600,7 @@ export class CronosFighter extends Fighter {
     const qualityLevel = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
     const useAggressiveMode = false;
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 

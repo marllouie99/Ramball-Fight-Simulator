@@ -464,8 +464,7 @@ export class SukunaFighter extends Fighter {
       return; // Hold Sukuna in stasis during Mahoraga's 3D Wheel Adaptation Game Pause!
     }
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
 
@@ -483,11 +482,6 @@ export class SukunaFighter extends Fighter {
         this.domainActive = false;
       } else {
         this._applyDomainEffect(arena);
-        // Sukuna himself only unleashes active rapid slashes & teleports when not paralyzed, not ambushed, and not channeling Fuga
-        const isAmbushedOrTargetStealthed = this.isTargetOfAmbush || (opponent && opponent.isAmbushing);
-        if (!isAmbushedOrTargetStealthed && !this.timeStopTimer && !this.electricStunTimer && !this.crimsonElectrifiedTimer && !this.isChannelingDivineFlame && (this.divineFlameRecoveryTimer || 0) <= 0) {
-          this._doDomainRapidSlashes(opponent, arena, ownerIndex);
-        }
       }
     }
 
@@ -754,9 +748,8 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
-    // Skip normal behavior while in Domain Expansion
+    // Inside Domain Expansion: Malevolent Shrine controls the field, Sukuna maintains steady combat rhythm
     if (this.domainActive) {
-      this.isMeleeMode = false;
       this.flurryHitsLeft = 0;
       this.rapidSlashHitsLeft = 0;
 
@@ -773,7 +766,27 @@ export class SukunaFighter extends Fighter {
           this.fugaSoundKey = 'fuga_charge_' + Math.random().toString(36).substr(2, 9);
           playLoopingSound(this.fugaSoundKey, sound.src, sound.volume);
         }
+        return;
       }
+
+      // Controlled combat actions during domain (no frantic hyper-teleporting)
+      if (opponent && !opponent.isDead) {
+        this.aim(opponent);
+        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+        if (dist <= 100) {
+          this._updateMeleeCombat(opponent, arena, ownerIndex);
+        } else {
+          if (this.shootCooldown > 0) {
+            this.shootCooldown--;
+          } else {
+            this.shoot(ownerIndex);
+            this.shootCooldown = this.shootCooldownMax;
+          }
+        }
+      }
+
+      this.applyMovementPhysics();
+      this.resolveWallBounce(arena);
       return;
     }
 

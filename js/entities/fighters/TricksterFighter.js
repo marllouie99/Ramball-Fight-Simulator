@@ -322,8 +322,7 @@ export class TricksterFighter extends Fighter {
     // Float high enough (25+ pixels) so the shadow is clearly visible beneath the character's body!
     this.z = 25 + Math.sin(Date.now() / 200) * 6;
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
     

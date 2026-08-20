@@ -4,6 +4,11 @@
 // ─────────────────────────────────────────────
 
 export const bloodConfig = {
+  // ── 1. GLOBAL BLOOD PARTICLE SIZE ADJUSTMENT ──
+  // Multiplies the rendered width and height of ALL blood particles globally in the arena
+  // (e.g. 1.0 = standard retro pixel size, 1.5 = 50% larger, 2.0 = double size, 0.7 = smaller mist)
+  globalSizeMultiplier: 1.0,
+
   // Global Active Blood Particle Limits in the Arena
   limits: {
     maxParticles1v1: 40,        // Max active blood particles in 1v1 / Training
@@ -13,13 +18,13 @@ export const bloodConfig = {
     maxParticlesMulti: 35,      // Max active blood particles in 2v2 / Multi modes
   },
 
-  // Standard Damage Hit Blood Splash (Basic attacks, skills, punches)
+  // Standard Damage Hit Blood Splash (Basic attacks, skills, punches, bullets)
   hit: {
     minDroplets: 1,             // Minimum blood droplets spawned on hit
     maxDroplets: 3,             // Maximum blood droplets spawned on normal hit
     damageDivisor: 12.0,        // Damage divisor to scale droplet count (higher = fewer particles)
-    minSize: 2.0,               // Minimum pixel square droplet size (px)
-    maxSize: 3.4,               // Maximum pixel square droplet size (px)
+    minSize: 5.0,               // Minimum pixel square droplet size (px) — ADJUST HIT PARTICLE SIZE HERE
+    maxSize: 5.4,               // Maximum pixel square droplet size (px) — ADJUST HIT PARTICLE SIZE HERE
     baseSpeed: 4.0,             // Base ejection velocity
     speedVariance: 8.0,         // Random speed variance added to base speed
     spreadAngle: 0.5,           // Spread cone angle in radians (relative to damage vector)
@@ -34,8 +39,8 @@ export const bloodConfig = {
     count1v2: 16,               // Droplet count for 1v2 mode
     countFFA: 16,               // Droplet count for FFA mode
     countMulti: 18,             // Droplet count for 2v2 / Multi modes
-    minSize: 3.0,               // Minimum pixel square size for fatal droplets (px)
-    maxSize: 5.0,               // Maximum pixel square size for fatal droplets (px)
+    minSize: 3.0,               // Minimum pixel square size for fatal droplets (px) — ADJUST FATAL PARTICLE SIZE HERE
+    maxSize: 5.0,               // Maximum pixel square size for fatal droplets (px) — ADJUST FATAL PARTICLE SIZE HERE
     baseSpeed: 6.0,             // Base radial explosion speed
     speedVariance: 12.0,        // Random speed variance added to base speed
     maxActiveLimit1v1: 65,      // Max active particles ceiling during fatal burst (1v1)

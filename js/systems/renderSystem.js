@@ -7,7 +7,7 @@ import {
 } from '../graphics/ui.js';
 import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
-  drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawIllusions, 
+  drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
@@ -25,6 +25,7 @@ import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { updateHybridProjectiles, updateHybridRika, updateHybridSukunaFuga } from '../graphics/renderers/hybridProjectileRenderer.js';
 import { updateHybridEnvironment, updateHybridCronospheres, updateHybridBerserkerRage } from '../graphics/renderers/hybridEnvironmentRenderer.js';
+import { updateDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 
 
 
@@ -226,6 +227,8 @@ export function renderGame() {
         updateHybridBerserkerRage();
 
         drawBloodEffects(); // Draw blood effects on top of everything
+        updateDroppedMagazines();
+        drawDroppedMagazines(state.ctx); // Draw John Wick dropped magazines on the arena floor
         drawSparkEffects(); // Draw spark effects on top of everything
         drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact
         drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes

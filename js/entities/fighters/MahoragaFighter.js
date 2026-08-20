@@ -790,8 +790,7 @@ export class MahoragaFighter extends Fighter {
 
     if (this.dodgeIFrames > 0) this.dodgeIFrames--;
 
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
     if (this.swordCooldown > 0) this.swordCooldown--;

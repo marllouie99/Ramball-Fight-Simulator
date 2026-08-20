@@ -258,6 +258,11 @@ export const state = {
   // Illusions (for Doppleganger fighter)
   illusions: [],
 
+  // John Wick debris (empty magazines, thrown guns, and spent bullet casings)
+  droppedMagazines: [],
+  thrownGuns: [],
+  spentCasings: [],
+
   // UI state
   previewBalls: [],
   indexScroll: 0,
@@ -726,9 +731,9 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   }
 
   let displayText = String(text);
-  // Add a minus sign if it's a raw number
-  if (/^\d+(\.\d+)?$/.test(displayText)) {
-    displayText = '-' + displayText;
+  // Remove leading minus sign if present on damage numbers
+  if (displayText.startsWith('-')) {
+    displayText = displayText.slice(1);
   }
 
   // Detect if this text contains numbers (needs readable font like Architects Daughter instead of Glast Blitch)

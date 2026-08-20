@@ -160,6 +160,12 @@ export const BASIC_ATTACK_SOUNDS = {
 
   // ── Default fallback ─────────────────────────
   // Used when a fighter has no custom sound entry.
+  // ── John Wick ─────────────────────────────
+  33: {
+    src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
   default: {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
     volume: 0.5,
@@ -330,6 +336,18 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   'layla': {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
     volume: 0.45,
+    delay: 0,
+  },
+
+  // John Wick - Tactical Gun-Fu Marksman
+  'john_wick': {
+    src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
+    volume: 0.85,
+    delay: 0,
+  },
+  'johnwick': {
+    src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
+    volume: 0.85,
     delay: 0,
   }
 };

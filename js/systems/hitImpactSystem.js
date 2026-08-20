@@ -4,6 +4,7 @@ import { state, triggerGlobalScreenShake, spawnFloatingText } from '../core/stat
 import { audioSystem } from '../systems/audioSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnAnimePunchImpactFrame } from '../graphics/particles/sparkEffect.js';
+import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
 
 export const HitImpactSystem = {
   /**
@@ -96,7 +97,7 @@ export const HitImpactSystem = {
       return false; // Pierce
     } 
 
-    // Genos Incineration Palm Fireball — Physical push back knockback & slow movement effect on hit!
+    // Genos Incineration Palm Fireball — Physical push back knockback & impact flash on hit!
     if (projectile.visual === 'genosFireball') {
       const knockbackForce = CONFIG.genos?.blastKnockback || 8.5;
       const hitAngle = Math.atan2(projectile.vy, projectile.vx);
@@ -107,17 +108,7 @@ export const HitImpactSystem = {
       target.x += Math.cos(hitAngle) * (knockbackForce * 0.4);
       target.y += Math.sin(hitAngle) * (knockbackForce * 0.4);
 
-      // 2. Slow movement effect (45% slow for 50 frames / ~0.8 seconds)
-      const slowDuration = CONFIG.genos?.blastSlowDuration || 50;
-      const slowMultiplier = CONFIG.genos?.blastSlowMultiplier || 0.55;
-      if (typeof target.applySlow === 'function') {
-        target.applySlow(slowDuration, slowMultiplier);
-      } else {
-        target.slowTimer = Math.max(target.slowTimer || 0, slowDuration);
-        target.slowMultiplier = Math.min(target.slowMultiplier || 1.0, slowMultiplier);
-      }
-
-      // 3. Orange heat impact flash & fiery sparks
+      // 2. Orange heat impact flash & fiery sparks
       const expRadius = projectile.explosionRadius || 35;
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, expRadius, '#FF5500');
@@ -127,6 +118,169 @@ export const HitImpactSystem = {
       }
 
       return true; // Destroy fireball on hit
+    }
+
+    // John Wick TTI Pit Viper 9mm — Tactical push back knockback & ballistic impact flash
+    if (projectile.visual === 'johnWickBullet') {
+      const knockbackForce = CONFIG.john_wick?.bulletHitPushback || 3.5;
+      const hitAngle = Math.atan2(projectile.vy, projectile.vx);
+
+      // 1. Physical push back on target along the bullet velocity vector
+      target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
+      target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
+      target.x += Math.cos(hitAngle) * (knockbackForce * 0.45);
+      target.y += Math.sin(hitAngle) * (knockbackForce * 0.45);
+
+      // Arena boundary clamp to prevent targets from getting pushed through walls
+      if (state && state.arena) {
+        const minX = state.arena.x + (target.r || 20);
+        const maxX = state.arena.x + state.arena.width - (target.r || 20);
+        const minY = state.arena.y + (target.r || 20);
+        const maxY = state.arena.y + state.arena.height - (target.r || 20);
+        target.x = Math.max(minX, Math.min(maxX, target.x));
+        target.y = Math.max(minY, Math.min(maxY, target.y));
+      }
+
+      // 2. High-contrast amber/gold kinetic impact sparks & flash
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 22, '#F59E0B');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, 'orange');
+      }
+
+      // 3. Directional blood splatter particles on bullet entry/exit
+      if (typeof spawnBloodEffect === 'function') {
+        const bloodMin = CONFIG.john_wick?.bulletHitBloodMinSize ?? 2.5;
+        const bloodMax = CONFIG.john_wick?.bulletHitBloodMaxSize ?? 4.8;
+        const bloodCount = CONFIG.john_wick?.bulletHitBloodCount ?? 4;
+        spawnBloodEffect(target, 12, hitAngle, { minSize: bloodMin, maxSize: bloodMax, count: bloodCount });
+      }
+
+      // 4. Crisp flesh hit / ballistic impact SFX
+      const hitSfx = CONFIG.john_wick?.sounds?.fleshHit || 'attack_fleshhit';
+      const hitVol = CONFIG.john_wick?.soundVolumes?.fleshHit ?? 0.6;
+      audioSystem.playSFX(hitSfx, hitVol);
+
+      // 4. Subtle punchy screen shake on direct 9mm pistol bullet impact
+      if (typeof triggerGlobalScreenShake === 'function') {
+        const shakeInt = CONFIG.john_wick?.bulletHitShakeIntensity || 1.4;
+        const shakeDur = CONFIG.john_wick?.bulletHitShakeDuration || 3;
+        triggerGlobalScreenShake(shakeInt, shakeDur);
+      }
+
+      return true; // Bullet spent on impact
+    }
+
+    // John Wick Benelli M4 12-Gauge Buckshot Pellet — Staggering push back knockback & heavy kinetic impact
+    if (projectile.visual === 'johnWickShotgunPellet') {
+      const pelletKnockback = CONFIG.john_wick?.shotgunPelletKnockback || 7.5;
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Heavy physical push back on target along the buckshot velocity vector
+      target.vx = (target.vx || 0) + Math.cos(hitAngle) * pelletKnockback;
+      target.vy = (target.vy || 0) + Math.sin(hitAngle) * pelletKnockback;
+      target.x += Math.cos(hitAngle) * (pelletKnockback * 0.55);
+      target.y += Math.sin(hitAngle) * (pelletKnockback * 0.55);
+
+      // Arena boundary clamp to prevent targets from clipping out of bounds
+      if (state && state.arena) {
+        const minX = state.arena.x + (target.r || 20);
+        const maxX = state.arena.x + state.arena.width - (target.r || 20);
+        const minY = state.arena.y + (target.r || 20);
+        const maxY = state.arena.y + state.arena.height - (target.r || 20);
+        target.x = Math.max(minX, Math.min(maxX, target.x));
+        target.y = Math.max(minY, Math.min(maxY, target.y));
+      }
+
+      // Flinch stun
+      if (typeof target.applyHitStun === 'function') {
+        target.applyHitStun(8);
+      } else {
+        target.hitStunTimer = Math.max(target.hitStunTimer || 0, 8);
+      }
+
+      // 2. High-impact kinetic orange sparks & fiery flash
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 26, '#F59E0B');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, 'orange');
+      }
+
+      // 3. Directional blood splatter particles
+      if (typeof spawnBloodEffect === 'function') {
+        const bloodMin = CONFIG.john_wick?.bulletHitBloodMinSize ?? 2.8;
+        const bloodMax = CONFIG.john_wick?.bulletHitBloodMaxSize ?? 5.2;
+        spawnBloodEffect(target, 14, hitAngle, { minSize: bloodMin, maxSize: bloodMax, count: 4 });
+      }
+
+      // 4. Ballistic impact SFX & heavy 12-gauge screen shake
+      const sgHitSfx = CONFIG.john_wick?.sounds?.fleshHit || 'attack_fleshhit';
+      const sgHitVol = CONFIG.john_wick?.soundVolumes?.fleshHit ?? 0.8;
+      audioSystem.playSFX(sgHitSfx, sgHitVol);
+      if (typeof triggerGlobalScreenShake === 'function') {
+        const shakeInt = CONFIG.john_wick?.shotgunHitShakeIntensity || 4.0;
+        const shakeDur = CONFIG.john_wick?.shotgunHitShakeDuration || 7;
+        triggerGlobalScreenShake(shakeInt, shakeDur);
+      }
+
+      return true; // Pellet spent on impact
+    }
+
+    // John Wick TTI M4 Rifle 5.56 NATO — Supersonic penetrator pushback & cyan tracer flash
+    if (projectile.visual === 'johnWickRifleBullet') {
+      const knockbackForce = CONFIG.john_wick?.rifleBulletPushback || 7.0;
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Physical directional push back
+      target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
+      target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
+      target.x += Math.cos(hitAngle) * (knockbackForce * 0.45);
+      target.y += Math.sin(hitAngle) * (knockbackForce * 0.45);
+
+      // Arena boundary clamp
+      if (state && state.arena) {
+        const minX = state.arena.x + (target.r || 20);
+        const maxX = state.arena.x + state.arena.width - (target.r || 20);
+        const minY = state.arena.y + (target.r || 20);
+        const maxY = state.arena.y + state.arena.height - (target.r || 20);
+        target.x = Math.max(minX, Math.min(maxX, target.x));
+        target.y = Math.max(minY, Math.min(maxY, target.y));
+      }
+
+      if (typeof target.applyHitStun === 'function') {
+        target.applyHitStun(4);
+      } else {
+        target.hitStunTimer = Math.max(target.hitStunTimer || 0, 4);
+      }
+
+      // 2. Cyan supersonic tracer spark & flash
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 22, '#06B6D4');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 6, 'cyan');
+      }
+
+      // 3. Directional blood splatter particles
+      if (typeof spawnBloodEffect === 'function') {
+        const bloodMin = CONFIG.john_wick?.bulletHitBloodMinSize ?? 2.4;
+        const bloodMax = CONFIG.john_wick?.bulletHitBloodMaxSize ?? 4.5;
+        spawnBloodEffect(target, 10, hitAngle, { minSize: bloodMin, maxSize: bloodMax, count: 3 });
+      }
+
+      // 4. Ballistic impact SFX & machine gun rapid vibration shake
+      const rifleHitSfx = CONFIG.john_wick?.sounds?.fleshHit || 'attack_fleshhit';
+      const rifleHitVol = CONFIG.john_wick?.soundVolumes?.fleshHit ?? 0.55;
+      audioSystem.playSFX(rifleHitSfx, rifleHitVol);
+      if (typeof triggerGlobalScreenShake === 'function') {
+        const shakeInt = CONFIG.john_wick?.rifleHitShakeIntensity || 0.7;
+        const shakeDur = CONFIG.john_wick?.rifleHitShakeDuration || 2;
+        triggerGlobalScreenShake(shakeInt, shakeDur);
+      }
+
+      return true; // Bullet spent on impact
     }
 
     // Layla Steampunk Cannon - custom cyan sparks and flash impact effects

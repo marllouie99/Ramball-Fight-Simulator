@@ -1,3 +1,101 @@
+export function drawBleedEffect(ctx, baseRadius, timer = 180, fighter = null) {
+  ctx.save();
+  const t = Date.now();
+  const pulse = Math.sin(t * 0.012) * 0.5 + 0.5;
+
+  // 1. Crimson wound pulse glow on body
+  ctx.fillStyle = `rgba(180, 0, 0, ${0.18 + 0.14 * pulse})`;
+  ctx.beginPath();
+  ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Puncture bleeding cuts across body
+  ctx.strokeStyle = 'rgba(220, 20, 20, 0.85)';
+  ctx.lineWidth = 1.8;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(-baseRadius * 0.35, -baseRadius * 0.20);
+  ctx.lineTo(-baseRadius * 0.15, baseRadius * 0.30);
+  ctx.moveTo(baseRadius * 0.20, -baseRadius * 0.30);
+  ctx.lineTo(baseRadius * 0.35, baseRadius * 0.15);
+  ctx.stroke();
+
+  // 3. Floating Bleed Droplet Icon on top of the model (with gentle floating bob)
+  // Counteract fighter body rotation and vertical flipping so the status icon stays strictly upright above the head in world space
+  ctx.save();
+  if (fighter) {
+    const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft && !fighter.isSpinning) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-angle);
+  }
+
+  const bobY = Math.sin(t / 160) * 2.5;
+  const iconY = -baseRadius - 26 + bobY;
+  ctx.translate(0, iconY);
+
+  const iconPulse = 1.0 + Math.sin(t / 200) * 0.04;
+  ctx.scale(iconPulse, iconPulse);
+
+  // Subtle dark outline/shadow behind icon for high contrast visibility on any background
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+  ctx.beginPath();
+  ctx.arc(0, 3, 10, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Deep Crimson Stylized Droplet Body with dripping tails
+  ctx.fillStyle = '#C81E1E';
+  ctx.beginPath();
+  // Top pointed tip
+  ctx.moveTo(0, -13);
+  // Right bulb curve
+  ctx.bezierCurveTo(7.5, -4, 9.5, 3, 6.5, 7.5);
+  // Right drip
+  ctx.bezierCurveTo(4.2, 9.2, 3.2, 11.5, 3.2, 13);
+  ctx.arc(2.5, 13.5, 0.8, 0, Math.PI);
+  // Center long dripping stream
+  ctx.bezierCurveTo(2.2, 10, 1.2, 11, 1.2, 16.5);
+  ctx.arc(0, 17, 1.3, 0, Math.PI);
+  ctx.bezierCurveTo(-1.2, 11, -2.2, 10, -2.5, 13.5);
+  // Left drip
+  ctx.arc(-3.2, 13, 0.8, 0, Math.PI);
+  // Left bulb curve
+  ctx.bezierCurveTo(-3.2, 11.5, -4.2, 9.2, -6.5, 7.5);
+  ctx.bezierCurveTo(-9.5, 3, -7.5, -4, 0, -13);
+  ctx.closePath();
+  ctx.fill();
+
+  // Extra detached dripping beads below
+  ctx.beginPath();
+  ctx.arc(0, 20.5, 1.0, 0, Math.PI * 2);
+  ctx.arc(-2.8, 17.5, 0.75, 0, Math.PI * 2);
+  ctx.arc(2.8, 18.5, 0.75, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Curved Pure White Gloss Highlight (Right shoulder)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.beginPath();
+  ctx.moveTo(1.8, -7.5);
+  ctx.bezierCurveTo(5.8, -1.5, 6.8, 3.5, 4.2, 6.8);
+  ctx.bezierCurveTo(5.6, 4.2, 4.8, -1.0, 1.8, -7.5);
+  ctx.closePath();
+  ctx.fill();
+
+  // Subtle curved rim highlight (Left lower bulb)
+  ctx.beginPath();
+  ctx.moveTo(-5.2, 1.8);
+  ctx.bezierCurveTo(-6.5, 4.8, -4.8, 7.2, -2.2, 7.8);
+  ctx.bezierCurveTo(-3.8, 7.0, -5.4, 5.0, -5.2, 1.8);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore(); // Undo icon transform
+
+  ctx.restore();
+}
+
 export function drawSlowEffect(ctx, baseRadius) {
   // A subtle dark blue aura with descending rings indicating "weighed down"
   ctx.fillStyle = 'rgba(40, 60, 100, 0.4)';
@@ -24,28 +122,28 @@ export function drawSlowEffect(ctx, baseRadius) {
 export function drawElectricStunEffect(ctx, baseRadius, useAggressiveMode) {
   ctx.save();
   
-  // Clean, bright cyan flash on the body (faint so it doesn't hide other effects)
-  ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
+  // Clean electric gold pulse on the body
+  ctx.fillStyle = 'rgba(255, 215, 0, 0.15)';
   ctx.beginPath();
   ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
   ctx.fill();
 
   // OPTIMIZATION: Skip shockwaves on low-end machines
   if (!useAggressiveMode) {
-    // Expanding EMP / energy shockwaves
+    // Expanding golden electricity shockwaves
     const timeFactor1 = (Date.now() % 200) / 200; // Loops every 200ms
     const timeFactor2 = ((Date.now() + 100) % 200) / 200; // Offset by 100ms
     
     // Inner thicker shockwave
-    ctx.strokeStyle = `rgba(0, 255, 255, ${1 - timeFactor1})`;
-    ctx.lineWidth = 4;
+    ctx.strokeStyle = `rgba(255, 235, 120, ${1 - timeFactor1})`;
+    ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.arc(0, 0, baseRadius * (1 + timeFactor1 * 1.5), 0, Math.PI * 2);
     ctx.stroke();
 
     // Outer thinner shockwave
-    ctx.strokeStyle = `rgba(0, 255, 255, ${1 - timeFactor2})`;
-    ctx.lineWidth = 2;
+    ctx.strokeStyle = `rgba(255, 215, 0, ${1 - timeFactor2})`;
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
     ctx.arc(0, 0, baseRadius * (1 + timeFactor2 * 2.5), 0, Math.PI * 2);
     ctx.stroke();
@@ -687,8 +785,19 @@ export function drawMahitoFleshBubblyDeformLocal(ctx, r = 25, paralyzeTimer = 45
   ctx.restore();
 }
 
-export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTimer = 45, color = '#A855F7', entity = null) {
+export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTimer = 45, color = '#FFEE58', entity = null) {
   ctx.save();
+
+  // Counteract fighter body rotation and vertical flipping so the halo stays strictly upright above the head in world space
+  if (entity) {
+    const angle = entity._isWinnerReveal ? 0 : (entity.gunAngle !== undefined ? entity.gunAngle : (entity.angle || 0));
+    const facingLeft = Math.abs(angle) > Math.PI / 2;
+    if (facingLeft && !entity.isSpinning) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-angle);
+  }
+
   const time = Date.now() * 0.004;
   const numRings = 2;
   
@@ -697,7 +806,7 @@ export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTi
     ctx.save();
     
     // Tilted orbit center above the head
-    const yOffset = -baseRadius - 12 + (i * 5);
+    const yOffset = -baseRadius - 14 + (i * 5);
     ctx.translate(0, yOffset);
     
     // 3D Tilt perspective (squish Y axis)
@@ -708,15 +817,15 @@ export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTi
     ctx.rotate(angleOffset);
     
     // Orbit radius
-    const r = baseRadius * 0.7;
+    const r = baseRadius * 0.75;
     
     // Draw the ring path
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.strokeStyle = isMahito 
-      ? `rgba(0, 229, 255, ${0.5 + 0.3 * Math.sin(time * 1.5 + i)})`
-      : `rgba(255, 215, 0, ${0.4 + 0.3 * Math.sin(time * 1.5 + i)})`;
-    ctx.lineWidth = 2.0;
+      ? `rgba(217, 70, 239, ${0.6 + 0.3 * Math.sin(time * 1.5 + i)})`
+      : `rgba(255, 215, 0, ${0.6 + 0.3 * Math.sin(time * 1.5 + i)})`;
+    ctx.lineWidth = 2.2;
     ctx.stroke();
     
     // Draw 2 small stars/particles orbiting on opposite sides of the ring
@@ -735,19 +844,19 @@ export function drawParalyzeEffect(ctx, baseRadius, isMahito = false, paralyzeTi
       
       ctx.beginPath();
       // Draw 4-point star polygon
-      ctx.moveTo(0, -6);
-      ctx.lineTo(1.5, -1.5);
-      ctx.lineTo(6, 0);
-      ctx.lineTo(1.5, 1.5);
-      ctx.lineTo(0, 6);
-      ctx.lineTo(-1.5, 1.5);
-      ctx.lineTo(-6, 0);
-      ctx.lineTo(-1.5, -1.5);
+      ctx.moveTo(0, -6.5);
+      ctx.lineTo(1.8, -1.8);
+      ctx.lineTo(6.5, 0);
+      ctx.lineTo(1.8, 1.8);
+      ctx.lineTo(0, 6.5);
+      ctx.lineTo(-1.8, 1.8);
+      ctx.lineTo(-6.5, 0);
+      ctx.lineTo(-1.8, -1.8);
       ctx.closePath();
-       ctx.fillStyle = '#FFFFFF';
+      ctx.fillStyle = '#FFFFFF';
       ctx.fill();
-      ctx.strokeStyle = isMahito ? 'rgba(217, 70, 239, 0.95)' : 'rgba(255, 235, 59, 0.9)';
-      ctx.lineWidth = 1.0;
+      ctx.strokeStyle = isMahito ? 'rgba(217, 70, 239, 0.95)' : 'rgba(255, 235, 59, 0.95)';
+      ctx.lineWidth = 1.2;
       ctx.stroke();
       
       ctx.restore();
@@ -1280,5 +1389,152 @@ export function drawMinionHealthBar(ctx, x, y, width = 38, height = 7, hp = 100,
 
   ctx.restore();
   ctx.restore();
+}
+
+/** Declarative registry for all global status overlays rendered on fighters */
+export const STATUS_OVERLAY_REGISTRY = [
+  {
+    id: 'slow',
+    isActive: (f) => !f.purpleHitTimer && ((f.statusEffects && f.statusEffects.fighter.slowTimer > 0) || f.slowTimer > 0),
+    render: (ctx, baseRadius, f) => {
+      const trappedInTojiUltimate = typeof state !== 'undefined' && state.fighters && state.fighters.some(other => 
+        other && other.ultimateActive && other.ultimateTarget === f && (other.type === 'toji' || other.characterId === 'toji')
+      );
+      if (!trappedInTojiUltimate) {
+        drawSlowEffect(ctx, baseRadius);
+      }
+    }
+  },
+  {
+    id: 'electricStun',
+    isActive: (f) => f.electricStunTimer > 0,
+    render: (ctx, baseRadius, f) => drawElectricStunEffect(ctx, baseRadius, false)
+  },
+  {
+    id: 'pureLoveBeamRecovery',
+    isActive: (f) => f.pureLoveBeamRecoveryTimer > 0,
+    render: (ctx, baseRadius, f) => {
+      ctx.save();
+      ctx.fillStyle = 'rgba(255, 20, 147, 0.45)';
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+      
+      const time = Date.now();
+      const pulse = (Math.sin(time / 100) + 1) / 2;
+      ctx.strokeStyle = 'rgba(255, 105, 180, 0.85)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, baseRadius * (1.05 + pulse * 0.15), baseRadius * (1.05 + pulse * 0.15), 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  },
+  {
+    id: 'dubstepStun',
+    isActive: (f) => f.dubstepStunVisualTimer > 0,
+    render: (ctx, baseRadius, f) => drawDubstepStunEffect(ctx, baseRadius, f.dubstepStunVisualTimer)
+  },
+  {
+    id: 'crimsonElectrified',
+    isActive: (f) => f.crimsonElectrifiedTimer > 0,
+    render: (ctx, baseRadius, f) => drawCrimsonElectrifiedEffect(ctx, baseRadius, f.crimsonElectrifiedTrickster)
+  },
+  {
+    id: 'poison',
+    isActive: (f) => f.poisonTicks > 0,
+    render: (ctx, baseRadius, f) => drawPoisonEffect(ctx, baseRadius)
+  },
+  {
+    id: 'bleed',
+    isActive: (f) => f.bleedTimer > 0,
+    render: (ctx, baseRadius, f) => drawBleedEffect(ctx, baseRadius, f.bleedTimer, f)
+  },
+  {
+    id: 'silence',
+    isActive: (f) => f.silenceTimer > 0,
+    render: (ctx, baseRadius, f) => drawSilenceEffect(ctx, baseRadius)
+  },
+  {
+    id: 'thunderRoots',
+    isActive: (f) => f.thunderRootsTimer > 0,
+    render: (ctx, baseRadius, f) => drawThunderRootsEffect(ctx, baseRadius)
+  },
+  {
+    id: 'nanamiArmorFracture',
+    isActive: (f) => f.nanamiArmorFractureTimer > 0,
+    render: (ctx, baseRadius, f) => {
+      ctx.save();
+      const fracTime = Date.now() * 0.005;
+      const pulse = 0.5 + 0.5 * Math.sin(fracTime * 3);
+      ctx.strokeStyle = `rgba(255, 215, 0, ${0.55 + 0.35 * pulse})`;
+      ctx.lineWidth = 1.4;
+
+      ctx.beginPath();
+      ctx.moveTo(-baseRadius * 0.6, -baseRadius * 0.3);
+      ctx.lineTo(-baseRadius * 0.1, 0);
+      ctx.lineTo(baseRadius * 0.5, -baseRadius * 0.4);
+      ctx.moveTo(-baseRadius * 0.1, 0);
+      ctx.lineTo(baseRadius * 0.2, baseRadius * 0.6);
+      ctx.stroke();
+
+      ctx.strokeStyle = `rgba(212, 175, 55, ${0.35 * pulse})`;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius * 1.04, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+  },
+  {
+    id: 'burn',
+    isActive: (f) => f.burnTimer > 0,
+    render: (ctx, baseRadius, f) => {
+      const offset = baseRadius * 0.15;
+      const grad = ctx.createRadialGradient(-offset, -offset, 0, 0, 0, baseRadius);
+      const pulse = 0.05 * Math.sin(Date.now() / 100);
+      grad.addColorStop(0, 'rgba(255, 255, 220, 0.65)');
+      grad.addColorStop(0.35, `rgba(255, 130, 0, ${0.5 + pulse})`);
+      grad.addColorStop(0.75, `rgba(200, 30, 0, ${0.35 + pulse})`);
+      grad.addColorStop(1, 'rgba(100, 0, 0, 0)');
+
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  },
+  {
+    id: 'blackFlashDebuff',
+    isActive: (f) => f.blackFlashDebuffTimer > 0,
+    render: (ctx, baseRadius, f) => drawBlackFlashDebuffEffect(ctx, baseRadius)
+  },
+  {
+    id: 'voidMark',
+    isActive: (f) => f.voidMarkTimer > 0,
+    render: (ctx, baseRadius, f) => drawVoidMarkEffect(ctx, baseRadius)
+  },
+  {
+    id: 'paralyze',
+    isActive: (f) => (f.paralyzeTimer > 0) || (f.timeStopTimer > 0 && !f.isFrozenByInfinity && !f.frozenByCronos && !f.isCronosStasis),
+    render: (ctx, baseRadius, f) => drawParalyzeEffect(ctx, baseRadius, false, f.paralyzeTimer || f.timeStopTimer, '#FFEE58', f)
+  },
+  {
+    id: 'soulDisfigurement',
+    isActive: (f) => (f.soulDisfigurementTimer || 0) > 0 || (f.soulDisfigurementVisualTimer || 0) > 0,
+    render: (ctx, baseRadius, f) => drawSoulDisfigurementEffect(ctx, f)
+  },
+  {
+    id: 'embeddedMahitoSpikes',
+    isActive: (f) => f.embeddedMahitoSpikes && f.embeddedMahitoSpikes.length > 0,
+    render: (ctx, baseRadius, f) => drawEmbeddedMahitoSpikes(ctx, f)
+  }
+];
+
+/** Dynamically register a new status overlay renderer */
+export function registerStatusOverlay(overlayConfig) {
+  if (overlayConfig && typeof overlayConfig.render === 'function' && typeof overlayConfig.isActive === 'function') {
+    STATUS_OVERLAY_REGISTRY.push(overlayConfig);
+  }
 }
 

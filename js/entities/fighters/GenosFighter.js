@@ -40,7 +40,7 @@ export class GenosFighter extends Fighter {
     this.basicBlastAnimTimer = 0;
 
     // Skill 1: Machine Gun Blows
-    const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 480);
+    const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 1200);
     this.flurryCooldown = initFlurryCD;
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
@@ -56,7 +56,7 @@ export class GenosFighter extends Fighter {
     this.dashTargetY = 0;
 
     // Ultimate: Spiral Incineration Cannon
-    this.ultCooldown = CONFIG.genos?.initialUltCooldown !== undefined ? CONFIG.genos.initialUltCooldown : (CONFIG.genos?.ultCooldown || 1680);
+    this.ultCooldown = CONFIG.genos?.initialUltCooldown !== undefined ? CONFIG.genos.initialUltCooldown : (CONFIG.genos?.ultCooldown || 800);
     this.isChargingUlt = false;
     this.isFiringUlt = false;
     this.ultTimer = 0;
@@ -70,11 +70,11 @@ export class GenosFighter extends Fighter {
     this.usedSelfDestruct = false;
 
     // Basic Attack Ammo & Stance System
-    this.maxHeatAmmo = CONFIG.genos?.maxHeatAmmo || 6;
+    this.maxHeatAmmo = CONFIG.genos?.maxHeatAmmo || 20;
     this.heatAmmo = this.maxHeatAmmo;
     this.isMeleeStance = false;
     this.meleeDashCount = 0; // Track thruster dashes performed during Melee Mode
-    this.ammoReloadMax = CONFIG.genos?.ammoReloadFrames || 300; // 5s reload CD
+    this.ammoReloadMax = CONFIG.genos?.ammoReloadFrames || 500;
     this.ammoReloadTimer = 0;
     this.meleeDashDelayTimer = 0; // Delay frames between Melee Mode thruster dashes
     this.isMeleeDashNext = true; // Alternating state machine: DASH -> REBOUNCE -> DASH -> REBOUNCE
@@ -88,7 +88,7 @@ export class GenosFighter extends Fighter {
 
   reset() {
     super.reset();
-    const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 480);
+    const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 1200);
     this.flurryCooldown = initFlurryCD;
   }
 
@@ -369,8 +369,9 @@ export class GenosFighter extends Fighter {
       return result;
     }
 
-    // If Genos hasn't self-destructed yet, check if this incoming damage would drop him to 10% HP or below
-    const sdThreshold = this.maxHp * 0.10;
+    // If Genos hasn't self-destructed yet, check if this incoming damage would drop him to threshold HP or below
+    const thresholdRatio = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
+    const sdThreshold = this.maxHp * thresholdRatio;
     const nextHp = this.hp - amount;
 
     // Trigger self-destruct ONLY if Genos survives the hit (nextHp > 0) but drops to 10% or below
@@ -454,17 +455,15 @@ export class GenosFighter extends Fighter {
             hitAny = true;
             applyDamageToTarget(target, damage, this, { isBasic: true });
 
+            const pushForce = CONFIG.genos?.meleePunchKnockback || 9.0;
             const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
-            const pushVx = Math.cos(pushAngle) * 9.0;
-            const pushVy = Math.sin(pushAngle) * 9.0;
+            const pushVx = Math.cos(pushAngle) * pushForce;
+            const pushVy = Math.sin(pushAngle) * pushForce;
             if (typeof target.applyKnockback === 'function') {
               target.applyKnockback(pushVx, pushVy);
             } else {
               target.vx += pushVx;
               target.vy += pushVy;
-            }
-            if (typeof target.applyTimeStop === 'function') {
-              target.applyTimeStop(4);
             }
             if (typeof spawnAnimePunchImpactFrame === 'function') {
               spawnAnimePunchImpactFrame(target.x, target.y, 55, pushAngle, 'gold');
@@ -486,7 +485,7 @@ export class GenosFighter extends Fighter {
       if (hitAny) {
         this._basicHitConnectedTimer = 10; // Enable hand fire aura & punch impact visuals for 10 frames
         this.triggerPunchAnimation();
-        this.shootCooldown = CONFIG.genos?.meleePunchCooldown || 18;
+        this.shootCooldown = CONFIG.genos?.meleePunchCooldown || 15;
         if (typeof triggerGlobalScreenShake === 'function') {
           triggerGlobalScreenShake(1.2, 8);
         }
@@ -513,10 +512,11 @@ export class GenosFighter extends Fighter {
     spawnX += Math.cos(perpAngle) * sideOffset;
     spawnY += Math.sin(perpAngle) * sideOffset;
 
-    const speed = CONFIG.genos?.blastSpeed || 14;
+    const speed = CONFIG.genos?.blastSpeed || 20;
     const damage = CONFIG.genos?.blastDamage || 14;
     const range = CONFIG.genos?.blastRange || 350;
     const blastRadius = CONFIG.genos?.blastAoeRadius || 35;
+    const projRadius = CONFIG.genos?.blastProjectileRadius || 9;
 
     // Fire custom fireball projectile using projectileSystem
     if (projectileSystem) {
@@ -535,7 +535,7 @@ export class GenosFighter extends Fighter {
       );
       if (p) {
         p.color = '#FF5500';
-        p.r = 9;
+        p.r = projRadius;
         p.visual = 'genosFireball';
         p.isExplosive = true;
         p.explosionRadius = blastRadius;
@@ -589,14 +589,10 @@ export class GenosFighter extends Fighter {
     if (this.flurryCooldown > 0 || !opponent) return;
 
     this.isFlurrying = true;
-    this.flurryHitsLeft = CONFIG.genos?.flurryHitCount || 8;
+    this.flurryHitsLeft = CONFIG.genos?.flurryHitCount || 15;
     this.flurryTimer = 0;
     this.flurryTarget = opponent;
-    this.flurryCooldown = CONFIG.genos?.flurryCooldown || 480;
-
-    if (typeof spawnFloatingText === 'function') {
-      spawnFloatingText(this.x, this.y - this.r - 28, "MACHINE GUN BLOWS!", "#FF7700");
-    }
+    this.flurryCooldown = CONFIG.genos?.flurryCooldown || 1200;
 
     const oldX = this.x;
     const oldY = this.y;
@@ -635,7 +631,9 @@ export class GenosFighter extends Fighter {
       }
     }
 
-    spawnFloatingText(this.x, this.y - this.r - 20, "MACHINE GUN BLOWS!", "#FF5500");
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 28, "MACHINE GUN BLOWS!", "#FF5500");
+    }
     if (CONFIG.genos?.flurryVoiceEnabled !== false) {
       const delay = CONFIG.genos?.flurryVoiceDelay || 0;
       if (delay > 0) {
@@ -687,12 +685,10 @@ export class GenosFighter extends Fighter {
     for (const target of targetsToScan) {
       if (Math.hypot(target.x - this.x, target.y - this.y) <= radius + target.r) {
         applyDamageToTarget(target, damage, this, { isSkill: true });
+        const pushForce = CONFIG.genos?.dashes?.rocketDash?.stompKnockback ?? CONFIG.genos?.stompKnockback ?? 14;
         const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        target.vx += Math.cos(pushAngle) * 14;
-        target.vy += Math.sin(pushAngle) * 14;
-        if (typeof target.applySlow === 'function') {
-          target.applySlow(30, 0.35); // Brief slow from ground shockwave
-        }
+        target.vx += Math.cos(pushAngle) * pushForce;
+        target.vy += Math.sin(pushAngle) * pushForce;
       }
     }
   }
@@ -777,7 +773,8 @@ export class GenosFighter extends Fighter {
   performSelfDestructExplosion() {
     this.isSelfDestructing = false;
     this.usedSelfDestruct = true;
-    this.hp = Math.round(this.maxHp * 0.01); // Survives with exactly 1% HP!
+    const survivalPct = CONFIG.genos?.selfDestructSurvivalHpPercent ?? 0.01;
+    this.hp = Math.max(1, Math.round(this.maxHp * survivalPct)); // Survives with configured % HP!
 
     // Immediately kill charging audio handle & any active charging sound instance so it's completely gone!
     if (this._selfDestructChargeHandle) {
@@ -787,13 +784,16 @@ export class GenosFighter extends Fighter {
     const chargeSrc = CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
     try { stopSoundBySrc(chargeSrc); } catch (e) {}
 
-    triggerGlobalScreenShake(18, 50);
+    const shakeIntensity = CONFIG.genos?.selfDestructShakeIntensity || 18;
+    const shakeDuration = CONFIG.genos?.selfDestructShakeDuration || 50;
+    triggerGlobalScreenShake(shakeIntensity, shakeDuration);
     const sdSoundSrc = CONFIG.genos?.selfDestructSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-explosion.mp3';
     const sdSoundVol = CONFIG.genos?.selfDestructVolume ?? 2.5;
     audioSystem.playSFX(sdSoundSrc, sdSoundVol);
 
     const radius = CONFIG.genos?.selfDestructRadius || 200;
     const damage = CONFIG.genos?.selfDestructDamage || 250;
+    const blastKnockback = CONFIG.genos?.selfDestructKnockback || 20;
 
     // Scan all valid targets (fighters, illusions & Rika) in radius (Rule #6 compliant)
     const targetsToScan = [];
@@ -820,8 +820,8 @@ export class GenosFighter extends Fighter {
       if (dist <= radius + target.r) {
         applyDamageToTarget(target, damage, this, { isExplosion: true, isUltimate: true });
         const pushAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        target.vx += Math.cos(pushAngle) * 20;
-        target.vy += Math.sin(pushAngle) * 20;
+        target.vx += Math.cos(pushAngle) * blastKnockback;
+        target.vy += Math.sin(pushAngle) * blastKnockback;
       }
     }
 
@@ -840,9 +840,9 @@ export class GenosFighter extends Fighter {
       }
     }
 
-    // Trigger post-explosion breather recovery pause & shattered piece reassembly (4.0s dramatic animation)
+    // Trigger post-explosion breather recovery pause & shattered piece reassembly
     this.isSelfDestructRecovering = true;
-    this.selfDestructRecoveryMax = CONFIG.genos?.selfDestructRecoveryFrames || 240;
+    this.selfDestructRecoveryMax = CONFIG.genos?.selfDestructRecoveryFrames || 90;
     this.selfDestructRecoveryTimer = this.selfDestructRecoveryMax;
 
     // Initialize shattered cybernetic pieces array for magnetic piece-by-piece reassembly (Wide dramatic scatter distance)
@@ -925,7 +925,7 @@ export class GenosFighter extends Fighter {
 
           // Restore Ranged Mode stance with 100% full Heat Ammo
           this.isMeleeStance = false;
-          this.heatAmmo = this.maxHeatAmmo || 10;
+          this.heatAmmo = this.maxHeatAmmo || 20;
           this.ammoReloadTimer = 0;
           this.meleeDashCount = 0;
 
@@ -1180,7 +1180,7 @@ export class GenosFighter extends Fighter {
 
       // Damage Ticks every 6 frames
       if (this.ultTimer % (CONFIG.genos?.ultTickInterval || 6) === 0) {
-        const damage = CONFIG.genos?.ultDamagePerTick || 15;
+        const damage = CONFIG.genos?.ultDamagePerTick || 10;
 
         for (const target of targetsToScan) {
           const dx = target.x - this.x;
@@ -1191,20 +1191,14 @@ export class GenosFighter extends Fighter {
           if (projDist >= 0 && projDist <= range && perpDist <= width / 2 + target.r) {
             applyDamageToTarget(target, damage, this, { isSkill: true, isUltimate: true, isGenosBeam: true });
             
-            // 1. Light Incineration Slow Debuff (allows enemy to move a little inside beam)
-            const slowMult = CONFIG.genos?.ultSlowMultiplier ?? 0.45;
-            if (typeof target.applySlow === 'function') {
-              target.applySlow(25, slowMult);
-            }
-
-            // 2. Controlled Directional Incineration Beam Push (blends with user movement velocity)
+            // 1. Controlled Directional Incineration Beam Push (blends with user movement velocity)
             const pushForce = CONFIG.genos?.ultKnockbackForce || 8;
             const pushVx = Math.cos(this.ultAngle) * pushForce;
             const pushVy = Math.sin(this.ultAngle) * pushForce;
             target.vx = target.vx * 0.4 + pushVx;
             target.vy = target.vy * 0.4 + pushVy;
 
-            // 3. Impact Flash & Laser Hit Sparks on Target
+            // 2. Impact Flash & Laser Hit Sparks on Target
             if (typeof spawnSparks === 'function') {
               spawnSparks(target.x, target.y, 5, 'laserHit');
             }
@@ -1472,7 +1466,7 @@ export class GenosFighter extends Fighter {
         if (this._justEnteredMeleeStance || (wallBounced && canTriggerWallBounce)) {
           this._lastWallBounceFrame = currentFrame;
 
-          const maxDashes = CONFIG.genos?.maxMeleeDashes || 5;
+          const maxDashes = CONFIG.genos?.maxMeleeDashes || 10;
           if ((this._justEnteredMeleeStance || this.isMeleeDashNext) && (this.meleeDashCount || 0) < maxDashes) {
             // ── DASH PHASE: Launch explosive high-speed thruster dash burst towards enemy ──
             this.meleeDashCount = (this.meleeDashCount || 0) + 1;
@@ -1486,7 +1480,7 @@ export class GenosFighter extends Fighter {
             // Boost this.speed during melee thruster dash
             const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
             const baseSpd = this.baseSpeed || 5.2;
-            const speedMult = CONFIG.genos?.dashes?.meleeThrusterDash?.speedMultiplier ?? 2.4;
+            const speedMult = CONFIG.genos?.dashes?.meleeThrusterDash?.speedMultiplier ?? 3.4;
             this.speed = baseSpd * modeMult * speedMult;
             this.speedBoostTimer = CONFIG.genos?.dashes?.meleeThrusterDash?.durationFrames ?? 18;
 
@@ -1590,21 +1584,28 @@ export class GenosFighter extends Fighter {
     if (canAct && opponent && opponent.hp > 0 && !this.isChargingUlt && !this.isFiringUlt && !this.isUltRecovering) {
       const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
 
-      // Skill 1 Priority: Machine Gun Blows (FIRST priority when available! Thruster dash engages up to 280px)
-      if (this.flurryCooldown <= 0 && dist <= 280) {
+      // Skill 1 Priority: Machine Gun Blows (FIRST priority when available!)
+      const flurryTriggerRange = CONFIG.genos?.flurryTriggerRange || 280;
+      const ultMinRange = CONFIG.genos?.ultTriggerMinRange || 180;
+      const ultMaxRange = CONFIG.genos?.ultTriggerMaxRange || 450;
+      const stompTriggerRange = CONFIG.genos?.dashes?.rocketDash?.triggerRange ?? CONFIG.genos?.stompRadius ?? 120;
+      const punchReach = CONFIG.genos?.meleePunchReach || 65;
+      const blastRange = CONFIG.genos?.blastRange || 350;
+
+      if (this.flurryCooldown <= 0 && dist <= flurryTriggerRange) {
         this.executeMachineGunBlows(opponent);
       }
-      // Ultimate Priority: Medium range (200px - 450px)
-      else if (this.ultCooldown <= 0 && dist >= 180 && dist <= 450) {
+      // Ultimate Priority: Medium range
+      else if (this.ultCooldown <= 0 && dist >= ultMinRange && dist <= ultMaxRange) {
         this.executeSpiralIncinerationCannon(opponent);
       }
-      // Skill 2 Priority: Rocket Stomp (close-range smash <= 120px)
-      else if (this.dashCooldown <= 0 && dist <= 120) {
+      // Skill 2 Priority: Rocket Stomp
+      else if (this.dashCooldown <= 0 && dist <= stompTriggerRange) {
         this.executeRocketStomp(opponent);
       }
-      // Basic Attack: Range (dist <= 350px for Ranged Fireballs, dist <= 85px for Melee Punches)
+      // Basic Attack: Range
       else {
-        const maxRange = this.isMeleeStance ? 85 : 350;
+        const maxRange = this.isMeleeStance ? (this.r + punchReach + 20) : blastRange;
         if (dist <= maxRange && (this.shootCooldown <= 0 || !this.shootCooldown)) {
           this.executeBasicBlast(opponent);
         }

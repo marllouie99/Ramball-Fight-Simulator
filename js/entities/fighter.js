@@ -288,6 +288,12 @@ export class Fighter {
     this.burnDamageTimer = 0;
     this.lastBurnAttacker = null;
     this.burnSpreadCooldown = 0;
+    // Bleed effect state (Global Debuff)
+    this.bleedTimer = 0;
+    this.bleedDamageTimer = 0;
+    this.bleedDamagePerTick = 4;
+    this.bleedIntervalFrames = 30;
+    this.lastBleedAttacker = null;
     // Silence effect state
     this.silenceTimer = 0;
     this.blackFlashDebuffTimer = 0;
@@ -610,12 +616,24 @@ export class Fighter {
     }
   }
 
-  handlePoison() {
-    this.statusEffects.handlePoison();
+  /** Unified master tick for all global debuffs and status effects. */
+  handleStatusEffects() {
+    this.statusEffects.handleStatusEffects();
   }
 
-  handleBurn() {
-    this.statusEffects.handleBurn();
+  applyStatusEffect(effectName, ...args) {
+    return this.statusEffects.applyStatusEffect(effectName, ...args);
+  }
+
+  // Backwards compatibility delegates for specific effects
+  handlePoison() { this.handleStatusEffects(); }
+  handleBurn() { this.handleStatusEffects(); }
+  handleBleed() { this.handleStatusEffects(); }
+
+  applyPoison(attacker) { this.statusEffects.applyPoison(attacker); }
+  applyBurn(attacker) { this.statusEffects.applyBurn(attacker); }
+  applyBleed(attacker, duration, damagePerTick, intervalFrames) {
+    this.statusEffects.applyBleed(attacker, duration, damagePerTick, intervalFrames);
   }
 
   _decrementSkillCooldowns() {
@@ -869,7 +887,31 @@ export class Fighter {
 
     // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff)
     if (this.evadeBuffTimer > 0 && amount > 0) {
-      const isBasicAttack = opts.isProjectile || opts.isMelee || opts.isBasicAttack || (!opts.isSkill && !opts.isUltimate && !opts.isDomain && !opts.isPureLoveBeam && !opts.isDivineFlame && !opts.isPurpleDPS);
+      const isTickOrBeam = Boolean(
+        opts && (
+          opts.isPureLoveBeam ||
+          opts.isGenosBeam ||
+          opts.isLaser ||
+          opts.isLaserBeam ||
+          opts.isBeam ||
+          opts.isContinuous ||
+          opts.isTickDamage ||
+          opts.isTick ||
+          opts.isBleed ||
+          opts.fromBleed ||
+          opts.isBurn ||
+          opts.fromBurn ||
+          opts.isPoison ||
+          opts.isPurpleDPS ||
+          opts.isDivineFlame ||
+          opts.isDomain ||
+          opts.isDomainSlash ||
+          opts.fromDomain ||
+          opts.fromBlackHole
+        )
+      ) || (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
+
+      const isBasicAttack = !isTickOrBeam && (opts.isProjectile || opts.isMelee || opts.isBasicAttack || (!opts.isSkill && !opts.isUltimate && !opts.isDomain));
       if (isBasicAttack) {
         const chance = this.evadeChance ?? (CONFIG.todo?.evadeChance || 0.60);
         if (Math.random() < chance) {
@@ -1405,8 +1447,7 @@ export class Fighter {
 
   /** Standard per-frame update tick for basic movement, shooting, and physics. */
   update(opponent, ownerIndex, arena) {
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     this._tickAttackSound();
     

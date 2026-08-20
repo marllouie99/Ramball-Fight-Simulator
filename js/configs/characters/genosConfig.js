@@ -27,6 +27,7 @@ export const genosConfig = {
   flurryReach: 65,
   flurryArcAngle: Math.PI * 0.5, // 90 degree arc
   flurryCooldown: 1200, // Cooldown duration between uses
+  flurryTriggerRange: 280, // AI engagement range (px) to initiate Machine Gun Blows
 
   // Dash System (Unified tuning for all Genos thruster dashes)
   dashes: {
@@ -38,6 +39,8 @@ export const genosConfig = {
       speed: 0.25,       // Easing interpolation step per frame (0.25 = 25% smooth step)
       stompDamage: 30,   // Ground stomp damage on landing
       stompRadius: 75,   // Ground stomp radius (px)
+      stompKnockback: 14, // Push velocity applied to targets caught in stomp
+      triggerRange: 120, // AI distance threshold (px) to trigger Rocket Stomp
     },
     // Melee Stance Thruster Dash
     meleeThrusterDash: {
@@ -58,19 +61,24 @@ export const genosConfig = {
   dashSpeed: 0.25,
   stompDamage: 30,
   stompRadius: 75,
+  stompKnockback: 14,
+  meleePunchKnockback: 9.0,
+  blastProjectileRadius: 9,
 
   // Ultimate: Spiral Incineration Cannon
   initialUltCooldown: 1500, // Initial cooldown at match start (28s at 60fps)
   ultCooldown: 800, // 28 seconds at 60fps
   ultWindupFrames: 60, // 1.0s windup
   ultDurationFrames: 120, // 2.0s beam duration
-  ultDamagePerTick: 10,
+  ultDamagePerTick: 15,
   ultTickInterval: 6, // 10 ticks per second (300 total damage)
   ultBeamWidth: 60,
   ultBeamRange: 1200, // 1200px beam range across full arena (matches Hyperion's beam length)
   ultKnockbackForce: 8, // Directional beam push speed (prevents hyper-accel rebounce)
   ultSlowMultiplier: 0.45, // Speed multiplier for targets caught in beam (0.45 = 45% speed allows moving a little)
   ultBeamCenterPull: 0.04, // Axis alignment pull strength (0.04 allows enemies to steer/move inside beam)
+  ultTriggerMinRange: 180, // AI minimum distance to initiate beam
+  ultTriggerMaxRange: 450, // AI maximum distance to initiate beam
 
   // Ultimate Screen Shake & Recovery Tuning
   ultWindupShakeIntensity: 0,   // Windup channeling shake intensity (0 = disabled)
@@ -84,9 +92,14 @@ export const genosConfig = {
   postUltFlurryCooldown: 60,    // Grace period cooldown in frames (1.0s) before Genos can flurry after recovery
 
   // Passive: Core Overdrive (Self-Destruct)
+  selfDestructHpThreshold: 0.10,    // HP percentage threshold (0.10 = 10% HP) below which Genos initiates Core Overdrive Self-Destruct
   selfDestructCountdownFrames: 150, // 2.5 seconds
   selfDestructRadius: 200,
   selfDestructDamage: 250, // True damage explosion
+  selfDestructKnockback: 20, // Push velocity applied to targets caught in blast
+  selfDestructSurvivalHpPercent: 0.01, // Percentage of max HP Genos retains after explosion (1%)
+  selfDestructShakeIntensity: 18,
+  selfDestructShakeDuration: 50,
 
   //----------------------------------AUDIO CONFIG-----------------------------------------//
 

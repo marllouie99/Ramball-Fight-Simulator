@@ -37,7 +37,8 @@ function initCustomizations() {
       toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-      nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+      nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
@@ -210,7 +211,8 @@ export function drawWeaponStudioScreen() {
     { key: 'toji', label: 'TOJI SPEAR' },
     { key: 'cronos', label: 'CRONOS BLADE' },
     { key: 'ruby', label: 'RUBY SCYTHE' },
-    { key: 'nanami', label: 'NANAMI CLEAVER' }
+    { key: 'nanami', label: 'NANAMI CLEAVER' },
+    { key: 'john_wick', label: 'JOHN WICK PIT VIPER' }
   ];
 
   weapons.forEach((w, idx) => {

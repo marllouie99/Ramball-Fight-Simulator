@@ -405,6 +405,162 @@ export const SKILL_SOUNDS = {
       volume: 1.5,
       delay: 0
     }
+  },
+
+  // ── John Wick ─────────────────────────────
+  33: {
+    pencil: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    pencilstab: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    backstab: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    shell_drop: {
+      src: 'Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3',
+      volume: 0.65,
+      delay: 0
+    },
+    gun_drop: {
+      src: 'Assets/Sound Effects/Skills/johnwick-gundrop.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    gun_switch: {
+      src: 'Assets/Sound Effects/Skills/johnwick-gunswitch.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    weaponswitch: {
+      src: 'Assets/Sound Effects/Skills/johnwick-gunswitch.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    m4_reload: {
+      src: 'Assets/Sound Effects/Skills/johnwick-m4-reload.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    m4_shot: {
+      src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    pistol_reload: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pistol-reload.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    pistol_shot: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    shotgun_crack: {
+      src: 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    shotgun_reload: {
+      src: 'Assets/Sound Effects/Skills/johnwick-shotgun-reload.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    rollback_voice: {
+      src: 'Assets/Sound Effects/Skills/Johnwick-rollback-voiceline.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    switchgun_voice: {
+      src: 'Assets/Sound Effects/Skills/johnwick-switchgun-voiceline.mp3',
+      volume: 1.0,
+      delay: 0
+    }
+  },
+  'john_wick': {
+    pencil: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    pencilstab: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    backstab: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pencilstab.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    shell_drop: {
+      src: 'Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3',
+      volume: 0.65,
+      delay: 0
+    },
+    gun_drop: {
+      src: 'Assets/Sound Effects/Skills/johnwick-gundrop.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    gun_switch: {
+      src: 'Assets/Sound Effects/Skills/johnwick-gunswitch.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    weaponswitch: {
+      src: 'Assets/Sound Effects/Skills/johnwick-gunswitch.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    m4_reload: {
+      src: 'Assets/Sound Effects/Skills/johnwick-m4-reload.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    m4_shot: {
+      src: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    pistol_reload: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pistol-reload.mp3',
+      volume: 0.90,
+      delay: 0
+    },
+    pistol_shot: {
+      src: 'Assets/Sound Effects/Skills/johnwick-pistol-shot.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    shotgun_crack: {
+      src: 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    shotgun_reload: {
+      src: 'Assets/Sound Effects/Skills/johnwick-shotgun-reload.mp3',
+      volume: 0.85,
+      delay: 0
+    },
+    rollback_voice: {
+      src: 'Assets/Sound Effects/Skills/Johnwick-rollback-voiceline.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    switchgun_voice: {
+      src: 'Assets/Sound Effects/Skills/johnwick-switchgun-voiceline.mp3',
+      volume: 1.0,
+      delay: 0
+    }
   }
 };
 
@@ -441,6 +597,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS[100];
     } else if (strKey.includes('genos')) {
       fighterConfig = SKILL_SOUNDS['genos'];
+    } else if (strKey.includes('john')) {
+      fighterConfig = SKILL_SOUNDS[33] || SKILL_SOUNDS['john_wick'];
     }
   }
 

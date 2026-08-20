@@ -434,8 +434,7 @@ export class KnightFighter extends Fighter {
 
   // â”€â”€ Main update â”€â”€
   update(opponent, ownerIndex, arena) {
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
 
     // Time stop - freeze ALL movement, spinning, and actions
     if (this._handleTimeStop()) {

@@ -210,9 +210,7 @@ export class LaserFighter extends Fighter {
       return;
     }
 
-    this.handlePoison();
-    this.handleBurn();
-
+    this.handleStatusEffects();
     this._tickCooldowns();
 
     // Time stop - freeze ALL movement, spinning, and actions

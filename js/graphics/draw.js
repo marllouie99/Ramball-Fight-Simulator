@@ -20,6 +20,7 @@ import { CONFIG, GUN_TIP_DIST } from '../core/config.js';
 import { initFlameCanvas, resizeFlameCanvas, drawFlamesToCanvas, clearFlameCanvas } from './canvasManager.js';
 import { drawDeathEffects } from './particles/deathShatterEffect.js';
 import { drawBloodEffects } from './particles/bloodEffect.js';
+import { drawDroppedMagazines } from './particles/johnWickDroppedMagazine.js';
 import { drawIllusionDeathEffects } from './particles/illusionDeathEffect.js';
 import { drawIllusionSpawnEffects } from './particles/illusionSpawnEffect.js';
 import { drawBerserkerRageEffects } from './particles/berserkerRageEffect.js';
@@ -59,7 +60,7 @@ export function getNow() {
 export { drawDivineFlameArrowConstruct };
 export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay };
 export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen };
-export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
+export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawDroppedMagazines, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 export { drawGenosSelfDestructDimScreen };
 export { drawSoulDisfigurementEffect, drawSoulDisfigurementCounter } from './statusEffects.js';
 

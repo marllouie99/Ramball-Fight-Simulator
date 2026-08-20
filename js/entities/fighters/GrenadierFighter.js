@@ -25,8 +25,7 @@ export class GrenadierFighter extends Fighter {
   }
 
   update(opponent, ownerIndex, arena) {
-    this.handlePoison();
-    this.handleBurn();
+    this.handleStatusEffects();
     this._tickCooldowns();
     if (this.throwAnimationTimer > 0) {
       this.throwAnimationTimer--;

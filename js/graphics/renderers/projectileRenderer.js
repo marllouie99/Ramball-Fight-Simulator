@@ -18,6 +18,7 @@ import { drawSukunaSlash, drawGhostBlade, drawSukunaCleave, drawSukunaFurnaceArr
 import { drawMahoragaThrow } from '../weapons/mahoragaWeaponGraphics.js';
 import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.js';
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
+import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -497,6 +498,24 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     if (p.visual === 'sukunaFurnaceArrow' || p.isSukunaFurnace) {
       if (typeof state !== 'undefined' && state.pixiApp) return;
       drawSukunaFurnaceArrow(ctx, p);
+      return;
+    }
+
+    // John Wick bullet visual - sleek tactical bullet
+    if (p.visual === 'johnWickBullet') {
+      drawJohnWickBullet(ctx, p);
+      return;
+    }
+
+    // John Wick shotgun pellet visual - heavy 12-gauge buckshot
+    if (p.visual === 'johnWickShotgunPellet') {
+      drawJohnWickShotgunPellet(ctx, p);
+      return;
+    }
+
+    // John Wick rifle bullet visual - supersonic 5.56 green-tip
+    if (p.visual === 'johnWickRifleBullet') {
+      drawJohnWickRifleBullet(ctx, p);
       return;
     }
 
