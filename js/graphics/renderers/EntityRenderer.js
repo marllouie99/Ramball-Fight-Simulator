@@ -182,7 +182,7 @@ export function drawFighters() {
 
   // John Wick CQC Assassination Highlight Spotlight & Arena Dim Effect
   const wickFighter = fighters ? fighters.find(f => f && (f.characterId === 'john_wick' || f.type === 'john_wick') && f.cqcComboPhase) : null;
-  if (wickFighter && (wickFighter.cqcComboPhase === 'PUNCH_1' || wickFighter.cqcComboPhase === 'PUNCH_2' || wickFighter.cqcComboPhase === 'PENCIL_STAB' || wickFighter.cqcComboPhase === 'BACKWARD_ROLL')) {
+  if (wickFighter && (wickFighter.cqcComboPhase === 'PENCIL_STAB' || wickFighter.cqcComboPhase === 'BACKWARD_ROLL')) {
     const target = wickFighter.cqcComboTarget;
     const wCfg = (typeof CONFIG !== 'undefined' && CONFIG.john_wick) ? CONFIG.john_wick : {};
     const maxDimAlpha = wCfg.cqcSpotlightDimAlpha || 0.68;

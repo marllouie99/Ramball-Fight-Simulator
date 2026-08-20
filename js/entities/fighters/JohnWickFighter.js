@@ -343,125 +343,23 @@ export class JohnWickFighter extends Fighter {
           else target.hitStunTimer = 8;
         }
         
-        // FULL 360° SPIN COMPLETION: Transition to PUNCH_1 once the roll animation has finished
+        // FULL 360° SPIN COMPLETION: Transition directly to PENCIL_STAB (Skill 2: "With a F***ing Pencil")
         if (this.rollTimer <= 0) {
-          this.cqcComboPhase = 'PUNCH_1';
+          this.cqcComboPhase = 'PENCIL_STAB';
           this.isRolling = false;
           this.vx = 0;
           this.vy = 0;
           this.hideGun = true;
-          this.isPencilEquipped = false;
-          const p1Dur = cfg.cqcPunch1Duration || 18;
-          this.punchAnimTimer = p1Dur;
-          this.punchMaxTime = p1Dur;
-          this.punchAnimHand = 0; // Lead front-hand punch
+          this.isPencilEquipped = true;
+          this.punchAnimTimer = 0;
+          const windupF = cfg.cqcPencilWindupFrames ?? 14;
+          const thrustF = cfg.cqcPencilThrustFrames ?? 8;
+          const pullbackF = cfg.cqcPencilPullbackFrames ?? 14;
+          const pencilDur = cfg.cqcPencilStabDuration || (windupF + thrustF + pullbackF);
+          this.pencilAttackTimer = pencilDur;
+          this.pencilMaxTime = pencilDur;
+          this._pencilDamageDealt = false;
 
-          this.aim(target);
-          target.vx = 0;
-          target.vy = 0;
-          if (typeof target.applyHitStun === 'function') target.applyHitStun(p1Dur + 2);
-          else target.hitStunTimer = p1Dur + 2;
-
-          const punch1Dmg = cfg.cqcPunch1Damage || 20;
-          applyDamageToTarget(target, punch1Dmg, this, { isMelee: true });
-
-          spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 12, 'GUN-FU!', '#F59E0B');
-          spawnBloodEffect(target, 6, this.gunAngle, { minSize: cfg.meleeHitBloodMinSize || 2.5, maxSize: cfg.meleeHitBloodMaxSize || 4.8, count: cfg.meleeHitBloodCount || 3 });
-          spawnSparks(target.x, target.y, 8, '#F59E0B');
-          const hitSfx = cfg.sounds?.fleshHit || 'attack_fleshhit';
-          const hitVol = cfg.soundVolumes?.fleshHit ?? 0.85;
-          audioSystem.playSFX(hitSfx, hitVol);
-          triggerGlobalScreenShake(1.5, 4);
-
-          this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 8));
-        }
-      } else {
-        this.cqcComboPhase = 'BACKWARD_ROLL';
-        this.rollTimer = 0;
-      }
-    } else if (this.cqcComboPhase === 'PUNCH_1') {
-      this.punchAnimTimer--;
-      this.vx = 0;
-      this.vy = 0;
-      if (target && target.hp > 0) {
-        this.aim(target);
-        // Firmly stop enemy movement and anchor in CQC grab position
-        const cqcAngle = this.gunAngle || 0;
-        const cqcDist = this.r + (target.r || 25) + 6;
-        target.x = this.x + Math.cos(cqcAngle) * cqcDist;
-        target.y = this.y + Math.sin(cqcAngle) * cqcDist;
-        clampToArena(target);
-        target.vx = 0;
-        target.vy = 0;
-        if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-        if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
-        else target.hitStunTimer = 20;
-      }
-
-      // Transition to PUNCH_2 (Follow-up Cross Hook) when punch 1 finishes
-      if (this.punchAnimTimer <= 0) {
-        this.cqcComboPhase = 'PUNCH_2';
-        const p2Dur = cfg.cqcPunch2Duration || 14;
-        this.punchAnimTimer = p2Dur;
-        this.punchMaxTime = p2Dur;
-        this.punchAnimHand = 1; // Back-hand cross punch
-
-        if (target && target.hp > 0) {
-          this.aim(target);
-          target.vx = 0;
-          target.vy = 0;
-          if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-          if (typeof target.applyHitStun === 'function') target.applyHitStun(p2Dur + 4);
-          else target.hitStunTimer = p2Dur + 4;
-
-          const punch2Dmg = cfg.cqcPunch2Damage || 20;
-          applyDamageToTarget(target, punch2Dmg, this, { isMelee: true });
-
-          spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 12, 'STRIKE!', '#F59E0B');
-          spawnBloodEffect(target, 8, this.gunAngle, { minSize: cfg.meleeHitBloodMinSize || 2.8, maxSize: cfg.meleeHitBloodMaxSize || 4.8, count: 4 });
-          spawnSparks(target.x, target.y, 10, '#F59E0B');
-          const hitSfx = cfg.sounds?.fleshHit || 'attack_fleshhit';
-          const hitVol = cfg.soundVolumes?.fleshHit ?? 0.95;
-          audioSystem.playSFX(hitSfx, hitVol);
-          triggerGlobalScreenShake(2.0, 5);
-
-          this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 8));
-        }
-      }
-    } else if (this.cqcComboPhase === 'PUNCH_2') {
-      this.punchAnimTimer--;
-      this.vx = 0;
-      this.vy = 0;
-      if (target && target.hp > 0) {
-        this.aim(target);
-        // Firmly stop enemy movement and anchor in CQC grab position
-        const cqcAngle = this.gunAngle || 0;
-        const cqcDist = this.r + (target.r || 25) + 6;
-        target.x = this.x + Math.cos(cqcAngle) * cqcDist;
-        target.y = this.y + Math.sin(cqcAngle) * cqcDist;
-        clampToArena(target);
-        target.vx = 0;
-        target.vy = 0;
-        if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-        if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
-        else target.hitStunTimer = 20;
-      }
-
-      // Transition to PENCIL_STAB (Skill 2: "With a F***ing Pencil") when punch 2 finishes
-      if (this.punchAnimTimer <= 0) {
-        this.cqcComboPhase = 'PENCIL_STAB';
-        this.punchAnimTimer = 0;
-        this.hideGun = true;
-        this.isPencilEquipped = true;
-        const windupF = cfg.cqcPencilWindupFrames ?? 14;
-        const thrustF = cfg.cqcPencilThrustFrames ?? 8;
-        const pullbackF = cfg.cqcPencilPullbackFrames ?? 14;
-        const pencilDur = cfg.cqcPencilStabDuration || (windupF + thrustF + pullbackF);
-        this.pencilAttackTimer = pencilDur;
-        this.pencilMaxTime = pencilDur;
-        this._pencilDamageDealt = false;
-
-        if (target && target.hp > 0) {
           this.aim(target);
           target.vx = 0;
           target.vy = 0;
@@ -469,6 +367,9 @@ export class JohnWickFighter extends Fighter {
           if (typeof target.applyHitStun === 'function') target.applyHitStun(pencilDur + 6);
           else target.hitStunTimer = pencilDur + 6;
         }
+      } else {
+        this.cqcComboPhase = 'BACKWARD_ROLL';
+        this.rollTimer = 0;
       }
     } else if (this.cqcComboPhase === 'PENCIL_STAB') {
       this.pencilAttackTimer--;

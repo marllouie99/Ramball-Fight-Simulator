@@ -124,7 +124,7 @@ export const johnWickConfig = {
   cqcPencilBloodMaxSize: 6.8,         // Arterial spray max droplet size
   cqcPencilBloodCount: 14,            // Arterial spray droplet count
 
-  // ── 7. 5-PHASE C.A.R. ASSASSINATION COMBO (EMPTY MAGAZINE TRIGGER) ──
+  // ── 7. PENCIL ASSASSINATION CQC COMBO (EMPTY MAGAZINE TRIGGER) ──
   outOfAmmoRollDelayFrames: 18,        // Delay frames (~0.30s) after ammo hits 0 before initiating forward dive-roll
   
   // Phase 1: Forward 360° Spin Dive-Roll
@@ -132,15 +132,7 @@ export const johnWickConfig = {
   cqcForwardRollDuration: 20,         // Forward roll duration (frames)
   cqcForwardEvadeDuration: 26,        // 100% Evade intangibility during forward roll (frames)
 
-  // Phase 2: Gun-Fu Punch 1 (Lead Strike)
-  cqcPunch1Damage: 20,                // Lead punch damage
-  cqcPunch1Duration: 18,              // Lead punch animation frames (~0.30s)
-
-  // Phase 3: Gun-Fu Punch 2 (Cross Hook)
-  cqcPunch2Damage: 20,                // Cross hook damage
-  cqcPunch2Duration: 18,              // Cross hook animation frames (~0.30s)
-
-  // Phase 4: Pencil Assassination (Chamber -> Forward Stab -> Pullback)
+  // Phase 2: Pencil Assassination (Chamber -> Forward Stab -> Pullback)
   cqcPencilWindupFrames: 14,          // Chamber / arm pullback frames before the thrust (~0.23s)
   cqcPencilThrustFrames: 8,           // Explosive forward stab frames (tip plunges into target, ~0.13s)
   cqcPencilPullbackFrames: 14,        // Pullback retraction frames after impact (~0.23s)
@@ -149,7 +141,7 @@ export const johnWickConfig = {
   cqcPencilImpactShakeDuration: 12,   // Screen shake duration on pencil tip impact
   cqcPencilKnockback: 22,             // Physical knockback impulse launched on victim upon stab impact (px/frame)
 
-  // Phase 5: Backward 360° Spin Disengage Roll & Tactical Speed Reload
+  // Phase 3: Backward 360° Spin Disengage Roll & Tactical Speed Reload
   cqcBackwardRollSpeed: 18,           // Backward disengage roll speed
   cqcBackwardRollDuration: 22,        // Backward roll duration (frames)
   cqcBackwardEvadeDuration: 28,       // Evade intangibility during backward roll (frames)
