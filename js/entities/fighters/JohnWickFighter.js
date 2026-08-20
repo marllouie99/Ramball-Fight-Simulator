@@ -64,9 +64,11 @@ export class JohnWickFighter extends Fighter {
     this.flashTimer = 0;
     this.casingTimer = 0;
 
-    // 5-Phase Assassination Combo State Machine
+    // 5-Phase Assassination Combo State Machine & Out-of-Ammo Delay
     this.cqcComboPhase = null; // 'FORWARD_ROLL' | 'PUNCH_1' | 'PUNCH_2' | 'PENCIL_STAB' | 'BACKWARD_ROLL' | 'STOP_RELOAD' | 'SWITCH_WEAPON'
     this.cqcComboTarget = null;
+    this.outOfAmmoRollDelayTimer = 0;
+    this.pendingAssassinationTarget = null;
 
     // Demo attack cycle state
     this._demoAttackCycle = 0;
@@ -106,6 +108,8 @@ export class JohnWickFighter extends Fighter {
     this.casingTimer = 0;
     this.cqcComboPhase = null;
     this.cqcComboTarget = null;
+    this.outOfAmmoRollDelayTimer = 0;
+    this.pendingAssassinationTarget = null;
     this._demoAttackCycle = 0;
   }
 
@@ -1036,13 +1040,13 @@ export class JohnWickFighter extends Fighter {
       this.focusGauge = Math.min(this.maxFocusGauge, this.focusGauge + (cfg.focusGainPerBulletHit || 8));
     }
 
-    // ── TRIGGER ASSASSINATION COMBO ON EMPTY MAGAZINE ──
+    // ── TRIGGER ASSASSINATION COMBO ON EMPTY MAGAZINE (WITH DELAY FRAMES) ──
     if (this.magazineBullets <= 0) {
       this.magazineBullets = 0;
       const targetEnemy = this._findCloseEnemyTarget(450) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
       if (targetEnemy) {
-        this.startAssassinationCombo(targetEnemy);
-        return;
+        this.pendingAssassinationTarget = targetEnemy;
+        this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;
       } else {
         // Fallback reload if no enemy is alive
         this.isReloading = true;
@@ -1065,14 +1069,16 @@ export class JohnWickFighter extends Fighter {
 
   /**
    * Close-Quarters Combat (CQC) Check:
-   * Only triggers assassination combo if magazine is empty!
+   * Only triggers assassination combo if magazine is empty and out-of-ammo delay has passed!
    */
   _updateMeleeCombat() {
-    if (this.cqcComboPhase || this.hp <= 0 || this.isReloading) return;
-    if (this.magazineBullets <= 0) {
+    if (this.cqcComboPhase || this.hp <= 0 || this.isReloading || this.outOfAmmoRollDelayTimer > 0) return;
+    if (this.magazineBullets <= 0 && !this.pendingAssassinationTarget) {
       const closeTarget = this._findCloseEnemyTarget(120);
       if (closeTarget) {
-        this.startAssassinationCombo(closeTarget);
+        const cfg = CONFIG.john_wick || {};
+        this.pendingAssassinationTarget = closeTarget;
+        this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;
       }
     }
   }
@@ -1504,11 +1510,6 @@ export class JohnWickFighter extends Fighter {
       if (opponent && opponent.hp > 0) this.aim(opponent);
       this._updateMeleeCombat();
       return;
-    } else if (this.rollCooldown <= 0 && opponent && opponent.hp > 0 && typeof state !== 'undefined' && state.gameState === 'playing') {
-      // Initiate Assassination Combo ONLY when magazine is empty
-      if (this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading) {
-        this.startAssassinationCombo(opponent);
-      }
     }
 
     // Reload handling
@@ -1526,10 +1527,38 @@ export class JohnWickFighter extends Fighter {
       }
     }
 
-    // 3. Close-Quarters Assassination Check (ONLY when magazine is empty)
-    if (opponent && opponent.hp > 0 && !this.isRolling && typeof state !== 'undefined' && state.gameState === 'playing') {
-      if (this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading) {
-        this.startAssassinationCombo(opponent);
+    // 3. Out-Of-Ammo delay countdown before initiating forward roll assassination combo
+    if (this.outOfAmmoRollDelayTimer > 0) {
+      this.outOfAmmoRollDelayTimer--;
+      if (this.outOfAmmoRollDelayTimer <= 0 && this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading && !this.isRolling) {
+        const target = (this.pendingAssassinationTarget && this.pendingAssassinationTarget.hp > 0 && !this.pendingAssassinationTarget.isDying)
+          ? this.pendingAssassinationTarget
+          : (this._findCloseEnemyTarget(450) || (opponent && opponent.hp > 0 ? opponent : null));
+        this.pendingAssassinationTarget = null;
+        if (target) {
+          this.startAssassinationCombo(target);
+        } else {
+          this.isReloading = true;
+          this._hasDroppedMag = false;
+          this._hasSlappedNewMag = false;
+          this._hasPlayedReloadSound = false;
+          let rTime = cfg.reloadTime || 75;
+          if (this.currentEquippedWeapon === 'shotgun') {
+            rTime = cfg.shotgunReloadTime || 96;
+            this.magazineBullets = 0;
+          } else if (this.currentEquippedWeapon === 'rifle') {
+            rTime = cfg.rifleReloadTime || 85;
+          }
+          this.reloadTimer = rTime;
+          this.reloadMaxTime = rTime;
+          this.shootCooldown = rTime;
+        }
+      }
+    } else if (this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading && !this.isRolling && typeof state !== 'undefined' && state.gameState === 'playing') {
+      const targetEnemy = this._findCloseEnemyTarget(450) || (opponent && opponent.hp > 0 ? opponent : null) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
+      if (targetEnemy) {
+        this.pendingAssassinationTarget = targetEnemy;
+        this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;
       }
     }
 

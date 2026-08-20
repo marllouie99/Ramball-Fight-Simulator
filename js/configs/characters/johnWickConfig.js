@@ -125,6 +125,8 @@ export const johnWickConfig = {
   cqcPencilBloodCount: 14,            // Arterial spray droplet count
 
   // ── 7. 5-PHASE C.A.R. ASSASSINATION COMBO (EMPTY MAGAZINE TRIGGER) ──
+  outOfAmmoRollDelayFrames: 18,        // Delay frames (~0.30s) after ammo hits 0 before initiating forward dive-roll
+  
   // Phase 1: Forward 360° Spin Dive-Roll
   cqcForwardRollSpeed: 22,            // Forward roll blitz speed towards target
   cqcForwardRollDuration: 20,         // Forward roll duration (frames)
@@ -187,7 +189,7 @@ export const johnWickConfig = {
     bulletDeflect: 'Assets/Sound Effects/Skills/parry.mp3'
   },
   soundVolumes: {
-    pistolShot: 0.85,
+    pistolShot: 0.7,
     pistolReload: 0.90,
     shotgunShot: 0.95,
     shotgunCrack: 0.85,
