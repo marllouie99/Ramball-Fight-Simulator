@@ -1120,9 +1120,11 @@ export class JohnWickFighter extends Fighter {
   }
 
   /**
-   * Tactical Movement Roll: Chance to perform a high-velocity combat dive/roll while moving to travel fast
+   * Tactical Evasive Roll: Intelligently triggered ONLY when an enemy gets near to John Wick (proximity trigger)
+   * or when closing in for melee. Performs an evasive combat roll to create distance and reposition.
+   * Eliminates random rolling while simply moving across empty space.
    */
-  _checkMovementRoll(opponent, arena) {
+  _checkTacticalEvadeRoll(opponent, arena) {
     if (this.isRolling || this.cqcComboPhase || this.hp <= 0) return;
     if ((this.hitStunTimer && this.hitStunTimer > 0) || (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isTargetOfAmbush) return;
     if (typeof state === 'undefined' || state.gameState !== 'playing') return;
@@ -1133,37 +1135,95 @@ export class JohnWickFighter extends Fighter {
     }
 
     const cfg = CONFIG.john_wick || {};
-    const moveMag = Math.hypot(this.vx, this.vy);
-    
-    // Check if John Wick is actively moving across the arena or navigating towards/away from opponent
-    const isMoving = moveMag > 0.5 || (opponent && opponent.hp > 0 && Math.hypot(opponent.x - this.x, opponent.y - this.y) > 70);
-    if (!isMoving) return;
+    const closeDistThreshold = cfg.rollEnemyCloseDistance || 110;
 
-    const rollChance = cfg.movementRollChance ?? 0.035;
-    if (Math.random() < rollChance) {
-      this.isRolling = true;
-      this.isRollingBack = false;
-      const rollDur = cfg.movementRollDuration || 18;
-      this.rollTimer = rollDur;
-      this.rollMaxTimer = rollDur;
-      this.movementRollCooldown = cfg.movementRollCooldown || 120;
-      this.evadeBuffTimer = cfg.movementRollEvadeDuration || 22;
+    // Query for nearby enemy threat (fighters or illusions)
+    let threatTarget = null;
+    let minThreatDist = Infinity;
 
-      // Calculate roll trajectory in current moving direction or toward opponent
-      let moveAngle = moveMag > 0.5 ? Math.atan2(this.vy, this.vx) : (opponent ? Math.atan2(opponent.y - this.y, opponent.x - this.x) : (this.gunAngle || 0));
-      
-      const rollSpeed = cfg.movementRollSpeed || 20.0;
-      this.vx = Math.cos(moveAngle) * rollSpeed;
-      this.vy = Math.sin(moveAngle) * rollSpeed;
-
-      // Audio & VFX
-      const rollSfx = cfg.sounds?.rollForward || cfg.sounds?.combatRoll || 'Assets/Sound Effects/Skills/dash1.mp3';
-      const rollVol = cfg.soundVolumes?.rollForward ?? (cfg.soundVolumes?.combatRoll ?? 0.85);
-      audioSystem.playSFX(rollSfx, rollVol);
-
-      spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 14, 'TACTICAL ROLL!', '#F59E0B');
-      spawnSparks(this.x, this.y, 8, 'silverStreak', '#CBD5E1');
+    // Check primary opponent
+    if (opponent && opponent.hp > 0 && !opponent.isDying) {
+      const d = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+      if (d <= closeDistThreshold) {
+        threatTarget = opponent;
+        minThreatDist = d;
+      }
     }
+
+    // Check all other enemy fighters
+    if (!threatTarget && state.fighters) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0 || f.isDying || f.isTurret) continue;
+        if (typeof state.getFighterTeam === 'function') {
+          const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
+          const theirTeam = state.getFighterTeam(i);
+          if (myTeam !== null && myTeam === theirTeam) continue;
+        }
+        const d = Math.hypot(f.x - this.x, f.y - this.y);
+        if (d <= closeDistThreshold && d < minThreatDist) {
+          threatTarget = f;
+          minThreatDist = d;
+        }
+      }
+    }
+
+    // Also check illusions if no fighter found
+    if (!threatTarget && state.illusions) {
+      for (let i = 0; i < state.illusions.length; i++) {
+        const ill = state.illusions[i];
+        if (!ill || ill.hp <= 0) continue;
+        const d = Math.hypot(ill.x - this.x, ill.y - this.y);
+        if (d <= closeDistThreshold && d < minThreatDist) {
+          threatTarget = ill;
+          minThreatDist = d;
+        }
+      }
+    }
+
+    // Only roll if an enemy actually got close!
+    if (!threatTarget) return;
+
+    // Execute Tactical Combat Roll to evade/reposition
+    this.isRolling = true;
+    this.isRollingBack = false;
+    const rollDur = cfg.rollDuration || cfg.movementRollDuration || 18;
+    this.rollTimer = rollDur;
+    this.rollMaxTimer = rollDur;
+    this.movementRollCooldown = cfg.rollCooldown || 180;
+    this.evadeBuffTimer = cfg.rollEvadeDuration || 24;
+
+    // Roll angle: Roll away from the close enemy, or lateral flank (weave 45-90 degrees) to escape
+    const dx = this.x - threatTarget.x;
+    const dy = this.y - threatTarget.y;
+    const awayAngle = Math.atan2(dy, dx);
+    const lateralWeave = (Math.random() < 0.5 ? 0.45 : -0.45);
+    let rollAngle = awayAngle + lateralWeave;
+
+    // Check arena wall collision anticipation so he rolls toward open space
+    if (arena) {
+      const futureX = this.x + Math.cos(rollAngle) * 80;
+      const futureY = this.y + Math.sin(rollAngle) * 80;
+      if (futureX < arena.x + 30 || futureX > arena.x + arena.width - 30 ||
+          futureY < arena.y + 30 || futureY > arena.y + arena.height - 30) {
+        // Steer toward center of arena
+        const arenaCenterX = arena.x + arena.width / 2;
+        const arenaCenterY = arena.y + arena.height / 2;
+        rollAngle = Math.atan2(arenaCenterY - this.y, arenaCenterX - this.x);
+      }
+    }
+
+    const rollSpeed = cfg.rollSpeed || cfg.movementRollSpeed || 20.0;
+    this.vx = Math.cos(rollAngle) * rollSpeed;
+    this.vy = Math.sin(rollAngle) * rollSpeed;
+
+    // Audio & VFX
+    const rollSfx = cfg.sounds?.rollForward || cfg.sounds?.combatRoll || 'Assets/Sound Effects/Skills/dash1.mp3';
+    const rollVol = cfg.soundVolumes?.rollForward ?? (cfg.soundVolumes?.combatRoll ?? 0.85);
+    audioSystem.playSFX(rollSfx, rollVol);
+
+    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 14, 'EVASIVE ROLL!', '#F59E0B');
+    spawnSparks(this.x, this.y, 8, 'silverStreak', '#CBD5E1');
   }
 
   /**
@@ -1482,8 +1542,8 @@ export class JohnWickFighter extends Fighter {
 
     super.update(opponent, ownerIndex, arena);
 
-    // 4. Check Tactical Movement Roll (Fast travel maneuver while moving)
-    this._checkMovementRoll(opponent, arena);
+    // 4. Check Tactical Evasive Roll (Triggered when enemy approaches close)
+    this._checkTacticalEvadeRoll(opponent, arena);
   }
 
   drawGun(ctx) {

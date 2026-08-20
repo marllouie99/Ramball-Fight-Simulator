@@ -97,20 +97,18 @@ export const johnWickConfig = {
   meleeHitBloodCount: 3,              // Blood droplet count on punch
 
   // ── 5. SKILL 1: TACTICAL COMBAT ROLL & EVADE INTANGIBILITY ──
-  rollCooldown: 240,                  // 4.0s cooldown (240 frames)
+  rollCooldown: 180,                  // 3.0s cooldown between tactical rolls (180 frames)
   rollDistance: 160,                  // Roll dash travel distance in pixels
   rollDuration: 18,                   // 18 frames roll animation
   evadeAlwaysActive: true,            // Evade buff is always active (passive dodge/intangibility)
   evadeBuffDuration: 40,              // Active intangibility duration (frames)
-  evadeChance: 0.08,                  // 15% passive dodge chance (100% during Evade Buff)
+  evadeChance: 0.08,                  // 8% passive dodge chance (100% during Evade Buff)
   rollInstantReload: true,            // Instantly reloads magazine on tactical combat roll
   
-  // Tactical Movement Roll (Fast Travel Maneuver while moving)
-  movementRollChance: 0.035,          // 3.5% chance per moving frame (~every 2-3s of movement)
-  movementRollSpeed: 20.0,            // High-velocity forward roll speed (px/frame)
-  movementRollDuration: 18,           // Duration of movement roll (frames)
-  movementRollCooldown: 120,          // 2.0s cooldown between movement rolls (120 frames)
-  movementRollEvadeDuration: 22,      // Evade i-frames during movement roll (frames)
+  // Tactical Proximity Threat Evasive Roll (Triggered ONLY when an enemy gets close)
+  rollEnemyCloseDistance: 110,        // Close proximity trigger distance (px): rolls when enemy gets near
+  rollSpeed: 20.0,                    // Tactical roll speed (px/frame)
+  rollEvadeDuration: 24,              // Evade i-frames during tactical roll (frames)
 
   // ── 6. SKILL 2: THE INFAMOUS NO. 2 PENCIL (ASSASSINATION) ──
   pencilCooldown: 450,                // 7.5s cooldown (450 frames)
