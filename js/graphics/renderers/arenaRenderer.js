@@ -356,11 +356,11 @@ export function drawArena() {
   // ── Draw Wall Cracks (Decals) ──
   if (state.wallCracks && state.wallCracks.length > 0) {
     ctx.save();
-    // Strict boundary clipping: prevent wall cracks from ever overlaying the top title header/HUD or bottom health/skill HUD cards
+    // Generous wall zone bounds: allow full natural fissure propagation without intersecting top title header or bottom HUD cards
     ctx.beginPath();
-    const clipMarginTop = 10;
-    const clipMarginBottom = 12;
-    const clipMarginSides = 35;
+    const clipMarginTop = 75;
+    const clipMarginBottom = 75;
+    const clipMarginSides = 42;
     ctx.rect(
       arena.x - clipMarginSides,
       arena.y - clipMarginTop,
