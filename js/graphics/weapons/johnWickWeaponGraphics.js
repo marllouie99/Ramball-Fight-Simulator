@@ -1897,14 +1897,31 @@ export function drawJohnWickRifle(ctx, x, y, gunAngle, r, opts = {}) {
 
   if (isSwitching && switchTimer > 0) {
     const switchProgress = 1.0 - (switchTimer / switchMaxTime); // 0 to 1
-    const equipSine = Math.sin(switchProgress * Math.PI);
-    switchAngleOffset = -0.28 * equipSine;
-    switchOffsetY = -4.0 * equipSine;
 
-    // Charging handle pull & release in the middle of equip
-    if (switchProgress > 0.30 && switchProgress < 0.70) {
-      const charP = (switchProgress - 0.30) / 0.40;
-      chargingOffset = -Math.sin(charP * Math.PI) * 6.0;
+    // 3-Phase Tactical High-Ready Lift & Charging Handle Crack Animation:
+    // Phase 1 (0.00 - 0.28): Rapid high-ready lift (rifle tilts up ~45° and raises into chest)
+    // Phase 2 (0.28 - 0.68): Held high while charging handle aggressively racks back (-12.0px) and snaps forward into battery
+    // Phase 3 (0.68 - 1.00): Smooth level down to horizontal shoulder aim stance
+    if (switchProgress < 0.28) {
+      const liftT = switchProgress / 0.28;
+      const easeLift = Math.sin(liftT * Math.PI * 0.5); // Ease out curve
+      switchAngleOffset = -0.78 * easeLift; // Lift up ~45 degrees
+      switchOffsetY = -10.0 * easeLift;
+      chargingOffset = 0;
+    } else if (switchProgress < 0.68) {
+      const rackT = (switchProgress - 0.28) / 0.40; // 0 to 1
+      // Held up high with a crisp mechanical kickback when racked
+      const rackSine = Math.sin(rackT * Math.PI);
+      switchAngleOffset = -0.78 - 0.06 * rackSine;
+      switchOffsetY = -10.0 - 1.2 * rackSine;
+      // Charging handle pull & release stroke: slides back -12.0px and forcefully snaps forward
+      chargingOffset = -Math.sin(rackT * Math.PI) * 12.0;
+    } else {
+      const lowerT = (switchProgress - 0.68) / 0.32; // 0 to 1
+      const easeLower = 1.0 - Math.sin(lowerT * Math.PI * 0.5);
+      switchAngleOffset = -0.78 * easeLower;
+      switchOffsetY = -10.0 * easeLower;
+      chargingOffset = 0;
     }
   } else if (isReloading && reloadTimer > 0) {
     const reloadProgress = 1.0 - (reloadTimer / reloadMaxTime);
@@ -2179,14 +2196,27 @@ export function drawJohnWickRifle(ctx, x, y, gunAngle, r, opts = {}) {
   ctx.arc(barrelX + 9.5, barrelY + 2.5, 1.1, 0, Math.PI * 2);
   ctx.fill();
 
-  // Ejection Port & Dust Cover
-  ctx.fillStyle = g.ejectionPort;
+  // Ejection Port & Dust Cover (Opens when charging handle is pulled!)
+  ctx.fillStyle = (chargingOffset < -1.5) ? '#0D0E11' : g.ejectionPort;
   ctx.strokeStyle = '#000000';
   ctx.lineWidth = 0.8;
   ctx.beginPath();
   ctx.rect(barrelX - 3.0, barrelY - 4.5, 8.5, 4.5);
   ctx.fill();
   ctx.stroke();
+
+  // If charging handle is pulled: show bolt carrier group sliding back and golden 5.56 brass round in chamber
+  if (chargingOffset < -1.5) {
+    // Silver-chrome Bolt Carrier Group sliding back
+    ctx.fillStyle = '#CBD5E1';
+    ctx.fillRect(barrelX - 2.5 + chargingOffset * 0.45, barrelY - 4.0, 3.8, 3.5);
+
+    // 5.56 NATO Gold Brass Cartridge visible in chamber
+    ctx.fillStyle = '#D4AF37';
+    ctx.beginPath();
+    ctx.roundRect(barrelX + 0.8, barrelY - 3.0, 4.2, 1.8, 0.4);
+    ctx.fill();
+  }
 
   // Brass Deflector triangular pyramid
   ctx.fillStyle = g.receiverUpper;
@@ -2214,6 +2244,12 @@ export function drawJohnWickRifle(ctx, x, y, gunAngle, r, opts = {}) {
   ctx.roundRect(barrelX - 13.5 + chargingOffset, barrelY - 7.2, 4.5, 2.2, 0.6);
   ctx.fill();
   ctx.stroke();
+
+  // Charging handle extended latch lever when pulled
+  if (chargingOffset < -2.0) {
+    ctx.fillStyle = '#1A1C20';
+    ctx.fillRect(barrelX - 15.5 + chargingOffset, barrelY - 8.2, 3.5, 2.0);
+  }
 
   // ─────────────────────────────────────────────────────────────
   // 5. AIMPOINT CompM4 / M68 CCO TACTICAL RED DOT SCOPE (Matching Reference Image)

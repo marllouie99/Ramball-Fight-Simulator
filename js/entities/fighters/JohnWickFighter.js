@@ -64,11 +64,13 @@ export class JohnWickFighter extends Fighter {
     this.flashTimer = 0;
     this.casingTimer = 0;
 
-    // 5-Phase Assassination Combo State Machine & Out-of-Ammo Delay
-    this.cqcComboPhase = null; // 'FORWARD_ROLL' | 'PUNCH_1' | 'PUNCH_2' | 'PENCIL_STAB' | 'BACKWARD_ROLL' | 'STOP_RELOAD' | 'SWITCH_WEAPON'
+    // 3-Phase Assassination Combo State Machine & Out-of-Ammo Delay
+    this.cqcComboPhase = null; // 'FORWARD_ROLL' | 'PENCIL_STAB' | 'BACKWARD_ROLL' | 'STOP_RELOAD' | 'SWITCH_WEAPON'
     this.cqcComboTarget = null;
     this.outOfAmmoRollDelayTimer = 0;
     this.pendingAssassinationTarget = null;
+    this._shotgunCrackSoundPlayed = false;
+    this._rifleCrackSoundPlayed = false;
 
     // Demo attack cycle state
     this._demoAttackCycle = 0;
@@ -110,6 +112,8 @@ export class JohnWickFighter extends Fighter {
     this.cqcComboTarget = null;
     this.outOfAmmoRollDelayTimer = 0;
     this.pendingAssassinationTarget = null;
+    this._shotgunCrackSoundPlayed = false;
+    this._rifleCrackSoundPlayed = false;
     this._demoAttackCycle = 0;
   }
 
@@ -612,6 +616,7 @@ export class JohnWickFighter extends Fighter {
       this.magazineBullets = this.maxMagazine;
       this.shootCooldownMax = cfg.rifleFireCooldown || 7;
       weaponName = 'EXCOMMUNICADO (M4 RIFLE)!';
+      this._rifleCrackSoundPlayed = false;
     } else {
       this.maxMagazine = cfg.magazineSize || 12;
       this.magazineBullets = this.maxMagazine;
@@ -622,7 +627,9 @@ export class JohnWickFighter extends Fighter {
     // 4. Start Weapon Switch Animation & Racking
     const swDur = (nextWeapon === 'shotgun')
       ? (cfg.shotgunSwitchDuration || 44)
-      : (cfg.weaponSwitchDuration || 36);
+      : (nextWeapon === 'rifle')
+        ? (cfg.rifleSwitchDuration || 44)
+        : (cfg.weaponSwitchDuration || 36);
     this.weaponSwitchTimer = swDur;
     this.weaponSwitchMaxTime = swDur;
     this.isReloading = false;
@@ -651,7 +658,7 @@ export class JohnWickFighter extends Fighter {
   _processShotgunSwitchCrack(cfg) {
     if (this.currentEquippedWeapon !== 'shotgun' || this.weaponSwitchTimer <= 0) return;
     const swProg = 1.0 - (this.weaponSwitchTimer / (this.weaponSwitchMaxTime || 44));
-    // At peak of the lift (~30% through), trigger the shotgun rack & crack SFX and chamber sparks!
+    // At peak of the lift (~28-30% through), trigger the shotgun rack & crack SFX and chamber sparks!
     if (swProg >= 0.28 && !this._shotgunCrackSoundPlayed) {
       this._shotgunCrackSoundPlayed = true;
       const crackSfx = cfg.sounds?.shotgunCrack || cfg.shotgunCrackSound || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3';
@@ -668,6 +675,35 @@ export class JohnWickFighter extends Fighter {
       const chX = this.x + cosA * (this.r + 12) + perpX * (facingLeft ? 4 : -4);
       const chY = this.y + sinA * (this.r + 12) + perpY * (facingLeft ? 4 : -4);
       spawnSparks(chX, chY, 8, 'silverStreak', '#F59E0B');
+    }
+  }
+
+  /**
+   * Triggers the authentic mechanical M4 charging handle rack / crack sound & chamber sparks during weapon equip
+   */
+  _processRifleSwitchCrack(cfg) {
+    if (this.currentEquippedWeapon !== 'rifle' || this.weaponSwitchTimer <= 0) return;
+    const swProg = 1.0 - (this.weaponSwitchTimer / (this.weaponSwitchMaxTime || 44));
+    // At peak of the lift (~28-30% through), trigger the M4 charging handle rack & crack SFX and chamber sparks!
+    if (swProg >= 0.28 && !this._rifleCrackSoundPlayed) {
+      this._rifleCrackSoundPlayed = true;
+      const crackSfx = cfg.sounds?.rifleCrack || cfg.rifleCrackSound || 'Assets/Sound Effects/Skills/johnwick-m4-reload.mp3';
+      const crackVol = cfg.soundVolumes?.rifleCrack ?? cfg.rifleCrackVolume ?? 0.90;
+      audioSystem.playSFX(crackSfx, crackVol);
+
+      // Tactical chamber spark burst and mechanical vibration
+      const angle = this.gunAngle || 0;
+      const facingLeft = Math.abs(angle) > Math.PI / 2;
+      const cosA = Math.cos(angle);
+      const sinA = Math.sin(angle);
+      const perpX = -sinA;
+      const perpY = cosA;
+      const chX = this.x + cosA * (this.r + 10) + perpX * (facingLeft ? 3.5 : -3.5);
+      const chY = this.y + sinA * (this.r + 10) + perpY * (facingLeft ? 3.5 : -3.5);
+      spawnSparks(chX, chY, 8, 'gold', '#F59E0B');
+      spawnSparks(chX, chY, 5, 'silverStreak', '#CBD5E1');
+      triggerGlobalScreenShake(1.4, 3);
+      spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 14, 'CHARGING HANDLE!', '#38BDF8');
     }
   }
 
@@ -1335,13 +1371,14 @@ export class JohnWickFighter extends Fighter {
     if (this.recoilOffset > 0) this.recoilOffset = Math.max(0, this.recoilOffset - 0.8);
     if (this.flashTimer > 0) this.flashTimer--;
     if (this.casingTimer > 0) this.casingTimer--;
+    const cfg = CONFIG.john_wick || {};
+
     if (this.suitShimmerTimer > 0) this.suitShimmerTimer--;
     if (!this.cqcComboPhase && this.weaponSwitchTimer > 0) {
       this.weaponSwitchTimer--;
       this._processShotgunSwitchCrack(cfg);
+      this._processRifleSwitchCrack(cfg);
     }
-
-    const cfg = CONFIG.john_wick || {};
 
     // 2. Update Assassination Combo State Machine
     if (this.cqcComboPhase) {
@@ -1516,7 +1553,7 @@ export class JohnWickFighter extends Fighter {
         reloadMaxTime: cfg.rifleReloadTime || 85,
         isSwitching: Boolean(this.weaponSwitchTimer && this.weaponSwitchTimer > 0),
         switchTimer: this.weaponSwitchTimer,
-        switchMaxTime: this.weaponSwitchMaxTime || cfg.weaponSwitchDuration || 36
+        switchMaxTime: this.weaponSwitchMaxTime || cfg.rifleSwitchDuration || 44
       });
     } else {
       const cfg = CONFIG.john_wick || {};

@@ -85,6 +85,9 @@ export const johnWickConfig = {
   rifleCasingDuration: 12,            // 5.56 casing tumble duration (frames)
   rifleSelfPushback: 1.2,             // Physical recoil impulse pushing John Wick backwards
   rifleReloadTime: 85,                // Mag-drop & fresh PMAG insertion duration (frames)
+  rifleSwitchDuration: 44,            // M4 Rifle high-ready lift & charging handle crack duration (frames)
+  rifleCrackSound: 'Assets/Sound Effects/Skills/johnwick-m4-reload.mp3',
+  rifleCrackVolume: 0.90,
 
   // ── 4. CLOSE-QUARTERS COMBAT (CQC) MARTIAL ARTS ──
   meleePunchReach: 85,                // 85px punch reach
@@ -157,7 +160,7 @@ export const johnWickConfig = {
   excommunicadoEvadeChance: 0.10,           // 100% Evade dodge chance in Excommunicado state
   excommunicadoSpeedMultiplier: 1.40,      // +40% movement speed multiplier while wielding M4 Rifle (5.4 -> 7.56 px/frame)
   excommunicadoAmmoMultiplier: 1.50,       // 1.5x magazine capacity multiplier for M4 Rifle (30 -> 45 rounds)
-  excommunicadoRifleMagazineSize: 45,      // 45-round extended drum/PMAG capacity for M4 Rifle during Excommunicado
+  excommunicadoRifleMagazineSize: 30,      // 45-round extended drum/PMAG capacity for M4 Rifle during Excommunicado
 
   // ── 10. AUDIO CONFIGURATION, VOLUMES, CHANCES & TIMING DELAYS (delays measured in ms or frames) ──
   sounds: {
