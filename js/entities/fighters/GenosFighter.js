@@ -950,10 +950,8 @@ export class GenosFighter extends Fighter {
           const flatHeal = cfg.selfDestructHpRecoveryFlat || 0;
           const recoveredHp = Math.round(this.maxHp * healPct) + flatHeal;
           if (recoveredHp > 0) {
-            this.hp = Math.min(this.maxHp, this.hp + recoveredHp);
-            if (typeof spawnFloatingText === 'function') {
-              spawnFloatingText(this.x, this.y - this.r - 46, `+${recoveredHp} HP`, "#00FF66");
-            }
+            this.heal(recoveredHp, { color: '#39FF14' });
+            this._healthBarHealTimer = 28; // Triggers vibrant green edge glow & pulse on HUD Health Bar!
           }
 
           if (typeof spawnImpactFlash === 'function') {
