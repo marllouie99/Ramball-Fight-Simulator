@@ -1035,9 +1035,10 @@ export class Fighter {
       const faah = getAnnouncerSound('faah');
       if (faah) audioSystem.playSFX(faah.src, faah.volume, faah.speed, faah.offset || 0);
 
-      // Helper: a Doppelganger with surviving illusions is still "in play", same for evading Mahito
+      // Helper: an entity is in play if alive, a Doppelganger with illusions, evading Mahito, or Genos in Overdrive/Recovery
       const _isEffectivelyAlive = (f) => {
         if (!f || f.isTurret) return false;
+        if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
         if (f.hp > 0) return true;
         const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
         if (isDoppel) {
@@ -1061,15 +1062,16 @@ export class Fighter {
         }
       };
 
-      // If the dying fighter is a Doppelganger or evading Mahito with surviving copies, or paralyzed in Soul Disfigurement, don't end the round yet
+      // If the dying fighter is a Doppelganger, evading Mahito, paralyzed in Soul Disfigurement, or Genos in Core Overdrive/Recovery, don't end the round yet
       const isThisDoppel = this.type === 'doppleganger' || this._def?.type === 'doppleganger' || this.characterId === 'doppleganger';
       const isThisMahitoEvading = (this.characterId === 'mahito' || this.type === 'mahito') && this.isEvading;
       const isThisParalyzedBySoul = Boolean(this.isParalyzedByMahito && (this.paralyzeTimer || 0) > 0);
+      const isThisGenosOverdrive = (this.characterId === 'genos' || this.type === 'genos') && (this.isSelfDestructing || this.isSelfDestructRecovering);
 
       if ((isThisDoppel && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.hp > 0)) ||
           (isThisMahitoEvading && state.illusions && state.illusions.some(ill => ill && ill.owner === this && ill.isEvasionMinion && ill.hp > 0)) ||
-          isThisParalyzedBySoul) {
-        // Round continues until explosion triggers!
+          isThisParalyzedBySoul || isThisGenosOverdrive) {
+        // Round continues until explosion/reboot completes!
         recordKill();
         return true;
       }
@@ -1093,6 +1095,7 @@ export class Fighter {
     const _isEffectivelyAlive = (f) => {
       if (!f || f.isTurret) return false;
       if (f.isParalyzedByMahito && (f.paralyzeTimer || 0) > 0) return true;
+      if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
       if (f.hp > 0) return true;
       const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
       if (isDoppel) {

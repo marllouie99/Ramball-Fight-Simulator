@@ -348,8 +348,13 @@ export class GenosFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    // 1. Invulnerable / Intangible during post-explosion piece reassembly
+    if (this.isSelfDestructRecovering) {
+      return false;
+    }
+
+    // 2. High DEF while charging core overload countdown
     if (this.isSelfDestructing) {
-      // Genos gains massive DEF (Damage Reduction) while charging self-destruct!
       const isTrueDamage = Boolean(opts && (opts.isTrueDamage || opts.trueDamage || opts.isPureLoveBeam || opts.isPurpleDPS));
       let finalAmount = amount;
       const defReduction = CONFIG.genos?.selfDestructDamageReduction ?? 0.75;
@@ -361,33 +366,25 @@ export class GenosFighter extends Fighter {
         }
       }
 
-      const result = super.takeDamage(finalAmount, attacker, opts);
-      if (this.hp <= 0 || this.isDead) {
-        // Failed to self-destruct before dying — stops charging sound and dies cleanly!
-        if (this._selfDestructChargeHandle) {
-          try { stopSound(this._selfDestructChargeHandle); } catch (e) {}
-          this._selfDestructChargeHandle = null;
-        }
-        const chargeSrc = CONFIG.genos?.selfDestructChargeSound || 'Assets/Sound Effects/Skills/genos-selfdestruct-charging.mp3';
-        try { stopSoundBySrc(chargeSrc); } catch (e) {}
-
-        this.isSelfDestructing = false;
-        this.usedSelfDestruct = true;
-        if (typeof spawnFloatingText === 'function') {
-          spawnFloatingText(this.x, this.y - this.r - 28, "OVERLOAD DESTROYED!", "#FF2200");
-        }
+      // Ensure Core Overdrive completes its countdown without premature death
+      const currentHp = Number(this.hp) || 0;
+      const nextHp = currentHp - finalAmount;
+      if (nextHp <= 0) {
+        this.hp = 1;
+        this.hitFlashTimer = 6;
+        return true;
       }
-      return result;
+
+      return super.takeDamage(finalAmount, attacker, opts);
     }
 
-    // If Genos hasn't self-destructed yet, check if this incoming damage would drop him to threshold HP or below
+    // 3. Trigger Core Overdrive when HP drops to threshold or fatal damage is taken
     const thresholdRatio = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
     const sdThreshold = this.maxHp * thresholdRatio;
     const nextHp = this.hp - amount;
 
-    // Trigger self-destruct ONLY if Genos survives the hit (nextHp > 0) but drops to 10% or below
-    if (nextHp > 0 && nextHp <= sdThreshold && !this.usedSelfDestruct) {
-      this.hp = nextHp;
+    if (!this.usedSelfDestruct && nextHp <= sdThreshold) {
+      this.hp = Math.max(1, Math.min(sdThreshold, nextHp > 0 ? nextHp : Math.round(sdThreshold)));
       this.isSelfDestructing = true;
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
       
@@ -784,8 +781,17 @@ export class GenosFighter extends Fighter {
   performSelfDestructExplosion() {
     this.isSelfDestructing = false;
     this.usedSelfDestruct = true;
-    const survivalPct = CONFIG.genos?.selfDestructSurvivalHpPercent ?? 0.01;
-    this.hp = Math.max(1, Math.round(this.maxHp * survivalPct)); // Survives with configured % HP!
+
+    // Immediately restore recovered HP upon explosion
+    const cfg = CONFIG.genos || {};
+    const healPct = cfg.selfDestructHpRecoveryPercent ?? cfg.selfDestructRecoveryHpPercent ?? 0.30;
+    const flatHeal = cfg.selfDestructHpRecoveryFlat || 0;
+    const recoveredHp = Math.max(1, Math.round(this.maxHp * healPct) + flatHeal);
+    this.hp = Math.min(this.maxHp, recoveredHp);
+    this._healthBarHealTimer = 40; // Vibrant green glow on HUD health bar
+    if (typeof spawnFloatingText === 'function') {
+      spawnFloatingText(this.x, this.y - this.r - 28, `+${recoveredHp} HP`, "#39FF14");
+    }
 
     // Immediately kill charging audio handle & any active charging sound instance so it's completely gone!
     if (this._selfDestructChargeHandle) {
@@ -944,22 +950,13 @@ export class GenosFighter extends Fighter {
           if (this.afterImages) this.afterImages.length = 0;
           if (this.rocketFlameTrail) this.rocketFlameTrail.length = 0;
 
-          // ── RECOVER HP UPON CYBERNETIC REASSEMBLY / REBOOT ──
-          const cfg = CONFIG.genos || {};
-          const healPct = cfg.selfDestructHpRecoveryPercent ?? cfg.selfDestructRecoveryHpPercent ?? 0.30;
-          const flatHeal = cfg.selfDestructHpRecoveryFlat || 0;
-          const recoveredHp = Math.round(this.maxHp * healPct) + flatHeal;
-          if (recoveredHp > 0) {
-            this.heal(recoveredHp, { color: '#39FF14' });
-            this._healthBarHealTimer = 28; // Triggers vibrant green edge glow & pulse on HUD Health Bar!
-          }
-
-          if (typeof spawnImpactFlash === 'function') {
-            spawnImpactFlash(this.x, this.y, 45, '#00E5FF');
-          }
-          if (typeof spawnFloatingText === 'function') {
-            spawnFloatingText(this.x, this.y - this.r - 24, "SYSTEMS REBOOTED!", "#00FFDD");
-          }
+        this._healthBarHealTimer = 28;
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(this.x, this.y, 45, '#00E5FF');
+        }
+        if (typeof spawnFloatingText === 'function') {
+          spawnFloatingText(this.x, this.y - this.r - 24, "SYSTEMS REBOOTED!", "#00FFDD");
+        }
         }
       }
       return; // Stop movement & attacks during breather recovery!
