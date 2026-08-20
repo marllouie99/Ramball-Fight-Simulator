@@ -609,6 +609,8 @@ export class JohnWickFighter extends Fighter {
       this.shootCooldownMax = cfg.shotgunFireCooldown || 34;
       weaponName = 'BENELLI M4!';
       this._shotgunCrackSoundPlayed = false;
+      this.isUltimateMode = false;
+      this.isExcommunicado = false;
     } else if (nextWeapon === 'rifle') {
       const baseRifleMag = cfg.rifleMagazineSize || 30;
       const ammoMult = cfg.excommunicadoAmmoMultiplier || 1.50;
@@ -617,11 +619,15 @@ export class JohnWickFighter extends Fighter {
       this.shootCooldownMax = cfg.rifleFireCooldown || 7;
       weaponName = 'EXCOMMUNICADO (M4 RIFLE)!';
       this._rifleCrackSoundPlayed = false;
+      this.isUltimateMode = true;
+      this.isExcommunicado = true;
     } else {
       this.maxMagazine = cfg.magazineSize || 12;
       this.magazineBullets = this.maxMagazine;
       this.shootCooldownMax = cfg.fireCooldown || 20;
       weaponName = 'TTI PIT VIPER!';
+      this.isUltimateMode = false;
+      this.isExcommunicado = false;
     }
 
     // 4. Start Weapon Switch Animation & Racking
@@ -1502,8 +1508,10 @@ export class JohnWickFighter extends Fighter {
 
     this._updateMeleeCombat();
 
-    // Update Dynamic Movement Speed (Excommunicado Speed Multiplier on M4 Rifle)
+    // Update Dynamic Movement Speed & Ultimate Mode (Excommunicado Speed Multiplier on M4 Rifle)
     const isExcommunicado = (this.currentEquippedWeapon === 'rifle');
+    this.isExcommunicado = isExcommunicado;
+    this.isUltimateMode = isExcommunicado;
     const baseSpeed = cfg.speed !== undefined ? cfg.speed : (cfg.moveSpeed !== undefined ? cfg.moveSpeed : 6.4);
     this.speed = isExcommunicado ? (baseSpeed * (cfg.excommunicadoSpeedMultiplier || 1.40)) : baseSpeed;
 
