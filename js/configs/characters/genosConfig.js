@@ -98,9 +98,12 @@ export const genosConfig = {
   selfDestructRadius: 200,
   selfDestructDamage: 250, // True damage explosion
   selfDestructKnockback: 20, // Push velocity applied to targets caught in blast
-  selfDestructSurvivalHpPercent: 0.01, // Percentage of max HP Genos retains after explosion (1%)
+  selfDestructSurvivalHpPercent: 0.01, // Percentage of max HP Genos retains immediately after explosion (1%)
+  selfDestructHpRecoveryPercent: 0.30, // Percentage of max HP Genos recovers upon completing cybernetic reboot reassembly (30% = +96 HP)
+  selfDestructHpRecoveryFlat: 0,       // Optional flat HP amount added upon reboot recovery (0 = disabled)
   selfDestructShakeIntensity: 18,
   selfDestructShakeDuration: 50,
+  selfDestructRecoveryFrames: 90, // Breather recovery pause duration in frames (~1.5s) after exploding
 
   //----------------------------------AUDIO CONFIG-----------------------------------------//
 

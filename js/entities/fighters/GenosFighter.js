@@ -944,11 +944,23 @@ export class GenosFighter extends Fighter {
           if (this.afterImages) this.afterImages.length = 0;
           if (this.rocketFlameTrail) this.rocketFlameTrail.length = 0;
 
+          // ── RECOVER HP UPON CYBERNETIC REASSEMBLY / REBOOT ──
+          const cfg = CONFIG.genos || {};
+          const healPct = cfg.selfDestructHpRecoveryPercent ?? cfg.selfDestructRecoveryHpPercent ?? 0.30;
+          const flatHeal = cfg.selfDestructHpRecoveryFlat || 0;
+          const recoveredHp = Math.round(this.maxHp * healPct) + flatHeal;
+          if (recoveredHp > 0) {
+            this.hp = Math.min(this.maxHp, this.hp + recoveredHp);
+            if (typeof spawnFloatingText === 'function') {
+              spawnFloatingText(this.x, this.y - this.r - 46, `+${recoveredHp} HP`, "#00FF66");
+            }
+          }
+
           if (typeof spawnImpactFlash === 'function') {
             spawnImpactFlash(this.x, this.y, 45, '#00E5FF');
           }
           if (typeof spawnFloatingText === 'function') {
-            spawnFloatingText(this.x, this.y - this.r - 28, "SYSTEMS REBOOTED!", "#00FFDD");
+            spawnFloatingText(this.x, this.y - this.r - 24, "SYSTEMS REBOOTED!", "#00FFDD");
           }
         }
       }
