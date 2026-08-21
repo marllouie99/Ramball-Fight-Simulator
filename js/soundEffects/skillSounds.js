@@ -87,6 +87,11 @@ export const SKILL_SOUNDS = {
 
   // ── Engineer ─────────────────────────────────
   15: {
+    deploy: {
+      src: 'Assets/Sound Effects/Skills/repair.mp3',
+      volume: 0.7,
+      delay: 0
+    },
     build: {
       src: 'Assets/Sound Effects/Skills/hammer.mp3',
       volume: 0.6,

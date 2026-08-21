@@ -8,35 +8,64 @@ import { getSkillEffectSound } from '../soundEffects/skillEffectSounds.js';
 import { drawTurret } from '../graphics/weaponVisuals.js';
 import { spawnSparks } from '../graphics/particles/sparkEffect.js';
 import { spawnDeathShatter, spawnMachineCorpse } from '../graphics/particles/deathShatterEffect.js';
+import { drawMinionHealthBar } from '../graphics/statusEffects.js';
 
 export class TurretEntity extends Fighter {
-  constructor(x, y, ownerFighter) {
+  constructor(x, y, ownerFighter, level = 1) {
+    const cfg = CONFIG.Engineer || {};
+    const sentryLevel = Math.max(1, Math.min(3, level || 1));
+
+    // Stats scaling by Sentry Level
+    let maxHp = cfg.turretLevel1Hp || 200;
+    let damage = cfg.turretLevel1Damage || 2.2;
+    let fireRate = cfg.turretLevel1FireRate || 8;
+    let ammoCount = cfg.turretLevel1Ammo || 15;
+
+    if (sentryLevel === 2) {
+      maxHp = cfg.turretLevel2Hp || 280;
+      damage = cfg.turretLevel2Damage || 1.8;
+      fireRate = cfg.turretLevel2FireRate || 6;
+      ammoCount = cfg.turretLevel2Ammo || 25;
+    } else if (sentryLevel === 3) {
+      maxHp = cfg.turretLevel3Hp || 380;
+      damage = cfg.turretLevel3Damage || 2.0;
+      fireRate = cfg.turretLevel3FireRate || 5;
+      ammoCount = cfg.turretLevel3Ammo || 35;
+    }
+
     // Create a dummy definition for the Turret
     const def = {
       id: 999,
-      name: 'Sentry',
-      color: '#8B4513', // Brown/Metallic color
+      name: `Sentry Lv${sentryLevel}`,
+      color: '#8B4513',
       startX: x,
       startY: y,
       startVx: 0,
       startVy: 0,
-      radius: 18,
+      radius: cfg.turretRadius || 18,
       type: 'Turret',
       isTurret: true,
       isMinion: true,
-      hp: CONFIG.Engineer.turretHp,
-      damage: CONFIG.Engineer.turretDamage,
-      cooldown: CONFIG.Engineer.turretFireRate,
+      hp: maxHp,
+      damage: damage,
+      cooldown: fireRate,
       moveSpeed: 0,
-      spinRate: 0.05,
+      spinRate: cfg.spinRate || 0.05,
     };
     super(def);
 
     this.owner = ownerFighter;
+    this.level = sentryLevel;
     this.isTurret = true;
     this.isMinion = true;
-    this.maxHp = CONFIG.Engineer.turretHp || 50;
+    this.isDeployable = true;
+    this.isImmovable = true;
+    this.cannotBeKnockbacked = true;
+    this.hideHpText = true; // Disable HP number overlay over body
+    this.maxHp = maxHp;
     this.hp = this.maxHp;
+    this.damage = damage;
+    this.shootCooldownMax = fireRate;
     this.healCooldownTimer = 0;
     this.recoilTimer = 0;
     this.hitFlashTimer = 0;
@@ -44,18 +73,32 @@ export class TurretEntity extends Fighter {
     this.smokeParticles = [];
 
     // Ammo system
-    this.ammo = CONFIG.Engineer.turretAmmo;
-    this.maxAmmo = CONFIG.Engineer.turretAmmo;
+    this.ammo = ammoCount;
+    this.maxAmmo = ammoCount;
     this.reloadTimer = 0;
     this.isReloading = false;
+    this._hasDetectedTarget = false;
+    this._rocketSalvoCounter = 0;
   }
 
   reset() {
     super.reset();
+    const cfg = CONFIG.Engineer || {};
     this.isTurret = true;
     this.isMinion = true;
-    this.maxHp = CONFIG.Engineer.turretHp || 50;
+    this.isDeployable = true;
+    this.isImmovable = true;
+    this.cannotBeKnockbacked = true;
+    this.hideHpText = true;
+    this.maxHp = cfg.turretHp || 200;
     this.hp = this.maxHp;
+    this.ammo = cfg.turretAmmo || 20;
+    this.maxAmmo = cfg.turretAmmo || 20;
+    this._hasDetectedTarget = false;
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
   }
 
   // Override to make turret immune to ALL knockback physics.
@@ -74,7 +117,21 @@ export class TurretEntity extends Fighter {
     // Turrets are immune to poison damage
     if (opts.isPoison) return false;
 
+    if (opts) {
+      opts.knockback = false;
+      opts.knockbackVx = 0;
+      opts.knockbackVy = 0;
+    }
+
     const applied = super.takeDamage(amount, attacker, opts);
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX !== undefined) {
+      this.x = this._fixedX;
+      this.y = this._fixedY;
+    }
     if (applied && this.hp > 0) {
       this.hitFlashTimer = 10;
     }
@@ -86,13 +143,15 @@ export class TurretEntity extends Fighter {
   }
 
   onDeath() {
+    const cfg = CONFIG.Engineer || {};
     // Distinct "machine broke" animation: corpse on ground + sparks
     spawnMachineCorpse(this.x, this.y, this.gunAngle);
     for (let i = 0; i < 4; i++) {
       spawnSparks(this.x, this.y, 8, 'orange');
     }
-    const deathSound = getSkillEffectSound('turret', 'death');
-    if (deathSound) audioSystem.playSFX(deathSound.src, deathSound.volume);
+    const deathSfx = cfg.sounds?.sentryDestroyed || 'Assets/Sound Effects/Skills/engineer-sentrydestroyed.mp3';
+    const deathVol = cfg.soundVolumes?.sentryDestroyed ?? 1.0;
+    audioSystem.playSFX(deathSfx, deathVol);
   }
 
   heal(amount) {
@@ -103,6 +162,7 @@ export class TurretEntity extends Fighter {
 
   update(opponent, ownerIndex, arena) {
     if (this.hp <= 0) return;
+    const cfg = CONFIG.Engineer || {};
 
     if (this.healCooldownTimer > 0) this.healCooldownTimer--;
     if (this.shootCooldown > 0) this.shootCooldown--;
@@ -128,41 +188,19 @@ export class TurretEntity extends Fighter {
       return; // Freeze! No moving, aiming, or shooting
     }
 
-    // ── Position anchor lock ─────────────────────────────────────────────
-    // Many fighters bypass applyKnockback() and directly assign target.vx/vy
-    // or move target.x/y via collision-separation math.  To resist ALL of
-    // these, we:
-    //   1. Check if there is significant externally-applied velocity (i.e. a
-    //      black-hole is pulling us) — if so, allow movement and update anchor.
-    //   2. Otherwise zero velocity immediately and snap position back to the
-    //      saved anchor so the turret is truly immovable.
-    const isBlackholePull = (Math.abs(this.vx) > 0.5 || Math.abs(this.vy) > 0.5);
-
-    if (isBlackholePull) {
-      // Allow genuine black-hole gravity to move the turret
-      this.x += this.vx;
-      this.y += this.vy;
-      this.vx *= 0.8;
-      this.vy *= 0.8;
-      // Update the anchor so it follows while being pulled
+    // ── Absolute Immovable Anchor Lock ──
+    // Sentry Turret is a fixed, heavy mechanical deployable anchored to the arena floor.
+    // Zero out all velocities and lock coordinates unconditionally to prevent ANY push or displacement.
+    this.vx = 0;
+    this.vy = 0;
+    this.knockbackVx = 0;
+    this.knockbackVy = 0;
+    if (this._fixedX === undefined) {
       this._fixedX = this.x;
       this._fixedY = this.y;
     } else {
-      // Snap velocity to zero so nothing external can slide us
-      this.vx = 0;
-      this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      // Snap position back to anchor (undoes any collision-separation push
-      // or direct x/y assignment that happened since the last frame)
-      if (this._fixedX !== undefined) {
-        this.x = this._fixedX;
-        this.y = this._fixedY;
-      } else {
-        // First frame: record current position as the anchor
-        this._fixedX = this.x;
-        this._fixedY = this.y;
-      }
+      this.x = this._fixedX;
+      this.y = this._fixedY;
     }
 
     // Keep within arena bounds
@@ -205,6 +243,9 @@ export class TurretEntity extends Fighter {
         this.ammo = this.maxAmmo;
         this.isReloading = false;
         spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADED!', '#ffff00');
+        const reloadedSfx = cfg.sounds?.sentryReloaded || 'Assets/Sound Effects/Skills/engineer-sentryreloaded.mp3';
+        const reloadedVol = cfg.soundVolumes?.sentryReloaded ?? 0.90;
+        audioSystem.playSFX(reloadedSfx, reloadedVol);
       }
     }
 
@@ -252,13 +293,23 @@ export class TurretEntity extends Fighter {
     }
 
     // Aim and shoot if target is within range
-    const rangeSq = CONFIG.Engineer.turretRange * CONFIG.Engineer.turretRange;
+    const rangeSq = (cfg.turretRange || 350) * (cfg.turretRange || 350);
     if (target && minDist <= rangeSq) {
+      this.laserTargetDist = Math.sqrt(minDist);
+      if (!this._hasDetectedTarget) {
+        this._hasDetectedTarget = true;
+        const detectSfx = cfg.sounds?.sentryDetected || 'Assets/Sound Effects/Skills/engineer-sentrydetected.mp3';
+        const detectVol = cfg.soundVolumes?.sentryDetected ?? 0.95;
+        audioSystem.playSFX(detectSfx, detectVol);
+      }
+
       const isAimed = this.aimAt(target.x, target.y);
       if (isAimed && this.shootCooldown <= 0 && !this.isReloading && this.ammo > 0) {
         this.shootAtTarget(target);
       }
     } else {
+      this._hasDetectedTarget = false;
+      this.laserTargetDist = cfg.turretRange || 350;
       // Idle spin
       this.angle += this.speed * (this._def.spinRate || 0.05);
       this.gunAngle += 0.02; // slowly rotate gun when idle
@@ -293,57 +344,109 @@ export class TurretEntity extends Fighter {
     const ownerIndex = state.fighters.indexOf(this.owner);
     if (ownerIndex === -1) return;
 
-    const speed = CONFIG.Engineer.turretBulletSpeed;
-
-    // Calculate exact spawn positions from both barrel clusters
+    const cfg = CONFIG.Engineer || {};
+    const speed = cfg.turretBulletSpeed || 22;
     const s = this.r / 20;
-    const muzzleX = 38 * s; // barrelStartX(18) + barrelLen(20)
-    const upperY = -5 * s;  // upper barrel cluster (barrelSpacing)
-    const lowerY = 5 * s;   // lower barrel cluster
-
     const cosA = Math.cos(this.gunAngle);
     const sinA = Math.sin(this.gunAngle);
 
-    // Upper barrel projectile
-    const spawnX1 = this.x + muzzleX * cosA - upperY * sinA;
-    const spawnY1 = this.y + muzzleX * sinA + upperY * cosA;
-    projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX1, spawnY1, this.gunAngle);
+    // Generate unique pair ID for projectiles fired in this volley
+    this._shotPairCounter = (this._shotPairCounter || 0) + 1;
+    const pairId = `turret_pair_${this._shotPairCounter}_${Date.now()}`;
 
-    // Lower barrel projectile
-    const spawnX2 = this.x + muzzleX * cosA - lowerY * sinA;
-    const spawnY2 = this.y + muzzleX * sinA + lowerY * cosA;
-    projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX2, spawnY2, this.gunAngle);
+    if (this.level === 1) {
+      // ── Level 1: Single Center Barrel Shot ──
+      const muzzleX = 30 * s;
+      const spawnX = this.x + muzzleX * cosA;
+      const spawnY = this.y + muzzleX * sinA;
+      const p = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX, spawnY, this.gunAngle);
+      if (p) {
+        p.shotPairId = pairId;
+        p.isTurretBullet = true;
+      }
 
-    const shotSound = getBasicAttackSound(this._def?.id || 999, this._def?.type || 'turret');
-    if (shotSound) audioSystem.playSFX(shotSound.src, shotSound.volume);
-    
-    // Spawn smoke particles at the muzzle tips
-    for (let i = 0; i < 4; i++) {
-      const isUpper = i % 2 === 0;
-      const bx = isUpper ? spawnX1 : spawnX2;
-      const by = isUpper ? spawnY1 : spawnY2;
-      const angle = this.gunAngle + (Math.random() - 0.5) * 0.8;
-      const spd = 0.5 + Math.random() * 1.5;
-      this.smokeParticles.push({
-        x: bx + (Math.random() - 0.5) * 4,
-        y: by + (Math.random() - 0.5) * 4,
-        vx: Math.cos(angle) * spd,
-        vy: Math.sin(angle) * spd,
-        life: 15 + Math.random() * 10,
-        maxLife: 25,
-        size: 2 + Math.random() * 2
-      });
+      // Muzzle smoke
+      for (let i = 0; i < 2; i++) {
+        const angle = this.gunAngle + (Math.random() - 0.5) * 0.5;
+        const spd = 0.5 + Math.random() * 1.5;
+        this.smokeParticles.push({
+          x: spawnX + (Math.random() - 0.5) * 3,
+          y: spawnY + (Math.random() - 0.5) * 3,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 14 + Math.random() * 8,
+          maxLife: 22,
+          size: 2 + Math.random() * 2
+        });
+      }
+    } else {
+      // ── Level 2 & 3: Twin Gatling Minigun Volley ──
+      const muzzleX = 38 * s;
+      const upperY = -5 * s;
+      const lowerY = 5 * s;
+
+      // Upper barrel projectile
+      const spawnX1 = this.x + muzzleX * cosA - upperY * sinA;
+      const spawnY1 = this.y + muzzleX * sinA + upperY * cosA;
+      const p1 = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX1, spawnY1, this.gunAngle);
+      if (p1) {
+        p1.shotPairId = pairId;
+        p1.isTurretBullet = true;
+      }
+
+      // Lower barrel projectile
+      const spawnX2 = this.x + muzzleX * cosA - lowerY * sinA;
+      const spawnY2 = this.y + muzzleX * sinA + lowerY * cosA;
+      const p2 = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'turretBullet', spawnX2, spawnY2, this.gunAngle);
+      if (p2) {
+        p2.shotPairId = pairId;
+        p2.isTurretBullet = true;
+      }
+
+      // Spawn smoke particles at the muzzle tips
+      for (let i = 0; i < 4; i++) {
+        const isUpper = i % 2 === 0;
+        const bx = isUpper ? spawnX1 : spawnX2;
+        const by = isUpper ? spawnY1 : spawnY2;
+        const angle = this.gunAngle + (Math.random() - 0.5) * 0.8;
+        const spd = 0.5 + Math.random() * 1.5;
+        this.smokeParticles.push({
+          x: bx + (Math.random() - 0.5) * 4,
+          y: by + (Math.random() - 0.5) * 4,
+          vx: Math.cos(angle) * spd,
+          vy: Math.sin(angle) * spd,
+          life: 15 + Math.random() * 10,
+          maxLife: 25,
+          size: 2 + Math.random() * 2
+        });
+      }
+
+      // ── Level 3: Quad Micro-Rocket Salvo ──
+      if (this.level === 3) {
+        this._rocketSalvoCounter = (this._rocketSalvoCounter || 0) + 1;
+        const rocketInterval = cfg.turretLevel3RocketInterval || 4;
+        if (this._rocketSalvoCounter % rocketInterval === 0) {
+          this._fireRocketSalvo(target, ownerIndex, cosA, sinA, s);
+        }
+      }
     }
 
+    const shotSfx = cfg.sounds?.sentryGunshot || 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3';
+    const shotVol = cfg.soundVolumes?.sentryGunshot ?? 0.80;
+    audioSystem.playSFX(shotSfx, shotVol);
+
     this.shootCooldown = this.shootCooldownMax;
-    this.recoilTimer = 10; // Add recoil animation timer
+    this.recoilTimer = 10;
 
     // Consume ammo — trigger reload when magazine is empty
     this.ammo--;
     if (this.ammo <= 0) {
       this.isReloading = true;
-      this.reloadTimer = CONFIG.Engineer.turretReloadTime;
+      this.reloadTimer = cfg.turretReloadTime || 90;
       spawnFloatingText(this.x, this.y - this.r - 20, 'RELOADING...', '#ff3333');
+      const reloadSfx = cfg.sounds?.sentryReloading || 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3';
+      const reloadVol = cfg.soundVolumes?.sentryReloading ?? 0.90;
+      audioSystem.playSFX(reloadSfx, reloadVol);
     }
 
     // Turret loses HP based on its damage when it shoots
@@ -352,14 +455,43 @@ export class TurretEntity extends Fighter {
       this.hp = 0;
       if (this.onDeath) this.onDeath();
     }
+  }
 
-    // Play sound
-    const sound = getBasicAttackSound(this.owner._def.id, 'aimbot'); // Reusing aimbot sound for turret
-    if (sound) {
-      audioSystem.playSFX(sound.src, sound.volume * 0.7);
-      this._attackSoundTimer = sound.delay;
-      this._attackSoundConfig = sound;
+  _fireRocketSalvo(target, ownerIndex, cosA, sinA, s) {
+    const cfg = CONFIG.Engineer || {};
+    const rocketDamage = cfg.turretLevel3RocketDamage || 8.0;
+    const podYOffsets = [-12 * s, -8 * s, 8 * s, 12 * s];
+    const podX = 10 * s;
+
+    for (let i = 0; i < 4; i++) {
+      const offY = podYOffsets[i];
+      const rX = this.x + podX * cosA - offY * sinA;
+      const rY = this.y + podX * sinA + offY * cosA;
+      const spreadAngle = this.gunAngle + (i - 1.5) * 0.12;
+
+      const rocket = projectileSystem.fireProjectile(
+        this,
+        ownerIndex,
+        rocketDamage,
+        false,
+        18,
+        false,
+        'turretBullet',
+        rX,
+        rY,
+        spreadAngle
+      );
+
+      if (rocket) {
+        rocket.isRocket = true;
+        rocket.isTurretBullet = true;
+      }
+
+      // Rocket backblast smoke
+      spawnSparks(rX, rY, 4, 'orange');
     }
+
+    triggerGlobalScreenShake(10, 8);
   }
 
   draw(ctx) {
@@ -372,11 +504,9 @@ export class TurretEntity extends Fighter {
       for (const p of this.smokeParticles) {
         let alpha, fillStyle;
         if (p.isDark) {
-          // Thick black/dark grey smoke for overheating
           alpha = Math.max(0, p.life / p.maxLife) * 0.75;
           fillStyle = `rgba(40, 40, 40, ${alpha})`;
         } else {
-          // Standard grey smoke for shooting, made more opaque to contrast with white background
           alpha = Math.max(0, p.life / p.maxLife) * 0.6;
           fillStyle = `rgba(130, 130, 130, ${alpha})`;
         }
@@ -389,34 +519,20 @@ export class TurretEntity extends Fighter {
 
     // Heal/repair visual effect
     if (this.healTimer > 0) {
-      const t = this.healTimer / 20; // 0..1
+      const t = this.healTimer / 20;
       ctx.save();
       ctx.translate(this.x, this.y);
 
-      // Expanding green pulse ring
       ctx.beginPath();
       ctx.arc(0, 0, this.r * (2.5 - t * 1.2), 0, Math.PI * 2);
       ctx.strokeStyle = `rgba(0, 255, 80, ${t * 0.7})`;
       ctx.lineWidth = 2;
       ctx.stroke();
 
-      // Inner green glow
       ctx.beginPath();
       ctx.arc(0, 0, this.r * 0.9, 0, Math.PI * 2);
       ctx.fillStyle = `rgba(0, 255, 80, ${t * 0.2})`;
       ctx.fill();
-
-      // Rotating wrench sparks
-      const sparkCount = 6;
-      const baseAngle = (1 - t) * Math.PI * 3; // spin as it fades
-      ctx.fillStyle = `rgba(100, 255, 100, ${t})`;
-      for (let i = 0; i < sparkCount; i++) {
-        const a = baseAngle + (i / sparkCount) * Math.PI * 2;
-        const dist = this.r * (1.0 + (1 - t) * 0.8);
-        const sx = Math.cos(a) * dist;
-        const sy = Math.sin(a) * dist;
-        ctx.fillRect(sx - 1.5, sy - 1.5, 3, 3);
-      }
 
       ctx.restore();
     }
@@ -425,26 +541,32 @@ export class TurretEntity extends Fighter {
     this.drawAmmo(ctx);
   }
 
-  drawAmmo(ctx) {
-    if (this.isBuilding) return;
+  drawHealth(ctx) {
+    if (this.hp <= 0 || this.isBuilding) return;
+    const floatY = (this.y - (this.z || 0)) - this.r - 18;
+    drawMinionHealthBar(ctx, this.x, floatY, 36, 6, this.hp, this.maxHp);
+  }
 
-    const startY = this.y - this.r - (CONFIG.Engineer.turretAmmoBarOffsetY || 25);
+  drawAmmo(ctx) {
+    if (this.isBuilding || this.hp <= 0) return;
 
     if (this.isReloading) {
-      const progress = 1 - (this.reloadTimer / CONFIG.Engineer.turretReloadTime);
-      const width = CONFIG.Engineer.turretReloadBarWidth || 30;
+      const startY = (this.y - (this.z || 0)) - this.r - 18;
+      const progress = 1 - (this.reloadTimer / (CONFIG.Engineer.turretReloadTime || 90));
+      const width = CONFIG.Engineer.turretReloadBarWidth || 32;
       const height = CONFIG.Engineer.turretReloadBarHeight || 5;
+      const reloadY = startY + 8;
       const startX = this.x - width / 2;
 
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
-      ctx.fillRect(startX, startY, width, height);
+      ctx.fillRect(startX, reloadY, width, height);
 
       ctx.fillStyle = '#ff6666';
-      ctx.fillRect(startX, startY, width * progress, height);
+      ctx.fillRect(startX, reloadY, width * progress, height);
 
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1;
-      ctx.strokeRect(startX, startY, width, height);
+      ctx.strokeRect(startX, reloadY, width, height);
     }
   }
 

@@ -299,8 +299,8 @@ export function resolveFighterCollision(a, b) {
     return; // Neither moves or bounces during ambush/counter execution
   }
 
-  const aIsImmovable = a.isTurret || aIsFlurrying || aIsYutaBeam || aIsAmbushLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || a.isChannelingBankai;
-  const bIsImmovable = b.isTurret || bIsFlurrying || bIsYutaBeam || bIsAmbushLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || b.isChannelingBankai;
+  const aIsImmovable = a.isTurret || a.isDispenser || aIsFlurrying || aIsYutaBeam || aIsAmbushLocked || (a.fleshSurgeAnimTimer && a.fleshSurgeAnimTimer > 0) || a.isChannelingBankai;
+  const bIsImmovable = b.isTurret || b.isDispenser || bIsFlurrying || bIsYutaBeam || bIsAmbushLocked || (b.fleshSurgeAnimTimer && b.fleshSurgeAnimTimer > 0) || b.isChannelingBankai;
 
   if (aIsImmovable || bIsImmovable) {
     if (aIsImmovable && !bIsImmovable) {
@@ -349,7 +349,7 @@ export function resolveFighterCollision(a, b) {
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
-  if (!a.isTurret) {
+  if (!a.isTurret && !a.isDispenser) {
     // Fighters in rage or melee mode ignore the bounce impulse so they can stick to their targets
     if (!a.isInRage && !a.isMeleeMode) {
       a.vx -= impulse * nx + randA * impulse * tx;
@@ -358,7 +358,7 @@ export function resolveFighterCollision(a, b) {
     a.normalizeSpeed();
   }
   
-  if (!b.isTurret) {
+  if (!b.isTurret && !b.isDispenser) {
     if (!b.isInRage && !b.isMeleeMode) {
       b.vx += impulse * nx + randB * impulse * tx;
       b.vy += impulse * ny + randB * impulse * ty;
@@ -797,10 +797,10 @@ export function updateFighters() {
           const nx = dx / dist;
           const ny = dy / dist;
           const overlap = minDist - dist;
-          if (fighter.isTurret || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai) {
+          if (fighter.isTurret || fighter.isDispenser || (fighter.fleshSurgeAnimTimer && fighter.fleshSurgeAnimTimer > 0) || fighter.isChannelingBankai) {
             entity.x += nx * overlap;
             entity.y += ny * overlap;
-          } else if (entity.isTurret || entity.isChannelingBankai) {
+          } else if (entity.isTurret || entity.isDispenser || entity.isChannelingBankai) {
             fighter.x -= nx * overlap;
             fighter.y -= ny * overlap;
           } else {

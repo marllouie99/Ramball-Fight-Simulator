@@ -16,6 +16,7 @@ import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js?v=4';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
+import { engineerConfig } from '../configs/characters/engineerConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
 
@@ -37,6 +38,8 @@ export const CONFIG = {
   ichigo: ichigoConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
+  engineer: engineerConfig,
+  Engineer: engineerConfig,
   arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
@@ -467,45 +470,9 @@ export const CONFIG = {
     illusionSpeedSync: true,  // if true, illusions spawn with current speed; if false, use base speed
   },
 
-  /** Engineer ΓÇö Turret and Shotgun/Wrench */
-  Engineer: {
-    // Turret config
-    turretSpawnDistance: -40, // Negative means spawn BEHIND the engineer, positive means IN FRONT
-    turretBuildTime: 90,
-
-    // Shotgun stats (Range)
-    shotgunCooldown: 80,
-    shotgunPellets: 8,        // Increased from 5
-    shotgunSpread: 0.45,      // Spread angle in radians (wider)
-    shotgunDamage: 5.20,       // Lower per pellet, but more pellets total
-    shotgunSpeed: 30,         // Extremely fast initial burst, slowed down by drag
-    shotgunRange: 400,       // Max distance to trigger shotgun attack
-
-    // Wrench stats (Melee)
-    wrenchCooldown: 30,
-    wrenchDamage: 15,
-    wrenchRange: 85,          // Melee distance
-    wrenchSwipeDuration: 16,  // Animation duration
-
-    // Turret stats (Skill)
-    skillCooldown: 1000,
-    turretHp: 200,
-    turretDamage: 0.2,
-    turretFireRate: 7,
-    turretRange: 350,
-    turretBulletSpeed: 15,
-    turretAimSpeed: 0.08,     // Radians per frame
-    turretBuildTime: 150,      // Frames to build turret (1.5 seconds)
-    turretHealAmount: 30,     // Healing applied when bounced into
-    turretHealCooldown: 60,   // Cooldown between heal triggers per turret
-    turretAmmo: 20,            // Shots per magazine before reloading
-    turretReloadTime: 90,     // Frames to reload (1.5 seconds at 60fps)
-    turretAmmoBarOffsetY: 25, // Distance above turret to draw ammo UI
-    turretReloadBarWidth: 30, // Width of the reload progress bar
-    turretReloadBarHeight: 5, // Height of the reload progress bar
-    turretAmmoPipWidth: 4,    // Diameter of individual ammo pips
-    turretAmmoPipSpacing: 6,  // Spacing between ammo pips
-  },
+  /** Engineer — Master Builder & Support Specialist */
+  Engineer: engineerConfig,
+  engineer: engineerConfig,
 
   /** Ruby ΓÇö Scythe fighter */
   ruby: {
@@ -948,8 +915,8 @@ export const FIGHTER_DEFS = [
     damage: 5,
     cooldown: 4,
     moveSpeed: 4.4,
-    ability: 'Deploy Turret',
-    desc: 'Builds a Turret to assist Engineer in fight.',
+    ability: 'Sentry & Dispenser',
+    desc: 'Constructs an automated Sentry Turret to assault foes and a Dispenser to tether healing and boost reload speed.',
   },
   {
     id: 16,

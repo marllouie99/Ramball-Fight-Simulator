@@ -48,11 +48,17 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
     target.hp = Math.max(0, Number((currentHp - effectiveAmount).toFixed(2)));
 
     if (target.hp < prevHp && effectiveAmount > 0) {
+      const isTurretPair = Boolean(opts.projectile && opts.projectile.shotPairId);
+      const isSecondTurretHit = Boolean(isTurretPair && target._lastTurretPairHitId === opts.projectile.shotPairId);
+      if (isTurretPair) {
+        target._lastTurretPairHitId = opts.projectile.shotPairId;
+      }
+
       // Trigger global white hit flash visual effect
       target.hitFlashTimer = 8;
 
-      // Play flesh hit audio effect unless it's a continuous DPS/dot effect
-      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified) {
+      // Play flesh hit audio effect unless it's a continuous DPS/dot effect or duplicate turret pair hit
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isDomainDPS && !opts.isElectrified && !isSecondTurretHit) {
         audioSystem.playSFX('attack_fleshhit', 0.6);
       } else if (opts.isPurpleDPS || opts.isDomainDPS) {
         const now = Date.now();
@@ -69,10 +75,10 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
       } else if (opts.damageAngle !== undefined) {
         damageAngle = opts.damageAngle;
       }
-      if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive) {
+      if (typeof spawnBloodEffect === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive && !isSecondTurretHit) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(effectiveAmount * 0.16)) : effectiveAmount;
         spawnBloodEffect(target, bloodAmount, damageAngle);
-      } else if (typeof spawnSparks === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive) {
+      } else if (typeof spawnSparks === 'function' && !opts.noBlood && !opts.suppressBlood && !isRatioPauseActive && !isSecondTurretHit) {
         spawnSparks(target.x, target.y, 6, 'crimsonSniper');
       }
 
@@ -81,7 +87,7 @@ export function applyDamageToTarget(target, amount, attacker, opts = {}) {
                             !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
                             !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
                             !opts.isExplosion && !opts.isAOE;
-      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0) {
+      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !isSecondTurretHit) {
         if (typeof target.isPerformingSkill !== 'function' || !target.isPerformingSkill()) {
           if (typeof target.applyTimeStop === 'function') {
             target.applyTimeStop(CONFIG.basicAttackHitPauseDuration);
@@ -602,7 +608,7 @@ export class Fighter {
     const isMahitoDomainActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'mahito' || f.type === 'mahito') && f.domainActive);
 
     // Fatal Blood Splash explosion! Splashes to death with visceral blood
-    if (typeof spawnFatalBloodSplash === 'function' && !this.isTurret) {
+    if (typeof spawnFatalBloodSplash === 'function' && !this.isTurret && !this.isDispenser) {
       spawnFatalBloodSplash(this);
     }
 
@@ -611,7 +617,7 @@ export class Fighter {
     }
 
     // Death shatter shard explosion (body physically shatters into pieces)
-    if (typeof spawnDeathShatter === 'function' && !this.isTurret) {
+    if (typeof spawnDeathShatter === 'function' && !this.isTurret && !this.isDispenser) {
       spawnDeathShatter(this);
     }
   }
@@ -950,8 +956,14 @@ export class Fighter {
         actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
       }
     }
+    const isTurretPair = Boolean(opts.projectile && opts.projectile.shotPairId);
+    const isSecondTurretHit = Boolean(isTurretPair && this._lastTurretPairHitId === opts.projectile.shotPairId);
+    if (isTurretPair) {
+      this._lastTurretPairHitId = opts.projectile.shotPairId;
+    }
+
     // Spawn floating damage number when actual HP was reduced
-    if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText) {
+    if (this.hp < prevHp && amount > 0 && !opts.skipStandardDamageText && !isSecondTurretHit) {
       let color = (attacker && attacker.color) ? attacker.color : (this.color || '#ff4444');
       if (attacker && (attacker.characterId === 'toji' || attacker.type === 'toji')) {
         color = '#e9d5ff'; // Highly visible bright lavender for Toji
@@ -994,7 +1006,7 @@ export class Fighter {
       }
       const isRatioPauseActive = (this.ratioHitPauseTimer > 0) || (attacker && attacker.ratioHitPauseTimer > 0);
       const isExplosionOrFlame = opts.isExplosion || opts.isDivineFlame || opts.isFlame || opts.isBurn || opts.isPurpleDPS || opts.isDomainDPS || opts.isDomain || opts.noBlood || opts.suppressBlood || isRatioPauseActive;
-      if (!this.isTurret && !isExplosionOrFlame) {
+      if (!this.isTurret && !isExplosionOrFlame && !isSecondTurretHit) {
         const bloodAmount = opts.isRikaAttack ? Math.max(1, Math.round(amount * 0.16)) : amount;
         if (typeof spawnBloodEffect === 'function') {
           spawnBloodEffect(this, bloodAmount, damageAngle);
@@ -1003,7 +1015,7 @@ export class Fighter {
       
       // Global blast / knockback / explosion skill interruption & penalty cooldown
       const isBlastOrKnockback = opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2);
-      if (isBlastOrKnockback && !this.isTurret) {
+      if (isBlastOrKnockback && !this.isTurret && !this.isDispenser) {
         this.interruptAttacks(true);
       }
 
@@ -1012,7 +1024,7 @@ export class Fighter {
                             !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && 
                             !opts.isSkill && !opts.isUltimate && !opts.isRikaAttack && 
                             !opts.isExplosion && !opts.isAOE;
-      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !this.isTurret) {
+      if (isBasicAttack && CONFIG.basicAttackHitPauseDuration > 0 && !this.isTurret && !this.isDispenser && !isSecondTurretHit) {
         if (!this.isPerformingSkill()) {
           this.basicAttackHitPauseTimer = CONFIG.basicAttackHitPauseDuration;
         }
@@ -1020,12 +1032,14 @@ export class Fighter {
 
       // Play hit sound and trigger hit flash
       if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.fromBlackHole && !opts.isPurpleDPS && !opts.isElectrified && !opts.isDomainDPS && !opts.isPureLoveBeam) {
-        if (!this.isTurret) {
-          audioSystem.playSFX('attack_fleshhit', 0.6);
+        if (!this.isTurret && !this.isDispenser) {
+          if (!isSecondTurretHit) {
+            audioSystem.playSFX('attack_fleshhit', 0.6);
+          }
           this.hitFlashTimer = 8;
         }
       } else if (opts.isPurpleDPS || opts.isDomainDPS) {
-        if (!this.isTurret) {
+        if (!this.isTurret && !this.isDispenser) {
           this.hitFlashTimer = 6;
           const now = Date.now();
           if (!this._lastPurpleHitSoundTime || (now - this._lastPurpleHitSoundTime > 130)) {
@@ -1042,7 +1056,7 @@ export class Fighter {
       }
       this.onDeath();
       
-      if (this.isTurret) {
+      if (this.isTurret || this.isDispenser) {
         return true;
       }
 
@@ -1052,7 +1066,7 @@ export class Fighter {
 
       // Helper: an entity is in play if alive, a Doppelganger with illusions, evading Mahito, or Genos in Overdrive/Recovery
       const _isEffectivelyAlive = (f) => {
-        if (!f || f.isTurret) return false;
+        if (!f || f.isTurret || f.isDispenser) return false;
         if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
         if (f.hp > 0) return true;
         const isDoppel = f.type === 'doppleganger' || f._def?.type === 'doppleganger' || f.characterId === 'doppleganger';
@@ -1108,7 +1122,7 @@ export class Fighter {
 
     // Helper: an entity is "in play" if alive, a doppelganger with copies, evading Mahito, or shivering in Soul Disfigurement
     const _isEffectivelyAlive = (f) => {
-      if (!f || f.isTurret) return false;
+      if (!f || f.isTurret || f.isDispenser) return false;
       if (f.isParalyzedByMahito && (f.paralyzeTimer || 0) > 0) return true;
       if ((f.characterId === 'genos' || f.type === 'genos') && (f.isSelfDestructing || f.isSelfDestructRecovering)) return true;
       if (f.hp > 0) return true;

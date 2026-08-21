@@ -122,7 +122,7 @@ function drawWinnerReveal(winner, timer, mode) {
   preview.vx = 0;
   preview.vy = 0;
   preview.angle = 0;
-  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami') ? 0 : Math.PI * 0.5; // Yuta, Toji, Nanami face forward, others point weapons down
+  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami' || def.type === 'Engineer' || def.type === 'engineer') ? 0 : Math.PI * 0.5; // Yuta, Toji, Nanami, Engineer face forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
   if (def.type === 'gojo' || def.type === 'yuta') {
@@ -234,7 +234,7 @@ function drawFfaChampionReveal(winner, timer) {
   preview.vx = 0;
   preview.vy = 0;
   preview.angle = 0;
-  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami') ? 0 : Math.PI * 0.5; // Yuta, Toji, and Nanami face forward, others point weapons down
+  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami' || def.type === 'Engineer' || def.type === 'engineer') ? 0 : Math.PI * 0.5; // Yuta, Toji, Nanami, Engineer face forward, others point weapons down
   preview.shootCooldown = 0;
   preview._isWinnerReveal = true;
   if (preview.rika) {
@@ -482,7 +482,7 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     preview.vx = 0;
     preview.vy = 0;
     preview.angle = 0;
-    preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami') ? 0 : Math.PI * 0.5; // Relaxed resting pose, Yuta, Toji, Nanami point forward
+    preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami' || def.type === 'Engineer' || def.type === 'engineer') ? 0 : Math.PI * 0.5; // Relaxed resting pose, Yuta, Toji, Nanami, Engineer point forward
     preview.shootCooldown = 0;
     preview._isWinnerReveal = true;
     if (preview.rika) {

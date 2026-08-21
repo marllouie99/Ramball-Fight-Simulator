@@ -13,7 +13,7 @@ let _shimmerFrame = 0;
 let _shimmerValue = 1;
 import { drawRangerBullet } from './weapons/rangerWeaponGraphics.js';
 import { drawGunSlingerBullet, drawGunSlingerMuzzleFlash } from './weapons/gunSlingerWeaponGraphics.js';
-import { drawEngineerBullet, drawTurret, drawTurretBullet } from './weapons/engineerWeaponGraphics.js';
+import { drawEngineerBullet, drawTurret, drawTurretBullet, drawDispenser, drawDispenserTetherBeam, drawDispenserHealingRing } from './weapons/engineerWeaponGraphics.js';
 import { drawBomberExplosionGraphic, drawBomberGrenade, drawGrenadeTrail, drawBomberC4 } from './weapons/bomberWeaponGraphics.js';
 import { drawThermobaricExplosions as modDrawThermobaricExplosions } from './renderers/explosionRenderer.js';
 import { CONFIG, GUN_TIP_DIST } from '../core/config.js';

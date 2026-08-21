@@ -69,7 +69,7 @@ export const johnWickConfig = {
   gunThrowSpinSpeed: 0.28,            // Rotation speed of tossed gun
 
   // ── 3.6. TERTIARY WEAPON: TTI M4 / BCM CARBINE (M4 RIFLE) ──
-  rifleMagazineSize: 30,              // 30 rounds 5.56x45mm NATO per PMAG
+  rifleMagazineSize: 20,              // 30 rounds 5.56x45mm NATO per PMAG
   rifleFireCooldown: 7,               // High rate-of-fire (~8.5 shots/s, 7 frames per shot)
   rifleBulletDamage: 14,              // Base damage per 5.56 rifle round
   rifleBulletSpeed: 24.5,             // Supersonic 5.56 rifle projectile velocity
@@ -155,12 +155,12 @@ export const johnWickConfig = {
   cqcSpotlightBloomRadius: 150,       // Underfoot Continental Gold floor glow radius (px)
 
   // ── 9. ULTIMATE SKILL: EXCOMMUNICADO / CONTINENTAL EXECUTION (M4 RIFLE ASCENSION) ──
-  excommunicadoDefMultiplier: 0.20,        // 1.5x DEF multiplier (increases 40% DEF to 60% DEF while wielding M4 Rifle)
-  excommunicadoEvadeMultiplier: 0.20,      // Evade boost multiplier
+  excommunicadoDefMultiplier: 1.50,        // 1.5x DEF multiplier (increases 40% DEF to 60% DEF while wielding M4 Rifle)
+  excommunicadoEvadeMultiplier: 0.05,      // Evade boost multiplier
   excommunicadoEvadeChance: 0.10,           // 100% Evade dodge chance in Excommunicado state
   excommunicadoSpeedMultiplier: 1.40,      // +40% movement speed multiplier while wielding M4 Rifle (5.4 -> 7.56 px/frame)
-  excommunicadoAmmoMultiplier: 0.01,       // 1.5x magazine capacity multiplier for M4 Rifle (30 -> 45 rounds)
-  excommunicadoRifleMagazineSize: 1,      // 45-round extended drum/PMAG capacity for M4 Rifle during Excommunicado
+  excommunicadoAmmoMultiplier: 0.10,       // 1.5x magazine capacity multiplier for M4 Rifle (30 -> 45 rounds)
+  excommunicadoRifleMagazineSize: 25,      // 45-round extended drum/PMAG capacity for M4 Rifle during Excommunicado
 
   // ── 10. AUDIO CONFIGURATION, VOLUMES, CHANCES & TIMING DELAYS (delays measured in ms or frames) ──
   sounds: {

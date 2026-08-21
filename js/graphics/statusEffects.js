@@ -23,13 +23,22 @@ export function drawBleedEffect(ctx, baseRadius, timer = 180, fighter = null) {
   // 3. Floating Bleed Droplet Icon on top of the model (with gentle floating bob)
   // Counteract fighter body rotation and vertical flipping so the status icon stays strictly upright above the head in world space
   ctx.save();
-  if (fighter) {
-    const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
-    const facingLeft = Math.abs(angle) > Math.PI / 2;
+  if (typeof ctx.getTransform === 'function') {
+    const m = ctx.getTransform();
+    const currentAngle = Math.atan2(m.b, m.a);
+    const isFlipped = (m.a * m.d - m.b * m.c) < 0;
+    if (isFlipped) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-currentAngle);
+  } else if (fighter) {
+    const hasGunAngleSkin = Boolean(fighter.characterId && (fighter.characterId === 'john_wick' || fighter.characterId === 'toji' || fighter.characterId === 'gojo' || fighter.characterId === 'sukuna' || fighter.characterId === 'yuta' || fighter.characterId === 'mahito' || fighter.characterId === 'mahoraga' || fighter.characterId === 'saitama' || fighter.characterId === 'nanami' || fighter.characterId === 'yuji' || fighter.characterId === 'todo' || fighter.characterId === 'ichigo' || fighter.characterId === 'genos' || fighter.characterId === 'layla' || fighter.characterId === 'ruby' || fighter.characterId === 'cronos' || fighter.characterId === 'darkslategray'));
+    const appliedAngle = fighter._isWinnerReveal ? 0 : (hasGunAngleSkin ? (fighter.gunAngle || 0) : (fighter.angle !== undefined ? fighter.angle : (fighter.gunAngle || 0)));
+    const facingLeft = Math.abs(appliedAngle) > Math.PI / 2;
     if (facingLeft && !fighter.isSpinning) {
       ctx.scale(1, -1);
     }
-    ctx.rotate(-angle);
+    ctx.rotate(-appliedAngle);
   }
 
   const bobY = Math.sin(t / 160) * 2.5;
@@ -488,6 +497,17 @@ export function drawSilenceEffect(ctx, baseRadius) {
   ctx.setLineDash([]); // Prevent dashed line leak
 
   // 4. Silence Padlock Icon floating above target's head
+  ctx.save();
+  if (typeof ctx.getTransform === 'function') {
+    const m = ctx.getTransform();
+    const currentAngle = Math.atan2(m.b, m.a);
+    const isFlipped = (m.a * m.d - m.b * m.c) < 0;
+    if (isFlipped) {
+      ctx.scale(1, -1);
+    }
+    ctx.rotate(-currentAngle);
+  }
+
   const lockY = -baseRadius - 14;
   ctx.fillStyle = '#D8A0FF';
   ctx.strokeStyle = '#5A189A';
@@ -500,6 +520,7 @@ export function drawSilenceEffect(ctx, baseRadius) {
   ctx.beginPath();
   ctx.arc(0, lockY - 5, 4, Math.PI, 0);
   ctx.stroke();
+  ctx.restore();
 
   ctx.restore();
 }

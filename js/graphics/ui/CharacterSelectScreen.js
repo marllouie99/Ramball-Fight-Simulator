@@ -14,12 +14,9 @@ import { audioSystem } from '../../systems/audioSystem.js';
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
-let modalScrollY = 0;
-let modalTargetScrollY = 0;
-let isDraggingModalScroll = false;
-let isDraggingModalThumb = false;
-let modalDragStartY = 0;
-let modalDragStartScrollY = 0;
+let modalPage = 0;
+let _lastModalWheelTime = 0;
+let _lastCardWheelTime = 0;
 let _playerCardBounds = [];
 
 function drawTlfsEnemyPoolGrid(x, y, w, h) {
@@ -188,75 +185,40 @@ function drawFighterSelectModal() {
   ctx.fillStyle = '#f59e0b';
   ctx.fillRect(mx + 20, my + 52, modalW - 40, 1.5);
 
-  // ── Smooth Scrollable Grid Configuration (Left Side: 3 Columns) ──
+  // ── Paginated Grid Configuration (Left Side: 3 Columns x 5 Rows = 15 Items per Page) ──
   const cols = 3;
+  const rows = 5;
+  const itemsPerPage = cols * rows;
   const gap = 6;
   const gridW = 210;
   const listX = mx + 20;
   const listY = my + 62;
-  const viewportH = 440;
 
   const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
-  const cellH = 64;
+  const cellH = 68;
 
   const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
 
-  const totalRows = Math.ceil(modalAvailableFighters.length / cols);
-  const totalContentH = totalRows * (cellH + gap) - gap;
-  const maxScroll = Math.max(0, totalContentH - viewportH);
+  const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
+  modalPage = Math.max(0, Math.min(totalPages - 1, modalPage));
 
-  // Smooth scroll interpolation
-  modalScrollY += (modalTargetScrollY - modalScrollY) * 0.35;
-  if (Math.abs(modalTargetScrollY - modalScrollY) < 0.1) {
-    modalScrollY = modalTargetScrollY;
-  }
+  const startIdx = modalPage * itemsPerPage;
+  const pageFighters = modalAvailableFighters.slice(startIdx, startIdx + itemsPerPage);
 
-  // ── Tactical Scrollbar Track & Thumb ──
-  const trackX = listX + gridW + 4;
-  const trackW = 4;
-  const trackH = viewportH;
-  const trackY = listY;
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  drawChamferedRect(ctx, trackX, trackY, trackW, trackH, 2);
-  ctx.fill();
-
-  if (totalContentH > viewportH) {
-    const thumbH = Math.max(32, (viewportH / totalContentH) * viewportH);
-    const thumbY = trackY + (modalScrollY / (maxScroll || 1)) * (trackH - thumbH);
-    ctx.save();
-    ctx.fillStyle = isDraggingModalThumb ? '#f59e0b' : 'rgba(245, 158, 11, 0.7)';
-    if (isDraggingModalThumb) {
-      ctx.shadowColor = '#f59e0b';
-      ctx.shadowBlur = 6;
-    }
-    drawChamferedRect(ctx, trackX, thumbY, trackW, thumbH, 2);
-    ctx.fill();
-    ctx.restore();
-  }
-
-  // ── Render Scrollable Roster Grid (Clipped to Viewport) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(listX - 2, listY, gridW + 4, viewportH);
-  ctx.clip();
-
-  modalAvailableFighters.forEach(({ def, idx }, listPos) => {
-    const col = listPos % cols;
-    const row = Math.floor(listPos / cols);
+  // ── Render Current Page Roster Grid ──
+  pageFighters.forEach(({ def, idx }, localPos) => {
+    const col = localPos % cols;
+    const row = Math.floor(localPos / cols);
 
     const itemX = listX + col * (cellW + gap);
-    const itemY = listY + row * (cellH + gap) - modalScrollY;
-
-    // Viewport cull check
-    if (itemY + cellH < listY - 5 || itemY > listY + viewportH + 5) return;
+    const itemY = listY + row * (cellH + gap);
 
     const isSelected = idx === modalInspectIndex;
 
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.18)';
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.20)';
       ctx.strokeStyle = '#f59e0b';
       ctx.lineWidth = 1.5;
       ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
@@ -296,22 +258,83 @@ function drawFighterSelectModal() {
     if (shortName.length > 9) shortName = shortName.substring(0, 8) + '.';
     ctx.fillText(shortName.toUpperCase(), avatarX, itemY + cellH - 3);
 
-    // Register button only if clicking within the visible viewport bounds
-    if (itemY + cellH >= listY && itemY <= listY + viewportH) {
-      const clickY = Math.max(listY, itemY);
-      const clickH = Math.min(itemY + cellH, listY + viewportH) - clickY;
-      _registerButton(itemX, clickY, cellW, clickH, () => {
-        if (modalInspectIndex !== idx) {
-          modalInspectIndex = idx;
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_dash5', 0.12);
-          }
+    _registerButton(itemX, itemY, cellW, cellH, () => {
+      if (modalInspectIndex !== idx) {
+        modalInspectIndex = idx;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
         }
-      });
-    }
+      }
+    });
   });
 
+  // ── Pagination Controls Dock at Bottom of Roster Grid ──
+  const paginationY = listY + rows * (cellH + gap) + 4;
+  const paginationH = 34;
+
+  // Background panel for pagination
+  ctx.save();
+  ctx.fillStyle = 'rgba(12, 16, 24, 0.90)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 1;
+  drawChamferedRect(ctx, listX, paginationY, gridW, paginationH, 5);
+  ctx.fill();
+  ctx.stroke();
   ctx.restore();
+
+  // Previous Page Button
+  const pageBtnW = 32;
+  const pageBtnH = 24;
+  const pageBtnY = paginationY + paginationH / 2;
+
+  drawButton('◄', listX + 8 + pageBtnW / 2, pageBtnY, () => {
+    if (modalPage > 0) {
+      modalPage--;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  }, pageBtnW, pageBtnH, null, 4);
+
+  // Next Page Button
+  drawButton('►', listX + gridW - 8 - pageBtnW / 2, pageBtnY, () => {
+    if (modalPage < totalPages - 1) {
+      modalPage++;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash5', 0.12);
+      }
+    }
+  }, pageBtnW, pageBtnH, null, 4);
+
+  // Page Indicator Text & Dot Pips
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 11px "Rajdhani", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(`PAGE ${modalPage + 1} / ${totalPages}`, listX + gridW / 2, paginationY + 11);
+
+  // Tactical Dot Pips
+  const dotSpacing = 14;
+  const dotsStartX = listX + gridW / 2 - ((totalPages - 1) * dotSpacing) / 2;
+  for (let p = 0; p < totalPages; p++) {
+    const dotX = dotsStartX + p * dotSpacing;
+    const dotY = paginationY + 24;
+    const isCurrentPage = p === modalPage;
+
+    ctx.fillStyle = isCurrentPage ? '#f59e0b' : 'rgba(255, 255, 255, 0.25)';
+    ctx.beginPath();
+    ctx.arc(dotX, dotY, isCurrentPage ? 3.5 : 2.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    _registerButton(dotX - 6, dotY - 6, 12, 12, () => {
+      if (modalPage !== p) {
+        modalPage = p;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
+        }
+      }
+    });
+  }
 
   // ── Right Side: Champion Showcase Stage ──
   const detailX = listX + gridW + 16;
@@ -1036,21 +1059,9 @@ function openFighterSelectModal(slotProp, fighterIndex) {
   const pos = modalAvailableFighters.findIndex(f => f.idx === fighterIndex);
   
   if (pos !== -1) {
-    const cols = 3;
-    const gap = 6;
-    const cellH = 64;
-    const viewportH = 440;
-    const totalRows = Math.ceil(modalAvailableFighters.length / cols);
-    const totalContentH = totalRows * (cellH + gap) - gap;
-    const maxScroll = Math.max(0, totalContentH - viewportH);
-    
-    const row = Math.floor(pos / cols);
-    const rowY = row * (cellH + gap);
-    modalTargetScrollY = Math.max(0, Math.min(maxScroll, rowY - viewportH / 2 + cellH / 2));
-    modalScrollY = modalTargetScrollY;
+    modalPage = Math.floor(pos / 15);
   } else {
-    modalTargetScrollY = 0;
-    modalScrollY = 0;
+    modalPage = 0;
   }
 }
 
@@ -1067,6 +1078,25 @@ window.addEventListener('keydown', (e) => {
         }
         selectingSlot = null;
         e.preventDefault();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        e.preventDefault();
+        if (modalPage > 0) {
+          modalPage--;
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.12);
+          }
+        }
+      } else if (e.key === 'ArrowRight' || e.key === 'PageDown') {
+        e.preventDefault();
+        const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
+          .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / 15));
+        if (modalPage < totalPages - 1) {
+          modalPage++;
+          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+            audioSystem.playSFX('skill_dash5', 0.12);
+          }
+        }
       }
       return;
     }
@@ -1093,140 +1123,81 @@ window.addEventListener('keydown', (e) => {
 });
 
 // Event listeners for character select screen & modal scrolling
-const eventTarget = state.pixiApp ? state.pixiApp.view : (state.canvas || window);
-if (eventTarget && eventTarget.addEventListener) {
-  eventTarget.addEventListener('wheel', (e) => {
-    if (state.gameState !== 'select') return;
+window.addEventListener('wheel', (e) => {
+  if (state.gameState !== 'select') return;
 
-    const rect = state.canvas.getBoundingClientRect();
-    const scaleX = state.canvas.width / rect.width;
-    const scaleY = state.canvas.height / rect.height;
-    const mouseX = (e.clientX - rect.left) * scaleX;
-    const mouseY = (e.clientY - rect.top) * scaleY;
+  const activeCanvas = (state.pixiApp && state.pixiApp.view) ? state.pixiApp.view : state.canvas;
+  const rect = (activeCanvas && activeCanvas.getBoundingClientRect) ? activeCanvas.getBoundingClientRect() : { left: 0, top: 0, width: state.canvas.width, height: state.canvas.height };
+  const scaleX = state.canvas.width / (rect.width || 1);
+  const scaleY = state.canvas.height / (rect.height || 1);
+  const mouseX = (e.clientX - rect.left) * scaleX;
+  const mouseY = (e.clientY - rect.top) * scaleY;
 
-    if (selectingSlot !== null) {
-      // Modal scroll
-      const modalW = Math.min(state.canvas.width - 20, 510);
-      const modalH = Math.min(state.canvas.height - 40, 600);
-      const mx = (state.canvas.width - modalW) / 2;
-      const my = (state.canvas.height - modalH) / 2;
-
-      const gridW = 210;
-      const listX = mx + 20;
-      const listY = my + 62;
-      const viewportH = 440;
-
-      if (mouseX >= mx && mouseX <= mx + gridW + 35 && mouseY >= listY && mouseY <= listY + viewportH) {
-        e.preventDefault();
-        const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
-          .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-        const totalRows = Math.ceil(modalAvailableFighters.length / 3);
-        const totalContentH = totalRows * (64 + 6) - 6;
-        const maxScroll = Math.max(0, totalContentH - viewportH);
-        
-        modalTargetScrollY += e.deltaY * 0.7;
-        modalTargetScrollY = Math.max(0, Math.min(maxScroll, modalTargetScrollY));
-      }
-      return;
-    }
-
-    // Main character select screen: scroll over player card to cycle fighters
-    const card = _playerCardBounds.find(c => mouseX >= c.x && mouseX <= c.x + c.w && mouseY >= c.y && mouseY <= c.y + c.h);
-    if (card) {
-      e.preventDefault();
-      const availableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
-        .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-      const currentIdx = state[card.slotProp];
-      const listPos = availableFighters.findIndex(f => f.idx === currentIdx);
-      const count = availableFighters.length;
-      if (count > 0) {
-        let nextPos = listPos;
-        if (e.deltaY > 0) {
-          nextPos = (listPos + 1) % count;
-        } else if (e.deltaY < 0) {
-          nextPos = (listPos - 1 + count) % count;
-        }
-        if (nextPos !== listPos && nextPos >= 0 && nextPos < count) {
-          state[card.slotProp] = availableFighters[nextPos].idx;
-          if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-            audioSystem.playSFX('skill_dash5', 0.12);
-          }
-        }
-      }
-    }
-  }, { passive: false });
-
-  eventTarget.addEventListener('mousedown', (e) => {
-    if (state.gameState !== 'select' || selectingSlot === null) return;
-
-    const rect = state.canvas.getBoundingClientRect();
-    const scaleX = state.canvas.width / rect.width;
-    const scaleY = state.canvas.height / rect.height;
-    const mouseX = (e.clientX - rect.left) * scaleX;
-    const mouseY = (e.clientY - rect.top) * scaleY;
-
+  if (selectingSlot !== null) {
+    // Modal scroll: flip to next / previous page on scroll!
     const modalW = Math.min(state.canvas.width - 20, 510);
     const modalH = Math.min(state.canvas.height - 40, 600);
     const mx = (state.canvas.width - modalW) / 2;
     const my = (state.canvas.height - modalH) / 2;
 
-    const gridW = 210;
-    const listX = mx + 20;
-    const listY = my + 62;
-    const viewportH = 440;
-    const trackX = listX + gridW + 4;
-
-    // Check if clicked scrollbar track or thumb
-    if (mouseX >= trackX - 6 && mouseX <= trackX + 16 && mouseY >= listY && mouseY <= listY + viewportH) {
-      isDraggingModalThumb = true;
-      modalDragStartY = mouseY;
-      modalDragStartScrollY = modalTargetScrollY;
-      return;
+    // If hovering anywhere over the modal or modal area
+    if (mouseX >= mx - 20 && mouseX <= mx + modalW + 20 && mouseY >= my - 20 && mouseY <= my + modalH + 20) {
+      e.preventDefault();
+      const now = performance.now();
+      if (now - _lastModalWheelTime > 140) {
+        const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
+          .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
+        const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / 15));
+        
+        if (e.deltaY > 0) {
+          if (modalPage < totalPages - 1) {
+            modalPage++;
+            _lastModalWheelTime = now;
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('skill_dash5', 0.12);
+            }
+          }
+        } else if (e.deltaY < 0) {
+          if (modalPage > 0) {
+            modalPage--;
+            _lastModalWheelTime = now;
+            if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+              audioSystem.playSFX('skill_dash5', 0.12);
+            }
+          }
+        }
+      }
     }
+    return;
+  }
 
-    // Check if clicked inside grid area for drag-scrolling
-    if (mouseX >= listX && mouseX <= listX + gridW && mouseY >= listY && mouseY <= listY + viewportH) {
-      isDraggingModalScroll = true;
-      modalDragStartY = mouseY;
-      modalDragStartScrollY = modalTargetScrollY;
-    }
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (state.gameState !== 'select' || selectingSlot === null) return;
-    if (!isDraggingModalScroll && !isDraggingModalThumb) return;
-
-    const rect = state.canvas.getBoundingClientRect();
-    const scaleY = state.canvas.height / rect.height;
-    const mouseY = (e.clientY - rect.top) * scaleY;
-
-    const modalW = Math.min(state.canvas.width - 20, 510);
-    const modalH = Math.min(state.canvas.height - 40, 600);
-    const my = (state.canvas.height - modalH) / 2;
-    const viewportH = 440;
-
-    const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
+  // Main character select screen: scroll over player card to cycle fighters cleanly
+  const card = _playerCardBounds.find(c => mouseX >= c.x && mouseX <= c.x + c.w && mouseY >= c.y && mouseY <= c.y + c.h);
+  if (card) {
+    e.preventDefault();
+    const now = performance.now();
+    if (now - _lastCardWheelTime < 130) return;
+    _lastCardWheelTime = now;
+    const availableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
       .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
-    const totalRows = Math.ceil(modalAvailableFighters.length / 3);
-    const totalContentH = totalRows * (64 + 6) - 6;
-    const maxScroll = Math.max(0, totalContentH - viewportH);
-
-    if (isDraggingModalThumb) {
-      const thumbH = Math.max(32, (viewportH / totalContentH) * viewportH);
-      const delta = mouseY - modalDragStartY;
-      const scrollRatio = delta / Math.max(1, viewportH - thumbH);
-      modalTargetScrollY = Math.max(0, Math.min(maxScroll, modalDragStartScrollY + scrollRatio * maxScroll));
-      modalScrollY = modalTargetScrollY;
-    } else if (isDraggingModalScroll) {
-      const delta = mouseY - modalDragStartY;
-      modalTargetScrollY = Math.max(0, Math.min(maxScroll, modalDragStartScrollY - delta));
+    const currentIdx = state[card.slotProp];
+    const listPos = availableFighters.findIndex(f => f.idx === currentIdx);
+    const count = availableFighters.length;
+    if (count > 0) {
+      let nextPos = listPos;
+      if (e.deltaY > 0) {
+        nextPos = (listPos + 1) % count;
+      } else if (e.deltaY < 0) {
+        nextPos = (listPos - 1 + count) % count;
+      }
+      if (nextPos !== listPos && nextPos >= 0 && nextPos < count) {
+        state[card.slotProp] = availableFighters[nextPos].idx;
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX('skill_dash5', 0.12);
+        }
+      }
     }
-  });
+  }
+}, { passive: false });
 
-  window.addEventListener('mouseup', () => {
-    isDraggingModalScroll = false;
-    isDraggingModalThumb = false;
-  });
-}
-
-export { drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, selectingSlot, modalInspectIndex, modalScrollY, modalTargetScrollY };
+export { drawTlfsEnemyPoolGrid, drawSmallFighterBadge, drawFighterSelectModal, drawSelectScreen, randomizeFfaFighters, selectingSlot, modalInspectIndex, modalPage };

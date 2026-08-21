@@ -833,7 +833,7 @@ export class JohnWickFighter extends Fighter {
     if ((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed) {
       return;
     }
-    if (this.cqcComboPhase || this.isReloading || (this.weaponSwitchTimer && this.weaponSwitchTimer > 0) || this.isRolling) return;
+    if (this.cqcComboPhase || this.isReloading || (this.weaponSwitchTimer && this.weaponSwitchTimer > 0) || this.isRolling || this.outOfAmmoRollDelayTimer > 0 || this.magazineBullets <= 0) return;
 
     const cfg = CONFIG.john_wick || {};
     this.magazineBullets--;
@@ -957,7 +957,7 @@ export class JohnWickFighter extends Fighter {
     // ── TRIGGER ASSASSINATION COMBO ON EMPTY MAGAZINE (WITH DELAY FRAMES) ──
     if (this.magazineBullets <= 0) {
       this.magazineBullets = 0;
-      const targetEnemy = this._findCloseEnemyTarget(450) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
+      const targetEnemy = this._findCloseEnemyTarget(Infinity) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
       if (targetEnemy) {
         this.pendingAssassinationTarget = targetEnemy;
         this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;
@@ -1025,8 +1025,8 @@ export class JohnWickFighter extends Fighter {
     this.vx = Math.cos(rollAngle) * rollSpeed;
     this.vy = Math.sin(rollAngle) * rollSpeed;
 
-    // Tactical quick-draw reload on roll execution
-    if (cfg.rollInstantReload) {
+    // Tactical quick-draw reload on roll execution (only for standard weapons, not Excommunicado M4 rifle)
+    if (cfg.rollInstantReload && this.currentEquippedWeapon !== 'rifle') {
       this.magazineBullets = this.maxMagazine || cfg.magazineSize || 12;
       this.isReloading = false;
       this.reloadTimer = 0;
@@ -1449,7 +1449,7 @@ export class JohnWickFighter extends Fighter {
       if (this.outOfAmmoRollDelayTimer <= 0 && this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading && !this.isRolling) {
         const target = (this.pendingAssassinationTarget && this.pendingAssassinationTarget.hp > 0 && !this.pendingAssassinationTarget.isDying)
           ? this.pendingAssassinationTarget
-          : (this._findCloseEnemyTarget(450) || (opponent && opponent.hp > 0 ? opponent : null));
+          : (this._findCloseEnemyTarget(Infinity) || (opponent && opponent.hp > 0 ? opponent : null));
         this.pendingAssassinationTarget = null;
         if (target) {
           this.startAssassinationCombo(target);
@@ -1471,7 +1471,7 @@ export class JohnWickFighter extends Fighter {
         }
       }
     } else if (this.magazineBullets <= 0 && !this.cqcComboPhase && !this.isReloading && !this.isRolling && typeof state !== 'undefined' && state.gameState === 'playing') {
-      const targetEnemy = this._findCloseEnemyTarget(450) || (opponent && opponent.hp > 0 ? opponent : null) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
+      const targetEnemy = this._findCloseEnemyTarget(Infinity) || (opponent && opponent.hp > 0 ? opponent : null) || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0 && !this.isTeammate(f)) : null);
       if (targetEnemy) {
         this.pendingAssassinationTarget = targetEnemy;
         this.outOfAmmoRollDelayTimer = cfg.outOfAmmoRollDelayFrames || 18;

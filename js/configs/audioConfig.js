@@ -58,5 +58,10 @@ export const AUDIO_CONFIG = {
   'skill_johnwick_shotgun_crack': 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3',
   'skill_johnwick_shotgun_reload': 'Assets/Sound Effects/Skills/johnwick-shotgun-reload.mp3',
   'skill_johnwick_switchgun_voice': 'Assets/Sound Effects/Skills/johnwick-switchgun-voiceline.mp3',
-  'skill_johnwick_rollback_voice': 'Assets/Sound Effects/Skills/Johnwick-rollback-voiceline.mp3'
+  'skill_johnwick_rollback_voice': 'Assets/Sound Effects/Skills/Johnwick-rollback-voiceline.mp3',
+  'skill_engineer_sentry_destroyed': 'Assets/Sound Effects/Skills/engineer-sentrydestroyed.mp3',
+  'skill_engineer_sentry_detected': 'Assets/Sound Effects/Skills/engineer-sentrydetected.mp3',
+  'skill_engineer_sentry_gunshot': 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3',
+  'skill_engineer_sentry_reloaded': 'Assets/Sound Effects/Skills/engineer-sentryreloaded.mp3',
+  'skill_engineer_sentry_reloading': 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3'
 };

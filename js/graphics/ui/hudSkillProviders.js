@@ -884,7 +884,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     if (f.currentEquippedWeapon === 'shotgun') {
       weaponName = 'SHOTGUN';
     } else if (f.currentEquippedWeapon === 'rifle') {
-      weaponName = 'RIFLE';
+      weaponName = 'M4 RIFLE';
     }
 
     if (f.weaponSwitchTimer && f.weaponSwitchTimer > 0) {
@@ -922,21 +922,23 @@ export function getSkillDataForFighter(f, getProjectiles) {
       // Pistol phase: 0% base + buildup progress toward shotgun (0–50%)
       const magSpent = Math.max(0, Math.min(1.0, 1 - (bullets / maxMag)));
       const cycleProgress = (Math.min(2, rollbacks) + magSpent) / 3;
-      ultPct = cycleProgress * 50;
+      ultPct = Math.max(0, Math.min(50, cycleProgress * 50));
       ultReady = false;
     } else if (currentWeapon === 'shotgun') {
       // Shotgun phase: 50% base + buildup progress toward rifle (50–100%)
       const magSpent = Math.max(0, Math.min(1.0, 1 - (bullets / maxMag)));
       const cycleProgress = (Math.min(2, rollbacks) + magSpent) / 3;
-      ultPct = 50 + cycleProgress * 50;
-      ultReady = false;
+      ultPct = Math.max(50, Math.min(100, 50 + cycleProgress * 50));
+      ultReady = ultPct >= 99;
     } else if (currentWeapon === 'rifle') {
-      // Rifle reached: Excommunicado ACTIVE — drains dynamically from 100% down to 0% across the 3 M4 rifle cycles!
+      // M4 Rifle reached: Excommunicado is fully ACTIVE!
+      // Drains continuously from 100% down to 0% across all 3 M4 rifle cycles (1 cycle = 1 full 45-round magazine)
       const currentMagRatio = Math.max(0, Math.min(1.0, bullets / maxMag));
-      const completedCycles = Math.min(3, rollbacks);
-      const remainingCycleFraction = Math.max(0, (3 - completedCycles - 1) + currentMagRatio);
-      ultPct = (remainingCycleFraction / 3) * 100;
-      ultReady = ultPct > 0;
+      const completedRollbacks = Math.min(2, Math.max(0, rollbacks));
+      const remainingMagazines = 2 - completedRollbacks;
+      const totalRemainingRatio = (remainingMagazines + currentMagRatio) / 3;
+      ultPct = Math.max(0, Math.min(100, totalRemainingRatio * 100));
+      ultReady = true;
     }
     ultPct = Math.max(0, Math.min(100, ultPct));
 
@@ -948,26 +950,66 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
   if (f.characterId === 'engineer' || f.type === 'Engineer' || f.type === 'engineer' || f._def?.type === 'Engineer') {
     const themeColor = f.color || '#ffcc00';
-    const skillMax = (CONFIG.Engineer && CONFIG.Engineer.skillCooldown) || 1000;
+    const skillMax = (CONFIG.Engineer && CONFIG.Engineer.skillCooldown) || 500;
     const hasLiveTurret = Boolean(
-      (f.turretEntity && f.turretEntity.hp > 0 && state.fighters && state.fighters.includes(f.turretEntity)) ||
-      f.isBuildingTurret
+      f.turretEntity && f.turretEntity.hp > 0 && (!state.fighters || state.fighters.includes(f.turretEntity))
     );
 
-    let skillPct = 0;
-    let skillReady = false;
+    let sentryPct = 0;
+    let sentryReady = false;
 
-    if (hasLiveTurret) {
-      skillPct = 0;
-      skillReady = false;
+    if (f.isBuildingTurret) {
+      const buildTime = CONFIG.Engineer?.turretBuildTime || 90;
+      sentryPct = Math.max(0, Math.min(100, (1 - (f.buildTimer / buildTime)) * 100));
+      sentryReady = false;
+    } else if (hasLiveTurret) {
+      // Drains in real-time strictly based on Sentry HP
+      const maxHp = f.turretEntity.maxHp || 200;
+      sentryPct = Math.max(0, Math.min(100, (f.turretEntity.hp / maxHp) * 100));
+      sentryReady = true;
     } else {
+      // Sentry destroyed: Cooldown ticks from skillMax to 0, charging the bar
       const current = f.skillCooldown !== undefined ? f.skillCooldown : 0;
-      skillPct = Math.max(0, Math.min(100, (1 - (current / skillMax)) * 100));
-      skillReady = skillPct >= 99;
+      sentryPct = Math.max(0, Math.min(100, (1 - (current / skillMax)) * 100));
+      sentryReady = sentryPct >= 99;
     }
 
+    const hasLiveDispenser = Boolean(
+      f.dispenserEntity && f.dispenserEntity.hp > 0 && (!state.fighters || state.fighters.includes(f.dispenserEntity))
+    );
+
+    let dispenserPct = 0;
+    let dispenserReady = false;
+    const dispenserMax = CONFIG.Engineer?.dispenserCooldown || 300;
+
+    if (f.isBuildingDispenser) {
+      const buildTime = CONFIG.Engineer?.dispenserBuildTime || 110;
+      dispenserPct = Math.max(0, Math.min(100, (1 - (f.dispenserBuildTimer / buildTime)) * 100));
+      dispenserReady = false;
+    } else if (hasLiveDispenser) {
+      // Drains in real-time strictly based on Dispenser HP
+      const maxHp = f.dispenserEntity.maxHp || 160;
+      dispenserPct = Math.max(0, Math.min(100, (f.dispenserEntity.hp / maxHp) * 100));
+      dispenserReady = true;
+    } else {
+      // Dispenser destroyed: Cooldown ticks from dispenserMax to 0, charging the bar
+      const current = f.dispenserCooldown !== undefined ? f.dispenserCooldown : 0;
+      dispenserPct = Math.max(0, Math.min(100, (1 - (current / dispenserMax)) * 100));
+      dispenserReady = dispenserPct >= 99;
+    }
+
+    // Dynamically display Sentry level (LVL 1, LVL 2, LVL 3)
+    let sentryLvl = 1;
+    if (f.turretEntity && f.turretEntity.level) {
+      sentryLvl = f.turretEntity.level;
+    } else {
+      sentryLvl = Math.max(1, Math.min(3, f.sentryBuildLevel || 1));
+    }
+    const sentryLabel = `SENTRY LVL ${sentryLvl}`;
+
     return [
-      { id: 'turret', pct: skillPct, ready: skillReady, color: themeColor, label: 'SENTRY' }
+      { id: 'turret', pct: sentryPct, ready: sentryReady, color: themeColor, label: sentryLabel },
+      { id: 'dispenser', pct: dispenserPct, ready: dispenserReady, color: themeColor, label: 'DISPENSER' }
     ];
   }
 

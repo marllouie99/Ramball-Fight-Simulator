@@ -341,6 +341,10 @@ function executeTacticalAction(action) {
     state.mode = '1v1';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
+  } else if (action === 'mode-standoff') {
+    state.mode = 'Stand Off';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
   } else if (action === 'mode-2v2') {
     state.mode = '2v2';
     state.p3Index = state.p3Index ?? 2;
