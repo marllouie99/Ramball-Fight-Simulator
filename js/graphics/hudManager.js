@@ -231,10 +231,12 @@ function updateHealthHud() {
   const { fighters, mode, scores, teamScores } = state;
   if (!fighters) return;
 
-  // OPTIMIZATION: Auto-rebuild if HUD display mode changed.
+  // OPTIMIZATION: Auto-rebuild if HUD display mode or Arena Theme changed.
   const hudModeChanged = state._lastHudShowFighterDescription !== CONFIG.hudShowFighterDescription;
+  const themeChanged = state._lastArenaTheme !== (state.arenaTheme || 'light');
   state._lastHudShowFighterDescription = CONFIG.hudShowFighterDescription;
-  if (hudModeChanged) {
+  state._lastArenaTheme = state.arenaTheme || 'light';
+  if (hudModeChanged || themeChanged) {
     clearHealthHud();
   }
 
@@ -277,18 +279,24 @@ function updateHealthHud() {
       f._counterPunchImpactFlashTimer && f._counterPunchImpactFlashTimer > 0
     );
 
+    const isDarkTheme = (state.arenaTheme === 'dark');
     const _dimEls = [
       document.querySelector('.game-container'),
       document.querySelector('.game-box'),
       document.getElementById('hudBottomContainer'),
       document.getElementById('hudTopContainer'),
       document.getElementById('healthHud'),
+      document.getElementById('healthHudLeft'),
+      document.getElementById('healthHudRight'),
       document.body
     ];
     _dimEls.forEach(el => {
       if (el) {
         if (isDimmedNow) el.classList.add('hud-dimmed');
         else el.classList.remove('hud-dimmed');
+
+        if (isDarkTheme) el.classList.add('arena-dark-mode');
+        else el.classList.remove('arena-dark-mode');
 
         // Snap HUD text to black during punch impact white flash
         if (isSaitamaPunchImpactFlash) el.classList.add('hud-punch-impact');
@@ -882,9 +890,11 @@ function updateHealthHud() {
       const spanClass = isSpan2 ? ' span-2' : '';
 
       if (splitIdx !== -1) {
-        return `<div class="${spanClass}">${label}<span style="font-size: ${valFontSize.toFixed(1)}px;">${displayVal.trim()}</span></div>`;
+        const cleanLabel = label.replace(/<\/?b>/g, '');
+        const cleanVal = displayVal.replace(/<\/?b>/g, '').trim();
+        return `<div class="${spanClass}"><span class="hud-stat-label" style="font-weight: normal;">${cleanLabel}</span> <span class="hud-stat-val" style="font-size: ${valFontSize.toFixed(1)}px; font-weight: normal;">${cleanVal}</span></div>`;
       }
-      return `<div class="${spanClass}">${line}</div>`;
+      return `<div class="${spanClass}" style="font-weight: normal;">${line.replace(/<\/?b>/g, '')}</div>`;
     }).join('');
 
     return linesHTML;
@@ -935,13 +945,36 @@ function updateHealthHud() {
 
     const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
     const maxChars = extraClass.includes('ffa-card') ? 18 : 24;
-    let nameColor = fighterColor || '#ffffff';
+    const isDark = (state.arenaTheme === 'dark');
+    const defaultNameColor = isDark ? '#ffffff' : '#111111';
+    let nameColor = fighterColor || defaultNameColor;
+    if (nameColor === '#fff' || nameColor === '#ffffff') {
+      nameColor = defaultNameColor;
+    }
     let truncatedTitle = title;
     if (title && title.length > maxChars) {
       truncatedTitle = title.substring(0, maxChars - 1) + '…';
     }
 
-    const titleStyle = `font-size: ${baseFontSize}px; text-transform: uppercase; font-family: 'Glast Blitch', Arial, sans-serif; letter-spacing: 0.5px; `;
+    const hexToRgba = (hex, alpha) => {
+      if (!hex) return `rgba(255, 255, 255, ${alpha})`;
+      let c = String(hex).replace('#', '');
+      if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
+      if (c.length !== 6) return `rgba(255, 255, 255, ${alpha})`;
+      const r = parseInt(c.substring(0, 2), 16) || 255;
+      const g = parseInt(c.substring(2, 4), 16) || 255;
+      const b = parseInt(c.substring(4, 6), 16) || 255;
+      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    };
+
+    const getTitleStyle = (color) => {
+      const glow1 = hexToRgba(color, 0.70);
+      const glow2 = hexToRgba(color, 0.35);
+      const shadow = isDark 
+        ? `text-shadow: 0 1px 2px #000000, 0 0 8px ${glow1}, 0 0 16px ${glow2}; -webkit-text-stroke: 0.8px #000000; text-stroke: 0.8px #000000; paint-order: stroke fill;` 
+        : `text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);`;
+      return `font-size: ${baseFontSize}px; text-transform: uppercase; font-family: 'Glast Blitch', Arial, sans-serif; letter-spacing: 0.8px; font-weight: normal; ${shadow} `;
+    };
 
     let barsHTML = '';
     if (members && members.length > 0) {
@@ -960,7 +993,7 @@ function updateHealthHud() {
         const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
         const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
 
-        let memberNameColor = m.color || '#ffffff';
+        let memberNameColor = m.color || defaultNameColor;
         const fType = (m.type || m.characterId || (m._def && m._def.type) || '').toLowerCase();
         if (fType === 'gojo') memberNameColor = '#00E5FF';
         else if (fType === 'yuta') memberNameColor = '#FF69B4';
@@ -970,12 +1003,16 @@ function updateHealthHud() {
         else if (fType === 'toji') memberNameColor = '#A855F7';
         else if (fType === 'sukuna') memberNameColor = '#FF4500';
         else if (fType === 'saitama') memberNameColor = '#FF2A2A';
+        else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') memberNameColor = isDark ? '#E2E8F0' : '#1A202C';
+        else if (memberNameColor === '#fff' || memberNameColor === '#ffffff') {
+          memberNameColor = defaultNameColor;
+        }
 
         const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
         return `
           <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
-            <div class="health-card__title" style="${titleStyle}color: ${memberNameColor}; font-weight: bold; margin: 0 0 4px 0; text-align: ${titleAlign || 'left'};">${memberName}</div>
+            <div class="health-card__title" style="${getTitleStyle(memberNameColor)}color: ${memberNameColor}; margin: 0 0 4px 0; text-align: ${titleAlign || 'left'};">${memberName}</div>
             <div class="health-card__bar" style="${memberShakeStyle}">
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
@@ -1029,7 +1066,7 @@ function updateHealthHud() {
 
     const headerRowHTML = (title || maxBullets > 0) ? `
       <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 6px;">
-        ${title ? `<div class="health-card__title" style="${titleStyle}color: ${nameColor}; font-weight: bold; margin: 0; text-align: ${titleAlign};">${truncatedTitle}</div>` : ''}
+        ${title ? `<div class="health-card__title" style="${getTitleStyle(nameColor)}color: ${nameColor}; margin: 0; text-align: ${titleAlign};">${truncatedTitle}</div>` : ''}
         ${winsHTML}
       </div>
     ` : '';
@@ -1066,6 +1103,7 @@ function updateHealthHud() {
         else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
         else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
         else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
+        else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') nameColor = (state.arenaTheme === 'dark') ? '#E2E8F0' : '#1A202C';
         const fighterName = soloFighter.name || 'SOLO PLAYER';
         const fighterStats = state.leaderboard[soloFighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
@@ -1242,6 +1280,7 @@ function updateHealthHud() {
         else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
         else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
         else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
+        else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') nameColor = (state.arenaTheme === 'dark') ? '#E2E8F0' : '#1A202C';
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;

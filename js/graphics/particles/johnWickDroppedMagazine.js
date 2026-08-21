@@ -5,6 +5,7 @@
 
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle } from '../weapons/johnWickWeaponGraphics.js';
 
@@ -15,6 +16,23 @@ if (typeof state !== 'undefined') {
   if (!state.spentCasings) state.spentCasings = [];
 }
 
+/** Check if current mode is 1v2 Stand Off */
+function is1v2Mode() {
+  if (typeof state === 'undefined') return false;
+  return state.mode === GAME_MODES.STAND_OFF_1V2 || 
+         state.mode === '1v2 Stand Off' || 
+         state.mode === '1v2';
+}
+
+/** Check if current mode has 3+ fighters */
+function isMultiFighterMode() {
+  if (typeof state === 'undefined') return false;
+  return is1v2Mode() || 
+         state.mode === GAME_MODES.TWO_VS_TWO || 
+         state.mode === GAME_MODES.FFA || 
+         (state.fighters && state.fighters.length > 2);
+}
+
 /**
  * Spawns an empty dropped magazine at the magwell base of John Wick's firearm (Pistol or M4 Rifle)
  */
@@ -22,8 +40,10 @@ export function spawnDroppedMagazine(fighterX, fighterY, gunAngle = 0, weaponTyp
   if (typeof state === 'undefined') return;
   if (!state.droppedMagazines) state.droppedMagazines = [];
 
-  const MAX_MAGAZINES = 8;
-  if (state.droppedMagazines.length >= MAX_MAGAZINES) {
+  const is1v2 = is1v2Mode();
+  const isMulti = isMultiFighterMode();
+  const MAX_MAGAZINES = is1v2 ? 3 : (isMulti ? 5 : 8);
+  while (state.droppedMagazines.length >= MAX_MAGAZINES) {
     state.droppedMagazines.shift();
   }
 
@@ -54,8 +74,9 @@ export function spawnDroppedMagazine(fighterX, fighterY, gunAngle = 0, weaponTyp
     weaponType: isRifle ? 'rifle' : 'pistol',
     onGround: false,
     bounceCount: 0,
+    airFrames: 0,
     life: 1.0,
-    decay: 0.0035,
+    decay: is1v2 ? 0.030 : (isMulti ? 0.015 : 0.005),
     width: isRifle ? 9.0 : 6.5,
     height: isRifle ? 22.0 : 14.0
   });
@@ -68,8 +89,10 @@ export function spawnThrownGun(fighterX, fighterY, gunAngle = 0, weaponType = 'p
   if (typeof state === 'undefined') return;
   if (!state.thrownGuns) state.thrownGuns = [];
 
-  const MAX_THROWN_GUNS = 8;
-  if (state.thrownGuns.length >= MAX_THROWN_GUNS) {
+  const is1v2 = is1v2Mode();
+  const isMulti = isMultiFighterMode();
+  const MAX_THROWN_GUNS = is1v2 ? 3 : (isMulti ? 4 : 8);
+  while (state.thrownGuns.length >= MAX_THROWN_GUNS) {
     state.thrownGuns.shift();
   }
 
@@ -94,8 +117,9 @@ export function spawnThrownGun(fighterX, fighterY, gunAngle = 0, weaponType = 'p
     weaponType: weaponType,
     onGround: false,
     bounceCount: 0,
+    airFrames: 0,
     life: 1.0,
-    decay: 0.0040 // ~4.0s on the floor
+    decay: is1v2 ? 0.025 : (isMulti ? 0.012 : 0.006)
   });
 }
 
@@ -107,8 +131,12 @@ export function spawnSpentCasing(fighterX, fighterY, gunAngle = 0, casingType = 
   if (typeof state === 'undefined') return;
   if (!state.spentCasings) state.spentCasings = [];
 
-  const MAX_CASINGS = 35;
-  if (state.spentCasings.length >= MAX_CASINGS) {
+  const is1v2 = is1v2Mode();
+  const isMulti = isMultiFighterMode();
+
+  // Snappy casing limits: In 1v2 mode, strictly keep max 6 casings to eliminate any FPS drops
+  const MAX_CASINGS = is1v2 ? 6 : (isMulti ? 10 : 18);
+  while (state.spentCasings.length >= MAX_CASINGS) {
     state.spentCasings.shift();
   }
 
@@ -140,6 +168,9 @@ export function spawnSpentCasing(fighterX, fighterY, gunAngle = 0, casingType = 
   const ejectAngle = gunAngle + (facingLeft ? Math.PI * 0.62 : -Math.PI * 0.62) + (Math.random() - 0.5) * 0.35;
   const ejectSpeed = casingType === '556' ? (3.8 + Math.random() * 2.2) : (casingType === '12gauge' ? (4.2 + Math.random() * 2.5) : (3.2 + Math.random() * 1.8));
 
+  // In 1v2 mode, shells disappear quickly (decay 0.050 = ~20 frames / ~0.3s on floor)
+  const decayRate = is1v2 ? 0.050 : (isMulti ? 0.025 : 0.012);
+
   state.spentCasings.push({
     x: spawnX,
     y: spawnY,
@@ -150,8 +181,9 @@ export function spawnSpentCasing(fighterX, fighterY, gunAngle = 0, casingType = 
     casingType: casingType,
     onGround: false,
     bounceCount: 0,
+    airFrames: 0,
     life: 1.0,
-    decay: 0.0022 // Lingers ~7.5s on the floor
+    decay: decayRate
   });
 }
 
@@ -276,6 +308,7 @@ export function updateDroppedMagazines() {
 
   // 3. Update Spent Casings
   if (state.spentCasings && state.spentCasings.length > 0) {
+    const is1v2 = is1v2Mode();
     for (let i = state.spentCasings.length - 1; i >= 0; i--) {
       const c = state.spentCasings[i];
       if (!c.onGround) {
@@ -285,6 +318,12 @@ export function updateDroppedMagazines() {
         c.x += c.vx;
         c.y += c.vy;
         c.rot += c.vRot;
+        c.airFrames = (c.airFrames || 0) + 1;
+
+        // In 1v2 mode, fade out rapidly if airborne for more than 20 frames
+        if (is1v2 && c.airFrames > 20) {
+          c.life -= 0.05;
+        }
 
         if (c.x <= arenaLeft) {
           c.x = arenaLeft;
@@ -307,7 +346,7 @@ export function updateDroppedMagazines() {
               audioSystem.playSFX(shellDropSfx, shellDropVol);
             }
           }
-          if (c.bounceCount < 3 && Math.abs(c.vy) > 1.2) {
+          if (c.bounceCount < (is1v2 ? 2 : 3) && Math.abs(c.vy) > 1.2) {
             c.vy = -c.vy * 0.40;
             c.vx *= 0.70;
             c.vRot *= 0.6;
@@ -324,9 +363,10 @@ export function updateDroppedMagazines() {
         c.vx *= 0.85;
         c.x += c.vx;
         c.life -= c.decay;
-        if (c.life <= 0) {
-          state.spentCasings.splice(i, 1);
-        }
+      }
+
+      if (c.life <= 0) {
+        state.spentCasings.splice(i, 1);
       }
     }
   }
@@ -342,7 +382,7 @@ export function drawDroppedMagazines(ctx) {
   if (state.droppedMagazines && state.droppedMagazines.length > 0) {
     for (let i = 0; i < state.droppedMagazines.length; i++) {
       const mag = state.droppedMagazines[i];
-      if (mag.life <= 0) continue;
+      if (mag.life <= 0.02) continue;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, mag.life));
@@ -351,7 +391,7 @@ export function drawDroppedMagazines(ctx) {
 
       if (mag.weaponType === 'rifle') {
         // Shadow for dropped rifle mag
-        if (mag.onGround || mag.y > (CONFIG.arena.y + CONFIG.arena.height - 40)) {
+        if (mag.life > 0.20 && (mag.onGround || mag.y > (CONFIG.arena.y + CONFIG.arena.height - 40))) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
           ctx.beginPath();
           ctx.ellipse(0, 2, 11, 4, 0, 0, Math.PI * 2);
@@ -409,7 +449,7 @@ export function drawDroppedMagazines(ctx) {
         ctx.restore();
       } else {
         // Pistol Magazine (TTI Pit Viper 9mm)
-        if (mag.onGround || mag.y > (CONFIG.arena.y + CONFIG.arena.height - 40)) {
+        if (mag.life > 0.20 && (mag.onGround || mag.y > (CONFIG.arena.y + CONFIG.arena.height - 40))) {
           ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
           ctx.beginPath();
           ctx.ellipse(0, 2, 8, 3, 0, 0, Math.PI * 2);
@@ -454,7 +494,7 @@ export function drawDroppedMagazines(ctx) {
   if (state.thrownGuns && state.thrownGuns.length > 0) {
     for (let i = 0; i < state.thrownGuns.length; i++) {
       const gun = state.thrownGuns[i];
-      if (gun.life <= 0) continue;
+      if (gun.life <= 0.02) continue;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, gun.life));
@@ -462,7 +502,7 @@ export function drawDroppedMagazines(ctx) {
       ctx.rotate(gun.rot);
 
       // Floor shadow
-      if (gun.onGround || gun.y > (CONFIG.arena.y + CONFIG.arena.height - 45)) {
+      if (gun.life > 0.20 && (gun.onGround || gun.y > (CONFIG.arena.y + CONFIG.arena.height - 45))) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
         ctx.beginPath();
         const shadowR = gun.weaponType === 'shotgun' ? 24 : (gun.weaponType === 'rifle' ? 22 : 14);
@@ -490,7 +530,7 @@ export function drawDroppedMagazines(ctx) {
   if (state.spentCasings && state.spentCasings.length > 0) {
     for (let i = 0; i < state.spentCasings.length; i++) {
       const c = state.spentCasings[i];
-      if (c.life <= 0) continue;
+      if (c.life <= 0.02) continue;
 
       ctx.save();
       ctx.globalAlpha = Math.max(0, Math.min(1, c.life));
@@ -498,7 +538,7 @@ export function drawDroppedMagazines(ctx) {
       ctx.rotate(c.rot);
 
       // Floor contact shadow when resting on or near bottom arena floor
-      if (c.onGround || c.y > (CONFIG.arena.y + CONFIG.arena.height - 35)) {
+      if (c.life > 0.20 && (c.onGround || c.y > (CONFIG.arena.y + CONFIG.arena.height - 35))) {
         ctx.fillStyle = 'rgba(0, 0, 0, 0.30)';
         ctx.beginPath();
         const shadowW = c.casingType === '12gauge' ? 6.5 : (c.casingType === '556' ? 5.5 : 4.5);

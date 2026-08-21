@@ -365,11 +365,26 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
  * Uses a micro-fade-out to prevent click/pop on eviction.
  */
 function _evictOldestSound() {
-  // Find the oldest handle (first in the Set)
-  const iterator = _activeSoundHandles.values();
-  const oldest = iterator.next().value;
-  if (!oldest) return;
+  // Find the oldest NON-PROTECTED handle (never evict announcer, faah, death sounds, or voicelines)
+  let candidate = null;
+  for (const handle of _activeSoundHandles) {
+    if (!handle) continue;
+    const srcStr = String(handle.src || '').toLowerCase();
+    if (srcStr.includes('announcer') || srcStr.includes('faah') || srcStr.includes('voiceline') || srcStr.includes('death')) {
+      continue; // Protected from eviction!
+    }
+    candidate = handle;
+    break;
+  }
 
+  // Fallback if all active handles are protected
+  if (!candidate) {
+    const iterator = _activeSoundHandles.values();
+    candidate = iterator.next().value;
+  }
+  if (!candidate) return;
+
+  const oldest = candidate;
   if (oldest.gainNode) {
     try {
       const audioCtx = getAudioContext();
@@ -850,8 +865,11 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 2. Stop/fade active Web Audio API & HTML Audio handles
   const handles = Array.from(_activeSoundHandles);
   for (const handle of handles) {
-    if (keepAnnouncer && handle.src && (String(handle.src).toLowerCase().includes('announcer') || String(handle.src).toLowerCase().includes('machinegunblow'))) {
-      continue;
+    if (keepAnnouncer && handle.src) {
+      const srcLower = String(handle.src).toLowerCase();
+      if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('faah') || srcLower.includes('voiceline')) {
+        continue;
+      }
     }
     if (fadeDelayMs > 0) {
       const timerId = setTimeout(() => {
@@ -867,8 +885,11 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 3. Stop any fallback HTML Audio elements
   _activeSounds.forEach((audio) => {
     if (audio) {
-      if (keepAnnouncer && audio.src && (String(audio.src).toLowerCase().includes('announcer') || String(audio.src).toLowerCase().includes('machinegunblow'))) {
-        return;
+      if (keepAnnouncer && audio.src) {
+        const srcLower = String(audio.src).toLowerCase();
+        if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('faah') || srcLower.includes('voiceline')) {
+          return;
+        }
       }
       if (fadeDelayMs > 0) {
         const timerId = setTimeout(() => {

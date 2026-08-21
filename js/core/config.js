@@ -47,7 +47,7 @@ export const CONFIG = {
   hpBar: { height: 6, yOffset: 16 },
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
   globalFighter: {
-    sizeMultiplier: 1.3,                       // scale the size of all fighters globally (1.0 = default)
+    sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
     handSizeMultiplier: 1.4,                   // scale the size of all fighter hands globally (1.0 = default)
   },
   /** Global Bleed Debuff Settings */
@@ -68,6 +68,7 @@ export const CONFIG = {
   arenaYOffset: -110,                // Vertical offset shift (px) from center (negative = up, positive = down)
   arenaXOverride: null,              // Absolute X override (px) - set to a number (e.g. 50) to skip centering
   arenaYOverride: null,              // Absolute Y override (px) - set to a number (e.g. 120) to skip centering
+  arenaTheme: 'light',               // Arena visual theme: 'light' | 'dark'
   canvasBgColor: '#ffffffff',        // Canvas background color (hex string or hex number)
   arenaOuterBgColor: '#fffdf1ff',    // Background color of the container area outside the arena (under HUD and sides)
   arenaInnerBgColor: '#ffffffff',    // Background color inside the arena boundaries
@@ -488,7 +489,7 @@ export const CONFIG = {
 
     // Turret stats (Skill)
     skillCooldown: 1000,
-    turretHp: 100,
+    turretHp: 200,
     turretDamage: 0.2,
     turretFireRate: 7,
     turretRange: 350,

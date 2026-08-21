@@ -9,6 +9,9 @@ import { FIGHTER_DEFS, CONFIG } from './config.js';
 import { handleUIClick, handleUIMove } from '../graphics/ui.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
 import { initGraphicsCache } from '../graphics/graphicsCache.js';
+import { syncHudPosition } from '../graphics/ui/hudLayout.js';
+import { clearHealthHud } from '../graphics/hudManager.js';
+import { getTacticalIcon } from '../graphics/ui/tacticalIcons.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -41,9 +44,7 @@ window.addEventListener('keydown', (e) => {
     }
   } else if (e.key === ' ' || e.key === 'Enter' || e.key.toLowerCase() === 's') {
     if (state.gameState === 'title') {
-      stopAllSounds(false, 0, 0);
-      stopAllLoopingSounds(0, 0);
-      state.gameState = 'select';
+      executeTacticalAction(activeTacticalAction);
     }
     else if (state.gameState === 'select') startGame();
     else if (state.gameState === 'roundEnd') startNextRound();
@@ -193,67 +194,52 @@ startGameLoop();
 // ─────────────────────────────────────────────
 // HTML UI DOM LISTENERS
 // ─────────────────────────────────────────────
-document.getElementById('btn-battle')?.addEventListener('click', () => {
-  stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
-  state.gameState = 'select';
-});
+// ─────────────────────────────────────────────
+// HTML UI DOM LISTENERS: DOOM ETERNAL TACTICAL TERMINAL
+// ─────────────────────────────────────────────
 
-document.getElementById('btn-index')?.addEventListener('click', () => {
-  state.gameState = 'index';
-});
+// Function to apply Arena Theme (Dark / Light)
+export function applyArenaTheme(theme) {
+  state.arenaTheme = theme;
+  CONFIG.arenaTheme = theme;
+  localStorage.setItem('arenaTheme', theme);
 
-document.getElementById('btn-weapons')?.addEventListener('click', () => {
-  state.gameState = 'weapons';
-});
+  const isDark = (theme === 'dark');
+  CONFIG.canvasBgColor = isDark ? '#000000' : '#ffffffff';
+  CONFIG.arenaOuterBgColor = isDark ? '#121318' : '#fffdf1ff';
+  CONFIG.arenaInnerBgColor = isDark ? '#1a1c23' : '#ffffffff';
+  CONFIG.hudTextColor = isDark ? '#f0f2f5' : '#131313ff';
 
-document.getElementById('btn-weapon-studio')?.addEventListener('click', () => {
-  state.gameState = 'weaponStudio';
-});
+  // Invalidate cached canvases
+  state._arenaBorderCanvas = null;
+  state._titleHeaderCanvas = null;
+  state._titleHeaderCanvasTheme = null;
 
-document.getElementById('btn-testmode')?.addEventListener('click', (e) => {
-  state.testMode = !state.testMode;
-  e.target.innerText = '🧪 TEST MODE: ' + (state.testMode ? 'ON' : 'OFF');
-});
+  // Toggle DOM classes
+  const _themeEls = [
+    document.querySelector('.game-container'),
+    document.querySelector('.game-box'),
+    document.getElementById('hudBottomContainer'),
+    document.getElementById('hudTopContainer'),
+    document.getElementById('healthHud'),
+    document.getElementById('healthHudLeft'),
+    document.getElementById('healthHudRight'),
+  ];
+  _themeEls.forEach(el => {
+    if (el) {
+      if (isDark) el.classList.add('arena-dark-mode');
+      else el.classList.remove('arena-dark-mode');
+    }
+  });
 
-// Initialize HUD Mode from localStorage or CONFIG default
-if (localStorage.getItem('hudShowFighterDescription') !== null) {
-  CONFIG.hudShowFighterDescription = localStorage.getItem('hudShowFighterDescription') === 'true';
+  const btn = document.getElementById('btn-theme');
+  if (btn) {
+    btn.innerText = isDark ? 'DARK MODE' : 'LIGHT MODE';
+  }
+
+  clearHealthHud();
+  syncHudPosition();
 }
-const hudModeBtn = document.getElementById('btn-hudmode');
-if (hudModeBtn) {
-  hudModeBtn.innerText = '📋 HUD: ' + (CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS');
-}
-
-document.getElementById('btn-hudmode')?.addEventListener('click', (e) => {
-  CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
-  localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
-  e.target.innerText = '📋 HUD: ' + (CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS');
-});
-
-// Initialize Performance Mode from localStorage
-state.performanceMode = localStorage.getItem('performanceMode') === 'true';
-const perfBtn = document.getElementById('btn-performance');
-if (perfBtn) {
-  perfBtn.innerText = '⚙ PERFORMANCE: ' + (state.performanceMode ? 'ON' : 'OFF');
-}
-
-document.getElementById('btn-performance')?.addEventListener('click', (e) => {
-  state.performanceMode = !state.performanceMode;
-  localStorage.setItem('performanceMode', state.performanceMode);
-  e.target.innerText = '⚙ PERFORMANCE: ' + (state.performanceMode ? 'ON' : 'OFF');
-});
-
-// Initialize FPS & Logs Toggle from localStorage
-const fpsBtn = document.getElementById('btn-fps');
-if (fpsBtn) {
-  fpsBtn.innerText = '📊 FPS & LOGS: ' + (state.hideFpsLogs ? 'OFF' : 'ON');
-}
-
-document.getElementById('btn-fps')?.addEventListener('click', (e) => {
-  state.hideFpsLogs = !state.hideFpsLogs;
-  localStorage.setItem('hideFpsLogs', state.hideFpsLogs);
-  e.target.innerText = '📊 FPS & LOGS: ' + (state.hideFpsLogs ? 'OFF' : 'ON');
-});
 
 // Function to sync Cinefilm overlay state
 export function updateCinefilmOverlay() {
@@ -267,20 +253,269 @@ export function updateCinefilmOverlay() {
     }
   }
   if (btn) {
-    btn.innerText = '🎞️ CINEFILM FILTER: ' + (state.cinefilmFilter ? 'ON' : 'OFF');
+    btn.innerText = state.cinefilmFilter ? 'ON' : 'OFF';
   }
 }
 
-// Initialize Cinefilm Filter from localStorage
+// Initialize System States from localStorage
+const savedTheme = localStorage.getItem('arenaTheme') || 'light';
+applyArenaTheme(savedTheme);
+
+if (localStorage.getItem('hudShowFighterDescription') !== null) {
+  CONFIG.hudShowFighterDescription = localStorage.getItem('hudShowFighterDescription') === 'true';
+}
+const hudModeBtn = document.getElementById('btn-hudmode');
+if (hudModeBtn) {
+  hudModeBtn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+}
+
+state.performanceMode = localStorage.getItem('performanceMode') === 'true';
+const perfBtn = document.getElementById('btn-performance');
+if (perfBtn) {
+  perfBtn.innerText = state.performanceMode ? 'ON' : 'OFF';
+}
+
+const fpsBtn = document.getElementById('btn-fps');
+if (fpsBtn) {
+  fpsBtn.innerText = state.hideFpsLogs ? 'OFF' : 'ON';
+}
+
 state.cinefilmFilter = localStorage.getItem('cinefilmFilter') === 'true';
 updateCinefilmOverlay();
 
-document.getElementById('btn-cinefilm')?.addEventListener('click', () => {
+// Tactical Terminal State
+let activeTacticalAction = 'mode-1v1';
+
+function updateBriefingPanel(cardEl, playAudio = true) {
+  if (!cardEl) return;
+  const title = cardEl.getAttribute('data-title') || 'TACTICAL OPERATION';
+  const desc = cardEl.getAttribute('data-desc') || 'Select an operation to proceed to deployment.';
+  const iconKey = cardEl.getAttribute('data-icon') || 'duel';
+  const action = cardEl.getAttribute('data-action') || 'mode-1v1';
+  const tag1 = cardEl.getAttribute('data-tag1') || '■ OPERATION';
+  const tag2 = cardEl.getAttribute('data-tag2') || '■ TIER 1';
+  const tag3 = cardEl.getAttribute('data-tag3') || '■ READY';
+
+  activeTacticalAction = action;
+
+  const briefingTitle = document.getElementById('briefing-title');
+  const briefingDesc = document.getElementById('briefing-desc');
+  const briefingIcon = document.getElementById('briefing-icon');
+  const tagEl1 = document.getElementById('briefing-tag-1');
+  const tagEl2 = document.getElementById('briefing-tag-2');
+  const tagEl3 = document.getElementById('briefing-tag-3');
+  const launchText = document.getElementById('launch-button-text');
+
+  if (briefingTitle) briefingTitle.innerText = title;
+  if (briefingDesc) briefingDesc.innerText = desc;
+  if (briefingIcon) briefingIcon.innerHTML = getTacticalIcon(iconKey);
+  if (tagEl1) tagEl1.innerText = tag1;
+  if (tagEl2) tagEl2.innerText = tag2;
+  if (tagEl3) tagEl3.innerText = tag3;
+
+  if (launchText) {
+    if (action.startsWith('mode-')) {
+      launchText.innerText = 'LAUNCH ' + title;
+    } else if (action.startsWith('screen-')) {
+      launchText.innerText = 'OPEN ' + title;
+    } else {
+      launchText.innerText = 'CONFIGURE ' + title;
+    }
+  }
+
+  // Update active state across cards
+  document.querySelectorAll('.tactical-card').forEach(c => c.classList.remove('active'));
+  cardEl.classList.add('active');
+
+  if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash5', 0.12);
+  }
+}
+
+function executeTacticalAction(action) {
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash3', 0.4);
+  }
+
+  if (action === 'mode-1v1') {
+    state.mode = '1v1';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'mode-2v2') {
+    state.mode = '2v2';
+    state.p3Index = state.p3Index ?? 2;
+    state.p4Index = state.p4Index ?? 3;
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'mode-ffa') {
+    state.mode = 'FFA';
+    state.p3Index = state.p3Index ?? 2;
+    state.p4Index = state.p4Index ?? 3;
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'mode-standoff1v2') {
+    state.mode = '1v2 Stand Off';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'screen-index') {
+    state.gameState = 'index';
+  } else if (action === 'screen-weaponstudio') {
+    state.gameState = 'weaponStudio';
+  } else if (action === 'screen-weapons') {
+    state.gameState = 'weapons';
+  } else if (action === 'screen-leaderboard') {
+    state.gameState = 'leaderboard';
+  } else if (action === 'toggle-theme') {
+    const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
+    applyArenaTheme(nextTheme);
+  } else if (action === 'toggle-hud') {
+    CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
+    localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
+    const btn = document.getElementById('btn-hudmode');
+    if (btn) btn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+  } else if (action === 'toggle-cinefilm') {
+    state.cinefilmFilter = !state.cinefilmFilter;
+    localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
+    updateCinefilmOverlay();
+  } else if (action === 'toggle-perf') {
+    state.performanceMode = !state.performanceMode;
+    localStorage.setItem('performanceMode', state.performanceMode);
+    const btn = document.getElementById('btn-performance');
+    if (btn) btn.innerText = state.performanceMode ? 'ON' : 'OFF';
+  } else if (action === 'toggle-fps') {
+    state.hideFpsLogs = !state.hideFpsLogs;
+    localStorage.setItem('hideFpsLogs', state.hideFpsLogs);
+    const btn = document.getElementById('btn-fps');
+    if (btn) btn.innerText = state.hideFpsLogs ? 'OFF' : 'ON';
+  } else if (action === 'toggle-testmode') {
+    state.testMode = !state.testMode;
+    const btn = document.getElementById('btn-testmode');
+    if (btn) btn.innerText = state.testMode ? 'ON' : 'OFF';
+  }
+}
+
+// Category Tabs Switching
+const categoryLabelMap = {
+  all: 'OPERATIONS',
+  modes: 'BATTLE MODES',
+  arsenal: 'ARSENAL & STUDIO',
+  database: 'DATABASE & STATS',
+  system: 'SYSTEM CONFIG',
+};
+
+const tabButtons = document.querySelectorAll('.tactical-tab-btn');
+tabButtons.forEach(btn => {
+  btn.addEventListener('click', () => {
+    const category = btn.getAttribute('data-category');
+    tabButtons.forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+
+    const catLabel = document.getElementById('tactical-category-label');
+    if (catLabel) catLabel.innerText = categoryLabelMap[category] || 'OPERATIONS';
+
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('skill_dash1', 0.2);
+    }
+
+    const cards = document.querySelectorAll('.tactical-card');
+    let visibleCount = 0;
+    let firstVisible = null;
+
+    cards.forEach(card => {
+      const cardCat = card.getAttribute('data-category');
+      if (category === 'all' || cardCat === category) {
+        card.style.display = 'flex';
+        visibleCount++;
+        if (!firstVisible) firstVisible = card;
+      } else {
+        card.style.display = 'none';
+      }
+    });
+
+    const badge = document.getElementById('tactical-counter-badge');
+    if (badge) badge.innerText = `(${visibleCount} READY)`;
+
+    if (firstVisible) {
+      updateBriefingPanel(firstVisible, false);
+    }
+  });
+});
+
+// Tactical Card Selection & Click
+document.querySelectorAll('.tactical-card').forEach(card => {
+  card.addEventListener('mouseenter', () => {
+    updateBriefingPanel(card, true);
+  });
+  card.addEventListener('click', (e) => {
+    // If clicking directly on a child button inside system card, let the button handler fire
+    if (e.target && e.target.tagName === 'BUTTON') return;
+    updateBriefingPanel(card, false);
+    const action = card.getAttribute('data-action');
+    if (action) executeTacticalAction(action);
+  });
+});
+
+// Launch Button
+document.getElementById('btn-tactical-launch')?.addEventListener('click', () => {
+  executeTacticalAction(activeTacticalAction);
+});
+
+// System Buttons Handlers
+document.getElementById('btn-theme')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
+  applyArenaTheme(nextTheme);
+});
+
+document.getElementById('quick-toggle-theme')?.addEventListener('click', () => {
+  const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
+  applyArenaTheme(nextTheme);
+});
+
+document.getElementById('btn-hudmode')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  CONFIG.hudShowFighterDescription = !CONFIG.hudShowFighterDescription;
+  localStorage.setItem('hudShowFighterDescription', CONFIG.hudShowFighterDescription);
+  e.target.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
+});
+
+document.getElementById('btn-cinefilm')?.addEventListener('click', (e) => {
+  e.stopPropagation();
   state.cinefilmFilter = !state.cinefilmFilter;
   localStorage.setItem('cinefilmFilter', state.cinefilmFilter);
   updateCinefilmOverlay();
 });
 
-document.getElementById('btn-leaderboard')?.addEventListener('click', () => {
-  state.gameState = 'leaderboard';
+document.getElementById('btn-performance')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  state.performanceMode = !state.performanceMode;
+  localStorage.setItem('performanceMode', state.performanceMode);
+  e.target.innerText = state.performanceMode ? 'ON' : 'OFF';
+});
+
+document.getElementById('btn-fps')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  state.hideFpsLogs = !state.hideFpsLogs;
+  localStorage.setItem('hideFpsLogs', state.hideFpsLogs);
+  e.target.innerText = state.hideFpsLogs ? 'OFF' : 'ON';
+});
+
+document.getElementById('btn-testmode')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  state.testMode = !state.testMode;
+  e.target.innerText = state.testMode ? 'ON' : 'OFF';
+});
+
+// Keyboard / Tactical Controller Prompts
+window.addEventListener('keydown', (e) => {
+  if (state.gameState === 'title') {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      const activeTab = document.querySelector('.tactical-tab-btn.active');
+      const tabs = Array.from(document.querySelectorAll('.tactical-tab-btn'));
+      const idx = tabs.indexOf(activeTab);
+      const nextIdx = (idx + 1) % tabs.length;
+      tabs[nextIdx]?.click();
+    }
+  }
 });

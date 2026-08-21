@@ -911,7 +911,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
       magReady = bullets > 0;
     }
 
-    // 2. Ultimate: Excommunicado (Weapon Cycle Progression toward M4 Rifle)
+    // 2. Ultimate: Excommunicado (Weapon Cycle Progression toward M4 Rifle & Active Drain)
     const currentWeapon = f.currentEquippedWeapon || 'pistol';
     const rollbacks = f.rollbackCount || 0;
     let ultPct = 0;
@@ -919,21 +919,55 @@ export function getSkillDataForFighter(f, getProjectiles) {
     let ultLabel = 'EXCOMMUNICADO';
 
     if (currentWeapon === 'pistol') {
-      // Pistol phase: 0% base + rollback progress toward shotgun (0–33%)
-      ultPct = (rollbacks / 3) * 33.33;
+      // Pistol phase: 0% base + buildup progress toward shotgun (0–50%)
+      const magSpent = Math.max(0, Math.min(1.0, 1 - (bullets / maxMag)));
+      const cycleProgress = (Math.min(2, rollbacks) + magSpent) / 3;
+      ultPct = cycleProgress * 50;
+      ultReady = false;
     } else if (currentWeapon === 'shotgun') {
-      // Shotgun phase: 33% base + rollback progress toward rifle (33–66%)
-      ultPct = 33.33 + (rollbacks / 3) * 33.33;
+      // Shotgun phase: 50% base + buildup progress toward rifle (50–100%)
+      const magSpent = Math.max(0, Math.min(1.0, 1 - (bullets / maxMag)));
+      const cycleProgress = (Math.min(2, rollbacks) + magSpent) / 3;
+      ultPct = 50 + cycleProgress * 50;
+      ultReady = false;
     } else if (currentWeapon === 'rifle') {
-      // Rifle reached: Excommunicado ACTIVE (100%)
-      ultPct = 100;
-      ultReady = true;
+      // Rifle reached: Excommunicado ACTIVE — drains dynamically from 100% down to 0% across the 3 M4 rifle cycles!
+      const currentMagRatio = Math.max(0, Math.min(1.0, bullets / maxMag));
+      const completedCycles = Math.min(3, rollbacks);
+      const remainingCycleFraction = Math.max(0, (3 - completedCycles - 1) + currentMagRatio);
+      ultPct = (remainingCycleFraction / 3) * 100;
+      ultReady = ultPct > 0;
     }
     ultPct = Math.max(0, Math.min(100, ultPct));
 
     return [
       { id: 'magazine', pct: magPct, ready: magReady, color: themeColor, label: weaponName },
       { id: 'ultimate', pct: ultPct, ready: ultReady, color: themeColor, label: ultLabel }
+    ];
+  }
+
+  if (f.characterId === 'engineer' || f.type === 'Engineer' || f.type === 'engineer' || f._def?.type === 'Engineer') {
+    const themeColor = f.color || '#ffcc00';
+    const skillMax = (CONFIG.Engineer && CONFIG.Engineer.skillCooldown) || 1000;
+    const hasLiveTurret = Boolean(
+      (f.turretEntity && f.turretEntity.hp > 0 && state.fighters && state.fighters.includes(f.turretEntity)) ||
+      f.isBuildingTurret
+    );
+
+    let skillPct = 0;
+    let skillReady = false;
+
+    if (hasLiveTurret) {
+      skillPct = 0;
+      skillReady = false;
+    } else {
+      const current = f.skillCooldown !== undefined ? f.skillCooldown : 0;
+      skillPct = Math.max(0, Math.min(100, (1 - (current / skillMax)) * 100));
+      skillReady = skillPct >= 99;
+    }
+
+    return [
+      { id: 'turret', pct: skillPct, ready: skillReady, color: themeColor, label: 'SENTRY' }
     ];
   }
 

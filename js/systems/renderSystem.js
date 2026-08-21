@@ -1,5 +1,6 @@
 import { state, isChampionScreenActive } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
+import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
   drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawHUD, 
@@ -87,10 +88,31 @@ export function renderGame() {
       const maxTimer = state.screenShake.maxTimer || state.screenShake.timer;
       const dampRatio = maxTimer > 0 ? (state.screenShake.timer / maxTimer) : 1.0;
       const mult = (typeof CONFIG !== 'undefined' && CONFIG.globalScreenShakeIntensityMultiplier !== undefined) ? CONFIG.globalScreenShakeIntensityMultiplier : 1.0;
-      const currentIntensity = state.screenShake.intensity * dampRatio * mult;
+      
+      const is1v2OrFFA = (typeof state !== 'undefined') && (
+        state.mode === GAME_MODES.STAND_OFF_1V2 || 
+        state.mode === '1v2 Stand Off' || 
+        state.mode === '1v2' ||
+        state.mode === GAME_MODES.FFA ||
+        state.mode === 'FFA'
+      );
+
+      let effectiveIntensity = state.screenShake.intensity;
+      if (is1v2OrFFA) {
+        effectiveIntensity = Math.min(3.5, effectiveIntensity);
+      }
+
+      const currentIntensity = effectiveIntensity * dampRatio * mult;
       
       shakeX = (Math.random() - 0.5) * currentIntensity * 2;
       shakeY = (Math.random() - 0.5) * currentIntensity * 2;
+
+      if (is1v2OrFFA) {
+        const clampLimit = 3.5;
+        shakeX = Math.max(-clampLimit, Math.min(clampLimit, shakeX));
+        shakeY = Math.max(-clampLimit, Math.min(clampLimit, shakeY));
+      }
+
       state.screenShake.timer--;
       if (state.screenShake.timer <= 0) {
         state.screenShake.intensity = 0;
@@ -198,6 +220,15 @@ export function renderGame() {
         // Draw thermobaric explosion shockwaves (Fuga) on the ground, before fighters
         if (!isGojoDomainActive) {
           drawThermobaricExplosions(state.ctx); 
+        }
+
+        // Draw active domain foreground structures (e.g. Sukuna's Malevolent Shrine) on top of the arena border & floor, but behind fighters
+        if (state.fighters) {
+          for (const f of state.fighters) {
+            if (f && f.domainActive && typeof f.drawDomainForeground === 'function') {
+              f.drawDomainForeground(state.ctx);
+            }
+          }
         }
 
         drawGenosSpeedLines(); // Full-screen anime action speed lines during Machine Gun Blows

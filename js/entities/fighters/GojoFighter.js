@@ -279,7 +279,7 @@ export class GojoFighter extends Fighter {
     }
 
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled on guaranteed hits, Toji ambush, or Pure Love Beam)
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
     const isTargetOfAmbush = (attacker && attacker.isAmbushing) || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (this.isTargetOfAmbush === true) || (this.caughtInPureLoveBeam === true);
     if (!isTargetOfAmbush && !isGuaranteedHit && this.dodgeCooldown <= 0 && Math.random() < (CONFIG.gojo.teleportDodgeChance ?? 0.10) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm && !opts.isPureLoveBeam) {
       this._executeTeleportDodge(attacker, CONFIG.arena);

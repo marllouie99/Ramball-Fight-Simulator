@@ -480,12 +480,14 @@ function endRoundIfFFAEnded() {
 }
 
 function endRoundIf2v2Ended() {
-  if ((state.mode !== GAME_MODES.TWO_VS_TWO && state.mode !== GAME_MODES.STAND_OFF_1V2) || state.gameState !== 'playing') return;
+  const is1v2 = (state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2');
+  const is2v2 = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2');
+  if ((!is2v2 && !is1v2) || state.gameState !== 'playing') return;
 
   let team0Alive = false;
   let team1Alive = false;
 
-  if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+  if (is1v2) {
     team0Alive = isFighterEffectivelyAlive(state.fighters[0]);
     team1Alive = isFighterEffectivelyAlive(state.fighters[1]) || isFighterEffectivelyAlive(state.fighters[2]);
   } else {
@@ -507,12 +509,12 @@ function endRoundIf2v2Ended() {
   state.roundWinner = winnerFighter;
   state.roundEndTimer = 0;
 
-  const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
+  const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 1;
   const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
 
   // Stop all sounds when round ends, unless it is a match end (champion screen)
   if (!isMatchEnd) {
-    stopAllSounds();
+    stopAllSounds(true, 2000, 500);
     stopAllLoopingSounds();
   }
 

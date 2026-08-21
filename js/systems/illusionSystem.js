@@ -292,8 +292,8 @@ export function updateIllusions() {
     }
 
     // MANDATORY RULE 1: TimeStop & HitStun Freeze Guard
-    if (illusion.timeStopTimer > 0) {
-      illusion.timeStopTimer--;
+    if (illusion.timeStopTimer > 0 || illusion.isTargetOfAmbush) {
+      if (illusion.timeStopTimer > 0) illusion.timeStopTimer--;
       illusion.vx = 0;
       illusion.vy = 0;
       continue; // Stop update and attack execution so illusion is completely frozen!

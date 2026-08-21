@@ -29,7 +29,7 @@ export const mahoragaConfig = {
 
     // ── Sword of Extermination & Basic Melee Attacks ──
     swordRange: 110,                // Melee reach (110px frontal arc) for Sword of Extermination
-    swordCooldown: 20,              // Frames between sword strikes (0.5s at 60fps)
+    swordCooldown: 25,              // Frames between sword strikes (0.5s at 60fps)
     swordDamage: 15,                // True damage dealt by Sword of Extermination
     swordArcRadians: Math.PI * 1.3, // Frontal arc angle (in radians) for multi-target melee swings (~234°)
     swordAnimFrames: 18,            // Duration (frames) of sword chop swing animation

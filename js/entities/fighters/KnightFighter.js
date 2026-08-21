@@ -216,9 +216,10 @@ export class KnightFighter extends Fighter {
 
   // â”€â”€ Passive: shield block on direct projectile hits and melee attacks â”€â”€
   takeDamage(amount, attacker, opts = {}) {
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));
     // Shield blocks direct projectile hits and melee attacks (not while dashing).
     // Some projectile hits pass opts.isProjectile, others provide opts.projectile.
-    const isBlockableHit = !!(opts.isProjectile || opts.projectile || opts.isMelee);
+    const isBlockableHit = !!(opts.isProjectile || opts.projectile || opts.isMelee) && !isGuaranteedHit;
     if (isBlockableHit && this.fsm.isInState('KnightIdle') && !(this.timeStopTimer > 0)) {
       if (Math.random() < CONFIG.knight.shieldBlockChance) {
         // Shield absorbs this hit; reduce shield health and possibly break

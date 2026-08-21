@@ -1,7 +1,7 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
 import { renderGojoDomainBackground } from '../../entities/fighters/gojo/gojoDomainVisuals.js';
-import { renderSukunaDomainBackground, renderSukunaDomainForeground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
+import { renderSukunaDomainBackground } from '../../entities/fighters/sukuna/sukunaDomainVisuals.js';
 import { renderYutaDomainBackground, renderYutaSukunaDomainClashRift } from '../../entities/fighters/yuta/yutaDomainVisuals.js';
 import { renderMahitoDomainBackground } from './environmentalRenderer.js';
 import { drawLaylaMaleficSurgeGrid } from '../../entities/fighters/LaylaFighter.js';
@@ -259,21 +259,6 @@ function getSukunaDomainHybridData() {
   return sukunaDomainHybridData;
 }
 
-let sukunaForegroundHybridData = null;
-function getSukunaForegroundHybridData() {
-  if (!sukunaForegroundHybridData) {
-    const canvas = document.createElement('canvas');
-    canvas.width = state.canvas ? state.canvas.width : 1920;
-    canvas.height = state.canvas ? state.canvas.height : 1080;
-    const ctx = canvas.getContext('2d');
-    const texture = window.PIXI.Texture.from(canvas);
-    const sprite = new window.PIXI.Sprite(texture);
-    sukunaForegroundHybridData = { canvas, ctx, texture, sprite };
-  }
-  syncDomainHybridDataSize(sukunaForegroundHybridData);
-  return sukunaForegroundHybridData;
-}
-
 let yutaDomainHybridData = null;
 function getYutaDomainHybridData() {
   if (!yutaDomainHybridData) {
@@ -357,40 +342,22 @@ export function updateHybridEnvironment() {
       renderSukunaDomainBackground(sukuna, bgData.ctx, isMultiDomain && sukuna !== state.fighters.find(f => f.domainActive));
       bgData.texture.update();
     }
-
-    const fgData = getSukunaForegroundHybridData();
-    if (!fgData.sprite.parent) layer.addChild(fgData.sprite);
-    fgData.sprite.x = -20;
-    fgData.sprite.y = -20;
-    fgData.sprite.width = state.canvas.width + 40;
-    fgData.sprite.height = state.canvas.height + 40;
-    if (updateSukuna) {
-      fgData.ctx.clearRect(0, 0, fgData.canvas.width, fgData.canvas.height);
-      renderSukunaDomainForeground(sukuna, fgData.ctx);
-      fgData.texture.update();
-    }
   } else {
     if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent) {
       sukunaDomainHybridData.sprite.parent.removeChild(sukunaDomainHybridData.sprite);
-    }
-    if (sukunaForegroundHybridData && sukunaForegroundHybridData.sprite.parent) {
-      sukunaForegroundHybridData.sprite.parent.removeChild(sukunaForegroundHybridData.sprite);
     }
   }
 
   // Ensure explicit Z-order sorting for Domain Clashes (Gojo vs Sukuna):
   // 1. Sukuna Domain Background (Liquid Floor) -> Back (Index 0)
-  // 2. Gojo Unlimited Void Background (Dark starry void overlaying floor) -> Middle (Index 1)
-  // 3. Sukuna Malevolent Shrine Structure -> Front (Index 2 - Always on top of Gojo's void!)
+  // 2. Gojo Unlimited Void Background (Dark starry void overlaying floor) -> Front (Index 1)
   if (gojo && sukuna && layer) {
     const gojoSprite = gojoDomainHybridData?.sprite;
     const sukunaBgSprite = sukunaDomainHybridData?.sprite;
-    const sukunaFgSprite = sukunaForegroundHybridData?.sprite;
 
-    if (gojoSprite && sukunaBgSprite && sukunaFgSprite && gojoSprite.parent === layer && sukunaBgSprite.parent === layer && sukunaFgSprite.parent === layer) {
+    if (gojoSprite && sukunaBgSprite && gojoSprite.parent === layer && sukunaBgSprite.parent === layer) {
       layer.setChildIndex(sukunaBgSprite, 0);
       layer.setChildIndex(gojoSprite, 1);
-      layer.setChildIndex(sukunaFgSprite, 2);
     }
   }
 
@@ -433,7 +400,6 @@ export function updateHybridEnvironment() {
   if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
   if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent === layer) layer.addChild(sukunaDomainHybridData.sprite);
   if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent === layer) layer.addChild(yutaDomainHybridData.sprite);
-  if (sukunaForegroundHybridData && sukunaForegroundHybridData.sprite.parent === layer) layer.addChild(sukunaForegroundHybridData.sprite);
   
   // 1. Sukuna Furnace
   const sukunaFuga = state.fighters?.find(f => 

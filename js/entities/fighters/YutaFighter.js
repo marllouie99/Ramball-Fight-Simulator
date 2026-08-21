@@ -198,7 +198,7 @@ export class YutaFighter extends Fighter {
       this.knockbackVy = 0;
     }
 
-    const isFrozen = this._handleTimeStop() || (isEnemyDomainActive && !this.isChannelingDomain);
+    const isFrozen = this._handleTimeStop() || (isEnemyDomainActive && !this.isChannelingDomain && !this.domainActive);
     if (isFrozen || this.isTargetOfAmbush) {
       // Pause active beam audio handles while frozen in domain stasis
       if (this.isChannelingPureLoveBeam || this.rikaEmergingForBeamTimer > 0 || this.isFiringPureLoveBeam) {
@@ -666,7 +666,13 @@ export class YutaFighter extends Fighter {
       const shakeIntensity = lifeRatio > 0.3 ? baseShake : Math.max(1, baseShake * (lifeRatio / 0.3));
       // Directly set shake state every frame for persistent rumble (triggerGlobalScreenShake's dampRatio fights per-frame resets)
       if (state.screenShake) {
-        state.screenShake.intensity = shakeIntensity;
+        const is1v2 = (typeof state !== 'undefined') && (
+          state.mode === '1v2 Stand Off' || 
+          state.mode === '1v2' || 
+          state.mode === 'STAND_OFF_1V2' ||
+          (state.fighters && state.fighters.length > 2)
+        );
+        state.screenShake.intensity = is1v2 ? 3.5 : shakeIntensity;
         state.screenShake.timer = 2;
         state.screenShake.maxTimer = 2;
       }
@@ -992,15 +998,11 @@ export class YutaFighter extends Fighter {
       return; // Hold Yuta in emergence pose until Rika is fully manifested!
     }
 
-    // Pure Love Beam Trigger: Automatically triggers when HP <= 15%
+    // Pure Love Beam Trigger: Automatically triggers when HP <= threshold and Rika is active
     const pureLoveBeamThreshold = CONFIG.yuta.pureLoveBeamHpThreshold ?? 0.15;
-    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold) {
-      const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
+    const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
 
-      if (!isRikaActive) {
-        return; // Pure Love Beam REQUIRES Rika to be active on the field! Cannot fire if Rika is dead.
-      }
-
+    if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive) {
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
       const hasEnemies = state.fighters.some((f, idx) => {
         if (!f || f.hp <= 0 || f === this) return false;

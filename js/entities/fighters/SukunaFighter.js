@@ -299,7 +299,7 @@ export class SukunaFighter extends Fighter {
 
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready, disabled on guaranteed hits / Nanami 7:3 Ratio crit)
     if (this.dodgeCooldown === undefined) this.dodgeCooldown = 0;
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
     const isStunned = (this.timeStopTimer > 0) || (this.hitStunTimer > 0) || (this.electricStunTimer > 0) || (this.dubstepStunTimer > 0) || (this.crimsonElectrifiedTimer > 0) || (this.isInsideCronosSphere && this.isInsideCronosSphere());
     if (!this.isTargetOfAmbush && !isGuaranteedHit && this.dodgeCooldown <= 0 && !isStunned && Math.random() < (CONFIG.sukuna.teleportDodgeChance ?? 0.30) && !opts.isHeal && !this.isDead && !this.domainActive && !opts.isStorm) {
       this._executeTeleportDodge(attacker, CONFIG.arena);

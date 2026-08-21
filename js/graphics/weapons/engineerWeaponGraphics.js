@@ -3,7 +3,7 @@
 // ─────────────────────────────────────────────
 
 import { state } from '../../core/state.js';
-import { CONFIG } from '../../core/config.js';
+import { CONFIG, getHandSize } from '../../core/config.js';
 
 export const Engineer_WEAPON_GRAPHICS = {
   colors: {
@@ -20,7 +20,7 @@ export const Engineer_WEAPON_GRAPHICS = {
   }
 };
 
-export function drawEngineer(ctx, options) {
+export function drawEngineer(ctx, options = {}) {
   const {
     x = 0,
     y = 0,
@@ -33,19 +33,22 @@ export function drawEngineer(ctx, options) {
     wrenchSlashFadeTimer = 0,
     shotgunRecoilTimer = 0,
     lastWeaponUsed = 'shotgun',
-    color = '#ffcc00'
+    color = '#ffcc00',
+    hideHands = false
   } = options;
+
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || hideHands;
   
   if (lastWeaponUsed === 'wrench') {
     // Shotgun is stowed on back
-    drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, 0, true);
+    drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, 0, true, color, shouldHideHands);
     // Wrench is active
-    drawEngineerWrench(ctx, x, y, wrenchActive ? wrenchAngle : gunAngle, r, facingRight, wrenchActive ? wrenchTimer : 0, false, color, wrenchSlashFadeTimer);
+    drawEngineerWrench(ctx, x, y, wrenchActive ? wrenchAngle : gunAngle, r, facingRight, wrenchActive ? wrenchTimer : 0, false, color, wrenchSlashFadeTimer, shouldHideHands);
   } else {
     // Wrench is stowed on back
-    drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, 0, true, color, 0);
+    drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, 0, true, color, 0, shouldHideHands);
     // Shotgun is active
-    drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, shotgunRecoilTimer, false);
+    drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, shotgunRecoilTimer, false, color, shouldHideHands);
   }
   
   // Draw the iconic yellow engineer hard hat on top of the body
@@ -112,7 +115,7 @@ function drawEngineerCap(ctx, x, y, gunAngle, r) {
   ctx.restore();
 }
 
-function drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, recoilTimer = 0, isStowed = false) {
+function drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, recoilTimer = 0, isStowed = false, color = '#ffcc00', shouldHideHands = false) {
   ctx.save();
   ctx.translate(x, y);
   
@@ -120,21 +123,25 @@ function drawEngineerShotgun(ctx, x, y, gunAngle, r, facingRight, recoilTimer = 
     ctx.rotate(gunAngle + Math.PI); // Point to the back
     ctx.translate(r * 0.4, 0); // Position on the back
     ctx.rotate(Math.PI / 4); // Slung diagonally
-    ctx.scale(0.8, 0.8); // Slightly smaller when stowed
+    ctx.scale(0.95, 0.95); // Slightly smaller when stowed
   } else {
     ctx.rotate(gunAngle);
-    ctx.translate(r + 5, 0); // Hold in front
+    ctx.translate(r + 6, 0); // Hold in front
   }
 
   if (!facingRight) {
     ctx.scale(1, -1);
   }
+
+  // Scale the shotgun model similar to John Wick's prominent weapon proportions (1.25x)
+  const defaultShotgunScale = isStowed ? 1.0 : 1.25;
+  ctx.scale(defaultShotgunScale, defaultShotgunScale);
   
-  drawEngineerShotgunModel(ctx, recoilTimer);
+  drawEngineerShotgunModel(ctx, recoilTimer, isStowed, color, shouldHideHands);
   ctx.restore();
 }
 
-function drawEngineerShotgunModel(ctx, recoilTimer) {
+function drawEngineerShotgunModel(ctx, recoilTimer, isStowed = false, color = '#ffcc00', shouldHideHands = false) {
   ctx.save();
   ctx.strokeStyle = '#000';
   ctx.lineWidth = 1.5;
@@ -249,14 +256,53 @@ function drawEngineerShotgunModel(ctx, recoilTimer) {
   ctx.lineWidth = 1;
   ctx.stroke();
 
+  // 6. Proportional Hands on Shotgun Grip & Pump (when held in front - scaled up similar to John Wick's hands)
+  if (!isStowed && !shouldHideHands) {
+    // Rear Grip Hand (holding pistol grip)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(-8, 3, getHandSize(6.8), 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Subtle finger crease shading
+    ctx.beginPath();
+    ctx.arc(-8, 1.8, getHandSize(4.8), 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+
+    // Front Support Hand (holding pump forend slider)
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(pumpX + 8, 3.2, getHandSize(6.5), 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#000000';
+    ctx.stroke();
+
+    // Subtle finger crease shading
+    ctx.beginPath();
+    ctx.arc(pumpX + 8, 2.0, getHandSize(4.6), 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.lineWidth = 0.8;
+    ctx.stroke();
+    ctx.restore();
+  }
+
   ctx.restore();
 }
 
-export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, isStowed = false, color = '#ffcc00', slashFadeTimer = 0) {
+export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, isStowed = false, color = '#ffcc00', slashFadeTimer = 0, shouldHideHands = false) {
   ctx.save();
   ctx.translate(x, y);
   
-  const swipeArc = Math.PI * 0.8; // 144 degrees swipe
+  const swipeArc = (150 * Math.PI) / 180; // 150° wide kinetic swing arc
   
   if (isStowed) {
     ctx.rotate(gunAngle + Math.PI); // Point to the back
@@ -277,72 +323,174 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
     let slashAlpha = 0.0;
     
     if (timer > 0) {
-      const maxTimer = CONFIG.Engineer?.wrenchSwipeDuration || 16;
-      slashProgress = 1 - (timer / maxTimer);
-      slashAlpha = 1.0;
+      const maxTimer = CONFIG.Engineer?.wrenchSwipeDuration || 18;
+      const p = Math.min(1.0, Math.max(0.0, 1.0 - (timer / maxTimer)));
       
-      // Arm swings from -72 deg to +72 deg
-      armAngleOffset = (-swipeArc / 2 + swipeArc * slashProgress) * flipDir;
+      let swingT = 0;
+      let wristOffset = 0;
       
-      // Wrist flicks from -90 deg to 0 deg during the first half of the swing
-      if (slashProgress < 0.5) {
-        wristAngleOffset = (-Math.PI / 2 + (slashProgress * 2) * (Math.PI / 2)) * flipDir;
+      if (p < 0.20) {
+        // Phase 1: Windup & Tension (Pull arm back with anticipation)
+        const wP = p / 0.20;
+        const easeW = Math.sin(wP * Math.PI * 0.5);
+        swingT = -easeW * 0.18; // Pulls back -18%
+        wristOffset = -0.60 * easeW;
+      } else if (p < 0.65) {
+        // Phase 2: High-Speed Violent Downward Chop
+        const sP = (p - 0.20) / 0.45;
+        const powerCurve = Math.pow(sP, 1.75);
+        swingT = -0.18 + 1.18 * powerCurve; // Violent accelerated arc
+        wristOffset = -0.60 + 1.10 * Math.sin(sP * Math.PI); // Snapping whip
+      } else if (p < 0.82) {
+        // Phase 3: Heavy Impact Shudder & Mechanical Clank Deceleration
+        const hP = (p - 0.65) / 0.17;
+        swingT = 1.0 + Math.sin(hP * Math.PI * 4) * 0.025; // Clank shudder
+        wristOffset = 0.50 * (1 - hP);
       } else {
-        wristAngleOffset = 0; // Follow through straight
+        // Phase 4: Follow-Through Recovery Ease
+        const rP = (p - 0.82) / 0.18;
+        const easeR = Math.sin(rP * Math.PI * 0.5);
+        swingT = 1.0 * (1 - easeR);
+        wristOffset = 0;
       }
+      
+      armAngleOffset = (-swipeArc * 0.5 + swipeArc * swingT) * flipDir;
+      wristAngleOffset = wristOffset * flipDir;
+      
       showSlash = true;
+      slashProgress = Math.min(1.0, Math.max(0.0, (swingT + 0.18) / 1.18));
+      slashAlpha = (p < 0.20) ? (p / 0.20) : (p > 0.82 ? (1 - (p - 0.82) / 0.18) : 1.0);
     } else {
-      // Idle/Resting position — held forward like a sword, pointed at the target
+      // Idle/Resting position — held forward pointed at target
       armAngleOffset = 0;
       wristAngleOffset = 0;
       
       if (slashFadeTimer > 0) {
         showSlash = true;
         slashProgress = 1.0; // Fully extended
-        slashAlpha = slashFadeTimer / 12; // Fades out
+        slashAlpha = Math.pow(slashFadeTimer / 12, 1.4); // Smooth power fade
       }
     }
     
-    // Crescent visual swing trail centered on wrench head
-    if (showSlash) {
+    // ── Dynamic Needle-Sharp Double-Tapered Industrial Crescent Slash Arc ──
+    if (showSlash && slashAlpha > 0.01) {
       ctx.save();
-      const angleStart = gunAngle + (-swipeArc / 2) * flipDir;
-      const angleEnd = gunAngle + (-swipeArc / 2 + swipeArc * slashProgress) * flipDir;
-      const trailRadius = r + 5 + 46;
+      const startAngle = gunAngle + (-swipeArc * 0.5) * flipDir;
+      const sweepAngle = (swipeArc * slashProgress) * flipDir;
+      const endAngle = startAngle + sweepAngle;
       
+      const outerR = r + 5 + 46;
+      const innerR = r + 5 + 14;
+      const midR = (outerR + innerR) * 0.5;
+      const halfThick = (outerR - innerR) * 0.5;
+      
+      const steps = 24;
+      const stepAngle = sweepAngle / steps;
+      
+      // 1. Broad Outer Ambient Industrial Heat Shockwave
+      ctx.save();
       ctx.beginPath();
-      ctx.arc(0, 0, trailRadius + 9, angleStart, angleEnd, flipDir < 0);
-      ctx.arc(0, 0, trailRadius - 9, angleEnd, angleStart, flipDir > 0);
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const a = startAngle + i * stepAngle;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+        const rad = midR + (halfThick + 8) * taper;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+        else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      for (let i = steps; i >= 0; i--) {
+        const t = i / steps;
+        const a = startAngle + i * stepAngle;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+        const rad = midR - (halfThick + 8) * taper;
+        ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      ctx.closePath();
+      ctx.fillStyle = `rgba(234, 88, 12, ${(0.30 * slashAlpha).toFixed(3)})`;
+      ctx.fill();
+      ctx.restore();
+      
+      // 2. Intense Golden-Amber Industrial Crescent Body
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const a = startAngle + i * stepAngle;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+        const rad = midR + halfThick * taper;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+        else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      for (let i = steps; i >= 0; i--) {
+        const t = i / steps;
+        const a = startAngle + i * stepAngle;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.15) * (0.3 + 0.7 * t);
+        const rad = midR - halfThick * taper;
+        ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
       ctx.closePath();
       
-      const trailGrad = ctx.createRadialGradient(0, 0, trailRadius - 10, 0, 0, trailRadius + 10);
-      trailGrad.addColorStop(0, 'rgba(255, 215, 0, 0)');
-      trailGrad.addColorStop(0.3, `rgba(255, 215, 0, ${0.6 * slashAlpha})`);
-      trailGrad.addColorStop(0.5, `rgba(255, 255, 255, ${0.95 * slashAlpha})`);
-      trailGrad.addColorStop(0.7, `rgba(255, 165, 0, ${0.45 * slashAlpha})`);
-      trailGrad.addColorStop(1, 'rgba(255, 165, 0, 0)');
-      
-      ctx.fillStyle = trailGrad;
+      const grad = ctx.createRadialGradient(0, 0, innerR, 0, 0, outerR);
+      grad.addColorStop(0,   `rgba(245, 158, 11, 0)`);
+      grad.addColorStop(0.3, `rgba(245, 158, 11, ${(0.80 * slashAlpha).toFixed(3)})`);
+      grad.addColorStop(0.5, `rgba(255, 255, 255, ${(0.95 * slashAlpha).toFixed(3)})`);
+      grad.addColorStop(0.7, `rgba(245, 158, 11, ${(0.85 * slashAlpha).toFixed(3)})`);
+      grad.addColorStop(1,   `rgba(234, 88, 12, 0)`);
+      ctx.fillStyle = grad;
       ctx.fill();
+      ctx.restore();
+      
+      // 3. Razor White Cutting Core Centerline
+      ctx.save();
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        const a = startAngle + i * stepAngle;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.25);
+        const rad = midR + 2.2 * taper;
+        if (i === 0) ctx.moveTo(Math.cos(a) * rad, Math.sin(a) * rad);
+        else ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      for (let i = steps; i >= 0; i--) {
+        const t = i / steps;
+        const a = startAngle + i * stepAngle;
+        const taper = Math.pow(Math.sin(t * Math.PI), 1.25);
+        const rad = midR - 2.2 * taper;
+        ctx.lineTo(Math.cos(a) * rad, Math.sin(a) * rad);
+      }
+      ctx.closePath();
+      ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * slashAlpha).toFixed(3)})`;
+      ctx.fill();
+      ctx.restore();
+
       ctx.restore();
     }
     
     // Rotate arm from shoulder
     ctx.rotate(gunAngle + armAngleOffset);
     
-    // Move to hand
+    // Move to hand grip position
     ctx.translate(r + 5, 0);
 
-    // Draw hand circle at active wrench joint
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 3, 6, 0, Math.PI * 2);
-    ctx.fillStyle = color;
-    ctx.fill();
-    ctx.lineWidth = 1.5;
-    ctx.strokeStyle = '#000000';
-    ctx.stroke();
-    ctx.restore();
+    // Draw proportional Hand circle holding wrench handle base (scaled similar to John Wick getHandSize(6.8))
+    if (!shouldHideHands) {
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(0, 0, getHandSize(6.8), 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 1.2;
+      ctx.strokeStyle = '#000000';
+      ctx.stroke();
+
+      // Subtle finger crease shading
+      ctx.beginPath();
+      ctx.arc(0, -1.2, getHandSize(4.8), 0.2 * Math.PI, 0.8 * Math.PI);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.35)';
+      ctx.lineWidth = 0.8;
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Apply wrist rotation
     ctx.rotate(wristAngleOffset);
@@ -354,7 +502,7 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
   
   const colors = Engineer_WEAPON_GRAPHICS.colors;
   
-  // Scale wrench to match shotgun size
+  // Scale wrench to match weapon proportions
   ctx.scale(1.5, 1.5);
   
   ctx.strokeStyle = colors.outline;
@@ -492,20 +640,7 @@ export function drawEngineerWrench(ctx, x, y, gunAngle, r, facingRight, timer, i
   ctx.strokeStyle = colors.outline;
   ctx.lineWidth = 1;
   
-  // Swipe effect (motion blur trail)
   ctx.restore();
-  
-  if (timer > 0) {
-    ctx.save();
-    ctx.translate(x, y);
-    ctx.rotate(gunAngle);
-    ctx.beginPath();
-    ctx.arc(0, 0, r + 25, -swipeArc/2, swipeArc/2);
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-    ctx.restore();
-  }
 }
 
 export function drawEngineerBullet(ctx, x, y, angle, scale, lifeRatio) {

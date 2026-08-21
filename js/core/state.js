@@ -185,6 +185,7 @@ export const state = {
 
   indexCategory: 'All',
   mode: GAME_MODES.ONE_VS_ONE,
+  arenaTheme: 'light', // 'light' | 'dark'
   testMode: false, // Disables leaderboard recording
   cinefilmFilter: false, // Retro Cinefilm 35mm filter toggle
   dummyAggressive: false, // Whether target dummies fight back
@@ -377,21 +378,39 @@ export function triggerGlobalScreenShake(intensity, duration) {
   if (state.performanceMode) return;
   if (isChampionScreenActive()) return;
 
+  const is1v2OrFFA = (typeof state !== 'undefined') && (
+    state.mode === GAME_MODES.STAND_OFF_1V2 || 
+    state.mode === '1v2 Stand Off' || 
+    state.mode === '1v2' ||
+    state.mode === GAME_MODES.FFA ||
+    state.mode === 'FFA'
+  );
+
+  let targetIntensity = intensity;
+  let targetDuration = duration;
+
+  if (is1v2OrFFA) {
+    // In 1v2 and FFA modes: all damage types that trigger an arena shake effect have the EXACT SAME uniform,
+    // optimized intensity (3.5) and duration (6 frames) to prevent FPS drops and camera thrashing.
+    targetIntensity = 3.5;
+    targetDuration = 6;
+  }
+
   const mult = (typeof CONFIG !== 'undefined' && CONFIG.globalScreenShakeIntensityMultiplier !== undefined) 
     ? CONFIG.globalScreenShakeIntensityMultiplier 
     : 1.0;
   if (mult <= 0) return;
 
-  const scaledIntensity = intensity * mult;
+  const scaledIntensity = targetIntensity * mult;
 
   if (scaledIntensity >= state.screenShake.intensity || state.screenShake.timer <= 0) {
     state.screenShake.intensity = scaledIntensity;
-    state.screenShake.timer = duration;
-    state.screenShake.maxTimer = duration;
+    state.screenShake.timer = targetDuration;
+    state.screenShake.maxTimer = targetDuration;
   } else {
-    if (state.screenShake.timer < duration) {
-      state.screenShake.timer = duration;
-      state.screenShake.maxTimer = Math.max(state.screenShake.maxTimer, duration);
+    if (state.screenShake.timer < targetDuration) {
+      state.screenShake.timer = targetDuration;
+      state.screenShake.maxTimer = Math.max(state.screenShake.maxTimer, targetDuration);
     }
   }
 }

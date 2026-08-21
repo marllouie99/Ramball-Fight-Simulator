@@ -392,10 +392,8 @@ export class TricksterFighter extends Fighter {
     if (this.beamTimer > 0) {
       this.beamTimer--;
       
-      // Continuous violent screen shake while firing
-      if (!state.screenShake || state.screenShake.timer <= 1) {
-        state.screenShake = { timer: 5, intensity: 6 };
-      }
+      // Continuous screen shake while firing
+      triggerGlobalScreenShake(6, 5);
 
       // Slowly rotate toward the target while firing the beam
       if (opponent) {
@@ -477,7 +475,7 @@ export class TricksterFighter extends Fighter {
           this.beamHitState.clear();
           this.beamCharge = 0;
           
-          state.screenShake = { timer: 20, intensity: 15 };
+          triggerGlobalScreenShake(15, 20);
 
           if (!this._laserSoundKey) {
             this._laserSoundKey = `ivory-laser-${ownerIndex}`;

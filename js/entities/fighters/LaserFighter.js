@@ -1,7 +1,7 @@
 import { fadeOutLoopingSound, stopLoopingSound } from '../../systems/soundSystem.js';
 import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST } from '../../core/config.js';
-import { state, spawnFloatingText } from '../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -226,10 +226,8 @@ export class LaserFighter extends Fighter {
       this.isFiringSkillShot = 'laser_beam';
       this.beamTimer--;
 
-      // Continuous violent screen shake while firing
-      if (!state.screenShake || state.screenShake.timer <= 1) {
-        state.screenShake = { timer: 5, intensity: 6 };
-      }
+      // Continuous screen shake while firing
+      triggerGlobalScreenShake(6, 5);
 
       // Slowly rotate toward the target while firing the beam
       if (opponent) {
@@ -303,8 +301,8 @@ export class LaserFighter extends Fighter {
         this.beamHitState.clear();
         this.beamCharge = 0;
 
-        // Massive screen shake when beam fires
-        state.screenShake = { timer: 20, intensity: 15 };
+        // Screen shake when beam fires
+        triggerGlobalScreenShake(15, 20);
 
         if (!this._laserSoundKey) {
           this._laserSoundKey = `ivory-laser-${ownerIndex}`;

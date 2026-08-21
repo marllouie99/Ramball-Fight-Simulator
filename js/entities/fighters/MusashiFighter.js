@@ -106,8 +106,10 @@ export class MusashiFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    // Preemptive Strike Active: Negate damage, teleport, and counter
-    if (this.preemptiveActiveTimer > 0 && attacker && !opts.isCounter) {
+    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
+
+    // Preemptive Strike counter (teleport behind attacker when hit)
+    if (this.preemptiveActiveTimer > 0 && attacker && !opts.isCounter && !isGuaranteedHit) {
       this.preemptiveActiveTimer = 0;
       spawnFloatingText(this.x, this.y - this.r - 10, 'PREEMPTIVE STRIKE!', '#ff00ff');
       
@@ -149,7 +151,6 @@ export class MusashiFighter extends Fighter {
     }
 
     // Void Stance: 100% dodge chance (unless guaranteed hit, time stopped or stunned)
-    const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter);
     if (this.currentStance === 'void' && !isGuaranteedHit && !(this.timeStopTimer > 0) && !(this.electricStunTimer > 0)) {
       if (Math.random() < CONFIG.musashi.voidDodgeChance) {
         spawnFloatingText(this.x, this.y - this.r - 5, 'DODGE', '#8a2be2');

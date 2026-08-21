@@ -231,7 +231,20 @@ export class Fighter {
     this.vx = Math.cos(angle) * moveSpeed;
     this.vy = Math.sin(angle) * moveSpeed;
 
-    if (MODE_SETTINGS[state.mode]?.fixedHp) {
+    const isTurretOrMinion = Boolean(
+      this.isTurret ||
+      this.isMinion ||
+      this.isDeployable ||
+      this.isIceWall ||
+      this.isIllusion ||
+      d.isTurret ||
+      d.isMinion ||
+      d.isDeployable ||
+      d.type === 'Turret' ||
+      d.type === 'minion'
+    );
+
+    if (!isTurretOrMinion && MODE_SETTINGS[state.mode]?.fixedHp) {
       this.maxHp = MODE_SETTINGS[state.mode].fixedHp;
     } else {
       this.maxHp = baseHp * (MODE_HP_MULTIPLIER[state.mode] || 1);
@@ -758,6 +771,7 @@ export class Fighter {
           }
 
           if (this.preventKnockbackBounce) {
+            this.preventKnockbackBounce = false; // Clear flag so fighter can recover smoothly after wall pin expires
             // They hit the wall while pinned! Stick them to the wall for wallPinDurationFrames
             const pinDuration = CONFIG.saitama?.wallPinDurationFrames ?? 60;
             if (CONFIG.saitama?.disableWallPinCyanOverlay !== false) {
@@ -853,11 +867,12 @@ export class Fighter {
    *  Returns true if damage was applied, false if it was blocked or ignored.
    */
   takeDamage(amount, attacker, opts = {}) {
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit));
     const isHeal = opts.isHeal || amount < 0;
     if (isHeal) {
       if (this.hp <= 0) return false;
     } else {
-      if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain) || (this.vanishTimer && this.vanishTimer > 0) || (this.invincibilityTimer && this.invincibilityTimer > 0)) return false;
+      if (this.hp <= 0 || (this.isAmbushing && !opts.isDomain && !isGuaranteedHit) || (this.vanishTimer && this.vanishTimer > 0 && !isGuaranteedHit) || (this.invincibilityTimer && this.invincibilityTimer > 0 && !isGuaranteedHit)) return false;
     }
 
     // Base fighter doesn't block; sanitize inputs before applying damage.
@@ -886,7 +901,7 @@ export class Fighter {
     }
 
     // Evade Buff: Chance to completely miss/evade incoming enemy basic attacks (e.g. Boogie Woogie swap buff)
-    if (this.evadeBuffTimer > 0 && amount > 0) {
+    if (this.evadeBuffTimer > 0 && amount > 0 && !isGuaranteedHit) {
       const isTickOrBeam = Boolean(
         opts && (
           opts.isPureLoveBeam ||
@@ -1113,11 +1128,14 @@ export class Fighter {
     const realAttackerIndex = state.fighters.indexOf(realAttacker);
     const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
 
-    if (state.mode === '2v2' || state.mode === '1v2 Stand Off') {
+    const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
+    const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO);
+
+    if (is2v2 || is1v2) {
       let team0Alive = false;
       let team1Alive = false;
 
-      if (state.mode === '1v2 Stand Off') {
+      if (is1v2) {
         team0Alive = _isEffectivelyAlive(state.fighters[0]);
         team1Alive = _isEffectivelyAlive(state.fighters[1]) || _isEffectivelyAlive(state.fighters[2]);
       } else {
@@ -1136,11 +1154,11 @@ export class Fighter {
         state.roundWinner = winnerFighter;
         state.roundEndTimer = 0;
 
-        const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 2;
+        const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 1;
         const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
 
         if (!isMatchEnd) {
-          stopAllSounds();
+          stopAllSounds(true, 2000, 500);
           stopAllLoopingSounds();
         }
 

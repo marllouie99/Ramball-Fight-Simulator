@@ -177,12 +177,12 @@ export function drawFloatingTexts() {
   const texts = state.floatingTexts;
   if (!texts || texts.length === 0) return;
 
+  const isDark = (state.arenaTheme === 'dark');
+
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.lineWidth = 3;
   ctx.lineJoin = 'round';
-  ctx.strokeStyle = 'rgba(0,0,0,0.9)';
 
   let currentFont = '';
 
@@ -220,9 +220,21 @@ export function drawFloatingTexts() {
         ctx.restore();
       }
 
-      ctx.lineWidth = t.isDamage ? 3.2 : 3.0;
-      ctx.strokeStyle = 'rgba(0,0,0,0.92)';
-      ctx.strokeText(t.text, t.x, t.y);
+      if (isDark) {
+        // In Dark Mode: Thin crisp white outer stroke
+        ctx.lineWidth = t.isDamage ? 4.6 : 4.2;
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.strokeText(t.text, t.x, t.y);
+
+        ctx.lineWidth = t.isDamage ? 2.6 : 2.4;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.strokeText(t.text, t.x, t.y);
+      } else {
+        // In Light Mode: Classic bold black outline
+        ctx.lineWidth = t.isDamage ? 3.2 : 3.0;
+        ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+        ctx.strokeText(t.text, t.x, t.y);
+      }
 
       ctx.fillStyle = 'rgba(0,0,0,0.4)';
       ctx.fillText(t.text, t.x + 1, t.y + 1); // Subtle drop shadow
@@ -519,6 +531,40 @@ export function drawUltimateChannelingTexts() {
   if (!ctx || !fighters || fighters.length === 0) return;
 
   const now = Date.now();
+  const isDark = (state.arenaTheme === 'dark');
+
+  const renderChannelingText = (fighter, text, baseColor, progress, outerGlowColor = null) => {
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+    ctx.font = 'bold 21px "Glast Blitch", Arial';
+    ctx.textAlign = 'center';
+    ctx.lineJoin = 'round';
+    const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
+
+    if (outerGlowColor) {
+      ctx.strokeStyle = outerGlowColor;
+      ctx.lineWidth = 6;
+      ctx.strokeText(text, 0, textY);
+    }
+
+    if (isDark) {
+      ctx.lineWidth = 4.8;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${progress * 0.90})`;
+      ctx.strokeText(text, 0, textY);
+
+      ctx.lineWidth = 2.8;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress * 0.95})`;
+      ctx.strokeText(text, 0, textY);
+    } else {
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = `rgba(0, 0, 0, ${progress * 0.90})`;
+      ctx.strokeText(text, 0, textY);
+    }
+
+    ctx.fillStyle = baseColor;
+    ctx.fillText(text, 0, textY);
+    ctx.restore();
+  };
 
   fighters.forEach(fighter => {
     if (!fighter || fighter.hp <= 0) return;
@@ -532,90 +578,24 @@ export function drawUltimateChannelingTexts() {
     if (isToji) {
       if ((fighter.ultimatePhase === 'CHANNELING' || (fighter.isChannelingDomain && !fighter.ultimateActive)) && (fighter.timeStopTimer || 0) <= 0) {
         const progress = Math.min(1.0, (fighter.ultimateChargeTimer || 0) / Math.max(1, fighter.ultimateChargeMax || 90));
-        ctx.save();
-        ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-        ctx.font = 'bold 21px "Glast Blitch", Arial';
-        ctx.fillStyle = `rgba(160, 64, 255, ${progress})`;
-        ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-        ctx.lineWidth = 3.2;
-        ctx.textAlign = 'center';
-        const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-        ctx.strokeText('CURSE INVENTORY', 0, textY);
-        ctx.fillText('CURSE INVENTORY', 0, textY);
-        ctx.restore();
+        renderChannelingText(fighter, 'CURSE INVENTORY', `rgba(160, 64, 255, ${progress})`, progress);
       }
     } else if (isMahito && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
       const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 120));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-      ctx.font = 'bold 21px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(217, 70, 239, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 3.2;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(217, 70, 239, ${progress})`, progress);
     } else if (isGojo && fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
       const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax || 120));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-      ctx.font = 'bold 21px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(0, 229, 255, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 3.2;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(0, 229, 255, ${progress})`, progress);
     } else if (isSukuna && fighter.isChannelingDomainExpansion && !fighter.domainActive && (fighter.timeStopTimer || 0) <= 0) {
       const maxTime = CONFIG.sukuna?.domainChargeMax || 120;
       const progress = Math.min(1.0, Math.max(0, (fighter.domainChargeTimer || 0) / maxTime));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-      ctx.font = 'bold 21px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(220, 20, 60, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 3.2;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(220, 20, 60, ${progress})`, progress);
     } else if (isYuta && fighter.isChannelingDomain) {
       const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 180));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-      ctx.font = 'bold 21px "Glast Blitch", Arial';
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-
-      ctx.strokeStyle = `rgba(255, 20, 147, ${progress * 0.4})`;
-      ctx.lineWidth = 6;
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress * 0.9})`;
-      ctx.lineWidth = 3.5;
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-
-      ctx.fillStyle = `rgba(255, 255, 255, ${progress})`;
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(255, 255, 255, ${progress})`, progress, `rgba(255, 20, 147, ${progress * 0.4})`);
     } else if (fighter.isChannelingDomainExpansion || fighter.isChannelingDomain) {
       const progress = Math.min(1.0, (fighter.domainChargeTimer || 0) / Math.max(1, fighter.domainChargeMax || 120));
-      ctx.save();
-      ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
-      ctx.font = 'bold 21px "Glast Blitch", Arial';
-      ctx.fillStyle = `rgba(255, 215, 0, ${progress})`;
-      ctx.strokeStyle = `rgba(0, 0, 0, ${progress})`;
-      ctx.lineWidth = 3.2;
-      ctx.textAlign = 'center';
-      const textY = -fighter.r - 42 - (Math.sin(now / 150) * 4);
-      ctx.strokeText('DOMAIN EXPANSION', 0, textY);
-      ctx.fillText('DOMAIN EXPANSION', 0, textY);
-      ctx.restore();
+      renderChannelingText(fighter, 'DOMAIN EXPANSION', `rgba(255, 215, 0, ${progress})`, progress);
     }
   });
 }

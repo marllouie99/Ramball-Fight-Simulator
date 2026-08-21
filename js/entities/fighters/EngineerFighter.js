@@ -5,6 +5,8 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
+import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { TurretEntity } from '../TurretEntity.js';
 import { drawEngineer } from '../../graphics/weaponVisuals.js';
 
@@ -73,10 +75,29 @@ export class EngineerFighter extends Fighter {
       return;
     }
 
+    // Check if turret is dead or removed
+    if (this.turretEntity && (this.turretEntity.hp <= 0 || (state.fighters && !state.fighters.includes(this.turretEntity)))) {
+      this.turretEntity = null;
+      if (this.skillCooldown <= 0) {
+        this.skillCooldown = CONFIG.Engineer?.skillCooldown || 1000;
+      }
+    }
+
+    const hasLiveTurret = Boolean(
+      (this.turretEntity && this.turretEntity.hp > 0 && state.fighters && state.fighters.includes(this.turretEntity)) ||
+      this.isBuildingTurret
+    );
+
     // Cooldown ticks
     if (this.shotgunCooldown > 0) this.shotgunCooldown--;
     if (this.wrenchCooldown > 0) this.wrenchCooldown--;
-    if (this.skillCooldown > 0) this.skillCooldown--;
+    
+    // Only tick skill cooldown when turret is NOT alive/active
+    if (!hasLiveTurret) {
+      if (this.skillCooldown > 0) this.skillCooldown--;
+    } else {
+      this.skillCooldown = CONFIG.Engineer?.skillCooldown || 1000;
+    }
     
     // Wrench visual timer
     if (this.wrenchActive) {
@@ -94,14 +115,10 @@ export class EngineerFighter extends Fighter {
       this.shotgunRecoilTimer--;
     }
 
-    // Check if turret is dead or removed
-    if (this.turretEntity && (this.turretEntity.hp <= 0 || !state.fighters.includes(this.turretEntity))) {
-      this.turretEntity = null;
-    }
-
     // -- 1. SKILL: DEPLOY TURRET (Disabled in demo mode) --
     if (!this.isDemoFighter && this.skillCooldown <= 0 && !this.isBuildingTurret && !this.turretEntity) {
       this.isBuildingTurret = true;
+      this.skillCooldown = CONFIG.Engineer?.skillCooldown || 1000;
       this.buildTimer = CONFIG.Engineer.turretBuildTime || 90;
       
       // Direction to build the turret
@@ -156,12 +173,17 @@ export class EngineerFighter extends Fighter {
         this.gunAngle = Math.atan2(this.turretEntity.y - this.y, this.turretEntity.x - this.x);
       }
       
-      // Hammering animation loop
+      // Hammering animation loop with welding sparks
       if (this.buildTimer % 15 === 0) {
         this.wrenchActive = true;
         this.lastWeaponUsed = 'wrench';
-        this.wrenchTimer = CONFIG.Engineer.wrenchSwipeDuration || 10;
+        this.wrenchTimer = CONFIG.Engineer.wrenchSwipeDuration || 14;
         this.wrenchAngle = this.gunAngle;
+        
+        if (this.turretEntity) {
+          spawnSparks(this.turretEntity.x, this.turretEntity.y, 6, 'gold');
+          spawnSparks(this.turretEntity.x, this.turretEntity.y, 4, 'silverStreak');
+        }
         
         const buildSound = getSkillSound(this._def?.id, 'build');
         if (buildSound) audioSystem.playSFX(buildSound.src, buildSound.volume);
@@ -194,6 +216,7 @@ export class EngineerFighter extends Fighter {
         
         // Visual text on self too
         spawnFloatingText(this.x, this.y - this.r - 5, "HEAL!", "#00FF00");
+        spawnSparks(this.turretEntity.x, this.turretEntity.y, 8, 'green');
         
         const healSound = getSkillSound(this._def?.id, 'repair');
         if (healSound) audioSystem.playSFX(healSound.src, healSound.volume);
@@ -207,21 +230,10 @@ export class EngineerFighter extends Fighter {
       
       this.aim(opponent);
       
-      if (dist <= CONFIG.Engineer.wrenchRange) {
-        // Close range: Wrench
+      if (dist <= (CONFIG.Engineer.wrenchRange || 85)) {
+        // Close range: Wrench Strike
         if (this.wrenchCooldown <= 0) {
-          this.wrenchActive = true;
-          this.lastWeaponUsed = 'wrench';
-          this.wrenchTimer = CONFIG.Engineer.wrenchSwipeDuration;
-          this.wrenchAngle = this.gunAngle; // Lock angle for visual swipe
-          this.wrenchCooldown = CONFIG.Engineer.wrenchCooldown;
-          
-          opponent.takeDamage(CONFIG.Engineer.wrenchDamage, this, { isMelee: true });
-          triggerGlobalScreenShake(8, 8);
-          spawnFloatingText(opponent.x, opponent.y - opponent.r - 5, 'WHACK!', '#FFD700');
-          
-          const hitSound = getBasicAttackSound(null, 'engineer_melee'); // Default melee or specific
-          if (hitSound) audioSystem.playSFX(hitSound.src, hitSound.volume);
+          this._executeWrenchStrike(opponent, arena);
         }
       } else if (dist <= CONFIG.Engineer.shotgunRange) {
         // Range: Shotgun
@@ -235,6 +247,21 @@ export class EngineerFighter extends Fighter {
     }
 
     // -- 4. MOVEMENT & BOUNCE --
+    // If stationary and not currently constructing turret, recover velocity towards opponent or arena center
+    if (!this.isBuildingTurret && this.vx === 0 && this.vy === 0) {
+      let recoverAngle;
+      if (opponent && opponent.hp > 0) {
+        recoverAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      } else if (arena) {
+        recoverAngle = Math.atan2(arena.y + arena.height / 2 - this.y, arena.x + arena.width / 2 - this.x);
+      } else {
+        recoverAngle = this.gunAngle || this.angle || (Math.random() * Math.PI * 2);
+      }
+      recoverAngle += (Math.random() - 0.5) * 0.4;
+      this.vx = Math.cos(recoverAngle) * this.speed;
+      this.vy = Math.sin(recoverAngle) * this.speed;
+    }
+
     this.x += this.vx;
     this.y += this.vy;
     this.angle += this.speed * (this._def.spinRate || 0.05);
@@ -242,19 +269,105 @@ export class EngineerFighter extends Fighter {
     // Bouncing off walls
     this.resolveWallBounce(arena, opponent);
   }
+
+  /**
+   * Multi-Target Frontal Arc Cone Melee Strike for Wrench (Rule 7 Standard)
+   */
+  _executeWrenchStrike(primaryOpponent, arena) {
+    const cfg = CONFIG.Engineer || {};
+    const reach = (cfg.wrenchRange || 85) + (primaryOpponent?.r || 20);
+    const arc = (135 * Math.PI) / 180; // 135° frontal cone
+    const facing = this.gunAngle;
+
+    const candidates = [];
+    if (state.fighters) {
+      for (const f of state.fighters) {
+        if (f && f !== this && f.hp > 0 && !this.isTeammate(f) && !f.isTurret) candidates.push(f);
+      }
+    }
+    if (state.illusions) {
+      const myIdx = state.fighters ? state.fighters.indexOf(this) : -1;
+      for (const ill of state.illusions) {
+        if (ill && ill.hp > 0 && ill.owner !== myIdx && !this.isTeammate(ill.owner)) candidates.push(ill);
+      }
+    }
+
+    let hitAny = false;
+    for (const target of candidates) {
+      const dx = target.x - this.x;
+      const dy = target.y - this.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= reach) {
+        const targetAngle = Math.atan2(dy, dx);
+        let diff = targetAngle - facing;
+        while (diff > Math.PI) diff -= Math.PI * 2;
+        while (diff < -Math.PI) diff += Math.PI * 2;
+
+        if (Math.abs(diff) <= arc / 2) {
+          // Gojo Limitless Infinity Barrier Check
+          const isTargetGojoInfinity = (target.characterId === 'gojo' || target.type === 'gojo' || target._def?.id === 'gojo') &&
+            (target.infinityCooldown <= 0 || target.domainActive || !target.isMeleeMode);
+
+          if (isTargetGojoInfinity) {
+            if (typeof target.triggerInfinityBlock === 'function') {
+              target.triggerInfinityBlock(this.x, this.y, this);
+            }
+            this.vx = -Math.cos(facing) * 12;
+            this.vy = -Math.sin(facing) * 12;
+            spawnSparks(target.x, target.y, 12, 'cyan', '#00E5FF');
+            spawnImpactFlash(target.x, target.y, 28, 'layla');
+            audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.85);
+            spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 12, 'BLOCKED!', '#00E5FF');
+            continue;
+          }
+
+          // 1. Deal Melee Wrench Damage
+          const dmg = cfg.wrenchDamage || 18;
+          applyDamageToTarget(target, dmg, this, { isMelee: true, isBasicAttack: true });
+
+          // 2. Physical Knockback Impulse & Hit-Stun
+          const pushForce = 12;
+          target.vx = (target.vx || 0) + Math.cos(facing) * (pushForce * 0.55);
+          target.vy = (target.vy || 0) + Math.sin(facing) * (pushForce * 0.55);
+          if (typeof target.applyHitStun === 'function') target.applyHitStun(8);
+
+          // 3. Audio & Visual Impact (Industrial Welding Sparks + Metallic Flash + Blood)
+          spawnFloatingText(target.x, (target.y - (target.z || 0)) - target.r - 10, 'WHACK!', '#FFD700');
+          spawnSparks(target.x, target.y, 10, 'gold');
+          spawnSparks(target.x, target.y, 8, 'silverStreak');
+          spawnImpactFlash(target.x, target.y, 32, 'rgba(255, 200, 50, 0.85)');
+          spawnBloodEffect(target, 10, facing, { minSize: 2.5, maxSize: 5.0, count: 4 });
+
+          hitAny = true;
+        }
+      }
+    }
+
+    this.wrenchActive = true;
+    this.lastWeaponUsed = 'wrench';
+    this.wrenchTimer = cfg.wrenchSwipeDuration || 18;
+    this.wrenchAngle = facing;
+    this.wrenchCooldown = cfg.wrenchCooldown || 28;
+
+    const hitSound = getBasicAttackSound(null, 'engineer_melee');
+    if (hitSound) audioSystem.playSFX(hitSound.src, hitSound.volume);
+
+    triggerGlobalScreenShake(8, 8);
+  }
   
   _fireShotgun() {
     if (!projectileSystem) return;
 
     // A real shotgun blast: more pellets, randomized spread, varied speeds
-    const pellets = CONFIG.Engineer.shotgunPellets || 8;
-    const spread = CONFIG.Engineer.shotgunSpread || 0.45;
-    const damage = CONFIG.Engineer.shotgunDamage;
-    const baseSpeed = CONFIG.Engineer.shotgunSpeed || 14;
+    const pellets = CONFIG.Engineer?.shotgunPellets || 8;
+    const spread = CONFIG.Engineer?.shotgunSpread || 0.45;
+    const damage = CONFIG.Engineer?.shotgunDamage || 5.2;
+    const baseSpeed = CONFIG.Engineer?.shotgunSpeed || 14;
     
-    // Muzzle position
-    const muzzleX = this.x + Math.cos(this.gunAngle) * (this.r + 20);
-    const muzzleY = this.y + Math.sin(this.gunAngle) * (this.r + 20);
+    // Muzzle position at the tip of the scaled shotgun
+    const muzzleX = this.x + Math.cos(this.gunAngle) * (this.r + 62);
+    const muzzleY = this.y + Math.sin(this.gunAngle) * (this.r + 62);
 
     // Spawn projectiles in a randomized cone
     for (let i = 0; i < pellets; i++) {
@@ -275,18 +388,13 @@ export class EngineerFighter extends Fighter {
     triggerGlobalScreenShake(12, 10);
 
     // Muzzle Flash & Smoke
-    import('../../graphics/particles/sparkEffect.js').then(module => {
-      // Huge fiery burst
-      for(let i=0; i<4; i++) {
-         module.spawnSparks(muzzleX, muzzleY, 3, 'orange');
-      }
-      module.spawnSparks(muzzleX, muzzleY, 5, 'gray'); // smoke
-    });
+    spawnSparks(muzzleX, muzzleY, 8, 'orange');
+    spawnSparks(muzzleX, muzzleY, 5, 'gray');
 
     const shotSound = getBasicAttackSound(this._def?.id);
     if (shotSound) audioSystem.playSFX(shotSound.src, shotSound.volume);
     
-    this.shotgunCooldown = CONFIG.Engineer.shotgunCooldown;
+    this.shotgunCooldown = CONFIG.Engineer?.shotgunCooldown || 80;
     this.shotgunRecoilTimer = 15;
     
     // Heavy Pushback / Recoil
@@ -314,34 +422,14 @@ export class EngineerFighter extends Fighter {
       wrenchSlashFadeTimer: this.wrenchSlashFadeTimer || 0,
       shotgunRecoilTimer: this.shotgunRecoilTimer || 0,
       lastWeaponUsed: this.lastWeaponUsed || 'shotgun',
-      color: this.color
+      color: this.color,
+      hideHands: this.hideFrontHand || this.hideHands
     });
-    
-    // Draw Hand holding the weapon (only when holding shotgun)
-    if (this.lastWeaponUsed !== 'wrench') {
-      ctx.save();
-      ctx.translate(this.x, this.y);
-      ctx.rotate(this.gunAngle);
-      if (Math.abs(this.gunAngle) < Math.PI / 2) {
-        ctx.translate(this.r + 6, 0);
-      } else {
-        ctx.scale(1, -1);
-        ctx.translate(this.r + 6, 0);
-      }
-      ctx.beginPath();
-      ctx.arc(0, 3, 6, 0, Math.PI * 2);
-      ctx.fillStyle = this.color;
-      ctx.fill();
-      ctx.lineWidth = 1.5;
-      ctx.strokeStyle = '#000';
-      ctx.stroke();
-      ctx.restore();
-    }
     
     if (this.isBuildingTurret) {
       const barWidth = 40;
       const barHeight = 6;
-      const buildTime = CONFIG.Engineer.turretBuildTime || 90;
+      const buildTime = CONFIG.Engineer?.turretBuildTime || 90;
       const progress = 1 - (this.buildTimer / buildTime);
       
       ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';

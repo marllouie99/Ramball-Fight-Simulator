@@ -185,9 +185,10 @@ export class CronosFighter extends Fighter {
 
   // Override takeDamage to implement counter-stop passive
   takeDamage(amount, attacker, opts = {}) {
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));
     const damageTaken = super.takeDamage(amount, attacker, opts);
 
-    if (damageTaken !== false && attacker && attacker !== this) {
+    if (damageTaken !== false && attacker && attacker !== this && !opts.isSaitamaCounter && !opts.isCounter && !isGuaranteedHit) {
       // Counter-stop chance when attacked
       if (Math.random() < CONFIG.cronos.counterStopChance) {
         // Prevent spamming floating text and resetting state if already stopped

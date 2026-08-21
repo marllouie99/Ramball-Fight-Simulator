@@ -234,15 +234,6 @@ export class JohnWickFighter extends Fighter {
     this.vx = Math.cos(rollAngle) * rollSpeed;
     this.vy = Math.sin(rollAngle) * rollSpeed;
 
-    // Firmly stop and lock target movement as forward roll initiates!
-    if (target && target.hp > 0) {
-      target.isTargetOfAmbush = true;
-      target.caughtInJohnWickCombo = true;
-      target.vx = 0;
-      target.vy = 0;
-      if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-    }
-
     spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 16, 'ASSASSINATION!', '#F59E0B');
     spawnSparks(this.x, this.y, 10, 'silverStreak', '#CBD5E1');
     const rollSfx = cfg.sounds?.rollForward || cfg.sounds?.combatRoll || 'Assets/Sound Effects/Skills/dash1.mp3';
@@ -281,14 +272,8 @@ export class JohnWickFighter extends Fighter {
 
     if (this.cqcComboPhase === 'FORWARD_ROLL') {
       this.rollTimer--;
-      // Guide trajectory toward target & keep target firmly stationary
+      // Guide trajectory toward target during the roll (target is NOT interrupted during roll)
       if (target && target.hp > 0) {
-        target.isTargetOfAmbush = true;
-        target.caughtInJohnWickCombo = true;
-        target.vx = 0;
-        target.vy = 0;
-        if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-
         const dx = target.x - this.x;
         const dy = target.y - this.y;
         const dist = Math.hypot(dx, dy);
@@ -337,14 +322,9 @@ export class JohnWickFighter extends Fighter {
           this.vx = (dx / dist) * rollSpeed;
           this.vy = (dy / dist) * rollSpeed;
         } else {
-          // Reached close contact: smoothly brake and hold enemy in brief hit-stun
+          // Reached close contact: smoothly brake
           this.vx *= 0.55;
           this.vy *= 0.55;
-          target.vx = 0;
-          target.vy = 0;
-          if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-          if (typeof target.applyHitStun === 'function') target.applyHitStun(8);
-          else target.hitStunTimer = 8;
         }
         
         // FULL 360° SPIN COMPLETION: Transition directly to PENCIL_STAB (Skill 2: "With a F***ing Pencil")
@@ -365,11 +345,6 @@ export class JohnWickFighter extends Fighter {
           this._pencilDamageDealt = false;
 
           this.aim(target);
-          target.vx = 0;
-          target.vy = 0;
-          if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-          if (typeof target.applyHitStun === 'function') target.applyHitStun(pencilDur + 6);
-          else target.hitStunTimer = pencilDur + 6;
         }
       } else {
         this.cqcComboPhase = 'BACKWARD_ROLL';
@@ -389,23 +364,19 @@ export class JohnWickFighter extends Fighter {
       if (target && target.hp > 0) {
         this.aim(target);
 
-        // Before impact, firmly anchor the enemy in front of John Wick
-        if (!this._pencilDamageDealt) {
-          const cqcAngle = this.gunAngle || 0;
-          const cqcDist = this.r + (target.r || 25) + 6;
-          target.x = this.x + Math.cos(cqcAngle) * cqcDist;
-          target.y = this.y + Math.sin(cqcAngle) * cqcDist;
-          clampToArena(target);
-          target.vx = 0;
-          target.vy = 0;
-          if (typeof target.interruptAttacks === 'function') target.interruptAttacks();
-          if (typeof target.applyHitStun === 'function') target.applyHitStun(20);
-          else target.hitStunTimer = 20;
-        }
-
-        // Forward thrust connects at full linear extension (tip impact instant)
+        // Forward thrust connects at full linear extension (tip impact instant — EXACT MOMENT HE STABS!)
         if (progress >= thrustRatio && !this._pencilDamageDealt) {
           this._pencilDamageDealt = true;
+
+          // CANCEL / INTERRUPT target attacks only when the stab lands!
+          if (typeof target.interruptAttacks === 'function') {
+            target.interruptAttacks();
+          }
+          if (typeof target.applyHitStun === 'function') {
+            target.applyHitStun(pullbackF + 10);
+          } else {
+            target.hitStunTimer = pullbackF + 10;
+          }
 
           // Deal massive true damage & apply bleed + slow
           const pencilDmg = cfg.pencilDamage || 65;
@@ -1223,8 +1194,9 @@ export class JohnWickFighter extends Fighter {
     );
 
     // ── 1. PASSIVE EVADE / INTANGIBILITY (Excommunicado Multiplier / Guaranteed Dodge) ──
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit));
     const isEvadeActive = Boolean(this.isEvadeAlwaysActive || isExcommunicado || (this.isRolling && this.rollTimer > 0) || (this.evadeBuffTimer && this.evadeBuffTimer > 0));
-    if (isEvadeActive && !isTickOrBeamDamage) {
+    if (isEvadeActive && !isTickOrBeamDamage && !isGuaranteedHit) {
       const baseEvade = this.evadeChance !== undefined ? this.evadeChance : (cfg.evadeChance ?? 1.0);
       const chance = isExcommunicado ? (cfg.excommunicadoEvadeChance ?? Math.min(1.0, baseEvade * (cfg.excommunicadoEvadeMultiplier || 1.50))) : baseEvade;
       if (Math.random() <= chance) {
@@ -1245,7 +1217,7 @@ export class JohnWickFighter extends Fighter {
     let finalAmount = amount;
 
     // ── 2. PASSIVE 1: BALLISTIC TAILORED SUIT (Enhanced DEF Multiplier in Excommunicado) ──
-    if (!isTrueDamage && cfg.ballisticSuitDamageReduction) {
+    if (!isTrueDamage && !isGuaranteedHit && !opts?.bypassShield && cfg.ballisticSuitDamageReduction) {
       let defReduction = cfg.ballisticSuitDamageReduction;
       if (isExcommunicado) {
         defReduction = Math.min(0.85, defReduction * (cfg.excommunicadoDefMultiplier || 1.50));

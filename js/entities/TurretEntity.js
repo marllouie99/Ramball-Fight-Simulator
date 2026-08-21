@@ -14,7 +14,7 @@ export class TurretEntity extends Fighter {
     // Create a dummy definition for the Turret
     const def = {
       id: 999,
-      name: 'Turret',
+      name: 'Sentry',
       color: '#8B4513', // Brown/Metallic color
       startX: x,
       startY: y,
@@ -22,6 +22,8 @@ export class TurretEntity extends Fighter {
       startVy: 0,
       radius: 18,
       type: 'Turret',
+      isTurret: true,
+      isMinion: true,
       hp: CONFIG.Engineer.turretHp,
       damage: CONFIG.Engineer.turretDamage,
       cooldown: CONFIG.Engineer.turretFireRate,
@@ -32,6 +34,9 @@ export class TurretEntity extends Fighter {
 
     this.owner = ownerFighter;
     this.isTurret = true;
+    this.isMinion = true;
+    this.maxHp = CONFIG.Engineer.turretHp || 50;
+    this.hp = this.maxHp;
     this.healCooldownTimer = 0;
     this.recoilTimer = 0;
     this.hitFlashTimer = 0;
@@ -43,6 +48,14 @@ export class TurretEntity extends Fighter {
     this.maxAmmo = CONFIG.Engineer.turretAmmo;
     this.reloadTimer = 0;
     this.isReloading = false;
+  }
+
+  reset() {
+    super.reset();
+    this.isTurret = true;
+    this.isMinion = true;
+    this.maxHp = CONFIG.Engineer.turretHp || 50;
+    this.hp = this.maxHp;
   }
 
   // Override to make turret immune to ALL knockback physics.

@@ -1,6 +1,6 @@
 import { state, saveWeaponCustomizations } from '../../core/state.js';
 import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
-import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText } from './uiFramework.js';
+import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawChamferedRect } from './uiFramework.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 
 // Currently selected weapon key in studio: 'mahito' | 'yuta' | 'toji' | 'cronos' | 'ruby'
@@ -56,7 +56,7 @@ export function drawWeaponStudioScreen() {
   const { ctx, canvas } = state;
   initCustomizations();
 
-  // 1. Reset Context for Title/UI Screens
+  // 1. Reset Context
   ctx.resetTransform();
   ctx.globalAlpha = 1.0;
   ctx.globalCompositeOperation = 'source-over';
@@ -65,59 +65,204 @@ export function drawWeaponStudioScreen() {
   _clearButtons();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // 2. Background (Radial Dark Gradient)
-  const bgGrad = ctx.createRadialGradient(canvas.width / 2, canvas.height / 2, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.8);
-  bgGrad.addColorStop(0, '#0a0d14');
-  bgGrad.addColorStop(1, '#020305');
+  // 2. Sleek Gunmetal Background Gradient
+  const bgGrad = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  bgGrad.addColorStop(0, '#07080c');
+  bgGrad.addColorStop(0.5, '#10131c');
+  bgGrad.addColorStop(1, '#07080c');
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   const activeWeaponKey = state.studioSelectedWeapon;
   const activeDef = FIGHTER_DEFS.find(f => f.type === activeWeaponKey);
-  const themeColor = activeDef?.color || '#FFD700';
+  const themeColor = activeDef?.color || '#f59e0b';
 
-  // 3. Glowing Radial Backlight for Weapon Preview
-  const heroY = canvas.height * 0.35;
+  // ── Tier 1: Header Section ──
+  ctx.fillStyle = '#64748b';
+  ctx.font = '900 10px "Rajdhani", monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('CIRCLE BATTLE // WEAPON STUDIO // SYS.v2.5', canvas.width / 2, 56);
+
   ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-  const glow = ctx.createRadialGradient(canvas.width / 2, heroY, 0, canvas.width / 2, heroY, 200);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 20px "Outfit", "Rajdhani", sans-serif';
+  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
+  ctx.shadowBlur = 8;
+  ctx.fillText('[ WEAPON STUDIO ]', canvas.width / 2, 74);
+  ctx.restore();
+
+  // Weapon Selector Chips (2 Rows of Clean Chamfered Tabs)
+  const weapons = [
+    { key: 'mahito', label: 'MAHITO' },
+    { key: 'yuta', label: 'YUTA' },
+    { key: 'toji', label: 'TOJI' },
+    { key: 'cronos', label: 'CRONOS' },
+    { key: 'ruby', label: 'RUBY' },
+    { key: 'nanami', label: 'NANAMI' },
+    { key: 'john_wick', label: 'JOHN WICK' }
+  ];
+
+  // Row 1: First 4 weapons
+  const row1 = weapons.slice(0, 4);
+  const row2 = weapons.slice(4);
+
+  const r1W = 120;
+  const r1H = 22;
+  const r1Spacing = 6;
+  const r1TotalW = row1.length * r1W + (row1.length - 1) * r1Spacing;
+  let r1StartX = (canvas.width - r1TotalW) / 2;
+
+  row1.forEach((w) => {
+    const isSelected = activeWeaponKey === w.key;
+    ctx.save();
+    if (isSelected) {
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowBlur = 6;
+    } else {
+      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+    }
+    drawChamferedRect(ctx, r1StartX, 88, r1W, r1H, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = isSelected ? '#ffffff' : '#8899aa';
+    ctx.font = '900 9.5px "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(w.label, r1StartX + r1W / 2, 88 + r1H / 2);
+
+    _registerButton(r1StartX, 88, r1W, r1H, () => {
+      state.studioSelectedWeapon = w.key;
+      state.studioSelectedDetail = null;
+      isDraggingBase = false;
+      isDraggingTip = false;
+      activeDragFinger = -1;
+      activeDragType = null;
+    });
+    r1StartX += r1W + r1Spacing;
+  });
+
+  // Row 2: Remaining 3 weapons
+  const r2W = 158;
+  const r2H = 22;
+  const r2Spacing = 6;
+  const r2TotalW = row2.length * r2W + (row2.length - 1) * r2Spacing;
+  let r2StartX = (canvas.width - r2TotalW) / 2;
+
+  row2.forEach((w) => {
+    const isSelected = activeWeaponKey === w.key;
+    ctx.save();
+    if (isSelected) {
+      ctx.fillStyle = 'rgba(245, 158, 11, 0.22)';
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowBlur = 6;
+    } else {
+      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+      ctx.lineWidth = 1;
+    }
+    drawChamferedRect(ctx, r2StartX, 114, r2W, r2H, 4);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.fillStyle = isSelected ? '#ffffff' : '#8899aa';
+    ctx.font = '900 9.5px "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(w.label, r2StartX + r2W / 2, 114 + r2H / 2);
+
+    _registerButton(r2StartX, 114, r2W, r2H, () => {
+      state.studioSelectedWeapon = w.key;
+      state.studioSelectedDetail = null;
+      isDraggingBase = false;
+      isDraggingTip = false;
+      activeDragFinger = -1;
+      activeDragType = null;
+    });
+    r2StartX += r2W + r2Spacing;
+  });
+
+  // ── Tier 2: Precision Viewport Stage ──
+  const viewportX = 16;
+  const viewportY = 142;
+  const viewportW = canvas.width - 32; // 508px
+  const viewportH = 372;
+  const heroX = canvas.width / 2;
+  const heroY = viewportY + viewportH / 2;
+
+  // Viewport Container Panel
+  drawPanel(viewportX, viewportY, viewportW, viewportH, 0.94, 8);
+
+  // Background Grid Blueprint inside Viewport
+  ctx.save();
+  ctx.beginPath();
+  drawChamferedRect(ctx, viewportX + 1, viewportY + 1, viewportW - 2, viewportH - 2, 7);
+  ctx.clip();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+  ctx.lineWidth = 1;
+  const gridSize = 28;
+  for (let gx = viewportX; gx < viewportX + viewportW; gx += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(gx, viewportY);
+    ctx.lineTo(gx, viewportY + viewportH);
+    ctx.stroke();
+  }
+  for (let gy = viewportY; gy < viewportY + viewportH; gy += gridSize) {
+    ctx.beginPath();
+    ctx.moveTo(viewportX, gy);
+    ctx.lineTo(viewportX + viewportW, gy);
+    ctx.stroke();
+  }
+
+  // Viewport Concentric Calibration Rings & Crosshairs
+  ctx.strokeStyle = 'rgba(245, 158, 11, 0.12)';
+  ctx.beginPath();
+  ctx.arc(heroX, heroY, 60, 0, Math.PI * 2);
+  ctx.arc(heroX, heroY, 130, 0, Math.PI * 2);
+  ctx.arc(heroX, heroY, 190, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(heroX - 220, heroY);
+  ctx.lineTo(heroX + 220, heroY);
+  ctx.moveTo(heroX, heroY - 180);
+  ctx.lineTo(heroX, heroY + 180);
+  ctx.stroke();
+
+  // Signature Radial Glow
+  const glow = ctx.createRadialGradient(heroX, heroY, 0, heroX, heroY, 220);
   let r = 0, g = 150, b = 255;
   if (themeColor.startsWith('#') && themeColor.length === 7) {
     r = parseInt(themeColor.slice(1, 3), 16);
     g = parseInt(themeColor.slice(3, 5), 16);
     b = parseInt(themeColor.slice(5, 7), 16);
   }
-  glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
-  glow.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.05)`);
+  glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.22)`);
+  glow.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.04)`);
   glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = glow;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.restore();
+  ctx.fillRect(viewportX, viewportY, viewportW, viewportH);
 
-  // 4. Draw Header Title
-  ctx.fillStyle = '#ffffff';
-  ctx.font = 'bold 24px Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.shadowColor = 'rgba(255, 215, 0, 0.4)';
-  ctx.shadowBlur = 8;
-  ctx.fillText('🛠️ WEAPON STUDIO', canvas.width / 2, 45);
-  ctx.shadowBlur = 0;
-
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-  ctx.font = '11px Arial';
-  ctx.fillText('Interactive customization. Select a parameter details card to adjust.', canvas.width / 2, 65);
-
-  // 5. Draw Weapon Hero Preview
+  // Render Hero Weapon Preview
   const currentScale = state.studioPreviewScale;
-  
   if (state.studioPixelArtMode) {
-    const pixelFactor = 0.30; // Lower = chunkier pixels
-    const pw = Math.ceil(canvas.width * pixelFactor);
-    const ph = Math.ceil(canvas.height * pixelFactor);
-    
+    const pixelFactor = 0.30;
+    const pw = Math.ceil(viewportW * pixelFactor);
+    const ph = Math.ceil(viewportH * pixelFactor);
+
     if (!state._studioPixelCanvas) {
-       state._studioPixelCanvas = document.createElement('canvas');
+      state._studioPixelCanvas = document.createElement('canvas');
     }
     const pc = state._studioPixelCanvas;
     if (pc.width !== pw || pc.height !== ph) {
@@ -126,376 +271,409 @@ export function drawWeaponStudioScreen() {
     }
     const pctx = pc.getContext('2d');
     pctx.clearRect(0, 0, pw, ph);
-    
+
     pctx.save();
-    pctx.translate(pw / 2, heroY * pixelFactor);
+    pctx.translate(pw / 2, ph / 2);
     pctx.scale(currentScale * pixelFactor, currentScale * pixelFactor);
     drawWeaponPreview(pctx, activeWeaponKey, themeColor);
     pctx.restore();
-    
+
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    ctx.drawImage(pc, 0, 0, pw, ph, 0, 0, canvas.width, canvas.height);
+    ctx.drawImage(pc, 0, 0, pw, ph, viewportX, viewportY, viewportW, viewportH);
     ctx.restore();
   } else {
     ctx.save();
-    ctx.translate(canvas.width / 2, heroY);
+    ctx.translate(heroX, heroY);
     ctx.scale(currentScale, currentScale);
     drawWeaponPreview(ctx, activeWeaponKey, themeColor);
     ctx.restore();
   }
 
-  // 5b. Zoom Controls (Below Preview)
-  const zoomBarY = heroY + 155;
-  const zoomBarCenterX = canvas.width / 2;
+  // Draw Interactive Drag Handles
+  if (state.studioSelectedDetail !== null) {
+    ctx.save();
+    ctx.translate(heroX, heroY);
+    ctx.scale(currentScale, currentScale);
 
-  // Zoom percentage label
-  const zoomPct = Math.round((currentScale / ZOOM_DEFAULT) * 100);
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
-  ctx.font = 'bold 10px monospace';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'alphabetic';
-  ctx.fillText(`🔍 ${zoomPct}%`, zoomBarCenterX, zoomBarY - 10);
+    if (activeWeaponKey === 'mahito' && state.studioSelectedDetail === 'finger') {
+      const handX = 25;
+      const blades = state.weaponCustomizations.mahito.blades;
+      const b = blades[state.studioClawFinger];
+      if (b) {
+        const kx = handX + b.knuckleX;
+        const ky = b.knuckleY;
 
-  // Zoom Out button
-  drawButton('−', zoomBarCenterX - 52, zoomBarY + 3, () => {
-    state.studioPreviewScale = Math.max(ZOOM_MIN, state.studioPreviewScale - ZOOM_STEP);
-  }, 28, 18);
+        const cosAngle = Math.cos(b.fanAngle);
+        const sinAngle = Math.sin(b.fanAngle);
+        const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
+        const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
 
-  // Zoom bar background track
-  const trackW = 60;
-  const trackH = 6;
-  const trackX = zoomBarCenterX - trackW / 2;
-  const trackY = zoomBarY - 1;
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-  ctx.beginPath();
-  ctx.roundRect(trackX, trackY, trackW, trackH, 3);
-  ctx.fill();
+        // Knuckle Handle (Teal)
+        ctx.beginPath(); ctx.arc(kx, ky, 4.0, 0, Math.PI * 2);
+        ctx.fillStyle = (activeDragFinger === state.studioClawFinger && activeDragType === 'knuckle') ? '#00ffff' : 'rgba(0, 255, 255, 0.85)';
+        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.0; ctx.stroke();
 
-  // Zoom bar fill
-  const zoomFrac = (currentScale - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN);
-  const fillW = Math.max(4, zoomFrac * trackW);
-  const barGrad = ctx.createLinearGradient(trackX, trackY, trackX + fillW, trackY);
-  barGrad.addColorStop(0, 'rgba(0, 200, 255, 0.7)');
-  barGrad.addColorStop(1, 'rgba(0, 255, 200, 0.9)');
-  ctx.fillStyle = barGrad;
-  ctx.beginPath();
-  ctx.roundRect(trackX, trackY, fillW, trackH, 3);
-  ctx.fill();
+        // Tip Handle (Amber / Red)
+        ctx.beginPath(); ctx.arc(tx, ty, 4.0, 0, Math.PI * 2);
+        ctx.fillStyle = (activeDragFinger === state.studioClawFinger && activeDragType === 'tip') ? '#f59e0b' : 'rgba(245, 158, 11, 0.85)';
+        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.0; ctx.stroke();
 
-  // Zoom In button
-  drawButton('+', zoomBarCenterX + 52, zoomBarY + 3, () => {
-    state.studioPreviewScale = Math.min(ZOOM_MAX, state.studioPreviewScale + ZOOM_STEP);
-  }, 28, 18);
+        // Guide line
+        ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(tx, ty);
+        ctx.strokeStyle = 'rgba(255,255,255,0.4)'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
+      }
+    } else if (activeWeaponKey !== 'mahito') {
+      const custom = state.weaponCustomizations[activeWeaponKey];
+      let offsetX = -40;
+      if (activeWeaponKey === 'cronos') offsetX = -55;
+      else if (activeWeaponKey === 'ruby') offsetX = -75;
 
-  // Reset Zoom button (small)
-  drawButton('⟲', zoomBarCenterX + 90, zoomBarY + 3, () => {
-    state.studioPreviewScale = ZOOM_DEFAULT;
-  }, 22, 18);
+      const baseLx = offsetX + custom.offsetX;
+      const baseLy = custom.offsetY;
 
-  // 6. Left Panel: Weapon Selection list
-  const leftX = 18;
-  const leftY = 85;
-  const leftW = 145;
-  const leftH = 215;
-  drawPanel(leftX, leftY, leftW, leftH, 0.85, 8);
+      if (state.studioSelectedDetail === 'position') {
+        ctx.beginPath(); ctx.arc(baseLx, baseLy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDraggingBase ? '#00ffff' : 'rgba(0, 255, 255, 0.85)';
+        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.0; ctx.stroke();
+      } else if (state.studioSelectedDetail === 'scale_angle') {
+        const lineLen = 70;
+        const tipLx = baseLx + lineLen * custom.scale * Math.cos(custom.angleOffset);
+        const tipLy = baseLy + lineLen * custom.scale * Math.sin(custom.angleOffset);
 
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 10px monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText('SELECT WEAPON', leftX + leftW / 2, leftY + 18);
+        ctx.beginPath(); ctx.arc(tipLx, tipLy, 4.5, 0, Math.PI * 2);
+        ctx.fillStyle = isDraggingTip ? '#f59e0b' : 'rgba(245, 158, 11, 0.85)';
+        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.0; ctx.stroke();
 
-  const weapons = [
-    { key: 'mahito', label: 'MAHITO CLAWS' },
-    { key: 'yuta', label: 'YUTA KATANA' },
-    { key: 'toji', label: 'TOJI SPEAR' },
-    { key: 'cronos', label: 'CRONOS BLADE' },
-    { key: 'ruby', label: 'RUBY SCYTHE' },
-    { key: 'nanami', label: 'NANAMI CLEAVER' },
-    { key: 'john_wick', label: 'JOHN WICK PIT VIPER' }
-  ];
+        ctx.beginPath(); ctx.moveTo(baseLx, baseLy); ctx.lineTo(tipLx, tipLy);
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 0.8; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
+      }
+    }
+    ctx.restore();
+  }
 
-  weapons.forEach((w, idx) => {
-    const btnX = leftX + leftW / 2;
-    const btnY = leftY + 38 + idx * 26;
-    const isSelected = activeWeaponKey === w.key;
+  ctx.restore(); // Restore clip
 
-    const wBtn = 115;
-    const hBtn = 20;
-    const bx = btnX - wBtn / 2;
-    const by = btnY - hBtn / 2;
-
-    ctx.fillStyle = isSelected ? 'rgba(255, 215, 0, 0.22)' : 'rgba(255, 255, 255, 0.04)';
-    ctx.strokeStyle = isSelected ? '#FFD700' : 'rgba(255, 255, 255, 0.12)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.roundRect(bx, by, wBtn, hBtn, 4);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.fillStyle = isSelected ? '#FFD700' : 'rgba(255, 255, 255, 0.7)';
-    ctx.font = 'bold 9px Arial';
-    ctx.fillText(w.label, btnX, btnY + 3);
-
-    _registerButton(bx, by, wBtn, hBtn, () => {
-      state.studioSelectedWeapon = w.key;
-      state.studioSelectedDetail = null; // Hide handles until user clicks a detail
-      isDraggingBase = false;
-      isDraggingTip = false;
-      activeDragFinger = -1;
-      activeDragType = null;
-    });
-  });
-
-  // 6b. Pixel Art Toggle
+  // Viewport Overlays: Pixel Art toggle (Top Left)
   if (state.studioPixelArtMode === undefined) state.studioPixelArtMode = false;
-  
-  const pxBtnY = leftY + leftH + 22;
-  const pxBtnW = 125;
-  const pxBtnH = 24;
-  const pxBtnX = leftX + leftW / 2;
-  
-  ctx.fillStyle = state.studioPixelArtMode ? 'rgba(0, 255, 128, 0.15)' : 'rgba(255, 255, 255, 0.04)';
-  ctx.strokeStyle = state.studioPixelArtMode ? '#00ff80' : 'rgba(255, 255, 255, 0.15)';
+  const pxBtnX = viewportX + 10;
+  const pxBtnY = viewportY + 10;
+  const pxBtnW = 105;
+  const pxBtnH = 22;
+
+  ctx.save();
+  ctx.fillStyle = state.studioPixelArtMode ? 'rgba(245, 158, 11, 0.22)' : 'rgba(18, 22, 32, 0.9)';
+  ctx.strokeStyle = state.studioPixelArtMode ? '#f59e0b' : 'rgba(255, 255, 255, 0.15)';
   ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.roundRect(pxBtnX - pxBtnW / 2, pxBtnY - pxBtnH / 2, pxBtnW, pxBtnH, 4);
+  drawChamferedRect(ctx, pxBtnX, pxBtnY, pxBtnW, pxBtnH, 4);
   ctx.fill();
   ctx.stroke();
-  
-  ctx.fillStyle = state.studioPixelArtMode ? '#00ff80' : 'rgba(255, 255, 255, 0.6)';
-  ctx.font = 'bold 9px Arial';
+  ctx.restore();
+
+  ctx.fillStyle = state.studioPixelArtMode ? '#f59e0b' : '#94a3b8';
+  ctx.font = '900 9px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
-  ctx.fillText(state.studioPixelArtMode ? '👾 PIXEL ART: ON' : '👾 PIXEL ART: OFF', pxBtnX, pxBtnY + 3);
-  
-  _registerButton(pxBtnX - pxBtnW / 2, pxBtnY - pxBtnH / 2, pxBtnW, pxBtnH, () => {
+  ctx.textBaseline = 'middle';
+  ctx.fillText(state.studioPixelArtMode ? 'PIXEL ART: ON' : 'PIXEL ART: OFF', pxBtnX + pxBtnW / 2, pxBtnY + pxBtnH / 2);
+
+  _registerButton(pxBtnX, pxBtnY, pxBtnW, pxBtnH, () => {
     state.studioPixelArtMode = !state.studioPixelArtMode;
   });
 
-  // 7. Right Panel: Precise Curvature & Transform Controls
-  const rightW = 145;
-  const rightX = canvas.width - rightW - 18;
-  const rightY = 85;
-  const rightH = 255;
-  drawPanel(rightX, rightY, rightW, rightH, 0.85, 8);
+  // Viewport Overlays: Zoom Controls Bar (Bottom of Viewport)
+  const zoomY = viewportY + viewportH - 24;
+  const zoomCenterX = heroX;
+  const zoomPct = Math.round((currentScale / ZOOM_DEFAULT) * 100);
 
-  ctx.fillStyle = '#FFD700';
-  ctx.font = 'bold 10px monospace';
+  drawButton('−', zoomCenterX - 85, zoomY, () => {
+    state.studioPreviewScale = Math.max(ZOOM_MIN, state.studioPreviewScale - ZOOM_STEP);
+  }, 26, 18, null, 3);
+
+  // Zoom Bar track
+  const trackW = 90;
+  const trackH = 6;
+  const trackX = zoomCenterX - trackW / 2;
+  const trackY = zoomY - 3;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+  ctx.lineWidth = 1;
+  drawChamferedRect(ctx, trackX, trackY, trackW, trackH, 2);
+  ctx.fill();
+  ctx.stroke();
+
+  const zoomFrac = (currentScale - ZOOM_MIN) / (ZOOM_MAX - ZOOM_MIN);
+  const fillW = Math.max(4, zoomFrac * trackW);
+  ctx.fillStyle = '#f59e0b';
+  drawChamferedRect(ctx, trackX, trackY, fillW, trackH, 2);
+  ctx.fill();
+
+  drawButton('+', zoomCenterX + 85, zoomY, () => {
+    state.studioPreviewScale = Math.min(ZOOM_MAX, state.studioPreviewScale + ZOOM_STEP);
+  }, 26, 18, null, 3);
+
+  drawButton('⟲', zoomCenterX + 120, zoomY, () => {
+    state.studioPreviewScale = ZOOM_DEFAULT;
+  }, 22, 18, null, 3);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 9.5px "Rajdhani", monospace';
   ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText(`ZOOM: ${zoomPct}%`, zoomCenterX, zoomY - 7);
+
+  // ── Tier 3: Dual Parameter Console ──
+  const consoleY = viewportY + viewportH + 10; // 524
+  const consoleH = 320;
+  const consoleGap = 12;
+  const leftConsoleW = Math.floor((viewportW - consoleGap) * 0.48); // 238px
+  const rightConsoleW = viewportW - leftConsoleW - consoleGap; // 258px
+  const leftConsoleX = viewportX;
+  const rightConsoleX = leftConsoleX + leftConsoleW + consoleGap;
+
+  // Left Console Panel (Layers & Components)
+  drawPanel(leftConsoleX, consoleY, leftConsoleW, consoleH, 0.92, 8);
+  // Right Console Panel (Precision Metrics)
+  drawPanel(rightConsoleX, consoleY, rightConsoleW, consoleH, 0.92, 8);
+
+  // Console Headers
+  ctx.fillStyle = '#f59e0b';
+  ctx.font = '900 10px "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
 
   if (activeWeaponKey === 'mahito') {
-    ctx.fillText('CLAW FINGERS', rightX + rightW / 2, rightY + 18);
-    if (state.studioClawFinger === undefined) state.studioClawFinger = 0;
+    ctx.fillText('CLAW BLADE LAYERS //', leftConsoleX + 14, consoleY + 12);
+    ctx.fillText('GEOMETRY CALIBRATION //', rightConsoleX + 14, consoleY + 12);
 
+    if (state.studioClawFinger === undefined) state.studioClawFinger = 0;
     const drawOrder = state.weaponCustomizations.mahito.drawOrder;
-    const clawNames = ['FINGER 1', 'FINGER 2', 'FINGER 3', 'THUMB'];
+    const clawNames = ['FINGER 1 (TOP)', 'FINGER 2 (MID-TOP)', 'FINGER 3 (MID-BOT)', 'THUMB (BOTTOM)'];
+
+    // Finger Layer Cards in Left Console
     clawNames.forEach((name, idx) => {
-      const btnX = rightX + rightW / 2;
-      const btnY = rightY + 32 + idx * 22;
+      const cardY = consoleY + 34 + idx * 48;
+      const cardW = leftConsoleW - 24;
+      const cardH = 40;
+      const cardX = leftConsoleX + 12;
       const isSelected = state.studioClawFinger === idx && state.studioSelectedDetail === 'finger';
 
-      // Layer position: 0 = backmost, 3 = frontmost
       const layerPos = drawOrder.indexOf(idx);
-      const layerLabel = layerPos === drawOrder.length - 1 ? 'FRONT' : layerPos === 0 ? 'BACK' : `L${layerPos + 1}`;
+      const layerLabel = layerPos === drawOrder.length - 1 ? 'TOP' : layerPos === 0 ? 'BOTTOM' : `LAYER ${layerPos + 1}`;
 
-      const wBtn = 115;
-      const hBtn = 17;
-      const bx = btnX - wBtn / 2;
-      const by = btnY - hBtn / 2;
-
-      ctx.fillStyle = isSelected ? 'rgba(0, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.03)';
-      ctx.strokeStyle = isSelected ? '#00ffff' : 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, wBtn, hBtn, 3);
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.20)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, cardX, cardY, cardW, cardH, 5);
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
 
-      // Name label
-      ctx.fillStyle = isSelected ? '#00ffff' : 'rgba(255, 255, 255, 0.7)';
-      ctx.font = 'bold 8px Arial';
+      ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
+      ctx.font = '900 10px "Rajdhani", sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(name, bx + 5, btnY + 3);
+      ctx.textBaseline = 'top';
+      ctx.fillText(name, cardX + 10, cardY + 8);
 
-      // Layer badge
-      const badgeColor = layerPos === drawOrder.length - 1 ? '#FFD700' : layerPos === 0 ? 'rgba(255,255,255,0.35)' : 'rgba(255,255,255,0.55)';
-      ctx.fillStyle = badgeColor;
-      ctx.font = '7px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(layerLabel, bx + wBtn - 38, btnY + 3);
+      ctx.fillStyle = isSelected ? '#f59e0b' : '#64748b';
+      ctx.font = '900 8.5px "Rajdhani", monospace';
+      ctx.fillText(`ORDER: [ ${layerLabel} ]`, cardX + 10, cardY + 23);
 
-      // ▲ Bring Forward button
-      const upBtnX = bx + wBtn - 22;
-      const upBtnY = by + 1;
-      const arrowBtnW = 10;
-      const arrowBtnH = hBtn - 2;
-      const canMoveUp = layerPos < drawOrder.length - 1;
+      // Layer Up (▲) / Down (▼) buttons
+      const upBtnX = cardX + cardW - 48;
+      const downBtnX = cardX + cardW - 24;
+      const btnSize = 18;
+      const btnY = cardY + 11;
 
-      ctx.fillStyle = canMoveUp ? 'rgba(0, 200, 100, 0.25)' : 'rgba(255,255,255,0.04)';
-      ctx.beginPath();
-      ctx.roundRect(upBtnX, upBtnY, arrowBtnW, arrowBtnH, 2);
-      ctx.fill();
-      ctx.fillStyle = canMoveUp ? '#00ff88' : 'rgba(255,255,255,0.15)';
-      ctx.font = 'bold 9px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('▲', upBtnX + arrowBtnW / 2, upBtnY + arrowBtnH / 2 + 3);
+      drawButton('▲', upBtnX, btnY + btnSize / 2, () => {
+        const pos = drawOrder.indexOf(idx);
+        if (pos < drawOrder.length - 1) {
+          [drawOrder[pos], drawOrder[pos + 1]] = [drawOrder[pos + 1], drawOrder[pos]];
+          saveWeaponCustomizations();
+        }
+      }, btnSize, btnSize, null, 2);
 
-      if (canMoveUp) {
-        _registerButton(upBtnX, upBtnY, arrowBtnW, arrowBtnH, () => {
-          const pos = drawOrder.indexOf(idx);
-          if (pos < drawOrder.length - 1) {
-            [drawOrder[pos], drawOrder[pos + 1]] = [drawOrder[pos + 1], drawOrder[pos]];
-            saveWeaponCustomizations();
-          }
-        });
-      }
+      drawButton('▼', downBtnX, btnY + btnSize / 2, () => {
+        const pos = drawOrder.indexOf(idx);
+        if (pos > 0) {
+          [drawOrder[pos], drawOrder[pos - 1]] = [drawOrder[pos - 1], drawOrder[pos]];
+          saveWeaponCustomizations();
+        }
+      }, btnSize, btnSize, null, 2);
 
-      // ▼ Send Back button
-      const downBtnX = bx + wBtn - 11;
-      const downBtnY = by + 1;
-      const canMoveDown = layerPos > 0;
-
-      ctx.fillStyle = canMoveDown ? 'rgba(200, 100, 0, 0.25)' : 'rgba(255,255,255,0.04)';
-      ctx.beginPath();
-      ctx.roundRect(downBtnX, downBtnY, arrowBtnW, arrowBtnH, 2);
-      ctx.fill();
-      ctx.fillStyle = canMoveDown ? '#ffaa00' : 'rgba(255,255,255,0.15)';
-      ctx.font = 'bold 9px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('▼', downBtnX + arrowBtnW / 2, downBtnY + arrowBtnH / 2 + 3);
-
-      if (canMoveDown) {
-        _registerButton(downBtnX, downBtnY, arrowBtnW, arrowBtnH, () => {
-          const pos = drawOrder.indexOf(idx);
-          if (pos > 0) {
-            [drawOrder[pos], drawOrder[pos - 1]] = [drawOrder[pos - 1], drawOrder[pos]];
-            saveWeaponCustomizations();
-          }
-        });
-      }
-
-      // Main card click area (excluding arrow buttons)
-      _registerButton(bx, by, wBtn - 24, hBtn, () => {
+      _registerButton(cardX, cardY, cardW - 52, cardH, () => {
         state.studioClawFinger = idx;
         state.studioSelectedDetail = 'finger';
       });
     });
 
-    const adjustY = rightY + 125;
+    // Right Console Metrics for Mahito
     const f = state.weaponCustomizations.mahito.blades[state.studioClawFinger];
+    let curY = consoleY + 34;
 
     if (state.studioSelectedDetail === 'finger') {
-      // Arch
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '9px Arial';
-      ctx.textAlign = 'left';
-      ctx.fillText(`Arch: ${Math.round(f.topArchY)}`, rightX + 15, adjustY + 20);
-      drawButton('-', rightX + rightW - 50, adjustY + 20, () => { f.topArchY -= 1.0; saveWeaponCustomizations(); }, 16, 12);
-      drawButton('+', rightX + rightW - 25, adjustY + 20, () => { f.topArchY += 1.0; saveWeaponCustomizations(); }, 16, 12);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9px "Rajdhani", sans-serif';
+      ctx.fillText(`ACTIVE: ${clawNames[state.studioClawFinger]}`, rightConsoleX + 14, curY);
+      curY += 22;
 
-      // Tip
+      // Arch Stepper
       ctx.fillStyle = '#ffffff';
-      ctx.fillText(`Tip: ${Math.round(f.tipY)}`, rightX + 15, adjustY + 40);
-      drawButton('-', rightX + rightW - 50, adjustY + 40, () => { f.tipY -= 1.0; saveWeaponCustomizations(); }, 16, 12);
-      drawButton('+', rightX + rightW - 25, adjustY + 40, () => { f.tipY += 1.0; saveWeaponCustomizations(); }, 16, 12);
+      ctx.font = '900 11px "Rajdhani", sans-serif';
+      ctx.fillText(`SPINE ARCH: ${Math.round(f.topArchY)}px`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { f.topArchY -= 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { f.topArchY += 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 34;
+
+      // Tip Stepper
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(`TIP CURVATURE: ${Math.round(f.tipY)}px`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { f.tipY -= 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { f.tipY += 1.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 34;
+
+      // Blade Length Readout
+      ctx.fillStyle = '#94a3b8';
+      ctx.font = '900 10px "Rajdhani", monospace';
+      ctx.fillText(`BLADE LENGTH: ${Math.round(f.length)}px`, rightConsoleX + 14, curY);
+      curY += 20;
+      ctx.fillText(`FAN ANGLE: ${(f.fanAngle * (180 / Math.PI)).toFixed(1)}°`, rightConsoleX + 14, curY);
+      curY += 32;
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.font = 'italic 8.5px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Click a finger card', rightX + rightW / 2, adjustY + 25);
-      ctx.fillText('to edit curvature', rightX + rightW / 2, adjustY + 38);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 10px "Rajdhani", sans-serif';
+      ctx.fillText('SELECT A FINGER CARD ON THE LEFT', rightConsoleX + 14, curY + 20);
+      ctx.fillText('TO ADJUST BLADE CURVATURE', rightConsoleX + 14, curY + 36);
+      curY += 80;
     }
 
-    // ── Weapon Scale Control (always visible for Mahito) ──
-    const scaleY = adjustY + 58;
+    // Divider
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(rightConsoleX + 14, curY);
+    ctx.lineTo(rightConsoleX + rightConsoleW - 14, curY);
+    ctx.stroke();
+    curY += 16;
+
+    // Global Weapon Scale
     const mahitoCustom = state.weaponCustomizations.mahito;
-    ctx.fillStyle = 'rgba(255, 215, 0, 0.6)';
-    ctx.font = 'bold 8px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText('WEAPON SCALE', rightX + rightW / 2, scaleY);
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '900 10.5px "Rajdhani", sans-serif';
+    ctx.fillText('GLOBAL CLAW SCALE //', rightConsoleX + 14, curY);
+    curY += 20;
 
     ctx.fillStyle = '#ffffff';
-    ctx.font = '9px Arial';
-    ctx.textAlign = 'left';
-    ctx.fillText(`Scale: ${mahitoCustom.weaponScale.toFixed(2)}x`, rightX + 15, scaleY + 16);
-    drawButton('-', rightX + rightW - 50, scaleY + 16, () => { mahitoCustom.weaponScale = Math.max(0.3, mahitoCustom.weaponScale - 0.05); saveWeaponCustomizations(); }, 16, 12);
-    drawButton('+', rightX + rightW - 25, scaleY + 16, () => { mahitoCustom.weaponScale = Math.min(3.0, mahitoCustom.weaponScale + 0.05); saveWeaponCustomizations(); }, 16, 12);
+    ctx.font = '900 12px "Rajdhani", sans-serif';
+    ctx.fillText(`SCALE: ${mahitoCustom.weaponScale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+    drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { mahitoCustom.weaponScale = Math.max(0.3, mahitoCustom.weaponScale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+    drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { mahitoCustom.weaponScale = Math.min(3.0, mahitoCustom.weaponScale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+
   } else {
-    // Selectable Details List
-    ctx.fillText('ADJUSTABLE DETAILS', rightX + rightW / 2, rightY + 18);
-    
+    // Non-Mahito Weapons Console
+    ctx.fillText('CALIBRATION MODE //', leftConsoleX + 14, consoleY + 12);
+    ctx.fillText('TRANSFORM METRICS //', rightConsoleX + 14, consoleY + 12);
+
     const detailOptions = [
-      { id: 'position', label: '📍 POSITION (X, Y)' },
-      { id: 'scale_angle', label: '📐 SCALE & ANGLE' }
+      { id: 'position', label: 'POSITION (X, Y)', desc: 'Translate weapon grip point' },
+      { id: 'scale_angle', label: 'SCALE & ROTATION', desc: 'Adjust size & tilt angle' }
     ];
-    
+
     detailOptions.forEach((opt, idx) => {
-      const btnX = rightX + rightW / 2;
-      const btnY = rightY + 34 + idx * 22;
+      const cardY = consoleY + 34 + idx * 56;
+      const cardW = leftConsoleW - 24;
+      const cardH = 48;
+      const cardX = leftConsoleX + 12;
       const isSelected = state.studioSelectedDetail === opt.id;
-      
-      const wBtn = 120;
-      const hBtn = 18;
-      const bx = btnX - wBtn / 2;
-      const by = btnY - hBtn / 2;
-      
-      ctx.fillStyle = isSelected ? 'rgba(0, 255, 255, 0.15)' : 'rgba(255, 255, 255, 0.03)';
-      ctx.strokeStyle = isSelected ? '#00ffff' : 'rgba(255, 255, 255, 0.1)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.roundRect(bx, by, wBtn, hBtn, 3);
+
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.20)';
+        ctx.strokeStyle = '#f59e0b';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, cardX, cardY, cardW, cardH, 5);
       ctx.fill();
       ctx.stroke();
-      
-      ctx.fillStyle = isSelected ? '#00ffff' : 'rgba(255, 255, 255, 0.7)';
-      ctx.font = 'bold 8.5px Arial';
-      ctx.fillText(opt.label, btnX, btnY + 4.5);
-      
-      _registerButton(bx, by, wBtn, hBtn, () => {
+      ctx.restore();
+
+      ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
+      ctx.font = '900 11px "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(opt.label, cardX + 10, cardY + 9);
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 8.5px "Rajdhani", sans-serif';
+      ctx.fillText(opt.desc, cardX + 10, cardY + 26);
+
+      _registerButton(cardX, cardY, cardW, cardH, () => {
         state.studioSelectedDetail = opt.id;
       });
     });
 
-    const controlY = rightY + 98;
     const custom = state.weaponCustomizations[activeWeaponKey];
-    ctx.fillStyle = '#ffffff';
-    ctx.font = '9px Arial';
-    ctx.textAlign = 'left';
+    let curY = consoleY + 34;
 
     if (state.studioSelectedDetail === 'position') {
-      // Offset X
-      ctx.fillText(`Offset X: ${Math.round(custom.offsetX)}`, rightX + 15, controlY);
-      drawButton('-', rightX + rightW - 50, controlY, () => { custom.offsetX -= 2.0; saveWeaponCustomizations(); }, 16, 12);
-      drawButton('+', rightX + rightW - 25, controlY, () => { custom.offsetX += 2.0; saveWeaponCustomizations(); }, 16, 12);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11.5px "Rajdhani", sans-serif';
+      ctx.fillText(`OFFSET X: ${Math.round(custom.offsetX)}px`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.offsetX -= 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.offsetX += 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 38;
 
-      // Offset Y
-      ctx.fillText(`Offset Y: ${Math.round(custom.offsetY)}`, rightX + 15, controlY + 26);
-      drawButton('-', rightX + rightW - 50, controlY + 26, () => { custom.offsetY -= 2.0; saveWeaponCustomizations(); }, 16, 12);
-      drawButton('+', rightX + rightW - 25, controlY + 26, () => { custom.offsetY += 2.0; saveWeaponCustomizations(); }, 16, 12);
+      ctx.fillText(`OFFSET Y: ${Math.round(custom.offsetY)}px`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.offsetY -= 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.offsetY += 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 38;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('DRAG TEAL HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+      ctx.fillText('FOR REAL-TIME POSITIONING', rightConsoleX + 14, curY + 26);
+
     } else if (state.studioSelectedDetail === 'scale_angle') {
-      // Scale
-      ctx.fillText(`Scale: ${custom.scale.toFixed(2)}x`, rightX + 15, controlY);
-      drawButton('-', rightX + rightW - 50, controlY, () => { custom.scale = Math.max(0.3, custom.scale - 0.05); saveWeaponCustomizations(); }, 16, 12);
-      drawButton('+', rightX + rightW - 25, controlY, () => { custom.scale = Math.min(3.0, custom.scale + 0.05); saveWeaponCustomizations(); }, 16, 12);
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11.5px "Rajdhani", sans-serif';
+      ctx.fillText(`SCALE: ${custom.scale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.scale = Math.max(0.3, custom.scale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.scale = Math.min(3.0, custom.scale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 38;
 
-      // Angle Offset
-      const deg = Math.round((custom.angleOffset * 180) / Math.PI);
-      ctx.fillText(`Angle: ${deg}°`, rightX + 15, controlY + 26);
-      drawButton('-', rightX + rightW - 50, controlY + 26, () => { custom.angleOffset -= 0.08; saveWeaponCustomizations(); }, 16, 12);
-      drawButton('+', rightX + rightW - 25, controlY + 26, () => { custom.angleOffset += 0.08; saveWeaponCustomizations(); }, 16, 12);
+      const deg = Math.round(custom.angleOffset * (180 / Math.PI));
+      ctx.fillText(`ROTATION: ${deg}°`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.angleOffset -= 0.05; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.angleOffset += 0.05; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 38;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+      ctx.fillText('FOR REAL-TIME ROTATION & SCALE', rightConsoleX + 14, curY + 26);
+
     } else {
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-      ctx.font = 'italic 8.5px Arial';
-      ctx.textAlign = 'center';
-      ctx.fillText('Click details card above', rightX + rightW / 2, controlY + 12);
-      ctx.fillText('to enable handles', rightX + rightW / 2, controlY + 25);
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 10px "Rajdhani", sans-serif';
+      ctx.fillText('SELECT A CALIBRATION MODE ON LEFT', rightConsoleX + 14, curY + 20);
+      ctx.fillText('TO ENABLE PARAMETER CONTROLS', rightConsoleX + 14, curY + 36);
     }
   }
 
-  // 8. Bottom Center: Reset & Lock buttons
-  const ctrlBtnY = canvas.height - 180;
-  drawButton('🔄 RESET TO DEFAULT', canvas.width / 2, ctrlBtnY, () => {
-    if (confirm('Reset current weapon customization?')) {
+  // ── Tier 4: Bottom Action Deck ──
+  const bottomY = canvas.height - 34;
+  drawButton('RESET DEFAULTS', 150, bottomY, () => {
+    if (confirm(`Reset ${activeWeaponKey.toUpperCase()} customizations to default?`)) {
       if (activeWeaponKey === 'mahito') {
         state.weaponCustomizations.mahito.blades = [
           { idx: 0, knuckleX: 3.0, knuckleY: -6.5, fanAngle: -0.32, length: 82, heelWidth: 14.0, topArchY: -14.0, tipY: 16.0 },
@@ -515,80 +693,11 @@ export function drawWeaponStudioScreen() {
       }
       saveWeaponCustomizations();
     }
-  }, 160, 24);
+  }, 140, 28, null, 4);
 
-  // 9. Back Button
-  drawButton('⌂ BACK TO MENU', canvas.width / 2, canvas.height - 40, () => {
+  drawButton('⌂ BACK TO MENU', 390, bottomY, () => {
     state.gameState = 'title';
-  }, 160, 32);
-
-  // 10. Draw Canvas Interactive Drag Handles (Conditional visibility based on selection)
-  if (state.studioSelectedDetail !== null) {
-    ctx.save();
-    ctx.translate(canvas.width / 2, heroY);
-    ctx.scale(currentScale, currentScale);
-
-    if (activeWeaponKey === 'mahito' && state.studioSelectedDetail === 'finger') {
-      // Claw finger handles (knuckles & tips) - Render ONLY for the selected finger
-      const handX = 25;
-      const blades = state.weaponCustomizations.mahito.blades;
-      const b = blades[state.studioClawFinger];
-      if (b) {
-        const kx = handX + b.knuckleX;
-        const ky = b.knuckleY;
-
-        const cosAngle = Math.cos(b.fanAngle);
-        const sinAngle = Math.sin(b.fanAngle);
-        const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
-        const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
-
-        // Knuckle (Teal handle)
-        ctx.beginPath(); ctx.arc(kx, ky, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = (activeDragFinger === state.studioClawFinger && activeDragType === 'knuckle') ? '#00ffff' : 'rgba(0, 255, 255, 0.75)';
-        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8; ctx.stroke();
-
-        // Tip (Crimson handle)
-        ctx.beginPath(); ctx.arc(tx, ty, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = (activeDragFinger === state.studioClawFinger && activeDragType === 'tip') ? '#ff3333' : 'rgba(255, 50, 50, 0.75)';
-        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8; ctx.stroke();
-
-        // Guideline
-        ctx.beginPath(); ctx.moveTo(kx, ky); ctx.lineTo(tx, ty);
-        ctx.strokeStyle = 'rgba(255,255,255,0.3)'; ctx.lineWidth = 0.5; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
-      }
-    } else if (activeWeaponKey !== 'mahito') {
-      // Generic transforms handles for single-blade weapons
-      const custom = state.weaponCustomizations[activeWeaponKey];
-      
-      let offsetX = -40;
-      if (activeWeaponKey === 'cronos') offsetX = -55;
-      else if (activeWeaponKey === 'ruby') offsetX = -75;
-
-      const baseLx = offsetX + custom.offsetX;
-      const baseLy = custom.offsetY;
-
-      if (state.studioSelectedDetail === 'position') {
-        // Grip Anchor (Teal handle) - Position adjust only
-        ctx.beginPath(); ctx.arc(baseLx, baseLy, 4.0, 0, Math.PI * 2);
-        ctx.fillStyle = isDraggingBase ? '#00ffff' : 'rgba(0, 255, 255, 0.85)';
-        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8; ctx.stroke();
-      } else if (state.studioSelectedDetail === 'scale_angle') {
-        // Scale / Angle Handle (Crimson handle) - Angle/Scale adjust only
-        const lineLen = 70;
-        const tipLx = baseLx + lineLen * custom.scale * Math.cos(custom.angleOffset);
-        const tipLy = baseLy + lineLen * custom.scale * Math.sin(custom.angleOffset);
-
-        ctx.beginPath(); ctx.arc(tipLx, tipLy, 4.0, 0, Math.PI * 2);
-        ctx.fillStyle = isDraggingTip ? '#ff3333' : 'rgba(255, 50, 50, 0.85)';
-        ctx.fill(); ctx.strokeStyle = '#fff'; ctx.lineWidth = 0.8; ctx.stroke();
-
-        // Connection bone line from grip anchor to tip
-        ctx.beginPath(); ctx.moveTo(baseLx, baseLy); ctx.lineTo(tipLx, tipLy);
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.4)'; ctx.lineWidth = 0.6; ctx.setLineDash([2, 2]); ctx.stroke(); ctx.setLineDash([]);
-      }
-    }
-    ctx.restore();
-  }
+  }, 140, 28, null, 4);
 }
 
 // ─────────────────────────────────────────────
@@ -607,7 +716,9 @@ if (typeof window !== 'undefined') {
     const my = (e.clientY - rect.top) * scaleY;
 
     const currentScale = state.studioPreviewScale;
-    const heroY = state.canvas.height * 0.35;
+    const viewportY = 142;
+    const viewportH = 372;
+    const heroY = viewportY + viewportH / 2;
     const activeWeaponKey = state.studioSelectedWeapon;
 
     // Convert mouse position to local hero display space
@@ -631,14 +742,14 @@ if (typeof window !== 'undefined') {
       const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
 
       // Knuckle click check
-      if (Math.hypot(localX - kx, localY - ky) < 10) {
+      if (Math.hypot(localX - kx, localY - ky) < 14) {
         activeDragFinger = i;
         activeDragType = 'knuckle';
         return;
       }
 
       // Tip click check
-      if (Math.hypot(localX - tx, localY - ty) < 10) {
+      if (Math.hypot(localX - tx, localY - ty) < 14) {
         activeDragFinger = i;
         activeDragType = 'tip';
         return;
@@ -654,7 +765,7 @@ if (typeof window !== 'undefined') {
 
       if (state.studioSelectedDetail === 'position') {
         // Grip anchor check
-        if (Math.hypot(localX - baseLx, localY - baseLy) < 10) {
+        if (Math.hypot(localX - baseLx, localY - baseLy) < 14) {
           isDraggingBase = true;
           return;
         }
@@ -664,7 +775,7 @@ if (typeof window !== 'undefined') {
         const tipLy = baseLy + lineLen * custom.scale * Math.sin(custom.angleOffset);
 
         // Tip handle check
-        if (Math.hypot(localX - tipLx, localY - tipLy) < 10) {
+        if (Math.hypot(localX - tipLx, localY - tipLy) < 14) {
           isDraggingTip = true;
           return;
         }
@@ -682,7 +793,9 @@ if (typeof window !== 'undefined') {
     const my = (e.clientY - rect.top) * scaleY;
 
     const currentScale = state.studioPreviewScale;
-    const heroY = state.canvas.height * 0.35;
+    const viewportY = 142;
+    const viewportH = 372;
+    const heroY = viewportY + viewportH / 2;
     const activeWeaponKey = state.studioSelectedWeapon;
 
     const localX = (mx - state.canvas.width / 2) / currentScale;

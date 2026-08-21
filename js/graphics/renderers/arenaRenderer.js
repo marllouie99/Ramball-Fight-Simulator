@@ -69,23 +69,23 @@ function drawSketchyLine(ctx, x1, y1, x2, y2, seed, color = 'rgba(20,20,25,0.85)
   ctx.restore();
 }
 
-function drawSketchyArenaBorders(ctx, arena, wallWidth) {
+function drawSketchyArenaBorders(ctx, arena, wallWidth, color = 'rgba(15,15,18,0.85)') {
   const x = arena.x;
   const y = arena.y;
   const w = arena.width;
   const h = arena.height;
 
   // Draw outside walls with pencil effect
-  drawSketchyLine(ctx, x, y, x + w, y, 100, 'rgba(15,15,18,0.85)', wallWidth); // Top
-  drawSketchyLine(ctx, x + w, y, x + w, y + h, 200, 'rgba(15,15,18,0.85)', wallWidth); // Right
-  drawSketchyLine(ctx, x + w, y + h, x, y + h, 300, 'rgba(15,15,18,0.85)', wallWidth); // Bottom
-  drawSketchyLine(ctx, x, y + h, x, y, 400, 'rgba(15,15,18,0.85)', wallWidth); // Left
+  drawSketchyLine(ctx, x, y, x + w, y, 100, color, wallWidth); // Top
+  drawSketchyLine(ctx, x + w, y, x + w, y + h, 200, color, wallWidth); // Right
+  drawSketchyLine(ctx, x + w, y + h, x, y + h, 300, color, wallWidth); // Bottom
+  drawSketchyLine(ctx, x, y + h, x, y, 400, color, wallWidth); // Left
 }
 
 /**
- * Renders a solid jet-black vector fissure crack (matching manga comic / PNG crack art).
+ * Renders a solid vector fissure crack (matching manga comic / PNG crack art).
  */
-function drawSolidVectorCrack(ctx, crack) {
+function drawSolidVectorCrack(ctx, crack, isDark = false) {
   const alpha = Math.min(1.0, crack.life / 30); // fade out at end of lifetime
   ctx.save();
   ctx.translate(crack.x, crack.y);
@@ -97,7 +97,7 @@ function drawSolidVectorCrack(ctx, crack) {
     return r / 233280;
   };
 
-  const fillStyle = `rgba(15, 15, 18, ${alpha * 0.95})`;
+  const fillStyle = isDark ? `rgba(235, 240, 250, ${alpha * 0.90})` : `rgba(15, 15, 18, ${alpha * 0.95})`;
 
   // Helper to draw a filled polygonal crack ribbon path with tapering thickness
   const drawPolygonalRibbon = (spineNodes) => {
@@ -283,9 +283,10 @@ export function drawArena() {
     return { color: 0x000000, alpha: 1 };
   };
 
-  const canvasBg = parseColor(CONFIG.canvasBgColor || '#000000');
-  const outerBg = parseColor(CONFIG.arenaOuterBgColor || '#f5f5f5');
-  const innerBg = parseColor(CONFIG.arenaInnerBgColor || '#ffffff');
+  const isDark = (state.arenaTheme === 'dark');
+  const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#000000'));
+  const outerBg = parseColor(isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
+  const innerBg = parseColor(isDark ? '#1a1c23' : (CONFIG.arenaInnerBgColor || '#ffffff'));
 
   // Fill the entire canvas (global background)
   g.beginFill(canvasBg.color, canvasBg.alpha);
@@ -331,16 +332,18 @@ export function drawArena() {
     : 4;
   
   // Draw sketchy pencil-style borders on the 2D Canvas context
-  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._version !== 2 || state._arenaBorderCanvas.arenaWidth !== arena.width || state._arenaBorderCanvas.arenaHeight !== arena.height || state._arenaBorderCanvas.wallWidth !== wallWidth) {
+  const borderColor = isDark ? 'rgba(230, 235, 245, 0.85)' : 'rgba(15, 15, 18, 0.85)';
+  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._version !== 2 || state._arenaBorderCanvas.arenaWidth !== arena.width || state._arenaBorderCanvas.arenaHeight !== arena.height || state._arenaBorderCanvas.wallWidth !== wallWidth || state._arenaBorderCanvas._theme !== (state.arenaTheme || 'light')) {
     const padding = 60; // Extra padding for overshoots
     const offCanvas = document.createElement('canvas');
     offCanvas.width = arena.width + padding * 2;
     offCanvas.height = arena.height + padding * 2;
     const oc = offCanvas.getContext('2d');
     
-    drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth);
+    drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth, borderColor);
     
     offCanvas._version = 2;
+    offCanvas._theme = state.arenaTheme || 'light';
     offCanvas.arenaWidth = arena.width;
     offCanvas.arenaHeight = arena.height;
     offCanvas.wallWidth = wallWidth;
@@ -377,7 +380,7 @@ export function drawArena() {
         continue;
       }
       
-      drawSolidVectorCrack(ctx, crack);
+      drawSolidVectorCrack(ctx, crack, isDark);
     }
     ctx.restore();
   }
@@ -389,7 +392,7 @@ export function drawArena() {
   const centerY = arena.y + arena.height / 2;
 
   ctx.save();
-  ctx.fillStyle = 'rgba(30, 120, 255, 0.15)';
+  ctx.fillStyle = isDark ? 'rgba(90, 180, 255, 0.07)' : 'rgba(30, 120, 255, 0.05)';
   ctx.font = '900 34px "Impact", "Trebuchet MS", "Arial Black", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -401,7 +404,7 @@ export function drawArena() {
 
   // ── Cached Title Header (text only) ──────────────────────────────
   // Render the entire title text once into an offscreen canvas, then blit it every frame.
-  if (!state._titleHeaderCanvas) {
+  if (!state._titleHeaderCanvas || state._titleHeaderCanvasTheme !== (state.arenaTheme || 'light')) {
     // Prevent Flash of Unstyled Text (FOUT) and visual jumping by waiting for custom fonts
     if (document.fonts) {
       const harutoReady = document.fonts.check('900 42px "Haruto"');
@@ -422,11 +425,11 @@ export function drawArena() {
 
     // ── Title Text (rendered once) ────────────────────────────────────────
     const textCX = headerW / 2;
-    oc.fillStyle = '#000000';
+    oc.fillStyle = isDark ? '#ffffff' : '#000000';
     oc.font = '900 42px "Haruto", Arial';
     oc.textAlign = 'center';
     oc.textBaseline = 'middle';
-    oc.strokeStyle = '#ffffff';
+    oc.strokeStyle = isDark ? '#000000' : '#ffffff';
     oc.lineWidth = 4.5;
     oc.strokeText('Fight of Characters', textCX, 100);
     oc.fillText('Fight of Characters', textCX, 100);
@@ -436,7 +439,9 @@ export function drawArena() {
     oc.strokeText('Ball Fight Simulator', textCX, 135);
     oc.fillText('Ball Fight Simulator', textCX, 135);
 
+    offCanvas._theme = state.arenaTheme || 'light';
     state._titleHeaderCanvas = offCanvas;
+    state._titleHeaderCanvasTheme = offCanvas._theme;
   }
 
   // Blit the fully cached title header (text only) in one drawImage call

@@ -94,12 +94,12 @@ export const genosConfig = {
   // Passive: Core Overdrive (Self-Destruct)
   selfDestructHpThreshold: 0.10,    // HP percentage threshold (0.10 = 10% HP) below which Genos initiates Core Overdrive Self-Destruct
   selfDestructCountdownFrames: 150, // 2.5 seconds
-  selfDestructDamageReduction: 0.75, // 75% Damage Reduction (DEF) while charging core overload self-destruct
+  selfDestructDamageReduction: 0.50, // 75% Damage Reduction (DEF) while charging core overload self-destruct
   selfDestructRadius: 200,
   selfDestructDamage: 250, // True damage explosion
   selfDestructKnockback: 20, // Push velocity applied to targets caught in blast
   selfDestructSurvivalHpPercent: 0.01, // Percentage of max HP Genos retains immediately after explosion (1%)
-  selfDestructHpRecoveryPercent: 0.30, // Percentage of max HP Genos recovers upon completing cybernetic reboot reassembly (30% = +96 HP)
+  selfDestructHpRecoveryPercent: 0.15, // Percentage of max HP Genos recovers upon completing cybernetic reboot reassembly (30% = +96 HP)
   selfDestructHpRecoveryFlat: 0,       // Optional flat HP amount added upon reboot recovery (0 = disabled)
   selfDestructShakeIntensity: 18,
   selfDestructShakeDuration: 50,

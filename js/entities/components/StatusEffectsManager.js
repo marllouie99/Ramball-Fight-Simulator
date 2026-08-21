@@ -280,6 +280,7 @@ export class StatusEffectsManager {
         fighter.timeStopTimer = 0;
         fighter.isFrozenByInfinity = false;
         fighter.suppressFreezeOverlay = false;
+        fighter.preventKnockbackBounce = false;
         delete fighter._suppressFreezeTimer;
         // Restore any saved velocities (from counter or sphere freezes)
         if (typeof fighter._resumeVx === 'number') {
@@ -294,6 +295,15 @@ export class StatusEffectsManager {
         delete fighter._timeStopFrozenGunAngle;
         delete fighter._timeStopOriginalDuration;
         delete fighter._timeStopStartTime;
+
+        // Restore baseline movement velocity if fighter is stationary and not channeling/building
+        if (fighter.vx === 0 && fighter.vy === 0 && (fighter.speed || 0) > 0 && !fighter.isBuildingTurret && !fighter.isChannelingDomain && !fighter.isCountering) {
+          const arenaCenterX = (typeof CONFIG !== 'undefined' && CONFIG.arena) ? (CONFIG.arena.x + CONFIG.arena.width / 2) : fighter.x;
+          const arenaCenterY = (typeof CONFIG !== 'undefined' && CONFIG.arena) ? (CONFIG.arena.y + CONFIG.arena.height / 2) : fighter.y;
+          const recoverAngle = Math.atan2(arenaCenterY - fighter.y, arenaCenterX - fighter.x) + (Math.random() - 0.5) * 0.4;
+          fighter.vx = Math.cos(recoverAngle) * fighter.speed;
+          fighter.vy = Math.sin(recoverAngle) * fighter.speed;
+        }
       }
       return true;
     } else {

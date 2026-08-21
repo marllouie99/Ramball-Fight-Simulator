@@ -1,4 +1,5 @@
 import { CONFIG } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 let _hudSyncInitialized = false;
 let _cachedGameBox = null;
@@ -23,7 +24,8 @@ export function syncHudPosition() {
   _cachedGameBox.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
   _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
   
-  const outerBgColor = CONFIG.arenaOuterBgColor || '#ffffff';
+  const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+  const outerBgColor = isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#ffffff');
   _cachedGameBox.style.backgroundColor = outerBgColor.replace(/ff$/, '');
 
   const boxRect = _cachedGameBox.getBoundingClientRect();

@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -17,7 +17,7 @@ export const saitamaConfig = {
   punchKnockback: 100, // Massive knockback force
   punchReach: 80,
   punchArcAngle: Math.PI * 0.5, // 90 degree arc angle
-  punchCooldown: 500, // ~0.5s cooldown
+  punchCooldown: 300, // ~0.5s cooldown
   punchWindup: 0,
   punchWindupFrames: 0,
   punchMaxTime: 22,                // Smooth punch animation frames
@@ -75,7 +75,10 @@ export const saitamaConfig = {
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
-  counterPunchDamage: 1000,        // Damage dealt by the counter punch
+  counterPunchDamage: 1000,        // Damage dealt by the counter punch to primary target
+  counterFrontalReach: 750,        // Long frontal shockwave blast reach (px)
+  counterFrontalArc: (135 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
+  counterFrontalCollateralDamage: 650, // Damage dealt to collateral enemies caught in the wide long frontal blast
   counterWindupFrames: 50,        // Frames Saitama waits before teleporting (reaction delay)
   counterTeleportIdleFrames: 10,  // Frames Saitama stands completely still (staring) after teleporting before starting the charge
   counterTeleportDistanceOffset: 35, // Distance offset behind enemy (guarantees Saitama never overlaps the enemy's body)

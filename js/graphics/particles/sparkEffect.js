@@ -1163,6 +1163,100 @@ export function drawSparkEffects(layer = 'all') {
 
           ctx.restore();
         }
+      } else if (effect.type === 'saitamaCounterFrontalBlast') {
+        // Massive Wide Long Frontal Supersonic Shockwave Blast (Death Punch Canyon)
+        const startX = effect.x;
+        const startY = effect.y;
+        const angle = effect.angle || 0;
+        const reach = effect.reach || 750;
+        const arc = effect.arcAngle || (Math.PI * 0.75); // 135-degree wide frontal cone
+        const progress = 1.0 - effect.life; // 0 to 1
+        const alpha = Math.sin(effect.life * Math.PI);
+
+        if (alpha > 0.01) {
+          ctx.save();
+          ctx.translate(startX, startY);
+          ctx.rotate(angle);
+
+          // Fast supersonic expansion along length: reaches full length by progress = 0.25
+          const currentReach = reach * Math.min(1.0, progress / 0.22);
+          const halfArc = arc * 0.5;
+
+          // 1. Broad Outer Fiery Crimson Shockwave Atmosphere (Death Punch style)
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          const coneSteps = 16;
+          for (let s = 0; s <= coneSteps; s++) {
+            const t = s / coneSteps;
+            const a = -halfArc + t * arc;
+            const rDist = currentReach * (0.85 + 0.15 * Math.sin(t * Math.PI));
+            ctx.lineTo(Math.cos(a) * rDist, Math.sin(a) * rDist);
+          }
+          ctx.closePath();
+          const outerGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, currentReach);
+          outerGrad.addColorStop(0,    `rgba(239, 68, 68, ${(0.65 * alpha).toFixed(3)})`);
+          outerGrad.addColorStop(0.35, `rgba(245, 158, 11, ${(0.45 * alpha).toFixed(3)})`);
+          outerGrad.addColorStop(0.70, `rgba(245, 196, 0, ${(0.25 * alpha).toFixed(3)})`);
+          outerGrad.addColorStop(1,    'rgba(239, 68, 68, 0)');
+          ctx.fillStyle = outerGrad;
+          ctx.fill();
+          ctx.restore();
+
+          // 2. Focused Dense Golden-Amber Supersonic Pressure Cone
+          ctx.save();
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          const coreArc = halfArc * 0.65;
+          for (let s = 0; s <= coneSteps; s++) {
+            const t = s / coneSteps;
+            const a = -coreArc + t * (coreArc * 2);
+            const rDist = currentReach * (0.95 + 0.05 * Math.sin(t * Math.PI));
+            ctx.lineTo(Math.cos(a) * rDist, Math.sin(a) * rDist);
+          }
+          ctx.closePath();
+          const coreGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, currentReach);
+          coreGrad.addColorStop(0,    `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`);
+          coreGrad.addColorStop(0.25, `rgba(245, 196, 0, ${(0.85 * alpha).toFixed(3)})`);
+          coreGrad.addColorStop(0.65, `rgba(234, 88, 12, ${(0.55 * alpha).toFixed(3)})`);
+          coreGrad.addColorStop(1,    'rgba(234, 88, 12, 0)');
+          ctx.fillStyle = coreGrad;
+          ctx.fill();
+          ctx.restore();
+
+          // 3. Razor-Sharp White Supersonic Air Displacement Needles
+          const needleCount = 14;
+          ctx.fillStyle = `rgba(255, 255, 255, ${(0.92 * alpha).toFixed(3)})`;
+          for (let n = 0; n < needleCount; n++) {
+            const nAngle = (-halfArc * 0.82) + (n / (needleCount - 1)) * (arc * 0.82);
+            const nDist = currentReach * (0.40 + (n % 3) * 0.25);
+            const nLen = Math.min(220, currentReach * 0.38);
+            const nStartX = Math.cos(nAngle) * (nDist - nLen * 0.5);
+            const nStartY = Math.sin(nAngle) * (nDist - nLen * 0.5);
+            const nEndX = Math.cos(nAngle) * (nDist + nLen * 0.5);
+            const nEndY = Math.sin(nAngle) * (nDist + nLen * 0.5);
+            const perpX = -Math.sin(nAngle) * 3.5 * alpha;
+            const perpY =  Math.cos(nAngle) * 3.5 * alpha;
+
+            ctx.beginPath();
+            ctx.moveTo(nStartX, nStartY);
+            ctx.lineTo((nStartX + nEndX) * 0.5 + perpX, (nStartY + nEndY) * 0.5 + perpY);
+            ctx.lineTo(nEndX, nEndY);
+            ctx.lineTo((nStartX + nEndX) * 0.5 - perpX, (nStartY + nEndY) * 0.5 - perpY);
+            ctx.closePath();
+            ctx.fill();
+          }
+
+          // 4. Centerline Blinding Air Canyon Fissure
+          ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
+          ctx.lineWidth = 4.5 * alpha;
+          ctx.beginPath();
+          ctx.moveTo(0, 0);
+          ctx.lineTo(currentReach * 1.05, 0);
+          ctx.stroke();
+
+          ctx.restore();
+        }
       } else if (effect.type === 'cursedBiteMaw') {
         // Cursed Jaw Bite Attack Visual (Fanged jaws snapping shut over target)
         const ang = effect.angle || 0;
@@ -2489,6 +2583,64 @@ export function spawnPunchWindSpeedLines(x, y, punchAngle = 0, length = 160, the
         state.sparkEffects.push(line);
       }
     }
+  }
+}
+
+/**
+ * Spawns Saitama's Serious Skill Counter Wide Long Frontal Supersonic Shockwave Blast (Death Punch Canyon).
+ * @param {number} x - Origin X (fist position)
+ * @param {number} y - Origin Y (fist position)
+ * @param {number} angle - Facing/Punch trajectory angle in radians
+ * @param {number} reach - Length of the frontal shockwave (default 750px)
+ * @param {number} arcAngle - Wide frontal cone angle in radians (default 135 deg)
+ */
+export function spawnSaitamaCounterFrontalBlast(x, y, angle = 0, reach = 750, arcAngle = Math.PI * 0.75) {
+  const blast = ParticleSystem.getParticle();
+  blast.x = x;
+  blast.y = y;
+  blast.vx = 0;
+  blast.vy = 0;
+  blast.angle = angle;
+  blast.reach = reach;
+  blast.arcAngle = arcAngle;
+  blast.life = 1.0;
+  blast.decay = 0.038; // ~26 frames duration (fast, punchy supersonic shockwave)
+  blast.friction = 1.0;
+  blast.type = 'saitamaCounterFrontalBlast';
+  blast.isFlash = true;
+
+  if (state.sparkEffects) {
+    state.sparkEffects.push(blast);
+  }
+
+  // Sequential expanding shockwaves along the corridor
+  const cosA = Math.cos(angle);
+  const sinA = Math.sin(angle);
+  const distances = [60, 180, 320, 480, 640];
+  const radii = [90, 125, 160, 200, 240];
+
+  distances.forEach((dist, idx) => {
+    if (dist < reach) {
+      const swX = x + cosA * dist;
+      const swY = y + sinA * dist;
+      if (typeof spawnMeleeClashShockwave === 'function') {
+        spawnMeleeClashShockwave(swX, swY, radii[idx] || 120, 'gold');
+      }
+    }
+  });
+
+  // High-speed wind streaks along the corridor
+  if (typeof spawnPunchWindSpeedLines === 'function') {
+    spawnPunchWindSpeedLines(x, y, angle, 260, 'orange');
+    spawnPunchWindSpeedLines(x + cosA * 150, y + sinA * 150, angle, 280, 'orange');
+    spawnPunchWindSpeedLines(x + cosA * 300, y + sinA * 300, angle, 300, 'orange');
+  }
+
+  // Fiery orange/gold sparks bursting along the corridor
+  if (typeof spawnSparks === 'function') {
+    spawnSparks(x + cosA * 40, y + sinA * 40, 18, 'gold');
+    spawnSparks(x + cosA * 160, y + sinA * 160, 14, 'orange');
+    spawnSparks(x + cosA * 320, y + sinA * 320, 10, 'crimson');
   }
 }
 

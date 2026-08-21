@@ -86,10 +86,11 @@ export class ZeusFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
+    const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));
     const applied = super.takeDamage(amount, attacker, opts);
 
     // Aegis Shield Passive
-    if (applied && attacker && this.hp > 0 && !this.isTurret) {
+    if (applied && attacker && this.hp > 0 && !this.isTurret && !opts.isSaitamaCounter && !opts.isCounter && !isGuaranteedHit) {
       if (this.aegisCooldown <= 0) {
         this._triggerAegisShield(attacker);
       }

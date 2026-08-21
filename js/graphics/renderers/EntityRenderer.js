@@ -1,5 +1,6 @@
 import { state } from '../../core/state.js';
 import { CONFIG } from '../../core/config.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from '../weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from '../fighters/doppelgangerSkin.js';
 import { drawSketchyCircle } from './fighterRenderer.js';
@@ -27,16 +28,32 @@ export function drawFighters() {
   // Removed debug overlay hiding to prevent DOM layout thrashing
 
   // Helper to render team indicator ring for team modes (2v2 and 1v2 Stand Off)
-  const isTeamMode = (mode === '2v2' || mode === '1v2 Stand Off' || mode === '1v2');
+  const isTeamMode = (mode === '2v2' || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.TWO_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2);
 
-  const drawTeamRing = (fighter, fi, isOnTop = false) => {
+  const drawTeamRing = (fighter, fi) => {
     if (!isTeamMode || !fighter || fighter.hp <= 0 || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
     const team = state.getFighterTeam(fi);
     if (team === null) return;
 
     // In 1v2 mode, remove team indicator for the solo fighter (team 0)
-    const is1v2Mode = (mode === '1v2 Stand Off' || mode === '1v2' || state.mode === '1v2 Stand Off' || state.mode === '1v2');
+    const is1v2Mode = (mode === '1v2 Stand Off' || mode === '1v2' || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === GAME_MODES.STAND_OFF_1V2);
     if (is1v2Mode && team === 0) return;
+
+    // In 1v2 mode, do not put team indicator on minions, turrets, illusions, or summons
+    const isMinionOrTurret = Boolean(
+      fighter.isTurret ||
+      fighter.isMinion ||
+      fighter.isIllusion ||
+      fighter.isRika ||
+      fighter.isEvasionMinion ||
+      fighter.isTransfiguredHuman ||
+      fighter.type === 'Turret' ||
+      fighter.type === 'turret' ||
+      fighter._def?.isTurret ||
+      fighter._def?.isMinion ||
+      fighter.owner
+    );
+    if (is1v2Mode && isMinionOrTurret) return;
 
     const teamColor = team === 0 ? '#ff4d4d' : '#4da3ff';
 
@@ -46,42 +63,25 @@ export function drawFighters() {
     ctx.save();
     ctx.translate(drawX, drawY);
 
-    if (!isOnTop) {
-      // Underfoot ground indicator (filled)
-      ctx.beginPath();
-      ctx.arc(0, 0, fighter.r + 8, 0, Math.PI * 2);
-      ctx.fillStyle = teamColor;
-      ctx.globalAlpha = 1.0;
-      ctx.fill();
-      
-      // Crisp outline
-      ctx.strokeStyle = '#000'; // Black outline for contrast
-      ctx.lineWidth = 2;
-      ctx.globalAlpha = 1.0;
-      ctx.stroke();
+    // Underfoot ground indicator (bottom layer)
+    ctx.beginPath();
+    ctx.arc(0, 0, fighter.r + 8, 0, Math.PI * 2);
+    ctx.fillStyle = teamColor;
+    ctx.globalAlpha = 1.0;
+    ctx.fill();
+    
+    // Crisp outline
+    ctx.strokeStyle = '#000'; // Black outline for contrast
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 1.0;
+    ctx.stroke();
 
-      // Draw team silhouette/glow
-      ctx.beginPath();
-      ctx.arc(0, 0, fighter.r + 4, 0, Math.PI * 2);
-      ctx.fillStyle = teamColor;
-      ctx.globalAlpha = 0.2;
-      ctx.fill();
-    } else {
-      // Over-aura crisp team indicator ring overlay so Cursed Energy aura & domain effects never obscure team identity!
-      ctx.beginPath();
-      ctx.arc(0, 0, fighter.r + 9, 0, Math.PI * 2);
-      ctx.strokeStyle = teamColor;
-      ctx.lineWidth = 3.5;
-      ctx.globalAlpha = 1.0;
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(0, 0, fighter.r + 11, 0, Math.PI * 2);
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.5;
-      ctx.globalAlpha = 0.8;
-      ctx.stroke();
-    }
+    // Draw team silhouette/glow
+    ctx.beginPath();
+    ctx.arc(0, 0, fighter.r + 4, 0, Math.PI * 2);
+    ctx.fillStyle = teamColor;
+    ctx.globalAlpha = 0.2;
+    ctx.fill();
 
     ctx.restore();
   };
@@ -291,6 +291,14 @@ export function drawFighters() {
     return a.f.y - b.f.y;
   });
 
+  // ── BOTTOM LAYER PASS: Underfoot Team Indicator Rings ──
+  // Always render team indicator rings on the bottom layer underneath all fighters, bodies, hands, weapons & effects!
+  if (isTeamMode && fighters) {
+    fighters.forEach((f, fi) => {
+      drawTeamRing(f, fi);
+    });
+  }
+
   _sortedFightersBuffer.forEach((item) => {
     const fighter = item.f;
     const fi = item.i;
@@ -308,9 +316,6 @@ export function drawFighters() {
       ctx.scale(scale, scale);
       ctx.translate(-fighter.x, -(fighter.y - (fighter.z || 0)));
     }
-
-    // Draw underfoot team indicator ring base
-    drawTeamRing(fighter, fi, false);
 
     // Shivering animation when paralyzed by Mahito (violent soul reshaping vibration)
     const isParalyzedByMahito = Boolean(fighter.isParalyzedByMahito || ((fighter.paralyzeTimer || 0) > 0 && fighter.isParalyzedByMahito));
@@ -360,9 +365,6 @@ export function drawFighters() {
     if (shiverX !== 0 || shiverY !== 0) {
       ctx.restore();
     }
-
-    // Draw crisp team indicator overlay ring AFTER fighter & CE aura draw, so CE aura never hides team indicator
-    drawTeamRing(fighter, fi, true);
 
     // Draw Mahito Paralyze Bubbly Flesh Deform & Orbiting Rings directly on top of fighter
     if (isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0) {
