@@ -26,7 +26,7 @@ export const MODE_SETTINGS = {
     rounds: 1, // Only 1 round in Stand Off
     hpMultiplier: 1.0,
     fixedHp: 2000, // 1000 HP for both fighters
-    speedMultiplier: 1.6,
+    speedMultiplier: 1.9,
     initialFuelPickups: 2,
     supportFourFighters: false,
   },

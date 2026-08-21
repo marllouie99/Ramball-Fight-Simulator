@@ -17,7 +17,7 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
-import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive } from '../core/state.js';
+import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahitoSoulExplosion, spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
@@ -1107,6 +1107,23 @@ export class Fighter {
 
       recordKill();
 
+      // Trigger GTA "MISSION PASSED! RESPECT +" overlay whenever CJ kills an enemy or enemy team is wiped
+      if (typeof triggerMissionPassedOverlay === 'function') {
+        const cjFighter = state.fighters && state.fighters.find(f => f && (f.characterId === 'cj' || f.type === 'cj' || (f._def && (f._def.id === 'cj' || f._def.type === 'cj'))));
+        if (cjFighter && !cjFighter.dead && cjFighter.hp > 0 && this !== cjFighter) {
+          const isCjKiller = (realAttacker === cjFighter || (realAttacker && (realAttacker.characterId === 'cj' || realAttacker.type === 'cj')));
+          const cjIdx = state.fighters.indexOf(cjFighter);
+          const dyingIdx = state.fighters.indexOf(this);
+          const cjTeam = (state.getFighterTeam && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(cjIdx) : null;
+          const dyingTeam = (state.getFighterTeam && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(dyingIdx) : null;
+          const isEnemy = (cjTeam === null || dyingTeam === null || cjTeam !== dyingTeam);
+
+          if (isCjKiller || isEnemy) {
+            triggerMissionPassedOverlay();
+          }
+        }
+      }
+
       // Check for round/match transitions
       this.checkRoundOrMatchEnd(realAttacker);
     }
@@ -1230,6 +1247,14 @@ export class Fighter {
       }
 
       state.gameState = 'roundEnd';
+    }
+
+    // Trigger GTA Mission Passed overlay on round or match win for CJ
+    if (typeof triggerMissionPassedOverlay === 'function') {
+      const cjFighter = state.fighters && state.fighters.find(f => f && (f.characterId === 'cj' || f.type === 'cj' || (f._def && (f._def.id === 'cj' || f._def.type === 'cj'))));
+      if (cjFighter && !cjFighter.dead && cjFighter.hp > 0) {
+        triggerMissionPassedOverlay();
+      }
     }
   }
 

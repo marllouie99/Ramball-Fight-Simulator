@@ -38,10 +38,14 @@ function initCustomizations() {
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
-      john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
+      john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      cj: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  if (!state.weaponCustomizations.cj) {
+    state.weaponCustomizations.cj = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   // Ensure drawOrder exists (migration for older saves)
   if (!state.weaponCustomizations.mahito.drawOrder) {
@@ -100,7 +104,8 @@ export function drawWeaponStudioScreen() {
     { key: 'cronos', label: 'CRONOS' },
     { key: 'ruby', label: 'RUBY' },
     { key: 'nanami', label: 'NANAMI' },
-    { key: 'john_wick', label: 'JOHN WICK' }
+    { key: 'john_wick', label: 'JOHN WICK' },
+    { key: 'cj', label: 'CJ' }
   ];
 
   // Row 1: First 4 weapons

@@ -335,5 +335,22 @@ To support a new weapon in the Weapon Studio:
 ### Full UI & HUD Gauge Synchronization
 - HUD skill progress bars (`hudSkillProviders.js`), cooldown clocks, and stat displays MUST read from the exact same configuration keys as the combat logic so that visual meters and physical gameplay timers remain 100% synchronized at all times.
 
+## 24. HUD Health Bar Green Heal Pop-Out Pulse & Cheat Heal Standards
+
+### Health Bar Pop-Out Heal Glow & DOM Heal Bubble (`_lastHealAmount` & `_healthBarHealTimer`)
+- Whenever a fighter triggers an instant HP restoration, cheat code heal (such as CJ's `HESOYAM`), Reverse Cursed Technique (RCT), or life-drain effect:
+  - The executing fighter MUST set:
+    ```javascript
+    this._lastHealAmount = actualHealed; // Triggers DOM .hud-heal-bubble pop-out floating text directly over the top HUD health card bar!
+    this._healthBarHealTimer = 30;       // Triggers vibrant neon emerald green (.heal-glow) box-shadow pulse on the health bar
+    this._healthBarShakeTimer = 8;       // Triggers subtle physical punchy pop-out shake on the health card
+    ```
+  - In `hudManager.js`, `triggerHudHealBubble(cachedCard.hpBar, fighter._lastHealAmount)` automatically attaches a floating `.hud-heal-bubble` (`+<amount>`) styled with neon green shadow (`#00FF66`) and floating animation above the health bar.
+  - This provides an immediate, punchy pop-out visual confirmation directly on the health bar (matching Mahoraga / Mahito heal standards).
+
+### Floating In-World Text & Cheat Notification Separation
+- In addition to the HUD health bar pop-out bubble, the in-world floating text over the fighter's body MUST follow Rule 22 format (`+<amount>` in `#00FF66`).
+- Cheat currency, shields, or titles (e.g. `+$250,000` in `#22C55E` and `+75 KEVLAR SHIELD` in `#38BDF8`) MUST spawn as dedicated separate floating text elements to prevent visual clutter or overlapping.
+
 
 

@@ -19,9 +19,20 @@ initFlameCanvas();
 resizeFlameCanvas();
 
 // ─────────────────────────────────────────────
-// GRAPHICS CACHE INITIALIZATION
+// GRAPHICS CACHE & FONT INITIALIZATION
 // ─────────────────────────────────────────────
 initGraphicsCache();
+
+if (typeof document !== 'undefined' && 'fonts' in document) {
+  try {
+    const gtaFont = new FontFace('Pricedown', 'url(Assets/Font/gtafont/pricedow.ttf)');
+    gtaFont.load().then((loadedFont) => {
+      document.fonts.add(loadedFont);
+    }).catch((e) => console.warn('Pricedown font load warning:', e));
+  } catch (e) {
+    console.warn('FontFace error:', e);
+  }
+}
 
 // Handle window resize for flame canvas
 window.addEventListener('resize', () => {

@@ -219,6 +219,17 @@ export const BASIC_ATTACK_SOUNDS = {
     src: 'Assets/Sound Effects/Attacks/laserpew.mp3',
     volume: 0.45,
     delay: 0,
+  },
+
+  // ── Carl "CJ" Johnson (ID 34) ─────────
+  34: {
+    src: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    volume: 1.0,
+    delay: 0,
   }
 };
 
@@ -228,6 +239,25 @@ export const BASIC_ATTACK_SOUNDS = {
  * This is checked as a fallback when BASIC_ATTACK_SOUNDS[id] has no entry.
  */
 export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
+  // Carl "CJ" Johnson — Street Boxing Brass Knuckles
+  'cj': {
+    src: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    volume: 1.0,
+    delay: 0,
+  },
+  'cj_punch': {
+    src: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    volume: 1.0,
+    delay: 0,
+  },
   // Engineer — high-rate-of-fire automatic weapon
   'Engineer': {
     src: 'Assets/Sound Effects/Attacks/revolvershot.mp3',

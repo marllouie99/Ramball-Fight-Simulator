@@ -199,7 +199,7 @@ export const johnWickConfig = {
     rollbackVoice: 1.0,
     rollForward: 0.85,
     combatRoll: 0.80,
-    evadeWoosh: 0.50,
+    evadeWoosh: 0.0,
     fleshHit: 0.90,
     bulletDeflect: 0.0
   },

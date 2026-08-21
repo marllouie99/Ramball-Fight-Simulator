@@ -16,6 +16,9 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { FRAME_TIME } from './gameLoop.js';
 
 export function updateGame() {
+    // Increment global frame count on EVERY frame across all game states
+    state.frameCount = (state.frameCount || 0) + 1;
+
     // Update Logic based on state
     if (state.gameState === 'countdown') {
       const isAnnouncerPlaying = state.announcerPlayingSequence;
@@ -47,7 +50,6 @@ export function updateGame() {
     }
     
     if (state.gameState === 'playing') {
-      state.frameCount = (state.frameCount || 0) + 1;
       state.matchTimer = (state.matchTimer || 0) + 1;
       updateFighters();
       updateProjectiles();
@@ -63,8 +65,9 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.roundEndTimer++;
 
-      // Auto next round / match
-      const autoDelay = (state.mode === 'FFA' && state.ffaMatchComplete) ? 300 : 180;
+      // Auto next round / match (allow full duration for Mission Passed overlay + winner reveal)
+      const hasOverlay = Boolean(state.missionPassedOverlay);
+      const autoDelay = (state.mode === 'FFA' && state.ffaMatchComplete) ? 320 : (hasOverlay ? 280 : 180);
       if (state.roundEndTimer >= autoDelay) {
         startNextRound();
       }
@@ -84,8 +87,10 @@ export function updateGame() {
         clearAllBattleEffects();
       }
 
-      // Auto next match (increased from 300 to 360 to account for the 60-frame action delay)
-      if (state.matchEndTimer >= 360) {
+      // Auto next match (allow full duration for Mission Passed overlay + champion reveal)
+      const hasOverlay = Boolean(state.missionPassedOverlay);
+      const matchEndAutoDelay = hasOverlay ? 440 : 360;
+      if (state.matchEndTimer >= matchEndAutoDelay) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();
         } else if (state.mode === '1v1' || state.mode === 'Stand Off') {

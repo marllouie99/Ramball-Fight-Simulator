@@ -4,7 +4,7 @@
 import { CONFIG, FIGHTER_DEFS } from '../core/config.js';
 import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { projectileSystem } from './projectileSystem.js';
-import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance } from '../core/state.js';
+import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance, triggerMissionPassedOverlay } from '../core/state.js';
 import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
 import { audioSystem } from './audioSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
@@ -429,6 +429,34 @@ function getClosestOpponent(fighter) {
   return closest;
 }
 
+function checkCjVictoryOverlay(winner) {
+  const cjFighter = state.fighters && state.fighters.find(f => f && (f.characterId === 'cj' || f.type === 'cj' || (f._def && (f._def.id === 'cj' || f._def.type === 'cj'))));
+  if (!cjFighter || cjFighter.dead || cjFighter.hp <= 0) return;
+
+  let isCjWinner = false;
+  if (winner) {
+    if (winner === cjFighter || winner.characterId === 'cj' || winner.type === 'cj') {
+      isCjWinner = true;
+    } else if (state.getFighterTeam && typeof state.getFighterTeam === 'function') {
+      const winnerIdx = state.fighters.indexOf(winner);
+      const cjIdx = state.fighters.indexOf(cjFighter);
+      const winnerTeam = state.getFighterTeam(winnerIdx);
+      const cjTeam = state.getFighterTeam(cjIdx);
+      if (winnerTeam !== null && winnerTeam === cjTeam) {
+        isCjWinner = true;
+      }
+    }
+  } else {
+    isCjWinner = true;
+  }
+
+  if (isCjWinner) {
+    if (typeof triggerMissionPassedOverlay === 'function') {
+      triggerMissionPassedOverlay({ timer: 240 });
+    }
+  }
+}
+
 function endRoundIfFFAEnded() {
   if (state.mode !== GAME_MODES.FFA || state.gameState !== 'playing') return;
 
@@ -450,6 +478,7 @@ function endRoundIfFFAEnded() {
 
   let isMatchEnd = false;
   if (winner) {
+    checkCjVictoryOverlay(winner);
     const winnerIndex = state.fighters.indexOf(winner);
     if (winnerIndex >= 0) {
       const winThreshold = 2;
@@ -508,6 +537,10 @@ function endRoundIf2v2Ended() {
 
   state.roundWinner = winnerFighter;
   state.roundEndTimer = 0;
+
+  if (winnerFighter) {
+    checkCjVictoryOverlay(winnerFighter);
+  }
 
   const winThreshold = MODE_SETTINGS[state.mode]?.rounds ?? 1;
   const isMatchEnd = state.teamScores[winningTeam] >= winThreshold;
@@ -575,6 +608,7 @@ function endRoundIf1v1Ended() {
 
   let isMatchEnd = false;
   if (winner) {
+    checkCjVictoryOverlay(winner);
     const winnerIndex = state.fighters.indexOf(winner);
     if (winnerIndex >= 0) {
       const winThreshold = MODE_SETTINGS[state.mode]?.rounds === 1 ? 1 : 2;

@@ -1013,6 +1013,85 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  if (f.characterId === 'cj' || f.type === 'cj') {
+    const cfg = CONFIG.cj || {};
+    const themeColor = cfg.themeColor || '#16A34A'; // Grove Street Green (Rule 18 unified theme)
+
+    // 0. RESPECT+ (Passive Progression Gauge)
+    const respect = f.respect || 0;
+    const maxRespect = f.maxRespect || 100;
+    const respectPct = Math.max(0, Math.min(100, (respect / maxRespect) * 100));
+    const respectReady = f.isGroveStreetOg || respect >= 50;
+    const respectLabel = (f.isGroveStreetOg || respect >= 100 || f.hasTriggeredTier2) ? 'RESPECTED' : 'RESPECT+';
+
+    // 1. HESOYAM (Activation and Progress Based on HP Lost)
+    const maxHp = f.maxHp || 440;
+    const currentHp = (f.hp !== undefined) ? f.hp : maxHp;
+    const lostHp = Math.max(0, maxHp - currentHp);
+    const minLostRatio = cfg.hesoyamMinLostPercent ?? 0.25;
+    const requiredLostHp = maxHp * minLostRatio;
+
+    let hesoPct = 0;
+    let hesoReady = false;
+    let hesoLabel = 'HESOYAM';
+
+    if (f.hasUsedHesoyam) {
+      hesoLabel = 'HESOYAM (ACTIVATED)';
+      // When activated, progress bar shows percentage of HP currently lost
+      hesoPct = Math.max(0, Math.min(100, (lostHp / maxHp) * 100));
+      hesoReady = false;
+    } else {
+      // Prior to activation, progress bar fills from 0% to 100% as CJ loses HP towards the activation threshold
+      hesoPct = Math.max(0, Math.min(100, (lostHp / requiredLostHp) * 100));
+      hesoReady = (hesoPct >= 99 && (f.hesoyamCooldown || 0) <= 0);
+    }
+
+    // 2. ROCKETMAN Jetpack
+    let jpPct = 0;
+    let jpReady = false;
+    const jpLabel = f.isJetpackActive ? 'ROCKETMAN (ACTIVATED)' : 'ROCKETMAN';
+    if (f.isJetpackActive) {
+      const jpDur = f.jetpackMaxTimer || cfg.jetpackDuration || 270;
+      jpPct = Math.max(0, Math.min(100, (f.jetpackTimer / jpDur) * 100));
+      jpReady = true;
+    } else {
+      const jpMax = f.jetpackCooldownMax || cfg.jetpackCooldown || 570;
+      const jpCurrent = f.jetpackCooldown !== undefined ? f.jetpackCooldown : 0;
+      jpPct = Math.max(0, Math.min(100, (1 - (jpCurrent / jpMax)) * 100));
+      jpReady = jpPct >= 99;
+    }
+
+    // 3. GROVE STREET DRIVE-BY
+    const dbMax = f.driveByCooldownMax || cfg.driveByCooldown || 600;
+    const dbCurrent = f.driveByCooldown !== undefined ? f.driveByCooldown : 0;
+    const dbPct = Math.max(0, Math.min(100, (1 - (dbCurrent / dbMax)) * 100));
+    const dbReady = dbPct >= 99;
+    const dbLabel = 'GROVE ST.';
+
+    // 4. BAGUVIX (Ultimate)
+    let ultPct = 0;
+    let ultReady = false;
+    const ultLabel = f.isBaguvixActive ? 'BAGUVIX (ACTIVATED)' : 'BAGUVIX';
+    if (f.isBaguvixActive) {
+      const bagMax = f.baguvixMaxTimer || cfg.baguvixDuration || 300;
+      ultPct = Math.max(0, Math.min(100, (f.baguvixTimer / bagMax) * 100));
+      ultReady = true;
+    } else {
+      const respect = f.respect || 0;
+      const maxRespect = f.maxRespect || 100;
+      ultPct = Math.max(0, Math.min(100, (respect / maxRespect) * 100));
+      ultReady = ultPct >= 99;
+    }
+
+    return [
+      { id: 'respect', pct: respectPct, ready: respectReady, color: themeColor, label: respectLabel },
+      { id: 'hesoyam', pct: hesoPct, ready: hesoReady, color: themeColor, label: hesoLabel },
+      { id: 'jetpack', pct: jpPct, ready: jpReady, color: themeColor, label: jpLabel },
+      { id: 'driveby', pct: dbPct, ready: dbReady, color: themeColor, label: dbLabel },
+      { id: 'baguvix', pct: ultPct, ready: ultReady, color: themeColor, label: ultLabel }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

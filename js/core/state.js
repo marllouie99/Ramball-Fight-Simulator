@@ -148,6 +148,12 @@ export const state = {
   // Global screen shake
   screenShake: { timer: 0, maxTimer: 0, intensity: 0 },
 
+  // GTA San Andreas Cheat Pop-Out Notification Banner
+  cheatNotification: { text: '', timer: 0, maxTimer: 140 },
+
+  // GTA San Andreas "MISSION PASSED! RESPECT +" Arena Overlay
+  missionPassedOverlay: { active: false, timer: 0, maxTimer: 180, title: 'mission passed!', subtitle: 'RESPECT +' },
+
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'
   
@@ -272,6 +278,8 @@ export const state = {
   weaponScroll: 0,
   weaponPage: 0,
   selectedWeapon: null,
+  missionPassedOverlay: null,
+  cheatNotification: null,
 
   // FPS tracking
   fps: 0,
@@ -579,7 +587,14 @@ const SKILL_TEXT_WHITELIST = [
   'MACHINE GUN BLOWS',
   'ROCKET STOMP!',
   'ROCKET STOMP',
-  'INCINERATE!'
+  'INCINERATE!',
+  'RESPECT+',
+  'GROVE STREET OG!',
+  'CHEAT ACTIVATED!',
+  'HESOYAM!',
+  'ROCKETMAN!',
+  'BAGUVIX!',
+  'GROVE ST. DRIVE-BY!'
 ];
 
 function isAllowedFloatingText(text) {
@@ -773,5 +788,31 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
   });
 }
 
+/**
+ * Triggers the GTA San Andreas "mission passed! RESPECT +" center screen overlay.
+ */
+export function triggerMissionPassedOverlay(opts = {}) {
+  // If overlay is already active or playing, NEVER restart or reset its timer!
+  if (state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0)) {
+    return;
+  }
+  const duration = opts.timer || 180;
+  state.missionPassedOverlay = {
+    active: true,
+    timer: duration,
+    maxTimer: duration,
+    title: 'mission Passed!',
+    subtitle: 'RESPECT +',
+    isComplete: false,
+    _lastTickFrame: -1
+  };
+  try {
+    if (typeof window !== 'undefined' && window.audioSystem && typeof window.audioSystem.playSFX === 'function') {
+      window.audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
+    }
+  } catch (e) {}
+}
+
 state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
 window.state = state;
+window.triggerMissionPassedOverlay = triggerMissionPassedOverlay;

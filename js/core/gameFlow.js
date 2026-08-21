@@ -261,6 +261,7 @@ export function reinitFighters(isNewMatch = false) {
   if (state.wallCracks) state.wallCracks.length = 0;
   state.roundWinner = null;
   state.roundEndTimer = 0;
+  state.missionPassedOverlay = null;
  
   // Reset qualityLevel and screenShake on round init
   state.qualityLevel = state.performanceMode ? 0.2 : 1.0;

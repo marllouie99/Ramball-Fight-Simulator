@@ -23,6 +23,7 @@ import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
+import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun } from '../weapons/cjWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -262,6 +263,23 @@ function drawWeaponInfoCard(ctx, def) {
     } else {
       nameText = 'Sharpened No. 2 Cedar Graphite Pencil';
       descText = 'Legendary sharpened No. 2 cedar graphite pencil in reverse tactical grip during assassination grab-and-stab executions, inflicting stacking bleed damage.';
+    }
+  }
+
+  if (def.type === 'cj') {
+    const activeIndex = (state.gameState === 'weaponDetail') ? (state.cjWeaponIndex || 0) : 0;
+    if (activeIndex === 0) {
+      nameText = 'Authentic Cast-Brass Knuckles';
+      descText = 'Heavy metallic 4-ring cast-brass knuckles for rapid-fire street boxing CQC. Delivers heavy kinetic staggering blows, liver hooks, and builds RESPECT+ with every hit.';
+    } else if (activeIndex === 1) {
+      nameText = 'DARPA Area 69 Jetpack (ROCKETMAN)';
+      descText = 'Experimental military jetpack with roaring dual rocket thrusters. Grants 360° omni-directional high-speed hover flight, leaving fiery burning ground trails and empowering supersonic knuckle dives.';
+    } else if (activeIndex === 2) {
+      nameText = 'Dual Micro-Uzi Submachine Guns';
+      descText = 'Dual-wielded high-cadence 9mm submachine guns equipped during Jetpack flight. Unleashes rapid alternating strafe bullet streams at 12 rounds/sec with airborne evasion.';
+    } else {
+      nameText = 'M134 Heavy Minigun (BAGUVIX / FULLCLIP)';
+      descText = 'Six-barrel rotating Gatling minigun with infinite ammunition. Unleashes a continuous 45 rounds/sec armor-piercing bullet storm during BAGUVIX God Mode overdrive.';
     }
   }
 
@@ -725,6 +743,30 @@ function drawWeaponDetailScreen() {
       state.selectedIchigoSkin = 'bankai';
       if (state.previewFighter) state.previewFighter.skin = 'bankai';
     }, 85, 22, null, 3);
+  } else if (def.type === 'cj') {
+    state.cjWeaponIndex = state.cjWeaponIndex || 0;
+    const labels = ['1/4: BRASS KNUCKLES', '2/4: DARPA JETPACK', '3/4: DUAL MICRO-UZIS', '4/4: M134 MINIGUN'];
+    const currentWeaponLabel = labels[state.cjWeaponIndex] || labels[0];
+
+    ctx.fillStyle = '#16a34a';
+    ctx.font = '900 11px "Rajdhani", monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
+
+    drawButton('◄', canvas.width / 2 - 135, pagY, () => {
+      state.cjWeaponIndex = (state.cjWeaponIndex + 3) % 4;
+      if (state.previewFighter) {
+        state.previewFighter.isJetpackActive = (state.cjWeaponIndex === 1 || state.cjWeaponIndex === 2);
+      }
+    }, 30, 22, null, 3);
+
+    drawButton('►', canvas.width / 2 + 135, pagY, () => {
+      state.cjWeaponIndex = (state.cjWeaponIndex + 1) % 4;
+      if (state.previewFighter) {
+        state.previewFighter.isJetpackActive = (state.cjWeaponIndex === 1 || state.cjWeaponIndex === 2);
+      }
+    }, 30, 22, null, 3);
   }
 
   // ── Tier 3: Technical Dossier Card (Y: 480 to 890) ──
@@ -1183,6 +1225,21 @@ function drawWeaponPreview(ctx, type, color) {
           drawJohnWickRifle(ctx, 0, 0, gunAngle, r);
         } else {
           drawJohnWickPencil(ctx, 0, 0, gunAngle, r);
+        }
+        return;
+      }
+
+      case 'cj': {
+        const isDetail = (state.gameState === 'weaponDetail');
+        const activeIndex = isDetail ? (state.cjWeaponIndex || 0) : 0;
+        if (activeIndex === 0) {
+          drawCjBrassKnuckles(ctx, 0, 0, gunAngle, r, { standalone: true });
+        } else if (activeIndex === 1) {
+          drawCjJetpackWeapon(ctx, 0, 0, gunAngle, r);
+        } else if (activeIndex === 2) {
+          drawCjMicroUzi(ctx, 0, 0, 1.35, 0, 0);
+        } else {
+          drawCjMinigun(ctx, 0, 0, gunAngle, r);
         }
         return;
       }

@@ -16,6 +16,7 @@ import { mahitoConfig } from '../configs/characters/mahitoConfig.js?v=4';
 import { nanamiConfig } from '../configs/characters/nanamiConfig.js?v=4';
 import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
+import { cjConfig } from '../configs/characters/cjConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
@@ -38,6 +39,8 @@ export const CONFIG = {
   ichigo: ichigoConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
+  cj: cjConfig,
+  CJ: cjConfig,
   engineer: engineerConfig,
   Engineer: engineerConfig,
   arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
@@ -1278,6 +1281,25 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: 6.2,
     ability: 'C.A.R. Gun-Fu & The Pencil',
     desc: 'The Baba Yaga. Master of Center Axis Relock Gun-Fu and ruthless CQC. Passive: Ballistic Tailored Suit resists ranged damage. Wields the custom TTI Pit Viper 9mm and the infamous No. 2 Pencil for armor-piercing assassination takedowns.',
+  },
+  {
+    id: 34,
+    name: 'CJ',
+    category: 'Pop Culture & Action',
+    color: '#16A34A', // Grove Street Families Green
+    startX: 300, startY: 250,
+    startVx: 1.2, startVy: 1.0,
+    radius: 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'cj',
+    hp: 440,
+    damage: 24,
+    cooldown: 18,
+    moveSpeed: cjConfig.speed || 6.0,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Brass Knuckles & Cheats',
+    desc: 'Carl Johnson from Grove Street. Master of cheats and street brawling. Wields metallic brass knuckles, HESOYAM armor bursts, Area 69 Jetpack flight, Grove Street drive-by backup, and BAGUVIX God Mode.',
   }
 ];
 

@@ -1,6 +1,6 @@
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { Fighter } from '../../entities/fighter.js';
-import { drawHUD } from '../hudManager.js?v=6';
+import { drawHUD, drawMissionPassedOverlay } from '../hudManager.js?v=6';
 import { state } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
@@ -19,12 +19,13 @@ function drawRoundEndScreen() {
     state._winnerEmbers = null;
   }
 
-  // Delay before winning display appears (in frames, ~1 second delay)
-  const displayDelay = 60;
+  // If CJ's Mission Passed overlay is active, let it play its full smooth fade-in & out (180 frames)
+  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete));
+  const displayDelay = hasMissionOverlay ? 180 : 60;
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Smooth fade-in effect (only after delay)
-  const fadeAlpha = Math.min(0.96, (delayedTimer / 60) * 0.96);
+  const fadeAlpha = Math.min(0.96, (delayedTimer / 45) * 0.96);
   ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
@@ -308,21 +309,26 @@ function drawMatchEndScreen() {
     state._winnerEmbers = null;
   }
 
-  // Delay before winning display and black background overlay starts (in frames, ~1 second delay)
-  const displayDelay = 60;
+  // If CJ's Mission Passed overlay is active, let it complete its smooth fade-in & fade-out (180 frames)
+  // before the champion screen slowly and smoothly fades in
+  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete));
+  const displayDelay = hasMissionOverlay ? 180 : 60;
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
-  // Fade in the dark background over 60 frames (only after delay)
-  const bgAlpha = Math.min(0.96, (delayedTimer / 60) * 0.96);
+  // Fade in the dark background smoothly over 45 frames (starts as overlay begins fading out)
+  const bgFadeStart = hasMissionOverlay ? 145 : 60;
+  const bgTimer = Math.max(0, matchEndTimer - bgFadeStart);
+  const bgAlpha = Math.min(0.96, (bgTimer / 45) * 0.96);
   ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // Delay showing the rest of the screen by 45 frames (0.75s) after the background starts fading
-  const delay = displayDelay + 45;
+  // Delay showing the rest of the screen until the overlay fade-out is complete
+  const delay = displayDelay + 5;
   if (state.matchEndTimer < delay) return;
 
+  // Silky smooth, slow reveal for the champion screen over 45 frames
   const revealTimer = state.matchEndTimer - delay;
-  const globalAlpha = Math.min(1, revealTimer / 30);
+  const globalAlpha = Math.min(1, revealTimer / 45);
 
   ctx.save();
   ctx.globalAlpha = globalAlpha;

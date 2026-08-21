@@ -4,7 +4,7 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
   drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawHUD, 
-  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown
+  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay
 } from '../graphics/ui.js';
 import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
@@ -340,6 +340,9 @@ export function renderGame() {
       } else if (state.gameState === 'matchEnd') {
         drawMatchEndScreen();
       }
+
+      // Render GTA San Andreas "mission passed! RESPECT +" overlay on top level before champion reveal
+      drawMissionPassedOverlay(state.topLevelUiCtx || state.ctx);
 
       // Restore original context and canvas
       state.ctx = originalCtx;

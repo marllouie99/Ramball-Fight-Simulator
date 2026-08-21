@@ -181,8 +181,176 @@ export function drawHUD() {
     ctx.font = 'italic 12px Arial';
     ctx.fillText('', cx, bottomY);
 
+    // Draw authentic GTA San Andreas "Cheat activated" top-left arena slide banner
+    drawCheatNotification(ctx);
+
     ctx.restore();
   }
+}
+
+/**
+ * Draws the iconic GTA San Andreas "Cheat activated" top-left pop-out notification banner.
+ */
+export function drawCheatNotification(ctx) {
+  const notif = state.cheatNotification;
+  if (!notif || notif.timer <= 0) return;
+
+  notif.timer--;
+
+  const text = notif.text || 'Cheat activated';
+  const fontSize = 15;
+  const fontStr = `900 ${fontSize}px "Franklin Gothic Heavy", "Impact", "Arial Black", "Trebuchet MS", sans-serif`;
+
+  ctx.save();
+  ctx.font = fontStr;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'middle';
+
+  const textWidth = ctx.measureText(text).width;
+  // Authentic GTA San Andreas rectangular bar with wide right-side extension
+  const boxWidth = Math.max(195, textWidth + 60);
+  const boxHeight = 26;
+
+  // Position directly at top-left inside the arena (pops out in place)
+  const arenaX = (state.arena && state.arena.x !== undefined) ? state.arena.x : 20;
+  const arenaY = (state.arena && state.arena.y !== undefined) ? state.arena.y : 180;
+  const targetX = arenaX + 10;
+  const targetY = arenaY + 10;
+
+  // 1. Authentic GTA San Andreas flat dark teal-slate box (#1d3336) with sharp 0px rectangular edges
+  ctx.fillStyle = '#1d3336';
+  ctx.fillRect(targetX, targetY, boxWidth, boxHeight);
+
+  // 2. Text rendering with 1px black drop-shadow
+  const textX = targetX + 8;
+  const textY = targetY + boxHeight / 2 + 1;
+
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
+  ctx.fillText(text, textX + 1, textY + 1);
+
+  // Exact muted silver-teal text color from GTA SA HUD (#b3c8cc)
+  ctx.fillStyle = '#b3c8cc';
+  ctx.fillText(text, textX, textY);
+
+  ctx.restore();
+}
+
+/**
+ * Draws the iconic GTA San Andreas "mission passed! RESPECT +" center arena overlay.
+ */
+export function drawMissionPassedOverlay(ctx) {
+  const overlay = state.missionPassedOverlay;
+  if (!overlay || !overlay.active || overlay.timer <= 0) return;
+
+  // Unconditionally decrement timer once per draw frame
+  overlay.timer--;
+
+  const totalFrames = overlay.maxTimer || 180;
+  const elapsed = totalFrames - overlay.timer;
+  const remaining = overlay.timer;
+
+  // Pure smooth alpha fade-in (30 frames) and smooth fade-out (30 frames) with zero scaling/popping
+  let alpha = 1.0;
+
+  if (elapsed < 30) {
+    const t = Math.max(0, Math.min(1, elapsed / 30));
+    alpha = Math.sin((t * Math.PI) / 2);
+  } else if (remaining < 30) {
+    const t = Math.max(0, Math.min(1, remaining / 30));
+    alpha = Math.sin((t * Math.PI) / 2);
+  }
+
+  if (overlay.timer <= 0) {
+    overlay.active = false;
+    overlay.isComplete = true;
+    return;
+  }
+
+  const arenaX = (state.arena && state.arena.x !== undefined) ? state.arena.x : (CONFIG.arena?.x ?? 40);
+  const arenaY = (state.arena && state.arena.y !== undefined) ? state.arena.y : (CONFIG.arena?.y ?? 240);
+  const arenaW = (state.arena && state.arena.width !== undefined) ? state.arena.width : (CONFIG.arena?.width ?? 450);
+  const arenaH = (state.arena && state.arena.height !== undefined) ? state.arena.height : (CONFIG.arena?.height ?? 450);
+
+  const cx = arenaX + arenaW / 2;
+  const cy = arenaY + arenaH / 2;
+
+  ctx.save();
+  ctx.translate(cx, cy);
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // ── Line 1: "mission Passed!" (Exact 1:1 GTA San Andreas Capital P & Proportions) ──
+  ctx.font = 'normal 56px "Pricedown", "Impact", "Arial Black", sans-serif';
+  ctx.lineWidth = 7.5;
+  ctx.strokeStyle = '#000000';
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 3;
+  ctx.strokeText('mission Passed!', 0, -20);
+
+  // Gradient Fill: Exact Authentic GTA San Andreas Warm Ochre-Amber
+  const grad = ctx.createLinearGradient(0, -48, 0, 10);
+  grad.addColorStop(0, '#E18E06');
+  grad.addColorStop(0.5, '#D88204');
+  grad.addColorStop(1, '#B86500');
+  ctx.fillStyle = grad;
+  ctx.fillText('mission Passed!', 0, -20);
+
+  // ── Line 2: "RESPECT" + Authentic 1:1 GTA Block Cross Plus Sign ──
+  const line2Y = 32;
+  ctx.font = 'normal 48px "Pricedown", "Impact", "Arial Black", sans-serif';
+  const respectText = 'RESPECT';
+  const textMetrics = ctx.measureText(respectText);
+  const textW = textMetrics.width;
+
+  const plusSize = 22;      // Full width and height of the plus sign
+  const barThick = 8;       // Thickness of the horizontal & vertical arms
+  const gap = 12;           // Space between "RESPECT" and the plus sign
+  const totalW = textW + gap + plusSize;
+
+  const textStartX = -totalW / 2;
+  const respectCenterX = textStartX + textW / 2;
+  const plusCenterX = textStartX + textW + gap + plusSize / 2;
+  const plusCenterY = line2Y;
+
+  // Draw "RESPECT"
+  ctx.lineWidth = 6.5;
+  ctx.strokeStyle = '#000000';
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 3;
+  ctx.strokeText(respectText, respectCenterX, line2Y);
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillText(respectText, respectCenterX, line2Y);
+
+  // Draw 1:1 Authentic GTA San Andreas Block Cross Plus Sign
+  const s = plusSize / 2;
+  const t = barThick / 2;
+
+  ctx.beginPath();
+  ctx.moveTo(plusCenterX - t, plusCenterY - s);
+  ctx.lineTo(plusCenterX + t, plusCenterY - s);
+  ctx.lineTo(plusCenterX + t, plusCenterY - t);
+  ctx.lineTo(plusCenterX + s, plusCenterY - t);
+  ctx.lineTo(plusCenterX + s, plusCenterY + t);
+  ctx.lineTo(plusCenterX + t, plusCenterY + t);
+  ctx.lineTo(plusCenterX + t, plusCenterY + s);
+  ctx.lineTo(plusCenterX - t, plusCenterY + s);
+  ctx.lineTo(plusCenterX - t, plusCenterY + t);
+  ctx.lineTo(plusCenterX - s, plusCenterY + t);
+  ctx.lineTo(plusCenterX - s, plusCenterY - t);
+  ctx.lineTo(plusCenterX - t, plusCenterY - t);
+  ctx.closePath();
+
+  ctx.lineWidth = 6.5;
+  ctx.strokeStyle = '#000000';
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 3;
+  ctx.stroke();
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fill();
+
+  ctx.restore();
 }
 // HUD Cache Map
 const _hudCache = {
@@ -250,17 +418,14 @@ function updateHealthHud() {
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
   const isSingleColumnMode = is1v1 || isStandOff;
-  const teamMode = is2v2;
-
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = fighters.map(f => {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)}`;
   }).join('|');
-
   const hpChanged = currentHpStr !== state._lastHpStr;
   const skillsChanged = currentSkillsStr !== state._lastSkillsStr;
 
@@ -480,6 +645,66 @@ function updateHealthHud() {
         info.push(`<b>Evade:</b> ${evadeVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>Evade:</b> 0%`);
+      }
+    } else if (f.characterId === 'cj' || f.type === 'cj') {
+      const cfg = CONFIG.cj || {};
+      const baseDmg = cfg.meleePunchDamage || 24;
+      const baseSpeed = cfg.speed || 6.0;
+      const baseKb = cfg.meleeKnockback || 16;
+      const respect = f.respect || 0;
+
+      // 1. Punch Damage (DMG)
+      if (f.isGroveStreetOg) {
+        const boostDmg = Math.round(baseDmg * 0.15);
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
+
+      // 2. Movement Speed (SPD)
+      if (f.isGroveStreetOg || respect >= 100) {
+        const boostSpd = (baseSpeed * 0.20).toFixed(1);
+        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${boostSpd} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else if (respect >= 50) {
+        const boostSpd = (baseSpeed * 0.15).toFixed(1);
+        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${boostSpd} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)}`);
+      }
+
+      // 3. Defense / Damage Resistance (DEF) - includes Kevlar Shield (hesoyamShieldAmount)
+      if (f.isBaguvixActive || f.isGodModeActive) {
+        info.push(`<b>DEF:</b> 100% <span style="color: #15803d; font-size: 10px;">(GOD MODE) ▲</span>`);
+      } else if (f.hesoyamShield > 0) {
+        const ogDef = f.isGroveStreetOg ? '10% + ' : '';
+        info.push(`<b>DEF:</b> ${ogDef}${Math.round(f.hesoyamShield)} Shield <span style="color: #38bdf8; font-size: 10px;">▲</span>`);
+      } else if (f.isGroveStreetOg) {
+        info.push(`<b>DEF:</b> 10% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DEF:</b> 0%`);
+      }
+
+      // 4. Knockback (KB)
+      const hKb = cfg.hesoyamKnockback || 22;
+      let punchKbStr = `${baseKb}`;
+      if (respect >= 50) {
+        const boostKb = Math.round(baseKb * 0.15);
+        punchKbStr = `${baseKb} + ${boostKb} <span style="color: #15803d; font-size: 10px;">▲</span>`;
+      }
+      info.push(`<b>KB:</b> ${punchKbStr} / ${hKb}`);
+
+      // 5. Evade (Airborne Jetpack Flight Buff)
+      const isEvading = Boolean(f.isJetpackActive || (f.evadeBuffTimer && f.evadeBuffTimer > 0) || (f.z && f.z > 0));
+      if (isEvading) {
+        const evadeVal = Math.round((f.evadeChance ?? (cfg.jetpackEvadeChance || 0.50)) * 100);
+        info.push(`<b>Evade:</b> ${evadeVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>Evade:</b> 0%`);
+      }
+
+      // 6. Attack Speed (ATK SPD)
+      if (f.isGroveStreetOg) {
+        info.push(`<b>ATK SPD:</b> +25% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       }
     } else {
       info.push(`<b>DMG:</b> ${baseDmg}`);
@@ -745,6 +970,67 @@ function updateHealthHud() {
       } else if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
         const liveCount = state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0;
         info.push(`<b>Illusions:</b> ${liveCount}`);
+      } else if (f.characterId === 'cj' || f.type === 'cj') {
+        const cfg = CONFIG.cj || {};
+        const isTier1 = (f.respect || 0) >= 50;
+        const isOg = Boolean(f.isGroveStreetOg);
+
+        // 1. DMG: Base / Heavy punch (+15% during OG Surge)
+        const basePunch = cfg.meleePunchDamage || 24;
+        const heavyPunch = Math.round(basePunch * 1.25);
+        if (isOg) {
+          const dmgBoost = cfg.respectDamageBoost || 0.15;
+          const ogBase = Math.round(basePunch * (1 + dmgBoost));
+          const ogHeavy = Math.round(heavyPunch * (1 + dmgBoost));
+          info.push(`<b>DMG:</b> ${ogBase} / ${ogHeavy} <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>DMG:</b> ${basePunch} / ${heavyPunch}`);
+        }
+
+        // 2. SPD: +15% (Tier 1) / +20% (OG)
+        if (isOg) {
+          const spdBoost = Math.round(((cfg.respectSpeedBoost || 0.15) + 0.05) * 100);
+          info.push(`<b>SPD:</b> +${spdBoost}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else if (isTier1) {
+          const spdBoost = Math.round((cfg.respectSpeedBoost || 0.15) * 100);
+          info.push(`<b>SPD:</b> +${spdBoost}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>SPD:</b> 0%`);
+        }
+
+        // 3. DEF: Kevlar Shield + 10% OG Resistance
+        const shieldVal = f.hesoyamShield || 0;
+        if (shieldVal > 0 && isOg) {
+          const defPercent = Math.round((cfg.respectDefenseBoost || 0.10) * 100);
+          info.push(`<b>DEF:</b> +${shieldVal} | +${defPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else if (shieldVal > 0) {
+          info.push(`<b>DEF:</b> +${shieldVal} <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else if (isOg) {
+          const defPercent = Math.round((cfg.respectDefenseBoost || 0.10) * 100);
+          info.push(`<b>DEF:</b> +${defPercent}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>DEF:</b> 0%`);
+        }
+
+        // 4. KB: Base Knockback (Tier 1 +15% Boost)
+        const baseKb = cfg.meleeKnockback || 18.0;
+        const heavyKb = Math.round(baseKb * 1.22);
+        if (isTier1 || isOg) {
+          const kbBoost = cfg.respectSpeedBoost || 0.15;
+          const t1Base = Math.round(baseKb * (1 + kbBoost));
+          const t1Heavy = Math.round(heavyKb * (1 + kbBoost));
+          info.push(`<b>KB:</b> ${t1Base} / ${t1Heavy} <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>KB:</b> ${Math.round(baseKb)} / ${heavyKb}`);
+        }
+
+        // 5. ATK SPD: +25% (OG)
+        if (isOg) {
+          const atkSpdBoost = Math.round((cfg.respectAttackSpeedBoost || 0.25) * 100);
+          info.push(`<b>ATK SPD:</b> +${atkSpdBoost}% <span style="color: #00FF66; font-size: 10px;">▲</span>`);
+        } else {
+          info.push(`<b>ATK SPD:</b> 0%`);
+        }
       }
     }
 

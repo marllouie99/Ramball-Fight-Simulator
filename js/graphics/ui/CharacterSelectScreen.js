@@ -763,6 +763,8 @@ export function getFighterWeaponInfo(def) {
     case 'john_wick':
     case 'johnwick':
       return { name: 'TTI PIT VIPER & BENELLI M4', category: 'TACTICAL FIREARMS // GUN-FU', desc: 'Combat Master 9mm, Super 90 shotgun, M4A1 rifle, and sharpened No. 2 pencil.' };
+    case 'cj':
+      return { name: 'BRASS KNUCKLES & JETPACK', category: 'STREET BRAWLER // CHEAT ARSENAL', desc: 'Heavy metallic brass knuckles for CQC boxing, Area 69 Jetpack flight, and Minigun.' };
     case 'dummy':
       return { name: 'BALLISTIC TARGET CHASSIS', category: 'TRAINING // SANDBOX', desc: 'Reinforced training frame designed for testing weapon DPS and combos.' };
     default:

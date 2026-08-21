@@ -9,8 +9,17 @@
   <link
     href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Bangers&family=Permanent+Marker&family=Outfit:wght@800;900&family=Rajdhani:wght@700;900&display=swap"
     rel="stylesheet">
+  <link rel="preload" href="Assets/Font/gtafont/pricedow.ttf" as="font" type="font/ttf" crossorigin>
   <link rel="stylesheet" href="css/style.css?v=11" />
   <style>
+    @font-face {
+      font-family: 'Pricedown';
+      src: url('Assets/Font/gtafont/pricedow.ttf') format('truetype');
+      font-weight: normal;
+      font-style: normal;
+      font-display: block;
+    }
+
     /* Optimize HTML & Body for Centered Canvas Preview */
     html,
     body {
@@ -401,6 +410,9 @@
       document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/7.3.2/pixi.min.js"><\/script>');
     }
   </script>
+
+  <!-- Hidden Font Preloader for Pricedown GTA Font -->
+  <span style="font-family: 'Pricedown'; position: absolute; left: -9999px; top: -9999px; opacity: 0; pointer-events: none;" aria-hidden="true">mission passed! RESPECT +</span>
 
   <script type="module" src="js/core/main.js?v=77"></script>
 </body>

@@ -35,6 +35,8 @@ import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, draw
 import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
+export { drawCjSkin } from './fighters/cjSkin.js';
+
 
 import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';
 import { drawDivineFlameArrowConstruct } from './weapons/sukunaWeaponGraphics.js';

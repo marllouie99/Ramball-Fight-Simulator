@@ -25,6 +25,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Pricedown';
+  src: url('../Assets/Font/gtafont/pricedow.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 html,
 body {
   margin: 0;

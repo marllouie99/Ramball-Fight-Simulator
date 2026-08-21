@@ -19,6 +19,7 @@ import { drawMahoragaThrow } from '../weapons/mahoragaWeaponGraphics.js';
 import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.js';
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
+import { drawCjUziBullet } from '../weapons/cjWeaponGraphics.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -981,6 +982,11 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
 
     if (p.visual === 'genosFireball') {
       drawGenosFireball(ctx, p);
+      return;
+    }
+
+    if (p.visual === 'cjUziBullet') {
+      drawCjUziBullet(ctx, p);
       return;
     }
 
