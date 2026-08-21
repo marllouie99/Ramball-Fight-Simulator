@@ -1062,11 +1062,18 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     // 3. GROVE STREET DRIVE-BY
-    const dbMax = f.driveByCooldownMax || cfg.driveByCooldown || 600;
-    const dbCurrent = f.driveByCooldown !== undefined ? f.driveByCooldown : 0;
-    const dbPct = Math.max(0, Math.min(100, (1 - (dbCurrent / dbMax)) * 100));
-    const dbReady = dbPct >= 99;
-    const dbLabel = 'GROVE ST.';
+    let dbPct = 0;
+    let dbReady = false;
+    const dbLabel = f.isDriveByActive ? 'GROVE ST. (ACTIVE)' : 'GROVE ST.';
+    if (f.isDriveByActive) {
+      dbPct = 100;
+      dbReady = true;
+    } else {
+      const dbMax = f.driveByCooldownMax || cfg.driveByCooldown || 600;
+      const dbCurrent = f.driveByCooldown !== undefined ? f.driveByCooldown : 0;
+      dbPct = Math.max(0, Math.min(100, (1 - (dbCurrent / dbMax)) * 100));
+      dbReady = dbPct >= 99;
+    }
 
     // 4. BAGUVIX (Ultimate)
     let ultPct = 0;

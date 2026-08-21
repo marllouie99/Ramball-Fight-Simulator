@@ -1453,6 +1453,9 @@ export class Fighter {
     if (this.soulSwapActive) {
       targetSpeed *= (CONFIG.yuji?.soulSwapSpeedMultiplier ?? 1.30); // noticeable speed boost during Soul Swap
     }
+    if (this.speedMultiplier !== undefined && this.speedMultiplier !== 1) {
+      targetSpeed *= this.speedMultiplier;
+    }
     if (this.slowTimer > 0) {
       this.slowTimer--;
       targetSpeed *= this.slowMultiplier;

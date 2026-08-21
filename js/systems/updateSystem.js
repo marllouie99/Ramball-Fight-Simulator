@@ -13,6 +13,7 @@ import { updateBlackFlashEffects } from '../graphics/particles/blackFlashEffect.
 import { updateLightningEffects } from '../graphics/particles/lightningEffects.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
+import { updateDriveBys } from './cjDriveBySystem.js';
 import { FRAME_TIME } from './gameLoop.js';
 
 export function updateGame() {
@@ -53,6 +54,7 @@ export function updateGame() {
       state.matchTimer = (state.matchTimer || 0) + 1;
       updateFighters();
       updateProjectiles();
+      updateDriveBys();
       // Update flame particle system
       const dt = Math.min(FRAME_TIME / 1000, 0.1); // Convert to seconds, cap at 100ms
       flamewardenFlameSystem.update(dt);
@@ -60,6 +62,7 @@ export function updateGame() {
       // Keep fighters moving in background during winning display
       updateFighters();
       updateProjectiles();
+      updateDriveBys();
       // Update flame particle system
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);
@@ -75,6 +78,7 @@ export function updateGame() {
       // Keep fighters moving in background during match end display
       updateFighters();
       updateProjectiles();
+      updateDriveBys();
       // Update flame particle system
       const dt = Math.min(FRAME_TIME / 1000, 0.1);
       flamewardenFlameSystem.update(dt);

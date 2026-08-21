@@ -283,6 +283,57 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
+    // Carl "CJ" Johnson Gunshots (Drive-By Tec-9, Dual Micro-Uzis, Riot Minigun) — Physical push back knockback & ballistic impact flash
+    const isCjBullet = projectile.visual === 'cjUziBullet' || projectile.visual === 'cjMinigunBullet' || (attacker && (attacker.characterId === 'cj' || attacker.type === 'cj') && projectile.visual && projectile.visual.includes('cj'));
+    if (isCjBullet) {
+      const knockbackForce = projectile.knockback || (CONFIG.cj?.gunHitPushback || 3.5);
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Physical push back on target along the bullet velocity vector
+      target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
+      target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
+      target.x += Math.cos(hitAngle) * (knockbackForce * 0.45);
+      target.y += Math.sin(hitAngle) * (knockbackForce * 0.45);
+
+      // Arena boundary clamp to prevent targets from getting pushed through walls
+      if (state && state.arena) {
+        const minX = state.arena.x + (target.r || 20);
+        const maxX = state.arena.x + state.arena.width - (target.r || 20);
+        const minY = state.arena.y + (target.r || 20);
+        const maxY = state.arena.y + state.arena.height - (target.r || 20);
+        target.x = Math.max(minX, Math.min(maxX, target.x));
+        target.y = Math.max(minY, Math.min(maxY, target.y));
+      }
+
+      // 2. Subtle hit flinch
+      if (typeof target.applyHitStun === 'function') {
+        target.applyHitStun(6);
+      } else {
+        target.hitStunTimer = Math.max(target.hitStunTimer || 0, 6);
+      }
+
+      // 3. High-contrast golden-amber kinetic impact sparks & flash
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 22, '#F59E0B');
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 6, '#F59E0B');
+      }
+
+      // 4. Directional blood splatter particles on bullet entry/exit
+      if (typeof spawnBloodEffect === 'function') {
+        spawnBloodEffect(target, 10, hitAngle, { minSize: 2.2, maxSize: 4.2, count: 3 });
+      }
+
+      // 5. Subtle punchy screen shake on direct bullet impact
+      if (typeof triggerGlobalScreenShake === 'function') {
+        const shakeInt = CONFIG.cj?.gunHitShakeIntensity || 1.2;
+        triggerGlobalScreenShake(shakeInt, 3);
+      }
+
+      return true; // Bullet spent on impact
+    }
+
     // Layla Steampunk Cannon - custom cyan sparks and flash impact effects
     const isLaylaBasic = projectile.visual === 'layla_basic_bullet';
     const isLaylaUlt = projectile.visual === 'layla_ultimate_bullet';

@@ -4,22 +4,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self' 'unsafe-inline' 'unsafe-eval' https: data: blob: file:; font-src 'self' https: data: blob: file:; style-src 'self' 'unsafe-inline' https:; media-src 'self' data: blob: file:; img-src 'self' data: blob: file: https:;">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link
     href="https://fonts.googleapis.com/css2?family=Architects+Daughter&family=Bangers&family=Permanent+Marker&family=Outfit:wght@800;900&family=Rajdhani:wght@700;900&display=swap"
     rel="stylesheet">
-  <link rel="preload" href="Assets/Font/gtafont/pricedow.ttf" as="font" type="font/ttf" crossorigin>
+  <link rel="preload" href="Assets/Font/gtafont/pricedow.ttf" as="font" type="font/ttf" crossorigin="anonymous">
   <link rel="stylesheet" href="css/style.css?v=11" />
   <style>
-    @font-face {
-      font-family: 'Pricedown';
-      src: url('Assets/Font/gtafont/pricedow.ttf') format('truetype');
-      font-weight: normal;
-      font-style: normal;
-      font-display: block;
-    }
-
     /* Optimize HTML & Body for Centered Canvas Preview */
     html,
     body {

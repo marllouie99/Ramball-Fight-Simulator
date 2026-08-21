@@ -21,6 +21,7 @@ import { clearAllPools } from '../graphics/objectPool.js';
 import { clearHealthHud } from '../graphics/hudManager.js?v=6';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
+import { clearDriveBys } from '../systems/cjDriveBySystem.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -820,6 +821,7 @@ export function resetMatch() {
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
   clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
+  clearDriveBys(); // Clear all Grove Street drive-by vehicles and effects
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -838,6 +840,7 @@ export function goToTitle() {
   state.wallCracks = []; // Clear all wall crack decals on return to title
   clearHealthHud(); // Flush DOM and Map cache cleanly
   clearDroppedMagazines(); // Clear all John Wick debris
+  clearDriveBys();
   
   state.gameState = 'title';
 }

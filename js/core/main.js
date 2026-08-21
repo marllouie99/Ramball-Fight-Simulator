@@ -25,10 +25,7 @@ initGraphicsCache();
 
 if (typeof document !== 'undefined' && 'fonts' in document) {
   try {
-    const gtaFont = new FontFace('Pricedown', 'url(Assets/Font/gtafont/pricedow.ttf)');
-    gtaFont.load().then((loadedFont) => {
-      document.fonts.add(loadedFont);
-    }).catch((e) => console.warn('Pricedown font load warning:', e));
+    document.fonts.load('48px "Pricedown"').catch((e) => console.warn('Pricedown font load warning:', e));
   } catch (e) {
     console.warn('FontFace error:', e);
   }

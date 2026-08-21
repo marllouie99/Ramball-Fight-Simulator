@@ -1214,9 +1214,28 @@ export function drawIllusions() {
     // Draw the swirling violet smoke OVER the body
     drawDopplegangerBodyEffect(ctx, 0, 0, illusion.r, 0, 'over', animTime);
 
-    // Draw status overlays (shock, poison, burn)
     if (typeof illusion.drawStatusOverlays === 'function') {
       illusion.drawStatusOverlays(ctx, illusion.r);
+    }
+
+    const isIllusionStunned = Boolean(
+      (illusion.paralyzeTimer && illusion.paralyzeTimer > 0) ||
+      (illusion.timeStopTimer && illusion.timeStopTimer > 0) ||
+      (illusion.electricStunTimer && illusion.electricStunTimer > 0) ||
+      (illusion.hitStunTimer && illusion.hitStunTimer > 0) ||
+      illusion.isParalyzed ||
+      illusion.isParalyzedByMahoraga ||
+      illusion.isFrozenByInfinity ||
+      illusion.frozenByCronos ||
+      illusion.isCronosStasis ||
+      illusion.isTargetOfAmbush ||
+      illusion.caughtInSaitamaFlurry
+    );
+    if (isIllusionStunned) {
+      const dur = illusion.paralyzeTimer || illusion.timeStopTimer || illusion.electricStunTimer || illusion.hitStunTimer || 45;
+      const isMahito = Boolean(illusion.isParalyzedByMahito);
+      const color = isMahito ? '#A855F7' : '#FFEE58';
+      drawParalyzeEffect(ctx, illusion.r || 25, isMahito, dur, color, illusion);
     }
 
     if (illusion._embeddedMahitoSpikes && illusion._embeddedMahitoSpikes.length > 0) {

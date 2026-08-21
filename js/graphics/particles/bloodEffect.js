@@ -10,6 +10,7 @@ import { bomberExplosionSystem } from './bomberExplosionVisuals.js';
 import { burnEffectSystem } from './burnEffectVisuals.js';
 import { ParticleSystem } from '../../systems/particles/ParticleSystem.js';
 import { spawnSparks } from './sparkEffect.js';
+import { clearDriveBys } from '../../systems/cjDriveBySystem.js';
 
 // Object pool for PixiJS Sprites to prevent GC thrashing
 const bloodSpritePool = [];
@@ -535,6 +536,7 @@ export function clearAllBattleEffects() {
   // Clear WebGL particles
   bomberExplosionSystem.clear();
   burnEffectSystem.clear();
+  clearDriveBys();
 
   // 3. Clear per-fighter attached visual effects (hitFlameWisps, afterImages, punchEffects, trails)
   if (state.fighters) {

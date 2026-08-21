@@ -448,6 +448,11 @@ export class SaitamaFighter extends Fighter {
           if (ill && ill !== this) allEntities.push(ill);
         });
       }
+      if (state.cjDriveBys) {
+        state.cjDriveBys.forEach(car => {
+          if (car && car !== this) allEntities.push(car);
+        });
+      }
     }
 
     for (const ent of allEntities) {
@@ -557,6 +562,11 @@ export class SaitamaFighter extends Fighter {
             if (ill && ill !== this) allEntities.push(ill);
           });
         }
+        if (state.cjDriveBys) {
+          state.cjDriveBys.forEach(car => {
+            if (car && car !== this) allEntities.push(car);
+          });
+        }
       }
 
       for (const ent of allEntities) {
@@ -645,6 +655,16 @@ export class SaitamaFighter extends Fighter {
               if (myTeam !== null && myTeam === illTeam) continue;
             }
             collateralTargets.push(ill);
+          }
+        }
+        if (state.cjDriveBys) {
+          for (const car of state.cjDriveBys) {
+            if (!car || car.dead || car.hp <= 0 || car === target) continue;
+            if (car.owner) {
+              const carTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(car.owner)) : null;
+              if (myTeam !== null && myTeam === carTeam) continue;
+            }
+            collateralTargets.push(car);
           }
         }
       }
@@ -846,6 +866,11 @@ export class SaitamaFighter extends Fighter {
     if (this.flurryTarget) {
       this.flurryTarget.caughtInSaitamaFlurry = false;
     }
+    if (typeof state !== 'undefined') {
+      if (state.fighters) state.fighters.forEach(f => { if (f) f.caughtInSaitamaFlurry = false; });
+      if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInSaitamaFlurry = false; });
+      if (state.cjDriveBys) state.cjDriveBys.forEach(car => { if (car) car.caughtInSaitamaFlurry = false; });
+    }
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
@@ -1015,6 +1040,17 @@ export class SaitamaFighter extends Fighter {
             if (myTeam !== null && myTeam === illTeam) continue; // Ignore true teammates' illusions
           }
           targetsToScan.push(ill);
+        }
+      }
+      if (state.cjDriveBys) {
+        const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+        for (const car of state.cjDriveBys) {
+          if (!car || car.dead || car.hp <= 0) continue;
+          if (car.owner) {
+            const carTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(car.owner)) : null;
+            if (myTeam !== null && myTeam === carTeam) continue;
+          }
+          targetsToScan.push(car);
         }
       }
     }
@@ -1318,6 +1354,17 @@ export class SaitamaFighter extends Fighter {
               if (myTeam !== null && myTeam === illTeam) continue;
             }
             targetsToScan.push(ill);
+          }
+        }
+        if (state.cjDriveBys) {
+          const myTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+          for (const car of state.cjDriveBys) {
+            if (!car || car.dead || car.hp <= 0) continue;
+            if (car.owner) {
+              const carTeam = state.getFighterTeam ? state.getFighterTeam(state.fighters.indexOf(car.owner)) : null;
+              if (myTeam !== null && myTeam === carTeam) continue;
+            }
+            targetsToScan.push(car);
           }
         }
       }

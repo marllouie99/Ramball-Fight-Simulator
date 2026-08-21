@@ -20,9 +20,9 @@ export const cjConfig = {
   respectSpeedBoost: 0.15,     // +15% move speed at >= 50% Respect (Permanent)
   respectAttackSpeedBoost: 0.25, // +25% attack speed at 100% OG (Permanent)
   respectDamageBoost: 0.15,    // +15% punch damage at 100% OG (Permanent)
-  cheatTypingFramesPerChar: 14, // Natural typing cadence (~0.23s per character)
-  cheatTypingHoldDelay: 24,     // 24 frames (~0.40s) hold delay with full word displayed before activating
-  cheatActivationPostDelay: 18, // 18 frames (~0.30s) post-activation pose delay before resuming action
+  cheatTypingFramesPerChar: 9,  // Measured typing cadence (~0.15s per character) for clear readable keystrokes
+  cheatTypingHoldDelay: 16,     // 16 frames (~0.26s) confirmation hold with full word displayed
+  cheatActivationPostDelay: 8,  // 8 frames (~0.13s) post-activation pose delay before resuming action
 
   // ── 3. BASIC ATTACK: BRASS KNUCKLES STREET BOXING ──
   meleePunchReach: 80,         // 80px punch reach
@@ -46,24 +46,37 @@ export const cjConfig = {
 
   // ── 5. SKILL 2: ROCKETMAN / YECGAA (DARPA Jetpack & Dual Micro-Uzi Strafe) ──
   jetpackCooldown: 570,        // 9.5s (570 frames)
-  jetpackDuration: 270,        // 4.5s flight duration (270 frames)
-  jetpackSpeedMultiplier: 1.30, // High-speed omni-directional hover
+  jetpackDuration: 600,        // 4.5s flight duration (270 frames)
+  jetpackSpeedMultiplier: 1.40, // Smooth, agile jetpack flight speed (+40% boost, ~8.4 px/frame)
   jetpackEvadeChance: 0.50,    // 50% airborne evasion chance against incoming attacks
   jetpackThrusterBurnDamage: 6, // Burning damage per frame in thruster fire
-  jetpackDiveDashSpeed: 16.0,  // Supersonic knuckle dive boost speed
+  jetpackDiveDashSpeed: 12.0,  // Controlled knuckle dive boost speed
   jetpackUziFireInterval: 5,   // Rapid dual alternating fire cadence (every 5 frames = 12 bullets/sec)
   jetpackUziBulletDamage: 8,   // 8 damage per 9mm full metal jacket round
   jetpackUziBulletSpeed: 23.0, // High velocity strafe bullet speed
   jetpackUziSpread: 0.07,      // Natural Micro-SMG bullet spray spread
   jetpackUziRange: 320,        // Effective firing range while hovering
   jetpackUziKnockback: 2.8,    // Impact impulse
+  gunHitPushback: 3.5,         // Small physical pushback knockback on all CJ gun hits (Drive-by Tec-9, Dual Uzis, Minigun)
+  gunHitShakeIntensity: 1.2,   // Subtle punchy screen shake on direct bullet impact
 
   // ── 6. SKILL 3: GROVESTREET4LIFE (Drive-By Backup) ──
   driveByCooldown: 600,        // 10.0s (600 frames)
-  driveByBulletCount: 20,      // Rapid 20-round Tec-9 burst
+  driveByStayDuration: 600,    // 4.0s (240 frames) staying & drifting in arena per pass
+  driveByCarHp: 280,           // 280 Max HP minion health bar (can be targeted and damaged by enemies)
+  driveByPasses: 3,            // 2 repeated drive-by sweeps per Skill 3 activation
+  driveByReenterDelay: 60,     // 1.0s (60 frames) pause between passes
+  driveByBulletCount: 60,      // 16 rounds per pass (32 total across both passes)
   driveByBulletDamage: 8,      // 8 damage per bullet
   driveByBulletSpeed: 22.0,
+  driveByBurstInterval: 8,     // Paced rhythmic 8-frame alternating bursts
+  driveByCarSpeed: 6.5,        // Cinematic lowrider cruise & drift speed
+  driveByRamDamage: 22,        // 22 impact damage when running over/ramming enemies
+  driveByRamKnockback: 18.0,   // Physical vehicular knockback impulse
   driveBySlowDuration: 120,    // 2.0s slow in burning tire burnout oil
+  driveByOilRadius: 55,        // 55px burnout oil slow zone radius
+  driveByOilDuration: 240,     // 4.0s (240 frames) duration on the ground
+  driveByRespectGain: 15,      // Respect gained on successful drive-by invocation
 
   // ── 7. ULTIMATE: BAGUVIX (God Mode & Minigun Riot Overdrive) ──
   baguvixDuration: 300,        // 5.0s (300 frames) invulnerability

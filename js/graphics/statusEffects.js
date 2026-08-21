@@ -1537,8 +1537,29 @@ export const STATUS_OVERLAY_REGISTRY = [
   },
   {
     id: 'paralyze',
-    isActive: (f) => (f.paralyzeTimer > 0) || (f.timeStopTimer > 0 && !f.isFrozenByInfinity && !f.frozenByCronos && !f.isCronosStasis),
-    render: (ctx, baseRadius, f) => drawParalyzeEffect(ctx, baseRadius, false, f.paralyzeTimer || f.timeStopTimer, '#FFEE58', f)
+    isActive: (f) => Boolean(
+      (f.paralyzeTimer && f.paralyzeTimer > 0) ||
+      (f.timeStopTimer && f.timeStopTimer > 0) ||
+      (f.electricStunTimer && f.electricStunTimer > 0) ||
+      (f.hitStunTimer && f.hitStunTimer > 0) ||
+      (f.stunTimer && f.stunTimer > 0) ||
+      (f.knockbackStunTimer && f.knockbackStunTimer > 0) ||
+      (f.dubstepStunTimer && f.dubstepStunTimer > 0) ||
+      (f.ratioHitPauseTimer && f.ratioHitPauseTimer > 0) ||
+      f.isParalyzed ||
+      f.isParalyzedByMahoraga ||
+      f.isFrozenByInfinity ||
+      f.frozenByCronos ||
+      f.isCronosStasis ||
+      f.isTargetOfAmbush ||
+      f.caughtInSaitamaFlurry
+    ),
+    render: (ctx, baseRadius, f) => {
+      const dur = f.paralyzeTimer || f.timeStopTimer || f.electricStunTimer || f.hitStunTimer || 45;
+      const isMahito = Boolean(f.isParalyzedByMahito);
+      const color = isMahito ? '#A855F7' : '#FFEE58';
+      drawParalyzeEffect(ctx, baseRadius, isMahito, dur, color, f);
+    }
   },
   {
     id: 'soulDisfigurement',

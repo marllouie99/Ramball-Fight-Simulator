@@ -1190,6 +1190,36 @@ class ProjectileSystem {
       }
     }
 
+    // ── Check Collision against Greenwood Sedan Minion (CJ Drive-By Car) ──
+    if (state.cjDriveBys && state.cjDriveBys.length > 0) {
+      for (const car of state.cjDriveBys) {
+        if (!car || car.dead || car.hp <= 0 || car.phase === 'WAITING_REENTER') continue;
+        const carOwnerIdx = fighters.indexOf(car.owner);
+        if (projectile.owner === carOwnerIdx || (typeof areOnSameTeam === 'function' && areOnSameTeam(projectile.owner, carOwnerIdx))) continue;
+        if (projectile.hitFighters && projectile.hitFighters.has(car)) continue;
+
+        const hitRadius = (car.hitRadius || 44) + projectile.r;
+        const cdx = car.x - projectile.x;
+        const cdy = car.y - projectile.y;
+        if (Math.abs(cdx) <= hitRadius && Math.abs(cdy) <= hitRadius) {
+          const distSq = cdx * cdx + cdy * cdy;
+          if (distSq <= hitRadius * hitRadius) {
+            const attacker = fighters[projectile.owner];
+            if (typeof car.takeDamage === 'function') {
+              car.takeDamage(projectile.damage, attacker, { isProjectile: true, projectile });
+            }
+
+            const shouldDestroy = HitImpactSystem.processProjectileHit(car, projectile, attacker, fighters);
+            if (!shouldDestroy) {
+              continue;
+            } else {
+              return true;
+            }
+          }
+        }
+      }
+    }
+
     return false;
   }
 
@@ -1999,9 +2029,22 @@ class ProjectileSystem {
       return behaviorExpire;
     }
 
+    if (p.life <= 0) return true;
+
+    // If projectile penetrates/ignores walls (e.g., CJ Drive-By bullets fired from outside or through borders)
+    if (p.ignoreWalls || p.pierceWalls || p.visual === 'cjUziBullet') {
+      const arena = CONFIG.arena;
+      const margin = 350;
+      return (
+        p.x < arena.x - margin ||
+        p.x > arena.x + arena.width + margin ||
+        p.y < arena.y - margin ||
+        p.y > arena.y + arena.height + margin
+      );
+    }
+
     const arena = CONFIG.arena;
     return (
-      p.life <= 0 ||
       p.x - p.r < arena.x ||
       p.x + p.r > arena.x + arena.width ||
       p.y - p.r < arena.y ||

@@ -7,8 +7,9 @@ import { CONFIG } from '../../core/config.js';
 import { drawCjSkin } from '../../graphics/fighters/cjSkin.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
-import { spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { spawnGroveStreetDriveBy } from '../../systems/cjDriveBySystem.js';
+import { spawnDroppedJetpack, clearFloatingJetpacks } from '../../graphics/particles/cjFloatingJetpack.js';
 
 export class CJFighter extends Fighter {
   constructor(def) {
@@ -17,6 +18,8 @@ export class CJFighter extends Fighter {
     this.type = 'cj';
 
     const cfg = CONFIG.cj || {};
+    this.baseSpeed = this.speed || cfg.speed || 6.0;
+    this.speed = this.baseSpeed;
 
     // ── Combat & Punch Variables (Brass Knuckles CQC) ──
     this.punchAnimTimer = 0;
@@ -63,15 +66,17 @@ export class CJFighter extends Fighter {
     this.isJetpackActive = false;
     this.jetpackTimer = 0;
     this.jetpackMaxTimer = cfg.jetpackDuration || 270;
-    this.jetpackCooldown = 0;
     this.jetpackCooldownMax = cfg.jetpackCooldown || 570;
+    this.jetpackCooldown = this.jetpackCooldownMax; // Starts on cooldown initially
     this.jetpackDiveCooldown = 0;
     this.evadeBuffTimer = 0;
     this.evadeChance = 0;
+    this.jetpackBounceGraceTimer = 0;
 
     // ── Skill 3: GROVESTREET4LIFE Drive-By ──
-    this.driveByCooldown = 0;
+    this.isDriveByActive = false;
     this.driveByCooldownMax = cfg.driveByCooldown || 600;
+    this.driveByCooldown = this.driveByCooldownMax; // Starts on cooldown initially
 
     // ── Ultimate: BAGUVIX God Mode & Minigun ──
     this.isBaguvixActive = false;
@@ -223,7 +228,62 @@ export class CJFighter extends Fighter {
 
       // Dynamic flight speed boost
       const baseRespectBoost = this.respect >= 50 ? (cfg.respectSpeedBoost || 0.15) : 0;
-      this.speedMultiplier = (1 + baseRespectBoost) * (cfg.jetpackSpeedMultiplier || 1.30);
+      const jetMult = (1 + baseRespectBoost) * (cfg.jetpackSpeedMultiplier || 1.40);
+      this.speedMultiplier = jetMult;
+      this.speed = (this.baseSpeed || 6.0) * jetMult;
+
+      // Natural Wall Bounce Deflection Grace Period (allows clean ricochet deflection before AI resumes tracking)
+      if (this.jetpackBounceGraceTimer > 0) {
+        this.jetpackBounceGraceTimer--;
+        const curSpd = Math.hypot(this.vx, this.vy);
+        if (curSpd > 0) {
+          this.vx = (this.vx / curSpd) * this.speed;
+          this.vy = (this.vy / curSpd) * this.speed;
+        }
+        if (opponent && !opponent.dead && opponent.hp > 0 && typeof this.aim === 'function') {
+          this.aim(opponent);
+        }
+      } else if (opponent && !opponent.dead && opponent.hp > 0) {
+        if (typeof this.aim === 'function') {
+          this.aim(opponent);
+        }
+
+        const dx = opponent.x - this.x;
+        const dy = opponent.y - this.y;
+        const dist = Math.hypot(dx, dy);
+        const directAngle = Math.atan2(dy, dx);
+
+        // Desired flight trajectory: circle and strafe at optimal Uzi range (~180px)
+        let flightAngle;
+        if (dist > 220) {
+          flightAngle = directAngle; // Close in rapidly
+        } else if (dist < 110) {
+          flightAngle = directAngle + Math.PI; // Back up to maintain shooting clearance
+        } else {
+          // High-speed strafe circling
+          const strafeDir = (this.jetpackTimer % 120 < 60) ? (Math.PI * 0.5) : (-Math.PI * 0.5);
+          flightAngle = directAngle + strafeDir * 0.75;
+        }
+
+        // Steer velocity smoothly at balanced flight speed
+        const targetVx = Math.cos(flightAngle) * this.speed;
+        const targetVy = Math.sin(flightAngle) * this.speed;
+        this.vx += (targetVx - this.vx) * 0.14;
+        this.vy += (targetVy - this.vy) * 0.14;
+
+        // Maintain full flight speed
+        const curSpd = Math.hypot(this.vx, this.vy);
+        if (curSpd > 0) {
+          this.vx = (this.vx / curSpd) * this.speed;
+          this.vy = (this.vy / curSpd) * this.speed;
+        }
+      } else {
+        const curVelMag = Math.hypot(this.vx, this.vy);
+        if (curVelMag > 0.05) {
+          this.vx = (this.vx / curVelMag) * this.speed;
+          this.vy = (this.vy / curVelMag) * this.speed;
+        }
+      }
 
       // Thruster ground burn AOE trail behind CJ
       if (this.jetpackTimer % 5 === 0) {
@@ -232,9 +292,6 @@ export class CJFighter extends Fighter {
 
       // Dual Micro-Uzi Rapid Airborne Strafe Fire (Alternate Left/Right barrels)
       if (opponent && !opponent.dead && opponent.hp > 0) {
-        if (typeof this.aim === 'function') {
-          this.aim(opponent);
-        }
         const d = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         if (this.uziFireCooldown <= 0 && d <= (cfg.jetpackUziRange || 340)) {
           this._fireJetpackUzi(opponent);
@@ -261,8 +318,19 @@ export class CJFighter extends Fighter {
         this.z = 0;
         this.evadeBuffTimer = 0;
         this.evadeChance = 0;
-        this.speedMultiplier = 1 + (this.respect >= 50 ? (cfg.respectSpeedBoost || 0.15) : 0);
+        const groundMult = 1 + (this.respect >= 50 ? (cfg.respectSpeedBoost || 0.15) : 0);
+        this.speedMultiplier = groundMult;
+        this.speed = (this.baseSpeed || 6.0) * groundMult;
         this.jetpackCooldown = this.jetpackCooldownMax;
+        const landVelMag = Math.hypot(this.vx, this.vy);
+        if (landVelMag > this.speed) {
+          this.vx = (this.vx / landVelMag) * this.speed;
+          this.vy = (this.vy / landVelMag) * this.speed;
+        }
+
+        // Spawn floating 360° rotating Jetpack pickup item on the ground where CJ detached it
+        spawnDroppedJetpack(this.x, this.y);
+        audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
       }
     } else {
       this.z = 0;
@@ -270,6 +338,9 @@ export class CJFighter extends Fighter {
         this.evadeChance = 0;
         this.evadeBuffTimer = 0;
       }
+      const groundMult = 1 + (this.respect >= 50 ? (cfg.respectSpeedBoost || 0.15) : 0);
+      this.speedMultiplier = groundMult;
+      this.speed = (this.baseSpeed || 6.0) * groundMult;
     }
 
     // Update God Mode status
@@ -319,8 +390,39 @@ export class CJFighter extends Fighter {
             this.cheatActionCallback = null;
             cb();
           }
-          this.cheatPostDelayTimer = cfg.cheatActivationPostDelay || 18;
+          if (this.isJetpackActive) {
+            this.cheatPostDelayTimer = 0;
+            this.isTypingCheat = false;
+          } else {
+            this.cheatPostDelayTimer = cfg.cheatActivationPostDelay || 18;
+          }
         }
+      }
+    }
+
+    // ── Check Strict Close-Range Collision with Dropped Floating Jetpack Pickup Item ──
+    const hasDroppedJetpack = Boolean(state.cjDroppedJetpacks && state.cjDroppedJetpacks.length > 0);
+    if (!this.dead && !this.isJetpackActive && this.jetpackCooldown <= 0 && hasDroppedJetpack) {
+      for (let i = state.cjDroppedJetpacks.length - 1; i >= 0; i--) {
+        const item = state.cjDroppedJetpacks[i];
+        if (!item) continue;
+        const d = Math.hypot(this.x - item.x, this.y - item.y);
+        const closePickupRadius = (this.r || 25) + 6; // Strict close-range contact (~31px)
+        if (d <= closePickupRadius) {
+          state.cjDroppedJetpacks.splice(i, 1);
+          this._executeRocketman(true);
+          break;
+        }
+      }
+    }
+
+    // Ground AI: Steer towards dropped jetpack to retrieve it when CD is ready
+    if (!this.dead && !this.isJetpackActive && !this.isTypingCheat && this.jetpackCooldown <= 0 && hasDroppedJetpack) {
+      const nearestJetpack = state.cjDroppedJetpacks[0];
+      if (nearestJetpack) {
+        const toAngle = Math.atan2(nearestJetpack.y - this.y, nearestJetpack.x - this.x);
+        this.vx += Math.cos(toAngle) * 0.85;
+        this.vy += Math.sin(toAngle) * 0.85;
       }
     }
 
@@ -338,8 +440,10 @@ export class CJFighter extends Fighter {
       }
     }
 
-    // ── Skill 2: ROCKETMAN Jetpack Activation Condition ──
-    if (!this.isJetpackActive && this.jetpackCooldown <= 0 && !this.dead && !this.isTypingCheat) {
+    // ── Skill 2: ROCKETMAN Jetpack Initial Activation Condition ──
+    // If a dropped jetpack is already in the arena, CJ must retrieve it in close range (handled above).
+    // If no dropped jetpack exists on the ground (e.g. initial round start), he equips his initial jetpack directly.
+    if (!this.isJetpackActive && this.jetpackCooldown <= 0 && !this.dead && !hasDroppedJetpack) {
       if (opponent && !opponent.dead && opponent.hp > 0) {
         const d = Math.hypot(opponent.x - this.x, opponent.y - this.y);
         if (d > 70) {
@@ -348,13 +452,91 @@ export class CJFighter extends Fighter {
       }
     }
 
+    // ── Skill 3: GROVESTREET4LIFE Drive-By Activation Condition ──
+    if (!this.isDriveByActive && this.driveByCooldown <= 0 && !this.dead && !this.isTypingCheat) {
+      if (opponent && !opponent.dead && opponent.hp > 0) {
+        this.activateDriveBy();
+      }
+    }
+
     // Call base physics & AI update
     super.update(opponent, ownerIndex, arena);
     if (this.isTypingCheat) {
       this.vx = 0;
       this.vy = 0;
+      this.punchAnimTimer = 0;
+      this.shootCooldown = Math.max(this.shootCooldown || 0, 30);
     }
     this._updateMeleeCombat(opponent, arena);
+  }
+
+  /**
+   * Dedicated movement physics for CJ.
+   * During Jetpack flight, directly applies full supersonic kinematic velocity
+   * without sluggish ground ramp-up or dampening.
+   */
+  applyMovementPhysics(extraMultiplier = 1) {
+    if (this.isJetpackActive) {
+      this.x += this.vx;
+      this.y += this.vy;
+      return;
+    }
+    super.applyMovementPhysics(extraMultiplier);
+  }
+
+  /**
+   * Dedicated wall bounce logic for CJ.
+   * During Jetpack flight, deflects naturally off arena boundaries without stickiness or momentum loss.
+   */
+  resolveWallBounce(arena, opponent) {
+    if (this.isJetpackActive && arena) {
+      let bounced = false;
+      const minDeflect = 2.5; // Natural outbound push away from wall
+      if (this.x - this.r < arena.x) {
+        this.x = arena.x + this.r;
+        this.vx = Math.max(minDeflect, Math.abs(this.vx));
+        this.vy += (Math.random() - 0.5) * 1.5;
+        bounced = true;
+      } else if (this.x + this.r > arena.x + arena.width) {
+        this.x = arena.x + arena.width - this.r;
+        this.vx = -Math.max(minDeflect, Math.abs(this.vx));
+        this.vy += (Math.random() - 0.5) * 1.5;
+        bounced = true;
+      }
+      if (this.y - this.r < arena.y) {
+        this.y = arena.y + this.r;
+        this.vy = Math.max(minDeflect, Math.abs(this.vy));
+        this.vx += (Math.random() - 0.5) * 1.5;
+        bounced = true;
+      } else if (this.y + this.r > arena.y + arena.height) {
+        this.y = arena.y + arena.height - this.r;
+        this.vy = -Math.max(minDeflect, Math.abs(this.vy));
+        this.vx += (Math.random() - 0.5) * 1.5;
+        bounced = true;
+      }
+
+      if (bounced) {
+        this.jetpackBounceGraceTimer = 16; // ~0.26s natural deflection glide away from wall
+        const curSpd = Math.hypot(this.vx, this.vy);
+        if (curSpd > 0) {
+          this.vx = (this.vx / curSpd) * this.speed;
+          this.vy = (this.vy / curSpd) * this.speed;
+        }
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(this.x, this.y, '#F97316', 4);
+        }
+      }
+      return bounced;
+    }
+    return super.resolveWallBounce(arena, opponent);
+  }
+
+  /**
+   * Override base gun shoot to disable default shooting logic (CJ uses street boxing CQC).
+   * Also ensures all attacks are strictly disabled while typing cheat codes.
+   */
+  shoot(ownerIndex) {
+    if (this.dead || this.isTypingCheat) return;
   }
 
   /**
@@ -364,8 +546,8 @@ export class CJFighter extends Fighter {
   startCheatTyping(codeString, onComplete) {
     if (this.dead) return;
     const cfg = CONFIG.cj || {};
-    const framesPerChar = cfg.cheatTypingFramesPerChar || 14;
-    const holdDelay = cfg.cheatTypingHoldDelay || 24; // Confirmation pause with full word displayed
+    const framesPerChar = cfg.cheatTypingFramesPerChar || 9;
+    const holdDelay = cfg.cheatTypingHoldDelay || 16; // Confirmation pause with full word displayed
     this.isTypingCheat = true;
     this.cheatCodeString = codeString.toUpperCase();
     this.cheatTypedChars = 0;
@@ -485,25 +667,42 @@ export class CJFighter extends Fighter {
 
   /**
    * Skill 2: ROCKETMAN / YECGAA (DARPA Area 69 Jetpack Flight & Sonic Thrust Dive)
+   * Instant flight activation without cheat typing.
    */
   activateRocketman() {
-    if (this.dead || this.isTypingCheat || this.isJetpackActive) return;
-
-    this.startCheatTyping('ROCKETMAN', () => {
-      this._executeRocketman();
-    });
+    if (this.dead || this.isJetpackActive) return;
+    this._executeRocketman();
   }
 
-  _executeRocketman() {
+  _executeRocketman(isPickup = false) {
     if (this.dead) return;
     const cfg = CONFIG.cj || {};
+    this.isTypingCheat = false;
+    this.cheatPostDelayTimer = 0;
     this.isJetpackActive = true;
     this.jetpackTimer = this.jetpackMaxTimer;
     this.jetpackCooldown = this.jetpackCooldownMax;
     this.jetpackDiveCooldown = 25;
 
-    // Trigger authentic GTA San Andreas cheat notification
-    this.triggerCheat('ROCKETMAN', 'JETPACK FLIGHT ACTIVE');
+    // Clear all dropped floating jetpack pickups from the arena floor
+    clearFloatingJetpacks();
+
+    // Apply high-speed flight physics immediately
+    const baseRespectBoost = this.respect >= 50 ? (cfg.respectSpeedBoost || 0.15) : 0;
+    const jetMult = (1 + baseRespectBoost) * (cfg.jetpackSpeedMultiplier || 1.40);
+    this.speedMultiplier = jetMult;
+    this.speed = (this.baseSpeed || 6.0) * jetMult;
+
+    const launchAngle = (this.gunAngle !== undefined) ? this.gunAngle : (this.angle || 0);
+    this.vx = Math.cos(launchAngle) * this.speed;
+    this.vy = Math.sin(launchAngle) * this.speed;
+
+    // Trigger authentic GTA San Andreas cheat notification or pickup floating text
+    if (!isPickup) {
+      this.triggerCheat('ROCKETMAN', 'JETPACK FLIGHT ACTIVE');
+    } else {
+      spawnFloatingText(this.x, this.y - this.r - 20, 'JETPACK EQUIPPED!', '#38BDF8');
+    }
 
     // Rocket ignition and thrust SFX
     audioSystem.playSFX('Assets/Sound Effects/Skills/fugaignite.mp3', 0.85);
@@ -511,17 +710,43 @@ export class CJFighter extends Fighter {
 
     // Visual ignition burst & sparks
     if (typeof spawnImpactFlash === 'function') {
-      spawnImpactFlash(this.x, this.y, 45, '#F97316');
+      spawnImpactFlash(this.x, this.y, 50, '#38BDF8');
     }
     if (typeof spawnSparks === 'function') {
-      spawnSparks(this.x, this.y, '#38BDF8', 12);
+      spawnSparks(this.x, this.y, '#FBBF24', 18);
     }
 
     this.gainRespect(cfg.jetpackRespectGain || 10);
   }
 
+  /**
+   * Skill 3: GROVESTREET4LIFE (Gang Drive-By Backup)
+   */
+  activateDriveBy() {
+    if (this.dead || this.isTypingCheat || this.isDriveByActive) return;
+
+    this.startCheatTyping('GROVESTREET4LIFE', () => {
+      this._executeDriveBy();
+    });
+  }
+
+  _executeDriveBy() {
+    if (this.dead) return;
+    const cfg = CONFIG.cj || {};
+    this.driveByCooldown = this.driveByCooldownMax;
+
+    // Trigger authentic GTA San Andreas cheat notification
+    this.triggerCheat('GROVESTREET4LIFE', 'GROVE STREET GANG BACKUP');
+
+    // Spawn the Greenwood sedan drive-by car
+    spawnGroveStreetDriveBy(this);
+
+    // Build Respect on successful skill activation
+    this.gainRespect(cfg.driveByRespectGain || 15);
+  }
+
   _executeJetpackDive(opponent) {
-    if (this.dead || !opponent || opponent.dead) return;
+    if (this.dead || this.isTypingCheat || !opponent || opponent.dead) return;
     const cfg = CONFIG.cj || {};
     const angle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
     if (typeof this.aim === 'function') {
@@ -544,6 +769,7 @@ export class CJFighter extends Fighter {
   }
 
   _emitJetpackThrusterBurn(arena) {
+    if (this.dead || this.isTypingCheat) return;
     const cfg = CONFIG.cj || {};
     const burnDmg = cfg.jetpackThrusterBurnDamage || 6;
     const angle = (this.gunAngle || this.angle || 0);
@@ -589,7 +815,7 @@ export class CJFighter extends Fighter {
    * Fires high-velocity alternating Dual Micro-Uzi bursts during Jetpack flight
    */
   _fireJetpackUzi(opponent) {
-    if (this.dead || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
+    if (this.dead || this.isTypingCheat || (typeof state !== 'undefined' && state.gameState !== 'playing')) return;
     const cfg = CONFIG.cj || {};
     const isFront = (this.uziSide === 0);
     this.uziSide = (this.uziSide === 0) ? 1 : 0; // Alternate between front and back guns

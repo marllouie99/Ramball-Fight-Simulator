@@ -14,7 +14,9 @@ import {
   drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
-  drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen
+  drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
+  drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
+  drawFloatingJetpacks, updateFloatingJetpacks
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -231,11 +233,15 @@ export function renderGame() {
           }
         }
 
+        // Draw drive-by skid marks, burnout oil puddle & headlights on the ground, before fighters
+        drawDriveByGroundEffects(state.ctx);
+
         drawGenosSpeedLines(); // Full-screen anime action speed lines during Machine Gun Blows
         drawNanamiSpeedLines(); // Supersonic manga action speed lines during Nanami blitz/lunges
         drawSaitamaSpeedLines(); // Manga action speed lines during Consecutive Normal Punches
         drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
         drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
+        drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
         drawIllusions(); // Draw Doppleganger illusions
         drawAllCronosSpheres(state.ctx); // Draw Cronos spheres on top of illusions
         drawProjectiles(); // Draw projectiles AFTER fighters so they appear on top of body
@@ -260,7 +266,10 @@ export function renderGame() {
         drawBloodEffects(); // Draw blood effects on top of everything
         updateDroppedMagazines();
         drawDroppedMagazines(state.ctx); // Draw John Wick dropped magazines on the arena floor
+        updateFloatingJetpacks();
+        drawFloatingJetpacks(state.ctx); // Draw CJ dropped 360 rotating floating Jetpack pickups on the arena floor
         drawSparkEffects(); // Draw spark effects on top of everything
+        drawBamEffects(state.ctx); // Draw comic BAM! impact effects on top of collisions
         drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact
         drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
 

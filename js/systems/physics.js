@@ -426,6 +426,29 @@ function getClosestOpponent(fighter) {
     }
   }
 
+  // Also check active Drive-By Car minions - valid enemy minion targets
+  if (state.cjDriveBys) {
+    for (let i = 0; i < state.cjDriveBys.length; i++) {
+      const car = state.cjDriveBys[i];
+      if (!car || car.dead || car.hp <= 0 || car.phase === 'WAITING_REENTER') continue;
+      // Skip if this car belongs to the fighter or their owner
+      if (car.owner === fighter || (fighter.owner && car.owner === fighter.owner)) continue;
+      // Skip if this car belongs to a teammate
+      if (isTeamMode && fighterTeam !== null && car.owner) {
+        const _carOwnerIdx = car.owner._stateIdx !== undefined ? car.owner._stateIdx : state.fighters.indexOf(car.owner);
+        const ownerTeam = state.getFighterTeam(_carOwnerIdx);
+        if (ownerTeam === fighterTeam) continue;
+      }
+      const dx = car.x - fighter.x;
+      const dy = car.y - fighter.y;
+      const dSq = dx * dx + dy * dy;
+      if (dSq < bestDistance) {
+        bestDistance = dSq;
+        closest = car;
+      }
+    }
+  }
+
   return closest;
 }
 

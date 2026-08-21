@@ -1,6 +1,10 @@
 export { drawFuelPickups } from './renderers/arenaRenderer.js';
 export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawTodoTakadaIdolScreenOverlay } from './renderers/effectsRenderer.js';
 export { drawFighters, drawIllusions } from './renderers/EntityRenderer.js';
+export { drawDriveBys, drawDriveByGroundEffects } from '../systems/cjDriveBySystem.js';
+export { drawBamEffects, spawnBamEffect, updateBamEffects, clearBamEffects } from './particles/bamImpactEffect.js';
+export { drawFloatingJetpacks, spawnDroppedJetpack, updateFloatingJetpacks, clearFloatingJetpacks } from './particles/cjFloatingJetpack.js';
+export { drawCarExplosions, drawCarScorchMarks, spawnCarExplosion, updateCarExplosions, clearCarExplosions } from './particles/cjCarExplosion.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA
 // ——————————————————————————————————————————————————————
