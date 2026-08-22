@@ -70,12 +70,12 @@ export const gojoConfig = {
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealPercent: 0.25, // Heals 20% of max HP per RCT trigger
+  reverseCursedTechniqueHealAmount: 125,   // Flat HP healed per RCT trigger
   reverseCursedTechniqueCooldown: 700,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
   passiveRctHealRate: 0,                   // Disabled
-  rctRevivalHealPercent: 0.30,             // Restores 30% max HP on emergency revival
+  rctRevivalHealAmount: 150,               // Flat HP restored on emergency revival
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
   initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration

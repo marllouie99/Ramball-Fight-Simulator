@@ -25,6 +25,7 @@ export function updateGame() {
       const isAnnouncerPlaying = state.announcerPlayingSequence;
       
       if (isAnnouncerPlaying) {
+        state.countdownTimer = (state.countdownTimer || 0) + 1;
         // Update fighters during countdown to aim guns at opponents
         updateFighters();
         // Update flame particle system

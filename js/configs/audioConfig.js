@@ -63,5 +63,23 @@ export const AUDIO_CONFIG = {
   'skill_engineer_sentry_detected': 'Assets/Sound Effects/Skills/engineer-sentrydetected.mp3',
   'skill_engineer_sentry_gunshot': 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3',
   'skill_engineer_sentry_reloaded': 'Assets/Sound Effects/Skills/engineer-sentryreloaded.mp3',
-  'skill_engineer_sentry_reloading': 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3'
+  'skill_engineer_sentry_reloading': 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3',
+
+  // CJ Grove Street
+  'skill_cj_carroam_noise': 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
+  'skill_cj_cheatactivated_banner': 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
+  'skill_cj_deathmusic': 'Assets/Sound Effects/Skills/cj-deathmusic.mp3',
+  'skill_cj_grovestreet_voiceline': 'Assets/Sound Effects/Skills/cj-GROVESTREET4LIFE-voiceline.mp3',
+  'skill_cj_homiesarrival_voiceline': 'Assets/Sound Effects/Skills/cj-homiesarrival-voiceline.mp3',
+  'skill_cj_homiearrival_voiceline2': 'Assets/Sound Effects/Skills/cj-homiearrival-voiceline2.mp3',
+  'skill_cj_homiearrival_voiceline3': 'Assets/Sound Effects/Skills/cj-homiearrival-voiceline3.mp3',
+  'skill_cj_homiearrival_voiceline4': 'Assets/Sound Effects/Skills/cj-homiearrival-voiceline4.mp3',
+  'skill_cj_homies_noise1': 'Assets/Sound Effects/Skills/cj-homies-noise1.mp3',
+  'skill_cj_homies_noise2': 'Assets/Sound Effects/Skills/cj-homies-noise2.mp3',
+  'skill_cj_homie_noise3': 'Assets/Sound Effects/Skills/cj-homie-noise3.mp3',
+  'skill_cj_homie_noise4': 'Assets/Sound Effects/Skills/cj-homie-noise4.mp3',
+  'skill_cj_homie_noise5': 'Assets/Sound Effects/Skills/cj-homie-noise5.mp3',
+  'skill_cj_intro_voiceline': 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3',
+  'skill_cj_respectoverlay_bgmusic': 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3',
+  'skill_cj_typeclick1letter_noise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3'
 };

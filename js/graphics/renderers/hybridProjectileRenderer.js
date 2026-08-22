@@ -143,6 +143,14 @@ export function updateHybridProjectiles() {
   }
 }
 
+export function clearHybridProjectiles() {
+  for (const [id, data] of activeSprites.entries()) {
+    data.sprite.parent?.removeChild(data.sprite);
+    data.inUse = false;
+  }
+  activeSprites.clear();
+}
+
 let rikaSprite = null;
 let rikaCanvas = null;
 let rikaCtx = null;

@@ -8,12 +8,24 @@
 
 import { getHandSize } from '../../core/config.js';
 import { state, isChampionScreenActive } from '../../core/state.js';
-import { drawAuthenticBrassKnucklesShape, drawCjMicroUzi } from '../weapons/cjWeaponGraphics.js';
+import { drawAuthenticBrassKnucklesShape, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 
 let _cjImage = null;
 let _cjImageLoading = false;
 let _cachedSkinGrad = null;
 let _cachedSkinGradR = 0;
+let _cachedFadeGrad = null;
+let _cachedFadeGradR = 0;
+
+const _FINGER_HOLES = [
+  { x: 3.2 * 0.85, y: -7.2 * 0.85 },
+  { x: 4.9 * 0.85, y: -2.3 * 0.85 },
+  { x: 4.9 * 0.85, y:  2.3 * 0.85 },
+  { x: 3.2 * 0.85, y:  7.2 * 0.85 },
+];
+
+const _RIBBED_OFFSETS = [-0.55, -0.40, -0.25, -0.10, 0, 0.10, 0.25, 0.40, 0.55];
+const _SHOULDER_STRAP_OFFSETS = [-0.32, 0.20];
 
 function _getSkinGrad(ctx, r) {
   if (!_cachedSkinGrad || _cachedSkinGradR !== r) {
@@ -24,6 +36,17 @@ function _getSkinGrad(ctx, r) {
     _cachedSkinGrad.addColorStop(1, 'rgba(60, 30, 15, 0.40)');
   }
   return _cachedSkinGrad;
+}
+
+function _getFadeGrad(ctx, r) {
+  if (!_cachedFadeGrad || _cachedFadeGradR !== r) {
+    _cachedFadeGradR = r;
+    _cachedFadeGrad = ctx.createLinearGradient(0, -r * 0.85, 0, -r * 0.35);
+    _cachedFadeGrad.addColorStop(0, '#1C120C');
+    _cachedFadeGrad.addColorStop(0.70, 'rgba(40, 25, 18, 0.75)');
+    _cachedFadeGrad.addColorStop(1, 'rgba(141, 85, 56, 0)');
+  }
+  return _cachedFadeGrad;
 }
 
 /**
@@ -55,13 +78,8 @@ function _drawCjHand(ctx, x, y, radius, skinColor, punchProgress = 0, isHoldingG
   if (!isHoldingGun) {
     // Clenched Fingers passing through the brass knuckle holes
     ctx.fillStyle = skinColor;
-    const fingerHoles = [
-      { x: 3.2 * 0.85, y: -7.2 * 0.85 },
-      { x: 4.9 * 0.85, y: -2.3 * 0.85 },
-      { x: 4.9 * 0.85, y:  2.3 * 0.85 },
-      { x: 3.2 * 0.85, y:  7.2 * 0.85 },
-    ];
-    for (const h of fingerHoles) {
+    for (let i = 0; i < _FINGER_HOLES.length; i++) {
+      const h = _FINGER_HOLES[i];
       ctx.beginPath();
       ctx.arc(h.x, h.y, radius * 0.32, 0, Math.PI * 2);
       ctx.fill();
@@ -93,214 +111,365 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
   ctx.save();
 
   // Jetpack base anchor on CJ's back (-X direction)
-  const jpX = -r * 0.76;
-  const tankW = r * 0.32;
-  const tankH = r * 0.88;
-  const tankTopY = -r * 0.52;
+  const jpX = -r * 0.78;
+  const tankW = r * 0.34;
+  const tankH = r * 0.94;
+  const tankTopY = -r * 0.54;
   const tankBtmY = tankTopY + tankH;
 
-  // ── 1. CENTRAL OLIVE-DRAB ENGINE & AVIONICS BOX (Mounted to back) ──
-  const boxW = r * 0.42;
-  const boxH = r * 0.65;
-  const boxX = jpX - boxW * 0.35;
-  const boxY = -r * 0.32;
+  // ── 0. REAR HARNESS & MATTE INDUSTRIAL SILVER / BRUSHED ALUMINUM BACKING MOUNT ──
+  const frameGrad = ctx.createLinearGradient(jpX - tankW, tankTopY, jpX + tankW, tankBtmY);
+  frameGrad.addColorStop(0.00, '#64748B');
+  frameGrad.addColorStop(0.25, '#94A3B8');
+  frameGrad.addColorStop(0.50, '#CBD5E1'); // Brushed aluminum sheen
+  frameGrad.addColorStop(0.80, '#94A3B8');
+  frameGrad.addColorStop(1.00, '#475569');
 
-  // Main Olive-Drab Metal Body
-  const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH);
-  boxGrad.addColorStop(0, '#364234');
-  boxGrad.addColorStop(0.5, '#404D3E');
-  boxGrad.addColorStop(1, '#283327');
-
-  ctx.fillStyle = boxGrad;
-  ctx.strokeStyle = '#151C14';
-  ctx.lineWidth = 1.4;
+  ctx.fillStyle = frameGrad;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.8;
   ctx.beginPath();
-  ctx.roundRect(boxX, boxY, boxW, boxH, 2);
+  ctx.roundRect(jpX - tankW * 0.85, tankTopY + 4, tankW * 2.1, tankH - 12, 3);
   ctx.fill();
   ctx.stroke();
 
-  // Top Electronics Module Bay
-  const bayW = boxW * 0.75;
-  const bayH = boxH * 0.26;
-  const bayX = boxX + (boxW - bayW) * 0.5;
-  const topBayY = boxY + boxH * 0.06;
+  // Dark-Tan Leather Harness Straps with Heavy Buckles
+  ctx.fillStyle = '#784B28'; // Dark-tan leather
+  ctx.strokeStyle = '#3D2514';
+  ctx.lineWidth = 0.8;
+  ctx.fillRect(jpX - tankW * 0.85 + 2, tankTopY + 7, tankW * 2.1 - 4, 3.0);
+  ctx.strokeRect(jpX - tankW * 0.85 + 2, tankTopY + 7, tankW * 2.1 - 4, 3.0);
+  ctx.fillRect(jpX - tankW * 0.85 + 2, tankBtmY - 14, tankW * 2.1 - 4, 3.0);
+  ctx.strokeRect(jpX - tankW * 0.85 + 2, tankBtmY - 14, tankW * 2.1 - 4, 3.0);
 
-  ctx.fillStyle = '#1A2219';
-  ctx.strokeStyle = '#2F3D2D';
-  ctx.lineWidth = 1.0;
-  ctx.fillRect(bayX, topBayY, bayW, bayH);
-  ctx.strokeRect(bayX, topBayY, bayW, bayH);
+  // Central Vertical Manifold Riser Block (Matte Brushed Aluminum)
+  const riserGrad = ctx.createLinearGradient(jpX - 4, 0, jpX + 4, 0);
+  riserGrad.addColorStop(0.0, '#64748B');
+  riserGrad.addColorStop(0.5, '#CBD5E1');
+  riserGrad.addColorStop(1.0, '#475569');
+  ctx.fillStyle = riserGrad;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.4;
+  ctx.fillRect(jpX - 4, tankTopY - 7, 8, 7);
+  ctx.strokeRect(jpX - 4, tankTopY - 7, 8, 7);
 
-  // Amber Indicator Display Bars
+  // ── 1. DUAL MUTED OLIVE DRAB / MILITARY GREEN FUEL TANKS (Left & Right) ──
+  const tankXPositions = [jpX - tankW * 0.75, jpX + tankW * 0.25];
+
+  for (let tIdx = 0; tIdx < tankXPositions.length; tIdx++) {
+    const tX = tankXPositions[tIdx];
+    const isLeft = (tIdx === 0);
+
+    // Curved Silver Feeder Tube from Tank Dome to Top Manifold (with black outline)
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3.6;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(tX + tankW * 0.5, tankTopY);
+    ctx.quadraticCurveTo(tX + tankW * 0.5, tankTopY - 5, (isLeft ? jpX - 3 : jpX + 3), tankTopY - 6);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#CBD5E1';
+    ctx.lineWidth = 2.0;
+    ctx.stroke();
+
+    // 3D Muted Olive Drab / Military Green Gradient
+    const tankGrad = ctx.createLinearGradient(tX, 0, tX + tankW, 0);
+    tankGrad.addColorStop(0.00, '#2E381C'); // Shadowed olive drab
+    tankGrad.addColorStop(0.18, '#44542A'); // Military olive body
+    tankGrad.addColorStop(0.40, '#657B3E'); // Top specular military sheen
+    tankGrad.addColorStop(0.70, '#44542A'); // Matte green
+    tankGrad.addColorStop(1.00, '#1D2411'); // Dark underside shadow
+
+    ctx.fillStyle = tankGrad;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.roundRect(tX, tankTopY, tankW, tankH, 6.5);
+    ctx.fill();
+    ctx.stroke();
+
+    // Top Dome Specular Arc Highlight
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.arc(tX + tankW * 0.5, tankTopY + 5.5, 4.0, Math.PI * 1.15, Math.PI * 1.85);
+    ctx.stroke();
+
+    // Vertical Cyan Sight Glass Fuel Gauge Slot
+    const glassX = isLeft ? (tX + 1.8) : (tX + tankW - 4.8);
+    const glassY = tankTopY + 12;
+    const glassW = 3.0;
+    const glassH = tankH * 0.48;
+
+    // Recessed Dark Housing
+    ctx.fillStyle = '#0F172A';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.roundRect(glassX, glassY, glassW, glassH, 1.2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Glowing Cyan Fuel Column
+    const fuelGrad = ctx.createLinearGradient(glassX, glassY, glassX + glassW, glassY);
+    fuelGrad.addColorStop(0.0, '#0284C7');
+    fuelGrad.addColorStop(0.5, '#38BDF8');
+    fuelGrad.addColorStop(1.0, '#7DD3FC');
+    ctx.fillStyle = fuelGrad;
+    ctx.fillRect(glassX + 0.5, glassY + 0.5, glassW - 1.0, glassH - 1.0);
+
+    // White Glint Line on Glass
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillRect(glassX + 0.7, glassY + 1.5, 0.6, glassH - 3.0);
+
+    // Dark Canvas Strap with Heavy Buckles
+    const strapY = tankTopY + 8.5;
+    const strapH = 5.0;
+    const strapGrad = ctx.createLinearGradient(tX - 1, 0, tX + tankW + 1, 0);
+    strapGrad.addColorStop(0, '#181B14');
+    strapGrad.addColorStop(0.4, '#2B3024');
+    strapGrad.addColorStop(1, '#11140E');
+
+    ctx.fillStyle = strapGrad;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.fillRect(tX - 0.8, strapY, tankW + 1.6, strapH);
+    ctx.strokeRect(tX - 0.8, strapY, tankW + 1.6, strapH);
+
+    // Heavy Silver Buckle Clasp
+    ctx.fillStyle = '#CBD5E1';
+    ctx.fillRect(tX + 1.5, strapY + 1.0, 3.0, strapH - 2.0);
+    ctx.fillRect(tX + tankW - 4.5, strapY + 1.0, 3.0, strapH - 2.0);
+  }
+
+  // ── 2. CENTRAL OLIVE-DRAB AVIONICS & CONTROL MODULE ──
+  const boxW = r * 0.44;
+  const boxH = r * 0.76;
+  const boxX = jpX - boxW * 0.5;
+  const boxY = -r * 0.34;
+
+  const boxGrad = ctx.createLinearGradient(boxX, boxY, boxX + boxW, boxY + boxH);
+  boxGrad.addColorStop(0.0, '#44542A');
+  boxGrad.addColorStop(0.5, '#3B4824');
+  boxGrad.addColorStop(1.0, '#242C16');
+
+  ctx.fillStyle = boxGrad;
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.roundRect(boxX, boxY, boxW, boxH, 2.2);
+  ctx.fill();
+  ctx.stroke();
+
+  // Copper/Brass Side Wiring Brackets connecting Box to Tanks
+  const copperYs = [boxY + boxH * 0.38, boxY + boxH * 0.52];
+  for (const cY of copperYs) {
+    const cGradL = ctx.createLinearGradient(boxX - 3, cY, boxX, cY);
+    cGradL.addColorStop(0, '#B45309');
+    cGradL.addColorStop(0.5, '#F59E0B');
+    cGradL.addColorStop(1, '#92400E');
+    ctx.fillStyle = cGradL;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(boxX - 3.2, cY - 1.2, 3.6, 2.4);
+    ctx.strokeRect(boxX - 3.2, cY - 1.2, 3.6, 2.4);
+
+    const cGradR = ctx.createLinearGradient(boxX + boxW, cY, boxX + boxW + 3, cY);
+    cGradR.addColorStop(0, '#92400E');
+    cGradR.addColorStop(0.5, '#F59E0B');
+    cGradR.addColorStop(1, '#B45309');
+    ctx.fillStyle = cGradR;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.2;
+    ctx.fillRect(boxX + boxW - 0.4, cY - 1.2, 3.6, 2.4);
+    ctx.strokeRect(boxX + boxW - 0.4, cY - 1.2, 3.6, 2.4);
+  }
+
+  // A. Upper Instrument Section Bay
+  const upperBayX = boxX + 1.8;
+  const upperBayY = boxY + 2.0;
+  const upperBayW = boxW - 3.6;
+  const upperBayH = boxH * 0.30;
+
+  ctx.fillStyle = '#22280F';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.2;
+  ctx.fillRect(upperBayX, upperBayY, upperBayW, upperBayH);
+  ctx.strokeRect(upperBayX, upperBayY, upperBayW, upperBayH);
+
+  // White Status Display Monitor
+  ctx.fillStyle = '#F8FAFC';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 0.8;
+  ctx.fillRect(upperBayX + 1.5, upperBayY + 1.5, upperBayW - 3.0, 2.6);
+  ctx.strokeRect(upperBayX + 1.5, upperBayY + 1.5, upperBayW - 3.0, 2.6);
+
+  // Red Rectangular Command Button
+  ctx.fillStyle = '#DC2626';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 0.8;
+  ctx.fillRect(upperBayX + 1.5, upperBayY + 4.8, 4.5, 2.2);
+  ctx.strokeRect(upperBayX + 1.5, upperBayY + 4.8, 4.5, 2.2);
+
+  // Status LED Array (Amber, Cyan, Green)
   ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(bayX + 2, topBayY + 2.5, bayW * 0.55, 1.8);
-  ctx.fillRect(bayX + 2, topBayY + 6.0, bayW * 0.35, 1.8);
-  ctx.fillStyle = '#EF4444';
-  ctx.fillRect(bayX + bayW - 4.5, topBayY + 2.5, 2.2, 2.2);
+  ctx.fillRect(upperBayX + 1.5, upperBayY + 7.8, 2.0, 1.6);
+  ctx.fillStyle = '#06B6D4';
+  ctx.fillRect(upperBayX + 4.2, upperBayY + 7.8, 2.0, 1.6);
+  ctx.fillStyle = '#10B981';
+  ctx.fillRect(upperBayX + 6.9, upperBayY + 7.8, 2.0, 1.6);
 
-  // Bottom Electronics Module Bay
-  const btmBayY = boxY + boxH * 0.66;
-  ctx.fillStyle = '#1A2219';
-  ctx.fillRect(bayX, btmBayY, bayW, bayH);
-  ctx.strokeRect(bayX, btmBayY, bayW, bayH);
-
-  ctx.fillStyle = '#F59E0B';
-  ctx.fillRect(bayX + 2, btmBayY + 2.5, bayW * 0.50, 1.8);
-  ctx.fillRect(bayX + 2, btmBayY + 6.0, bayW * 0.30, 1.8);
-  ctx.fillStyle = '#22C55E';
-  ctx.fillRect(bayX + bayW - 4.5, btmBayY + 2.5, 2.2, 2.2);
-
-  // Center Vertical Caution Hazard Stripe Panel
-  const hazardW = boxW * 0.40;
-  const hazardH = boxH * 0.26;
-  const hazardX = boxX + (boxW - hazardW) * 0.5;
-  const hazardY = boxY + (boxH - hazardH) * 0.5;
+  // B. Center Authentic Red/Black Caution Hazard Warning Sticker
+  const hazX = boxX + 2.6;
+  const hazY = boxY + boxH * 0.36;
+  const hazW = boxW - 5.2;
+  const hazH = boxH * 0.28;
 
   ctx.save();
   ctx.beginPath();
-  ctx.rect(hazardX, hazardY, hazardW, hazardH);
+  ctx.rect(hazX, hazY, hazW, hazH);
   ctx.clip();
 
-  ctx.fillStyle = '#D97706';
-  ctx.fillRect(hazardX, hazardY, hazardW, hazardH);
+  ctx.fillStyle = '#DC2626';
+  ctx.fillRect(hazX, hazY, hazW, hazH);
 
-  ctx.fillStyle = '#18181B';
-  for (let hx = -hazardW; hx <= hazardW * 2; hx += 3.0) {
+  ctx.fillStyle = '#111827';
+  for (let sx = -hazW * 2; sx <= hazW * 3; sx += 3.8) {
     ctx.beginPath();
-    ctx.moveTo(hazardX + hx, hazardY);
-    ctx.lineTo(hazardX + hx - 3.5, hazardY + hazardH);
-    ctx.lineTo(hazardX + hx - 1.5, hazardY + hazardH);
-    ctx.lineTo(hazardX + hx + 2.0, hazardY);
+    ctx.moveTo(hazX + sx, hazY);
+    ctx.lineTo(hazX + sx + 2.4, hazY);
+    ctx.lineTo(hazX + sx + 2.4 - 4.0, hazY + hazH);
+    ctx.lineTo(hazX + sx - 4.0, hazY + hazH);
     ctx.closePath();
     ctx.fill();
   }
   ctx.restore();
-  ctx.strokeStyle = '#18181B';
-  ctx.lineWidth = 1.0;
-  ctx.strokeRect(hazardX, hazardY, hazardW, hazardH);
 
-  // 4 Horizontal Copper Brackets
-  ctx.fillStyle = '#D97706';
-  ctx.strokeStyle = '#92400E';
-  ctx.lineWidth = 0.8;
-  const bktYs = [boxY + boxH * 0.36, boxY + boxH * 0.60];
-  for (const bY of bktYs) {
-    ctx.fillRect(boxX - 3.5, bY - 1.2, 5, 2.4);
-    ctx.strokeRect(boxX - 3.5, bY - 1.2, 5, 2.4);
-    ctx.fillRect(boxX + boxW - 1.5, bY - 1.2, 5, 2.4);
-    ctx.strokeRect(boxX + boxW - 1.5, bY - 1.2, 5, 2.4);
-  }
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(hazX, hazY, hazW, hazH);
 
-  // ── 2. DUAL BRUSHED SLATE-BLUE STEEL CYLINDERS (Standing vertically along Y) ──
-  const tankXPositions = [jpX - tankW * 0.70, jpX + tankW * 0.30];
+  // C. Lower Switch Section Bay
+  const lowerBayX = boxX + 1.8;
+  const lowerBayY = boxY + boxH * 0.68;
+  const lowerBayW = boxW - 3.6;
+  const lowerBayH = boxH * 0.26;
 
-  for (let tIdx = 0; tIdx < tankXPositions.length; tIdx++) {
-    const tX = tankXPositions[tIdx];
+  ctx.fillStyle = '#22280F';
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 1.2;
+  ctx.fillRect(lowerBayX, lowerBayY, lowerBayW, lowerBayH);
+  ctx.strokeRect(lowerBayX, lowerBayY, lowerBayW, lowerBayH);
 
-    // 3D Metallic Slate-Blue Cylinder Gradient
-    const tankGrad = ctx.createLinearGradient(tX, 0, tX + tankW, 0);
-    tankGrad.addColorStop(0, '#2C3744');
-    tankGrad.addColorStop(0.25, '#536578');
-    tankGrad.addColorStop(0.55, '#9CB1C6'); // Center specular light reflection
-    tankGrad.addColorStop(0.85, '#435263');
-    tankGrad.addColorStop(1, '#1E2732');
-
-    ctx.fillStyle = tankGrad;
-    ctx.strokeStyle = '#111822';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.roundRect(tX, tankTopY, tankW, tankH, 6);
-    ctx.fill();
-    ctx.stroke();
-
-    // Center Vertical Indented Shadow Groove
-    const tankCenterX = tX + tankW * 0.5;
-    ctx.strokeStyle = 'rgba(17, 24, 34, 0.65)';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.moveTo(tankCenterX, tankTopY + tankH * 0.18);
-    ctx.lineTo(tankCenterX, tankBtmY - tankH * 0.18);
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(226, 232, 240, 0.40)';
+  // 3 Stacked Buttons (Red, Red, Gold)
+  const swCols = ['#DC2626', '#DC2626', '#EAB308'];
+  for (let s = 0; s < swCols.length; s++) {
+    const sY = lowerBayY + 1.2 + s * 2.5;
+    ctx.fillStyle = swCols[s];
+    ctx.strokeStyle = '#000000';
     ctx.lineWidth = 0.7;
-    ctx.beginPath();
-    ctx.moveTo(tankCenterX + 0.8, tankTopY + tankH * 0.18);
-    ctx.lineTo(tankCenterX + 0.8, tankBtmY - tankH * 0.18);
-    ctx.stroke();
-
-    // Dual Black Clamp Bands around each cylinder
-    const bandYs = [tankTopY + tankH * 0.25, tankBtmY - tankH * 0.25];
-    for (const bndY of bandYs) {
-      ctx.fillStyle = '#18181B';
-      ctx.strokeStyle = '#09090B';
-      ctx.lineWidth = 0.9;
-      ctx.fillRect(tX - 1, bndY - 2.5, tankW + 2, 5);
-      ctx.strokeRect(tX - 1, bndY - 2.5, tankW + 2, 5);
-
-      // Silver Fastener Buckle
-      ctx.fillStyle = '#94A3B8';
-      ctx.fillRect(tankCenterX - 2, bndY - 1.5, 4, 3);
-    }
-
-    // Top Dome Valve Pin
-    ctx.fillStyle = '#64748B';
-    ctx.strokeStyle = '#0F172A';
-    ctx.lineWidth = 0.8;
-    ctx.fillRect(tankCenterX - 1.5, tankTopY - 3.5, 3, 3.5);
-    ctx.strokeRect(tankCenterX - 1.5, tankTopY - 3.5, 3, 3.5);
+    ctx.fillRect(lowerBayX + 1.8, sY, lowerBayW - 3.6, 1.8);
+    ctx.strokeRect(lowerBayX + 1.8, sY, lowerBayW - 3.6, 1.8);
   }
 
-  // ── 3. WIDE OVERHEAD ARCHING EXHAUST MANIFOLD (Top arch behind neck/shoulders) ──
-  const archY = tankTopY - 3.5;
-  const archLeftX = tankXPositions[0] - 3.5;
-  const archRightX = tankXPositions[1] + tankW + 3.5;
-  const archCenterX = (archLeftX + archRightX) * 0.5;
+  // ── 3. WIDE OVERHEAD ARCHING EXHAUST MANIFOLD (Dark Charcoal / Burnt-Metal Steel Cross-Pipe) ──
+  const archLeftX = tankXPositions[0] - tankW * 0.45;
+  const archRightX = tankXPositions[1] + tankW * 1.45;
+  const archTopY = tankTopY - 7.0;
+  const elbowY = tankTopY + 6.0;
 
-  const pipeGrad = ctx.createLinearGradient(archLeftX, 0, archRightX, 0);
-  pipeGrad.addColorStop(0, '#18181B');
-  pipeGrad.addColorStop(0.35, '#3F3F46');
-  pipeGrad.addColorStop(0.70, '#27272A');
-  pipeGrad.addColorStop(1, '#09090B');
-
-  ctx.strokeStyle = pipeGrad;
-  ctx.lineWidth = 5.2;
+  // 1. Pipe Black Outer Outline Stroke Underlayer
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 11.0;
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
-
   ctx.beginPath();
-  ctx.moveTo(archLeftX, tankTopY + 8);
-  ctx.quadraticCurveTo(archLeftX, archY, archCenterX, archY);
-  ctx.quadraticCurveTo(archRightX, archY, archRightX, tankTopY + 8);
+  ctx.moveTo(archLeftX, elbowY);
+  ctx.quadraticCurveTo(archLeftX, archTopY, jpX, archTopY);
+  ctx.quadraticCurveTo(archRightX, archTopY, archRightX, elbowY);
   ctx.stroke();
 
-  // ── 4. DOWNWARD-FACING THRUSTER NOZZLES & ROCKET EXHAUST FLAMES (+Y Direction) ──
-  const nozzleXs = [tankXPositions[0] + tankW * 0.5, tankXPositions[1] + tankW * 0.5];
+  // 2. Main Dark Charcoal / Burnt-Metal Steel Pipe Body
+  const pipeGrad = ctx.createLinearGradient(archLeftX, 0, archRightX, 0);
+  pipeGrad.addColorStop(0.0, '#1C1E24');
+  pipeGrad.addColorStop(0.25, '#3B424D');
+  pipeGrad.addColorStop(0.5, '#16191F');
+  pipeGrad.addColorStop(0.75, '#3B424D');
+  pipeGrad.addColorStop(1.0, '#1C1E24');
+
+  ctx.strokeStyle = pipeGrad;
+  ctx.lineWidth = 7.0;
+  ctx.beginPath();
+  ctx.moveTo(archLeftX, elbowY);
+  ctx.quadraticCurveTo(archLeftX, archTopY, jpX, archTopY);
+  ctx.quadraticCurveTo(archRightX, archTopY, archRightX, elbowY);
+  ctx.stroke();
+
+  // 3. Specular Center Highlight Curve
+  ctx.strokeStyle = 'rgba(203, 213, 225, 0.45)';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.moveTo(archLeftX + 1.5, elbowY - 1.5);
+  ctx.quadraticCurveTo(archLeftX + 1.5, archTopY + 1.5, jpX, archTopY + 1.5);
+  ctx.quadraticCurveTo(archRightX - 1.5, archTopY + 1.5, archRightX - 1.5, elbowY - 1.5);
+  ctx.stroke();
+
+  // ── 4. DOWNWARD-FACING THRUSTER NOZZLES (+Y Direction — Burnt-Metal Steel & Heat-Treated Rings) ──
+  const nozzleXs = [archLeftX, archRightX];
 
   for (let nIdx = 0; nIdx < nozzleXs.length; nIdx++) {
     const nX = nozzleXs[nIdx];
-    const nY = tankBtmY;
 
-    // Dark Titanium Exhaust Bell pointing DOWNWARD (+Y)
-    const bellW = 8.5;
-    const bellH = 7.5;
-    const bellBtmY = nY + bellH;
+    // Heat-Treated Burnt Bronze/Steel Collar Ring
+    const ringW = 7.5;
+    const ringH = 4.2;
+    const ringY = elbowY;
+    const ringGrad = ctx.createLinearGradient(nX - ringW * 0.5, 0, nX + ringW * 0.5, 0);
+    ringGrad.addColorStop(0.0, '#78350F');
+    ringGrad.addColorStop(0.35, '#D97706');
+    ringGrad.addColorStop(0.7, '#92400E');
+    ringGrad.addColorStop(1.0, '#451A03');
 
-    ctx.fillStyle = '#27272A';
-    ctx.strokeStyle = '#09090B';
-    ctx.lineWidth = 1.2;
+    ctx.fillStyle = ringGrad;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(nX - bellW * 0.35, nY);
-    ctx.lineTo(nX - bellW * 0.55, bellBtmY);
-    ctx.lineTo(nX + bellW * 0.55, bellBtmY);
-    ctx.lineTo(nX + bellW * 0.35, nY);
+    ctx.roundRect(nX - ringW * 0.5, ringY, ringW, ringH, 1.0);
+    ctx.fill();
+    ctx.stroke();
+
+    // Tapered Dark Charcoal / Burnt Steel Nozzle Cone
+    const coneTopW = 6.8;
+    const coneBtmW = 4.2;
+    const coneTopY = ringY + ringH;
+    const coneH = 6.5;
+    const coneBtmY = coneTopY + coneH;
+
+    const coneGrad = ctx.createLinearGradient(nX - coneTopW * 0.5, 0, nX + coneTopW * 0.5, 0);
+    coneGrad.addColorStop(0.0, '#1C1E24');
+    coneGrad.addColorStop(0.35, '#3F4654');
+    coneGrad.addColorStop(0.7, '#2A303C');
+    coneGrad.addColorStop(1.0, '#121418');
+
+    ctx.fillStyle = coneGrad;
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(nX - coneTopW * 0.5, coneTopY);
+    ctx.lineTo(nX + coneTopW * 0.5, coneTopY);
+    ctx.lineTo(nX + coneBtmW * 0.5, coneBtmY);
+    ctx.lineTo(nX - coneBtmW * 0.5, coneBtmY);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
-    // Chrome Flange Ring on nozzle
-    ctx.fillStyle = '#71717A';
-    ctx.fillRect(nX - bellW * 0.45, nY + bellH * 0.35, bellW * 0.90, 2.0);
+    // Open Exhaust Rim
+    ctx.fillStyle = '#09090B';
+    ctx.beginPath();
+    ctx.ellipse(nX, coneBtmY, coneBtmW * 0.5, 1.1, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
 
     // ── 5. VIBRANT DOWNWARD ROCKET THRUST FLAMES (Shooting in +Y direction) ──
     const flameWobble = Math.sin(time * 16 + nIdx * 7) * 0.15 + Math.cos(time * 24 + nIdx * 11) * 0.10;
@@ -308,7 +477,7 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
     const flameSpread = (r * 0.36) * (1.0 + flameWobble * 0.5);
 
     // Stage 1: Outer Orange / Amber Jet Plume
-    const outerFlameGrad = ctx.createLinearGradient(nX, bellBtmY, nX, bellBtmY + flameLen);
+    const outerFlameGrad = ctx.createLinearGradient(nX, coneBtmY, nX, coneBtmY + flameLen);
     outerFlameGrad.addColorStop(0, 'rgba(255, 170, 0, 0.98)');
     outerFlameGrad.addColorStop(0.35, 'rgba(249, 115, 22, 0.88)');
     outerFlameGrad.addColorStop(0.70, 'rgba(234, 88, 12, 0.50)');
@@ -316,14 +485,14 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
 
     ctx.fillStyle = outerFlameGrad;
     ctx.beginPath();
-    ctx.moveTo(nX - flameSpread * 0.50, bellBtmY);
-    ctx.quadraticCurveTo(nX - flameSpread * 0.85, bellBtmY + flameLen * 0.45, nX, bellBtmY + flameLen);
-    ctx.quadraticCurveTo(nX + flameSpread * 0.85, bellBtmY + flameLen * 0.45, nX + flameSpread * 0.50, bellBtmY);
+    ctx.moveTo(nX - flameSpread * 0.50, coneBtmY);
+    ctx.quadraticCurveTo(nX - flameSpread * 0.85, coneBtmY + flameLen * 0.45, nX, coneBtmY + flameLen);
+    ctx.quadraticCurveTo(nX + flameSpread * 0.85, coneBtmY + flameLen * 0.45, nX + flameSpread * 0.50, coneBtmY);
     ctx.closePath();
     ctx.fill();
 
     // Stage 2: Bright Yellow Core Flame (1:1 with GTA San Andreas)
-    const coreFlameGrad = ctx.createLinearGradient(nX, bellBtmY, nX, bellBtmY + flameLen * 0.65);
+    const coreFlameGrad = ctx.createLinearGradient(nX, coneBtmY, nX, coneBtmY + flameLen * 0.65);
     coreFlameGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
     coreFlameGrad.addColorStop(0.30, 'rgba(255, 230, 0, 0.95)');
     coreFlameGrad.addColorStop(0.75, 'rgba(245, 158, 11, 0.60)');
@@ -331,23 +500,23 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
 
     ctx.fillStyle = coreFlameGrad;
     ctx.beginPath();
-    ctx.moveTo(nX - flameSpread * 0.30, bellBtmY);
-    ctx.quadraticCurveTo(nX - flameSpread * 0.45, bellBtmY + flameLen * 0.28, nX, bellBtmY + flameLen * 0.65);
-    ctx.quadraticCurveTo(nX + flameSpread * 0.45, bellBtmY + flameLen * 0.28, nX + flameSpread * 0.30, bellBtmY);
+    ctx.moveTo(nX - flameSpread * 0.30, coneBtmY);
+    ctx.quadraticCurveTo(nX - flameSpread * 0.45, coneBtmY + flameLen * 0.28, nX, coneBtmY + flameLen * 0.65);
+    ctx.quadraticCurveTo(nX + flameSpread * 0.45, coneBtmY + flameLen * 0.28, nX + flameSpread * 0.30, coneBtmY);
     ctx.closePath();
     ctx.fill();
 
     // Stage 3: Intense White-Hot Throat Stream
-    const throatGrad = ctx.createLinearGradient(nX, bellBtmY, nX, bellBtmY + flameLen * 0.30);
+    const throatGrad = ctx.createLinearGradient(nX, coneBtmY, nX, coneBtmY + flameLen * 0.30);
     throatGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
     throatGrad.addColorStop(0.60, 'rgba(254, 240, 138, 0.90)');
     throatGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
 
     ctx.fillStyle = throatGrad;
     ctx.beginPath();
-    ctx.moveTo(nX - flameSpread * 0.15, bellBtmY);
-    ctx.quadraticCurveTo(nX - flameSpread * 0.20, bellBtmY + flameLen * 0.14, nX, bellBtmY + flameLen * 0.30);
-    ctx.quadraticCurveTo(nX + flameSpread * 0.20, bellBtmY + flameLen * 0.14, nX + flameSpread * 0.15, bellBtmY);
+    ctx.moveTo(nX - flameSpread * 0.15, coneBtmY);
+    ctx.quadraticCurveTo(nX - flameSpread * 0.20, coneBtmY + flameLen * 0.14, nX, coneBtmY + flameLen * 0.30);
+    ctx.quadraticCurveTo(nX + flameSpread * 0.20, coneBtmY + flameLen * 0.14, nX + flameSpread * 0.15, coneBtmY);
     ctx.closePath();
     ctx.fill();
 
@@ -355,7 +524,7 @@ function _drawCjJetpack(ctx, r, isJetpackActive) {
     for (let s = 0; s < 2; s++) {
       const sparkPhase = ((time * 32 + s * 19 + nIdx * 29) % 45);
       const sparkX = nX + Math.sin(sparkPhase * 1.8) * (flameSpread * 0.35);
-      const sparkY = bellBtmY + flameLen * 0.25 + sparkPhase * 1.5;
+      const sparkY = coneBtmY + flameLen * 0.25 + sparkPhase * 1.5;
       const sparkAlpha = Math.max(0, 1.0 - sparkPhase / 45);
 
       ctx.fillStyle = `rgba(255, 230, 0, ${sparkAlpha.toFixed(2)})`;
@@ -504,7 +673,11 @@ function _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive) {
 export function drawCjSkin(ctx, fighter) {
   const r = fighter.r || 25;
   const z = fighter.z || 0;
-  const isJetpackActive = Boolean(fighter.isJetpackActive || (fighter.jetpackTimer && fighter.jetpackTimer > 0) || z > 0);
+  const previewIdx = fighter.previewWeaponIndex !== undefined ? fighter.previewWeaponIndex : null;
+  const isTec9Active = Boolean(previewIdx === 4 || fighter.isTec9Active);
+  const isMinigunActive = Boolean(fighter.isBaguvixActive || fighter.isGodModeActive || previewIdx === 3);
+  const isJetpackActive = Boolean(fighter.isJetpackActive || (fighter.jetpackTimer && fighter.jetpackTimer > 0) || z > 0 || previewIdx === 1 || previewIdx === 2);
+  const isUziActive = Boolean(previewIdx === 2 || (isJetpackActive && previewIdx !== 1 && !isMinigunActive && !isTec9Active));
 
   // ── LAYER -1: GROUND SHADOW SILHOUETTE (Drawn on ground plane before Z-elevation) ──
   _drawCjGroundShadow(ctx, fighter, r, z, isJetpackActive);
@@ -540,12 +713,26 @@ export function drawCjSkin(ctx, fighter) {
   let hideFrontHand = false;
   let hideBackHand = true;
 
-  if (isJetpackActive) {
+  if (isMinigunActive) {
+    hideBackHand = false; // Both hands grip the heavy M134 Minigun
+    const mgScale = 1.15;
+    const mgAnchorX = r * 1.67;
+    // Back hand grips the forward upright carry handle loop in front
+    backX = mgAnchorX + (6.0 * mgScale);
+    backY = -14.0 * mgScale;
+    // Front hand grips the rear chainsaw spade grip holder at the back
+    frontX = mgAnchorX + (-36.5 * mgScale);
+    frontY = -12.5 * mgScale;
+  } else if (isJetpackActive && isUziActive) {
     hideBackHand = false; // Both hands active during Jetpack Dual Uzi mode
     backX = r * 0.88;
     backY = -r * 0.38;
     frontX = r * 0.96;
     frontY = r * 0.38;
+  } else if (isJetpackActive && !isUziActive) {
+    hideBackHand = true;
+    frontX = r * 0.95;
+    frontY = 0;
   } else if (isPunching) {
     frontX = r * 0.95 + lungeExtension * 1.40;
     frontY = Math.sin(rawProgress * Math.PI) * (r * 0.20);
@@ -575,9 +762,13 @@ export function drawCjSkin(ctx, fighter) {
   _drawCjCheatAura(ctx, r, isGodMode, isHesoyamActive, isRespectAura);
   _drawCjJetpack(ctx, r, isJetpackActive);
 
-  // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Fist) ──
+  // ── LAYER 1: BACK HAND (Behind Body Layer — Left Micro-Uzi / Minigun Forward Grip / Fist) ──
   if (!hideBackHand) {
-    if (isJetpackActive) {
+    if (isMinigunActive) {
+      const minigunRecoil = fighter.minigunRecoil || 0;
+      // Back hand grips forward upright support handle loop
+      _drawCjHand(ctx, backX - minigunRecoil, backY, handRadius * 0.92, skinColor, 0, true);
+    } else if (isJetpackActive && isUziActive) {
       const recoilB = fighter.uziRecoilBack || 0;
       const flashB = fighter.uziFlashTimerBack || 0;
       // 1. Draw hand base FIRST behind the gun
@@ -620,8 +811,8 @@ export function drawCjSkin(ctx, fighter) {
     // Tank Top Ribbed Texture Stripes (subtle vertical lines across enlarged torso)
     ctx.strokeStyle = 'rgba(203, 213, 225, 0.55)';
     ctx.lineWidth = 1.0;
-    const ribXs = [-r * 0.55, -r * 0.40, -r * 0.25, -r * 0.10, 0, r * 0.10, r * 0.25, r * 0.40, r * 0.55];
-    for (const rx of ribXs) {
+    for (let i = 0; i < _RIBBED_OFFSETS.length; i++) {
+      const rx = r * _RIBBED_OFFSETS[i];
       ctx.beginPath();
       ctx.moveTo(rx, r * 0.15);
       ctx.lineTo(rx, r * 0.55);
@@ -635,6 +826,36 @@ export function drawCjSkin(ctx, fighter) {
     ctx.moveTo(r * Math.cos(Math.PI * 0.95), r * Math.sin(Math.PI * 0.95));
     ctx.quadraticCurveTo(0, r * 0.05, r * Math.cos(Math.PI * 0.05), r * Math.sin(Math.PI * 0.05));
     ctx.stroke();
+
+    // D. Authentic Retro-Military Leather Torso Harness (When Jetpack Active)
+    if (isJetpackActive) {
+      // Dark-Tan Leather Shoulder & Chest Cross Straps
+      ctx.fillStyle = '#784B28'; // Rich dark-tan leather
+      ctx.strokeStyle = '#3D2514';
+      ctx.lineWidth = 1.0;
+
+      // Left & Right Vertical Shoulder Straps
+      for (let i = 0; i < _SHOULDER_STRAP_OFFSETS.length; i++) {
+        const sx = r * _SHOULDER_STRAP_OFFSETS[i];
+        ctx.fillRect(sx, r * 0.08, r * 0.12, r * 0.48);
+        ctx.strokeRect(sx, r * 0.08, r * 0.12, r * 0.48);
+      }
+
+      // Horizontal Chest Cross-Strap
+      ctx.fillRect(-r * 0.45, r * 0.28, r * 0.90, r * 0.10);
+      ctx.strokeRect(-r * 0.45, r * 0.28, r * 0.90, r * 0.10);
+
+      // Heavy Silver Center Chest Buckle & D-Ring
+      ctx.fillStyle = '#E2E8F0';
+      ctx.strokeStyle = '#09090B';
+      ctx.lineWidth = 0.8;
+      ctx.fillRect(-r * 0.08, r * 0.26, r * 0.16, r * 0.14);
+      ctx.strokeRect(-r * 0.08, r * 0.26, r * 0.16, r * 0.14);
+
+      // Buckle pin
+      ctx.fillStyle = '#475569';
+      ctx.fillRect(-r * 0.02, r * 0.28, r * 0.04, r * 0.10);
+    }
 
     // E. Dark Blue Denim Jeans Waistband & Leather Belt (+Y bottom hemisphere)
     // Dark Blue Denim Jeans (#1E3A8A / #1D4ED8)
@@ -672,13 +893,8 @@ export function drawCjSkin(ctx, fighter) {
     ctx.closePath();
     ctx.fill();
 
-    // Temple Fade / Gradient Hair Shadow
-    const fadeGrad = ctx.createLinearGradient(0, -r * 0.85, 0, -r * 0.35);
-    fadeGrad.addColorStop(0, '#1C120C');
-    fadeGrad.addColorStop(0.70, 'rgba(40, 25, 18, 0.75)');
-    fadeGrad.addColorStop(1, 'rgba(141, 85, 56, 0)');
-
-    ctx.fillStyle = fadeGrad;
+    // Temple Fade / Gradient Hair Shadow (Cached)
+    ctx.fillStyle = _getFadeGrad(ctx, r);
     ctx.beginPath();
     ctx.arc(0, -r * 0.38, r * 0.55, Math.PI * 1.05, Math.PI * 1.95);
     ctx.fill();
@@ -700,9 +916,33 @@ export function drawCjSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
 
-  // ── LAYER 3: FRONT HAND (Front Layer — On Top of Body Circle — Right Micro-Uzi / Fist) ──
+  // ── LAYER 3: FRONT HAND (Front Layer — On Top of Body Circle — Minigun / Right Micro-Uzi / Fist) ──
   if (!hideFrontHand) {
-    if (isJetpackActive) {
+    if (isMinigunActive) {
+      const minigunRecoil = fighter.minigunRecoil || 0;
+      const minigunFlash = fighter.minigunFlashTimer || 0;
+      const minigunHeat = (previewIdx === 3) ? 0.35 : (fighter.minigunHeat || 0);
+      const minigunSpin = (previewIdx === 3) ? (Date.now() * 0.004) : (fighter.minigunSpinAngle || 0);
+
+      // 1. Draw M134 Heavy Minigun centered at fighter forward anchor
+      drawCjMinigun(ctx, r * 0.92, 0, 0, r, {
+        scale: 1.15,
+        recoil: minigunRecoil,
+        flashTimer: minigunFlash,
+        heat: minigunHeat,
+        spinAngle: minigunSpin
+      });
+
+      // 2. Draw front hand gripping the rear trigger spade housing holder at the back
+      _drawCjHand(ctx, frontX - minigunRecoil, frontY, handRadius, skinColor, 0, true);
+    } else if (isTec9Active) {
+      const recoilTec = fighter.tec9Recoil || 0;
+      const flashTec = fighter.tec9Flash || 0;
+      // 1. Draw hand base FIRST behind the gun
+      _drawCjHand(ctx, frontX - recoilTec * 0.5 - 6, frontY, handRadius, skinColor, 0, true);
+      // 2. Draw Intratec TEC-9 ON TOP of the hand
+      drawCjTec9(ctx, frontX, frontY, 1.15, recoilTec, flashTec);
+    } else if (isJetpackActive && isUziActive) {
       const recoilF = fighter.uziRecoilFront || 0;
       const flashF = fighter.uziFlashTimerFront || 0;
       // 1. Draw hand base FIRST behind the gun

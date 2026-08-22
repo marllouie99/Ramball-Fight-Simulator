@@ -18,6 +18,7 @@ import { spawnDeathShatter } from '../../../graphics/particles/deathShatterEffec
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnMahitoClawScratchImpact, spawnMahitoSoulExplosion, spawnMahitoDomainSoulTendrilStrike } from '../../../graphics/particles/sparkEffect.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { projectileSystem } from '../../../systems/projectileSystem.js';
+import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 /**
  * Helper: Clamps a coordinate (x, y) to inside the active arena boundaries.
@@ -1003,13 +1004,13 @@ export function updateMahitoSoulPhaseSlip(fighter) {
 
   // Store afterimage
   if (!fighter._dashAfterimages) fighter._dashAfterimages = [];
-  fighter._dashAfterimages.push({
+  pushTrailCap(fighter._dashAfterimages, {
     x: fighter.x,
     y: fighter.y,
     alpha: 0.85,
     angle: fighter.gunAngle || 0,
     isTransformed
-  });
+  }, 12);
 
   // Step movement
   fighter.x += vec.x;

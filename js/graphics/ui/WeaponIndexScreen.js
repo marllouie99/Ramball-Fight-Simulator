@@ -23,7 +23,7 @@ import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
-import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun } from '../weapons/cjWeaponGraphics.js';
+import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -224,6 +224,10 @@ function isFighterDemoAttacking(fighter) {
     (fighter.meleeSwingTimer > 0) ||
     (fighter.slashGlowTimer > 0) ||
     (fighter.isCleaving === true) ||
+    (fighter.uziFlashTimerFront > 0) ||
+    (fighter.uziRecoilFront > 0) ||
+    (fighter.minigunFlashTimer > 0) ||
+    (fighter.minigunRecoil > 0) ||
     (fighter.meleeCooldown > (fighter.meleeCooldownMax - 15))
   );
 }
@@ -272,14 +276,17 @@ function drawWeaponInfoCard(ctx, def) {
       nameText = 'Authentic Cast-Brass Knuckles';
       descText = 'Heavy metallic 4-ring cast-brass knuckles for rapid-fire street boxing CQC. Delivers heavy kinetic staggering blows, liver hooks, and builds RESPECT+ with every hit.';
     } else if (activeIndex === 1) {
-      nameText = 'DARPA Area 69 Jetpack (ROCKETMAN)';
-      descText = 'Experimental military jetpack with roaring dual rocket thrusters. Grants 360° omni-directional high-speed hover flight, leaving fiery burning ground trails and empowering supersonic knuckle dives.';
+      nameText = 'Military Jetpack (Easy Jet / ROCKETMAN)';
+      descText = 'Iconic GTA: San Andreas Jetpack. Features a matte industrial silver & brushed aluminum frame with structural welds, dual vertical muted olive-drab fuel tanks strapped with dark canvas & heavy buckles, dark charcoal burnt-metal nozzles, and dark-tan leather harness straps. Grants 360° omni-directional flight.';
     } else if (activeIndex === 2) {
-      nameText = 'Dual Micro-Uzi Submachine Guns';
-      descText = 'Dual-wielded high-cadence 9mm submachine guns equipped during Jetpack flight. Unleashes rapid alternating strafe bullet streams at 12 rounds/sec with airborne evasion.';
+      nameText = 'Micro SMG (IMI Micro-Uzi)';
+      descText = 'Iconic GTA: San Andreas Micro SMG. Features matte gunmetal gray steel with industrial metallic reflections, molded dark charcoal polymer furniture, and stamped sheet metal sights. Dual-wielded during Jetpack flight at 12 rounds/sec.';
+    } else if (activeIndex === 3) {
+      nameText = 'M134 Minigun (Vulcan / BAGUVIX)';
+      descText = 'Iconic GTA: San Andreas Minigun. Features matte military olive drab housing, charcoal steel reinforcement plates, polished steel barrels with metallic blue-gray sheen and burnt tips, rubberized canvas ammo feed chute, and metallic silver hardware. Unleashes 45 rounds/sec during BAGUVIX God Mode.';
     } else {
-      nameText = 'M134 Heavy Minigun (BAGUVIX / FULLCLIP)';
-      descText = 'Six-barrel rotating Gatling minigun with infinite ammunition. Unleashes a continuous 45 rounds/sec armor-piercing bullet storm during BAGUVIX God Mode overdrive.';
+      nameText = 'TEC-9 (Intratec / GROVESTREET4LIFE)';
+      descText = 'Iconic GTA: San Andreas TEC-9. Features a worn matte gunmetal gray receiver with stamped weld lines, molded dark charcoal polymer lower frame & grip, and contrasting matte black barrel shroud with cooling perforations. Wielded during Grove Street Drive-Bys.';
     }
   }
 
@@ -633,6 +640,16 @@ function drawWeaponDetailScreen() {
     previewFighter.x = 0;
     previewFighter.y = 0;
 
+    if (def.type === 'cj') {
+      const cjIdx = state.cjWeaponIndex || 0;
+      previewFighter.z = (cjIdx === 1 || cjIdx === 2) ? 24 : 0;
+      previewFighter.isJetpackActive = (cjIdx === 1 || cjIdx === 2);
+      previewFighter.isBaguvixActive = (cjIdx === 3);
+      previewFighter.isGodModeActive = (cjIdx === 3);
+      previewFighter.isTec9Active = (cjIdx === 4);
+      previewFighter.previewWeaponIndex = cjIdx;
+    }
+
     if (previewFighter.spearSwingTimer > 0) previewFighter.spearSwingTimer--;
     if (previewFighter.katanaSlashTimer > 0) previewFighter.katanaSlashTimer--;
     if (previewFighter.punchAnimTimer > 0) previewFighter.punchAnimTimer--;
@@ -641,6 +658,18 @@ function drawWeaponDetailScreen() {
     if (previewFighter.slashGlowTimer > 0) previewFighter.slashGlowTimer--;
     if (previewFighter.meleeCooldown > 0) previewFighter.meleeCooldown--;
     if (previewFighter.wheelGlowTimer > 0) previewFighter.wheelGlowTimer--;
+    if (previewFighter.tec9Recoil > 0) previewFighter.tec9Recoil = Math.max(0, previewFighter.tec9Recoil - 0.6);
+    if (previewFighter.tec9Flash > 0) previewFighter.tec9Flash--;
+    if (previewFighter.uziRecoilFront > 0) previewFighter.uziRecoilFront = Math.max(0, previewFighter.uziRecoilFront - 0.5);
+    if (previewFighter.uziRecoilBack > 0) previewFighter.uziRecoilBack = Math.max(0, previewFighter.uziRecoilBack - 0.5);
+    if (previewFighter.uziFlashTimerFront > 0) previewFighter.uziFlashTimerFront--;
+    if (previewFighter.uziFlashTimerBack > 0) previewFighter.uziFlashTimerBack--;
+    if (previewFighter.minigunRecoil > 0) previewFighter.minigunRecoil = Math.max(0, previewFighter.minigunRecoil - 0.8);
+    if (previewFighter.minigunFlashTimer > 0) {
+      previewFighter.minigunFlashTimer--;
+      previewFighter.minigunSpinAngle = (previewFighter.minigunSpinAngle || 0) + 0.45;
+    }
+    if (previewFighter.minigunHeat > 0) previewFighter.minigunHeat = Math.max(0, previewFighter.minigunHeat - 0.02);
 
     try {
       const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
@@ -745,7 +774,13 @@ function drawWeaponDetailScreen() {
     }, 85, 22, null, 3);
   } else if (def.type === 'cj') {
     state.cjWeaponIndex = state.cjWeaponIndex || 0;
-    const labels = ['1/4: BRASS KNUCKLES', '2/4: DARPA JETPACK', '3/4: DUAL MICRO-UZIS', '4/4: M134 MINIGUN'];
+    const labels = [
+      '1/5: BRASS KNUCKLES',
+      '2/5: DARPA JETPACK',
+      '3/5: MICRO SMG (MICRO-UZI)',
+      '4/5: M134 MINIGUN',
+      '5/5: INTRATEC TEC-9'
+    ];
     const currentWeaponLabel = labels[state.cjWeaponIndex] || labels[0];
 
     ctx.fillStyle = '#16a34a';
@@ -755,17 +790,29 @@ function drawWeaponDetailScreen() {
     ctx.fillText(currentWeaponLabel, canvas.width / 2, pagY);
 
     drawButton('◄', canvas.width / 2 - 135, pagY, () => {
-      state.cjWeaponIndex = (state.cjWeaponIndex + 3) % 4;
+      state.cjWeaponIndex = (state.cjWeaponIndex + 4) % 5;
       if (state.previewFighter) {
-        state.previewFighter.isJetpackActive = (state.cjWeaponIndex === 1 || state.cjWeaponIndex === 2);
+        const idx = state.cjWeaponIndex;
+        state.previewFighter.z = (idx === 1 || idx === 2) ? 24 : 0;
+        state.previewFighter.isJetpackActive = (idx === 1 || idx === 2);
+        state.previewFighter.isBaguvixActive = (idx === 3);
+        state.previewFighter.isGodModeActive = (idx === 3);
+        state.previewFighter.previewWeaponIndex = idx;
       }
+      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
     }, 30, 22, null, 3);
 
     drawButton('►', canvas.width / 2 + 135, pagY, () => {
-      state.cjWeaponIndex = (state.cjWeaponIndex + 1) % 4;
+      state.cjWeaponIndex = (state.cjWeaponIndex + 1) % 5;
       if (state.previewFighter) {
-        state.previewFighter.isJetpackActive = (state.cjWeaponIndex === 1 || state.cjWeaponIndex === 2);
+        const idx = state.cjWeaponIndex;
+        state.previewFighter.z = (idx === 1 || idx === 2) ? 24 : 0;
+        state.previewFighter.isJetpackActive = (idx === 1 || idx === 2);
+        state.previewFighter.isBaguvixActive = (idx === 3);
+        state.previewFighter.isGodModeActive = (idx === 3);
+        state.previewFighter.previewWeaponIndex = idx;
       }
+      audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
     }, 30, 22, null, 3);
   }
 
@@ -1230,16 +1277,22 @@ function drawWeaponPreview(ctx, type, color) {
       }
 
       case 'cj': {
+        const isStudio = (state.gameState === 'weaponStudio');
         const isDetail = (state.gameState === 'weaponDetail');
-        const activeIndex = isDetail ? (state.cjWeaponIndex || 0) : 0;
+        const activeIndex = isStudio 
+          ? (state.studioCjWeaponIndex || 0) 
+          : (isDetail ? (state.cjWeaponIndex || 0) : 0);
+
         if (activeIndex === 0) {
           drawCjBrassKnuckles(ctx, 0, 0, gunAngle, r, { standalone: true });
         } else if (activeIndex === 1) {
           drawCjJetpackWeapon(ctx, 0, 0, gunAngle, r);
         } else if (activeIndex === 2) {
           drawCjMicroUzi(ctx, 0, 0, 1.35, 0, 0);
+        } else if (activeIndex === 3) {
+          drawCjMinigun(ctx, -14, 0, 0, 0, { scale: 1.35 });
         } else {
-          drawCjMinigun(ctx, 0, 0, gunAngle, r);
+          drawCjTec9(ctx, 0, 0, 1.35, 0, 0);
         }
         return;
       }

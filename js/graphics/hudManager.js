@@ -352,6 +352,90 @@ export function drawMissionPassedOverlay(ctx) {
 
   ctx.restore();
 }
+
+/**
+ * Triggers and draws the authentic GTA: San Andreas "WASTED" screen overlay.
+ * Renders full-width horizontal dark band banner with red Pricedown typography.
+ */
+export function drawWastedOverlay(ctx) {
+  const overlay = state.wastedOverlay;
+  if (!overlay || !overlay.active || overlay.timer <= 0) return;
+
+  // Unconditionally decrement timer once per draw frame
+  overlay.timer--;
+
+  const totalFrames = overlay.maxTimer || 200;
+  const elapsed = totalFrames - overlay.timer;
+  const remaining = overlay.timer;
+
+  // Smooth alpha fade-in (20 frames) and smooth fade-out (30 frames)
+  let alpha = 1.0;
+  if (elapsed < 20) {
+    const t = Math.max(0, Math.min(1, elapsed / 20));
+    alpha = Math.sin((t * Math.PI) / 2);
+  } else if (remaining < 30) {
+    const t = Math.max(0, Math.min(1, remaining / 30));
+    alpha = Math.sin((t * Math.PI) / 2);
+  }
+
+  if (overlay.timer <= 0) {
+    overlay.active = false;
+    overlay.isComplete = true;
+    return;
+  }
+
+  const cw = (ctx.canvas && ctx.canvas.width) || (state.canvas && state.canvas.width) || 530;
+  const ch = (ctx.canvas && ctx.canvas.height) || (state.canvas && state.canvas.height) || 940;
+
+  const arenaY = (state.arena && state.arena.y !== undefined) ? state.arena.y : 240;
+  const arenaH = (state.arena && state.arena.height !== undefined) ? state.arena.height : 450;
+  const cy = arenaY + arenaH / 2;
+
+  ctx.save();
+  ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+
+  // 1. Full-screen subtle death vignette / desaturation dim
+  const vigGrad = ctx.createRadialGradient(cw / 2, cy, 50, cw / 2, cy, Math.max(cw, ch) * 0.7);
+  vigGrad.addColorStop(0.0, 'rgba(0, 0, 0, 0.15)');
+  vigGrad.addColorStop(0.65, 'rgba(0, 0, 0, 0.35)');
+  vigGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.65)');
+  ctx.fillStyle = vigGrad;
+  ctx.fillRect(0, 0, cw, ch);
+
+  // 2. Full-width horizontal dark banner band across screen
+  const bannerH = 92;
+  const bannerTop = cy - bannerH / 2;
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.78)';
+  ctx.fillRect(0, bannerTop, cw, bannerH);
+
+  // Top and bottom crisp black edge rules
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, bannerTop, cw, 2.5);
+  ctx.fillRect(0, bannerTop + bannerH - 2.5, cw, 2.5);
+
+  // 3. Center "WASTED" Red Typography
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'normal 62px "Pricedown", "Impact", "Arial Black", sans-serif';
+
+  // Heavy Black Miter Outline
+  ctx.lineWidth = 8;
+  ctx.strokeStyle = '#000000';
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 3;
+  ctx.strokeText('WASTED', cw / 2, cy);
+
+  // Authentic GTA Red Gradient Fill
+  const textGrad = ctx.createLinearGradient(0, cy - 30, 0, cy + 30);
+  textGrad.addColorStop(0.0, '#EF4444'); // Bright Crimson Top
+  textGrad.addColorStop(0.5, '#DC2626'); // Rich Red Mid
+  textGrad.addColorStop(1.0, '#991B1B'); // Deep Dark Red Bottom
+  ctx.fillStyle = textGrad;
+  ctx.fillText('WASTED', cw / 2, cy);
+
+  ctx.restore();
+}
+
 // HUD Cache Map
 const _hudCache = {
   teams: new Map(), // teamIndex -> cached team card elements
@@ -424,7 +508,7 @@ function updateHealthHud() {
     if (!f) return '';
     const illCount = (f.characterId === 'doppleganger' || f.type === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppelganger')
       ? (state.illusions ? state.illusions.filter(ill => ill && ill.isDoppelganger && ill.hp > 0).length : 0) : 0;
-    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)}`;
+    return `${f.isReloading || false},${f.magazineBullets || 0},${q(f.skillCooldown)},${q(f.cooldownTimer)},${f.domainActive || false},${q(f.beamCharge)},${q(f.beamTimer)},${q(f.shootCooldown)},${illCount},${q(f.totalAccumDamage)},${q(f.throwCooldown)},${q(f.shoutCooldown)},${q(f.reverseCursedTechniqueCooldown)},${f.isTakadaUltActive || false},${q(f.takadaUltTimer)},${f.isTakadaChanneling || false},${q(f.takadaChannelTimer)},${q(f.timeStopTimer)},${q(f.evadeBuffTimer)},${f.isRolling || false},${q(f.rollCooldown)},${f.isSelfDestructing || false},${f.isJetpackActive || false},${q(f.jetpackTimer)},${f.isBaguvixActive || false},${q(f.hesoyamShield)},${q(f.respect)},${q(f.jetpackCooldown)},${q(f.driveByCooldown)},${q(f.baguvixCooldown)},${q(f.baguvixTimer)},${q(f.driveByTimer)},${f.hasUsedHesoyam || false},${f.isDriveByActive || false},${f.isTypingCheat || false}`;
   }).join('|');
   const hpChanged = currentHpStr !== state._lastHpStr;
   const skillsChanged = currentSkillsStr !== state._lastSkillsStr;
@@ -649,60 +733,17 @@ function updateHealthHud() {
     } else if (f.characterId === 'cj' || f.type === 'cj') {
       const cfg = CONFIG.cj || {};
       const baseDmg = cfg.meleePunchDamage || 24;
-      const baseSpeed = cfg.speed || 6.0;
-      const baseKb = cfg.meleeKnockback || 16;
-      const respect = f.respect || 0;
 
       // 1. Punch Damage (DMG)
       if (f.isGroveStreetOg) {
-        const boostDmg = Math.round(baseDmg * 0.15);
+        const dmgBoost = cfg.respectDamageBoost || 0.15;
+        const boostDmg = Math.round(baseDmg * dmgBoost);
         info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
         info.push(`<b>DMG:</b> ${baseDmg}`);
       }
 
-      // 2. Movement Speed (SPD)
-      if (f.isGroveStreetOg || respect >= 100) {
-        const boostSpd = (baseSpeed * 0.20).toFixed(1);
-        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${boostSpd} <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else if (respect >= 50) {
-        const boostSpd = (baseSpeed * 0.15).toFixed(1);
-        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${boostSpd} <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)}`);
-      }
-
-      // 3. Defense / Damage Resistance (DEF) - includes Kevlar Shield (hesoyamShieldAmount)
-      if (f.isBaguvixActive || f.isGodModeActive) {
-        info.push(`<b>DEF:</b> 100% <span style="color: #15803d; font-size: 10px;">(GOD MODE) ▲</span>`);
-      } else if (f.hesoyamShield > 0) {
-        const ogDef = f.isGroveStreetOg ? '10% + ' : '';
-        info.push(`<b>DEF:</b> ${ogDef}${Math.round(f.hesoyamShield)} Shield <span style="color: #38bdf8; font-size: 10px;">▲</span>`);
-      } else if (f.isGroveStreetOg) {
-        info.push(`<b>DEF:</b> 10% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>DEF:</b> 0%`);
-      }
-
-      // 4. Knockback (KB)
-      const hKb = cfg.hesoyamKnockback || 22;
-      let punchKbStr = `${baseKb}`;
-      if (respect >= 50) {
-        const boostKb = Math.round(baseKb * 0.15);
-        punchKbStr = `${baseKb} + ${boostKb} <span style="color: #15803d; font-size: 10px;">▲</span>`;
-      }
-      info.push(`<b>KB:</b> ${punchKbStr} / ${hKb}`);
-
-      // 5. Evade (Airborne Jetpack Flight Buff)
-      const isEvading = Boolean(f.isJetpackActive || (f.evadeBuffTimer && f.evadeBuffTimer > 0) || (f.z && f.z > 0));
-      if (isEvading) {
-        const evadeVal = Math.round((f.evadeChance ?? (cfg.jetpackEvadeChance || 0.50)) * 100);
-        info.push(`<b>Evade:</b> ${evadeVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-      } else {
-        info.push(`<b>Evade:</b> 0%`);
-      }
-
-      // 6. Attack Speed (ATK SPD)
+      // 2. Attack Speed (ATK SPD)
       if (f.isGroveStreetOg) {
         info.push(`<b>ATK SPD:</b> +25% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       }
@@ -1074,9 +1115,252 @@ function updateHealthHud() {
     return String(label).replace(/(\d+%|\d+)/g, '<span class="hud-num">$1</span>');
   };
 
+  const getCjStarLevel = (fighter) => {
+    if (!fighter || !state.fighters) return 0;
+    
+    // Find all opposing enemy fighters
+    const myIndex = state.fighters.indexOf(fighter);
+    const myTeam = (typeof state.getFighterTeam === 'function' && myIndex >= 0) ? state.getFighterTeam(myIndex) : null;
+    
+    let totalOppMaxHp = 0;
+    let totalOppCurrentHp = 0;
+    let allOpponentsDead = true;
+
+    for (let i = 0; i < state.fighters.length; i++) {
+      const other = state.fighters[i];
+      if (!other || other === fighter || other.isTurret) continue;
+      
+      // If team mode, exclude teammates
+      if (myTeam !== null && typeof state.getFighterTeam === 'function' && state.getFighterTeam(i) === myTeam) {
+        continue;
+      }
+
+      const oppMax = other._originalMaxHp || other.maxHp || 440;
+      const oppHp = Math.max(0, (typeof other.getDisplayHp === 'function') ? other.getDisplayHp() : (other.hp || 0));
+      
+      totalOppMaxHp += oppMax;
+      totalOppCurrentHp += oppHp;
+
+      if (oppHp > 0 && !other.dead) {
+        allOpponentsDead = false;
+      }
+    }
+
+    if (totalOppMaxHp <= 0) return 0;
+    if (allOpponentsDead || totalOppCurrentHp <= 0) return 6; // Enemy completely drained all HP / died -> Full 6 stars!
+
+    // Drained ratio: 0.0 (enemy full HP) -> 1.0 (enemy 0 HP)
+    const drainedRatio = Math.max(0, Math.min(1.0, 1.0 - (totalOppCurrentHp / totalOppMaxHp)));
+
+    // Progressive 6-star distribution: 1 star per ~16.67% of enemy HP drained
+    const stars = Math.min(6, Math.max(0, Math.floor(drainedRatio * 6)));
+    return stars;
+  };
+
+  const generateCjStarsSVGs = (filledStars = 0) => {
+    let html = '';
+    const safeStars = Math.min(6, Math.max(0, filledStars));
+    for (let i = 0; i < 6; i++) {
+      // In GTA: San Andreas, wanted stars fill from right to left (☆☆☆★★★)
+      const isFilled = i >= (6 - safeStars);
+      const starFill = isFilled ? '#EAB308' : '#141417';
+      const starClass = isFilled ? 'hud-cj-star filled' : 'hud-cj-star empty';
+      html += `
+        <span class="${starClass}">
+          <svg viewBox="0 0 24 24">
+            <polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26" 
+              fill="${starFill}" 
+              stroke="#000000" 
+              stroke-width="2" 
+              stroke-linejoin="miter" />
+          </svg>
+        </span>
+      `;
+    }
+    return html;
+  };
+
+  const generateCjStarsHTML = (fighter, align = 'left') => {
+    const starCount = getCjStarLevel(fighter);
+    const justify = align === 'right' ? 'flex-end' : 'flex-start';
+    return `
+      <div class="hud-cj-stars" data-cj-stars="true" style="display: flex; align-items: center; justify-content: ${justify}; gap: 3px;">
+        ${generateCjStarsSVGs(starCount)}
+      </div>
+    `;
+  };
+
+  const getCjMoneyText = (fighter) => {
+    if (!fighter) return '$00000350';
+    if (fighter.money === undefined) fighter.money = 350;
+    return '$' + String(Math.max(0, Math.round(fighter.money))).padStart(8, '0');
+  };
+
+  const updateAndGetCjMoneyText = (fighter) => {
+    if (!fighter) return '$00000350';
+    if (fighter.money === undefined) fighter.money = 350;
+    if (fighter._currentMoneyVal === undefined) fighter._currentMoneyVal = fighter.money;
+
+    // Check if money changed to trigger a roll
+    if (fighter._lastTargetMoney === undefined) {
+      fighter._lastTargetMoney = fighter.money;
+    } else if (fighter.money !== fighter._lastTargetMoney) {
+      fighter._moneyRollStart = fighter._currentMoneyVal;
+      fighter._moneyRollTarget = fighter.money;
+      fighter._moneyRollingTimer = 75; // 75 frames (~1.25s)
+      fighter._moneyRollMaxTimer = 75;
+      fighter._lastTargetMoney = fighter.money;
+    }
+
+    if (fighter._moneyRollingTimer && fighter._moneyRollingTimer > 0) {
+      fighter._moneyRollingTimer--;
+      const progress = 1 - (fighter._moneyRollingTimer / fighter._moneyRollMaxTimer);
+      const currentBase = Math.round(fighter._moneyRollStart + (fighter._moneyRollTarget - fighter._moneyRollStart) * progress);
+      fighter._currentMoneyVal = currentBase;
+
+      const targetStr = String(Math.max(0, fighter._moneyRollTarget)).padStart(8, '0');
+      let displayStr = '$';
+      for (let i = 0; i < 8; i++) {
+        // Digits settle progressively from left to right as progress increases
+        const settleProgress = 0.25 + (i / 8) * 0.70;
+        if (progress < settleProgress && fighter._moneyRollingTimer > 0) {
+          // Active rolling digit: random 0-9
+          displayStr += Math.floor(Math.random() * 10);
+        } else {
+          displayStr += targetStr[i];
+        }
+      }
+      return displayStr;
+    }
+
+    fighter._currentMoneyVal = fighter.money;
+    return '$' + String(Math.max(0, Math.round(fighter.money))).padStart(8, '0');
+  };
+
+  const generateCjMoneyHTML = (fighter, align = 'left') => {
+    const moneyText = getCjMoneyText(fighter);
+    const justify = align === 'right' ? 'flex-end' : 'flex-start';
+    return `
+      <div class="hud-cj-money" style="display: flex; align-items: center; justify-content: ${justify}; width: 100%;">
+        <span class="hud-cj-money-text">${moneyText}</span>
+      </div>
+    `;
+  };
+
+  const getMatchTimeString = () => {
+    const frames = (typeof state !== 'undefined' && state.matchTimer) ? state.matchTimer : 0;
+    const totalSec = Math.floor(frames / 60);
+    const mins = String(Math.floor(totalSec / 60)).padStart(2, '0');
+    const secs = String(totalSec % 60).padStart(2, '0');
+    return `${mins}:${secs}`;
+  };
+
+  const getCjActiveWeaponData = (f) => {
+    if (!f) {
+      return {
+        icon: 'Assets/references/knuckle-icon.png',
+        ammo: '',
+        name: 'Brass Knuckles'
+      };
+    }
+
+    // 1. Minigun (BAGUVIX God Mode)
+    if (f.isBaguvixActive || f.isGodModeActive || (f.minigunHeat && f.minigunHeat > 0)) {
+      return {
+        icon: 'Assets/references/minigun-icon.png',
+        ammo: '∞',
+        name: 'M134 Minigun'
+      };
+    }
+
+    // 2. Dual Micro-Uzis (Rocketman Jetpack flight / Drive-By / Ranged)
+    if (f.isJetpackActive || f.isDriveByActive || (f.magazineBullets !== undefined && f.magazineBullets > 0)) {
+      return {
+        icon: 'Assets/references/uzi-icon.png',
+        ammo: '∞',
+        name: 'Micro-Uzi'
+      };
+    }
+
+    // 3. Fists / Brass Knuckles (Default Melee)
+    return {
+      icon: 'Assets/references/knuckle-icon.png',
+      ammo: '',
+      name: 'Brass Knuckles'
+    };
+  };
+
+  const generateCjGtaHudWidgetHTML = (targetFighter, titleAlign = 'left', metaValue = '', shakeStyle = '') => {
+    const wp = getCjActiveWeaponData(targetFighter);
+    const clockText = getMatchTimeString();
+    
+    const curHp = (typeof targetFighter.getDisplayHp === 'function') ? targetFighter.getDisplayHp() : targetFighter.hp;
+    const maxHp = targetFighter._originalMaxHp || targetFighter.maxHp || 440;
+    const hpRatio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
+    const hpPercent = Math.min(100, Math.max(0, Math.round(hpRatio * 100)));
+
+    const staminaVal = (targetFighter.stamina !== undefined) ? targetFighter.stamina : 100;
+    const maxStamina = targetFighter.maxStamina || 100;
+    const staminaRatio = maxStamina > 0 ? Math.min(1.0, Math.max(0, staminaVal / maxStamina)) : 1.0;
+    const staminaPercent = Math.min(100, Math.max(0, Math.round(staminaRatio * 100)));
+
+    const moneyText = getCjMoneyText(targetFighter);
+    const starCount = getCjStarLevel(targetFighter);
+    const isRight = (titleAlign === 'right');
+    const alignSelf = isRight ? 'margin-left: auto;' : 'margin-right: auto;';
+
+    return `
+      <div class="hud-cj-gta-widget" style="${alignSelf} ${shakeStyle}">
+        <!-- Top Row: Weapon Box on Left, Clock + Armor/Health on Right (Authentic GTA PS2 Layout) -->
+        <div class="hud-cj-top-row">
+          <!-- 1. Weapon Icon Frame -->
+          <div class="hud-cj-weapon-box">
+            <img class="hud-cj-weapon-icon" src="${wp.icon}" alt="${wp.name}" />
+            <span class="hud-cj-weapon-ammo">${wp.ammo}</span>
+          </div>
+
+          <!-- 2. Clock + Armor/Health Bars Stack -->
+          <div class="hud-cj-bars-column">
+            <!-- Match Clock (MM:SS) -->
+            <div class="hud-cj-clock-row">
+              <span class="hud-cj-clock-text">${clockText}</span>
+            </div>
+
+            <!-- White Stamina / Sprint Bar (GTA Fatigue & Movement Speed Mechanic) -->
+            <div class="hud-cj-armor-bar">
+              <div class="hud-cj-armor-fill" style="width: ${staminaPercent}%; background: ${targetFighter.isExhausted ? '#94A3B8' : '#FFFFFF'};"></div>
+            </div>
+
+            <!-- Red Health Bar (HP) -->
+            <div class="health-card__bar hud-bar-cj">
+              <div class="health-card__fill" style="width: ${hpPercent}%; background: #DC2626;"></div>
+              <span class="health-card__bar-text" style="display: none;">${metaValue}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Middle: GTA Cash Money ($00000000) -->
+        <div class="hud-cj-money-row">
+          <span class="hud-cj-money-text">${moneyText}</span>
+        </div>
+
+        <!-- Bottom of Widget: 6 Wanted Stars (Filling Right to Left) -->
+        <div class="hud-cj-stars" data-cj-stars="true">
+          ${generateCjStarsSVGs(starCount)}
+        </div>
+      </div>
+    `;
+  };
+
+  const generateCjGtaStackHTML = (fighter, align = 'left') => {
+    return generateCjGtaHudWidgetHTML(fighter, align);
+  };
+
   const generateFighterSkillsHTML = (f, align, singleColumn = false) => {
     const skills = getSkillDataForFighter(f);
     if (!skills || skills.length === 0) return '';
+    const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
+    const cjSkillClass = isCj ? ' hud-skill-box-cj' : '';
 
     return skills.map((s, index) => {
       const plainTextLen = s.label ? s.label.replace(/<[^>]*>/g, '').length : 0;
@@ -1113,7 +1397,7 @@ function updateHealthHud() {
       if (s.noFill) {
         const parentColor = s.color ? `color: ${s.color};` : '';
         return `
-          <div class="hud-skill-box align-${align} label-only${spanClass}" data-skill-id="${s.id}" style="${parentColor} justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
+          <div class="hud-skill-box align-${align} label-only${spanClass}${cjSkillClass}" data-skill-id="${s.id}" style="${parentColor} justify-content: ${align === 'right' ? 'flex-end' : 'flex-start'};">
             <div class="hud-skill-box-fill" style="display: none;"></div>
             <div class="hud-skill-box-text" style="${textStyle}">${formattedLabel}</div>
           </div>
@@ -1122,7 +1406,7 @@ function updateHealthHud() {
       const boxStyle = `--skill-glow-color: ${s.color};`;
       const fillStyle = `width: ${Math.round(s.pct)}%; background: ${s.color};`;
       return `
-        <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}${spanClass}" data-skill-id="${s.id}" style="${boxStyle}">
+        <div class="hud-skill-box align-${align}${s.ready ? ' hud-skill-ready' : ''}${spanClass}${cjSkillClass}" data-skill-id="${s.id}" style="${boxStyle}">
           <div class="hud-skill-box-fill" style="${fillStyle}"></div>
           <div class="hud-skill-box-text" style="${textStyle}">${formattedLabel}</div>
         </div>
@@ -1253,21 +1537,27 @@ function updateHealthHud() {
       return `rgba(${r}, ${g}, ${b}, ${alpha})`;
     };
 
-    const getTitleStyle = (color) => {
+    const getTitleStyle = (color, isCj = false) => {
       const glow1 = hexToRgba(color, 0.70);
       const glow2 = hexToRgba(color, 0.35);
+      const fontFamily = isCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
+      const fontSize = isCj ? (baseFontSize + 2) : baseFontSize;
+      const letterSpacing = isCj ? '1.2px' : '0.8px';
       const shadow = isDark 
         ? `text-shadow: 0 1px 2px #000000, 0 0 8px ${glow1}, 0 0 16px ${glow2}; -webkit-text-stroke: 0.8px #000000; text-stroke: 0.8px #000000; paint-order: stroke fill;` 
         : `text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);`;
-      return `font-size: ${baseFontSize}px; text-transform: uppercase; font-family: 'Glast Blitch', Arial, sans-serif; letter-spacing: 0.8px; font-weight: normal; ${shadow} `;
+      return `font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; ${shadow} `;
     };
 
     let barsHTML = '';
     if (members && members.length > 0) {
       barsHTML = members.map((m, mIndex) => {
+        const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
+        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
+        const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
         const hpText = `${Math.floor(Math.min(Number(m.maxHp), Math.max(0, Number(m.hp) || 0)))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
         const memberShakeTimer = m._healthBarShakeTimer || 0;
@@ -1289,6 +1579,7 @@ function updateHealthHud() {
         else if (fType === 'toji') memberNameColor = '#A855F7';
         else if (fType === 'sukuna') memberNameColor = '#FF4500';
         else if (fType === 'saitama') memberNameColor = '#FF2A2A';
+        else if (fType === 'cj') memberNameColor = '#16A34A';
         else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') memberNameColor = isDark ? '#E2E8F0' : '#1A202C';
         else if (memberNameColor === '#fff' || memberNameColor === '#ffffff') {
           memberNameColor = defaultNameColor;
@@ -1296,10 +1587,26 @@ function updateHealthHud() {
 
         const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
+        if (isMemberCj) {
+          return `
+            <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
+              <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 4px 0;">
+                <div class="health-card__title" style="${getTitleStyle(memberNameColor, isMemberCj)}color: ${memberNameColor}; margin: 0; text-align: ${titleAlign || 'left'}; flex-shrink: 0;">${memberName}</div>
+              </div>
+              ${generateCjGtaHudWidgetHTML(m, titleAlign, hpText, memberShakeStyle)}
+              ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
+              ${memberInfoHTML ? `<div class="health-card__info" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;">${memberInfoHTML}</div>` : ''}
+            </div>
+          `;
+        }
+
         return `
           <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
-            <div class="health-card__title" style="${getTitleStyle(memberNameColor)}color: ${memberNameColor}; margin: 0 0 4px 0; text-align: ${titleAlign || 'left'};">${memberName}</div>
-            <div class="health-card__bar" style="${memberShakeStyle}">
+            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 4px 0;">
+              <div class="health-card__title" style="${getTitleStyle(memberNameColor, isMemberCj)}color: ${memberNameColor}; margin: 0; text-align: ${titleAlign || 'left'}; flex-shrink: 0;">${memberName}</div>
+            </div>
+            ${memberStackHTML}
+            <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle}">
               <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
               <span class="health-card__bar-text">${hpText}</span>
             </div>
@@ -1309,8 +1616,10 @@ function updateHealthHud() {
         `;
       }).join('');
     } else {
+      const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
-      const barColor = safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444';
+      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
+      const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
       
       const isDummy = targetFighter && (targetFighter.characterId === 'dummy' || targetFighter.type === 'dummy');
@@ -1325,34 +1634,46 @@ function updateHealthHud() {
       const skillsGridStyle = singleColumn ? 'grid-template-columns: 1fr;' : '';
       const infoGridStyle = singleColumn ? `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px; grid-template-columns: 1fr;` : `color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudInfoFontSize || 14.5}px;`;
 
-      barsHTML = `
-        <div class="health-card__bar" style="${barShakeStyle}">
-          <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
-          <span class="health-card__bar-text">${metaValue}</span>
-        </div>
-        ${showDescription ? `
-          ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
-          <div class="health-card__desc" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudDescFontSize || 16}px; line-height: 1.4; margin-top: 8px;">
-            ${description.replace(/(\d+(?:\.\d+)?%?)/g, '<span class="hud-number">$1</span>')}
-          </div>
-        ` : `
+      if (isTargetCj) {
+        barsHTML = `
+          ${generateCjGtaHudWidgetHTML(targetFighter, titleAlign, metaValue, barShakeStyle)}
           <div class="health-card__skills" style="${skillsGridStyle}">
             ${skillsHTML}
           </div>
           ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
-        `}
-      `;
+        `;
+      } else {
+        barsHTML = `
+          <div class="health-card__bar${cjBarClass}" style="${barShakeStyle}">
+            <div class="${className}" style="width:${percent}%; background:${barColor};"></div>
+            <span class="health-card__bar-text">${metaValue}</span>
+          </div>
+          ${showDescription ? `
+            ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+            <div class="health-card__desc" style="color: ${CONFIG.hudTextColor}; font-size: ${CONFIG.hudDescFontSize || 16}px; line-height: 1.4; margin-top: 8px;">
+              ${description.replace(/(\d+(?:\.\d+)?%?)/g, '<span class="hud-number">$1</span>')}
+            </div>
+          ` : `
+            <div class="health-card__skills" style="${skillsGridStyle}">
+              ${skillsHTML}
+            </div>
+            ${infoHTML ? `<div class="health-card__info" style="${infoGridStyle}">${infoHTML}</div>` : ''}
+          `}
+        `;
+      }
     }
 
+    const isCardCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
+    const cjStackHTML = '';
     const winsBullets = Array.from({ length: maxBullets }, (_, i) => {
       const filled = i < wins;
       return `<div class="health-card__win-bullet ${filled ? 'filled' : ''}"></div>`;
     }).join('');
-    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 4px; align-items: center;">${winsBullets}</div>` : '';
+    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">${winsBullets}</div>` : '';
 
     const headerRowHTML = (title || maxBullets > 0) ? `
-      <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 6px;">
-        ${title ? `<div class="health-card__title" style="${getTitleStyle(nameColor)}color: ${nameColor}; margin: 0; text-align: ${titleAlign};">${truncatedTitle}</div>` : ''}
+      <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 4px;">
+        ${title ? `<div class="health-card__title" style="${getTitleStyle(nameColor, isCardCj)}color: ${nameColor}; margin: 0; text-align: ${titleAlign}; flex-shrink: 0;">${truncatedTitle}</div>` : ''}
         ${winsHTML}
       </div>
     ` : '';
@@ -1360,6 +1681,7 @@ function updateHealthHud() {
     return `
       <div class="health-card ${extraClass}" style="${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
         ${headerRowHTML}
+        ${cjStackHTML}
         ${barsHTML}
       </div>
     `;
@@ -1430,6 +1752,8 @@ function updateHealthHud() {
         const hpBar = soloCardElement.querySelector('.health-card__bar');
         const hpBarFill = soloCardElement.querySelector('.health-card__fill');
         const hpBarText = soloCardElement.querySelector('.health-card__bar-text');
+        const starsContainer = soloCardElement.querySelector('.hud-cj-stars');
+        const moneyTextEl = soloCardElement.querySelector('.hud-cj-money-text');
         const winBullets = Array.from(soloCardElement.querySelectorAll('.health-card__win-bullet'));
         const infoContainer = soloCardElement.querySelector('.health-card__info');
         const checkbox = soloCardElement.querySelector('input[type="checkbox"]');
@@ -1447,6 +1771,10 @@ function updateHealthHud() {
           hpBar,
           hpBarFill,
           hpBarText,
+          starsContainer,
+          moneyTextEl,
+          lastMoneyText: '',
+          lastStarCount: -1,
           winBullets,
           infoContainer,
           checkbox,
@@ -1484,6 +1812,8 @@ function updateHealthHud() {
         const fill = memberEl.querySelector('.health-card__fill');
         const text = memberEl.querySelector('.health-card__bar-text');
         const bar = memberEl.querySelector('.health-card__bar');
+        const starsContainer = memberEl.querySelector('.hud-cj-stars');
+        const moneyTextEl = memberEl.querySelector('.hud-cj-money-text');
         const infoContainer = memberEl.querySelector('.health-card__info');
         const skillBars = new Map();
         memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
@@ -1492,7 +1822,7 @@ function updateHealthHud() {
           const textEl = box.querySelector('.hud-skill-box-text');
           skillBars.set(id, { box, fill: fillEl, text: textEl });
         });
-        cachedOppMembers.push({ fill, text, bar, infoContainer, skillBars, fighter: oppMembers[i], lastInfoHTML: '' });
+        cachedOppMembers.push({ fill, text, bar, starsContainer, moneyTextEl, lastMoneyText: '', lastStarCount: -1, infoContainer, skillBars, fighter: oppMembers[i], lastInfoHTML: '' });
       });
 
       _hudCache.teams.set(1, {
@@ -1535,15 +1865,25 @@ function updateHealthHud() {
           const fill = memberEl.querySelector('.health-card__fill');
           const text = memberEl.querySelector('.health-card__bar-text');
           const bar = memberEl.querySelector('.health-card__bar');
+          const starsContainer = memberEl.querySelector('.hud-cj-stars');
+          const moneyTextEl = memberEl.querySelector('.hud-cj-money-text');
+          const weaponIconEl = memberEl.querySelector('.hud-cj-weapon-icon');
+          const weaponAmmoEl = memberEl.querySelector('.hud-cj-weapon-ammo');
+          const clockTextEl = memberEl.querySelector('.hud-cj-clock-text');
+          const armorFillEl = memberEl.querySelector('.hud-cj-armor-fill');
           const infoContainer = memberEl.querySelector('.health-card__info');
           const skillBars = new Map();
-          memberEl.querySelectorAll('.hud-skill-box').forEach(box => {
+          cardElement.querySelectorAll('.hud-skill-box').forEach(box => {
             const id = box.getAttribute('data-skill-id');
             const fillEl = box.querySelector('.hud-skill-box-fill');
             const textEl = box.querySelector('.hud-skill-box-text');
             skillBars.set(id, { box, fill: fillEl, text: textEl });
           });
-          cachedMembers.push({ fill, text, bar, infoContainer, skillBars, fighter: members[i], lastInfoHTML: '' });
+          cachedMembers.push({
+            fill, text, bar, starsContainer, moneyTextEl, weaponIconEl, weaponAmmoEl, clockTextEl, armorFillEl,
+            lastMoneyText: '', lastStarCount: -1, lastWeaponIcon: '', lastWeaponAmmo: '', lastClockText: '',
+            infoContainer, skillBars, fighter: members[i], lastInfoHTML: ''
+          });
         });
 
         _hudCache.teams.set(teamIndex, {
@@ -1566,6 +1906,7 @@ function updateHealthHud() {
         else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
         else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
         else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
+        else if (fType === 'cj') nameColor = '#16A34A';
         else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') nameColor = (state.arenaTheme === 'dark') ? '#E2E8F0' : '#1A202C';
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
@@ -1630,6 +1971,12 @@ function updateHealthHud() {
         const hpBar = cardElement.querySelector('.health-card__bar');
         const hpBarFill = cardElement.querySelector('.health-card__fill');
         const hpBarText = cardElement.querySelector('.health-card__bar-text');
+        const starsContainer = cardElement.querySelector('.hud-cj-stars');
+        const moneyTextEl = cardElement.querySelector('.hud-cj-money-text');
+        const weaponIconEl = cardElement.querySelector('.hud-cj-weapon-icon');
+        const weaponAmmoEl = cardElement.querySelector('.hud-cj-weapon-ammo');
+        const clockTextEl = cardElement.querySelector('.hud-cj-clock-text');
+        const armorFillEl = cardElement.querySelector('.hud-cj-armor-fill');
         const winBullets = Array.from(cardElement.querySelectorAll('.health-card__win-bullet'));
         const infoContainer = cardElement.querySelector('.health-card__info');
         const checkbox = cardElement.querySelector('input[type="checkbox"]');
@@ -1647,6 +1994,22 @@ function updateHealthHud() {
           hpBar,
           hpBarFill,
           hpBarText,
+          starsContainer,
+          moneyTextEl,
+          weaponIconEl,
+          weaponAmmoEl,
+          clockTextEl,
+          armorFillEl,
+          lastMoneyText: '',
+          lastStarCount: -1,
+          lastWeaponIcon: '',
+          lastWeaponAmmo: '',
+          lastClockText: '',
+          lastStaminaPct: -1,
+          lastIsExhausted: null,
+          lastHpPct: -1,
+          lastBarColor: '',
+          lastHpText: '',
           winBullets,
           infoContainer,
           checkbox,
@@ -1668,28 +2031,93 @@ function updateHealthHud() {
           fighter._lastHealAmount = 0;
         }
 
+        const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
         const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
         const maxHp = fighter._originalMaxHp || fighter.maxHp;
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
+        const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
         const glow = getGlowStyles(fighter);
         
-        m.fill.style.width = `${percent}%`;
-        m.fill.style.background = barColor;
-        m.fill.style.boxShadow = glow.boxShadow || '';
+        if (m.lastHpPct !== percent) {
+          m.fill.style.width = `${percent}%`;
+          m.lastHpPct = percent;
+        }
+        if (m.lastBarColor !== barColor) {
+          m.fill.style.background = barColor;
+          m.lastBarColor = barColor;
+        }
+        m.fill.style.boxShadow = isCj ? '' : (glow.boxShadow || '');
         m.fill.style.filter = glow.filter || '';
         m.fill.className = glow.className || 'health-card__fill';
         
         if (m.bar) {
-          m.bar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+          const cjBarClass = isCj ? ' hud-bar-cj' : '';
+          m.bar.className = `health-card__bar${cjBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
           const memberShakeTimer = fighter._healthBarShakeTimer || 0;
           const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
           m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
         const hpText = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
-        m.text.textContent = hpText;
+        if (m.lastHpText !== hpText) {
+          m.text.textContent = hpText;
+          m.lastHpText = hpText;
+        }
+
+        // Wanted Stars Update for CJ (Team Member)
+        if (isCj && m.starsContainer) {
+          const starCount = getCjStarLevel(fighter);
+          if (m.lastStarCount !== starCount) {
+            m.starsContainer.innerHTML = generateCjStarsSVGs(starCount);
+            m.lastStarCount = starCount;
+          }
+        }
+
+        // Money Update for CJ (Team Member)
+        if (isCj && m.moneyTextEl) {
+          const text = updateAndGetCjMoneyText(fighter);
+          if (m.lastMoneyText !== text) {
+            m.moneyTextEl.textContent = text;
+            m.lastMoneyText = text;
+          }
+        }
+
+        // GTA HUD Widget Updates for CJ (Team Member)
+        if (isCj) {
+          if (m.clockTextEl) {
+            const clockStr = getMatchTimeString();
+            if (m.lastClockText !== clockStr) {
+              m.clockTextEl.textContent = clockStr;
+              m.lastClockText = clockStr;
+            }
+          }
+          if (m.weaponIconEl) {
+            const wp = getCjActiveWeaponData(fighter);
+            if (m.lastWeaponIcon !== wp.icon) {
+              m.weaponIconEl.setAttribute('src', wp.icon);
+              m.lastWeaponIcon = wp.icon;
+            }
+            if (m.weaponAmmoEl && m.lastWeaponAmmo !== wp.ammo) {
+              m.weaponAmmoEl.textContent = wp.ammo;
+              m.lastWeaponAmmo = wp.ammo;
+            }
+          }
+          if (m.armorFillEl) {
+            const staminaVal = (fighter.stamina !== undefined) ? fighter.stamina : 100;
+            const maxStamina = fighter.maxStamina || 100;
+            const staminaPct = Math.min(100, Math.max(0, Math.round((staminaVal / maxStamina) * 100)));
+            const isExh = Boolean(fighter.isExhausted);
+            if (m.lastStaminaPct !== staminaPct) {
+              m.armorFillEl.style.width = `${staminaPct}%`;
+              m.lastStaminaPct = staminaPct;
+            }
+            if (m.lastIsExhausted !== isExh) {
+              m.armorFillEl.style.background = isExh ? '#94A3B8' : '#FFFFFF';
+              m.lastIsExhausted = isExh;
+            }
+          }
+        }
 
         // Skill Bars Update for Team Member
         if (m.skillBars && m.skillBars.size > 0) {
@@ -1773,23 +2201,31 @@ function updateHealthHud() {
         fighter._lastHealAmount = 0;
       }
 
+      const isCj = fighter && (fighter.characterId === 'cj' || fighter.type === 'cj');
       const curHp = (typeof fighter.getDisplayHp === 'function') ? fighter.getDisplayHp() : fighter.hp;
       const maxHp = fighter._originalMaxHp || fighter.maxHp;
       const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-      const barColor = ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444';
+      const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
       const glow = getGlowStyles(fighter);
 
       if (cachedCard.hpBarFill) {
-        cachedCard.hpBarFill.style.width = `${percent}%`;
-        cachedCard.hpBarFill.style.background = barColor;
-        cachedCard.hpBarFill.style.boxShadow = glow.boxShadow || '';
+        if (cachedCard.lastHpPct !== percent) {
+          cachedCard.hpBarFill.style.width = `${percent}%`;
+          cachedCard.lastHpPct = percent;
+        }
+        if (cachedCard.lastBarColor !== barColor) {
+          cachedCard.hpBarFill.style.background = barColor;
+          cachedCard.lastBarColor = barColor;
+        }
+        cachedCard.hpBarFill.style.boxShadow = isCj ? '' : (glow.boxShadow || '');
         cachedCard.hpBarFill.style.filter = glow.filter || '';
         cachedCard.hpBarFill.className = glow.className || 'health-card__fill';
       }
 
       if (cachedCard.hpBar) {
-        cachedCard.hpBar.className = `health-card__bar${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
+        const cjBarClass = isCj ? ' hud-bar-cj' : '';
+        cachedCard.hpBar.className = `health-card__bar${cjBarClass}${glow.className?.includes('hit-glow') ? ' hit-glow' : glow.className?.includes('heal-glow') ? ' heal-glow' : ''}`;
         const shakeTimer = fighter._healthBarShakeTimer || 0;
         const shakeAmount = shakeTimer > 0 ? Math.sin((12 - shakeTimer) * 0.75) * 3 : 0;
         cachedCard.hpBar.style.transform = shakeTimer > 0 ? `translateX(${shakeAmount}px)` : '';
@@ -1797,7 +2233,64 @@ function updateHealthHud() {
 
       if (cachedCard.hpBarText) {
         const metaValue = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
-        cachedCard.hpBarText.textContent = metaValue;
+        if (cachedCard.lastHpText !== metaValue) {
+          cachedCard.hpBarText.textContent = metaValue;
+          cachedCard.lastHpText = metaValue;
+        }
+      }
+
+      // Wanted Stars Update for CJ (Individual Fighter)
+      if (isCj && cachedCard.starsContainer) {
+        const starCount = getCjStarLevel(fighter);
+        if (cachedCard.lastStarCount !== starCount) {
+          cachedCard.starsContainer.innerHTML = generateCjStarsSVGs(starCount);
+          cachedCard.lastStarCount = starCount;
+        }
+      }
+
+      // Money Update for CJ (Individual Fighter)
+      if (isCj && cachedCard.moneyTextEl) {
+        const text = updateAndGetCjMoneyText(fighter);
+        if (cachedCard.lastMoneyText !== text) {
+          cachedCard.moneyTextEl.textContent = text;
+          cachedCard.lastMoneyText = text;
+        }
+      }
+
+      // GTA HUD Widget Updates for CJ (Individual Fighter)
+      if (isCj) {
+        if (cachedCard.clockTextEl) {
+          const clockStr = getMatchTimeString();
+          if (cachedCard.lastClockText !== clockStr) {
+            cachedCard.clockTextEl.textContent = clockStr;
+            cachedCard.lastClockText = clockStr;
+          }
+        }
+        if (cachedCard.weaponIconEl) {
+          const wp = getCjActiveWeaponData(fighter);
+          if (cachedCard.lastWeaponIcon !== wp.icon) {
+            cachedCard.weaponIconEl.setAttribute('src', wp.icon);
+            cachedCard.lastWeaponIcon = wp.icon;
+          }
+          if (cachedCard.weaponAmmoEl && cachedCard.lastWeaponAmmo !== wp.ammo) {
+            cachedCard.weaponAmmoEl.textContent = wp.ammo;
+            cachedCard.lastWeaponAmmo = wp.ammo;
+          }
+        }
+        if (cachedCard.armorFillEl) {
+          const staminaVal = (fighter.stamina !== undefined) ? fighter.stamina : 100;
+          const maxStamina = fighter.maxStamina || 100;
+          const staminaPct = Math.min(100, Math.max(0, Math.round((staminaVal / maxStamina) * 100)));
+          const isExh = Boolean(fighter.isExhausted);
+          if (cachedCard.lastStaminaPct !== staminaPct) {
+            cachedCard.armorFillEl.style.width = `${staminaPct}%`;
+            cachedCard.lastStaminaPct = staminaPct;
+          }
+          if (cachedCard.lastIsExhausted !== isExh) {
+            cachedCard.armorFillEl.style.background = isExh ? '#94A3B8' : '#FFFFFF';
+            cachedCard.lastIsExhausted = isExh;
+          }
+        }
       }
 
       cachedCard.cardElement.style.transform = '';

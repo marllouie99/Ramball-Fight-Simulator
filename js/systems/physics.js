@@ -750,6 +750,9 @@ export function updateFighters() {
       if (opponent) {
         fighter.aim(opponent, null);
       }
+      if (typeof fighter.onCountdown === 'function') {
+        fighter.onCountdown(opponent);
+      }
     });
     // Still update fuel pickups for visual pulsing during countdown
     updateFuelPickups();

@@ -6,6 +6,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawMusashiWeapons, drawMusashiSheaths } from '../../graphics/weapons/musashiWeaponGraphics.js';
+import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 export class MusashiFighter extends Fighter {
   constructor(def) {
@@ -131,7 +132,7 @@ export class MusashiFighter extends Fighter {
       const numImages = Math.max(5, Math.floor(teleportDist / 12)); // Spawn an afterimage every 12 pixels
       for (let i = 0; i <= numImages; i++) {
         const t = i / numImages;
-        this.afterImages.push({
+        pushTrailCap(this.afterImages, {
           x: oldX + (this.x - oldX) * t,
           y: oldY + (this.y - oldY) * t,
           gunAngle: this.gunAngle,
@@ -273,7 +274,7 @@ export class MusashiFighter extends Fighter {
             const numImages = Math.max(3, Math.floor(teleportDist / 12));
             for (let i = 0; i <= numImages; i++) {
               const t = i / numImages;
-              this.afterImages.push({
+              pushTrailCap(this.afterImages, {
                 x: oldX + (this.x - oldX) * t,
                 y: oldY + (this.y - oldY) * t,
                 timer: 15,
@@ -407,7 +408,7 @@ export class MusashiFighter extends Fighter {
          const numImages = Math.max(5, Math.floor(teleportDist / 12));
          for (let i = 0; i <= numImages; i++) {
            const t = i / numImages;
-           this.afterImages.push({
+           pushTrailCap(this.afterImages, {
              x: oldX + (this.x - oldX) * t,
              y: oldY + (this.y - oldY) * t,
              gunAngle: this.gunAngle,
@@ -508,7 +509,7 @@ export class MusashiFighter extends Fighter {
        if (!this.afterImages) this.afterImages = [];
        // Spawn trails frequently while running
        if (Math.random() < 0.4) {
-          this.afterImages.push({
+          pushTrailCap(this.afterImages, {
              x: this.x,
              y: this.y,
              gunAngle: this.gunAngle,

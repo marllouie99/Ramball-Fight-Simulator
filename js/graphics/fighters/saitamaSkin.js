@@ -38,7 +38,10 @@ export function drawSaitamaSkin(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
 
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || fighter.angle || 0);
+  // Serious Skill Counter Punch Follow-Through MUST NEVER be interrupted/snapped when enemy dies or champion screen triggers
+  const isPostCounter = Boolean(fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0);
+
+  const angle = (fighter._isWinnerReveal && !isPostCounter) ? 0 : (fighter.gunAngle || fighter.angle || 0);
   ctx.rotate(angle);
   const facingLeft = Math.abs(angle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
@@ -49,7 +52,6 @@ export function drawSaitamaSkin(ctx, fighter) {
 
   // Smooth sinusoidal punch progress or counter punch post-punch follow-through
   const isNormalPunching = !isChampScreen && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-  const isPostCounter = !isChampScreen && Boolean(fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0);
   const isFlurrying = !isChampScreen && Boolean(fighter.isFlurrying);
   const isPunching = isNormalPunching || isPostCounter || isFlurrying;
 

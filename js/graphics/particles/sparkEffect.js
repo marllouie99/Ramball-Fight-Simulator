@@ -589,7 +589,7 @@ export function drawSparkEffects(layer = 'all') {
   const { ctx } = state;
   if (!ctx) return;
 
-  const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+  const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
 
   for (const effect of state.sparkEffects) {
     // PixiJS sparks are rendered in the WebGL scene graph, so we skip drawing them in 2D
@@ -886,7 +886,7 @@ export function drawSparkEffects(layer = 'all') {
           effect.size += (effect.targetSize - effect.size) * 0.16;
         }
         
-        const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+        const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
         if (isGamePlay) {
           // Gameplay-optimized dual-stroke ring
           ctx.strokeStyle = `rgba(255, 20, 147, ${effect.life * 0.85})`;
@@ -2239,7 +2239,7 @@ export function drawSparkEffects(layer = 'all') {
     } else {
       // Standard spark - small glowing dot
       const safeColor = (typeof effect.color === 'string' && effect.color) ? effect.color : '#00E5FF';
-      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd'].includes(state.gameState));
+      const isGamePlay = (typeof state !== 'undefined' && state.gameState && ['fight', 'countdown', 'paused', 'roundEnd', 'matchEnd', 'playing'].includes(state.gameState));
       if (isGamePlay) {
         // During gameplay: skip per-particle radial gradient (saves huge CPU time per frame)
         ctx.fillStyle = safeColor;

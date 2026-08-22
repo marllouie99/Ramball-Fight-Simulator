@@ -115,8 +115,7 @@ export function activateReverseCursedTechnique(fighter, attacker) {
   if (fighter.isDead) return;
   fighter.reverseCursedTechniqueCooldown = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700;
 
-  const healPercent = CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.25;
-  const healAmount = fighter.maxHp * healPercent;
+  const healAmount = CONFIG.sukuna?.reverseCursedTechniqueHealAmount ?? (CONFIG.sukuna?.reverseCursedTechniqueHealPercent ? fighter.maxHp * CONFIG.sukuna.reverseCursedTechniqueHealPercent : 125);
 
   fighter.hp = Math.min(fighter.maxHp, Math.max(fighter.hp, 0) + healAmount);
 

@@ -326,7 +326,8 @@ export class SukunaFighter extends Fighter {
 
       this.hasUsedRCTRevival = true;
       this.isDead = false;
-      this.hp = Math.max(1, this.maxHp * (CONFIG.sukuna?.rctRevivalHealPercent || CONFIG.sukuna?.reverseCursedTechniqueHealPercent || 0.25));
+      const revivalAmount = CONFIG.sukuna?.rctRevivalHealAmount ?? (CONFIG.sukuna?.rctRevivalHealPercent ? this.maxHp * CONFIG.sukuna.rctRevivalHealPercent : (CONFIG.sukuna?.reverseCursedTechniqueHealAmount ?? 125));
+      this.hp = Math.min(this.maxHp, Math.max(1, revivalAmount));
       this.invincibilityTimer = 60; // 1.0s invincibility during emergency revival
       this._activateReverseCursedTechnique(attacker);
       if (typeof spawnFloatingText === 'function') {
@@ -429,8 +430,8 @@ export class SukunaFighter extends Fighter {
       const didBounce = this.resolveWallBounce(arena);
 
       // Spawn red afterimages for dramatic slide effect
-      if (this.afterImages && typeof this.afterImages.push === 'function') {
-        this.afterImages.push({
+      if (this.afterImages) {
+        pushTrailCap(this.afterImages, {
           x: this.x,
           y: this.y,
           angle: this.angle,

@@ -8,10 +8,12 @@
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../core/state.js';
 import { CONFIG } from '../core/config.js';
 import { audioSystem } from './audioSystem.js';
+import { stopSound, stopSoundBySrc } from './soundSystem.js';
 import { projectileSystem } from './projectileSystem.js';
 import { spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
 import { spawnBamEffect, updateBamEffects, clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearFloatingJetpacks } from '../graphics/particles/cjFloatingJetpack.js';
+import { clearDroppedMiniguns } from '../graphics/particles/cjDroppedMinigun.js';
 import {
   spawnCarExplosion,
   updateCarExplosions,
@@ -27,6 +29,11 @@ import {
   drawBurnoutOilPuddle,
   drawTireSmokeParticles
 } from '../graphics/vehicles/groveStreetCarGraphics.js';
+import { spawnSpentCasing } from '../graphics/particles/johnWickDroppedMagazine.js';
+
+// Track previously played audio to guarantee zero back-to-back repetitions
+let _lastGlobalRoamNoise = null;
+let _lastGlobalArrivalVoiceline = null;
 
 // Pre-allocate global state arrays
 if (typeof state !== 'undefined') {
@@ -113,10 +120,11 @@ function initCarPass(car, fromLeft, passNum) {
   car.roamTarget = null;
   car.bulletsLeft = cfg.driveByBulletCount || 16;
   car.bulletDamage = cfg.driveByBulletDamage || 8;
-  car.bulletSpeed = cfg.driveByBulletSpeed || 22.0;
-  car.fireCooldown = 10;
-  car.fireInterval = cfg.driveByBurstInterval || 8;
+  car.bulletSpeed = cfg.driveByBulletSpeed || 28.0;
+  car.fireInterval = cfg.driveByBurstInterval || 22;
+  car.fireCooldown = car.fireInterval;
   car.hasDroppedOil = false;
+  car.homieVoiceCooldown = 60; // ~1s delay after car arrives before 1st homie noise
 
   // Fresh skid mark tracks for this pass
   car.skidLeftTrack = { points: [], alpha: 1.0, width: 6.2 };
@@ -213,6 +221,12 @@ export function spawnGroveStreetDriveBy(cjFighter) {
     frozenByCronos: false,
     isTargetOfAmbush: false,
     caughtInSaitamaFlurry: false,
+    caughtInPureLoveBeam: false,
+    wasCaughtInPureLoveBeam: false,
+    pureLoveBeamTimer: 0,
+    pureLoveBeamRecoveryTimer: 0,
+    isCaughtInPurple: false,
+    purpleHitTimer: 0,
     slowMultiplier: 1.0,
     slowTimer: 0,
     vx: 0,
@@ -238,6 +252,8 @@ export function spawnGroveStreetDriveBy(cjFighter) {
     applyKnockback(kx, ky) {
       this.x += Number(kx) || 0;
       this.y += Number(ky) || 0;
+      this.knockbackVx = Number(kx) || 0;
+      this.knockbackVy = Number(ky) || 0;
     },
 
     applySlow(multiplier, duration) {
@@ -283,6 +299,13 @@ export function spawnGroveStreetDriveBy(cjFighter) {
       this.dead = true;
       this.hp = 0;
 
+      // Stop engine roam noise immediately
+      stopSoundBySrc('cj-carroam-noise');
+      if (this.roamSoundHandle) {
+        stopSound(this.roamSoundHandle);
+        this.roamSoundHandle = null;
+      }
+
       // Spawn grand vehicle detonation explosion with multi-layered fireball,
       // flying burning scrap metal debris, smoke plumes, scorch crater, and AOE blast damage
       spawnCarExplosion(this.x, this.y, this.angle, this.owner);
@@ -298,14 +321,39 @@ export function spawnGroveStreetDriveBy(cjFighter) {
   };
 
   initCarPass(car, fromLeft, 1);
+  car.totalRoamNoisesPlayed = 0; // Strictly capped at 2 noises total per driveByCooldown invocation
 
   state.cjDriveBys.push(car);
   cjFighter.isDriveByActive = true;
 
-  // Audio: Authentic tire screech & engine acceleration
-  audioSystem.playSFX('Assets/Sound Effects/Skills/dash2.mp3', 0.95);
-  audioSystem.playSFX('Assets/Sound Effects/Attacks/flamespray1.mp3', 0.65);
-  audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 0.90);
+  // Homies arrival voiceline pool when the car arrives (never repeat previous arrival voiceline)
+  const arrivalSounds = CONFIG.cj?.sounds?.homiesArrivalVoicelines || (
+    CONFIG.cj?.sounds?.homiesArrivalVoiceline
+      ? [CONFIG.cj.sounds.homiesArrivalVoiceline]
+      : [
+          'Assets/Sound Effects/Skills/cj-homiesarrival-voiceline.mp3',
+          'Assets/Sound Effects/Skills/cj-homiearrival-voiceline2.mp3',
+          'Assets/Sound Effects/Skills/cj-homiearrival-voiceline3.mp3',
+          'Assets/Sound Effects/Skills/cj-homiearrival-voiceline4.mp3'
+        ]
+  );
+  let arrivalSound;
+  if (Array.isArray(arrivalSounds) && arrivalSounds.length > 0) {
+    const candidates = (arrivalSounds.length > 1 && _lastGlobalArrivalVoiceline)
+      ? arrivalSounds.filter(s => s !== _lastGlobalArrivalVoiceline)
+      : arrivalSounds;
+    arrivalSound = candidates[Math.floor(Math.random() * candidates.length)];
+    _lastGlobalArrivalVoiceline = arrivalSound;
+  } else {
+    arrivalSound = arrivalSounds;
+  }
+  const arrivalVol = CONFIG.cj?.soundVolumes?.homiesArrivalVoiceline ?? 3.0;
+  audioSystem.playSFX(arrivalSound, arrivalVol);
+
+  // Car roaming engine noise
+  const roamSound = CONFIG.cj?.sounds?.carRoamNoise || 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3';
+  const roamVol = CONFIG.cj?.soundVolumes?.carRoamNoise ?? 0.8;
+  car.roamSoundHandle = audioSystem.playSFX(roamSound, roamVol);
 
   // Global screen shake on entrance
   if (typeof triggerGlobalScreenShake === 'function') {
@@ -347,7 +395,6 @@ export function updateDriveBys() {
           const nextFromLeft = !car.fromLeft; // Alternate side entrance
           initCarPass(car, nextFromLeft, car.currentPass + 1);
           audioSystem.playSFX('Assets/Sound Effects/Skills/dash2.mp3', 0.95);
-          audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 0.90);
           if (typeof triggerGlobalScreenShake === 'function') {
             triggerGlobalScreenShake(3, 4);
           }
@@ -360,6 +407,17 @@ export function updateDriveBys() {
       if (car.electricStunTimer && car.electricStunTimer > 0) car.electricStunTimer--;
       if (car.hitStunTimer && car.hitStunTimer > 0) car.hitStunTimer--;
       if (car.slowTimer && car.slowTimer > 0) car.slowTimer--;
+      if (car.purpleHitTimer && car.purpleHitTimer > 0) {
+        car.purpleHitTimer--;
+        if (car.purpleHitTimer <= 0) car.isCaughtInPurple = false;
+      }
+      if (car.pureLoveBeamTimer && car.pureLoveBeamTimer > 0) {
+        car.pureLoveBeamTimer--;
+        if (car.pureLoveBeamTimer <= 0) car.caughtInPureLoveBeam = false;
+      }
+      if (car.pureLoveBeamRecoveryTimer && car.pureLoveBeamRecoveryTimer > 0) {
+        car.pureLoveBeamRecoveryTimer--;
+      }
 
       // Auto-recovery cleanup: verify if external lock attacks are still active in the arena
       if (car.caughtInSaitamaFlurry) {
@@ -376,9 +434,24 @@ export function updateDriveBys() {
         }
       }
 
+      if (car.caughtInPureLoveBeam || (car.pureLoveBeamTimer && car.pureLoveBeamTimer > 0)) {
+        const isBeamFiring = state.fighters && state.fighters.some(f => f && (f.isFiringPureLoveBeam || f.isChannelingPureLoveBeam));
+        if (!isBeamFiring && (!car.pureLoveBeamTimer || car.pureLoveBeamTimer <= 0)) {
+          car.caughtInPureLoveBeam = false;
+        }
+      }
+
+      if (car.isCaughtInPurple || (car.purpleHitTimer && car.purpleHitTimer > 0)) {
+        const hasPurple = typeof projectileSystem !== 'undefined' && projectileSystem.projectiles && projectileSystem.projectiles.some(p => p && p.isGojoPurple);
+        if (!hasPurple && (!car.purpleHitTimer || car.purpleHitTimer <= 0)) {
+          car.isCaughtInPurple = false;
+        }
+      }
+
       if (car.isFrozenByInfinity) {
-        const hasActiveInfinity = state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && (f.infinityCooldown <= 0 || f.domainActive));
-        if (!hasActiveInfinity) {
+        if (car.timeStopTimer > 0) car.timeStopTimer--;
+        const hasActiveInfinity = state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && (f.infinityCooldown <= 0 || f.domainActive) && !f.isMeleeMode);
+        if (!hasActiveInfinity && (!car.timeStopTimer || car.timeStopTimer <= 0)) {
           car.isFrozenByInfinity = false;
         }
       }
@@ -390,7 +463,17 @@ export function updateDriveBys() {
         }
       }
 
-      // Check if vehicle is currently frozen / paused
+      // Gojo Unlimited Void Domain Expansion stasis check
+      const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive && f.hp > 0);
+      if (isGojoDomainActive) {
+        car.timeStopTimer = Math.max(car.timeStopTimer || 0, 15);
+        car.speed = 0;
+        car.targetSpeed = 0;
+        car.vx = 0;
+        car.vy = 0;
+      }
+
+      // Check if vehicle is currently frozen / paused / dragged by external beam or gravity
       const isFrozen = Boolean(
         (car.timeStopTimer && car.timeStopTimer > 0) ||
         (car.electricStunTimer && car.electricStunTimer > 0) ||
@@ -398,11 +481,25 @@ export function updateDriveBys() {
         car.isFrozenByInfinity ||
         car.frozenByCronos ||
         car.isTargetOfAmbush ||
-        car.caughtInSaitamaFlurry
+        car.caughtInSaitamaFlurry ||
+        car.isCaughtInPurple ||
+        (car.purpleHitTimer && car.purpleHitTimer > 0) ||
+        car.caughtInPureLoveBeam ||
+        (car.pureLoveBeamTimer && car.pureLoveBeamTimer > 0)
       );
 
+      // Process residual knockback decay on car position
+      if (car.knockbackVx || car.knockbackVy) {
+        car.x += car.knockbackVx;
+        car.y += car.knockbackVy;
+        car.knockbackVx *= 0.85;
+        car.knockbackVy *= 0.85;
+        if (Math.abs(car.knockbackVx) < 0.1) car.knockbackVx = 0;
+        if (Math.abs(car.knockbackVy) < 0.1) car.knockbackVy = 0;
+      }
+
       if (isFrozen) {
-        // Vehicle is temporarily frozen in place: halt movement, aiming, and firing until freeze expires
+        // Vehicle is temporarily frozen in place / controlled by external beam or vortex: halt engine steering and firing
         car.homie1Flash = 0;
         car.homie2Flash = 0;
         continue;
@@ -416,6 +513,37 @@ export function updateDriveBys() {
       if (car.homie2Recoil > 0) car.homie2Recoil = Math.max(0, car.homie2Recoil - 0.7);
       if (car.homie1Flash > 0) car.homie1Flash--;
       if (car.homie2Flash > 0) car.homie2Flash--;
+
+      // Homie Roaming Voiceline Noises (STRICTLY ONLY 2 NOISES PER DRIVEBY COOLDOWN, NEVER REPEAT PREVIOUS)
+      if ((car.phase === 'ROAMING' || car.phase === 'STAYING') && (car.totalRoamNoisesPlayed || 0) < 2) {
+        car.homieVoiceCooldown = (car.homieVoiceCooldown || 0) - 1;
+        if (car.homieVoiceCooldown <= 0) {
+          const noises = CONFIG.cj?.sounds?.homieRoamNoises || [
+            'Assets/Sound Effects/Skills/cj-homies-noise1.mp3',
+            'Assets/Sound Effects/Skills/cj-homies-noise2.mp3',
+            'Assets/Sound Effects/Skills/cj-homie-noise3.mp3',
+            'Assets/Sound Effects/Skills/cj-homie-noise4.mp3',
+            'Assets/Sound Effects/Skills/cj-homie-noise5.mp3'
+          ];
+          if (Array.isArray(noises) && noises.length > 0) {
+            // Strictly exclude the previously played noise so it NEVER repeats back-to-back
+            const previousNoise = _lastGlobalRoamNoise || car._lastHomieNoise;
+            const candidates = (noises.length > 1 && previousNoise)
+              ? noises.filter(n => n !== previousNoise)
+              : noises;
+            const selectedNoise = candidates[Math.floor(Math.random() * candidates.length)];
+            _lastGlobalRoamNoise = selectedNoise;
+            car._lastHomieNoise = selectedNoise;
+            car.totalRoamNoisesPlayed = (car.totalRoamNoisesPlayed || 0) + 1;
+
+            const noiseVol = CONFIG.cj?.soundVolumes?.homieRoamNoises ?? 3.0;
+            audioSystem.playSFX(selectedNoise, noiseVol);
+
+            // Space the 2nd noise by ~2.7s (160 frames) so it won't play immediately after the 1st
+            car.homieVoiceCooldown = 160;
+          }
+        }
+      }
 
       // Rule 6: Dynamically refresh active enemy target
       let activeTarget = car.target;
@@ -467,13 +595,20 @@ export function updateDriveBys() {
       }
 
       // ── DRIVE-BY MOVEMENT & DRIFT STATE MACHINE ──
+      const currentSpeed = (car.speed !== undefined) ? car.speed : 6.6;
+      const isMoving = currentSpeed > 0.5 && !isFrozen;
+
       if (car.phase === 'ENTERING') {
         // High-speed arrival toward the arena roaming zone
         const distToCenter = Math.hypot(arenaCenterX - car.x, arenaCenterY - car.y);
         const toAimAngle = Math.atan2(car.entryAimY - car.y, car.entryAimX - car.x);
         const angleDiff = shortestAngleDiff(toAimAngle, car.angle);
 
-        car.angle += Math.max(-0.06, Math.min(0.06, angleDiff * 0.12));
+        if (isMoving) {
+          const steerFactor = Math.min(1.0, currentSpeed / 4.0);
+          car.angle += Math.max(-0.06, Math.min(0.06, angleDiff * 0.12)) * steerFactor;
+        }
+
         car.vx = Math.cos(car.angle) * car.speed;
         car.vy = Math.sin(car.angle) * car.speed;
         car.x += car.vx;
@@ -489,6 +624,13 @@ export function updateDriveBys() {
       } else if (car.phase === 'ROAMING' || car.phase === 'CRUISING') {
         // Roam completely freely and randomly across/through the arena for driveByStayDuration
         car.stayTimer++;
+
+        // Recurring car engine roam sound
+        if (car.stayTimer % 75 === 1) {
+          const roamSound = CONFIG.cj?.sounds?.carRoamNoise || 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3';
+          const roamVol = CONFIG.cj?.soundVolumes?.carRoamNoise ?? 0.8;
+          audioSystem.playSFX(roamSound, roamVol);
+        }
 
         // 1. Pick a new random target waypoint if not set, or reached, or every ~85 frames
         const distToRoam = car.roamTarget ? Math.hypot(car.roamTarget.x - car.x, car.roamTarget.y - car.y) : 0;
@@ -508,11 +650,14 @@ export function updateDriveBys() {
         if (car.y < arena.y - extremeMargin) steerY += 2.0;
         if (car.y > arena.y + arena.height + extremeMargin) steerY -= 2.0;
 
-        // 4. Clamped steering rate to eliminate all wiggling (heavy lowrider steering)
-        const targetHeading = Math.atan2(steerY, steerX);
-        const angleDiff = shortestAngleDiff(targetHeading, car.angle);
-        const maxSteerRate = 0.055;
-        car.angle += Math.max(-maxSteerRate, Math.min(maxSteerRate, angleDiff * 0.12));
+        // 4. Clamped steering rate (ONLY steers while moving forward, never rotates on the spot when stopped)
+        if (isMoving) {
+          const targetHeading = Math.atan2(steerY, steerX);
+          const angleDiff = shortestAngleDiff(targetHeading, car.angle);
+          const maxSteerRate = 0.055;
+          const steerFactor = Math.min(1.0, currentSpeed / 4.0);
+          car.angle += Math.max(-maxSteerRate, Math.min(maxSteerRate, angleDiff * 0.12)) * steerFactor;
+        }
 
         // 5. Continuous smooth drive
         car.speed = 6.6;
@@ -521,66 +666,72 @@ export function updateDriveBys() {
         car.x += car.vx;
         car.y += car.vy;
 
-        // Drop Burnout Oil Puddle on the track at frame 60
-        if (!car.hasDroppedOil && car.stayTimer > 60) {
-          car.hasDroppedOil = true;
-          if (state.cjBurnoutPuddles) {
-            state.cjBurnoutPuddles.push({
-              x: car.x,
-              y: car.y,
-              r: cfg.driveByOilRadius || 55,
-              angle: car.angle,
-              life: cfg.driveByOilDuration || 240,
-              maxLife: cfg.driveByOilDuration || 240,
-              maxAlpha: 0.80,
-              owner: car.owner
-            });
-            audioSystem.playSFX('Assets/Sound Effects/Attacks/flamespray1.mp3', 0.70);
-            if (typeof spawnImpactFlash === 'function') {
-              spawnImpactFlash(car.x, car.y, 48, '#16A34A');
-            }
-          }
-        }
+        // ── VICTORY LAP LOGIC: If round/match is over and CJ won, keep car roaming forever! ──
+        const isRoundOver = state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || Boolean(state.missionPassedOverlay);
+        const isCjAliveWinner = Boolean(car.owner && !car.owner.dead && car.owner.hp > 0);
 
-        // Exactly when driveByStayDuration finishes, transition to EXITING
-        if (car.stayTimer >= car.stayDuration) {
+        if (isRoundOver && isCjAliveWinner) {
+          // Continuous Victory Roam! Reset timer so car never exits
+          car.stayTimer = 0;
+          car.phase = 'ROAMING';
+        } else if (car.stayTimer >= car.stayDuration) {
           car.phase = 'EXITING';
           car.exitAngle = car.angle; // Smooth exit along current forward trajectory
+          stopSoundBySrc('cj-carroam-noise');
+          if (car.roamSoundHandle) {
+            stopSound(car.roamSoundHandle);
+            car.roamSoundHandle = null;
+          }
           audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.95);
-          audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 0.90);
         }
       } else if (car.phase === 'EXITING') {
-        // Accelerate cleanly off-screen in exit direction
-        car.speed = Math.min(12.0, car.speed + 0.35);
-        if (car.exitAngle !== null && car.exitAngle !== undefined) {
-          const exitDiff = shortestAngleDiff(car.exitAngle, car.angle);
-          car.angle += exitDiff * 0.08;
-        }
+        const isRoundOver = state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || Boolean(state.missionPassedOverlay);
+        const isCjAliveWinner = Boolean(car.owner && !car.owner.dead && car.owner.hp > 0);
 
-        car.vx = Math.cos(car.angle) * car.speed;
-        car.vy = Math.sin(car.angle) * car.speed;
-        car.x += car.vx;
-        car.y += car.vy;
+        if (isRoundOver && isCjAliveWinner) {
+          // Immediately cancel exiting and switch back to victory roaming!
+          car.phase = 'ROAMING';
+          car.stayTimer = 0;
+          car.roamTarget = pickRandomArenaTarget(arena, car.x, car.y);
+        } else {
+          // Accelerate cleanly off-screen in exit direction
+          car.speed = Math.min(12.0, car.speed + 0.35);
+          if (isMoving && car.exitAngle !== null && car.exitAngle !== undefined) {
+            const exitDiff = shortestAngleDiff(car.exitAngle, car.angle);
+            const steerFactor = Math.min(1.0, currentSpeed / 4.0);
+            car.angle += exitDiff * 0.08 * steerFactor;
+          }
 
-        // Clean up when fully off-screen
-        const isFarOffscreen = (
-          car.x < arena.x - 240 ||
-          car.x > arena.x + arena.width + 240 ||
-          car.y < arena.y - 240 ||
-          car.y > arena.y + arena.height + 240
-        );
+          car.vx = Math.cos(car.angle) * car.speed;
+          car.vy = Math.sin(car.angle) * car.speed;
+          car.x += car.vx;
+          car.y += car.vy;
 
-        if (isFarOffscreen) {
-          if (car.passesRemaining > 1) {
-            // Repeat another roaming pass from the opposite side!
-            car.passesRemaining--;
-            car.phase = 'WAITING_REENTER';
-            car.reenterTimer = cfg.driveByReenterDelay || 60; // 1.0s pause before next sweep
-          } else {
-            // All passes completed
-            car.dead = true;
-            if (car.owner) {
-              car.owner.isDriveByActive = false;
+          // Clean up when fully off-screen
+          const isFarOffscreen = (
+            car.x < arena.x - 240 ||
+            car.x > arena.x + arena.width + 240 ||
+            car.y < arena.y - 240 ||
+            car.y > arena.y + arena.height + 240
+          );
+
+          if (isFarOffscreen) {
+            stopSoundBySrc('cj-carroam-noise');
+            if (car.roamSoundHandle) {
+              stopSound(car.roamSoundHandle);
+              car.roamSoundHandle = null;
+            }
+            if (car.passesRemaining > 1) {
+              // Repeat another roaming pass from the opposite side!
+              car.passesRemaining--;
+              car.phase = 'WAITING_REENTER';
+              car.reenterTimer = cfg.driveByReenterDelay || 60; // 1.0s pause before next sweep
+            } else {
+              // All passes completed
+              car.dead = true;
+              if (car.owner) {
+                car.owner.isDriveByActive = false;
+              }
             }
           }
         }
@@ -600,38 +751,30 @@ export function updateDriveBys() {
         const rightWheelX = car.x + cosA * rearDist + perpX * wheelHalfW;
         const rightWheelY = car.y + sinA * rearDist + perpY * wheelHalfW;
 
-        if (car.skidLeftTrack && car.skidLeftTrack.points) {
-          car.skidLeftTrack.points.push({ x: leftWheelX, y: leftWheelY });
-          if (car.skidLeftTrack.points.length > 70) car.skidLeftTrack.points.shift();
-        }
-        if (car.skidRightTrack && car.skidRightTrack.points) {
-          car.skidRightTrack.points.push({ x: rightWheelX, y: rightWheelY });
-          if (car.skidRightTrack.points.length > 70) car.skidRightTrack.points.shift();
+        // Throttled skid mark recording (every 4 frames) with compact buffer to eliminate FPS drops
+        if (car.timer % 4 === 0) {
+          if (car.skidLeftTrack && car.skidLeftTrack.points) {
+            car.skidLeftTrack.points.push({ x: leftWheelX, y: leftWheelY });
+            if (car.skidLeftTrack.points.length > 14) car.skidLeftTrack.points.shift();
+          }
+          if (car.skidRightTrack && car.skidRightTrack.points) {
+            car.skidRightTrack.points.push({ x: rightWheelX, y: rightWheelY });
+            if (car.skidRightTrack.points.length > 14) car.skidRightTrack.points.shift();
+          }
         }
 
-        // Billowing white tire smoke particles
-        if (state.cjTireSmoke && car.timer % 2 === 0) {
+        // Billowing white tire smoke particles (capped at 10 active particles)
+        if (state.cjTireSmoke && car.timer % 5 === 0 && state.cjTireSmoke.length < 10) {
           state.cjTireSmoke.push({
-            x: leftWheelX + (Math.random() - 0.5) * 8,
-            y: leftWheelY + (Math.random() - 0.5) * 8,
-            vx: -car.vx * 0.12 + (Math.random() - 0.5) * 1.5,
-            vy: -car.vy * 0.12 + (Math.random() - 0.5) * 1.5,
-            r: 6.0 + Math.random() * 4.0,
-            maxR: 18 + Math.random() * 8,
-            life: 26,
-            maxLife: 26,
-            maxAlpha: 0.50
-          });
-          state.cjTireSmoke.push({
-            x: rightWheelX + (Math.random() - 0.5) * 8,
-            y: rightWheelY + (Math.random() - 0.5) * 8,
-            vx: -car.vx * 0.12 + (Math.random() - 0.5) * 1.5,
-            vy: -car.vy * 0.12 + (Math.random() - 0.5) * 1.5,
-            r: 6.0 + Math.random() * 4.0,
-            maxR: 18 + Math.random() * 8,
-            life: 26,
-            maxLife: 26,
-            maxAlpha: 0.50
+            x: leftWheelX + (Math.random() - 0.5) * 4,
+            y: leftWheelY + (Math.random() - 0.5) * 4,
+            vx: -car.vx * 0.08 + (Math.random() - 0.5) * 0.8,
+            vy: -car.vy * 0.08 + (Math.random() - 0.5) * 0.8,
+            r: 5.0,
+            maxR: 14.0,
+            life: 16,
+            maxLife: 16,
+            maxAlpha: 0.35
           });
         }
       }
@@ -645,31 +788,31 @@ export function updateDriveBys() {
         const ramDamage = cfg.driveByRamDamage || 22;
         const baseKnockback = cfg.driveByRamKnockback || 18.0;
 
-        const allCandidates = [
-          ...(state.fighters || []),
-          ...(state.illusions || [])
-        ];
-
-        for (const ent of allCandidates) {
-          if (!ent || ent === car.owner || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.isAmbushing || ent.owner === car.owner) continue;
+        const _processRamCollision = (ent) => {
+          if (!ent || ent === car.owner || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.isAmbushing || ent.owner === car.owner) return;
 
           // Team check
           if (typeof state.getFighterTeam === 'function' && car.owner) {
             if (ent.owner) {
               const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
-              if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
+              if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) return;
             } else {
               const entTeam = state.getFighterTeam(state.fighters.indexOf(ent));
-              if (myTeam !== null && entTeam !== null && myTeam === entTeam) continue;
+              if (myTeam !== null && entTeam !== null && myTeam === entTeam) return;
             }
           }
 
-          // Transform enemy world position to car local coordinates (Oriented Bounding Box)
           const dx = ent.x - car.x;
           const dy = ent.y - car.y;
+          const entRadius = ent.r || 20;
+          const maxReach = halfL + entRadius;
+
+          // Fast bounding box rejection before expensive trigonometrics
+          if (Math.abs(dx) > maxReach || Math.abs(dy) > maxReach) return;
+
+          // Transform enemy world position to car local coordinates (Oriented Bounding Box)
           const localX = dx * cosA + dy * sinA;
           const localY = -dx * sinA + dy * cosA;
-          const entRadius = ent.r || 20;
 
           const clampX = Math.max(-halfL, Math.min(halfL, localX));
           const clampY = Math.max(-halfW, Math.min(halfW, localY));
@@ -677,6 +820,17 @@ export function updateDriveBys() {
 
           if (distSq < entRadius * entRadius) {
             // Collision detected!
+            const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') &&
+              !ent.isMeleeMode &&
+              ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
+            if (isGojoInfinity) {
+              if (typeof ent.triggerInfinityBlock === 'function') {
+                ent.triggerInfinityBlock(car.x, car.y, car);
+              }
+              return;
+            }
+
             const now = Date.now();
             const lastHit = ent._lastCjCarRamTime || 0;
 
@@ -734,9 +888,20 @@ export function updateDriveBys() {
 
               // Gain Respect for CJ
               if (car.owner && typeof car.owner.gainRespect === 'function') {
-                car.owner.gainRespect(4);
+                car.owner.gainRespect(cfg.driveByRamRespectGain || 4);
               }
             }
+          }
+        };
+
+        if (state.fighters) {
+          for (let fi = 0; fi < state.fighters.length; fi++) {
+            _processRamCollision(state.fighters[fi]);
+          }
+        }
+        if (state.illusions) {
+          for (let ii = 0; ii < state.illusions.length; ii++) {
+            _processRamCollision(state.illusions[ii]);
           }
         }
       }
@@ -763,22 +928,28 @@ export function updateDriveBys() {
           const homieOffsetAlongCar = isHomie1 ? (cabinX + cabinW * 0.12) : (cabinX - cabinW * 0.15);
           const homieSideOffset = car.width * 0.38;
 
-          const spawnX = car.x + cosA * homieOffsetAlongCar + perpX * homieSideOffset;
-          const spawnY = car.y + sinA * homieOffsetAlongCar + perpY * homieSideOffset;
+          const homieX = car.x + cosA * homieOffsetAlongCar + perpX * homieSideOffset;
+          const homieY = car.y + sinA * homieOffsetAlongCar + perpY * homieSideOffset;
 
           // Target aim angle with small natural spray spread
-          const rawTargetAngle = Math.atan2(activeTarget.y - spawnY, activeTarget.x - spawnX);
+          const rawTargetAngle = Math.atan2(activeTarget.y - homieY, activeTarget.x - homieX);
           const spread = (Math.random() - 0.5) * 0.08;
           const bulletAngle = rawTargetAngle + spread;
 
+          // Exact TEC-9 muzzle tip: 12.5px gun offset + (44.0 * 1.05) muzzle reach = ~58.7px along bulletAngle
+          const tec9TipDist = 58.7;
+          const spawnX = homieX + Math.cos(bulletAngle) * tec9TipDist;
+          const spawnY = homieY + Math.sin(bulletAngle) * tec9TipDist;
+
           const myIndex = state.fighters ? state.fighters.indexOf(car.owner) : 0;
+          const bSpeed = car.bulletSpeed || cfg.driveByBulletSpeed || 28.0;
           if (typeof projectileSystem !== 'undefined' && projectileSystem) {
             const p = projectileSystem.fireProjectile(
               car.owner,
               myIndex,
               car.bulletDamage,
               false,
-              car.bulletSpeed,
+              bSpeed,
               false,
               'cjUziBullet',
               spawnX,
@@ -808,92 +979,39 @@ export function updateDriveBys() {
             : 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3';
           audioSystem.playSFX(shotSfx, 0.70);
 
+          // Eject physical 9mm spent shell casings from car window dropping to arena floor
+          if (typeof spawnSpentCasing === 'function') {
+            spawnSpentCasing(homieX, homieY, bulletAngle, '9mm', 14);
+          }
+
           if (car.shotCount % 4 === 0) {
             audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3', 0.50);
           }
 
           // Visual spark bursts at muzzle
           if (typeof spawnSparks === 'function') {
-            spawnSparks(spawnX, spawnY, '#F59E0B', 3);
+            spawnSparks(spawnX, spawnY, 3, 'gold', '#F59E0B');
           }
 
           // Build Respect for CJ on successful barrage firing
           if (car.owner && typeof car.owner.gainRespect === 'function') {
-            car.owner.gainRespect(1);
+            car.owner.gainRespect(cfg.driveByBulletRespectGain || 1);
           }
         }
       }
     }
   }
 
-  // ── 2. UPDATE BURNOUT OIL PUDDLES & ENEMY SLOW DEBUFFS ──
+  // ── 2. BURNOUT OIL PUDDLES REMOVED PER USER REQUEST ──
   if (state.cjBurnoutPuddles && state.cjBurnoutPuddles.length > 0) {
-    const allCandidates = [
-      ...(state.fighters || []),
-      ...(state.illusions || [])
-    ];
-
-    for (let i = state.cjBurnoutPuddles.length - 1; i >= 0; i--) {
-      const puddle = state.cjBurnoutPuddles[i];
-      if (!puddle || puddle.life <= 0) {
-        state.cjBurnoutPuddles.splice(i, 1);
-        continue;
-      }
-
-      puddle.life--;
-
-      const myTeam = (typeof state.getFighterTeam === 'function' && puddle.owner)
-        ? state.getFighterTeam(state.fighters.indexOf(puddle.owner))
-        : null;
-
-      // Check if any enemy entities step into the burnout oil
-      for (const ent of allCandidates) {
-        if (!ent || ent === puddle.owner || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.owner === puddle.owner) continue;
-
-        if (typeof state.getFighterTeam === 'function') {
-          if (ent.owner) {
-            const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
-            if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) continue;
-          } else {
-            const entTeam = state.getFighterTeam(state.fighters.indexOf(ent));
-            if (myTeam !== null && entTeam !== null && myTeam === entTeam) continue;
-          }
-        }
-
-        const dist = Math.hypot(ent.x - puddle.x, ent.y - puddle.y);
-        if (dist <= puddle.r + (ent.r || 20)) {
-          // Apply 35% Movement Slow Debuff (speed x 0.65)
-          ent.vx = (ent.vx || 0) * 0.75;
-          ent.vy = (ent.vy || 0) * 0.75;
-
-          const now = Date.now();
-          if (!ent._lastCjOilTextTime || now - ent._lastCjOilTextTime > 1200) {
-            ent._lastCjOilTextTime = now;
-            spawnFloatingText(ent.x, ent.y - (ent.r || 20) - 14, 'SLOWED (BURNOUT)', '#EAB308');
-            audioSystem.playSFX('Assets/Sound Effects/Skills/dash4.mp3', 0.45);
-          }
-
-          // Small tire smoke wisps underfoot
-          if (Math.random() < 0.25 && state.cjTireSmoke) {
-            state.cjTireSmoke.push({
-              x: ent.x + (Math.random() - 0.5) * 10,
-              y: ent.y + (ent.r || 20) - 4,
-              vx: (Math.random() - 0.5) * 1.0,
-              vy: -0.8 - Math.random() * 0.8,
-              r: 4.5,
-              maxR: 12.0,
-              life: 18,
-              maxLife: 18,
-              maxAlpha: 0.40
-            });
-          }
-        }
-      }
-    }
+    state.cjBurnoutPuddles.length = 0;
   }
 
   // ── 3. UPDATE TIRE SMOKE PARTICLES ──
   if (state.cjTireSmoke && state.cjTireSmoke.length > 0) {
+    if (state.cjTireSmoke.length > 12) {
+      state.cjTireSmoke.splice(0, state.cjTireSmoke.length - 12);
+    }
     for (let i = state.cjTireSmoke.length - 1; i >= 0; i--) {
       const p = state.cjTireSmoke[i];
       if (!p || p.life <= 0) {
@@ -910,14 +1028,17 @@ export function updateDriveBys() {
 
   // ── 4. DECAY SKID TRACKS ──
   if (state.cjSkidTracks && state.cjSkidTracks.length > 0) {
+    if (state.cjSkidTracks.length > 12) {
+      state.cjSkidTracks.splice(0, state.cjSkidTracks.length - 12);
+    }
     for (let i = state.cjSkidTracks.length - 1; i >= 0; i--) {
       const track = state.cjSkidTracks[i];
-      if (!track || track.alpha <= 0) {
+      if (!track || track.alpha <= 0.02) {
         state.cjSkidTracks.splice(i, 1);
         continue;
       }
-      // Slow gradual fade over 400 frames
-      track.alpha -= 0.0025;
+      // Clean decay over 120 frames
+      track.alpha -= 0.008;
     }
   }
 }
@@ -937,12 +1058,6 @@ export function drawDriveByGroundEffects(ctx) {
     drawCarSkidMarks(ctx, state.cjSkidTracks);
   }
 
-  // 2. Burnout oil puddles
-  if (state.cjBurnoutPuddles && state.cjBurnoutPuddles.length > 0) {
-    for (let i = 0; i < state.cjBurnoutPuddles.length; i++) {
-      drawBurnoutOilPuddle(ctx, state.cjBurnoutPuddles[i]);
-    }
-  }
 
   // 3. Headlight illumination cones projecting onto the ground
   if (state.cjDriveBys && state.cjDriveBys.length > 0) {
@@ -1003,5 +1118,9 @@ export function clearDriveBys() {
   if (state.cjTireSmoke) state.cjTireSmoke.length = 0;
   clearBamEffects();
   clearFloatingJetpacks();
+  clearDroppedMiniguns();
   clearCarExplosions();
+  stopSoundBySrc('cj-carroam-noise');
+  _lastGlobalRoamNoise = null;
+  _lastGlobalArrivalVoiceline = null;
 }

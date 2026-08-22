@@ -22,6 +22,11 @@ import { clearHealthHud } from '../graphics/hudManager.js?v=6';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { clearDriveBys } from '../systems/cjDriveBySystem.js';
+import { clearFloatingJetpacks } from '../graphics/particles/cjFloatingJetpack.js';
+import { clearDroppedMiniguns } from '../graphics/particles/cjDroppedMinigun.js';
+import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
+import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
+import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -248,6 +253,14 @@ export function reinitFighters(isNewMatch = false) {
   burnEffectSystem.clear();
   bomberExplosionSystem.clear();
   flamewardenFlameSystem.clear();
+  clearDroppedMagazines();
+  clearDriveBys();
+  clearFloatingJetpacks();
+  clearDroppedMiniguns();
+  clearCarExplosions();
+  clearBamEffects();
+  clearHybridProjectiles();
+  clearProjectiles();
 
   if (state.floatingTexts) state.floatingTexts.length = 0;
   if (state.bloodEffects) state.bloodEffects.length = 0;
@@ -260,9 +273,12 @@ export function reinitFighters(isNewMatch = false) {
   if (state.effects) state.effects.length = 0;
   if (state.illusions) state.illusions.length = 0;
   if (state.wallCracks) state.wallCracks.length = 0;
+  if (state.thermobaricExplosions) state.thermobaricExplosions.length = 0;
+  if (state.soulSwapBeams) state.soulSwapBeams.length = 0;
   state.roundWinner = null;
   state.roundEndTimer = 0;
   state.missionPassedOverlay = null;
+  state.wastedOverlay = null;
  
   // Reset qualityLevel and screenShake on round init
   state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
@@ -544,20 +560,6 @@ export function reinitFighters(isNewMatch = false) {
 export function randomize1v1Fighters() {
   if (FIGHTER_DEFS.length < 2) return;
   
-  // DEBUG: Force Berserker (index 9) for player 1 to test axe swing
-  const FORCE_BERSERKER = true;
-  if (FORCE_BERSERKER) {
-    // Find Berserker index
-    const berserkerIdx = FIGHTER_DEFS.findIndex(d => d.id === 'berserker');
-    if (berserkerIdx !== -1) {
-      state.p1Index = berserkerIdx;
-      // Pick a random opponent
-      const otherIndices = FIGHTER_DEFS.map((_, idx) => idx).filter(idx => idx !== berserkerIdx);
-      state.p2Index = otherIndices[Math.floor(Math.random() * otherIndices.length)];
-      return;
-    }
-  }
-  
   const indices = FIGHTER_DEFS.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
@@ -624,6 +626,12 @@ export function startNextRound() {
   flamewardenFlameSystem.clear(); // Clear flame particles from previous round
   burnEffectSystem.clear();
   clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
+  clearDriveBys();
+  clearFloatingJetpacks();
+  clearDroppedMiniguns();
+  clearCarExplosions();
+  clearBamEffects();
+  clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -644,6 +652,12 @@ export function restartCurrentRound() {
   flamewardenFlameSystem.clear(); // Clear flame particles
   burnEffectSystem.clear();
   clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
+  clearDriveBys();
+  clearFloatingJetpacks();
+  clearDroppedMiniguns();
+  clearCarExplosions();
+  clearBamEffects();
+  clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -822,6 +836,11 @@ export function resetMatch() {
   burnEffectSystem.clear();
   clearDroppedMagazines(); // Clear all John Wick dropped magazines, thrown guns, and spent casings
   clearDriveBys(); // Clear all Grove Street drive-by vehicles and effects
+  clearFloatingJetpacks();
+  clearDroppedMiniguns();
+  clearCarExplosions();
+  clearBamEffects();
+  clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
   startCountdown();
 }
@@ -841,6 +860,13 @@ export function goToTitle() {
   clearHealthHud(); // Flush DOM and Map cache cleanly
   clearDroppedMagazines(); // Clear all John Wick debris
   clearDriveBys();
+  clearFloatingJetpacks();
+  clearDroppedMiniguns();
+  clearCarExplosions();
+  clearBamEffects();
+  clearHybridProjectiles();
+  clearProjectiles();
+  clearAllPools();
   
   state.gameState = 'title';
 }

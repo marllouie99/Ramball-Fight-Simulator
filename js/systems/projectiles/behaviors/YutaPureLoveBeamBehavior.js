@@ -20,7 +20,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
 
       const allTargets = [
         ...(state.fighters || []),
-        ...(state.illusions || [])
+        ...(state.illusions || []),
+        ...(state.cjDriveBys || [])
       ];
 
       // Calculate line segment for collision
@@ -46,14 +47,20 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
         if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
         
-        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
-        const isEnemy = ownerTeam === null || (entIdx !== -1 ? (state.getFighterTeam ? state.getFighterTeam(entIdx) !== ownerTeam : true) : true);
+        let isEnemy = true;
+        if (ownerTeam !== null) {
+          const checkFighter = ent.owner || ent;
+          const entIdx = state.fighters ? state.fighters.indexOf(checkFighter) : -1;
+          if (entIdx !== -1 && state.getFighterTeam) {
+            isEnemy = state.getFighterTeam(entIdx) !== ownerTeam;
+          }
+        }
         if (!isEnemy) continue;
 
         // Line-to-Circle Collision & Origin Proximity Check
         const cx = ent.x;
         const cy = ent.y;
-        const radius = ent.r || 20;
+        const radius = ent.hitRadius || ent.r || 20;
         
         const dx = endX - startX;
         const dy = endY - startY;
@@ -120,10 +127,10 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           
           const arena = state.arena || CONFIG.arena;
           const isTouchingWall = arena && (
-            (ent.x - ent.r <= arena.x + 5) ||
-            (ent.x + ent.r >= arena.x + arena.width - 5) ||
-            (ent.y - ent.r <= arena.y + 5) ||
-            (ent.y + ent.r >= arena.y + arena.height - 5)
+            (ent.x - (ent.r || 20) <= arena.x + 5) ||
+            (ent.x + (ent.r || 20) >= arena.x + arena.width - 5) ||
+            (ent.y - (ent.r || 20) <= arena.y + 5) ||
+            (ent.y + (ent.r || 20) >= arena.y + arena.height - 5)
           );
 
           if (isTouchingWall) {
@@ -134,7 +141,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           } else {
             const pushForce = p.knockback || 6;
             const pushAngle = p.angle;
-            if (ent.applyKnockback) {
+            if (typeof ent.applyKnockback === 'function') {
               ent.applyKnockback(Math.cos(pushAngle) * pushForce, Math.sin(pushAngle) * pushForce);
             } else {
               ent.vx = (ent.vx || 0) + Math.cos(pushAngle) * pushForce;
@@ -170,7 +177,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
     if (p.life <= 0) {
       const allTargets = [
         ...(state.fighters || []),
-        ...(state.illusions || [])
+        ...(state.illusions || []),
+        ...(state.cjDriveBys || [])
       ];
       for (let k = 0; k < allTargets.length; k++) {
         const ent = allTargets[k];

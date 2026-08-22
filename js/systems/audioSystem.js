@@ -130,3 +130,6 @@ class AudioEventEmitter {
 }
 
 export const audioSystem = new AudioEventEmitter();
+if (typeof window !== 'undefined') {
+  window.audioSystem = audioSystem;
+}

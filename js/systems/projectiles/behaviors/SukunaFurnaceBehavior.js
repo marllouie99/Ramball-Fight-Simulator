@@ -9,7 +9,7 @@ export class SukunaFurnaceBehavior extends ProjectileBehavior {
   static spawn(system, x, y, vx, vy, damage, ownerIndex) {
     audioSystem.playSFX('attack_fireball', 0.8);
     
-    const proj = system._getPooledProjectile();
+    const proj = system._getProjectile();
     proj.x = x;
     proj.y = y;
     proj.vx = vx;

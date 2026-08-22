@@ -11,9 +11,10 @@ export const sukunaConfig = {
     maxCritMultiplier: 1.50,          // 3.50x max crit damage multiplier cap
 
     // Reverse Cursed Technique (Passive)
-    reverseCursedTechniqueHpThreshold: 0.25,  // Triggers when HP drops to 30% or below
-    reverseCursedTechniqueHealPercent: 0.25,   // Heals 40% of max HP
+    reverseCursedTechniqueHpThreshold: 0.25,  // Triggers when HP drops to 25% or below
+    reverseCursedTechniqueHealAmount: 125,    // Flat HP healed per RCT trigger
     reverseCursedTechniqueCooldown: 700,      // 20 second cooldown before it can trigger again
+    rctRevivalHealAmount: 125,                // Flat HP restored on emergency revival
 
     // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
     slashDamage: 15,          // Base damage per Dismantle / Martial Arts strike

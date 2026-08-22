@@ -1,8 +1,6 @@
-// ─────────────────────────────────────────────
-// VISUAL TRAIL SYSTEM & ZERO-GC POOLING
-// ─────────────────────────────────────────────
-// Eliminates OBS recording sluggishness and Garbage Collection pauses
-// by replacing .splice() / .shift() with fast swap-and-pop and max capacity capping.
+import { CONFIG } from '../../core/config.js';
+import { state } from '../../core/state.js';
+import { MODE_SETTINGS, GAME_MODES } from '../../core/modeConfig.js';
 
 /**
  * Fast zero-GC array cleanup using swap-and-pop instead of Array.prototype.splice.
@@ -21,22 +19,58 @@ export function fastCleanArray(arr, updateFn) {
   }
 }
 
-export function pushTrailCap(arr, item, maxCap = 25) {
-  if (!arr) return;
+/**
+ * Returns the effective maximum afterimage capacity based on current game mode and performance state.
+ * @param {number} fallbackCap - Default fallback cap if no mode limit is configured
+ * @returns {number}
+ */
+export function getEffectiveAfterimageLimit(fallbackCap = 25) {
+  let effectiveCap = fallbackCap;
+  const curState = (typeof state !== 'undefined') ? state : (typeof window !== 'undefined' ? window.state : null);
 
-  let effectiveCap = maxCap;
-  if (typeof window !== 'undefined' && window.state) {
-    const state = window.state;
-    const fps = state.fps || 60;
-    const quality = state.qualityLevel || 1.0;
+  if (curState && curState.mode) {
+    const currentMode = curState.mode;
+
+    // Check mode settings from modeConfig.js first
+    const modeSetting = (typeof MODE_SETTINGS !== 'undefined' && MODE_SETTINGS[currentMode])
+      || (typeof MODE_SETTINGS !== 'undefined' && (
+        currentMode.includes('1v2') ? MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2] :
+        (currentMode === 'Stand Off' || currentMode === 'StandOff') ? MODE_SETTINGS[GAME_MODES.STAND_OFF] :
+        null
+      ));
+
+    if (modeSetting && modeSetting.maxAfterimages !== undefined) {
+      effectiveCap = Math.min(effectiveCap, modeSetting.maxAfterimages);
+    } else if (typeof CONFIG !== 'undefined') {
+      const is1v2 = currentMode.includes('1v2') || currentMode === '1v2' || currentMode === 'STAND_OFF_1V2';
+      const isStandOff = currentMode === 'Stand Off' || currentMode === 'StandOff' || currentMode === 'STAND_OFF';
+
+      if (is1v2 && (CONFIG.standOff1v2?.maxAfterimages !== undefined || CONFIG.oneVsTwo?.maxAfterimages !== undefined)) {
+        const limit1v2 = CONFIG.standOff1v2?.maxAfterimages ?? CONFIG.oneVsTwo?.maxAfterimages;
+        effectiveCap = Math.min(effectiveCap, limit1v2);
+      } else if (isStandOff && CONFIG.standOff?.maxAfterimages !== undefined) {
+        effectiveCap = Math.min(effectiveCap, CONFIG.standOff.maxAfterimages);
+      }
+    }
+
+    const fps = (curState.fps !== undefined && curState.fps > 0) ? curState.fps : 60;
+    const quality = (curState.qualityLevel !== undefined) ? curState.qualityLevel : 1.0;
     
     // Dynamically throttle the maximum trail size if the game loop drops below 55 FPS
     if (fps < 52 || quality < 0.75) {
-      effectiveCap = Math.max(6, Math.floor(maxCap * 0.45)); // Reduce max trail size by 55%
+      effectiveCap = Math.max(3, Math.floor(effectiveCap * 0.45)); // Reduce max trail size by 55%
     } else if (fps < 56 || quality < 0.9) {
-      effectiveCap = Math.max(10, Math.floor(maxCap * 0.7)); // Reduce max trail size by 30%
+      effectiveCap = Math.max(5, Math.floor(effectiveCap * 0.7)); // Reduce max trail size by 30%
     }
   }
+
+  return effectiveCap;
+}
+
+export function pushTrailCap(arr, item, maxCap = 25) {
+  if (!arr) return;
+
+  const effectiveCap = getEffectiveAfterimageLimit(maxCap);
 
   // Quickly trim the array down to the new target capacity using pop() to prevent memory/GC churn
   while (arr.length > effectiveCap) {
@@ -67,10 +101,14 @@ export class RingBufferTrail {
   }
 
   add(item) {
+    const effectiveMaxSize = getEffectiveAfterimageLimit(this.maxSize);
+
     this.buffer[this.head] = item;
-    this.head = (this.head + 1) % this.maxSize;
-    if (this.count < this.maxSize) {
+    this.head = (this.head + 1) % effectiveMaxSize;
+    if (this.count < effectiveMaxSize) {
       this.count++;
+    } else if (this.count > effectiveMaxSize) {
+      this.count = effectiveMaxSize;
     }
   }
 

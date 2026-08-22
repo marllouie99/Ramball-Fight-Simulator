@@ -1107,24 +1107,7 @@ export class Fighter {
 
       recordKill();
 
-      // Trigger GTA "MISSION PASSED! RESPECT +" overlay whenever CJ kills an enemy or enemy team is wiped
-      if (typeof triggerMissionPassedOverlay === 'function') {
-        const cjFighter = state.fighters && state.fighters.find(f => f && (f.characterId === 'cj' || f.type === 'cj' || (f._def && (f._def.id === 'cj' || f._def.type === 'cj'))));
-        if (cjFighter && !cjFighter.dead && cjFighter.hp > 0 && this !== cjFighter) {
-          const isCjKiller = (realAttacker === cjFighter || (realAttacker && (realAttacker.characterId === 'cj' || realAttacker.type === 'cj')));
-          const cjIdx = state.fighters.indexOf(cjFighter);
-          const dyingIdx = state.fighters.indexOf(this);
-          const cjTeam = (state.getFighterTeam && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(cjIdx) : null;
-          const dyingTeam = (state.getFighterTeam && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(dyingIdx) : null;
-          const isEnemy = (cjTeam === null || dyingTeam === null || cjTeam !== dyingTeam);
-
-          if (isCjKiller || isEnemy) {
-            triggerMissionPassedOverlay();
-          }
-        }
-      }
-
-      // Check for round/match transitions
+      // Check for round/match transitions (stopAllSounds may fire inside)
       this.checkRoundOrMatchEnd(realAttacker);
     }
     return true;

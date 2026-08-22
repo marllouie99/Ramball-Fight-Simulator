@@ -335,7 +335,8 @@ export class GojoFighter extends Fighter {
 
       this.hasUsedRCTRevival = true;
       this.isDead = false;
-      this.hp = Math.max(1, this.maxHp * (CONFIG.gojo?.rctRevivalHealPercent || 0.30));
+      const revivalAmount = CONFIG.gojo?.rctRevivalHealAmount ?? (CONFIG.gojo?.rctRevivalHealPercent ? this.maxHp * CONFIG.gojo.rctRevivalHealPercent : 150);
+      this.hp = Math.min(this.maxHp, Math.max(1, revivalAmount));
       this.invincibilityTimer = 60; // 1.0s invincibility during emergency revival
       const opponent = attacker || (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
       this._activateReverseCursedTechnique(opponent, CONFIG.arena);
@@ -387,8 +388,8 @@ export class GojoFighter extends Fighter {
       const didBounce = this.resolveWallBounce(arena);
 
       // Spawn blue afterimages for dramatic slide effect
-      if (this.afterImages && typeof this.afterImages.push === 'function') {
-        this.afterImages.push({
+      if (this.afterImages) {
+        pushTrailCap(this.afterImages, {
           x: this.x,
           y: this.y,
           angle: this.angle,
@@ -990,7 +991,8 @@ export class GojoFighter extends Fighter {
       this.rctChannelTimer--;
 
       // Gradually heal over the channel duration (0 when instant heal was already applied)
-      const healPerFrame = this._rctHealPerFrame ?? ((this.maxHp * (CONFIG.gojo?.reverseCursedTechniqueHealPercent || 0.35)) / 90);
+      const totalRctAmount = CONFIG.gojo?.reverseCursedTechniqueHealAmount ?? (CONFIG.gojo?.reverseCursedTechniqueHealPercent ? this.maxHp * CONFIG.gojo.reverseCursedTechniqueHealPercent : 125);
+      const healPerFrame = this._rctHealPerFrame ?? (totalRctAmount / 90);
       if (healPerFrame > 0) {
         this.takeDamage(-healPerFrame, this, { isHeal: true });
       }
@@ -1576,10 +1578,14 @@ export class GojoFighter extends Fighter {
     if ((this.isMeleeMode && !isBreatherState && !isDomainChanneling && !this.domainActive) || this.hp <= 0 || this.isChannelingPurple) return;
 
     const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
-    const allTargets = [...(state.fighters || []), ...(state.illusions || [])];
+    const allTargets = [
+      ...(state.fighters || []),
+      ...(state.illusions || []),
+      ...(state.cjDriveBys || [])
+    ];
 
     for (const entity of allTargets) {
-      if (!entity || entity === this || entity.hp <= 0) continue;
+      if (!entity || entity === this || entity.hp <= 0 || entity.dead) continue;
       if (entity.owner === this || (entity.team !== undefined && entity.team === this.team)) continue; // Don't block self, teammates, or own summons/illusions
 
       // Toji & Domain channelers explicitly bypass Infinity
@@ -1605,7 +1611,7 @@ export class GojoFighter extends Fighter {
       const dx = entity.x - this.x;
       const dy = entY - gojoY;
       const distSq = dx * dx + dy * dy;
-      const entRadius = entity.r || 25;
+      const entRadius = entity.hitRadius || entity.r || 25;
       const minDist = entRadius + barrierRadius;
 
       if (distSq < minDist * minDist) {
@@ -1702,6 +1708,24 @@ export class GojoFighter extends Fighter {
         }
       });
     }
+
+    // Also apply domain paralysis to Greenwood Sedan minion cars (CJ Drive-By)
+    if (state.cjDriveBys && state.cjDriveBys.length > 0) {
+      state.cjDriveBys.forEach((car) => {
+        if (car && !car.dead && car.hp > 0) {
+          if (typeof car.applyHitStun === 'function') car.applyHitStun(15);
+          else car.hitStunTimer = Math.max(car.hitStunTimer || 0, 15);
+
+          if (typeof car.applyTimeStop === 'function') car.applyTimeStop(15);
+          else car.timeStopTimer = Math.max(car.timeStopTimer || 0, 15);
+
+          car.speed = 0;
+          car.targetSpeed = 0;
+          car.vx = 0;
+          car.vy = 0;
+        }
+      });
+    }
   }
 
 
@@ -1746,8 +1770,7 @@ export class GojoFighter extends Fighter {
     // Aura timer (cooldown already locked at top of this method)
     this.healingAuraTimer = 180;  // 3 seconds healing aura
 
-    const healPercent = CONFIG.gojo?.reverseCursedTechniqueHealPercent || 0.35;
-    const totalHeal = this.maxHp * healPercent;
+    const totalHeal = CONFIG.gojo?.reverseCursedTechniqueHealAmount ?? (CONFIG.gojo?.reverseCursedTechniqueHealPercent ? this.maxHp * CONFIG.gojo.reverseCursedTechniqueHealPercent : 125);
     this._totalRctHealTarget = totalHeal;
     this._rctHealPerFrame = 0; // no per-frame ticking — heal is applied instantly below
 

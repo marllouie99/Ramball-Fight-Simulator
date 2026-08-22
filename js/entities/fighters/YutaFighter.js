@@ -1514,24 +1514,24 @@ export class YutaFighter extends Fighter {
 
     // Fire massive beam projectile originating in front of Yuta's hand
     const offsetDist = (this.r || 22) + 14;
-    projectileSystem.projectiles.push({
-      owner: state.fighters.indexOf(this),
-      x: this.x + Math.cos(this.gunAngle) * offsetDist,
-      y: this.y + Math.sin(this.gunAngle) * offsetDist,
-      vx: Math.cos(this.gunAngle) * 20, // Used for logical bounding box extension, actual velocity can be faster or instant
-      vy: Math.sin(this.gunAngle) * 20,
-      angle: this.gunAngle,
-      r: CONFIG.yuta.pureLoveBeamWidth || 170, // Beam thickness (Increased size)
-      length: CONFIG.yuta.pureLoveBeamLength || 2500, // Screen spanning
-      damage: CONFIG.yuta.pureLoveBeamDamagePerTick || 12, // per tick
-      knockback: CONFIG.yuta.pureLoveBeamKnockback || 6,
-      life: CONFIG.yuta.pureLoveBeamDuration || 60,
-      maxLife: CONFIG.yuta.pureLoveBeamDuration || 60,
-      visual: 'yuta_pure_love_beam',
-      behaviorType: 'yuta_pure_love_beam',
-      piercing: true,
-      hitTargets: new Set() // Will track hit targets per tick or clear out to hit multiple times
-    });
+    const p = projectileSystem._getProjectile();
+    p.owner = state.fighters.indexOf(this);
+    p.x = this.x + Math.cos(this.gunAngle) * offsetDist;
+    p.y = this.y + Math.sin(this.gunAngle) * offsetDist;
+    p.vx = Math.cos(this.gunAngle) * 20; // Used for logical bounding box extension, actual velocity can be faster or instant
+    p.vy = Math.sin(this.gunAngle) * 20;
+    p.angle = this.gunAngle;
+    p.r = CONFIG.yuta.pureLoveBeamWidth || 170; // Beam thickness (Increased size)
+    p.length = CONFIG.yuta.pureLoveBeamLength || 2500; // Screen spanning
+    p.damage = CONFIG.yuta.pureLoveBeamDamagePerTick || 12; // per tick
+    p.knockback = CONFIG.yuta.pureLoveBeamKnockback || 6;
+    p.life = CONFIG.yuta.pureLoveBeamDuration || 60;
+    p.maxLife = CONFIG.yuta.pureLoveBeamDuration || 60;
+    p.visual = 'yuta_pure_love_beam';
+    p.behaviorType = 'yuta_pure_love_beam';
+    p.piercing = true;
+    p.hitTargets = new Set();
+    projectileSystem.projectiles.push(p);
 
     // Massive screen shake and recoil
     triggerGlobalScreenShake(15, 60);

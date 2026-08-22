@@ -107,7 +107,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
     const ownerFighter = fighters[projectile.owner];
     const allTargets = [
       ...(state.fighters || []),
-      ...(state.illusions || [])
+      ...(state.illusions || []),
+      ...(state.cjDriveBys || [])
     ];
 
     // 1. Continuous slow + pull + paralysis effect for targets trapped in the purple orb
@@ -118,6 +119,10 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
       if (ent.owner && ent.owner === ownerFighter) continue;
       const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
       if (entIdx !== -1 && areOnSameTeam(projectile.owner, entIdx)) continue;
+      if (ent.owner) {
+        const ownerIdx = state.fighters ? state.fighters.indexOf(ent.owner) : -1;
+        if (ownerIdx !== -1 && areOnSameTeam(projectile.owner, ownerIdx)) continue;
+      }
       
       const isMahoraga = ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent.name === 'Mahoraga';
       const isPurpleAdapted = isMahoraga && (
@@ -149,8 +154,8 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           }
           
           const pullStrength = purplePullForce * (1 - dist / trapRadius);
-          ent.vx *= 0.1;
-          ent.vy *= 0.1;
+          ent.vx = (ent.vx || 0) * 0.1;
+          ent.vy = (ent.vy || 0) * 0.1;
           
           // Suppress existing knockback so they don't fling out of the orb
           if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.5;
@@ -178,15 +183,15 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ent.y += dirY * outerPullSpeed;
 
           // Dampen existing velocity and pull velocity impulse towards core
-          ent.vx = ent.vx * 0.65 + dirX * (outerPullSpeed * 0.4);
-          ent.vy = ent.vy * 0.65 + dirY * (outerPullSpeed * 0.4);
+          ent.vx = (ent.vx || 0) * 0.65 + dirX * (outerPullSpeed * 0.4);
+          ent.vy = (ent.vy || 0) * 0.65 + dirY * (outerPullSpeed * 0.4);
           if (ent.knockbackVx !== undefined) ent.knockbackVx *= 0.6;
           if (ent.knockbackVy !== undefined) ent.knockbackVy *= 0.6;
         }
       }
     }
 
-    // 2. DPS tick - damage all valid targets (fighters & illusions) trapped inside or pulled into the purple orb's radius
+    // 2. DPS tick - damage all valid targets (fighters, illusions & vehicles) trapped inside or pulled into the purple orb's radius
     projectile.purpleLastDPSTick = (projectile.purpleLastDPSTick || 0) + 1;
     if (projectile.purpleLastDPSTick >= projectile.purpleDPSInterval) {
       projectile.purpleLastDPSTick = 0;
@@ -198,6 +203,12 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const ent = allTargets[i];
         if (!ent || ent.hp <= 0 || ent === ownerFighter) continue;
         if (ent.owner && ent.owner === ownerFighter) continue;
+        const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+        if (entIdx !== -1 && areOnSameTeam(projectile.owner, entIdx)) continue;
+        if (ent.owner) {
+          const ownerIdx = state.fighters ? state.fighters.indexOf(ent.owner) : -1;
+          if (ownerIdx !== -1 && areOnSameTeam(projectile.owner, ownerIdx)) continue;
+        }
         
         const dx = ent.x - projectile.x;
         const dy = ent.y - projectile.y;

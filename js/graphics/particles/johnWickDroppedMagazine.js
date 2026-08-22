@@ -134,8 +134,8 @@ export function spawnSpentCasing(fighterX, fighterY, gunAngle = 0, casingType = 
   const is1v2 = is1v2Mode();
   const isMulti = isMultiFighterMode();
 
-  // Snappy casing limits: In 1v2 mode, strictly keep max 6 casings to eliminate any FPS drops
-  const MAX_CASINGS = is1v2 ? 6 : (isMulti ? 10 : 18);
+  // Snappy casing limits: In 1v2 mode keep max 12 casings, in 1v1 keep max 24 casings
+  const MAX_CASINGS = is1v2 ? 12 : (isMulti ? 16 : 24);
   while (state.spentCasings.length >= MAX_CASINGS) {
     state.spentCasings.shift();
   }
@@ -150,7 +150,10 @@ export function spawnSpentCasing(fighterX, fighterY, gunAngle = 0, casingType = 
   let localEjectX = r * 0.85;
   let localEjectY = facingLeft ? 5 : -5;
 
-  if (casingType === '556') {
+  if (casingType === '762minigun') {
+    localEjectX = r * 1.67 - 6.0;
+    localEjectY = facingLeft ? 12 : -12;
+  } else if (casingType === '556') {
     localEjectX = r * 0.85 + 2 * defaultWeaponScale;
     localEjectY = (facingLeft ? 5 : -5) * defaultWeaponScale;
   } else if (casingType === '12gauge') {
@@ -166,10 +169,10 @@ export function spawnSpentCasing(fighterX, fighterY, gunAngle = 0, casingType = 
 
   // Eject upwards and backward/rightward relative to gun facing
   const ejectAngle = gunAngle + (facingLeft ? Math.PI * 0.62 : -Math.PI * 0.62) + (Math.random() - 0.5) * 0.35;
-  const ejectSpeed = casingType === '556' ? (3.8 + Math.random() * 2.2) : (casingType === '12gauge' ? (4.2 + Math.random() * 2.5) : (3.2 + Math.random() * 1.8));
+  const ejectSpeed = casingType === '762minigun' ? (4.2 + Math.random() * 2.6) : (casingType === '556' ? (3.8 + Math.random() * 2.2) : (casingType === '12gauge' ? (4.2 + Math.random() * 2.5) : (3.2 + Math.random() * 1.8)));
 
-  // In 1v2 mode, shells disappear quickly (decay 0.050 = ~20 frames / ~0.3s on floor)
-  const decayRate = is1v2 ? 0.050 : (isMulti ? 0.025 : 0.012);
+  // In 1v2 mode, shells disappear quickly (decay 0.040 = ~25 frames / ~0.4s on floor)
+  const decayRate = is1v2 ? 0.040 : (isMulti ? 0.020 : 0.010);
 
   state.spentCasings.push({
     x: spawnX,
@@ -546,7 +549,37 @@ export function drawDroppedMagazines(ctx) {
         ctx.fill();
       }
 
-      if (c.casingType === '556') {
+      if (c.casingType === '762minigun') {
+        // 7.62x51mm NATO Heavy Bottleneck Minigun Brass Casing
+        ctx.fillStyle = '#F59E0B'; // Rich Deep Golden Brass
+        ctx.strokeStyle = '#78350F';
+        ctx.lineWidth = 0.55;
+        ctx.beginPath();
+        ctx.rect(-4.2, -1.5, 5.8, 3.0);
+        ctx.fill();
+        ctx.stroke();
+
+        // Tapered neck / shoulder
+        ctx.fillStyle = '#D97706';
+        ctx.beginPath();
+        ctx.moveTo(1.6, -1.5);
+        ctx.lineTo(2.6, -1.0);
+        ctx.lineTo(4.2, -1.0);
+        ctx.lineTo(4.2, 1.0);
+        ctx.lineTo(2.6, 1.0);
+        ctx.lineTo(1.6, 1.5);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Extractor groove rim at base
+        ctx.fillStyle = '#78350F';
+        ctx.fillRect(-4.8, -1.6, 0.8, 3.2);
+
+        // Specular glint
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.65)';
+        ctx.fillRect(-3.0, -1.0, 4.0, 0.7);
+      } else if (c.casingType === '556') {
         // 5.56×45mm NATO Bottleneck Rifle Casing
         // Main brass cylinder body
         ctx.fillStyle = '#EAB308'; // Polished Brass

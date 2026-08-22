@@ -8,6 +8,7 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawLaylaGoggles, drawLaylaPigtails, drawLaylaBody, drawLaylaAfterImages } from '../../graphics/fighters/laylaSkin.js';
 import { drawLaylaGun } from '../../graphics/weapons/laylaWeaponGraphics.js';
 import { spawnSparks, spawnImpactFlash } from '../../graphics/particles/sparkEffect.js';
+import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 /**
  * Layla - Cosmic Marksman
@@ -498,7 +499,8 @@ export class LaylaFighter extends Fighter {
 
     // Spawn new afterimages during speed boost or dash
     if (this.maleficBuffTimer > 0 || this.isDashing || this.voidDashCooldown > (CONFIG.layla.voidDashCooldown || 120) - 15) {
-      this.afterImages.push({
+      if (!this.afterImages) this.afterImages = [];
+      pushTrailCap(this.afterImages, {
         x: this.x,
         y: this.y,
         timer: 15,

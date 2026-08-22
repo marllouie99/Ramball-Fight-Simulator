@@ -40,20 +40,20 @@ function executeCursedSpeech(fighter) {
   // or we can just apply it directly here.
   
   // Let's spawn an expanding ring projectile to give it a hitbox
-  projectileSystem.projectiles.push({
-    owner: state.fighters.indexOf(fighter),
-    x: fighter.x,
-    y: fighter.y,
-    vx: 0,
-    vy: 0,
-    r: 10,
-    maxR: CONFIG.yuta.cursedSpeechRadius || 150,
-    damage: 0, // No damage, just CC
-    life: 20,
-    maxLife: 20,
-    visual: 'cursedSpeechWave',
-    isCursedSpeech: true
-  });
+  const p = projectileSystem._getProjectile();
+  p.owner = state.fighters.indexOf(fighter);
+  p.x = fighter.x;
+  p.y = fighter.y;
+  p.vx = 0;
+  p.vy = 0;
+  p.r = 10;
+  p.maxR = CONFIG.yuta.cursedSpeechRadius || 150;
+  p.damage = 0; // No damage, just CC
+  p.life = 20;
+  p.maxLife = 20;
+  p.visual = 'cursedSpeechWave';
+  p.isCursedSpeech = true;
+  projectileSystem.projectiles.push(p);
 }
 
 export function executeThinIceBreaker(fighter, angle) {

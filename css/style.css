@@ -1546,3 +1546,389 @@ canvas {
     opacity: 0;
   }
 }
+
+/* ─────────────────────────────────────────────
+   CJ Unique GTA San Andreas HUD Health & Skill Bars
+───────────────────────────────────────────── */
+.health-card__bar.hud-bar-cj {
+  position: relative !important;
+  width: 100% !important;
+  height: 17px !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  border: 2.5px solid #000000 !important;
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  margin: 8px 0 0 !important;
+}
+
+.health-card__bar.hud-bar-cj .health-card__fill {
+  height: 100% !important;
+  max-width: 100% !important;
+  border-radius: 0px !important;
+  background: #FFFFFF !important;
+  box-shadow: none !important;
+  position: relative !important;
+}
+
+.health-card__bar.hud-bar-cj .health-card__fill::after {
+  display: none !important;
+}
+
+.health-card__bar.hud-bar-cj .health-card__bar-text {
+  position: absolute !important;
+  right: 6px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  font-family: 'Impact', 'Arial Black', 'Trebuchet MS', 'Franklin Gothic Medium', sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.8px !important;
+  color: #000000 !important;
+  pointer-events: none !important;
+  z-index: 2 !important;
+  line-height: 1 !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0px !important;
+}
+
+.hud-skill-box.hud-skill-box-cj {
+  position: relative !important;
+  width: 100% !important;
+  height: 18px !important;
+  background: rgba(0, 0, 0, 0.45) !important;
+  border: 2.5px solid #000000 !important;
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+}
+
+.hud-skill-box.hud-skill-box-cj .hud-skill-box-fill {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  border-radius: 0px !important;
+  background: #8BB5E8 !important;
+  opacity: 1.0 !important;
+  box-shadow: none !important;
+  z-index: 1 !important;
+}
+
+.hud-skill-box.hud-skill-box-cj .hud-skill-box-text {
+  position: relative !important;
+  z-index: 2 !important;
+  font-family: 'Impact', 'Arial Black', 'Trebuchet MS', 'Franklin Gothic Medium', sans-serif !important;
+  font-size: 13px !important;
+  font-weight: 900 !important;
+  letter-spacing: 0.8px !important;
+  color: #000000 !important;
+  text-transform: uppercase !important;
+  margin-left: 6px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0px !important;
+}
+
+.hud-skill-box.hud-skill-box-cj .hud-skill-box-text .hud-num {
+  font-family: 'Impact', 'Arial Black', 'Trebuchet MS', 'Franklin Gothic Medium', sans-serif !important;
+  font-weight: 900 !important;
+  color: #000000 !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0px !important;
+}
+
+.hud-skill-box.hud-skill-box-cj.hud-skill-ready {
+  box-shadow: 0 0 6px 1px rgba(139, 181, 232, 0.8) !important;
+}
+
+/* ── CJ Custom HUD Dark Mode & Dimmed Overrides ── */
+.arena-dark-mode .health-card__bar.hud-bar-cj,
+.health-card.arena-dark-mode .health-card__bar.hud-bar-cj,
+.hud-dimmed .health-card__bar.hud-bar-cj,
+.health-card.hud-dimmed .health-card__bar.hud-bar-cj {
+  border: 2.5px solid #000000 !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  box-shadow: none !important;
+}
+
+.arena-dark-mode .health-card__bar.hud-bar-cj .health-card__fill,
+.health-card.arena-dark-mode .health-card__bar.hud-bar-cj .health-card__fill,
+.hud-dimmed .health-card__bar.hud-bar-cj .health-card__fill,
+.health-card.hud-dimmed .health-card__bar.hud-bar-cj .health-card__fill {
+  background: #FFFFFF !important;
+  box-shadow: none !important;
+}
+
+.arena-dark-mode .health-card__bar.hud-bar-cj .health-card__bar-text,
+.health-card.arena-dark-mode .health-card__bar.hud-bar-cj .health-card__bar-text,
+.hud-dimmed .health-card__bar.hud-bar-cj .health-card__bar-text,
+.health-card.hud-dimmed .health-card__bar.hud-bar-cj .health-card__bar-text {
+  color: #000000 !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0px !important;
+}
+
+.arena-dark-mode .hud-skill-box.hud-skill-box-cj,
+.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj,
+.hud-dimmed .hud-skill-box.hud-skill-box-cj,
+.health-card.hud-dimmed .hud-skill-box.hud-skill-box-cj {
+  border: 2.5px solid #000000 !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  box-shadow: none !important;
+}
+
+.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill,
+.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill,
+.hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill,
+.health-card.hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill {
+  background: #8BB5E8 !important;
+  opacity: 1.0 !important;
+  box-shadow: none !important;
+}
+
+.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-text,
+.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-text,
+.hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-text,
+.health-card.hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-text {
+  color: #000000 !important;
+  text-shadow: none !important;
+  -webkit-text-stroke: 0px !important;
+}
+
+/* ─────────────────────────────────────────────
+   CJ GTA San Andreas Complete HUD Widget
+───────────────────────────────────────────── */
+.hud-cj-gta-widget {
+  display: flex !important;
+  flex-direction: column !important;
+  width: 195px !important;
+  max-width: 195px !important;
+  margin: 1px 0 8px 0 !important;
+  box-sizing: border-box !important;
+}
+
+.hud-cj-top-row {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important;
+  margin-bottom: 2px !important;
+}
+
+.hud-cj-weapon-box {
+  flex-shrink: 0 !important;
+  width: 68px !important;
+  height: 68px !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  position: relative !important;
+  overflow: visible !important;
+  box-shadow: none !important;
+  box-sizing: border-box !important;
+}
+
+.hud-cj-weapon-icon {
+  width: 68px !important;
+  height: 68px !important;
+  object-fit: contain !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.hud-cj-weapon-ammo {
+  position: absolute !important;
+  bottom: 4px !important;
+  left: 6px !important;
+  font-family: 'Pricedown', 'Impact', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: bold !important;
+  color: #93C5FD !important; /* Authentic GTA light blue ammo text */
+  line-height: 1 !important;
+  text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 1px 2px rgba(0, 0, 0, 0.8) !important;
+  letter-spacing: 0.5px !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.hud-cj-bars-column {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+  height: 68px !important;
+  padding: 1px 0 !important;
+  box-sizing: border-box !important;
+}
+
+.hud-cj-clock-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  line-height: 1 !important;
+  height: 26px !important;
+}
+
+.hud-cj-clock-text {
+  font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
+  font-size: 30px !important;
+  font-weight: bold !important;
+  color: #FFFFFF !important; /* Authentic GTA bright white clock */
+  letter-spacing: 2px !important;
+  line-height: 1 !important;
+  text-shadow: -1.5px -1.5px 0 #000, 1.5px -1.5px 0 #000, -1.5px 1.5px 0 #000, 1.5px 1.5px 0 #000, 0 2px 3px rgba(0,0,0,0.9) !important;
+  -webkit-text-stroke: 1.2px #000000 !important;
+  user-select: none !important;
+}
+
+.hud-cj-armor-bar {
+  position: relative !important;
+  width: 100% !important;
+  height: 9px !important;
+  background: #000000 !important;
+  border: 1.5px solid #000000 !important;
+  border-radius: 0px !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.hud-cj-armor-fill {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  background: #FFFFFF !important; /* Authentic GTA White Armor bar */
+  transition: width 0.1s ease !important;
+}
+
+.health-card__bar.hud-bar-cj {
+  position: relative !important;
+  width: 100% !important;
+  height: 12px !important;
+  background: #000000 !important;
+  border: 1.5px solid #000000 !important;
+  border-radius: 0px !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+  overflow: hidden !important;
+}
+
+.health-card__bar.hud-bar-cj .health-card__fill {
+  position: absolute !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100% !important;
+  background: #DC2626 !important; /* Authentic GTA Red Health bar */
+  border-radius: 0px !important;
+  transition: width 0.1s ease !important;
+}
+
+.hud-cj-money-row {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  width: 100% !important;
+  margin: 4px 0 2px 0 !important;
+}
+
+.hud-cj-money-text {
+  font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
+  font-size: 28px !important;
+  font-weight: bold !important;
+  letter-spacing: 2px !important;
+  color: #558B37 !important; /* Authentic GTA San Andreas Cash Green */
+  line-height: 1 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85) !important;
+  -webkit-text-stroke: 0.6px #000000 !important;
+  user-select: none !important;
+  pointer-events: none !important;
+}
+
+.arena-dark-mode .hud-cj-money-text,
+.hud-dimmed .hud-cj-money-text {
+  color: #558B37 !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.85) !important;
+  -webkit-text-stroke: 0.6px #000000 !important;
+}
+
+/* ─────────────────────────────────────────────
+   CJ GTA San Andreas 6 Wanted Stars
+───────────────────────────────────────────── */
+.hud-cj-stars {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  line-height: 1 !important;
+  margin: 2px 0 0 0 !important;
+  width: 100% !important;
+}
+
+.hud-cj-star {
+  display: inline-block !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  width: 20px !important;
+  height: 20px !important;
+  transition: transform 0.22s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease !important;
+}
+
+.hud-cj-star svg {
+  width: 20px !important;
+  height: 20px !important;
+  display: block !important;
+}
+
+.hud-cj-star.empty polygon {
+  fill: #141417 !important;
+  stroke: #000000 !important;
+  stroke-width: 2px !important;
+}
+
+.hud-cj-star.filled {
+  filter: drop-shadow(0 0 3px rgba(234, 179, 8, 0.85)) !important;
+  animation: hudStarPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.hud-cj-star.filled polygon {
+  fill: #EAB308 !important; /* Authentic GTA San Andreas Gold/Amber Yellow */
+  stroke: #000000 !important;
+  stroke-width: 2px !important;
+}
+
+@keyframes hudStarPop {
+  0% {
+    transform: scale(0.6);
+  }
+  60% {
+    transform: scale(1.35);
+  }
+  100% {
+    transform: scale(1.0);
+  }
+}
+
+.arena-dark-mode .hud-cj-star.empty polygon,
+.hud-dimmed .hud-cj-star.empty polygon {
+  fill: #141417 !important;
+  stroke: #000000 !important;
+}
+
+.arena-dark-mode .hud-cj-star.filled polygon,
+.hud-dimmed .hud-cj-star.filled polygon {
+  fill: #EAB308 !important;
+  stroke: #000000 !important;
+}

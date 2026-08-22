@@ -19,8 +19,8 @@ function drawRoundEndScreen() {
     state._winnerEmbers = null;
   }
 
-  // If CJ's Mission Passed overlay is active, let it play its full smooth fade-in & out (180 frames)
-  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete));
+  // If CJ's Mission Passed or Wasted overlay is active, let it play its full smooth fade-in & out (180-200 frames)
+  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
   const displayDelay = hasMissionOverlay ? 180 : 60;
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
@@ -309,9 +309,9 @@ function drawMatchEndScreen() {
     state._winnerEmbers = null;
   }
 
-  // If CJ's Mission Passed overlay is active, let it complete its smooth fade-in & fade-out (180 frames)
+  // If CJ's Mission Passed or Wasted overlay is active, let it complete its smooth fade-in & fade-out (180-200 frames)
   // before the champion screen slowly and smoothly fades in
-  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete));
+  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
   const displayDelay = hasMissionOverlay ? 180 : 60;
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 

@@ -3,6 +3,7 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from './config.js';
 import { GAME_MODES, MODE_SETTINGS } from './modeConfig.js';
+import { audioSystem } from '../systems/audioSystem.js';
 
 // Late-bound reference – registered by projectileSystem after all modules load
 // to break the state ↔ projectileSystem circular dependency.
@@ -153,6 +154,9 @@ export const state = {
 
   // GTA San Andreas "MISSION PASSED! RESPECT +" Arena Overlay
   missionPassedOverlay: { active: false, timer: 0, maxTimer: 180, title: 'mission passed!', subtitle: 'RESPECT +' },
+
+  // GTA San Andreas "WASTED" Death Overlay
+  wastedOverlay: { active: false, timer: 0, maxTimer: 200, title: 'WASTED' },
 
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'
@@ -384,12 +388,15 @@ export function isChampionScreenActive() {
 
 export function triggerGlobalScreenShake(intensity, duration) {
   if (state.performanceMode) return;
-  if (isChampionScreenActive()) return;
+  // Allow fatal impact screen shakes during early roundEnd before podium overlay
+  if (isChampionScreenActive() && (typeof state !== 'undefined' && state.roundEndTimer > 45)) return;
 
-  const is1v2OrFFA = (typeof state !== 'undefined') && (
+  const is1v2 = (typeof state !== 'undefined') && (
     state.mode === GAME_MODES.STAND_OFF_1V2 || 
     state.mode === '1v2 Stand Off' || 
-    state.mode === '1v2' ||
+    state.mode === '1v2'
+  );
+  const isFFA = (typeof state !== 'undefined') && (
     state.mode === GAME_MODES.FFA ||
     state.mode === 'FFA'
   );
@@ -397,11 +404,21 @@ export function triggerGlobalScreenShake(intensity, duration) {
   let targetIntensity = intensity;
   let targetDuration = duration;
 
-  if (is1v2OrFFA) {
-    // In 1v2 and FFA modes: all damage types that trigger an arena shake effect have the EXACT SAME uniform,
-    // optimized intensity (3.5) and duration (6 frames) to prevent FPS drops and camera thrashing.
-    targetIntensity = 3.5;
-    targetDuration = 6;
+  const modeKey = is1v2 ? GAME_MODES.STAND_OFF_1V2 : (isFFA ? GAME_MODES.FFA : state.mode);
+  const modeSettings = (typeof MODE_SETTINGS !== 'undefined' && modeKey) ? MODE_SETTINGS[modeKey] : null;
+
+  if (is1v2) {
+    // In 1v2 mode: use the configurable arenaShakeIntensity from MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2] (defaults to 3.5)
+    targetIntensity = modeSettings?.arenaShakeIntensity ?? 3.5;
+    targetDuration = modeSettings?.arenaShakeDuration ?? 6;
+  } else if (isFFA) {
+    targetIntensity = modeSettings?.arenaShakeIntensity ?? 3.5;
+    targetDuration = modeSettings?.arenaShakeDuration ?? 6;
+  } else if (modeSettings && modeSettings.arenaShakeIntensity !== undefined) {
+    targetIntensity = modeSettings.arenaShakeIntensity;
+    if (modeSettings.arenaShakeDuration !== undefined) {
+      targetDuration = modeSettings.arenaShakeDuration;
+    }
   }
 
   const mult = (typeof CONFIG !== 'undefined' && CONFIG.globalScreenShakeIntensityMultiplier !== undefined) 
@@ -593,7 +610,6 @@ const SKILL_TEXT_WHITELIST = [
   'CHEAT ACTIVATED!',
   'HESOYAM!',
   'ROCKETMAN!',
-  'BAGUVIX!',
   'GROVE ST. DRIVE-BY!'
 ];
 
@@ -792,8 +808,22 @@ export function spawnFloatingText(x, y, text, color = '#ffffff') {
  * Triggers the GTA San Andreas "mission passed! RESPECT +" center screen overlay.
  */
 export function triggerMissionPassedOverlay(opts = {}) {
-  // If overlay is already active or playing, NEVER restart or reset its timer!
+  // Always play the respect bgmusic immediately (even if overlay already active,
+  // because stopAllSounds in round transitions may have killed the previous instance)
+  const _playRespectMusic = () => {
+    try {
+      const winMusic = (typeof CONFIG !== 'undefined' && CONFIG.cj?.sounds?.respectOverlayBgMusic) || 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3';
+      const winVol = (typeof CONFIG !== 'undefined' && CONFIG.cj?.soundVolumes?.respectOverlayBgMusic) ?? 0.8;
+      const sys = (typeof audioSystem !== 'undefined' && audioSystem) || (typeof window !== 'undefined' && window.audioSystem);
+      if (sys && typeof sys.playSFX === 'function') {
+        sys.playSFX(winMusic, winVol);
+      }
+    } catch (e) {}
+  };
+
+  // If overlay is already active, just re-play the audio (don't reset timer)
   if (state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0)) {
+    _playRespectMusic();
     return;
   }
   const duration = opts.timer || 180;
@@ -806,13 +836,41 @@ export function triggerMissionPassedOverlay(opts = {}) {
     isComplete: false,
     _lastTickFrame: -1
   };
-  try {
-    if (typeof window !== 'undefined' && window.audioSystem && typeof window.audioSystem.playSFX === 'function') {
-      window.audioSystem.playSFX('Assets/Sound Effects/Skills/enhance.mp3', 1.0);
-    }
-  } catch (e) {}
+  _playRespectMusic();
+}
+
+/**
+ * Triggers the GTA San Andreas "WASTED" center screen overlay with death music.
+ */
+export function triggerWastedOverlay(opts = {}) {
+  const _playWastedMusic = () => {
+    try {
+      const deathSound = (typeof CONFIG !== 'undefined' && CONFIG.cj?.sounds?.deathMusic) || 'Assets/Sound Effects/Skills/cj-deathmusic.mp3';
+      const deathVol = (typeof CONFIG !== 'undefined' && CONFIG.cj?.soundVolumes?.deathMusic) ?? 0.85;
+      const sys = (typeof audioSystem !== 'undefined' && audioSystem) || (typeof window !== 'undefined' && window.audioSystem);
+      if (sys && typeof sys.playSFX === 'function') {
+        sys.playSFX(deathSound, deathVol);
+      }
+    } catch (e) {}
+  };
+
+  if (state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0)) {
+    _playWastedMusic();
+    return;
+  }
+  const duration = opts.timer || 200;
+  state.wastedOverlay = {
+    active: true,
+    timer: duration,
+    maxTimer: duration,
+    title: 'WASTED',
+    isComplete: false,
+    _lastTickFrame: -1
+  };
+  _playWastedMusic();
 }
 
 state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
 window.state = state;
 window.triggerMissionPassedOverlay = triggerMissionPassedOverlay;
+window.triggerWastedOverlay = triggerWastedOverlay;

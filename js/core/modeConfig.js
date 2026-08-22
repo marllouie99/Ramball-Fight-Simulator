@@ -20,25 +20,33 @@ export const MODE_SETTINGS = {
     speedMultiplier: 1.5,
     initialFuelPickups: 2,
     supportFourFighters: false,
+    maxAfterimages: 25, // Max afterimages in normal 1v1 mode
+    afterimageDecayMultiplier: 1.0,
   },
   [GAME_MODES.STAND_OFF]: {
     label: 'Stand Off',
     rounds: 1, // Only 1 round in Stand Off
     hpMultiplier: 1.0,
     fixedHp: 2000, // 1000 HP for both fighters
-    speedMultiplier: 1.9,
+    speedMultiplier: 1.8,
     initialFuelPickups: 2,
     supportFourFighters: false,
+    maxAfterimages: 2, // Configurable limit for afterimages in 1v1 Stand Off mode
+    afterimageDecayMultiplier: 1.2,
   },
   [GAME_MODES.STAND_OFF_1V2]: {
     label: '1v2 Stand Off',
     rounds: 1,
     hpMultiplier: 1.0,
-    fixedHp: 2500, // For the duo
-    soloFixedHp: 2500, // For the alone fighter
+    fixedHp: 5000, // For the duo
+    soloFixedHp: 5000, // For the alone fighter
     speedMultiplier: 1.6,
     initialFuelPickups: 2,
+    arenaShakeIntensity: 6.5, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
+    arenaShakeDuration: 6,    // Configurable arena shake duration (in frames) for 1v2 mode
     supportFourFighters: false, // We will manually handle 3 fighters
+    maxAfterimages: 2, // Configurable limit for afterimages in 1v2 Stand Off mode
+    afterimageDecayMultiplier: 1.5,
     teamColors: {
       team0: '#ff4d4d', // Solo
       team1: '#4da3ff', // Duo
@@ -52,6 +60,8 @@ export const MODE_SETTINGS = {
     initialFuelPickups: 2,
     supportFourFighters: false,
     playerFixedHp: 500, // Configurable fixed HP for the player
+    maxAfterimages: 15,
+    afterimageDecayMultiplier: 1.0,
   },
   [GAME_MODES.TWO_VS_TWO]: {
     label: '2v2',
@@ -60,6 +70,8 @@ export const MODE_SETTINGS = {
     speedMultiplier: 1.1,
     initialFuelPickups: 3,
     supportFourFighters: true,
+    maxAfterimages: 6,
+    afterimageDecayMultiplier: 1.6,
     teamColors: {
       team0: '#ff4d4d',
       team1: '#4da3ff',
@@ -72,6 +84,8 @@ export const MODE_SETTINGS = {
     speedMultiplier: 1.5,
     initialFuelPickups: 3,
     supportFourFighters: true,
+    maxAfterimages: 6,
+    afterimageDecayMultiplier: 1.6,
   },
 };
 
@@ -85,6 +99,10 @@ export const MODE_HP_MULTIPLIER = Object.fromEntries(
 
 export const MODE_SPEED_MULTIPLIER = Object.fromEntries(
   Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.speedMultiplier])
+);
+
+export const MODE_MAX_AFTERIMAGES = Object.fromEntries(
+  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.maxAfterimages ?? 25])
 );
 
 export const MODE_TEAM_COLORS = {

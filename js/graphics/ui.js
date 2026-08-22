@@ -4,7 +4,7 @@
 
 import { renderFpsDebugOverlay } from './ui/debugOverlay.js';
 import { renderTeamHpCard } from './ui/hudRenderer.js';
-import { drawHUD, clearHealthHud, drawMissionPassedOverlay } from './hudManager.js?v=6';
+import { drawHUD, clearHealthHud, drawMissionPassedOverlay, drawWastedOverlay } from './hudManager.js?v=6';
 import { 
   handleUIMove, 
   handleUIClick, 
@@ -65,5 +65,6 @@ export {
   drawRoundEndScreen,
   drawMatchEndScreen,
   drawCountdown,
-  drawMissionPassedOverlay
+  drawMissionPassedOverlay,
+  drawWastedOverlay
 };

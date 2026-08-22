@@ -6,6 +6,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { drawDarkSlateGrayShuriken, drawDarkSlateGrayMelee } from '../../graphics/weaponVisuals.js';
+import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 /**
  * DarkSlateGray Fighter (Ninja)
@@ -167,7 +168,7 @@ export class DarkSlateGrayFighter extends Fighter {
         const zigzagDistance = (i % 2 === 0 ? 1 : -1) * (5 + i * 4);
         const offsetX = -Math.cos(moveAngle) * offsetDistance + Math.cos(perpAngle) * zigzagDistance;
         const offsetY = -Math.sin(moveAngle) * offsetDistance + Math.sin(perpAngle) * zigzagDistance;
-        this.afterimages.push({
+        pushTrailCap(this.afterimages, {
           x: this.x + offsetX,
           y: this.y + offsetY,
           radius: this.r * (1 - i * 0.1),
@@ -230,7 +231,7 @@ export class DarkSlateGrayFighter extends Fighter {
       const zigzagDistance = (i % 2 === 0 ? 1 : -1) * (5 + i * 4);
       const offsetX = -Math.cos(moveAngle) * offsetDistance + Math.cos(perpAngle) * zigzagDistance;
       const offsetY = -Math.sin(moveAngle) * offsetDistance + Math.sin(perpAngle) * zigzagDistance;
-      this.afterimages.push({
+      pushTrailCap(this.afterimages, {
         x: this.x + offsetX,
         y: this.y + offsetY,
         radius: this.r * (1 - i * 0.1),

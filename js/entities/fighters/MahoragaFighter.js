@@ -7,6 +7,7 @@ import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawMahoragaSword } from '../../graphics/weapons/mahoragaWeaponGraphics.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
+import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 // ── Refactored Mahoraga Modules ──
 import { handleAdaptationDamage, triggerAdaptation, handleInfinityFreeze, adaptToPureLoveBeam, adaptToYutaFlurry, adaptToThinIceBreaker, adaptToSoulDisfigurement, adaptToSaitamaCounter } from './mahoraga/mahoragaAdaptation.js';
@@ -890,8 +891,8 @@ export class MahoragaFighter extends Fighter {
       (!this.adaptedGenosBeam && ((this.caughtInGenosBeamTimer || 0) > 0 || this.caughtInGenosFlurry))
     );
 
-    // Rule #1 Early Exit Guard: Ambush (Toji Ambush / Saitama Serious Counter) completely freezes Mahoraga during windup!
-    if (this.isTargetOfAmbush) {
+    // Rule #1 Early Exit Guard: Freeze / Gojo Domain / Ambush / Infinity / Beam Paralysis completely freezes Mahoraga!
+    if (this.isTargetOfAmbush || isInsideGojoDomain || isFrozen || isInfinityFrozen || isBeamParalyzed) {
       this.interruptAttacks(true);
       this.isCleaving = false;
       this.isShouting = false;
@@ -904,70 +905,9 @@ export class MahoragaFighter extends Fighter {
       this.neutralStanceTimer = 0;
       this.vx = 0;
       this.vy = 0;
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      return; // MANDATORY: Complete paralyzing freeze so fighter is frozen and DOES NOT SLIDE during ambush!
-    }
-
-    if (isInsideGojoDomain || isFrozen || isInfinityFrozen || isBeamParalyzed) {
-      const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
-      const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
-      const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-      const inMeleeRange = opponent && Math.hypot(opponent.x - this.x, opponent.y - this.y) < (this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110));
-      const canAttackUnderCC = ccTenacity > 0 && inMeleeRange;
-
-      if (!canAttackUnderCC) {
-        this.interruptAttacks();
-        this.isCleaving = false;
-        this.isShouting = false;
-        this.isThrowing = false;
-        this.isBlitzActive = false;
-        this.isInfinityBlitz = false;
-      }
-
-      if (isInsideGojoDomain || isBeamParalyzed) {
-        this.adaptationPauseTimer = 0;
-        this.adaptationDashTimer = 0;
-        this._pendingCounterTarget = null;
-      }
-      this.neutralStanceTimer = 0;
-
-      if (ccTenacity > 0 && opponent && !opponent.isDead) {
-        const steerAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-        const moveSpeed = this.speed * ccTenacity;
-
-        // Combine steer velocity and knockback push so he slowly gets pushed back but keeps marching forward!
-        const steerVx = Math.cos(steerAngle) * moveSpeed;
-        const steerVy = Math.sin(steerAngle) * moveSpeed;
-        this.vx = steerVx + (this.knockbackVx || 0);
-        this.vy = steerVy + (this.knockbackVy || 0);
-
-        this.x += this.vx;
-        this.y += this.vy;
-
-        // Constrain within arena boundary
-        const arenaBounds = arena || CONFIG.arena || { x: 50, y: 50, width: 1100, height: 700 };
-        const margin = this.r || 30;
-        const minX = arenaBounds.x + margin;
-        const maxX = arenaBounds.x + (arenaBounds.width || arenaBounds.w || 1100) - margin;
-        const minY = arenaBounds.y + margin;
-        const maxY = arenaBounds.y + (arenaBounds.height || arenaBounds.h || 700) - margin;
-        this.x = Math.max(minX, Math.min(maxX, this.x));
-        this.y = Math.max(minY, Math.min(maxY, this.y));
-
-        this.aim(opponent);
-
-        // Execute melee attack if cooldown is ready and we are close enough under CC
-        if (canAttackUnderCC && (this.swordCooldown || 0) <= 0) {
-          this._performMeleeAttack(opponent);
-        }
-      } else {
-        this.vx = 0;
-        this.vy = 0;
-      }
-
-      this.applyMovementPhysics(0);
-      return; // MANDATORY: Complete paralyzing freeze while caught in Pure Love Beam, Purple, or Void!
+      if (this.knockbackVx !== undefined) this.knockbackVx = 0;
+      if (this.knockbackVy !== undefined) this.knockbackVy = 0;
+      return; // MANDATORY: Complete paralyzing freeze so fighter is frozen and DOES NOT SLIDE during domain/time-stop/infinity!
     }
 
     // ── MID-ACTION INTERRUPT FROM HOLLOW PURPLE, PURE LOVE BEAM, OR GENOS ULTIMATE ──
@@ -1165,7 +1105,7 @@ export class MahoragaFighter extends Fighter {
       }
 
       if (!this.adaptationAfterimages) this.adaptationAfterimages = [];
-      this.adaptationAfterimages.push({
+      pushTrailCap(this.adaptationAfterimages, {
         x: this.x,
         y: this.y,
         gunAngle: this.gunAngle,

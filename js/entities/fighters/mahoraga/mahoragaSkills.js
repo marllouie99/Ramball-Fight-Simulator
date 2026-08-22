@@ -11,7 +11,12 @@ import { pushTrailCap } from '../../../graphics/particles/visualTrailSystem.js';
 
 function isTeleportDisabled(fighter) {
   if (!fighter) return false;
-  if (fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return true;
+  const isInsideDomain = typeof state !== 'undefined' && (
+    state.activeDomain === 'unlimited_void' || 
+    state.domainActive === 'unlimited_void' || 
+    (state.fighters && state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo') && f.domainActive))
+  );
+  if (isInsideDomain || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0 || fighter.isFrozenByInfinity) return true;
   const caughtInBeam = fighter.caughtInPureLoveBeam || (fighter.pureLoveBeamRecoveryTimer || 0) > 0;
   return caughtInBeam && !fighter.adaptedPureLoveBeam;
 }

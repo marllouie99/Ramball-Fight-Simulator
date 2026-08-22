@@ -63,6 +63,22 @@ export const CONFIG = {
     defaultDamagePerTick: 4,                   // true damage per bleed tick
     dripParticleIntervalFrames: 5,             // frames between dripping blood particles
   },
+  /** 1v1 Stand Off Mode Settings */
+  standOff: {
+    maxAfterimages: 12,                        // Maximum active afterimages / ghost trails allowed per fighter in 1v1 Stand Off mode
+    afterimageDecayMultiplier: 1.2,            // Multiplier to accelerate afterimage fade rate in 1v1 Stand Off mode
+  },
+  /** 1v2 Mode & Stand Off 1v2 Settings */
+  standOff1v2: {
+    maxAfterimages: 8,                         // Maximum active afterimages / ghost trails allowed per fighter in 1v2 mode (reduces visual clutter & FPS drops)
+    afterimageDecayMultiplier: 1.5,            // Multiplier to accelerate afterimage fade rate in 1v2 mode
+    maxParticles: 45,                          // Max active particle cap in 1v2 mode
+    particleCountScale: 0.45,                  // Particle spawn count scale in 1v2 mode
+  },
+  oneVsTwo: {
+    maxAfterimages: 8,                         // Alias for standOff1v2.maxAfterimages
+    afterimageDecayMultiplier: 1.5,
+  },
   blackFlash: blackFlashConfig,
   hudShowFighterDescription: true, // Set to true to display fighter description in HUD card instead of skill progress bars
   basicAttackHitPauseDuration: 0, // Hit-pause duration in frames for basic attacks (0 to disable)
@@ -1296,7 +1312,7 @@ export const FIGHTER_DEFS = [
     hp: 440,
     damage: 24,
     cooldown: 18,
-    moveSpeed: cjConfig.speed || 6.0,
+    moveSpeed: cjConfig.speed || 5.5,
     projectileSpeedMultiplier: 1.0,
     ability: 'Brass Knuckles & Cheats',
     desc: 'Carl Johnson from Grove Street. Master of cheats and street brawling. Wields metallic brass knuckles, HESOYAM armor bursts, Area 69 Jetpack flight, Grove Street drive-by backup, and BAGUVIX God Mode.',

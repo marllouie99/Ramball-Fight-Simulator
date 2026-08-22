@@ -15,6 +15,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
+import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 export class TricksterFighter extends Fighter {
   constructor(def) {
@@ -356,7 +357,7 @@ export class TricksterFighter extends Fighter {
       // Spawn green afterimages (motion trails) while in rage
       if (this.rageTimer % 3 === 0) {
         if (!this.afterImages) this.afterImages = [];
-        this.afterImages.push({
+        pushTrailCap(this.afterImages, {
           x: this.x,
           y: this.y,
           gunAngle: this.gunAngle,
@@ -548,7 +549,7 @@ export class TricksterFighter extends Fighter {
             const numImages = Math.max(3, Math.floor(teleportDist / 12));
             for (let i = 0; i <= numImages; i++) {
               const t = i / numImages;
-              this.afterImages.push({
+              pushTrailCap(this.afterImages, {
                 x: oldX + (this.x - oldX) * t,
                 y: oldY + (this.y - oldY) * t,
                 timer: 15,
@@ -1060,7 +1061,7 @@ export class TricksterFighter extends Fighter {
          const numImages = Math.max(5, Math.floor(teleportDist / 12));
          for (let i = 0; i <= numImages; i++) {
            const t = i / numImages;
-           this.afterImages.push({
+           pushTrailCap(this.afterImages, {
              x: oldX + (this.x - oldX) * t,
              y: oldY + (this.y - oldY) * t,
              gunAngle: this.gunAngle,

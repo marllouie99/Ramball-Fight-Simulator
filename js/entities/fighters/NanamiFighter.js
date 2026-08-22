@@ -616,17 +616,15 @@ export class NanamiFighter extends Fighter {
       }
       if ((this.roundElapsedFrames % 8 === 0) && Math.hypot(this.vx, this.vy) > 2.5) {
         if (!this.afterImages) this.afterImages = [];
-        if (this.afterImages.length < 6) {
-          this.afterImages.push({
-            x: this.x,
-            y: this.y,
-            r: this.r || 25,
-            angle: this.angle || 0,
-            gunAngle: this.gunAngle || 0,
-            timer: 10,
-            maxTimer: 10
-          });
-        }
+        pushTrailCap(this.afterImages, {
+          x: this.x,
+          y: this.y,
+          r: this.r || 25,
+          angle: this.angle || 0,
+          gunAngle: this.gunAngle || 0,
+          timer: 10,
+          maxTimer: 10
+        });
       }
     }
 
@@ -1192,11 +1190,12 @@ export class NanamiFighter extends Fighter {
       if (dist <= hitRadius) {
         this.lungeHitEntities.add(ent);
 
-        // Gojo Limitless Infinity Guard (Rule 9)
+        // Gojo Limitless Infinity Guard
         const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') && !ent.isMeleeMode && ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
         if (isGojoInfinity) {
-          if (typeof this.applyTimeStop === 'function') this.applyTimeStop(25);
-          this.isFrozenByInfinity = true;
+          if (typeof ent.triggerInfinityBlock === 'function') {
+            ent.triggerInfinityBlock(this.x, this.y, this);
+          }
           this.interruptAttacks();
           spawnSparks(ent.x, ent.y, 10, '#00E5FF', '#FFFFFF');
           if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(2.5, 8);

@@ -536,7 +536,18 @@ export function clearAllBattleEffects() {
   // Clear WebGL particles
   bomberExplosionSystem.clear();
   burnEffectSystem.clear();
-  clearDriveBys();
+
+  // If CJ won the round/match, keep his Greenwood sedan roaming for victory celebrations!
+  const isCjWinner = Boolean(
+    state.fighters && state.fighters.some(f => {
+      const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
+      return isCj && f.hp > 0 && !f.dead;
+    })
+  );
+
+  if (!isCjWinner) {
+    clearDriveBys();
+  }
 
   // 3. Clear per-fighter attached visual effects (hitFlameWisps, afterImages, punchEffects, trails)
   if (state.fighters) {

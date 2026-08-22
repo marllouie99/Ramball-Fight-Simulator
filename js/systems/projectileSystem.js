@@ -14,6 +14,7 @@ import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnGround
 import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
 import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManager.js';
+import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -52,13 +53,123 @@ class ProjectileSystem {
   _preallocatePool() {
     for (let i = 0; i < this.poolSize; i++) {
       const p = this.pool[i];
-      p.x = 0; p.y = 0; p.vx = 0; p.vy = 0; p.r = 0; p.life = 0; p.maxLife = 0;
-      p.owner = null; p.damage = 0; p.isFollowUp = false; p.isBlackHole = false;
-      p.isFlame = false; p.isGrenade = false; p.isBomberGrenade = false; p.isC4 = false;
-      p.fadingOut = false; p._resumeVx = undefined; p._resumeVy = undefined;
-      p.isFrozenByInfinity = false; p.infinityFreezeTimer = undefined;
-      p.history = [];
+      this._resetProjectileProperties(p);
     }
+  }
+
+  _resetProjectileProperties(p) {
+    p.x = 0;
+    p.y = 0;
+    p.vx = 0;
+    p.vy = 0;
+    p.r = 0;
+    p.life = 0;
+    p.maxLife = 0;
+    p.startLife = 0;
+    p.originX = 0;
+    p.originY = 0;
+    p.baseRadius = 0;
+    p.baseSpeed = 0;
+    p.angle = 0;
+    p.length = undefined;
+    p.color = null;
+    p.owner = null;
+    p.damage = 0;
+    p.isFollowUp = false;
+    p.fadingOut = false;
+    p._resumeVx = undefined;
+    p._resumeVy = undefined;
+    p.isFrozenByInfinity = false;
+    p.infinityFreezeTimer = undefined;
+
+    // Behaviors & Visuals
+    p.behaviorType = null;
+    p.visual = null;
+    p.isBlackHole = false;
+    p.isFlame = false;
+    p.isGrenade = false;
+    p.isBomberGrenade = false;
+    p.isC4 = false;
+    p.isDeathC4 = false;
+    p.isSticky = false;
+    p.transformed = false;
+    p.transformTimer = undefined;
+    p.initialTransformTimer = undefined;
+    p.capturedByBlackHole = null;
+    p.stoppedByCronosSphere = false;
+    p.isSukunaSlash = false;
+    p.isSukunaDomainSlash = false;
+    p.isSukunaFurnace = false;
+    p.isGojoBlue = false;
+    p.isGojoPurple = false;
+    p.isGojoPurpleOrb = false;
+    p.isGojoRed = false;
+    p.isArcaneBolt = false;
+    p.isChainLightning = false;
+    p.isGetsuga = false;
+    p.isGetsugaTensho = false;
+    p.getsugaForm = undefined;
+    p.isMahitoBodyRepel = false;
+    p.isVoid = false;
+    p.isVisual = false;
+    p.isExplosion = false;
+    p.isGlassShard = false;
+    p.isPoisonSpill = false;
+    p.isExplosionFlash = false;
+    p.isExplosionFireball = false;
+    p.isExplosionShockwave = false;
+    p.isExplosionSmoke = false;
+    p.isExplosionScorch = false;
+    p.isExplosionEmber = false;
+    p.isExplosionSpark = false;
+    p.isExplosionDebris = false;
+    p.explosionType = null;
+    p._detonated = false;
+    p.ownerFighter = null;
+    p.ignoreWalls = false;
+    p.pierceWalls = false;
+    p.piercing = false;
+    p.hitTargets = null;
+    p.hitFighters = null;
+    p.purpleDPS = undefined;
+    p.purpleDPSInterval = undefined;
+    p.purpleLastDPSTick = undefined;
+    p.purpleDamagedFighters = null;
+    p.purpleShakeCounter = undefined;
+    p.isAdaptableSkillShot = false;
+    p.skillShotId = undefined;
+    p.gridIndex = undefined;
+    p.flameParticles = null;
+    p.emberParticles = null;
+    p._fugaFlameTimer = undefined;
+    p.chainCount = undefined;
+    p.isCursedSpeech = false;
+    p.isGhostBlade = false;
+    p.isShuriken = false;
+    p.isAimbot = false;
+    p.isSniper = false;
+    p.isZeus = false;
+    p.isPoison = false;
+    p.isRailgun = false;
+    p.isShurikenStuck = false;
+    p.isTurretBullet = false;
+    p.isTurretRocket = false;
+    p.aoeRadius = undefined;
+    p.slowDuration = undefined;
+    p.slowMultiplier = undefined;
+    p.markDuration = undefined;
+    p.stuckAngle = undefined;
+    p.stuckX = undefined;
+    p.stuckY = undefined;
+    p.fadeAlpha = undefined;
+    p.trailPoints = null;
+    p.trail = null;
+    p.particles = null;
+    p.maxR = undefined;
+    p.baseAngle = undefined;
+
+    if (p.history) p.history.length = 0;
+    else p.history = [];
   }
 
   /**
@@ -67,47 +178,15 @@ class ProjectileSystem {
   _getProjectile() {
     const p = this.pool[this.poolIndex];
     this.poolIndex = (this.poolIndex + 1) % this.poolSize;
+    this._resetProjectileProperties(p);
     return p;
   }
 
+  _getPooledProjectile() {
+    return this._getProjectile();
+  }
+
   _returnProjectile(proj) {
-    proj.isFlame = false;
-    proj.isBlackHole = false;
-    proj.isGrenade = false;
-    proj.isBomberGrenade = false;
-    proj.isC4 = false;
-    proj.capturedByBlackHole = null;
-    proj.stoppedByCronosSphere = false;
-    proj.fadingOut = false;
-    proj._resumeVx = undefined;
-    proj._resumeVy = undefined;
-    proj.isFrozenByInfinity = false;
-    proj.infinityFreezeTimer = undefined;
-    proj.isSukunaSlash = false;
-    
-    // Clear visual flags to fix recycle bugs (e.g., normal projectiles turning into green triangles)
-    proj.isExplosion = false;
-    proj.isGlassShard = false;
-    proj.isPoisonSpill = false;
-    proj.isExplosionFlash = false;
-    proj.isExplosionFireball = false;
-    proj.isExplosionShockwave = false;
-    proj.isExplosionSmoke = false;
-    proj.isExplosionScorch = false;
-    proj.isExplosionEmber = false;
-    proj.isExplosionSpark = false;
-    proj.isExplosionDebris = false;
-    proj.isVisual = false;
-    proj.isDeathC4 = false;
-    proj.isSticky = false;
-    proj.transformed = false;
-    proj.visual = null;
-    proj.explosionType = null;
-    proj._detonated = false; // CRITICAL: Clear detonation flag so pool slots don't carry over to new projectiles
-    proj.isMahitoBodyRepel = false;
-    proj.ownerFighter = null;
-    proj.isVoid = false;
-    
     if (proj.soundKey) {
       fadeOutLoopingSound(proj.soundKey, 500); // Smooth fade out over 0.5s when projectile dies
       proj.soundKey = null;
@@ -120,11 +199,9 @@ class ProjectileSystem {
 
     if (proj.isGojoPurple) {
       fadeOutSoundBySrc('hollowpurple', 350);
-      proj.isGojoPurple = false;
-      proj.isGojoPurpleOrb = false;
     }
     
-    if (proj.history) proj.history.length = 0;
+    this._resetProjectileProperties(proj);
   }
 
   /**
@@ -189,6 +266,14 @@ class ProjectileSystem {
       let tipDist = GUN_TIP_DIST(fighter.r);
       if (fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
         tipDist = fighter.r * 0.85 + 28 * 1.25;
+      } else if (fighter._def && fighter._def.type === 'cj') {
+        if (fighter.isBaguvixActive || fighter.isGodModeActive || fighter.previewWeaponIndex === 3) {
+          tipDist = (fighter.r * 1.67) + (56.0 * 1.15); // Exact M134 Minigun muzzle tip
+        } else if (fighter.isJetpackActive || fighter.previewWeaponIndex === 1 || fighter.previewWeaponIndex === 2) {
+          tipDist = (fighter.r * 0.96) + (39.5 * 1.05); // Exact Micro-Uzi muzzle tip (barrel reach 39.5px)
+        } else if (fighter.isTec9Active || fighter.previewWeaponIndex === 4) {
+          tipDist = 12.5 + (44.0 * 1.05); // Exact Intratec TEC-9 muzzle tip
+        }
       }
       dirX = Math.cos(fighter.gunAngle);
       dirY = Math.sin(fighter.gunAngle);
@@ -2032,7 +2117,7 @@ class ProjectileSystem {
     if (p.life <= 0) return true;
 
     // If projectile penetrates/ignores walls (e.g., CJ Drive-By bullets fired from outside or through borders)
-    if (p.ignoreWalls || p.pierceWalls || p.visual === 'cjUziBullet') {
+    if (p.ignoreWalls || p.pierceWalls || p.visual === 'cjUziBullet' || p.visual === 'cjMinigunBullet') {
       const arena = CONFIG.arena;
       const margin = 350;
       return (
@@ -3074,6 +3159,15 @@ class ProjectileSystem {
     }
     this.frozenProjectiles.length = 0;
     this.stuckShurikens.length = 0;
+
+    // Fully reset all pool instances to pristine state
+    for (let i = 0; i < this.poolSize; i++) {
+      this._resetProjectileProperties(this.pool[i]);
+    }
+    this.poolIndex = 0;
+
+    // Clear WebGL active projectile sprites
+    clearHybridProjectiles();
   }
 
   /**

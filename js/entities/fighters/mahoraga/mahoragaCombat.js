@@ -94,19 +94,7 @@ export function performMeleeAttack(fighter, opponent) {
     (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry))
   );
 
-  let isParalyzed = isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam;
-  if (isParalyzed) {
-    const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
-    const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
-    const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
-    const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-    const inMeleeRange = opponent && Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y) < (fighter.r + opponent.r + (CONFIG.mahoraga?.swordRange ?? 110));
-    
-    if (ccTenacity > 0 && inMeleeRange) {
-      isParalyzed = false; // Allow attacking under CC!
-    }
-  }
-
+  const isParalyzed = isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam || fighter.isTargetOfAmbush || fighter.isFrozenByInfinity;
   if (isParalyzed) {
     fighter.neutralStanceTimer = 0;
     fighter.adaptationDashTimer = 0;

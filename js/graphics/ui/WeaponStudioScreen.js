@@ -580,8 +580,110 @@ export function drawWeaponStudioScreen() {
     drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { mahitoCustom.weaponScale = Math.max(0.3, mahitoCustom.weaponScale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
     drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { mahitoCustom.weaponScale = Math.min(3.0, mahitoCustom.weaponScale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
 
+  } else if (activeWeaponKey === 'cj') {
+    ctx.fillText('CJ WEAPONS ARSENAL //', leftConsoleX + 14, consoleY + 12);
+    ctx.fillText('TRANSFORM METRICS //', rightConsoleX + 14, consoleY + 12);
+
+    if (state.studioCjWeaponIndex === undefined) state.studioCjWeaponIndex = 0;
+    const cjWeapons = [
+      { id: 0, label: '1. BRASS KNUCKLES', desc: 'CQC metallic cast knuckles' },
+      { id: 1, label: '2. DARPA JETPACK', desc: 'Area 69 dual rocket thrusters' },
+      { id: 2, label: '3. DUAL MICRO-UZIS', desc: '9mm submachine guns' },
+      { id: 3, label: '4. M134 MINIGUN', desc: '6-barrel Gatling minigun' },
+      { id: 4, label: '5. INTRATEC TEC-9', desc: 'Skill 3 Drive-By submachine gun' }
+    ];
+
+    cjWeapons.forEach((w) => {
+      const cardY = consoleY + 30 + w.id * 46;
+      const cardW = leftConsoleW - 24;
+      const cardH = 40;
+      const cardX = leftConsoleX + 12;
+      const isSelected = state.studioCjWeaponIndex === w.id;
+
+      ctx.save();
+      if (isSelected) {
+        ctx.fillStyle = 'rgba(22, 163, 74, 0.22)';
+        ctx.strokeStyle = '#16a34a';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+        ctx.lineWidth = 1;
+      }
+      drawChamferedRect(ctx, cardX, cardY, cardW, cardH, 5);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      ctx.fillStyle = isSelected ? '#ffffff' : '#94a3b8';
+      ctx.font = '900 10px "Rajdhani", sans-serif';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      ctx.fillText(w.label, cardX + 10, cardY + 6);
+
+      ctx.fillStyle = isSelected ? '#4ade80' : '#64748b';
+      ctx.font = '900 8.5px "Rajdhani", sans-serif';
+      ctx.fillText(w.desc, cardX + 10, cardY + 21);
+
+      _registerButton(cardX, cardY, cardW, cardH, () => {
+        state.studioCjWeaponIndex = w.id;
+      });
+    });
+
+    const custom = state.weaponCustomizations.cj || { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+    let curY = consoleY + 34;
+
+    const modeW = Math.floor((rightConsoleW - 36) / 2);
+    const isPosMode = (state.studioSelectedDetail !== 'scale_angle');
+
+    drawButton('📍 POSITION', rightConsoleX + 14 + modeW / 2, curY + 10, () => {
+      state.studioSelectedDetail = 'position';
+    }, modeW, 22, isPosMode ? '#16a34a' : null, 3);
+
+    drawButton('📐 SCALE & ROT', rightConsoleX + 22 + modeW + modeW / 2, curY + 10, () => {
+      state.studioSelectedDetail = 'scale_angle';
+    }, modeW, 22, !isPosMode ? '#16a34a' : null, 3);
+
+    curY += 40;
+
+    if (isPosMode) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11.5px "Rajdhani", sans-serif';
+      ctx.fillText(`OFFSET X: ${Math.round(custom.offsetX)}px`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.offsetX -= 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.offsetX += 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 36;
+
+      ctx.fillText(`OFFSET Y: ${Math.round(custom.offsetY)}px`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.offsetY -= 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.offsetY += 2.0; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 36;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('DRAG TEAL HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+      ctx.fillText('FOR REAL-TIME POSITIONING', rightConsoleX + 14, curY + 26);
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11.5px "Rajdhani", sans-serif';
+      ctx.fillText(`SCALE: ${custom.scale.toFixed(2)}x`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.scale = Math.max(0.3, custom.scale - 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.scale = Math.min(3.0, custom.scale + 0.05); saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 36;
+
+      const deg = Math.round(custom.angleOffset * (180 / Math.PI));
+      ctx.fillText(`ROTATION: ${deg}°`, rightConsoleX + 14, curY + 4);
+      drawButton('−', rightConsoleX + rightConsoleW - 54, curY + 8, () => { custom.angleOffset -= 0.05; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      drawButton('+', rightConsoleX + rightConsoleW - 26, curY + 8, () => { custom.angleOffset += 0.05; saveWeaponCustomizations(); }, 22, 18, null, 2);
+      curY += 36;
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '900 9.5px "Rajdhani", sans-serif';
+      ctx.fillText('DRAG AMBER HANDLE IN VIEWPORT', rightConsoleX + 14, curY + 10);
+      ctx.fillText('FOR REAL-TIME ROTATION & SCALE', rightConsoleX + 14, curY + 26);
+    }
   } else {
-    // Non-Mahito Weapons Console
+    // Non-Mahito / Non-CJ Weapons Console
     ctx.fillText('CALIBRATION MODE //', leftConsoleX + 14, consoleY + 12);
     ctx.fillText('TRANSFORM METRICS //', rightConsoleX + 14, consoleY + 12);
 

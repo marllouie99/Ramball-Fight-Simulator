@@ -4,7 +4,7 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
   drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawHUD, 
-  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay
+  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
 } from '../graphics/ui.js';
 import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
@@ -16,7 +16,9 @@ import {
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
-  drawFloatingJetpacks, updateFloatingJetpacks
+  drawFloatingJetpacks, updateFloatingJetpacks,
+  drawDroppedMiniguns, updateDroppedMiniguns,
+  drawCjSanAndreasAtmosphere
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -191,6 +193,9 @@ export function renderGame() {
       }
 
       try {
+        // ── GTA SAN ANDREAS ATMOSPHERIC VIBE FILTER (Warm Los Santos golden hour haze) ──
+        drawCjSanAndreasAtmosphere();
+
         // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Rendered behind fighters so fighters stay un-tinted) ──
         drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
         updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
@@ -268,6 +273,8 @@ export function renderGame() {
         drawDroppedMagazines(state.ctx); // Draw John Wick dropped magazines on the arena floor
         updateFloatingJetpacks();
         drawFloatingJetpacks(state.ctx); // Draw CJ dropped 360 rotating floating Jetpack pickups on the arena floor
+        updateDroppedMiniguns();
+        drawDroppedMiniguns(state.ctx); // Draw CJ dropped overheated Minigun on the arena floor
         drawSparkEffects(); // Draw spark effects on top of everything
         drawBamEffects(state.ctx); // Draw comic BAM! impact effects on top of collisions
         drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact
@@ -350,8 +357,9 @@ export function renderGame() {
         drawMatchEndScreen();
       }
 
-      // Render GTA San Andreas "mission passed! RESPECT +" overlay on top level before champion reveal
+      // Render GTA San Andreas "mission passed! RESPECT +" and "WASTED" overlays on top level before champion reveal
       drawMissionPassedOverlay(state.topLevelUiCtx || state.ctx);
+      drawWastedOverlay(state.topLevelUiCtx || state.ctx);
 
       // Restore original context and canvas
       state.ctx = originalCtx;

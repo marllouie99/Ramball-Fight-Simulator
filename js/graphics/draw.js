@@ -4,6 +4,7 @@ export { drawFighters, drawIllusions } from './renderers/EntityRenderer.js';
 export { drawDriveBys, drawDriveByGroundEffects } from '../systems/cjDriveBySystem.js';
 export { drawBamEffects, spawnBamEffect, updateBamEffects, clearBamEffects } from './particles/bamImpactEffect.js';
 export { drawFloatingJetpacks, spawnDroppedJetpack, updateFloatingJetpacks, clearFloatingJetpacks } from './particles/cjFloatingJetpack.js';
+export { drawDroppedMiniguns, spawnDroppedMinigun, updateDroppedMiniguns, clearDroppedMiniguns } from './particles/cjDroppedMinigun.js';
 export { drawCarExplosions, drawCarScorchMarks, spawnCarExplosion, updateCarExplosions, clearCarExplosions } from './particles/cjCarExplosion.js';
 // ——————————————————————————————————————————————————————
 // DRAW — ARENA
@@ -35,7 +36,7 @@ import { projectileSystem } from '../systems/projectileSystem.js';
 import { drawThunderboltShape } from './weapons/zeusWeaponGraphics.js';
 import { drawLapseBlueOrb, drawGojoOrb, drawPurpleOrbTrail } from './weapons/gojoWeaponGraphics.js';
 import { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen } from './renderers/arenaRenderer.js';
-import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay } from './renderers/environmentalRenderer.js';
+import { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere } from './renderers/environmentalRenderer.js';
 import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
@@ -64,7 +65,7 @@ export function getNow() {
 }
 
 export { drawDivineFlameArrowConstruct };
-export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay };
+export { drawStormDimScreen, drawFurnaceDimScreen, drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawCjSanAndreasAtmosphere };
 export { drawArena, drawPurpleDimScreen, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen, drawSaitamaSeriousPunchDimScreen, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen };
 export { drawDeathEffects, drawDoppelgangerDeathEffects, drawBloodEffects, drawDroppedMagazines, drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, drawSparkEffects };
 export { drawGenosSelfDestructDimScreen };

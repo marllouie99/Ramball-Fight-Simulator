@@ -109,8 +109,8 @@ export function spawnCarExplosion(x, y, carAngle = 0, owner = null) {
 
   // ── 5. AUDIO BLAST & SCREEN SHAKE ──
   audioSystem.playSFX('Assets/Sound Effects/Attacks/groundSmash.mp3', 1.0);
-  audioSystem.playSFX('Assets/Sound Effects/Skills/fugaexplosion.mp3', 0.95);
-  audioSystem.playSFX('Assets/Sound Effects/Skills/fugaignite.mp3', 0.85);
+  audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.95);
+  audioSystem.playSFX('Assets/Sound Effects/Skills/machinebroken.mp3', 0.80);
 
   if (typeof triggerGlobalScreenShake === 'function') {
     triggerGlobalScreenShake(12, 12);
@@ -121,9 +121,9 @@ export function spawnCarExplosion(x, y, carAngle = 0, owner = null) {
     spawnImpactFlash(posX, posY, 55, '#FEF08A');
   }
   if (typeof spawnSparks === 'function') {
-    spawnSparks(posX, posY, '#F97316', 24);
-    spawnSparks(posX, posY, '#FBBF24', 20);
-    spawnSparks(posX, posY, '#374151', 16);
+    spawnSparks(posX, posY, 24, 'orange', '#F97316');
+    spawnSparks(posX, posY, 20, 'gold', '#FBBF24');
+    spawnSparks(posX, posY, 16, 'crimson', '#374151');
   }
 
   // ── 6. RULE 6 UNIFIED QUERY: VEHICLE DETONATION AOE DAMAGE & KNOCKBACK ──
@@ -157,6 +157,17 @@ export function spawnCarExplosion(x, y, carAngle = 0, owner = null) {
     const dist = Math.hypot(dx, dy);
 
     if (dist <= aoeRadius + (ent.r || 20)) {
+      const isGojoInfinity = (ent.characterId === 'gojo' || ent.type === 'gojo') &&
+        !ent.isMeleeMode &&
+        ((ent.infinityCooldown || 0) <= 0 || ent.infinityActive);
+
+      if (isGojoInfinity) {
+        if (typeof ent.triggerInfinityBlock === 'function') {
+          ent.triggerInfinityBlock(posX, posY, owner);
+        }
+        continue; // Explosion shockwave cannot penetrate Limitless Infinity!
+      }
+
       // Deal explosion damage
       if (typeof ent.takeDamage === 'function') {
         ent.takeDamage(aoeDamage, owner || null, { isSkill: true });
@@ -173,7 +184,7 @@ export function spawnCarExplosion(x, y, carAngle = 0, owner = null) {
         spawnImpactFlash(ent.x, ent.y, 35, '#EF4444');
       }
       if (typeof spawnSparks === 'function') {
-        spawnSparks(ent.x, ent.y, '#F97316', 10);
+        spawnSparks(ent.x, ent.y, 10, 'orange', '#F97316');
       }
     }
   }
@@ -249,8 +260,32 @@ export function updateCarExplosions() {
   }
 }
 
+let _cachedExplosionSmokeGrad = null;
+let _cachedScorchGrad = null;
+
+function _getExplosionSmokeGrad(ctx) {
+  if (!_cachedExplosionSmokeGrad) {
+    _cachedExplosionSmokeGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 32);
+    _cachedExplosionSmokeGrad.addColorStop(0, 'rgba(24, 24, 27, 0.85)');
+    _cachedExplosionSmokeGrad.addColorStop(0.65, 'rgba(39, 39, 42, 0.45)');
+    _cachedExplosionSmokeGrad.addColorStop(1, 'rgba(9, 9, 11, 0)');
+  }
+  return _cachedExplosionSmokeGrad;
+}
+
+function _getScorchGrad(ctx) {
+  if (!_cachedScorchGrad) {
+    _cachedScorchGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, 60);
+    _cachedScorchGrad.addColorStop(0, 'rgba(12, 12, 14, 0.95)');
+    _cachedScorchGrad.addColorStop(0.5, 'rgba(24, 24, 27, 0.75)');
+    _cachedScorchGrad.addColorStop(0.85, 'rgba(39, 39, 42, 0.35)');
+    _cachedScorchGrad.addColorStop(1, 'rgba(15, 15, 20, 0)');
+  }
+  return _cachedScorchGrad;
+}
+
 /**
- * Draws ground scorch marks left by car explosions
+ * Draws ground scorch marks left by car explosions (Cached high-performance)
  */
 export function drawCarScorchMarks(ctx) {
   if (typeof state === 'undefined' || !state.cjCarScorchMarks || state.cjCarScorchMarks.length === 0) return;
@@ -263,18 +298,13 @@ export function drawCarScorchMarks(ctx) {
     ctx.save();
     ctx.translate(sc.x, sc.y);
     ctx.rotate(sc.angle);
-    ctx.scale(1.25, 0.75); // Elongated vehicle footprint
+    ctx.scale((sc.radius / 60) * 1.25, (sc.radius / 60) * 0.75); // Elongated vehicle footprint
 
-    // Burnt charcoal crater gradient
-    const scorchGrad = ctx.createRadialGradient(0, 0, 4, 0, 0, sc.radius);
-    scorchGrad.addColorStop(0, `rgba(12, 12, 14, ${(sc.alpha * 0.95).toFixed(3)})`);
-    scorchGrad.addColorStop(0.5, `rgba(24, 24, 27, ${(sc.alpha * 0.75).toFixed(3)})`);
-    scorchGrad.addColorStop(0.85, `rgba(39, 39, 42, ${(sc.alpha * 0.35).toFixed(3)})`);
-    scorchGrad.addColorStop(1, 'rgba(15, 15, 20, 0)');
-
-    ctx.fillStyle = scorchGrad;
+    // Burnt charcoal crater gradient (Cached)
+    ctx.globalAlpha = sc.alpha;
+    ctx.fillStyle = _getScorchGrad(ctx);
     ctx.beginPath();
-    ctx.arc(0, 0, sc.radius, 0, Math.PI * 2);
+    ctx.arc(0, 0, 60, 0, Math.PI * 2);
     ctx.fill();
 
     // Lingering incandescent glowing ember sparks
@@ -294,7 +324,7 @@ export function drawCarScorchMarks(ctx) {
 }
 
 /**
- * Draws active car explosions, fireballs, shockwaves, smoke, and flying shrapnel
+ * Draws active car explosions, fireballs, shockwaves, smoke, and flying shrapnel (Cached high-performance)
  */
 export function drawCarExplosions(ctx) {
   if (typeof state === 'undefined' || !state.cjCarExplosions || state.cjCarExplosions.length === 0) return;
@@ -307,19 +337,20 @@ export function drawCarExplosions(ctx) {
 
     const p = exp.timer / exp.maxTimer;
 
-    // ── 1. BILLOWING VOLUMETRIC SMOKE PLUMES ──
+    // ── 1. BILLOWING VOLUMETRIC SMOKE PLUMES (Cached) ──
     if (exp.smokePuffs && exp.smokePuffs.length > 0) {
       for (const smk of exp.smokePuffs) {
         const smkAlpha = Math.min(0.75, (smk.life / smk.maxLife) * 0.75);
-        const smkGrad = ctx.createRadialGradient(smk.x, smk.y, 2, smk.x, smk.y, smk.radius);
-        smkGrad.addColorStop(0, `rgba(24, 24, 27, ${(smkAlpha * 0.9).toFixed(3)})`);
-        smkGrad.addColorStop(0.65, `rgba(39, 39, 42, ${(smkAlpha * 0.5).toFixed(3)})`);
-        smkGrad.addColorStop(1, 'rgba(9, 9, 11, 0)');
 
-        ctx.fillStyle = smkGrad;
+        ctx.save();
+        ctx.translate(smk.x, smk.y);
+        ctx.scale(smk.radius / 32, smk.radius / 32);
+        ctx.globalAlpha = smkAlpha;
+        ctx.fillStyle = _getExplosionSmokeGrad(ctx);
         ctx.beginPath();
-        ctx.arc(smk.x, smk.y, smk.radius, 0, Math.PI * 2);
+        ctx.arc(0, 0, 32, 0, Math.PI * 2);
         ctx.fill();
+        ctx.restore();
       }
     }
 

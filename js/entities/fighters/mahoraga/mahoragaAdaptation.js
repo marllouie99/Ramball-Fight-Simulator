@@ -528,7 +528,8 @@ export function handleInfinityFreeze(fighter) {
     fighter.isFrozenByInfinity = true;
     fighter.vx = 0;
     fighter.vy = 0;
-    fighter.applyMovementPhysics(0);
+    if (fighter.knockbackVx !== undefined) fighter.knockbackVx = 0;
+    if (fighter.knockbackVy !== undefined) fighter.knockbackVy = 0;
     return true; // Frozen — caller should return early
   } else {
     fighter.isFrozenByInfinity = false;

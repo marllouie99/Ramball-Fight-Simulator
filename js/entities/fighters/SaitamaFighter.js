@@ -4,7 +4,7 @@ import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/s
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnPunchWindSpeedLines, spawnSaitamaCounterFrontalBlast } from '../../graphics/particles/sparkEffect.js';
 import { drawSaitamaSkin } from '../../graphics/fighters/saitamaSkin.js';
-import { fastCleanArray } from '../../graphics/particles/visualTrailSystem.js';
+import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 import { fadeOutSound } from '../../systems/soundSystem.js';
 
 /**
@@ -233,7 +233,7 @@ export class SaitamaFighter extends Fighter {
     const steps = Math.min(10, Math.max(3, Math.floor(dodgeDist / 25)));
     for (let i = 0; i <= steps; i++) {
       const p = i / steps;
-      this.afterImages.push({
+      pushTrailCap(this.afterImages, {
         x: oldX + (this.x - oldX) * p,
         y: oldY + (this.y - oldY) * p,
         r: this.r,
@@ -407,6 +407,7 @@ export class SaitamaFighter extends Fighter {
     if (typeof this.aim === 'function') {
       this.aim(target);
     }
+    this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
 
     // Spawn ghost model skin afterimages along teleport trajectory dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
@@ -415,7 +416,7 @@ export class SaitamaFighter extends Fighter {
     for (let i = 0; i <= steps; i++) {
       const p = i / steps;
       const duration = 22 + Math.floor(p * 8);
-      this.afterImages.push({
+      pushTrailCap(this.afterImages, {
         x: oldX + (this.x - oldX) * p,
         y: oldY + (this.y - oldY) * p,
         r: this.r,
@@ -578,55 +579,56 @@ export class SaitamaFighter extends Fighter {
         }
       }
 
-      if (!target || target.hp <= 0) return; // Target died during wind-up
-
-      // Floating text
-      if (typeof spawnFloatingText === 'function') {
-        spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
-      }
-
       // Clear punchAnimTimer so _postCounterRecoveryTimer solely drives the single unified punch follow-through
       this.punchAnimTimer = 0;
 
-      const pushAngle = this.gunAngle !== undefined ? this.gunAngle : 0;
+      const pushAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || (this._counterAimAngle !== undefined ? this._counterAimAngle : 0));
+      this._counterAimAngle = pushAngle;
       const fistX = this.x + Math.cos(pushAngle) * (this.r + 15);
       const fistY = this.y + Math.sin(pushAngle) * (this.r + 15);
 
-      // Massive Counter Punch Damage (1000 damage) to primary target — bypasses Limitless Infinity barrier & all evasion/dodge mechanics
-      const massiveDamage = CONFIG.saitama?.counterPunchDamage || 1000;
-      applyDamageToTarget(target, massiveDamage, this, { 
-        isSkill: true, 
-        isCounter: true, 
-        isCritical: true, 
-        bypassShield: true, 
-        isSaitamaCounter: true,
-        bypassEvade: true,
-        undodgeable: true,
-        isGuaranteedHit: true,
-        isTrueDamage: true
-      });
+      if (target && target.hp > 0) {
+        // Floating text
+        if (typeof spawnFloatingText === 'function') {
+          spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
+        }
 
-      // Heavy directional knockback push toward Saitama's facing angle
-      const knockbackForce = CONFIG.saitama?.counterPunchKnockback || 55;
-      const kx = Math.cos(pushAngle) * knockbackForce;
-      const ky = Math.sin(pushAngle) * knockbackForce;
-      
-      target.vx = kx;
-      target.vy = ky;
-      if (typeof target.applyKnockback === 'function') {
-        target.applyKnockback(kx, ky);
-      }
+        // Massive Counter Punch Damage (1000 damage) to primary target — bypasses Limitless Infinity barrier & all evasion/dodge mechanics
+        const massiveDamage = CONFIG.saitama?.counterPunchDamage || 1000;
+        applyDamageToTarget(target, massiveDamage, this, { 
+          isSkill: true, 
+          isCounter: true, 
+          isCritical: true, 
+          bypassShield: true, 
+          isSaitamaCounter: true,
+          bypassEvade: true,
+          undodgeable: true,
+          isGuaranteedHit: true,
+          isTrueDamage: true
+        });
 
-      // Slow movement debuff — the enemy staggers after taking the massive punch
-      const slowFrames = CONFIG.saitama?.counterPunchSlowFrames ?? 120;    // ~2s
-      const slowMult = CONFIG.saitama?.counterPunchSlowMultiplier ?? 0.35; // 35% speed
-      target.saitamaCounterDebuffTimer = slowFrames;
-      target.saitamaCounterAttacker = this;
-      if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
-        target.statusEffects.applySlow(slowFrames, slowMult);
-      } else {
-        target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
-        target.slowMultiplier = slowMult;
+        // Heavy directional knockback push toward Saitama's facing angle
+        const knockbackForce = CONFIG.saitama?.counterPunchKnockback || 55;
+        const kx = Math.cos(pushAngle) * knockbackForce;
+        const ky = Math.sin(pushAngle) * knockbackForce;
+        
+        target.vx = kx;
+        target.vy = ky;
+        if (typeof target.applyKnockback === 'function') {
+          target.applyKnockback(kx, ky);
+        }
+
+        // Slow movement debuff — the enemy staggers after taking the massive punch
+        const slowFrames = CONFIG.saitama?.counterPunchSlowFrames ?? 120;    // ~2s
+        const slowMult = CONFIG.saitama?.counterPunchSlowMultiplier ?? 0.35; // 35% speed
+        target.saitamaCounterDebuffTimer = slowFrames;
+        target.saitamaCounterAttacker = this;
+        if (target.statusEffects && typeof target.statusEffects.applySlow === 'function') {
+          target.statusEffects.applySlow(slowFrames, slowMult);
+        } else {
+          target.slowTimer = Math.max(target.slowTimer || 0, slowFrames);
+          target.slowMultiplier = slowMult;
+        }
       }
 
       // ── Wide Long Frontal Multi-Target Shockwave Corridor (Death Punch Canyon) ──
@@ -732,13 +734,19 @@ export class SaitamaFighter extends Fighter {
         triggerGlobalScreenShake(shakeIntensity, shakeFrames);
       }
       if (typeof spawnAnimePunchImpactFrame === 'function') {
-        spawnAnimePunchImpactFrame(target.x, target.y, 85, pushAngle, 'gold');
+        const impactTargetX = (target && target.x !== undefined) ? target.x : (fistX + Math.cos(pushAngle) * 45);
+        const impactTargetY = (target && target.y !== undefined) ? target.y : (fistY + Math.sin(pushAngle) * 45);
+        spawnAnimePunchImpactFrame(impactTargetX, impactTargetY, 85, pushAngle, 'gold');
       }
       if (typeof spawnMeleeClashShockwave === 'function') {
-        spawnMeleeClashShockwave(target.x, target.y, 110, 'gojo');
+        const impactTargetX = (target && target.x !== undefined) ? target.x : (fistX + Math.cos(pushAngle) * 45);
+        const impactTargetY = (target && target.y !== undefined) ? target.y : (fistY + Math.sin(pushAngle) * 45);
+        spawnMeleeClashShockwave(impactTargetX, impactTargetY, 110, 'gojo');
       }
       if (typeof spawnImpactFlash === 'function') {
-        spawnImpactFlash(target.x, target.y, 55, '#FFFFFF');
+        const impactTargetX = (target && target.x !== undefined) ? target.x : (fistX + Math.cos(pushAngle) * 45);
+        const impactTargetY = (target && target.y !== undefined) ? target.y : (fistY + Math.sin(pushAngle) * 45);
+        spawnImpactFlash(impactTargetX, impactTargetY, 55, '#FFFFFF');
       }
 
       // HUD Text Snap: White → Black on punch impact (screen flashes bright white)
@@ -823,7 +831,7 @@ export class SaitamaFighter extends Fighter {
     const steps = Math.min(14, Math.max(4, Math.floor(dashDist / 25)));
     for (let s = 0; s <= steps; s++) {
       const p = s / steps;
-      this.afterImages.push({
+      pushTrailCap(this.afterImages, {
         x: oldX + (this.x - oldX) * p,
         y: oldY + (this.y - oldY) * p,
         r: this.r,
@@ -1305,6 +1313,10 @@ export class SaitamaFighter extends Fighter {
       const target = this._counterPunchTarget || opponent;
       if (target && target.hp > 0 && typeof this.aim === 'function') {
         this.aim(target);
+        this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+      } else if (this._counterAimAngle !== undefined) {
+        this.gunAngle = this._counterAimAngle;
+        this.angle = this._counterAimAngle;
       }
       return;
     }

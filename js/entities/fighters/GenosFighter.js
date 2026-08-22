@@ -7,6 +7,7 @@ import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { spawnImpactFlash, spawnSparks, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave, spawnGenosThrusterDashVisual, spawnLaserSmoke, spawnGroundScorch, spawnGenosSelfDestructExplosion } from '../../graphics/particles/sparkEffect.js';
 import { drawGenosSkin, drawGenosHands } from '../../graphics/fighters/genosSkin.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
+import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
 /**
  * Genos — The Demon Cyborg
@@ -617,7 +618,7 @@ export class GenosFighter extends Fighter {
     const steps = 3;
     for (let s = 1; s <= steps; s++) {
       const p = s / steps;
-      this.afterImages.push({
+      pushTrailCap(this.afterImages, {
         x: oldX + (this.x - oldX) * p,
         y: oldY + (this.y - oldY) * p,
         r: this.r,
@@ -1031,18 +1032,16 @@ export class GenosFighter extends Fighter {
 
         // Spawn dense ghost body after-images every frame for a closely-packed trail
         if (!this.afterImages) this.afterImages = [];
-        if (this.afterImages.length < 8) {
-          this.afterImages.push({
-            x: this.x,
-            y: this.y,
-            r: this.r,
-            vx: this.vx,
-            vy: this.vy,
-            gunAngle: this.gunAngle || this.angle || 0,
-            timer: 10,
-            maxTimer: 10,
-          });
-        }
+        pushTrailCap(this.afterImages, {
+          x: this.x,
+          y: this.y,
+          r: this.r,
+          vx: this.vx,
+          vy: this.vy,
+          gunAngle: this.gunAngle || this.angle || 0,
+          timer: 10,
+          maxTimer: 10,
+        });
 
         if (this.speedBoostTimer % 2 === 0) {
           const backAngle = Math.atan2(-this.vy, -this.vx);

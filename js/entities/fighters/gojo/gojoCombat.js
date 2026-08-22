@@ -120,6 +120,11 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       
 
 
+      // Interrupt active attack channeling on barrier collision (entity is repelled, NOT frozen; only projectiles freeze)
+      if (typeof attacker.interruptAttacks === 'function') {
+        attacker.interruptAttacks();
+      }
+
       // Calculate push direction away from Gojo
       let dx = attacker.x - fighter.x;
       let dy = (attacker.y - (attacker.z || 0)) - (fighter.y - (fighter.z || 0));
@@ -163,7 +168,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       
       // Resolve spatial overlap instantly to snap/slide attacker outside the barrier radius
       const barrierRadius = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
-      const attRadius = attacker.r || 25;
+      const attRadius = attacker.hitRadius || attacker.r || 25;
       const minDist = attRadius + barrierRadius;
       const overlap = minDist - dist;
 
