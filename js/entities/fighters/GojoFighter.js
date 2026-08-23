@@ -1763,7 +1763,7 @@ export class GojoFighter extends Fighter {
     if (this.isDead || this.isChannelingAnySkill() || this.isChannelingRCT) return;
     if (this.reverseCursedTechniqueCooldown > 0) return;
 
-    const threshold = CONFIG.gojo.reverseCursedTechniqueHpThreshold || 0.10;
+    const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
     const hpPercent = this.hp / this.maxHp;
 
     // Trigger when HP drops to threshold or below

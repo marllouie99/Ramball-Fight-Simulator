@@ -12,12 +12,41 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { _clearButtons, _registerButton, drawChamferedRect } from './uiFramework.js';
 import { proceedFromFaceOffToCountdown, startMatchDirectlyFromFaceOff } from '../../core/gameFlow.js';
 
-// Cache for live fighter preview instances
-const _faceOffFighterCache = {};
+// Cache for live fighter preview instances (Pooled by character type to eliminate GC churn)
+const _fighterTypePreviewCache = {};
 
 // Static seed arrays for background particles and floating debris
 let _floatingDebris = null;
 let _scratchLines = null;
+let _bgCacheCanvas = null;
+let _bgCacheCtx = null;
+let _lastBgKey = '';
+const _textWidthCache = Object.create(null);
+
+// Pre-computed ink splatter points for VS emblem
+const _inkSplatterPoints = [];
+for (let i = 0; i < 16; i++) {
+  const angle = (i / 16) * Math.PI * 2;
+  const baseR = (i % 2 === 0) ? 58 : 36;
+  const offset = ((i * 7) % 11) - 5;
+  const r = baseR + offset;
+  _inkSplatterPoints.push({
+    x: Math.cos(angle) * r,
+    y: Math.sin(angle) * r
+  });
+}
+
+const _splatterDots = [];
+for (let s = 0; s < 8; s++) {
+  const sAngle = s * 0.8;
+  const sDist = 52 + (s * 7) % 25;
+  _splatterDots.push({
+    x: Math.cos(sAngle) * sDist,
+    y: Math.sin(sAngle) * sDist,
+    r: 2.4 + (s % 3),
+    isLeft: (s % 2 === 0)
+  });
+}
 
 // Easing Functions
 function easeOutBack(t) {
@@ -26,9 +55,14 @@ function easeOutBack(t) {
   return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
 }
 
-// Color Utility Helpers
+// Memoized Color Utility Helpers to eliminate per-frame regex & string allocations
+const _brightnessCache = Object.create(null);
 function adjustBrightness(hex, percent) {
   if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return hex || '#ffffff';
+  const key = hex + '_' + percent;
+  let res = _brightnessCache[key];
+  if (res) return res;
+
   let cleanHex = hex.replace('#', '');
   if (cleanHex.length === 3) {
     cleanHex = cleanHex.split('').map(c => c + c).join('');
@@ -41,11 +75,18 @@ function adjustBrightness(hex, percent) {
   r = Math.min(255, Math.max(0, r));
   g = Math.min(255, Math.max(0, g));
   b = Math.min(255, Math.max(0, b));
-  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+  res = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
+  _brightnessCache[key] = res;
+  return res;
 }
 
+const _rgbaCache = Object.create(null);
 function hexToRgba(hex, alpha) {
   if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(255, 255, 255, ${alpha})`;
+  const key = hex + '_' + alpha;
+  let res = _rgbaCache[key];
+  if (res) return res;
+
   let cleanHex = hex.replace('#', '');
   if (cleanHex.length === 3) {
     cleanHex = cleanHex.split('').map(c => c + c).join('');
@@ -55,7 +96,9 @@ function hexToRgba(hex, alpha) {
   let r = (num >> 16) & 255;
   let g = (num >> 8) & 255;
   let b = num & 255;
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  res = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  _rgbaCache[key] = res;
+  return res;
 }
 
 function initDebrisAndScratches(width, height) {
@@ -88,12 +131,13 @@ function initDebrisAndScratches(width, height) {
   }
 }
 
-/** Prepares a fresh, properly styled fighter model for the face-off layout */
+/** Prepares a fresh, properly styled fighter model for the face-off layout (Singleton pool by character type) */
 function getFaceOffFighter(slotKey, def, targetAngle) {
   if (!def) return null;
-  if (!_faceOffFighterCache[slotKey] || _faceOffFighterCache[slotKey].type !== def.type) {
-    const FighterClass = (typeof FIGHTER_CLASS_MAP !== 'undefined' && FIGHTER_CLASS_MAP && FIGHTER_CLASS_MAP[def.type]) ? FIGHTER_CLASS_MAP[def.type] : Fighter;
-    _faceOffFighterCache[slotKey] = new FighterClass({
+  const type = def.type || def.id || 'fighter';
+  if (!_fighterTypePreviewCache[type]) {
+    const FighterClass = (typeof FIGHTER_CLASS_MAP !== 'undefined' && FIGHTER_CLASS_MAP && FIGHTER_CLASS_MAP[type]) ? FIGHTER_CLASS_MAP[type] : Fighter;
+    _fighterTypePreviewCache[type] = new FighterClass({
       ...def,
       startX: 0,
       startY: 0,
@@ -101,7 +145,7 @@ function getFaceOffFighter(slotKey, def, targetAngle) {
       startVy: 0,
     });
   }
-  const f = _faceOffFighterCache[slotKey];
+  const f = _fighterTypePreviewCache[type];
   f.x = 0;
   f.y = 0;
   f.vx = 0;
@@ -124,7 +168,7 @@ function getFaceOffFighter(slotKey, def, targetAngle) {
   f.attackCooldown = 0;
   f.attackSwingTimer = 0;
 
-  if (def.type === 'trickster') {
+  if (type === 'trickster') {
     f.tkTarget = null;
     f.tkTimer = 0;
     f.stolenType = null;
@@ -135,12 +179,21 @@ function getFaceOffFighter(slotKey, def, targetAngle) {
     f.flurryHitsLeft = 0;
     f.flurryTimer = 0;
     f.stormActive = false;
-  } else if (def.type === 'gojo') {
-    f.isMeleeMode = false;
-    f.orbTransition = 1;
+  } else if (type === 'gojo') {
+    f.isMeleeMode = true;
+    f.orbTransition = 0;
+    f.hideWeapon = true;
+    f.hideHands = true;
+    f.hideFrontHand = true;
+    f.hideBackHand = true;
     f.redEffectTimer = 0;
     f.domainActive = false;
-  } else if (def.type === 'sukuna' || def.type === 'yuta' || def.type === 'yuji') {
+  } else if (type === 'sukuna') {
+    f.hideHands = true;
+    f.hideFrontHand = true;
+    f.hideBackHand = true;
+    f.combatAuraOpacity = 1.0;
+  } else if (type === 'yuta' || type === 'yuji') {
     f.combatAuraOpacity = 1.0;
   }
 
@@ -259,11 +312,19 @@ export function drawFaceOffThumbnailScreen() {
   }
 }
 
-/** Draws the Dynamic Anime Grunge Split Background */
-function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColor, timer) {
-  if (!_floatingDebris || _floatingDebris.length === 0) {
-    initDebrisAndScratches(width, height);
+/** Renders the Static Background Elements onto a Cached Offscreen Canvas */
+function renderCachedBackground(width, height, leftColor, rightColor) {
+  if (!_bgCacheCanvas) {
+    _bgCacheCanvas = document.createElement('canvas');
+    _bgCacheCtx = _bgCacheCanvas.getContext('2d');
   }
+  if (_bgCacheCanvas.width !== width || _bgCacheCanvas.height !== height) {
+    _bgCacheCanvas.width = width;
+    _bgCacheCanvas.height = height;
+  }
+
+  const ctx = _bgCacheCtx;
+  ctx.clearRect(0, 0, width, height);
 
   // ── Step 1: Base Left Domain (Deep Moody Obsidian Tinted with Fighter 1's Color) ──
   const leftBgGrad = ctx.createLinearGradient(0, 0, width * 0.6, height);
@@ -320,11 +381,31 @@ function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColo
   // ── Step 4: Grunge Paint Splatters & Diagonal Brush Streaks ──
   drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftColor, rightColor);
 
-  // ── Step 5: Jagged White Lightning Fracture Seam ──
-  drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, timer);
-
-  // ── Step 6: Floating Triangles & Debris Specks ──
+  // ── Step 5: Floating Triangles & Debris Specks ──
   drawFloatingActionDebris(ctx, width, height, leftColor, rightColor);
+}
+
+/** Draws the Dynamic Anime Grunge Split Background with High-Performance Offscreen Caching */
+function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColor, timer) {
+  if (!_floatingDebris || _floatingDebris.length === 0) {
+    initDebrisAndScratches(width, height);
+  }
+
+  const bgKey = `${width}_${height}_${leftColor}_${rightColor}`;
+  if (bgKey !== _lastBgKey || !_bgCacheCanvas) {
+    _lastBgKey = bgKey;
+    renderCachedBackground(width, height, leftColor, rightColor);
+  }
+
+  // 1-Call Blit of the pre-rendered background
+  if (_bgCacheCanvas) {
+    ctx.drawImage(_bgCacheCanvas, 0, 0);
+  }
+
+  // Dynamic Jagged White Lightning Fracture Seam
+  const topSplitX = width * 0.62;
+  const botSplitX = width * 0.38;
+  drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, timer);
 }
 
 /** Draws procedural halftone dot grids */
@@ -451,11 +532,9 @@ function drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, time
   const crackProgress = Math.min(1.0, timer / 12);
   const visibleCount = Math.max(2, Math.floor(crackPoints.length * crackProgress));
 
-  // Outer bold lightning glow stroke
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.lineWidth = 6.0;
   ctx.lineJoin = 'miter';
   ctx.miterLimit = 4;
+  ctx.lineCap = 'square';
 
   ctx.beginPath();
   for (let i = 0; i < visibleCount; i++) {
@@ -468,16 +547,25 @@ function drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, time
     if (i === 0) ctx.moveTo(px, py);
     else ctx.lineTo(px, py);
   }
+
+  // 1. Thick Solid Black Ink Stroke Backing
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 13.0;
   ctx.stroke();
 
-  // Middle intense bright line
-  ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 3.2;
+  // 2. Outer White Lightning Glow Stroke
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.70)';
+  ctx.lineWidth = 5.0;
   ctx.stroke();
 
-  // Inner intense bright white core
+  // 3. Middle Intense Bright White Line
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.4;
+  ctx.lineWidth = 2.8;
+  ctx.stroke();
+
+  // 4. Inner Intense Bright White Core
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.2;
   ctx.stroke();
 
   ctx.restore();
@@ -520,6 +608,7 @@ function drawFloatingActionDebris(ctx, width, height, leftColor, rightColor) {
 // Dynamic variables for rolling animation
 const _lastSlotMap = {};
 const _lockedMap = {};
+let _lastAudioTickTimer = -1;
 
 function getStripFighterDef(slotIndex, totalSlots, targetDef, seed) {
   if (slotIndex >= totalSlots) return targetDef;
@@ -548,10 +637,11 @@ function drawSmoothReelColumn(ctx, centerX, centerY, targetDef, slotKey, totalSl
   const currentSlotFloat = scrollY / slotH;
   const baseSlot = Math.floor(currentSlotFloat);
 
-  // Audio tick on each new slot entering center
+  // Audio tick on each new slot entering center (throttled to max 1 SFX per frame)
   if (!isLocked && baseSlot !== _lastSlotMap[slotKey]) {
     _lastSlotMap[slotKey] = baseSlot;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX && timer !== _lastAudioTickTimer) {
+      _lastAudioTickTimer = timer;
       const vol = Math.min(0.25, 0.08 + (1 - t) * 0.16);
       audioSystem.playSFX('Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3', vol);
     }
@@ -1040,40 +1130,40 @@ function drawEngineerStyleHeroGlow(ctx, cx, cy, radius, glowColor = '#38bdf8') {
  * Unified Center Emblem: Transitions "VS" -> 3 -> 2 -> 1 -> FIGHT!
  */
 function drawCenterUnifiedCountdown(ctx, cx, cy, timer, leftColor = '#38bdf8', rightColor = '#e51a2e', exitProgress = 0, customLabel = 'VS') {
-  // Stage 1: "VS" Initial Clash (Timer 66 - 92)
-  if (timer < 92) {
-    const prog = Math.min(1.0, (timer - 66) / 18);
+  // Stage 1: "VS" Initial Clash (Timer 96 - 126)
+  if (timer < 126) {
+    const prog = Math.min(1.0, (timer - 96) / 18);
     const ease = easeOutBack(prog);
     drawAnimeBrushVsClash(ctx, cx, cy, customLabel, ease, leftColor, rightColor);
     return;
   }
 
-  // Stage 2: Countdown "3" (Timer 92 - 122)
-  if (timer < 122) {
-    const prog = Math.min(1.0, (timer - 92) / 16);
+  // Stage 2: Countdown "3" (Timer 126 - 156)
+  if (timer < 156) {
+    const prog = Math.min(1.0, (timer - 126) / 16);
     const ease = easeOutBack(prog);
     drawCountdownDigit(ctx, cx, cy, '3', ease, leftColor, rightColor);
     return;
   }
 
-  // Stage 3: Countdown "2" (Timer 122 - 152)
-  if (timer < 152) {
-    const prog = Math.min(1.0, (timer - 122) / 16);
+  // Stage 3: Countdown "2" (Timer 156 - 186)
+  if (timer < 186) {
+    const prog = Math.min(1.0, (timer - 156) / 16);
     const ease = easeOutBack(prog);
     drawCountdownDigit(ctx, cx, cy, '2', ease, leftColor, rightColor);
     return;
   }
 
-  // Stage 4: Countdown "1" (Timer 152 - 182)
-  if (timer < 182) {
-    const prog = Math.min(1.0, (timer - 152) / 16);
+  // Stage 4: Countdown "1" (Timer 186 - 216)
+  if (timer < 216) {
+    const prog = Math.min(1.0, (timer - 186) / 16);
     const ease = easeOutBack(prog);
     drawCountdownDigit(ctx, cx, cy, '1', ease, leftColor, rightColor);
     return;
   }
 
-  // Stage 5: Final "FIGHT!" Burst (Timer 182+)
-  const prog = Math.min(1.0, (timer - 182) / 16);
+  // Stage 5: Final "FIGHT!" Burst (Timer 216+)
+  const prog = Math.min(1.0, (timer - 216) / 16);
   const ease = easeOutBack(prog);
   drawCountdownDigit(ctx, cx, cy, 'FIGHT!', ease, leftColor, rightColor, exitProgress);
 }
@@ -1094,32 +1184,25 @@ function drawAnimeBrushVsClash(ctx, cx, cy, label, ease, leftColor, rightColor) 
   ctx.arc(0, 0, 110, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Ink Splatter Explosion Burst
+  // 2. Ink Splatter Explosion Burst (Pre-computed polygon points)
   const inkScale = Math.min(1.0, ease);
   ctx.save();
   ctx.scale(inkScale, inkScale);
   ctx.fillStyle = '#06070a';
   ctx.beginPath();
-  const points = 16;
-  for (let i = 0; i < points; i++) {
-    const angle = (i / points) * Math.PI * 2;
-    const baseR = (i % 2 === 0) ? 58 : 36;
-    const offset = ((i * 7) % 11) - 5;
-    const r = baseR + offset;
-    const px = Math.cos(angle) * r;
-    const py = Math.sin(angle) * r;
-    if (i === 0) ctx.moveTo(px, py);
-    else ctx.lineTo(px, py);
+  for (let i = 0; i < _inkSplatterPoints.length; i++) {
+    const pt = _inkSplatterPoints[i];
+    if (i === 0) ctx.moveTo(pt.x, pt.y);
+    else ctx.lineTo(pt.x, pt.y);
   }
   ctx.closePath();
   ctx.fill();
 
-  for (let s = 0; s < 8; s++) {
-    const sAngle = s * 0.8;
-    const sDist = 52 + (s * 7) % 25;
+  for (let s = 0; s < _splatterDots.length; s++) {
+    const dot = _splatterDots[s];
     ctx.beginPath();
-    ctx.arc(Math.cos(sAngle) * sDist, Math.sin(sAngle) * sDist, 2.4 + (s % 3), 0, Math.PI * 2);
-    ctx.fillStyle = s % 2 === 0 ? leftColor : rightColor;
+    ctx.arc(dot.x, dot.y, dot.r, 0, Math.PI * 2);
+    ctx.fillStyle = dot.isLeft ? leftColor : rightColor;
     ctx.fill();
   }
   ctx.restore();
@@ -1297,8 +1380,11 @@ function drawFighterCleanName(ctx, cx, cy, name, accentColor) {
   ctx.fillStyle = '#ffffff';
   ctx.fillText(upperName, cx, cy);
 
-  const textMetrics = ctx.measureText(upperName);
-  const underlineW = textMetrics.width * 0.90;
+  let underlineW = _textWidthCache[upperName];
+  if (underlineW === undefined) {
+    underlineW = ctx.measureText(upperName).width * 0.90;
+    _textWidthCache[upperName] = underlineW;
+  }
   const lineY = cy + fontSize * 0.65;
 
   ctx.strokeStyle = hexToRgba(accentColor, 0.35);

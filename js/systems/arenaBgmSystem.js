@@ -53,6 +53,7 @@ let _lastUnmutedVolume = 0.50;
 let _isArenaBgmPlaying = false;
 let _isDucked = false;
 let _currentTrackSrc = null;
+let _lastPlayedTrackSrc = null;
 let _selectedTrackId = null;
 let _previewTrackId = null;
 let _isArenaBgmModalOpen = false;
@@ -473,10 +474,11 @@ export function getCurrentPlayingBgmTitle() {
   const trackId = getSavedArenaBgmId();
   if (trackId === 'off') return null;
 
-  // If a track is actively playing, resolve the real name from the source
-  if (_currentTrackSrc) {
+  // If a track is actively playing or was played in the active/current match, resolve the real name
+  const trackSrc = _currentTrackSrc || _lastPlayedTrackSrc;
+  if (trackSrc) {
     // 1. Try matching from the track registry (handles custom tracks with blob URLs too)
-    const matched = ARENA_BGM_TRACKS.find(t => t.src === _currentTrackSrc);
+    const matched = ARENA_BGM_TRACKS.find(t => t.src === trackSrc);
     if (matched) {
       // For custom tracks, prefer the stored filename over the formatted name
       if (matched.filename) {
@@ -488,8 +490,8 @@ export function getCurrentPlayingBgmTitle() {
     }
 
     // 2. Fallback: extract the filename directly from the src path
-    if (_currentTrackSrc && !_currentTrackSrc.startsWith('blob:')) {
-      const parts = decodeURIComponent(_currentTrackSrc).split('/');
+    if (trackSrc && !trackSrc.startsWith('blob:')) {
+      const parts = decodeURIComponent(trackSrc).split('/');
       const fileName = parts[parts.length - 1];
       if (fileName) {
         return `🎵 ${formatTrackNameFromFilename(fileName)}`;
@@ -555,6 +557,7 @@ export function startArenaBgm(forceNew = false) {
   stopLoopingSound(ARENA_BGM_LOOP_KEY);
 
   _currentTrackSrc = chosenSrc;
+  _lastPlayedTrackSrc = chosenSrc;
   _isArenaBgmPlaying = true;
   _isDucked = false;
 

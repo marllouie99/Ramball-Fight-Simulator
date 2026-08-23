@@ -20,10 +20,45 @@ const MAX_POOL_SIZE = 30;
 const MAX_CACHE_SIZE = 250; // Maximum number of cached sounds
 
 // ── CONCURRENT SOUND LIMITING (prevents audio bus overload → crackling) ──
-const MAX_CONCURRENT_SOUNDS = 24; // Hard cap on simultaneous Web Audio sources
+const MAX_CONCURRENT_SOUNDS = 40; // Hard cap on simultaneous Web Audio sources
 // Micro-fade duration in seconds to prevent click/pop artifacts on start/stop
 const MICRO_FADE_IN = 0.008;  // 8ms fade-in
 const MICRO_FADE_OUT = 0.015; // 15ms fade-out
+
+/**
+ * Checks whether an audio source is a protected voice line, announcer dialogue,
+ * character sound, or death voice that must NEVER be cut off prematurely.
+ * @param {string} src
+ * @returns {boolean}
+ */
+export function isProtectedVoiceOrAnnouncerSound(src) {
+  if (!src) return false;
+  const s = String(src).toLowerCase();
+  return s.includes('announcer') ||
+         s.includes('faah') ||
+         s.includes('voiceline') ||
+         s.includes('voice') ||
+         s.includes('homie') ||
+         s.includes('noise') ||
+         s.includes('dialogue') ||
+         s.includes('mybestfriend') ||
+         s.includes('bestfriend') ||
+         s.includes('tadaka') ||
+         s.includes('takada') ||
+         s.includes('imagination') ||
+         s.includes('deathmusic') ||
+         s.includes('respect') ||
+         s.includes('wasted') ||
+         s.includes('missionpassed') ||
+         s.includes('cheatactivated') ||
+         s.includes('you-win') ||
+         s.includes('you_win') ||
+         s.includes('fight') ||
+         s.includes('bell') ||
+         s.includes('timertick') ||
+         s.includes('machinegunblow') ||
+         s.includes('ui');
+}
 
 function _pruneSoundCache() {
   if (_cache.size > MAX_CACHE_SIZE) {
@@ -403,23 +438,18 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
  * Uses a micro-fade-out to prevent click/pop on eviction.
  */
 function _evictOldestSound() {
-  // Find the oldest NON-PROTECTED handle (never evict announcer, faah, death sounds, or voicelines)
+  // Find the oldest NON-PROTECTED handle (never evict announcer, faah, death sounds, voicelines, or homie noises)
   let candidate = null;
   for (const handle of _activeSoundHandles) {
     if (!handle) continue;
-    const srcStr = String(handle.src || '').toLowerCase();
-    if (srcStr.includes('announcer') || srcStr.includes('faah') || srcStr.includes('voiceline') || srcStr.includes('death')) {
+    if (isProtectedVoiceOrAnnouncerSound(handle.src)) {
       continue; // Protected from eviction!
     }
     candidate = handle;
     break;
   }
 
-  // Fallback if all active handles are protected
-  if (!candidate) {
-    const iterator = _activeSoundHandles.values();
-    candidate = iterator.next().value;
-  }
+  // If all active handles are protected voice clips, do not evict them!
   if (!candidate) return;
 
   const oldest = candidate;
@@ -482,8 +512,7 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
   }
 
   // Check if gameState is roundEnd/matchEnd to block non-announcer/UI combat sounds (after the initial action delay of 60 frames)
-  const srcStr = String(src).toLowerCase();
-  const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui') || srcStr.includes('mybestfriend') || srcStr.includes('bestfriend') || srcStr.includes('voiceline') || srcStr.includes('tadaka') || srcStr.includes('imagination') || srcStr.includes('faah') || srcStr.includes('repair');
+  const isAnnouncerOrUi = isProtectedVoiceOrAnnouncerSound(src);
   if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
     const isDuringActionDelay = (state.gameState === 'roundEnd' && state.roundEndTimer < 60) || 
                                 (state.gameState === 'matchEnd' && state.matchEndTimer < 60);
@@ -567,25 +596,24 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
         gainNode
       };
       _activeSoundHandles.add(handle);
-      setTimeout(() => {
-        // Micro-fade-out before stopping to prevent click/pop on natural end
-        try {
-          const ctx = getAudioContext();
-          const fadeStart = ctx.currentTime;
-          gainNode.gain.cancelScheduledValues(fadeStart);
-          gainNode.gain.setValueAtTime(gainNode.gain.value, fadeStart);
-          gainNode.gain.linearRampToValueAtTime(0.001, fadeStart + MICRO_FADE_OUT);
-        } catch(e) {}
-        setTimeout(() => {
-          try { source.stop(0); } catch(e) {}
-          try { source.disconnect(); } catch(e) {}
-          try { gainNode.disconnect(); } catch(e) {}
-          _activeSoundHandles.delete(handle); 
-          if (typeof onEnded === 'function') {
-            onEnded();
-          }
-        }, MICRO_FADE_OUT * 1000 + 5);
-      }, Math.max(0, duration * 1000 - MICRO_FADE_OUT * 1000));
+
+      // Natural AudioBuffer completion handler: avoids clock-drift truncation from setTimeout
+      source.onended = () => {
+        try { source.disconnect(); } catch(e) {}
+        try { gainNode.disconnect(); } catch(e) {}
+        _activeSoundHandles.delete(handle);
+        if (typeof onEnded === 'function') {
+          onEnded();
+        }
+      };
+
+      // Safety timeout purely for garbage collection in case onended is dropped
+      const safetyTimeout = setTimeout(() => {
+        _activeSoundHandles.delete(handle);
+        try { source.disconnect(); } catch(e) {}
+        try { gainNode.disconnect(); } catch(e) {}
+      }, Math.max(1000, duration * 1000 + 600));
+      _pendingSoundTimeouts.add(safetyTimeout);
 
       return handle;
     } catch (e) {
@@ -917,15 +945,8 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 2. Stop/fade active Web Audio API & HTML Audio handles
   const handles = Array.from(_activeSoundHandles);
   for (const handle of handles) {
-    const srcLower = String(handle.src || '').toLowerCase();
-    // faah.mp3 is ALWAYS protected from being cut or stopped when enemy dies
-    if (srcLower.includes('faah') || srcLower.includes('announcer/faah')) {
+    if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(handle.src)) {
       continue;
-    }
-    if (keepAnnouncer && handle.src) {
-      if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('voiceline')) {
-        continue;
-      }
     }
     if (fadeDelayMs > 0) {
       const timerId = setTimeout(() => {
@@ -941,15 +962,8 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 3. Stop any fallback HTML Audio elements
   _activeSounds.forEach((audio) => {
     if (audio) {
-      const srcLower = String(audio.src || '').toLowerCase();
-      // faah.mp3 is ALWAYS protected from being cut or stopped when enemy dies
-      if (srcLower.includes('faah') || srcLower.includes('announcer/faah')) {
+      if (keepAnnouncer && isProtectedVoiceOrAnnouncerSound(audio.src)) {
         return;
-      }
-      if (keepAnnouncer && audio.src) {
-        if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('voiceline')) {
-          return;
-        }
       }
       if (fadeDelayMs > 0) {
         const timerId = setTimeout(() => {

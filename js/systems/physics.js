@@ -6,6 +6,7 @@ import { GAME_MODES, MODE_SETTINGS } from '../core/modeConfig.js';
 import { projectileSystem } from './projectileSystem.js';
 import { state, spawnFloatingText, recordWin, recordLoss, createFighterInstance, triggerMissionPassedOverlay } from '../core/state.js';
 import { stopAllLoopingSounds, stopAllSounds } from './soundSystem.js';
+import { stopArenaBgm } from './arenaBgmSystem.js';
 import { audioSystem } from './audioSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { updateIllusions } from './illusionSystem.js';
@@ -496,6 +497,7 @@ function endRoundIfFFAEnded() {
   if (aliveCount > 1) return;
 
   if (aliveCount === 0) winner = null;
+  stopArenaBgm(true);
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 
@@ -550,6 +552,7 @@ function endRoundIf2v2Ended() {
   // Round ends when one team is eliminated (including all illusions)
   if (team0Alive && team1Alive) return;
 
+  stopArenaBgm(true);
   const winningTeam = team0Alive ? 0 : 1;
   state.teamScores[winningTeam]++;
   
@@ -598,6 +601,7 @@ function endRoundIf1v1Ended() {
 
   if (aliveCount > 1) return;
 
+  stopArenaBgm(true);
   if (aliveCount === 0) winner = null;
   state.roundWinner = winner;
   state.roundEndTimer = 0;

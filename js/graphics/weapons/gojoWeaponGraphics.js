@@ -2,7 +2,7 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
 export function drawGojoWeapon(ctx, fighter) {
-    if (fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideWeapon) {
+    if (fighter.isGrabbedByMahoraga || fighter.isParalyzedByMahoraga || (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideWeapon || fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff')) {
         return;
     }
     const z = fighter.z || 0;
@@ -131,10 +131,11 @@ export function drawGojoWeapon(ctx, fighter) {
         }
     } else {
         // Melee Mode - Hands are drawn with full punch animation in GojoFighter._drawHandCursedEnergy
-        // Suppress the Blue Orb during countdown, Reversal Red, Domain Expansion, victory screen, or active Purple travel
+        // Suppress the Blue Orb during countdown, showoff screen, Reversal Red, Domain Expansion, victory screen, or active Purple travel
         const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+        const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
         const recoveryTimer = fighter.purpleRecoveryTimer || 0;
-        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown || recoveryTimer > 30) {
+        if ((fighter.redEffectTimer || 0) > 0 || fighter.isChannelingDomainExpansion || fighter.domainActive || fighter._isWinnerReveal || isCountdown || isFaceOff || recoveryTimer > 30) {
             ctx.restore();
             return;
         }

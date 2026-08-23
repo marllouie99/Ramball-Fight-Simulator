@@ -1,4 +1,5 @@
 import { stopAllSounds, stopAllLoopingSounds, stopSound, fadeOutSound, stopLoopingSound } from '../systems/soundSystem.js';
+import { stopArenaBgm } from '../systems/arenaBgmSystem.js';
 // ─────────────────────────────────────────────
 // BASE FIGHTER CLASS
 // ─────────────────────────────────────────────
@@ -1158,6 +1159,7 @@ export class Fighter {
       }
       
       if (!team0Alive || !team1Alive) {
+        stopArenaBgm(true);
         const winningTeam = team0Alive ? 0 : 1;
         state.teamScores[winningTeam]++;
 
@@ -1184,6 +1186,7 @@ export class Fighter {
         }
       }
     } else if (state.mode !== 'FFA' && roundEnds) {
+      stopArenaBgm(true);
       const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
       const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
       const winnerIndex = winnerFighter ? state.fighters.indexOf(winnerFighter) : -1;
@@ -1220,6 +1223,7 @@ export class Fighter {
         state.gameState = 'roundEnd';
       }
     } else if (state.mode === 'FFA' && roundEnds) {
+      stopArenaBgm(true);
       state.roundWinner = realAttacker;
       state.roundEndTimer = 0;
       state.ffaMatchComplete = true;

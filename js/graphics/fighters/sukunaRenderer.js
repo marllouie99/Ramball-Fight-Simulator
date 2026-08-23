@@ -205,11 +205,12 @@ export class SukunaRenderer {
   static _drawHandCursedEnergy(ctx, fighter, layer = 'all') {
     const basePosY = (fighter.y - (fighter.z || 0));
 
-    // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Target of Ambush: Hide hands completely
+    // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Showoff (FaceOff) / Target of Ambush: Hide hands completely
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
-    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
+    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || isFaceOff || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
 
-    if (isWinnerScreen || fighter.isTargetOfAmbush || (typeof state !== 'undefined' && state.showSkinOnly)) {
+    if (isWinnerScreen || fighter.isTargetOfAmbush || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands) {
       return;
     }
 

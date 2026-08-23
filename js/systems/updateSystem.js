@@ -16,7 +16,7 @@ import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { updateDriveBys } from './cjDriveBySystem.js';
 import { FRAME_TIME } from './gameLoop.js';
-import { updateArenaBgm, startArenaBgm } from './arenaBgmSystem.js';
+import { updateArenaBgm, startArenaBgm, stopArenaBgm } from './arenaBgmSystem.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
@@ -96,6 +96,7 @@ export function updateGame() {
       const dt = Math.min(FRAME_TIME / 1000, 0.1); // Convert to seconds, cap at 100ms
       flamewardenFlameSystem.update(dt);
     } else if (state.gameState === 'roundEnd') {
+      stopArenaBgm(true);
       // Keep fighters moving in background during winning display
       updateFighters();
       updateProjectiles();
@@ -112,6 +113,7 @@ export function updateGame() {
         startNextRound();
       }
     } else if (state.gameState === 'matchEnd') {
+      stopArenaBgm(true);
       // Keep fighters moving in background during match end display
       updateFighters();
       updateProjectiles();

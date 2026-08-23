@@ -394,10 +394,11 @@ export class GojoRenderer {
   static _getHandPositions(fighter) {
     const basePosY = (fighter.y - (fighter.z || 0));
 
-    // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown: Hide hands completely
+    // Champion Screen / Victory Reveal / Fighter Index Stance / Round Countdown / Showoff (FaceOff): Hide hands completely
     const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
-    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
-    if (isWinnerScreen) {
+    const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
+    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || isFaceOff || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    if (isWinnerScreen || fighter.hideHands) {
       return null;
     }
 
@@ -523,6 +524,13 @@ export class GojoRenderer {
   // Render physical circle hands (back layer behind body, front layer on top of body)
   static _drawHandCursedEnergy(ctx, fighter, layer = 'all') {
     if (typeof state !== 'undefined' && state.showSkinOnly) return;
+    if (fighter.hideHands) return;
+
+    const isCountdown = typeof state !== 'undefined' && state.gameState === 'countdown';
+    const isFaceOff = fighter._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff');
+    const isWinnerScreen = fighter._isWinnerReveal || isCountdown || isFaceOff || (typeof state !== 'undefined' && (state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.gameState === 'indexDetail' || state.gameState === 'index'));
+    if (isWinnerScreen || fighter.isTargetOfAmbush) return;
+
     const hands = fighter._getHandPositions();
     if (!hands) return;
 
