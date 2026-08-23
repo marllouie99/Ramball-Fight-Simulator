@@ -40,6 +40,10 @@ import {
   drawRoundEndScreen, 
   drawMatchEndScreen 
 } from './ui/GameOverScreen.js';
+import {
+  drawFaceOffThumbnailScreen,
+  captureFaceOffScreenshot
+} from './ui/ThumbnailFaceOffScreen.js';
 
 export {
   renderTeamHpCard,
@@ -65,6 +69,8 @@ export {
   drawRoundEndScreen,
   drawMatchEndScreen,
   drawCountdown,
+  drawFaceOffThumbnailScreen,
+  captureFaceOffScreenshot,
   drawMissionPassedOverlay,
   drawWastedOverlay
 };

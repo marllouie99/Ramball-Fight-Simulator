@@ -261,7 +261,9 @@ export class GojoFighter extends Fighter {
     spawnImpactFlash(rx, ry, 20, 'lightningTrail');
 
     const sound = getBasicAttackSound(21, 'gojo');
-    if (sound) audioSystem.playSFX(sound.src, sound.volume);
+    const sndSrc = sound?.src || CONFIG.gojo?.sounds?.blueOrb || 'Assets/Sound Effects/Attacks/spaceshot.mp3';
+    const sndVol = sound?.volume ?? (CONFIG.gojo?.soundVolumes?.blueOrb ?? 0.6);
+    audioSystem.playSFX(sndSrc, sndVol);
   }
 
   triggerInfinityBlock(hitX, hitY, attacker) {
@@ -829,7 +831,9 @@ export class GojoFighter extends Fighter {
         if (!this._hasPlayedDomainChannelSound) {
           this._hasPlayedDomainChannelSound = true;
           const channelSound = getSkillSound(this._def?.id, 'domain_channel');
-          if (channelSound) audioSystem.playSFX(channelSound.src, channelSound.volume);
+          const chanSrc = channelSound?.src || CONFIG.gojo?.sounds?.domainChannel || 'Assets/Sound Effects/Skills/gojodomain.mp3';
+          const chanVol = channelSound?.volume ?? (CONFIG.gojo?.soundVolumes?.domainChannel ?? 5.0);
+          audioSystem.playSFX(chanSrc, chanVol);
         }
       }
       return;
@@ -847,9 +851,9 @@ export class GojoFighter extends Fighter {
       this.vx = Math.cos(slideAngle) * initialSpeed;
       this.vy = Math.sin(slideAngle) * initialSpeed;
 
-      if (typeof audioSystem !== 'undefined') {
-        audioSystem.playSFX('skill_dash3', 0.6);
-      }
+      const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
+      const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.6;
+      audioSystem.playSFX(dashSnd, dashVol);
       return;
     }
 
@@ -898,17 +902,17 @@ export class GojoFighter extends Fighter {
         if (!this._hasPlayedPurpleChannelSound) {
           this._hasPlayedPurpleChannelSound = true;
           const sound = getSkillSound(this._def?.id, 'purple_charge');
-          if (sound) {
-            const delayMs = Math.max(0, (sound.delay || 0) * 1000);
-            if (delayMs > 0) {
-              setTimeout(() => {
-                if (this.isChannelingPurple && this.hp > 0) {
-                  this._purpleChargeSoundHandle = audioSystem.playSFX(sound.src, sound.volume);
-                }
-              }, delayMs);
-            } else {
-              this._purpleChargeSoundHandle = audioSystem.playSFX(sound.src, sound.volume);
-            }
+          const chargeSrc = sound?.src || CONFIG.gojo?.sounds?.purpleCharge || 'Assets/Sound Effects/Skills/mixing.mp3';
+          const chargeVol = sound?.volume ?? (CONFIG.gojo?.soundVolumes?.purpleCharge ?? 5.0);
+          const delayMs = Math.max(0, ((sound?.delay !== undefined ? sound.delay : (CONFIG.gojo?.soundDelays?.purpleCharge || 0)) || 0) * 1000);
+          if (delayMs > 0) {
+            setTimeout(() => {
+              if (this.isChannelingPurple && this.hp > 0) {
+                this._purpleChargeSoundHandle = audioSystem.playSFX(chargeSrc, chargeVol);
+              }
+            }, delayMs);
+          } else {
+            this._purpleChargeSoundHandle = audioSystem.playSFX(chargeSrc, chargeVol);
           }
         }
       }
@@ -932,7 +936,9 @@ export class GojoFighter extends Fighter {
       const deployTriggerFrame = Math.floor(this.purpleChargeMax * 0.75);
       if (this.purpleChargeTimer === deployTriggerFrame) {
         const sDeploy = getSkillSound(this._def?.id, 'purple_deploy');
-        audioSystem.playSFX(sDeploy?.src || 'Assets/Sound Effects/Skills/purpledeploy.mp3', sDeploy?.volume ?? 0.9);
+        const deploySrc = sDeploy?.src || CONFIG.gojo?.sounds?.purpleDeploy || 'Assets/Sound Effects/Skills/purpledeploy.mp3';
+        const deployVol = sDeploy?.volume ?? (CONFIG.gojo?.soundVolumes?.purpleDeploy ?? 2.5);
+        audioSystem.playSFX(deploySrc, deployVol);
       }
 
       // 2. Levitation: Gojo rises smoothly in the air as Red and Blue mix
@@ -1301,7 +1307,9 @@ export class GojoFighter extends Fighter {
 
       spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
       spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
-      audioSystem.playSFX('skill_dash3', 0.6);
+      const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
+      const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.6;
+      audioSystem.playSFX(dashSnd, dashVol);
     }
 
     // 2. Verify target is inside punch reach before striking (prevents punching empty air if target dodges away)
@@ -1377,7 +1385,9 @@ export class GojoFighter extends Fighter {
 
     spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
     spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
-    audioSystem.playSFX('skill_dash3', 0.8);
+    const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
+    const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.8;
+    audioSystem.playSFX(dashSnd, dashVol);
   }
 
   aim(opponent) {
@@ -1661,7 +1671,9 @@ export class GojoFighter extends Fighter {
     if (!this._playedDeployAudio) {
       this._playedDeployAudio = true;
       const activateSound = getSkillSound(this._def?.id, 'domain_activate') || getSkillSound(this._def?.id, 'domain');
-      if (activateSound) audioSystem.playSFX(activateSound.src, activateSound.volume);
+      const actSrc = activateSound?.src || CONFIG.gojo?.sounds?.domainActivate || 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3';
+      const actVol = activateSound?.volume ?? (CONFIG.gojo?.soundVolumes?.domainActivate ?? 5.0);
+      audioSystem.playSFX(actSrc, actVol);
     }
   }
 
@@ -1845,7 +1857,9 @@ export class GojoFighter extends Fighter {
 
     // Play sound effect
     const sound = getSkillSound(this._def?.id, 'reverseCursedTechnique');
-    if (sound) audioSystem.playSFX(sound.src, sound.volume);
+    const rctSrc = sound?.src || CONFIG.gojo?.sounds?.reverseCursedTechnique || 'Assets/Sound Effects/Skills/repair.mp3';
+    const rctVol = sound?.volume ?? (CONFIG.gojo?.soundVolumes?.reverseCursedTechnique ?? 1.0);
+    audioSystem.playSFX(rctSrc, rctVol);
   }
   draw(ctx) { GojoRenderer.draw(ctx, this); }
   _getHandPositions() { return GojoRenderer._getHandPositions(this); }

@@ -140,15 +140,7 @@ export async function preloadSound(src) {
  */
 export function playLoopingSound(key, src, volume = 1.0, speed = 1.0, fadeMs = 0) {
   if (_loopingSounds.has(key)) {
-    const existing = _loopingSounds.get(key);
-    if (existing.paused || existing.ended) {
-      existing.currentTime = 0;
-      existing.volume = Math.max(0, Math.min(1, volume));
-      existing.playbackRate = Math.max(0.1, speed);
-      existing.loop = true;
-      existing.play().catch(() => {});
-    }
-    return existing;
+    stopLoopingSound(key);
   }
   // If cache holds an AudioBuffer, use Web Audio API for zero-latency playback
   const cached = _cache.get(src);
@@ -338,6 +330,52 @@ export function resumeLoopingSound(key, volume = 1.0) {
 }
 
 /**
+ * Smoothly adjust volume of an active looping sound.
+ * @param {string} key
+ * @param {number} targetVolume
+ * @param {number} [rampMs=0]
+ */
+export function setLoopingSoundVolume(key, targetVolume, rampMs = 0) {
+  const soundObj = _loopingSounds.get(key);
+  if (!soundObj) return;
+
+  if (soundObj.gainNode && soundObj.buffer) {
+    try {
+      const audioCtx = getAudioContext();
+      const now = audioCtx.currentTime;
+      const targetGain = Math.max(0, Math.min(15, targetVolume));
+      soundObj.gainNode.gain.cancelScheduledValues(now);
+      if (rampMs > 0) {
+        soundObj.gainNode.gain.setValueAtTime(soundObj.gainNode.gain.value, now);
+        soundObj.gainNode.gain.linearRampToValueAtTime(targetGain, now + (rampMs / 1000));
+      } else {
+        soundObj.gainNode.gain.setValueAtTime(targetGain, now);
+      }
+    } catch (e) {}
+    return;
+  }
+
+  // HTML5 Audio element
+  const audio = soundObj;
+  if (audio && typeof audio.volume === 'number') {
+    const targetVol = Math.max(0, Math.min(1, targetVolume));
+    if (rampMs > 0) {
+      const startVol = audio.volume;
+      const steps = 15;
+      const stepDelay = Math.max(10, rampMs / steps);
+      let step = 0;
+      const interval = setInterval(() => {
+        step++;
+        audio.volume = Math.max(0, Math.min(1, startVol + (targetVol - startVol) * (step / steps)));
+        if (step >= steps) clearInterval(interval);
+      }, stepDelay);
+    } else {
+      audio.volume = targetVol;
+    }
+  }
+}
+
+/**
  * Stop all looping sounds with optional delay and smooth fade-out.
  * @param {number} [fadeDelayMs=2000] - Delay in ms before starting fade-out (default 2 seconds).
  * @param {number} [fadeDurationMs=500] - Fade duration in ms.
@@ -438,9 +476,14 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
     if (obj.onEnded !== undefined) onEnded = obj.onEnded;
   }
 
+  // Strict Mute Check: If volume is zero, immediately abort playback
+  if (volume <= 0.0001) {
+    return null;
+  }
+
   // Check if gameState is roundEnd/matchEnd to block non-announcer/UI combat sounds (after the initial action delay of 60 frames)
   const srcStr = String(src).toLowerCase();
-  const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui') || srcStr.includes('mybestfriend') || srcStr.includes('bestfriend') || srcStr.includes('voiceline') || srcStr.includes('tadaka') || srcStr.includes('imagination');
+  const isAnnouncerOrUi = srcStr.includes('announcer') || srcStr.includes('ui') || srcStr.includes('mybestfriend') || srcStr.includes('bestfriend') || srcStr.includes('voiceline') || srcStr.includes('tadaka') || srcStr.includes('imagination') || srcStr.includes('faah') || srcStr.includes('repair');
   if (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
     const isDuringActionDelay = (state.gameState === 'roundEnd' && state.roundEndTimer < 60) || 
                                 (state.gameState === 'matchEnd' && state.matchEndTimer < 60);
@@ -613,6 +656,10 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
  */
 export function stopSound(soundHandle) {
   if (!soundHandle) return;
+  const srcStr = String(soundHandle.src || (soundHandle.audio && soundHandle.audio.src) || '').toLowerCase();
+  if (srcStr.includes('faah') || srcStr.includes('announcer/faah')) {
+    return; // PROTECTED: Never cut faah.mp3 death audio!
+  }
   try {
     // Web Audio: micro-fade-out then disconnect to prevent click/pop
     if (soundHandle.gainNode && typeof soundHandle.gainNode.gain === 'object') {
@@ -659,6 +706,10 @@ export function stopSound(soundHandle) {
  */
 export function fadeOutSound(soundHandle, fadeMs = 350) {
   if (!soundHandle) return;
+  const srcStr = String(soundHandle.src || (soundHandle.audio && soundHandle.audio.src) || '').toLowerCase();
+  if (srcStr.includes('faah') || srcStr.includes('announcer/faah')) {
+    return; // PROTECTED: Never cut or fade out faah.mp3!
+  }
 
   // Web Audio API instance (gainNode)
   if (soundHandle.gainNode) {
@@ -844,6 +895,7 @@ export function fadeOutSoundBySrc(src, fadeMs = 350) {
 export function stopSoundBySrc(src) {
   if (!src) return;
   const target = String(src).toLowerCase();
+  if (target.includes('faah')) return; // PROTECTED: Never cut faah.mp3!
   for (const handle of Array.from(_activeSoundHandles)) {
     if (handle && handle.src && String(handle.src).toLowerCase().includes(target)) {
       stopSound(handle);
@@ -865,9 +917,13 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 2. Stop/fade active Web Audio API & HTML Audio handles
   const handles = Array.from(_activeSoundHandles);
   for (const handle of handles) {
+    const srcLower = String(handle.src || '').toLowerCase();
+    // faah.mp3 is ALWAYS protected from being cut or stopped when enemy dies
+    if (srcLower.includes('faah') || srcLower.includes('announcer/faah')) {
+      continue;
+    }
     if (keepAnnouncer && handle.src) {
-      const srcLower = String(handle.src).toLowerCase();
-      if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('faah') || srcLower.includes('voiceline')) {
+      if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('voiceline')) {
         continue;
       }
     }
@@ -885,9 +941,13 @@ export function stopAllSounds(keepAnnouncer = true, fadeDelayMs = 2000, fadeDura
   // 3. Stop any fallback HTML Audio elements
   _activeSounds.forEach((audio) => {
     if (audio) {
+      const srcLower = String(audio.src || '').toLowerCase();
+      // faah.mp3 is ALWAYS protected from being cut or stopped when enemy dies
+      if (srcLower.includes('faah') || srcLower.includes('announcer/faah')) {
+        return;
+      }
       if (keepAnnouncer && audio.src) {
-        const srcLower = String(audio.src).toLowerCase();
-        if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('faah') || srcLower.includes('voiceline')) {
+        if (srcLower.includes('announcer') || srcLower.includes('machinegunblow') || srcLower.includes('voiceline')) {
           return;
         }
       }

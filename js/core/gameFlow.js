@@ -23,6 +23,7 @@ import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { clearDriveBys } from '../systems/cjDriveBySystem.js';
 import { clearFloatingJetpacks } from '../graphics/particles/cjFloatingJetpack.js';
+import { startArenaBgm, stopArenaBgm, ARENA_BGM_TRACKS } from '../systems/arenaBgmSystem.js';
 import { clearDroppedMiniguns } from '../graphics/particles/cjDroppedMinigun.js';
 import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
@@ -125,6 +126,18 @@ function preloadGameSounds() {
     }
   }
 
+  const gojoSounds = [];
+  if (CONFIG.gojo && CONFIG.gojo.sounds) {
+    for (const key of Object.keys(CONFIG.gojo.sounds)) {
+      const val = CONFIG.gojo.sounds[key];
+      if (Array.isArray(val)) {
+        gojoSounds.push(...val);
+      } else if (typeof val === 'string') {
+        gojoSounds.push(val);
+      }
+    }
+  }
+
   const mahitoSounds = [];
   if (CONFIG.mahito && CONFIG.mahito.sounds) {
     for (const key of Object.keys(CONFIG.mahito.sounds)) {
@@ -133,6 +146,30 @@ function preloadGameSounds() {
         mahitoSounds.push(...val);
       } else if (typeof val === 'string') {
         mahitoSounds.push(val);
+      }
+    }
+  }
+
+  const mahoragaSounds = [];
+  if (CONFIG.mahoraga && CONFIG.mahoraga.sounds) {
+    for (const key of Object.keys(CONFIG.mahoraga.sounds)) {
+      const val = CONFIG.mahoraga.sounds[key];
+      if (Array.isArray(val)) {
+        mahoragaSounds.push(...val);
+      } else if (typeof val === 'string') {
+        mahoragaSounds.push(val);
+      }
+    }
+  }
+
+  const cjSounds = [];
+  if (CONFIG.cj && CONFIG.cj.sounds) {
+    for (const key of Object.keys(CONFIG.cj.sounds)) {
+      const val = CONFIG.cj.sounds[key];
+      if (Array.isArray(val)) {
+        cjSounds.push(...val);
+      } else if (typeof val === 'string') {
+        cjSounds.push(val);
       }
     }
   }
@@ -150,7 +187,11 @@ function preloadGameSounds() {
     ...saitamaSounds,
     ...todoSounds,
     ...nanamiSounds,
-    ...mahitoSounds
+    ...gojoSounds,
+    ...mahitoSounds,
+    ...mahoragaSounds,
+    ...cjSounds,
+    ...ARENA_BGM_TRACKS.map(t => t.src).filter(Boolean)
   ])];
   return Promise.all(allPaths.map(preloadSound));
 }
@@ -279,6 +320,8 @@ export function reinitFighters(isNewMatch = false) {
   state.roundEndTimer = 0;
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
+  state._isChampionLayoutActive = false;
+  state._winnerStartPositions = null;
  
   // Reset qualityLevel and screenShake on round init
   state.qualityLevel = state.performanceMode ? 0.2 : 1.0;
@@ -575,6 +618,20 @@ export function resetMatchWithRandom1v1Fighters() {
   resetMatch();
 }
 
+export function startRandomStandoffBattle() {
+  state.mode = 'Stand Off';
+  randomize1v1Fighters();
+  state.isRandomRollShowoff = true;
+  state.faceOffTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffAutoStart = true;
+  state.faceOffFromSelect = false;
+  state.faceOffCleanMode = false;
+  resetMatch();
+  startFaceOffScreen(false);
+}
+
 export function randomize1v2Fighters() {
   if (FIGHTER_DEFS.length < 3) return;
   const indices = FIGHTER_DEFS.map((_, idx) => idx);
@@ -592,12 +649,151 @@ export function resetMatchWithRandom1v2Fighters() {
   resetMatch();
 }
 
+export function startRandom1v2Battle() {
+  state.mode = '1v2 Stand Off';
+  randomize1v2Fighters();
+  state.isRandomRollShowoff = true;
+  state.faceOffTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffAutoStart = true;
+  state.faceOffFromSelect = false;
+  state.faceOffCleanMode = false;
+  resetMatch();
+  startFaceOffScreen(false);
+}
+
+export function randomize2v2Fighters() {
+  if (FIGHTER_DEFS.length < 4) return;
+  const indices = FIGHTER_DEFS.map((_, idx) => idx);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  state.p1Index = indices[0];
+  state.p3Index = indices[1];
+  state.p2Index = indices[2];
+  state.p4Index = indices[3];
+}
+
+export function startRandom2v2Battle() {
+  state.mode = '2v2';
+  randomize2v2Fighters();
+  state.isRandomRollShowoff = true;
+  state.faceOffTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffAutoStart = true;
+  state.faceOffFromSelect = false;
+  state.faceOffCleanMode = false;
+  resetMatch();
+  startFaceOffScreen(false);
+}
+
+export function randomizeFfaFighters() {
+  if (FIGHTER_DEFS.length < 4) return;
+  const indices = FIGHTER_DEFS.map((_, idx) => idx);
+  for (let i = indices.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [indices[i], indices[j]] = [indices[j], indices[i]];
+  }
+  state.p1Index = indices[0];
+  state.p2Index = indices[1];
+  state.p3Index = indices[2];
+  state.p4Index = indices[3];
+}
+
+export function startRandomFfaBattle() {
+  state.mode = 'FFA';
+  randomizeFfaFighters();
+  state.isRandomRollShowoff = true;
+  state.faceOffTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffAutoStart = true;
+  state.faceOffFromSelect = false;
+  state.faceOffCleanMode = false;
+  resetMatch();
+  startFaceOffScreen(false);
+}
+
+export function startFaceOffScreen(isThumbnailOnly = false) {
+  state.faceOffTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffFromSelect = isThumbnailOnly;
+  state.faceOffAutoStart = !isThumbnailOnly;
+  state.faceOffCleanMode = false;
+  state.gameState = 'faceoff';
+  if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash5', 0.25);
+  }
+}
+
+export function startMatchDirectlyFromFaceOff() {
+  state._isChampionLayoutActive = false;
+  state.roundEndTimer = 0;
+  state.matchEndTimer = 0;
+  state.faceOffExiting = false;
+  state.faceOffExitTimer = 0;
+  state.faceOffTimer = 0; // Reset faceOffTimer so HP overlay and in-game timers activate cleanly
+  state.isRandomRollShowoff = false;
+  state.battleStartFadeTimer = 16;
+  state.battleStartDelayTimer = 22; // Small delay (22 frames / ~0.35s) before fighters start moving
+  state.gameState = 'playing';
+  state.countdownTimer = state.countdownDuration || 180;
+  state.announcerPlayingSequence = false;
+  state.announcerSubtitle = '';
+  startArenaBgm(true);
+
+  // Instant Battle Start Readiness: Clear initial spawn cooldowns & ensure HP overlay displays!
+  if (state.fighters) {
+    state.fighters.forEach(f => {
+      if (f && f.hp > 0) {
+        f._isFaceOff = false;
+        f.hideHpText = false;
+        f.shootCooldown = 0;
+        f.cooldown = 0;
+        f.meleeCooldown = 0;
+        f.forcedMeleeTimer = 0;
+        f.hitStunTimer = 0;
+        f.knockbackStunTimer = 0;
+        if (f.type === 'gojo' || (f._def && f._def.type === 'gojo')) {
+          f.combatAuraOpacity = 1;
+        } else if (f.type === 'sukuna' || (f._def && f._def.type === 'sukuna')) {
+          f.combatAuraOpacity = 1;
+        }
+      }
+    });
+  }
+}
+
+export function proceedFromFaceOffToCountdown() {
+  if (state.gameState === 'faceoff') {
+    state.faceOffAutoStart = true;
+    if (state.faceOffTimer < 216) {
+      state.faceOffTimer = 216; // Fast-forward directly to FIGHT! burst
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0);
+        audioSystem.playSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0);
+      }
+      return;
+    }
+    startMatchDirectlyFromFaceOff();
+    return;
+  }
+  startCountdown();
+}
+
 export async function startGame() {
   await preloadGameSounds();
-  resetMatch();
+  resetMatch(true); // Enters Face-Off overlay before countdown
 }
 
 export function startNextRound() {
+  state._isChampionLayoutActive = false;
+  state.roundEndTimer = 0;
+  state.matchEndTimer = 0;
   if (state.mode === GAME_MODES.FFA && state.ffaMatchComplete) {
     resetMatch();
     return;
@@ -637,6 +833,9 @@ export function startNextRound() {
 }
 
 export function restartCurrentRound() {
+  state._isChampionLayoutActive = false;
+  state.roundEndTimer = 0;
+  state.matchEndTimer = 0;
   state.illusions = []; // Clear all illusions
   state.wallCracks = []; // Clear all wall crack decals
   if (state.announcerSoundHandle) {
@@ -795,7 +994,8 @@ export function startCountdown() {
   }
 }
 
-export function resetMatch() {
+export function resetMatch(showFaceOff = true) {
+  state._isChampionLayoutActive = false;
   if (state.mode === 'TLFS') {
     state.tlfsDefeatedEnemies = 0;
     if (state.tlfsAllowedEnemies && state.tlfsAllowedEnemies.length > 0) {
@@ -809,8 +1009,11 @@ export function resetMatch() {
   state.matchWinner = null;
   state.roundEndTimer = 0;
   state.matchEndTimer = 0;
+  state.battleStartDelayTimer = 0;
   state.ffaMatchComplete = false;
   state._hasPlayedChampionVictoryVoice = false;
+  state._hasPlayedChampionYouWinVoice = false;
+  state._hasPlayedFollowForMoreSfx = false;
   state.illusions = []; // Clear all illusions on match reset
   state.wallCracks = []; // Clear all wall crack decals on match reset
   state.matchKills = [[], [], [], []];
@@ -842,7 +1045,11 @@ export function resetMatch() {
   clearBamEffects();
   clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
-  startCountdown();
+  if (showFaceOff) {
+    startFaceOffScreen(false);
+  } else {
+    startCountdown();
+  }
 }
 
 export function goToTitle() {

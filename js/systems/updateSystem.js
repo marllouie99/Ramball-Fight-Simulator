@@ -1,7 +1,8 @@
 import { state } from '../core/state.js';
 import { updateFighters, updateProjectiles } from './physics.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
-import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatch } from '../core/gameFlow.js';
+import { startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, resetMatch, startCountdown, startMatchDirectlyFromFaceOff } from '../core/gameFlow.js';
+import { triggerFaceOffSFX } from '../graphics/ui/ThumbnailFaceOffScreen.js';
 import { updateDeathEffects } from '../graphics/particles/deathShatterEffect.js';
 import { updateIllusionDeathEffects } from '../graphics/particles/illusionDeathEffect.js';
 import { updateDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -15,10 +16,41 @@ import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { updateDriveBys } from './cjDriveBySystem.js';
 import { FRAME_TIME } from './gameLoop.js';
+import { updateArenaBgm, startArenaBgm } from './arenaBgmSystem.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
     state.frameCount = (state.frameCount || 0) + 1;
+
+    if (state.gameState === 'faceoff') {
+      state.faceOffTimer = (state.faceOffTimer || 0) + 1;
+      if (state.faceOffSavedToastTimer > 0) {
+        state.faceOffSavedToastTimer--;
+      }
+
+      if (state.faceOffAutoStart) {
+        // Audio SFX cues at key countdown milestones (with 32-frame dramatic standoff pause)
+        if (state.faceOffTimer === 96) triggerFaceOffSFX('skill_dash5', 0.35); // VS clash
+        if (state.faceOffTimer === 126) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
+        if (state.faceOffTimer === 156) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
+        if (state.faceOffTimer === 186) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
+        if (state.faceOffTimer === 216) {
+          triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
+          triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
+        }
+
+        // When showoff countdown concludes at frame 242, launch directly into combat!
+        if (state.faceOffTimer >= 242) {
+          startMatchDirectlyFromFaceOff();
+        }
+      } else {
+        // Manual thumbnail hold mode: hold at frame 120 (VS settled)
+        if (state.faceOffTimer > 120) {
+          state.faceOffTimer = 120;
+        }
+      }
+      return;
+    }
 
     // Update Logic based on state
     if (state.gameState === 'countdown') {
@@ -33,7 +65,10 @@ export function updateGame() {
         flamewardenFlameSystem.update(dt);
       } else {
         state.gameState = 'playing';
+        state._isChampionLayoutActive = false;
+        state.battleStartDelayTimer = 22; // Small delay (22 frames / ~0.35s) before fighters start moving
         state.countdownTimer = state.countdownDuration; // Ensure countdown HUD clears/completes
+        startArenaBgm(true);
         // Instant Battle Start Readiness: Clear initial spawn cooldowns so fighters attack & engage immediately when GO! hits!
         if (state.fighters) {
           state.fighters.forEach(f => {
@@ -53,6 +88,7 @@ export function updateGame() {
     
     if (state.gameState === 'playing') {
       state.matchTimer = (state.matchTimer || 0) + 1;
+      updateArenaBgm();
       updateFighters();
       updateProjectiles();
       updateDriveBys();
@@ -69,9 +105,9 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.roundEndTimer++;
 
-      // Auto next round / match (allow full duration for Mission Passed overlay + winner reveal)
+      // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Follow For More banner)
       const hasOverlay = Boolean(state.missionPassedOverlay);
-      const autoDelay = (state.mode === 'FFA' && state.ffaMatchComplete) ? 320 : (hasOverlay ? 280 : 180);
+      const autoDelay = (state.mode === 'FFA' && state.ffaMatchComplete) ? 340 : (hasOverlay ? 340 : 300);
       if (state.roundEndTimer >= autoDelay) {
         startNextRound();
       }

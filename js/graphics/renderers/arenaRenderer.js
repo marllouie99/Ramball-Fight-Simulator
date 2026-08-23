@@ -1,8 +1,6 @@
-// ─────────────────────────────────────────────
-// ARENA & SCREEN OVERLAY RENDERER
-// ─────────────────────────────────────────────
 import { state, getProjectiles } from '../../core/state.js';
-import { CONFIG } from '../../core/config.js';
+import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
+import { getCurrentPlayingBgmTitle } from '../../systems/arenaBgmSystem.js';
 
 // ──────────────────────────────────────────
 // SKETCHY BORDER HELPERS
@@ -259,11 +257,163 @@ function drawSolidVectorCrack(ctx, crack, isDark = false) {
   ctx.restore();
 }
 
+// ──────────────────────────────────────────
+// ANIME GRAPHIC DETAILS OVERLAY SYSTEM
+// (Halftone Dots, Action Triangles, Diagonal Speed Needles - OUTSIDE ARENA ONLY)
+// ──────────────────────────────────────────
+
+/**
+ * Draws the Halftone Dot Matrix ("circle thingy"), Action Triangles, and Speed Needles
+ * strictly OUTSIDE the arena playing field onto the outer canvas margins.
+ */
+function drawOuterArenaGraphicDetails(ctx, canvasWidth, canvasHeight, arena, isDark) {
+  ctx.save();
+
+  // Exclude the arena bounding box so details render strictly OUTSIDE the arena
+  ctx.beginPath();
+  ctx.rect(0, 0, canvasWidth, canvasHeight);
+  ctx.rect(arena.x, arena.y, arena.width, arena.height);
+  ctx.clip('evenodd');
+
+  // 1. Halftone Dot Matrix ("circle thingy") in outer margins
+  const dotColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.07)';
+  drawArenaHalftoneGrid(ctx, 0, 0, canvasWidth, canvasHeight, dotColor);
+
+  // 2. Action Triangles ("the small triangles") & Diagonal Speed Needles in outer margins
+  drawOuterActionTrianglesAndNeedles(ctx, canvasWidth, canvasHeight, arena, isDark);
+
+  ctx.restore();
+}
+
+function drawArenaHalftoneGrid(ctx, startX, startY, gridW, gridH, dotColor) {
+  const spacing = 14;
+  const cols = Math.floor(gridW / spacing);
+  const rows = Math.floor(gridH / spacing);
+
+  ctx.save();
+  ctx.fillStyle = dotColor;
+
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = startX + c * spacing + (r % 2 === 0 ? 0 : spacing * 0.5);
+      const y = startY + r * spacing;
+
+      const normX = c / cols;
+      const normY = r / rows;
+      const dist = Math.hypot(normX - 0.5, normY - 0.5);
+      const radiusFactor = Math.max(0.2, 1.0 - dist * 0.75);
+      const radius = Math.min(3.2, Math.max(0.8, radiusFactor * 3.0));
+
+      ctx.beginPath();
+      ctx.arc(x, y, radius, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+  ctx.restore();
+}
+
+function drawOuterActionTrianglesAndNeedles(ctx, width, height, arena, isDark) {
+  ctx.save();
+
+  // 1. Action Triangles in the outer margins
+  const triangleColors = [
+    'rgba(56, 189, 248, 0.75)',  // Cyan
+    'rgba(235, 60, 80, 0.70)',   // Crimson / Coral
+    isDark ? 'rgba(255, 255, 255, 0.75)' : 'rgba(30, 35, 45, 0.65)', // Contrast Neutral
+    'rgba(96, 165, 250, 0.70)'   // Electric Blue
+  ];
+
+  for (let i = 0; i < 28; i++) {
+    // Distribute triangles primarily in the left, right, top, and bottom margins
+    let tx, ty;
+    if (i % 4 === 0) {
+      // Left margin
+      tx = ((i * 37.3 + 15) % Math.max(20, arena.x - 15)) + 10;
+      ty = ((i * 123.7) % height);
+    } else if (i % 4 === 1) {
+      // Right margin
+      const rightMarginW = Math.max(20, width - (arena.x + arena.width) - 20);
+      tx = arena.x + arena.width + 10 + ((i * 43.1) % rightMarginW);
+      ty = ((i * 137.9) % height);
+    } else if (i % 4 === 2) {
+      // Top margin
+      tx = ((i * 89.5) % width);
+      ty = ((i * 29.1 + 10) % Math.max(20, arena.y - 15)) + 5;
+    } else {
+      // Bottom margin
+      const bottomMarginH = Math.max(20, height - (arena.y + arena.height) - 15);
+      tx = ((i * 93.7) % width);
+      ty = arena.y + arena.height + 5 + ((i * 31.3) % bottomMarginH);
+    }
+
+    const tr = 4.5 + (i % 5) * 1.6;
+    const rot = (i * 0.58) % (Math.PI * 2);
+    const color = triangleColors[i % triangleColors.length];
+    const isSolid = (i % 4 === 0);
+
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.rotate(rot);
+    ctx.globalAlpha = 0.60 + (i % 3) * 0.15;
+
+    ctx.beginPath();
+    ctx.moveTo(0, -tr);
+    ctx.lineTo(tr * 0.86, tr * 0.5);
+    ctx.lineTo(-tr * 0.86, tr * 0.5);
+    ctx.closePath();
+
+    if (isSolid) {
+      ctx.fillStyle = color;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // 2. Diagonal Needle Speed Lines across the outer margins
+  const needleColors = [
+    'rgba(56, 189, 248, 0.65)',
+    'rgba(96, 165, 250, 0.60)',
+    isDark ? 'rgba(255, 255, 255, 0.65)' : 'rgba(40, 50, 70, 0.55)'
+  ];
+
+  for (let i = 0; i < 18; i++) {
+    let sx, sy;
+    if (i % 2 === 0) {
+      // Left side needle
+      sx = ((i * 47.1 + 10) % Math.max(20, arena.x - 10));
+      sy = ((i * 111.3 + 30) % height);
+    } else {
+      // Right side needle
+      const rightMarginW = Math.max(20, width - (arena.x + arena.width) - 20);
+      sx = arena.x + arena.width + 10 + ((i * 53.7) % rightMarginW);
+      sy = ((i * 119.7 + 30) % height);
+    }
+
+    const len = 45 + (i % 5) * 18;
+    const angle = -0.68 + ((i % 3) - 1) * 0.06;
+    const color = needleColors[i % needleColors.length];
+
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx + Math.cos(angle) * len, sy + Math.sin(angle) * len);
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = 0.55 + (i % 3) * 0.15;
+    ctx.lineWidth = 1.2 + (i % 2) * 0.6;
+    ctx.stroke();
+  }
+
+  ctx.restore();
+}
+
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
-  // We draw the solid backgrounds using PixiJS so they sit behind the 2D canvas sprite
+  // 1. Draw outer background container (Original Colors)
   if (!state.arenaGraphics) {
     state.arenaGraphics = new window.PIXI.Graphics();
     pixiLayers.arena.addChild(state.arenaGraphics);
@@ -272,7 +422,6 @@ export function drawArena() {
   const g = state.arenaGraphics;
   g.clear();
 
-  // Helper to parse hex string into PIXI color and alpha
   const parseColor = (c) => {
     if (typeof c === 'number') return { color: c, alpha: 1 };
     if (!c) return { color: 0x000000, alpha: 1 };
@@ -288,13 +437,10 @@ export function drawArena() {
   const outerBg = parseColor(isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
   const innerBg = parseColor(isDark ? '#1a1c23' : (CONFIG.arenaInnerBgColor || '#ffffff'));
 
-  // Fill the entire canvas (global background)
   g.beginFill(canvasBg.color, canvasBg.alpha);
   g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
   g.endFill();
 
-  // Draw the container area outside the arena (under HUD and sides)
-  // Set to fill the entire height of the canvas so there are no black bars at the top or bottom
   const whiteTop = 0;
   const whiteBottom = pixiApp.screen.height;
   if (!hasActiveDomain) {
@@ -302,13 +448,12 @@ export function drawArena() {
     g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
     g.endFill();
   } else {
-    // Fill the arena background with solid black when a domain is active
-    // so any edge gaps during screen shakes blend seamlessly with the domain's dark borders
     g.beginFill(canvasBg.color, canvasBg.alpha);
     g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
     g.endFill();
   }
 
+  // 2. Draw Floor Background (Original Colors)
   if (!hasActiveDomain) {
     if (!state.floorGraphics) {
       state.floorGraphics = new window.PIXI.Graphics();
@@ -316,7 +461,6 @@ export function drawArena() {
     }
     const fg = state.floorGraphics;
     fg.clear();
-    // Arena floor background (inside the arena boundaries)
     fg.beginFill(innerBg.color, innerBg.alpha);
     fg.drawRect(arena.x, arena.y, arena.width, arena.height);
     fg.endFill();
@@ -326,27 +470,39 @@ export function drawArena() {
     }
   }
 
-  // Draw the arena boundary stroke
+  // 3. Draw Graphic Details (Halftone Dots, Action Triangles, Speed Needles) strictly OUTSIDE the arena
+  if (!hasActiveDomain) {
+    const detailsKey = `${canvas.width}_${canvas.height}_${arena.x}_${arena.y}_${arena.width}_${arena.height}_${isDark ? 'dark' : 'light'}`;
+    if (!state._arenaOuterDetailsCanvas || state._arenaOuterDetailsCanvas._key !== detailsKey) {
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = canvas.width;
+      offCanvas.height = canvas.height;
+      const oc = offCanvas.getContext('2d');
+      drawOuterArenaGraphicDetails(oc, canvas.width, canvas.height, arena, isDark);
+      offCanvas._key = detailsKey;
+      state._arenaOuterDetailsCanvas = offCanvas;
+    }
+
+    ctx.save();
+    ctx.drawImage(state._arenaOuterDetailsCanvas, 0, 0);
+    ctx.restore();
+  }
+
+  // 4. Draw Arena Borders
   const wallWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
     ? state.config.arena.wallWidth 
     : 4;
-  
-  // Draw sketchy pencil-style borders on the 2D Canvas context
+
   const borderColor = isDark ? 'rgba(230, 235, 245, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._version !== 2 || state._arenaBorderCanvas.arenaWidth !== arena.width || state._arenaBorderCanvas.arenaHeight !== arena.height || state._arenaBorderCanvas.wallWidth !== wallWidth || state._arenaBorderCanvas._theme !== (state.arenaTheme || 'light')) {
-    const padding = 60; // Extra padding for overshoots
+  const borderKey = `${arena.width}_${arena.height}_${wallWidth}_${isDark ? 'dark' : 'light'}`;
+  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
+    const padding = 60;
     const offCanvas = document.createElement('canvas');
     offCanvas.width = arena.width + padding * 2;
     offCanvas.height = arena.height + padding * 2;
     const oc = offCanvas.getContext('2d');
-    
     drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth, borderColor);
-    
-    offCanvas._version = 2;
-    offCanvas._theme = state.arenaTheme || 'light';
-    offCanvas.arenaWidth = arena.width;
-    offCanvas.arenaHeight = arena.height;
-    offCanvas.wallWidth = wallWidth;
+    offCanvas._key = borderKey;
     state._arenaBorderCanvas = offCanvas;
   }
 
@@ -359,7 +515,6 @@ export function drawArena() {
   // ── Draw Wall Cracks (Decals) ──
   if (state.wallCracks && state.wallCracks.length > 0) {
     ctx.save();
-    // Generous wall zone bounds: allow full natural fissure propagation without intersecting top title header or bottom HUD cards
     ctx.beginPath();
     const clipMarginTop = 75;
     const clipMarginBottom = 75;
@@ -379,7 +534,6 @@ export function drawArena() {
         state.wallCracks.splice(i, 1);
         continue;
       }
-      
       drawSolidVectorCrack(ctx, crack, isDark);
     }
     ctx.restore();
@@ -387,7 +541,7 @@ export function drawArena() {
 
   ctx.restore();
 
-  // Draw "CRONOSPHERE" transparent watermark on the 2D Canvas (since text is easier in Canvas2D)
+  // 5. Draw "CRONOSPHERE" transparent watermark
   const centerX = arena.x + arena.width / 2;
   const centerY = arena.y + arena.height / 2;
 
@@ -402,8 +556,27 @@ export function drawArena() {
   ctx.fillText('CRONOSPHERE', centerX, centerY);
   ctx.restore();
 
-  // ── Cached Title Header (text only) ──────────────────────────────
-  // Render the entire title text once into an offscreen canvas, then blit it every frame if enabled.
+  // 5b. Background Music Title Text above Top Arena Wall
+  const bgmTitle = getCurrentPlayingBgmTitle();
+  if (bgmTitle && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+    const textY = arena.y - 8;
+    ctx.save();
+    ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'bottom';
+    
+    // Crisp dark/light stroke outline
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.95)';
+    ctx.strokeText(bgmTitle, centerX, textY);
+    
+    // High-visibility amber-gold fill
+    ctx.fillStyle = isDark ? '#f59e0b' : '#b45309';
+    ctx.fillText(bgmTitle, centerX, textY);
+    ctx.restore();
+  }
+
+  // 6. Cached Title Header (text only)
   const showTitle = (typeof CONFIG !== 'undefined' && CONFIG.showArenaTitle !== undefined) ? CONFIG.showArenaTitle : false;
   if (!showTitle) {
     return;

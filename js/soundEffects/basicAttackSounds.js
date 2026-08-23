@@ -15,6 +15,8 @@
 //   delay = 3   → sound plays 3 frames AFTER the attack fires
 //   delay = 10  → sound plays 10 frames after (good for syncing with projectile travel)
 
+import { CONFIG } from '../core/config.js';
+
 export const BASIC_ATTACK_SOUNDS = {
   // ── Ranger (aimbot/Jazz) ──────────────────────────
   // Fires a homing projectile. Uses dubstep gun notes sequentially.
@@ -223,12 +225,16 @@ export const BASIC_ATTACK_SOUNDS = {
 
   // ── Carl "CJ" Johnson (ID 34) ─────────
   34: {
-    src: [
-      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
-    ],
-    volume: 1.0,
+    get src() {
+      return CONFIG.cj?.sounds?.punchHit || [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.cj?.soundVolumes?.punchHit !== undefined ? CONFIG.cj.soundVolumes.punchHit : 0.8;
+    },
     delay: 0,
   }
 };
@@ -241,21 +247,29 @@ export const BASIC_ATTACK_SOUNDS = {
 export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   // Carl "CJ" Johnson — Street Boxing Brass Knuckles
   'cj': {
-    src: [
-      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
-    ],
-    volume: 1.0,
+    get src() {
+      return CONFIG.cj?.sounds?.punchHit || [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.cj?.soundVolumes?.punchHit !== undefined ? CONFIG.cj.soundVolumes.punchHit : 0.8;
+    },
     delay: 0,
   },
   'cj_punch': {
-    src: [
-      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
-    ],
-    volume: 1.0,
+    get src() {
+      return CONFIG.cj?.sounds?.punchHit || [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.cj?.soundVolumes?.punchHit !== undefined ? CONFIG.cj.soundVolumes.punchHit : 0.8;
+    },
     delay: 0,
   },
   // Engineer — high-rate-of-fire automatic weapon
@@ -323,21 +337,29 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
   },
   // Mahoraga — Heavy martial punches & rapid strikes
   'mahoraga': {
-    src: [
-      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
-    ],
-    volume: 1.0,
+    get src() {
+      return CONFIG.mahoraga?.sounds?.punchSounds || [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.mahoraga?.soundVolumes?.punch !== undefined ? CONFIG.mahoraga.soundVolumes.punch : 1.0;
+    },
     delay: 0,
   },
   'mahoraga_punch': {
-    src: [
-      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
-      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
-    ],
-    volume: 1.0,
+    get src() {
+      return CONFIG.mahoraga?.sounds?.punchSounds || [
+        'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+        'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+      ];
+    },
+    get volume() {
+      return CONFIG.mahoraga?.soundVolumes?.punch !== undefined ? CONFIG.mahoraga.soundVolumes.punch : 1.0;
+    },
     delay: 0,
   },
   // Todo — Brawler melee punches (uses Gojo punch attack audio)

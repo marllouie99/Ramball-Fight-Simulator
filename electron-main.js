@@ -1,7 +1,38 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
 const os = require('os');
 const fs = require('fs');
+
+// Auto-sync & scan function for ARENA-BGMUSIC folder:
+function scanAndSyncBgmFolder() {
+  try {
+    const bgmDir = path.join(__dirname, 'Assets', 'Sound Effects', 'ARENA-BGMUSIC');
+    if (!fs.existsSync(bgmDir)) {
+      fs.mkdirSync(bgmDir, { recursive: true });
+    }
+    const files = fs.readdirSync(bgmDir);
+    const audioFiles = files.filter(f => /\.(mp3|wav|ogg|m4a)$/i.test(f));
+    
+    // Auto-update manifest.json so web / offline loaders stay 100% in sync
+    const manifestPath = path.join(bgmDir, 'manifest.json');
+    fs.writeFileSync(manifestPath, JSON.stringify(audioFiles, null, 2), 'utf-8');
+    
+    return audioFiles;
+  } catch (err) {
+    console.error('Error scanning BGM folder:', err);
+    return [];
+  }
+}
+
+ipcMain.handle('scan-bgm-folder', () => {
+  return scanAndSyncBgmFolder();
+});
+
+ipcMain.handle('open-bgm-folder', () => {
+  const bgmDir = path.join(__dirname, 'Assets', 'Sound Effects', 'ARENA-BGMUSIC');
+  shell.openPath(bgmDir);
+  return true;
+});
 
 // Redirect UserData directory to a local Temp folder to bypass OneDrive sync locking and AppData permission conflicts
 const tempUserDataPath = path.join(os.tmpdir(), 'circle-mini-battle-userdata');
@@ -25,6 +56,9 @@ app.commandLine.appendSwitch('disable-background-timer-throttling');
 app.commandLine.appendSwitch('disable-backgrounding-occluded-windows');
 
 function createWindow () {
+  // Sync BGM folder immediately on window creation
+  scanAndSyncBgmFolder();
+
   const win = new BrowserWindow({
     width: 540,
     height: 960,
@@ -32,7 +66,8 @@ function createWindow () {
     resizable: false,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     },
     frame: false, // Removes the Windows title bar and borders for a perfect 9:16 capture
     autoHideMenuBar: true

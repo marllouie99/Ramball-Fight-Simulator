@@ -209,6 +209,19 @@ export const state = {
   matchEndTimer: 0,
   ffaMatchComplete: false,
 
+  // Face-Off & Thumbnail Overlay State
+  faceOffTimer: 0,
+  faceOffExiting: false,
+  faceOffExitTimer: 0,
+  faceOffExitDuration: 20,
+  faceOffScale: 1.35,
+  faceOffCleanMode: false,
+  faceOffAutoStart: true,
+  faceOffTheme: 'neon', // 'neon' | 'manga' | 'arena'
+  faceOffSavedToastTimer: 0,
+  faceOffFromSelect: false,
+  faceOffParticles: [],
+
   // TLFS gamemode state
   tlfsAllowedEnemies: [], // Will be populated with all fighter indices
   tlfsDefeatedEnemies: 0,

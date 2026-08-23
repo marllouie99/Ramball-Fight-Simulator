@@ -159,8 +159,8 @@ export class FighterRenderer {
   }
 
   static drawHealth(ctx, fighter) {
-    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
-    if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter.hideHpText) return;
+    if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
+    if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter._isFaceOff || (fighter.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
 
     ctx.save();
     ctx.font = 'bold 18px Arial';

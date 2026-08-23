@@ -93,4 +93,72 @@ export const gojoConfig = {
   teleportDodgeChance: 0.10,               // Chance to teleport dodge incoming attacks
   teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
   teleportDodgeDistance: 85,               // Distance teleported on dodge
+
+  // ── 9. Audio Configuration, Volume & Delays (Organized same as Nanami) ──
+  sounds: {
+    // Basic Attack & Martial Arts Melee
+    blueOrb: 'Assets/Sound Effects/Attacks/spaceshot.mp3',
+    meleePunch: 'Assets/Sound Effects/Attacks/punch.mp3',
+    teleportDash: 'Assets/Sound Effects/Skills/dash3.mp3',
+
+    // Passive: Limitless Infinity Barrier
+    infinityCollide: 'Assets/Sound Effects/SkillEffects/infinity-collide.mp3',
+
+    // Skill 1: Cursed Technique Reversal: Red
+    redChanneling: 'Assets/Sound Effects/Skills/redchanneling.mp3',
+    redCharging: 'Assets/Sound Effects/Skills/redcharging.mp3',
+    redDeploy: 'Assets/Sound Effects/Skills/reddeploy.mp3',
+    redBlast: 'Assets/Sound Effects/Skills/redblast.mp3',
+
+    // Skill 2: Secret Technique: Hollow Purple
+    purpleCharge: 'Assets/Sound Effects/Skills/mixing.mp3',
+    purpleFlare: 'Assets/Sound Effects/Skills/dash3.mp3',
+    purpleDeploy: 'Assets/Sound Effects/Skills/purpledeploy.mp3',
+    purpleFire: 'Assets/Sound Effects/Skills/hollowpurple.mp3',
+
+    // Ultimate: Domain Expansion (Unlimited Void — Muryōkūsho)
+    domainChannel: 'Assets/Sound Effects/Skills/gojodomain.mp3',
+    domainExpansion: 'Assets/Sound Effects/Skills/gojodomainexpansion.mp3',
+    domainActivate: 'Assets/Sound Effects/Skills/gojodomaindeploy.mp3',
+
+    // Reverse Cursed Technique (RCT) Healing
+    reverseCursedTechnique: 'Assets/Sound Effects/Skills/repair.mp3'
+  },
+  soundVolumes: {
+    blueOrb: 0.60,
+    meleePunch: 1.80,
+    teleportDash: 0.80,
+    infinityCollide: 1.00,
+    redChanneling: 1.50,
+    redCharging: 2.00,
+    redDeploy: 2.00,
+    redBlast: 1.50,
+    purpleCharge: 3.00,
+    purpleFlare: 0.85,
+    purpleDeploy: 2.50,
+    purpleFire: 1.00,
+    domainChannel: 3.00,
+    domainExpansion: 3.00,
+    domainActivate: 3.00,
+    reverseCursedTechnique: 1.00
+  },
+  soundDelays: {
+    blueOrb: 0,
+    meleePunch: 0,
+    teleportDash: 0,
+    infinityCollide: 0,
+    redChanneling: 0,
+    redCharging: 0,
+    redDeploy: 0,
+    redBlast: 0,
+    purpleCharge: -0.10,
+    purpleFlare: 0,
+    purpleDeploy: 0,
+    purpleFire: 0,
+    domainChannel: 0,
+    domainExpansion: 0,
+    domainActivate: -0.10,
+    reverseCursedTechnique: 0
+  }
 };
+

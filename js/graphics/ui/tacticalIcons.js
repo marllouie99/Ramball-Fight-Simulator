@@ -27,6 +27,15 @@ export const TACTICAL_ICONS = {
     <path d="M12 8v8m-4-4h8"/>
   </svg>`,
 
+  random: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="3"/>
+    <circle cx="8" cy="8" r="1.5" fill="currentColor"/>
+    <circle cx="16" cy="16" r="1.5" fill="currentColor"/>
+    <circle cx="16" cy="8" r="1.5" fill="currentColor"/>
+    <circle cx="8" cy="16" r="1.5" fill="currentColor"/>
+    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+  </svg>`,
+
   database: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <rect x="3" y="3" width="18" height="18" rx="2"/>
     <path d="M7 8h10M7 12h10M7 16h6"/>

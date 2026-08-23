@@ -2749,6 +2749,8 @@ export function drawMahitoTwinScissor(ctx, fighter, layer = 'all') {
     ctx.stroke();
   }
   ctx.restore();
+
+  ctx.restore();
 }
 
 /**

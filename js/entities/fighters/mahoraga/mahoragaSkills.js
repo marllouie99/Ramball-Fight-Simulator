@@ -103,7 +103,9 @@ export function gojoPurpleTeleportDodge(fighter, gojo, purpleOrb = null) {
   spawnImpactFlash(fromX, fromY, 40, '#8A2BE2');
   spawnSparks(fromX, fromY, 20, 'arcane', '#8A2BE2');
   spawnImpactFlash(toX, toY, 35, '#8A2BE2');
-  audioSystem.playSFX('skill_dash5', 1.0);
+  const dashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+  const dashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+  audioSystem.playSFX(dashSnd, dashVol);
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ PURPLE DODGED!', '#8A2BE2');
 }
 
@@ -145,7 +147,9 @@ export function gojoRedTeleportDodge(fighter, gojo) {
   spawnImpactFlash(fromX, fromY, 40, '#FF1144');
   spawnSparks(fromX, fromY, 20, 'arcane', '#FF1144');
   spawnImpactFlash(toX, toY, 35, '#FF1144');
-  audioSystem.playSFX('skill_dash5', 1.0);
+  const dashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+  const dashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+  audioSystem.playSFX(dashSnd, dashVol);
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ RED DODGED!', '#FF1144');
 }
 
@@ -235,7 +239,9 @@ export function startAdaptationFlashDash(fighter, attacker) {
 
   spawnImpactFlash(fromX, fromY, 28, '#E0E0E0');
   spawnSparks(fromX, fromY, 12, 'silver', '#FFFFFF');
-  audioSystem.playSFX('skill_dash3', 1.0);
+  const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
+  const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(tpSnd, tpVol);
 }
 
 /**
@@ -320,7 +326,9 @@ export function sukunaFugaTeleportDodge(fighter, sukuna, fugaOrb = null) {
   spawnImpactFlash(fromX, fromY, 40, '#FF6F00');
   spawnSparks(fromX, fromY, 20, 'arcane', '#FF6F00');
   spawnImpactFlash(toX, toY, 35, '#FF6F00');
-  audioSystem.playSFX('skill_dash5', 1.0);
+  const fugaDashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+  const fugaDashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+  audioSystem.playSFX(fugaDashSnd, fugaDashVol);
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, '⚡ FUGA DODGED!', '#FF6F00');
 }
 
@@ -438,6 +446,8 @@ export function generalSkillShotTeleportDodge(fighter, attacker, projectile) {
   spawnImpactFlash(fromX, fromY, 40, color);
   spawnSparks(fromX, fromY, 20, 'arcane', color);
   spawnImpactFlash(toX, toY, 35, color);
-  audioSystem.playSFX('skill_dash5', 1.0);
+  const genDashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+  const genDashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+  audioSystem.playSFX(genDashSnd, genDashVol);
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, `⚡ ${displayName} DODGED!`, color);
 }

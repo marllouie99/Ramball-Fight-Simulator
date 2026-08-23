@@ -1,4 +1,4 @@
-import { randomize1v1Fighters, randomize1v2Fighters, goToTitle, startGame } from '../../core/gameFlow.js';
+import { randomize1v1Fighters, randomize1v2Fighters, goToTitle, startGame, startFaceOffScreen } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
@@ -11,6 +11,7 @@ import { getFighterPreview } from './FighterPreviewCache.js';
 import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
+import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
@@ -495,18 +496,25 @@ function drawSelectScreen() {
   const modeButtonY = 104;
   drawModeSelection(canvas.width / 2, modeButtonY);
 
-  // Tactical Sub-Controls (Test Mode & Dummy Toggles - Shifted to Y = 128)
-  const tmW = 114;
-  const tmH = 22;
-  const gap = 12;
-  const tmX = canvas.width / 2 - tmW - gap / 2;
+  // Tactical Sub-Controls (Test Mode, Dummy Target & Arena BGM - Shifted to Y = 128)
+  const tmW = 88;
+  const daW = 98;
+  const bgmW = 114;
+  const ctrlH = 22;
+  const gap = 8;
+  const totalCtrlW = tmW + daW + bgmW + gap * 2;
+  const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
+  const tmX = startCtrlX;
+  const daX = tmX + tmW + gap;
+  const bgmX = daX + daW + gap;
   const tmY = 128;
 
+  // 1. Test Mode Button
   ctx.save();
   ctx.fillStyle = state.testMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(18, 22, 32, 0.85)';
   ctx.strokeStyle = state.testMode ? '#f59e0b' : 'rgba(255, 255, 255, 0.12)';
   ctx.lineWidth = 1;
-  drawChamferedRect(ctx, tmX, tmY, tmW, tmH, 4);
+  drawChamferedRect(ctx, tmX, tmY, tmW, ctrlH, 4);
   ctx.fill();
   ctx.stroke();
 
@@ -514,10 +522,10 @@ function drawSelectScreen() {
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('TEST MODE', tmX + tmW / 2 - 8, tmY + tmH / 2);
+  ctx.fillText('TEST MODE', tmX + tmW / 2 - 6, tmY + ctrlH / 2);
 
   ctx.beginPath();
-  ctx.arc(tmX + tmW - 12, tmY + tmH / 2, 3, 0, Math.PI * 2);
+  ctx.arc(tmX + tmW - 10, tmY + ctrlH / 2, 3, 0, Math.PI * 2);
   ctx.fillStyle = state.testMode ? '#f59e0b' : '#475569';
   if (state.testMode) {
     ctx.shadowColor = '#f59e0b';
@@ -526,16 +534,14 @@ function drawSelectScreen() {
   ctx.fill();
   ctx.restore();
 
-  _registerButton(tmX, tmY, tmW, tmH, () => { state.testMode = !state.testMode; });
+  _registerButton(tmX, tmY, tmW, ctrlH, () => { state.testMode = !state.testMode; });
 
-  const daX = canvas.width / 2 + gap / 2;
-  const daY = 128;
-
+  // 2. Dummy Target Button
   ctx.save();
   ctx.fillStyle = state.dummyEnabled ? 'rgba(245, 158, 11, 0.15)' : 'rgba(18, 22, 32, 0.85)';
   ctx.strokeStyle = state.dummyEnabled ? '#f59e0b' : 'rgba(255, 255, 255, 0.12)';
   ctx.lineWidth = 1;
-  drawChamferedRect(ctx, daX, daY, tmW, tmH, 4);
+  drawChamferedRect(ctx, daX, tmY, daW, ctrlH, 4);
   ctx.fill();
   ctx.stroke();
 
@@ -543,10 +549,10 @@ function drawSelectScreen() {
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('DUMMY TARGET', daX + tmW / 2 - 8, daY + tmH / 2);
+  ctx.fillText('DUMMY TARGET', daX + daW / 2 - 6, tmY + ctrlH / 2);
 
   ctx.beginPath();
-  ctx.arc(daX + tmW - 12, daY + tmH / 2, 3, 0, Math.PI * 2);
+  ctx.arc(daX + daW - 10, tmY + ctrlH / 2, 3, 0, Math.PI * 2);
   ctx.fillStyle = state.dummyEnabled ? '#f59e0b' : '#475569';
   if (state.dummyEnabled) {
     ctx.shadowColor = '#f59e0b';
@@ -555,7 +561,7 @@ function drawSelectScreen() {
   ctx.fill();
   ctx.restore();
 
-  _registerButton(daX, daY, tmW, tmH, () => {
+  _registerButton(daX, tmY, daW, ctrlH, () => {
     state.dummyEnabled = !state.dummyEnabled;
     if (!state.dummyEnabled) {
       const dummyIdx = FIGHTER_DEFS.findIndex(d => d.type === 'dummy');
@@ -567,6 +573,9 @@ function drawSelectScreen() {
       }
     }
   });
+
+  // 3. Arena BGM Selector Button
+  drawArenaBgmSelector(ctx, bgmX, tmY, bgmW, ctrlH);
 
   // ── Main Combatant Grid (Shifted to topY = 158) ──
   const topY = 158;
@@ -661,18 +670,33 @@ function drawSelectScreen() {
   if (selectingSlot !== null) {
     drawFighterSelectModal();
   }
+
+  if (isArenaBgmModalOpen()) {
+    drawArenaBgmModal(state.ctx);
+  }
 }
 
 function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
   const { canvas } = state;
-  const startBtnW = 170;
-  const randBtnW = 140;
-  const btnGap = 12;
-  const startBtnX = canvas.width / 2 - (startBtnW + randBtnW + btnGap) / 2 + startBtnW / 2;
-  const randBtnX = startBtnX + startBtnW / 2 + btnGap + randBtnW / 2;
+  const startBtnW = 160;
+  const thumbBtnW = 125;
+  const randBtnW = 120;
+  const btnGap = 8;
+  const totalRowW = startBtnW + thumbBtnW + randBtnW + btnGap * 2;
+  let startX = canvas.width / 2 - totalRowW / 2;
+
+  const startBtnX = startX + startBtnW / 2;
+  startX += startBtnW + btnGap;
+  const thumbBtnX = startX + thumbBtnW / 2;
+  startX += thumbBtnW + btnGap;
+  const randBtnX = startX + randBtnW / 2;
+
   const actionRowY = 840;
 
-  drawButton(primaryLabel, startBtnX, actionRowY, onStart, startBtnW, 44);
+  drawButton(primaryLabel, startBtnX, actionRowY, onStart, startBtnW, 44, '#ef4444');
+  drawButton('📸 THUMBNAIL', thumbBtnX, actionRowY, () => {
+    startFaceOffScreen(true);
+  }, thumbBtnW, 44, '#f59e0b');
   drawButton('RANDOMIZE', randBtnX, actionRowY, onRandomize, randBtnW, 44);
   drawButton('BACK TO MENU', canvas.width / 2, 898, () => { goToTitle(); }, 140, 32);
 
@@ -682,7 +706,7 @@ function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
   ctx.font = '900 9.5px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('[SPACE] START  •  [R] RANDOMIZE  •  [ESC] BACK', canvas.width / 2, 940);
+  ctx.fillText('[SPACE] START  •  [T] THUMBNAIL  •  [R] RANDOMIZE  •  [ESC] BACK', canvas.width / 2, 940);
 }
 
 function randomizeFfaFighters() {
@@ -1070,6 +1094,13 @@ function openFighterSelectModal(slotProp, fighterIndex) {
 // Global Keyboard Shortcuts for Tactical Select Screen
 window.addEventListener('keydown', (e) => {
   if (state.gameState === 'select') {
+    if (isArenaBgmModalOpen()) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        closeArenaBgmModal();
+        e.preventDefault();
+        return;
+      }
+    }
     if (selectingSlot !== null) {
       if (e.key === 'Escape') {
         selectingSlot = null;
@@ -1106,6 +1137,9 @@ window.addEventListener('keydown', (e) => {
     if (e.code === 'Space' || e.key === 'Enter') {
       e.preventDefault();
       startGame();
+    } else if (e.code === 'KeyT') {
+      e.preventDefault();
+      startFaceOffScreen(true);
     } else if (e.code === 'KeyR') {
       e.preventDefault();
       if (state.mode === '1v1' || state.mode === 'Stand Off') {

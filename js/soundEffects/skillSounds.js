@@ -7,6 +7,8 @@
 //   - volume:   Playback volume (0.0 to 1.0, can be >1.0 for gain)
 //   - delay:    Seconds (or frames, depending on skill logic) to wait before playing the sound
 
+import { CONFIG } from '../core/config.js';
+
 export const SKILL_SOUNDS = {
   // â”€â”€ Berserker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   10: {
@@ -242,6 +244,16 @@ export const SKILL_SOUNDS = {
       src: 'Assets/Sound Effects/Skills/redblast.mp3',
       volume: 2.5,
       delay: 0
+    },
+    reverse_cursed_technique: {
+      src: 'Assets/Sound Effects/Skills/repair.mp3',
+      volume: 1.0,
+      delay: 0
+    },
+    reversecursedtechnique: {
+      src: 'Assets/Sound Effects/Skills/repair.mp3',
+      volume: 1.0,
+      delay: 0
     }
   },
 
@@ -352,25 +364,33 @@ export const SKILL_SOUNDS = {
   },
   // ── Mahoraga ──────────────────────────
   100: {
-    parry: {
-      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
-      volume: 0.8,
-      delay: 0
+    get parry() {
+      return {
+        src: CONFIG.mahoraga?.sounds?.parry || 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+        volume: CONFIG.mahoraga?.soundVolumes?.parry !== undefined ? CONFIG.mahoraga.soundVolumes.parry : 0.8,
+        delay: CONFIG.mahoraga?.soundDelays?.parry || 0
+      };
     },
-    shieldblock: {
-      src: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
-      volume: 0.7,
-      delay: 0
+    get shieldblock() {
+      return {
+        src: CONFIG.mahoraga?.sounds?.shieldBlock || 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+        volume: CONFIG.mahoraga?.soundVolumes?.shieldBlock !== undefined ? CONFIG.mahoraga.soundVolumes.shieldBlock : 0.7,
+        delay: CONFIG.mahoraga?.soundDelays?.shieldBlock || 0
+      };
     },
-    shout: {
-      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-      volume: 2.2,
-      delay: 0
+    get shout() {
+      return {
+        src: CONFIG.mahoraga?.sounds?.shout || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        volume: CONFIG.mahoraga?.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 2.2,
+        delay: CONFIG.mahoraga?.soundDelays?.shout || 0
+      };
     },
-    divineshout: {
-      src: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
-      volume: 2.2,
-      delay: 0
+    get divineshout() {
+      return {
+        src: CONFIG.mahoraga?.sounds?.shout || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        volume: CONFIG.mahoraga?.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 2.2,
+        delay: CONFIG.mahoraga?.soundDelays?.shout || 0
+      };
     }
   },
   // ── Genos ─────────────────────────────

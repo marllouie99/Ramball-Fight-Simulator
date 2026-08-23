@@ -4,10 +4,11 @@
 
 import { state } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js';
-import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, restartCurrentRound, resetMatch } from './gameFlow.js';
+import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown } from './gameFlow.js';
 import { FIGHTER_DEFS, CONFIG } from './config.js';
-import { handleUIClick, handleUIMove } from '../graphics/ui.js';
+import { handleUIClick, handleUIMove, captureFaceOffScreenshot } from '../graphics/ui.js';
 import { stopAllSounds, stopAllLoopingSounds, unlockAudio } from '../systems/soundSystem.js';
+import { getSelectedArenaBgmTrack, cycleNextArenaBgmTrack } from '../systems/arenaBgmSystem.js';
 import { initGraphicsCache } from '../graphics/graphicsCache.js';
 import { syncHudPosition } from '../graphics/ui/hudLayout.js';
 import { clearHealthHud } from '../graphics/hudManager.js';
@@ -44,6 +45,10 @@ window.addEventListener('keydown', (e) => {
   unlockAudio();
 
   if (e.key === 'Escape' || e.key.toLowerCase() === 'p') {
+    if (state.gameState === 'faceoff') {
+      state.gameState = 'select';
+      return;
+    }
     if (state.gameState === 'playing' || state.gameState === 'countdown') {
       state.previousGameState = state.gameState;
       state.gameState = 'paused';
@@ -51,6 +56,14 @@ window.addEventListener('keydown', (e) => {
       state.gameState = state.previousGameState || 'playing';
     }
   } else if (e.key === ' ' || e.key === 'Enter' || e.key.toLowerCase() === 's') {
+    if (state.gameState === 'faceoff') {
+      if (e.key.toLowerCase() === 's') {
+        captureFaceOffScreenshot();
+      } else {
+        proceedFromFaceOffToCountdown();
+      }
+      return;
+    }
     if (state.gameState === 'title') {
       executeTacticalAction(activeTacticalAction);
     }
@@ -61,21 +74,23 @@ window.addEventListener('keydown', (e) => {
       else if (state.mode === '1v1' || state.mode === 'Stand Off') resetMatchWithRandom1v1Fighters();
       else resetMatch();
     }
-  } else if (e.key.toLowerCase() === 'r') {
-    if (state.gameState === 'playing' || state.gameState === 'roundEnd') {
-      restartCurrentRound();
-    } else if (state.gameState === 'matchEnd') {
-      resetMatch();
-    }
   } else if (e.key.toLowerCase() === 'c') {
+    if (state.gameState === 'faceoff') {
+      state.faceOffCleanMode = !state.faceOffCleanMode;
+      return;
+    }
     if (state.allFpsLogs && state.allFpsLogs.length > 0) {
       const logText = state.allFpsLogs.join('\n');
       navigator.clipboard.writeText(logText).catch(err => console.error('Failed to copy logs:', err));
       state.fpsLogsCopiedTimer = 120; // Show copied message for 2 seconds
     }
-  } else if (e.key.toLowerCase() === 'h') {
-    state.hideFpsLogs = !state.hideFpsLogs;
   } else if (e.key.toLowerCase() === 't') {
+    if (state.gameState === 'faceoff') {
+      const themes = ['neon', 'manga', 'arena'];
+      const nextIdx = (themes.indexOf(state.faceOffTheme || 'neon') + 1) % themes.length;
+      state.faceOffTheme = themes[nextIdx];
+      return;
+    }
     // DEBUG: Press 'T' to trigger Gojo's RCT aura (for testing visual effect)
     if (state.gameState === 'playing' && state.fighters) {
       state.fighters.forEach(fighter => {
@@ -85,6 +100,14 @@ window.addEventListener('keydown', (e) => {
         }
       });
     }
+  } else if (e.key.toLowerCase() === 'r') {
+    if (state.gameState === 'playing' || state.gameState === 'roundEnd') {
+      restartCurrentRound();
+    } else if (state.gameState === 'matchEnd') {
+      resetMatch();
+    }
+  } else if (e.key.toLowerCase() === 'h') {
+    state.hideFpsLogs = !state.hideFpsLogs;
   }
 });
 
@@ -287,6 +310,11 @@ if (arenaTitleBtn) {
   arenaTitleBtn.innerText = CONFIG.showArenaTitle ? 'ON' : 'OFF';
 }
 
+const bgmBtn = document.getElementById('btn-bgm');
+if (bgmBtn) {
+  bgmBtn.innerText = getSelectedArenaBgmTrack().name;
+}
+
 state.performanceMode = localStorage.getItem('performanceMode') === 'true';
 const perfBtn = document.getElementById('btn-performance');
 if (perfBtn) {
@@ -363,6 +391,9 @@ function executeTacticalAction(action) {
     state.mode = 'Stand Off';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
+  } else if (action === 'mode-random-standoff') {
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    startRandomStandoffBattle();
   } else if (action === 'mode-2v2') {
     state.mode = '2v2';
     state.p3Index = state.p3Index ?? 2;
@@ -538,6 +569,12 @@ document.getElementById('btn-arenatitle')?.addEventListener('click', (e) => {
   CONFIG.showArenaTitle = !CONFIG.showArenaTitle;
   localStorage.setItem('showArenaTitle', CONFIG.showArenaTitle);
   e.target.innerText = CONFIG.showArenaTitle ? 'ON' : 'OFF';
+});
+
+document.getElementById('btn-bgm')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  const nextTrack = cycleNextArenaBgmTrack();
+  e.target.innerText = nextTrack.name;
 });
 
 // Keyboard / Tactical Controller Prompts

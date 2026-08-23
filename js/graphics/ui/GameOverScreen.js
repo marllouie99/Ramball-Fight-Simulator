@@ -1,3 +1,7 @@
+// ─────────────────────────────────────────────
+// GAME OVER & CHAMPION VICTORY REVEAL SCREEN
+// (Seamless In-Arena Layout: Champion Left, Stats Right)
+// ─────────────────────────────────────────────
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { Fighter } from '../../entities/fighter.js';
 import { drawHUD, drawMissionPassedOverlay } from '../hudManager.js?v=6';
@@ -8,198 +12,352 @@ import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel,
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters, randomize1v2Fighters, goToTitle } from '../../core/gameFlow.js';
 import { MODE_SETTINGS } from '../../core/modeConfig.js';
+import { stopArenaBgm } from '../../systems/arenaBgmSystem.js';
 
+// ──────────────────────────────────────────
+// COLOR & MATH UTILITIES
+// ──────────────────────────────────────────
 
-function drawRoundEndScreen() {
-  const { ctx, canvas, arena, roundWinner, roundNum, roundEndTimer, mode, ffaMatchComplete, scores } = state;
-  _clearButtons();
-  drawHUD();
-
-  if (roundEndTimer <= 2) {
-    state._winnerEmbers = null;
+function adjustBrightness(hex, percent) {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return hex || '#ffffff';
+  let cleanHex = hex.replace('#', '');
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
   }
-
-  // If CJ's Mission Passed or Wasted overlay is active, let it play its full smooth fade-in & out (180-200 frames)
-  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
-  const displayDelay = hasMissionOverlay ? 180 : 60;
-  const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
-
-  // Smooth fade-in effect (only after delay)
-  const fadeAlpha = Math.min(0.96, (delayedTimer / 45) * 0.96);
-  ctx.fillStyle = `rgba(0,0,0,${fadeAlpha})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-
-  // Check if winner has 2 victories (match win condition)
-  const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
-  const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
-  const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
-  const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThresholdForReveal;
-  const showModel = hasTwoWins && roundWinner;
-
-  // Determine winner text
-  let winnerText;
-  if (mode === '2v2') {
-    const winningTeam = state.teamScores[0] > state.teamScores[1] ? 0 : 1;
-    winnerText = `TEAM ${winningTeam + 1} WINS ROUND ${roundNum}!`;
-    ctx.fillStyle = winningTeam === 0 ? '#ff4d4d' : '#4da3ff';
-  } else {
-    if (roundWinner) {
-      winnerText = `${roundWinner.name.toUpperCase()} WINS ROUND ${roundNum}!`;
-      ctx.fillStyle = roundWinner.color;
-    } else {
-      winnerText = `ROUND ${roundNum} IS A DRAW!`;
-      ctx.fillStyle = '#ffffff';
-    }
-  }
-  const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || showModel;
-
-  if (!isChampionReveal) {
-    const textFadeAlpha = Math.min(1.0, delayedTimer / 30);
-    if (textFadeAlpha > 0) {
-      ctx.save();
-      ctx.globalAlpha = textFadeAlpha;
-      
-      // Slight vertical slide-up for a silky smooth entry
-      const yOffset = (1 - textFadeAlpha) * 10;
-      const textY = cy - 10 + yOffset;
-
-      // Choose font based on numerical character detection
-      const hasNumber = /\d/.test(winnerText);
-      ctx.font = hasNumber ? 'bold 36px "Architects Daughter", Arial' : 'bold 38px "Glast Blitch", Arial';
-      ctx.textAlign = 'center';
-      
-      // Draw outline for premium visibility
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 6;
-      ctx.strokeText(winnerText, cx, textY);
-      ctx.fillText(winnerText, cx, textY);
-
-      ctx.restore();
-    }
-  }
-
-  // Champion reveal animation in final FFA round
-  if (mode === 'FFA' && ffaMatchComplete && roundWinner) {
-    drawFfaChampionReveal(roundWinner, delayedTimer);
-  }
-
-  // Show winner model at 2 victories for 1v1 and 2v2 modes
-  if (showModel && mode !== 'FFA') {
-    drawWinnerReveal(roundWinner, delayedTimer, mode);
-  }
-
-  // Register full screen click
-  _registerButton(0, 0, canvas.width, canvas.height, () => { startNextRound(); });
+  let num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return hex;
+  let r = (num >> 16) + Math.round(255 * (percent / 100));
+  let g = ((num >> 8) & 0x00FF) + Math.round(255 * (percent / 100));
+  let b = (num & 0x0000FF) + Math.round(255 * (percent / 100));
+  r = Math.min(255, Math.max(0, r));
+  g = Math.min(255, Math.max(0, g));
+  b = Math.min(255, Math.max(0, b));
+  return `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
 }
 
-function drawWinnerReveal(winner, timer, mode) {
-  const { ctx, canvas } = state;
-  const cx = state.arena.x + state.arena.width / 2;
-  const cy = state.arena.y + state.arena.height / 2 - 10;
-  const scale = 1.4 + Math.sin(timer * 0.08) * 0.08;
-
-
-
-
-
-  // Draw the actual fighter model at the center, scaled up for the reveal.
-  const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
-  if (!state._winnerRevealFighter || state._winnerRevealFighter.type !== def.type) {
-    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-    state._winnerRevealFighter = new FighterClass({
-      ...def,
-      startX: 0,
-      startY: 0,
-      startVx: 0,
-      startVy: 0,
-    });
+function hexToRgba(hex, alpha) {
+  if (!hex || typeof hex !== 'string' || !hex.startsWith('#')) return `rgba(255, 255, 255, ${alpha})`;
+  let cleanHex = hex.replace('#', '');
+  if (cleanHex.length === 3) {
+    cleanHex = cleanHex.split('').map(c => c + c).join('');
   }
-  const preview = state._winnerRevealFighter;
-  preview.x = 0;
-  preview.y = 0;
-  preview.vx = 0;
-  preview.vy = 0;
-  preview.angle = 0;
-  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami' || def.type === 'Engineer' || def.type === 'engineer') ? 0 : Math.PI * 0.5; // Yuta, Toji, Nanami, Engineer face forward, others point weapons down
-  preview.shootCooldown = 0;
-  preview._isWinnerReveal = true;
-  if (def.type === 'gojo' || def.type === 'yuta') {
-    preview.combatAuraOpacity = 1;
-  }
-  if (def.type === 'gojo') {
-    preview.isMeleeMode = false;  // Force ranged mode so the Blue Lapse orb is visible
-    preview.orbTransition = 1;   // Fully show the orb (0=melee/hidden, 1=ranged/visible)
+  let num = parseInt(cleanHex, 16);
+  if (isNaN(num)) return `rgba(255, 255, 255, ${alpha})`;
+  let r = (num >> 16) & 255;
+  let g = (num >> 8) & 255;
+  let b = num & 255;
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+function easeOutBack(t) {
+  const c1 = 1.70158;
+  const c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+// ──────────────────────────────────────────
+// ENGINEER-STYLE HOLOGRAPHIC HERO GLOW SYSTEM
+// ──────────────────────────────────────────
+
+function drawEngineerStyleHeroGlow(ctx, cx, cy, radius, glowColor = '#38bdf8', globalAlpha = 1.0) {
+  ctx.save();
+  ctx.globalAlpha = Math.min(1.0, Math.max(0.0, globalAlpha));
+  ctx.translate(cx, cy);
+
+  // 1. Volumetric Back Silhouette Body Bloom
+  const backBloom = ctx.createRadialGradient(0, 0, radius * 0.3, 0, 0, radius * 2.4);
+  backBloom.addColorStop(0, hexToRgba(glowColor, 0.75));
+  backBloom.addColorStop(0.35, hexToRgba(glowColor, 0.45));
+  backBloom.addColorStop(0.70, hexToRgba(glowColor, 0.14));
+  backBloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = backBloom;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 2.4, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Ground Oval Drop Shadow Base
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 1.45, radius * 0.48, 0, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.70)';
+  ctx.fill();
+
+  // 3. Translucent Radial Holographic Floor Fill
+  const floorFill = ctx.createRadialGradient(0, radius * 0.95, 6, 0, radius * 0.95, radius * 1.9);
+  floorFill.addColorStop(0, hexToRgba(glowColor, 0.60));
+  floorFill.addColorStop(0.55, hexToRgba(glowColor, 0.22));
+  floorFill.addColorStop(1, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = floorFill;
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 1.9, radius * 0.62, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 4. Multi-Layered Perimeter Boundary Rings
+  ctx.strokeStyle = hexToRgba(glowColor, 0.30);
+  ctx.lineWidth = 6.5;
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 1.65, radius * 0.55, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = hexToRgba(glowColor, 0.90);
+  ctx.lineWidth = 2.4;
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 1.65, radius * 0.55, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 1.65, radius * 0.55, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 5. Inner Concentric Ripple Ring
+  ctx.strokeStyle = hexToRgba(glowColor, 0.55);
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  ctx.ellipse(0, radius * 0.95, radius * 1.10, radius * 0.38, 0, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // 6. Tactical Holographic Cross / Diamond Tech Nodes
+  const rx = radius * 1.65;
+  const ry = radius * 0.55;
+  const nodes = [
+    { x: -rx, y: radius * 0.95 },
+    { x: rx,  y: radius * 0.95 },
+    { x: 0,   y: radius * 0.95 - ry },
+    { x: 0,   y: radius * 0.95 + ry }
+  ];
+
+  nodes.forEach(n => {
+    ctx.fillStyle = glowColor;
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 4.0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, 2.0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+// ──────────────────────────────────────────
+// STYLIZED CHAMPION TYPOGRAPHY & NAMEPLATES
+// ──────────────────────────────────────────
+
+function drawChampionTitle(ctx, cx, y, titleText, themeColor) {
+  ctx.save();
+  ctx.font = '900 38px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Layer 1: Wide radiant outer glow stroke
+  ctx.strokeStyle = hexToRgba(themeColor, 0.55);
+  ctx.lineWidth = 14;
+  ctx.strokeText(titleText, cx, y);
+
+  // Layer 2: Sharp bold black outline
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 6;
+  ctx.lineJoin = 'round';
+  ctx.strokeText(titleText, cx, y);
+
+  // Layer 3: Dynamic vertical gradient fill
+  const grad = ctx.createLinearGradient(0, y - 20, 0, y + 20);
+  grad.addColorStop(0, '#ffffff');
+  grad.addColorStop(0.40, adjustBrightness(themeColor, +30));
+  grad.addColorStop(1, themeColor);
+  ctx.fillStyle = grad;
+  ctx.fillText(titleText, cx, y);
+
+  // Layer 4: Bright inner highlight core
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 36px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif';
+  ctx.fillText(titleText, cx, y - 1);
+
+  ctx.restore();
+}
+
+function drawChampionNameplate(ctx, cx, y, nameStr, themeColor) {
+  ctx.save();
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Fighter Name
+  ctx.font = '900 24px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+
+  // Radiant outer stroke
+  ctx.strokeStyle = hexToRgba(themeColor, 0.40);
+  ctx.lineWidth = 8;
+  ctx.strokeText(nameStr, cx, y);
+
+  // Black outline
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 4;
+  ctx.strokeText(nameStr, cx, y);
+
+  // Gradient text fill
+  const nameGrad = ctx.createLinearGradient(0, y - 12, 0, y + 12);
+  nameGrad.addColorStop(0, '#ffffff');
+  nameGrad.addColorStop(0.5, adjustBrightness(themeColor, +25));
+  nameGrad.addColorStop(1, themeColor);
+  ctx.fillStyle = nameGrad;
+  ctx.fillText(nameStr, cx, y);
+
+  // Laser Underline with Tactical Diamond Pins
+  const lineY = y + 18;
+  const halfW = Math.min(140, Math.max(75, nameStr.length * 8.0));
+
+  const lineGrad = ctx.createLinearGradient(cx - halfW, 0, cx + halfW, 0);
+  lineGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
+  lineGrad.addColorStop(0.2, hexToRgba(themeColor, 0.5));
+  lineGrad.addColorStop(0.5, '#ffffff');
+  lineGrad.addColorStop(0.8, hexToRgba(themeColor, 0.5));
+  lineGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+  ctx.strokeStyle = lineGrad;
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(cx - halfW, lineY);
+  ctx.lineTo(cx + halfW, lineY);
+  ctx.stroke();
+
+  // Diamond End Pins
+  [-halfW + 10, halfW - 10].forEach(dx => {
+    ctx.fillStyle = themeColor;
+    ctx.beginPath();
+    ctx.arc(cx + dx, lineY, 2.8, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(cx + dx, lineY, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+function drawChampionStats(ctx, cx, yStart, winner, themeColor, timer = 60) {
+  const winnerDealt = Math.round(winner?.damageDealt || 0);
+  const winnerReceived = Math.round(winner?.damageReceived || 0);
+
+  const rowW = 180;
+  const leftX = cx - rowW / 2;
+  const rightX = cx + rowW / 2;
+
+  ctx.save();
+
+  // Helper for rolling numeric values with smooth ease-out interpolation
+  const drawRollingRow = (label, targetNum, y, valColor, delay) => {
+    // 1. Label with black outline for high contrast
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'middle';
+    ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3.5;
+    ctx.strokeText(label.toUpperCase(), leftX, y);
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
+    ctx.fillText(label.toUpperCase(), leftX, y);
+
+    // 2. Rolling Number Value
+    const rollProgress = Math.min(1.0, Math.max(0.0, (timer - delay) / 38));
+    const ease = 1 - Math.pow(1 - rollProgress, 3); // easeOutCubic
+    const currentNum = Math.round(targetNum * ease);
+    const numStr = currentNum.toString();
+
+    ctx.textAlign = 'right';
+    ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
+
+    // Active rolling glow stroke
+    if (rollProgress > 0 && rollProgress < 1.0) {
+      ctx.strokeStyle = hexToRgba(valColor || '#ffffff', 0.40);
+      ctx.lineWidth = 6.0;
+      ctx.strokeText(numStr, rightX, y);
+    }
+
+    // Crisp black outline & fill
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3.5;
+    ctx.strokeText(numStr, rightX, y);
+
+    ctx.fillStyle = valColor || '#ffffff';
+    ctx.fillText(numStr, rightX, y);
+  };
+
+  // Staggered roll: Damage Dealt starts at frame 14, Damage Received starts at frame 18
+  drawRollingRow('Damage Dealt', winnerDealt, yStart, '#ffffff', 14);
+  drawRollingRow('Damage Received', winnerReceived, yStart + 24, '#f87171', 18);
+
+  ctx.restore();
+}
+
+/**
+ * Animated Pop-Out "Follow for more :)" Text Banner in the bottom
+ */
+function drawFollowForMoreBanner(ctx, cx, cy, timer) {
+  // Entrance pops out at frame 122 strictly AFTER the fighter's champion voiceline finishes
+  const popProgress = Math.min(1.0, Math.max(0.0, (timer - 122) / 16));
+  if (popProgress <= 0) return;
+
+  // Play Announcer bell sound when text pops out (frame 122)
+  if (!state._hasPlayedFollowForMoreSfx) {
+    state._hasPlayedFollowForMoreSfx = true;
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('Assets/Sound Effects/Announcer/bell.mp3', 1.0);
+    }
   }
 
-  // Draw volumetric god rays behind the model
-  drawGodRays(ctx, cx, cy, timer, winner);
+  const popEase = easeOutBack(popProgress);
+  const textStr = 'Follow for more :)';
 
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
+  ctx.scale(popEase, popEase);
 
-  // Draw a layered alpha glow ring BEFORE the fighter body (no shadowBlur — per perf rules,
-  // shadowBlur forces a CPU Gaussian blur on every fill call inside preview.draw)
-  const glowColor = winner.color || '#ffffff';
-  ctx.beginPath();
-  ctx.arc(0, 0, (winner.r || 25) + 30, 0, Math.PI * 2);
-  ctx.fillStyle = glowColor.startsWith('#') ? glowColor + '30' : 'rgba(255,255,255,0.19)';
-  ctx.fill();
-  ctx.beginPath();
-  ctx.arc(0, 0, (winner.r || 25) + 14, 0, Math.PI * 2);
-  ctx.fillStyle = glowColor.startsWith('#') ? glowColor + '18' : 'rgba(255,255,255,0.09)';
-  ctx.fill();
-
-  preview.draw(ctx, null);
-  ctx.restore();
-
-  const textFadeAlpha = Math.min(1.0, timer / 30);
-
-  ctx.save();
-  ctx.globalAlpha = textFadeAlpha;
-  ctx.font = 'bold 28px Arial';
+  // Clean, simple typography (slightly bigger & bolder for clarity)
+  ctx.font = '700 17.5px "Outfit", "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-  ctx.lineWidth = 4;
-  ctx.strokeText('WINNER', cx, cy - 116);
-  ctx.fillStyle = '#fff';
-  ctx.fillText('WINNER', cx, cy - 116);
-  ctx.restore();
+  ctx.textBaseline = 'middle';
 
-  ctx.save();
-  ctx.globalAlpha = textFadeAlpha;
-  ctx.font = '32px "Glast Blitch", Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillStyle = winner.color || '#fff';
-  ctx.fillText(winner.name.toUpperCase(), cx, cy + winner.r * scale + 18);
-  ctx.restore();
+  // Crisp, simple black outline
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 3.2;
+  ctx.strokeText(textStr, 0, 0);
 
-  const isDuelMode = mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off';
-  if (isDuelMode) {
-    ctx.save();
-    ctx.globalAlpha = textFadeAlpha;
-    drawWinnerStats(ctx, cx, cy + winner.r * scale + 50, winner);
-    ctx.restore();
-  }
+  // Clean white text fill
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(textStr, 0, 0);
+
+  ctx.restore();
 }
 
-function drawFfaChampionReveal(winner, timer) {
-  const { ctx, canvas } = state;
-  const cx = state.arena.x + state.arena.width / 2;
-  const cy = state.arena.y + state.arena.height / 2 - 10;
-  const pulse = 1 + Math.sin(timer * 0.10) * 0.12;
-  const scale = 1.4 + Math.sin(timer * 0.08) * 0.08;
+// ─────────────────────────────────────────────
+// SEAMLESS IN-ARENA CHAMPION LAYOUT
+// (Fighter Glides Left, Stats Slide Right)
+// ─────────────────────────────────────────────
 
-  // Smooth fade-in animation over 30 frames (0.5 seconds at 60fps)
-  const fadeAlpha = Math.min(1, timer / 30);
+function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
+  const { ctx, arena } = state;
+  const arenaX = arena ? arena.x : 0;
+  const arenaY = arena ? arena.y : 0;
+  const arenaW = arena ? arena.width : state.canvas.width;
+  const arenaH = arena ? arena.height : state.canvas.height;
 
-  // Trigger Champion Victory Voiceline when FFA champion screen is revealed
-  if (!state._hasPlayedChampionVictoryVoice && timer > 0) {
+  // 0. Snap Cut Arena BGM & Play Street Fighter II "YOU WIN!" Announcer Voice (Frame 1)
+  if (timer > 0) {
+    stopArenaBgm(true);
+  }
+  if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
+    state._hasPlayedChampionYouWinVoice = true;
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3', 1.0);
+    }
+  }
+
+  // 0b. Play Champion Victory Voiceline of the winning fighter strictly AFTER the SF2 "YOU WIN!" announcer finishes (Frame 68)
+  if (!state._hasPlayedChampionVictoryVoice && timer >= 68) {
     state._hasPlayedChampionVictoryVoice = true;
 
     const isTodo = winner && (winner.characterId === 'todo' || winner.type === 'todo' || winner._def?.id === 'todo');
@@ -207,6 +365,13 @@ function drawFfaChampionReveal(winner, timer) {
       const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
       const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
       audioSystem.playSFX(todoSnd, vol);
+    }
+
+    const isYuji = winner && (winner.characterId === 'yuji' || winner.type === 'yuji' || winner._def?.id === 'yuji');
+    if (isYuji) {
+      const yujiSnd = CONFIG.yuji?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3';
+      const vol = CONFIG.yuji?.victoryVoiceVolume ?? 3.5;
+      audioSystem.playSFX(yujiSnd, vol);
     }
 
     const isSaitama = winner && (winner.characterId === 'saitama' || winner.type === 'saitama' || winner._def?.id === 'saitama');
@@ -217,208 +382,12 @@ function drawFfaChampionReveal(winner, timer) {
     }
   }
 
-  // Draw the actual fighter model at the center, scaled up for the reveal.
-  const def = winner._def || FIGHTER_DEFS.find(d => d.id === winner._def?.id);
-  if (!state._winnerRevealFighter || state._winnerRevealFighter.type !== def.type) {
-    const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-    state._winnerRevealFighter = new FighterClass({
-      ...def,
-      startX: 0,
-      startY: 0,
-      startVx: 0,
-      startVy: 0,
-    });
-  }
-  const preview = state._winnerRevealFighter;
-  preview.x = 0;
-  preview.y = 0;
-  preview.vx = 0;
-  preview.vy = 0;
-  preview.angle = 0;
-  preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami' || def.type === 'Engineer' || def.type === 'engineer') ? 0 : Math.PI * 0.5; // Yuta, Toji, Nanami, Engineer face forward, others point weapons down
-  preview.shootCooldown = 0;
-  preview._isWinnerReveal = true;
-  if (preview.rika) {
-    preview.rika.active = false;
-    preview.rikaAlpha = 0;
-  }
-  if (def.type === 'gojo' || def.type === 'yuta') {
-    preview.combatAuraOpacity = 1;
-  }
-  if (def.type === 'gojo') {
-    preview.isMeleeMode = false;  // Force ranged mode so the Blue Lapse orb is visible
-    preview.orbTransition = 1;   // Fully show the orb (0=melee/hidden, 1=ranged/visible)
-  }
-
-  // Use an offscreen canvas to guarantee perfect fade-in composition
-  // This prevents complex weapon rendering logic from overriding globalAlpha
-  if (!state._championPreviewCanvas) {
-    state._championPreviewCanvas = document.createElement('canvas');
-    state._championPreviewCanvas.width = 400;
-    state._championPreviewCanvas.height = 400;
-    state._championPreviewCtx = state._championPreviewCanvas.getContext('2d');
-  }
-  
-  const pCtx = state._championPreviewCtx;
-  pCtx.clearRect(0, 0, 400, 400);
-  
-  pCtx.save();
-  pCtx.translate(200, 200);
-  // No shadowBlur here — it forces CPU Gaussian blur on every fill inside preview.draw()
-  // (drawGojoOrb alone has ~10 fill calls per orb), causing severe lag spikes.
-  // The glow is provided by drawGojoOrb's own layered aura fills.
-  preview.draw(pCtx, null);
-  pCtx.restore();
-
-  // Draw volumetric god rays behind the model
-  drawGodRays(ctx, cx, cy, timer, winner);
-
+  // 1. Smoothly Darken the Arena & Full Canvas (Deep Dark Victory Backdrop)
+  const fadeAlpha = Math.min(1.0, timer / 30);
   ctx.save();
-  ctx.globalAlpha = fadeAlpha;
-  ctx.translate(cx, cy);
-  ctx.scale(scale, scale);
-  ctx.drawImage(state._championPreviewCanvas, -200, -200);
+  ctx.fillStyle = `rgba(3, 4, 6, ${0.90 * fadeAlpha})`;
+  ctx.fillRect(0, 0, state.canvas.width, state.canvas.height);
   ctx.restore();
-
-  ctx.save();
-  ctx.globalAlpha = fadeAlpha;
-  ctx.font = 'bold 36px "Conformity", Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
-  ctx.lineWidth = 4;
-  ctx.strokeText('CHAMPION', cx, cy - 116);
-  ctx.fillStyle = '#fff';
-  ctx.fillText('CHAMPION', cx, cy - 116);
-  ctx.restore();
-
-  ctx.font = '32px "Glast Blitch", Arial';
-  ctx.textBaseline = 'top';
-  ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
-
-
-  ctx.restore();
-}
-
-function drawMatchEndScreen() {
-  const { ctx, canvas, matchWinner, scores, fighters, mode, matchEndTimer } = state;
-  _clearButtons();
-  drawHUD();
-
-  if (matchEndTimer <= 2) {
-    state._winnerEmbers = null;
-  }
-
-  // If CJ's Mission Passed or Wasted overlay is active, let it complete its smooth fade-in & fade-out (180-200 frames)
-  // before the champion screen slowly and smoothly fades in
-  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
-  const displayDelay = hasMissionOverlay ? 180 : 60;
-  const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
-
-  // Fade in the dark background smoothly over 45 frames (starts as overlay begins fading out)
-  const bgFadeStart = hasMissionOverlay ? 145 : 60;
-  const bgTimer = Math.max(0, matchEndTimer - bgFadeStart);
-  const bgAlpha = Math.min(0.96, (bgTimer / 45) * 0.96);
-  ctx.fillStyle = `rgba(0,0,0,${bgAlpha})`;
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-  // Delay showing the rest of the screen until the overlay fade-out is complete
-  const delay = displayDelay + 5;
-  if (state.matchEndTimer < delay) return;
-
-  // Silky smooth, slow reveal for the champion screen over 45 frames
-  const revealTimer = state.matchEndTimer - delay;
-  const globalAlpha = Math.min(1, revealTimer / 45);
-
-  ctx.save();
-  ctx.globalAlpha = globalAlpha;
-
-  const cx = canvas.width / 2;
-  const cy = canvas.height / 2;
-
-
-
-  // TLFS mode Champion Screen
-  if (mode === 'TLFS') {
-    const wonGauntlet = state.matchWinner === fighters[0];
-    
-    ctx.save();
-    ctx.textAlign = 'center';
-    
-    if (wonGauntlet) {
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#ffd700';
-      ctx.fillStyle = '#ffd700';
-      ctx.font = '48px "Conformity", Arial';
-      ctx.fillText('CHAMPION!', cx, cy - 40);
-      
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 24px Arial';
-      ctx.shadowBlur = 0;
-      ctx.fillText(`YOU DEFEATED 5 ENEMIES`, cx, cy + 10);
-    } else {
-      ctx.shadowBlur = 20;
-      ctx.shadowColor = '#ff4d4d';
-      ctx.fillStyle = '#ff4d4d';
-      ctx.font = '48px "Conformity", Arial';
-      ctx.fillText('CHAMPION FALLEN', cx, cy - 40);
-      
-      ctx.fillStyle = '#fff';
-      ctx.font = 'bold 24px Arial';
-      ctx.shadowBlur = 0;
-      ctx.fillText(`YOU DEFEATED ${state.tlfsDefeatedEnemies} ENEMIES`, cx, cy + 10);
-    }
-    
-    ctx.fillStyle = '#aaa';
-    ctx.font = '14px Arial';
-    if (Math.floor(Date.now() / 500) % 2 === 0) {
-      ctx.fillText(`CLICK ANYWHERE TO RESTART`, cx, canvas.height - 30);
-    }
-
-    _registerButton(0, 0, canvas.width, canvas.height, () => {
-      resetMatch();
-      goToTitle(); // Optional: send them back to select screen after TLFS
-    });
-    
-    ctx.restore();
-    return;
-  }
-
-  // Special champion reveal animation for match winner (1v1, 1v2 Stand Off, 2v2 & FFA)
-  const effectiveWinner = matchWinner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
-  if (effectiveWinner) {
-    drawMatchWinnerReveal(effectiveWinner, delayedTimer, mode);
-  }
-
-  if (mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off' || mode === '2v2' || mode === 'FFA') {
-    ctx.fillStyle = '#aaa';
-    ctx.font = '14px Arial';
-    ctx.textAlign = 'center';
-    if (Math.floor(Date.now() / 500) % 2 === 0) {
-      ctx.fillText(`CLICK ANYWHERE TO RESTART`, cx, canvas.height - 30);
-    }
-
-    _registerButton(0, 0, canvas.width, canvas.height, () => {
-      if (mode === '1v2 Stand Off') {
-        import('../core/gameFlow.js').then(m => m.randomize1v2Fighters());
-      } else if (mode === '1v1' || mode === 'Stand Off') {
-        randomize1v1Fighters();
-      }
-      resetMatch();
-    });
-  }
-
-  ctx.restore();
-}
-
-// ─────────────────────────────────────────────
-// MATCH WINNER CHAMPION REVEAL ANIMATION
-// ─────────────────────────────────────────────
-
-function drawMatchWinnerReveal(winner, timer, mode) {
-  const { ctx, canvas } = state;
-  const cx = state.arena.x + state.arena.width / 2;
-  const cy = state.arena.y + state.arena.height / 2 - 10;
 
   // Detect winning team members for team modes (1v2 Stand Off or 2v2)
   const winnerIndex = state.fighters ? state.fighters.indexOf(winner) : -1;
@@ -432,45 +401,41 @@ function drawMatchWinnerReveal(winner, timer, mode) {
     }
   }
 
-  // Scale animation
   const isMultiWinner = winningFighters.length > 1;
-  const scale = isMultiWinner ? 1.1 : 1.5;
-  const offsets = isMultiWinner ? [-95, 95] : [0];
+  const primaryThemeColor = winner?.color || '#38bdf8';
 
+  // 2. Left Hero Zone (Fighter Glides Smoothly into Left Side)
+  const targetHeroX = arenaX + arenaW * 0.22;
+  const targetHeroY = arenaY + arenaH * 0.50;
+  const targetScale = isMultiWinner ? 1.15 : 1.35;
 
-
-
-
-  // Trigger Champion Victory Voiceline when champion screen is revealed
-  if (!state._hasPlayedChampionVictoryVoice && timer > 0) {
-    state._hasPlayedChampionVictoryVoice = true;
-
-    const hasTodo = winningFighters.some(f => f && (f.characterId === 'todo' || f.type === 'todo' || f._def?.id === 'todo'));
-    if (hasTodo) {
-      const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
-      const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
-      audioSystem.playSFX(todoSnd, vol);
-    }
-
-    const hasSaitama = winningFighters.some(f => f && (f.characterId === 'saitama' || f.type === 'saitama' || f._def?.id === 'saitama'));
-    if (hasSaitama) {
-      const saitamaSnd = CONFIG.saitama?.sounds?.championVoiceline || CONFIG.saitama?.championVoiceline || 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3';
-      const vol = CONFIG.saitama?.soundVolumes?.championVoiceline ?? (CONFIG.saitama?.championVoiceVolume ?? 3.5);
-      audioSystem.playSFX(saitamaSnd, vol);
-    }
+  // Store start positions snapshot at the moment of death
+  if (!state._winnerStartPositions || state._winnerStartPositionsTimerReset !== isMatchEnd) {
+    state._winnerStartPositions = winningFighters.map(f => ({
+      x: f.x || targetHeroX,
+      y: f.y || targetHeroY,
+      gunAngle: f.gunAngle || 0
+    }));
+    state._winnerStartPositionsTimerReset = isMatchEnd;
   }
 
-  // ── Draw volumetric god rays behind model(s) ────────────────────────────────
-  winningFighters.forEach((wFighter, idx) => {
-    const offsetX = offsets[idx] || 0;
-    drawGodRays(ctx, cx + offsetX, cy, timer, wFighter);
-  });
+  // Smooth Glide Animation Curve (easeOutCubic)
+  const glideProgress = Math.min(1.0, timer / 42);
+  const glideEase = 1 - Math.pow(1 - glideProgress, 3);
+  const glowProgress = Math.min(1.0, Math.max(0.0, (timer - 8) / 30));
 
-  // ── Draw the winner fighter model(s) ───────────────────────────────────────
   winningFighters.forEach((wFighter, idx) => {
-    const offsetX = offsets[idx] || 0;
     const def = wFighter._def || FIGHTER_DEFS.find(d => d.id === wFighter._def?.id);
     if (!def) return;
+
+    const startPos = state._winnerStartPositions[idx] || { x: wFighter.x, y: wFighter.y, gunAngle: 0 };
+    const heroYOffset = isMultiWinner ? (idx === 0 ? -arenaH * 0.18 : arenaH * 0.18) : 0;
+    const finalHeroY = targetHeroY + heroYOffset;
+
+    const currX = startPos.x + (targetHeroX - startPos.x) * glideEase;
+    const currY = startPos.y + (finalHeroY - startPos.y) * glideEase;
+    const currScale = 1.0 + (targetScale - 1.0) * glideEase;
+
     if (!state._winnerFightersCache) state._winnerFightersCache = {};
     if (!state._winnerFightersCache[def.type]) {
       const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
@@ -482,13 +447,14 @@ function drawMatchWinnerReveal(winner, timer, mode) {
         startVy: 0,
       });
     }
+
     const preview = state._winnerFightersCache[def.type];
     preview.x = 0;
     preview.y = 0;
     preview.vx = 0;
     preview.vy = 0;
     preview.angle = 0;
-    preview.gunAngle = (def.type === 'yuta' || def.type === 'toji' || def.type === 'nanami' || def.type === 'Engineer' || def.type === 'engineer') ? 0 : Math.PI * 0.5; // Relaxed resting pose, Yuta, Toji, Nanami, Engineer point forward
+    preview.gunAngle = 0; // Upright frontal victory stance
     preview.shootCooldown = 0;
     preview._isWinnerReveal = true;
     if (preview.rika) {
@@ -499,216 +465,167 @@ function drawMatchWinnerReveal(winner, timer, mode) {
       preview.combatAuraOpacity = 1;
     }
     if (def.type === 'gojo') {
-      preview.isMeleeMode = false;  // Force ranged mode so the Blue Lapse orb is visible
-      preview.orbTransition = 1;   // Fully show the orb (0=melee/hidden, 1=ranged/visible)
+      preview.isMeleeMode = false;
+      preview.orbTransition = 1;
     }
 
+    const fColor = def.color || wFighter.color || '#38bdf8';
+
     ctx.save();
-    ctx.translate(cx + offsetX, cy);
-    ctx.scale(scale, scale);
+    // Engineer Hero Glow (Blooms underneath fighter on the left)
+    drawEngineerStyleHeroGlow(ctx, currX, currY, (wFighter.r || 24) * currScale, fColor, glowProgress);
 
-    // Draw layered alpha glow ring BEFORE the fighter (no shadowBlur — causes CPU lag spike
-    // because it blurs every single fill inside preview.draw, including all drawGojoOrb fills)
-    const fighterGlowColor = (def.type === 'layla') ? '#00E5FF' : (wFighter.color || '#ffffff');
-    ctx.beginPath();
-    ctx.arc(0, 0, (wFighter.r || 20) + 32, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,0.06)`;
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, 0, (wFighter.r || 20) + 16, 0, Math.PI * 2);
-    ctx.fillStyle = fighterGlowColor.startsWith('#') ? fighterGlowColor + '22' : 'rgba(255,255,255,0.13)';
-    ctx.fill();
-    ctx.beginPath();
-    ctx.arc(0, 0, (wFighter.r || 20) + 8, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255,255,255,0.08)`;
-    ctx.fill();
-
+    ctx.translate(currX, currY);
+    ctx.scale(currScale, currScale);
     preview.draw(ctx, null);
     ctx.restore();
   });
 
-  // ── "CHAMPION" title text ───────────────────────────────────────────────
-  const titleAlpha = Math.min(1, timer / 30);
-  ctx.save();
-  ctx.globalAlpha = titleAlpha;
+  // 3. Right Stats Zone (Stats Slide Smoothly into Right Side)
+  const targetStatsX = arenaX + arenaW * 0.72;
+  const targetStatsY = arenaY + arenaH * 0.50;
 
-  // Text glow
-  ctx.shadowBlur = 20;
-  ctx.shadowColor = winner.color || '#fff';
-  ctx.font = '48px "Conformity", Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'bottom';
-  
-  // High-contrast stroke outline
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.9)';
-  ctx.lineWidth = 5;
-  const titleText = isMultiWinner ? 'CHAMPIONS' : 'CHAMPION';
-  ctx.strokeText(titleText, cx, cy - 145);
-  
-  ctx.fillStyle = '#fff';
-  ctx.fillText(titleText, cx, cy - 145);
+  const statsProgress = Math.min(1.0, Math.max(0.0, (timer - 12) / 32));
+  if (statsProgress > 0) {
+    const statsEase = easeOutBack(statsProgress);
+    const slideOffset = (1 - statsProgress) * 45;
+    const statsX = targetStatsX + slideOffset;
 
-  ctx.shadowBlur = 0;
-  if (isMultiWinner && winningFighters.length === 2) {
-    ctx.font = '32px "Glast Blitch", Arial';
-    ctx.fillStyle = winningFighters[0].color || '#fff';
-    ctx.fillText(winningFighters[0].name.toUpperCase(), cx - 95, cy + 115);
+    ctx.save();
+    ctx.globalAlpha = statsProgress;
 
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
-    ctx.font = 'bold 24px Rajdhani, Arial';
-    ctx.fillText('&', cx, cy + 114);
+    // Top Title ("CHAMPION" / "ROUND VICTORY")
+    drawChampionTitle(ctx, statsX, targetStatsY - 50, titleText, primaryThemeColor);
 
-    ctx.font = '32px "Glast Blitch", Arial';
-    ctx.fillStyle = winningFighters[1].color || '#fff';
-    ctx.fillText(winningFighters[1].name.toUpperCase(), cx + 95, cy + 115);
-  } else {
-    ctx.font = '32px "Glast Blitch", Arial';
-    ctx.fillStyle = winner.color || '#fff';
-    ctx.fillText(winner.name.toUpperCase(), cx, cy + 110);
-    
-    const isDuelMode = mode === '1v1' || mode === 'Stand Off' || mode === '1v2 Stand Off';
-    if (isDuelMode) {
-      drawWinnerStats(ctx, cx, cy + 144, winner);
+    // Fighter Nameplate
+    if (isMultiWinner && winningFighters.length === 2) {
+      const nameStr = `${winningFighters[0].name.toUpperCase()}  &  ${winningFighters[1].name.toUpperCase()}`;
+      drawChampionNameplate(ctx, statsX, targetStatsY - 14, nameStr, primaryThemeColor);
+    } else if (winner) {
+      drawChampionNameplate(ctx, statsX, targetStatsY - 14, winner.name.toUpperCase(), primaryThemeColor);
     }
-  }
 
-  ctx.restore();
-}
-
-function drawWinnerStats(ctx, cx, yStart, winner) {
-  const winnerDealt = Math.round(winner.damageDealt || 0);
-  const winnerReceived = Math.round(winner.damageReceived || 0);
-
-
-
-  ctx.save();
-  
-  // Draw subtle horizontal separator
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(cx - 160, yStart);
-  ctx.lineTo(cx + 160, yStart);
-  ctx.stroke();
-
-  // Draw header (Removed as requested)
-  /*
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.font = '20px "Glast Blitch", Arial';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  ctx.fillText('ROUND STATISTICS', cx, yStart + 12);
-  */
-  // Row helper: Left column (labels) starting at cx-110, Right column (values) ending at cx+110
-  const drawStatRow = (label, val, y) => {
-    ctx.textAlign = 'left';
-    ctx.fillStyle = '#bbb';
-    ctx.font = '18px "Glast Blitch", Arial';
-    ctx.fillText(label.toUpperCase(), cx - 110, y);
-
-    ctx.font = 'bold 20px "Architects Daughter", Arial';
-    ctx.fillStyle = '#fff';
-    ctx.textAlign = 'right';
-    ctx.fillText(val, cx + 110, y);
-  };
-
-  // Draw rows
-  drawStatRow('Damage Dealt', winnerDealt, yStart + 42);
-  drawStatRow('Damage Received', winnerReceived, yStart + 66);
-
-
-
-  ctx.restore();
-}
-
-function drawGodRays(ctx, cx, cy, timer, winner) {
-  const baseColor = winner.color || '#fff';
-  const arenaY = (state.arena && state.arena.y !== undefined) ? state.arena.y : 170;
-  const arenaH = (state.arena && state.arena.height !== undefined) ? state.arena.height : 460;
-
-  // The light source origin — high above the visible area, never drawn directly
-  const srcY = arenaY - 600;
-
-  // Helper: draw one shaft from the invisible source point downward
-  function drawShaft(destX, destY, halfAngle, alpha, width) {
-    // Calculate angles to the left and right edges of the shaft
-    const dx1 = destX - cx;
-    const baseAngle = Math.atan2(destY - srcY, dx1);
-    const leftAngle  = baseAngle - halfAngle;
-    const rightAngle = baseAngle + halfAngle;
-
-    const length = 900; // long enough to fill the whole canvas height
-
-    const lx = cx + Math.cos(leftAngle)  * length;
-    const ly = srcY + Math.sin(leftAngle)  * length;
-    const rx = cx + Math.cos(rightAngle) * length;
-    const ry = srcY + Math.sin(rightAngle) * length;
-
-    // Gradient along the shaft from source downward
-    const grad = ctx.createLinearGradient(cx, srcY, cx, srcY + length * 0.75);
-    grad.addColorStop(0,    'rgba(0,0,0,0)');
-    grad.addColorStop(0.10, colorToRgba(baseColor, alpha * 1.0));
-    grad.addColorStop(0.50, colorToRgba(baseColor, alpha * 0.35));
-    grad.addColorStop(1,    'rgba(0,0,0,0)');
-
-    ctx.fillStyle = grad;
-    ctx.beginPath();
-    ctx.moveTo(cx, srcY);
-    ctx.lineTo(lx, ly);
-    ctx.lineTo(rx, ry);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.save();
-  ctx.globalCompositeOperation = 'screen';
-
-  // Clip to arena bounds so light doesn't spill outside the dark panel
-  ctx.beginPath();
-  ctx.rect(0, arenaY, (state.canvas && state.canvas.width) || 540, arenaH);
-  ctx.clip();
-
-  // 3 swaying spotlights — narrow angle for tight theatrical beams
-  const s1 = Math.sin(timer * 0.012) * 0.04;
-  drawShaft(cx - 90 + s1 * 300, arenaY + arenaH, 0.045, 0.18, 0.045);
-
-  const s2 = Math.cos(timer * 0.008) * 0.03;
-  drawShaft(cx      + s2 * 300, arenaY + arenaH, 0.065, 0.28, 0.065);
-
-  const s3 = Math.sin(timer * 0.01 + 1.5) * 0.04;
-  drawShaft(cx + 90 + s3 * 300, arenaY + arenaH, 0.045, 0.18, 0.045);
-
-  ctx.restore();
-
-  // 2. Render Floating Ember Sparks rising upwards (angled diagonal lines)
-  // (Removed as requested)
-}
-
-function colorToRgba(color, alpha) {
-  if (!color) return `rgba(255, 255, 255, ${alpha})`;
-  if (color.startsWith('rgba')) {
-    return color.replace(/[^,]+(?=\))/, alpha);
-  }
-  if (color.startsWith('rgb')) {
-    return color.replace('rgb', 'rgba').replace(')', `, ${alpha})`);
-  }
-  if (color.startsWith('#')) {
-    let hex = color.slice(1);
-    if (hex.length === 3) {
-      hex = hex[0] + hex[0] + hex[1] + hex[1] + hex[2] + hex[2];
+    // Clean Text Stats with Rolling Digit Animation
+    if (winner) {
+      drawChampionStats(ctx, statsX, targetStatsY + 22, winner, primaryThemeColor, timer);
     }
-    const num = parseInt(hex, 16);
-    const r = (num >> 16) & 255;
-    const g = (num >> 8) & 255;
-    const b = num & 255;
-    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+
+    ctx.restore();
   }
-  // Fallback
-  return `rgba(255, 255, 255, ${alpha})`;
+
+  // 4. Pop-out "Follow for more :)" banner in the bottom center of the arena
+  drawFollowForMoreBanner(ctx, arenaX + arenaW / 2, arenaY + arenaH - 26, timer, primaryThemeColor);
 }
 
 // ─────────────────────────────────────────────
-// COUNTDOWN SCREEN
+// ROUND END SCREEN (INTERIM ROUNDS)
 // ─────────────────────────────────────────────
+
+function drawRoundEndScreen() {
+  const { ctx, roundWinner, roundNum, roundEndTimer, mode, ffaMatchComplete, scores } = state;
+  _clearButtons();
+  drawHUD();
+
+  if (roundEndTimer <= 2) {
+    state._winnerStartPositions = null;
+    state._hasPlayedFollowForMoreSfx = false;
+    state._hasPlayedChampionYouWinVoice = false;
+  }
+
+  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (160 frames).
+  // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
+  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
+  const displayDelay = hasMissionOverlay ? 160 : 75;
+  const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
+
+  // Check if winner has 2 victories (match win condition)
+  const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
+  const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
+  const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
+  const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThresholdForReveal;
+  const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || (hasTwoWins && roundWinner);
+
+  const isChampionActive = delayedTimer > 0;
+  state._isChampionLayoutActive = isChampionActive;
+
+  if (isChampionActive) {
+    const titleText = isChampionReveal 
+      ? 'CHAMPION' 
+      : (roundWinner ? `${roundWinner.name.toUpperCase()} WINS!` : 'ROUND DRAW!');
+
+    drawInArenaChampionLayout(roundWinner, delayedTimer, titleText, mode, isChampionReveal);
+  }
+
+  // Register full screen click
+  _registerButton(0, 0, state.canvas.width, state.canvas.height, () => { startNextRound(); });
+}
+
+// ─────────────────────────────────────────────
+// WINNER REVEAL HELPERS
+// ─────────────────────────────────────────────
+
+function drawWinnerReveal(winner, timer, mode) {
+  state._isChampionLayoutActive = true;
+  drawInArenaChampionLayout(winner, timer, 'CHAMPION', mode, true);
+}
+
+function drawFfaChampionReveal(winner, timer) {
+  state._isChampionLayoutActive = true;
+  drawInArenaChampionLayout(winner, timer, 'CHAMPION', 'FFA', true);
+}
+
+// ─────────────────────────────────────────────
+// MATCH END SCREEN (MAIN VICTORY REVEAL)
+// ─────────────────────────────────────────────
+
+function drawMatchEndScreen() {
+  const { ctx, canvas, matchWinner, fighters, mode, matchEndTimer } = state;
+  _clearButtons();
+  drawHUD();
+
+  if (matchEndTimer <= 2) {
+    state._winnerStartPositions = null;
+    state._isChampionLayoutActive = false;
+    state._hasPlayedFollowForMoreSfx = false;
+    state._hasPlayedChampionYouWinVoice = false;
+  }
+
+  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (160 frames).
+  // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
+  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
+  const displayDelay = hasMissionOverlay ? 160 : 75;
+  const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
+
+  // Determine Match Winner Entity
+  const effectiveWinner = matchWinner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
+
+  const isMatchChampionActive = delayedTimer > 0;
+  state._isChampionLayoutActive = isMatchChampionActive;
+
+  if (isMatchChampionActive) {
+    const titleText = (mode === 'TLFS') 
+      ? (state.matchWinner === fighters[0] ? 'GAUNTLET CONQUERED!' : 'CHAMPION FALLEN')
+      : 'CHAMPION';
+
+    drawInArenaChampionLayout(effectiveWinner, delayedTimer, titleText, mode, true);
+  }
+
+  // Register Fullscreen Restart Handler
+  _registerButton(0, 0, canvas.width, canvas.height, () => {
+    if (mode === 'TLFS') {
+      resetMatch();
+      goToTitle();
+    } else {
+      if (mode === '1v2 Stand Off') {
+        import('../core/gameFlow.js').then(m => m.randomize1v2Fighters());
+      } else if (mode === '1v1' || mode === 'Stand Off') {
+        randomize1v1Fighters();
+      }
+      resetMatch();
+    }
+  });
+}
+
+const drawMatchWinnerReveal = drawWinnerReveal;
 
 export { drawRoundEndScreen, drawWinnerReveal, drawFfaChampionReveal, drawMatchEndScreen, drawMatchWinnerReveal };

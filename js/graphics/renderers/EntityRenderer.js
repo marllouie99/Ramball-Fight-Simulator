@@ -305,6 +305,9 @@ export function drawFighters() {
     const isParalyzedInSoulDisfigurement = Boolean(fighter && fighter.isParalyzedByMahito && (fighter.paralyzeTimer || 0) > 0);
     if (!fighter || (fighter.hp <= 0 && !isParalyzedInSoulDisfigurement) || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
 
+    // Only skip drawing living fighter when GameOverScreen is actively rendering the in-arena champion layout
+    if (state._isChampionLayoutActive && fighter.hp > 0) return;
+
     updateEntityVisualScale(fighter);
 
     const scale = fighter.visualScale !== undefined ? fighter.visualScale : 1.0;

@@ -264,7 +264,7 @@ export class CJFighter extends Fighter {
 
       this.respectAuraTimer = 180;
       const cheatSound = CONFIG.cj?.sounds?.cheatActivated || 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3';
-      const cheatVol = CONFIG.cj?.soundVolumes?.cheatActivated ?? 0.8;
+      const cheatVol = CONFIG.cj?.soundVolumes?.cheatActivated !== undefined ? CONFIG.cj.soundVolumes.cheatActivated : 3.5;
       audioSystem.playSFX(cheatSound, cheatVol);
     }
   }
@@ -283,7 +283,7 @@ export class CJFighter extends Fighter {
       spawnFloatingText(this.x, this.y - this.r - 20, subtitle, '#22C55E');
     }
     const cheatSound = CONFIG.cj?.sounds?.cheatActivated || 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3';
-    const cheatVol = CONFIG.cj?.soundVolumes?.cheatActivated ?? 0.8;
+    const cheatVol = CONFIG.cj?.soundVolumes?.cheatActivated !== undefined ? CONFIG.cj.soundVolumes.cheatActivated : 3.5;
     audioSystem.playSFX(cheatSound, cheatVol);
   }
 
@@ -302,7 +302,9 @@ export class CJFighter extends Fighter {
       if (!this._lastBaguvixTextTime || now - this._lastBaguvixTextTime > 120) {
         this._lastBaguvixTextTime = now;
         spawnSparks(this.x, this.y, '#FEF08A', 5);
-        audioSystem.playSFX('Assets/Sound Effects/Skills/parry.mp3', 0.65);
+        const parrySnd = CONFIG.cj?.sounds?.parry || 'Assets/Sound Effects/Skills/parry.mp3';
+        const parryVol = CONFIG.cj?.soundVolumes?.parry !== undefined ? CONFIG.cj.soundVolumes.parry : 0.65;
+        audioSystem.playSFX(parrySnd, parryVol);
       }
       return false; // Total damage immunity!
     }
@@ -343,7 +345,9 @@ export class CJFighter extends Fighter {
             this._lastEvadeTextTime = now;
             spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 16, 'EVADE!', '#38BDF8');
             spawnSparks(this.x, this.y, '#38BDF8', 8);
-            audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+            const evadeSnd = CONFIG.cj?.sounds?.evade || 'Assets/Sound Effects/Skills/dash1.mp3';
+            const evadeVol = CONFIG.cj?.soundVolumes?.evade !== undefined ? CONFIG.cj.soundVolumes.evade : 0.85;
+            audioSystem.playSFX(evadeSnd, evadeVol);
 
             // Reactive thruster micro-juke to evade attack
             const jukeAngle = Math.random() * Math.PI * 2;
@@ -360,7 +364,9 @@ export class CJFighter extends Fighter {
       if (this.hesoyamShield >= amount) {
         this.hesoyamShield -= amount;
         spawnFloatingText(this.x, this.y - this.r - 10, `-${Math.round(amount)}`, '#38BDF8');
-        audioSystem.playSFX('Assets/Sound Effects/Skills/shieldblock.mp3', 0.65);
+        const shieldSnd = CONFIG.cj?.sounds?.shieldBlock || 'Assets/Sound Effects/Skills/shieldblock.mp3';
+        const shieldVol = CONFIG.cj?.soundVolumes?.shieldBlock !== undefined ? CONFIG.cj.soundVolumes.shieldBlock : 0.65;
+        audioSystem.playSFX(shieldSnd, shieldVol);
         this.gainRespect(cfg.respectGainOnHit || 2);
         return false;
       } else {
@@ -404,18 +410,10 @@ export class CJFighter extends Fighter {
   }
 
   /**
-   * Countdown Phase Hook: Plays intro voiceline as the round countdown approaches fight start
+   * Countdown Phase Hook
    */
   onCountdown(opponent) {
-    if (!this._hasPlayedIntroVoiceline) {
-      this._countdownFrames = (this._countdownFrames || 0) + 1;
-      if (this._countdownFrames >= 20 || (state.countdownTimer && state.countdownTimer >= 20)) {
-        this._hasPlayedIntroVoiceline = true;
-        const introSound = CONFIG.cj?.sounds?.introVoiceline || 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3';
-        const introVol = CONFIG.cj?.soundVolumes?.introVoiceline ?? 3.0;
-        audioSystem.playSFX(introSound, introVol);
-      }
-    }
+    // Handled exclusively by the show-off screen countdown transition
   }
 
   /**
@@ -432,25 +430,6 @@ export class CJFighter extends Fighter {
       }
     }
     if (this.dead) return;
-
-    // Play Intro Voiceline when round countdown is active (~25 frames in, as countdown finishes / approaches fight callout)
-    if (!this._hasPlayedIntroVoiceline && typeof state !== 'undefined') {
-      if (state.gameState === 'countdown') {
-        this._countdownFrames = (this._countdownFrames || 0) + 1;
-        if (this._countdownFrames >= 25 || (state.countdownTimer && state.countdownTimer >= 25)) {
-          this._hasPlayedIntroVoiceline = true;
-          const introSound = CONFIG.cj?.sounds?.introVoiceline || 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3';
-          const introVol = CONFIG.cj?.soundVolumes?.introVoiceline ?? 3.0;
-          audioSystem.playSFX(introSound, introVol);
-        }
-      } else if (state.gameState === 'playing' && (state.matchTimer || 0) <= 60) {
-        // Fallback for instant-start modes without countdown
-        this._hasPlayedIntroVoiceline = true;
-        const introSound = CONFIG.cj?.sounds?.introVoiceline || 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3';
-        const introVol = CONFIG.cj?.soundVolumes?.introVoiceline ?? 3.0;
-        audioSystem.playSFX(introSound, introVol);
-      }
-    }
 
     // Rule 1: TimeStop & Ambush early exit guard (Immune during BAGUVIX God Mode)
     if (this.isBaguvixActive || this.isGodModeActive) {
@@ -755,7 +734,7 @@ export class CJFighter extends Fighter {
           this.cheatTypedChars = targetChars;
           // Keystroke click SFX per character typed
           const typeSound = CONFIG.cj?.sounds?.typeClickNoise || 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3';
-          const typeVol = CONFIG.cj?.soundVolumes?.typeClickNoise ?? 0.8;
+          const typeVol = CONFIG.cj?.soundVolumes?.typeClickNoise !== undefined ? CONFIG.cj.soundVolumes.typeClickNoise : 2.5;
           audioSystem.playSFX(typeSound, typeVol);
         }
 
@@ -992,7 +971,7 @@ export class CJFighter extends Fighter {
 
     // Instant first keystroke audio click on activation
     const typeSound = CONFIG.cj?.sounds?.typeClickNoise || 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3';
-    const typeVol = CONFIG.cj?.soundVolumes?.typeClickNoise ?? 0.8;
+    const typeVol = CONFIG.cj?.soundVolumes?.typeClickNoise !== undefined ? CONFIG.cj.soundVolumes.typeClickNoise : 2.5;
     audioSystem.playSFX(typeSound, typeVol);
   }
 
@@ -1155,7 +1134,9 @@ export class CJFighter extends Fighter {
     }
 
     // Rocket ignition and thrust SFX
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/flamespray1.mp3', 0.85);
+    const igniteSnd = CONFIG.cj?.sounds?.jetpackIgnition || 'Assets/Sound Effects/Attacks/flamespray1.mp3';
+    const igniteVol = CONFIG.cj?.soundVolumes?.jetpackIgnition !== undefined ? CONFIG.cj.soundVolumes.jetpackIgnition : 0.85;
+    audioSystem.playSFX(igniteSnd, igniteVol);
 
     // Visual ignition burst & sparks
     if (typeof spawnImpactFlash === 'function') {
@@ -1306,12 +1287,14 @@ export class CJFighter extends Fighter {
     }
 
     // Heavy alternating minigun gunfire sounds with John Wick M4 rifle crack
-    const mgSounds = [
+    const mgSounds = CONFIG.cj?.sounds?.minigunShot || [
       'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
       'Assets/Sound Effects/Attacks/revolvershot.mp3',
       'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3'
     ];
-    audioSystem.playSFX(mgSounds[Math.floor(Math.random() * mgSounds.length)], 0.58);
+    const mgSound = Array.isArray(mgSounds) ? mgSounds[Math.floor(Math.random() * mgSounds.length)] : mgSounds;
+    const mgVol = CONFIG.cj?.soundVolumes?.minigunShot !== undefined ? CONFIG.cj.soundVolumes.minigunShot : 0.80;
+    audioSystem.playSFX(mgSound, mgVol);
 
     // Eject tumbling 7.62mm minigun brass casing to the ground
     if (typeof spawnSpentCasing === 'function') {
@@ -1390,7 +1373,9 @@ export class CJFighter extends Fighter {
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(8, 8);
     }
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/explosion.mp3', 0.85);
+    const riotSnd = CONFIG.cj?.sounds?.riotShockwave || 'Assets/Sound Effects/Attacks/explosion.mp3';
+    const riotVol = CONFIG.cj?.soundVolumes?.riotShockwave !== undefined ? CONFIG.cj.soundVolumes.riotShockwave : 0.85;
+    audioSystem.playSFX(riotSnd, riotVol);
     spawnFloatingText(this.x, this.y - this.r - 32, 'RIOT SHOCKWAVE!', '#EA580C');
   }
 
@@ -1413,7 +1398,9 @@ export class CJFighter extends Fighter {
     this.punchAnimTimer = this.punchMaxTime;
     this.meleeCooldown = this.meleeCooldownMax;
 
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/heavypunch3.mp3', 1.0);
+    const diveSnd = CONFIG.cj?.sounds?.jetpackDive || 'Assets/Sound Effects/Attacks/heavypunch3.mp3';
+    const diveVol = CONFIG.cj?.soundVolumes?.jetpackDive !== undefined ? CONFIG.cj.soundVolumes.jetpackDive : 1.0;
+    audioSystem.playSFX(diveSnd, diveVol);
   }
 
   _emitJetpackThrusterBurn(arena) {
@@ -1499,7 +1486,9 @@ export class CJFighter extends Fighter {
       this.uziRecoilBack = 4.5;
     }
 
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/revolvershot.mp3', 0.60);
+    const uziSnd = CONFIG.cj?.sounds?.jetpackUziShot || 'Assets/Sound Effects/Attacks/revolvershot.mp3';
+    const uziVol = CONFIG.cj?.soundVolumes?.jetpackUziShot !== undefined ? CONFIG.cj.soundVolumes.jetpackUziShot : 0.60;
+    audioSystem.playSFX(uziSnd, uziVol);
     if (typeof spawnSparks === 'function') {
       spawnSparks(spawnX, spawnY, '#F59E0B', 3);
     }
@@ -1650,13 +1639,14 @@ export class CJFighter extends Fighter {
       }
 
       // Punch Audio SFX
-      const punchSounds = [
+      const punchSounds = CONFIG.cj?.sounds?.punchHit || [
         'Assets/Sound Effects/Attacks/heavypunch1.mp3',
         'Assets/Sound Effects/Attacks/heavypunch2.mp3',
         'Assets/Sound Effects/Attacks/heavypunch3.mp3'
       ];
-      const soundFile = punchSounds[Math.floor(Math.random() * punchSounds.length)];
-      audioSystem.playSFX(soundFile, isHeavyCross ? 1.0 : 0.85);
+      const soundFile = Array.isArray(punchSounds) ? punchSounds[Math.floor(Math.random() * punchSounds.length)] : punchSounds;
+      const punchVol = CONFIG.cj?.soundVolumes?.punchHit !== undefined ? CONFIG.cj.soundVolumes.punchHit : 0.80;
+      audioSystem.playSFX(soundFile, isHeavyCross ? punchVol * 1.2 : punchVol);
     }
   }
 
@@ -1747,8 +1737,8 @@ export class CJFighter extends Fighter {
    * Draw Health Number Overlay (Anchored to elevated body when flying)
    */
   drawHealth(ctx) {
-    if (typeof state !== 'undefined' && state.gameState === 'countdown') return;
-    if (this.hp <= 0 || this._isWinnerReveal || this.hideHpText) return;
+    if (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'faceoff' || state.gameState === 'faceOff' || state.gameState === 'faceOffThumbnail')) return;
+    if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || (this.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
 
     const z = this.z || 0;
     ctx.save();

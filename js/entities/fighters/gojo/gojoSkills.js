@@ -68,12 +68,14 @@ export function activateRed(fighter) {
     fighter._lastRedSoundTime = now;
     fighter._hasPlayedRedChannelingSound = true;
     const sVoice = getSkillSound(fighter._def?.id, 'red_channeling');
-    audioSystem.playSFX(sVoice?.src || 'Assets/Sound Effects/Skills/redchanneling.mp3', sVoice?.volume ?? 1.8);
+    const redChanSnd = sVoice?.src || CONFIG.gojo?.sounds?.redChanneling || 'Assets/Sound Effects/Skills/redchanneling.mp3';
+    const redChanVol = sVoice?.volume ?? (CONFIG.gojo?.soundVolumes?.redChanneling ?? 1.8);
+    audioSystem.playSFX(redChanSnd, redChanVol);
 
     const sCharging = getSkillSound(fighter._def?.id, 'red_charging');
-    if (sCharging) {
-      audioSystem.playSFX(sCharging.src, sCharging.volume);
-    }
+    const redChargeSnd = sCharging?.src || CONFIG.gojo?.sounds?.redCharging || 'Assets/Sound Effects/Skills/redcharging.mp3';
+    const redChargeVol = sCharging?.volume ?? (CONFIG.gojo?.soundVolumes?.redCharging ?? 2.0);
+    audioSystem.playSFX(redChargeSnd, redChargeVol);
   }
 }
 
@@ -90,7 +92,9 @@ export function detonateRed(fighter) {
   triggerGlobalScreenShake(12, 18);
 
   const sBlast = getSkillSound(fighter._def?.id, 'red_blast');
-  audioSystem.playSFX(sBlast?.src || 'Assets/Sound Effects/Skills/redblast.mp3', sBlast?.volume ?? 1.5);
+  const blastSnd = sBlast?.src || CONFIG.gojo?.sounds?.redBlast || 'Assets/Sound Effects/Skills/redblast.mp3';
+  const blastVol = sBlast?.volume ?? (CONFIG.gojo?.soundVolumes?.redBlast ?? 2.5);
+  audioSystem.playSFX(blastSnd, blastVol);
 
   const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
   const arena = CONFIG.arena;
@@ -261,7 +265,9 @@ export function executePurpleRetreat(fighter) {
     spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'RETREAT!', '#00BFFF');
     spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
     spawnImpactFlash(fighter.x, fighter.y, 30, 'lightningTrail');
-    audioSystem.playSFX('skill_dash3', 0.9);
+    const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
+    const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.9;
+    audioSystem.playSFX(dashSnd, dashVol);
   }
 }
 

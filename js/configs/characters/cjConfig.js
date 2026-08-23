@@ -108,12 +108,36 @@ export const cjConfig = {
 
   // ── 8. AUDIO ASSETS, VOLUMES & TIMING DELAYS ──
   sounds: {
-    punchHit: 'Assets/Sound Effects/Attacks/punch-heavy.mp3',
-    minigunShot: 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
-    carRoamNoise: 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
+    // Street Boxing Brass Knuckles CQC
+    punchHit: [
+      'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+      'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+    ],
+    parry: 'Assets/Sound Effects/Skills/parry.mp3',
+    evade: 'Assets/Sound Effects/Skills/dash1.mp3',
+    shieldBlock: 'Assets/Sound Effects/Skills/shieldblock.mp3',
+
+    // Cheat Code Typing & Activation
+    typeClickNoise: 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3',
     cheatActivated: 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
-    deathMusic: 'Assets/Sound Effects/Skills/cj-deathmusic.mp3',
-    groveStreetVoiceline: 'Assets/Sound Effects/Skills/cj-GROVESTREET4LIFE-voiceline.mp3',
+
+    // Skill 1: HESOYAM
+    hesoyamShockwave: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+
+    // Skill 2: ROCKETMAN Jetpack & Dual Uzis
+    jetpackIgnition: 'Assets/Sound Effects/Attacks/flamespray1.mp3',
+    jetpackUziShot: 'Assets/Sound Effects/Attacks/revolvershot.mp3',
+    jetpackDive: 'Assets/Sound Effects/Attacks/heavypunch3.mp3',
+
+    // Skill 3: GROVESTREET4LIFE Greenwood Drive-By
+    carRoamNoise: 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
+    carRam: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+    carDriveByShot: [
+      'Assets/Sound Effects/Attacks/revolvershot.mp3',
+      'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3'
+    ],
+    carShellDrop: 'Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3',
     homiesArrivalVoiceline: 'Assets/Sound Effects/Skills/cj-homiesarrival-voiceline.mp3',
     homiesArrivalVoicelines: [
       'Assets/Sound Effects/Skills/cj-homiesarrival-voiceline.mp3',
@@ -128,22 +152,44 @@ export const cjConfig = {
       'Assets/Sound Effects/Skills/cj-homie-noise4.mp3',
       'Assets/Sound Effects/Skills/cj-homie-noise5.mp3'
     ],
+
+    // Ultimate: BAGUVIX God Mode & M134 Minigun
+    minigunShot: [
+      'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3',
+      'Assets/Sound Effects/Attacks/revolvershot.mp3',
+      'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3'
+    ],
+    riotShockwave: 'Assets/Sound Effects/Attacks/explosion.mp3',
+
+    // Voicelines & Music
     introVoiceline: 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3',
-    respectOverlayBgMusic: 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3',
-    typeClickNoise: 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3'
+    groveStreetVoiceline: 'Assets/Sound Effects/Skills/cj-GROVESTREET4LIFE-voiceline.mp3',
+    deathMusic: 'Assets/Sound Effects/Skills/cj-deathmusic.mp3',
+    respectOverlayBgMusic: 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3'
   },
   soundVolumes: {
-    punchHit: 0.8,
-    minigunShot: 0.8,
-    carRoamNoise: 1.5,
-    cheatActivated: 3.5,
-    deathMusic: 2.5,
-    groveStreetVoiceline: 3.0,
-    homiesArrivalVoiceline: 3.0,
-    homieRoamNoises: 3.0,
-    introVoiceline: 3.0,
-    respectOverlayBgMusic: 3.5,
-    typeClickNoise: 2.5
+    punchHit: 0.50,
+    parry: 0.50,
+    evade: 0.50,
+    shieldBlock: 0.50,
+    typeClickNoise: 0.50,
+    cheatActivated: 0.50,
+    hesoyamShockwave: 0.50,
+    jetpackIgnition: 0.50,
+    jetpackUziShot: 0.20,
+    jetpackDive: 0.50,
+    carRoamNoise: 0.50,
+    carRam: 0.50,
+    carDriveByShot: 0.20,
+    carShellDrop: 0.50,
+    homiesArrivalVoiceline: 3.00,
+    homieRoamNoises: 3.00,
+    minigunShot: 0.20,
+    riotShockwave: 0.50,
+    introVoiceline: 3.00,
+    groveStreetVoiceline: 3.00,
+    deathMusic: 1.50,
+    respectOverlayBgMusic: 1.50
   },
   soundChances: {
     punchHit: 1.0,
@@ -151,14 +197,27 @@ export const cjConfig = {
     homieRoamNoises: 0.50
   },
   soundDelays: {
-    carRoamNoise: 0,
+    punchHit: 0,
+    parry: 0,
+    evade: 0,
+    shieldBlock: 0,
+    typeClickNoise: 0,
     cheatActivated: 0,
-    deathMusic: 0,
-    groveStreetVoiceline: 0,
+    hesoyamShockwave: 0,
+    jetpackIgnition: 0,
+    jetpackUziShot: 0,
+    jetpackDive: 0,
+    carRoamNoise: 0,
+    carRam: 0,
+    carDriveByShot: 0,
+    carShellDrop: 0,
     homiesArrivalVoiceline: 0,
     homieRoamNoises: 0,
+    minigunShot: 0,
+    riotShockwave: 0,
     introVoiceline: 0,
-    respectOverlayBgMusic: 0,
-    typeClickNoise: 0
+    groveStreetVoiceline: 0,
+    deathMusic: 0,
+    respectOverlayBgMusic: 0
   }
 };

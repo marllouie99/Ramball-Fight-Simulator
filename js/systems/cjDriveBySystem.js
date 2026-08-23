@@ -352,7 +352,7 @@ export function spawnGroveStreetDriveBy(cjFighter) {
 
   // Car roaming engine noise
   const roamSound = CONFIG.cj?.sounds?.carRoamNoise || 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3';
-  const roamVol = CONFIG.cj?.soundVolumes?.carRoamNoise ?? 0.8;
+  const roamVol = CONFIG.cj?.soundVolumes?.carRoamNoise !== undefined ? CONFIG.cj.soundVolumes.carRoamNoise : 1.5;
   car.roamSoundHandle = audioSystem.playSFX(roamSound, roamVol);
 
   // Global screen shake on entrance
@@ -628,7 +628,7 @@ export function updateDriveBys() {
         // Recurring car engine roam sound
         if (car.stayTimer % 75 === 1) {
           const roamSound = CONFIG.cj?.sounds?.carRoamNoise || 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3';
-          const roamVol = CONFIG.cj?.soundVolumes?.carRoamNoise ?? 0.8;
+          const roamVol = CONFIG.cj?.soundVolumes?.carRoamNoise !== undefined ? CONFIG.cj.soundVolumes.carRoamNoise : 1.5;
           audioSystem.playSFX(roamSound, roamVol);
         }
 
@@ -867,7 +867,9 @@ export function updateDriveBys() {
               }
 
               // Audio: Heavy vehicular impact crash SFX
-              audioSystem.playSFX('Assets/Sound Effects/Attacks/groundSmash.mp3', 0.85);
+              const ramSnd = CONFIG.cj?.sounds?.carRam || 'Assets/Sound Effects/Attacks/groundSmash.mp3';
+              const ramVol = CONFIG.cj?.soundVolumes?.carRam !== undefined ? CONFIG.cj.soundVolumes.carRam : 0.85;
+              audioSystem.playSFX(ramSnd, ramVol);
               audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.70);
 
               // Visual FX: Comic "BAM!" starburst, impact flash, sparks, and screen shake
@@ -974,10 +976,15 @@ export function updateDriveBys() {
           }
 
           // Gunshot Audio & Shell Casing SFX
-          const shotSfx = (car.shotCount % 2 === 0)
-            ? 'Assets/Sound Effects/Attacks/revolvershot.mp3'
-            : 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3';
-          audioSystem.playSFX(shotSfx, 0.70);
+          const driveByShots = CONFIG.cj?.sounds?.carDriveByShot || [
+            'Assets/Sound Effects/Attacks/revolvershot.mp3',
+            'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3'
+          ];
+          const shotSfx = Array.isArray(driveByShots)
+            ? driveByShots[car.shotCount % driveByShots.length]
+            : driveByShots;
+          const shotVol = CONFIG.cj?.soundVolumes?.carDriveByShot !== undefined ? CONFIG.cj.soundVolumes.carDriveByShot : 0.70;
+          audioSystem.playSFX(shotSfx, shotVol);
 
           // Eject physical 9mm spent shell casings from car window dropping to arena floor
           if (typeof spawnSpentCasing === 'function') {
@@ -985,7 +992,9 @@ export function updateDriveBys() {
           }
 
           if (car.shotCount % 4 === 0) {
-            audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3', 0.50);
+            const shellSnd = CONFIG.cj?.sounds?.carShellDrop || 'Assets/Sound Effects/Skills/johnwick-bulleshell-drop.mp3';
+            const shellVol = CONFIG.cj?.soundVolumes?.carShellDrop !== undefined ? CONFIG.cj.soundVolumes.carShellDrop : 0.50;
+            audioSystem.playSFX(shellSnd, shellVol);
           }
 
           // Visual spark bursts at muzzle

@@ -1,4 +1,5 @@
 import { playSound } from '../systems/soundSystem.js';
+import { CONFIG } from '../core/config.js';
 
 // ─────────────────────────────────────────────
 // SKILL EFFECT SOUND EFFECTS CONFIG
@@ -229,6 +230,49 @@ export function getSkillEffectSound(fighterName, effectName) {
   }
   const lowerName = nameKey;
   const lowerEffect = String(effectName || '').toLowerCase();
+
+  // Dynamic overrides for Mahoraga from mahoragaConfig.js
+  if (lowerName.includes('mahoraga') && CONFIG.mahoraga) {
+    if (lowerEffect === 'wheelclick') {
+      return {
+        src: CONFIG.mahoraga.sounds?.wheelClick || 'Assets/Sound Effects/Skills/mahoraga-wheelclick.mp3',
+        volume: CONFIG.mahoraga.soundVolumes?.wheelClick !== undefined ? CONFIG.mahoraga.soundVolumes.wheelClick : 1.5,
+        speed: 1.0
+      };
+    }
+    if (lowerEffect === 'shout') {
+      return {
+        src: CONFIG.mahoraga.sounds?.shout || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        volume: CONFIG.mahoraga.soundVolumes?.shout !== undefined ? CONFIG.mahoraga.soundVolumes.shout : 2.2,
+        speed: 1.0
+      };
+    }
+    if (lowerEffect === 'shout_impact') {
+      return {
+        src: CONFIG.mahoraga.sounds?.shoutImpact || 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        volume: CONFIG.mahoraga.soundVolumes?.shoutImpact !== undefined ? CONFIG.mahoraga.soundVolumes.shoutImpact : 1.8,
+        speed: 1.0
+      };
+    }
+    if (lowerEffect === 'punch' || lowerEffect === 'heavypunch') {
+      return {
+        src: CONFIG.mahoraga.sounds?.punchSounds || [
+          'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+          'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+          'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+        ],
+        volume: CONFIG.mahoraga.soundVolumes?.punch !== undefined ? CONFIG.mahoraga.soundVolumes.punch : 1.0,
+        speed: 1.0
+      };
+    }
+    if (lowerEffect === 'dash' || lowerEffect === 'teleport') {
+      return {
+        src: CONFIG.mahoraga.sounds?.dash || 'Assets/Sound Effects/Skills/dash5.mp3',
+        volume: CONFIG.mahoraga.soundVolumes?.dash !== undefined ? CONFIG.mahoraga.soundVolumes.dash : 1.0,
+        speed: 1.0
+      };
+    }
+  }
 
   const fighterConfig = SKILL_EFFECT_SOUNDS[lowerName];
   if (!fighterConfig) return null;

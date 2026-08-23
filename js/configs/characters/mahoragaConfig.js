@@ -131,4 +131,71 @@ export const mahoragaConfig = {
     heavyPunchKnockbackForce: 18.0,    // Knockback force for heavy off-hand punch impacts
     adaptationStrikeKnockbackForce: 42.0, // Knockback launch force for Adaptation Strike counter
     blitzKineticKnockbackForce: 16.0,  // Knockback force for random kinetic punch procs during blitz
+
+    // ── Audio configuration, volume & timing delay adjustments (delays measured in frames @ 60fps) ──
+    sounds: {
+        // Dharma Wheel Adaptation
+        wheelClick: 'Assets/Sound Effects/Skills/mahoraga-wheelclick.mp3',
+        wheelEnhance: 'Assets/Sound Effects/Skills/enhance.mp3',
+
+        // Sword of Extermination & Melee Combat
+        swordSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+        fleshHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
+        punchSounds: [
+            'Assets/Sound Effects/Attacks/heavypunch1.mp3',
+            'Assets/Sound Effects/Attacks/heavypunch2.mp3',
+            'Assets/Sound Effects/Attacks/heavypunch3.mp3'
+        ],
+        parry: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+        shieldBlock: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+
+        // Movement, Teleport & Flash Blitz
+        dash: 'Assets/Sound Effects/Skills/dash5.mp3',
+        teleportDash: 'Assets/Sound Effects/Skills/dash3.mp3',
+
+        // Divine Shout & Ground Impact
+        shout: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        shoutImpact: 'Assets/Sound Effects/Attacks/groundSmash.mp3',
+        shoutExplosion: 'Assets/Sound Effects/Attacks/explosion.mp3',
+
+        // Level 8 Wall Slam & Supersonic Execution Combo
+        wallSlamLunge: 'Assets/Sound Effects/Skills/dash5.mp3',
+        wallSlamImpale: 'Assets/Sound Effects/Skills/backstab.mp3',
+        wallSlamImpact: 'Assets/Sound Effects/Attacks/fleshhit.mp3'
+    },
+    soundVolumes: {
+        wheelClick: 0.50,
+        wheelEnhance: 0.50,
+        swordSwing: 0.50,
+        fleshHit: 0.50,
+        punch: 0.20,
+        parry: 0.50,
+        shieldBlock: 0.50,
+        dash: 0.50,
+        teleportDash: 0.50,
+        shout: 0.50,
+        shoutImpact: 0.50,
+        shoutExplosion: 0.50,
+        wallSlamLunge: 0.50,
+        wallSlamImpale: 0.50,
+        wallSlamImpact: 0.50
+    },
+    soundDelays: {
+        wheelClick: 0,
+        wheelEnhance: 0,
+        swordSwing: 0,
+        fleshHit: 0,
+        punch: 0,
+        parry: 0,
+        shieldBlock: 0,
+        dash: 0,
+        teleportDash: 0,
+        shout: 0,
+        shoutImpact: 0,
+        shoutExplosion: 0,
+        wallSlamLunge: 0,
+        wallSlamImpale: 0,
+        wallSlamImpact: 0
+    }
 };
+

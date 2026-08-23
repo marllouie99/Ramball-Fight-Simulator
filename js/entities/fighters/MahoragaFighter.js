@@ -508,7 +508,10 @@ export class MahoragaFighter extends Fighter {
   _performMeleeAttack(opponent) { performMeleeAttack(this, opponent); }
   _executeCleave(opponent) { executeCleave(this, opponent); }
   _executeShout(opponent, ownerIndex) { executeShout(this, opponent, ownerIndex); }
-  _playRandomHeavyPunchSound(volume) { playRandomHeavyPunchSound(volume); }
+  _playRandomHeavyPunchSound(volume = null) {
+    const vol = volume !== null ? volume : (CONFIG.mahoraga?.soundVolumes?.punch !== undefined ? CONFIG.mahoraga.soundVolumes.punch : 1.0);
+    playRandomHeavyPunchSound(vol);
+  }
   _getFrontRadiusTargets(maxRangeOffset, coneAngle) { return getFrontRadiusTargets(this, maxRangeOffset, coneAngle); }
   initiateLevel8WallSlam(opponent) { initiateLevel8WallSlam(this, opponent); }
   updateLevel8WallSlam(opponent, ownerIndex, arena) { updateLevel8WallSlam(this, opponent, ownerIndex, arena); }
@@ -1151,7 +1154,7 @@ export class MahoragaFighter extends Fighter {
           spawnSparks(target.x, target.y, 25, 'silver', '#FFFFFF');
           spawnMeleeClashShockwave(target.x, target.y, 110, 'silver');
           triggerGlobalScreenShake(10, 18);
-          this._playRandomHeavyPunchSound(0.85);
+          this._playRandomHeavyPunchSound();
 
           this._executeShout(target, ownerIndex);
 
@@ -1174,7 +1177,9 @@ export class MahoragaFighter extends Fighter {
           target.takeDamage(dmg, this, { isMelee: true, isSkill: true });
           this.punchAnimTimer = 22;
           this.punchAnimMaxTimer = 22;
-          audioSystem.playSFX('attack_swordswing', 1.0);
+          const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+          const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
+          audioSystem.playSFX(swordSnd, swordVol);
           spawnImpactFlash(target.x, target.y, 45, '#FFD700');
           spawnSparks(target.x, target.y, 15, 'gold', '#FFFFFF');
           spawnFloatingText(this.x, this.y - this.r - 25, '⚡ ADAPTATION STRIKE!', '#FFD700');
@@ -1187,12 +1192,14 @@ export class MahoragaFighter extends Fighter {
             if (this.attackCount % 2 === 0) {
               this.leftPunchTimer = 18;
               this.leftPunchMaxTimer = 18;
-              this._playRandomHeavyPunchSound(1.0);
+              this._playRandomHeavyPunchSound();
             } else {
               this.swordCombo = (this.swordCombo || 0) + 1;
               this.punchAnimTimer = 18;
               this.punchAnimMaxTimer = 18;
-              audioSystem.playSFX('attack_swordswing', 1.0);
+              const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+              const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
+              audioSystem.playSFX(swordSnd, swordVol);
             }
 
             const counterTargets = this._getFrontRadiusTargets(100, Math.PI * 1.3);
@@ -1396,12 +1403,14 @@ export class MahoragaFighter extends Fighter {
             if (this.attackCount % 2 === 0) {
               this.leftPunchTimer = 16;
               this.leftPunchMaxTimer = 16;
-              this._playRandomHeavyPunchSound(1.0);
+              this._playRandomHeavyPunchSound();
             } else {
               this.swordCombo = (this.swordCombo || 0) + 1;
               this.punchAnimTimer = 16;
               this.punchAnimMaxTimer = 16;
-              audioSystem.playSFX('attack_swordswing', 1.0);
+              const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+              const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
+              audioSystem.playSFX(swordSnd, swordVol);
             }
 
             this.aim(opponent);
@@ -1658,8 +1667,10 @@ export class MahoragaFighter extends Fighter {
           const word = animeWords[(hitIndex - 1) % animeWords.length];
           spawnFloatingText(target.x + (Math.random() - 0.5) * 20, target.y - target.r - 20, word, '#FFD700');
 
-          this._playRandomHeavyPunchSound(0.9);
-          audioSystem.playSFX('attack_swordswing', 0.8);
+          this._playRandomHeavyPunchSound();
+          const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+          const swordVol = (CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0) * 0.8;
+          audioSystem.playSFX(swordSnd, swordVol);
 
           const isPunchHit = (hitIndex % 2 === 1);
           const rollBlitzKnockback = isPunchHit && (Math.random() < 0.45);

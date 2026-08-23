@@ -293,29 +293,32 @@ export function drawTricksterStaff(ctx, fighter) {
   ctx.arc(0, topY + 45, 2.5, Math.PI * 0.2, Math.PI * 1.8);
   ctx.stroke();
 
-  // ADD HANDS (NEW CODE)
-  ctx.fillStyle = fighter._def ? fighter._def.color : '#8A2BE2';  // 2. Bright Energy Core (Cyan/Teal Glow)
-  ctx.save();
-  ctx.fillStyle = '#00f7ff'; // reset shadow for hand
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#000';
-  ctx.globalAlpha = baseAlpha;
-  
-  const handR = getHandSize(6);
-  if (fighter.stolenWindUpTimer > 0) {
-    // Left hand
-    ctx.beginPath();
-    ctx.arc(-shaftThickness/2 - 4, 10, handR, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-    // Right hand
-    ctx.beginPath();
-    ctx.arc(shaftThickness/2 + 4, -10, handR, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
-  } else {
-    // Single hand gripping the staff
-    ctx.beginPath();
-    ctx.arc(0, 5, handR, 0, Math.PI * 2);
-    ctx.fill(); ctx.stroke();
+  // ADD HANDS
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  if (!shouldHideHands && !fighter.hideFrontHand) {
+    ctx.save();
+    ctx.fillStyle = '#00f7ff';
+    ctx.lineWidth = 1.5;
+    ctx.strokeStyle = '#000';
+    ctx.globalAlpha = baseAlpha;
+    
+    const handR = getHandSize(6);
+    if (fighter.stolenWindUpTimer > 0) {
+      // Left hand
+      ctx.beginPath();
+      ctx.arc(-shaftThickness/2 - 4, 10, handR, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      // Right hand
+      ctx.beginPath();
+      ctx.arc(shaftThickness/2 + 4, -10, handR, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    } else {
+      // Single hand gripping the staff
+      ctx.beginPath();
+      ctx.arc(0, 5, handR, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+    ctx.restore();
   }
 
   ctx.restore();

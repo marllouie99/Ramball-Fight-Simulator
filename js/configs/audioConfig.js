@@ -2,6 +2,14 @@ export const AUDIO_CONFIG = {
   // UI & General
   'ui_click': 'Assets/Sound Effects/Skills/dash1.mp3',
   'ui_hover': 'Assets/Sound Effects/Skills/dash3.mp3',
+  'ui_bell': 'Assets/Sound Effects/Announcer/bell.mp3',
+  'bell': 'Assets/Sound Effects/Announcer/bell.mp3',
+  'timertick': 'Assets/Sound Effects/Announcer/timertick.mp3',
+  'fight': 'Assets/Sound Effects/Announcer/fight.mp3',
+  'ringbell': 'Assets/Sound Effects/Announcer/ring-bell.mp3',
+  'ring_bell': 'Assets/Sound Effects/Announcer/ring-bell.mp3',
+  'youwin': 'Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3',
+  'street_fighter_you_win': 'Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3',
 
   // Attacks
   'attack_explosion': 'Assets/Sound Effects/Attacks/explosion.mp3',
@@ -64,6 +72,8 @@ export const AUDIO_CONFIG = {
   'skill_engineer_sentry_gunshot': 'Assets/Sound Effects/Skills/engineer-sentrygunshot.mp3',
   'skill_engineer_sentry_reloaded': 'Assets/Sound Effects/Skills/engineer-sentryreloaded.mp3',
   'skill_engineer_sentry_reloading': 'Assets/Sound Effects/Skills/engineer-sentryreloading.mp3',
+  'skill_engineer_repair': 'Assets/Sound Effects/Skills/repair.mp3',
+  'repair': 'Assets/Sound Effects/Skills/repair.mp3',
 
   // CJ Grove Street
   'skill_cj_carroam_noise': 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',

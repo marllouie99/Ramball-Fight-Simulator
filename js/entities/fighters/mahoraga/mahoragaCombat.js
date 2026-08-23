@@ -15,14 +15,16 @@ import { spawnTeleportAfterimages } from './mahoragaSkills.js';
 /**
  * Play a random heavy punch sound effect.
  */
-export function playRandomHeavyPunchSound(volume = 1.0) {
-  const heavyPunches = [
+export function playRandomHeavyPunchSound(volume = null) {
+  const vol = volume !== null ? volume : (CONFIG.mahoraga?.soundVolumes?.punch !== undefined ? CONFIG.mahoraga.soundVolumes.punch : 1.0);
+  if (vol <= 0.0001) return;
+  const heavyPunches = CONFIG.mahoraga?.sounds?.punchSounds || [
     'Assets/Sound Effects/Attacks/heavypunch1.mp3',
     'Assets/Sound Effects/Attacks/heavypunch2.mp3',
     'Assets/Sound Effects/Attacks/heavypunch3.mp3'
   ];
   const chosenSound = heavyPunches[Math.floor(Math.random() * heavyPunches.length)];
-  audioSystem.playSFX(chosenSound, volume);
+  audioSystem.playSFX(chosenSound, vol);
 }
 
 /**
@@ -148,12 +150,14 @@ export function performMeleeAttack(fighter, opponent) {
   if (isPunch) {
     fighter.leftPunchTimer = punchAnimDuration;
     fighter.leftPunchMaxTimer = punchAnimDuration;
-    playRandomHeavyPunchSound(1.0);
+    playRandomHeavyPunchSound();
   } else {
     fighter.swordCombo = (fighter.swordCombo || 0) + 1;
     fighter.punchAnimTimer = swordAnimDuration;
     fighter.punchAnimMaxTimer = swordAnimDuration;
-    audioSystem.playSFX('attack_swordswing', 1.0);
+    const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+    const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0;
+    audioSystem.playSFX(swordSnd, swordVol);
   }
 
   // AOE frontal arc query (Sword reach & arc angle from config)
@@ -265,7 +269,9 @@ export function performMeleeAttack(fighter, opponent) {
  */
 export function executeCleave(fighter, opponent) {
   triggerGlobalScreenShake(8, 15);
-  audioSystem.playSFX('attack_swordswing', 0.9);
+  const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+  const swordVol = (CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0) * 0.9;
+  audioSystem.playSFX(swordSnd, swordVol);
   fighter.punchAnimTimer = 18;
   fighter.punchAnimMaxTimer = 18;
   fighter.swordCombo = (fighter.swordCombo || 0) + 1;
@@ -338,7 +344,9 @@ export function shootBladeBarrage(fighter, ownerIndex) {
     proj.skillShotColor = '#8B4513';
   }
 
-  audioSystem.playSFX('attack_swordswing', 0.35);
+  const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+  const swordVol = (CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0) * 0.35;
+  audioSystem.playSFX(swordSnd, swordVol);
 }
 
 /**
@@ -375,7 +383,9 @@ export function initiateLevel8WallSlam(fighter, opponent) {
   fighter.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 600;
 
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, '⚡ LEVEL 8 WALL SLAM!', '#FFEE58');
-  audioSystem.playSFX('attack_fleshhit', 0.9);
+  const fleshSnd = CONFIG.mahoraga?.sounds?.fleshHit || 'attack_fleshhit';
+  const fleshVol = CONFIG.mahoraga?.soundVolumes?.fleshHit ?? 0.9;
+  audioSystem.playSFX(fleshSnd, fleshVol);
 }
 
 export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
@@ -420,7 +430,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       fighter.wallSlamGrabAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
 
       // Play lunge dash sound at start of grab lunge
-      audioSystem.playSFX('skill_dash5', 0.9);
+      const lungeSnd = CONFIG.mahoraga?.sounds?.wallSlamLunge || 'skill_dash5';
+      const lungeVol = CONFIG.mahoraga?.soundVolumes?.wallSlamLunge ?? 0.9;
+      audioSystem.playSFX(lungeSnd, lungeVol);
 
       // Clear target's active projectiles (like Gojo's Blue, Red, Purple) to hide all active attack visual effects
       if (state.projectiles) {
@@ -439,7 +451,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     
     if (fighter.wallSlamTimer === 12) {
       // Play backstab sound upon contact/impale
-      audioSystem.playSFX('skill_backstab', 1.0);
+      const impaleSnd = CONFIG.mahoraga?.sounds?.wallSlamImpale || 'skill_backstab';
+      const impaleVol = CONFIG.mahoraga?.soundVolumes?.wallSlamImpale ?? 1.0;
+      audioSystem.playSFX(impaleSnd, impaleVol);
       spawnFloatingText(target.x, target.y - target.r - 28, '⚔️ IMPALED!', '#FFEE58');
       spawnImpactFlash(target.x, target.y, 45, '#FF3333');
       spawnSparks(target.x, target.y, 15, 'crimsonSniper', '#FFFFFF');
@@ -519,7 +533,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       spawnAnimePunchImpactFrame(target.x, target.y, 60, angle, 'gold');
       spawnImpactFlash(target.x, target.y, 60, '#FFEE58');
       triggerGlobalScreenShake(12, 15);
-      audioSystem.playSFX('attack_fleshhit', 1.0);
+      const smashSnd = CONFIG.mahoraga?.sounds?.wallSlamImpact || 'attack_fleshhit';
+      const smashVol = CONFIG.mahoraga?.soundVolumes?.wallSlamImpact ?? 1.0;
+      audioSystem.playSFX(smashSnd, smashVol);
     }
     
     // Keep target locked during the first few frames of the punch hitpause
@@ -565,7 +581,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       fighter.wallSlamTargetVelY = Math.sin(wallAngle) * throwSpeed;
 
       triggerGlobalScreenShake(8, 14);
-      audioSystem.playSFX('skill_dash5', 1.0);
+      const throwSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+      const throwVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+      audioSystem.playSFX(throwSnd, throwVol);
     }
   }
   // ── PHASE 2: SUPERSONIC WALL THROW ──
@@ -684,8 +702,12 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     spawnMeleeClashShockwave(target.x, target.y, 110, 'mahoraga');
     spawnSparks(target.x, target.y, 20, 'gold', '#FFFFFF');
     triggerGlobalScreenShake(12, 18);
-    audioSystem.playSFX('attack_swordswing', 1.0);
-    audioSystem.playSFX('attack_fleshhit', 1.0);
+    const execSwordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
+    const execSwordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing ?? 1.0;
+    const execFleshSnd = CONFIG.mahoraga?.sounds?.fleshHit || 'attack_fleshhit';
+    const execFleshVol = CONFIG.mahoraga?.soundVolumes?.fleshHit ?? 1.0;
+    audioSystem.playSFX(execSwordSnd, execSwordVol);
+    audioSystem.playSFX(execFleshSnd, execFleshVol);
 
     // End Wall Slam combo
     target.isGrabbedByMahoraga = false;
@@ -720,8 +742,12 @@ export function executeShout(fighter, opponent, ownerIndex) {
   
   // Play heavy ground impact and shockwave burst SFX
   playSkillEffectSound('mahoraga', 'shout');
-  audioSystem.playSFX('attack_groundsmash', 1.8);
-  audioSystem.playSFX('attack_explosion', 0.85);
+  const shoutImpactSnd = CONFIG.mahoraga?.sounds?.shoutImpact || 'attack_groundsmash';
+  const shoutImpactVol = CONFIG.mahoraga?.soundVolumes?.shoutImpact ?? 1.8;
+  const shoutExpSnd = CONFIG.mahoraga?.sounds?.shoutExplosion || 'attack_explosion';
+  const shoutExpVol = CONFIG.mahoraga?.soundVolumes?.shoutExplosion ?? 0.85;
+  audioSystem.playSFX(shoutImpactSnd, shoutImpactVol);
+  audioSystem.playSFX(shoutExpSnd, shoutExpVol);
 
   // Spawn the improved Concentric Gold/Silver Shockwave and Outward Spark Burst
   spawnMahoragaShoutBurst(fighter.x, fighter.y, shoutRadius);

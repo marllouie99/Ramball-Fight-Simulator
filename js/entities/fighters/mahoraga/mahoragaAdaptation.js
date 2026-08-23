@@ -472,7 +472,9 @@ export function applyGojoAdaptation(fighter, gojoType) {
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
-  audioSystem.playSFX('skill_dash3', 0.8);
+  const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
+  const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(tpSnd, tpVol);
 }
 
 /**
@@ -569,7 +571,9 @@ export function applySukunaAdaptation(fighter, sukunaType) {
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
-  audioSystem.playSFX('skill_dash3', 0.8);
+  const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
+  const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(tpSnd, tpVol);
 }
 
 /**
@@ -616,7 +620,9 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
-  audioSystem.playSFX('skill_dash3', 0.8);
+  const tpSnd = CONFIG.mahoraga?.sounds?.teleportDash || 'skill_dash3';
+  const tpVol = CONFIG.mahoraga?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(tpSnd, tpVol);
 }
 
 /**
@@ -710,7 +716,9 @@ export function adaptToPureLoveBeam(fighter) {
     fighter.swordCombo = (fighter.swordCombo || 0) + 1;
     fighter.punchAnimTimer = 18;
     fighter.leftPunchTimer = 0;
-    audioSystem.playSFX('skill_dash5', 1.0);
+    const dashSnd = CONFIG.mahoraga?.sounds?.dash || 'skill_dash5';
+    const dashVol = CONFIG.mahoraga?.soundVolumes?.dash ?? 1.0;
+    audioSystem.playSFX(dashSnd, dashVol);
   } else {
     // If enemy is actively firing a beam, lock stance on 5s cooldown and DO NOT TELEPORT!
     fighter.neutralStanceTimer = 0;
@@ -955,6 +963,8 @@ function applyRCTHeal(fighter) {
     spawnImpactFlash(fighter.x, fighter.y, 55, 'healing');
     spawnSparks(fighter.x, fighter.y, 30, 'arcane');
     spawnSparks(fighter.x, fighter.y, 20, 'arcaneAscendLine');
-    audioSystem.playSFX('skill_enhance', 0.85);
+    const enhSnd = CONFIG.mahoraga?.sounds?.wheelEnhance || 'skill_enhance';
+    const enhVol = CONFIG.mahoraga?.soundVolumes?.wheelEnhance ?? 0.85;
+    audioSystem.playSFX(enhSnd, enhVol);
   }
 }

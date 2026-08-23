@@ -19,6 +19,7 @@ class AudioEventEmitter {
     // Explicit event routing to the underlying low-level soundSystem
     if (event === 'playSFX') {
       const [id, volume = 1.0, speed = 1.0, offset = 0, delay = 0, onEnded = null] = args;
+      if (volume <= 0.0001) return null;
       const src = AUDIO_CONFIG[id] || id; // Fallback to string if not mapped
       if (typeof src === 'string' && !src.includes('/') && !src.includes('.')) {
         return null; // Skip unmapped sound key that is not a file path

@@ -3,7 +3,7 @@ import { CONFIG } from '../core/config.js';
 import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
-  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawHUD, 
+  drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
   drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
 } from '../graphics/ui.js';
 import {
@@ -44,7 +44,7 @@ export function renderGame() {
 
     // Toggle WebGL layers visibility based on game state to prevent leftover battle visuals
     // and dim effects from glitching behind/above panels on menu/select/index screens.
-    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail'].includes(state.gameState);
+    const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail', 'weaponStudio', 'faceoff'].includes(state.gameState);
     if (state.pixiLayers) {
       state.pixiLayers.background.visible = isBattleState;
       state.pixiLayers.arena.visible = isBattleState;
@@ -157,8 +157,26 @@ export function renderGame() {
       drawWeaponDetailScreen();
     } else if (state.gameState === 'weaponStudio') {
       drawWeaponStudioScreen();
+    } else if (state.gameState === 'faceoff') {
+      // Hide gameplay WebGL layers so stale floating damage numbers / effects don't persist on the showoff screen
+      if (state.floatingTextSprite) state.floatingTextSprite.visible = false;
+      if (state.floatingTextCtx && state.floatingTextCanvas) {
+        state.floatingTextCtx.clearRect(0, 0, state.floatingTextCanvas.width, state.floatingTextCanvas.height);
+      }
+      if (state.pixiLayers) {
+        state.pixiLayers.projectiles.visible = false;
+        state.pixiLayers.particles.visible = false;
+        state.pixiLayers.effects.visible = false;
+        state.pixiLayers.environment.visible = false;
+      }
+      drawFaceOffThumbnailScreen();
     } else {
       if (state.pixiLayers) {
+        // Restore gameplay WebGL layers that were hidden during faceoff/menu screens
+        state.pixiLayers.projectiles.visible = true;
+        state.pixiLayers.particles.visible = true;
+        state.pixiLayers.effects.visible = true;
+        state.pixiLayers.environment.visible = true;
         // Stop shaking the arena layer (keep outer background static)
         state.pixiLayers.arena.position.set(0, 0);
         // OPTIMIZED: Only set positions if currently shaking or if we need to reset them to 0
@@ -283,6 +301,7 @@ export function renderGame() {
         // Composite flame canvas onto main canvas (clipped to arena bounds)
         compositeFlameCanvas();
 
+        if (state.floatingTextSprite) state.floatingTextSprite.visible = true;
         drawFloatingTexts(); 
         drawUltimateChannelingTexts();
 
@@ -344,8 +363,29 @@ export function renderGame() {
         drawHUD();
       }
 
-      if (state.gameState === 'countdown') {
+      if (state.gameState === 'playing') {
+        // Smooth White Flash Veil Dissolve when entering arena from Face-Off Countdown
+        if (state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
+          state.battleStartFadeTimer--;
+          const uiCtx = state.topLevelUiCtx || state.ctx;
+          const flashAlpha = Math.max(0, state.battleStartFadeTimer / 16);
+          uiCtx.save();
+          uiCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.95})`;
+          uiCtx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+          uiCtx.restore();
+        }
+      } else if (state.gameState === 'countdown') {
         drawCountdown();
+
+        // Smooth Arena Entrance Flash Fade
+        if ((state.countdownTimer || 0) < 14) {
+          const uiCtx = state.topLevelUiCtx || state.ctx;
+          const flashAlpha = Math.max(0, 1 - (state.countdownTimer || 0) / 14);
+          uiCtx.save();
+          uiCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.95})`;
+          uiCtx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+          uiCtx.restore();
+        }
       } else if (state.gameState === 'paused') {
         drawPauseScreen();
       } else if (state.gameState === 'roundEnd') {

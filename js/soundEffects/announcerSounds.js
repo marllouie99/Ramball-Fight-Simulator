@@ -53,6 +53,41 @@ export const ANNOUNCER_SOUNDS = {
         speed: 1.0,
         offset: 0.0,
         duration: 2.5,
+    },
+    bell: {
+        src: 'Assets/Sound Effects/Announcer/bell.mp3',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 2.0,
+    },
+    timertick: {
+        src: 'Assets/Sound Effects/Announcer/timertick.mp3',
+        volume: 0.9,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 1.5,
+    },
+    fight: {
+        src: 'Assets/Sound Effects/Announcer/fight.mp3',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 2.0,
+    },
+    ringbell: {
+        src: 'Assets/Sound Effects/Announcer/ring-bell.mp3',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 2.5,
+    },
+    youwin: {
+        src: 'Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3',
+        volume: 1.0,
+        speed: 1.0,
+        offset: 0.0,
+        duration: 2.5,
     }
 };
 

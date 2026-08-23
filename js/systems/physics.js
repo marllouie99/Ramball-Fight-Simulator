@@ -574,33 +574,6 @@ function endRoundIf2v2Ended() {
     stopAllLoopingSounds();
   }
 
-  // Play victory voicelines when winning team wins
-  if (state.fighters) {
-    const todoFighter = state.fighters.find(f => f && (f.characterId === 'todo' || f.type === 'todo'));
-    if (todoFighter) {
-      const todoIdx = state.fighters.indexOf(todoFighter);
-      const todoTeam = state.getFighterTeam ? state.getFighterTeam(todoIdx) : null;
-      if (todoTeam !== null && todoTeam === winningTeam) {
-        const todoSnd = CONFIG.todo?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/todo-voiceline-mybestfriend.mp3';
-        const vol = CONFIG.todo?.victoryVoiceVolume ?? 3.5;
-        audioSystem.playSFX(todoSnd, vol);
-      }
-    }
-
-    if (isMatchEnd) {
-      const saitamaFighter = state.fighters.find(f => f && (f.characterId === 'saitama' || f.type === 'saitama'));
-      if (saitamaFighter) {
-        const saitamaIdx = state.fighters.indexOf(saitamaFighter);
-        const saitamaTeam = state.getFighterTeam ? state.getFighterTeam(saitamaIdx) : null;
-        if (saitamaTeam !== null && saitamaTeam === winningTeam) {
-          const saitamaSnd = CONFIG.saitama?.sounds?.championVoiceline || CONFIG.saitama?.championVoiceline || 'Assets/Sound Effects/SkillEffects/saitama-champion-voiceline.mp3';
-          const vol = CONFIG.saitama?.soundVolumes?.championVoiceline ?? (CONFIG.saitama?.championVoiceVolume ?? 3.5);
-          audioSystem.playSFX(saitamaSnd, vol);
-        }
-      }
-    }
-  }
-
   if (isMatchEnd) {
     state.matchWinner = winnerFighter;
     state.matchEndTimer = 0;
@@ -741,11 +714,17 @@ function endRoundIfTlfsEnded() {
 // ─────────────────────────────────────────────
 
 export function updateFighters() {
-  // During countdown, only update visual effects but don't allow movement
-  if (state.gameState === 'countdown') {
-    // Keep bodies upright and update gun angles for all fighters so they face opponents during countdown
+  // During countdown or initial battle start delay, fighters face opponents with zero velocity
+  const isStartDelayed = (state.gameState === 'playing' && (state.battleStartDelayTimer || 0) > 0);
+  if (state.gameState === 'countdown' || isStartDelayed) {
+    if (isStartDelayed) {
+      state.battleStartDelayTimer--;
+    }
+    // Keep bodies upright and update gun angles for all fighters so they face opponents during countdown / start pause
     state.fighters.forEach((fighter) => {
       if (!fighter || fighter.hp <= 0) return;
+      fighter.vx = 0;
+      fighter.vy = 0;
       const opponent = getClosestOpponent(fighter);
       if (opponent) {
         fighter.aim(opponent, null);

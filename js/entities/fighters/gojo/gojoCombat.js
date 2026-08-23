@@ -63,7 +63,9 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
       const nowSound = Date.now();
       if (!fighter._lastInfinityCollideSoundTime || nowSound - fighter._lastInfinityCollideSoundTime >= 250) {
         fighter._lastInfinityCollideSoundTime = nowSound;
-        audioSystem.playSFX('effect_infinity_collide', 1.0);
+        const infSnd = CONFIG.gojo?.sounds?.infinityCollide || 'effect_infinity_collide';
+        const infVol = CONFIG.gojo?.soundVolumes?.infinityCollide ?? 1.0;
+        audioSystem.playSFX(infSnd, infVol);
       }
      
       // Spawn visual barrier rebound ring effect at the impact position
@@ -262,6 +264,7 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 
   spawnFloatingText(oldX, oldY - fighter.r - 10, 'EVADE!', '#00BFFF');
   spawnImpactFlash(oldX, oldY, 22, 'lightningTrail');
-  spawnImpactFlash(fighter.x, fighter.y, 22, 'lightningTrail');
-  audioSystem.playSFX('skill_dash3', 0.8);
+  const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
+  const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.8;
+  audioSystem.playSFX(dashSnd, dashVol);
 }
