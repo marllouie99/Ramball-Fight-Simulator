@@ -430,7 +430,7 @@ export function updateHybridEnvironment() {
   }
 
   // 2. Gojo Purple
-  const gojoPurple = state.fighters?.find(f => f && (f.isChannelingPurple || (f.purpleRecoveryTimer && f.purpleRecoveryTimer > 0)));
+  const gojoPurple = state.fighters?.find(f => f && (f.isChannelingPurple || (f.purpleRecoveryTimer && f.purpleRecoveryTimer > 0)) && !f.isTargetOfAmbush && !f.caughtInSaitamaCounter);
   const purpleOrb = getProjectiles().find(p => p && (p.isGojoPurple || p.isGojoPurpleOrb) && p.life > 0);
 
   let tOpPurple = 0, cxPurple = state.canvas.width / 2, cyPurple = state.canvas.height / 2;

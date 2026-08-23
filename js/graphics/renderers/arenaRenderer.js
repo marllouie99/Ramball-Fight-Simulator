@@ -403,7 +403,12 @@ export function drawArena() {
   ctx.restore();
 
   // ── Cached Title Header (text only) ──────────────────────────────
-  // Render the entire title text once into an offscreen canvas, then blit it every frame.
+  // Render the entire title text once into an offscreen canvas, then blit it every frame if enabled.
+  const showTitle = (typeof CONFIG !== 'undefined' && CONFIG.showArenaTitle !== undefined) ? CONFIG.showArenaTitle : false;
+  if (!showTitle) {
+    return;
+  }
+
   if (!state._titleHeaderCanvas || state._titleHeaderCanvasTheme !== (state.arenaTheme || 'light')) {
     // Prevent Flash of Unstyled Text (FOUT) and visual jumping by waiting for custom fonts
     if (document.fonts) {
@@ -461,10 +466,19 @@ export function excludeGojoInfinityFromDim(ctx) {
   if (!state.fighters) return;
   const shakeX = state.shakeX || 0;
   const shakeY = state.shakeY || 0;
+  const isSaitamaCounterActive = state.fighters.some(f => 
+    f && (f.characterId === 'saitama' || f.type === 'saitama') && 
+    ((f._counterPunchTimer && f._counterPunchTimer > 0) || 
+     (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || 
+     (f._counterWindupTimer && f._counterWindupTimer > 0) ||
+     f.isCountering)
+  );
   for (const f of state.fighters) {
     if (!f || f.hp <= 0) continue;
     const isGojo = (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo' || f._def?.type === 'gojo');
     if (!isGojo) continue;
+    const isBarrierSuppressed = Boolean(f.isTargetOfAmbush || f.caughtInSaitamaCounter || isSaitamaCounterActive || (f.infinityFadeOpacity !== undefined && f.infinityFadeOpacity <= 0.005));
+    if (isBarrierSuppressed) continue;
     const isLimitlessActive = (!f.isMeleeMode || (f.infinityBlockTimer || 0) > 0);
     if (!isLimitlessActive) continue;
     
@@ -1432,7 +1446,6 @@ export function drawSaitamaSeriousPunchDimScreen() {
     ctx.restore();
   }
 
-  excludeGojoInfinityFromDim(ctx);
   ctx.restore();
 }
 function _pathHandShape(ctx) {

@@ -277,6 +277,16 @@ if (hudModeBtn) {
   hudModeBtn.innerText = CONFIG.hudShowFighterDescription ? 'DESCRIPTION' : 'SKILL BARS';
 }
 
+if (localStorage.getItem('showArenaTitle') !== null) {
+  CONFIG.showArenaTitle = localStorage.getItem('showArenaTitle') === 'true';
+} else {
+  CONFIG.showArenaTitle = false;
+}
+const arenaTitleBtn = document.getElementById('btn-arenatitle');
+if (arenaTitleBtn) {
+  arenaTitleBtn.innerText = CONFIG.showArenaTitle ? 'ON' : 'OFF';
+}
+
 state.performanceMode = localStorage.getItem('performanceMode') === 'true';
 const perfBtn = document.getElementById('btn-performance');
 if (perfBtn) {
@@ -403,6 +413,11 @@ function executeTacticalAction(action) {
     state.testMode = !state.testMode;
     const btn = document.getElementById('btn-testmode');
     if (btn) btn.innerText = state.testMode ? 'ON' : 'OFF';
+  } else if (action === 'toggle-arenatitle') {
+    CONFIG.showArenaTitle = !CONFIG.showArenaTitle;
+    localStorage.setItem('showArenaTitle', CONFIG.showArenaTitle);
+    const btn = document.getElementById('btn-arenatitle');
+    if (btn) btn.innerText = CONFIG.showArenaTitle ? 'ON' : 'OFF';
   }
 }
 
@@ -516,6 +531,13 @@ document.getElementById('btn-testmode')?.addEventListener('click', (e) => {
   e.stopPropagation();
   state.testMode = !state.testMode;
   e.target.innerText = state.testMode ? 'ON' : 'OFF';
+});
+
+document.getElementById('btn-arenatitle')?.addEventListener('click', (e) => {
+  e.stopPropagation();
+  CONFIG.showArenaTitle = !CONFIG.showArenaTitle;
+  localStorage.setItem('showArenaTitle', CONFIG.showArenaTitle);
+  e.target.innerText = CONFIG.showArenaTitle ? 'ON' : 'OFF';
 });
 
 // Keyboard / Tactical Controller Prompts

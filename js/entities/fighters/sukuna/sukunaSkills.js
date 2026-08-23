@@ -132,24 +132,64 @@ export function activateReverseCursedTechnique(fighter, attacker) {
 }
 
 export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
-  if (!opponent || opponent.isDead) return;
   if (fighter.isChannelingDivineFlame || (fighter.divineFlameRecoveryTimer || 0) > 0) return; // Do not teleport or slash while channeling/firing Fuga!
 
-  const isFrozen = (fighter.timeStopTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.crimsonElectrifiedTimer > 0);
+  const isFrozen = (fighter.timeStopTimer > 0) || (fighter.electricStunTimer > 0) || (fighter.crimsonElectrifiedTimer > 0) || (fighter.hitStunTimer > 0) || (fighter.silenceTimer || 0) > 0 || fighter.isTargetOfAmbush;
+  if (isFrozen) return;
+
+  // ── Unified Target Resolution (Rule #6: Fighters & Illusions) ──
+  let target = opponent;
+  const myTeam = (typeof state !== 'undefined' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(fighter)) : null;
+
+  if (!target || target.isDead || target.hp <= 0 || target.invincibilityTimer > 0 || target.isStealthed) {
+    const validTargets = [];
+    if (typeof state !== 'undefined' && state.fighters) {
+      state.fighters.forEach((f, idx) => {
+        if (f && f !== fighter && f.hp > 0 && f.invincibilityTimer <= 0 && !f.isStealthed) {
+          const isEnemy = myTeam === null || state.getFighterTeam(idx) !== myTeam;
+          if (isEnemy) validTargets.push(f);
+        }
+      });
+    }
+    if (typeof state !== 'undefined' && state.illusions) {
+      state.illusions.forEach(ill => {
+        if (!ill || ill.hp <= 0 || ill.owner === fighter || ill.isRika) return;
+        if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
+        validTargets.push(ill);
+      });
+    }
+    if (validTargets.length > 0) {
+      // Pick nearest valid enemy
+      validTargets.sort((a, b) => Math.hypot(fighter.x - a.x, fighter.y - a.y) - Math.hypot(fighter.x - b.x, fighter.y - b.y));
+      target = validTargets[0];
+    } else {
+      return; // No valid enemy targets remaining in arena
+    }
+  }
 
   if (fighter.rapidSlashTimer === undefined || fighter.rapidSlashTimer <= 0) {
-    const aimAngle = Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x);
-    if (!isFrozen) {
-      fighter.gunAngle = aimAngle;
-    }
+    const aimAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    fighter.gunAngle = aimAngle;
 
     const slashSpeed = CONFIG.sukuna?.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
-    const slashDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
+    const baseDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
+    let slashDamage = baseDamage;
+    let isCrit = false;
+    if (typeof fighter.evaluateSlashCrit === 'function') {
+      const res = fighter.evaluateSlashCrit(target, baseDamage, { isMelee: false, isDomain: true });
+      slashDamage = res.finalDamage;
+      isCrit = res.isCrit;
+    }
+
+    const actualOwnerIndex = (typeof ownerIndex === 'number') ? ownerIndex : (state.fighters ? state.fighters.indexOf(fighter) : 0);
+
+    // Multi-angle arc variance per strike
+    const slashAngle = aimAngle + (Math.random() - 0.5) * 0.35;
 
     if (projectileSystem) {
       projectileSystem.fireProjectile(
         fighter,
-        ownerIndex,
+        actualOwnerIndex,
         slashDamage,
         false,
         slashSpeed,
@@ -157,64 +197,74 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
         'ghostBlade',
         fighter.x,
         fighter.y,
-        aimAngle
+        slashAngle
       );
     }
 
     spawnFloatingText(fighter.x, fighter.y - 30, 'CLEAVE!', '#E0E8FF');
-    spawnSparks(opponent.x, opponent.y, 4, 'crimsonSniper', '#8B0000');
+    spawnSparks(target.x, target.y, 16, 'crimsonSniper', '#8B0000');
+    triggerGlobalScreenShake(5, 6);
+
+    fighter.punchAnimTimer = 0;
     fighter.slashGlowTimer = 25;
-    fighter.slashSwingTimer = 10;
-    fighter.slashHand = fighter.slashHand === 1 ? 0 : 1;
+    fighter.slashSwingTimer = 14;
+    fighter.slashSwingMaxTimer = 14;
+    fighter.slashHand = (fighter.slashHand === 1 ? 0 : 1);
 
     const cleaveAngle = aimAngle;
-    opponent.vx += Math.cos(cleaveAngle) * 3;
-    opponent.vy += Math.sin(cleaveAngle) * 3;
+    target.vx = (target.vx || 0) + Math.cos(cleaveAngle) * 3;
+    target.vy = (target.vy || 0) + Math.sin(cleaveAngle) * 3;
 
-    if (fighter._slashSoundCooldown <= 0) {
+    if ((fighter._slashSoundCooldown || 0) <= 0) {
       audioSystem.playSFX('attack_swordswing', 0.9);
       audioSystem.playSFX('skill_backstab', 0.7);
-      fighter._slashSoundCooldown = 12;
+      fighter._slashSoundCooldown = 10;
     }
 
-    spawnImpactFlash(fighter.x, fighter.y, 4, 'crimsonSniper');
+    spawnImpactFlash(fighter.x, fighter.y, 15, 'crimsonSniper');
 
-    if (!isFrozen) {
-      const oldX = fighter.x;
-      const oldY = fighter.y;
+    // ── Instant Teleport Reposition around Target ──
+    const oldX = fighter.x;
+    const oldY = fighter.y;
 
-      const teleportAngle = Math.random() * Math.PI * 2;
-      const teleportDist = 120 + Math.random() * 150;
-      fighter.x = fighter.x + Math.cos(teleportAngle) * teleportDist;
-      fighter.y = fighter.y + Math.sin(teleportAngle) * teleportDist;
+    const teleportAngle = Math.random() * Math.PI * 2;
+    const targetRadius = target.r || 20;
+    const teleportDist = targetRadius + fighter.r + 90 + Math.random() * 80;
+    fighter.x = target.x + Math.cos(teleportAngle) * teleportDist;
+    fighter.y = target.y + Math.sin(teleportAngle) * teleportDist;
 
-      if (arena) {
-        fighter.x = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, fighter.x));
-        fighter.y = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, fighter.y));
-      }
-
-      fighter.vx = 0;
-      fighter.vy = 0;
-
-      if (typeof fighter._spawnTeleportAfterimages === 'function') {
-        fighter._spawnTeleportAfterimages(oldX, oldY, fighter.x, fighter.y);
-      }
-
-      spawnImpactFlash(oldX, oldY, 5, 'crimsonSniper');
-      spawnImpactFlash(fighter.x, fighter.y, 5, 'crimsonSniper');
+    const arenaObj = (arena && arena.width) ? arena : (state.arena || CONFIG.arena);
+    if (arenaObj) {
+      fighter.x = Math.max(arenaObj.x + fighter.r + 20, Math.min(arenaObj.x + arenaObj.width - fighter.r - 20, fighter.x));
+      fighter.y = Math.max(arenaObj.y + fighter.r + 20, Math.min(arenaObj.y + arenaObj.height - fighter.r - 20, fighter.y));
     }
+
+    fighter.vx = 0;
+    fighter.vy = 0;
+
+    // Rule #3: Position & Target Aim Alignment immediately after teleport
+    fighter.aim(target);
+
+    if (typeof fighter._spawnTeleportAfterimages === 'function') {
+      fighter._spawnTeleportAfterimages(oldX, oldY, fighter.x, fighter.y);
+    }
+    spawnImpactFlash(oldX, oldY, 15, 'crimsonSniper');
+    spawnImpactFlash(fighter.x, fighter.y, 20, 'crimsonSniper');
+    audioSystem.playSFX('skill_dash3', 0.7);
+
+    if (typeof target.applyHitStun === 'function') target.applyHitStun(6);
+    if (typeof fighter.applyBleed === 'function') fighter.applyBleed(target, 1);
 
     fighter.rapidSlashTimer = CONFIG.sukuna?.domainRapidSlashCooldown || 20;
   } else {
     fighter.rapidSlashTimer--;
+    fighter.aim(target);
   }
 
-  if (!isFrozen) {
-    fighter.vx = 0;
-    fighter.vy = 0;
-    if (typeof fighter.applyMovementPhysics === 'function') fighter.applyMovementPhysics(0);
-    if (typeof fighter.resolveWallBounce === 'function') fighter.resolveWallBounce(arena, opponent);
-  }
+  fighter.vx = 0;
+  fighter.vy = 0;
+  if (typeof fighter.applyMovementPhysics === 'function') fighter.applyMovementPhysics(0);
+  if (typeof fighter.resolveWallBounce === 'function') fighter.resolveWallBounce(arena, target);
 
   if (fighter.afterImages) {
     fastCleanArray(fighter.afterImages, (img) => {

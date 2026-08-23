@@ -1,5 +1,5 @@
 import { getHandSize } from '../../core/config.js';
-import { state, isChampionScreenActive } from '../../core/state.js';
+import { state } from '../../core/state.js';
 
 /**
  * Visual Skin Renderer for Saitama (The Caped Baldy)
@@ -41,18 +41,17 @@ export function drawSaitamaSkin(ctx, fighter) {
   // Serious Skill Counter Punch Follow-Through MUST NEVER be interrupted/snapped when enemy dies or champion screen triggers
   const isPostCounter = Boolean(fighter._postCounterRecoveryTimer && fighter._postCounterRecoveryTimer > 0);
 
-  const angle = (fighter._isWinnerReveal && !isPostCounter) ? 0 : (fighter.gunAngle || fighter.angle || 0);
+  // Podium preview check: suppresses combat animation offsets during winner reveal podium display ONLY
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+
+  const angle = (isPodiumPreview && !isPostCounter) ? 0 : (fighter.gunAngle || fighter.angle || 0);
   ctx.rotate(angle);
   const facingLeft = Math.abs(angle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
-  // Champion screen or winner reveal check: suppresses combat animation glitches during winner podium reveal ONLY
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) ||
-                        Boolean(fighter._isWinnerReveal);
-
   // Smooth sinusoidal punch progress or counter punch post-punch follow-through
-  const isNormalPunching = !isChampScreen && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-  const isFlurrying = !isChampScreen && Boolean(fighter.isFlurrying);
+  const isNormalPunching = !isPodiumPreview && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
+  const isFlurrying = !isPodiumPreview && Boolean(fighter.isFlurrying);
   const isPunching = isNormalPunching || isPostCounter || isFlurrying;
 
   let rawProgress = 0;
@@ -65,13 +64,13 @@ export function drawSaitamaSkin(ctx, fighter) {
       easePunch = Math.sin(rawProgress * Math.PI);
     } else if (isPostCounter) {
       // Serious Skill Counter Punch Single Unified Follow-Through:
-      // - First 15% of recovery (p < 0.15): Explosive forward punch extension
-      // - Middle 55% (0.15 <= p <= 0.70): Heroic follow-through hold at max reach in the air while shockwaves blast & target flies/dies
+      // - First 12% of recovery (p < 0.12): Explosive forward punch extension
+      // - Middle 58% (0.12 <= p <= 0.70): Heroic follow-through hold at max reach in the air while shockwaves blast & target flies/dies
       // - Final 30% (p > 0.70): Smooth cosine ease-out retraction back to guard
-      const maxRec = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterPunchRecoveryFrames) || 50;
+      const maxRec = (typeof CONFIG !== 'undefined' && CONFIG.saitama?.counterPunchRecoveryFrames) || 65;
       const p = Math.min(1.0, Math.max(0.0, 1.0 - (fighter._postCounterRecoveryTimer / maxRec)));
-      if (p < 0.15) {
-        easePunch = Math.sin((p / 0.15) * (Math.PI / 2));
+      if (p < 0.12) {
+        easePunch = Math.sin((p / 0.12) * (Math.PI / 2));
       } else if (p <= 0.70) {
         easePunch = 1.0;
       } else {
@@ -126,8 +125,8 @@ export function drawSaitamaSkin(ctx, fighter) {
   const handRadius = Math.max(r * 0.38, getHandSize(8.5));
 
   // Calculate Serious Counter or Basic Attack charging progress and scale
-  const isChargingCounter = !isChampScreen && Boolean(fighter._counterPunchTimer && fighter._counterPunchTimer > 0);
-  const isChargingBasic = !isChampScreen && Boolean(fighter.basicPunchChargeTimer && fighter.basicPunchChargeTimer > 0);
+  const isChargingCounter = !isPodiumPreview && Boolean(fighter._counterPunchTimer && fighter._counterPunchTimer > 0);
+  const isChargingBasic = !isPodiumPreview && Boolean(fighter.basicPunchChargeTimer && fighter.basicPunchChargeTimer > 0);
   const isChargingAny = isChargingCounter || isChargingBasic;
 
   let chargeScale = 0;
@@ -323,7 +322,7 @@ export function drawSaitamaSkin(ctx, fighter) {
   }
 
   // ── Render Back Hand (Back Layer - Active during Consecutive Normal Punches Flurry) ──
-  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isChampScreen;
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isPodiumPreview;
   if (!shouldHideHands && !fighter.hideBackHand && isFlurrying) {
     drawSaitamaArm(ctx, r, backHandX, backHandY, handRadius, -r * 0.28, false);
   }
@@ -379,6 +378,7 @@ export function drawSaitamaSkin(ctx, fighter) {
     if (isFlurrying) {
       drawSaitamaArm(ctx, r, frontHandX, frontHandY, handRadius, r * 0.28, true);
     } else {
+      // Crisp solid red brawler glove (no stretching arm sleeve)
       ctx.beginPath();
       ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
       ctx.fillStyle = '#C80000';
@@ -386,6 +386,12 @@ export function drawSaitamaSkin(ctx, fighter) {
       ctx.strokeStyle = '#000000';
       ctx.lineWidth = 3.0;
       ctx.stroke();
+
+      // Knuckle highlight
+      ctx.beginPath();
+      ctx.arc(frontHandX + handRadius * 0.22, frontHandY - handRadius * 0.18, handRadius * 0.32, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(255, 130, 130, 0.55)';
+      ctx.fill();
     }
   }
 

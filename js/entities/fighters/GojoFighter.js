@@ -608,7 +608,14 @@ export class GojoFighter extends Fighter {
     }
 
     // Smooth fade-in & fade-out for Limitless Infinity barrier visuals
-    const isUnderAmbush = this.isTargetOfAmbush;
+    const isSaitamaCounterActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'saitama' || f.type === 'saitama') && 
+      ((f._counterPunchTimer && f._counterPunchTimer > 0) || 
+       (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || 
+       (f._counterWindupTimer && f._counterWindupTimer > 0) ||
+       f.isCountering)
+    );
+    const isUnderAmbush = Boolean(this.isTargetOfAmbush || this.caughtInSaitamaCounter || isSaitamaCounterActive);
 
     // Detect if Gojo is inside an ENEMY's domain (not his own)
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && f.hp > 0);
@@ -624,6 +631,10 @@ export class GojoFighter extends Fighter {
       this.infinityFadeOpacity = Math.min(1.0, (this.infinityFadeOpacity || 0) + 0.05); // ~20 frames smooth fade-in
     } else {
       this.infinityFadeOpacity = isUnderAmbush ? 0 : Math.max(0.0, (this.infinityFadeOpacity || 0) - 0.08); // ~12 frames smooth fade-out
+    }
+
+    if (isUnderAmbush) {
+      this.infinityBlockTimer = 0;
     }
 
     if (this.teleportSlideTimer > 0) {
@@ -688,19 +699,19 @@ export class GojoFighter extends Fighter {
     if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.healingAuraTimer > 0) this.healingAuraTimer--;
 
-    // Completely immobilize Gojo if Toji is actively performing his ambush sequence on him
+    // Completely immobilize Gojo if Toji or Saitama is actively performing an ambush/counter sequence on him
     // UNLESS Gojo is inside his own Domain Expansion (he has ultimate advantage and cannot be restrained!)
     const isActuallyBeingAmbushed = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f.hp > 0 && 
-      f.characterId === 'toji' && 
-      f.isAmbushing
+      ((f.characterId === 'toji' && f.isAmbushing) ||
+       (f.characterId === 'saitama' && ((f._counterPunchTimer && f._counterPunchTimer > 0) || (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || f.isCountering)))
     );
     if (!isActuallyBeingAmbushed || this.domainActive) {
       this.isTargetOfAmbush = false;
     } else {
       this.vx = 0;
       this.vy = 0;
-      return; // Immobilize AI & abilities while Toji is actively striking Gojo in ambush
+      return; // Immobilize AI & abilities while Toji/Saitama is actively striking Gojo in ambush
     }
 
     // Check for Reverse Cursed Technique (Self heal at low HP)

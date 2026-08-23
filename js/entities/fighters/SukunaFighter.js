@@ -749,10 +749,9 @@ export class SukunaFighter extends Fighter {
       return;
     }
 
-    // Inside Domain Expansion: Malevolent Shrine controls the field, Sukuna maintains steady combat rhythm
+    // Inside Domain Expansion: Malevolent Shrine controls the field & Sukuna performs rapid teleport slashes!
     if (this.domainActive) {
       this.flurryHitsLeft = 0;
-      this.rapidSlashHitsLeft = 0;
 
       const isAmbushedOrStunned = this.isTargetOfAmbush || (this.timeStopTimer || 0) > 0 || (this.hitStunTimer || 0) > 0 || (opponent && (opponent.isAmbushing || opponent.ultimateActive));
 
@@ -770,24 +769,13 @@ export class SukunaFighter extends Fighter {
         return;
       }
 
-      // Controlled combat actions during domain (no frantic hyper-teleporting)
-      if (opponent && !opponent.isDead) {
-        this.aim(opponent);
-        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-        if (dist <= 100) {
-          this._updateMeleeCombat(opponent, arena, ownerIndex);
-        } else {
-          if (this.shootCooldown > 0) {
-            this.shootCooldown--;
-          } else {
-            this.shoot(ownerIndex);
-            this.shootCooldown = this.shootCooldownMax;
-          }
-        }
+      // Execute Sukuna's domain slash-teleport-slash-teleport mechanic
+      if (!isAmbushedOrStunned) {
+        this._doDomainRapidSlashes(opponent, arena, ownerIndex);
       }
 
-      this.applyMovementPhysics();
-      this.resolveWallBounce(arena);
+      this.applyMovementPhysics(0);
+      this.resolveWallBounce(arena, opponent);
       return;
     }
 
@@ -1210,8 +1198,9 @@ export class SukunaFighter extends Fighter {
     this.domainActive = true;
     this.domainActivationTime = Date.now();
     this.domainUseCount++;
-    this.domainTimer = CONFIG.sukuna.domainDuration || 180;
-    this.domainCooldown = CONFIG.sukuna.domainCooldown || 1500;
+    this.domainTimer = CONFIG.sukuna.domainDuration || 500;
+    this.domainCooldown = CONFIG.sukuna.domainCooldown || 1950;
+    this.rapidSlashTimer = 0; // Ready for first slash immediately upon domain opening!
 
     // Position closer to the center of the arena so the top of the shrine isn't clipped
     if (arena) {

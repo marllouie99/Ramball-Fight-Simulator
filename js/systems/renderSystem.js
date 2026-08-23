@@ -17,8 +17,7 @@ import {
   drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
-  drawDroppedMiniguns, updateDroppedMiniguns,
-  drawCjSanAndreasAtmosphere
+  drawDroppedMiniguns, updateDroppedMiniguns
 } from '../graphics/draw.js';
 import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
@@ -193,8 +192,6 @@ export function renderGame() {
       }
 
       try {
-        // ── GTA SAN ANDREAS ATMOSPHERIC VIBE FILTER (Warm Los Santos golden hour haze) ──
-        drawCjSanAndreasAtmosphere();
 
         // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Rendered behind fighters so fighters stay un-tinted) ──
         drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm

@@ -31,7 +31,7 @@ export const MODE_SETTINGS = {
     speedMultiplier: 1.8,
     initialFuelPickups: 2,
     supportFourFighters: false,
-    maxAfterimages: 2, // Configurable limit for afterimages in 1v1 Stand Off mode
+    maxAfterimages: 12, // Configurable limit for afterimages in 1v1 Stand Off mode
     afterimageDecayMultiplier: 1.2,
   },
   [GAME_MODES.STAND_OFF_1V2]: {

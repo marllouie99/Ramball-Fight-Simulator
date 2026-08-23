@@ -92,18 +92,18 @@ export function drawNobaraSkin(ctx, fighter) {
   const r = fighter.r || 25;
   const isEcstasy = Boolean(fighter.isEcstasyActive || ((fighter.hp / (fighter.maxHp || 400)) <= 0.50));
   const isBlitzing = Boolean(fighter.isBlitzing || (fighter.blackFlashAuraTimer && fighter.blackFlashAuraTimer > 0));
-  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
 
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
   // 1. Draw Cursed Energy Aura
-  if (!fighter._isWinnerReveal) {
+  if (!isPodiumPreview) {
     drawNobaraCursedEnergyAura(ctx, fighter);
   }
 
   // 2. Standard Upright Orientation & Local Angle Transforms (Rule 19)
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  const angle = isPodiumPreview ? 0 : (fighter.gunAngle || 0);
   ctx.rotate(angle);
 
   const facingLeft = Math.abs(angle) > Math.PI / 2;
@@ -112,7 +112,7 @@ export function drawNobaraSkin(ctx, fighter) {
   }
 
   // 3. Animation States & Progress
-  const isSwinging = !isMatchEnded && (fighter.slashSwingTimer > 0 || fighter.punchAnimTimer > 0);
+  const isSwinging = !isPodiumPreview && (fighter.slashSwingTimer > 0 || fighter.punchAnimTimer > 0);
   let rawProgress = 0;
   if (isSwinging) {
     const maxT = fighter.slashSwingMaxTimer || fighter.punchMaxTime || 18;
@@ -130,8 +130,7 @@ export function drawNobaraSkin(ctx, fighter) {
   const backX = r * 0.30;
   const backY = -r * 0.42;
 
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) || Boolean(fighter._isWinnerReveal);
-  const hideHandsAndWeapon = isChampScreen || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand;
   const hideBackHand = hideHandsAndWeapon || fighter.hideBackHand;
   const handRadius = getHandSize(6.8);

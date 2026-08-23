@@ -169,8 +169,8 @@ export function drawYujiSkin(ctx, fighter) {
   if (facingLeft) ctx.scale(1, -1);
 
   // Smooth sinusoidal punch progress (eliminates sharp cubic snapping)
-  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
-  const isPunching = !isMatchEnded && fighter.punchAnimTimer > 0;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isPunching = !isPodiumPreview && fighter.punchAnimTimer > 0;
   let rawProgress = 0;
   if (isPunching) {
     const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 14;
@@ -191,13 +191,13 @@ export function drawYujiSkin(ctx, fighter) {
 
   let frontX = r * 0.95, frontY = 0;
   let backX = 0, backY = 0;
-  let hideFrontHand = (typeof state !== 'undefined' && state.showSkinOnly);
+  let hideFrontHand = (typeof state !== 'undefined' && state.showSkinOnly) || isPodiumPreview;
   let hideBackHand = true; // Back hand hidden for brawler single front hand stance
   fighter.hideFrontHand = hideFrontHand;
   fighter.hideBackHand = hideBackHand;
 
   const isSukunaForm = fighter.soulSwapActive || (fighter.soulSwapTransitionTimer > 0);
-  const isSlashActive = !isMatchEnded && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));
+  const isSlashActive = !isPodiumPreview && ((fighter.slashSwingTimer > 0) || ((fighter.rapidSlashHitsLeft || 0) > 0) || (isSukunaForm && fighter.punchAnimTimer > 0));
 
   // Single-Handed Sukuna Slash Swing Chop Animation
   if (isSlashActive) {

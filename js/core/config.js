@@ -100,6 +100,7 @@ export const CONFIG = {
   hudInfoFontSize: 14.5,             // Font size for fighter info (DMG, etc.) in HUD (px)
   hudSkillFontSize: 15,              // Font size for skill bar labels in HUD (px)
   hudWidthModifier: 1.0,            // HUD width relative to raw arena width. 1.0 = full arena width; 0.95 = aligns with arena side walls (matches internalScale)
+  showArenaTitle: false,             // Set to true to display the "Fight of Characters / Ball Fight Simulator" title header above the arena, false to hide it
 
   // ΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇΓöÇ
   // PER-FIGHTER TUNINGs

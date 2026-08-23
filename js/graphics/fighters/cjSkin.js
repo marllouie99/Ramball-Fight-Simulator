@@ -695,8 +695,8 @@ export function drawCjSkin(ctx, fighter) {
   }
 
   // 2. Punch Animation Progress (Sinusoidal lead jab / overhand cross)
-  const isMatchEnded = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) || Boolean(fighter._isWinnerReveal);
-  const isPunching = !isMatchEnded && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isPunching = !isPodiumPreview && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
 
   let rawProgress = 0;
   if (isPunching) {
@@ -741,8 +741,7 @@ export function drawCjSkin(ctx, fighter) {
     frontY = 0;
   }
 
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) || Boolean(fighter._isWinnerReveal);
-  const hideHandsAndWeapon = isChampScreen || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (hideHandsAndWeapon || fighter.hideFrontHand) hideFrontHand = true;
   if (hideHandsAndWeapon || fighter.hideBackHand) hideBackHand = true;
 

@@ -977,8 +977,8 @@ export function drawMahitoSkin(ctx, fighter) {
   }
 
   // 3. Smooth Punch Animation Dynamics (Ease curve for lunges/recoils)
-  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
-  const isPunching = !isMatchEnded && !isChannelingDomain && !isEvading && !isEvasionMinion && !isPreSplitting && fighter.punchAnimTimer > 0;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isPunching = !isPodiumPreview && !isChannelingDomain && !isEvading && !isEvasionMinion && !isPreSplitting && fighter.punchAnimTimer > 0;
   let rawProgress = 0;
   if (isPunching) {
     const maxT = fighter.punchMaxTime || 16;

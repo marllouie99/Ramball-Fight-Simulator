@@ -1,4 +1,4 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -75,7 +75,7 @@ export const saitamaConfig = {
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
-  counterPunchDamage: 1000,        // Damage dealt by the counter punch to primary target
+  counterPunchDamage: 2000,        // Damage dealt by the counter punch to primary target
   counterFrontalReach: 750,        // Long frontal shockwave blast reach (px)
   counterFrontalArc: (135 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
   counterFrontalCollateralDamage: 650, // Damage dealt to collateral enemies caught in the wide long frontal blast
@@ -87,10 +87,10 @@ export const saitamaConfig = {
   counterPunchHitPauseFrames: 10, // Frames the target is frozen after the punch lands
   counterPunchSlowFrames: 120,    // Slow debuff duration after punch (~2s at 60fps)
   counterPunchSlowMultiplier: 0.35, // Slow debuff strength (35% speed — staggering)
-  counterPunchRecoveryFrames: 50, // Frames Saitama stands still after landing (post-punch stall)
+  counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
   skillPunishCooldown: 2000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 2000, // Cooldown at the start of the round before first counter is available (2000 frames)
+  initialSkillPunishCooldown: 10, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterPunchVoiceEnabled: true,

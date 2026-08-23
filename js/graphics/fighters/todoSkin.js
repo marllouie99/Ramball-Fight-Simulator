@@ -84,8 +84,8 @@ export function drawTodoSkin(ctx, fighter) {
   if (facingLeft) ctx.scale(1, -1);
 
   // Smooth sinusoidal punch progress
-  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
-  const isPunching = !isMatchEnded && fighter.punchAnimTimer > 0;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isPunching = !isPodiumPreview && fighter.punchAnimTimer > 0;
   let rawProgress = 0;
   if (isPunching) {
     const maxT = fighter.punchActiveMaxTime || fighter.punchMaxTime || 14;

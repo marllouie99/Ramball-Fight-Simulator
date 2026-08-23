@@ -266,8 +266,8 @@ export function drawNanamiSkin(ctx, fighter) {
   }
 
   // 2. Standard Upright Orientation & Local Angle Transforms (Rule 19)
-  const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
-  const angle = fighter._isWinnerReveal ? 0 : (fighter.gunAngle || 0);
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const angle = isPodiumPreview ? 0 : (fighter.gunAngle || 0);
   ctx.rotate(angle);
 
   const facingLeft = Math.abs(angle) > Math.PI / 2;
@@ -277,7 +277,7 @@ export function drawNanamiSkin(ctx, fighter) {
 
   // 3. Melee Chop, Punch & Collapse Animation Progress (Continuous Smooth Curve)
   const isCollapsing = Boolean(fighter.isCollapsing || (fighter.collapseTimer && fighter.collapseTimer > 0));
-  const isPunching = !isMatchEnded && (fighter.punchAnimTimer > 0 || fighter.slashSwingTimer > 0 || isCollapsing);
+  const isPunching = !isPodiumPreview && (fighter.punchAnimTimer > 0 || fighter.slashSwingTimer > 0 || isCollapsing);
   let rawProgress = 0;
   if (isCollapsing) {
     const maxT = fighter.collapseMaxTimer || 14;
@@ -343,8 +343,7 @@ export function drawNanamiSkin(ctx, fighter) {
     frontY = 0;
   }
 
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) || Boolean(fighter._isWinnerReveal);
-  const hideHandsAndWeapon = isChampScreen || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand;
   const handRadius = getHandSize(7.5);
   const skinColor = '#F3CBB0';

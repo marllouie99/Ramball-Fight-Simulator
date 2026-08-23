@@ -392,11 +392,8 @@ export function drawGenosSkin(ctx, fighter, isPreTranslated = false) {
  * panel lines, energy conduit grooves, joint bolts, and a glowing palm blast port cannon.
  */
 export function drawGenosHands(ctx, fighter, isPreTranslated = false) {
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) ||
-                        fighter._isWinnerReveal ||
-                        (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'matchEnd' || state.gameState === 'roundEnd'));
-
-  if (isChampScreen) return;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  if (isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands) return;
 
   const isPunching = (fighter.punchAnimTimer && fighter.punchAnimTimer > 0) || fighter.isFlurrying;
   const isBasicAttacking = fighter.basicBlastAnimTimer && fighter.basicBlastAnimTimer > 0;
@@ -824,11 +821,8 @@ function _drawMechArm(ctx, cx, cy, hr, palmColor, isChargingUlt, isSelfDestructi
  * Renders Genos's Incineration Palm Heat Ammo Gauge (Ranged Mode) & Reload Bar (Melee Mode)
  */
 function drawGenosAmmoGauge(ctx, fighter) {
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) ||
-                        fighter._isWinnerReveal ||
-                        (typeof state !== 'undefined' && (state.gameState === 'countdown' || state.gameState === 'matchEnd' || state.gameState === 'roundEnd'));
-
-  if (isChampScreen || fighter._isAfterImage) return;
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  if (isPodiumPreview || fighter._isAfterImage) return;
 
   const r = fighter.r || 25;
   const maxAmmo = fighter.maxHeatAmmo || 6;

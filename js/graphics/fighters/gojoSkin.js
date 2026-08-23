@@ -55,7 +55,15 @@ export function drawGojoBody(ctx, fighter) {
     }
 
     // === ENHANCED GOJO LIMITLESS (INFINITY) SPATIAL DISTORTION BARRIER ===
-    const fadeOpacity = (fighter.isTargetOfAmbush) ? 0 : (fighter.infinityFadeOpacity || 0);
+    const isSaitamaCounterActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'saitama' || f.type === 'saitama') && 
+      ((f._counterPunchTimer && f._counterPunchTimer > 0) || 
+       (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || 
+       (f._counterWindupTimer && f._counterWindupTimer > 0) ||
+       f.isCountering)
+    );
+    const isBarrierSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive);
+    const fadeOpacity = isBarrierSuppressed ? 0 : (fighter.infinityFadeOpacity || 0);
     if (fadeOpacity > 0.005) {
       const time = Date.now();
       const infinityR = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);
@@ -113,7 +121,7 @@ export function drawGojoBody(ctx, fighter) {
     }
 
     // === ACTIVE INFINITY BLOCK SHIELD FLASH & RIPPLE ===
-    if (fighter.infinityBlockTimer > 0) {
+    if (fighter.infinityBlockTimer > 0 && !isBarrierSuppressed) {
       const blockProg = 1 - (fighter.infinityBlockTimer / (fighter.infinityBlockMaxTimer || 25));
       const alpha = Math.sin((1 - blockProg) * Math.PI);
       const barrierR = CONFIG.gojo?.infinityRadius ?? (fighter.r + 30);

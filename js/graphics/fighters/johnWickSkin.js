@@ -246,9 +246,9 @@ export function drawJohnWickSkin(ctx, fighter) {
   }
 
   // 2. Animation & Punch/Gun-Fu Extension Progress
-  const isMatchEnded = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) || Boolean(fighter._isWinnerReveal);
-  const isPunching = !isMatchEnded && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
-  const isPencilStabbing = !isMatchEnded && Boolean(fighter.pencilAttackTimer && fighter.pencilAttackTimer > 0);
+  const isPodiumPreview = Boolean(fighter._isWinnerReveal);
+  const isPunching = !isPodiumPreview && Boolean(fighter.punchAnimTimer && fighter.punchAnimTimer > 0);
+  const isPencilStabbing = !isPodiumPreview && Boolean(fighter.pencilAttackTimer && fighter.pencilAttackTimer > 0);
 
   let rawProgress = 0;
   if (isPunching) {
@@ -377,8 +377,7 @@ export function drawJohnWickSkin(ctx, fighter) {
     backY = r * 0.12;
   }
 
-  const isChampScreen = (typeof isChampionScreenActive === 'function' && isChampionScreenActive()) || Boolean(fighter._isWinnerReveal);
-  const hideHandsAndWeapon = isChampScreen || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isRolling;
+  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands || isRolling;
   if (hideHandsAndWeapon || fighter.hideFrontHand) hideFrontHand = true;
   if (hideHandsAndWeapon || fighter.hideBackHand) hideBackHand = true;
   const handRadius = getHandSize(7.2);

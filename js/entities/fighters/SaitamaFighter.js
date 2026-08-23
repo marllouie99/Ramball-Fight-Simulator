@@ -468,6 +468,22 @@ export class SaitamaFighter extends Fighter {
       ent.vx = 0;
       ent.vy = 0;
       ent.isTargetOfAmbush = true;
+      ent.caughtInSaitamaCounter = true;
+      if (ent.characterId === 'gojo' || ent.type === 'gojo') {
+        ent.infinityFadeOpacity = 0;
+        ent.infinityBlockTimer = 0;
+        ent.infinityActive = false;
+        ent.sakugaImpactTimer = 0;
+        ent.hitFlameWisps = [];
+        ent.punchEffects = [];
+        ent.afterImages = [];
+        ent.redEffectTimer = 0;
+        ent.redBuildupPhase = false;
+        ent.isChannelingPurple = false;
+        ent.purpleRecoveryTimer = 0;
+        ent.healingAuraTimer = 0;
+        ent.combatAuraOpacity = 0;
+      }
       if (typeof ent.applyTimeStop === 'function') {
         ent.applyTimeStop(counterFreezeDuration, { isSkill: true });
       } else {
@@ -576,6 +592,21 @@ export class SaitamaFighter extends Fighter {
         ent.hitStunTimer = 0;
         if (ent.statusEffects && typeof ent.statusEffects.timeStopTimer !== 'undefined') {
           ent.statusEffects.timeStopTimer = 0;
+        }
+        if (ent.characterId === 'gojo' || ent.type === 'gojo') {
+          ent.infinityFadeOpacity = 0;
+          ent.infinityBlockTimer = 0;
+          ent.infinityActive = false;
+          ent.sakugaImpactTimer = 0;
+          ent.hitFlameWisps = [];
+          ent.punchEffects = [];
+          ent.afterImages = [];
+          ent.redEffectTimer = 0;
+          ent.redBuildupPhase = false;
+          ent.isChannelingPurple = false;
+          ent.purpleRecoveryTimer = 0;
+          ent.healingAuraTimer = 0;
+          ent.combatAuraOpacity = 0;
         }
       }
 
@@ -755,7 +786,7 @@ export class SaitamaFighter extends Fighter {
       // Saitama stops and stares briefly after landing the punch
       this.vx = 0;
       this.vy = 0;
-      this._postCounterRecoveryTimer = CONFIG.saitama?.counterPunchRecoveryFrames ?? 50;
+      this._postCounterRecoveryTimer = CONFIG.saitama?.counterPunchRecoveryFrames ?? 65;
     }
   }
 
@@ -1279,6 +1310,11 @@ export class SaitamaFighter extends Fighter {
       this._postCounterRecoveryTimer--;
       if (this._postCounterRecoveryTimer <= 0 && (!this._counterPunchTimer || this._counterPunchTimer <= 0)) {
         this.isCountering = false;
+        if (typeof state !== 'undefined' && state.fighters) {
+          state.fighters.forEach(f => {
+            if (f && f.caughtInSaitamaCounter) f.caughtInSaitamaCounter = false;
+          });
+        }
       }
     }
 

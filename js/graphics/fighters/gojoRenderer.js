@@ -12,8 +12,17 @@ export class GojoRenderer {
   static draw(ctx, fighter) {
     if (fighter.isDead) return;
 
+    const isSaitamaCounterActive = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && (f.characterId === 'saitama' || f.type === 'saitama') && 
+      ((f._counterPunchTimer && f._counterPunchTimer > 0) || 
+       (f._postCounterRecoveryTimer && f._postCounterRecoveryTimer > 0) || 
+       (f._counterWindupTimer && f._counterWindupTimer > 0) ||
+       f.isCountering)
+    );
+    const isSuppressed = Boolean(fighter.isTargetOfAmbush || fighter.caughtInSaitamaCounter || isSaitamaCounterActive);
+
     // Domain Expansion Channeling Visuals (Ground ring, Aura)
-    if (fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0) {
+    if (fighter.isChannelingDomainExpansion && (fighter.timeStopTimer || 0) <= 0 && !isSuppressed) {
       const progress = Math.min(1.0, fighter.domainChargeTimer / Math.max(1, fighter.domainChargeMax));
 
       ctx.save();
@@ -44,7 +53,7 @@ export class GojoRenderer {
     }
 
     // Purple Recovery Stasis Ring
-    if ((fighter.purpleRecoveryTimer || 0) > 0) {
+    if ((fighter.purpleRecoveryTimer || 0) > 0 && !isSuppressed) {
       ctx.save();
       const pulse = 1 + Math.sin(Date.now() / 100) * 0.1;
       const ringRadius = (fighter.r + 10) * pulse;
@@ -72,7 +81,7 @@ export class GojoRenderer {
     }
 
     // Draw Sakuga Anime Impact Frame (matches reference image style with unique angle/variation)
-    if (fighter.sakugaImpactTimer > 0) {
+    if (fighter.sakugaImpactTimer > 0 && !isSuppressed) {
       fighter._drawSakugaImpactFrame(
         ctx,
         fighter.sakugaImpactX,
@@ -85,7 +94,7 @@ export class GojoRenderer {
     }
 
     // Render residual hit flame wisps (soft, flowy, curling JJK spirit flames)
-    if (fighter.hitFlameWisps && fighter.hitFlameWisps.length > 0) {
+    if (fighter.hitFlameWisps && fighter.hitFlameWisps.length > 0 && !isSuppressed) {
       const time = Date.now();
       fighter.hitFlameWisps.forEach((wisp, idx) => {
         const progress = wisp.timer / wisp.maxTimer;
@@ -129,7 +138,7 @@ export class GojoRenderer {
     }
 
     // Draw afterimages during dodge & teleports
-    if (fighter.afterImages && fighter.afterImages.length > 0) {
+    if (fighter.afterImages && fighter.afterImages.length > 0 && !isSuppressed) {
       ctx.save();
       const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
       fighter.afterImages.forEach((img, i) => {
@@ -147,7 +156,7 @@ export class GojoRenderer {
     }
 
     // Draw Gojo Punch Impact Effects
-    if (fighter.punchEffects && fighter.punchEffects.length > 0) {
+    if (fighter.punchEffects && fighter.punchEffects.length > 0 && !isSuppressed) {
       fighter.punchEffects.forEach(effect => {
         const prog = 1 - (effect.timer / effect.maxTimer);
         const alpha = Math.sin((1 - prog) * Math.PI);
@@ -288,17 +297,19 @@ export class GojoRenderer {
 
     // 1. Draw JJK Cursed Energy Flame Aura BEHIND body
     // Suppress aura while channeling Hollow Purple so Red & Blue orbs stand out cleanly
-    // Also suppress when frozen by Gojo's own domain or when his domain is active
+    // Also suppress when frozen by Gojo's own domain or when his domain is active or under ambush/counter
     const isFrozenByDomain = (fighter.timeStopTimer > 0) || (fighter.hitStunTimer > 0);
     const isInOwnDomain = fighter.domainActive;
-    if (fighter.isChannelingPurple) {
-      if (fighter.is200PercentChannel || fighter.purpleUseCount === 1) {
-        fighter._drawJJKCursedEnergyAura(ctx, 'purple');
+    if (!isSuppressed) {
+      if (fighter.isChannelingPurple) {
+        if (fighter.is200PercentChannel || fighter.purpleUseCount === 1) {
+          fighter._drawJJKCursedEnergyAura(ctx, 'purple');
+        }
+      } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
+        fighter._drawJJKCursedEnergyAura(ctx, 'rct');
+      } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
+        fighter._drawJJKCursedEnergyAura(ctx, 'blue');
       }
-    } else if (fighter.isChannelingRCT || fighter.healingAuraTimer > 0) {
-      fighter._drawJJKCursedEnergyAura(ctx, 'rct');
-    } else if (!isFrozenByDomain && !isInOwnDomain && (fighter.isMeleeMode || fighter.combatAuraOpacity > 0 || state.gameState === 'countdown' || fighter._isWinnerReveal)) {
-      fighter._drawJJKCursedEnergyAura(ctx, 'blue');
     }
 
     // Draw hand Cursed Energy flame blobs BEHIND body
@@ -325,13 +336,13 @@ export class GojoRenderer {
       fighter.drawGun(ctx);
     }
 
-    // Draw Reversal Red Orb + blast ON TOP of body and hands (hidden during Mahoraga wheel click pause)
+    // Draw Reversal Red Orb + blast ON TOP of body and hands (hidden during Mahoraga wheel click pause or under counter)
     const isMahoAdapting = (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
       f && f.hp > 0 && (f.type === 'mahoraga' || (f._def && f._def.type === 'mahoraga') || f.characterId === 'mahoraga') && 
       ((f.wheelClickTimer || 0) > 0 || (f.adaptationPauseTimer || 0) > 0)
     )) || ((fighter.mahoragaAdaptationFreezeTimer || 0) > 0);
 
-    if (fighter.redEffectTimer > 0 && !isMahoAdapting) {
+    if (fighter.redEffectTimer > 0 && !isMahoAdapting && !isSuppressed) {
       fighter._drawReversalRedEffect(ctx);
     }
 
