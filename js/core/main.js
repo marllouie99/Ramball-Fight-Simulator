@@ -2,7 +2,7 @@
 // MAIN — Entry point for the ES6 module build
 // ─────────────────────────────────────────────
 
-import { state } from './state.js';
+import { state, loadFighterSelections, saveFighterSelections } from './state.js';
 import { initFlameCanvas, resizeFlameCanvas } from '../graphics/canvasManager.js';
 import { startGame, startNextRound, resetMatchWithRandom1v1Fighters, resetMatchWithRandom1v2Fighters, startRandomStandoffBattle, restartCurrentRound, resetMatch, proceedFromFaceOffToCountdown } from './gameFlow.js';
 import { FIGHTER_DEFS, CONFIG } from './config.js';
@@ -13,6 +13,8 @@ import { initGraphicsCache } from '../graphics/graphicsCache.js';
 import { syncHudPosition } from '../graphics/ui/hudLayout.js';
 import { clearHealthHud } from '../graphics/hudManager.js';
 import { getTacticalIcon } from '../graphics/ui/tacticalIcons.js';
+import { GAME_MODES } from './modeConfig.js';
+import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 // ─────────────────────────────────────────────
 // FLAME CANVAS INITIALIZATION
 // ─────────────────────────────────────────────
@@ -231,14 +233,17 @@ startGameLoop();
 
 // Function to apply Arena Theme (Dark / Light)
 export function applyArenaTheme(theme) {
-  state.arenaTheme = theme;
-  CONFIG.arenaTheme = theme;
-  localStorage.setItem('arenaTheme', theme);
+  const effectiveTheme = (state.gameCategory === 'tactical') ? 'dark' : theme;
+  state.arenaTheme = effectiveTheme;
+  CONFIG.arenaTheme = effectiveTheme;
+  if (state.gameCategory !== 'tactical') {
+    localStorage.setItem('arenaTheme', effectiveTheme);
+  }
 
-  const isDark = (theme === 'dark');
+  const isDark = (effectiveTheme === 'dark');
   CONFIG.canvasBgColor = isDark ? '#000000' : '#ffffffff';
-  CONFIG.arenaOuterBgColor = isDark ? '#121318' : '#fffdf1ff';
-  CONFIG.arenaInnerBgColor = isDark ? '#1a1c23' : '#ffffffff';
+  CONFIG.arenaOuterBgColor = isDark ? '#000000' : '#fffdf1ff';
+  CONFIG.arenaInnerBgColor = isDark ? '#0b0f19' : '#ffffffff';
   CONFIG.hudTextColor = isDark ? '#f0f2f5' : '#131313ff';
 
   // Invalidate cached canvases
@@ -332,7 +337,7 @@ updateCinefilmOverlay();
 // Tactical Terminal State
 let activeTacticalAction = 'mode-1v1';
 
-function updateBriefingPanel(cardEl, playAudio = true) {
+export function updateBriefingPanel(cardEl, playAudio = true) {
   if (!cardEl) return;
   const title = cardEl.getAttribute('data-title') || 'TACTICAL OPERATION';
   const desc = cardEl.getAttribute('data-desc') || 'Select an operation to proceed to deployment.';
@@ -351,6 +356,7 @@ function updateBriefingPanel(cardEl, playAudio = true) {
   const tagEl2 = document.getElementById('briefing-tag-2');
   const tagEl3 = document.getElementById('briefing-tag-3');
   const launchText = document.getElementById('launch-button-text');
+  const progressLabel = document.getElementById('briefing-progress-label');
 
   if (briefingTitle) briefingTitle.innerText = title;
   if (briefingDesc) briefingDesc.innerText = desc;
@@ -359,8 +365,14 @@ function updateBriefingPanel(cardEl, playAudio = true) {
   if (tagEl2) tagEl2.innerText = tag2;
   if (tagEl3) tagEl3.innerText = tag3;
 
+  if (progressLabel) {
+    progressLabel.innerText = (state.gameCategory === 'tactical')
+      ? 'STATUS: 100% ARMED & READY'
+      : 'STATUS: 100% OPERATIONAL';
+  }
+
   if (launchText) {
-    if (action.startsWith('mode-')) {
+    if (action.startsWith('mode-') || action.startsWith('tactical-')) {
       launchText.innerText = 'LAUNCH ' + title;
     } else if (action.startsWith('screen-')) {
       launchText.innerText = 'OPEN ' + title;
@@ -378,47 +390,101 @@ function updateBriefingPanel(cardEl, playAudio = true) {
   }
 }
 
-function executeTacticalAction(action) {
+export function executeTacticalAction(action) {
   if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
     audioSystem.playSFX('skill_dash3', 0.4);
   }
 
+  // Fight of Characters Actions
   if (action === 'mode-1v1') {
-    state.mode = '1v1';
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.ONE_VS_ONE || '1v1';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   } else if (action === 'mode-standoff') {
-    state.mode = 'Stand Off';
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.STAND_OFF || 'Stand Off';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   } else if (action === 'mode-random-standoff') {
+    state.gameCategory = 'foc';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     startRandomStandoffBattle();
   } else if (action === 'mode-2v2') {
-    state.mode = '2v2';
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.TWO_VS_TWO || '2v2';
     state.p3Index = state.p3Index ?? 2;
     state.p4Index = state.p4Index ?? 3;
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   } else if (action === 'mode-ffa') {
-    state.mode = 'FFA';
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.FFA || 'FFA';
     state.p3Index = state.p3Index ?? 2;
     state.p4Index = state.p4Index ?? 3;
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
   } else if (action === 'mode-standoff1v2') {
-    state.mode = '1v2 Stand Off';
+    state.gameCategory = 'foc';
+    state.mode = GAME_MODES.STAND_OFF_1V2 || '1v2 Stand Off';
     stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
     state.gameState = 'select';
-  } else if (action === 'screen-index') {
+  }
+
+  // Tactical Shooter Actions
+  else if (action === 'tactical-4v4') {
+    state.gameCategory = 'tactical';
+    state.mode = GAME_MODES.TACTICAL_4V4 || 'Tactical 4v4';
+    loadFighterSelections('tactical');
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'tactical-1v1') {
+    state.gameCategory = 'tactical';
+    state.mode = GAME_MODES.TACTICAL_1V1 || 'Tactical 1v1';
+    loadFighterSelections('tactical');
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'tactical-standoff') {
+    state.gameCategory = 'tactical';
+    state.mode = GAME_MODES.TACTICAL_STANDOFF || 'Tactical Stand Off';
+    loadFighterSelections('tactical');
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'tactical-random') {
+    state.gameCategory = 'tactical';
+    state.mode = GAME_MODES.TACTICAL_RANDOM || 'Tactical Random';
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    startRandomStandoffBattle();
+  } else if (action === 'tactical-2v2') {
+    state.gameCategory = 'tactical';
+    state.mode = GAME_MODES.TACTICAL_2V2 || 'Tactical 2v2';
+    loadFighterSelections('tactical');
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  } else if (action === 'tactical-ffa') {
+    state.gameCategory = 'tactical';
+    state.mode = GAME_MODES.TACTICAL_FFA || 'Tactical FFA';
+    loadFighterSelections('tactical');
+    stopAllSounds(false, 0, 0); stopAllLoopingSounds(0, 0);
+    state.gameState = 'select';
+  }
+
+  // Database / Arsenal Screens
+  else if (action === 'screen-index') {
     state.gameState = 'index';
   } else if (action === 'screen-weaponstudio') {
     state.gameState = 'weaponStudio';
   } else if (action === 'screen-weapons') {
+    state.weaponSelectedFighter = null;
+    state.weaponPage = 0;
+    state.weaponCategoryTab = (state.gameCategory === 'tactical') ? 'tactical' : 'foc';
     state.gameState = 'weapons';
   } else if (action === 'screen-leaderboard') {
     state.gameState = 'leaderboard';
-  } else if (action === 'toggle-theme') {
+  }
+
+  // System Configurations
+  else if (action === 'toggle-theme') {
     const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
     applyArenaTheme(nextTheme);
   } else if (action === 'toggle-hud') {
@@ -452,8 +518,10 @@ function executeTacticalAction(action) {
   }
 }
 
-// Category Tabs Switching
-const categoryLabelMap = {
+// ─────────────────────────────────────────────
+// GAME HUB SWITCHER & FILTERING
+// ─────────────────────────────────────────────
+const focCategoryLabelMap = {
   all: 'OPERATIONS',
   modes: 'BATTLE MODES',
   arsenal: 'ARSENAL & STUDIO',
@@ -461,6 +529,109 @@ const categoryLabelMap = {
   system: 'SYSTEM CONFIG',
 };
 
+const tacticalCategoryLabelMap = {
+  all: 'OPERATIONS',
+  modes: 'TACTICAL MODES',
+  arsenal: 'FIREARMS ARMORY',
+  database: 'SHOOTER ROSTER',
+  system: 'SYSTEM CONFIG',
+};
+
+export function filterTacticalCards(category = 'all', hub = null) {
+  const activeHub = hub || state.gameCategory || 'foc';
+  const cards = document.querySelectorAll('.tactical-card');
+  let visibleCount = 0;
+  let firstVisible = null;
+
+  cards.forEach(card => {
+    const cardCat = card.getAttribute('data-category');
+    const cardHub = card.getAttribute('data-hub') || 'all';
+
+    const matchCategory = (category === 'all' || cardCat === category);
+    const matchHub = (cardHub === 'all' || cardHub === activeHub);
+
+    if (matchCategory && matchHub) {
+      card.style.display = 'flex';
+      visibleCount++;
+      if (!firstVisible) firstVisible = card;
+    } else {
+      card.style.display = 'none';
+    }
+  });
+
+  const badge = document.getElementById('tactical-counter-badge');
+  if (badge) badge.innerText = `(${visibleCount} READY)`;
+
+  if (firstVisible) {
+    updateBriefingPanel(firstVisible, false);
+  }
+}
+
+export function switchGameHub(hub, playAudio = true) {
+  state.gameCategory = hub;
+
+  const btnFoc = document.getElementById('btn-hub-foc');
+  const btnTactical = document.getElementById('btn-hub-tactical');
+  const titleScreen = document.getElementById('title-screen');
+  const crumbSub = document.getElementById('crumb-sub-label');
+  const crumbId = document.getElementById('crumb-id-label');
+  const tabModesLabel = document.getElementById('tab-modes-label');
+  const tabArsenalLabel = document.getElementById('tab-arsenal-label');
+  const tabDatabaseLabel = document.getElementById('tab-database-label');
+  const catLabel = document.getElementById('tactical-category-label');
+
+  if (hub === 'tactical') {
+    state.mode = GAME_MODES.TACTICAL_FFA || 'Tactical FFA';
+    state.arena = { ...STARTER_MAP.arena };
+    loadFighterSelections('tactical');
+    activeTacticalAction = 'tactical-ffa';
+    btnFoc?.classList.remove('active');
+    btnTactical?.classList.add('active');
+    titleScreen?.classList.add('hub-tactical');
+    if (crumbSub) crumbSub.innerText = 'TACTICAL SHOOTER';
+    if (crumbId) crumbId.innerText = 'GUNS & BALLISTICS';
+    if (tabModesLabel) tabModesLabel.innerText = 'OPERATIONS';
+    if (tabArsenalLabel) tabArsenalLabel.innerText = 'ARMORY';
+    if (tabDatabaseLabel) tabDatabaseLabel.innerText = 'ROSTER';
+    applyArenaTheme('dark');
+  } else {
+    state.mode = GAME_MODES.ONE_VS_ONE || '1v1';
+    state.arena = { ...CONFIG.arena };
+    loadFighterSelections('foc');
+    activeTacticalAction = 'mode-1v1';
+    btnTactical?.classList.remove('active');
+    btnFoc?.classList.add('active');
+    titleScreen?.classList.remove('hub-tactical');
+    if (crumbSub) crumbSub.innerText = 'FIGHT OF CHARACTERS';
+    if (crumbId) crumbId.innerText = 'ANIME ARENA';
+    if (tabModesLabel) tabModesLabel.innerText = 'BATTLE';
+    if (tabArsenalLabel) tabArsenalLabel.innerText = 'ARSENAL';
+    if (tabDatabaseLabel) tabDatabaseLabel.innerText = 'DATABASE';
+    applyArenaTheme(localStorage.getItem('arenaTheme') || 'light');
+  }
+
+  const activeTab = document.querySelector('.tactical-tab-btn.active');
+  const currentCategory = activeTab ? activeTab.getAttribute('data-category') : 'all';
+  const labelMap = (hub === 'tactical') ? tacticalCategoryLabelMap : focCategoryLabelMap;
+  if (catLabel) catLabel.innerText = labelMap[currentCategory] || 'OPERATIONS';
+
+  if (playAudio && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+    audioSystem.playSFX('skill_dash1', 0.25);
+  }
+
+  filterTacticalCards(currentCategory, hub);
+}
+
+// Hub Switcher Button Listeners
+document.getElementById('btn-hub-foc')?.addEventListener('click', () => {
+  switchGameHub('foc');
+});
+
+document.getElementById('btn-hub-tactical')?.addEventListener('click', () => {
+  switchGameHub('tactical');
+});
+
+// Category Tabs Switching
 const tabButtons = document.querySelectorAll('.tactical-tab-btn');
 tabButtons.forEach(btn => {
   btn.addEventListener('click', () => {
@@ -468,34 +639,15 @@ tabButtons.forEach(btn => {
     tabButtons.forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
 
+    const labelMap = (state.gameCategory === 'tactical') ? tacticalCategoryLabelMap : focCategoryLabelMap;
     const catLabel = document.getElementById('tactical-category-label');
-    if (catLabel) catLabel.innerText = categoryLabelMap[category] || 'OPERATIONS';
+    if (catLabel) catLabel.innerText = labelMap[category] || 'OPERATIONS';
 
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
       audioSystem.playSFX('skill_dash1', 0.2);
     }
 
-    const cards = document.querySelectorAll('.tactical-card');
-    let visibleCount = 0;
-    let firstVisible = null;
-
-    cards.forEach(card => {
-      const cardCat = card.getAttribute('data-category');
-      if (category === 'all' || cardCat === category) {
-        card.style.display = 'flex';
-        visibleCount++;
-        if (!firstVisible) firstVisible = card;
-      } else {
-        card.style.display = 'none';
-      }
-    });
-
-    const badge = document.getElementById('tactical-counter-badge');
-    if (badge) badge.innerText = `(${visibleCount} READY)`;
-
-    if (firstVisible) {
-      updateBriefingPanel(firstVisible, false);
-    }
+    filterTacticalCards(category, state.gameCategory || 'foc');
   });
 });
 
@@ -521,11 +673,13 @@ document.getElementById('btn-tactical-launch')?.addEventListener('click', () => 
 // System Buttons Handlers
 document.getElementById('btn-theme')?.addEventListener('click', (e) => {
   e.stopPropagation();
+  if (state.gameCategory === 'tactical') return; // Enforce dark mode in Tactical mode
   const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
   applyArenaTheme(nextTheme);
 });
 
 document.getElementById('quick-toggle-theme')?.addEventListener('click', () => {
+  if (state.gameCategory === 'tactical') return; // Enforce dark mode in Tactical mode
   const nextTheme = (state.arenaTheme === 'dark') ? 'light' : 'dark';
   applyArenaTheme(nextTheme);
 });
@@ -577,6 +731,9 @@ document.getElementById('btn-bgm')?.addEventListener('click', (e) => {
   e.target.innerText = nextTrack.name;
 });
 
+// Initialize initial cards filter on boot
+filterTacticalCards('all', state.gameCategory || 'foc');
+
 // Keyboard / Tactical Controller Prompts
 window.addEventListener('keydown', (e) => {
   if (state.gameState === 'title') {
@@ -587,6 +744,10 @@ window.addEventListener('keydown', (e) => {
       const idx = tabs.indexOf(activeTab);
       const nextIdx = (idx + 1) % tabs.length;
       tabs[nextIdx]?.click();
+    } else if (e.key === '1') {
+      switchGameHub('foc');
+    } else if (e.key === '2') {
+      switchGameHub('tactical');
     }
   }
 });

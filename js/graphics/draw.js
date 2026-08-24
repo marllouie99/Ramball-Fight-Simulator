@@ -1,5 +1,5 @@
 export { drawFuelPickups } from './renderers/arenaRenderer.js';
-export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawTodoTakadaIdolScreenOverlay } from './renderers/effectsRenderer.js';
+export { drawBlackHoleEffects, drawFloatingTexts, drawUltimateChannelingTexts, drawFlames, drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawTodoTakadaIdolScreenOverlay } from './renderers/effectsRenderer.js';
 export { drawFighters, drawIllusions } from './renderers/EntityRenderer.js';
 export { drawDriveBys, drawDriveByGroundEffects } from '../systems/cjDriveBySystem.js';
 export { drawBamEffects, spawnBamEffect, updateBamEffects, clearBamEffects } from './particles/bamImpactEffect.js';
@@ -41,6 +41,7 @@ import { drawGenosSelfDestructDimScreen } from './renderers/effectsRenderer.js';
 import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapons/dopplegangerWeaponGraphics.js';
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
 export { drawCjSkin } from './fighters/cjSkin.js';
+export { drawTojiSkin, drawTojiGhostSkin } from './fighters/tojiSkin.js';
 
 
 import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';

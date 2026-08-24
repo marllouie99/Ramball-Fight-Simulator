@@ -4,9 +4,10 @@ import { stopAllSounds, stopAllLoopingSounds, preloadSound, stopSound } from '..
 // Extracted from main.js so that ui.js can import these without
 // creating a circular dependency with main.js.
 // ─────────────────────────────────────────────
-import { CONFIG, FIGHTER_DEFS } from './config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from './config.js';
 import { GAME_MODES, MODE_SETTINGS } from './modeConfig.js';
 import { state, createFighterInstance, clearProjectiles } from './state.js';
+import { STARTER_MAP, MONOLITH_MAP } from '../../Tactical Force/maps/index.js';
 import { updateFighters, updateProjectiles, spawnFuelPickup } from '../systems/physics.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getBasicAttackSoundPaths } from '../soundEffects/basicAttackSounds.js';
@@ -346,20 +347,28 @@ export function reinitFighters(isNewMatch = false) {
   state.fighters.forEach((f) => { if (f) f.lastKilledDef = null; });
  
   let fighterIndexes = [state.p1Index, state.p2Index];
-  if (state.mode === GAME_MODES.FFA) {
+  if (state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA') {
     fighterIndexes.push(state.p3Index, state.p4Index);
-  } else if (state.mode === GAME_MODES.TWO_VS_TWO) {
-    // UI shows RED side as p1/p3 and BLUE side as p2/p4,
-    // so arrange fighters to match the team spawn ordering.
+  } else if (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4) {
+    // Arrange fighters to match the team spawn ordering.
     fighterIndexes = [state.p1Index, state.p3Index, state.p2Index, state.p4Index];
   } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
     // 1v2 mode: Team 0 is p1, Team 1 is p2 and p3
     fighterIndexes = [state.p1Index, state.p2Index, state.p3Index];
   }
  
+  const isTacticalActive = (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
+  if (CONFIG.globalFighter) {
+    CONFIG.globalFighter.sizeMultiplier = isTacticalActive
+      ? (CONFIG.tactical?.sizeMultiplier ?? 0.8)
+      : (CONFIG.globalFighter._defaultFocSizeMultiplier ?? 1.2);
+  }
+
+  const currentDefs = getActiveFighterDefs();
   state.fighters.length = 0;
   for (const idx of fighterIndexes) {
-    state.fighters.push(createFighterInstance(FIGHTER_DEFS[idx], idx));
+    const def = currentDefs[idx] || FIGHTER_DEFS[idx] || currentDefs[0];
+    state.fighters.push(createFighterInstance(def, idx));
   }
  
   state.fighters.forEach((fighter, idx) => {
@@ -471,8 +480,78 @@ export function reinitFighters(isNewMatch = false) {
     });
   }
 
+  const activeTacticalMap = state.activeMap || STARTER_MAP;
+
+  if (isTacticalActive) {
+    state.arena = { ...activeTacticalMap.arena };
+    state.arenaTheme = 'dark';
+    CONFIG.arenaTheme = 'dark';
+  } else if (!state.arena || state.arena.width === STARTER_MAP.arena.width) {
+    state.arena = { ...CONFIG.arena };
+  }
+
   const arena = state.arena;
-  if (state.mode === GAME_MODES.FFA) {
+  if (isTacticalActive) {
+    if (activeTacticalMap.id === 'tactical_monolith_map' || activeTacticalMap === MONOLITH_MAP) {
+      // ── Monolith Map (Sector 02) ──
+      // 2 Players: West vs East
+      // 3 Players: West vs East vs North Corridor
+      // 4 Players: West vs East vs North vs South Corridor
+      const count = state.fighters.length;
+      const spawnList = count <= 2
+        ? (activeTacticalMap.spawns?.twoPlayer || MONOLITH_MAP.spawns.twoPlayer)
+        : (count === 3
+            ? (activeTacticalMap.spawns?.threePlayer || MONOLITH_MAP.spawns.threePlayer)
+            : (activeTacticalMap.spawns?.fourPlayer || MONOLITH_MAP.spawns.fourPlayer));
+
+      state.fighters.forEach((fighter, index) => {
+        if (!fighter) return;
+        const pt = spawnList[index % spawnList.length];
+        const pad = (fighter.r || 24) + (arena.wallWidth || 6) + 6;
+        fighter.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, pt.x));
+        fighter.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, pt.y));
+        fighter.gunAngle = pt.angle;
+        fighter.angle = pt.angle;
+        const spd = fighter.speed || 1.5;
+        fighter.vx = Math.cos(pt.angle) * spd;
+        fighter.vy = Math.sin(pt.angle) * spd;
+      });
+    } else {
+      // ── Starter Map (Sector 01) & Dynamic Tactical Spawns ──
+      const spawns = activeTacticalMap.spawns?.ffa || [
+        { x: arena.x + 67.5, y: arena.y + 45 },
+        { x: arena.x + arena.width - 67.5, y: arena.y + 45 },
+        { x: arena.x + 67.5, y: arena.y + arena.height - 45 },
+        { x: arena.x + arena.width - 67.5, y: arena.y + arena.height - 45 }
+      ];
+
+      // Shuffle corner indices randomly so every player gets a distinct pocket
+      const shuffledIndices = spawns.map((_, i) => i);
+      for (let i = shuffledIndices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledIndices[i], shuffledIndices[j]] = [shuffledIndices[j], shuffledIndices[i]];
+      }
+
+      const arenaCenterX = arena.x + arena.width / 2;
+      const arenaCenterY = arena.y + arena.height / 2;
+
+      state.fighters.forEach((fighter, index) => {
+        if (!fighter) return;
+        const cornerIndex = shuffledIndices[index % shuffledIndices.length];
+        const pt = spawns[cornerIndex];
+        const angle = pt.angle !== undefined ? pt.angle : Math.atan2(arenaCenterY - pt.y, arenaCenterX - pt.x);
+
+        const pad = (fighter.r || 24) + (arena.wallWidth || 6) + 6;
+        fighter.x = Math.max(arena.x + pad, Math.min(arena.x + arena.width - pad, pt.x));
+        fighter.y = Math.max(arena.y + pad, Math.min(arena.y + arena.height - pad, pt.y));
+        fighter.gunAngle = angle;
+        fighter.angle = angle;
+        const spd = fighter.speed || 1.5;
+        fighter.vx = Math.cos(angle) * spd;
+        fighter.vy = Math.sin(angle) * spd;
+      });
+    }
+  } else if (state.mode === GAME_MODES.FFA || state.mode === 'FFA') {
     const leftX = arena.x + arena.width * 0.20;
     const rightX = arena.x + arena.width * 0.80;
     const topY = arena.y + arena.height * 0.25;
@@ -601,9 +680,10 @@ export function reinitFighters(isNewMatch = false) {
 }
 
 export function randomize1v1Fighters() {
-  if (FIGHTER_DEFS.length < 2) return;
+  const currentDefs = getActiveFighterDefs();
+  if (currentDefs.length < 2) return;
   
-  const indices = FIGHTER_DEFS.map((_, idx) => idx);
+  const indices = currentDefs.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -633,8 +713,9 @@ export function startRandomStandoffBattle() {
 }
 
 export function randomize1v2Fighters() {
-  if (FIGHTER_DEFS.length < 3) return;
-  const indices = FIGHTER_DEFS.map((_, idx) => idx);
+  const currentDefs = getActiveFighterDefs();
+  if (currentDefs.length < 3) return;
+  const indices = currentDefs.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
@@ -794,7 +875,8 @@ export function startNextRound() {
   state._isChampionLayoutActive = false;
   state.roundEndTimer = 0;
   state.matchEndTimer = 0;
-  if (state.mode === GAME_MODES.FFA && state.ffaMatchComplete) {
+  const isFFA = (state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA');
+  if (isFFA && state.ffaMatchComplete) {
     resetMatch();
     return;
   }

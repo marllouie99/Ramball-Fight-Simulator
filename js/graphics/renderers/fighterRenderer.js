@@ -99,8 +99,9 @@ export class FighterRenderer {
     // Suppress white hit-flash during Yuji's soul-swap transformation or on match end / winner reveal; the
     // 'lighter' composite at full opacity would completely wash the body white.
     const isSoulSwapTransitioning = (fighter.soulSwapTransitionTimer || 0) > 0 || fighter.soulSwapActive;
+    const isUltimateActive = Boolean(fighter.ultimateActive || fighter.isChannelingDomainExpansion || fighter.isChannelingDomain);
     const isMatchEnded = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) || Boolean(fighter._isWinnerReveal);
-    if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning && !isMatchEnded) {
+    if (fighter.hitFlashTimer > 0 && !isSoulSwapTransitioning && !isUltimateActive && !isMatchEnded) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
       ctx.beginPath();
@@ -163,14 +164,30 @@ export class FighterRenderer {
     if (fighter.hp <= 0 || fighter._isWinnerReveal || fighter._isFaceOff || (fighter.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
 
     ctx.save();
+    const z = fighter.z || 0;
+    const drawY = fighter.y - z;
+
+    // 1. Floating Name on TOP of the Fighter Body Circle
+    if (fighter.name) {
+      const nameText = fighter.name.toUpperCase();
+      const nameY = drawY - fighter.r - 8;
+      const themeColor = fighter.themeColor || fighter.color || '#ffffff';
+
+      ctx.font = 'bold 11px "Outfit", "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.strokeText(nameText, fighter.x, nameY);
+      ctx.fillStyle = themeColor;
+      ctx.fillText(nameText, fighter.x, nameY);
+    }
+
+    // 2. Health Number in center of body
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const hpText = Math.floor(fighter.hp).toString();
-    // fighter.y is correct here — the draw() wrapper already applies a ctx.translate
-    // offset of -z when the fighter has elevation (hasZ), so subtracting z again
-    // would push the text 2x too high above the body center.
-    const drawY = fighter.y;
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.strokeText(hpText, fighter.x, drawY);
@@ -180,7 +197,7 @@ export class FighterRenderer {
   }
 
   static drawFreezeTimer(ctx, fighter) {
-    if (fighter._suppressFreezeTimer) return;
+    if (fighter._suppressFreezeTimer || fighter.isTargetOfAmbush) return;
     if (!fighter._timeStopStartTime || !fighter._timeStopOriginalDuration) return;
     
     ctx.save();
@@ -190,7 +207,7 @@ export class FighterRenderer {
     const seconds = Math.ceil(remainingFrames / 60);
     const text = `⏳ ${seconds}s`;
     
-    const drawY = (fighter.y - (fighter.z || 0)) - (fighter.r + 18);
+    const drawY = (fighter.y - (fighter.z || 0)) - (fighter.r + 22);
     ctx.font = 'bold 11px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'bottom';
@@ -198,7 +215,7 @@ export class FighterRenderer {
     ctx.lineWidth = 3;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)';
     ctx.strokeText(text, fighter.x, drawY);
-    ctx.fillStyle = '#00F3FF';
+    ctx.fillStyle = '#FFEE58';
     ctx.fillText(text, fighter.x, drawY);
     ctx.restore();
   }

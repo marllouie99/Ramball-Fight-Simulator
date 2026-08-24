@@ -78,6 +78,10 @@ export const AUDIO_CONFIG = {
   // CJ Grove Street
   'skill_cj_carroam_noise': 'Assets/Sound Effects/Skills/cj-carroam-noise.mp3',
   'skill_cj_cheatactivated_banner': 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
+  'skill_cj_cheatactivated': 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
+  'cheatActivated': 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
+  'cheat_activated': 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
+  'cj_cheatactivated_banner': 'Assets/Sound Effects/Skills/cj-cheatactivated-banner.mp3',
   'skill_cj_deathmusic': 'Assets/Sound Effects/Skills/cj-deathmusic.mp3',
   'skill_cj_grovestreet_voiceline': 'Assets/Sound Effects/Skills/cj-GROVESTREET4LIFE-voiceline.mp3',
   'skill_cj_homiesarrival_voiceline': 'Assets/Sound Effects/Skills/cj-homiesarrival-voiceline.mp3',
@@ -91,5 +95,6 @@ export const AUDIO_CONFIG = {
   'skill_cj_homie_noise5': 'Assets/Sound Effects/Skills/cj-homie-noise5.mp3',
   'skill_cj_intro_voiceline': 'Assets/Sound Effects/Skills/cj-intro-voiceline.mp3',
   'skill_cj_respectoverlay_bgmusic': 'Assets/Sound Effects/Skills/cj-respectoverlay-bgmusic.mp3',
-  'skill_cj_typeclick1letter_noise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3'
+  'skill_cj_typeclick1letter_noise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3',
+  'typeClickNoise': 'Assets/Sound Effects/Skills/cj-typeclick1letter-noise.mp3'
 };

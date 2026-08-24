@@ -4,7 +4,7 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import {
   drawTitleScreen, drawSelectScreen, drawIndexScreen, drawIndexDetailScreen, 
   drawLeaderboardScreen, drawWeaponMenu, drawWeaponDetailScreen, drawWeaponStudioScreen, drawFaceOffThumbnailScreen, drawHUD, 
-  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay
+  drawPauseScreen, drawRoundEndScreen, drawMatchEndScreen, drawCountdown, drawMissionPassedOverlay, drawWastedOverlay, drawKillFeed
 } from '../graphics/ui.js';
 import {
   drawArena, drawProjectiles, drawFuelPickups, drawFighters, drawFloatingTexts, drawUltimateChannelingTexts,
@@ -13,7 +13,7 @@ import {
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
   drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
-  drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
+  drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
   drawDriveBys, drawDriveByGroundEffects, drawBamEffects,
   drawFloatingJetpacks, updateFloatingJetpacks,
@@ -158,7 +158,7 @@ export function renderGame() {
     } else if (state.gameState === 'weaponStudio') {
       drawWeaponStudioScreen();
     } else if (state.gameState === 'faceoff') {
-      // Hide gameplay WebGL layers so stale floating damage numbers / effects don't persist on the showoff screen
+      // Hide gameplay WebGL layers and DOM HUD elements so they never linger on the showoff screen
       if (state.floatingTextSprite) state.floatingTextSprite.visible = false;
       if (state.floatingTextCtx && state.floatingTextCanvas) {
         state.floatingTextCtx.clearRect(0, 0, state.floatingTextCanvas.width, state.floatingTextCanvas.height);
@@ -169,6 +169,16 @@ export function renderGame() {
         state.pixiLayers.effects.visible = false;
         state.pixiLayers.environment.visible = false;
       }
+      const hudTop = document.getElementById('hudTopContainer');
+      const hudBot = document.getElementById('hudBottomContainer');
+      const hudMain = document.getElementById('healthHud');
+      const hudLeft = document.getElementById('healthHudLeft');
+      const hudRight = document.getElementById('healthHudRight');
+      if (hudTop) { hudTop.style.display = 'none'; hudTop.style.visibility = 'hidden'; }
+      if (hudBot) { hudBot.style.display = 'none'; hudBot.style.visibility = 'hidden'; }
+      if (hudMain) { hudMain.style.display = 'none'; hudMain.style.visibility = 'hidden'; }
+      if (hudLeft) { hudLeft.style.display = 'none'; hudLeft.style.visibility = 'hidden'; }
+      if (hudRight) { hudRight.style.display = 'none'; hudRight.style.visibility = 'hidden'; }
       drawFaceOffThumbnailScreen();
     } else {
       if (state.pixiLayers) {
@@ -259,6 +269,7 @@ export function renderGame() {
         drawGenosSpeedLines(); // Full-screen anime action speed lines during Machine Gun Blows
         drawNanamiSpeedLines(); // Supersonic manga action speed lines during Nanami blitz/lunges
         drawSaitamaSpeedLines(); // Manga action speed lines during Consecutive Normal Punches
+        drawIchigoBankaiSpeedLines(); // Supersonic Bankai manga speed lines during Ichigo dashes/swings
         drawTodoTakadaIdolScreenOverlay(); // Dreamy Takada-chan idol screen overlay during Todo's channeling/ultimate
         drawFighters(); // Draw fighters ON TOP of dim screens so Gojo & fighters stay 100% visible & un-tinted!
         drawDriveBys(state.ctx); // Draw Greenwood sedan, homies & tire burnout smoke
@@ -397,6 +408,9 @@ export function renderGame() {
       // Render GTA San Andreas "mission passed! RESPECT +" and "WASTED" overlays on top level before champion reveal
       drawMissionPassedOverlay(state.topLevelUiCtx || state.ctx);
       drawWastedOverlay(state.topLevelUiCtx || state.ctx);
+
+      // Render Counter-Strike style kill feed in top-right arena corner
+      drawKillFeed(state.topLevelUiCtx || state.ctx);
 
       // Restore original context and canvas
       state.ctx = originalCtx;

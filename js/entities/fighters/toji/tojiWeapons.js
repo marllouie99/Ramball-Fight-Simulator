@@ -6,9 +6,9 @@ import { applyDamageToTarget } from '../../fighter.js';
 import { CONFIG } from '../../../core/config.js';
 import { audioSystem } from '../../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave } from '../../../graphics/particles/sparkEffect.js';
+import { spawnBloodEffect } from '../../../graphics/particles/bloodEffect.js';
 import { TOJI_WEAPON_CONFIG } from '../../../graphics/weapons/tojiWeaponGraphics.js';
-import { getSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
-import { state, triggerGlobalScreenShake } from '../../../core/state.js';
+import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../../core/state.js';
 
 export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, maxReach, arcAngle = Math.PI * 0.6) {
   const targets = new Set();
@@ -77,14 +77,23 @@ export function tojiGetTargetsInFrontalArc(fighter, primaryTarget, attackAngle, 
 
 export function initChainPhysics(fighter) {
   fighter.chainNodes = [];
-  const baseAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0)) + 0.42;
-  const ringX = (fighter.x || 0) + Math.cos(baseAngle) * ((fighter.r || 25) - 4);
-  const ringY = (fighter.y || 0) + Math.sin(baseAngle) * ((fighter.r || 25) - 4);
+  const baseAngle = (fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0));
+  const normAngle = Math.atan2(Math.sin(baseAngle), Math.cos(baseAngle));
+  const isFacingLeft = Math.abs(normAngle) > Math.PI / 2;
+  const flipSign = isFacingLeft ? -1 : 1;
+
+  const renderAngle = baseAngle + (0.42 * flipSign);
+  const totalRadius = (fighter.r || 25) - 4;
+  const ringX = (fighter.x || 0) + Math.cos(renderAngle) * totalRadius;
+  const ringY = (fighter.y || 0) + Math.sin(renderAngle) * totalRadius;
+  const linkDist = 4.8;
 
   for (let i = 0; i < 9; i++) {
+    const t = i / 8;
+    const sway = Math.sin(t * Math.PI) * 2.0 * (isFacingLeft ? 1 : -1);
     fighter.chainNodes.push({
-      x: ringX - i * 4,
-      y: ringY + i * 5,
+      x: ringX + sway,
+      y: ringY + (i * linkDist * 0.96),
       vx: 0,
       vy: 0
     });
@@ -97,9 +106,13 @@ export function updateChainPhysics(fighter) {
   }
 
   const baseAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
+  const normAngle = Math.atan2(Math.sin(baseAngle), Math.cos(baseAngle));
+  const isFacingLeft = Math.abs(normAngle) > Math.PI / 2;
+  const flipSign = isFacingLeft ? -1 : 1;
+
   const isAttacking = fighter.spearSwingTimer > 0;
 
-  let offsetAngle = 0.42;
+  let offsetAngle = 0.42 * flipSign;
   let thrustDistance = 0;
 
   if (isAttacking) {
@@ -107,18 +120,18 @@ export function updateChainPhysics(fighter) {
     if (t < 0.25) {
       const p = t / 0.25;
       thrustDistance = -6 * p;
-      offsetAngle = 0.42 + 0.15 * p;
+      offsetAngle = (0.42 + 0.15 * p) * flipSign;
     } else if (t < 0.65) {
       const p = (t - 0.25) / 0.4;
       thrustDistance = -6 + 32 * Math.sin(p * Math.PI);
-      offsetAngle = 0.57 - 0.9 * Math.sin(p * Math.PI * 0.5);
+      offsetAngle = (0.57 - 0.9 * Math.sin(p * Math.PI * 0.5)) * flipSign;
     } else {
       const p = (t - 0.65) / 0.35;
       thrustDistance = 6 * (1 - p);
-      offsetAngle = -0.33 + (0.42 - (-0.33)) * p;
+      offsetAngle = (-0.33 + (0.42 - (-0.33)) * p) * flipSign;
     }
   } else {
-    offsetAngle += Math.sin(Date.now() / 250) * 0.05;
+    offsetAngle += Math.sin(Date.now() / 250) * 0.05 * flipSign;
   }
 
   const renderAngle = baseAngle + offsetAngle;
@@ -134,13 +147,14 @@ export function updateChainPhysics(fighter) {
 
   if (!isMoving) {
     for (let i = 1; i < fighter.chainNodes.length; i++) {
-      const hangAngle = renderAngle + Math.PI * (0.45 + i * 0.12);
+      const t = i / (fighter.chainNodes.length - 1);
+      const sway = Math.sin(t * Math.PI) * 2.0 * (isFacingLeft ? 1 : -1);
       const node = fighter.chainNodes[i];
-      const tx = ringX + Math.cos(hangAngle) * (i * linkDist * 0.75);
-      const ty = ringY + Math.sin(hangAngle) * (i * linkDist * 0.75) + (i * 1.2);
+      const tx = ringX + sway;
+      const ty = ringY + (i * linkDist * 0.96);
       
-      node.x += (tx - node.x) * 0.35;
-      node.y += (ty - node.y) * 0.35;
+      node.x += (tx - node.x) * 0.40;
+      node.y += (ty - node.y) * 0.40;
       node.vx = 0;
       node.vy = 0;
     }
@@ -233,6 +247,7 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
       if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
     }
 
+    spawnBloodEffect(target, 16, attackAngle);
     spawnImpactFlash(target.x, target.y, 180, 'rgba(255, 30, 75, 0.95)');
     spawnCrimsonLightningImpact(target.x, target.y, 140);
     spawnSparks(target.x, target.y, 50, 'crimsonSniper');
@@ -325,26 +340,41 @@ export function performInvertedSpearStrike(fighter, primaryTarget, ownerIndex, i
       spawnImpactFlash(target.x, target.y, 45, 'rgba(160, 30, 240, 0.9)');
     }
 
+    spawnBloodEffect(target, isAmbushThrust ? 14 : 10, attackAngle);
     spawnSparks(target.x, target.y, '#A078C8', 12);
     spawnSparks(target.x, target.y, '#FF3355', 10);
     spawnSparks(target.x, target.y, 12, 'crimsonSniper');
     spawnImpactFlash(target.x, target.y, 30);
 
-    if (isAmbushThrust) {
-      if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
-      if (!target.isTurret && !target.cannotBeKnockbacked) {
-        target.isFirstHitKnockback = true;
-        const pushAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
-        const knockbackSpeed = CONFIG.toji?.ambushSpearThrustKnockback || 28;
-        
-        const kbVx = Math.cos(pushAngle) * knockbackSpeed;
-        const kbVy = Math.sin(pushAngle) * knockbackSpeed;
-        target.vx = kbVx;
-        target.vy = kbVy;
-        target.knockbackDecay = 0.84;
-        if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
-      }
+    if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
 
+    if (!target.isTurret && !target.cannotBeKnockbacked) {
+      target.isFirstHitKnockback = isAmbushThrust;
+      const pushAngle = isAmbushThrust ? Math.atan2(target.y - fighter.y, target.x - fighter.x) : attackAngle;
+      const knockbackSpeed = isAmbushThrust ? (CONFIG.toji?.ambushSpearThrustKnockback || 28) : (CONFIG.toji?.spearKnockback || 8.5);
+      
+      const kbVx = Math.cos(pushAngle) * knockbackSpeed;
+      const kbVy = Math.sin(pushAngle) * knockbackSpeed;
+      target.vx = kbVx;
+      target.vy = kbVy;
+      target.knockbackDecay = isAmbushThrust ? 0.84 : 0.88;
+      if (typeof target.applyKnockback === 'function') target.applyKnockback(kbVx, kbVy);
+    }
+
+    if (isAmbushThrust && typeof target.applyHitStun === 'function') {
+      target.applyHitStun(18);
+    }
+
+    // Apply Decrease Regen debuff to target on basic attack hit
+    const regenDebuffFrames = CONFIG.toji?.regenDebuffDuration ?? 300;
+    target.tojiRegenDebuffTimer = Math.max(target.tojiRegenDebuffTimer || 0, regenDebuffFrames);
+    const now = Date.now();
+    if (!target._lastTojiDebuffAppliedTime || now - target._lastTojiDebuffAppliedTime > 800) {
+      spawnFloatingText(target.x, target.y - target.r - 20, 'REGEN DECREASED!', '#C084FC');
+      target._lastTojiDebuffAppliedTime = now;
+    }
+
+    if (isAmbushThrust) {
       spawnCrimsonLightningImpact(target.x, target.y, 110);
       spawnSparks(target.x, target.y, 40, 'crimsonSniper');
     }

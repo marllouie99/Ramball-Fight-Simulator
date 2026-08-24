@@ -4,13 +4,14 @@
 // Cinematic 1-by-1 Entrance + Central "VS" to Countdown Transition (3... 2... 1... FIGHT!)
 // ─────────────────────────────────────────────
 import { state } from '../../core/state.js';
-import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { GAME_MODES } from '../../core/modeConfig.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { Fighter } from '../../entities/fighter.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { _clearButtons, _registerButton, drawChamferedRect } from './uiFramework.js';
 import { proceedFromFaceOffToCountdown, startMatchDirectlyFromFaceOff } from '../../core/gameFlow.js';
+import { clearHealthHud } from '../hudManager.js';
 
 // Cache for live fighter preview instances (Pooled by character type to eliminate GC churn)
 const _fighterTypePreviewCache = {};
@@ -21,6 +22,9 @@ let _scratchLines = null;
 let _bgCacheCanvas = null;
 let _bgCacheCtx = null;
 let _lastBgKey = '';
+let _ffaBgCacheCanvas = null;
+let _ffaBgCacheCtx = null;
+let _lastFfaBgKey = '';
 const _textWidthCache = Object.create(null);
 
 // Pre-computed ink splatter points for VS emblem
@@ -214,8 +218,9 @@ export function captureFaceOffScreenshot() {
   try {
     const dataUrl = canvas.toDataURL('image/png');
     const link = document.createElement('a');
-    const p1Name = FIGHTER_DEFS[state.p1Index]?.name || 'Fighter-1';
-    const p2Name = FIGHTER_DEFS[state.p2Index]?.name || 'Fighter-2';
+    const currentDefs = getActiveFighterDefs();
+    const p1Name = currentDefs[state.p1Index]?.name || 'Fighter-1';
+    const p2Name = currentDefs[state.p2Index]?.name || 'Fighter-2';
     link.download = `circle-battle-thumbnail-${p1Name}-vs-${p2Name}.png`.toLowerCase().replace(/\s+/g, '-');
     link.href = dataUrl;
     link.click();
@@ -244,10 +249,11 @@ export function drawFaceOffThumbnailScreen() {
   const exitProgress = Math.min(1.0, Math.max(0, (timer - 216) / 24));
 
   // Resolve fighter definitions and theme colors
-  const p1Def = FIGHTER_DEFS[state.p1Index] || FIGHTER_DEFS[0];
-  const p2Def = FIGHTER_DEFS[state.p2Index] || FIGHTER_DEFS[1];
-  const p3Def = FIGHTER_DEFS[state.p3Index] || FIGHTER_DEFS[2];
-  const p4Def = FIGHTER_DEFS[state.p4Index] || FIGHTER_DEFS[3];
+  const currentDefs = getActiveFighterDefs();
+  const p1Def = currentDefs[state.p1Index] || currentDefs[0] || FIGHTER_DEFS[0];
+  const p2Def = currentDefs[state.p2Index] || currentDefs[1] || currentDefs[0];
+  const p3Def = currentDefs[state.p3Index] || currentDefs[2] || currentDefs[0];
+  const p4Def = currentDefs[state.p4Index] || currentDefs[3] || currentDefs[0];
 
   let leftThemeColor = p1Def?.color || '#38bdf8';
   let rightThemeColor = p2Def?.color || '#e51a2e';
@@ -263,6 +269,7 @@ export function drawFaceOffThumbnailScreen() {
   rightThemeColor = rollP2Def?.color || rightThemeColor;
 
   if (timer <= 2) {
+    clearHealthHud();
     state._hasPlayedCjFaceOffIntroVoice = false;
   }
 
@@ -284,21 +291,31 @@ export function drawFaceOffThumbnailScreen() {
     proceedFromFaceOffToCountdown();
   });
 
-  // 1. Draw Anime Grunge Diagonal Split Background
-  drawAnimeGrungeSplitBackground(ctx, canvas.width, canvas.height, leftThemeColor, rightThemeColor, timer);
-
-  // 2. Render Mode-Specific Side-by-Side Face-Off Layout with "VS" to Countdown Transition
-  if (mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2') {
-    draw1v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, p3Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-  } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2') {
-    draw2v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p3Def, p2Def, p4Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
-  } else if (mode === GAME_MODES.FFA || mode === 'FFA') {
+  // 1. Draw Anime Grunge Background (4-Way Zigzag Split for FFA, Diagonal 2-Way Split for others)
+  const isFFA = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
+  if (isFFA) {
+    const ffaColors = [
+      p1Def?.color || '#3b82f6',
+      p2Def?.color || '#10b981',
+      p3Def?.color || '#f59e0b',
+      p4Def?.color || '#ef4444'
+    ];
+    drawFfaAnimeGrungeZigzagBackground(ctx, canvas.width, canvas.height, ffaColors, timer);
     drawFfaFaceOff(ctx, canvas.width, canvas.height, [p1Def, p2Def, p3Def, p4Def], scale, timer, exitProgress);
-  } else if (mode === 'TLFS') {
-    drawTlfsFaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
   } else {
-    // Default: 1v1 Duel / Stand Off
-    draw1v1FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+    drawAnimeGrungeSplitBackground(ctx, canvas.width, canvas.height, leftThemeColor, rightThemeColor, timer);
+
+    // 2. Render Mode-Specific Side-by-Side Face-Off Layout with "VS" to Countdown Transition
+    if (mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2') {
+      draw1v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, p3Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+    } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
+      draw2v2FaceOff(ctx, canvas.width, canvas.height, p1Def, p3Def, p2Def, p4Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+    } else if (mode === 'TLFS') {
+      drawTlfsFaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+    } else {
+      // Default: 1v1 Duel / Stand Off / Tactical 1v1 / Tactical Standoff
+      draw1v1FaceOff(ctx, canvas.width, canvas.height, p1Def, p2Def, scale, timer, leftThemeColor, rightThemeColor, exitProgress);
+    }
   }
 
   // 3. Draw Spatial Slash Shockwave & Flash Dissolve during Final FIGHT! Exit
@@ -406,6 +423,290 @@ function drawAnimeGrungeSplitBackground(ctx, width, height, leftColor, rightColo
   const topSplitX = width * 0.62;
   const botSplitX = width * 0.38;
   drawJaggedLightningCrack(ctx, width, height, topSplitX, botSplitX, timer);
+}
+
+/** Horizontal zigzag coordinates for FFA 4-way screen division */
+function getFfaHorizontalZigzagPoints(width, midY) {
+  return [
+    { x: 0,             y: midY },
+    { x: width * 0.12,  y: midY - 14 },
+    { x: width * 0.22,  y: midY + 16 },
+    { x: width * 0.35,  y: midY - 18 },
+    { x: width * 0.50,  y: midY },
+    { x: width * 0.65,  y: midY + 18 },
+    { x: width * 0.78,  y: midY - 16 },
+    { x: width * 0.88,  y: midY + 14 },
+    { x: width,         y: midY }
+  ];
+}
+
+/** Vertical zigzag coordinates for FFA 4-way screen division */
+function getFfaVerticalZigzagPoints(height, midX) {
+  return [
+    { x: midX,        y: 0 },
+    { x: midX - 16,   y: height * 0.14 },
+    { x: midX + 18,   y: height * 0.28 },
+    { x: midX,        y: height * 0.44 },
+    { x: midX - 18,   y: height * 0.60 },
+    { x: midX + 16,   y: height * 0.76 },
+    { x: midX - 12,   y: height * 0.90 },
+    { x: midX,        y: height }
+  ];
+}
+
+/** Renders the FFA 4-Way Background with 4 Distinct Theme Colors & Frames Occupying 100% of each section */
+function renderCachedFfaBackground(width, height, colors) {
+  if (!_ffaBgCacheCanvas) {
+    _ffaBgCacheCanvas = document.createElement('canvas');
+    _ffaBgCacheCtx = _ffaBgCacheCanvas.getContext('2d');
+  }
+  if (_ffaBgCacheCanvas.width !== width || _ffaBgCacheCanvas.height !== height) {
+    _ffaBgCacheCanvas.width = width;
+    _ffaBgCacheCanvas.height = height;
+  }
+
+  const ctx = _ffaBgCacheCtx;
+  ctx.clearRect(0, 0, width, height);
+
+  const midX = width * 0.5;
+  const midY = height * 0.44;
+  const hz = getFfaHorizontalZigzagPoints(width, midY);
+  const vz = getFfaVerticalZigzagPoints(height, midX);
+
+  const c0 = colors[0] || '#3b82f6';
+  const c1 = colors[1] || '#10b981';
+  const c2 = colors[2] || '#f59e0b';
+  const c3 = colors[3] || '#ef4444';
+
+  // Helper to render a fully saturated, rich, edge-to-edge theme domain inside a clipped quadrant
+  const renderQuadrant = (clipFn, startX, startY, endX, endY, qX, qY, qW, qH, color) => {
+    ctx.save();
+    ctx.beginPath();
+    clipFn();
+    ctx.closePath();
+    ctx.clip();
+
+    // 1. Rich Edge-to-Edge Theme Color Gradient (100% coverage, no black voids)
+    const deepDark = adjustBrightness(color, -70);
+    const midDark = adjustBrightness(color, -44);
+    const topVibrant = adjustBrightness(color, -22);
+
+    const grad = ctx.createLinearGradient(startX, startY, endX, endY);
+    grad.addColorStop(0, deepDark);
+    grad.addColorStop(0.5, midDark);
+    grad.addColorStop(1, topVibrant);
+    ctx.fillStyle = grad;
+    ctx.fillRect(qX - 50, qY - 50, qW + 100, qH + 100);
+
+    // 2. High-Impact Ambient Energy Bloom across the whole frame
+    const bloomCenterX = qX + qW * 0.5;
+    const bloomCenterY = qY + qH * 0.5;
+    const bloomRadius = Math.hypot(qW, qH) * 0.65;
+    const bloom = ctx.createRadialGradient(bloomCenterX, bloomCenterY, 20, bloomCenterX, bloomCenterY, bloomRadius);
+    bloom.addColorStop(0, hexToRgba(color, 0.48));
+    bloom.addColorStop(0.45, hexToRgba(color, 0.22));
+    bloom.addColorStop(0.85, hexToRgba(color, 0.06));
+    bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = bloom;
+    ctx.fillRect(qX - 50, qY - 50, qW + 100, qH + 100);
+
+    // 3. Full-Frame Halftone Dot Pattern
+    drawHalftoneGrid(ctx, qX, qY, qW, qH, hexToRgba(color, 0.20), true);
+
+    // 4. Subtle Inner Glow & Paint Strokes
+    const cornerGrad = ctx.createRadialGradient(startX, startY, 10, startX, startY, qW * 0.8);
+    cornerGrad.addColorStop(0, hexToRgba(color, 0.35));
+    cornerGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = cornerGrad;
+    ctx.fillRect(qX - 50, qY - 50, qW + 100, qH + 100);
+
+    ctx.restore();
+  };
+
+  // ── Quadrant 0: Top-Left (Fighter 1) ──
+  renderQuadrant(
+    () => {
+      ctx.moveTo(0, 0);
+      ctx.lineTo(midX, 0);
+      for (let i = 0; i < vz.length; i++) {
+        if (vz[i].y <= midY) ctx.lineTo(vz[i].x, vz[i].y);
+      }
+      for (let i = hz.length - 1; i >= 0; i--) {
+        if (hz[i].x <= midX) ctx.lineTo(hz[i].x, hz[i].y);
+      }
+      ctx.lineTo(0, 0);
+    },
+    0, 0, midX, midY,
+    0, 0, midX, midY,
+    c0
+  );
+
+  // ── Quadrant 1: Top-Right (Fighter 2) ──
+  renderQuadrant(
+    () => {
+      ctx.moveTo(midX, 0);
+      ctx.lineTo(width, 0);
+      ctx.lineTo(width, midY);
+      for (let i = hz.length - 1; i >= 0; i--) {
+        if (hz[i].x >= midX) ctx.lineTo(hz[i].x, hz[i].y);
+      }
+      for (let i = vz.length - 1; i >= 0; i--) {
+        if (vz[i].y <= midY) ctx.lineTo(vz[i].x, vz[i].y);
+      }
+    },
+    width, 0, midX, midY,
+    midX, 0, width - midX, midY,
+    c1
+  );
+
+  // ── Quadrant 2: Bottom-Left (Fighter 3) ──
+  renderQuadrant(
+    () => {
+      ctx.moveTo(0, midY);
+      for (let i = 0; i < hz.length; i++) {
+        if (hz[i].x <= midX) ctx.lineTo(hz[i].x, hz[i].y);
+      }
+      for (let i = 0; i < vz.length; i++) {
+        if (vz[i].y >= midY) ctx.lineTo(vz[i].x, vz[i].y);
+      }
+      ctx.lineTo(0, height);
+      ctx.lineTo(0, midY);
+    },
+    0, height, midX, midY,
+    0, midY, midX, height - midY,
+    c2
+  );
+
+  // ── Quadrant 3: Bottom-Right (Fighter 4) ──
+  renderQuadrant(
+    () => {
+      ctx.moveTo(midX, midY);
+      for (let i = 0; i < hz.length; i++) {
+        if (hz[i].x >= midX) ctx.lineTo(hz[i].x, hz[i].y);
+      }
+      ctx.lineTo(width, height);
+      ctx.lineTo(midX, height);
+      for (let i = vz.length - 1; i >= 0; i--) {
+        if (vz[i].y >= midY) ctx.lineTo(vz[i].x, vz[i].y);
+      }
+    },
+    width, height, midX, midY,
+    midX, midY, width - midX, height - midY,
+    c3
+  );
+
+  // Floating debris in all 4 colors
+  drawFloatingFfaDebris(ctx, width, height, colors);
+}
+
+/** Draws the 4-way FFA Anime Grunge Zigzag Background */
+function drawFfaAnimeGrungeZigzagBackground(ctx, width, height, colors, timer) {
+  if (!_floatingDebris || _floatingDebris.length === 0) {
+    initDebrisAndScratches(width, height);
+  }
+
+  const bgKey = `${width}_${height}_${colors.join('_')}`;
+  if (bgKey !== _lastFfaBgKey || !_ffaBgCacheCanvas) {
+    _lastFfaBgKey = bgKey;
+    renderCachedFfaBackground(width, height, colors);
+  }
+
+  if (_ffaBgCacheCanvas) {
+    ctx.drawImage(_ffaBgCacheCanvas, 0, 0);
+  }
+
+  const midX = width * 0.5;
+  const midY = height * 0.44;
+  drawFfaJaggedZigzagDividers(ctx, width, height, midX, midY, timer, colors);
+}
+
+/** Draws the sharp horizontal and vertical zigzag divider seams */
+function drawFfaJaggedZigzagDividers(ctx, width, height, midX, midY, timer, colors) {
+  ctx.save();
+
+  const hz = getFfaHorizontalZigzagPoints(width, midY);
+  const vz = getFfaVerticalZigzagPoints(height, midX);
+
+  ctx.lineJoin = 'miter';
+  ctx.miterLimit = 4;
+  ctx.lineCap = 'square';
+
+  const tracePath = (pts) => {
+    ctx.beginPath();
+    pts.forEach((p, idx) => {
+      if (idx === 0) ctx.moveTo(p.x, p.y);
+      else ctx.lineTo(p.x, p.y);
+    });
+  };
+
+  // 1. Thick Solid Black Ink Backing
+  ctx.strokeStyle = '#000000';
+  ctx.lineWidth = 14.0;
+  tracePath(hz);
+  ctx.stroke();
+  tracePath(vz);
+  ctx.stroke();
+
+  // 2. Outer White / Neon Glow Line
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.65)';
+  ctx.lineWidth = 5.0;
+  tracePath(hz);
+  ctx.stroke();
+  tracePath(vz);
+  ctx.stroke();
+
+  // 3. Middle Intense White Lightning Line
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2.6;
+  tracePath(hz);
+  ctx.stroke();
+  tracePath(vz);
+  ctx.stroke();
+
+  // 4. Center Diamond Intersection Emblem
+  ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  const nodeR = 7.0;
+  ctx.moveTo(midX, midY - nodeR);
+  ctx.lineTo(midX + nodeR, midY);
+  ctx.lineTo(midX, midY + nodeR);
+  ctx.lineTo(midX - nodeR, midY);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/** Draws floating geometric action debris in 4 FFA colors */
+function drawFloatingFfaDebris(ctx, width, height, colors) {
+  if (!_floatingDebris) return;
+
+  ctx.save();
+  _floatingDebris.forEach((d, idx) => {
+    ctx.save();
+    ctx.translate(d.x, d.y);
+    ctx.rotate(d.rotation);
+    ctx.globalAlpha = d.alpha * 0.9;
+
+    ctx.beginPath();
+    const r = d.size;
+    ctx.moveTo(0, -r);
+    ctx.lineTo(r * 0.86, r * 0.5);
+    ctx.lineTo(-r * 0.86, r * 0.5);
+    ctx.closePath();
+
+    const color = colors[idx % colors.length] || '#ffffff';
+    if (d.isSolid) {
+      ctx.fillStyle = color;
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 1.4;
+      ctx.stroke();
+    }
+    ctx.restore();
+  });
+  ctx.restore();
 }
 
 /** Draws procedural halftone dot grids */
@@ -612,9 +913,10 @@ let _lastAudioTickTimer = -1;
 
 function getStripFighterDef(slotIndex, totalSlots, targetDef, seed) {
   if (slotIndex >= totalSlots) return targetDef;
+  const currentDefs = getActiveFighterDefs();
   const clampedIdx = Math.max(0, slotIndex);
-  const hashIdx = (clampedIdx * 7 + seed) % FIGHTER_DEFS.length;
-  return FIGHTER_DEFS[hashIdx] || targetDef;
+  const hashIdx = (clampedIdx * 7 + seed) % currentDefs.length;
+  return currentDefs[hashIdx] || targetDef;
 }
 
 function drawSmoothReelColumn(ctx, centerX, centerY, targetDef, slotKey, totalSlots, duration, timer, scale, themeColor, facingAngle, isLeft) {
@@ -781,11 +1083,11 @@ function draw1v2FaceOff(ctx, width, height, p1Def, p2Def, p3Def, scale, timer, l
   const targetRightX = width * 0.76;
   const centerY = height * 0.44;
 
-  const soloScale = scale * 1.15;
-  const duoScale = scale * 0.85;
+  // Unified scale: Everyone (Solo P1, Duo P2, Duo P3) has the exact same scale size in 1v2 showoff
+  const unifiedScale = scale * 0.96;
 
-  const duo1Y = centerY - 65;
-  const duo2Y = centerY + 65;
+  const duo1Y = centerY - 82;
+  const duo2Y = centerY + 82;
 
   if (timer <= 1) {
     _lastSlotMap['p1'] = -1;
@@ -807,56 +1109,67 @@ function draw1v2FaceOff(ctx, width, height, p1Def, p2Def, p3Def, scale, timer, l
     d2X -= easeExit * 340;
   }
 
-  // Solo Boss (Left) - Staggered lock 1 (36)
+  // 1. Solo Boss (Left) - Staggered lock 1 (36)
   ctx.save();
   if (exitProgress > 0.05) {
     drawExitDashSpeedLines(ctx, leftX - 60, centerY, 140, leftColor, exitProgress);
   }
   const { activeDef: activeP1Def } = drawSmoothReelColumn(
-    ctx, leftX, centerY, p1Def, 'p1', 16, 36, timer, soloScale, leftColor, 0, true
+    ctx, leftX, centerY, p1Def, 'p1', 16, 36, timer, unifiedScale, leftColor, 0, true
   );
   ctx.restore();
 
-  // Solo Boss Name
-  const soloNameY = centerY + 115 * (soloScale / 1.35);
+  // Solo Boss Name Plate (directly below Solo fighter)
+  const soloNameY = centerY + 78 * (unifiedScale / 1.35);
   const soloNameAlpha = Math.max(0, 1 - exitProgress * 2.5);
   if (soloNameAlpha > 0) {
     ctx.save();
     ctx.globalAlpha = soloNameAlpha;
-    drawFighterCleanName(ctx, leftX, soloNameY, activeP1Def?.name || '', activeP1Def?.color || leftColor);
+    drawFighterCleanName(ctx, leftX, soloNameY, activeP1Def?.name || '', activeP1Def?.color || leftColor, 1.0);
     ctx.restore();
   }
 
-  // Duo 1 (Top Right) - Staggered lock 2 (48)
+  // 2. Duo 1 (Top Right) - Staggered lock 2 (48)
   ctx.save();
   if (exitProgress > 0.05) {
     drawExitDashSpeedLines(ctx, d1X + 60, duo1Y, -140, p2Def?.color || rightColor, exitProgress);
   }
   const { activeDef: activeP2Def } = drawSmoothReelColumn(
-    ctx, d1X, duo1Y, p2Def, 'p2', 20, 48, timer, duoScale, p2Def?.color || rightColor, Math.PI, false
+    ctx, d1X, duo1Y, p2Def, 'p2', 20, 48, timer, unifiedScale, p2Def?.color || rightColor, Math.PI, false
   );
   ctx.restore();
 
-  // Duo 2 (Bottom Right) - Staggered lock 3 (60)
+  // Duo 1 Name Plate (displayed directly at Duo 1's bottom)
+  const duo1NameY = duo1Y + 54 * (unifiedScale / 1.35);
+  const duo1NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
+  if (duo1NameAlpha > 0) {
+    ctx.save();
+    ctx.globalAlpha = duo1NameAlpha;
+    drawFighterCleanName(ctx, d1X, duo1NameY, activeP2Def?.name || '', activeP2Def?.color || p2Def?.color || rightColor, 0.82);
+    ctx.restore();
+  }
+
+  // 3. Duo 2 (Bottom Right) - Staggered lock 3 (60)
   ctx.save();
   if (exitProgress > 0.05) {
     drawExitDashSpeedLines(ctx, d2X + 60, duo2Y, -140, p3Def?.color || rightColor, exitProgress);
   }
   const { activeDef: activeP3Def } = drawSmoothReelColumn(
-    ctx, d2X, duo2Y, p3Def, 'p3', 24, 60, timer, duoScale, p3Def?.color || rightColor, Math.PI, false
+    ctx, d2X, duo2Y, p3Def, 'p3', 24, 60, timer, unifiedScale, p3Def?.color || rightColor, Math.PI, false
   );
   ctx.restore();
 
-  // Duo Combined Name
-  const duoNameY = centerY + 135 * (duoScale / 1.0);
-  const duoNameAlpha = Math.max(0, 1 - exitProgress * 2.5);
-  if (duoNameAlpha > 0) {
+  // Duo 2 Name Plate (displayed directly at Duo 2's bottom)
+  const duo2NameY = duo2Y + 54 * (unifiedScale / 1.35);
+  const duo2NameAlpha = Math.max(0, 1 - exitProgress * 2.5);
+  if (duo2NameAlpha > 0) {
     ctx.save();
-    ctx.globalAlpha = duoNameAlpha;
-    drawFighterCleanName(ctx, targetRightX, duoNameY, `${activeP2Def?.name || ''} & ${activeP3Def?.name || ''}`, rightColor);
+    ctx.globalAlpha = duo2NameAlpha;
+    drawFighterCleanName(ctx, d2X, duo2NameY, activeP3Def?.name || '', activeP3Def?.color || p3Def?.color || rightColor, 0.82);
     ctx.restore();
   }
 
+  // 4. Center "1 VS 2" to Countdown Transition
   if (timer >= 96) {
     drawCenterUnifiedCountdown(ctx, width / 2, centerY, timer, activeP1Def?.color || leftColor, rightColor, exitProgress, '1 VS 2');
   }
@@ -961,15 +1274,15 @@ function draw2v2FaceOff(ctx, width, height, t1p1Def, t1p2Def, t2p1Def, t2p2Def, 
 function drawFfaFaceOff(ctx, width, height, defs, scale, timer, exitProgress = 0) {
   const cx = width / 2;
   const cy = height * 0.44;
-  const ffaScale = scale * 0.85;
-  const spreadX = width * 0.26;
-  const spreadY = 70;
+  const ffaScale = scale * 0.82;
+  const spreadX = width * 0.25;
+  const spreadY = 65;
 
   const positions = [
-    { targetX: cx - spreadX, targetY: cy - spreadY, angle: 0.35, slots: 14, duration: 34 },
-    { targetX: cx + spreadX, targetY: cy - spreadY, angle: Math.PI - 0.35, slots: 18, duration: 44 },
-    { targetX: cx - spreadX, targetY: cy + spreadY, angle: -0.35, slots: 22, duration: 54 },
-    { targetX: cx + spreadX, targetY: cy + spreadY, angle: Math.PI + 0.35, slots: 26, duration: 64 }
+    { targetX: cx - spreadX, targetY: cy - spreadY, angle: 0.35, slots: 14, duration: 34, labelY: cy - spreadY + 48 },
+    { targetX: cx + spreadX, targetY: cy - spreadY, angle: Math.PI - 0.35, slots: 18, duration: 44, labelY: cy - spreadY + 48 },
+    { targetX: cx - spreadX, targetY: cy + spreadY, angle: -0.35, slots: 22, duration: 54, labelY: cy + spreadY + 48 },
+    { targetX: cx + spreadX, targetY: cy + spreadY, angle: Math.PI + 0.35, slots: 26, duration: 64, labelY: cy + spreadY + 48 }
   ];
 
   if (timer <= 1) {
@@ -997,26 +1310,24 @@ function drawFfaFaceOff(ctx, width, height, defs, scale, timer, exitProgress = 0
       ctx, currX, currY, def, `ffa_${i}`, pos.slots, pos.duration, timer, ffaScale, def.color || '#f59e0b', pos.angle, i % 2 === 0
     );
     ctx.restore();
-    activeDefs.push(activeDef || def);
+
+    const finalDef = activeDef || def;
+    activeDefs.push(finalDef);
+
+    // Draw individual fighter nameplate inside their own quadrant frame
+    if (exitProgress < 0.6) {
+      const nameAlpha = Math.max(0, 1 - exitProgress * 2.0);
+      ctx.save();
+      ctx.globalAlpha = nameAlpha;
+      drawFighterCleanName(ctx, currX, pos.labelY, finalDef.name, finalDef.color || '#ffffff', 0.80);
+      ctx.restore();
+    }
   });
 
   if (timer >= 96) {
-    drawCenterUnifiedCountdown(ctx, cx, cy, timer, activeDefs[0]?.color || '#f59e0b', activeDefs[1]?.color || '#3b82f6', exitProgress, 'FFA');
-
-    if (exitProgress < 0.4) {
-      const nameY = cy + 130;
-      ctx.save();
-      ctx.fillStyle = '#ffffff';
-      ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
-      ctx.textAlign = 'center';
-      ctx.textBaseline = 'middle';
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 4;
-      const nameStr = activeDefs.map(d => d.name.toUpperCase()).join('   •   ');
-      ctx.strokeText(nameStr, cx, nameY);
-      ctx.fillText(nameStr, cx, nameY);
-      ctx.restore();
-    }
+    const isTactical = (state.gameCategory === 'tactical' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.TACTICAL_FFA);
+    const badgeText = isTactical ? 'TACTICAL FFA' : 'FFA';
+    drawCenterUnifiedCountdown(ctx, cx, cy, timer, activeDefs[0]?.color || '#f59e0b', activeDefs[1]?.color || '#3b82f6', exitProgress, badgeText);
   }
 }
 
@@ -1357,55 +1668,57 @@ function drawExitArenaTransitionWipe(ctx, width, height, exitProgress, leftColor
 }
 
 /** Draws ONLY the Fighter's Name with Multi-Layer Laser Glow Underline */
-function drawFighterCleanName(ctx, cx, cy, name, accentColor) {
+function drawFighterCleanName(ctx, cx, cy, name, accentColor, fontScale = 1.0) {
   if (!name) return;
 
   const upperName = name.toUpperCase();
   ctx.save();
 
-  const fontSize = upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30);
+  const baseFontSize = upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30);
+  const fontSize = Math.round(baseFontSize * fontScale);
   ctx.font = `900 ${fontSize}px "Outfit", "Rajdhani", sans-serif`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
   ctx.strokeStyle = hexToRgba(accentColor, 0.40);
-  ctx.lineWidth = 10;
+  ctx.lineWidth = 10 * fontScale;
   ctx.strokeText(upperName, cx, cy);
 
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 5;
+  ctx.lineWidth = 5 * fontScale;
   ctx.lineJoin = 'round';
   ctx.strokeText(upperName, cx, cy);
 
   ctx.fillStyle = '#ffffff';
   ctx.fillText(upperName, cx, cy);
 
-  let underlineW = _textWidthCache[upperName];
+  const cacheKey = `${upperName}_${fontSize}`;
+  let underlineW = _textWidthCache[cacheKey];
   if (underlineW === undefined) {
     underlineW = ctx.measureText(upperName).width * 0.90;
-    _textWidthCache[upperName] = underlineW;
+    _textWidthCache[cacheKey] = underlineW;
   }
   const lineY = cy + fontSize * 0.65;
 
   ctx.strokeStyle = hexToRgba(accentColor, 0.35);
-  ctx.lineWidth = 6.5;
+  ctx.lineWidth = 6.5 * fontScale;
   ctx.beginPath();
   ctx.moveTo(cx - underlineW / 2, lineY);
   ctx.lineTo(cx + underlineW / 2, lineY);
   ctx.stroke();
 
   ctx.strokeStyle = accentColor || '#ffffff';
-  ctx.lineWidth = 2.6;
+  ctx.lineWidth = 2.6 * fontScale;
   ctx.beginPath();
   ctx.moveTo(cx - underlineW / 2, lineY);
   ctx.lineTo(cx + underlineW / 2, lineY);
   ctx.stroke();
 
   ctx.strokeStyle = '#ffffff';
-  ctx.lineWidth = 1.0;
+  ctx.lineWidth = 1.0 * fontScale;
   ctx.beginPath();
-  ctx.moveTo(cx - underlineW / 2 + 6, lineY);
-  ctx.lineTo(cx + underlineW / 2 - 6, lineY);
+  ctx.moveTo(cx - underlineW / 2 + 6 * fontScale, lineY);
+  ctx.lineTo(cx + underlineW / 2 - 6 * fontScale, lineY);
   ctx.stroke();
 
   ctx.restore();

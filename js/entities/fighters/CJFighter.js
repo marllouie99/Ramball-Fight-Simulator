@@ -1741,12 +1741,30 @@ export class CJFighter extends Fighter {
     if (this.hp <= 0 || this._isWinnerReveal || this._isFaceOff || (this.hideHpText && typeof state !== 'undefined' && state.gameState !== 'playing')) return;
 
     const z = this.z || 0;
+    const drawY = this.y - z;
     ctx.save();
+
+    // 1. Floating Name on TOP of the Fighter Body Circle
+    if (this.name) {
+      const nameText = this.name.toUpperCase();
+      const nameY = drawY - this.r - 8;
+      const themeColor = this.themeColor || this.color || '#ffffff';
+
+      ctx.font = 'bold 11px "Outfit", "Segoe UI", Arial, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      ctx.lineWidth = 3.2;
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
+      ctx.strokeText(nameText, this.x, nameY);
+      ctx.fillStyle = themeColor;
+      ctx.fillText(nameText, this.x, nameY);
+    }
+
+    // 2. Health Number in center
     ctx.font = 'bold 18px Arial';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const hpText = Math.floor(this.hp).toString();
-    const drawY = this.y - z;
     ctx.lineWidth = 4;
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)';
     ctx.strokeText(hpText, this.x, drawY);

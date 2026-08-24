@@ -44,6 +44,7 @@ import {
   drawFaceOffThumbnailScreen,
   captureFaceOffScreenshot
 } from './ui/ThumbnailFaceOffScreen.js';
+import { drawKillFeed } from './ui/killFeedRenderer.js';
 
 export {
   renderTeamHpCard,
@@ -72,5 +73,6 @@ export {
   drawFaceOffThumbnailScreen,
   captureFaceOffScreenshot,
   drawMissionPassedOverlay,
-  drawWastedOverlay
+  drawWastedOverlay,
+  drawKillFeed
 };

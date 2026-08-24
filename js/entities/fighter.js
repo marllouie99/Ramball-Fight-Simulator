@@ -18,11 +18,12 @@ import { FighterRenderer } from '../graphics/renderers/fighterRenderer.js';
 // Note: `state` is imported for use inside function bodies only.
 // This circular dep (fighter ↔ state) is safe because state is only
 // accessed at call time, never at module evaluation time.
-import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay } from '../core/state.js';
+import { state, spawnFloatingText, recordWin, recordLoss, triggerGlobalScreenShake, isChampionScreenActive, triggerMissionPassedOverlay, pushKillFeed } from '../core/state.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame, spawnMahitoSoulExplosion, spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
+import { hasLineOfSight } from '../../Tactical Force/maps/index.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -147,6 +148,17 @@ export class Fighter {
     if (oldHp !== undefined && value > oldHp) {
       if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0) {
         value = oldHp; // Disable all healing while caught inside Yuta's Pure Love Beam
+      } else if (this.tojiRegenDebuffTimer > 0) {
+        const healingAmount = value - oldHp;
+        const debuffMult = CONFIG.toji?.regenDebuffMultiplier ?? 0.40;
+        const reducedHealing = healingAmount * debuffMult;
+        value = oldHp + reducedHealing;
+
+        const now = Date.now();
+        if (!this._lastTojiRegenDebuffTextTime || now - this._lastTojiRegenDebuffTextTime > 600) {
+          spawnFloatingText(this.x, this.y - this.r - 28, "REGEN DECREASED!", "#C084FC");
+          this._lastTojiRegenDebuffTextTime = now;
+        }
       } else if (this.pureLoveBeamRegenDebuffTimer > 0) {
         const healingAmount = value - oldHp;
         const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
@@ -229,10 +241,14 @@ export class Fighter {
 
     const baseHp = Number(d.hp || 100);
     // Store original base speed before any multipliers (used for spin rate calculations)
-    const startVx = d.startVx || 0, startVy = d.startVy || 0;
-    const originalBaseSpeed = d.moveSpeed !== undefined ? d.moveSpeed : Math.sqrt(startVx * startVx + startVy * startVy) || 1;
+    let originalBaseSpeed = d.moveSpeed !== undefined ? d.moveSpeed : Math.sqrt(startVx * startVx + startVy * startVy) || 1;
+    if (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().includes('tactical')) && CONFIG.tactical?.enableUnifiedSpeed && CONFIG.tactical?.unifiedMovementSpeed) {
+      originalBaseSpeed = CONFIG.tactical.unifiedMovementSpeed;
+    }
     // Apply mode speed multiplier only to movement speed, not spin rate
     const moveSpeed = originalBaseSpeed * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
+    this.speed = moveSpeed;
+    this.baseSpeed = moveSpeed;
 
     const angle = Math.random() * Math.PI * 2;
     this.vx = Math.cos(angle) * moveSpeed;
@@ -267,6 +283,7 @@ export class Fighter {
     this.angle = 0;
     this.gunAngle = 0;
     this.lastKilledDef = null;
+    this.roundKilledDefs = [];
     this.shootCooldown = 0;
     this.speed = moveSpeed;
     this.baseSpeed = originalBaseSpeed; // Original speed for spin rate calculations (not affected by mode multiplier)
@@ -318,6 +335,7 @@ export class Fighter {
     this.silenceTimer = 0;
     this.blackFlashDebuffTimer = 0;
     this.pureLoveBeamRegenDebuffTimer = 0;
+    this.tojiRegenDebuffTimer = 0;
     this.paralyzeTimer = 0;
     this.isParalyzedByMahito = false;
     this.isGrabbedByMahoraga = false;
@@ -479,11 +497,31 @@ export class Fighter {
     this.purpleChargeTimer = 0;
     this.redEffectTimer = 0;
     this.shootCooldown = 60;
+
+    // Clear afterimages & transient attack trails
+    if (this.swordTrail) this.swordTrail.length = 0;
+    if (this.afterImages) this.afterImages.length = 0;
+    if (this._dashAfterimages) this._dashAfterimages.length = 0;
+    if (this.stealthAfterimages) this.stealthAfterimages.length = 0;
+    if (this.adaptationAfterimages) this.adaptationAfterimages.length = 0;
+    if (this._afterImages) this._afterImages.length = 0;
+    if (this.hitFlameWisps) this.hitFlameWisps.length = 0;
+    if (this.punchEffects) this.punchEffects.length = 0;
+    if (this.slashHitVisuals) this.slashHitVisuals.length = 0;
   }
 
 
   applyTimeStop(frames) {
     this.statusEffects.applyTimeStop(frames);
+  }
+
+  applyKnockback(vx, vy, stunFrames = 0) {
+    if (this.isTurret || this.isDispenser || this.isAmbushing) return;
+    this.knockbackVx = (this.knockbackVx || 0) + vx;
+    this.knockbackVy = (this.knockbackVy || 0) + vy;
+    if (stunFrames > 0) {
+      this.knockbackStunTimer = Math.max(this.knockbackStunTimer || 0, stunFrames);
+    }
   }
 
   _handleTimeStop() {
@@ -697,6 +735,9 @@ export class Fighter {
     }
     if (this.pureLoveBeamRegenDebuffTimer > 0) {
       this.pureLoveBeamRegenDebuffTimer--;
+    }
+    if (this.tojiRegenDebuffTimer > 0) {
+      this.tojiRegenDebuffTimer--;
     }
     if (this.hitStunTimer > 0) this.hitStunTimer--;
     if (this.caughtInLaserBeamTimer > 0) this.caughtInLaserBeamTimer--;
@@ -1013,7 +1054,23 @@ export class Fighter {
           spawnBloodEffect(this, bloodAmount, damageAngle);
         }
       }
-      
+      // Apply physical directional knockback whenever taking hit damage
+      if (!opts.isPoison && !opts.isBurn && !opts.isFlame && !opts.isContinuous && !opts.isDomainDPS && !opts.fromBlackHole && !this.isTurret && !this.isDispenser) {
+        let kbAngle = damageAngle;
+        if (opts.projectile) {
+          kbAngle = Math.atan2(opts.projectile.vy || Math.sin(opts.projectile.angle || 0), opts.projectile.vx || Math.cos(opts.projectile.angle || 0));
+        }
+        if (kbAngle !== null) {
+          const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
+          const baseKb = opts.knockbackForce || opts.projectile?.knockbackForce || attackerConfig.knockbackForce || (opts.isMelee ? 3.5 : (opts.isProjectile ? 3.0 : 2.0));
+          const kbVx = Math.cos(kbAngle) * baseKb;
+          const kbVy = Math.sin(kbAngle) * baseKb;
+          this.applyKnockback(kbVx, kbVy, opts.isHeavy ? 6 : 0);
+          this.vx += kbVx * 0.45;
+          this.vy += kbVy * 0.45;
+        }
+      }
+
       // Global blast / knockback / explosion skill interruption & penalty cooldown
       const isBlastOrKnockback = opts.isExplosion || opts.isDivineFlame || opts.isRed || opts.isKnockback || opts.isAOE || (opts.knockback && Math.hypot(opts.knockbackVx || 0, opts.knockbackVy || 0) > 2);
       if (isBlastOrKnockback && !this.isTurret && !this.isDispenser) {
@@ -1084,11 +1141,25 @@ export class Fighter {
       const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
       const recordKill = () => {
         if (realAttacker && realAttacker !== this) {
-          realAttacker.lastKilledDef = this._def;
-          const realIdx = state.fighters.indexOf(realAttacker);
-          if (realIdx >= 0) {
-            state.matchKills[realIdx].push(this._def);
+          const victimDef = this._def || { name: this.name, color: this.color, type: this.type };
+          realAttacker.lastKilledDef = victimDef;
+          if (!realAttacker.killedDefs) realAttacker.killedDefs = [];
+          if (!realAttacker.killedDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
+            realAttacker.killedDefs.push(victimDef);
           }
+          if (!realAttacker.roundKilledDefs) realAttacker.roundKilledDefs = [];
+          if (!realAttacker.roundKilledDefs.some(d => d && (d.name === victimDef.name || (victimDef.id && d.id === victimDef.id)))) {
+            realAttacker.roundKilledDefs.push(victimDef);
+          }
+          const realIdx = state.fighters.indexOf(realAttacker);
+          if (realIdx >= 0 && state.matchKills && state.matchKills[realIdx]) {
+            state.matchKills[realIdx].push(victimDef);
+          }
+
+          // Push to Counter-Strike Style Kill Feed
+          const weapon = realAttacker.characterId || realAttacker._def?.name || realAttacker.name || 'FIREARM';
+          const isHeadshot = Boolean(this._lastHitWasHeadshot || realAttacker.lastShotWasHeadshot);
+          pushKillFeed(realAttacker, this, weapon, isHeadshot);
         }
       };
 
@@ -1138,13 +1209,14 @@ export class Fighter {
       return false;
     };
 
-    const aliveCount = state.fighters.filter((f) => f && _isEffectivelyAlive(f)).length;
+    const aliveFighters = state.fighters.filter((f) => f && _isEffectivelyAlive(f) && f !== this);
+    const aliveCount = aliveFighters.length;
     const realAttacker = (attacker && attacker.owner) ? attacker.owner : attacker;
     const realAttackerIndex = state.fighters.indexOf(realAttacker);
-    const roundEnds = state.mode !== 'FFA' || aliveCount <= 1;
 
+    const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
     const is1v2 = (state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2' || state.mode === GAME_MODES.STAND_OFF_1V2);
-    const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO);
+    const is2v2 = (state.mode === '2v2' || state.mode === GAME_MODES.TWO_VS_TWO || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2);
 
     if (is2v2 || is1v2) {
       let team0Alive = false;
@@ -1185,7 +1257,36 @@ export class Fighter {
           state.gameState = 'roundEnd';
         }
       }
-    } else if (state.mode !== 'FFA' && roundEnds) {
+    } else if (isFFA) {
+      // FFA: Continue fight until only ONE fighter survives!
+      if (aliveCount <= 1) {
+        stopArenaBgm(true);
+        const soleSurvivor = aliveFighters[0] || state.fighters.find(f => f && _isEffectivelyAlive(f)) || null;
+        const winnerIndex = soleSurvivor ? state.fighters.indexOf(soleSurvivor) : -1;
+
+        if (winnerIndex >= 0) {
+          state.scores[winnerIndex]++;
+        }
+
+        state.roundWinner = soleSurvivor;
+        state.roundEndTimer = 0;
+
+        const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 1;
+        const winThreshold = modeRounds === 1 ? 1 : 2;
+        const isMatchEnd = winnerIndex >= 0 && state.scores[winnerIndex] >= winThreshold;
+
+        if (isMatchEnd) {
+          state.ffaMatchComplete = true;
+          state.matchWinner = soleSurvivor;
+          state.gameState = 'matchEnd';
+        } else {
+          stopAllSounds();
+          stopAllLoopingSounds();
+          state.gameState = 'roundEnd';
+        }
+      }
+    } else {
+      // 1v1 / Stand Off / Tactical 1v1 / Tactical Standoff / TLFS
       stopArenaBgm(true);
       const survivor = state.fighters.find(f => f && f !== this && _isEffectivelyAlive(f));
       const winnerFighter = survivor || ((realAttacker && realAttacker !== this && _isEffectivelyAlive(realAttacker)) ? realAttacker : null);
@@ -1222,18 +1323,6 @@ export class Fighter {
       } else {
         state.gameState = 'roundEnd';
       }
-    } else if (state.mode === 'FFA' && roundEnds) {
-      stopArenaBgm(true);
-      state.roundWinner = realAttacker;
-      state.roundEndTimer = 0;
-      state.ffaMatchComplete = true;
-
-      if (!state.ffaMatchComplete) {
-        stopAllSounds();
-        stopAllLoopingSounds();
-      }
-
-      state.gameState = 'roundEnd';
     }
 
     // Trigger GTA Mission Passed overlay on round or match win for CJ
@@ -1352,6 +1441,34 @@ export class Fighter {
       return;
     }
 
+    // In tactical shooter modes, disable auto-aim snapping! The gun rotates with the spinning body
+    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
+    const isTacticalFighter = (this.isTacticalFighter || (this._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp', 'barrett50cal'].includes(this._def.type)));
+
+    if (isTactical || isTacticalFighter) {
+      this.gunAngle = this.angle;
+      this.hasClearLOS = hasLineOfSight(this.x, this.y, opponent.x, opponent.y);
+      return;
+    }
+
+    // Line of sight check for tactical modes with cover obstacles
+    const hasLOS = hasLineOfSight(this.x, this.y, opponent.x, opponent.y);
+
+    if (!hasLOS) {
+      // Wall blocks sightline: Do NOT snap auto-aim through the wall.
+      // Instead, look ahead in the direction of current movement velocity.
+      const moveSpeed = Math.hypot(this.vx, this.vy);
+      if (moveSpeed > 0.1) {
+        const moveAngle = Math.atan2(this.vy, this.vx);
+        this.gunAngle = moveAngle;
+        this.angle = moveAngle;
+      }
+      this.hasClearLOS = false;
+      return;
+    }
+
+    this.hasClearLOS = true;
+
     // Target Musashi's ghost if he is flurrying
     let targetX = opponent.x;
     let targetY = opponent.y;
@@ -1393,6 +1510,13 @@ export class Fighter {
     if ((this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed || (this.hitStunTimer && this.hitStunTimer > 0)) {
       return;
     }
+
+    // Do NOT fire if Line of Sight is blocked by a wall in tactical mode
+    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || state.mode === 'Tactical 2v2');
+    if (isTactical && this.hasClearLOS === false) {
+      return;
+    }
+
     if (projectileSystem) {
       projectileSystem.fireProjectile(this, ownerIndex, this.damage);
     }
@@ -1490,7 +1614,10 @@ export class Fighter {
     this.x += this.vx;
     this.y += this.vy;
     if (!this.hitStunTimer || this.hitStunTimer <= 0) {
-      const spinRate = this._def.spinRate ?? CONFIG.spin.rate;
+      const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
+      const isTacticalFighter = (this.isTacticalFighter || (this._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp', 'barrett50cal'].includes(this._def.type)));
+      const defaultSpinRate = (isTactical || isTacticalFighter) ? (CONFIG.tactical?.bodySpinRate ?? 0.055) : (CONFIG.spin?.rate ?? 0.06);
+      const spinRate = this._def?.spinRate ?? defaultSpinRate;
       this.angle += this.speed * spinRate;
     }
   }
@@ -1553,11 +1680,16 @@ export class Fighter {
     // Shooting
     const isParalyzed = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed;
     const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed && !this.isCaughtInBeam();
-    if (this.shootCooldown > 0) {
-      this.shootCooldown--;
-    } else if (this._def.type !== 'orange' && canAct) { // Prevent Orange from using this default shoot
-      this.shoot(ownerIndex);
-      this.shootCooldown = this.shootCooldownMax;
+    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
+    const isTacticalFighter = (this.isTacticalFighter || (this._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp', 'barrett50cal'].includes(this._def.type)));
+
+    if (!isTactical && !isTacticalFighter) {
+      if (this.shootCooldown > 0) {
+        this.shootCooldown--;
+      } else if (this._def.type !== 'orange' && canAct) { // Prevent Orange from using this default shoot
+        this.shoot(ownerIndex);
+        this.shootCooldown = this.shootCooldownMax;
+      }
     }
 
     this.applyMovementPhysics();

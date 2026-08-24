@@ -20,6 +20,7 @@ import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphics.js';
+import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
@@ -561,6 +562,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
     // Add rangerBullet handler
     if (p.visual === 'rangerBullet') {
       drawRangerBullet(ctx, p);
+      return;
+    }
+
+    // Unified Tactical Force Bullet Projectile (Dynamic Character Theme Colored)
+    if (p.visual === 'tacticalBullet') {
+      drawTacticalBullet(ctx, p);
       return;
     }
 

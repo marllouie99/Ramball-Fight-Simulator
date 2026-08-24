@@ -40,6 +40,9 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('voice') ||
          s.includes('homie') ||
          s.includes('noise') ||
+         s.includes('clone') ||
+         s.includes('minion') ||
+         s.includes('mahito') ||
          s.includes('dialogue') ||
          s.includes('mybestfriend') ||
          s.includes('bestfriend') ||
@@ -51,6 +54,7 @@ export function isProtectedVoiceOrAnnouncerSound(src) {
          s.includes('wasted') ||
          s.includes('missionpassed') ||
          s.includes('cheatactivated') ||
+         s.includes('cheat') ||
          s.includes('you-win') ||
          s.includes('you_win') ||
          s.includes('fight') ||

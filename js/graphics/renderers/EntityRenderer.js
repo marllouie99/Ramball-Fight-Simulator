@@ -31,7 +31,11 @@ export function drawFighters() {
   const isTeamMode = (mode === '2v2' || mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.TWO_VS_TWO || mode === GAME_MODES.STAND_OFF_1V2);
 
   const drawTeamRing = (fighter, fi) => {
-    if (!isTeamMode || !fighter || fighter.hp <= 0 || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
+    if (!isTeamMode || !fighter || fighter.hp <= 0 || fighter.isDead || (fighter.vanishTimer && fighter.vanishTimer > 0)) return;
+
+    // Immediately hide team indicators when champion screen or round end is active
+    if (state._isChampionLayoutActive || state.gameState === 'matchEnd' || state.gameState === 'roundEnd' || state.roundWinner || state.matchWinner) return;
+
     const team = state.getFighterTeam(fi);
     if (team === null) return;
 
@@ -39,7 +43,17 @@ export function drawFighters() {
     const is1v2Mode = (mode === '1v2 Stand Off' || mode === '1v2' || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === GAME_MODES.STAND_OFF_1V2);
     if (is1v2Mode && team === 0) return;
 
-    // In 1v2 mode, do not put team indicator on minions, turrets, illusions, or summons
+    // Immediately hide team indicator as soon as all opposing enemy fighters die
+    if (fighters) {
+      const hasAliveEnemy = fighters.some((other, oi) => {
+        if (!other || other.hp <= 0 || other.isDead) return false;
+        const otherTeam = state.getFighterTeam(oi);
+        return otherTeam !== null && otherTeam !== team;
+      });
+      if (!hasAliveEnemy) return;
+    }
+
+    // Do not put team indicator on minions, turrets, illusions, or summons
     const isMinionOrTurret = Boolean(
       fighter.isTurret ||
       fighter.isMinion ||
@@ -53,7 +67,7 @@ export function drawFighters() {
       fighter._def?.isMinion ||
       fighter.owner
     );
-    if (is1v2Mode && isMinionOrTurret) return;
+    if (isMinionOrTurret) return;
 
     const teamColor = team === 0 ? '#ff4d4d' : '#4da3ff';
 
@@ -376,6 +390,39 @@ export function drawFighters() {
       drawMahitoFleshBubblyDeformLocal(ctx, fighter.r || 25, fighter.paralyzeTimer, '#A855F7', fighter);
       drawParalyzeEffect(ctx, fighter.r || 25, true, fighter.paralyzeTimer, '#A855F7', fighter);
       ctx.restore();
+      if (typeof state !== 'undefined' && state.frameCount !== undefined) {
+        fighter._stunRenderedFrame = state.frameCount;
+      }
+    }
+
+    // Universal Paralyze / Stun / TimeStop / Ambush 3D Golden Orbiting Rings Visual (Rule 9 & Mahoraga Wall Slam Stun Standard)
+    const isFighterStunned = Boolean(
+      (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
+      (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
+      (fighter.electricStunTimer && fighter.electricStunTimer > 0) ||
+      (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
+      (fighter.stunTimer && fighter.stunTimer > 0) ||
+      (fighter.knockbackStunTimer && fighter.knockbackStunTimer > 0) ||
+      (fighter.dubstepStunTimer && fighter.dubstepStunTimer > 0) ||
+      (fighter.ratioHitPauseTimer && fighter.ratioHitPauseTimer > 0) ||
+      fighter.isParalyzed ||
+      fighter.isParalyzedByMahoraga ||
+      fighter.isFrozenByInfinity ||
+      fighter.frozenByCronos ||
+      fighter.isCronosStasis ||
+      fighter.isTargetOfAmbush ||
+      fighter.caughtInSaitamaFlurry
+    );
+
+    if (isFighterStunned && !isParalyzedByMahito) {
+      const dur = fighter.paralyzeTimer || fighter.timeStopTimer || fighter.electricStunTimer || fighter.hitStunTimer || 45;
+      ctx.save();
+      ctx.translate(fighter.x + shiverX, (fighter.y - (fighter.z || 0)) + shiverY);
+      drawParalyzeEffect(ctx, fighter.r || 25, false, dur, '#FFEE58', fighter);
+      ctx.restore();
+      if (typeof state !== 'undefined' && state.frameCount !== undefined) {
+        fighter._stunRenderedFrame = state.frameCount;
+      }
     }
 
     // Embedded Mahito Bone Spikes attached to body
@@ -384,6 +431,81 @@ export function drawFighters() {
       ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
       drawEmbeddedMahitoSpikes(ctx, fighter.r, fighter);
       ctx.restore();
+    }
+
+    // ── TOJI ULTIMATE HIGHLIGHT PASS: Both Toji and the Enemy Target get highlighted ──
+    const activeTojiUlt = fighters ? fighters.find(f => f && (f.characterId === 'toji' || f.type === 'toji') && f.ultimateActive) : null;
+    if (activeTojiUlt && (fighter === activeTojiUlt || fighter === activeTojiUlt.ultimateTarget)) {
+      const isToji = (fighter === activeTojiUlt);
+      const target = activeTojiUlt.ultimateTarget;
+      if (fighter.hp > 0) {
+        ctx.save();
+        ctx.translate(fighter.x + shiverX, (fighter.y - (fighter.z || 0)) + shiverY);
+        
+        const fr = fighter.r || 25;
+        const now = Date.now();
+        const pulse = 0.5 + 0.5 * Math.sin(now * 0.008);
+
+        if (isToji) {
+          // 1. Ethereal Violet / Pure White Cursed Energy Rim Glow around Toji
+          ctx.strokeStyle = `rgba(215, 140, 255, ${0.75 + 0.25 * pulse})`;
+          ctx.lineWidth = 3.2;
+          ctx.beginPath();
+          ctx.arc(0, 0, fr + 3, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.60 + 0.35 * pulse})`;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(0, 0, fr + 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+        } else if (target && fighter === target) {
+          // 2. Threat Lock-On Crimson Halo & Tactical Brackets on the Enemy Target
+          ctx.strokeStyle = `rgba(255, 45, 90, ${0.80 + 0.20 * pulse})`;
+          ctx.lineWidth = 3.2;
+          ctx.beginPath();
+          ctx.arc(0, 0, fr + 3, 0, Math.PI * 2);
+          ctx.stroke();
+
+          ctx.strokeStyle = `rgba(255, 255, 255, ${0.70 + 0.25 * pulse})`;
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          ctx.arc(0, 0, fr + 1.5, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Tactical Target Brackets (4 corners)
+          const bLen = 8;
+          const bDist = fr + 7 + pulse * 2;
+          ctx.strokeStyle = `rgba(255, 50, 90, ${0.85 + 0.15 * pulse})`;
+          ctx.lineWidth = 2.0;
+          // Top-Left
+          ctx.beginPath();
+          ctx.moveTo(-bDist, -bDist + bLen);
+          ctx.lineTo(-bDist, -bDist);
+          ctx.lineTo(-bDist + bLen, -bDist);
+          ctx.stroke();
+          // Top-Right
+          ctx.beginPath();
+          ctx.moveTo(bDist - bLen, -bDist);
+          ctx.lineTo(bDist, -bDist);
+          ctx.lineTo(bDist, -bDist + bLen);
+          ctx.stroke();
+          // Bottom-Left
+          ctx.beginPath();
+          ctx.moveTo(-bDist, bDist - bLen);
+          ctx.lineTo(-bDist, bDist);
+          ctx.lineTo(-bDist + bLen, bDist);
+          ctx.stroke();
+          // Bottom-Right
+          ctx.beginPath();
+          ctx.moveTo(bDist - bLen, bDist);
+          ctx.lineTo(bDist, bDist);
+          ctx.lineTo(bDist, bDist - bLen);
+          ctx.stroke();
+        }
+
+        ctx.restore();
+      }
     }
 
     // Floating Mahito Soul Disfigurement Stack Counter Badge (At top of body)
@@ -405,80 +527,6 @@ export function drawFighters() {
       }
     }
   }
-
-  // Draw time-stop visual effect (Cronos passive/sphere effect or Gojo Infinity freeze)
-  const allStasisEntities = [
-    ...(fighters || []),
-    ...(state.illusions || [])
-  ];
-
-  allStasisEntities.forEach((entity) => {
-    if (!entity || entity.hp <= 0) return;
-    
-    // Suppress stasis overlays entirely when target is being ambushed by Toji
-    if (entity.isTargetOfAmbush) return;
-    
-    let isInfinityFreeze = entity.isFrozenByInfinity && (entity.timeStopTimer || 0) > 0;
-    const isMahoragaFreeze = entity.mahoragaAdaptationFreezeTimer > 0;
-
-    // Check if Gojo's Domain Expansion (Unlimited Void) is currently active and freezing everyone
-    let gojoDomainActive = false;
-    if (typeof state !== 'undefined') {
-      if (state.domainActive || state.activeDomain) gojoDomainActive = true;
-      if (!gojoDomainActive && state.fighters) {
-        gojoDomainActive = state.fighters.some(f => f && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive);
-      }
-    }
-
-    // Unlimited Void freeze, Hollow Purple hit, Pure Love Beam, & Wall Pin: do not apply blue fill/ring overlay
-    const isPureLoveBeamTrapped = entity.caughtInPureLoveBeam || (entity.pureLoveBeamTimer && entity.pureLoveBeamTimer > 0) || (entity.pureLoveBeamRecoveryTimer && entity.pureLoveBeamRecoveryTimer > 0);
-    if (gojoDomainActive || entity.isCaughtInPurple || (entity.purpleHitTimer && entity.purpleHitTimer > 0) || isPureLoveBeamTrapped || entity.suppressFreezeOverlay || entity.isWallPinned) return;
-
-    const isCronosFreeze = entity.frozenByCronos || entity.isCronosStasis;
-    const isFrozen = isInfinityFreeze || isCronosFreeze;
-    if (!isFrozen) return;
-
-    // If Mahoraga paused time for adaptation (and it's not Gojo's infinity), don't draw an overlay
-    if (isMahoragaFreeze && !isInfinityFreeze) return;
-
-    const isCyanOverlay = isInfinityFreeze; // Cyan blue ONLY for Gojo's Limitless Infinity freeze, Gold for Cronos
-    const colorFill = isCyanOverlay ? 'rgba(0, 229, 255, 0.65)' : 'rgba(255, 215, 0, 0.35)'; // Cyan for Gojo / Infinity, Gold for Cronos
-    const colorRing = isCyanOverlay ? 'rgba(224, 255, 255, 0.9)' : 'rgba(255, 255, 150, 0.8)';
-
-    ctx.save();
-    ctx.translate(entity.x, entity.y - (entity.z || 0));
-
-    const time = Date.now() / 200;
-    const pulse = Math.sin(time * 2) * 0.5 + 0.5;
-
-    // 1. Body fill overlay
-    ctx.beginPath();
-    ctx.arc(0, 0, entity.r + 3, 0, Math.PI * 2);
-    ctx.fillStyle = colorFill;
-    ctx.fill();
-
-    // 2. Outer glowing stasis ring
-    ctx.beginPath();
-    ctx.arc(0, 0, entity.r + 4 + pulse * 4, 0, Math.PI * 2);
-    ctx.strokeStyle = colorRing;
-    ctx.lineWidth = 3.0;
-    ctx.stroke();
-
-    // Floating stasis particles / tick marks (like a clock)
-    for (let i = 0; i < 4; i++) {
-      ctx.save();
-      ctx.rotate((Math.PI * 2 * i) / 4 + time * 0.5);
-      ctx.beginPath();
-      ctx.moveTo(0, -entity.r - 6);
-      ctx.lineTo(0, -entity.r - 14);
-      ctx.strokeStyle = '#00F3FF';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-      ctx.restore();
-    }
-
-    ctx.restore();
-  });
 
   const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 

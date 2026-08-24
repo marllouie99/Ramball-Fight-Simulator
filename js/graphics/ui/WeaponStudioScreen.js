@@ -812,9 +812,9 @@ export function drawWeaponStudioScreen() {
 // ─────────────────────────────────────────────
 if (typeof window !== 'undefined') {
   const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
-
-  eventTarget.addEventListener('mousedown', (e) => {
-    if (state.gameState !== 'weaponStudio' || state.studioSelectedDetail === null) return;
+  if (eventTarget && typeof eventTarget.addEventListener === 'function') {
+    eventTarget.addEventListener('mousedown', (e) => {
+      if (state.gameState !== 'weaponStudio' || state.studioSelectedDetail === null) return;
 
     const rect = eventTarget.getBoundingClientRect();
     const scaleX = state.canvas.width / rect.width;
@@ -958,4 +958,5 @@ if (typeof window !== 'undefined') {
     const delta = e.deltaY > 0 ? -ZOOM_STEP * 0.5 : ZOOM_STEP * 0.5;
     state.studioPreviewScale = Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, state.studioPreviewScale + delta));
   }, { passive: false });
+  }
 }

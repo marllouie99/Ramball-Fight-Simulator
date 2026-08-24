@@ -37,6 +37,7 @@ import { NanamiFighter } from '../fighters/NanamiFighter.js';
 import { NobaraFighter } from '../fighters/NobaraFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
+import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
 
 export const FIGHTER_CLASS_MAP = {
   'normal':    NormalFighter,
@@ -77,6 +78,27 @@ export const FIGHTER_CLASS_MAP = {
   'john_wick': JohnWickFighter,
   'johnwick':  JohnWickFighter,
   'cj':        CJFighter,
+  'rifle':     RifleFighter,
+  'm4a1':      RifleFighter,
+  'shotgun':   ShotgunFighter,
+  'spas12':    ShotgunFighter,
+  'spas_12':   ShotgunFighter,
+  'pistol':    PistolFighter,
+  'desert_eagle': PistolFighter,
+  'deserteagle': PistolFighter,
+  'sniper':    SniperFighter,
+  'awp':       SniperFighter,
+  'barrett':   BarrettFighter,
+  'barrett50cal': BarrettFighter,
+  'tactical_barrett': BarrettFighter,
+  'tactical_sniper': SniperFighter,
+  'tactical_gunslinger': PistolFighter,
+  'tactical_commando': RifleFighter,
+  'tactical_guerilla': RifleFighter,
+  'tactical_breacher': ShotgunFighter,
+  'tactical_heavy': RifleFighter,
+  'tactical_infiltrator': PistolFighter,
+  'tactical_marksman': SniperFighter,
 };
 
 

@@ -434,7 +434,9 @@ export function updateIllusions() {
         illusion.swordCooldown = 9999;
         
         // ── Evasion Health Regeneration Buff for minion clones ──
-        const evaRegenRate = CONFIG.mahito?.evasion?.regenRate ?? 0.05;
+        if (illusion.tojiRegenDebuffTimer > 0) illusion.tojiRegenDebuffTimer--;
+        const debuffMult = illusion.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : 1.0;
+        const evaRegenRate = (CONFIG.mahito?.evasion?.regenRate ?? 0.05) * debuffMult;
         if (illusion.hp > 0 && illusion.hp < illusion.maxHp) {
           illusion.hp = Math.min(illusion.maxHp, Number((illusion.hp + evaRegenRate).toFixed(2)));
           illusion._evadeRegenTick = (illusion._evadeRegenTick || 0) + 1;

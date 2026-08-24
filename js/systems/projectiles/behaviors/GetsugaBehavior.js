@@ -35,7 +35,9 @@ export class GetsugaBehavior extends ProjectileBehavior {
     if (typeof state !== 'undefined' && state.illusions) allCandidates.push(...state.illusions);
 
     const form = projectile.getsugaForm || 'shikai';
-    const hitRadius = projectile.r || (form === 'hollow' ? 42 : (form === 'bankai' ? 36 : 38));
+    const hitRadius = projectile.r || (form === 'hollow'
+      ? (CONFIG.ichigo?.hollowGetsugaRadius || 42)
+      : (form === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaRadius || 36) : (CONFIG.ichigo?.getsugaRadius || 38)));
 
     // 3. Piercing Sweep: Cleave all valid enemy entities in the crescent wave's path
     for (let i = 0; i < allCandidates.length; i++) {
@@ -79,10 +81,10 @@ export class GetsugaBehavior extends ProjectileBehavior {
           spawnImpactFlash(f.x, f.y, flashType);
         }
         if (typeof spawnMeleeClashShockwave === 'function') {
-          spawnMeleeClashShockwave(f.x, f.y, 40, flashType);
+          spawnMeleeClashShockwave(f.x, f.y, CONFIG.ichigo?.getsugaShockwaveSize || 40, flashType);
         }
         if (typeof triggerGlobalScreenShake === 'function') {
-          triggerGlobalScreenShake(form === 'bankai' || form === 'hollow' ? 3 : 2, 10);
+          triggerGlobalScreenShake(form === 'bankai' || form === 'hollow' ? (CONFIG.ichigo?.hollowGetsugaScreenShake || 3) : (CONFIG.ichigo?.getsugaScreenShake || 2), 10);
         }
 
         audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.85);

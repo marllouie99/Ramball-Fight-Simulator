@@ -105,7 +105,7 @@ export function modUpdateStealth(fighter, opponent) {
         initialAlpha: 0.60,
         maxTimer: 14,
         timer: 14
-      }, 30);
+      }, 4);
     }
 
     if (fighter.stealthTimer <= 0) {

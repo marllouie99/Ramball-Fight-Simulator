@@ -111,10 +111,10 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
   if (!chainNodes) {
     const staticNodes = [];
     const p0 = { x: 0, y: 0 };
-    const p1 = { x: -22, y: 32 };
-    const p2 = { x: -45, y: -10 };
-    const p3 = { x: -12, y: -22 };
-    const numLinks = 10;
+    const p1 = { x: -4, y: 12 };
+    const p2 = { x: -7, y: 26 };
+    const p3 = { x: -8, y: 40 };
+    const numLinks = 9;
     for (let i = 0; i <= numLinks; i++) {
       const t = i / numLinks;
       const invT = 1 - t;
@@ -162,10 +162,10 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
   ctx.save();
   ctx.beginPath();
   ctx.arc(22, 1, getHandSize(6.0), 0, Math.PI * 2);
-  ctx.fillStyle = handColor || '#242722';
+  ctx.fillStyle = handColor || '#E8BD9B';
   ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.4;
+  ctx.strokeStyle = '#0E0E12';
+  ctx.lineWidth = 1.6;
   ctx.stroke();
   ctx.restore();
 
@@ -357,15 +357,14 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
     ctx.stroke();
   }
 
-  // Hands gripping Katana handle
+  // Hand gripping Katana handle
   ctx.save();
   ctx.beginPath();
-  ctx.arc(30, 1, getHandSize(5.5), 0, Math.PI * 2);
-  ctx.arc(16, -1, getHandSize(5.0), 0, Math.PI * 2);
-  ctx.fillStyle = handColor || '#242722';
+  ctx.arc(24, 0, getHandSize(5.8), 0, Math.PI * 2);
+  ctx.fillStyle = handColor || '#E8BD9B';
   ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
+  ctx.strokeStyle = '#0E0E12';
+  ctx.lineWidth = 1.6;
   ctx.stroke();
   ctx.restore();
 
@@ -483,7 +482,8 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
 /**
  * Renders Toji's Split Soul Katana rested over his right shoulder/back (Lore Dual-Wield Back Holster Stance).
  */
-export function drawRestedKatanaOverShoulder(ctx, cx, cy, angle, r = 25) {
+export function drawRestedKatanaOverShoulder(ctx, cx, cy, angle, r = 25, handColor = '#E8BD9B') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(cx, cy);
 
@@ -501,7 +501,7 @@ export function drawRestedKatanaOverShoulder(ctx, cx, cy, angle, r = 25) {
   }
 
   ctx.rotate(-0.05);
-  drawSplitSoulKatana(ctx, 0, 0, 0, 0, null);
+  drawSplitSoulKatana(ctx, 0, 0, 0, 0, handColor);
 
   ctx.restore();
 }
@@ -509,7 +509,8 @@ export function drawRestedKatanaOverShoulder(ctx, cx, cy, angle, r = 25) {
 /**
  * Renders Toji's Inverted Spear of Heaven rested at his left hip/back sheath.
  */
-export function drawRestedInvertedSpearAtHip(ctx, cx, cy, angle, r = 25, chainNodes = null) {
+export function drawRestedInvertedSpearAtHip(ctx, cx, cy, angle, r = 25, chainNodes = null, handColor = '#E8BD9B') {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(cx, cy);
 
@@ -526,7 +527,7 @@ export function drawRestedInvertedSpearAtHip(ctx, cx, cy, angle, r = 25, chainNo
     ctx.scale(0.60, 0.60);
   }
 
-  drawInvertedSpear(ctx, 0, 0, 0, 0, chainNodes, null);
+  drawInvertedSpear(ctx, 0, 0, 0, 0, chainNodes, handColor);
 
   ctx.restore();
 }

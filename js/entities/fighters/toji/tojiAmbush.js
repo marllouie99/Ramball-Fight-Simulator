@@ -54,7 +54,7 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
     audioSystem.playSFX('skill_dash5', 1.0);
   }
 
-  const steps = 6;
+  const steps = 3;
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
     const x = fromX + (toX - fromX) * t;
@@ -75,7 +75,7 @@ export function modSpawnTeleportAfterimages(fighter, fromX, fromY, toX, toY, sta
       toY: toY,
       progress: t,
       isDomainAfterimage: fighter.ultimateActive || fighter.isChannelingDomain
-    }, 30);
+    }, 4);
   }
 }
 
@@ -92,7 +92,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
 
   opponent.isTargetOfAmbush = true;
   if (typeof opponent.interruptAttacks === 'function') {
-    opponent.interruptAttacks();
+    opponent.interruptAttacks(true);
   }
   opponent.slashSwingTimer = 0;
   opponent.katanaSlashTimer = 0;
@@ -103,8 +103,22 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   opponent.rapidSlashHitsLeft = 0;
   opponent.thinIceBreakerPunchTimer = 0;
   opponent.isChannelingThinIceBreaker = false;
+  opponent.maceCannonAnimTimer = 0;
+  opponent._maceCannonData = null;
+  opponent.twinScissorAnimTimer = 0;
+  opponent._twinScissorData = null;
+  opponent.fleshSurgeAnimTimer = 0;
+  opponent._fleshSurgePlungeAngle = null;
+  opponent._fleshSurgeChain = null;
+  opponent.soulPhaseDashTimer = 0;
+  opponent.hideFrontHand = false;
+  opponent.hideBackHand = false;
   if (opponent.swordTrail) opponent.swordTrail.length = 0;
   if (opponent.afterImages) opponent.afterImages.length = 0;
+  if (opponent._dashAfterimages) opponent._dashAfterimages.length = 0;
+  if (opponent.stealthAfterimages) opponent.stealthAfterimages.length = 0;
+  if (opponent.adaptationAfterimages) opponent.adaptationAfterimages.length = 0;
+  if (opponent._afterImages) opponent._afterImages.length = 0;
   if (opponent.hitFlameWisps) opponent.hitFlameWisps.length = 0;
   if (opponent.punchEffects) opponent.punchEffects.length = 0;
   if (opponent.slashHitVisuals) opponent.slashHitVisuals.length = 0;
@@ -158,6 +172,7 @@ export function modStartAmbushSequence(fighter, opponent, isInterrupt = false) {
   if (typeof opponent.applyTimeStop === 'function') {
     opponent.applyTimeStop(freezeDuration);
   }
+  opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, freezeDuration);
   opponent.vx = 0;
   opponent.vy = 0;
 
@@ -230,6 +245,24 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
   opponent.rapidSlashHitsLeft = 0;
   opponent.thinIceBreakerPunchTimer = 0;
   opponent.isChannelingThinIceBreaker = false;
+  opponent.maceCannonAnimTimer = 0;
+  opponent._maceCannonData = null;
+  opponent.twinScissorAnimTimer = 0;
+  opponent._twinScissorData = null;
+  opponent.fleshSurgeAnimTimer = 0;
+  opponent._fleshSurgePlungeAngle = null;
+  opponent.soulPhaseDashTimer = 0;
+  opponent.hideFrontHand = false;
+  opponent.hideBackHand = false;
+  if (opponent.swordTrail) opponent.swordTrail.length = 0;
+  if (opponent.afterImages) opponent.afterImages.length = 0;
+  if (opponent._dashAfterimages) opponent._dashAfterimages.length = 0;
+  if (opponent.stealthAfterimages) opponent.stealthAfterimages.length = 0;
+  if (opponent.adaptationAfterimages) opponent.adaptationAfterimages.length = 0;
+  if (opponent._afterImages) opponent._afterImages.length = 0;
+  if (opponent.hitFlameWisps) opponent.hitFlameWisps.length = 0;
+  if (opponent.punchEffects) opponent.punchEffects.length = 0;
+  if (opponent.slashHitVisuals) opponent.slashHitVisuals.length = 0;
 
   if (fighter.stealthAfterimages && fighter.stealthAfterimages.length > 0) {
     fastCleanArray(fighter.stealthAfterimages, (img) => {
@@ -399,6 +432,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
     if (typeof opponent.applyTimeStop === 'function') {
       opponent.applyTimeStop(katanaFreeze);
     }
+    opponent.paralyzeTimer = Math.max(opponent.paralyzeTimer || 0, katanaFreeze);
     if (!opponent.domainActive) {
       opponent.vx = 0;
       opponent.vy = 0;
@@ -584,7 +618,7 @@ export function modUpdateAmbushSequence(fighter, opponent, ownerIndex) {
       if (fighter.phantomStrikeTimer <= hitDelayFrame) {
         fighter._flurryHitApplied = true;
 
-        const maxStrikes = fighter.phantomMaxStrikes || 6;
+        const maxStrikes = fighter.phantomMaxStrikes || CONFIG.toji?.ambushPhantomFlurryStrikes || 10;
         const isFinalStrike = (fighter.phantomStrikeCount === maxStrikes);
 
         const attackAngle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);

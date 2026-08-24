@@ -15,31 +15,33 @@ let _cachedPixiView = null;
  */
 export function syncHudPosition() {
   if (!_cachedGameBox) _cachedGameBox = document.querySelector('.game-box');
-  if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas');
+  if (!_cachedPixiView) _cachedPixiView = _cachedGameBox?.querySelector('canvas') || document.getElementById('arena');
   if (!_cachedGameBox || !_cachedPixiView) return;
 
-  const canvasWidth = CONFIG.canvasWidth || 540;
-  const canvasHeight = CONFIG.canvasHeight || 960;
+  const canvasWidth = (typeof state !== 'undefined' && state.canvas && state.canvas.width) || CONFIG.canvasWidth || 540;
+  const canvasHeight = (typeof state !== 'undefined' && state.canvas && state.canvas.height) || CONFIG.canvasHeight || 1080;
 
   _cachedGameBox.style.aspectRatio = `${canvasWidth} / ${canvasHeight}`;
   _cachedGameBox.style.maxWidth = `${canvasWidth}px`;
   
-  const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-  const outerBgColor = isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#ffffff');
+  const isDark = (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || state.arenaTheme === 'dark'));
+  const outerBgColor = isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#ffffff');
   _cachedGameBox.style.backgroundColor = outerBgColor.replace(/ff$/, '');
 
   const boxRect = _cachedGameBox.getBoundingClientRect();
   const canvasRect = _cachedPixiView.getBoundingClientRect();
 
-  if (boxRect.height <= 0 || canvasRect.height <= 0) return;
+  if (boxRect.height <= 0 || canvasRect.height <= 0 || boxRect.width <= 0 || canvasRect.width <= 0) return;
 
   const canvasTopInBox = canvasRect.top - boxRect.top;
+  const canvasLeftInBox = canvasRect.left - boxRect.left;
 
   const scale = CONFIG.internalScale || 1.0;
   const hudScale = scale * 0.9;
 
-  const arenaWidth = CONFIG.arena.width;
-  const arenaX = CONFIG.arena.x;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
+  const arenaWidth = arena.width;
+  const arenaX = arena.x;
   
   const widthModifier = CONFIG.hudWidthModifier ?? scale;
 
@@ -50,7 +52,7 @@ export function syncHudPosition() {
   const visualLeftPercent = (hudCssLeft / canvasWidth) * 100;
 
   // 1. Position Top HUD Container
-  const topRatio = (CONFIG.arena.y - 90) / canvasHeight;
+  const topRatio = ((arena.y - 90) / canvasHeight);
   const topPx = canvasTopInBox + canvasRect.height * topRatio;
   const topPercent = (topPx / boxRect.height) * 100;
   
@@ -66,7 +68,7 @@ export function syncHudPosition() {
   }
 
   // 2. Position Bottom HUD Container
-  const bottomRatio = (CONFIG.arena.y + CONFIG.arena.height + 20) / canvasHeight;
+  const bottomRatio = ((arena.y + arena.height + 20) / canvasHeight);
   const bottomPx = canvasTopInBox + canvasRect.height * bottomRatio;
   const bottomPercent = (bottomPx / boxRect.height) * 100;
 
@@ -82,7 +84,7 @@ export function syncHudPosition() {
   }
 
   // 3. Position Health HUD
-  const arenaBottomRatio = (CONFIG.arena.y + CONFIG.arena.height) / canvasHeight;
+  const arenaBottomRatio = (arena.y + arena.height) / canvasHeight;
   const arenaBottomInBox = canvasTopInBox + canvasRect.height * arenaBottomRatio;
   const hudMargin = canvasRect.height * (20 / canvasHeight);
   const hudTopPx = arenaBottomInBox + hudMargin;

@@ -200,8 +200,13 @@ export function drawFloatingTexts() {
     if (t.timer < t.maxTimer) {
       ctx.globalAlpha = Math.max(0, alpha);
       
-      // Floating damage numbers (20px bold), skill title text (18px bold)
-      const targetFont = t.isDamage ? 'bold 20px "Architects Daughter"' : 'bold 18px "Glast Blitch"';
+      const isTactical = (state.gameCategory === 'tactical' || (state.mode && String(state.mode).toLowerCase().includes('tactical')));
+
+      // Simple, clean modern font for Tactical Force; stylized comic/brush fonts for FOC
+      const targetFont = isTactical
+        ? (t.isDamage ? '900 18px "Outfit", "Segoe UI", sans-serif' : '900 13.5px "Rajdhani", "Outfit", "Segoe UI", sans-serif')
+        : (t.isDamage ? 'bold 20px "Architects Daughter"' : 'bold 18px "Glast Blitch"');
+
       if (currentFont !== targetFont) {
         ctx.font = targetFont;
         currentFont = targetFont;
@@ -222,16 +227,18 @@ export function drawFloatingTexts() {
 
       if (isDark) {
         // In Dark Mode: Thin crisp white outer stroke
-        ctx.lineWidth = t.isDamage ? 4.6 : 4.2;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.92)';
+        ctx.lineWidth = isTactical ? (t.isDamage ? 3.0 : 2.5) : (t.isDamage ? 4.6 : 4.2);
+        ctx.strokeStyle = isTactical ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.92)';
         ctx.strokeText(t.text, t.x, t.y);
 
-        ctx.lineWidth = t.isDamage ? 2.6 : 2.4;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.strokeText(t.text, t.x, t.y);
+        if (!isTactical) {
+          ctx.lineWidth = t.isDamage ? 2.6 : 2.4;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+          ctx.strokeText(t.text, t.x, t.y);
+        }
       } else {
         // In Light Mode: Classic bold black outline
-        ctx.lineWidth = t.isDamage ? 3.2 : 3.0;
+        ctx.lineWidth = isTactical ? 2.6 : (t.isDamage ? 3.2 : 3.0);
         ctx.strokeStyle = 'rgba(0,0,0,0.92)';
         ctx.strokeText(t.text, t.x, t.y);
       }
@@ -910,6 +917,7 @@ export function drawMahoragaSpeedLines() {
   ctx.restore();
 }
 
+
 function _drawIdolHeartPath(ctx, x, y, size) {
   ctx.beginPath();
   const topH = size * 0.3;
@@ -1205,6 +1213,112 @@ export function drawNanamiSpeedLines() {
     const seed = _nanamiSpeedLineSeeds[i];
     const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 85);
     const backOffset = (nanami.r || 25) * 1.2;
+    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
+    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
+
+    const halfLen = seed.len / 2;
+    const halfThick = seed.maxThick / 2;
+    const midOff = halfLen * 0.15;
+
+    const startX = lineCenterX - cosA * halfLen;
+    const startY = lineCenterY - sinA * halfLen;
+
+    const midX = lineCenterX + cosA * midOff;
+    const midY = lineCenterY + sinA * midOff;
+
+    const endX = lineCenterX + cosA * halfLen;
+    const endY = lineCenterY + sinA * halfLen;
+
+    const topMidX = midX + perpX * halfThick;
+    const topMidY = midY + perpY * halfThick;
+
+    const botMidX = midX - perpX * halfThick;
+    const botMidY = midY - perpY * halfThick;
+
+    ctx.fillStyle = seed.color;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    ctx.lineTo(topMidX, topMidY);
+    ctx.lineTo(endX, endY);
+    ctx.lineTo(botMidX, botMidY);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
+// Ichigo Kurosaki — Bankai Manga Action Speed Lines (Rule 16 Compliant)
+// ─────────────────────────────────────────────
+let _ichigoSpeedLineSeeds = null;
+
+function _initIchigoSpeedLineSeeds() {
+  _ichigoSpeedLineSeeds = [];
+  const count = 24;
+  const clusterWidth = 38; // ±(r * 1.4) around body
+  for (let i = 0; i < count; i++) {
+    const norm = (i / (count - 1)) * 2 - 1; // -1 to +1
+    const perpOffset = norm * clusterWidth;
+    const normDist = 1 - Math.abs(norm); // Parabolic length: center lines longest
+    const len = 38 + normDist * 58;
+    const maxThick = 1.0 + Math.random() * 1.4; // 1.0px - 2.4px
+    const speed = 1.3 + Math.random() * 0.8;
+    const phase = Math.random() * 100;
+
+    // 4-slot theme: [Crimson Reiatsu, Electric Cyan, White Core, Jet Black Ink]
+    let color;
+    if (i % 4 === 0) color = '#DC143C';                     // Crimson Reiatsu
+    else if (i % 4 === 1) color = '#00E5FF';                // Electric Cyan
+    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White Core
+    else color = 'rgba(10, 8, 14, 0.95)';                   // Deep Jet Black Ink
+
+    _ichigoSpeedLineSeeds.push({
+      perpOffset,
+      len,
+      maxThick,
+      speed,
+      phase,
+      color
+    });
+  }
+}
+
+export function drawIchigoBankaiSpeedLines() {
+  if (!state.fighters) return;
+  const ichigo = state.fighters.find(f => {
+    if (!f || f.hp <= 0 || (f.characterId !== 'ichigo' && f.type !== 'ichigo')) return false;
+    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush || (f.isFrozenByInfinity);
+    if (isFrozen) return false;
+    const isBankai = Boolean(f.bankaiActive || f.skin === 'bankai');
+    const isDashing = Boolean(f.isShunpoDashing || (f.shunpoDashTimer && f.shunpoDashTimer > 0));
+    const isSlashing = Boolean(f.slashSwingTimer && f.slashSwingTimer > 0);
+    const isMovingFast = Math.hypot(f.vx || 0, f.vy || 0) > 2.5;
+    return isDashing || (isBankai && (isSlashing || isMovingFast));
+  });
+  if (!ichigo) return;
+
+  const ctx = state.ctx;
+  if (!ctx) return;
+
+  if (!_ichigoSpeedLineSeeds) _initIchigoSpeedLineSeeds();
+
+  const lineAngle = ichigo.gunAngle !== undefined ? ichigo.gunAngle : (ichigo.angle || 0);
+  const cosA = Math.cos(lineAngle);
+  const sinA = Math.sin(lineAngle);
+  const perpX = -sinA;
+  const perpY = cosA;
+
+  const cx = ichigo.x;
+  const cy = ichigo.y;
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+
+  ctx.save();
+
+  for (let i = 0; i < _ichigoSpeedLineSeeds.length; i++) {
+    const seed = _ichigoSpeedLineSeeds[i];
+    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 90);
+    const backOffset = (ichigo.r || 24) * 1.25;
     const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
     const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
 

@@ -1,7 +1,7 @@
-import { randomize1v1Fighters, randomize1v2Fighters, goToTitle, startGame, startFaceOffScreen } from '../../core/gameFlow.js';
-import { state } from '../../core/state.js';
+import { goToTitle, startGame, startFaceOffScreen } from '../../core/gameFlow.js';
+import { state, saveFighterSelections } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
-import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { drawModeSelection } from './MainMenuScreen.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
@@ -12,10 +12,13 @@ import { drawWeaponPreview } from './WeaponIndexScreen.js';
 import { spawnFloatingText } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { drawArenaBgmSelector, isArenaBgmModalOpen, drawArenaBgmModal, closeArenaBgmModal } from '../../systems/arenaBgmSystem.js';
+import { GAME_MODES } from '../../core/modeConfig.js';
+import { STARTER_MAP, MONOLITH_MAP } from '../../../Tactical Force/maps/index.js';
 
 let selectingSlot = null;
 let modalInspectIndex = 0;
 let modalPage = 0;
+let isTacticalMapModalOpen = false;
 let _lastModalWheelTime = 0;
 let _lastCardWheelTime = 0;
 let _playerCardBounds = [];
@@ -47,7 +50,8 @@ function drawTlfsEnemyPoolGrid(x, y, w, h) {
   const startX = x + padding;
   let startY = y + 38;
   
-  const poolFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx })).filter(({ def }) => def.type !== 'dummy');
+  const currentDefs = getActiveFighterDefs();
+  const poolFighters = currentDefs.map((def, idx) => ({ def, idx })).filter(({ def }) => def.type !== 'dummy');
   
   poolFighters.forEach(({ def, idx }, listPos) => {
     const col = listPos % cols;
@@ -152,6 +156,204 @@ function drawSmallFighterBadge(ctx, def, cx, cy, size = 16) {
   }
 }
 
+function drawMinimapBlueprint(ctx, map, x, y, w, h) {
+  ctx.save();
+  // Floor background
+  ctx.fillStyle = '#060a12';
+  ctx.fillRect(x, y, w, h);
+  ctx.strokeStyle = '#1e293b';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x, y, w, h);
+
+  // Scale map obstacles to fit the minimap rect dynamically
+  const mapArena = map.arena || { x: 40, y: 105, width: 460, height: 740 };
+  const scaleX = w / mapArena.width;
+  const scaleY = h / mapArena.height;
+
+  if (map.obstacles && Array.isArray(map.obstacles)) {
+    map.obstacles.forEach(obs => {
+      const ox = x + (obs.x - mapArena.x) * scaleX;
+      const oy = y + (obs.y - mapArena.y) * scaleY;
+      const ow = obs.w * scaleX;
+      const oh = obs.h * scaleY;
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(ox, oy, ow, oh);
+      ctx.strokeStyle = '#64748b';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(ox, oy, ow, oh);
+    });
+  }
+
+  // Draw spawn indicator points (cyan dots)
+  const isMonolith = (map.id === 'tactical_monolith_map' || map === MONOLITH_MAP);
+  const spawnPoints = isMonolith
+    ? (map.spawns?.fourPlayer || MONOLITH_MAP.spawns.fourPlayer)
+    : (map.spawns?.ffa || STARTER_MAP.spawns?.ffa || [
+        { x: 87.5, y: 210 }, { x: 452.5, y: 210 }, { x: 87.5, y: 690 }, { x: 452.5, y: 690 }
+      ]);
+
+  spawnPoints.forEach(sp => {
+    const sx = x + (sp.x - mapArena.x) * scaleX;
+    const sy = y + (sp.y - mapArena.y) * scaleY;
+    ctx.beginPath();
+    ctx.arc(sx, sy, 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = '#00e5ff';
+    ctx.shadowColor = '#00e5ff';
+    ctx.shadowBlur = 4;
+    ctx.fill();
+  });
+
+  ctx.restore();
+}
+
+function drawTacticalMapSelectModal() {
+  const { ctx, canvas } = state;
+  const modalW = Math.min(canvas.width - 24, 500);
+  const modalH = 590;
+  const mx = (canvas.width - modalW) / 2;
+  const my = (canvas.height - modalH) / 2;
+
+  // Dark glass backdrop overlay
+  ctx.fillStyle = 'rgba(6, 8, 14, 0.92)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Draw main outer Tactical Chamfered Panel
+  drawPanel(mx, my, modalW, modalH, 0.96, 12, 'rgba(0, 229, 255, 0.35)');
+
+  // Header Banner
+  ctx.fillStyle = '#00e5ff';
+  ctx.font = '900 10.5px "Rajdhani", sans-serif';
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
+  ctx.fillText('TACTICAL SHOOTER // BATTLEGROUND MAP SELECTION // SYS.v2.5', mx + 20, my + 14);
+
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '900 18px "Outfit", "Rajdhani", sans-serif';
+  ctx.fillText('CHOOSE COMBAT SECTOR MAP', mx + 20, my + 28);
+
+  // Header accent line
+  ctx.fillStyle = '#00e5ff';
+  ctx.fillRect(mx + 20, my + 52, modalW - 40, 1.5);
+
+  const activeMap = state.activeMap || STARTER_MAP;
+  const maps = [
+    {
+      map: STARTER_MAP,
+      title: 'SECTOR 01 // STARTER PROTOCOL',
+      subtitle: 'BALANCED BREACH FACILITY',
+      features: '4 CORNER POCKETS • 7 BARRIERS • CENTER MID-WALL',
+      desc: 'Balanced breach facility with corner spawn pockets, wide flanking corridors, and center mid-lane cover. Ideal for dynamic team crossfires.'
+    },
+    {
+      map: MONOLITH_MAP,
+      title: 'SECTOR 02 // MONOLITH',
+      subtitle: 'THREE VERTICAL MONOLITH PILLARS',
+      features: '3 MONOLITH PILLARS • DUAL VERTICAL LANES • CROSSFIRE HUBS',
+      desc: 'Three massive vertical monolith pillars creating straight open flanking lanes and close-quarters crossfire ambush corridors.'
+    }
+  ];
+
+  const cardW = modalW - 40;
+  const cardH = 210;
+  const startCardY = my + 64;
+  const cardGap = 16;
+
+  maps.forEach((item, idx) => {
+    const cardY = startCardY + idx * (cardH + cardGap);
+    const isSelected = (activeMap.id === item.map.id || activeMap === item.map);
+
+    // Card background
+    ctx.save();
+    if (isSelected) {
+      ctx.fillStyle = 'rgba(0, 229, 255, 0.14)';
+      ctx.strokeStyle = '#00e5ff';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = 'rgba(0, 229, 255, 0.45)';
+      ctx.shadowBlur = 10;
+    } else {
+      ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+      ctx.lineWidth = 1;
+    }
+    drawChamferedRect(ctx, mx + 20, cardY, cardW, cardH, 8);
+    ctx.fill();
+    ctx.stroke();
+    ctx.restore();
+
+    // Minimap blueprint preview on left
+    const miniW = 90;
+    const miniH = 170;
+    const miniX = mx + 34;
+    const miniY = cardY + 20;
+    drawMinimapBlueprint(ctx, item.map, miniX, miniY, miniW, miniH);
+
+    // Text intel on right
+    const textX = miniX + miniW + 16;
+    const maxTextW = cardW - miniW - 46;
+
+    // Title
+    ctx.fillStyle = isSelected ? '#00e5ff' : '#ffffff';
+    ctx.font = '900 15px "Outfit", "Rajdhani", sans-serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillText(item.title, textX, cardY + 18);
+
+    // Subtitle
+    ctx.fillStyle = isSelected ? 'rgba(0, 229, 255, 0.75)' : '#94a3b8';
+    ctx.font = '900 10.5px "Rajdhani", sans-serif';
+    ctx.fillText(item.subtitle, textX, cardY + 38);
+
+    // Features tag
+    ctx.fillStyle = '#f59e0b';
+    ctx.font = '900 9.5px "Rajdhani", sans-serif';
+    ctx.fillText(item.features, textX, cardY + 56);
+
+    // Description
+    ctx.fillStyle = '#cbd5e1';
+    ctx.font = '11.5px "Rajdhani", "Segoe UI", sans-serif';
+    wrapText(ctx, item.desc, textX, cardY + 76, maxTextW, 16);
+
+    // Status pill
+    const pillW = 100;
+    const pillH = 26;
+    const pillX = textX;
+    const pillY = cardY + cardH - 38;
+
+    ctx.save();
+    ctx.fillStyle = isSelected ? '#00e5ff' : 'rgba(255, 255, 255, 0.08)';
+    ctx.strokeStyle = isSelected ? '#00e5ff' : 'rgba(255, 255, 255, 0.2)';
+    ctx.lineWidth = 1;
+    drawChamferedRect(ctx, pillX, pillY, pillW, pillH, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = isSelected ? '#06080e' : '#ffffff';
+    ctx.font = '900 11px "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(isSelected ? '✓ ACTIVE' : 'SELECT MAP', pillX + pillW / 2, pillY + pillH / 2);
+    ctx.restore();
+
+    // Register card click
+    _registerButton(mx + 20, cardY, cardW, cardH, () => {
+      state.activeMap = item.map;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.25);
+      }
+      isTacticalMapModalOpen = false;
+    });
+  });
+
+  // Bottom Close Button
+  const closeBtnW = 160;
+  const closeBtnH = 32;
+  const closeBtnX = canvas.width / 2;
+  const closeBtnY = my + modalH - 28;
+  drawButton('CLOSE MAP LIST', closeBtnX, closeBtnY, () => {
+    isTacticalMapModalOpen = false;
+  }, closeBtnW, closeBtnH);
+}
+
 function drawFighterSelectModal() {
   const { ctx, canvas } = state;
   const modalW = Math.min(canvas.width - 20, 510);
@@ -163,27 +365,30 @@ function drawFighterSelectModal() {
   ctx.fillStyle = 'rgba(6, 8, 14, 0.90)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  const selectedDef = FIGHTER_DEFS[modalInspectIndex] || FIGHTER_DEFS[0];
+  const isTactical = state.gameCategory === 'tactical';
+  const themeColor = isTactical ? '#00e5ff' : '#f59e0b';
+  const currentDefs = getActiveFighterDefs();
+  const selectedDef = currentDefs[modalInspectIndex] || currentDefs[0] || FIGHTER_DEFS[0];
 
   // Draw main outer Tactical Chamfered Panel
-  drawPanel(mx, my, modalW, modalH, 0.96, 12, 'rgba(255, 255, 255, 0.18)');
+  drawPanel(mx, my, modalW, modalH, 0.96, 12, isTactical ? 'rgba(0, 229, 255, 0.3)' : 'rgba(255, 255, 255, 0.18)');
 
   // Header Banner
   const pNumMatch = selectingSlot ? selectingSlot.match(/\d/) : null;
   const slotLabel = pNumMatch ? `PLAYER ${pNumMatch[0]}` : 'PLAYER';
 
-  ctx.fillStyle = '#f59e0b';
+  ctx.fillStyle = themeColor;
   ctx.font = '900 10.5px "Rajdhani", sans-serif';
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
-  ctx.fillText('TACTICAL ROSTER // PROTOCOL 01', mx + 20, my + 14);
+  ctx.fillText(isTactical ? 'TACTICAL FORCE // OPERATIVE ROSTER' : 'TACTICAL ROSTER // PROTOCOL 01', mx + 20, my + 14);
 
   ctx.fillStyle = '#ffffff';
   ctx.font = '900 18px "Outfit", "Rajdhani", sans-serif';
   ctx.fillText(`CHOOSE FIGHTER FOR ${slotLabel}`, mx + 20, my + 28);
 
   // Header accent line
-  ctx.fillStyle = '#f59e0b';
+  ctx.fillStyle = themeColor;
   ctx.fillRect(mx + 20, my + 52, modalW - 40, 1.5);
 
   // ── Paginated Grid Configuration (Left Side: 3 Columns x 5 Rows = 15 Items per Page) ──
@@ -198,7 +403,7 @@ function drawFighterSelectModal() {
   const cellW = Math.floor((gridW - (cols - 1) * gap) / cols);
   const cellH = 68;
 
-  const modalAvailableFighters = FIGHTER_DEFS.map((def, idx) => ({ def, idx }))
+  const modalAvailableFighters = currentDefs.map((def, idx) => ({ def, idx }))
     .filter(({ def }) => !(!state.dummyEnabled && def.type === 'dummy'));
 
   const totalPages = Math.max(1, Math.ceil(modalAvailableFighters.length / itemsPerPage));
@@ -219,10 +424,10 @@ function drawFighterSelectModal() {
 
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.20)';
-      ctx.strokeStyle = '#f59e0b';
+      ctx.fillStyle = isTactical ? 'rgba(0, 229, 255, 0.20)' : 'rgba(245, 158, 11, 0.20)';
+      ctx.strokeStyle = themeColor;
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
       ctx.shadowBlur = 8;
     } else {
       ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
@@ -453,6 +658,7 @@ function drawFighterSelectModal() {
   drawButton('LOCK IN', detailX + detailW / 2, footerY, () => {
     if (selectingSlot) {
       state[selectingSlot] = modalInspectIndex;
+      saveFighterSelections();
     }
     selectingSlot = null;
   }, btnW, btnH, null, 6);
@@ -477,48 +683,97 @@ function drawSelectScreen() {
 
   // ── Header Section ──
   // Tactical Breadcrumb
-  ctx.fillStyle = '#64748b';
+  const isTactical = state.gameCategory === 'tactical' || mode === 'Tactical 2v2' || mode === 'Tactical FFA' || mode === 'Tactical 4v4' || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1;
+  const isTac1v1 = isTactical && (mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === '1v1');
+  const isTacFFA = isTactical && (mode === 'Tactical FFA' || mode === GAME_MODES.TACTICAL_FFA);
+
+  ctx.fillStyle = isTactical ? '#00e5ff' : '#64748b';
   ctx.font = '900 10px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('CIRCLE BATTLE // OPERATION SETUP // SYS.v2.5', canvas.width / 2, 56);
+  const breadcrumbText = isTac1v1
+    ? 'TACTICAL SHOOTER // 1 VS 1 DUEL // SYS.v2.5'
+    : (isTacFFA
+      ? 'TACTICAL SHOOTER // 4-PLAYER FFA // SYS.v2.5'
+      : (isTactical ? 'TACTICAL SHOOTER // 2 VS 2 TEAM SETUP // SYS.v2.5' : 'CIRCLE BATTLE // OPERATION SETUP // SYS.v2.5'));
+  ctx.fillText(breadcrumbText, canvas.width / 2, 56);
 
   // Screen Title
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
+  ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)';
   ctx.shadowBlur = 8;
-  ctx.fillText('[ TACTICAL DEPLOYMENT ]', canvas.width / 2, 78);
+  const titleText = isTac1v1
+    ? '[ 1 VS 1 TACTICAL DUEL ]'
+    : (isTacFFA
+      ? '[ 4-PLAYER TACTICAL FREE-FOR-ALL ]'
+      : (isTactical ? '[ 2 VS 2 TACTICAL FIREFIGHT ]' : '[ TACTICAL DEPLOYMENT ]'));
+  ctx.fillText(titleText, canvas.width / 2, 78);
   ctx.restore();
 
   // Mode Selection Tabs (Shifted down to Y = 104)
   const modeButtonY = 104;
   drawModeSelection(canvas.width / 2, modeButtonY);
 
-  // Tactical Sub-Controls (Test Mode, Dummy Target & Arena BGM - Shifted to Y = 128)
-  const tmW = 88;
-  const daW = 98;
-  const bgmW = 114;
+  // Tactical Sub-Controls (Map Selector, Test Mode, Dummy Target & Arena BGM - Shifted to Y = 128)
+  const mapW = isTactical ? 122 : 0;
+  const tmW = 82;
+  const daW = 92;
+  const bgmW = 106;
   const ctrlH = 22;
-  const gap = 8;
-  const totalCtrlW = tmW + daW + bgmW + gap * 2;
+  const gap = 6;
+  const totalCtrlW = (isTactical ? mapW + gap : 0) + tmW + daW + bgmW + gap * 2;
   const startCtrlX = canvas.width / 2 - totalCtrlW / 2;
-  const tmX = startCtrlX;
+  
+  const tmY = 128;
+  let curCtrlX = startCtrlX;
+  if (isTactical) {
+    const activeMap = state.activeMap || STARTER_MAP;
+    const isMonolith = (activeMap.id === 'tactical_monolith_map' || activeMap === MONOLITH_MAP);
+    const mapLabel = isMonolith ? '🗺️ MONOLITH' : '🗺️ SECTOR 01';
+
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 229, 255, 0.16)';
+    ctx.strokeStyle = '#00e5ff';
+    ctx.lineWidth = 1;
+    ctx.shadowColor = 'rgba(0, 229, 255, 0.4)';
+    ctx.shadowBlur = 6;
+    drawChamferedRect(ctx, curCtrlX, tmY, mapW, ctrlH, 4);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = '#00e5ff';
+    ctx.font = '900 10px "Rajdhani", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(mapLabel, curCtrlX + mapW / 2, tmY + ctrlH / 2);
+    ctx.restore();
+
+    _registerButton(curCtrlX, tmY, mapW, ctrlH, () => {
+      isTacticalMapModalOpen = true;
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.25);
+      }
+    });
+
+    curCtrlX += mapW + gap;
+  }
+
+  const tmX = curCtrlX;
   const daX = tmX + tmW + gap;
   const bgmX = daX + daW + gap;
-  const tmY = 128;
 
   // 1. Test Mode Button
   ctx.save();
-  ctx.fillStyle = state.testMode ? 'rgba(245, 158, 11, 0.15)' : 'rgba(18, 22, 32, 0.85)';
-  ctx.strokeStyle = state.testMode ? '#f59e0b' : 'rgba(255, 255, 255, 0.12)';
+  ctx.fillStyle = state.testMode ? (isTactical ? 'rgba(0, 229, 255, 0.15)' : 'rgba(245, 158, 11, 0.15)') : 'rgba(18, 22, 32, 0.85)';
+  ctx.strokeStyle = state.testMode ? (isTactical ? '#00e5ff' : '#f59e0b') : 'rgba(255, 255, 255, 0.12)';
   ctx.lineWidth = 1;
   drawChamferedRect(ctx, tmX, tmY, tmW, ctrlH, 4);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = state.testMode ? '#f59e0b' : '#8899aa';
+  ctx.fillStyle = state.testMode ? (isTactical ? '#00e5ff' : '#f59e0b') : '#8899aa';
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -526,9 +781,9 @@ function drawSelectScreen() {
 
   ctx.beginPath();
   ctx.arc(tmX + tmW - 10, tmY + ctrlH / 2, 3, 0, Math.PI * 2);
-  ctx.fillStyle = state.testMode ? '#f59e0b' : '#475569';
+  ctx.fillStyle = state.testMode ? (isTactical ? '#00e5ff' : '#f59e0b') : '#475569';
   if (state.testMode) {
-    ctx.shadowColor = '#f59e0b';
+    ctx.shadowColor = isTactical ? '#00e5ff' : '#f59e0b';
     ctx.shadowBlur = 6;
   }
   ctx.fill();
@@ -538,14 +793,14 @@ function drawSelectScreen() {
 
   // 2. Dummy Target Button
   ctx.save();
-  ctx.fillStyle = state.dummyEnabled ? 'rgba(245, 158, 11, 0.15)' : 'rgba(18, 22, 32, 0.85)';
-  ctx.strokeStyle = state.dummyEnabled ? '#f59e0b' : 'rgba(255, 255, 255, 0.12)';
+  ctx.fillStyle = state.dummyEnabled ? (isTactical ? 'rgba(0, 229, 255, 0.15)' : 'rgba(245, 158, 11, 0.15)') : 'rgba(18, 22, 32, 0.85)';
+  ctx.strokeStyle = state.dummyEnabled ? (isTactical ? '#00e5ff' : '#f59e0b') : 'rgba(255, 255, 255, 0.12)';
   ctx.lineWidth = 1;
   drawChamferedRect(ctx, daX, tmY, daW, ctrlH, 4);
   ctx.fill();
   ctx.stroke();
 
-  ctx.fillStyle = state.dummyEnabled ? '#f59e0b' : '#8899aa';
+  ctx.fillStyle = state.dummyEnabled ? (isTactical ? '#00e5ff' : '#f59e0b') : '#8899aa';
   ctx.font = '900 10px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -553,9 +808,9 @@ function drawSelectScreen() {
 
   ctx.beginPath();
   ctx.arc(daX + daW - 10, tmY + ctrlH / 2, 3, 0, Math.PI * 2);
-  ctx.fillStyle = state.dummyEnabled ? '#f59e0b' : '#475569';
+  ctx.fillStyle = state.dummyEnabled ? (isTactical ? '#00e5ff' : '#f59e0b') : '#475569';
   if (state.dummyEnabled) {
-    ctx.shadowColor = '#f59e0b';
+    ctx.shadowColor = isTactical ? '#00e5ff' : '#f59e0b';
     ctx.shadowBlur = 6;
   }
   ctx.fill();
@@ -585,12 +840,17 @@ function drawSelectScreen() {
   const cardW = Math.floor((totalCardW - cardGap) / 2); // 248px
   const fullCardH = 650; // Expands to Y = 808!
 
-  if (mode === '1v1' || mode === 'Stand Off') {
+  if (isTac1v1 || (!isTactical && (mode === '1v1' || mode === 'Stand Off'))) {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
 
-    drawPlayerCard('p1Index', 'PLAYER 1 // RED CORNER', leftX, topY, cardW, fullCardH, '#dc2626', true, true);
-    drawPlayerCard('p2Index', 'PLAYER 2 // BLUE CORNER', rightX, topY, cardW, fullCardH, '#38bdf8', true, true);
+    const p1Title = isTac1v1 ? 'OPERATIVE 1 // CT ALPHA' : 'PLAYER 1 // RED CORNER';
+    const p2Title = isTac1v1 ? 'OPERATIVE 2 // T CHARLIE' : 'PLAYER 2 // BLUE CORNER';
+    const p1Color = isTac1v1 ? '#3b82f6' : '#dc2626';
+    const p2Color = isTac1v1 ? '#ef4444' : '#38bdf8';
+
+    drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, fullCardH, p1Color, true, true);
+    drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, fullCardH, p2Color, true, true);
 
     // Center Holographic VS Crest
     const vsX = canvas.width / 2;
@@ -598,7 +858,7 @@ function drawSelectScreen() {
     
     ctx.save();
     // Outer tech ring
-    ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
+    ctx.strokeStyle = isTactical ? 'rgba(0, 229, 255, 0.35)' : 'rgba(245, 158, 11, 0.35)';
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.arc(vsX, vsY, 24, 0, Math.PI * 2);
@@ -606,9 +866,9 @@ function drawSelectScreen() {
 
     // Inner shield
     ctx.fillStyle = '#0b0d13';
-    ctx.strokeStyle = '#f59e0b';
+    ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
     ctx.lineWidth = 1.5;
-    ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+    ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
     ctx.shadowBlur = 8;
     ctx.beginPath();
     ctx.arc(vsX, vsY, 18, 0, Math.PI * 2);
@@ -623,9 +883,10 @@ function drawSelectScreen() {
     ctx.restore();
 
     // Bottom Command Dock
-    drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomize1v1Fighters());
+    const btnText = isTac1v1 ? 'START TACTICAL DUEL' : 'START BATTLE';
+    drawBottomCommandDeck(btnText, () => startGame(), () => randomize1v1Fighters());
 
-  } else if (mode === '1v2 Stand Off') {
+  } else if (!isTactical && (mode === '1v2 Stand Off' || mode === '1v2' || mode === GAME_MODES.STAND_OFF_1V2 || mode === 'STAND_OFF_1V2')) {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
     const stackedH = Math.floor((fullCardH - cardGap) / 2);
@@ -637,23 +898,60 @@ function drawSelectScreen() {
 
     drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomize1v2Fighters());
 
-  } else if (mode === '2v2' || mode === 'FFA') {
+  } else if (isTactical || mode === '2v2' || mode === 'Tactical 2v2' || mode === 'FFA' || mode === 'Tactical FFA') {
     const leftX = margin;
     const rightX = margin + cardW + cardGap;
     const stackedH = Math.floor((fullCardH - cardGap) / 2);
     const bottomY = topY + stackedH + cardGap;
 
-    const p1Title = mode === '2v2' ? 'RED TEAM // SQUAD 1' : 'PLAYER 1';
-    const p2Title = mode === '2v2' ? 'BLUE TEAM // SQUAD 1' : 'PLAYER 2';
-    const p3Title = mode === '2v2' ? 'RED TEAM // SQUAD 2' : 'PLAYER 3';
-    const p4Title = mode === '2v2' ? 'BLUE TEAM // SQUAD 2' : 'PLAYER 4';
+    const isTeamMode = isTactical || mode === '2v2' || mode === 'Tactical 2v2';
 
-    drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, stackedH, '#dc2626', true);
-    drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, stackedH, '#38bdf8', true);
-    drawPlayerCard('p3Index', p3Title, leftX, bottomY, cardW, stackedH, '#dc2626', true);
-    drawPlayerCard('p4Index', p4Title, rightX, bottomY, cardW, stackedH, '#38bdf8', true);
+    const p1Title = isTactical ? 'TEAM 1 // CT ALPHA' : (mode === '2v2' ? 'RED TEAM // SQUAD 1' : 'PLAYER 1');
+    const p2Title = isTactical ? 'TEAM 2 // T CHARLIE' : (mode === '2v2' ? 'BLUE TEAM // SQUAD 1' : 'PLAYER 2');
+    const p3Title = isTactical ? 'TEAM 1 // CT BRAVO' : (mode === '2v2' ? 'RED TEAM // SQUAD 2' : 'PLAYER 3');
+    const p4Title = isTactical ? 'TEAM 2 // T DELTA' : (mode === '2v2' ? 'BLUE TEAM // SQUAD 2' : 'PLAYER 4');
 
-    drawBottomCommandDeck('START BATTLE', () => startGame(), () => randomizeFfaFighters());
+    const p1Color = isTactical ? '#3b82f6' : (mode === '2v2' ? '#dc2626' : '#ef4444');
+    const p2Color = isTactical ? '#ef4444' : (mode === '2v2' ? '#38bdf8' : '#38bdf8');
+    const p3Color = isTactical ? '#3b82f6' : (mode === '2v2' ? '#dc2626' : '#f59e0b');
+    const p4Color = isTactical ? '#ef4444' : (mode === '2v2' ? '#38bdf8' : '#a855f7');
+
+    drawPlayerCard('p1Index', p1Title, leftX, topY, cardW, stackedH, p1Color, true);
+    drawPlayerCard('p2Index', p2Title, rightX, topY, cardW, stackedH, p2Color, true);
+    drawPlayerCard('p3Index', p3Title, leftX, bottomY, cardW, stackedH, p3Color, true);
+    drawPlayerCard('p4Index', p4Title, rightX, bottomY, cardW, stackedH, p4Color, true);
+
+    // Center Holographic VS Crest for team mode
+    if (isTeamMode) {
+      const vsX = canvas.width / 2;
+      const vsY = topY + fullCardH / 2 - 10;
+      
+      ctx.save();
+      ctx.strokeStyle = isTactical ? 'rgba(0, 229, 255, 0.35)' : 'rgba(245, 158, 11, 0.35)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(vsX, vsY, 20, 0, Math.PI * 2);
+      ctx.stroke();
+
+      ctx.fillStyle = '#0b0d13';
+      ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowBlur = 8;
+      ctx.beginPath();
+      ctx.arc(vsX, vsY, 15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '900 11px "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('VS', vsX, vsY + 1);
+      ctx.restore();
+    }
+
+    drawBottomCommandDeck(isTactical ? 'START TACTICAL 2V2' : (mode === '2v2' ? 'START 2V2 DUO' : 'START BATTLE'), () => startGame(), () => randomizeFfaFighters());
 
   } else if (mode === 'TLFS') {
     const leftX = margin;
@@ -669,6 +967,10 @@ function drawSelectScreen() {
 
   if (selectingSlot !== null) {
     drawFighterSelectModal();
+  }
+
+  if (isTacticalMapModalOpen) {
+    drawTacticalMapSelectModal();
   }
 
   if (isArenaBgmModalOpen()) {
@@ -709,22 +1011,70 @@ function drawBottomCommandDeck(primaryLabel, onStart, onRandomize) {
   ctx.fillText('[SPACE] START  •  [T] THUMBNAIL  •  [R] RANDOMIZE  •  [ESC] BACK', canvas.width / 2, 940);
 }
 
+function randomize1v1Fighters() {
+  const currentDefs = getActiveFighterDefs();
+  const available = currentDefs.map((_, idx) => idx).filter(idx => currentDefs[idx] && currentDefs[idx].type !== 'dummy');
+  if (available.length > 0) {
+    state.p1Index = available[Math.floor(Math.random() * available.length)];
+    const remaining = available.filter(idx => idx !== state.p1Index);
+    state.p2Index = remaining.length > 0 ? remaining[Math.floor(Math.random() * remaining.length)] : state.p1Index;
+  }
+}
+
+function randomize1v2Fighters() {
+  const currentDefs = getActiveFighterDefs();
+  const available = currentDefs.map((_, idx) => idx).filter(idx => currentDefs[idx] && currentDefs[idx].type !== 'dummy');
+  if (available.length > 0) {
+    state.p1Index = available[Math.floor(Math.random() * available.length)];
+    const rem1 = available.filter(idx => idx !== state.p1Index);
+    state.p2Index = rem1.length > 0 ? rem1[Math.floor(Math.random() * rem1.length)] : state.p1Index;
+    const rem2 = rem1.filter(idx => idx !== state.p2Index);
+    state.p3Index = rem2.length > 0 ? rem2[Math.floor(Math.random() * rem2.length)] : state.p2Index;
+  }
+}
+
 function randomizeFfaFighters() {
-  const indices = FIGHTER_DEFS.map((_, idx) => idx);
+  const currentDefs = getActiveFighterDefs();
+  const indices = currentDefs.map((_, idx) => idx);
   for (let i = indices.length - 1; i > 0; i -= 1) {
     const j = Math.floor(Math.random() * (i + 1));
     [indices[i], indices[j]] = [indices[j], indices[i]];
   }
 
-  state.p1Index = indices[0];
-  state.p2Index = indices[1];
-  state.p3Index = indices[2];
-  state.p4Index = indices[3];
+  state.p1Index = indices[0] ?? 0;
+  state.p2Index = indices[1] ?? (indices.length > 1 ? 1 : 0);
+  state.p3Index = indices[2] ?? (indices.length > 2 ? 2 : 0);
+  state.p4Index = indices[3] ?? (indices.length > 3 ? 3 : 0);
 }
 
 export function getFighterWeaponInfo(def) {
+  if (!def) return { name: 'TACTICAL FIREARM', category: 'BALLISTIC', desc: 'Standard issue firearm.' };
   const t = def.type ? def.type.toLowerCase() : '';
   switch (t) {
+    case 'rifle':
+      return { name: 'M4A1 CARBINE', category: 'BALLISTIC // 5.56MM RIFLE', desc: 'Versatile combat carbine delivering sustained ballistic bursts and rapid magazine reloads.' };
+    case 'shotgun':
+      return { name: 'SPAS-12 SHOTGUN', category: 'BALLISTIC // 12-GAUGE', desc: 'Heavy close-quarters entry weapon firing 6-pellet buckshot spread with massive target knockback.' };
+    case 'pistol':
+      return { name: 'DESERT EAGLE .50', category: 'BALLISTIC // .50 MAGNUM', desc: 'Lightweight high-mobility sidearm with fast trigger response and critical headshot potential.' };
+    case 'sniper':
+      return { name: 'AWP .338 MAGNUM', category: 'BALLISTIC // .338 SNIPER', desc: 'Heavy high-caliber sniper rifle with laser aim trajectory and armor-piercing match rounds.' };
+    case 'tactical_sniper':
+      return { name: '.338 BOLT-ACTION AWP', category: 'BALLISTIC // SNIPER', desc: 'Precision long-range sniper rifle with armor-piercing execution rounds.' };
+    case 'tactical_gunslinger':
+      return { name: 'DUAL .45 REVOLVERS', category: 'BALLISTIC // DUAL PISTOLS', desc: 'Twin tactical revolvers with rapid fire rate and critical impact chance.' };
+    case 'tactical_commando':
+      return { name: 'M4A1-S TACTICAL CARBINE', category: 'BALLISTIC // ASSAULT RIFLE', desc: 'Suppressed military carbine delivering pinpoint burst fire and steady recoil control.' };
+    case 'tactical_guerilla':
+      return { name: '7.62MM AK-47 RIFLE', category: 'BALLISTIC // HEAVY RIFLE', desc: 'Heavy assault rifle delivering high stopping power and punishing bullet impacts.' };
+    case 'tactical_breacher':
+      return { name: 'SPAS-12 TACTICAL SHOTGUN', category: 'BALLISTIC // BUCKSHOT', desc: '12-gauge entry shotgun with multi-pellet spread and close-quarters knockback.' };
+    case 'tactical_heavy':
+      return { name: 'M134 ROTARY MINIGUN', category: 'BALLISTIC // HEAVY SUPPORT', desc: 'Motorized high-RPM multi-barrel minigun providing heavy bullet suppression.' };
+    case 'tactical_infiltrator':
+      return { name: 'MP5-SD SILENCED SMG', category: 'BALLISTIC // SUBMACHINE GUN', desc: 'Stealth submachine gun with high fire rate, silenced muzzle, and high mobility.' };
+    case 'tactical_marksman':
+      return { name: 'MK14 EBR SEMI-AUTO DMR', category: 'BALLISTIC // DESIGNATED MARKSMAN', desc: 'Semi-automatic battle rifle providing continuous mid-range precision suppression.' };
     case 'normal':
     case 'sharpshooter':
       return { name: 'HEAVY SNIPER RIFLE', category: 'BALLISTIC // RANGED', desc: 'Fires high-velocity match bullets with a lethal execution shot on reload.' };
@@ -824,8 +1174,21 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
   ctx.textBaseline = 'middle';
   ctx.fillText(title, x + w / 2, y + 17);
 
-  const fighterIndex = state[slotProp];
-  const def = FIGHTER_DEFS[fighterIndex];
+  const currentDefs = getActiveFighterDefs();
+  const fighterIndex = state[slotProp] ?? 0;
+  const def = currentDefs[fighterIndex] || currentDefs[0] || FIGHTER_DEFS[0];
+
+  // Register click on card to open character selection modal
+  if (enabled) {
+    _registerButton(x, y, w, h, () => {
+      selectingSlot = slotProp;
+      modalInspectIndex = state[slotProp] ?? 0;
+      modalPage = Math.floor(modalInspectIndex / 15);
+      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        audioSystem.playSFX('skill_dash1', 0.2);
+      }
+    });
+  }
 
   if (!enabled) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.35)';
@@ -841,13 +1204,14 @@ function drawPlayerCard(slotProp, title, x, y, w, h, accentColor, enabled, isLar
 
   // Helper function to cycle fighters for this slot
   const cycleFighter = (direction) => {
-    const availableFighters = FIGHTER_DEFS.map((d, idx) => ({ d, idx }))
+    const availableFighters = currentDefs.map((d, idx) => ({ d, idx }))
       .filter(({ d }) => !(!state.dummyEnabled && d.type === 'dummy'));
     const pos = availableFighters.findIndex(f => f.idx === state[slotProp]);
     const count = availableFighters.length;
     if (count > 0) {
       const nextPos = (pos + direction + count) % count;
       state[slotProp] = availableFighters[nextPos].idx;
+      saveFighterSelections();
       if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
         audioSystem.playSFX('skill_dash5', 0.12);
       }
@@ -1094,6 +1458,13 @@ function openFighterSelectModal(slotProp, fighterIndex) {
 // Global Keyboard Shortcuts for Tactical Select Screen
 window.addEventListener('keydown', (e) => {
   if (state.gameState === 'select') {
+    if (isTacticalMapModalOpen) {
+      if (e.key === 'Escape' || e.key === 'Enter') {
+        isTacticalMapModalOpen = false;
+        e.preventDefault();
+        return;
+      }
+    }
     if (isArenaBgmModalOpen()) {
       if (e.key === 'Escape' || e.key === 'Enter') {
         closeArenaBgmModal();
@@ -1108,6 +1479,7 @@ window.addEventListener('keydown', (e) => {
       } else if (e.key === 'Enter' || e.code === 'Space') {
         if (selectingSlot) {
           state[selectingSlot] = modalInspectIndex;
+          saveFighterSelections();
         }
         selectingSlot = null;
         e.preventDefault();
@@ -1228,6 +1600,7 @@ window.addEventListener('wheel', (e) => {
       }
       if (nextPos !== listPos && nextPos >= 0 && nextPos < count) {
         state[card.slotProp] = availableFighters[nextPos].idx;
+        saveFighterSelections();
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           audioSystem.playSFX('skill_dash5', 0.12);
         }

@@ -253,6 +253,19 @@ export class MahitoFighter extends Fighter {
     if ((this.twinScissorAnimTimer > 0 || this.domainChargeTimer > 0) && !forceCancelAll) {
       return;
     }
+    // Pull back and cancel all stretched limbs, morphs, and special animations immediately
+    this.punchAnimTimer = 0;
+    this.fleshSurgeAnimTimer = 0;
+    this._fleshSurgePlungeAngle = null;
+    this._fleshSurgeChain = null;
+    this.maceCannonAnimTimer = 0;
+    this._maceCannonData = null;
+    this.twinScissorAnimTimer = 0;
+    this._twinScissorData = null;
+    this.soulPhaseDashTimer = 0;
+    this.soulPhaseDashVector = null;
+    this.hideFrontHand = false;
+    this.hideBackHand = false;
     super.interruptAttacks(forceCancelAll);
   }
 

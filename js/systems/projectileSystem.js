@@ -15,6 +15,7 @@ import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
 import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManager.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
+import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -331,6 +332,9 @@ class ProjectileSystem {
     if (!visualType && fighter._def && (fighter._def.type === 'john_wick' || fighter._def.type === 'johnwick')) {
       visualType = 'johnWickBullet';
     }
+    if (!visualType && (fighter.gameCategory === 'tactical' || (fighter._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'm4a1', 'spas12', 'desert_eagle', 'awp'].includes(fighter._def.type)))) {
+      visualType = 'tacticalBullet';
+    }
 
     const proj = this._getProjectile();
     proj.x = spawnX;
@@ -638,7 +642,7 @@ class ProjectileSystem {
     const isBankai = form === 'bankai';
     const isShikai = form === 'shikai';
 
-    const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 16;
+    const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 10;
     const defaultSpeed = isMask
       ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 22)
       : (isBankai
@@ -651,7 +655,9 @@ class ProjectileSystem {
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
 
-    const projRadius = isMask ? 42 : (isBankai ? 36 : 38);
+    const projRadius = isMask 
+      ? (CONFIG.ichigo?.hollowGetsugaRadius || 42) 
+      : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 36) : (CONFIG.ichigo?.getsugaRadius || 38));
     const maxLife = 240; // Extended lifetime so wave flies all the way past window boundaries
 
     const proj = this._getProjectile();
@@ -662,9 +668,13 @@ class ProjectileSystem {
     proj.r = projRadius;
     proj.life = maxLife;
     proj.maxLife = maxLife;
-    proj.color = isMask ? '#FF1E00' : (isBankai ? '#00E5FF' : '#00D5FF');
+    proj.color = isMask 
+      ? (CONFIG.ichigo?.hollowGetsugaColor || '#FF1E00') 
+      : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#00E5FF') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'));
     proj.owner = ownerIndex;
-    proj.damage = Number.isFinite(Number(damage)) ? Number(damage) : (isMask ? 50 : (isBankai ? 45 : 30));
+    proj.damage = Number.isFinite(Number(damage)) 
+      ? Number(damage) 
+      : (isMask ? (CONFIG.ichigo?.hollowGetsugaDamage || 50) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 45) : (CONFIG.ichigo?.getsugaDamage || 30)));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
     proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';
@@ -1026,15 +1036,41 @@ class ProjectileSystem {
         continue;
       }
 
-      // ── Bounding-box culling: skip expensive Math.hypot when projectile is far ──
-      const hitRadius = fighter.r + projectile.r;
-      const dx = fighter.x - projectile.x;
-      const dy = fighter.y - projectile.y;
-      if (Math.abs(dx) > hitRadius || Math.abs(dy) > hitRadius) continue;
+      // ── Swept Continuous Collision Detection (CCD) for high-speed projectiles ──
+      const projRadius = projectile.r || (projectile.bulletRadius || 5);
+      const hitRadius = fighter.r + projRadius;
 
-      const distSq = dx * dx + dy * dy;
+      // Calculate distance from fighter center to the line segment traveled by the projectile this frame
+      const prevX = projectile.x - (projectile.vx || 0);
+      const prevY = projectile.y - (projectile.vy || 0);
+      const segVx = projectile.vx || 0;
+      const segVy = projectile.vy || 0;
+      const segLenSq = segVx * segVx + segVy * segVy;
+
+      // Fast broad-phase AABB test
+      const minX = Math.min(prevX, projectile.x) - hitRadius;
+      const maxX = Math.max(prevX, projectile.x) + hitRadius;
+      const minY = Math.min(prevY, projectile.y) - hitRadius;
+      const maxY = Math.max(prevY, projectile.y) + hitRadius;
+
+      if (fighter.x < minX || fighter.x > maxX || fighter.y < minY || fighter.y > maxY) continue;
+
+      let distSq;
+      if (segLenSq > 0.001) {
+        const t = Math.max(0, Math.min(1, ((fighter.x - prevX) * segVx + (fighter.y - prevY) * segVy) / segLenSq));
+        const closestX = prevX + t * segVx;
+        const closestY = prevY + t * segVy;
+        const cdx = fighter.x - closestX;
+        const cdy = fighter.y - closestY;
+        distSq = cdx * cdx + cdy * cdy;
+      } else {
+        const dx = fighter.x - projectile.x;
+        const dy = fighter.y - projectile.y;
+        distSq = dx * dx + dy * dy;
+      }
+
       const hitRadiusSq = hitRadius * hitRadius;
-      const proximityRadius = hitRadius + (CONFIG.darkslategray.proximityTriggerRadius || 0);
+      const proximityRadius = hitRadius + (CONFIG.darkslategray?.proximityTriggerRadius || 0);
       const proxRadiusSq = proximityRadius * proximityRadius;
 
       if (distSq < hitRadiusSq) {
@@ -1133,8 +1169,9 @@ class ProjectileSystem {
           }
 
           const applied = fighter.takeDamage(finalProjDmg, attacker, {
-            isFlame: !!projectile.isFlame,
+            isProjectile: true,
             projectile,
+            isFlame: !!projectile.isFlame,
             isCrit: isSlashCrit,
             skipStandardDamageText: false
           });
@@ -2128,7 +2165,7 @@ class ProjectileSystem {
       );
     }
 
-    const arena = CONFIG.arena;
+    const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
     return (
       p.x - p.r < arena.x ||
       p.x + p.r > arena.x + arena.width ||
@@ -2721,7 +2758,7 @@ class ProjectileSystem {
       if (!p.fadingOut) {
         if (!p.history) p.history = [];
         p.history.push({ x: p.x, y: p.y });
-        const maxHistory = p.historyMax || (p.isArcaneBolt ? 30 : (p.isBlue ? 8 : 10));
+        const maxHistory = p.historyMax || (p.visual === 'tacticalBullet' ? 14 : (p.isArcaneBolt ? 30 : (p.isBlue ? 8 : 10)));
         if (p.history.length > maxHistory) {
           while (p.history.length > maxHistory) {
             p.history.shift();
@@ -2739,6 +2776,33 @@ class ProjectileSystem {
       p.x += p.vx;
       p.y += p.vy;
       p.life -= 1;
+
+      // Tactical Map Cover Obstacle Interception (Supports Sector 01 & Sector 02 Monolith)
+      const activeObstacles = (state.activeMap && state.activeMap.obstacles) || (state.gameCategory === 'tactical' ? STARTER_MAP.obstacles : null);
+      if (activeObstacles && activeObstacles.length > 0) {
+        let hitObs = false;
+        for (let oi = 0; oi < activeObstacles.length; oi++) {
+          const obs = activeObstacles[oi];
+          if (p.x >= obs.x && p.x <= obs.x + obs.w && p.y >= obs.y && p.y <= obs.y + obs.h) {
+            if (typeof spawnSparks === 'function') {
+              spawnSparks(p.x, p.y, 6, 'gold', '#F59E0B');
+            }
+            if (typeof spawnImpactFlash === 'function') {
+              spawnImpactFlash(p.x, p.y, 14, '#F59E0B');
+            }
+            p.life = 0;
+            hitObs = true;
+            break;
+          }
+        }
+        if (hitObs) {
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+          continue;
+        }
+      }
 
       // TRICKSTER / CRONOS SPHERE BLENDER EFFECT:
       // If the owner has an active Time Sphere, trap their projectiles inside it!

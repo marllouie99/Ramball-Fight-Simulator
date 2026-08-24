@@ -1,3 +1,11 @@
+import {
+  TACTICAL_GAME_MODES,
+  TACTICAL_MODE_SETTINGS,
+  TACTICAL_SYSTEM_CONFIG,
+  isTacticalMode,
+  getTacticalModeSettings
+} from '../../Tactical Force/tacticalModeConfig.js';
+
 // ─────────────────────────────────────────────
 // GAME MODE CONFIGURATION
 // ─────────────────────────────────────────────
@@ -9,6 +17,12 @@ export const GAME_MODES = {
   TWO_VS_TWO: '2v2',
   FFA: 'FFA',
   TLFS: 'TLFS',
+  TACTICAL_4V4: 'Tactical 4v4',
+  TACTICAL_1V1: 'Tactical 1v1',
+  TACTICAL_STANDOFF: 'Tactical Stand Off',
+  TACTICAL_2V2: 'Tactical 2v2',
+  TACTICAL_FFA: 'Tactical FFA',
+  TACTICAL_RANDOM: 'Tactical Random',
 };
 
 export const MODE_SETTINGS = {
@@ -38,8 +52,8 @@ export const MODE_SETTINGS = {
     label: '1v2 Stand Off',
     rounds: 1,
     hpMultiplier: 1.0,
-    fixedHp: 5000, // For the duo
-    soloFixedHp: 5000, // For the alone fighter
+    fixedHp: 2000, // For the duo
+    soloFixedHp: 2000, // For the alone fighter
     speedMultiplier: 1.6,
     initialFuelPickups: 2,
     arenaShakeIntensity: 6.5, // Configurable arena shake effect intensity for 1v2 mode (adjust this value)
@@ -87,18 +101,20 @@ export const MODE_SETTINGS = {
     maxAfterimages: 6,
     afterimageDecayMultiplier: 1.6,
   },
+  // Seamlessly integrate all Tactical Force game mode settings directly from tacticalModeConfig.js
+  ...TACTICAL_MODE_SETTINGS
 };
 
 export const MODE_ROUNDS = Object.fromEntries(
-  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.rounds])
+  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.rounds ?? 3])
 );
 
 export const MODE_HP_MULTIPLIER = Object.fromEntries(
-  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.hpMultiplier])
+  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.hpMultiplier ?? 1.0])
 );
 
 export const MODE_SPEED_MULTIPLIER = Object.fromEntries(
-  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.speedMultiplier])
+  Object.entries(MODE_SETTINGS).map(([mode, settings]) => [mode, settings.speedMultiplier ?? 1.0])
 );
 
 export const MODE_MAX_AFTERIMAGES = Object.fromEntries(
@@ -106,8 +122,20 @@ export const MODE_MAX_AFTERIMAGES = Object.fromEntries(
 );
 
 export const MODE_TEAM_COLORS = {
-  [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO].teamColors,
-  [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2].teamColors,
+  [GAME_MODES.TWO_VS_TWO]: MODE_SETTINGS[GAME_MODES.TWO_VS_TWO]?.teamColors,
+  [GAME_MODES.STAND_OFF_1V2]: MODE_SETTINGS[GAME_MODES.STAND_OFF_1V2]?.teamColors,
+  [GAME_MODES.TACTICAL_4V4]: TACTICAL_MODE_SETTINGS[TACTICAL_GAME_MODES.TACTICAL_4V4]?.teamColors,
+  [GAME_MODES.TACTICAL_2V2]: TACTICAL_MODE_SETTINGS[TACTICAL_GAME_MODES.TACTICAL_2V2]?.teamColors,
 };
+
+export {
+  TACTICAL_GAME_MODES,
+  TACTICAL_MODE_SETTINGS,
+  TACTICAL_SYSTEM_CONFIG,
+  isTacticalMode,
+  getTacticalModeSettings
+};
+
+
 
 

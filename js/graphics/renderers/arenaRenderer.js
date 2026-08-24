@@ -1,6 +1,7 @@
 import { state, getProjectiles } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { getCurrentPlayingBgmTitle } from '../../systems/arenaBgmSystem.js';
+import { drawTacticalMap, STARTER_MAP } from '../../../Tactical Force/maps/index.js';
 
 // ──────────────────────────────────────────
 // SKETCHY BORDER HELPERS
@@ -411,6 +412,24 @@ function drawOuterActionTrianglesAndNeedles(ctx, width, height, arena, isDark) {
 
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
+
+  // Custom Tactical Shooter Battleground Map
+  if (state.gameCategory === 'tactical') {
+    if (state.arenaGraphics) {
+      const g = state.arenaGraphics;
+      g.clear();
+      g.beginFill(0x000000, 1.0);
+      const scrW = pixiApp ? pixiApp.screen.width : (canvas.width || 540);
+      const scrH = pixiApp ? pixiApp.screen.height : (canvas.height || 960);
+      g.drawRect(0, 0, scrW, scrH);
+      g.endFill();
+    }
+    if (state.floorGraphics) state.floorGraphics.clear();
+    const activeMap = state.activeMap || STARTER_MAP;
+    drawTacticalMap(ctx, activeMap);
+    return;
+  }
+
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
   // 1. Draw outer background container (Original Colors)
@@ -964,6 +983,45 @@ export function drawTojiUltimateOverlay() {
     if (head.x < -100) {
       flyHeads.splice(i, 1);
     }
+  }
+
+  // ── SPOTLIGHT HIGHLIGHTS: Illuminates Toji and the Target through the dark ultimate overlay ──
+  if (toji) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'screen';
+    
+    // 1. Toji Cinematic Spotlight / Ethereal Backlight
+    const tojiScreenX = toji.x + (state.shakeX || 0);
+    const tojiScreenY = (toji.y - (toji.z || 0)) + (state.shakeY || 0);
+    const tojiSpotR = (toji.r || 25) * 5.0; // ~125px radius bloom
+    const tojiGrad = ctx.createRadialGradient(tojiScreenX, tojiScreenY, 10, tojiScreenX, tojiScreenY, tojiSpotR);
+    tojiGrad.addColorStop(0,    'rgba(215, 140, 255, 0.85)'); // Electric Violet Core
+    tojiGrad.addColorStop(0.30, 'rgba(160, 48, 255, 0.55)');
+    tojiGrad.addColorStop(0.65, 'rgba(100, 20, 180, 0.25)');
+    tojiGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = tojiGrad;
+    ctx.beginPath();
+    ctx.arc(tojiScreenX, tojiScreenY, tojiSpotR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 2. Target Cinematic Threat Spotlight (The Enemy)
+    const target = toji.ultimateTarget;
+    if (target && target.hp > 0) {
+      const targetScreenX = target.x + (state.shakeX || 0);
+      const targetScreenY = (target.y - (target.z || 0)) + (state.shakeY || 0);
+      const targetSpotR = (target.r || 25) * 5.0; // ~125px radius bloom
+      const targetGrad = ctx.createRadialGradient(targetScreenX, targetScreenY, 10, targetScreenX, targetScreenY, targetSpotR);
+      targetGrad.addColorStop(0,    'rgba(255, 90, 130, 0.85)'); // Radiant Crimson Core
+      targetGrad.addColorStop(0.30, 'rgba(255, 30, 86, 0.55)');
+      targetGrad.addColorStop(0.65, 'rgba(180, 15, 50, 0.25)');
+      targetGrad.addColorStop(1.0,  'rgba(0, 0, 0, 0)');
+      ctx.fillStyle = targetGrad;
+      ctx.beginPath();
+      ctx.arc(targetScreenX, targetScreenY, targetSpotR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
   }
 
   // Exclude Gojo's Limitless Infinity Barrier from full-screen dimming
@@ -1811,30 +1869,37 @@ function _drawSeriousRedFist(ctx, progress) {
 }
 
 /**
- * Draws a short dramatic black-crimson dim screen vignette on Bankai sky lightning ground impact.
+ * Draws cinematic Bleach anime atmospheric lighting and black-crimson radial vignette during Bankai channeling and eruption.
  */
 export function drawBankaiImpactDimScreen() {
   const { ctx, canvas, arena } = state;
   if (!ctx || !canvas || !arena) return;
 
   const ichigo = state.fighters?.find(f => 
-    f && (f.characterId === 'ichigo' || f.type === 'ichigo') && f.isChannelingBankai
+    f && (f.characterId === 'ichigo' || f.type === 'ichigo') && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0))
   );
   if (!ichigo) return;
 
-  const maxB = ichigo.bankaiChargeMax || 50;
-  const curB = ichigo.bankaiChargeTimer || 0;
-  const bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
+  let opacity = 0;
+  if (ichigo.isChannelingBankai) {
+    const maxB = ichigo.bankaiChargeMax || 50;
+    const curB = ichigo.bankaiChargeTimer || 0;
+    const bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
 
-  const lightningThreshold = 0.12;
-  const dimEndThreshold = 0.60;
-
-  if (bankaiProg < lightningThreshold || bankaiProg > dimEndThreshold) return;
-
-  const dimProg = (bankaiProg - lightningThreshold) / (dimEndThreshold - lightningThreshold);
-  // Rich bell curve: Fast rise on impact, smooth graceful decay
-  const easeCurve = Math.sin(dimProg * Math.PI);
-  const opacity = easeCurve * 0.78;
+    if (bankaiProg < 0.75) {
+      // Phase 1: Rising atmospheric tension & soaring vortex
+      opacity = Math.min(0.85, bankaiProg * 1.15);
+    } else {
+      // Phase 2: Maximum Singularity Compression tension
+      const compP = (bankaiProg - 0.75) / 0.25;
+      opacity = 0.85 + compP * 0.08 + Math.sin(Date.now() * 0.04) * 0.04;
+    }
+  } else if (ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0) {
+    // Phase 3: Eruption release burst decay
+    const burstMax = ichigo.bankaiBurstMax || 36;
+    const burstProg = 1.0 - (ichigo.bankaiBurstTimer / burstMax);
+    opacity = Math.pow(1.0 - burstProg, 1.4) * 0.88;
+  }
 
   if (opacity <= 0.01) return;
 
@@ -1842,17 +1907,17 @@ export function drawBankaiImpactDimScreen() {
   const shakeY = state.shakeY || 0;
   const cx = ichigo.x + shakeX;
   const cy = ichigo.y + shakeY;
-  const maxR = Math.max(canvas.width, canvas.height) * 0.85;
+  const maxR = Math.max(canvas.width, canvas.height) * 0.90;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // Radial Black-Crimson Vignette (Centered on Ichigo's Impact Point)
-  const grad = ctx.createRadialGradient(cx, cy, 30, cx, cy, maxR);
-  grad.addColorStop(0.0, `rgba(40, 4, 8, ${opacity * 0.45})`);       // Translucent crimson center
-  grad.addColorStop(0.35, `rgba(18, 2, 4, ${opacity * 0.75})`);      // Deep dark crimson ring
-  grad.addColorStop(0.75, `rgba(6, 1, 2, ${opacity * 0.92})`);       // Pitch black-crimson edge
-  grad.addColorStop(1.0, `rgba(2, 0, 1, ${opacity * 0.98})`);        // Absolute void boundary
+  // Radial Black-Crimson Vignette (Centered on Ichigo's Spiritual Pressure Epicenter)
+  const grad = ctx.createRadialGradient(cx, cy, 35, cx, cy, maxR);
+  grad.addColorStop(0.0, `rgba(45, 5, 12, ${opacity * 0.40})`);       // Translucent crimson center
+  grad.addColorStop(0.30, `rgba(18, 3, 6, ${opacity * 0.72})`);      // Deep dark crimson ring
+  grad.addColorStop(0.70, `rgba(6, 1, 3, ${opacity * 0.92})`);       // Pitch black-crimson edge
+  grad.addColorStop(1.0, `rgba(1, 0, 2, ${opacity * 0.98})`);        // Absolute void boundary
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);

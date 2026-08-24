@@ -334,6 +334,65 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
+    // Tactical Force Operative Bullets (M4A1, SPAS-12, Desert Eagle, AWP, Barrett M82) — Caliber pushback & ballistic impact
+    if (projectile.visual === 'tacticalBullet') {
+      const dmg = projectile.damage || 25;
+      const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
+      const baseKb = projectile.knockbackForce || projectile.knockback || attackerConfig.knockbackForce || (dmg >= 100 ? 12.0 : (dmg >= 65 ? 10.0 : (dmg >= 35 ? 6.0 : 4.2)));
+      const knockbackForce = baseKb;
+
+      const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
+
+      // 1. Physical push back on target along the bullet velocity vector
+      target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
+      target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
+      target.x += Math.cos(hitAngle) * (knockbackForce * 0.45);
+      target.y += Math.sin(hitAngle) * (knockbackForce * 0.45);
+
+      // Arena boundary clamp to prevent targets from clipping out of bounds
+      if (state && state.arena) {
+        const minX = state.arena.x + (target.r || 20);
+        const maxX = state.arena.x + state.arena.width - (target.r || 20);
+        const minY = state.arena.y + (target.r || 20);
+        const maxY = state.arena.y + state.arena.height - (target.r || 20);
+        target.x = Math.max(minX, Math.min(maxX, target.x));
+        target.y = Math.max(minY, Math.min(maxY, target.y));
+      }
+
+      // 2. Flinch stun
+      if (dmg >= 50) {
+        if (typeof target.applyHitStun === 'function') {
+          target.applyHitStun(8);
+        } else {
+          target.hitStunTimer = Math.max(target.hitStunTimer || 0, 8);
+        }
+      }
+
+      // 3. Directional blood splatter particles on bullet entry/exit
+      if (typeof spawnBloodEffect === 'function') {
+        const bloodCount = (dmg >= 60) ? 6 : ((dmg >= 30) ? 4 : 3);
+        const bloodSize = (dmg >= 60) ? 4.8 : 3.5;
+        spawnBloodEffect(target, 12, hitAngle, { minSize: 2.5, maxSize: bloodSize, count: bloodCount });
+      }
+
+      // 4. Kinetic impact sparks & flash matching operative theme
+      const sparkColor = (attacker && attacker.color) ? attacker.color : '#F59E0B';
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, (dmg >= 60) ? 30 : 22, sparkColor);
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, (dmg >= 60) ? 10 : 6, 'orange');
+      }
+
+      // 5. Ballistic impact SFX & punchy screen shake on heavy hits
+      audioSystem.playSFX('attack_fleshhit', (dmg >= 60) ? 0.9 : 0.6);
+      if (dmg >= 50 && typeof triggerGlobalScreenShake === 'function') {
+        triggerGlobalScreenShake((dmg >= 60) ? 5.0 : 2.5, 4);
+      }
+
+      return true; // Bullet spent on impact
+    }
+
     // Layla Steampunk Cannon - custom cyan sparks and flash impact effects
     const isLaylaBasic = projectile.visual === 'layla_basic_bullet';
     const isLaylaUlt = projectile.visual === 'layla_ultimate_bullet';
@@ -522,6 +581,23 @@ export const HitImpactSystem = {
       } else {
         return true; 
       }
+    }
+
+    // Default standard projectile physical pushback & kinetic impulse
+    const knockbackForce = projectile.knockback || Math.min(5.5, Math.max(1.8, (projectile.damage || 15) * 0.12));
+    const hitAngle = Math.atan2(projectile.vy || 0, projectile.vx || 0.001);
+    target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
+    target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
+    target.x += Math.cos(hitAngle) * (knockbackForce * 0.35);
+    target.y += Math.sin(hitAngle) * (knockbackForce * 0.35);
+
+    if (state && state.arena) {
+      const minX = state.arena.x + (target.r || 20);
+      const maxX = state.arena.x + state.arena.width - (target.r || 20);
+      const minY = state.arena.y + (target.r || 20);
+      const maxY = state.arena.y + state.arena.height - (target.r || 20);
+      target.x = Math.max(minX, Math.min(maxX, target.x));
+      target.y = Math.max(minY, Math.min(maxY, target.y));
     }
 
     return true; // Default behavior: destroy projectile

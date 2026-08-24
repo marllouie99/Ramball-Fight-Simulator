@@ -20,8 +20,12 @@ import { cjConfig } from '../configs/characters/cjConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
+import { m4a1Config, spas12Config, desertEagleConfig, awpConfig, barrettConfig, tacticalMainConfig } from '../../Tactical Force/configs/index.js';
+import { TACTICAL_FIGHTER_DEFS } from '../../Tactical Force/tacticalFighterDefs.js';
 
 export const CONFIG = {
+  tactical: tacticalMainConfig,
+  tacticalMain: tacticalMainConfig,
   blood: bloodConfig,
   saitama: saitamaConfig,
   genos: genosConfig,
@@ -43,6 +47,21 @@ export const CONFIG = {
   CJ: cjConfig,
   engineer: engineerConfig,
   Engineer: engineerConfig,
+  m4a1: m4a1Config,
+  M4A1: m4a1Config,
+  rifle: m4a1Config,
+  spas12: spas12Config,
+  SPAS12: spas12Config,
+  shotgun: spas12Config,
+  desertEagle: desertEagleConfig,
+  deserteagle: desertEagleConfig,
+  pistol: desertEagleConfig,
+  awp: awpConfig,
+  AWP: awpConfig,
+  sniper: awpConfig,
+  barrett: barrettConfig,
+  Barrett: barrettConfig,
+  barrett50cal: barrettConfig,
   arena: { x: 40, y: 240, width: 450, height: 450, wallWidth: 4 },
   projectile: { speed: 5.5, radius: 5, life: 120, damage: 10 },
   gun: { baseOffset: 10, barrelLength: 12 }, // distance from fighter edge
@@ -54,7 +73,10 @@ export const CONFIG = {
   rounds: { max: 3 },                          // default max rounds for match (used in Fighter.takeDamage)
   globalFighter: {
     sizeMultiplier: 1.2,                       // scale the size of all fighters globally (1.0 = default)
+    _defaultFocSizeMultiplier: 1.2,            // reference base size for FOC modes
     handSizeMultiplier: 1.4,                   // scale the size of all fighter hands globally (1.0 = default)
+    unifiedMovementSpeed: tacticalMainConfig.unifiedMovementSpeed, // unified movement speed across tactical fighters
+    enableUnifiedSpeed: tacticalMainConfig.enableUnifiedSpeed,
   },
   /** Global Bleed Debuff Settings */
   bleed: {
@@ -1350,9 +1372,25 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
 /** Total distance from fighter center to gun barrel tip. */
 export const GUN_TIP_DIST = (r) => r + CONFIG.gun.baseOffset + CONFIG.gun.barrelLength;
 
+export { TACTICAL_FIGHTER_DEFS };
+
+/** Helper function to get active fighter definitions according to active game category ('foc' | 'tactical') */
+export function getActiveFighterDefs(category) {
+  let cat = category;
+  if (!cat && typeof window !== 'undefined' && window.state) {
+    if (window.state.gameCategory) {
+      cat = window.state.gameCategory;
+    } else if (window.state.mode && String(window.state.mode).toLowerCase().startsWith('tactical')) {
+      cat = 'tactical';
+    }
+  }
+  return (cat === 'tactical') ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+}
+
 /** Helper function to get fighter definition by ID */
 export function getFighterById(id) {
-  return FIGHTER_DEFS.find(def => def.id === id);
+  const activeDefs = getActiveFighterDefs();
+  return activeDefs.find(def => def.id === id) || FIGHTER_DEFS.find(def => def.id === id);
 }
 
 /** Helper function to scale hand radius globally */

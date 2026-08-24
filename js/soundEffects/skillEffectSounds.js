@@ -143,6 +143,11 @@ export const SKILL_EFFECT_SOUNDS = {
       volume: 1.0,
       delay: 0,
     },
+    phantomflurry: {
+      src: 'Assets/Sound Effects/Skills/toji-3rdseq-phantomflurry.mp3',
+      volume: 4.0,
+      delay: 0,
+    },
     dash: {
       src: 'Assets/Sound Effects/Skills/dash5.mp3',
       volume: 1.0,

@@ -500,6 +500,13 @@ canvas {
   display: none;
 }
 
+/* ── Tactical Compact 2-Top / 2-Bottom HUD Cards ── */
+.tactical-hud-card {
+  box-sizing: border-box;
+  transition: transform 0.1s ease, opacity 0.2s ease, filter 0.2s ease;
+  user-select: none;
+}
+
 /* ── Adaptive 2-Column Grid Skill Bar Container ── */
 .health-card__skills {
   margin-top: 6px;
@@ -592,6 +599,12 @@ canvas {
 }
 
 /* ── Arena Dark Mode: Crisp White & Silver Theme ── */
+.game-container.arena-dark-mode,
+.game-box.arena-dark-mode {
+  background: #000000 !important;
+  background-color: #000000 !important;
+}
+
 .arena-dark-mode .health-card__title,
 .health-card.arena-dark-mode .health-card__title {
   -webkit-text-stroke: 0.8px #000000;
@@ -961,6 +974,136 @@ canvas {
 
 .tactical-breadcrumbs .crumb-id {
   color: #94a3b8;
+}
+
+/* Top-Level Game Hub Switcher */
+.game-hub-switcher {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  margin: 4px 0 2px 0;
+}
+
+.hub-switch-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  background: linear-gradient(135deg, rgba(22, 27, 38, 0.9) 0%, rgba(13, 16, 24, 0.95) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  clip-path: polygon(8px 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  text-align: left;
+}
+
+.hub-switch-btn .hub-btn-glow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.22s ease;
+}
+
+.hub-switch-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+
+.hub-switch-btn .hub-btn-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.3));
+}
+
+.hub-switch-btn .hub-btn-info {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.hub-switch-btn .hub-btn-title {
+  font-family: 'Outfit', 'Rajdhani', sans-serif;
+  font-size: 11.5px;
+  font-weight: 900;
+  letter-spacing: 0.8px;
+  color: #cbd5e1;
+  text-transform: uppercase;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-switch-btn .hub-btn-sub {
+  font-family: 'Rajdhani', monospace, sans-serif;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  color: #64748b;
+  text-transform: uppercase;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hub-switch-btn .hub-active-indicator {
+  font-family: 'Rajdhani', sans-serif;
+  font-size: 7.5px;
+  font-weight: 900;
+  letter-spacing: 1px;
+  padding: 1px 5px;
+  clip-path: polygon(3px 0, 100% 0, calc(100% - 3px) 100%, 0 100%);
+  text-transform: uppercase;
+  display: none;
+  flex-shrink: 0;
+}
+
+/* Active Fight of Characters Hub */
+.hub-switch-btn[data-hub="foc"].active {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16) 0%, rgba(20, 24, 34, 0.95) 100%);
+  border-color: #f59e0b;
+  box-shadow: 0 0 14px rgba(245, 158, 11, 0.25), inset 0 0 12px rgba(245, 158, 11, 0.1);
+}
+.hub-switch-btn[data-hub="foc"].active .hub-btn-title {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(245, 158, 11, 0.6);
+}
+.hub-switch-btn[data-hub="foc"].active .hub-btn-sub {
+  color: #f59e0b;
+}
+.hub-switch-btn[data-hub="foc"].active .hub-active-indicator {
+  display: block;
+  background: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.5);
+}
+
+/* Active Tactical Shooter Hub */
+.hub-switch-btn[data-hub="tactical"].active {
+  background: linear-gradient(135deg, rgba(0, 229, 255, 0.18) 0%, rgba(14, 24, 36, 0.95) 100%);
+  border-color: #00e5ff;
+  box-shadow: 0 0 14px rgba(0, 229, 255, 0.25), inset 0 0 12px rgba(0, 229, 255, 0.1);
+}
+.hub-switch-btn[data-hub="tactical"].active .hub-btn-title {
+  color: #ffffff;
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.6);
+}
+.hub-switch-btn[data-hub="tactical"].active .hub-btn-sub {
+  color: #00e5ff;
+}
+.hub-switch-btn[data-hub="tactical"].active .hub-active-indicator {
+  display: block;
+  background: rgba(0, 229, 255, 0.2);
+  color: #00e5ff;
+  border: 1px solid rgba(0, 229, 255, 0.5);
 }
 
 .tactical-title-row {
@@ -1384,6 +1527,89 @@ canvas {
 .card-progress-bar .fill {
   height: 100%;
   background: #f59e0b;
+}
+
+/* Tactical Shooter Hub Card Accent Styles */
+.tactical-card.tactical-hub-card {
+  border-left: 3px solid rgba(0, 229, 255, 0.6);
+}
+
+.tactical-card.tactical-hub-card:hover {
+  border-color: rgba(0, 229, 255, 0.8);
+  background: rgba(18, 32, 46, 0.95);
+  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.25), inset 2px 0 0 #00e5ff;
+}
+
+.tactical-card.tactical-hub-card.active {
+  background: linear-gradient(90deg, rgba(0, 229, 255, 0.16) 0%, rgba(18, 28, 42, 0.98) 100%);
+  border-color: #00e5ff;
+  box-shadow: 0 4px 14px rgba(0, 229, 255, 0.3), inset 3px 0 0 #00e5ff;
+}
+
+.tactical-emblem {
+  background: rgba(0, 229, 255, 0.08) !important;
+  border-color: rgba(0, 229, 255, 0.3) !important;
+}
+
+.tactical-card.tactical-hub-card:hover .tactical-emblem .tactical-svg-icon,
+.tactical-card.tactical-hub-card.active .tactical-emblem .tactical-svg-icon {
+  stroke: #00e5ff !important;
+}
+
+.tactical-pill {
+  background: rgba(0, 229, 255, 0.15) !important;
+  color: #00e5ff !important;
+  border: 1px solid rgba(0, 229, 255, 0.45) !important;
+  text-shadow: 0 0 6px rgba(0, 229, 255, 0.4);
+}
+
+.tactical-fill {
+  background: #00e5ff !important;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.6) !important;
+}
+
+/* Terminal Hub Tactical Overrides */
+.doom-tactical-terminal.hub-tactical .tactical-breadcrumbs .crumb-sep {
+  color: #00e5ff;
+}
+.doom-tactical-terminal.hub-tactical .tactical-main-title .title-bracket {
+  color: #00e5ff;
+}
+.doom-tactical-terminal.hub-tactical .tactical-counter-badge {
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.4);
+  text-shadow: 0 0 8px rgba(0, 229, 255, 0.4);
+}
+.doom-tactical-terminal.hub-tactical .tactical-tab-btn.active {
+  background: rgba(0, 229, 255, 0.15);
+  border-color: #00e5ff;
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.25);
+  text-shadow: 0 0 6px rgba(0, 229, 255, 0.6);
+}
+.doom-tactical-terminal.hub-tactical .tactical-briefing-panel {
+  border-left-color: #00e5ff;
+}
+.doom-tactical-terminal.hub-tactical .briefing-icon-badge {
+  background: rgba(0, 229, 255, 0.1);
+  border-color: rgba(0, 229, 255, 0.4);
+  color: #00e5ff;
+}
+.doom-tactical-terminal.hub-tactical .briefing-icon-badge .tactical-svg-icon {
+  stroke: #00e5ff;
+}
+.doom-tactical-terminal.hub-tactical .briefing-progress-fill {
+  background: #00e5ff;
+  box-shadow: 0 0 6px rgba(0, 229, 255, 0.5);
+}
+.doom-tactical-terminal.hub-tactical .tactical-launch-btn {
+  background: linear-gradient(135deg, #0284c7 0%, #0369a1 50%, #075985 100%);
+  border-color: rgba(0, 229, 255, 0.5);
+  box-shadow: 0 4px 14px rgba(2, 132, 199, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.doom-tactical-terminal.hub-tactical .tactical-launch-btn:hover {
+  background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 50%, #0369a1 100%);
+  box-shadow: 0 6px 20px rgba(14, 165, 233, 0.55);
 }
 
 /* System Config Chip Buttons */

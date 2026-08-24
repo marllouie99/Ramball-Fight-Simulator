@@ -426,7 +426,7 @@ export function drawTensaZangetsu(ctx, x, y, angle, r) {
  *  - Vasto Lorde: Demonic pitch-black core with blazing blood-red trim
  */
 export function drawIchigoSlashArc(ctx, fighter) {
-  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isFrozenByInfinity || (fighter.timeStopTimer && fighter.timeStopTimer > 0) || (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0)) return;
+  if (!fighter || fighter.slashSwingTimer <= 0 || fighter.isChannelingGetsuga || fighter.isChannelingBankai || fighter.isFrozenByInfinity || (fighter.timeStopTimer && fighter.timeStopTimer > 0) || (fighter.statusEffects && fighter.statusEffects.timeStopTimer > 0)) return;
 
   const maxT = fighter.slashSwingMaxTimer || 22;
   const rawProgress = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));

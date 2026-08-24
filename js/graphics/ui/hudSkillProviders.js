@@ -847,7 +847,7 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     // Skill 2: Flash Step (Shunpo) 2-Strike Flurry
-    const shunpoMax = CONFIG.ichigo?.shunpoCooldown || 240;
+    const shunpoMax = CONFIG.ichigo?.shunpoCooldown || 300;
     const shunpoTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
     let shunpoPct = Math.max(0, Math.min(100, (1 - (shunpoTimer / shunpoMax)) * 100));
     if (f.isShunpoDashing || f.shunpoComboActive) shunpoPct = 100;
@@ -1104,6 +1104,29 @@ export function getSkillDataForFighter(f, getProjectiles) {
       { id: 'jetpack', pct: jpPct, ready: jpReady, color: skillColor, label: jpLabel },
       { id: 'driveby', pct: dbPct, ready: dbReady, color: skillColor, label: dbLabel },
       { id: 'baguvix', pct: ultPct, ready: ultReady, color: skillColor, label: ultLabel }
+    ];
+  }
+
+  // ── Tactical Force Operatives: Magazine Ammo / Reload Bar ──
+  const fType = (f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
+  if (['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal', 'tactical_commando', 'tactical_guerilla', 'tactical_breacher', 'tactical_gunslinger', 'tactical_infiltrator', 'tactical_marksman', 'tactical_barrett', 'tactical_sniper', 'tactical_heavy'].includes(fType)) {
+    const maxMag = f.maxMagazine || 30;
+    const curAmmo = f.magazineBullets !== undefined ? f.magazineBullets : maxMag;
+    let ammoPct = 0;
+    let label = '';
+    const themeColor = f.color || '#3b82f6';
+
+    if (f.isReloading) {
+      const reloadProg = f.reloadDuration ? Math.max(0, Math.min(1, 1 - ((f.reloadTimer || 0) / f.reloadDuration))) : 0;
+      ammoPct = Math.round(reloadProg * 100);
+      label = `RELOADING (${ammoPct}%)`;
+    } else {
+      ammoPct = Math.round((curAmmo / maxMag) * 100);
+      label = `MAGAZINE: ${curAmmo}/${maxMag}`;
+    }
+
+    return [
+      { id: 'magazine', pct: ammoPct, ready: !f.isReloading && curAmmo > 0, color: themeColor, label: label }
     ];
   }
 

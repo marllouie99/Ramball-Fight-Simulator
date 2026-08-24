@@ -60,6 +60,9 @@ export class IchigoFighter extends Fighter {
     this.bankaiChargeTimer = 0;
     this.bankaiChargeMax = CONFIG.ichigo?.bankaiChargeFrames || 50;
     this.bankaiSlideTimer = 0;
+    this.bankaiBurstTimer = 0;
+    this.bankaiBurstMax = CONFIG.ichigo?.bankaiBurstFrames || 36;
+    this.bankaiShards = [];
   }
 
   reset() {
@@ -89,6 +92,8 @@ export class IchigoFighter extends Fighter {
     this.isChannelingBankai = false;
     this.bankaiChargeTimer = 0;
     this.bankaiSlideTimer = 0;
+    this.bankaiBurstTimer = 0;
+    this.bankaiShards = [];
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -111,6 +116,10 @@ export class IchigoFighter extends Fighter {
     this.isChannelingBankai = false;
     this.bankaiChargeTimer = 0;
     this.bankaiSlideTimer = 0;
+    if (forceCancelAll) {
+      this.bankaiBurstTimer = 0;
+      this.bankaiShards = [];
+    }
   }
 
   applyKnockback(vx, vy) {
@@ -222,6 +231,9 @@ export class IchigoFighter extends Fighter {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
     if (this.isChannelingBankai || this.bankaiActive) return;
 
+    this.slashSwingTimer = 0;
+    this.isGetsugaSlash = false;
+
     const chargeFrames = CONFIG.ichigo?.bankaiChargeFrames || 50;
     const slideFrames = CONFIG.ichigo?.bankaiSlideFrames || 10;
 
@@ -243,16 +255,48 @@ export class IchigoFighter extends Fighter {
     this.bankaiTimer = CONFIG.ichigo?.bankaiDuration || 600;
     this.ultimateCooldown = 0;
 
-    spawnFloatingText(this.x, this.y - this.r - 28, "...KAI!", "#FF1E00");
+    this.bankaiBurstMax = CONFIG.ichigo?.bankaiBurstFrames || 36;
+    this.bankaiBurstTimer = this.bankaiBurstMax;
+
+    // Initialize 24 crystalline Reiatsu barrier shards exploding outward
+    this.bankaiShards = [];
+    const shardCount = 24;
+    for (let i = 0; i < shardCount; i++) {
+      const angle = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
+      const speed = 4.5 + Math.random() * 6.5;
+      const size = 6.0 + Math.random() * 8.5;
+      const rot = Math.random() * Math.PI * 2;
+      const rotSpeed = (Math.random() - 0.5) * 0.25;
+      let color;
+      if (i % 4 === 0) color = '#111111';        // Jet Black void shard
+      else if (i % 4 === 1) color = '#DC143C';   // Crimson core
+      else if (i % 4 === 2) color = '#FF1E00';   // Fiery red
+      else color = '#00E5FF';                   // Electric cyan edge
+
+      this.bankaiShards.push({
+        x: this.x,
+        y: this.y,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed,
+        size,
+        rot,
+        rotSpeed,
+        color,
+        life: 1.0
+      });
+    }
+
+    spawnFloatingText(this.x, this.y - this.r - 28, "...KAI! TENSA ZANGETSU", "#FF1E00");
     audioSystem.playSFX('Assets/Sound Effects/Skills/domainexpansion.mp3', 1.0);
     audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
+    audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.90);
     
     if (typeof triggerGlobalScreenShake === 'function') {
-      triggerGlobalScreenShake(CONFIG.ichigo?.bankaiScreenShake || 6, 25);
+      triggerGlobalScreenShake(CONFIG.ichigo?.bankaiScreenShake || 7, 28);
     }
-    const shockwaveSize = CONFIG.ichigo?.bankaiAuraShockwaveSize || 75;
+    const shockwaveSize = CONFIG.ichigo?.bankaiAuraShockwaveSize || 95;
     spawnMeleeClashShockwave(this.x, this.y, shockwaveSize, 'sukuna');
-    spawnMeleeClashShockwave(this.x, this.y, shockwaveSize * 0.7, 'gojo');
+    spawnMeleeClashShockwave(this.x, this.y, shockwaveSize * 0.8, 'gojo');
     spawnImpactFlash(this.x, this.y, 'sukuna');
   }
 
@@ -280,6 +324,9 @@ export class IchigoFighter extends Fighter {
   fireGetsuga(target) {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
     if (this.isChannelingGetsuga || this.isShunpoDashing || this.shunpoComboActive) return;
+
+    this.slashSwingTimer = 0;
+    this.isGetsugaSlash = false;
 
     if (target) {
       this.aim(target);
@@ -369,7 +416,7 @@ export class IchigoFighter extends Fighter {
     this.shunpoTarget = target;
     this.shunpoComboActive = true;
     this.shunpoComboStep = 1;
-    this.shunpoCooldown = CONFIG.ichigo?.shunpoCooldown || 240;
+    this.shunpoCooldown = CONFIG.ichigo?.shunpoCooldown || 300;
     this._shunpoBaseAngle = baseAngle;
 
     const offset = target.r + (CONFIG.ichigo?.shunpoTargetOffset || 34);
@@ -456,7 +503,7 @@ export class IchigoFighter extends Fighter {
           enemy.applyKnockback(Math.cos(angleToEnemy) * kbForce, Math.sin(angleToEnemy) * kbForce);
           
           spawnImpactFlash(enemy.x, enemy.y, isMask ? 'sukuna' : 'gojo');
-          spawnMeleeClashShockwave(enemy.x, enemy.y, 35, isMask ? 'sukuna' : 'gojo');
+          spawnMeleeClashShockwave(enemy.x, enemy.y, CONFIG.ichigo?.swordShockwaveSize || 35, isMask ? 'sukuna' : 'gojo');
         }
       }
     });
@@ -568,6 +615,25 @@ export class IchigoFighter extends Fighter {
 
     // Update Zangetsu trailing cloth ribbon physics
     updateZangetsuRibbonPhysics(this);
+
+    // Bankai Post-Release Burst & Crystalline Shards Update
+    if (this.bankaiBurstTimer > 0) {
+      this.bankaiBurstTimer--;
+      if (this.bankaiShards && this.bankaiShards.length > 0) {
+        fastCleanArray(this.bankaiShards, (shard) => {
+          shard.x += shard.vx;
+          shard.y += shard.vy;
+          shard.vx *= 0.93;
+          shard.vy *= 0.93;
+          shard.rot += shard.rotSpeed;
+          shard.life = this.bankaiBurstTimer / this.bankaiBurstMax;
+          return this.bankaiBurstTimer > 0;
+        });
+      }
+      if (Math.random() < 0.50) {
+        spawnSparks(this.x + (Math.random() - 0.5) * this.r * 2, this.y + (Math.random() - 0.5) * this.r * 2, 2, Math.random() < 0.5 ? '#FF1E00' : '#00E5FF');
+      }
+    }
 
     // Slash swing animation timer
     if (this.slashSwingTimer > 0) {
@@ -697,16 +763,16 @@ export class IchigoFighter extends Fighter {
             target.applyHitStun(CONFIG.ichigo?.shunpoStunDuration || CONFIG.ichigo?.shunpoStrike2StunDuration || 22);
 
             const aimAngle = this.gunAngle || 0;
-            const kbForce = (CONFIG.ichigo?.knockback || 6) + 3;
+            const kbForce = CONFIG.ichigo?.shunpoStrike2Knockback || ((CONFIG.ichigo?.knockback || 6) + 3);
             if (typeof target.applyKnockback === 'function') {
               target.applyKnockback(Math.cos(aimAngle) * kbForce, Math.sin(aimAngle) * kbForce);
             }
 
             spawnImpactFlash(target.x, target.y, isMask ? 'sukuna' : 'gojo');
-            spawnMeleeClashShockwave(target.x, target.y, 45, isMask ? 'sukuna' : 'gojo');
+            spawnMeleeClashShockwave(target.x, target.y, CONFIG.ichigo?.shunpoShockwaveSize || 45, isMask ? 'sukuna' : 'gojo');
             audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
             if (typeof triggerGlobalScreenShake === 'function') {
-              triggerGlobalScreenShake(3, 12);
+              triggerGlobalScreenShake(CONFIG.ichigo?.shunpoScreenShake || 3, 12);
             }
 
             // Combo finished

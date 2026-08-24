@@ -24,6 +24,7 @@ import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGr
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
+import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -55,19 +56,63 @@ function drawWeaponMenu() {
   ctx.font = '900 10px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('CIRCLE BATTLE // ARSENAL DATABASE // SYS.v2.5', canvas.width / 2, 56);
+  ctx.fillText('CIRCLE BATTLE // ARSENAL DATABASE // SYS.v2.5', canvas.width / 2, 48);
 
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
   ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
   ctx.shadowBlur = 8;
-  ctx.fillText('[ WEAPON ARSENAL ]', canvas.width / 2, 78);
+  ctx.fillText('[ WEAPON ARSENAL ]', canvas.width / 2, 70);
   ctx.restore();
 
-  ctx.fillStyle = '#94a3b8';
-  ctx.font = '10.5px "Rajdhani", sans-serif';
-  ctx.fillText('Inspect calibrated weapon schematics and live ballistic systems.', canvas.width / 2, 94);
+  // ── Category Switcher Tabs ──
+  if (!state.weaponCategoryTab) {
+    state.weaponCategoryTab = (state.gameCategory === 'tactical') ? 'tactical' : 'foc';
+  }
+
+  const tabY = 94;
+  const tabW = 160;
+  const tabH = 26;
+  const tabGap = 12;
+  const totalTabsW = tabW * 2 + tabGap;
+  const tabStartX = (canvas.width - totalTabsW) / 2;
+
+  // Tab 1: FOC Fantasy / Anime Weapons
+  const isFoc = state.weaponCategoryTab !== 'tactical';
+  drawButton(
+    isFoc ? '⚔️ [ FOC WEAPONS ]' : '⚔️ FOC WEAPONS',
+    tabStartX + tabW / 2,
+    tabY,
+    () => {
+      if (state.weaponCategoryTab !== 'foc') {
+        state.weaponCategoryTab = 'foc';
+        state.weaponPage = 0;
+      }
+    },
+    tabW,
+    tabH,
+    isFoc ? '#f59e0b' : null,
+    4
+  );
+
+  // Tab 2: Tactical Force Firearms
+  const isTac = state.weaponCategoryTab === 'tactical';
+  drawButton(
+    isTac ? '🎯 [ TACTICAL FIREARMS ]' : '🎯 TACTICAL FIREARMS',
+    tabStartX + tabW + tabGap + tabW / 2,
+    tabY,
+    () => {
+      if (state.weaponCategoryTab !== 'tactical') {
+        state.weaponCategoryTab = 'tactical';
+        state.weaponPage = 0;
+      }
+    },
+    tabW,
+    tabH,
+    isTac ? '#3b82f6' : null,
+    4
+  );
 
   const cardX = Math.max(16, (canvas.width - 508) / 2);
   const cardW = Math.min(canvas.width - 32, 508);
@@ -75,15 +120,17 @@ function drawWeaponMenu() {
   const cardSpacing = 10;
   const itemsPerPage = 5;
 
-  const totalPages = Math.max(1, Math.ceil(FIGHTER_DEFS.length / itemsPerPage));
+  const activeDefs = (state.weaponCategoryTab === 'tactical') ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+
+  const totalPages = Math.max(1, Math.ceil(activeDefs.length / itemsPerPage));
   if (state.weaponPage === undefined) state.weaponPage = 0;
   if (state.weaponPage >= totalPages) state.weaponPage = totalPages - 1;
   if (state.weaponPage < 0) state.weaponPage = 0;
 
   const startIdx = state.weaponPage * itemsPerPage;
-  const pageItems = FIGHTER_DEFS.slice(startIdx, startIdx + itemsPerPage);
+  const pageItems = activeDefs.slice(startIdx, startIdx + itemsPerPage);
 
-  const startY = 108;
+  const startY = 124;
 
   pageItems.forEach((def, pos) => {
     const idx = startIdx + pos;
@@ -228,6 +275,10 @@ function isFighterDemoAttacking(fighter) {
     (fighter.uziRecoilFront > 0) ||
     (fighter.minigunFlashTimer > 0) ||
     (fighter.minigunRecoil > 0) ||
+    (fighter.muzzleFlashTimer > 0) ||
+    (fighter.gunRecoil > 0) ||
+    (fighter.pumpTimer > 0) ||
+    (fighter.burstShotsRemaining > 0) ||
     (fighter.meleeCooldown > (fighter.meleeCooldownMax - 15))
   );
 }
@@ -242,7 +293,19 @@ function drawWeaponInfoCard(ctx, def) {
   let nameText = def.name;
   let descText = def.desc;
 
-  if (def.type === 'ichigo') {
+  if (def.type === 'rifle' || def.type === 'm4a1') {
+    nameText = 'M4A1 5.56mm Tactical Assault Carbine';
+    descText = 'Elite 5.56×45mm NATO assault carbine. Features a 6-position collapsible LE stock, flat-top Picatinny rail with CompM4 red-dot sight, ribbed cylindrical handguard with cooling vents, triangular front sight, and 30-round PMAG. Unleashes rapid, deadly 3-round bursts with balanced recoil.';
+  } else if (def.type === 'shotgun' || def.type === 'spas12' || def.type === 'spas_12') {
+    nameText = 'SPAS-12 12-Gauge Tactical Combat Shotgun';
+    descText = 'Heavy 12-gauge close-quarters entry weapon. Features twin telescoping stock rods, top Picatinny rail, ghost ring sights, ventilated heat shield, and sliding pump forend. Fires lethal 6-pellet buckshot spreads with authentic post-shot pump racking and chamber ejection.';
+  } else if (def.type === 'pistol' || def.type === 'desert_eagle' || def.type === 'deserteagle') {
+    nameText = 'Magnum Research Desert Eagle .50 AE';
+    descText = 'High-caliber .50 Action Express hand cannon. Features full-length top/bottom Picatinny rails, ambidextrous safety with red fire dot, cocked spur hammer, extended beavertail, ergonomic wrap-around grip, and slide blowback exposing the chrome barrel chamber.';
+  } else if (def.type === 'sniper' || def.type === 'awp') {
+    nameText = 'Accuracy International Arctic Warfare AWP .338';
+    descText = 'Precision .338 Lapua Magnum sniper rifle. Features iconic thumbhole polymer chassis, stepped rubber recoil buttpad, adjustable cheek riser, assembly hex bolts, 50mm high-magnification scope, and heavy manual bolt-action chambering.';
+  } else if (def.type === 'ichigo') {
     const skin = state.selectedIchigoSkin || 'shikai';
     if (skin === 'shikai') {
       nameText = 'Ichigo (Shikai Zangetsu)';
@@ -433,15 +496,16 @@ function drawWeaponDetailScreen() {
   ctx.fillText('[ WEAPON DOSSIER ]', canvas.width / 2, navY);
   ctx.restore();
 
-  const currentIdx = FIGHTER_DEFS.findIndex(f => f.type === def.type);
+  const activeList = TACTICAL_FIGHTER_DEFS.some(f => f.type === def.type) ? TACTICAL_FIGHTER_DEFS : FIGHTER_DEFS;
+  const currentIdx = activeList.findIndex(f => f.type === def.type);
   if (currentIdx > 0) {
     drawButton('◄ PREV', canvas.width - 95, navY, () => {
-      state.selectedWeapon = FIGHTER_DEFS[currentIdx - 1];
+      state.selectedWeapon = activeList[currentIdx - 1];
     }, 55, 24, null, 3);
   }
-  if (currentIdx < FIGHTER_DEFS.length - 1) {
+  if (currentIdx < activeList.length - 1) {
     drawButton('NEXT ►', canvas.width - 34, navY, () => {
-      state.selectedWeapon = FIGHTER_DEFS[currentIdx + 1];
+      state.selectedWeapon = activeList[currentIdx + 1];
     }, 55, 24, null, 3);
   }
 
@@ -670,6 +734,30 @@ function drawWeaponDetailScreen() {
       previewFighter.minigunSpinAngle = (previewFighter.minigunSpinAngle || 0) + 0.45;
     }
     if (previewFighter.minigunHeat > 0) previewFighter.minigunHeat = Math.max(0, previewFighter.minigunHeat - 0.02);
+
+    // Tactical Force Firearm Preview Timers
+    if (previewFighter.muzzleFlashTimer > 0) previewFighter.muzzleFlashTimer--;
+    if (previewFighter.gunRecoil > 0) previewFighter.gunRecoil = Math.max(0, previewFighter.gunRecoil - 0.12);
+    if (previewFighter.pumpTimer > 0) {
+      previewFighter.pumpTimer--;
+      if (previewFighter.pumpTimer === 11 && typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+        const cfg = CONFIG.spas12 || CONFIG.shotgun || {};
+        audioSystem.playSFX(cfg.sounds?.pump || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3', cfg.soundVolumes?.pump ?? 1.0, 1.0);
+      }
+    }
+    if (previewFighter.burstShotsRemaining > 0) {
+      previewFighter.burstTimer--;
+      if (previewFighter.burstTimer <= 0) {
+        previewFighter.burstShotsRemaining--;
+        previewFighter.burstTimer = 4;
+        previewFighter.muzzleFlashTimer = 3;
+        previewFighter.gunRecoil = 0.9;
+        const cfg = CONFIG.m4a1 || CONFIG.rifle || {};
+        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+          audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Skills/johnwick-m4-shot.mp3', cfg.soundVolumes?.fire ?? 1.0, 1.0);
+        }
+      }
+    }
 
     try {
       const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
@@ -1008,6 +1096,36 @@ function drawWeaponPreview(ctx, type, color) {
 
   try {
     switch (type) {
+      case 'rifle':
+      case 'tactical_commando':
+      case 'tactical_guerilla':
+      case 'tactical_heavy':
+        drawTacticalRifleWeapon(ctx, 0, 0, gunAngle, r, { isPreview: true, themeColor: '#3b82f6' });
+        return;
+
+      case 'shotgun':
+      case 'tactical_breacher':
+        drawTacticalShotgunWeapon(ctx, 0, 0, gunAngle, r, { isPreview: true, themeColor: '#10b981' });
+        return;
+
+      case 'pistol':
+      case 'tactical_gunslinger':
+      case 'tactical_infiltrator':
+        drawTacticalPistolWeapon(ctx, 0, 0, gunAngle, r, { isPreview: true, themeColor: '#f59e0b' });
+        return;
+
+      case 'sniper':
+      case 'tactical_sniper':
+      case 'tactical_marksman':
+        drawTacticalSniperWeapon(ctx, 0, 0, gunAngle, r, { isPreview: true, themeColor: '#ef4444' });
+        return;
+
+      case 'barrett':
+      case 'barrett50cal':
+      case 'tactical_barrett':
+        drawBarrettWeapon(ctx, 0, 0, gunAngle, r, { isPreview: true, themeColor: '#06b6d4' });
+        return;
+
       case 'ichigo': {
         const isShikaiActive = (state.selectedIchigoSkin === 'shikai');
         if (isShikaiActive) {
@@ -1325,24 +1443,26 @@ function drawWeaponPreview(ctx, type, color) {
 export { drawWeaponMenu, isFighterDemoAttacking, drawWeaponInfoCard, triggerWeaponDemoAttack, drawWeaponDetailScreen, drawYutaKatana, drawWeaponPreview };
 
 const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
-eventTarget.addEventListener('wheel', (e) => {
-  if (state.gameState === 'weaponDetail') {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.3 : 0.3;
-    state.weaponPreviewScale = Math.min(4.8, Math.max(1.0, (state.weaponPreviewScale || 2.4) + delta));
-    return;
-  }
-  if (state.gameState === 'weapons') {
-    e.preventDefault();
-    const totalPages = Math.ceil(FIGHTER_DEFS.length / 5);
-    if (e.deltaY > 0 && state.weaponPage < totalPages - 1) {
-      state.weaponPage++;
-    } else if (e.deltaY < 0 && state.weaponPage > 0) {
-      state.weaponPage--;
+if (eventTarget && typeof eventTarget.addEventListener === 'function') {
+  eventTarget.addEventListener('wheel', (e) => {
+    if (state.gameState === 'weaponDetail') {
+      e.preventDefault();
+      const delta = e.deltaY > 0 ? -0.3 : 0.3;
+      state.weaponPreviewScale = Math.min(4.8, Math.max(1.0, (state.weaponPreviewScale || 2.4) + delta));
+      return;
     }
-    return;
-  }
-}, { passive: false });
+    if (state.gameState === 'weapons') {
+      e.preventDefault();
+      const totalPages = Math.ceil(FIGHTER_DEFS.length / 5);
+      if (e.deltaY > 0 && state.weaponPage < totalPages - 1) {
+        state.weaponPage++;
+      } else if (e.deltaY < 0 && state.weaponPage > 0) {
+        state.weaponPage--;
+      }
+      return;
+    }
+  }, { passive: false });
+}
 
 // Interactive Claw Editor Drag & Resize Logic
 let isDraggingClaw = false;
@@ -1350,95 +1470,95 @@ let activeDragFinger = -1;
 let activeDragType = null;
 
 if (typeof window !== 'undefined') {
-  eventTarget.addEventListener('mousedown', (e) => {
-    if (state.gameState !== 'weaponDetail' || !state.clawEditMode || !state.selectedWeapon || state.selectedWeapon.type !== 'mahito') return;
+  if (eventTarget && typeof eventTarget.addEventListener === 'function') {
+    eventTarget.addEventListener('mousedown', (e) => {
+      if (state.gameState !== 'weaponDetail' || !state.clawEditMode || !state.selectedWeapon || state.selectedWeapon.type !== 'mahito') return;
 
-    const rect = eventTarget.getBoundingClientRect();
-    const scaleX = state.canvas.width / rect.width;
-    const scaleY = state.canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+      const rect = eventTarget.getBoundingClientRect();
+      const scaleX = state.canvas.width / rect.width;
+      const scaleY = state.canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
 
-    const currentScale = state.weaponPreviewScale || 2.4;
-    const heroY = state.canvas.height * 0.30;
-    const offsetX = -40;
-    const handX = 25;
+      const currentScale = state.weaponPreviewScale || 2.4;
+      const heroY = state.canvas.height * 0.30;
+      const offsetX = -40;
+      const handX = 25;
 
-    // Convert mouse coordinates back to local space of preview display
-    const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
-    const localY = (my - heroY) / currentScale;
+      // Convert mouse coordinates back to local space of preview display
+      const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
+      const localY = (my - heroY) / currentScale;
 
-    const blades = state.mahitoClawCustomBlades;
-    if (!blades) return;
+      const blades = state.mahitoClawCustomBlades;
+      if (!blades) return;
 
-    for (let i = 0; i < blades.length; i++) {
-      const b = blades[i];
-      const kx = handX + b.knuckleX;
-      const ky = b.knuckleY;
+      for (let i = 0; i < blades.length; i++) {
+        const b = blades[i];
+        const kx = handX + b.knuckleX;
+        const ky = b.knuckleY;
 
-      const cosAngle = Math.cos(b.fanAngle);
-      const sinAngle = Math.sin(b.fanAngle);
-      const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
-      const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
+        const cosAngle = Math.cos(b.fanAngle);
+        const sinAngle = Math.sin(b.fanAngle);
+        const tx = handX + b.knuckleX + b.length * cosAngle - b.tipY * sinAngle;
+        const ty = b.knuckleY + b.length * sinAngle + b.tipY * cosAngle;
 
-      // 1. Detect Knuckle Click (10px local radius hit box)
-      if (Math.hypot(localX - kx, localY - ky) < 10) {
-        isDraggingClaw = true;
-        activeDragFinger = i;
-        activeDragType = 'knuckle';
-        return;
+        // 1. Detect Knuckle Click (10px local radius hit box)
+        if (Math.hypot(localX - kx, localY - ky) < 10) {
+          isDraggingClaw = true;
+          activeDragFinger = i;
+          activeDragType = 'knuckle';
+          return;
+        }
+
+        // 2. Detect Tip Click (10px local radius hit box)
+        if (Math.hypot(localX - tx, localY - ty) < 10) {
+          isDraggingClaw = true;
+          activeDragFinger = i;
+          activeDragType = 'tip';
+          return;
+        }
       }
+    });
 
-      // 2. Detect Tip Click (10px local radius hit box)
-      if (Math.hypot(localX - tx, localY - ty) < 10) {
-        isDraggingClaw = true;
-        activeDragFinger = i;
-        activeDragType = 'tip';
-        return;
+    eventTarget.addEventListener('mousemove', (e) => {
+      if (!isDraggingClaw || activeDragFinger < 0 || !state.mahitoClawCustomBlades) return;
+
+      const rect = eventTarget.getBoundingClientRect();
+      const scaleX = state.canvas.width / rect.width;
+      const scaleY = state.canvas.height / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+
+      const currentScale = state.weaponPreviewScale || 2.4;
+      const heroY = state.canvas.height * 0.30;
+      const offsetX = -40;
+      const handX = 25;
+
+      const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
+      const localY = (my - heroY) / currentScale;
+
+      const b = state.mahitoClawCustomBlades[activeDragFinger];
+      if (!b) return;
+
+      if (activeDragType === 'knuckle') {
+        b.knuckleX = localX - handX;
+        b.knuckleY = localY;
+      } else if (activeDragType === 'tip') {
+        const dx = localX - (handX + b.knuckleX);
+        const dy = localY - b.knuckleY;
+        const dist = Math.hypot(dx, dy);
+        
+        // Calculate length and rotation angle with correct trigonometric offset for b.tipY
+        if (dist > Math.abs(b.tipY)) {
+          b.length = Math.sqrt(dist * dist - b.tipY * b.tipY);
+          b.fanAngle = Math.atan2(dy, dx) - Math.atan2(b.tipY, b.length);
+        } else {
+          b.length = 15;
+          b.fanAngle = Math.atan2(dy, dx);
+        }
       }
-    }
-  });
-
-  window.addEventListener('mousemove', (e) => {
-    if (!isDraggingClaw || state.gameState !== 'weaponDetail' || !state.clawEditMode) return;
-
-    const rect = eventTarget.getBoundingClientRect();
-    const scaleX = state.canvas.width / rect.width;
-    const scaleY = state.canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-
-    const currentScale = state.weaponPreviewScale || 2.4;
-    const heroY = state.canvas.height * 0.30;
-    const offsetX = -40;
-    const handX = 25;
-
-    const localX = (mx - (state.canvas.width / 2 + offsetX * currentScale)) / currentScale;
-    const localY = (my - heroY) / currentScale;
-
-    const blades = state.mahitoClawCustomBlades;
-    if (!blades || activeDragFinger < 0 || activeDragFinger >= blades.length) return;
-
-    const b = blades[activeDragFinger];
-
-    if (activeDragType === 'knuckle') {
-      b.knuckleX = localX - handX;
-      b.knuckleY = localY;
-    } else if (activeDragType === 'tip') {
-      const dx = localX - (handX + b.knuckleX);
-      const dy = localY - b.knuckleY;
-      const dist = Math.hypot(dx, dy);
-      
-      // Calculate length and rotation angle with correct trigonometric offset for b.tipY
-      if (dist > Math.abs(b.tipY)) {
-        b.length = Math.sqrt(dist * dist - b.tipY * b.tipY);
-        b.fanAngle = Math.atan2(dy, dx) - Math.atan2(b.tipY, b.length);
-      } else {
-        b.length = 15;
-        b.fanAngle = Math.atan2(dy, dx);
-      }
-    }
-  });
+    });
+  }
 
   window.addEventListener('mouseup', () => {
     isDraggingClaw = false;

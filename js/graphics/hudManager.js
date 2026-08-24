@@ -31,16 +31,17 @@ export function isScreenDimmedActive() {
       f.isChannelingDomainExpansion ||
       f.isChannelingFuga ||
       f.isChannelingUlt ||
+      (f.ultimatePhase === 'CHANNELING') ||
       (f.domainChargeTimer || 0) > 0 ||
       (f.purpleChargeTimer || 0) > 0
     ));
     if (!isChanneling) return true;
   }
 
-  // 3. Active Dim Effect States (active beam/strike phase — excludes Saitama Serious Counter per requirement)
+  // 3. Active Dim Effect States (active beam/strike phase — excludes channeling phases)
   const hasActiveDimEffect = state.fighters.some(f => f && (
     (f.isFiringPurple || (f.purpleHitTimer || 0) > 0) ||
-    f.tojiUltimateActive ||
+    ((f.characterId === 'toji' || f.type === 'toji') && f.ultimateActive && f.ultimatePhase !== 'CHANNELING' && !f.isChannelingDomain) ||
     (f.furnaceFireArrowTimer || 0) > 0
   ));
   if (hasActiveDimEffect) return true;
@@ -89,7 +90,7 @@ export function drawHUD() {
     const winThreshold = modeRounds === 1 ? 1 : 2;
     const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThreshold;
     const showModel = hasTwoWins && roundWinner;
-    const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || showModel;
+    const isChampionReveal = ((mode === 'FFA' || mode === 'Tactical FFA' || mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA) && ffaMatchComplete) || showModel;
     
     if (isChampionReveal) {
       const displayDelay = 60; // round end delay
@@ -102,22 +103,33 @@ export function drawHUD() {
   if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
   if (!_cachedContainerLeft) _cachedContainerLeft = document.getElementById('healthHudLeft');
   if (!_cachedContainerRight) _cachedContainerRight = document.getElementById('healthHudRight');
-  if (!_cachedTopContainer) _cachedTopContainer = document.querySelector('.hud-top-container');
-  if (!_cachedBottomContainer) _cachedBottomContainer = document.querySelector('.hud-bottom-container');
+  if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer') || document.querySelector('.hud-top-container');
+  if (!_cachedBottomContainer) _cachedBottomContainer = document.getElementById('hudBottomContainer') || document.querySelector('.hud-bottom-container');
   const containerBottom = _cachedContainerBottom;
   const containerLeft = _cachedContainerLeft;
   const containerRight = _cachedContainerRight;
   const topContainer = _cachedTopContainer;
   const bottomContainer = _cachedBottomContainer;
-  
+
+  // FOC & Tactical modes HUD visibility
+  if (topContainer) {
+    topContainer.style.display = 'none';
+    topContainer.style.visibility = 'hidden';
+  }
+  if (bottomContainer) {
+    bottomContainer.style.display = 'none';
+    bottomContainer.style.visibility = 'hidden';
+  }
   if (containerBottom) {
-    containerBottom.classList.toggle('ffa-hud', mode === GAME_MODES.FFA);
-    const isSingleColMode = (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off');
+    const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
+    containerBottom.classList.toggle('ffa-hud', isFfaMode);
+    const isSingleColMode = (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off');
     containerBottom.classList.toggle('single-column-hud', isSingleColMode);
     containerBottom.style.opacity = hudOpacity;
     if (hudOpacity <= 0) {
       containerBottom.style.visibility = 'hidden';
       containerBottom.style.pointerEvents = 'none';
+      containerBottom.style.display = 'none';
     } else {
       containerBottom.style.display = 'flex';
       containerBottom.style.visibility = 'visible';
@@ -125,34 +137,28 @@ export function drawHUD() {
     }
   }
   if (containerLeft) {
-    containerLeft.style.opacity = hudOpacity;
-    if (hudOpacity <= 0) {
+    if (hudOpacity <= 0 || !containerLeft.children.length) {
       containerLeft.style.visibility = 'hidden';
       containerLeft.style.pointerEvents = 'none';
+      containerLeft.style.display = 'none';
     } else {
+      containerLeft.style.opacity = hudOpacity;
       containerLeft.style.display = 'block';
       containerLeft.style.visibility = 'visible';
       containerLeft.style.pointerEvents = 'auto';
     }
   }
   if (containerRight) {
-    containerRight.style.opacity = hudOpacity;
-    if (hudOpacity <= 0) {
+    if (hudOpacity <= 0 || !containerRight.children.length) {
       containerRight.style.visibility = 'hidden';
       containerRight.style.pointerEvents = 'none';
+      containerRight.style.display = 'none';
     } else {
+      containerRight.style.opacity = hudOpacity;
       containerRight.style.display = 'block';
       containerRight.style.visibility = 'visible';
       containerRight.style.pointerEvents = 'auto';
     }
-  }
-  if (topContainer) {
-    topContainer.style.opacity = hudOpacity;
-    topContainer.style.display = 'none';
-  }
-  if (bottomContainer) {
-    bottomContainer.style.opacity = hudOpacity;
-    bottomContainer.style.display = 'none';
   }
 
   updateHealthHud();
@@ -160,26 +166,6 @@ export function drawHUD() {
   if (hudOpacity > 0) {
     ctx.save();
     ctx.globalAlpha = hudOpacity;
-
-    const cx = state.arena.x + state.arena.width / 2;
-    const topY = state.arena.y - 36;
-
-    // Draw round on top (hidden in 1v1, FFA, and Stand Off modes)
-    if (mode !== GAME_MODES.ONE_VS_ONE && mode !== '1v1' && mode !== GAME_MODES.STAND_OFF && mode !== GAME_MODES.STAND_OFF_1V2 && mode !== 'Stand Off' && mode !== '1v2 Stand Off' && mode !== GAME_MODES.FFA && mode !== 'FFA') {
-        drawPanel(cx - 90, topY, 180, 26, 0.7);
-
-        ctx.fillStyle = '#fff';
-        ctx.font = 'bold 12px Arial';
-        ctx.textAlign = 'center';
-        const roundsMax = MODE_SETTINGS[mode]?.rounds || MODE_SETTINGS[GAME_MODES.ONE_VS_ONE].rounds;
-        ctx.fillText(`ROUND ${roundNum} OF ${roundsMax}`, cx, topY + 18);
-    }
-
-    // Draw rotate message at the bottom
-    const bottomY = state.arena.y + state.arena.height + 20;
-    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-    ctx.font = 'italic 12px Arial';
-    ctx.fillText('', cx, bottomY);
 
     // Draw authentic GTA San Andreas "Cheat activated" top-left arena slide banner
     drawCheatNotification(ctx);
@@ -442,16 +428,49 @@ const _hudCache = {
   fighters: new Map(), // fighter -> cached fighter card elements
 };
 
+// Persistent Tactical Card DOM elements cache
+const _tacticalCards = {
+  top: [],
+  bottom: []
+};
+
 export function clearHealthHud() {
   _hudCache.teams.clear();
   _hudCache.fighters.clear();
+  _tacticalCards.top = [];
+  _tacticalCards.bottom = [];
 
   if (!_cachedContainerBottom) _cachedContainerBottom = document.getElementById('healthHud');
   if (!_cachedContainerLeft) _cachedContainerLeft = document.getElementById('healthHudLeft');
   if (!_cachedContainerRight) _cachedContainerRight = document.getElementById('healthHudRight');
-  if (_cachedContainerBottom) _cachedContainerBottom.innerHTML = '';
-  if (_cachedContainerLeft) _cachedContainerLeft.innerHTML = '';
-  if (_cachedContainerRight) _cachedContainerRight.innerHTML = '';
+  if (!_cachedTopContainer) _cachedTopContainer = document.getElementById('hudTopContainer');
+  if (!_cachedBottomContainer) _cachedBottomContainer = document.getElementById('hudBottomContainer');
+
+  if (_cachedContainerBottom) {
+    _cachedContainerBottom.innerHTML = '';
+    _cachedContainerBottom.style.display = 'none';
+    _cachedContainerBottom.style.visibility = 'hidden';
+  }
+  if (_cachedContainerLeft) {
+    _cachedContainerLeft.innerHTML = '';
+    _cachedContainerLeft.style.display = 'none';
+    _cachedContainerLeft.style.visibility = 'hidden';
+  }
+  if (_cachedContainerRight) {
+    _cachedContainerRight.innerHTML = '';
+    _cachedContainerRight.style.display = 'none';
+    _cachedContainerRight.style.visibility = 'hidden';
+  }
+  if (_cachedTopContainer) {
+    _cachedTopContainer.innerHTML = '';
+    _cachedTopContainer.style.display = 'none';
+    _cachedTopContainer.style.visibility = 'hidden';
+  }
+  if (_cachedBottomContainer) {
+    _cachedBottomContainer.innerHTML = '';
+    _cachedBottomContainer.style.display = 'none';
+    _cachedBottomContainer.style.visibility = 'hidden';
+  }
   
   if (!_cachedTopLeft) _cachedTopLeft = document.getElementById('hudTopLeft');
   if (!_cachedTopRight) _cachedTopRight = document.getElementById('hudTopRight');
@@ -461,6 +480,166 @@ export function clearHealthHud() {
   if (_cachedTopRight) _cachedTopRight.innerHTML = '';
   if (_cachedBottomLeft) _cachedBottomLeft.innerHTML = '';
   if (_cachedBottomRight) _cachedBottomRight.innerHTML = '';
+}
+
+function ensureTacticalCardElement(container, index, accentColor) {
+  let card = container.querySelector(`[data-tactical-idx="${index}"]`);
+  if (!card) {
+    card = document.createElement('div');
+    card.className = 'tactical-hud-card';
+    card.setAttribute('data-tactical-idx', index);
+    card.style.cssText = `
+      flex: 1 1 0;
+      min-width: 0;
+      box-sizing: border-box;
+      padding: 5px 8px;
+      background: linear-gradient(135deg, rgba(11, 15, 25, 0.94) 0%, rgba(15, 23, 42, 0.94) 100%);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 4px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      display: flex;
+      flex-direction: column;
+      gap: 3.5px;
+    `;
+    card.innerHTML = `
+      <!-- Top Row: Operator Name & Caliber / Live Health Readout -->
+      <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1.2;">
+        <div style="display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden;">
+          <span class="tac-name" style="font-family: 'Rajdhani', 'Outfit', sans-serif; font-size: 12px; font-weight: 900; color: ${accentColor}; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+          <span class="tac-caliber" style="font-family: 'Rajdhani', monospace; font-size: 9px; font-weight: 700; color: #94a3b8; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 2px; white-space: nowrap;"></span>
+        </div>
+        <div class="tac-hp-badge" style="font-family: 'Rajdhani', monospace; font-size: 11.5px; font-weight: 900; color: #f8fafc; display: flex; align-items: baseline; gap: 2px;">
+          <span class="tac-hp">0</span><span class="tac-hp-unit" style="font-size: 9px; color: #64748b;"> HP</span>
+        </div>
+      </div>
+
+      <!-- Middle: Clean Health Bar Track -->
+      <div class="health-card__bar" style="height: 4.5px; background: rgba(255, 255, 255, 0.12); border-radius: 2px; overflow: hidden; position: relative;">
+        <div class="health-card__fill" style="width: 100%; height: 100%; background: ${accentColor}; border-radius: 2px; transition: width 0.15s ease, background 0.2s ease;"></div>
+      </div>
+
+      <!-- Bottom Row: Simple Clean Minimal Text for AMMO and DMG (No cards/boxes) -->
+      <div style="display: flex; justify-content: space-between; align-items: center; font-family: 'Rajdhani', monospace; font-size: 10.5px; font-weight: 700; line-height: 1; padding: 1px 0;">
+        <!-- Left: Ammo Simple Text -->
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 9px; color: #64748b;">AMMO</span>
+          <span class="tac-ammo" style="color: #fbbf24; font-weight: 800;">0/0</span>
+        </div>
+        <!-- Right: Damage Simple Text -->
+        <div style="display: flex; align-items: center; gap: 4px;">
+          <span style="font-size: 9px; color: #64748b;">DMG</span>
+          <span class="tac-dmg" style="color: #cbd5e1; font-weight: 800;">0</span>
+        </div>
+      </div>
+    `;
+    container.appendChild(card);
+  }
+  return {
+    card,
+    nameEl: card.querySelector('.tac-name'),
+    caliberEl: card.querySelector('.tac-caliber'),
+    dmgEl: card.querySelector('.tac-dmg'),
+    ammoEl: card.querySelector('.tac-ammo'),
+    hpEl: card.querySelector('.tac-hp'),
+    hpUnitEl: card.querySelector('.tac-hp-unit'),
+    hpBadge: card.querySelector('.tac-hp-badge'),
+    fillEl: card.querySelector('.health-card__fill')
+  };
+}
+
+function updateTacticalCard(cardObj, f, index, accentColor) {
+  if (!cardObj || !cardObj.card) return;
+  if (!f) {
+    if (cardObj.card.style.display !== 'none') cardObj.card.style.display = 'none';
+    return;
+  }
+  if (cardObj.card.style.display !== '') cardObj.card.style.display = '';
+
+  const maxHp = Math.max(1, Math.round(Number(f.maxHp) || 100));
+  const hp = Math.max(0, Math.min(maxHp, Math.round(Number(f.hp) || 0)));
+  const ratio = hp / maxHp;
+  const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
+  const name = (f.name || f.type || `OP ${index + 1}`).toUpperCase();
+  const fighterColor = (f.color || accentColor || '#ffffff');
+  const barColor = ratio > 0.25 ? fighterColor : '#ef4444';
+  const isDead = hp <= 0;
+  const attackDmg = Math.round(Number(f.damage !== undefined ? f.damage : (f._def && f._def.damage)) || 0);
+  const curAmmo = f.magazineBullets !== undefined ? f.magazineBullets : (f.maxMagazine || 30);
+  const maxAmmo = f.maxMagazine || 30;
+  const isReloading = Boolean(f.isReloading);
+
+  // 1. Operator Name
+  if (cardObj.nameEl) {
+    if (cardObj.nameEl.textContent !== name) cardObj.nameEl.textContent = name;
+    if (cardObj.nameEl.style.color !== fighterColor) cardObj.nameEl.style.color = fighterColor;
+  }
+
+  // 2. Caliber / Class Sub-tag
+  if (cardObj.caliberEl) {
+    let caliberStr = 'TACTICAL';
+    const t = (f.type || f.name || '').toLowerCase();
+    if (t.includes('rifle') || t.includes('m4a1')) {
+      caliberStr = '5.56 NATO';
+    } else if (t.includes('shotgun') || t.includes('spas')) {
+      caliberStr = '12-GAUGE';
+    } else if (t.includes('pistol') || t.includes('desert') || t.includes('eagle')) {
+      caliberStr = '.50 AE';
+    } else if (t.includes('sniper') || t.includes('awp')) {
+      caliberStr = '.338 LAPUA';
+    }
+    if (cardObj.caliberEl.textContent !== caliberStr) cardObj.caliberEl.textContent = caliberStr;
+  }
+
+  // 3. Damage Simple Text
+  if (cardObj.dmgEl) {
+    let dmgText = `${attackDmg}`;
+    const t = (f.type || f.name || '').toLowerCase();
+    if (t.includes('shotgun') || t.includes('spas')) {
+      dmgText = `${attackDmg}×6`;
+    } else if (t.includes('rifle') || t.includes('m4a1')) {
+      dmgText = `${attackDmg}×3`;
+    }
+    if (cardObj.dmgEl.textContent !== dmgText) cardObj.dmgEl.textContent = dmgText;
+  }
+
+  // 4. Ammo Simple Text
+  if (cardObj.ammoEl) {
+    if (isDead) {
+      cardObj.ammoEl.textContent = '-';
+      cardObj.ammoEl.style.color = '#64748b';
+    } else if (isReloading) {
+      cardObj.ammoEl.textContent = 'RELOAD...';
+      cardObj.ammoEl.style.color = '#38bdf8';
+    } else {
+      const isLow = curAmmo <= Math.max(1, Math.floor(maxAmmo * 0.25));
+      cardObj.ammoEl.textContent = `${curAmmo}/${maxAmmo}`;
+      cardObj.ammoEl.style.color = isLow ? '#ef4444' : '#fbbf24';
+    }
+  }
+
+  // 5. HP Readout
+  if (cardObj.hpEl) {
+    if (isDead) {
+      cardObj.hpEl.textContent = 'KIA';
+      cardObj.hpEl.style.color = '#ef4444';
+      if (cardObj.hpUnitEl) cardObj.hpUnitEl.style.display = 'none';
+    } else {
+      cardObj.hpEl.textContent = `${hp}`;
+      cardObj.hpEl.style.color = (ratio <= 0.25) ? '#ef4444' : '#f8fafc';
+      if (cardObj.hpUnitEl) cardObj.hpUnitEl.style.display = 'inline';
+    }
+  }
+
+  // 6. Healthbar Fill
+  if (cardObj.fillEl) {
+    const widthStr = `${percent}%`;
+    if (cardObj.fillEl.style.width !== widthStr) cardObj.fillEl.style.width = widthStr;
+    if (cardObj.fillEl.style.background !== barColor) cardObj.fillEl.style.background = barColor;
+  }
+
+  const opacityStr = isDead ? '0.35' : '1';
+  if (cardObj.card.style.opacity !== opacityStr) cardObj.card.style.opacity = opacityStr;
 }
 
 document.addEventListener('mousedown', (e) => {
@@ -493,15 +672,13 @@ function updateHealthHud() {
   }
 
   // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
-  // Fast-ticking cooldown timers change by ~1 every single frame, which used to defeat this
-  // throttle entirely. Quantizing them lets per-frame ticking fall through to the periodic
-  // refresh below instead of forcing a full HUD recompute on every single frame.
-  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1';
-  const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off';
+  const isTactical = (state.gameCategory === 'tactical' || String(mode).toLowerCase().startsWith('tactical'));
+  const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
+  const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
-  const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2';
+  const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
-  const isSingleColumnMode = is1v1 || isStandOff;
+  const isSingleColumnMode = is1v1 || isStandOff || (isTactical && fighters.length <= 2);
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = fighters.map(f => {
@@ -589,6 +766,7 @@ function updateHealthHud() {
   const getAdditionalInfoForFighter = (f) => {
     const info = [];
     const baseDmg = parseFloat(Math.max(0, Number(f.damage) || 0).toFixed(1));
+    const fType = (f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
 
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
@@ -597,9 +775,9 @@ function updateHealthHud() {
       if (checkHasTeammate(f)) {
         if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
           info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.pureLoveBeamRegenDebuffTimer > 0) {
+        } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
           const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.45) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : 2.0) : baseRegen;
-          const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25);
           const debuffedRegen = currentRegen * debuffMult;
           info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (f.domainActive || isRikaAlive) {
@@ -641,9 +819,9 @@ function updateHealthHud() {
 
         if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
           info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.pureLoveBeamRegenDebuffTimer > 0) {
+        } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
           const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.45) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : 2.0) : baseRegen;
-          const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25);
           const debuffedRegen = currentRegen * debuffMult;
           info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (f.domainActive || isRikaAlive) {
@@ -748,7 +926,10 @@ function updateHealthHud() {
         info.push(`<b>ATK SPD:</b> +25% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       }
     } else {
-      info.push(`<b>DMG:</b> ${baseDmg}`);
+      const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
+      if (!isTacticalChar) {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
       
       if (f.characterId === 'gojo' || f.type === 'gojo') {
         if (f.isMeleeMode) {
@@ -835,7 +1016,7 @@ function updateHealthHud() {
 
         let critDmgStr = `${baseCritMult}% (True DMG)`;
         if (isOvertime) {
-          critDmgStr = `${overtimeCritMult}% (True DMG) <span style="color: #D4AF37; font-size: 10px;">⚡</span>`;
+          critDmgStr = `${overtimeCritMult}% (True DMG)`;
         }
 
         info.push(`<b>Crit Rate:</b> ${critRateStr}`);
@@ -851,7 +1032,18 @@ function updateHealthHud() {
         } else {
           info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)}`);
         }
-        info.push(`<b>Dodge:</b> ${Math.round((CONFIG.toji?.stealthDodgeChance || 0.10) * 100)}%`);
+        const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(f)) : null;
+        const isEnemyDomain = state.fighters && state.fighters.some((enemy, idx) => {
+          if (!enemy || enemy === f || enemy.hp <= 0) return false;
+          const isDomainRunning = enemy.domainActive || enemy._mahitoDomainActive || enemy.isChannelingDomainExpansion || enemy.isChannelingDomain;
+          if (!isDomainRunning) return false;
+          const enemyTeam = state.getFighterTeam(idx);
+          return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
+        });
+        const currentDodgeRate = isEnemyDomain 
+          ? Math.round((CONFIG.toji?.domainDodgeChance ?? 1.0) * 100)
+          : Math.round((CONFIG.toji?.stealthDodgeChance ?? 0.25) * 100);
+        info.push(`<b>Dodge:</b> ${currentDodgeRate}%${isEnemyDomain ? ' <span style="color: #c084fc; font-size: 10px;">(DOMAIN)</span>' : ''}`);
       } else if (f.characterId === 'cronos' || f.type === 'cronos') {
         const baseSpeed = (f.baseSpeed || 5.0) * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
         const currentSpeed = f.speed !== undefined ? f.speed : baseSpeed;
@@ -944,8 +1136,8 @@ function updateHealthHud() {
 
         if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
           info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.pureLoveBeamRegenDebuffTimer > 0) {
-          const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+        } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
+          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25);
           const debuffedRegenPerSec = Math.round(currentRegenPerSec * debuffMult);
           info.push(`<b>Regen:</b> +${debuffedRegenPerSec}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (totalStages > 0) {
@@ -1094,6 +1286,21 @@ function updateHealthHud() {
       } else {
         info.push(`<b>Evade:</b> 0%`);
       }
+    }
+
+    // Tactical Force Operatives stats info
+    if (['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType)) {
+      const dmg = f.damage || (f._def && f._def.damage) || 20;
+      info.push(`<b>DMG:</b> ${dmg}`);
+      const spd = (f.speed || (f._def && f._def.moveSpeed) || 5.0).toFixed(1);
+      info.push(`<b>SPD:</b> ${spd}`);
+      let caliber = 'TACTICAL';
+      if (fType.includes('rifle') || fType.includes('m4a1')) caliber = '5.56 NATO';
+      else if (fType.includes('shotgun') || fType.includes('spas')) caliber = '12-GAUGE';
+      else if (fType.includes('pistol') || fType.includes('desert') || fType.includes('eagle')) caliber = '.50 AE';
+      else if (fType.includes('sniper') || fType.includes('awp')) caliber = '.338 LAPUA';
+      else if (fType.includes('barrett')) caliber = '.50 BMG';
+      info.push(`<b>CALIBER:</b> ${caliber}`);
     }
 
     // Tick Damage
@@ -1618,7 +1825,7 @@ function updateHealthHud() {
     } else {
       const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
-      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
+      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444');
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
       
@@ -1960,7 +2167,7 @@ function updateHealthHud() {
         tempDiv.innerHTML = cardHTML;
         const cardElement = tempDiv.firstElementChild;
 
-        if (mode === GAME_MODES.FFA || mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'TLFS') {
+        if (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA' || is1v1 || isStandOff || isTLFS || isTactical || fighters.length <= 4) {
           containerBottom.appendChild(cardElement);
         } else if (index % 2 === 0) {
           containerLeft.appendChild(cardElement);
@@ -2059,7 +2266,8 @@ function updateHealthHud() {
           m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
-        const hpText = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
+        const dmgVal = Math.round(fighter.damageDealt || 0);
+        const hpText = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))} • DMG ${dmgVal}`;
         if (m.lastHpText !== hpText) {
           m.text.textContent = hpText;
           m.lastHpText = hpText;
@@ -2232,7 +2440,8 @@ function updateHealthHud() {
       }
 
       if (cachedCard.hpBarText) {
-        const metaValue = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
+        const dmgVal = Math.round(fighter.damageDealt || 0);
+        const metaValue = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))} • DMG ${dmgVal}`;
         if (cachedCard.lastHpText !== metaValue) {
           cachedCard.hpBarText.textContent = metaValue;
           cachedCard.lastHpText = metaValue;
@@ -2395,8 +2604,9 @@ function updateHealthHud() {
         }
       }
     });
-
-    // 7. (Dim class toggle is now handled every frame before the throttle guard above.)
   }
 }
+
+export { updateHealthHud };
+
 

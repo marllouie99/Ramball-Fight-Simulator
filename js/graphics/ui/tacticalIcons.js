@@ -97,6 +97,43 @@ export const TACTICAL_ICONS = {
     <line x1="6" y1="16" x2="18" y2="16"/>
   </svg>`,
 
+  audio: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 18V5l12-2v13"/>
+    <circle cx="6" cy="18" r="3"/>
+    <circle cx="18" cy="16" r="3"/>
+  </svg>`,
+
+  crosshair: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="8"/>
+    <line x1="12" y1="2" x2="12" y2="6"/>
+    <line x1="12" y1="18" x2="12" y2="22"/>
+    <line x1="2" y1="12" x2="6" y2="12"/>
+    <line x1="18" y1="12" x2="22" y2="12"/>
+    <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+  </svg>`,
+
+  gun: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 8h12l1 3h3v3h-2v2h-3l-2-2H8l-3 4H2l2-6H3V8z"/>
+    <circle cx="10" cy="11" r="1" fill="currentColor"/>
+  </svg>`,
+
+  rifle: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2 11h14l3-2h3v4h-2l-2 2h-4v2h-2v-2H8l-4 3H2v-5z"/>
+    <line x1="11" y1="8" x2="16" y2="8"/>
+  </svg>`,
+
+  target: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="9"/>
+    <circle cx="12" cy="12" r="5"/>
+    <circle cx="12" cy="12" r="2" fill="currentColor"/>
+  </svg>`,
+
+  ammo: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="5" y="6" width="4" height="12" rx="1"/>
+    <rect x="10" y="4" width="4" height="14" rx="1"/>
+    <rect x="15" y="6" width="4" height="12" rx="1"/>
+  </svg>`,
+
   launch: `<svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
     <polygon points="5 3 19 12 5 21 5 3"/>
   </svg>`

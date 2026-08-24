@@ -11,7 +11,7 @@ import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { startNextRound, restartCurrentRound, resetMatch, randomize1v1Fighters, randomize1v2Fighters, goToTitle } from '../../core/gameFlow.js';
-import { MODE_SETTINGS } from '../../core/modeConfig.js';
+import { MODE_SETTINGS, GAME_MODES } from '../../core/modeConfig.js';
 import { stopArenaBgm } from '../../systems/arenaBgmSystem.js';
 
 // ──────────────────────────────────────────
@@ -146,25 +146,34 @@ function drawEngineerStyleHeroGlow(ctx, cx, cy, radius, glowColor = '#38bdf8', g
 // STYLIZED CHAMPION TYPOGRAPHY & NAMEPLATES
 // ──────────────────────────────────────────
 
-function drawChampionTitle(ctx, cx, y, titleText, themeColor) {
+function drawChampionTitle(ctx, cx, y, titleText, themeColor, maxAllowedWidth = 260) {
+  if (!titleText) return;
   ctx.save();
-  ctx.font = '900 38px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
+  let fontSize = 34;
+  ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif`;
+  let measuredW = ctx.measureText(titleText).width;
+  if (measuredW > maxAllowedWidth) {
+    fontSize = Math.max(16, Math.floor(fontSize * (maxAllowedWidth / measuredW)));
+    ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif`;
+    measuredW = ctx.measureText(titleText).width;
+  }
+
   // Layer 1: Wide radiant outer glow stroke
   ctx.strokeStyle = hexToRgba(themeColor, 0.55);
-  ctx.lineWidth = 14;
+  ctx.lineWidth = Math.max(4, fontSize * 0.35);
   ctx.strokeText(titleText, cx, y);
 
   // Layer 2: Sharp bold black outline
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 6;
+  ctx.lineWidth = Math.max(3, fontSize * 0.18);
   ctx.lineJoin = 'round';
   ctx.strokeText(titleText, cx, y);
 
   // Layer 3: Dynamic vertical gradient fill
-  const grad = ctx.createLinearGradient(0, y - 20, 0, y + 20);
+  const grad = ctx.createLinearGradient(0, y - fontSize * 0.5, 0, y + fontSize * 0.5);
   grad.addColorStop(0, '#ffffff');
   grad.addColorStop(0.40, adjustBrightness(themeColor, +30));
   grad.addColorStop(1, themeColor);
@@ -173,32 +182,43 @@ function drawChampionTitle(ctx, cx, y, titleText, themeColor) {
 
   // Layer 4: Bright inner highlight core
   ctx.fillStyle = '#ffffff';
-  ctx.font = '900 36px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif';
+  ctx.font = `900 ${Math.max(12, fontSize - 2)}px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif`;
   ctx.fillText(titleText, cx, y - 1);
 
   ctx.restore();
 }
 
-function drawChampionNameplate(ctx, cx, y, nameStr, themeColor) {
+function drawChampionNameplate(ctx, cx, y, nameStr, themeColor, fontScale = 1.0, maxAllowedWidth = 260) {
+  if (!nameStr) return;
   ctx.save();
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // Fighter Name
-  ctx.font = '900 24px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+  // Base font size with dynamic measurement fitting
+  let baseFontSize = 24;
+  let fontSize = Math.round(baseFontSize * fontScale);
+  ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", sans-serif`;
+
+  const targetMaxW = maxAllowedWidth * fontScale;
+  let measuredW = ctx.measureText(nameStr).width;
+  if (measuredW > targetMaxW) {
+    fontSize = Math.max(13, Math.floor(fontSize * (targetMaxW / measuredW)));
+    ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", sans-serif`;
+    measuredW = ctx.measureText(nameStr).width;
+  }
 
   // Radiant outer stroke
   ctx.strokeStyle = hexToRgba(themeColor, 0.40);
-  ctx.lineWidth = 8;
+  ctx.lineWidth = Math.max(3, 6 * fontScale);
   ctx.strokeText(nameStr, cx, y);
 
   // Black outline
   ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 4;
+  ctx.lineWidth = Math.max(2.5, 3.8 * fontScale);
   ctx.strokeText(nameStr, cx, y);
 
   // Gradient text fill
-  const nameGrad = ctx.createLinearGradient(0, y - 12, 0, y + 12);
+  const nameGrad = ctx.createLinearGradient(0, y - fontSize * 0.45, 0, y + fontSize * 0.45);
   nameGrad.addColorStop(0, '#ffffff');
   nameGrad.addColorStop(0.5, adjustBrightness(themeColor, +25));
   nameGrad.addColorStop(1, themeColor);
@@ -206,8 +226,8 @@ function drawChampionNameplate(ctx, cx, y, nameStr, themeColor) {
   ctx.fillText(nameStr, cx, y);
 
   // Laser Underline with Tactical Diamond Pins
-  const lineY = y + 18;
-  const halfW = Math.min(140, Math.max(75, nameStr.length * 8.0));
+  const lineY = y + (fontSize * 0.65) + 3;
+  const halfW = Math.min(targetMaxW / 2, Math.max(35 * fontScale, measuredW / 2 + 10 * fontScale));
 
   const lineGrad = ctx.createLinearGradient(cx - halfW, 0, cx + halfW, 0);
   lineGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
@@ -217,35 +237,37 @@ function drawChampionNameplate(ctx, cx, y, nameStr, themeColor) {
   lineGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
 
   ctx.strokeStyle = lineGrad;
-  ctx.lineWidth = 2.0;
+  ctx.lineWidth = 2.0 * fontScale;
   ctx.beginPath();
   ctx.moveTo(cx - halfW, lineY);
   ctx.lineTo(cx + halfW, lineY);
   ctx.stroke();
 
   // Diamond End Pins
-  [-halfW + 10, halfW - 10].forEach(dx => {
+  [-halfW + 6 * fontScale, halfW - 6 * fontScale].forEach(dx => {
     ctx.fillStyle = themeColor;
     ctx.beginPath();
-    ctx.arc(cx + dx, lineY, 2.8, 0, Math.PI * 2);
+    ctx.arc(cx + dx, lineY, 2.2 * fontScale, 0, Math.PI * 2);
     ctx.fill();
 
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
-    ctx.arc(cx + dx, lineY, 1.4, 0, Math.PI * 2);
+    ctx.arc(cx + dx, lineY, 1.0 * fontScale, 0, Math.PI * 2);
     ctx.fill();
   });
 
   ctx.restore();
 }
 
-function drawChampionStats(ctx, cx, yStart, winner, themeColor, timer = 60) {
-  const winnerDealt = Math.round(winner?.damageDealt || 0);
-  const winnerReceived = Math.round(winner?.damageReceived || 0);
+function drawChampionStats(ctx, cx, yStart, fighter, themeColor, timer = 60, startDelay = 14, fontScale = 1.0) {
+  if (!fighter) return;
+  const dealt = Math.round(fighter.damageDealt || 0);
+  const received = Math.round(fighter.damageReceived || 0);
 
-  const rowW = 180;
+  const rowW = 175 * fontScale;
   const leftX = cx - rowW / 2;
   const rightX = cx + rowW / 2;
+  const rowGap = 20 * fontScale;
 
   ctx.save();
 
@@ -254,9 +276,9 @@ function drawChampionStats(ctx, cx, yStart, winner, themeColor, timer = 60) {
     // 1. Label with black outline for high contrast
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.font = '900 13px "Outfit", "Rajdhani", sans-serif';
+    ctx.font = `900 ${Math.round(12 * fontScale)}px "Outfit", "Rajdhani", sans-serif`;
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3.0 * fontScale;
     ctx.strokeText(label.toUpperCase(), leftX, y);
     ctx.fillStyle = 'rgba(255, 255, 255, 0.85)';
     ctx.fillText(label.toUpperCase(), leftX, y);
@@ -268,27 +290,42 @@ function drawChampionStats(ctx, cx, yStart, winner, themeColor, timer = 60) {
     const numStr = currentNum.toString();
 
     ctx.textAlign = 'right';
-    ctx.font = '900 16px "Outfit", "Rajdhani", sans-serif';
+    ctx.font = `900 ${Math.round(15 * fontScale)}px "Outfit", "Rajdhani", sans-serif`;
 
     // Active rolling glow stroke
     if (rollProgress > 0 && rollProgress < 1.0) {
       ctx.strokeStyle = hexToRgba(valColor || '#ffffff', 0.40);
-      ctx.lineWidth = 6.0;
+      ctx.lineWidth = 5.0 * fontScale;
       ctx.strokeText(numStr, rightX, y);
     }
 
     // Crisp black outline & fill
     ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 3.5;
+    ctx.lineWidth = 3.0 * fontScale;
     ctx.strokeText(numStr, rightX, y);
 
     ctx.fillStyle = valColor || '#ffffff';
     ctx.fillText(numStr, rightX, y);
   };
 
-  // Staggered roll: Damage Dealt starts at frame 14, Damage Received starts at frame 18
-  drawRollingRow('Damage Dealt', winnerDealt, yStart, '#ffffff', 14);
-  drawRollingRow('Damage Received', winnerReceived, yStart + 24, '#f87171', 18);
+  // Calculate Kill Count for the champion
+  const rawKills = (state.gameState === 'roundEnd')
+    ? ((fighter.roundKilledDefs && fighter.roundKilledDefs.length > 0) ? fighter.roundKilledDefs : (fighter.killedDefs || []))
+    : ((fighter.killedDefs && fighter.killedDefs.length > 0) ? fighter.killedDefs : (fighter.roundKilledDefs || []));
+
+  const killCount = (rawKills && rawKills.length > 0)
+    ? rawKills.length
+    : (fighter.lastKilledDef ? 1 : 0);
+
+  const mode = state.mode;
+  const is1v1Mode = mode === '1v1' || mode === 'Stand Off' || mode === GAME_MODES.ONE_VS_ONE || mode === GAME_MODES.STAND_OFF || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Random' || mode === GAME_MODES.TACTICAL_RANDOM;
+
+  // Staggered roll: Damage Dealt starts at startDelay, Damage Received starts at startDelay + 4, Kill Count at startDelay + 8
+  drawRollingRow('Damage Dealt', dealt, yStart, '#ffffff', startDelay);
+  drawRollingRow('Damage Received', received, yStart + rowGap, '#f87171', startDelay + 4);
+  if (!is1v1Mode) {
+    drawRollingRow('Kill Count', killCount, yStart + rowGap * 2, '#38bdf8', startDelay + 8);
+  }
 
   ctx.restore();
 }
@@ -390,11 +427,18 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   ctx.restore();
 
   // Detect winning team members for team modes (1v2 Stand Off or 2v2)
+  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO);
+  const isTeamMode = is1v2 || is2v2;
+
   const winnerIndex = state.fighters ? state.fighters.indexOf(winner) : -1;
-  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : (state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
+  let winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : null;
+  if (winningTeam === null && isTeamMode) {
+    winningTeam = state.teamScores[0] >= state.teamScores[1] ? 0 : 1;
+  }
   let winningFighters = winner ? [winner] : [];
 
-  if (winningTeam !== null && (mode === '2v2' || mode === '1v2 Stand Off')) {
+  if (winningTeam !== null && isTeamMode) {
     const teamMembers = state.fighters.filter((f, idx) => f && state.getFighterTeam(idx) === winningTeam);
     if (teamMembers.length > 0) {
       winningFighters = teamMembers;
@@ -402,12 +446,12 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   }
 
   const isMultiWinner = winningFighters.length > 1;
-  const primaryThemeColor = winner?.color || '#38bdf8';
+  const primaryThemeColor = winner?.color || winningFighters[0]?.color || '#38bdf8';
 
   // 2. Left Hero Zone (Fighter Glides Smoothly into Left Side)
   const targetHeroX = arenaX + arenaW * 0.22;
   const targetHeroY = arenaY + arenaH * 0.50;
-  const targetScale = isMultiWinner ? 1.15 : 1.35;
+  const targetScale = isMultiWinner ? 1.05 : 1.35;
 
   // Store start positions snapshot at the moment of death
   if (!state._winnerStartPositions || state._winnerStartPositionsTimerReset !== isMatchEnd) {
@@ -425,21 +469,23 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   const glowProgress = Math.min(1.0, Math.max(0.0, (timer - 8) / 30));
 
   winningFighters.forEach((wFighter, idx) => {
-    const def = wFighter._def || FIGHTER_DEFS.find(d => d.id === wFighter._def?.id);
+    const def = wFighter._def || FIGHTER_DEFS.find(d => d.id === wFighter._def?.id || d.id === wFighter.characterId || d.type === wFighter.type || d.id === wFighter.id || d.name === wFighter.name) || wFighter;
     if (!def) return;
 
     const startPos = state._winnerStartPositions[idx] || { x: wFighter.x, y: wFighter.y, gunAngle: 0 };
-    const heroYOffset = isMultiWinner ? (idx === 0 ? -arenaH * 0.18 : arenaH * 0.18) : 0;
+    const heroYOffset = isMultiWinner ? (idx === 0 ? -70 : 70) : 0;
     const finalHeroY = targetHeroY + heroYOffset;
 
     const currX = startPos.x + (targetHeroX - startPos.x) * glideEase;
     const currY = startPos.y + (finalHeroY - startPos.y) * glideEase;
     const currScale = 1.0 + (targetScale - 1.0) * glideEase;
 
+    const fType = def.type || def.characterId || wFighter.type || wFighter.characterId || 'default';
+    const previewKey = fType + '_' + idx;
     if (!state._winnerFightersCache) state._winnerFightersCache = {};
-    if (!state._winnerFightersCache[def.type]) {
-      const FighterClass = FIGHTER_CLASS_MAP[def.type] || Fighter;
-      state._winnerFightersCache[def.type] = new FighterClass({
+    if (!state._winnerFightersCache[previewKey]) {
+      const FighterClass = FIGHTER_CLASS_MAP[fType] || Fighter;
+      state._winnerFightersCache[previewKey] = new FighterClass({
         ...def,
         startX: 0,
         startY: 0,
@@ -448,7 +494,7 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
       });
     }
 
-    const preview = state._winnerFightersCache[def.type];
+    const preview = state._winnerFightersCache[previewKey];
     preview.x = 0;
     preview.y = 0;
     preview.vx = 0;
@@ -494,27 +540,39 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     ctx.save();
     ctx.globalAlpha = statsProgress;
 
-    // Top Title ("CHAMPION" / "ROUND VICTORY")
-    drawChampionTitle(ctx, statsX, targetStatsY - 50, titleText, primaryThemeColor);
+    if (isMultiWinner && winningFighters.length >= 2) {
+      // Top Title ("CHAMPION" / "ROUND WINNER")
+      drawChampionTitle(ctx, statsX, targetStatsY - 145, titleText, primaryThemeColor, arenaW * 0.44);
 
-    // Fighter Nameplate
-    if (isMultiWinner && winningFighters.length === 2) {
-      const nameStr = `${winningFighters[0].name.toUpperCase()}  &  ${winningFighters[1].name.toUpperCase()}`;
-      drawChampionNameplate(ctx, statsX, targetStatsY - 14, nameStr, primaryThemeColor);
-    } else if (winner) {
-      drawChampionNameplate(ctx, statsX, targetStatsY - 14, winner.name.toUpperCase(), primaryThemeColor);
-    }
+      // Teammate 1 (Top Hero individual block)
+      const t1 = winningFighters[0];
+      const t1Y = targetStatsY - 70;
+      drawChampionNameplate(ctx, statsX, t1Y - 18, t1.name.toUpperCase(), t1.color || primaryThemeColor, 0.88, arenaW * 0.42);
+      drawChampionStats(ctx, statsX, t1Y + 12, t1, t1.color || primaryThemeColor, timer, 12, 0.90);
 
-    // Clean Text Stats with Rolling Digit Animation
-    if (winner) {
-      drawChampionStats(ctx, statsX, targetStatsY + 22, winner, primaryThemeColor, timer);
+      // Teammate 2 (Bottom Hero individual block)
+      const t2 = winningFighters[1];
+      const t2Y = targetStatsY + 70;
+      drawChampionNameplate(ctx, statsX, t2Y - 18, t2.name.toUpperCase(), t2.color || primaryThemeColor, 0.88, arenaW * 0.42);
+      drawChampionStats(ctx, statsX, t2Y + 12, t2, t2.color || primaryThemeColor, timer, 16, 0.90);
+    } else {
+      // Top Title ("CHAMPION" / "ROUND WINNER")
+      drawChampionTitle(ctx, statsX, targetStatsY - 58, titleText, primaryThemeColor, arenaW * 0.44);
+
+      // Solo Fighter Nameplate & Individual Stats
+      if (winner) {
+        drawChampionNameplate(ctx, statsX, targetStatsY - 14, winner.name.toUpperCase(), primaryThemeColor, 1.0, arenaW * 0.42);
+        drawChampionStats(ctx, statsX, targetStatsY + 22, winner, primaryThemeColor, timer, 14, 1.0);
+      }
     }
 
     ctx.restore();
   }
 
-  // 4. Pop-out "Follow for more :)" banner in the bottom center of the arena
-  drawFollowForMoreBanner(ctx, arenaX + arenaW / 2, arenaY + arenaH - 26, timer, primaryThemeColor);
+  // 4. Pop-out "Follow for more :)" banner in the bottom center of the arena (Shifted up for Tactical & FOC)
+  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.startsWith('tactical') || mode.startsWith('Tactical')));
+  const bannerY = isTactical ? (arenaY + arenaH - 58) : (arenaY + arenaH - 34);
+  drawFollowForMoreBanner(ctx, arenaX + arenaW / 2, bannerY, timer, primaryThemeColor);
 }
 
 // ─────────────────────────────────────────────
@@ -539,11 +597,21 @@ function drawRoundEndScreen() {
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
+  const is1v2 = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+  const is2v2 = (mode === '2v2' || mode === GAME_MODES.TWO_VS_TWO || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_2V2);
+  const isTeamMode = is1v2 || is2v2;
+  const isFFA = (mode === 'FFA' || mode === 'Tactical FFA' || mode === GAME_MODES.FFA || mode === GAME_MODES.TACTICAL_FFA);
+
   const winnerIndex = roundWinner ? state.fighters.indexOf(roundWinner) : -1;
+  const winningTeam = winnerIndex >= 0 ? state.getFighterTeam(winnerIndex) : (state.teamScores[0] >= state.teamScores[1] ? 0 : 1);
   const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 3;
   const winThresholdForReveal = modeRounds === 1 ? 1 : 2;
-  const hasTwoWins = winnerIndex >= 0 && scores[winnerIndex] >= winThresholdForReveal;
-  const isChampionReveal = (mode === 'FFA' && ffaMatchComplete) || (hasTwoWins && roundWinner);
+
+  const hasTwoWins = isTeamMode 
+    ? (winningTeam !== null && state.teamScores[winningTeam] >= winThresholdForReveal)
+    : (winnerIndex >= 0 && scores[winnerIndex] >= winThresholdForReveal);
+
+  const isChampionReveal = (isFFA && (ffaMatchComplete || modeRounds === 1)) || (hasTwoWins && roundWinner);
 
   const isChampionActive = delayedTimer > 0;
   state._isChampionLayoutActive = isChampionActive;
@@ -551,7 +619,7 @@ function drawRoundEndScreen() {
   if (isChampionActive) {
     const titleText = isChampionReveal 
       ? 'CHAMPION' 
-      : (roundWinner ? `${roundWinner.name.toUpperCase()} WINS!` : 'ROUND DRAW!');
+      : (roundWinner ? 'ROUND WINNER' : 'ROUND DRAW');
 
     drawInArenaChampionLayout(roundWinner, delayedTimer, titleText, mode, isChampionReveal);
   }
@@ -616,8 +684,9 @@ function drawMatchEndScreen() {
       resetMatch();
       goToTitle();
     } else {
-      if (mode === '1v2 Stand Off') {
-        import('../core/gameFlow.js').then(m => m.randomize1v2Fighters());
+      const is1v2Mode = (mode === '1v2 Stand Off' || mode === '1v2' || mode === 'STAND_OFF_1V2' || mode === GAME_MODES.STAND_OFF_1V2);
+      if (is1v2Mode) {
+        import('../../core/gameFlow.js').then(m => m.randomize1v2Fighters());
       } else if (mode === '1v1' || mode === 'Stand Off') {
         randomize1v1Fighters();
       }

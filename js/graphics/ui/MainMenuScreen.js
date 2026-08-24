@@ -283,7 +283,12 @@ function _drawSmallEditor(ctx, val, x, y, fighterIndex, statName) {
 
 function drawModeSelection(cx, cy) {
   const { ctx, canvas } = state;
-  const modes = [
+  const isTactical = state.gameCategory === 'tactical';
+  const modes = isTactical ? [
+    { id: GAME_MODES.TACTICAL_1V1 || 'Tactical 1v1', label: 'DUEL (1V1)' },
+    { id: GAME_MODES.TACTICAL_FFA || 'Tactical FFA', label: 'TACTICAL FFA (4P)' },
+    { id: GAME_MODES.TACTICAL_2V2 || 'Tactical 2v2', label: '2 VS 2 (TEAMS)' }
+  ] : [
     { id: '1v1', label: '1V1' },
     { id: 'Stand Off', label: 'STANDOFF' },
     { id: '1v2 Stand Off', label: '1V2 SHOW' },
@@ -291,7 +296,8 @@ function drawModeSelection(cx, cy) {
     { id: 'FFA', label: 'FFA' },
     { id: 'TLFS', label: 'TLFS' }
   ];
-  const buttonWidth = Math.min(80, Math.max(65, (canvas.width - 40) / modes.length - 4));
+
+  const buttonWidth = isTactical ? 140 : Math.min(80, Math.max(65, (canvas.width - 40) / modes.length - 4));
   const buttonHeight = 28;
   const gap = 5;
   const totalWidth = modes.length * buttonWidth + (modes.length - 1) * gap;
@@ -303,10 +309,10 @@ function drawModeSelection(cx, cy) {
 
     ctx.save();
     if (selected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.16)';
-      ctx.strokeStyle = '#f59e0b';
+      ctx.fillStyle = isTactical ? 'rgba(0, 229, 255, 0.18)' : 'rgba(245, 158, 11, 0.16)';
+      ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.5)' : 'rgba(245, 158, 11, 0.4)';
       ctx.shadowBlur = 8;
     } else {
       ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
@@ -320,8 +326,8 @@ function drawModeSelection(cx, cy) {
     ctx.restore();
 
     // Mode text
-    ctx.fillStyle = selected ? '#ffffff' : '#8899aa';
-    ctx.font = '900 11px "Rajdhani", "Outfit", sans-serif';
+    ctx.fillStyle = selected ? (isTactical ? '#00e5ff' : '#ffffff') : '#8899aa';
+    ctx.font = '900 11.5px "Rajdhani", "Outfit", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(mode.label, startX + buttonWidth / 2, cy);
@@ -332,7 +338,7 @@ function drawModeSelection(cx, cy) {
         if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
           audioSystem.playSFX('skill_dash1', 0.2);
         }
-        if (state.mode === 'FFA' || state.mode === '2v2') {
+        if (state.mode === 'FFA' || state.mode === '2v2' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.TACTICAL_FFA) {
           state.p3Index = state.p3Index ?? 2;
           state.p4Index = state.p4Index ?? 3;
         }

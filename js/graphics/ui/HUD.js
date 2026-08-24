@@ -243,7 +243,8 @@ function drawCountdown() {
   const cy = state.arena.y + state.arena.height / 2;
 
   if (announcerPlayingSequence) {
-    const isSubtitleHidden = (state.mode === '1v1' || state.mode === 'Stand Off' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.FFA || state.mode === 'FFA');
+    const isTactical = state.gameCategory === 'tactical' || (typeof state.mode === 'string' && (state.mode.startsWith('tactical') || state.mode.startsWith('Tactical')));
+    const isSubtitleHidden = isTactical || (state.mode === '1v1' || state.mode === 'Stand Off' || state.mode === '1v2 Stand Off' || state.mode === GAME_MODES.FFA || state.mode === 'FFA');
     if (announcerSubtitle && !isSubtitleHidden) {
       ctx.save();
       // Use "Architects Daughter" if text contains numbers, otherwise use "Glast Blitch"

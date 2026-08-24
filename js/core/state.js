@@ -194,6 +194,7 @@ export const state = {
   mahitoClawCustomBlades: null,
 
   indexCategory: 'All',
+  gameCategory: 'foc', // 'foc' (Fight of Characters) | 'tactical' (Tactical Shooter)
   mode: GAME_MODES.ONE_VS_ONE,
   arenaTheme: 'light', // 'light' | 'dark'
   testMode: false, // Disables leaderboard recording
@@ -229,12 +230,19 @@ export const state = {
   // Leaderboard for 1v1 mode - tracks wins and losses per fighter
   leaderboard: {}, // { fighterIndex: { wins: 0, losses: 0 } }
 
-  // Team assignment for 2v2: fighters 0,1 are team 0; fighters 2,3 are team 1
+  // Team assignment: for 4v4 CT vs T, 2v2 duo, and 1v2 standoff
   getFighterTeam(fighterIndex) {
-    if (state.mode === GAME_MODES.TWO_VS_TWO) {
+    const is4v4 = state.mode === GAME_MODES.TACTICAL_4V4 || state.mode === 'Tactical 4v4' || state.mode === '4v4';
+    const is2v2 = state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2';
+    const is1v2 = state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2';
+    if (is4v4) {
+      if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
+      const half = Math.max(1, Math.ceil(state.fighters.length / 2));
+      return fighterIndex < half ? 0 : 1;
+    } else if (is2v2) {
       if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
       return fighterIndex < 2 ? 0 : 1;
-    } else if (state.mode === GAME_MODES.STAND_OFF_1V2) {
+    } else if (is1v2) {
       if (typeof fighterIndex !== 'number' || fighterIndex < 0 || fighterIndex >= state.fighters.length) return null;
       return fighterIndex === 0 ? 0 : 1;
     }
@@ -317,6 +325,9 @@ export const state = {
   // Match kill tracking for leaderboard
   matchKills: [[], [], [], []],
 
+  // Counter-Strike style kill feed
+  killFeed: [],
+
   // Machine gun casing effects
   effects: [],
 
@@ -329,6 +340,10 @@ export const state = {
   announcerSubtitle: '',
   matchTimer: 0,
 };
+
+if (typeof window !== 'undefined') {
+  window.state = state;
+}
 
 // ─────────────────────────────────────────────
 // HELPER FUNCTIONS
@@ -555,9 +570,49 @@ export function loadWeaponCustomizations() {
   }
 }
 
+// Save fighter selections per category (foc / tactical) to localStorage
+export function saveFighterSelections() {
+  try {
+    const cat = state.gameCategory || 'foc';
+    const selections = {
+      p1Index: state.p1Index ?? 0,
+      p2Index: state.p2Index ?? 1,
+      p3Index: state.p3Index ?? 2,
+      p4Index: state.p4Index ?? 3
+    };
+    const allSavedStr = localStorage.getItem('circleMiniBattleFighterSelections');
+    const allSaved = allSavedStr ? JSON.parse(allSavedStr) : {};
+    allSaved[cat] = selections;
+    localStorage.setItem('circleMiniBattleFighterSelections', JSON.stringify(allSaved));
+  } catch (e) {
+    console.warn('Could not save fighter selections:', e);
+  }
+}
+
+// Load fighter selections for a specific category (or current state.gameCategory)
+export function loadFighterSelections(targetCat = null) {
+  try {
+    const cat = targetCat || state.gameCategory || 'foc';
+    const allSavedStr = localStorage.getItem('circleMiniBattleFighterSelections');
+    if (allSavedStr) {
+      const allSaved = JSON.parse(allSavedStr);
+      if (allSaved && allSaved[cat]) {
+        const sel = allSaved[cat];
+        if (typeof sel.p1Index === 'number') state.p1Index = sel.p1Index;
+        if (typeof sel.p2Index === 'number') state.p2Index = sel.p2Index;
+        if (typeof sel.p3Index === 'number') state.p3Index = sel.p3Index;
+        if (typeof sel.p4Index === 'number') state.p4Index = sel.p4Index;
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load fighter selections:', e);
+  }
+}
+
 // Initialize on load
 loadLeaderboard();
 loadWeaponCustomizations();
+loadFighterSelections();
 
 // Debug hook: expose internal state for browser inspection
 if (typeof window !== 'undefined') {
@@ -628,11 +683,8 @@ const SKILL_TEXT_WHITELIST = [
 
 function isAllowedFloatingText(text) {
   const normalizedText = String(text).trim();
-  const isNumeric = /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
-  if (isNumeric) return true;
-  if (normalizedText.startsWith('SHIELD ') || normalizedText.startsWith('CRIT!') || normalizedText.includes('CRIT')) return true;
-  if (normalizedText.includes('SILENCED') || normalizedText.includes('PARRY') || normalizedText.includes('FLURRY') || normalizedText.includes('INCINERAT') || normalizedText.includes('MACHINE GUN') || normalizedText.includes('CANNON') || normalizedText.includes('STOMP') || normalizedText.includes('MISS') || normalizedText.includes('EVASION') || normalizedText.includes('EVADE')) return true;
-  return SKILL_TEXT_WHITELIST.includes(normalizedText);
+  // Strictly allow only numeric damage or heal values (e.g. 24, -24, +50, 105)
+  return /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
 }
 
 const FLOATING_TEXT_SPAM_COOLDOWN = 50; // ms window to filter identical messages in close proximity
@@ -743,12 +795,7 @@ function getContrastColor(colorStr, backgroundIsDark) {
 }
 
 export function spawnFloatingText(x, y, text, color = '#ffffff') {
-  if (MINIMAL_FLOATING_TEXT && !isAllowedFloatingText(text)) return;
-
-  const normalizedUpper = String(text).trim().toUpperCase();
-  if (normalizedUpper === 'MISS!' || normalizedUpper === 'MISS' || normalizedUpper === 'NEAR MISS!' || normalizedUpper.includes('MISS')) {
-    color = '#A0AEC0'; // Combat Gray / Silver
-  }
+  if (!isAllowedFloatingText(text)) return;
 
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive);
   const backgroundIsDark = hasActiveDomain || (state.currentHUDDimOpacity && state.currentHUDDimOpacity > 0.3);
@@ -887,3 +934,5 @@ state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
 window.state = state;
 window.triggerMissionPassedOverlay = triggerMissionPassedOverlay;
 window.triggerWastedOverlay = triggerWastedOverlay;
+
+export { pushKillFeed } from '../graphics/ui/killFeedRenderer.js';

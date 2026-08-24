@@ -13,6 +13,7 @@ import { updateIllusions } from './illusionSystem.js';
 import { triggerMahitoParalyzeExplosion } from '../entities/fighters/mahito/mahitoCombat.js';
 import { spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
 import { clampRikaToArena } from '../entities/fighters/yuta/rikaLogic.js';
+import { handleObstacleCollision, hasLineOfSight, STARTER_MAP } from '../../Tactical Force/maps/index.js';
 
 // ─────────────────────────────────────────────
 // SPATIAL PARTITIONING GRID
@@ -381,9 +382,14 @@ export function updateProjectiles() {
 function getClosestOpponent(fighter) {
   let closest = null;
   let bestDistance = Infinity;
+  let closestLOS = null;
+  let bestDistanceLOS = Infinity;
+
   const fighterIndex = fighter._stateIdx !== undefined ? fighter._stateIdx : state.fighters.indexOf(fighter);
   const fighterTeam = state.getFighterTeam(fighterIndex);
-  const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2);
+  const isTactical = state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical');
+  const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2 || (isTactical && (state.mode === 'Tactical 2v2' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4)));
+  const obstacles = isTactical ? ((state.activeMap && state.activeMap.obstacles) || STARTER_MAP.obstacles) : null;
 
   // Check regular fighters
   for (let i = 0; i < state.fighters.length; i++) {
@@ -398,9 +404,19 @@ function getClosestOpponent(fighter) {
     const dx = other.x - fighter.x;
     const dy = other.y - fighter.y;
     const dSq = dx * dx + dy * dy;
+
     if (dSq < bestDistance) {
       bestDistance = dSq;
       closest = other;
+    }
+
+    if (obstacles) {
+      if (hasLineOfSight(fighter.x, fighter.y, other.x, other.y, obstacles)) {
+        if (dSq < bestDistanceLOS) {
+          bestDistanceLOS = dSq;
+          closestLOS = other;
+        }
+      }
     }
   }
 
@@ -409,9 +425,7 @@ function getClosestOpponent(fighter) {
     for (let i = 0; i < state.illusions.length; i++) {
       const illusion = state.illusions[i];
       if (!illusion || illusion.hp <= 0 || (illusion.vanishTimer && illusion.vanishTimer > 0)) continue;
-      // Skip if this illusion belongs to the fighter (Doppleganger shouldn't target own illusions)
       if (illusion.owner === fighter) continue;
-      // Skip if this illusion belongs to a teammate
       if (isTeamMode && fighterTeam !== null && illusion.owner) {
         const _illOwnerIdx = illusion.owner._stateIdx !== undefined ? illusion.owner._stateIdx : state.fighters.indexOf(illusion.owner);
         const ownerTeam = state.getFighterTeam(_illOwnerIdx);
@@ -420,9 +434,19 @@ function getClosestOpponent(fighter) {
       const dx = illusion.x - fighter.x;
       const dy = illusion.y - fighter.y;
       const dSq = dx * dx + dy * dy;
+
       if (dSq < bestDistance) {
         bestDistance = dSq;
         closest = illusion;
+      }
+
+      if (obstacles) {
+        if (hasLineOfSight(fighter.x, fighter.y, illusion.x, illusion.y, obstacles)) {
+          if (dSq < bestDistanceLOS) {
+            bestDistanceLOS = dSq;
+            closestLOS = illusion;
+          }
+        }
       }
     }
   }
@@ -432,9 +456,7 @@ function getClosestOpponent(fighter) {
     for (let i = 0; i < state.cjDriveBys.length; i++) {
       const car = state.cjDriveBys[i];
       if (!car || car.dead || car.hp <= 0 || car.phase === 'WAITING_REENTER') continue;
-      // Skip if this car belongs to the fighter or their owner
       if (car.owner === fighter || (fighter.owner && car.owner === fighter.owner)) continue;
-      // Skip if this car belongs to a teammate
       if (isTeamMode && fighterTeam !== null && car.owner) {
         const _carOwnerIdx = car.owner._stateIdx !== undefined ? car.owner._stateIdx : state.fighters.indexOf(car.owner);
         const ownerTeam = state.getFighterTeam(_carOwnerIdx);
@@ -448,6 +470,11 @@ function getClosestOpponent(fighter) {
         closest = car;
       }
     }
+  }
+
+  // If an enemy with clear Line of Sight exists, prioritize engaging them!
+  if (closestLOS) {
+    return closestLOS;
   }
 
   return closest;
@@ -482,7 +509,8 @@ function checkCjVictoryOverlay(winner) {
 }
 
 function endRoundIfFFAEnded() {
-  if (state.mode !== GAME_MODES.FFA || state.gameState !== 'playing') return;
+  const isFFA = (state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA');
+  if (!isFFA || state.gameState !== 'playing') return;
 
   let aliveCount = 0;
   let winner = null;
@@ -501,14 +529,19 @@ function endRoundIfFFAEnded() {
   state.roundWinner = winner;
   state.roundEndTimer = 0;
 
+  const modeRounds = MODE_SETTINGS[state.mode]?.rounds || 1;
+  const winThreshold = modeRounds === 1 ? 1 : 2;
+
   let isMatchEnd = false;
   if (winner) {
     checkCjVictoryOverlay(winner);
     const winnerIndex = state.fighters.indexOf(winner);
     if (winnerIndex >= 0) {
-      const winThreshold = 2;
-      if (state.scores[winnerIndex] + 1 >= winThreshold) {
+      state.scores[winnerIndex]++;
+      if (state.scores[winnerIndex] >= winThreshold) {
         isMatchEnd = true;
+        state.ffaMatchComplete = true;
+        state.matchWinner = winner;
       }
     }
   }
@@ -519,23 +552,12 @@ function endRoundIfFFAEnded() {
     stopAllLoopingSounds();
   }
 
-  if (winner) {
-    const winnerIndex = state.fighters.indexOf(winner);
-    if (winnerIndex >= 0) {
-      state.scores[winnerIndex]++;
-      const winThreshold = 2;
-      if (state.scores[winnerIndex] >= winThreshold) {
-        state.ffaMatchComplete = true;
-      }
-    }
-  }
-
-  state.gameState = 'roundEnd';
+  state.gameState = isMatchEnd ? 'matchEnd' : 'roundEnd';
 }
 
 function endRoundIf2v2Ended() {
   const is1v2 = (state.mode === GAME_MODES.STAND_OFF_1V2 || state.mode === '1v2 Stand Off' || state.mode === '1v2' || state.mode === 'STAND_OFF_1V2');
-  const is2v2 = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2');
+  const is2v2 = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === '2v2' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === 'Tactical 2v2');
   if ((!is2v2 && !is1v2) || state.gameState !== 'playing') return;
 
   let team0Alive = false;
@@ -873,6 +895,16 @@ export function updateFighters() {
 
     updateFuelPickups();
     updateIllusions();
+
+    // 3. Tactical Map Obstacle Collisions (Supports Sector 01 & Sector 02 Monolith)
+    const activeObstacles = (state.activeMap && state.activeMap.obstacles) || (state.gameCategory === 'tactical' ? STARTER_MAP.obstacles : null);
+    if (activeObstacles && activeObstacles.length > 0) {
+      for (const fighter of state.fighters) {
+        if (fighter && fighter.hp > 0) {
+          handleObstacleCollision(fighter, activeObstacles);
+        }
+      }
+    }
   }
 
   if (state.gameState === 'playing') {

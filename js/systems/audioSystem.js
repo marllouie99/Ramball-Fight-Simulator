@@ -85,41 +85,55 @@ class AudioEventEmitter {
     const newPriority = options.priority || (options.isProtected ? 'protected' : 'normal');
 
     // Priority levels: 'domain' (highest, level 3) > 'protected' (level 2) > 'normal' (level 1)
-    const priorityValue = {
-      'domain': 3,
-      'protected': 2,
-      'normal': 1
-    };
-
     const currentPriority = fighter._activeVoicelinePriority || (fighter._activeVoicelineIsProtected ? 'protected' : 'normal');
     const isCurrentActive = Boolean(
       fighter._activeVoicelineHandle &&
-      fighter._activeVoicelineEndTime &&
-      now < fighter._activeVoicelineEndTime
+      (
+        (typeof fighter._activeVoicelineHandle.isPlaying === 'function' && fighter._activeVoicelineHandle.isPlaying()) ||
+        (fighter._activeVoicelineEndTime && now < fighter._activeVoicelineEndTime)
+      )
     );
 
-    // If a strictly higher priority voiceline is currently playing and not expired, block lower priority incoming lines
-    if (isCurrentActive && (priorityValue[newPriority] || 1) < (priorityValue[currentPriority] || 1)) {
-      return null;
-    }
-
-    // Stop the fighter's currently playing voiceline (if any)
-    if (fighter._activeVoicelineHandle) {
+    // If an active voiceline is already playing on this fighter:
+    // Regular ability voicelines MUST NOT cut off an ongoing speaking line mid-sentence.
+    // Domain Channeling & Domain Deployment are the ONLY exceptions that can interrupt and override.
+    if (isCurrentActive) {
+      if (newPriority !== 'domain') {
+        // Speaker is currently talking; do not interrupt or cut off mid-speech!
+        return null;
+      }
+      // Domain Expansion / Channeling: stops any previous voiceline cleanly
+      if (fighter._activeVoicelineHandle) {
+        stopSound(fighter._activeVoicelineHandle);
+        fighter._activeVoicelineHandle = null;
+      }
+    } else if (fighter._activeVoicelineHandle) {
       stopSound(fighter._activeVoicelineHandle);
       fighter._activeVoicelineHandle = null;
     }
 
     // Play the new voiceline and store the handle on the fighter
-    const handle = this.playSFX(id, volume, speed, offset, delay);
+    const handle = this.playSFX(id, volume, speed, offset, delay, () => {
+      if (fighter._activeVoicelineHandle === handle) {
+        fighter._activeVoicelineHandle = null;
+        delete fighter._activeVoicelineEndTime;
+        delete fighter._activeVoicelinePriority;
+        delete fighter._activeVoicelineIsProtected;
+      }
+    });
+
+    if (!handle) return null;
+
     fighter._activeVoicelineHandle = handle;
     fighter._activeVoicelinePriority = newPriority;
     fighter._activeVoicelineIsProtected = (newPriority === 'domain' || newPriority === 'protected');
-    if (fighter._activeVoicelineIsProtected) {
-      const durationMs = (options && options.durationMs) || 4000;
-      fighter._activeVoicelineEndTime = now + durationMs;
-    } else {
-      delete fighter._activeVoicelineEndTime;
-    }
+
+    // Calculate natural duration from audio handle or fallback
+    const defaultDurationMs = (handle.duration && handle.duration > 0)
+      ? (handle.duration * 1000)
+      : (newPriority === 'domain' ? 3500 : 2200);
+    const durationMs = (options && options.durationMs) || defaultDurationMs;
+    fighter._activeVoicelineEndTime = now + durationMs;
 
     return handle;
   }

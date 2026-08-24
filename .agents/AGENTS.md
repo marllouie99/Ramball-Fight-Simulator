@@ -40,7 +40,7 @@
 - ALL existing and future fighters, summoned minions, illusions, Doppelganger clones, turrets, and entities MUST be affected by Gojo's **Limitless Infinity barrier** when striking or approaching Gojo while Infinity is active (`infinityCooldown <= 0`).
 - The ONLY explicit lore exception is **Toji Fushiguro** (`characterId === 'toji'` or `type === 'toji'`), who wields the Inverted Spear of Heaven (ISOH) to bypass Limitless Infinity.
 - **Mahoraga** is blocked and frozen initially, but after 2 Infinity freeze exposures, Mahoraga's Eight-Handled Sword Wheel clicks to adapt (`gojoInfinityImmune = true` & `adapted.melee = true`), granting total immunity to Infinity freeze thereafter.
-- Whenever an entity (fighter or illusion) has `timeStopTimer > 0` or `isFrozenByInfinity = true`, `draw.js` MUST render a deep electric cyan blue fill overlay (`rgba(0, 229, 255, 0.65)`) over the entity's body (matching frozen projectile visuals).
+- Stunned, paralyzed, or time-stopped entities (fighters & illusions) render the 3D orbiting golden rings and stars stun visual (`drawParalyzeEffect`), avoiding full-body cyan paint overlays.
 
 ## 10. WebGL / PixiJS Rendering & Performance Guidelines (Hybrid Rendering)
 - High-frequency or persistent heavy visual effects (such as Sukuna's Fuga fire arrow trail, Gojo's Hollow Purple/Lapse Blue moving orbs, and full-screen dim overlays) MUST be migrated to WebGL/PixiJS to maintain 60 FPS performance (especially during screen recording).
@@ -352,5 +352,61 @@ To support a new weapon in the Weapon Studio:
 - In addition to the HUD health bar pop-out bubble, the in-world floating text over the fighter's body MUST follow Rule 22 format (`+<amount>` in `#00FF66`).
 - Cheat currency, shields, or titles (e.g. `+$250,000` in `#22C55E` and `+75 KEVLAR SHIELD` in `#38BDF8`) MUST spawn as dedicated separate floating text elements to prevent visual clutter or overlapping.
 
+## 25. Tactical Force — Engineering & Visual Standards
 
+### 1. Unified Neon Theme Weapon Graphics Standard
+- **Unified Visual Identity**: ALL firearms in Tactical Force (M4A1, SPAS-12, Desert Eagle, AWP, and all future firearms) MUST strictly adhere to the unified **Neon Tactical Cyberpunk Theme**:
+  - **Base Chassis / Receiver**: Deep obsidian and cyber-slate matte body (`#0b0f19`, `#0f172a`, `#1e293b`).
+  - **Luminous Neon Contours**: Razor-sharp glowing neon outline borders and energy conduit inlays (`lineWidth: 1.2px – 1.4px`) with high contrast against dark backdrops.
+  - **Thematic Character & Weapon Neon Color Matrix**:
+    - **M4A1 (Tactical Rifle)**: **Neon Electric Cyan** (`#00e5ff` / `#38bdf8`)
+    - **SPAS-12 (Tactical Shotgun)**: **Neon Emerald / Matrix Mint** (`#10b981` / `#00ff88`)
+    - **Desert Eagle (Magnum Pistol)**: **Neon Cyber Amber / Solar Gold** (`#f59e0b` / `#ffb703`)
+    - **AWP (Bolt-Action Sniper)**: **Neon Hyper Plasma Blue / Cyan** (`#00f0ff` / `#38bdf8`)
+  - **Holographic Optics & Sights**: Semi-transparent neon tinted glass (`rgba(neon, 0.65)`) with bright white center reticle dot.
+  - **Muzzle Flashes**: Directional multi-spike flash polygons with white-hot core (`#ffffff`) and theme-matching neon outer petals.
+  - **Prohibition of `shadowBlur`**: NEVER use `ctx.shadowBlur` or `ctx.shadowColor` for neon weapon glows (Rule 11). Simulate luminescence with concentric shapes and high-contrast neon vector fills.
 
+### 2. Fighter Update Loop & Combat Method Signatures
+- **Argument Propagation in `update()`**: Subclasses (`RifleFighter`, `ShotgunFighter`, `PistolFighter`, `SniperFighter`) MUST pass all parameters to `super.update(opponent, ownerIndex, arena)`. Failing to pass `opponent` causes base physics to drop target tracking and halt movement.
+- **Top Freeze Guard (Rule 1)**: Must return immediately when `this._handleTimeStop()` evaluates to true.
+- **Overloaded `shoot()` Signature Support**: Handle overloaded calls where `typeof target === 'number'` to prevent `undefined` ownerIndex.
+
+### 3. Obstacle Physics & Collision Standards
+- **Obstacle Penetration Resolution**: Rectangular cover barriers must resolve both perimeter and interior overlaps, reflecting velocity with restitution (`0.85 – 0.90`).
+- **Natural Tangent Deflection & Normalization**: Always apply a subtle tangential deflection jitter on bounce and invoke `entity.normalizeSpeed()` so fighters immediately recover standard patrol velocity.
+
+### 4. Ultra-Simple Persistent Tactical HUD Architecture
+- **In-Place DOM Mutation**: NEVER re-assign `innerHTML = ...` inside recurring update ticks. Cache card element references (`_tacticalCards = { top: [], bottom: [] }`) and update properties in-place.
+- **Ultra-Simple Minimalist Layout**:
+  - Top HUD (Team 1 CT): 2 compact side-by-side cards.
+  - Bottom HUD (Team 2 T): 2 compact side-by-side cards.
+  - Minimal elements: Operative name on the left, current HP / `KIA` on the right, and a clean 6px solid health bar underneath.
+  - Zero bloated paddings, zero drop-shadow blur filters, zero nested sub-bars or clutter.
+
+### 5. Tactical Map Geometry & Arena Dark Mode Standards
+- **Clean Minimalist Geometry**: Solid slate walls (`#1e293b` fill, `#475569` border) and solid dark arena floor (`#0d1117`).
+- **Pitch Black Canvas Background**: Outer canvas space MUST be deep pure black (`#000000`) for high-contrast neon readability.
+
+### 6. Unified Tactical Projectiles Standard (Dynamic Character Color Theme)
+- **Unified Streamlined Geometry**: All tactical projectiles share a sleek, aerodynamic tracer capsule (`drawTacticalBullet`) with a brilliant white-hot kinetic core and a tapered trailing speed streak.
+- **Dynamic Character Theme Color**: The outer neon tracer glow and motion streak MUST dynamically reflect the firing character's color theme (`p.color || shooter.color || shooter.themeColor`), ensuring visual harmony across all operatives (M4A1 Cyan, SPAS-12 Emerald, Desert Eagle Amber, AWP Plasma Blue).
+- **Proportional Caliber Scaling**: Caliber differences (shotgun pellets vs. magnum pistol slugs vs. sniper match rounds) are represented via `bulletLength`, `bulletWidth`, and `tacticalCaliberScale` while strictly preserving the unified capsule geometry.
+
+### 7. Tactical AI Line-of-Sight (LOS) & Wall Occlusion Standards
+- **Line-of-Sight Raycasting**: All tactical AI fighters MUST evaluate `hasLineOfSight(x1, y1, x2, y2, obstacles)` before aiming and shooting.
+- **No Wall Auto-Aim Lock**: When an opponent is occluded behind a wall (`hasLineOfSight === false`), AI fighters MUST NOT lock their guns through the wall. Instead, they aim forward in the direction of their movement velocity, slicing corners naturally.
+- **Hold Fire on Blocked Sightlines**: AI fighters MUST NOT discharge weapons into solid cover obstacles (`if (!hasLineOfSight) return;`), saving ammunition until clear line-of-sight is established.
+- **LOS Target Prioritization**: `getClosestOpponent()` prioritizes engaging enemies with unobstructed sightlines over occluded targets.
+- **Obstacle-Clipped Laser Sight**: Sniper laser aimlines must raycast against obstacles (`raycastToObstacles()`) and terminate directly on the wall surface with a laser point.
+
+### 8. Tactical Game Mode Configuration Standards
+- **Centralized Mode Config**: All Tactical Shooter match rules, team structures, rounds, health pools, and HUD layouts are defined in `Tactical Force/tacticalModeConfig.js` (`TACTICAL_GAME_MODES`, `TACTICAL_MODE_SETTINGS`, `TACTICAL_SYSTEM_CONFIG`).
+- **Standardized Modes**:
+  - `Tactical 2v2`: 2v2 CT (M4A1, SPAS-12) vs T (Desert Eagle, AWP), 3 rounds, 500 HP, Sector 01 map.
+  - `Tactical 1v1`: 1v1 duel, 3 rounds, 500 HP.
+  - `Tactical Stand Off`: 1 round sudden death, 1500 HP.
+  - `Tactical FFA`: 4-player deathmatch, 3 rounds, 500 HP.
+  - `Tactical 4v4`: 4v4 full squad encounter, 5 rounds, 500 HP.
+  - `Tactical Random`: Random firearm loadout round rotations.
+- **System Rules**: Always enforce dark arena theme, 2D line of sight, and unified projectile visuals across all tactical modes.

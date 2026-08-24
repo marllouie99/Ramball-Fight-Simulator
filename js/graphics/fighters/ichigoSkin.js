@@ -1,4 +1,4 @@
-import { getHandSize } from '../../core/config.js';
+import { getHandSize, CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
 export function drawIchigoSkin(ctx, fighter) {
@@ -22,31 +22,34 @@ export function drawIchigoSkin(ctx, fighter) {
   );
 
   const isBankaiChanneling = !isFrozen && Boolean(fighter.isChannelingBankai && fighter.bankaiChargeTimer > 0);
+  const isBankaiBursting = !isFrozen && Boolean(fighter.bankaiBurstTimer && fighter.bankaiBurstTimer > 0);
   const auraOpacity = isBankai ? 0.85 : (isMask ? 0.65 : 0.25);
 
   let bankaiProg = 0;
   if (isBankaiChanneling) {
-    const maxB = fighter.bankaiChargeMax || 50;
+    const maxB = fighter.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 50;
     bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.bankaiChargeTimer || 0) / maxB)));
   }
 
   if (isBankaiChanneling) {
-    _drawBankaiTransformationDome(ctx, r, bankaiProg, now);
+    _drawBankaiTransformationVortex(ctx, r, bankaiProg, now, fighter);
+  } else if (isBankaiBursting) {
+    _drawBankaiEruptionBurst(ctx, r, fighter, now);
   } else if (!isLowQuality) {
     const pulse = 1.0 + Math.sin(now * 0.015) * 0.15;
-    const grad = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, r * (isBankai ? 2.4 : (isMask ? 2.0 : 1.6)) * pulse);
+    const grad = ctx.createRadialGradient(0, 0, r * 0.7, 0, 0, r * (isBankai ? 2.6 : (isMask ? 2.0 : 1.6)) * pulse);
     
     if (isBankai && isMask) {
       // Bankai + Hollow Mask: Dense black core with fiery crimson / cyan corona
-      grad.addColorStop(0, 'rgba(0, 229, 255, 0.75)');
-      grad.addColorStop(0.35, 'rgba(255, 30, 0, 0.65)');
-      grad.addColorStop(0.7, 'rgba(10, 5, 10, 0.5)');
+      grad.addColorStop(0, 'rgba(0, 229, 255, 0.85)');
+      grad.addColorStop(0.30, 'rgba(255, 30, 0, 0.75)');
+      grad.addColorStop(0.65, 'rgba(10, 5, 10, 0.65)');
       grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
     } else if (isBankai) {
-      // Pure Bankai: Intense black & electric cyan Reiatsu aura
-      grad.addColorStop(0, 'rgba(0, 229, 255, 0.80)');
-      grad.addColorStop(0.4, 'rgba(15, 15, 25, 0.65)');
-      grad.addColorStop(0.8, 'rgba(0, 100, 150, 0.35)');
+      // Pure Bankai: Deep black void core + roaring electric cyan & fiery crimson corona
+      grad.addColorStop(0, 'rgba(0, 229, 255, 0.90)');
+      grad.addColorStop(0.35, 'rgba(220, 20, 20, 0.60)');
+      grad.addColorStop(0.70, 'rgba(10, 10, 18, 0.75)');
       grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
     } else if (isMask) {
       // Hollow Mask: Black & red flame-like aura
@@ -62,8 +65,13 @@ export function drawIchigoSkin(ctx, fighter) {
     
     ctx.fillStyle = grad;
     ctx.beginPath();
-    ctx.arc(0, 0, r * (isBankai ? 2.4 : (isMask ? 2.0 : 1.6)) * pulse, 0, Math.PI * 2);
+    ctx.arc(0, 0, r * (isBankai ? 2.6 : (isMask ? 2.0 : 1.6)) * pulse, 0, Math.PI * 2);
     ctx.fill();
+
+    // Active Bankai rising spiritual flame wisps
+    if (isBankai && !isFrozen) {
+      _drawBankaiActiveFlameWisps(ctx, r, now);
+    }
   }
 
   // ── 2. Facing / Rotation Setup ──
@@ -100,7 +108,7 @@ export function drawIchigoSkin(ctx, fighter) {
   const isChanneling = !isFrozenEntity && Boolean(fighter.isChannelingGetsuga && fighter.getsugaChargeTimer > 0);
   let chargeProg = 0;
   if (isChanneling) {
-    const chargeMax = fighter.getsugaChargeMax || 24;
+    const chargeMax = fighter.getsugaChargeMax || CONFIG.ichigo?.getsugaChargeFrames || 50;
     chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
   }
 
@@ -111,7 +119,26 @@ export function drawIchigoSkin(ctx, fighter) {
   let bodyShiftX = 0;
   let bodyTilt = 0;
 
-  if (isSlashing) {
+  if (isBankaiChanneling) {
+    // 2-Handed Focus Bankai Transformation Charge Pose:
+    // Holds sword horizontally / diagonally in front of chest, trembling with intense spiritual pressure
+    const bankaiTremble = Math.sin(now * 0.065) * 0.06 * (0.4 + 0.6 * bankaiProg);
+    swingAngle = -0.55 + bankaiTremble;
+    thrustDistance = -6 - 4 * bankaiProg; // Pulls sword close to body
+    bodyShiftX = -3 - 2 * bankaiProg;     // Body hunkers low into grounding stance
+    bodyTilt = -0.06 + bankaiTremble * 0.5;
+  } else if (isChanneling) {
+    // Dynamic 2-Handed Overhead Sword Lift-Up Charging Animation:
+    // As chargeProg increases (0 -> 1), sword lifts upward & backward from idle (-0.16 rad) up into the high sky (-2.10 rad / ~ -120°)
+    const liftEase = Math.min(1.0, chargeProg * 1.7);
+    const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
+    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.04 * (0.3 + 0.7 * chargeProg);
+
+    swingAngle = -0.16 + (-2.10 - (-0.16)) * smoothLift + chargeTremble;
+    thrustDistance = -4 - 6 * smoothLift; // Pulls back close to shoulder/head
+    bodyShiftX = -1.5 - 3.0 * smoothLift; // Body coils back into power stance
+    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.5;
+  } else if (isSlashing) {
     const maxT = fighter.slashSwingMaxTimer || 22;
     rawSlashProg = Math.min(1.0, Math.max(0.0, 1.0 - (fighter.slashSwingTimer / maxT)));
 
@@ -161,25 +188,6 @@ export function drawIchigoSkin(ctx, fighter) {
         bodyTilt = 0.05 * easeP;
       }
     }
-  } else if (isBankaiChanneling) {
-    // 2-Handed Focus Bankai Transformation Charge Pose:
-    // Holds sword horizontally / diagonally in front of chest, trembling with intense spiritual pressure
-    const bankaiTremble = Math.sin(now * 0.065) * 0.06 * (0.4 + 0.6 * bankaiProg);
-    swingAngle = -0.55 + bankaiTremble;
-    thrustDistance = -6 - 4 * bankaiProg; // Pulls sword close to body
-    bodyShiftX = -3 - 2 * bankaiProg;     // Body hunkers low into grounding stance
-    bodyTilt = -0.06 + bankaiTremble * 0.5;
-  } else if (isChanneling) {
-    // Dynamic 2-Handed Overhead Sword Lift-Up Charging Animation:
-    // As chargeProg increases (0 -> 1), sword lifts upward & backward from idle (-0.16 rad) up into the high sky (-2.10 rad / ~ -120°)
-    const liftEase = Math.min(1.0, chargeProg * 1.7);
-    const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
-    const chargeTremble = Math.sin(Date.now() * 0.045) * 0.04 * (0.3 + 0.7 * chargeProg);
-
-    swingAngle = -0.16 + (-2.10 - (-0.16)) * smoothLift + chargeTremble;
-    thrustDistance = -4 - 6 * smoothLift; // Pulls back close to shoulder/head
-    bodyShiftX = -1.5 - 3.0 * smoothLift; // Body coils back into power stance
-    bodyTilt = -0.04 - 0.08 * smoothLift + chargeTremble * 0.5;
   } else if (isCountdownOrPreview) {
     // Countdown / Preview back-slung pose: handle behind head (upper-left), blade tip sweeping down-right
     swingAngle = Math.PI / 4;
@@ -849,238 +857,457 @@ function _drawGetsugaChargingAura(ctx, startX, len, isMask, isBankai, isShikai, 
   ctx.restore();
 }
 
-function _drawBankaiTransformationDome(ctx, r, bankaiProg, now) {
+function _drawBankaiTransformationVortex(ctx, r, bankaiProg, now, fighter) {
   ctx.save();
 
-  const beamTopY = -420; // High in the sky
-  const strandCount = 3;
+  const isCompressing = bankaiProg >= 0.75;
+  const compProg = isCompressing ? (bankaiProg - 0.75) / 0.25 : 0.0;
+  const easeProg = Math.pow(bankaiProg, 1.2);
 
-  // ── Phase 1: Fast Descending Sky Lightning Beam (0.0 -> 0.12) ──
-  const lightningThreshold = 0.12;
-  const descentP = Math.min(1.0, bankaiProg / lightningThreshold);
-  const tipProg = Math.pow(descentP, 2.0); // Fast acceleration downwards
-  const currentBottomY = beamTopY + (0 - beamTopY) * tipProg;
+  // ── 1. Ground Reiatsu Fissures & Electrical Floor Cracks ──
+  const fissureReach = r * (2.4 + bankaiProg * 3.2);
+  const crackCount = 14;
+  const crackAlpha = Math.min(1.0, bankaiProg * 2.2) * (1.0 - compProg * 0.35);
 
-  // ── Phase 2: Ground Impact & Spherical Shockwave Expansion (0.12 -> 1.0) ──
-  const isImpacted = bankaiProg >= lightningThreshold;
-  const impactP = isImpacted ? Math.min(1.0, (bankaiProg - lightningThreshold) / (1.0 - lightningThreshold)) : 0;
-  // Explosive monotonic shockwave expansion curve (starts fast on impact, decelerates smoothly as it reaches full radius)
-  const expandEase = 1.0 - Math.pow(1.0 - impactP, 2.2);
-  const domeR = r * 3.6 * expandEase;
-  const domeAlpha = Math.min(1.0, impactP * 2.5);
+  // Ground Reiatsu Scorch Base
+  const scorchR = r * (1.8 + bankaiProg * 2.5);
+  const scorchGrad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, scorchR);
+  scorchGrad.addColorStop(0, `rgba(4, 2, 4, ${0.92 * crackAlpha})`);
+  scorchGrad.addColorStop(0.50, `rgba(30, 4, 8, ${0.75 * crackAlpha})`);
+  scorchGrad.addColorStop(0.85, `rgba(220, 20, 20, ${0.40 * crackAlpha})`);
+  scorchGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+  ctx.fillStyle = scorchGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, scorchR, 0, Math.PI * 2);
+  ctx.fill();
 
-  if (isImpacted && domeR > 2) {
-    // 1. Radial Ground Electric Tendrils & Impact Cracks (Shooting from center to dome rim)
-    const branchCount = 12;
-    for (let b = 0; b < branchCount; b++) {
-      const bAng = b * (Math.PI * 2 / branchCount) + Math.sin(now * 0.01 + b) * 0.12;
-      const bLen = domeR * (0.45 + 0.55 * ((b % 3 === 0) ? 0.95 : 0.72));
-      const numSegs = 4;
-      
-      ctx.beginPath();
-      ctx.moveTo(0, 0);
-      let curX = 0;
-      let curY = 0;
-      for (let s = 1; s <= numSegs; s++) {
-        const frac = s / numSegs;
-        const jag = (s % 2 === 0 ? 1 : -1) * (4.5 + 3.0 * Math.sin(now * 0.04 + b * 2));
-        const segDist = bLen * frac;
-        curX = Math.cos(bAng) * segDist - Math.sin(bAng) * jag;
-        curY = Math.sin(bAng) * segDist + Math.cos(bAng) * jag;
-        ctx.lineTo(curX, curY);
-      }
-      ctx.strokeStyle = b % 2 === 0 
-        ? `rgba(255, 30, 20, ${0.85 * domeAlpha})` 
-        : `rgba(255, 110, 70, ${0.75 * domeAlpha})`;
-      ctx.lineWidth = b % 2 === 0 ? 1.8 : 1.2;
-      ctx.stroke();
+  // Branching ground fissures radiating outward
+  for (let b = 0; b < crackCount; b++) {
+    const bAng = b * (Math.PI * 2 / crackCount) + Math.sin(now * 0.008 + b * 1.5) * 0.10;
+    const bLen = fissureReach * (0.55 + 0.45 * ((b % 3 === 0) ? 0.98 : 0.76));
+    const numSegs = 4;
+    
+    // Pass A: Outer Crimson Glow
+    ctx.beginPath();
+    ctx.moveTo(0, 0);
+    let curX = 0, curY = 0;
+    for (let s = 1; s <= numSegs; s++) {
+      const frac = s / numSegs;
+      const jag = (s % 2 === 0 ? 1 : -1) * (5.0 + 3.5 * Math.sin(now * 0.035 + b * 2));
+      const segDist = bLen * frac;
+      curX = Math.cos(bAng) * segDist - Math.sin(bAng) * jag;
+      curY = Math.sin(bAng) * segDist + Math.cos(bAng) * jag;
+      ctx.lineTo(curX, curY);
     }
-
-    // 2. Translucent Spherical Dome Barrier (Pitch-Black Inside, Crimson Red on the Outer Perimeter)
-    const domeGrad = ctx.createRadialGradient(0, 0, domeR * 0.12, 0, 0, domeR);
-    domeGrad.addColorStop(0, `rgba(4, 1, 1, ${0.90 * domeAlpha})`);        // Pitch-black void core
-    domeGrad.addColorStop(0.55, `rgba(12, 2, 2, ${0.80 * domeAlpha})`);     // Dark translucent interior
-    domeGrad.addColorStop(0.82, `rgba(180, 10, 10, ${0.55 * domeAlpha})`);  // Inner crimson transition
-    domeGrad.addColorStop(0.96, `rgba(255, 30, 20, ${0.92 * domeAlpha})`);  // Brilliant crimson red perimeter
-    domeGrad.addColorStop(1.0, 'rgba(255, 0, 0, 0.0)');                    // Outer soft falloff
-
-    ctx.fillStyle = domeGrad;
-    ctx.beginPath();
-    ctx.arc(0, 0, domeR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Perimeter Red Barrier Outlines (Layered Concentric Strokes for Rich Glow)
-    ctx.strokeStyle = `rgba(255, 20, 20, ${0.35 * domeAlpha})`;
-    ctx.lineWidth = 5.5;
-    ctx.beginPath();
-    ctx.arc(0, 0, domeR, 0, Math.PI * 2);
+    ctx.strokeStyle = (b % 2 === 0) 
+      ? `rgba(220, 20, 20, ${0.85 * crackAlpha})` 
+      : `rgba(255, 60, 20, ${0.75 * crackAlpha})`;
+    ctx.lineWidth = 4.2;
     ctx.stroke();
 
-    ctx.strokeStyle = `rgba(255, 60, 40, ${0.95 * domeAlpha})`;
-    ctx.lineWidth = 2.2;
+    // Pass B: Hot White-Amber Core Line
     ctx.beginPath();
-    ctx.arc(0, 0, domeR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.strokeStyle = `rgba(255, 200, 180, ${0.90 * domeAlpha})`;
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.arc(0, 0, domeR, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 3. Horizontal Undulating Electric Lightning Equator Ring
-    const ringSteps = 56;
-    const radX = domeR * 1.02;
-    const radY = domeR * 0.38;
-
-    // Pass A: Outer Crimson Glow Band
-    ctx.beginPath();
-    for (let i = 0; i <= ringSteps; i++) {
-      const t = (i / ringSteps) * Math.PI * 2;
-      const wave1 = Math.sin(t * 7 + now * 0.025) * 4.5;
-      const wave2 = Math.cos(t * 4 - now * 0.018) * 3.0;
-      const jitter = (wave1 + wave2) * expandEase;
-      const px = (radX + jitter) * Math.cos(t);
-      const py = (radY + jitter * 0.35) * Math.sin(t);
-      if (i === 0) ctx.moveTo(px, py);
-      else ctx.lineTo(px, py);
+    ctx.moveTo(0, 0);
+    for (let s = 1; s <= numSegs; s++) {
+      const frac = s / numSegs;
+      const jag = (s % 2 === 0 ? 1 : -1) * (5.0 + 3.5 * Math.sin(now * 0.035 + b * 2));
+      const segDist = bLen * frac;
+      curX = Math.cos(bAng) * segDist - Math.sin(bAng) * jag;
+      curY = Math.sin(bAng) * segDist + Math.cos(bAng) * jag;
+      ctx.lineTo(curX, curY);
     }
-    ctx.closePath();
-    ctx.strokeStyle = `rgba(255, 20, 20, ${0.65 * domeAlpha})`;
-    ctx.lineWidth = 6.0;
-    ctx.stroke();
-
-    // Pass B: Intense Crimson Core
-    ctx.strokeStyle = `rgba(255, 60, 30, ${0.95 * domeAlpha})`;
-    ctx.lineWidth = 2.6;
-    ctx.stroke();
-
-    // Pass C: Hot White-Amber Center Line
-    ctx.strokeStyle = `rgba(255, 255, 240, ${0.95 * domeAlpha})`;
+    ctx.strokeStyle = `rgba(255, 255, 240, ${0.95 * crackAlpha})`;
     ctx.lineWidth = 1.2;
     ctx.stroke();
+  }
 
-    // 4. Outer Zigzag Lightning Sparks Escaping Barrier Shell
-    const sparkOutCount = 7;
-    for (let s = 0; s < sparkOutCount; s++) {
-      const sAng = s * (Math.PI * 2 / sparkOutCount) + 0.35 + Math.sin(now * 0.02 + s) * 0.15;
-      const startRad = domeR - 3;
-      const endRad = domeR + (18 + Math.sin(now * 0.05 + s * 3) * 6) * expandEase;
-      
+  // ── 2. Inward Gravitational Suction Spiritual Energy Motes ──
+  const suctionCount = 18;
+  for (let i = 0; i < suctionCount; i++) {
+    const suctionSpeed = 0.0022 * (1.2 + bankaiProg * 1.8);
+    const suctionP = ((now * suctionSpeed + i * (1.0 / suctionCount)) % 1.0);
+    const invP = 1.0 - suctionP; // 1.0 -> 0.0 (rushing into center)
+    const startDist = 160 + (i % 5) * 18;
+    const curDist = invP * startDist;
+    const spiralAngle = i * (Math.PI * 2 / suctionCount) + (now * 0.0025) + invP * 1.4;
+
+    const sx = Math.cos(spiralAngle) * curDist;
+    const sy = Math.sin(spiralAngle) * curDist;
+    const tailLen = (8 + 14 * bankaiProg) * invP;
+    const tx = sx + Math.cos(spiralAngle + 0.35) * tailLen;
+    const ty = sy + Math.sin(spiralAngle + 0.35) * tailLen;
+
+    const moteAlpha = Math.sin(suctionP * Math.PI) * Math.min(1.0, bankaiProg * 2.0);
+    if (moteAlpha > 0.01) {
       ctx.beginPath();
-      ctx.moveTo(Math.cos(sAng) * startRad, Math.sin(sAng) * (startRad * 0.38));
-      const midRad = (startRad + endRad) * 0.5;
-      const jagX = Math.cos(sAng) * midRad + (s % 2 === 0 ? 5 : -5);
-      const jagY = Math.sin(sAng) * (midRad * 0.38) + (s % 2 === 0 ? -4 : 4);
-      ctx.lineTo(jagX, jagY);
-      ctx.lineTo(Math.cos(sAng) * endRad, Math.sin(sAng) * (endRad * 0.38));
-      
-      ctx.strokeStyle = s % 2 === 0 
-        ? `rgba(255, 80, 50, ${0.95 * domeAlpha})` 
-        : `rgba(255, 240, 220, ${0.95 * domeAlpha})`;
-      ctx.lineWidth = 1.6;
+      ctx.moveTo(tx, ty);
+      ctx.lineTo(sx, sy);
+      if (i % 3 === 0) {
+        ctx.strokeStyle = `rgba(0, 229, 255, ${0.90 * moteAlpha})`;
+      } else if (i % 3 === 1) {
+        ctx.strokeStyle = `rgba(255, 30, 20, ${0.95 * moteAlpha})`;
+      } else {
+        ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * moteAlpha})`;
+      }
+      ctx.lineWidth = 1.8;
       ctx.stroke();
     }
   }
 
-  // 5. Vertical Sky Lightning Beam (Descending Column - disappears immediately upon ground impact)
-  if (!isImpacted) {
-    for (let st = 0; st < strandCount; st++) {
-      const phaseOffset = st * (Math.PI * 2 / 3);
-      ctx.beginPath();
-      ctx.moveTo(0, beamTopY);
-      
-      const numYSteps = 24;
-      for (let yStep = 1; yStep <= numYSteps; yStep++) {
-        const frac = yStep / numYSteps;
-        const curY = beamTopY + (currentBottomY - beamTopY) * frac;
-        
-        // Braided helical twisting + high-frequency electric jitter
-        const helix = Math.sin(curY * 0.035 + now * 0.03 + phaseOffset) * (8 * (1 - frac * 0.4));
-        const jitter = ((Math.random() - 0.5) * 3.5);
-        const curX = helix + jitter;
-        
-        ctx.lineTo(curX, curY);
-      }
+  // ── 3. Colossal Towering Skyward Reiatsu Vortex Pillar ──
+  const beamTopY = -680;
+  const beamBottomY = +25;
+  const pillarBaseW = r * 2.9 * (1.0 + 0.18 * Math.sin(now * 0.025));
+  const pillarW = pillarBaseW * (isCompressing ? (1.0 - compProg * 0.60) : 1.0);
+  const vortexAlpha = Math.min(1.0, bankaiProg * 2.5);
 
-      // Outer Crimson Corona
-      ctx.strokeStyle = 'rgba(255, 20, 20, 0.85)';
-      ctx.lineWidth = 4.8;
-      ctx.stroke();
+  const numYSteps = 28;
+  const leftPts = [];
+  const rightPts = [];
 
-      // Hot White Core Strike
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
-      ctx.lineWidth = 1.8;
-      ctx.stroke();
-    }
+  for (let step = 0; step <= numYSteps; step++) {
+    const frac = step / numYSteps;
+    const y = beamBottomY + (beamTopY - beamBottomY) * frac;
+    // Dynamic dual-frequency sine wave contours for raging Reiatsu silhouette
+    const wave1 = Math.sin(y * 0.022 - now * 0.035) * (pillarW * 0.22);
+    const wave2 = Math.cos(y * 0.012 + now * 0.020) * (pillarW * 0.14);
+    const totalWave = wave1 + wave2;
 
-    // Advancing tip spark flare leading the descent
-    const tipR = 12 + 6 * Math.sin(now * 0.05);
-    const tipGrad = ctx.createRadialGradient(0, currentBottomY, 0, 0, currentBottomY, tipR);
-    tipGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-    tipGrad.addColorStop(0.4, 'rgba(255, 60, 20, 0.9)');
-    tipGrad.addColorStop(1.0, 'rgba(255, 0, 0, 0.0)');
-    ctx.fillStyle = tipGrad;
+    const currentW = pillarW * (1.0 + 0.15 * Math.sin(frac * Math.PI));
+    leftPts.push({ x: -currentW + totalWave, y });
+    rightPts.push({ x: currentW + totalWave, y });
+  }
+
+  // Pass A: Outer Fiery Crimson & Cyan Corona Band
+  ctx.beginPath();
+  ctx.moveTo(leftPts[0].x - 6, leftPts[0].y);
+  for (let i = 1; i < leftPts.length; i++) ctx.lineTo(leftPts[i].x - 6, leftPts[i].y);
+  for (let i = rightPts.length - 1; i >= 0; i--) ctx.lineTo(rightPts[i].x + 6, rightPts[i].y);
+  ctx.closePath();
+
+  const coronaGrad = ctx.createLinearGradient(-pillarW * 1.2, 0, pillarW * 1.2, 0);
+  coronaGrad.addColorStop(0.0, `rgba(0, 229, 255, ${0.40 * vortexAlpha})`);
+  coronaGrad.addColorStop(0.18, `rgba(220, 20, 20, ${0.85 * vortexAlpha})`);
+  coronaGrad.addColorStop(0.50, `rgba(255, 60, 20, ${0.75 * vortexAlpha})`);
+  coronaGrad.addColorStop(0.82, `rgba(220, 20, 20, ${0.85 * vortexAlpha})`);
+  coronaGrad.addColorStop(1.0, `rgba(0, 229, 255, ${0.40 * vortexAlpha})`);
+  ctx.fillStyle = coronaGrad;
+  ctx.fill();
+
+  // Pass B: Deep Pitch-Black Void Spiritual Pressure Core
+  ctx.beginPath();
+  ctx.moveTo(leftPts[0].x, leftPts[0].y);
+  for (let i = 1; i < leftPts.length; i++) ctx.lineTo(leftPts[i].x, leftPts[i].y);
+  for (let i = rightPts.length - 1; i >= 0; i--) ctx.lineTo(rightPts[i].x, rightPts[i].y);
+  ctx.closePath();
+
+  const coreGrad = ctx.createLinearGradient(-pillarW, 0, pillarW, 0);
+  coreGrad.addColorStop(0.0, `rgba(220, 20, 20, ${0.70 * vortexAlpha})`);
+  coreGrad.addColorStop(0.25, `rgba(8, 2, 6, ${0.96 * vortexAlpha})`);
+  coreGrad.addColorStop(0.50, `rgba(2, 1, 3, ${0.99 * vortexAlpha})`);
+  coreGrad.addColorStop(0.75, `rgba(8, 2, 6, ${0.96 * vortexAlpha})`);
+  coreGrad.addColorStop(1.0, `rgba(220, 20, 20, ${0.70 * vortexAlpha})`);
+  ctx.fillStyle = coreGrad;
+  ctx.fill();
+
+  // Pass C: Helical Braided Energy Ribbons (4 Ascending Strands)
+  const strandCount = 4;
+  for (let st = 0; st < strandCount; st++) {
+    const phaseOffset = st * (Math.PI / 2);
     ctx.beginPath();
-    ctx.arc(0, currentBottomY, tipR, 0, Math.PI * 2);
-    ctx.fill();
-  } else {
-    // Central Ground Impact Starburst
-    const flareR = r * (0.8 + 0.4 * Math.sin(now * 0.06)) * (0.6 + 0.4 * expandEase);
-    const flareGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, flareR);
-    flareGrad.addColorStop(0, 'rgba(255, 255, 255, 1.0)');
-    flareGrad.addColorStop(0.35, 'rgba(255, 100, 50, 0.95)');
-    flareGrad.addColorStop(0.70, 'rgba(220, 20, 20, 0.65)');
-    flareGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = flareGrad;
-    ctx.beginPath();
-    ctx.arc(0, 0, flareR, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Floating red embers rising up into the air
-    const emberCount = 5;
-    for (let e = 0; e < emberCount; e++) {
-      const eProg = ((now * 0.0018 + e * 0.22) % 1.0);
-      const ey = -eProg * 140;
-      const ex = Math.sin(now * 0.01 + e * 2) * (14 * (1 - eProg));
-      const er = 1.4 * (1 - eProg * 0.5);
-      ctx.fillStyle = e % 2 === 0 ? 'rgba(255, 255, 255, 0.9)' : 'rgba(255, 40, 20, 0.9)';
-      ctx.beginPath();
-      ctx.arc(ex, ey, er, 0, Math.PI * 2);
-      ctx.fill();
+    for (let step = 0; step <= numYSteps; step++) {
+      const frac = step / numYSteps;
+      const y = beamBottomY + (beamTopY - beamBottomY) * frac;
+      const helix = Math.sin(y * 0.024 - now * 0.040 + phaseOffset) * (pillarW * 0.65);
+      const jitter = ((Math.sin(now * 0.05 + step) - 0.5) * 2.5);
+      const hx = helix + jitter;
+      if (step === 0) ctx.moveTo(hx, y);
+      else ctx.lineTo(hx, y);
     }
+    // Outer Crimson Strand
+    ctx.strokeStyle = (st % 2 === 0) 
+      ? `rgba(255, 30, 20, ${0.85 * vortexAlpha})` 
+      : `rgba(0, 229, 255, ${0.75 * vortexAlpha})`;
+    ctx.lineWidth = 3.6;
+    ctx.stroke();
+
+    // Hot White Core Strand
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * vortexAlpha})`;
+    ctx.lineWidth = 1.2;
+    ctx.stroke();
+  }
+
+  // Pass D: High-Voltage Vertical Branching Lightning Tendrils
+  const boltCount = 3;
+  for (let b = 0; b < boltCount; b++) {
+    const boltPhase = b * (Math.PI * 2 / 3);
+    ctx.beginPath();
+    ctx.moveTo(0, beamBottomY);
+    for (let step = 1; step <= 20; step++) {
+      const frac = step / 20;
+      const by = beamBottomY + (beamTopY - beamBottomY) * frac;
+      const bjitter = Math.sin(by * 0.03 + now * 0.03 + boltPhase) * (pillarW * 0.40) + ((Math.random() - 0.5) * 10);
+      ctx.lineTo(bjitter, by);
+    }
+    ctx.strokeStyle = `rgba(255, 20, 20, ${0.85 * vortexAlpha})`;
+    ctx.lineWidth = 4.2;
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * vortexAlpha})`;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+
+  // ── 4. Central Singularity Compression Sphere & Equator Rings ──
+  if (isCompressing) {
+    const singR = r * (1.6 - compProg * 0.55);
+    const singAlpha = Math.min(1.0, compProg * 1.6);
+
+    // Dense Black Hole Singularity Core
+    const singGrad = ctx.createRadialGradient(0, 0, singR * 0.2, 0, 0, singR);
+    singGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+    singGrad.addColorStop(0.20, `rgba(0, 229, 255, ${0.95 * singAlpha})`);
+    singGrad.addColorStop(0.45, `rgba(255, 30, 20, ${0.95 * singAlpha})`);
+    singGrad.addColorStop(0.80, `rgba(4, 2, 4, ${0.98 * singAlpha})`);
+    singGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = singGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, singR * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // High-Speed Rotating Equator Rings
+    const ringSteps = 48;
+    const ringRadX = singR * 1.45;
+    const ringRadY = singR * 0.45;
+
+    ctx.save();
+    ctx.rotate(now * 0.008);
+    ctx.beginPath();
+    for (let i = 0; i <= ringSteps; i++) {
+      const t = (i / ringSteps) * Math.PI * 2;
+      const wave = Math.sin(t * 8 + now * 0.04) * 3.5;
+      const rx = (ringRadX + wave) * Math.cos(t);
+      const ry = (ringRadY + wave * 0.4) * Math.sin(t);
+      if (i === 0) ctx.moveTo(rx, ry);
+      else ctx.lineTo(rx, ry);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = `rgba(255, 30, 20, ${0.90 * singAlpha})`;
+    ctx.lineWidth = 4.5;
+    ctx.stroke();
+
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * singAlpha})`;
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // ── 5. Rising Spiritual Flame Embers ──
+  const emberCount = 8;
+  for (let e = 0; e < emberCount; e++) {
+    const eProg = ((now * 0.0020 + e * 0.125) % 1.0);
+    const ey = -eProg * 220;
+    const ex = Math.sin(now * 0.015 + e * 2) * (pillarW * 0.45 * (1 - eProg * 0.5));
+    const er = (1.5 + (e % 3) * 0.8) * (1 - eProg * 0.6);
+    ctx.fillStyle = (e % 2 === 0) 
+      ? `rgba(255, 255, 255, ${0.90 * (1 - eProg)})` 
+      : `rgba(255, 40, 20, ${0.90 * (1 - eProg)})`;
+    ctx.beginPath();
+    ctx.arc(ex, ey, er, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
 }
 
-function _drawBankaiChargingAura(ctx, startX, len, bankaiProg) {
-  const now = Date.now();
-  const pulse = 1.0 + 0.20 * Math.sin(now * 0.04);
-  const glowH = 16 * pulse * (0.8 + 0.4 * bankaiProg);
+function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
+  const maxB = fighter.bankaiBurstMax || 36;
+  const curB = fighter.bankaiBurstTimer || 0;
+  const burstProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
+  const alpha = Math.pow(1.0 - burstProg, 0.85);
+
+  if (alpha <= 0.01) return;
 
   ctx.save();
+
+  // ── 1. Concentric Expanding Shockwave Blast Rings ──
+  // Ring 1: Fast Supersonic Needle Shockwave Ring
+  const needleR = r + burstProg * 340;
+  ctx.strokeStyle = `rgba(255, 255, 255, ${0.95 * alpha})`;
+  ctx.lineWidth = Math.max(1.0, 4.5 * (1.0 - burstProg));
+  ctx.beginPath();
+  ctx.arc(0, 0, needleR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(0, 229, 255, ${0.80 * alpha})`;
+  ctx.lineWidth = Math.max(1.0, 9.0 * (1.0 - burstProg));
+  ctx.beginPath();
+  ctx.arc(0, 0, needleR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // Ring 2: Thick Crimson-Black Spiritual Blastwave
+  const blastR = r + Math.pow(burstProg, 0.72) * 220;
+  const blastSteps = 48;
+  ctx.beginPath();
+  for (let i = 0; i <= blastSteps; i++) {
+    const t = (i / blastSteps) * Math.PI * 2;
+    const wave = Math.sin(t * 10 + now * 0.03) * (5.0 * (1.0 - burstProg));
+    const bx = (blastR + wave) * Math.cos(t);
+    const by = (blastR + wave) * Math.sin(t);
+    if (i === 0) ctx.moveTo(bx, by);
+    else ctx.lineTo(bx, by);
+  }
+  ctx.closePath();
+  ctx.strokeStyle = `rgba(220, 20, 20, ${0.85 * alpha})`;
+  ctx.lineWidth = Math.max(1.5, 8.5 * (1.0 - burstProg));
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 60, 20, ${0.95 * alpha})`;
+  ctx.lineWidth = Math.max(1.0, 3.2 * (1.0 - burstProg));
+  ctx.stroke();
+
+  ctx.strokeStyle = `rgba(255, 255, 240, ${0.95 * alpha})`;
+  ctx.lineWidth = Math.max(0.8, 1.2 * (1.0 - burstProg));
+  ctx.stroke();
+
+  // Ring 3: Inner Void Implosion Shock Ring
+  const innerR = r + burstProg * 120;
+  ctx.strokeStyle = `rgba(10, 5, 12, ${0.90 * alpha})`;
+  ctx.lineWidth = Math.max(1.0, 12.0 * (1.0 - burstProg));
+  ctx.beginPath();
+  ctx.arc(0, 0, innerR, 0, Math.PI * 2);
+  ctx.stroke();
+
+  // ── 2. Shattering Crystalline Reiatsu Shards ──
+  if (fighter.bankaiShards && fighter.bankaiShards.length > 0) {
+    for (let s = 0; s < fighter.bankaiShards.length; s++) {
+      const shard = fighter.bankaiShards[s];
+      const relX = shard.x - fighter.x;
+      const relY = shard.y - fighter.y;
+      const shardAlpha = (shard.life || 1.0) * alpha;
+
+      if (shardAlpha > 0.02) {
+        ctx.save();
+        ctx.translate(relX, relY);
+        ctx.rotate(shard.rot || 0);
+
+        const sz = shard.size || 7.0;
+        // 4-point crystalline diamond shard polygon
+        ctx.beginPath();
+        ctx.moveTo(0, -sz * 1.3);
+        ctx.lineTo(sz * 0.6, 0);
+        ctx.lineTo(0, sz * 1.3);
+        ctx.lineTo(-sz * 0.6, 0);
+        ctx.closePath();
+
+        ctx.fillStyle = shard.color || '#111111';
+        ctx.globalAlpha = shardAlpha;
+        ctx.fill();
+
+        ctx.strokeStyle = (s % 2 === 0) ? `rgba(255, 255, 255, ${0.90 * shardAlpha})` : `rgba(0, 229, 255, ${0.85 * shardAlpha})`;
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+
+        ctx.restore();
+      }
+    }
+  }
+
+  // ── 3. Billowing Dark Ink-Smoke & Spirit Flame Wisps ──
+  const smokeCount = 8;
+  for (let sm = 0; sm < smokeCount; sm++) {
+    const smAngle = sm * (Math.PI * 2 / smokeCount) + 0.2;
+    const smDist = r * 0.8 + burstProg * 90;
+    const smX = Math.cos(smAngle) * smDist;
+    const smY = Math.sin(smAngle) * smDist;
+    const smR = (12 + (sm % 3) * 6) * (1.0 + burstProg * 0.8);
+
+    const smGrad = ctx.createRadialGradient(smX, smY, 0, smX, smY, smR);
+    smGrad.addColorStop(0.0, `rgba(12, 4, 10, ${0.80 * alpha})`);
+    smGrad.addColorStop(0.60, `rgba(220, 20, 20, ${0.40 * alpha})`);
+    smGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = smGrad;
+    ctx.beginPath();
+    ctx.arc(smX, smY, smR, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+function _drawBankaiActiveFlameWisps(ctx, r, now) {
+  ctx.save();
+  const wispCount = 5;
+  for (let w = 0; w < wispCount; w++) {
+    const wProg = ((now * 0.0025 + w * 0.20) % 1.0);
+    const wAng = (w / wispCount) * Math.PI * 2 + Math.sin(now * 0.01 + w) * 0.25;
+    const wDist = r * (0.85 + 0.35 * wProg);
+    const wx = Math.cos(wAng) * wDist;
+    const wy = Math.sin(wAng) * wDist - wProg * 18; // rises slightly
+    const wR = (3.5 + (w % 2) * 2.0) * (1.0 - wProg * 0.7);
+    const wAlpha = Math.sin(wProg * Math.PI) * 0.80;
+
+    const wGrad = ctx.createRadialGradient(wx, wy, 0, wx, wy, wR * 1.5);
+    wGrad.addColorStop(0.0, `rgba(255, 255, 255, ${0.95 * wAlpha})`);
+    wGrad.addColorStop(0.40, (w % 2 === 0) ? `rgba(0, 229, 255, ${0.90 * wAlpha})` : `rgba(255, 30, 20, ${0.90 * wAlpha})`);
+    wGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = wGrad;
+    ctx.beginPath();
+    ctx.arc(wx, wy, wR * 1.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function _drawBankaiChargingAura(ctx, startX, len, bankaiProg) {
+  const now = Date.now();
+  const pulse = 1.0 + 0.22 * Math.sin(now * 0.045);
+  const glowH = 18 * pulse * (0.85 + 0.45 * bankaiProg);
+
+  ctx.save();
+  // Multi-Pass Roaring Black & Crimson Reiatsu Plasma Gradient
   const grad = ctx.createLinearGradient(startX, 0, startX + len, 0);
-  grad.addColorStop(0, 'rgba(10, 0, 0, 0.90)');
-  grad.addColorStop(0.4, 'rgba(220, 20, 20, 0.95)');
-  grad.addColorStop(0.8, 'rgba(255, 50, 0, 0.90)');
-  grad.addColorStop(1.0, 'rgba(255, 255, 255, 0.95)');
+  grad.addColorStop(0.0, 'rgba(6, 2, 8, 0.98)');
+  grad.addColorStop(0.30, 'rgba(220, 20, 20, 0.95)');
+  grad.addColorStop(0.70, 'rgba(255, 50, 0, 0.92)');
+  grad.addColorStop(0.92, 'rgba(0, 229, 255, 0.95)');
+  grad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
 
   ctx.fillStyle = grad;
-  ctx.fillRect(startX - 2, -glowH * 0.5, len + 8, glowH);
+  ctx.fillRect(startX - 2, -glowH * 0.5, len + 10, glowH);
 
-  // Crackling red lightning lines along blade
+  // Outer Crimson Corona Fringe
+  ctx.strokeStyle = 'rgba(255, 30, 20, 0.85)';
+  ctx.lineWidth = 3.5;
+  ctx.strokeRect(startX - 2, -glowH * 0.5, len + 10, glowH);
+
+  // Crackling High-Voltage White-Hot Lightning Arcs along the Blade
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 1.8;
   ctx.beginPath();
   ctx.moveTo(startX, 0);
-  for (let i = 1; i <= 4; i++) {
-    const lx = startX + (i / 4) * len;
-    const ly = ((i % 2 === 0) ? 1 : -1) * (glowH * 0.4);
+  for (let i = 1; i <= 5; i++) {
+    const lx = startX + (i / 5) * len;
+    const ly = ((i % 2 === 0) ? 1 : -1) * (glowH * 0.45) + ((Math.sin(now * 0.06 + i) - 0.5) * 3);
     ctx.lineTo(lx, ly);
   }
   ctx.stroke();
+
+  // Advancing Tip Plasma Burst
+  const tipX = startX + len;
+  const tipR = (10 + 6 * Math.sin(now * 0.05)) * (0.8 + 0.4 * bankaiProg);
+  const tipGrad = ctx.createRadialGradient(tipX, 0, 0, tipX, 0, tipR);
+  tipGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)');
+  tipGrad.addColorStop(0.35, 'rgba(0, 229, 255, 0.95)');
+  tipGrad.addColorStop(0.70, 'rgba(255, 30, 20, 0.80)');
+  tipGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+  ctx.fillStyle = tipGrad;
+  ctx.beginPath();
+  ctx.arc(tipX, 0, tipR, 0, Math.PI * 2);
+  ctx.fill();
 
   ctx.restore();
 }
@@ -1156,7 +1383,16 @@ export function getZangetsuPommelWorldPos(fighter) {
   let thrustDistance = 0;
   let bodyShiftX = 0;
 
-  if (isSlashing) {
+  if (isChanneling) {
+    const chargeMax = fighter.getsugaChargeMax || CONFIG.ichigo?.getsugaChargeFrames || 50;
+    const chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
+    const liftEase = Math.min(1.0, chargeProg * 1.7);
+    const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
+
+    localSwordAngle = -0.16 + (-2.10 - (-0.16)) * smoothLift;
+    thrustDistance = -4 - 6 * smoothLift;
+    bodyShiftX = -1.5 - 3.0 * smoothLift;
+  } else if (isSlashing) {
     if (fighter.isGetsugaSlash) {
       if (rawSlashProg < 0.50) {
         const p = rawSlashProg / 0.50;
@@ -1192,15 +1428,6 @@ export function getZangetsuPommelWorldPos(fighter) {
         bodyShiftX = 4.0 * easeP;
       }
     }
-  } else if (isChanneling) {
-    const chargeMax = fighter.getsugaChargeMax || 24;
-    const chargeProg = Math.min(1.0, Math.max(0.0, 1.0 - ((fighter.getsugaChargeTimer || 0) / chargeMax)));
-    const liftEase = Math.min(1.0, chargeProg * 1.7);
-    const smoothLift = liftEase * liftEase * (3 - 2 * liftEase);
-
-    localSwordAngle = -0.16 + (-2.10 - (-0.16)) * smoothLift;
-    thrustDistance = -4 - 6 * smoothLift;
-    bodyShiftX = -1.5 - 3.0 * smoothLift;
   } else if (isCountdownOrPreview) {
     localSwordAngle = Math.PI / 4;
     thrustDistance = 0;

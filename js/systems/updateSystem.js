@@ -17,6 +17,7 @@ import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisu
 import { updateDriveBys } from './cjDriveBySystem.js';
 import { FRAME_TIME } from './gameLoop.js';
 import { updateArenaBgm, startArenaBgm, stopArenaBgm } from './arenaBgmSystem.js';
+import { GAME_MODES } from '../core/modeConfig.js';
 
 export function updateGame() {
     // Increment global frame count on EVERY frame across all game states
@@ -108,7 +109,8 @@ export function updateGame() {
 
       // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Follow For More banner)
       const hasOverlay = Boolean(state.missionPassedOverlay);
-      const autoDelay = (state.mode === 'FFA' && state.ffaMatchComplete) ? 340 : (hasOverlay ? 340 : 300);
+      const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
+      const autoDelay = (isFFA && state.ffaMatchComplete) ? 340 : (hasOverlay ? 340 : 300);
       if (state.roundEndTimer >= autoDelay) {
         startNextRound();
       }

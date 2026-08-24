@@ -4,10 +4,12 @@ import { projectileSystem } from '../../systems/projectileSystem.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnMeleeClashShockwave, spawnArcaneSmoke, spawnTojiWhirlingWindDebris, spawnGroundScorch } from '../../graphics/particles/sparkEffect.js';
+import { spawnBloodEffect } from '../../graphics/particles/bloodEffect.js';
 import { drawInvertedSpear, drawSplitSoulKatana, drawPhysicsChain, drawRestedKatanaOverShoulder, drawRestedInvertedSpearAtHip, TOJI_WEAPON_CONFIG } from '../../graphics/weapons/tojiWeaponGraphics.js';
+import { drawTojiSkin, drawTojiGhostSkin } from '../../graphics/fighters/tojiSkin.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
-import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike } from './toji/tojiWeapons.js';
+import { initChainPhysics as modInitChain, updateChainPhysics as modUpdateChain, performSplitSoulKatanaSlash as modKatanaSlash, performInvertedSpearStrike as modSpearStrike, tojiGetTargetsInFrontalArc } from './toji/tojiWeapons.js';
 import { modSpawnTeleportAfterimages, modStartAmbushSequence, modUpdateAmbushSequence, tojiIsTargetDeadOrRemoved } from './toji/tojiAmbush.js';
 import { modUpdateChannelSense, modUpdateStealth } from './toji/tojiSkills.js';
 import { MODE_SPEED_MULTIPLIER } from '../../core/modeConfig.js';
@@ -23,7 +25,7 @@ export class TojiFighter extends Fighter {
     
     // Heavenly Restriction Stealth Passive (Configurable Duration & Cooldown)
     this.stealthMaxDuration = CONFIG.toji?.stealthDuration || 240;
-    this.stealthMaxCooldown = CONFIG.toji?.stealthCooldown || 420;
+    this.stealthMaxCooldown = CONFIG.toji?.stealthCooldown || 500;
     this.stealthTimer = this.stealthMaxDuration;
     this.stealthCooldown = 0;
     this.isStealthed = true;
@@ -189,7 +191,10 @@ export class TojiFighter extends Fighter {
     this._initChainPhysics();
   }
 
-  interruptAttacks() {
+  interruptAttacks(force = false) {
+    if (this.ultimateActive && !force) {
+      return; // PROTECTED: Never cancel or interrupt active ultimate!
+    }
     super.interruptAttacks();
     this.isAmbushing = false;
     this.ambushTarget = null;
@@ -208,6 +213,8 @@ export class TojiFighter extends Fighter {
     this._activeSlashProgress = 0;
     this._recoveryProgress = 0;
     if (this.swordTrail) this.swordTrail.length = 0;
+    if (this.stealthAfterimages) this.stealthAfterimages.length = 0;
+    if (this.afterImages) this.afterImages.length = 0;
     if (typeof state !== 'undefined') {
       if (state.fighters) {
         state.fighters.forEach(f => {
@@ -222,23 +229,69 @@ export class TojiFighter extends Fighter {
     }
   }
 
+  applyTimeStop(frames) {
+    if (this.ultimateActive) return;
+    super.applyTimeStop(frames);
+  }
+
+  applyHitStun(frames) {
+    if (this.ultimateActive) return;
+    super.applyHitStun(frames);
+  }
+
+  applyParalyze(frames) {
+    if (this.ultimateActive) return;
+    if (typeof super.applyParalyze === 'function') super.applyParalyze(frames);
+  }
+
   /**
    * Overrides takeDamage to implement Inverted Spear Melee Parry & Ambush Counter-Attack.
    */
   takeDamage(amount, attacker, opts = {}) {
-    if (this.isDead || this.hp <= 0) return false;
+    if (opts.isHeal) return super.takeDamage(amount, attacker, opts);
 
-    // Stealth & Ultimate Dodge Chance: physically dodge incoming projectiles while in stealth or during ultimate
+    // Check if an enemy Domain Expansion is currently active in the arena
+    const myTeam = (typeof state !== 'undefined' && typeof state.getFighterTeam === 'function' && state.fighters) ? state.getFighterTeam(state.fighters.indexOf(this)) : null;
+    const isEnemyDomainActive = Boolean(
+      (typeof state !== 'undefined' && (state.domainActive || state.activeDomain)) ||
+      (typeof state !== 'undefined' && state.fighters && state.fighters.some((f, idx) => {
+        if (!f || f === this || f.hp <= 0) return false;
+        const isDomainRunning = f.domainActive || f._mahitoDomainActive || f.isChannelingDomainExpansion || f.isChannelingDomain;
+        if (!isDomainRunning) return false;
+        const enemyTeam = state.getFighterTeam(idx);
+        return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
+      }))
+    );
+
+    // Heavenly Restriction / Physical Instinct Dodge: physically dodge incoming melee attacks, strikes & projectiles
+    // Dodge chance significantly increases when inside an enemy Domain Expansion (0 Cursed Energy stealth mastery!)
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
-    const isDodgeable = opts.isProjectile && !opts.isTrueDamage && !isGuaranteedHit;
-    let dodgeChance = CONFIG.toji?.stealthDodgeChance || 0.10;
-    if (this.ultimateActive) {
-      dodgeChance *= (CONFIG.toji?.ultimateDodgeMultiplier || 3.0);
+    const isDirectAttack = Boolean(
+      opts.isProjectile ||
+      opts.projectile ||
+      opts.isRanged ||
+      opts.isBullet ||
+      opts.isLaser ||
+      opts.isMelee ||
+      opts.isPhysical ||
+      opts.isPunch ||
+      opts.isSlash ||
+      opts.isBasic ||
+      opts.isSkill ||
+      opts.isDirect ||
+      (attacker && attacker !== this && !opts.isTrueDamage && !opts.fromBlackHole && !opts.isDomainDPS && !opts.isBurn && !opts.isPoison)
+    );
+    const isDodgeable = isDirectAttack && !opts.isTrueDamage && !isGuaranteedHit && !opts.fromBlackHole && !opts.isDomainDPS && !opts.isBurn && !opts.isPoison;
+    
+    let dodgeChance = CONFIG.toji?.stealthDodgeChance ?? 0.25;
+    if (isEnemyDomainActive) {
+      const domainDodgeBonus = CONFIG.toji?.domainDodgeBonus ?? 0.75;
+      const domainDodgeChance = CONFIG.toji?.domainDodgeChance ?? 1.0;
+      dodgeChance = Math.min(1.0, Math.max(dodgeChance + domainDodgeBonus, domainDodgeChance));
     }
     
-    const canDodge = isDodgeable && (this.isStealthed || this.ultimateActive);
-    if (canDodge && Math.random() < dodgeChance) {
-      spawnFloatingText(this.x, this.y - this.r - 5, 'DODGE!', '#a855f7');
+    if (isDodgeable && (dodgeChance >= 1.0 || Math.random() < dodgeChance)) {
+      spawnFloatingText(this.x, this.y - this.r - 8, 'MISS!', '#C084FC');
       audioSystem.playSFX('skill_parry', 0.65);
       
       // Spawn standard Toji stealth flash-step afterimages
@@ -259,18 +312,10 @@ export class TojiFighter extends Fighter {
           initialAlpha: 0.60 - i * 0.15,
           maxTimer: 14,
           timer: 14
-        }, 30);
+        }, 4);
       }
       return false; // Damage dodged & negated!
     }
-
-    // Check if an enemy Domain Expansion is currently active in the arena
-    const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
-    const isEnemyDomainActive = state.fighters && state.fighters.some((f, idx) => {
-      if (!f || f === this || f.hp <= 0 || !f.domainActive) return false;
-      const enemyTeam = state.getFighterTeam(idx);
-      return myTeam === null || enemyTeam === null || myTeam !== enemyTeam;
-    });
 
     // Inverted Spear Parry & Counter-Attack (active inside enemy domains against strikes/projectiles AND domain slash ticks!)
     const parryChance = CONFIG.toji?.parryChance || 0.45;
@@ -361,12 +406,19 @@ export class TojiFighter extends Fighter {
     if (!closest) return;
     
     this.ultimateActive = true;
+    this.ultimateCooldown = this.ultimateCooldownMax || CONFIG.toji?.ultimateCooldown || 2500;
     this.ultimatePhase = 'CHANNELING';
     this.isChannelingDomain = true;
     this.ultimateChargeTimer = 0;
     this.ultimateChargeMax = CONFIG.toji?.ultimateChargeTime || 90; // 90 frames (1.5s channel)
-    this.ultimateCooldown = this.ultimateCooldownMax;
     this.ultimateTarget = closest;
+    if (closest) {
+      if (closest.afterImages) closest.afterImages.length = 0;
+      if (closest._dashAfterimages) closest._dashAfterimages.length = 0;
+      if (closest.stealthAfterimages) closest.stealthAfterimages.length = 0;
+      if (closest.adaptationAfterimages) closest.adaptationAfterimages.length = 0;
+      if (closest._afterImages) closest._afterImages.length = 0;
+    }
     this.ultimateAssaultCount = 0;
     
     // Clear any lingering stealth afterimages so they don't get stuck on screen
@@ -418,6 +470,7 @@ export class TojiFighter extends Fighter {
         this.ultimateTarget = nextTarget;
       } else {
         this.ultimateActive = false;
+        this.ultimateCooldown = this.ultimateCooldownMax || CONFIG.toji?.ultimateCooldown || 2500;
         this.isChannelingDomain = false;
         this.ultimatePhase = null;
         this.ultimateTarget = null;
@@ -450,7 +503,7 @@ export class TojiFighter extends Fighter {
           timer: 16,
           initialAlpha: 0.6,
           isDomainAfterimage: true
-        }, 30);
+        }, 4);
       }
 
       if (this.ultimateChargeTimer >= (this.ultimateChargeMax || 90)) {
@@ -483,6 +536,18 @@ export class TojiFighter extends Fighter {
         if (typeof this.ultimateTarget.applySlow === 'function') {
           this.ultimateTarget.applySlow(this.ultimateTotalTimer, 0.1); // 10% movement speed through assault
         }
+        if (typeof this.ultimateTarget.interruptAttacks === 'function') {
+          this.ultimateTarget.interruptAttacks(true);
+        }
+        this.ultimateTarget.maceCannonAnimTimer = 0;
+        this.ultimateTarget._maceCannonData = null;
+        this.ultimateTarget.twinScissorAnimTimer = 0;
+        this.ultimateTarget._twinScissorData = null;
+        this.ultimateTarget.fleshSurgeAnimTimer = 0;
+        this.ultimateTarget._fleshSurgePlungeAngle = null;
+        this.ultimateTarget._fleshSurgeChain = null;
+        this.ultimateTarget.hideFrontHand = false;
+        this.ultimateTarget.hideBackHand = false;
         
         // Dash backwards into the smoke!
         const dx = this.ultimateTarget.x - this.x;
@@ -499,7 +564,7 @@ export class TojiFighter extends Fighter {
 
     this.ultimateTotalTimer--;
 
-    const maxStrikes = CONFIG.toji?.ultimateMaxStrikes || 5;
+    const maxStrikes = CONFIG.toji?.ultimateMaxStrikes || 6;
     
     // Transition to CRATER slam once the configured number of strikes is reached
     // We wait until he's fully in the 'VANISHED' phase after the final hit to transition smoothly
@@ -511,7 +576,7 @@ export class TojiFighter extends Fighter {
       this.craterFadeInTotal = fadeInFrames;
 
       const finalBlowChargeSound = getSkillEffectSound('toji', 'finalblowcharging');
-      audioSystem.playSFX(finalBlowChargeSound?.src || 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3', finalBlowChargeSound?.volume || 1.5, finalBlowChargeSound?.speed || 1.0, 0, finalBlowChargeSound?.delay || 0);
+      audioSystem.playSFX(finalBlowChargeSound?.src || CONFIG.toji?.sounds?.finalBlowCharging || 'Assets/Sound Effects/Skills/tojo-finalblow-charging.mp3', finalBlowChargeSound?.volume || CONFIG.toji?.soundVolumes?.finalBlowCharging || 4.5, finalBlowChargeSound?.speed || 1.0, 0, finalBlowChargeSound?.delay || 0);
       
       this.vx = 0;
       this.vy = 0;
@@ -799,7 +864,7 @@ export class TojiFighter extends Fighter {
         spawnImpactFlash(this.x, groundY, 85, 'rgba(255, 255, 255, 0.95)');
 
         const finalBlowSound = getSkillEffectSound('toji', 'ultimatefinalblow');
-        audioSystem.playSFX(finalBlowSound?.src || 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3', finalBlowSound?.volume || 1.5, finalBlowSound?.speed || 1.0, 0, finalBlowSound?.delay || 0);
+        audioSystem.playSFX(finalBlowSound?.src || CONFIG.toji?.sounds?.ultimateFinalBlow || 'Assets/Sound Effects/Skills/toji-ultimate-finalblow.mp3', finalBlowSound?.volume || CONFIG.toji?.soundVolumes?.ultimateFinalBlow || 4.5, finalBlowSound?.speed || 1.0, 0, finalBlowSound?.delay || 0);
         audioSystem.playSFX('attack_swordswing', 1.0);
       } else if (this.ultimateCycleTimer > 0) {
         this.ultimateCycleTimer--;
@@ -827,22 +892,36 @@ export class TojiFighter extends Fighter {
         spawnSparks(this.x, this.y, 50, 'crimsonSniper');
         audioSystem.playSFX('attack_groundsmash', 1.2);
         
-        applyDamageToTarget(this.ultimateTarget, CONFIG.toji?.ultimateCraterDamage || 65, this, { isMelee: true, isTrueDamage: true });
+        // Multi-target Frontal Arc AOE on 360 Spin Dive Final Blow (Rule 7 & Rule 6 compliant)
+        const impactAngle = (this.ultimateTarget && this.ultimateTarget.hp > 0)
+          ? Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x)
+          : (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0));
+        const finalReach = CONFIG.toji?.ultimateCraterReach || CONFIG.toji?.ultimateCraterRadius || 185;
+        const finalArc = CONFIG.toji?.ultimateCraterArc || (Math.PI * 1.35); // 243° wide frontal sweeping cone
+        const finalTargets = tojiGetTargetsInFrontalArc(this, this.ultimateTarget, impactAngle, finalReach, finalArc);
+        const craterDamage = CONFIG.toji?.ultimateCraterDamage || 65;
 
-        // Unfreeze target & apply massive kinetic ricochet knockback launch!
-        if (!tojiIsTargetDeadOrRemoved(this, this.ultimateTarget)) {
-          this._clearTargetFreeze(this.ultimateTarget);
-          if (!this.ultimateTarget.isTurret && !this.ultimateTarget.cannotBeKnockbacked) {
-            this.ultimateTarget.isFirstHitKnockback = false; // Enable ricochet wall bouncing!
-            const kbAngle = Math.atan2(this.ultimateTarget.y - this.y, this.ultimateTarget.x - this.x);
+        for (const hitTarget of finalTargets) {
+          if (!hitTarget || hitTarget.hp <= 0) continue;
+          
+          applyDamageToTarget(hitTarget, craterDamage, this, { isMelee: true, isTrueDamage: true });
+          
+          const hitAngle = Math.atan2(hitTarget.y - this.y, hitTarget.x - this.x);
+          spawnBloodEffect(hitTarget.x, hitTarget.y, 25, '#B30000', hitAngle);
+          spawnSparks(hitTarget.x, hitTarget.y, 20, 'crimsonSniper');
+
+          // Unfreeze target & apply massive kinetic ricochet knockback launch!
+          this._clearTargetFreeze(hitTarget);
+          if (!hitTarget.isTurret && !hitTarget.cannotBeKnockbacked) {
+            hitTarget.isFirstHitKnockback = false; // Enable ricochet wall bouncing!
             const kbForce = (CONFIG.toji?.ambushKnockbackForce || 48) * 1.1; // 53px/frame explosive velocity!
-            const kbVx = Math.cos(kbAngle) * kbForce;
-            const kbVy = Math.sin(kbAngle) * kbForce;
-            this.ultimateTarget.vx = kbVx;
-            this.ultimateTarget.vy = kbVy;
-            this.ultimateTarget.knockbackDecay = 0.90; // Smooth kinetic deceleration
-            if (typeof this.ultimateTarget.applyKnockback === 'function') {
-              this.ultimateTarget.applyKnockback(kbVx, kbVy);
+            const kbVx = Math.cos(hitAngle) * kbForce;
+            const kbVy = Math.sin(hitAngle) * kbForce;
+            hitTarget.vx = kbVx;
+            hitTarget.vy = kbVy;
+            hitTarget.knockbackDecay = 0.90; // Smooth kinetic deceleration
+            if (typeof hitTarget.applyKnockback === 'function') {
+              hitTarget.applyKnockback(kbVx, kbVy);
             }
           }
         }
@@ -850,6 +929,7 @@ export class TojiFighter extends Fighter {
         // ALWAYS cleanup ultimate state, even if target was killed!
         this._clearTargetFreeze(this);
         this.ultimateActive = false;
+        this.ultimateCooldown = this.ultimateCooldownMax || CONFIG.toji?.ultimateCooldown || 2500;
         this.isSpinning = false;
         this._diveStartAngle = undefined;
         this._diveChargeBaseAngle = undefined;
@@ -883,6 +963,11 @@ export class TojiFighter extends Fighter {
   }
 
   _updateAfterImages() {
+    if (this._isFrozenOrPaused()) {
+      if (this.stealthAfterimages) this.stealthAfterimages.length = 0;
+      if (this.afterImages) this.afterImages.length = 0;
+      return;
+    }
     if (!this.stealthAfterimages || this.stealthAfterimages.length === 0) return;
     fastCleanArray(this.stealthAfterimages, (img) => {
       if (!img) return false;
@@ -894,24 +979,102 @@ export class TojiFighter extends Fighter {
     });
   }
 
+  _isFrozenOrPaused() {
+    if (this.ultimateActive) return false;
+    return Boolean(
+      this.isFrozen ||
+      this.isFrozenByInfinity ||
+      (this.timeStopTimer && this.timeStopTimer > 0) ||
+      (this.statusEffects && this.statusEffects.timeStopTimer > 0) ||
+      (this.mahoragaAdaptationFreezeTimer && this.mahoragaAdaptationFreezeTimer > 0) ||
+      this.frozenByCronos ||
+      this.isCronosStasis ||
+      this.isTargetOfAmbush ||
+      this.caughtInGenosFlurry ||
+      this.caughtInJohnWickCombo ||
+      this.caughtInPureLoveBeam ||
+      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
+      (this.paralyzeTimer && this.paralyzeTimer > 0) ||
+      (this.electricStunTimer && this.electricStunTimer > 0) ||
+      (this.hitStunTimer && this.hitStunTimer > 0) ||
+      (this.stunTimer && this.stunTimer > 0) ||
+      (this.knockbackStunTimer && this.knockbackStunTimer > 0) ||
+      (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
+      (this.ratioHitPauseTimer && this.ratioHitPauseTimer > 0) ||
+      this.isParalyzed ||
+      this.isParalyzedByMahoraga ||
+      this.isParalyzedByMahito ||
+      this.isCaughtInPurple ||
+      (this.purpleHitTimer && this.purpleHitTimer > 0) ||
+      this.isWallPinned
+    );
+  }
+
   /**
    * Main update loop for Toji's mechanics.
    */
   update(opponent, ownerIndex, arena) {
-    // Check John Wick CQC Combo / Ambush Target Freeze (bypasses Heavenly Restriction)
-    if (this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
-      this.vx = 0;
-      this.vy = 0;
-      this.interruptAttacks();
-      return; // Stop Toji's movement and actions completely while John Wick rolls/attacks!
+    // 0. Ultimate Super Armor & Complete Freeze/Stasis Immunity:
+    // When performing Curse Inventory - Full Arsenal Unleashed ultimate, Toji is completely immune
+    // to all freeze attacks, stuns, paralyze effects, domain locks, or status interruptions.
+    if (this.ultimateActive) {
+      if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+      this.hitFlashTimer = 0; // Completely suppress white hit flash while in ultimate
+      this.mahoragaAdaptationFreezeTimer = 0;
+      this.isTargetOfAmbush = false;
+      this.caughtInGenosFlurry = false;
+      this.caughtInJohnWickCombo = false;
+      this.timeStopTimer = 0;
+      if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
+      this.paralyzeTimer = 0;
+      this.isParalyzed = false;
+      this.isParalyzedByMahito = false;
+      this.isParalyzedByMahoraga = false;
+      this.electricStunTimer = 0;
+      this.hitStunTimer = 0;
+      this.stunTimer = 0;
+      this.knockbackStunTimer = 0;
+      this.dubstepStunTimer = 0;
+      this.ratioHitPauseTimer = 0;
+      this.isFrozen = false;
+      this.isFrozenByInfinity = false;
+      this.frozenByCronos = false;
+      this.isCronosStasis = false;
+      this.isCaughtInPurple = false;
+      this.purpleHitTimer = 0;
+      this.isWallPinned = false;
+      this.pureLoveBeamRecoveryTimer = 0;
+      this.caughtInPureLoveBeam = false;
+      this.pureLoveBeamTimer = 0;
+      this._suppressFreezeTimer = 0;
+      this.redKnockbackTimer = 0;
+      this.redSlowTimer = 0;
+      this.slowTimer = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
+      // Motion trail afterimages during ultimate
+      this._updateAfterImages();
+      this.updateUltimate(arena, ownerIndex);
+      return;
     }
 
-    // Check Mahoraga Divine Adaptation Freeze first (bypasses Heavenly Restriction immunity)
+    // 1. Check Mahoraga Divine Adaptation Freeze first (bypasses Heavenly Restriction immunity)
     if (this.mahoragaAdaptationFreezeTimer > 0) {
       this.mahoragaAdaptationFreezeTimer--;
       this.vx = 0;
       this.vy = 0;
-      return; // Freeze Toji mid-action during Mahoraga's 3D Wheel rotation!
+      this.interruptAttacks();
+      return;
+    }
+
+    // 2. Top-of-loop Freeze / Status Effect Guard (Rule 1 Compliant: decrements timers & returns if frozen/paralyzed)
+    const isFrozen = this._handleTimeStop();
+    if (isFrozen || this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
+      this.vx = 0;
+      this.vy = 0;
+      this.interruptAttacks();
+      return;
     }
 
     // Gojo Reversal Red Spatial Repulsion Knockback (bypasses Heavenly Restriction immunity!)
@@ -971,29 +1134,15 @@ export class TojiFighter extends Fighter {
     this._tickCooldowns();
     this._tickAttackSound();
 
-    // Toji Heavenly Restriction Immunity: Immune to time-stop, domain freeze, hit stun, and CC (EXCEPT Genos Machine Gun Blows & John Wick CQC Ambush!)
-    if (this.caughtInGenosFlurry || this.caughtInJohnWickCombo || this.isTargetOfAmbush) {
-      this.vx = 0;
-      this.vy = 0;
-      this.interruptAttacks();
-      if (this.statusEffects && typeof this.statusEffects.applyTimeStop === 'function') {
-        this.statusEffects.applyTimeStop(10);
-      }
-      return; // Stop update execution so Toji is 100% frozen in place!
-    } else {
-      this.timeStopTimer = 0;
-      if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
-    }
+    // Reset standard timers purged by Heavenly Restriction (when not in specific flurries/combos)
+    this.timeStopTimer = 0;
+    if (this.statusEffects) this.statusEffects.timeStopTimer = 0;
     this.hitStunTimer = 0;
     this.knockbackStunTimer = 0;
     this.electricStunTimer = 0;
     this.dubstepStunTimer = 0;
     this.crimsonElectrifiedTimer = 0;
     this._suppressFreezeTimer = 0;
-
-    if (this._handleTimeStop()) {
-      return;
-    }
 
     // Tick timers
     if (this.spearCooldown > 0) this.spearCooldown--;
@@ -1009,16 +1158,6 @@ export class TojiFighter extends Fighter {
       }
     } else if (this.katanaSlashFadeTimer > 0) {
       this.katanaSlashFadeTimer--;
-    }
-
-    // Handle Ultimate Sequence
-    if (this.ultimateActive) {
-      // Purge knockback forces — Toji controls his own position during ultimate
-      this.knockbackVx = 0;
-      this.knockbackVy = 0;
-      this.knockbackStunTimer = 0;
-      this.updateUltimate(arena, ownerIndex);
-      return;
     }
 
     // Auto-trigger ultimate when ready (AI logic)
@@ -1150,7 +1289,13 @@ export class TojiFighter extends Fighter {
    */
   _clearTargetFreeze(target) {
     if (!target) return;
+    target.isTargetOfAmbush = false;
     target.timeStopTimer = 0;
+    target.paralyzeTimer = 0;
+    target.hitStunTimer = 0;
+    target.isParalyzed = false;
+    target.isParalyzedByMahoraga = false;
+    if (target.statusEffects) target.statusEffects.timeStopTimer = 0;
     delete target._timeStopOriginalDuration;
     delete target._timeStopStartTime;
     delete target._timeStopFrozenAngle;
@@ -1281,7 +1426,7 @@ export class TojiFighter extends Fighter {
         ctx.fill();
         ctx.beginPath();
         ctx.arc(0, 0, glowRadius * 0.2, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${0.30 * progress})`;
+        ctx.fillStyle = `rgba(180, 80, 255, ${0.20 * progress})`;
         ctx.fill();
         ctx.restore();
       }
@@ -1302,7 +1447,7 @@ export class TojiFighter extends Fighter {
       ? 1 
       : (Math.abs(_normBaseAngle) > Math.PI / 2 ? -1 : 1);
 
-    let offsetAngle = 0.42; // Lore low assassin side guard stance
+    let offsetAngle = 0.42 * _katanaFlipSign; // Lore low assassin side guard stance (mirrored when facing left)
     let thrustDistance = 0;
     let slashArcAlpha = 0;
     let attackPhaseProgress = 0;
@@ -1362,7 +1507,7 @@ export class TojiFighter extends Fighter {
 
       // Deep coiled weapon charging stance: hand and weapon held steady at shoulder ready to plunge
       thrustDistance = -24;
-      offsetAngle = 0.50;
+      offsetAngle = 0.50 * _katanaFlipSign;
 
       // Render Charging Weapon Energy Flare at spear tip held at shoulder
       ctx.save();
@@ -1600,7 +1745,7 @@ export class TojiFighter extends Fighter {
         if (t < 0.12) {
           const p = t / 0.12;
           thrustDistance = -24 * (1 - p * 0.1); // Coiled far back at shoulder
-          offsetAngle = 0.50 * (1 - p);
+          offsetAngle = 0.50 * (1 - p) * _katanaFlipSign;
           slashArcAlpha = 0;
         } else if (t < 0.72) {
           const p = (t - 0.12) / 0.60;
@@ -1620,7 +1765,7 @@ export class TojiFighter extends Fighter {
           const p = (t - 0.72) / 0.28;
           const easeP = p * (2 - p);
           thrustDistance = 70 * (1 - easeP);
-          offsetAngle = 0.42 * easeP;
+          offsetAngle = 0.42 * easeP * _katanaFlipSign;
           slashArcAlpha = 0;
         }
       } else {
@@ -1634,7 +1779,7 @@ export class TojiFighter extends Fighter {
           // Phase 1: Ultra-fast snap to cocked upper-right position (reads as "already cocked")
           const p = t / 0.05;
           thrustDistance = -8 * p;
-          offsetAngle = 0.42 - 1.57 * p;   // 0.42 → -1.15 (upper-right, 11 o'clock)
+          offsetAngle = (0.42 - 1.57 * p) * _katanaFlipSign;   // 0.42 → -1.15 (upper-right, 11 o'clock)
           slashArcAlpha = 0;
           this._activeSlashProgress = 0;
           this._recoveryProgress = 0;
@@ -1645,7 +1790,7 @@ export class TojiFighter extends Fighter {
           // thrustDistance: blade eases forward to a steady +12px and holds there during the arc.
           // No sin-pulse lunge — that was causing the thrust look.
           thrustDistance = -8 + 20 * Math.min(1.0, p * 3.0); // ramps to +12 in first 1/3, then holds
-          offsetAngle = -1.15 + 2.20 * sweepCurve;            // -1.15 → +1.05 (wider top-to-bottom arc, 126 degrees)
+          offsetAngle = (-1.15 + 2.20 * sweepCurve) * _katanaFlipSign;            // -1.15 → +1.05 (wider top-to-bottom arc, 126 degrees)
           slashArcAlpha = Math.min(1.0, p * 4.0);              // Fades in instantly and stays at 1.0
           this._activeSlashProgress = p; // Store the progress on this for trailing erase effect
           this._recoveryProgress = 0;
@@ -1664,7 +1809,7 @@ export class TojiFighter extends Fighter {
           const p = (t - 0.52) / 0.48;
           const easeP = p * (2 - p); // quadratic ease-out
           thrustDistance = 12 * (1 - easeP);                   // eases back from +12 to 0
-          offsetAngle = 1.05 + (0.42 - 1.05) * easeP;          // +1.05 → +0.42
+          offsetAngle = (1.05 + (0.42 - 1.05) * easeP) * _katanaFlipSign;          // +1.05 → +0.42
           slashArcAlpha = 1 - p;                               // Fades out during recovery phase
           this._activeSlashProgress = 1.0;
           this._recoveryProgress = p; // Store recovery progress
@@ -1717,22 +1862,22 @@ export class TojiFighter extends Fighter {
       const progress = 1 - (this.blockPoseTimer / 25);
       if (this.parryType === 'deflect') {
         // Fast sharp counter-swipe rotation matching Yuta's deflection pose!
-        offsetAngle = (Math.PI / 3.5) - (Math.PI * 0.6) * Math.min(1.0, progress * 2.5);
+        offsetAngle = ((Math.PI / 3.5) - (Math.PI * 0.6) * Math.min(1.0, progress * 2.5)) * _katanaFlipSign;
         thrustDistance = 12 * Math.sin(progress * Math.PI);
       } else {
         // Guard Pose: Hold Inverted Spear flat across chest
-        offsetAngle = Math.PI / 2;
+        offsetAngle = (Math.PI / 2) * _katanaFlipSign;
         thrustDistance = -6;
       }
     } else {
       // Idle assassin stance breathing sway
-      offsetAngle += Math.sin(now / 250) * 0.05;
+      offsetAngle += Math.sin(now / 250) * 0.05 * _katanaFlipSign;
     }
 
     const renderAngle = baseAngle + offsetAngle;
 
     // 1. Draw motion ghosting shadow during thrust lunge (shows hand & weapon driving forward)
-    if (isAttacking && attackPhaseProgress >= 0.15 && attackPhaseProgress <= 0.70) {
+    if (isAttacking && attackPhaseProgress >= 0.15 && attackPhaseProgress <= 0.70 && !this._isFrozenOrPaused()) {
       ctx.save();
       ctx.globalAlpha = 0.45;
       const ghostOffset = this.isAmbushThrust
@@ -1744,10 +1889,11 @@ export class TojiFighter extends Fighter {
       ctx.restore();
     }
 
-    // 1.4. High-Speed Stealth & Domain Motion Trail Afterimages (Matches Gojo & Sukuna teleport visual system)
-    if (this.stealthAfterimages && this.stealthAfterimages.length > 0) {
+    // 1.4. High-Speed Stealth & Domain Motion Trail Ghost Model Afterimages (Skin Model Ghosting)
+    if (this.stealthAfterimages && this.stealthAfterimages.length > 0 && !this._isFrozenOrPaused()) {
       const skipAlternate = (typeof state !== 'undefined' && state.fps && state.fps < 45);
-      for (let i = 0; i < this.stealthAfterimages.length; i++) {
+      const startIdx = Math.max(0, this.stealthAfterimages.length - 4);
+      for (let i = startIdx; i < this.stealthAfterimages.length; i++) {
         if (skipAlternate && i % 2 === 0) continue;
         const img = this.stealthAfterimages[i];
         if (!img || img.timer <= 0) continue;
@@ -1758,22 +1904,20 @@ export class TojiFighter extends Fighter {
 
         if (alpha <= 0.01) continue;
 
-        ctx.save();
-
         // 1. Dash Trajectory Line (skip in low quality for perf)
         if (!isLowQuality && img.fromX !== undefined && img.toX !== undefined) {
-          const lineHex = img.isDomainAfterimage ? '#A040FF' : '#8A2BE2';
+          const lineHex = img.isDomainAfterimage ? '#A040FF' : '#FF1E56';
           ctx.save();
           ctx.globalAlpha = alpha * 0.6;
           ctx.strokeStyle = lineHex;
-          ctx.lineWidth = 3.5;
+          ctx.lineWidth = 3.0;
           ctx.beginPath();
           ctx.moveTo(img.fromX, img.fromY);
           ctx.lineTo(img.toX, img.toY);
           ctx.stroke();
 
           ctx.strokeStyle = '#FFFFFF';
-          ctx.lineWidth = 1.4;
+          ctx.lineWidth = 1.2;
           ctx.beginPath();
           ctx.moveTo(img.fromX, img.fromY);
           ctx.lineTo(img.toX, img.toY);
@@ -1781,101 +1925,35 @@ export class TojiFighter extends Fighter {
           ctx.restore();
         }
 
-        ctx.translate(img.x, img.y);
-        ctx.rotate(img.angle || 0);
-
-        // 2. Cursed Energy Aura Glow — flat concentric fills instead of radial gradient (perf: eliminates gradient allocation)
-        if (!isLowQuality) {
-          ctx.save();
-          ctx.globalCompositeOperation = 'screen';
-          ctx.beginPath();
-          ctx.arc(0, 0, this.r * 1.4, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(160, 64, 255, ${alpha * 0.4})`;
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(0, 0, this.r * 0.6, 0, Math.PI * 2);
-          ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.5})`;
-          ctx.fill();
-          ctx.restore();
-        }
-
-        // 3. Body Circle Silhouette & Outer Glow Ring
-        ctx.save();
-        ctx.globalAlpha = alpha;
-        ctx.beginPath();
-        ctx.arc(0, 0, this.r * 1.1, 0, Math.PI * 2);
-        ctx.fillStyle = img.isDomainAfterimage ? '#281438' : '#1A0B26';
-        ctx.fill();
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 2.5;
-        ctx.stroke();
-
-        // 4. Anime Eye Glints (skip in low quality)
-        if (!isLowQuality) {
-          ctx.fillStyle = '#E0FFFF';
-          ctx.beginPath();
-          ctx.arc(this.r * 0.5, -this.r * 0.25, 3, 0, Math.PI * 2);
-          ctx.arc(this.r * 0.5, this.r * 0.25, 3, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.restore();
-
-        ctx.restore();
+        // 2. Render Full Ghost Model of Toji's Skin at recorded world coordinates
+        const aiAngle = img.gunAngle !== undefined ? img.gunAngle : (img.angle || 0);
+        drawTojiGhostSkin(ctx, img.x, img.y, aiAngle, this.r, alpha, img.isDomainAfterimage);
       }
-    }
-
-    // 1.5. Solid Dark Shadow Purple Stealth Ring & Breather Indicator
-    if (this.isStealthed) {
-      ctx.save();
-      
-      // Pulse effect
-      const pulse = 1 + Math.sin(now / 150) * 0.15;
-      const ringRadius = (this.r + 8) * pulse;
-      
-      // Draw base glowing ring
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, ringRadius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(160, 60, 255, 0.15)';
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(160, 60, 255, 0.6)';
-      ctx.lineWidth = 2.0;
-      ctx.stroke();
-      
-      // Draw countdown arc (Breather timer)
-      const maxStealth = 120; // The fixed 2-second breather duration
-      const ratio = Math.max(0, Math.min(1, this.stealthTimer / maxStealth));
-      ctx.beginPath();
-      ctx.arc(this.x, this.y, ringRadius + 4, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * ratio));
-      ctx.strokeStyle = '#A040FF';
-      ctx.lineWidth = 3.5;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-      
-      ctx.restore();
     }
 
     // 1.8. Draw Rested Weapon on BACK LAYER (Behind Toji's body circle)
     const isKatanaDrawn = (this.ambushPhase === 'KATANA_DRAW' || this.ambushPhase === 'KATANA_CHASE' || this.ambushPhase === 'KATANA_CHARGE' || this.ambushPhase === 'KATANA_SLASH' || this.ambushPhase === 'KATANA_RECOVERY') && !this.ultimateActive;
     const isKatanaActiveInHand = isKatanaDrawn || (this.ambushPhase === 'PHANTOM_FLURRY' && !this.ultimateActive);
     const isUltimateFinal = this.ultimateActive && (this.ultimatePhase === 'CRATER_FADEIN' || this.ultimatePhase === 'CRATER' || this.ultimatePhase === 'CRATER_DIVE');
-    const isCountdown = (typeof state !== 'undefined' && state.gameState === 'countdown') || this._isWinnerReveal;
+    const isShowoffOrPreview = this._isFaceOff || this._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'countdown' || state._isFaceOffScreenActive));
 
-    if (isKatanaDrawn) {
-      drawRestedInvertedSpearAtHip(ctx, this.x, this.y, baseAngle, this.r, this.chainNodes);
-    } else if (isCountdown) {
-      drawRestedKatanaOverShoulder(ctx, this.x, this.y, baseAngle, this.r);
+    if (isKatanaDrawn || isKatanaActiveInHand || isUltimateFinal) {
+      // During active skill execution with Katana in hand, Inverted Spear rests at hip
+      drawRestedInvertedSpearAtHip(ctx, this.x, this.y, baseAngle, this.r, this.chainNodes, '#E8BD9B');
+    } else if (isShowoffOrPreview) {
+      // Dual-wield pose with Katana over shoulder only shown in showoff screen / countdown / preview cards
+      drawRestedKatanaOverShoulder(ctx, this.x, this.y, baseAngle, this.r, '#E8BD9B');
     }
 
-    // 2. Draw base circle body and outline
-    this.drawBody(ctx);
-    this.drawOutline(ctx);
+    // 2. Draw Toji's signature skin model (Rule 19 & 20 compliant)
+    drawTojiSkin(ctx, this);
 
     // 3. Draw physics chain trailing naturally in world space
+    modUpdateChain(this);
     drawPhysicsChain(ctx, this.chainNodes);
 
     // 4. HIGH-IMPACT ANIME SLASH VISUAL EFFECTS (Impact & Recovery Phase)
-    const isTojiPausedOrFrozen = this.caughtInGenosFlurry || (this.timeStopTimer || 0) > 0 || this.isFrozenByInfinity || (this.statusEffects && (this.statusEffects.timeStopTimer || 0) > 0) || this.isTargetOfAmbush || this.isFrozen;
+    const isTojiPausedOrFrozen = this._isFrozenOrPaused();
     if (slashArcAlpha > 0 && !isTojiPausedOrFrozen) {
       ctx.save();
       // Use the world-space origin snapshotted at swing-start so the slash arc stays
@@ -2064,16 +2142,6 @@ export class TojiFighter extends Fighter {
         ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha})`;
         ctx.lineWidth = 3;
         ctx.stroke();
-
-        // D. Linear High-Speed Air Piercing Speed Lines
-        const offsetys = [-18, -10, 0, 10, 18];
-        ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha * 0.9})`;
-        ctx.lineWidth = 1.8;
-        for (const oy of offsetys) {
-          ctx.beginPath();
-          ctx.moveTo(this.r + 10, oy);
-          ctx.stroke();
-        }
       } else if (this.ambushPhase === 'PHANTOM_FLURRY') {
         // --- DUAL-WIELD PHANTOM FLURRY SLASH ARCS ---
         const drawArc = (arcAngle, radius, thick, alpha, color1, color2, color3) => {
@@ -2228,90 +2296,106 @@ export class TojiFighter extends Fighter {
         const maxThick = (isKatana ? 24 : 16) * (editP ? editP.thickness : 1.0) * thickScale; // Slim razor-sharp crescent thickness scaled!
         const steps = isLowQuality ? 18 : 30;
 
-        // 1. Outer Neon Violet Glowing Aura
+        // 1. Volumetric Outer Cursed Energy Shockwave Glow
         ctx.beginPath();
-        ctx.arc(0, 0, outerR + 4, tailAngle, tipAngle, false);
+        ctx.arc(0, 0, outerR + 6, tailAngle, tipAngle, false);
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-          const thick = (maxThick + 5) * taper;
-          const r = (outerR + 4) - thick;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.25) * (0.28 + 0.72 * t);
+          const thick = (maxThick + 8) * taper;
+          const r = (outerR + 6) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
         ctx.closePath();
-        ctx.fillStyle = `rgba(160, 30, 240, ${slashArcAlpha * 0.70})`;
+        ctx.fillStyle = `rgba(160, 48, 255, ${slashArcAlpha * 0.45})`;
         ctx.fill();
 
-        // 2. Inner Deep Crimson / Violet Secondary Energy Flare
+        // 2. Inner Radiant Crimson Nullification Energy Flare
         ctx.beginPath();
-        ctx.arc(0, 0, outerR + 1.5, tailAngle, tipAngle, false);
+        ctx.arc(0, 0, outerR + 2.5, tailAngle, tipAngle, false);
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
-          const thick = (maxThick + 2) * taper;
-          const r = (outerR + 1.5) - thick;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.25) * (0.28 + 0.72 * t);
+          const thick = (maxThick + 4) * taper;
+          const r = (outerR + 2.5) - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
         ctx.closePath();
-        ctx.fillStyle = `rgba(220, 20, 100, ${slashArcAlpha * 0.80})`;
+        ctx.fillStyle = `rgba(255, 30, 86, ${slashArcAlpha * 0.65})`;
         ctx.fill();
 
-        // 3. Void-Black Pitch Dark Cursed Energy Core (With Jagged Teeth Notches)
+        // 3. Void-Black Pitch Dark Cursed Energy Core (Smooth with sharp inner serration notches)
         ctx.beginPath();
         ctx.arc(0, 0, outerR, tailAngle, tipAngle, false);
         for (let i = steps; i >= 0; i--) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
           let thick = maxThick * taper;
 
           const notchPattern = Math.sin(t * Math.PI * 10);
           if (notchPattern > 0.65 && t > 0.15 && t < 0.85) {
-            thick += 4.5 * (notchPattern - 0.65);
+            thick += 5.0 * (notchPattern - 0.65);
           }
 
           const r = outerR - thick;
           ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
         }
         ctx.closePath();
-        ctx.fillStyle = `rgba(12, 4, 20, ${slashArcAlpha * 0.96})`;
+        ctx.fillStyle = `rgba(8, 4, 16, ${slashArcAlpha * 0.98})`;
         ctx.fill();
 
-        // 4. Electric Violet Outer Razor Edge Line
+        // 4. Bright Metallic Silver Hamon Slicing Wave
+        ctx.beginPath();
+        ctx.arc(0, 0, outerR, tailAngle, tipAngle, false);
+        for (let i = steps; i >= 0; i--) {
+          const t = i / steps;
+          const angle = tailAngle + (tipAngle - tailAngle) * t;
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
+          const thick = maxThick * 0.35 * taper;
+          const r = outerR - thick;
+          ctx.lineTo(Math.cos(angle) * r, Math.sin(angle) * r);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(226, 234, 245, ${slashArcAlpha * 0.85})`;
+        ctx.fill();
+
+        // 5. Electric Violet Outer Razor Edge Contour Line
         ctx.beginPath();
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
           const thick = maxThick * taper;
-          const r = outerR - thick * 0.25;
+          const r = outerR - thick * 0.18;
           const x = Math.cos(angle) * r;
           const y = Math.sin(angle) * r;
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = `rgba(235, 140, 255, ${slashArcAlpha})`;
-        ctx.lineWidth = 2.4;
+        ctx.strokeStyle = `rgba(220, 140, 255, ${slashArcAlpha * 0.95})`;
+        ctx.lineWidth = 2.8;
         ctx.lineCap = 'round';
         ctx.stroke();
 
-        // 5. Pure White Razor Core Highlights
+        // 6. Hyper-Bright Pure White-Hot Slicing Razor Edge Core
         ctx.beginPath();
         for (let i = 0; i <= steps; i++) {
           const t = i / steps;
           const angle = tailAngle + (tipAngle - tailAngle) * t;
-          const taper = Math.pow(Math.sin(t * Math.PI), 1.4) * (0.3 + 0.7 * t);
+          const taper = Math.pow(Math.sin(t * Math.PI), 1.20) * (0.28 + 0.72 * t);
           const thick = maxThick * taper;
-          const r = outerR - thick * 0.25;
+          const r = outerR - thick * 0.18;
           const x = Math.cos(angle) * r;
           const y = Math.sin(angle) * r;
           if (i === 0) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
-        ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha * 0.9})`;
-        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = `rgba(255, 255, 255, ${slashArcAlpha * 0.98})`;
+        ctx.lineWidth = 1.4;
+        ctx.lineCap = 'round';
         ctx.stroke();
       }
 
@@ -2346,9 +2430,9 @@ export class TojiFighter extends Fighter {
       // Ultimate Sequence Strikes: Displayed 1 by 1 (ONLY 1 weapon drawn per strike, alternating Katana vs Spear!)
       const isKatanaActive = (this.phantomStrikeCount % 2) === 0;
       if (isKatanaActive) {
-        drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.color, baseAngle);
+        drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, '#E8BD9B', baseAngle);
       } else {
-        drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, this.color, baseAngle);
+        drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, '#E8BD9B', baseAngle);
       }
     } else if (isKatanaActiveInHand || isUltimateFinal) {
       const isSpinningDive = this.ultimateActive && this.ultimatePhase === 'CRATER' && (this.ultimateCycleTimer || 0) <= (CONFIG.toji?.ultimateCraterDiveTime || 15);
@@ -2357,13 +2441,13 @@ export class TojiFighter extends Fighter {
       // Use the snapshotted charge-end base angle so the katana's Y-flip state is FROZEN
       // for the entire 360 spin — exactly matching the charge animation's last frame.
       const finalBaseAngle = isSpinningDive ? (this._diveChargeBaseAngle !== undefined ? this._diveChargeBaseAngle : baseAngle) : baseAngle;
-      drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.color, finalBaseAngle);
+      drawSplitSoulKatana(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, '#E8BD9B', finalBaseAngle);
     } else {
-      drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, this.color, baseAngle);
+      drawInvertedSpear(ctx, this.x, this.y, renderAngle, this.r + thrustDistance, this.chainNodes, '#E8BD9B', baseAngle);
     }
     ctx.restore();
 
-    if ((this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH')) || this.ambushPhase === 'KATANA_CHARGE') {
+    if (!isTojiPausedOrFrozen && (((this.isAmbushing && (this.ambushPhase === 'BACK_CHARGE' || this.ambushPhase === 'FRONT_LAUNCH')) || this.ambushPhase === 'KATANA_CHARGE'))) {
       let chargeRatio = 1.0;
       if (this.ambushPhase === 'KATANA_CHARGE') {
         const fadeInTotal = this.craterFadeInTotal || 30;
@@ -2483,6 +2567,10 @@ export class TojiFighter extends Fighter {
     
     // Heavenly Restriction Floating Text is drawn on top layer by drawUltimateChannelingTexts()
     ctx.restore();
+  }
+
+  drawBody(ctx) {
+    drawTojiSkin(ctx, this);
   }
 }
 

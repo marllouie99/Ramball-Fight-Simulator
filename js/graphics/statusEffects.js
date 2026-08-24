@@ -1555,10 +1555,14 @@ export const STATUS_OVERLAY_REGISTRY = [
       f.caughtInSaitamaFlurry
     ),
     render: (ctx, baseRadius, f) => {
+      if (typeof state !== 'undefined' && f && f._stunRenderedFrame === state.frameCount) return;
       const dur = f.paralyzeTimer || f.timeStopTimer || f.electricStunTimer || f.hitStunTimer || 45;
       const isMahito = Boolean(f.isParalyzedByMahito);
       const color = isMahito ? '#A855F7' : '#FFEE58';
       drawParalyzeEffect(ctx, baseRadius, isMahito, dur, color, f);
+      if (typeof state !== 'undefined' && state.frameCount !== undefined && f) {
+        f._stunRenderedFrame = state.frameCount;
+      }
     }
   },
   {

@@ -2,7 +2,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { unlockAudio } from '../../systems/soundSystem.js';
 import { goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
-import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
+import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
 import { clearHealthHud } from '../hudManager.js?v=6';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
@@ -60,27 +60,31 @@ function drawIndexScreen() {
 
   updatePreviewBalls();
 
+  const isTactical = state.gameCategory === 'tactical';
+  const currentDefs = getActiveFighterDefs();
+
   // ── Header Section ──
-  ctx.fillStyle = '#64748b';
+  ctx.fillStyle = isTactical ? '#00e5ff' : '#64748b';
   ctx.font = '900 10px "Rajdhani", monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('CIRCLE BATTLE // FIGHTER DOSSIER // SYS.v2.5', canvas.width / 2, 56);
+  ctx.fillText(isTactical ? 'TACTICAL SHOOTER // OPERATIVE DOSSIER // SYS.v2.5' : 'CIRCLE BATTLE // FIGHTER DOSSIER // SYS.v2.5', canvas.width / 2, 56);
 
   ctx.save();
   ctx.fillStyle = '#ffffff';
   ctx.font = '900 22px "Outfit", "Rajdhani", sans-serif';
-  ctx.shadowColor = 'rgba(255, 255, 255, 0.2)';
+  ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.4)' : 'rgba(255, 255, 255, 0.2)';
   ctx.shadowBlur = 8;
-  ctx.fillText('[ FIGHTER DATABASE ]', canvas.width / 2, 78);
+  ctx.fillText(isTactical ? '[ SHOOTER ROSTER ]' : '[ FIGHTER DATABASE ]', canvas.width / 2, 78);
   ctx.restore();
 
   ctx.fillStyle = '#94a3b8';
   ctx.font = '10.5px "Rajdhani", sans-serif';
-  ctx.fillText('Inspect combatant classifications, abilities, and core telemetry.', canvas.width / 2, 94);
+  ctx.fillText(isTactical ? 'Inspect firearm combatants, ballistics data, and tactical abilities.' : 'Inspect combatant classifications, abilities, and core telemetry.', canvas.width / 2, 94);
 
   // ── Category Filter Tabs ──
-  const categories = ['All', 'Greek Mythology', 'Japanese', 'Sci-Fi & Modern', 'Fantasy & Magic'];
+  const rawCategories = Array.from(new Set(currentDefs.map(d => d.category).filter(Boolean)));
+  const categories = ['All', ...rawCategories];
   const catXStart = 20;
   let currentCX = catXStart;
   let currentCY = 106;
@@ -100,10 +104,10 @@ function drawIndexScreen() {
     
     ctx.save();
     if (isSelected) {
-      ctx.fillStyle = 'rgba(245, 158, 11, 0.16)';
-      ctx.strokeStyle = '#f59e0b';
+      ctx.fillStyle = isTactical ? 'rgba(0, 229, 255, 0.16)' : 'rgba(245, 158, 11, 0.16)';
+      ctx.strokeStyle = isTactical ? '#00e5ff' : '#f59e0b';
       ctx.lineWidth = 1.5;
-      ctx.shadowColor = 'rgba(245, 158, 11, 0.4)';
+      ctx.shadowColor = isTactical ? 'rgba(0, 229, 255, 0.4)' : 'rgba(245, 158, 11, 0.4)';
       ctx.shadowBlur = 6;
     } else {
       ctx.fillStyle = 'rgba(18, 22, 32, 0.85)';
@@ -116,7 +120,7 @@ function drawIndexScreen() {
     ctx.stroke();
     ctx.restore();
     
-    ctx.fillStyle = isSelected ? '#ffffff' : '#8899aa';
+    ctx.fillStyle = isSelected ? (isTactical ? '#00e5ff' : '#ffffff') : '#8899aa';
     ctx.font = '900 10px "Rajdhani", sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -137,7 +141,7 @@ function drawIndexScreen() {
   const cardSpacing = 10;
   const itemsPerPage = 5;
 
-  const filteredDefs = FIGHTER_DEFS.filter(def => 
+  const filteredDefs = currentDefs.filter(def => 
     !state.indexCategory || state.indexCategory === 'All' || def.category === state.indexCategory
   );
 
@@ -150,14 +154,14 @@ function drawIndexScreen() {
   const pageItems = filteredDefs.slice(startIdx, startIdx + itemsPerPage);
 
   pageItems.forEach((def, pos) => {
-    const originalIdx = FIGHTER_DEFS.findIndex(d => d.id === def.id);
+    const originalIdx = currentDefs.findIndex(d => d.id === def.id);
     const cardY = cardsStartY + pos * (cardH + cardSpacing);
 
     // Tactical Chamfered Panel
     drawPanel(cardX, cardY, cardW, cardH, 0.92, 8);
 
     // Left Accent Pip Line
-    ctx.fillStyle = def.color || '#f59e0b';
+    ctx.fillStyle = def.color || (isTactical ? '#00e5ff' : '#f59e0b');
     ctx.fillRect(cardX + 2, cardY + 12, 3, cardH - 24);
 
     // Fighter Preview Avatar & Glowing Stage
@@ -289,7 +293,8 @@ function drawIndexDetailScreen() {
   clearHealthHud();
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const def = FIGHTER_DEFS[state.indexInspectIndex];
+  const currentDefs = getActiveFighterDefs();
+  const def = currentDefs[state.indexInspectIndex];
   if (!def) {
     state.gameState = 'index';
     return;
@@ -719,7 +724,7 @@ function drawIndexDetailScreen() {
 
   // Previous Fighter Button
   drawButton('◄ PREV FIGHTER', 90, dockY, () => {
-    state.indexInspectIndex = (currentIdx - 1 + FIGHTER_DEFS.length) % FIGHTER_DEFS.length;
+    state.indexInspectIndex = (currentIdx - 1 + currentDefs.length) % currentDefs.length;
     state.indexDetailFighter = null;
   }, 130, 28, null, 4);
 
@@ -730,7 +735,7 @@ function drawIndexDetailScreen() {
 
   // Next Fighter Button
   drawButton('NEXT FIGHTER ►', canvas.width - 90, dockY, () => {
-    state.indexInspectIndex = (currentIdx + 1) % FIGHTER_DEFS.length;
+    state.indexInspectIndex = (currentIdx + 1) % currentDefs.length;
     state.indexDetailFighter = null;
   }, 130, 28, null, 4);
 }
@@ -745,10 +750,12 @@ let lastInspectedIndex = -1;
 export { drawIndexScreen, drawIndexDetailScreen, updatePreviewBalls };
 
 const eventTarget = state.pixiApp ? state.pixiApp.view : state.canvas;
-eventTarget.addEventListener('wheel', (e) => {
-  if (state.gameState === 'index') {
-    e.preventDefault();
-    const filteredDefs = FIGHTER_DEFS.filter(def => 
+if (eventTarget && typeof eventTarget.addEventListener === 'function') {
+  eventTarget.addEventListener('wheel', (e) => {
+    if (state.gameState === 'index') {
+      e.preventDefault();
+    const currentDefs = getActiveFighterDefs();
+    const filteredDefs = currentDefs.filter(def => 
       !state.indexCategory || state.indexCategory === 'All' || def.category === state.indexCategory
     );
     const totalPages = Math.ceil(filteredDefs.length / 5);
@@ -760,3 +767,4 @@ eventTarget.addEventListener('wheel', (e) => {
     return;
   }
 }, { passive: false });
+}

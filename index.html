@@ -78,17 +78,40 @@
             <div class="tactical-breadcrumbs">
               <span class="crumb-root">CIRCLE BATTLE</span>
               <span class="crumb-sep">//</span>
-              <span class="crumb-sub">TACTICAL OPERATIONS</span>
+              <span class="crumb-sub" id="crumb-sub-label">FIGHT OF CHARACTERS</span>
               <span class="crumb-sep">//</span>
-              <span class="crumb-id">SYS.v2.5</span>
+              <span class="crumb-id" id="crumb-id-label">ANIME ARENA</span>
             </div>
+
+            <!-- Top-Level Game Hub Switcher -->
+            <div class="game-hub-switcher" role="tablist">
+              <button id="btn-hub-foc" class="hub-switch-btn active" data-hub="foc">
+                <div class="hub-btn-glow"></div>
+                <span class="hub-btn-icon">⚔️</span>
+                <div class="hub-btn-info">
+                  <span class="hub-btn-title">FIGHT OF CHARACTERS</span>
+                  <span class="hub-btn-sub">ANIME & JUJUTSU BRAWL</span>
+                </div>
+                <span class="hub-active-indicator">ACTIVE</span>
+              </button>
+              <button id="btn-hub-tactical" class="hub-switch-btn" data-hub="tactical">
+                <div class="hub-btn-glow"></div>
+                <span class="hub-btn-icon">🎯</span>
+                <div class="hub-btn-info">
+                  <span class="hub-btn-title">TACTICAL SHOOTER</span>
+                  <span class="hub-btn-sub">GUNS & BALLISTICS ONLY</span>
+                </div>
+                <span class="hub-active-indicator">ACTIVE</span>
+              </button>
+            </div>
+
             <div class="tactical-title-row">
               <div class="tactical-main-title">
                 <span class="title-bracket">[</span>
                 <span class="title-text" id="tactical-category-label">OPERATIONS</span>
                 <span class="title-bracket">]</span>
               </div>
-              <div class="tactical-counter-badge" id="tactical-counter-badge">(9/9 READY)</div>
+              <div class="tactical-counter-badge" id="tactical-counter-badge">(10 READY)</div>
             </div>
 
             <!-- Category Tabs Navigation Bar -->
@@ -97,13 +120,13 @@
                 <span class="tab-tag">ALL</span>
               </button>
               <button class="tactical-tab-btn" data-category="modes">
-                <span class="tab-tag">BATTLE</span>
+                <span class="tab-tag" id="tab-modes-label">BATTLE</span>
               </button>
               <button class="tactical-tab-btn" data-category="arsenal">
-                <span class="tab-tag">ARSENAL</span>
+                <span class="tab-tag" id="tab-arsenal-label">ARSENAL</span>
               </button>
               <button class="tactical-tab-btn" data-category="database">
-                <span class="tab-tag">DATABASE</span>
+                <span class="tab-tag" id="tab-database-label">DATABASE</span>
               </button>
               <button class="tactical-tab-btn" data-category="system">
                 <span class="tab-tag">SYSTEM</span>
@@ -138,7 +161,7 @@
                 <div class="briefing-progress-bar">
                   <div class="briefing-progress-fill" style="width: 100%;"></div>
                 </div>
-                <div class="briefing-progress-label">STATUS: 100% OPERATIONAL</div>
+                <div class="briefing-progress-label" id="briefing-progress-label">STATUS: 100% OPERATIONAL</div>
               </div>
 
               <!-- Quick Launch Button -->
@@ -150,8 +173,12 @@
 
             <!-- Operation Cards Scrollable List -->
             <div class="tactical-cards-scrollview" id="tactical-cards-list">
+              <!-- ============================================== -->
+              <!-- FIGHT OF CHARACTERS CARDS (data-hub="foc") -->
+              <!-- ============================================== -->
+
               <!-- 1v1 Mode -->
-              <div class="tactical-card active" data-category="modes" data-action="mode-1v1" data-title="1V1 DUEL" data-desc="Direct high-stakes single duel. Choose your champion, test your reflexes, and unleash ultimate techniques." data-icon="duel" data-tag1="■ RANKED" data-tag2="■ TIER 1" data-tag3="■ DEPLOYABLE">
+              <div class="tactical-card active" data-hub="foc" data-category="modes" data-action="mode-1v1" data-title="1V1 DUEL" data-desc="Direct high-stakes single duel. Choose your champion, test your reflexes, and unleash ultimate techniques." data-icon="duel" data-tag1="■ RANKED" data-tag2="■ TIER 1" data-tag3="■ DEPLOYABLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-4.5-4.5"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/></svg>
                 </div>
@@ -166,7 +193,7 @@
               </div>
 
               <!-- 1v1 Stand Off Mode -->
-              <div class="tactical-card" data-category="modes" data-action="mode-standoff" data-title="1V1 STAND-OFF" data-desc="High-HP single round sudden death duel. 2000 HP clash with intense sustained combat and decisive victory." data-icon="standoff" data-tag1="■ HARDCORE" data-tag2="■ 2000 HP" data-tag3="■ 1 ROUND">
+              <div class="tactical-card" data-hub="foc" data-category="modes" data-action="mode-standoff" data-title="1V1 STAND-OFF" data-desc="High-HP single round sudden death duel. 2000 HP clash with intense sustained combat and decisive victory." data-icon="standoff" data-tag1="■ HARDCORE" data-tag2="■ 2000 HP" data-tag3="■ 1 ROUND">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v8m-4-4h8"/></svg>
                 </div>
@@ -181,7 +208,7 @@
               </div>
 
               <!-- Battle Random Mode (Instant 1v1 Standoff with Rolling Showoff) -->
-              <div class="tactical-card" data-category="modes" data-action="mode-random-standoff" data-title="BATTLE RANDOM" data-desc="Instant 1v1 Stand-Off match with random fighters and animated slot-machine showoff entrance!" data-icon="random" data-tag1="■ RANDOM" data-tag2="■ 2000 HP" data-tag3="■ INSTANT">
+              <div class="tactical-card" data-hub="foc" data-category="modes" data-action="mode-random-standoff" data-title="BATTLE RANDOM" data-desc="Instant 1v1 Stand-Off match with random fighters and animated slot-machine showoff entrance!" data-icon="random" data-tag1="■ RANDOM" data-tag2="■ 2000 HP" data-tag3="■ INSTANT">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5" fill="currentColor"/><circle cx="16" cy="16" r="1.5" fill="currentColor"/><circle cx="16" cy="8" r="1.5" fill="currentColor"/><circle cx="8" cy="16" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/></svg>
                 </div>
@@ -196,7 +223,7 @@
               </div>
 
               <!-- 2v2 Tag Team -->
-              <div class="tactical-card" data-category="modes" data-action="mode-2v2" data-title="2V2 TAG TEAM" data-desc="Fast-paced 4-fighter duo skirmish. Coordinate synergies and overcome enemy team formations." data-icon="squad" data-tag1="■ TEAM" data-tag2="■ TIER 2" data-tag3="■ CO-OP">
+              <div class="tactical-card" data-hub="foc" data-category="modes" data-action="mode-2v2" data-title="2V2 TAG TEAM" data-desc="Fast-paced 4-fighter duo skirmish. Coordinate synergies and overcome enemy team formations." data-icon="squad" data-tag1="■ TEAM" data-tag2="■ TIER 2" data-tag3="■ CO-OP">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                 </div>
@@ -211,7 +238,7 @@
               </div>
 
               <!-- Free For All -->
-              <div class="tactical-card" data-category="modes" data-action="mode-ffa" data-title="FREE FOR ALL" data-desc="4-player chaotic deathmatch. Every fighter for themselves in an all-out survival arena." data-icon="ffa" data-tag1="■ CHAOS" data-tag2="■ TIER 3" data-tag3="■ 4-PLAYER">
+              <div class="tactical-card" data-hub="foc" data-category="modes" data-action="mode-ffa" data-title="FREE FOR ALL" data-desc="4-player chaotic deathmatch. Every fighter for themselves in an all-out survival arena." data-icon="ffa" data-tag1="■ CHAOS" data-tag2="■ TIER 3" data-tag3="■ 4-PLAYER">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
                 </div>
@@ -226,7 +253,7 @@
               </div>
 
               <!-- 1v2 Stand Off -->
-              <div class="tactical-card" data-category="modes" data-action="mode-standoff1v2" data-title="1V2 STAND-OFF" data-desc="Asymmetrical survival challenge. Conquer two coordinated opponents as a solo powerhouse." data-icon="standoff" data-tag1="■ SURVIVAL" data-tag2="■ TIER 3" data-tag3="■ ASYMMETRIC">
+              <div class="tactical-card" data-hub="foc" data-category="modes" data-action="mode-standoff1v2" data-title="1V2 STAND-OFF" data-desc="Asymmetrical survival challenge. Conquer two coordinated opponents as a solo powerhouse." data-icon="standoff" data-tag1="■ SURVIVAL" data-tag2="■ TIER 3" data-tag3="■ ASYMMETRIC">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M12 8v8m-4-4h8"/></svg>
                 </div>
@@ -241,7 +268,7 @@
               </div>
 
               <!-- Fighter Index -->
-              <div class="tactical-card" data-category="database" data-action="screen-index" data-title="FIGHTER INDEX" data-desc="Explore 20+ Anime and Jujutsu brawlers with in-depth stats, technique guides, and lore." data-icon="database" data-tag1="■ DATABASE" data-tag2="■ 24 FIGHTERS" data-tag3="■ PROFILES">
+              <div class="tactical-card" data-hub="foc" data-category="database" data-action="screen-index" data-title="FIGHTER INDEX" data-desc="Explore 24+ Anime and Jujutsu brawlers with in-depth stats, technique guides, and lore." data-icon="database" data-tag1="■ DATABASE" data-tag2="■ 24 FIGHTERS" data-tag3="■ PROFILES">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
                 </div>
@@ -256,7 +283,7 @@
               </div>
 
               <!-- Weapon Studio -->
-              <div class="tactical-card" data-category="arsenal" data-action="screen-weaponstudio" data-title="WEAPON STUDIO" data-desc="Interactive real-time weapon geometry editor. Tune blade offsets, scales, fan angles, and layer ordering." data-icon="studio" data-tag1="■ WORKBENCH" data-tag2="■ CUSTOM" data-tag3="■ EDITOR">
+              <div class="tactical-card" data-hub="foc" data-category="arsenal" data-action="screen-weaponstudio" data-title="WEAPON STUDIO" data-desc="Interactive real-time weapon geometry editor. Tune blade offsets, scales, fan angles, and layer ordering." data-icon="studio" data-tag1="■ WORKBENCH" data-tag2="■ CUSTOM" data-tag3="■ EDITOR">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
                 </div>
@@ -271,7 +298,7 @@
               </div>
 
               <!-- Weapons Arsenal -->
-              <div class="tactical-card" data-category="arsenal" data-action="screen-weapons" data-title="WEAPON ARSENAL" data-desc="Inspect all melee blades, katanas, scythes, guns, and custom arsenal models with live previews." data-icon="arsenal" data-tag1="■ ARSENAL" data-tag2="■ PREVIEWS" data-tag3="■ WEAPONS">
+              <div class="tactical-card" data-hub="foc" data-category="arsenal" data-action="screen-weapons" data-title="WEAPON ARSENAL" data-desc="Inspect all melee blades, katanas, scythes, guns, and custom arsenal models with live previews." data-icon="arsenal" data-tag1="■ ARSENAL" data-tag2="■ PREVIEWS" data-tag3="■ WEAPONS">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-4m-4 4l-2-2 4-4 2 2-4 4z"/><path d="M8 16L20 4l1 1L9 17l-1-1z"/></svg>
                 </div>
@@ -286,7 +313,7 @@
               </div>
 
               <!-- Leaderboards -->
-              <div class="tactical-card" data-category="database" data-action="screen-leaderboard" data-title="LEADERBOARDS" data-desc="Track match records, win percentages, and total victories across all arena fighters." data-icon="leaderboard" data-tag1="■ STATS" data-tag2="■ RECORDS" data-tag3="■ SYNCED">
+              <div class="tactical-card" data-hub="foc" data-category="database" data-action="screen-leaderboard" data-title="LEADERBOARDS" data-desc="Track match records, win percentages, and total victories across all arena fighters." data-icon="leaderboard" data-tag1="■ STATS" data-tag2="■ RECORDS" data-tag3="■ SYNCED">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1v-2.34"/><path d="M18 14.66V17c0 .55-.45 1-1 1h-2c-.55 0-1-.45-1-1v-2.34"/><path d="M6 4h12v5a6 6 0 0 1-12 0V4z"/></svg>
                 </div>
@@ -300,8 +327,90 @@
                 </div>
               </div>
 
-              <!-- System Config Cards -->
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-theme" data-title="ARENA THEME" data-desc="Switch between High-Contrast Light Mode and OLED Dark Mode." data-icon="theme" data-tag1="■ SYSTEM" data-tag2="■ VISUAL" data-tag3="■ TOGGLE">
+              <!-- ============================================== -->
+              <!-- TACTICAL SHOOTER CARDS (data-hub="tactical") -->
+              <!-- ============================================== -->
+
+              <!-- Tactical 1v1 Duel (1v1 Mode) -->
+              <div class="tactical-card tactical-hub-card active" data-hub="tactical" data-category="modes" data-action="tactical-1v1" data-title="1V1 DUEL" data-desc="High-precision 1v1 firearm duel in Sector 01. Pure tactical aim, corner slicing, obstacle cover, and reload timing test." data-icon="duel" data-tag1="■ 1V1 DUEL" data-tag2="■ BALLISTIC" data-tag3="■ SECTOR 01" style="display: none;">
+                <div class="card-left-emblem tactical-emblem">
+                  <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 17.5L3 6V3h3l11.5 11.5"/><path d="M13 19l6 2 2-6-4.5-4.5"/><path d="M9.5 6.5L21 18v3h-3L6.5 9.5"/></svg>
+                </div>
+                <div class="card-content">
+                  <div class="card-title-row">
+                    <span class="card-title">1V1 DUEL</span>
+                    <span class="card-status-pill tactical-pill">1 VS 1</span>
+                  </div>
+                  <div class="card-subtitle">TACTICAL FIREARM DUEL</div>
+                  <div class="card-progress-bar"><div class="fill tactical-fill" style="width: 100%;"></div></div>
+                </div>
+              </div>
+
+              <!-- Tactical Free For All -->
+              <div class="tactical-card tactical-hub-card" data-hub="tactical" data-category="modes" data-action="tactical-ffa" data-title="TACTICAL FFA" data-desc="4-player tactical free-for-all deathmatch in Sector 01. Every operator for themselves—utilize cover obstacles, line of sight, and supersonic ballistics." data-icon="ffa" data-tag1="■ 4-PLAYER" data-tag2="■ FFA" data-tag3="■ SECTOR 01" style="display: none;">
+                <div class="card-left-emblem tactical-emblem">
+                  <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="7"/><path d="M12 2v3m0 14v3M2 12h3m14 0h3"/><circle cx="12" cy="12" r="2" fill="currentColor"/></svg>
+                </div>
+                <div class="card-content">
+                  <div class="card-title-row">
+                    <span class="card-title">TACTICAL FFA</span>
+                    <span class="card-status-pill tactical-pill">4-PLAYER</span>
+                  </div>
+                  <div class="card-subtitle">FREE FOR ALL BREACH DEATHMATCH</div>
+                  <div class="card-progress-bar"><div class="fill tactical-fill" style="width: 100%;"></div></div>
+                </div>
+              </div>
+
+              <!-- 2v2 Tactical Team Firefight -->
+              <div class="tactical-card tactical-hub-card" data-hub="tactical" data-category="modes" data-action="tactical-2v2" data-title="2V2 FIREFIGHT" data-desc="2 vs 2 tactical team firefight. Counter-Terrorist team vs Terrorist Force. Coordinate crossfire angles, ballistic suppression, and tactical squad eliminations." data-icon="squad" data-tag1="■ 2 VS 2" data-tag2="■ CT VS T" data-tag3="■ TEAMS" style="display: none;">
+                <div class="card-left-emblem tactical-emblem">
+                  <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                </div>
+                <div class="card-content">
+                  <div class="card-title-row">
+                    <span class="card-title">2V2 FIREFIGHT</span>
+                    <span class="card-status-pill tactical-pill">CT VS T</span>
+                  </div>
+                  <div class="card-subtitle">2 VS 2 TACTICAL TEAM BATTLE</div>
+                  <div class="card-progress-bar"><div class="fill tactical-fill" style="width: 100%;"></div></div>
+                </div>
+              </div>
+
+              <!-- Firearms Armory -->
+              <div class="tactical-card tactical-hub-card" data-hub="tactical" data-category="arsenal" data-action="screen-weapons" data-title="FIREARMS ARMORY" data-desc="Inspect all firearm models, dual revolvers, pistols, rifles, muzzle flashes, and ballistics data." data-icon="arsenal" data-tag1="■ ARMORY" data-tag2="■ BALLISTICS" data-tag3="■ FIREARMS" style="display: none;">
+                <div class="card-left-emblem tactical-emblem">
+                  <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20l4-4m-4 4l-2-2 4-4 2 2-4 4z"/><path d="M8 16L20 4l1 1L9 17l-1-1z"/></svg>
+                </div>
+                <div class="card-content">
+                  <div class="card-title-row">
+                    <span class="card-title">FIREARMS ARMORY</span>
+                    <span class="card-status-pill tactical-pill">INSPECT</span>
+                  </div>
+                  <div class="card-subtitle">FIREARM WEAPONS & SKINS</div>
+                  <div class="card-progress-bar"><div class="fill tactical-fill" style="width: 100%;"></div></div>
+                </div>
+              </div>
+
+              <!-- Shooter Roster -->
+              <div class="tactical-card tactical-hub-card" data-hub="tactical" data-category="database" data-action="screen-index" data-title="SHOOTER ROSTER" data-desc="Browse specialized firearm combatants, gunslingers, operatives, and marksmanship profiles." data-icon="database" data-tag1="■ ROSTER" data-tag2="■ GUNNERS" data-tag3="■ INTEL" style="display: none;">
+                <div class="card-left-emblem tactical-emblem">
+                  <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h10M7 12h10M7 16h6"/></svg>
+                </div>
+                <div class="card-content">
+                  <div class="card-title-row">
+                    <span class="card-title">SHOOTER ROSTER</span>
+                    <span class="card-status-pill tactical-pill">PROFILES</span>
+                  </div>
+                  <div class="card-subtitle">TACTICAL FIGHTERS & STATS</div>
+                  <div class="card-progress-bar"><div class="fill tactical-fill" style="width: 100%;"></div></div>
+                </div>
+              </div>
+
+              <!-- ============================================== -->
+              <!-- SYSTEM CONFIG CARDS (data-hub="all") -->
+              <!-- ============================================== -->
+
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-theme" data-title="ARENA THEME" data-desc="Switch between High-Contrast Light Mode and OLED Dark Mode." data-icon="theme" data-tag1="■ SYSTEM" data-tag2="■ VISUAL" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 0 0 18z" fill="currentColor"/></svg>
                 </div>
@@ -314,7 +423,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-hud" data-title="HUD DISPLAY MODE" data-desc="Toggle between Skill Cooldown Progress Bars and Fighter Lore/Descriptions." data-icon="hud" data-tag1="■ SYSTEM" data-tag2="■ HUD" data-tag3="■ TOGGLE">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-hud" data-title="HUD DISPLAY MODE" data-desc="Toggle between Skill Cooldown Progress Bars and Fighter Lore/Descriptions." data-icon="hud" data-tag1="■ SYSTEM" data-tag2="■ HUD" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="6" y1="8" x2="18" y2="8"/><line x1="6" y1="12" x2="14" y2="12"/></svg>
                 </div>
@@ -327,7 +436,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-cinefilm" data-title="CINEFILM FILTER" data-desc="Apply vintage 1998 retro film grain, timestamp, and cinematic color grade." data-icon="cinefilm" data-tag1="■ SYSTEM" data-tag2="■ RETRO" data-tag3="■ TOGGLE">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-cinefilm" data-title="CINEFILM FILTER" data-desc="Apply vintage 1998 retro film grain, timestamp, and cinematic color grade." data-icon="cinefilm" data-tag1="■ SYSTEM" data-tag2="■ RETRO" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="20" height="20" rx="2"/><line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/><line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/><line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="7" x2="22" y2="7"/><line x1="17" y1="17" x2="22" y2="17"/></svg>
                 </div>
@@ -340,7 +449,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-perf" data-title="PERFORMANCE MODE" data-desc="Optimize particle systems and effects for maximum frame rates." data-icon="performance" data-tag1="■ SYSTEM" data-tag2="■ OPTIMIZE" data-tag3="■ TOGGLE">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-perf" data-title="PERFORMANCE MODE" data-desc="Optimize particle systems and effects for maximum frame rates." data-icon="performance" data-tag1="■ SYSTEM" data-tag2="■ OPTIMIZE" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                 </div>
@@ -353,7 +462,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-fps" data-title="FPS & LOGS" data-desc="Display real-time frame rates, memory diagnostics, and combat metrics." data-icon="fps" data-tag1="■ SYSTEM" data-tag2="■ METRICS" data-tag3="■ TOGGLE">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-fps" data-title="FPS & LOGS" data-desc="Display real-time frame rates, memory diagnostics, and combat metrics." data-icon="fps" data-tag1="■ SYSTEM" data-tag2="■ METRICS" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
                 </div>
@@ -366,7 +475,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-bgm" data-title="ARENA SOUNDTRACK" data-desc="Select Arena Background Music track (Guile, M. Bison, Ryu, Random, or Off)." data-icon="audio" data-tag1="■ SYSTEM" data-tag2="■ AUDIO" data-tag3="■ SELECT">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-bgm" data-title="ARENA SOUNDTRACK" data-desc="Select Arena Background Music track (Guile, M. Bison, Ryu, Random, or Off)." data-icon="audio" data-tag1="■ SYSTEM" data-tag2="■ AUDIO" data-tag3="■ SELECT">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
                 </div>
@@ -379,7 +488,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-testmode" data-title="TEST MODE" data-desc="Enable rapid testing, cooldown bypasses, and combat sandboxing." data-icon="testmode" data-tag1="■ SYSTEM" data-tag2="■ DEBUG" data-tag3="■ TOGGLE">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-testmode" data-title="TEST MODE" data-desc="Enable rapid testing, cooldown bypasses, and combat sandboxing." data-icon="testmode" data-tag1="■ SYSTEM" data-tag2="■ DEBUG" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.31L4.2 19.5A2 2 0 0 0 6 22h12a2 2 0 0 0 1.8-2.5L14 9.31V2"/><line x1="8.5" y1="2" x2="15.5" y2="2"/><line x1="6" y1="16" x2="18" y2="16"/></svg>
                 </div>
@@ -392,7 +501,7 @@
                 </div>
               </div>
 
-              <div class="tactical-card system-card" data-category="system" data-action="toggle-arenatitle" data-title="ARENA TITLE" data-desc="Toggle the 'Fight of Characters / Ball Fight Simulator' header watermark above the arena." data-icon="title" data-tag1="■ SYSTEM" data-tag2="■ ARENA" data-tag3="■ TOGGLE">
+              <div class="tactical-card system-card" data-hub="all" data-category="system" data-action="toggle-arenatitle" data-title="ARENA TITLE" data-desc="Toggle the 'Fight of Characters / Ball Fight Simulator' header watermark above the arena." data-icon="title" data-tag1="■ SYSTEM" data-tag2="■ ARENA" data-tag3="■ TOGGLE">
                 <div class="card-left-emblem">
                   <svg class="tactical-svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 7 4 4 20 4 20 7"/><line x1="9" y1="20" x2="15" y2="20"/><line x1="12" y1="4" x2="12" y2="20"/></svg>
                 </div>

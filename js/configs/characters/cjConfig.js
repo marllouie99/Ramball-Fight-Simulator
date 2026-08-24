@@ -172,8 +172,8 @@ export const cjConfig = {
     parry: 0.50,
     evade: 0.50,
     shieldBlock: 0.50,
-    typeClickNoise: 0.50,
-    cheatActivated: 0.50,
+    typeClickNoise: 2.00,
+    cheatActivated: 3.50,
     hesoyamShockwave: 0.50,
     jetpackIgnition: 0.50,
     jetpackUziShot: 0.20,
@@ -194,6 +194,7 @@ export const cjConfig = {
   soundChances: {
     punchHit: 1.0,
     typeClickNoise: 1.0,
+    cheatActivated: 1.0,
     homieRoamNoises: 0.50
   },
   soundDelays: {
