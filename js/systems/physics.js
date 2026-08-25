@@ -233,6 +233,9 @@ export function resolveFighterCollision(a, b) {
   if (a.ultimateActive && (a.name === 'Toji Fushiguro' || a.id === 'toji')) return;
   if (b.ultimateActive && (b.name === 'Toji Fushiguro' || b.id === 'toji')) return;
 
+  // Megumi phases through fighters while submerged in liquid shadow or erupting (Kage no Utsuwa)
+  if (a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) return;
+
   // Mahito phases directly through fighters during Phantom Soul Slip claw dash
   if ((a.soulPhaseDashTimer && a.soulPhaseDashTimer > 0) || (b.soulPhaseDashTimer && b.soulPhaseDashTimer > 0)) return;
 
@@ -748,7 +751,7 @@ export function updateFighters() {
       fighter.vx = 0;
       fighter.vy = 0;
       const opponent = getClosestOpponent(fighter);
-      if (opponent) {
+      if (opponent && !opponent.isSubmerged) {
         fighter.aim(opponent, null);
       }
       if (typeof fighter.onCountdown === 'function') {
@@ -822,8 +825,8 @@ export function updateFighters() {
         // Skip teammates in 2v2 mode
         if ((state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2) && state.getFighterTeam(i) === state.getFighterTeam(j)) continue;
         
-        // Skip physical collision resolution during Wall Slam grabs to prevent stuttering/zigzag physics feedback loops
-        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga) continue;
+        // Skip physical collision resolution during Wall Slam grabs or when submerged/erupting in liquid shadow
+        if (a.isWallSlamActive || b.isWallSlamActive || a.isGrabbedByMahoraga || b.isGrabbedByMahoraga || a.isSubmerged || b.isSubmerged || a.isErupting || b.isErupting) continue;
 
         resolveFighterCollision(a, b);
       }
@@ -832,8 +835,8 @@ export function updateFighters() {
     // 2. Fighter-Illusion Collisions
     for (const fighter of state.fighters) {
       if (!fighter || fighter.hp <= 0) continue;
-      // Skip during Wall Slam grab
-      if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga) continue;
+      // Skip during Wall Slam grab or when submerged/erupting in liquid shadow
+      if (fighter.isWallSlamActive || fighter.isGrabbedByMahoraga || fighter.isSubmerged || fighter.isErupting) continue;
       // Cronos phases through illusions while inside his own sphere; Mahito phases during Phantom Soul Slip
       if (fighter._isInsideOwnSphere?.() || (fighter.soulPhaseDashTimer && fighter.soulPhaseDashTimer > 0)) continue;
 
@@ -841,7 +844,7 @@ export function updateFighters() {
       for (const entity of nearbyEntities) {
         if (!entity || entity === fighter) continue;
         if (!entity.isIllusion) continue; // Skip fighter-fighter collisions (already handled)
-        if (!entity.hp || entity.hp <= 0) continue;
+        if (!entity.hp || entity.hp <= 0 || entity.isSubmerged || entity.isErupting) continue;
 
         const dx = entity.x - fighter.x;
         const dy = entity.y - fighter.y;

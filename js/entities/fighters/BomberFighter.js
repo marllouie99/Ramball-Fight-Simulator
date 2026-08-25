@@ -159,12 +159,6 @@ export class BomberFighter extends Fighter {
     this.resolveWallBounce(arena, opponent);
   }
 
-  aim(opponent) {
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
-  }
-
   onDamageDealt(target, projectile, ownerIndex) {
     spawnFloatingText(target.x, target.y - target.r - 5, 'BOOM!', '#FF6600');
   }

@@ -2,6 +2,24 @@
 // Yuji Itadori — The Black Flash Brawler Config
 // ─────────────────────────────────────────────
 export const yujiConfig = {
+  // ── Base Attributes ──
+  hp: 230,
+  speed: 7.0,
+  moveSpeed: 7.0,
+  r: 25,
+  radius: 25,
+  color: '#D95C7E', // Deep pink JJK uniform
+  themeColor: '#D95C7E',
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 18,
+  cooldown: 18,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Black Flash',
+  desc: 'Attacks with black flash.',
+
   // Basic Attack: Cursed Energy Punch
   punchDamage: 18,              // Base damage per melee punch
   knockback: 7,                 // Knockback impulse on punch hit

@@ -43,28 +43,24 @@ export class LaserFighter extends Fighter {
     return angle;
   }
 
-  aim(opponent) {
-    if (opponent) {
-      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      
-      // Initialize gunAngle if undefined
-      if (this.gunAngle === undefined) {
-        this.gunAngle = targetAngle;
-      }
-
-      const delta = this.normalizeAngle(targetAngle - this.gunAngle);
-      // When beam is actively firing, rotate with heavy beam inertia; otherwise track swiftly
-      const maxRotate = this.beamTimer > 0 
-        ? ((CONFIG.laser.beamRotateSpeed || 0.015) * 2) 
-        : 0.20; 
-
-      if (Math.abs(delta) > maxRotate) {
-        this.gunAngle += Math.sign(delta) * maxRotate;
-      } else {
-        this.gunAngle = targetAngle;
-      }
-      this.angle = this.gunAngle;
+  applyAim(opponent, targetAngle) {
+    // Initialize gunAngle if undefined
+    if (this.gunAngle === undefined) {
+      this.gunAngle = targetAngle;
     }
+
+    const delta = this.normalizeAngle(targetAngle - this.gunAngle);
+    // When beam is actively firing, rotate with heavy beam inertia; otherwise track swiftly
+    const maxRotate = this.beamTimer > 0 
+      ? ((CONFIG.laser.beamRotateSpeed || 0.015) * 2) 
+      : 0.20; 
+
+    if (Math.abs(delta) > maxRotate) {
+      this.gunAngle += Math.sign(delta) * maxRotate;
+    } else {
+      this.gunAngle = targetAngle;
+    }
+    this.angle = this.gunAngle;
   }
 
   getBeamLine() {

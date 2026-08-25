@@ -254,43 +254,14 @@ export class MahoragaFighter extends Fighter {
   }
 
   /**
-   * Mahoraga rotates his body (this.angle) as he aims for the target.
-   * gunAngle matches this.angle so gunAngle and body orientation rotate together.
+   * Mahoraga can aim whenever not in hard CC or Pure Love Beam recovery.
    */
-  aim(opponent) {
-    if (!opponent || this.isTargetOfAmbush) {
-      return;
+  canAim() {
+    if (!super.canAim()) return false;
+    if (this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0) {
+      return false;
     }
-
-    // Do NOT rotate or snap facing direction while in hard stun or beam paralysis
-    const isHardCC = (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 || (this.timeStopTimer || 0) > 0 ||
-                     this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0;
-    if (isHardCC) {
-      return;
-    }
-
-    let targetX = opponent.x;
-    let targetY = opponent.y;
-    if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
-      targetX = opponent.flurryGhost.x;
-      targetY = opponent.flurryGhost.y;
-    }
-
-    const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
-
-    if (opponent.isStealthed) {
-      const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-      let diff = targetAngle - currentAngle;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-      this.gunAngle = currentAngle + diff * turnRate;
-      this.angle = this.gunAngle;
-      return;
-    }
-
-    this.gunAngle = targetAngle;
-    this.angle = targetAngle;
+    return true;
   }
 
   takeDamage(amount, attacker, opts = {}) {

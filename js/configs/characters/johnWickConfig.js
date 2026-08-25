@@ -7,11 +7,22 @@ export const johnWickConfig = {
   // ── 1. BASE ATTRIBUTES ──
   hp: 420,
   speed: 6.4,
+  moveSpeed: 6.4,
   r: 25,
+  radius: 25,
   color: '#2B2D31',          // Tactical Charcoal Gunmetal
   themeColor: '#64748B',     // Tactical Gunmetal Slate (Dark aesthetic with clear text readability)
   secondaryColor: '#94A3B8', // Muted Silver/Steel Accent
   muzzleFlashColor: '#F97316', // Hot Muzzle Orange
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 22,
+  cooldown: 35,
+  projectileSpeedMultiplier: 6.2,
+  ability: 'C.A.R. Gun-Fu & The Pencil',
+  desc: 'The Baba Yaga. Master of Center Axis Relock Gun-Fu and ruthless CQC. Passive: Ballistic Tailored Suit resists ranged damage. Wields the custom TTI Pit Viper 9mm and the infamous No. 2 Pencil for armor-piercing assassination takedowns.',
 
   // ── 2. PASSIVE 1: BALLISTIC TAILORED SUIT & FOCUS ──
   ballisticSuitDamageReduction: 0.05, // 40% flat damage mitigation against all incoming attacks (melee, CQC, martial arts, blade slashes, and ranged projectiles)

@@ -105,10 +105,8 @@ export class HydraFighter extends Fighter {
     }
   }
 
-  aim(opponent) {
-    if (opponent && this.attackSwingTimer <= 0) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
+  canAim() {
+    return super.canAim() && this.attackSwingTimer <= 0;
   }
 
   performStolenAttack(opponent) {

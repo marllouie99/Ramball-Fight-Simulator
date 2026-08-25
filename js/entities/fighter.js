@@ -1404,6 +1404,9 @@ export class Fighter {
 
   /** Resolves wall collision and bounces back with varied angles. */
   resolveWallBounce(arena) {
+    if (!arena && typeof state !== 'undefined') arena = state.arena;
+    if (!arena) return false;
+
     const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
@@ -1479,6 +1482,7 @@ export class Fighter {
       
       this.normalizeSpeed();
     }
+    return bounced;
   }
 
   /** Plays a wall bounce sound effect. */
@@ -1486,15 +1490,45 @@ export class Fighter {
     // Disabled as requested
   }
 
-  /** Controls how the gun is aimed. Default aims in direction of opponent with delayed reaction time if stealthed. */
+  /**
+   * Centralized check to verify if a target is valid, alive, and detectable.
+   * Single source of truth for all current and future target eligibility states.
+   */
+  isValidAimTarget(target) {
+    if (!target || target === this) return false;
+    if (target.hp <= 0 || target.isDead || target._hasDied) return false;
+    if (target.vanishTimer > 0 || target.isSubmerged || target.isErupting) return false;
+    return true;
+  }
+
+  /**
+   * Evaluates if this fighter is currently able to rotate and aim.
+   * Subclasses can override canAim() to add character-specific skill/channeling locks.
+   */
+  canAim() {
+    if (this.hp <= 0 || this.isDead) return false;
+    if (this.isTargetOfAmbush || (this.timeStopTimer > 0)) return false;
+    const isHardCC = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed ||
+                     (this.electricStunTimer && this.electricStunTimer > 0) ||
+                     (this.dubstepStunTimer && this.dubstepStunTimer > 0) ||
+                     (typeof this.isCaughtInBeam === 'function' && this.isCaughtInBeam());
+    if (isHardCC) return false;
+    return true;
+  }
+
+  /**
+   * Master Aim Pipeline (Template Method Pattern).
+   * Executes universal validation guards and delegates custom angle application to applyAim().
+   * Future fighter classes automatically inherit all target validation and status guards.
+   */
   aim(opponent) {
-    if (!opponent || opponent.vanishTimer > 0 || this.isTargetOfAmbush || (this.timeStopTimer > 0)) {
-      return;
+    if (!this.canAim() || !this.isValidAimTarget(opponent)) {
+      return false;
     }
 
     this.hasClearLOS = true;
 
-    // Target Musashi's ghost if he is flurrying
+    // Musashi ghost decoy targeting support
     let targetX = opponent.x;
     let targetY = opponent.y;
     if (opponent.type === 'musashi' && opponent.flurryHitsLeft > 0 && opponent.flurryGhost) {
@@ -1504,8 +1538,17 @@ export class Fighter {
 
     const targetAngle = Math.atan2(targetY - this.y, targetX - this.x);
 
+    // Delegate to subclass or standard application
+    this.applyAim(opponent, targetAngle);
+    return true;
+  }
+
+  /**
+   * Default aim angle application. Subclasses can override applyAim() for custom inertia or turn rate.
+   */
+  applyAim(opponent, targetAngle) {
     // If opponent is stealthed (e.g. Toji Heavenly Restriction), aim tracking has a sluggish delayed reaction time!
-    if (opponent.isStealthed) {
+    if (opponent && opponent.isStealthed) {
       const currentAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
       let diff = targetAngle - currentAngle;
       while (diff < -Math.PI) diff += Math.PI * 2;
@@ -1701,14 +1744,14 @@ export class Fighter {
     const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed && !this.isCaughtInBeam();
 
     // Aiming — Keep gunAngle and angle tracked dynamically to the target before shooting
-    if (isTargetAlive && !this.isTargetOfAmbush && !this.isCaughtInBeam() && !isParalyzed) {
+    if (isTargetAlive && !opponent.isSubmerged && !opponent.isErupting && !this.isTargetOfAmbush && !this.isCaughtInBeam() && !isParalyzed) {
       this.aim(opponent);
     }
 
     // Shooting
     if (this.shootCooldown > 0) {
       this.shootCooldown--;
-    } else if (this._def.type !== 'orange' && canAct && isTargetAlive) { // Prevent Orange from using this default shoot
+    } else if (this._def.type !== 'orange' && canAct && isTargetAlive && !opponent.isSubmerged && !opponent.isErupting) { // Prevent shooting at submerged/erupting targets
       this.shoot(ownerIndex);
       this.shootCooldown = this.shootCooldownMax;
     }
@@ -1716,7 +1759,7 @@ export class Fighter {
     this.applyMovementPhysics();
 
     // Aiming & Bouncing — Refresh aim after movement physics to ensure facing orientation remains aligned
-    if (isTargetAlive && !this.isTargetOfAmbush && !this.isCaughtInBeam() && !isParalyzed) {
+    if (isTargetAlive && !opponent.isSubmerged && !opponent.isErupting && !this.isTargetOfAmbush && !this.isCaughtInBeam() && !isParalyzed) {
       this.aim(opponent);
     }
     this.resolveWallBounce(arena, opponent);

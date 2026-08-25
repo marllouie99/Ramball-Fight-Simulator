@@ -2,6 +2,24 @@
 // Gojo Satoru — Limitless Fighter Configuration
 // ─────────────────────────────────────────────
 export const gojoConfig = {
+  // ── Base Attributes ──
+  hp: 200,
+  speed: 5.5,
+  moveSpeed: 5.5,
+  r: 25,
+  radius: 25,
+  color: '#E0FFFF', // Light Cyan
+  themeColor: '#E0FFFF',
+  startX: 300,
+  startY: 250,
+  startVx: 1.1,
+  startVy: 0.9,
+  damage: 12,
+  cooldown: 80,
+  projectileSpeedMultiplier: 6.0,
+  ability: 'Limitless',
+  desc: 'Uses Blue to pull and Reversal Red to repel. Hollow Purple pierces everything, and Unlimited Void stuns all enemies.',
+
   // ── 1. Limitless Infinity Passive Barrier ──
   infinityCooldown: 100,                   // Recharge cooldown in frames before Infinity barrier reactivates after blocking
   infinityActiveDuration: 100,              // Frames Infinity continues to block multiple attacks after first impact

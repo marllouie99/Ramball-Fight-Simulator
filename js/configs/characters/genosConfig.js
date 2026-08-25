@@ -1,9 +1,21 @@
 export const genosConfig = {
   // Base Stats
   hp: 320,
+  speed: 5.2,
   moveSpeed: 5.2,
-  color: '#FF5500', // Incineration Orange
+  r: 25,
   radius: 25,
+  color: '#FF5500', // Incineration Orange
+  themeColor: '#FF5500',
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 14,
+  cooldown: 27,
+  projectileSpeedMultiplier: 1.4,
+  ability: 'Incinerate',
+  desc: 'Demon Cyborg. Zones with explosive basic blasts, Rocket Stomps to close in, and uses a devastating continuous fire beam. Explodes upon defeat.',
 
   // Basic Attack: Incineration Palms (Ranged Fire Blasts)
   blastDamage: 14,

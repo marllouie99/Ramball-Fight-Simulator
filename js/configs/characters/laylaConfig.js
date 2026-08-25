@@ -2,6 +2,24 @@
 // Layla — Cosmic Marksman Config
 // ─────────────────────────────────────────────
 export const laylaConfig = {
+    // ── Base Attributes ──
+    hp: 55,
+    speed: 4.5,
+    moveSpeed: 4.5,
+    r: 25,
+    radius: 25,
+    color: '#00E5FF', // Blue Cosmic Theme
+    themeColor: '#00E5FF',
+    startX: 300,
+    startY: 250,
+    startVx: 1.1,
+    startVy: 0.9,
+    damage: 12,
+    cooldown: 70,
+    projectileSpeedMultiplier: 3.0,
+    ability: 'Ascending Power',
+    desc: 'Scaling marksman who gains damage and range with each hit. Uses Malefic Bomb, Void Dash, and Destruction Barrage ultimate.',
+
     // Ascending Power Passive
     maxStacks: 10,
     damagePerStack: 1.5,

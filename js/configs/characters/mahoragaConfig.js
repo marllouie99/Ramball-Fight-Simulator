@@ -2,8 +2,45 @@
 // Mahoraga — Divine General Config
 // ─────────────────────────────────────────────
 export const mahoragaConfig = {
+    // ── Base Attributes ──
+    hp: 250,
+    speed: 6.5,
+    moveSpeed: 6.5,
+    r: 30,
+    radius: 30,
+    color: '#F5F5DC', // Beige / Off-White
+    themeColor: '#F5F5DC',
+    startX: 300,
+    startY: 250,
+    startVx: 1.1,
+    startVy: 1.1,
+    damage: 15,
+    cooldown: 60,
+    projectileSpeedMultiplier: 1.0,
     isAvailableInArena: true,       // Toggle to show/hide Mahoraga in character select screen
-    moveSpeed: 6.5,                 // Base movement speed (before adaptation speed boosts)
+    ability: 'Wheel of Adaptation',
+    desc: 'Adapts to damage types. Increase chance of parry and blocks to incoming attacks for each wheel rotation.',
+
+    // ── Neutral Close-Quarters Attack-Teleport Stance ──
+    neutralAttacksPerTeleport: 2,
+    neutralAttackInterval: 20,
+    neutralTeleportDelay: 12,
+    neutralTeleportDistance: 55,
+
+    // ── Throw Barrage & Blitz Finishing ──
+    throwCooldown: 1000,
+    throwMinDistance: 180,
+    throwSpreadAngle: 0.28,
+    throwDamage: 14,
+    throwSpeed: 25,
+    throwKnockback: 6.0,
+    throwBarrageCount: 10,
+    throwBarrageInterval: 5,
+    throwAimRotationSpeed: 0.06,
+    blitzHitsCount: 6,
+    blitzHitDamage: 16,
+    blitzFinisherDamage: 35,
+    blitzFinisherKnockback: 35.0,
 
     // ── Adaptation & RCT Mechanics ──
     maxAdaptationStages: 8,         // Total adaptation stages (8 clicks = full 360° rotation of Eight-Handled Wheel)

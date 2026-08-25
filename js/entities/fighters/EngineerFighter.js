@@ -576,12 +576,6 @@ export class EngineerFighter extends Fighter {
     this.vy -= Math.sin(this.gunAngle) * recoilForce;
   }
 
-  aim(opponent) {
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
-  }
-
   drawGun(ctx) {
     drawEngineer(ctx, {
       x: this.x,

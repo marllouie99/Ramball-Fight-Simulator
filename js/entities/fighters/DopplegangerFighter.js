@@ -296,12 +296,6 @@ export class DopplegangerFighter extends Fighter {
     this.resolveWallBounce(arena, opponent);
   }
 
-  /** Auto-locks onto opponent like Aimbot fighters */
-  aim(opponent) {
-    if (!opponent || opponent.hp <= 0) return;
-    this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-  }
-
   drawBody(ctx) {
     const animTime = this.animationTime || Date.now();
     

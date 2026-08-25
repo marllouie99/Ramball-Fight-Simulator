@@ -2,6 +2,24 @@
 // Ichigo Kurosaki — Substitute Soul Reaper Config
 // ─────────────────────────────────────────────
 export const ichigoConfig = {
+  // ── Base Attributes ──
+  hp: 240,
+  speed: 7.0,
+  moveSpeed: 7.0,
+  r: 25,
+  radius: 25,
+  color: '#FF5500', // Orange details
+  themeColor: '#FF5500',
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 16,
+  cooldown: 30,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Hollow Mask',
+  desc: 'Wields Zangetsu with fast frontal-arc sword slashes. Awakes Hollow Mask under 30% HP for stats boost. Ultimate unleashes Bankai: Tensa Zangetsu.',
+
   // Basic Attack: Zangetsu Cleave
   swordDamage: 16,               // Base damage per melee slash
   swordCooldown: 30,             // Cooldown in frames between slashes (~0.5s)

@@ -38,11 +38,15 @@ function initCustomizations() {
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      megumi: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       cj: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 }
     };
     // Sync state.mahitoClawCustomBlades with the new unified structure
     state.mahitoClawCustomBlades = state.weaponCustomizations.mahito.blades;
+  }
+  if (!state.weaponCustomizations.megumi) {
+    state.weaponCustomizations.megumi = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   if (!state.weaponCustomizations.cj) {
     state.weaponCustomizations.cj = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
@@ -104,13 +108,14 @@ export function drawWeaponStudioScreen() {
     { key: 'cronos', label: 'CRONOS' },
     { key: 'ruby', label: 'RUBY' },
     { key: 'nanami', label: 'NANAMI' },
+    { key: 'megumi', label: 'MEGUMI' },
     { key: 'john_wick', label: 'JOHN WICK' },
     { key: 'cj', label: 'CJ' }
   ];
 
-  // Row 1: First 4 weapons
-  const row1 = weapons.slice(0, 4);
-  const row2 = weapons.slice(4);
+  // Row 1: First 5 weapons, Row 2: Remaining
+  const row1 = weapons.slice(0, 5);
+  const row2 = weapons.slice(5);
 
   const r1W = 120;
   const r1H = 22;

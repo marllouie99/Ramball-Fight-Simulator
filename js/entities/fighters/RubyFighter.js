@@ -459,14 +459,6 @@ export class RubyFighter extends Fighter {
     this.resolveWallBounce(arena);
   }
 
-  aim(opponent) {
-    if (opponent && opponent.hp > 0) {
-      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      this.gunAngle = targetAngle;
-      this.angle = targetAngle;
-    }
-  }
-
   // ── drawing ─────────────────────────────────────────
 
   drawBody(ctx) {

@@ -324,6 +324,12 @@ export const BASIC_ATTACK_SOUNDS_BY_TYPE = {
     volume: 0.7,
     delay: 0,
   },
+  // Megumi — Cursed Sword Chop
+  'megumi': {
+    src: 'Assets/Sound Effects/Attacks/swordswing.mp3',
+    volume: 0.75,
+    delay: 0,
+  },
   // Sukuna — Dismantle slashes & Melee punches
   'sukuna': {
     src: 'Assets/Sound Effects/Attacks/swordswing.mp3',

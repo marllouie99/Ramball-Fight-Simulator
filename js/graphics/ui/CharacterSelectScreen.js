@@ -1134,6 +1134,8 @@ export function getFighterWeaponInfo(def) {
       return { name: 'ZANGETSU / TENSA ZANGETSU', category: 'ZANPAKUTO // GETSUGA', desc: 'Heavy cleaver blade unleashing Kuroi Getsuga Tensho energy waves.' };
     case 'nanami':
       return { name: 'RATIO TECHNIQUE CLEAVER', category: 'CURSED // 7:3 RATIO', desc: 'Fabric-wrapped blunt blade that creates critical hit weak points on contact.' };
+    case 'megumi':
+      return { name: "MEGUMI'S CURSED SWORD", category: 'CURSED TOOL // BROADSWORD', desc: "Megumi's signature heavy broad cursed blade. Features a thick slate-steel slab blade with a spearhead chisel tip, white cloth bandage collar wrapping, matte black cylindrical hilt, and ring pommel." };
     case 'john_wick':
     case 'johnwick':
       return { name: 'TTI PIT VIPER & BENELLI M4', category: 'TACTICAL FIREARMS // GUN-FU', desc: 'Combat Master 9mm, Super 90 shotgun, M4A1 rifle, and sharpened No. 2 pencil.' };

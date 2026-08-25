@@ -177,12 +177,6 @@ export class CronosFighter extends Fighter {
     }
   }
 
-  aim(opponent) {
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
-  }
-
   // Override takeDamage to implement counter-stop passive
   takeDamage(amount, attacker, opts = {}) {
     const isGuaranteedHit = Boolean(opts && (opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassShield || opts.bypassEvade || opts.isGuaranteedHit));

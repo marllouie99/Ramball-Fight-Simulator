@@ -106,12 +106,6 @@ export class GrenadierFighter extends Fighter {
     spawnFloatingText(target.x, target.y - target.r - 5, 'BOOM!', '#4dff4d');
   }
 
-  aim(opponent) {
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
-  }
-
   drawOutline(ctx) {
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);

@@ -42,6 +42,8 @@ import { drawDopplegangerBodyEffect, drawDopplegangerPurpleSword } from './weapo
 import { drawDoppelgangerSkin } from './fighters/doppelgangerSkin.js';
 export { drawCjSkin } from './fighters/cjSkin.js';
 export { drawTojiSkin, drawTojiGhostSkin } from './fighters/tojiSkin.js';
+export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
+export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
 
 
 import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';

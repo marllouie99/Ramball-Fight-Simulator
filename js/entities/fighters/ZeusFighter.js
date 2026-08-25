@@ -202,12 +202,8 @@ export class ZeusFighter extends Fighter {
       this.applyMovementPhysics();
     }
     
-    // Aim directly at opponent
-    if (opponent && !opponent.isDead) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    } else {
-      this.aim(opponent);
-    }
+    // Aim directly at opponent using master aim pipeline
+    this.aim(opponent);
     
     this.resolveWallBounce(arena);
   }

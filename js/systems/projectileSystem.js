@@ -1038,6 +1038,9 @@ class ProjectileSystem {
       // Skip if this projectile has piercing and already hit this fighter
       if (projectile.hitFighters && projectile.hitFighters.has(fighter)) continue;
 
+      // Skip submerged or erupting entities (e.g. Megumi Shadow Sink) - projectiles pass freely over the floor shadow
+      if (fighter.isSubmerged || fighter.isErupting) continue;
+
       // Special handling for Sukuna's Fuga arrow:
       // If the enemy is dead (e.g. killed by domain slashes), detonate immediately on impact with their body
       const isDead = fighter.hp <= 0 || fighter.isDead;

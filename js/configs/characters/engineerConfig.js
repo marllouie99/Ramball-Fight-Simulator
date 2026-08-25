@@ -5,11 +5,22 @@
 export const engineerConfig = {
   // Base Attributes
   hp: 400,
-  moveSpeed: 5.0,
   speed: 5.0,
+  moveSpeed: 5.0,
   r: 25,
+  radius: 25,
   color: '#FFB800', // Engineer Hardhat Gold / Warm Amber
+  themeColor: '#FFB800',
   spinRate: 0.05,
+  startX: 280,
+  startY: 220,
+  startVx: 1.1,
+  startVy: 0.9,
+  damage: 5,
+  cooldown: 4,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Sentry & Dispenser',
+  desc: 'Constructs an automated Sentry Turret to assault foes and a Dispenser to tether healing and boost reload speed.',
 
   // Primary Ranged Attack: Shotgun
   shotgunCooldown: 80,

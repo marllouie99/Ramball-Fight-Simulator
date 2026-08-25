@@ -1,16 +1,28 @@
-﻿// ─────────────────────────────────────────────
+// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
 export const saitamaConfig = {
   // Base stats
   hp: 420,
+  speed: 6.0,
   moveSpeed: 6.0,
+  r: 25,
+  radius: 25,
   color: '#F5C400', // Bright Safety Yellow body
+  themeColor: '#F5C400',
   hudNameColor: '#FF2A2A', // Red HUD Fighter Name
   hudSkillBarColor: '#FF2A2A', // Red HUD Skill Progress Bars
   damageNumberColor: '#FF2A2A', // Red Floating Damage Numbers
-  radius: 25,
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 100,
+  cooldown: 200,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'One Punch',
+  desc: 'Hero for fun. Ignores basic hit flinches. Basic hits deal massive damage. Serious Punch ultimate obliterates anything across the arena.',
 
   // Basic Attack: Normal Punch
   punchDamage: 100, // Massive basic attack damage

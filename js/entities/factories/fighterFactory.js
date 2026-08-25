@@ -35,6 +35,7 @@ import { IchigoFighter } from '../fighters/IchigoFighter.js';
 import { MahitoFighter } from '../fighters/MahitoFighter.js';
 import { NanamiFighter } from '../fighters/NanamiFighter.js';
 import { NobaraFighter } from '../fighters/NobaraFighter.js';
+import { MegumiFighter } from '../fighters/MegumiFighter.js';
 import { JohnWickFighter } from '../fighters/JohnWickFighter.js';
 import { CJFighter } from '../fighters/CJFighter.js';
 import { RifleFighter, ShotgunFighter, PistolFighter, SniperFighter, BarrettFighter } from '../../../Tactical Force/characters/index.js';
@@ -75,6 +76,7 @@ export const FIGHTER_CLASS_MAP = {
   'mahito': MahitoFighter,
   'nanami': NanamiFighter,
   'nobara': NobaraFighter,
+  'megumi': MegumiFighter,
   'john_wick': JohnWickFighter,
   'johnwick':  JohnWickFighter,
   'cj':        CJFighter,

@@ -1235,18 +1235,12 @@ export class TojiFighter extends Fighter {
   }
 
   /**
-   * Aim logic: rotates Toji's weapon and body angle toward the opponent.
+   * Extends master target validation with Toji-specific removed/died entity guards.
    */
-  aim(opponent) {
-    if (!tojiIsTargetDeadOrRemoved(this, opponent)) {
-      const dx = opponent.x - this.x;
-      const dy = opponent.y - this.y;
-      const targetAngle = Math.atan2(dy, dx);
-      this.gunAngle = targetAngle;
-      this.angle = targetAngle;
-    } else {
-      this.gunAngle = this.angle;
-    }
+  isValidAimTarget(target) {
+    if (!super.isValidAimTarget(target)) return false;
+    if (tojiIsTargetDeadOrRemoved(this, target)) return false;
+    return true;
   }
 
   /**

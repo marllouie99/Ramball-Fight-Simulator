@@ -2,6 +2,24 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
+    // ── Base Attributes ──
+    hp: 200,
+    speed: 5.8,
+    moveSpeed: 5.8,
+    r: 25,
+    radius: 25,
+    color: '#8B0000', // Dark Crimson
+    themeColor: '#8B0000',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.0,
+    damage: 15,
+    cooldown: 80,
+    projectileSpeedMultiplier: 3.0,
+    ability: 'King of Curses',
+    desc: 'Deploys Malevolent Shrine domain deals unblockable damage.',
+
     // Basic Attack: Dismantle / Cleave Ranged Slashes
     slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
     slashDamage: 18,                  // Base damage per slash

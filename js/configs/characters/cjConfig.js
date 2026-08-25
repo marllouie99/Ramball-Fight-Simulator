@@ -7,7 +7,9 @@ export const cjConfig = {
   // ── 1. BASE ATTRIBUTES ──
   hp: 440,
   speed: 5.5,
+  moveSpeed: 5.5,
   r: 25,
+  radius: 25,
   color: '#16A34A',            // Grove Street Families Green
   themeColor: '#16A34A',       // Unified HUD & UI Accent Green
   healthBarColor: '#FFFFFF',   // GTA San Andreas Authentic White Health Bar
@@ -15,6 +17,15 @@ export const cjConfig = {
   wantedStarThresholds: [50, 120, 200, 300, 420, 560], // Cumulative damage dealt thresholds for 6 Wanted Stars
   secondaryColor: '#F59E0B',   // San Andreas Sunset Gold
   skinColor: '#8D5538',        // Natural Warm Brown Skin Tone
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 24,
+  cooldown: 18,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Brass Knuckles & Cheats',
+  desc: 'Carl Johnson from Grove Street. Master of cheats and street brawling. Wields metallic brass knuckles, HESOYAM armor bursts, Area 69 Jetpack flight, Grove Street drive-by backup, and BAGUVIX God Mode.',
 
   // ── 1.1 STAMINA & FATIGUE SYSTEM ──
   maxStamina: 100,             // 100 max stamina

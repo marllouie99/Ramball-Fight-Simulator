@@ -556,6 +556,36 @@ export function getSkillDataForFighter(f, getProjectiles) {
       { id: 'ecstasy',   pct: ecstasyPct,   ready: isEcstasy,          color: themeColor, label: ecstasyLabel }
     ];
   }
+  if (f.characterId === 'megumi' || f.type === 'megumi') {
+    const themeColor = f.color || '#1C2D4A';
+
+    // Skill 1: Divine Dog: Totality
+    const totalityMax = f.totalityCooldownMax || CONFIG.megumi?.totalityCooldown || 420;
+    const totalityTimer = f.totalityCooldown !== undefined ? f.totalityCooldown : 0;
+    const totalityPct = Math.max(0, Math.min(100, (1 - (totalityTimer / totalityMax)) * 100));
+
+    // Skill 2: Nue (Thunder Bird)
+    const nueMax = f.nueCooldownMax || CONFIG.megumi?.nueCooldown || 360;
+    const nueTimer = f.nueCooldown !== undefined ? f.nueCooldown : 0;
+    const nuePct = Math.max(0, Math.min(100, (1 - (nueTimer / nueMax)) * 100));
+
+    // Skill 3: Shadow Sink (Evasion)
+    const sinkMax = f.shadowSinkCooldownMax || CONFIG.megumi?.shadowSinkCooldown || 300;
+    const sinkTimer = f.shadowSinkCooldown !== undefined ? f.shadowSinkCooldown : 0;
+    const sinkPct = Math.max(0, Math.min(100, (1 - (sinkTimer / sinkMax)) * 100));
+
+    // Domain Expansion / Desperation Mahoraga Ritual
+    const isDesperation = (f.hp / (f.maxHp || 380)) <= (CONFIG.megumi?.mahoragaThresholdHpPercent || 0.20);
+    const domainLabel = isDesperation ? 'SUMMON MAHORAGA' : 'CHIMERA SHADOW GARDEN';
+    const domainPct = f.domainActive ? 100 : (isDesperation ? 100 : Math.max(0, Math.min(100, (1 - (f.hp / (f.maxHp || 380))) * 100)));
+
+    return [
+      { id: 'totality', pct: totalityPct, ready: totalityPct >= 99, color: themeColor, label: 'DIVINE DOG: TOTALITY' },
+      { id: 'nue',      pct: nuePct,      ready: nuePct >= 99,      color: themeColor, label: 'NUE: THUNDER BIRD' },
+      { id: 'shadow',   pct: sinkPct,     ready: sinkPct >= 99,     color: themeColor, label: 'SHADOW SINK' },
+      { id: 'domain',   pct: domainPct,   ready: domainPct >= 99,   color: themeColor, label: domainLabel }
+    ];
+  }
   if (f.characterId === 'saitama' || f.type === 'saitama') {
     const themeColor = CONFIG.saitama?.hudSkillBarColor || CONFIG.saitama?.themeColor || '#FF2A2A';
 

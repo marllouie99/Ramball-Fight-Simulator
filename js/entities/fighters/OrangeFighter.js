@@ -29,11 +29,6 @@ export class OrangeFighter extends Fighter {
     this._isFlameSoundPlaying = false;
   }
 
-  aim(opponent) {
-    if (!opponent) return;
-    this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-  }
-
   shoot(ownerIndex, opponent) {
     if (!projectileSystem || this.isCaughtInBeam()) return false;
     if (!opponent) return false;

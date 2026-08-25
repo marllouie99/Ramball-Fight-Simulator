@@ -2,6 +2,24 @@
 // Yuta Okkotsu — Special Grade Sorcerer Config
 // ─────────────────────────────────────────────
 export const yutaConfig = {
+  // ── Base Attributes ──
+  hp: 200,
+  speed: 5.8,
+  moveSpeed: 5.8,
+  r: 25,
+  radius: 25,
+  color: '#EEEEEE', // Soft Silver / White
+  themeColor: '#EEEEEE',
+  startX: 400,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  damage: 15,
+  cooldown: 50,
+  projectileSpeedMultiplier: 3.0,
+  ability: 'Copy & Rika',
+  desc: 'Summons Rika to assist Yuta in fight and uses Authentic Mutual Love domain.',
+
   // Passive: Reverse Cursed Technique (RCT) & Passive Regeneration
   regenRate: 0.05,                         // HP restored per frame passively
   rctRevivalHpThreshold: 0.05,             // Triggers RCT revival when HP drops to 5% or below

@@ -410,3 +410,34 @@ To support a new weapon in the Weapon Studio:
   - `Tactical 4v4`: 4v4 full squad encounter, 5 rounds, 500 HP.
   - `Tactical Random`: Random firearm loadout round rotations.
 - **System Rules**: Always enforce dark arena theme, 2D line of sight, and unified projectile visuals across all tactical modes.
+
+## 22. Unified Fighter Aim Pipeline & Target Validation Standards
+
+### Overview
+To eliminate scattered, ad-hoc angle calculations and prevent stealth/submerged targeting regressions, all current and future fighters MUST adhere to the centralized **Template Method Pattern** defined on base `Fighter.js`.
+
+### Architecture & Hooks
+1. **Master Aim Pipeline (`Fighter.prototype.aim(opponent)`)**:
+   - `aim(opponent)` is the **single universal entry point** called by `physics.js` and AI steering loops.
+   - It automatically verifies `canAim()` and `isValidAimTarget(opponent)`, resolves Musashi ghost decoys, calculates `targetAngle`, and delegates angle application to `this.applyAim(opponent, targetAngle)`.
+   - **NEVER** override `aim(opponent)` in a subclass unless calling `super.aim(opponent)`.
+
+2. **Centralized Target Eligibility (`Fighter.prototype.isValidAimTarget(target)`)**:
+   - Evaluates if a target is alive, non-vanished (`vanishTimer <= 0`), and non-submerged (`!target.isSubmerged`).
+   - Subclasses with additional target validation (e.g. Toji's `tojiIsTargetDeadOrRemoved`) extend `isValidAimTarget(target)` via `if (!super.isValidAimTarget(target)) return false;`.
+
+3. **Fighter Aim Capability (`Fighter.prototype.canAim()`)**:
+   - Evaluates hard CC status effects (time-stop, paralysis, electric stun, dubstep stun, beam capture, ambush targets).
+   - Subclasses requiring skill channeling locks (e.g., Mahoraga, Gojo, Mahito, Hydra) extend `canAim()`:
+     ```javascript
+     canAim() {
+       if (!super.canAim()) return false;
+       if (this.isChannelingSkill) return false;
+       return true;
+     }
+     ```
+
+4. **Modular Angle Application (`Fighter.prototype.applyAim(opponent, targetAngle)`)**:
+   - By default sets `this.gunAngle = targetAngle; this.angle = targetAngle;` and handles Toji Heavenly Restriction stealth turn delays.
+   - Subclasses requiring specialized rotational inertia (e.g., Laser beam rotation speed limits) override `applyAim(opponent, targetAngle)` exclusively without having to duplicate any validation guards.
+

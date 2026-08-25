@@ -332,13 +332,6 @@ export class BerserkerFighter extends Fighter {
     }
   }
 
-  aim(opponent) {
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      this.angle = this.gunAngle;
-    }
-  }
-
   drawOutline(ctx) {
     super.drawOutline(ctx);
 

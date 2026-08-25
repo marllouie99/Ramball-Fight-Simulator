@@ -5,8 +5,21 @@
 export const mahitoConfig = {
   // ── 1. BASE ATTRIBUTES & CORE STATS ────────────────────────────────────────
   hp: 230,
-  damage: 14,
+  damage: 16,
+  speed: 5.8,
   moveSpeed: 5.8,
+  r: 25,
+  radius: 25,
+  color: '#C026D3', // Vivid Magenta-Violet / Cursed Energy
+  themeColor: '#C026D3',
+  startX: 300,
+  startY: 250,
+  startVx: 1.2,
+  startVy: 1.0,
+  cooldown: 22,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Soul Scalpel Claws',
+  desc: 'Wields 4 curved scythe-talon claws. Passive: Phantom Soul Slip phases directly through enemies with a high-speed claw cross-slice. Secondary skill unleashes Subterranean Flesh Surge; transforms into Distorted Killing form.',
   
   // Basic Attack: Idle Transfiguration (Melee Morph)
   arcAngle: (135 * Math.PI) / 180, // 135° frontal cone sweep (Rule #7 & #8 compliant)

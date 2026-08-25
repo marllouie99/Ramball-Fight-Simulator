@@ -15,27 +15,6 @@ export class AimbotFighter extends Fighter {
     super(def);
   }
 
-  /** Overrides aimbot behavior to lock onto opponent's position. */
-  aim(opponent) {
-    if (!opponent || opponent.vanishTimer > 0 || this.isTargetOfAmbush) return;
-
-    const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-
-    // Delayed / sluggish reaction time when aiming at stealthed targets (Toji)
-    if (opponent.isStealthed) {
-      let diff = targetAngle - this.gunAngle;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      const turnRate = CONFIG.toji?.stealthTurnRate || 0.035;
-      this.gunAngle += diff * turnRate; // Sluggish delayed turn rate
-      this.angle = this.gunAngle;
-      return;
-    }
-
-    this.gunAngle = targetAngle;
-    this.angle = targetAngle;
-  }
-
   onDamageDealt(target, projectile, ownerIndex) {
     // Apply dubstep stun effect on hit based on probability
     const stunChance = CONFIG.aimbot?.electricStunChance ?? 0.5;

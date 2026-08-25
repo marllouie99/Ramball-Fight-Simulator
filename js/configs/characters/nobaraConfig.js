@@ -6,11 +6,22 @@ export const nobaraConfig = {
   // Base Attributes
   hp: 400,
   speed: 5.4,
+  moveSpeed: 5.4,
   r: 25,
+  radius: 25,
   color: '#D94E68', // Deep Rose Crimson
   themeColor: '#D94E68',
   secondaryColor: '#FF6B81', // Cursed Flame Coral
   goldAccent: '#D4AF37', // Straw Gold
+  startX: 300,
+  startY: 250,
+  startVx: 1.1,
+  startVy: 1.0,
+  damage: 24,
+  cooldown: 42,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Straw Doll Technique',
+  desc: 'Wields a steel claw hammer and cursed nails. Embeds nails in enemies and environment. Passive: Unflinching Ecstasy surges under 50% HP. Skill 1: Hairpin detonates all active nails. Skill 2: Resonance pierces soul across any distance.',
 
   // Passive: Unflinching Ecstasy (Kōyō no Shinshō)
   ecstasyHpThreshold: 0.50,         // Triggers under 50% HP

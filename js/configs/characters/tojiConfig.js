@@ -6,8 +6,20 @@ export const tojiConfig = {
   // Base Attributes
   hp: 420,
   speed: 5.6,
+  moveSpeed: 5.6,
   r: 25,
-  color: '#A040FF', // Cursed Violet
+  radius: 25,
+  color: '#281438', // Dark Shadow Purple
+  themeColor: '#281438',
+  startX: 350,
+  startY: 250,
+  startVx: 1.5,
+  startVy: 1.5,
+  damage: 15,
+  cooldown: 40,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Heavenly Restriction',
+  desc: 'Zero Cursed Energy. Immune to Domains. Silences enemies with the Inverted Spear of Heaven.',
 
   // Passive: Heavenly Restriction (Tenyo Jubaku)
   stealthDodgeChance: 0.35,          // Base chance (25%) to physically dodge incoming melee attacks, strikes & projectiles outside domains (displays "MISS!")

@@ -22,6 +22,7 @@ import { drawRubyScythe } from '../weapons/rubyWeaponGraphics.js';
 import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
+import { drawMegumiShadowBlade } from '../weapons/megumiWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
@@ -1087,6 +1088,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'ruby') offsetX = -75; // Massive scythe
   else if (type === 'toji') offsetX = -40; // Inverted Spear
   else if (type === 'yuta') offsetX = -40; // Katana
+  else if (type === 'megumi') offsetX = -45; // Shadow Blade
   else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
   else if (type === 'ichigo') {
     offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -45;
@@ -1373,6 +1375,11 @@ function drawWeaponPreview(ctx, type, color) {
       case 'nanami':
         // Nanami's Wrapped Blunt Cleaver
         drawNanamiCleaver(ctx, 0, 0, gunAngle, r, false);
+        return;
+
+      case 'megumi':
+        // Megumi's Shadow Blade (Second Cursed Sword) - Diagonal Upright Guard Stance
+        drawMegumiShadowBlade(ctx, 0, 0, gunAngle - 1.12, r, false, 0);
         return;
 
       case 'john_wick':

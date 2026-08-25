@@ -83,12 +83,6 @@ export class DarkSlateGrayFighter extends Fighter {
     return angle;
   }
 
-  aim(opponent) {
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
-  }
-
   // Override takeDamage to implement dodge mechanics
   takeDamage(amount, attacker, opts = {}) {
     const isFlameContact = !!opts.isFlame;

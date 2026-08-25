@@ -2,6 +2,24 @@
 // Aoi Todo — Boogie Woogie Brawler Config
 // ─────────────────────────────────────────────
 export const todoConfig = {
+    // ── Base Attributes ──
+    hp: 220,
+    speed: 6.5,
+    moveSpeed: 6.5,
+    r: 25,
+    radius: 25,
+    color: '#D2691E', // Chocolate / Brown
+    themeColor: '#D2691E',
+    startX: 300,
+    startY: 250,
+    startVx: 1.2,
+    startVy: 1.0,
+    damage: 12,
+    cooldown: 60,
+    projectileSpeedMultiplier: 1.0,
+    ability: 'Boogie Woogie',
+    desc: 'Claps hands to swap positions with enemies or cursed rocks. Focuses on disorienting opponents.',
+
     // Basic Combat & Stats
     baseDamageReduction: 0.05,    // 20% passive damage reduction (Grade 1 Cursed Energy brawler physique)
     zoneDamageReduction: 0.05,    // 35% damage reduction while in the Zone / Black Flash window

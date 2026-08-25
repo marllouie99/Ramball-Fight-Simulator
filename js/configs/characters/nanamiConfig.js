@@ -5,9 +5,21 @@
 export const nanamiConfig = {
   // Base Attributes
   hp: 420,
-  speed: 5.3,
+  speed: 5.5,
+  moveSpeed: 5.5,
   r: 25,
+  radius: 25,
   color: '#D4AF37', // Refined Golden Sand / Warm Ochre
+  themeColor: '#D4AF37',
+  startX: 300,
+  startY: 250,
+  startVx: 1.1,
+  startVy: 1.0,
+  damage: 22,
+  cooldown: 55,
+  projectileSpeedMultiplier: 1.0,
+  ability: 'Ratio Technique (7:3)',
+  desc: 'Wields a cloth-wrapped blunt cleaver. Passive: 7:3 Ratio Technique deals guaranteed True Damage critical strikes and fractures enemy defense. Enters Overtime under 40% HP or after 25s for a 120% cursed energy surge.',
 
   // Passive: Overtime (Jigai)
   overtimeThresholdSeconds: 25,     // Activates after 25s elapsed in the round
