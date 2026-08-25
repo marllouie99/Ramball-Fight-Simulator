@@ -2,6 +2,7 @@ import { STARTER_MAP } from './starterMap.js';
 import { MONOLITH_MAP } from './monolithMap.js';
 import { drawTacticalMap } from './tacticalMapRenderer.js';
 import { state } from '../../js/core/state.js';
+import { CONFIG } from '../../js/core/config.js';
 
 export const TACTICAL_MAPS = {
   tactical_starter_map: STARTER_MAP,
@@ -22,85 +23,150 @@ export { STARTER_MAP, MONOLITH_MAP, drawTacticalMap };
 /**
  * Checks and handles collision between a circle entity (fighter or projectile)
  * and all rectangular tactical cover obstacles in the map.
+ * Uses iterative relaxation to cleanly resolve tight spaces and multi-obstacle pinches.
  * Returns true if a collision occurred.
  */
-export function handleObstacleCollision(entity, obstacles, restitution = 0.9) {
-  if (!obstacles || !Array.isArray(obstacles) || obstacles.length === 0) return false;
-  const er = entity.r || entity.radius || 15;
-  let collided = false;
+export function handleObstacleCollision(entity, obstacles, restitution = 0.85) {
+  if (!obstacles || !Array.isArray(obstacles) || obstacles.length === 0 || !entity) return false;
+  const er = entity.r || entity.radius || 25;
+  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
+  let anyCollided = false;
 
-  for (let i = 0; i < obstacles.length; i++) {
-    const obs = obstacles[i];
-    // Find closest point on obstacle rectangle to entity center
-    const closestX = Math.max(obs.x, Math.min(entity.x, obs.x + obs.w));
-    const closestY = Math.max(obs.y, Math.min(entity.y, obs.y + obs.h));
+  const spread = (CONFIG?.tactical?.obstacleRebounceSpread !== undefined) ? CONFIG.tactical.obstacleRebounceSpread : 0.85;
+  const flipChance = (CONFIG?.tactical?.rebounceTangentialFlipChance !== undefined) ? CONFIG.tactical.rebounceTangentialFlipChance : 0.45;
+  const minTangentialMult = (CONFIG?.tactical?.minWallTangentialSpeed !== undefined) ? CONFIG.tactical.minWallTangentialSpeed : 0.65;
+  const spinReverseChance = (CONFIG?.tactical?.spinReverseOnBounceChance !== undefined) ? CONFIG.tactical.spinReverseOnBounceChance : 0.40;
 
-    const dx = entity.x - closestX;
-    const dy = entity.y - closestY;
-    const distSq = dx * dx + dy * dy;
+  // Multi-pass iterative solver (3 iterations) to resolve corner pinches and tight pockets
+  for (let iter = 0; iter < 3; iter++) {
+    let iterCollided = false;
 
-    if (distSq === 0) {
-      // Entity center is strictly inside the obstacle box
-      const leftDist = entity.x - obs.x;
-      const rightDist = (obs.x + obs.w) - entity.x;
-      const topDist = entity.y - obs.y;
-      const botDist = (obs.y + obs.h) - entity.y;
-      const minDist = Math.min(leftDist, rightDist, topDist, botDist);
+    for (let i = 0; i < obstacles.length; i++) {
+      const obs = obstacles[i];
+      // Find closest point on obstacle rectangle to entity center
+      const closestX = Math.max(obs.x, Math.min(entity.x, obs.x + obs.w));
+      const closestY = Math.max(obs.y, Math.min(entity.y, obs.y + obs.h));
 
-      let nx = 0, ny = 0, penetration = er;
-      if (minDist === topDist) { ny = -1; penetration += topDist; }
-      else if (minDist === botDist) { ny = 1; penetration += botDist; }
-      else if (minDist === leftDist) { nx = -1; penetration += leftDist; }
-      else { nx = 1; penetration += rightDist; }
+      const dx = entity.x - closestX;
+      const dy = entity.y - closestY;
+      const distSq = dx * dx + dy * dy;
 
-      entity.x += nx * penetration;
-      entity.y += ny * penetration;
-      if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
-        const dot = entity.vx * nx + entity.vy * ny;
-        if (dot < 0) {
-          entity.vx = (entity.vx - 2 * dot * nx) * restitution;
-          entity.vy = (entity.vy - 2 * dot * ny) * restitution;
-          const tangentX = -ny;
-          const tangentY = nx;
-          const bias = (Math.random() - 0.5) * 0.8;
-          entity.vx += tangentX * bias;
-          entity.vy += tangentY * bias;
+      if (distSq === 0 || (entity.x >= obs.x && entity.x <= obs.x + obs.w && entity.y >= obs.y && entity.y <= obs.y + obs.h)) {
+        // Entity center is strictly inside or overlapping the obstacle box
+        const leftDist = entity.x - obs.x;
+        const rightDist = (obs.x + obs.w) - entity.x;
+        const topDist = entity.y - obs.y;
+        const botDist = (obs.y + obs.h) - entity.y;
+
+        const minDist = Math.min(leftDist, rightDist, topDist, botDist);
+        let nx = 0, ny = 0;
+        if (minDist === topDist) { ny = -1; }
+        else if (minDist === botDist) { ny = 1; }
+        else if (minDist === leftDist) { nx = -1; }
+        else { nx = 1; }
+
+        const penetration = er + minDist;
+        entity.x += nx * penetration;
+        entity.y += ny * penetration;
+
+        if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
+          const targetSpd = entity.speed || 5.0;
+          const minBounce = targetSpd * 0.75;
+          const minTangential = targetSpd * minTangentialMult;
+          const dot = entity.vx * nx + entity.vy * ny;
+          if (dot < 0) {
+            entity.vx = entity.vx - 2 * dot * nx;
+            entity.vy = entity.vy - 2 * dot * ny;
+          }
+          entity.vx += nx * minBounce;
+          entity.vy += ny * minBounce;
+
+          // Tangential & Directional Scattering
+          const tx = -ny;
+          const ty = nx;
+          let currentTangential = entity.vx * tx + entity.vy * ty;
+
+          if (Math.random() < flipChance && Math.abs(currentTangential) > 0.1) {
+            currentTangential = -currentTangential;
+          }
+          currentTangential += (Math.random() - 0.5) * 2 * spread * targetSpd;
+
+          if (Math.abs(currentTangential) < minTangential) {
+            const dir = (currentTangential !== 0) ? Math.sign(currentTangential) : (Math.random() < 0.5 ? 1 : -1);
+            currentTangential = dir * (minTangential + Math.random() * targetSpd * 0.35);
+          }
+
+          const normalSpd = Math.max(minBounce, Math.abs(entity.vx * nx + entity.vy * ny));
+          entity.vx = nx * normalSpd + tx * currentTangential;
+          entity.vy = ny * normalSpd + ty * currentTangential;
         }
-      }
-      collided = true;
-    } else if (distSq < er * er) {
-      const dist = Math.sqrt(distSq);
-      const nx = dx / dist;
-      const ny = dy / dist;
-      const penetration = er - dist;
+        iterCollided = true;
+        anyCollided = true;
+      } else if (distSq < er * er) {
+        const dist = Math.sqrt(distSq);
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const penetration = er - dist;
 
-      // Push entity out of obstacle
-      entity.x += nx * penetration;
-      entity.y += ny * penetration;
+        // Push entity out of obstacle
+        entity.x += nx * penetration;
+        entity.y += ny * penetration;
 
-      // Reflect / bounce velocity
-      if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
-        const dot = entity.vx * nx + entity.vy * ny;
-        if (dot < 0) {
-          entity.vx = (entity.vx - 2 * dot * nx) * restitution;
-          entity.vy = (entity.vy - 2 * dot * ny) * restitution;
-          const tangentX = -ny;
-          const tangentY = nx;
-          const bias = (Math.random() - 0.5) * 0.8;
-          entity.vx += tangentX * bias;
-          entity.vy += tangentY * bias;
+        // Reflect / bounce velocity
+        if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
+          const targetSpd = entity.speed || 5.0;
+          const minBounce = targetSpd * 0.75;
+          const minTangential = targetSpd * minTangentialMult;
+          const dot = entity.vx * nx + entity.vy * ny;
+          if (dot < 0) {
+            entity.vx = entity.vx - 2 * dot * nx;
+            entity.vy = entity.vy - 2 * dot * ny;
+          }
+          entity.vx += nx * minBounce;
+          entity.vy += ny * minBounce;
+
+          // Tangential & Directional Scattering
+          const tx = -ny;
+          const ty = nx;
+          let currentTangential = entity.vx * tx + entity.vy * ty;
+
+          if (Math.random() < flipChance && Math.abs(currentTangential) > 0.1) {
+            currentTangential = -currentTangential;
+          }
+          currentTangential += (Math.random() - 0.5) * 2 * spread * targetSpd;
+
+          if (Math.abs(currentTangential) < minTangential) {
+            const dir = (currentTangential !== 0) ? Math.sign(currentTangential) : (Math.random() < 0.5 ? 1 : -1);
+            currentTangential = dir * (minTangential + Math.random() * targetSpd * 0.35);
+          }
+
+          const normalSpd = Math.max(minBounce, Math.abs(entity.vx * nx + entity.vy * ny));
+          entity.vx = nx * normalSpd + tx * currentTangential;
+          entity.vy = ny * normalSpd + ty * currentTangential;
         }
-      }
 
-      collided = true;
+        iterCollided = true;
+        anyCollided = true;
+      }
+    }
+
+    if (!iterCollided) break;
+  }
+
+  if (anyCollided) {
+    if (typeof entity.normalizeSpeed === 'function') {
+      entity.normalizeSpeed();
+    } else if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
+      const spd = Math.hypot(entity.vx, entity.vy);
+      const targetSpd = entity.speed || 5.0;
+      if (spd > 0.05) {
+        entity.vx = (entity.vx / spd) * targetSpd;
+        entity.vy = (entity.vy / spd) * targetSpd;
+      }
     }
   }
 
-  if (collided && typeof entity.normalizeSpeed === 'function') {
-    entity.normalizeSpeed();
-  }
-
-  return collided;
+  return anyCollided;
 }
 
 /**
@@ -159,7 +225,8 @@ export function checkLineIntersectsAABB(x1, y1, x2, y2, rx, ry, rw, rh) {
  * Returns true if NO obstacles block the sightline.
  */
 export function hasLineOfSight(x1, y1, x2, y2, obstacles = null) {
-  const obsList = obstacles || (typeof state !== 'undefined' && state.activeMap?.obstacles) || (typeof STARTER_MAP !== 'undefined' ? STARTER_MAP.obstacles : null);
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+  const obsList = obstacles || (typeof state !== 'undefined' && state.activeMap?.obstacles) || (isTactical && typeof STARTER_MAP !== 'undefined' ? STARTER_MAP.obstacles : null);
   if (!obsList || !Array.isArray(obsList) || obsList.length === 0) return true;
 
   for (let i = 0; i < obsList.length; i++) {
@@ -175,7 +242,8 @@ export function hasLineOfSight(x1, y1, x2, y2, obstacles = null) {
  * Casts a ray from (startX, startY) at angle for maxDistance and finds the earliest intersection distance against obstacles.
  */
 export function raycastToObstacles(startX, startY, angle, maxDistance = 1000, obstacles = null) {
-  const obsList = obstacles || (typeof state !== 'undefined' && state.activeMap?.obstacles) || (typeof STARTER_MAP !== 'undefined' ? STARTER_MAP.obstacles : null);
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+  const obsList = obstacles || (typeof state !== 'undefined' && state.activeMap?.obstacles) || (isTactical && typeof STARTER_MAP !== 'undefined' ? STARTER_MAP.obstacles : null);
   if (!obsList || !Array.isArray(obsList) || obsList.length === 0) return maxDistance;
 
   const targetX = startX + Math.cos(angle) * maxDistance;

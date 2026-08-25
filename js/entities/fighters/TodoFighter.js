@@ -120,6 +120,9 @@ export class TodoFighter extends Fighter {
     );
 
     if (isFrozen || this.isTargetOfAmbush || this.isParalyzed || isBeamOrPurpleTrapped) {
+      if (typeof this._handleFrozenSkillCooldowns === 'function') {
+        this._handleFrozenSkillCooldowns();
+      }
       // If Todo is caught / frozen in Gojo's domain, continue ticking down his Takada Ultimate timer each frame!
       if (isGojoDomainActive && this.isTakadaUltActive) {
         this.takadaUltTimer = Math.max(0, (this.takadaUltTimer || 0) - 1);

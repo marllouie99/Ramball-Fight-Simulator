@@ -648,6 +648,17 @@ const SKILL_TEXT_WHITELIST = [
   'DODGE!',
   'MELEE DODGE!',
   'NEAR MISS!',
+  'MISS!',
+  'MISS',
+  'EVADE!',
+  'COUNTER!',
+  'SERIOUS COUNTER!',
+  'UNLIMITED VOID',
+  'REVERSAL RED',
+  'HOLLOW PURPLE',
+  'PURPLE 100%',
+  'PURPLE 200%',
+  'RETREAT!',
   'HIT!',
   'SHIELD BREAK!',
   'SHIELD BASH!',
@@ -683,8 +694,12 @@ const SKILL_TEXT_WHITELIST = [
 
 function isAllowedFloatingText(text) {
   const normalizedText = String(text).trim();
-  // Strictly allow only numeric damage or heal values (e.g. 24, -24, +50, 105)
-  return /^[+-]?\d+(\.\d+)?$/.test(normalizedText);
+  // Allow numeric damage or heal values (e.g. 24, -24, +50, 105)
+  if (/^[+-]?\d+(\.\d+)?$/.test(normalizedText)) return true;
+  // Allow whitelisted skill, dodge & reaction labels
+  const upper = normalizedText.toUpperCase();
+  if (SKILL_TEXT_WHITELIST.includes(upper) || SKILL_TEXT_WHITELIST.includes(upper + '!')) return true;
+  return false;
 }
 
 const FLOATING_TEXT_SPAM_COOLDOWN = 50; // ms window to filter identical messages in close proximity

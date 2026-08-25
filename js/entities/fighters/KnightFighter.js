@@ -423,6 +423,7 @@ export class KnightFighter extends Fighter {
   aim(opponent) {
     if (opponent) {
       this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      this.angle = this.gunAngle;
     } else {
       this.gunAngle = Math.atan2(this.vy, this.vx);
     }

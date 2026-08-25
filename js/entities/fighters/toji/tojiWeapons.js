@@ -214,15 +214,6 @@ export function performSplitSoulKatanaSlash(fighter, primaryTarget, ownerIndex) 
     applyDamageToTarget(target, damage, fighter, { isMelee: true, isTrueDamage: true, isSoulSplit: true, isAdaptableSkillShot: !!fighter.isAmbushing, skillShotId: fighter.isAmbushing ? 'tojiAmbush' : null });
     target.soulWoundTimer = soulWoundDuration;
 
-    if (typeof target.applySlow === 'function') {
-      const slowDur = CONFIG.toji?.katanaSlowDuration || 90;
-      const slowMult = CONFIG.toji?.katanaSlowMultiplier ?? 0.40;
-      target.applySlow(slowDur, slowMult);
-    } else {
-      target.slowTimer = CONFIG.toji?.katanaSlowDuration || 90;
-      target.slowMultiplier = CONFIG.toji?.katanaSlowMultiplier ?? 0.40;
-    }
-
     if (typeof fighter._clearTargetFreeze === 'function') fighter._clearTargetFreeze(target);
     const targetHitAngle = Math.atan2(fighter.y - target.y, fighter.x - target.x);
     let angleDiff = targetHitAngle - (target.angle || 0);

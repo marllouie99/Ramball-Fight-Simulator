@@ -1744,8 +1744,9 @@ export class CJFighter extends Fighter {
     const drawY = this.y - z;
     ctx.save();
 
-    // 1. Floating Name on TOP of the Fighter Body Circle
-    if (this.name) {
+    // 1. Floating Name on TOP of the Fighter Body Circle (Hidden in FOC mode)
+    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+    if (this.name && isTactical && !this.hideFloatingName && !this.hideName) {
       const nameText = this.name.toUpperCase();
       const nameY = drawY - this.r - 8;
       const themeColor = this.themeColor || this.color || '#ffffff';

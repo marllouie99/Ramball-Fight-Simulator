@@ -229,6 +229,9 @@ export class StatusEffectsManager {
       fighter.vy *= 0.5;
       fighter.x += fighter.vx;
       fighter.y += fighter.vy;
+      if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
+        fighter._handleFrozenSkillCooldowns();
+      }
       return true;
     }
 
@@ -254,6 +257,9 @@ export class StatusEffectsManager {
       fighter.vy *= 0.5;
       fighter.x += fighter.vx;
       fighter.y += fighter.vy;
+      if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
+        fighter._handleFrozenSkillCooldowns();
+      }
       return true;
     }
 
@@ -268,12 +274,8 @@ export class StatusEffectsManager {
       }
 
       // Continuously decrement skill & ultimate cooldowns while frozen (EXCEPT inside Gojo's Unlimited Void Domain)
-      const isGojoDomainActive = (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
-        f && (f.type === 'gojo' || f.characterId === 'gojo' || f._def?.id === 'gojo') && f.domainActive
-      ));
-
-      if (!isGojoDomainActive && typeof fighter._decrementSkillCooldowns === 'function') {
-        fighter._decrementSkillCooldowns();
+      if (typeof fighter._handleFrozenSkillCooldowns === 'function') {
+        fighter._handleFrozenSkillCooldowns();
       }
 
       if (fighter.timeStopTimer <= 0) {

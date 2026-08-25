@@ -142,7 +142,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
           ent.isCaughtInPurple = true;
           // Complete paralysis debuff while caught in Hollow Purple gravitational vortex
           if (typeof ent.interruptAttacks === 'function') {
-            ent.interruptAttacks(true);
+            ent.interruptAttacks();
           }
           if (typeof ent.applyTimeStop === 'function') {
             ent.applyTimeStop(12, { isSkill: true, isUltimate: true, isPurple: true });

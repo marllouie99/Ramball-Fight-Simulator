@@ -396,13 +396,12 @@ export function drawFighters() {
     }
 
     // Universal Paralyze / Stun / TimeStop / Ambush 3D Golden Orbiting Rings Visual (Rule 9 & Mahoraga Wall Slam Stun Standard)
+    // NOTE: hitStunTimer and knockbackStunTimer from basic attacks are excluded — they are short flinch pauses, NOT hard CC freezes.
     const isFighterStunned = Boolean(
       (fighter.paralyzeTimer && fighter.paralyzeTimer > 0) ||
-      (fighter.timeStopTimer && fighter.timeStopTimer > 0) ||
+      (fighter.timeStopTimer && fighter.timeStopTimer > 0 && !fighter.suppressFreezeOverlay) ||
       (fighter.electricStunTimer && fighter.electricStunTimer > 0) ||
-      (fighter.hitStunTimer && fighter.hitStunTimer > 0) ||
       (fighter.stunTimer && fighter.stunTimer > 0) ||
-      (fighter.knockbackStunTimer && fighter.knockbackStunTimer > 0) ||
       (fighter.dubstepStunTimer && fighter.dubstepStunTimer > 0) ||
       (fighter.ratioHitPauseTimer && fighter.ratioHitPauseTimer > 0) ||
       fighter.isParalyzed ||

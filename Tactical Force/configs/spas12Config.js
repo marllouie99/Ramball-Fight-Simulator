@@ -18,7 +18,7 @@ export const spas12Config = {
   magazineSize: 8,               // 8 shells in tubular mag
   fireCooldown: 45,              // Deliberate pump-action interval (45 frames / 0.75s)
   pelletCount: 6,                // 6 buckshot pellets per blast
-  damagePerPellet: 18,           // 18 damage per pellet (108 total point-blank)
+  damagePerPellet: 10,           // 18 damage per pellet (108 total point-blank)
   spreadAngle: (12.5 * Math.PI) / 180, // 12.5° cone spread
   projectileSpeedMultiplier: 2.1,
   bulletRadius: 4.2,

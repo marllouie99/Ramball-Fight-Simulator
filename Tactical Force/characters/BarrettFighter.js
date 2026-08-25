@@ -3,7 +3,7 @@
 // .50 BMG Semi-Automatic Anti-Materiel Marksman
 // ─────────────────────────────────────────────
 
-import { Fighter } from '../../js/entities/fighter.js';
+import { TacticalBaseFighter } from './TacticalBaseFighter.js';
 import { CONFIG } from '../../js/core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../js/core/state.js';
 import { projectileSystem } from '../../js/systems/projectileSystem.js';
@@ -12,7 +12,7 @@ import { drawBarrettWeapon } from '../weapons/barrettWeapon.js';
 import { drawBarrettSkin } from '../skins/barrettSkin.js';
 import { hasLineOfSight } from '../maps/index.js';
 
-export class BarrettFighter extends Fighter {
+export class BarrettFighter extends TacticalBaseFighter {
   constructor(defOrX, y, radius, color, moveSpeed, customConfig = {}, fighterIndex = 0) {
     const cfg = CONFIG.barrett || {};
     let def;
@@ -32,6 +32,9 @@ export class BarrettFighter extends Fighter {
       };
     }
     super(def);
+    this.isTacticalFighter = true;
+    this.gameCategory = 'tactical';
+    this.spinDirection = Math.random() < 0.5 ? 1 : -1;
 
     this.characterId = 'barrett';
     this.name = def.name || 'BARRETT';
@@ -123,24 +126,23 @@ export class BarrettFighter extends Fighter {
       spawnFloatingText(this.x, this.y - this.r - 15, 'RELOADING...', '#94a3b8');
     }
 
-    // Rotational spin aim alignment sweep detection
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.paralyzeTimer || this.paralyzeTimer <= 0) && !this.isCaughtInBeam();
+    // Recoil animation recovery
+    if (this.gunRecoil > 0) {
+      this.gunRecoil = Math.max(0, this.gunRecoil * 0.80 - 0.05);
+    }
+
+    // Rotational spin sweep aim detection
+    const canAct = (!this.paralyzeTimer || this.paralyzeTimer <= 0) && !this.isCaughtInBeam() && (!this.boltTimer || this.boltTimer <= 0);
     if (canAct && !this.isReloading && opponent && opponent.hp > 0 && !opponent.isDead) {
-      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      let angleDiff = targetAngle - this.angle;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      const isSweeping = this.checkSpinSweep(opponent, CONFIG.tactical?.aimAlignmentThreshold || 0.16);
 
-      const alignmentThreshold = CONFIG.tactical?.aimAlignmentThreshold || 0.14;
-      const isAligned = Math.abs(angleDiff) <= alignmentThreshold;
-
-      if (isAligned && !this.lastAimAligned && this.shootDebounce <= 0) {
+      if (isSweeping && !this.lastAimAligned && this.shootDebounce <= 0) {
         if (hasLineOfSight(this.x, this.y, opponent.x, opponent.y)) {
           this.shoot(opponent, ownerIndex);
           this.shootDebounce = 8;
         }
       }
-      this.lastAimAligned = isAligned;
+      this.lastAimAligned = isSweeping;
     } else {
       this.lastAimAligned = false;
     }
@@ -158,7 +160,23 @@ export class BarrettFighter extends Fighter {
     }
 
     if (this.isReloading || this.magazineBullets <= 0) return;
-    if (this.hasClearLOS === false) return;
+    if (this.boltTimer > 0) return;
+
+    if (!target || target.hp <= 0) {
+      if (typeof state !== 'undefined' && state.fighters) {
+        let bestDist = Infinity;
+        for (let fi = 0; fi < state.fighters.length; fi++) {
+          const f = state.fighters[fi];
+          if (!f || f === this || f.hp <= 0) continue;
+          const d = Math.hypot(f.x - this.x, f.y - this.y);
+          if (d < bestDist) {
+            bestDist = d;
+            target = f;
+          }
+        }
+      }
+    }
+
     if (target && target.hp > 0 && !hasLineOfSight(this.x, this.y, target.x, target.y)) return;
 
     const cfg = CONFIG.barrett || {};
@@ -168,45 +186,43 @@ export class BarrettFighter extends Fighter {
     this._boltCrackPlayed = false;
     this.gunRecoil = cfg.recoilDistance ? (cfg.recoilDistance / 8.0) : 2.2;
 
-    const fireAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-
-    // Massive .50 BMG recoil impulse
-    const recoilForce = cfg.recoilForce || 9.0;
-    this.vx -= Math.cos(fireAngle) * recoilForce;
-    this.vy -= Math.sin(fireAngle) * recoilForce;
+    let fireAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    if (target && target.hp > 0) {
+      const targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+      let diff = targetAngle - fireAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      if (Math.abs(diff) <= 0.22) {
+        fireAngle = targetAngle;
+        this.angle = targetAngle;
+        this.gunAngle = targetAngle;
+      }
+    }
 
     // Trigger high-caliber shockwave shake
     triggerGlobalScreenShake(cfg.screenShakeIntensity || 11.0, cfg.screenShakeDuration || 9);
 
-    // Spawn tip position at muzzle brake crown (clamped so bullet never spawns behind close targets)
+    // Spawn tip position at muzzle brake crown
     const scaleFactor = (this.r / 25);
-    let tipDist = this.r + 55 * scaleFactor;
-    if (target && target.hp > 0) {
-      const distToTarget = Math.hypot(target.x - this.x, target.y - this.y);
-      const maxSafeTip = Math.max(this.r + 2, distToTarget - (target.r || 24) - 4);
-      if (tipDist > maxSafeTip) {
-        tipDist = maxSafeTip;
-      }
-    }
+    const tipDist = this.r + 55 * scaleFactor;
     const spawnX = this.x + Math.cos(fireAngle) * tipDist;
     const spawnY = this.y + Math.sin(fireAngle) * tipDist;
 
     // Fire hyper-velocity armor-piercing anti-materiel round
     const speed = (CONFIG.projectile?.speed || 7) * (this._def?.projectileSpeedMultiplier || cfg.projectileSpeedMultiplier || 3.8);
-    const proj = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'tacticalBullet', spawnX, spawnY);
+    const proj = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'tacticalBullet', spawnX, spawnY, fireAngle);
     if (proj) {
-      proj.r = 7.0 * scaleFactor;
+      proj.r = 8.0 * scaleFactor;
       proj.bulletLength = 26 * scaleFactor;
-      proj.bulletWidth = 4.8 * scaleFactor;
-      proj.bulletRadius = (cfg.bulletRadius || 6.0) * scaleFactor;
+      proj.bulletWidth = 5.0 * scaleFactor;
+      proj.bulletRadius = (cfg.bulletRadius || 6.5) * scaleFactor;
       proj.life = cfg.bulletLife || 130;
-      proj.tacticalCaliberScale = 1.30 * scaleFactor;
-      proj.knockbackForce = cfg.knockbackForce || 12.5;
+      proj.tacticalCaliberScale = 1.35 * scaleFactor;
       proj.historyMax = 22;
     }
 
     if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Attacks/awp-fire.mp3', cfg.soundVolumes?.fire ?? 0.85, 0.90);
+      audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Attacks/barrett-m82-fire.mp3', cfg.soundVolumes?.fire ?? 0.85, 0.90);
     }
   }
 
@@ -222,15 +238,17 @@ export class BarrettFighter extends Fighter {
   }
 
   draw(ctx) {
-    const angle = this._isWinnerReveal ? 0 : (this.gunAngle || this.angle || 0);
+    const isFaceOff = this._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff') || this._isPreview;
+    const angle = this._isWinnerReveal ? 0 : (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0));
 
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    // Upright local rotation and vertical mirroring (Rule 19)
     ctx.rotate(angle);
+
+    // Upright vertical mirroring for showoff / face-off screens so right-side fighters are not upside down
     const facingLeft = Math.abs(angle) > Math.PI / 2;
-    if (facingLeft) {
+    if (facingLeft && (isFaceOff || !this.isSpinning)) {
       ctx.scale(1, -1);
     }
 

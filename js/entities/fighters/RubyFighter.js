@@ -455,13 +455,16 @@ export class RubyFighter extends Fighter {
 
     this.x += this.vx;
     this.y += this.vy;
-    this.angle += this.speed * (this._def.spinRate ?? CONFIG.spin.rate);
-
-    if (opponent) {
-      this.gunAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-    }
-
+    this.aim(opponent);
     this.resolveWallBounce(arena);
+  }
+
+  aim(opponent) {
+    if (opponent && opponent.hp > 0) {
+      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
+      this.gunAngle = targetAngle;
+      this.angle = targetAngle;
+    }
   }
 
   // ── drawing ─────────────────────────────────────────

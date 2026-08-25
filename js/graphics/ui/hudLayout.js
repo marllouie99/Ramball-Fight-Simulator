@@ -36,8 +36,10 @@ export function syncHudPosition() {
   const canvasTopInBox = canvasRect.top - boxRect.top;
   const canvasLeftInBox = canvasRect.left - boxRect.left;
 
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+
   const scale = CONFIG.internalScale || 1.0;
-  const hudScale = scale * 0.9;
+  const hudScale = isTactical ? 1.0 : (scale * 0.9);
 
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
   const arenaWidth = arena.width;
@@ -45,10 +47,10 @@ export function syncHudPosition() {
   
   const widthModifier = CONFIG.hudWidthModifier ?? scale;
 
-  const hudCssWidth = (arenaWidth * widthModifier) / hudScale;
+  const hudCssWidth = isTactical ? arenaWidth : ((arenaWidth * widthModifier) / hudScale);
   const visualWidthPercent = (hudCssWidth / canvasWidth) * 100;
 
-  const hudCssLeft = (arenaX + arenaWidth / 2) - hudCssWidth / 2;
+  const hudCssLeft = isTactical ? arenaX : ((arenaX + arenaWidth / 2) - hudCssWidth / 2);
   const visualLeftPercent = (hudCssLeft / canvasWidth) * 100;
 
   // 1. Position Top HUD Container
@@ -63,7 +65,7 @@ export function syncHudPosition() {
     _cachedTopContainer.style.maxWidth = 'none';
     _cachedTopContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
     _cachedTopContainer.style.right = 'auto';
-    _cachedTopContainer.style.transform = `scale(${hudScale})`;
+    _cachedTopContainer.style.transform = isTactical ? 'none' : `scale(${hudScale})`;
     _cachedTopContainer.style.transformOrigin = 'top center';
   }
 
@@ -79,7 +81,7 @@ export function syncHudPosition() {
     _cachedBottomContainer.style.maxWidth = 'none';
     _cachedBottomContainer.style.left = `${visualLeftPercent.toFixed(3)}%`;
     _cachedBottomContainer.style.right = 'auto';
-    _cachedBottomContainer.style.transform = `scale(${hudScale})`;
+    _cachedBottomContainer.style.transform = isTactical ? 'none' : `scale(${hudScale})`;
     _cachedBottomContainer.style.transformOrigin = 'top center';
   }
 
@@ -99,7 +101,7 @@ export function syncHudPosition() {
     healthHud.style.left = `${visualLeftPercent.toFixed(3)}%`;
     healthHud.style.right = 'auto';
     healthHud.style.margin = '0';
-    healthHud.style.transform = `scale(${hudScale})`;
+    healthHud.style.transform = isTactical ? 'none' : `scale(${hudScale})`;
     healthHud.style.transformOrigin = 'top center';
   }
 }

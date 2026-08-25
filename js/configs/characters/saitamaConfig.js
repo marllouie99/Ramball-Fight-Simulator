@@ -1,4 +1,4 @@
-// ─────────────────────────────────────────────
+﻿// ─────────────────────────────────────────────
 // Saitama — The Caped Baldy Config
 // ─────────────────────────────────────────────
 
@@ -17,7 +17,7 @@ export const saitamaConfig = {
   punchKnockback: 100, // Massive knockback force
   punchReach: 80,
   punchArcAngle: Math.PI * 0.5, // 90 degree arc angle
-  punchCooldown: 300, // ~0.5s cooldown
+  punchCooldown: 500, // ~0.5s cooldown
   punchWindup: 0,
   punchWindupFrames: 0,
   punchMaxTime: 22,                // Smooth punch animation frames
@@ -31,11 +31,13 @@ export const saitamaConfig = {
   disableWallPinCyanOverlay: true, // Remove electric cyan freeze overlay when enemy is pinned to wall
   punchScreenShakeIntensity: 12,   // Arena screen shake intensity on basic attack punch hit
   punchScreenShakeDuration: 10,    // Arena screen shake duration (frames) on basic attack punch hit
+  punchFrontalReach: 420,          // Frontal supersonic shockwave blast reach (px) on normal punch
+  punchFrontalArc: Math.PI * 0.65, // Frontal shockwave blast cone angle on normal punch
   wallPinScreenShakeIntensity: 30,  // Arena screen shake intensity on wall pin impact
   wallPinScreenShakeDuration: 12,  // Arena screen shake duration (frames) on wall pin impact
 
   // Skill 1: Consecutive Normal Punches
-  flurryDamage: 24,                 // Damage per rapid punch hit
+  flurryDamage: 30,                 // Damage per rapid punch hit
   flurryHitCount: 10,               // 10 rapid consecutive normal punches
   flurryHitInterval: 4,             // Frames between consecutive punch hits (~0.066s)
   flurryReach: 95,                  // Range of flurry punches
@@ -43,9 +45,11 @@ export const saitamaConfig = {
   flurryDashOffset: 25,             // Distance offset when dashing to target
   flurryForwardSlideSpeed: 4.5,     // Forward slide step (px) Saitama advances on each punch
   flurryPushbackPerHit: 7.0,        // Backward push distance (px) applied to enemy on each punch
-  flurryFinalSlamDamage: 85,        // Final devastating finisher punch
+  flurryFinalSlamDamage: 50,        // Final devastating finisher punch
   flurryFinalSlamKnockback: 65,     // Heavy knockback on final blow
-  flurryCooldown: 1500,              // Cooldown frames at 60fps
+  flurryFinalFrontalReach: 560,     // Frontal supersonic shockwave blast reach (px) on flurry final punch
+  flurryFinalFrontalArc: Math.PI * 0.70, // Frontal shockwave blast cone angle on flurry final punch
+  flurryCooldown: 1000,              // Cooldown frames at 60fps
   flurryTriggerDistance: 260,       // AI trigger distance threshold
   flurryInitialHitPauseFrames: 20,  // Target hit-pause on flurry start
   flurryHoldHitPauseFrames: 8,      // Target hit-pause during flurry cycle
@@ -69,13 +73,14 @@ export const saitamaConfig = {
 
   // Passive: Caped Baldy Reflexes (Dodge Teleport)
   dodgeChance: 0.50, // probability (0-1) of successfully dodging incoming attacks
-  dodgeDistance: 50, // Short sidestep distance (left/right)
+  dodgeDistance: 100, // Short sidestep distance (left/right)
   dodgeCooldown: 1, // Minimum frames (~0.06s) between dodge sidesteps
   attackerTeleportChaseDelayFrames: 5, // Delay (frames) applied to teleporting chasers (Gojo/Sukuna) when Saitama dodges (~0.5s)
 
   // Passive: Serious Skill Counter (Teleport Behind Punch)
   counterTriggerDistance: 320,     // Max range threshold (px) within which Saitama can trigger Serious Skill Counter
-  counterPunchDamage: 2000,        // Damage dealt by the counter punch to primary target
+  counterPunchDamageMultiplier: 20.0, // Damage multiplier based on Normal Punch basic attack (20.0x = 2000 damage with 100 base punchDamage)
+  counterPunchMultiplier: 20.0,    // Alias multiplier
   counterFrontalReach: 750,        // Long frontal shockwave blast reach (px)
   counterFrontalArc: (135 * Math.PI) / 180, // Wide 135-degree frontal shockwave cone arc
   counterFrontalCollateralDamage: 650, // Damage dealt to collateral enemies caught in the wide long frontal blast
@@ -90,7 +95,7 @@ export const saitamaConfig = {
   counterPunchRecoveryFrames: 65, // Frames Saitama stands still after landing (post-punch stall)
   counterDodgeLockFrames: 20,      // Dodge cooldown after counter execution
   skillPunishCooldown: 2000,       // Cooldown between consecutive counter punches (2000 frames ~33.3s at 60fps)
-  initialSkillPunishCooldown: 10, // Cooldown at the start of the round before first counter is available (2000 frames)
+  initialSkillPunishCooldown: 2500, // Cooldown at the start of the round before first counter is available (2000 frames)
   counterPunchScreenShakeIntensity: 100.0, // Intensity of the screen shake
   counterPunchScreenShakeFrames: 30,     // Duration of the screen shake
   counterPunchVoiceEnabled: true,

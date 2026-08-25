@@ -9,12 +9,12 @@ export const STARTER_MAP = {
   codeName: 'SECTOR 01',
   desc: 'Clean tactical arena featuring structured spawn pockets, corner barriers, and a center lane cover wall.',
 
-  // ── Arena Bounds & Geometry (Scaled Tactical Battleground: 500 x 560 at x:20, y:170) ──
+  // ── Arena Bounds & Geometry (Elongated Tactical Arena: 440 x 680 at x:50, y:150) ──
   arena: {
-    x: 20,
-    y: 170,
-    width: 500,
-    height: 560,
+    x: 50,
+    y: 150,
+    width: 440,
+    height: 680,
     wallWidth: 6
   },
 
@@ -28,109 +28,109 @@ export const STARTER_MAP = {
     team1Accent: '#ef4444'
   },
 
-  // ── Clean Tactical Barriers ──
+  // ── Clean Tactical Barriers (Freestanding island covers with open 75px flank corridors) ──
   obstacles: [
-    // 1. Top-Left Horizontal Barrier
+    // 1. Top-Left Horizontal Barrier (Freestanding cover with 75px left flank & 60px center lane)
     {
       id: 'top_left_wall',
       type: 'wall',
-      x: 20,
+      x: 125,
       y: 250,
-      w: 135,
-      h: 10,
+      w: 80,
+      h: 24,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     },
-    // 2. Top-Right Horizontal Barrier
+    // 2. Top-Right Horizontal Barrier (Freestanding cover with 75px right flank & 60px center lane)
     {
       id: 'top_right_wall',
       type: 'wall',
-      x: 365,
+      x: 335,
       y: 250,
-      w: 135,
-      h: 10,
+      w: 80,
+      h: 24,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     },
-    // 3. Top-Center Vertical Divider
+    // 3. Top-Center Vertical Divider (Separates CT North spawn lanes)
     {
       id: 'top_center_divider',
       type: 'wall',
-      x: 265,
-      y: 170,
-      w: 10,
-      h: 100,
+      x: 258,
+      y: 150,
+      w: 24,
+      h: 80,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     },
-    // 4. Center Mid-Lane Horizontal Barrier
+    // 4. Center Mid-Lane Horizontal Barrier (Central heavy cover)
     {
       id: 'mid_center_wall',
       type: 'wall',
-      x: 185,
-      y: 445,
-      w: 170,
-      h: 10,
+      x: 160,
+      y: 478,
+      w: 220,
+      h: 24,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     },
-    // 5. Bottom-Left Horizontal Barrier
+    // 5. Bottom-Left Horizontal Barrier (Freestanding cover with 75px left flank & 60px center lane)
     {
       id: 'bottom_left_wall',
       type: 'wall',
-      x: 20,
-      y: 650,
-      w: 135,
-      h: 10,
+      x: 125,
+      y: 706,
+      w: 80,
+      h: 24,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     },
-    // 6. Bottom-Right Horizontal Barrier
+    // 6. Bottom-Right Horizontal Barrier (Freestanding cover with 75px right flank & 60px center lane)
     {
       id: 'bottom_right_wall',
       type: 'wall',
-      x: 365,
-      y: 650,
-      w: 135,
-      h: 10,
+      x: 335,
+      y: 706,
+      w: 80,
+      h: 24,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     },
-    // 7. Bottom-Center Vertical Divider
+    // 7. Bottom-Center Vertical Divider (Separates T South spawn lanes)
     {
       id: 'bottom_center_divider',
       type: 'wall',
-      x: 265,
-      y: 630,
-      w: 10,
-      h: 100,
+      x: 258,
+      y: 750,
+      w: 24,
+      h: 80,
       color: '#1e293b',
       borderColor: '#475569',
       isDestructible: false
     }
   ],
 
-  // ── Spawn Positions (Matching the 4 Base Pockets) ──
+  // ── Spawn Positions (Matching the 4 Base Pockets with diagonal lane angles) ──
   spawns: {
     team0: [ // Top CT Base (North)
-      { x: 87.5, y: 210, angle: Math.PI * 0.5 },
-      { x: 452.5, y: 210, angle: Math.PI * 0.5 }
+      { x: 165, y: 195, angle: Math.PI * 0.35 },
+      { x: 375, y: 195, angle: Math.PI * 0.65 }
     ],
     team1: [ // Bottom T Base (South)
-      { x: 87.5, y: 690, angle: -Math.PI * 0.5 },
-      { x: 452.5, y: 690, angle: -Math.PI * 0.5 }
+      { x: 165, y: 785, angle: -Math.PI * 0.35 },
+      { x: 375, y: 785, angle: -Math.PI * 0.65 }
     ],
     ffa: [
-      { x: 87.5, y: 210 },
-      { x: 452.5, y: 210 },
-      { x: 87.5, y: 690 },
-      { x: 452.5, y: 690 }
+      { x: 165, y: 195, angle: Math.PI * 0.35 },
+      { x: 375, y: 195, angle: Math.PI * 0.65 },
+      { x: 165, y: 785, angle: -Math.PI * 0.35 },
+      { x: 375, y: 785, angle: -Math.PI * 0.65 }
     ]
   }
 };

@@ -118,7 +118,6 @@ export function modExecuteKatanaMelee(fighter, angle) {
       enemy.vx += kbX;
       enemy.vy += kbY;
     }
-    if (typeof enemy.applyHitStun === 'function') enemy.applyHitStun(CONFIG.yuta?.meleeHitStun || 12);
 
     // Check for clash with Gojo or Sukuna
     if (enemy._def && (enemy._def.id === 'sukuna' || enemy._def.name === 'SukunaFighter' || enemy._def.id === 'gojo' || enemy._def.name === 'GojoFighter' || enemy.type === 'sukuna')) {

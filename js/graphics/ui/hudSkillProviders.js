@@ -62,19 +62,14 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const redTimer = f.redCooldown !== undefined ? f.redCooldown : redMax;
     const redPct = Math.max(0, Math.min(100, (1 - (redTimer / redMax)) * 100));
 
-    // RCT Progress based on LOST HP
-    const maxHp = f.maxHp || 100;
-    const currentHp = f.hp !== undefined ? f.hp : maxHp;
-    const lostHp = Math.max(0, maxHp - currentHp);
-    const threshold = CONFIG.gojo?.reverseCursedTechniqueHpThreshold || 0.25;
-    const requiredLostHp = maxHp * (1 - threshold);
-
-    let rctPct = 0;
-    // When used (channeling, healing aura, or on post-use cooldown), drain instantly to 0%
-    if (f.isChannelingRCT || (f.healingAuraTimer || 0) > 0 || (f.reverseCursedTechniqueCooldown || 0) > 0) {
-      rctPct = 0;
+    // RCT Progress based on Cooldown Recovery
+    const rctMax = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
+    const rctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
+    let rctPct;
+    if (f.isChannelingRCT || (f.healingAuraTimer || 0) > 0) {
+      rctPct = 100;
     } else {
-      rctPct = Math.max(0, Math.min(100, (lostHp / requiredLostHp) * 100));
+      rctPct = Math.max(0, Math.min(100, (1 - (rctTimer / rctMax)) * 100));
     }
 
     const label100 = CONFIG.gojo?.purpleSecondCastTextHeader100 || 'PURPLE 100%';
@@ -158,19 +153,14 @@ export function getSkillDataForFighter(f, getProjectiles) {
       flamePct = Math.max(0, Math.min(100, (1 - (flameTimer / flameMax)) * 100));
     }
 
-    // RCT Progress based on LOST HP
-    const sukunaMaxHp = f.maxHp || 100;
-    const sukunaCurrentHp = f.hp !== undefined ? f.hp : sukunaMaxHp;
-    const sukunaLostHp = Math.max(0, sukunaMaxHp - sukunaCurrentHp);
-    const sukunaThreshold = CONFIG.sukuna?.reverseCursedTechniqueHpThreshold || 0.25;
-    const sukunaRequiredLostHp = sukunaMaxHp * (1 - sukunaThreshold);
-
-    let rctPct = 0;
-    // When used (visual healing active or on post-use cooldown), drain instantly to 0%
-    if ((f.rctVisualTimer || 0) > 0 || (f.reverseCursedTechniqueCooldown || 0) > 0) {
-      rctPct = 0;
+    // RCT Progress based on Cooldown Recovery
+    const sukunaRctMax = CONFIG.sukuna?.reverseCursedTechniqueCooldown || 700;
+    const sukunaRctTimer = f.reverseCursedTechniqueCooldown !== undefined ? f.reverseCursedTechniqueCooldown : 0;
+    let rctPct;
+    if ((f.rctVisualTimer || 0) > 0) {
+      rctPct = 100;
     } else {
-      rctPct = Math.max(0, Math.min(100, (sukunaLostHp / sukunaRequiredLostHp) * 100));
+      rctPct = Math.max(0, Math.min(100, (1 - (sukunaRctTimer / sukunaRctMax)) * 100));
     }
 
     return [

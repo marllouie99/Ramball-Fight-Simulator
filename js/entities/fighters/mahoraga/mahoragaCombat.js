@@ -225,13 +225,11 @@ export function performMeleeAttack(fighter, opponent) {
       t.vy = (t.vy || 0) + Math.sin(pushAngle) * kbForce;
       t.x += Math.cos(pushAngle) * (kbForce * 0.35);
       t.y += Math.sin(pushAngle) * (kbForce * 0.35);
-      if (typeof t.applyHitStun === 'function') t.applyHitStun(punchHitStun);
       spawnFloatingText(t.x, t.y - (t.r || 20) - 22, 'HEAVY PUNCH KNOCKBACK!', '#FFD700');
       triggerGlobalScreenShake(9, 14);
     } else {
       t.vx += Math.cos(pushAngle) * swordBasePush;
       t.vy += Math.sin(pushAngle) * swordBasePush;
-      if (typeof t.applyHitStun === 'function') t.applyHitStun(swordHitStun);
     }
 
     if (state && state.arena) {

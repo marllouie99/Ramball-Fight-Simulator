@@ -171,7 +171,7 @@ export function doDomainRapidSlashes(fighter, opponent, arena, ownerIndex) {
     const aimAngle = Math.atan2(target.y - fighter.y, target.x - fighter.x);
     fighter.gunAngle = aimAngle;
 
-    const slashSpeed = CONFIG.sukuna?.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
+    const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
     const baseDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
     let slashDamage = baseDamage;
     let isCrit = false;
@@ -300,7 +300,7 @@ export function applyDomainEffect(fighter, arena) {
     const ownerIdx = state.fighters.indexOf(fighter);
     const shrineX = fighter.domainX || fighter.x;
     const shrineY = fighter.domainY || fighter.y;
-    const slashSpeed = CONFIG.sukuna?.slashSpeed ?? (CONFIG.projectile?.speed ? CONFIG.projectile.speed * 1.6 : 22);
+    const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
 
     state.fighters.forEach((f, idx) => {
       if (f && f !== fighter && f.hp > 0) {

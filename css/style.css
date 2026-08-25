@@ -507,6 +507,260 @@ canvas {
   user-select: none;
 }
 
+/* ─────────────────────────────────────────────────────────────
+   TACTICAL SHOOTER HUD SYSTEM (Exclusive to Tactical Game)
+   Clean Minimalist HUD: No Cards, Only Name & Healthbar,
+   Aligned to Opposite Sides of the Arena
+───────────────────────────────────────────────────────────── */
+
+.health-hud.tactical-hud {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: flex-start !important;
+  gap: 6px 12px !important;
+  max-width: none !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
+}
+
+.health-card.tactical-card {
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  backdrop-filter: none !important;
+  box-shadow: none !important;
+  min-width: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2.5px !important;
+  flex: 0 0 calc(50% - 6px) !important;
+  width: calc(50% - 6px) !important;
+  max-width: calc(50% - 6px) !important;
+}
+
+/* 2-Column Arrangement for 1v1, 2v2, and FFA */
+.health-card.tactical-card.tactical-card-2x2,
+.health-hud.tactical-hud .health-card.tactical-card-2x2,
+.health-hud.ffa-hud.tactical-hud .health-card,
+.health-hud.tactical-hud.single-column-hud .health-card,
+.health-card.tactical-card.tactical-card-1v1,
+.health-hud.tactical-hud .health-card {
+  width: calc(50% - 6px) !important;
+  max-width: calc(50% - 6px) !important;
+  min-width: calc(50% - 6px) !important;
+  flex: 0 0 calc(50% - 6px) !important;
+  box-sizing: border-box !important;
+}
+
+/* 1. Header & Title: Clean Sans-Serif Standard Fonts (NO custom fonts) */
+.tactical-card .health-card__title,
+.tactical-hud .health-card__title,
+.tactical-card .tac-name,
+.tactical-hud .tac-name {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif !important;
+  font-size: 11.5px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.4px !important;
+  text-transform: uppercase !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95) !important;
+  -webkit-text-stroke: 0px !important;
+  text-stroke: 0px !important;
+  paint-order: normal !important;
+  line-height: 1.15 !important;
+  margin: 0 0 2px 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+.tactical-card .health-card__header-row,
+.tactical-hud .health-card__header-row,
+.tactical-card .tactical-header-row,
+.tactical-hud .tactical-header-row {
+  margin-bottom: 2px !important;
+  gap: 4px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+}
+
+/* Caliber Pill & Stats Row Disabled (Simple HUD Mode) */
+.tactical-card .tac-caliber-pill,
+.tactical-hud .tac-caliber-pill,
+.tactical-card .health-card__skills,
+.tactical-hud .health-card__skills,
+.tactical-card .hud-skill-box,
+.tactical-hud .hud-skill-box,
+.tactical-card .health-card__info,
+.tactical-hud .health-card__info,
+.tactical-card .tac-info-grid,
+.tactical-hud .tac-info-grid,
+.tactical-card .health-card__desc,
+.tactical-hud .health-card__desc {
+  display: none !important;
+}
+
+/* 2. Health Bar Track & Text (Clean compact rectangular standard bar) */
+.tactical-card .health-card__bar,
+.tactical-hud .health-card__bar {
+  height: 11px !important;
+  border-radius: 2.5px !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  border: 1px solid rgba(255, 255, 255, 0.22) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7) !important;
+  overflow: hidden !important;
+  position: relative !important;
+  margin: 0 !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+}
+
+.tactical-card .health-card__fill,
+.tactical-hud .health-card__fill {
+  border-radius: 1.5px !important;
+  transition: width 0.15s ease, background-color 0.2s ease !important;
+  opacity: 0.95 !important;
+}
+
+.tactical-card .health-card__fill::after,
+.tactical-hud .health-card__fill::after {
+  display: none !important;
+}
+
+.tactical-card .health-card__bar-text,
+.tactical-hud .health-card__bar-text {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace, sans-serif !important;
+  font-size: 9px !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.3px !important;
+  color: #f8fafc !important;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95) !important;
+  line-height: 11px !important;
+  position: absolute !important;
+  right: 5px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  z-index: 2 !important;
+}
+
+/* 3. Skill & Magazine Status Boxes */
+.tactical-card .health-card__skills,
+.tactical-hud .health-card__skills {
+  margin-top: 2px !important;
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 3px !important;
+  width: 100% !important;
+}
+
+.tactical-card .hud-skill-box,
+.tactical-hud .hud-skill-box {
+  height: 18px !important;
+  min-height: 18px !important;
+  border-radius: 3px !important;
+  background: rgba(15, 23, 42, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.14) !important;
+  box-shadow: none !important;
+  padding: 0 6px !important;
+  box-sizing: border-box !important;
+  display: flex !important;
+  align-items: center !important;
+  position: relative !important;
+  overflow: hidden !important;
+  margin: 0 !important;
+}
+
+.tactical-card .hud-skill-box-fill,
+.tactical-hud .hud-skill-box-fill {
+  border-radius: 2px !important;
+  opacity: 0.65 !important;
+}
+
+.tactical-card .hud-skill-box-text,
+.tactical-hud .hud-skill-box-text,
+.tactical-card .hud-skill-box-text *,
+.tactical-hud .hud-skill-box-text * {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 800 !important;
+  color: #ffffff !important;
+  letter-spacing: 0.5px !important;
+  text-transform: uppercase !important;
+  margin: 0 !important;
+  text-align: center !important;
+  width: 100% !important;
+}
+
+.tactical-card .hud-skill-box-text .hud-num,
+.tactical-hud .hud-skill-box-text .hud-num,
+.tactical-card .hud-num,
+.tactical-hud .hud-num {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 1.0em !important;
+  letter-spacing: 0.5px !important;
+  color: #ffffff !important;
+}
+
+/* 4. Stats / Caliber / Telemetry Info */
+.tactical-card .health-card__info,
+.tactical-hud .health-card__info,
+.tactical-card .tac-info-grid,
+.tactical-hud .tac-info-grid {
+  margin-top: 2px !important;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  color: #94a3b8 !important;
+  letter-spacing: 0.3px !important;
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: space-between !important;
+  align-items: center !important;
+  gap: 2px 4px !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  line-height: 1.2 !important;
+}
+
+.tactical-card .health-card__info *,
+.tactical-hud .health-card__info *,
+.tactical-card .tac-info-grid *,
+.tactical-hud .tac-info-grid * {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, sans-serif !important;
+  font-size: 10px !important;
+  letter-spacing: 0.3px !important;
+}
+
+.tactical-card .hud-stat-label,
+.tactical-hud .hud-stat-label {
+  color: #64748b !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  font-size: 9.5px !important;
+}
+
+.tactical-card .hud-stat-val,
+.tactical-hud .hud-stat-val {
+  color: #cbd5e1 !important;
+  font-weight: 800 !important;
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace, sans-serif !important;
+}
+
+/* 5. Bullet & Win Indicators (Hidden in Tactical HUD) */
+.tactical-card .health-card__wins,
+.tactical-hud .health-card__wins,
+.tactical-card .health-card__win-bullet,
+.tactical-hud .health-card__win-bullet {
+  display: none !important;
+}
+
 /* ── Adaptive 2-Column Grid Skill Bar Container ── */
 .health-card__skills {
   margin-top: 6px;
@@ -674,36 +928,44 @@ canvas {
   color: #f0f2f5;
 }
 
-/* ── Screen Dimmed Mode: Pure White HUD Font Text ── */
-.hud-dimmed .health-card__title,
-.hud-dimmed .health-card__text,
-.hud-dimmed .hud-skill-box-text,
-.hud-dimmed .health-card__info,
-.hud-dimmed .health-card__info > div,
-.hud-dimmed .health-card__info b,
-.hud-dimmed .health-card__info span,
-.hud-dimmed .health-card__desc,
-.hud-dimmed .health-card__desc span,
-.hud-dimmed .health-card__bar-text,
+/* ── Screen Dimmed Mode: Pure White HUD Font Text (Domain Expansions / Unlimited Void) ── */
+.hud-dimmed #healthHud,
+.hud-dimmed #healthHud *,
+.hud-dimmed #healthHudLeft,
+.hud-dimmed #healthHudLeft *,
+.hud-dimmed #healthHudRight,
+.hud-dimmed #healthHudRight *,
+.hud-dimmed #hudBottomContainer,
+.hud-dimmed #hudBottomContainer *,
+.hud-dimmed #hudTopContainer,
+.hud-dimmed #hudTopContainer *,
+.hud-dimmed #hudTopLeft,
+.hud-dimmed #hudTopLeft *,
+.hud-dimmed #hudTopRight,
+.hud-dimmed #hudTopRight *,
+.hud-dimmed #hudBottomLeft,
+.hud-dimmed #hudBottomLeft *,
+.hud-dimmed #hudBottomRight,
+.hud-dimmed #hudBottomRight *,
+.hud-dimmed .health-card,
+.hud-dimmed .health-card *,
+.hud-dimmed .tactical-hud-card,
+.hud-dimmed .tactical-hud-card *,
 .hud-dimmed .hud-name-box,
-.hud-dimmed .health-card__score,
-.hud-dimmed .health-card__meta,
-.hud-dimmed .hud-number,
-.hud-dimmed .hud-skill-box,
-.health-card.hud-dimmed .health-card__title,
-.health-card.hud-dimmed .health-card__text,
-.health-card.hud-dimmed .hud-skill-box-text,
-.health-card.hud-dimmed .health-card__info,
-.health-card.hud-dimmed .health-card__info > div,
-.health-card.hud-dimmed .health-card__info b,
-.health-card.hud-dimmed .health-card__info span,
-.health-card.hud-dimmed .health-card__desc,
-.health-card.hud-dimmed .health-card__desc span,
-.health-card.hud-dimmed .health-card__bar-text,
-.health-card.hud-dimmed .hud-name-box,
-.health-card.hud-dimmed .health-card__score,
-.health-card.hud-dimmed .health-card__meta,
-.health-card.hud-dimmed .hud-number {
+.hud-dimmed .hud-name-box *,
+.hud-dimmed .hud-skill-group,
+.hud-dimmed .hud-skill-group *,
+.hud-dimmed .hud-skill-box-text,
+.hud-dimmed .hud-stat-label,
+.hud-dimmed .hud-stat-val,
+#healthHud.hud-dimmed,
+#healthHud.hud-dimmed *,
+#healthHudLeft.hud-dimmed,
+#healthHudLeft.hud-dimmed *,
+#healthHudRight.hud-dimmed,
+#healthHudRight.hud-dimmed *,
+.health-card.hud-dimmed,
+.health-card.hud-dimmed * {
   color: #FFFFFF !important;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 1px 3px #000000 !important;
 }
@@ -857,6 +1119,19 @@ canvas {
   letter-spacing: 0.5px !important;
   display: inline-block;
   vertical-align: baseline;
+}
+
+.tactical-card .hud-skill-box-text .hud-num,
+.tactical-hud .hud-skill-box-text .hud-num,
+.tactical-card .hud-num,
+.tactical-hud .hud-num,
+.tactical-card .hud-number,
+.tactical-hud .hud-number {
+  font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace, sans-serif !important;
+  font-weight: 800 !important;
+  font-size: 1.0em !important;
+  letter-spacing: 0.5px !important;
+  color: #ffffff !important;
 }
 
 .hud-skill-box-fill {

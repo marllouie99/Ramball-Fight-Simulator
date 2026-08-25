@@ -11,9 +11,15 @@ import { audioSystem } from './audioSystem.js';
 import { spawnIllusionDeath } from '../graphics/particles/illusionDeathEffect.js';
 import { updateIllusions } from './illusionSystem.js';
 import { triggerMahitoParalyzeExplosion } from '../entities/fighters/mahito/mahitoCombat.js';
-import { spawnMahitoSoulBubbles } from '../graphics/particles/sparkEffect.js';
-import { clampRikaToArena } from '../entities/fighters/yuta/rikaLogic.js';
-import { handleObstacleCollision, hasLineOfSight, STARTER_MAP } from '../../Tactical Force/maps/index.js';
+import { spawnMahitoSoulBubbles, spawnSparks, spawnImpactFlash } from '../graphics/particles/sparkEffect.js';
+import { 
+  isTacticalFighter, 
+  getTacticalClosestOpponent, 
+  resolveTacticalFighterCollision, 
+  updateTacticalPhysicsPass,
+  resolveTacticalGunCollisions, 
+  handleTacticalObstaclePass 
+} from '../../Tactical Force/systems/tacticalPhysics.js';
 
 // ─────────────────────────────────────────────
 // SPATIAL PARTITIONING GRID
@@ -345,9 +351,16 @@ export function resolveFighterCollision(a, b) {
   const rawImpulse = -(1 + restitution) * dotN / 2;
   const impulse = slowActive ? rawImpulse * 0.15 : rawImpulse;
 
-  // ── Varied bounce: add random tangent component so fighters don't always
+  // Delegate Tactical Fighter collisions to isolated Tactical Physics
+  const isTactical = isTacticalFighter(a) || isTacticalFighter(b) || (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical')));
+  if (isTactical) {
+    resolveTacticalFighterCollision(a, b, impulse, nx, ny, tx, ty);
+    return;
+  }
+
+  // ── Pure FOC Collision Bounce: add random tangent component so fighters don't always
   //    bounce back along the exact collision normal ──────────────────────────
-  const tangentStrength = 0.4; // how much perpendicular randomness to add
+  const tangentStrength = 0.4;
   const randA = (Math.random() - 0.5) * 2 * tangentStrength;
   const randB = (Math.random() - 0.5) * 2 * tangentStrength;
 
@@ -370,6 +383,11 @@ export function resolveFighterCollision(a, b) {
 }
 
 // ─────────────────────────────────────────────
+// TACTICAL FORCE RE-EXPORTS (Modularized in Tactical Force/systems/tacticalPhysics.js)
+// ─────────────────────────────────────────────
+export { isTacticalFighter, resolveTacticalGunCollisions };
+
+// ─────────────────────────────────────────────
 // PROJECTILE UPDATE (main loop step)
 // ─────────────────────────────────────────────
 
@@ -380,18 +398,19 @@ export function updateProjectiles() {
 }
 
 function getClosestOpponent(fighter) {
+  const isTactical = (typeof state !== 'undefined' && state.gameCategory === 'tactical') || isTacticalFighter(fighter) || (typeof state !== 'undefined' && String(state.mode || '').toLowerCase().startsWith('tactical'));
+  if (isTactical) {
+    return getTacticalClosestOpponent(fighter);
+  }
+
   let closest = null;
   let bestDistance = Infinity;
-  let closestLOS = null;
-  let bestDistanceLOS = Infinity;
 
   const fighterIndex = fighter._stateIdx !== undefined ? fighter._stateIdx : state.fighters.indexOf(fighter);
   const fighterTeam = state.getFighterTeam(fighterIndex);
-  const isTactical = state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical');
-  const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2 || (isTactical && (state.mode === 'Tactical 2v2' || state.mode === 'Tactical 4v4' || state.mode === GAME_MODES.TACTICAL_2V2 || state.mode === GAME_MODES.TACTICAL_4V4)));
-  const obstacles = isTactical ? ((state.activeMap && state.activeMap.obstacles) || STARTER_MAP.obstacles) : null;
+  const isTeamMode = (state.mode === GAME_MODES.TWO_VS_TWO || state.mode === GAME_MODES.STAND_OFF_1V2);
 
-  // Check regular fighters
+  // Check regular fighters (Pure FOC targeting without obstacle overhead)
   for (let i = 0; i < state.fighters.length; i++) {
     const other = state.fighters[i];
     if (!other || other === fighter || other.hp <= 0) continue;
@@ -408,15 +427,6 @@ function getClosestOpponent(fighter) {
     if (dSq < bestDistance) {
       bestDistance = dSq;
       closest = other;
-    }
-
-    if (obstacles) {
-      if (hasLineOfSight(fighter.x, fighter.y, other.x, other.y, obstacles)) {
-        if (dSq < bestDistanceLOS) {
-          bestDistanceLOS = dSq;
-          closestLOS = other;
-        }
-      }
     }
   }
 
@@ -438,15 +448,6 @@ function getClosestOpponent(fighter) {
       if (dSq < bestDistance) {
         bestDistance = dSq;
         closest = illusion;
-      }
-
-      if (obstacles) {
-        if (hasLineOfSight(fighter.x, fighter.y, illusion.x, illusion.y, obstacles)) {
-          if (dSq < bestDistanceLOS) {
-            bestDistanceLOS = dSq;
-            closestLOS = illusion;
-          }
-        }
       }
     }
   }
@@ -470,11 +471,6 @@ function getClosestOpponent(fighter) {
         closest = car;
       }
     }
-  }
-
-  // If an enemy with clear Line of Sight exists, prioritize engaging them!
-  if (closestLOS) {
-    return closestLOS;
   }
 
   return closest;
@@ -896,14 +892,10 @@ export function updateFighters() {
     updateFuelPickups();
     updateIllusions();
 
-    // 3. Tactical Map Obstacle Collisions (Supports Sector 01 & Sector 02 Monolith)
-    const activeObstacles = (state.activeMap && state.activeMap.obstacles) || (state.gameCategory === 'tactical' ? STARTER_MAP.obstacles : null);
-    if (activeObstacles && activeObstacles.length > 0) {
-      for (const fighter of state.fighters) {
-        if (fighter && fighter.hp > 0) {
-          handleObstacleCollision(fighter, activeObstacles);
-        }
-      }
+    // 3 & 4. Tactical Mode Exclusive Passes (Gun Collisions & Cover Obstacles isolated in tacticalPhysics.js)
+    const isTacticalActive = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+    if (isTacticalActive) {
+      updateTacticalPhysicsPass(state.fighters, state.illusions);
     }
   }
 

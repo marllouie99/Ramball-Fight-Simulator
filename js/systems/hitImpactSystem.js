@@ -3,8 +3,9 @@ import { GAME_MODES } from '../core/modeConfig.js';
 import { state, triggerGlobalScreenShake, spawnFloatingText } from '../core/state.js';
 import { audioSystem } from '../systems/audioSystem.js';
 import { getSkillSound } from '../soundEffects/skillSounds.js';
-import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnAnimePunchImpactFrame } from '../graphics/particles/sparkEffect.js';
+import { spawnSparks, spawnImpactFlash, spawnCrimsonLightningImpact, spawnAnimePunchImpactFrame, spawnMeleeClashShockwave } from '../graphics/particles/sparkEffect.js';
 import { spawnBloodEffect } from '../graphics/particles/bloodEffect.js';
+import { handleObstacleCollision, STARTER_MAP } from '../../Tactical Force/maps/index.js';
 
 export const HitImpactSystem = {
   /**
@@ -65,8 +66,6 @@ export const HitImpactSystem = {
         }
       }
 
-      if (typeof target.applyHitStun === 'function') target.applyHitStun(10);
-      
       return isSukunaSlash ? false : true; // Debris breaks on target hit
     } 
     
@@ -193,13 +192,6 @@ export const HitImpactSystem = {
         target.y = Math.max(minY, Math.min(maxY, target.y));
       }
 
-      // Flinch stun
-      if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(8);
-      } else {
-        target.hitStunTimer = Math.max(target.hitStunTimer || 0, 8);
-      }
-
       // 2. High-impact kinetic orange sparks & fiery flash
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, 26, '#F59E0B');
@@ -247,12 +239,6 @@ export const HitImpactSystem = {
         const maxY = state.arena.y + state.arena.height - (target.r || 20);
         target.x = Math.max(minX, Math.min(maxX, target.x));
         target.y = Math.max(minY, Math.min(maxY, target.y));
-      }
-
-      if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(4);
-      } else {
-        target.hitStunTimer = Math.max(target.hitStunTimer || 0, 4);
       }
 
       // 2. Cyan supersonic tracer spark & flash
@@ -305,13 +291,6 @@ export const HitImpactSystem = {
         target.y = Math.max(minY, Math.min(maxY, target.y));
       }
 
-      // 2. Subtle hit flinch
-      if (typeof target.applyHitStun === 'function') {
-        target.applyHitStun(6);
-      } else {
-        target.hitStunTimer = Math.max(target.hitStunTimer || 0, 6);
-      }
-
       // 3. High-contrast golden-amber kinetic impact sparks & flash
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, 22, '#F59E0B');
@@ -334,48 +313,26 @@ export const HitImpactSystem = {
       return true; // Bullet spent on impact
     }
 
-    // Tactical Force Operative Bullets (M4A1, SPAS-12, Desert Eagle, AWP, Barrett M82) — Caliber pushback & ballistic impact
+    // Tactical Force Operative Bullets (M4A1, SPAS-12, Desert Eagle, AWP, Barrett M82) — Ballistic impact without knockback
     if (projectile.visual === 'tacticalBullet') {
       const dmg = projectile.damage || 25;
-      const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
-      const baseKb = projectile.knockbackForce || projectile.knockback || attackerConfig.knockbackForce || (dmg >= 100 ? 12.0 : (dmg >= 65 ? 10.0 : (dmg >= 35 ? 6.0 : 4.2)));
-      const knockbackForce = baseKb;
-
       const hitAngle = Math.atan2(projectile.vy || Math.sin(projectile.angle || 0), projectile.vx || Math.cos(projectile.angle || 0));
 
-      // 1. Physical push back on target along the bullet velocity vector
-      target.vx = (target.vx || 0) + Math.cos(hitAngle) * knockbackForce;
-      target.vy = (target.vy || 0) + Math.sin(hitAngle) * knockbackForce;
-      target.x += Math.cos(hitAngle) * (knockbackForce * 0.45);
-      target.y += Math.sin(hitAngle) * (knockbackForce * 0.45);
-
-      // Arena boundary clamp to prevent targets from clipping out of bounds
-      if (state && state.arena) {
-        const minX = state.arena.x + (target.r || 20);
-        const maxX = state.arena.x + state.arena.width - (target.r || 20);
-        const minY = state.arena.y + (target.r || 20);
-        const maxY = state.arena.y + state.arena.height - (target.r || 20);
-        target.x = Math.max(minX, Math.min(maxX, target.x));
-        target.y = Math.max(minY, Math.min(maxY, target.y));
-      }
-
-      // 2. Flinch stun
-      if (dmg >= 50) {
-        if (typeof target.applyHitStun === 'function') {
-          target.applyHitStun(8);
-        } else {
-          target.hitStunTimer = Math.max(target.hitStunTimer || 0, 8);
-        }
-      }
-
-      // 3. Directional blood splatter particles on bullet entry/exit
+      // 1. Directional blood splatter particles on bullet entry/exit
       if (typeof spawnBloodEffect === 'function') {
         const bloodCount = (dmg >= 60) ? 6 : ((dmg >= 30) ? 4 : 3);
         const bloodSize = (dmg >= 60) ? 4.8 : 3.5;
         spawnBloodEffect(target, 12, hitAngle, { minSize: 2.5, maxSize: bloodSize, count: bloodCount });
       }
 
-      // 4. Kinetic impact sparks & flash matching operative theme
+      // 2. Expanding kinetic shockwave ring visual around target (Visual only, no physical knockback displacement)
+      if (typeof spawnMeleeClashShockwave === 'function') {
+        const swRadius = (dmg >= 60) ? 55 : ((dmg >= 30) ? 42 : 32);
+        const sparkColor = (attacker && attacker.color) ? attacker.color : 'gold';
+        spawnMeleeClashShockwave(target.x, target.y, swRadius, sparkColor);
+      }
+
+      // 3. Kinetic impact sparks & flash matching operative theme
       const sparkColor = (attacker && attacker.color) ? attacker.color : '#F59E0B';
       if (typeof spawnImpactFlash === 'function') {
         spawnImpactFlash(target.x, target.y, (dmg >= 60) ? 30 : 22, sparkColor);
@@ -384,7 +341,7 @@ export const HitImpactSystem = {
         spawnSparks(target.x, target.y, (dmg >= 60) ? 10 : 6, 'orange');
       }
 
-      // 5. Ballistic impact SFX & punchy screen shake on heavy hits
+      // 4. Ballistic impact SFX & punchy screen shake on heavy hits
       audioSystem.playSFX('attack_fleshhit', (dmg >= 60) ? 0.9 : 0.6);
       if (dmg >= 50 && typeof triggerGlobalScreenShake === 'function') {
         triggerGlobalScreenShake((dmg >= 60) ? 5.0 : 2.5, 4);

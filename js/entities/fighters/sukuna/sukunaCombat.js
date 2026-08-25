@@ -43,12 +43,22 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   const oldX = fighter.x;
   const oldY = fighter.y;
 
-  // Evasion angle: smooth backward flash-step away from attacker (no rapid zigzag)
-  const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
-  const dist = (CONFIG.sukuna?.teleportDodgeDistance ?? 85) + Math.random() * 15;
-
-  let targetX = fighter.x + Math.cos(angle) * dist;
-  let targetY = fighter.y + Math.sin(angle) * dist;
+  let targetX, targetY;
+  if (fighter.isMeleeMode && attacker && !attacker.isDead) {
+    // In Melee Mode: Flash-step flank pivot to the side/behind attacker (stays inside melee reach!)
+    const angleToAttacker = Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x);
+    const flankSign = Math.random() < 0.5 ? 1 : -1;
+    const angle = angleToAttacker + flankSign * (Math.PI * 0.45);
+    const dist = (attacker.r || 25) + fighter.r + 12;
+    targetX = attacker.x + Math.cos(angle) * dist;
+    targetY = attacker.y + Math.sin(angle) * dist;
+  } else {
+    // In Ranged Mode: Smooth backward flash-step away from attacker
+    const angle = attacker ? (Math.atan2(fighter.y - attacker.y, fighter.x - attacker.x) + (Math.random() - 0.5) * 0.35) : (Math.random() * Math.PI * 2);
+    const dist = (CONFIG.sukuna?.teleportDodgeDistance ?? 85) + Math.random() * 15;
+    targetX = fighter.x + Math.cos(angle) * dist;
+    targetY = fighter.y + Math.sin(angle) * dist;
+  }
 
   if (arena) {
     targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
@@ -58,6 +68,9 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   fighter.x = targetX;
   fighter.y = targetY;
   if (typeof fighter.aim === 'function' && attacker) fighter.aim(attacker);
+  if (attacker && typeof attacker.aim === 'function' && !attacker.isTargetOfAmbush) {
+    attacker.aim(fighter);
+  }
   fighter.vx = 0;
   fighter.vy = 0;
 
@@ -70,12 +83,12 @@ export function executeTeleportDodge(fighter, attacker, arena) {
 }
 
 export function teleportAwayFrom(fighter, opponent, arena) {
-  if (!opponent) return;
+  if (!opponent || opponent.isAmbushing || fighter.isTargetOfAmbush || (fighter.timeStopTimer || 0) > 0) return;
   const oldX = fighter.x;
   const oldY = fighter.y;
 
   const angle = Math.atan2(fighter.y - opponent.y, fighter.x - opponent.x) + (Math.random() - 0.5);
-  const dist = CONFIG.sukuna?.comboDisengageDistance ?? 300;
+  const dist = CONFIG.sukuna?.comboDisengageDistance ?? 280;
   let targetX = opponent.x + Math.cos(angle) * dist;
   let targetY = opponent.y + Math.sin(angle) * dist;
 
@@ -87,8 +100,14 @@ export function teleportAwayFrom(fighter, opponent, arena) {
   fighter.x = targetX;
   fighter.y = targetY;
   if (typeof fighter.aim === 'function') fighter.aim(opponent);
+  if (opponent && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
+    opponent.aim(fighter);
+  }
   fighter.vx = 0;
   fighter.vy = 0;
+
+  // Smooth mode switch to Ranged without freezing movement
+  fighter.shootCooldown = Math.max(fighter.shootCooldown || 0, 15);
 
   spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
   spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
@@ -97,51 +116,71 @@ export function teleportAwayFrom(fighter, opponent, arena) {
 }
 
 export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
-  if (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam()) {
+  if (fighter.isChannelingDivineFlame || fighter.isChannelingDomainExpansion || (typeof fighter.isCaughtInBeam === 'function' && fighter.isCaughtInBeam())) {
     fighter.vx = 0;
     fighter.vy = 0;
     fighter.punchAnimTimer = 0;
     fighter.punchActiveMaxTime = 0;
     return;
   }
-  const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 15;
 
-  if (fighter.meleePunchCooldown > 0) {
-    fighter.meleePunchCooldown--;
-    if (opponent && !opponent.isDead && fighter.meleeComboCount > 0) {
-      const dx = opponent.x - fighter.x;
-      const dy = opponent.y - fighter.y;
-      const dist = Math.hypot(dx, dy);
-      if (dist > fighter.r + opponent.r + 5) {
-        fighter.vx += (dx / dist) * 0.5;
-        fighter.vy += (dy / dist) * 0.5;
+  // Dynamic target selection in multi-enemy/1v2 mode: prioritize closest living enemy
+  let activeTarget = opponent;
+  const myTeam = state.getFighterTeam(state.fighters ? state.fighters.indexOf(fighter) : 0);
+  let minDist = (activeTarget && activeTarget.hp > 0) ? Math.hypot(activeTarget.x - fighter.x, activeTarget.y - fighter.y) : Infinity;
+
+  if (state.fighters && state.fighters.length > 1) {
+    for (let i = 0; i < state.fighters.length; i++) {
+      const f = state.fighters[i];
+      if (f && f !== fighter && f.hp > 0) {
+        const isEnemy = myTeam === null || state.getFighterTeam(i) !== myTeam;
+        if (isEnemy) {
+          const d = Math.hypot(f.x - fighter.x, f.y - fighter.y);
+          if (d < minDist) {
+            minDist = d;
+            activeTarget = f;
+          }
+        }
       }
     }
+  }
+
+  opponent = activeTarget;
+
+  const punchCooldown = CONFIG.sukuna?.meleePunchCooldown || 9;
+
+  // Handle punch cooldown — zero velocity so Sukuna stands completely still when punching
+  if (fighter.meleePunchCooldown > 0) {
+    fighter.meleePunchCooldown--;
+    fighter.vx = 0;
+    fighter.vy = 0;
     return;
   }
 
   const isTojiOpponent = opponent && (opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji');
   if (!opponent || opponent.isDead || (opponent.isStealthed && !fighter.domainActive && !isTojiOpponent)) return;
 
+  // Initialize combo state (matches Gojo's 3-6 punch rhythm)
   if (fighter.meleeComboCount === undefined) fighter.meleeComboCount = 0;
-  if (fighter.meleeComboTarget === undefined) fighter.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
+  if (!fighter.meleeComboTarget) fighter.meleeComboTarget = Math.random() < 0.5 ? 6 : 3;
 
   const distToOpponent = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
   const attackReach = fighter.r + opponent.r + 35;
   const isOutOfReach = distToOpponent > attackReach;
 
-  // Flash-step teleport if out of reach OR periodically between rapid combo strikes
+  // Teleport at start of new combo sequence (meleeComboCount === 0), if out of reach, or between strikes
   const canTeleportChase = (fighter.teleportChaseDelayTimer || 0) <= 0;
-  const shouldTeleport = canTeleportChase && (isOutOfReach || (fighter.meleeComboCount > 0 && fighter.meleeComboCount % 2 === 0));
+  const shouldTeleport = canTeleportChase && (isOutOfReach || (fighter.meleeComboCount === 0) || (fighter.meleeComboCount > 0 && fighter.meleeComboCount % 2 === 0));
 
   if (shouldTeleport) {
     const oldX = fighter.x;
     const oldY = fighter.y;
 
-    const angleToOpponent = Math.random() * Math.PI * 2;
-    const behindOffset = opponent.r + fighter.r + 10;
-    let targetX = opponent.x - Math.cos(angleToOpponent) * behindOffset;
-    let targetY = opponent.y - Math.sin(angleToOpponent) * behindOffset;
+    const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
+    const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.45 : -Math.PI * 0.45);
+    const behindOffset = opponent.r + fighter.r + 12; // Perfect spacing: cleanly inside punch reach
+    let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
+    let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
 
     if (arena) {
       targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
@@ -151,6 +190,9 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     fighter.x = targetX;
     fighter.y = targetY;
     if (typeof fighter.aim === 'function') fighter.aim(opponent);
+    if (opponent && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
+      opponent.aim(fighter);
+    }
 
     fighter.vx = 0;
     fighter.vy = 0;
@@ -158,31 +200,55 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
     spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
     audioSystem.playSFX('skill_dash3', 0.6);
-  } else {
-    if (typeof fighter.aim === 'function') fighter.aim(opponent);
   }
 
-  // Verify target is inside punch reach before striking (prevents punching empty air if target dodges away)
-  const currentDist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
+  // Verify target is inside punch reach before striking (teleport chase if target dodged out of reach)
+  let currentDist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
   const punchReach = fighter.r + opponent.r + 45;
   if (currentDist > punchReach) {
-    return; // Do NOT punch the air when target is out of reach!
+    if (canTeleportChase && !shouldTeleport) {
+      const oldX = fighter.x;
+      const oldY = fighter.y;
+      const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
+      const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.45 : -Math.PI * 0.45);
+      const behindOffset = opponent.r + fighter.r + 12;
+      let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
+      let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
+      if (arena) {
+        targetX = Math.max(arena.x + fighter.r, Math.min(arena.x + arena.width - fighter.r, targetX));
+        targetY = Math.max(arena.y + fighter.r, Math.min(arena.y + arena.height - fighter.r, targetY));
+      }
+      fighter.x = targetX;
+      fighter.y = targetY;
+      if (typeof fighter.aim === 'function') fighter.aim(opponent);
+      if (opponent && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
+        opponent.aim(fighter);
+      }
+      spawnTeleportAfterimages(fighter, oldX, oldY, targetX, targetY);
+      spawnImpactFlash(oldX, oldY, 20, 'crimsonSniper');
+      spawnImpactFlash(fighter.x, fighter.y, 25, 'crimsonSniper');
+      audioSystem.playSFX('skill_dash3', 0.6);
+      currentDist = Math.hypot(opponent.x - fighter.x, opponent.y - fighter.y);
+    }
+    if (currentDist > punchReach) {
+      return; // Do NOT punch the air when target is still out of reach!
+    }
   }
 
+  // Execute punch strike
   fighter.meleeComboCount++;
   fighter.martialArtsComboCount = (fighter.martialArtsComboCount || 0) + 1;
-  fighter.punchAnimTimer = 16;
-  fighter.punchAnimMaxTimer = 16;
+  fighter.punchAnimTimer = 8; // Snappy 8-frame punch animation (matching Gojo)
+  fighter.punchAnimMaxTimer = 8;
   fighter.punchAnimHand = (fighter.punchAnimHand === 1 ? 0 : 1);
   fighter.slashSwingTimer = 0;
 
-  const slashDamage = CONFIG.sukuna?.slashDamage ?? fighter.damage;
+  const punchDamage = CONFIG.sukuna?.meleePunchDamage || CONFIG.sukuna?.slashDamage || 15;
   const punchAngle = (opponent && !opponent.isDead) ? Math.atan2(opponent.y - fighter.y, opponent.x - fighter.x) : (fighter.gunAngle || 0);
-  const reach = fighter.r + 65;
+  const reach = fighter.r + 80; // Extended reach to ensure hits connect cleanly
   const arc = Math.PI * 0.5; // 90 degree frontal punch arc
 
   const validTargets = [];
-  const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
 
   const allEntities = [
     ...(state.fighters || []),
@@ -216,68 +282,55 @@ export function updateMeleeCombat(fighter, opponent, arena, ownerIndex) {
     }
   }
 
-  // Set melee punch cooldown to enforce proper combo timing and prevent 60 FPS teleport spam
+  // Set melee punch cooldown
   fighter.meleePunchCooldown = punchCooldown;
 
-  if (validTargets.length === 0) return;
-
-  const isFinalHit = fighter.meleeComboCount >= (fighter.meleeComboTarget || 1);
-  const pushForce = isFinalHit ? 14 : 7.5;
-
   for (const target of validTargets) {
-    let finalDmg = slashDamage;
+    let finalDmg = punchDamage;
     let isCrit = false;
     if (typeof fighter.evaluateSlashCrit === 'function') {
-      const res = fighter.evaluateSlashCrit(target, slashDamage, { isMelee: true });
+      const res = fighter.evaluateSlashCrit(target, punchDamage, { isMelee: true });
       finalDmg = res.finalDamage;
       isCrit = res.isCrit;
     }
-    target.takeDamage(finalDmg, fighter, { isMelee: true, isSukunaSlash: true, isCrit });
-    if (typeof target.applyHitStun === 'function') target.applyHitStun(12);
+    // Pass isSkill: true (matching Gojo) to bypass basic attack flinch lock and allow dynamic target tracking
+    target.takeDamage(finalDmg, fighter, { isMelee: true, isSukunaSlash: true, isCrit, isSkill: true });
+    if (target && typeof target.aim === 'function' && !target.isTargetOfAmbush) {
+      target.aim(fighter);
+    }
 
     // Manga Spiky Crescent Impact Frame (matching Sukuna's crimson skin/cursed theme)
     spawnAnimePunchImpactFrame(target.x, target.y, 55, punchAngle, 'crimson');
-
-    // Melee hit physics: pushback disabled for basic/melee hits
-
   }
 
   triggerGlobalScreenShake(4, 5);
 
-  // punchAnimTimer (set above) drives the 2-handed martial arts punch animation in melee mode, displaying both hands.
-
-  if (opponent._def && (opponent._def.id === 'gojo' || opponent._def.name === 'GojoFighter' || opponent._def.id === 'yuta' || opponent._def.name === 'YutaFighter' || opponent.type === 'yuta')) {
+  // Check for brawler clash shockwave (when both are in melee range)
+  const isBrawlerOpponent = opponent && !opponent.isDead && (opponent.characterId === 'gojo' || opponent.characterId === 'saitama' || opponent.characterId === 'yuji' || opponent.characterId === 'todo' || opponent._def?.id === 'gojo');
+  if (isBrawlerOpponent) {
     if (!fighter.meleeClashCooldown) fighter.meleeClashCooldown = 0;
     if (fighter.meleeClashCooldown <= 0) {
       const midX = (fighter.x + opponent.x) / 2;
       const midY = (fighter.y + opponent.y) / 2;
-      const isYuta = (opponent._def?.id === 'yuta' || opponent.type === 'yuta' || opponent._def?.name === 'YutaFighter');
-      spawnMeleeClashShockwave(midX, midY, 100, isYuta ? 'yuta' : 'gojo');
+      spawnMeleeClashShockwave(midX, midY, 100, 'gojo');
       triggerGlobalScreenShake(8, 10);
       fighter.meleeClashCooldown = 30;
     }
   }
-
-  opponent.vx += Math.cos(punchAngle) * 2;
-  opponent.vy += Math.sin(punchAngle) * 2;
-
-  spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, 'MARTIAL ARTS', '#8B0000');
 
   if (!fighter._slashSoundCooldown || fighter._slashSoundCooldown <= 0) {
     audioSystem.playSFX('Assets/Sound Effects/Attacks/punch.mp3', 2.8);
     fighter._slashSoundCooldown = 8;
   }
 
-  // Time stop removed here so it does not cancel ultimates / domain channeling via hard CC!
-  fighter.meleePunchCooldown = punchCooldown;
-
+  // Reset combo counter and DISENGAGE to ranged mode when combo target is reached
   if (fighter.meleeComboCount >= fighter.meleeComboTarget) {
     fighter.meleeComboCount = 0;
-    fighter.meleeComboTarget = Math.random() < 0.35 ? 4 : 3;
+    fighter.meleeComboTarget = Math.random() < 0.5 ? 6 : 3;
 
-    if (!fighter.domainActive && (fighter.flurryHitsLeft || 0) <= 0) {
+    if (!fighter.domainActive && (fighter.flurryHitsLeft || 0) <= 0 && (fighter.forcedMeleeTimer || 0) <= 0) {
       fighter.isMeleeMode = false;
-      fighter.meleeModeCooldown = CONFIG.sukuna?.meleeModeSeparationCooldown ?? 240;
+      fighter.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120; // Mandatory ranged separation!
       if (opponent && !opponent.isDead) {
         teleportAwayFrom(fighter, opponent, arena);
       }

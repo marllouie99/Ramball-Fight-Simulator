@@ -2,6 +2,11 @@
 // Ryomen Sukuna — King of Curses Config
 // ─────────────────────────────────────────────
 export const sukunaConfig = {
+    // Basic Attack: Dismantle / Cleave Ranged Slashes
+    slashSpeed: 40,                   // Supersonic travel speed of Dismantle and Cleave slashes (px/frame)
+    slashDamage: 18,                  // Base damage per slash
+    slashCooldown: 50,                // Frames between ranged basic slash attacks
+
     // Stacking Slash Crit Passive
     baseCritChance: 0.25,             // 10% base crit chance
     baseCritMultiplier: 0.25,         // 1.50x base crit damage multiplier
@@ -16,23 +21,20 @@ export const sukunaConfig = {
     reverseCursedTechniqueCooldown: 700,      // 20 second cooldown before it can trigger again
     rctRevivalHealAmount: 125,                // Flat HP restored on emergency revival
 
-    // Basic Attack: Dismantle (Long Distance) & Cursed Martial Arts (Close Distance)
-    slashDamage: 15,          // Base damage per Dismantle / Martial Arts strike
-    slashSpeed: 50,          // Speed of Dismantle slash projectiles
-    slashCooldown: 50,       // Frames between basic attacks
-    meleeDistanceThreshold: 50, // Distance threshold for switching to Cursed Martial Arts
-    meleePunchCooldown: 15,  // Cooldown in frames (~0.2s) between attack-teleport punches in melee mode
+    // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
+    closeRangeRadius: 220,            // Proximity distance (pixels) to enter Melee Mode
+    initialMeleeDuration: 120,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
+    meleeModeCooldown: 120,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
+    comboDisengageDistance: 280,      // Distance (pixels) teleported away when disengaging after clash
+    meleePunchDamage: 15,             // Damage dealt per martial arts punch strike
+    meleePunchCooldown: 9,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
+    teleportSpeed: 15,                // Teleport movement slide speed
 
     // Teleport Dodge / Evade Mechanic
-    teleportDodgeChance: 0.10,               // 30% chance to teleport dodge incoming attacks
+    teleportDodgeChance: 0.10,               // 10% chance to teleport dodge incoming attacks
     teleportDodgeCooldown: 90,               // Frames (1.5 seconds) between teleport dodges
     teleportDodgeDistance: 85,               // Distance teleported on dodge
     teleportSlideSpeed: 8.5,                 // Residual sliding velocity speed applied every time Sukuna teleports
-
-    // Anime Melee Combat Rhythm & Disengage
-    forcedMeleeIntroDuration: 180,           // Frames (3.0 seconds) forced melee clash at start of round
-    meleeModeSeparationCooldown: 240,        // Frames (4.0 seconds) mandatory ranged separation after combo disengage
-    comboDisengageDistance: 300,             // Distance (pixels) teleported away on combo finisher
 
     // Bleed Debuff
     bleedDamagePerStack: 2,  // Damage per bleed stack

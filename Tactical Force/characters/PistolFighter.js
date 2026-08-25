@@ -4,7 +4,7 @@
 // Semi-Auto Combat Handgun, High Mobility, Fast Trigger & Critical Headshots
 // ─────────────────────────────────────────────
 
-import { Fighter } from '../../js/entities/fighter.js';
+import { TacticalBaseFighter } from './TacticalBaseFighter.js';
 import { CONFIG } from '../../js/core/config.js';
 import { projectileSystem } from '../../js/systems/projectileSystem.js';
 import { state, spawnFloatingText } from '../../js/core/state.js';
@@ -13,9 +13,12 @@ import { drawDesertEagleWeapon, drawTacticalPistolWeapon } from '../weapons/inde
 import { drawDesertEagleSkin, drawPistolSkin } from '../skins/index.js';
 import { hasLineOfSight } from '../maps/index.js';
 
-export class PistolFighter extends Fighter {
+export class PistolFighter extends TacticalBaseFighter {
   constructor(def) {
     super(def);
+    this.isTacticalFighter = true;
+    this.gameCategory = 'tactical';
+    this.spinDirection = Math.random() < 0.5 ? 1 : -1;
     const cfg = CONFIG.desertEagle || CONFIG.pistol || {};
     this.maxMagazine = cfg.magazineSize || 7;
     this.magazineBullets = this.maxMagazine;
@@ -80,24 +83,23 @@ export class PistolFighter extends Fighter {
       spawnFloatingText(this.x, this.y - this.r - 15, 'RELOADING...', '#94a3b8');
     }
 
-    // Rotational spin aim alignment sweep detection
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.paralyzeTimer || this.paralyzeTimer <= 0) && !this.isCaughtInBeam();
+    // Recoil animation recovery
+    if (this.gunRecoil > 0) {
+      this.gunRecoil = Math.max(0, this.gunRecoil * 0.78 - 0.05);
+    }
+
+    // Rotational spin sweep aim detection
+    const canAct = (!this.paralyzeTimer || this.paralyzeTimer <= 0) && !this.isCaughtInBeam();
     if (canAct && !this.isReloading && opponent && opponent.hp > 0 && !opponent.isDead) {
-      const targetAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-      let angleDiff = targetAngle - this.angle;
-      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
-      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      const isSweeping = this.checkSpinSweep(opponent, CONFIG.tactical?.aimAlignmentThreshold || 0.16);
 
-      const alignmentThreshold = CONFIG.tactical?.aimAlignmentThreshold || 0.14;
-      const isAligned = Math.abs(angleDiff) <= alignmentThreshold;
-
-      if (isAligned && !this.lastAimAligned && this.shootDebounce <= 0) {
+      if (isSweeping && !this.lastAimAligned && this.shootDebounce <= 0) {
         if (hasLineOfSight(this.x, this.y, opponent.x, opponent.y)) {
           this.shoot(opponent, ownerIndex);
           this.shootDebounce = 8;
         }
       }
-      this.lastAimAligned = isAligned;
+      this.lastAimAligned = isSweeping;
     } else {
       this.lastAimAligned = false;
     }
@@ -115,7 +117,22 @@ export class PistolFighter extends Fighter {
     }
 
     if (this.isReloading || this.magazineBullets <= 0) return;
-    if (this.hasClearLOS === false) return;
+
+    if (!target || target.hp <= 0) {
+      if (typeof state !== 'undefined' && state.fighters) {
+        let bestDist = Infinity;
+        for (let fi = 0; fi < state.fighters.length; fi++) {
+          const f = state.fighters[fi];
+          if (!f || f === this || f.hp <= 0) continue;
+          const d = Math.hypot(f.x - this.x, f.y - this.y);
+          if (d < bestDist) {
+            bestDist = d;
+            target = f;
+          }
+        }
+      }
+    }
+
     if (target && target.hp > 0 && !hasLineOfSight(this.x, this.y, target.x, target.y)) return;
 
     const cfg = CONFIG.desertEagle || CONFIG.pistol || {};
@@ -123,32 +140,32 @@ export class PistolFighter extends Fighter {
     this.muzzleFlashTimer = cfg.flashDuration || 4;
     this.gunRecoil = cfg.recoilDistance ? (cfg.recoilDistance / 5.0) : 1.25;
 
-    const fireAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    let fireAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    if (target && target.hp > 0) {
+      const targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+      let diff = targetAngle - fireAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      if (Math.abs(diff) <= 0.22) {
+        fireAngle = targetAngle;
+        this.angle = targetAngle;
+        this.gunAngle = targetAngle;
+      }
+    }
 
-    // Recoil push
-    const recoilForce = cfg.recoilForce || 2.8;
-    this.vx -= Math.cos(fireAngle) * recoilForce;
-    this.vy -= Math.sin(fireAngle) * recoilForce;
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(1.5, 3);
     }
 
-    // Spawn tip position (clamped so bullet never spawns behind close targets)
+    // Spawn tip position at muzzle
     const scaleFactor = (this.r / 25);
-    let tipDist = this.r + 32 * scaleFactor;
-    if (target && target.hp > 0) {
-      const distToTarget = Math.hypot(target.x - this.x, target.y - this.y);
-      const maxSafeTip = Math.max(this.r + 2, distToTarget - (target.r || 24) - 4);
-      if (tipDist > maxSafeTip) {
-        tipDist = maxSafeTip;
-      }
-    }
+    const tipDist = this.r + 32 * scaleFactor;
     const spawnX = this.x + Math.cos(fireAngle) * tipDist;
     const spawnY = this.y + Math.sin(fireAngle) * tipDist;
 
-    // Fire magnum projectile
+    // Fire heavy .50 AE magnum projectile
     const speed = (CONFIG.projectile?.speed || 7) * (this._def?.projectileSpeedMultiplier || cfg.projectileSpeedMultiplier || 2.4);
-    const proj = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'tacticalBullet', spawnX, spawnY);
+    const proj = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'tacticalBullet', spawnX, spawnY, fireAngle);
     if (proj) {
       proj.r = 5.0 * scaleFactor;
       proj.bulletLength = 14 * scaleFactor;
@@ -156,7 +173,6 @@ export class PistolFighter extends Fighter {
       proj.bulletRadius = (cfg.bulletRadius || 4.5) * scaleFactor;
       proj.life = cfg.bulletLife || 80;
       proj.tacticalCaliberScale = 1.1 * scaleFactor;
-      proj.knockbackForce = cfg.knockbackForce || 6.0;
       proj.historyMax = 12;
     }
 
@@ -175,15 +191,17 @@ export class PistolFighter extends Fighter {
   }
 
   draw(ctx) {
-    const angle = this._isWinnerReveal ? 0 : (this.gunAngle || this.angle || 0);
+    const isFaceOff = this._isFaceOff || (typeof state !== 'undefined' && state.gameState === 'faceoff') || this._isPreview;
+    const angle = this._isWinnerReveal ? 0 : (this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0));
 
     ctx.save();
     ctx.translate(this.x, this.y);
 
-    // Standard local rotation and upright mirroring (Rule 19)
     ctx.rotate(angle);
+
+    // Upright vertical mirroring for showoff / face-off screens so right-side fighters are not upside down
     const facingLeft = Math.abs(angle) > Math.PI / 2;
-    if (facingLeft) {
+    if (facingLeft && (isFaceOff || !this.isSpinning)) {
       ctx.scale(1, -1);
     }
 

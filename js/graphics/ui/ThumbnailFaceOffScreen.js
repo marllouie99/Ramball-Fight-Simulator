@@ -135,6 +135,20 @@ function initDebrisAndScratches(width, height) {
   }
 }
 
+// Slot seed calculation helper to ensure exact synchrony between reel strip and background roll
+function getSlotSeed(slotKey) {
+  if (!slotKey) return 0;
+  return (slotKey.charCodeAt(0) * 7 + (slotKey.charCodeAt(1) || 3) * 13) % 31;
+}
+
+function getStripFighterDef(slotIndex, totalSlots, targetDef, seed) {
+  if (slotIndex >= totalSlots) return targetDef;
+  const currentDefs = getActiveFighterDefs();
+  const clampedIdx = Math.max(0, slotIndex);
+  const hashIdx = (clampedIdx * 7 + seed) % currentDefs.length;
+  return currentDefs[hashIdx] || targetDef;
+}
+
 /** Prepares a fresh, properly styled fighter model for the face-off layout (Singleton pool by character type) */
 function getFaceOffFighter(slotKey, def, targetAngle) {
   if (!def) return null;
@@ -258,15 +272,38 @@ export function drawFaceOffThumbnailScreen() {
   let leftThemeColor = p1Def?.color || '#38bdf8';
   let rightThemeColor = p2Def?.color || '#e51a2e';
 
-  const t1 = Math.min(1.0, timer / 38);
-  const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
-  const rollP1Def = getStripFighterDef(k1, 16, p1Def, 3);
-  leftThemeColor = rollP1Def?.color || leftThemeColor;
+  if (mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off' || mode === '1v2') {
+    const t1 = Math.min(1.0, timer / 36);
+    const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
+    const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
+    leftThemeColor = rollP1Def?.color || leftThemeColor;
 
-  const t2 = Math.min(1.0, timer / 58);
-  const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
-  const rollP2Def = getStripFighterDef(k2, 22, p2Def, 7);
-  rightThemeColor = rollP2Def?.color || rightThemeColor;
+    const t2 = Math.min(1.0, timer / 48);
+    const k2 = Math.min(20, Math.round(20 * (1 - Math.pow(1 - t2, 3.8))));
+    const rollP2Def = getStripFighterDef(k2, 20, p2Def, getSlotSeed('p2'));
+    rightThemeColor = rollP2Def?.color || rightThemeColor;
+  } else if (mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2') {
+    const t1 = Math.min(1.0, timer / 34);
+    const k1 = Math.min(14, Math.round(14 * (1 - Math.pow(1 - t1, 3.8))));
+    const rollP1Def = getStripFighterDef(k1, 14, p1Def, getSlotSeed('p1'));
+    leftThemeColor = rollP1Def?.color || leftThemeColor;
+
+    const t2 = Math.min(1.0, timer / 54);
+    const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
+    const rollP2Def = getStripFighterDef(k2, 22, p2Def, getSlotSeed('p2'));
+    rightThemeColor = rollP2Def?.color || rightThemeColor;
+  } else {
+    // 1v1 Duel / Stand Off / Tactical 1v1 / Tactical Standoff / TLFS
+    const t1 = Math.min(1.0, timer / 38);
+    const k1 = Math.min(16, Math.round(16 * (1 - Math.pow(1 - t1, 3.8))));
+    const rollP1Def = getStripFighterDef(k1, 16, p1Def, getSlotSeed('p1'));
+    leftThemeColor = rollP1Def?.color || leftThemeColor;
+
+    const t2 = Math.min(1.0, timer / 58);
+    const k2 = Math.min(22, Math.round(22 * (1 - Math.pow(1 - t2, 3.8))));
+    const rollP2Def = getStripFighterDef(k2, 22, p2Def, getSlotSeed('p2'));
+    rightThemeColor = rollP2Def?.color || rightThemeColor;
+  }
 
   if (timer <= 2) {
     clearHealthHud();
@@ -294,12 +331,14 @@ export function drawFaceOffThumbnailScreen() {
   // 1. Draw Anime Grunge Background (4-Way Zigzag Split for FFA, Diagonal 2-Way Split for others)
   const isFFA = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
   if (isFFA) {
-    const ffaColors = [
-      p1Def?.color || '#3b82f6',
-      p2Def?.color || '#10b981',
-      p3Def?.color || '#f59e0b',
-      p4Def?.color || '#ef4444'
-    ];
+    const ffaDurations = [34, 44, 54, 64];
+    const ffaSlots = [14, 18, 22, 26];
+    const ffaColors = [p1Def, p2Def, p3Def, p4Def].map((def, i) => {
+      const t = Math.min(1.0, timer / ffaDurations[i]);
+      const k = Math.min(ffaSlots[i], Math.round(ffaSlots[i] * (1 - Math.pow(1 - t, 3.8))));
+      const rollDef = getStripFighterDef(k, ffaSlots[i], def, getSlotSeed(`ffa_${i}`));
+      return rollDef?.color || ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'][i];
+    });
     drawFfaAnimeGrungeZigzagBackground(ctx, canvas.width, canvas.height, ffaColors, timer);
     drawFfaFaceOff(ctx, canvas.width, canvas.height, [p1Def, p2Def, p3Def, p4Def], scale, timer, exitProgress);
   } else {
@@ -343,27 +382,38 @@ function renderCachedBackground(width, height, leftColor, rightColor) {
   const ctx = _bgCacheCtx;
   ctx.clearRect(0, 0, width, height);
 
-  // ── Step 1: Base Left Domain (Deep Moody Obsidian Tinted with Fighter 1's Color) ──
-  const leftBgGrad = ctx.createLinearGradient(0, 0, width * 0.6, height);
-  const darkLeft1 = adjustBrightness(leftColor, -88);
-  leftBgGrad.addColorStop(0, '#040508');
-  leftBgGrad.addColorStop(0.5, darkLeft1);
-  leftBgGrad.addColorStop(1, '#030406');
-  ctx.fillStyle = leftBgGrad;
-  ctx.fillRect(0, 0, width, height);
+  const topSplitX = width * 0.62;
+  const botSplitX = width * 0.38;
 
-  // Left Ambient Energy Bloom (Subtle & Moody)
+  // ── Step 1: Diagonal Left Domain (Deep, Rich, Vibrant Shade of Fighter 1's Color) ──
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(0, 0);
+  ctx.lineTo(topSplitX, 0);
+  ctx.lineTo(botSplitX, height);
+  ctx.lineTo(0, height);
+  ctx.closePath();
+
+  const leftGrad = ctx.createLinearGradient(0, 0, botSplitX, height);
+  const deepDarkLeft = adjustBrightness(leftColor, -65);
+  const midDarkLeft = adjustBrightness(leftColor, -48);
+  const topDarkLeft = adjustBrightness(leftColor, -35);
+  leftGrad.addColorStop(0, topDarkLeft);
+  leftGrad.addColorStop(0.5, midDarkLeft);
+  leftGrad.addColorStop(1, deepDarkLeft);
+  ctx.fillStyle = leftGrad;
+  ctx.fill();
+  ctx.restore();
+
+  // Left Ambient Energy Bloom (Moody & Saturated)
   const leftBloom = ctx.createRadialGradient(width * 0.22, height * 0.44, 20, width * 0.22, height * 0.44, width * 0.48);
-  leftBloom.addColorStop(0, hexToRgba(leftColor, 0.24));
-  leftBloom.addColorStop(0.55, hexToRgba(leftColor, 0.06));
+  leftBloom.addColorStop(0, hexToRgba(leftColor, 0.28));
+  leftBloom.addColorStop(0.55, hexToRgba(leftColor, 0.08));
   leftBloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
   ctx.fillStyle = leftBloom;
   ctx.fillRect(0, 0, width, height);
 
   // ── Step 2: Diagonal Right Domain (Deep, Rich, Slightly Dark Shade of Fighter 2's Color) ──
-  const topSplitX = width * 0.62;
-  const botSplitX = width * 0.38;
-
   ctx.save();
   ctx.beginPath();
   ctx.moveTo(topSplitX, 0);
@@ -392,8 +442,8 @@ function renderCachedBackground(width, height, leftColor, rightColor) {
   ctx.fillRect(0, 0, width, height);
 
   // ── Step 3: Halftone Dot Patterns ──
-  drawHalftoneGrid(ctx, 0, 0, width * 0.45, height * 0.40, hexToRgba(leftColor, 0.15), true);
-  drawHalftoneGrid(ctx, width * 0.55, height * 0.60, width * 0.45, height * 0.40, 'rgba(0, 0, 0, 0.40)', false);
+  drawHalftoneGrid(ctx, 0, 0, width * 0.45, height * 0.40, hexToRgba(leftColor, 0.18), true);
+  drawHalftoneGrid(ctx, width * 0.55, height * 0.60, width * 0.45, height * 0.40, hexToRgba(rightColor, 0.18), false);
 
   // ── Step 4: Grunge Paint Splatters & Diagonal Brush Streaks ──
   drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftColor, rightColor);
@@ -742,7 +792,7 @@ function drawGrungeBrushStrokes(ctx, width, height, topSplitX, botSplitX, leftCo
   ctx.save();
 
   // 1. Heavy Left-Side Paint Spikes extending into the Right side
-  ctx.fillStyle = adjustBrightness(leftColor, -65);
+  ctx.fillStyle = leftColor;
   const leftSplats = [
     { y: height * 0.22, length: 110, h: 26 },
     { y: height * 0.32, length: 140, h: 34 },
@@ -911,14 +961,6 @@ const _lastSlotMap = {};
 const _lockedMap = {};
 let _lastAudioTickTimer = -1;
 
-function getStripFighterDef(slotIndex, totalSlots, targetDef, seed) {
-  if (slotIndex >= totalSlots) return targetDef;
-  const currentDefs = getActiveFighterDefs();
-  const clampedIdx = Math.max(0, slotIndex);
-  const hashIdx = (clampedIdx * 7 + seed) % currentDefs.length;
-  return currentDefs[hashIdx] || targetDef;
-}
-
 function drawSmoothReelColumn(ctx, centerX, centerY, targetDef, slotKey, totalSlots, duration, timer, scale, themeColor, facingAngle, isLeft) {
   const slotH = 140 * (scale / 1.35);
   const totalDist = totalSlots * slotH;
@@ -959,7 +1001,7 @@ function drawSmoothReelColumn(ctx, centerX, centerY, targetDef, slotKey, totalSl
 
   // Render visible characters on the clean conveyor roll with smooth alpha falloff
   const maxReach = 135 * (scale / 1.35);
-  const seed = (slotKey.charCodeAt(0) * 7 + (slotKey.charCodeAt(1) || 3) * 13) % 31;
+  const seed = getSlotSeed(slotKey);
   const nonTargetFade = isLocked ? 0 : (t > 0.75 ? Math.max(0, 1 - (t - 0.75) / 0.25) : 1.0);
 
   // If locked, we only draw the single finalized target fighter

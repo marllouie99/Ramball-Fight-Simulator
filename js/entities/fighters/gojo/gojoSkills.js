@@ -58,8 +58,7 @@ export function activateRed(fighter) {
   fighter._redTargetRef = targetF;
   fighter.redTargetAngle = targetF ? Math.atan2(targetF.y - fighter.y, targetF.x - fighter.x) : fighter.gunAngle;
 
-  // Text pop and light buildup sparks
-  spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'REVERSAL RED', '#FF1144');
+  // Light buildup sparks
   spawnSparks(fighter.x, fighter.y, 12, 'crimsonSniper');
   triggerGlobalScreenShake(4, 6);
 
@@ -166,10 +165,6 @@ export function firePurple(fighter, ownerIndex) {
   const baseDamage = CONFIG.gojo?.purpleDamage || 70;
   const baseDPS = CONFIG.gojo?.purpleDPS || 150;
 
-  if (isSecondCast && typeof spawnFloatingText === 'function') {
-    const bannerText = CONFIG.gojo?.purpleSecondCastTextBanner || '200% HOLLOW PURPLE!';
-    spawnFloatingText(fighter.x, fighter.y - fighter.r - 25, bannerText, '#A020F0');
-  }
 
   // Once the 2nd purple releases, reset purpleUseCount back to 0 so the next cast cycles back to 100%!
   if (fighter.purpleUseCount >= 2) {
@@ -260,9 +255,6 @@ export function executePurpleRetreat(fighter) {
 
     const breatherDuration = CONFIG.gojo?.modeSwitchBreatherDuration ?? 45;
     fighter.modeSwitchBreatherTimer = breatherDuration;
-    fighter.shootCooldown = Math.max(fighter.shootCooldown || 0, breatherDuration);
-
-    spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'RETREAT!', '#00BFFF');
     spawnImpactFlash(oldX, oldY, 25, 'lightningTrail');
     spawnImpactFlash(fighter.x, fighter.y, 30, 'lightningTrail');
     const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';

@@ -346,6 +346,7 @@ class ProjectileSystem {
     proj.maxLife = life;
     proj.color = fighter.color;
     proj.owner = ownerIndex;
+    proj.ownerFighter = fighter;
     proj.damage = Number.isFinite(projDamage) ? projDamage : 0;
     proj.isFollowUp = isFollowUp;
     proj.fadingOut = false;
@@ -556,7 +557,7 @@ class ProjectileSystem {
    * Spawns parallel faint flying slashes in a grid formation.
    */
   fireSukunaDismantleGrid(fighter, ownerIndex, damage) {
-    const speed = CONFIG.sukuna?.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
+    const speed = CONFIG.sukuna?.slashSpeed || 40;
     const angle = fighter.gunAngle;
     const tipDist = GUN_TIP_DIST(fighter.r);
     
@@ -1006,17 +1007,34 @@ class ProjectileSystem {
     if (projectile.isVisual) return false; // Visual-only particles skip all collision
     if (projectile.isGetsuga || projectile.behaviorType === 'getsuga_tensho') return false; // Getsuga handles multi-target piercing in GetsugaBehavior
 
-    // OPTIMIZED: Use spatial grid to get only nearby fighters instead of checking all
-    const nearbyFighters = spatialGrid.getNearby(projectile.x, projectile.y, projectile.r * 2 + 100);
+    // Query all active fighters and illusions directly to prevent spatial grid misses
+    const candidateEntities = [];
+    if (fighters && fighters.length > 0) {
+      for (let fi = 0; fi < fighters.length; fi++) {
+        if (fighters[fi]) candidateEntities.push({ fighter: fighters[fi], fi, isIllusion: false });
+      }
+    }
+    if (typeof state !== 'undefined' && state.illusions && state.illusions.length > 0) {
+      for (let ii = 0; ii < state.illusions.length; ii++) {
+        if (state.illusions[ii]) candidateEntities.push({ fighter: state.illusions[ii], fi: -1, isIllusion: true });
+      }
+    }
 
-    for (const fighter of nearbyFighters) {
+    for (const { fighter, fi, isIllusion } of candidateEntities) {
       if (!fighter || fighter.isAmbushing || (fighter.vanishTimer && fighter.vanishTimer > 0) || (fighter.invincibilityTimer && fighter.invincibilityTimer > 0)) continue;
-      const fi = (typeof fighter.fighterIndex === 'number') ? fighter.fighterIndex : fighters.indexOf(fighter);
-      if (fi == null || fi === -1) continue;
 
-      if (projectile.owner === fi) continue;
+      // Skip projectile owner
+      if (projectile.ownerFighter && projectile.ownerFighter === fighter) continue;
+      if (typeof projectile.owner === 'number' && fi !== -1 && projectile.owner === fi) continue;
+      if (isIllusion && fighter.owner && projectile.ownerFighter && fighter.owner === projectile.ownerFighter) continue;
+
       // Skip teammates in 2v2 mode
-      if (areOnSameTeam(projectile.owner, fi)) continue;
+      if (fi !== -1 && areOnSameTeam(projectile.owner, fi)) continue;
+      if (isIllusion && fighter.owner) {
+        const illOwnerIdx = (typeof fighter.ownerIndex === 'number') ? fighter.ownerIndex : (fighters ? fighters.indexOf(fighter.owner) : -1);
+        if (illOwnerIdx !== -1 && areOnSameTeam(projectile.owner, illOwnerIdx)) continue;
+      }
+
       // Skip if this projectile has piercing and already hit this fighter
       if (projectile.hitFighters && projectile.hitFighters.has(fighter)) continue;
 
@@ -1025,7 +1043,7 @@ class ProjectileSystem {
       const isDead = fighter.hp <= 0 || fighter.isDead;
       if (isDead) {
         if (projectile.isSukunaFurnace || projectile.visual === 'sukunaFurnaceArrow' || projectile.behaviorType === 'sukuna_furnace') {
-          const hitRadius = fighter.r + projectile.r + 15;
+          const hitRadius = (fighter.r || 25) + (projectile.r || 8) + 15;
           const dx = fighter.x - projectile.x;
           const dy = fighter.y - projectile.y;
           if (dx * dx + dy * dy < hitRadius * hitRadius) {
@@ -1037,14 +1055,15 @@ class ProjectileSystem {
       }
 
       // ── Swept Continuous Collision Detection (CCD) for high-speed projectiles ──
-      const projRadius = projectile.r || (projectile.bulletRadius || 5);
-      const hitRadius = fighter.r + projRadius;
+      const isTactical = projectile.visual === 'tacticalBullet';
+      const projRadius = isTactical ? Math.max(9, (projectile.r || 5) + 3) : (projectile.r || (projectile.bulletRadius || 5));
+      const hitRadius = (fighter.r || 25) + projRadius;
 
       // Calculate distance from fighter center to the line segment traveled by the projectile this frame
-      const prevX = projectile.x - (projectile.vx || 0);
-      const prevY = projectile.y - (projectile.vy || 0);
       const segVx = projectile.vx || 0;
       const segVy = projectile.vy || 0;
+      const prevX = projectile.x - segVx;
+      const prevY = projectile.y - segVy;
       const segLenSq = segVx * segVx + segVy * segVy;
 
       // Fast broad-phase AABB test
@@ -2175,6 +2194,29 @@ class ProjectileSystem {
   }
 
   /**
+   * Checks if a projectile collided with a tactical map cover obstacle.
+   */
+  checkObstacleHit(p) {
+    if (p.ignoreWalls || p.pierceWalls) return false;
+    const activeObstacles = (typeof state !== 'undefined' && state.activeMap && state.activeMap.obstacles) || (typeof state !== 'undefined' && state.gameCategory === 'tactical' ? STARTER_MAP.obstacles : null);
+    if (!activeObstacles || activeObstacles.length === 0) return false;
+
+    for (let oi = 0; oi < activeObstacles.length; oi++) {
+      const obs = activeObstacles[oi];
+      if (p.x >= obs.x && p.x <= obs.x + obs.w && p.y >= obs.y && p.y <= obs.y + obs.h) {
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(p.x, p.y, 6, 'gold', '#F59E0B');
+        }
+        if (typeof spawnImpactFlash === 'function') {
+          spawnImpactFlash(p.x, p.y, 14, '#F59E0B');
+        }
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
    * Updates all projectiles in the system.
    */
   update(fighters) {
@@ -2229,6 +2271,7 @@ class ProjectileSystem {
               p.visual === 'turretBullet' ||
               p.visual === 'EngineerBullet' ||
               p.visual === 'gunslingerBullet' ||
+              p.visual === 'tacticalBullet' ||
               p.isGojoPurple ||
               p.isSukunaFurnace
             );
@@ -2777,33 +2820,6 @@ class ProjectileSystem {
       p.y += p.vy;
       p.life -= 1;
 
-      // Tactical Map Cover Obstacle Interception (Supports Sector 01 & Sector 02 Monolith)
-      const activeObstacles = (state.activeMap && state.activeMap.obstacles) || (state.gameCategory === 'tactical' ? STARTER_MAP.obstacles : null);
-      if (activeObstacles && activeObstacles.length > 0) {
-        let hitObs = false;
-        for (let oi = 0; oi < activeObstacles.length; oi++) {
-          const obs = activeObstacles[oi];
-          if (p.x >= obs.x && p.x <= obs.x + obs.w && p.y >= obs.y && p.y <= obs.y + obs.h) {
-            if (typeof spawnSparks === 'function') {
-              spawnSparks(p.x, p.y, 6, 'gold', '#F59E0B');
-            }
-            if (typeof spawnImpactFlash === 'function') {
-              spawnImpactFlash(p.x, p.y, 14, '#F59E0B');
-            }
-            p.life = 0;
-            hitObs = true;
-            break;
-          }
-        }
-        if (hitObs) {
-          this._returnProjectile(p);
-          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
-          this.projectiles.pop();
-          i--;
-          continue;
-        }
-      }
-
       // TRICKSTER / CRONOS SPHERE BLENDER EFFECT:
       // If the owner has an active Time Sphere, trap their projectiles inside it!
       const owner = fighters[p.owner];
@@ -2935,7 +2951,8 @@ class ProjectileSystem {
       }
 
       const hit = this.checkProjectileHits(p, fighters);
-      const expired = this.isProjectileExpired(p);
+      const hitObstacle = !hit && this.checkObstacleHit(p);
+      const expired = hitObstacle || this.isProjectileExpired(p);
 
       if (hit || expired) {
         if (p.isMahitoBodyRepel) {

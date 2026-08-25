@@ -23,7 +23,6 @@ import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave, spawnAnimePunc
 import { drawSlowEffect, drawElectricStunEffect, drawCrimsonElectrifiedEffect, drawPoisonEffect, drawBurnEffect, drawDubstepStunEffect, drawThunderRootsEffect, drawSilenceEffect } from '../graphics/statusEffects.js';
 import { fastCleanArray } from '../graphics/particles/visualTrailSystem.js';
 import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.js';
-import { hasLineOfSight } from '../../Tactical Force/maps/index.js';
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
@@ -417,17 +416,23 @@ export class Fighter {
                          this.redBuildupPhase || this.isChannelingRCT || 
                          (this.divineFlameChargeTimer || 0) > 0 || (this.domainChargeTimer || 0) > 0;
 
-    // Apply universal 4.5s penalty cooldown (270 frames) to skill cooldowns if interrupted mid-channeling
-    if (isChanneling || forceCancelAll) {
+    // Apply 4.5s penalty cooldown (270 frames) ONLY to the specific ability actively interrupted mid-channeling
+    if (isChanneling) {
       const penaltyCD = 270;
-      for (const key in this) {
-        if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer')) {
-          if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer' || key === 'shootCooldown' || key === 'attackCooldown' || key === 'meleePunchCooldown') continue;
-          if (key === 'pureLoveBeamCooldownTimer' && !this.isChannelingPureLoveBeam) continue;
-          if (typeof this[key] === 'number') {
-            this[key] = Math.max(this[key] || 0, penaltyCD);
-          }
-        }
+      if (this.isChannelingPurple || (this.purpleChargeTimer || 0) > 0) {
+        if (typeof this.purpleCooldown === 'number') this.purpleCooldown = Math.max(this.purpleCooldown, penaltyCD);
+      }
+      if (this.isChannelingDivineFlame || (this.divineFlameChargeTimer || 0) > 0) {
+        if (typeof this.divineFlameCooldown === 'number') this.divineFlameCooldown = Math.max(this.divineFlameCooldown, penaltyCD);
+      }
+      if (this.isChannelingDomainExpansion || this.isChannelingDomain || (this.domainChargeTimer || 0) > 0) {
+        if (typeof this.domainCooldown === 'number') this.domainCooldown = Math.max(this.domainCooldown, penaltyCD);
+      }
+      if (this.redBuildupPhase || (this.redEffectTimer || 0) > 0) {
+        if (typeof this.redCooldown === 'number') this.redCooldown = Math.max(this.redCooldown, penaltyCD);
+      }
+      if (this.isChannelingRCT) {
+        if (typeof this.reverseCursedTechniqueCooldown === 'number') this.reverseCursedTechniqueCooldown = Math.max(this.reverseCursedTechniqueCooldown, penaltyCD);
       }
     }
 
@@ -524,6 +529,39 @@ export class Fighter {
     }
   }
 
+  /** Reverses the fighter's rotational body spin direction upon collision/deflection. */
+  reverseSpin(debounceFrames = 8) {
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : ((Date.now() / 16.6) | 0);
+    if (this._lastSpinReverseFrame && (currentFrame - this._lastSpinReverseFrame) < debounceFrames) {
+      return;
+    }
+    this._lastSpinReverseFrame = currentFrame;
+    if (this.spinDirection === undefined) {
+      this.spinDirection = 1;
+    }
+    this.spinDirection = -this.spinDirection;
+  }
+
+  _handleFrozenSkillCooldowns() {
+    const currentFrame = (typeof state !== 'undefined' && state.frameCount !== undefined) ? state.frameCount : 0;
+    if (this._lastSkillCdTickFrame === currentFrame && currentFrame > 0) return;
+    this._lastSkillCdTickFrame = currentFrame;
+
+    // Dodge cooldowns and passive reflexes must ALWAYS tick down even while time-stopped
+    if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+
+    // Check if trapped inside Gojo's Unlimited Void Domain Expansion (Rule 17: Closed barrier cognitive stasis freezes cooldowns)
+    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+    );
+
+    // If NOT inside Gojo's Unlimited Void domain, skill & ultimate cooldowns continue ticking down!
+    // (e.g. while caught in Gojo's Hollow Purple vortex, beams, Infinity barrier repulsion, hit-stun, etc.)
+    if (!isInsideGojoDomain) {
+      this._decrementSkillCooldowns();
+    }
+  }
+
   _handleTimeStop() {
     this._tickCooldowns();
     this._processKnockbackPhysics();
@@ -543,7 +581,9 @@ export class Fighter {
         spawnMahitoSoulBubbles(this.x, this.y, 2);
       }
       if (this.paralyzeTimer === 1 && this.isParalyzedByMahito) {
-        triggerMahitoParalyzeExplosion(this);
+        if (typeof triggerMahitoParalyzeExplosion === 'function') {
+          triggerMahitoParalyzeExplosion(this);
+        }
       }
       this.paralyzeTimer--;
       if (this.paralyzeTimer <= 0) {
@@ -551,25 +591,33 @@ export class Fighter {
       }
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
       return true;
     }
     if (this.isGrabbedByMahoraga) {
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
       return true;
     }
     if (this.isTargetOfAmbush) {
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
       return true;
     }
     if (this.basicAttackHitPauseTimer > 0) {
       this.basicAttackHitPauseTimer--;
       this.vx = 0;
       this.vy = 0;
+      this._handleFrozenSkillCooldowns();
       return true;
     }
-    return this.statusEffects.handleTimeStop();
+    const isFrozen = this.statusEffects.handleTimeStop();
+    if (isFrozen) {
+      this._handleFrozenSkillCooldowns();
+    }
+    return isFrozen;
   }
 
   isPerformingSkill() {
@@ -700,10 +748,10 @@ export class Fighter {
     }
     if (this.vanishTimer > 0) this.vanishTimer--;
     // Universal helper to ensure skill and ultimate cooldowns continue counting down
-    // even while time-stopped, hit-stunned, or frozen by Limitless Infinity!
+    // even while time-stopped, hit-stunned, caught in Hollow Purple, or frozen by Limitless Infinity!
     for (const key in this) {
-      if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer') || key === 'shootCooldown' || key === 'attackCooldown') {
-        if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer') continue;
+      if (key.endsWith('Cooldown') || key.endsWith('CooldownTimer') || key.endsWith('CD') || key === 'shootCooldown' || key === 'attackCooldown') {
+        if (key === 'timeStopTimer' || key === 'basicAttackHitPauseTimer' || key === 'hitStunTimer' || key === 'electricStunTimer' || key === 'dubstepStunTimer' || key === 'crimsonElectrifiedTimer' || key === 'purpleHitTimer') continue;
         if (typeof this[key] === 'number' && this[key] > 0) {
           this[key]--;
         }
@@ -1156,10 +1204,13 @@ export class Fighter {
             state.matchKills[realIdx].push(victimDef);
           }
 
-          // Push to Counter-Strike Style Kill Feed
-          const weapon = realAttacker.characterId || realAttacker._def?.name || realAttacker.name || 'FIREARM';
-          const isHeadshot = Boolean(this._lastHitWasHeadshot || realAttacker.lastShotWasHeadshot);
-          pushKillFeed(realAttacker, this, weapon, isHeadshot);
+          // Push to Counter-Strike Style Kill Feed (Tactical mode only)
+          const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+          if (isTactical) {
+            const weapon = realAttacker.characterId || realAttacker._def?.name || realAttacker.name || 'FIREARM';
+            const isHeadshot = Boolean(this._lastHitWasHeadshot || realAttacker.lastShotWasHeadshot);
+            pushKillFeed(realAttacker, this, weapon, isHeadshot);
+          }
         }
       };
 
@@ -1383,7 +1434,7 @@ export class Fighter {
     }
 
     let bounced = false;
-    const restitution = CONFIG.collision.restitution;
+    const restitution = CONFIG.collision?.restitution ?? 0.95;
     const angleJitter = 3.5;  // Increased for more random bounce angles
 
     if (this.x - this.r < arena.x) {
@@ -1437,33 +1488,7 @@ export class Fighter {
 
   /** Controls how the gun is aimed. Default aims in direction of opponent with delayed reaction time if stealthed. */
   aim(opponent) {
-    if (!opponent || opponent.vanishTimer > 0 || this.isTargetOfAmbush || (this.knockbackStunTimer > 0) || (this.hitStunTimer > 0) || (this.timeStopTimer > 0)) {
-      return;
-    }
-
-    // In tactical shooter modes, disable auto-aim snapping! The gun rotates with the spinning body
-    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
-    const isTacticalFighter = (this.isTacticalFighter || (this._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp', 'barrett50cal'].includes(this._def.type)));
-
-    if (isTactical || isTacticalFighter) {
-      this.gunAngle = this.angle;
-      this.hasClearLOS = hasLineOfSight(this.x, this.y, opponent.x, opponent.y);
-      return;
-    }
-
-    // Line of sight check for tactical modes with cover obstacles
-    const hasLOS = hasLineOfSight(this.x, this.y, opponent.x, opponent.y);
-
-    if (!hasLOS) {
-      // Wall blocks sightline: Do NOT snap auto-aim through the wall.
-      // Instead, look ahead in the direction of current movement velocity.
-      const moveSpeed = Math.hypot(this.vx, this.vy);
-      if (moveSpeed > 0.1) {
-        const moveAngle = Math.atan2(this.vy, this.vx);
-        this.gunAngle = moveAngle;
-        this.angle = moveAngle;
-      }
-      this.hasClearLOS = false;
+    if (!opponent || opponent.vanishTimer > 0 || this.isTargetOfAmbush || (this.timeStopTimer > 0)) {
       return;
     }
 
@@ -1594,7 +1619,6 @@ export class Fighter {
 
     // Velocity Recovery (gradually return to target speed after knockback or slow)
     let currentSpeed = Math.hypot(this.vx, this.vy);
-    
     // Auto-recover from zero velocity if we should be moving
     if (targetSpeed > 0 && currentSpeed < 0.05) {
       // Nudge in the direction of our facing angle
@@ -1613,10 +1637,9 @@ export class Fighter {
     // Movement
     this.x += this.vx;
     this.y += this.vy;
+
     if (!this.hitStunTimer || this.hitStunTimer <= 0) {
-      const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
-      const isTacticalFighter = (this.isTacticalFighter || (this._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp', 'barrett50cal'].includes(this._def.type)));
-      const defaultSpinRate = (isTactical || isTacticalFighter) ? (CONFIG.tactical?.bodySpinRate ?? 0.055) : (CONFIG.spin?.rate ?? 0.06);
+      const defaultSpinRate = CONFIG.spin?.rate ?? 0.06;
       const spinRate = this._def?.spinRate ?? defaultSpinRate;
       this.angle += this.speed * spinRate;
     }
@@ -1662,40 +1685,38 @@ export class Fighter {
       this.interruptAttacks();
     }
 
-    // Stop attacking if round/match has ended or if target/opponent is dead!
+    // Stop attacking if round/match has ended
     const isGamePlaying = typeof state !== 'undefined' && state.gameState === 'playing';
     const isTargetAlive = opponent && !opponent.isDead && opponent.hp > 0;
 
     if (!isGamePlaying) {
       this.interruptAttacks();
       this.shootCooldown = 60;
+      this.applyMovementPhysics();
+      this.resolveWallBounce(arena, opponent);
       return;
     }
 
-    if (!isTargetAlive) {
-      this.shootCooldown = this.shootCooldownMax || 0;
-      return;
+    const isParalyzed = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed;
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed && !this.isCaughtInBeam();
+
+    // Aiming — Keep gunAngle and angle tracked dynamically to the target before shooting
+    if (isTargetAlive && !this.isTargetOfAmbush && !this.isCaughtInBeam() && !isParalyzed) {
+      this.aim(opponent);
     }
 
     // Shooting
-    const isParalyzed = (this.paralyzeTimer && this.paralyzeTimer > 0) || this.isParalyzed;
-    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && !isParalyzed && !this.isCaughtInBeam();
-    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().startsWith('tactical'));
-    const isTacticalFighter = (this.isTacticalFighter || (this._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp', 'barrett50cal'].includes(this._def.type)));
-
-    if (!isTactical && !isTacticalFighter) {
-      if (this.shootCooldown > 0) {
-        this.shootCooldown--;
-      } else if (this._def.type !== 'orange' && canAct) { // Prevent Orange from using this default shoot
-        this.shoot(ownerIndex);
-        this.shootCooldown = this.shootCooldownMax;
-      }
+    if (this.shootCooldown > 0) {
+      this.shootCooldown--;
+    } else if (this._def.type !== 'orange' && canAct && isTargetAlive) { // Prevent Orange from using this default shoot
+      this.shoot(ownerIndex);
+      this.shootCooldown = this.shootCooldownMax;
     }
 
     this.applyMovementPhysics();
 
-    // Aiming & Bouncing
-    if (canAct) {
+    // Aiming & Bouncing — Refresh aim after movement physics to ensure facing orientation remains aligned
+    if (isTargetAlive && !this.isTargetOfAmbush && !this.isCaughtInBeam() && !isParalyzed) {
       this.aim(opponent);
     }
     this.resolveWallBounce(arena, opponent);

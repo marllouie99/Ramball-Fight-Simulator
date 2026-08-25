@@ -262,11 +262,10 @@ export class MahoragaFighter extends Fighter {
       return;
     }
 
-    // Do NOT rotate or snap facing direction while in hit stun, knockback, or beam paralysis!
-    const isInHitReaction = (this.hitStunTimer || 0) > 0 || (this.knockbackStunTimer || 0) > 0 || 
-                            (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 ||
-                            this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0;
-    if (isInHitReaction) {
+    // Do NOT rotate or snap facing direction while in hard stun or beam paralysis
+    const isHardCC = (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0 || (this.timeStopTimer || 0) > 0 ||
+                     this.caughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0 || (this.pureLoveBeamRecoveryTimer || 0) > 0;
+    if (isHardCC) {
       return;
     }
 

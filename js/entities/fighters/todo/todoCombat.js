@@ -107,18 +107,6 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
       target.applyKnockback(Math.cos(angle) * knockback, Math.sin(angle) * knockback);
     }
 
-    // Apply stop movement & hit-stun to enemy on standard basic attacks as well
-    if (!isCombo) {
-      if (typeof target.applyHitStun === 'function') {
-        const hitStunFrames = CONFIG.todo?.basicPunchHitStun || 14;
-        target.applyHitStun(hitStunFrames);
-      }
-      if (typeof target.applySlow === 'function') {
-        const slowDur = CONFIG.todo?.basicPunchSlowDuration || 20;
-        const slowMult = CONFIG.todo?.basicPunchSlowMultiplier ?? 0.0;
-        target.applySlow(slowDur, slowMult);
-      }
-    }
 
     // Arena Screen Shake Dispatcher
     if (typeof triggerGlobalScreenShake === 'function') {

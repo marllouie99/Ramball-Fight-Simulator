@@ -53,16 +53,17 @@ export class LaserFighter extends Fighter {
       }
 
       const delta = this.normalizeAngle(targetAngle - this.gunAngle);
-      // Slowly rotate towards the target. 
-      // We can use a slightly faster speed for aiming than for firing, 
-      // or just use the config value. Let's use config value * 2 for aiming.
-      const maxRotate = (CONFIG.laser.beamRotateSpeed || 0.015) * 2; 
+      // When beam is actively firing, rotate with heavy beam inertia; otherwise track swiftly
+      const maxRotate = this.beamTimer > 0 
+        ? ((CONFIG.laser.beamRotateSpeed || 0.015) * 2) 
+        : 0.20; 
 
       if (Math.abs(delta) > maxRotate) {
         this.gunAngle += Math.sign(delta) * maxRotate;
       } else {
         this.gunAngle = targetAngle;
       }
+      this.angle = this.gunAngle;
     }
   }
 

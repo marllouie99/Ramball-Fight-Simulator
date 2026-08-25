@@ -42,7 +42,7 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
     fighter.infinityActive = true;
     fighter.infinityCooldown = 0;
   }
-  if (fighter.domainActive || (fighter.isMeleeMode && !isBreatherState && !isDomainChanneling)) return false;
+  if (fighter.isChannelingPurple || fighter.domainActive || (fighter.isMeleeMode && !isBreatherState && !isDomainChanneling)) return false;
 
   fighter.infinityBlockTimer = 25;
   fighter.infinityBlockMaxTimer = 25;
@@ -55,9 +55,6 @@ export function triggerInfinityBlock(fighter, hitX, hitY, attacker) {
   // Skip visual/audio spam inside Gojo's own domain (Unlimited Void uses paralysis, not barrier bounces)
   if (!fighter.domainActive) {
     if (fighter._lastInfinityRingFrame !== currentFrame) {
-      fighter._lastInfinityRingFrame = currentFrame;
-
-      spawnFloatingText(fighter.x, fighter.y - fighter.r - 20, 'INFINITY', '#E0FFFF');
       triggerGlobalScreenShake(3, 6);
 
       const nowSound = Date.now();
@@ -260,9 +257,11 @@ export function executeTeleportDodge(fighter, attacker, arena) {
   applyTeleportSlideBrake(fighter, oldX, oldY, targetX, targetY, arena);
   if (attacker) {
     fighter.aim(attacker);
+    if (typeof attacker.aim === 'function' && !attacker.isTargetOfAmbush) {
+      attacker.aim(fighter);
+    }
   }
 
-  spawnFloatingText(oldX, oldY - fighter.r - 10, 'EVADE!', '#00BFFF');
   spawnImpactFlash(oldX, oldY, 22, 'lightningTrail');
   const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
   const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.8;

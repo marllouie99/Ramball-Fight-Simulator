@@ -13,38 +13,27 @@ export { syncHudPosition, initHudSync };
 initHudSync();
 
 /**
- * Checks if the screen is currently dimmed by an active Domain Expansion or visual dim effect.
- * Excludes skill channeling / windup phases per explicit requirement.
+ * Checks if the screen is currently dimmed by an active Domain Expansion (or active non-Purple ultimate strike).
+ * Strictly excludes skill channeling / windup phases, and excludes Hollow Purple per explicit requirements.
  */
 export function isScreenDimmedActive() {
   if (typeof state === 'undefined' || !state.fighters) return false;
 
-  // 1. Any active Domain Expansion (active phase, NOT during channeling/windup)
-  const isAnyDomainActive = state.fighters.some(f => f && f.domainActive && !f.isChannelingDomainExpansion && !f.isChannelingDomain && (f.domainChargeTimer || 0) <= 0);
+  // 1. Any active Domain Expansion (deployed barrier phase, NOT during slide or channeling/windup)
+  const isAnyDomainActive = state.fighters.some(f => 
+    f && f.domainActive && 
+    !f.isChannelingDomainExpansion && 
+    !f.isChannelingDomain && 
+    !f.isDomainPreSlide
+  );
   if (isAnyDomainActive) return true;
 
-  // 2. Global full-screen dim flags (excluding active channeling windups)
-  if (state.isScreenDimmed || state.activeDimScreen) {
-    const isChanneling = state.fighters.some(f => f && (
-      f.isChannelingPurple ||
-      f.isChannelingDomain ||
-      f.isChannelingDomainExpansion ||
-      f.isChannelingFuga ||
-      f.isChannelingUlt ||
-      (f.ultimatePhase === 'CHANNELING') ||
-      (f.domainChargeTimer || 0) > 0 ||
-      (f.purpleChargeTimer || 0) > 0
-    ));
-    if (!isChanneling) return true;
-  }
-
-  // 3. Active Dim Effect States (active beam/strike phase — excludes channeling phases)
-  const hasActiveDimEffect = state.fighters.some(f => f && (
-    (f.isFiringPurple || (f.purpleHitTimer || 0) > 0) ||
+  // 2. Active non-domain ultimate strikes (e.g. Toji Swarm, Sukuna Fuga Arrow) — STRICTLY EXCLUDES HOLLOW PURPLE
+  const hasNonPurpleDimEffect = state.fighters.some(f => f && (
     ((f.characterId === 'toji' || f.type === 'toji') && f.ultimateActive && f.ultimatePhase !== 'CHANNELING' && !f.isChannelingDomain) ||
     (f.furnaceFireArrowTimer || 0) > 0
   ));
-  if (hasActiveDimEffect) return true;
+  if (hasNonPurpleDimEffect) return true;
 
   return false;
 }
@@ -60,6 +49,57 @@ export function triggerHudHealBubble(hpBarElement, healAmount) {
       bubble.parentNode.removeChild(bubble);
     }
   }, 2200);
+}
+
+/**
+ * Checks if a specific fighter is a Tactical Shooter operative.
+ */
+export function isTacticalFighter(f) {
+  if (!f) return false;
+  if (f.gameCategory === 'tactical' || (f._def && f._def.gameCategory === 'tactical')) return true;
+  const t = String(f.characterId || f.type || (f._def && f._def.type) || '').toLowerCase();
+  return ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal', 'tactical_commando', 'tactical_guerilla', 'tactical_breacher', 'tactical_gunslinger', 'tactical_infiltrator', 'tactical_marksman', 'tactical_barrett', 'tactical_sniper', 'tactical_heavy'].includes(t);
+}
+
+/**
+ * Robust check if current match/gamemode is Tactical Shooter.
+ */
+export function isTacticalMatch(s) {
+  const stateObj = s || (typeof state !== 'undefined' ? state : null);
+  if (!stateObj) return false;
+  if (stateObj.gameCategory === 'tactical') return true;
+  const m = String(stateObj.mode || '').toLowerCase();
+  if (m.includes('tactical')) return true;
+  if (stateObj.fighters && stateObj.fighters.some(f => isTacticalFighter(f))) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Returns formatted caliber string for tactical operatives.
+ */
+export function getTacticalCaliber(f) {
+  if (!f) return 'TACTICAL';
+  const t = String(f.characterId || f.type || (f._def && f._def.type) || (f.name) || '').toLowerCase();
+  if (t.includes('rifle') || t.includes('m4a1')) return '5.56 NATO';
+  if (t.includes('shotgun') || t.includes('spas')) return '12-GAUGE';
+  if (t.includes('pistol') || t.includes('desert') || t.includes('eagle')) return '.50 AE';
+  if (t.includes('sniper') || t.includes('awp')) return '.338 LAPUA';
+  if (t.includes('barrett')) return '.50 BMG';
+  return 'TACTICAL';
+}
+
+/**
+ * Returns formatted damage string for tactical operatives (e.g. 18×6 for shotgun, 35×3 for rifle).
+ */
+export function getTacticalDamageDisplay(f) {
+  if (!f) return '0';
+  const t = String(f.characterId || f.type || (f._def && f._def.type) || (f.name) || '').toLowerCase();
+  const baseDmg = Math.round(Number(f.damage !== undefined ? f.damage : (f._def && f._def.damage)) || 0);
+  if (t.includes('shotgun') || t.includes('spas')) return `${baseDmg}×6`;
+  if (t.includes('rifle') || t.includes('m4a1')) return `${baseDmg}×3`;
+  return `${baseDmg}`;
 }
 
 // ── Cached DOM references for per-frame HUD functions ──
@@ -121,9 +161,17 @@ export function drawHUD() {
     bottomContainer.style.visibility = 'hidden';
   }
   if (containerBottom) {
+    const isTactical = isTacticalMatch(state);
+
+    // Tactical HUD toggle — when enableHud is false in tacticalMainConfig, hide all HUD
+    if (isTactical && CONFIG.tactical && CONFIG.tactical.enableHud === false) {
+      hudOpacity = 0;
+    }
+
     const isFfaMode = (mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA');
-    containerBottom.classList.toggle('ffa-hud', isFfaMode);
-    const isSingleColMode = (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off');
+    containerBottom.classList.toggle('ffa-hud', isFfaMode && !isTactical);
+    containerBottom.classList.toggle('tactical-hud', isTactical);
+    const isSingleColMode = !isTactical && (mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.STAND_OFF || mode === 'Stand Off');
     containerBottom.classList.toggle('single-column-hud', isSingleColMode);
     containerBottom.style.opacity = hudOpacity;
     if (hudOpacity <= 0) {
@@ -492,43 +540,43 @@ function ensureTacticalCardElement(container, index, accentColor) {
       flex: 1 1 0;
       min-width: 0;
       box-sizing: border-box;
-      padding: 5px 8px;
+      padding: 3.5px 6px;
       background: linear-gradient(135deg, rgba(11, 15, 25, 0.94) 0%, rgba(15, 23, 42, 0.94) 100%);
       border: 1px solid rgba(255, 255, 255, 0.12);
-      border-radius: 4px;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+      border-radius: 3px;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
       backdrop-filter: blur(8px);
       display: flex;
       flex-direction: column;
-      gap: 3.5px;
+      gap: 2.5px;
     `;
     card.innerHTML = `
       <!-- Top Row: Operator Name & Caliber / Live Health Readout -->
-      <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1.2;">
-        <div style="display: flex; align-items: center; gap: 5px; min-width: 0; overflow: hidden;">
-          <span class="tac-name" style="font-family: 'Rajdhani', 'Outfit', sans-serif; font-size: 12px; font-weight: 900; color: ${accentColor}; letter-spacing: 0.5px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
-          <span class="tac-caliber" style="font-family: 'Rajdhani', monospace; font-size: 9px; font-weight: 700; color: #94a3b8; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); padding: 1px 4px; border-radius: 2px; white-space: nowrap;"></span>
+      <div style="display: flex; justify-content: space-between; align-items: center; line-height: 1.15;">
+        <div style="display: flex; align-items: center; gap: 4px; min-width: 0; overflow: hidden;">
+          <span class="tac-name" style="font-family: 'Rajdhani', 'Outfit', sans-serif; font-size: 10.5px; font-weight: 900; color: ${accentColor}; letter-spacing: 0.4px; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;"></span>
+          <span class="tac-caliber" style="font-family: 'Rajdhani', monospace; font-size: 8px; font-weight: 700; color: #94a3b8; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.08); padding: 0 3px; border-radius: 2px; white-space: nowrap;"></span>
         </div>
-        <div class="tac-hp-badge" style="font-family: 'Rajdhani', monospace; font-size: 11.5px; font-weight: 900; color: #f8fafc; display: flex; align-items: baseline; gap: 2px;">
-          <span class="tac-hp">0</span><span class="tac-hp-unit" style="font-size: 9px; color: #64748b;"> HP</span>
+        <div class="tac-hp-badge" style="font-family: 'Rajdhani', monospace; font-size: 10px; font-weight: 900; color: #f8fafc; display: flex; align-items: baseline; gap: 2px;">
+          <span class="tac-hp">0</span><span class="tac-hp-unit" style="font-size: 8px; color: #64748b;"> HP</span>
         </div>
       </div>
 
       <!-- Middle: Clean Health Bar Track -->
-      <div class="health-card__bar" style="height: 4.5px; background: rgba(255, 255, 255, 0.12); border-radius: 2px; overflow: hidden; position: relative;">
-        <div class="health-card__fill" style="width: 100%; height: 100%; background: ${accentColor}; border-radius: 2px; transition: width 0.15s ease, background 0.2s ease;"></div>
+      <div class="health-card__bar" style="height: 3.5px; background: rgba(255, 255, 255, 0.12); border-radius: 1.5px; overflow: hidden; position: relative;">
+        <div class="health-card__fill" style="width: 100%; height: 100%; background: ${accentColor}; border-radius: 1.5px; transition: width 0.15s ease, background 0.2s ease;"></div>
       </div>
 
       <!-- Bottom Row: Simple Clean Minimal Text for AMMO and DMG (No cards/boxes) -->
-      <div style="display: flex; justify-content: space-between; align-items: center; font-family: 'Rajdhani', monospace; font-size: 10.5px; font-weight: 700; line-height: 1; padding: 1px 0;">
+      <div style="display: flex; justify-content: space-between; align-items: center; font-family: 'Rajdhani', monospace; font-size: 9px; font-weight: 700; line-height: 1; padding: 0.5px 0;">
         <!-- Left: Ammo Simple Text -->
-        <div style="display: flex; align-items: center; gap: 4px;">
-          <span style="font-size: 9px; color: #64748b;">AMMO</span>
+        <div style="display: flex; align-items: center; gap: 3px;">
+          <span style="font-size: 8px; color: #64748b;">AMMO</span>
           <span class="tac-ammo" style="color: #fbbf24; font-weight: 800;">0/0</span>
         </div>
         <!-- Right: Damage Simple Text -->
-        <div style="display: flex; align-items: center; gap: 4px;">
-          <span style="font-size: 9px; color: #64748b;">DMG</span>
+        <div style="display: flex; align-items: center; gap: 3px;">
+          <span style="font-size: 8px; color: #64748b;">DMG</span>
           <span class="tac-dmg" style="color: #cbd5e1; font-weight: 800;">0</span>
         </div>
       </div>
@@ -672,13 +720,13 @@ function updateHealthHud() {
   }
 
   // OPTIMIZATION: Throttling HUD updates to prevent extreme DOM reflow lag from progress bars.
-  const isTactical = (state.gameCategory === 'tactical' || String(mode).toLowerCase().startsWith('tactical'));
+  const isTactical = isTacticalMatch(state);
   const is1v1 = mode === GAME_MODES.ONE_VS_ONE || mode === '1v1' || mode === GAME_MODES.TACTICAL_1V1 || mode === 'Tactical 1v1' || (isTactical && fighters.length === 2 && !mode.includes('2v2') && !mode.includes('4v4'));
   const isStandOff = mode === GAME_MODES.STAND_OFF || mode === 'Stand Off' || mode === GAME_MODES.TACTICAL_STANDOFF || mode === 'Tactical Stand Off' || mode === GAME_MODES.TACTICAL_RANDOM || mode === 'Tactical Random';
   const is1v2 = mode === GAME_MODES.STAND_OFF_1V2 || mode === '1v2 Stand Off';
   const is2v2 = mode === GAME_MODES.TWO_VS_TWO || mode === '2v2' || mode === GAME_MODES.TACTICAL_2V2 || mode === 'Tactical 2v2' || mode === GAME_MODES.TACTICAL_4V4 || mode === 'Tactical 4v4';
   const isTLFS = mode === GAME_MODES.TLFS || mode === 'TLFS';
-  const isSingleColumnMode = is1v1 || isStandOff || (isTactical && fighters.length <= 2);
+  const isSingleColumnMode = (is1v1 || isStandOff) && !isTactical;
   const currentHpStr = fighters.map(f => f ? Math.round(f.hp) : 0).join(',');
   const q = (v) => Math.round((v || 0) / 4);
   const currentSkillsStr = fighters.map(f => {
@@ -711,6 +759,10 @@ function updateHealthHud() {
       document.querySelector('.game-box'),
       document.getElementById('hudBottomContainer'),
       document.getElementById('hudTopContainer'),
+      document.getElementById('hudTopLeft'),
+      document.getElementById('hudTopRight'),
+      document.getElementById('hudBottomLeft'),
+      document.getElementById('hudBottomRight'),
       document.getElementById('healthHud'),
       document.getElementById('healthHudLeft'),
       document.getElementById('healthHudRight'),
@@ -1311,8 +1363,11 @@ function updateHealthHud() {
     return info;
   };
 
-  const formatSkillLabel = (label) => {
+  const formatSkillLabel = (label, isTac = false) => {
     if (!label) return '';
+    if (isTac) {
+      return String(label);
+    }
     if (String(label).includes('<')) {
       return String(label).replace(/(<[^>]+>)|(\d+%|\d+)/g, (match, tag, num) => {
         if (tag) return tag;
@@ -1564,6 +1619,9 @@ function updateHealthHud() {
   };
 
   const generateFighterSkillsHTML = (f, align, singleColumn = false) => {
+    const isTac = isTacticalFighter(f) || isTacticalMatch(state);
+    if (isTac) return ''; // Simple HUD mode: Only Name & Healthbar
+
     const skills = getSkillDataForFighter(f);
     if (!skills || skills.length === 0) return '';
     const isCj = f && (f.characterId === 'cj' || f.type === 'cj');
@@ -1577,10 +1635,12 @@ function updateHealthHud() {
       // In 2-column mode: long names (> 14 chars), single skills, or odd skills span 2 columns.
       const isLastOddSkill = (skills.length % 2 === 1 && index === skills.length - 1);
       const isLongName = plainTextLen > 14;
-      const isSpan2 = singleColumn || skills.length === 1 || isLongName || isLastOddSkill || s.fullWidth;
+      const isSpan2 = isTac || singleColumn || skills.length === 1 || isLongName || isLastOddSkill || s.fullWidth;
 
       let fontSz = 14.5;
-      if (singleColumn) {
+      if (isTac) {
+        fontSz = 11.0;
+      } else if (singleColumn) {
         if (plainTextLen > 36) fontSz = 12.5;
         else if (plainTextLen > 28) fontSz = 13.5;
         else if (plainTextLen > 22) fontSz = 14.2;
@@ -1597,8 +1657,10 @@ function updateHealthHud() {
         else fontSz = 14.5;
       }
 
-      const textStyle = `font-size: ${fontSz}px; text-align: ${align}; white-space: nowrap;`;
-      const formattedLabel = formatSkillLabel(s.label);
+      const textStyle = isTac
+        ? `font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, monospace, sans-serif; font-size: 11px; font-weight: 800; text-align: center; width: 100%; letter-spacing: 0.5px; text-transform: uppercase;`
+        : `font-size: ${fontSz}px; text-align: ${align}; white-space: nowrap;`;
+      const formattedLabel = formatSkillLabel(s.label, isTac);
       const spanClass = isSpan2 ? ' span-2' : '';
 
       if (s.noFill) {
@@ -1622,6 +1684,10 @@ function updateHealthHud() {
   };
 
   const generateFighterInfoHTML = (f, singleColumn = false, isTeam = false) => {
+    if (!f) return '';
+    const isTacFighter = isTacticalFighter(f) || isTacticalMatch(state);
+    if (isTacFighter) return ''; // Simple HUD mode: Only Name & Healthbar
+
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
@@ -1719,10 +1785,14 @@ function updateHealthHud() {
   const buildCard = ({ title, scoreText, fillColor, fillRatio, metaLabel, metaValue, members = null, extraClass = '', borderColor = null, wins = 0, fighterColor = null, shakeTimer = 0, isWinner = false, description = '', kills = [], maxBullets = 5, targetFighter = null, titleAlign = 'left', singleColumn = false }) => {
     const safeRatio = Number.isFinite(fillRatio) ? Math.max(0, Math.min(1, fillRatio)) : 0;
     const winnerStyle = '';
+    const isTactical = isTacticalMatch(state) || (targetFighter && isTacticalFighter(targetFighter)) || (members && members.some(m => isTacticalFighter(m)));
+    if (isTactical) {
+      maxBullets = 0;
+    }
 
     const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
-    const maxChars = extraClass.includes('ffa-card') ? 18 : 24;
-    const isDark = (state.arenaTheme === 'dark');
+    const maxChars = isTactical ? 28 : (extraClass.includes('ffa-card') ? 18 : 24);
+    const isDark = (state.arenaTheme === 'dark') || isTactical;
     const defaultNameColor = isDark ? '#ffffff' : '#111111';
     let nameColor = fighterColor || defaultNameColor;
     if (nameColor === '#fff' || nameColor === '#ffffff') {
@@ -1745,6 +1815,9 @@ function updateHealthHud() {
     };
 
     const getTitleStyle = (color, isCj = false) => {
+      if (isTactical) {
+        return `font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95); -webkit-text-stroke: 0px; text-stroke: 0px; `;
+      }
       const glow1 = hexToRgba(color, 0.70);
       const glow2 = hexToRgba(color, 0.35);
       const fontFamily = isCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
@@ -1766,7 +1839,7 @@ function updateHealthHud() {
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
-        const hpText = `${Math.floor(Math.min(Number(m.maxHp), Math.max(0, Number(m.hp) || 0)))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
+        const hpText = (isTactical && m.hp <= 0) ? 'KIA' : `${Math.floor(Math.min(Number(m.maxHp), Math.max(0, Number(m.hp) || 0)))}/${Math.floor(Math.max(0, Number(m.maxHp) || 0))}`;
         const memberShakeTimer = m._healthBarShakeTimer || 0;
         const memberShakeAmount = memberShakeTimer > 0 ? Math.sin((12 - memberShakeTimer) * 0.75) * 3 : 0;
         const memberShakeStyle = memberShakeTimer > 0 ? `transform: translateX(${memberShakeAmount}px);` : '';
@@ -1808,9 +1881,9 @@ function updateHealthHud() {
         }
 
         return `
-          <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
-            <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 4px 0;">
-              <div class="health-card__title" style="${getTitleStyle(memberNameColor, isMemberCj)}color: ${memberNameColor}; margin: 0; text-align: ${titleAlign || 'left'}; flex-shrink: 0;">${memberName}</div>
+          <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '6px'};">
+            <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 3px 0;">
+              <div class="health-card__title tac-name" style="${getTitleStyle(memberNameColor, isMemberCj)}color: ${memberNameColor}; margin: 0; text-align: ${titleAlign || 'left'}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${memberName}</div>
             </div>
             ${memberStackHTML}
             <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle}">
@@ -1876,17 +1949,24 @@ function updateHealthHud() {
       const filled = i < wins;
       return `<div class="health-card__win-bullet ${filled ? 'filled' : ''}"></div>`;
     }).join('');
-    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 4px; align-items: center; flex-shrink: 0;">${winsBullets}</div>` : '';
+    const winsHTML = maxBullets > 0 ? `<div class="health-card__wins" style="display: flex; gap: 3px; align-items: center; flex-shrink: 0; margin: 0;">${winsBullets}</div>` : '';
 
-    const headerRowHTML = (title || maxBullets > 0) ? `
-      <div class="health-card__header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 8px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 4px;">
-        ${title ? `<div class="health-card__title" style="${getTitleStyle(nameColor, isCardCj)}color: ${nameColor}; margin: 0; text-align: ${titleAlign}; flex-shrink: 0;">${truncatedTitle}</div>` : ''}
+    const rightHeaderHTML = winsHTML ? `
+      <div style="display: flex; align-items: center; gap: 5px; flex-shrink: 0;">
         ${winsHTML}
       </div>
     ` : '';
 
+    const headerRowHTML = (title || rightHeaderHTML) ? `
+      <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 3px;">
+        ${title ? `<div class="health-card__title tac-name" style="${getTitleStyle(nameColor, isCardCj)}color: ${nameColor}; margin: 0; text-align: ${titleAlign}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${truncatedTitle}</div>` : ''}
+        ${rightHeaderHTML}
+      </div>
+    ` : '';
+
+    const cardBgStyle = 'background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;';
     return `
-      <div class="health-card ${extraClass}" style="${winnerStyle} background: transparent; border: none; border-radius: 0; padding: 0; box-shadow: none;">
+      <div class="health-card ${extraClass}" style="${winnerStyle} ${cardBgStyle}">
         ${headerRowHTML}
         ${cjStackHTML}
         ${barsHTML}
@@ -1937,7 +2017,7 @@ function updateHealthHud() {
           fillRatio: ratio,
           metaLabel: `DMG: ${parseFloat(Math.max(0, Number(soloFighter.damage) || 0).toFixed(1))}`,
           metaValue: `${Math.floor(Math.max(0, Number(soloFighter.hp) || 0))}/${Math.floor(Math.max(0, Number(soloFighter.maxHp) || 0))}`,
-          extraClass: 'red solo-1v2-card',
+          extraClass: isTactical ? 'tactical-card' : 'red solo-1v2-card',
           borderColor: color,
           wins: matchWins,
           fighterColor: nameColor,
@@ -2053,12 +2133,12 @@ function updateHealthHud() {
           scoreText: `${teamScores[teamIndex] || 0} WINS`,
           fillColor: team.color,
           members: members,
-          extraClass: team.key,
+          extraClass: isTactical ? `${team.key} tactical-card` : team.key,
           shakeTimer,
           isWinner: isWinner,
           borderColor: isWinner ? '#ffd700' : null,
           kills: members.flatMap(m => state.matchKills ? state.matchKills[m] || [] : []),
-          maxBullets: 3,
+          maxBullets: isTactical ? 0 : 3,
           titleAlign: teamIndex === 0 ? 'left' : 'right'
         });
 
@@ -2141,7 +2221,17 @@ function updateHealthHud() {
             `;
         }
 
-        const isSingleCol = isSingleColumnMode && mode !== GAME_MODES.FFA;
+        const isFfa = mode === GAME_MODES.FFA || mode === 'FFA' || mode === GAME_MODES.TACTICAL_FFA || mode === 'Tactical FFA';
+        let extraClassStr = '';
+        if (isTactical) {
+          const is2x2 = isFfa || fighters.length >= 3;
+          extraClassStr = is2x2 ? 'tactical-card tactical-card-2x2' : 'tactical-card tactical-card-1v1';
+        } else {
+          extraClassStr = isFfa ? 'ffa-card' : (isSingleColumnMode ? 'single-column' : '');
+        }
+
+        const maxBulletsCount = (mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.TACTICAL_STANDOFF || isTactical) ? 0 : (isFfa ? 0 : 2);
+
         const cardHTML = buildCard({
           title: fighterName,
           scoreText: totalGames > 0 ? `${winRate}% WR` : '',
@@ -2149,18 +2239,18 @@ function updateHealthHud() {
           fillRatio: ratio,
           metaLabel: `DMG: ${parseFloat(Math.max(0, Number(fighter.damage) || 0).toFixed(1))}`,
           metaValue: `${Math.floor(Math.max(0, Number(fighter.hp) || 0))}/${Math.floor(Math.max(0, Number(fighter.maxHp) || 0))}`,
-          extraClass: mode === GAME_MODES.FFA ? 'ffa-card' : (isSingleCol ? 'single-column' : ''),
+          extraClass: extraClassStr,
           borderColor: color,
           wins: matchWins,
           fighterColor: nameColor,
           shakeTimer,
           isWinner: fighter === state.roundWinner,
           description: cardDesc,
-          kills: (mode === GAME_MODES.FFA) && state.matchKills ? state.matchKills[index] || [] : [],
-          maxBullets: (mode === GAME_MODES.STAND_OFF || mode === GAME_MODES.FFA) ? 0 : 2,
+          kills: (isFfa) && state.matchKills ? state.matchKills[index] || [] : [],
+          maxBullets: maxBulletsCount,
           targetFighter: fighter,
           titleAlign: (index % 2 === 0 ? 'left' : 'right'),
-          singleColumn: isSingleCol
+          singleColumn: isSingleColumnMode
         });
 
         const tempDiv = document.createElement('div');
@@ -2266,8 +2356,8 @@ function updateHealthHud() {
           m.bar.style.transform = memberShakeTimer > 0 ? `translateX(${memberShakeAmount}px)` : '';
         }
 
-        const dmgVal = Math.round(fighter.damageDealt || 0);
-        const hpText = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))} • DMG ${dmgVal}`;
+        const isTactical = isTacticalMatch(state);
+        const hpText = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
         if (m.lastHpText !== hpText) {
           m.text.textContent = hpText;
           m.lastHpText = hpText;
@@ -2346,7 +2436,7 @@ function updateHealthHud() {
                   cachedSkill.lastLabelOnly = true;
                 }
                 if (cachedSkill.lastLabel !== s.label) {
-                  cachedSkill.text.innerHTML = formatSkillLabel(s.label);
+                  cachedSkill.text.innerHTML = formatSkillLabel(s.label, isTactical);
                   cachedSkill.lastLabel = s.label;
                 }
               } else {
@@ -2367,7 +2457,7 @@ function updateHealthHud() {
                   cachedSkill.lastLabelOnly = false;
                 }
                 if (cachedSkill.lastLabel !== s.label) {
-                  cachedSkill.text.innerHTML = formatSkillLabel(s.label);
+                  cachedSkill.text.innerHTML = formatSkillLabel(s.label, isTactical);
                   cachedSkill.lastLabel = s.label;
                 }
               }
@@ -2440,8 +2530,8 @@ function updateHealthHud() {
       }
 
       if (cachedCard.hpBarText) {
-        const dmgVal = Math.round(fighter.damageDealt || 0);
-        const metaValue = `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))} • DMG ${dmgVal}`;
+        const isTactical = isTacticalMatch(state);
+        const metaValue = (curHp <= 0 && isTactical) ? 'KIA' : `${Math.floor(Math.min(Number(maxHp), Math.max(0, Number(curHp) || 0)))}/${Math.floor(Math.max(0, Number(maxHp) || 0))}`;
         if (cachedCard.lastHpText !== metaValue) {
           cachedCard.hpBarText.textContent = metaValue;
           cachedCard.lastHpText = metaValue;
@@ -2505,12 +2595,17 @@ function updateHealthHud() {
       cachedCard.cardElement.style.transform = '';
 
       // 3. Wins bullets
+      const isTactical = isTacticalMatch(state);
       const matchWins = scores[index] || 0;
       cachedCard.winBullets.forEach((bullet, i) => {
         const filled = i < matchWins;
         if (filled) {
           bullet.classList.add('filled');
-          bullet.style.background = fighter.color || '#ffd700';
+          if (isTactical) {
+            bullet.style.background = '#fbbf24';
+          } else {
+            bullet.style.background = fighter.color || '#ffd700';
+          }
         } else {
           bullet.classList.remove('filled');
           bullet.style.background = '';
@@ -2539,7 +2634,7 @@ function updateHealthHud() {
                 cachedSkill.lastLabelOnly = true;
               }
               if (cachedSkill.lastLabel !== s.label) {
-                cachedSkill.text.innerHTML = formatSkillLabel(s.label);
+                cachedSkill.text.innerHTML = formatSkillLabel(s.label, isTactical);
                 cachedSkill.lastLabel = s.label;
               }
             } else {
@@ -2560,7 +2655,7 @@ function updateHealthHud() {
                 cachedSkill.lastLabelOnly = false;
               }
               if (cachedSkill.lastLabel !== s.label) {
-                cachedSkill.text.innerHTML = formatSkillLabel(s.label);
+                cachedSkill.text.innerHTML = formatSkillLabel(s.label, isTactical);
                 cachedSkill.lastLabel = s.label;
               }
             }

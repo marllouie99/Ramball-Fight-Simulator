@@ -271,13 +271,12 @@ export class GojoFighter extends Fighter {
   }
 
   takeDamage(amount, attacker, opts = {}) {
-    const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 180;
+    const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 220;
     if ((opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
-      if (!this.isMeleeMode && this.forcedMeleeTimer <= 0) {
-        this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 100;
+      if (!this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0) {
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
+        this.isMeleeMode = true;
       }
-      this.isMeleeMode = true;
-      this.meleeModeCooldown = 0;
     }
 
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready - disabled on guaranteed hits, Toji ambush, or Pure Love Beam)
@@ -307,7 +306,7 @@ export class GojoFighter extends Fighter {
       this.isMeleeMode = false;
     }
     const isInsideEnemyDomain = !this.domainActive && state.fighters && state.fighters.some(f => f && f !== this && f.domainActive && f.hp > 0);
-    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !isToji && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
+    if ((!this.isMeleeMode || isBreatherState || isDomainChanneling || this.domainActive) && !this.isChannelingPurple && !isToji && !isSaitamaCountering && !isGuaranteedHit && !isAttackerChannelingDomain && attacker && attacker !== this && this.hp > 0 && !opts.isStorm && !opts.isDomain && !opts.bypassShield) {
       const freezeChance = CONFIG.gojo?.infinityFreezeChance ?? 0.90;
       const totalMahoragaStages = attacker.adaptationStage ? ((attacker.adaptationStage.melee || 0) + (attacker.adaptationStage.ranged || 0) + (attacker.adaptationStage.skill || 0)) : 0;
       const hasAdapted = attacker.gojoInfinityImmune || attacker.isMaxAdapted || attacker.isInfinityBlitz || attacker.isWallSlamActive || totalMahoragaStages >= 8;
@@ -693,13 +692,19 @@ export class GojoFighter extends Fighter {
       if (this.infinityCooldown <= 0) this.infinityActive = true;
     }
 
-    // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain) every frame without freezing inside domain
+    // Decrement skill cooldowns (Red, Purple, RCT, Blue, Domain, Melee) every frame without freezing inside domain
     if (this.cooldown > 0) this.cooldown--;
     if ((this.redEffectTimer || 0) <= 0 && this.redCooldown > 0) this.redCooldown--;
     if (!this.isChannelingPurple && (this.purpleRecoveryTimer || 0) <= 0 && this.purpleCooldown > 0) this.purpleCooldown--;
     if (this.domainCooldown > 0) this.domainCooldown--;
     if (!this.isChannelingRCT && this.reverseCursedTechniqueCooldown > 0) this.reverseCursedTechniqueCooldown--;
     if (this.healingAuraTimer > 0) this.healingAuraTimer--;
+    if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
+    if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
+    if (this.teleportChaseDelayTimer > 0) this.teleportChaseDelayTimer--;
+    if (this.meleeClashCooldown > 0) this.meleeClashCooldown--;
+    if (this.teleportDodgeCooldown > 0) this.teleportDodgeCooldown--;
+    if (this.punchAnimTimer > 0) this.punchAnimTimer--;
 
     // Completely immobilize Gojo if Toji or Saitama is actively performing an ambush/counter sequence on him
     // UNLESS Gojo is inside his own Domain Expansion (he has ultimate advantage and cannot be restrained!)
@@ -726,7 +731,7 @@ export class GojoFighter extends Fighter {
         this.domainActive = false;
         this.forcedMeleeTimer = 0; // Release forced melee lock so Gojo can move freely again!
         this.isMeleeMode = false; // Stop chasing in melee!
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 600; // Enforce separation
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Enforce separation
         this.postDomainFadeInTimer = 90; // ~1.5 seconds of fade-in after domain ends
 
         if (opponent && !opponent.isDead) {
@@ -751,6 +756,7 @@ export class GojoFighter extends Fighter {
         this.isMeleeMode = true;
         this.forcedMeleeTimer = Math.max(this.forcedMeleeTimer, 30);
         this.meleeModeCooldown = 0;
+        this._applyDomainEffect();
       }
     }
 
@@ -1095,8 +1101,8 @@ export class GojoFighter extends Fighter {
     // Check if ANY enemy is currently meleeing Gojo or in close range
     let isBeingMeleed = false;
     let closestEnemyDist = Infinity;
-    const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 180;
-    const leaveMeleeRadius = closeRangeRadius + 40;
+    const closeRangeRadius = CONFIG.gojo?.closeRangeRadius ?? 220;
+    const leaveMeleeRadius = closeRangeRadius + 60;
 
     if (state.fighters && state.fighters.length > 0) {
       for (let i = 0; i < state.fighters.length; i++) {
@@ -1108,7 +1114,8 @@ export class GojoFighter extends Fighter {
         const d = Math.hypot(this.x - f.x, this.y - f.y);
         if (d < closestEnemyDist) closestEnemyDist = d;
 
-        if (d <= closeRangeRadius || f.isMeleeMode || f.flurryTarget === this) {
+        const isBrawlerEnemy = f.isMeleeMode || f.isBrawler || f.isMeleeFighter || f.characterId === 'saitama' || f.type === 'saitama' || f.characterId === 'yuji' || f.characterId === 'todo' || f.flurryTarget === this || f.isFlurrying || (f.punchAnimTimer && f.punchAnimTimer > 0);
+        if (d <= closeRangeRadius || (isBrawlerEnemy && d <= 320)) {
           isBeingMeleed = true;
           break;
         }
@@ -1118,33 +1125,42 @@ export class GojoFighter extends Fighter {
     // Switch modes based on distance & melee engagement (only when not in special states)
     if (!this.isTeleporting && !this.isChannelingPurple) {
       if (this.domainActive) {
-        this.isMeleeMode = true; // Force melee mode in domain
-      } else if (this.meleeModeCooldown > 0) {
-        // Mandatory ranged separation period — STRICTLY PREVENT MELEE until cooldown reaches 0!
-        this.isMeleeMode = false;
-        this.forcedMeleeTimer = 0;
+        this.isMeleeMode = true; // Always force melee mode during Domain Expansion
       } else if (opponent && opponent.isStealthed && !this.domainActive && !(opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji')) {
         // Disengage from melee combat while non-Toji opponent is in stealth mode
         this.isMeleeMode = false;
-      } else if (isBeingMeleed) {
-        // Enter Melee Mode when in close melee engagement (only when cooldown is ready!)
-        if (!this.isMeleeMode && this.forcedMeleeTimer <= 0) {
-          this.forcedMeleeTimer = CONFIG.gojo.initialMeleeDuration || 100;
-        }
-        this.isMeleeMode = true;
-      } else if (this.forcedMeleeTimer > 0) {
-        this.wasForcedMelee = true;
-        this.isMeleeMode = true;
-      } else {
-        if (this.isMeleeMode && closestEnemyDist > leaveMeleeRadius) {
-          // Left melee range - switch back to ranged mode and teleport away
+        this.forcedMeleeTimer = 0;
+      } else if (this.meleeModeCooldown > 0) {
+        // MANDATORY RANGED SEPARATION: strictly stay in Ranged Mode until cooldown expires!
+        if (this.isMeleeMode) {
           this.isMeleeMode = false;
-          this.wasForcedMelee = false;
-          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 600;
+          this.forcedMeleeTimer = 0;
           if (opponent && !opponent.isDead) {
             this._teleportAwayFrom(opponent, arena);
           }
         }
+      } else if (this.isMeleeMode) {
+        // Gojo is currently in Melee Mode: Check if duration expired or enemy moved far away
+        if (this.forcedMeleeTimer <= 0) {
+          // DURATION EXPIRED: Disengage to Ranged Mode and start separation cooldown!
+          this.isMeleeMode = false;
+          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? 120;
+          if (opponent && !opponent.isDead) {
+            this._teleportAwayFrom(opponent, arena);
+          }
+        } else if (closestEnemyDist > leaveMeleeRadius) {
+          // Enemy left melee range early: Disengage to Ranged Mode
+          this.isMeleeMode = false;
+          this.forcedMeleeTimer = 0;
+          this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? 120;
+          if (opponent && !opponent.isDead) {
+            this._teleportAwayFrom(opponent, arena);
+          }
+        }
+      } else if (isBeingMeleed && this.meleeModeCooldown <= 0) {
+        // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
+        this.isMeleeMode = true;
+        this.forcedMeleeTimer = CONFIG.gojo?.initialMeleeDuration ?? 120;
       }
     }
 
@@ -1198,7 +1214,7 @@ export class GojoFighter extends Fighter {
     }
     this.applyMovementPhysics(speedMult);
 
-    if (opponent && !opponent.isDead && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0 && (this.hitStunTimer || 0) <= 0) {
+    if (opponent && !opponent.isDead && !this.isTargetOfAmbush && (this.timeStopTimer || 0) <= 0) {
       this.aim(opponent);
     }
 
@@ -1304,6 +1320,9 @@ export class GojoFighter extends Fighter {
         this.teleportSlideTimer = 0; // Zero slide pause during Unlimited Void speed punches
       }
       this.aim(opponent);
+      if (opponent && !opponent.isDead && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
+        opponent.aim(this);
+      }
 
       spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
       spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
@@ -1313,19 +1332,46 @@ export class GojoFighter extends Fighter {
     }
 
     // 2. Verify target is inside punch reach before striking (prevents punching empty air if target dodges away)
-    const currentDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+    let currentDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
     const punchReach = this.r + opponent.r + 45;
     if (currentDist > punchReach) {
-      return; // Do NOT punch the air when target is out of reach!
+      // If target just dodged out of punch reach (e.g. Saitama/Sukuna dodge sidestep), attempt an immediate teleport chase!
+      if (canTeleportChase && !shouldTeleport) {
+        const oldX = this.x;
+        const oldY = this.y;
+        const angleFromOpponent = Math.atan2(oldY - opponent.y, oldX - opponent.x);
+        const flankAngle = angleFromOpponent + (Math.random() < 0.5 ? Math.PI * 0.45 : -Math.PI * 0.45);
+        const behindOffset = opponent.r + this.r + 12;
+        let targetX = opponent.x + Math.cos(flankAngle) * behindOffset;
+        let targetY = opponent.y + Math.sin(flankAngle) * behindOffset;
+        if (arena) {
+          targetX = Math.max(arena.x + this.r, Math.min(arena.x + arena.width - this.r, targetX));
+          targetY = Math.max(arena.y + this.r, Math.min(arena.y + arena.height - this.r, targetY));
+        }
+        this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
+        this.aim(opponent);
+        if (opponent && !opponent.isDead && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
+          opponent.aim(this);
+        }
+        spawnImpactFlash(oldX, oldY, 20, 'lightningTrail');
+        spawnImpactFlash(this.x, this.y, 25, 'lightningTrail');
+        const dashSnd = CONFIG.gojo?.sounds?.teleportDash || 'skill_dash3';
+        const dashVol = CONFIG.gojo?.soundVolumes?.teleportDash ?? 0.6;
+        audioSystem.playSFX(dashSnd, dashVol);
+        currentDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+      }
+      if (currentDist > punchReach) {
+        return; // Do NOT punch the air if target is still out of reach!
+      }
     }
 
     // 3. Execute punch at current position
     this._meleePunch(opponent);
     this.meleeComboCount++;
 
-    // Check for Sukuna clash shockwave (when both are in melee range)
-    if (opponent && !opponent.isDead && opponent._def &&
-      (opponent._def.id === 'sukuna' || opponent._def.name === 'SukunaFighter')) {
+    // Check for brawler clash shockwave (when both are in melee range)
+    const isBrawlerOpponent = opponent && !opponent.isDead && (opponent.characterId === 'sukuna' || opponent.characterId === 'saitama' || opponent.characterId === 'yuji' || opponent.characterId === 'todo' || opponent._def?.id === 'sukuna');
+    if (isBrawlerOpponent) {
       if (!this.meleeClashCooldown) this.meleeClashCooldown = 0;
       if (this.meleeClashCooldown <= 0) {
         // Spawn shockwave at midpoint between fighters
@@ -1348,7 +1394,7 @@ export class GojoFighter extends Fighter {
 
       if (!this.domainActive && this.forcedMeleeTimer <= 0) {
         this.isMeleeMode = false;
-        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 600; // Mandatory ranged separation!
+        this.meleeModeCooldown = CONFIG.gojo?.meleeModeCooldown ?? CONFIG.gojo?.meleeModeSeparationCooldown ?? 120; // Mandatory ranged separation!
         if (opponent && !opponent.isDead) {
           this._teleportAwayFrom(opponent, arena);
         }
@@ -1378,6 +1424,9 @@ export class GojoFighter extends Fighter {
 
     this._applyTeleportSlideBrake(oldX, oldY, targetX, targetY, arena);
     this.aim(opponent);
+    if (opponent && !opponent.isDead && typeof opponent.aim === 'function' && !opponent.isTargetOfAmbush) {
+      opponent.aim(this);
+    }
 
     // Smooth mode switch to Ranged without freezing movement
     this.shootCooldown = Math.max(this.shootCooldown || 0, 15);
@@ -1462,6 +1511,9 @@ export class GojoFighter extends Fighter {
     for (const target of validTargets) {
       // Pass isSkill: true to bypass the basic attack hit-pause (which locks target updates)
       target.takeDamage(punchDamage, this, { isMelee: true, isDomain: this.domainActive, isSkill: true });
+      if (target && !target.isDead && typeof target.aim === 'function' && !target.isTargetOfAmbush) {
+        target.aim(this);
+      }
 
       const angle = Math.atan2(target.y - this.y, target.x - this.x);
       
@@ -1650,6 +1702,7 @@ export class GojoFighter extends Fighter {
 
   _activateDomain(arena) {
     this.isChannelingDomainExpansion = false;
+    this.domainChargeTimer = 0;
     this._hasPlayedDomainChannelSound = false;
     this.domainActive = true;
     this.domainActivationTime = Date.now();
@@ -1665,8 +1718,6 @@ export class GojoFighter extends Fighter {
     this.wasForcedMelee = true;
     this.meleeModeCooldown = 0;
     this.meleeComboCount = 0;
-
-    spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, 'UNLIMITED VOID', '#00E5FF');
 
     if (!this._playedDeployAudio) {
       this._playedDeployAudio = true;
@@ -1777,7 +1828,7 @@ export class GojoFighter extends Fighter {
     if (this.isDead || this.hp <= 0) return;
     if ((this.reverseCursedTechniqueCooldown || 0) > 0 || this.isChannelingRCT) return;
     // Set cooldown immediately as sentinel before ANY heal/visual logic runs
-    this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 900;
+    this.reverseCursedTechniqueCooldown = CONFIG.gojo?.reverseCursedTechniqueCooldown || 700;
 
     // Teleport away to a safe distance before performing RCT
     if (opponent && arena) {
@@ -1802,7 +1853,6 @@ export class GojoFighter extends Fighter {
 
     // Visual effects - prominent green RCT heal indicator
     if (typeof spawnFloatingText === 'function') {
-      spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 40, 'RCT HEAL!', '#00FF66');
       spawnFloatingText(this.x, (this.y - (this.z || 0)) - this.r - 20, '+' + Math.round(totalHeal), '#00FF00');
     }
 

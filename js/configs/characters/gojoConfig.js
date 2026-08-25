@@ -70,7 +70,7 @@ export const gojoConfig = {
   // ── 6. Reverse Cursed Technique (RCT) Healing ──
   enableRCTHeal: true,                     // Enable Gojo's Reverse Cursed Technique healing
   reverseCursedTechniqueHpThreshold: 0.25, // Triggers RCT when HP drops to 25% or below
-  reverseCursedTechniqueHealAmount: 125,   // Flat HP healed per RCT trigger
+  reverseCursedTechniqueHealAmount: 500,   // Flat HP healed per RCT trigger
   reverseCursedTechniqueCooldown: 700,     // 15 second cooldown between RCT heals
   rctChannelDuration: 90,                  // 1.5 second channeling heal window
   enablePassiveRctRegen: false,            // Passive continuous regen disabled
@@ -78,16 +78,13 @@ export const gojoConfig = {
   rctRevivalHealAmount: 150,               // Flat HP restored on emergency revival
 
   // ── 7. Melee Mode & Hand-to-Hand Martial Arts ──
-  initialMeleeDuration: 100, // Forces hand-to-hand combat for the initial duration
-  meleeModeCooldown: 100,   // 10 second cooldown before hand-to-hand combat mode can trigger again
-  closeRangeRadius: 180,    // Distance at which Gojo switches to melee mode
-  meleePunchDamage: 14,     // Damage dealt by each punch
-  meleePunchCooldown: 9,   // Frames between punches
-  teleportDelay: 5,        // Frames delay before teleport after punch
-  teleportSpeed: 15,        // Speed of teleport movement
-  forcedMeleeIntroDuration: 200,           // Forced melee clash at start of round
-  meleeModeSeparationCooldown: 100,        // Mandatory ranged separation after combo disengage
-  comboDisengageDistance: 300,             // Distance teleported away on combo finisher
+  closeRangeRadius: 220,            // Proximity distance (pixels) to enter Melee Mode
+  initialMeleeDuration: 300,        // Active melee clash duration in frames (120 frames = 2.0 seconds at 60fps)
+  meleeModeCooldown: 120,           // Mandatory ranged separation cooldown in frames (120 frames = 2.0 seconds at 60fps)
+  comboDisengageDistance: 280,      // Distance (pixels) teleported away when disengaging after clash
+  meleePunchDamage: 14,             // Damage dealt per martial arts punch strike
+  meleePunchCooldown: 9,            // Frames between consecutive punches during flurry (~0.15s at 60fps)
+  teleportSpeed: 15,                // Teleport movement slide speed
 
   // ── 8. Teleport Dodge & Evasion Mechanics ──
   teleportDodgeChance: 0.10,               // Chance to teleport dodge incoming attacks

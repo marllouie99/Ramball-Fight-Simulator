@@ -395,10 +395,10 @@ export function updateHybridEnvironment() {
   }
 
   // Enforce deterministic domain Z-order sorting:
-  // Mahito/Gojo (bottom) -> Sukuna Background (middle) -> Yuta Background/Crosses (top) -> Sukuna Shrine Foreground (top-most)
-  if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent === layer) layer.addChild(mahitoDomainHybridData.sprite);
-  if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
+  // Sukuna Background Dim/Floor (bottom) -> Gojo Background (middle) -> Mahito Background/Hands (overlays Sukuna Dim, underneath Shrine) -> Yuta Background/Crosses (top)
   if (sukunaDomainHybridData && sukunaDomainHybridData.sprite.parent === layer) layer.addChild(sukunaDomainHybridData.sprite);
+  if (gojoDomainHybridData && gojoDomainHybridData.sprite.parent === layer) layer.addChild(gojoDomainHybridData.sprite);
+  if (mahitoDomainHybridData && mahitoDomainHybridData.sprite.parent === layer) layer.addChild(mahitoDomainHybridData.sprite);
   if (yutaDomainHybridData && yutaDomainHybridData.sprite.parent === layer) layer.addChild(yutaDomainHybridData.sprite);
   
   // 1. Sukuna Furnace

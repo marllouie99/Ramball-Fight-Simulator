@@ -247,9 +247,9 @@ function drawTacticalMapSelectModal() {
     {
       map: MONOLITH_MAP,
       title: 'SECTOR 02 // MONOLITH',
-      subtitle: 'THREE VERTICAL MONOLITH PILLARS',
-      features: '3 MONOLITH PILLARS • DUAL VERTICAL LANES • CROSSFIRE HUBS',
-      desc: 'Three massive vertical monolith pillars creating straight open flanking lanes and close-quarters crossfire ambush corridors.'
+      subtitle: 'CENTRAL MONOLITH PILLAR',
+      features: 'CENTRAL MONOLITH PILLAR • DUAL VERTICAL LANES • OPEN NORTH/SOUTH',
+      desc: 'Massive central monolith pillar creating straight open flanking lanes and dynamic crossfire combat.'
     }
   ];
 

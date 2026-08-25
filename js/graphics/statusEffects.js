@@ -1534,46 +1534,6 @@ export const STATUS_OVERLAY_REGISTRY = [
     id: 'voidMark',
     isActive: (f) => f.voidMarkTimer > 0,
     render: (ctx, baseRadius, f) => drawVoidMarkEffect(ctx, baseRadius)
-  },
-  {
-    id: 'paralyze',
-    isActive: (f) => Boolean(
-      (f.paralyzeTimer && f.paralyzeTimer > 0) ||
-      (f.timeStopTimer && f.timeStopTimer > 0) ||
-      (f.electricStunTimer && f.electricStunTimer > 0) ||
-      (f.hitStunTimer && f.hitStunTimer > 0) ||
-      (f.stunTimer && f.stunTimer > 0) ||
-      (f.knockbackStunTimer && f.knockbackStunTimer > 0) ||
-      (f.dubstepStunTimer && f.dubstepStunTimer > 0) ||
-      (f.ratioHitPauseTimer && f.ratioHitPauseTimer > 0) ||
-      f.isParalyzed ||
-      f.isParalyzedByMahoraga ||
-      f.isFrozenByInfinity ||
-      f.frozenByCronos ||
-      f.isCronosStasis ||
-      f.isTargetOfAmbush ||
-      f.caughtInSaitamaFlurry
-    ),
-    render: (ctx, baseRadius, f) => {
-      if (typeof state !== 'undefined' && f && f._stunRenderedFrame === state.frameCount) return;
-      const dur = f.paralyzeTimer || f.timeStopTimer || f.electricStunTimer || f.hitStunTimer || 45;
-      const isMahito = Boolean(f.isParalyzedByMahito);
-      const color = isMahito ? '#A855F7' : '#FFEE58';
-      drawParalyzeEffect(ctx, baseRadius, isMahito, dur, color, f);
-      if (typeof state !== 'undefined' && state.frameCount !== undefined && f) {
-        f._stunRenderedFrame = state.frameCount;
-      }
-    }
-  },
-  {
-    id: 'soulDisfigurement',
-    isActive: (f) => (f.soulDisfigurementTimer || 0) > 0 || (f.soulDisfigurementVisualTimer || 0) > 0,
-    render: (ctx, baseRadius, f) => drawSoulDisfigurementEffect(ctx, f)
-  },
-  {
-    id: 'embeddedMahitoSpikes',
-    isActive: (f) => f.embeddedMahitoSpikes && f.embeddedMahitoSpikes.length > 0,
-    render: (ctx, baseRadius, f) => drawEmbeddedMahitoSpikes(ctx, f)
   }
 ];
 

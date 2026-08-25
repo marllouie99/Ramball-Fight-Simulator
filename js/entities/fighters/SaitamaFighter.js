@@ -29,6 +29,8 @@ export class SaitamaFighter extends Fighter {
 
     // Martial Arts / Brawler variables
     this.isMeleeFighter = true;
+    this.isMeleeMode = true;
+    this.isBrawler = true;
     this.punchAnimTimer = 0;
     this.punchMaxTime = CONFIG.saitama?.punchMaxTime || 22; // Smooth 22-frame punch animation cycle
     this.isRightPunch = true;
@@ -131,25 +133,23 @@ export class SaitamaFighter extends Fighter {
    * Passive Dodge Teleport (Caped Baldy Reflexes):
    * Sidesteps a short distance left or right upon detecting incoming attacks or projectiles.
    */
-  executeDodgeTeleport(attacker, isProjectile = false) {
+   executeDodgeTeleport(attacker, isProjectile = false) {
     if (this.hp <= 0) return false;
-    // Check if ANY fighter has an active domain (domain state lives on each fighter, not on state)
-    const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
 
-    // Allow Caped Baldy Reflexes to work inside Gojo's domain:
-    // Saitama can reactively dodge punches while frozen, but stays immobilized otherwise.
-    const isDomainDodge = isInsideDomain && this.timeStopTimer > 0;
+    const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
+    const isDomainDodge = isInsideDomain;
+    const isBeamOrTickDodge = Boolean(this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0));
 
     const isExecutingSeriousCounter = (this._counterPunchTimer && this._counterPunchTimer > 0) || !!this._counterPunchTarget || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0);
 
     // Check if Nanami is currently executing his 7:3 Ratio hit-pause
     const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
 
-    if (this.dodgeCooldown > 0 || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isNanamiPausing) {
+    if ((this.dodgeCooldown > 0 && !isDomainDodge && !isBeamOrTickDodge) || this.isFrozenByInfinity || this.isTargetOfAmbush || isExecutingSeriousCounter || isNanamiPausing) {
       return false;
     }
-    // Block dodge if time-stopped by non-domain effects
-    if (this.timeStopTimer > 0 && !isDomainDodge) {
+    // Block dodge if time-stopped by non-domain effects (unless dodging beam/purple tick)
+    if (this.timeStopTimer > 0 && !isDomainDodge && !isBeamOrTickDodge) {
       return false;
     }
 
@@ -164,10 +164,12 @@ export class SaitamaFighter extends Fighter {
 
     // Reference angle relative to incoming attacker/projectile or Saitama's facing angle
     let refAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    if (attacker && attacker !== this && typeof attacker.x === 'number') {
+    if (attacker && attacker !== this && typeof attacker.x === 'number' && typeof attacker.y === 'number') {
       refAngle = Math.atan2(this.y - attacker.y, this.x - attacker.x);
-    } else if (attacker && typeof attacker.vx === 'number' && typeof attacker.vy === 'number') {
+    } else if (attacker && typeof attacker.vx === 'number' && typeof attacker.vy === 'number' && (attacker.vx !== 0 || attacker.vy !== 0)) {
       refAngle = Math.atan2(attacker.vy, attacker.vx);
+    } else if (attacker && typeof attacker.angle === 'number') {
+      refAngle = attacker.angle;
     }
 
     // Alternate left (-90 deg) and right (+90 deg) sidesteps for dynamic visual movement
@@ -175,7 +177,9 @@ export class SaitamaFighter extends Fighter {
     const sideSign = this._lastDodgeSideLeft ? 1 : -1;
     let perpAngle = refAngle + (sideSign * Math.PI / 2);
 
-    const dist = CONFIG.saitama?.dodgeDistance || 50;
+    // Use wide dodge distance for beams and Purple vortex to ensure clean lateral displacement outside the damage cylinder
+    const baseDist = CONFIG.saitama?.dodgeDistance || 100;
+    const dist = isBeamOrTickDodge ? Math.max(baseDist, 120) : baseDist;
     let targetX = this.x + Math.cos(perpAngle) * dist;
     let targetY = this.y + Math.sin(perpAngle) * dist;
 
@@ -202,15 +206,20 @@ export class SaitamaFighter extends Fighter {
     this.x = targetX;
     this.y = targetY;
 
-    // Clear any hitStun or hit-pause on dodge so Saitama maintains Caped Baldy reflexes
+    // Clear any hitStun, hit-pause, or beam/purple trap state on dodge so Saitama breaks free cleanly
     const savedTimeStop = this.timeStopTimer;
     this.hitStunTimer = 0;
     this.basicAttackHitPauseTimer = 0;
     this.timeStopTimer = 0;
+    this.isCaughtInPurple = false;
+    this.purpleHitTimer = 0;
+    this.caughtInPureLoveBeam = false;
+    this.wasCaughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+    this.pureLoveBeamRecoveryTimer = 0;
 
-    // If dodging inside a domain, re-apply the freeze so Saitama stays immobilized
-    // He can reactively sidestep punches but can't move/attack between dodges
-    if (isDomainDodge && savedTimeStop > 0) {
+    // If dodging inside a domain, re-apply the domain time-stop so Saitama stays immobilized between dodges
+    if (isDomainDodge && savedTimeStop > 0 && !isBeamOrTickDodge) {
       this.timeStopTimer = savedTimeStop;
     }
 
@@ -283,7 +292,7 @@ export class SaitamaFighter extends Fighter {
     this.vx = Math.cos(perpAngle) * microGlideSpeed;
     this.vy = Math.sin(perpAngle) * microGlideSpeed;
     this.dodgeStallTimer = 8; // Short 8-frame micro-glide (~0.13s)
-    this.dodgeCooldown = CONFIG.saitama?.dodgeCooldown ?? 1;
+    this.dodgeCooldown = (isDomainDodge || isBeamOrTickDodge) ? 0 : (CONFIG.saitama?.dodgeCooldown ?? 1);
     return true;
   }
 
@@ -624,8 +633,10 @@ export class SaitamaFighter extends Fighter {
           spawnFloatingText(this.x, this.y - this.r - 14, 'COUNTER!', '#FFD700');
         }
 
-        // Massive Counter Punch Damage (1000 damage) to primary target — bypasses Limitless Infinity barrier & all evasion/dodge mechanics
-        const massiveDamage = CONFIG.saitama?.counterPunchDamage || 1000;
+        // Massive Counter Punch Damage (calculated dynamically from basic attack Normal Punch * multiplier)
+        const basePunchDamage = CONFIG.saitama?.punchDamage || 100;
+        const damageMult = CONFIG.saitama?.counterPunchDamageMultiplier ?? CONFIG.saitama?.counterPunchMultiplier ?? (CONFIG.saitama?.counterPunchDamage !== undefined ? (CONFIG.saitama.counterPunchDamage / basePunchDamage) : 20.0);
+        const massiveDamage = Math.round(basePunchDamage * damageMult);
         applyDamageToTarget(target, massiveDamage, this, { 
           isSkill: true, 
           isCounter: true, 
@@ -895,6 +906,12 @@ export class SaitamaFighter extends Fighter {
 
   _decrementSkillCooldowns() {
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+
+    const isInsideGojoDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => 
+      f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f._def?.id === 'gojo') && f.domainActive && f.hp > 0
+    );
+    if (isInsideGojoDomain) return; // Offensive skills frozen inside Unlimited Void!
+
     if (this.skillPunishCooldown > 0) this.skillPunishCooldown--;
     if (this.flurryCooldown > 0) this.flurryCooldown--;
     if (this.sideHopsCooldown > 0) this.sideHopsCooldown--;
@@ -902,6 +919,14 @@ export class SaitamaFighter extends Fighter {
   }
 
   interruptAttacks(forceCancelAll = false) {
+    const isSilenced = (this.silenceTimer || 0) > 0;
+    const isHardCC = forceCancelAll || this.isTargetOfAmbush || isSilenced || (this.timeStopTimer || 0) > 0 || (this.electricStunTimer || 0) > 0;
+
+    // Hyper Armor: Consecutive Normal Punches barrage cannot be interrupted by incidental flinches
+    if (this.isFlurrying && !isHardCC) {
+      return;
+    }
+
     if (this.flurryTarget) {
       this.flurryTarget.caughtInSaitamaFlurry = false;
     }
@@ -927,20 +952,20 @@ export class SaitamaFighter extends Fighter {
    * Intercepts incoming attack damage to execute dodge teleport (0 damage).
    */
   takeDamage(amount, attacker, opts = {}) {
-    // If paralyzed by Gojo's Purple, time stop, Nanami's guaranteed 7:3 Ratio strike / hit-pause, or sure-hit attack, Saitama cannot dodge or counter!
-    // EXCEPTION: Inside a domain, Saitama's Caped Baldy Reflexes still allow reactive dodges against melee punches.
+    // If paralyzed by Nanami's guaranteed 7:3 Ratio strike / hit-pause or explicit sure-kill attack, Saitama cannot dodge or counter!
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
-    const isDomainFreeze = isInsideDomain && this.timeStopTimer > 0;
+    const isDomainFreeze = isInsideDomain;
+    const isBeamOrTickAttack = Boolean(opts.isPurpleDPS || opts.isPureLoveBeam || opts.isBeam || opts.isLaserBeam || opts.isLaylaBeam || opts.isGenosBeam || this.isCaughtInPurple || this.caughtInPureLoveBeam);
     const isGuaranteedHit = Boolean(opts.isRatioCrit || opts.isNanamiPause || opts.undodgeable || opts.isSureKill || opts.isSaitamaCounter || opts.bypassEvade || opts.isGuaranteedHit);
     const isNanamiPausing = Boolean((attacker && (attacker.characterId === 'nanami' || attacker.type === 'nanami') && (attacker.ratioHitPauseTimer || 0) > 0) || (typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0)));
 
-    if (opts.isPurpleDPS || this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || isGuaranteedHit || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze)) {
+    if (isGuaranteedHit || isNanamiPausing || (this.timeStopTimer > 0 && !isDomainFreeze && !isBeamOrTickAttack)) {
       return super.takeDamage(amount, attacker, opts);
     }
 
     // If incoming damage is from a skill/ultimate/channeling attack and counter is ready, execute counter punch!
     const isSkillAttack = opts.isSkill || opts.isUltimate || opts.isMachineGunBlow || opts.isChanneling;
-    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0) {
+    if (isSkillAttack && attacker && attacker !== this && this.skillPunishCooldown <= 0 && !isBeamOrTickAttack) {
       const maxRange = CONFIG.saitama?.counterTriggerDistance ?? 320;
       const distToAttacker = Math.hypot(attacker.x - this.x, attacker.y - this.y);
       if (distToAttacker <= maxRange) {
@@ -952,10 +977,11 @@ export class SaitamaFighter extends Fighter {
     }
 
     // Ignore non-attack DOTs (poison, burn, domain environment ticks)
-    const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isMachineGunBlow || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn && !opts.fromBlackHole && !opts.isDomainDPS);
+    const isDirectAttack = opts.isProjectile || opts.isMelee || opts.isRanged || opts.isMachineGunBlow || opts.isPhysical || opts.isBasic || opts.isSkill || opts.isUltimate || isBeamOrTickAttack || (attacker && attacker !== this && !opts.isPoison && !opts.isBurn && !opts.fromBlackHole && !opts.isDomainDPS);
 
     if (isDirectAttack) {
-      const dodged = this.executeDodgeTeleport(attacker);
+      const dodgeTarget = (opts.projectile && typeof opts.projectile.x === 'number') ? opts.projectile : (attacker || null);
+      const dodged = this.executeDodgeTeleport(dodgeTarget);
       if (dodged) {
         return false; // Negate damage (dodged!)
       }
@@ -968,11 +994,7 @@ export class SaitamaFighter extends Fighter {
    * Triggers dodge sidestep as projectiles approach near-miss radius
    */
   onProjectileApproach(projectile, attacker) {
-    // Do NOT dodge Gojo's Hollow Purple — Saitama gets caught in the vortex!
-    if (projectile && (projectile.isGojoPurple || projectile.isGojoPurpleOrb || projectile.behaviorType === 'gojo_purple')) {
-      return;
-    }
-    const src = attacker || projectile;
+    const src = projectile || attacker;
     this.executeDodgeTeleport(src, true);
   }
 
@@ -1115,6 +1137,15 @@ export class SaitamaFighter extends Fighter {
       }
     }
 
+    // Spawn Frontal Supersonic Shockwave Blast (Death Punch style) on Normal Punch
+    const fistX = this.x + Math.cos(aimAngle) * (this.r + 15);
+    const fistY = this.y + Math.sin(aimAngle) * (this.r + 15);
+    const punchBlastReach = CONFIG.saitama?.punchFrontalReach || 420;
+    const punchBlastArc = CONFIG.saitama?.punchFrontalArc || (Math.PI * 0.65);
+    if (typeof spawnSaitamaCounterFrontalBlast === 'function') {
+      spawnSaitamaCounterFrontalBlast(fistX, fistY, aimAngle, punchBlastReach, punchBlastArc);
+    }
+
     const validHits = [];
     for (const target of targetsToScan) {
       const dist = Math.hypot(target.x - this.x, target.y - this.y);
@@ -1212,6 +1243,9 @@ export class SaitamaFighter extends Fighter {
 
   reset() {
     super.reset();
+    this.isMeleeFighter = true;
+    this.isMeleeMode = true;
+    this.isBrawler = true;
     this.shootCooldownMax = CONFIG.saitama?.punchCooldown || 500;
     this.cooldown = this.shootCooldownMax;
     this.punchCooldownTimer = 0;
@@ -1500,6 +1534,15 @@ export class SaitamaFighter extends Fighter {
           spawnPunchWindSpeedLines(this.x, this.y, aimAngle, isFinalHit ? 220 : 150, 'orange');
         }
 
+        // Spawn Frontal Supersonic Shockwave Blast on Consecutive Normal Punches Final Punch
+        if (isFinalHit && typeof spawnSaitamaCounterFrontalBlast === 'function') {
+          const finalFistX = this.x + Math.cos(aimAngle) * (this.r + 15);
+          const finalFistY = this.y + Math.sin(aimAngle) * (this.r + 15);
+          const finalBlastReach = CONFIG.saitama?.flurryFinalFrontalReach || 560;
+          const finalBlastArc = CONFIG.saitama?.flurryFinalFrontalArc || (Math.PI * 0.70);
+          spawnSaitamaCounterFrontalBlast(finalFistX, finalFistY, aimAngle, finalBlastReach, finalBlastArc);
+        }
+
         // Boredom passive bonus
         const boredomMult = 1 + (this.boredomStacks || 0) * (CONFIG.saitama?.boredomDamagePerStack || 0.15);
 
@@ -1597,6 +1640,10 @@ export class SaitamaFighter extends Fighter {
       this.vy *= 0.85;
       this.x += this.vx;
       this.y += this.vy;
+      if (opponent && opponent.hp > 0 && typeof this.aim === 'function') {
+        this.aim(opponent);
+      }
+      this.resolveWallBounce(arena, opponent);
     } else {
       // Call base fighter update logic for movement physics, wall bounce, etc. ONLY when freely walking
       super.update(opponent, ownerIndex, arena);
@@ -1605,11 +1652,12 @@ export class SaitamaFighter extends Fighter {
     // Tick basic attack charging wind-up phase
     if (this.basicPunchChargeTimer > 0) {
       this.basicPunchChargeTimer--;
-      if (this.basicPunchTarget && this.basicPunchTarget.hp > 0 && typeof this.aim === 'function') {
-        this.aim(this.basicPunchTarget);
+      const punchTgt = (this.basicPunchTarget && this.basicPunchTarget.hp > 0) ? this.basicPunchTarget : opponent;
+      if (punchTgt && punchTgt.hp > 0 && typeof this.aim === 'function') {
+        this.aim(punchTgt);
       }
       if (this.basicPunchChargeTimer <= 0) {
-        const t = this.basicPunchTarget;
+        const t = this.basicPunchTarget || punchTgt;
         this.basicPunchTarget = null;
         if (t && t.hp > 0) {
           this.executeNormalPunch(t);

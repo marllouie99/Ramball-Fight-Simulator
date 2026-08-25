@@ -167,8 +167,9 @@ export class FighterRenderer {
     const z = fighter.z || 0;
     const drawY = fighter.y - z;
 
-    // 1. Floating Name on TOP of the Fighter Body Circle
-    if (fighter.name) {
+    // 1. Floating Name on TOP of the Fighter Body Circle (Hidden in FOC mode)
+    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+    if (fighter.name && isTactical && !fighter.hideFloatingName && !fighter.hideName) {
       const nameText = fighter.name.toUpperCase();
       const nameY = drawY - fighter.r - 8;
       const themeColor = fighter.themeColor || fighter.color || '#ffffff';

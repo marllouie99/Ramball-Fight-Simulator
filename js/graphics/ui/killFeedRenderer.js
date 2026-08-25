@@ -9,6 +9,10 @@ import { state } from '../../core/state.js';
  * Pushes a new kill log event to state.killFeed
  */
 export function pushKillFeed(attacker, victim, weaponName = '', isHeadshot = false) {
+  // Only active in Tactical shooter mode (CS-style tactical kill log)
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+  if (!isTactical) return;
+
   if (!state.killFeed) state.killFeed = [];
 
   const attackerName = attacker ? (attacker.name || attacker._def?.name || 'ATTACKER').toUpperCase() : 'UNKNOWN';
@@ -91,6 +95,9 @@ function drawTacticalBulletIcon(ctx, cx, cy, isHeadshot = false) {
  * Renders Counter-Strike style kill feed in top-right arena corner
  */
 export function drawKillFeed(ctx) {
+  const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode || '').toLowerCase().includes('tactical'));
+  if (!isTactical) return;
+
   if (!state.killFeed || state.killFeed.length === 0) return;
 
   // Arena bounds anchor

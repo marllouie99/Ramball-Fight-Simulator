@@ -292,9 +292,12 @@ export class SukunaFighter extends Fighter {
 
   takeDamage(amount, attacker, opts = {}) {
     // If getting meleed or hit up close, force switch into Melee Mode to punch back
-    if ((opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= 160)) && !this.domainActive) {
-      this.isMeleeMode = true;
-      this.meleeModeCooldown = 0;
+    const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 220;
+    if ((opts.isMelee || (attacker && Math.hypot(attacker.x - this.x, attacker.y - this.y) <= closeRangeRadius)) && (this.meleeModeCooldown || 0) <= 0) {
+      if (!this.isMeleeMode && (this.forcedMeleeTimer || 0) <= 0) {
+        this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
+        this.isMeleeMode = true;
+      }
     }
 
     // High-speed Teleport Dodge chance (30% chance when dodge cooldown is ready, disabled on guaranteed hits / Nanami 7:3 Ratio crit)
@@ -384,8 +387,8 @@ export class SukunaFighter extends Fighter {
 
     if (!closestEnemy) return; // No targets available (e.g., won the match)
 
-    const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
-    const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
+    const slashDamage = CONFIG.sukuna?.slashDamage ?? this.damage;
+    const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
 
     // Trigger single-hand slicing chop animation with off-hand strictly hidden
     this.punchAnimTimer = 0;
@@ -576,38 +579,10 @@ export class SukunaFighter extends Fighter {
       });
     }
 
-    // Melee mode state management (Gojo-style forced close combat)
-    let distToOpponent = Infinity;
-    if (opponent && !opponent.isDead) {
-      distToOpponent = Math.hypot(this.x - opponent.x, this.y - opponent.y);
-    }
-
-    // Switch modes dynamically based on distance (only when not in special states)
-    if (!this.isChannelingDivineFlame && !this.domainActive && (this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0) {
-      if (opponent && (opponent.isStealthed || opponent.isAmbushing) && !this.domainActive) {
-        // Disengage from melee combat while opponent is in stealth or ambushing
-        this.isMeleeMode = false;
-      } else if (distToOpponent <= 160) {
-        // CLOSE RANGE: Opponent is right next to Sukuna — force melee hand-to-hand combat!
-        if (!this.isMeleeMode) {
-          this.isMeleeMode = true;
-          this.meleeComboCount = 0;
-        }
-        this.meleeModeCooldown = 0; // Clear separation cooldown when opponent is close
-      } else if (this.meleeModeCooldown > 0) {
-        // Mandatory ranged separation period after combo disengage, active only when opponent is NOT up close
-        this.isMeleeMode = false;
-      } else if (distToOpponent > 260) {
-        if (this.isMeleeMode) {
-          this.isMeleeMode = false;
-          this.meleeModeCooldown = CONFIG.sukuna?.meleeModeSeparationCooldown ?? 240;
-        }
-      }
-    }
-
     if (this.punchAnimTimer > 0) this.punchAnimTimer--;
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.dodgeCooldown > 0) this.dodgeCooldown--;
+    if (this.forcedMeleeTimer > 0) this.forcedMeleeTimer--;
     if (this.meleeModeCooldown > 0) this.meleeModeCooldown--;
 
     // Update afterimages (fades afterimages during melee, dodge & flurry)
@@ -794,19 +769,29 @@ export class SukunaFighter extends Fighter {
         this.flurryTimer = CONFIG.sukuna.flurryHitInterval || 6;
         if (this.flurryHitsLeft <= 0) {
           this.flurryGhost = null;
-          if (projectileSystem && this.flurryTarget && !this.flurryTarget.isDead) {
+          let target = (this.flurryTarget && !this.flurryTarget.isDead && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
+          if (!target || target.hp <= 0 || target.isDead) {
+            target = (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null) || opponent;
+          }
+          if (target && !target.isDead && target.hp > 0) {
+            this.flurryTarget = target;
             const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
 
             // Teleport away before unleashing the final Cleave/Dismantle slash
             const oldX = this.x;
             const oldY = this.y;
-            const escapeDist = 200; // Teleport a good distance away
+            const escapeDist = 180; // Teleport a good distance away
             const escapeAngle = Math.random() * Math.PI * 2;
-            this.x = this.flurryTarget.x + Math.cos(escapeAngle) * escapeDist;
-            this.y = this.flurryTarget.y + Math.sin(escapeAngle) * escapeDist;
+            this.x = target.x + Math.cos(escapeAngle) * escapeDist;
+            this.y = target.y + Math.sin(escapeAngle) * escapeDist;
+
+            // Clamp to arena bounds
+            const arena = CONFIG.arena || { x: 0, y: 0, width: 1200, height: 700 };
+            this.x = Math.max(arena.x + 30, Math.min(arena.x + arena.width - 30, this.x));
+            this.y = Math.max(arena.y + 30, Math.min(arena.y + arena.height - 30, this.y));
 
             // Make sure he aims perfectly back at the target
-            this.aim(this.flurryTarget);
+            this.aim(target);
 
             // Spawn some visual flare for the teleport
             this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
@@ -822,8 +807,9 @@ export class SukunaFighter extends Fighter {
           return; // Flurry finished, do not process another melee strike
         }
 
-        // Find all valid targets within range
-        let possibleTargets = [];
+        // Find all valid targets within range (prioritizing enemy fighters)
+        let fighterTargets = [];
+        let illusionTargets = [];
         const flurryRange = CONFIG.sukuna.flurryRange || 150;
         const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
@@ -833,7 +819,7 @@ export class SukunaFighter extends Fighter {
             if (isEnemy && !f.isStealthed) {
               const dist = Math.hypot(this.x - f.x, this.y - f.y);
               if (dist <= flurryRange) {
-                possibleTargets.push(f);
+                fighterTargets.push(f);
               }
             }
           }
@@ -844,14 +830,17 @@ export class SukunaFighter extends Fighter {
             if (!ill || ill.hp <= 0 || ill.owner === this || ill.isRika) return;
             if (myTeam !== null && ill.owner && state.getFighterTeam(state.fighters.indexOf(ill.owner)) === myTeam) return;
             if (Math.hypot(ill.x - this.x, ill.y - this.y) <= flurryRange) {
-              possibleTargets.push(ill);
+              illusionTargets.push(ill);
             }
           });
         }
 
-        // Randomly pick a new target for every single hit to create an Omnislash effect
+        // Prioritize enemy fighter targets first
+        const possibleTargets = fighterTargets.length > 0 ? fighterTargets : illusionTargets;
         if (possibleTargets.length > 0) {
           this.flurryTarget = possibleTargets[Math.floor(Math.random() * possibleTargets.length)];
+        } else if (opponent && opponent.hp > 0) {
+          this.flurryTarget = opponent;
         }
 
         if (this.flurryTarget && !this.flurryTarget.isDead) {
@@ -938,20 +927,36 @@ export class SukunaFighter extends Fighter {
         this.flurryHitsLeft = 0;
         return;
       }
+
+      // Ensure flurryTarget is an active alive enemy (prioritizing opponent / enemy fighters)
+      let target = (this.flurryTarget && !this.flurryTarget.isDead && this.flurryTarget.hp > 0) ? this.flurryTarget : opponent;
+      if (!target || target.hp <= 0 || target.isDead) {
+        target = (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null) || opponent;
+      }
+      this.flurryTarget = target;
+
+      if (!target || target.hp <= 0) {
+        this.rapidSlashHitsLeft = 0;
+        return;
+      }
+
+      // Continuously keep Sukuna facing and aimed directly at the target while preparing/firing
+      this.aim(target);
+
       this.rapidSlashTimer--;
 
       if (this.rapidSlashTimer <= 0) {
-        if (projectileSystem && this.flurryTarget && !this.flurryTarget.isDead) {
-          // Direct aim calculation to target (overriding stealth aim penalty during flurry combo!)
-          const directAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
-          const slashAngle = directAngle + (Math.random() - 0.5) * 0.45; // Dynamic multi-angle arc variance per strike!
+        if (projectileSystem && target && !target.isDead && target.hp > 0) {
+          // Direct aim calculation strictly towards the target's current position
+          const directAngle = Math.atan2(target.y - this.y, target.x - this.x);
           this.gunAngle = directAngle;
+          this.angle = directAngle;
 
           const ownerIndex = state.fighters ? state.fighters.indexOf(this) : 0;
-          const slashSpeed = CONFIG.sukuna.slashSpeed ?? (CONFIG.projectile.speed * 1.5);
-          const slashDamage = CONFIG.sukuna.slashDamage ?? this.damage;
+          const slashSpeed = CONFIG.sukuna?.slashSpeed || 40;
+          const slashDamage = CONFIG.sukuna?.slashDamage ?? this.damage;
 
-          // Fire one ghost blade slash directly along the multi-directional slashAngle
+          // Fire one ghost blade slash directly along directAngle to the target
           projectileSystem.fireProjectile(
             this,
             ownerIndex,
@@ -962,22 +967,21 @@ export class SukunaFighter extends Fighter {
             'ghostBlade',
             this.x,
             this.y,
-            slashAngle
+            directAngle
           );
 
           spawnFloatingText(this.x, this.y - 30, 'CLEAVE!', '#E0E8FF');
           triggerGlobalScreenShake(6, 8);
-          spawnSparks(this.flurryTarget.x, this.flurryTarget.y, 20, 'crimsonSniper', '#8B0000');
+          spawnSparks(target.x, target.y, 20, 'crimsonSniper', '#8B0000');
           this.punchAnimTimer = 0;
           this.slashGlowTimer = 25;
           this.slashSwingTimer = 16;
           this.slashSwingMaxTimer = 16;
           this.slashHand = this.slashHand === 1 ? 0 : 1;
 
-          // Apply knockback to target
-          const cleaveAngle = Math.atan2(this.flurryTarget.y - this.y, this.flurryTarget.x - this.x);
-          this.flurryTarget.vx += Math.cos(cleaveAngle) * 3;
-          this.flurryTarget.vy += Math.sin(cleaveAngle) * 3;
+          // Apply knockback to target along directAngle
+          target.vx += Math.cos(directAngle) * 3;
+          target.vy += Math.sin(directAngle) * 3;
 
           // Play swordswing sound on rapid slash hit
           if (this._slashSoundCooldown <= 0) {
@@ -993,22 +997,22 @@ export class SukunaFighter extends Fighter {
           this.rapidSlashHitsLeft--;
 
           // Teleport to a new position around current location (only if more slashes remain)
-          if (this.rapidSlashHitsLeft > 0 && this.flurryTarget && !this.flurryTarget.isDead) {
+          if (this.rapidSlashHitsLeft > 0 && target && !target.isDead) {
             const oldX = this.x;
             const oldY = this.y;
 
             // Teleport to a dynamic surrounding position around the target so slashes unleash from all 360° directions!
             const teleportAngle = Math.random() * Math.PI * 2;
-            const targetRadius = this.flurryTarget.r || 20;
+            const targetRadius = target.r || 20;
             const teleportDist = targetRadius + this.r + 25 + Math.random() * 40;
-            this.x = this.flurryTarget.x + Math.cos(teleportAngle) * teleportDist;
-            this.y = this.flurryTarget.y + Math.sin(teleportAngle) * teleportDist;
+            this.x = target.x + Math.cos(teleportAngle) * teleportDist;
+            this.y = target.y + Math.sin(teleportAngle) * teleportDist;
 
             // Clamp to arena bounds
             const arena = CONFIG.arena || { x: 0, y: 0, width: 1200, height: 700 };
             this.x = Math.max(arena.x + 30, Math.min(arena.x + arena.width - 30, this.x));
             this.y = Math.max(arena.y + 30, Math.min(arena.y + arena.height - 30, this.y));
-            this.aim(this.flurryTarget);
+            this.aim(target);
 
             // Spawn afterimage at old position
             this._spawnTeleportAfterimages(oldX, oldY, this.x, this.y);
@@ -1019,7 +1023,7 @@ export class SukunaFighter extends Fighter {
             playSound('Assets/Sound Effects/Skills/dash3.mp3', 0.7);
 
             // Apply hit pause on target
-            if (typeof this.flurryTarget?.applyHitStun === 'function') this.flurryTarget.applyHitStun(8);
+            if (typeof target.applyHitStun === 'function') target.applyHitStun(8);
 
             // Set timer for next slash (readable rhythmic pacing)
             this.rapidSlashTimer = CONFIG.sukuna.rapidSlashCooldown || 20;
@@ -1034,10 +1038,7 @@ export class SukunaFighter extends Fighter {
       this.vx = 0;
       this.vy = 0;
       this.applyMovementPhysics(0);
-
-      // Allow movement during rapid slash sequence (no dramatic slowdown)
-      // this.applyMovementPhysics();
-      this.resolveWallBounce(arena, this.flurryTarget);
+      this.resolveWallBounce(arena, target);
 
       // Update afterimages
       if (this.afterImages) {
@@ -1135,19 +1136,97 @@ export class SukunaFighter extends Fighter {
       return; // Prevent melee/shoot in the same frame
     }
 
+    // Dynamic enemy proximity check
+    let isBeingMeleed = false;
+    let closestEnemyDist = Infinity;
+    const myTeam = state.getFighterTeam(ownerIndex);
+    const closeRangeRadius = CONFIG.sukuna?.closeRangeRadius ?? 220;
+    const leaveMeleeRadius = closeRangeRadius + 60;
+
+    if (state.fighters && state.fighters.length > 0) {
+      for (let i = 0; i < state.fighters.length; i++) {
+        const f = state.fighters[i];
+        if (!f || f === this || f.hp <= 0 || (f.isStealthed && !this.domainActive)) continue;
+        const targetTeam = state.getFighterTeam ? state.getFighterTeam(i) : null;
+        if (myTeam !== null && myTeam === targetTeam) continue;
+        const d = Math.hypot(f.x - this.x, f.y - this.y);
+        if (d < closestEnemyDist) closestEnemyDist = d;
+
+        const isBrawlerEnemy = f.isMeleeMode || f.isBrawler || f.isMeleeFighter || f.characterId === 'saitama' || f.type === 'saitama' || f.characterId === 'yuji' || f.characterId === 'todo' || f.characterId === 'gojo' || f.flurryTarget === this || f.isFlurrying || (f.punchAnimTimer && f.punchAnimTimer > 0);
+        if (d <= closeRangeRadius || (isBrawlerEnemy && d <= 320)) {
+          isBeingMeleed = true;
+        }
+      }
+    }
+
+    // Switch modes based on distance & melee engagement (only when not in special states)
+    if (!this.isTeleporting && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion && (this.flurryHitsLeft || 0) <= 0 && (this.rapidSlashHitsLeft || 0) <= 0) {
+      if (this.domainActive) {
+        this.isMeleeMode = true; // Always force melee mode during Domain Expansion
+      } else if (opponent && opponent.isStealthed && !this.domainActive && !(opponent.characterId === 'toji' || opponent.type === 'toji' || opponent._def?.id === 'toji')) {
+        // Disengage from melee combat while non-Toji opponent is in stealth mode
+        this.isMeleeMode = false;
+        this.forcedMeleeTimer = 0;
+      } else if (this.meleeModeCooldown > 0) {
+        // MANDATORY RANGED SEPARATION: strictly stay in Ranged Mode until cooldown expires!
+        if (this.isMeleeMode) {
+          this.isMeleeMode = false;
+          this.forcedMeleeTimer = 0;
+          if (opponent && !opponent.isDead) {
+            this._teleportAwayFrom(opponent, arena);
+          }
+        }
+      } else if (this.isMeleeMode) {
+        // Sukuna is currently in Melee Mode: Check if duration expired or enemy moved far away
+        if (this.forcedMeleeTimer <= 0) {
+          // DURATION EXPIRED: Disengage to Ranged Mode and start separation cooldown!
+          this.isMeleeMode = false;
+          this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
+          if (opponent && !opponent.isDead) {
+            this._teleportAwayFrom(opponent, arena);
+          }
+        } else if (closestEnemyDist > leaveMeleeRadius) {
+          // Enemy left melee range early: Disengage to Ranged Mode
+          this.isMeleeMode = false;
+          this.forcedMeleeTimer = 0;
+          this.meleeModeCooldown = CONFIG.sukuna?.meleeModeCooldown ?? 120;
+          if (opponent && !opponent.isDead) {
+            this._teleportAwayFrom(opponent, arena);
+          }
+        }
+      } else if (isBeingMeleed && this.meleeModeCooldown <= 0) {
+        // Cooldown is READY and enemy is in melee range: ENTER MELEE MODE!
+        this.isMeleeMode = true;
+        this.forcedMeleeTimer = CONFIG.sukuna?.initialMeleeDuration ?? 120;
+      }
+    }
+
+    const canAct = (!this.hitStunTimer || this.hitStunTimer <= 0) && (!this.timeStopTimer || this.timeStopTimer <= 0) && !this.isChannelingDivineFlame && !this.isChannelingDomainExpansion && (this.divineFlameRecoveryTimer || 0) <= 0;
 
     // Handle Melee Combat Mode vs Ranged Mode
     if (this.isMeleeMode) {
-      this.vx = 0; // Lock movement during melee punch-teleport sequence
+      this.vx = 0; // In Melee Mode, teleportation handles 100% of his positional movement!
       this.vy = 0;
       if (opponent && !opponent.isDead) {
-        this._updateMeleeCombat(opponent, arena, ownerIndex);
+        const dist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
+        const minDistance = this.r + opponent.r + 2;
+
+        if (dist < minDistance) {
+          // Contact Repulsion Buffer: Push Sukuna back slightly ONLY if he physically clips inside target circle
+          const pushX = (this.x - opponent.x) / (dist || 1);
+          const pushY = (this.y - opponent.y) / (dist || 1);
+          this.vx = pushX * 2.0;
+          this.vy = pushY * 2.0;
+        }
+        if (canAct) {
+          this._updateMeleeCombat(opponent, arena, ownerIndex);
+        }
       }
     } else {
       // Ranged Mode - Basic attack (Dismantle)
       if (this.shootCooldown > 0) {
         this.shootCooldown--;
-      } else {
+      } else if (canAct) {
         this.shoot(ownerIndex);
         this.shootCooldown = this.shootCooldownMax;
       }
