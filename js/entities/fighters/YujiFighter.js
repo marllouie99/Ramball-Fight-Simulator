@@ -170,6 +170,11 @@ export class YujiFighter extends Fighter {
         this.rapidSlashTimer = 1;
         // Ensure punch state is fully cleared before rapid slashes begin
         this.punchAnimTimer = 0;
+        const rapidSlashVoice = CONFIG.sukuna?.sounds?.rapidSlashVoiceline || CONFIG.sukuna?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3';
+        const voiceVol = CONFIG.sukuna?.soundVolumes?.rapidSlashVoiceline ?? (CONFIG.sukuna?.rapidSlashVoiceVolume ?? 3.0);
+        if (typeof audioSystem !== 'undefined' && audioSystem.playFighterVoiceline) {
+          audioSystem.playFighterVoiceline(this, rapidSlashVoice, voiceVol);
+        }
       }
       return;
     }

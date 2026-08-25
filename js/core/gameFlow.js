@@ -175,6 +175,22 @@ function preloadGameSounds() {
     }
   }
 
+  const sukunaSounds = [];
+  if (CONFIG.sukuna) {
+    if (CONFIG.sukuna.sounds) {
+      for (const key of Object.keys(CONFIG.sukuna.sounds)) {
+        const val = CONFIG.sukuna.sounds[key];
+        if (Array.isArray(val)) {
+          sukunaSounds.push(...val);
+        } else if (typeof val === 'string') {
+          sukunaSounds.push(val);
+        }
+      }
+    }
+    if (CONFIG.sukuna.championVoiceline) sukunaSounds.push(CONFIG.sukuna.championVoiceline);
+    if (CONFIG.sukuna.rapidSlashVoiceline) sukunaSounds.push(CONFIG.sukuna.rapidSlashVoiceline);
+  }
+
   const allPaths = [...new Set([
     ...legacyPaths,
     ...mappedConfigPaths,
@@ -192,6 +208,7 @@ function preloadGameSounds() {
     ...mahitoSounds,
     ...mahoragaSounds,
     ...cjSounds,
+    ...sukunaSounds,
     ...ARENA_BGM_TRACKS.map(t => t.src).filter(Boolean)
   ])];
   return Promise.all(allPaths.map(preloadSound));

@@ -2,6 +2,7 @@ import { Fighter } from '../fighter.js';
 import { CONFIG, GUN_TIP_DIST, getHandSize } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { playSound, playLoopingSound, fadeOutLoopingSound, stopLoopingSound, pauseLoopingSound, resumeLoopingSound } from '../../systems/soundSystem.js';
+import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getBasicAttackSound } from '../../soundEffects/basicAttackSounds.js';
 import { spawnSparks, spawnImpactFlash, spawnMeleeClashShockwave, spawnAnimePunchImpactFrame } from '../../graphics/particles/sparkEffect.js';
@@ -801,6 +802,12 @@ export class SukunaFighter extends Fighter {
             // Transition to rapid slash state
             this.rapidSlashHitsLeft = CONFIG.sukuna?.flurryHits || 10; // Unleash rapid ghost slashes
             this.rapidSlashTimer = 0;
+
+            const rapidSlashVoice = CONFIG.sukuna?.sounds?.rapidSlashVoiceline || CONFIG.sukuna?.rapidSlashVoiceline || 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3';
+            const voiceVol = CONFIG.sukuna?.soundVolumes?.rapidSlashVoiceline ?? (CONFIG.sukuna?.rapidSlashVoiceVolume ?? 3.0);
+            if (typeof audioSystem !== 'undefined' && audioSystem.playFighterVoiceline) {
+              audioSystem.playFighterVoiceline(this, rapidSlashVoice, voiceVol);
+            }
           } else {
             this.flurryTarget = null;
           }

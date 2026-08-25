@@ -417,6 +417,13 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
       const vol = CONFIG.saitama?.soundVolumes?.championVoiceline ?? (CONFIG.saitama?.championVoiceVolume ?? 3.5);
       audioSystem.playSFX(saitamaSnd, vol);
     }
+
+    const isSukuna = winner && (winner.characterId === 'sukuna' || winner.type === 'sukuna' || winner._def?.id === 'sukuna');
+    if (isSukuna) {
+      const sukunaSnd = CONFIG.sukuna?.sounds?.championVoiceline || CONFIG.sukuna?.championVoiceline || 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3';
+      const vol = CONFIG.sukuna?.soundVolumes?.championVoiceline ?? (CONFIG.sukuna?.championVoiceVolume ?? 3.5);
+      audioSystem.playSFX(sukunaSnd, vol);
+    }
   }
 
   // 1. Smoothly Darken the Arena & Full Canvas (Deep Dark Victory Backdrop)

@@ -293,6 +293,21 @@ export const SKILL_SOUNDS = {
       src: 'Assets/Sound Effects/Skills/fugaexplode.mp3',
       volume: 1.5,
       delay: 0
+    },
+    rapidslash: {
+      src: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
+      volume: 3.0,
+      delay: 0
+    },
+    rapidslash_voiceline: {
+      src: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
+      volume: 3.0,
+      delay: 0
+    },
+    champion_voiceline: {
+      src: 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3',
+      volume: 3.5,
+      delay: 0
     }
   },
 

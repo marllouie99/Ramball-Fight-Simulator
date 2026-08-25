@@ -81,4 +81,19 @@ export const sukunaConfig = {
     domainRapidSlashCooldown: 20, // Frames between Sukuna's rapid teleport slashes inside Domain
     domainRadius: 240,        // Radius of the open-air death zone
     domainRampRatePerSec: 0.12,// 10% damage increase per second targets stay inside
+
+    // Audio & Voicelines
+    sounds: {
+      championVoiceline: 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3',
+      rapidSlashVoiceline: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3'
+    },
+    soundVolumes: {
+      championVoiceline: 3.5,
+      rapidSlashVoiceline: 3.0
+    },
+    championVoiceline: 'Assets/Sound Effects/Skills/Sukuna-champion-voiceline.mp3',
+    championVoiceVolume: 3.5,
+    rapidSlashVoiceline: 'Assets/Sound Effects/Skills/Sukuna-rapidslash-voiceline.mp3',
+    rapidSlashVoiceVolume: 3.0
 };
+
