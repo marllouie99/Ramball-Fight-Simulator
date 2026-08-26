@@ -10,6 +10,9 @@ import { audioSystem } from '../systems/audioSystem.js';
 let _projectileSystem = null;
 export function registerProjectileSystem(ps) { _projectileSystem = ps; }
 
+let _tacticalProjectileSystem = null;
+export function registerTacticalProjectileSystem(tps) { _tacticalProjectileSystem = tps; }
+
 const canvas = document.getElementById('arena');
 canvas.width = CONFIG.canvasWidth || 540;
 canvas.height = CONFIG.canvasHeight || 960;
@@ -385,10 +388,16 @@ export function getProjectiles() {
   return _projectileSystem ? _projectileSystem.getProjectiles() : [];
 }
 
-// Helper to clear projectiles
+// Helper to clear projectiles across standard and tactical systems
 export function clearProjectiles() {
   if (_projectileSystem) {
     _projectileSystem.clear();
+  }
+  if (_tacticalProjectileSystem) {
+    _tacticalProjectileSystem.clear();
+  }
+  if (typeof state !== 'undefined' && state.projectiles) {
+    state.projectiles.length = 0;
   }
 }
 

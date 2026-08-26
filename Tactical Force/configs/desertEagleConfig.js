@@ -16,8 +16,8 @@ export const desertEagleConfig = {
 
   // ── 2. PRIMARY WEAPON: DESERT EAGLE .50 ──
   magazineSize: 7,               // Authentic 7-round .50 AE magazine
-  fireCooldown: 24,              // Heavy .50 AE semi-auto hand cannon cadence (24 frames / 0.4s)
-  damage: 38,                    // Flat bullet damage
+  fireCooldown: 80,              // Heavy .50 AE semi-auto hand cannon cadence (24 frames / 0.4s)
+  damage: 15,                    // Flat bullet damage
   projectileSpeedMultiplier: 2.4,
   bulletRadius: 4.5,
   bulletLife: 80,

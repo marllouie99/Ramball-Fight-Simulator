@@ -18,8 +18,8 @@ export const m4a1Config = {
   magazineSize: 30,              // 30 rounds per PMAG (10 bursts)
   burstCount: 3,                 // 3 rounds per burst trigger
   burstInterval: 4,              // 4 frames between each round in burst
-  fireCooldown: 24,              // Cooldown between bursts (24 frames / 0.4s)
-  damage: 22,                    // Damage per 5.56 round (66 dmg per burst)
+  fireCooldown: 60,              // Cooldown between bursts (24 frames / 0.4s)
+  damage: 10,                    // Damage per 5.56 round (66 dmg per burst)
   projectileSpeedMultiplier: 2.6,// Supersonic bullet velocity
   bulletRadius: 4.8,             // Projectile collision radius
   bulletLife: 95,

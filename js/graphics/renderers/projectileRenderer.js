@@ -21,12 +21,18 @@ import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphics.js';
 import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
+import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
 let _fugaLocalTrailPool = [];
 
 export function drawProjectiles() {
   const ctx = state.ctx;
   const projectiles = getProjectiles();
   const now = getNow(); // Cache time once for all projectiles
+
+  // Dedicated Tactical Force Projectiles
+  if (typeof tacticalProjectileSystem !== 'undefined' && tacticalProjectileSystem.projectiles && tacticalProjectileSystem.projectiles.length > 0) {
+    tacticalProjectileSystem.draw(ctx);
+  }
 
   // View culling - define canvas bounds with generous padding so projectiles never clip out on screen
   const canvasW = (state.canvas && state.canvas.width) ? state.canvas.width : 540;

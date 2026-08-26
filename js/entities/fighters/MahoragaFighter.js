@@ -500,21 +500,7 @@ export class MahoragaFighter extends Fighter {
   }
 
   applyKnockback(vx, vy) {
-    const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
-    const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.075;
-    const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.60;
-    const ccTenacity = Math.min(maxCcTenacity, totalStages * ccTenacityMult);
-
-    if (ccTenacity > 0) {
-      vx = vx * (1.0 - ccTenacity);
-      vy = vy * (1.0 - ccTenacity);
-    }
-    
     super.applyKnockback(vx, vy);
-
-    if (ccTenacity > 0 && this.knockbackStunTimer > 0) {
-      this.knockbackStunTimer = Math.max(1, Math.round(this.knockbackStunTimer * (1.0 - ccTenacity)));
-    }
   }
 
   interruptAttacks(forceCancelAll = false) {
@@ -1219,11 +1205,6 @@ export class MahoragaFighter extends Fighter {
 
       if (this.adaptationPauseTimer === 0) {
         this.wheelRotation = this.wheelTargetRotation;
-        const isInsideDomain = typeof state !== 'undefined' && (state.activeDomain || state.domainActive || (state.fighters && state.fighters.some(f => f && f.domainActive)));
-        const targetToDash = this._pendingCounterTarget || opponent || (state.fighters ? state.fighters.find(f => f && f !== this && (f.characterId === 'gojo' || f.type === 'gojo' || f.characterId === 'sukuna' || f.type === 'sukuna') && f.hp > 0) : null);
-        if (targetToDash && !targetToDash.isDead && !isInsideDomain) {
-          this._startAdaptationFlashDash(targetToDash);
-        }
         this._pendingCounterTarget = null;
       }
       return;
@@ -1285,141 +1266,12 @@ export class MahoragaFighter extends Fighter {
       if (Math.random() < 0.6) {
         spawnSparks(this.x + (Math.random() - 0.5) * this.r * 1.6, this.y + (Math.random() - 0.5) * this.r * 1.6, 2, 'arcane', '#9D4EDD');
       }
-      if (!this.isInfinityBlitz && (this.infinityBlitzCooldownTimer || 0) <= 0 && (this.adaptationPauseTimer || 0) <= 0) {
-        this.isInfinityBlitz = true;
-        this.infinityBlitzDurationTimer = CONFIG.mahoraga?.infinityBlitzDurationFrames ?? 300;
-        this.infinityBlitzTimer = 0;
-        this.infinityBlitzAttacksInSeq = 0;
-        spawnFloatingText(this.x, this.y - this.r - 25, '⚡ LEVEL 8 SPEED BLITZ!', '#FFD700');
+      if (!this.hasAnnouncedLevel8) {
+        this.hasAnnouncedLevel8 = true;
+        spawnFloatingText(this.x, this.y - this.r - 25, '⚡ LEVEL 8 AWAKENED!', '#FFD700');
         triggerGlobalScreenShake(6, 14);
         audioSystem.playSFX('skill_enhance', 1.0);
       }
-    } else if (this.isWallSlamActive) {
-      this.isInfinityBlitz = false;
-    }
-
-    // ── LEVEL 8 INFINITY BLITZ COMBAT LOOP ──
-    if (this.isInfinityBlitz && !this.isWallSlamActive && (this.adaptationPauseTimer || 0) <= 0) {
-      this.isCleaving = false;
-      this.isShouting = false;
-      this.isThrowing = false;
-      this.isBlitzActive = false;
-
-      if (this.infinityBlitzDurationTimer > 0) {
-        this.infinityBlitzDurationTimer--;
-        if (this.infinityBlitzDurationTimer <= 0) {
-          this.isInfinityBlitz = false;
-          this.infinityBlitzCooldownTimer = CONFIG.mahoraga?.infinityBlitzCooldownFrames ?? 800;
-          spawnFloatingText(this.x, this.y - this.r - 25, '⏳ SPEED BLITZ COOLDOWN', '#AAAAAA');
-          triggerGlobalScreenShake(3, 8);
-        }
-      }
-
-      this.infinityBlitzTimer = (this.infinityBlitzTimer || 0) + 1;
-      const interval = CONFIG.mahoraga?.infinityBlitzInterval ?? 20;
-
-      if (opponent && opponent.hp > 0 && !opponent.isDead) {
-        // Level 8 Max Adaptation: Mahoraga does NOT walk or chase on foot.
-        // He remains stationary until flash-teleporting directly into flanking range to strike.
-        this.vx = 0;
-        this.vy = 0;
-
-        if (this.infinityBlitzTimer >= interval) {
-          this.infinityBlitzTimer = 0;
-
-          const distToEnemy = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-          const maxMeleeRange = this.r + opponent.r + (CONFIG.mahoraga?.swordRange || 110);
-
-          const reqAttacks = CONFIG.mahoraga?.infinityBlitzAttacksPerTeleport ?? 5;
-          const enemyEscaped = distToEnemy > maxMeleeRange;
-
-          const isSeqComplete = (this.infinityBlitzAttacksInSeq || 0) >= reqAttacks;
-          if (enemyEscaped || isSeqComplete) {
-            if (isSeqComplete) {
-              this.infinityBlitzAttacksInSeq = 0;
-            }
-
-            const oldX = this.x;
-            const oldY = this.y;
-
-            const flankAngle = Math.atan2(opponent.y - this.y, opponent.x - this.x) + (Math.random() - 0.5) * Math.PI * 1.4;
-            const teleOffset = CONFIG.mahoraga?.infinityBlitzTeleportDistance ?? 18;
-            const teleDist = this.r + opponent.r + teleOffset;
-
-            let teleX = opponent.x + Math.cos(flankAngle) * teleDist;
-            let teleY = opponent.y + Math.sin(flankAngle) * teleDist;
-
-            const activeArena = arena || CONFIG.arena;
-            if (activeArena) {
-              teleX = Math.max(activeArena.x + this.r + 5, Math.min(activeArena.x + activeArena.width - this.r - 5, teleX));
-              teleY = Math.max(activeArena.y + this.r + 5, Math.min(activeArena.y + activeArena.height - this.r - 5, teleY));
-            }
-
-            // Level 8 Speed-Blitz Teleport (Instant position snap with afterimages for ultra-fast blitz attacks)
-            this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
-            this.x = teleX;
-            this.y = teleY;
-            this.vx = 0;
-            this.vy = 0;
-            this.aim(opponent);
-            audioSystem.playSFX('skill_dash5', 1.0);
-          }
-
-          const currentDist = Math.hypot(opponent.x - this.x, opponent.y - this.y);
-          if (currentDist <= maxMeleeRange) {
-            this.infinityBlitzAttacksInSeq = (this.infinityBlitzAttacksInSeq || 0) + 1;
-
-            this.attackCount = (this.attackCount || 0) + 1;
-            if (this.attackCount % 2 === 0) {
-              this.leftPunchTimer = 16;
-              this.leftPunchMaxTimer = 16;
-              this._playRandomHeavyPunchSound();
-            } else {
-              this.swordCombo = (this.swordCombo || 0) + 1;
-              this.punchAnimTimer = 16;
-              this.punchAnimMaxTimer = 16;
-              const swordSnd = CONFIG.mahoraga?.sounds?.swordSwing || 'attack_swordswing';
-              const swordVol = CONFIG.mahoraga?.soundVolumes?.swordSwing !== undefined ? CONFIG.mahoraga.soundVolumes.swordSwing : 1.0;
-              audioSystem.playSFX(swordSnd, swordVol);
-            }
-
-            this.aim(opponent);
-            const damage = CONFIG.mahoraga?.infinityBlitzDamage ?? (CONFIG.mahoraga?.swordDamage ?? 15);
-            opponent.takeDamage(damage, this, { isMelee: true });
-
-            // Apply brief heavy slow to keep them trapped in the blitz flurry
-            const slowDur = CONFIG.mahoraga?.infinityBlitzStrikeSlowDurationFrames ?? 15;
-            const slowMult = CONFIG.mahoraga?.infinityBlitzStrikeSlowMultiplier ?? 0.40;
-            if (typeof opponent.applySlow === 'function') {
-              opponent.applySlow(slowDur, slowMult, { isMahoragaShout: true });
-            } else {
-              opponent.slowTimer = slowDur;
-              opponent.slowMultiplier = slowMult;
-            }
-
-            const angle = Math.atan2(opponent.y - this.y, opponent.x - this.x);
-            // Spawn golden spiky crescent effect for both punches and blade slash attacks!
-            spawnAnimePunchImpactFrame(opponent.x, opponent.y, 55, angle, 'gold');
-
-            const isPunch = (this.attackCount % 2 === 0);
-            if (!isPunch) {
-              this.sakugaImpactTimer = 12;
-              this.sakugaImpactMaxTimer = 12;
-              this.sakugaImpactX = opponent.x;
-              this.sakugaImpactY = opponent.y;
-              this.sakugaImpactAngle = Math.random() * Math.PI * 2;
-              this.sakugaImpactSeed = Math.random();
-            }
-            spawnSparks(opponent.x, opponent.y, 15, 'gold', '#FFFFFF');
-            spawnMeleeClashShockwave(opponent.x, opponent.y, 90, 'mahoraga');
-            triggerGlobalScreenShake(7, 12);
-          }
-        }
-      }
-
-      this.applyMovementPhysics();
-      if (arena) this.resolveWallBounce(arena, opponent);
-      return;
     }
 
     // ── Divine Shout (Instant Release on the Move) ──
@@ -1464,39 +1316,9 @@ export class MahoragaFighter extends Fighter {
         if (this.throwBarrageShotsLeft <= 0) {
           this.isThrowing = false;
           this.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 1000;
-
-          this.isBlitzActive = true;
-          this.blitzWindupTimer = CONFIG.mahoraga?.blitzWindupFrames ?? 14;
-          this.blitzHitsLeft = CONFIG.mahoraga?.blitzHitsCount ?? 10;
-          this.blitzTimer = 0;
-          this.blitzStayTimer = 999;
-          this.blitzTotalDuration = CONFIG.mahoraga?.blitzTotalDurationFrames ?? 150;
-          this.blitzTarget = opponent;
-          spawnFloatingText(this.x, this.y - this.r - 25, 'HAND-TO-HAND BLITZ!', '#FFD700');
         }
       }
       return;
-    }
-
-    // ── Lore-Accurate Adaptation: Counter-activate vs enemy blitz ──
-    const isEnemyBlitzing = opponent && !opponent.isDead && (
-      opponent.isBlitzActive || 
-      opponent.isTeleportFlurry || 
-      opponent.isTeleporting ||
-      (opponent.flurryHitsLeft && opponent.flurryHitsLeft > 0) ||
-      (opponent.blitzHitsLeft && opponent.blitzHitsLeft > 0)
-    );
-
-    if (isEnemyBlitzing && !this.isBlitzActive && (this.blitzCooldownTimer || 0) <= 0) {
-      this.isBlitzActive = true;
-      this.blitzWindupTimer = 2;
-      this.blitzHitsLeft = CONFIG.mahoraga?.blitzHitsCount ?? 10;
-      this.blitzTimer = 0;
-      this.blitzStayTimer = 999;
-      this.blitzTotalDuration = CONFIG.mahoraga?.blitzTotalDurationFrames ?? 150;
-      this.blitzTarget = opponent;
-      spawnFloatingText(this.x, this.y - this.r - 25, 'ADAPTED BLITZ DUEL!', '#FFD700');
-      audioSystem.playSFX('skill_dash5', 1.0);
     }
 
     // ── HAND-TO-HAND BLITZ SEQUENCE ──
@@ -1557,7 +1379,18 @@ export class MahoragaFighter extends Fighter {
           (target.blitzHitsLeft && target.blitzHitsLeft > 0)
         );
 
-        if ((distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) || (isTargetBlitzing && distToTarget > 55)) {
+        if (this.isWallSlamBlitz && target) {
+          // Mahoraga stays firmly stationed in front of the wall-pinned target
+          this.vx = 0;
+          this.vy = 0;
+          this.aim(target);
+          if (target.wallSlamPinnedX !== undefined && target.wallSlamPinnedY !== undefined) {
+            target.x = target.wallSlamPinnedX;
+            target.y = target.wallSlamPinnedY;
+            target.vx = 0;
+            target.vy = 0;
+          }
+        } else if ((distToTarget > maxMeleeDist && this.blitzStayTimer >= minStayFrames) || (isTargetBlitzing && distToTarget > 55)) {
           this.blitzStayTimer = 0;
           const angles = [0, Math.PI, -Math.PI * 0.5, Math.PI * 0.5];
           const baseAngle = angles[(hitIndex - 1) % angles.length] + (Math.random() - 0.5) * 0.4;
@@ -1645,7 +1478,15 @@ export class MahoragaFighter extends Fighter {
           const isPunchHit = (hitIndex % 2 === 1);
           const rollBlitzKnockback = isPunchHit && (Math.random() < 0.45);
 
-          if (rollBlitzKnockback) {
+          if (this.isWallSlamBlitz && target) {
+            // Target is firmly pinned against the wall during Wall Slam rapid hits — NO SLIDING!
+            target.vx = 0;
+            target.vy = 0;
+            if (target.wallSlamPinnedX !== undefined && target.wallSlamPinnedY !== undefined) {
+              target.x = target.wallSlamPinnedX;
+              target.y = target.wallSlamPinnedY;
+            }
+          } else if (rollBlitzKnockback) {
             const kbForce = CONFIG.mahoraga?.blitzKineticKnockbackForce ?? 16.0;
             target.vx = (target.vx || 0) + Math.cos(pushAngle) * kbForce;
             target.vy = (target.vy || 0) + Math.sin(pushAngle) * kbForce;
@@ -1699,6 +1540,8 @@ export class MahoragaFighter extends Fighter {
           target.mahoragaAdaptationFreezeTimer = 0;
           target.hitStunTimer = 0;
           target.isParalyzedByMahoraga = false;
+          target.wallSlamPinnedX = undefined;
+          target.wallSlamPinnedY = undefined;
           target.paralyzeTimer = 0;
 
           const kbAngle = this.gunAngle;
@@ -1744,14 +1587,10 @@ export class MahoragaFighter extends Fighter {
       this.cleaveCooldown = CONFIG.mahoraga?.cleaveCooldown ?? 600;
     }
 
-    // ── Natural Bounce Movement (no direct-chase steering) ──
-    // Mahoraga uses natural wall-bounce physics, counter-teleports, and attack-blitzes.
+    // ── Natural Bounce Movement ──
+    // Mahoraga uses natural wall-bounce and enemy-collision physics, counter-teleports, and attack-blitzes.
     const target = this._findClosestEnemy(opponent);
-    if (!target || target.isDead) {
-      this.vx *= 0.9;
-      this.vy *= 0.9;
-      this.isMeleeMode = false;
-    }
+    this.isMeleeMode = false;
 
     this.applyMovementPhysics();
 
@@ -1761,17 +1600,6 @@ export class MahoragaFighter extends Fighter {
                               (this.electricStunTimer || 0) > 0 || (this.dubstepStunTimer || 0) > 0;
       if (!isInHitReaction) {
         this.aim(target);
-
-        // Natural movement approach steering: Mahoraga tracks and closes in on his target
-        const currentSpeed = Math.hypot(this.vx, this.vy);
-        if (currentSpeed < (this.speed || (CONFIG.mahoraga?.moveSpeed ?? 6.5))) {
-          const dx = target.x - this.x;
-          const dy = target.y - this.y;
-          const dist = Math.hypot(dx, dy) || 1;
-          const steerForce = CONFIG.mahoraga?.approachSteerForce ?? 0.45;
-          this.vx += (dx / dist) * steerForce;
-          this.vy += (dy / dist) * steerForce;
-        }
       }
       const distToOpponent = Math.hypot(this.x - target.x, this.y - target.y, (this.z || 0) - (target.z || 0));
       const swordRange = CONFIG.mahoraga?.swordRange ?? 110;
@@ -1792,54 +1620,11 @@ export class MahoragaFighter extends Fighter {
         target.isChannelingDivineFlame
       );
 
-      // ── WHEEL STAGE 2+: HIGH-SPEED ADAPTATION TO ENEMY TELEPORT-ATTACK BLITZ ──
-      const totalStages2 = (this.adaptationStage.melee || 0) + (this.adaptationStage.ranged || 0) + (this.adaptationStage.skill || 0);
-      const currentStage = Math.max(...Object.values(this.adaptationStage || { default: 0 }));
-      const hasAdaptedToTeleport = (totalStages2 >= 2 || currentStage >= 2 || this.isMaxAdapted);
-
-      const isEnemyTeleportBlitzing = (
-        target.isBlitzActive ||
-        (target.rapidSlashHitsLeft && target.rapidSlashHitsLeft > 0) ||
-        (target.flurryHitsLeft && target.flurryHitsLeft > 0) ||
-        target.isTeleporting ||
-        (target.teleportCooldown && target.teleportCooldown > 80) ||
-        (target.tojiAmbushStage && target.tojiAmbushStage > 0) ||
-        (target.lastTeleportTime && (performance.now() - target.lastTeleportTime < 300)) ||
-        (target.punchAnimTimer > 0 && Math.hypot(target.vx, target.vy) > 12)
-      );
-
-      if (hasAdaptedToTeleport && isEnemyTeleportBlitzing && (this.teleportCounterCooldown || 0) <= 0 && !target.isAmbushing && !isBeamParalyzed) {
-        this.teleportCounterCooldown = 10;
-
-        const oldX = this.x;
-        const oldY = this.y;
-
-        const approachAngle = Math.atan2(target.y - this.y, target.x - this.x);
-        const backAngle = approachAngle + Math.PI + (Math.random() - 0.5) * 0.8;
-        const teleDist = this.r + target.r + 20;
-        let teleX = target.x + Math.cos(backAngle) * teleDist;
-        let teleY = target.y + Math.sin(backAngle) * teleDist;
-
-        const activeArena = arena || CONFIG.arena;
-        if (activeArena) {
-          teleX = Math.max(activeArena.x + this.r + 5, Math.min(activeArena.x + activeArena.width - this.r - 5, teleX));
-          teleY = Math.max(activeArena.y + this.r + 5, Math.min(activeArena.y + activeArena.height - this.r - 5, teleY));
-        }
-
-        // Instant Stage 2+ Counter Teleport (No floor sliding!)
-        this._spawnTeleportAfterimages(oldX, oldY, teleX, teleY, this.gunAngle);
-        this.x = teleX;
-        this.y = teleY;
-        this.vx = 0;
-        this.vy = 0;
-        this.aim(target);
-      }
-
       // ── AI SKILL DECISION TREE ──
       const shoutRadius = CONFIG.mahoraga?.shoutRadius || 180;
       const frontTargetsForAttack = this._getFrontRadiusTargets(swordRange, swordArc);
       const isAnyTargetInRange = distToOpponent <= meleeDist || frontTargetsForAttack.length > 0;
-      const canActSkills = !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz;
+      const canActSkills = !isInHitReaction && !this.isShouting && !this.isCleaving && !this.isThrowing && !this.isWallSlamActive && !this.isInfinityBlitz;
 
       if (canActSkills) {
         const minThrowDist = CONFIG.mahoraga?.throwMinDistance || 240;

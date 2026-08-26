@@ -15,29 +15,14 @@
 
 ---
 
-## 2. Fighter Update Loop & Combat Method Signatures
-- **Argument Propagation in `update()`**: Subclasses (`RifleFighter`, `ShotgunFighter`, `PistolFighter`, `SniperFighter`) MUST pass all parameters to `super.update(opponent, ownerIndex, arena)`. Failing to pass `opponent` causes base physics to drop target tracking and halt movement.
-- **Top Freeze Guard (Rule 1)**:
-  ```javascript
-  const isFrozen = this._handleTimeStop();
-  if (isFrozen || this.isTargetOfAmbush) {
-    this.interruptAttacks();
-    return; // MANDATORY: Stop update execution so fighter is frozen!
-  }
-  ```
-- **Overloaded `shoot()` Signature Support**:
-  ```javascript
-  shoot(target, ownerIndex) {
-    if (typeof target === 'number' && ownerIndex === undefined) {
-      ownerIndex = target;
-      target = null;
-    }
-    if (ownerIndex === undefined) {
-      ownerIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : 0;
-    }
-    // ...
-  }
-  ```
+## 2. Centralized Tactical Weapon & Combat Architecture
+- **Unified Base Class (`TacticalBaseFighter`)**: All tactical operatives (`RifleFighter`, `ShotgunFighter`, `PistolFighter`, `SniperFighter`, `BarrettFighter`, and all future tactical operatives) inherit their combat lifecycle from `TacticalBaseFighter`.
+- **Initialization via `setupWeapon(cfg, options)`**: Operatives initialize in their constructor by calling `this.setupWeapon(cfg, options)`. The base class automatically wires magazine sizing, tactical reloads, fire cooldowns, action timers (`boltDuration`, `pumpDuration`), recoil physics, screen shake, and muzzle tip geometry.
+- **Unified `update()` and Continuous Fire Rate**: The base class handles time-stop freeze guards, weapon action timers, reload states, and automatically triggers `this.shoot(opponent, ownerIndex)` on every frame that `canTacticalShoot()` passes, maintaining the exact fire cadence defined by `fireCooldown`.
+- **Custom Weapon Firing Hooks**:
+  - `onFireWeapon(target, ownerIndex, fireAngle, spawnX, spawnY)`: Override in subclasses that require special ballistics (e.g. buckshot spread cone for `ShotgunFighter` or burst initialization for `RifleFighter`).
+  - `onUpdateWeaponAction(opponent, ownerIndex)`: Override in subclasses for per-frame action progression (e.g. `RifleFighter` burst queue advancing).
+- **Target Vector Aiming**: All weapons automatically compute the direct target vector via `this.getFireAngle(target)` (`Math.atan2(target.y - this.y, target.x - this.x)`) when target is alive and in Line of Sight.
 
 ---
 

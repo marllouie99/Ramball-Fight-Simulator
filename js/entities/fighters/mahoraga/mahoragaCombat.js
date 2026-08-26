@@ -96,8 +96,9 @@ export function performMeleeAttack(fighter, opponent) {
     (!fighter.adaptedGenosBeam && ((fighter.caughtInGenosBeamTimer || 0) > 0 || fighter.caughtInGenosFlurry))
   );
 
+  const isInHitReaction = (fighter.knockbackStunTimer || 0) > 0 || (fighter.hitStunTimer || 0) > 0 || (fighter.electricStunTimer || 0) > 0 || (fighter.dubstepStunTimer || 0) > 0;
   const isParalyzed = isInsideDomain || (fighter.timeStopTimer || 0) > 0 || isCaughtInBeam || fighter.isTargetOfAmbush || fighter.isFrozenByInfinity;
-  if (isParalyzed) {
+  if (isParalyzed || isInHitReaction) {
     fighter.neutralStanceTimer = 0;
     fighter.adaptationDashTimer = 0;
     return;
@@ -398,6 +399,9 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   if (isInterrupted || !target || target.hp <= 0 || target.isDead) {
     if (target) {
       target.isGrabbedByMahoraga = false;
+      target.isParalyzedByMahoraga = false;
+      target.wallSlamPinnedX = undefined;
+      target.wallSlamPinnedY = undefined;
       target.z = 0;
     }
     fighter.isWallSlamActive = false;
@@ -616,6 +620,8 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
       target.y = Math.max(minY, Math.min(maxY, target.y));
       target.vx = 0;
       target.vy = 0;
+      target.wallSlamPinnedX = target.x;
+      target.wallSlamPinnedY = target.y;
 
       // Deal heavy wall impact damage
       const impactDamage = CONFIG.mahoraga?.wallSlamImpactDamage ?? 20;

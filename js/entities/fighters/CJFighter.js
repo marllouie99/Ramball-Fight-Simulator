@@ -1280,9 +1280,7 @@ export class CJFighter extends Fighter {
 
     if (typeof projectileSystem !== 'undefined' && projectileSystem) {
       projectileSystem.fireProjectile(this, myIndex, dmg, false, speed, false, 'cjMinigunBullet', spawnX, spawnY, bulletAngle, {
-        knockback: cfg.minigunKnockback || 6.5,
-        pierceWalls: true,
-        ignoreWalls: true
+        knockback: cfg.minigunKnockback || 6.5
       });
     }
 

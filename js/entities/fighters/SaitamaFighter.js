@@ -138,7 +138,14 @@ export class SaitamaFighter extends Fighter {
 
     const isInsideDomain = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f.domainActive);
     const isDomainDodge = isInsideDomain;
-    const isBeamOrTickDodge = Boolean(this.isCaughtInPurple || (this.purpleHitTimer && this.purpleHitTimer > 0) || this.caughtInPureLoveBeam || (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0));
+    const isBeamOrTickDodge = Boolean(
+      this.isCaughtInPurple || 
+      (this.purpleHitTimer && this.purpleHitTimer > 0) || 
+      this.caughtInPureLoveBeam || 
+      (this.pureLoveBeamTimer && this.pureLoveBeamTimer > 0) ||
+      this.caughtInGenosFlurry ||
+      (this.caughtInGenosBeamTimer && this.caughtInGenosBeamTimer > 0)
+    );
 
     const isExecutingSeriousCounter = (this._counterPunchTimer && this._counterPunchTimer > 0) || !!this._counterPunchTarget || (this._postCounterRecoveryTimer && this._postCounterRecoveryTimer > 0);
 
@@ -206,7 +213,7 @@ export class SaitamaFighter extends Fighter {
     this.x = targetX;
     this.y = targetY;
 
-    // Clear any hitStun, hit-pause, or beam/purple trap state on dodge so Saitama breaks free cleanly
+    // Clear any hitStun, hit-pause, or beam/purple/flurry trap state on dodge so Saitama breaks free cleanly
     const savedTimeStop = this.timeStopTimer;
     this.hitStunTimer = 0;
     this.basicAttackHitPauseTimer = 0;
@@ -217,6 +224,18 @@ export class SaitamaFighter extends Fighter {
     this.wasCaughtInPureLoveBeam = false;
     this.pureLoveBeamTimer = 0;
     this.pureLoveBeamRecoveryTimer = 0;
+    this.caughtInGenosFlurry = false;
+    this.caughtInGenosBeamTimer = 0;
+    this.caughtInSaitamaFlurry = false;
+    this.caughtInLaserBeamTimer = 0;
+    this.caughtInLaylaBeamTimer = 0;
+    this.caughtInJohnWickCombo = false;
+    this.paralyzeTimer = 0;
+    this.isParalyzed = false;
+    this.isParalyzedByMahito = false;
+    this.isParalyzedByMahoraga = false;
+    this.electricStunTimer = 0;
+    this.dubstepStunTimer = 0;
 
     // If dodging inside a domain, re-apply the domain time-stop so Saitama stays immobilized between dodges
     if (isDomainDodge && savedTimeStop > 0 && !isBeamOrTickDodge) {
@@ -224,9 +243,18 @@ export class SaitamaFighter extends Fighter {
     }
 
     // MANDATORY Rule #3: Always update aim facing direction relative to opponent after changing position!
-    const targetOpponent = (attacker && attacker !== this && attacker.hp > 0 && typeof attacker.x === 'number') ? attacker : (state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
-    if (targetOpponent && typeof this.aim === 'function') {
-      this.aim(targetOpponent);
+    const targetOpponent = (attacker && attacker !== this && attacker.hp > 0 && typeof attacker.x === 'number')
+      ? attacker 
+      : ((attacker && attacker.owner && attacker.owner !== this && attacker.owner.hp > 0 && typeof attacker.owner.x === 'number')
+        ? attacker.owner
+        : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null));
+    if (targetOpponent && typeof targetOpponent.x === 'number') {
+      const aimAngle = Math.atan2(targetOpponent.y - this.y, targetOpponent.x - this.x);
+      this.gunAngle = aimAngle;
+      this.angle = aimAngle;
+      if (typeof this.aim === 'function') {
+        this.aim(targetOpponent);
+      }
     }
 
     // Apply teleport chase delay to attacker (e.g. Gojo or Sukuna) so they don't snap-teleport instantly to Saitama's new dodge position
@@ -404,19 +432,36 @@ export class SaitamaFighter extends Fighter {
     this.vx = 0;
     this.vy = 0;
 
-    // Set counter state and clear any Infinity freeze/stasis
+    // Set counter state and clear any Infinity freeze/stasis/beam/flurry locks
     this.isCountering = true;
     this.isFrozenByInfinity = false;
     this.infinityFreezeTimer = 0;
     this.hitStunTimer = 0;
     this.basicAttackHitPauseTimer = 0;
     this.timeStopTimer = 0;
+    this.caughtInGenosFlurry = false;
+    this.caughtInGenosBeamTimer = 0;
+    this.caughtInSaitamaFlurry = false;
+    this.caughtInPureLoveBeam = false;
+    this.wasCaughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+    this.pureLoveBeamRecoveryTimer = 0;
+    this.isCaughtInPurple = false;
+    this.purpleHitTimer = 0;
+    this.caughtInLaserBeamTimer = 0;
+    this.caughtInLaylaBeamTimer = 0;
+    this.caughtInJohnWickCombo = false;
+    this.paralyzeTimer = 0;
+    this.isParalyzed = false;
 
     // MANDATORY Rule #3: Immediately aim facing direction at the target's back
+    const behindTargetAngle = Math.atan2(target.y - this.y, target.x - this.x);
+    this.gunAngle = behindTargetAngle;
+    this.angle = behindTargetAngle;
     if (typeof this.aim === 'function') {
       this.aim(target);
     }
-    this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
+    this._counterAimAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || behindTargetAngle);
 
     // Spawn ghost model skin afterimages along teleport trajectory dynamically scaled with distance
     if (!this.afterImages) this.afterImages = [];
@@ -930,6 +975,7 @@ export class SaitamaFighter extends Fighter {
     if (this.flurryTarget) {
       this.flurryTarget.caughtInSaitamaFlurry = false;
     }
+    this.caughtInGenosFlurry = false;
     if (typeof state !== 'undefined') {
       if (state.fighters) state.fighters.forEach(f => { if (f) f.caughtInSaitamaFlurry = false; });
       if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInSaitamaFlurry = false; });
@@ -1257,6 +1303,16 @@ export class SaitamaFighter extends Fighter {
     this.flurryHitsLeft = 0;
     this.flurryTimer = 0;
     this.flurryTarget = null;
+    this.caughtInGenosFlurry = false;
+    this.caughtInGenosBeamTimer = 0;
+    this.caughtInSaitamaFlurry = false;
+    this.caughtInPureLoveBeam = false;
+    this.wasCaughtInPureLoveBeam = false;
+    this.pureLoveBeamTimer = 0;
+    this.pureLoveBeamRecoveryTimer = 0;
+    this.isCaughtInPurple = false;
+    this.purpleHitTimer = 0;
+    this.caughtInJohnWickCombo = false;
   }
 
   /**
@@ -1640,10 +1696,16 @@ export class SaitamaFighter extends Fighter {
       this.vy *= 0.85;
       this.x += this.vx;
       this.y += this.vy;
-      if (opponent && opponent.hp > 0 && typeof this.aim === 'function') {
-        this.aim(opponent);
+      const target = (opponent && opponent.hp > 0) ? opponent : (typeof state !== 'undefined' && state.fighters ? state.fighters.find(f => f && f !== this && f.hp > 0) : null);
+      if (target && target.hp > 0) {
+        const aimAngle = Math.atan2(target.y - this.y, target.x - this.x);
+        this.gunAngle = aimAngle;
+        this.angle = aimAngle;
+        if (typeof this.aim === 'function') {
+          this.aim(target);
+        }
       }
-      this.resolveWallBounce(arena, opponent);
+      this.resolveWallBounce(arena, target || opponent);
     } else {
       // Call base fighter update logic for movement physics, wall bounce, etc. ONLY when freely walking
       super.update(opponent, ownerIndex, arena);

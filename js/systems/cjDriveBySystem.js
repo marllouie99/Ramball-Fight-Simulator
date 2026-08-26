@@ -959,9 +959,7 @@ export function updateDriveBys() {
               bulletAngle
             );
             if (p) {
-              p.ignoreWalls = true;
-              p.pierceWalls = true;
-              p.life = 75; // 75 frames * 22px = 1650px (flies seamlessly through walls across the entire screen)
+              p.life = 75;
               p.maxLife = 75;
             }
           }

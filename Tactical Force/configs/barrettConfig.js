@@ -18,7 +18,7 @@ export const barrettConfig = {
   magazineSize: 10,              // 10-round angled steel box magazine
   fireCooldown: 100,             // Heavy .50 BMG semi-auto cadence (~1.03s)
   boltDuration: 28,              // Heavy bolt cycle & crack animation duration after firing
-  damage: 200,                   // Anti-materiel kinetic round
+  damage: 25,                   // Anti-materiel kinetic round
   projectileSpeedMultiplier: 3.8,// Supersonic heavy round
   bulletRadius: 5.6,
   bulletLife: 130,

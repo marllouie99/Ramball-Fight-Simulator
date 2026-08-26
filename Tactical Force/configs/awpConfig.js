@@ -16,9 +16,9 @@ export const awpConfig = {
 
   // ── 2. PRIMARY WEAPON: .338 AWP SNIPER ──
   magazineSize: 5,               // 5-round bolt-action mag
-  fireCooldown: 85,              // Heavy manual bolt cycling interval (85 frames / 1.4s)
+  fireCooldown: 90,              // Heavy manual bolt cycling interval (85 frames / 1.4s)
   boltDuration: 26,              // Manual bolt racking & crack cycle duration after firing
-  damage: 105,                   // Lethal AP match round
+  damage: 15,                   // Lethal AP match round
   projectileSpeedMultiplier: 3.6,// Hyper-velocity round
   bulletRadius: 5.2,
   bulletLife: 120,

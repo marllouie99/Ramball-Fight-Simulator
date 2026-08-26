@@ -16,6 +16,7 @@ let _cachedBumpGrad = null;
 let _cachedWindshieldGrad = null;
 let _cachedRearGlassGrad = null;
 let _cachedRoofGrad = null;
+let _cachedRimGrad = null;
 let _cachedWheelCanvas = null;
 
 function _getHeadlightGrad(ctx, length) {

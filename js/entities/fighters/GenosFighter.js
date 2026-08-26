@@ -91,6 +91,13 @@ export class GenosFighter extends Fighter {
     super.reset();
     const initFlurryCD = CONFIG.genos?.initialFlurryCooldown !== undefined ? CONFIG.genos.initialFlurryCooldown : (CONFIG.genos?.flurryCooldown || 1200);
     this.flurryCooldown = initFlurryCD;
+    if (this.flurryTarget) {
+      this.flurryTarget.caughtInGenosFlurry = false;
+    }
+    if (typeof state !== 'undefined') {
+      if (state.fighters) state.fighters.forEach(f => { if (f) f.caughtInGenosFlurry = false; });
+      if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInGenosFlurry = false; });
+    }
   }
 
   draw(ctx) {
@@ -379,13 +386,13 @@ export class GenosFighter extends Fighter {
       return super.takeDamage(finalAmount, attacker, opts);
     }
 
-    // 3. Trigger Core Overdrive when HP drops to threshold or fatal damage is taken
+    // 3. Trigger Core Overdrive when HP drops to threshold (non-fatal damage only)
     const thresholdRatio = CONFIG.genos?.selfDestructHpThreshold ?? CONFIG.genos?.selfDestructThreshold ?? 0.10;
     const sdThreshold = this.maxHp * thresholdRatio;
     const nextHp = this.hp - amount;
 
-    if (!this.usedSelfDestruct && nextHp <= sdThreshold) {
-      this.hp = Math.max(1, Math.min(sdThreshold, nextHp > 0 ? nextHp : Math.round(sdThreshold)));
+    if (!this.usedSelfDestruct && nextHp > 0 && nextHp <= sdThreshold) {
+      this.hp = Math.max(1, Math.min(sdThreshold, nextHp));
       this.isSelfDestructing = true;
       this.selfDestructTimer = CONFIG.genos?.selfDestructCountdownFrames || 150;
       
@@ -636,7 +643,7 @@ export class GenosFighter extends Fighter {
       if (opponent.knockbackVx !== undefined) opponent.knockbackVx = 0;
       if (opponent.knockbackVy !== undefined) opponent.knockbackVy = 0;
       if (typeof opponent.applyTimeStop === 'function') {
-        opponent.applyTimeStop(25);
+        opponent.applyTimeStop(25, { isSkill: true });
       }
     }
 
@@ -721,6 +728,10 @@ export class GenosFighter extends Fighter {
     }
     if (this.flurryTarget) {
       this.flurryTarget.caughtInGenosFlurry = false;
+    }
+    if (typeof state !== 'undefined') {
+      if (state.fighters) state.fighters.forEach(f => { if (f) f.caughtInGenosFlurry = false; });
+      if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInGenosFlurry = false; });
     }
     this.isFlurrying = false;
     this.flurryHitsLeft = 0;
@@ -1351,6 +1362,7 @@ export class GenosFighter extends Fighter {
       // Continuously stop enemy target movement every frame during Machine Gun Blows
       for (const target of targetsToScan) {
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
+        let inCone = false;
         if (dist <= this.r + reach + target.r) {
           const angleToTarget = Math.atan2(target.y - this.y, target.x - this.x);
           let angleDiff = angleToTarget - aimAngle;
@@ -1358,6 +1370,7 @@ export class GenosFighter extends Fighter {
           while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
 
           if (Math.abs(angleDiff) <= halfArc) {
+            inCone = true;
             if (this.flurryHitsLeft > 0) {
               target.vx = 0;
               target.vy = 0;
@@ -1365,10 +1378,13 @@ export class GenosFighter extends Fighter {
               if (target.knockbackVx !== undefined) target.knockbackVx = 0;
               if (target.knockbackVy !== undefined) target.knockbackVy = 0;
               if (typeof target.applyTimeStop === 'function') {
-                target.applyTimeStop(10);
+                target.applyTimeStop(10, { isSkill: true });
               }
             }
           }
+        }
+        if (!inCone) {
+          target.caughtInGenosFlurry = false;
         }
       }
 
@@ -1396,7 +1412,7 @@ export class GenosFighter extends Fighter {
                 target.caughtInGenosFlurry = false;
                 // Final hit: apply heavy finisher knockback push & extended hit-pause
                 if (typeof target.applyTimeStop === 'function') {
-                  target.applyTimeStop(20);
+                  target.applyTimeStop(20, { isSkill: true });
                 }
                 const pushForce = 18.0;
                 const pushVx = Math.cos(angleToTarget) * pushForce;
@@ -1415,7 +1431,7 @@ export class GenosFighter extends Fighter {
                 if (target.knockbackVx !== undefined) target.knockbackVx = 0;
                 if (target.knockbackVy !== undefined) target.knockbackVy = 0;
                 if (typeof target.applyTimeStop === 'function') {
-                  target.applyTimeStop(12);
+                  target.applyTimeStop(12, { isSkill: true });
                 }
               }
 
@@ -1456,6 +1472,13 @@ export class GenosFighter extends Fighter {
 
       if (this.flurryHitsLeft <= 0) {
         this.isFlurrying = false;
+        if (this.flurryTarget) {
+          this.flurryTarget.caughtInGenosFlurry = false;
+        }
+        if (typeof state !== 'undefined') {
+          if (state.fighters) state.fighters.forEach(f => { if (f) f.caughtInGenosFlurry = false; });
+          if (state.illusions) state.illusions.forEach(ill => { if (ill) ill.caughtInGenosFlurry = false; });
+        }
         this.flurryTarget = null;
       }
       return;

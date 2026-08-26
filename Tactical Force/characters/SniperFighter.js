@@ -6,210 +6,49 @@
 
 import { TacticalBaseFighter } from './TacticalBaseFighter.js';
 import { CONFIG } from '../../js/core/config.js';
-import { projectileSystem } from '../../js/systems/projectileSystem.js';
-import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../js/core/state.js';
-import { audioSystem } from '../../js/systems/audioSystem.js';
-import { drawAwpWeapon, drawTacticalSniperWeapon } from '../weapons/index.js';
-import { drawAwpSkin, drawSniperSkin } from '../skins/index.js';
-import { hasLineOfSight } from '../maps/index.js';
+import { state } from '../../js/core/state.js';
+import { drawTacticalSniperWeapon } from '../weapons/index.js';
+import { drawSniperSkin } from '../skins/index.js';
 
 export class SniperFighter extends TacticalBaseFighter {
   constructor(def) {
     super(def);
-    this.isTacticalFighter = true;
-    this.gameCategory = 'tactical';
     this.spinDirection = Math.random() < 0.5 ? 1 : -1;
     const cfg = CONFIG.awp || CONFIG.sniper || {};
-    this.maxMagazine = cfg.magazineSize || 5;
-    this.magazineBullets = this.maxMagazine;
-    this.reloadDuration = cfg.reloadTime || 65;
-    this.reloadTimer = 0;
-    this.isReloading = false;
-    this.muzzleFlashTimer = 0;
-    this.boltDuration = cfg.boltDuration || 26;
+    this.setupWeapon(cfg, {
+      defaultMag: 5,
+      defaultReload: 65,
+      defaultCooldown: 85,
+      actionDuration: cfg.boltDuration || 26,
+      tipOffset: 52,
+      recoilDivisor: 8.0,
+      baseRecoil: 2.0,
+      reloadText: 'LOCKED & LOADED',
+      bulletOptions: {
+        r: 6.0,
+        length: 26,
+        width: 4.8,
+        radius: cfg.bulletRadius || 5.2,
+        life: cfg.bulletLife || 120,
+        caliberScale: 1.35,
+        historyMax: 20
+      },
+      screenShake: {
+        intensity: cfg.screenShakeIntensity || 10.0,
+        duration: cfg.screenShakeDuration || 8
+      }
+    });
+    this.boltDuration = this.actionDuration;
     this.boltTimer = 0;
-    this._boltCrackPlayed = false;
     this.aimLaserOpacity = cfg.laserSightAlpha ?? 0.45;
   }
 
   reset() {
     super.reset();
-    const cfg = CONFIG.awp || CONFIG.sniper || {};
-    this.maxMagazine = cfg.magazineSize || 5;
-    this.magazineBullets = this.maxMagazine;
-    this.reloadDuration = cfg.reloadTime || 65;
-    this.reloadTimer = 0;
-    this.isReloading = false;
-    this.muzzleFlashTimer = 0;
-    this.boltDuration = cfg.boltDuration || 26;
+    const cfg = this.weaponConfig || CONFIG.awp || CONFIG.sniper || {};
+    this.resetTacticalWeapon(cfg, 5, 65);
+    this.boltDuration = this.actionDuration || 26;
     this.boltTimer = 0;
-    this._boltCrackPlayed = false;
-    this.lastAimAligned = false;
-    this.shootDebounce = 0;
-  }
-
-  update(opponent, ownerIndex, arena) {
-    // Top freeze guard (Rule 1)
-    const isFrozen = this._handleTimeStop();
-    if (isFrozen || this.isTargetOfAmbush) {
-      this.interruptAttacks();
-      return;
-    }
-
-    const cfg = CONFIG.awp || CONFIG.sniper || {};
-
-    if (this.muzzleFlashTimer > 0) {
-      this.muzzleFlashTimer--;
-    }
-
-    if (this.gunRecoil > 0) {
-      this.gunRecoil = Math.max(0, this.gunRecoil - 0.08);
-    }
-
-    if (this.shootDebounce > 0) {
-      this.shootDebounce--;
-    }
-
-    // Manual Bolt Racking & Crack SFX Trigger (Like Shotgun)
-    if (this.boltTimer > 0) {
-      this.boltTimer--;
-      if (this.boltTimer === Math.floor(this.boltDuration / 2) && !this._boltCrackPlayed) {
-        this._boltCrackPlayed = true;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX(cfg.sounds?.bolt || 'Assets/Sound Effects/Skills/johnwick-shotgun-crack.mp3', cfg.soundVolumes?.bolt ?? 0.35, 1.1);
-        }
-      }
-    }
-
-    // Magazine Reload
-    if (this.isReloading) {
-      this.reloadTimer--;
-      if (this.reloadTimer <= 0) {
-        this.isReloading = false;
-        this.magazineBullets = this.maxMagazine;
-        if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-          audioSystem.playSFX(cfg.sounds?.reload || 'Assets/Sound Effects/Skills/johnwick-m4-reload.mp3', cfg.soundVolumes?.reload ?? 0.30);
-        }
-        spawnFloatingText(this.x, this.y - this.r - 15, 'LOCKED & LOADED', this.color || '#ef4444');
-      }
-    } else if (this.magazineBullets <= 0) {
-      this.isReloading = true;
-      this.reloadTimer = this.reloadDuration; // ~1.08s bolt action reload
-      if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-        audioSystem.playSFX('skill_dash1', 0.25, 0.8);
-      }
-      spawnFloatingText(this.x, this.y - this.r - 15, 'BOLT CYCLE...', '#94a3b8');
-    }
-
-    // Recoil animation recovery
-    if (this.gunRecoil > 0) {
-      this.gunRecoil = Math.max(0, this.gunRecoil * 0.80 - 0.05);
-    }
-
-    // Rotational spin sweep aim detection
-    const canAct = (!this.paralyzeTimer || this.paralyzeTimer <= 0) && !this.isCaughtInBeam() && (!this.boltTimer || this.boltTimer <= 0);
-    if (canAct && !this.isReloading && opponent && opponent.hp > 0 && !opponent.isDead) {
-      const isSweeping = this.checkSpinSweep(opponent, CONFIG.tactical?.aimAlignmentThreshold || 0.16);
-
-      if (isSweeping && !this.lastAimAligned && this.shootDebounce <= 0) {
-        if (hasLineOfSight(this.x, this.y, opponent.x, opponent.y)) {
-          this.shoot(opponent, ownerIndex);
-          this.shootDebounce = 8;
-        }
-      }
-      this.lastAimAligned = isSweeping;
-    } else {
-      this.lastAimAligned = false;
-    }
-
-    super.update(opponent, ownerIndex, arena);
-  }
-
-  shoot(target, ownerIndex) {
-    if (typeof target === 'number' && ownerIndex === undefined) {
-      ownerIndex = target;
-      target = null;
-    }
-    if (ownerIndex === undefined) {
-      ownerIndex = (typeof state !== 'undefined' && state.fighters) ? state.fighters.indexOf(this) : 0;
-    }
-
-    if (this.isReloading || this.magazineBullets <= 0) return;
-    if (this.boltTimer > 0) return;
-
-    if (!target || target.hp <= 0) {
-      if (typeof state !== 'undefined' && state.fighters) {
-        let bestDist = Infinity;
-        for (let fi = 0; fi < state.fighters.length; fi++) {
-          const f = state.fighters[fi];
-          if (!f || f === this || f.hp <= 0) continue;
-          const d = Math.hypot(f.x - this.x, f.y - this.y);
-          if (d < bestDist) {
-            bestDist = d;
-            target = f;
-          }
-        }
-      }
-    }
-
-    if (target && target.hp > 0 && !hasLineOfSight(this.x, this.y, target.x, target.y)) return;
-
-    const cfg = CONFIG.awp || CONFIG.sniper || {};
-    this.magazineBullets--;
-    this.muzzleFlashTimer = cfg.flashDuration || 6;
-    this.boltTimer = this.boltDuration;
-    this._boltCrackPlayed = false;
-    this.gunRecoil = cfg.recoilDistance ? (cfg.recoilDistance / 8.0) : 2.0;
-
-    let fireAngle = this.gunAngle !== undefined ? this.gunAngle : (this.angle || 0);
-    if (target && target.hp > 0) {
-      const targetAngle = Math.atan2(target.y - this.y, target.x - this.x);
-      let diff = targetAngle - fireAngle;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      if (Math.abs(diff) <= 0.22) {
-        fireAngle = targetAngle;
-        this.angle = targetAngle;
-        this.gunAngle = targetAngle;
-      }
-    }
-
-    // Trigger sniper screen shake
-    triggerGlobalScreenShake(cfg.screenShakeIntensity || 10.0, cfg.screenShakeDuration || 8);
-
-    // Spawn tip position at muzzle
-    const scaleFactor = (this.r / 25);
-    const tipDist = this.r + 52 * scaleFactor;
-    const spawnX = this.x + Math.cos(fireAngle) * tipDist;
-    const spawnY = this.y + Math.sin(fireAngle) * tipDist;
-
-    // Fire hyper-velocity armor-piercing round
-    const speed = (CONFIG.projectile?.speed || 7) * (this._def?.projectileSpeedMultiplier || cfg.projectileSpeedMultiplier || 3.6);
-    const proj = projectileSystem.fireProjectile(this, ownerIndex, this.damage, false, speed, false, 'tacticalBullet', spawnX, spawnY, fireAngle);
-    if (proj) {
-      proj.r = 6.0 * scaleFactor;
-      proj.bulletLength = 26 * scaleFactor;
-      proj.bulletWidth = 4.8 * scaleFactor;
-      proj.bulletRadius = (cfg.bulletRadius || 5.2) * scaleFactor;
-      proj.life = cfg.bulletLife || 120;
-      proj.tacticalCaliberScale = 1.35 * scaleFactor;
-      proj.historyMax = 20;
-    }
-
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Attacks/awp-fire.mp3', cfg.soundVolumes?.fire ?? 0.80, 0.85);
-    }
-  }
-
-  triggerDemoAttack() {
-    const cfg = CONFIG.awp || CONFIG.sniper || {};
-    this.muzzleFlashTimer = cfg.flashDuration || 6;
-    this.boltTimer = this.boltDuration;
-    this._boltCrackPlayed = false;
-    this.gunRecoil = 2.0;
-    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
-      audioSystem.playSFX(cfg.sounds?.fire || 'Assets/Sound Effects/Attacks/awp-fire.mp3', cfg.soundVolumes?.fire ?? 0.80, 0.85);
-    }
   }
 
   draw(ctx) {
@@ -221,9 +60,9 @@ export class SniperFighter extends TacticalBaseFighter {
 
     ctx.rotate(angle);
 
-    // Upright vertical mirroring for showoff / face-off screens so right-side fighters are not upside down
+    // Upright vertical mirroring so fighter and weapon stay upright facing left (Rule 19)
     const facingLeft = Math.abs(angle) > Math.PI / 2;
-    if (facingLeft && (isFaceOff || !this.isSpinning)) {
+    if (facingLeft) {
       ctx.scale(1, -1);
     }
 

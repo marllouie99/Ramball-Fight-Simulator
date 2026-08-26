@@ -7,7 +7,7 @@
 export const tacticalMainConfig = {
   // ── 1. GLOBAL UNIFIED FIGHTER MOVEMENT SPEED ──
   // Adjust this single value to globally tune the movement speed of all tactical operatives
-  unifiedMovementSpeed: 5.0,
+  unifiedMovementSpeed: 4.0,
   enableUnifiedSpeed: true,
 
   // ── 2. GLOBAL UNIFIED FIGHTER ATTRIBUTES ──
@@ -17,7 +17,7 @@ export const tacticalMainConfig = {
   aimAlignmentThreshold: 0.16,  // Smooth sweep alignment tolerance in radians (~9.2 degrees) when sweeping past enemy
 
   // ── 3. GLOBAL BALLISTICS & WEAPONS TUNING ──
-  globalBulletSpeedMultiplier: 0.8,
+  globalBulletSpeedMultiplier: 0.5,
   globalDamageMultiplier: 1.0,
   globalRecoilForceMultiplier: 1.0,
   globalReloadTimeMultiplier: 1.0,
@@ -41,13 +41,20 @@ export const tacticalMainConfig = {
   gunBashCooldown: 22,           // Frames between melee hits per enemy
 
   // ── 7. TACTICAL REBOUNCE & DIRECTIONAL PHYSICS ──
-  enableDynamicRebounce: true,          // Enable high-variance multi-directional rebounces
-  rebounceDirectionalVariance: 0.85,    // Angular spread / variance upon wall impact (0.0 = strict specular, 1.0 = wide scatter)
-  rebounceTangentialFlipChance: 0.45,   // 45% chance to flip tangential sliding direction around walls/obstacles
-  obstacleRebounceSpread: 0.85,         // Angular scatter spread when bouncing off cover obstacles
-  minWallTangentialSpeed: 0.65,         // Multiplier of base speed for tangential deflection on walls (prevents 1D ping-pong)
-  spinReverseOnBounceChance: 0.0,       // 0% - Maintain uninterrupted continuous 360 spin in single direction
-  bodyBumpScatterForce: 0.85,           // Enhanced perpendicular scatter on fighter-to-fighter collisions
+  enableDynamicRebounce: true,          // Enable natural momentum-preserving physical rebounces
+  restitution: 0.95,                    // Realistic kinetic restitution upon impact
+  angleDeflectionVariance: 0.08,        // Subtle organic variance in radians (~4.5 deg) preventing pure 1D ping-pong
+  minTangentialNudge: 0.15,             // Subtle corner deflection nudge when hitting perpendicular surfaces
+
+  // ── 8. BULLET RICOCHET & FIRE DISCIPLINE ──
+  bulletMaxWallBounces: 2,              // Max wall/obstacle ricochets before bullet expires
+  holdFireDuringBounce: false,          // Continuous fire rate based strictly on fireCooldown
+
+  // ── 9. TACTICAL AIM TRACKING & SMOOTHING (ANTI-SNAP) ──
+  aimTurnSpeedInSight: 0.24,            // Maximum angular turn rate per frame when tracking enemy in clear LOS (~13.8 deg/frame)
+  aimTurnSpeedOccluded: 0.14,           // Smooth transition turn rate when enemy is occluded behind walls (~8.0 deg/frame)
+  aimSmoothingInSight: 0.28,            // Organic angular lerp factor for crisp target tracking
+  aimSmoothingOccluded: 0.18,           // Gentle angular lerp factor when returning to movement heading
 };
 
 export const mainTacticalConfig = tacticalMainConfig;

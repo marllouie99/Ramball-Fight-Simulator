@@ -7,6 +7,7 @@ import { state, spawnFloatingText } from '../../js/core/state.js';
 import { GAME_MODES } from '../../js/core/modeConfig.js';
 import { spawnImpactFlash, spawnSparks, spawnMeleeClashShockwave } from '../../js/graphics/particles/sparkEffect.js';
 import { STARTER_MAP, handleObstacleCollision, hasLineOfSight } from '../maps/index.js';
+import { tacticalProjectileSystem } from './tacticalProjectileSystem.js';
 
 /**
  * Checks whether an entity is a tactical operative.
@@ -304,36 +305,33 @@ export function getTacticalClosestOpponent(fighter) {
 
 /**
  * Resolves fighter-to-fighter body collisions when at least one entity is a Tactical operative.
- * Applies higher tangential scatter force and triggers rotational spin reversals.
+ * Applies clean elastic impulse response preserving momentum.
  */
 export function resolveTacticalFighterCollision(a, b, impulse, nx, ny, tx, ty) {
-  const scatterForce = CONFIG.tactical?.bodyBumpScatterForce ?? 0.85;
-  const randA = (Math.random() - 0.5) * 2 * scatterForce;
-  const randB = (Math.random() - 0.5) * 2 * scatterForce;
-
   if (!a.isTurret && !a.isDispenser) {
     if (!a.isInRage && !a.isMeleeMode) {
-      a.vx -= impulse * nx + randA * impulse * tx;
-      a.vy -= impulse * ny + randA * impulse * ty;
+      a.vx -= impulse * nx;
+      a.vy -= impulse * ny;
     }
     if (typeof a.normalizeSpeed === 'function') a.normalizeSpeed();
   }
 
   if (!b.isTurret && !b.isDispenser) {
     if (!b.isInRage && !b.isMeleeMode) {
-      b.vx += impulse * nx + randB * impulse * tx;
-      b.vy += impulse * ny + randB * impulse * ty;
+      b.vx += impulse * nx;
+      b.vy += impulse * ny;
     }
     if (typeof b.normalizeSpeed === 'function') b.normalizeSpeed();
   }
 }
 
 /**
- * Executes tactical mode physics passes (Gun Barrel Collisions & Cover Obstacles).
+ * Executes tactical mode physics passes (Gun Barrel Collisions, Cover Obstacles, & Dedicated Projectiles).
  */
 export function updateTacticalPhysicsPass(fighters, illusions) {
   resolveTacticalGunCollisions(fighters, illusions);
   handleTacticalObstaclePass(fighters);
+  tacticalProjectileSystem.update(fighters);
 }
 
 export { hasLineOfSight as hasTacticalLineOfSight };

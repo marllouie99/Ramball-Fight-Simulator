@@ -26,6 +26,14 @@ import { triggerMahitoParalyzeExplosion } from './fighters/mahito/mahitoCombat.j
 
 export function applyDamageToTarget(target, amount, attacker, opts = {}) {
   if (!target) return false;
+  if (typeof opts === 'string') {
+    opts = { source: opts };
+  } else if (!opts || typeof opts !== 'object') {
+    opts = {};
+  }
+  if (typeof attacker === 'number' && typeof state !== 'undefined' && state.fighters) {
+    attacker = state.fighters[attacker] || null;
+  }
 
   if (target.isIllusion) {
     let currentHp = Number(target.hp);
@@ -240,10 +248,7 @@ export class Fighter {
 
     const baseHp = Number(d.hp || 100);
     // Store original base speed before any multipliers (used for spin rate calculations)
-    let originalBaseSpeed = d.moveSpeed !== undefined ? d.moveSpeed : Math.sqrt(startVx * startVx + startVy * startVy) || 1;
-    if (typeof state !== 'undefined' && (state.gameCategory === 'tactical' || String(state.mode).toLowerCase().includes('tactical')) && CONFIG.tactical?.enableUnifiedSpeed && CONFIG.tactical?.unifiedMovementSpeed) {
-      originalBaseSpeed = CONFIG.tactical.unifiedMovementSpeed;
-    }
+    const originalBaseSpeed = d.moveSpeed !== undefined ? d.moveSpeed : (d.speed !== undefined ? d.speed : (Math.hypot(d.startVx || 0, d.startVy || 0) || 5));
     // Apply mode speed multiplier only to movement speed, not spin rate
     const moveSpeed = originalBaseSpeed * (MODE_SPEED_MULTIPLIER[state.mode] || 1);
     this.speed = moveSpeed;
@@ -524,7 +529,9 @@ export class Fighter {
     if (this.isTurret || this.isDispenser || this.isAmbushing) return;
     this.knockbackVx = (this.knockbackVx || 0) + vx;
     this.knockbackVy = (this.knockbackVy || 0) + vy;
-    if (stunFrames > 0) {
+    this.vx = (this.vx || 0) + vx;
+    this.vy = (this.vy || 0) + vy;
+    if (stunFrames > 0 && this.characterId !== 'toji' && this.type !== 'toji') {
       this.knockbackStunTimer = Math.max(this.knockbackStunTimer || 0, stunFrames);
     }
   }
@@ -576,7 +583,11 @@ export class Fighter {
         this.vy *= slowMult;
       }
     }
-    if (this.paralyzeTimer > 0) {
+    if (this.isParalyzedByMahoraga || this.paralyzeTimer > 0) {
+      if (this.wallSlamPinnedX !== undefined && this.wallSlamPinnedY !== undefined) {
+        this.x = this.wallSlamPinnedX;
+        this.y = this.wallSlamPinnedY;
+      }
       if (this.isParalyzedByMahito && this.paralyzeTimer % 3 === 0 && typeof spawnMahitoSoulBubbles === 'function') {
         spawnMahitoSoulBubbles(this.x, this.y, 2);
       }
@@ -585,8 +596,8 @@ export class Fighter {
           triggerMahitoParalyzeExplosion(this);
         }
       }
-      this.paralyzeTimer--;
-      if (this.paralyzeTimer <= 0) {
+      if (this.paralyzeTimer > 0) this.paralyzeTimer--;
+      if (this.paralyzeTimer <= 0 && !this.isParalyzedByMahoraga) {
         this.isParalyzedByMahito = false;
       }
       this.vx = 0;
@@ -709,18 +720,7 @@ export class Fighter {
     }
   }
 
-  // Knockback is now applied directly to fighter's position, so physics engines of custom fighters can't interfere.
-  // Knockback is applied directly to fighter's position, so physics engines of custom fighters can't interfere.
-  applyKnockback(vx, vy) {
-    this.knockbackVx = vx;
-    this.knockbackVy = vy;
-    this.vx = vx;
-    this.vy = vy;
-    // Domain Immunity should NOT make you immune to physical knockback sliding!
-    if (this.characterId !== 'toji' && this.type !== 'toji') {
-      this.knockbackStunTimer = 20; // Steering freeze for normal fighters so knockback slides cleanly
-    }
-  }
+
 
   /** Unified master tick for all global debuffs and status effects. */
   handleStatusEffects() {
@@ -1038,12 +1038,14 @@ export class Fighter {
     const actualDamage = prevHp - this.hp;
     if (actualDamage > 0) {
       this.damageReceived = (this.damageReceived || 0) + actualDamage;
-      if (attacker) {
+      if (attacker && typeof attacker === 'object') {
         let actualAttacker = attacker;
-        if (attacker.isIllusion && attacker.owner) {
+        if (attacker.isIllusion && attacker.owner && typeof attacker.owner === 'object') {
           actualAttacker = attacker.owner;
         }
-        actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
+        if (actualAttacker && typeof actualAttacker === 'object') {
+          actualAttacker.damageDealt = (actualAttacker.damageDealt || 0) + actualDamage;
+        }
       }
     }
     const isTurretPair = Boolean(opts.projectile && opts.projectile.shotPairId);
@@ -1110,12 +1112,11 @@ export class Fighter {
         }
         if (kbAngle !== null) {
           const attackerConfig = (attacker?.characterId && CONFIG[attacker.characterId]) || attacker?.customConfig || {};
-          const baseKb = opts.knockbackForce || opts.projectile?.knockbackForce || attackerConfig.knockbackForce || (opts.isMelee ? 3.5 : (opts.isProjectile ? 3.0 : 2.0));
+          const baseKb = opts.knockbackForce || opts.projectile?.knockbackForce || attackerConfig.knockbackForce || (opts.isMelee ? 2.5 : (opts.isProjectile ? 1.5 : 1.0));
           const kbVx = Math.cos(kbAngle) * baseKb;
           const kbVy = Math.sin(kbAngle) * baseKb;
-          this.applyKnockback(kbVx, kbVy, opts.isHeavy ? 6 : 0);
-          this.vx += kbVx * 0.45;
-          this.vy += kbVy * 0.45;
+          const stunFrames = opts.isHeavy ? 15 : (opts.isKnockback || opts.isExplosion ? 10 : 0);
+          this.applyKnockback(kbVx, kbVy, stunFrames);
         }
       }
 
@@ -1579,12 +1580,6 @@ export class Fighter {
       return;
     }
 
-    // Do NOT fire if Line of Sight is blocked by a wall in tactical mode
-    const isTactical = typeof state !== 'undefined' && (state.gameCategory === 'tactical' || state.mode === 'Tactical 2v2');
-    if (isTactical && this.hasClearLOS === false) {
-      return;
-    }
-
     if (projectileSystem) {
       projectileSystem.fireProjectile(this, ownerIndex, this.damage);
     }
@@ -1664,8 +1659,8 @@ export class Fighter {
     let currentSpeed = Math.hypot(this.vx, this.vy);
     // Auto-recover from zero velocity if we should be moving
     if (targetSpeed > 0 && currentSpeed < 0.05) {
-      // Nudge in the direction of our facing angle
-      const nudgeAngle = this.angle || this.gunAngle || 0;
+      // Nudge in the direction of movement/body angle, not weapon gunAngle
+      const nudgeAngle = (this.angle !== undefined && this.angle !== 0) ? this.angle : (Math.random() * Math.PI * 2);
       this.vx = Math.cos(nudgeAngle) * 0.1;
       this.vy = Math.sin(nudgeAngle) * 0.1;
       currentSpeed = 0.1;

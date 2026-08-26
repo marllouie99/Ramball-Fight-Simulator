@@ -29,6 +29,7 @@ import { clearDroppedMiniguns } from '../graphics/particles/cjDroppedMinigun.js'
 import { clearCarExplosions } from '../graphics/particles/cjCarExplosion.js';
 import { clearBamEffects } from '../graphics/particles/bamImpactEffect.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
+import { tacticalProjectileSystem } from '../../Tactical Force/systems/tacticalProjectileSystem.js';
 
 // ─────────────────────────────────────────────
 // SOUND PRELOADING
@@ -320,6 +321,7 @@ export function reinitFighters(isNewMatch = false) {
   clearBamEffects();
   clearHybridProjectiles();
   clearProjectiles();
+  tacticalProjectileSystem.clear();
 
   if (state.floatingTexts) state.floatingTexts.length = 0;
   if (state.bloodEffects) state.bloodEffects.length = 0;
@@ -957,6 +959,7 @@ export function restartCurrentRound() {
   clearBamEffects();
   clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
+  tacticalProjectileSystem.clear();
   startCountdown();
 }
 
@@ -1144,6 +1147,7 @@ export function resetMatch(showFaceOff = true) {
   clearBamEffects();
   clearHybridProjectiles();
   clearAllPools(); // Clear all particle object pools
+  tacticalProjectileSystem.clear();
   if (showFaceOff) {
     startFaceOffScreen(false);
   } else {

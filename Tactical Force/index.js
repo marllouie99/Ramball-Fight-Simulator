@@ -57,5 +57,10 @@ export {
   drawAwpWeapon,
   drawTacticalSniperWeapon,
   drawBarrettWeapon,
-  drawTacticalMuzzleFlash
+  drawTacticalMuzzleFlash,
+  drawTacticalBullet
 } from './weapons/index.js';
+
+// Dedicated Tactical Projectile System & Physics
+export { TacticalProjectileSystem, tacticalProjectileSystem } from './systems/tacticalProjectileSystem.js';
+export { updateTacticalPhysicsPass, isTacticalFighter, getTacticalGunReach } from './systems/tacticalPhysics.js';

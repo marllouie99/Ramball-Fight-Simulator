@@ -26,19 +26,13 @@ export { STARTER_MAP, MONOLITH_MAP, drawTacticalMap };
  * Uses iterative relaxation to cleanly resolve tight spaces and multi-obstacle pinches.
  * Returns true if a collision occurred.
  */
-export function handleObstacleCollision(entity, obstacles, restitution = 0.85) {
+export function handleObstacleCollision(entity, obstacles, restitution = 0.95) {
   if (!obstacles || !Array.isArray(obstacles) || obstacles.length === 0 || !entity) return false;
   const er = entity.r || entity.radius || 25;
-  const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : null;
   let anyCollided = false;
 
-  const spread = (CONFIG?.tactical?.obstacleRebounceSpread !== undefined) ? CONFIG.tactical.obstacleRebounceSpread : 0.85;
-  const flipChance = (CONFIG?.tactical?.rebounceTangentialFlipChance !== undefined) ? CONFIG.tactical.rebounceTangentialFlipChance : 0.45;
-  const minTangentialMult = (CONFIG?.tactical?.minWallTangentialSpeed !== undefined) ? CONFIG.tactical.minWallTangentialSpeed : 0.65;
-  const spinReverseChance = (CONFIG?.tactical?.spinReverseOnBounceChance !== undefined) ? CONFIG.tactical.spinReverseOnBounceChance : 0.40;
-
-  // Multi-pass iterative solver (3 iterations) to resolve corner pinches and tight pockets
-  for (let iter = 0; iter < 3; iter++) {
+  // Multi-pass iterative solver (2 iterations) to resolve corner pinches and tight pockets
+  for (let iter = 0; iter < 2; iter++) {
     let iterCollided = false;
 
     for (let i = 0; i < obstacles.length; i++) {
@@ -70,35 +64,22 @@ export function handleObstacleCollision(entity, obstacles, restitution = 0.85) {
         entity.y += ny * penetration;
 
         if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
-          const targetSpd = entity.speed || 5.0;
-          const minBounce = targetSpd * 0.75;
-          const minTangential = targetSpd * minTangentialMult;
           const dot = entity.vx * nx + entity.vy * ny;
           if (dot < 0) {
-            entity.vx = entity.vx - 2 * dot * nx;
-            entity.vy = entity.vy - 2 * dot * ny;
+            // Elastic specular reflection along surface normal
+            entity.vx = entity.vx - (1 + restitution) * dot * nx;
+            entity.vy = entity.vy - (1 + restitution) * dot * ny;
+
+            // Subtle tangent drift if perfectly orthogonal to prevent infinite 1D bounce
+            const tx = -ny, ty = nx;
+            const tangential = entity.vx * tx + entity.vy * ty;
+            const targetSpd = entity.speed || 5.0;
+            if (Math.abs(tangential) < targetSpd * 0.15) {
+              const nudge = (Math.random() < 0.5 ? 1 : -1) * targetSpd * 0.20;
+              entity.vx += tx * nudge;
+              entity.vy += ty * nudge;
+            }
           }
-          entity.vx += nx * minBounce;
-          entity.vy += ny * minBounce;
-
-          // Tangential & Directional Scattering
-          const tx = -ny;
-          const ty = nx;
-          let currentTangential = entity.vx * tx + entity.vy * ty;
-
-          if (Math.random() < flipChance && Math.abs(currentTangential) > 0.1) {
-            currentTangential = -currentTangential;
-          }
-          currentTangential += (Math.random() - 0.5) * 2 * spread * targetSpd;
-
-          if (Math.abs(currentTangential) < minTangential) {
-            const dir = (currentTangential !== 0) ? Math.sign(currentTangential) : (Math.random() < 0.5 ? 1 : -1);
-            currentTangential = dir * (minTangential + Math.random() * targetSpd * 0.35);
-          }
-
-          const normalSpd = Math.max(minBounce, Math.abs(entity.vx * nx + entity.vy * ny));
-          entity.vx = nx * normalSpd + tx * currentTangential;
-          entity.vy = ny * normalSpd + ty * currentTangential;
         }
         iterCollided = true;
         anyCollided = true;
@@ -108,41 +89,27 @@ export function handleObstacleCollision(entity, obstacles, restitution = 0.85) {
         const ny = dy / dist;
         const penetration = er - dist;
 
-        // Push entity out of obstacle
+        // Push entity smoothly out of obstacle
         entity.x += nx * penetration;
         entity.y += ny * penetration;
 
-        // Reflect / bounce velocity
+        // Natural momentum-conserving specular reflection
         if (typeof entity.vx === 'number' && typeof entity.vy === 'number') {
-          const targetSpd = entity.speed || 5.0;
-          const minBounce = targetSpd * 0.75;
-          const minTangential = targetSpd * minTangentialMult;
           const dot = entity.vx * nx + entity.vy * ny;
           if (dot < 0) {
-            entity.vx = entity.vx - 2 * dot * nx;
-            entity.vy = entity.vy - 2 * dot * ny;
+            entity.vx = entity.vx - (1 + restitution) * dot * nx;
+            entity.vy = entity.vy - (1 + restitution) * dot * ny;
+
+            // Subtle angular variation to avoid infinite corner loops
+            const tx = -ny, ty = nx;
+            const tangential = entity.vx * tx + entity.vy * ty;
+            const targetSpd = entity.speed || 5.0;
+            if (Math.abs(tangential) < targetSpd * 0.15) {
+              const nudge = (Math.random() < 0.5 ? 1 : -1) * targetSpd * 0.20;
+              entity.vx += tx * nudge;
+              entity.vy += ty * nudge;
+            }
           }
-          entity.vx += nx * minBounce;
-          entity.vy += ny * minBounce;
-
-          // Tangential & Directional Scattering
-          const tx = -ny;
-          const ty = nx;
-          let currentTangential = entity.vx * tx + entity.vy * ty;
-
-          if (Math.random() < flipChance && Math.abs(currentTangential) > 0.1) {
-            currentTangential = -currentTangential;
-          }
-          currentTangential += (Math.random() - 0.5) * 2 * spread * targetSpd;
-
-          if (Math.abs(currentTangential) < minTangential) {
-            const dir = (currentTangential !== 0) ? Math.sign(currentTangential) : (Math.random() < 0.5 ? 1 : -1);
-            currentTangential = dir * (minTangential + Math.random() * targetSpd * 0.35);
-          }
-
-          const normalSpd = Math.max(minBounce, Math.abs(entity.vx * nx + entity.vy * ny));
-          entity.vx = nx * normalSpd + tx * currentTangential;
-          entity.vy = ny * normalSpd + ty * currentTangential;
         }
 
         iterCollided = true;

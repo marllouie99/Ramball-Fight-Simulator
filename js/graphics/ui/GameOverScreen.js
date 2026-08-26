@@ -371,6 +371,72 @@ function drawFollowForMoreBanner(ctx, cx, cy, timer) {
 }
 
 // ─────────────────────────────────────────────
+// SIMPLE IN-ARENA TACTICAL WINNER OVERLAY
+// (Clean In-Arena Text: e.g. "M4A1 Wins!")
+// ─────────────────────────────────────────────
+
+function drawTacticalWinnerOverlay(ctx, winner, timer, mode) {
+  const arena = state.arena || { x: 50, y: 150, width: 440, height: 680 };
+  const arenaX = arena ? arena.x : 0;
+  const arenaY = arena ? arena.y : 0;
+  const arenaW = arena ? arena.width : state.canvas.width;
+  const arenaH = arena ? arena.height : state.canvas.height;
+
+  // 0. Snap Cut Arena BGM & Play Winner Announcer Audio (Frame 1)
+  if (timer > 0) {
+    stopArenaBgm(true);
+  }
+  if (!state._hasPlayedChampionYouWinVoice && timer > 0) {
+    state._hasPlayedChampionYouWinVoice = true;
+    if (typeof audioSystem !== 'undefined' && audioSystem.playSFX) {
+      audioSystem.playSFX('Assets/Sound Effects/Announcer/street-fighter-ii-you-win.mp3', 1.0);
+    }
+  }
+
+  const centerX = arenaX + arenaW / 2;
+  const centerY = arenaY + arenaH * 0.48;
+
+  // Resolve winner entity or team
+  const effectiveWinner = winner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
+  
+  let winText = 'Round Draw!';
+  let themeColor = '#ffffff';
+
+  if (effectiveWinner) {
+    const rawName = effectiveWinner.name || effectiveWinner._def?.name || 'Operative';
+    winText = `${rawName} Wins!`;
+    themeColor = effectiveWinner.color || effectiveWinner.themeColor || '#ffffff';
+  }
+
+  // Smooth entrance scale & alpha
+  const animProgress = Math.min(1.0, timer / 14);
+  const alpha = animProgress;
+  const scale = 0.90 + 0.10 * easeOutBack(animProgress);
+
+  ctx.save();
+  ctx.translate(centerX, centerY);
+  ctx.scale(scale, scale);
+  ctx.globalAlpha = alpha;
+
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // High-contrast pure Winner Text ("M4A1 Wins!")
+  ctx.font = '900 36px "Outfit", "Segoe UI", Arial, sans-serif';
+
+  // Thick dark stroke for high readability against map floor
+  ctx.lineWidth = 6;
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+  ctx.strokeText(winText, 0, 0);
+
+  // Vibrant theme fill
+  ctx.fillStyle = themeColor;
+  ctx.fillText(winText, 0, 0);
+
+  ctx.restore();
+}
+
+// ─────────────────────────────────────────────
 // SEAMLESS IN-ARENA CHAMPION LAYOUT
 // (Fighter Glides Left, Stats Slide Right)
 // ─────────────────────────────────────────────
@@ -381,6 +447,13 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
   const arenaY = arena ? arena.y : 0;
   const arenaW = arena ? arena.width : state.canvas.width;
   const arenaH = arena ? arena.height : state.canvas.height;
+
+  // Tactical Mode Override: simple in-arena overlay text without champion layout
+  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
+  if (isTactical) {
+    drawTacticalWinnerOverlay(ctx, winner, timer, mode);
+    return;
+  }
 
   // 0. Snap Cut Arena BGM & Play Street Fighter II "YOU WIN!" Announcer Voice (Frame 1)
   if (timer > 0) {
@@ -576,9 +649,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     ctx.restore();
   }
 
-  // 4. Pop-out "Follow for more :)" banner in the bottom center of the arena (Shifted up for Tactical & FOC)
-  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.startsWith('tactical') || mode.startsWith('Tactical')));
-  const bannerY = isTactical ? (arenaY + arenaH - 58) : (arenaY + arenaH - 34);
+  // 4. Pop-out "Follow for more :)" banner in the bottom center of the arena
+  const bannerY = arenaY + arenaH - 34;
   drawFollowForMoreBanner(ctx, arenaX + arenaW / 2, bannerY, timer, primaryThemeColor);
 }
 
@@ -598,9 +670,11 @@ function drawRoundEndScreen() {
   }
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (160 frames).
+  // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
   // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
+  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
   const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
-  const displayDelay = hasMissionOverlay ? 160 : 75;
+  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 160 : 75);
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
@@ -621,7 +695,7 @@ function drawRoundEndScreen() {
   const isChampionReveal = (isFFA && (ffaMatchComplete || modeRounds === 1)) || (hasTwoWins && roundWinner);
 
   const isChampionActive = delayedTimer > 0;
-  state._isChampionLayoutActive = isChampionActive;
+  state._isChampionLayoutActive = isChampionActive && !isTactical;
 
   if (isChampionActive) {
     const titleText = isChampionReveal 
@@ -640,12 +714,14 @@ function drawRoundEndScreen() {
 // ─────────────────────────────────────────────
 
 function drawWinnerReveal(winner, timer, mode) {
-  state._isChampionLayoutActive = true;
+  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
+  state._isChampionLayoutActive = !isTactical;
   drawInArenaChampionLayout(winner, timer, 'CHAMPION', mode, true);
 }
 
 function drawFfaChampionReveal(winner, timer) {
-  state._isChampionLayoutActive = true;
+  const isTactical = state.gameCategory === 'tactical' || (typeof state.mode === 'string' && (state.mode.toLowerCase().includes('tactical')));
+  state._isChampionLayoutActive = !isTactical;
   drawInArenaChampionLayout(winner, timer, 'CHAMPION', 'FFA', true);
 }
 
@@ -666,16 +742,18 @@ function drawMatchEndScreen() {
   }
 
   // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (160 frames).
+  // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
   // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
+  const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
   const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
-  const displayDelay = hasMissionOverlay ? 160 : 75;
+  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 160 : 75);
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
   // Determine Match Winner Entity
   const effectiveWinner = matchWinner || (state.fighters ? state.fighters.find(f => f && f.hp > 0) : null);
 
   const isMatchChampionActive = delayedTimer > 0;
-  state._isChampionLayoutActive = isMatchChampionActive;
+  state._isChampionLayoutActive = isMatchChampionActive && !isTactical;
 
   if (isMatchChampionActive) {
     const titleText = (mode === 'TLFS') 

@@ -15,7 +15,6 @@ import { spatialGrid } from './physics.js';
 import { HitImpactSystem } from './hitImpactSystem.js';
 import { ProjectileBehaviorManager } from './projectiles/ProjectileBehaviorManager.js';
 import { clearHybridProjectiles } from '../graphics/renderers/hybridProjectileRenderer.js';
-import { STARTER_MAP } from '../../Tactical Force/maps/index.js';
 
 // Frame counter for visual-only particle optimization
 let visualUpdateFrame = 0;
@@ -252,7 +251,12 @@ class ProjectileSystem {
     // projectiles on the next frame to maintain performance without breaking gameplay.
 
     const { radius, life } = CONFIG.projectile;
-    const speed = speedOverride ?? CONFIG.projectile.speed;
+    let speed = speedOverride;
+    if (speed === undefined) {
+      const isTac = fighter && (fighter.gameCategory === 'tactical' || fighter.isTacticalFighter || (fighter._def && ['rifle', 'shotgun', 'pistol', 'sniper', 'barrett', 'm4a1', 'spas12', 'desert_eagle', 'awp'].includes(fighter._def.type)));
+      const tacGlobalMult = isTac ? (CONFIG.tactical?.globalBulletSpeedMultiplier ?? 1.0) : 1.0;
+      speed = (CONFIG.projectile.speed * (fighter?._def?.projectileSpeedMultiplier || 1)) * tacGlobalMult;
+    }
     const projDamage = Number(damage);
 
     // Use custom spawn position if provided, otherwise calculate from gun tip
@@ -2182,48 +2186,15 @@ class ProjectileSystem {
 
     if (p.life <= 0) return true;
 
-    // If projectile penetrates/ignores walls (e.g., CJ Drive-By bullets fired from outside or through borders)
-    if (p.ignoreWalls || p.pierceWalls || p.visual === 'cjUziBullet' || p.visual === 'cjMinigunBullet') {
-      const arena = CONFIG.arena;
-      const margin = 350;
-      return (
-        p.x < arena.x - margin ||
-        p.x > arena.x + arena.width + margin ||
-        p.y < arena.y - margin ||
-        p.y > arena.y + arena.height + margin
-      );
-    }
-
     const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
-    return (
-      p.x - p.r < arena.x ||
-      p.x + p.r > arena.x + arena.width ||
-      p.y - p.r < arena.y ||
-      p.y + p.r > arena.y + arena.height
-    );
-  }
+    const pr = p.r || 5;
 
-  /**
-   * Checks if a projectile collided with a tactical map cover obstacle.
-   */
-  checkObstacleHit(p) {
-    if (p.ignoreWalls || p.pierceWalls) return false;
-    const activeObstacles = (typeof state !== 'undefined' && state.activeMap && state.activeMap.obstacles) || (typeof state !== 'undefined' && state.gameCategory === 'tactical' ? STARTER_MAP.obstacles : null);
-    if (!activeObstacles || activeObstacles.length === 0) return false;
+    const hitLeft   = p.x - pr < arena.x;
+    const hitRight  = p.x + pr > arena.x + arena.width;
+    const hitTop    = p.y - pr < arena.y;
+    const hitBottom = p.y + pr > arena.y + arena.height;
 
-    for (let oi = 0; oi < activeObstacles.length; oi++) {
-      const obs = activeObstacles[oi];
-      if (p.x >= obs.x && p.x <= obs.x + obs.w && p.y >= obs.y && p.y <= obs.y + obs.h) {
-        if (typeof spawnSparks === 'function') {
-          spawnSparks(p.x, p.y, 6, 'gold', '#F59E0B');
-        }
-        if (typeof spawnImpactFlash === 'function') {
-          spawnImpactFlash(p.x, p.y, 14, '#F59E0B');
-        }
-        return true;
-      }
-    }
-    return false;
+    return (hitLeft || hitRight || hitTop || hitBottom);
   }
 
   /**
@@ -2961,8 +2932,7 @@ class ProjectileSystem {
       }
 
       const hit = this.checkProjectileHits(p, fighters);
-      const hitObstacle = !hit && this.checkObstacleHit(p);
-      const expired = hitObstacle || this.isProjectileExpired(p);
+      const expired = this.isProjectileExpired(p);
 
       if (hit || expired) {
         if (p.isMahitoBodyRepel) {
