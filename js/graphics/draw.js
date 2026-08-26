@@ -44,6 +44,7 @@ export { drawCjSkin } from './fighters/cjSkin.js';
 export { drawTojiSkin, drawTojiGhostSkin } from './fighters/tojiSkin.js';
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
+export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 
 
 import { drawProjectiles as modDrawProjectiles, drawBlackHoleVisual } from './renderers/projectileRenderer.js';

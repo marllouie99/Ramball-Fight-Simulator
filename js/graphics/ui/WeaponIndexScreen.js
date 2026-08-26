@@ -1205,7 +1205,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'megumi') offsetX = -45; // Shadow Blade
   else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
   else if (type === 'ichigo') {
-    offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -45;
+    offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -55;
   }
   
   ctx.translate(offsetX, 0);

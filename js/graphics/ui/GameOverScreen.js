@@ -595,6 +595,18 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
       preview.orbTransition = 1;
     }
 
+    // Sync active transformations & skins from the winning fighter entity (e.g. Ichigo Bankai/Hollow Mask)
+    if (wFighter.skin) preview.skin = wFighter.skin;
+    if (fType === 'ichigo' || wFighter.characterId === 'ichigo' || wFighter.type === 'ichigo') {
+      preview.bankaiActive = Boolean(wFighter.bankaiActive);
+      preview.hollowMaskActive = Boolean(wFighter.hollowMaskActive);
+      preview.skin = wFighter.skin || (wFighter.bankaiActive ? (wFighter.hollowMaskActive ? 'bankai_mask' : 'bankai') : (wFighter.hollowMaskActive ? 'shikai_mask' : 'shikai'));
+      preview.combatAuraOpacity = wFighter.combatAuraOpacity !== undefined ? wFighter.combatAuraOpacity : (wFighter.bankaiActive ? 1 : 0.5);
+    }
+    if (wFighter.isHeianEra !== undefined) preview.isHeianEra = wFighter.isHeianEra;
+    if (wFighter.isFourArms !== undefined) preview.isFourArms = wFighter.isFourArms;
+    if (wFighter.mode !== undefined) preview.mode = wFighter.mode;
+
     const fColor = def.color || wFighter.color || '#38bdf8';
 
     ctx.save();

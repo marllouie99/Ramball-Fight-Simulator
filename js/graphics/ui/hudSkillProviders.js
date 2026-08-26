@@ -852,10 +852,18 @@ export function getSkillDataForFighter(f, getProjectiles) {
   if (f.characterId === 'ichigo' || f.type === 'ichigo') {
     const themeColor = f.color || '#FF5500';
     const isBankaiForm = Boolean(f.bankaiActive || f.skin === 'bankai');
+    const curHp = f.hp !== undefined ? f.hp : (f.maxHp || 100);
+    const maxHp = f.maxHp || 100;
+    const hpRatio = Math.max(0, Math.min(1, curHp / maxHp));
 
-    // ── Unified Skill Combo: Shunpo Getsuga Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga Tensho) ──
     const baseComboMax = CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || 450;
-    const cdMult = isBankaiForm ? (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50) : 1.0;
+    let cdMult = 1.0;
+    if (isBankaiForm) {
+      cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50);
+    }
+    if (f.hollowMaskActive) {
+      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.75);
+    }
     const comboMax = Math.round(baseComboMax * cdMult);
     const comboTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
     
@@ -864,34 +872,60 @@ export function getSkillDataForFighter(f, getProjectiles) {
     const comboReady = comboPct >= 99;
     const comboLabel = isBankaiForm ? 'TENSA GETSUGA COMBO' : 'SHUNPO GETSUGA COMBO';
 
-    // Ultimate: Bankai Awakening (Tensa Zangetsu) - EXCLUSIVELY based on ultimateThreshold
-    const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.90;
-    const curHp = f.hp !== undefined ? f.hp : (f.maxHp || 100);
-    const maxHp = f.maxHp || 100;
-    const hpRatio = Math.max(0, Math.min(1, curHp / maxHp));
-    
+    // ── Passive: Hollow Mask Awakening ──
+    const hollowThreshold = CONFIG.ichigo?.hollowMaskThreshold ?? 0.30;
+    const hollowMaxDuration = CONFIG.ichigo?.hollowMaskDuration || 600;
+    let hollowPct = 0;
+    let hollowReady = false;
+    let hollowLabel = 'HOLLOW MASK';
+
+    if (f.hollowMaskActive) {
+      const remainingTime = f.hollowMaskTimer !== undefined ? f.hollowMaskTimer : hollowMaxDuration;
+      hollowPct = Math.max(0, Math.min(100, (remainingTime / hollowMaxDuration) * 100));
+      hollowReady = true;
+      hollowLabel = 'HOLLOW AWAKENED';
+    } else if (f.hollowMaskUsed) {
+      hollowPct = 0;
+      hollowReady = false;
+      hollowLabel = 'HOLLOW MASK';
+    } else {
+      const hollowProg = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / Math.max(0.01, (1.0 - hollowThreshold))));
+      hollowPct = hollowProg * 100;
+      hollowReady = hpRatio <= hollowThreshold;
+      hollowLabel = 'HOLLOW MASK';
+    }
+
+    // Ultimate: Bankai Awakening (Tensa Zangetsu)
     let ultPct = 0;
     let ultReady = false;
 
-    if (f.isChannelingBankai || f.bankaiActive) {
+    if (f.isChannelingBankai) {
       ultPct = 100;
       ultReady = true;
+    } else if (f.bankaiActive) {
+      // Smoothly drain based on remaining active Bankai duration (100% -> 0%)
+      const bankaiDuration = CONFIG.ichigo?.bankaiDuration || 800;
+      const remaining = f.bankaiTimer !== undefined ? f.bankaiTimer : bankaiDuration;
+      ultPct = Math.max(0, Math.min(100, (remaining / bankaiDuration) * 100));
+      ultReady = true;
     } else if (f.bankaiUsed) {
-      ultPct = 0;
-      ultReady = false;
+      // Recharging on cooldown between Bankai activations (0% -> 100%)
+      const ultMax = CONFIG.ichigo?.ultimateCooldown || 1500;
+      const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
+      ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      ultReady = ultPct >= 99;
     } else {
-      // Exclusively based on ultimateThreshold (e.g. 0.50):
-      // Full HP (100%) -> 0% (NO ticking over time)
-      // Dropping towards threshold -> fills steadily based on HP lost towards threshold
-      // At or below threshold (HP <= 50%) -> 100% (READY)
+      // Pre-first activation: fills steadily as HP drops towards threshold (<= 90%)
+      const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.90;
       const progress = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / Math.max(0.01, (1.0 - ultThreshold))));
       ultPct = progress * 100;
       ultReady = hpRatio <= ultThreshold;
     }
 
     return [
-      { id: 'combo',   pct: comboPct, ready: comboReady, color: themeColor, label: comboLabel },
-      { id: 'bankai',  pct: ultPct,   ready: ultReady,   color: themeColor, label: 'BANKAI' }
+      { id: 'combo',   pct: comboPct,  ready: comboReady,  color: themeColor, label: comboLabel },
+      { id: 'hollow',  pct: hollowPct, ready: hollowReady, color: themeColor, label: hollowLabel },
+      { id: 'bankai',  pct: ultPct,    ready: ultReady,    color: themeColor, label: 'BANKAI' }
     ];
   }
 

@@ -36,8 +36,9 @@ function drawHpPanel(fighter, x, y, alignRight, fighterIndex) {
     fighter._cachedNameWidthLimit = maxNameW;
   }
 
-  ctx.font = `bold ${fighter._cachedNameFontSize}px "Glast Blitch", Arial`;
-  ctx.fillStyle = fighter.color || '#ffffff';
+  const isDimmed = (typeof state !== 'undefined' && state.currentHUDDimOpacity !== undefined && state.currentHUDDimOpacity > 0.1);
+  const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+  ctx.fillStyle = (isDimmed || isDark) ? '#ffffff' : '#000000';
   ctx.textBaseline = 'alphabetic';
 
   const nameXBase = alignRight ? px + panelW - padding : px + padding;

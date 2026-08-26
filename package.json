@@ -6,6 +6,7 @@
   "scripts": {
     "start": "electron .",
     "start:electron": "electron .",
+    "verify": "node scripts/verifyCodebase.js",
     "build": "electron-builder --win"
   },
   "author": "",

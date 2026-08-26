@@ -43,7 +43,9 @@ export function renderTeamHpCard(teamIndex, fighterIndexes, x, y, w, h, teamColo
     ctx.roundRect(rowX, currentY, rowW, rowH, 10);
     ctx.fill();
 
-    ctx.fillStyle = fighter.color || '#ffffff';
+    const isDimmed = (typeof state !== 'undefined' && state.currentHUDDimOpacity !== undefined && state.currentHUDDimOpacity > 0.1);
+    const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+    ctx.fillStyle = (isDimmed || isDark) ? '#ffffff' : '#000000';
     ctx.font = '13px "Glast Blitch", Arial';
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';

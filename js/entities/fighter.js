@@ -835,7 +835,7 @@ export class Fighter {
 
         // Silky Smooth Kinetic Ricochet Wall Bounce (0.82 smooth velocity reflection)
         let bounceMult = this.isFirstHitKnockback ? 0.35 : 0.82;
-        if (this.preventKnockbackBounce) bounceMult = 0; // Stick to the wall instead of bouncing
+        if (this.preventKnockbackBounce || this.isDraggedByGetsuga) bounceMult = 0; // Stick to the wall instead of bouncing
 
         if (this.x - this.r < arena.x) { this.x = arena.x + this.r; this.knockbackVx = Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
         if (this.x + this.r > arena.x + arena.width) { this.x = arena.x + arena.width - this.r; this.knockbackVx = -Math.abs(this.knockbackVx) * bounceMult; bounced = true; }
@@ -844,7 +844,7 @@ export class Fighter {
 
         if (bounced) {
           const isPureLoveBeamCaught = (this.caughtInPureLoveBeam || this.wasCaughtInPureLoveBeam || (this.pureLoveBeamTimer || 0) > 0);
-          if (isPureLoveBeamCaught) {
+          if (isPureLoveBeamCaught || this.isDraggedByGetsuga) {
             // Pin firmly to wall surface without sliding horizontally or vertically along wall
             this.vx = 0;
             this.vy = 0;
@@ -868,53 +868,65 @@ export class Fighter {
 
           if (this.preventKnockbackBounce) {
             this.preventKnockbackBounce = false; // Clear flag so fighter can recover smoothly after wall pin expires
-            // They hit the wall while pinned! Stick them to the wall for wallPinDurationFrames
-            const pinDuration = CONFIG.saitama?.wallPinDurationFrames ?? 60;
-            if (CONFIG.saitama?.disableWallPinCyanOverlay !== false) {
-              this.suppressFreezeOverlay = true;
-            }
-            if (typeof this.applyTimeStop === 'function') {
-              this.applyTimeStop(pinDuration);
+            const isSaitamaPin = Boolean(this._knockedBackBySaitamaBasicPunch || this.isWallPinnedBySaitama);
+            
+            if (isSaitamaPin) {
+              this._knockedBackBySaitamaBasicPunch = false;
+              this.isWallPinnedBySaitama = false;
+              // They hit the wall while pinned by Saitama! Stick them to the wall for wallPinDurationFrames
+              const pinDuration = CONFIG.saitama?.wallPinDurationFrames ?? 60;
+              if (CONFIG.saitama?.disableWallPinCyanOverlay !== false) {
+                this.suppressFreezeOverlay = true;
+              }
+              if (typeof this.applyTimeStop === 'function') {
+                this.applyTimeStop(pinDuration);
+              } else {
+                this.hitStunTimer = pinDuration;
+              }
+              this.knockbackVx = 0;
+              this.knockbackVy = 0;
+              
+              // Forcefully interrupt any ongoing dashes, teleports, or abilities
+              if (typeof this.interruptAttacks === 'function') {
+                this.interruptAttacks(true);
+              }
+              
+              const wallPinShakeIntensity = CONFIG.saitama?.wallPinScreenShakeIntensity ?? 8;
+              const wallPinShakeDuration = CONFIG.saitama?.wallPinScreenShakeDuration ?? 12;
+              triggerGlobalScreenShake(wallPinShakeIntensity, wallPinShakeDuration);
+              audioSystem.playSFX('attack_fleshhit', 1.0);
+              spawnImpactFlash(this.x, this.y, 60, 'rgba(255, 50, 50, 0.9)');
+              spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
+              
+              // Create a persistent wall crack decal
+              if (typeof state !== 'undefined' && arena) {
+                if (!state.wallCracks) state.wallCracks = [];
+                let angle = 0;
+                let crackX = this.x;
+                let crackY = this.y;
+                
+                if (this.x - this.r <= arena.x + 5) { angle = 0; crackX = arena.x; } // Left wall
+                else if (this.x + this.r >= arena.x + arena.width - 5) { angle = Math.PI; crackX = arena.x + arena.width; } // Right wall
+                else if (this.y - this.r <= arena.y + 5) { angle = Math.PI / 2; crackY = arena.y; } // Top wall
+                else if (this.y + this.r >= arena.y + arena.height - 5) { angle = -Math.PI / 2; crackY = arena.y + arena.height; } // Bottom wall
+                
+                state.wallCracks.push({
+                  x: crackX,
+                  y: crackY,
+                  angle: angle,
+                  life: 600, // 10 seconds
+                  maxLife: 600,
+                  seed: Math.random() * 1000,
+                  scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
+                  thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
+                });
+              }
             } else {
-              this.hitStunTimer = pinDuration;
-            }
-            this.knockbackVx = 0;
-            this.knockbackVy = 0;
-            
-            // Forcefully interrupt any ongoing dashes, teleports, or abilities
-            if (typeof this.interruptAttacks === 'function') {
-              this.interruptAttacks(true);
-            }
-            
-            const wallPinShakeIntensity = CONFIG.saitama?.wallPinScreenShakeIntensity ?? 8;
-            const wallPinShakeDuration = CONFIG.saitama?.wallPinScreenShakeDuration ?? 12;
-            triggerGlobalScreenShake(wallPinShakeIntensity, wallPinShakeDuration);
-            audioSystem.playSFX('attack_fleshhit', 1.0);
-            spawnImpactFlash(this.x, this.y, 60, 'rgba(255, 50, 50, 0.9)');
-            spawnMeleeClashShockwave(this.x, this.y, 120, 'gold');
-            
-            // Create a persistent wall crack decal
-            if (typeof state !== 'undefined' && arena) {
-              if (!state.wallCracks) state.wallCracks = [];
-              let angle = 0;
-              let crackX = this.x;
-              let crackY = this.y;
-              
-              if (this.x - this.r <= arena.x + 5) { angle = 0; crackX = arena.x; } // Left wall (cracks expand left/outside)
-              else if (this.x + this.r >= arena.x + arena.width - 5) { angle = Math.PI; crackX = arena.x + arena.width; } // Right wall
-              else if (this.y - this.r <= arena.y + 5) { angle = Math.PI / 2; crackY = arena.y; } // Top wall
-              else if (this.y + this.r >= arena.y + arena.height - 5) { angle = -Math.PI / 2; crackY = arena.y + arena.height; } // Bottom wall
-              
-              state.wallCracks.push({
-                x: crackX,
-                y: crackY,
-                angle: angle,
-                life: 600, // 10 seconds
-                maxLife: 600,
-                seed: Math.random() * 1000,
-                scale: CONFIG.saitama?.wallCrackScale ?? 0.45,
-                thickness: CONFIG.saitama?.wallCrackThickness ?? 0.35,
-              });
+              // Non-Saitama wall contact (e.g. Getsuga drag) - cleanly stop knockback without spawning wall crack decals
+              this.knockbackVx = 0;
+              this.knockbackVy = 0;
+              this.vx = 0;
+              this.vy = 0;
             }
           } else if (!this.isFirstHitKnockback && currentSpeed > 6) {
             triggerGlobalScreenShake(5, 6); // Subtle micro camera punch for smooth motion!
@@ -1408,7 +1420,7 @@ export class Fighter {
     if (!arena && typeof state !== 'undefined') arena = state.arena;
     if (!arena) return false;
 
-    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce;
+    const isBeamTrapped = (this.caughtInGenosBeamTimer > 0) || this.caughtInPureLoveBeam || ((this.pureLoveBeamTimer || 0) > 0) || this.preventKnockbackBounce || this.isDraggedByGetsuga;
     if (isBeamTrapped) {
       // Pin trapped target against wall bounds without bouncing back or adding random angle jitter
       let clamped = false;

@@ -23,6 +23,7 @@ import { compositeFlameCanvas } from '../graphics/canvasManager.js';
 import { drawDoppelgangerDeathEffects } from '../graphics/particles/doppelgangerDeathEffect.js';
 import { drawBlackFlashEffects } from '../graphics/particles/blackFlashEffect.js';
 import { drawLightningEffects } from '../graphics/particles/lightningEffects.js';
+import { drawGetsugaImpactEffects, updateGetsugaImpactEffects } from '../graphics/particles/getsugaImpactEffect.js';
 import { renderYutaSukunaDomainClashRift } from '../entities/fighters/yuta/yutaDomainVisuals.js';
 import { flamewardenFlameSystem } from '../graphics/weapons/flamewardenWeaponGraphics.js';
 import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
@@ -305,6 +306,8 @@ export function renderGame() {
         drawBamEffects(state.ctx); // Draw comic BAM! impact effects on top of collisions
         drawBlackFlashEffects(state.ctx); // Draw Black Flash cursed energy impact
         drawLightningEffects(state.ctx); // Draw Zeus storm lightning strikes
+        updateGetsugaImpactEffects();
+        drawGetsugaImpactEffects(state.ctx); // Draw Bleach Getsuga Tensho spatial cleave impact effects
 
         // Nanami 7:3 Ratio Ruler & Blood Rupture overlay renders ON TOP of all fighters & entities
         drawNanamiRatioCritDimScreen();

@@ -1921,7 +1921,12 @@ export function drawBankaiImpactDimScreen() {
   if (!ctx || !canvas || !arena) return;
 
   const ichigo = state.fighters?.find(f => 
-    f && (f.characterId === 'ichigo' || f.type === 'ichigo') && (f.isChannelingBankai || (f.bankaiBurstTimer && f.bankaiBurstTimer > 0))
+    f && (f.characterId === 'ichigo' || f.type === 'ichigo') && (
+      f.isChannelingBankai || 
+      (f.bankaiBurstTimer && f.bankaiBurstTimer > 0) ||
+      (f.hollowMaskFormationTimer && f.hollowMaskFormationTimer > 0) ||
+      (f.hollowBurstTimer && f.hollowBurstTimer > 0)
+    )
   );
   if (!ichigo) return;
 
@@ -1934,6 +1939,10 @@ export function drawBankaiImpactDimScreen() {
 
   let isChanneling = Boolean(ichigo.isChannelingBankai && ichigo.bankaiChargeTimer > 0);
   let isBursting = Boolean(ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0);
+  let isHollow = !isChanneling && !isBursting && Boolean(
+    (ichigo.hollowMaskFormationTimer && ichigo.hollowMaskFormationTimer > 0) ||
+    (ichigo.hollowBurstTimer && ichigo.hollowBurstTimer > 0)
+  );
 
   let opacity = 0;
   let bankaiProg = 0;
@@ -1957,6 +1966,14 @@ export function drawBankaiImpactDimScreen() {
     const burstMax = ichigo.bankaiBurstMax || CONFIG.ichigo?.bankaiBurstFrames || 36;
     burstProg = 1.0 - (ichigo.bankaiBurstTimer / burstMax);
     opacity = Math.pow(1.0 - burstProg, 1.3) * 0.92;
+  } else if (isHollow) {
+    // Hollow Transformation burst & formation decay
+    const maxH = ichigo.hollowBurstMax || ichigo.hollowMaskFormationMax || CONFIG.ichigo?.hollowMaskFormationFrames || 54;
+    const curH = (ichigo.hollowBurstTimer !== undefined && ichigo.hollowBurstTimer > 0) 
+      ? ichigo.hollowBurstTimer 
+      : (ichigo.hollowMaskFormationTimer || 0);
+    burstProg = Math.min(1.0, Math.max(0.0, 1.0 - (curH / maxH)));
+    opacity = Math.pow(1.0 - burstProg, 1.2) * 0.88;
   }
 
   if (opacity <= 0.01) return;
@@ -1965,34 +1982,49 @@ export function drawBankaiImpactDimScreen() {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
   // ── 1. Moment of Eruption Inverted Negative Flash (Frames 0-3 of burst) ──
-  if (isBursting && burstProg < 0.10) {
+  if ((isBursting || isHollow) && burstProg < 0.10) {
     const flashAlpha = Math.pow(1.0 - (burstProg / 0.10), 1.5) * 0.95;
     ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
   }
 
-  // ── 2. Full-Screen Radial Bleach Void Vignette (Pitch Dark with Crimson Corona) ──
+  // ── 2. Full-Screen Radial Bleach Void Vignette ──
   const maxR = Math.max(canvas.width, canvas.height) * 0.95;
   const grad = ctx.createRadialGradient(cx, cy, r * 1.2, cx, cy, maxR);
-  grad.addColorStop(0.0, `rgba(40, 6, 15, ${(opacity * 0.35).toFixed(3)})`);     // Translucent dark crimson core
-  grad.addColorStop(0.25, `rgba(16, 3, 8, ${(opacity * 0.75).toFixed(3)})`);     // Deep dark void ring
-  grad.addColorStop(0.65, `rgba(4, 1, 6, ${(opacity * 0.94).toFixed(3)})`);      // Pitch black atmosphere
-  grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.98).toFixed(3)})`);       // Absolute boundary
+  if (isHollow) {
+    // Stark monochrome White-Black theme for Hollow Transformation
+    grad.addColorStop(0.0, `rgba(255, 255, 255, ${(opacity * 0.18).toFixed(3)})`);
+    grad.addColorStop(0.25, `rgba(25, 25, 32, ${(opacity * 0.70).toFixed(3)})`);
+    grad.addColorStop(0.65, `rgba(6, 6, 10, ${(opacity * 0.94).toFixed(3)})`);
+    grad.addColorStop(1.0, `rgba(1, 1, 3, ${(opacity * 0.98).toFixed(3)})`);
+  } else {
+    // Crimson-Black theme for Bankai
+    grad.addColorStop(0.0, `rgba(40, 6, 15, ${(opacity * 0.35).toFixed(3)})`);
+    grad.addColorStop(0.25, `rgba(16, 3, 8, ${(opacity * 0.75).toFixed(3)})`);
+    grad.addColorStop(0.65, `rgba(4, 1, 6, ${(opacity * 0.94).toFixed(3)})`);
+    grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.98).toFixed(3)})`);
+  }
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
   // ── 3. Arena Floor Expanding Concentric Reiatsu Shock Rings ──
-  if (isChanneling) {
+  if (isChanneling || isHollow) {
     const ringCount = 3;
     for (let i = 0; i < ringCount; i++) {
       const ringP = ((now * 0.0022 + i * (1.0 / ringCount)) % 1.0);
       const ringR = r * 1.5 + ringP * 280;
       const ringAlpha = (1.0 - ringP) * Math.sin(ringP * Math.PI) * opacity * 0.70;
       if (ringAlpha > 0.01) {
-        ctx.strokeStyle = (i % 2 === 0) 
-          ? `rgba(220, 20, 20, ${ringAlpha.toFixed(3)})` 
-          : `rgba(255, 45, 20, ${ringAlpha.toFixed(3)})`;
+        if (isHollow) {
+          ctx.strokeStyle = (i % 2 === 0) 
+            ? `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})` 
+            : `rgba(10, 10, 15, ${ringAlpha.toFixed(3)})`;
+        } else {
+          ctx.strokeStyle = (i % 2 === 0) 
+            ? `rgba(220, 20, 20, ${ringAlpha.toFixed(3)})` 
+            : `rgba(255, 45, 20, ${ringAlpha.toFixed(3)})`;
+        }
         ctx.lineWidth = Math.max(1.0, 3.5 * (1.0 - ringP));
         ctx.beginPath();
         ctx.arc(cx, cy, ringR, 0, Math.PI * 2);

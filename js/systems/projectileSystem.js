@@ -644,8 +644,8 @@ class ProjectileSystem {
    */
   fireGetsugaTensho(fighter, ownerIndex, damage, speedOverride, form = 'shikai') {
     const isFinal = form === 'final_bankai';
-    const isMask = form === 'hollow';
-    const isBankai = form === 'bankai' || isFinal;
+    const isMask = form === 'hollow' || form === 'bankai_hollow';
+    const isBankai = form === 'bankai' || form === 'bankai_hollow' || isFinal;
     const isShikai = form === 'shikai';
 
     const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
@@ -680,9 +680,11 @@ class ProjectileSystem {
     proj.maxLife = maxLife;
     proj.color = isFinal
       ? '#DC143C'
-      : (isMask 
-        ? (CONFIG.ichigo?.hollowGetsugaColor || '#FF1E00') 
-        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#00E5FF') : (CONFIG.ichigo?.getsugaColor || '#00D5FF')));
+      : (form === 'bankai_hollow'
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaColor || '#FF1E00')
+        : (form === 'hollow'
+          ? (CONFIG.ichigo?.hollowGetsugaColor || '#00E5FF')
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#FF1E32') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'))));
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 

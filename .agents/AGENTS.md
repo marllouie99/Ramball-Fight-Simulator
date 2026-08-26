@@ -441,3 +441,15 @@ To eliminate scattered, ad-hoc angle calculations and prevent stealth/submerged 
    - By default sets `this.gunAngle = targetAngle; this.angle = targetAngle;` and handles Toji Heavenly Restriction stealth turn delays.
    - Subclasses requiring specialized rotational inertia (e.g., Laser beam rotation speed limits) override `applyAim(opponent, targetAngle)` exclusively without having to duplicate any validation guards.
 
+## 24. Zero Duplicate Identifier & Codebase Integrity Standard (`npm run verify`)
+- **Prohibition of Duplicate Top-Level Identifiers**:
+  - NEVER declare duplicate top-level functions, classes, `const`, `let`, or `var` variables within the same module file.
+  - Doing so causes immediate fatal runtime errors (`Uncaught SyntaxError: Identifier '...' has already been declared`) that crash the game loop during startup or fighter rendering.
+- **Mandatory Verification Workflow**:
+  - After modifying any JavaScript files, ALWAYS execute the automated codebase integrity checker:
+    ```bash
+    npm run verify
+    ```
+    (or `node scripts/verifyCodebase.js`).
+  - The script scans all 240+ project files in under 2 seconds, checking syntax validity and ensuring 0 duplicate declarations exist across the entire repository.
+

@@ -977,6 +977,74 @@ function updateHealthHud() {
       if (f.isGroveStreetOg) {
         info.push(`<b>ATK SPD:</b> +25% <span style="color: #15803d; font-size: 10px;">▲</span>`);
       }
+    } else if (f.characterId === 'ichigo' || f.type === 'ichigo') {
+      const isBankai = Boolean(f.bankaiActive || f.skin === 'bankai');
+      const isMask = Boolean(f.hollowMaskActive);
+      const baseDmg = CONFIG.ichigo?.swordDamage || 16;
+      let dmgMult = 1.0;
+      if (isBankai) dmgMult *= (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4);
+      if (isMask) dmgMult *= (CONFIG.ichigo?.hollowDamageMultiplier || 1.5);
+      const currentDmg = Math.round(baseDmg * dmgMult);
+      const boostDmg = currentDmg - baseDmg;
+
+      // 1. DMG: XX + XX
+      if (boostDmg > 0) {
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
+
+      // 2. ATTK SPD: XX + XX
+      if (isMask) {
+        const cdMult = CONFIG.ichigo?.hollowSwordCooldownMultiplier || 0.65;
+        const atkSpdBoost = Math.round(((1 / cdMult) - 1) * 100);
+        info.push(`<b>ATTK SPD:</b> 0% + ${atkSpdBoost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>ATTK SPD:</b> 0%`);
+      }
+
+      // 3. SPD: XX + XX
+      const modeMult = (typeof state !== 'undefined' && state.mode && typeof MODE_SPEED_MULTIPLIER !== 'undefined' && MODE_SPEED_MULTIPLIER[state.mode]) || 1;
+      const baseSpeed = (CONFIG.ichigo?.moveSpeed || 7.0) * modeMult;
+      let spdMult = 1.0;
+      if (isBankai) spdMult *= (CONFIG.ichigo?.bankaiSpeedMultiplier || 1.5);
+      if (isMask) spdMult *= (CONFIG.ichigo?.hollowSpeedMultiplier || 1.4);
+      const currentSpeed = baseSpeed * spdMult;
+      const spdDiff = currentSpeed - baseSpeed;
+      if (spdDiff > 0.01) {
+        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)} + ${spdDiff.toFixed(1)} <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>SPD:</b> ${baseSpeed.toFixed(1)}`);
+      }
+
+      // 4. DEF: XX + XX
+      const baseDef = 0;
+      if (isMask) {
+        const defBoost = Math.round((CONFIG.ichigo?.hollowDamageReduction ?? 0.20) * 100);
+        info.push(`<b>DEF:</b> ${baseDef}% + ${defBoost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>DEF:</b> ${baseDef}%`);
+      }
+
+      // 5. PARRY: XX + XX
+      const baseParry = Math.round((CONFIG.ichigo?.parryChance ?? 0.15) * 100);
+      let currentParry = baseParry;
+      if (isBankai && isMask) {
+        currentParry = Math.round((CONFIG.ichigo?.bankaiHollowParryChance ?? 0.35) * 100);
+      } else if (isMask) {
+        currentParry = Math.round((CONFIG.ichigo?.hollowParryChance ?? 0.30) * 100);
+      } else if (isBankai) {
+        currentParry = Math.round((CONFIG.ichigo?.bankaiParryChance ?? 0.25) * 100);
+      }
+      if (f.blockPoseTimer > 0) {
+        currentParry = Math.min(95, currentParry + 15);
+      }
+      if (currentParry > baseParry) {
+        const parryBoost = currentParry - baseParry;
+        info.push(`<b>PARRY:</b> ${baseParry}% + ${parryBoost}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>PARRY:</b> ${baseParry}%`);
+      }
     } else {
       const isTacticalChar = ['rifle', 'm4a1', 'shotgun', 'spas12', 'spas_12', 'pistol', 'desert_eagle', 'deserteagle', 'sniper', 'awp', 'barrett', 'barrett50cal'].includes(fType);
       if (!isTacticalChar) {
@@ -1691,7 +1759,7 @@ function updateHealthHud() {
     let info = getAdditionalInfoForFighter(f);
     const isDummy = f.characterId === 'dummy' || f.type === 'dummy';
     if (CONFIG.hudShowFighterDescription && !isDummy) {
-      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>Regen:</b>'));
+      info = info.filter(line => line.includes('<b>DMG:</b>') || line.includes('<b>Tick DMG:</b>') || line.includes('<b>Stun Chance:</b>') || line.includes('<b>Illusions:</b>') || line.includes('<b>DODGE:</b>') || line.includes('<b>Dodge:</b>') || line.includes('<b>Dodge Chance:</b>') || line.includes('<b>DEF:</b>') || line.includes('<b>ATK RANGE:</b>') || line.includes('<b>CC:</b>') || line.includes('<b>Parry:</b>') || line.includes('<b>PARRY:</b>') || line.includes('<b>ATTK SPD:</b>') || line.includes('<b>ATK SPD:</b>') || line.includes('<b>SPD:</b>') || line.includes('<b>Speed:</b>') || line.includes('<b>Regen:</b>'));
     }
     if (info.length === 0) return '';
     
@@ -1793,40 +1861,21 @@ function updateHealthHud() {
     const baseFontSize = extraClass.includes('ffa-card') ? 16 : (CONFIG.hudTitleFontSize || 20);
     const maxChars = isTactical ? 28 : (extraClass.includes('ffa-card') ? 18 : 24);
     const isDark = (state.arenaTheme === 'dark') || isTactical;
-    const defaultNameColor = isDark ? '#ffffff' : '#111111';
-    let nameColor = fighterColor || defaultNameColor;
-    if (nameColor === '#fff' || nameColor === '#ffffff') {
-      nameColor = defaultNameColor;
-    }
+    const defaultNameColor = isDark ? '#ffffff' : '#000000';
+    let nameColor = defaultNameColor;
     let truncatedTitle = title;
     if (title && title.length > maxChars) {
       truncatedTitle = title.substring(0, maxChars - 1) + '…';
     }
 
-    const hexToRgba = (hex, alpha) => {
-      if (!hex) return `rgba(255, 255, 255, ${alpha})`;
-      let c = String(hex).replace('#', '');
-      if (c.length === 3) c = c[0] + c[0] + c[1] + c[1] + c[2] + c[2];
-      if (c.length !== 6) return `rgba(255, 255, 255, ${alpha})`;
-      const r = parseInt(c.substring(0, 2), 16) || 255;
-      const g = parseInt(c.substring(2, 4), 16) || 255;
-      const b = parseInt(c.substring(4, 6), 16) || 255;
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    };
-
     const getTitleStyle = (color, isCj = false) => {
       if (isTactical) {
-        return `font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.95); -webkit-text-stroke: 0px; text-stroke: 0px; `;
+        return `font-size: 13px; text-transform: uppercase; font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Roboto', 'Inter', 'Helvetica Neue', Arial, sans-serif; font-weight: 800; letter-spacing: 0.6px; line-height: 1.15; `;
       }
-      const glow1 = hexToRgba(color, 0.70);
-      const glow2 = hexToRgba(color, 0.35);
       const fontFamily = isCj ? `'Pricedown', 'Impact', 'Arial Black', Arial, sans-serif` : `'Glast Blitch', Arial, sans-serif`;
       const fontSize = isCj ? (baseFontSize + 2) : baseFontSize;
       const letterSpacing = isCj ? '1.2px' : '0.8px';
-      const shadow = isDark 
-        ? `text-shadow: 0 1px 2px #000000, 0 0 8px ${glow1}, 0 0 16px ${glow2}; -webkit-text-stroke: 0.8px #000000; text-stroke: 0.8px #000000; paint-order: stroke fill;` 
-        : `text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);`;
-      return `font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; ${shadow} `;
+      return `font-size: ${fontSize}px; text-transform: uppercase; font-family: ${fontFamily}; letter-spacing: ${letterSpacing}; font-weight: normal; `;
     };
 
     let barsHTML = '';
@@ -1849,29 +1898,14 @@ function updateHealthHud() {
         const memberSkillsHTML = !showDescription ? generateFighterSkillsHTML(m, titleAlign || 'left', isSingleCol) : '';
         const memberInfoHTML = generateFighterInfoHTML(m, isSingleCol, true);
 
-        let memberNameColor = m.color || defaultNameColor;
-        const fType = (m.type || m.characterId || (m._def && m._def.type) || '').toLowerCase();
-        if (fType === 'gojo') memberNameColor = '#00E5FF';
-        else if (fType === 'yuta') memberNameColor = '#FF69B4';
-        else if (fType === 'mahoraga') memberNameColor = '#FFD700';
-        else if (fType === 'yuji') memberNameColor = '#FF3366';
-        else if (fType === 'mahito') memberNameColor = '#D946EF';
-        else if (fType === 'toji') memberNameColor = '#A855F7';
-        else if (fType === 'sukuna') memberNameColor = '#FF4500';
-        else if (fType === 'saitama') memberNameColor = '#FF2A2A';
-        else if (fType === 'cj') memberNameColor = '#16A34A';
-        else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') memberNameColor = isDark ? '#E2E8F0' : '#1A202C';
-        else if (memberNameColor === '#fff' || memberNameColor === '#ffffff') {
-          memberNameColor = defaultNameColor;
-        }
-
+        let memberNameColor = defaultNameColor;
         const memberName = (m.name || m.characterId || ('PLAYER ' + (state.fighters.indexOf(m) + 1))).toUpperCase();
 
         if (isMemberCj) {
           return `
             <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '14px'};">
               <div style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 4px 0;">
-                <div class="health-card__title" style="${getTitleStyle(memberNameColor, isMemberCj)}color: ${memberNameColor}; margin: 0; text-align: ${titleAlign || 'left'}; flex-shrink: 0;">${memberName}</div>
+                <div class="health-card__title" style="${getTitleStyle(memberNameColor, isMemberCj)}margin: 0; text-align: ${titleAlign || 'left'}; flex-shrink: 0;">${memberName}</div>
               </div>
               ${generateCjGtaHudWidgetHTML(m, titleAlign, hpText, memberShakeStyle)}
               ${memberSkillsHTML ? `<div class="health-card__skills">${memberSkillsHTML}</div>` : ''}
@@ -1883,7 +1917,7 @@ function updateHealthHud() {
         return `
           <div class="health-card__member" style="margin-top: ${mIndex === 0 ? '0' : '6px'};">
             <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin: 0 0 3px 0;">
-              <div class="health-card__title tac-name" style="${getTitleStyle(memberNameColor, isMemberCj)}color: ${memberNameColor}; margin: 0; text-align: ${titleAlign || 'left'}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${memberName}</div>
+              <div class="health-card__title tac-name" style="${getTitleStyle(memberNameColor, isMemberCj)}margin: 0; text-align: ${titleAlign || 'left'}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${memberName}</div>
             </div>
             ${memberStackHTML}
             <div class="health-card__bar${cjBarClass}" style="${memberShakeStyle}">
@@ -1959,7 +1993,7 @@ function updateHealthHud() {
 
     const headerRowHTML = (title || rightHeaderHTML) ? `
       <div class="health-card__header-row tactical-header-row" style="display: flex; align-items: center; justify-content: space-between; width: 100%; gap: 6px; flex-direction: ${titleAlign === 'right' ? 'row-reverse' : 'row'}; margin-bottom: 3px;">
-        ${title ? `<div class="health-card__title tac-name" style="${getTitleStyle(nameColor, isCardCj)}color: ${nameColor}; margin: 0; text-align: ${titleAlign}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${truncatedTitle}</div>` : ''}
+        ${title ? `<div class="health-card__title tac-name" style="${getTitleStyle(nameColor, isCardCj)}margin: 0; text-align: ${titleAlign}; flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${truncatedTitle}</div>` : ''}
         ${rightHeaderHTML}
       </div>
     ` : '';
@@ -1989,16 +2023,7 @@ function updateHealthHud() {
       if (soloFighter && !soloFighter.isTurret) {
         const ratio = soloFighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(soloFighter.hp) / Number(soloFighter.maxHp))) : 0;
         const color = soloFighter.color || '#fff';
-        let nameColor = color;
-        const fType = (soloFighter.type || soloFighter.characterId || (soloFighter._def && soloFighter._def.type) || '').toLowerCase();
-        if (fType === 'gojo') nameColor = '#00E5FF';        // Cyan name
-        else if (fType === 'yuta') nameColor = '#FF69B4';   // Pink name
-        else if (fType === 'mahoraga') nameColor = '#FFD700'; // Gold name
-        else if (fType === 'mahito') nameColor = '#D946EF';   // Vivid Magenta-Violet name
-        else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
-        else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
-        else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
-        else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') nameColor = (state.arenaTheme === 'dark') ? '#E2E8F0' : '#1A202C';
+        let nameColor = (state.arenaTheme === 'dark') ? '#ffffff' : '#000000';
         const fighterName = soloFighter.name || 'SOLO PLAYER';
         const fighterStats = state.leaderboard[soloFighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;
@@ -2184,17 +2209,7 @@ function updateHealthHud() {
         if (!fighter || fighter.isTurret) return;
         const ratio = fighter.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(fighter.hp) / Number(fighter.maxHp))) : 0;
         const color = fighter.color || '#fff';
-        let nameColor = color;
-        const fType = (fighter.type || fighter.characterId || (fighter._def && fighter._def.type) || '').toLowerCase();
-        if (fType === 'gojo') nameColor = '#00E5FF';        // Cyan name
-        else if (fType === 'yuta') nameColor = '#FF69B4';   // Pink name
-        else if (fType === 'mahoraga') nameColor = '#FFD700'; // Gold name
-        else if (fType === 'mahito') nameColor = '#D946EF';   // Vivid Magenta-Violet name
-        else if (fType === 'toji') nameColor = '#A855F7';     // Purple name
-        else if (fType === 'sukuna') nameColor = '#FF4500';   // Crimson name
-        else if (fType === 'saitama') nameColor = '#FF2A2A';  // Red name
-        else if (fType === 'cj') nameColor = '#16A34A';
-        else if (fType === 'john_wick' || fType === 'johnwick' || fType === 'wick') nameColor = (state.arenaTheme === 'dark') ? '#E2E8F0' : '#1A202C';
+        let nameColor = (state.arenaTheme === 'dark') ? '#ffffff' : '#000000';
         const fighterName = fighter.name || `FIGHTER ${index + 1}`;
         const fighterStats = state.leaderboard[fighter.fighterIndex] || { wins: 0, losses: 0 };
         const careerWins = fighterStats.wins;

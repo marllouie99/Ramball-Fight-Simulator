@@ -160,7 +160,8 @@ canvas {
 .health-card.ffa-card .health-card__title {
   font-size: 16px !important;
   font-family: 'Glast Blitch', Arial, sans-serif !important;
-  text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8) !important;
+  color: #000000 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7) !important;
   letter-spacing: 0.5px !important;
 }
 
@@ -204,7 +205,8 @@ canvas {
   font-weight: normal;
   letter-spacing: 0.5px;
   text-transform: uppercase;
-  color: #ffffff;
+  color: #000000;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
   flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
@@ -567,7 +569,8 @@ canvas {
   font-weight: 800 !important;
   letter-spacing: 0.4px !important;
   text-transform: uppercase !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95) !important;
+  color: #000000 !important;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7) !important;
   -webkit-text-stroke: 0px !important;
   text-stroke: 0px !important;
   paint-order: normal !important;
@@ -860,11 +863,14 @@ canvas {
 }
 
 .arena-dark-mode .health-card__title,
-.health-card.arena-dark-mode .health-card__title {
+.health-card.arena-dark-mode .health-card__title,
+.arena-dark-mode .tac-name,
+.health-card.arena-dark-mode .tac-name {
+  color: #FFFFFF !important;
   -webkit-text-stroke: 0.8px #000000;
   text-stroke: 0.8px #000000;
   paint-order: stroke fill;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.9) !important;
 }
 
 .arena-dark-mode .health-card__info,
@@ -928,7 +934,7 @@ canvas {
   color: #f0f2f5;
 }
 
-/* ── Screen Dimmed Mode: Pure White HUD Font Text (Domain Expansions / Unlimited Void) ── */
+/* ── Screen Dimmed Mode: Pure White HUD Font Text (Domain Expansions / Unlimited Void / Dim Effects) ── */
 .hud-dimmed #healthHud,
 .hud-dimmed #healthHud *,
 .hud-dimmed #healthHudLeft,
@@ -949,6 +955,9 @@ canvas {
 .hud-dimmed #hudBottomRight *,
 .hud-dimmed .health-card,
 .hud-dimmed .health-card *,
+.hud-dimmed .health-card__title,
+.hud-dimmed .tac-name,
+.hud-dimmed .health-card__member .health-card__title,
 .hud-dimmed .tactical-hud-card,
 .hud-dimmed .tactical-hud-card *,
 .hud-dimmed .hud-name-box,
@@ -960,12 +969,16 @@ canvas {
 .hud-dimmed .hud-stat-val,
 #healthHud.hud-dimmed,
 #healthHud.hud-dimmed *,
+#healthHud.hud-dimmed .health-card__title,
+#healthHud.hud-dimmed .tac-name,
 #healthHudLeft.hud-dimmed,
 #healthHudLeft.hud-dimmed *,
 #healthHudRight.hud-dimmed,
 #healthHudRight.hud-dimmed *,
 .health-card.hud-dimmed,
-.health-card.hud-dimmed * {
+.health-card.hud-dimmed *,
+.health-card.hud-dimmed .health-card__title,
+.health-card.hud-dimmed .tac-name {
   color: #FFFFFF !important;
   text-shadow: 0 0 6px rgba(0, 0, 0, 0.95), 0 1px 3px #000000 !important;
 }

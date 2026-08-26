@@ -3,9 +3,9 @@ import { CONFIG } from '../../core/config.js';
 import { state, spawnFloatingText, triggerGlobalScreenShake } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
-import { drawIchigoSkin, updateZangetsuRibbonPhysics } from '../../graphics/fighters/ichigoSkin.js';
+import { drawIchigoSkin, updateZangetsuRibbonPhysics, updateTensaZangetsuChainPhysics } from '../../graphics/fighters/ichigoSkin.js';
 import { fastCleanArray, pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
-import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks } from '../../graphics/particles/sparkEffect.js';
+import { spawnMeleeClashShockwave, spawnImpactFlash, spawnSparks, spawnParrySparksEffect } from '../../graphics/particles/sparkEffect.js';
 import { spawnHollowMaskShatter } from '../../graphics/particles/deathShatterEffect.js';
 import { drawIchigoSlashArc } from '../../graphics/weapons/ichigoWeaponGraphics.js';
 
@@ -28,14 +28,19 @@ export class IchigoFighter extends Fighter {
     this.hollowMaskUsed = false;
     this.hollowMaskFormationTimer = 0;
     this.hollowMaskFormationMax = CONFIG.ichigo?.hollowMaskFormationFrames || 54;
+    this.hollowBurstTimer = 0;
+    this.hollowBurstMax = CONFIG.ichigo?.hollowBurstFrames || 36;
 
     this.bankaiActive = false;
     this.bankaiTimer = 0;
 
-    // Visuals
+    // Visuals & Defensive Parry States
     this.afterImages = [];
     this.slashSwingTimer = 0;
     this.slashSwingMaxTimer = 0;
+    this.parryStanceIndex = 0;
+    this.blockPoseTimer = 0;
+    this.parryHitAnimTimer = 0;
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoStartX = 0;
@@ -76,6 +81,15 @@ export class IchigoFighter extends Fighter {
     this.bankaiClothStreamers = [];
   }
 
+  _playSound(key, defaultSfx, defaultVol = 1.0) {
+    const sfx = CONFIG.ichigo?.sounds?.[key] || defaultSfx;
+    const vol = CONFIG.ichigo?.soundVolumes?.[key] ?? defaultVol;
+    const delay = CONFIG.ichigo?.soundDelays?.[key] ?? 0;
+    if (sfx && typeof audioSystem !== 'undefined' && typeof audioSystem.playSFX === 'function') {
+      audioSystem.playSFX(sfx, vol, 1.0, 0, delay);
+    }
+  }
+
   reset() {
     super.reset();
     this.swordCooldown = 0;
@@ -87,6 +101,7 @@ export class IchigoFighter extends Fighter {
     this.hollowMaskUsed = false;
     this.hollowMaskFormationTimer = 0;
     this.hollowMaskFormationMax = CONFIG.ichigo?.hollowMaskFormationFrames || 54;
+    this.hollowBurstTimer = 0;
     this.bankaiActive = false;
     this.bankaiTimer = 0;
     this.bankaiUsed = false;
@@ -94,6 +109,9 @@ export class IchigoFighter extends Fighter {
     this.isFinalMassiveGetsuga = false;
     this.afterImages = [];
     this.slashSwingTimer = 0;
+    this.parryStanceIndex = 0;
+    this.blockPoseTimer = 0;
+    this.parryHitAnimTimer = 0;
     this.isShunpoDashing = false;
     this.shunpoDashTimer = 0;
     this.shunpoComboActive = false;
@@ -189,7 +207,91 @@ export class IchigoFighter extends Fighter {
     if (this.swordCooldown > 0) this.swordCooldown--;
     if (this.getsugaCooldown > 0) this.getsugaCooldown--;
     if (this.shunpoCooldown > 0) this.shunpoCooldown--;
+    if (this.ultimateCooldown > 0) this.ultimateCooldown--;
     return super._handleTimeStop();
+  }
+
+  getParryChance() {
+    const isBankai = this.bankaiActive || this.skin === 'bankai';
+    const isMask = this.hollowMaskActive;
+    let chance = CONFIG.ichigo?.parryChance ?? 0.15;
+    if (isBankai && isMask) {
+      chance = CONFIG.ichigo?.bankaiHollowParryChance ?? 0.35;
+    } else if (isMask) {
+      chance = CONFIG.ichigo?.hollowParryChance ?? 0.30;
+    } else if (isBankai) {
+      chance = CONFIG.ichigo?.bankaiParryChance ?? 0.25;
+    }
+    if (this.blockPoseTimer > 0) {
+      chance += 0.15;
+    }
+    return Math.min(0.85, chance);
+  }
+
+  takeDamage(amount, attacker, opts = {}) {
+    if (opts.isHeal || amount <= 0) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+    if (this.isDead || this.hp <= 0) {
+      return super.takeDamage(amount, attacker, opts);
+    }
+
+    // 1. Zanjutsu Parry Check (Blade deflection on incoming attack)
+    const isBusy = this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing || this.isFrozen || this.isParalyzed;
+    if (!isBusy && !opts.bypassShield && Math.random() < this.getParryChance()) {
+      // Successful Parry & Deflection!
+      const isBankai = this.bankaiActive || this.skin === 'bankai';
+      const lastStance = this.parryStanceIndex || 0;
+      this.parryStanceIndex = (lastStance + 1 + Math.floor(Math.random() * 3)) % 4;
+      this.blockPoseTimer = CONFIG.ichigo?.parryGuardDuration || 45;
+      this.parryHitAnimTimer = CONFIG.ichigo?.parryHitAnimDuration || 18;
+
+      if (attacker && !attacker.isDead && typeof this.aim === 'function') {
+        this.aim(attacker);
+      }
+
+      // Spark calculation along angled parry blade
+      const pStance = this.parryStanceIndex;
+      let stanceOffset = -1.15;
+      if (pStance === 1) stanceOffset = 1.30;
+      else if (pStance === 2) stanceOffset = 1.57;
+      else if (pStance === 3) stanceOffset = -0.78;
+
+      const bladeAngle = (this.gunAngle || 0) + stanceOffset;
+      const sparkX = this.x + Math.cos(bladeAngle) * 45;
+      const sparkY = this.y + Math.sin(bladeAngle) * 45;
+
+      if (typeof spawnParrySparksEffect === 'function') {
+        spawnParrySparksEffect(sparkX, sparkY);
+      }
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(sparkX, sparkY, 12, isBankai ? '#DC143C' : '#00E5FF');
+      }
+
+      this._playSound('parry', 'Assets/Sound Effects/Skills/parry.mp3', 0.85);
+      if (typeof triggerGlobalScreenShake === 'function') {
+        triggerGlobalScreenShake(3.5, 8);
+      }
+
+      // Deflection pushback on melee attacker
+      if (attacker && attacker !== this && !attacker.isDead && typeof attacker.applyKnockback === 'function') {
+        const pushAngle = Math.atan2(attacker.y - this.y, attacker.x - this.x);
+        const pushF = CONFIG.ichigo?.parryDeflectionPush || 7.0;
+        attacker.applyKnockback(Math.cos(pushAngle) * pushF, Math.sin(pushAngle) * pushF);
+      }
+
+      spawnFloatingText(this.x, this.y - this.r - 20, "PARRY!", isBankai ? "#DC143C" : "#00E5FF");
+      return 0; // Fully deflected / negated damage!
+    }
+
+    // 2. Hierro (Iron Skin) Damage Reduction
+    let finalAmount = amount;
+    if (this.hollowMaskActive) {
+      const defRed = CONFIG.ichigo?.hollowDamageReduction ?? 0.20;
+      finalAmount = Math.max(1, finalAmount * (1.0 - defRed));
+    }
+
+    return super.takeDamage(finalAmount, attacker, opts);
   }
 
   _getClosestEnemy() {
@@ -251,9 +353,10 @@ export class IchigoFighter extends Fighter {
 
   activateBankai() {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
-    if (this.bankaiUsed || this.isChannelingBankai || this.bankaiActive) return;
+    if (this.isChannelingBankai || this.bankaiActive || this.ultimateCooldown > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0) return;
 
     this.bankaiUsed = true;
+    this.ultimateCooldown = 0;
 
     this.slashSwingTimer = 0;
     this.isGetsugaSlash = false;
@@ -270,7 +373,7 @@ export class IchigoFighter extends Fighter {
     this.bankaiSlideTimer = 0; // Immediate complete stop (no sliding)
 
     spawnFloatingText(this.x, this.y - this.r - 28, "BAN...", "#DC143C");
-    audioSystem.playSFX('Assets/Sound Effects/Skills/redcharging.mp3', 1.0);
+    this._playSound('bankaiCharge', 'Assets/Sound Effects/Skills/redcharging.mp3', 1.0);
   }
 
   _releaseBankai() {
@@ -338,9 +441,9 @@ export class IchigoFighter extends Fighter {
     }
 
     spawnFloatingText(this.x, this.y - this.r - 28, "...KAI! TENSA ZANGETSU", "#FF1E00");
-    audioSystem.playSFX('Assets/Sound Effects/Skills/domainexpansion.mp3', 1.0);
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
-    audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.90);
+    this._playSound('bankaiReleaseDomain', 'Assets/Sound Effects/Skills/domainexpansion.mp3', 1.0);
+    this._playSound('bankaiReleaseSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
+    this._playSound('bankaiReleaseFlare', 'Assets/Sound Effects/SkillEffects/flare.mp3', 0.90);
     
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(CONFIG.ichigo?.bankaiScreenShake || 7, 28);
@@ -413,6 +516,10 @@ export class IchigoFighter extends Fighter {
           spawnImpactFlash(enemy.x, enemy.y, 'sukuna');
           spawnMeleeClashShockwave(enemy.x, enemy.y, 65, 'sukuna');
           spawnSparks(enemy.x, enemy.y, 8, '#DC143C');
+
+          if (typeof triggerGlobalScreenShake === 'function') {
+            triggerGlobalScreenShake(CONFIG.ichigo?.bankaiWindHitScreenShake ?? 6.0, CONFIG.ichigo?.bankaiWindHitShakeDuration ?? 12);
+          }
         }
       }
     });
@@ -420,7 +527,7 @@ export class IchigoFighter extends Fighter {
 
   shoot(ownerIndex) {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return false;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive) return false;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive) return false;
     const target = this._getClosestEnemy();
     if (target) {
       this.aim(target);
@@ -438,12 +545,12 @@ export class IchigoFighter extends Fighter {
     const swingDur = CONFIG.ichigo?.swordSwingDuration || 22;
     this.slashSwingTimer = swingDur;
     this.slashSwingMaxTimer = swingDur;
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
+    this._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
   }
 
   fireFinalMassiveGetsuga(target = null) {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.isShunpoDashing) return;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing) return;
 
     this.slashSwingTimer = 0;
     this.isGetsugaSlash = false;
@@ -464,8 +571,8 @@ export class IchigoFighter extends Fighter {
     this.getsugaSlideTimer = 0;
 
     spawnFloatingText(this.x, this.y - this.r - 28, "FINAL KUROI GETSUGA...", "#DC143C");
-    audioSystem.playSFX('Assets/Sound Effects/Skills/redcharging.mp3', 1.0);
-    audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.90);
+    this._playSound('finalGetsugaCharge', 'Assets/Sound Effects/Skills/redcharging.mp3', 1.0);
+    this._playSound('finalGetsugaFuga', 'Assets/Sound Effects/Skills/fuga.mp3', 0.90);
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(4.5, 22);
     }
@@ -473,7 +580,7 @@ export class IchigoFighter extends Fighter {
 
   fireGetsuga(target = null, isCombo = false) {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.isShunpoDashing) return;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing) return;
 
     this.slashSwingTimer = 0;
     this.isGetsugaSlash = false;
@@ -489,9 +596,14 @@ export class IchigoFighter extends Fighter {
     const isBankai = this.bankaiActive || this.skin === 'bankai';
     const isMask = this.hollowMaskActive;
 
-    const chargeFrames = isBankai
+    let baseChargeFrames = isBankai
       ? (CONFIG.ichigo?.bankaiGetsugaChargeFrames ?? Math.round((CONFIG.ichigo?.getsugaChargeFrames || 100) * 0.35))
       : (CONFIG.ichigo?.getsugaChargeFrames || 100);
+    if (isMask) {
+      const maskChargeMult = CONFIG.ichigo?.hollowGetsugaChargeMultiplier ?? 0.50;
+      baseChargeFrames = Math.round(baseChargeFrames * maskChargeMult);
+    }
+    const chargeFrames = Math.max(12, baseChargeFrames);
     const slideFrames = isCombo ? 0 : (CONFIG.ichigo?.getsugaSlideFrames || 8);
 
     this.isChannelingGetsuga = true;
@@ -499,11 +611,11 @@ export class IchigoFighter extends Fighter {
     this.getsugaChargeTimer = chargeFrames;
     this.getsugaSlideTimer = slideFrames;
 
-    const chargeText = isMask ? 'BLACK GETSUGA...' : (isBankai ? 'KUROI GETSUGA...' : 'GETSUGA...');
-    const chargeColor = isMask ? '#FF1E00' : (isBankai ? '#DC143C' : '#00D5FF');
+    const chargeText = (isBankai && isMask) ? 'BLACK KUROI GETSUGA...' : (isMask ? 'HOLLOW GETSUGA...' : (isBankai ? 'KUROI GETSUGA...' : 'GETSUGA...'));
+    const chargeColor = (isBankai && isMask) ? '#FF1E00' : (isMask ? '#00E5FF' : (isBankai ? '#FF1E32' : '#00D5FF'));
 
     spawnFloatingText(this.x, this.y - this.r - 28, chargeText, chargeColor);
-    audioSystem.playSFX('Assets/Sound Effects/Skills/redcharging.mp3', 0.85);
+    this._playSound('getsugaCharge', 'Assets/Sound Effects/Skills/redcharging.mp3', 0.85);
   }
 
   _releaseGetsuga() {
@@ -520,28 +632,37 @@ export class IchigoFighter extends Fighter {
     let form = 'shikai';
     let text = '...TENSHO!';
     let textColor = '#00D5FF';
-    let shakeAmt = CONFIG.ichigo?.getsugaScreenShake || 3;
+    let shakeAmt = CONFIG.ichigo?.getsugaScreenShake || 3.5;
 
     if (isFinal) {
       form = 'final_bankai';
       text = '...FINAL KUROI GETSUGA!';
       textColor = '#DC143C';
-      shakeAmt = CONFIG.ichigo?.bankaiFinalGetsugaScreenShake || 8;
+      shakeAmt = CONFIG.ichigo?.bankaiFinalGetsugaScreenShake || 8.5;
+    } else if (isBankai && isMask) {
+      form = 'bankai_hollow';
+      text = '...BLACK KUROI GETSUGA!';
+      textColor = '#FF1E00';
+      shakeAmt = CONFIG.ichigo?.bankaiHollowGetsugaScreenShake || 5.5;
     } else if (isMask) {
       form = 'hollow';
-      text = '...BLACK GETSUGA!';
-      textColor = '#FF1E00';
-      shakeAmt = CONFIG.ichigo?.hollowGetsugaScreenShake || 4;
+      text = '...HOLLOW GETSUGA!';
+      textColor = '#00E5FF';
+      shakeAmt = CONFIG.ichigo?.hollowGetsugaScreenShake || 5.0;
     } else if (isBankai) {
       form = 'bankai';
       text = '...KUROI GETSUGA!';
-      textColor = '#00E5FF';
-      shakeAmt = CONFIG.ichigo?.bankaiGetsugaScreenShake || 4;
+      textColor = '#FF1E32';
+      shakeAmt = CONFIG.ichigo?.bankaiGetsugaScreenShake || 4.5;
     }
 
     const baseDmg = isFinal
-      ? (CONFIG.ichigo?.bankaiFinalGetsugaDamage || 125)
-      : (isMask ? (CONFIG.ichigo?.hollowGetsugaDamage || 50) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 48) : (CONFIG.ichigo?.getsugaDamage || 32)));
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaDamage || 125) * (isMask ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.5) : 1.0)
+      : (isBankai && isMask
+        ? (CONFIG.ichigo?.bankaiHollowGetsugaDamage || Math.round((CONFIG.ichigo?.bankaiGetsugaDamage || 48) * (CONFIG.ichigo?.hollowDamageMultiplier || 1.5)))
+        : (isMask
+          ? (CONFIG.ichigo?.hollowGetsugaDamage || 50)
+          : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 48) : (CONFIG.ichigo?.getsugaDamage || 32))));
     const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
     const speed = isFinal
       ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed || 24)
@@ -556,7 +677,14 @@ export class IchigoFighter extends Fighter {
     const slashDur = CONFIG.ichigo?.getsugaSlashDuration || 24;
     this.slashSwingTimer = slashDur;
     this.slashSwingMaxTimer = slashDur;
-    this.getsugaCooldown = CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.getsugaCooldown || 450;
+    let cdMult = 1.0;
+    if (isBankai) {
+      cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiGetsugaCooldownMultiplier ?? 0.50);
+    }
+    if (isMask) {
+      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowGetsugaCooldownMultiplier ?? 0.75);
+    }
+    this.getsugaCooldown = Math.round((CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.getsugaCooldown || 450) * cdMult);
 
     // Set post-release breather / recovery frames before resuming movement or new attacks
     const recoveryFrames = isBankai 
@@ -571,8 +699,8 @@ export class IchigoFighter extends Fighter {
     this.vy = -Math.sin(aimAngle) * recoil;
 
     spawnFloatingText(this.x, this.y - this.r - 28, text, textColor);
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
-    audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.85);
+    this._playSound('getsugaReleaseSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
+    this._playSound('getsugaReleaseFlare', 'Assets/Sound Effects/SkillEffects/flare.mp3', 0.85);
     if (typeof triggerGlobalScreenShake === 'function') {
       triggerGlobalScreenShake(shakeAmt, 14);
     }
@@ -620,17 +748,26 @@ export class IchigoFighter extends Fighter {
 
   performShunpoGetsugaCombo(target) {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive) return;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive) return;
     if (!target || target.hp <= 0) return;
     const baseAngle = Math.atan2(this.y - target.y, this.x - target.x);
     
     const isBankai = this.bankaiActive || this.skin === 'bankai';
-    const maxStrikes = isBankai 
+    const isMask = this.hollowMaskActive;
+    let maxStrikes = isBankai 
       ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
       : (CONFIG.ichigo?.shunpoStrikes || 2);
-    const cdMult = isBankai 
-      ? (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50) 
-      : 1.0;
+    if (isMask) {
+      const maskStrikeMult = CONFIG.ichigo?.hollowShunpoStrikesMultiplier || 1.5;
+      maxStrikes = Math.round(maxStrikes * maskStrikeMult);
+    }
+    let cdMult = 1.0;
+    if (isBankai) {
+      cdMult *= (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50);
+    }
+    if (isMask) {
+      cdMult *= (CONFIG.ichigo?.hollowComboCooldownMultiplier ?? CONFIG.ichigo?.hollowShunpoCooldownMultiplier ?? 0.75);
+    }
 
     const cd = Math.round((CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || 450) * cdMult);
     this.shunpoCooldown = cd;
@@ -662,26 +799,31 @@ export class IchigoFighter extends Fighter {
     this.shunpoDashTimer = isBankai ? 3 : (CONFIG.ichigo?.shunpoDashDuration || 4);
 
     spawnFloatingText(this.x, this.y - this.r - 20, isBankai ? 'TENSA SHUNPO!' : 'SHUNPO!', isBankai ? '#DC143C' : '#FFFFFF');
-    audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.85);
+    this._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
   }
 
   performMeleeCleave(target) {
     if (this.isDead || this.hp <= 0 || this.isFrozen || this.isTargetOfAmbush || this.isParalyzed) return;
-    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive) return;
+    if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive) return;
     const isBankai = this.bankaiActive || this.skin === 'bankai';
     const isMask = this.hollowMaskActive;
-    const damageMult = isMask
-      ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.5)
-      : (isBankai ? (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4) : 1.0);
+    let damageMult = 1.0;
+    if (isBankai) damageMult *= (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4);
+    if (isMask) damageMult *= (CONFIG.ichigo?.hollowDamageMultiplier || 1.5);
     const baseDamage = CONFIG.ichigo?.swordDamage || 16;
     const finalDamage = baseDamage * damageMult;
 
-    this.swordCooldown = CONFIG.ichigo?.swordCooldown || 30;
+    let baseCooldown = CONFIG.ichigo?.swordCooldown || 30;
+    if (isMask) {
+      const maskCdMult = CONFIG.ichigo?.hollowSwordCooldownMultiplier || 0.65;
+      baseCooldown = Math.round(baseCooldown * maskCdMult);
+    }
+    this.swordCooldown = baseCooldown;
     const swingDur = CONFIG.ichigo?.swordSwingDuration || 22;
     this.slashSwingTimer = swingDur;
     this.slashSwingMaxTimer = swingDur;
 
-    audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
+    this._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
 
     // Rule #7: Frontal Arc Radius AOE for Melee Weapon Users
     const arc = ((CONFIG.ichigo?.swordArc || 140) * Math.PI) / 180;
@@ -731,12 +873,32 @@ export class IchigoFighter extends Fighter {
 
           // Deal damage and knockback
           applyDamageToTarget(enemy, finalDamage, this, { isMelee: true });
+
+          // Hollow Mask Lifesteal (High-Speed Regeneration)
+          if (isMask && finalDamage > 0) {
+            const healPercent = CONFIG.ichigo?.hollowLifesteal ?? 0.15;
+            const healAmount = Math.round(finalDamage * healPercent);
+            if (healAmount > 0 && this.hp < this.maxHp) {
+              this.hp = Math.min(this.maxHp, this.hp + healAmount);
+              this._lastHealAmount = healAmount;
+              this._healthBarHealTimer = 16;
+              spawnFloatingText(this.x + (Math.random() - 0.5) * 16, this.y - this.r - 12, `+${healAmount}`, "#00FF66");
+            }
+          }
           
           const kbForce = CONFIG.ichigo?.knockback || 6;
           enemy.applyKnockback(Math.cos(angleToEnemy) * kbForce, Math.sin(angleToEnemy) * kbForce);
           
           spawnImpactFlash(enemy.x, enemy.y, isMask ? 'sukuna' : 'gojo');
           spawnMeleeClashShockwave(enemy.x, enemy.y, CONFIG.ichigo?.swordShockwaveSize || 35, isMask ? 'sukuna' : 'gojo');
+
+          if (typeof triggerGlobalScreenShake === 'function') {
+            const shakeIntensity = isMask
+              ? (CONFIG.ichigo?.hollowSwordHitScreenShake ?? 4.5)
+              : (isBankai ? (CONFIG.ichigo?.bankaiSwordHitScreenShake ?? 4.0) : (CONFIG.ichigo?.swordHitScreenShake ?? 3.0));
+            const shakeDuration = CONFIG.ichigo?.swordHitShakeDuration ?? 6;
+            triggerGlobalScreenShake(shakeIntensity, shakeDuration);
+          }
         }
       }
     });
@@ -757,6 +919,10 @@ export class IchigoFighter extends Fighter {
     }
 
     if (this.hitFlashTimer > 0) this.hitFlashTimer--;
+    if (this.blockPoseTimer > 0) this.blockPoseTimer--;
+    // Update Zangetsu ribbon & Bankai chain physics & anchor (keeps them seamlessly locked to pommel even when frozen)
+    updateZangetsuRibbonPhysics(this);
+    updateTensaZangetsuChainPhysics(this);
 
     // Rule #1: At the top of EVERY fighter update() method, freeze/time-stop guard checks
     const isFrozen = this._handleTimeStop() || 
@@ -773,8 +939,9 @@ export class IchigoFighter extends Fighter {
       return;
     }
 
-    // Zero out movement velocity if performing Shunpo combo, static Getsuga charge, or static Bankai transformation (channeling or burst)
-    if (this.isShunpoDashing || this.shunpoComboActive || (this.isChannelingGetsuga && this.getsugaSlideTimer <= 0) || this.isChannelingBankai || this.bankaiBurstTimer > 0) {
+    // Zero out movement velocity if performing Shunpo combo, static Getsuga charge, Bankai transformation, or Hollow Mask transformation
+    const isTransformingHollow = Boolean(this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0);
+    if (this.isShunpoDashing || this.shunpoComboActive || (this.isChannelingGetsuga && this.getsugaSlideTimer <= 0) || this.isChannelingBankai || this.bankaiBurstTimer > 0 || isTransformingHollow) {
       this.vx = 0;
       this.vy = 0;
       this.knockbackVx = 0;
@@ -787,9 +954,19 @@ export class IchigoFighter extends Fighter {
       this.knockbackVy = 0;
     }
 
+    // Update active speed multipliers (combines Bankai and Hollow Mask form boosts)
+    let speedMult = 1.0;
+    if (this.bankaiActive) {
+      speedMult *= (CONFIG.ichigo?.bankaiSpeedMultiplier || 1.5);
+    }
+    if (this.hollowMaskActive) {
+      speedMult *= (CONFIG.ichigo?.hollowSpeedMultiplier || 1.4);
+    }
+    this.speedMultiplier = speedMult;
+
     super.update(opponent, ownerIndex, arena);
 
-    if (this.isShunpoDashing || this.shunpoComboActive || (this.isChannelingGetsuga && this.getsugaSlideTimer <= 0) || this.isChannelingBankai || this.bankaiBurstTimer > 0) {
+    if (this.isShunpoDashing || this.shunpoComboActive || (this.isChannelingGetsuga && this.getsugaSlideTimer <= 0) || this.isChannelingBankai || this.bankaiBurstTimer > 0 || isTransformingHollow) {
       this.vx = 0;
       this.vy = 0;
       this.knockbackVx = 0;
@@ -800,9 +977,6 @@ export class IchigoFighter extends Fighter {
       this.knockbackVx = 0;
       this.knockbackVy = 0;
     }
-
-    // Update Zangetsu trailing cloth ribbon physics continuously every frame (even during Getsuga channeling & Shunpo)
-    updateZangetsuRibbonPhysics(this);
 
     // Frame-by-frame decay of supersonic speed afterimages
     if (this.afterImages && this.afterImages.length > 0) {
@@ -915,23 +1089,51 @@ export class IchigoFighter extends Fighter {
       }
     }
 
-    // Hollow Mask Passive Activation
-    if (!this.hollowMaskUsed && !this.bankaiActive && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold || 0.30)) {
+    // Hollow Mask Passive Activation (Activates under 30% HP in both Shikai and Bankai)
+    if (!this.hollowMaskUsed && this.hp / this.maxHp <= (CONFIG.ichigo?.hollowMaskThreshold || 0.30)) {
+      this.interruptAttacks(); // Cancel any ongoing attack/dash to lock in place
       this.hollowMaskUsed = true;
       this.hollowMaskActive = true;
       this.hollowMaskTimer = CONFIG.ichigo?.hollowMaskDuration || 600;
       this.hollowMaskFormationTimer = CONFIG.ichigo?.hollowMaskFormationFrames || 54;
       this.hollowMaskFormationMax = CONFIG.ichigo?.hollowMaskFormationFrames || 54;
-      spawnFloatingText(this.x, this.y - this.r - 28, "HOLLOW AWAKENING!", "#FF1E00");
-      audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.95);
-      audioSystem.playSFX('Assets/Sound Effects/SkillEffects/flare.mp3', 0.85);
+      this.hollowBurstTimer = CONFIG.ichigo?.hollowBurstFrames || 36;
+      this.hollowBurstMax = CONFIG.ichigo?.hollowBurstFrames || 36;
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      const isBankai = this.bankaiActive || this.skin === 'bankai';
+      const text = isBankai ? "BANKAI + HOLLOW AWAKENING!" : "HOLLOW AWAKENING!";
+      spawnFloatingText(this.x, this.y - this.r - 28, text, "#FF1E00");
+      this._playSound('hollowAwakenFlame', 'Assets/Sound Effects/Skills/fuga.mp3', 0.95);
+      this._playSound('hollowAwakenFlare', 'Assets/Sound Effects/SkillEffects/flare.mp3', 0.85);
       if (typeof triggerGlobalScreenShake === 'function') {
-        triggerGlobalScreenShake(3.5, 18);
+        triggerGlobalScreenShake(isBankai ? 4.5 : 3.5, 18);
       }
     }
 
-    if (this.hollowMaskFormationTimer > 0) {
-      this.hollowMaskFormationTimer--;
+    // Hollow Mask Formation & Sky Burst Immobility Lock (Freezes movement and actions until transformation visual finishes)
+    if (this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0) {
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+
+      if (this.hollowBurstTimer > 0) {
+        this.hollowBurstTimer--;
+      }
+      if (this.hollowMaskFormationTimer > 0) {
+        this.hollowMaskFormationTimer--;
+      }
+
+      // Micro-spark emission during mask formation
+      if (Math.random() < 0.40) {
+        spawnSparks(this.x + (Math.random() - 0.5) * this.r * 1.6, this.y - this.r * 0.3 + (Math.random() - 0.5) * this.r * 1.6, 2, Math.random() < 0.5 ? '#FFFFFF' : '#111111');
+      }
+
+      // Lock fighter from moving / taking action / triggering skills until the transformation visual is completely done
+      return;
     }
 
     // Hollow Mask expiration
@@ -1002,8 +1204,9 @@ export class IchigoFighter extends Fighter {
 
       if (this.bankaiTimer <= 0) {
         this.bankaiActive = false;
+        this.ultimateCooldown = CONFIG.ichigo?.ultimateCooldown || 1500;
         spawnFloatingText(this.x, this.y - this.r - 28, "BANKAI ENDED", "#FFFFFF");
-        audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
+        this._playSound('bankaiEnded', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.8);
       }
     }
 
@@ -1067,18 +1270,24 @@ export class IchigoFighter extends Fighter {
 
           const isBankai = this.bankaiActive || this.skin === 'bankai';
           const isMask = this.hollowMaskActive;
-          const damageMult = isMask
-            ? (CONFIG.ichigo?.hollowDamageMultiplier || 1.5)
-            : (isBankai ? (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4) : 1.0);
+          let damageMult = 1.0;
+          if (isBankai) damageMult *= (CONFIG.ichigo?.bankaiDamageMultiplier || 1.4);
+          if (isMask) damageMult *= (CONFIG.ichigo?.hollowDamageMultiplier || 1.5);
           const baseSlashDmg = CONFIG.ichigo?.shunpoStrike1Damage || 20;
-          const maxSteps = this.shunpoMaxSteps || (isBankai ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) : (CONFIG.ichigo?.shunpoStrikes || 2));
+          let defaultStrikes = isBankai 
+            ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
+            : (CONFIG.ichigo?.shunpoStrikes || 2);
+          if (isMask) {
+            defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier || 1.5));
+          }
+          const maxSteps = this.shunpoMaxSteps || defaultStrikes;
 
           if (this.shunpoComboStep < maxSteps) {
             // ── Intermediate Flurry Strike (Step k of N) ──
             const s1Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike1Duration || 10) : (CONFIG.ichigo?.shunpoStrike1SlashDuration || 14);
             this.slashSwingTimer = s1Duration;
             this.slashSwingMaxTimer = s1Duration;
-            audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
+            this._playSound('swordSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.85);
 
             // Rule #5: Freeze target during flurry combo
             if (typeof target.applyTimeStop === 'function') {
@@ -1088,7 +1297,14 @@ export class IchigoFighter extends Fighter {
             // Deal intermediate strike damage
             applyDamageToTarget(target, baseSlashDmg * damageMult, this, { isSkill: true });
             spawnImpactFlash(target.x, target.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
-            audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.75);
+            this._playSound('shunpoStrikeHit', 'Assets/Sound Effects/Attacks/fleshhit.mp3', 0.75);
+            if (typeof triggerGlobalScreenShake === 'function') {
+              const strikeShake = isBankai
+                ? (CONFIG.ichigo?.bankaiShunpoStrike1ScreenShake ?? 3.5)
+                : (CONFIG.ichigo?.shunpoStrike1ScreenShake ?? 2.5);
+              const strikeDur = CONFIG.ichigo?.shunpoStrike1ShakeDuration ?? 6;
+              triggerGlobalScreenShake(strikeShake, strikeDur);
+            }
 
             // Set delay before triggering next Flash Step
             this.shunpoComboDelayTimer = isBankai 
@@ -1099,7 +1315,7 @@ export class IchigoFighter extends Fighter {
             const s2Duration = isBankai ? (CONFIG.ichigo?.bankaiShunpoStrike2Duration || 14) : (CONFIG.ichigo?.shunpoStrike2SlashDuration || 16);
             this.slashSwingTimer = s2Duration;
             this.slashSwingMaxTimer = s2Duration;
-            audioSystem.playSFX('Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
+            this._playSound('shunpoFinisherSwing', 'Assets/Sound Effects/Attacks/swordswing.mp3', 0.95);
 
             // Deal final finisher damage & knockback
             const strike2Mult = CONFIG.ichigo?.shunpoStrike2Multiplier || 1.35;
@@ -1115,9 +1331,13 @@ export class IchigoFighter extends Fighter {
 
             spawnImpactFlash(target.x, target.y, (isBankai || isMask) ? 'sukuna' : 'gojo');
             spawnMeleeClashShockwave(target.x, target.y, CONFIG.ichigo?.shunpoShockwaveSize || 45, (isBankai || isMask) ? 'sukuna' : 'gojo');
-            audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
+            this._playSound('shunpoFinisherHit', 'Assets/Sound Effects/Attacks/fleshhit.mp3', 0.9);
             if (typeof triggerGlobalScreenShake === 'function') {
-              triggerGlobalScreenShake(CONFIG.ichigo?.shunpoScreenShake || 3, 12);
+              const finShake = isBankai
+                ? (CONFIG.ichigo?.bankaiShunpoFinisherScreenShake ?? 5.5)
+                : (isMask ? (CONFIG.ichigo?.hollowShunpoFinisherScreenShake ?? 5.0) : (CONFIG.ichigo?.shunpoScreenShake ?? 4.0));
+              const finDur = CONFIG.ichigo?.shunpoFinisherShakeDuration ?? 10;
+              triggerGlobalScreenShake(finShake, finDur);
             }
 
             // Immediately schedule the Disengage Back-Step Flash Step!
@@ -1135,7 +1355,15 @@ export class IchigoFighter extends Fighter {
 
     // Advance Shunpo Flurry Combo or Trigger Disengage Back-Step
     if (this.shunpoComboActive && this.shunpoTarget) {
-      const maxSteps = this.shunpoMaxSteps || ((this.bankaiActive || this.skin === 'bankai') ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) : (CONFIG.ichigo?.shunpoStrikes || 2));
+      const isBankai = this.bankaiActive || this.skin === 'bankai';
+      const isMask = this.hollowMaskActive;
+      let defaultStrikes = isBankai 
+        ? (CONFIG.ichigo?.bankaiShunpoStrikes || 6) 
+        : (CONFIG.ichigo?.shunpoStrikes || 2);
+      if (isMask) {
+        defaultStrikes = Math.round(defaultStrikes * (CONFIG.ichigo?.hollowShunpoStrikesMultiplier || 1.5));
+      }
+      const maxSteps = this.shunpoMaxSteps || defaultStrikes;
       
       // Check Disengage Back-Step trigger
       if (this.shunpoComboStep >= maxSteps && this.shunpoDisengageDelayTimer > 0) {
@@ -1165,7 +1393,7 @@ export class IchigoFighter extends Fighter {
               : (CONFIG.ichigo?.comboDisengageDashFrames || 3);
 
             spawnFloatingText(this.x, this.y - this.r - 20, isBankai ? 'TENSA STEP!' : 'FLASH STEP!', isBankai ? '#DC143C' : '#00D5FF');
-            audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', 0.95);
+            this._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', 0.95);
             return;
           } else {
             this.shunpoComboActive = false;
@@ -1204,7 +1432,7 @@ export class IchigoFighter extends Fighter {
             const labels = ['', 'FLANK SLASH!', 'CROSS STRIKE!', 'LIGHTNING FLASH!', 'SHADOW PIERCE!', 'TENSA BLITZ!', 'CROSS SLASH!'];
             const stepText = isFinalStep ? 'CROSS SLASH!' : (labels[this.shunpoComboStep] || 'FLASH STRIKE!');
             spawnFloatingText(this.x, this.y - this.r - 20, stepText, isBankai ? '#DC143C' : '#FFD700');
-            audioSystem.playSFX('Assets/Sound Effects/Skills/dash1.mp3', isBankai ? 0.95 : 0.9);
+            this._playSound('shunpoDash', 'Assets/Sound Effects/Skills/dash1.mp3', isBankai ? 0.95 : 0.9);
             return;
           } else {
             this.shunpoComboActive = false;
@@ -1231,9 +1459,10 @@ export class IchigoFighter extends Fighter {
         this.aim(target);
         const dist = Math.hypot(target.x - this.x, target.y - this.y);
 
-        // 1. Trigger Ultimate: Bankai Awakening (Strictly ONCE per match when HP drops <= ultimateThreshold)
+        // 1. Trigger Ultimate: Bankai Awakening (Repeats on cooldown throughout the match)
         const ultThreshold = CONFIG.ichigo?.ultimateThreshold || 0.90;
-        if (!this.bankaiUsed && !this.bankaiActive && !this.isChannelingBankai && (this.hp / this.maxHp <= ultThreshold)) {
+        const canBankai = !this.bankaiActive && !this.isChannelingBankai && this.ultimateCooldown <= 0 && (!this.bankaiUsed ? (this.hp / this.maxHp <= ultThreshold) : true);
+        if (canBankai) {
           this.activateBankai();
         }
 
