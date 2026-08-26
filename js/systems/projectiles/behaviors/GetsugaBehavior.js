@@ -62,29 +62,42 @@ export class GetsugaBehavior extends ProjectileBehavior {
 
         // Apply knockback in wave direction
         const angle = Math.atan2(projectile.vy, projectile.vx);
-        const kbForce = form === 'hollow'
-          ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
-          : (form === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6));
+        const isFinal = form === 'final_bankai';
+        const kbForce = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaKnockback || 14)
+          : (form === 'hollow'
+            ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
+            : (form === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
         if (typeof f.applyKnockback === 'function') {
           f.applyKnockback(Math.cos(angle) * kbForce, Math.sin(angle) * kbForce);
         }
-        const stunDuration = form === 'hollow'
-          ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
-          : (form === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 16));
+        const stunDuration = isFinal
+          ? (CONFIG.ichigo?.bankaiFinalGetsugaHitStun || 28)
+          : (form === 'hollow'
+            ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
+            : (form === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18)));
         if (typeof f.applyHitStun === 'function') {
           f.applyHitStun(stunDuration);
         }
 
         // Visual impacts
-        const flashType = form === 'hollow' ? 'sukuna' : 'gojo';
+        const flashType = (isFinal || form === 'hollow') ? 'sukuna' : 'gojo';
         if (typeof spawnImpactFlash === 'function') {
           spawnImpactFlash(f.x, f.y, flashType);
         }
         if (typeof spawnMeleeClashShockwave === 'function') {
-          spawnMeleeClashShockwave(f.x, f.y, CONFIG.ichigo?.getsugaShockwaveSize || 40, flashType);
+          const swSize = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaShockwaveSize || 110)
+            : (CONFIG.ichigo?.getsugaShockwaveSize || 40);
+          spawnMeleeClashShockwave(f.x, f.y, swSize, flashType);
         }
         if (typeof triggerGlobalScreenShake === 'function') {
-          triggerGlobalScreenShake(form === 'bankai' || form === 'hollow' ? (CONFIG.ichigo?.hollowGetsugaScreenShake || 3) : (CONFIG.ichigo?.getsugaScreenShake || 2), 10);
+          const shakeAmt = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaScreenShake || 8)
+            : (form === 'hollow'
+              ? (CONFIG.ichigo?.hollowGetsugaScreenShake || 4)
+              : (form === 'bankai' ? (CONFIG.ichigo?.bankaiGetsugaScreenShake || 4) : (CONFIG.ichigo?.getsugaScreenShake || 3)));
+          triggerGlobalScreenShake(shakeAmt, 14);
         }
 
         audioSystem.playSFX('Assets/Sound Effects/Attacks/fleshhit.mp3', 0.85);

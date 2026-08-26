@@ -215,6 +215,37 @@ export function updateIndexDetailDemo(def, demoArea) {
     } else if (currentAnim === 'incinerate' && def.type === 'genos') {
       fighter.isChargingUlt = true;
       fighter.ultTimer = 60;
+    } else if (currentAnim === 'hollow' && def.type === 'ichigo') {
+      fighter.hollowMaskActive = true;
+      const formationMax = CONFIG.ichigo?.hollowMaskFormationFrames || 54;
+      fighter.hollowMaskFormationMax = formationMax;
+      if (demoSpeed > 0) {
+        if (fighter.hollowMaskFormationTimer === undefined || fighter.hollowMaskFormationTimer <= 0) {
+          fighter.hollowMaskFormationTimer = formationMax;
+        } else {
+          fighter.hollowMaskFormationTimer--;
+          if (fighter.hollowMaskFormationTimer <= 0) {
+            if ((pstate.frame % 90) === 0) {
+              fighter.hollowMaskFormationTimer = formationMax;
+            }
+          }
+        }
+      }
+    } else if (currentAnim === 'getsuga' && def.type === 'ichigo') {
+      fighter.isChannelingGetsuga = true;
+      const chargeMax = 60;
+      fighter.getsugaChargeMax = chargeMax;
+      if (demoSpeed > 0) {
+        fighter.getsugaChargeTimer = ((fighter.getsugaChargeTimer || 0) + 1) % chargeMax;
+      }
+    } else if (currentAnim === 'bankai' && def.type === 'ichigo') {
+      fighter.bankaiActive = true;
+      fighter.skin = 'bankai';
+      const chargeMax = 60;
+      fighter.bankaiChargeMax = chargeMax;
+      if (demoSpeed > 0) {
+        fighter.bankaiChargeTimer = ((fighter.bankaiChargeTimer || 0) + 1) % chargeMax;
+      }
     }
 
     pstate.frame += 1;
@@ -240,6 +271,19 @@ export function updateIndexDetailDemo(def, demoArea) {
     if (fighter.isInfinityBlitz && currentAnim !== 'level8') {
       fighter.isInfinityBlitz = false;
       fighter.adaptationStage = { melee: 0, ranged: 0, skill: 0 };
+    }
+    if (fighter.hollowMaskActive && currentAnim !== 'hollow') {
+      fighter.hollowMaskActive = false;
+      fighter.hollowMaskFormationTimer = 0;
+    }
+    if (fighter.isChannelingGetsuga && currentAnim !== 'getsuga') {
+      fighter.isChannelingGetsuga = false;
+      fighter.getsugaChargeTimer = 0;
+    }
+    if (fighter.skin === 'bankai' && currentAnim !== 'bankai') {
+      fighter.bankaiActive = false;
+      fighter.skin = 'shikai';
+      fighter.bankaiChargeTimer = 0;
     }
   }
 

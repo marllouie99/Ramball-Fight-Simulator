@@ -1042,27 +1042,7 @@ export function drawTodoTakadaIdolScreenOverlay() {
   ctx.save();
   ctx.globalAlpha = _todoIdolOverlayAlpha;
 
-  // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain OR Saitama's Serious Punch is active so domain/punch visuals & dim are not overlayed)
-  if (!isMahitoDomainActive && !isSaitamaSeriousPunchActive) {
-    if (!_cachedOverlayGrad || _cachedGradW !== screenW || _cachedGradH !== screenH) {
-      _cachedGradW = screenW;
-      _cachedGradH = screenH;
-      const cx = screenW / 2;
-      const cy = screenH / 2;
-      const maxR = Math.hypot(screenW, screenH) * 0.70;
-
-      _cachedOverlayGrad = ctx.createRadialGradient(cx, cy, 50, cx, cy, maxR);
-      _cachedOverlayGrad.addColorStop(0.0, 'rgba(255, 240, 250, 0.88)');
-      _cachedOverlayGrad.addColorStop(0.45, 'rgba(248, 205, 238, 0.75)');
-      _cachedOverlayGrad.addColorStop(0.80, 'rgba(235, 175, 225, 0.60)');
-      _cachedOverlayGrad.addColorStop(1.0, 'rgba(215, 145, 210, 0.45)');
-    }
-
-    ctx.fillStyle = _cachedOverlayGrad;
-    ctx.fillRect(0, 0, screenW, screenH);
-  }
-
-  // 2. Batched Full-Screen Shimmering White Sparks (Always render)
+  // 1. Cached Full-Screen Radial Background Gradient (Suppressed when Mahito's domain OR Saitama's Serious  // 2. Batched Full-Screen Shimmering White Sparks (Always render)
   const sparkleCount = isLowPerf ? 7 : _todoSparkleSeeds.length;
   _drawBatchedIdolSparkles(ctx, _todoSparkleSeeds.slice(0, sparkleCount), screenW, screenH, now, _todoIdolOverlayAlpha);
 
@@ -1227,7 +1207,7 @@ export function drawNanamiSpeedLines() {
     const midY = lineCenterY + sinA * midOff;
 
     const endX = lineCenterX + cosA * halfLen;
-    const endY = lineCenterY + sinA * halfLen;
+    const endY = lineCenterY - sinA * halfLen;
 
     const topMidX = midX + perpX * halfThick;
     const topMidY = midY + perpY * halfThick;
@@ -1249,107 +1229,9 @@ export function drawNanamiSpeedLines() {
 }
 
 // ─────────────────────────────────────────────
-// Ichigo Kurosaki — Bankai Manga Action Speed Lines (Rule 16 Compliant)
+// Ichigo Kurosaki — Bankai Speed Lines (Disabled per user request)
 // ─────────────────────────────────────────────
-let _ichigoSpeedLineSeeds = null;
-
-function _initIchigoSpeedLineSeeds() {
-  _ichigoSpeedLineSeeds = [];
-  const count = 24;
-  const clusterWidth = 38; // ±(r * 1.4) around body
-  for (let i = 0; i < count; i++) {
-    const norm = (i / (count - 1)) * 2 - 1; // -1 to +1
-    const perpOffset = norm * clusterWidth;
-    const normDist = 1 - Math.abs(norm); // Parabolic length: center lines longest
-    const len = 38 + normDist * 58;
-    const maxThick = 1.0 + Math.random() * 1.4; // 1.0px - 2.4px
-    const speed = 1.3 + Math.random() * 0.8;
-    const phase = Math.random() * 100;
-
-    // 4-slot theme: [Crimson Reiatsu, Electric Cyan, White Core, Jet Black Ink]
-    let color;
-    if (i % 4 === 0) color = '#DC143C';                     // Crimson Reiatsu
-    else if (i % 4 === 1) color = '#00E5FF';                // Electric Cyan
-    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White Core
-    else color = 'rgba(10, 8, 14, 0.95)';                   // Deep Jet Black Ink
-
-    _ichigoSpeedLineSeeds.push({
-      perpOffset,
-      len,
-      maxThick,
-      speed,
-      phase,
-      color
-    });
-  }
-}
-
 export function drawIchigoBankaiSpeedLines() {
-  if (!state.fighters) return;
-  const ichigo = state.fighters.find(f => {
-    if (!f || f.hp <= 0 || (f.characterId !== 'ichigo' && f.type !== 'ichigo')) return false;
-    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush || (f.isFrozenByInfinity);
-    if (isFrozen) return false;
-    const isBankai = Boolean(f.bankaiActive || f.skin === 'bankai');
-    const isDashing = Boolean(f.isShunpoDashing || (f.shunpoDashTimer && f.shunpoDashTimer > 0));
-    const isSlashing = Boolean(f.slashSwingTimer && f.slashSwingTimer > 0);
-    const isMovingFast = Math.hypot(f.vx || 0, f.vy || 0) > 2.5;
-    return isDashing || (isBankai && (isSlashing || isMovingFast));
-  });
-  if (!ichigo) return;
-
-  const ctx = state.ctx;
-  if (!ctx) return;
-
-  if (!_ichigoSpeedLineSeeds) _initIchigoSpeedLineSeeds();
-
-  const lineAngle = ichigo.gunAngle !== undefined ? ichigo.gunAngle : (ichigo.angle || 0);
-  const cosA = Math.cos(lineAngle);
-  const sinA = Math.sin(lineAngle);
-  const perpX = -sinA;
-  const perpY = cosA;
-
-  const cx = ichigo.x;
-  const cy = ichigo.y;
-  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-
-  ctx.save();
-
-  for (let i = 0; i < _ichigoSpeedLineSeeds.length; i++) {
-    const seed = _ichigoSpeedLineSeeds[i];
-    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 90);
-    const backOffset = (ichigo.r || 24) * 1.25;
-    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
-    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
-
-    const halfLen = seed.len / 2;
-    const halfThick = seed.maxThick / 2;
-    const midOff = halfLen * 0.15;
-
-    const startX = lineCenterX - cosA * halfLen;
-    const startY = lineCenterY - sinA * halfLen;
-
-    const midX = lineCenterX + cosA * midOff;
-    const midY = lineCenterY + sinA * midOff;
-
-    const endX = lineCenterX + cosA * halfLen;
-    const endY = lineCenterY + sinA * halfLen;
-
-    const topMidX = midX + perpX * halfThick;
-    const topMidY = midY + perpY * halfThick;
-
-    const botMidX = midX - perpX * halfThick;
-    const botMidY = midY - perpY * halfThick;
-
-    ctx.fillStyle = seed.color;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(topMidX, topMidY);
-    ctx.lineTo(endX, endY);
-    ctx.lineTo(botMidX, botMidY);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.restore();
+  // Disabled per user request: no speed lines during Ichigo's Bankai form
+  return;
 }

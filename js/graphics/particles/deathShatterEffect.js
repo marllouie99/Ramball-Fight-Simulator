@@ -122,6 +122,46 @@ export function updateDeathEffects() {
   }
 }
 
+export function spawnHollowMaskShatter(fighter) {
+  const isMulti = typeof state !== 'undefined' && state.mode && state.mode !== '1v1' && state.mode !== 'Training';
+  const qualityMultiplier = (typeof state !== 'undefined' && state.qualityLevel) || 1.0;
+  const shardCount = Math.max(8, Math.floor((isMulti ? 10 : 16) * qualityMultiplier));
+  const baseSpeed = 5.2;
+
+  // Play crisp porcelain glass breaking sound effect
+  if (typeof audioSystem !== 'undefined') {
+    audioSystem.playSFX('Assets/Sound Effects/Skills/thin-ice-breaker.mp3', 0.85);
+  }
+
+  for (let i = 0; i < shardCount; i++) {
+    if (state.deathEffects && state.deathEffects.length >= 60) {
+      state.deathEffects.shift();
+    }
+
+    const angle = (Math.PI * 2 * i) / shardCount + (Math.random() - 0.5) * 0.6;
+    const speed = baseSpeed + Math.random() * 4.5;
+    const size = (fighter.r || 25) * (0.16 + Math.random() * 0.22);
+    const hasStripe = i % 3 === 0;
+
+    state.deathEffects.push({
+      x: fighter.x + (Math.random() - 0.5) * (fighter.r * 0.8),
+      y: fighter.y - fighter.r * 0.2 + (Math.random() - 0.5) * (fighter.r * 0.8),
+      vx: Math.cos(angle) * speed + (fighter.vx || 0) * 0.3,
+      vy: Math.sin(angle) * speed - (1.5 + Math.random() * 3.0),
+      rotation: Math.random() * Math.PI * 2,
+      rotationSpeed: (Math.random() - 0.5) * 0.55,
+      size: size,
+      color: '#FFFFFF',
+      hasRedStripe: hasStripe,
+      isHollowMaskShard: true,
+      life: 1.0,
+      maxLife: 1.0,
+      decay: 0.016 + Math.random() * 0.008,
+      gravity: 0.16
+    });
+  }
+}
+
 /**
  * Draws all death shatter effects.
  */
@@ -132,7 +172,45 @@ export function drawDeathEffects() {
     ctx.translate(effect.x, effect.y);
     ctx.rotate(effect.rotation);
     ctx.globalAlpha = Math.min(1, effect.life);
-    if (effect.isMachineCorpse) {
+    if (effect.isHollowMaskShard) {
+      const s = effect.size;
+      // Draw sharp polygonal porcelain mask fragment
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 1.1);
+      ctx.lineTo(s * 0.85, -s * 0.2);
+      ctx.lineTo(s * 0.65, s * 0.85);
+      ctx.lineTo(-s * 0.75, s * 0.6);
+      ctx.closePath();
+
+      // White porcelain mask fill
+      ctx.fillStyle = effect.color || '#FFFFFF';
+      ctx.fill();
+
+      // Red visceral Hollow marking stripe on select shards
+      if (effect.hasRedStripe) {
+        ctx.fillStyle = '#DC143C';
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.2, -s * 0.9);
+        ctx.lineTo(s * 0.4, -s * 0.1);
+        ctx.lineTo(s * 0.1, s * 0.5);
+        ctx.lineTo(-s * 0.4, -s * 0.3);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // Crisp dark manga ink border outline
+      ctx.strokeStyle = '#111111';
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Glowing crimson cursed trail aura motes
+      if (effect.life > 0.3 && Math.random() < 0.25) {
+        ctx.fillStyle = 'rgba(220, 20, 20, 0.6)';
+        ctx.beginPath();
+        ctx.arc(-s * 0.3, s * 0.3, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    } else if (effect.isMachineCorpse) {
       const s = effect.size / 15; // default size is 15
       ctx.scale(s, s);
       

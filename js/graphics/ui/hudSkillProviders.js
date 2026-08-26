@@ -851,29 +851,21 @@ export function getSkillDataForFighter(f, getProjectiles) {
 
   if (f.characterId === 'ichigo' || f.type === 'ichigo') {
     const themeColor = f.color || '#FF5500';
+    const isBankaiForm = Boolean(f.bankaiActive || f.skin === 'bankai');
 
-    // Skill 1: Getsuga Tensho (100% ready when off-cooldown/channeling, recharges over getsugaCooldown)
-    const getsugaMax = CONFIG.ichigo?.getsugaCooldown || 360;
-    const getsugaTimer = f.getsugaCooldown !== undefined ? f.getsugaCooldown : 0;
-    let getsugaPct = 0;
-    let getsugaReady = false;
-
-    if (f.isChannelingGetsuga || getsugaTimer <= 0) {
-      getsugaPct = 100;
-      getsugaReady = true;
-    } else {
-      getsugaPct = Math.max(0, Math.min(100, (1 - (getsugaTimer / getsugaMax)) * 100));
-      getsugaReady = getsugaPct >= 99;
-    }
-
-    // Skill 2: Flash Step (Shunpo) 2-Strike Flurry
-    const shunpoMax = CONFIG.ichigo?.shunpoCooldown || 300;
-    const shunpoTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
-    let shunpoPct = Math.max(0, Math.min(100, (1 - (shunpoTimer / shunpoMax)) * 100));
-    if (f.isShunpoDashing || f.shunpoComboActive) shunpoPct = 100;
+    // ── Unified Skill Combo: Shunpo Getsuga Blitz (Flash Step Flurry -> Disengage Back-Step -> Getsuga Tensho) ──
+    const baseComboMax = CONFIG.ichigo?.comboCooldown || CONFIG.ichigo?.shunpoCooldown || 450;
+    const cdMult = isBankaiForm ? (CONFIG.ichigo?.bankaiComboCooldownMultiplier ?? CONFIG.ichigo?.bankaiShunpoCooldownMultiplier ?? 0.50) : 1.0;
+    const comboMax = Math.round(baseComboMax * cdMult);
+    const comboTimer = f.shunpoCooldown !== undefined ? f.shunpoCooldown : 0;
+    
+    // Smooth monotonic cooldown progression from 0% -> 100% (READY) per Rule 22
+    const comboPct = Math.max(0, Math.min(100, (1 - (comboTimer / comboMax)) * 100));
+    const comboReady = comboPct >= 99;
+    const comboLabel = isBankaiForm ? 'TENSA GETSUGA COMBO' : 'SHUNPO GETSUGA COMBO';
 
     // Ultimate: Bankai Awakening (Tensa Zangetsu) - EXCLUSIVELY based on ultimateThreshold
-    const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.50;
+    const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.90;
     const curHp = f.hp !== undefined ? f.hp : (f.maxHp || 100);
     const maxHp = f.maxHp || 100;
     const hpRatio = Math.max(0, Math.min(1, curHp / maxHp));
@@ -884,6 +876,9 @@ export function getSkillDataForFighter(f, getProjectiles) {
     if (f.isChannelingBankai || f.bankaiActive) {
       ultPct = 100;
       ultReady = true;
+    } else if (f.bankaiUsed) {
+      ultPct = 0;
+      ultReady = false;
     } else {
       // Exclusively based on ultimateThreshold (e.g. 0.50):
       // Full HP (100%) -> 0% (NO ticking over time)
@@ -895,9 +890,8 @@ export function getSkillDataForFighter(f, getProjectiles) {
     }
 
     return [
-      { id: 'getsuga', pct: getsugaPct, ready: getsugaReady, color: themeColor, label: 'GETSUGA TENSHO' },
-      { id: 'shunpo',  pct: shunpoPct,  ready: shunpoPct >= 99,  color: themeColor, label: 'FLASH STEP FLURRY' },
-      { id: 'bankai',  pct: ultPct,      ready: ultReady,         color: themeColor, label: 'BANKAI' }
+      { id: 'combo',   pct: comboPct, ready: comboReady, color: themeColor, label: comboLabel },
+      { id: 'bankai',  pct: ultPct,   ready: ultReady,   color: themeColor, label: 'BANKAI' }
     ];
   }
 

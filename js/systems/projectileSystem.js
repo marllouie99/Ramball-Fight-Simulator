@@ -639,16 +639,19 @@ class ProjectileSystem {
    * Fires Ichigo's signature Getsuga Tensho piercing crescent wave.
    */
   fireGetsugaTensho(fighter, ownerIndex, damage, speedOverride, form = 'shikai') {
+    const isFinal = form === 'final_bankai';
     const isMask = form === 'hollow';
-    const isBankai = form === 'bankai';
+    const isBankai = form === 'bankai' || isFinal;
     const isShikai = form === 'shikai';
 
-    const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 10;
-    const defaultSpeed = isMask
-      ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 22)
-      : (isBankai
-        ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22)
-        : baseSpeed);
+    const baseSpeed = CONFIG.ichigo?.getsugaTravelSpeed ?? CONFIG.ichigo?.getsugaSpeed ?? 11;
+    const defaultSpeed = isFinal
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaSpeed ?? 24)
+      : (isMask
+        ? (CONFIG.ichigo?.hollowGetsugaSpeed ?? 22)
+        : (isBankai
+          ? (CONFIG.ichigo?.bankaiGetsugaSpeed ?? 22)
+          : baseSpeed));
     const speed = speedOverride ?? defaultSpeed;
 
     const angle = fighter.gunAngle !== undefined ? fighter.gunAngle : (fighter.angle || 0);
@@ -656,9 +659,11 @@ class ProjectileSystem {
     const dirX = Math.cos(angle);
     const dirY = Math.sin(angle);
 
-    const projRadius = isMask 
-      ? (CONFIG.ichigo?.hollowGetsugaRadius || 42) 
-      : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 36) : (CONFIG.ichigo?.getsugaRadius || 38));
+    const projRadius = isFinal
+      ? (CONFIG.ichigo?.bankaiFinalGetsugaRadius || 65)
+      : (isMask 
+        ? (CONFIG.ichigo?.hollowGetsugaRadius || 42) 
+        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaRadius || 36) : (CONFIG.ichigo?.getsugaRadius || 38)));
     const maxLife = 240; // Extended lifetime so wave flies all the way past window boundaries
 
     const proj = this._getProjectile();
@@ -669,13 +674,15 @@ class ProjectileSystem {
     proj.r = projRadius;
     proj.life = maxLife;
     proj.maxLife = maxLife;
-    proj.color = isMask 
-      ? (CONFIG.ichigo?.hollowGetsugaColor || '#FF1E00') 
-      : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#00E5FF') : (CONFIG.ichigo?.getsugaColor || '#00D5FF'));
+    proj.color = isFinal
+      ? '#DC143C'
+      : (isMask 
+        ? (CONFIG.ichigo?.hollowGetsugaColor || '#FF1E00') 
+        : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaColor || '#00E5FF') : (CONFIG.ichigo?.getsugaColor || '#00D5FF')));
     proj.owner = ownerIndex;
     proj.damage = Number.isFinite(Number(damage)) 
       ? Number(damage) 
-      : (isMask ? (CONFIG.ichigo?.hollowGetsugaDamage || 50) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 45) : (CONFIG.ichigo?.getsugaDamage || 30)));
+      : (isFinal ? (CONFIG.ichigo?.bankaiFinalGetsugaDamage || 125) : (isMask ? (CONFIG.ichigo?.hollowGetsugaDamage || 50) : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDamage || 48) : (CONFIG.ichigo?.getsugaDamage || 32))));
     proj.isGetsuga = true;
     proj.getsugaForm = form;
     proj.visual = (isMask || isBankai) ? 'blackGetsuga' : 'getsuga';

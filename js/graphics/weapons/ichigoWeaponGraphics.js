@@ -7,8 +7,9 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   const owner = state.fighters && state.fighters[p.owner];
   const form = p.getsugaForm || (isBlack ? (owner && owner.hollowMaskActive ? 'hollow' : 'bankai') : 'shikai');
   
+  const isFinal = form === 'final_bankai';
   const isMask = form === 'hollow';
-  const isBankai = form === 'bankai';
+  const isBankai = form === 'bankai' || isFinal;
   const isShikai = form === 'shikai';
 
   const scale = owner ? Math.max(0.9, owner.r / 22) : 1.0;
@@ -18,11 +19,12 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
-  ctx.scale(scale * (isMask ? 1.50 : 1.35), scale * (isMask ? 1.50 : 1.35));
+  const scaleMult = isFinal ? 2.10 : (isMask ? 1.50 : 1.35);
+  ctx.scale(scale * scaleMult, scale * scaleMult);
 
-  const r = isMask ? 54 : (isBankai ? 46 : 48);
-  const maxThick = isMask ? 20 : (isBankai ? 16 : 17);
-  const halfSpan = isMask ? (0.78 * Math.PI) : (0.76 * Math.PI); // ~137° - 144° sweep
+  const r = isFinal ? 72 : (isMask ? 54 : (isBankai ? 46 : 48));
+  const maxThick = isFinal ? 28 : (isMask ? 20 : (isBankai ? 16 : 17));
+  const halfSpan = isFinal ? (0.84 * Math.PI) : (isMask ? (0.78 * Math.PI) : (0.76 * Math.PI)); // ~137° - 151° sweep
   const numSteps = 32;
 
   // 1. Pass 1: Outer Reiatsu Spiritual Pressure Bloom Wave
@@ -32,7 +34,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     const t = (i / numSteps) * 2 - 1; // -1 to +1
     const ang = t * halfSpan;
     const taper = Math.cos(t * (Math.PI / 2));
-    const dist = r + taper * 5.5;
+    const dist = r + taper * (isFinal ? 8.5 : 5.5);
     const px = Math.cos(ang) * dist;
     const py = Math.sin(ang) * dist;
     if (i === 0) ctx.moveTo(px, py);
@@ -43,14 +45,15 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfSpan;
     const taper = Math.cos(t * (Math.PI / 2));
-    const dist = r - (maxThick * taper) - taper * 7.0;
+    const dist = r - (maxThick * taper) - taper * (isFinal ? 10.0 : 7.0);
     const px = Math.cos(ang) * dist;
     const py = Math.sin(ang) * dist;
     ctx.lineTo(px, py);
   }
   ctx.closePath();
 
-  if (isMask) ctx.fillStyle = `rgba(255, 40, 0, ${0.50 * alpha})`;
+  if (isFinal) ctx.fillStyle = `rgba(220, 20, 60, ${0.65 * alpha})`;
+  else if (isMask) ctx.fillStyle = `rgba(255, 40, 0, ${0.50 * alpha})`;
   else if (isBankai) ctx.fillStyle = `rgba(0, 229, 255, ${0.45 * alpha})`;
   else ctx.fillStyle = `rgba(0, 191, 255, ${0.45 * alpha})`;
   ctx.fill();
@@ -61,7 +64,7 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfSpan;
     const taper = Math.cos(t * (Math.PI / 2));
-    const dist = r + taper * 2.0;
+    const dist = r + taper * (isFinal ? 3.5 : 2.0);
     const px = Math.cos(ang) * dist;
     const py = Math.sin(ang) * dist;
     if (i === 0) ctx.moveTo(px, py);
@@ -78,7 +81,8 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   }
   ctx.closePath();
 
-  if (isMask) ctx.fillStyle = `rgba(15, 4, 4, ${0.96 * alpha})`;
+  if (isFinal) ctx.fillStyle = `rgba(10, 2, 4, ${0.98 * alpha})`;
+  else if (isMask) ctx.fillStyle = `rgba(15, 4, 4, ${0.96 * alpha})`;
   else if (isBankai) ctx.fillStyle = `rgba(10, 10, 14, ${0.96 * alpha})`;
   else ctx.fillStyle = `rgba(240, 248, 255, ${0.95 * alpha})`;
   ctx.fill();
@@ -96,7 +100,10 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     else ctx.lineTo(px, py);
   }
 
-  if (isMask) {
+  if (isFinal) {
+    ctx.strokeStyle = `rgba(255, 40, 40, ${1.0 * alpha})`;
+    ctx.lineWidth = 3.2;
+  } else if (isMask) {
     ctx.strokeStyle = `rgba(255, 120, 0, ${0.92 * alpha})`;
     ctx.lineWidth = 2.6;
   } else if (isBankai) {
@@ -109,14 +116,14 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   ctx.stroke();
 
   // 4. Pass 4: Trailing Reiatsu Streamers / Speed Needles
-  const streamerCount = isMask ? 7 : 6;
+  const streamerCount = isFinal ? 9 : (isMask ? 7 : 6);
   ctx.save();
   for (let s = 0; s < streamerCount; s++) {
     const stNorm = (s / (streamerCount - 1)) * 2 - 1; // -1 to +1
     const stAng = stNorm * (halfSpan * 0.85);
     const taper = Math.cos(stNorm * (Math.PI / 2));
     const startRad = r - (maxThick * taper * 0.8);
-    const trailLen = (isMask ? 24 : 20) + taper * 25;
+    const trailLen = (isFinal ? 38 : (isMask ? 24 : 20)) + taper * (isFinal ? 35 : 25);
 
     const sx1 = Math.cos(stAng) * startRad;
     const sy1 = Math.sin(stAng) * startRad;
@@ -127,11 +134,12 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
     ctx.moveTo(sx1, sy1);
     ctx.lineTo(sx2, sy2);
 
-    if (isMask) ctx.strokeStyle = `rgba(255, 60, 0, ${0.75 * alpha})`;
+    if (isFinal) ctx.strokeStyle = `rgba(220, 20, 60, ${0.85 * alpha})`;
+    else if (isMask) ctx.strokeStyle = `rgba(255, 60, 0, ${0.75 * alpha})`;
     else if (isBankai) ctx.strokeStyle = `rgba(0, 229, 255, ${0.75 * alpha})`;
     else ctx.strokeStyle = `rgba(135, 206, 250, ${0.80 * alpha})`;
 
-    ctx.lineWidth = 1.6;
+    ctx.lineWidth = isFinal ? 2.2 : 1.6;
     ctx.stroke();
   }
   ctx.restore();

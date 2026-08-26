@@ -1868,8 +1868,53 @@ function _drawSeriousRedFist(ctx, progress) {
   ctx.restore();
 }
 
+// ──────────────────────────────────────────
+// BLEACH BANKAI CINEMATIC TRANSFORMATION SEEDS & OVERLAY
+// ──────────────────────────────────────────
+let _bankaiInwardSeeds = null;
+function _initBankaiInwardSeeds() {
+  _bankaiInwardSeeds = [];
+  const count = 36;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + (Math.sin(i * 1.7) * 0.12);
+    const startDist = 380 + (i % 7) * 45;
+    const len = 70 + (i % 5) * 30;
+    const maxThick = 1.6 + (i % 3) * 0.8;
+    const speed = 1.8 + (i % 4) * 0.5;
+    const phase = (i * 17) % 100;
+    let color;
+    if (i % 4 === 0) color = '#DC143C';                     // Crimson Reiatsu
+    else if (i % 4 === 1) color = '#00E5FF';                // Electric Cyan
+    else if (i % 4 === 2) color = 'rgba(255, 255, 255, 0.95)'; // White Core
+    else color = 'rgba(15, 8, 20, 0.95)';                   // Deep Manga Ink
+
+    _bankaiInwardSeeds.push({ angle, startDist, len, maxThick, speed, phase, color });
+  }
+}
+
+let _bankaiBurstSeeds = null;
+function _initBankaiBurstSeeds() {
+  _bankaiBurstSeeds = [];
+  const count = 48;
+  for (let i = 0; i < count; i++) {
+    const angle = (i / count) * Math.PI * 2 + (Math.sin(i * 2.3) * 0.08);
+    const len = 90 + (i % 6) * 40;
+    const maxThick = 1.8 + (i % 4) * 0.9;
+    const speed = 2.4 + (i % 3) * 0.8;
+    const phase = (i * 23) % 100;
+    let color;
+    if (i % 4 === 0) color = '#DC143C';                     // Crimson Reiatsu
+    else if (i % 4 === 1) color = '#FF3214';                // Fiery Red/Scarlet
+    else if (i % 4 === 2) color = '#FFFFFF';                // White Core
+    else color = 'rgba(10, 4, 15, 0.95)';                   // Jet Black Ink
+
+    _bankaiBurstSeeds.push({ angle, len, maxThick, speed, phase, color });
+  }
+}
+
 /**
- * Draws cinematic Bleach anime atmospheric lighting and black-crimson radial vignette during Bankai channeling and eruption.
+ * Draws cinematic Bleach anime atmospheric lighting, inward manga gravitational focus lines,
+ * ground spiritual fissures, radial blast lines, and title typography during Bankai transformation.
  */
 export function drawBankaiImpactDimScreen() {
   const { ctx, canvas, arena } = state;
@@ -1880,47 +1925,81 @@ export function drawBankaiImpactDimScreen() {
   );
   if (!ichigo) return;
 
-  let opacity = 0;
-  if (ichigo.isChannelingBankai) {
-    const maxB = ichigo.bankaiChargeMax || 50;
-    const curB = ichigo.bankaiChargeTimer || 0;
-    const bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
-
-    if (bankaiProg < 0.75) {
-      // Phase 1: Rising atmospheric tension & soaring vortex
-      opacity = Math.min(0.85, bankaiProg * 1.15);
-    } else {
-      // Phase 2: Maximum Singularity Compression tension
-      const compP = (bankaiProg - 0.75) / 0.25;
-      opacity = 0.85 + compP * 0.08 + Math.sin(Date.now() * 0.04) * 0.04;
-    }
-  } else if (ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0) {
-    // Phase 3: Eruption release burst decay
-    const burstMax = ichigo.bankaiBurstMax || 36;
-    const burstProg = 1.0 - (ichigo.bankaiBurstTimer / burstMax);
-    opacity = Math.pow(1.0 - burstProg, 1.4) * 0.88;
-  }
-
-  if (opacity <= 0.01) return;
-
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const shakeX = state.shakeX || 0;
   const shakeY = state.shakeY || 0;
   const cx = ichigo.x + shakeX;
   const cy = ichigo.y + shakeY;
-  const maxR = Math.max(canvas.width, canvas.height) * 0.90;
+  const r = ichigo.r || 25;
+
+  let isChanneling = Boolean(ichigo.isChannelingBankai && ichigo.bankaiChargeTimer > 0);
+  let isBursting = Boolean(ichigo.bankaiBurstTimer && ichigo.bankaiBurstTimer > 0);
+
+  let opacity = 0;
+  let bankaiProg = 0;
+  let burstProg = 0;
+
+  if (isChanneling) {
+    const maxB = ichigo.bankaiChargeMax || CONFIG.ichigo?.bankaiChargeFrames || 50;
+    const curB = ichigo.bankaiChargeTimer || 0;
+    bankaiProg = Math.min(1.0, Math.max(0.0, 1.0 - (curB / maxB)));
+
+    if (bankaiProg < 0.70) {
+      // Phase 1: Rising atmospheric spiritual pressure & vortex build-up
+      opacity = Math.min(0.88, bankaiProg * 1.30);
+    } else {
+      // Phase 2: Maximum Singularity Implosion tension
+      const compP = (bankaiProg - 0.70) / 0.30;
+      opacity = 0.88 + compP * 0.08 + Math.sin(now * 0.04) * 0.03;
+    }
+  } else if (isBursting) {
+    // Phase 3: Eruption release burst decay
+    const burstMax = ichigo.bankaiBurstMax || CONFIG.ichigo?.bankaiBurstFrames || 36;
+    burstProg = 1.0 - (ichigo.bankaiBurstTimer / burstMax);
+    opacity = Math.pow(1.0 - burstProg, 1.3) * 0.92;
+  }
+
+  if (opacity <= 0.01) return;
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-  // Radial Black-Crimson Vignette (Centered on Ichigo's Spiritual Pressure Epicenter)
-  const grad = ctx.createRadialGradient(cx, cy, 35, cx, cy, maxR);
-  grad.addColorStop(0.0, `rgba(45, 5, 12, ${opacity * 0.40})`);       // Translucent crimson center
-  grad.addColorStop(0.30, `rgba(18, 3, 6, ${opacity * 0.72})`);      // Deep dark crimson ring
-  grad.addColorStop(0.70, `rgba(6, 1, 3, ${opacity * 0.92})`);       // Pitch black-crimson edge
-  grad.addColorStop(1.0, `rgba(1, 0, 2, ${opacity * 0.98})`);        // Absolute void boundary
+  // ── 1. Moment of Eruption Inverted Negative Flash (Frames 0-3 of burst) ──
+  if (isBursting && burstProg < 0.10) {
+    const flashAlpha = Math.pow(1.0 - (burstProg / 0.10), 1.5) * 0.95;
+    ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha.toFixed(3)})`;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  // ── 2. Full-Screen Radial Bleach Void Vignette (Pitch Dark with Crimson Corona) ──
+  const maxR = Math.max(canvas.width, canvas.height) * 0.95;
+  const grad = ctx.createRadialGradient(cx, cy, r * 1.2, cx, cy, maxR);
+  grad.addColorStop(0.0, `rgba(40, 6, 15, ${(opacity * 0.35).toFixed(3)})`);     // Translucent dark crimson core
+  grad.addColorStop(0.25, `rgba(16, 3, 8, ${(opacity * 0.75).toFixed(3)})`);     // Deep dark void ring
+  grad.addColorStop(0.65, `rgba(4, 1, 6, ${(opacity * 0.94).toFixed(3)})`);      // Pitch black atmosphere
+  grad.addColorStop(1.0, `rgba(1, 0, 2, ${(opacity * 0.98).toFixed(3)})`);       // Absolute boundary
 
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // ── 3. Arena Floor Expanding Concentric Reiatsu Shock Rings ──
+  if (isChanneling) {
+    const ringCount = 3;
+    for (let i = 0; i < ringCount; i++) {
+      const ringP = ((now * 0.0022 + i * (1.0 / ringCount)) % 1.0);
+      const ringR = r * 1.5 + ringP * 280;
+      const ringAlpha = (1.0 - ringP) * Math.sin(ringP * Math.PI) * opacity * 0.70;
+      if (ringAlpha > 0.01) {
+        ctx.strokeStyle = (i % 2 === 0) 
+          ? `rgba(220, 20, 20, ${ringAlpha.toFixed(3)})` 
+          : `rgba(255, 45, 20, ${ringAlpha.toFixed(3)})`;
+        ctx.lineWidth = Math.max(1.0, 3.5 * (1.0 - ringP));
+        ctx.beginPath();
+        ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
+        ctx.stroke();
+      }
+    }
+  }
 
   ctx.restore();
 }

@@ -26,6 +26,7 @@ import { drawMegumiShadowBlade } from '../weapons/megumiWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
+import { spawnHollowMaskShatter, updateDeathEffects, drawDeathEffects } from '../particles/deathShatterEffect.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { getSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
@@ -308,12 +309,17 @@ function drawWeaponInfoCard(ctx, def) {
     descText = 'Precision .338 Lapua Magnum sniper rifle. Features iconic thumbhole polymer chassis, stepped rubber recoil buttpad, adjustable cheek riser, assembly hex bolts, 50mm high-magnification scope, and heavy manual bolt-action chambering.';
   } else if (def.type === 'ichigo') {
     const skin = state.selectedIchigoSkin || 'shikai';
+    const isMask = Boolean(state.showHollowMask);
     if (skin === 'shikai') {
-      nameText = 'Ichigo (Shikai Zangetsu)';
-      descText = 'Wields massive oversized Shikai Zangetsu with trailing white cloth ribbons. Unleashes high-density Getsuga Tensho crescent waves, 2-strike Shunpo flurry, and Hollow Mask under 30% HP. Bankai unleashes Tensa Zangetsu!';
+      nameText = isMask ? 'Ichigo (Shikai + Hollow Mask)' : 'Ichigo (Shikai Zangetsu)';
+      descText = isMask
+        ? 'Empowered with the Visored Hollow Mask! Boosts spiritual pressure, movement velocity, and unleashes enhanced Getsuga waves with black-crimson spiritual pressure.'
+        : 'Wields massive oversized Shikai Zangetsu with trailing white cloth ribbons. Unleashes high-density Getsuga Tensho crescent waves, 2-strike Shunpo flurry, and Hollow Mask under 30% HP. Bankai unleashes Tensa Zangetsu!';
     } else {
-      nameText = 'Ichigo (Bankai: Tensa Zangetsu)';
-      descText = 'Wields sleek Kurotsuba Tensa Zangetsu with high-frequency frontal-arc slashes. Fires Kuroi Getsuga waves and dashes with supersonic Shunpo flurries.';
+      nameText = isMask ? 'Ichigo (Bankai + Hollow Mask)' : 'Ichigo (Bankai: Tensa Zangetsu)';
+      descText = isMask
+        ? 'Bankai augmented by the Visored Hollow Mask! Unleashes supersonic 6-strike Shunpo blazes and devastating Kuroi Getsuga crescent arcs.'
+        : 'Wields sleek Kurotsuba Tensa Zangetsu with high-frequency frontal-arc slashes. Fires Kuroi Getsuga waves and dashes with supersonic Shunpo flurries.';
     }
   }
 
@@ -541,6 +547,60 @@ function drawWeaponDetailScreen() {
     }
   });
 
+  if (def.type === 'ichigo') {
+    const maskToggleText = state.showHollowMask ? 'MASK: ON' : 'MASK: OFF';
+    buttonsToDraw.push({
+      text: maskToggleText,
+      width: 90,
+      action: () => {
+        state.showHollowMask = !state.showHollowMask;
+        if (state.previewFighter) {
+          state.previewFighter.hollowMaskActive = state.showHollowMask;
+          state.previewFighter.demoShatterTimer = 0;
+          if (state.showHollowMask) {
+            state.previewFighter.hollowMaskFormationTimer = 54;
+            state.previewFighter.hollowMaskFormationMax = 54;
+            state.previewFighter.hollowMaskTimer = 600;
+            audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
+          } else {
+            state.previewFighter.hollowMaskFormationTimer = 0;
+          }
+        }
+      }
+    });
+
+    const isForming = state.previewFighter && state.previewFighter.hollowMaskFormationTimer > 0;
+    buttonsToDraw.push({
+      text: isForming ? 'FORMING...' : 'FORM MASK',
+      width: 100,
+      action: () => {
+        state.showHollowMask = true;
+        if (state.previewFighter) {
+          state.previewFighter.hollowMaskActive = true;
+          state.previewFighter.demoShatterTimer = 0;
+          state.previewFighter.hollowMaskFormationTimer = 54;
+          state.previewFighter.hollowMaskFormationMax = 54;
+          state.previewFighter.hollowMaskTimer = 600;
+          audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
+        }
+      }
+    });
+
+    const isShattering = state.previewFighter && state.previewFighter.demoShatterTimer > 0;
+    buttonsToDraw.push({
+      text: isShattering ? 'CRACKING...' : 'SHATTER MASK',
+      width: 110,
+      action: () => {
+        state.showHollowMask = true;
+        if (state.previewFighter) {
+          state.previewFighter.hollowMaskActive = true;
+          state.previewFighter.hollowMaskFormationTimer = 0;
+          state.previewFighter.demoShatterTimer = 75;
+        }
+      }
+    });
+  }
+
   const isAttacking = isFighterDemoAttacking(state.previewFighter);
   const demoBtnText = isAttacking ? 'ATTACKING...' : 'DEMO ATTACK';
   buttonsToDraw.push({
@@ -705,6 +765,28 @@ function drawWeaponDetailScreen() {
     previewFighter.x = 0;
     previewFighter.y = 0;
 
+    if (def.type === 'ichigo') {
+      previewFighter.skin = state.selectedIchigoSkin || 'shikai';
+      if (previewFighter.demoShatterTimer !== undefined && previewFighter.demoShatterTimer > 0) {
+        previewFighter.hollowMaskActive = true;
+        previewFighter.hollowMaskTimer = Math.round((previewFighter.demoShatterTimer / 75) * 160);
+        previewFighter.demoShatterTimer--;
+        if (previewFighter.demoShatterTimer <= 0) {
+          previewFighter.hollowMaskActive = false;
+          state.showHollowMask = false;
+          spawnHollowMaskShatter(previewFighter);
+        }
+      } else {
+        previewFighter.hollowMaskActive = Boolean(state.showHollowMask);
+        if (previewFighter.hollowMaskFormationTimer > 0) {
+          previewFighter.hollowMaskFormationTimer--;
+        }
+        if (previewFighter.hollowMaskActive && (previewFighter.hollowMaskTimer === undefined || previewFighter.hollowMaskTimer <= 0)) {
+          previewFighter.hollowMaskTimer = 600;
+        }
+      }
+    }
+
     if (def.type === 'cj') {
       const cjIdx = state.cjWeaponIndex || 0;
       previewFighter.z = (cjIdx === 1 || cjIdx === 2) ? 24 : 0;
@@ -763,6 +845,8 @@ function drawWeaponDetailScreen() {
     try {
       const fakeTarget = { x: 80, y: 0, r: 25, hp: 100, maxHp: 100, vx: 0, vy: 0, applyKnockback: () => {}, applySlow: () => {}, applyTimeStop: () => {}, takeDamage: () => {} };
       previewFighter.draw(ctx, fakeTarget);
+      updateDeathEffects();
+      drawDeathEffects();
     } catch (e) {
       console.error('Preview draw error:', e);
     }
@@ -849,17 +933,47 @@ function drawWeaponDetailScreen() {
       audioSystem.playSFX('Assets/Sound Effects/Skills/johnwick-gunswitch.mp3', 0.9);
     }, 30, 22, null, 3);
   } else if (def.type === 'ichigo') {
-    const shikaiBtnX = canvas.width / 2 - 55;
-    const bankaiBtnX = canvas.width / 2 + 55;
+    const maskActive = Boolean(state.showHollowMask);
+    const isShattering = state.previewFighter && state.previewFighter.demoShatterTimer > 0;
+    const shikaiBtnX  = canvas.width / 2 - 145;
+    const bankaiBtnX  = canvas.width / 2 - 55;
+    const maskBtnX    = canvas.width / 2 + 45;
+    const shatterBtnX = canvas.width / 2 + 150;
 
     drawButton('SHIKAI', shikaiBtnX, pagY, () => {
       state.selectedIchigoSkin = 'shikai';
       if (state.previewFighter) state.previewFighter.skin = 'shikai';
-    }, 85, 22, null, 3);
+    }, 70, 22, null, 3);
 
     drawButton('BANKAI', bankaiBtnX, pagY, () => {
       state.selectedIchigoSkin = 'bankai';
       if (state.previewFighter) state.previewFighter.skin = 'bankai';
+    }, 70, 22, null, 3);
+
+    const maskLabel = maskActive ? 'MASK: ON' : 'MASK: OFF';
+    drawButton(maskLabel, maskBtnX, pagY, () => {
+      state.showHollowMask = !state.showHollowMask;
+      if (state.previewFighter) {
+        state.previewFighter.hollowMaskActive = state.showHollowMask;
+        state.previewFighter.demoShatterTimer = 0;
+        if (state.showHollowMask) {
+          state.previewFighter.hollowMaskFormationTimer = 54;
+          state.previewFighter.hollowMaskFormationMax = 54;
+          state.previewFighter.hollowMaskTimer = 600;
+          audioSystem.playSFX('Assets/Sound Effects/Skills/fuga.mp3', 0.9);
+        } else {
+          state.previewFighter.hollowMaskFormationTimer = 0;
+        }
+      }
+    }, 85, 22, null, 3);
+
+    const shatterLabel = isShattering ? 'CRACKING...' : 'SHATTER';
+    drawButton(shatterLabel, shatterBtnX, pagY, () => {
+      state.showHollowMask = true;
+      if (state.previewFighter) {
+        state.previewFighter.hollowMaskActive = true;
+        state.previewFighter.demoShatterTimer = 75;
+      }
     }, 85, 22, null, 3);
   } else if (def.type === 'cj') {
     state.cjWeaponIndex = state.cjWeaponIndex || 0;

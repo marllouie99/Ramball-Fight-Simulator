@@ -162,7 +162,10 @@ export class MeleeFighter extends Fighter {
 
   drawBody(ctx) {
     drawSpikeSkin(ctx, this.x, this.y, this.r, this.angle, this.color);
+    ctx.save();
+    ctx.translate(this.x, this.y);
     this.drawStatusOverlays(ctx, this.r);
+    ctx.restore();
   }
 
   draw(ctx) {
