@@ -249,3 +249,106 @@ export function drawCjSanAndreasAtmosphere() {
   // GTA San Andreas atmosphere filter removed per user request
 }
 
+let currentBaguvixDimOpacity = 0;
+
+/**
+ * Draws a dark Grove Street green dim screen overlay when CJ activates or is in BAGUVIX God Mode.
+ * Features a vibrant emerald/lime radial bloom centered on CJ, fading out to deep dark turf green and pitch black.
+ * Design matches the high-contrast aesthetic of Gojo's Hollow Purple dim overlay with Grove Street green branding.
+ * Conforms to Rule 10, Rule 11, and Rule 14.
+ */
+export function drawCjBaguvixDimScreen() {
+  const { ctx, canvas, arena } = state;
+  if (!ctx || !canvas || !arena) return;
+
+  if (CONFIG.cj?.enableBaguvixDimScreen === false) return;
+
+  // Find CJ fighters that are typing BAGUVIX or actively in Baguvix God Mode
+  const cjFighter = (state.fighters?.find(f =>
+    f && (f.characterId === 'cj' || f.type === 'cj' || f._def?.id === 'cj' || f._def?.type === 'cj') &&
+    (f.isBaguvixActive || f.isGodModeActive || (f.isTypingCheat && f.cheatCodeString === 'BAGUVIX'))
+  )) || (state.previewFighter && (state.previewFighter.isBaguvixActive || state.previewFighter.isGodModeActive) ? state.previewFighter : null);
+
+  let targetOpacity = 0;
+  let cx = canvas.width / 2;
+  let cy = canvas.height / 2;
+
+  if (cjFighter) {
+    cx = cjFighter.x;
+    cy = cjFighter.y - (cjFighter.z || 0);
+
+    if (cjFighter.isTypingCheat && cjFighter.cheatCodeString === 'BAGUVIX') {
+      const maxTyping = (cjFighter.cheatTypingMaxTimer || 60);
+      const progress = Math.min(1.0, 1.0 - ((cjFighter.cheatTypingTimer || 0) / Math.max(1, maxTyping)));
+      targetOpacity = 0.20 + progress * 0.40; // Smooth buildup from 0.20 to 0.60 while typing
+    } else if (cjFighter.isBaguvixActive || cjFighter.isGodModeActive) {
+      const baseMax = CONFIG.cj?.baguvixDimOpacity || 0.68;
+      const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+      const pulse = Math.sin(now * 0.005) * 0.04;
+      targetOpacity = baseMax + pulse;
+    }
+  }
+
+  // Smoothly interpolate dim opacity for seamless fade-in and gradual fade-out
+  if (targetOpacity > currentBaguvixDimOpacity) {
+    currentBaguvixDimOpacity += (targetOpacity - currentBaguvixDimOpacity) * 0.15; // Smooth fade-in
+  } else {
+    currentBaguvixDimOpacity += (targetOpacity - currentBaguvixDimOpacity) * 0.10; // Smooth clear fade-out
+  }
+
+  if (currentBaguvixDimOpacity < 0.01) {
+    currentBaguvixDimOpacity = 0;
+    return;
+  }
+
+  const shakeX = state.shakeX || 0;
+  const shakeY = state.shakeY || 0;
+
+  ctx.save();
+  // Reset transform to identity screen space so full-screen dim rect is glued to screen (Rule 14)
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+  const opacity = currentBaguvixDimOpacity;
+
+  // Base dark overlay (Rule 14 & Rule 11 compliant)
+  ctx.fillStyle = `rgba(0, 0, 0, ${opacity * 0.90})`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Dynamic radial gradient centered on CJ
+  const maxDim = Math.max(arena.width, arena.height) * 0.85;
+  const roundCx = Math.round((cx + shakeX) / 10) * 10;
+  const roundCy = Math.round((cy + shakeY) / 10) * 10;
+  const key = `${roundCx}_${roundCy}_${maxDim}`;
+
+  if (!state._cachedBaguvixDimGrad || state._cachedBaguvixDimKey !== key) {
+    state._cachedBaguvixDimKey = key;
+    state._cachedBaguvixDimGrad = ctx.createRadialGradient(
+      roundCx, roundCy, 0,
+      roundCx, roundCy, maxDim
+    );
+    const glowR = 120;
+    const rRatio = glowR / maxDim;
+
+    // Concentrates a deep, highly saturated vibrant Grove Street emerald green halo around CJ, fading to pitch black
+    state._cachedBaguvixDimGrad.addColorStop(0, 'rgba(74, 222, 128, 1.0)');           // Vibrant neon lime-green core
+    state._cachedBaguvixDimGrad.addColorStop(rRatio * 0.25, 'rgba(34, 197, 94, 0.95)'); // Saturated electric emerald green
+    state._cachedBaguvixDimGrad.addColorStop(rRatio * 0.60, 'rgba(22, 163, 74, 0.75)'); // Deep Grove Street green ring
+    state._cachedBaguvixDimGrad.addColorStop(rRatio * 1.05, 'rgba(20, 83, 45, 0.45)');  // Dark turf halo bloom
+    state._cachedBaguvixDimGrad.addColorStop(rRatio * 1.55, 'rgba(5, 46, 22, 0.20)');   // Deep night-green transition
+    state._cachedBaguvixDimGrad.addColorStop(Math.min(1.0, rRatio * 2.2), 'rgba(0, 0, 0, 1.0)'); // Dark outer space
+    state._cachedBaguvixDimGrad.addColorStop(1.0, 'rgba(0, 0, 0, 1.0)');               // Pitch black boundary
+  }
+
+  ctx.globalAlpha = opacity;
+  ctx.fillStyle = state._cachedBaguvixDimGrad;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Exclude Gojo's Limitless Infinity Barrier from screen dimming (Rule 9)
+  excludeGojoInfinityFromDim(ctx);
+
+  ctx.restore();
+
+  state.globalDimEdgeColor = `rgba(0, 0, 0, ${opacity * 0.95})`;
+}
+
+

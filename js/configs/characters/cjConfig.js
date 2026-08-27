@@ -116,6 +116,8 @@ export const cjConfig = {
   riotShockwaveDamage: 25,     // Shockwave explosion damage
   riotShockwaveKnockback: 22.0,// Heavy radial pushback towards arena walls
   droppedMinigunDuration: 240, // 4.0s (240 frames) duration of overheated smoking minigun on the floor
+  enableBaguvixDimScreen: true, // Dark Grove Street emerald green radial dim overlay
+  baguvixDimOpacity: 0.68,      // Max dim opacity during BAGUVIX God Mode
 
   // ── 8. AUDIO ASSETS, VOLUMES & TIMING DELAYS ──
   sounds: {

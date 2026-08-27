@@ -11,7 +11,7 @@ import {
   drawFlames, drawDeathEffects, drawBlackHoleEffects, drawBloodEffects, drawDroppedMagazines, drawIllusions, 
   drawIllusionDeathEffects, drawIllusionSpawnEffects, drawBerserkerRageEffects, 
   drawSparkEffects, drawPurpleDimScreen, drawStormDimScreen, drawFurnaceDimScreen, 
-  drawRikaSummonDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
+  drawRikaSummonDimScreen, drawCjBaguvixDimScreen, drawMahitoDomainOverlay, drawTojiUltimateOverlay, drawMahoragaAdaptationDimScreen, drawMahoragaLevel8DimScreen,
   drawAllCronosSpheres, drawThermobaricExplosions, drawThinIceBreakerDimScreen,
   drawGenosSpeedLines, drawMahoragaSpeedLines, drawNanamiSpeedLines, drawSaitamaSpeedLines, drawIchigoBankaiSpeedLines, drawSaitamaSeriousPunchDimScreen, drawGenosSelfDestructDimScreen,
   drawTodoTakadaIdolScreenOverlay, drawNanamiRatioCritDimScreen, drawBankaiImpactDimScreen,
@@ -230,6 +230,7 @@ export function renderGame() {
         drawPurpleDimScreen(); // 2D Gojo Hollow Purple radial dim overlay
         drawFurnaceDimScreen(); // 2D Sukuna Fuga Furnace radial dim overlay
         drawRikaSummonDimScreen(); // Draw dark cursed energy dim screen overlay when Yuta summons Rika
+        drawCjBaguvixDimScreen(); // 2D CJ BAGUVIX God Mode dark Grove Street emerald green radial dim overlay
         drawThinIceBreakerDimScreen(); // Draw cyan/blue dark screen dim when Thin Ice Breaker lands
         drawMahoragaAdaptationDimScreen();
         drawMahoragaLevel8DimScreen();
