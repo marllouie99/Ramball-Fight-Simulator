@@ -121,7 +121,7 @@ export const yutaConfig = {
   pureLoveBeamShakeIntensity: 6,            // Arena shake intensity while beam is active (decays in final 30%)
   pureLoveBeamRegenDebuffDuration: 1500,      // Duration (600 frames = 10s) of reduced healing/regen after beam exposure
   pureLoveBeamRegenDebuffMultiplier: 0.50,  // Healing received multiplier (0.25 = 75% reduction) during the debuff
-  pureLoveBeamDamageStackPerTick: 0.5,      // Permanent base damage increase per beam hit tick
+  pureLoveBeamDamageStackPerTick: 0.5,      // Permanent base damage increase for Yuta per beam hit tick
   pureLoveBeamLifestealPct: 0.5,            // Lifesteal percentage (0.1 = 10% of damage dealt) recovered as HP per beam hit tick
 
 

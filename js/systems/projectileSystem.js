@@ -100,6 +100,7 @@ class ProjectileSystem {
     p.isSukunaSlash = false;
     p.isSukunaDomainSlash = false;
     p.isSukunaFurnace = false;
+    p.isPureLoveBeam = false;
     p.isGojoBlue = false;
     p.isGojoPurple = false;
     p.isGojoPurpleOrb = false;

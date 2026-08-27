@@ -48,7 +48,7 @@ export const mahoragaConfig = {
     rctRegenPerStage: 0.03,          // Passive RCT HP regeneration per frame per adaptation level (+1.8 HP/sec per stage)
     enableRCTHeal: true,             // Toggle on/off Reverse Cursed Technique flat healing on wheel click
     rctHealFlatAmount: 100,          // Heals a flat 100 HP on each wheel rotation click
-    defBuffPerClickPercent: 0.01,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
+    defBuffPerClickPercent: 0.02,    // Defense boost per wheel click (0.01 = 1% damage reduction per stage)
     maxDefBuffPercent: 0.50,         // Maximum defense damage reduction cap (0.50 = 50% max reduction)
     ccTenacityPerClickPercent: 0.075,// CC tenacity resistance factor per wheel click (+7.5% resistance per stage)
     maxCcTenacityPercent: 0.60,      // Maximum speed/KB resistance factor under stasis (60% max)
@@ -146,7 +146,7 @@ export const mahoragaConfig = {
     wallSlamThrowSpeed: 45.0,         // Supersonic velocity at which opponent is hurled to the wall
     wallSlamImpactDamage: 20,         // Damage taken upon slamming into the wall
     wallSlamParalyzeDuration: 150,     // Duration (frames) opponent is paralyzed on wall contact
-    wallSlamMenacingStandoff: 50,     // Delay (frames) Mahoraga pauses menacingly before dashing to the wall-pinned target
+    wallSlamMenacingStandoff: 20,     // Delay (frames) Mahoraga pauses menacingly before dashing to the wall-pinned target (snappy ~0.33s)
     wallSlamFollowupDamage: 25,       // Damage dealt on the initial execution strike upon reaching target
     wallSlamBlitzHitsCount: 10,       // Total rapid hits in the Wall Slam execution flurry
     wallSlamBlitzHitInterval: 10,      // Frame interval between each rapid hit during Wall Slam flurry

@@ -92,7 +92,7 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
         const otherProj = system.projectiles[j];
         if (otherProj === projectile || otherProj.isVisual || otherProj.life <= 0) continue;
         if (areOnSameTeam(projectile.owner, otherProj.owner)) continue;
-        if (otherProj.isSukunaFurnace || otherProj.behaviorType === 'sukuna_furnace') continue;
+        if (otherProj.isSukunaFurnace || otherProj.behaviorType === 'sukuna_furnace' || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
         
         const dx = projectile.x - otherProj.x;
         const dy = projectile.y - otherProj.y;

@@ -554,11 +554,11 @@ export function updateHybridEnvironment() {
     if (yutaFighter.isChannelingPureLoveBeam || yutaFighter.isFiringPureLoveBeam) {
       targetRikaOpacity = 0.95; // Deep pitch dark black dim during Pure Love Beam
     } else if (yutaFighter.rikaCallTimer > 0) {
-      const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 40;
+      const maxCharge = CONFIG.yuta?.rikaSummonChargeDuration || 30;
       const progress = 1.0 - (yutaFighter.rikaCallTimer / maxCharge);
       targetRikaOpacity = 0.25 + progress * 0.50; // Up to 0.75 opacity
     } else if (yutaFighter.rika && yutaFighter.rika.spawnTimer > 0) {
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       const progress = yutaFighter.rika.spawnTimer / ariseMax;
       targetRikaOpacity = 0.75 * progress;
     }

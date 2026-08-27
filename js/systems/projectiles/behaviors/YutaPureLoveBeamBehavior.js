@@ -82,21 +82,21 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
         const isInsideBeam = isAtBeamOrigin || (distFromAxis <= (currentBeamRadius + radius));
 
         if (isInsideBeam) {
-          const normalizedOffAxis = Math.min(1.0, distFromAxis / Math.max(1, currentBeamRadius + radius));
-          const widthSpreadDamageMult = 1.0 - (normalizedOffAxis * 0.35);
-          const finalDamage = p.damage * widthSpreadDamageMult;
+          const solidDamage = CONFIG.yuta?.pureLoveBeamDamagePerTick ?? p.damage ?? 10;
 
           if (p.hitTargets && !p.hitTargets.has(ent)) {
             p.hitTargets.add(ent);
             
             if (typeof ent.takeDamage === 'function') {
-              ent.takeDamage(finalDamage, ownerFighter, { isPureLoveBeam: true, bypassShield: true });
-              const dmgGain = CONFIG.yuta?.pureLoveBeamDamageStackPerTick ?? 0.5;
-              ownerFighter.pureLoveBeamBonusDamage = (ownerFighter.pureLoveBeamBonusDamage || 0) + dmgGain;
-              p.damage = (p.damage || CONFIG.yuta?.pureLoveBeamDamagePerTick || 12) + dmgGain;
+              ent.takeDamage(solidDamage, ownerFighter, { isPureLoveBeam: true, bypassShield: true });
 
-              const lifestealPct = CONFIG.yuta?.pureLoveBeamLifestealPct ?? 0.1;
-              const healAmount = finalDamage * lifestealPct;
+              const dmgGain = CONFIG.yuta?.pureLoveBeamDamageStackPerTick ?? 0.5;
+              if (dmgGain > 0 && ownerFighter) {
+                ownerFighter.pureLoveBeamBonusDamage = (ownerFighter.pureLoveBeamBonusDamage || 0) + dmgGain;
+              }
+
+              const lifestealPct = CONFIG.yuta?.pureLoveBeamLifestealPct ?? 0.5;
+              const healAmount = solidDamage * lifestealPct;
               if (healAmount > 0 && typeof ownerFighter.takeDamage === 'function') {
                 ownerFighter.takeDamage(-healAmount, ownerFighter, { isHeal: true });
               }
@@ -106,8 +106,8 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           ent.caughtInPureLoveBeam = true;
           ent.wasCaughtInPureLoveBeam = true;
           ent.pureLoveBeamTimer = 10;
-          ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15;
-          ent.pureLoveBeamRegenDebuffTimer = CONFIG.yuta?.pureLoveBeamRegenDebuffDuration ?? 600; // Disable & reduce regen after beam expires
+          ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
+          ent.pureLoveBeamRegenDebuffTimer = CONFIG.yuta?.pureLoveBeamRegenDebuffDuration ?? 1500; // Disable & reduce regen after beam expires
 
           if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
             ent.neutralStanceTimer = 0;
@@ -155,7 +155,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
           ent.caughtInPureLoveBeam = false;
           ent.wasCaughtInPureLoveBeam = false;
           ent.pureLoveBeamTimer = 0;
-          ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15;
+          ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
           if (typeof ent.interruptAttacks === 'function') {
             ent.interruptAttacks();
           }
@@ -187,7 +187,7 @@ export class YutaPureLoveBeamBehavior extends ProjectileBehavior {
             ent.caughtInPureLoveBeam = false;
             ent.wasCaughtInPureLoveBeam = false;
             ent.pureLoveBeamTimer = 0;
-            ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 15;
+            ent.pureLoveBeamRecoveryTimer = CONFIG.yuta?.pureLoveBeamStunDuration ?? 120;
             
             if (ent.characterId === 'mahoraga' || ent.type === 'mahoraga' || ent._def?.id === 'mahoraga') {
               if (typeof ent.adaptToPureLoveBeam === 'function') {

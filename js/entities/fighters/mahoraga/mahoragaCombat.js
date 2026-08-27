@@ -381,6 +381,13 @@ export function initiateLevel8WallSlam(fighter, opponent) {
   fighter.wallSlamTarget = opponent;
   fighter.throwCooldown = CONFIG.mahoraga?.throwCooldown ?? 600;
 
+  if (opponent) {
+    if (typeof opponent.interruptAttacks === 'function') opponent.interruptAttacks(true);
+    opponent.isGrabbedByMahoraga = true;
+    opponent.isParalyzedByMahoraga = true;
+    opponent.isWallSlammed = true;
+  }
+
   spawnFloatingText(fighter.x, fighter.y - fighter.r - 28, '⚡ LEVEL 8 WALL SLAM!', '#FFEE58');
   const fleshSnd = CONFIG.mahoraga?.sounds?.fleshHit || 'attack_fleshhit';
   const fleshVol = CONFIG.mahoraga?.soundVolumes?.fleshHit ?? 0.9;
@@ -400,6 +407,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     if (target) {
       target.isGrabbedByMahoraga = false;
       target.isParalyzedByMahoraga = false;
+      target.isWallSlammed = false;
       target.wallSlamPinnedX = undefined;
       target.wallSlamPinnedY = undefined;
       target.z = 0;
@@ -669,7 +677,7 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
     fighter.vx = 0;
     fighter.vy = 0;
 
-    const standoffFrames = CONFIG.mahoraga?.wallSlamMenacingStandoff ?? 50;
+    const standoffFrames = CONFIG.mahoraga?.wallSlamMenacingStandoff ?? 20;
     if (fighter.wallSlamTimer >= standoffFrames) { // Wait before dashing
       fighter.wallSlamPhase = 'dash';
       fighter.wallSlamTimer = 0;
@@ -677,16 +685,24 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   }
   // ── PHASE 3: SUPERSONIC DASH TO PARALYZED TARGET ──
   else if (fighter.wallSlamPhase === 'dash') {
-    const oldX = fighter.x;
-    const oldY = fighter.y;
-    const dashRate = 0.40;
+    const dashRate = 0.45;
+    const angleToTarget = Math.atan2(target.y - fighter.y, target.x - fighter.x);
+    const idealDist = fighter.r + target.r + 14;
+    const targetX = target.x - Math.cos(angleToTarget) * idealDist;
+    const targetY = target.y - Math.sin(angleToTarget) * idealDist;
 
-    fighter.x += (target.x - fighter.x) * dashRate;
-    fighter.y += (target.y - fighter.y) * dashRate;
+    fighter.x += (targetX - fighter.x) * dashRate;
+    fighter.y += (targetY - fighter.y) * dashRate;
+    fighter.vx = 0;
+    fighter.vy = 0;
+    fighter.knockbackVx = 0;
+    fighter.knockbackVy = 0;
     fighter.aim(target);
 
     const dist = Math.hypot(target.x - fighter.x, target.y - fighter.y);
-    if (dist <= fighter.r + target.r + 25 || fighter.wallSlamTimer >= 14) {
+    if (dist <= idealDist + 10 || fighter.wallSlamTimer >= 14) {
+      fighter.x = targetX;
+      fighter.y = targetY;
       fighter.wallSlamPhase = 'strike';
       fighter.wallSlamTimer = 0;
     }
@@ -694,6 +710,10 @@ export function updateLevel8WallSlam(fighter, opponent, ownerIndex, arena) {
   // ── PHASE 4: HEAVY SWORD EXECUTE HIT & FLURRY TRANSITION ──
   else if (fighter.wallSlamPhase === 'strike') {
     fighter.aim(target);
+    fighter.vx = 0;
+    fighter.vy = 0;
+    fighter.knockbackVx = 0;
+    fighter.knockbackVy = 0;
     fighter.punchAnimTimer = 10;
     fighter.swordCombo = 1;
 

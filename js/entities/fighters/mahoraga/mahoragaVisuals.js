@@ -319,6 +319,98 @@ export function drawAfterimages(ctx, fighter) {
 }
 
 /**
+ * Renders the 3-second Gamma Ray Rainbow Prismatic Aura underlay behind Mahoraga's body.
+ * Triggered on every Eight-Handled Sword Wheel click.
+ */
+export function drawMahoragaGammaRayRainbowUnderlay(ctx, fighter) {
+  if (!fighter || !fighter.gammaRayRainbowTimer || fighter.gammaRayRainbowTimer <= 0) return;
+
+  const timer = fighter.gammaRayRainbowTimer;
+  const maxTimer = fighter.gammaRayRainbowMax || 180;
+  const alpha = Math.min(1.0, timer / 25.0);
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const time = now * 0.001;
+  const r = fighter.r || 25;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+
+  // Organic random multi-harmonic wandering focal vectors (non-spinning, chaotic drift)
+  const pulse = 1.0 + 0.09 * (Math.sin(time * 6.3) * 0.5 + Math.cos(time * 11.2) * 0.5);
+  const auraR = r * 1.20 * pulse;
+
+  const fx1 = (Math.sin(time * 2.7) * 0.6 + Math.cos(time * 5.3) * 0.4) * (r * 0.75);
+  const fy1 = (Math.cos(time * 3.1) * 0.6 + Math.sin(time * 6.7) * 0.4) * (r * 0.75);
+  const fx2 = (Math.sin(time * 3.9 + 1.7) * 0.6 + Math.cos(time * 7.8) * 0.4) * (r * 0.85);
+  const fy2 = (Math.cos(time * 2.5 + 2.1) * 0.6 + Math.sin(time * 8.4) * 0.4) * (r * 0.85);
+
+  const auraGrad = ctx.createLinearGradient(fx1, fy1, fx2, fy2);
+  const s1 = Math.max(0.05, Math.min(0.28, 0.18 + Math.sin(time * 3.3) * 0.06));
+  const s2 = Math.max(0.30, Math.min(0.50, 0.38 + Math.cos(time * 2.9) * 0.06));
+  const s3 = Math.max(0.52, Math.min(0.72, 0.58 + Math.sin(time * 4.1) * 0.06));
+  const s4 = Math.max(0.74, Math.min(0.92, 0.78 + Math.cos(time * 3.7) * 0.06));
+
+  auraGrad.addColorStop(0.00, `rgba(255, 0, 85, ${(0.45 * alpha).toFixed(3)})`);
+  auraGrad.addColorStop(s1, `rgba(255, 120, 0, ${(0.45 * alpha).toFixed(3)})`);
+  auraGrad.addColorStop(s2, `rgba(255, 230, 0, ${(0.45 * alpha).toFixed(3)})`);
+  auraGrad.addColorStop(s3, `rgba(0, 255, 120, ${(0.45 * alpha).toFixed(3)})`);
+  auraGrad.addColorStop(s4, `rgba(0, 220, 255, ${(0.45 * alpha).toFixed(3)})`);
+  auraGrad.addColorStop(1.00, `rgba(180, 0, 255, ${(0.45 * alpha).toFixed(3)})`);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, auraR, 0, Math.PI * 2);
+  ctx.fillStyle = auraGrad;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Renders the 3-second Gamma Ray Rainbow Prismatic Sheen overlay across Mahoraga's body.
+ */
+export function drawMahoragaGammaRayRainbowOverlay(ctx, fighter) {
+  if (!fighter || !fighter.gammaRayRainbowTimer || fighter.gammaRayRainbowTimer <= 0) return;
+
+  const timer = fighter.gammaRayRainbowTimer;
+  const maxTimer = fighter.gammaRayRainbowMax || 180;
+  const alpha = Math.min(1.0, timer / 25.0);
+
+  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+  const time = now * 0.001;
+  const r = fighter.r || 25;
+
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+
+  // Organic random multi-frequency shimmer over the body (no circular spin)
+  const gx1 = (Math.cos(time * 3.5) * 0.6 + Math.sin(time * 7.1) * 0.4) * (r * 0.8);
+  const gy1 = (Math.sin(time * 4.2) * 0.6 + Math.cos(time * 6.5) * 0.4) * (r * 0.8);
+  const gx2 = (Math.sin(time * 3.1 + 2.4) * 0.6 + Math.cos(time * 8.7) * 0.4) * (r * 0.8);
+  const gy2 = (Math.cos(time * 3.8 + 1.2) * 0.6 + Math.sin(time * 5.9) * 0.4) * (r * 0.8);
+
+  const rainbowGrad = ctx.createLinearGradient(gx1, gy1, gx2, gy2);
+  const os1 = Math.max(0.05, Math.min(0.28, 0.18 + Math.cos(time * 3.7) * 0.06));
+  const os2 = Math.max(0.30, Math.min(0.50, 0.38 + Math.sin(time * 2.5) * 0.06));
+  const os3 = Math.max(0.52, Math.min(0.72, 0.58 + Math.cos(time * 4.3) * 0.06));
+  const os4 = Math.max(0.74, Math.min(0.92, 0.78 + Math.sin(time * 3.1) * 0.06));
+
+  rainbowGrad.addColorStop(0.00, `rgba(255, 0, 85, ${(0.38 * alpha).toFixed(3)})`);
+  rainbowGrad.addColorStop(os1, `rgba(255, 120, 0, ${(0.42 * alpha).toFixed(3)})`);
+  rainbowGrad.addColorStop(os2, `rgba(255, 230, 0, ${(0.42 * alpha).toFixed(3)})`);
+  rainbowGrad.addColorStop(os3, `rgba(0, 255, 120, ${(0.42 * alpha).toFixed(3)})`);
+  rainbowGrad.addColorStop(os4, `rgba(0, 220, 255, ${(0.42 * alpha).toFixed(3)})`);
+  rainbowGrad.addColorStop(1.00, `rgba(180, 0, 255, ${(0.38 * alpha).toFixed(3)})`);
+
+  ctx.beginPath();
+  ctx.arc(0, 0, r, 0, Math.PI * 2);
+  ctx.fillStyle = rainbowGrad;
+  ctx.fill();
+
+  ctx.restore();
+}
+
+/**
  * Main draw method for Mahoraga fighter.
  * Renders afterimages, Level 8 glow, stance rings, body, wings, necklace, wheel,
  * cleave windup, sakuga impact, and health bar.
@@ -339,7 +431,10 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
   const totalStages = (fighter.adaptationStage?.melee || 0) + (fighter.adaptationStage?.ranged || 0) + (fighter.adaptationStage?.skill || 0);
   const isLevel8 = totalStages >= 8 || fighter.isInfinityBlitz;
 
-
+  // 0b. Draw Gamma Ray Rainbow Theme Visual Effect Underlay (3 seconds on wheel click)
+  if (!isGojoDomainActive) {
+    drawMahoragaGammaRayRainbowUnderlay(ctx, fighter);
+  }
 
   ctx.save();
 
@@ -359,6 +454,11 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
 
   // 5. Draw 3D Wheel of Adaptation & Surrounding Golden Ring Highlight
   drawMahoraga3DWheel(ctx, fighter);
+
+  // 5b. Draw Gamma Ray Rainbow Theme Visual Effect Overlay
+  if (!isGojoDomainActive) {
+    drawMahoragaGammaRayRainbowOverlay(ctx, fighter);
+  }
 
   ctx.restore();
 

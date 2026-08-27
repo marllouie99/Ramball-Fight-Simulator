@@ -100,8 +100,10 @@ export function drawIchigoSkin(ctx, fighter) {
 
   // ── 1.8. Bankai & Hollow Mask 3D Ribbon Lifecycle Alpha ──
   // Ribbons show up during Bankai or Hollow Mask formation, then smoothly disappear
+  // Strictly hidden during Champion Screen / Winner Reveal
+  const isChampionScreen = Boolean(fighter._isWinnerReveal || (typeof state !== 'undefined' && state.gameState === 'champion'));
   let ribbonAlpha = 0;
-  if (!isFrozen) {
+  if (!isFrozen && !isChampionScreen) {
     if (isCountdownOrPreview) {
       if (isForming) {
         // Smoothly fade out ribbon as mask approaches completion (0.65 -> 0.95)
@@ -260,7 +262,7 @@ export function drawIchigoSkin(ctx, fighter) {
     bodyTilt = 0;
   } else if (isBackSlungPose) {
     // Shikai Champion Screen / FaceOff / Preview back-slung pose: handle behind head, blade sweeping down-right
-    swingAngle = Math.PI / 4.2;
+    swingAngle = facingLeft ? (Math.PI - Math.PI / 4.2) : (Math.PI / 4.2);
     thrustDistance = 0;
   } else if ((fighter.blockPoseTimer && fighter.blockPoseTimer > 0) || (fighter.parryHitAnimTimer && fighter.parryHitAnimTimer > 0)) {
     // ── Dynamic Zanjutsu Parry & Deflection Angles (4 Distinct Blade Postures) ──
@@ -525,15 +527,20 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.closePath();
       ctx.stroke();
 
-      // D) Hands gripping Shikai handle during active combat
-      if (!isBackSlungPose && !hideHandsAndWeapon) {
-        // Back hand (for 2-handed grip on heavy chop or charging stance)
-        if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
-          _drawIchigoHand(ctx, hiltX + 7, 0, skinColor, true);
-        }
-        // Front hand (main grip near guard)
-        if (!hideFrontHand) {
-          _drawIchigoHand(ctx, hiltX + 18, 0, skinColor, true);
+      // D) Hands gripping Shikai handle during active combat or champion screen
+      if (!hideHandsAndWeapon) {
+        if (!isBackSlungPose) {
+          // Back hand (for 2-handed grip on heavy chop or charging stance)
+          if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
+            _drawIchigoHand(ctx, hiltX + 7, 0, skinColor, true);
+          }
+          // Front hand (main grip near guard)
+          if (!hideFrontHand) {
+            _drawIchigoHand(ctx, hiltX + 18, 0, skinColor, true);
+          }
+        } else if (isChampionScreen && !hideFrontHand) {
+          // Front hand resting on lower-left of body circle during champion screen
+          _drawIchigoHand(ctx, -r * 0.55, r * 0.45, skinColor, true);
         }
       }
 
@@ -561,7 +568,7 @@ export function drawIchigoSkin(ctx, fighter) {
     } else {
       // ── Tensa Zangetsu (Bankai daito) ──
       const swordLen = 94;
-      const swordStartX = isBankaiStance ? (r * 1.05) : ((isSlashing || !isBackSlungPose) ? (r * 0.65) : (-r * 0.65));
+      const swordStartX = isBankaiStance ? (r * 0.82 + 16) : ((isSlashing || !isBackSlungPose) ? (r * 0.65) : (-r * 0.65));
 
       // Render dynamic physics-based Kusari chain in world coordinates during combat
       if (fighter.bankaiChainNodes && fighter.bankaiChainNodes.length >= 2 && !isBackSlungPose) {
@@ -574,11 +581,13 @@ export function drawIchigoSkin(ctx, fighter) {
       // Render authentic enlarged Tensa Zangetsu katana (fins, 卍 tsuba, red diamonds)
       drawTensaZangetsuKatana(ctx, swordStartX, isMask, { 
         bladeLen: swordLen,
-        skipChain: Boolean(fighter.bankaiChainNodes && !isBackSlungPose)
+        skipChain: Boolean(fighter.bankaiChainNodes && !isBackSlungPose),
+        isBankaiStance: isBankaiStance,
+        isChampionScreen: isChampionScreen
       });
 
-      // Tiny live Kuroi Reiatsu aura emitting along the Bankai sword (during live combat or Bankai victory stance)
-      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality) {
+      // Live Kuroi Reiatsu aura emitting along the Bankai sword (during active combat only — strictly hidden during champion screen)
+      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen) {
         drawBankaiSwordOrbitingAura(ctx, swordStartX, swordLen, isMask, isFrozen);
       }
 
@@ -588,9 +597,11 @@ export function drawIchigoSkin(ctx, fighter) {
         if ((isChanneling || isBankaiChanneling || (isSlashing && rawSlashProg >= 0.08 && rawSlashProg <= 0.65)) && !hideBackHand) {
           _drawIchigoHand(ctx, swordStartX - 22, 0, skinColor, false);
         }
-        // Front hand (main grip behind guard)
+        // Front hand (main grip on the hilt/holder part behind guard, positioned cleanly on the handle)
         if (!hideFrontHand) {
-          _drawIchigoHand(ctx, swordStartX - 10, 0, skinColor, false);
+          const frontHandOffsetX = isBankaiStance ? -16 : -10;
+          const frontHandOffsetY = 0;
+          _drawIchigoHand(ctx, swordStartX + frontHandOffsetX, frontHandOffsetY, skinColor, false);
         }
       }
 
@@ -681,37 +692,42 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.fill();
 
       // Wrap collar fold outlines (black robe wrap lines)
+      const strapSign = facingLeft ? -1 : 1;
       ctx.strokeStyle = '#111111';
       ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.25, r * 0.1);
+      ctx.moveTo(-r * 0.25 * strapSign, r * 0.1);
       ctx.lineTo(0, r * 0.42);
-      ctx.moveTo(r * 0.25, r * 0.1);
-      ctx.lineTo(-r * 0.12, r * 0.49);
+      ctx.moveTo(r * 0.25 * strapSign, r * 0.1);
+      ctx.lineTo(-r * 0.12 * strapSign, r * 0.49);
       ctx.stroke();
 
       // Diagonal Red Ribbon/Chain Strap (for holding Zangetsu on his back)
+      // Invert local X when facingLeft so strap always canonically slants Top-Left to Bottom-Right in screen space!
+      const strapStartX = -r * 0.35 * strapSign;
+      const strapEndX = r * 0.25 * strapSign;
+
       ctx.save();
       // 1. Dark red shadow backing line
       ctx.strokeStyle = '#700c0f';
       ctx.lineWidth = 4.5;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.35, r * 0.1);
-      ctx.lineTo(r * 0.25, r * 0.55);
+      ctx.moveTo(strapStartX, r * 0.1);
+      ctx.lineTo(strapEndX, r * 0.55);
       ctx.stroke();
 
       // 2. Red core line
       ctx.strokeStyle = '#E31B23';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
-      ctx.moveTo(-r * 0.35, r * 0.1);
-      ctx.lineTo(r * 0.25, r * 0.55);
+      ctx.moveTo(strapStartX, r * 0.1);
+      ctx.lineTo(strapEndX, r * 0.55);
       ctx.stroke();
 
       // 3. Small red beads along the strap
       ctx.fillStyle = '#FF4D52';
       for (let t = 0.05; t <= 0.95; t += 0.16) {
-        const px = -r * 0.35 * (1 - t) + (r * 0.25) * t;
+        const px = strapStartX * (1 - t) + strapEndX * t;
         const py = r * 0.1 * (1 - t) + (r * 0.55) * t;
         ctx.beginPath();
         ctx.arc(px, py, 2.5, 0, Math.PI * 2);
@@ -859,7 +875,7 @@ export function drawIchigoSkin(ctx, fighter) {
     // Fully occupies face and hair region across the body circle
     if (isMask && !isForming) {
       let maskCrackProgress = 0;
-      if (fighter.hollowMaskActive && fighter.hollowMaskTimer !== undefined) {
+      if (!isChampionScreen && fighter.hollowMaskActive && fighter.hollowMaskTimer !== undefined) {
         const crackWindow = 180; // starts cracking in last 3 seconds (180 frames)
         if (fighter.hollowMaskTimer < crackWindow) {
           maskCrackProgress = Math.min(1.0, Math.max(0.0, (crackWindow - fighter.hollowMaskTimer) / crackWindow));
@@ -908,8 +924,8 @@ export function drawIchigoSkin(ctx, fighter) {
         ctx.fill();
       }
 
-      // Spreading fracture fissures and breaking pieces when duration is expiring
-      if (maskCrackProgress > 0.01) {
+      // Spreading fracture fissures and breaking pieces when duration is expiring (strictly hidden during champion screen)
+      if (maskCrackProgress > 0.01 && !isChampionScreen) {
         _drawHollowMaskCracks(ctx, r, maskCrackProgress, now, fighter);
       }
     }
@@ -976,6 +992,8 @@ export function drawIchigoSkin(ctx, fighter) {
 
 function _drawHollowMaskCracks(ctx, r, progress, now, fighter) {
   if (progress <= 0.02) return;
+  const isChampionScreen = Boolean(fighter && (fighter._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'champion' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd'))));
+  if (isChampionScreen) return;
 
   const jitter = progress > 0.65 ? Math.sin(now * 0.08) * 0.85 * progress : 0;
   ctx.save();
@@ -1283,46 +1301,54 @@ function _drawBankaiLiveAura(ctx, r, isBankai, isMask, now, layer = 'back') {
     ctx.stroke();
 
     // ══════════════════════════════════════════════════════════════════════
-    // ── 2. CRACKLING ELECTRIC LIGHTNING FILAMENTS ──
+    // ── 2. FLOATING HOT CORE REIATSU PARTICLES (Rising Embers) ──
     // ══════════════════════════════════════════════════════════════════════
-    const arcCount = 4;
-    for (let a = 0; a < arcCount; a++) {
-      const aPhase = ((now * 0.003 + a * 1.57) % (Math.PI * 2));
-      const aAng = aPhase;
-      const startDist = r * (0.95 + 0.15 * Math.sin(now * 0.01 + a));
-      const arcLen = (14 + (a % 2) * 10) * (0.8 + 0.4 * Math.sin(now * 0.02 + a * 2.1));
-      
-      const ax = Math.cos(aAng) * startDist;
-      const ay = Math.sin(aAng) * startDist;
+    const emberCount = 4;
+    for (let p = 0; p < emberCount; p++) {
+      const pProg = ((now * 0.0018 + p * (1.0 / emberCount)) % 1.0);
+      const pAng = (p * (Math.PI * 2 / emberCount)) + Math.sin(now * 0.003 + p * 1.7) * 0.35;
+      const pDist = r * (0.95 + 0.45 * (1.0 - pProg * 0.4));
+      const px = Math.cos(pAng) * pDist + Math.sin(now * 0.004 + p) * 4.0;
+      const py = Math.sin(pAng) * pDist - pProg * 28.0; // floats smoothly upward
+      const pRadius = (2.4 + (p % 3) * 1.2) * (1.0 - pProg * 0.4);
+      const pAlpha = Math.sin(pProg * Math.PI) * 0.95;
 
-      const segs = 4;
-      ctx.beginPath();
-      ctx.moveTo(ax, ay);
-      let curX = ax, curY = ay;
-      for (let s = 1; s <= segs; s++) {
-        const frac = s / segs;
-        const normAngle = aAng + (s % 2 === 0 ? 0.35 : -0.35) + Math.sin(now * 0.03 + a + s) * 0.2;
-        const segDist = startDist + frac * arcLen;
-        curX = Math.cos(normAngle) * segDist;
-        curY = Math.sin(normAngle) * segDist;
-        ctx.lineTo(curX, curY);
+      if (pAlpha > 0.02) {
+        let glowColor = 'rgba(255, 40, 30, 0.92)';
+        let darkEdge = 'rgba(15, 2, 8, 0.45)';
+
+        if (theme === 'bankai_mask') {
+          glowColor = (p % 2 === 0) ? 'rgba(255, 20, 40, 0.95)' : 'rgba(220, 0, 30, 0.90)';
+          darkEdge = 'rgba(10, 0, 4, 0.60)';
+        } else if (theme === 'bankai') {
+          glowColor = (p % 2 === 0) ? 'rgba(255, 50, 30, 0.92)' : 'rgba(220, 20, 40, 0.88)';
+          darkEdge = 'rgba(15, 2, 8, 0.45)';
+        } else if (theme === 'shikai_mask') {
+          glowColor = (p % 2 === 0) ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 40, 60, 0.85)';
+          darkEdge = 'rgba(10, 10, 15, 0.40)';
+        } else {
+          glowColor = 'rgba(0, 229, 255, 0.90)';
+          darkEdge = 'rgba(0, 40, 120, 0.35)';
+        }
+
+        // Soft outer glowing halo with jet-black core
+        const pGrad = ctx.createRadialGradient(px, py, 0, px, py, pRadius * 2.4);
+        pGrad.addColorStop(0.0, 'rgba(5, 5, 8, 1.0)');
+        pGrad.addColorStop(0.40, glowColor);
+        pGrad.addColorStop(0.80, darkEdge);
+        pGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+        ctx.fillStyle = pGrad;
+        ctx.beginPath();
+        ctx.arc(px, py, pRadius * 2.4, 0, Math.PI * 2);
+        ctx.fill();
+
+        // High-contrast jet-black void core
+        ctx.fillStyle = '#050508';
+        ctx.beginPath();
+        ctx.arc(px, py, pRadius * 0.65, 0, Math.PI * 2);
+        ctx.fill();
       }
-
-      if (theme === 'bankai_mask') {
-        ctx.strokeStyle = (a % 2 === 0) ? '#FF0033' : '#0A0206';
-      } else if (theme === 'bankai') {
-        ctx.strokeStyle = 'rgba(255, 40, 30, 0.90)';
-      } else if (theme === 'shikai_mask') {
-        ctx.strokeStyle = (a % 2 === 0) ? '#FFFFFF' : 'rgba(255, 30, 40, 0.85)';
-      } else {
-        ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
-      }
-      ctx.lineWidth = 2.4;
-      ctx.stroke();
-
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
     }
 
     // ══════════════════════════════════════════════════════════════════════
@@ -1362,118 +1388,46 @@ function _drawBankaiLiveAura(ctx, r, isBankai, isMask, now, layer = 'back') {
     ctx.save();
 
     // ══════════════════════════════════════════════════════════════════════
-    // ── 4. PULSING CHEST SPIRIT HEART CORE ──
+    // ── 4. FRONT FLOATING HOT CORE REIATSU EMBERS ──
     // ══════════════════════════════════════════════════════════════════════
-    const coreY = -r * 0.08;
-    const pulse = 1.0 + 0.14 * Math.sin(now * 0.008);
-    const coreRad = (r * 0.40) * pulse;
+    const frontMoteCount = 3;
+    for (let m = 0; m < frontMoteCount; m++) {
+      const mSeed = ((now * 0.0020 + m * (1.0 / frontMoteCount) + 0.35) % 1.0);
+      const mAng = m * (Math.PI * 2 / frontMoteCount) + Math.sin(now * 0.003 + m) * 0.4;
+      const mDist = r * (0.80 + (1.0 - mSeed * 0.3) * 0.45);
+      const mX = Math.cos(mAng) * mDist + Math.sin(now * 0.004 + m) * 2.5;
+      const mY = Math.sin(mAng) * mDist - mSeed * 22.0; // floats smoothly upward
+      const mRadius = (2.0 + (m % 2) * 1.0) * (1.0 - mSeed * 0.35);
+      const mAlpha = Math.sin(mSeed * Math.PI) * 0.90;
 
-    const heartGrad = ctx.createRadialGradient(0, coreY, 0, 0, coreY, coreRad * 1.6);
-    if (theme === 'bankai_mask') {
-      heartGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
-      heartGrad.addColorStop(0.25, 'rgba(255, 20, 50, 0.95)');
-      heartGrad.addColorStop(0.65, 'rgba(10, 0, 4, 0.70)');
-      heartGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    } else if (theme === 'bankai') {
-      heartGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
-      heartGrad.addColorStop(0.25, 'rgba(255, 50, 80, 0.90)');
-      heartGrad.addColorStop(0.65, 'rgba(220, 10, 40, 0.50)');
-      heartGrad.addColorStop(1.0, 'rgba(180, 0, 20, 0.0)');
-    } else if (theme === 'shikai_mask') {
-      heartGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
-      heartGrad.addColorStop(0.25, 'rgba(240, 245, 255, 0.85)');
-      heartGrad.addColorStop(0.65, 'rgba(255, 30, 50, 0.50)');
-      heartGrad.addColorStop(1.0, 'rgba(180, 0, 20, 0.0)');
-    } else {
-      heartGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
-      heartGrad.addColorStop(0.25, 'rgba(0, 229, 255, 0.90)');
-      heartGrad.addColorStop(0.65, 'rgba(0, 140, 255, 0.50)');
-      heartGrad.addColorStop(1.0, 'rgba(0, 80, 200, 0.0)');
-    }
+      if (mAlpha > 0.02) {
+        let glowColor = 'rgba(255, 40, 30, 0.92)';
+        if (theme === 'bankai_mask') {
+          glowColor = (m % 2 === 0) ? 'rgba(255, 20, 40, 0.95)' : 'rgba(255, 255, 255, 0.90)';
+        } else if (theme === 'bankai') {
+          glowColor = (m % 2 === 0) ? 'rgba(255, 60, 40, 0.92)' : 'rgba(220, 20, 40, 0.88)';
+        } else if (theme === 'shikai_mask') {
+          glowColor = (m % 2 === 0) ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 40, 60, 0.85)';
+        } else {
+          glowColor = 'rgba(0, 229, 255, 0.92)';
+        }
 
-    ctx.beginPath();
-    ctx.arc(0, coreY, coreRad * 1.6, 0, Math.PI * 2);
-    ctx.fillStyle = heartGrad;
-    ctx.fill();
+        const mGrad = ctx.createRadialGradient(mX, mY, 0, mX, mY, mRadius * 2.2);
+        mGrad.addColorStop(0.0, 'rgba(5, 5, 8, 1.0)');
+        mGrad.addColorStop(0.45, glowColor);
+        mGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
 
-    // Organic Spirit Heart Branch Veins
-    const veinCount = 4;
-    for (let v = 0; v < veinCount; v++) {
-      const vAng = (v / veinCount) * Math.PI * 2 + Math.sin(now * 0.004 + v) * 0.25;
-      const vLen = coreRad * (0.8 + 0.4 * Math.sin(now * 0.01 + v * 1.7));
-      const vx = Math.cos(vAng) * vLen;
-      const vy = coreY + Math.sin(vAng) * vLen;
-
-      ctx.beginPath();
-      ctx.moveTo(0, coreY);
-      ctx.quadraticCurveTo(vx * 0.5 + Math.sin(now * 0.02 + v) * 2.5, coreY + (vy - coreY) * 0.5, vx, vy);
-      if (theme === 'bankai_mask' || theme === 'bankai') {
-        ctx.strokeStyle = 'rgba(255, 120, 140, 0.85)';
-      } else if (theme === 'shikai_mask') {
-        ctx.strokeStyle = 'rgba(255, 180, 190, 0.85)';
-      } else {
-        ctx.strokeStyle = 'rgba(140, 240, 255, 0.85)';
-      }
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ── 5. FRONT MICRO-LIGHTNING ARCS & DISCHARGES ──
-    // ══════════════════════════════════════════════════════════════════════
-    const frontArcs = 3;
-    for (let f = 0; f < frontArcs; f++) {
-      if (Math.sin(now * 0.025 + f * 2.3) > 0.15) {
-        const fAng = (f * 2.1 + now * 0.004) % (Math.PI * 2);
-        const fR = r * (0.85 + (f % 2) * 0.25);
-        const fx1 = Math.cos(fAng) * fR;
-        const fy1 = Math.sin(fAng) * fR;
-        const fx2 = Math.cos(fAng + 0.35) * (fR + 7);
-        const fy2 = Math.sin(fAng + 0.35) * (fR + 7);
-
+        ctx.fillStyle = mGrad;
         ctx.beginPath();
-        ctx.moveTo(fx1, fy1);
-        ctx.lineTo((fx1 + fx2) / 2 + Math.sin(now * 0.05 + f) * 3.5, (fy1 + fy2) / 2);
-        ctx.lineTo(fx2, fy2);
-        if (theme === 'bankai_mask') ctx.strokeStyle = (f % 2 === 0) ? '#FF0033' : '#0A0206';
-        else if (theme === 'bankai') ctx.strokeStyle = '#FF3322';
-        else if (theme === 'shikai_mask') ctx.strokeStyle = '#FFFFFF';
-        else ctx.strokeStyle = '#00E5FF';
-        ctx.lineWidth = 1.8;
-        ctx.stroke();
+        ctx.arc(mX, mY, mRadius * 2.2, 0, Math.PI * 2);
+        ctx.fill();
 
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 0.9;
-        ctx.stroke();
+        // High-contrast jet-black core
+        ctx.fillStyle = '#050508';
+        ctx.beginPath();
+        ctx.arc(mX, mY, mRadius * 0.6, 0, Math.PI * 2);
+        ctx.fill();
       }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ── 6. ETHEREAL FLOATING ELECTRIC SPARKS / MOTES ──
-    // ══════════════════════════════════════════════════════════════════════
-    const moteCount = 8;
-    for (let m = 0; m < moteCount; m++) {
-      const mSeed = ((now * 0.0018 + m * (1.0 / moteCount)) % 1.0);
-      const mAng = m * (Math.PI * 2 / moteCount) + Math.sin(now * 0.003 + m) * 0.4;
-      const mDist = r * (0.90 + mSeed * 0.65);
-      const mX = Math.cos(mAng) * mDist;
-      const mY = Math.sin(mAng) * mDist - mSeed * 14;
-      const mSize = (2.0 + (m % 2) * 1.2) * (1.0 - mSeed * 0.5);
-      const mAlpha = Math.sin(mSeed * Math.PI) * 0.85;
-
-      if (theme === 'bankai_mask') {
-        ctx.fillStyle = (m % 3 === 0) ? `rgba(255, 255, 255, ${mAlpha.toFixed(3)})` : (m % 3 === 1 ? `rgba(255, 0, 40, ${mAlpha.toFixed(3)})` : `rgba(15, 2, 6, ${mAlpha.toFixed(3)})`);
-      } else if (theme === 'bankai') {
-        ctx.fillStyle = (m % 2 === 0) ? `rgba(255, 255, 255, ${mAlpha.toFixed(3)})` : `rgba(255, 50, 30, ${mAlpha.toFixed(3)})`;
-      } else if (theme === 'shikai_mask') {
-        ctx.fillStyle = (m % 2 === 0) ? `rgba(255, 255, 255, ${mAlpha.toFixed(3)})` : `rgba(255, 60, 80, ${mAlpha.toFixed(3)})`;
-      } else {
-        ctx.fillStyle = (m % 2 === 0) ? `rgba(255, 255, 255, ${mAlpha.toFixed(3)})` : `rgba(0, 229, 255, ${mAlpha.toFixed(3)})`;
-      }
-
-      ctx.beginPath();
-      ctx.arc(mX, mY, mSize, 0, Math.PI * 2);
-      ctx.fill();
     }
 
     ctx.restore();
@@ -1954,6 +1908,11 @@ function _drawGetsugaChargingAura(ctx, params) {
     const fin3StartX = startX + 80;
     const tipX = startX + len;
     const expand = 2.5 + 4.5 * chargeProg * pulse;
+    const getSori = (x) => {
+      const t = Math.max(0, Math.min(1.0, (x - bladeBaseX) / (tipX - bladeBaseX)));
+      return -Math.pow(t, 1.45) * 8.5;
+    };
+    const tipY = getSori(tipX);
 
     // Helper to trace dynamic Bankai blade silhouette with active Reiatsu turbulence
     const traceBankaiBlade = (exp = 0) => {
@@ -1962,19 +1921,19 @@ function _drawGetsugaChargingAura(ctx, params) {
       const waveBot = Math.cos(time * 24.0) * 1.2 * (0.4 + 0.6 * chargeProg);
 
       // Cutting edge (-Y / top)
-      ctx.moveTo(bladeBaseX, -3.2 - exp);
-      ctx.quadraticCurveTo(startX + 72, -3.0 - exp + waveTop, tipX + exp * 1.2, 0.1);
+      ctx.moveTo(bladeBaseX, -2.8 - exp);
+      ctx.quadraticCurveTo(startX + 50, getSori(startX + 50) - 2.8 - exp + waveTop, tipX + exp * 1.2, tipY + waveTop * 0.5);
 
       // Spine edge with 3 stepped fins (+Y / bottom)
-      ctx.quadraticCurveTo(startX + 87, 3.6 + exp + waveBot, fin3StartX + 1.8, 5.8 + exp);
-      ctx.lineTo(fin2StartX + 12.2, 2.8 + exp);
-      ctx.lineTo(fin2StartX + 10.5, 4.8 + exp);
-      ctx.lineTo(fin2StartX + 1.8, 5.6 + exp);
-      ctx.lineTo(fin1StartX + 12.2, 3.1 + exp);
-      ctx.lineTo(fin1StartX + 10.5, 4.8 + exp);
-      ctx.lineTo(fin1StartX + 1.8, 5.4 + exp);
-      ctx.lineTo(fin1StartX, 3.2 + exp);
-      ctx.lineTo(bladeBaseX, 3.2 + exp);
+      ctx.quadraticCurveTo(startX + 87, getSori(startX + 87) + 3.2 + exp + waveBot, fin3StartX + 2.2, getSori(fin3StartX) + 5.3 + exp);
+      ctx.lineTo(fin2StartX + 12.2, getSori(fin2StartX + 12.2) + 2.5 + exp);
+      ctx.lineTo(fin2StartX + 10.5, getSori(fin2StartX + 10.5) + 4.3 + exp);
+      ctx.lineTo(fin2StartX + 2.2, getSori(fin2StartX) + 5.1 + exp);
+      ctx.lineTo(fin1StartX + 12.2, getSori(fin1StartX + 12.2) + 2.7 + exp);
+      ctx.lineTo(fin1StartX + 10.5, getSori(fin1StartX + 10.5) + 4.3 + exp);
+      ctx.lineTo(fin1StartX + 2.2, getSori(fin1StartX) + 4.9 + exp);
+      ctx.lineTo(fin1StartX, getSori(fin1StartX) + 2.8 + exp);
+      ctx.lineTo(bladeBaseX, 2.8 + exp);
       ctx.closePath();
     };
 
@@ -2004,13 +1963,13 @@ function _drawGetsugaChargingAura(ctx, params) {
     for (let a = 0; a < arcCount; a++) {
       const aPhase = ((time * (14.0 + chargeProg * 10.0) + a * 1.5) % 1.0);
       const ax = bladeBaseX + aPhase * (len - 10);
-      const topY = -3.0;
-      const botY = 4.0;
+      const topY = getSori(ax) - 2.8;
+      const botY = getSori(ax) + 4.0;
       const jitterX = Math.sin(time * 35.0 + a * 3.0) * (2.5 + 3.0 * chargeProg);
 
       ctx.beginPath();
       ctx.moveTo(ax, botY);
-      ctx.lineTo(ax + jitterX, 0);
+      ctx.lineTo(ax + jitterX, getSori(ax));
       ctx.lineTo(ax + 4 + jitterX * 0.5, topY);
       ctx.strokeStyle = (a % 2 === 0) ? coreColor : primaryColor;
       ctx.lineWidth = 1.2 + 0.8 * chargeProg;
@@ -2026,7 +1985,7 @@ function _drawGetsugaChargingAura(ctx, params) {
       const swirlAng = time * 10.0 + e * 1.15;
       const targetBladeX = bladeBaseX + (e / emberCount) * (len - 8);
       const ex = targetBladeX + Math.cos(swirlAng) * swirlDist;
-      const ey = Math.sin(swirlAng) * (swirlDist * 0.55);
+      const ey = getSori(targetBladeX) + Math.sin(swirlAng) * (swirlDist * 0.55);
 
       ctx.beginPath();
       ctx.arc(ex, ey, 1.4 + (1.0 - et) * 1.6, 0, Math.PI * 2);
@@ -2891,24 +2850,34 @@ function _drawBankaiActiveFlameWisps(ctx, r, now) {
     ctx.fill();
   }
 
-  // Micro Lightning Arc Sparkles
-  if (Math.sin(now * 0.02) > 0.4) {
-    const lAng = (now * 0.005) % (Math.PI * 2);
-    const lx1 = Math.cos(lAng) * (r * 1.1);
-    const ly1 = Math.sin(lAng) * (r * 1.1);
-    const lx2 = Math.cos(lAng + 0.4) * (r * 1.4);
-    const ly2 = Math.sin(lAng + 0.4) * (r * 1.4);
-    ctx.strokeStyle = 'rgba(255, 30, 20, 0.90)';
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.moveTo(lx1, ly1);
-    ctx.lineTo((lx1 + lx2) / 2 + Math.sin(now * 0.05) * 4, (ly1 + ly2) / 2);
-    ctx.lineTo(lx2, ly2);
-    ctx.stroke();
+  // Floating Hot Core Particle Sparkles
+  const sparkCount = 2;
+  for (let s = 0; s < sparkCount; s++) {
+    const sProg = ((now * 0.003 + s * (1.0 / sparkCount)) % 1.0);
+    const sAng = (s * 2.2 + now * 0.004) % (Math.PI * 2);
+    const sDist = r * (0.95 + 0.35 * (1.0 - sProg * 0.4));
+    const sx = Math.cos(sAng) * sDist;
+    const sy = Math.sin(sAng) * sDist - sProg * 20;
+    const sR = (1.8 + (s % 2) * 0.8) * (1.0 - sProg * 0.3);
+    const sAlpha = Math.sin(sProg * Math.PI) * 0.90;
 
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 1.0;
-    ctx.stroke();
+    if (sAlpha > 0.02) {
+      const sGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sR * 2.2);
+      sGrad.addColorStop(0.0, 'rgba(5, 5, 8, 1.0)');
+      sGrad.addColorStop(0.45, 'rgba(255, 40, 30, 0.95)');
+      sGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+      ctx.fillStyle = sGrad;
+      ctx.beginPath();
+      ctx.arc(sx, sy, sR * 2.2, 0, Math.PI * 2);
+      ctx.fill();
+
+      // High-contrast jet-black core
+      ctx.fillStyle = '#050508';
+      ctx.beginPath();
+      ctx.arc(sx, sy, sR * 0.6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 
   ctx.restore();
@@ -3073,7 +3042,7 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
     thrustDistance = 0;
     bodyShiftX = 0;
   } else if (isBackSlungPose) {
-    swingAngle = Math.PI / 4.2;
+    swingAngle = facingLeft ? (Math.PI - Math.PI / 4.2) : (Math.PI / 4.2);
     thrustDistance = 0;
   } else if ((fighter.blockPoseTimer && fighter.blockPoseTimer > 0) || (fighter.parryHitAnimTimer && fighter.parryHitAnimTimer > 0)) {
     const pStance = fighter.parryStanceIndex || 0;
@@ -3136,12 +3105,12 @@ const _ZANGETSU_STRAND_CONFIGS = [
     // Strand 0: Longest primary flowing sash (trails gracefully behind, high physical inertia)
     nodes: 14,
     linkDist: 5.5,
-    damping: 0.90,
-    gravity: 0.16,
-    flutterSpeed: 0.008,
-    flutterAmp: 3.2,
+    damping: 0.94,
+    gravity: 0.12,
+    flutterSpeed: 0.003,
+    flutterAmp: 0.8,
     flutterPhase: 0.0,
-    lateralDrift: 1.6,
+    lateralDrift: 0.8,
     width: 3.8,
     color: '#FFFFFF',
     rootOffset: 0.0
@@ -3150,12 +3119,12 @@ const _ZANGETSU_STRAND_CONFIGS = [
     // Strand 1: Medium secondary ribbon (fluttering alongside with air turbulence)
     nodes: 10,
     linkDist: 4.8,
-    damping: 0.88,
-    gravity: 0.14,
-    flutterSpeed: 0.013,
-    flutterAmp: 4.0,
+    damping: 0.93,
+    gravity: 0.10,
+    flutterSpeed: 0.004,
+    flutterAmp: 0.6,
     flutterPhase: 2.1,
-    lateralDrift: -2.6,
+    lateralDrift: -0.8,
     width: 2.8,
     color: '#F4F4F4',
     rootOffset: 2.0
@@ -3164,12 +3133,12 @@ const _ZANGETSU_STRAND_CONFIGS = [
     // Strand 2: Shorter loose wrap tail (rippling with micro-curls and high frequency)
     nodes: 7,
     linkDist: 4.2,
-    damping: 0.85,
-    gravity: 0.20,
-    flutterSpeed: 0.020,
-    flutterAmp: 4.8,
+    damping: 0.92,
+    gravity: 0.14,
+    flutterSpeed: 0.005,
+    flutterAmp: 0.5,
     flutterPhase: 4.5,
-    lateralDrift: 3.2,
+    lateralDrift: 0.8,
     width: 2.2,
     color: '#E8E8E8',
     rootOffset: -2.0
@@ -3209,11 +3178,11 @@ export function updateZangetsuRibbonPhysics(fighter) {
   while (angleDelta > Math.PI) angleDelta -= Math.PI * 2;
   fighter._prevRibbonAngle = angle;
 
-  // Tangential whip impulse from sword rotations
-  const whipX = -Math.sin(angle) * angleDelta * 45;
-  const whipY = Math.cos(angle) * angleDelta * 45;
-  const centrifX = Math.cos(angle) * Math.abs(angleDelta) * 30;
-  const centrifY = Math.sin(angle) * Math.abs(angleDelta) * 30;
+  // Tangential whip impulse from sword rotations (subdued for clean stability)
+  const whipX = -Math.sin(angle) * angleDelta * 18;
+  const whipY = Math.cos(angle) * angleDelta * 18;
+  const centrifX = Math.cos(angle) * Math.abs(angleDelta) * 12;
+  const centrifY = Math.sin(angle) * Math.abs(angleDelta) * 12;
 
   const spd = Math.hypot(pommelVx, pommelVy);
 
@@ -3308,18 +3277,20 @@ export function updateZangetsuRibbonPhysics(fighter) {
         const node = strand[i];
         const tailWeight = i / cfg.nodes;
 
-        // Progressive wave ripple propagating along the ribbon
-        const wave = Math.sin(now * cfg.flutterSpeed - i * 0.60 + cfg.flutterPhase) * (cfg.flutterAmp * (0.2 + 0.8 * tailWeight));
+        // Gentle, calm wave ripple propagating along the ribbon (subdued wiggle)
+        const isCalmPose = isFrozen || Boolean(fighter._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'champion' || state.gameState === 'faceoff' || state.gameState === 'characterSelect')));
+        const ampMult = isCalmPose ? 0.20 : 1.0;
+        const wave = Math.sin(now * cfg.flutterSpeed - i * 0.45 + cfg.flutterPhase) * (cfg.flutterAmp * ampMult * (0.2 + 0.8 * tailWeight));
         const waveX = perpX * wave;
         const waveY = perpY * wave;
 
         // Aerodynamic drag opposing pommel movement + rotational whip
-        const dragX = -pommelVx * 0.40 * (0.3 + 0.7 * tailWeight) + (whipX + centrifX) * tailWeight * 0.5 + waveX * 0.35;
-        const dragY = -pommelVy * 0.40 * (0.3 + 0.7 * tailWeight) + (whipY + centrifY) * tailWeight * 0.5 + waveY * 0.35 + cfg.gravity * (0.4 + 0.6 * tailWeight);
+        const dragX = -pommelVx * 0.35 * (0.3 + 0.7 * tailWeight) + (whipX + centrifX) * tailWeight * 0.35;
+        const dragY = -pommelVy * 0.35 * (0.3 + 0.7 * tailWeight) + (whipY + centrifY) * tailWeight * 0.35 + cfg.gravity * (0.4 + 0.6 * tailWeight);
 
         // Verlet velocity integration
-        const vx = (node.x - (node.prevX ?? node.x)) * cfg.damping + dragX * 0.45;
-        const vy = (node.y - (node.prevY ?? node.y)) * cfg.damping + dragY * 0.45;
+        const vx = (node.x - (node.prevX ?? node.x)) * cfg.damping + (dragX + waveX) * 0.35;
+        const vy = (node.y - (node.prevY ?? node.y)) * cfg.damping + (dragY + waveY) * 0.35;
 
         node.prevX = node.x;
         node.prevY = node.y;

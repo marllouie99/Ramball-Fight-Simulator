@@ -163,14 +163,31 @@ async function main() {
     fighter.isFrozenByInfinity = false;
     fighter.timeStopTimer = 0;
 
-    // 5. Special Transformations & Forms
+    // 5. Special Transformations, Forms & Skill Channeling
     if (fType === 'ichigo') {
+      // Shikai Getsuga charging
+      fighter.isChannelingGetsuga = true;
+      fighter.getsugaChargeTimer = 15;
+      fighter.getsugaChargeMaxTimer = 30;
+      fighter.draw(mockCtx, null);
+
+      // Bankai Getsuga charging
       fighter.bankaiActive = true;
       fighter.hollowMaskActive = false;
       fighter.update(dummyOpponent, 0, state.arena);
       fighter.draw(mockCtx, null);
 
+      // Bankai + Hollow Mask Getsuga charging
       fighter.hollowMaskActive = true;
+      fighter.update(dummyOpponent, 0, state.arena);
+      fighter.draw(mockCtx, null);
+
+      fighter.isChannelingGetsuga = false;
+    }
+    if (fType === 'mahoraga') {
+      fighter.wheelClickTimer = 15;
+      fighter.gammaRayRainbowTimer = 100;
+      fighter.gammaRayRainbowMax = 180;
       fighter.update(dummyOpponent, 0, state.arena);
       fighter.draw(mockCtx, null);
     }

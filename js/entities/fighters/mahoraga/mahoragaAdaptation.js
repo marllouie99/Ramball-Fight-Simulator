@@ -11,6 +11,12 @@ import { audioSystem } from '../../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../../soundEffects/skillEffectSounds.js';
 import { SKILL_REGISTRY } from '../../../configs/skills/skillRegistry.js';
 
+export function triggerMahoragaGammaRayRainbow(fighter) {
+  if (!fighter) return;
+  fighter.gammaRayRainbowTimer = 180; // 3 seconds at 60 FPS
+  fighter.gammaRayRainbowMax = 180;
+}
+
 /**
  * Handle adaptation damage accumulation inside takeDamage().
  * Determines attack type, applies stage reduction, accumulates damage,
@@ -56,10 +62,24 @@ export function handleAdaptationDamage(fighter, amount, attacker, opts = {}) {
   } else if (opts.projectile && opts.projectile.isGojoPurple) {
     skillShotId = 'purple';
     skillShotColor = '#8A2BE2';
+  } else if (opts.isGetsuga || (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.skillShotId === 'getsugaTensho'))) {
+    skillShotId = 'getsugaTensho';
+    const gForm = opts.getsugaForm || (opts.projectile && opts.projectile.getsugaForm) || 'shikai';
+    skillShotColor = (gForm === 'bankai_hollow' || gForm === 'final_bankai') ? '#FF1E00' : (gForm === 'bankai' ? '#FF1E32' : '#00D5FF');
   }
 
   let finalAmount = amount;
   const currentStage = fighter.goldAdaptationStage?.[type] || 0;
+
+  // ── 50% Damage Reduction when Adapted to Ichigo's Getsuga Tensho ──
+  const isGetsugaHit = opts.isGetsuga || (opts.projectile && (opts.projectile.isGetsuga || opts.projectile.behaviorType === 'getsuga_tensho' || opts.projectile.skillShotId === 'getsugaTensho'));
+  const isGetsugaAdapted = fighter.adaptedGetsuga || 
+                          (fighter.adaptedSkills && (fighter.adaptedSkills['getsugaTensho'] || fighter.adaptedSkills['getsuga'])) || 
+                          (fighter.gojoAdaptColorHistory && (fighter.gojoAdaptColorHistory.includes('#00D5FF') || fighter.gojoAdaptColorHistory.includes('#FF1E32') || fighter.gojoAdaptColorHistory.includes('#FF1E00')));
+
+  if (isGetsugaHit && isGetsugaAdapted) {
+    finalAmount *= 0.50; // Half damage (50% reduction) when adapted to Getsuga Tensho!
+  }
 
   // ── 50% Damage Reduction when Adapted to Hollow Purple ──
   const isPurpleHit = opts.isPurpleDPS || (opts.projectile && (opts.projectile.isGojoPurple || opts.projectile.isGojoPurpleOrb || opts.projectile.behaviorType === 'gojo_purple' || opts.projectile.skillShotId === 'purple')) || opts.isPurple;
@@ -352,6 +372,8 @@ export function triggerAdaptation(fighter, type, attacker) {
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
 
+  triggerMahoragaGammaRayRainbow(fighter);
+
   // Freeze all enemy targets on screen
   const targetsToFreeze = [];
   if (attacker && attacker !== fighter && attacker.hp > 0) targetsToFreeze.push(attacker);
@@ -599,10 +621,17 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
     fighter.gojoAdapted.purple = true;
     fighter.gojoPurpleDodgeReady = true;
   }
-  if (skillShotId === 'divineFlame') {
-    if (!fighter.sukunaAdapted) fighter.sukunaAdapted = { divineFlame: false };
-    fighter.sukunaAdapted.divineFlame = true;
-    fighter.sukunaFugaDodgeReady = true;
+  if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
+    fighter.adaptedGetsuga = true;
+    fighter.adaptedSkills['getsugaTensho'] = true;
+    fighter.adaptedSkills['getsuga'] = true;
+    fighter.isSlowedByGetsuga = false;
+    fighter.slowTimer = 0;
+    fighter.slowMultiplier = 1.0;
+    if (fighter.statusEffects) {
+      fighter.statusEffects.slowTimer = 0;
+      fighter.statusEffects.slowMultiplier = 1.0;
+    }
   }
 
   fighter.wheelGlowColor = color || fighter.wheelGlowColor;
@@ -615,8 +644,13 @@ export function applySkillShotAdaptation(fighter, skillShotId, color) {
   }
 
   const wheelY = fighter.y - fighter.r - 28;
-  const displayName = skillShotId.toUpperCase().replace('_', ' ');
-  spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} DODGE!`, color);
+  if (skillShotId === 'getsugaTensho' || skillShotId === 'getsuga') {
+    spawnFloatingText(fighter.x, wheelY - 35, '⚙️ ADAPTED: GETSUGA TENSHO!', color || '#FF1E32');
+    spawnFloatingText(fighter.x, wheelY - 52, '🛡️ 50% Damage Reduction & Slow Immune!', '#FFFFFF');
+  } else {
+    const displayName = skillShotId.toUpperCase().replace('_', ' ');
+    spawnFloatingText(fighter.x, wheelY - 35, `🛡️ ADAPTED: ${displayName} DODGE!`, color);
+  }
 
   spawnImpactFlash(fighter.x, fighter.y, 45, 'lightningTrail');
   spawnSparks(fighter.x, fighter.y, 20, 'arcane', fighter.wheelGlowColor);
@@ -662,6 +696,8 @@ export function adaptToPureLoveBeam(fighter) {
   fighter.wheelClickMax = pauseFrames;
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  triggerMahoragaGammaRayRainbow(fighter);
 
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
@@ -758,6 +794,8 @@ export function adaptToYutaFlurry(fighter) {
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
 
+  triggerMahoragaGammaRayRainbow(fighter);
+
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
@@ -810,6 +848,8 @@ export function adaptToThinIceBreaker(fighter) {
   fighter.wheelClickMax = pauseFrames;
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  triggerMahoragaGammaRayRainbow(fighter);
 
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
@@ -870,6 +910,8 @@ export function adaptToSoulDisfigurement(fighter) {
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
 
+  triggerMahoragaGammaRayRainbow(fighter);
+
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {
       if (f && f !== fighter && f.hp > 0) {
@@ -928,6 +970,8 @@ export function adaptToSaitamaCounter(fighter, attacker) {
   fighter.wheelClickMax = pauseFrames;
   fighter.wheelStartRotation = fighter.wheelRotation || 0;
   fighter.wheelTargetRotation = fighter.wheelStartRotation + (Math.PI / 4);
+
+  triggerMahoragaGammaRayRainbow(fighter);
 
   if (typeof state !== 'undefined' && state.fighters) {
     state.fighters.forEach(f => {

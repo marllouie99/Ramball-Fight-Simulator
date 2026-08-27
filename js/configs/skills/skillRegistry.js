@@ -88,5 +88,18 @@ export const SKILL_REGISTRY = {
     adaptationWindowFrames: 300,
     adaptationDelayFrames: 30,
     dodgeType: 'perpendicular',
+  },
+
+  // Ichigo's Getsuga Tensho
+  'getsugaTensho': {
+    id: 'getsugaTensho',
+    name: 'Getsuga Tensho',
+    ownerType: 'ichigo',
+    skillShotColor: '#FF1E32',
+    dodgeRadius: 160,
+    adaptationThresholdPct: 0.15,
+    adaptationWindowFrames: 300,
+    adaptationDelayFrames: 45,
+    dodgeType: 'perpendicular',
   }
 };

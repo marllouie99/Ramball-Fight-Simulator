@@ -43,18 +43,19 @@ export const ichigoConfig = {
   comboTriggerMaxDist: 400,      // Maximum trigger distance (gap-closes with Flash Step)
 
   // Phase 1: Flash Step Multi-Strike Flurry
-  shunpoStrikes: 2,              // Base flurry strike count in Shikai form
+  shunpoStrikes: 4,              // Base flurry strike count in Shikai form
   shunpoRange: 220,              // Distance dashed on initial flank step
   shunpoDashDuration: 4,         // Flash step teleport duration frames
   shunpoTargetOffset: 34,        // Distance offset from target center on teleport arrival
   shunpoStrike1Damage: 20,       // Base damage for intermediate flank slashes
-  shunpoStrike1FreezeDuration: 12, // Hit-pause frames on target during intermediate strikes
+  shunpoStrike1FreezeDuration: 0,  // Hit-pause frames on target during intermediate strikes (0 = allow enemy aiming and reactions)
   shunpoStrike1SlashDuration: 14,// Swing animation duration frames for intermediate strikes
   shunpoStrike1ScreenShake: 2.5, // Arena screen shake intensity on intermediate flurry strike hit
   shunpoStrike1ShakeDuration: 6, // Shake duration in frames on intermediate strike hit
   bankaiShunpoStrike1ScreenShake: 3.5, // Bankai intermediate flurry strike hit shake
   shunpoStrike2Multiplier: 1.35, // Finisher damage multiplier for final flurry strike
-  shunpoStrike2StunDuration: 20, // Stun frames applied on finisher hit
+  shunpoStrike2StunDuration: 8,  // Stun frames applied on finisher hit
+  bankaiShunpoStunDuration: 8,   // Stun frames on Bankai finisher hit
   shunpoStrike2SlashDuration: 16,// Swing animation duration frames for final finisher strike
   shunpoStrike2Knockback: 7,     // Finisher knockback force pushing target back
   shunpoShockwaveSize: 45,       // Shockwave burst size on finisher
@@ -98,13 +99,13 @@ export const ichigoConfig = {
   hollowBurstFrames: 36,         // Sky burst eruption duration frames upon Hollow transformation
   hollowSpeedMultiplier: 1.4,    // Speed boost multiplier
   hollowDamageMultiplier: 1.5,   // Damage multiplier boost
-  hollowDamageReduction: 0.20,   // 20% incoming damage mitigation (Hierro) during Hollow Mask
+  hollowDamageReduction: 0.30,   // 20% incoming damage mitigation (Hierro) during Hollow Mask
   hollowLifesteal: 0.50,         // 15% vampiric lifesteal heal on damage dealt during Hollow Mask
-  hollowShunpoStrikesMultiplier: 2.0, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
+  hollowShunpoStrikesMultiplier: 1.5, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
   hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
-  hollowComboCooldownMultiplier: 0.75, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)
+  hollowComboCooldownMultiplier: 0.50, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)
   hollowGetsugaChargeMultiplier: 0.50, // Reduction multiplier reducing Getsuga Tensho charging frames during Hollow form (50% faster charge)
-  hollowGetsugaDamage: 50,       // Upgraded Black Getsuga damage while mask active
+  hollowGetsugaDamage: 100,       // Upgraded Black Getsuga damage while mask active
   hollowGetsugaSpeed: 22,        // Hollow Mask projectile travel speed
   hollowGetsugaKnockback: 8,     // Knockback force applied
   hollowGetsugaHitStun: 20,      // Hit stun frames applied on hit
@@ -131,7 +132,8 @@ export const ichigoConfig = {
 
   // 1. Activation & Transformation
   ultimateThreshold: 0.90,       // Automatically activates when HP <= 90%
-  ultimateCooldown: 1500,        // Ultimate cooldown frames (25s)
+  bankaiRechargeHpRatio: 0.20,   // Damage required after Bankai expires to reactivate Bankai (20% of max HP)
+  ultimateCooldown: 1500,        // Fallback cooldown frames (25s)
   bankaiDuration: 800,           // Duration of Bankai form in frames (~13.3s)
   bankaiSlideFrames: 10,         // Braking skid slide frames when initiating Bankai
   bankaiSlideDamping: 0.70,      // Velocity damping per frame during brake slide
@@ -159,7 +161,7 @@ export const ichigoConfig = {
 
   // 4. Kuroi Getsuga Tensho Wave (Bankai Combo Release)
   bankaiGetsugaChargeFrames: 30, // Reduced faster Getsuga charging frames during Bankai form (frames)
-  bankaiGetsugaDamage: 48,       // Kuroi Getsuga damage during Bankai
+  bankaiGetsugaDamage: 100,       // Kuroi Getsuga damage during Bankai
   bankaiHollowGetsugaDamage: 72, // Kuroi Getsuga damage during Bankai + Hollow Mask (48 * 1.5)
   bankaiGetsugaSpeed: 22,        // Kuroi Getsuga travel speed (pixels/frame)
   bankaiGetsugaRadius: 58,       // Bankai Getsuga projectile radius (increased scale)
@@ -189,9 +191,9 @@ export const ichigoConfig = {
   // 6. Grand Finisher: Final Massive Kuroi Getsuga (Unleashed before Bankai ends)
   bankaiFinalGetsugaTriggerTimer: 90,   // Bankai duration threshold frames when Grand Finisher triggers
   bankaiFinalGetsugaChargeFrames: 100,   // Epic gathering charge frames before firing the massive wave
-  bankaiFinalGetsugaDamage: 125,        // Colossal Kuroi Getsuga damage (Ultimate Finisher)
+  bankaiFinalGetsugaDamage: 150,        // Colossal Kuroi Getsuga damage (Ultimate Finisher)
   bankaiFinalGetsugaRadius: 98,         // Huge projectile radius (increased scale)
-  bankaiFinalGetsugaSpeed: 24,          // Fast supersonic wave speed
+  bankaiFinalGetsugaSpeed: 10,          // Fast supersonic wave speed
   bankaiFinalGetsugaKnockback: 30,      // Massive knockback blowing targets across arena
   bankaiFinalGetsugaHitStun: 28,        // Heavy hit stun
   bankaiFinalGetsugaSlowDuration: 140,  // Heavy slow duration from Final Getsuga
@@ -207,7 +209,7 @@ export const ichigoConfig = {
   sounds: {
     swordSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',
     fleshHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-    parry: 'Assets/Sound Effects/Skills/parry.mp3',
+    parry: 'Assets/Sound Effects/Skills/shieldblock2.mp3',
     shunpoDash: 'Assets/Sound Effects/Skills/dash1.mp3',
     shunpoStrikeHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
     shunpoFinisherSwing: 'Assets/Sound Effects/Attacks/swordswing.mp3',

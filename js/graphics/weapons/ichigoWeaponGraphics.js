@@ -721,17 +721,38 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
   if (!opts.skipChain) {
     const ringX = hiltStartX - 4.2;
     const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-    const breathe = Math.sin(now * 0.0025) * 1.5;
+    const breathe = Math.sin(now * 0.0025) * 0.8;
     
     // Natural hanging catenary drape under gravity with subtle breathing sway
     const chainLinks = [];
     const linkCount = 13;
-    for (let i = 0; i < linkCount; i++) {
-      const t = i / (linkCount - 1);
-      const cx = ringX - t * 30.0;
-      const cy = Math.sin(t * Math.PI) * (14.0 + breathe) + t * 4.0;
-      const ang = Math.cos(t * Math.PI) * 0.85 - 0.25;
-      chainLinks.push({ x: cx, y: cy, ang: ang });
+    const isBankaiStance = Boolean(opts.isBankaiStance || opts.isChampionScreen);
+
+    if (isBankaiStance) {
+      // In Bankai Champion stance (swingAngle = 2.65, scale(1, -1)), hang chain straight downwards under gravity!
+      const downX = Math.sin(2.65);  // ~ +0.4728
+      const downY = -Math.cos(2.65); // ~ +0.8811
+      const perpDownX = downY;       // ~ +0.8811
+      const perpDownY = -downX;      // ~ -0.4728
+
+      for (let i = 0; i < linkCount; i++) {
+        const t = i / (linkCount - 1);
+        const hangLen = 28.0;
+        const catenarySway = Math.sin(t * Math.PI) * (2.2 + breathe);
+        const cx = ringX + t * hangLen * downX + catenarySway * perpDownX;
+        const cy = 0 + t * hangLen * downY + catenarySway * perpDownY;
+        const baseAng = Math.atan2(downY, downX);
+        const swayAng = Math.cos(t * Math.PI) * 0.20;
+        chainLinks.push({ x: cx, y: cy, ang: baseAng + swayAng });
+      }
+    } else {
+      for (let i = 0; i < linkCount; i++) {
+        const t = i / (linkCount - 1);
+        const cx = ringX - t * 30.0;
+        const cy = Math.sin(t * Math.PI) * (14.0 + breathe) + t * 4.0;
+        const ang = Math.cos(t * Math.PI) * 0.85 - 0.25;
+        chainLinks.push({ x: cx, y: cy, ang: ang });
+      }
     }
 
     ctx.save();
@@ -771,37 +792,45 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
   ctx.lineWidth = 0.7;
   ctx.strokeRect(swordStartX - 0.5, -3.5, 5.8, 7.0);
 
-  // ── 4. Slender Pitch-Black Katana Blade with 3 Serrated Fin Steps ──
+  // ── 4. Slender Pitch-Black Katana Blade with Authentic Katana Sori Curvature & 3 Serrated Fin Steps ──
   const fin1StartX = swordStartX + 52;
   const fin2StartX = swordStartX + 66;
   const fin3StartX = swordStartX + 80;
 
-  // 4a. Blade Silhouette Path (with the 3 stepped fins on the spine — +Y side)
-  ctx.beginPath();
-  // Cutting edge (smooth top edge at -Y)
-  ctx.moveTo(bladeBaseX, -3.2);
-  ctx.quadraticCurveTo(swordStartX + 72, -3.0, tipX, 0.1); // Needle sharp kissaki tip
+  // Sori (Curvature) function: smooth upward katana arch toward Kissaki tip
+  const getSori = (x) => {
+    const t = Math.max(0, Math.min(1.0, (x - bladeBaseX) / (tipX - bladeBaseX)));
+    return -Math.pow(t, 1.45) * 8.5;
+  };
 
-  // Spine edge with 3 stepped fins (+Y side, trailing below)
-  ctx.quadraticCurveTo(swordStartX + 87, 3.6, fin3StartX + 1.8, 5.8);
+  const tipY = getSori(tipX); // -8.5
+
+  // 4a. Blade Silhouette Path (with authentic upward Sori curvature and 3 stepped fins on the spine)
+  ctx.beginPath();
+  // Cutting edge (smooth curved top edge at -Y)
+  ctx.moveTo(bladeBaseX, -2.8);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) - 2.8, tipX, tipY); // Needle sharp kissaki tip
+
+  // Spine edge with 3 stepped fins (+Y side, trailing below following the sori curve)
+  ctx.quadraticCurveTo(swordStartX + 87, getSori(swordStartX + 87) + 3.2, fin3StartX + 2.2, getSori(fin3StartX) + 5.3);
 
   // Fin 3 (nearest tip)
-  ctx.lineTo(fin2StartX + 12.2, 2.8);
-  ctx.lineTo(fin2StartX + 10.5, 4.8);
-  ctx.lineTo(fin2StartX + 1.8, 5.6);
+  ctx.lineTo(fin2StartX + 12.2, getSori(fin2StartX + 12.2) + 2.5);
+  ctx.lineTo(fin2StartX + 10.5, getSori(fin2StartX + 10.5) + 4.3);
+  ctx.lineTo(fin2StartX + 2.2, getSori(fin2StartX) + 5.1);
 
   // Fin 2
-  ctx.lineTo(fin1StartX + 12.2, 3.1);
-  ctx.lineTo(fin1StartX + 10.5, 4.8);
-  ctx.lineTo(fin1StartX + 1.8, 5.4);
+  ctx.lineTo(fin1StartX + 12.2, getSori(fin1StartX + 12.2) + 2.7);
+  ctx.lineTo(fin1StartX + 10.5, getSori(fin1StartX + 10.5) + 4.3);
+  ctx.lineTo(fin1StartX + 2.2, getSori(fin1StartX) + 4.9);
 
   // Fin 1 (nearest guard)
-  ctx.lineTo(fin1StartX, 3.2);
-  ctx.lineTo(bladeBaseX, 3.2);
+  ctx.lineTo(fin1StartX, getSori(fin1StartX) + 2.8);
+  ctx.lineTo(bladeBaseX, 2.8);
   ctx.closePath();
 
   // 4b. Dark Obsidian Blade Body Fill
-  const bladeGrad = ctx.createLinearGradient(bladeBaseX, -3.2, bladeBaseX, 5.8);
+  const bladeGrad = ctx.createLinearGradient(bladeBaseX, -2.8, bladeBaseX, 5.8);
   bladeGrad.addColorStop(0, '#0C0C10');
   bladeGrad.addColorStop(0.42, '#14141A');
   bladeGrad.addColorStop(0.45, '#1A1A22');
@@ -810,56 +839,53 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
   ctx.fillStyle = bladeGrad;
   ctx.fill();
 
-  // 4c. Shinogi Ridge Line (Katana bevel separation line)
+  // 4c. Shinogi Ridge Line (Katana bevel separation line along curved spine)
   ctx.beginPath();
-  ctx.moveTo(bladeBaseX, 0.4);
-  ctx.lineTo(swordStartX + 72, 0.4);
-  ctx.quadraticCurveTo(swordStartX + 84, 0.7, tipX - 2.0, 0.0);
+  ctx.moveTo(bladeBaseX, 0.0);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50), tipX - 2.5, tipY + 0.4);
   ctx.strokeStyle = 'rgba(75, 80, 100, 0.50)';
   ctx.lineWidth = 0.8;
   ctx.stroke();
 
-  // 4d. Razor Cutting Edge Polished Steel Highlight (now on -Y / top)
+  // 4d. Razor Cutting Edge Polished Steel / Crimson Highlight
   ctx.beginPath();
-  ctx.moveTo(bladeBaseX, -2.8);
-  ctx.quadraticCurveTo(swordStartX + 72, -2.6, tipX, 0.1);
-  ctx.strokeStyle = isMask ? 'rgba(255, 60, 0, 0.90)' : 'rgba(200, 215, 235, 0.75)';
+  ctx.moveTo(bladeBaseX, -2.4);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) - 2.4, tipX, tipY);
+  ctx.strokeStyle = isMask ? 'rgba(255, 60, 0, 0.90)' : 'rgba(200, 215, 235, 0.80)';
   ctx.lineWidth = isMask ? 1.2 : 0.95;
   ctx.stroke();
 
-  // 4e. Fin Step Accent Highlights (Metallic highlights on the 3 stepped notches, now on +Y)
+  // 4e. Fin Step Accent Highlights (Metallic highlights on the 3 stepped notches)
   ctx.beginPath();
   // Fin 1 edge
-  ctx.moveTo(fin1StartX, 3.2);
-  ctx.lineTo(fin1StartX + 1.8, 5.4);
-  ctx.lineTo(fin1StartX + 10.5, 4.8);
+  ctx.moveTo(fin1StartX, getSori(fin1StartX) + 2.8);
+  ctx.lineTo(fin1StartX + 2.2, getSori(fin1StartX) + 4.9);
+  ctx.lineTo(fin1StartX + 10.5, getSori(fin1StartX + 10.5) + 4.3);
   // Fin 2 edge
-  ctx.moveTo(fin2StartX, 3.1);
-  ctx.lineTo(fin2StartX + 1.8, 5.6);
-  ctx.lineTo(fin2StartX + 10.5, 4.8);
+  ctx.moveTo(fin2StartX, getSori(fin2StartX) + 2.7);
+  ctx.lineTo(fin2StartX + 2.2, getSori(fin2StartX) + 5.1);
+  ctx.lineTo(fin2StartX + 10.5, getSori(fin2StartX + 10.5) + 4.3);
   // Fin 3 edge
-  ctx.moveTo(fin3StartX, 2.8);
-  ctx.lineTo(fin3StartX + 1.8, 5.8);
-  ctx.quadraticCurveTo(swordStartX + 87, 3.6, tipX, 0.1);
+  ctx.moveTo(fin3StartX, getSori(fin3StartX) + 2.5);
+  ctx.lineTo(fin3StartX + 2.2, getSori(fin3StartX) + 5.3);
+  ctx.quadraticCurveTo(swordStartX + 87, getSori(swordStartX + 87) + 3.2, tipX, tipY);
   ctx.strokeStyle = isMask ? 'rgba(255, 90, 20, 0.80)' : 'rgba(130, 140, 170, 0.65)';
   ctx.lineWidth = 0.8;
   ctx.stroke();
 
   // 4f. Crisp Outer Silhouette Outline
   ctx.beginPath();
-  // Cutting edge (-Y)
-  ctx.moveTo(bladeBaseX, -3.2);
-  ctx.quadraticCurveTo(swordStartX + 72, -3.0, tipX, 0.1);
-  // Spine edge with fins (+Y)
-  ctx.quadraticCurveTo(swordStartX + 87, 3.6, fin3StartX + 1.8, 5.8);
-  ctx.lineTo(fin2StartX + 12.2, 2.8);
-  ctx.lineTo(fin2StartX + 10.5, 4.8);
-  ctx.lineTo(fin2StartX + 1.8, 5.6);
-  ctx.lineTo(fin1StartX + 12.2, 3.1);
-  ctx.lineTo(fin1StartX + 10.5, 4.8);
-  ctx.lineTo(fin1StartX + 1.8, 5.4);
-  ctx.lineTo(fin1StartX, 3.2);
-  ctx.lineTo(bladeBaseX, 3.2);
+  ctx.moveTo(bladeBaseX, -2.8);
+  ctx.quadraticCurveTo(swordStartX + 50, getSori(swordStartX + 50) - 2.8, tipX, tipY);
+  ctx.quadraticCurveTo(swordStartX + 87, getSori(swordStartX + 87) + 3.2, fin3StartX + 2.2, getSori(fin3StartX) + 5.3);
+  ctx.lineTo(fin2StartX + 12.2, getSori(fin2StartX + 12.2) + 2.5);
+  ctx.lineTo(fin2StartX + 10.5, getSori(fin2StartX + 10.5) + 4.3);
+  ctx.lineTo(fin2StartX + 2.2, getSori(fin2StartX) + 5.1);
+  ctx.lineTo(fin1StartX + 12.2, getSori(fin1StartX + 12.2) + 2.7);
+  ctx.lineTo(fin1StartX + 10.5, getSori(fin1StartX + 10.5) + 4.3);
+  ctx.lineTo(fin1StartX + 2.2, getSori(fin1StartX) + 4.9);
+  ctx.lineTo(fin1StartX, getSori(fin1StartX) + 2.8);
+  ctx.lineTo(bladeBaseX, 2.8);
   ctx.closePath();
   ctx.strokeStyle = '#050508';
   ctx.lineWidth = 0.95;
@@ -927,108 +953,118 @@ export function drawBankaiSwordOrbitingAura(ctx, swordStartX, swordLen = 94, isM
   const bladeBaseX = swordStartX + 5;
   const actualBladeLen = swordLen - 8;
 
+  const getSori = (x) => -Math.pow(Math.max(0, Math.min(1.0, (x - bladeBaseX) / actualBladeLen)), 1.45) * 8.5;
+
   ctx.save();
 
-  // ── 1. Rising Smoke Wisps (Bold atmospheric smoke plumes drifting off blade spine) ──
-  const smokeCount = 14;
+  // ── 1. Omnidirectional Random Kuroi Reiatsu Flame Plumes (Wandering in all directions around blade) ──
+  const smokeCount = 20;
   for (let i = 0; i < smokeCount; i++) {
     const seed = (i * 137.508) % 1.0;
-    const speed = 0.22 + seed * 0.16;
-    const lifeT = ((time * speed + seed * 6.28) % 2.8) / 2.8;
+    const speed = 0.95 + seed * 0.90;
+    const lifeT = ((time * speed + seed * 3.14) % 1.6) / 1.6;
 
-    const bladeT = (seed + lifeT * 0.06) % 1.0;
+    const bladeT = (seed + lifeT * 0.18) % 1.0;
     const baseX = bladeBaseX + bladeT * actualBladeLen;
-    const wander = Math.sin(time * 1.0 + i * 2.3) * 5.0 * lifeT;
+    const soriY = getSori(baseX);
 
-    // Rise from spine (+Y) with turbulent curl
-    const riseY = 4.5 + lifeT * 18.0 * (0.7 + 0.3 * seed);
-    const curlX = Math.sin(time * 0.7 + i * 1.7 + lifeT * 3.5) * 6.0 * lifeT;
+    // Multi-harmonic chaotic random drift vectors around the blade (both cutting edge -Y, spine +Y, and tip)
+    const driftAngle = seed * Math.PI * 2 + Math.sin(time * 3.4 + i * 1.7) * 1.8;
+    const driftDist = (3.5 + Math.sin(time * 4.5 + i * 2.1) * 2.5) + lifeT * 18.0 * (0.6 + 0.4 * seed);
 
-    const px = baseX + curlX + wander * 0.3;
-    const py = riseY + Math.cos(time * 1.3 + i) * 2.0 * lifeT;
+    const randCurlX = Math.cos(driftAngle) * driftDist + Math.sin(time * 5.0 + i) * 3.5;
+    const randCurlY = Math.sin(driftAngle) * driftDist + Math.cos(time * 4.4 + i * 1.3) * 3.5;
+
+    const px = baseX + randCurlX;
+    const py = soriY + randCurlY;
 
     // Smoke lifecycle
-    const fadeIn = Math.min(1.0, lifeT * 4.0);
-    const fadeOut = Math.max(0.0, 1.0 - Math.pow(lifeT, 1.6));
-    const alpha = fadeIn * fadeOut * (isMask ? 0.72 : 0.62);
+    const fadeIn = Math.min(1.0, lifeT * 5.0);
+    const fadeOut = Math.max(0.0, 1.0 - Math.pow(lifeT, 1.4));
+    const alpha = fadeIn * fadeOut * (isMask ? 0.85 : 0.75);
     if (alpha <= 0.03) continue;
 
-    // Smoke grows larger as it drifts (small near blade → large as it dissipates)
-    const size = (3.0 + lifeT * 9.0) * (0.75 + seed * 0.5);
+    const size = (3.5 + lifeT * 11.0) * (0.75 + seed * 0.5);
 
-    ctx.globalAlpha = alpha;
-
-    // Outer dark smoke body
+    // Outer dark void smoke body
     ctx.beginPath();
     ctx.arc(px, py, size, 0, Math.PI * 2);
-    ctx.fillStyle = isMask
-      ? 'rgba(50, 6, 0, 0.72)'
-      : 'rgba(12, 6, 18, 0.68)';
+    ctx.fillStyle = isMask ? 'rgba(40, 4, 0, 0.80)' : 'rgba(10, 4, 16, 0.78)';
+    ctx.globalAlpha = alpha;
     ctx.fill();
 
-    // Crimson mid-ring glow (visible colored halo around each wisp)
-    if (lifeT < 0.75) {
-      const ringAlpha = (1.0 - lifeT / 0.75) * 0.45;
+    // Radiant Crimson / Scarlet glowing flame halo
+    if (lifeT < 0.80) {
+      const ringAlpha = (1.0 - lifeT / 0.80) * 0.65;
       ctx.beginPath();
-      ctx.arc(px, py, size * 0.72, 0, Math.PI * 2);
+      ctx.arc(px, py, size * 0.70, 0, Math.PI * 2);
       ctx.fillStyle = isMask
-        ? `rgba(255, 50, 0, ${ringAlpha.toFixed(3)})`
-        : `rgba(200, 25, 50, ${ringAlpha.toFixed(3)})`;
+        ? `rgba(255, 45, 0, ${(alpha * ringAlpha).toFixed(3)})`
+        : `rgba(225, 25, 55, ${(alpha * ringAlpha).toFixed(3)})`;
       ctx.globalAlpha = alpha * ringAlpha;
       ctx.fill();
     }
 
-    // Hot ember core center
+    // White-hot / blazing ember core center
     if (lifeT < 0.55) {
-      const coreAlpha = (1.0 - lifeT / 0.55) * 0.80;
+      const coreAlpha = (1.0 - lifeT / 0.55) * 0.90;
       ctx.beginPath();
       ctx.arc(px, py, size * 0.35, 0, Math.PI * 2);
       ctx.fillStyle = isMask
-        ? `rgba(255, 80, 10, ${coreAlpha.toFixed(3)})`
-        : `rgba(220, 40, 55, ${coreAlpha.toFixed(3)})`;
+        ? `rgba(255, 140, 30, ${(alpha * coreAlpha).toFixed(3)})`
+        : `rgba(255, 75, 90, ${(alpha * coreAlpha).toFixed(3)})`;
       ctx.globalAlpha = alpha * coreAlpha;
       ctx.fill();
     }
   }
 
-  // ── 2. Blade-Hugging Haze (Dark mist clinging to the blade surface) ──
-  const hazeSteps = 8;
+  // ── 2. Organic Random Blade Plasma Sheen (Surging & wandering around top and bottom surfaces) ──
+  const hazeSteps = 12;
   for (let h = 0; h < hazeSteps; h++) {
     const ht = (h + 0.5) / hazeSteps;
     const hx = bladeBaseX + ht * actualBladeLen;
-    const breathe = Math.sin(time * 1.6 + h * 1.1) * 2.0;
+    const soriY = getSori(hx);
+
+    // Random wandering offsets in both X and Y
+    const side = (h % 3 === 0 ? -1.0 : (h % 3 === 1 ? 1.0 : 0.0));
+    const breatheX = Math.sin(time * 4.2 + h * 1.8) * 3.5;
+    const breatheY = (side * 4.2) + Math.sin(time * 5.8 + h * 1.5) * 3.5;
 
     ctx.save();
-    ctx.translate(hx, breathe * 0.3);
+    ctx.translate(hx + breatheX, soriY + breatheY);
 
-    const hazeW = 8.0 + Math.sin(time * 0.9 + h * 2.0) * 3.5;
-    const hazeH = 3.5 + Math.sin(time * 1.4 + h * 1.5) * 1.5;
-    const hazeAlpha = 0.28 + 0.14 * Math.sin(time * 1.1 + h * 0.8);
+    const hazeW = 9.0 + Math.sin(time * 4.0 + h * 2.2) * 4.0;
+    const hazeH = 4.5 + Math.sin(time * 5.0 + h * 1.8) * 2.0;
+    const hazeAlpha = (0.35 + 0.20 * Math.sin(time * 4.5 + h * 1.2)) * (isMask ? 0.9 : 0.75);
 
     ctx.beginPath();
-    ctx.ellipse(0, 3.5 + breathe, hazeW, hazeH, 0, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, hazeW, hazeH, 0, 0, Math.PI * 2);
     ctx.fillStyle = isMask
-      ? `rgba(70, 10, 0, ${hazeAlpha.toFixed(3)})`
-      : `rgba(20, 8, 28, ${hazeAlpha.toFixed(3)})`;
+      ? `rgba(80, 12, 0, ${hazeAlpha.toFixed(3)})`
+      : `rgba(28, 8, 38, ${hazeAlpha.toFixed(3)})`;
     ctx.globalAlpha = hazeAlpha;
     ctx.fill();
 
     ctx.restore();
   }
 
-  // ── 3. Ember Sparks (Hot sparks popping off the smoke) ──
-  const sparkCount = 6;
+  // ── 3. High-Frequency Leaping Reiatsu Sparks (Darting in all random directions) ──
+  const sparkCount = 10;
   for (let s = 0; s < sparkCount; s++) {
-    const st = ((time * 0.55 + s * 1.05) % 2.0) / 2.0;
-    const sx = bladeBaseX + ((s * 0.18 + st * 0.04) % 1.0) * actualBladeLen;
-    const sy = 4.0 + st * 12.0 + Math.sin(time * 2.8 + s * 2.5) * 2.5;
-    const sparkAlpha = Math.sin(st * Math.PI) * 0.85;
+    const st = ((time * 1.8 + s * 0.85) % 1.4) / 1.4;
+    const sparkAngle = (s * 1.75 + time * 3.5) % (Math.PI * 2);
+    const sparkDist = (3.0 + st * 16.0) * (0.8 + 0.4 * Math.sin(time * 6.0 + s));
+
+    const sx = bladeBaseX + ((s * 0.22 + st * 0.12) % 1.0) * actualBladeLen + Math.cos(sparkAngle) * sparkDist;
+    const soriY = getSori(sx);
+    const sy = soriY + Math.sin(sparkAngle) * sparkDist;
+    const sparkAlpha = Math.sin(st * Math.PI) * 0.95;
 
     if (sparkAlpha <= 0.05) continue;
 
     ctx.beginPath();
-    ctx.arc(sx + Math.sin(time * 1.8 + s) * 4.0, sy, 1.2 + (1 - st) * 0.8, 0, Math.PI * 2);
-    ctx.fillStyle = isMask ? '#FF7040' : '#E62040';
+    ctx.arc(sx, sy, 1.4 + (1.0 - st) * 1.2, 0, Math.PI * 2);
+    ctx.fillStyle = isMask ? '#FFA040' : '#FF2E55';
     ctx.globalAlpha = sparkAlpha;
     ctx.fill();
   }
@@ -1048,7 +1084,8 @@ export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
   const swordStartX = r * 0.7;
   drawTensaZangetsuKatana(ctx, swordStartX, Boolean(opts.isMask), opts);
 
-  if (opts.showAura !== false) {
+  const isChampionScreen = Boolean(opts.isWinnerReveal || (typeof state !== 'undefined' && state.gameState === 'champion'));
+  if (opts.showAura !== false && !isChampionScreen) {
     drawBankaiSwordOrbitingAura(ctx, swordStartX, opts.bladeLen || 94, Boolean(opts.isMask), false);
   }
 

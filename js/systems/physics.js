@@ -297,6 +297,13 @@ export function resolveFighterCollision(a, b) {
     return;
   }
 
+  const aIsWallSlam = a.isWallSlamActive || a.isWallSlamBlitz || a.isGrabbedByMahoraga || a.isParalyzedByMahoraga || (a.wallSlamPinnedX !== undefined);
+  const bIsWallSlam = b.isWallSlamActive || b.isWallSlamBlitz || b.isGrabbedByMahoraga || b.isParalyzedByMahoraga || (b.wallSlamPinnedX !== undefined);
+
+  if (aIsWallSlam || bIsWallSlam) {
+    return; // Complete immunity to circle-circle overlap separation and bounce during Mahoraga's Wall Slam & Execution Flurry!
+  }
+
   const aIsFlurrying = a.isFlurrying || b.caughtInGenosFlurry || b.caughtInSaitamaFlurry;
   const bIsFlurrying = b.isFlurrying || a.caughtInGenosFlurry || a.caughtInSaitamaFlurry;
 

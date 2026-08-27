@@ -168,7 +168,7 @@ export class Fighter {
         }
       } else if (this.pureLoveBeamRegenDebuffTimer > 0) {
         const healingAmount = value - oldHp;
-        const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25;
+        const debuffMult = CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50;
         const reducedHealing = healingAmount * debuffMult;
         value = oldHp + reducedHealing;
 
@@ -578,12 +578,12 @@ export class Fighter {
       } else {
         this.pureLoveBeamRecoveryTimer--;
         // Heavy slow instead of full freeze — enemy is slowed during recovery but can move and recover
-        const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.40;
+        const slowMult = CONFIG.yuta?.pureLoveBeamSlowMultiplier ?? 0.20;
         this.vx *= slowMult;
         this.vy *= slowMult;
       }
     }
-    if (this.isParalyzedByMahoraga || this.paralyzeTimer > 0) {
+    if (this.isParalyzedByMahoraga || this.paralyzeTimer > 0 || this.isWallSlammed) {
       if (this.wallSlamPinnedX !== undefined && this.wallSlamPinnedY !== undefined) {
         this.x = this.wallSlamPinnedX;
         this.y = this.wallSlamPinnedY;
@@ -597,8 +597,12 @@ export class Fighter {
         }
       }
       if (this.paralyzeTimer > 0) this.paralyzeTimer--;
-      if (this.paralyzeTimer <= 0 && !this.isParalyzedByMahoraga) {
+      if (this.paralyzeTimer <= 0) {
         this.isParalyzedByMahito = false;
+        this.isParalyzedByMahoraga = false;
+        this.isWallSlammed = false;
+        this.wallSlamPinnedX = undefined;
+        this.wallSlamPinnedY = undefined;
       }
       this.vx = 0;
       this.vy = 0;

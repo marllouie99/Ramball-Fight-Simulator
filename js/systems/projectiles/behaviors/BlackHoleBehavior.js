@@ -172,7 +172,7 @@ export class BlackHoleBehavior extends ProjectileBehavior {
     // Apply pull to other projectiles
     for (let j = 0; j < system.projectiles.length; j++) {
       const otherProj = system.projectiles[j];
-      if (otherProj === p || otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill || otherProj.isBlackHole) continue;
+      if (otherProj === p || otherProj.isVisual || otherProj.isExplosion || otherProj.isPoisonSpill || otherProj.isBlackHole || otherProj.behaviorType === 'yuta_pure_love_beam' || otherProj.visual === 'yuta_pure_love_beam' || otherProj.isPureLoveBeam) continue;
       
       const otherProjOwner = fighters[otherProj.owner];
       if (otherProjOwner && otherProjOwner._def && otherProjOwner._def.type === 'black') continue;

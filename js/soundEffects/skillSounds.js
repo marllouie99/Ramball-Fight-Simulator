@@ -447,6 +447,24 @@ export const SKILL_SOUNDS = {
     }
   },
 
+  // ── Ichigo ────────────────────────────
+  29: {
+    get parry() {
+      return {
+        src: CONFIG.ichigo?.sounds?.parry || 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+        volume: CONFIG.ichigo?.soundVolumes?.parry !== undefined ? CONFIG.ichigo.soundVolumes.parry : 0.8,
+        delay: CONFIG.ichigo?.soundDelays?.parry || 0
+      };
+    },
+    get shieldblock() {
+      return {
+        src: CONFIG.ichigo?.sounds?.parry || 'Assets/Sound Effects/Skills/shieldblock2.mp3',
+        volume: CONFIG.ichigo?.soundVolumes?.parry !== undefined ? CONFIG.ichigo.soundVolumes.parry : 0.8,
+        delay: CONFIG.ichigo?.soundDelays?.parry || 0
+      };
+    }
+  },
+
   // ── John Wick ─────────────────────────────
   33: {
     pencil: {
@@ -639,6 +657,8 @@ export function getSkillSound(fighterId, skillName) {
       fighterConfig = SKILL_SOUNDS['genos'];
     } else if (strKey.includes('john')) {
       fighterConfig = SKILL_SOUNDS[33] || SKILL_SOUNDS['john_wick'];
+    } else if (strKey.includes('ichigo')) {
+      fighterConfig = SKILL_SOUNDS[29] || SKILL_SOUNDS['ichigo'];
     }
   }
 

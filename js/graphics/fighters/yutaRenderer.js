@@ -160,7 +160,7 @@ export class YutaRenderer {
       let drawX = rk.x;
       let drawY = rk.y;
       if (rk.spawnTimer > 0) {
-        const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+        const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
         const progress = 1 - (rk.spawnTimer / ariseMax);
         const shakeAmt = (1.0 - progress * 0.4) * 5;
         drawX += (Math.random() - 0.5) * shakeAmt;
@@ -251,7 +251,7 @@ export class YutaRenderer {
     let drawX = renderState ? renderState.drawX : rk.x;
     let drawY = renderState ? renderState.drawY : rk.y;
     if (!renderState && rk.spawnTimer > 0) {
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       const progress = 1 - (rk.spawnTimer / ariseMax);
       const shakeAmt = (1.0 - progress * 0.4) * 5;
       drawX += (Math.random() - 0.5) * shakeAmt;
@@ -652,7 +652,7 @@ export class YutaRenderer {
     let emergenceFingerFlex = 0;
 
     if (isEmerging) {
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       const progress = 1 - (fighter.rika.spawnTimer / ariseMax);
       // Arms sweep out wide during rise and pause moment
       emergenceAngleOffset = (Math.sin(progress * Math.PI) * 0.35 * sideSign);
@@ -898,7 +898,7 @@ export class YutaRenderer {
     const leftArmTimer = rk.leftArmTimer || 0;
 
     const spawnScale = renderState ? renderState.spawnScale : (rk.spawnScale ?? 1.0);
-    const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+    const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
     let ariseCeAlpha = 1.0;
     if (rk.spawnTimer > 0) {
       const progress = 1.0 - (rk.spawnTimer / ariseMax);
@@ -912,7 +912,7 @@ export class YutaRenderer {
     let drawX = renderState ? renderState.drawX : rk.x;
     let drawY = renderState ? renderState.drawY : rk.y;
     if (!renderState && rk.spawnTimer > 0) {
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       const progress = 1 - (rk.spawnTimer / ariseMax);
       const shakeAmt = (1.0 - progress * 0.4) * 5;
       drawX += (Math.random() - 0.5) * shakeAmt;

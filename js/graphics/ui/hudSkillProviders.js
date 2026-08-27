@@ -908,18 +908,23 @@ export function getSkillDataForFighter(f, getProjectiles) {
       const remaining = f.bankaiTimer !== undefined ? f.bankaiTimer : bankaiDuration;
       ultPct = Math.max(0, Math.min(100, (remaining / bankaiDuration) * 100));
       ultReady = true;
+      f._maxBankaiPct = 0;
     } else if (f.bankaiUsed) {
-      // Recharging on cooldown between Bankai activations (0% -> 100%)
-      const ultMax = CONFIG.ichigo?.ultimateCooldown || 1500;
-      const ultTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : ultMax;
-      ultPct = Math.max(0, Math.min(100, (1 - (ultTimer / ultMax)) * 100));
+      // Subsequent activation: fills monotonically based on HP lost after previous Bankai expired!
+      const baseline = f.bankaiRechargeHpBaseline !== undefined ? f.bankaiRechargeHpBaseline : f.hp;
+      const reqDamage = (f.maxHp || 240) * (CONFIG.ichigo?.bankaiRechargeHpRatio ?? 0.20);
+      const damageTaken = Math.max(0, baseline - f.hp);
+      const rawPct = Math.max(0, Math.min(100, (damageTaken / reqDamage) * 100));
+      f._maxBankaiPct = Math.max(f._maxBankaiPct || 0, rawPct);
+      ultPct = f._maxBankaiPct;
       ultReady = ultPct >= 99;
     } else {
       // Pre-first activation: fills steadily as HP drops towards threshold (<= 90%)
       const ultThreshold = CONFIG.ichigo?.ultimateThreshold ?? 0.90;
-      const progress = Math.max(0, Math.min(1.0, (1.0 - hpRatio) / Math.max(0.01, (1.0 - ultThreshold))));
-      ultPct = progress * 100;
-      ultReady = hpRatio <= ultThreshold;
+      const rawPct = Math.max(0, Math.min(100, ((1.0 - hpRatio) / Math.max(0.01, (1.0 - ultThreshold))) * 100));
+      f._maxBankaiPct = Math.max(f._maxBankaiPct || 0, rawPct);
+      ultPct = f._maxBankaiPct;
+      ultReady = hpRatio <= ultThreshold || ultPct >= 99;
     }
 
     return [

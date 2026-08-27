@@ -596,12 +596,19 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
 
     // Sync active transformations & skins from the winning fighter entity (e.g. Ichigo Bankai/Hollow Mask)
+    // Snapshot active forms once so they are permanently preserved on the champion podium without decaying
     if (wFighter.skin) preview.skin = wFighter.skin;
     if (fType === 'ichigo' || wFighter.characterId === 'ichigo' || wFighter.type === 'ichigo') {
-      preview.bankaiActive = Boolean(wFighter.bankaiActive);
-      preview.hollowMaskActive = Boolean(wFighter.hollowMaskActive);
-      preview.skin = wFighter.skin || (wFighter.bankaiActive ? (wFighter.hollowMaskActive ? 'bankai_mask' : 'bankai') : (wFighter.hollowMaskActive ? 'shikai_mask' : 'shikai'));
-      preview.combatAuraOpacity = wFighter.combatAuraOpacity !== undefined ? wFighter.combatAuraOpacity : (wFighter.bankaiActive ? 1 : 0.5);
+      if (wFighter._winnerBankaiActive === undefined) {
+        wFighter._winnerBankaiActive = Boolean(wFighter.bankaiActive || wFighter.skin === 'bankai' || wFighter.skin === 'bankai_mask');
+      }
+      if (wFighter._winnerHollowMaskActive === undefined) {
+        wFighter._winnerHollowMaskActive = Boolean(wFighter.hollowMaskActive || wFighter.skin === 'bankai_mask' || wFighter.skin === 'shikai_mask');
+      }
+      preview.bankaiActive = wFighter._winnerBankaiActive;
+      preview.hollowMaskActive = wFighter._winnerHollowMaskActive;
+      preview.skin = (preview.bankaiActive ? (preview.hollowMaskActive ? 'bankai_mask' : 'bankai') : (preview.hollowMaskActive ? 'shikai_mask' : (wFighter.skin || 'shikai')));
+      preview.combatAuraOpacity = wFighter.combatAuraOpacity !== undefined ? wFighter.combatAuraOpacity : (preview.bankaiActive ? 1 : 0.5);
     }
     if (wFighter.isHeianEra !== undefined) preview.isHeianEra = wFighter.isHeianEra;
     if (wFighter.isFourArms !== undefined) preview.isFourArms = wFighter.isFourArms;

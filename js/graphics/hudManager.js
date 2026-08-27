@@ -822,69 +822,55 @@ function updateHealthHud() {
 
     if (f.characterId === 'yuta' || f.type === 'yuta') {
       const isRikaAlive = typeof f.isRikaAliveInDomain === 'function' ? f.isRikaAliveInDomain() : (f.rika && f.rika.active && !f.rika.isDying);
+      const baseDmg = CONFIG.yuta?.meleeDamage || CONFIG.yuta?.damage || 15;
       const baseRegen = CONFIG.yuta?.regenRate || 0.05;
 
-      if (checkHasTeammate(f)) {
-        if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
-          info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
-          const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.45) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : 2.0) : baseRegen;
-          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25);
-          const debuffedRegen = currentRegen * debuffMult;
-          info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.domainActive || isRikaAlive) {
-          const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
-          const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
-          const rctRate = domainRctHealRate * regenMult;
-          const bonusRegen = rctRate - baseRegen;
-          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
-        }
+      // 1. DMG Stat Line (Includes Pure Love Beam bonus damage stacks + Rika multiplier)
+      const bonusBeamDmg = Math.round(f.pureLoveBeamBonusDamage || 0);
+      const dmgMult = typeof f.getRikaDamageMultiplier === 'function' ? f.getRikaDamageMultiplier() : (isRikaAlive ? (CONFIG.yuta?.domainRikaDamageMultiplier || 1.50) : 1.0);
+      const totalDmg = Math.round((baseDmg + bonusBeamDmg) * dmgMult);
+      const boostDmg = totalDmg - baseDmg;
+      if (boostDmg > 0) {
+        info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
       } else {
-        if (isRikaAlive) {
-          const dmgMult = typeof f.getRikaDamageMultiplier === 'function' ? f.getRikaDamageMultiplier() : (CONFIG.yuta?.domainRikaDamageMultiplier || 2.0);
-          const boostDmg = Math.round(baseDmg * (dmgMult - 1));
-          info.push(`<b>DMG:</b> ${baseDmg} + ${boostDmg} <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>DMG:</b> ${baseDmg}`);
-        }
-        
-        const isGuarding = (f.blockPoseTimer || 0) > 0;
-        const baseParryRatio = isGuarding ? (CONFIG.yuta?.parryActiveChance ?? 0.90) : (CONFIG.yuta?.parryPassiveChance ?? 0.90);
-        const parryStacks = f.parryStacks || 0;
-        const parryBonus = Math.round(parryStacks * (CONFIG.yuta?.parryChancePerStack ?? 0.05) * 100);
-        const baseParryVal = Math.round(baseParryRatio * 100);
-        const totalParryVal = Math.min(98, baseParryVal + parryBonus);
+        info.push(`<b>DMG:</b> ${baseDmg}`);
+      }
 
-        const isSummoningRika = typeof f.isSummoningRika === 'function' ? f.isSummoningRika() : ((f.rikaCallTimer || 0) > 0 || (f.rika && ((f.rika.chargeTimer || 0) > 0 || (f.rika.spawnTimer || 0) > 0)));
+      // 2. Parry Stat Line
+      const isGuarding = (f.blockPoseTimer || 0) > 0;
+      const baseParryRatio = CONFIG.yuta?.parryPassiveChance ?? 0.50;
+      const baseParryVal = Math.round(baseParryRatio * 100);
+      const parryStacks = f.parryStacks || 0;
+      const stackBonus = Math.round(parryStacks * (CONFIG.yuta?.parryChancePerStack ?? 0.05) * 100);
+      const guardBonus = isGuarding ? Math.max(0, Math.round(((CONFIG.yuta?.parryActiveChance ?? 0.50) - baseParryRatio) * 100)) : 0;
+      const totalBonus = stackBonus + guardBonus;
 
-        if (isSummoningRika) {
-          info.push(`<b>Parry:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
-        } else if (parryBonus > 0) {
-          info.push(`<b>Parry:</b> ${baseParryVal}% + ${parryBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else if (isGuarding) {
-          info.push(`<b>Parry:</b> ${totalParryVal}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>Parry:</b> ${totalParryVal}%`);
-        }
+      const isSummoningRika = typeof f.isSummoningRika === 'function' ? f.isSummoningRika() : ((f.rikaCallTimer || 0) > 0 || (f.rika && ((f.rika.chargeTimer || 0) > 0 || (f.rika.spawnTimer || 0) > 0)));
 
-        if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
-          info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
-          const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.45) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : 2.0) : baseRegen;
-          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25);
-          const debuffedRegen = currentRegen * debuffMult;
-          info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
-        } else if (f.domainActive || isRikaAlive) {
-          const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 2.0);
-          const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.45;
-          const rctRate = domainRctHealRate * regenMult;
-          const bonusRegen = rctRate - baseRegen;
-          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
-        } else {
-          info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
-        }
+      if (isSummoningRika) {
+        info.push(`<b>Parry:</b> 0% <span style="color: #ef4444; font-size: 10px;">(Summoning)</span>`);
+      } else if (totalBonus > 0) {
+        info.push(`<b>Parry:</b> ${baseParryVal}% + ${totalBonus}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>Parry:</b> ${baseParryVal}%`);
+      }
+
+      // 3. Regen Stat Line
+      if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
+        info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+      } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
+        const currentRegen = (f.domainActive || isRikaAlive) ? (CONFIG.yuta?.domainRctHealRate || 0.05) * (typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 1.10)) : baseRegen;
+        const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50);
+        const debuffedRegen = currentRegen * debuffMult;
+        info.push(`<b>Regen:</b> ${debuffedRegen.toFixed(2)}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
+      } else if (f.domainActive || isRikaAlive) {
+        const regenMult = typeof f.getRikaRegenMultiplier === 'function' ? f.getRikaRegenMultiplier() : (CONFIG.yuta?.domainRikaRegenMultiplier || 1.10);
+        const domainRctHealRate = CONFIG.yuta?.domainRctHealRate || 0.05;
+        const rctRate = domainRctHealRate * regenMult;
+        const bonusRegen = rctRate - baseRegen;
+        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}% + ${bonusRegen.toFixed(2)}% <span style="color: #15803d; font-size: 10px;">▲</span>`);
+      } else {
+        info.push(`<b>Regen:</b> ${baseRegen.toFixed(2)}%`);
       }
     } else if (f.characterId === 'yuji' || f.type === 'yuji') {
       const punchBase = CONFIG.yuji?.punchDamage || 18;
@@ -1257,7 +1243,7 @@ function updateHealthHud() {
         if (f.caughtInPureLoveBeam || (f.pureLoveBeamTimer || 0) > 0) {
           info.push(`<b>Regen:</b> 0% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (f.tojiRegenDebuffTimer > 0 || f.pureLoveBeamRegenDebuffTimer > 0) {
-          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.25);
+          const debuffMult = f.tojiRegenDebuffTimer > 0 ? (CONFIG.toji?.regenDebuffMultiplier ?? 0.40) : (CONFIG.yuta?.pureLoveBeamRegenDebuffMultiplier ?? 0.50);
           const debuffedRegenPerSec = Math.round(currentRegenPerSec * debuffMult);
           info.push(`<b>Regen:</b> +${debuffedRegenPerSec}% <span style="color: #ef4444; font-size: 10px;">▼</span>`);
         } else if (totalStages > 0) {

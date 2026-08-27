@@ -188,6 +188,8 @@ export class MahoragaFighter extends Fighter {
     this.wheelTargetRotation = 0;
     this.wheelGlowTimer = 0;
     this.wheelClickTimer = 0;
+    this.gammaRayRainbowTimer = 0;
+    this.gammaRayRainbowMax = 180;
     this.shieldIconTimer = 0;
     this.shieldIconReduction = 12;
 
@@ -486,7 +488,12 @@ export class MahoragaFighter extends Fighter {
   initiateLevel8WallSlam(opponent) { initiateLevel8WallSlam(this, opponent); }
   updateLevel8WallSlam(opponent, ownerIndex, arena) { updateLevel8WallSlam(this, opponent, ownerIndex, arena); }
 
-  applySlow(frames, multiplier) {
+  applySlow(frames, multiplier, opts = {}) {
+    if ((opts && opts.isGetsuga) || opts?.skillShotId === 'getsugaTensho' || opts?.isGetsugaSlow) {
+      if (this.adaptedGetsuga || (this.adaptedSkills && (this.adaptedSkills['getsugaTensho'] || this.adaptedSkills['getsuga']))) {
+        return; // Total immunity to Getsuga Tensho slow debuff!
+      }
+    }
     const totalStages = (this.adaptationStage?.melee || 0) + (this.adaptationStage?.ranged || 0) + (this.adaptationStage?.skill || 0);
     const ccTenacityMult = CONFIG.mahoraga?.ccTenacityPerClickPercent || 0.05;
     const maxCcTenacity = CONFIG.mahoraga?.maxCcTenacityPercent || 0.40;
@@ -500,6 +507,11 @@ export class MahoragaFighter extends Fighter {
   }
 
   applyKnockback(vx, vy) {
+    if (this.isWallSlamActive || this.isWallSlamBlitz || this.isBlitzActive) {
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
+      return;
+    }
     super.applyKnockback(vx, vy);
   }
 
@@ -763,6 +775,7 @@ export class MahoragaFighter extends Fighter {
       this.wheelRotation = this.wheelTargetRotation;
     }
     if (this.wheelGlowTimer > 0) this.wheelGlowTimer--;
+    if (this.gammaRayRainbowTimer > 0) this.gammaRayRainbowTimer--;
 
     if (this.pendingPurpleAdaptation) {
       const livePurpleOrb = (projectileSystem && projectileSystem.projectiles)
@@ -1323,10 +1336,10 @@ export class MahoragaFighter extends Fighter {
 
     // ── HAND-TO-HAND BLITZ SEQUENCE ──
     if (this.isBlitzActive) {
-      if ((this.knockbackStunTimer || 0) <= 0) {
-        this.vx = 0;
-        this.vy = 0;
-      }
+      this.vx = 0;
+      this.vy = 0;
+      this.knockbackVx = 0;
+      this.knockbackVy = 0;
       this.applyMovementPhysics(0);
 
       const target = this.blitzTarget || opponent;
@@ -1338,9 +1351,34 @@ export class MahoragaFighter extends Fighter {
         this.blitzCooldownTimer = 180;
         if (target) {
           target.isParalyzedByMahoraga = false;
+          target.isWallSlammed = false;
+          target.wallSlamPinnedX = undefined;
+          target.wallSlamPinnedY = undefined;
           target.paralyzeTimer = 0;
         }
         return;
+      }
+
+      if (this.isWallSlamBlitz && target) {
+        this.aim(target);
+        this.vx = 0;
+        this.vy = 0;
+        this.knockbackVx = 0;
+        this.knockbackVy = 0;
+
+        const aimAngle = this.gunAngle !== undefined ? this.gunAngle : Math.atan2(target.y - this.y, target.x - this.x);
+        const idealDist = this.r + target.r + 14;
+        const idealX = target.x - Math.cos(aimAngle) * idealDist;
+        const idealY = target.y - Math.sin(aimAngle) * idealDist;
+        this.x += (idealX - this.x) * 0.45;
+        this.y += (idealY - this.y) * 0.45;
+
+        if (target.wallSlamPinnedX !== undefined && target.wallSlamPinnedY !== undefined) {
+          target.x = target.wallSlamPinnedX;
+          target.y = target.wallSlamPinnedY;
+          target.vx = 0;
+          target.vy = 0;
+        }
       }
 
       if (this.blitzWindupTimer > 0) {
@@ -1540,6 +1578,7 @@ export class MahoragaFighter extends Fighter {
           target.mahoragaAdaptationFreezeTimer = 0;
           target.hitStunTimer = 0;
           target.isParalyzedByMahoraga = false;
+          target.isWallSlammed = false;
           target.wallSlamPinnedX = undefined;
           target.wallSlamPinnedY = undefined;
           target.paralyzeTimer = 0;

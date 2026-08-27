@@ -412,7 +412,7 @@ export class YutaFighter extends Fighter {
         }
 
         this.flurryHitsLeft--;
-        this.flurryTimer = CONFIG.yuta.flurryHitInterval || 6;
+        this.flurryTimer = CONFIG.yuta.flurryHitInterval || 7;
 
         // Query nearby valid enemy targets (fighters & illusions/minions) within 450px
         const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
@@ -450,7 +450,7 @@ export class YutaFighter extends Fighter {
 
           const bonusDmg = this.pureLoveBeamBonusDamage || 0;
           const dmgMult = this.getRikaDamageMultiplier();
-          const flurryDmg = ((CONFIG.yuta.flurryDamage || 8) + bonusDmg) * dmgMult;
+          const flurryDmg = ((CONFIG.yuta.flurryDamage || 15) + bonusDmg) * dmgMult;
 
           // 50% Auto-Block/Parry check if Mahoraga is adapted to Yuta's Flurry
           let isFlurryParried = false;
@@ -612,8 +612,8 @@ export class YutaFighter extends Fighter {
 
       if (this.rika && this.rika.active && this.rika.hp > 0) {
         // Drain ALL of Rika's HP during charge phase — bar empties by the time beam fires
-        const chargeFrames = CONFIG.yuta?.pureLoveBeamChargeFrames || 90;
-        const drainPerFrame = (this.rika.maxHp || 250) / chargeFrames;
+        const chargeFrames = CONFIG.yuta?.pureLoveBeamChargeFrames || 150;
+        const drainPerFrame = (this.rika.maxHp || CONFIG.yuta?.rikaMaxHp || 500) / chargeFrames;
         this.rika.hp = Math.max(0, this.rika.hp - drainPerFrame);
       }
 
@@ -639,7 +639,7 @@ export class YutaFighter extends Fighter {
         this._pureLoveBeamChargeSoundHandle = audioSystem.playSFX(soundSrc, soundVol, 1.0, CONFIG.yuta?.pureLoveBeamChargeOffset ?? 0);
       }
 
-      const chargeMax = CONFIG.yuta.pureLoveBeamChargeFrames || 90;
+      const chargeMax = CONFIG.yuta.pureLoveBeamChargeFrames || 150;
       if (this.pureLoveBeamChargeTimer >= chargeMax) {
         this.activatePureLoveBeam();
       }
@@ -660,7 +660,7 @@ export class YutaFighter extends Fighter {
       }
 
       // Continuous arena shake while beam is active — decays during final collapse
-      const beamDuration = CONFIG.yuta?.pureLoveBeamDuration || 60;
+      const beamDuration = CONFIG.yuta?.pureLoveBeamDuration || 280;
       const lifeRatio = this.pureLoveBeamActiveTimer / beamDuration;
       const baseShake = CONFIG.yuta?.pureLoveBeamShakeIntensity ?? 6;
       const shakeIntensity = lifeRatio > 0.3 ? baseShake : Math.max(1, baseShake * (lifeRatio / 0.3));
@@ -683,7 +683,7 @@ export class YutaFighter extends Fighter {
       const startX = this.x + Math.cos(angle) * offsetDist;
       const startY = this.y + Math.sin(angle) * offsetDist;
       const beamLength = CONFIG.yuta?.pureLoveBeamLength || 2500;
-      const beamWidth = CONFIG.yuta?.pureLoveBeamWidth || 170;
+      const beamWidth = CONFIG.yuta?.pureLoveBeamWidth || 200;
 
       if (this.pureLoveBeamActiveTimer % 2 === 0) {
         spawnYutaBeamLingeringParticles(startX, startY, angle, beamLength, beamWidth, 3);
@@ -850,7 +850,7 @@ export class YutaFighter extends Fighter {
         // Domain Reverse Cursed Technique (RCT): Continuous accelerated healing inside Authentic Mutual Love!
          if (this.hp > 0 && this.hp < this.maxHp) {
           const regenMult = this.getRikaRegenMultiplier();
-          const rctRate = (CONFIG.yuta.domainRctHealRate || 0.45) * regenMult;
+          const rctRate = (CONFIG.yuta.domainRctHealRate || 0.05) * regenMult;
           this.hp = Math.min(this.maxHp, this.hp + rctRate);
 
           if (Math.random() < 0.12) {
@@ -877,11 +877,11 @@ export class YutaFighter extends Fighter {
 
     // Domain Trigger (Up to 2 activations per round): Based strictly on taking HP damage!
     const hpRatio = this.hp / (this.maxHp || 200);
-    const domainHpThreshold1 = CONFIG.yuta?.domainHpThreshold ?? 0.80;  // 1st Domain at 80% HP
+    const domainHpThreshold1 = CONFIG.yuta?.domainHpThreshold ?? 0.60;  // 1st Domain at 60% HP
     const maxDomainUses = CONFIG.yuta?.domainMaxUses || 2;
 
-    // For 2nd Domain Expansion, Yuta MUST get hit and lose additional HP (20% max HP damage) AFTER 1st domain ends!
-    const hpDamageNeededFor2ndDomain = (this.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.20);
+    // For 2nd Domain Expansion, Yuta MUST get hit and lose additional HP (75% max HP damage) AFTER 1st domain ends!
+    const hpDamageNeededFor2ndDomain = (this.maxHp || 200) * (CONFIG.yuta?.domain2HpDamageRequired ?? 0.75);
     const hpLostSince1stDomain = this.domain2DamageTaken || 0;
 
     const canActivate = (!this.domainActive && !this.isChannelingDomain && (this.domainUseCount < maxDomainUses) && !this.isDying && this.hp > 0 && this.rika && this.rika.active && this.rika.hp > 0);
@@ -999,7 +999,7 @@ export class YutaFighter extends Fighter {
     }
 
     // Pure Love Beam Trigger: Automatically triggers when HP <= threshold and Rika is active
-    const pureLoveBeamThreshold = CONFIG.yuta.pureLoveBeamHpThreshold ?? 0.15;
+    const pureLoveBeamThreshold = CONFIG.yuta.pureLoveBeamHpThreshold ?? 0.60;
     const isRikaActive = (this.isRikaAliveInDomain() || (this.rika && this.rika.active && !this.rika.isDying && !this.rika.disappearing && this.rika.hp > 0));
 
     if (!this.isDemoFighter && !this.isGrabbedByMahoraga && (this.pureLoveBeamCooldownTimer || 0) <= 0 && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && !this.isChannelingDomain && !this.domainActive && hpRatio <= pureLoveBeamThreshold && isRikaActive) {
@@ -1096,7 +1096,7 @@ export class YutaFighter extends Fighter {
     const isKnockedBack = (this.knockbackStunTimer || 0) > 0;
     if (this.hitStunTimer > 0 && !isKnockedBack && !this.isChannelingDomain && !this.isChannelingPureLoveBeam && !this.isFiringPureLoveBeam && (this.pureLoveBeamBreatherTimer || 0) <= 0 && this.hp > 0 && this.meleeCooldown <= 0) {
       let enemyInMelee = false;
-      const range = CONFIG.yuta.meleeRange || 95;
+      const range = CONFIG.yuta.meleeRange || 70;
       const arc = CONFIG.yuta.meleeArc || (Math.PI * 0.75);
       const myTeam = state.getFighterTeam(state.fighters.indexOf(this));
 
@@ -1268,7 +1268,7 @@ export class YutaFighter extends Fighter {
 
         // Trigger Phantom Flurry counter (which automatically completes into Thin Ice Breaker!)
         this.blockPoseTimer = 0; // Clear block pose so he swings!
-        this.flurryHitsLeft = CONFIG.yuta.flurryHits || 5;
+        this.flurryHitsLeft = CONFIG.yuta.flurryHits || 7;
         this.flurryTimer = 0;
         this.flurryTarget = attacker;
         const attackSound = getBasicAttackSound('musashi');
@@ -1483,7 +1483,7 @@ export class YutaFighter extends Fighter {
   activatePureLoveBeam() {
     this.isChannelingPureLoveBeam = false;
     this.isFiringPureLoveBeam = true;
-    this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 180;
+    this.pureLoveBeamActiveTimer = CONFIG.yuta?.pureLoveBeamDuration || 280;
     this.pureLoveBeamCooldownTimer = CONFIG.yuta?.pureLoveBeamCooldown || 1200;
     this.pureLoveBeamLockedAngle = this.gunAngle || 0; // Lock firing angle for the entire beam duration!
 
@@ -1521,14 +1521,15 @@ export class YutaFighter extends Fighter {
     p.vx = Math.cos(this.gunAngle) * 20; // Used for logical bounding box extension, actual velocity can be faster or instant
     p.vy = Math.sin(this.gunAngle) * 20;
     p.angle = this.gunAngle;
-    p.r = CONFIG.yuta.pureLoveBeamWidth || 170; // Beam thickness (Increased size)
+    p.r = CONFIG.yuta.pureLoveBeamWidth || 200; // Beam thickness (Increased size)
     p.length = CONFIG.yuta.pureLoveBeamLength || 2500; // Screen spanning
-    p.damage = CONFIG.yuta.pureLoveBeamDamagePerTick || 12; // per tick
+    p.damage = CONFIG.yuta?.pureLoveBeamDamagePerTick ?? 10; // per tick
     p.knockback = CONFIG.yuta.pureLoveBeamKnockback || 6;
-    p.life = CONFIG.yuta.pureLoveBeamDuration || 60;
-    p.maxLife = CONFIG.yuta.pureLoveBeamDuration || 60;
+    p.life = CONFIG.yuta.pureLoveBeamDuration || 280;
+    p.maxLife = CONFIG.yuta.pureLoveBeamDuration || 280;
     p.visual = 'yuta_pure_love_beam';
     p.behaviorType = 'yuta_pure_love_beam';
+    p.isPureLoveBeam = true;
     p.piercing = true;
     p.hitTargets = new Set();
     projectileSystem.projectiles.push(p);
@@ -1543,7 +1544,7 @@ export class YutaFighter extends Fighter {
     this.isChannelingDomain = false;
     this.domainActive = true;
     this.domainActivationTime = Date.now();
-    this.domainTimer = CONFIG.yuta.domainDuration || 400;
+    this.domainTimer = CONFIG.yuta.domainDuration || 500;
     this.domainX = this.x;
     this.domainY = this.y;
     this.rikaCallTimer = 0; // Force clear any call freeze
@@ -1567,7 +1568,7 @@ export class YutaFighter extends Fighter {
         // Keep the appear animation when she appears to domain just remove the shockwave
         this.rika.x = this.x;
         this.rika.y = this.y;
-        this.rika.spawnTimer = CONFIG.yuta?.rikaAriseDuration || 180;
+        this.rika.spawnTimer = CONFIG.yuta?.rikaAriseDuration || 45;
         this.rika.spawnScale = 0.05;
         this.rika.playedComeRikaSound = false;
         this.rika.playedAriseRoarSound = false;
@@ -1630,14 +1631,14 @@ export class YutaFighter extends Fighter {
   // Returns the current damage multiplier: base mult when Rika is alive, doubled when domain is also active
   getRikaDamageMultiplier() {
     if (!this.isRikaAliveInDomain()) return 1.0;
-    const baseMult = CONFIG.yuta.domainRikaDamageMultiplier || 2.0;
+    const baseMult = CONFIG.yuta.domainRikaDamageMultiplier || 1.50;
     return this.domainActive ? baseMult * 2 : baseMult;
   }
 
   // Returns the current regen multiplier: base mult when Rika is alive, doubled when domain is also active
   getRikaRegenMultiplier() {
     if (!this.isRikaAliveInDomain()) return 1.0;
-    const baseMult = CONFIG.yuta.domainRikaRegenMultiplier || 1.2;
+    const baseMult = CONFIG.yuta.domainRikaRegenMultiplier || 1.10;
     return this.domainActive ? baseMult * 2 : baseMult;
   }
 
@@ -1649,7 +1650,7 @@ export class YutaFighter extends Fighter {
     let enemyInMelee = false;
     let closestEnemy = null;
     let closestDist = Infinity;
-    const range = CONFIG.yuta.meleeRange || 95;
+    const range = CONFIG.yuta.meleeRange || 70;
     const myTeam = (state && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(state.fighters.indexOf(this)) : this.team;
 
     const allTargets = [

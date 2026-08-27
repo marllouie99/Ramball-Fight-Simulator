@@ -462,11 +462,11 @@ export function updateRika(fighter, arena) {
         // --- Emergence Blast Damage & Radial Knockback for Fighters & Illusions ---
         if (typeof state !== 'undefined') {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
-          const emergenceRadius = CONFIG.yuta?.rikaEmergenceRadius || 260;
-          const emergenceDamage = (CONFIG.yuta?.rikaEmergenceDamage || 35) + damageGain;
-          const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback || 18;
-          const emergenceHitStun = CONFIG.yuta?.rikaEmergenceHitStun || 20;
+          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 15));
+          const emergenceRadius = CONFIG.yuta?.rikaEmergenceRadius || 400;
+          const emergenceDamage = (CONFIG.yuta?.rikaEmergenceDamage || 25) + damageGain;
+          const emergenceKnockback = CONFIG.yuta?.rikaEmergenceKnockback || 8;
+          const emergenceHitStun = CONFIG.yuta?.rikaEmergenceHitStun || 15;
 
           if (state.fighters) {
             state.fighters.forEach((enemy, idx) => {
@@ -531,7 +531,7 @@ export function updateRika(fighter, arena) {
         // --- Vengeful Death Dispersion Damage & Knockback (#8) ---
         if (typeof state !== 'undefined' && state.fighters) {
           const myTeam = state.getFighterTeam(state.fighters.indexOf(fighter));
-          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
+          const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 15));
           const dispersionRadius = CONFIG.yuta?.rikaDeathExplosionRadius || 280;
           const dispersionDamage = (CONFIG.yuta?.rikaDeathExplosionDamage || 35) + damageGain;
           const dispersionKnockback = CONFIG.yuta?.rikaDeathExplosionKnockback || 10;
@@ -673,7 +673,7 @@ export function updateRika(fighter, arena) {
       rk.hp = rk.maxHp; // Reset HP upon manifestation
       rk.playedComeRikaSound = false;
       rk.playedAriseRoarSound = false;
-      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 180;
+      const ariseMax = CONFIG.yuta?.rikaAriseDuration || 45;
       rk.spawnTimer = ariseMax;
       rk.spawnScale = 0.05;
       rk.isDomainSpawn = true; // Supress shockwaves for channeling/domain spawns
@@ -780,7 +780,7 @@ export function updateRika(fighter, arena) {
   findRikaTarget(fighter, rk);
 
   // Move Rika — ball-like movement: always moving, bounces off walls
-  const speed = fighter.baseSpeed * (CONFIG.yuta.rikaSpeedMultiplier || 1.3);
+  const speed = fighter.baseSpeed * (CONFIG.yuta.rikaSpeedMultiplier || 1.8);
 
   // Ensure Rika always has velocity (initialize if spawning or stationary)
   const currentSpeed = Math.hypot(rk.vx, rk.vy);
@@ -849,8 +849,8 @@ export function updateRika(fighter, arena) {
         }
       }
 
-      const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 16));
-      const rikaDmg = (CONFIG.yuta.rikaDamage || 25) + damageGain;
+      const damageGain = Math.max(0, (fighter.damage || 0) - (CONFIG.yuta?.damage || 15));
+      const rikaDmg = (CONFIG.yuta.rikaDamage || 20) + damageGain;
       const knockbackForce = CONFIG.yuta?.rikaHitKnockback || 16;
       const recoilForce = CONFIG.yuta?.rikaHitRecoil || 6;
       const hitStunDuration = CONFIG.yuta?.rikaHitStun || 12;
@@ -889,7 +889,7 @@ export function updateRika(fighter, arena) {
       // 3. Heavy Impact Screen Shake, Flash & Sparks
       if (typeof triggerGlobalScreenShake === 'function') triggerGlobalScreenShake(8, 10);
       if (!isLowQuality && typeof spawnRikaRoarShockwave === 'function') spawnRikaRoarShockwave(contactX, contactY, 110);
-      rk.attackTimer = CONFIG.yuta.rikaAttackRate || 40;
+      rk.attackTimer = CONFIG.yuta.rikaAttackRate || 30;
 
       // Play random demonic Rika attack noise (rikanoise1.mp3, rikanoise2.mp3, rikanoise3.mp3)
       // NEVER cuts the audio! Lets the current roar audio play to 100% completion before picking a new random roar.

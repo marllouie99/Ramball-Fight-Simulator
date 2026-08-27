@@ -172,7 +172,9 @@ export class GetsugaBehavior extends ProjectileBehavior {
         projectile.hitTargets.set(f, hitCooldown); // Cooldown before this target can be hit again by the same wave
 
         // Apply skill damage
-        applyDamageToTarget(f, projectile.damage, attacker, { isSkill: true });
+        applyDamageToTarget(f, projectile.damage, attacker, { isSkill: true, isGetsuga: true, getsugaForm: form, projectile });
+
+        const isGetsugaAdapted = Boolean(f.adaptedGetsuga || (f.adaptedSkills && (f.adaptedSkills['getsugaTensho'] || f.adaptedSkills['getsuga'])));
 
         // Apply knockback in wave direction
         const angle = Math.atan2(projectile.vy, projectile.vx);
@@ -182,48 +184,52 @@ export class GetsugaBehavior extends ProjectileBehavior {
             ? (CONFIG.ichigo?.hollowGetsugaKnockback || 8)
             : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaKnockback || 8) : (CONFIG.ichigo?.getsugaKnockback || 6)));
         if (typeof f.applyKnockback === 'function') {
-          f.applyKnockback(Math.cos(angle) * kbForce, Math.sin(angle) * kbForce);
+          f.applyKnockback(Math.cos(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce), Math.sin(angle) * (isGetsugaAdapted ? kbForce * 0.5 : kbForce));
         }
 
-        // Apply hit stun
+        // Apply hit stun (reduced if adapted)
         const stunDuration = isFinal
           ? (CONFIG.ichigo?.bankaiFinalGetsugaHitStun || 28)
           : (isMask
             ? (CONFIG.ichigo?.hollowGetsugaHitStun || 20)
             : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaHitStun || 20) : (CONFIG.ichigo?.getsugaHitStun || 18)));
         if (typeof f.applyHitStun === 'function') {
-          f.applyHitStun(stunDuration);
+          f.applyHitStun(isGetsugaAdapted ? Math.round(stunDuration * 0.4) : stunDuration);
         }
 
-        // ── 5. Apply Movement Slow Debuff ──
-        const slowDuration = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaSlowDuration || 140)
-          : (isMask
-            ? (CONFIG.ichigo?.hollowGetsugaSlowDuration || 100)
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSlowDuration || 100) : (CONFIG.ichigo?.getsugaSlowDuration || 90)));
-        const slowMultiplier = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaSlowMultiplier || 0.20)
-          : (isMask
-            ? (CONFIG.ichigo?.hollowGetsugaSlowMultiplier || 0.35)
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSlowMultiplier || 0.35) : (CONFIG.ichigo?.getsugaSlowMultiplier || 0.40)));
+        // ── 5. Apply Movement Slow Debuff (Immune if Adapted!) ──
+        if (!isGetsugaAdapted) {
+          const slowDuration = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaSlowDuration || 140)
+            : (isMask
+              ? (CONFIG.ichigo?.hollowGetsugaSlowDuration || 100)
+              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSlowDuration || 100) : (CONFIG.ichigo?.getsugaSlowDuration || 90)));
+          const slowMultiplier = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaSlowMultiplier || 0.20)
+            : (isMask
+              ? (CONFIG.ichigo?.hollowGetsugaSlowMultiplier || 0.35)
+              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaSlowMultiplier || 0.35) : (CONFIG.ichigo?.getsugaSlowMultiplier || 0.40)));
 
-        if (typeof f.applySlow === 'function') {
-          f.applySlow(slowDuration, slowMultiplier, { isGetsuga: true });
+          if (typeof f.applySlow === 'function') {
+            f.applySlow(slowDuration, slowMultiplier, { isGetsuga: true });
+          }
+          if (f.statusEffects && typeof f.statusEffects.applySlow === 'function') {
+            f.statusEffects.applySlow(slowDuration, slowMultiplier);
+          }
+          f.slowTimer = Math.max(f.slowTimer || 0, slowDuration);
+          f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMultiplier);
         }
-        if (f.statusEffects && typeof f.statusEffects.applySlow === 'function') {
-          f.statusEffects.applySlow(slowDuration, slowMultiplier);
-        }
-        f.slowTimer = Math.max(f.slowTimer || 0, slowDuration);
-        f.slowMultiplier = Math.min(f.slowMultiplier || 1.0, slowMultiplier);
 
-        // ── 6. Register for Active Wave Dragging ──
-        if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
-        const dragFrames = isFinal
-          ? (CONFIG.ichigo?.bankaiFinalGetsugaDragFrames || 24)
-          : (isMask
-            ? (CONFIG.ichigo?.hollowGetsugaDragFrames || 18)
-            : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDragFrames || 16) : (CONFIG.ichigo?.getsugaDragFrames || 14)));
-        projectile.draggedTargets.set(f, dragFrames);
+        // ── 6. Register for Active Wave Dragging (Immune if Adapted!) ──
+        if (!isGetsugaAdapted) {
+          if (!projectile.draggedTargets) projectile.draggedTargets = new Map();
+          const dragFrames = isFinal
+            ? (CONFIG.ichigo?.bankaiFinalGetsugaDragFrames || 24)
+            : (isMask
+              ? (CONFIG.ichigo?.hollowGetsugaDragFrames || 18)
+              : (isBankai ? (CONFIG.ichigo?.bankaiGetsugaDragFrames || 16) : (CONFIG.ichigo?.getsugaDragFrames || 14)));
+          projectile.draggedTargets.set(f, dragFrames);
+        }
 
         // Visual impacts: specialized Bleach Getsuga Tensho spatial cleave hit effect
         if (typeof spawnGetsugaHitEffect === 'function') {
@@ -261,7 +267,7 @@ export class GetsugaBehavior extends ProjectileBehavior {
     if (system && system.projectiles) {
       for (let j = 0; j < system.projectiles.length; j++) {
         const other = system.projectiles[j];
-        if (!other || other === projectile || other.owner === ownerIdx || other.isGetsuga || other.isGojoPurple || other.isSukunaFurnace) continue;
+        if (!other || other === projectile || other.owner === ownerIdx || other.isGetsuga || other.isGojoPurple || other.isSukunaFurnace || other.behaviorType === 'yuta_pure_love_beam' || other.visual === 'yuta_pure_love_beam' || other.isPureLoveBeam) continue;
         const d = Math.hypot(other.x - projectile.x, other.y - projectile.y);
         if (d <= hitRadius + (other.r || 6)) {
           other.life = 0;
