@@ -1205,7 +1205,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'yuta') offsetX = -40; // Katana
   else if (type === 'megumi') offsetX = -45; // Shadow Blade
   else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
-  else if (type === 'uryu') offsetX = -18; // TYBW Spirit Bow
+  else if (type === 'uryu') offsetX = 0; // TYBW Spirit Bow centered
   else if (type === 'ichigo') {
     offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -55;
   }
@@ -1357,7 +1357,10 @@ function drawWeaponPreview(ctx, type, color) {
 
 
       case 'uryu':
-        drawUryuBow(ctx, 0, 0, r, 0.45, { isAiming: true });
+        ctx.save();
+        ctx.scale(0.72, 0.72);
+        drawUryuBow(ctx, 0, 0, r, 0.35, { isAiming: true });
+        ctx.restore();
         return;
 
       case 'gunslinger':

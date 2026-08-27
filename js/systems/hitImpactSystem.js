@@ -113,11 +113,15 @@ export const HitImpactSystem = {
         audioSystem.playSFX('attack_fleshhit', 0.65);
       }
 
-      // Micro-knockback pushing target
-      const kb = CONFIG.uryu?.arrowKnockback || 4.5;
+      // Micro-knockback pushing target (safe, non-tunneling)
+      const kb = CONFIG.uryu?.arrowKnockback || 2.2;
       const angle = (projectile.lastAngle !== undefined) ? projectile.lastAngle : (Math.atan2(projectile.vy || 0, projectile.vx || 0) || 0);
-      target.vx = (target.vx || 0) + Math.cos(angle) * kb;
-      target.vy = (target.vy || 0) + Math.sin(angle) * kb;
+      if (typeof target.applyKnockback === 'function') {
+        target.applyKnockback(Math.cos(angle) * kb, Math.sin(angle) * kb);
+      } else {
+        target.vx = (target.vx || 0) + Math.cos(angle) * kb;
+        target.vy = (target.vy || 0) + Math.sin(angle) * kb;
+      }
 
       // Charge Uryu's Reishi Sklaverei gauge on hit
       if (attacker && (attacker.characterId === 'uryu' || attacker.type === 'uryu')) {

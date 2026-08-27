@@ -7,29 +7,70 @@ import { getHandSize } from '../../core/config.js';
 
 export const CRIMSON_SNIPER_WEAPON_GRAPHICS = {
   colors: {
-    whiteMetal: '#e8e8eb',     // Main body
-    greyMetal: '#9a9ca1',      // Darker metal accents
-    darkMetal: '#26272b',      // Barrel and scope parts
-    blackPolymer: '#151518',   // Stock and grip
-    glowCore: '#ffffff',       // Center of glows
-    glowRed: '#ff1111',        // Red glows
-    glowRedDark: '#990000',    // Darker red for borders
-    outline: '#080808',        // General outline
-    trigger: '#cc3300'         // Trigger color
+    // 1:1 Reference Artwork Color Palette
+    outline: '#0f121a',         // Deep dark pixel ink outline
+
+    // White / Platinum Armor Plating
+    whiteShine: '#ffffff',      // Specular highlight / glint cuts
+    whiteLight: '#eef2f8',      // Main white armor shell
+    whiteMid: '#c5cee0',        // Mid silver bevel
+    whiteDark: '#8a9ab5',       // Armor panel shadow
+    whiteDeep: '#54637d',       // Deepest armor crease
+
+    // Titanium / Gunmetal Chassis & Barrel
+    metalGlint: '#8a9bbd',      // Top bevel glint
+    metalLight: '#5d6d8a',      // Highlight metal
+    metalMid: '#3d485e',        // Mid gunmetal body
+    metalDark: '#262d3d',       // Dark metal base
+    metalDeep: '#181c26',       // Shadowed receiver plate
+    metalBlack: '#0d0f15',      // Deepest recess / barrel core
+
+    // Carbon Fiber / Hex Mesh Textures
+    meshBg: '#1b1f2b',          // Dark mesh base
+    meshDot1: '#2f374a',        // Mesh weave dot 1
+    meshDot2: '#45506b',        // Mesh weave dot 2
+
+    // Neon Energy Conduits & Glowing Ammo Nodes (Matching Reference Gold/Amber + Crimson)
+    glowCore: '#ffffff',        // White-hot center
+    glowBright: '#ffe033',      // Blinding neon gold/yellow
+    glowMid: '#ff9e00',         // Vibrant amber glow
+    glowDark: '#d9480f',        // Deep orange/crimson conduit trench
+    glowOff: '#191d26',         // Dimmed spent node slot
+    triggerOrange: '#ff8800',   // Curved amber trigger
+
+    // Scope Optics & Accents
+    lensGlint: '#ffffff',       // Lens glass glint
+    lensCyanLight: '#7dd3fc',   // Optic lens highlight
+    lensCyanDark: '#0284c7',    // Deep optic chamber
   },
   positioning: {
-    scale: 0.55,
-    baseX: -5,
+    scale: 0.65,
+    baseX: -4,
   }
 };
 
-export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, maxAmmo = 4, reloadTimer = 0, isReloading = false, flashTimer = 0, tensionIntensity = 0, fighterColor = '#ff1111') {
+export function drawRedSniperGun(
+  ctx,
+  x,
+  y,
+  gunAngle,
+  r,
+  recoil = 0,
+  ammo = 4,
+  maxAmmo = 4,
+  reloadTimer = 0,
+  isReloading = false,
+  flashTimer = 0,
+  tensionIntensity = 0,
+  fighterColor = '#ff1111'
+) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
+
   ctx.save();
   ctx.translate(x, y);
-  
-  // Apply visual recoil rotation kick (upwards)
-  const kickAngle = Math.sin(recoil * Math.PI / 2) * -0.15;
+
+  // Recoil kick rotation & backward displacement
+  const kickAngle = Math.sin((recoil * Math.PI) / 2) * -0.13;
   ctx.rotate(gunAngle + kickAngle);
 
   if (Math.abs(gunAngle) > Math.PI / 2) {
@@ -40,550 +81,441 @@ export function drawRedSniperGun(ctx, x, y, gunAngle, r, recoil = 0, ammo = 4, m
   const s = cfg.positioning.scale;
   const bx = r + cfg.positioning.baseX;
 
-  // Apply visual recoil translation kick (backwards)
-  const kickback = Math.sin(recoil * Math.PI / 2) * 12;
+  const kickback = Math.sin((recoil * Math.PI) / 2) * 12;
   ctx.translate(bx - kickback, 0);
 
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = 1.5 * s;
+  const C = cfg.colors;
+  const now = Date.now();
+  const pulse = Math.sin(now / 130) * 0.5 + 0.5; // 0 to 1
 
-  const colors = cfg.colors;
+  // ═══════════════════════════════════════════════════════════════════
+  // HIGH-PRECISION PIXEL GRID ENGINE
+  // ═══════════════════════════════════════════════════════════════════
+  const P = 1.05 * s; // Fine pixel block unit matching the reference resolution
 
-  const drawPoly = (pts, fill, stroke, evenodd = false) => {
-    ctx.beginPath();
-    let isFirst = true;
-    for (const pt of pts) {
-      if (pt === null) {
-        isFirst = true;
-        continue;
+  const px = (gx, gy, fill) => {
+    if (!fill) return;
+    ctx.fillStyle = fill;
+    ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(P), Math.round(P));
+  };
+
+  const pxRect = (gx, gy, gw, gh, fill) => {
+    if (!fill) return;
+    ctx.fillStyle = fill;
+    ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(gw * P), Math.round(gh * P));
+  };
+
+  // Draw carbon fiber / hex mesh pattern
+  const pxMesh = (gx, gy, gw, gh) => {
+    pxRect(gx, gy, gw, gh, C.meshBg);
+    for (let my = 0; my < gh; my++) {
+      for (let mx = 0; mx < gw; mx++) {
+        if ((mx + my) % 2 === 0) {
+          px(gx + mx, gy + my, C.meshDot1);
+        } else if ((mx + my) % 4 === 1) {
+          px(gx + mx, gy + my, C.meshDot2);
+        }
       }
-      if (isFirst) {
-        ctx.moveTo(pt[0] * s, pt[1] * s);
-        isFirst = false;
-      } else {
-        ctx.lineTo(pt[0] * s, pt[1] * s);
-      }
-    }
-    if (fill) {
-      ctx.fillStyle = fill;
-      if (evenodd) ctx.fill('evenodd');
-      else ctx.fill();
-    }
-    if (stroke) {
-      ctx.strokeStyle = stroke;
-      ctx.stroke();
     }
   };
 
-  // Add shadow for depth (OPTIMIZED: using shadowOffsetY only, removed shadowBlur)
-  // OPTIMIZED: Removed shadowColor
-  // OPTIMIZED: Removed shadowBlur
-  ctx.shadowOffsetY = 2;
-  
-  // --- 1. Long Dark Barrel ---
-  drawPoly([
-    [10, -4],
-    [125, -4],
-    [125, 2],
-    [10, 2],
-    [10, -4]
-  ], colors.darkMetal, colors.outline);
+  // Draw glowing energy conduit node (on barrel & receiver)
+  const drawCapsuleNode = (gx, gy, isLit) => {
+    // 6x3 capsule node
+    pxRect(gx - 1, gy - 1, 8, 5, C.outline);
+    if (isLit) {
+      pxRect(gx, gy, 6, 3, C.glowDark);
+      pxRect(gx + 1, gy, 4, 3, C.glowMid);
+      pxRect(gx + 1, gy + 1, 4, 1, C.glowBright);
+      px(gx + 2, gy + 1, C.glowCore);
+      px(gx + 3, gy + 1, C.glowCore);
+    } else {
+      pxRect(gx, gy, 6, 3, C.glowOff);
+      pxRect(gx + 1, gy + 1, 4, 1, C.metalDeep);
+    }
+  };
 
-  // --- 2. Muzzle Brake ---
-  // (Removed bulky muzzle brake to make the barrel sleek and straight)
-
-  // --- 3. Main Black Polymer (Stock + Grip + Lower Receiver) ---
-  drawPoly([
-    // Outer contour
-    [10, -3],
-    [-15, -3],
-    [-22, -10],
-    [-38, -10],
-    [-46, 2],
-    [-40, 16],
-    [-30, 16],
-    [-18, 30],
-    [-6, 30],
-    [6, 16],
-    [6, 4],
-    [10, -3],
-    null, // start hole 1 (thumbhole)
-    [-12, 4],
-    [-22, 12],
-    [-28, 12],
-    [-22, -2],
-    [-12, 4],
-    null, // start hole 2 (trigger area)
-    [-1, 4],
-    [3, 8],
-    [3, 11],
-    [-3, 11],
-    [-1, 4]
-  ], colors.blackPolymer, colors.outline, true);
-
-  // --- 4. Trigger ---
-  drawPoly([
-    [1, 4],
-    [-1, 8],
-    [1, 10],
-    [2, 10],
-    [2, 4],
-    [1, 4]
-  ], colors.trigger, null);
-
-  // --- 5. Light Metal Stock Accents ---
-  drawPoly([
-    [-28, -12],
-    [-42, -12],
-    [-50, 2],
-    [-44, 18],
-    [-34, 18],
-    [-40, 4],
-    [-34, -6],
-    [-28, -12]
-  ], colors.whiteMetal, colors.outline);
-
-  // --- 6. Main Light Metal Body ---
-  drawPoly([
-    [-2, -7],
-    [16, -7],
-    [20, -10],
-    [36, -10],
-    [36, -2],
-    [58, -2],
-    [52, 6],
-    [26, 6],
-    [24, 12],
-    [12, 12],
-    [6, 18],
-    [-2, 14],
-    [4, 8],
-    [-6, 8],
-    [-12, -2],
-    [-2, -7]
-  ], colors.whiteMetal, colors.outline);
-
-  // Panel lines / Details on Main Body
-  // OPTIMIZED: Removed shadowBlur 
-  drawPoly([
-    [24, 6],
-    [28, -2],
-    [34, -2],
-    [34, -6]
-  ], null, colors.greyMetal);
-  
-  drawPoly([
-    [12, -2],
-    [12, 4],
-    [18, 4]
-  ], null, colors.greyMetal);
-
-  // --- 6.5. DYNAMIC MAGAZINE ---
-  // The magazine hangs below the gun body, drops down when reloading
-  let magDropY = 0;
-  if (isReloading) {
-     const progress = 1 - (reloadTimer / 120); // roughly 0 to 1
-     if (progress < 0.2) {
-       magDropY = progress * 5 * 20; // drops down
-     } else if (progress > 0.8) {
-       magDropY = (1 - progress) * 5 * 20; // snaps back up
-     } else {
-       magDropY = 20; // stays dropped below
-     }
-  }
-
-  // Draw magazine AFTER gun body so it appears on top
-  // Position it below the gun body (gun ends at ~Y=18, magazine starts at Y=20)
-  ctx.save();
-  ctx.translate(0, (20 + magDropY) * s);
-  
-  // Magazine body - rectangular box hanging below
-  drawPoly([
-    [12, 0],
-    [26, 0],
-    [28, 18],
-    [20, 22],
-    [10, 22],
-    [8, 18],
-    [12, 0]
-  ], colors.blackPolymer, colors.outline);
-  
-  // Magazine follower/top plate
-  drawPoly([
-    [12, 0],
-    [26, 0],
-    [26, 4],
-    [12, 4]
-  ], colors.greyMetal, colors.outline);
-  
-  // Ammo Indicator lights on magazine (glowing pips)
-  for (let i = 0; i < maxAmmo; i++) {
-    const pipY = 12 - i * 3;
-    const isFilled = i < ammo;
-    ctx.fillStyle = isFilled ? colors.glowRed : colors.darkMetal;
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
-    ctx.beginPath();
-    ctx.arc(17 * s, pipY * s, 1.2 * s, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.restore();
-  // OPTIMIZED: Removed shadowBlur
-
-  // --- 6.8 RELOAD FINISH FLASH ---
-  if (flashTimer > 0) {
-    const flashProgress = flashTimer / 20; // 1 to 0
-    
-    ctx.globalCompositeOperation = 'lighter';
-    ctx.fillStyle = `rgba(255, 100, 100, ${flashProgress})`;
-    // OPTIMIZED: Removed shadowBlur (expensive operation)
-    
-    // Core glow at the magazine port
-    ctx.beginPath();
-    ctx.arc(18 * s, 10 * s, 12 * flashProgress * s, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Vents discharging excess heat (white hot center)
-    ctx.fillStyle = `rgba(255, 255, 255, ${flashProgress})`;
-    ctx.beginPath();
-    ctx.arc(18 * s, 10 * s, 5 * flashProgress * s, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Side vent lines lighting up
-    ctx.strokeStyle = `rgba(255, 100, 100, ${flashProgress * 0.8})`;
-    ctx.lineWidth = 2 * s;
-    ctx.beginPath();
-    ctx.moveTo(28 * s, 0);
-    ctx.lineTo(34 * s, 0);
-    ctx.moveTo(34 * s, 0);
-    ctx.lineTo(36 * s, -4 * s);
-    ctx.stroke();
-
-    // OPTIMIZED: Removed shadowBlur
-    ctx.globalCompositeOperation = 'source-over';
-  }
-
-  // --- 7. Underbarrel Foregrip (Light Metal) ---
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
-  drawPoly([
-    [26, 12],
-    [46, 12],
-    [48, 6],
-    [68, 6],
-    [72, 10],
-    [48, 10],
-    [44, 16],
-    [22, 16],
-    [26, 12]
-  ], colors.whiteMetal, colors.outline);
-
-  // --- 8. Scope Mount ---
-  drawPoly([
-    [6, -7],
-    [10, -18],
-    [20, -18],
-    [24, -10],
-    [6, -7]
-  ], colors.darkMetal, colors.outline);
-
-  // --- 9. Scope Main Body ---
-  drawPoly([
-    [-4, -24],
-    [28, -24],
-    [34, -18],
-    [34, -12],
-    [-8, -12],
-    [-4, -24]
-  ], colors.whiteMetal, colors.outline);
-
-  // --- 10. Scope Front End (Dark Metal) ---
-  drawPoly([
-    [28, -26],
-    [42, -26],
-    [34, -12],
-    [32, -12],
-    [28, -26]
-  ], colors.blackPolymer, colors.outline);
-
-  // --- 11. Scope Back End (Dark Metal) ---
-  drawPoly([
-    [-14, -22],
-    [-4, -22],
-    [-2, -12],
-    [-10, -12],
-    [-14, -22]
-  ], colors.blackPolymer, colors.outline);
-
-
-  // --- 12. GLOWING ACCENTS (Red) ---
-  const now = Date.now();
-  const pulse1 = Math.sin(now / 150) * 0.5 + 0.5; // 0 to 1
-  const pulse2 = Math.sin(now / 200 + Math.PI) * 0.5 + 0.2;
-
-  // OPTIMIZED: Removed shadowBlur (expensive operation)
-  
-  // Outer glow and red areas
-  ctx.fillStyle = `rgba(255, ${60 + pulse1 * 40}, ${60 + pulse1 * 40}, ${0.8 + pulse1 * 0.2})`; 
-  
-  // Barrel Glowing Slots
-  ctx.fillRect(48 * s, -3 * s, 6 * s, 2 * s);
-  ctx.fillStyle = `rgba(255, ${60 + pulse2 * 40}, ${60 + pulse2 * 40}, ${0.8 + pulse2 * 0.2})`;
-  ctx.fillRect(56 * s, -3 * s, 10 * s, 2 * s);
-  ctx.fillStyle = `rgba(255, ${60 + pulse1 * 40}, ${60 + pulse1 * 40}, ${0.8 + pulse1 * 0.2})`;
-  ctx.fillRect(68 * s, -3 * s, 6 * s, 2 * s);
-
-  ctx.fillStyle = '#ff6666'; // Reset for remaining parts
-  
-  // Glowing slit on main body above trigger
-  ctx.beginPath();
-  ctx.moveTo(18 * s, 2 * s);
-  ctx.lineTo(26 * s, 2 * s);
-  ctx.lineTo(24 * s, 3 * s);
-  ctx.lineTo(16 * s, 3 * s);
-  ctx.fill();
-
-  // Circle glow on main body
-  ctx.beginPath();
-  ctx.arc(8 * s, 3 * s, 1.5 * s, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Scope Glow Details
-  ctx.lineWidth = 1.5 * s;
-  ctx.strokeStyle = colors.glowRed;
-  
-  // Connecting line on scope
-  ctx.beginPath();
-  ctx.moveTo(4 * s, -18 * s);
-  ctx.lineTo(12 * s, -18 * s);
-  ctx.lineTo(16 * s, -15 * s);
-  ctx.lineTo(22 * s, -15 * s);
-  ctx.stroke();
-
-  // Scope Dials
-  ctx.lineWidth = 1 * s;
-  ctx.fillStyle = colors.darkMetal;
-  
-  // Dial 1
-  ctx.beginPath();
-  ctx.arc(10 * s, -18 * s, 3 * s, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
-  
-  // Dial 2
-  ctx.beginPath();
-  ctx.arc(18 * s, -15 * s, 3 * s, 0, Math.PI * 2);
-  ctx.fill(); ctx.stroke();
-
-  // Highlight Cores
-  ctx.fillStyle = colors.glowCore;
-  ctx.beginPath(); ctx.arc(10 * s, -18 * s, 1 * s, 0, Math.PI * 2); ctx.fill();
-  ctx.beginPath(); ctx.arc(18 * s, -15 * s, 1 * s, 0, Math.PI * 2); ctx.fill();
-
-  ctx.fillStyle = '#ff6666';
-  // Red glow on dark scope tip
-  ctx.beginPath();
-  ctx.moveTo(34 * s, -24 * s);
-  ctx.lineTo(38 * s, -24 * s);
-  ctx.lineTo(34 * s, -18 * s);
-  ctx.lineTo(32 * s, -18 * s);
-  ctx.fill();
-
-  // Red lens
-  ctx.fillStyle = colors.glowRed;
-  ctx.beginPath();
-  ctx.moveTo(40 * s, -24 * s);
-  ctx.lineTo(41 * s, -24 * s);
-  ctx.lineTo(35 * s, -13 * s);
-  ctx.lineTo(34 * s, -13 * s);
-  ctx.fill();
-
-  // Muzzle glow (at the tip of the barrel)
-  ctx.fillStyle = colors.glowCore;
-  ctx.beginPath();
-  ctx.arc(125 * s, 0, 2 * s + pulse1 * 0.5 * s, 0, Math.PI * 2);
-  ctx.fill();
-
-  // --- 13. DYNAMIC LASER SIGHT & ENERGY ---
-  ctx.globalCompositeOperation = 'source-over'; // Changed from 'lighter' so it is visible on white backgrounds
-  // OPTIMIZED: Removed shadowBlur // Turn off shadow for lighter elements
-  
-  // Laser Sight Beam
-  const beamLength = 1200 * s; // Extended to stretch across the arena
-  const beamAlpha = 0.2 + pulse1 * 0.15;
-  const grad = ctx.createLinearGradient(125 * s, 0, 125 * s + beamLength, 0);
-  grad.addColorStop(0, `rgba(255, 30, 30, ${beamAlpha})`);
-  grad.addColorStop(1, 'rgba(255, 30, 30, 0)');
-  
-  ctx.beginPath();
-  ctx.moveTo(125 * s, -0.6 * s);
-  ctx.lineTo(125 * s + beamLength, -0.6 * s);
-  ctx.lineTo(125 * s + beamLength, 0.6 * s);
-  ctx.lineTo(125 * s, 0.6 * s);
-  ctx.fillStyle = grad;
-  ctx.fill();
-
-  // Bright center of the laser sight
-  const coreGrad = ctx.createLinearGradient(125 * s, 0, 125 * s + beamLength * 0.6, 0);
-  coreGrad.addColorStop(0, `rgba(255, 200, 200, ${beamAlpha * 1.5})`);
-  coreGrad.addColorStop(1, 'rgba(255, 200, 200, 0)');
-  ctx.beginPath();
-  ctx.moveTo(125 * s, -0.2 * s);
-  ctx.lineTo(125 * s + beamLength * 0.6, -0.2 * s);
-  ctx.lineTo(125 * s + beamLength * 0.6, 0.2 * s);
-  ctx.lineTo(125 * s, 0.2 * s);
-  ctx.fillStyle = coreGrad;
-  ctx.fill();
-
-  // Floating Energy Particles near muzzle
-  ctx.fillStyle = '#ff6666';
-  for (let i = 0; i < 4; i++) {
-    const pX = 90 * s + Math.sin(now / (100 + i * 50)) * 18 * s;
-    const pY = Math.cos(now / (120 + i * 40)) * 6 * s;
-    const pSize = (0.5 + Math.sin(now / 100 + i) * 0.5) * 1.5 * s;
-    ctx.beginPath();
-    ctx.arc(pX, pY, pSize, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Energy rings along the barrel
-  ctx.strokeStyle = `rgba(255, 60, 40, ${0.4 + pulse2 * 0.5})`;
-  ctx.lineWidth = 1 * s;
-  for (let i = 0; i < 3; i++) {
-    const ringX = 50 * s + i * 11 * s + Math.sin(now / 150 + i) * 3 * s;
-    ctx.beginPath();
-    ctx.ellipse(ringX, 0, 1.5 * s, 4.5 * s, 0, 0, Math.PI * 2);
-    ctx.stroke();
-  }
-  
-  // --- 14. ANIME SHOCKWAVE (WOOSH) ON FIRE ---
-  if (recoil > 0) {
-    const shockProgress = 1.0 - recoil; // 0.0 to 1.0
-    // The shockwave blasts forward and expands massively
-    const shockX = 102 * s + shockProgress * 80 * s; 
-    const shockHeight = 40 * s + Math.pow(shockProgress, 0.5) * 180 * s; 
-    const shockWidth = 10 * s + Math.pow(shockProgress, 0.5) * 40 * s;
-    const shockThickness = Math.pow(recoil, 1.5) * 12; // Thins out quickly
-    
-    ctx.save();
-    // Do NOT use 'lighter' since the arena background is white/light.
-    // Use 'source-over' with dark/contrasting colors so it's highly visible!
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.translate(shockX, 0); // Moves forward from muzzle
-    
-    // Draw an anime-style sharp crescent / shock ring (Dark Crimson)
-    ctx.beginPath();
-    ctx.ellipse(0, 0, shockWidth, shockHeight, 0, -Math.PI/2.5, Math.PI/2.5);
-    ctx.lineWidth = shockThickness * s;
-    ctx.lineCap = 'round';
-    ctx.strokeStyle = `rgba(180, 0, 0, ${recoil})`; // Deep red blast
-    ctx.stroke();
-    
-    // An inner, sharper black ring trailing slightly behind
-    ctx.beginPath();
-    ctx.ellipse(-5 * s, 0, shockWidth * 0.8, shockHeight * 0.8, 0, -Math.PI/2.5, Math.PI/2.5);
-    ctx.lineWidth = (shockThickness * 0.5) * s;
-    ctx.strokeStyle = `rgba(0, 0, 0, ${recoil * 0.8})`; // Black pressure ring
-    ctx.stroke();
-
-    // A horizontal blast line (the 'woosh' wind line) piercing through the center
-    const lineLength = 100 * s + shockProgress * 300 * s;
-    ctx.beginPath();
-    ctx.moveTo(-lineLength * 0.3, 0);
-    ctx.lineTo(lineLength * 0.7, 0);
-    ctx.lineWidth = Math.pow(recoil, 2) * 6 * s;
-    ctx.strokeStyle = `rgba(30, 30, 35, ${recoil * 0.7})`; // Dark gray/black wind streak
-    ctx.stroke();
-
-    ctx.restore();
-  }
-
-  // --- 15. TENSION AURA: ENHANCED SHOT READY ---
-  // The intensity smooths in as ammo drops to 2 and fully surges at 1
+  // ═══════════════════════════════════════════════════════════════════
+  // 1. TENSION AURA (Enhanced Execution Shot Ready)
+  // ═══════════════════════════════════════════════════════════════════
   if (tensionIntensity > 0) {
-    const time = Date.now() / 150;
-    
-    ctx.save();
-    // Center the aura around the middle of the long barrel
-    ctx.translate(60 * s, 0);
-    
-    // 1. Smooth Fade-in Dark Red Smoke
-    const auraGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 45 * s);
-    auraGrad.addColorStop(0, `rgba(180, 0, 0, ${0.6 * tensionIntensity})`);
-    auraGrad.addColorStop(0.5, `rgba(80, 0, 0, ${0.3 * tensionIntensity})`);
-    auraGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    
-    ctx.fillStyle = auraGrad;
-    for (let i = -1; i <= 2; i++) {
-        // Smoke clouds smoothly drifting
-        const xOffset = i * 25 * s + Math.sin(time * 0.5 + i) * 10 * s;
-        const yOffset = Math.cos(time * 0.5 + i * 2) * 8 * s;
-        ctx.beginPath();
-        ctx.ellipse(xOffset, yOffset, 40 * s, 25 * s, 0, 0, Math.PI * 2);
-        ctx.fill();
+    const t = now / 110;
+    for (let i = 0; i < 9; i++) {
+      const pTime = (t * 0.7 + i * 1.6) % 4.5;
+      const pX = -10 + i * 11 + Math.sin(t + i) * 3;
+      const pY = -12 - pTime * 3.5;
+      const pSize = Math.max(1, 3 - Math.floor(pTime * 0.7));
+      ctx.fillStyle = i % 2 === 0 ? C.glowBright : C.glowMid;
+      ctx.globalAlpha = Math.max(0, (1 - pTime / 4.5) * tensionIntensity);
+      ctx.fillRect(Math.round(pX * P), Math.round(pY * P), Math.round(pSize * P), Math.round(pSize * P));
     }
-    
-    // 2. Smoke-red Lightning Ascending (converging) to the gun
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    
-    // Fewer sparks at lower intensities
-    const baseSparks = tensionIntensity > 0.5 ? 4 : 1; 
-    const numSparks = baseSparks + Math.floor(Math.random() * (tensionIntensity > 0.5 ? 3 : 2));
-    for (let i = 0; i < numSparks; i++) {
-        const isDark = Math.random() > 0.8;
-        ctx.strokeStyle = isDark ? `rgba(30, 0, 0, ${0.9 * tensionIntensity})` : `rgba(255, ${Math.random() * 50}, 50, ${0.8 * tensionIntensity})`;
-        ctx.lineWidth = (isDark ? 2 : 1.5) * s;
-        
-        // Pick a point along the barrel
-        const barrelX = (Math.random() - 0.5) * 110 * s;
-        
-        // Start the spark OUTSIDE the gun (ascending from the smoke aura)
-        const startY = (Math.random() > 0.5 ? 1 : -1) * (15 + Math.random() * 25) * s;
-        const startX = barrelX + (Math.random() - 0.5) * 20 * s;
-        
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        
-        let curX = startX;
-        let curY = startY;
-        const segments = 3;
-        
-        for (let j = 1; j <= segments; j++) {
-            const t = j / segments;
-            // Interpolate towards the barrel center
-            const targetX = startX + (barrelX - startX) * t;
-            const targetY = startY + (0 - startY) * t;
-            
-            // Add jaggedness
-            curX = targetX + (Math.random() - 0.5) * 12 * s;
-            curY = targetY + (Math.random() - 0.5) * 8 * s;
-            
-            // Force the final point to hit the barrel exactly
-            if (j === segments) {
-                curX = barrelX;
-                curY = 0;
-            }
-            
-            ctx.lineTo(curX, curY);
-        }
-        ctx.stroke();
-    }
-    
-    ctx.restore();
+    ctx.globalAlpha = 1.0;
   }
 
-  ctx.globalCompositeOperation = 'source-over';
+  // ═══════════════════════════════════════════════════════════════════
+  // 2. BUTTSTOCK, CARBON MESH & SOLID THUMBHOLE (Exact 1:1 Reference)
+  // ═══════════════════════════════════════════════════════════════════
+  // ── 2.1 Angled White & Dark Buttpad with Sharp Toe (Leftmost) ──
+  // Outer angled white frame
+  pxRect(-58, -6, 6, 20, C.outline);
+  pxRect(-57, -5, 4, 18, C.whiteMid);
+  pxRect(-57, -5, 2, 18, C.whiteShine); // Rear glint
+  pxRect(-54, -4, 2, 16, C.whiteDark);
 
-  // ── Hand ──
-  ctx.save();
-  ctx.translate(3 * s, 10 * s); // Position hand near the trigger grip
-  ctx.fillStyle = fighterColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, getHandSize(6), 0, Math.PI * 2);
-  ctx.fill();
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = '#000';
-  ctx.stroke();
-  ctx.restore();
+  // Lower pointed toe extending down-left
+  pxRect(-59, 10, 5, 5, C.outline);
+  pxRect(-58, 11, 3, 3, C.whiteShine);
+  pxRect(-55, 12, 2, 2, C.whiteMid);
+
+  // Recessed dark rubber cushion core inside buttpad
+  pxRect(-54, -3, 6, 12, C.outline);
+  pxRect(-53, -2, 4, 10, C.metalDeep);
+  pxRect(-53, -2, 2, 10, C.metalDark);
+
+  // Undercut shadow notch above bottom toe
+  pxRect(-53, 8, 6, 4, C.metalBlack);
+
+  // ── 2.2 White Armor Cheek-Crest & Inset Circular Port (Top) ──
+  // Sweeping top white armor shell
+  pxRect(-54, -8, 28, 8, C.outline);
+  pxRect(-53, -7, 26, 6, C.whiteLight);
+  pxRect(-53, -7, 26, 1, C.whiteShine); // Pure specular top edge
+  pxRect(-53, -4, 26, 2, C.whiteMid);
+  pxRect(-53, -2, 26, 1, C.whiteDark);
+
+  // Forward sloping crest bevel
+  pxRect(-28, -6, 6, 4, C.outline);
+  pxRect(-27, -5, 4, 2, C.whiteShine);
+
+  // Circular Port / Socket Inset in the white armor (X = -44, Y = -3)
+  pxRect(-46, -5, 6, 6, C.outline);
+  pxRect(-45, -4, 4, 4, C.whiteMid);
+  pxRect(-45, -4, 2, 2, C.whiteShine);
+  pxRect(-44, -3, 2, 2, C.metalDeep); // Dark socket core
+
+  // ── 2.3 Continuous Carbon Fiber / Honeycomb Mesh Body ──
+  // Flows across the entire cheek and upper stock section
+  pxRect(-50, -1, 32, 10, C.outline);
+  pxMesh(-49, 0, 30, 8);
+
+  // Upper stock horizontal titanium beam
+  pxRect(-34, -2, 18, 4, C.outline);
+  pxRect(-33, -1, 16, 2, C.metalDark);
+  pxRect(-33, -1, 16, 1, C.metalGlint);
+
+  // ── 2.4 Solid Sculpted Triangular Thumbhole Loop ──
+  // Solid thick diagonal titanium plate running from bottom buttstock to grip base
+  // Rendered as a continuous solid 6px-wide diagonal armor bridge
+  for (let s = 0; s < 18; s++) {
+    const sx = -48 + s * 1.6;
+    const sy = 6 + s * 0.75;
+    pxRect(Math.round(sx), Math.round(sy), 6, 5, C.outline);
+    pxRect(Math.round(sx + 1), Math.round(sy + 1), 4, 3, C.metalDark);
+    pxRect(Math.round(sx + 1), Math.round(sy + 1), 4, 1, C.metalGlint); // Top edge glint
+    pxRect(Math.round(sx + 1), Math.round(sy + 3), 4, 1, C.metalBlack); // Underside shadow
+  }
+
+  // Inner Bronze/Slate Bevel Arch around the triangular cutout
+  pxRect(-32, 2, 14, 2, '#4d4436');
+  pxRect(-26, 4, 8, 2, '#5e5443');
+  pxRect(-20, 6, 4, 2, '#4d4436');
+
+  // Interior Organic Triangular Cutout Shadow Window
+  pxRect(-30, 4, 12, 5, 'rgba(10, 12, 18, 0.85)');
+  pxRect(-26, 9, 6, 3, 'rgba(10, 12, 18, 0.85)');
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 3. ERGONOMIC SCULPTED PISTOL GRIP & FOREGUARD FIN
+  // ═══════════════════════════════════════════════════════════════════
+  // ── Sculpted White Armor Grip Frame with Undulating Finger Grooves ──
+  pxRect(-18, 4, 9, 18, C.outline);
+  pxRect(-17, 5, 7, 16, C.whiteLight);
+  pxRect(-17, 5, 2, 16, C.whiteShine);
+
+  // Undulating Finger Grooves on front edge of grip
+  px(-19, 7, C.whiteShine);
+  px(-19, 12, C.whiteShine);
+  px(-19, 17, C.whiteShine);
+
+  // Dark textured inner grip panel
+  pxRect(-14, 7, 3, 12, C.metalDeep);
+  pxRect(-13, 8, 1, 10, C.metalDark);
+
+  // Bottom Grip Heel Cap
+  pxRect(-19, 21, 9, 3, C.outline);
+  pxRect(-18, 22, 7, 1, C.whiteMid);
+
+  // ── Curved Bright Orange Trigger & Guard ──
+  pxRect(-10, 4, 3, 8, C.outline);
+  pxRect(-10, 10, 8, 3, C.outline);
+  pxRect(-4, 6, 3, 6, C.outline);
+
+  // Curved bright orange trigger blade
+  pxRect(-6, 6, 3, 4, C.triggerOrange);
+  px(-5, 6, C.glowCore);
+  px(-4, 9, C.triggerOrange);
+
+  // ── Circular Pivot Medallion on Receiver ──
+  pxRect(-6, 2, 6, 6, C.outline);
+  pxRect(-5, 3, 4, 4, C.metalMid);
+  pxRect(-4, 4, 2, 2, C.metalGlint);
+  px(-4, 4, C.glowCore);
+
+  // ── Forward-Slanted Carbon-Mesh Foreguard Fin ──
+  // Sweeps down and forward in front of the trigger
+  for (let fin = 0; fin < 14; fin++) {
+    const fx = -7 + fin * 1.5;
+    const fy = 9 + fin * 1.4;
+    pxRect(Math.round(fx), Math.round(fy), 6, 4, C.outline);
+    pxMesh(Math.round(fx + 1), Math.round(fy + 1), 4, 2);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 4. MAIN RECEIVER, HEAT FIN SLITS & SWEEPING LOWER HULL
+  // ═══════════════════════════════════════════════════════════════════
+  // Central titanium receiver housing
+  pxRect(-18, -6, 60, 10, C.outline);
+  pxRect(-17, -5, 58, 8, C.metalDark);
+  pxRect(-17, -5, 58, 1, C.metalGlint);
+  pxRect(-17, -4, 58, 4, C.metalMid);
+
+  // ── 4 Angled/Ribbed Heatsink Cooling Vents (Top of Receiver) ──
+  for (let i = 0; i < 4; i++) {
+    const rx = 10 + i * 5;
+    pxRect(rx, -9, 3, 4, C.outline);
+    pxRect(rx + 1, -8, 2, 3, C.metalLight);
+    px(rx + 1, -8, C.metalGlint);
+  }
+
+  // ── Sweeping White/Silver Lower Armor Hull ──
+  pxRect(-2, 4, 52, 7, C.outline);
+  pxRect(-1, 5, 50, 5, C.whiteLight);
+  pxRect(-1, 5, 50, 1, C.whiteShine); // Specular top edge
+  pxRect(-1, 8, 50, 1, C.whiteMid);
+  pxRect(-1, 9, 50, 1, C.whiteDark);  // Underside shadow
+
+  // Forward aerodynamic hull beak
+  pxRect(48, 6, 8, 4, C.outline);
+  pxRect(49, 7, 6, 2, C.whiteLight);
+  px(49, 7, C.whiteShine);
+
+  // ── 3 Diagonal Specular Glint Cuts (/// on Lower Hull) ──
+  // Glint 1
+  px(32, 6, C.whiteShine); px(31, 7, C.whiteShine); px(30, 8, C.whiteShine);
+  // Glint 2
+  px(36, 6, C.whiteShine); px(35, 7, C.whiteShine); px(34, 8, C.whiteShine);
+  // Glint 3
+  px(40, 6, C.whiteShine); px(39, 7, C.whiteShine); px(38, 8, C.whiteShine);
+
+  // ── Flowing Glowing Neon Circuit Conduit (Receiver Seam) ──
+  const recGlow = pulse > 0.5 ? C.glowBright : C.glowMid;
+  pxRect(4, 0, 16, 2, recGlow);
+  px(8, 0, C.glowCore);
+  px(16, 0, C.glowCore);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 5. MODULAR ARMORED SNIPER SCOPE (Exact 1:1 Reference Match)
+  // ═══════════════════════════════════════════════════════════════════
+  // ── 5.1 Central Angled Cantilever Mounting Strut (Bottom) ──
+  pxRect(-2, -10, 10, 4, C.outline);
+  pxRect(-1, -9, 8, 3, C.metalDeep);
+  pxRect(4, -11, 6, 5, C.outline);
+  pxRect(5, -10, 4, 3, C.metalDark);
+  // Strut hinge bolt
+  pxRect(6, -9, 2, 2, C.metalGlint);
+  px(6, -9, C.glowCore);
+
+  // ── 5.2 Rear Ocular Section & Sharp Visor Fin (Left) ──
+  // Sharp white top visor fin overhanging to the left
+  pxRect(-26, -18, 10, 4, C.outline);
+  pxRect(-25, -17, 8, 2, C.whiteLight);
+  pxRect(-25, -17, 8, 1, C.whiteShine);
+  pxRect(-27, -19, 4, 2, C.outline); // Sharp rearward tip
+  pxRect(-26, -18, 3, 1, C.whiteShine);
+
+  // Angled Rear Eyepiece Housing (Slanted forward)
+  pxRect(-23, -16, 8, 7, C.outline);
+  pxRect(-22, -15, 6, 5, C.metalDeep);
+
+  // Angled Yellow Glowing Ocular Slit on Rear Face
+  pxRect(-24, -17, 2, 3, C.outline);
+  px(-23, -16, C.glowBright);
+  px(-23, -15, C.glowCore);
+  px(-22, -14, C.glowBright);
+  px(-21, -13, C.glowMid);
+
+  // ── 5.3 Main Scope Center Body & Armored Roof ──
+  // Scope dark titanium body tube
+  pxRect(-16, -16, 28, 6, C.outline);
+  pxRect(-15, -15, 26, 4, C.metalDark);
+  pxRect(-15, -15, 26, 1, C.metalLight);
+
+  // Main White Armor Top Shroud
+  pxRect(-16, -21, 28, 6, C.outline);
+  pxRect(-15, -20, 26, 4, C.whiteLight);
+  pxRect(-15, -20, 26, 1, C.whiteShine); // Pure specular top edge
+  pxRect(-15, -17, 26, 1, C.whiteDark);
+
+  // Front slope of center white armor
+  pxRect(10, -19, 4, 4, C.outline);
+  pxRect(10, -18, 2, 2, C.whiteMid);
+
+  // ── 5.4 Dual Circular Metallic Dials (Side of Scope) ──
+  // Dial 1 (Left - Large Dial) centered at X = -5, Y = -14
+  pxRect(-8, -17, 7, 7, C.outline);
+  pxRect(-7, -16, 5, 5, C.metalLight);
+  pxRect(-6, -15, 3, 3, C.metalDeep);
+  px(-5, -14, C.whiteShine); // Center bolt glint
+
+  // Dial 2 (Right - Smaller Dial) centered at X = 2, Y = -14
+  pxRect(0, -16, 5, 5, C.outline);
+  pxRect(1, -15, 3, 3, C.metalLight);
+  px(2, -14, C.whiteShine);
+
+  // ── 5.5 Wavy Glowing Neon Yellow Power Conduit Line ──
+  // Loops under Dial 1, curves up between the dials, loops under Dial 2, and extends forward
+  const scopeGlow = pulse > 0.5 ? C.glowBright : C.glowMid;
+  // Under Dial 1:
+  pxRect(-12, -12, 4, 2, scopeGlow);
+  pxRect(-8, -10, 7, 2, scopeGlow);
+  px(-5, -10, C.glowCore);
+  // Curve up between dials:
+  pxRect(-1, -12, 2, 3, scopeGlow);
+  px(-1, -13, C.glowCore);
+  // Under Dial 2:
+  pxRect(1, -11, 5, 2, scopeGlow);
+  px(3, -11, C.glowCore);
+  // Straight forward bridge to front objective bell:
+  pxRect(6, -12, 14, 2, scopeGlow);
+  px(12, -12, C.glowCore);
+  px(17, -12, C.glowCore);
+
+  // ── 5.6 Elevated Front Objective Bell (Right) ──
+  // Connecting energy tube/bridge
+  pxRect(12, -14, 8, 4, C.outline);
+  pxRect(13, -13, 6, 2, C.metalDeep);
+
+  // Front Objective Housing (Raised & Forward)
+  pxRect(18, -18, 14, 8, C.outline);
+  pxRect(19, -17, 12, 6, C.metalDark);
+  pxRect(19, -17, 12, 1, C.metalLight);
+
+  // Elevated White/Platinum Angled Armor Hood
+  pxRect(16, -21, 16, 5, C.outline);
+  pxRect(17, -20, 14, 3, C.whiteLight);
+  pxRect(17, -20, 14, 1, C.whiteShine); // Top glint
+  pxRect(17, -18, 14, 1, C.whiteMid);
+  // Front overhang tip
+  pxRect(30, -22, 4, 3, C.outline);
+  pxRect(30, -21, 2, 1, C.whiteShine);
+
+  // Front Angled Objective Aperture (Slanted face with glowing amber/yellow lens slit)
+  pxRect(28, -19, 4, 10, C.outline);
+  pxRect(31, -18, 3, 8, C.outline);
+  pxRect(32, -17, 1, 6, C.glowBright); // Glowing front lens slit
+  px(32, -16, C.glowCore);
+  px(32, -15, C.glowCore);
+  px(31, -13, C.glowMid);
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 6. PRECISION RAIL BARREL, AMMO NODES & UNDERBARREL RAIL
+  // ═══════════════════════════════════════════════════════════════════
+  // ── Heavy Cylindrical Barrel Base ──
+  pxRect(38, -6, 52, 6, C.outline);
+  pxRect(38, -5, 52, 4, C.metalDark);
+  pxRect(38, -5, 52, 1, C.metalGlint); // Cylindrical top specular line
+  pxRect(38, -2, 52, 1, C.metalBlack); // Underside shadow
+
+  // Continuous Glowing Energy Conduit on Barrel
+  const bGlow = pulse > 0.5 ? C.glowBright : C.glowMid;
+  pxRect(38, -4, 52, 1, bGlow);
+
+  // ── Dynamic Glowing Power Nodes (Ammo Counter: Lights 1 to 4) ──
+  // Capsule node 1
+  drawCapsuleNode(44, -5, ammo >= 1);
+  // Capsule node 2
+  drawCapsuleNode(56, -5, ammo >= 2);
+  // Capsule node 3
+  drawCapsuleNode(68, -5, ammo >= 3);
+  // Capsule node 4 (near muzzle)
+  drawCapsuleNode(80, -5, ammo >= 4);
+
+  // ── Underbarrel Handguard / Bipod Rail with Ergonomic Grooves ──
+  pxRect(64, 0, 24, 6, C.outline);
+  pxRect(65, 1, 22, 4, C.metalDark);
+  pxRect(65, 1, 22, 1, C.metalLight);
+
+  // 3 Ergonomic Grip Grooves on Underbarrel Block
+  pxRect(68, 3, 3, 2, C.metalBlack);
+  pxRect(74, 3, 3, 2, C.metalBlack);
+  pxRect(80, 3, 3, 2, C.metalBlack);
+
+  // ── Top-Mounted Front Rail Guide / Loop ──
+  pxRect(76, -10, 10, 5, C.outline);
+  pxRect(77, -9, 8, 3, C.metalMid);
+  pxRect(79, -8, 4, 1, C.metalBlack); // Loop cutout
+
+  // ── Angular Heavy Precision Muzzle Compensator ──
+  pxRect(90, -7, 5, 8, C.outline);
+  pxRect(91, -6, 3, 6, C.metalDark);
+  pxRect(91, -6, 3, 1, C.whiteShine);
+  pxRect(94, -6, 3, 6, C.outline);
+  pxRect(95, -5, 1, 4, C.metalBlack); // Muzzle exit port
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 7. DOTTED PIXEL LASER SIGHT
+  // ═══════════════════════════════════════════════════════════════════
+  const laserLen = 140;
+  const laserAlpha = 0.35 + pulse * 0.35;
+  ctx.fillStyle = `rgba(255, 30, 60, ${laserAlpha})`;
+  for (let lx = 97; lx < 97 + laserLen; lx += 4) {
+    ctx.fillRect(Math.round(lx * P), Math.round(-4 * P), Math.round(2.5 * P), Math.round(1.5 * P));
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 8. RETRO PIXEL MUZZLE BLAST & SHOCKWAVE (On Recoil Fire)
+  // ═══════════════════════════════════════════════════════════════════
+  if (recoil > 0) {
+    const shockProg = 1.0 - recoil;
+    const blastX = 98 + shockProg * 26;
+    const blastH = Math.round(4 + shockProg * 14);
+    const blastW = Math.round(2 + shockProg * 7);
+
+    // Pixel Shockwave Diamond Rings
+    ctx.fillStyle = `rgba(255, 180, 0, ${recoil * 0.9})`;
+    for (let dy = -blastH; dy <= blastH; dy += 2) {
+      const dx = Math.round((1 - Math.abs(dy) / blastH) * blastW);
+      ctx.fillRect(Math.round((blastX + dx) * P), Math.round(dy * P), Math.round(2 * P), Math.round(2 * P));
+      ctx.fillRect(Math.round((blastX - dx * 0.4) * P), Math.round(dy * P), Math.round(2 * P), Math.round(2 * P));
+    }
+
+    // Muzzle Star Flare
+    if (recoil > 0.4) {
+      const starS = (recoil - 0.4) * 2;
+      ctx.fillStyle = C.glowCore;
+      pxRect(97, -4, Math.round(7 * starS), 2, C.glowCore);
+      pxRect(99, Math.round(-4 - 3 * starS), 2, Math.round(7 * starS), C.glowCore);
+    }
+  }
+
+  // ── Reload Finish Flash (Pixel Spark Burst) ──
+  if (flashTimer > 0) {
+    const fP = flashTimer / 20;
+    const fS = Math.round(fP * 6);
+    pxRect(12 - fS, 1, fS * 2 + 1, 1, C.glowCore);
+    pxRect(12, 1 - fS, 1, fS * 2 + 1, C.glowCore);
+    pxRect(11, 0, 3, 3, C.glowBright);
+  }
+
+  // ═══════════════════════════════════════════════════════════════════
+  // 9. PROPORTIONAL PIXEL GLOVE GRIP (Subtle ~4px Hand)
+  // ═══════════════════════════════════════════════════════════════════
+  const hx = -14;
+  const hy = 11;
+  pxRect(hx - 2, hy - 2, 5, 5, C.outline);
+  pxRect(hx - 1, hy - 1, 3, 3, fighterColor);
+  px(hx - 1, hy - 1, C.whiteShine); // Knuckle highlight
+  px(hx + 1, hy + 1, C.metalDeep);  // Palm shadow
 
   ctx.restore();
 }

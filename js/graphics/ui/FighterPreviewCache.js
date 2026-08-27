@@ -20,11 +20,15 @@ function renderPreviewForDef(def, cacheKey) {
     startX: previewSize / 2,
     startY: previewSize / 2,
   });
+  const isUryu = def.type === 'uryu';
   previewFighter.angle = 0; // Static angle for consistent previews
-  previewFighter.gunAngle = Math.PI / 4; // Consistent gun angle
+  previewFighter.gunAngle = isUryu ? 0 : Math.PI / 4; // Uryu stands upright aiming forward
+  if (isUryu) {
+    previewFighter.smoothDrawProgress = 0.30;
+  }
   
   try {
-    if (typeof previewFighter.aim === 'function') {
+    if (typeof previewFighter.aim === 'function' && !isUryu) {
       previewFighter.aim({ x: previewSize, y: previewSize });
     }
     previewFighter.draw(ctx);

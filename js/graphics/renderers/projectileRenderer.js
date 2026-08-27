@@ -20,6 +20,7 @@ import { drawGetsugaSlash, drawCeroBeam } from '../weapons/ichigoWeaponGraphics.
 import { drawPoisonSpill } from '../weapons/alchemistWeaponGraphics.js';
 import { drawJohnWickBullet, drawJohnWickShotgunPellet, drawJohnWickRifleBullet } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjUziBullet, drawCjMinigunBullet } from '../weapons/cjWeaponGraphics.js';
+import { _getUryuArrowImage } from '../weapons/uryuWeaponGraphics.js';
 import { drawTacticalBullet } from '../../../Tactical Force/weapons/tacticalWeaponGraphics.js';
 import { tacticalProjectileSystem } from '../../../Tactical Force/systems/tacticalProjectileSystem.js';
 let _fugaLocalTrailPool = [];
@@ -463,6 +464,12 @@ function _drawSingleProjectile(ctx, p, now, isGojoDomainActive) {
       const owner = state.fighters && state.fighters[p.owner];
       const scale = owner ? Math.max(0.6, owner.r / 25) : 0.8;
       drawShurikenProjectile(ctx, p.x, p.y, spinAngle, scale);
+      return;
+    }
+
+    // Uryu Ishida Heilig Pfeil (Sacred Spirit Arrow) visual
+    if (p.visual === 'heiligPfeil' || p.isHeiligPfeil) {
+      drawHeiligPfeil(ctx, p);
       return;
     }
 
@@ -1263,17 +1270,24 @@ export function drawGojoPurpleOrb(ctx, p) {
     ctx.fill();
   }
   
-  // Draw the main orb (standard or 200% scaled)
+  // Draw the main orb (standard or 200% scaled) with dynamic flight rotation
   const drawR = is200 ? p.r * 1.35 : p.r;
-  drawGojoOrb(ctx, p.x, p.y, drawR, visualTime, colorType, 0);
+  const spinSpeed = p.isGojoPurple ? 0.016 : 0.024;
+  const spinAngle = visualTime * spinSpeed;
+
+  ctx.save();
+  ctx.translate(p.x, p.y);
+  ctx.rotate(spinAngle);
+  drawGojoOrb(ctx, 0, 0, drawR, visualTime, colorType, 0);
 
   // 200%: Extra white-hot core overlay for empowered feel
   if (is200 && p.isGojoPurple) {
     ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
     ctx.beginPath();
-    ctx.arc(p.x, p.y, drawR * 0.6, 0, Math.PI * 2);
+    ctx.arc(0, 0, drawR * 0.6, 0, Math.PI * 2);
     ctx.fill();
   }
+  ctx.restore();
 
   ctx.restore();
 }
@@ -1916,84 +1930,95 @@ function drawHeiligPfeil(ctx, p) {
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
 
-  const speed = Math.hypot(p.vx || 0, p.vy || 0) || 22;
-  const arrowLen = 32;
-  const halfLen = arrowLen / 2;
-  const trailLen = Math.min(80, speed * 2.8);
+  const speed = Math.hypot(p.vx || 0, p.vy || 0) || 24;
+  const scale = p.scale || 0.140;
+  const arrowImg = (typeof _getUryuArrowImage === 'function') ? _getUryuArrowImage() : null;
+  const arrowLen = 521 * scale; // ~73px
+  const halfLen = arrowLen / 2; // ~36.5px
+  const trailLen = Math.min(110, speed * 3.5);
 
-  // 1. Radiant Cyan Speed Streak Trail
+  // 1. Radiant Cyan Speed Streak Trail streaming behind the nock
   const trailGrad = ctx.createLinearGradient(-halfLen - trailLen, 0, -halfLen, 0);
   trailGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
-  trailGrad.addColorStop(0.6, 'rgba(0, 229, 255, 0.35)');
-  trailGrad.addColorStop(1, 'rgba(0, 229, 255, 0.75)');
+  trailGrad.addColorStop(0.5, 'rgba(0, 229, 255, 0.35)');
+  trailGrad.addColorStop(1, 'rgba(0, 229, 255, 0.85)');
 
   ctx.fillStyle = trailGrad;
   ctx.beginPath();
   ctx.moveTo(-halfLen - trailLen, 0);
-  ctx.lineTo(-halfLen, -3.2);
-  ctx.lineTo(-halfLen, 3.2);
+  ctx.lineTo(-halfLen, -4.5);
+  ctx.lineTo(-halfLen, 4.5);
   ctx.closePath();
   ctx.fill();
 
-  // White core beam trail
-  const coreTrailGrad = ctx.createLinearGradient(-halfLen - trailLen * 0.6, 0, -halfLen, 0);
+  // White-hot core beam trail
+  const coreTrailGrad = ctx.createLinearGradient(-halfLen - trailLen * 0.7, 0, -halfLen, 0);
   coreTrailGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
   coreTrailGrad.addColorStop(1, 'rgba(255, 255, 255, 0.95)');
   ctx.strokeStyle = coreTrailGrad;
-  ctx.lineWidth = 1.6;
+  ctx.lineWidth = 2.0;
   ctx.beginPath();
-  ctx.moveTo(-halfLen - trailLen * 0.6, 0);
+  ctx.moveTo(-halfLen - trailLen * 0.7, 0);
   ctx.lineTo(-halfLen, 0);
   ctx.stroke();
 
-  // 2. Cyan Spirit Aura Halo around arrow shaft
-  ctx.strokeStyle = 'rgba(0, 229, 255, 0.60)';
-  ctx.lineWidth = 4.8;
-  ctx.lineCap = 'round';
+  // 2. Draw Exact Pixel-Art Sacred Arrow (ISHIDA-ARROW.png) Centered at (p.x, p.y)
+  if (arrowImg && arrowImg.complete && arrowImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    ctx.scale(scale, scale);
+    // Center the 521px wide texture so (0, 0) is the center of the arrow
+    ctx.drawImage(arrowImg, -260, -33);
+    ctx.restore();
+  } else {
+    // High-fidelity vector fallback
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.moveTo(-halfLen, 0);
+    ctx.lineTo(halfLen, 0);
+    ctx.stroke();
+  }
+
+  // 3. Piercing Light / Energy Aura
+  ctx.strokeStyle = p.isPiercing ? 'rgba(0, 229, 255, 0.90)' : 'rgba(0, 229, 255, 0.60)';
+  ctx.lineWidth = p.isPiercing ? 3.8 : 2.4;
   ctx.beginPath();
-  ctx.moveTo(-halfLen, 0);
-  ctx.lineTo(halfLen + 6, 0);
+  ctx.moveTo(-halfLen * 0.6, 0);
+  ctx.lineTo(halfLen + 4, 0);
   ctx.stroke();
 
-  // 3. Pure White-Hot Shaft Core
+  // 4. 4-Way Cruciform Star Glint at the Arrowhead Tip (+halfLen, 0)
+  const flareSize = p.isPiercing ? 14 : 9;
   ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 1.6;
   ctx.beginPath();
-  ctx.moveTo(-halfLen, 0);
-  ctx.lineTo(halfLen + 6, 0);
+  ctx.moveTo(halfLen - flareSize * 0.4, 0);
+  ctx.lineTo(halfLen + flareSize, 0);
+  ctx.moveTo(halfLen, -flareSize * 0.5);
+  ctx.lineTo(halfLen, flareSize * 0.5);
   ctx.stroke();
 
-  // 4. Diamond Reishi Arrowhead
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#00E5FF';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(halfLen + 12, 0);
-  ctx.lineTo(halfLen - 2, -4.8);
-  ctx.lineTo(halfLen + 1, 0);
-  ctx.lineTo(halfLen - 2, 4.8);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  if (p.isPiercing) {
+    const diagSize = flareSize * 0.45;
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.95)';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(halfLen - diagSize, -diagSize);
+    ctx.lineTo(halfLen + diagSize, diagSize);
+    ctx.moveTo(halfLen - diagSize, diagSize);
+    ctx.lineTo(halfLen + diagSize, -diagSize);
+    ctx.stroke();
+  }
 
-  // 5. 4-Way Cruciform Reishi Flare at tip
-  ctx.strokeStyle = '#FFFFFF';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(halfLen + 6, 0);
-  ctx.lineTo(halfLen + 15, 0);
-  ctx.moveTo(halfLen + 10, -4.5);
-  ctx.lineTo(halfLen + 10, 4.5);
-  ctx.stroke();
-
-  // 6. Sacred Spark Fletching at Nock
+  // 5. Sacred Spirit Spark Fletching at Nock (-halfLen, 0)
   ctx.fillStyle = '#00E5FF';
   ctx.beginPath();
-  ctx.arc(-halfLen, 0, 3.2, 0, Math.PI * 2);
+  ctx.arc(-halfLen, 0, 3.5, 0, Math.PI * 2);
   ctx.fill();
   ctx.fillStyle = '#FFFFFF';
   ctx.beginPath();
-  ctx.arc(-halfLen, 0, 1.6, 0, Math.PI * 2);
+  ctx.arc(-halfLen, 0, 1.8, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();

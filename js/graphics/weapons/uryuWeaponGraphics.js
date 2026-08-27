@@ -6,6 +6,109 @@
 
 import { state } from '../../core/state.js';
 
+let _uryuBowImage = null;
+let _uryuBowImageLoading = false;
+
+export function _getUryuBowImage() {
+  if (_uryuBowImage && _uryuBowImage.complete && _uryuBowImage.naturalWidth > 0) {
+    return _uryuBowImage;
+  }
+  if (!_uryuBowImageLoading && typeof Image !== 'undefined') {
+    _uryuBowImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _uryuBowImage = img;
+      _uryuBowImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ishida bow image at Assets/model/ISHIDA-BOW.png', e);
+      _uryuBowImageLoading = false;
+    };
+    img.src = 'Assets/model/ISHIDA-BOW.png?v=2';
+    _uryuBowImage = img;
+  }
+  return _uryuBowImage;
+}
+
+let _uryuBowFrameImage = null;
+let _uryuBowFrameImageLoading = false;
+
+export function _getUryuBowFrameImage() {
+  if (_uryuBowFrameImage && _uryuBowFrameImage.complete && _uryuBowFrameImage.naturalWidth > 0) {
+    return _uryuBowFrameImage;
+  }
+  if (!_uryuBowFrameImageLoading && typeof Image !== 'undefined') {
+    _uryuBowFrameImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _uryuBowFrameImage = img;
+      _uryuBowFrameImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ishida bow frame image at Assets/model/ISHIDA-BOW-FRAME.png', e);
+      _uryuBowFrameImageLoading = false;
+    };
+    img.src = 'Assets/model/ISHIDA-BOW-FRAME.png?v=2';
+    _uryuBowFrameImage = img;
+  }
+  return _uryuBowFrameImage;
+}
+
+let _uryuArrowImage = null;
+let _uryuArrowImageLoading = false;
+
+export function _getUryuArrowImage() {
+  if (_uryuArrowImage && _uryuArrowImage.complete && _uryuArrowImage.naturalWidth > 0) {
+    return _uryuArrowImage;
+  }
+  if (!_uryuArrowImageLoading && typeof Image !== 'undefined') {
+    _uryuArrowImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _uryuArrowImage = img;
+      _uryuArrowImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ishida arrow image at Assets/model/ISHIDA-ARROW.png', e);
+      _uryuArrowImageLoading = false;
+    };
+    img.src = 'Assets/model/ISHIDA-ARROW.png?v=2';
+    _uryuArrowImage = img;
+  }
+  return _uryuArrowImage;
+}
+
+let _uryuBowBladeImage = null;
+let _uryuBowBladeImageLoading = false;
+
+export function _getUryuBowBladeImage() {
+  if (_uryuBowBladeImage && _uryuBowBladeImage.complete && _uryuBowBladeImage.naturalWidth > 0) {
+    return _uryuBowBladeImage;
+  }
+  if (!_uryuBowBladeImageLoading && typeof Image !== 'undefined') {
+    _uryuBowBladeImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _uryuBowBladeImage = img;
+      _uryuBowBladeImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ishida bow blade image at Assets/model/ISHIDA-BOW-BLADE.png', e);
+      _uryuBowBladeImageLoading = false;
+    };
+    img.src = 'Assets/model/ISHIDA-BOW-BLADE.png?v=2';
+    _uryuBowBladeImage = img;
+  }
+  return _uryuBowBladeImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getUryuBowImage();
+  _getUryuBowFrameImage();
+  _getUryuArrowImage();
+  _getUryuBowBladeImage();
+}
+
 export const URYU_WEAPON_GRAPHICS = {
   bow: {
     coreCyan: '#00E5FF',
@@ -25,6 +128,8 @@ export const URYU_WEAPON_GRAPHICS = {
 
 /**
  * Draws Ginrei Kojaku (Sacred Spirit Bow) and loaded Heilig Pfeil arrow.
+ * Supports pixel art weapon model rendering from Assets/model/ISHIDA-BOW-FRAME.png & ISHIDA-ARROW.png
+ * (matching Ichigo's weapon model method with physical dynamic arrow pull-back).
  * @param {CanvasRenderingContext2D} ctx
  * @param {number} x - Front hand grip X in local space
  * @param {number} y - Front hand grip Y in local space
@@ -41,7 +146,6 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
   ctx.save();
   ctx.translate(x, y);
 
-  // Weapon customization offsets if configured in Weapon Studio
   const custom = (typeof state !== 'undefined' && state.weaponCustomizations && state.weaponCustomizations.uryu)
     ? state.weaponCustomizations.uryu
     : { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
@@ -55,8 +159,143 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
   ctx.rotate(customAngle);
   ctx.scale(customScale, customScale);
 
-  // ── TYBW WANDENREICH BROAD-BLADE SPIRIT BOW (HEILIG BOGEN) ──
   const scale = isVollstandig ? 1.25 : 1.0;
+  const clampedDraw = Math.min(1.0, Math.max(0.0, drawProgress));
+  const recoilTimer = opts.recoilTimer || 0;
+  const recoilMax = opts.recoilMax || 6;
+  const recoilP = (recoilTimer > 0) ? (1.0 - recoilTimer / recoilMax) : 1.0;
+  const recoilOffset = (recoilTimer > 0)
+    ? Math.sin(recoilP * Math.PI * 3) * Math.exp(-recoilP * 3.2) * (r * 0.45)
+    : 0;
+
+  const bowFrameImg = _getUryuBowFrameImage();
+  const arrowImg = _getUryuArrowImage();
+  const bowImg = _getUryuBowImage();
+
+  const hasModular = (bowFrameImg && bowFrameImg.complete && bowFrameImg.naturalWidth > 0) ||
+                     (bowImg && bowImg.complete && bowImg.naturalWidth > 0);
+
+  if (hasModular) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; 
+
+    // Grand Anime Spirit Bow Scaling: ~95px span matching Ichigo's Zangetsu blade
+    const imgScale = (r / 25) * 0.140 * scale;
+    const gripX = 370;
+    const gripY = 337;
+
+    const frameToDraw = (bowFrameImg && bowFrameImg.complete && bowFrameImg.naturalWidth > 0) ? bowFrameImg : bowImg;
+    ctx.save();
+    ctx.scale(imgScale, imgScale);
+    ctx.drawImage(frameToDraw, -gripX, -gripY);
+    ctx.restore();
+
+    const topTipX = -141 * imgScale - clampedDraw * 2.5 * scale;
+    const topTipY = -329 * imgScale + clampedDraw * 2.0 * scale;
+    const botTipX = -142 * imgScale - clampedDraw * 2.5 * scale;
+    const botTipY = 329 * imgScale - clampedDraw * 2.0 * scale;
+
+    const maxDrawBackX = - (r * 2.60 * scale);
+    const restStringX = -141 * imgScale;
+    const drawBackX = restStringX + (maxDrawBackX - restStringX) * Math.pow(clampedDraw, 0.85) + recoilOffset;
+
+    ctx.save();
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.65)';
+    ctx.lineWidth = 2.8;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(topTipX, topTipY);
+    ctx.lineTo(drawBackX, 0);
+    ctx.lineTo(botTipX, botTipY);
+    ctx.stroke();
+
+    ctx.strokeStyle = '#FFFFFF';
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(topTipX, topTipY);
+    ctx.lineTo(drawBackX, 0);
+    ctx.lineTo(botTipX, botTipY);
+    ctx.stroke();
+    ctx.restore();
+
+    const isFiringRecoil = recoilTimer > 0 && clampedDraw <= 0.05;
+    if ((clampedDraw > 0.03 || opts.isAiming) && !isFiringRecoil) {
+      const arrowAlpha = Math.min(1.0, (clampedDraw > 0 ? (clampedDraw / 0.18) : 0.85));
+
+      ctx.save();
+      ctx.globalAlpha = (ctx.globalAlpha || 1.0) * arrowAlpha;
+
+      if (arrowImg && arrowImg.complete && arrowImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        ctx.scale(imgScale, imgScale);
+        ctx.drawImage(arrowImg, drawBackX / imgScale, -33);
+        ctx.restore();
+      }
+
+      const arrowTipX = drawBackX + 520 * imgScale;
+
+      if (clampedDraw > 0.10) {
+        ctx.save();
+        for (let k = 0; k < 6; k++) {
+          const streamPhase = ((now * 0.005) + k * 0.18) % 1.0;
+          const streamAngle = (k * Math.PI * 2 / 6) + (now * 0.004);
+          const streamDist = (1.0 - streamPhase) * 24 * clampedDraw;
+          const sx = arrowTipX + Math.cos(streamAngle) * streamDist + (1.0 - streamPhase) * 10;
+          const sy = Math.sin(streamAngle) * streamDist * 0.65;
+          const sAlpha = Math.sin(streamPhase * Math.PI) * 0.85 * clampedDraw;
+          ctx.strokeStyle = `rgba(0, 229, 255, ${sAlpha.toFixed(2)})`;
+          ctx.lineWidth = 1.4;
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(arrowTipX, 0);
+          ctx.stroke();
+        }
+        ctx.restore();
+      }
+
+      const flareSize = (5 + clampedDraw * 14);
+      const flareAlpha = 0.50 + clampedDraw * 0.50 + Math.sin(now * 0.015) * 0.15;
+      ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1.0, flareAlpha).toFixed(2)})`;
+      ctx.lineWidth = 1.3 + clampedDraw * 0.7;
+      ctx.beginPath();
+      ctx.moveTo(arrowTipX - flareSize * 0.3, 0);
+      ctx.lineTo(arrowTipX + flareSize * 1.2, 0);
+      ctx.moveTo(arrowTipX + flareSize * 0.4, -flareSize * 0.55);
+      ctx.lineTo(arrowTipX + flareSize * 0.4, flareSize * 0.55);
+      ctx.stroke();
+
+      if (clampedDraw > 0.60) {
+        const diagSize = flareSize * 0.50;
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.90)';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(arrowTipX + flareSize * 0.4 - diagSize, -diagSize);
+        ctx.lineTo(arrowTipX + flareSize * 0.4 + diagSize, diagSize);
+        ctx.moveTo(arrowTipX + flareSize * 0.4 - diagSize, diagSize);
+        ctx.lineTo(arrowTipX + flareSize * 0.4 + diagSize, -diagSize);
+        ctx.stroke();
+      }
+
+      // Sacred Spirit Spark Fletching at Nock
+      ctx.fillStyle = '#00E5FF';
+      ctx.beginPath();
+      ctx.arc(drawBackX, 0, 3.4 + clampedDraw * 1.4, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(drawBackX, 0, 1.8 + clampedDraw * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore(); // end arrow Alpha save
+    }
+
+    ctx.restore(); // end modular save
+    ctx.restore(); // end outer drawUryuBow save
+    return;
+  }
+
+  // ── PROCEDURAL FALLBACK (When image is not yet loaded) ──
   const R_center = r * 2.15 * scale; // Radius of circular bow arc (~54px)
   const centerX = - (R_center - r * 0.45); // Arc center behind the grip (~-43px)
   const bladeHW = r * 0.22 * scale; // Broad-blade half-width (~5.5px)
@@ -72,24 +311,19 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
   const a_blade_end  = 0.88; // Stepped shoulder tapering into needle tip rod
   const a_tip_end    = 1.06; // Final needle tip where bowstring attaches
 
-  // String nock endpoints
-  const topTipX = centerX + R_center * Math.cos(-a_tip_end);
-  const topTipY = R_center * Math.sin(-a_tip_end);
-  const botTipX = centerX + R_center * Math.cos(a_tip_end);
-  const botTipY = R_center * Math.sin(a_tip_end);
+  // Elastic bow limb tip deflection under string tension
+  const flexX = -clampedDraw * 2.5 * scale;
+  const flexY = clampedDraw * 1.8 * scale;
 
-  // Smooth string draw physics with harmonic release recoil
-  const recoilTimer = opts.recoilTimer || 0;
-  const recoilMax = opts.recoilMax || 6;
-  const recoilP = (recoilTimer > 0) ? (1.0 - recoilTimer / recoilMax) : 1.0;
-  const recoilOffset = (recoilTimer > 0)
-    ? Math.sin(recoilP * Math.PI * 3) * Math.exp(-recoilP * 3.2) * (r * 0.40)
-    : 0;
+  // String nock endpoints (with subtle elastic inward flex under tension)
+  const topTipX = centerX + R_center * Math.cos(-a_tip_end) + flexX;
+  const topTipY = R_center * Math.sin(-a_tip_end) + flexY;
+  const botTipX = centerX + R_center * Math.cos(a_tip_end) + flexX;
+  const botTipY = R_center * Math.sin(a_tip_end) - flexY;
 
-  const maxDrawBackX = - (r * 1.65 + drawProgress * (r * 0.95));
+  const maxDrawBackX = - (r * 1.85 * scale);
   const restStringX = topTipX; // Natural straight resting line
-  const clampedDraw = Math.min(1.0, Math.max(0.0, drawProgress));
-  const drawBackX = restStringX + (maxDrawBackX - restStringX) * Math.pow(clampedDraw, 0.75) + recoilOffset;
+  const drawBackX = restStringX + (maxDrawBackX - restStringX) * Math.pow(clampedDraw, 0.85) + recoilOffset;
 
   // ── 0. FLOATING AMBIENT REISHI SPARKLES (Frosted starlight aura) ──
   ctx.save();
@@ -144,13 +378,36 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
   ctx.restore();
 
   // ── 2. LOADED HEILIG PFEIL (SACRED ARROW) ──
-  if (clampedDraw > 0.08 || opts.isAiming) {
-    const arrowAlpha = Math.min(1.0, (clampedDraw - 0.08) / 0.25);
-    const arrowLen = Math.abs(drawBackX) + r * 1.85 + drawProgress * 10;
-    const arrowTipX = drawBackX + arrowLen;
+  // Arrow is visible while drawing / aiming, but not during pure release recoil (arrow is in flight!)
+  const isFiringRecoil = recoilTimer > 0 && clampedDraw <= 0.05;
+  if ((clampedDraw > 0.03 || opts.isAiming) && !isFiringRecoil) {
+    const arrowAlpha = Math.min(1.0, (clampedDraw > 0 ? (clampedDraw / 0.18) : 0.85));
+    // Fixed arrow physical length: Arrow slides backward through the front grip as drawBackX pulls back!
+    const arrowLength = r * 2.65 * scale;
+    const arrowTipX = drawBackX + arrowLength;
 
     ctx.save();
     ctx.globalAlpha = (ctx.globalAlpha || 1.0) * arrowAlpha;
+
+    // Converging Reishi particle suction streaks (gathering ambient spirit energy into arrowhead)
+    if (clampedDraw > 0.15) {
+      ctx.save();
+      for (let k = 0; k < 5; k++) {
+        const streamPhase = ((now * 0.004) + k * 0.23) % 1.0;
+        const streamAngle = (k * Math.PI * 2 / 5) + (now * 0.002);
+        const streamDist = (1.0 - streamPhase) * 22 * clampedDraw;
+        const sx = arrowTipX + Math.cos(streamAngle) * streamDist + (1.0 - streamPhase) * 8;
+        const sy = Math.sin(streamAngle) * streamDist * 0.6;
+        const sAlpha = Math.sin(streamPhase * Math.PI) * 0.75 * clampedDraw;
+        ctx.strokeStyle = `rgba(0, 229, 255, ${sAlpha.toFixed(2)})`;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(sx, sy);
+        ctx.lineTo(arrowTipX, 0);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
     // A. Arrow Outer Spirit Aura
     ctx.strokeStyle = 'rgba(0, 229, 255, 0.60)';
@@ -168,52 +425,68 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
     ctx.lineTo(arrowTipX, 0);
     ctx.stroke();
 
-    // C. Reishi Energy Spiral Helix around shaft
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
-    ctx.lineWidth = 1.1;
+    // C. Reishi Energy Spiral Helix around shaft (tightens and spins faster as draw tension peaks)
+    const helixSpeed = now * (0.006 + clampedDraw * 0.012);
+    const spirals = 7 + Math.floor(clampedDraw * 4);
+    ctx.strokeStyle = `rgba(56, 189, 248, ${(0.60 + clampedDraw * 0.35).toFixed(2)})`;
+    ctx.lineWidth = 1.0 + clampedDraw * 0.4;
     ctx.beginPath();
-    const spirals = 8;
-    for (let s = 0; s < spirals; s++) {
+    for (let s = 0; s <= spirals; s++) {
       const sx = drawBackX + (s / spirals) * (arrowTipX - drawBackX);
-      const phase1 = ((now * 0.007) + s * 0.85) % (Math.PI * 2);
-      const sy1 = Math.sin(phase1) * 2.8;
-      if (s === 0) ctx.moveTo(sx, sy1);
-      else ctx.lineTo(sx, sy1);
+      const phase = (helixSpeed + s * 0.75) % (Math.PI * 2);
+      const sy = Math.sin(phase) * (2.2 + clampedDraw * 1.0);
+      if (s === 0) ctx.moveTo(sx, sy);
+      else ctx.lineTo(sx, sy);
     }
     ctx.stroke();
 
     // D. Diamond Reishi Arrowhead
+    const headScale = 1.0 + clampedDraw * 0.35;
     ctx.fillStyle = '#FFFFFF';
     ctx.strokeStyle = '#00E5FF';
     ctx.lineWidth = 1.3;
     ctx.beginPath();
-    ctx.moveTo(arrowTipX + 10, 0);
-    ctx.lineTo(arrowTipX - 4.5, -4.5);
-    ctx.lineTo(arrowTipX - 1.5, 0);
-    ctx.lineTo(arrowTipX - 4.5, 4.5);
+    ctx.moveTo(arrowTipX + 10 * headScale, 0);
+    ctx.lineTo(arrowTipX - 4.5 * headScale, -4.5 * headScale);
+    ctx.lineTo(arrowTipX - 1.5 * headScale, 0);
+    ctx.lineTo(arrowTipX - 4.5 * headScale, 4.5 * headScale);
     ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
     // E. 4-Pointed Cruciform Reishi Flare at Arrowhead
-    const flarePulse = 0.75 + Math.sin(now * 0.01) * 0.25;
-    ctx.strokeStyle = `rgba(255, 255, 255, ${flarePulse.toFixed(2)})`;
-    ctx.lineWidth = 1.2;
+    const flareSize = (4 + clampedDraw * 12);
+    const flareAlpha = 0.50 + clampedDraw * 0.50 + Math.sin(now * 0.015) * 0.15;
+    ctx.strokeStyle = `rgba(255, 255, 255, ${Math.min(1.0, flareAlpha).toFixed(2)})`;
+    ctx.lineWidth = 1.2 + clampedDraw * 0.6;
     ctx.beginPath();
-    ctx.moveTo(arrowTipX + 4, 0);
-    ctx.lineTo(arrowTipX + 13, 0);
-    ctx.moveTo(arrowTipX + 8, -4.5);
-    ctx.lineTo(arrowTipX + 8, 4.5);
+    ctx.moveTo(arrowTipX - flareSize * 0.3, 0);
+    ctx.lineTo(arrowTipX + flareSize * 1.2, 0);
+    ctx.moveTo(arrowTipX + flareSize * 0.4, -flareSize * 0.55);
+    ctx.lineTo(arrowTipX + flareSize * 0.4, flareSize * 0.55);
     ctx.stroke();
 
-    // F. Sacred Spirit Spark Fletching at Nock
+    // Diagonal mini cross glint at peak tension
+    if (clampedDraw > 0.75) {
+      const diagSize = flareSize * 0.45;
+      ctx.strokeStyle = 'rgba(0, 229, 255, 0.85)';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(arrowTipX + flareSize * 0.4 - diagSize, -diagSize);
+      ctx.lineTo(arrowTipX + flareSize * 0.4 + diagSize, diagSize);
+      ctx.moveTo(arrowTipX + flareSize * 0.4 - diagSize, diagSize);
+      ctx.lineTo(arrowTipX + flareSize * 0.4 + diagSize, -diagSize);
+      ctx.stroke();
+    }
+
+    // F. Sacred Spirit Spark Fletching at Nock (Anchored to drawBackX)
     ctx.fillStyle = '#00E5FF';
     ctx.beginPath();
-    ctx.arc(drawBackX + 2, 0, 3.2, 0, Math.PI * 2);
+    ctx.arc(drawBackX + 2, 0, 3.2 + clampedDraw * 1.2, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#FFFFFF';
     ctx.beginPath();
-    ctx.arc(drawBackX + 2, 0, 1.6, 0, Math.PI * 2);
+    ctx.arc(drawBackX + 2, 0, 1.6 + clampedDraw * 0.8, 0, Math.PI * 2);
     ctx.fill();
     ctx.restore();
   }

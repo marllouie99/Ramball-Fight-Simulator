@@ -20,383 +20,148 @@ export function drawGetsugaSlash(ctx, p, isBlack) {
   const alpha = Math.min(1.0, lifeRatio * 1.30) * fadeAlpha;
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
 
+  // Quantize time to 30 FPS for stepped retro anime feel
+  const msPerFrame = 1000 / 30;
+  const qTime = Math.floor(now / msPerFrame) * msPerFrame;
+
   ctx.save();
   ctx.translate(p.x, p.y);
   ctx.rotate(angle);
   const scaleMult = isFinal ? 2.85 : ((isBankaiHollow || isShikaiHollow) ? 2.15 : (isBankai ? 1.95 : 1.85));
   ctx.scale(scale * scaleMult, scale * scaleMult);
 
-  // ── Exact Crescent Parameters (Matching VFX Reference Image) ──
-  const R = isFinal ? 84 : ((isBankaiHollow || isShikaiHollow) ? 62 : (isBankai ? 54 : 56));             // Crescent outer radius
-  const maxThick = isFinal ? 30 : ((isBankaiHollow || isShikaiHollow) ? 22 : (isBankai ? 19 : 20));      // Maximum crescent body thickness at center
-  const halfAngle = isFinal ? (0.70 * Math.PI) : ((isBankaiHollow || isShikaiHollow) ? (0.66 * Math.PI) : (0.64 * Math.PI)); // ~115° - 126° sweep
-  const numSteps = 24;
+  // ── Exact Crescent Parameters ──
+  const R = isFinal ? 84 : ((isBankaiHollow || isShikaiHollow) ? 62 : (isBankai ? 54 : 56));
+  const maxThick = isFinal ? 30 : ((isBankaiHollow || isShikaiHollow) ? 22 : (isBankai ? 19 : 20));
+  const halfAngle = isFinal ? (0.70 * Math.PI) : ((isBankaiHollow || isShikaiHollow) ? (0.66 * Math.PI) : (0.64 * Math.PI));
+  const px = 2.5; // Grid-snapped pixel unit
 
-  // ── 0. Soft Volumetric Atmospheric Glow (Concentric Radial Diffusion) ──
-  const glowSteps = 24;
-  ctx.beginPath();
-  for (let i = 0; i <= glowSteps; i++) {
-    const t = (i / glowSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const gTaper = Math.cos(t * (Math.PI / 2));
-    const dist = R + maxThick * 0.75 * gTaper;
-    const gx = Math.cos(ang) * dist;
-    const gy = Math.sin(ang) * dist;
-    if (i === 0) ctx.moveTo(gx, gy);
-    else ctx.lineTo(gx, gy);
-  }
-  for (let i = glowSteps; i >= 0; i--) {
-    const t = (i / glowSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const gTaper = Math.cos(t * (Math.PI / 2));
-    const dist = R - maxThick * 1.85 * Math.pow(gTaper, 1.2);
-    const gx = Math.cos(ang) * dist;
-    const gy = Math.sin(ang) * dist;
-    ctx.lineTo(gx, gy);
-  }
-  ctx.closePath();
+  // ── Palette Definition ──
+  let cBorder, cSaturated, cBright, cCore, cAura, isDarkCore;
 
-  if (isInfinityFrozen) ctx.fillStyle = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(3)})`;
-  else if (isFinal) ctx.fillStyle = `rgba(220, 20, 60, ${(0.30 * alpha).toFixed(3)})`;
-  else if (isBankaiHollow) ctx.fillStyle = `rgba(220, 20, 40, ${(0.32 * alpha).toFixed(3)})`;
-  else if (isShikaiHollow) ctx.fillStyle = `rgba(0, 229, 255, ${(0.32 * alpha).toFixed(3)})`;
-  else if (isBankai) ctx.fillStyle = `rgba(220, 20, 40, ${(0.28 * alpha).toFixed(3)})`;
-  else ctx.fillStyle = `rgba(0, 160, 255, ${(0.26 * alpha).toFixed(3)})`;
-  ctx.fill();
-
-  // ── 1. Trailing Ethereal Motion Blur Echoes ──
-  const echoCount = isFinal ? 3 : 2;
-  for (let e = echoCount; e >= 1; e--) {
-    const eFrac = e / (echoCount + 1);
-    const eDist = e * (isFinal ? 14 : 9);
-    const eAlpha = alpha * (1.0 - eFrac) * 0.40;
-
-    ctx.save();
-    ctx.translate(-eDist, 0);
-    ctx.scale(1.0 - eFrac * 0.08, 1.0 - eFrac * 0.08);
-
-    ctx.beginPath();
-    for (let i = 0; i <= numSteps; i++) {
-      const t = (i / numSteps) * 2 - 1;
-      const ang = t * halfAngle;
-      const fx = Math.cos(ang) * R;
-      const fy = Math.sin(ang) * R;
-      if (i === 0) ctx.moveTo(fx, fy);
-      else ctx.lineTo(fx, fy);
-    }
-    for (let i = numSteps; i >= 0; i--) {
-      const t = (i / numSteps) * 2 - 1;
-      const ang = t * halfAngle;
-      const taper = Math.cos(t * (Math.PI / 2));
-      const inR = R - maxThick * Math.pow(taper, 1.25);
-      const bx = Math.cos(ang) * inR;
-      const by = Math.sin(ang) * inR;
-      ctx.lineTo(bx, by);
-    }
-    ctx.closePath();
-
-    if (isInfinityFrozen) ctx.fillStyle = `rgba(0, 220, 255, ${eAlpha.toFixed(3)})`;
-    else if (isFinal) ctx.fillStyle = `rgba(220, 20, 60, ${eAlpha.toFixed(3)})`;
-    else if (isBankaiHollow) ctx.fillStyle = `rgba(220, 20, 40, ${eAlpha.toFixed(3)})`;
-    else if (isShikaiHollow) ctx.fillStyle = `rgba(0, 220, 255, ${eAlpha.toFixed(3)})`;
-    else if (isBankai) ctx.fillStyle = `rgba(220, 20, 40, ${eAlpha.toFixed(3)})`;
-    else ctx.fillStyle = `rgba(0, 200, 255, ${eAlpha.toFixed(3)})`;
-    ctx.fill();
-
-    ctx.restore();
+  if (isInfinityFrozen) {
+    cBorder    = '#001a44';
+    cSaturated = '#0055dd';
+    cBright    = '#00e5ff';
+    cCore      = '#ffffff';
+    cAura      = `rgba(0, 229, 255, ${(0.35 * alpha).toFixed(2)})`;
+    isDarkCore = false;
+  } else if (isFinal) {
+    cBorder    = '#200005';
+    cSaturated = '#0a0002'; // Void core
+    cBright    = '#ff1133';
+    cCore      = '#ffffff';
+    cAura      = `rgba(255, 20, 60, ${(0.35 * alpha).toFixed(2)})`;
+    isDarkCore = true;
+  } else if (isBankaiHollow) {
+    cBorder    = '#180004';
+    cSaturated = '#050002'; // Void core
+    cBright    = '#ff2244';
+    cCore      = '#ffffff';
+    cAura      = `rgba(255, 30, 60, ${(0.35 * alpha).toFixed(2)})`;
+    isDarkCore = true;
+  } else if (isShikaiHollow) {
+    cBorder    = '#020814';
+    cSaturated = '#061020'; // Dark cyan void
+    cBright    = '#00f0ff';
+    cCore      = '#ffffff';
+    cAura      = `rgba(0, 240, 255, ${(0.35 * alpha).toFixed(2)})`;
+    isDarkCore = true;
+  } else if (isBankai) {
+    cBorder    = '#220008';
+    cSaturated = '#080206'; // Void black core
+    cBright    = '#ff1e32';
+    cCore      = '#ffffff';
+    cAura      = `rgba(220, 20, 40, ${(0.32 * alpha).toFixed(2)})`;
+    isDarkCore = true;
+  } else { // Standard Shikai
+    cBorder    = '#00143a';
+    cSaturated = '#0066ee';
+    cBright    = '#00e5ff';
+    cCore      = '#ffffff';
+    cAura      = `rgba(0, 180, 255, ${(0.32 * alpha).toFixed(2)})`;
+    isDarkCore = false;
   }
 
-  // ── 2. Outer Luminous Crescent Halo (Smooth Outer Edge Gradient) ──
-  ctx.beginPath();
+  // ── 1. Stepped Atmosphere Pixel Aura ──
+  const auraR = R + px * 2.0;
+  ctx.fillStyle = cAura;
+  for (let a = -halfAngle; a <= halfAngle; a += 0.05) {
+    const sx = Math.round((Math.cos(a) * auraR) / px) * px;
+    const sy = Math.round((Math.sin(a) * auraR) / px) * px;
+    ctx.fillRect(sx, sy, px, px);
+  }
+
+  // ── 2. Stepped High-Contrast Dark Border Perimeter ──
+  ctx.fillStyle = cBorder;
+  const numSteps = 32;
   for (let i = 0; i <= numSteps; i++) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfAngle;
-    const taper = Math.cos(t * (Math.PI / 2));
-    const fx = Math.cos(ang) * (R + 2.8 * taper);
-    const fy = Math.sin(ang) * (R + 2.8 * taper);
-    if (i === 0) ctx.moveTo(fx, fy);
-    else ctx.lineTo(fx, fy);
+    const sx = Math.round((Math.cos(ang) * (R + px * 0.8)) / px) * px;
+    const sy = Math.round((Math.sin(ang) * (R + px * 0.8)) / px) * px;
+    ctx.fillRect(sx, sy, px, px);
   }
   for (let i = numSteps; i >= 0; i--) {
     const t = (i / numSteps) * 2 - 1;
     const ang = t * halfAngle;
     const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - maxThick * 1.15 * Math.pow(taper, 1.30);
-    const bx = Math.cos(ang) * inR;
-    const by = Math.sin(ang) * inR;
-    ctx.lineTo(bx, by);
-  }
-  ctx.closePath();
-
-  const haloGrad = ctx.createRadialGradient(R * 0.4, 0, R * 0.2, R * 0.6, 0, R * 1.2);
-  if (isInfinityFrozen) {
-    haloGrad.addColorStop(0.0, `rgba(0, 240, 255, ${(0.75 * alpha).toFixed(3)})`);
-    haloGrad.addColorStop(1.0, 'rgba(0, 100, 255, 0.0)');
-  } else if (isFinal) {
-    haloGrad.addColorStop(0.0, `rgba(220, 20, 60, ${(0.65 * alpha).toFixed(3)})`);
-    haloGrad.addColorStop(1.0, 'rgba(120, 0, 20, 0.0)');
-  } else if (isBankaiHollow) {
-    haloGrad.addColorStop(0.0, `rgba(255, 30, 50, ${(0.70 * alpha).toFixed(3)})`);
-    haloGrad.addColorStop(1.0, 'rgba(18, 2, 6, 0.0)');
-  } else if (isShikaiHollow) {
-    haloGrad.addColorStop(0.0, `rgba(0, 235, 255, ${(0.70 * alpha).toFixed(3)})`);
-    haloGrad.addColorStop(1.0, 'rgba(10, 15, 25, 0.0)');
-  } else if (isBankai) {
-    haloGrad.addColorStop(0.0, `rgba(255, 30, 50, ${(0.65 * alpha).toFixed(3)})`);
-    haloGrad.addColorStop(1.0, 'rgba(150, 10, 20, 0.0)');
-  } else {
-    haloGrad.addColorStop(0.0, `rgba(0, 220, 255, ${(0.65 * alpha).toFixed(3)})`);
-    haloGrad.addColorStop(1.0, 'rgba(0, 100, 255, 0.0)');
-  }
-  ctx.fillStyle = haloGrad;
-  ctx.fill();
-
-  // ── 3. Main Dense Crescent Body (Form-Themed Color Flow) ──
-  ctx.beginPath();
-  // Convex Outer Leading Arc
-  for (let i = 0; i <= numSteps; i++) {
-    const t = (i / numSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const fx = Math.cos(ang) * R;
-    const fy = Math.sin(ang) * R;
-    if (i === 0) ctx.moveTo(fx, fy);
-    else ctx.lineTo(fx, fy);
-  }
-  // Concave Inner Trailing Arc (Clean, smooth fluid taper)
-  for (let i = numSteps; i >= 0; i--) {
-    const t = (i / numSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - maxThick * Math.pow(taper, 1.32);
-    const bx = Math.cos(ang) * inR;
-    const by = Math.sin(ang) * inR;
-    ctx.lineTo(bx, by);
-  }
-  ctx.closePath();
-
-  // Directional Linear Plasma Gradient from Leading Apex toward Center Concave Wake
-  const bodyGrad = ctx.createLinearGradient(R, 0, R - maxThick * 1.1, 0);
-  if (isInfinityFrozen) {
-    // ── Frozen by Limitless Infinity: Pure Laser White -> Radiant Electric Cyan -> Deep Azure ──
-    bodyGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.20, `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.65, `rgba(0, 130, 255, ${(0.92 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(1.0, `rgba(0, 60, 200, ${(0.20 * alpha).toFixed(3)})`);
-  } else if (isFinal) {
-    bodyGrad.addColorStop(0.0, `rgba(255, 240, 240, ${(1.0 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.18, `rgba(220, 20, 60, ${(0.96 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.55, `rgba(8, 1, 3, ${(0.99 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(1.0, `rgba(4, 0, 1, ${(0.30 * alpha).toFixed(3)})`);
-  } else if (isBankaiHollow) {
-    // ── Hollow in Bankai: Black + Red Crimson + White Lines ──
-    bodyGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.18, `rgba(255, 25, 45, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.52, `rgba(6, 1, 2, ${(0.99 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(1.0, `rgba(2, 0, 1, ${(0.30 * alpha).toFixed(3)})`);
-  } else if (isShikaiHollow) {
-    // ── Hollow in Shikai: CyanBlue + White + Black Lines ──
-    bodyGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.20, `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.55, `rgba(10, 12, 18, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(1.0, `rgba(0, 140, 240, ${(0.20 * alpha).toFixed(3)})`);
-  } else if (isBankai) {
-    bodyGrad.addColorStop(0.0, `rgba(255, 240, 245, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.18, `rgba(255, 25, 45, ${(0.96 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.55, `rgba(10, 2, 5, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(1.0, `rgba(6, 1, 3, ${(0.25 * alpha).toFixed(3)})`);
-  } else {
-    // Standard Shikai: Brilliant White -> Electric Cyan -> Deep Radiant Azure
-    bodyGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.20, `rgba(70, 245, 255, ${(0.98 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(0.65, `rgba(0, 150, 255, ${(0.88 * alpha).toFixed(3)})`);
-    bodyGrad.addColorStop(1.0, `rgba(0, 90, 240, ${(0.15 * alpha).toFixed(3)})`);
-  }
-  ctx.fillStyle = bodyGrad;
-  ctx.fill();
-
-  // ── 4. Stylized Inner Fluid Plasma Whisps (Anime Liquid Plasma Texture) ──
-  ctx.save();
-  ctx.beginPath();
-  const whispSteps = 28;
-  for (let i = 0; i <= whispSteps; i++) {
-    const t = (i / whispSteps) * 2 - 1;
-    const ang = t * (halfAngle * 0.88);
-    const taper = Math.cos(t * (Math.PI / 2));
-    const wave = Math.sin(t * Math.PI * 3 + now * 0.012) * (1.2 * taper);
-    const fx = Math.cos(ang) * (R - maxThick * 0.22 + wave);
-    const fy = Math.sin(ang) * (R - maxThick * 0.22 + wave);
-    if (i === 0) ctx.moveTo(fx, fy);
-    else ctx.lineTo(fx, fy);
-  }
-  for (let i = whispSteps; i >= 0; i--) {
-    const t = (i / whispSteps) * 2 - 1;
-    const ang = t * (halfAngle * 0.88);
-    const taper = Math.cos(t * (Math.PI / 2));
-    const inR = R - maxThick * (0.68 * Math.pow(taper, 1.4));
-    const bx = Math.cos(ang) * inR;
-    const by = Math.sin(ang) * inR;
-    ctx.lineTo(bx, by);
-  }
-  ctx.closePath();
-
-  if (isInfinityFrozen) ctx.fillStyle = `rgba(180, 250, 255, ${(0.75 * alpha).toFixed(3)})`;
-  else if (isFinal) ctx.fillStyle = `rgba(255, 40, 70, ${(0.45 * alpha).toFixed(3)})`;
-  else if (isBankaiHollow) ctx.fillStyle = `rgba(255, 40, 70, ${(0.55 * alpha).toFixed(3)})`;
-  else if (isShikaiHollow) ctx.fillStyle = `rgba(0, 240, 255, ${(0.60 * alpha).toFixed(3)})`;
-  else if (isBankai) ctx.fillStyle = `rgba(255, 30, 50, ${(0.38 * alpha).toFixed(3)})`;
-  else ctx.fillStyle = `rgba(180, 250, 255, ${(0.65 * alpha).toFixed(3)})`;
-  ctx.fill();
-  ctx.restore();
-
-  // ── 5. Leading Arc Lines (Themed Line Contours) ──
-  // Outer Outline Stroke
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = (i / numSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const fx = Math.cos(ang) * R;
-    const fy = Math.sin(ang) * R;
-    if (i === 0) ctx.moveTo(fx, fy);
-    else ctx.lineTo(fx, fy);
+    const inR = R - maxThick * Math.pow(taper, 1.32) - px;
+    const sx = Math.round((Math.cos(ang) * inR) / px) * px;
+    const sy = Math.round((Math.sin(ang) * inR) / px) * px;
+    ctx.fillRect(sx, sy, px, px);
   }
 
-  if (isInfinityFrozen) {
-    ctx.strokeStyle = `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 3.6;
-    ctx.stroke();
-  } else if (isFinal) {
-    ctx.strokeStyle = `rgba(255, 40, 60, ${(0.95 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 3.6;
-    ctx.stroke();
-  } else if (isBankaiHollow) {
-    // Bankai Hollow: Crimson outer glow with Black accent line
-    ctx.strokeStyle = `rgba(255, 30, 50, ${(0.98 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 3.6;
-    ctx.stroke();
-    ctx.beginPath();
-    for (let i = 0; i <= numSteps; i++) {
-      const t = (i / numSteps) * 2 - 1;
-      const ang = t * halfAngle;
-      const fx = Math.cos(ang) * (R - 0.5);
-      const fy = Math.sin(ang) * (R - 0.5);
-      if (i === 0) ctx.moveTo(fx, fy);
-      else ctx.lineTo(fx, fy);
+  // ── 3. Dense Stepped Crescent Body Grid ──
+  const minX = Math.floor((Math.cos(halfAngle) * R - maxThick) / px) * px;
+  const maxX = Math.ceil(R / px) * px;
+  const maxY = Math.ceil((Math.sin(halfAngle) * R) / px) * px;
+
+  for (let gy = -maxY; gy <= maxY; gy += px) {
+    for (let gx = minX; gx <= maxX; gx += px) {
+      const dist = Math.sqrt(gx * gx + gy * gy);
+      const ang = Math.atan2(gy, gx);
+
+      if (Math.abs(ang) <= halfAngle) {
+        const t = ang / halfAngle;
+        const taper = Math.cos(t * (Math.PI / 2));
+        const inR = R - maxThick * Math.pow(taper, 1.32);
+
+        if (dist >= inR && dist <= R) {
+          const depthFromApex = R - dist; // 0 at leading edge, maxThick at back
+
+          if (depthFromApex < px * 1.3) {
+            ctx.fillStyle = cCore; // Razor-sharp white-hot leading edge
+          } else if (depthFromApex < px * 3.2) {
+            ctx.fillStyle = cBright; // Saturated electric energy rim
+          } else {
+            ctx.fillStyle = isDarkCore ? cSaturated : ((Math.round(gx / px) + Math.round(gy / px)) % 2 === 0 ? cSaturated : cBright);
+          }
+          ctx.fillRect(Math.round(gx), Math.round(gy), px, px);
+        }
+      }
     }
-    ctx.strokeStyle = `rgba(5, 1, 2, ${(0.95 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-  } else if (isShikaiHollow) {
-    // Shikai Hollow: Cyan-Blue outer glow with Black contrast line
-    ctx.strokeStyle = `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 3.6;
-    ctx.stroke();
-    ctx.beginPath();
-    for (let i = 0; i <= numSteps; i++) {
-      const t = (i / numSteps) * 2 - 1;
-      const ang = t * halfAngle;
-      const fx = Math.cos(ang) * (R - 0.5);
-      const fy = Math.sin(ang) * (R - 0.5);
-      if (i === 0) ctx.moveTo(fx, fy);
-      else ctx.lineTo(fx, fy);
-    }
-    ctx.strokeStyle = `rgba(5, 8, 14, ${(0.98 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
-  } else if (isBankai) {
-    ctx.strokeStyle = `rgba(255, 30, 50, ${(0.95 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 3.0;
-    ctx.stroke();
-  } else {
-    ctx.strokeStyle = `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 3.4;
-    ctx.stroke();
   }
 
-  // Inner Ultra-Bright White-Hot Laser Spine (The "White Lines")
-  ctx.beginPath();
-  for (let i = 0; i <= numSteps; i++) {
-    const t = (i / numSteps) * 2 - 1;
-    const ang = t * halfAngle;
-    const fx = Math.cos(ang) * R;
-    const fy = Math.sin(ang) * R;
-    if (i === 0) ctx.moveTo(fx, fy);
-    else ctx.lineTo(fx, fy);
+  // ── 4. Leading Apex Stepped Pixel Diamond Flare ──
+  const apexX = Math.round(R / px) * px;
+  ctx.fillStyle = cCore;
+  ctx.fillRect(apexX - px * 0.5, -px * 0.5, px, px);
+  ctx.fillRect(apexX - px * 2, -px * 0.5, px * 4, px);
+  ctx.fillRect(apexX - px * 0.5, -px * 2, px, px * 4);
+
+  // ── 5. Trailing Stepped Pixel Sparkles (3 Dynamic Motes) ──
+  for (let s = 0; s < 3; s++) {
+    const sSeed = s * 73.1 + qTime * 0.006;
+    const sAng = (Math.sin(sSeed) * halfAngle * 0.7);
+    const sT = Math.cos((sAng / halfAngle) * (Math.PI / 2));
+    const sInR = R - maxThick * Math.pow(sT, 1.32) - (px * (2 + (s % 3) * 2));
+    const sx = Math.round((Math.cos(sAng) * sInR) / px) * px;
+    const sy = Math.round((Math.sin(sAng) * sInR) / px) * px;
+
+    ctx.fillStyle = s % 2 === 0 ? cCore : cBright;
+    ctx.fillRect(sx, sy, px, px);
   }
-  ctx.strokeStyle = `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`;
-  ctx.lineWidth = (isBankaiHollow || isShikaiHollow || isInfinityFrozen) ? 1.6 : 1.4;
-  ctx.stroke();
-
-  // ── 6. Iconic Center Leading Slash Flare / Energy Beam ──
-  const flareLen = isFinal ? 46 : ((isBankaiHollow || isShikaiHollow || isInfinityFrozen) ? 36 : (isBankai ? 28 : 30));
-  const flareAngle = -0.45; // ~-25° angle matching the dynamic cutting slash beam in Image 2
-  const cosF = Math.cos(flareAngle);
-  const sinF = Math.sin(flareAngle);
-  const perpFX = -sinF;
-  const perpFY = cosF;
-
-  ctx.save();
-  ctx.translate(R, 0);
-
-  // Pass A: Brilliant 4-Point Forward Cutting Slash Flare
-  ctx.beginPath();
-  ctx.moveTo(cosF * flareLen, sinF * flareLen);                             // Sharp leading spear tip
-  ctx.lineTo(perpFX * 3.5 - cosF * (flareLen * 0.2), perpFY * 3.5 - sinF * (flareLen * 0.2));
-  ctx.lineTo(-cosF * (flareLen * 0.45), -sinF * (flareLen * 0.45));          // Trailing core root
-  ctx.lineTo(-perpFX * 3.5 - cosF * (flareLen * 0.2), -perpFY * 3.5 - sinF * (flareLen * 0.2));
-  ctx.closePath();
-
-  ctx.fillStyle = `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`;
-  ctx.fill();
-
-  // Pass B: Outer Glow on the Cutting Beam
-  if (isInfinityFrozen) ctx.strokeStyle = `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`;
-  else if (isFinal) ctx.strokeStyle = `rgba(255, 40, 60, ${(0.92 * alpha).toFixed(3)})`;
-  else if (isBankaiHollow) ctx.strokeStyle = `rgba(255, 30, 50, ${(0.95 * alpha).toFixed(3)})`;
-  else if (isShikaiHollow) ctx.strokeStyle = `rgba(0, 240, 255, ${(0.98 * alpha).toFixed(3)})`;
-  else if (isBankai) ctx.strokeStyle = `rgba(255, 30, 50, ${(0.92 * alpha).toFixed(3)})`;
-  else ctx.strokeStyle = `rgba(0, 240, 255, ${(0.95 * alpha).toFixed(3)})`;
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
-
-  // Pass C: Circular Focal Blast Orb & Micro Energy Droplets
-  const focalGrad = ctx.createRadialGradient(0, 0, 0, 0, 0, 8.5);
-  focalGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`);
-  if (isInfinityFrozen) {
-    focalGrad.addColorStop(0.45, `rgba(0, 240, 255, ${(0.85 * alpha).toFixed(3)})`);
-    focalGrad.addColorStop(1.0, 'rgba(0, 140, 255, 0.0)');
-  } else if (isFinal || isBankaiHollow) {
-    focalGrad.addColorStop(0.45, `rgba(255, 40, 50, ${(0.85 * alpha).toFixed(3)})`);
-    focalGrad.addColorStop(1.0, 'rgba(220, 20, 40, 0.0)');
-  } else if (isShikaiHollow) {
-    focalGrad.addColorStop(0.45, `rgba(0, 240, 255, ${(0.85 * alpha).toFixed(3)})`);
-    focalGrad.addColorStop(1.0, 'rgba(0, 140, 255, 0.0)');
-  } else if (isBankai) {
-    focalGrad.addColorStop(0.45, `rgba(255, 40, 50, ${(0.85 * alpha).toFixed(3)})`);
-    focalGrad.addColorStop(1.0, 'rgba(220, 20, 40, 0.0)');
-  } else {
-    focalGrad.addColorStop(0.45, `rgba(0, 230, 255, ${(0.85 * alpha).toFixed(3)})`);
-    focalGrad.addColorStop(1.0, 'rgba(0, 140, 255, 0.0)');
-  }
-  ctx.fillStyle = focalGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, 8.5, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Micro Energy Droplets / Spark Beads near the flare
-  const droplets = [
-    { dx: cosF * (flareLen * 0.55) + perpFX * 4.5, dy: sinF * (flareLen * 0.55) + perpFY * 4.5, sz: 1.8 },
-    { dx: cosF * (flareLen * 0.85) - perpFX * 3.0, dy: sinF * (flareLen * 0.85) - perpFY * 3.0, sz: 1.4 },
-    { dx: -cosF * 6 + perpFX * 6.0,                 dy: -sinF * 6 + perpFY * 6.0,                 sz: 1.6 }
-  ];
-  for (let d = 0; d < droplets.length; d++) {
-    const dp = droplets[d];
-    ctx.fillStyle = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
-    ctx.beginPath();
-    ctx.arc(dp.dx, dp.dy, dp.sz, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  ctx.restore();
 
   ctx.restore();
 }
@@ -440,11 +205,126 @@ export function drawCeroBeam(ctx, p) {
   ctx.restore();
 }
 
+let _shikaiSwordImage = null;
+let _shikaiSwordImageLoading = false;
+
+export function _getShikaiSwordImage() {
+  if (_shikaiSwordImage && _shikaiSwordImage.complete && _shikaiSwordImage.naturalWidth > 0) {
+    return _shikaiSwordImage;
+  }
+  if (!_shikaiSwordImageLoading && typeof Image !== 'undefined') {
+    _shikaiSwordImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _shikaiSwordImage = img;
+      _shikaiSwordImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Shikai sword image at Assets/model/ICHIGO-SHIKAI-SWORD.png', e);
+      _shikaiSwordImageLoading = false;
+    };
+    img.src = 'Assets/model/ICHIGO-SHIKAI-SWORD.png';
+    _shikaiSwordImage = img;
+  }
+  return _shikaiSwordImage;
+}
+
+let _shikaiSwordBladeImage = null;
+let _shikaiSwordBladeImageLoading = false;
+
+export function _getShikaiSwordBladeImage() {
+  if (_shikaiSwordBladeImage && _shikaiSwordBladeImage.complete && _shikaiSwordBladeImage.naturalWidth > 0) {
+    return _shikaiSwordBladeImage;
+  }
+  if (!_shikaiSwordBladeImageLoading && typeof Image !== 'undefined') {
+    _shikaiSwordBladeImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _shikaiSwordBladeImage = img;
+      _shikaiSwordBladeImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Shikai sword blade image at Assets/model/ICHIGO-SHIKAI-SWORD-BLADE.png', e);
+      _shikaiSwordBladeImageLoading = false;
+    };
+    img.src = 'Assets/model/ICHIGO-SHIKAI-SWORD-BLADE.png';
+    _shikaiSwordBladeImage = img;
+  }
+  return _shikaiSwordBladeImage;
+}
+
+let _bankaiSwordImage = null;
+let _bankaiSwordImageLoading = false;
+
+export function _getBankaiSwordImage() {
+  if (_bankaiSwordImage && _bankaiSwordImage.complete && _bankaiSwordImage.naturalWidth > 0) {
+    return _bankaiSwordImage;
+  }
+  if (!_bankaiSwordImageLoading && typeof Image !== 'undefined') {
+    _bankaiSwordImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _bankaiSwordImage = img;
+      _bankaiSwordImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Bankai sword image at Assets/model/ICHIGO-BANKAI-SWORD.png', e);
+      _bankaiSwordImageLoading = false;
+    };
+    img.src = 'Assets/model/ICHIGO-BANKAI-SWORD.png';
+    _bankaiSwordImage = img;
+  }
+  return _bankaiSwordImage;
+}
+
+let _bankaiSwordBladeImage = null;
+let _bankaiSwordBladeImageLoading = false;
+
+export function _getBankaiSwordBladeImage() {
+  if (_bankaiSwordBladeImage && _bankaiSwordBladeImage.complete && _bankaiSwordBladeImage.naturalWidth > 0) {
+    return _bankaiSwordBladeImage;
+  }
+  if (!_bankaiSwordBladeImageLoading && typeof Image !== 'undefined') {
+    _bankaiSwordBladeImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _bankaiSwordBladeImage = img;
+      _bankaiSwordBladeImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Bankai sword blade image at Assets/model/ICHIGO-BANKAI-SWORD-BLADE.png', e);
+      _bankaiSwordBladeImageLoading = false;
+    };
+    img.src = 'Assets/model/ICHIGO-BANKAI-SWORD-BLADE.png';
+    _bankaiSwordBladeImage = img;
+  }
+  return _bankaiSwordBladeImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getShikaiSwordImage();
+  _getShikaiSwordBladeImage();
+  _getBankaiSwordImage();
+  _getBankaiSwordBladeImage();
+}
+
 export function drawShikaiZangetsu(ctx, x, y, angle, r) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
   ctx.save();
   ctx.translate(x, y);
   ctx.rotate(angle);
+
+  const img = _getShikaiSwordImage();
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
+    const s = 0.20; // Exact preview scale
+    ctx.scale(s, s);
+    ctx.drawImage(img, -280, -60);
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
 
   // Standalone weapon scale
   const scale = 0.78;
@@ -454,130 +334,156 @@ export function drawShikaiZangetsu(ctx, x, y, angle, r) {
   const handleThick = 6.5;
   const hiltX = -handleLen; // -42
 
-  // 1. Draw Trailing White Cloth Ribbons from the Pommel (Slim & Compact 3 Strands)
+  // 1. Pixel Art White Cloth Ribbons from the Pommel
   ctx.save();
 
   // Ribbon Strand 3 (Deepest downward loop, weaving behind)
-  ctx.fillStyle = '#EAEAEA';
-  ctx.strokeStyle = '#222222';
-  ctx.lineWidth = 0.8;
+  ctx.fillStyle = '#cbd5e1';
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 1.0;
   ctx.beginPath();
   ctx.moveTo(hiltX - 1, 1);
-  ctx.bezierCurveTo(hiltX - 12, 10, hiltX - 14, 24, hiltX - 2, 27);
-  ctx.bezierCurveTo(hiltX + 10, 30, hiltX + 22, 22, hiltX + 38, 20);
+  ctx.lineTo(hiltX - 12, 10);
+  ctx.lineTo(hiltX - 14, 24);
+  ctx.lineTo(hiltX - 2, 27);
+  ctx.lineTo(hiltX + 10, 30);
+  ctx.lineTo(hiltX + 22, 22);
+  ctx.lineTo(hiltX + 38, 20);
   ctx.lineTo(hiltX + 36, 17);
-  ctx.bezierCurveTo(hiltX + 22, 19, hiltX + 10, 26, hiltX - 2, 24);
-  ctx.bezierCurveTo(hiltX - 10, 22, hiltX - 8, 9, hiltX - 1, 2);
+  ctx.lineTo(hiltX + 22, 19);
+  ctx.lineTo(hiltX + 10, 26);
+  ctx.lineTo(hiltX - 2, 24);
+  ctx.lineTo(hiltX - 10, 22);
+  ctx.lineTo(hiltX - 8, 9);
+  ctx.lineTo(hiltX - 1, 2);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   // Ribbon Strand 2 (Middle strand crossing under Strand 1)
-  ctx.fillStyle = '#F5F5F5';
-  ctx.strokeStyle = '#222222';
-  ctx.lineWidth = 0.8;
+  ctx.fillStyle = '#e2e8f0';
   ctx.beginPath();
   ctx.moveTo(hiltX - 1, 1);
-  ctx.bezierCurveTo(hiltX - 8, 6, hiltX - 8, 18, hiltX + 2, 20);
-  ctx.bezierCurveTo(hiltX + 15, 22, hiltX + 28, 16, hiltX + 46, 23);
+  ctx.lineTo(hiltX - 8, 6);
+  ctx.lineTo(hiltX - 8, 18);
+  ctx.lineTo(hiltX + 2, 20);
+  ctx.lineTo(hiltX + 15, 22);
+  ctx.lineTo(hiltX + 28, 16);
+  ctx.lineTo(hiltX + 46, 23);
   ctx.lineTo(hiltX + 44, 20);
-  ctx.bezierCurveTo(hiltX + 28, 13, hiltX + 15, 19, hiltX + 2, 17);
-  ctx.bezierCurveTo(hiltX - 5, 15, hiltX - 5, 5, hiltX, 2);
+  ctx.lineTo(hiltX + 28, 13);
+  ctx.lineTo(hiltX + 15, 19);
+  ctx.lineTo(hiltX + 2, 17);
+  ctx.lineTo(hiltX - 5, 15);
+  ctx.lineTo(hiltX - 5, 5);
+  ctx.lineTo(hiltX, 2);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   // Ribbon Strand 1 (Front strand crossing over middle and waving to top tail)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 0.8;
+  ctx.fillStyle = '#ffffff';
   ctx.beginPath();
   ctx.moveTo(hiltX - 1, 1);
-  ctx.bezierCurveTo(hiltX - 10, 8, hiltX - 11, 22, hiltX - 1, 24);
-  ctx.bezierCurveTo(hiltX + 10, 26, hiltX + 22, 12, hiltX + 38, 13);
-  ctx.bezierCurveTo(hiltX + 46, 14, hiltX + 50, 16, hiltX + 54, 13);
+  ctx.lineTo(hiltX - 10, 8);
+  ctx.lineTo(hiltX - 11, 22);
+  ctx.lineTo(hiltX - 1, 24);
+  ctx.lineTo(hiltX + 10, 26);
+  ctx.lineTo(hiltX + 22, 12);
+  ctx.lineTo(hiltX + 38, 13);
+  ctx.lineTo(hiltX + 54, 13);
   ctx.lineTo(hiltX + 52, 10);
-  ctx.bezierCurveTo(hiltX + 48, 12, hiltX + 44, 11, hiltX + 36, 10);
-  ctx.bezierCurveTo(hiltX + 22, 9, hiltX + 10, 22, hiltX - 1, 21);
-  ctx.bezierCurveTo(hiltX - 8, 19, hiltX - 7, 7, hiltX, 1);
+  ctx.lineTo(hiltX + 36, 10);
+  ctx.lineTo(hiltX + 22, 9);
+  ctx.lineTo(hiltX + 10, 22);
+  ctx.lineTo(hiltX - 1, 21);
+  ctx.lineTo(hiltX - 8, 19);
+  ctx.lineTo(hiltX - 7, 7);
+  ctx.lineTo(hiltX, 1);
   ctx.closePath();
   ctx.fill();
   ctx.stroke();
 
   // Fabric Pommel Wrap Knot
-  ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.ellipse(hiltX - 1.5, 0, 2.8, 4, -0.2, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(hiltX - 3.0, -3.5, 4.0, 7.0);
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 1.0;
+  ctx.strokeRect(hiltX - 3.0, -3.5, 4.0, 7.0);
 
   ctx.restore();
 
-  // 2. Draw Handle / Hilt (white cloth wrapped directly around hilt, NO handguard/collar!)
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.moveTo(hiltX, -handleThick / 2);
-  ctx.lineTo(0, -handleThick / 2);
-  ctx.lineTo(0, handleThick / 2);
-  ctx.lineTo(hiltX, handleThick / 2);
-  ctx.closePath();
-  ctx.fill();
+  // 2. Pixel Art Handle / Hilt (White wrapped cloth with diamond Ito stitches)
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(hiltX, -handleThick / 2, handleLen, handleThick);
 
-  // Fabric wrapping texture lines (white cloth wrapped around hilt)
-  ctx.strokeStyle = '#D8D8D8';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  for (let px = hiltX + 4; px < 0; px += 4.5) {
-    ctx.moveTo(px, -handleThick / 2);
-    ctx.lineTo(px + 2.5, handleThick / 2);
-    ctx.moveTo(px + 2.5, -handleThick / 2);
-    ctx.lineTo(px, handleThick / 2);
+  // Pixel Ito stitches
+  ctx.fillStyle = '#94a3b8';
+  for (let px = hiltX + 3.5; px < 0; px += 5.5) {
+    ctx.fillRect(px, -handleThick / 2, 2.0, 2.0);
+    ctx.fillRect(px + 1.5, -0.5, 2.0, 1.5);
+    ctx.fillRect(px, handleThick / 2 - 2.0, 2.0, 2.0);
   }
-  ctx.stroke();
 
   // Handle outer outline
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 1.0;
+  ctx.strokeStyle = '#0f172a';
+  ctx.lineWidth = 1.2;
   ctx.strokeRect(hiltX, -handleThick / 2, handleLen, handleThick);
 
-  // 3. Blade Geometry
+  // 3. Pixel Art Blade Geometry
   const tipX = 145, tipY = -12;
   const cutoutR = 7.0;
   const cutoutCenterX = cutoutR, cutoutCenterY = 3.5;
   const heelX = cutoutR * 2, heelY = 22;
 
-  // A) Draw Black Back Spine Region (Upper Portion of the Blade)
-  ctx.fillStyle = '#1A1A1A';
+  // A) Draw Black Back Spine Region (Dark Gunmetal & Midnight Black)
+  ctx.fillStyle = '#101216';
   ctx.beginPath();
   ctx.moveTo(0, -3.5);
   ctx.lineTo(tipX, tipY);
   ctx.quadraticCurveTo(75, -2, heelX, cutoutCenterY);
   ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR, 0, Math.PI, true);
-  ctx.lineTo(0, 6.0); // Small downward spur under handle
+  ctx.lineTo(0, 6.0);
   ctx.lineTo(0, -3.5);
   ctx.closePath();
   ctx.fill();
 
-  // B) Draw Silver Steel Blade Body (Main Lower Region & Cutting Edge)
-  const silverGrad = ctx.createLinearGradient(heelX, 0, tipX, 0);
-  silverGrad.addColorStop(0, '#E5E5E5');
-  silverGrad.addColorStop(0.3, '#FFFFFF');
-  silverGrad.addColorStop(0.7, '#ECECEC');
-  silverGrad.addColorStop(1, '#D8D8D8');
+  // Upper spine top highlight line (pixel bevel)
+  ctx.strokeStyle = '#2d3342';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -2.5);
+  ctx.lineTo(tipX, tipY);
+  ctx.stroke();
 
-  ctx.fillStyle = silverGrad;
+  // B) Draw Silver Steel Blade Body (Main Lower Region & Cutting Edge)
+  ctx.fillStyle = '#e2e8f0';
   ctx.beginPath();
   ctx.moveTo(heelX, heelY);
-  ctx.quadraticCurveTo(80, 18, tipX, tipY); // Bottom cutting edge arc
-  ctx.quadraticCurveTo(75, -2, heelX, cutoutCenterY); // Seam line separating black spine
-  ctx.lineTo(heelX, heelY); // Heel vertical line
+  ctx.quadraticCurveTo(80, 18, tipX, tipY);
+  ctx.quadraticCurveTo(75, -2, heelX, cutoutCenterY);
+  ctx.lineTo(heelX, heelY);
   ctx.closePath();
   ctx.fill();
 
-  // C) Draw Outer Outlines & Seam Details
-  ctx.strokeStyle = '#111111';
+  // Upper blade seam shading band
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  ctx.moveTo(heelX, cutoutCenterY + 1.5);
+  ctx.quadraticCurveTo(75, -0.5, tipX, tipY);
+  ctx.stroke();
+
+  // Razor-sharp pure white cutting edge
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 1.8;
+  ctx.beginPath();
+  ctx.moveTo(heelX, heelY);
+  ctx.quadraticCurveTo(80, 18, tipX, tipY);
+  ctx.stroke();
+
+  // C) Crisp Pixel Outer Outlines & Seam Details
+  ctx.strokeStyle = '#0f172a';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.moveTo(0, -3.5);
@@ -591,19 +497,11 @@ export function drawShikaiZangetsu(ctx, x, y, angle, r) {
   ctx.stroke();
 
   // Seam line separating Black Spine from Silver Steel Body
-  ctx.strokeStyle = 'rgba(20, 20, 20, 0.7)';
+  ctx.strokeStyle = '#0f172a';
   ctx.lineWidth = 1.0;
   ctx.beginPath();
   ctx.moveTo(heelX, cutoutCenterY);
   ctx.quadraticCurveTo(75, -2, tipX, tipY);
-  ctx.stroke();
-
-  // Metallic highlight line along silver edge
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.moveTo(heelX + 1, heelY - 2);
-  ctx.quadraticCurveTo(80, 16, tipX - 2, tipY + 0.5);
   ctx.stroke();
 
   ctx.restore();
@@ -619,6 +517,79 @@ export function drawShikaiZangetsu(ctx, x, y, angle, r) {
  */
 export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts = {}) {
   const bladeLen = opts.bladeLen || 94;
+
+  const bladeImg = _getBankaiSwordBladeImage();
+  if (bladeImg && bladeImg.complete && bladeImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const s = bladeLen / 566.0;
+    ctx.translate(swordStartX, 0);
+    ctx.scale(s, s);
+    ctx.drawImage(bladeImg, -194, -78.5);
+    ctx.restore();
+
+    // Broken Black Chain (Kusari) if not skipped
+    if (!opts.skipChain) {
+      const hiltStartX = swordStartX - 32;
+      const ringX = hiltStartX - 4.2;
+      const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
+      const breathe = Math.sin(now * 0.0025) * 0.8;
+      
+      const chainLinks = [];
+      const linkCount = 13;
+      const isBankaiStance = Boolean(opts.isBankaiStance || opts.isChampionScreen);
+
+      if (isBankaiStance) {
+        const downX = Math.sin(2.65);
+        const downY = -Math.cos(2.65);
+        const perpDownX = downY;
+        const perpDownY = -downX;
+
+        for (let i = 0; i < linkCount; i++) {
+          const t = i / (linkCount - 1);
+          const hangLen = 28.0;
+          const catenarySway = Math.sin(t * Math.PI) * (2.2 + breathe);
+          const cx = ringX + t * hangLen * downX + catenarySway * perpDownX;
+          const cy = 0 + t * hangLen * downY + catenarySway * perpDownY;
+          const baseAng = Math.atan2(downY, downX);
+          const swayAng = Math.cos(t * Math.PI) * 0.20;
+          chainLinks.push({ x: cx, y: cy, ang: baseAng + swayAng });
+        }
+      } else {
+        for (let i = 0; i < linkCount; i++) {
+          const t = i / (linkCount - 1);
+          const cx = ringX - t * 30.0;
+          const cy = Math.sin(t * Math.PI) * (14.0 + breathe) + t * 4.0;
+          const ang = Math.cos(t * Math.PI) * 0.85 - 0.25;
+          chainLinks.push({ x: cx, y: cy, ang: ang });
+        }
+      }
+
+      ctx.save();
+      for (let c = 0; c < chainLinks.length; c++) {
+        const cl = chainLinks[c];
+        ctx.save();
+        ctx.translate(cl.x, cl.y);
+        ctx.rotate(cl.ang);
+
+        const isOdd = (c % 2 === 1);
+        const linkRx = 2.7;
+        const linkRy = isOdd ? 1.0 : 1.6;
+
+        ctx.fillStyle = '#0a0a0e';
+        ctx.strokeStyle = '#2d3342';
+        ctx.lineWidth = 1.0;
+        ctx.fillRect(-linkRx, -linkRy, linkRx * 2, linkRy * 2);
+        ctx.strokeRect(-linkRx, -linkRy, linkRx * 2, linkRy * 2);
+
+        ctx.restore();
+      }
+      ctx.restore();
+    }
+
+    return;
+  }
+
   const bladeBaseX = swordStartX + 5;
   const tipX = swordStartX + bladeLen;
 
@@ -948,128 +919,8 @@ export function drawTensaZangetsuKatana(ctx, swordStartX, isMask = false, opts =
  * creating a menacing living weapon feel clearly visible during arena combat.
  */
 export function drawBankaiSwordOrbitingAura(ctx, swordStartX, swordLen = 94, isMask = false, isFrozen = false) {
-  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-  const time = isFrozen ? 0 : (now * 0.001);
-  const bladeBaseX = swordStartX + 5;
-  const actualBladeLen = swordLen - 8;
-
-  const getSori = (x) => -Math.pow(Math.max(0, Math.min(1.0, (x - bladeBaseX) / actualBladeLen)), 1.45) * 8.5;
-
-  ctx.save();
-
-  // ── 1. Omnidirectional Random Kuroi Reiatsu Flame Plumes (Wandering in all directions around blade) ──
-  const smokeCount = 20;
-  for (let i = 0; i < smokeCount; i++) {
-    const seed = (i * 137.508) % 1.0;
-    const speed = 0.95 + seed * 0.90;
-    const lifeT = ((time * speed + seed * 3.14) % 1.6) / 1.6;
-
-    const bladeT = (seed + lifeT * 0.18) % 1.0;
-    const baseX = bladeBaseX + bladeT * actualBladeLen;
-    const soriY = getSori(baseX);
-
-    // Multi-harmonic chaotic random drift vectors around the blade (both cutting edge -Y, spine +Y, and tip)
-    const driftAngle = seed * Math.PI * 2 + Math.sin(time * 3.4 + i * 1.7) * 1.8;
-    const driftDist = (3.5 + Math.sin(time * 4.5 + i * 2.1) * 2.5) + lifeT * 18.0 * (0.6 + 0.4 * seed);
-
-    const randCurlX = Math.cos(driftAngle) * driftDist + Math.sin(time * 5.0 + i) * 3.5;
-    const randCurlY = Math.sin(driftAngle) * driftDist + Math.cos(time * 4.4 + i * 1.3) * 3.5;
-
-    const px = baseX + randCurlX;
-    const py = soriY + randCurlY;
-
-    // Smoke lifecycle
-    const fadeIn = Math.min(1.0, lifeT * 5.0);
-    const fadeOut = Math.max(0.0, 1.0 - Math.pow(lifeT, 1.4));
-    const alpha = fadeIn * fadeOut * (isMask ? 0.85 : 0.75);
-    if (alpha <= 0.03) continue;
-
-    const size = (3.5 + lifeT * 11.0) * (0.75 + seed * 0.5);
-
-    // Outer dark void smoke body
-    ctx.beginPath();
-    ctx.arc(px, py, size, 0, Math.PI * 2);
-    ctx.fillStyle = isMask ? 'rgba(40, 4, 0, 0.80)' : 'rgba(10, 4, 16, 0.78)';
-    ctx.globalAlpha = alpha;
-    ctx.fill();
-
-    // Radiant Crimson / Scarlet glowing flame halo
-    if (lifeT < 0.80) {
-      const ringAlpha = (1.0 - lifeT / 0.80) * 0.65;
-      ctx.beginPath();
-      ctx.arc(px, py, size * 0.70, 0, Math.PI * 2);
-      ctx.fillStyle = isMask
-        ? `rgba(255, 45, 0, ${(alpha * ringAlpha).toFixed(3)})`
-        : `rgba(225, 25, 55, ${(alpha * ringAlpha).toFixed(3)})`;
-      ctx.globalAlpha = alpha * ringAlpha;
-      ctx.fill();
-    }
-
-    // White-hot / blazing ember core center
-    if (lifeT < 0.55) {
-      const coreAlpha = (1.0 - lifeT / 0.55) * 0.90;
-      ctx.beginPath();
-      ctx.arc(px, py, size * 0.35, 0, Math.PI * 2);
-      ctx.fillStyle = isMask
-        ? `rgba(255, 140, 30, ${(alpha * coreAlpha).toFixed(3)})`
-        : `rgba(255, 75, 90, ${(alpha * coreAlpha).toFixed(3)})`;
-      ctx.globalAlpha = alpha * coreAlpha;
-      ctx.fill();
-    }
-  }
-
-  // ── 2. Organic Random Blade Plasma Sheen (Surging & wandering around top and bottom surfaces) ──
-  const hazeSteps = 12;
-  for (let h = 0; h < hazeSteps; h++) {
-    const ht = (h + 0.5) / hazeSteps;
-    const hx = bladeBaseX + ht * actualBladeLen;
-    const soriY = getSori(hx);
-
-    // Random wandering offsets in both X and Y
-    const side = (h % 3 === 0 ? -1.0 : (h % 3 === 1 ? 1.0 : 0.0));
-    const breatheX = Math.sin(time * 4.2 + h * 1.8) * 3.5;
-    const breatheY = (side * 4.2) + Math.sin(time * 5.8 + h * 1.5) * 3.5;
-
-    ctx.save();
-    ctx.translate(hx + breatheX, soriY + breatheY);
-
-    const hazeW = 9.0 + Math.sin(time * 4.0 + h * 2.2) * 4.0;
-    const hazeH = 4.5 + Math.sin(time * 5.0 + h * 1.8) * 2.0;
-    const hazeAlpha = (0.35 + 0.20 * Math.sin(time * 4.5 + h * 1.2)) * (isMask ? 0.9 : 0.75);
-
-    ctx.beginPath();
-    ctx.ellipse(0, 0, hazeW, hazeH, 0, 0, Math.PI * 2);
-    ctx.fillStyle = isMask
-      ? `rgba(80, 12, 0, ${hazeAlpha.toFixed(3)})`
-      : `rgba(28, 8, 38, ${hazeAlpha.toFixed(3)})`;
-    ctx.globalAlpha = hazeAlpha;
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  // ── 3. High-Frequency Leaping Reiatsu Sparks (Darting in all random directions) ──
-  const sparkCount = 10;
-  for (let s = 0; s < sparkCount; s++) {
-    const st = ((time * 1.8 + s * 0.85) % 1.4) / 1.4;
-    const sparkAngle = (s * 1.75 + time * 3.5) % (Math.PI * 2);
-    const sparkDist = (3.0 + st * 16.0) * (0.8 + 0.4 * Math.sin(time * 6.0 + s));
-
-    const sx = bladeBaseX + ((s * 0.22 + st * 0.12) % 1.0) * actualBladeLen + Math.cos(sparkAngle) * sparkDist;
-    const soriY = getSori(sx);
-    const sy = soriY + Math.sin(sparkAngle) * sparkDist;
-    const sparkAlpha = Math.sin(st * Math.PI) * 0.95;
-
-    if (sparkAlpha <= 0.05) continue;
-
-    ctx.beginPath();
-    ctx.arc(sx, sy, 1.4 + (1.0 - st) * 1.2, 0, Math.PI * 2);
-    ctx.fillStyle = isMask ? '#FFA040' : '#FF2E55';
-    ctx.globalAlpha = sparkAlpha;
-    ctx.fill();
-  }
-
-  ctx.restore();
+  // Live Bankai sword aura effect removed per user request
+  return;
 }
 
 export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
@@ -1078,6 +929,18 @@ export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
   ctx.translate(x, y);
   ctx.rotate(angle);
 
+  const img = _getBankaiSwordImage();
+  if (img && img.complete && img.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const s = 0.18;
+    ctx.scale(s, s);
+    ctx.drawImage(img, -410, -78.5);
+    ctx.restore();
+    ctx.restore();
+    return;
+  }
+
   const scale = opts.scale || 1.15;
   ctx.scale(scale, scale);
 
@@ -1085,7 +948,8 @@ export function drawTensaZangetsu(ctx, x, y, angle, r, opts = {}) {
   drawTensaZangetsuKatana(ctx, swordStartX, Boolean(opts.isMask), opts);
 
   const isChampionScreen = Boolean(opts.isWinnerReveal || (typeof state !== 'undefined' && state.gameState === 'champion'));
-  if (opts.showAura !== false && !isChampionScreen) {
+  const isBattleState = (typeof state !== 'undefined' && state.gameState === 'playing');
+  if (opts.showAura === true && !isChampionScreen && isBattleState) {
     drawBankaiSwordOrbitingAura(ctx, swordStartX, opts.bladeLen || 94, Boolean(opts.isMask), false);
   }
 

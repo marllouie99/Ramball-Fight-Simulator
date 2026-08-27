@@ -1639,6 +1639,23 @@ export class Fighter {
   }
 
   /**
+   * Applies impulse knockback to the fighter with anti-tunneling speed clamp.
+   * @param {number} vx - Horizontal knockback component
+   * @param {number} vy - Vertical knockback component
+   */
+  applyKnockback(vx, vy) {
+    if (this.immuneToCC || this.isSuperArmor) return;
+    this.vx = (this.vx || 0) + (vx || 0);
+    this.vy = (this.vy || 0) + (vy || 0);
+    const spd = Math.hypot(this.vx, this.vy);
+    const maxKnockbackSpd = 14.0;
+    if (spd > maxKnockbackSpd) {
+      this.vx = (this.vx / spd) * maxKnockbackSpd;
+      this.vy = (this.vy / spd) * maxKnockbackSpd;
+    }
+  }
+
+  /**
    * Applies slow timer, hit stun, velocity recovery, and basic position update.
    * Extracted so subclasses that override update() can still use base physics.
    * @param {number} extraMultiplier - Extra speed multiplier (e.g. for reloading)

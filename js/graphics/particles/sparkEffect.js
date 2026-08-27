@@ -1164,7 +1164,7 @@ export function drawSparkEffects(layer = 'all') {
           ctx.restore();
         }
       } else if (effect.type === 'saitamaCounterFrontalBlast') {
-        // Massive Wide Long Frontal Supersonic Shockwave Blast (Death Punch Canyon)
+        // Massive Wide Long Frontal Supersonic Shockwave Blast (PIXEL ART STYLE)
         const startX = effect.x;
         const startY = effect.y;
         const angle = effect.angle || 0;
@@ -1178,82 +1178,130 @@ export function drawSparkEffects(layer = 'all') {
           ctx.translate(startX, startY);
           ctx.rotate(angle);
 
-          // Fast supersonic expansion along length: reaches full length by progress = 0.25
+          // Pixel block unit for retro arcade resolution (4px grid)
+          const pxSize = 4;
+          const pxB = (gx, gy, gw, gh, fill) => {
+            if (!fill) return;
+            ctx.fillStyle = fill;
+            ctx.fillRect(
+              Math.round(gx / pxSize) * pxSize,
+              Math.round(gy / pxSize) * pxSize,
+              Math.max(pxSize, Math.round(gw / pxSize) * pxSize),
+              Math.max(pxSize, Math.round(gh / pxSize) * pxSize)
+            );
+          };
+
+          // Fast supersonic expansion along length: reaches full length by progress = 0.22
           const currentReach = reach * Math.min(1.0, progress / 0.22);
           const halfArc = arc * 0.5;
 
-          // 1. Broad Outer Fiery Crimson Shockwave Atmosphere (Death Punch style)
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          const coneSteps = 16;
-          for (let s = 0; s <= coneSteps; s++) {
-            const t = s / coneSteps;
-            const a = -halfArc + t * arc;
-            const rDist = currentReach * (0.85 + 0.15 * Math.sin(t * Math.PI));
-            ctx.lineTo(Math.cos(a) * rDist, Math.sin(a) * rDist);
-          }
-          ctx.closePath();
-          const outerGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, currentReach);
-          outerGrad.addColorStop(0,    `rgba(239, 68, 68, ${(0.65 * alpha).toFixed(3)})`);
-          outerGrad.addColorStop(0.35, `rgba(245, 158, 11, ${(0.45 * alpha).toFixed(3)})`);
-          outerGrad.addColorStop(0.70, `rgba(245, 196, 0, ${(0.25 * alpha).toFixed(3)})`);
-          outerGrad.addColorStop(1,    'rgba(239, 68, 68, 0)');
-          ctx.fillStyle = outerGrad;
-          ctx.fill();
-          ctx.restore();
+          // ── 1. Broad Outer Fiery Crimson Pixel Atmosphere (Stepped Bands) ──
+          const bandCount = 10;
+          for (let b = 0; b < bandCount; b++) {
+            const bDist = (b + 1) * (currentReach / bandCount);
+            const bRatio = b / bandCount; // 0 (near) to 1 (far)
+            const bAlpha = alpha * (1.0 - bRatio * 0.6);
+            
+            let bandColor;
+            if (bRatio < 0.3) {
+              bandColor = `rgba(255, 224, 51, ${(0.65 * bAlpha).toFixed(3)})`; // Gold
+            } else if (bRatio < 0.65) {
+              bandColor = `rgba(255, 136, 0, ${(0.50 * bAlpha).toFixed(3)})`;  // Amber
+            } else {
+              bandColor = `rgba(239, 68, 68, ${(0.35 * bAlpha).toFixed(3)})`;   // Crimson
+            }
 
-          // 2. Focused Dense Golden-Amber Supersonic Pressure Cone
-          ctx.save();
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
+            const stepCount = 14;
+            for (let s = 0; s <= stepCount; s++) {
+              const t = s / stepCount;
+              const a = -halfArc + t * arc;
+              const rDist = bDist * (0.88 + 0.12 * Math.sin(t * Math.PI));
+              const pxX = Math.cos(a) * rDist;
+              const pxY = Math.sin(a) * rDist;
+              pxB(pxX - 4, pxY - 4, 8, 8, bandColor);
+            }
+          }
+
+          // ── 2. Focused Dense Golden-Amber Supersonic Pressure Cone ──
+          const coreBandCount = 8;
           const coreArc = halfArc * 0.65;
-          for (let s = 0; s <= coneSteps; s++) {
-            const t = s / coneSteps;
-            const a = -coreArc + t * (coreArc * 2);
-            const rDist = currentReach * (0.95 + 0.05 * Math.sin(t * Math.PI));
-            ctx.lineTo(Math.cos(a) * rDist, Math.sin(a) * rDist);
-          }
-          ctx.closePath();
-          const coreGrad = ctx.createRadialGradient(0, 0, 10, 0, 0, currentReach);
-          coreGrad.addColorStop(0,    `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`);
-          coreGrad.addColorStop(0.25, `rgba(245, 196, 0, ${(0.85 * alpha).toFixed(3)})`);
-          coreGrad.addColorStop(0.65, `rgba(234, 88, 12, ${(0.55 * alpha).toFixed(3)})`);
-          coreGrad.addColorStop(1,    'rgba(234, 88, 12, 0)');
-          ctx.fillStyle = coreGrad;
-          ctx.fill();
-          ctx.restore();
+          for (let cb = 0; cb < coreBandCount; cb++) {
+            const cDist = (cb + 1) * (currentReach / coreBandCount);
+            const cRatio = cb / coreBandCount;
+            const cAlpha = alpha * (1.0 - cRatio * 0.45);
 
-          // 3. Razor-Sharp White Supersonic Air Displacement Needles
+            let coreFill;
+            if (cRatio < 0.35) {
+              coreFill = `rgba(255, 255, 255, ${(0.92 * cAlpha).toFixed(3)})`; // White-hot core
+            } else if (cRatio < 0.70) {
+              coreFill = `rgba(255, 224, 51, ${(0.82 * cAlpha).toFixed(3)})`;  // Neon gold
+            } else {
+              coreFill = `rgba(245, 158, 11, ${(0.65 * cAlpha).toFixed(3)})`;  // Bright amber
+            }
+
+            const cStepCount = 12;
+            for (let s = 0; s <= cStepCount; s++) {
+              const t = s / cStepCount;
+              const a = -coreArc + t * (coreArc * 2);
+              const rDist = cDist * (0.94 + 0.06 * Math.sin(t * Math.PI));
+              const pxX = Math.cos(a) * rDist;
+              const pxY = Math.sin(a) * rDist;
+              pxB(pxX - 3, pxY - 3, 6, 6, coreFill);
+            }
+          }
+
+          // ── 3. Razor-Sharp Stepped Pixel Air Displacement Needles ──
           const needleCount = 14;
-          ctx.fillStyle = `rgba(255, 255, 255, ${(0.92 * alpha).toFixed(3)})`;
+          const needleCol = `rgba(255, 255, 255, ${(0.95 * alpha).toFixed(3)})`;
+          const needleGlow = `rgba(255, 224, 51, ${(0.75 * alpha).toFixed(3)})`;
+
           for (let n = 0; n < needleCount; n++) {
             const nAngle = (-halfArc * 0.82) + (n / (needleCount - 1)) * (arc * 0.82);
-            const nDist = currentReach * (0.40 + (n % 3) * 0.25);
+            const nDist = currentReach * (0.35 + (n % 3) * 0.28);
             const nLen = Math.min(220, currentReach * 0.38);
-            const nStartX = Math.cos(nAngle) * (nDist - nLen * 0.5);
-            const nStartY = Math.sin(nAngle) * (nDist - nLen * 0.5);
-            const nEndX = Math.cos(nAngle) * (nDist + nLen * 0.5);
-            const nEndY = Math.sin(nAngle) * (nDist + nLen * 0.5);
-            const perpX = -Math.sin(nAngle) * 3.5 * alpha;
-            const perpY =  Math.cos(nAngle) * 3.5 * alpha;
 
-            ctx.beginPath();
-            ctx.moveTo(nStartX, nStartY);
-            ctx.lineTo((nStartX + nEndX) * 0.5 + perpX, (nStartY + nEndY) * 0.5 + perpY);
-            ctx.lineTo(nEndX, nEndY);
-            ctx.lineTo((nStartX + nEndX) * 0.5 - perpX, (nStartY + nEndY) * 0.5 - perpY);
-            ctx.closePath();
-            ctx.fill();
+            const nSteps = 8;
+            for (let step = 0; step < nSteps; step++) {
+              const sProgress = step / nSteps;
+              const stepDist = (nDist - nLen * 0.5) + sProgress * nLen;
+              const sx = Math.cos(nAngle) * stepDist;
+              const sy = Math.sin(nAngle) * stepDist;
+              
+              // Taper thickness: thick in middle, needle-thin at tips
+              const thick = Math.sin(sProgress * Math.PI) * 5 + 2;
+              pxB(sx - thick * 0.5, sy - thick * 0.5, thick, thick, sProgress > 0.4 && sProgress < 0.8 ? needleCol : needleGlow);
+            }
           }
 
-          // 4. Centerline Blinding Air Canyon Fissure
-          ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-          ctx.lineWidth = 4.5 * alpha;
-          ctx.beginPath();
-          ctx.moveTo(0, 0);
-          ctx.lineTo(currentReach * 1.05, 0);
-          ctx.stroke();
+          // ── 4. Centerline Blinding Pixel Air Canyon Fissure ──
+          const beamSteps = Math.min(100, Math.round((currentReach * 1.05) / 8));
+          for (let bs = 0; bs < beamSteps; bs++) {
+            const bx = bs * 8;
+            const bThick = (Math.sin((bs / beamSteps) * Math.PI) * 4 + 3) * alpha;
+            // White core beam
+            pxB(bx, -bThick * 0.5, 8, bThick, `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`);
+            // Golden outer fringe
+            pxB(bx, -bThick * 0.5 - 2, 8, 2, `rgba(255, 224, 51, ${(0.70 * alpha).toFixed(3)})`);
+            pxB(bx, bThick * 0.5, 8, 2, `rgba(255, 224, 51, ${(0.70 * alpha).toFixed(3)})`);
+          }
+
+          // ── 5. Expanding Pixel Shockwave Diamonds along the corridor ──
+          const diamondDists = [currentReach * 0.25, currentReach * 0.55, currentReach * 0.85];
+          diamondDists.forEach(dDist => {
+            if (dDist < currentReach) {
+              const dRad = (dDist * 0.22 + 10) * alpha;
+              const dColor = `rgba(255, 224, 51, ${(0.80 * alpha).toFixed(3)})`;
+              const dWhite = `rgba(255, 255, 255, ${(0.90 * alpha).toFixed(3)})`;
+              
+              // 4-point pixel diamond ring
+              for (let dy = -dRad; dy <= dRad; dy += 4) {
+                const dx = Math.round((1 - Math.abs(dy) / dRad) * dRad * 0.6);
+                pxB(dDist + dx, dy, 4, 4, dColor);
+                pxB(dDist - dx, dy, 4, 4, dColor);
+              }
+              pxB(dDist - 2, -2, 4, 4, dWhite); // Center glint
+            }
+          });
 
           ctx.restore();
         }

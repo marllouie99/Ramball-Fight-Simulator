@@ -1,6 +1,6 @@
 import { getHandSize, CONFIG } from '../../core/config.js';
 import { state } from '../../core/state.js';
-import { drawTensaZangetsuKatana, drawBankaiSwordOrbitingAura } from '../weapons/ichigoWeaponGraphics.js';
+import { drawTensaZangetsuKatana, drawBankaiSwordOrbitingAura, _getShikaiSwordImage, _getShikaiSwordBladeImage } from '../weapons/ichigoWeaponGraphics.js';
 
 let _hollowMaskImage = null;
 let _hollowMaskImageLoading = false;
@@ -26,8 +26,58 @@ function _getHollowMaskImage() {
   return _hollowMaskImage;
 }
 
+let _ichigoBankaiImage = null;
+let _ichigoBankaiImageLoading = false;
+
+function _getIchigoBankaiImage() {
+  if (_ichigoBankaiImage && _ichigoBankaiImage.complete && _ichigoBankaiImage.naturalWidth > 0) {
+    return _ichigoBankaiImage;
+  }
+  if (!_ichigoBankaiImageLoading && typeof Image !== 'undefined') {
+    _ichigoBankaiImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _ichigoBankaiImage = img;
+      _ichigoBankaiImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ichigo Bankai image at Assets/model/ICHIGO-BANKAI.png', e);
+      _ichigoBankaiImageLoading = false;
+    };
+    img.src = 'Assets/model/ICHIGO-BANKAI.png';
+    _ichigoBankaiImage = img;
+  }
+  return _ichigoBankaiImage;
+}
+
+let _ichigoShikaiImage = null;
+let _ichigoShikaiImageLoading = false;
+
+function _getIchigoShikaiImage() {
+  if (_ichigoShikaiImage && _ichigoShikaiImage.complete && _ichigoShikaiImage.naturalWidth > 0) {
+    return _ichigoShikaiImage;
+  }
+  if (!_ichigoShikaiImageLoading && typeof Image !== 'undefined') {
+    _ichigoShikaiImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _ichigoShikaiImage = img;
+      _ichigoShikaiImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ichigo Shikai image at Assets/model/ICHIGO-SHIKAI.png', e);
+      _ichigoShikaiImageLoading = false;
+    };
+    img.src = 'Assets/model/ICHIGO-SHIKAI.png';
+    _ichigoShikaiImage = img;
+  }
+  return _ichigoShikaiImage;
+}
+
 if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
   _getHollowMaskImage();
+  _getIchigoBankaiImage();
+  _getIchigoShikaiImage();
 }
 
 export function drawIchigoSkin(ctx, fighter) {
@@ -58,12 +108,19 @@ export function drawIchigoSkin(ctx, fighter) {
   const isBackSlungPose = Boolean(
     fighter._isWinnerReveal || 
     (typeof state !== 'undefined' && (
-      state.gameState === 'faceoff' ||
+      state.gameState === 'weapons' ||
+      state.gameState === 'weaponDetail' ||
+      state.gameState === 'weaponStudio' ||
       state.gameState === 'weaponIndex' || 
+      state.gameState === 'faceoff' ||
+      state.gameState === 'select' ||
+      state.gameState === 'index' ||
+      state.gameState === 'indexDetail' ||
       state.gameState === 'characterSelect' || 
-      state.gameState === 'indexDetail' || 
+      state.gameState === 'leaderboard' ||
       state._isFaceOffScreenActive ||
-      state.isRandomRollShowoff
+      state.isRandomRollShowoff ||
+      state.previewFighter === fighter
     )) ||
     fighter.isDemoFighter ||
     fighter._isFaceOff
@@ -100,10 +157,23 @@ export function drawIchigoSkin(ctx, fighter) {
 
   // ── 1.8. Bankai & Hollow Mask 3D Ribbon Lifecycle Alpha ──
   // Ribbons show up during Bankai or Hollow Mask formation, then smoothly disappear
-  // Strictly hidden during Champion Screen / Winner Reveal
+  // Strictly hidden during Champion Screen / Winner Reveal and Weapon Menu
   const isChampionScreen = Boolean(fighter._isWinnerReveal || (typeof state !== 'undefined' && state.gameState === 'champion'));
+  const isWeaponMenu = Boolean(
+    isCountdownOrPreview ||
+    (typeof state !== 'undefined' && (
+      state.gameState === 'weapons' || 
+      state.gameState === 'weaponDetail' || 
+      state.gameState === 'weaponStudio' || 
+      state.gameState === 'weaponIndex' || 
+      state.gameState === 'select' ||
+      state.gameState === 'index' ||
+      state.gameState === 'indexDetail' ||
+      state.previewFighter === fighter
+    ))
+  );
   let ribbonAlpha = 0;
-  if (!isFrozen && !isChampionScreen) {
+  if (!isFrozen && !isChampionScreen && !isWeaponMenu) {
     if (isCountdownOrPreview) {
       if (isForming) {
         // Smoothly fade out ribbon as mask approaches completion (0.65 -> 0.95)
@@ -131,7 +201,7 @@ export function drawIchigoSkin(ctx, fighter) {
   }
 
   // ── 1.9. Live Spiritual Pressure Aura: Back Layer (Volumetric Plasma Shroud & Floor Pool) ──
-  if (!isLowQuality && !isCountdownOrPreview && (isBankai || isMask || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0.05)) && !isFrozen && !isBankaiChanneling) {
+  if (!isLowQuality && !isCountdownOrPreview && !isWeaponMenu && (isBankai || isMask || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0.05)) && !isFrozen && !isBankaiChanneling) {
     _drawBankaiLiveAura(ctx, r, isBankai, isMask, now, 'back');
   }
 
@@ -142,7 +212,7 @@ export function drawIchigoSkin(ctx, fighter) {
   const facingLeft = Math.abs(angle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
-  if (!isLowQuality && ribbonAlpha > 0.01) {
+  if (!isLowQuality && !isWeaponMenu && ribbonAlpha > 0.01) {
     _drawIchigoFloatingReiatsuAura(ctx, r, isBankai, isMask, isFrozen, now, 'back', ribbonAlpha, isForming, formationProg);
   }
 
@@ -310,6 +380,7 @@ export function drawIchigoSkin(ctx, fighter) {
     if (isShikai) {
       // ── Shikai Zangetsu (Accurate Silver Blade + Black Spine + Trailing Ribbons) ──
       const swordStartX = (isSlashing || !isBackSlungPose) ? (r * 0.68) : (-r * 0.72);
+      const swordImg = _getShikaiSwordImage();
 
       ctx.save();
       ctx.translate(swordStartX, 0);
@@ -318,6 +389,10 @@ export function drawIchigoSkin(ctx, fighter) {
       const handleLen = 32;
       const handleThick = 6.0;
       const hiltX = -handleLen;
+      const tipX = 120, tipY = -10;
+      const cutoutR = 5.5;
+      const cutoutCenterX = cutoutR, cutoutCenterY = 3.0;
+      const heelX = cutoutR * 2, heelY = 18;
 
       // 1. Draw Trailing White Cloth Ribbons from the Pommel (Dynamic 2-Pass White Cloth Ribbons)
       if (fighter.ribbonStrands && fighter.ribbonStrands.length === 3) {
@@ -330,7 +405,6 @@ export function drawIchigoSkin(ctx, fighter) {
         let perpX = (spd > 0.3) ? -(fighter.vy || 0) / spd : -Math.sin(swordAngle);
         let perpY = (spd > 0.3) ? (fighter.vx || 0) / spd : Math.cos(swordAngle);
 
-        // Always guarantee the ribbon root is perfectly anchored to the sword pommel
         for (let s = 0; s < 3; s++) {
           const cfg = _ZANGETSU_STRAND_CONFIGS[s];
           const strand = fighter.ribbonStrands[s];
@@ -354,7 +428,6 @@ export function drawIchigoSkin(ctx, fighter) {
           }
         }
 
-        // Draw in back-to-front order: Strand 2 (shortest/back), Strand 1 (medium), Strand 0 (longest/main)
         const drawOrder = [2, 1, 0];
 
         for (let idx = 0; idx < 3; idx++) {
@@ -363,169 +436,181 @@ export function drawIchigoSkin(ctx, fighter) {
           const strand = fighter.ribbonStrands[s];
           if (!strand || strand.length < 2) continue;
 
-          ctx.lineCap = 'round';
-          ctx.lineJoin = 'round';
-
-          // Pass 1: Crisp Dark Outer Border (creates depth separation when ribbons cross)
-          ctx.beginPath();
-          ctx.moveTo(strand[0].x, strand[0].y);
-          for (let i = 1; i < strand.length - 1; i++) {
-            const xc = (strand[i].x + strand[i + 1].x) / 2;
-            const yc = (strand[i].y + strand[i + 1].y) / 2;
-            ctx.quadraticCurveTo(strand[i].x, strand[i].y, xc, yc);
-          }
-          ctx.lineTo(strand[strand.length - 1].x, strand[strand.length - 1].y);
-          ctx.strokeStyle = '#111111';
-          ctx.lineWidth = cfg.width + 1.8;
-          ctx.stroke();
-
-          // Pass 2: White Cloth Ribbon Core with individual strand color tone
-          ctx.beginPath();
-          ctx.moveTo(strand[0].x, strand[0].y);
-          for (let i = 1; i < strand.length - 1; i++) {
-            const xc = (strand[i].x + strand[i + 1].x) / 2;
-            const yc = (strand[i].y + strand[i + 1].y) / 2;
-            ctx.quadraticCurveTo(strand[i].x, strand[i].y, xc, yc);
-          }
-          ctx.lineTo(strand[strand.length - 1].x, strand[strand.length - 1].y);
-          ctx.strokeStyle = cfg.color;
-          ctx.lineWidth = cfg.width;
-          ctx.stroke();
+          _drawPixelRibbonStrand(ctx, strand, cfg, 2.0);
         }
 
-        // Fabric Pommel Wrap Knot in World Space
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.arc(pommel.x, pommel.y, 3.4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        // Stepped Pixel Knot at Pommel Wrap
+        const kx = Math.round(pommel.x / 2.0) * 2.0;
+        const ky = Math.round(pommel.y / 2.0) * 2.0;
+        ctx.fillStyle = '#0f172a';
+        ctx.fillRect(kx - 4.0, ky - 4.0, 8.0, 8.0);
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(kx - 2.0, ky - 2.0, 4.0, 4.0);
 
         ctx.restore();
       } else {
-        // Fallback: Static 3 Bezier Ribbons for UI preview cards
         ctx.save();
-
-        // Ribbon Strand 3 (Deepest downward loop, weaving behind)
-        ctx.fillStyle = '#EAEAEA';
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 0.8;
+        ctx.fillStyle = '#cbd5e1';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.0;
         ctx.beginPath();
         ctx.moveTo(hiltX - 1, 1);
-        ctx.bezierCurveTo(hiltX - 10, 8, hiltX - 12, 20, hiltX - 2, 23);
-        ctx.bezierCurveTo(hiltX + 8, 25, hiltX + 18, 18, hiltX + 32, 17);
-        ctx.lineTo(hiltX + 30, 14);
-        ctx.bezierCurveTo(hiltX + 18, 16, hiltX + 8, 22, hiltX - 2, 20);
-        ctx.bezierCurveTo(hiltX - 8, 18, hiltX - 6, 8, hiltX - 1, 2);
+        ctx.lineTo(hiltX - 12, 10);
+        ctx.lineTo(hiltX - 14, 24);
+        ctx.lineTo(hiltX - 2, 27);
+        ctx.lineTo(hiltX + 10, 30);
+        ctx.lineTo(hiltX + 22, 22);
+        ctx.lineTo(hiltX + 38, 20);
+        ctx.lineTo(hiltX + 36, 17);
+        ctx.lineTo(hiltX + 22, 19);
+        ctx.lineTo(hiltX + 10, 26);
+        ctx.lineTo(hiltX - 2, 24);
+        ctx.lineTo(hiltX - 10, 22);
+        ctx.lineTo(hiltX - 8, 9);
+        ctx.lineTo(hiltX - 1, 2);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Ribbon Strand 2 (Middle strand crossing under Strand 1)
-        ctx.fillStyle = '#F5F5F5';
-        ctx.strokeStyle = '#222222';
-        ctx.lineWidth = 0.8;
+        ctx.fillStyle = '#e2e8f0';
         ctx.beginPath();
         ctx.moveTo(hiltX - 1, 1);
-        ctx.bezierCurveTo(hiltX - 6, 5, hiltX - 6, 15, hiltX + 2, 17);
-        ctx.bezierCurveTo(hiltX + 12, 19, hiltX + 23, 14, hiltX + 38, 19);
-        ctx.lineTo(hiltX + 36, 16);
-        ctx.bezierCurveTo(hiltX + 23, 11, hiltX + 12, 16, hiltX + 2, 14);
-        ctx.bezierCurveTo(hiltX - 4, 12, hiltX - 4, 4, hiltX, 2);
+        ctx.lineTo(hiltX - 8, 6);
+        ctx.lineTo(hiltX - 8, 18);
+        ctx.lineTo(hiltX + 2, 20);
+        ctx.lineTo(hiltX + 15, 22);
+        ctx.lineTo(hiltX + 28, 16);
+        ctx.lineTo(hiltX + 46, 23);
+        ctx.lineTo(hiltX + 44, 20);
+        ctx.lineTo(hiltX + 28, 13);
+        ctx.lineTo(hiltX + 15, 19);
+        ctx.lineTo(hiltX + 2, 17);
+        ctx.lineTo(hiltX - 5, 15);
+        ctx.lineTo(hiltX - 5, 5);
+        ctx.lineTo(hiltX, 2);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Ribbon Strand 1 (Front strand crossing over middle and waving to top tail)
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 0.8;
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
         ctx.moveTo(hiltX - 1, 1);
-        ctx.bezierCurveTo(hiltX - 8, 7, hiltX - 9, 18, hiltX - 1, 20);
-        ctx.bezierCurveTo(hiltX + 8, 22, hiltX + 18, 10, hiltX + 32, 11);
-        ctx.bezierCurveTo(hiltX + 38, 12, hiltX + 42, 13, hiltX + 45, 11);
-        ctx.lineTo(hiltX + 43, 8);
-        ctx.bezierCurveTo(hiltX + 40, 10, hiltX + 36, 9, hiltX + 30, 8);
-        ctx.bezierCurveTo(hiltX + 18, 7, hiltX + 8, 18, hiltX - 1, 17);
-        ctx.bezierCurveTo(hiltX - 6, 16, hiltX - 5, 6, hiltX, 1);
+        ctx.lineTo(hiltX - 10, 8);
+        ctx.lineTo(hiltX - 11, 22);
+        ctx.lineTo(hiltX - 1, 24);
+        ctx.lineTo(hiltX + 10, 26);
+        ctx.lineTo(hiltX + 22, 12);
+        ctx.lineTo(hiltX + 38, 13);
+        ctx.lineTo(hiltX + 54, 13);
+        ctx.lineTo(hiltX + 52, 10);
+        ctx.lineTo(hiltX + 36, 10);
+        ctx.lineTo(hiltX + 22, 9);
+        ctx.lineTo(hiltX + 10, 22);
+        ctx.lineTo(hiltX - 1, 21);
+        ctx.lineTo(hiltX - 8, 19);
+        ctx.lineTo(hiltX - 7, 7);
+        ctx.lineTo(hiltX, 1);
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
 
-        // Fabric Pommel Wrap Knot
-        ctx.fillStyle = '#FFFFFF';
-        ctx.strokeStyle = '#111111';
-        ctx.lineWidth = 0.9;
-        ctx.beginPath();
-        ctx.ellipse(hiltX - 1.5, 0, 2.5, 3.5, -0.2, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(hiltX - 3.0, -3.5, 4.0, 7.0);
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.0;
+        ctx.strokeRect(hiltX - 3.0, -3.5, 4.0, 7.0);
 
         ctx.restore();
       }
 
-      // 2. Draw Handle (white wrapped directly around hilt, NO handguard/collar!)
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(hiltX, -handleThick / 2, handleLen, handleThick);
+      // 2. Rigid Pixel Art Blade & Handle
+      const swordBladeImg = _getShikaiSwordBladeImage();
+      if (swordBladeImg && swordBladeImg.complete && swordBladeImg.naturalWidth > 0) {
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+        const s = 0.1825;
+        ctx.scale(s, s);
+        ctx.drawImage(swordBladeImg, -280, -60);
+        ctx.restore();
+      } else {
+        // Fallback procedural
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(hiltX, -handleThick / 2, handleLen, handleThick);
 
-      ctx.strokeStyle = '#D8D8D8';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      for (let px = hiltX + 3; px < 0; px += 4) {
-        ctx.moveTo(px, -handleThick / 2);
-        ctx.lineTo(px + 2, handleThick / 2);
-        ctx.moveTo(px + 2, -handleThick / 2);
-        ctx.lineTo(px, handleThick / 2);
+        ctx.fillStyle = '#94a3b8';
+        for (let px = hiltX + 3.0; px < 0; px += 5.0) {
+          ctx.fillRect(px, -handleThick / 2, 1.8, 1.8);
+          ctx.fillRect(px + 1.2, -0.5, 1.8, 1.2);
+          ctx.fillRect(px, handleThick / 2 - 1.8, 1.8, 1.8);
+        }
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.2;
+        ctx.strokeRect(hiltX, -handleThick / 2, handleLen, handleThick);
+
+        // Black Back Spine Region
+        ctx.fillStyle = '#101216';
+        ctx.beginPath();
+        ctx.moveTo(0, -3.0);
+        ctx.lineTo(tipX, tipY);
+        ctx.quadraticCurveTo(60, -2, heelX, cutoutCenterY);
+        ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR, 0, Math.PI, true);
+        ctx.lineTo(0, 5.0);
+        ctx.lineTo(0, -3.0);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#2d3342';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.moveTo(0, -2.2);
+        ctx.lineTo(tipX, tipY);
+        ctx.stroke();
+
+        // Silver Steel Blade Body
+        ctx.fillStyle = '#e2e8f0';
+        ctx.beginPath();
+        ctx.moveTo(heelX, heelY);
+        ctx.quadraticCurveTo(65, 15, tipX, tipY);
+        ctx.quadraticCurveTo(60, -2, heelX, cutoutCenterY);
+        ctx.lineTo(heelX, heelY);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#94a3b8';
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.moveTo(heelX, cutoutCenterY + 1.2);
+        ctx.quadraticCurveTo(60, -0.5, tipX, tipY);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 1.6;
+        ctx.beginPath();
+        ctx.moveTo(heelX, heelY);
+        ctx.quadraticCurveTo(65, 15, tipX, tipY);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(0, -3.0);
+        ctx.lineTo(tipX, tipY);
+        ctx.quadraticCurveTo(65, 15, heelX, heelY);
+        ctx.lineTo(heelX, cutoutCenterY);
+        ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR, 0, Math.PI, true);
+        ctx.lineTo(0, 5.0);
+        ctx.lineTo(0, -3.0);
+        ctx.closePath();
+        ctx.stroke();
+
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(heelX, cutoutCenterY);
+        ctx.quadraticCurveTo(60, -2, tipX, tipY);
+        ctx.stroke();
       }
-      ctx.stroke();
-
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.0;
-      ctx.strokeRect(hiltX, -handleThick / 2, handleLen, handleThick);
-
-      // 3. Blade Geometry
-      const tipX = 120, tipY = -10;
-      const cutoutR = 5.5;
-      const cutoutCenterX = cutoutR, cutoutCenterY = 3.0;
-      const heelX = cutoutR * 2, heelY = 18;
-
-      // A) Black Back Spine Region
-      ctx.fillStyle = '#1A1A1A';
-      ctx.beginPath();
-      ctx.moveTo(0, -3.0);
-      ctx.lineTo(tipX, tipY);
-      ctx.quadraticCurveTo(60, -2, heelX, cutoutCenterY);
-      ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR, 0, Math.PI, true);
-      ctx.lineTo(0, 5.0);
-      ctx.lineTo(0, -3.0);
-      ctx.closePath();
-      ctx.fill();
-
-      // B) Silver Steel Blade Body
-      ctx.fillStyle = '#F5F5F5';
-      ctx.beginPath();
-      ctx.moveTo(heelX, heelY);
-      ctx.quadraticCurveTo(65, 15, tipX, tipY);
-      ctx.quadraticCurveTo(60, -2, heelX, cutoutCenterY);
-      ctx.lineTo(heelX, heelY);
-      ctx.closePath();
-      ctx.fill();
-
-      // C) Outer Outline
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(0, -3.0);
-      ctx.lineTo(tipX, tipY);
-      ctx.quadraticCurveTo(65, 15, heelX, heelY);
-      ctx.lineTo(heelX, cutoutCenterY);
-      ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR, 0, Math.PI, true);
-      ctx.lineTo(0, 5.0);
-      ctx.lineTo(0, -3.0);
-      ctx.closePath();
-      ctx.stroke();
 
       // D) Hands gripping Shikai handle during active combat or champion screen
       if (!hideHandsAndWeapon) {
@@ -586,8 +671,22 @@ export function drawIchigoSkin(ctx, fighter) {
         isChampionScreen: isChampionScreen
       });
 
-      // Live Kuroi Reiatsu aura emitting along the Bankai sword (during active combat only — strictly hidden during champion screen)
-      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen) {
+      // Live Kuroi Reiatsu aura emitting along the Bankai sword (during active combat only — strictly hidden during champion screen, weapon menu, character select)
+      const isBattlePlaying = (typeof state !== 'undefined' && state.gameState === 'playing');
+      const shouldHideSwordAura = !isBattlePlaying || Boolean(
+        fighter.isWeaponMenu ||
+        fighter.hideSwordAura ||
+        (typeof state !== 'undefined' && (
+          state.gameState === 'weapons' ||
+          state.gameState === 'weaponDetail' ||
+          state.gameState === 'weaponStudio' ||
+          state.gameState === 'select' ||
+          state.gameState === 'index' ||
+          state.gameState === 'indexDetail' ||
+          state.previewFighter === fighter
+        ))
+      );
+      if ((!isBackSlungPose || isBankaiStance) && !hideHandsAndWeapon && !isLowQuality && !isChampionScreen && !shouldHideSwordAura) {
         drawBankaiSwordOrbitingAura(ctx, swordStartX, swordLen, isMask, isFrozen);
       }
 
@@ -639,44 +738,57 @@ export function drawIchigoSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // ── Base Bankai & Hollow Mask Aesthetics ──
-  // Peach skin base
-  ctx.fillStyle = '#FFE0BD';
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+  const modelImg = isBankai ? _getIchigoBankaiImage() : _getIchigoShikaiImage();
+  if (modelImg && modelImg.complete && modelImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
+    if (isBankai) {
+      // Bankai PNG model crop: sx: 35, sy: 40, sw: 422, sh: 423
+      ctx.drawImage(modelImg, 35, 40, 422, 423, -r, -r, r * 2, r * 2);
+    } else {
+      // Shikai PNG model crop: sx: 35, sy: 41, sw: 418, sh: 422
+      ctx.drawImage(modelImg, 35, 41, 418, 422, -r, -r, r * 2, r * 2);
+    }
+    ctx.restore();
+  } else {
+    // ── Fallback Procedural Bankai & Shikai Aesthetics ──
+    // Peach skin base
+    ctx.fillStyle = '#FFE0BD';
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Orange hair (Standard spiky)
-  ctx.fillStyle = '#FF7F00';
-  ctx.beginPath();
-  ctx.moveTo(-r, -r);
-  ctx.lineTo(r, -r);
-  // Draw spiky non-uniform crown fringe from right to left:
-  ctx.lineTo(r, -r * 0.35);
-  ctx.lineTo(r * 0.85, -r * 0.45);
-  ctx.lineTo(r * 0.88, -r * 0.35);    // Spike 1 (leans right/outward)
-  ctx.lineTo(r * 0.72, -r * 0.48);
-  ctx.lineTo(r * 0.62, -r * 0.28);   // Spike 2 (leans right/outward)
-  ctx.lineTo(r * 0.5, -r * 0.42);
-  ctx.lineTo(r * 0.45, -r * 0.46);
-  ctx.lineTo(r * 0.4, -r * 0.35);    // Spike 3 (leans left/inward)
-  ctx.lineTo(r * 0.35, -r * 0.48);
-  ctx.lineTo(r * 0.2, -r * 0.25);   // Spike 4 (leans left/inward)
-  ctx.lineTo(r * 0.15, -r * 0.42);
-  ctx.lineTo(r * 0.05, -r * 0.32);   // Spike 5 (center, vertical)
-  ctx.lineTo(-r * 0.05, -r * 0.45);
-  ctx.lineTo(-r * 0.12, -r * 0.25);  // Spike 6 (leans right/inward)
-  ctx.lineTo(-r * 0.25, -r * 0.42);
-  ctx.lineTo(-r * 0.32, -r * 0.35); // Spike 7 (leans right/inward)
-  ctx.lineTo(-r * 0.45, -r * 0.45);
-  ctx.lineTo(-r * 0.52, -r * 0.28);   // Spike 8 (leans right/inward)
-  ctx.lineTo(-r * 0.7, -r * 0.42);
-  ctx.lineTo(-r * 0.78, -r * 0.35); // Spike 9 (leans right/inward)
-  ctx.lineTo(-r, -r * 0.35);
-  ctx.closePath();
-  ctx.fill();
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 1.8;
+    // Orange hair (Standard spiky)
+    ctx.fillStyle = '#FF7F00';
+    ctx.beginPath();
+    ctx.moveTo(-r, -r);
+    ctx.lineTo(r, -r);
+    ctx.lineTo(r, -r * 0.35);
+    ctx.lineTo(r * 0.85, -r * 0.45);
+    ctx.lineTo(r * 0.88, -r * 0.35);
+    ctx.lineTo(r * 0.72, -r * 0.48);
+    ctx.lineTo(r * 0.62, -r * 0.28);
+    ctx.lineTo(r * 0.5, -r * 0.42);
+    ctx.lineTo(r * 0.45, -r * 0.46);
+    ctx.lineTo(r * 0.4, -r * 0.35);
+    ctx.lineTo(r * 0.35, -r * 0.48);
+    ctx.lineTo(r * 0.2, -r * 0.25);
+    ctx.lineTo(r * 0.15, -r * 0.42);
+    ctx.lineTo(r * 0.05, -r * 0.32);
+    ctx.lineTo(-r * 0.05, -r * 0.45);
+    ctx.lineTo(-r * 0.12, -r * 0.25);
+    ctx.lineTo(-r * 0.25, -r * 0.42);
+    ctx.lineTo(-r * 0.32, -r * 0.35);
+    ctx.lineTo(-r * 0.45, -r * 0.45);
+    ctx.lineTo(-r * 0.52, -r * 0.28);
+    ctx.lineTo(-r * 0.7, -r * 0.42);
+    ctx.lineTo(-r * 0.78, -r * 0.35);
+    ctx.lineTo(-r, -r * 0.35);
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = '#111111';
+    ctx.lineWidth = 1.8;
+
     if (isShikai) {
       // ── Standard Shikai robes: black robes covering from y = 0.1 ──
       ctx.fillStyle = '#111111';
@@ -703,12 +815,10 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.stroke();
 
       // Diagonal Red Ribbon/Chain Strap (for holding Zangetsu on his back)
-      // Invert local X when facingLeft so strap always canonically slants Top-Left to Bottom-Right in screen space!
       const strapStartX = -r * 0.35 * strapSign;
       const strapEndX = r * 0.25 * strapSign;
 
       ctx.save();
-      // 1. Dark red shadow backing line
       ctx.strokeStyle = '#700c0f';
       ctx.lineWidth = 4.5;
       ctx.beginPath();
@@ -716,7 +826,6 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.lineTo(strapEndX, r * 0.55);
       ctx.stroke();
 
-      // 2. Red core line
       ctx.strokeStyle = '#E31B23';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -724,7 +833,6 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.lineTo(strapEndX, r * 0.55);
       ctx.stroke();
 
-      // 3. Small red beads along the strap
       ctx.fillStyle = '#FF4D52';
       for (let t = 0.05; t <= 0.95; t += 0.16) {
         const px = strapStartX * (1 - t) + strapEndX * t;
@@ -757,13 +865,11 @@ export function drawIchigoSkin(ctx, fighter) {
       // Hanging sash ribbons (tied tails hanging down)
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
-      // Left ribbon tail
       ctx.moveTo(-r * 0.06, r * 0.68);
       ctx.lineTo(-r * 0.18, r * 0.95);
       ctx.lineTo(-r * 0.02, r * 0.95);
       ctx.lineTo(0, r * 0.68);
       ctx.closePath();
-      // Right ribbon tail
       ctx.moveTo(0, r * 0.68);
       ctx.lineTo(r * 0.02, r * 0.95);
       ctx.lineTo(r * 0.18, r * 0.95);
@@ -771,16 +877,13 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.closePath();
       ctx.fill();
 
-      // Outlines for hanging ribbons
       ctx.strokeStyle = '#111111';
       ctx.lineWidth = 1.0;
       ctx.beginPath();
-      // Left tail outline
       ctx.moveTo(-r * 0.06, r * 0.68);
       ctx.lineTo(-r * 0.18, r * 0.95);
       ctx.lineTo(-r * 0.02, r * 0.95);
       ctx.lineTo(0, r * 0.68);
-      // Right tail outline
       ctx.moveTo(0, r * 0.68);
       ctx.lineTo(r * 0.02, r * 0.95);
       ctx.lineTo(r * 0.18, r * 0.95);
@@ -788,11 +891,9 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.stroke();
     } else {
       // ── Current Bankai robes with deep V-neck and split obi coat ──
-      // Shihakusho (Black robe chest area)
       ctx.fillStyle = '#111111';
       ctx.fillRect(-r, r * 0.1, r * 2, r * 0.95);
 
-      // Peach skin insert for the chest exposure inside the V-neck
       ctx.fillStyle = '#FFE0BD';
       ctx.beginPath();
       ctx.moveTo(-r * 0.35, r * 0.1);
@@ -801,7 +902,6 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.closePath();
       ctx.fill();
 
-      // White collar border trim
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 3.5;
       ctx.beginPath();
@@ -810,26 +910,20 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.lineTo(r * 0.32, r * 0.1);
       ctx.stroke();
 
-      // Thin black outlines to frame the white collar border cleanly
       ctx.strokeStyle = '#111111';
       ctx.lineWidth = 1.0;
-      
-      // Outer black line against black robes
       ctx.beginPath();
       ctx.moveTo(-r * 0.35, r * 0.1);
       ctx.lineTo(0, r * 0.45);
       ctx.lineTo(r * 0.35, r * 0.1);
       ctx.stroke();
 
-      // Inner black line against chest skin
       ctx.beginPath();
       ctx.moveTo(-r * 0.28, r * 0.1);
       ctx.lineTo(0, r * 0.39);
       ctx.lineTo(r * 0.28, r * 0.1);
       ctx.stroke();
 
-      // ── Shihakusho Coat Split & White Obi Belt ──
-      // 1. White sash/belt base inside the inverted V split
       ctx.fillStyle = '#FFFFFF';
       ctx.beginPath();
       ctx.moveTo(0, r * 0.65);
@@ -838,7 +932,6 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.closePath();
       ctx.fill();
 
-      // 2. Grey details for obi belt fabric layers
       ctx.strokeStyle = '#D5D5D5';
       ctx.lineWidth = 1.8;
       ctx.beginPath();
@@ -848,11 +941,9 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.lineTo(r * 0.18, r * 0.88);
       ctx.stroke();
 
-      // 3. Central black sash tie knot detail
       ctx.fillStyle = '#111111';
       ctx.fillRect(-r * 0.04, r * 0.72, r * 0.08, r * 0.28);
 
-      // 4. White outer border lines for the split coat edges
       ctx.strokeStyle = '#FFFFFF';
       ctx.lineWidth = 2.5;
       ctx.beginPath();
@@ -861,7 +952,6 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.lineTo(r * 0.28, r);
       ctx.stroke();
 
-      // 5. Thin black outline to separate white split edges from black robes cleanly
       ctx.strokeStyle = '#111111';
       ctx.lineWidth = 1.0;
       ctx.beginPath();
@@ -870,68 +960,10 @@ export function drawIchigoSkin(ctx, fighter) {
       ctx.lineTo(r * 0.28, r);
       ctx.stroke();
     }
-
-    // ── Hollow Mask Overlay (Assets/references/Hollow Mask.png) ──
-    // Fully occupies face and hair region across the body circle
-    if (isMask && !isForming) {
-      let maskCrackProgress = 0;
-      if (!isChampionScreen && fighter.hollowMaskActive && fighter.hollowMaskTimer !== undefined) {
-        const crackWindow = 180; // starts cracking in last 3 seconds (180 frames)
-        if (fighter.hollowMaskTimer < crackWindow) {
-          maskCrackProgress = Math.min(1.0, Math.max(0.0, (crackWindow - fighter.hollowMaskTimer) / crackWindow));
-        }
-      }
-
-      const maskImg = _getHollowMaskImage();
-      const destW = r * 2.15;
-      const destH = r * 2.50;
-      const destX = -destW / 2;
-      const destY = -r * 1.08;
-
-      if (maskImg && maskImg.complete && maskImg.naturalWidth > 0) {
-        // Fully assembled Hollow Mask PNG
-        ctx.save();
-        ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
-        ctx.restore();
-      } else {
-        ctx.fillStyle = "#FFFFFF"; // White mask base covering upper face
-        ctx.beginPath();
-        ctx.arc(0, 0, r, -Math.PI * 0.95, -Math.PI * 0.05, false);
-        ctx.lineTo(0, r * 0.5);
-        ctx.closePath();
-        ctx.fill();
-
-        // Red/Black jagged mask lines
-        ctx.strokeStyle = "#B00000";
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(-r * 0.4, -r * 0.4);
-        ctx.lineTo(-r * 0.1, -r * 0.1);
-        ctx.moveTo(-r * 0.6, -r * 0.2);
-        ctx.lineTo(-r * 0.2, 0);
-        ctx.moveTo(-r * 0.5, 0.1);
-        ctx.lineTo(-r * 0.1, r * 0.3);
-        ctx.stroke();
-
-        // Hollow yellow eye iris details
-        ctx.fillStyle = "#FFD700";
-        ctx.beginPath();
-        ctx.arc(-r * 0.35, -r * 0.1, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.fillStyle = "#111111";
-        ctx.beginPath();
-        ctx.arc(-r * 0.35, -r * 0.1, 1.2, 0, Math.PI * 2);
-        ctx.fill();
-      }
-
-      // Spreading fracture fissures and breaking pieces when duration is expiring (strictly hidden during champion screen)
-      if (maskCrackProgress > 0.01 && !isChampionScreen) {
-        _drawHollowMaskCracks(ctx, r, maskCrackProgress, now, fighter);
-      }
-    }
+  }
   ctx.restore(); // end main body circle clip
 
-  // ── 5. Outer Body Stroke & Bankai Channeling Body Edge Glow ──
+  // ── 5. Outer Body Stroke, Edge Glow & Unclipped Hollow Mask Overlay ──
   ctx.save();
   if (bodyShiftX !== 0 || bodyTilt !== 0) {
     ctx.translate(bodyShiftX, 0);
@@ -947,23 +979,76 @@ export function drawIchigoSkin(ctx, fighter) {
   ctx.beginPath();
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
-  ctx.restore();
+
+  // ── 5.2. Fully Assembled Hollow Mask Overlay (UNCLIPPED over character body) ──
+  if (isMask && !isForming) {
+    let maskCrackProgress = 0;
+    if (!isChampionScreen && fighter.hollowMaskActive && fighter.hollowMaskTimer !== undefined) {
+      const crackWindow = 180; // starts cracking in last 3 seconds (180 frames)
+      if (fighter.hollowMaskTimer < crackWindow) {
+        maskCrackProgress = Math.min(1.0, Math.max(0.0, (crackWindow - fighter.hollowMaskTimer) / crackWindow));
+      }
+    }
+
+    const maskImg = _getHollowMaskImage();
+    const destW = r * 2.15;
+    const destH = r * 2.50;
+    const destX = -destW / 2;
+    const destY = -r * 1.08;
+
+    if (maskImg && maskImg.complete && maskImg.naturalWidth > 0) {
+      // Fully assembled Hollow Mask PNG (unclipped)
+      ctx.save();
+      ctx.drawImage(maskImg, 266, 143, 492, 747, destX, destY, destW, destH);
+      ctx.restore();
+    } else {
+      ctx.fillStyle = "#FFFFFF"; // White mask base covering upper face
+      ctx.beginPath();
+      ctx.arc(0, 0, r, -Math.PI * 0.95, -Math.PI * 0.05, false);
+      ctx.lineTo(0, r * 0.5);
+      ctx.closePath();
+      ctx.fill();
+
+      // Red/Black jagged mask lines
+      ctx.strokeStyle = "#B00000";
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(-r * 0.4, -r * 0.4);
+      ctx.lineTo(-r * 0.1, -r * 0.1);
+      ctx.moveTo(-r * 0.6, -r * 0.2);
+      ctx.lineTo(-r * 0.2, 0);
+      ctx.moveTo(-r * 0.5, 0.1);
+      ctx.lineTo(-r * 0.1, r * 0.3);
+      ctx.stroke();
+
+      // Hollow yellow eye iris details
+      ctx.fillStyle = "#FFD700";
+      ctx.beginPath();
+      ctx.arc(-r * 0.35, -r * 0.1, 3.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#111111";
+      ctx.beginPath();
+      ctx.arc(-r * 0.35, -r * 0.1, 1.2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Spreading fracture fissures and breaking pieces when duration is expiring (strictly hidden during champion screen)
+    if (maskCrackProgress > 0.01 && !isChampionScreen) {
+      _drawHollowMaskCracks(ctx, r, maskCrackProgress, now, fighter);
+    }
+  }
 
   // ── 5.5. Hollow Mask Formation Animation (UNCLIPPED over character body) ──
   if (isMask && isForming) {
-    ctx.save();
-    if (bodyShiftX !== 0 || bodyTilt !== 0) {
-      ctx.translate(bodyShiftX, 0);
-      ctx.rotate(bodyTilt);
-    }
     const maskImg = _getHollowMaskImage();
     const destW = r * 2.15;
     const destH = r * 2.50;
     const destX = -destW / 2;
     const destY = -r * 1.08;
     _drawHollowMaskFormation(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
-    ctx.restore();
   }
+
+  ctx.restore();
 
   // Render sword ON TOP of body circle during active fight or Bankai champion stance
   if (!isBackSlungPose || isBankaiStance) {
@@ -971,14 +1056,14 @@ export function drawIchigoSkin(ctx, fighter) {
   }
 
   // ── 6. Foreground Floating Reiatsu Flame Aura (Wafting in front of robes, chest, and face) ──
-  if (!isLowQuality && ribbonAlpha > 0.01) {
+  if (!isLowQuality && !isWeaponMenu && ribbonAlpha > 0.01) {
     _drawIchigoFloatingReiatsuAura(ctx, r, isBankai, isMask, isFrozen, now, 'front', ribbonAlpha, isForming, formationProg);
   }
 
   ctx.restore(); // end local body rotation
 
   // ── 6.5. Live Spiritual Pressure Aura: Front Layer (Spirit Heart Core & Micro-Lightning Discharges) ──
-  if (!isLowQuality && !isCountdownOrPreview && (isBankai || isMask || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0.05)) && !isFrozen && !isBankaiChanneling) {
+  if (!isLowQuality && !isCountdownOrPreview && !isWeaponMenu && (isBankai || isMask || (fighter.combatAuraOpacity && fighter.combatAuraOpacity > 0.05)) && !isFrozen && !isBankaiChanneling) {
     _drawBankaiLiveAura(ctx, r, isBankai, isMask, now, 'front');
   }
 
@@ -1184,254 +1269,8 @@ for (let i = 0; i < _LIVE_AURA_NUM_PTS; i++) {
 }
 
 function _drawBankaiLiveAura(ctx, r, isBankai, isMask, now, layer = 'back') {
-  const isCountdownOrPreview = (typeof state !== 'undefined' && (
-    state.gameState === 'countdown' || 
-    state.gameState === 'faceoff' ||
-    state.gameState === 'weaponIndex' || 
-    state.gameState === 'characterSelect' || 
-    state.gameState === 'indexDetail' || 
-    state.gameState === 'matchEnd' || 
-    state.gameState === 'roundEnd' ||
-    state._isFaceOffScreenActive ||
-    state.isRandomRollShowoff
-  ));
-  if (isCountdownOrPreview) return;
-
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-
-  // Form theme resolution:
-  let theme = 'bankai';
-  if (isBankai && isMask) theme = 'bankai_mask';
-  else if (isBankai) theme = 'bankai';
-  else if (isMask) theme = 'shikai_mask';
-  else theme = 'shikai';
-
-  if (layer === 'back') {
-    ctx.save();
-    
-    // ══════════════════════════════════════════════════════════════════════
-    // ── 1. SOFT VOLUMETRIC PLASMA SHROUD (Smooth Organic Bézier Contour) ──
-    // ══════════════════════════════════════════════════════════════════════
-    const numPoints = _LIVE_AURA_NUM_PTS;
-    const baseRadius = r * 1.18;
-    const points = _liveAuraPoints;
-
-    for (let i = 0; i < numPoints; i++) {
-      const theta = (Math.PI * 2 / numPoints) * i;
-      const upFactor = Math.max(0, -Math.sin(theta) + 0.3) * 0.9;
-      const wave1 = Math.sin(theta * 3.0 + now * 0.007) * 5.0;
-      const wave2 = Math.cos(theta * 2.0 - now * 0.005) * 4.0;
-      const flicker = Math.sin(now * 0.016 + i * 1.5) * 3.0 * (1.0 + upFactor * 0.5);
-      const totalR = baseRadius + wave1 + wave2 + flicker + upFactor * (r * 0.35);
-
-      points[i].x = Math.cos(theta) * totalR;
-      points[i].y = Math.sin(theta) * totalR;
-    }
-
-    const getContourPath = () => {
-      ctx.beginPath();
-      let mx = (points[numPoints - 1].x + points[0].x) * 0.5;
-      let my = (points[numPoints - 1].y + points[0].y) * 0.5;
-      ctx.moveTo(mx, my);
-      for (let i = 0; i < numPoints; i++) {
-        const p = points[i];
-        const next = points[(i + 1) % numPoints];
-        ctx.quadraticCurveTo(p.x, p.y, (p.x + next.x) * 0.5, (p.y + next.y) * 0.5);
-      }
-      ctx.closePath();
-    };
-
-    // Layer A: Outer Soft Ethereal Bloom (Scaled by 1.30)
-    if (!isLowQuality) {
-      ctx.save();
-      ctx.scale(1.30, 1.30);
-      getContourPath();
-      if (theme === 'bankai_mask') ctx.fillStyle = 'rgba(255, 10, 40, 0.22)';
-      else if (theme === 'bankai') ctx.fillStyle = 'rgba(220, 20, 40, 0.20)';
-      else if (theme === 'shikai_mask') ctx.fillStyle = 'rgba(240, 245, 255, 0.20)';
-      else ctx.fillStyle = 'rgba(0, 140, 255, 0.18)';
-      ctx.fill();
-      ctx.restore();
-    }
-
-    // Layer B: Middle Vibrant Fluid Glow (Scaled by 1.14)
-    ctx.save();
-    ctx.scale(1.14, 1.14);
-    getContourPath();
-    if (theme === 'bankai_mask') ctx.fillStyle = 'rgba(255, 30, 60, 0.32)';
-    else if (theme === 'bankai') ctx.fillStyle = 'rgba(255, 40, 30, 0.30)';
-    else if (theme === 'shikai_mask') ctx.fillStyle = 'rgba(220, 230, 245, 0.30)';
-    else ctx.fillStyle = 'rgba(0, 210, 255, 0.32)';
-    ctx.fill();
-    ctx.restore();
-
-    // Layer C: Core Luminous Fluid (Scaled 1.0)
-    getContourPath();
-    const coreGrad = ctx.createRadialGradient(0, -r * 0.2, r * 0.2, 0, 0, r * 1.35);
-    if (theme === 'bankai_mask') {
-      coreGrad.addColorStop(0.0, 'rgba(255, 240, 240, 0.85)');
-      coreGrad.addColorStop(0.40, 'rgba(255, 20, 40, 0.60)');
-      coreGrad.addColorStop(0.80, 'rgba(15, 2, 8, 0.50)');
-      coreGrad.addColorStop(1.0, 'rgba(5, 0, 4, 0.15)');
-    } else if (theme === 'bankai') {
-      coreGrad.addColorStop(0.0, 'rgba(255, 120, 80, 0.70)');
-      coreGrad.addColorStop(0.45, 'rgba(220, 20, 20, 0.45)');
-      coreGrad.addColorStop(0.85, 'rgba(20, 4, 8, 0.35)');
-      coreGrad.addColorStop(1.0, 'rgba(10, 2, 4, 0.05)');
-    } else if (theme === 'shikai_mask') {
-      coreGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.80)');
-      coreGrad.addColorStop(0.45, 'rgba(200, 220, 240, 0.55)');
-      coreGrad.addColorStop(0.85, 'rgba(180, 20, 30, 0.30)');
-      coreGrad.addColorStop(1.0, 'rgba(10, 10, 15, 0.10)');
-    } else {
-      coreGrad.addColorStop(0.0, 'rgba(220, 250, 255, 0.70)');
-      coreGrad.addColorStop(0.45, 'rgba(0, 229, 255, 0.45)');
-      coreGrad.addColorStop(0.85, 'rgba(0, 100, 255, 0.25)');
-      coreGrad.addColorStop(1.0, 'rgba(0, 30, 120, 0.05)');
-    }
-    ctx.fillStyle = coreGrad;
-    ctx.fill();
-
-    // Layer D: Soft Stylized Calligraphic Energy Contour Edge
-    if (theme === 'bankai_mask') ctx.strokeStyle = 'rgba(0, 0, 0, 0.85)';
-    else if (theme === 'bankai') ctx.strokeStyle = 'rgba(20, 2, 5, 0.60)';
-    else if (theme === 'shikai_mask') ctx.strokeStyle = 'rgba(5, 5, 8, 0.65)';
-    else ctx.strokeStyle = 'rgba(0, 40, 90, 0.35)';
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ── 2. FLOATING HOT CORE REIATSU PARTICLES (Rising Embers) ──
-    // ══════════════════════════════════════════════════════════════════════
-    const emberCount = 4;
-    for (let p = 0; p < emberCount; p++) {
-      const pProg = ((now * 0.0018 + p * (1.0 / emberCount)) % 1.0);
-      const pAng = (p * (Math.PI * 2 / emberCount)) + Math.sin(now * 0.003 + p * 1.7) * 0.35;
-      const pDist = r * (0.95 + 0.45 * (1.0 - pProg * 0.4));
-      const px = Math.cos(pAng) * pDist + Math.sin(now * 0.004 + p) * 4.0;
-      const py = Math.sin(pAng) * pDist - pProg * 28.0; // floats smoothly upward
-      const pRadius = (2.4 + (p % 3) * 1.2) * (1.0 - pProg * 0.4);
-      const pAlpha = Math.sin(pProg * Math.PI) * 0.95;
-
-      if (pAlpha > 0.02) {
-        let glowColor = 'rgba(255, 40, 30, 0.92)';
-        let darkEdge = 'rgba(15, 2, 8, 0.45)';
-
-        if (theme === 'bankai_mask') {
-          glowColor = (p % 2 === 0) ? 'rgba(255, 20, 40, 0.95)' : 'rgba(220, 0, 30, 0.90)';
-          darkEdge = 'rgba(10, 0, 4, 0.60)';
-        } else if (theme === 'bankai') {
-          glowColor = (p % 2 === 0) ? 'rgba(255, 50, 30, 0.92)' : 'rgba(220, 20, 40, 0.88)';
-          darkEdge = 'rgba(15, 2, 8, 0.45)';
-        } else if (theme === 'shikai_mask') {
-          glowColor = (p % 2 === 0) ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 40, 60, 0.85)';
-          darkEdge = 'rgba(10, 10, 15, 0.40)';
-        } else {
-          glowColor = 'rgba(0, 229, 255, 0.90)';
-          darkEdge = 'rgba(0, 40, 120, 0.35)';
-        }
-
-        // Soft outer glowing halo with jet-black core
-        const pGrad = ctx.createRadialGradient(px, py, 0, px, py, pRadius * 2.4);
-        pGrad.addColorStop(0.0, 'rgba(5, 5, 8, 1.0)');
-        pGrad.addColorStop(0.40, glowColor);
-        pGrad.addColorStop(0.80, darkEdge);
-        pGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = pGrad;
-        ctx.beginPath();
-        ctx.arc(px, py, pRadius * 2.4, 0, Math.PI * 2);
-        ctx.fill();
-
-        // High-contrast jet-black void core
-        ctx.fillStyle = '#050508';
-        ctx.beginPath();
-        ctx.arc(px, py, pRadius * 0.65, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ── 3. SOFT ETHEREAL GROUND FLOOR ENERGY GLOW ──
-    // ══════════════════════════════════════════════════════════════════════
-    const groundY = r * 0.35;
-    const grx = r * 1.55;
-    const gry = r * 0.70;
-    const gGrad = ctx.createRadialGradient(0, groundY, 0, 0, groundY, grx);
-    if (theme === 'bankai_mask') {
-      gGrad.addColorStop(0.0, 'rgba(10, 0, 4, 0.50)');
-      gGrad.addColorStop(0.6, 'rgba(255, 0, 40, 0.30)');
-      gGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    } else if (theme === 'bankai') {
-      gGrad.addColorStop(0.0, 'rgba(15, 2, 5, 0.45)');
-      gGrad.addColorStop(0.6, 'rgba(220, 20, 30, 0.22)');
-      gGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    } else if (theme === 'shikai_mask') {
-      gGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.35)');
-      gGrad.addColorStop(0.6, 'rgba(220, 20, 40, 0.18)');
-      gGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    } else {
-      gGrad.addColorStop(0.0, 'rgba(0, 229, 255, 0.38)');
-      gGrad.addColorStop(0.6, 'rgba(0, 120, 255, 0.15)');
-      gGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0.0)');
-    }
-
-    ctx.beginPath();
-    ctx.ellipse(0, groundY, grx, gry, 0, 0, Math.PI * 2);
-    ctx.fillStyle = gGrad;
-    ctx.fill();
-
-    ctx.restore();
-  }
-
-  if (layer === 'front') {
-    ctx.save();
-
-    // ══════════════════════════════════════════════════════════════════════
-    // ── 4. FRONT FLOATING HOT CORE REIATSU EMBERS ──
-    // ══════════════════════════════════════════════════════════════════════
-    const frontMoteCount = 3;
-    for (let m = 0; m < frontMoteCount; m++) {
-      const mSeed = ((now * 0.0020 + m * (1.0 / frontMoteCount) + 0.35) % 1.0);
-      const mAng = m * (Math.PI * 2 / frontMoteCount) + Math.sin(now * 0.003 + m) * 0.4;
-      const mDist = r * (0.80 + (1.0 - mSeed * 0.3) * 0.45);
-      const mX = Math.cos(mAng) * mDist + Math.sin(now * 0.004 + m) * 2.5;
-      const mY = Math.sin(mAng) * mDist - mSeed * 22.0; // floats smoothly upward
-      const mRadius = (2.0 + (m % 2) * 1.0) * (1.0 - mSeed * 0.35);
-      const mAlpha = Math.sin(mSeed * Math.PI) * 0.90;
-
-      if (mAlpha > 0.02) {
-        let glowColor = 'rgba(255, 40, 30, 0.92)';
-        if (theme === 'bankai_mask') {
-          glowColor = (m % 2 === 0) ? 'rgba(255, 20, 40, 0.95)' : 'rgba(255, 255, 255, 0.90)';
-        } else if (theme === 'bankai') {
-          glowColor = (m % 2 === 0) ? 'rgba(255, 60, 40, 0.92)' : 'rgba(220, 20, 40, 0.88)';
-        } else if (theme === 'shikai_mask') {
-          glowColor = (m % 2 === 0) ? 'rgba(255, 255, 255, 0.95)' : 'rgba(255, 40, 60, 0.85)';
-        } else {
-          glowColor = 'rgba(0, 229, 255, 0.92)';
-        }
-
-        const mGrad = ctx.createRadialGradient(mX, mY, 0, mX, mY, mRadius * 2.2);
-        mGrad.addColorStop(0.0, 'rgba(5, 5, 8, 1.0)');
-        mGrad.addColorStop(0.45, glowColor);
-        mGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-        ctx.fillStyle = mGrad;
-        ctx.beginPath();
-        ctx.arc(mX, mY, mRadius * 2.2, 0, Math.PI * 2);
-        ctx.fill();
-
-        // High-contrast jet-black core
-        ctx.fillStyle = '#050508';
-        ctx.beginPath();
-        ctx.arc(mX, mY, mRadius * 0.6, 0, Math.PI * 2);
-        ctx.fill();
-      }
-    }
-
-    ctx.restore();
-  }
+  // Live Bankai aura effect removed per user request
+  return;
 }
 
 
@@ -1751,6 +1590,56 @@ function _drawOrbiting3dSlashRibbon(ctx, r, ribbon, theta, now, lzDepth, isFront
   ctx.restore();
 }
 
+function _drawPixelDiamond(ctx, x, y, size = 4.0, color = '#ff1e38', coreColor = '#ffffff', pSize = 2.0) {
+  const gx = Math.round(x / pSize) * pSize;
+  const gy = Math.round(y / pSize) * pSize;
+  const halfS = Math.max(1, Math.round(size / pSize)) * pSize;
+
+  // Outer black pixel frame
+  ctx.fillStyle = '#08080c';
+  ctx.fillRect(gx - halfS - pSize, gy, (halfS + pSize) * 2 + pSize, pSize);
+  ctx.fillRect(gx, gy - halfS - pSize, pSize, (halfS + pSize) * 2 + pSize);
+
+  // Colored cross
+  ctx.fillStyle = color;
+  ctx.fillRect(gx - halfS, gy, halfS * 2 + pSize, pSize);
+  ctx.fillRect(gx, gy - halfS, pSize, halfS * 2 + pSize);
+
+  // White core center block
+  ctx.fillStyle = coreColor;
+  ctx.fillRect(gx, gy, pSize, pSize);
+}
+
+function _drawPixelLightning(ctx, x0, y0, x1, y1, color = '#00f0ff', coreColor = '#ffffff', pSize = 2.0) {
+  const gx0 = Math.round(x0 / pSize) * pSize;
+  const gy0 = Math.round(y0 / pSize) * pSize;
+  const gx1 = Math.round(x1 / pSize) * pSize;
+  const gy1 = Math.round(y1 / pSize) * pSize;
+
+  const dx = gx1 - gx0;
+  const dy = gy1 - gy0;
+  const midX = gx0 + Math.round((dx * 0.5) / pSize) * pSize;
+  const midY = gy0 + Math.round((dy * 0.5 + 4.0) / pSize) * pSize;
+
+  const drawPixelLine = (ax, ay, bx, by) => {
+    const dist = Math.hypot(bx - ax, by - ay);
+    const steps = Math.max(1, Math.ceil(dist / pSize));
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const px = Math.round((ax + (bx - ax) * t) / pSize) * pSize;
+      const py = Math.round((ay + (by - ay) * t) / pSize) * pSize;
+      ctx.fillStyle = '#08080c';
+      ctx.fillRect(px - pSize, py, pSize * 3, pSize);
+      ctx.fillRect(px, py - pSize, pSize, pSize * 3);
+      ctx.fillStyle = color;
+      ctx.fillRect(px, py, pSize, pSize);
+    }
+  };
+
+  drawPixelLine(gx0, gy0, midX, midY);
+  drawPixelLine(midX, midY, gx1, gy1);
+}
+
 function _drawGetsugaChargingAura(ctx, params) {
   const {
     isShikai = true,
@@ -1769,10 +1658,12 @@ function _drawGetsugaChargingAura(ctx, params) {
     swordLen = 94
   } = params;
 
+  if (chargeProg <= 0.01) return;
+
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
   const time = now * 0.001;
-  const pulse = 1.0 + 0.16 * Math.sin(time * 26.0);
-  const auraAlpha = Math.min(1.0, (0.55 + 0.45 * chargeProg) * pulse);
+  const pulse = 1.0 + 0.12 * Math.sin(time * 16.0 + chargeProg * 6.0);
+  const alpha = Math.min(1.0, 0.45 + 0.55 * chargeProg) * pulse;
 
   const isFinal = Boolean(fighter && (fighter.isFinalMassiveGetsuga || fighter._isFinalGetsugaCharging));
   const isBankaiHollow = isMask && isBankai;
@@ -1780,301 +1671,284 @@ function _drawGetsugaChargingAura(ctx, params) {
 
   ctx.save();
 
-  // ── Color theme definition matching active form ──
-  let primaryColor, secondaryColor, coreColor, darkInkColor;
-  if (isFinal) {
-    primaryColor = '#E60026';   // Intense Ruby Crimson
-    secondaryColor = '#FF3355'; // Scarlet Glow
-    coreColor = '#FFFFFF';      // Pure White Laser Core
-    darkInkColor = '#080004';   // Abyssal Black Void
-  } else if (isBankaiHollow) {
-    primaryColor = '#FF1E00';   // Blood Red
-    secondaryColor = '#DC143C'; // Crimson Flame
-    coreColor = '#FFFFFF';      // Pure White Lines
-    darkInkColor = '#060102';   // Jet Black Void
-  } else if (isShikaiHollow) {
-    primaryColor = '#00E5FF';   // Electric Cyan
-    secondaryColor = '#80F0FF'; // Bright Azure
-    coreColor = '#FFFFFF';      // Pure White
-    darkInkColor = '#0A0E18';   // Void Black Lines
+  // ── Color Palettes ──
+  let primaryColor, secondaryColor, coreColor, outerCoronaColor;
+  if (isFinal || isBankaiHollow) {
+    primaryColor = `rgba(255, 30, 20, ${(0.92 * alpha).toFixed(3)})`;
+    secondaryColor = `rgba(180, 10, 15, ${(0.65 * alpha).toFixed(3)})`;
+    coreColor = `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`;
+    outerCoronaColor = `rgba(255, 30, 20, ${(0.25 * alpha).toFixed(3)})`;
   } else if (isBankai) {
-    primaryColor = '#FF1E38';   // Crimson Neon
-    secondaryColor = '#FF4455'; // Scarlet
-    coreColor = '#FFFFFF';      // White Hot Core
-    darkInkColor = '#0A0206';   // Pitch Black
+    // Kuroi Getsuga: Crimson/Scarlet with white-hot core and dark void contrast
+    primaryColor = `rgba(255, 30, 55, ${(0.92 * alpha).toFixed(3)})`;
+    secondaryColor = `rgba(200, 15, 35, ${(0.65 * alpha).toFixed(3)})`;
+    coreColor = `rgba(255, 245, 245, ${(1.0 * alpha).toFixed(3)})`;
+    outerCoronaColor = `rgba(255, 25, 50, ${(0.25 * alpha).toFixed(3)})`;
+  } else if (isShikaiHollow) {
+    primaryColor = `rgba(0, 240, 255, ${(0.92 * alpha).toFixed(3)})`;
+    secondaryColor = `rgba(0, 170, 255, ${(0.65 * alpha).toFixed(3)})`;
+    coreColor = `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`;
+    outerCoronaColor = `rgba(0, 240, 255, ${(0.25 * alpha).toFixed(3)})`;
   } else {
-    // Standard Shikai
-    primaryColor = '#00D5FF';   // Sky Blue
-    secondaryColor = '#00F0FF'; // Electric Azure
-    coreColor = '#FFFFFF';      // Pure White Core
-    darkInkColor = '#004080';   // Deep Oceanic Contrast
+    // Standard Shikai Getsuga Tensho (Radiant Azure Blue)
+    primaryColor = `rgba(0, 215, 255, ${(0.92 * alpha).toFixed(3)})`;
+    secondaryColor = `rgba(0, 140, 255, ${(0.65 * alpha).toFixed(3)})`;
+    coreColor = `rgba(255, 255, 255, ${(1.0 * alpha).toFixed(3)})`;
+    outerCoronaColor = `rgba(0, 215, 255, ${(0.25 * alpha).toFixed(3)})`;
   }
 
   if (isShikai) {
-    // ══════════════════════════════════════════════════════════════════════
-    // ── SHIKAI ZANGETSU: DYNAMIC FLOWING REIATSU ENERGY ERUPTION ──
-    // ══════════════════════════════════════════════════════════════════════
-    const expand = 2.5 + 5.0 * chargeProg * pulse;
+    // ═════════════════════════════════════════════════════════════════════
+    // ── SHIKAI GETSUGA TENSHO CHARGING AURA ──
+    // ═════════════════════════════════════════════════════════════════════
 
-    // Helper to trace dynamic Shikai blade with rippling Reiatsu waves
-    const traceShikaiBlade = (exp = 0) => {
-      ctx.beginPath();
-      ctx.moveTo(-exp * 0.4, -3.0 - exp);
-      // Animated wave along top cutting edge
-      const waveTip = Math.sin(time * 24.0) * 1.5 * (0.3 + 0.7 * chargeProg);
-      ctx.lineTo(tipX + exp + waveTip, tipY - exp * 0.3);
-      ctx.quadraticCurveTo(65 + exp * 0.3, 15 + exp * 0.8, heelX + exp * 0.5, heelY + exp * 0.8);
-      ctx.lineTo(heelX, cutoutCenterY + exp * 0.4);
-      ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR + exp * 0.3, 0, Math.PI, true);
-      ctx.lineTo(-exp * 0.4, 5.0 + exp);
-      ctx.closePath();
-    };
-
-    // 1. Radiant Energy Cloak with dynamic shifting glow
-    ctx.save();
-    traceShikaiBlade(expand);
-    const gradShift = Math.sin(time * 18.0) * 15;
-    const outerGrad = ctx.createLinearGradient(0, 0, tipX + gradShift, tipY);
-    if (isBankaiHollow || isFinal) {
-      outerGrad.addColorStop(0.0, `rgba(8, 2, 4, ${(0.60 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(0.40, `rgba(220, 20, 60, ${(0.75 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(0.85, `rgba(255, 30, 0, ${(0.85 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(1.0, `rgba(255, 255, 255, ${(0.95 * auraAlpha).toFixed(3)})`);
-    } else if (isShikaiHollow) {
-      outerGrad.addColorStop(0.0, `rgba(10, 14, 24, ${(0.65 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(0.40, `rgba(0, 229, 255, ${(0.75 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(0.85, `rgba(160, 245, 255, ${(0.85 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(1.0, `rgba(255, 255, 255, ${(0.95 * auraAlpha).toFixed(3)})`);
-    } else {
-      outerGrad.addColorStop(0.0, `rgba(0, 100, 255, ${(0.45 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(0.45, `rgba(0, 213, 255, ${(0.70 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(0.85, `rgba(160, 245, 255, ${(0.85 * auraAlpha).toFixed(3)})`);
-      outerGrad.addColorStop(1.0, `rgba(255, 255, 255, ${(0.95 * auraAlpha).toFixed(3)})`);
-    }
-    ctx.fillStyle = outerGrad;
+    // 1. Outer Diffuse Reiatsu Corona
+    const expandOuter = (4.0 + 8.0 * chargeProg) * pulse;
+    ctx.beginPath();
+    ctx.moveTo(-expandOuter * 0.5, -3.0 - expandOuter);
+    ctx.lineTo(tipX + expandOuter * 1.2, tipY - expandOuter * 0.8);
+    ctx.quadraticCurveTo(65 + expandOuter, 15 + expandOuter, heelX - expandOuter * 0.3, heelY + expandOuter);
+    ctx.quadraticCurveTo(cutoutCenterX - expandOuter, cutoutCenterY, -expandOuter * 0.5, 5.0 + expandOuter * 0.5);
+    ctx.closePath();
+    ctx.fillStyle = outerCoronaColor;
     ctx.fill();
-    ctx.restore();
 
-    // 2. Dynamic Pulsing Outer Contour
-    ctx.save();
-    traceShikaiBlade(expand * 0.45);
+    // 2. Mid Vivid Reiatsu Shroud
+    const expandMid = (2.0 + 4.5 * chargeProg) * pulse;
+    ctx.beginPath();
+    ctx.moveTo(-expandMid * 0.5, -3.0 - expandMid);
+    ctx.lineTo(tipX + expandMid, tipY - expandMid * 0.6);
+    ctx.quadraticCurveTo(65 + expandMid * 0.8, 15 + expandMid * 0.8, heelX, heelY + expandMid * 0.8);
+    ctx.quadraticCurveTo(cutoutCenterX, cutoutCenterY, -expandMid * 0.5, 5.0);
+    ctx.closePath();
+    ctx.fillStyle = secondaryColor;
+    ctx.fill();
+
+    // 3. Crisp Inner Luminous Contour Lines along spine and cutting edge
     ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 1.8 + 2.0 * chargeProg;
+    ctx.lineWidth = Math.max(1.4, 2.8 * chargeProg * pulse);
+    ctx.beginPath();
+    ctx.moveTo(0, -3.0);
+    ctx.lineTo(tipX, tipY);
+    ctx.quadraticCurveTo(65, 15, heelX, heelY);
     ctx.stroke();
-    ctx.restore();
 
-    // 3. Fast-streaming Reiatsu lightning arcs along cleaver blade
-    const arcCount = Math.floor(3 + 3 * chargeProg);
-    for (let a = 0; a < arcCount; a++) {
-      const aPhase = ((time * 16.0 + a * 1.8) % 1.0);
-      const ax1 = aPhase * tipX;
-      const ay1 = -3.0 + aPhase * tipY;
-      const jitter = Math.sin(time * 30.0 + a * 4.0) * (3.0 + 4.0 * chargeProg);
+    // 4. White-Hot Core Blade Edge Shimmer
+    ctx.strokeStyle = coreColor;
+    ctx.lineWidth = Math.max(0.8, 1.4 * chargeProg);
+    ctx.beginPath();
+    ctx.moveTo(10, -2.5);
+    ctx.lineTo(tipX, tipY);
+    ctx.quadraticCurveTo(65, 15, heelX + 4, heelY - 2);
+    ctx.stroke();
 
-      ctx.beginPath();
-      ctx.moveTo(ax1, ay1);
-      ctx.lineTo(ax1 + 12, ay1 + jitter);
-      ctx.strokeStyle = (a % 2 === 0) ? coreColor : primaryColor;
-      ctx.lineWidth = 1.2 + 0.8 * chargeProg;
-      ctx.globalAlpha = 0.85 * auraAlpha;
-      ctx.stroke();
-    }
-
-    // 4. Inward Swirling Reiatsu Particles condensing into the blade
-    const orbCount = Math.floor(5 + 5 * chargeProg);
-    for (let o = 0; o < orbCount; o++) {
-      const ot = ((time * (1.8 + chargeProg * 1.5) + o * (1.0 / orbCount)) % 1.0);
-      const swirlDist = (1.0 - ot) * (28 * (1.0 - chargeProg * 0.3));
-      const swirlAngle = time * 8.0 + o * 1.25;
-      const ox = (o / orbCount) * tipX + Math.cos(swirlAngle) * swirlDist;
-      const oy = Math.sin(swirlAngle) * (swirlDist * 0.5);
-
-      ctx.beginPath();
-      ctx.arc(ox, oy, 1.4 + (1.0 - ot) * 1.2, 0, Math.PI * 2);
-      ctx.fillStyle = (o % 2 === 0) ? coreColor : primaryColor;
-      ctx.globalAlpha = Math.sin(ot * Math.PI) * auraAlpha;
-      ctx.fill();
-    }
+    // 5. Tip Condensation Burst
+    const tipFlashR = (3.5 + 9.0 * chargeProg * pulse);
+    const tipGrad = ctx.createRadialGradient(tipX, tipY, 0, tipX, tipY, tipFlashR);
+    tipGrad.addColorStop(0.0, coreColor);
+    tipGrad.addColorStop(0.40, primaryColor);
+    tipGrad.addColorStop(0.80, secondaryColor);
+    tipGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = tipGrad;
+    ctx.beginPath();
+    ctx.arc(tipX, tipY, tipFlashR, 0, Math.PI * 2);
+    ctx.fill();
 
   } else {
-    // ══════════════════════════════════════════════════════════════════════
-    // ── BANKAI TENSA ZANGETSU: LIVING STREAMING KUROI REIATSU STORM ──
-    // ══════════════════════════════════════════════════════════════════════
+    // ═════════════════════════════════════════════════════════════════════
+    // ── BANKAI GETSUGA TENSHO (KUROI GETSUGA) CHARGING AURA ──
+    // ═════════════════════════════════════════════════════════════════════
     const startX = swordStartX;
     const len = swordLen || 94;
     const bladeBaseX = startX + 5;
-    const fin1StartX = startX + 52;
-    const fin2StartX = startX + 66;
-    const fin3StartX = startX + 80;
-    const tipX = startX + len;
-    const expand = 2.5 + 4.5 * chargeProg * pulse;
+    const actualBladeLen = len - 8;
     const getSori = (x) => {
-      const t = Math.max(0, Math.min(1.0, (x - bladeBaseX) / (tipX - bladeBaseX)));
+      const t = Math.max(0, Math.min(1.0, (x - bladeBaseX) / (actualBladeLen || 1)));
       return -Math.pow(t, 1.45) * 8.5;
     };
-    const tipY = getSori(tipX);
 
-    // Helper to trace dynamic Bankai blade silhouette with active Reiatsu turbulence
-    const traceBankaiBlade = (exp = 0) => {
-      ctx.beginPath();
-      const waveTop = Math.sin(time * 26.0) * 1.2 * (0.4 + 0.6 * chargeProg);
-      const waveBot = Math.cos(time * 24.0) * 1.2 * (0.4 + 0.6 * chargeProg);
-
-      // Cutting edge (-Y / top)
-      ctx.moveTo(bladeBaseX, -2.8 - exp);
-      ctx.quadraticCurveTo(startX + 50, getSori(startX + 50) - 2.8 - exp + waveTop, tipX + exp * 1.2, tipY + waveTop * 0.5);
-
-      // Spine edge with 3 stepped fins (+Y / bottom)
-      ctx.quadraticCurveTo(startX + 87, getSori(startX + 87) + 3.2 + exp + waveBot, fin3StartX + 2.2, getSori(fin3StartX) + 5.3 + exp);
-      ctx.lineTo(fin2StartX + 12.2, getSori(fin2StartX + 12.2) + 2.5 + exp);
-      ctx.lineTo(fin2StartX + 10.5, getSori(fin2StartX + 10.5) + 4.3 + exp);
-      ctx.lineTo(fin2StartX + 2.2, getSori(fin2StartX) + 5.1 + exp);
-      ctx.lineTo(fin1StartX + 12.2, getSori(fin1StartX + 12.2) + 2.7 + exp);
-      ctx.lineTo(fin1StartX + 10.5, getSori(fin1StartX + 10.5) + 4.3 + exp);
-      ctx.lineTo(fin1StartX + 2.2, getSori(fin1StartX) + 4.9 + exp);
-      ctx.lineTo(fin1StartX, getSori(fin1StartX) + 2.8 + exp);
-      ctx.lineTo(bladeBaseX, 2.8 + exp);
-      ctx.closePath();
-    };
-
-    // 1. Turbulent Kuroi Reiatsu Plasma Sheath with dynamic flow
-    ctx.save();
-    traceBankaiBlade(expand);
-    const gradOffset = Math.sin(time * 20.0) * 12;
-    const bankaiGrad = ctx.createLinearGradient(bladeBaseX, -3.2, tipX + gradOffset, 5.8);
-    bankaiGrad.addColorStop(0.0, `rgba(10, 2, 4, ${(0.45 * auraAlpha).toFixed(3)})`);
-    bankaiGrad.addColorStop(0.35, `rgba(220, 20, 45, ${(0.65 * auraAlpha).toFixed(3)})`);
-    bankaiGrad.addColorStop(0.75, `rgba(255, 40, 60, ${(0.80 * auraAlpha).toFixed(3)})`);
-    bankaiGrad.addColorStop(1.0, `rgba(255, 255, 255, ${(0.92 * auraAlpha).toFixed(3)})`);
-    ctx.fillStyle = bankaiGrad;
+    // 1. Outer Crimson Reiatsu Corona
+    const expandOuter = (3.5 + 7.0 * chargeProg) * pulse;
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      const bx = bladeBaseX + t * actualBladeLen;
+      const by = getSori(bx) - 2.8 - expandOuter;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
+    }
+    for (let i = 16; i >= 0; i--) {
+      const t = i / 16;
+      const bx = bladeBaseX + t * actualBladeLen;
+      const by = getSori(bx) + 4.5 + expandOuter;
+      ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    ctx.fillStyle = outerCoronaColor;
     ctx.fill();
-    ctx.restore();
 
-    // 2. Intense Burning Red Outer Energy Contour
-    ctx.save();
-    traceBankaiBlade(expand * 0.45);
+    // 2. Mid Vivid Kuroi Shroud
+    const expandMid = (1.8 + 3.5 * chargeProg) * pulse;
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      const bx = bladeBaseX + t * actualBladeLen;
+      const by = getSori(bx) - 2.8 - expandMid;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
+    }
+    for (let i = 16; i >= 0; i--) {
+      const t = i / 16;
+      const bx = bladeBaseX + t * actualBladeLen;
+      const by = getSori(bx) + 4.5 + expandMid;
+      ctx.lineTo(bx, by);
+    }
+    ctx.closePath();
+    ctx.fillStyle = secondaryColor;
+    ctx.fill();
+
+    // 3. Crisp Crimson Luminous Contour Line along katana edge & spine
     ctx.strokeStyle = primaryColor;
-    ctx.lineWidth = 1.6 + 1.8 * chargeProg;
+    ctx.lineWidth = Math.max(1.2, 2.5 * chargeProg * pulse);
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      const bx = bladeBaseX + t * actualBladeLen;
+      const by = getSori(bx) + 4.5;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
+    }
     ctx.stroke();
-    ctx.restore();
 
-    // 3. Fast Rushing Kuroi Lightning Discharges jumping along the entire blade
-    const arcCount = Math.floor(4 + 4 * chargeProg);
-    for (let a = 0; a < arcCount; a++) {
-      const aPhase = ((time * (14.0 + chargeProg * 10.0) + a * 1.5) % 1.0);
-      const ax = bladeBaseX + aPhase * (len - 10);
-      const topY = getSori(ax) - 2.8;
-      const botY = getSori(ax) + 4.0;
-      const jitterX = Math.sin(time * 35.0 + a * 3.0) * (2.5 + 3.0 * chargeProg);
-
-      ctx.beginPath();
-      ctx.moveTo(ax, botY);
-      ctx.lineTo(ax + jitterX, getSori(ax));
-      ctx.lineTo(ax + 4 + jitterX * 0.5, topY);
-      ctx.strokeStyle = (a % 2 === 0) ? coreColor : primaryColor;
-      ctx.lineWidth = 1.2 + 0.8 * chargeProg;
-      ctx.globalAlpha = 0.90 * auraAlpha;
-      ctx.stroke();
+    // 4. White-Hot Core Shimmer on cutting edge
+    ctx.strokeStyle = coreColor;
+    ctx.lineWidth = Math.max(0.7, 1.2 * chargeProg);
+    ctx.beginPath();
+    for (let i = 0; i <= 16; i++) {
+      const t = i / 16;
+      const bx = bladeBaseX + t * actualBladeLen;
+      const by = getSori(bx) + 4.0;
+      if (i === 0) ctx.moveTo(bx, by);
+      else ctx.lineTo(bx, by);
     }
+    ctx.stroke();
 
-    // 4. High-Speed Kuroi Vortex Embers Spiraling into Tensa Zangetsu
-    const emberCount = Math.floor(8 + 8 * chargeProg);
-    for (let e = 0; e < emberCount; e++) {
-      const et = ((time * (2.2 + chargeProg * 2.0) + e * (1.0 / emberCount)) % 1.0);
-      const swirlDist = (1.0 - et) * (34 * (1.0 - chargeProg * 0.35));
-      const swirlAng = time * 10.0 + e * 1.15;
-      const targetBladeX = bladeBaseX + (e / emberCount) * (len - 8);
-      const ex = targetBladeX + Math.cos(swirlAng) * swirlDist;
-      const ey = getSori(targetBladeX) + Math.sin(swirlAng) * (swirlDist * 0.55);
+    // 5. Tip Kuroi Getsuga Flash Point
+    const tipX_actual = bladeBaseX + actualBladeLen;
+    const tipY_actual = getSori(tipX_actual);
+    const tipFlashR = (3.5 + 9.0 * chargeProg * pulse);
 
-      ctx.beginPath();
-      ctx.arc(ex, ey, 1.4 + (1.0 - et) * 1.6, 0, Math.PI * 2);
-      ctx.fillStyle = (e % 3 === 0) ? coreColor : primaryColor;
-      ctx.globalAlpha = Math.sin(et * Math.PI) * (0.85 * auraAlpha);
-      ctx.fill();
-    }
+    const tipGrad = ctx.createRadialGradient(tipX_actual, tipY_actual, 0, tipX_actual, tipY_actual, tipFlashR);
+    tipGrad.addColorStop(0.0, coreColor);
+    tipGrad.addColorStop(0.40, primaryColor);
+    tipGrad.addColorStop(0.80, secondaryColor);
+    tipGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+
+    ctx.fillStyle = tipGrad;
+    ctx.beginPath();
+    ctx.arc(tipX_actual, tipY_actual, tipFlashR, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.restore();
 }
 
 function _drawBankaiChargingAura(ctx, tipX, tipY, heelX, heelY, cutoutCenterX, cutoutCenterY, cutoutR, bankaiProg) {
+  if (bankaiProg <= 0.01) return;
   const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-  const pulse = 1.0 + 0.10 * Math.sin(now * 0.03);
-  const auraAlpha = Math.min(1.0, bankaiProg * 2.0);
+  const time = now * 0.001;
+  const pulse = 1.0 + 0.15 * Math.sin(time * 24.0);
+  const alpha = Math.min(1.0, 0.5 + 0.5 * bankaiProg) * pulse;
 
   ctx.save();
 
-  // Surging Bankai Spiritual Pressure Eruption along Zangetsu
-  const expand = (3.0 + 8.0 * bankaiProg) * pulse;
+  // Full-blade crimson corona envelope
+  const expand = (3.0 + 6.0 * bankaiProg) * pulse;
   ctx.beginPath();
-  ctx.moveTo(-expand * 0.4, -3.0 - expand);
-  ctx.lineTo(tipX + expand * 1.2, tipY - expand * 0.4);
-  ctx.quadraticCurveTo(65 + expand * 0.3, 15 + expand * 1.0, heelX + expand * 0.6, heelY + expand * 1.0);
-  ctx.lineTo(heelX, cutoutCenterY + expand * 0.5);
-  ctx.arc(cutoutCenterX, cutoutCenterY, cutoutR + expand * 0.4, 0, Math.PI, true);
-  ctx.lineTo(-expand * 0.4, 5.0 + expand);
+  ctx.moveTo(-expand * 0.5, -3.0 - expand);
+  ctx.lineTo(tipX + expand, tipY - expand * 0.8);
+  ctx.quadraticCurveTo(65 + expand, 15 + expand, heelX, heelY + expand);
+  ctx.quadraticCurveTo(cutoutCenterX, cutoutCenterY, -expand * 0.5, 5.0);
   ctx.closePath();
-
-  const bGrad = ctx.createLinearGradient(0, 0, tipX, tipY);
-  bGrad.addColorStop(0.0, `rgba(8, 2, 4, ${(0.85 * auraAlpha).toFixed(3)})`);
-  bGrad.addColorStop(0.35, `rgba(220, 20, 60, ${(0.92 * auraAlpha).toFixed(3)})`);
-  bGrad.addColorStop(0.70, `rgba(255, 30, 20, ${(0.95 * auraAlpha).toFixed(3)})`);
-  bGrad.addColorStop(1.0, `rgba(255, 255, 255, ${(1.0 * auraAlpha).toFixed(3)})`);
-
-  ctx.fillStyle = bGrad;
+  ctx.fillStyle = `rgba(220, 20, 30, ${(0.35 * alpha).toFixed(3)})`;
   ctx.fill();
-
-  // Edge Laser Stroke
-  ctx.strokeStyle = '#FF1E00';
-  ctx.lineWidth = 2.0 + 2.0 * bankaiProg;
+  ctx.strokeStyle = `rgba(255, 30, 40, ${(0.85 * alpha).toFixed(3)})`;
+  ctx.lineWidth = 1.5;
   ctx.stroke();
+
+  // Rising Crimson Flames along the spine
+  const steps = 14;
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const bx = t * tipX;
+    const by = -3.0 + t * (tipY + 3.0);
+    const fProg = ((time * 4.0 + i * 0.3) % 1.0);
+    const fH = (4.0 + 8.0 * bankaiProg) * (1.0 - fProg * 0.35);
+    const fA = Math.sin(fProg * Math.PI) * alpha;
+
+    if (fA > 0.02) {
+      ctx.fillStyle = `rgba(255, 40, 50, ${(0.90 * fA).toFixed(3)})`;
+      ctx.beginPath();
+      ctx.moveTo(bx - 2.5, by);
+      ctx.lineTo(bx, by - fH);
+      ctx.lineTo(bx + 2.5, by);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = `rgba(255, 255, 255, ${(1.0 * fA).toFixed(3)})`;
+      ctx.fillRect(bx - 0.75, by - fH * 0.4, 1.5, 1.5);
+    }
+  }
 
   ctx.restore();
 }
 
 function _drawBankaiTransformationVortex(ctx, r, bankaiProg, now, fighter) {
   ctx.save();
+  const msPerFrame = 1000 / 30;
+  const qTime = Math.floor(now / msPerFrame) * msPerFrame;
+  const time = qTime * 0.001;
+  const pSize = 2.5;
 
-  const vortexAlpha = Math.min(1.0, bankaiProg * 2.0);
-  const pulse = 1.0 + Math.sin(now * 0.02) * 0.08;
+  const ringCount = 4;
+  for (let rc = 0; rc < ringCount; rc++) {
+    const ringProg = ((time * 1.5 + rc * (1.0 / ringCount)) % 1.0);
+    const ringDist = r * (0.6 + (1.0 - ringProg) * 2.2);
+    const segs = 16;
 
-  // ── Clean Spiritual Pressure Base Glow (Jet Black & Crimson Red) ──
-  const baseR = r * (1.6 + bankaiProg * 1.2) * pulse;
-  const grad = ctx.createRadialGradient(0, 0, r * 0.4, 0, 0, baseR);
-  grad.addColorStop(0.0, `rgba(220, 20, 20, ${(0.55 * vortexAlpha).toFixed(3)})`);
-  grad.addColorStop(0.40, `rgba(18, 4, 12, ${(0.75 * vortexAlpha).toFixed(3)})`);
-  grad.addColorStop(0.80, `rgba(6, 2, 8, ${(0.55 * vortexAlpha).toFixed(3)})`);
-  grad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
+    for (let seg = 0; seg < segs; seg++) {
+      if ((seg + rc) % 2 === 0) continue;
+      const segAngle = (seg / segs) * Math.PI * 2 + time * 6.0;
+      const rx = Math.cos(segAngle) * ringDist;
+      const ry = Math.sin(segAngle) * ringDist;
 
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(0, 0, baseR, 0, Math.PI * 2);
-  ctx.fill();
+      const gx = Math.round(rx / pSize) * pSize;
+      const gy = Math.round(ry / pSize) * pSize;
 
-  // ── Subtle Spiritual Pressure Sparks ──
-  const particleCount = 8;
-  for (let p = 0; p < particleCount; p++) {
-    const pProg = ((now * 0.0022 + p * (1.0 / particleCount)) % 1.0);
-    const pDist = r * (0.7 + (1.0 - pProg) * 1.8);
-    const pAngle = p * (Math.PI * 2 / particleCount) + now * 0.005;
-    const px = Math.cos(pAngle) * pDist;
-    const py = Math.sin(pAngle) * pDist;
-    const pSize = (1.8 + (p % 2) * 1.0) * (1.0 - pProg * 0.5);
+      ctx.fillStyle = '#08080c';
+      ctx.fillRect(gx - pSize, gy - pSize, pSize * 3, pSize * 3);
 
-    ctx.fillStyle = (p % 2 === 0) 
-      ? `rgba(220, 20, 20, ${(0.92 * (1.0 - pProg) * vortexAlpha).toFixed(3)})` 
-      : `rgba(255, 230, 230, ${(0.98 * (1.0 - pProg) * vortexAlpha).toFixed(3)})`;
-    ctx.beginPath();
-    ctx.arc(px, py, pSize, 0, Math.PI * 2);
-    ctx.fill();
+      ctx.fillStyle = (rc % 2 === 0) ? '#ff1e20' : '#dc143c';
+      ctx.fillRect(gx, gy, pSize, pSize);
+    }
+  }
+
+  const sparkCount = 8;
+  for (let s = 0; s < sparkCount; s++) {
+    const spProg = ((time * 2.0 + s * (1.0 / sparkCount)) % 1.0);
+    const spDist = r * (0.5 + (1.0 - spProg) * 2.4);
+    const spAngle = s * (Math.PI * 2 / sparkCount) + time * 4.5;
+    const sx = Math.cos(spAngle) * spDist;
+    const sy = Math.sin(spAngle) * spDist;
+
+    _drawPixelDiamond(ctx, sx, sy, 3.5, (s % 2 === 0) ? '#ff2030' : '#ffffff', '#ffffff', pSize);
   }
 
   ctx.restore();
 }
 
 function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
-  // Timing: Surges violently upward into the sky upon releasing Bankai
+  // Timing: Surges violently upward into the sky upon Bankai Awakening
   const pillarProg = Math.min(1.0, burstProg / 0.70);
   const pillarHeight = 140 + Math.pow(pillarProg, 0.55) * 800; // Skyward beam reaching high into the air
   const pillarBaseW = (44 + 20 * (1.0 - burstProg));
@@ -2084,18 +1958,18 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
 
   ctx.save();
 
-  // ── 1. Colossal Outer Black-Crimson Reiatsu Corona Shroud (Multi-Peak Needle Silhouette) ──
+  // ── 1. Colossal Outer Reiatsu Corona Shroud (Multi-Peak Needle Silhouette: Jet Black & Crimson Red) ──
   const coronaW = pillarBaseW * 1.55;
   const coronaGrad = ctx.createLinearGradient(-coronaW, 0, coronaW, 0);
   coronaGrad.addColorStop(0.0, 'rgba(220, 20, 20, 0.0)');
-  coronaGrad.addColorStop(0.20, `rgba(220, 20, 20, ${(0.80 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.42, `rgba(12, 4, 10, ${(0.92 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.50, `rgba(255, 30, 20, ${(0.98 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.58, `rgba(12, 4, 10, ${(0.92 * pillarAlpha).toFixed(3)})`);
-  coronaGrad.addColorStop(0.80, `rgba(220, 20, 20, ${(0.80 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.20, `rgba(220, 20, 20, ${(0.85 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.42, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.50, `rgba(255, 240, 240, ${(1.0 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.58, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coronaGrad.addColorStop(0.80, `rgba(220, 20, 20, ${(0.85 * pillarAlpha).toFixed(3)})`);
   coronaGrad.addColorStop(1.0, 'rgba(220, 20, 20, 0.0)');
 
-  // Outer Multi-Peak Needle Polygon (Exact match to Bleach anime reference)
+  // Outer Multi-Peak Needle Polygon
   ctx.beginPath();
   ctx.moveTo(-coronaW, 0);
   ctx.lineTo(-coronaW * 0.75, -pillarHeight * 0.55);
@@ -2112,14 +1986,14 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   ctx.fillStyle = coronaGrad;
   ctx.fill();
 
-  // ── 2. High-Density Black Void & Ruby Core Column ──
+  // ── 2. High-Density Black Void & Stark Ruby-White Core Column ──
   const coreW = pillarBaseW * 0.75;
   const coreGrad = ctx.createLinearGradient(-coreW, 0, coreW, 0);
   coreGrad.addColorStop(0.0, 'rgba(12, 4, 10, 0.0)');
   coreGrad.addColorStop(0.20, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.40, `rgba(220, 20, 20, ${(0.92 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.50, `rgba(255, 240, 240, ${(1.0 * pillarAlpha).toFixed(3)})`);
-  coreGrad.addColorStop(0.60, `rgba(220, 20, 20, ${(0.92 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.40, `rgba(255, 30, 20, ${(0.95 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.50, `rgba(255, 255, 255, ${(1.0 * pillarAlpha).toFixed(3)})`);
+  coreGrad.addColorStop(0.60, `rgba(255, 30, 20, ${(0.95 * pillarAlpha).toFixed(3)})`);
   coreGrad.addColorStop(0.80, `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`);
   coreGrad.addColorStop(1.0, 'rgba(12, 4, 10, 0.0)');
 
@@ -2135,7 +2009,7 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   ctx.fillStyle = coreGrad;
   ctx.fill();
 
-  // ── 3. Vertical Supersonic Speed Needle Streaks Inside Pillar ──
+  // ── 3. Vertical Supersonic Speed Needle Streaks Inside Pillar (Black-Crimson Lines) ──
   const streakCount = 8;
   for (let s = 0; s < streakCount; s++) {
     const sNorm = (s / (streakCount - 1)) * 2 - 1; // -1 to +1
@@ -2147,10 +2021,10 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
     const sThick = (1.5 + (1.0 - Math.abs(sNorm)) * 1.5) * (1.0 - burstProg * 0.4);
 
     let sColor;
-    if (s % 4 === 0) sColor = `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`;
-    else if (s % 4 === 1) sColor = `rgba(220, 20, 20, ${(0.92 * pillarAlpha).toFixed(3)})`;
-    else if (s % 4 === 2) sColor = `rgba(255, 45, 20, ${(0.95 * pillarAlpha).toFixed(3)})`;
-    else sColor = `rgba(255, 240, 240, ${(0.98 * pillarAlpha).toFixed(3)})`;
+    if (s % 4 === 0) sColor = `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`;       // Manga dark ink line
+    else if (s % 4 === 1) sColor = `rgba(220, 20, 20, ${(0.95 * pillarAlpha).toFixed(3)})`; // Crimson Reiatsu
+    else if (s % 4 === 2) sColor = `rgba(255, 45, 20, ${(0.95 * pillarAlpha).toFixed(3)})`; // Fiery red
+    else sColor = `rgba(255, 245, 240, ${(0.98 * pillarAlpha).toFixed(3)})`;                 // Ruby-white core
 
     ctx.fillStyle = sColor;
     ctx.beginPath();
@@ -2163,7 +2037,6 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
   }
 
   // ── 4. Transonic Mach Vapor Expansion Discs (Horizontal Condensation Rings) ──
-  // Matching the 3 stacked horizontal supersonic vapor rings in the reference image
   const ringDefs = [
     { baseY: -25,  scaleX: 1.50, scaleY: 0.32, speed: 1.0, thick: 14.0 },
     { baseY: -95,  scaleX: 1.35, scaleY: 0.28, speed: 1.15, thick: 11.0 },
@@ -2175,7 +2048,7 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
     const ringProg = Math.min(1.0, burstProg * rd.speed);
     const rx = (pillarBaseW * 0.9 + ringProg * 175 * rd.scaleX);
     const ry = rx * rd.scaleY;
-    const curY = rd.baseY - ringProg * 35; // Rises slightly as sonic wave expands upward
+    const curY = rd.baseY - ringProg * 35;
     const ringA = Math.sin(Math.min(1.0, burstProg * 1.4) * Math.PI) * pillarAlpha * 0.88;
 
     if (ringA > 0.01) {
@@ -2183,21 +2056,21 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
       ctx.translate(0, curY);
 
       // Outer Crimson Vapor Ring
-      ctx.strokeStyle = `rgba(220, 20, 20, ${(0.62 * ringA).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(220, 20, 20, ${(0.72 * ringA).toFixed(3)})`;
       ctx.lineWidth = rd.thick * (1.0 - burstProg * 0.5);
       ctx.beginPath();
       ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
 
       // Sharp Jet-Black Void Shock Edge
-      ctx.strokeStyle = `rgba(12, 4, 10, ${(0.92 * ringA).toFixed(3)})`;
+      ctx.strokeStyle = `rgba(12, 4, 10, ${(0.95 * ringA).toFixed(3)})`;
       ctx.lineWidth = 2.4 * (1.0 - burstProg * 0.5);
       ctx.beginPath();
       ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
       ctx.stroke();
 
-      // Fiery Red / Ruby Condensation Vapor Core
-      ctx.strokeStyle = `rgba(255, 45, 20, ${(0.95 * ringA).toFixed(3)})`;
+      // Stark Ruby-White Condensation Vapor Core
+      ctx.strokeStyle = `rgba(255, 240, 240, ${(0.98 * ringA).toFixed(3)})`;
       ctx.lineWidth = 1.2 * (1.0 - burstProg * 0.5);
       ctx.beginPath();
       ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
@@ -2207,7 +2080,7 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
     }
   }
 
-  // ── 5. Vertical Ascending Micro-Lightning Tendrils ──
+  // ── 5. Vertical Ascending Micro-Lightning Tendrils (Black-Crimson Theme) ──
   const boltCount = 4;
   for (let b = 0; b < boltCount; b++) {
     const bSide = b % 2 === 0 ? -1 : 1;
@@ -2226,12 +2099,12 @@ function _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
       curY = startY - frac * bLen;
       ctx.lineTo(curX, curY);
     }
-    ctx.strokeStyle = `rgba(220, 20, 20, ${(0.92 * pillarAlpha).toFixed(3)})`;
-    ctx.lineWidth = 2.2;
+    ctx.strokeStyle = `rgba(12, 4, 10, ${(0.95 * pillarAlpha).toFixed(3)})`;
+    ctx.lineWidth = 2.4;
     ctx.stroke();
 
-    ctx.strokeStyle = `rgba(255, 220, 220, ${(0.98 * pillarAlpha).toFixed(3)})`;
-    ctx.lineWidth = 1.0;
+    ctx.strokeStyle = (b % 2 === 0) ? `rgba(255, 30, 20, ${(0.98 * pillarAlpha).toFixed(3)})` : `rgba(255, 245, 240, ${(0.98 * pillarAlpha).toFixed(3)})`;
+    ctx.lineWidth = 1.2;
     ctx.stroke();
   }
 
@@ -2248,53 +2121,8 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
 
   ctx.save();
 
-  // ── 0. Skyward Sonic Reiatsu Blast Pillar & Transonic Mach Vapor Discs ──
   _drawBankaiSkywardSonicPillar(ctx, r, burstProg, alpha, now);
 
-  // ── 1. Concentric Expanding Shockwave Blast Rings ──
-  // Ring 1: Fast Supersonic Needle Shockwave Ring
-  const needleR = r + burstProg * 380;
-  ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 4.5 * (1.0 - burstProg));
-  ctx.beginPath();
-  ctx.arc(0, 0, needleR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.strokeStyle = `rgba(220, 20, 20, ${(0.92 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 9.5 * (1.0 - burstProg));
-  ctx.beginPath();
-  ctx.arc(0, 0, needleR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Ring 2: Clean Straight Crimson Spiritual Blastwave Shock Ring
-  const blastR = r + Math.pow(burstProg, 0.72) * 260;
-  ctx.beginPath();
-  ctx.arc(0, 0, blastR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(220, 20, 20, ${(0.90 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.5, 7.0 * (1.0 - burstProg));
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, blastR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 60, 20, ${(0.95 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 3.0 * (1.0 - burstProg));
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, blastR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 255, 240, ${(0.98 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(0.8, 1.2 * (1.0 - burstProg));
-  ctx.stroke();
-
-  // Ring 3: Inner Void Implosion Shock Ring
-  const innerR = r + burstProg * 140;
-  ctx.strokeStyle = `rgba(10, 4, 15, ${(0.94 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 14.0 * (1.0 - burstProg));
-  ctx.beginPath();
-  ctx.arc(0, 0, innerR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // ── 2. Shattering Crystalline Reiatsu Diamond Shards ──
   if (fighter.bankaiShards && fighter.bankaiShards.length > 0) {
     for (let s = 0; s < fighter.bankaiShards.length; s++) {
       const shard = fighter.bankaiShards[s];
@@ -2306,170 +2134,11 @@ function _drawBankaiEruptionBurst(ctx, r, fighter, now) {
         ctx.save();
         ctx.translate(relX, relY);
         ctx.rotate(shard.rot || 0);
-
-        const sz = shard.size || 7.5;
-        // 4-point crystalline diamond shard polygon
-        ctx.beginPath();
-        ctx.moveTo(0, -sz * 1.4);
-        ctx.lineTo(sz * 0.65, 0);
-        ctx.lineTo(0, sz * 1.4);
-        ctx.lineTo(-sz * 0.65, 0);
-        ctx.closePath();
-
-        ctx.fillStyle = shard.color || '#111111';
-        ctx.globalAlpha = shardAlpha;
-        ctx.fill();
-
-        ctx.strokeStyle = (s % 2 === 0) 
-          ? `rgba(255, 255, 255, ${(0.95 * shardAlpha).toFixed(3)})` 
-          : `rgba(220, 20, 20, ${(0.92 * shardAlpha).toFixed(3)})`;
-        ctx.lineWidth = 1.2;
-        ctx.stroke();
-
+        _drawPixelDiamond(ctx, 0, 0, shard.size || 6.0, shard.color || '#ff1e38', '#ffffff', 2.0);
         ctx.restore();
       }
     }
   }
-
-  // ── 3. Swirling Shihakusho Cloth Streamers ──
-  if (fighter.bankaiClothStreamers && fighter.bankaiClothStreamers.length > 0) {
-    for (let c = 0; c < fighter.bankaiClothStreamers.length; c++) {
-      const st = fighter.bankaiClothStreamers[c];
-      const relX = st.x - fighter.x;
-      const relY = st.y - fighter.y;
-      const stAlpha = (st.life || 1.0) * alpha;
-
-      if (stAlpha > 0.02) {
-        ctx.save();
-        ctx.translate(relX, relY);
-        ctx.rotate(st.angle || 0);
-
-        const len = st.length || 20;
-        const wid = st.width || 3.5;
-
-        ctx.beginPath();
-        ctx.moveTo(-len * 0.5, 0);
-        ctx.quadraticCurveTo(0, Math.sin(now * 0.03 + c) * 6, len * 0.5, 0);
-        ctx.strokeStyle = (c % 3 === 0) ? `rgba(220, 20, 20, ${(0.80 * stAlpha).toFixed(3)})` : `rgba(12, 5, 14, ${(0.95 * stAlpha).toFixed(3)})`;
-        ctx.lineWidth = wid;
-        ctx.lineCap = 'round';
-        ctx.stroke();
-
-        ctx.restore();
-      }
-    }
-  }
-
-  // ── 4. Billowing Dark Ink-Smoke & Spirit Flame Clouds ──
-  const smokeCount = 8;
-  for (let sm = 0; sm < smokeCount; sm++) {
-    const smAngle = sm * (Math.PI * 2 / smokeCount) + 0.2;
-    const smDist = r * 0.8 + burstProg * 110;
-    const smX = Math.cos(smAngle) * smDist;
-    const smY = Math.sin(smAngle) * smDist;
-    const smR = (14 + (sm % 3) * 6) * (1.0 + burstProg * 0.9);
-
-    const smGrad = ctx.createRadialGradient(smX, smY, 0, smX, smY, smR);
-    smGrad.addColorStop(0.0, `rgba(12, 4, 10, ${(0.85 * alpha).toFixed(3)})`);
-    smGrad.addColorStop(0.55, `rgba(220, 20, 20, ${(0.45 * alpha).toFixed(3)})`);
-    smGrad.addColorStop(0.85, `rgba(255, 45, 20, ${(0.25 * alpha).toFixed(3)})`);
-    smGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = smGrad;
-    ctx.beginPath();
-    ctx.arc(smX, smY, smR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ── 5. Forward Supersonic Reiatsu Wind Pressure Blastwave Cone (Black-Crimson Red) ──
-  const aimAngle = fighter._bankaiBurstAngle !== undefined ? fighter._bankaiBurstAngle : (fighter.gunAngle || 0);
-  ctx.save();
-  ctx.rotate(aimAngle);
-
-  const windReach = r * 1.2 + burstProg * 320;
-  const halfArc = 0.70; // ~40° half angle (80° total focused core wind cone)
-  const windAlpha = Math.pow(1.0 - burstProg, 1.1) * alpha;
-
-  // Pass A: Forward Conical Black-Crimson Wind Pressure Gradient Fill
-  const coneGrad = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, windReach);
-  coneGrad.addColorStop(0.0, `rgba(12, 4, 10, ${(0.65 * windAlpha).toFixed(3)})`);
-  coneGrad.addColorStop(0.35, `rgba(220, 20, 20, ${(0.45 * windAlpha).toFixed(3)})`);
-  coneGrad.addColorStop(0.70, `rgba(255, 30, 0, ${(0.22 * windAlpha).toFixed(3)})`);
-  coneGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-  ctx.fillStyle = coneGrad;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.arc(0, 0, windReach, -halfArc, halfArc);
-  ctx.closePath();
-  ctx.fill();
-
-  // Pass B: Straight Black-Crimson Wind Pressure Shock Arcs
-  for (let w = 0; w < 3; w++) {
-    const waveR = windReach * (0.65 + w * 0.18);
-    
-    // Outer Crimson Glow Arc
-    ctx.beginPath();
-    ctx.arc(0, 0, waveR, -halfArc, halfArc);
-    ctx.strokeStyle = (w % 2 === 0) 
-      ? `rgba(220, 20, 20, ${(0.92 * windAlpha).toFixed(3)})` 
-      : `rgba(255, 30, 20, ${(0.95 * windAlpha).toFixed(3)})`;
-    ctx.lineWidth = Math.max(1.5, (6.0 - w * 1.5) * (1.0 - burstProg));
-    ctx.stroke();
-
-    // Dark Jet-Black Core Line
-    ctx.beginPath();
-    ctx.arc(0, 0, waveR, -halfArc, halfArc);
-    ctx.strokeStyle = `rgba(12, 4, 10, ${(0.90 * windAlpha).toFixed(3)})`;
-    ctx.lineWidth = Math.max(0.8, (2.5 - w * 0.7) * (1.0 - burstProg));
-    ctx.stroke();
-
-    // Hot Ruby-White Wavefront Accent
-    ctx.beginPath();
-    ctx.arc(0, 0, waveR, -halfArc, halfArc);
-    ctx.strokeStyle = `rgba(255, 240, 240, ${(0.98 * windAlpha).toFixed(3)})`;
-    ctx.lineWidth = Math.max(0.6, 1.0 * (1.0 - burstProg));
-    ctx.stroke();
-  }
-
-  // Pass C: Forward Supersonic Black-Crimson Wind Needles / Vapor Streaks
-  const needleCount = 12;
-  for (let n = 0; n < needleCount; n++) {
-    const norm = (n / (needleCount - 1)) * 2 - 1; // -1 to +1
-    const nAng = norm * (halfArc * 0.85);
-    const nDist = (r * 1.5) + burstProg * (260 + Math.abs(norm) * 70);
-    const nLen = (42 + (1 - Math.abs(norm)) * 55) * (1.0 - burstProg * 0.4);
-    const nThick = (2.4 + (1 - Math.abs(norm)) * 1.6) * (1.0 - burstProg * 0.5);
-
-    const cosN = Math.cos(nAng);
-    const sinN = Math.sin(nAng);
-    const perpX = -sinN;
-    const perpY = cosN;
-
-    const startX = cosN * (nDist - nLen / 2);
-    const startY = sinN * (nDist - nLen / 2);
-    const midX = cosN * (nDist);
-    const midY = sinN * (nDist);
-    const endX = cosN * (nDist + nLen / 2);
-    const endY = sinN * (nDist + nLen / 2);
-
-    let nColor;
-    if (n % 4 === 0) nColor = `rgba(12, 4, 10, ${(0.95 * windAlpha).toFixed(3)})`;      // Black void needle
-    else if (n % 4 === 1) nColor = `rgba(220, 20, 20, ${(0.92 * windAlpha).toFixed(3)})`; // Crimson Reiatsu
-    else if (n % 4 === 2) nColor = `rgba(255, 45, 20, ${(0.95 * windAlpha).toFixed(3)})`; // Fiery red
-    else nColor = `rgba(255, 245, 240, ${(0.98 * windAlpha).toFixed(3)})`;                 // Ruby-white core
-
-    ctx.fillStyle = nColor;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(midX + perpX * (nThick / 2), midY + perpY * (nThick / 2));
-    ctx.lineTo(endX, endY);
-    ctx.lineTo(midX - perpX * (nThick / 2), midY - perpY * (nThick / 2));
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.restore();
 
   ctx.restore();
 }
@@ -2649,235 +2318,44 @@ function _drawHollowEruptionBurst(ctx, r, fighter, now, formationProg = 0) {
 
   ctx.save();
 
-  // ── 0. Skyward Sonic Reiatsu Blast Pillar & Transonic Mach Vapor Discs ──
   _drawHollowSkywardSonicPillar(ctx, r, burstProg, alpha, now);
 
-  // ── 1. Concentric Expanding Shockwave Blast Rings (White-Black Lines) ──
-  // Ring 1: Fast Supersonic Needle Shockwave Ring
-  const needleR = r + burstProg * 380;
-  ctx.strokeStyle = `rgba(10, 10, 14, ${(0.92 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 8.5 * (1.0 - burstProg));
-  ctx.beginPath();
-  ctx.arc(0, 0, needleR, 0, Math.PI * 2);
-  ctx.stroke();
+  if (fighter.hollowShards && fighter.hollowShards.length > 0) {
+    for (let s = 0; s < fighter.hollowShards.length; s++) {
+      const shard = fighter.hollowShards[s];
+      const relX = shard.x - fighter.x;
+      const relY = shard.y - fighter.y;
+      const shardAlpha = (shard.life || 1.0) * alpha;
 
-  ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 4.0 * (1.0 - burstProg));
-  ctx.beginPath();
-  ctx.arc(0, 0, needleR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // Ring 2: Clean Straight Bone-White Spiritual Blastwave Shock Ring
-  const blastR = r + Math.pow(burstProg, 0.72) * 260;
-  ctx.beginPath();
-  ctx.arc(0, 0, blastR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(10, 10, 14, ${(0.90 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.5, 6.0 * (1.0 - burstProg));
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, blastR, 0, Math.PI * 2);
-  ctx.strokeStyle = `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 2.5 * (1.0 - burstProg));
-  ctx.stroke();
-
-  // Ring 3: Inner Void Implosion Shock Ring
-  const innerR = r + burstProg * 140;
-  ctx.strokeStyle = `rgba(5, 5, 8, ${(0.95 * alpha).toFixed(3)})`;
-  ctx.lineWidth = Math.max(1.0, 14.0 * (1.0 - burstProg));
-  ctx.beginPath();
-  ctx.arc(0, 0, innerR, 0, Math.PI * 2);
-  ctx.stroke();
-
-  // ── 2. Shattering Hollow Bone Crystalline Shards (White-Black Theme) ──
-  const shardCount = 16;
-  for (let s = 0; s < shardCount; s++) {
-    const sAng = (s / shardCount) * Math.PI * 2 + (s * 0.2);
-    const sDist = r + burstProg * (110 + (s % 3) * 40);
-    const sx = Math.cos(sAng) * sDist;
-    const sy = Math.sin(sAng) * sDist;
-    const sz = (5.5 + (s % 3) * 2.0) * (1.0 - burstProg * 0.4);
-
-    ctx.save();
-    ctx.translate(sx, sy);
-    ctx.rotate(sAng + burstProg * 2.5);
-
-    ctx.beginPath();
-    ctx.moveTo(0, -sz * 1.3);
-    ctx.lineTo(sz * 0.6, 0);
-    ctx.lineTo(0, sz * 1.3);
-    ctx.lineTo(-sz * 0.6, 0);
-    ctx.closePath();
-
-    ctx.fillStyle = (s % 2 === 0) ? '#FFFFFF' : '#111111';
-    ctx.globalAlpha = alpha;
-    ctx.fill();
-
-    ctx.strokeStyle = (s % 2 === 0) 
-      ? `rgba(10, 10, 14, ${(0.95 * alpha).toFixed(3)})` 
-      : `rgba(255, 255, 255, ${(0.98 * alpha).toFixed(3)})`;
-    ctx.lineWidth = 1.2;
-    ctx.stroke();
-
-    ctx.restore();
+      if (shardAlpha > 0.02) {
+        ctx.save();
+        ctx.translate(relX, relY);
+        ctx.rotate(shard.rot || 0);
+        _drawPixelDiamond(ctx, 0, 0, shard.size || 6.0, shard.color || '#ffffff', '#ffffff', 2.0);
+        ctx.restore();
+      }
+    }
   }
-
-  // ── 3. Billowing Dark Ink-Smoke & Spirit Flame Clouds (Monochrome Theme) ──
-  const smokeCount = 8;
-  for (let sm = 0; sm < smokeCount; sm++) {
-    const smAngle = sm * (Math.PI * 2 / smokeCount) + 0.2;
-    const smDist = r * 0.8 + burstProg * 110;
-    const smX = Math.cos(smAngle) * smDist;
-    const smY = Math.sin(smAngle) * smDist;
-    const smR = (14 + (sm % 3) * 6) * (1.0 + burstProg * 0.9);
-
-    const smGrad = ctx.createRadialGradient(smX, smY, 0, smX, smY, smR);
-    smGrad.addColorStop(0.0, `rgba(10, 10, 14, ${(0.85 * alpha).toFixed(3)})`);
-    smGrad.addColorStop(0.55, `rgba(40, 40, 50, ${(0.45 * alpha).toFixed(3)})`);
-    smGrad.addColorStop(0.85, `rgba(255, 255, 255, ${(0.22 * alpha).toFixed(3)})`);
-    smGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = smGrad;
-    ctx.beginPath();
-    ctx.arc(smX, smY, smR, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // ── 4. Forward Supersonic Hollow Wind Pressure Blastwave Cone (White-Black Lines) ──
-  const aimAngle = fighter.gunAngle || 0;
-  ctx.save();
-  ctx.rotate(aimAngle);
-
-  const windReach = r * 1.2 + burstProg * 320;
-  const halfArc = 0.70; // ~40° half angle (80° total focused core wind cone)
-  const windAlpha = Math.pow(1.0 - burstProg, 1.1) * alpha;
-
-  // Pass A: Forward Conical Black-White Wind Pressure Gradient Fill
-  const coneGrad = ctx.createRadialGradient(0, 0, r * 0.8, 0, 0, windReach);
-  coneGrad.addColorStop(0.0, `rgba(10, 10, 14, ${(0.65 * windAlpha).toFixed(3)})`);
-  coneGrad.addColorStop(0.35, `rgba(30, 30, 40, ${(0.45 * windAlpha).toFixed(3)})`);
-  coneGrad.addColorStop(0.70, `rgba(255, 255, 255, ${(0.22 * windAlpha).toFixed(3)})`);
-  coneGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-  ctx.fillStyle = coneGrad;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.arc(0, 0, windReach, -halfArc, halfArc);
-  ctx.closePath();
-  ctx.fill();
-
-  // Pass B: Straight White-Black Wind Pressure Shock Arcs
-  for (let w = 0; w < 3; w++) {
-    const waveR = windReach * (0.65 + w * 0.18);
-    
-    // Outer Pure White Glow Arc
-    ctx.beginPath();
-    ctx.arc(0, 0, waveR, -halfArc, halfArc);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${(0.95 * windAlpha).toFixed(3)})`;
-    ctx.lineWidth = Math.max(1.5, (5.5 - w * 1.4) * (1.0 - burstProg));
-    ctx.stroke();
-
-    // Dark Jet-Black Core Line
-    ctx.beginPath();
-    ctx.arc(0, 0, waveR, -halfArc, halfArc);
-    ctx.strokeStyle = `rgba(10, 10, 14, ${(0.92 * windAlpha).toFixed(3)})`;
-    ctx.lineWidth = Math.max(0.8, (2.2 - w * 0.6) * (1.0 - burstProg));
-    ctx.stroke();
-  }
-
-  // Pass C: Forward Supersonic White-Black Wind Needles
-  const needleCount = 12;
-  for (let n = 0; n < needleCount; n++) {
-    const norm = (n / (needleCount - 1)) * 2 - 1; // -1 to +1
-    const nAng = norm * (halfArc * 0.85);
-    const nDist = (r * 1.5) + burstProg * (260 + Math.abs(norm) * 70);
-    const nLen = (42 + (1 - Math.abs(norm)) * 55) * (1.0 - burstProg * 0.4);
-    const nThick = (2.4 + (1 - Math.abs(norm)) * 1.6) * (1.0 - burstProg * 0.5);
-
-    const cosN = Math.cos(nAng);
-    const sinN = Math.sin(nAng);
-    const perpX = -sinN;
-    const perpY = cosN;
-
-    const startX = cosN * (nDist - nLen / 2);
-    const startY = sinN * (nDist - nLen / 2);
-    const midX = cosN * (nDist);
-    const midY = sinN * (nDist);
-    const endX = cosN * (nDist + nLen / 2);
-    const endY = sinN * (nDist + nLen / 2);
-
-    let nColor;
-    if (n % 3 === 0) nColor = `rgba(10, 10, 14, ${(0.95 * windAlpha).toFixed(3)})`;       // Black void needle
-    else if (n % 3 === 1) nColor = `rgba(255, 255, 255, ${(0.98 * windAlpha).toFixed(3)})`; // Pure white needle
-    else nColor = `rgba(225, 235, 250, ${(0.95 * windAlpha).toFixed(3)})`;                  // Bone white needle
-
-    ctx.fillStyle = nColor;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(midX + perpX * (nThick / 2), midY + perpY * (nThick / 2));
-    ctx.lineTo(endX, endY);
-    ctx.lineTo(midX - perpX * (nThick / 2), midY - perpY * (nThick / 2));
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.restore();
 
   ctx.restore();
 }
 
 function _drawBankaiActiveFlameWisps(ctx, r, now) {
   ctx.save();
+  const msPerFrame = 1000 / 30;
+  const qTime = Math.floor(now / msPerFrame) * msPerFrame;
+  const time = qTime * 0.001;
+  const pSize = 2.0;
+
   const wispCount = 6;
   for (let w = 0; w < wispCount; w++) {
-    const wProg = ((now * 0.0028 + w * (1.0 / wispCount)) % 1.0);
-    const wAng = (w / wispCount) * Math.PI * 2 + Math.sin(now * 0.012 + w) * 0.30;
+    const wProg = ((time * 2.0 + w * (1.0 / wispCount)) % 1.0);
+    const wAng = (w / wispCount) * Math.PI * 2;
     const wDist = r * (0.85 + 0.40 * wProg);
     const wx = Math.cos(wAng) * wDist;
-    const wy = Math.sin(wAng) * wDist - wProg * 22; // rises upward
-    const wR = (3.8 + (w % 2) * 2.2) * (1.0 - wProg * 0.65);
-    const wAlpha = Math.sin(wProg * Math.PI) * 0.88;
+    const wy = Math.sin(wAng) * wDist - wProg * 22;
 
-    const wGrad = ctx.createRadialGradient(wx, wy, 0, wx, wy, wR * 1.6);
-    wGrad.addColorStop(0.0, `rgba(255, 255, 255, ${(0.98 * wAlpha).toFixed(3)})`);
-    wGrad.addColorStop(0.35, (w % 2 === 0) ? `rgba(255, 40, 30, ${(0.92 * wAlpha).toFixed(3)})` : `rgba(220, 20, 40, ${(0.92 * wAlpha).toFixed(3)})`);
-    wGrad.addColorStop(0.70, `rgba(15, 2, 8, ${(0.75 * wAlpha).toFixed(3)})`);
-    wGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-    ctx.fillStyle = wGrad;
-    ctx.beginPath();
-    ctx.arc(wx, wy, wR * 1.6, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // Floating Hot Core Particle Sparkles
-  const sparkCount = 2;
-  for (let s = 0; s < sparkCount; s++) {
-    const sProg = ((now * 0.003 + s * (1.0 / sparkCount)) % 1.0);
-    const sAng = (s * 2.2 + now * 0.004) % (Math.PI * 2);
-    const sDist = r * (0.95 + 0.35 * (1.0 - sProg * 0.4));
-    const sx = Math.cos(sAng) * sDist;
-    const sy = Math.sin(sAng) * sDist - sProg * 20;
-    const sR = (1.8 + (s % 2) * 0.8) * (1.0 - sProg * 0.3);
-    const sAlpha = Math.sin(sProg * Math.PI) * 0.90;
-
-    if (sAlpha > 0.02) {
-      const sGrad = ctx.createRadialGradient(sx, sy, 0, sx, sy, sR * 2.2);
-      sGrad.addColorStop(0.0, 'rgba(5, 5, 8, 1.0)');
-      sGrad.addColorStop(0.45, 'rgba(255, 40, 30, 0.95)');
-      sGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-
-      ctx.fillStyle = sGrad;
-      ctx.beginPath();
-      ctx.arc(sx, sy, sR * 2.2, 0, Math.PI * 2);
-      ctx.fill();
-
-      // High-contrast jet-black core
-      ctx.fillStyle = '#050508';
-      ctx.beginPath();
-      ctx.arc(sx, sy, sR * 0.6, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    _drawPixelDiamond(ctx, wx, wy, 3.5, (w % 2 === 0) ? '#ff2838' : '#dc143c', '#ffffff', pSize);
   }
 
   ctx.restore();
@@ -3100,9 +2578,64 @@ export function getZangetsuPommelWorldPos(fighter, isBankai = false) {
   return { x: worldX, y: worldY };
 }
 
+function _drawPixelRibbonStrand(ctx, strand, cfg, pSize = 2.0) {
+  if (!strand || strand.length < 2) return;
+  const outlineMap = new Map();
+  const fillMap = new Map();
+
+  const widthBlocks = Math.max(1, Math.round(cfg.width / pSize));
+  const halfW = widthBlocks / 2.0;
+
+  for (let s = 0; s < strand.length - 1; s++) {
+    const x0 = strand[s].x, y0 = strand[s].y;
+    const x1 = strand[s + 1].x, y1 = strand[s + 1].y;
+    const dx = x1 - x0, dy = y1 - y0;
+    const dist = Math.hypot(dx, dy);
+    const steps = Math.max(1, Math.ceil(dist / (pSize * 0.5)));
+    const ux = dx / Math.max(1e-4, dist);
+    const uy = dy / Math.max(1e-4, dist);
+    const nx = -uy;
+    const ny = ux;
+
+    for (let step = 0; step <= steps; step++) {
+      const t = step / steps;
+      const cx = x0 + dx * t;
+      const cy = y0 + dy * t;
+      const gx = Math.round(cx / pSize) * pSize;
+      const gy = Math.round(cy / pSize) * pSize;
+
+      for (let w = -Math.ceil(halfW) - 1; w <= Math.ceil(halfW) + 1; w++) {
+        const bx = Math.round((gx + nx * w * pSize) / pSize) * pSize;
+        const by = Math.round((gy + ny * w * pSize) / pSize) * pSize;
+        const key = `${bx}_${by}`;
+
+        if (Math.abs(w) <= halfW) {
+          fillMap.set(key, [bx, by]);
+        } else {
+          outlineMap.set(key, [bx, by]);
+        }
+      }
+    }
+  }
+
+  // Pass 1: Crisp outer black pixel outline blocks
+  ctx.fillStyle = '#0f172a';
+  for (const [key, pos] of outlineMap) {
+    if (!fillMap.has(key)) {
+      ctx.fillRect(pos[0], pos[1], pSize, pSize);
+    }
+  }
+
+  // Pass 2: Inner core color pixel blocks
+  ctx.fillStyle = cfg.color;
+  for (const [key, pos] of fillMap) {
+    ctx.fillRect(pos[0], pos[1], pSize, pSize);
+  }
+}
+
 const _ZANGETSU_STRAND_CONFIGS = [
   {
-    // Strand 0: Longest primary flowing sash (trails gracefully behind, high physical inertia)
+    // Strand 0: Longest primary flowing sash
     nodes: 14,
     linkDist: 5.5,
     damping: 0.94,
@@ -3111,12 +2644,12 @@ const _ZANGETSU_STRAND_CONFIGS = [
     flutterAmp: 0.8,
     flutterPhase: 0.0,
     lateralDrift: 0.8,
-    width: 3.8,
-    color: '#FFFFFF',
+    width: 4.0,
+    color: '#ffffff',
     rootOffset: 0.0
   },
   {
-    // Strand 1: Medium secondary ribbon (fluttering alongside with air turbulence)
+    // Strand 1: Medium secondary ribbon
     nodes: 10,
     linkDist: 4.8,
     damping: 0.93,
@@ -3125,12 +2658,12 @@ const _ZANGETSU_STRAND_CONFIGS = [
     flutterAmp: 0.6,
     flutterPhase: 2.1,
     lateralDrift: -0.8,
-    width: 2.8,
-    color: '#F4F4F4',
+    width: 3.0,
+    color: '#e2e8f0',
     rootOffset: 2.0
   },
   {
-    // Strand 2: Shorter loose wrap tail (rippling with micro-curls and high frequency)
+    // Strand 2: Shorter loose wrap tail
     nodes: 7,
     linkDist: 4.2,
     damping: 0.92,
@@ -3140,7 +2673,7 @@ const _ZANGETSU_STRAND_CONFIGS = [
     flutterPhase: 4.5,
     lateralDrift: 0.8,
     width: 2.2,
-    color: '#E8E8E8',
+    color: '#cbd5e1',
     rootOffset: -2.0
   }
 ];

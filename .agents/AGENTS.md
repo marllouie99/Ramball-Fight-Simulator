@@ -453,3 +453,67 @@ To eliminate scattered, ad-hoc angle calculations and prevent stealth/submerged 
     (or `node scripts/verifyCodebase.js`).
   - The script scans all 240+ project files in under 2 seconds, checking syntax validity and ensuring 0 duplicate declarations exist across the entire repository.
 
+## 25. Pixel Art Visual Style Standards (Weapons & Skill VFX)
+
+### 1. Aesthetic Philosophy & Fine Pixel Grid Engine
+- All weapon graphics, firearms, melee weapons, and skill visual effects (VFX) adhere to an authentic, high-density **Pixel Art Aesthetic** (inspired by classic arcade masterworks like *Street Fighter 3, Metal Slug, Katana Zero, Enter the Gungeon*).
+- **Prohibition of Giant Boxy Minecraft Blocks**: Weapons and effects MUST NOT be constructed out of oversized, clunky 8x8 squares or floating disconnected wireframe lines.
+- **Fine Pixel Density**: Rendering uses high-precision pixel block scaling ($P \approx 1.0 \times s$) to achieve sharp, high-resolution pixel art silhouettes (~150x60 grid resolution).
+
+### 2. 5-Tone Volumetric Shading Ramps & Surface Texturing
+- **Multi-Tone Palette Ramps**: Every structural component MUST employ a 4–5 tone volumetric shading ramp:
+  - `whiteShine` / `metalGlint`: Pure white `#ffffff` or light-tint specular highlights and diagonal glint cuts (`///`).
+  - `whiteLight` / `metalLight`: Primary surface color.
+  - `whiteMid` / `metalMid`: Midtone bevels and cylindrical edge transitions.
+  - `whiteDark` / `metalDark`: Deep structural shadow panels.
+  - `whiteDeep` / `metalBlack`: Deepest crease lines and recessed chassis slots.
+- **Micro-Pixel Texturing (Carbon-Fiber / Honeycomb Mesh)**:
+  - Textured grip panels, cheek pads, and handguards must use micro-pixel dithered patterns (`pxMesh`) with alternating weave highlight dots (`#2f374a`, `#45506b` on `#1b1f2b`).
+- **Flush Glowing Energy Nodes & Conduits**:
+  - Power cells, ammo count nodes, and circuit traces must be cleanly embedded flush within the chassis/barrel using 3-tone glowing ramps (white-hot core `#ffffff` $\rightarrow$ neon gold/crimson `#ffe033` $\rightarrow$ deep trench `#d9480f`).
+
+### 3. Skill Visual Effects (VFX) Pixel Art Standards
+- **Stepped Pixel Atmosphere & Cones**:
+  - Supersonic shockwaves, energy blasts, and pressure cones (such as Saitama's Frontal Attack) MUST be rendered using **stepped concentric pixel bands and rows** rather than smooth Gaussian blur radial gradients.
+- **Stepped Air Needles & Beam Fissures**:
+  - Supersonic speed streaks and air displacement needles MUST be drawn as razor-sharp **4-point stepped pixel polygons** with white leading tip blocks.
+  - Centerline shockwave fissures MUST be drawn as crisp, high-contrast segmented white pixel beams with glowing outer pixel fringes.
+- **Concentric Pixel Diamond Shockwaves**:
+  - Expanding shockwave ripples along blast corridors MUST use concentric **4-point and 8-point stepped pixel diamonds** with white center glints.
+- **Preservation of Gameplay Mechanics**:
+  - Pixel art transformations MUST NEVER alter the underlying gameplay logic, animation durations, collision hitboxes, reach distances, cone angles, or dynamic combat feedback (recoil kickback, reload drops, laser sight tracking, and ammo LED counters).
+
+## 26. Canvas 2D Transform Stack Integrity & `ctx.save()` / `ctx.restore()` Balance Standard
+
+### Overview & Regression Prevention
+An unbalanced Canvas 2D state stack (calling `ctx.save()` more times than `ctx.restore()` or failing to restore before an early `return`) leaves unpopped translations, scales, rotations, and clip paths active on the global context. This causes severe rendering bugs: **doubled/ghost UI overlays, displaced menus, skewed fighter positions, and cascading scale corruption**.
+
+### Mandatory Rules for All Rendering Functions:
+1. **Strict 1:1 Save/Restore Balance**:
+   - In ANY rendering function (weapon graphics, fighter skins, skill VFX, projectiles, UI screens, or modals), every `ctx.save()` MUST be matched by exactly one `ctx.restore()`.
+2. **Early Return Guard Pattern**:
+   - When branching inside a render function (e.g. modular PNG image path vs procedural fallback path), **ALWAYS** ensure all active `ctx.save()` calls are fully restored before any `return` statement:
+     ```javascript
+     export function drawWeapon(ctx, x, y, r, ...) {
+       ctx.save();
+       ctx.translate(x, y);
+
+       if (hasModularImage) {
+         ctx.save();
+         ctx.drawImage(...);
+         ctx.restore(); // Pop inner image save
+
+         ctx.restore(); // MANDATORY: Pop outer weapon save before returning!
+         return;
+       }
+
+       // Procedural fallback path
+       ...
+       ctx.restore(); // MANDATORY: Pop outer weapon save at function exit!
+     }
+     ```
+3. **Automated Continuous Verification**:
+   - `npm run verify` (`scripts/verifyCodebase.js` $\rightarrow$ `scripts/testAllFighters.mjs`) automatically executes a mock Canvas stack inspector across all 43+ fighters, weapon graphics, and UI screens to verify that stack depth returns to strictly `0` after every render call.
+
+
+

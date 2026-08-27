@@ -618,7 +618,7 @@ function drawFighterSelectModal() {
 
   // Live Weapon Graphic Stage
   const mStageX = barX + barW / 2;
-  const mStageY = mWeaponBoxY + 66;
+  const mStageY = mWeaponBoxY + 58;
 
   ctx.save();
   ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';

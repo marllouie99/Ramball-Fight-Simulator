@@ -176,8 +176,13 @@ export function drawGojoWeapon(ctx, fighter) {
             const attackFlashValue = attackFlash > 0 ? attackFlash : 0;
             const effectiveRadius = handRadius * Math.sqrt(transition) * chargeScale;
             
-            // Draw Lapse Blue Orb
-            drawLapseBlueOrb(ctx, currentDist, 0, effectiveRadius, Date.now(), attackFlashValue * transition);
+            // Draw Lapse Blue Orb with firing launch spin
+            ctx.save();
+            ctx.translate(currentDist, 0);
+            const shootSpin = (fighter.shootCooldown > 0) ? (Date.now() * 0.02) : 0;
+            ctx.rotate(shootSpin);
+            drawLapseBlueOrb(ctx, 0, 0, effectiveRadius, Date.now(), attackFlashValue * transition);
+            ctx.restore();
 
             // Draw preparing suction rings / spatial distortion wisps while charging
             if (chargeRings) {
@@ -214,209 +219,130 @@ export function drawLapseBlueOrb(ctx, x, y, r, time, attackFlash = 0) {
 }
 
 /**
- * Draws an advanced, highly detailed Gojo orb (Blue, Red, or Purple).
+ * Draws an authentic, radiant Anime Pixel Art Gojo orb (Blue, Red, or Purple) matching Image 2.
  */
 export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash = 0) {
-    // Performance check for low-quality mode
-    const isLowQuality = (typeof state !== 'undefined' && 
-                          (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)) &&
-                          state.gameState !== 'matchEnd' && state.gameState !== 'roundEnd');
-
-    // Quantize time to 30 FPS to give the animation a stepped, stylized anime feel
+    // Quantize time to 30 FPS for stepped retro anime feel
     const msPerFrame = 1000 / 30;
     time = Math.floor(time / msPerFrame) * msPerFrame;
 
     ctx.save();
     ctx.translate(x, y);
 
-    const pulse = Math.sin(time / 150) * 0.1;
-    const baseR = r * (1 + pulse) + attackFlash * 0.5;
+    const pulse = Math.sin(time / 130) * 0.08;
+    const baseR = r * 1.50 * (1 + pulse) + attackFlash * 0.5;
+    const px = Math.max(1.8, Math.min(4.5, baseR / 8.5)); // Snapped pixel unit
 
-    let aura0, aura1, aura2;
-    let ring1, ring2;
-    let spark;
-    let coreBase;
-    let plasma1, plasma2;
-    let overlay;
+    let cDeep, cSaturated, cBright, cTint, cWhite, cAura;
 
     if (colorType === 'red') {
-        aura0 = [255, 30, 30];
-        aura1 = [200, 10, 10];
-        aura2 = [100, 0, 0];
-        ring1 = [255, 50, 50];
-        ring2 = [255, 100, 100];
-        spark = [255, 150, 150];
-        coreBase = 'rgba(20, 0, 0, 1)'; // Nearly pitch black red for high contrast
-        plasma1 = [255, 100, 100];
-        plasma2 = [255, 200, 200];
-        overlay = [255, 150, 150];
+        cDeep       = '#3b0008'; // Deep burgundy rim
+        cSaturated  = '#e60026'; // Rich crimson body
+        cBright     = '#ff3860'; // Vibrant scarlet plasma
+        cTint       = '#ffc2cc'; // Soft peach-pink tint
+        cWhite      = '#ffffff'; // White-hot core
+        cAura       = 'rgba(255, 30, 60, 0.28)';
     } else if (colorType === 'purple') {
-        aura0 = [180, 0, 255];
-        aura1 = [130, 0, 240];
-        aura2 = [60, 0, 140];
-        ring1 = [200, 80, 255];
-        ring2 = [220, 140, 255];
-        spark = [240, 180, 255];
-        coreBase = 'rgba(15, 0, 30, 0.40)'; // Semi-transparent void core so trapped enemies remain visible inside!
-        plasma1 = [210, 120, 255];
-        plasma2 = [255, 220, 255];
-        overlay = [225, 170, 255];
+        cDeep       = '#20003b'; // Deep void violet rim
+        cSaturated  = '#8d00e6'; // Rich electric purple body
+        cBright     = '#d438ff'; // Vibrant magenta plasma
+        cTint       = '#f3c4ff'; // Soft lavender tint
+        cWhite      = '#ffffff'; // White-hot core
+        cAura       = 'rgba(180, 40, 255, 0.28)';
     } else { // blue
-        aura0 = [0, 100, 255];
-        aura1 = [0, 50, 255];
-        aura2 = [0, 20, 200];
-        ring1 = [20, 100, 255];
-        ring2 = [100, 150, 255];
-        spark = [100, 200, 255];
-        coreBase = 'rgba(0, 10, 40, 0.40)'; // Semi-transparent blue core so sucked enemies remain visible!
-        plasma1 = [100, 180, 255];
-        plasma2 = [255, 255, 255];
-        overlay = [150, 220, 255];
+        cDeep       = '#00143b'; // Deep navy rim
+        cSaturated  = '#0059e6'; // Rich electric blue body
+        cBright     = '#00c8ff'; // Vibrant cyan plasma
+        cTint       = '#b3f0ff'; // Soft cyan tint
+        cWhite      = '#ffffff'; // White-hot core
+        cAura       = 'rgba(0, 180, 255, 0.28)';
     }
 
-    // 1. Massive Aura
-    const auraOpacity = 0.8 + attackFlash * 0.2;
-    if (isLowQuality) {
-        ctx.fillStyle = `rgba(${aura1.join(',')}, ${auraOpacity * 0.35})`;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 4.5, 0, Math.PI * 2);
-        ctx.fill();
-    } else {
-        const glow = ctx.createRadialGradient(0, 0, baseR * 0.2, 0, 0, baseR * 6);
-        glow.addColorStop(0, `rgba(${aura0.join(',')}, ${auraOpacity})`);
-        glow.addColorStop(0.2, `rgba(${aura1.join(',')}, ${auraOpacity * 0.75})`);
-        glow.addColorStop(0.5, `rgba(${aura2.join(',')}, ${auraOpacity * 0.25})`);
-        glow.addColorStop(1, `rgba(${aura2.join(',')}, 0)`);
-        ctx.fillStyle = glow;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 6, 0, Math.PI * 2);
-        ctx.fill();
+    // ── 1. Stepped Atmosphere Pixel Halo (Radiant Outer Glow) ──
+    const auraR = baseR * 1.35;
+    ctx.fillStyle = cAura;
+    for (let a = 0; a < 360; a += 2.0) {
+        const rad = (a * Math.PI) / 180;
+        const bx = Math.round((Math.cos(rad) * auraR) / px) * px;
+        const by = Math.round((Math.sin(rad) * auraR) / px) * px;
+        ctx.fillRect(bx, by, px, px);
     }
 
-    // 2. Soft, cloudy aura rings
-    ctx.save();
-    ctx.lineCap = 'round';
-    const ringCount = isLowQuality ? 2 : 4;
-    for (let i = 0; i < ringCount; i++) {
-        ctx.rotate(time / (200 + i * 50));
-        const ringR = baseR * (1.5 + i * 0.6);
-        ctx.beginPath();
-        ctx.arc(0, 0, ringR, 0, Math.PI * (1.5 + i * 0.1));
-        
-        ctx.lineWidth = Math.max(0.75, baseR * (0.35 - i * 0.05));
-        ctx.strokeStyle = `rgba(${ring1.join(',')}, ${0.4 - i * 0.08})`;
-        ctx.stroke();
-        
-        ctx.lineWidth = Math.max(0.5, baseR * (0.18 - i * 0.02));
-        ctx.strokeStyle = `rgba(${ring2.join(',')}, ${0.2 - i * 0.04})`;
-        ctx.stroke();
+    // ── 2. Stepped Circular Perimeter Outline (Deep High-Contrast Edge) ──
+    ctx.fillStyle = cDeep;
+    for (let a = 0; a < 360; a += 0.8) {
+        const rad = (a * Math.PI) / 180;
+        const bx = Math.round((Math.cos(rad) * baseR) / px) * px;
+        const by = Math.round((Math.sin(rad) * baseR) / px) * px;
+        ctx.fillRect(bx, by, px, px);
     }
-    ctx.restore();
 
-    // 3. Small particle sparks
-    ctx.save();
-    const sparkCount = isLowQuality ? 4 : 15;
-    for (let i = 0; i < sparkCount; i++) {
-        const seed = i * 1337.7331;
-        const angle = time / (80 + (seed % 100)) + seed;
-        const dist = baseR * (1.2 + (seed % 10) / 5);
-        
-        const px = Math.cos(angle) * dist;
-        const py = Math.sin(angle) * dist;
-        const sparkR = baseR * (0.05 + (seed % 5) / 20);
-        
-        ctx.beginPath();
-        ctx.arc(px, py, sparkR * 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${spark.join(',')}, 0.4)`;
-        ctx.fill();
-        
-        ctx.beginPath();
-        ctx.arc(px, py, sparkR, 0, Math.PI * 2);
-        ctx.fillStyle = '#FFFFFF';
-        ctx.fill();
-    }
-    ctx.restore();
+    // ── 3. Multi-Tier Radiant Concentric Plasma Matrix ──
+    const maxGrid = Math.ceil(baseR / px) * px;
+    for (let gy = -maxGrid; gy <= maxGrid; gy += px) {
+        for (let gx = -maxGrid; gx <= maxGrid; gx += px) {
+            const dist = Math.sqrt(gx * gx + gy * gy);
+            if (dist < baseR - px * 0.5) {
+                const ratio = dist / baseR; // 0 (center) to 1 (edge)
 
-    // 4. Boiling Plasma Core Texture (5 loops with clipping for sharp high-detail containment)
-    ctx.beginPath();
-    ctx.arc(0, 0, baseR * 1.4, 0, Math.PI * 2);
-    ctx.fillStyle = coreBase;
-    ctx.fill();
-
-    if (!isLowQuality) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 1.4, 0, Math.PI * 2);
-        ctx.clip();
-        
-        ctx.globalCompositeOperation = 'lighter';
-        
-        for (let i = 0; i < 5; i++) {
-            const seed = i * 999.99;
-            
-            const angle = time / (200 + (seed % 100)) + seed;
-            const dist = baseR * ((seed % 10) / 7); 
-            
-            const px = Math.cos(angle) * dist;
-            const py = Math.sin(angle) * dist;
-            
-            const blobR = baseR * (0.4 + (seed % 5) / 10 + Math.sin(time / 150 + seed) * 0.2);
-            
-            const blobGlow = ctx.createRadialGradient(px, py, 0, px, py, blobR);
-            blobGlow.addColorStop(0, `rgba(${plasma2.join(',')}, ${0.5 + (seed % 4) / 10})`);
-            blobGlow.addColorStop(0.4, `rgba(${plasma1.join(',')}, ${0.3 + (seed % 4) / 10})`);
-            blobGlow.addColorStop(1, `rgba(${plasma1.join(',')}, 0)`);
-            
-            ctx.beginPath();
-            ctx.arc(px, py, blobR, 0, Math.PI * 2);
-            ctx.fillStyle = blobGlow;
-            ctx.fill();
+                // Multi-tiered radiant color zones
+                if (ratio < 0.38) {
+                    ctx.fillStyle = cWhite; // Blazing white-hot sun core
+                } else if (ratio < 0.56) {
+                    ctx.fillStyle = cTint;  // High-luminosity glowing transition
+                } else if (ratio < 0.76) {
+                    ctx.fillStyle = cBright; // Saturated electric plasma
+                } else {
+                    ctx.fillStyle = cSaturated; // Rich deep energy rim
+                }
+                ctx.fillRect(Math.round(gx), Math.round(gy), px, px);
+            }
         }
-        ctx.restore();
     }
-    
-    // Overlay a final soft white glow
-    if (isLowQuality) {
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 1.3, 0, Math.PI * 2);
-        ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
-        ctx.fill();
-        ctx.stroke();
-    } else {
-        const centerGlow = ctx.createRadialGradient(0, 0, 0, 0, 0, baseR * 1.6);
-        centerGlow.addColorStop(0, 'rgba(255, 255, 255, 1.0)'); 
-        centerGlow.addColorStop(0.4, 'rgba(255, 255, 255, 0.85)'); // Extended white core for higher contrast and pop at small scale
-        centerGlow.addColorStop(0.65, `rgba(${overlay.join(',')}, 0.35)`); 
-        centerGlow.addColorStop(1, `rgba(${aura0.join(',')}, 0)`);
-        
-        ctx.fillStyle = centerGlow;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 1.6, 0, Math.PI * 2);
-        ctx.lineWidth = Math.max(1.0, baseR * 0.22); // Dynamic line width instead of hardcoded 3px
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)'; // Brighter stroke outline
-        ctx.fill();
-        ctx.stroke();
+
+    // ── 4. Dynamic Swirling Pixel Spiral Vortex Arms (2 Inward Swirls) ──
+    const swirlSpeed = time * 0.006;
+    for (let arm = 0; arm < 2; arm++) {
+        const baseAngle = swirlSpeed + arm * Math.PI;
+        for (let step = 0; step < 16; step++) {
+            const progress = step / 16;
+            const swirlR = (baseR * 0.25) + progress * (baseR * 0.60);
+            const swirlAngle = baseAngle + progress * 2.2;
+            const sx = Math.round((Math.cos(swirlAngle) * swirlR) / px) * px;
+            const sy = Math.round((Math.sin(swirlAngle) * swirlR) / px) * px;
+
+            ctx.fillStyle = progress < 0.5 ? cWhite : cTint;
+            ctx.fillRect(sx, sy, px, px);
+        }
     }
-    
-    // Final Bloom Shine Effect (Fast, no shadowBlur)
-    if (isLowQuality) {
-        ctx.fillStyle = `rgba(${overlay.join(',')}, 0.18)`;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 2.2, 0, Math.PI * 2);
-        ctx.fill();
-    } else {
-        ctx.globalCompositeOperation = 'lighter';
-        const bloom = ctx.createRadialGradient(0, 0, baseR * 0.5, 0, 0, baseR * 3.5);
-        bloom.addColorStop(0, `rgba(${overlay.join(',')}, 0.6)`);
-        bloom.addColorStop(0.4, `rgba(${aura1.join(',')}, 0.25)`);
-        bloom.addColorStop(1, 'rgba(0, 0, 0, 0)');
-        
-        ctx.fillStyle = bloom;
-        ctx.beginPath();
-        ctx.arc(0, 0, baseR * 3.5, 0, Math.PI * 2);
-        ctx.fill();
+
+    // ── 5. Instantaneous Stroboscopic Anime Lightning Discharges ──
+    // Discrete frame changes every 50ms for authentic electrical snap & crackle
+    const flashFrame = Math.floor(time / 50);
+    for (let b = 0; b < 6; b++) {
+        const hash = Math.sin(flashFrame * 127.1 + b * 311.7) * 43758.5453;
+        const rand = hash - Math.floor(hash);
+
+        // Stroboscopic flicker: bolts flash unpredictably on discrete frames
+        if (rand > 0.38) {
+            const boltAngle = (b / 6) * Math.PI * 2 + (rand - 0.5) * 0.9;
+            const startDist = baseR * 0.85;
+
+            let lx = Math.round((Math.cos(boltAngle) * startDist) / px) * px;
+            let ly = Math.round((Math.sin(boltAngle) * startDist) / px) * px;
+
+            // Sharp stepped lightning steps (sharp 45°/90° discrete pixel kinks)
+            const steps = 3 + Math.floor(rand * 3);
+            for (let s = 0; s < steps; s++) {
+                const segP = s / steps;
+                ctx.fillStyle = segP < 0.4 ? cWhite : (segP < 0.75 ? cTint : cBright);
+                ctx.fillRect(lx, ly, px, px);
+
+                const kink = (Math.sin(flashFrame * 7.3 + b * 13.1 + s * 17.7) > 0 ? 1 : -1) * px;
+                lx += Math.round((Math.cos(boltAngle) * px * 1.5 + (-Math.sin(boltAngle) * kink)) / px) * px;
+                ly += Math.round((Math.sin(boltAngle) * px * 1.5 + (Math.cos(boltAngle) * kink)) / px) * px;
+            }
+        }
     }
 
     ctx.restore();
@@ -424,139 +350,57 @@ export function drawGojoOrb(ctx, x, y, r, time, colorType = 'blue', attackFlash 
 
 
 /**
- * Draws the Hollow Purple trail effect for Gojo's ultimate - swirling vortex with red/blue/purple particles
- * @param {Object} ctx - Canvas context
- * @param {Object} p - Projectile object with x, y, history
- * @param {number} time - Current time in ms
+ * Draws the Hollow Purple trail effect for Gojo's ultimate - stepped pixel art trail with particles
  */
 export function drawPurpleOrbTrail(ctx, p, time) {
-    // Only draw trail if we have history
     if (!p.history || p.history.length < 2) {
         return;
     }
     
-    // Quantize time to 30 FPS to give the animation a stepped, stylized anime feel
+    // Quantize time to 30 FPS for stepped retro anime feel
     const msPerFrame = 1000 / 30;
     time = Math.floor(time / msPerFrame) * msPerFrame;
     
-    // Performance: check if we should run in optimized low-quality mode (e.g. FPS < 52 or performance mode active)
-    const isLowQuality = (typeof state !== 'undefined' && 
-                          (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5) || (state.fps && state.fps < 45)) &&
-                          state.gameState !== 'matchEnd' && state.gameState !== 'roundEnd');
-    
     ctx.save();
-    ctx.globalCompositeOperation = 'lighter';
+    const px = 3.0; // Snapped pixel unit
     
-    // Draw trail as a glowing line with particles
+    // Draw stepped pixel trail segments
     for (let i = 1; i < p.history.length; i++) {
-        // Optimize: Draw only alternate trail segments in low quality mode to save CPU draw calls
-        if (isLowQuality && i % 2 === 0) continue;
-        
         const prev = p.history[i - 1];
         const curr = p.history[i];
         
-        // Calculate trail segment properties
         const dx = curr.x - prev.x;
         const dy = curr.y - prev.y;
-        const distance = Math.hypot(dx, dy);
-        const angle = Math.atan2(dy, dx);
+        const dist = Math.hypot(dx, dy);
+        const steps = Math.max(1, Math.floor(dist / px));
+        const trailAlpha = 0.3 + (i / p.history.length) * 0.7;
         
-        // Trail opacity based on position in history (older = more transparent)
-        const trailAlpha = 0.5 + (i / p.history.length) * 0.5; // Much brighter trail
-        
-        // Draw main trail line with glow
-        ctx.beginPath();
-        ctx.moveTo(prev.x, prev.y);
-        ctx.lineTo(curr.x, curr.y);
-        ctx.strokeStyle = `rgba(180, 50, 255, ${trailAlpha})`;
-        ctx.lineWidth = 12 + (i / p.history.length) * 18; // Much thicker trail
-        ctx.lineCap = 'round';
-        ctx.stroke();
-        
-        // Inner bright line
-        ctx.beginPath();
-        ctx.moveTo(prev.x, prev.y);
-        ctx.lineTo(curr.x, curr.y);
-        ctx.strokeStyle = `rgba(255, 220, 255, ${trailAlpha})`;
-        ctx.lineWidth = 5;
-        ctx.stroke();
-        
-        // Draw swirling particles along the trail
-        // OPTIMIZATION: Only draw particles on every 4th segment in low quality (every 3rd in high quality)
-        const modCheck = isLowQuality ? 4 : 3;
-        if (i % modCheck === 0) {
-            const particleCount = isLowQuality ? 1 : (2 + Math.floor(distance / 25));
-            for (let j = 0; j < particleCount; j++) {
-                const t = j / particleCount;
-                const px = prev.x + dx * t;
-                const py = prev.y + dy * t;
-                
-                // Swirl offset
-                const swirl = Math.sin(time * 0.003 + i * 0.5 + j) * 15;
-                const px2 = px + Math.cos(angle + Math.PI/2) * swirl;
-                const py2 = py + Math.sin(angle + Math.PI/2) * swirl;
-                
-                if (isLowQuality) {
-                    // Single flat fill particle to avoid concentric fills
-                    ctx.beginPath();
-                    ctx.arc(px2, py2, 7, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(220, 180, 255, ${trailAlpha * 0.8})`;
-                    ctx.fill();
-                } else {
-                    // Outer glow
-                    ctx.beginPath();
-                    ctx.arc(px2, py2, 12, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(180, 50, 255, ${trailAlpha * 0.7})`;
-                    ctx.fill();
-                    
-                    // Inner bright particle
-                    ctx.beginPath();
-                    ctx.arc(px2, py2, 6, 0, Math.PI * 2);
-                    ctx.fillStyle = `rgba(255, 220, 255, ${trailAlpha})`;
-                    ctx.fill();
-                }
-            }
+        // Stepped trail blocks
+        for (let s = 0; s <= steps; s++) {
+            const t = s / steps;
+            const sx = Math.round((prev.x + dx * t) / px) * px;
+            const sy = Math.round((prev.y + dy * t) / px) * px;
+            
+            // Outer purple pixel block
+            ctx.fillStyle = `rgba(180, 40, 255, ${(trailAlpha * 0.7).toFixed(2)})`;
+            ctx.fillRect(sx - px * 1.5, sy - px * 1.5, px * 3, px * 3);
+            
+            // Inner white-hot pixel core
+            ctx.fillStyle = `rgba(255, 255, 255, ${(trailAlpha * 0.9).toFixed(2)})`;
+            ctx.fillRect(sx - px * 0.5, sy - px * 0.5, px, px);
         }
-    }
-    
-    // Add a central vortex effect at the orb's current position
-    const centerX = p.x;
-    const centerY = p.y;
-    
-    // Draw swirling vortex rings
-    const vortexRadius = 20 + Math.sin(time * 0.003) * 5;
-    const vortexCount = isLowQuality ? 3 : 8; // Fewer rings in low quality mode
-    
-    for (let i = 0; i < vortexCount; i++) {
-        const baseAngle = (i / vortexCount) * Math.PI * 2 + time * 0.002;
-        const radius = vortexRadius * (0.6 + Math.sin(time * 0.005 + i * 0.5) * 0.4);
         
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, baseAngle, baseAngle + Math.PI * 0.5);
-        ctx.strokeStyle = `rgba(220, 100, 255, 0.8)`;
-        ctx.lineWidth = isLowQuality ? 2.5 : 4;
-        ctx.stroke();
-    }
-    
-    // Add a final purple glow at the end of the trail
-    const glowRadius = 40 + Math.sin(time * 0.002) * 10;
-    
-    if (isLowQuality) {
-        // Fast flat fill to avoid CPU-intensive radial gradient generation
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(180, 50, 255, ${0.25 + Math.sin(time * 0.002) * 0.05})`;
-        ctx.fill();
-    } else {
-        const trailGlow = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, glowRadius);
-        trailGlow.addColorStop(0, 'rgba(255, 180, 255, 0.8)');
-        trailGlow.addColorStop(0.5, 'rgba(200, 100, 255, 0.5)');
-        trailGlow.addColorStop(1, 'rgba(150, 0, 255, 0)');
-        
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, glowRadius, 0, Math.PI * 2);
-        ctx.fillStyle = trailGlow;
-        ctx.fill();
+        // Trailing stepped diamond sparkles (every 2nd history node)
+        if (i % 2 === 0) {
+            const sAngle = (i * 1.3) + time * 0.005;
+            const offset = (Math.sin(sAngle) * 12);
+            const sx = Math.round((curr.x + Math.cos(sAngle) * offset) / px) * px;
+            const sy = Math.round((curr.y + Math.sin(sAngle) * offset) / px) * px;
+            
+            ctx.fillStyle = i % 4 === 0 ? '#FFFFFF' : '#df66ff';
+            ctx.fillRect(sx - px, sy, px * 3, px);
+            ctx.fillRect(sx, sy - px, px, px * 3);
+        }
     }
     
     ctx.restore();

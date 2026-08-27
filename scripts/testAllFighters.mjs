@@ -1,12 +1,23 @@
-// Comprehensive Automated Fighter Runtime & Simulation Test Suite
+// Comprehensive Automated Fighter Runtime, Simulation & Canvas Stack Integrity Test Suite
 
 // Setup global browser mock environment before loading game modules
 function createMockCtx() {
   const noop = () => {};
   const grad = { addColorStop: noop };
+  let _stackDepth = 0;
+
   return {
-    save: noop,
-    restore: noop,
+    save: () => {
+      _stackDepth++;
+    },
+    restore: () => {
+      _stackDepth--;
+      if (_stackDepth < 0) {
+        throw new Error(`[CANVAS STACK CORRUPTION] ctx.restore() called when stackDepth is ${_stackDepth} (extra restore call)`);
+      }
+    },
+    getStackDepth: () => _stackDepth,
+    resetStackDepth: () => { _stackDepth = 0; },
     beginPath: noop,
     closePath: noop,
     moveTo: noop,
@@ -32,6 +43,7 @@ function createMockCtx() {
     transform: noop,
     setTransform: noop,
     resetTransform: noop,
+    getTransform: () => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 }),
     fillText: noop,
     strokeText: noop,
     measureText: () => ({ width: 50 }),
@@ -83,6 +95,8 @@ globalThis.Image = class {
     this.width = 100;
     this.height = 100;
     this.complete = true;
+    this.naturalWidth = 100;
+    this.naturalHeight = 100;
   }
 };
 globalThis.Audio = class {
@@ -100,12 +114,24 @@ globalThis.localStorage = {
   removeItem: () => {}
 };
 
+function assertCanvasStackBalance(locationTag) {
+  const depth = mockCtx.getStackDepth();
+  if (depth !== 0) {
+    mockCtx.resetStackDepth();
+    throw new Error(`[CANVAS TRANSFORM STACK CORRUPTION] Unbalanced stack depth = ${depth} after ${locationTag}`);
+  }
+}
+
 async function main() {
-  const { FIGHTER_DEFS } = await import('../js/core/config.js');
+  const { FIGHTER_DEFS, TACTICAL_FIGHTER_DEFS } = await import('../js/core/config.js');
   const { FIGHTER_CLASS_MAP } = await import('../js/entities/factories/fighterFactory.js');
   const { state } = await import('../js/core/state.js');
+  const { drawWeaponPreview, drawWeaponMenu } = await import('../js/graphics/ui/WeaponIndexScreen.js');
+  const { drawSelectScreen } = await import('../js/graphics/ui/CharacterSelectScreen.js');
+  const { drawTitleScreen } = await import('../js/graphics/ui/MainMenuScreen.js');
+  const { drawIndexScreen } = await import('../js/graphics/ui/FighterIndexScreen.js');
 
-  console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states...');
+  console.log('🥋 [Fighter Runtime Test Suite] Testing all fighters across simulation states & Canvas 2D stack balance...');
 
   state.canvas = mockCanvas;
   state.ctx = mockCtx;
@@ -120,7 +146,9 @@ async function main() {
   let totalTested = 0;
   let errors = 0;
 
-  for (const def of FIGHTER_DEFS) {
+  const allDefs = [...FIGHTER_DEFS, ...(TACTICAL_FIGHTER_DEFS || [])];
+
+  for (const def of allDefs) {
     const fType = def.type || def.characterId || def.id;
     const FighterClass = FIGHTER_CLASS_MAP[fType];
     if (!FighterClass) continue;
@@ -134,73 +162,94 @@ async function main() {
         startVy: 0
       });
 
-    const dummyOpponent = new FighterClass({ ...def, startX: 200, startY: 200 });
-    state.fighters = [fighter, dummyOpponent];
-    totalTested++;
+      const dummyOpponent = new FighterClass({ ...def, startX: 200, startY: 200 });
+      state.fighters = [fighter, dummyOpponent];
+      totalTested++;
 
-    // 1. Base update & draw
-    fighter.update(dummyOpponent, 0, state.arena);
-    fighter.draw(mockCtx, null);
-
-    // 2. Melee & shooting animation states
-    fighter.isSlashing = true;
-    fighter.slashSwingTimer = 15;
-    fighter.slashSwingMaxTimer = 22;
-    fighter.draw(mockCtx, null);
-
-    // 3. Parry / block states
-    fighter.blockPoseTimer = 10;
-    fighter.parryHitAnimTimer = 8;
-    fighter.draw(mockCtx, null);
-    fighter.blockPoseTimer = 0;
-    fighter.parryHitAnimTimer = 0;
-
-    // 4. Stun / Infinity Freeze / TimeStop states
-    fighter.isFrozenByInfinity = true;
-    fighter.timeStopTimer = 20;
-    fighter.update(dummyOpponent, 0, state.arena);
-    fighter.draw(mockCtx, null);
-    fighter.isFrozenByInfinity = false;
-    fighter.timeStopTimer = 0;
-
-    // 5. Special Transformations, Forms & Skill Channeling
-    if (fType === 'ichigo') {
-      // Shikai Getsuga charging
-      fighter.isChannelingGetsuga = true;
-      fighter.getsugaChargeTimer = 15;
-      fighter.getsugaChargeMaxTimer = 30;
-      fighter.draw(mockCtx, null);
-
-      // Bankai Getsuga charging
-      fighter.bankaiActive = true;
-      fighter.hollowMaskActive = false;
+      // 1. Base update & draw
+      mockCtx.resetStackDepth();
       fighter.update(dummyOpponent, 0, state.arena);
       fighter.draw(mockCtx, null);
+      assertCanvasStackBalance(`Fighter '${fType}' base draw`);
 
-      // Bankai + Hollow Mask Getsuga charging
-      fighter.hollowMaskActive = true;
-      fighter.update(dummyOpponent, 0, state.arena);
+      // 2. Melee & shooting animation states
+      mockCtx.resetStackDepth();
+      fighter.isSlashing = true;
+      fighter.slashSwingTimer = 15;
+      fighter.slashSwingMaxTimer = 22;
       fighter.draw(mockCtx, null);
+      assertCanvasStackBalance(`Fighter '${fType}' melee slash state`);
+      fighter.isSlashing = false;
+      fighter.slashSwingTimer = 0;
 
-      fighter.isChannelingGetsuga = false;
-    }
-    if (fType === 'mahoraga') {
-      fighter.wheelClickTimer = 15;
-      fighter.gammaRayRainbowTimer = 100;
-      fighter.gammaRayRainbowMax = 180;
+      // 3. Parry / block states
+      mockCtx.resetStackDepth();
+      fighter.blockPoseTimer = 10;
+      fighter.parryHitAnimTimer = 8;
+      fighter.draw(mockCtx, null);
+      assertCanvasStackBalance(`Fighter '${fType}' block/parry state`);
+      fighter.blockPoseTimer = 0;
+      fighter.parryHitAnimTimer = 0;
+
+      // 4. Stun / Infinity Freeze / TimeStop states
+      mockCtx.resetStackDepth();
+      fighter.isFrozenByInfinity = true;
+      fighter.timeStopTimer = 20;
       fighter.update(dummyOpponent, 0, state.arena);
       fighter.draw(mockCtx, null);
-    }
-    if (fType === 'sukuna') {
-      fighter.isHeianEra = true;
-      fighter.isFourArms = true;
-      fighter.update(dummyOpponent, 0, state.arena);
-      fighter.draw(mockCtx, null);
-    }
+      assertCanvasStackBalance(`Fighter '${fType}' stun/timestop state`);
+      fighter.isFrozenByInfinity = false;
+      fighter.timeStopTimer = 0;
+
+      // 5. Special Transformations, Forms & Skill Channeling
+      if (fType === 'ichigo') {
+        mockCtx.resetStackDepth();
+        fighter.isChannelingGetsuga = true;
+        fighter.getsugaChargeTimer = 15;
+        fighter.getsugaChargeMaxTimer = 30;
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Ichigo Shikai Getsuga charge`);
+
+        mockCtx.resetStackDepth();
+        fighter.bankaiActive = true;
+        fighter.hollowMaskActive = false;
+        fighter.update(dummyOpponent, 0, state.arena);
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Ichigo Bankai`);
+
+        mockCtx.resetStackDepth();
+        fighter.hollowMaskActive = true;
+        fighter.update(dummyOpponent, 0, state.arena);
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Ichigo Bankai + Hollow Mask`);
+
+        fighter.isChannelingGetsuga = false;
+        fighter.bankaiActive = false;
+        fighter.hollowMaskActive = false;
+      }
+      if (fType === 'mahoraga') {
+        mockCtx.resetStackDepth();
+        fighter.wheelClickTimer = 15;
+        fighter.gammaRayRainbowTimer = 100;
+        fighter.gammaRayRainbowMax = 180;
+        fighter.update(dummyOpponent, 0, state.arena);
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Mahoraga gamma ray state`);
+      }
+      if (fType === 'sukuna') {
+        mockCtx.resetStackDepth();
+        fighter.isHeianEra = true;
+        fighter.isFourArms = true;
+        fighter.update(dummyOpponent, 0, state.arena);
+        fighter.draw(mockCtx, null);
+        assertCanvasStackBalance(`Sukuna Heian 4-arms form`);
+      }
 
       // 6. Winner / Champion Reveal Stance
+      mockCtx.resetStackDepth();
       fighter._isWinnerReveal = true;
       fighter.draw(mockCtx, null);
+      assertCanvasStackBalance(`Fighter '${fType}' WinnerReveal stance`);
 
     } catch (err) {
       console.error(`❌ [RUNTIME ERROR in fighter '${fType}'] during simulation:`, err);
@@ -208,12 +257,45 @@ async function main() {
     }
   }
 
+  // 7. Weapon Previews Canvas Stack Balance Check
+  console.log('⚔️ [Weapon Preview Stack Test] Verifying all weapon graphics transform balance...');
+  for (const def of allDefs) {
+    try {
+      mockCtx.resetStackDepth();
+      drawWeaponPreview(mockCtx, def.type, def.color);
+      assertCanvasStackBalance(`drawWeaponPreview('${def.type}')`);
+    } catch (err) {
+      console.error(`❌ [WEAPON PREVIEW ERROR in '${def.type}']:`, err);
+      errors++;
+    }
+  }
+
+  // 8. Core UI Screens Canvas Stack Balance Check
+  console.log('🖥️ [UI Screen Stack Test] Verifying all menus & select screens transform balance...');
+  const uiScreens = [
+    { name: 'drawTitleScreen', fn: drawTitleScreen },
+    { name: 'drawSelectScreen', fn: drawSelectScreen },
+    { name: 'drawWeaponMenu', fn: drawWeaponMenu },
+    { name: 'drawIndexScreen', fn: drawIndexScreen }
+  ];
+
+  for (const sc of uiScreens) {
+    try {
+      mockCtx.resetStackDepth();
+      sc.fn();
+      assertCanvasStackBalance(sc.name);
+    } catch (err) {
+      console.error(`❌ [UI SCREEN ERROR in '${sc.name}']:`, err);
+      errors++;
+    }
+  }
+
   console.log('───────────────────────────────────────────────────────');
   if (errors === 0) {
-    console.log(`✅ Successfully tested all ${totalTested} fighter classes and skins with ZERO runtime errors!`);
+    console.log(`✅ Successfully tested all ${totalTested} fighter classes, skins, weapon previews, and UI screens with ZERO runtime errors and 100% BALANCED Canvas 2D stacks!`);
     process.exit(0);
   } else {
-    console.error(`🚨 Found ${errors} fighter runtime errors!`);
+    console.error(`🚨 Found ${errors} fighter / weapon / UI runtime errors!`);
     process.exit(1);
   }
 }

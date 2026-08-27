@@ -9,6 +9,34 @@ import { getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 import { drawUryuBow, drawSeeleSchneider } from '../weapons/uryuWeaponGraphics.js';
 
+let _uryuBodyImage = null;
+let _uryuBodyImageLoading = false;
+
+export function _getUryuBodyImage() {
+  if (_uryuBodyImage && _uryuBodyImage.complete && _uryuBodyImage.naturalWidth > 0) {
+    return _uryuBodyImage;
+  }
+  if (!_uryuBodyImageLoading && typeof Image !== 'undefined') {
+    _uryuBodyImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _uryuBodyImage = img;
+      _uryuBodyImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Ishida body model image at Assets/model/ISHIDA.png', e);
+      _uryuBodyImageLoading = false;
+    };
+    img.src = 'Assets/model/ISHIDA.png?v=1';
+    _uryuBodyImage = img;
+  }
+  return _uryuBodyImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getUryuBodyImage();
+}
+
 /**
  * Draws Uryu's hand matching his fair anime skin tone.
  * Fully compliant with Rule 20 (Hand Visibility & Skin Only).
@@ -17,13 +45,26 @@ export function drawUryuHand(ctx, x, y, radius, isDrawing = false) {
   ctx.save();
   ctx.translate(x, y);
 
-  // 1. Quincy White Sleeve Cuff (Bordered with subtle dark trim)
+  // 1. Quincy White Sleeve Cuff (Extending toward the body)
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#0F172A';
+  ctx.lineWidth = 1.3;
+  ctx.beginPath();
+  if (isDrawing) {
+    // Sleeve cuff angled toward the body/elbow during draw pull
+    ctx.roundRect(-radius * 1.5, -radius * 0.85, radius * 1.4, radius * 1.7, 3);
+  } else {
+    ctx.roundRect(-radius * 1.1, -radius * 0.75, radius * 1.0, radius * 1.5, 2);
+  }
+  ctx.fill();
+  ctx.stroke();
+
+  // Subtle royal blue Quincy seam line on cuff
+  ctx.strokeStyle = '#1D4ED8';
   ctx.lineWidth = 1.2;
   ctx.beginPath();
-  ctx.roundRect(-radius * 1.05, -radius * 0.75, radius * 0.95, radius * 1.5, 2);
-  ctx.fill();
+  ctx.moveTo(isDrawing ? -radius * 1.4 : -radius * 1.0, 0);
+  ctx.lineTo(isDrawing ? -radius * 0.3 : -radius * 0.2, 0);
   ctx.stroke();
 
   // 2. Fair Anime Skin Tone Fist (Matching face #FFE8D6)
@@ -46,27 +87,31 @@ export function drawUryuHand(ctx, x, y, radius, isDrawing = false) {
   ctx.fill();
 
   // 3. Knuckle & Finger Creases
-  ctx.strokeStyle = 'rgba(180, 120, 100, 0.55)';
-  ctx.lineWidth = 1.0;
+  ctx.strokeStyle = '#0F172A';
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
   if (isDrawing) {
-    // 2-finger pinch stance for bowstring
-    ctx.moveTo(-radius * 0.3, -radius * 0.25);
-    ctx.lineTo(radius * 0.4, -radius * 0.25);
-    ctx.moveTo(-radius * 0.3, radius * 0.25);
-    ctx.lineTo(radius * 0.4, radius * 0.25);
+    // 2-finger archer string pinch stance (hooking over string apex)
+    ctx.moveTo(-radius * 0.4, -radius * 0.30);
+    ctx.lineTo(radius * 0.35, -radius * 0.30);
+    ctx.moveTo(-radius * 0.4, radius * 0.30);
+    ctx.lineTo(radius * 0.35, radius * 0.30);
   } else {
-    // Standard fist grip
-    ctx.moveTo(0, -radius * 0.4);
-    ctx.lineTo(0, radius * 0.4);
+    // Standard fist grip wrapping around bow riser
+    ctx.moveTo(0, -radius * 0.45);
+    ctx.lineTo(0, radius * 0.45);
   }
   ctx.stroke();
 
-  // Subtle Reishi spark at fingertips when drawing
+  // 4. Glowing Reishi spirit spark at string pinch point
   if (isDrawing) {
     ctx.fillStyle = '#00E5FF';
     ctx.beginPath();
-    ctx.arc(radius * 0.5, 0, 1.8, 0, Math.PI * 2);
+    ctx.arc(radius * 0.2, 0, 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#FFFFFF';
+    ctx.beginPath();
+    ctx.arc(radius * 0.2, 0, 1.2, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -339,10 +384,11 @@ export function drawUryuSkin(ctx, fighter) {
     : (isPodiumPreview ? 0.70 : 0);
 
   const isDrawing = drawProgress > 0.04;
+  const clampedDraw = Math.min(1.0, Math.max(0.0, drawProgress));
 
   // Hand Position Coordinates (Rule 19 / 20)
-  // Front Hand holding bow center grip
-  const frontX = r * 0.95 + drawProgress * 1.5;
+  // Front Hand holding bow center grip with firm forward push
+  const frontX = r * 1.05 + Math.pow(clampedDraw, 0.7) * 4.0;
   const frontY = 0;
 
   // Smooth String Nock & Recoil Physics
@@ -350,35 +396,48 @@ export function drawUryuSkin(ctx, fighter) {
   const recoilMax = fighter.stringRecoilMax || 6;
   const recoilP = (recoilTimer > 0) ? (1.0 - recoilTimer / recoilMax) : 1.0;
   const recoilOffset = (recoilTimer > 0)
-    ? Math.sin(recoilP * Math.PI * 3) * Math.exp(-recoilP * 3.2) * (r * 0.40)
+    ? Math.sin(recoilP * Math.PI * 3) * Math.exp(-recoilP * 3.2) * (r * 0.45)
     : 0;
 
-  const maxDrawBackX = - (r * 1.65 + drawProgress * (r * 0.95));
-  const restBackX = r * 0.40;
-  const targetBackX = restBackX + (frontX + maxDrawBackX - restBackX) * Math.pow(Math.min(1.0, drawProgress), 0.75) + recoilOffset;
-  const targetBackY = -r * 0.10 * (1.0 - drawProgress);
+  const isVollstandig = Boolean(fighter.vollstandigActive);
+  const bowScale = isVollstandig ? 1.25 : 1.0;
+  const imgScale = (r / 25) * 0.140 * bowScale;
+  const restStringX = -141 * imgScale;
+  const maxDrawBackX = - (r * 2.60 * bowScale);
+  const drawBackX = restStringX + (maxDrawBackX - restStringX) * Math.pow(clampedDraw, 0.85) + recoilOffset;
 
-  // Smooth exponential interpolation for back hand
+  // Back hand grips the arrow nock (frontX + drawBackX) during draw, rests naturally at idle
+  const restBackX = r * 0.40;
+  const restBackY = -r * 0.10;
+  const targetBackX = (clampedDraw <= 0.02 && recoilTimer <= 0)
+    ? restBackX
+    : (frontX + drawBackX);
+  const targetBackY = (clampedDraw <= 0.02 && recoilTimer <= 0)
+    ? restBackY
+    : 0;
+
+  // Smooth exponential interpolation for back hand (snappy tracking during active draw)
   if (fighter._smoothBackX === undefined || isPodiumPreview) {
     fighter._smoothBackX = targetBackX;
     fighter._smoothBackY = targetBackY;
   } else {
-    fighter._smoothBackX += (targetBackX - fighter._smoothBackX) * 0.35;
-    fighter._smoothBackY += (targetBackY - fighter._smoothBackY) * 0.35;
+    const lerpSpeed = isDrawing ? 0.80 : 0.45;
+    fighter._smoothBackX += (targetBackX - fighter._smoothBackX) * lerpSpeed;
+    fighter._smoothBackY += (targetBackY - fighter._smoothBackY) * lerpSpeed;
   }
 
   const backX = fighter._smoothBackX;
   const backY = fighter._smoothBackY;
 
-  const hideHandsAndWeapon = isPodiumPreview || (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
-  const hideFrontHand = hideHandsAndWeapon || fighter.hideFrontHand;
-  const hideBackHand = hideHandsAndWeapon || fighter.hideBackHand;
+  const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
+  const hideFrontHand = shouldHideHands || fighter.hideFrontHand;
+  const hideBackHand = shouldHideHands || fighter.hideBackHand;
   const handRadius = getHandSize(7.0);
   const skinColor = '#FFE8D6'; // Warm, clear fair anime skin tone
 
-  // ── LAYER 1: BACK HAND (Layer behind body circle — drawing bowstring) ──
-  if (!hideBackHand) {
-    drawUryuHand(ctx, backX, backY, handRadius * 0.92, isDrawing);
+  // ── LAYER 1: BACK HAND (Only at idle rest when not drawing) ──
+  if (!hideBackHand && !isDrawing && recoilTimer <= 0) {
+    drawUryuHand(ctx, backX, backY, handRadius * 0.92, false);
   }
 
   // ── LAYER 2: BODY CIRCLE (Clipped to Radius r) ──
@@ -387,21 +446,30 @@ export function drawUryuSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // A. BASE LAYER: WARM FAIR ANIME FACE & BODY SKIN
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+  const bodyImg = _getUryuBodyImage();
+  if (bodyImg && bodyImg.complete && bodyImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
+    const modelScale = 1.032;
+    const drawR = r * modelScale;
+    ctx.drawImage(bodyImg, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.restore();
+  } else {
+    // A. BASE LAYER: WARM FAIR ANIME FACE & BODY SKIN
+    ctx.fillStyle = skinColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
 
-  // Subtle 3D spherical skin depth shading (Zero shadowBlur - Rule 11)
-  const bodyGrad = ctx.createRadialGradient(-r * 0.20, -r * 0.15, r * 0.15, 0, 0, r * 1.05);
-  bodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.30)');
-  bodyGrad.addColorStop(0.70, 'rgba(240, 205, 185, 0.15)');
-  bodyGrad.addColorStop(1.0, 'rgba(160, 100, 80, 0.32)');
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+    // Subtle 3D spherical skin depth shading (Zero shadowBlur - Rule 11)
+    const bodyGrad = ctx.createRadialGradient(-r * 0.20, -r * 0.15, r * 0.15, 0, 0, r * 1.05);
+    bodyGrad.addColorStop(0, 'rgba(255, 255, 255, 0.30)');
+    bodyGrad.addColorStop(0.70, 'rgba(240, 205, 185, 0.15)');
+    bodyGrad.addColorStop(1.0, 'rgba(160, 100, 80, 0.32)');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
 
   // B. WANDENREICH STERNRITTER UNIFORM (+Y Bottom Hemisphere — Rule 19)
   // Perfectly matching the updated user diagram:
@@ -863,11 +931,12 @@ export function drawUryuSkin(ctx, fighter) {
 
   // 7. Dynamic Anime Glasses Glint (Signature right-lens gleam + 4-point star twinkle)
   const glintPulse = Math.sin(now * 0.0045) * 0.5 + 0.5;
-  const glintAlpha = isDrawing ? 0.98 : (0.40 + glintPulse * 0.55);
+  const isFullDraw = drawProgress > 0.80;
+  const glintAlpha = isFullDraw ? 1.0 : (isDrawing ? (0.70 + drawProgress * 0.30) : (0.40 + glintPulse * 0.55));
 
   ctx.save();
   ctx.strokeStyle = `rgba(255, 255, 255, ${glintAlpha.toFixed(2)})`;
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = isFullDraw ? 2.2 : 1.8;
   ctx.beginPath();
   ctx.moveTo(rx0 + 2, ryBot - 1);
   ctx.lineTo(rx1 - 2, ryTop + 1);
@@ -876,7 +945,7 @@ export function drawUryuSkin(ctx, fighter) {
   // 4-point star glint twinkle at upper corner
   const starCenterX = rx1 - glassW * 0.30;
   const starCenterY = ryTop + glassH * 0.35;
-  const starSize = 2.2 + glintPulse * 1.0;
+  const starSize = isFullDraw ? 3.8 : (2.2 + glintPulse * 1.0);
 
   ctx.fillStyle = `rgba(255, 255, 255, ${glintAlpha.toFixed(2)})`;
   ctx.beginPath();
@@ -892,6 +961,7 @@ export function drawUryuSkin(ctx, fighter) {
   ctx.fill();
 
   ctx.restore();
+  } // end of procedural fallback else
 
   ctx.restore(); // End of clipped body circle
 
@@ -902,17 +972,18 @@ export function drawUryuSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.stroke();
 
-  // ── LAYER 3: FRONT HAND & WEAPON (On top of body) ──
-  if (!hideFrontHand) {
-    if (isMeleeChop) {
-      // Draw Seele Schneider blade for melee intercept
+  // ── LAYER 3: HANDS & WEAPON (On top of body circle) ──
+  if (isMeleeChop) {
+    if (!hideFrontHand) {
       const chopMax = fighter.slashSwingMaxTimer || 18;
       const chopTimer = fighter.slashSwingTimer || 0;
       const chopP = Math.min(1.0, Math.max(0.0, 1.0 - (chopTimer / chopMax)));
       drawSeeleSchneider(ctx, frontX, frontY, r, chopP);
       drawUryuHand(ctx, frontX, frontY, handRadius, false);
-    } else {
-      // Draw Ginrei Kojaku Spirit Bow & Front Hand Grip
+    }
+  } else {
+    // 1. Ginrei Kojaku Spirit Bow & Front Hand Grip
+    if (!hideFrontHand) {
       drawUryuBow(ctx, frontX, frontY, r, drawProgress, {
         isAiming: isDrawing,
         isVollstandig: Boolean(fighter.vollstandigActive),
@@ -920,6 +991,11 @@ export function drawUryuSkin(ctx, fighter) {
         recoilMax: fighter.stringRecoilMax || 6
       });
       drawUryuHand(ctx, frontX, frontY, handRadius, false);
+    }
+
+    // 2. Drawing Hand (Gripping arrow nock & bowstring on top of torso during draw / recoil)
+    if (!hideBackHand && (isDrawing || recoilTimer > 0)) {
+      drawUryuHand(ctx, backX, backY, handRadius * 0.96, true);
     }
   }
 

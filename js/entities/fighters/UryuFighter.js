@@ -25,15 +25,17 @@ export class UryuFighter extends Fighter {
     const cfg = (typeof CONFIG !== 'undefined' && CONFIG.uryu) ? CONFIG.uryu : {};
 
     // Basic Attack & Animation States
-    this.shootAnimTimer = 0;
-    this.shootMaxTimer = 18;
     this.shootCooldown = 15;
     this.shootCooldownMax = cfg.shootCooldown || 34;
     this.burstRemaining = 0;
-    this.burstTimer = 0;
     this.isShooting = false;
     this.isDrawingBow = false;
+    this.drawPhase = 'IDLE'; // 'IDLE' | 'DRAWING' | 'RECOIL'
+    this.arrowDrawTimer = 0;
+    this.arrowDrawDuration = 11;
+    this.arrowDrawProgress = 0;
     this.smoothDrawProgress = 0;
+    this.recoilHoldTimer = 0;
     this.stringRecoilTimer = 0;
     this.stringRecoilMax = 6;
 
@@ -98,12 +100,17 @@ export class UryuFighter extends Fighter {
 
   reset() {
     super.reset();
-    this.shootAnimTimer = 0;
     this.shootCooldown = 15;
     this.burstRemaining = 0;
-    this.burstTimer = 0;
     this.isShooting = false;
     this.isDrawingBow = false;
+    this.drawPhase = 'IDLE';
+    this.arrowDrawTimer = 0;
+    this.arrowDrawDuration = 11;
+    this.arrowDrawProgress = 0;
+    this.smoothDrawProgress = 0;
+    this.recoilHoldTimer = 0;
+    this.stringRecoilTimer = 0;
     this.slashSwingTimer = 0;
     this.seeleCooldown = 0;
     this.hirenkyakuCooldown = 0;
@@ -125,8 +132,19 @@ export class UryuFighter extends Fighter {
     this.isShooting = false;
     this.isDrawingBow = false;
     this.burstRemaining = 0;
+    this.drawPhase = 'IDLE';
+    this.arrowDrawTimer = 0;
+    this.arrowDrawProgress = 0;
+    this.smoothDrawProgress = 0;
     this.isDeployingSprenger = false;
     this.slashSwingTimer = 0;
+  }
+
+  /**
+   * Demo attack trigger for character selection / weapon preview.
+   */
+  triggerDemoAttack() {
+    this._initiateBowVolley(null, 0);
   }
 
   _findNearestEnemy() {
@@ -153,7 +171,7 @@ export class UryuFighter extends Fighter {
     return nearest;
   }
 
-  update(arena, opponent, ownerIndex) {
+  update(opponent, ownerIndex, arena) {
     // 1. Mandatory Rule 1 Freeze & Ambush Guard
     const isFrozen = this._handleTimeStop();
     if (isFrozen || this.isTargetOfAmbush) {
@@ -165,25 +183,74 @@ export class UryuFighter extends Fighter {
 
     // Decay custom animation and attack timers
     if (this.stringRecoilTimer > 0) this.stringRecoilTimer--;
-    if (this.shootAnimTimer > 0) {
-      this.shootAnimTimer--;
-      if (this.shootAnimTimer <= 0 && this.burstRemaining <= 0) {
-        this.isDrawingBow = false;
-        this.isShooting = false;
-      }
-    }
-
-    // Smooth Draw Progress Lerp for buttery archery animations
-    let targetDraw = 0;
-    if (this.burstRemaining > 0 || this.isDrawingBow || this.shootAnimTimer > 0) {
-      targetDraw = 1.0;
-    }
-    this.smoothDrawProgress += (targetDraw - this.smoothDrawProgress) * 0.28;
-
     if (this.slashSwingTimer > 0) this.slashSwingTimer--;
     if (this.seeleCooldown > 0) this.seeleCooldown--;
     if (this.hirenkyakuCooldown > 0) this.hirenkyakuCooldown--;
     if (this.sprengerCooldown > 0) this.sprengerCooldown--;
+
+    // ── ACTIVE BOW SHOOTING & ARROW PULL-BACK CYCLE ──
+    if (this.isShooting && this.burstRemaining > 0) {
+      const target = this._findNearestEnemy() || opponent;
+      if (target) this.aim(target);
+
+      if (this.drawPhase === 'DRAWING') {
+        this.isDrawingBow = true;
+        this.arrowDrawTimer++;
+        const t = Math.min(1.0, this.arrowDrawTimer / this.arrowDrawDuration);
+        // Smooth cinematic pull-back easing (accelerating tension curve)
+        this.arrowDrawProgress = Math.sin(t * Math.PI * 0.5);
+
+        // Subtle Reishi gathering spark during draw
+        if (Math.random() < 0.25 && typeof spawnSparks === 'function') {
+          const angle = this.gunAngle || 0;
+          const sx = this.x + Math.cos(angle) * (this.r + 10) + (Math.random() - 0.5) * 12;
+          const sy = this.y + Math.sin(angle) * (this.r + 10) + (Math.random() - 0.5) * 12;
+          spawnSparks(sx, sy, '#00E5FF', 1);
+        }
+
+        if (this.arrowDrawTimer >= this.arrowDrawDuration) {
+          // Maximum tension reached: RELEASE ARROW!
+          this._fireHeiligPfeilArrow(target || opponent, ownerIndex);
+          this.burstRemaining--;
+          this.drawPhase = 'RECOIL';
+          this.recoilHoldTimer = 5;
+          this.arrowDrawProgress = 0;
+          this.stringRecoilTimer = this.stringRecoilMax;
+        }
+      } else if (this.drawPhase === 'RECOIL') {
+        this.recoilHoldTimer--;
+        this.arrowDrawProgress = 0;
+        if (this.recoilHoldTimer <= 0) {
+          if (this.burstRemaining > 0) {
+            // Rapid-fire subsequent arrow draw in volley
+            this.drawPhase = 'DRAWING';
+            this.arrowDrawTimer = 0;
+            const drawSpeedMult = this.isPiercingLightActive ? 0.70 : 1.0;
+            this.arrowDrawDuration = Math.max(6, Math.round(10 * drawSpeedMult));
+            this.arrowDrawProgress = 0;
+            this._playSound('bowDraw', 'Assets/Sound Effects/Skills/redcharging.mp3', 0.50);
+          } else {
+            // Volley finished
+            this.drawPhase = 'IDLE';
+            this.isShooting = false;
+            this.isDrawingBow = false;
+            this.shootCooldown = this.shootCooldownMax;
+          }
+        }
+      }
+    } else {
+      this.arrowDrawProgress = 0;
+      this.drawPhase = 'IDLE';
+      this.isShooting = false;
+      this.isDrawingBow = false;
+    }
+
+    // Direct, responsive Draw Progress tracking during draw phase
+    if (this.isShooting && this.drawPhase === 'DRAWING') {
+      this.smoothDrawProgress = this.arrowDrawProgress;
+    } else {
+      this.smoothDrawProgress += (0 - this.smoothDrawProgress) * 0.40;
+    }
 
     // ── PASSIVE 2: RANSŌTENGAI (HEAVENLY WILD PUPPET SUIT) ──
     if (this.ransotengaiCooldown > 0) this.ransotengaiCooldown--;
@@ -213,14 +280,15 @@ export class UryuFighter extends Fighter {
       this.ransotengaiTimer--;
       if (this.ransotengaiTimer <= 0) {
         this.ransotengaiActive = false;
+        this.speedMultiplier = 1.0;
+      } else {
+        // Ongoing puppet stasis: immunity to flinch & stuns
+        this.hitStunTimer = 0;
+        this.electricStunTimer = 0;
+        if (this.paralyzeTimer) this.paralyzeTimer = 0;
+        // Controlled +30% movement speed boost (safe, non-exponential)
+        this.speedMultiplier = 1.30;
       }
-      // Ongoing puppet stasis: immunity to flinch & stuns
-      this.hitStunTimer = 0;
-      this.electricStunTimer = 0;
-      if (this.paralyzeTimer) this.paralyzeTimer = 0;
-      // Movement speed boost (+45%)
-      this.vx *= 1.08;
-      this.vy *= 1.08;
     }
 
     // ── PASSIVE 1: REISHI ABSORPTION & SKLAVEREI GAUGE ──
@@ -296,19 +364,7 @@ export class UryuFighter extends Fighter {
       }
     }
 
-    // Process Active Bow Burst Volley
-    if (this.burstRemaining > 0) {
-      this.burstTimer--;
-      if (this.burstTimer <= 0) {
-        const target = this._findNearestEnemy() || opponent;
-        if (target) this.aim(target);
-        this._fireHeiligPfeilArrow(target || opponent, ownerIndex);
-        this.burstRemaining--;
-        this.burstTimer = 5;
-      }
-    }
-
-    super.update(arena, opponent, ownerIndex);
+    super.update(opponent, ownerIndex, arena);
   }
 
   /**
@@ -328,7 +384,7 @@ export class UryuFighter extends Fighter {
     // Close-quarters melee intercept vs ranged bow attack:
     if (dist <= 75 && this.seeleCooldown <= 0) {
       this._executeSeeleSchneider(target);
-    } else if (this.burstRemaining <= 0) {
+    } else if (this.burstRemaining <= 0 && !this.isShooting) {
       this._initiateBowVolley(target, ownerIndex);
     }
   }
@@ -366,10 +422,14 @@ export class UryuFighter extends Fighter {
             this.reishiGauge = Math.min(100, this.reishiGauge + meleeGain);
           }
 
-          // Push target away to restore archery spacing
-          const pushForce = CONFIG.uryu?.seeleKnockback || 9.5;
-          t.vx += Math.cos(angleToTarget) * pushForce;
-          t.vy += Math.sin(angleToTarget) * pushForce;
+          // Push target away to restore archery spacing (safe capped knockback)
+          const pushForce = CONFIG.uryu?.seeleKnockback || 4.5;
+          if (typeof t.applyKnockback === 'function') {
+            t.applyKnockback(Math.cos(angleToTarget) * pushForce, Math.sin(angleToTarget) * pushForce);
+          } else {
+            t.vx = (t.vx || 0) + Math.cos(angleToTarget) * pushForce;
+            t.vy = (t.vy || 0) + Math.sin(angleToTarget) * pushForce;
+          }
         }
       }
     }
@@ -378,16 +438,22 @@ export class UryuFighter extends Fighter {
   _initiateBowVolley(target, ownerIndex) {
     this.isShooting = true;
     this.isDrawingBow = true;
-    this.shootAnimTimer = this.shootMaxTimer;
     this.burstRemaining = CONFIG.uryu?.burstCount || 3;
-    this.burstTimer = 2; // Initial draw latency before first arrow
+    this.drawPhase = 'DRAWING';
+    this.arrowDrawTimer = 0;
+    // First arrow has a deliberate, crisp 16-frame draw; Piercing Light accelerates by 30%
+    const drawSpeedMult = this.isPiercingLightActive ? 0.70 : 1.0;
+    this.arrowDrawDuration = Math.max(8, Math.round(16 * drawSpeedMult));
+    this.arrowDrawProgress = 0;
     this._curOwnerIndex = ownerIndex;
+    if (target) this.aim(target);
     this._playSound('bowDraw', 'Assets/Sound Effects/Skills/redcharging.mp3', 0.65);
   }
 
   _fireHeiligPfeilArrow(target, ownerIndex) {
     const angle = this.gunAngle || 0;
-    const spawnDist = this.r + 14;
+    // Spawn projectile exactly in the center of the bow riser grip
+    const spawnDist = this.r * 1.05 + 3.0;
     const startX = this.x + Math.cos(angle) * spawnDist;
     const startY = this.y + Math.sin(angle) * spawnDist;
 
