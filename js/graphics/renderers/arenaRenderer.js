@@ -581,24 +581,85 @@ export function drawArena() {
   ctx.fillText('CRONOSPHERE', centerX, centerY);
   ctx.restore();
 
-  // 5b. Background Music Title Text above Top Arena Wall
-  const bgmTitle = getCurrentPlayingBgmTitle();
-  if (bgmTitle && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-    const textY = arena.y - 8;
-    ctx.save();
-    ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'bottom';
-    
-    // Crisp dark/light stroke outline
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = isDark ? 'rgba(0, 0, 0, 0.95)' : 'rgba(255, 255, 255, 0.95)';
-    ctx.strokeText(bgmTitle, centerX, textY);
-    
-    // High-visibility amber-gold fill
-    ctx.fillStyle = isDark ? '#f59e0b' : '#b45309';
-    ctx.fillText(bgmTitle, centerX, textY);
-    ctx.restore();
+  // 5b. Text above Top Arena Wall (Dark Mode: Fighter Names | Light Mode: BGM Title)
+  if (isDark) {
+    // In DARK MODE: Display Match Fighters Name above Top Arena Wall (e.g. "GOJO VS SUKUNA")
+    if (state.fighters && state.fighters.length > 0 && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+      const textY = arena.y - 9;
+      ctx.save();
+      ctx.font = '900 12px "Outfit", "Rajdhani", "Trebuchet MS", sans-serif';
+      ctx.textBaseline = 'bottom';
+      if ('letterSpacing' in ctx) {
+        ctx.letterSpacing = '1.5px';
+      }
+
+      if (state.fighters.length === 2) {
+        const f1 = state.fighters[0];
+        const f2 = state.fighters[1];
+        const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
+        const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
+        const vsText = ' VS ';
+
+        const w1 = ctx.measureText(name1).width;
+        const wVs = ctx.measureText(vsText).width;
+        const w2 = ctx.measureText(name2).width;
+        const totalW = w1 + wVs + w2;
+
+        let startX = centerX - totalW / 2;
+
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+
+        // Fighter 1 Name
+        ctx.textAlign = 'left';
+        ctx.fillStyle = f1.themeColor || f1.color || '#38BDF8';
+        ctx.strokeText(name1, startX, textY);
+        ctx.fillText(name1, startX, textY);
+        startX += w1;
+
+        // " VS "
+        ctx.fillStyle = '#94A3B8'; // Sleek neutral slate / silver
+        ctx.strokeText(vsText, startX, textY);
+        ctx.fillText(vsText, startX, textY);
+        startX += wVs;
+
+        // Fighter 2 Name
+        ctx.fillStyle = f2.themeColor || f2.color || '#F87171';
+        ctx.strokeText(name2, startX, textY);
+        ctx.fillText(name2, startX, textY);
+      } else {
+        // Multi-fighter or single fighter fallback
+        const names = state.fighters.map(f => (f.name || f._def?.name || f.characterId || 'P').toUpperCase()).join(' VS ');
+        ctx.textAlign = 'center';
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillStyle = '#F8FAFC';
+        ctx.strokeText(names, centerX, textY);
+        ctx.fillText(names, centerX, textY);
+      }
+
+      ctx.restore();
+    }
+  } else {
+    // In LIGHT MODE: Background Music Title Text above Top Arena Wall
+    const bgmTitle = getCurrentPlayingBgmTitle();
+    if (bgmTitle && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
+      const textY = arena.y - 8;
+      ctx.save();
+      ctx.font = '900 11px "Outfit", "Rajdhani", sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      
+      // Crisp light stroke outline
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.95)';
+      ctx.strokeText(bgmTitle, centerX, textY);
+      
+      // Amber-gold fill
+      ctx.fillStyle = '#b45309';
+      ctx.fillText(bgmTitle, centerX, textY);
+      ctx.restore();
+    }
   }
 
   // 6. Cached Title Header (text only)
