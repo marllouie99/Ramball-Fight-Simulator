@@ -248,6 +248,7 @@ export function applyArenaTheme(theme) {
 
   // Invalidate cached canvases
   state._arenaBorderCanvas = null;
+  state._arenaOuterDetailsCanvas = null;
   state._titleHeaderCanvas = null;
   state._titleHeaderCanvasTheme = null;
 

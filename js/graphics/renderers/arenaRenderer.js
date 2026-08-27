@@ -455,8 +455,8 @@ export function drawArena() {
 
     const isDark = (state.arenaTheme === 'dark');
     const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#000000'));
-    const outerBg = parseColor(isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
-    const innerBg = parseColor(isDark ? '#1a1c23' : (CONFIG.arenaInnerBgColor || '#ffffff'));
+    const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
+    const innerBg = parseColor(isDark ? '#0b0f19' : (CONFIG.arenaInnerBgColor || '#ffffff'));
 
     g.beginFill(canvasBg.color, canvasBg.alpha);
     g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
@@ -495,7 +495,8 @@ export function drawArena() {
   }
 
   // 3. Draw Graphic Details (Halftone Dots, Action Triangles, Speed Needles) strictly OUTSIDE the arena
-  if (!hasActiveDomain) {
+  // In DARK MODE: completely hide background theme details outside the arena (pure plain black)
+  if (!hasActiveDomain && !isDark) {
     const detailsKey = `${canvas.width}_${canvas.height}_${arena.x}_${arena.y}_${arena.width}_${arena.height}_${isDark ? 'dark' : 'light'}`;
     if (!state._arenaOuterDetailsCanvas || state._arenaOuterDetailsCanvas._key !== detailsKey) {
       const offCanvas = document.createElement('canvas');
