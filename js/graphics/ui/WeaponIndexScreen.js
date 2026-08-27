@@ -23,6 +23,7 @@ import { drawLaylaGun } from '../weapons/laylaWeaponGraphics.js';
 import { drawShikaiZangetsu, drawTensaZangetsu } from '../weapons/ichigoWeaponGraphics.js';
 import { drawNanamiCleaver } from '../weapons/nanamiWeaponGraphics.js';
 import { drawMegumiShadowBlade } from '../weapons/megumiWeaponGraphics.js';
+import { drawUryuBow } from '../weapons/uryuWeaponGraphics.js';
 import { drawJohnWickWeapon, drawJohnWickPistol, drawJohnWickShotgun, drawJohnWickRifle, drawJohnWickPencil } from '../weapons/johnWickWeaponGraphics.js';
 import { drawCjBrassKnuckles, drawCjJetpackWeapon, drawCjMicroUzi, drawCjMinigun, drawCjTec9 } from '../weapons/cjWeaponGraphics.js';
 import { drawTacticalRifleWeapon, drawTacticalShotgunWeapon, drawTacticalPistolWeapon, drawTacticalSniperWeapon, drawBarrettWeapon, TACTICAL_FIGHTER_DEFS } from '../../../Tactical Force/index.js';
@@ -1204,6 +1205,7 @@ function drawWeaponPreview(ctx, type, color) {
   else if (type === 'yuta') offsetX = -40; // Katana
   else if (type === 'megumi') offsetX = -45; // Shadow Blade
   else if (type === 'layla') offsetX = -30; // Steampunk Energy Cannon
+  else if (type === 'uryu') offsetX = -18; // TYBW Spirit Bow
   else if (type === 'ichigo') {
     offsetX = (state.selectedIchigoSkin === 'shikai') ? -55 : -55;
   }
@@ -1353,6 +1355,10 @@ function drawWeaponPreview(ctx, type, color) {
         return;
       }
 
+
+      case 'uryu':
+        drawUryuBow(ctx, 0, 0, r, 0.45, { isAiming: true });
+        return;
 
       case 'gunslinger':
         // Dual revolvers

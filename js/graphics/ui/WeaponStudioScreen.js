@@ -37,6 +37,7 @@ function initCustomizations() {
       toji: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       cronos: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       ruby: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
+      uryu: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       nanami: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       megumi: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
       john_wick: { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 },
@@ -47,6 +48,9 @@ function initCustomizations() {
   }
   if (!state.weaponCustomizations.megumi) {
     state.weaponCustomizations.megumi = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
+  }
+  if (!state.weaponCustomizations.uryu) {
+    state.weaponCustomizations.uryu = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
   }
   if (!state.weaponCustomizations.cj) {
     state.weaponCustomizations.cj = { offsetX: 0, offsetY: 0, scale: 1.0, angleOffset: 0 };
@@ -107,6 +111,7 @@ export function drawWeaponStudioScreen() {
     { key: 'toji', label: 'TOJI' },
     { key: 'cronos', label: 'CRONOS' },
     { key: 'ruby', label: 'RUBY' },
+    { key: 'uryu', label: 'URYU' },
     { key: 'nanami', label: 'NANAMI' },
     { key: 'megumi', label: 'MEGUMI' },
     { key: 'john_wick', label: 'JOHN WICK' },

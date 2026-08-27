@@ -18,6 +18,7 @@ import { nobaraConfig } from '../configs/characters/nobaraConfig.js';
 import { megumiConfig } from '../configs/characters/megumiConfig.js';
 import { johnWickConfig } from '../configs/characters/johnWickConfig.js';
 import { cjConfig } from '../configs/characters/cjConfig.js';
+import { uryuConfig } from '../configs/characters/uryuConfig.js';
 import { engineerConfig } from '../configs/characters/engineerConfig.js?v=4';
 import { blackFlashConfig } from '../configs/skills/blackFlashConfig.js';
 import { bloodConfig } from '../configs/bloodConfig.js';
@@ -43,6 +44,8 @@ export const CONFIG = {
   yuji: yujiConfig,
   layla: laylaConfig,
   ichigo: ichigoConfig,
+  uryu: uryuConfig,
+  ishida: uryuConfig,
   john_wick: johnWickConfig,
   johnWick: johnWickConfig,
   cj: cjConfig,
@@ -1381,6 +1384,27 @@ export const FIGHTER_DEFS = [
     projectileSpeedMultiplier: megumiConfig.projectileSpeedMultiplier || 1.0,
     ability: megumiConfig.ability || 'Ten Shadows Technique',
     desc: megumiConfig.desc || 'Wields the Ten Shadows Technique. Uses liquid shadow submersion, Divine Dog: Totality, Nue lightning, and Chimera Shadow Garden. Invokes untamed Mahoraga when in critical danger.',
+  },
+  {
+    id: 36,
+    name: 'Uryu Ishida',
+    category: 'Anime',
+    color: uryuConfig.color || '#00E5FF', // Quincy Radiant Cyan
+    startX: uryuConfig.startX || 300,
+    startY: uryuConfig.startY || 250,
+    startVx: uryuConfig.startVx || 1.2,
+    startVy: uryuConfig.startVy || 1.0,
+    radius: uryuConfig.radius || uryuConfig.r || 25,
+    aimbot: false,
+    spinRate: 0,
+    type: 'uryu',
+    hp: uryuConfig.hp || 230,
+    damage: uryuConfig.damage || 18,
+    cooldown: uryuConfig.cooldown || 28,
+    moveSpeed: uryuConfig.moveSpeed || uryuConfig.speed || 6.2,
+    projectileSpeedMultiplier: uryuConfig.projectileSpeedMultiplier || 1.0,
+    ability: uryuConfig.ability || 'The Antithesis',
+    desc: uryuConfig.desc || 'The Last Quincy. Attacks from long range with Heilig Bogen spirit arrows, glides with Hirenkyaku, traps enemies with Sprenger, and reverses damage with Schrift "A": The Antithesis.',
   }
 ];
 

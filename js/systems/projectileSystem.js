@@ -359,6 +359,9 @@ class ProjectileSystem {
     proj._resumeVy = undefined;
     proj.isFrozenByInfinity = false;
     proj.infinityFreezeTimer = undefined;
+    const calculatedAngle = (customAngle !== undefined ? customAngle : (Math.atan2(dirY, dirX) || 0));
+    proj.angle = calculatedAngle;
+    proj.lastAngle = calculatedAngle;
     proj.visual = visualType;
     proj.isSukunaSlash = (visualType === 'sukunaSlash' || visualType === 'sukunaCleave' || visualType === 'sukunaDismantleGrid' || visualType === 'ghostBlade' || (fighter && (fighter.characterId === 'sukuna' || fighter.type === 'sukuna')));
     if (proj.history) { proj.history.length = 0; proj.history.push({ x: spawnX, y: spawnY }); }
@@ -3042,6 +3045,27 @@ class ProjectileSystem {
             if (typeof spawnImpactFlash === 'function') {
               spawnImpactFlash(wallX, wallY, 16, '#F59E0B');
             }
+          }
+
+          this._returnProjectile(p);
+          this.projectiles[i] = this.projectiles[this.projectiles.length - 1];
+          this.projectiles.pop();
+          i--;
+          continue;
+        }
+
+        const isHeiligPfeil = p.visual === 'heiligPfeil' || p.isHeiligPfeil || p.type === 'heilig_pfeil';
+        if (isHeiligPfeil && expired && !hit) {
+          const arena = CONFIG.arena;
+          const wallX = Math.max(arena.x, Math.min(arena.x + arena.width, p.x));
+          const wallY = Math.max(arena.y, Math.min(arena.y + arena.height, p.y));
+
+          if (typeof spawnSparks === 'function') {
+            spawnSparks(wallX, wallY, 8, 'cyan', '#00E5FF');
+            spawnSparks(wallX, wallY, 4, 'silverStreak', '#FFFFFF');
+          }
+          if (typeof spawnImpactFlash === 'function') {
+            spawnImpactFlash(wallX, wallY, 20, '#00E5FF');
           }
 
           this._returnProjectile(p);

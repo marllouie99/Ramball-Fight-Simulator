@@ -1183,6 +1183,33 @@ export function getSkillDataForFighter(f, getProjectiles) {
     ];
   }
 
+  // ── Uryu Ishida: The Last Quincy HUD Skill Bars ──
+  if (f.characterId === 'uryu' || f.type === 'uryu' || f.characterId === 'ishida' || f.type === 'ishida') {
+    const themeColor = f.color || '#00E5FF';
+    const hMax = CONFIG.uryu?.hirenkyakuCooldown || 360;
+    const hTimer = f.hirenkyakuCooldown !== undefined ? f.hirenkyakuCooldown : 0;
+    const hPct = Math.max(0, Math.min(100, (1 - hTimer / hMax) * 100));
+
+    const sMax = CONFIG.uryu?.sprengerCooldown || 480;
+    const sTimer = f.sprengerCooldown !== undefined ? f.sprengerCooldown : 0;
+    const sPct = Math.max(0, Math.min(100, (1 - sTimer / sMax) * 100));
+
+    const uMax = CONFIG.uryu?.ultimateCooldown || 1200;
+    const uTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : 0;
+    let uPct = Math.max(0, Math.min(100, (1 - uTimer / uMax) * 100));
+    let uLabel = 'THE ANTITHESIS';
+    if (f.vollstandigActive) {
+      uPct = 100;
+      uLabel = 'VOLLSTÄNDIG ACTIVE';
+    }
+
+    return [
+      { id: 'hirenkyaku', pct: hPct, ready: hPct >= 99, color: themeColor, label: 'HIRENKYAKU' },
+      { id: 'sprenger', pct: sPct, ready: sPct >= 99, color: themeColor, label: 'SPRENGER' },
+      { id: 'antithesis', pct: uPct, ready: uPct >= 99, color: themeColor, label: uLabel }
+    ];
+  }
+
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {
     return [];
   }

@@ -44,6 +44,8 @@ export { drawCjSkin } from './fighters/cjSkin.js';
 export { drawTojiSkin, drawTojiGhostSkin } from './fighters/tojiSkin.js';
 export { drawMegumiSkin, drawMegumiGhostSkin } from './fighters/megumiSkin.js';
 export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './weapons/megumiWeaponGraphics.js';
+export { drawUryuSkin, drawUryuGhostSkin } from './fighters/uryuSkin.js';
+export { drawUryuBow } from './weapons/uryuWeaponGraphics.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 
 
