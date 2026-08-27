@@ -158,90 +158,10 @@ let rikaTexture = null;
 let rikaUpdateTick = 0;
 
 export function updateHybridRika() {
-  if (!state.pixiApp || !state.pixiLayers?.fighters) return;
-  const layer = state.pixiLayers.fighters;
-
-  // Find Yuta fighter (robust lookup across type, characterId, _def.type, _def.id)
-  const yuta = state.fighters?.find(f => f && (f.type === 'yuta' || f.characterId === 'yuta' || f._def?.type === 'yuta' || f._def?.id === 'yuta' || f._def?.id === 18) && f.rika);
-  
-  const isRikaActive = yuta && yuta.rika && (
-    yuta.rika.active || 
-    (yuta.rikaEmergingForBeamTimer && yuta.rikaEmergingForBeamTimer > 0) || 
-    yuta.isChannelingPureLoveBeam || 
-    yuta.isFiringPureLoveBeam || 
-    (yuta.rikaAlpha !== undefined && yuta.rikaAlpha > 0)
-  );
-
-  if (!yuta || !yuta.rika || !isRikaActive || state.gameState === 'matchEnd') {
-    if (rikaSprite && rikaSprite.parent) {
-      rikaSprite.parent.removeChild(rikaSprite);
-    }
-    return;
-  }
-
-  const rk = yuta.rika;
-  const size = 700;
-
-  if (!rikaSprite) {
-    rikaCanvas = document.createElement('canvas');
-    rikaCanvas.width = size;
-    rikaCanvas.height = size;
-    rikaCtx = rikaCanvas.getContext('2d');
-    rikaTexture = window.PIXI.Texture.from(rikaCanvas);
-    rikaSprite = new window.PIXI.Sprite(rikaTexture);
-    rikaSprite.anchor.set(0.5);
-  }
-
-  if (!rikaSprite.parent) {
-    layer.addChildAt(rikaSprite, 0);
-  }
-
-  // Update position and alpha every frame for buttery-smooth movement tracking
-  const currentAlpha = (yuta.rikaAlpha !== undefined) ? yuta.rikaAlpha : 1.0;
-  rikaSprite.x = rk.x;
-  rikaSprite.y = rk.y;
-  rikaSprite.alpha = Math.max(0, Math.min(1.0, currentAlpha));
-
-  // Force texture updates on every frame while spawning, emerging, or fading in/out
-  rikaUpdateTick++;
-  const isLowQuality = (typeof state !== 'undefined' && (state.performanceMode || (state.qualityLevel && state.qualityLevel < 0.5)));
-  const updateInterval = isLowQuality ? 3 : 2;
-
-  const isEmergingOrSpawning = (rk.spawnTimer && rk.spawnTimer > 0) || 
-                                (yuta.rikaEmergingForBeamTimer && yuta.rikaEmergingForBeamTimer > 0) || 
-                                (currentAlpha < 1.0) || 
-                                (rk.rightArmTimer && rk.rightArmTimer > 0) || 
-                                (rk.leftArmTimer && rk.leftArmTimer > 0);
-  const forceUpdate = isEmergingOrSpawning || (rikaUpdateTick === 1);
-
-  if (forceUpdate || (rikaUpdateTick % updateInterval === 0)) {
-    rikaCtx.clearRect(0, 0, size, size);
-    rikaCtx.save();
-    rikaCtx.translate(size / 2 - rk.x, size / 2 - rk.y);
-
-    const opponent = state.fighters?.find(f => f && f !== yuta && f.hp > 0);
-    const spawnScale = rk.spawnScale ?? 1.0;
-    
-    const renderState = {
-      drawX: rk.x,
-      drawY: rk.y,
-      targetAngle: rk.angle || 0,
-      spawnScale: spawnScale,
-      isHybrid: true
-    };
-
-    rikaCtx.globalAlpha = Math.max(0, Math.min(1.0, currentAlpha));
-    yuta._drawRikaCursedEnergyAura(rikaCtx, opponent, renderState);
-    yuta._drawRika(rikaCtx, opponent, renderState);
-
-    rikaCtx.restore();
-    rikaTexture.update();
-  }
-
-  // Enforce Z-order: Rika (bottom) -> Legacy 2D Canvas (top, containing Yuta's body circle and HP value)
-  if (state.legacyCanvasSprite && state.legacyCanvasSprite.parent === layer) {
-    layer.addChildAt(rikaSprite, 0);
-    layer.addChildAt(state.legacyCanvasSprite, 1);
+  // Rika is now rendered directly on state.ctx inside FighterRenderer / drawFighters
+  // to ensure she always renders on top of all full-screen dim effects and preserves correct Z-ordering
+  if (rikaSprite && rikaSprite.parent) {
+    rikaSprite.parent.removeChild(rikaSprite);
   }
 }
 

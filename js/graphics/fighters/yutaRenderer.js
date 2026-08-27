@@ -189,16 +189,14 @@ export class YutaRenderer {
         rk.angle = targetAngle;
       }
 
-      if (!state.pixiApp || fighter.isDemoFighter) {
-        const renderState = { drawX, drawY, targetAngle, spawnScale };
+      const renderState = { drawX, drawY, targetAngle, spawnScale };
 
-        ctx.save();
-        ctx.translate(tremorX, tremorY);
-        ctx.globalAlpha = fighter.rikaAlpha;
-        fighter._drawRikaCursedEnergyAura(ctx, opponent, renderState);
-        fighter._drawRika(ctx, opponent, renderState);
-        ctx.restore();
-      }
+      ctx.save();
+      ctx.translate(tremorX, tremorY);
+      ctx.globalAlpha = fighter.rikaAlpha;
+      fighter._drawRikaCursedEnergyAura(ctx, opponent, renderState);
+      fighter._drawRika(ctx, opponent, renderState);
+      ctx.restore();
     }
 
     fighter.hideHpText = wasHidingHp;
