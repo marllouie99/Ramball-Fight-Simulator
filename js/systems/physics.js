@@ -492,7 +492,7 @@ function checkCjVictoryOverlay(winner) {
 
   let isCjWinner = false;
   if (winner) {
-    if (winner === cjFighter || winner.characterId === 'cj' || winner.type === 'cj') {
+    if (winner === cjFighter || winner.characterId === 'cj' || winner.type === 'cj' || (winner._def && (winner._def.id === 'cj' || winner._def.type === 'cj'))) {
       isCjWinner = true;
     } else if (state.getFighterTeam && typeof state.getFighterTeam === 'function') {
       const winnerIdx = state.fighters.indexOf(winner);
@@ -503,13 +503,11 @@ function checkCjVictoryOverlay(winner) {
         isCjWinner = true;
       }
     }
-  } else {
-    isCjWinner = true;
   }
 
   if (isCjWinner) {
     if (typeof triggerMissionPassedOverlay === 'function') {
-      triggerMissionPassedOverlay({ timer: 240 });
+      triggerMissionPassedOverlay({ timer: 180 });
     }
   }
 }

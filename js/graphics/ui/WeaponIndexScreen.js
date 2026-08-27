@@ -4,7 +4,7 @@ import { updatePreviewBalls } from './FighterIndexScreen.js';
 import { FIGHTER_DEFS, CONFIG } from '../../core/config.js';
 import { Fighter } from '../../entities/fighter.js';
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
-import { clearHealthHud } from '../hudManager.js?v=6';
+import { clearHealthHud } from '../hudManager.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { getFighterWeaponInfo } from './CharacterSelectScreen.js';

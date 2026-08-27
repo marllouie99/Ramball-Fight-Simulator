@@ -394,7 +394,7 @@ export class CJFighter extends Fighter {
       this._hasPlayedDeathMusic = true;
       stopSoundBySrc('cj-carroam-noise');
       if (typeof triggerWastedOverlay === 'function') {
-        triggerWastedOverlay({ timer: 220 });
+        triggerWastedOverlay({ timer: 180 });
       }
     }
 
@@ -426,7 +426,7 @@ export class CJFighter extends Fighter {
       this._hasPlayedDeathMusic = true;
       stopSoundBySrc('cj-carroam-noise');
       if (typeof triggerWastedOverlay === 'function') {
-        triggerWastedOverlay({ timer: 220 });
+        triggerWastedOverlay({ timer: 180 });
       }
     }
     if (this.dead) return;

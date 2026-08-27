@@ -79,6 +79,9 @@ export function generateThemeBloodPalette(color) {
 }
 
 function getBloodSprite() {
+  if (typeof window === 'undefined' || !window.PIXI || !state.bloodSquareTexture || !state.pixiLayers || !state.pixiLayers.particles) {
+    return null;
+  }
   if (bloodSpritePool.length > 0) {
     const s = bloodSpritePool.pop();
     s.visible = true;
@@ -121,23 +124,27 @@ function addOrOverwriteBloodParticle(particleData, maxParticles = 300) {
     if (old && old.sprite) releaseBloodSprite(old.sprite);
 
     const sprite = getBloodSprite();
-    sprite.tint = particleData.numericColor;
-    sprite.width = particleData.size;
-    sprite.height = particleData.size;
-    sprite.alpha = 1.0;
-    sprite.x = particleData.x;
-    sprite.y = particleData.y;
+    if (sprite) {
+      sprite.tint = particleData.numericColor;
+      sprite.width = particleData.size;
+      sprite.height = particleData.size;
+      sprite.alpha = 1.0;
+      sprite.x = particleData.x;
+      sprite.y = particleData.y;
+    }
     particleData.sprite = sprite;
 
     state.bloodEffects[bestIdx] = particleData;
   } else {
     const sprite = getBloodSprite();
-    sprite.tint = particleData.numericColor;
-    sprite.width = particleData.size;
-    sprite.height = particleData.size;
-    sprite.alpha = 1.0;
-    sprite.x = particleData.x;
-    sprite.y = particleData.y;
+    if (sprite) {
+      sprite.tint = particleData.numericColor;
+      sprite.width = particleData.size;
+      sprite.height = particleData.size;
+      sprite.alpha = 1.0;
+      sprite.x = particleData.x;
+      sprite.y = particleData.y;
+    }
     particleData.sprite = sprite;
 
     state.bloodEffects.push(particleData);

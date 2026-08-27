@@ -440,8 +440,11 @@ export function stopAllLoopingSounds(fadeDelayMs = 2000, fadeDurationMs = 500) {
 /**
  * Evict the oldest active sound handle to make room for a new one.
  * Uses a micro-fade-out to prevent click/pop on eviction.
+ * @returns {boolean} Whether a sound was successfully evicted
  */
 function _evictOldestSound() {
+  if (_activeSoundHandles.size === 0) return false;
+
   // Find the oldest NON-PROTECTED handle (never evict announcer, faah, death sounds, voicelines, or homie noises)
   let candidate = null;
   for (const handle of _activeSoundHandles) {
@@ -453,8 +456,11 @@ function _evictOldestSound() {
     break;
   }
 
-  // If all active handles are protected voice clips, do not evict them!
-  if (!candidate) return;
+  // If all active handles are protected voice clips, evict the absolute oldest handle
+  if (!candidate) {
+    candidate = _activeSoundHandles.values().next().value;
+  }
+  if (!candidate) return false;
 
   const oldest = candidate;
   if (oldest.gainNode) {
@@ -562,8 +568,9 @@ export function playSound(src, volume = 1.0, speed = 1.0, offset = 0, delay = 0,
   _lastPlayTimes.set(src, now);
 
   // ── Evict oldest sounds if at concurrent limit to prevent audio bus overload ──
-  while (_activeSoundHandles.size >= MAX_CONCURRENT_SOUNDS) {
-    _evictOldestSound();
+  let _evictAttempts = _activeSoundHandles.size;
+  while (_activeSoundHandles.size >= MAX_CONCURRENT_SOUNDS && _evictAttempts-- > 0) {
+    if (!_evictOldestSound()) break;
   }
 
   const cached = _cache.get(src);

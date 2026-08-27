@@ -153,13 +153,13 @@ export const state = {
   screenShake: { timer: 0, maxTimer: 0, intensity: 0 },
 
   // GTA San Andreas Cheat Pop-Out Notification Banner
-  cheatNotification: { text: '', timer: 0, maxTimer: 140 },
+  cheatNotification: null,
 
   // GTA San Andreas "MISSION PASSED! RESPECT +" Arena Overlay
-  missionPassedOverlay: { active: false, timer: 0, maxTimer: 180, title: 'mission passed!', subtitle: 'RESPECT +' },
+  missionPassedOverlay: null,
 
   // GTA San Andreas "WASTED" Death Overlay
-  wastedOverlay: { active: false, timer: 0, maxTimer: 200, title: 'WASTED' },
+  wastedOverlay: null,
 
   // Game flow
   gameState: 'title', // 'title' | 'select' | 'index' | 'indexDetail' | 'leaderboard' | 'weapons' | 'weaponDetail' | 'playing' | 'paused' | 'roundEnd' | 'matchEnd'
@@ -910,6 +910,7 @@ export function triggerMissionPassedOverlay(opts = {}) {
     _playRespectMusic();
     return;
   }
+  state._hadMissionOverlay = true;
   const duration = opts.timer || 180;
   state.missionPassedOverlay = {
     active: true,
@@ -942,7 +943,8 @@ export function triggerWastedOverlay(opts = {}) {
     _playWastedMusic();
     return;
   }
-  const duration = opts.timer || 200;
+  state._hadMissionOverlay = true;
+  const duration = opts.timer || 180;
   state.wastedOverlay = {
     active: true,
     timer: duration,

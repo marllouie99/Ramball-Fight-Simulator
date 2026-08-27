@@ -108,9 +108,9 @@ export function updateGame() {
       state.roundEndTimer++;
 
       // Auto next round / match (allow full duration for SF2 Announcer -> Fighter Voiceline -> Follow For More banner)
-      const hasOverlay = Boolean(state.missionPassedOverlay);
+      const hasOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
       const isFFA = (state.mode === 'FFA' || state.mode === 'Tactical FFA' || state.mode === GAME_MODES.FFA || state.mode === GAME_MODES.TACTICAL_FFA);
-      const autoDelay = (isFFA && state.ffaMatchComplete) ? 340 : (hasOverlay ? 340 : 300);
+      const autoDelay = (isFFA && state.ffaMatchComplete) ? (hasOverlay ? 480 : 380) : (hasOverlay ? 480 : 300);
       if (state.roundEndTimer >= autoDelay) {
         startNextRound();
       }
@@ -125,16 +125,14 @@ export function updateGame() {
       flamewardenFlameSystem.update(dt);
       state.matchEndTimer++;
 
-      // At frame 60 the black overlay starts fading in — clear ALL lingering visual
-      // effects at this exact moment so blood, sparks, wisps, and texts vanish
-      // together with the blackout instead of bleeding through on top of it.
-      if (state.matchEndTimer === 60) {
+      const hasOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+      const blackoutFrame = hasOverlay ? 160 : 60;
+      if (state.matchEndTimer === blackoutFrame) {
         clearAllBattleEffects();
       }
 
       // Auto next match (allow full duration for Mission Passed overlay + champion reveal)
-      const hasOverlay = Boolean(state.missionPassedOverlay);
-      const matchEndAutoDelay = hasOverlay ? 440 : 360;
+      const matchEndAutoDelay = hasOverlay ? 540 : 360;
       if (state.matchEndTimer >= matchEndAutoDelay) {
         if (state.mode === '1v2 Stand Off') {
           resetMatchWithRandom1v2Fighters();

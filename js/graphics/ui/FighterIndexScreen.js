@@ -3,7 +3,7 @@ import { unlockAudio } from '../../systems/soundSystem.js';
 import { goToTitle } from '../../core/gameFlow.js';
 import { state } from '../../core/state.js';
 import { CONFIG, FIGHTER_DEFS, getActiveFighterDefs } from '../../core/config.js';
-import { clearHealthHud } from '../hudManager.js?v=6';
+import { clearHealthHud } from '../hudManager.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
 import { getFighterPreview } from './FighterPreviewCache.js';
 import { previewProjectileSystem, updateIndexDetailDemo, resetIndexDetailState } from '../preview.js';

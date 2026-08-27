@@ -19,7 +19,7 @@ import { burnEffectSystem } from '../graphics/particles/burnEffectVisuals.js';
 import { bomberExplosionSystem } from '../graphics/particles/bomberExplosionVisuals.js';
 import { ParticleSystem } from '../systems/particles/ParticleSystem.js';
 import { clearAllPools } from '../graphics/objectPool.js';
-import { clearHealthHud } from '../graphics/hudManager.js?v=6';
+import { clearHealthHud } from '../graphics/hudManager.js';
 import { AUDIO_CONFIG } from '../configs/audioConfig.js';
 import { clearDroppedMagazines } from '../graphics/particles/johnWickDroppedMagazine.js';
 import { clearDriveBys } from '../systems/cjDriveBySystem.js';
@@ -340,6 +340,8 @@ export function reinitFighters(isNewMatch = false) {
   state.roundEndTimer = 0;
   state.missionPassedOverlay = null;
   state.wastedOverlay = null;
+  state._hadMissionOverlay = false;
+  state.cheatNotification = null;
   state._isChampionLayoutActive = false;
   state._winnerStartPositions = null;
  
@@ -894,6 +896,9 @@ export function startNextRound() {
   state._isChampionLayoutActive = false;
   state.roundEndTimer = 0;
   state.matchEndTimer = 0;
+  state.missionPassedOverlay = null;
+  state.wastedOverlay = null;
+  state._hadMissionOverlay = false;
   const isFFA = (state.mode === GAME_MODES.FFA || state.mode === 'FFA' || state.mode === GAME_MODES.TACTICAL_FFA || state.mode === 'Tactical FFA');
   if (isFFA && state.ffaMatchComplete) {
     resetMatch();
@@ -937,6 +942,9 @@ export function restartCurrentRound() {
   state._isChampionLayoutActive = false;
   state.roundEndTimer = 0;
   state.matchEndTimer = 0;
+  state.missionPassedOverlay = null;
+  state.wastedOverlay = null;
+  state._hadMissionOverlay = false;
   state.illusions = []; // Clear all illusions
   state.wallCracks = []; // Clear all wall crack decals
   if (state.announcerSoundHandle) {
@@ -1113,6 +1121,9 @@ export function resetMatch(showFaceOff = true) {
   state.matchEndTimer = 0;
   state.battleStartDelayTimer = 0;
   state.ffaMatchComplete = false;
+  state.missionPassedOverlay = null;
+  state.wastedOverlay = null;
+  state.cheatNotification = null;
   state._hasPlayedChampionVictoryVoice = false;
   state._hasPlayedChampionYouWinVoice = false;
   state._hasPlayedFollowForMoreSfx = false;
@@ -1166,6 +1177,9 @@ export function goToTitle() {
   stopAllSounds(false, 0, 0);
   stopAllLoopingSounds(0, 0);
   
+  state.missionPassedOverlay = null;
+  state.wastedOverlay = null;
+  state.cheatNotification = null;
   state.wallCracks = []; // Clear all wall crack decals on return to title
   clearHealthHud(); // Flush DOM and Map cache cleanly
   clearDroppedMagazines(); // Clear all John Wick debris

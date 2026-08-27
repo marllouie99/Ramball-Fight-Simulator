@@ -1,7 +1,7 @@
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
 import { state, getLeaderboardData } from '../../core/state.js';
 import { updatePreviewBalls } from './FighterIndexScreen.js';
-import { clearHealthHud } from '../hudManager.js?v=6';
+import { clearHealthHud } from '../hudManager.js';
 import { _clearButtons, _registerButton, handleUIMove, handleUIClick, drawPanel, drawButton, wrapText, drawPremiumStatBar, drawStatBar, drawChamferedRect } from './uiFramework.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { startGame, goToTitle } from '../../core/gameFlow.js';

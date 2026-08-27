@@ -28,25 +28,19 @@ const _RIBBED_OFFSETS = [-0.55, -0.40, -0.25, -0.10, 0, 0.10, 0.25, 0.40, 0.55];
 const _SHOULDER_STRAP_OFFSETS = [-0.32, 0.20];
 
 function _getSkinGrad(ctx, r) {
-  if (!_cachedSkinGrad || _cachedSkinGradR !== r) {
-    _cachedSkinGradR = r;
-    _cachedSkinGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r * 1.05);
-    _cachedSkinGrad.addColorStop(0, 'rgba(255, 235, 210, 0.25)');
-    _cachedSkinGrad.addColorStop(0.65, 'rgba(160, 95, 60, 0.18)');
-    _cachedSkinGrad.addColorStop(1, 'rgba(60, 30, 15, 0.40)');
-  }
-  return _cachedSkinGrad;
+  const g = ctx.createRadialGradient(-r * 0.25, -r * 0.35, r * 0.1, 0, 0, r * 1.05);
+  g.addColorStop(0, 'rgba(255, 235, 210, 0.25)');
+  g.addColorStop(0.65, 'rgba(160, 95, 60, 0.18)');
+  g.addColorStop(1, 'rgba(60, 30, 15, 0.40)');
+  return g;
 }
 
 function _getFadeGrad(ctx, r) {
-  if (!_cachedFadeGrad || _cachedFadeGradR !== r) {
-    _cachedFadeGradR = r;
-    _cachedFadeGrad = ctx.createLinearGradient(0, -r * 0.85, 0, -r * 0.35);
-    _cachedFadeGrad.addColorStop(0, '#1C120C');
-    _cachedFadeGrad.addColorStop(0.70, 'rgba(40, 25, 18, 0.75)');
-    _cachedFadeGrad.addColorStop(1, 'rgba(141, 85, 56, 0)');
-  }
-  return _cachedFadeGrad;
+  const g = ctx.createLinearGradient(0, -r * 0.85, 0, -r * 0.35);
+  g.addColorStop(0, '#1C120C');
+  g.addColorStop(0.70, 'rgba(40, 25, 18, 0.75)');
+  g.addColorStop(1, 'rgba(141, 85, 56, 0)');
+  return g;
 }
 
 /**

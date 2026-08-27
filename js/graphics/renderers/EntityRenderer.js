@@ -258,7 +258,9 @@ export function drawFighters() {
   }
   
   // Sort the actual WebGL layer by Y for correct Z-indexing against other WebGL elements
-  state.pixiLayers.fighters.sortChildren();
+  if (state.pixiLayers?.fighters?.sortChildren) {
+    state.pixiLayers.fighters.sortChildren();
+  }
 
   _sortedFightersBuffer.sort((a, b) => {
     if (!a.f) return -1;

@@ -516,8 +516,8 @@ export function getCurrentPlayingBgmTitle() {
 export function shouldDuckArenaBgm() {
   if (typeof state === 'undefined' || !state.fighters) return false;
 
-  if (Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) ||
-      Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete))) {
+  if (Boolean(state.missionPassedOverlay && state.missionPassedOverlay.active && state.missionPassedOverlay.timer > 0) ||
+      Boolean(state.wastedOverlay && state.wastedOverlay.active && state.wastedOverlay.timer > 0)) {
     return true;
   }
 

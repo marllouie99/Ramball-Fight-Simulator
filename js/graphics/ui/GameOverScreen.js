@@ -4,7 +4,7 @@
 // ─────────────────────────────────────────────
 import { FIGHTER_CLASS_MAP } from '../../entities/factories/fighterFactory.js';
 import { Fighter } from '../../entities/fighter.js';
-import { drawHUD, drawMissionPassedOverlay } from '../hudManager.js?v=6';
+import { drawHUD, drawMissionPassedOverlay } from '../hudManager.js';
 import { state } from '../../core/state.js';
 import { audioSystem } from '../../systems/audioSystem.js';
 import { CONFIG, FIGHTER_DEFS } from '../../core/config.js';
@@ -686,14 +686,15 @@ function drawRoundEndScreen() {
     state._winnerStartPositions = null;
     state._hasPlayedFollowForMoreSfx = false;
     state._hasPlayedChampionYouWinVoice = false;
+    state._hasPlayedChampionVictoryVoice = false;
   }
 
-  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (160 frames).
+  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
   // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
   // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
   const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
-  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
-  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 160 : 75);
+  const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 180 : 75);
   const delayedTimer = Math.max(0, roundEndTimer - displayDelay);
 
   // Check if winner has 2 victories (match win condition)
@@ -758,14 +759,15 @@ function drawMatchEndScreen() {
     state._isChampionLayoutActive = false;
     state._hasPlayedFollowForMoreSfx = false;
     state._hasPlayedChampionYouWinVoice = false;
+    state._hasPlayedChampionVictoryVoice = false;
   }
 
-  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (160 frames).
+  // If CJ's Mission Passed or Wasted overlay is active, let it play out smoothly (180 frames).
   // For Tactical Force, respond quickly (10 frames) with the simple in-arena text.
   // Otherwise wait ~75 frames (~1.25s) for faah.mp3 death audio before transitioning into the champion layout!
   const isTactical = state.gameCategory === 'tactical' || (typeof mode === 'string' && (mode.toLowerCase().includes('tactical')));
-  const hasMissionOverlay = Boolean(state.missionPassedOverlay && (state.missionPassedOverlay.active || state.missionPassedOverlay.timer > 0 || state.missionPassedOverlay.isComplete)) || Boolean(state.wastedOverlay && (state.wastedOverlay.active || state.wastedOverlay.timer > 0 || state.wastedOverlay.isComplete));
-  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 160 : 75);
+  const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+  const displayDelay = isTactical ? 10 : (hasMissionOverlay ? 180 : 75);
   const delayedTimer = Math.max(0, matchEndTimer - displayDelay);
 
   // Determine Match Winner Entity

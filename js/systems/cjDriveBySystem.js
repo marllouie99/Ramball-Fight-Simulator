@@ -667,7 +667,7 @@ export function updateDriveBys() {
         car.y += car.vy;
 
         // ── VICTORY LAP LOGIC: If round/match is over and CJ won, keep car roaming forever! ──
-        const isRoundOver = state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || Boolean(state.missionPassedOverlay);
+        const isRoundOver = state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || Boolean(state.missionPassedOverlay && state.missionPassedOverlay.active && state.missionPassedOverlay.timer > 0);
         const isCjAliveWinner = Boolean(car.owner && !car.owner.dead && car.owner.hp > 0);
 
         if (isRoundOver && isCjAliveWinner) {
@@ -685,7 +685,7 @@ export function updateDriveBys() {
           audioSystem.playSFX('Assets/Sound Effects/Skills/dash3.mp3', 0.95);
         }
       } else if (car.phase === 'EXITING') {
-        const isRoundOver = state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || Boolean(state.missionPassedOverlay);
+        const isRoundOver = state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || Boolean(state.missionPassedOverlay && state.missionPassedOverlay.active && state.missionPassedOverlay.timer > 0);
         const isCjAliveWinner = Boolean(car.owner && !car.owner.dead && car.owner.hp > 0);
 
         if (isRoundOver && isCjAliveWinner) {
@@ -792,13 +792,18 @@ export function updateDriveBys() {
           if (!ent || ent === car.owner || ent.dead || ent.hp <= 0 || (ent.invincibilityTimer || 0) > 0 || ent.isAmbushing || ent.owner === car.owner) return;
 
           // Team check
-          if (typeof state.getFighterTeam === 'function' && car.owner) {
+          const myOwnerIndex = (state.fighters && car.owner) ? state.fighters.indexOf(car.owner) : -1;
+          const myTeam = (myOwnerIndex >= 0 && typeof state.getFighterTeam === 'function') ? state.getFighterTeam(myOwnerIndex) : null;
+
+          if (typeof state.getFighterTeam === 'function' && car.owner && myTeam !== null) {
             if (ent.owner) {
-              const ownerTeam = state.getFighterTeam(state.fighters.indexOf(ent.owner));
-              if (myTeam !== null && ownerTeam !== null && myTeam === ownerTeam) return;
+              const entOwnerIdx = state.fighters ? state.fighters.indexOf(ent.owner) : -1;
+              const ownerTeam = entOwnerIdx >= 0 ? state.getFighterTeam(entOwnerIdx) : null;
+              if (ownerTeam !== null && myTeam === ownerTeam) return;
             } else {
-              const entTeam = state.getFighterTeam(state.fighters.indexOf(ent));
-              if (myTeam !== null && entTeam !== null && myTeam === entTeam) return;
+              const entIdx = state.fighters ? state.fighters.indexOf(ent) : -1;
+              const entTeam = entIdx >= 0 ? state.getFighterTeam(entIdx) : null;
+              if (entTeam !== null && myTeam === entTeam) return;
             }
           }
 
@@ -943,7 +948,7 @@ export function updateDriveBys() {
           const spawnX = homieX + Math.cos(bulletAngle) * tec9TipDist;
           const spawnY = homieY + Math.sin(bulletAngle) * tec9TipDist;
 
-          const myIndex = state.fighters ? state.fighters.indexOf(car.owner) : 0;
+          const myIndex = (state.fighters && car.owner) ? Math.max(0, state.fighters.indexOf(car.owner)) : 0;
           const bSpeed = car.bulletSpeed || cfg.driveByBulletSpeed || 28.0;
           if (typeof projectileSystem !== 'undefined' && projectileSystem) {
             const p = projectileSystem.fireProjectile(

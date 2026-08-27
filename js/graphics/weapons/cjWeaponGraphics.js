@@ -97,16 +97,12 @@ export function drawAuthenticBrassKnucklesShape(ctx, scale = 1.0, opts = {}) {
   ctx.restore();
 }
 
-let _cachedBulletTrailGrad = null;
-
 function _getBulletTrailGrad(ctx) {
-  if (!_cachedBulletTrailGrad) {
-    _cachedBulletTrailGrad = ctx.createLinearGradient(-26, 0, 8, 0);
-    _cachedBulletTrailGrad.addColorStop(0, 'rgba(245, 158, 11, 0)');
-    _cachedBulletTrailGrad.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
-    _cachedBulletTrailGrad.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
-  }
-  return _cachedBulletTrailGrad;
+  const g = ctx.createLinearGradient(-26, 0, 8, 0);
+  g.addColorStop(0, 'rgba(245, 158, 11, 0)');
+  g.addColorStop(0.5, 'rgba(245, 158, 11, 0.45)');
+  g.addColorStop(1, 'rgba(254, 240, 138, 0.95)');
+  return g;
 }
 
 /**
@@ -218,32 +214,30 @@ let _cachedUziRecGrad = null;
 let _cachedUziBarrelGrad = null;
 
 function _initUziGradients(ctx) {
-  if (!_cachedUziMagGrad) {
-    _cachedUziMagGrad = ctx.createLinearGradient(-2.5, 0, 2.5, 0);
-    _cachedUziMagGrad.addColorStop(0.0, '#1E232B');
-    _cachedUziMagGrad.addColorStop(0.35, '#3B4452');
-    _cachedUziMagGrad.addColorStop(0.70, '#1E232B');
-    _cachedUziMagGrad.addColorStop(1.0, '#0F1217');
+  _cachedUziMagGrad = ctx.createLinearGradient(-2.5, 0, 2.5, 0);
+  _cachedUziMagGrad.addColorStop(0.0, '#1E232B');
+  _cachedUziMagGrad.addColorStop(0.35, '#3B4452');
+  _cachedUziMagGrad.addColorStop(0.70, '#1E232B');
+  _cachedUziMagGrad.addColorStop(1.0, '#0F1217');
 
-    _cachedUziGripGrad = ctx.createLinearGradient(-6, 0, 4, 0);
-    _cachedUziGripGrad.addColorStop(0.0, '#181B22');
-    _cachedUziGripGrad.addColorStop(0.35, '#282D37');
-    _cachedUziGripGrad.addColorStop(0.70, '#181B22');
-    _cachedUziGripGrad.addColorStop(1.0, '#0F1116');
+  _cachedUziGripGrad = ctx.createLinearGradient(-6, 0, 4, 0);
+  _cachedUziGripGrad.addColorStop(0.0, '#181B22');
+  _cachedUziGripGrad.addColorStop(0.35, '#282D37');
+  _cachedUziGripGrad.addColorStop(0.70, '#181B22');
+  _cachedUziGripGrad.addColorStop(1.0, '#0F1116');
 
-    _cachedUziRecGrad = ctx.createLinearGradient(0, -6.5, 0, 6.5);
-    _cachedUziRecGrad.addColorStop(0.00, '#2A303C');
-    _cachedUziRecGrad.addColorStop(0.18, '#4D576B');
-    _cachedUziRecGrad.addColorStop(0.42, '#647085');
-    _cachedUziRecGrad.addColorStop(0.70, '#323B4A');
-    _cachedUziRecGrad.addColorStop(1.00, '#1B2028');
+  _cachedUziRecGrad = ctx.createLinearGradient(0, -6.5, 0, 6.5);
+  _cachedUziRecGrad.addColorStop(0.00, '#2A303C');
+  _cachedUziRecGrad.addColorStop(0.18, '#4D576B');
+  _cachedUziRecGrad.addColorStop(0.42, '#647085');
+  _cachedUziRecGrad.addColorStop(0.70, '#323B4A');
+  _cachedUziRecGrad.addColorStop(1.00, '#1B2028');
 
-    _cachedUziBarrelGrad = ctx.createLinearGradient(0, -1.8, 0, 1.8);
-    _cachedUziBarrelGrad.addColorStop(0.0, '#323B4A');
-    _cachedUziBarrelGrad.addColorStop(0.3, '#647085');
-    _cachedUziBarrelGrad.addColorStop(0.7, '#2A303C');
-    _cachedUziBarrelGrad.addColorStop(1.0, '#181B22');
-  }
+  _cachedUziBarrelGrad = ctx.createLinearGradient(0, -1.8, 0, 1.8);
+  _cachedUziBarrelGrad.addColorStop(0.0, '#323B4A');
+  _cachedUziBarrelGrad.addColorStop(0.3, '#647085');
+  _cachedUziBarrelGrad.addColorStop(0.7, '#2A303C');
+  _cachedUziBarrelGrad.addColorStop(1.0, '#181B22');
 }
 
 /**
@@ -806,38 +800,36 @@ let _cachedTec9ShroudGrad = null;
 let _cachedTec9CapGrad = null;
 
 function _initTec9Gradients(ctx) {
-  if (!_cachedTec9MagGrad) {
-    _cachedTec9MagGrad = ctx.createLinearGradient(-3, 0, 3, 0);
-    _cachedTec9MagGrad.addColorStop(0.0, '#161B22');
-    _cachedTec9MagGrad.addColorStop(0.35, '#2D3644');
-    _cachedTec9MagGrad.addColorStop(0.70, '#161B22');
-    _cachedTec9MagGrad.addColorStop(1.0, '#0C0E12');
+  _cachedTec9MagGrad = ctx.createLinearGradient(-3, 0, 3, 0);
+  _cachedTec9MagGrad.addColorStop(0.0, '#161B22');
+  _cachedTec9MagGrad.addColorStop(0.35, '#2D3644');
+  _cachedTec9MagGrad.addColorStop(0.70, '#161B22');
+  _cachedTec9MagGrad.addColorStop(1.0, '#0C0E12');
 
-    _cachedTec9FrameGrad = ctx.createLinearGradient(-16, 0, 14, 0);
-    _cachedTec9FrameGrad.addColorStop(0.0, '#151820');
-    _cachedTec9FrameGrad.addColorStop(0.35, '#242933');
-    _cachedTec9FrameGrad.addColorStop(0.70, '#151820');
-    _cachedTec9FrameGrad.addColorStop(1.0, '#0A0C0F');
+  _cachedTec9FrameGrad = ctx.createLinearGradient(-16, 0, 14, 0);
+  _cachedTec9FrameGrad.addColorStop(0.0, '#151820');
+  _cachedTec9FrameGrad.addColorStop(0.35, '#242933');
+  _cachedTec9FrameGrad.addColorStop(0.70, '#151820');
+  _cachedTec9FrameGrad.addColorStop(1.0, '#0A0C0F');
 
-    _cachedTec9TubeGrad = ctx.createLinearGradient(0, -8.8, 0, -0.6);
-    _cachedTec9TubeGrad.addColorStop(0.00, '#252C36');
-    _cachedTec9TubeGrad.addColorStop(0.18, '#4A5769');
-    _cachedTec9TubeGrad.addColorStop(0.40, '#64748B');
-    _cachedTec9TubeGrad.addColorStop(0.70, '#384454');
-    _cachedTec9TubeGrad.addColorStop(1.00, '#1B2027');
+  _cachedTec9TubeGrad = ctx.createLinearGradient(0, -8.8, 0, -0.6);
+  _cachedTec9TubeGrad.addColorStop(0.00, '#252C36');
+  _cachedTec9TubeGrad.addColorStop(0.18, '#4A5769');
+  _cachedTec9TubeGrad.addColorStop(0.40, '#64748B');
+  _cachedTec9TubeGrad.addColorStop(0.70, '#384454');
+  _cachedTec9TubeGrad.addColorStop(1.00, '#1B2027');
 
-    _cachedTec9ShroudGrad = ctx.createLinearGradient(0, -8.2, 0, -1.0);
-    _cachedTec9ShroudGrad.addColorStop(0.00, '#11141A');
-    _cachedTec9ShroudGrad.addColorStop(0.20, '#28303C');
-    _cachedTec9ShroudGrad.addColorStop(0.50, '#181D24');
-    _cachedTec9ShroudGrad.addColorStop(0.85, '#0E1015');
-    _cachedTec9ShroudGrad.addColorStop(1.00, '#060709');
+  _cachedTec9ShroudGrad = ctx.createLinearGradient(0, -8.2, 0, -1.0);
+  _cachedTec9ShroudGrad.addColorStop(0.00, '#11141A');
+  _cachedTec9ShroudGrad.addColorStop(0.20, '#28303C');
+  _cachedTec9ShroudGrad.addColorStop(0.50, '#181D24');
+  _cachedTec9ShroudGrad.addColorStop(0.85, '#0E1015');
+  _cachedTec9ShroudGrad.addColorStop(1.00, '#060709');
 
-    _cachedTec9CapGrad = ctx.createLinearGradient(0, -6.8, 0, -2.0);
-    _cachedTec9CapGrad.addColorStop(0, '#2E3744');
-    _cachedTec9CapGrad.addColorStop(0.3, '#526075');
-    _cachedTec9CapGrad.addColorStop(1, '#1B2027');
-  }
+  _cachedTec9CapGrad = ctx.createLinearGradient(0, -6.8, 0, -2.0);
+  _cachedTec9CapGrad.addColorStop(0, '#2E3744');
+  _cachedTec9CapGrad.addColorStop(0.3, '#526075');
+  _cachedTec9CapGrad.addColorStop(1, '#1B2027');
 }
 
 /**
@@ -2399,31 +2391,29 @@ let _cachedHeatGrad = null;
 let _cachedClampGrad = null;
 
 function _initMinigunGradients(ctx) {
-  if (!_cachedTopBarrelGrad) {
-    _cachedTopBarrelGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
-    _cachedTopBarrelGrad.addColorStop(0.00, '#384556');
-    _cachedTopBarrelGrad.addColorStop(0.25, '#71829B');
-    _cachedTopBarrelGrad.addColorStop(0.50, '#94A3B8');
-    _cachedTopBarrelGrad.addColorStop(0.80, '#475569');
-    _cachedTopBarrelGrad.addColorStop(1.00, '#1E252F');
+  _cachedTopBarrelGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
+  _cachedTopBarrelGrad.addColorStop(0.00, '#384556');
+  _cachedTopBarrelGrad.addColorStop(0.25, '#71829B');
+  _cachedTopBarrelGrad.addColorStop(0.50, '#94A3B8');
+  _cachedTopBarrelGrad.addColorStop(0.80, '#475569');
+  _cachedTopBarrelGrad.addColorStop(1.00, '#1E252F');
 
-    _cachedBottomBarrelGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
-    _cachedBottomBarrelGrad.addColorStop(0.00, '#1E252F');
-    _cachedBottomBarrelGrad.addColorStop(0.50, '#384556');
-    _cachedBottomBarrelGrad.addColorStop(1.00, '#0E1116');
+  _cachedBottomBarrelGrad = ctx.createLinearGradient(0, -1.2, 0, 1.2);
+  _cachedBottomBarrelGrad.addColorStop(0.00, '#1E252F');
+  _cachedBottomBarrelGrad.addColorStop(0.50, '#384556');
+  _cachedBottomBarrelGrad.addColorStop(1.00, '#0E1116');
 
-    _cachedHeatGrad = ctx.createLinearGradient(0, 0, 14, 0);
-    _cachedHeatGrad.addColorStop(0.0, 'rgba(56, 69, 86, 0)');
-    _cachedHeatGrad.addColorStop(0.5, 'rgba(76, 94, 130, 0.40)');
-    _cachedHeatGrad.addColorStop(0.8, 'rgba(120, 90, 50, 0.35)');
-    _cachedHeatGrad.addColorStop(1.0, 'rgba(30, 37, 47, 0.60)');
+  _cachedHeatGrad = ctx.createLinearGradient(0, 0, 14, 0);
+  _cachedHeatGrad.addColorStop(0.0, 'rgba(56, 69, 86, 0)');
+  _cachedHeatGrad.addColorStop(0.5, 'rgba(76, 94, 130, 0.40)');
+  _cachedHeatGrad.addColorStop(0.8, 'rgba(120, 90, 50, 0.35)');
+  _cachedHeatGrad.addColorStop(1.0, 'rgba(30, 37, 47, 0.60)');
 
-    _cachedClampGrad = ctx.createLinearGradient(0, -8, 0, 8);
-    _cachedClampGrad.addColorStop(0.00, '#2A323D');
-    _cachedClampGrad.addColorStop(0.25, '#475569');
-    _cachedClampGrad.addColorStop(0.70, '#1E232B');
-    _cachedClampGrad.addColorStop(1.00, '#0F1217');
-  }
+  _cachedClampGrad = ctx.createLinearGradient(0, -8, 0, 8);
+  _cachedClampGrad.addColorStop(0.00, '#2A323D');
+  _cachedClampGrad.addColorStop(0.25, '#475569');
+  _cachedClampGrad.addColorStop(0.70, '#1E232B');
+  _cachedClampGrad.addColorStop(1.00, '#0F1217');
 }
 
 /**
@@ -2509,18 +2499,14 @@ function _drawMinigunClampRing(ctx, x, y, w, h) {
   ctx.restore();
 }
 
-let _cachedMuzzleGlowGrad = null;
-
 function _getMuzzleGlowGrad(ctx, glowR) {
-  if (!_cachedMuzzleGlowGrad) {
-    _cachedMuzzleGlowGrad = ctx.createRadialGradient(4, 0, 0, 4, 0, 48);
-    _cachedMuzzleGlowGrad.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
-    _cachedMuzzleGlowGrad.addColorStop(0.25, 'rgba(254, 240, 138, 0.88)');
-    _cachedMuzzleGlowGrad.addColorStop(0.55, 'rgba(249, 115, 22, 0.55)');
-    _cachedMuzzleGlowGrad.addColorStop(0.82, 'rgba(220, 38, 38, 0.20)');
-    _cachedMuzzleGlowGrad.addColorStop(1.0, 'rgba(220, 38, 38, 0)');
-  }
-  return _cachedMuzzleGlowGrad;
+  const g = ctx.createRadialGradient(4, 0, 0, 4, 0, 48);
+  g.addColorStop(0.0, 'rgba(255, 255, 255, 0.98)');
+  g.addColorStop(0.25, 'rgba(254, 240, 138, 0.88)');
+  g.addColorStop(0.55, 'rgba(249, 115, 22, 0.55)');
+  g.addColorStop(0.82, 'rgba(220, 38, 38, 0.20)');
+  g.addColorStop(1.0, 'rgba(220, 38, 38, 0)');
+  return g;
 }
 
 /**
@@ -2675,17 +2661,13 @@ function _drawMinigunRotationalMuzzleFlash(ctx, x, y, scale = 1.0, spinAngle = 0
   ctx.restore();
 }
 
-let _cachedMinigunTrailGrad = null;
-
 function _getMinigunTrailGrad(ctx) {
-  if (!_cachedMinigunTrailGrad) {
-    _cachedMinigunTrailGrad = ctx.createLinearGradient(-38, 0, 14, 0);
-    _cachedMinigunTrailGrad.addColorStop(0, 'rgba(234, 88, 12, 0)');
-    _cachedMinigunTrailGrad.addColorStop(0.35, 'rgba(245, 158, 11, 0.65)');
-    _cachedMinigunTrailGrad.addColorStop(0.75, 'rgba(251, 191, 36, 0.95)');
-    _cachedMinigunTrailGrad.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
-  }
-  return _cachedMinigunTrailGrad;
+  const g = ctx.createLinearGradient(-38, 0, 14, 0);
+  g.addColorStop(0, 'rgba(234, 88, 12, 0)');
+  g.addColorStop(0.35, 'rgba(245, 158, 11, 0.65)');
+  g.addColorStop(0.75, 'rgba(251, 191, 36, 0.95)');
+  g.addColorStop(1.0, 'rgba(255, 255, 255, 1.0)');
+  return g;
 }
 
 /**

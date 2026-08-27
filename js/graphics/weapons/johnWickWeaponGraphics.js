@@ -1012,53 +1012,43 @@ let _cachedRifleTrailGrad = null;
 let _cachedRifleCoreGrad = null;
 
 function _getBulletTrailGrad(ctx) {
-  if (!_cachedBulletTrailGrad) {
-    _cachedBulletTrailGrad = ctx.createLinearGradient(-32, 0, 0, 0);
-    _cachedBulletTrailGrad.addColorStop(0, 'rgba(251, 191, 36, 0.0)');
-    _cachedBulletTrailGrad.addColorStop(0.5, 'rgba(251, 191, 36, 0.3)');
-    _cachedBulletTrailGrad.addColorStop(1.0, 'rgba(254, 240, 138, 0.8)');
-  }
-  return _cachedBulletTrailGrad;
+  const g = ctx.createLinearGradient(-32, 0, 0, 0);
+  g.addColorStop(0, 'rgba(251, 191, 36, 0.0)');
+  g.addColorStop(0.5, 'rgba(251, 191, 36, 0.3)');
+  g.addColorStop(1.0, 'rgba(254, 240, 138, 0.8)');
+  return g;
 }
 
 function _getBulletCoreGrad(ctx) {
-  if (!_cachedBulletCoreGrad) {
-    _cachedBulletCoreGrad = ctx.createLinearGradient(-7, 0, 7, 0);
-    _cachedBulletCoreGrad.addColorStop(0, '#D97706'); // Copper jacket base
-    _cachedBulletCoreGrad.addColorStop(0.6, '#F59E0B'); // Polished gold middle
-    _cachedBulletCoreGrad.addColorStop(1.0, '#FEF08A'); // Hot-white tip
-  }
-  return _cachedBulletCoreGrad;
+  const g = ctx.createLinearGradient(-7, 0, 7, 0);
+  g.addColorStop(0, '#D97706'); // Copper jacket base
+  g.addColorStop(0.6, '#F59E0B'); // Polished gold middle
+  g.addColorStop(1.0, '#FEF08A'); // Hot-white tip
+  return g;
 }
 
 function _getPelletStreakGrad(ctx) {
-  if (!_cachedPelletStreakGrad) {
-    _cachedPelletStreakGrad = ctx.createLinearGradient(-18, 0, 0, 0);
-    _cachedPelletStreakGrad.addColorStop(0, 'rgba(239, 68, 68, 0)');
-    _cachedPelletStreakGrad.addColorStop(0.5, 'rgba(249, 115, 22, 0.5)');
-    _cachedPelletStreakGrad.addColorStop(1.0, 'rgba(254, 240, 138, 0.9)');
-  }
-  return _cachedPelletStreakGrad;
+  const g = ctx.createLinearGradient(-18, 0, 0, 0);
+  g.addColorStop(0, 'rgba(239, 68, 68, 0)');
+  g.addColorStop(0.5, 'rgba(249, 115, 22, 0.5)');
+  g.addColorStop(1.0, 'rgba(254, 240, 138, 0.9)');
+  return g;
 }
 
 function _getRifleTrailGrad(ctx) {
-  if (!_cachedRifleTrailGrad) {
-    _cachedRifleTrailGrad = ctx.createLinearGradient(-28, 0, 0, 0);
-    _cachedRifleTrailGrad.addColorStop(0, 'rgba(56, 189, 248, 0)');
-    _cachedRifleTrailGrad.addColorStop(0.6, 'rgba(245, 158, 11, 0.35)');
-    _cachedRifleTrailGrad.addColorStop(1.0, 'rgba(254, 240, 138, 0.85)');
-  }
-  return _cachedRifleTrailGrad;
+  const g = ctx.createLinearGradient(-28, 0, 0, 0);
+  g.addColorStop(0, 'rgba(56, 189, 248, 0)');
+  g.addColorStop(0.6, 'rgba(245, 158, 11, 0.35)');
+  g.addColorStop(1.0, 'rgba(254, 240, 138, 0.85)');
+  return g;
 }
 
 function _getRifleCoreGrad(ctx) {
-  if (!_cachedRifleCoreGrad) {
-    _cachedRifleCoreGrad = ctx.createLinearGradient(-8, 0, 8, 0);
-    _cachedRifleCoreGrad.addColorStop(0, '#D97706');    // Copper jacket base
-    _cachedRifleCoreGrad.addColorStop(0.65, '#F59E0B'); // Polished brass middle
-    _cachedRifleCoreGrad.addColorStop(1.0, '#10B981');  // Green-tip M855 steel penetrator tip
-  }
-  return _cachedRifleCoreGrad;
+  const g = ctx.createLinearGradient(-8, 0, 8, 0);
+  g.addColorStop(0, '#D97706');    // Copper jacket base
+  g.addColorStop(0.65, '#F59E0B'); // Polished brass middle
+  g.addColorStop(1.0, '#10B981');  // Green-tip M855 steel penetrator tip
+  return g;
 }
 
 /**

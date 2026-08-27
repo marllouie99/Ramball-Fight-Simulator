@@ -185,7 +185,7 @@ export function drawHUD() {
     }
   }
   if (containerLeft) {
-    if (hudOpacity <= 0 || !containerLeft.children.length) {
+    if (hudOpacity <= 0 || !containerLeft.children || !containerLeft.children.length) {
       containerLeft.style.visibility = 'hidden';
       containerLeft.style.pointerEvents = 'none';
       containerLeft.style.display = 'none';
@@ -197,7 +197,7 @@ export function drawHUD() {
     }
   }
   if (containerRight) {
-    if (hudOpacity <= 0 || !containerRight.children.length) {
+    if (hudOpacity <= 0 || !containerRight.children || !containerRight.children.length) {
       containerRight.style.visibility = 'hidden';
       containerRight.style.pointerEvents = 'none';
       containerRight.style.display = 'none';
@@ -227,9 +227,18 @@ export function drawHUD() {
  */
 export function drawCheatNotification(ctx) {
   const notif = state.cheatNotification;
-  if (!notif || notif.timer <= 0) return;
+  if (!notif || notif.timer <= 0) {
+    if (state.cheatNotification && state.cheatNotification.timer <= 0) {
+      state.cheatNotification = null;
+    }
+    return;
+  }
 
   notif.timer--;
+  if (notif.timer <= 0) {
+    state.cheatNotification = null;
+    return;
+  }
 
   const text = notif.text || 'Cheat activated';
   const fontSize = 15;
@@ -274,7 +283,12 @@ export function drawCheatNotification(ctx) {
  */
 export function drawMissionPassedOverlay(ctx) {
   const overlay = state.missionPassedOverlay;
-  if (!overlay || !overlay.active || overlay.timer <= 0) return;
+  if (!overlay || !overlay.active || overlay.timer <= 0) {
+    if (state.missionPassedOverlay && (state.missionPassedOverlay.timer <= 0 || !state.missionPassedOverlay.active)) {
+      state.missionPassedOverlay = null;
+    }
+    return;
+  }
 
   // Unconditionally decrement timer once per draw frame
   overlay.timer--;
@@ -297,6 +311,7 @@ export function drawMissionPassedOverlay(ctx) {
   if (overlay.timer <= 0) {
     overlay.active = false;
     overlay.isComplete = true;
+    state.missionPassedOverlay = null;
     return;
   }
 
@@ -393,7 +408,12 @@ export function drawMissionPassedOverlay(ctx) {
  */
 export function drawWastedOverlay(ctx) {
   const overlay = state.wastedOverlay;
-  if (!overlay || !overlay.active || overlay.timer <= 0) return;
+  if (!overlay || !overlay.active || overlay.timer <= 0) {
+    if (state.wastedOverlay && (state.wastedOverlay.timer <= 0 || !state.wastedOverlay.active)) {
+      state.wastedOverlay = null;
+    }
+    return;
+  }
 
   // Unconditionally decrement timer once per draw frame
   overlay.timer--;
@@ -415,6 +435,7 @@ export function drawWastedOverlay(ctx) {
   if (overlay.timer <= 0) {
     overlay.active = false;
     overlay.isComplete = true;
+    state.wastedOverlay = null;
     return;
   }
 

@@ -412,6 +412,7 @@ function drawOuterActionTrianglesAndNeedles(ctx, width, height, arena, isDark) {
 
 export function drawArena() {
   const { ctx, canvas, arena, pixiLayers, pixiApp } = state;
+  const isDark = (state.arenaTheme === 'dark');
 
   // Custom Tactical Shooter Battleground Map
   if (state.gameCategory === 'tactical') {
@@ -433,59 +434,63 @@ export function drawArena() {
   const hasActiveDomain = state.fighters && state.fighters.some(f => f && f.domainActive && typeof f.drawDomainBackground === 'function');
 
   // 1. Draw outer background container (Original Colors)
-  if (!state.arenaGraphics) {
-    state.arenaGraphics = new window.PIXI.Graphics();
-    pixiLayers.arena.addChild(state.arenaGraphics);
-  }
-  
-  const g = state.arenaGraphics;
-  g.clear();
-
-  const parseColor = (c) => {
-    if (typeof c === 'number') return { color: c, alpha: 1 };
-    if (!c) return { color: 0x000000, alpha: 1 };
-    let hex = c.replace('#', '');
-    if (hex.length === 8) return { color: parseInt(hex.substring(0, 6), 16), alpha: parseInt(hex.substring(6, 8), 16) / 255 };
-    if (hex.length === 6) return { color: parseInt(hex, 16), alpha: 1 };
-    if (hex.length === 3) return { color: parseInt(hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2], 16), alpha: 1 };
-    return { color: 0x000000, alpha: 1 };
-  };
-
-  const isDark = (state.arenaTheme === 'dark');
-  const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#000000'));
-  const outerBg = parseColor(isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
-  const innerBg = parseColor(isDark ? '#1a1c23' : (CONFIG.arenaInnerBgColor || '#ffffff'));
-
-  g.beginFill(canvasBg.color, canvasBg.alpha);
-  g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
-  g.endFill();
-
-  const whiteTop = 0;
-  const whiteBottom = pixiApp.screen.height;
-  if (!hasActiveDomain) {
-    g.beginFill(outerBg.color, outerBg.alpha);
-    g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
-    g.endFill();
-  } else {
-    g.beginFill(canvasBg.color, canvasBg.alpha);
-    g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
-    g.endFill();
-  }
-
-  // 2. Draw Floor Background (Original Colors)
-  if (!hasActiveDomain) {
-    if (!state.floorGraphics) {
-      state.floorGraphics = new window.PIXI.Graphics();
-      pixiLayers.environment.addChildAt(state.floorGraphics, 0);
+  if (typeof window !== 'undefined' && window.PIXI && pixiApp && pixiLayers?.arena) {
+    if (!state.arenaGraphics) {
+      state.arenaGraphics = new window.PIXI.Graphics();
+      pixiLayers.arena.addChild(state.arenaGraphics);
     }
-    const fg = state.floorGraphics;
-    fg.clear();
-    fg.beginFill(innerBg.color, innerBg.alpha);
-    fg.drawRect(arena.x, arena.y, arena.width, arena.height);
-    fg.endFill();
-  } else {
-    if (state.floorGraphics) {
-      state.floorGraphics.clear();
+    
+    const g = state.arenaGraphics;
+    g.clear();
+
+    const parseColor = (c) => {
+      if (typeof c === 'number') return { color: c, alpha: 1 };
+      if (!c) return { color: 0x000000, alpha: 1 };
+      let hex = c.replace('#', '');
+      if (hex.length === 8) return { color: parseInt(hex.substring(0, 6), 16), alpha: parseInt(hex.substring(6, 8), 16) / 255 };
+      if (hex.length === 6) return { color: parseInt(hex, 16), alpha: 1 };
+      if (hex.length === 3) return { color: parseInt(hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2], 16), alpha: 1 };
+      return { color: 0x000000, alpha: 1 };
+    };
+
+    const isDark = (state.arenaTheme === 'dark');
+    const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#000000'));
+    const outerBg = parseColor(isDark ? '#121318' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
+    const innerBg = parseColor(isDark ? '#1a1c23' : (CONFIG.arenaInnerBgColor || '#ffffff'));
+
+    g.beginFill(canvasBg.color, canvasBg.alpha);
+    g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
+    g.endFill();
+
+    const whiteTop = 0;
+    const whiteBottom = pixiApp.screen.height;
+    if (!hasActiveDomain) {
+      g.beginFill(outerBg.color, outerBg.alpha);
+      g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+      g.endFill();
+    } else {
+      g.beginFill(canvasBg.color, canvasBg.alpha);
+      g.drawRect(0, whiteTop, pixiApp.screen.width, whiteBottom - whiteTop);
+      g.endFill();
+    }
+
+    // 2. Draw Floor Background (Original Colors)
+    if (!hasActiveDomain) {
+      if (!state.floorGraphics && pixiLayers?.environment) {
+        state.floorGraphics = new window.PIXI.Graphics();
+        pixiLayers.environment.addChildAt(state.floorGraphics, 0);
+      }
+      if (state.floorGraphics) {
+        const fg = state.floorGraphics;
+        fg.clear();
+        fg.beginFill(innerBg.color, innerBg.alpha);
+        fg.drawRect(arena.x, arena.y, arena.width, arena.height);
+        fg.endFill();
+      }
+    } else {
+      if (state.floorGraphics) {
+        state.floorGraphics.clear();
+      }
     }
   }
 

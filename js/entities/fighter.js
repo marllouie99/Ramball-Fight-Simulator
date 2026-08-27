@@ -1393,11 +1393,23 @@ export class Fighter {
       }
     }
 
-    // Trigger GTA Mission Passed overlay on round or match win for CJ
-    if (typeof triggerMissionPassedOverlay === 'function') {
+    // Trigger GTA Mission Passed overlay on round or match win for CJ (only when CJ or CJ's team is verified winner)
+    if (typeof triggerMissionPassedOverlay === 'function' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
       const cjFighter = state.fighters && state.fighters.find(f => f && (f.characterId === 'cj' || f.type === 'cj' || (f._def && (f._def.id === 'cj' || f._def.type === 'cj'))));
-      if (cjFighter && !cjFighter.dead && cjFighter.hp > 0) {
-        triggerMissionPassedOverlay();
+      if (cjFighter && !cjFighter.dead && cjFighter.hp > 0 && state.roundWinner) {
+        let isCjWinner = (state.roundWinner === cjFighter || state.roundWinner.characterId === 'cj' || state.roundWinner.type === 'cj' || (state.roundWinner._def && (state.roundWinner._def.id === 'cj' || state.roundWinner._def.type === 'cj')));
+        if (!isCjWinner && state.getFighterTeam && typeof state.getFighterTeam === 'function') {
+          const winnerIdx = state.fighters.indexOf(state.roundWinner);
+          const cjIdx = state.fighters.indexOf(cjFighter);
+          const winnerTeam = state.getFighterTeam(winnerIdx);
+          const cjTeam = state.getFighterTeam(cjIdx);
+          if (winnerTeam !== null && winnerTeam === cjTeam) {
+            isCjWinner = true;
+          }
+        }
+        if (isCjWinner) {
+          triggerMissionPassedOverlay({ timer: 180 });
+        }
       }
     }
   }

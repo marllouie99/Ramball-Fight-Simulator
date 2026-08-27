@@ -20,68 +20,64 @@ let _cachedRimGrad = null;
 let _cachedWheelCanvas = null;
 
 function _getHeadlightGrad(ctx, length) {
-  if (!_cachedHeadlightGrad) {
-    _cachedHeadlightGrad = ctx.createLinearGradient(0, 0, length, 0);
-    _cachedHeadlightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
-    _cachedHeadlightGrad.addColorStop(0.3, 'rgba(253, 224, 71, 0.20)');
-    _cachedHeadlightGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.06)');
-    _cachedHeadlightGrad.addColorStop(1, 'rgba(234, 179, 8, 0)');
-  }
+  _cachedHeadlightGrad = ctx.createLinearGradient(0, 0, length, 0);
+  _cachedHeadlightGrad.addColorStop(0, 'rgba(254, 240, 138, 0.45)');
+  _cachedHeadlightGrad.addColorStop(0.3, 'rgba(253, 224, 71, 0.20)');
+  _cachedHeadlightGrad.addColorStop(0.7, 'rgba(250, 204, 21, 0.06)');
+  _cachedHeadlightGrad.addColorStop(1, 'rgba(234, 179, 8, 0)');
   return _cachedHeadlightGrad;
 }
 
 function _initVehicleGradients(ctx, halfW, length, width, cabinX, cabinW, cabinH, roofH, rimH) {
-  if (!_cachedBodyGrad) {
-    // Authentic 1980s Greenwood Sedan Pale Vintage Sage Green Paint
-    _cachedBodyGrad = ctx.createLinearGradient(0, -36, 0, 36);
-    _cachedBodyGrad.addColorStop(0, '#5A7862');    // Shadowed underside
-    _cachedBodyGrad.addColorStop(0.12, '#76987E'); // Muted Pale Sage
-    _cachedBodyGrad.addColorStop(0.35, '#95BA9D'); // Soft Pale Mint-Sage
-    _cachedBodyGrad.addColorStop(0.5, '#B8DBC0');  // Glossy Pale Sunlit Highlight
-    _cachedBodyGrad.addColorStop(0.72, '#95BA9D');
-    _cachedBodyGrad.addColorStop(0.92, '#76987E');
-    _cachedBodyGrad.addColorStop(1, '#5A7862');
+  // Authentic 1980s Greenwood Sedan Pale Vintage Sage Green Paint
+  _cachedBodyGrad = ctx.createLinearGradient(0, -36, 0, 36);
+  _cachedBodyGrad.addColorStop(0, '#5A7862');    // Shadowed underside
+  _cachedBodyGrad.addColorStop(0.12, '#76987E'); // Muted Pale Sage
+  _cachedBodyGrad.addColorStop(0.35, '#95BA9D'); // Soft Pale Mint-Sage
+  _cachedBodyGrad.addColorStop(0.5, '#B8DBC0');  // Glossy Pale Sunlit Highlight
+  _cachedBodyGrad.addColorStop(0.72, '#95BA9D');
+  _cachedBodyGrad.addColorStop(0.92, '#76987E');
+  _cachedBodyGrad.addColorStop(1, '#5A7862');
 
-    _cachedBumpGrad = ctx.createLinearGradient(0, -34, 0, 34);
-    _cachedBumpGrad.addColorStop(0, '#CBD5E1');
-    _cachedBumpGrad.addColorStop(0.5, '#FFFFFF');
-    _cachedBumpGrad.addColorStop(1, '#94A3B8');
+  _cachedBumpGrad = ctx.createLinearGradient(0, -34, 0, 34);
+  _cachedBumpGrad.addColorStop(0, '#CBD5E1');
+  _cachedBumpGrad.addColorStop(0.5, '#FFFFFF');
+  _cachedBumpGrad.addColorStop(1, '#94A3B8');
 
-    _cachedWindshieldGrad = ctx.createLinearGradient(-10, -28, 20, 28);
-    _cachedWindshieldGrad.addColorStop(0, '#0F172A');
-    _cachedWindshieldGrad.addColorStop(0.4, '#334155');
-    _cachedWindshieldGrad.addColorStop(0.7, '#1E293B');
-    _cachedWindshieldGrad.addColorStop(1, '#020617');
+  _cachedWindshieldGrad = ctx.createLinearGradient(-10, -28, 20, 28);
+  _cachedWindshieldGrad.addColorStop(0, '#0F172A');
+  _cachedWindshieldGrad.addColorStop(0.4, '#334155');
+  _cachedWindshieldGrad.addColorStop(0.7, '#1E293B');
+  _cachedWindshieldGrad.addColorStop(1, '#020617');
 
-    _cachedRearGlassGrad = ctx.createLinearGradient(-30, 0, 0, 0);
-    _cachedRearGlassGrad.addColorStop(0, '#020617');
-    _cachedRearGlassGrad.addColorStop(0.6, '#1E293B');
-    _cachedRearGlassGrad.addColorStop(1, '#0F172A');
+  _cachedRearGlassGrad = ctx.createLinearGradient(-30, 0, 0, 0);
+  _cachedRearGlassGrad.addColorStop(0, '#020617');
+  _cachedRearGlassGrad.addColorStop(0.6, '#1E293B');
+  _cachedRearGlassGrad.addColorStop(1, '#0F172A');
 
-    // Landau Vinyl Top Roof (Soft Pale Olive-Sage Vinyl)
-    _cachedRoofGrad = ctx.createLinearGradient(0, -24, 0, 24);
-    _cachedRoofGrad.addColorStop(0, '#4E6554');   // Soft Muted Vinyl Edge
-    _cachedRoofGrad.addColorStop(0.3, '#698470');
-    _cachedRoofGrad.addColorStop(0.5, '#87A58E');  // Pale Vinyl Crown Highlight
-    _cachedRoofGrad.addColorStop(0.7, '#698470');
-    _cachedRoofGrad.addColorStop(1, '#4E6554');
+  // Landau Vinyl Top Roof (Soft Pale Olive-Sage Vinyl)
+  _cachedRoofGrad = ctx.createLinearGradient(0, -24, 0, 24);
+  _cachedRoofGrad.addColorStop(0, '#4E6554');   // Soft Muted Vinyl Edge
+  _cachedRoofGrad.addColorStop(0.3, '#698470');
+  _cachedRoofGrad.addColorStop(0.5, '#87A58E');  // Pale Vinyl Crown Highlight
+  _cachedRoofGrad.addColorStop(0.7, '#698470');
+  _cachedRoofGrad.addColorStop(1, '#4E6554');
 
-    _cachedRimGrad = ctx.createLinearGradient(0, -5, 0, 5);
-    _cachedRimGrad.addColorStop(0, '#E2E8F0');
-    _cachedRimGrad.addColorStop(0.5, '#FFFFFF');
-    _cachedRimGrad.addColorStop(1, '#94A3B8');
+  _cachedRimGrad = ctx.createLinearGradient(0, -5, 0, 5);
+  _cachedRimGrad.addColorStop(0, '#E2E8F0');
+  _cachedRimGrad.addColorStop(0.5, '#FFFFFF');
+  _cachedRimGrad.addColorStop(1, '#94A3B8');
 
-    _cachedSmokeGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 16);
-    _cachedSmokeGrad.addColorStop(0, 'rgba(245, 248, 255, 0.65)');
-    _cachedSmokeGrad.addColorStop(0.65, 'rgba(215, 222, 232, 0.35)');
-    _cachedSmokeGrad.addColorStop(1, 'rgba(180, 190, 205, 0)');
+  _cachedSmokeGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, 16);
+  _cachedSmokeGrad.addColorStop(0, 'rgba(245, 248, 255, 0.65)');
+  _cachedSmokeGrad.addColorStop(0.65, 'rgba(215, 222, 232, 0.35)');
+  _cachedSmokeGrad.addColorStop(1, 'rgba(180, 190, 205, 0)');
 
-    _cachedOilGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, 55);
-    _cachedOilGrad.addColorStop(0, 'rgba(8, 8, 12, 0.85)');
-    _cachedOilGrad.addColorStop(0.6, 'rgba(18, 20, 24, 0.75)');
-    _cachedOilGrad.addColorStop(0.88, 'rgba(30, 38, 28, 0.35)');
-    _cachedOilGrad.addColorStop(1, 'rgba(6, 6, 8, 0)');
-  }
+  _cachedOilGrad = ctx.createRadialGradient(0, 0, 8, 0, 0, 55);
+  _cachedOilGrad.addColorStop(0, 'rgba(8, 8, 12, 0.85)');
+  _cachedOilGrad.addColorStop(0.6, 'rgba(18, 20, 24, 0.75)');
+  _cachedOilGrad.addColorStop(0.88, 'rgba(30, 38, 28, 0.35)');
+  _cachedOilGrad.addColorStop(1, 'rgba(6, 6, 8, 0)');
 }
 
 /**

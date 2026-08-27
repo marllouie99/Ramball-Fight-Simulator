@@ -47,24 +47,26 @@ export function renderGame() {
     // and dim effects from glitching behind/above panels on menu/select/index screens.
     const isBattleState = !['title', 'select', 'index', 'indexDetail', 'leaderboard', 'weapons', 'weaponDetail', 'weaponStudio', 'faceoff'].includes(state.gameState);
     if (state.pixiLayers) {
-      state.pixiLayers.background.visible = isBattleState;
-      state.pixiLayers.arena.visible = isBattleState;
-      state.pixiLayers.shadows.visible = isBattleState;
-      state.pixiLayers.environment.visible = isBattleState;
-      state.pixiLayers.projectiles.visible = isBattleState;
-      state.pixiLayers.particles.visible = isBattleState;
-      state.pixiLayers.effects.visible = isBattleState;
+      if (state.pixiLayers.background) state.pixiLayers.background.visible = isBattleState;
+      if (state.pixiLayers.arena) state.pixiLayers.arena.visible = isBattleState;
+      if (state.pixiLayers.shadows) state.pixiLayers.shadows.visible = isBattleState;
+      if (state.pixiLayers.environment) state.pixiLayers.environment.visible = isBattleState;
+      if (state.pixiLayers.projectiles) state.pixiLayers.projectiles.visible = isBattleState;
+      if (state.pixiLayers.particles) state.pixiLayers.particles.visible = isBattleState;
+      if (state.pixiLayers.effects) state.pixiLayers.effects.visible = isBattleState;
     }
 
     let stateDim = 0;
+    const hasMissionOverlay = Boolean(state._hadMissionOverlay || (state.missionPassedOverlay && state.missionPassedOverlay.active) || (state.wastedOverlay && state.wastedOverlay.active));
+    const dimStartFrame = hasMissionOverlay ? 160 : 60;
     if (state.gameState === 'matchEnd') {
       const timer = state.matchEndTimer || 0;
-      const delayedTimer = Math.max(0, timer - 60);
-      stateDim = Math.min(0.96, (delayedTimer / 60) * 0.96);
+      const delayedTimer = Math.max(0, timer - dimStartFrame);
+      stateDim = Math.min(0.96, (delayedTimer / 45) * 0.96);
     } else if (state.gameState === 'roundEnd') {
       const timer = state.roundEndTimer || 0;
-      const delayedTimer = Math.max(0, timer - 60);
-      stateDim = Math.min(0.96, (delayedTimer / 60) * 0.96);
+      const delayedTimer = Math.max(0, timer - dimStartFrame);
+      stateDim = Math.min(0.96, (delayedTimer / 45) * 0.96);
     }
 
     const baseDim = state.globalDimOpacity || 0;
@@ -165,10 +167,10 @@ export function renderGame() {
         state.floatingTextCtx.clearRect(0, 0, state.floatingTextCanvas.width, state.floatingTextCanvas.height);
       }
       if (state.pixiLayers) {
-        state.pixiLayers.projectiles.visible = false;
-        state.pixiLayers.particles.visible = false;
-        state.pixiLayers.effects.visible = false;
-        state.pixiLayers.environment.visible = false;
+        if (state.pixiLayers.projectiles) state.pixiLayers.projectiles.visible = false;
+        if (state.pixiLayers.particles) state.pixiLayers.particles.visible = false;
+        if (state.pixiLayers.effects) state.pixiLayers.effects.visible = false;
+        if (state.pixiLayers.environment) state.pixiLayers.environment.visible = false;
       }
       const hudTop = document.getElementById('hudTopContainer');
       const hudBot = document.getElementById('hudBottomContainer');
@@ -184,19 +186,19 @@ export function renderGame() {
     } else {
       if (state.pixiLayers) {
         // Restore gameplay WebGL layers that were hidden during faceoff/menu screens
-        state.pixiLayers.projectiles.visible = true;
-        state.pixiLayers.particles.visible = true;
-        state.pixiLayers.effects.visible = true;
-        state.pixiLayers.environment.visible = true;
+        if (state.pixiLayers.projectiles) state.pixiLayers.projectiles.visible = true;
+        if (state.pixiLayers.particles) state.pixiLayers.particles.visible = true;
+        if (state.pixiLayers.effects) state.pixiLayers.effects.visible = true;
+        if (state.pixiLayers.environment) state.pixiLayers.environment.visible = true;
         // Stop shaking the arena layer (keep outer background static)
-        state.pixiLayers.arena.position.set(0, 0);
+        if (state.pixiLayers.arena?.position?.set) state.pixiLayers.arena.position.set(0, 0);
         // OPTIMIZED: Only set positions if currently shaking or if we need to reset them to 0
         const hasShake = (shakeX !== 0 || shakeY !== 0);
         if (hasShake || state._lastShakeX !== 0 || state._lastShakeY !== 0) {
-          state.pixiLayers.environment.position.set(shakeX, shakeY);
-          state.pixiLayers.projectiles.position.set(shakeX, shakeY);
-          state.pixiLayers.particles.position.set(shakeX, shakeY);
-          state.pixiLayers.effects.position.set(shakeX, shakeY);
+          if (state.pixiLayers.environment?.position?.set) state.pixiLayers.environment.position.set(shakeX, shakeY);
+          if (state.pixiLayers.projectiles?.position?.set) state.pixiLayers.projectiles.position.set(shakeX, shakeY);
+          if (state.pixiLayers.particles?.position?.set) state.pixiLayers.particles.position.set(shakeX, shakeY);
+          if (state.pixiLayers.effects?.position?.set) state.pixiLayers.effects.position.set(shakeX, shakeY);
           state._lastShakeX = shakeX;
           state._lastShakeY = shakeY;
         }
