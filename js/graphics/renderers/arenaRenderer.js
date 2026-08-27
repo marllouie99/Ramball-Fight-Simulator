@@ -514,57 +514,68 @@ export function drawArena() {
   }
 
   // 4. Draw Arena Borders
-  const wallWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
-    ? state.config.arena.wallWidth 
-    : 4;
+  {
+    const wallWidth = (typeof state !== 'undefined' && state.config && state.config.arena && state.config.arena.wallWidth) 
+      ? state.config.arena.wallWidth 
+      : 4;
 
-  const borderColor = isDark ? 'rgba(230, 235, 245, 0.85)' : 'rgba(15, 15, 18, 0.85)';
-  const borderKey = `${arena.width}_${arena.height}_${wallWidth}_${isDark ? 'dark' : 'light'}`;
-  if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
-    const padding = 60;
-    const offCanvas = document.createElement('canvas');
-    offCanvas.width = arena.width + padding * 2;
-    offCanvas.height = arena.height + padding * 2;
-    const oc = offCanvas.getContext('2d');
-    drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth, borderColor);
-    offCanvas._key = borderKey;
-    state._arenaBorderCanvas = offCanvas;
-  }
-
-  const shakeX = state.shakeX || 0;
-  const shakeY = state.shakeY || 0;
-  ctx.save();
-  ctx.translate(shakeX, shakeY);
-  ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
-
-  // ── Draw Wall Cracks (Decals) ──
-  if (state.wallCracks && state.wallCracks.length > 0) {
-    ctx.save();
-    ctx.beginPath();
-    const clipMarginTop = 75;
-    const clipMarginBottom = 75;
-    const clipMarginSides = 42;
-    ctx.rect(
-      arena.x - clipMarginSides,
-      arena.y - clipMarginTop,
-      arena.width + clipMarginSides * 2,
-      arena.height + clipMarginTop + clipMarginBottom
-    );
-    ctx.clip();
-
-    for (let i = state.wallCracks.length - 1; i >= 0; i--) {
-      const crack = state.wallCracks[i];
-      crack.life--;
-      if (crack.life <= 0) {
-        state.wallCracks.splice(i, 1);
-        continue;
+    const borderColor = isDark ? 'rgba(255, 255, 255, 0.85)' : 'rgba(15, 15, 18, 0.85)';
+    const borderKey = `${arena.width}_${arena.height}_${wallWidth}_${isDark ? 'dark_clean' : 'light'}`;
+    if (!state._arenaBorderCanvas || state._arenaBorderCanvas._key !== borderKey) {
+      const padding = 60;
+      const offCanvas = document.createElement('canvas');
+      offCanvas.width = arena.width + padding * 2;
+      offCanvas.height = arena.height + padding * 2;
+      const oc = offCanvas.getContext('2d');
+      if (isDark) {
+        // Clean straight-line borders for Dark Mode
+        oc.strokeStyle = borderColor;
+        oc.lineWidth = wallWidth;
+        oc.lineJoin = 'miter';
+        oc.lineCap = 'square';
+        oc.strokeRect(padding, padding, arena.width, arena.height);
+      } else {
+        drawSketchyArenaBorders(oc, { x: padding, y: padding, width: arena.width, height: arena.height }, wallWidth, borderColor);
       }
-      drawSolidVectorCrack(ctx, crack, isDark);
+      offCanvas._key = borderKey;
+      state._arenaBorderCanvas = offCanvas;
     }
+
+    const shakeX = state.shakeX || 0;
+    const shakeY = state.shakeY || 0;
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+    ctx.drawImage(state._arenaBorderCanvas, arena.x - 60, arena.y - 60);
+
+    // ── Draw Wall Cracks (Decals) ──
+    if (state.wallCracks && state.wallCracks.length > 0) {
+      ctx.save();
+      ctx.beginPath();
+      const clipMarginTop = 75;
+      const clipMarginBottom = 75;
+      const clipMarginSides = 42;
+      ctx.rect(
+        arena.x - clipMarginSides,
+        arena.y - clipMarginTop,
+        arena.width + clipMarginSides * 2,
+        arena.height + clipMarginTop + clipMarginBottom
+      );
+      ctx.clip();
+
+      for (let i = state.wallCracks.length - 1; i >= 0; i--) {
+        const crack = state.wallCracks[i];
+        crack.life--;
+        if (crack.life <= 0) {
+          state.wallCracks.splice(i, 1);
+          continue;
+        }
+        drawSolidVectorCrack(ctx, crack, isDark);
+      }
+      ctx.restore();
+    }
+
     ctx.restore();
   }
-
-  ctx.restore();
 
   // 5. Draw "CRONOSPHERE" transparent watermark (Light Mode Only - hidden in Dark Mode)
   if (!isDark) {
@@ -587,14 +598,14 @@ export function drawArena() {
 
   // 5b. Text above Top Arena Wall (Dark Mode: Fighter Names | Light Mode: BGM Title)
   if (isDark) {
-    // In DARK MODE: Display Match Fighters Name above Top Arena Wall (e.g. "GOJO VS SUKUNA")
+    // In DARK MODE: Display Match Fighters Name above Top Arena Wall (e.g. "GOJO VS SUKUNA") with prominent bold typography
     if (state.fighters && state.fighters.length > 0 && (state.gameState === 'playing' || state.gameState === 'countdown' || state.gameState === 'roundEnd' || state.gameState === 'matchEnd')) {
-      const textY = arena.y - 9;
+      const textY = arena.y - 12;
       ctx.save();
-      ctx.font = '900 12px "Outfit", "Rajdhani", "Trebuchet MS", sans-serif';
+      ctx.font = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
       ctx.textBaseline = 'bottom';
       if ('letterSpacing' in ctx) {
-        ctx.letterSpacing = '1.5px';
+        ctx.letterSpacing = '2px';
       }
 
       if (state.fighters.length === 2) {
@@ -602,32 +613,54 @@ export function drawArena() {
         const f2 = state.fighters[1];
         const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
         const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
-        const vsText = ' VS ';
+        const vsText = 'VS';
 
+        const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const vsPadding = 12;
+
+        ctx.font = nameFont;
         const w1 = ctx.measureText(name1).width;
-        const wVs = ctx.measureText(vsText).width;
         const w2 = ctx.measureText(name2).width;
-        const totalW = w1 + wVs + w2;
+
+        ctx.font = vsFont;
+        const wVs = ctx.measureText(vsText).width;
+
+        const totalW = w1 + vsPadding + wVs + vsPadding + w2;
+        const maxW = arena.width - 16; // 8px padding on each side
+        const scale = totalW > maxW ? maxW / totalW : 1.0;
+
+        ctx.translate(centerX, textY);
+        ctx.scale(scale, 1.0);
+        ctx.translate(-centerX, -textY);
 
         let startX = centerX - totalW / 2;
 
-        ctx.lineWidth = 3.5;
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.textAlign = 'left';
 
         // Fighter 1 Name
-        ctx.textAlign = 'left';
+        ctx.font = nameFont;
+        ctx.lineWidth = 4.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = f1.themeColor || f1.color || '#38BDF8';
         ctx.strokeText(name1, startX, textY);
         ctx.fillText(name1, startX, textY);
-        startX += w1;
+        startX += w1 + vsPadding;
 
-        // " VS "
-        ctx.fillStyle = '#94A3B8'; // Sleek neutral slate / silver
-        ctx.strokeText(vsText, startX, textY);
-        ctx.fillText(vsText, startX, textY);
-        startX += wVs;
+        // "VS" Accent
+        ctx.font = vsFont;
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillStyle = '#94A3B8';
+        const vsY = textY - 1.5;
+        ctx.strokeText(vsText, startX, vsY);
+        ctx.fillText(vsText, startX, vsY);
+        startX += wVs + vsPadding;
 
         // Fighter 2 Name
+        ctx.font = nameFont;
+        ctx.lineWidth = 4.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = f2.themeColor || f2.color || '#F87171';
         ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
@@ -635,7 +668,13 @@ export function drawArena() {
         // Multi-fighter or single fighter fallback
         const names = state.fighters.map(f => (f.name || f._def?.name || f.characterId || 'P').toUpperCase()).join(' VS ');
         ctx.textAlign = 'center';
-        ctx.lineWidth = 3.5;
+        const namesW = ctx.measureText(names).width;
+        const maxW = arena.width - 16;
+        const scale = namesW > maxW ? maxW / namesW : 1.0;
+        ctx.translate(centerX, textY);
+        ctx.scale(scale, 1.0);
+        ctx.translate(-centerX, -textY);
+        ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
         ctx.fillStyle = '#F8FAFC';
         ctx.strokeText(names, centerX, textY);

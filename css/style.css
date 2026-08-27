@@ -862,15 +862,59 @@ canvas {
   background-color: #000000 !important;
 }
 
+/* Hide fighter names in HUD in Dark Mode since they are prominently displayed above the top arena wall */
 .arena-dark-mode .health-card__title,
 .health-card.arena-dark-mode .health-card__title,
 .arena-dark-mode .tac-name,
 .health-card.arena-dark-mode .tac-name {
-  color: #FFFFFF !important;
-  -webkit-text-stroke: 0.8px #000000;
-  text-stroke: 0.8px #000000;
-  paint-order: stroke fill;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 6px rgba(0, 0, 0, 0.9) !important;
+  display: none !important;
+}
+
+.arena-dark-mode .health-card__header-row {
+  margin-bottom: 0 !important;
+}
+
+/* Arcade Style Font Text in Dark Mode (Excluding CJ unique GTA HUD) */
+.arena-dark-mode #healthHud,
+.arena-dark-mode #healthHud *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.arena-dark-mode #healthHudLeft,
+.arena-dark-mode #healthHudLeft *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.arena-dark-mode #healthHudRight,
+.arena-dark-mode #healthHudRight *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.arena-dark-mode #hudBottomContainer,
+.arena-dark-mode #hudBottomContainer *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.arena-dark-mode #hudTopContainer,
+.arena-dark-mode #hudTopContainer *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.arena-dark-mode .health-card,
+.arena-dark-mode .health-card *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.health-card.arena-dark-mode,
+.health-card.arena-dark-mode *:not(.hud-cj-clock-text):not(.hud-cj-weapon-ammo):not(.hud-cj-money-text),
+.arena-dark-mode .hud-skill-box,
+.arena-dark-mode .hud-skill-box *,
+.arena-dark-mode .health-card__bar-text,
+.arena-dark-mode .health-card__info,
+.arena-dark-mode .health-card__desc,
+.arena-dark-mode .health-card__meta,
+.arena-dark-mode .tac-name,
+.arena-dark-mode .tac-caliber,
+.arena-dark-mode .tac-hp-badge {
+  font-family: 'Silkscreen', 'Press Start 2P', 'Rajdhani', monospace, sans-serif !important;
+}
+
+/* Preserve CJ Unique GTA HUD Pricedown Font in Dark Mode */
+.arena-dark-mode .hud-cj-clock-text,
+.health-card.arena-dark-mode .hud-cj-clock-text {
+  font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
+}
+
+.arena-dark-mode .hud-cj-weapon-ammo,
+.health-card.arena-dark-mode .hud-cj-weapon-ammo {
+  font-family: 'Pricedown', 'Impact', sans-serif !important;
+}
+
+.arena-dark-mode .hud-cj-money-text,
+.health-card.arena-dark-mode .hud-cj-money-text {
+  font-family: 'Pricedown', 'Impact', 'Arial Black', sans-serif !important;
 }
 
 .arena-dark-mode .health-card__info,
@@ -896,7 +940,7 @@ canvas {
 .arena-dark-mode .hud-skill-box,
 .health-card.arena-dark-mode .hud-skill-box {
   background: rgba(255, 255, 255, 0.08);
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border: 1.5px solid #FFFFFF !important;
   box-shadow: 1px 1px 2px rgba(0, 0, 0, 0.6), inset 0 0 4px rgba(255, 255, 255, 0.05);
 }
 
@@ -906,21 +950,27 @@ canvas {
 }
 
 .arena-dark-mode .hud-skill-box-text,
-.health-card.arena-dark-mode .hud-skill-box-text {
+.health-card.arena-dark-mode .hud-skill-box-text,
+.arena-dark-mode .hud-skill-box-text *,
+.health-card.arena-dark-mode .hud-skill-box-text *,
+.arena-dark-mode .hud-skill-box.label-only .hud-skill-box-text,
+.health-card.arena-dark-mode .hud-skill-box.label-only .hud-skill-box-text {
   color: #ffffff !important;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.9) !important;
 }
 
 .arena-dark-mode .health-card__bar,
 .health-card.arena-dark-mode .health-card__bar {
   background: rgba(255, 255, 255, 0.08);
-  border: 1.5px solid rgba(255, 255, 255, 0.28);
+  border: 1.5px solid #FFFFFF !important;
 }
 
+/* Healthbar Text in Dark Mode: White */
 .arena-dark-mode .health-card__bar-text,
 .health-card.arena-dark-mode .health-card__bar-text {
-  color: #ffffff;
-  text-shadow: 0 0 3px #000000, 0 1px 2px #000000;
+  color: #ffffff !important;
+  font-weight: 700 !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95) !important;
 }
 
 .arena-dark-mode .health-card__win-bullet,
@@ -2165,7 +2215,12 @@ canvas {
 
 /* ── CJ Custom HUD Dark Mode & Dimmed Overrides ── */
 .arena-dark-mode .health-card__bar.hud-bar-cj,
-.health-card.arena-dark-mode .health-card__bar.hud-bar-cj,
+.health-card.arena-dark-mode .health-card__bar.hud-bar-cj {
+  border: 1.5px solid #FFFFFF !important;
+  background: rgba(0, 0, 0, 0.55) !important;
+  box-shadow: none !important;
+}
+
 .hud-dimmed .health-card__bar.hud-bar-cj,
 .health-card.hud-dimmed .health-card__bar.hud-bar-cj {
   border: 2.5px solid #000000 !important;
@@ -2177,7 +2232,7 @@ canvas {
 .health-card.arena-dark-mode .health-card__bar.hud-bar-cj .health-card__fill,
 .hud-dimmed .health-card__bar.hud-bar-cj .health-card__fill,
 .health-card.hud-dimmed .health-card__bar.hud-bar-cj .health-card__fill {
-  background: #FFFFFF !important;
+  background: #DC2626 !important; /* Authentic GTA San Andreas Red Health bar */
   box-shadow: none !important;
 }
 
@@ -2185,13 +2240,18 @@ canvas {
 .health-card.arena-dark-mode .health-card__bar.hud-bar-cj .health-card__bar-text,
 .hud-dimmed .health-card__bar.hud-bar-cj .health-card__bar-text,
 .health-card.hud-dimmed .health-card__bar.hud-bar-cj .health-card__bar-text {
-  color: #000000 !important;
-  text-shadow: none !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 1px 2px #000000 !important;
   -webkit-text-stroke: 0px !important;
 }
 
 .arena-dark-mode .hud-skill-box.hud-skill-box-cj,
-.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj,
+.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj {
+  border: 1.5px solid #FFFFFF !important;
+  background: rgba(255, 255, 255, 0.08) !important;
+  box-shadow: none !important;
+}
+
 .hud-dimmed .hud-skill-box.hud-skill-box-cj,
 .health-card.hud-dimmed .hud-skill-box.hud-skill-box-cj {
   border: 2.5px solid #000000 !important;
@@ -2200,11 +2260,16 @@ canvas {
 }
 
 .arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill,
-.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill,
+.health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill {
+  background: #2b3d52 !important; /* Sleek dark steel slate theme */
+  opacity: 0.85 !important;
+  box-shadow: none !important;
+}
+
 .hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill,
 .health-card.hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-fill {
-  background: #8BB5E8 !important;
-  opacity: 1.0 !important;
+  background: #2b3d52 !important;
+  opacity: 0.85 !important;
   box-shadow: none !important;
 }
 
@@ -2212,8 +2277,8 @@ canvas {
 .health-card.arena-dark-mode .hud-skill-box.hud-skill-box-cj .hud-skill-box-text,
 .hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-text,
 .health-card.hud-dimmed .hud-skill-box.hud-skill-box-cj .hud-skill-box-text {
-  color: #000000 !important;
-  text-shadow: none !important;
+  color: #FFFFFF !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95), 0 0 4px rgba(0, 0, 0, 0.9) !important;
   -webkit-text-stroke: 0px !important;
 }
 

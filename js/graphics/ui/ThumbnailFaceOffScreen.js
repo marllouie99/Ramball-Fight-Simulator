@@ -1566,9 +1566,12 @@ function drawAnimeBrushVsClash(ctx, cx, cy, label, ease, leftColor, rightColor) 
     ctx.save();
     ctx.translate(-24 - vOffset, -vOffset * 0.5);
 
+    const _isDark = (state.arenaTheme === 'dark');
+    const _vsFont = _isDark ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
+    const _vsSmFont = _isDark ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
     ctx.strokeStyle = hexToRgba(leftColor, 0.40);
     ctx.lineWidth = 14;
-    ctx.font = '900 68px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+    ctx.font = `900 ${_isDark ? 52 : 68}px ${_vsFont}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeText('V', 0, 2);
@@ -1581,7 +1584,7 @@ function drawAnimeBrushVsClash(ctx, cx, cy, label, ease, leftColor, rightColor) 
     ctx.fillText('V', 0, 2);
 
     ctx.fillStyle = adjustBrightness(leftColor, +45);
-    ctx.font = '900 64px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+    ctx.font = `900 ${_isDark ? 48 : 64}px ${_vsSmFont}`;
     ctx.fillText('V', -1, 0);
     ctx.restore();
 
@@ -1591,7 +1594,7 @@ function drawAnimeBrushVsClash(ctx, cx, cy, label, ease, leftColor, rightColor) 
 
     ctx.strokeStyle = hexToRgba(rightColor, 0.40);
     ctx.lineWidth = 14;
-    ctx.font = '900 68px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+    ctx.font = `900 ${_isDark ? 52 : 68}px ${_vsFont}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeText('S', 0, 0);
@@ -1604,14 +1607,14 @@ function drawAnimeBrushVsClash(ctx, cx, cy, label, ease, leftColor, rightColor) 
     ctx.fillText('S', 0, 0);
 
     ctx.fillStyle = adjustBrightness(rightColor, +45);
-    ctx.font = '900 64px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+    ctx.font = `900 ${_isDark ? 48 : 64}px ${_vsSmFont}`;
     ctx.fillText('S', 1, -1);
     ctx.restore();
   } else {
     ctx.save();
     ctx.scale(Math.min(1.0, ease), Math.min(1.0, ease));
     ctx.fillStyle = rightColor;
-    ctx.font = '900 32px "Permanent Marker", "Bangers", "Outfit", sans-serif';
+    ctx.font = `900 ${(state.arenaTheme === 'dark') ? 22 : 32}px ${(state.arenaTheme === 'dark') ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif'}`;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.strokeStyle = '#000000';
@@ -1646,8 +1649,10 @@ function drawCountdownDigit(ctx, cx, cy, digitStr, ease, leftColor, rightColor, 
   ctx.fill();
 
   // 2. Large Stylized Countdown Typography
-  const fontSize = isFight ? 64 : 96;
-  ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", sans-serif`;
+  const _isDarkCD = (state.arenaTheme === 'dark');
+  const _cdFontFamily = _isDarkCD ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
+  const fontSize = _isDarkCD ? (isFight ? 48 : 72) : (isFight ? 64 : 96);
+  ctx.font = `900 ${fontSize}px ${_cdFontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -1672,7 +1677,7 @@ function drawCountdownDigit(ctx, cx, cy, digitStr, ease, leftColor, rightColor, 
 
   // Layer D: Inner bright white highlight core
   ctx.fillStyle = '#ffffff';
-  ctx.font = `900 ${fontSize * 0.94}px "Permanent Marker", "Bangers", "Outfit", sans-serif`;
+  ctx.font = `900 ${fontSize * 0.94}px ${_cdFontFamily}`;
   ctx.fillText(digitStr, 0, isFight ? 1 : 2);
 
   ctx.restore();
@@ -1716,9 +1721,13 @@ function drawFighterCleanName(ctx, cx, cy, name, accentColor, fontScale = 1.0) {
   const upperName = name.toUpperCase();
   ctx.save();
 
-  const baseFontSize = upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30);
+  const _isDarkName = (state.arenaTheme === 'dark');
+  const _nameFontFamily = _isDarkName ? '"Silkscreen", "Press Start 2P", monospace' : '"Outfit", "Rajdhani", sans-serif';
+  const baseFontSize = _isDarkName
+    ? (upperName.length > 10 ? 14 : (upperName.length > 7 ? 17 : 20))
+    : (upperName.length > 10 ? 22 : (upperName.length > 7 ? 26 : 30));
   const fontSize = Math.round(baseFontSize * fontScale);
-  ctx.font = `900 ${fontSize}px "Outfit", "Rajdhani", sans-serif`;
+  ctx.font = `900 ${fontSize}px ${_nameFontFamily}`;
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -1785,7 +1794,7 @@ function drawSavedToast(ctx, width, height, timer, leftColor = '#38bdf8', rightC
   ctx.stroke();
 
   ctx.fillStyle = '#ffffff';
-  ctx.font = '900 12.5px "Rajdhani", sans-serif';
+  ctx.font = (state.arenaTheme === 'dark') ? '700 9px "Silkscreen", "Press Start 2P", monospace' : '900 12.5px "Rajdhani", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('📸 THUMBNAIL PNG SAVED TO DOWNLOADS!', width / 2, toastY + toastH / 2);

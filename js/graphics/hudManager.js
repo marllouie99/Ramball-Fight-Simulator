@@ -260,8 +260,9 @@ export function drawCheatNotification(ctx) {
   const targetX = arenaX + 10;
   const targetY = arenaY + 10;
 
-  // 1. Authentic GTA San Andreas flat dark teal-slate box (#1d3336) with sharp 0px rectangular edges
-  ctx.fillStyle = '#1d3336';
+  // 1. Box Background: dark-gray in Dark Mode (#262930), authentic GTA dark teal-slate in Light Mode (#1d3336)
+  const isDark = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+  ctx.fillStyle = isDark ? '#262930' : '#1d3336';
   ctx.fillRect(targetX, targetY, boxWidth, boxHeight);
 
   // 2. Text rendering with 1px black drop-shadow
@@ -271,8 +272,8 @@ export function drawCheatNotification(ctx) {
   ctx.fillStyle = 'rgba(0, 0, 0, 0.95)';
   ctx.fillText(text, textX + 1, textY + 1);
 
-  // Exact muted silver-teal text color from GTA SA HUD (#b3c8cc)
-  ctx.fillStyle = '#b3c8cc';
+  // Text color: crisp silver-white (#f1f5f9) in Dark Mode, muted silver-teal (#b3c8cc) in Light Mode
+  ctx.fillStyle = isDark ? '#f1f5f9' : '#b3c8cc';
   ctx.fillText(text, textX, textY);
 
   ctx.restore();
@@ -1891,7 +1892,9 @@ function updateHealthHud() {
         const isMemberCj = m && (m.characterId === 'cj' || m.type === 'cj');
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+        const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
+        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? healthyGreen : ratio > 0.25 ? '#eab308' : '#ef4444');
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
@@ -1939,7 +1942,9 @@ function updateHealthHud() {
     } else {
       const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
-      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? '#22c55e' : safeRatio > 0.25 ? '#eab308' : '#ef4444');
+      const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+      const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
+      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? healthyGreen : safeRatio > 0.25 ? '#eab308' : '#ef4444');
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
       
@@ -2355,7 +2360,9 @@ function updateHealthHud() {
         const maxHp = fighter._originalMaxHp || fighter.maxHp;
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-        const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+        const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
+        const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyGreen : ratio > 0.25 ? '#eab308' : '#ef4444');
         const glow = getGlowStyles(fighter);
         
         if (m.lastHpPct !== percent) {
@@ -2526,7 +2533,9 @@ function updateHealthHud() {
       const maxHp = fighter._originalMaxHp || fighter.maxHp;
       const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
-      const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? '#22c55e' : ratio > 0.25 ? '#eab308' : '#ef4444');
+      const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
+      const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
+      const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyGreen : ratio > 0.25 ? '#eab308' : '#ef4444');
       const glow = getGlowStyles(fighter);
 
       if (cachedCard.hpBarFill) {

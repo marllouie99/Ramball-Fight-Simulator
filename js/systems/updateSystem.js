@@ -30,19 +30,31 @@ export function updateGame() {
       }
 
       if (state.faceOffAutoStart) {
-        // Audio SFX cues at key countdown milestones (with 32-frame dramatic standoff pause)
-        if (state.faceOffTimer === 96) triggerFaceOffSFX('skill_dash5', 0.35); // VS clash
-        if (state.faceOffTimer === 126) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
-        if (state.faceOffTimer === 156) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
-        if (state.faceOffTimer === 186) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
-        if (state.faceOffTimer === 216) {
-          triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
-          triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
-        }
+        const isDarkSkip = (state.arenaTheme === 'dark');
 
-        // When showoff countdown concludes at frame 242, launch directly into combat!
-        if (state.faceOffTimer >= 242) {
-          startMatchDirectlyFromFaceOff();
+        if (isDarkSkip) {
+          // Dark Mode: Skip showoff entirely — go straight to arena with FIGHT! overlay
+          if (state.faceOffTimer === 1) {
+            triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0);
+            triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0);
+            state._darkFightTextTimer = 36; // Show "FIGHT!" text for ~0.6s in arena
+            startMatchDirectlyFromFaceOff();
+          }
+        } else {
+          // Light Mode: Full showoff with VS entrance + countdown 3... 2... 1... FIGHT!
+          if (state.faceOffTimer === 96) triggerFaceOffSFX('skill_dash5', 0.35); // VS clash
+          if (state.faceOffTimer === 126) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 3
+          if (state.faceOffTimer === 156) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 2
+          if (state.faceOffTimer === 186) triggerFaceOffSFX('Assets/Sound Effects/Announcer/timertick.mp3', 0.9); // 1
+          if (state.faceOffTimer === 216) {
+            triggerFaceOffSFX('Assets/Sound Effects/Announcer/fight.mp3', 1.0); // FIGHT!
+            triggerFaceOffSFX('Assets/Sound Effects/Announcer/ring-bell.mp3', 1.0); // Ring Bell
+          }
+
+          // When showoff countdown concludes at frame 242, launch directly into combat!
+          if (state.faceOffTimer >= 242) {
+            startMatchDirectlyFromFaceOff();
+          }
         }
       } else {
         // Manual thumbnail hold mode: hold at frame 120 (VS settled)

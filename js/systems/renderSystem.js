@@ -182,7 +182,23 @@ export function renderGame() {
       if (hudMain) { hudMain.style.display = 'none'; hudMain.style.visibility = 'hidden'; }
       if (hudLeft) { hudLeft.style.display = 'none'; hudLeft.style.visibility = 'hidden'; }
       if (hudRight) { hudRight.style.display = 'none'; hudRight.style.visibility = 'hidden'; }
-      drawFaceOffThumbnailScreen();
+
+      const isDarkFaceOff = (state.arenaTheme === 'dark');
+      if (isDarkFaceOff) {
+        // Dark Mode: Faceoff is skipped on frame 1 (transitions to playing instantly)
+        // This block should not be reached, but as a fallback draw black
+        const fCtx = state.ctx || (state.topLevelUiCtx);
+        const fCanvas = state.canvas || (state.topLevelUiCanvas);
+        if (fCtx && fCanvas) {
+          fCtx.save();
+          fCtx.setTransform(1, 0, 0, 1, 0, 0);
+          fCtx.fillStyle = '#000000';
+          fCtx.fillRect(0, 0, fCanvas.width, fCanvas.height);
+          fCtx.restore();
+        }
+      } else {
+        drawFaceOffThumbnailScreen();
+      }
     } else {
       if (state.pixiLayers) {
         // Restore gameplay WebGL layers that were hidden during faceoff/menu screens
@@ -224,6 +240,27 @@ export function renderGame() {
 
       try {
 
+        // ── Dark Mode: Clip all dim effects to arena boundaries ──
+        const isDarkClip = (state.arenaTheme === 'dark') && state.arena;
+        if (isDarkClip) {
+          state.ctx.save();
+          state.ctx.beginPath();
+          state.ctx.rect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+          state.ctx.clip();
+
+          // Apply PIXI mask on WebGL effects layer to clip dim sprites to arena
+          if (state.pixiLayers?.effects && state.arena) {
+            if (!state._darkDimMask) {
+              state._darkDimMask = new window.PIXI.Graphics();
+            }
+            state._darkDimMask.clear();
+            state._darkDimMask.beginFill(0xffffff);
+            state._darkDimMask.drawRect(state.arena.x, state.arena.y, state.arena.width, state.arena.height);
+            state._darkDimMask.endFill();
+            state.pixiLayers.effects.mask = state._darkDimMask;
+          }
+        }
+
         // ── FULL-SCREEN DIM EFFECTS & DOMAIN BACKGROUNDS (Rendered behind fighters so fighters stay un-tinted) ──
         drawStormDimScreen(); // Draw dark dim screen overlay when Zeus is charging Storm
         updateHybridEnvironment(); // WebGL & 2D full-screen dim effects (Gojo Purple, Sukuna Fuga, Mahoraga adaptation)
@@ -239,6 +276,15 @@ export function renderGame() {
         drawSaitamaSeriousPunchDimScreen();
         drawGenosSelfDestructDimScreen(); // Smooth dim on charge + cyan starburst on explosion
         drawBankaiImpactDimScreen(); // Short black-crimson radial dim on Ichigo Bankai lightning impact
+
+        // ── Dark Mode: Restore clip after dim effects ──
+        if (isDarkClip) {
+          state.ctx.restore();
+          // Remove PIXI mask so other WebGL layers are unaffected
+          if (state.pixiLayers?.effects) {
+            state.pixiLayers.effects.mask = null;
+          }
+        }
 
         const isGojoDomainActive = state.fighters && state.fighters.some(f => f && (f.type === 'gojo' || (f._def && f._def.id === 'gojo')) && f.domainActive);
 
@@ -381,14 +427,49 @@ export function renderGame() {
       }
 
       if (state.gameState === 'playing') {
-        // Smooth White Flash Veil Dissolve when entering arena from Face-Off Countdown
-        if (state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
+        const isDarkPlaying = (state.arenaTheme === 'dark');
+
+        // Smooth White Flash Veil Dissolve when entering arena from Face-Off Countdown (disabled in Dark Mode)
+        if (!isDarkPlaying && state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
           state.battleStartFadeTimer--;
           const uiCtx = state.topLevelUiCtx || state.ctx;
           const flashAlpha = Math.max(0, state.battleStartFadeTimer / 16);
           uiCtx.save();
           uiCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha * 0.95})`;
           uiCtx.fillRect(0, 0, state.canvas.width, state.canvas.height);
+          uiCtx.restore();
+        }
+        // Dark Mode: Skip white flash but still tick down the timer
+        if (isDarkPlaying && state.battleStartFadeTimer && state.battleStartFadeTimer > 0) {
+          state.battleStartFadeTimer = 0;
+        }
+
+        // Dark Mode: "FIGHT!" arcade text overlay during battle start delay
+        if (isDarkPlaying && state._darkFightTextTimer && state._darkFightTextTimer > 0) {
+          state._darkFightTextTimer--;
+          const uiCtx = state.topLevelUiCtx || state.ctx;
+          const arena = state.arena || { x: 50, y: 150, width: 440, height: 680 };
+          const cx = arena.x + arena.width / 2;
+          const cy = arena.y + arena.height / 2;
+          const fadeAlpha = Math.min(1.0, state._darkFightTextTimer / 10);
+          const popP = Math.min(1.0, (36 - state._darkFightTextTimer) / 8);
+          const popScale = 0.5 + 0.5 * (1 - Math.pow(1 - popP, 3));
+
+          uiCtx.save();
+          uiCtx.globalAlpha = fadeAlpha;
+          uiCtx.translate(cx, cy);
+          uiCtx.scale(popScale, popScale);
+          uiCtx.font = '900 48px "Silkscreen", "Press Start 2P", monospace';
+          uiCtx.textAlign = 'center';
+          uiCtx.textBaseline = 'middle';
+          uiCtx.strokeStyle = 'rgba(255, 50, 50, 0.6)';
+          uiCtx.lineWidth = 10;
+          uiCtx.strokeText('FIGHT!', 0, 0);
+          uiCtx.strokeStyle = '#000000';
+          uiCtx.lineWidth = 5;
+          uiCtx.strokeText('FIGHT!', 0, 0);
+          uiCtx.fillStyle = '#ffffff';
+          uiCtx.fillText('FIGHT!', 0, 0);
           uiCtx.restore();
         }
       } else if (state.gameState === 'countdown') {

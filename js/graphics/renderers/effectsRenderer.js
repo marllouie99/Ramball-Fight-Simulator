@@ -202,10 +202,15 @@ export function drawFloatingTexts() {
       
       const isTactical = (state.gameCategory === 'tactical' || (state.mode && String(state.mode).toLowerCase().includes('tactical')));
 
-      // Simple, clean modern font for Tactical Force; stylized comic/brush fonts for FOC
-      const targetFont = isTactical
-        ? (t.isDamage ? '900 18px "Outfit", "Segoe UI", sans-serif' : '900 13.5px "Rajdhani", "Outfit", "Segoe UI", sans-serif')
-        : (t.isDamage ? 'bold 20px "Architects Daughter"' : 'bold 18px "Glast Blitch"');
+      // Arcade font in Dark Mode; clean modern font for Tactical; stylized comic/brush fonts for FOC Light
+      let targetFont;
+      if (isDark) {
+        targetFont = t.isDamage ? '700 16px "Silkscreen", "Press Start 2P", monospace' : '700 12px "Silkscreen", "Press Start 2P", monospace';
+      } else if (isTactical) {
+        targetFont = t.isDamage ? '900 18px "Outfit", "Segoe UI", sans-serif' : '900 13.5px "Rajdhani", "Outfit", "Segoe UI", sans-serif';
+      } else {
+        targetFont = t.isDamage ? 'bold 20px "Architects Daughter"' : 'bold 18px "Glast Blitch"';
+      }
 
       if (currentFont !== targetFont) {
         ctx.font = targetFont;

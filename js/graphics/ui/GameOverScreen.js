@@ -152,12 +152,15 @@ function drawChampionTitle(ctx, cx, y, titleText, themeColor, maxAllowedWidth = 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  let fontSize = 34;
-  ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif`;
+  const isDark = (state.arenaTheme === 'dark');
+  const fontFamily = isDark ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif';
+
+  let fontSize = isDark ? 28 : 34;
+  ctx.font = `900 ${fontSize}px ${fontFamily}`;
   let measuredW = ctx.measureText(titleText).width;
   if (measuredW > maxAllowedWidth) {
     fontSize = Math.max(16, Math.floor(fontSize * (maxAllowedWidth / measuredW)));
-    ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif`;
+    ctx.font = `900 ${fontSize}px ${fontFamily}`;
     measuredW = ctx.measureText(titleText).width;
   }
 
@@ -182,7 +185,7 @@ function drawChampionTitle(ctx, cx, y, titleText, themeColor, maxAllowedWidth = 
 
   // Layer 4: Bright inner highlight core
   ctx.fillStyle = '#ffffff';
-  ctx.font = `900 ${Math.max(12, fontSize - 2)}px "Permanent Marker", "Bangers", "Outfit", "Arial Black", sans-serif`;
+  ctx.font = `900 ${Math.max(12, fontSize - 2)}px ${fontFamily}`;
   ctx.fillText(titleText, cx, y - 1);
 
   ctx.restore();
@@ -194,16 +197,19 @@ function drawChampionNameplate(ctx, cx, y, nameStr, themeColor, fontScale = 1.0,
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
+  const isDark = (state.arenaTheme === 'dark');
+  const fontFamily = isDark ? '"Silkscreen", "Press Start 2P", monospace' : '"Permanent Marker", "Bangers", "Outfit", sans-serif';
+
   // Base font size with dynamic measurement fitting
-  let baseFontSize = 24;
+  let baseFontSize = isDark ? 18 : 24;
   let fontSize = Math.round(baseFontSize * fontScale);
-  ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", sans-serif`;
+  ctx.font = `900 ${fontSize}px ${fontFamily}`;
 
   const targetMaxW = maxAllowedWidth * fontScale;
   let measuredW = ctx.measureText(nameStr).width;
   if (measuredW > targetMaxW) {
     fontSize = Math.max(13, Math.floor(fontSize * (targetMaxW / measuredW)));
-    ctx.font = `900 ${fontSize}px "Permanent Marker", "Bangers", "Outfit", sans-serif`;
+    ctx.font = `900 ${fontSize}px ${fontFamily}`;
     measuredW = ctx.measureText(nameStr).width;
   }
 
@@ -276,7 +282,9 @@ function drawChampionStats(ctx, cx, yStart, fighter, themeColor, timer = 60, sta
     // 1. Label with black outline for high contrast
     ctx.textAlign = 'left';
     ctx.textBaseline = 'middle';
-    ctx.font = `900 ${Math.round(12 * fontScale)}px "Outfit", "Rajdhani", sans-serif`;
+    const isDarkStat = (state.arenaTheme === 'dark');
+    const statFontFamily = isDarkStat ? '"Silkscreen", "Press Start 2P", monospace' : '"Outfit", "Rajdhani", sans-serif';
+    ctx.font = `900 ${Math.round((isDarkStat ? 10 : 12) * fontScale)}px ${statFontFamily}`;
     ctx.strokeStyle = '#000000';
     ctx.lineWidth = 3.0 * fontScale;
     ctx.strokeText(label.toUpperCase(), leftX, y);
@@ -290,7 +298,7 @@ function drawChampionStats(ctx, cx, yStart, fighter, themeColor, timer = 60, sta
     const numStr = currentNum.toString();
 
     ctx.textAlign = 'right';
-    ctx.font = `900 ${Math.round(15 * fontScale)}px "Outfit", "Rajdhani", sans-serif`;
+    ctx.font = `900 ${Math.round((isDarkStat ? 12 : 15) * fontScale)}px ${statFontFamily}`;
 
     // Active rolling glow stroke
     if (rollProgress > 0 && rollProgress < 1.0) {
@@ -354,7 +362,8 @@ function drawFollowForMoreBanner(ctx, cx, cy, timer) {
   ctx.scale(popEase, popEase);
 
   // Clean, simple typography (slightly bigger & bolder for clarity)
-  ctx.font = '700 17.5px "Outfit", "Segoe UI", sans-serif';
+  const isDarkFollow = (state.arenaTheme === 'dark');
+  ctx.font = isDarkFollow ? '700 13px "Silkscreen", "Press Start 2P", monospace' : '700 17.5px "Outfit", "Segoe UI", sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
@@ -421,8 +430,8 @@ function drawTacticalWinnerOverlay(ctx, winner, timer, mode) {
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
 
-  // High-contrast pure Winner Text ("M4A1 Wins!")
-  ctx.font = '900 36px "Outfit", "Segoe UI", Arial, sans-serif';
+  const isDarkTac = (state.arenaTheme === 'dark');
+  ctx.font = isDarkTac ? '700 24px "Silkscreen", "Press Start 2P", monospace' : '900 36px "Outfit", "Segoe UI", Arial, sans-serif';
 
   // Thick dark stroke for high readability against map floor
   ctx.lineWidth = 6;
