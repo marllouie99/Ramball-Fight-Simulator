@@ -184,8 +184,8 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
 
     // D. Diamond Reishi Arrowhead
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#0F172A';
-    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = '#00E5FF';
+    ctx.lineWidth = 1.3;
     ctx.beginPath();
     ctx.moveTo(arrowTipX + 10, 0);
     ctx.lineTo(arrowTipX - 4.5, -4.5);
@@ -260,7 +260,14 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
       ctx.closePath();
     };
 
-    // A. Frosted Sparkling Crystal Broad-Blade Body (Gradient Fill)
+    // A. Outer Radiant Cyan Spirit Glow Shell (Zero shadowBlur - Rule 11)
+    ctx.strokeStyle = 'rgba(0, 229, 255, 0.45)';
+    ctx.lineWidth = 5.5;
+    ctx.lineJoin = 'miter';
+    buildArcLimbPath();
+    ctx.stroke();
+
+    // B. Frosted Sparkling Crystal Broad-Blade Body (Gradient Fill)
     const midAngle = dir * (a_stem_end + a_blade_end) * 0.5;
     const gradStartX = centerX + R_inner * Math.cos(dir * a_stem_end);
     const gradStartY = R_inner * Math.sin(dir * a_stem_end);
@@ -275,14 +282,10 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
     bladeGrad.addColorStop(1.0, '#38BDF8');
 
     ctx.fillStyle = bladeGrad;
+    ctx.strokeStyle = '#00E5FF';
+    ctx.lineWidth = 1.4;
     buildArcLimbPath();
     ctx.fill();
-
-    // B. Crisp Solid Black Manga Ink Outline (Weapon Stroke)
-    ctx.strokeStyle = '#0F172A';
-    ctx.lineWidth = 1.8;
-    ctx.lineJoin = 'miter';
-    buildArcLimbPath();
     ctx.stroke();
 
     // C. Internal Frosted Crystalline Starlight Sparkles
@@ -314,10 +317,10 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
     const tipX = isTop ? topTipX : botTipX;
     const tipY = isTop ? topTipY : botTipY;
     ctx.fillStyle = '#FFFFFF';
-    ctx.strokeStyle = '#0F172A';
-    ctx.lineWidth = 1.2;
+    ctx.strokeStyle = '#00E5FF';
+    ctx.lineWidth = 1.0;
     ctx.beginPath();
-    ctx.arc(tipX, tipY, 1.8, 0, Math.PI * 2);
+    ctx.arc(tipX, tipY, 1.6, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
@@ -331,7 +334,7 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
   // ── 4. SILVER QUINCY CROSS CENTER GRIP ──
   ctx.fillStyle = '#FFFFFF';
   ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.roundRect(-2.8, -6, 5.6, 12, 1.4);
   ctx.fill();
@@ -339,8 +342,8 @@ export function drawUryuBow(ctx, x, y, r, drawProgress = 0, opts = {}) {
 
   // Central Gemstone Core
   ctx.fillStyle = '#00E5FF';
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.2;
+  ctx.strokeStyle = '#FFFFFF';
+  ctx.lineWidth = 0.8;
   ctx.beginPath();
   ctx.arc(0, 0, 2.4, 0, Math.PI * 2);
   ctx.fill();
@@ -377,7 +380,7 @@ export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
   // 1. Handle & Silver Reishi Tube Base
   ctx.fillStyle = '#64748B';
   ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.8;
+  ctx.lineWidth = 1.2;
   ctx.beginPath();
   ctx.roundRect(-2.5, -3, 5, 16, 1.5);
   ctx.fill();
@@ -385,12 +388,9 @@ export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
 
   // Silver tube bottom cap
   ctx.fillStyle = '#CBD5E1';
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.arc(0, 13, 3, 0, Math.PI * 2);
   ctx.fill();
-  ctx.stroke();
 
   // 2. Vibrating Spirit Blade (3M RPM Saw-Tooth Visual)
   const vibration = (Math.sin(now * 0.08) * 0.8);
@@ -403,16 +403,9 @@ export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
   ctx.lineTo(0, -bladeLen);
   ctx.stroke();
 
-  // Main cyan blade with black edge outline
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 3.6;
-  ctx.beginPath();
-  ctx.moveTo(0, -3);
-  ctx.lineTo(0, -bladeLen);
-  ctx.stroke();
-
+  // Main cyan blade
   ctx.strokeStyle = '#00E5FF';
-  ctx.lineWidth = 2.2;
+  ctx.lineWidth = 2.4;
   ctx.beginPath();
   ctx.moveTo(0, -3);
   ctx.lineTo(0, -bladeLen);
@@ -427,7 +420,7 @@ export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
   ctx.stroke();
 
   // Vibrating edge notches
-  ctx.strokeStyle = '#FFFFFF';
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
   ctx.lineWidth = 1.0;
   for (let i = 0; i < 6; i++) {
     const toothY = -8 - i * (bladeLen / 7) + vibration;
@@ -439,15 +432,12 @@ export function drawSeeleSchneider(ctx, x, y, r, swingProgress = 0) {
 
   // Sharp tip point
   ctx.fillStyle = '#FFFFFF';
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 1.4;
   ctx.beginPath();
   ctx.moveTo(0, -bladeLen - 4);
   ctx.lineTo(3, -bladeLen + 2);
   ctx.lineTo(-3, -bladeLen + 2);
   ctx.closePath();
   ctx.fill();
-  ctx.stroke();
 
   ctx.restore();
 }
