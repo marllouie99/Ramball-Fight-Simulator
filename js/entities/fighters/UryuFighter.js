@@ -57,16 +57,19 @@ export class UryuFighter extends Fighter {
     this.isDeployingSprenger = false;
     this.sprengerTimer = 0;
 
-    // Passive: Reishi Sklaverei Gauge
+    // Passive 1: Reishi Sklaverei Gauge
     this.reishiGauge = 0;
-    this.reishiMaxGauge = 100;
+    this.reishiMaxGauge = cfg.reishiMaxGauge || 100;
     this.isPiercingLightActive = false;
     this.piercingLightTimer = 0;
+    this.piercingLightMax = cfg.piercingLightDuration || 360;
 
-    // Passive: Ransōtengai (Heavenly Wild Puppet Suit)
+    // Passive 2: Ransōtengai (Heavenly Wild Puppet Suit)
     this.ransotengaiActive = false;
     this.ransotengaiTimer = 0;
-    this.ransotengaiUsed = false;
+    this.ransotengaiMaxTimer = cfg.ransotengaiDuration || 360;
+    this.ransotengaiCooldown = 0;
+    this.ransotengaiCooldownMax = cfg.ransotengaiCooldown || 1200;
 
     // Ultimate: Vollständig & Schrift "A" The Antithesis
     this.ultimateCooldown = cfg.ultimateCooldown || 1200;
@@ -96,7 +99,7 @@ export class UryuFighter extends Fighter {
   reset() {
     super.reset();
     this.shootAnimTimer = 0;
-    this.shootCooldownTimer = 0;
+    this.shootCooldown = 15;
     this.burstRemaining = 0;
     this.burstTimer = 0;
     this.isShooting = false;
@@ -110,8 +113,10 @@ export class UryuFighter extends Fighter {
     this.sprengerCooldown = 0;
     this.reishiGauge = 0;
     this.isPiercingLightActive = false;
+    this.piercingLightTimer = 0;
     this.ransotengaiActive = false;
-    this.ransotengaiUsed = false;
+    this.ransotengaiTimer = 0;
+    this.ransotengaiCooldown = 0;
     this.vollstandigActive = false;
     this.antithesisUsed = false;
   }
@@ -158,7 +163,7 @@ export class UryuFighter extends Fighter {
 
     if (this.hp <= 0) return;
 
-    // Decay custom timers
+    // Decay custom animation and attack timers
     if (this.stringRecoilTimer > 0) this.stringRecoilTimer--;
     if (this.shootAnimTimer > 0) {
       this.shootAnimTimer--;
@@ -180,19 +185,105 @@ export class UryuFighter extends Fighter {
     if (this.hirenkyakuCooldown > 0) this.hirenkyakuCooldown--;
     if (this.sprengerCooldown > 0) this.sprengerCooldown--;
 
-    // Passive 2: Ransōtengai Check (<30% HP)
-    if (!this.ransotengaiUsed && (this.hp / (this.maxHp || 230)) <= 0.30) {
+    // ── PASSIVE 2: RANSŌTENGAI (HEAVENLY WILD PUPPET SUIT) ──
+    if (this.ransotengaiCooldown > 0) this.ransotengaiCooldown--;
+
+    const hpRatio = (this.maxHp > 0) ? (this.hp / this.maxHp) : 1.0;
+    const isHeavyCC = (this.hitStunTimer > 15 || this.electricStunTimer > 15 || (this.paralyzeTimer && this.paralyzeTimer > 15));
+    const shouldTriggerPuppet = !this.ransotengaiActive && this.ransotengaiCooldown <= 0 && (hpRatio <= (CONFIG.uryu?.ransotengaiHpThreshold || 0.30) || isHeavyCC);
+
+    if (shouldTriggerPuppet) {
       this.ransotengaiActive = true;
-      this.ransotengaiTimer = 360; // 6 seconds
-      this.ransotengaiUsed = true;
-      spawnFloatingText(this.x, this.y - 30, 'RANSŌTENGAI!', '#00E5FF');
-      this._playSound('hirenkyaku', 'Assets/Sound Effects/Skills/teleport.mp3', 1.0);
+      this.ransotengaiTimer = this.ransotengaiMaxTimer;
+      this.ransotengaiCooldown = this.ransotengaiCooldownMax;
+      // Instantly purge crowd control
+      this.hitStunTimer = 0;
+      this.electricStunTimer = 0;
+      if (this.paralyzeTimer) this.paralyzeTimer = 0;
+      spawnFloatingText(this.x, this.y - 35, 'RANSŌTENGAI!', '#00E5FF');
+      spawnImpactFlash(this.x, this.y, '#00E5FF');
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(this.x, this.y, 10, 'cyan', '#00E5FF');
+        spawnSparks(this.x, this.y, 6, 'silverStreak', '#FFFFFF');
+      }
+      this._playSound('hirenkyaku', 'Assets/Sound Effects/Skills/dash1.mp3', 1.0);
     }
 
     if (this.ransotengaiActive) {
       this.ransotengaiTimer--;
       if (this.ransotengaiTimer <= 0) {
         this.ransotengaiActive = false;
+      }
+      // Ongoing puppet stasis: immunity to flinch & stuns
+      this.hitStunTimer = 0;
+      this.electricStunTimer = 0;
+      if (this.paralyzeTimer) this.paralyzeTimer = 0;
+      // Movement speed boost (+45%)
+      this.vx *= 1.08;
+      this.vy *= 1.08;
+    }
+
+    // ── PASSIVE 1: REISHI ABSORPTION & SKLAVEREI GAUGE ──
+    if (this.isPiercingLightActive) {
+      this.piercingLightTimer--;
+      if (this.piercingLightTimer <= 0) {
+        this.isPiercingLightActive = false;
+        this.reishiGauge = 0;
+      }
+      // Accelerated bow cooldowns during Piercing Light (-40% draw delay)
+      if (this.shootCooldown > 0) {
+        this.shootCooldown = Math.max(0, this.shootCooldown - 1);
+      }
+    } else {
+      // 1. Natural ambient battlefield Reishi siphon
+      this.reishiGauge = Math.min(100, this.reishiGauge + 0.10);
+
+      // 2. Siphon Reishi from nearby enemy projectiles within 190px
+      if (state && state.projectiles && state.projectiles.length > 0) {
+        const resolvedOwner = (typeof ownerIndex === 'number' && ownerIndex >= 0) ? ownerIndex : (state.fighters ? state.fighters.indexOf(this) : -1);
+        for (let i = 0; i < state.projectiles.length; i++) {
+          const p = state.projectiles[i];
+          if (!p || p.owner === resolvedOwner) continue;
+          if (typeof state.getFighterTeam === 'function' && resolvedOwner >= 0) {
+            const myTeam = state.getFighterTeam(resolvedOwner);
+            const theirTeam = state.getFighterTeam(p.owner);
+            if (myTeam !== null && myTeam === theirTeam) continue;
+          }
+          const dist = Math.hypot(p.x - this.x, p.y - this.y);
+          if (dist <= 190) {
+            const gain = CONFIG.uryu?.siphonProjectileGain || 0.85;
+            this.reishiGauge = Math.min(100, this.reishiGauge + gain);
+            if (Math.random() < 0.10 && typeof spawnSparks === 'function') {
+              spawnSparks(p.x, p.y, 2, 'cyan', '#00E5FF');
+            }
+          }
+        }
+      }
+
+      // 3. Siphon Reishi from active enemy domains (Malevolent Shrine, Unlimited Void, etc.)
+      if (state && state.fighters) {
+        for (let i = 0; i < state.fighters.length; i++) {
+          const f = state.fighters[i];
+          if (!f || f === this || f.hp <= 0) continue;
+          if (f.domainActive || f.isDomainActive || f.domainRadius > 0) {
+            const gain = CONFIG.uryu?.siphonDomainGain || 0.65;
+            this.reishiGauge = Math.min(100, this.reishiGauge + gain);
+          }
+        }
+      }
+
+      // 4. Threshold trigger: 100% Reishi Gauge -> Piercing Light
+      if (this.reishiGauge >= 100) {
+        this.reishiGauge = 100;
+        this.isPiercingLightActive = true;
+        this.piercingLightTimer = this.piercingLightMax;
+        spawnFloatingText(this.x, this.y - 32, 'PIERCING LIGHT!', '#00E5FF');
+        spawnImpactFlash(this.x, this.y, '#00E5FF');
+        if (typeof spawnSparks === 'function') {
+          spawnSparks(this.x, this.y, 14, 'cyan', '#00E5FF');
+          spawnSparks(this.x, this.y, 8, 'silverStreak', '#FFFFFF');
+        }
+        this._playSound('hirenkyaku', 'Assets/Sound Effects/Skills/dash1.mp3', 0.85);
       }
     }
 
@@ -245,7 +336,7 @@ export class UryuFighter extends Fighter {
   _executeSeeleSchneider(target) {
     this.slashSwingTimer = this.slashSwingMaxTimer;
     this.seeleCooldown = this.seeleCooldownMax;
-    this._playSound('seeleSlice', 'Assets/Sound Effects/Attacks/knife_slash.mp3', 0.85);
+    this._playSound('seeleSlice', 'Assets/Sound Effects/Attacks/energysword.mp3', 0.85);
 
     // Frontal Arc Cone Multi-Target Melee (Rule 7)
     const reach = CONFIG.uryu?.seeleRange || 75;
@@ -268,6 +359,12 @@ export class UryuFighter extends Fighter {
           applyDamageToTarget(t, dmg, this);
           spawnImpactFlash(t.x, t.y, '#00E5FF');
           spawnSparks(t.x, t.y, '#FFFFFF', 6);
+
+          // Siphon Reishi on Seele Schneider parry hit
+          if (!this.isPiercingLightActive) {
+            const meleeGain = CONFIG.uryu?.siphonMeleeGain || 8.0;
+            this.reishiGauge = Math.min(100, this.reishiGauge + meleeGain);
+          }
 
           // Push target away to restore archery spacing
           const pushForce = CONFIG.uryu?.seeleKnockback || 9.5;
@@ -294,13 +391,15 @@ export class UryuFighter extends Fighter {
     const startX = this.x + Math.cos(angle) * spawnDist;
     const startY = this.y + Math.sin(angle) * spawnDist;
 
-    const arrowSpeed = CONFIG.uryu?.arrowSpeed || 24;
-    const arrowDmg = CONFIG.uryu?.arrowDamage || 18;
+    const speedMult = this.isPiercingLightActive ? (CONFIG.uryu?.piercingArrowSpeedMult || 1.35) : 1.0;
+    const dmgMult = this.isPiercingLightActive ? (CONFIG.uryu?.piercingDamageMult || 1.25) : 1.0;
+    const arrowSpeed = (CONFIG.uryu?.arrowSpeed || 24) * speedMult;
+    const arrowDmg = (CONFIG.uryu?.arrowDamage || 18) * dmgMult;
     const resolvedOwner = (typeof ownerIndex === 'number' && ownerIndex >= 0)
       ? ownerIndex
       : (typeof this._curOwnerIndex === 'number' ? this._curOwnerIndex : (state.fighters ? state.fighters.indexOf(this) : 0));
 
-    this._playSound('bowShoot', 'Assets/Sound Effects/Attacks/knife_slash.mp3', 0.8);
+    this._playSound('bowShoot', 'Assets/Sound Effects/Attacks/shurikenthrow.mp3', 0.8);
     this.stringRecoilTimer = this.stringRecoilMax;
 
     if (typeof projectileSystem !== 'undefined' && typeof projectileSystem.fireProjectile === 'function') {
@@ -320,6 +419,8 @@ export class UryuFighter extends Fighter {
         p.isHeiligPfeil = true;
         p.color = '#00E5FF';
         p.isPiercing = Boolean(this.isPiercingLightActive);
+        p.maxPierces = this.isPiercingLightActive ? (CONFIG.uryu?.piercingMaxPierces || 4) : 1;
+        p.ignoreArmor = this.isPiercingLightActive ? (CONFIG.uryu?.piercingIgnoreArmor || 0.30) : 0;
       }
     }
 

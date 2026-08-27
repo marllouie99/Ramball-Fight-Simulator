@@ -1186,14 +1186,29 @@ export function getSkillDataForFighter(f, getProjectiles) {
   // ── Uryu Ishida: The Last Quincy HUD Skill Bars ──
   if (f.characterId === 'uryu' || f.type === 'uryu' || f.characterId === 'ishida' || f.type === 'ishida') {
     const themeColor = f.color || '#00E5FF';
+
+    // Passive 1: Sklaverei Reishi Gauge
+    let reishiPct = f.reishiGauge !== undefined ? f.reishiGauge : 0;
+    let reishiLabel = 'SKLAVEREI GAUGE';
+    let reishiReady = reishiPct >= 99;
+    if (f.isPiercingLightActive) {
+      const plMax = f.piercingLightMax || 360;
+      reishiPct = Math.max(0, Math.min(100, ((f.piercingLightTimer || 0) / plMax) * 100));
+      reishiLabel = 'PIERCING LIGHT';
+      reishiReady = true;
+    }
+
+    // Skill 1: Hirenkyaku
     const hMax = CONFIG.uryu?.hirenkyakuCooldown || 360;
     const hTimer = f.hirenkyakuCooldown !== undefined ? f.hirenkyakuCooldown : 0;
     const hPct = Math.max(0, Math.min(100, (1 - hTimer / hMax) * 100));
 
+    // Skill 2: Sprenger
     const sMax = CONFIG.uryu?.sprengerCooldown || 480;
     const sTimer = f.sprengerCooldown !== undefined ? f.sprengerCooldown : 0;
     const sPct = Math.max(0, Math.min(100, (1 - sTimer / sMax) * 100));
 
+    // Ultimate: The Antithesis
     const uMax = CONFIG.uryu?.ultimateCooldown || 1200;
     const uTimer = f.ultimateCooldown !== undefined ? f.ultimateCooldown : 0;
     let uPct = Math.max(0, Math.min(100, (1 - uTimer / uMax) * 100));
@@ -1203,11 +1218,20 @@ export function getSkillDataForFighter(f, getProjectiles) {
       uLabel = 'VOLLSTÄNDIG ACTIVE';
     }
 
-    return [
+    const skills = [
+      { id: 'sklaverei', pct: reishiPct, ready: reishiReady, color: themeColor, label: reishiLabel },
       { id: 'hirenkyaku', pct: hPct, ready: hPct >= 99, color: themeColor, label: 'HIRENKYAKU' },
       { id: 'sprenger', pct: sPct, ready: sPct >= 99, color: themeColor, label: 'SPRENGER' },
       { id: 'antithesis', pct: uPct, ready: uPct >= 99, color: themeColor, label: uLabel }
     ];
+
+    if (f.ransotengaiActive) {
+      const pMax = f.ransotengaiMaxTimer || 360;
+      const puppetPct = Math.max(0, Math.min(100, ((f.ransotengaiTimer || 0) / pMax) * 100));
+      skills.push({ id: 'ransotengai', pct: puppetPct, ready: true, color: themeColor, label: 'RANSŌTENGAI (ACTIVE)' });
+    }
+
+    return skills;
   }
 
   if (f.characterId === 'doppleganger' || f.characterId === 'doppelganger' || f.type === 'doppleganger' || f.type === 'doppelganger') {

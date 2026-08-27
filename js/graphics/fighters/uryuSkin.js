@@ -86,7 +86,7 @@ export function drawUryuReishiAura(ctx, fighter) {
   const isVollstandig = Boolean(fighter.vollstandigActive);
 
   ctx.save();
-  ctx.translate(fighter.x, fighter.y);
+  // Canvas is already translated to (fighter.x, fighter.y) in drawUryuSkin
 
   // 1. Rising Spirit Particle Sparks (Combat only - Zero shadowBlur - Rule 11)
   ctx.fillStyle = '#00E5FF';
@@ -113,7 +113,112 @@ export function drawUryuReishiAura(ctx, fighter) {
     ctx.fill();
   }
 
-  // 3. Vollständig Single Radiant Reishi Wing (Left Side)
+  // 2. Piercing Light Radiant Reishi Aura & Orbiting Diamonds (Passive 1)
+  if (fighter.isPiercingLightActive) {
+    const pulse = Math.sin(now * 0.008) * 0.5 + 0.5;
+    
+    // Outer pulsating cyan Reishi shield ring
+    ctx.strokeStyle = `rgba(0, 229, 255, ${0.40 + pulse * 0.35})`;
+    ctx.lineWidth = 2.4;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.32 + pulse * 3.0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.75)';
+    ctx.lineWidth = 1.0;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.25 + pulse * 2.0, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // 4 Orbiting Quincy Diamond Motes
+    const orbAngle = now * 0.005;
+    for (let d = 0; d < 4; d++) {
+      const a = orbAngle + (d * Math.PI / 2);
+      const dx = Math.cos(a) * (r * 1.55);
+      const dy = Math.sin(a) * (r * 1.55);
+
+      ctx.fillStyle = '#FFFFFF';
+      ctx.strokeStyle = '#00E5FF';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(dx, dy - 4);
+      ctx.lineTo(dx + 3, dy);
+      ctx.lineTo(dx, dy + 4);
+      ctx.lineTo(dx - 3, dy);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  // 3. Ransōtengai (Heavenly Wild Puppet Suit) Overhead Marionette Strings (Passive 2)
+  if (fighter.ransotengaiActive) {
+    const stringTopX = Math.sin(now * 0.003) * (r * 0.35);
+    const stringTopY = -r * 4.8;
+
+    // Anchor joints on Uryu's body
+    const joints = [
+      { x: 0, y: -r * 0.85 },          // Head crown
+      { x: -r * 0.65, y: -r * 0.05 },  // Left shoulder
+      { x: r * 0.65, y: -r * 0.05 },   // Right shoulder
+      { x: -r * 0.25, y: r * 0.30 },   // Left torso
+      { x: r * 0.25, y: r * 0.30 },    // Right torso
+    ];
+
+    for (let j = 0; j < joints.length; j++) {
+      const jt = joints[j];
+      const pulsePhase = ((now * 0.005) + j * 0.20) % 1.0;
+      const pulseX = stringTopX + (jt.x - stringTopX) * pulsePhase;
+      const pulseY = stringTopY + (jt.y - stringTopY) * pulsePhase;
+
+      const stringGrad = ctx.createLinearGradient(stringTopX, stringTopY, jt.x, jt.y);
+      stringGrad.addColorStop(0, 'rgba(0, 229, 255, 0)');
+      stringGrad.addColorStop(0.25, 'rgba(0, 229, 255, 0.45)');
+      stringGrad.addColorStop(1.0, 'rgba(0, 229, 255, 0.85)');
+
+      // Outer glowing Reishi beam
+      ctx.strokeStyle = stringGrad;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.moveTo(stringTopX, stringTopY);
+      ctx.lineTo(jt.x, jt.y);
+      ctx.stroke();
+
+      // Inner white spirit filament
+      const coreGrad = ctx.createLinearGradient(stringTopX, stringTopY, jt.x, jt.y);
+      coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0)');
+      coreGrad.addColorStop(0.3, 'rgba(255, 255, 255, 0.65)');
+      coreGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.95)');
+
+      ctx.strokeStyle = coreGrad;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.moveTo(stringTopX, stringTopY);
+      ctx.lineTo(jt.x, jt.y);
+      ctx.stroke();
+
+      // Flowing Reishi spark mote traveling down string
+      ctx.fillStyle = '#FFFFFF';
+      ctx.beginPath();
+      ctx.arc(pulseX, pulseY, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Diamond attachment node at joint
+      ctx.fillStyle = '#00E5FF';
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.moveTo(jt.x, jt.y - 2.8);
+      ctx.lineTo(jt.x + 2.2, jt.y);
+      ctx.lineTo(jt.x, jt.y + 2.8);
+      ctx.lineTo(jt.x - 2.2, jt.y);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+    }
+  }
+
+  // 4. Vollständig Single Radiant Reishi Wing (Left Side)
   if (isVollstandig) {
     ctx.save();
     ctx.globalAlpha = 0.90;

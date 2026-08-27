@@ -96,6 +96,49 @@ export const HitImpactSystem = {
       return false; // Pierce
     } 
 
+    // ── Uryu Ishida: Heilig Pfeil (Sacred Spirit Arrow) Hit Processing ──
+    if (projectile.visual === 'heiligPfeil' || projectile.isHeiligPfeil) {
+      if (!projectile.hitFighters) projectile.hitFighters = new Set();
+      projectile.hitFighters.add(target);
+
+      // Reishi impact flash & silver/cyan sparks
+      if (typeof spawnSparks === 'function') {
+        spawnSparks(target.x, target.y, 8, 'cyan', '#00E5FF');
+        spawnSparks(target.x, target.y, 4, 'silverStreak', '#FFFFFF');
+      }
+      if (typeof spawnImpactFlash === 'function') {
+        spawnImpactFlash(target.x, target.y, 24, '#00E5FF');
+      }
+      if (audioSystem && typeof audioSystem.playSFX === 'function') {
+        audioSystem.playSFX('attack_fleshhit', 0.65);
+      }
+
+      // Micro-knockback pushing target
+      const kb = CONFIG.uryu?.arrowKnockback || 4.5;
+      const angle = (projectile.lastAngle !== undefined) ? projectile.lastAngle : (Math.atan2(projectile.vy || 0, projectile.vx || 0) || 0);
+      target.vx = (target.vx || 0) + Math.cos(angle) * kb;
+      target.vy = (target.vy || 0) + Math.sin(angle) * kb;
+
+      // Charge Uryu's Reishi Sklaverei gauge on hit
+      if (attacker && (attacker.characterId === 'uryu' || attacker.type === 'uryu')) {
+        if (typeof attacker.reishiGauge === 'number' && !attacker.isPiercingLightActive) {
+          const gain = CONFIG.uryu?.siphonHitGain || 4.5;
+          attacker.reishiGauge = Math.min(100, attacker.reishiGauge + gain);
+        }
+      }
+
+      // Check Piercing Light state
+      if (projectile.isPiercing) {
+        if (!projectile.pierceCount) projectile.pierceCount = 0;
+        projectile.pierceCount++;
+        const maxPierces = projectile.maxPierces || (CONFIG.uryu?.piercingMaxPierces || 4);
+        if (projectile.pierceCount < maxPierces) {
+          return false; // Continues piercing!
+        }
+      }
+      return true; // Destroyed on final hit
+    }
+
     // Genos Incineration Palm Fireball — Physical push back knockback & impact flash on hit!
     if (projectile.visual === 'genosFireball') {
       const knockbackForce = CONFIG.genos?.blastKnockback || 8.5;

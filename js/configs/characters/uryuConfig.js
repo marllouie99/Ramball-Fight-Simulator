@@ -56,14 +56,32 @@ export const uryuConfig = {
   ultimateCooldown: 1200,        // 20s cooldown
   antithesisThreshold: 0.35,     // Trigger threshold (35% HP or manual)
 
+  // ── Passive 1: Reishi Absorption & Sklaverei Gauge ──
+  reishiMaxGauge: 100,
+  piercingLightDuration: 360,     // 6 seconds of Piercing Light state
+  piercingArrowSpeedMult: 1.35,   // +35% arrow velocity
+  piercingDamageMult: 1.25,       // +25% arrow damage
+  piercingMaxPierces: 4,          // Pierce through up to 4 targets
+  piercingIgnoreArmor: 0.30,      // Ignore 30% damage reduction
+  siphonProjectileGain: 0.85,     // Reishi gained from nearby enemy projectile
+  siphonDomainGain: 0.65,         // Reishi gained per tick from active domains
+  siphonHitGain: 4.5,             // Reishi gained on arrow hit
+  siphonMeleeGain: 8.0,           // Reishi gained on Seele Schneider parry
+
+  // ── Passive 2: Ransōtengai (Heavenly Wild Puppet Suit) ──
+  ransotengaiHpThreshold: 0.30,   // Triggers at <= 30% HP
+  ransotengaiDuration: 360,       // 6 seconds duration
+  ransotengaiCooldown: 1200,      // 20s cooldown
+  ransotengaiSpeedBoost: 1.45,    // +45% movement speed
+
   // ── Sound FX Configuration ──
   sounds: {
     bowDraw: 'Assets/Sound Effects/Skills/redcharging.mp3',
-    bowShoot: 'Assets/Sound Effects/Attacks/knife_slash.mp3',
+    bowShoot: 'Assets/Sound Effects/Attacks/shurikenthrow.mp3',
     arrowHit: 'Assets/Sound Effects/Attacks/fleshhit.mp3',
-    hirenkyaku: 'Assets/Sound Effects/Skills/teleport.mp3',
-    seeleSlice: 'Assets/Sound Effects/Attacks/knife_slash.mp3',
-    sprengerBoom: 'Assets/Sound Effects/Skills/redexplosion.mp3',
+    hirenkyaku: 'Assets/Sound Effects/Skills/dash1.mp3',
+    seeleSlice: 'Assets/Sound Effects/Attacks/energysword.mp3',
+    sprengerBoom: 'Assets/Sound Effects/Skills/redblast.mp3',
     antithesis: 'Assets/Sound Effects/Skills/domainexpansion.mp3'
   },
   soundVolumes: {
