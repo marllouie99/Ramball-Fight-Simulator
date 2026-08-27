@@ -456,7 +456,7 @@ export function drawArena() {
     const isDark = (state.arenaTheme === 'dark');
     const canvasBg = parseColor(isDark ? '#000000' : (CONFIG.canvasBgColor || '#000000'));
     const outerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaOuterBgColor || '#f5f5f5'));
-    const innerBg = parseColor(isDark ? '#0b0f19' : (CONFIG.arenaInnerBgColor || '#ffffff'));
+    const innerBg = parseColor(isDark ? '#000000' : (CONFIG.arenaInnerBgColor || '#ffffff'));
 
     g.beginFill(canvasBg.color, canvasBg.alpha);
     g.drawRect(0, 0, pixiApp.screen.width, pixiApp.screen.height);
@@ -566,20 +566,24 @@ export function drawArena() {
 
   ctx.restore();
 
-  // 5. Draw "CRONOSPHERE" transparent watermark
-  const centerX = arena.x + arena.width / 2;
-  const centerY = arena.y + arena.height / 2;
+  // 5. Draw "CRONOSPHERE" transparent watermark (Light Mode Only - hidden in Dark Mode)
+  if (!isDark) {
+    const centerX = arena.x + arena.width / 2;
+    const centerY = arena.y + arena.height / 2;
 
-  ctx.save();
-  ctx.fillStyle = isDark ? 'rgba(90, 180, 255, 0.07)' : 'rgba(30, 120, 255, 0.05)';
-  ctx.font = '900 34px "Impact", "Trebuchet MS", "Arial Black", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  if ('letterSpacing' in ctx) {
-    ctx.letterSpacing = '6px';
+    ctx.save();
+    ctx.fillStyle = 'rgba(30, 120, 255, 0.05)';
+    ctx.font = '900 34px "Impact", "Trebuchet MS", "Arial Black", sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if ('letterSpacing' in ctx) {
+      ctx.letterSpacing = '6px';
+    }
+    ctx.fillText('CRONOSPHERE', centerX, centerY);
+    ctx.restore();
   }
-  ctx.fillText('CRONOSPHERE', centerX, centerY);
-  ctx.restore();
+
+  const centerX = arena.x + arena.width / 2;
 
   // 5b. Text above Top Arena Wall (Dark Mode: Fighter Names | Light Mode: BGM Title)
   if (isDark) {

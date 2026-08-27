@@ -243,7 +243,7 @@ export function applyArenaTheme(theme) {
   const isDark = (effectiveTheme === 'dark');
   CONFIG.canvasBgColor = isDark ? '#000000' : '#ffffffff';
   CONFIG.arenaOuterBgColor = isDark ? '#000000' : '#fffdf1ff';
-  CONFIG.arenaInnerBgColor = isDark ? '#0b0f19' : '#ffffffff';
+  CONFIG.arenaInnerBgColor = isDark ? '#000000' : '#ffffffff';
   CONFIG.hudTextColor = isDark ? '#f0f2f5' : '#131313ff';
 
   // Invalidate cached canvases
