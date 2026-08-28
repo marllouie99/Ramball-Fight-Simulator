@@ -152,6 +152,8 @@ export function spawnFuelPickup() {
  */
 export function updateFuelPickups() {
   if (state.gameState !== 'playing') return;
+  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+  if (isNanamiPausing) return;
 
   // Spawn new fuel pickups periodically
   state.fuelPickupSpawnTimer++;
@@ -276,6 +278,12 @@ export function resolveFighterCollision(a, b) {
   const isTodoCombo = (a.rockCounterComboLeft > 0) || (b.rockCounterComboLeft > 0);
   const effectiveOverlap = isTodoCombo ? overlap * 0.1 : overlap;
   
+  // Pause circle-circle physical push response during Nanami's 7:3 Ratio Hit-Pause
+  const isNanamiRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+  if (isNanamiRatioPausing) {
+    return;
+  }
+
   const aIsGojoDomain = a.domainActive && (a.characterId === 'gojo' || a.type === 'gojo' || a._def?.id === 'gojo');
   const bIsGojoDomain = b.domainActive && (b.characterId === 'gojo' || b.type === 'gojo' || b._def?.id === 'gojo');
   
@@ -402,6 +410,10 @@ export { isTacticalFighter, resolveTacticalGunCollisions };
 // ─────────────────────────────────────────────
 
 export function updateProjectiles() {
+  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+  if (isNanamiPausing) {
+    return; // Freeze all projectiles mid-air during Nanami's 7:3 Ratio pause
+  }
   if (projectileSystem) {
     projectileSystem.update(state.fighters);
   }

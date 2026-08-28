@@ -129,12 +129,9 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
   }
 
 
-  // Spiky Crescent Impact — centered on target so inner arc hugs the target circle
-  spawnAnimePunchImpactFrame(target.x, target.y, isBlackFlash ? 80 : 55, angle);
-
   // Effects
   if (isBlackFlash) {
-    // Full JJK-style Black Flash — void implosion + crimson screen flash + cursed energy bolts
+    // Full JJK-style Black Flash — void implosion + crimson screen flash + cursed energy bolts (No punch attack visual)
     spawnBlackFlash(target.x, target.y);
     playTodoPunchSound(this, isCombo);
     const bfAudioCfg = CONFIG.blackFlash?.audio || {};
@@ -158,6 +155,8 @@ export function modUpdateMeleeCombat(target, isCombo = false) {
     // Todo enters the Zone!
     this.blackFlashTimer = CONFIG.blackFlash?.zone?.duration ?? 300;
   } else {
+    // Spiky Crescent Impact for normal punch
+    spawnAnimePunchImpactFrame(target.x, target.y, 55, angle);
     playTodoPunchSound(this, isCombo);
   }
 

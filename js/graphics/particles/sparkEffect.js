@@ -819,27 +819,47 @@ export function drawSparkEffects(layer = 'all') {
         ctx.fill();
         ctx.restore();
       } else if (effect.type === 'arcaneAscendLine') {
-        // Glowing vertical thin line ascending upwards
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.lineCap = 'round';
-        
-        // Simulated glow line
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life * 0.25})`);
-        ctx.lineWidth = effect.size * 2.5;
-        ctx.beginPath();
-        ctx.moveTo(effect.x, effect.y);
-        ctx.lineTo(effect.x - effect.vx * 15, effect.y - effect.vy * 15); 
-        ctx.stroke();
+        // ── Pixel Art Style Regen / Healing Ascending Particle ──
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
+        const baseColor = effect.color || 'rgba(0, 255, 102, 1)';
 
-        // Main core line
-        ctx.strokeStyle = effect.color.replace('1)', `${effect.life})`);
-        ctx.lineWidth = effect.size;
-        ctx.beginPath();
-        ctx.moveTo(effect.x, effect.y);
-        ctx.lineTo(effect.x - effect.vx * 15, effect.y - effect.vy * 15); 
-        ctx.stroke();
-        
-        ctx.globalCompositeOperation = 'source-over';
+        // 1. Leading Pixel Art Cross / Sparkle (+)
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+        // White-hot center pixel
+        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
+
+        // 4 cardinal pixel arms (Regen Emerald / Green)
+        ctx.fillStyle = baseColor.replace(/[\d\.]+\)$/, `${(alpha * 0.95).toFixed(2)})`);
+        ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P); // Left
+        ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P); // Right
+        ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P); // Top
+        ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P); // Bottom
+
+        // Outer corner glow pixels (soft halo)
+        ctx.fillStyle = baseColor.replace(/[\d\.]+\)$/, `${(alpha * 0.40).toFixed(2)})`);
+        ctx.fillRect(cx - P * 2.5, cy - P * 0.5, P, P);
+        ctx.fillRect(cx + P * 1.5, cy - P * 0.5, P, P);
+        ctx.fillRect(cx - P * 0.5, cy - P * 2.5, P, P);
+        ctx.fillRect(cx - P * 0.5, cy + P * 1.5, P, P);
+
+        // 2. Stepped Ascending Pixel Tail trailing behind
+        const tailSteps = 4;
+        for (let s = 1; s <= tailSteps; s++) {
+          const tNorm = s / tailSteps;
+          const tx = snap(effect.x - effect.vx * s * 3.5);
+          const ty = snap(effect.y - effect.vy * s * 3.5);
+          const tailAlpha = alpha * (1 - tNorm) * 0.75;
+          if (tailAlpha > 0.05) {
+            ctx.fillStyle = (s === 1)
+              ? `rgba(255, 255, 255, ${tailAlpha.toFixed(2)})`
+              : baseColor.replace(/[\d\.]+\)$/, `${tailAlpha.toFixed(2)})`);
+            ctx.fillRect(tx - P * 0.5, ty - P * 0.5, P, P);
+          }
+        }
       } else if (effect.type === 'arcaneShockwave') {
         // Expanding dark green shockwave ring
         effect.size += (effect.targetSize - effect.size) * 0.06; // Much slower, graceful expansion
@@ -923,78 +943,98 @@ export function drawSparkEffects(layer = 'all') {
           ctx.stroke();
         }
       } else if (effect.type === 'mahitoSoulShockwave') {
-        // Expanding nested magenta & cyan soul disfigurement shockwave rings
+        // Expanding nested pixel-art magenta & cyan soul disfigurement shockwave rings
         if (effect.targetSize) {
           effect.size += (effect.targetSize - effect.size) * 0.16;
         }
 
+        const P = 2.5; // Stepped pixel grid size
+        const radius = effect.size;
+        const steps = Math.ceil(radius / P);
+
+        ctx.save();
+        ctx.imageSmoothingEnabled = false;
+
         if (effect.color === 'magenta') {
-          // Outer glow ring (hot purple/magenta)
-          ctx.strokeStyle = `rgba(217, 70, 239, ${effect.life * 0.8})`;
-          ctx.lineWidth = 6 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
+          // Stepped pixel shockwave ring (hot purple/magenta)
+          ctx.fillStyle = `rgba(217, 70, 239, ${(effect.life * 0.85).toFixed(3)})`;
+          for (let gy = -steps; gy <= steps; gy++) {
+            for (let gx = -steps; gx <= steps; gx++) {
+              const dist = Math.hypot(gx * P, gy * P);
+              if (dist <= radius + P && dist > radius - P * 1.5) {
+                if ((gx + gy) % 2 === 0 || effect.life > 0.5) {
+                  ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+                }
+              }
+            }
+          }
 
-          // Dark ink contrast ring
-          ctx.strokeStyle = `rgba(15, 5, 20, ${effect.life * 0.85})`;
-          ctx.lineWidth = 2.5 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.96), 0, Math.PI * 2);
-          ctx.stroke();
+          // Dark ink contrast pixel ring
+          ctx.fillStyle = `rgba(15, 5, 20, ${(effect.life * 0.90).toFixed(3)})`;
+          for (let gy = -steps; gy <= steps; gy++) {
+            for (let gx = -steps; gx <= steps; gx++) {
+              const dist = Math.hypot(gx * P, gy * P);
+              if (dist <= radius - P * 1.5 && dist > radius - P * 2.5) {
+                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+              }
+            }
+          }
         } else {
-          // Inner glow ring (electric cyan/white)
-          ctx.strokeStyle = `rgba(0, 229, 255, ${effect.life * 0.85})`;
-          ctx.lineWidth = 4 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, effect.size, 0, Math.PI * 2);
-          ctx.stroke();
+          // Inner cyan/white pixel shockwave ring
+          ctx.fillStyle = `rgba(0, 229, 255, ${(effect.life * 0.90).toFixed(3)})`;
+          for (let gy = -steps; gy <= steps; gy++) {
+            for (let gx = -steps; gx <= steps; gx++) {
+              const dist = Math.hypot(gx * P, gy * P);
+              if (dist <= radius + P && dist > radius - P * 1.2) {
+                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+              }
+            }
+          }
 
-          // Bright white core ring
-          ctx.strokeStyle = `rgba(255, 255, 255, ${effect.life * 0.95})`;
-          ctx.lineWidth = 1.8 * effect.life;
-          ctx.beginPath();
-          ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.95), 0, Math.PI * 2);
-          ctx.stroke();
+          // Bright white core pixel ring
+          ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
+          for (let gy = -steps; gy <= steps; gy++) {
+            for (let gx = -steps; gx <= steps; gx++) {
+              const dist = Math.hypot(gx * P, gy * P);
+              if (dist <= radius && dist > radius - P * 0.8) {
+                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+              }
+            }
+          }
         }
+        ctx.restore();
       } else if (effect.type === 'mahitoSoulCoreFlash') {
-        // Jagged, unstable starburst flash representing organic soul shifting & blood rupture
+        // Stepped 8-bit starburst flash representing organic soul shifting & blood rupture
         effect.size += (effect.targetSize - effect.size) * 0.22;
 
         ctx.save();
-        ctx.beginPath();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.5;
+
+        // 1. Pixel Art 8-Bit Starburst Core
         const points = 16;
         for (let p = 0; p < points; p++) {
           const angle = (p / points) * Math.PI * 2;
           const factor = (p % 4 === 0) ? 1.0 : (p % 2 === 0 ? 0.65 : 0.35);
-          const r = effect.size * factor;
-          const px = effect.x + Math.cos(angle) * r;
-          const py = effect.y + Math.sin(angle) * r;
-          if (p === 0) ctx.moveTo(px, py);
-          else ctx.lineTo(px, py);
+          const rayLen = effect.size * factor;
+          const raySteps = Math.max(1, Math.round(rayLen / P));
+
+          ctx.fillStyle = (p % 2 === 0) 
+            ? `rgba(220, 38, 38, ${(effect.life * 0.85).toFixed(3)})` 
+            : `rgba(217, 70, 239, ${(effect.life * 0.90).toFixed(3)})`;
+
+          for (let s = 0; s <= raySteps; s++) {
+            const rx = Math.round((effect.x + Math.cos(angle) * s * P) / P) * P;
+            const ry = Math.round((effect.y + Math.sin(angle) * s * P) / P) * P;
+            ctx.fillRect(rx, ry, P, P);
+          }
         }
-        ctx.closePath();
 
-        // Visceral Crimson Blood + Cursed Magenta Fill
-        ctx.fillStyle = `rgba(220, 38, 38, ${(effect.life * 0.85).toFixed(3)})`;
-        ctx.fill();
-
-        ctx.strokeStyle = `rgba(217, 70, 239, ${(effect.life * 0.90).toFixed(3)})`;
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-
-        // Neon magenta outer aura halo
-        ctx.globalCompositeOperation = 'lighter';
-        ctx.fillStyle = `rgba(217, 70, 239, ${(effect.life * 0.4).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, effect.size * 1.25, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Small tight bright inner core
-        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.65).toFixed(3)})`;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(2, effect.size * 0.18), 0, Math.PI * 2);
-        ctx.fill();
+        // 2. Pure-White 4-Point Pixel Core Diamond
+        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
+        const coreSize = Math.max(P * 2, Math.round((effect.size * 0.25) / P) * P);
+        ctx.fillRect(effect.x - coreSize, effect.y - P, coreSize * 2, P * 2);
+        ctx.fillRect(effect.x - P, effect.y - coreSize, P * 2, coreSize * 2);
 
         ctx.restore();
       } else if (effect.type === 'mahitoClawScratchBurst') {
@@ -1432,26 +1472,31 @@ export function drawSparkEffects(layer = 'all') {
         ctx.rotate(-effect.rotation);
         ctx.translate(-effect.x, -effect.y);
       } else if (effect.type === 'healing') {
-        // Bright blue healing particles for Gojo's Reverse Cursed Technique
-        ctx.globalCompositeOperation = 'lighter'; // Additive blending for glow
+        // ── Pixel Art Style Healing / RCT Sparkle (+) ──
+        const P = 2.0;
+        const snap = (v) => Math.round(v / P) * P;
+        const cx = snap(effect.x);
+        const cy = snap(effect.y);
+        const alpha = Math.max(0, Math.min(1.0, effect.life));
+        const col = effect.color || 'rgba(56, 189, 248, 1)';
 
-        const lifeStep = Math.round(effect.life * 20) / 20;
-        const gradient = getUnitRadialGradient(ctx, `healing_${lifeStep}`, [
-          [0, `rgba(200, 240, 255, ${lifeStep})`],
-          [0.4, `rgba(50, 150, 255, ${lifeStep * 0.8})`],
-          [1, 'rgba(0, 100, 200, 0)']
-        ]);
+        // White-hot center pixel
+        ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+        ctx.fillRect(cx - P * 0.5, cy - P * 0.5, P, P);
 
-        ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.scale(effect.size, effect.size);
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
-        ctx.restore();
+        // 4 cardinal healing arms
+        ctx.fillStyle = col.replace(/[\d\.]+\)$/, `${(alpha * 0.90).toFixed(2)})`);
+        ctx.fillRect(cx - P * 1.5, cy - P * 0.5, P, P);
+        ctx.fillRect(cx + P * 0.5, cy - P * 0.5, P, P);
+        ctx.fillRect(cx - P * 0.5, cy - P * 1.5, P, P);
+        ctx.fillRect(cx - P * 0.5, cy + P * 0.5, P, P);
 
-        ctx.globalCompositeOperation = 'source-over';
+        // Soft corner pixel halo
+        ctx.fillStyle = col.replace(/[\d\.]+\)$/, `${(alpha * 0.35).toFixed(2)})`);
+        ctx.fillRect(cx - P * 1.5, cy - P * 1.5, P, P);
+        ctx.fillRect(cx + P * 0.5, cy - P * 1.5, P, P);
+        ctx.fillRect(cx - P * 1.5, cy + P * 0.5, P, P);
+        ctx.fillRect(cx + P * 0.5, cy + P * 0.5, P, P);
       } else if (effect.type === 'yutaBeamPinkCore' || effect.isPinkCore) {
         // Lingering pink/magenta orb with pure white-hot center core (Matching user reference image)
         const alpha = Math.max(0, Math.min(1.0, effect.life));
@@ -1548,36 +1593,56 @@ export function drawSparkEffects(layer = 'all') {
           effect.size += (effect.targetSize - effect.size) * 0.15;
         }
         const isGojo = effect.clashType === 'gojo' || effect.clashType === 'gojo_infinity';
-        const mainColor = isGojo ? `rgba(0, 229, 255, ${effect.life * 0.85})` : `rgba(255, 60, 60, ${effect.life * 0.85})`;
-        const innerColor = isGojo ? `rgba(200, 245, 255, ${effect.life * 0.95})` : `rgba(255, 200, 200, ${effect.life * 0.95})`;
+        const P = 2.5;
+        const radius = Math.max(P * 2, effect.size);
+        const steps = Math.ceil(radius / P);
 
         ctx.save();
-        ctx.strokeStyle = mainColor;
-        ctx.lineWidth = 4 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size), 0, Math.PI * 2);
-        ctx.stroke();
+        ctx.imageSmoothingEnabled = false;
 
-        ctx.strokeStyle = innerColor;
-        ctx.lineWidth = 2 * effect.life;
-        ctx.beginPath();
-        ctx.arc(effect.x, effect.y, Math.max(0.1, effect.size * 0.75), 0, Math.PI * 2);
-        ctx.stroke();
+        // Outer themed pixel ring
+        ctx.fillStyle = isGojo ? `rgba(0, 229, 255, ${(effect.life * 0.85).toFixed(3)})` : `rgba(255, 60, 60, ${(effect.life * 0.85).toFixed(3)})`;
+        for (let gy = -steps; gy <= steps; gy++) {
+          for (let gx = -steps; gx <= steps; gx++) {
+            const dist = Math.hypot(gx * P, gy * P);
+            if (dist <= radius + P && dist > radius - P * 1.5) {
+              if ((gx + gy) % 2 === 0 || effect.life > 0.5) {
+                ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+              }
+            }
+          }
+        }
+
+        // Inner white pixel core ring
+        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
+        for (let gy = -steps; gy <= steps; gy++) {
+          for (let gx = -steps; gx <= steps; gx++) {
+            const dist = Math.hypot(gx * P, gy * P);
+            if (dist <= radius * 0.75 + P && dist > radius * 0.75 - P) {
+              ctx.fillRect(effect.x + gx * P, effect.y + gy * P, P, P);
+            }
+          }
+        }
+
         ctx.restore();
       } else {
-        // Default impact flash (cached: stops are life-independent, fade via ctx.globalAlpha)
-        const gradient = getUnitRadialGradient(ctx, 'defaultImpactFlash', [
-          [0, 'rgba(255, 255, 200, 0.8)'],
-          [0.3, 'rgba(255, 180, 80, 0.5)'],
-          [1, 'rgba(255, 100, 0, 0)']
-        ]);
+        // ── Default Pixel Art Impact Flash ──
         ctx.save();
-        ctx.translate(effect.x, effect.y);
-        ctx.scale(effect.size, effect.size);
-        ctx.beginPath();
-        ctx.arc(0, 0, 1, 0, Math.PI * 2);
-        ctx.fillStyle = gradient;
-        ctx.fill();
+        ctx.imageSmoothingEnabled = false;
+        const P = 2.0;
+        const flashR = Math.max(P * 2, effect.size * effect.life);
+        const flashSteps = Math.ceil(flashR / P);
+
+        // 8-bit starburst pixel cross
+        ctx.fillStyle = `rgba(255, 200, 80, ${(effect.life * 0.75).toFixed(3)})`;
+        ctx.fillRect(effect.x - flashR, effect.y - P, flashR * 2, P * 2);
+        ctx.fillRect(effect.x - P, effect.y - flashR, P * 2, flashR * 2);
+
+        // Center diamond
+        ctx.fillStyle = `rgba(255, 255, 255, ${(effect.life * 0.95).toFixed(3)})`;
+        const coreR = Math.max(P, Math.round((flashR * 0.4) / P) * P);
+        ctx.fillRect(effect.x - coreR, effect.y - coreR, coreR * 2, coreR * 2);
+
         ctx.restore();
       }
     } else if (effect.type === 'parrySpark') {
@@ -2098,94 +2163,76 @@ export function drawSparkEffects(layer = 'all') {
       ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
     } else if (effect.type === 'animeImpactFrame') {
-      // ── SPIKY CRESCENT IMPACT (Chopped in 8 Pieces + Action Lines) — Optimized ──
+      // ── GLOBAL PIXEL-ART PUNCH IMPACT CRESCENT & ACTION LINES ──
       ctx.save();
-      // Explicitly clear shadows to prevent circular black shadows from rendering
+      ctx.imageSmoothingEnabled = false;
       ctx.shadowColor = 'transparent';
       ctx.shadowBlur = 0;
       ctx.shadowOffsetX = 0;
       ctx.shadowOffsetY = 0;
       
       ctx.translate(effect.x, effect.y);
-      // hitAngle + PI: concave opening faces BACK toward attacker, spiky outer arc faces punch direction
       ctx.rotate((effect.hitAngle || 0) + Math.PI);
 
       const alpha = effect.life;
       const R = effect.size;
-
-      ctx.globalCompositeOperation = 'source-over';
+      const P = 2.0; // Stepped pixel unit
 
       const outerR = R * 1.12;
-      const innerR = R * 0.84;        // slim band
-      const halfArc = Math.PI * 0.72; // ±130° → 260° total arc
-      const totalArc = halfArc * 2;   // 260° arc span
+      const innerR = R * 0.84;
+      const halfArc = Math.PI * 0.72;
+      const totalArc = halfArc * 2;
 
-      // Draw radial speed/action lines projecting outward — BATCHED by color group
       const isGold = (effect.color === 'gold');
       const isBlackPink = (effect.color === 'blackpink');
       const isOrange = (effect.color === 'orange');
       const isCyan = (effect.color === 'cyan' || effect.color === 'blue' || effect.color === 'infinity');
       const isCrimson = (effect.color === 'crimson' || effect.color === 'red' || effect.color === 'sukuna');
+
+      // 1. Stepped Pixel Radial Action Lines
       const lineCount = 14;
-      ctx.lineWidth = 1.8;
       const startRad = innerR * 0.85;
 
-      // Resolve the two alternating stroke colors once
       let lineColorA, lineColorB;
-      if (isGold) { lineColorA = `rgba(0, 0, 0, ${alpha * 0.95})`; lineColorB = `rgba(255, 215, 0, ${alpha * 0.95})`; }
-      else if (isBlackPink) { lineColorA = `rgba(15, 10, 15, ${alpha * 0.95})`; lineColorB = `rgba(255, 20, 147, ${alpha * 0.95})`; }
-      else if (isOrange) { lineColorA = `rgba(255, 255, 255, ${alpha * 0.90})`; lineColorB = `rgba(255, 80, 0, ${alpha * 0.95})`; }
-      else if (isCyan) { lineColorA = `rgba(0, 20, 45, ${alpha * 0.95})`; lineColorB = `rgba(0, 229, 255, ${alpha * 0.95})`; }
-      else if (isCrimson) { lineColorA = `rgba(20, 2, 5, ${alpha * 0.95})`; lineColorB = `rgba(255, 36, 0, ${alpha * 0.95})`; }
-      else { lineColorA = `rgba(0, 0, 0, ${alpha * 0.9})`; lineColorB = lineColorA; }
+      if (isGold) { lineColorA = '#0E0F14'; lineColorB = '#FFD700'; }
+      else if (isBlackPink) { lineColorA = '#0E0F14'; lineColorB = '#FF1493'; }
+      else if (isOrange) { lineColorA = '#FFFFFF'; lineColorB = '#FF5000'; }
+      else if (isCyan) { lineColorA = '#00142D'; lineColorB = '#00E5FF'; }
+      else if (isCrimson) { lineColorA = '#140205'; lineColorB = '#FF2400'; }
+      else { lineColorA = '#0E0F14'; lineColorB = '#FFFFFF'; }
 
-      // Batch pass 1: Dark/primary accent lines (every 3rd)
-      ctx.strokeStyle = lineColorA;
-      ctx.beginPath();
       for (let i = 0; i < lineCount; i++) {
-        if (i % 3 !== 0) continue;
-        const a = -halfArc + (i / (lineCount - 1)) * totalArc + (Math.sin(i * 1.7) * 0.06);
+        const a = -halfArc + (i / (lineCount - 1)) * totalArc;
         const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
-        ctx.moveTo(Math.cos(a) * startRad, Math.sin(a) * startRad);
-        ctx.lineTo(Math.cos(a) * (startRad + len), Math.sin(a) * (startRad + len));
-      }
-      ctx.stroke();
+        const col = (i % 3 === 0) ? lineColorA : lineColorB;
+        ctx.fillStyle = col;
 
-      // Batch pass 2: Theme accent lines (non-3rd)
-      ctx.strokeStyle = lineColorB;
-      ctx.beginPath();
-      for (let i = 0; i < lineCount; i++) {
-        if (i % 3 === 0) continue;
-        const a = -halfArc + (i / (lineCount - 1)) * totalArc + (Math.sin(i * 1.7) * 0.06);
-        const len = R * (0.55 + Math.abs(Math.sin(i * 2.3)) * 0.45);
-        ctx.moveTo(Math.cos(a) * startRad, Math.sin(a) * startRad);
-        ctx.lineTo(Math.cos(a) * (startRad + len), Math.sin(a) * (startRad + len));
+        const lineSteps = Math.max(1, Math.round(len / P));
+        for (let s = 0; s <= lineSteps; s++) {
+          const curD = startRad + s * P;
+          const px = Math.round((Math.cos(a) * curD) / P) * P;
+          const py = Math.round((Math.sin(a) * curD) / P) * P;
+          ctx.fillRect(px, py, P, P);
+        }
       }
-      ctx.stroke();
 
-      // ── 8 SLIM CHOPPED CRESCENT PIECES — using hoisted ANIME_IMPACT_SEGMENTS ──
+      // 2. Stepped 8-Segment Chopped Pixel Impact Crescent Pieces
       const alphaFill = Math.min(1.0, alpha * 1.25);
 
       for (let sIdx = 0; sIdx < ANIME_IMPACT_SEGMENTS.length; sIdx++) {
         const seg = ANIME_IMPACT_SEGMENTS[sIdx];
-        const segN = 10;
-        const segPeakIdx = 5; // Math.round(segN * 0.5)
+        const segN = 8;
+        const segPeakIdx = 4;
 
-        // Draw main colored segment
-        if (isGold) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 0, 0, ${alphaFill})` : `rgba(255, 200, 0, ${alphaFill})`;
-        } else if (isBlackPink) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(15, 10, 15, ${alphaFill})` : `rgba(255, 20, 147, ${alphaFill})`;
-        } else if (isOrange) {
-          ctx.fillStyle = (sIdx % 2 === 0) ? `rgba(255, 80, 0, ${alphaFill})` : `rgba(255, 180, 0, ${alphaFill})`;
-        } else if (isCyan) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(0, 20, 45, ${alphaFill})` : `rgba(0, 229, 255, ${alphaFill})`;
-        } else if (isCrimson) {
-          ctx.fillStyle = (sIdx % 3 === 0) ? `rgba(20, 2, 5, ${alphaFill})` : `rgba(220, 20, 60, ${alphaFill})`;
-        } else {
-          ctx.fillStyle = `rgba(0, 0, 0, ${alphaFill})`;
-        }
-        ctx.beginPath();
+        let segColor;
+        if (isGold) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FFC800';
+        else if (isBlackPink) segColor = (sIdx % 3 === 0) ? '#0E0F14' : '#FF1493';
+        else if (isOrange) segColor = (sIdx % 2 === 0) ? '#FF5000' : '#FFB400';
+        else if (isCyan) segColor = (sIdx % 3 === 0) ? '#00142D' : '#00E5FF';
+        else if (isCrimson) segColor = (sIdx % 3 === 0) ? '#140205' : '#DC143C';
+        else segColor = '#0E0F14';
+
+        ctx.fillStyle = segColor;
 
         for (let i = 0; i <= segN; i++) {
           const localT = i / segN;
@@ -2193,56 +2240,25 @@ export function drawSparkEffects(layer = 'all') {
           const a = -halfArc + globalT * totalArc;
 
           let r;
-          if (i === 0 || i === segN) {
-            r = outerR * 0.80; // sharp tapered tips at piece edges
-          } else if (i === segPeakIdx) {
-            r = outerR * seg.maxSpike; // peak spike of segment
-          } else {
-            r = outerR * ((i % 2 === 0) ? 0.88 : 1.06);
+          if (i === 0 || i === segN) r = outerR * 0.80;
+          else if (i === segPeakIdx) r = outerR * seg.maxSpike;
+          else r = outerR * ((i % 2 === 0) ? 0.90 : 1.05);
+
+          const rSpan = r - innerR;
+          const rSteps = Math.max(1, Math.round(rSpan / P));
+          for (let s = 0; s <= rSteps; s++) {
+            const curR = innerR + s * P;
+            const px = Math.round((Math.cos(a) * curR) / P) * P;
+            const py = Math.round((Math.sin(a) * curR) / P) * P;
+            ctx.fillRect(px, py, P, P);
           }
-
-          const px = Math.cos(a) * r;
-          const py = Math.sin(a) * r;
-
-          if (i === 0) ctx.moveTo(px, py);
-          else         ctx.lineTo(px, py);
         }
-
-        const aStart = -halfArc + seg.t0 * totalArc;
-        const aEnd   = -halfArc + seg.t1 * totalArc;
-
-        ctx.arc(0, 0, innerR, aEnd, aStart, true);
-        ctx.closePath();
-        ctx.fill();
-
-        // Draw a secondary thin outer stroke line accent on each segment
-        if (isGold) {
-          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 215, 0, ${Math.min(1.0, alpha * 0.8)})` : `rgba(0, 0, 0, ${Math.min(1.0, alpha * 0.85)})`;
-        } else if (isBlackPink) {
-          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 20, 147, ${Math.min(1.0, alpha * 0.8)})` : `rgba(15, 10, 15, ${Math.min(1.0, alpha * 0.85)})`;
-        } else if (isOrange) {
-          ctx.strokeStyle = (sIdx % 2 === 0) ? `rgba(255, 220, 80, ${Math.min(1.0, alpha * 0.85)})` : `rgba(255, 60, 0, ${Math.min(1.0, alpha * 0.80)})`;
-        } else if (isCyan) {
-          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(224, 255, 255, ${Math.min(1.0, alpha * 0.95)})` : `rgba(0, 229, 255, ${Math.min(1.0, alpha * 0.85)})`;
-        } else if (isCrimson) {
-          ctx.strokeStyle = (sIdx % 3 === 0) ? `rgba(255, 220, 220, ${Math.min(1.0, alpha * 0.95)})` : `rgba(255, 36, 0, ${Math.min(1.0, alpha * 0.85)})`;
-        } else {
-          ctx.strokeStyle = `rgba(0, 0, 0, ${Math.min(1.0, alpha * 0.75)})`;
-        }
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        for (let i = 0; i <= segN; i++) {
-          const localT = i / segN;
-          const globalT = seg.t0 + localT * (seg.t1 - seg.t0);
-          const a = -halfArc + globalT * totalArc;
-          const r = outerR * (seg.maxSpike * 1.06) * (1.0 + (i % 2 === 0 ? 0.025 : -0.025));
-          const px = Math.cos(a) * r;
-          const py = Math.sin(a) * r;
-          if (i === 0) ctx.moveTo(px, py);
-          else         ctx.lineTo(px, py);
-        }
-        ctx.stroke();
       }
+
+      // 3. Central 4-Point Pure-White Specular Pixel Diamond
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-P * 2, -P * 0.5, P * 4, P);
+      ctx.fillRect(-P * 0.5, -P * 2, P, P * 4);
 
       ctx.restore();
     } else if (effect.type === 'punchWindSpeedLine') {

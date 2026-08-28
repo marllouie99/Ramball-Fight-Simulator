@@ -155,8 +155,10 @@ export function modUpdateMeleeCombat(customTarget = null, isCombo = false) {
           target.vy += Math.sin(angleToTarget) * knockback;
         }
 
-        // Visual effects
-        spawnAnimePunchImpactFrame(target.x, target.y, isBlackFlash ? 80 : 55, angleToTarget, 'blackpink');
+        // Visual effects (Suppress standard punch impact visual when Black Flash is triggered)
+        if (!isBlackFlash) {
+          spawnAnimePunchImpactFrame(target.x, target.y, 55, angleToTarget, 'blackpink');
+        }
 
         if (isBlackFlash) {
           spawnBlackFlash(target.x, target.y);

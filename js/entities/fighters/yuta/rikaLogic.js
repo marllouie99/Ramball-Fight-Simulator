@@ -751,6 +751,15 @@ export function updateRika(fighter, arena) {
     rk.hitFlashTimer--;
   }
 
+  // Freeze Rika during Nanami's 7:3 Ratio Hit-Pause
+  const isNanamiPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+  if (isNanamiPausing) {
+    rk.vx = 0;
+    rk.vy = 0;
+    clampRikaToArena(rk, currentArena);
+    return; // Completely frozen during Nanami's 7:3 Ratio pause!
+  }
+
   // Handle paralysis / time stop (Gojo's Domain Expansion / Unlimited Void / Mahoraga Wall Slam Paralyze)
   if (rk.timeStopTimer > 0) {
     rk.timeStopTimer--;

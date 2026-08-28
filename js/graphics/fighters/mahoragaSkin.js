@@ -9,88 +9,71 @@ let cachedWingLL = null;
 let cachedWingLR = null;
 
 function renderSingleWingBuffer(r, side, isUpper) {
+  // Render at HALF resolution — when drawn at 2x with imageSmoothingEnabled=false,
+  // this creates clean pixel art: smooth filled interiors with crisp stepped edges
   const canvas = document.createElement('canvas');
-  canvas.width = 360;
-  canvas.height = 200;
+  canvas.width = 180;
+  canvas.height = 100;
   const ctx = canvas.getContext('2d');
-  ctx.translate(180, 110);
+  ctx.translate(90, 55);
+  // Scale down to 50% — all geometry stays original size but renders half-res
+  ctx.scale(0.5, 0.5);
 
-  // Colors for organic divine feathered wings:
-  const featherWhite = '#FAFAF8';    // Soft white feather body
-  const featherLight = '#E8E8E0';   // Light cream highlight
-  const featherGrey = '#C8C8C0';    // Soft grey shadow
-  const featherDark = '#383830';    // Bold dark charcoal for crisp cloud lines & feather barbs
-  const outlineColor = '#000000';   // Black outline
+  // Colors for divine feathered wings:
+  const featherWhite = '#FAFAF8';
+  const featherLight = '#E8E8E0';
+  const featherGrey = '#C8C8C0';
+  const featherDark = '#383830';
+  const outlineColor = '#000000';
 
-  // Helper to draw one organic feathered wing segment with divine cloud lines
   function drawFeatherWing(layerIndex) {
     ctx.save();
 
-    // Fan out layers slightly so back layers are visible behind front layers
     const layerTilt = side * (isUpper ? -0.07 : 0.07) * layerIndex;
     ctx.rotate(layerTilt);
 
-    // Origin at eye socket area (upper wing higher, lower wing below)
     const rootX = side * r * 0.06;
     const rootY = isUpper ? -r * 0.58 : -r * 0.33;
 
-    // Layer-based parameters for depth
     const layerOffset = layerIndex * 0.12;
-    
-    // Wing extends with organic curved flow
     const baseLength = isUpper ? 2.1 : 1.8;
     const tipX = side * r * (baseLength + layerOffset);
     const tipY = isUpper ? -r * (1.05 + layerOffset * 0.25) : -r * (0.52 + layerOffset * 0.18);
 
-    // Control points for wavy S-curve upper edge
     const cp1x = side * r * (0.35 + layerOffset * 0.12);
     const cp1y = isUpper ? -r * (1.75 + layerOffset * 0.28) : -r * (0.95 + layerOffset * 0.20);
     const cp2x = side * r * (0.95 + layerOffset * 0.18);
     const cp2y = isUpper ? -r * (0.75 + layerOffset * 0.12) : -r * (0.38 + layerOffset * 0.08);
 
-    // Evaluate point on upper cubic curve at parameter t [0..1]
     const getTopPoint = (t) => {
       const mt = 1 - t;
-      const x = mt*mt*mt * rootX + 3*mt*mt*t * cp1x + 3*mt*t*t * cp2x + t*t*t * tipX;
-      const y = mt*mt*mt * rootY + 3*mt*mt*t * cp1y + 3*mt*t*t * cp2y + t*t*t * tipY;
-      return { x, y };
+      return { x: mt*mt*mt*rootX + 3*mt*mt*t*cp1x + 3*mt*t*t*cp2x + t*t*t*tipX,
+               y: mt*mt*mt*rootY + 3*mt*mt*t*cp1y + 3*mt*t*t*cp2y + t*t*t*tipY };
     };
 
-    // Baseline bottom curve control point
     const botCpX = (rootX + tipX) * 0.5 + side * r * 0.08;
     const botCpY = (rootY + tipY) * 0.5 + r * (isUpper ? 0.18 : 0.14);
 
-    // Evaluate point on bottom baseline curve at parameter t [0..1]
     const getBotPoint = (t) => {
       const mt = 1 - t;
-      const x = mt*mt * rootX + 2*mt*t * botCpX + t*t * tipX;
-      const y = mt*mt * rootY + 2*mt*t * botCpY + t*t * tipY;
-      return { x, y };
+      return { x: mt*mt*rootX + 2*mt*t*botCpX + t*t*tipX,
+               y: mt*mt*rootY + 2*mt*t*botCpY + t*t*tipY };
     };
 
-    // Evaluate point on central spine / rachis at parameter t [0..1]
     const getSpinePoint = (t) => {
       const topP = getTopPoint(t);
       const botP = getBotPoint(t);
-      return {
-        x: topP.x + (botP.x - topP.x) * 0.35,
-        y: topP.y + (botP.y - topP.y) * 0.35
-      };
+      return { x: topP.x + (botP.x - topP.x) * 0.35, y: topP.y + (botP.y - topP.y) * 0.35 };
     };
 
-    // Scalloped trailing edge notches
     const notches = [0.75, 0.50, 0.25];
     const getNotchPoint = (t) => {
       const topP = getTopPoint(t);
       const botP = getBotPoint(t);
-      const dipRatio = 0.22;
-      return {
-        x: botP.x + (topP.x - botP.x) * dipRatio,
-        y: botP.y + (topP.y - botP.y) * dipRatio
-      };
+      return { x: botP.x + (topP.x - botP.x) * 0.22, y: botP.y + (topP.y - botP.y) * 0.22 };
     };
 
-    // 1. DRAW MAIN WING BODY WITH SCALLOPED TRAILING EDGE
+    // 1. MAIN WING BODY WITH SCALLOPED TRAILING EDGE
     ctx.beginPath();
     ctx.moveTo(rootX, rootY);
     ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, tipX, tipY);
@@ -131,14 +114,13 @@ function renderSingleWingBuffer(r, side, isUpper) {
     }
     ctx.fillStyle = grad;
     ctx.fill();
-
     ctx.strokeStyle = outlineColor;
     ctx.lineWidth = 1.8;
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
 
-    // 2. DRAW CENTRAL SPINE / RACHIS
+    // 2. CENTRAL SPINE / RACHIS
     ctx.beginPath();
     const spineStart = getSpinePoint(0.05);
     ctx.moveTo(spineStart.x, spineStart.y);
@@ -162,7 +144,7 @@ function renderSingleWingBuffer(r, side, isUpper) {
     ctx.globalAlpha = 0.95;
     ctx.stroke();
 
-    // 3. DRAW CLOUD LINES & FEATHER BARBS
+    // 3. CLOUD LINES & FEATHER BARBS
     ctx.strokeStyle = featherDark;
     ctx.lineCap = 'round';
     ctx.globalAlpha = 0.85 - layerIndex * 0.1;
@@ -276,17 +258,17 @@ function renderSingleWingBuffer(r, side, isUpper) {
 
 /**
  * Draws Mahoraga's Eye-Socket Organic Feathered Wings with Floating & Flapping Motion.
- * Hardware-accelerated with 4 offscreen wing buffers!
+ * Half-res buffers scaled up 2x with nearest-neighbor for clean pixel art look!
  */
 export function drawMahoragaFaceWings(ctx, fighter) {
   if (!fighter) return;
 
   const r = fighter.r || 30;
   if (!cachedWingUL) {
-    cachedWingUL = renderSingleWingBuffer(r, -1, true);  // Upper Left
-    cachedWingUR = renderSingleWingBuffer(r, 1, true);   // Upper Right
-    cachedWingLL = renderSingleWingBuffer(r, -1, false); // Lower Left
-    cachedWingLR = renderSingleWingBuffer(r, 1, false);  // Lower Right
+    cachedWingUL = renderSingleWingBuffer(r, -1, true);
+    cachedWingUR = renderSingleWingBuffer(r, 1, true);
+    cachedWingLL = renderSingleWingBuffer(r, -1, false);
+    cachedWingLR = renderSingleWingBuffer(r, 1, false);
   }
 
   ctx.save();
@@ -296,53 +278,61 @@ export function drawMahoragaFaceWings(ctx, fighter) {
   ctx.rotate(rotAngle);
   if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
 
+  // Disable smoothing for crisp pixel art nearest-neighbor upscaling
+  const prevSmoothing = ctx.imageSmoothingEnabled;
+  ctx.imageSmoothingEnabled = false;
+
   // === Dynamic Organic Floating & Flapping Motion with Center Space Gap ===
   const floatTime = Date.now() * 0.003;
-  const floatY = Math.sin(floatTime) * 2.5; // vertical breathing float
+  const floatY = Math.sin(floatTime) * 2.5;
 
-  const wingGap = 6; // Subtle center gap between left and right wings
+  const wingGap = 6;
+
+  // Buffers are 180x100 (half of original 360x200), drawn at 2x = 360x200
+  const dw = 360, dh = 200;
 
   const ulPivotX = -r * 0.06 - wingGap, ulPivotY = -r * 0.58;
   const urPivotX = r * 0.06 + wingGap,  urPivotY = -r * 0.58;
   const llPivotX = -r * 0.06 - wingGap, llPivotY = -r * 0.33;
   const lrPivotX = r * 0.06 + wingGap,  lrPivotY = -r * 0.33;
 
-  // 1. Upper Left Wing (Flap + Float + Left Gap Offset)
+  // 1. Upper Left Wing
   ctx.save();
   const ulFlap = Math.sin(floatTime * 1.2) * 0.08;
   ctx.translate(ulPivotX, ulPivotY + floatY);
   ctx.rotate(ulFlap);
   ctx.translate(-ulPivotX, -ulPivotY - floatY);
-  ctx.drawImage(cachedWingUL, -180 - wingGap, -110 + floatY);
+  ctx.drawImage(cachedWingUL, -180 - wingGap, -110 + floatY, dw, dh);
   ctx.restore();
 
-  // 2. Upper Right Wing (Mirrored Flap + Float + Right Gap Offset)
+  // 2. Upper Right Wing
   ctx.save();
   const urFlap = -Math.sin(floatTime * 1.2) * 0.08;
   ctx.translate(urPivotX, urPivotY + floatY);
   ctx.rotate(urFlap);
   ctx.translate(-urPivotX, -urPivotY - floatY);
-  ctx.drawImage(cachedWingUR, -180 + wingGap, -110 + floatY);
+  ctx.drawImage(cachedWingUR, -180 + wingGap, -110 + floatY, dw, dh);
   ctx.restore();
 
-  // 3. Lower Left Wing (Phase-shifted Flap + Float + Left Gap Offset)
+  // 3. Lower Left Wing
   ctx.save();
   const llFlap = Math.sin(floatTime * 1.2 - 0.5) * 0.06;
   ctx.translate(llPivotX, llPivotY + floatY * 0.8);
   ctx.rotate(llFlap);
   ctx.translate(-llPivotX, -llPivotY - floatY * 0.8);
-  ctx.drawImage(cachedWingLL, -180 - wingGap, -110 + floatY * 0.8);
+  ctx.drawImage(cachedWingLL, -180 - wingGap, -110 + floatY * 0.8, dw, dh);
   ctx.restore();
 
-  // 4. Lower Right Wing (Mirrored Phase-shifted Flap + Float + Right Gap Offset)
+  // 4. Lower Right Wing
   ctx.save();
   const lrFlap = -Math.sin(floatTime * 1.2 - 0.5) * 0.06;
   ctx.translate(lrPivotX, lrPivotY + floatY * 0.8);
   ctx.rotate(lrFlap);
   ctx.translate(-lrPivotX, -lrPivotY - floatY * 0.8);
-  ctx.drawImage(cachedWingLR, -180 + wingGap, -110 + floatY * 0.8);
+  ctx.drawImage(cachedWingLR, -180 + wingGap, -110 + floatY * 0.8, dw, dh);
   ctx.restore();
 
+  ctx.imageSmoothingEnabled = prevSmoothing;
   ctx.restore();
 }
 
@@ -358,35 +348,51 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
   const rotAngle = fighter.angle || 0;
   ctx.rotate(rotAngle);
   if (Math.abs(rotAngle) > Math.PI / 2) ctx.scale(1, -1);
-  
-  // Keep chest necklace statically oriented relative to the rotated body
 
   const r = fighter.r || 30;
-  const chestY = r * 0.15; // Lowered mid-chest position
+  const chestY = r * 0.15;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
-  // 1. DUAL PARALLEL BLACK CORDS (Wide V-Dip across full chest width)
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.2;
-  ctx.lineCap = 'round';
+  // Pixel line helper
+  function _neckPixLine(x0, y0, x1, y1, color, thick) {
+    const dx = x1 - x0, dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(2, Math.ceil(len / P));
+    const halfT = Math.max(P * 0.5, (thick || P) * 0.5);
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const px = snap(x0 + dx * t);
+      const py = snap(y0 + dy * t);
+      ctx.fillStyle = color;
+      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+    }
+  }
+
+  // Pixel quadratic bezier helper
+  function _neckPixQuad(x0, y0, cpx, cpy, x1, y1, color, thick) {
+    const segs = 12;
+    let prevX = x0, prevY = y0;
+    for (let s = 1; s <= segs; s++) {
+      const t = s / segs;
+      const mt = 1 - t;
+      const nx = mt * mt * x0 + 2 * mt * t * cpx + t * t * x1;
+      const ny = mt * mt * y0 + 2 * mt * t * cpy + t * t * y1;
+      _neckPixLine(prevX, prevY, nx, ny, color, thick);
+      prevX = nx; prevY = ny;
+    }
+  }
 
   const leftX = -r * 0.75;
   const rightX = r * 0.75;
   const topY = chestY - 6;
   const bottomY = chestY + 3;
 
-  // Upper Cord Line
-  ctx.beginPath();
-  ctx.moveTo(leftX, topY);
-  ctx.quadraticCurveTo(0, bottomY - 3, rightX, topY);
-  ctx.stroke();
+  // 1. DUAL PARALLEL BLACK CORDS — pixel art quadratic beziers
+  _neckPixQuad(leftX, topY, 0, bottomY - 3, rightX, topY, '#000000', P * 1.1);
+  _neckPixQuad(leftX + 2, topY + 3, 0, bottomY, rightX - 2, topY + 3, '#000000', P * 1.1);
 
-  // Lower Cord Line
-  ctx.beginPath();
-  ctx.moveTo(leftX + 2, topY + 3);
-  ctx.quadraticCurveTo(0, bottomY, rightX - 2, topY + 3);
-  ctx.stroke();
-
-  // 2. 4 CIRCULAR RING NODES WITH DOUBLE RIBBON TASSELS
+  // 2. 4 CIRCULAR RING NODES WITH DOUBLE RIBBON TASSELS — pixel art
   const nodes = [
     { x: -r * 0.70, y: topY + 1 },
     { x: -r * 0.35, y: chestY - 1 },
@@ -395,30 +401,27 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
   ];
 
   nodes.forEach((node) => {
-    // Ring Node (Hollow Black Ring)
-    ctx.beginPath();
-    ctx.arc(node.x, node.y, 3.8, 0, Math.PI * 2);
-    ctx.fillStyle = '#EBEBE6'; // Skin tone center
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.2;
-    ctx.stroke();
+    // Ring Node — pixel filled circle
+    const ringR = 3.8;
+    const gridR = Math.ceil(ringR / P);
+    for (let gy = -gridR; gy <= gridR; gy++) {
+      for (let gx = -gridR; gx <= gridR; gx++) {
+        const dist = Math.sqrt(gx * gx + gy * gy) * P;
+        if (dist > ringR + P * 0.3) continue;
+        const px = snap(node.x + gx * P);
+        const py = snap(node.y + gy * P);
+        if (dist > ringR - P * 0.7) {
+          ctx.fillStyle = '#000000';
+        } else {
+          ctx.fillStyle = '#EBEBE6';
+        }
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+      }
+    }
 
-    // Double Ribbon Tassels (Two hanging black ribbons per node)
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.8;
-
-    // Left Ribbon Strand
-    ctx.beginPath();
-    ctx.moveTo(node.x - 1.5, node.y + 3.5);
-    ctx.lineTo(node.x - 3.5, node.y + 16);
-    ctx.stroke();
-
-    // Right Ribbon Strand
-    ctx.beginPath();
-    ctx.moveTo(node.x + 1.5, node.y + 3.5);
-    ctx.lineTo(node.x + 3.5, node.y + 16);
-    ctx.stroke();
+    // Double Ribbon Tassels — pixel lines
+    _neckPixLine(node.x - 1.5, node.y + 3.5, node.x - 3.5, node.y + 16, '#000000', P);
+    _neckPixLine(node.x + 1.5, node.y + 3.5, node.x + 3.5, node.y + 16, '#000000', P);
   });
 
   ctx.restore();

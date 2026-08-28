@@ -62,14 +62,34 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
   }
 
   update(projectile, fighters, system) {
-    // If the round or match has ended, instantly destroy Hollow Purple to prevent lag and screen shakes during the victory screen
+    // Advance visual time for animations so it freezes when caught in time sphere
+    projectile.visualTime = (projectile.visualTime || Date.now()) + 16.667;
+
+    const isMatchOver = (typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd'));
+
+    // If the round or match has ended, let Hollow Purple continue traveling across the arena smoothly
+    // as the champion/victory screen shows up (suppressing screen shakes and damage)
+    if (isMatchOver) {
+      projectile.life -= 1;
+      if (projectile.life <= 0) return true;
+
+      projectile.x += projectile.vx;
+      projectile.y += projectile.vy;
+
+      if (!projectile.history) projectile.history = [];
+      projectile.history.push({ x: projectile.x, y: projectile.y });
+      if (projectile.history.length > (projectile.historyMax || 20)) {
+        projectile.history.shift();
+      }
+
+      this.checkExpire(projectile, system);
+      return false; // Continue traveling during victory screen
+    }
+
     if (state.gameState !== 'playing') {
       projectile.life = 0;
       return true;
     }
-
-    // Advance visual time for animations so it freezes when caught in time sphere
-    projectile.visualTime = (projectile.visualTime || Date.now()) + 16.667;
 
     const ownerTeam = state.getFighterTeam(projectile.owner);
     const purpleSlowDuration = CONFIG.gojo?.purpleSlowDuration || 60;
@@ -235,6 +255,12 @@ export class GojoPurpleBehavior extends ProjectileBehavior {
 
     projectile.x += projectile.vx;
     projectile.y += projectile.vy;
+
+    if (!projectile.history) projectile.history = [];
+    projectile.history.push({ x: projectile.x, y: projectile.y });
+    if (projectile.history.length > (projectile.historyMax || 20)) {
+      projectile.history.shift();
+    }
 
     this.checkExpire(projectile, system);
 

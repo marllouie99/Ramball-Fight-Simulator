@@ -100,14 +100,19 @@ export function updateGame() {
     }
     
     if (state.gameState === 'playing') {
-      state.matchTimer = (state.matchTimer || 0) + 1;
+      const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+      if (!isNanamiPausing) {
+        state.matchTimer = (state.matchTimer || 0) + 1;
+      }
       updateArenaBgm();
       updateFighters();
       updateProjectiles();
       updateDriveBys();
-      // Update flame particle system
-      const dt = Math.min(FRAME_TIME / 1000, 0.1); // Convert to seconds, cap at 100ms
-      flamewardenFlameSystem.update(dt);
+      if (!isNanamiPausing) {
+        // Update flame particle system
+        const dt = Math.min(FRAME_TIME / 1000, 0.1); // Convert to seconds, cap at 100ms
+        flamewardenFlameSystem.update(dt);
+      }
     } else if (state.gameState === 'roundEnd') {
       stopArenaBgm(true);
       // Keep fighters moving in background during winning display

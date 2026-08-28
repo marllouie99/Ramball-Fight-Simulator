@@ -1145,8 +1145,92 @@ function drawStitchedPatchworkBall(ctx, illusion) {
     progress = 1.0 - (illusion.deathTimer / (illusion.maxDeathTimer || 20));
   }
 
-  const cachedCanvas = getPatchworkBallCanvas(r, variant, progress);
-  ctx.drawImage(cachedCanvas, -cachedCanvas.width / 2, -cachedCanvas.height / 2);
+  // 1. Draw swelling cursed energy bubbles protruding from sides when dying (pre-explosion)
+  if (progress > 0) {
+    ctx.save();
+    const bubbleColor = variant === 1 ? 'rgba(80, 120, 180, ' + (0.5 + progress * 0.4) + ')' : 
+                        variant === 2 ? 'rgba(160, 50, 50, ' + (0.5 + progress * 0.4) + ')' :
+                                        'rgba(120, 40, 180, ' + (0.5 + progress * 0.4) + ')';
+    ctx.fillStyle = bubbleColor;
+    ctx.strokeStyle = '#0A0610';
+    ctx.lineWidth = 1.5;
+
+    // Left bubble
+    const b1Radius = r * 0.7 * progress;
+    const b1X = -r * 0.8;
+    const b1Y = r * 0.3;
+    if (b1Radius > 2) {
+      ctx.beginPath();
+      ctx.arc(b1X, b1Y, b1Radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = variant === 1 ? 'rgba(160, 200, 255, ' + (0.3 + progress * 0.3) + ')' :
+                      variant === 2 ? 'rgba(255, 120, 120, ' + (0.3 + progress * 0.3) + ')' :
+                                      'rgba(200, 100, 255, ' + (0.3 + progress * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(b1X - b1Radius * 0.2, b1Y - b1Radius * 0.2, b1Radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Right bubble
+    ctx.fillStyle = bubbleColor;
+    const b2Radius = r * 0.8 * progress;
+    const b2X = r * 0.7;
+    const b2Y = r * 0.2;
+    if (b2Radius > 2) {
+      ctx.beginPath();
+      ctx.arc(b2X, b2Y, b2Radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = variant === 1 ? 'rgba(160, 200, 255, ' + (0.3 + progress * 0.3) + ')' :
+                      variant === 2 ? 'rgba(255, 120, 120, ' + (0.3 + progress * 0.3) + ')' :
+                                      'rgba(200, 100, 255, ' + (0.3 + progress * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(b2X - b2Radius * 0.2, b2Y - b2Radius * 0.2, b2Radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Top bubble
+    ctx.fillStyle = bubbleColor;
+    const b3Radius = r * 0.5 * progress;
+    const b3X = -r * 0.5;
+    const b3Y = -r * 0.7;
+    if (b3Radius > 2) {
+      ctx.beginPath();
+      ctx.arc(b3X, b3Y, b3Radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = variant === 1 ? 'rgba(160, 200, 255, ' + (0.3 + progress * 0.3) + ')' :
+                      variant === 2 ? 'rgba(255, 120, 120, ' + (0.3 + progress * 0.3) + ')' :
+                                      'rgba(200, 100, 255, ' + (0.3 + progress * 0.3) + ')';
+      ctx.beginPath();
+      ctx.arc(b3X - b3Radius * 0.2, b3Y - b3Radius * 0.2, b3Radius * 0.35, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // 2. Draw cursed spirit body directly on game canvas (zero clipping boundaries)
+  drawCursedSpiritBody(ctx, r, progress, variant);
+
+  // 3. Overlay intensifying cursed energy glow when about to explode
+  if (progress > 0.3) {
+    const glowAlpha = (progress - 0.3) * 0.6;
+    const glowGrad = ctx.createRadialGradient(0, 0, r * 0.2, 0, 0, r * 1.15);
+    const colorStart = variant === 1 ? 'rgba(160, 200, 255, ' + (glowAlpha * 0.65) + ')' :
+                       variant === 2 ? 'rgba(255, 120, 120, ' + (glowAlpha * 0.65) + ')' :
+                                       'rgba(220, 100, 255, ' + (glowAlpha * 0.65) + ')';
+    const colorMid = variant === 1 ? 'rgba(70, 130, 200, ' + (glowAlpha * 0.3) + ')' :
+                     variant === 2 ? 'rgba(200, 50, 50, ' + (glowAlpha * 0.3) + ')' :
+                                     'rgba(140, 30, 200, ' + (glowAlpha * 0.3) + ')';
+    glowGrad.addColorStop(0, colorStart);
+    glowGrad.addColorStop(0.6, colorMid);
+    glowGrad.addColorStop(1, 'rgba(140, 30, 200, 0.0)');
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r * 1.15, 0, Math.PI * 2);
+    ctx.fill();
+  }
 }
 
 export function drawIllusions() {

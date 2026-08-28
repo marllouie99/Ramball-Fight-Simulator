@@ -340,28 +340,66 @@ export class SukunaRenderer {
       if ((layer === 'all' || layer === 'back') && !hideBackHand) fighter._drawSukunaCursedEnergyAura(ctx, theme, backHandX, backHandY, blobRadius);
     }
 
-    // 2. Draw Physical Circle Hands (back hand behind body, front hand on top of body)
+    // 2. Draw Stepped Pixel-Art Hands (back hand behind body, front hand on top of body)
     const handRadius = getHandSize(7.5, fighter);
+    const skinColor = fighter.color || '#e0a899';
+
+    const _drawPixelFist = (hx, hy) => {
+      const P = 2.0;
+      const gridR = Math.max(P * 2, handRadius);
+      const steps = Math.ceil(gridR / P);
+
+      // Outer Dark Shell
+      ctx.fillStyle = '#0E0F14';
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= gridR + P * 0.75) {
+            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Inner Base Skin Tone
+      ctx.fillStyle = skinColor;
+      const innerR = gridR - P * 0.4;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR) {
+            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Shading
+      ctx.fillStyle = '#B57766';
+      for (let gy = 0; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Specular Highlight
+      ctx.fillStyle = '#FFF0EB';
+      ctx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
+      ctx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
+    };
 
     ctx.save();
-    ctx.fillStyle = fighter.color || '#e0a899';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.5;
+    ctx.imageSmoothingEnabled = false;
 
     // Back hand (behind body circle)
     if ((layer === 'all' || layer === 'back') && !hideBackHand) {
-      ctx.beginPath();
-      ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      _drawPixelFist(backHandX, backHandY);
     }
 
     // Front hand (on top of body circle)
     if ((layer === 'all' || layer === 'front') && !hideFrontHand) {
-      ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
+      _drawPixelFist(frontHandX, frontHandY);
     }
     ctx.restore();
 

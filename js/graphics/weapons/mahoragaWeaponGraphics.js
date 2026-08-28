@@ -93,73 +93,82 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
 
     const r = fighter.r || 30;
-    // Position beside him (to his left side, so it doesn't overlap his body or sword arm!)
+    // Position beside him (to his left side)
     const sideX = fighter.x - r - 18;
     const sideY = (fighter.y + 10) - progress * 28;
     
     ctx.save();
     ctx.translate(sideX, sideY);
-    // STRICTLY UPRIGHT (NO ROTATION!)
     
-    // Scale down to a clean, small badge size (0.65 scale)
     const popScale = Math.sin(Math.min(1, progress * 3) * Math.PI / 2) * 0.65;
     ctx.scale(popScale, popScale);
 
-    // 1. Sleek, upright divine Guardian barrier shield shape
-    ctx.beginPath();
-    ctx.moveTo(0, -22);       // Top point
-    ctx.lineTo(15, -14);      // Top right corner
-    ctx.lineTo(13, 6);        // Right side curve down
-    ctx.quadraticCurveTo(0, 22, 0, 24);   // Bottom tip
-    ctx.quadraticCurveTo(0, 22, -13, 6);  // Left side curve down
-    ctx.lineTo(-15, -14);     // Top left corner
-    ctx.closePath();
+    // 1. Pixel Art Shield Badge — stepped pixel blocks
+    const shP = 2.0;
+    // Shield outline pixels (shield shape approximation)
+    const shieldPixels = [
+      // Top cap
+      [-2, -11], [-1, -11], [0, -11], [1, -11], [2, -11],
+      // Upper sides
+      [-6, -9], [-7, -7], [-7, -5], [-7, -3], [-7, -1], [-7, 1],
+      [6, -9], [7, -7], [7, -5], [7, -3], [7, -1], [7, 1],
+      [-5, -10], [5, -10],
+      // Narrowing sides
+      [-6, 3], [-5, 5], [-4, 7], [-3, 9], [-2, 10], [-1, 11], [0, 12],
+      [6, 3], [5, 5], [4, 7], [3, 9], [2, 10], [1, 11],
+    ];
+    // Shield fill (golden gradient zones)
+    const shieldFillTop = '#FFFFFF';
+    const shieldFillMid = '#FFEB64';
+    const shieldFillBot = '#FFB400';
+    for (let sy = -10; sy <= 11; sy++) {
+      const halfW = sy < -8 ? 4 : (sy < 0 ? 6 : Math.max(0, 6 - Math.floor((sy + 1) * 0.55)));
+      for (let sx = -halfW; sx <= halfW; sx++) {
+        const norm = (sy + 10) / 21;
+        ctx.fillStyle = norm < 0.3 ? shieldFillTop : (norm < 0.65 ? shieldFillMid : shieldFillBot);
+        ctx.fillRect(sx * shP - shP * 0.5, sy * shP - shP * 0.5, shP, shP);
+      }
+    }
+    // Shield border
+    for (const [bx, by] of shieldPixels) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(bx * shP - shP * 0.5, by * shP - shP * 0.5, shP, shP);
+    }
 
-    // Radiant white-hot & golden divine energy fill
-    const shieldGrad = ctx.createLinearGradient(0, -22, 0, 24);
-    shieldGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-    shieldGrad.addColorStop(0.35, 'rgba(255, 235, 100, 0.85)');
-    shieldGrad.addColorStop(0.75, 'rgba(255, 180, 0, 0.55)');
-    shieldGrad.addColorStop(1, 'rgba(255, 140, 0, 0.1)');
-    ctx.fillStyle = shieldGrad;
-    ctx.fill();
-
-    // Crisp white & gold energy border
-    ctx.lineWidth = 2.2;
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.stroke();
-
-    // 2. Glowing GREEN UP ARROW (▲ / ⬆) symbolizing Defense Level Up!
-    ctx.save();
-    ctx.translate(0, -1); // Centered inside the shield
-    ctx.beginPath();
-    ctx.moveTo(0, -13);      // Arrow tip pointing UP
-    ctx.lineTo(8, -3);       // Right barb
-    ctx.lineTo(3.5, -3);     // Right stem inner
-    ctx.lineTo(3.5, 9);      // Right stem bottom
-    ctx.lineTo(-3.5, 9);     // Left stem bottom
-    ctx.lineTo(-3.5, -3);    // Left stem inner
-    ctx.lineTo(-8, -3);      // Left barb
-    ctx.closePath();
-
-    // Neon Emerald Green Gradient Fill
-    const arrowGrad = ctx.createLinearGradient(0, -13, 0, 9);
-    arrowGrad.addColorStop(0, '#76FF03');  // Bright neon lime green
-    arrowGrad.addColorStop(0.5, '#00E676'); // Vibrant emerald green
-    arrowGrad.addColorStop(1, '#00C853');  // Deep green
-    ctx.fillStyle = arrowGrad;
-    ctx.fill();
-
-    // Crisp white outline on the green arrow
-    ctx.lineWidth = 1.6;
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.stroke();
-    ctx.restore();
+    // 2. Pixel Art Green Up Arrow — centered inside shield
+    const arrowColor1 = '#76FF03';
+    const arrowColor2 = '#00E676';
+    // Arrow tip pixels
+    const arrowPixels = [
+      [0, -6, arrowColor1],
+      [-1, -5, arrowColor1], [0, -5, arrowColor1], [1, -5, arrowColor1],
+      [-2, -4, arrowColor1], [-1, -4, arrowColor1], [0, -4, arrowColor1], [1, -4, arrowColor1], [2, -4, arrowColor1],
+      [-3, -3, arrowColor2], [-2, -3, arrowColor2], [2, -3, arrowColor2], [3, -3, arrowColor2],
+      [-4, -2, arrowColor2], [-3, -2, arrowColor2], [3, -2, arrowColor2], [4, -2, arrowColor2],
+      // Stem
+      [-1, -2, arrowColor1], [0, -2, arrowColor1], [1, -2, arrowColor1],
+      [-1, -1, arrowColor1], [0, -1, arrowColor2], [1, -1, arrowColor1],
+      [-1, 0, arrowColor2], [0, 0, arrowColor2], [1, 0, arrowColor2],
+      [-1, 1, arrowColor2], [0, 1, arrowColor2], [1, 1, arrowColor2],
+      [-1, 2, arrowColor2], [0, 2, arrowColor2], [1, 2, arrowColor2],
+      [-1, 3, arrowColor2], [0, 3, arrowColor2], [1, 3, arrowColor2],
+      [-1, 4, arrowColor2], [0, 4, arrowColor2], [1, 4, arrowColor2],
+    ];
+    for (const [ax, ay, ac] of arrowPixels) {
+      ctx.fillStyle = ac;
+      ctx.fillRect(ax * shP - shP * 0.5, ay * shP - shP * 0.5, shP, shP);
+    }
+    // White outline on arrow tip
+    const arrowOutline = [[0, -7], [-1, -6], [1, -6], [-5, -2], [5, -2], [-4, -3], [4, -3]];
+    for (const [ox, oy] of arrowOutline) {
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(ox * shP - shP * 0.5, oy * shP - shP * 0.5, shP, shP);
+    }
 
     ctx.restore(); // Restore left shield badge transform
 
     // ----------------------------------------------------
-    // 3. SIMPLE GREEN + SIGN (Pops out on his right side!)
+    // 3. SIMPLE GREEN + SIGN (Pixel art on right side)
     // ----------------------------------------------------
     const rightX = fighter.x + r + 16;
     const rightY = (fighter.y + 10) - progress * 28;
@@ -168,10 +177,15 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     ctx.translate(rightX, rightY);
     ctx.scale(popScale, popScale);
 
-    // Simple bright green + sign
+    // Pixel art + sign
+    const plusP = 2.0;
     ctx.fillStyle = '#00FF66';
-    ctx.fillRect(-3, -10, 6, 20);
-    ctx.fillRect(-10, -3, 20, 6);
+    for (let g = -5; g <= 5; g++) {
+      // Vertical bar
+      ctx.fillRect(-plusP * 0.5, g * plusP - plusP * 0.5, plusP, plusP);
+      // Horizontal bar
+      ctx.fillRect(g * plusP - plusP * 0.5, -plusP * 0.5, plusP, plusP);
+    }
 
     ctx.restore(); // Restore right RCT badge transform
 
@@ -205,20 +219,33 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   if (isGlowing) {
     ctx.save();
     ctx.scale(scaleX, scaleY);
-    ctx.beginPath();
-    ctx.arc(0, 0, spokeRadius + 12, 0, Math.PI * 2);
     const glowAlpha = fighter.wheelGlowTimer > 0 ? Math.min(1.0, fighter.wheelGlowTimer / 45) : 0.45;
-    const glowGrad = ctx.createRadialGradient(0, 0, 5, 0, 0, spokeRadius + 14);
-
-    // Use Gojo-adapted color if set, otherwise default gold
     const glowColor = fighter.wheelGlowColor || '#FFD700';
     const glowColorDark = fighter.wheelGlowColor || '#DAA520';
+    const glowR = spokeRadius + 12;
+    const _gP = 2.0;
+    const _gSnap = (v) => Math.round(v / _gP) * _gP;
 
-    glowGrad.addColorStop(0, `rgba(255, 255, 255, ${glowAlpha})`);
-    glowGrad.addColorStop(0.4, `rgba(${hexToRgb(glowColor)}, ${glowAlpha * 0.8})`);
-    glowGrad.addColorStop(1, `rgba(${hexToRgb(glowColorDark)}, 0)`);
-    ctx.fillStyle = glowGrad;
-    ctx.fill();
+    // Stepped pixel concentric glow rings
+    const glowGridR = Math.ceil(glowR / _gP);
+    for (let gy = -glowGridR; gy <= glowGridR; gy++) {
+      for (let gx = -glowGridR; gx <= glowGridR; gx++) {
+        const dist = Math.sqrt(gx * gx + gy * gy) * _gP;
+        if (dist > glowR || dist < 5) continue;
+        const norm = dist / glowR;
+        let alpha;
+        if (norm < 0.4) alpha = glowAlpha;
+        else if (norm < 0.7) alpha = glowAlpha * 0.6;
+        else alpha = glowAlpha * 0.2;
+        if (alpha < 0.05) continue;
+        const px = _gSnap(gx * _gP);
+        const py = _gSnap(gy * _gP);
+        ctx.fillStyle = norm < 0.4
+          ? `rgba(255, 255, 255, ${alpha})`
+          : `rgba(${hexToRgb(glowColor)}, ${alpha})`;
+        ctx.fillRect(px - _gP * 0.5, py - _gP * 0.5, _gP, _gP);
+      }
+    }
     ctx.restore();
   }
 
@@ -229,190 +256,231 @@ export function drawMahoraga3DWheel(ctx, fighter) {
   );
 
   // ----------------------------------------------------
-  // RECOGNIZABLE ROTATION VISUAL EFFECT (DIVINE SHOCKWAVE HALO & SUNBURST RAYS)
+  // RECOGNIZABLE ROTATION VISUAL EFFECT (PIXEL ART DIVINE SHOCKWAVE HALO & SUNBURST RAYS)
   // ----------------------------------------------------
   if (fighter.wheelClickTimer > 0 && !isGojoDomainActive) {
     const clickMax = CONFIG.mahoraga?.wheelClickDuration || 25;
     const clickProgress = 1.0 - (fighter.wheelClickTimer / clickMax); // 0.0 to 1.0
     const haloAlpha = Math.max(0, 1.0 - clickProgress);
+    const _P = 2.0;
+    const _snap = (v) => Math.round(v / _P) * _P;
 
     ctx.save();
     ctx.scale(scaleX, scaleY);
 
-    // 1. Expanding Golden Halo Shockwave Ring
+    // 1. Expanding Golden Halo Shockwave Ring — stepped pixel ellipse
     const haloRadius = spokeRadius + clickProgress * 32;
-    ctx.beginPath();
-    ctx.arc(0, 0, haloRadius, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 223, 0, ${haloAlpha * 0.95})`;
-    ctx.lineWidth = 3.5 * haloAlpha;
-    ctx.stroke();
+    const haloSteps = Math.max(32, Math.round(haloRadius * 3));
+    ctx.globalAlpha = haloAlpha * 0.95;
+    for (let i = 0; i < haloSteps; i++) {
+      const a = (i / haloSteps) * Math.PI * 2;
+      const px = _snap(Math.cos(a) * haloRadius);
+      const py = _snap(Math.sin(a) * haloRadius);
+      ctx.fillStyle = '#FFDF00';
+      ctx.fillRect(px - _P * 0.5, py - _P * 0.5, _P, _P);
+    }
 
-    // Inner bright white shockwave rim
-    ctx.beginPath();
-    ctx.arc(0, 0, haloRadius * 0.82, 0, Math.PI * 2);
-    ctx.strokeStyle = `rgba(255, 255, 255, ${haloAlpha * 0.8})`;
-    ctx.lineWidth = 2.0;
-    ctx.stroke();
+    // Inner bright white shockwave rim — pixel ellipse
+    const innerHaloR = haloRadius * 0.82;
+    ctx.globalAlpha = haloAlpha * 0.8;
+    for (let i = 0; i < haloSteps; i++) {
+      const a = (i / haloSteps) * Math.PI * 2;
+      const px = _snap(Math.cos(a) * innerHaloR);
+      const py = _snap(Math.sin(a) * innerHaloR);
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(px - _P * 0.5, py - _P * 0.5, _P, _P);
+    }
+    ctx.globalAlpha = 1.0;
 
-    // 2. 8 Radial Sunburst Laser Beams (Shooting outward from 8 handle spheres!)
+    // 2. 8 Radial Sunburst Laser Beams — stepped pixel lines
     const currentRot = fighter.wheelRotation || 0;
     for (let i = 0; i < 8; i++) {
       const angle = currentRot + (i / 8) * Math.PI * 2;
       const innerDist = spokeRadius * 0.7;
       const outerDist = spokeRadius + clickProgress * 28;
+      const cosAngle = Math.cos(angle);
+      const sinAngle = Math.sin(angle);
+      const numSegs = Math.max(3, Math.ceil((outerDist - innerDist) / _P));
 
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * innerDist, Math.sin(angle) * innerDist);
-      ctx.lineTo(Math.cos(angle) * outerDist, Math.sin(angle) * outerDist);
-      ctx.strokeStyle = `rgba(255, 245, 157, ${haloAlpha})`;
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      // Bright white beam core
-      ctx.beginPath();
-      ctx.moveTo(Math.cos(angle) * innerDist, Math.sin(angle) * innerDist);
-      ctx.lineTo(Math.cos(angle) * (outerDist - 4), Math.sin(angle) * (outerDist - 4));
-      ctx.strokeStyle = `rgba(255, 255, 255, ${haloAlpha * 0.9})`;
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+      // Gold outer beam
+      for (let s = 0; s <= numSegs; s++) {
+        const t = s / numSegs;
+        const d = innerDist + (outerDist - innerDist) * t;
+        const px = _snap(cosAngle * d);
+        const py = _snap(sinAngle * d);
+        ctx.fillStyle = `rgba(255, 245, 157, ${haloAlpha})`;
+        ctx.fillRect(px - _P * 0.75, py - _P * 0.75, _P * 1.5, _P * 1.5);
+      }
+      // White beam core
+      for (let s = 0; s <= numSegs; s++) {
+        const t = s / numSegs;
+        const d = innerDist + (outerDist - innerDist - 4) * t;
+        if (d < innerDist) continue;
+        const px = _snap(cosAngle * d);
+        const py = _snap(sinAngle * d);
+        ctx.fillStyle = `rgba(255, 255, 255, ${haloAlpha * 0.9})`;
+        ctx.fillRect(px - _P * 0.3, py - _P * 0.3, _P * 0.6, _P * 0.6);
+      }
     }
 
-    // 3. Central Starburst Core Flare
-    ctx.beginPath();
-    ctx.arc(0, 0, 8 + (1 - clickProgress) * 10, 0, Math.PI * 2);
-    ctx.fillStyle = `rgba(255, 255, 255, ${haloAlpha * 0.75})`;
-    ctx.fill();
+    // 3. Central Starburst Core Flare — stepped pixel cross
+    const flareR = 8 + (1 - clickProgress) * 10;
+    ctx.globalAlpha = haloAlpha * 0.75;
+    // Horizontal + Vertical cross pixels
+    const flareGridR = Math.ceil(flareR / _P);
+    for (let g = -flareGridR; g <= flareGridR; g++) {
+      const dist = Math.abs(g) * _P;
+      if (dist > flareR) continue;
+      const brightness = 1 - dist / flareR;
+      const alpha = brightness * haloAlpha * 0.75;
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+      // Horizontal
+      ctx.fillRect(_snap(g * _P) - _P * 0.5, -_P * 0.5, _P, _P);
+      // Vertical
+      ctx.fillRect(-_P * 0.5, _snap(g * _P) - _P * 0.5, _P, _P);
+    }
+    ctx.globalAlpha = 1.0;
 
     ctx.restore();
   }
 
+  // ── PIXEL ART HELPERS (P = 2.0px grid) ──
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // Stepped pixel ellipse — draws filled pixel blocks tracing an ellipse
+  function _drawPixelEllipse(ctx, cx, cy, rx, ry, fillColor, borderColor) {
+    const steps = Math.max(24, Math.round(Math.max(rx, ry) * 2.5));
+    // Border layer first (slightly larger)
+    if (borderColor) {
+      for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const px = snap(cx + Math.cos(a) * (rx + P * 0.5));
+        const py = snap(cy + Math.sin(a) * (ry + P * 0.5));
+        ctx.fillStyle = borderColor;
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+      }
+    }
+    // Fill layer
+    if (fillColor) {
+      for (let i = 0; i < steps; i++) {
+        const a = (i / steps) * Math.PI * 2;
+        const px = snap(cx + Math.cos(a) * rx);
+        const py = snap(cy + Math.sin(a) * ry);
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+      }
+    }
+  }
+
+  // Stepped pixel line — draws filled pixel blocks along a line
+  function _drawPixelLine(ctx, x0, y0, x1, y1, color, thickness) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const numSteps = Math.max(2, Math.ceil(len / P));
+    const halfT = Math.max(P * 0.5, thickness * 0.5);
+    for (let s = 0; s <= numSteps; s++) {
+      const t = s / numSteps;
+      const px = snap(x0 + dx * t);
+      const py = snap(y0 + dy * t);
+      ctx.fillStyle = color;
+      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+    }
+  }
+
+  // Stepped pixel filled circle — fills interior with pixel blocks
+  function _fillPixelCircle(ctx, cx, cy, r, colors) {
+    // colors = { border, outer, mid, inner, glint }
+    const gridR = Math.ceil(r / P);
+    for (let gy = -gridR; gy <= gridR; gy++) {
+      for (let gx = -gridR; gx <= gridR; gx++) {
+        const dist = Math.sqrt(gx * gx + gy * gy) * P;
+        if (dist > r + P * 0.5) continue;
+        const norm = dist / r; // 0=center, 1=edge
+        let color;
+        if (norm > 0.92) {
+          color = colors.border || '#000000';
+        } else if (norm > 0.7) {
+          color = colors.outer || '#8B6508';
+        } else if (norm > 0.4) {
+          color = colors.mid || '#D4AF37';
+        } else {
+          color = colors.inner || '#FFF59D';
+        }
+        // Specular glint pixel in upper-left quadrant
+        if (colors.glint && gx <= -1 && gy <= -1 && norm < 0.35) {
+          color = colors.glint;
+        }
+        ctx.fillStyle = color;
+        ctx.fillRect(snap(cx + gx * P) - P * 0.5, snap(cy + gy * P) - P * 0.5, P, P);
+      }
+    }
+  }
+
   // ----------------------------------------------------
-  // LAYER 1: 3D EXTRUSION / UNDERSIDE SHADOW (Depth Thickness)
+  // LAYER 1: 3D EXTRUSION / UNDERSIDE SHADOW (Pixel Art Depth)
   // ----------------------------------------------------
   ctx.save();
   ctx.translate(0, depthOffset);
   ctx.scale(scaleX, scaleY);
   ctx.rotate(fighter.wheelRotation || 0);
 
-  // Dark underside outer ring
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 5;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius, 0, Math.PI * 2);
-  ctx.strokeStyle = '#3D2B0F';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+  // Dark underside outer ring — stepped pixel ellipse
+  _drawPixelEllipse(ctx, 0, 0, wheelRadius + P, wheelRadius + P, '#3D2B0F', '#000000');
+  _drawPixelEllipse(ctx, 0, 0, wheelRadius, wheelRadius, null, '#1A0F00');
 
   // Dark underside spokes & sphere bases
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(cosA * spokeRadius, sinA * spokeRadius);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 4;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(cosA * spokeRadius, sinA * spokeRadius);
-    ctx.strokeStyle = '#2A1D0A';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.arc(cosA * spokeRadius, sinA * spokeRadius, sphereRadius + 0.8, 0, Math.PI * 2);
-    ctx.fillStyle = '#000000';
-    ctx.fill();
+    // Shadow spoke line
+    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#000000', P * 2);
+    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#2A1D0A', P);
+    // Shadow sphere base
+    _fillPixelCircle(ctx, cosA * spokeRadius, sinA * spokeRadius, sphereRadius + P * 0.5, {
+      border: '#000000', outer: '#000000', mid: '#1A0F00', inner: '#1A0F00'
+    });
   }
   ctx.restore();
 
   // ----------------------------------------------------
-  // LAYER 2: MAIN TOP 3D WHEEL SURFACE WITH BLACK STROKE EDGES
+  // LAYER 2: MAIN TOP 3D WHEEL SURFACE (Pixel Art)
   // ----------------------------------------------------
   ctx.save();
   ctx.scale(scaleX, scaleY);
   ctx.rotate(fighter.wheelRotation || 0);
 
-  // 1. 8 Spokes
+  // 1. 8 Spokes — triple-layer pixel lines (black border → gold → highlight)
   for (let i = 0; i < 8; i++) {
     const angle = (i / 8) * Math.PI * 2;
     const cosA = Math.cos(angle);
     const sinA = Math.sin(angle);
-
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(cosA * spokeRadius, sinA * spokeRadius);
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 4.5;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(cosA * spokeRadius, sinA * spokeRadius);
-    ctx.strokeStyle = '#DAA520';
-    ctx.lineWidth = 2.5;
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(cosA * spokeRadius, sinA * spokeRadius);
-    ctx.strokeStyle = '#FFE57F';
-    ctx.lineWidth = 1;
-    ctx.stroke();
+    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#000000', P * 2.2);
+    _drawPixelLine(ctx, 0, 0, cosA * spokeRadius, sinA * spokeRadius, '#DAA520', P * 1.2);
+    _drawPixelLine(ctx, 0, 0, cosA * (spokeRadius * 0.85), sinA * (spokeRadius * 0.85), '#FFE57F', P * 0.5);
   }
 
-  // 2. Outer Ring Rim
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius + 1.5, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  // 2. Outer Ring Rim — stepped pixel ellipse (black border → gold → highlight)
+  _drawPixelEllipse(ctx, 0, 0, wheelRadius + P, wheelRadius + P, null, '#000000');
+  _drawPixelEllipse(ctx, 0, 0, wheelRadius, wheelRadius, '#DAA520', '#000000');
+  _drawPixelEllipse(ctx, 0, 0, wheelRadius - P * 0.5, wheelRadius - P * 0.5, '#FFE57F', null);
 
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius, 0, Math.PI * 2);
-  ctx.strokeStyle = '#DAA520';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+  // 3. Inner Ring Rim — stepped pixel ellipse
+  const innerRimR = wheelRadius * 0.55;
+  _drawPixelEllipse(ctx, 0, 0, innerRimR + P * 0.5, innerRimR + P * 0.5, null, '#000000');
+  _drawPixelEllipse(ctx, 0, 0, innerRimR, innerRimR, '#B8860B', '#000000');
+  _drawPixelEllipse(ctx, 0, 0, innerRimR - P * 0.4, innerRimR - P * 0.4, '#DAA520', null);
 
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius, 0, Math.PI * 2);
-  ctx.strokeStyle = '#FFE57F';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // 3. Inner Ring Rim
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius * 0.55, 0, Math.PI * 2);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 3.2;
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.arc(0, 0, wheelRadius * 0.55, 0, Math.PI * 2);
-  ctx.strokeStyle = '#B8860B';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // 4. Center Hub Dome
-  ctx.beginPath();
-  ctx.arc(0, 0, 5.5, 0, Math.PI * 2);
-  const hubGrad = ctx.createRadialGradient(-1.5, -1.5, 0.5, 0, 0, 6);
-  hubGrad.addColorStop(0, '#FFFFFF');
-  hubGrad.addColorStop(0.3, '#FFF59D');
-  hubGrad.addColorStop(0.7, '#D4AF37');
-  hubGrad.addColorStop(1, '#8B6508');
-  ctx.fillStyle = hubGrad;
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
+  // 4. Center Hub Dome — stepped pixel filled circle with specular glint
+  _fillPixelCircle(ctx, 0, 0, 5.5, {
+    border: '#000000',
+    outer: '#8B6508',
+    mid: '#D4AF37',
+    inner: '#FFF59D',
+    glint: '#FFFFFF'
+  });
 
   // Calculate total adaptation levels reached across all damage types & color history
   let activeStages = 0;
@@ -424,14 +492,11 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     activeStages = Math.min(8, Math.max(1, historyCount));
   }
 
-  // 5. 8 Handle Spheres (Glow color adapts to Gojo attack type when adapted!)
-  // Determine sphere colors: use Gojo-adapted color if set, otherwise default gold
+  // 5. 8 Handle Spheres — Pixel Art with Adaptation Color Support
   const sphereGlowColor = fighter.wheelGlowColor || '#FFD700';
   const sphereGlowRgb = hexToRgb(sphereGlowColor);
-  // Generate a lighter variant for the inner glow
   const sphereGlowLight = fighter.wheelGlowColor ? lightenHex(sphereGlowColor, 0.5) : '#FFF9C4';
   const sphereGlowLightRgb = hexToRgb(sphereGlowLight);
-  // Darker outer variant
   const sphereGlowDark = fighter.wheelGlowColor ? darkenHex(sphereGlowColor, 0.4) : '#FF8C00';
   const sphereGlowDarkRgb = hexToRgb(sphereGlowDark);
 
@@ -441,8 +506,7 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     const sy = Math.sin(angle) * spokeRadius;
     const isLeveled = i < activeStages;
 
-    // Per-sphere color: use the permanent color from the history entry for this sphere's click.
-    // Spheres without a history entry (general/non-Gojo adaptations) fall back to gold — NOT wheelGlowColor.
+    // Per-sphere color from adaptation history
     const adaptColorHistory = fighter.gojoAdaptColorHistory;
     const thisSphereColor      = (adaptColorHistory && adaptColorHistory[i]) ? adaptColorHistory[i] : '#FFD700';
     const thisSphereColorLight = lightenHex(thisSphereColor, 0.5);
@@ -450,59 +514,50 @@ export function drawMahoraga3DWheel(ctx, fighter) {
     const thisSphereRgb        = hexToRgb(thisSphereColor);
     const thisSphereRgbLight   = hexToRgb(thisSphereColorLight);
 
-    // Draw steady outer energy halo around leveled spheres (No spinning/pulsing!)
+    // Draw steady outer energy halo around leveled spheres — stepped pixel glow ring
     if (isLeveled) {
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(sx, sy, sphereRadius * 3.0, 0, Math.PI * 2);
-      const ballGlow = ctx.createRadialGradient(sx, sy, sphereRadius * 0.2, sx, sy, sphereRadius * 3.0);
-      ballGlow.addColorStop(0, 'rgba(255, 255, 255, 0.95)');
-      ballGlow.addColorStop(0.35, `rgba(${thisSphereRgbLight}, 0.85)`);
-      ballGlow.addColorStop(0.7,  `rgba(${thisSphereRgb}, 0.45)`);
-      ballGlow.addColorStop(1,    `rgba(${thisSphereRgb}, 0)`);
-      ctx.fillStyle = ballGlow;
-      ctx.fill();
-      ctx.restore();
+      const haloR = sphereRadius * 3.0;
+      const haloGridR = Math.ceil(haloR / P);
+      for (let gy = -haloGridR; gy <= haloGridR; gy++) {
+        for (let gx = -haloGridR; gx <= haloGridR; gx++) {
+          const dist = Math.sqrt(gx * gx + gy * gy) * P;
+          if (dist > haloR || dist < sphereRadius + P) continue;
+          const norm = (dist - sphereRadius) / (haloR - sphereRadius);
+          let alpha;
+          if (norm < 0.35) alpha = 0.85;
+          else if (norm < 0.7) alpha = 0.45;
+          else alpha = 0.15;
+          if (alpha < 0.1) continue;
+          const px = snap(sx + gx * P);
+          const py = snap(sy + gy * P);
+          ctx.fillStyle = norm < 0.35
+            ? `rgba(${thisSphereRgbLight}, ${alpha})`
+            : `rgba(${thisSphereRgb}, ${alpha})`;
+          ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+        }
+      }
     }
 
-    ctx.beginPath();
-    ctx.arc(sx, sy, sphereRadius, 0, Math.PI * 2);
-    
-    const sphereGrad = ctx.createRadialGradient(
-      sx - sphereRadius * 0.35, 
-      sy - sphereRadius * 0.35, 
-      0.5, 
-      sx, 
-      sy, 
-      sphereRadius
-    );
+    // Handle sphere — pixel filled circle
     if (isLeveled) {
-      // Each sphere uses its own permanent adaptation color from history
-      sphereGrad.addColorStop(0, '#FFFFFF');
-      sphereGrad.addColorStop(0.25, thisSphereColorLight);
-      sphereGrad.addColorStop(0.6, thisSphereColor);
-      sphereGrad.addColorStop(1, thisSphereColorDark);
+      _fillPixelCircle(ctx, sx, sy, sphereRadius, {
+        border: '#000000',
+        outer: thisSphereColorDark,
+        mid: thisSphereColor,
+        inner: thisSphereColorLight,
+        glint: '#FFFFFF'
+      });
+      // White energy rim pixels on leveled spheres
+      _drawPixelEllipse(ctx, sx, sy, sphereRadius + P * 0.6, sphereRadius + P * 0.6, null, '#FFFFFF');
     } else {
-      // Standard golden dharma spheres for unadapted levels
-      sphereGrad.addColorStop(0, '#FFFFFF');
-      sphereGrad.addColorStop(0.25, '#FFE082');
-      sphereGrad.addColorStop(0.7, '#C59B27');
-      sphereGrad.addColorStop(1, '#4A3319');
-    }
-    
-    ctx.fillStyle = sphereGrad;
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 1.6;
-    ctx.stroke();
-
-    // Crisp white energy rim on leveled spheres
-    if (isLeveled) {
-      ctx.beginPath();
-      ctx.arc(sx, sy, sphereRadius + 0.8, 0, Math.PI * 2);
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
+      // Standard golden dharma spheres
+      _fillPixelCircle(ctx, sx, sy, sphereRadius, {
+        border: '#000000',
+        outer: '#4A3319',
+        mid: '#C59B27',
+        inner: '#FFE082',
+        glint: '#FFFFFF'
+      });
     }
   }
 
@@ -814,133 +869,172 @@ export function drawMahoragaSword(ctx, x = 0, y = 0, gunAngle = 0, r = 30, punch
 
   ctx.translate(r * 0.3 + extendDist, 0);
 
-  // 1. White Bandaged Forearm (Extending from body into wrist ring)
-  ctx.beginPath();
-  ctx.roundRect(-20, -8, 14, 16, 3);
-  ctx.fillStyle = '#EBEBE6'; // Off-white bandage color
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
-  ctx.stroke();
+  // ── SWORD PIXEL ART HELPERS (P = 2.0px grid) ──
+  const sP = 2.0;
+  const sSnap = (v) => Math.round(v / sP) * sP;
 
-  // Bandage texture lines
-  ctx.strokeStyle = '#AFAFA5';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(-16, -8); ctx.lineTo(-14, 8);
-  ctx.moveTo(-11, -8); ctx.lineTo(-9, 8);
-  ctx.stroke();
+  // 1. Pixel Art White Bandaged Forearm
+  const armX0 = -20, armY0 = -8, armW = 14, armH = 16;
+  for (let gy = 0; gy < Math.ceil(armH / sP); gy++) {
+    for (let gx = 0; gx < Math.ceil(armW / sP); gx++) {
+      const px = sSnap(armX0 + gx * sP);
+      const py = sSnap(armY0 + gy * sP);
+      // Border pixels
+      if (gx === 0 || gx >= Math.ceil(armW / sP) - 1 || gy === 0 || gy >= Math.ceil(armH / sP) - 1) {
+        ctx.fillStyle = '#000000';
+      } else {
+        ctx.fillStyle = '#EBEBE6';
+      }
+      ctx.fillRect(px, py, sP, sP);
+    }
+  }
+  // Bandage texture pixel lines
+  for (let gy = 0; gy < Math.ceil(armH / sP); gy++) {
+    const py = sSnap(armY0 + gy * sP);
+    ctx.fillStyle = '#AFAFA5';
+    ctx.fillRect(sSnap(-16), py, sP, sP);
+    ctx.fillRect(sSnap(-11), py, sP, sP);
+  }
 
-  // 2. LARGE CLENCHED FIST (Positioned BEHIND blade, right AT the holder ring; Radius = 14px!)
+  // 2. Pixel Art Clenched Fist
   const fistRadius = 14.0;
-  ctx.beginPath();
-  ctx.arc(-2, 3, fistRadius, 0, Math.PI * 2);
-  ctx.fillStyle = color; // Skin tone matching body
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.2;
-  ctx.stroke();
+  const fistGridR = Math.ceil(fistRadius / sP);
+  for (let gy = -fistGridR; gy <= fistGridR; gy++) {
+    for (let gx = -fistGridR; gx <= fistGridR; gx++) {
+      const dist = Math.sqrt(gx * gx + gy * gy) * sP;
+      if (dist > fistRadius + sP * 0.3) continue;
+      const px = sSnap(-2 + gx * sP);
+      const py = sSnap(3 + gy * sP);
+      if (dist > fistRadius - sP * 0.5) {
+        ctx.fillStyle = '#000000';
+      } else if (gx <= -2 && gy <= -2 && dist < fistRadius * 0.35) {
+        ctx.fillStyle = '#FFFFFF'; // Specular glint
+      } else {
+        ctx.fillStyle = color;
+      }
+      ctx.fillRect(px - sP * 0.5, py - sP * 0.5, sP, sP);
+    }
+  }
 
-
-
-  // 3. Black Gauntlet Wrist Ring Holder (Clamping wrist & top of hand)
+  // 3. Pixel Art Black Gauntlet Wrist Ring Holder
   const ringW = 9;
   const ringH = 21;
-  ctx.beginPath();
-  ctx.roundRect(-7, -ringH / 2, ringW, ringH, 4);
-  ctx.fillStyle = '#1A1A1D'; // Dark charcoal gauntlet ring
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.2;
-  ctx.stroke();
+  const ringX0 = -7, ringY0 = -Math.floor(ringH / 2);
+  for (let gy = 0; gy < Math.ceil(ringH / sP); gy++) {
+    for (let gx = 0; gx < Math.ceil(ringW / sP); gx++) {
+      const px = sSnap(ringX0 + gx * sP);
+      const py = sSnap(ringY0 + gy * sP);
+      if (gx === 0 || gx >= Math.ceil(ringW / sP) - 1 || gy === 0 || gy >= Math.ceil(ringH / sP) - 1) {
+        ctx.fillStyle = '#000000';
+      } else if (gx === 2) {
+        ctx.fillStyle = '#55555C'; // Metallic highlight stripe
+      } else {
+        ctx.fillStyle = '#1A1A1D';
+      }
+      ctx.fillRect(px, py, sP, sP);
+    }
+  }
 
-  // Metallic ring highlight
-  ctx.beginPath();
-  ctx.moveTo(-3, -ringH / 2 + 2);
-  ctx.lineTo(-3, ringH / 2 - 2);
-  ctx.strokeStyle = '#55555C';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // 4. RETRACTABLE SWORD OF EXTERMINATION BLADE (Slides in & out of the wrist gauntlet ring!)
+  // 4. RETRACTABLE SWORD OF EXTERMINATION BLADE — Pixel Art
   const retractScale = isGuarding ? 0.45 : (isParrying ? 1.0 : (bladeRetractProgress !== undefined ? Math.max(0, Math.min(1, bladeRetractProgress)) : (isThrowing ? 0.0 : 1.0)));
 
   if (retractScale > 0.02) {
     ctx.save();
-    ctx.scale(retractScale, retractScale); // Smoothly slides back into forearm gauntlet ring!
+    ctx.scale(retractScale, retractScale);
 
     const totalStages = fighterObj ? ((fighterObj.adaptationStage?.melee || 0) + (fighterObj.adaptationStage?.ranged || 0) + (fighterObj.adaptationStage?.skill || 0)) : 0;
     const isLevel8 = fighterObj && (totalStages >= 8 || fighterObj.isInfinityBlitz || fighterObj.isMaxAdapted || (fighterObj.goldStages >= 8));
 
-    if (isLevel8) {
-      // Golden Level 8 Sword Outer Aura Glow (concentric golden shapes)
-      ctx.beginPath();
-      ctx.moveTo(-1, -bladeWidth / 2 - 3);
-      ctx.lineTo(bladeLength - 14, -bladeWidth / 2 - 2);
-      ctx.lineTo(bladeLength + 5, 0);
-      ctx.lineTo(bladeLength - 14, bladeWidth / 2 + 2);
-      ctx.lineTo(-1, bladeWidth / 2 + 3);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(255, 215, 0, 0.40)';
-      ctx.fill();
+    // Build blade pixel map — tapered diamond blade shape
+    // Blade extends from x=1 to x=bladeLength, width from -bladeWidth/2 to +bladeWidth/2
+    const halfW = bladeWidth / 2;
+    const taperStart = bladeLength - 16; // Point where blade starts narrowing to tip
 
-      ctx.beginPath();
-      ctx.moveTo(0, -bladeWidth / 2 - 1.5);
-      ctx.lineTo(bladeLength - 15, -bladeWidth / 2 - 1);
-      ctx.lineTo(bladeLength + 2.5, 0);
-      ctx.lineTo(bladeLength - 15, bladeWidth / 2 + 1);
-      ctx.lineTo(0, bladeWidth / 2 + 1.5);
-      ctx.closePath();
-      ctx.fillStyle = 'rgba(255, 238, 88, 0.70)';
-      ctx.fill();
+    // Level 8 Golden Aura (outer glow pixels)
+    if (isLevel8) {
+      const auraExpand = 3;
+      for (let bx = -1; bx <= bladeLength + 5; bx += sP) {
+        let maxHalfW;
+        if (bx < 1) maxHalfW = halfW + auraExpand;
+        else if (bx < taperStart) maxHalfW = halfW + auraExpand - (bx / taperStart) * 1;
+        else {
+          const tipT = (bx - taperStart) / (bladeLength + 5 - taperStart);
+          maxHalfW = (halfW + auraExpand) * (1 - tipT);
+        }
+        for (let by = -maxHalfW; by <= maxHalfW; by += sP) {
+          const px = sSnap(bx);
+          const py = sSnap(by);
+          ctx.fillStyle = 'rgba(255, 215, 0, 0.35)';
+          ctx.fillRect(px - sP * 0.5, py - sP * 0.5, sP, sP);
+        }
+      }
     }
 
-    ctx.beginPath();
-    ctx.moveTo(1, -bladeWidth / 2);
-    ctx.lineTo(bladeLength - 16, -bladeWidth / 2 + 1);
-    ctx.lineTo(bladeLength, 0); // Sharp needle tip
-    ctx.lineTo(bladeLength - 16, bladeWidth / 2 - 1);
-    ctx.lineTo(1, bladeWidth / 2);
-    ctx.closePath();
+    // Main blade body — pixel filled tapered shape
+    for (let bx = 1; bx <= bladeLength; bx += sP) {
+      let maxHalfW;
+      if (bx < taperStart) {
+        // Straight blade section — slight taper from base
+        maxHalfW = halfW - (bx / taperStart) * 1;
+      } else {
+        // Tapered tip section — narrows to needle point
+        const tipT = (bx - taperStart) / (bladeLength - taperStart);
+        maxHalfW = (halfW - 1) * (1 - tipT);
+      }
 
-    const bladeGrad = ctx.createLinearGradient(0, -bladeWidth / 2, 0, bladeWidth / 2);
-    if (isLevel8) {
-      bladeGrad.addColorStop(0, '#FFFFFF');
-      bladeGrad.addColorStop(0.25, '#FFEE58');
-      bladeGrad.addColorStop(0.65, '#FFD54F');
-      bladeGrad.addColorStop(1, '#FFA000');
-    } else {
-      bladeGrad.addColorStop(0, '#FFFFFF');
-      bladeGrad.addColorStop(0.3, '#E2E8F0');
-      bladeGrad.addColorStop(0.7, '#CBD5E1');
-      bladeGrad.addColorStop(1, '#94A3B8');
+      for (let by = -maxHalfW; by <= maxHalfW; by += sP) {
+        const px = sSnap(bx);
+        const py = sSnap(by);
+        const normY = Math.abs(by) / Math.max(1, maxHalfW);
+        const normX = bx / bladeLength;
+
+        // Determine pixel color — blade coloring with stepped shading zones
+        let pixColor;
+        if (normY > 0.85) {
+          // Border edge
+          pixColor = isLevel8 ? '#B78103' : '#000000';
+        } else if (normY < 0.25 && normX < 0.62) {
+          // Central bevel inset (dark core)
+          pixColor = isLevel8 ? '#4E342E' : '#22252A';
+        } else if (normY < 0.08) {
+          // Ridge spine center line
+          pixColor = isLevel8 ? '#FFF8E1' : '#FFFFFF';
+        } else {
+          // Main blade surface
+          if (isLevel8) {
+            pixColor = normY < 0.4 ? '#FFEE58' : (normY < 0.65 ? '#FFD54F' : '#FFA000');
+          } else {
+            pixColor = normY < 0.3 ? '#FFFFFF' : (normY < 0.5 ? '#E2E8F0' : (normY < 0.7 ? '#CBD5E1' : '#94A3B8'));
+          }
+        }
+        ctx.fillStyle = pixColor;
+        ctx.fillRect(px - sP * 0.5, py - sP * 0.5, sP, sP);
+      }
     }
-    ctx.fillStyle = bladeGrad;
-    ctx.fill();
 
-    ctx.strokeStyle = isLevel8 ? '#B78103' : '#000000';
-    ctx.lineWidth = 2.2 / Math.max(0.2, retractScale);
-    ctx.stroke();
+    // Blade outline — top and bottom edge pixel traces
+    for (let bx = 1; bx <= bladeLength; bx += sP) {
+      let edgeHalfW;
+      if (bx < taperStart) {
+        edgeHalfW = halfW - (bx / taperStart) * 1;
+      } else {
+        const tipT = (bx - taperStart) / (bladeLength - taperStart);
+        edgeHalfW = (halfW - 1) * (1 - tipT);
+      }
+      const px = sSnap(bx);
+      const borderColor = isLevel8 ? '#B78103' : '#000000';
+      // Top edge
+      ctx.fillStyle = borderColor;
+      ctx.fillRect(px - sP * 0.5, sSnap(-edgeHalfW) - sP * 0.5, sP, sP);
+      // Bottom edge
+      ctx.fillRect(px - sP * 0.5, sSnap(edgeHalfW) - sP * 0.5, sP, sP);
+    }
 
-    // Central Beveled Inset
-    ctx.beginPath();
-    ctx.moveTo(1, -bladeWidth * 0.28);
-    ctx.lineTo(bladeLength * 0.62, 0);
-    ctx.lineTo(1, bladeWidth * 0.28);
-    ctx.closePath();
-    ctx.fillStyle = isLevel8 ? '#4E342E' : '#22252A';
-    ctx.fill();
-    ctx.strokeStyle = isLevel8 ? '#FF8F00' : '#000000';
-    ctx.lineWidth = 1.4 / Math.max(0.2, retractScale);
-    ctx.stroke();
-
-    // Central Ridge Spine Line
-    ctx.beginPath();
-    ctx.moveTo(1, 0);
-    ctx.lineTo(bladeLength - 4, 0);
-    ctx.strokeStyle = isLevel8 ? '#FFF8E1' : '#FFFFFF';
-    ctx.lineWidth = (isLevel8 ? 2.2 : 1.5) / Math.max(0.2, retractScale);
-    ctx.stroke();
+    // Base cap (left edge of blade)
+    for (let by = -halfW; by <= halfW; by += sP) {
+      ctx.fillStyle = isLevel8 ? '#B78103' : '#000000';
+      ctx.fillRect(sSnap(1) - sP * 0.5, sSnap(by) - sP * 0.5, sP, sP);
+    }
 
     ctx.restore();
    // (Section 5 visual overlays removed; trail handles all attack graphics now);
@@ -1039,15 +1133,28 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   const facingLeft = Math.abs(gunAngle) > Math.PI / 2;
   if (facingLeft) ctx.scale(1, -1);
 
-  // 1. CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
+  // 1. PIXEL ART CLENCHED LEFT FIST (Radius = 14.0px, matching right sword hand size!)
   const fistRadius = 14.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, fistRadius, 0, Math.PI * 2);
-  ctx.fillStyle = fighter.color || '#F5F5DC'; // Skin tone matching body
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.5;
-  ctx.stroke();
+  const _lP = 2.0;
+  const _lSnap = (v) => Math.round(v / _lP) * _lP;
+  const _lGridR = Math.ceil(fistRadius / _lP);
+  const fistColor = fighter.color || '#F5F5DC';
+  for (let gy = -_lGridR; gy <= _lGridR; gy++) {
+    for (let gx = -_lGridR; gx <= _lGridR; gx++) {
+      const dist = Math.sqrt(gx * gx + gy * gy) * _lP;
+      if (dist > fistRadius + _lP * 0.3) continue;
+      const px = _lSnap(gx * _lP);
+      const py = _lSnap(gy * _lP);
+      if (dist > fistRadius - _lP * 0.5) {
+        ctx.fillStyle = '#000000';
+      } else if (gx <= -2 && gy <= -2 && dist < fistRadius * 0.35) {
+        ctx.fillStyle = '#FFFFFF'; // Specular glint
+      } else {
+        ctx.fillStyle = fistColor;
+      }
+      ctx.fillRect(px - _lP * 0.5, py - _lP * 0.5, _lP, _lP);
+    }
+  }
 
 
 
@@ -1171,121 +1278,213 @@ export function drawMahoragaThrow(ctx, p) {
   const now = Date.now();
   const spinAngle = moveAngle + (p.spinOffset || 0) + (now * 0.009);
 
+  // Pixel art grid configuration (P = 2.0px)
+  const dP = 2.0;
+  const snap = (v) => Math.round(v / dP) * dP;
+
+  // Stepped pixel line helper
+  function _debPixLine(x0, y0, x1, y1, color, thickness) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(2, Math.ceil(len / dP));
+    const halfT = Math.max(dP * 0.5, (thickness || dP) * 0.5);
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const px = snap(x0 + dx * t);
+      const py = snap(y0 + dy * t);
+      ctx.fillStyle = color;
+      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+    }
+  }
+
+  // Point in polygon test
+  function _pointInPoly(px, py, verts) {
+    let inside = false;
+    for (let i = 0, j = verts.length - 1; i < verts.length; j = i++) {
+      const xi = verts[i].x, yi = verts[i].y;
+      const xj = verts[j].x, yj = verts[j].y;
+      const intersect = ((yi > py) !== (yj > py)) &&
+        (px < (xj - xi) * (py - yi) / (yj - yi) + xi);
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  // Stepped pixel polygon fill & outline rasterizer
+  function _drawPixelDebrisPoly(verts, colorFn, borderColor) {
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    for (let i = 0; i < verts.length; i++) {
+      const v = verts[i];
+      if (v.x < minX) minX = v.x;
+      if (v.x > maxX) maxX = v.x;
+      if (v.y < minY) minY = v.y;
+      if (v.y > maxY) maxY = v.y;
+    }
+
+    const startX = snap(minX - dP);
+    const endX = snap(maxX + dP);
+    const startY = snap(minY - dP);
+    const endY = snap(maxY + dP);
+
+    // Fill interior pixels with stepped shading
+    for (let py = startY; py <= endY; py += dP) {
+      for (let px = startX; px <= endX; px += dP) {
+        if (_pointInPoly(px, py, verts)) {
+          ctx.fillStyle = colorFn(px, py);
+          ctx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
+        }
+      }
+    }
+
+    // Draw stepped pixel border
+    if (borderColor) {
+      for (let i = 0; i < verts.length; i++) {
+        const v1 = verts[i];
+        const v2 = verts[(i + 1) % verts.length];
+        _debPixLine(v1.x, v1.y, v2.x, v2.y, borderColor, dP);
+      }
+    }
+  }
+
+  // Stepped pixel ellipse helper
+  function _debPixEllipse(cx, cy, rx, ry, fillColor) {
+    const gridRx = Math.ceil(rx / dP);
+    const gridRy = Math.ceil(ry / dP);
+    for (let gy = -gridRy; gy <= gridRy; gy++) {
+      for (let gx = -gridRx; gx <= gridRx; gx++) {
+        const nx = (gx * dP) / rx;
+        const ny = (gy * dP) / ry;
+        if (nx * nx + ny * ny <= 1.0) {
+          const px = snap(cx + gx * dP);
+          const py = snap(cy + gy * dP);
+          ctx.fillStyle = fillColor;
+          ctx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
+        }
+      }
+    }
+  }
+
   ctx.save();
   ctx.translate(p.x, p.y);
 
-  // Soft Ground Drop Shadow
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(0, 18, 28, 11, 0, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-  ctx.fill();
-  ctx.restore();
+  // 1. Pixel Art Ground Drop Shadow
+  _debPixEllipse(0, 18, 28, 11, 'rgba(0, 0, 0, 0.32)');
 
   ctx.rotate(spinAngle);
 
   if (p.visual === 'mahoragaBasaltMonolith') {
-    // 1. PALE BONE & SLATE MONOLITH (With Radiant Pale Gold Fissure Cracks!)
-    ctx.beginPath();
-    ctx.moveTo(25, -4);
-    ctx.lineTo(16, 20);
-    ctx.lineTo(-8, 24);
-    ctx.lineTo(-24, 14);
-    ctx.lineTo(-26, -10);
-    ctx.lineTo(-10, -26);
-    ctx.lineTo(14, -20);
-    ctx.closePath();
+    // 1. PALE BONE & SLATE BASALT MONOLITH (Pixel Art with Radiant Fissure Cracks)
+    const monolithVerts = [
+      { x: 25,  y: -4 },
+      { x: 16,  y: 20 },
+      { x: -8,  y: 24 },
+      { x: -24, y: 14 },
+      { x: -26, y: -10 },
+      { x: -10, y: -26 },
+      { x: 14,  y: -20 }
+    ];
 
-    const basaltGrad = ctx.createLinearGradient(-25, -25, 25, 25);
-    basaltGrad.addColorStop(0, '#F1F5F9');   // Pale bone highlight
-    basaltGrad.addColorStop(0.5, '#CBD5E1'); // Pale slate gray
-    basaltGrad.addColorStop(1, '#64748B');   // Muted stone shadow
-    ctx.fillStyle = basaltGrad;
-    ctx.fill();
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+    _drawPixelDebrisPoly(
+      monolithVerts,
+      (px, py) => {
+        const diag = (px + py + 50) / 100;
+        if (diag < 0.28) return '#F1F5F9'; // Pale bone highlight
+        if (diag < 0.52) return '#CBD5E1'; // Pale slate gray
+        if (diag < 0.76) return '#94A3B8'; // Mid slate stone
+        return '#64748B';                  // Muted stone shadow
+      },
+      '#1E293B' // Dark slate pixel border
+    );
 
-    // Pale Gold-White Cursed Energy Fissure Veins
-    ctx.beginPath();
-    ctx.moveTo(14, -20); ctx.lineTo(3, -2); ctx.lineTo(-14, 12);
-    ctx.moveTo(-8, 24);  ctx.lineTo(1, 4);  ctx.lineTo(16, -8);
-    ctx.strokeStyle = '#FEF08A'; // Pale yellow gold fissure lines
-    ctx.lineWidth = 2.0;
-    ctx.stroke();
+    // Pale Gold-White Cursed Energy Fissure Veins (Stepped pixel lines)
+    _debPixLine(14, -20, 3, -2, '#FEF08A', dP * 1.1);
+    _debPixLine(3, -2, -14, 12, '#FEF08A', dP * 1.1);
+    _debPixLine(-8, 24, 1, 4, '#FEF08A', dP * 1.1);
+    _debPixLine(1, 4, 16, -8, '#FEF08A', dP * 1.1);
 
-    ctx.beginPath();
-    ctx.moveTo(3, -2); ctx.lineTo(16, -8);
-    ctx.strokeStyle = '#FFFFFF'; // Pure white-hot core
-    ctx.lineWidth = 1.4;
-    ctx.stroke();
+    // White-hot core highlight
+    _debPixLine(3, -2, 16, -8, '#FFFFFF', dP * 0.7);
 
   } else if (p.visual === 'mahoragaRuinConcrete') {
-    // 2. PALE ASH CONCRETE SLAB (Pale Ash Gray with Muted Steel Spikes)
-    ctx.beginPath();
-    ctx.moveTo(26, -12);
-    ctx.lineTo(24, 14);
-    ctx.lineTo(-22, 16);
-    ctx.lineTo(-26, -14);
-    ctx.closePath();
+    // 2. PALE ASH CONCRETE SLAB (Pixel Art with Muted Steel Spikes)
+    const concreteVerts = [
+      { x: 26,  y: -12 },
+      { x: 24,  y: 14 },
+      { x: -22, y: 16 },
+      { x: -26, y: -14 }
+    ];
 
-    const concGrad = ctx.createLinearGradient(-26, -14, 26, 16);
-    concGrad.addColorStop(0, '#E2E8F0');   // Pale ash white
-    concGrad.addColorStop(0.6, '#94A3B8'); // Soft cement gray
-    concGrad.addColorStop(1, '#475569');   // Muted slate edge
-    ctx.fillStyle = concGrad;
-    ctx.fill();
-    ctx.strokeStyle = '#1E293B';
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+    _drawPixelDebrisPoly(
+      concreteVerts,
+      (px, py) => {
+        const diag = (px + py + 40) / 80;
+        if (diag < 0.30) return '#E2E8F0'; // Pale ash white
+        if (diag < 0.65) return '#94A3B8'; // Soft cement gray
+        return '#475569';                  // Muted slate edge
+      },
+      '#0F172A' // Dark charcoal pixel border
+    );
 
-    // Muted Steel Rebar Spikes
-    ctx.strokeStyle = '#94A3B8'; // Pale steel gray
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.moveTo(26, -6); ctx.lineTo(36, -8);
-    ctx.moveTo(24, 8);  ctx.lineTo(33, 12);
-    ctx.moveTo(-26, -4); ctx.lineTo(-35, -2);
-    ctx.stroke();
+    // Muted Steel Rebar Spikes (Pixel art metal rods)
+    _debPixLine(26, -6, 36, -8, '#94A3B8', dP * 1.2);
+    _debPixLine(34, -8, 36, -8, '#FFFFFF', dP * 0.7); // Tip glint
 
-    // Subtle Fracture Fissures
-    ctx.beginPath();
-    ctx.moveTo(-18, -14); ctx.lineTo(-4, 0); ctx.lineTo(20, 14);
-    ctx.strokeStyle = '#0F172A';
-    ctx.lineWidth = 1.8;
-    ctx.stroke();
+    _debPixLine(24, 8, 33, 12, '#94A3B8', dP * 1.2);
+    _debPixLine(31, 11, 33, 12, '#FFFFFF', dP * 0.7);
+
+    _debPixLine(-26, -4, -35, -2, '#94A3B8', dP * 1.2);
+    _debPixLine(-33, -2, -35, -2, '#FFFFFF', dP * 0.7);
+
+    // Subtle Fracture Fissures (Stepped dark crack lines)
+    _debPixLine(-18, -14, -4, 0, '#0F172A', dP * 0.9);
+    _debPixLine(-4, 0, 20, 14, '#0F172A', dP * 0.9);
 
   } else {
-    // 3. PALE CHALK LIMESTONE RUBBLE (Pale White Ash Stone + Glowing Pale Core)
-    ctx.beginPath();
-    ctx.moveTo(22, -8);
-    ctx.lineTo(18, 16);
-    ctx.lineTo(-12, 20);
-    ctx.lineTo(-24, 4);
-    ctx.lineTo(-18, -20);
-    ctx.lineTo(6, -22);
-    ctx.closePath();
+    // 3. PALE CHALK LIMESTONE RUBBLE (Pixel Art with Glowing Cursed Amber Core)
+    const chalkVerts = [
+      { x: 22,  y: -8 },
+      { x: 18,  y: 16 },
+      { x: -12, y: 20 },
+      { x: -24, y: 4 },
+      { x: -18, y: -20 },
+      { x: 6,   y: -22 }
+    ];
 
-    const chalkGrad = ctx.createLinearGradient(-24, -22, 22, 20);
-    chalkGrad.addColorStop(0, '#F8FAFC');   // Pale chalk white
-    chalkGrad.addColorStop(0.5, '#E2E8F0'); // Soft ash gray
-    chalkGrad.addColorStop(1, '#94A3B8');   // Pale stone base
-    ctx.fillStyle = chalkGrad;
-    ctx.fill();
-    ctx.strokeStyle = '#334155';
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+    _drawPixelDebrisPoly(
+      chalkVerts,
+      (px, py) => {
+        const diag = (px + py + 46) / 92;
+        if (diag < 0.32) return '#F8FAFC'; // Pale chalk white
+        if (diag < 0.68) return '#E2E8F0'; // Soft ash gray
+        return '#94A3B8';                  // Pale stone base
+      },
+      '#1E293B' // Dark slate pixel border
+    );
 
-    // Soft Glowing White-Gold Core
-    ctx.beginPath();
-    ctx.arc(0, 0, 9, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(254, 240, 138, 0.75)'; // Pale yellow aura
-    ctx.fill();
-
-    ctx.beginPath();
-    ctx.arc(0, 0, 5, 0, Math.PI * 2);
-    ctx.fillStyle = '#FFFFFF'; // Pure white core
-    ctx.fill();
+    // Soft Glowing Cursed Amber-Gold Core (Pixel Art Concentric Rings)
+    const coreR = 8.5;
+    const gridR = Math.ceil(coreR / dP);
+    for (let gy = -gridR; gy <= gridR; gy++) {
+      for (let gx = -gridR; gx <= gridR; gx++) {
+        const dist = Math.sqrt(gx * gx + gy * gy) * dP;
+        if (dist > coreR + dP * 0.3) continue;
+        const px = snap(gx * dP);
+        const py = snap(gy * dP);
+        let cColor;
+        if (dist > coreR - dP * 0.6) {
+          cColor = 'rgba(202, 138, 4, 0.9)'; // Dark golden border
+        } else if (dist > coreR * 0.5) {
+          cColor = 'rgba(254, 240, 138, 0.85)'; // Yellow energy halo
+        } else if (dist > dP * 0.8) {
+          cColor = '#FEF9C3'; // Bright warm core
+        } else {
+          cColor = '#FFFFFF'; // Pure white center pixel
+        }
+        ctx.fillStyle = cColor;
+        ctx.fillRect(px - dP * 0.5, py - dP * 0.5, dP, dP);
+      }
+    }
   }
 
   ctx.restore();

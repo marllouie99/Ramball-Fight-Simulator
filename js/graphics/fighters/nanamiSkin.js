@@ -9,6 +9,34 @@ import { state, isChampionScreenActive } from '../../core/state.js';
 import { drawNanamiCleaver, drawNanamiCollapseShockwaves, drawNanamiBlackFlashActivationAura } from '../weapons/nanamiWeaponGraphics.js';
 import { GojoRenderer } from './gojoRenderer.js';
 
+let _nanamiSkinImage = null;
+let _nanamiSkinImageLoading = false;
+
+export function _getNanamiSkinImage() {
+  if (_nanamiSkinImage && _nanamiSkinImage.complete && _nanamiSkinImage.naturalWidth > 0) {
+    return _nanamiSkinImage;
+  }
+  if (!_nanamiSkinImageLoading && typeof Image !== 'undefined') {
+    _nanamiSkinImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _nanamiSkinImage = img;
+      _nanamiSkinImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Nanami skin image at Assets/model/Nanami-SKIN.png', e);
+      _nanamiSkinImageLoading = false;
+    };
+    img.src = 'Assets/model/Nanami-SKIN.png?v=1';
+    _nanamiSkinImage = img;
+  }
+  return _nanamiSkinImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getNanamiSkinImage();
+}
+
 // Pre-computed normalized constants to eliminate per-frame GC allocations
 const _TIE_SPLOTCHES = [
   { x: -0.04, y: 0.33, rx: 1.3, ry: 1.0 },
@@ -140,54 +168,72 @@ export function drawNanamiCursedEnergyAura(ctx, fighter) {
 }
 
 /**
- * Helper to draw a clenched fist with watch and skin tone
+ * Helper to draw a clenched fist with watch and skin tone (Pixel Art Edition)
  */
 function _drawFist(ctx, x, y, radius, skinColor, fighter, isFrontHand = false) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.imageSmoothingEnabled = false;
 
-  // 1. Wrist / Cuff base (Deep cerulean blue shirt cuff)
+  const P = 2.0;
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
+
+  // 1. Wrist / Cuff base (Deep cerulean blue shirt cuff - Stepped Pixel Art)
+  ctx.fillStyle = '#12243A';
+  ctx.fillRect(-gridR * 0.9, -gridR * 0.85, gridR * 1.8, gridR * 0.65);
   ctx.fillStyle = '#2B5882';
-  ctx.strokeStyle = '#12243A';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.roundRect(-radius * 0.95, -radius * 0.8, radius * 1.9, radius * 0.6, 2);
-  ctx.fill();
-  ctx.stroke();
+  ctx.fillRect(-gridR * 0.8, -gridR * 0.75, gridR * 1.6, gridR * 0.45);
 
-  // 2. Golden Wristwatch on the back hand
+  // 2. Golden Wristwatch on the back hand (Stepped Pixel Art)
   if (!isFrontHand) {
+    ctx.fillStyle = '#78350F';
+    ctx.fillRect(-gridR * 0.65, -gridR * 0.95, gridR * 1.3, gridR * 0.45);
     ctx.fillStyle = '#D4AF37';
-    ctx.strokeStyle = '#92400E';
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.roundRect(-radius * 0.75, -radius * 0.9, radius * 1.5, radius * 0.4, 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Watch face
+    ctx.fillRect(-gridR * 0.55, -gridR * 0.85, gridR * 1.1, gridR * 0.25);
+    // Watch Face Pixel
     ctx.fillStyle = '#FEF3C7';
-    ctx.beginPath();
-    ctx.arc(0, -radius * 0.7, radius * 0.35, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.fillRect(-P * 0.5, -gridR * 0.85, P, P);
   }
 
-  // 3. Hand Fist (Natural Skin Tone)
-  ctx.fillStyle = skinColor;
-  ctx.strokeStyle = '#1E293B';
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // 3. Stepped Dark Outline Shell
+  ctx.fillStyle = '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= gridR + P * 0.75) {
+        ctx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
 
-  // 4. Subtle Knuckle / Finger Line
-  ctx.strokeStyle = 'rgba(120, 53, 15, 0.45)';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-radius * 0.4, 0);
-  ctx.lineTo(radius * 0.4, 0);
-  ctx.stroke();
+  // 4. Stepped Inner Base Skin Tone
+  ctx.fillStyle = skinColor;
+  const innerR = gridR - P * 0.4;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR) {
+        ctx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
+
+  // 5. Knuckle Depth Shading
+  ctx.fillStyle = '#C49677';
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+        ctx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
+
+  // 6. Knuckle Specular Highlight Pixels
+  ctx.fillStyle = '#FFF3E8';
+  ctx.fillRect(P * 0.5, -innerR * 0.45, P, P);
+  ctx.fillRect(P * 1.5, -innerR * 0.45, P, P);
 
   ctx.restore();
 }
@@ -359,21 +405,31 @@ export function drawNanamiSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // A. Base Skin Fill (Warm Fair Tone)
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+  const nanamiImg = _getNanamiSkinImage();
+  if (nanamiImg && nanamiImg.complete && nanamiImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    // Nanami-SKIN.png content bounds: sx: 13, sy: 45, sw: 454, sh: 446
+    const modelScale = 1.08;
+    const drawR = r * modelScale;
+    ctx.drawImage(nanamiImg, 13, 45, 454, 446, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.restore();
+  } else {
+    // A. Base Skin Fill (Warm Fair Tone)
+    ctx.fillStyle = skinColor;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
 
-  // B. Shading Gradient for 3D depth (Zero shadowBlur - Rule 11)
-  const bodyGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.3, r * 0.15, 0, 0, r * 1.05);
-  bodyGrad.addColorStop(0, 'rgba(255, 245, 235, 0.25)');
-  bodyGrad.addColorStop(0.75, 'rgba(200, 140, 100, 0.12)');
-  bodyGrad.addColorStop(1, 'rgba(60, 30, 20, 0.35)');
-  ctx.fillStyle = bodyGrad;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
+    // B. Shading Gradient for 3D depth (Zero shadowBlur - Rule 11)
+    const bodyGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.3, r * 0.15, 0, 0, r * 1.05);
+    bodyGrad.addColorStop(0, 'rgba(255, 245, 235, 0.25)');
+    bodyGrad.addColorStop(0.75, 'rgba(200, 140, 100, 0.12)');
+    bodyGrad.addColorStop(1, 'rgba(60, 30, 20, 0.35)');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fill();
 
   // C. TORSO & CLOTHING (+Y Bottom Hemisphere — Rule 19)
   const shirtBlue = '#2B5882';       // Deep Cerulean / Steel Blue Dress Shirt
@@ -698,6 +754,7 @@ export function drawNanamiSkin(ctx, fighter) {
     ctx.lineTo(r * pt.nx, r * pt.ny);
   }
   ctx.stroke();
+  }
 
   ctx.restore(); // End clipped body circle
 

@@ -664,21 +664,137 @@ export function drawArena() {
         ctx.fillStyle = f2.themeColor || f2.color || '#F87171';
         ctx.strokeText(name2, startX, textY);
         ctx.fillText(name2, startX, textY);
-      } else {
-        // Multi-fighter or single fighter fallback
-        const names = state.fighters.map(f => (f.name || f._def?.name || f.characterId || 'P').toUpperCase()).join(' VS ');
-        ctx.textAlign = 'center';
-        const namesW = ctx.measureText(names).width;
+      } else if (state.fighters.length === 3) {
+        // ── 1v2 Mode: "NAME1 VS NAME2 & NAME3" with per-fighter colors ──
+        const f1 = state.fighters[0];
+        const f2 = state.fighters[1];
+        const f3 = state.fighters[2];
+        const name1 = (f1.name || f1._def?.name || f1.characterId || 'P1').toUpperCase();
+        const name2 = (f2.name || f2._def?.name || f2.characterId || 'P2').toUpperCase();
+        const name3 = (f3.name || f3._def?.name || f3.characterId || 'P3').toUpperCase();
+
+        const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const accentFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const ampFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const pad = 12;
+        const ampPad = 8;
+
+        ctx.font = nameFont;
+        const w1 = ctx.measureText(name1).width;
+        const w2 = ctx.measureText(name2).width;
+        const w3 = ctx.measureText(name3).width;
+        ctx.font = accentFont;
+        const wVs = ctx.measureText('VS').width;
+        ctx.font = ampFont;
+        const wAmp = ctx.measureText('&').width;
+
+        const totalW = w1 + pad + wVs + pad + w2 + ampPad + wAmp + ampPad + w3;
         const maxW = arena.width - 16;
-        const scale = namesW > maxW ? maxW / namesW : 1.0;
+        const scale = totalW > maxW ? maxW / totalW : 1.0;
+
         ctx.translate(centerX, textY);
         ctx.scale(scale, 1.0);
         ctx.translate(-centerX, -textY);
+
+        let startX = centerX - totalW / 2;
+        ctx.textAlign = 'left';
+
+        // Fighter 1 Name (Solo)
+        ctx.font = nameFont;
         ctx.lineWidth = 4.5;
         ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
-        ctx.fillStyle = '#F8FAFC';
-        ctx.strokeText(names, centerX, textY);
-        ctx.fillText(names, centerX, textY);
+        ctx.fillStyle = f1.themeColor || f1.color || '#38BDF8';
+        ctx.strokeText(name1, startX, textY);
+        ctx.fillText(name1, startX, textY);
+        startX += w1 + pad;
+
+        // "VS" Accent
+        ctx.font = accentFont;
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillStyle = '#94A3B8';
+        ctx.strokeText('VS', startX, textY - 1.5);
+        ctx.fillText('VS', startX, textY - 1.5);
+        startX += wVs + pad;
+
+        // Fighter 2 Name (Team Member 1)
+        ctx.font = nameFont;
+        ctx.lineWidth = 4.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillStyle = f2.themeColor || f2.color || '#F87171';
+        ctx.strokeText(name2, startX, textY);
+        ctx.fillText(name2, startX, textY);
+        startX += w2 + ampPad;
+
+        // "&" Ampersand Accent
+        ctx.font = ampFont;
+        ctx.lineWidth = 3.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillStyle = '#94A3B8';
+        ctx.strokeText('&', startX, textY - 1.5);
+        ctx.fillText('&', startX, textY - 1.5);
+        startX += wAmp + ampPad;
+
+        // Fighter 3 Name (Team Member 2)
+        ctx.font = nameFont;
+        ctx.lineWidth = 4.5;
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+        ctx.fillStyle = f3.themeColor || f3.color || '#FBBF24';
+        ctx.strokeText(name3, startX, textY);
+        ctx.fillText(name3, startX, textY);
+      } else {
+        // Multi-fighter fallback (FFA 4+): Per-fighter colored names joined by "VS"
+        const nameFont = '900 22px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const vsFont = '800 14px "Silkscreen", "Press Start 2P", "Rajdhani", monospace, sans-serif';
+        const pad = 10;
+
+        const fighterData = state.fighters.map(f => ({
+          name: (f.name || f._def?.name || f.characterId || 'P').toUpperCase(),
+          color: f.themeColor || f.color || '#F8FAFC'
+        }));
+
+        // Measure total width
+        let totalW = 0;
+        ctx.font = nameFont;
+        fighterData.forEach((fd, i) => {
+          totalW += ctx.measureText(fd.name).width;
+          if (i < fighterData.length - 1) {
+            ctx.font = vsFont;
+            totalW += pad + ctx.measureText('VS').width + pad;
+            ctx.font = nameFont;
+          }
+        });
+
+        const maxW = arena.width - 16;
+        const scale = totalW > maxW ? maxW / totalW : 1.0;
+        ctx.translate(centerX, textY);
+        ctx.scale(scale, 1.0);
+        ctx.translate(-centerX, -textY);
+
+        let startX = centerX - totalW / 2;
+        ctx.textAlign = 'left';
+
+        fighterData.forEach((fd, i) => {
+          // Fighter Name
+          ctx.font = nameFont;
+          ctx.lineWidth = 4.5;
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+          ctx.fillStyle = fd.color;
+          ctx.strokeText(fd.name, startX, textY);
+          ctx.fillText(fd.name, startX, textY);
+          startX += ctx.measureText(fd.name).width;
+
+          if (i < fighterData.length - 1) {
+            startX += pad;
+            ctx.font = vsFont;
+            ctx.lineWidth = 3.5;
+            ctx.strokeStyle = 'rgba(0, 0, 0, 0.95)';
+            ctx.fillStyle = '#94A3B8';
+            ctx.strokeText('VS', startX, textY - 1.5);
+            ctx.fillText('VS', startX, textY - 1.5);
+            startX += ctx.measureText('VS').width + pad;
+          }
+        });
       }
 
       ctx.restore();
@@ -1231,51 +1347,104 @@ function _drawPaintSplatter(ctx, cx, cy, scale = 1.0, color = '#E50018', bgDark 
   ctx.translate(cx, cy);
   ctx.scale(scale, scale);
 
-  function drawInkSplat(c, drawColor) {
-    c.fillStyle = drawColor;
-    
-    // 1. Irregular Core (overlapping circles to form a bumpy, solid blob)
-    for (let i = 0; i < _SPLATTER_CORE_CIRCLES.length; i++) {
-      const d = _SPLATTER_CORE_CIRCLES[i];
-      c.beginPath();
-      c.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-      c.fill();
-    }
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
 
-    // 2. Sharp, irregular streaks/spikes shooting outward
-    for (let i = 0; i < _SPLATTER_STREAKS.length; i++) {
-      const s = _SPLATTER_STREAKS[i];
-      c.beginPath();
-      c.moveTo(s.x1, s.y1);
-      c.lineTo(s.tipX, s.tipY);
-      c.lineTo(s.x2, s.y2);
-      c.closePath();
-      c.fill();
-      
-      if (s.bulbR) {
-        c.beginPath();
-        c.arc(s.tipX, s.tipY, s.bulbR, 0, Math.PI * 2);
-        c.fill();
+  // Stepped pixel circle fill
+  function _pixCircle(cx, cy, rad, fillColor) {
+    const gridR = Math.ceil(rad / P);
+    for (let gy = -gridR; gy <= gridR; gy++) {
+      for (let gx = -gridR; gx <= gridR; gx++) {
+        const dist = Math.sqrt(gx * gx + gy * gy) * P;
+        if (dist > rad + P * 0.25) continue;
+        const px = snap(cx + gx * P);
+        const py = snap(cy + gy * P);
+        ctx.fillStyle = fillColor;
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
       }
-    }
-
-    // 3. Floating, detached dots
-    for (let i = 0; i < _SPLATTER_DOTS.length; i++) {
-      const d = _SPLATTER_DOTS[i];
-      c.beginPath();
-      c.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-      c.fill();
     }
   }
 
-  // Pass 1: Dark Burgundy undercoat for depth
-  ctx.save();
-  ctx.scale(1.15, 1.15);
-  drawInkSplat(ctx, bgDark);
-  ctx.restore();
+  // Stepped pixel triangle streak
+  function _pixStreak(x1, y1, tipX, tipY, x2, y2, fillColor) {
+    const minX = Math.min(x1, tipX, x2);
+    const maxX = Math.max(x1, tipX, x2);
+    const minY = Math.min(y1, tipY, y2);
+    const maxY = Math.max(y1, tipY, y2);
+
+    const startX = snap(minX - P);
+    const endX = snap(maxX + P);
+    const startY = snap(minY - P);
+    const endY = snap(maxY + P);
+
+    // 3-point in-triangle test
+    function _inTri(px, py) {
+      const d1 = (px - tipX) * (y1 - tipY) - (x1 - tipX) * (py - tipY);
+      const d2 = (px - x2) * (tipY - y2) - (tipX - x2) * (py - y2);
+      const d3 = (px - x1) * (y2 - y1) - (x2 - x1) * (py - y1);
+      const hasNeg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+      const hasPos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+      return !(hasNeg && hasPos);
+    }
+
+    ctx.fillStyle = fillColor;
+    for (let py = startY; py <= endY; py += P) {
+      for (let px = startX; px <= endX; px += P) {
+        if (_inTri(px, py)) {
+          ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+        }
+      }
+    }
+  }
+
+  function drawPixelInkSplat(fillColor, scaleMult = 1.0) {
+    ctx.save();
+    if (scaleMult !== 1.0) {
+      ctx.scale(scaleMult, scaleMult);
+    }
+
+    // 1. Core Blob Circles (Stepped Pixel Masses)
+    for (let i = 0; i < _SPLATTER_CORE_CIRCLES.length; i++) {
+      const d = _SPLATTER_CORE_CIRCLES[i];
+      _pixCircle(d.x, d.y, d.r, fillColor);
+    }
+
+    // 2. Outward Streaks & Bulbous Tips
+    for (let i = 0; i < _SPLATTER_STREAKS.length; i++) {
+      const s = _SPLATTER_STREAKS[i];
+      _pixStreak(s.x1, s.y1, s.tipX, s.tipY, s.x2, s.y2, fillColor);
+      if (s.bulbR) {
+        _pixCircle(s.tipX, s.tipY, s.bulbR, fillColor);
+      }
+    }
+
+    // 3. Detached Splatter Dots
+    for (let i = 0; i < _SPLATTER_DOTS.length; i++) {
+      const d = _SPLATTER_DOTS[i];
+      _pixCircle(d.x, d.y, d.r, fillColor);
+    }
+
+    ctx.restore();
+  }
+
+  // Pass 1: Dark Burgundy undercoat for depth (scaled up for outline effect)
+  drawPixelInkSplat(bgDark, 1.14);
 
   // Pass 2: Vivid anime crimson body
-  drawInkSplat(ctx, color);
+  drawPixelInkSplat(color, 1.0);
+
+  // Pass 3: High-contrast Pixel Specular Glints on blood masses
+  ctx.fillStyle = 'rgba(255, 175, 185, 0.92)';
+  ctx.fillRect(snap(-6), snap(-12), P * 2, P);
+  ctx.fillRect(snap(6), snap(-8), P * 2, P);
+  ctx.fillRect(snap(-14), snap(4), P, P * 2);
+  ctx.fillRect(snap(10), snap(8), P * 2, P);
+  ctx.fillRect(snap(-2), snap(16), P * 2, P);
+
+  // Pure white glint pixels
+  ctx.fillStyle = '#FFFFFF';
+  ctx.fillRect(snap(-4), snap(-10), P, P);
+  ctx.fillRect(snap(8), snap(-6), P, P);
 
   ctx.restore();
 }
@@ -1337,51 +1506,70 @@ export function drawNanamiRatioCritDimScreen() {
     const step = rulerLength / 10;
     const alpha = Math.sin(rawProgress * Math.PI);
 
-    // ── 2A. DRAW WHITE 10-DIVISION RULER LINE ──
+    // ── 2A. DRAW PIXEL ART 10-DIVISION 7:3 RULER ──
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
+
+    function _rulerPixLine(x0, y0, x1, y1, color, thickness) {
+      const dx = x1 - x0;
+      const dy = y1 - y0;
+      const len = Math.sqrt(dx * dx + dy * dy);
+      const steps = Math.max(2, Math.ceil(len / P));
+      const halfT = Math.max(P * 0.5, (thickness || P) * 0.5);
+      for (let s = 0; s <= steps; s++) {
+        const t = s / steps;
+        const px = snap(x0 + dx * t);
+        const py = snap(y0 + dy * t);
+        ctx.fillStyle = color;
+        ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+      }
+    }
+
     ctx.save();
     ctx.globalAlpha = Math.min(1.0, alpha * 1.1);
-    ctx.strokeStyle = '#FFFFFF';
-    ctx.lineWidth = 4.0;
-    ctx.lineCap = 'butt';
 
-    // Main horizontal measurement bar
-    ctx.beginPath();
-    ctx.moveTo(-halfL, 0);
-    ctx.lineTo(halfL, 0);
-    ctx.stroke();
+    // Main horizontal measurement bar (Dark outline + Crisp White core + Yellow tint center)
+    _rulerPixLine(-halfL - 2, 0, halfL + 2, 0, '#000000', 8.0);
+    _rulerPixLine(-halfL, 0, halfL, 0, '#FFFFFF', 4.0);
+    _rulerPixLine(-halfL + 4, 0, halfL - 4, 0, '#FEF9C3', 2.0);
 
     // Measurement Ticks
     for (let k = 0; k <= 10; k++) {
-      const tx = -halfL + k * step;
+      const tx = snap(-halfL + k * step);
       if (k === 0 || k === 10) {
-        // End T-Caps
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 5.0;
-        ctx.beginPath();
-        ctx.moveTo(tx, -18);
-        ctx.lineTo(tx, 18);
-        ctx.stroke();
+        // End T-Caps (Pixel Art Crossbars)
+        _rulerPixLine(tx, -20, tx, 20, '#000000', 9.0);
+        _rulerPixLine(tx, -18, tx, 18, '#FFFFFF', 5.0);
+        // T-cap horizontal end caps
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(tx - P * 2, snap(-18) - P * 0.5, P * 4, P);
+        ctx.fillRect(tx - P * 2, snap(18) - P * 0.5, P * 4, P);
       } else if (k === 7) {
-        // The 7:3 Division Point (Crimson Red Highlight)
-        ctx.strokeStyle = '#FF1E27';
-        ctx.lineWidth = 5.0;
-        ctx.beginPath();
-        ctx.moveTo(tx, -16);
-        ctx.lineTo(tx, 16);
-        ctx.stroke();
+        // The 7:3 Division Point (Ruby/Crimson Pixel Pillar + White Core)
+        _rulerPixLine(tx, -20, tx, 20, '#4A0005', 9.0);
+        _rulerPixLine(tx, -18, tx, 18, '#FF1E27', 6.0);
+        _rulerPixLine(tx, -15, tx, 15, '#FFFFFF', 2.0);
+
+        // Stepped Pixel Diamond Reticle around 7:3 point
+        ctx.fillStyle = '#FF1E27';
+        ctx.fillRect(tx - P * 3, snap(-P), P, P * 2);
+        ctx.fillRect(tx + P * 2, snap(-P), P, P * 2);
+        ctx.fillRect(snap(tx - P), -P * 3, P * 2, P);
+        ctx.fillRect(snap(tx - P), P * 2, P * 2, P);
       } else {
-        // Standard White Ticks
-        ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 3.2;
-        ctx.beginPath();
-        ctx.moveTo(tx, -10);
-        ctx.lineTo(tx, 10);
-        ctx.stroke();
+        // Standard Division Ticks
+        const tickH = (k === 5) ? 14 : 10;
+        _rulerPixLine(tx, -tickH - 2, tx, tickH + 2, '#000000', 6.0);
+        _rulerPixLine(tx, -tickH, tx, tickH, '#FFFFFF', 3.2);
+        // Yellow tip highlight
+        ctx.fillStyle = '#FEF08A';
+        ctx.fillRect(tx - P * 0.5, snap(-tickH) - P * 0.5, P, P);
+        ctx.fillRect(tx - P * 0.5, snap(tickH) - P * 0.5, P, P);
       }
     }
     ctx.restore();
 
-    // ── 2B. DRAW GRAPHIC PAINT SPLATTER (After 360 Spin Finishes) ──
+    // ── 2B. DRAW PIXEL ART BLOOD SPLATTER (After 360 Spin Finishes) ──
     const ruptureX = -halfL + 7 * step; // Exactly at the 7:3 division tick (+72px along ruler)
     if (rawProgress >= 0.30) {
       const snapP = Math.min(1.0, (rawProgress - 0.30) / 0.70);

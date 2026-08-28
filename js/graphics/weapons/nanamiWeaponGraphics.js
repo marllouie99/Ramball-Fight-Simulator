@@ -5,6 +5,34 @@
 
 import { state } from '../../core/state.js';
 
+let _nanamiWeaponImage = null;
+let _nanamiWeaponImageLoading = false;
+
+export function _getNanamiWeaponImage() {
+  if (_nanamiWeaponImage && _nanamiWeaponImage.complete && _nanamiWeaponImage.naturalWidth > 0) {
+    return _nanamiWeaponImage;
+  }
+  if (!_nanamiWeaponImageLoading && typeof Image !== 'undefined') {
+    _nanamiWeaponImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _nanamiWeaponImage = img;
+      _nanamiWeaponImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Nanami weapon image at Assets/model/Nanami-weapon.png', e);
+      _nanamiWeaponImageLoading = false;
+    };
+    img.src = 'Assets/model/Nanami-weapon.png?v=1';
+    _nanamiWeaponImage = img;
+  }
+  return _nanamiWeaponImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getNanamiWeaponImage();
+}
+
 export const NANAMI_WEAPON_GRAPHICS = {
   blade: {
     handleBase: '#1F2024',
@@ -155,19 +183,28 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
     ctx.rotate(swingAngle);
   }
 
-  // ─────────────────────────────────────────────
-  // 1. ERGONOMIC MATTE BLACK HANDLE (x = -gripLength to 0)
-  // Top edge aligned flush on the top with blade top spine
-  // ─────────────────────────────────────────────
-  ctx.fillStyle = NANAMI_WEAPON_GRAPHICS.blade.handleBase;
-  ctx.strokeStyle = NANAMI_WEAPON_GRAPHICS.blade.handleEdge;
-  ctx.lineWidth = 1.6;
+  const wImg = _getNanamiWeaponImage();
+  if (wImg && wImg.complete && wImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    // Nanami-weapon.png content bounds: sx: 37, sy: 71, sw: 703, sh: 221
+    // Grip anchor at x = 210, y = 135
+    ctx.drawImage(wImg, 37, 71, 703, 221, -18.7, -6.9, 76.0, 23.9);
+    ctx.restore();
+  } else {
+    // ─────────────────────────────────────────────
+    // 1. ERGONOMIC MATTE BLACK HANDLE (x = -gripLength to 0)
+    // Top edge aligned flush on the top with blade top spine
+    // ─────────────────────────────────────────────
+    ctx.fillStyle = NANAMI_WEAPON_GRAPHICS.blade.handleBase;
+    ctx.strokeStyle = NANAMI_WEAPON_GRAPHICS.blade.handleEdge;
+    ctx.lineWidth = 1.6;
 
-  ctx.beginPath();
-  // Top straight handle spine (100% flush with blade top spine)
-  ctx.moveTo(0, topY);
-  ctx.lineTo(-gripLength * 0.70, topY);
-  ctx.lineTo(-gripLength * 0.92, topY - 1.5); // Slight pommel lift
+    ctx.beginPath();
+    // Top straight handle spine (100% flush with blade top spine)
+    ctx.moveTo(0, topY);
+    ctx.lineTo(-gripLength * 0.70, topY);
+    ctx.lineTo(-gripLength * 0.92, topY - 1.5); // Slight pommel lift
   // Rounded pommel flare
   ctx.quadraticCurveTo(-gripLength - 3.5, topY + 1.0, -gripLength - 2.5, gripBottomY + 2.5);
   ctx.lineTo(-gripLength * 0.90, gripBottomY + 3.0); // Pommel bottom flare
@@ -268,6 +305,7 @@ export function drawNanamiCleaver(ctx, x, y, gunAngle, r, swingActive = false, s
   ctx.lineTo(0, topY);
   ctx.closePath();
   ctx.stroke();
+  }
 
   // ─────────────────────────────────────────────
   // 3. OVERTIME GOLDEN CURSED ENERGY WRAP & 7:3 GLINT (STEADY)
@@ -491,63 +529,71 @@ export function drawRatioGridImpact(ctx, impactX, impactY, impactAngle = 0, scal
   const rulerLen = 66;
   const halfLen = rulerLen / 2;
 
-  // 1. Ratio Measurement Line
-  ctx.strokeStyle = `rgba(255, 215, 0, ${0.85 * alpha})`;
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  ctx.moveTo(-halfLen, 0);
-  ctx.lineTo(halfLen, 0);
-  ctx.stroke();
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  function _hitPixLine(x0, y0, x1, y1, col, thick) {
+    const dx = x1 - x0;
+    const dy = y1 - y0;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const steps = Math.max(2, Math.ceil(len / P));
+    const halfT = Math.max(P * 0.5, (thick || P) * 0.5);
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const px = snap(x0 + dx * t);
+      const py = snap(y0 + dy * t);
+      ctx.fillStyle = col;
+      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+    }
+  }
+
+  // 1. Ratio Measurement Line (Pixel Art Golden Beam)
+  _hitPixLine(-halfLen, 0, halfLen, 0, `rgba(255, 215, 0, ${0.90 * alpha})`, P);
 
   // 2. 10 Measurement Ticks across target (0 to 10)
   for (let i = 0; i <= 10; i++) {
-    const tx = -halfLen + (i / 10) * rulerLen;
+    const tx = snap(-halfLen + (i / 10) * rulerLen);
     const is7Point = (i === 7);
     const tickH = is7Point ? 12 : (i === 5 ? 8 : 5);
 
-    ctx.strokeStyle = is7Point
+    const tickCol = is7Point
       ? `rgba(255, 255, 255, ${0.98 * alpha})`
-      : `rgba(212, 175, 55, ${0.70 * alpha})`;
-    ctx.lineWidth = is7Point ? 2.0 : 1.1;
+      : `rgba(212, 175, 55, ${0.75 * alpha})`;
+    const tickThick = is7Point ? P * 1.5 : P;
 
-    ctx.beginPath();
-    ctx.moveTo(tx, -tickH / 2);
-    ctx.lineTo(tx, tickH / 2);
-    ctx.stroke();
+    _hitPixLine(tx, -tickH / 2, tx, tickH / 2, tickCol, tickThick);
 
-    // Golden 7:3 Starburst on the 7th tick
+    // Golden 7:3 Pixel Starburst on the 7th tick
     if (is7Point) {
       ctx.save();
       ctx.translate(tx, 0);
-      const starR = 6.5 * (1.0 + progress * 0.6);
+      const starR = snap(6.0 * (1.0 + progress * 0.6));
       ctx.fillStyle = `rgba(255, 230, 100, ${0.95 * alpha})`;
-      ctx.beginPath();
-      ctx.moveTo(0, -starR);
-      ctx.lineTo(starR * 0.3, -starR * 0.3);
-      ctx.lineTo(starR, 0);
-      ctx.lineTo(starR * 0.3, starR * 0.3);
-      ctx.lineTo(0, starR);
-      ctx.lineTo(-starR * 0.3, starR * 0.3);
-      ctx.lineTo(-starR, 0);
-      ctx.lineTo(-starR * 0.3, -starR * 0.3);
-      ctx.closePath();
-      ctx.fill();
+
+      // Stepped Pixel Starburst Cross + Diagonals
+      const gridR = Math.ceil(starR / P);
+      for (let gy = -gridR; gy <= gridR; gy++) {
+        for (let gx = -gridR; gx <= gridR; gx++) {
+          const isCross = (gx === 0 || gy === 0) && (Math.abs(gx) * P <= starR && Math.abs(gy) * P <= starR);
+          const isDiag = (Math.abs(gx) === Math.abs(gy)) && (Math.abs(gx) * P <= starR * 0.6);
+          if (isCross || isDiag) {
+            ctx.fillRect(snap(gx * P) - P * 0.5, snap(gy * P) - P * 0.5, P, P);
+          }
+        }
+      }
+      // Pure white center spark
+      ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * alpha})`;
+      ctx.fillRect(-P * 0.5, -P * 0.5, P, P);
       ctx.restore();
     }
   }
 
-  // 3. Golden Fracture Crack Lines radiating from 7:3 weak point
-  const weakPointX = -halfLen + 0.70 * rulerLen;
-  ctx.strokeStyle = `rgba(255, 215, 0, ${0.90 * alpha})`;
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.moveTo(weakPointX, 0);
-  ctx.lineTo(weakPointX + 11, -15 * (1.0 + progress * 0.4));
-  ctx.moveTo(weakPointX, 0);
-  ctx.lineTo(weakPointX + 12, 13 * (1.0 + progress * 0.4));
-  ctx.moveTo(weakPointX, 0);
-  ctx.lineTo(weakPointX - 9, -12 * (1.0 + progress * 0.4));
-  ctx.stroke();
+  // 3. Golden Fracture Crack Lines radiating from 7:3 weak point (Stepped pixel lines)
+  const weakPointX = snap(-halfLen + 0.70 * rulerLen);
+  const crackCol = `rgba(255, 215, 0, ${0.90 * alpha})`;
+  _hitPixLine(weakPointX, 0, weakPointX + 11, -15 * (1.0 + progress * 0.4), crackCol, P * 0.8);
+  _hitPixLine(weakPointX, 0, weakPointX + 12, 13 * (1.0 + progress * 0.4), crackCol, P * 0.8);
+  _hitPixLine(weakPointX, 0, weakPointX - 9, -12 * (1.0 + progress * 0.4), crackCol, P * 0.8);
 
   ctx.restore();
 }
@@ -754,11 +800,61 @@ export function drawNanamiCleaveShockwave(ctx, x, y, angle, radius = 95, timer =
 }
 
 /**
- * Draws Nanami's Skill 2: Collapse (Tōka) Ground-Shatter Shockwave, Radiating Cracks & Concrete Debris.
- * Strict Rule 11 (No shadowBlur) & High-Performance Vector Rendering.
+ * Draws Nanami's Skill 2: Collapse (Tōka) Ground Shockwave Rings in Pixel Art Style.
+ * Replaces ground cracks with expanding multi-layered pixel shockwave rings and pixel debris (P=2.0px).
  */
 export function drawNanamiCollapseShockwaves(ctx, fighter) {
   if (!fighter || !fighter.collapseShockwaves || fighter.collapseShockwaves.length === 0) return;
+
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+
+  // Stepped pixel ring helper
+  function _pixRing(radius, thickness, color) {
+    if (radius <= 1) return;
+    const steps = Math.max(28, Math.round(radius * 3.0));
+    const halfT = Math.max(P * 0.5, thickness * 0.5);
+    ctx.fillStyle = color;
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      const px = snap(Math.cos(a) * radius);
+      const py = snap(Math.sin(a) * radius);
+      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+    }
+  }
+
+  // Stepped pixel ray burst helper
+  function _pixRay(angle, rStart, rEnd, color, thickness) {
+    if (rEnd <= rStart) return;
+    const cosA = Math.cos(angle);
+    const sinA = Math.sin(angle);
+    const len = rEnd - rStart;
+    const steps = Math.max(2, Math.ceil(len / P));
+    const halfT = Math.max(P * 0.5, thickness * 0.5);
+    ctx.fillStyle = color;
+    for (let s = 0; s <= steps; s++) {
+      const t = s / steps;
+      const r = rStart + len * t;
+      const px = snap(cosA * r);
+      const py = snap(sinA * r);
+      ctx.fillRect(px - halfT, py - halfT, halfT * 2, halfT * 2);
+    }
+  }
+
+  // Stepped pixel circle helper
+  function _pixCircle(cx, cy, rad, color) {
+    const gridR = Math.ceil(rad / P);
+    for (let gy = -gridR; gy <= gridR; gy++) {
+      for (let gx = -gridR; gx <= gridR; gx++) {
+        const dist = Math.sqrt(gx * gx + gy * gy) * P;
+        if (dist > rad + P * 0.25) continue;
+        const px = snap(cx + gx * P);
+        const py = snap(cy + gy * P);
+        ctx.fillStyle = color;
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+      }
+    }
+  }
 
   for (let i = 0; i < fighter.collapseShockwaves.length; i++) {
     const sw = fighter.collapseShockwaves[i];
@@ -772,112 +868,90 @@ export function drawNanamiCollapseShockwaves(ctx, fighter) {
     ctx.save();
     ctx.translate(sw.x, sw.y);
 
-    // 1. Structural Ground Fissure Cracks (radiating from center)
-    if (sw.cracks && sw.cracks.length > 0) {
-      ctx.strokeStyle = `rgba(35, 30, 20, ${0.85 * alpha})`;
-      ctx.lineWidth = 2.4 * (1.0 - progress * 0.4);
-      ctx.lineCap = 'round';
-      ctx.lineJoin = 'round';
+    // 1. Central Ground Zero Blast Dome (Early impact explosion phase)
+    if (progress < 0.35) {
+      const domeP = 1.0 - (progress / 0.35);
+      const domeR = Math.max(4, 26 * domeP);
+      _pixCircle(0, 0, domeR, `rgba(184, 134, 11, ${0.45 * alpha})`);
+      _pixCircle(0, 0, domeR * 0.7, `rgba(255, 215, 0, ${0.75 * alpha})`);
+      _pixCircle(0, 0, domeR * 0.4, `rgba(255, 255, 255, ${0.95 * alpha})`);
 
-      ctx.beginPath();
-      for (let c = 0; c < sw.cracks.length; c++) {
-        const segs = sw.cracks[c];
-        if (!segs || segs.length === 0) continue;
-        ctx.moveTo(0, 0);
-        for (let s = 0; s < segs.length; s++) {
-          const segProgress = (s + 1) / segs.length;
-          if (segProgress <= easeOut * 1.2) {
-            ctx.lineTo(segs[s].x, segs[s].y);
-          }
-        }
-      }
-      ctx.stroke();
-
-      // Golden Cursed Energy Fissure Core Glow (Concentric line without shadowBlur)
-      ctx.strokeStyle = `rgba(255, 215, 0, ${0.75 * alpha})`;
-      ctx.lineWidth = 1.2 * (1.0 - progress * 0.4);
-      ctx.beginPath();
-      for (let c = 0; c < sw.cracks.length; c++) {
-        const segs = sw.cracks[c];
-        if (!segs || segs.length === 0) continue;
-        ctx.moveTo(0, 0);
-        for (let s = 0; s < segs.length; s++) {
-          const segProgress = (s + 1) / segs.length;
-          if (segProgress <= easeOut * 1.2) {
-            ctx.lineTo(segs[s].x, segs[s].y);
-          }
-        }
-      }
-      ctx.stroke();
+      // Specular center glint cross
+      ctx.fillStyle = '#FFFFFF';
+      ctx.fillRect(-P * 2, -P * 0.5, P * 4, P);
+      ctx.fillRect(-P * 0.5, -P * 2, P, P * 4);
     }
 
-    // 2. Expanding Ground Shockwave Rings
-    if (curRadius > 5) {
-      // Outer Golden Shockwave Ring
-      ctx.beginPath();
-      ctx.arc(0, 0, curR(curRadius), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(212, 175, 55, ${0.70 * alpha})`;
-      ctx.lineWidth = 3.5 * (1.0 - progress * 0.6);
-      ctx.stroke();
+    // 2. Expanding Pixel Art Shockwave Rings
+    if (curRadius > 4) {
+      // A. Inner Tertiary Ripple Ring (Trailing shockwave)
+      const ring3R = Math.max(0, curRadius * 0.58);
+      if (ring3R > 2) {
+        _pixRing(ring3R, P * 1.5, `rgba(212, 175, 55, ${0.40 * alpha})`);
+      }
 
-      // Inner White-Hot Compression Shockwave Ring
-      ctx.beginPath();
-      ctx.arc(0, 0, Math.max(0, curRadius - 4), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(255, 255, 255, ${0.90 * alpha})`;
-      ctx.lineWidth = 1.6 * (1.0 - progress * 0.6);
-      ctx.stroke();
+      // B. Secondary High-Compression White Shockwave Ring (with 8 pulse nodes)
+      const ring2R = Math.max(0, curRadius - 12 * (1.0 - progress * 0.4));
+      if (ring2R > 2) {
+        _pixRing(ring2R, P * 1.2, `rgba(255, 255, 255, ${0.92 * alpha})`);
 
-      // Faint Concrete Dust Perimeter Ring
-      ctx.beginPath();
-      ctx.arc(0, 0, Math.max(0, curRadius * 0.85), 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(160, 150, 130, ${0.40 * alpha})`;
-      ctx.lineWidth = 5.0 * (1.0 - progress * 0.5);
-      ctx.stroke();
+        // 8 Directional Pulse Node Blocks on the white compression ring
+        for (let n = 0; n < 8; n++) {
+          const nodeAngle = (n / 8) * Math.PI * 2;
+          const nx = snap(Math.cos(nodeAngle) * ring2R);
+          const ny = snap(Math.sin(nodeAngle) * ring2R);
+          ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * alpha})`;
+          ctx.fillRect(nx - P, ny - P, P * 2, P * 2);
+          ctx.fillStyle = `rgba(255, 235, 120, ${0.85 * alpha})`;
+          ctx.fillRect(nx - P * 0.5, ny - P * 0.5, P, P);
+        }
+      }
+
+      // C. Primary Outer Golden Shockwave Ring (High-Contrast Triple-Layer Wavefront)
+      const ringThickness = Math.max(P, 3.8 * (1.0 - progress * 0.5));
+      // Dark outer shadow backing
+      _pixRing(curRadius + P, ringThickness + P, `rgba(15, 23, 42, ${0.85 * alpha})`);
+      // Vivid Gold primary wavefront
+      _pixRing(curRadius, ringThickness, `rgba(255, 215, 0, ${0.95 * alpha})`);
+      // White-hot leading edge
+      _pixRing(curRadius - P * 0.5, P, `rgba(255, 255, 240, ${0.98 * alpha})`);
+
+      // D. Radial Pixel Shockwave Impulse Rays (12 radiating blast spikes)
+      const numRays = 12;
+      for (let r = 0; r < numRays; r++) {
+        const rayAngle = (r / numRays) * Math.PI * 2 + (r % 2 === 0 ? 0.05 : -0.05);
+        const rayStart = curRadius * 0.82;
+        const rayEnd = curRadius * (1.08 + (r % 3) * 0.04);
+        _pixRay(rayAngle, rayStart, rayEnd, `rgba(254, 240, 138, ${0.85 * alpha})`, P);
+        _pixRay(rayAngle, rayStart + 4, rayEnd - 2, `rgba(255, 255, 255, ${0.95 * alpha})`, P * 0.6);
+      }
     }
 
-    // 3. High-Velocity Concrete Rubble & Debris Chunks
+    // 3. High-Velocity Concrete Rubble & Debris Chunks (Pixel Art Fragments)
     if (sw.debris && sw.debris.length > 0) {
       for (let d = 0; d < sw.debris.length; d++) {
         const deb = sw.debris[d];
         ctx.save();
-        ctx.translate(deb.x, deb.y);
+        ctx.translate(snap(deb.x), snap(deb.y));
         ctx.rotate(deb.rotation || 0);
 
-        const sz = deb.size || 4;
-        ctx.fillStyle = `rgba(60, 55, 50, ${0.90 * alpha})`;
-        ctx.strokeStyle = `rgba(25, 22, 20, ${0.95 * alpha})`;
-        ctx.lineWidth = 1.0;
+        const sz = snap(Math.max(P, deb.size || 4));
 
-        ctx.beginPath();
-        if (deb.shape === 0) {
-          // Irregular Polygon Rock
-          ctx.moveTo(-sz, -sz * 0.6);
-          ctx.lineTo(sz * 0.8, -sz * 0.9);
-          ctx.lineTo(sz, sz * 0.5);
-          ctx.lineTo(-sz * 0.4, sz);
-        } else if (deb.shape === 1) {
-          // Quad Fragment
-          ctx.moveTo(-sz * 0.8, -sz * 0.8);
-          ctx.lineTo(sz * 0.9, -sz * 0.5);
-          ctx.lineTo(sz * 0.7, sz * 0.9);
-          ctx.lineTo(-sz * 0.9, sz * 0.6);
-        } else {
-          // Sharp Triangular Shard
-          ctx.moveTo(0, -sz * 1.1);
-          ctx.lineTo(sz * 0.8, sz * 0.8);
-          ctx.lineTo(-sz * 0.8, sz * 0.6);
-        }
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        // Dark charcoal pixel border
+        ctx.fillStyle = `rgba(15, 23, 42, ${0.95 * alpha})`;
+        ctx.fillRect(-sz - P * 0.5, -sz - P * 0.5, sz * 2 + P, sz * 2 + P);
 
-        // Highlight edge on rock
-        ctx.strokeStyle = `rgba(180, 175, 160, ${0.75 * alpha})`;
-        ctx.lineWidth = 0.8;
-        ctx.beginPath();
-        ctx.moveTo(-sz * 0.5, -sz * 0.5);
-        ctx.lineTo(sz * 0.4, -sz * 0.7);
-        ctx.stroke();
+        // Slate stone body
+        ctx.fillStyle = `rgba(100, 116, 139, ${0.90 * alpha})`;
+        ctx.fillRect(-sz, -sz, sz * 2, sz * 2);
+
+        // Highlight face (upper-left quadrant)
+        ctx.fillStyle = `rgba(226, 232, 240, ${0.95 * alpha})`;
+        ctx.fillRect(-sz, -sz, sz, sz);
+
+        // Specular glint pixel
+        ctx.fillStyle = `rgba(255, 255, 255, ${0.98 * alpha})`;
+        ctx.fillRect(-sz, -sz, P, P);
 
         ctx.restore();
       }

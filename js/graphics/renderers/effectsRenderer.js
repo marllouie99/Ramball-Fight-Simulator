@@ -1160,77 +1160,8 @@ function _initNanamiSpeedLineSeeds() {
 }
 
 export function drawNanamiSpeedLines() {
-  if (!state.fighters) return;
-  const nanami = state.fighters.find(f => {
-    if (!f || f.hp <= 0 || (f.characterId !== 'nanami' && f.type !== 'nanami')) return false;
-    const isFrozen = (f.timeStopTimer > 0) || (f.hitStunTimer > 0) || f.isTargetOfAmbush || (f.isFrozenByInfinity);
-    if (isFrozen) return false;
-    return f.isBlitzing || f.isLunging;
-  });
-  if (!nanami) return;
-
-  const ctx = state.ctx;
-  if (!ctx) return;
-
-  const activeState = nanami.isBlitzing ? 'blitz' : (nanami.isLunging ? 'lunge' : false);
-  if (!activeState) return;
-
-  if (nanami._lastSpeedLineState !== activeState) {
-    _nanamiSpeedLineSeeds = null;
-  }
-  nanami._lastSpeedLineState = activeState;
-
-  if (!_nanamiSpeedLineSeeds) _initNanamiSpeedLineSeeds();
-
-  const lineAngle = nanami.gunAngle !== undefined ? nanami.gunAngle : (nanami.angle || 0);
-  const cosA = Math.cos(lineAngle);
-  const sinA = Math.sin(lineAngle);
-  const perpX = -sinA;
-  const perpY = cosA;
-
-  const cx = nanami.x;
-  const cy = nanami.y;
-  const now = (typeof performance !== 'undefined') ? performance.now() : Date.now();
-
-  ctx.save();
-
-  for (let i = 0; i < _nanamiSpeedLineSeeds.length; i++) {
-    const seed = _nanamiSpeedLineSeeds[i];
-    const travel = ((now * 0.001 * seed.speed * 60 + seed.phase) % 85);
-    const backOffset = (nanami.r || 25) * 1.2;
-    const lineCenterX = cx - cosA * (backOffset + travel) + perpX * seed.perpOffset;
-    const lineCenterY = cy - sinA * (backOffset + travel) + perpY * seed.perpOffset;
-
-    const halfLen = seed.len / 2;
-    const halfThick = seed.maxThick / 2;
-    const midOff = halfLen * 0.15;
-
-    const startX = lineCenterX - cosA * halfLen;
-    const startY = lineCenterY - sinA * halfLen;
-
-    const midX = lineCenterX + cosA * midOff;
-    const midY = lineCenterY + sinA * midOff;
-
-    const endX = lineCenterX + cosA * halfLen;
-    const endY = lineCenterY - sinA * halfLen;
-
-    const topMidX = midX + perpX * halfThick;
-    const topMidY = midY + perpY * halfThick;
-
-    const botMidX = midX - perpX * halfThick;
-    const botMidY = midY - perpY * halfThick;
-
-    ctx.fillStyle = seed.color;
-    ctx.beginPath();
-    ctx.moveTo(startX, startY);
-    ctx.lineTo(topMidX, topMidY);
-    ctx.lineTo(endX, endY);
-    ctx.lineTo(botMidX, botMidY);
-    ctx.closePath();
-    ctx.fill();
-  }
-
-  ctx.restore();
+  // Speedlines disabled for Nanami dashes
+  return;
 }
 
 // ─────────────────────────────────────────────

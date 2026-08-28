@@ -7,6 +7,34 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
 import { state } from '../../core/state.js';
 
+let _yujiSkinImage = null;
+let _yujiSkinImageLoading = false;
+
+export function _getYujiSkinImage() {
+  if (_yujiSkinImage && _yujiSkinImage.complete && _yujiSkinImage.naturalWidth > 0) {
+    return _yujiSkinImage;
+  }
+  if (!_yujiSkinImageLoading && typeof Image !== 'undefined') {
+    _yujiSkinImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _yujiSkinImage = img;
+      _yujiSkinImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Yuji skin image at Assets/model/Yuji-SKIN.png', e);
+      _yujiSkinImageLoading = false;
+    };
+    img.src = 'Assets/model/Yuji-SKIN.png?v=1';
+    _yujiSkinImage = img;
+  }
+  return _yujiSkinImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getYujiSkinImage();
+}
+
 /**
  * Main entry point — draws Yuji's body circle.
  */
@@ -54,46 +82,44 @@ export function drawYujiSkin(ctx, fighter) {
   ctx.save();
   ctx.translate(fighter.x, fighter.y);
 
-  // Black Flash Zone Visual Indicator (crackling red/black sparks) - Optimized with batched stroke calls
+  // Black Flash Zone Visual Indicator (Stepped pixel crackling lightning streaks - No Diamonds)
   if (fighter.blackFlashTimer > 0) {
     const isMatchEnded = typeof state !== 'undefined' && (state.gameState === 'roundEnd' || state.gameState === 'matchEnd' || fighter._isWinnerReveal);
     const pulse = isMatchEnded ? 0.90 : (0.6 + Math.sin(now * 0.015) * 0.4);
     const sparkCount = isLowQuality ? 2 : (isMatchEnded ? 2 : 4);
     const rotSpeed = isMatchEnded ? 0 : (now * 0.016);
-    
-    // Draw rotating black outline sparks
-    ctx.strokeStyle = `rgba(0, 0, 0, ${pulse * 0.85})`;
-    ctx.lineWidth = 3.2;
-    ctx.beginPath();
-    for (let i = 0; i < sparkCount; i++) {
-      const a = (Math.PI / 2) * i + rotSpeed;
-      ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
-      ctx.lineTo(Math.cos(a) * (r + 14), Math.sin(a) * (r + 14));
-    }
-    ctx.stroke();
-    
-    // Draw rotating crimson core sparks (#B30000)
-    ctx.strokeStyle = `rgba(179, 0, 0, ${pulse})`;
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    for (let i = 0; i < sparkCount; i++) {
-      const a = (Math.PI / 2) * i + rotSpeed;
-      ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
-      ctx.lineTo(Math.cos(a) * (r + 12), Math.sin(a) * (r + 12));
-    }
-    ctx.stroke();
+    const P = 2.0;
 
-    if (!isLowQuality) {
-      // Draw rotating lilac-white inner highlights (#F3E8FF)
-      ctx.strokeStyle = `rgba(243, 232, 255, ${pulse * 0.9})`;
-      ctx.lineWidth = 0.8;
-      ctx.beginPath();
-      for (let i = 0; i < sparkCount; i++) {
-        const a = (Math.PI / 2) * i + rotSpeed;
-        ctx.moveTo(Math.cos(a) * (r + 4), Math.sin(a) * (r + 4));
-        ctx.lineTo(Math.cos(a) * (r + 9), Math.sin(a) * (r + 9));
+    for (let i = 0; i < sparkCount; i++) {
+      const a = (Math.PI / 2) * i + rotSpeed;
+      const sDist = r + 4;
+      const x0 = Math.round((Math.cos(a) * sDist) / P) * P;
+      const y0 = Math.round((Math.sin(a) * sDist) / P) * P;
+      const x1 = Math.round((Math.cos(a + 0.3) * (sDist + 10)) / P) * P;
+      const y1 = Math.round((Math.sin(a + 0.3) * (sDist + 10)) / P) * P;
+
+      // 1. Black outer streak
+      ctx.fillStyle = `rgba(0, 0, 0, ${pulse * 0.85})`;
+      const steps = 4;
+      for (let s = 0; s <= steps; s++) {
+        const px = Math.round((x0 + (x1 - x0) * (s / steps)) / P) * P;
+        const py = Math.round((y0 + (y1 - y0) * (s / steps)) / P) * P;
+        ctx.fillRect(px - P, py - P, P * 2, P * 2);
       }
-      ctx.stroke();
+
+      // 2. Crimson core line
+      ctx.fillStyle = `rgba(220, 20, 40, ${pulse})`;
+      for (let s = 0; s <= steps; s++) {
+        const px = Math.round((x0 + (x1 - x0) * (s / steps)) / P) * P;
+        const py = Math.round((y0 + (y1 - y0) * (s / steps)) / P) * P;
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+      }
+
+      // 3. Specular lilac-white tip
+      if (!isLowQuality) {
+        ctx.fillStyle = `rgba(243, 232, 255, ${pulse * 0.95})`;
+        ctx.fillRect(x1 - P * 0.5, y1 - P * 0.5, P, P);
+      }
     }
   }
 
@@ -250,23 +276,33 @@ export function drawYujiSkin(ctx, fighter) {
   ctx.arc(0, 0, r, 0, Math.PI * 2);
   ctx.clip();
 
-  // 1. Skin base — warm peach (changes to Sukuna's pale crimson-tinged skin when Soul Swap is active/transitioning)
-  ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Subtle shading gradient for 3D body volume
-  if (isSukunaForm) {
-    const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
-    bodyGrad.addColorStop(0, 'rgba(255, 235, 225, 0.25)');
-    bodyGrad.addColorStop(0.7, 'rgba(180, 80, 70, 0.15)');
-    bodyGrad.addColorStop(1, 'rgba(60, 10, 10, 0.45)');
-    ctx.fillStyle = bodyGrad;
+  const yujiImg = _getYujiSkinImage();
+  if (yujiImg && yujiImg.complete && yujiImg.naturalWidth > 0 && !isSukunaForm) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    // Exact centered crop of Yuji-SKIN.png (sx: 25, sy: 4, sw: 452, sh: 448)
+    const modelScale = 1.08;
+    const drawR = r * modelScale;
+    ctx.drawImage(yujiImg, 25, 4, 452, 448, -drawR, -drawR, drawR * 2, drawR * 2);
+    ctx.restore();
+  } else {
+    // 1. Skin base — warm peach (changes to Sukuna's pale crimson-tinged skin when Soul Swap is active/transitioning)
+    ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
     ctx.beginPath();
     ctx.arc(0, 0, r, 0, Math.PI * 2);
     ctx.fill();
-  }
+
+    // Subtle shading gradient for 3D body volume
+    if (isSukunaForm) {
+      const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
+      bodyGrad.addColorStop(0, 'rgba(255, 235, 225, 0.25)');
+      bodyGrad.addColorStop(0.7, 'rgba(180, 80, 70, 0.15)');
+      bodyGrad.addColorStop(1, 'rgba(60, 10, 10, 0.45)');
+      ctx.fillStyle = bodyGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+    }
 
   // ── 2. HAIR — dusty pink-salmon with jagged spiky fringe ──
   ctx.fillStyle = '#D9847A';
@@ -336,61 +372,208 @@ export function drawYujiSkin(ctx, fighter) {
   ctx.lineTo( r * 0.08, r * 0.28);
   ctx.stroke();
 
-  // ── 3. JACKET — dark navy base ──
-  ctx.fillStyle = '#1A1F2E';
-  ctx.fillRect(-r, r * 0.38, r * 2, r * 0.72);
-
-  // Subtle jacket panel shading (slightly lighter on sides for fabric folds)
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.04)';
-  ctx.fillRect(-r, r * 0.38, r * 0.55, r * 0.72);
-
-  // Collar — V-neck opening showing skin underneath
-  ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
+  // ── 3. JUJUTSU HIGH UNIFORM & ICONIC RED HOOD / COWL (Anime Reference) ──
+  // A. Neck opening with throat shadow
+  ctx.fillStyle = isSukunaForm ? '#C68A64' : '#DB9B72'; // Darker neck cast shadow
   ctx.beginPath();
-  ctx.moveTo(0, r * 0.42);
-  ctx.lineTo(-r * 0.22, r * 0.60);
-  ctx.lineTo( r * 0.22, r * 0.60);
+  ctx.moveTo(-r * 0.32, r * 0.08);
+  ctx.lineTo( r * 0.32, r * 0.08);
+  ctx.lineTo( r * 0.22, r * 0.32);
+  ctx.lineTo( 0, r * 0.35);
+  ctx.lineTo(-r * 0.22, r * 0.32);
   ctx.closePath();
   ctx.fill();
 
-  // Collar lapel outlines (dark edges of the V)
-  ctx.strokeStyle = '#0F1320';
-  ctx.lineWidth = Math.max(1.5, r * 0.06);
+  // B. Dark Violet-Navy Uniform Jacket Body (Lower Torso)
+  ctx.fillStyle = '#22263D';
+  ctx.beginPath();
+  ctx.moveTo(-r, r * 0.40);
+  ctx.lineTo( r, r * 0.40);
+  ctx.lineTo( r, r);
+  ctx.lineTo(-r, r);
+  ctx.closePath();
+  ctx.fill();
+
+  // Shaded lower jacket sides & folds
+  ctx.fillStyle = '#171A2B';
+  ctx.beginPath();
+  ctx.moveTo(-r, r * 0.40);
+  ctx.lineTo(-r * 0.50, r * 0.48);
+  ctx.lineTo(-r * 0.45, r);
+  ctx.lineTo(-r, r);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(r, r * 0.40);
+  ctx.lineTo(r * 0.70, r * 0.50);
+  ctx.lineTo(r * 0.65, r);
+  ctx.lineTo(r, r);
+  ctx.closePath();
+  ctx.fill();
+
+  // Asymmetric Diagonal Chest Placket / Lapel (sweeps down-rightward across chest)
+  ctx.save();
+  ctx.fillStyle = '#282D48';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.25, r * 0.52);
+  ctx.lineTo( r * 0.58, r * 0.68);
+  ctx.lineTo( r * 0.54, r * 0.96);
+  ctx.lineTo(-r * 0.15, r * 0.96);
+  ctx.closePath();
+  ctx.fill();
+
+  // Diagonal chest placket seam line
+  ctx.strokeStyle = '#0E101A';
+  ctx.lineWidth = Math.max(1.4, r * 0.055);
   ctx.lineCap = 'round';
   ctx.beginPath();
-  ctx.moveTo(0, r * 0.42);
-  ctx.lineTo(-r * 0.22, r * 0.60);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(0, r * 0.42);
-  ctx.lineTo( r * 0.22, r * 0.60);
+  ctx.moveTo(-r * 0.25, r * 0.52);
+  ctx.lineTo( r * 0.58, r * 0.68);
   ctx.stroke();
 
-  // Center zipper line (runs from collar down)
-  ctx.strokeStyle = '#2A3248';
-  ctx.lineWidth = Math.max(1, r * 0.035);
-  ctx.lineCap = 'butt';
+  // Diagonal fabric fold crease lines on navy uniform
+  ctx.strokeStyle = '#151828';
+  ctx.lineWidth = Math.max(1.0, r * 0.038);
   ctx.beginPath();
-  ctx.moveTo(0, r * 0.60);
-  ctx.lineTo(0, r * 0.96);
+  ctx.moveTo(-r * 0.40, r * 0.68);
+  ctx.quadraticCurveTo(-r * 0.10, r * 0.80, r * 0.35, r * 0.82);
   ctx.stroke();
 
-  // Red D-ring clips — Yuji's signature JJK jacket detail
-  const clipY = r * 0.64;
-  const clipSize = Math.max(2.5, r * 0.072);
-  for (const cx of [-r * 0.26, r * 0.26]) {
-    // Clip ring (red arc)
-    ctx.strokeStyle = '#CC2222';
-    ctx.lineWidth = Math.max(1.5, r * 0.055);
-    ctx.beginPath();
-    ctx.arc(cx, clipY, clipSize, Math.PI * 0.2, Math.PI * 1.8);
-    ctx.stroke();
-    // Small grey anchor dot
-    ctx.fillStyle = '#3A4055';
-    ctx.beginPath();
-    ctx.arc(cx, clipY - clipSize * 0.8, clipSize * 0.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.35, r * 0.80);
+  ctx.quadraticCurveTo(-r * 0.05, r * 0.90, r * 0.30, r * 0.92);
+  ctx.stroke();
+
+  // Third Golden Jujutsu Swirl Button on Left Chest Placket Point
+  _drawJJKSwirlButton(ctx, r * 0.46, r * 0.68, Math.max(2.2, r * 0.08));
+  ctx.restore();
+
+  // C. Voluminous Vivid Red Hoodie / Cowl Neck Wrap (Overlapping Layer)
+  // 1. Back/Shoulder Drapery Shadow Layer (Dark Deep Red #6E0D12)
+  ctx.fillStyle = '#6E0D12';
+  ctx.beginPath();
+  // Left shoulder drape
+  ctx.moveTo(-r, r * 0.18);
+  ctx.quadraticCurveTo(-r * 0.55, r * 0.10, -r * 0.20, r * 0.24);
+  ctx.lineTo(-r * 0.22, r * 0.54);
+  ctx.quadraticCurveTo(-r * 0.65, r * 0.56, -r, r * 0.42);
+  ctx.closePath();
+  ctx.fill();
+
+  // Right shoulder drape
+  ctx.beginPath();
+  ctx.moveTo(r * 0.18, r * 0.24);
+  ctx.quadraticCurveTo(r * 0.55, r * 0.10, r, r * 0.18);
+  ctx.lineTo(r, r * 0.42);
+  ctx.quadraticCurveTo(r * 0.60, r * 0.54, r * 0.22, r * 0.54);
+  ctx.closePath();
+  ctx.fill();
+
+  // 2. Main Vivid Red Cowl Body (Bright Crimson #C92A2A)
+  ctx.fillStyle = '#C92A2A';
+  ctx.beginPath();
+  ctx.moveTo(-r, r * 0.22);
+  ctx.quadraticCurveTo(-r * 0.60, r * 0.12, -r * 0.22, r * 0.26);
+  ctx.lineTo(-r * 0.18, r * 0.50);
+  ctx.quadraticCurveTo(-r * 0.65, r * 0.50, -r, r * 0.38);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(r * 0.18, r * 0.26);
+  ctx.quadraticCurveTo(r * 0.60, r * 0.12, r, r * 0.22);
+  ctx.lineTo(r, r * 0.38);
+  ctx.quadraticCurveTo(r * 0.60, r * 0.50, r * 0.18, r * 0.50);
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. Red Cowl Fabric Creases & Soft Roll Highlights (Upper Bright Lip #E03131)
+  ctx.strokeStyle = '#E03131';
+  ctx.lineWidth = Math.max(1.6, r * 0.06);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  // Left upper fold lip
+  ctx.moveTo(-r * 0.90, r * 0.22);
+  ctx.quadraticCurveTo(-r * 0.55, r * 0.15, -r * 0.24, r * 0.26);
+  ctx.stroke();
+  // Right upper fold lip
+  ctx.beginPath();
+  ctx.moveTo(r * 0.24, r * 0.26);
+  ctx.quadraticCurveTo(r * 0.55, r * 0.15, r * 0.90, r * 0.22);
+  ctx.stroke();
+
+  // Inner cowl crease shadows
+  ctx.strokeStyle = '#80141A';
+  ctx.lineWidth = Math.max(1.3, r * 0.05);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.85, r * 0.34);
+  ctx.quadraticCurveTo(-r * 0.50, r * 0.32, -r * 0.22, r * 0.40);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(r * 0.22, r * 0.40);
+  ctx.quadraticCurveTo(r * 0.50, r * 0.32, r * 0.85, r * 0.34);
+  ctx.stroke();
+
+  // 4. Center-Front Overlapping Collar Flap (Right Flap crossing to Left)
+  // Drop shadow cast under the overlapping flap onto the left drape
+  ctx.fillStyle = '#5C0E13';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.32, r * 0.20);
+  ctx.lineTo(-r * 0.18, r * 0.22);
+  ctx.lineTo(-r * 0.18, r * 0.58);
+  ctx.lineTo(-r * 0.32, r * 0.58);
+  ctx.closePath();
+  ctx.fill();
+
+  // The Overlapping Front Flap Body (#C92A2A with shadow bottom #A61E22)
+  ctx.fillStyle = '#C92A2A';
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.24, r * 0.22);
+  ctx.lineTo( r * 0.42, r * 0.18);
+  ctx.quadraticCurveTo(r * 0.56, r * 0.35, r * 0.45, r * 0.54);
+  ctx.lineTo(-r * 0.22, r * 0.56);
+  ctx.quadraticCurveTo(-r * 0.26, r * 0.38, -r * 0.24, r * 0.22);
+  ctx.closePath();
+  ctx.fill();
+
+  // Flap highlight fold along top edge
+  ctx.strokeStyle = '#EE5253';
+  ctx.lineWidth = Math.max(1.4, r * 0.055);
+  ctx.beginPath();
+  ctx.moveTo(-r * 0.24, r * 0.22);
+  ctx.lineTo( r * 0.42, r * 0.18);
+  ctx.stroke();
+
+  // Crisp Manga Dark Ink Boundary Lines around the red collar
+  ctx.strokeStyle = '#140205';
+  ctx.lineWidth = Math.max(1.3, r * 0.05);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  // Flap vertical overlapping edge
+  ctx.moveTo(-r * 0.24, r * 0.22);
+  ctx.quadraticCurveTo(-r * 0.27, r * 0.38, -r * 0.22, r * 0.56);
+  ctx.lineTo(r * 0.45, r * 0.54);
+  ctx.stroke();
+
+  // Outer collar outline
+  ctx.beginPath();
+  ctx.moveTo(-r, r * 0.20);
+  ctx.quadraticCurveTo(-r * 0.55, r * 0.10, -r * 0.24, r * 0.22);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(r * 0.42, r * 0.18);
+  ctx.quadraticCurveTo(r * 0.65, r * 0.10, r, r * 0.20);
+  ctx.stroke();
+
+  // 5. Two Golden Jujutsu Swirl Buttons on the Red Overlapping Collar Flap
+  // Upper Collar Swirl Button (Button 1)
+  _drawJJKSwirlButton(ctx, -r * 0.10, r * 0.32, Math.max(2.3, r * 0.088));
+
+  // Lower Collar Swirl Button (Button 2)
+  _drawJJKSwirlButton(ctx, -r * 0.10, r * 0.46, Math.max(2.3, r * 0.088));
 
   // 4. Soul Swap — Sukuna face markings (drawn during transition and active state)
   if (isSukunaForm) {
@@ -510,6 +693,7 @@ export function drawYujiSkin(ctx, fighter) {
     ctx.closePath();
     ctx.fill();
   }
+  }
 
   ctx.restore(); // undo clip
 
@@ -606,19 +790,107 @@ function _drawFist(ctx, x, y, radius, skinColor, fighter) {
     }
   }
 
-  // 2. Fist body
+  // 2. Stepped Pixel-Art Fist Body & Outer Manga Border
   ctx.globalAlpha = 1.0;
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
+  const P = 2.0;
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
+  const shadowColor = '#C99478';
 
-  // 3. Fist outline (standard black)
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  // Outer Dark Pixel Border Shell
+  ctx.fillStyle = '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= gridR + P * 0.75) {
+        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // Inner Base Skin Tone
+  ctx.fillStyle = skinColor;
+  const innerR = gridR - P * 0.4;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR) {
+        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // Knuckle Depth Shading
+  ctx.fillStyle = shadowColor;
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // Knuckle Specular Glint Pixels
+  ctx.fillStyle = '#FFF2EB';
+  const hx = Math.round(x + P * 0.5);
+  const hy = Math.round(y - innerR * 0.45);
+  ctx.fillRect(hx, hy, P, P);
+  ctx.fillRect(hx + P, hy, P, P);
 
   ctx.restore();
 }
+
+/**
+ * Draws an authentic golden Jujutsu High swirl / spiral button matching the anime reference.
+ */
+function _drawJJKSwirlButton(ctx, x, y, radius) {
+  ctx.save();
+  ctx.translate(x, y);
+
+  // 1. Dark ink socket / drop shadow
+  ctx.fillStyle = '#0E101A';
+  ctx.beginPath();
+  ctx.arc(0.4, 0.4, radius + 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 2. Antique Golden Metallic Base
+  const btnGrad = ctx.createLinearGradient(-radius * 0.7, -radius * 0.7, radius * 0.7, radius * 0.7);
+  btnGrad.addColorStop(0.0, '#FDE68A'); // Pale gold highlight
+  btnGrad.addColorStop(0.3, '#F59E0B'); // Warm amber gold
+  btnGrad.addColorStop(0.7, '#D97706'); // Deep golden bronze
+  btnGrad.addColorStop(1.0, '#78350F'); // Dark bronze shadow
+  ctx.fillStyle = btnGrad;
+  ctx.beginPath();
+  ctx.arc(0, 0, radius, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 3. Dark Outer Button Rim
+  ctx.strokeStyle = '#3D2005';
+  ctx.lineWidth = 0.8;
+  ctx.stroke();
+
+  // 4. Iconic Jujutsu High Swirl / Spiral Crest Pattern
+  ctx.strokeStyle = '#451A03';
+  ctx.lineWidth = Math.max(0.7, radius * 0.32);
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  // Outer spiral arc
+  ctx.arc(0, 0, radius * 0.60, 0.2, Math.PI * 1.35);
+  ctx.stroke();
+  // Inner swirl arc
+  ctx.beginPath();
+  ctx.arc(0, 0, radius * 0.32, Math.PI * 0.8, Math.PI * 2.2);
+  ctx.stroke();
+
+  // 5. Specular 1px White Glint
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.arc(-radius * 0.32, -radius * 0.32, Math.max(0.6, radius * 0.24), 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.restore();
+}
+
 
 

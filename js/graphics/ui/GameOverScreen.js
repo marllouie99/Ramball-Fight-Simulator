@@ -487,7 +487,8 @@ function drawInArenaChampionLayout(winner, timer, titleText, mode, isMatchEnd) {
     }
 
     const isYuji = winner && (winner.characterId === 'yuji' || winner.type === 'yuji' || winner._def?.id === 'yuji');
-    if (isYuji) {
+    const hasTodoTeammate = isYuji && state.fighters && state.fighters.some(f => f && f !== winner && (f.characterId === 'todo' || f.type === 'todo'));
+    if (isYuji && hasTodoTeammate) {
       const yujiSnd = CONFIG.yuji?.victoryVoiceSound || 'Assets/Sound Effects/SkillEffects/yuji-voiceline-bestfriend.mp3';
       const vol = CONFIG.yuji?.victoryVoiceVolume ?? 3.5;
       audioSystem.playSFX(yujiSnd, vol);

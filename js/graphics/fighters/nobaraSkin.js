@@ -438,29 +438,55 @@ export function drawNobaraSkin(ctx, fighter) {
 }
 
 /**
- * Draws a clean fighter fist adhering to hand size guidelines.
+ * Draws a clean fighter fist in stepped pixel-art style.
  */
 function _drawFist(ctx, x, y, radius, skinColor, shadowColor) {
   ctx.save();
   ctx.translate(x, y);
+  ctx.imageSmoothingEnabled = false;
 
-  // Fist Base
+  const P = 2.0;
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
+
+  // 1. Dark Pixel Outline Shell
+  ctx.fillStyle = '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= gridR + P * 0.75) {
+        ctx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
+
+  // 2. Base Skin Core
   ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius, 0, Math.PI * 2);
-  ctx.fill();
+  const innerR = gridR - P * 0.4;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR) {
+        ctx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
 
-  // Subtle Knuckle Crease & Outline
-  ctx.strokeStyle = shadowColor || '#E2AA90';
-  ctx.lineWidth = 1.1;
-  ctx.stroke();
+  // 3. Knuckle Depth Shading
+  ctx.fillStyle = shadowColor || '#D09075';
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+        ctx.fillRect(gx * P, gy * P, P, P);
+      }
+    }
+  }
 
-  // Inner Knuckle Definition
-  ctx.strokeStyle = '#D09075';
-  ctx.lineWidth = 0.8;
-  ctx.beginPath();
-  ctx.arc(0, 0, radius * 0.55, -Math.PI * 0.4, Math.PI * 0.4);
-  ctx.stroke();
+  // 4. Specular Knuckle Highlight
+  ctx.fillStyle = '#FFF5EB';
+  ctx.fillRect(P * 0.5, -innerR * 0.45, P, P);
+  ctx.fillRect(P * 1.5, -innerR * 0.45, P, P);
 
   ctx.restore();
 }

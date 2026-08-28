@@ -378,20 +378,8 @@ export function drawSaitamaSkin(ctx, fighter) {
     if (isFlurrying) {
       drawSaitamaArm(ctx, r, frontHandX, frontHandY, handRadius, r * 0.28, true);
     } else {
-      // Crisp solid red brawler glove (no stretching arm sleeve)
-      ctx.beginPath();
-      ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
-      ctx.fillStyle = '#C80000';
-      ctx.fill();
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 3.0;
-      ctx.stroke();
-
-      // Knuckle highlight
-      ctx.beginPath();
-      ctx.arc(frontHandX + handRadius * 0.22, frontHandY - handRadius * 0.18, handRadius * 0.32, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(255, 130, 130, 0.55)';
-      ctx.fill();
+      // Crisp stepped pixel-art brawler glove
+      drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
     }
   }
 
@@ -418,6 +406,65 @@ export function drawSaitamaSkin(ctx, fighter) {
 
 /**
  * Draws a punching arm with yellow hero suit sleeve and red glove
+ */
+/**
+ * Draws an authentic stepped pixel-art red brawler glove for Saitama.
+ */
+function drawSaitamaPixelGlove(ctx, handX, handY, handRadius, alpha = 1.0) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = alpha;
+
+  const P = 2.0;
+  const gridR = Math.max(P * 2, handRadius);
+  const steps = Math.ceil(gridR / P);
+
+  // 1. Dark Manga Ink Outline Shell
+  ctx.fillStyle = '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= gridR + P * 0.75) {
+        ctx.fillRect(Math.round(handX + gx * P), Math.round(handY + gy * P), P, P);
+      }
+    }
+  }
+
+  // 2. Base Red Glove Body (#C80000)
+  ctx.fillStyle = '#C80000';
+  const innerR = gridR - P * 0.4;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR) {
+        ctx.fillRect(Math.round(handX + gx * P), Math.round(handY + gy * P), P, P);
+      }
+    }
+  }
+
+  // 3. Dark Crimson Shading Blocks on bottom/heel
+  ctx.fillStyle = '#8A0000';
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+        ctx.fillRect(Math.round(handX + gx * P), Math.round(handY + gy * P), P, P);
+      }
+    }
+  }
+
+  // 4. Specular Knuckle Highlight Pixels
+  ctx.fillStyle = '#FF9999';
+  const hx = Math.round(handX + P * 0.5);
+  const hy = Math.round(handY - innerR * 0.45);
+  ctx.fillRect(hx, hy, P, P);
+  ctx.fillRect(hx + P, hy, P, P);
+
+  ctx.restore();
+}
+
+/**
+ * Draws a punching arm with yellow hero suit sleeve and red glove (Pixel Art)
  */
 function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = false) {
   ctx.save();
@@ -452,20 +499,8 @@ function drawSaitamaArm(ctx, r, handX, handY, handRadius, shoulderY, isFront = f
     ctx.stroke();
   }
 
-  // 2. Red Glove
-  ctx.beginPath();
-  ctx.arc(handX, handY, handRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#C80000';
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.8;
-  ctx.stroke();
-
-  // Speed highlight on glove knuckle
-  ctx.beginPath();
-  ctx.arc(handX + handRadius * 0.22, handY - handRadius * 0.18, handRadius * 0.32, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(255, 130, 130, 0.55)';
-  ctx.fill();
+  // 2. Stepped Pixel-Art Red Glove
+  drawSaitamaPixelGlove(ctx, handX, handY, handRadius);
 
   ctx.restore();
 }
@@ -535,14 +570,8 @@ function drawConsecutivePunchesBarrage(ctx, r, handRadius, flurryTimer) {
       ctx.stroke();
     }
 
-    // 3. Ghost Red Glove
-    ctx.beginPath();
-    ctx.arc(fistX, fistY, fRadius, 0, Math.PI * 2);
-    ctx.fillStyle = '#C80000';
-    ctx.fill();
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.4;
-    ctx.stroke();
+    // 3. Stepped Pixel-Art Ghost Red Glove
+    drawSaitamaPixelGlove(ctx, fistX, fistY, fRadius, alpha);
 
     ctx.restore();
   }
@@ -577,19 +606,12 @@ function drawSaitamaGhostModel(ctx, r) {
   ctx.stroke();
   ctx.restore();
 
-  // 2. Hands (Back & Front)
+  // 2. Hands (Back & Front - Pixel Art)
   const handRadius = Math.max(r * 0.38, 8.5);
-  const frontHandX = r * 0.85, frontHandY = r * 0.15;
   const backHandX = 0, backHandY = -r * 0.15;
 
   // Back Hand
-  ctx.beginPath();
-  ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#C80000';
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.2;
-  ctx.stroke();
+  drawSaitamaPixelGlove(ctx, backHandX, backHandY, handRadius);
 
   // 3. Body Circle
   ctx.save();
@@ -631,14 +653,9 @@ function drawSaitamaGhostModel(ctx, r) {
   ctx.lineWidth = 3.5;
   ctx.stroke();
 
-  // Front Hand
-  ctx.beginPath();
-  ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
-  ctx.fillStyle = '#C80000';
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.2;
-  ctx.stroke();
+  // Front Hand (Pixel Art)
+  const frontHandX = r * 0.95, frontHandY = 0;
+  drawSaitamaPixelGlove(ctx, frontHandX, frontHandY, handRadius);
 
   // Golden Speed Aura Overlay Ring
   ctx.beginPath();

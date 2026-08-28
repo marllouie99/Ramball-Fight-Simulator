@@ -133,7 +133,7 @@ export const mahitoConfig = {
     duration: 300,                 // Stacks linger for 300 frames (5s) before resetting
     burstDamage: 100,               // True unmitigated soul damage at max stacks
     burstHitStun: 300,             // Heavy stagger stun upon soul detonation
-    paralyzeDuration: 10,          // Paralyze debuff duration in frames (0.75s) upon reaching max stacks
+    paralyzeDuration: 20,          // Paralyze debuff duration in frames (0.75s) upon reaching max stacks
     burstKnockback: 20,            // Massive physical explosion push
     burstScreenShake: 8,           // Impact screen shake intensity
     ruptureDamage: 24,             // Final soul rupture explosion damage right before paralyze expires

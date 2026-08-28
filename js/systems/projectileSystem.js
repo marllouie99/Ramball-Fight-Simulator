@@ -2207,6 +2207,9 @@ class ProjectileSystem {
    * Updates all projectiles in the system.
    */
   update(fighters) {
+    const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+    if (isNanamiPausing) return;
+
     // OPTIMIZED: Update dynamic limits based on current entity count
     this._updateDynamicLimits();
 

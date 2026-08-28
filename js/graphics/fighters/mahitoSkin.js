@@ -23,6 +23,34 @@ import {
 import { GojoRenderer } from './gojoRenderer.js';
 import { drawMinionHealthBar, drawMahitoFleshBubblyDeformLocal } from '../statusEffects.js';
 
+let _mahitoSkinImage = null;
+let _mahitoSkinImageLoading = false;
+
+export function _getMahitoSkinImage() {
+  if (_mahitoSkinImage && _mahitoSkinImage.complete && _mahitoSkinImage.naturalWidth > 0) {
+    return _mahitoSkinImage;
+  }
+  if (!_mahitoSkinImageLoading && typeof Image !== 'undefined') {
+    _mahitoSkinImageLoading = true;
+    const img = new Image();
+    img.onload = () => {
+      _mahitoSkinImage = img;
+      _mahitoSkinImageLoading = false;
+    };
+    img.onerror = (e) => {
+      console.warn('Failed to load Mahito skin image at Assets/model/MAHITO-SKIN.png', e);
+      _mahitoSkinImageLoading = false;
+    };
+    img.src = 'Assets/model/MAHITO-SKIN.png?v=1';
+    _mahitoSkinImage = img;
+  }
+  return _mahitoSkinImage;
+}
+
+if (typeof window !== 'undefined' && typeof Image !== 'undefined') {
+  _getMahitoSkinImage();
+}
+
 /**
  * Renders JJK-authentic Cursed Energy Flame Aura engulfing Mahito.
  * Uses the exact same Sakuga JJK Cursed Energy engine as Gojo, Yuji, and Todo (recolored to Mahito's magenta/violet theme).
@@ -553,6 +581,17 @@ function drawTransformedCarapace(ctx, r, hideElbowBlades = false) {
  * - Detailed dark patchwork poncho tunic with stitched square grid pattern
  */
 function drawBaseMahito(ctx, r, fighter) {
+  const skinImg = _getMahitoSkinImage();
+  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
+    const scale = (r / 170.0);
+    ctx.scale(scale, scale);
+    ctx.drawImage(skinImg, -282.5, -257.5);
+    ctx.restore();
+    return;
+  }
+
   // ── 1. BACK HAIR VOLUME & TIED HAIR BUNDLES (Drawn behind body circle) ──
   ctx.save();
   ctx.fillStyle = '#9EB7C6';

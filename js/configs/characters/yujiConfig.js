@@ -61,11 +61,11 @@ export const yujiConfig = {
   // Ultimate: Soul Swap — Sukuna Takes Over
   soulSwapHpThreshold: 0.30,       // Triggers when HP drops to 30% or below
   soulSwapDuration: 800,           // Duration of Soul Swap in frames (8 seconds at 60fps)
-  soulSwapDamageMultiplier: 1.5,   // All damage multiplied while active
+  soulSwapDamageMultiplier: 2.5,   // All damage multiplied while active
   soulSwapBlackFlashThreshold: 2,  // Black Flash triggers after only 2 hits during Soul Swap
   soulSwapSpeedMultiplier: 1.3,    // Movement speed boost during Soul Swap
-  soulSwapRapidSlashHits: 16,      // Number of rapid 360° slash-teleport strikes Sukuna unleashes immediately on takeover
-  soulSwapRapidSlashCooldown: 26,  // Pacing frames between each slash-teleport strike (~0.27s, exact Sukuna flurry timing)
+  soulSwapRapidSlashHits: 20,      // Number of rapid 360° slash-teleport strikes Sukuna unleashes immediately on takeover
+  soulSwapRapidSlashCooldown: 15,  // Pacing frames between each slash-teleport strike (~0.27s, exact Sukuna flurry timing)
   soulSwapHealPercent: 0.30,       // Percentage of max HP restored to Yuji upon swapping back after the 12 slashes
   soulSwapCooldown: 99999,         // Once per match only
 

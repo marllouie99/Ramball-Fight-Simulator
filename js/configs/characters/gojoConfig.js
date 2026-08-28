@@ -30,6 +30,8 @@ export const gojoConfig = {
   infinityMeleePushForce: 8.5,             // Physical velocity impulse (rebound force) applied to push melee attackers away
   infinitySlowDuration: 45,                // Duration in frames (0.75s) of brief movement slow on barrier contact
   infinitySlowMultiplier: 0.50,            // Movement speed multiplier while slowed by Infinity barrier (50% speed)
+  infinitySlowRange: 140,                  // Proximity distance (pixels) beyond barrier where approaching enemies get slowed
+  infinitySlowMinMultiplier: 0.20,         // Maximum slow strength (20% speed / 80% slow) reached right against the barrier
   infinityMaxFrozenProjectiles: 2,        // Max limit of frozen projectiles allowed simultaneously to prevent FPS drops
 
   // ── 2. Basic Attack & Movement (Cursed Technique Lapse: Blue) ──

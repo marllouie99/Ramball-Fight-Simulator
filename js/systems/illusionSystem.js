@@ -19,6 +19,8 @@ const ILLUSION_SPLIT_MIN_HP = 2;
  */
 export function updateIllusions() {
   if (state.gameState !== 'playing' && state.gameState !== 'roundEnd' && state.gameState !== 'matchEnd') return;
+  const isNanamiPausing = state.fighters && state.fighters.some(f => f && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+  if (isNanamiPausing) return;
   const arena = (typeof state !== 'undefined' && state.arena) ? state.arena : CONFIG.arena;
 
   for (let i = state.illusions.length - 1; i >= 0; i--) {

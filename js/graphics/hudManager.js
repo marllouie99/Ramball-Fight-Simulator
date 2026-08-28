@@ -1780,6 +1780,19 @@ function updateHealthHud() {
       return '';
     };
     
+    // Pre-scan: if any stat line is too long for a 2-column grid in team cards,
+    // force all lines to single-column (span-2) to prevent text overflow
+    let forceAllSpan2 = false;
+    if (isTeam && !singleColumn) {
+      for (const ln of info) {
+        const pt = ln.replace(/<[^>]*>/g, '').trim();
+        if (pt.length > 20) {
+          forceAllSpan2 = true;
+          break;
+        }
+      }
+    }
+
     const linesHTML = info.map(line => {
       let labelText = '';
       const labelStart = line.indexOf('<b>');
@@ -1805,7 +1818,7 @@ function updateHealthHud() {
       }
 
       const plainLen = (labelText + ' ' + textOnlyVal).length;
-      const isSpan2 = singleColumn || info.length === 1 || plainLen > 24;
+      const isSpan2 = singleColumn || forceAllSpan2 || info.length === 1 || plainLen > 24;
       const spanClass = isSpan2 ? ' span-2' : '';
 
       if (splitIdx !== -1) {
@@ -1893,8 +1906,8 @@ function updateHealthHud() {
         const ratio = m.maxHp > 0 ? Math.min(1.0, Math.max(0, Number(m.hp) / Number(m.maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-        const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
-        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? healthyGreen : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const healthyColor = isDarkTheme ? (m.themeColor || m.color || '#15803d') : '#22c55e';
+        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? healthyColor : ratio > 0.25 ? '#eab308' : '#ef4444');
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
@@ -1943,8 +1956,8 @@ function updateHealthHud() {
       const isTargetCj = targetFighter && (targetFighter.characterId === 'cj' || targetFighter.type === 'cj');
       const percent = Math.round(safeRatio * 100);
       const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-      const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
-      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? healthyGreen : safeRatio > 0.25 ? '#eab308' : '#ef4444');
+      const healthyColor = isDarkTheme ? (targetFighter?.themeColor || targetFighter?.color || '#15803d') : '#22c55e';
+      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? healthyColor : safeRatio > 0.25 ? '#eab308' : '#ef4444');
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
       
@@ -2361,8 +2374,8 @@ function updateHealthHud() {
         const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-        const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
-        const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyGreen : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const healthyColor = isDarkTheme ? (fighter.themeColor || fighter.color || '#15803d') : '#22c55e';
+        const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyColor : ratio > 0.25 ? '#eab308' : '#ef4444');
         const glow = getGlowStyles(fighter);
         
         if (m.lastHpPct !== percent) {
@@ -2534,8 +2547,8 @@ function updateHealthHud() {
       const ratio = maxHp > 0 ? Math.min(1.0, Math.max(0, Number(curHp) / Number(maxHp))) : 0;
       const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
       const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
-      const healthyGreen = isDarkTheme ? '#15803d' : '#22c55e';
-      const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyGreen : ratio > 0.25 ? '#eab308' : '#ef4444');
+      const healthyColor = isDarkTheme ? (fighter.themeColor || fighter.color || '#15803d') : '#22c55e';
+      const barColor = isCj ? '#FFFFFF' : (ratio > 0.5 ? healthyColor : ratio > 0.25 ? '#eab308' : '#ef4444');
       const glow = getGlowStyles(fighter);
 
       if (cachedCard.hpBarFill) {

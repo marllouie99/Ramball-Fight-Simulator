@@ -1,12 +1,12 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// BLACK FLASH — Jujutsu Kaisen-Inspired Cursed Energy Strike Effect (High-Performance)
+// BLACK FLASH — Jujutsu Kaisen Cursed Energy Strike Effect (High-Impact Pixel Art)
 // ─────────────────────────────────────────────────────────────────────────────
 import { state } from '../../core/state.js';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // INTERNAL OBJECT POOL (Zero GC Overhead design)
 // ─────────────────────────────────────────────────────────────────────────────
-const BF_POOL_SIZE = 80;
+const BF_POOL_SIZE = 90;
 const _bfPool = [];
 
 for (let i = 0; i < BF_POOL_SIZE; i++) {
@@ -15,7 +15,7 @@ for (let i = 0; i < BF_POOL_SIZE; i++) {
     x: 0, y: 0, vx: 0, vy: 0,
     size: 0, maxSize: 0, life: 0, decay: 0, friction: 1,
     angle: 0, color: null,
-    boltPath: null, branchPath: null
+    boltSegments: [], branchSegments: [], microSpikes: []
   });
 }
 
@@ -24,7 +24,7 @@ function _getBFParticle() {
     type: null, x: 0, y: 0, vx: 0, vy: 0,
     size: 0, maxSize: 0, life: 0, decay: 0, friction: 1,
     angle: 0, color: null,
-    boltPath: null, branchPath: null
+    boltSegments: [], branchSegments: [], microSpikes: []
   };
 }
 
@@ -32,43 +32,42 @@ function _returnBFParticle(p) {
   p.type = null; p.x = 0; p.y = 0; p.vx = 0; p.vy = 0;
   p.size = 0; p.maxSize = 0; p.life = 0; p.decay = 0; p.friction = 1;
   p.angle = 0; p.color = null;
-  p.boltPath = null; p.branchPath = null;
+  p.boltSegments.length = 0;
+  p.branchSegments.length = 0;
+  p.microSpikes.length = 0;
   _bfPool.push(p);
 }
 
 const _blackFlashParticles = [];
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PRE-RENDERED GLOW CANVASES (GPU Texture Blits — Zero Gradient Re-allocation)
-// ─────────────────────────────────────────────────────────────────────────────
-let _coreCanvas = null;
-
-function _initCanvases() {
-  if (typeof document === 'undefined' || _coreCanvas) return;
-
-  // Pre-bake 128x128 Stark Void Implosion Core
-  _coreCanvas = document.createElement('canvas');
-  _coreCanvas.width = 128;
-  _coreCanvas.height = 128;
-  const cCtx = _coreCanvas.getContext('2d');
-  const cGrad = cCtx.createRadialGradient(64, 64, 0, 64, 64, 64);
-  cGrad.addColorStop(0,   'rgba(0, 0, 0, 1.0)');
-  cGrad.addColorStop(0.5, 'rgba(25, 0, 5, 0.92)');
-  cGrad.addColorStop(0.8, 'rgba(180, 0, 20, 0.35)');
-  cGrad.addColorStop(1.0, 'rgba(0, 0, 0, 0)');
-  cCtx.fillStyle = cGrad;
-  cCtx.fillRect(0, 0, 128, 128);
+/**
+ * Draws a stepped pixel-art line segment using square pixel blocks.
+ */
+function _drawPixelLine(ctx, x0, y0, x1, y1, P, color, sizeMultiplier = 1) {
+  const dx = x1 - x0;
+  const dy = y1 - y0;
+  const dist = Math.hypot(dx, dy);
+  const steps = Math.max(1, Math.round(dist / P));
+  const blockSize = Math.max(P, Math.round((P * sizeMultiplier) / P) * P);
+  const halfBlock = blockSize / 2;
+  ctx.fillStyle = color;
+  for (let s = 0; s <= steps; s++) {
+    const t = s / steps;
+    const px = Math.round((x0 + dx * t) / P) * P;
+    const py = Math.round((y0 + dy * t) / P) * P;
+    ctx.fillRect(px - halfBlock, py - halfBlock, blockSize, blockSize);
+  }
 }
 
-// Helper to generate jagged branching lightning paths once on spawn (Zero Draw-Loop Overhead)
-function _buildLightningPaths(boltCount, branches, lengthMult, isLowPerf) {
-  const hasPath2D = typeof Path2D !== 'undefined';
-  const boltPath = hasPath2D ? new Path2D() : null;
-  const branchPath = hasPath2D ? new Path2D() : null;
+// Helper to generate jagged branching pixel lightning segments on spawn
+function _buildLightningSegments(boltCount, branches, lengthMult, isLowPerf) {
+  const boltSegments = [];
+  const branchSegments = [];
+  const P = 2.5;
 
   for (let b = 0; b < boltCount; b++) {
-    const baseAngle = (b / boltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.5;
-    const totalLength = ((isLowPerf ? 55 : 85) + Math.random() * 40) * lengthMult;
+    const baseAngle = (b / boltCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+    const totalLength = ((isLowPerf ? 65 : 95) + Math.random() * 45) * lengthMult;
     const steps = isLowPerf ? 3 : (4 + Math.floor(Math.random() * 2));
     const stepLen = totalLength / steps;
 
@@ -78,34 +77,29 @@ function _buildLightningPaths(boltCount, branches, lengthMult, isLowPerf) {
     let branchQuota = branches;
 
     for (let i = 0; i < steps; i++) {
-      currentAngle += (Math.random() - 0.5) * 1.1;
-      const nextX = curX + Math.cos(currentAngle) * stepLen;
-      const nextY = curY + Math.sin(currentAngle) * stepLen;
+      currentAngle += (Math.random() - 0.5) * 1.15;
+      const nextX = Math.round((curX + Math.cos(currentAngle) * stepLen) / P) * P;
+      const nextY = Math.round((curY + Math.sin(currentAngle) * stepLen) / P) * P;
 
-      if (hasPath2D) {
-        boltPath.moveTo(curX, curY);
-        boltPath.lineTo(nextX, nextY);
-      }
+      boltSegments.push({ x0: curX, y0: curY, x1: nextX, y1: nextY });
 
       // Branching logic
-      if (branchQuota > 0 && Math.random() < 0.45) {
+      if (branchQuota > 0 && Math.random() < 0.50) {
         branchQuota--;
-        const bAngle = currentAngle + (Math.random() > 0.5 ? 1 : -1) * (0.6 + Math.random() * 0.7);
-        const bLen = stepLen * (1.3 + Math.random() * 0.6);
-        const bNextX = nextX + Math.cos(bAngle) * bLen;
-        const bNextY = nextY + Math.sin(bAngle) * bLen;
+        const bAngle = currentAngle + (Math.random() > 0.5 ? 1 : -1) * (0.65 + Math.random() * 0.75);
+        const bLen = stepLen * (1.35 + Math.random() * 0.65);
+        const bNextX = Math.round((nextX + Math.cos(bAngle) * bLen) / P) * P;
+        const bNextY = Math.round((nextY + Math.sin(bAngle) * bLen) / P) * P;
 
-        if (hasPath2D) {
-          branchPath.moveTo(nextX, nextY);
-          branchPath.lineTo(bNextX, bNextY);
+        branchSegments.push({ x0: nextX, y0: nextY, x1: bNextX, y1: bNextY });
 
-          // Micro-branch (skip in low perf)
-          if (!isLowPerf && Math.random() < 0.3) {
-            const mAngle = bAngle + (Math.random() > 0.5 ? 1 : -1) * 0.5;
-            const mLen = bLen * 0.5;
-            branchPath.moveTo(bNextX, bNextY);
-            branchPath.lineTo(bNextX + Math.cos(mAngle) * mLen, bNextY + Math.sin(mAngle) * mLen);
-          }
+        // Micro-branch
+        if (!isLowPerf && Math.random() < 0.35) {
+          const mAngle = bAngle + (Math.random() > 0.5 ? 1 : -1) * 0.55;
+          const mLen = bLen * 0.55;
+          const mNextX = Math.round((bNextX + Math.cos(mAngle) * mLen) / P) * P;
+          const mNextY = Math.round((bNextY + Math.sin(mAngle) * mLen) / P) * P;
+          branchSegments.push({ x0: bNextX, y0: bNextY, x1: mNextX, y1: mNextY });
         }
       }
 
@@ -114,7 +108,7 @@ function _buildLightningPaths(boltCount, branches, lengthMult, isLowPerf) {
     }
   }
 
-  return { boltPath, branchPath };
+  return { boltSegments, branchSegments };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,7 +121,6 @@ export function spawnBlackFlash(x, y) {
     const fps = (state && state.fps) || 60;
     const isLowPerf = (typeof state !== 'undefined' && state.performanceMode) || fps < 55;
     
-    // Bulletproof check for 1v2 mode
     const is1v2 = typeof state !== 'undefined' && 
                   state.mode && 
                   typeof state.mode === 'string' && 
@@ -143,62 +136,77 @@ export function spawnBlackFlash(x, y) {
     
     if (fps < 30 && Math.random() < 0.6) return;
 
-    // 1. IMPACT CORE (Void Implosion)
+    // 1. IMPACT CORE (Void Singularity Implosion)
     const core = _getBFParticle();
     core.type = 'bfCore';
     core.x = x; core.y = y;
-    core.size = 8;
-    core.maxSize = 46;
+    core.size = 10;
+    core.maxSize = is1v2 ? 42 : 52;
     core.life = 1.0;
-    core.decay = is1v2 ? 0.022 : 0.038;
+    core.decay = is1v2 ? 0.024 : 0.040;
+    
+    // Generate 8 radial micro-fracture spikes radiating from core
+    const P = 2.5;
+    const microSpikes = [];
+    const spikeCount = isLowPerf ? 6 : 8;
+    for (let s = 0; s < spikeCount; s++) {
+      const a = (s / spikeCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.3;
+      const len = 14 + Math.random() * 18;
+      microSpikes.push({
+        x0: 0, y0: 0,
+        x1: Math.round((Math.cos(a) * len) / P) * P,
+        y1: Math.round((Math.sin(a) * len) / P) * P
+      });
+    }
+    core.microSpikes = microSpikes;
     _blackFlashParticles.push(core);
 
-    // 2. JAGGED LIGHTNING BURST (Pre-compiled Path2D)
+    // 2. JAGGED LIGHTNING BURST (Stepped Pixel Art Fractures)
     const lightning = _getBFParticle();
     lightning.type = 'bfLightning';
     lightning.x = x; lightning.y = y;
     lightning.size = 1.0; 
     lightning.life = 1.0;
-    lightning.decay = is1v2 ? 0.030 : 0.052;
+    lightning.decay = is1v2 ? 0.028 : 0.048;
     
-    const boltCount = isLowPerf ? 3 : (is1v2 ? 4 : 5);
-    const branches = isLowPerf ? 0 : (is1v2 ? 1 : 2);
-    const lengthMult = is1v2 ? 0.9 : 1.0;
+    const boltCount = isLowPerf ? 4 : (is1v2 ? 5 : 6);
+    const branches = isLowPerf ? 0 : (is1v2 ? 2 : 3);
+    const lengthMult = is1v2 ? 0.95 : 1.1;
     
-    const paths = _buildLightningPaths(boltCount, branches, lengthMult, isLowPerf);
-    lightning.boltPath = paths.boltPath;
-    lightning.branchPath = paths.branchPath;
+    const paths = _buildLightningSegments(boltCount, branches, lengthMult, isLowPerf);
+    lightning.boltSegments = paths.boltSegments;
+    lightning.branchSegments = paths.branchSegments;
     _blackFlashParticles.push(lightning);
 
-    // 3. SPATIAL DISTORTION SHOCKWAVE RING
+    // 3. SPATIAL DISTORTION PIXEL SHOCKWAVE RING
     if (!isLowPerf) {
       const ring = _getBFParticle();
       ring.type = 'bfRing';
       ring.x = x; ring.y = y;
-      ring.size = 10;
-      ring.maxSize = is1v2 ? 95 : 125;
+      ring.size = 12;
+      ring.maxSize = is1v2 ? 100 : 135;
       ring.life = 1.0;
       ring.decay = is1v2 ? 0.025 : 0.045;
       _blackFlashParticles.push(ring);
     }
 
-    // 4. CURSED INK SHARDS (Streamlined to 5 crisp diamond debris particles)
-    const shardCount = isLowPerf ? 2 : (is1v2 ? 3 : 5);
-    const palette = ['#000000', '#1a0000', '#ff001e'];
-    for (let i = 0; i < shardCount; i++) {
-      const angle = (i / shardCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.4;
-      const speed = (4.5 + Math.random() * 5.5) * (is1v2 ? 0.85 : 1.0);
-      const shard = _getBFParticle();
-      shard.type = 'bfShard';
-      shard.x = x; shard.y = y;
-      shard.vx = Math.cos(angle) * speed;
-      shard.vy = Math.sin(angle) * speed;
-      shard.size = 3.5 + Math.random() * 4.5;
-      shard.life = 1.0;
-      shard.decay = (is1v2 ? 0.022 : 0.038) + Math.random() * 0.015;
-      shard.friction = 0.92;
-      shard.color = palette[i % palette.length];
-      _blackFlashParticles.push(shard);
+    // 4. SUPERSONIC DIRECTIONAL PIXEL SPARKS (Action Streaks, No Diamonds)
+    const streakCount = isLowPerf ? 4 : (is1v2 ? 6 : 10);
+    const palette = ['#FFFFFF', '#FF0022', '#B30000', '#0E0F14'];
+    for (let i = 0; i < streakCount; i++) {
+      const angle = (i / streakCount) * Math.PI * 2 + (Math.random() - 0.5) * 0.45;
+      const speed = (5.5 + Math.random() * 6.5) * (is1v2 ? 0.85 : 1.0);
+      const spark = _getBFParticle();
+      spark.type = 'bfSpark';
+      spark.x = x; spark.y = y;
+      spark.vx = Math.cos(angle) * speed;
+      spark.vy = Math.sin(angle) * speed;
+      spark.size = 2.0;
+      spark.life = 1.0;
+      spark.decay = (is1v2 ? 0.026 : 0.042) + Math.random() * 0.015;
+      spark.friction = 0.90;
+      spark.color = palette[i % palette.length];
+      _blackFlashParticles.push(spark);
     }
   } catch (err) {
     console.error("Error in spawnBlackFlash:", err);
@@ -245,7 +253,7 @@ export function clearBlackFlashEffects() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// DRAW (Batched Render Passes with Pre-Compiled Path2D)
+// DRAW (Stepped Pixel Art Passes - Zero Diamond Shapes)
 // ─────────────────────────────────────────────────────────────────────────────
 export function drawBlackFlashEffects(ctx) {
   if (!ctx || _blackFlashParticles.length === 0) return;
@@ -259,10 +267,10 @@ export function drawBlackFlashEffects(ctx) {
     return;
   }
 
-  _initCanvases();
   ctx.save();
-  ctx.lineJoin = 'miter';
-  ctx.lineCap = 'butt';
+  ctx.imageSmoothingEnabled = false;
+
+  const P = 2.5; // Stepped pixel grid size
 
   // Single pass drawing for all Black Flash elements
   for (let i = 0; i < _blackFlashParticles.length; i++) {
@@ -270,76 +278,158 @@ export function drawBlackFlashEffects(ctx) {
     if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || p.life <= 0) continue;
 
     if (p.type === 'bfLightning') {
-      if (!p.boltPath) continue;
+      if (!p.boltSegments || p.boltSegments.length === 0) continue;
       
       const activeLife = p.life * (0.75 + Math.random() * 0.25);
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.globalAlpha = Math.max(0, Math.min(1.0, activeLife));
 
-      // ── Layer 1: Crimson Red Spatial Distortion Outline (Outer Aura) ──
-      ctx.strokeStyle = `rgba(255, 15, 25, ${activeLife * 0.90})`;
-      ctx.lineWidth = 14 * activeLife;
-      ctx.stroke(p.boltPath);
-      if (p.branchPath) {
-        ctx.lineWidth = 7 * activeLife;
-        ctx.stroke(p.branchPath);
+      // ── Layer 1: Crimson Red Spatial Distortion Outline (Outer Pixel Aura) ──
+      const colCrimson = `rgba(255, 15, 25, ${(activeLife * 0.92).toFixed(3)})`;
+      for (const seg of p.boltSegments) {
+        _drawPixelLine(ctx, seg.x0, seg.y0, seg.x1, seg.y1, P, colCrimson, 3.4);
+      }
+      if (p.branchSegments) {
+        for (const seg of p.branchSegments) {
+          _drawPixelLine(ctx, seg.x0, seg.y0, seg.x1, seg.y1, P, colCrimson, 2.4);
+        }
       }
 
       // ── Layer 2: Stark Black Manga Ink Core (Center Lightning) ──
-      ctx.strokeStyle = `rgba(0, 0, 0, ${activeLife})`;
-      ctx.lineWidth = 6 * activeLife;
-      ctx.stroke(p.boltPath);
-      if (p.branchPath) {
-        ctx.lineWidth = 2.8 * activeLife;
-        ctx.stroke(p.branchPath);
+      const colBlack = `rgba(0, 0, 0, ${activeLife.toFixed(3)})`;
+      for (const seg of p.boltSegments) {
+        _drawPixelLine(ctx, seg.x0, seg.y0, seg.x1, seg.y1, P, colBlack, 2.2);
+      }
+      if (p.branchSegments) {
+        for (const seg of p.branchSegments) {
+          _drawPixelLine(ctx, seg.x0, seg.y0, seg.x1, seg.y1, P, colBlack, 1.4);
+        }
       }
 
-      // ── Layer 3: Hot Lilac-White Core Accent (Inner Spark Line) ──
-      ctx.strokeStyle = `rgba(243, 232, 255, ${activeLife * 0.95})`;
-      ctx.lineWidth = 1.6 * activeLife;
-      ctx.stroke(p.boltPath);
+      // ── Layer 3: Hot Lilac-White Specular Center Streak ──
+      const colLilac = `rgba(243, 232, 255, ${(activeLife * 0.98).toFixed(3)})`;
+      for (const seg of p.boltSegments) {
+        _drawPixelLine(ctx, seg.x0, seg.y0, seg.x1, seg.y1, P, colLilac, 1.0);
+      }
 
       ctx.restore();
 
     } else if (p.type === 'bfCore') {
-      p.size += (p.maxSize - p.size) * 0.25;
+      p.size += (p.maxSize - p.size) * 0.26;
+      const alpha = Math.max(0, Math.min(1.0, p.life * 1.15));
       
-      if (_coreCanvas) {
-        ctx.globalAlpha = Math.max(0, Math.min(1.0, p.life * 1.1));
-        ctx.drawImage(_coreCanvas, p.x - p.size, p.y - p.size, p.size * 2, p.size * 2);
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.globalAlpha = alpha;
+
+      const coreR = Math.max(P * 2, p.size);
+      const steps = Math.ceil(coreR / P);
+
+      // 1. Outer Stepped Crimson Cursed Energy Halo
+      ctx.fillStyle = 'rgba(255, 15, 30, 0.48)';
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const d = Math.hypot(gx * P, gy * P);
+          if (d <= coreR && (gx + gy) % 2 === 0) {
+            ctx.fillRect(gx * P, gy * P, P, P);
+          }
+        }
       }
 
+      // 2. Mid Stark Black Singularity (Stepped Octagonal Void Sphere)
+      ctx.fillStyle = '#000000';
+      const voidR = coreR * 0.72;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const d = Math.hypot(gx * P, gy * P);
+          if (d <= voidR) {
+            ctx.fillRect(gx * P, gy * P, P, P);
+          }
+        }
+      }
+
+      // 3. Central Pure-White Specular Flash Cluster
+      ctx.fillStyle = '#FFFFFF';
+      const whiteR = Math.max(P, voidR * 0.35);
+      for (let gy = -2; gy <= 2; gy++) {
+        for (let gx = -2; gx <= 2; gx++) {
+          if (Math.hypot(gx * P, gy * P) <= whiteR) {
+            ctx.fillRect(gx * P, gy * P, P, P);
+          }
+        }
+      }
+
+      // 4. Radiating Stepped Pixel Micro-Fractures
+      if (p.microSpikes && p.microSpikes.length > 0) {
+        const spikeAlpha = Math.max(0, Math.min(1.0, p.life));
+        const spikeCol = `rgba(255, 15, 30, ${spikeAlpha.toFixed(3)})`;
+        const spikeBlack = `rgba(0, 0, 0, ${spikeAlpha.toFixed(3)})`;
+        for (const spk of p.microSpikes) {
+          _drawPixelLine(ctx, spk.x0, spk.y0, spk.x1, spk.y1, P, spikeCol, 2.0);
+          _drawPixelLine(ctx, spk.x0, spk.y0, spk.x1 * 0.8, spk.y1 * 0.8, P, spikeBlack, 1.0);
+        }
+      }
+
+      ctx.restore();
+
     } else if (p.type === 'bfRing') {
-      p.size += (p.maxSize - p.size) * 0.22;
-      ctx.globalAlpha = Math.max(0, Math.min(1.0, p.life));
+      p.size += (p.maxSize - p.size) * 0.24;
+      const alpha = Math.max(0, Math.min(1.0, p.life));
+      const ringR = Math.max(P * 2, p.size);
+      const steps = Math.ceil(ringR / P);
 
-      // Outer dark red shockwave ring
-      ctx.strokeStyle = `rgba(180, 0, 15, ${p.life * 0.75})`;
-      ctx.lineWidth = 8 * p.life;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.stroke();
+      ctx.save();
+      ctx.translate(p.x, p.y);
 
-      // Inner crisp crimson/lilac ring
-      ctx.strokeStyle = `rgba(255, 230, 240, ${p.life * 0.85})`;
-      ctx.lineWidth = 2 * p.life;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * 0.95, 0, Math.PI * 2);
-      ctx.stroke();
+      // Outer Stepped Crimson Pixel Shockwave Ring
+      ctx.fillStyle = `rgba(220, 20, 40, ${(alpha * 0.80).toFixed(3)})`;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= ringR + P && dist > ringR - P * 1.5) {
+            if ((gx + gy) % 2 === 0 || p.life > 0.45) {
+              ctx.fillRect(gx * P, gy * P, P, P);
+            }
+          }
+        }
+      }
 
-    } else if (p.type === 'bfShard') {
-      ctx.globalAlpha = Math.max(0, Math.min(1.0, p.life));
-      ctx.fillStyle = p.color || '#000000';
-      
-      const s = p.size * p.life;
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y - s);
-      ctx.lineTo(p.x + s * 0.45, p.y);
-      ctx.lineTo(p.x, p.y + s);
-      ctx.lineTo(p.x - s * 0.45, p.y);
-      ctx.closePath();
-      ctx.fill();
+      // Inner Crisp Lilac/White Specular Pixel Ring
+      ctx.fillStyle = `rgba(255, 240, 245, ${(alpha * 0.90).toFixed(3)})`;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= ringR * 0.95 + P && dist > ringR * 0.95 - P) {
+            ctx.fillRect(gx * P, gy * P, P, P);
+          }
+        }
+      }
+
+      ctx.restore();
+
+    } else if (p.type === 'bfSpark') {
+      // High-velocity Directional Pixel Action Streak (NO DIAMONDS)
+      ctx.save();
+      const alpha = Math.max(0, Math.min(1.0, p.life));
+      ctx.globalAlpha = alpha;
+
+      const tailX = p.x - p.vx * 1.8;
+      const tailY = p.y - p.vy * 1.8;
+
+      // 1. Dark Red / Black Trail Streak
+      _drawPixelLine(ctx, tailX, tailY, p.x, p.y, P, 'rgba(180, 0, 20, 0.75)', 1.8);
+
+      // 2. Core Color Line
+      _drawPixelLine(ctx, tailX * 0.5 + p.x * 0.5, tailY * 0.5 + p.y * 0.5, p.x, p.y, P, p.color || '#FF0022', 1.2);
+
+      // 3. Leading Pure-White 1px Pixel Tip
+      ctx.fillStyle = '#FFFFFF';
+      const hx = Math.round(p.x / P) * P;
+      const hy = Math.round(p.y / P) * P;
+      ctx.fillRect(hx, hy, P, P);
+
+      ctx.restore();
     }
   }
 

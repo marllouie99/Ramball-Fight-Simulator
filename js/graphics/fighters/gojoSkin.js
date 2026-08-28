@@ -153,10 +153,11 @@ export function drawGojoBody(ctx, fighter) {
     if (img && img.complete && img.naturalWidth > 0) {
       ctx.save();
       ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-      // Exact sub-rectangle crop of the main Gojo circle from the 490x509 image (sx: 10, sy: 15, sw: 470, sh: 475)
-      const modelScale = 1.05; // Full standard size matching other fighters
+      // Exact centered bounding-box crop of Gojo's character model (sx: 44, sy: 50, sw: 422, sh: 422)
+      // Scaled with modelScale 1.15 to match John Wick, Mahito, and Ichigo
+      const modelScale = 1.15;
       const drawR = r * modelScale;
-      ctx.drawImage(img, 10, 15, 470, 475, -drawR, -drawR, drawR * 2, drawR * 2);
+      ctx.drawImage(img, 44, 50, 422, 422, -drawR, -drawR, drawR * 2, drawR * 2);
       ctx.restore();
 
       // Overlays (stun, poison, etc)

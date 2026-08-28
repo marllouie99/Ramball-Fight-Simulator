@@ -628,6 +628,14 @@ export class Fighter {
       this._handleFrozenSkillCooldowns();
       return true;
     }
+    // Global pause during Nanami's 7:3 Ratio Critical Hit-Pause mechanic
+    const isNanamiRatioPausing = typeof state !== 'undefined' && state.fighters && state.fighters.some(f => f && f !== this && (f.characterId === 'nanami' || f.type === 'nanami') && (f.ratioHitPauseTimer || 0) > 0);
+    if (isNanamiRatioPausing) {
+      this.vx = 0;
+      this.vy = 0;
+      this._handleFrozenSkillCooldowns();
+      return true;
+    }
     const isFrozen = this.statusEffects.handleTimeStop();
     if (isFrozen) {
       this._handleFrozenSkillCooldowns();

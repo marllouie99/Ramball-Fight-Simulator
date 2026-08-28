@@ -52,30 +52,112 @@ export class GojoRenderer {
       ctx.restore();
     }
 
-    // Purple Recovery Stasis Ring
+    // === PIXEL ART PURPLE RECOVERY BREATHER STASIS VISUAL ===
     if ((fighter.purpleRecoveryTimer || 0) > 0 && !isSuppressed) {
       ctx.save();
-      const pulse = 1 + Math.sin(Date.now() / 100) * 0.1;
-      const ringRadius = (fighter.r + 10) * pulse;
+      ctx.imageSmoothingEnabled = false;
 
-      // Base glowing aura (Increased opacity for better visibility)
-      ctx.beginPath();
-      ctx.arc(fighter.x, fighter.y, ringRadius, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(138, 43, 226, 0.35)'; // Bright BlueViolet
-      ctx.fill();
-      ctx.strokeStyle = 'rgba(138, 43, 226, 0.85)';
-      ctx.lineWidth = 3.0;
-      ctx.stroke();
-
-      // Countdown arc
-      const maxRecovery = 120; // 2 seconds
+      const time = Date.now();
+      const pulse = 1 + Math.sin(time * 0.008) * 0.08;
+      const ringRadius = (fighter.r + 12) * pulse;
+      const P = 2.5; // Stepped pixel grid size
+      const maxRecovery = fighter.purpleRecoveryMaxTimer || 120;
       const ratio = Math.max(0, Math.min(1, fighter.purpleRecoveryTimer / maxRecovery));
-      ctx.beginPath();
-      ctx.arc(fighter.x, fighter.y, ringRadius + 6, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * ratio));
-      ctx.strokeStyle = '#00E5FF'; // Very bright Cyan for maximum visibility
-      ctx.lineWidth = 4.5;
-      ctx.lineCap = 'round';
-      ctx.stroke();
+
+      const cx = fighter.x;
+      const cy = fighter.y - (fighter.z || 0);
+
+      // 1. Soft Stepped Pixel Atmosphere Fill
+      ctx.fillStyle = 'rgba(168, 85, 247, 0.18)';
+      const fillSteps = Math.ceil(ringRadius / P);
+      for (let gy = -fillSteps; gy <= fillSteps; gy++) {
+        for (let gx = -fillSteps; gx <= fillSteps; gx++) {
+          const d = Math.hypot(gx * P, gy * P);
+          if (d <= ringRadius && (gx + gy) % 2 === 0) {
+            ctx.fillRect(cx + gx * P, cy + gy * P, P, P);
+          }
+        }
+      }
+
+      // 2. Stepped Concentric Void Purple & Cursed Ink Pixel Ring
+      // 2.1 Dark Outer Ink Border
+      ctx.fillStyle = '#0E0F14';
+      for (let a = 0; a < 360; a += 1.2) {
+        const rad = (a * Math.PI) / 180;
+        const bx = Math.round((Math.cos(rad) * (ringRadius + P)) / P) * P;
+        const by = Math.round((Math.sin(rad) * (ringRadius + P)) / P) * P;
+        ctx.fillRect(cx + bx, cy + by, P, P);
+      }
+
+      // 2.2 Glowing Void Purple Main Ring
+      ctx.fillStyle = '#A855F7';
+      for (let a = 0; a < 360; a += 1.2) {
+        const rad = (a * Math.PI) / 180;
+        const bx = Math.round((Math.cos(rad) * ringRadius) / P) * P;
+        const by = Math.round((Math.sin(rad) * ringRadius) / P) * P;
+        ctx.fillRect(cx + bx, cy + by, P, P);
+      }
+
+      // 2.3 Inner Lavender Specular Core
+      ctx.fillStyle = '#E9D5FF';
+      for (let a = 0; a < 360; a += 2.4) {
+        const rad = (a * Math.PI) / 180;
+        const bx = Math.round((Math.cos(rad) * (ringRadius - P)) / P) * P;
+        const by = Math.round((Math.sin(rad) * (ringRadius - P)) / P) * P;
+        ctx.fillRect(cx + bx, cy + by, P, P);
+      }
+
+      // 3. Stepped Pixel Countdown Progress Arc (Electric Cyan & White Tip)
+      const arcR = ringRadius + P * 2.5;
+      const startAngle = -Math.PI / 2;
+      const endAngle = startAngle + (Math.PI * 2 * ratio);
+      const totalDeg = Math.round(ratio * 360);
+
+      // Dark shadow backdrop under countdown arc
+      ctx.fillStyle = '#001428';
+      for (let deg = 0; deg <= totalDeg; deg += 1.5) {
+        const rad = startAngle + (deg * Math.PI) / 180;
+        const ax = Math.round((Math.cos(rad) * (arcR + P * 0.8)) / P) * P;
+        const ay = Math.round((Math.sin(rad) * (arcR + P * 0.8)) / P) * P;
+        ctx.fillRect(cx + ax, cy + ay, P, P);
+      }
+
+      // Electric Cyan Progress Arc
+      ctx.fillStyle = '#00E5FF';
+      for (let deg = 0; deg <= totalDeg; deg += 1.5) {
+        const rad = startAngle + (deg * Math.PI) / 180;
+        const ax = Math.round((Math.cos(rad) * arcR) / P) * P;
+        const ay = Math.round((Math.sin(rad) * arcR) / P) * P;
+        ctx.fillRect(cx + ax, cy + ay, P, P);
+      }
+
+      // Pure-White Leading Pixel Head
+      if (totalDeg > 0) {
+        const leadRad = endAngle;
+        const lx = Math.round((Math.cos(leadRad) * arcR) / P) * P;
+        const ly = Math.round((Math.sin(leadRad) * arcR) / P) * P;
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(cx + lx - P * 0.5, cy + ly - P * 0.5, P * 2, P * 2);
+      }
+
+      // 4. Orbiting 4-Point Pixel Diamond Stars (Stabilizing Limitless Energy)
+      const starCount = 3;
+      const orbitSpeed = time * 0.003;
+      for (let s = 0; s < starCount; s++) {
+        const starAngle = orbitSpeed + (s * (Math.PI * 2 / starCount));
+        const starDist = ringRadius + 14;
+        const sx = Math.round((cx + Math.cos(starAngle) * starDist) / P) * P;
+        const sy = Math.round((cy + Math.sin(starAngle) * starDist) / P) * P;
+
+        // Outer cyan glow
+        ctx.fillStyle = '#00E5FF';
+        ctx.fillRect(sx - P, sy, P * 3, P);
+        ctx.fillRect(sx, sy - P, P, P * 3);
+
+        // Core white glint
+        ctx.fillStyle = '#FFFFFF';
+        ctx.fillRect(sx, sy, P, P);
+      }
 
       ctx.restore();
     }
@@ -537,19 +619,60 @@ export class GojoRenderer {
     const { frontHandX, frontHandY, backHandX, backHandY, hideFrontHand, hideBackHand } = hands;
     const handRadius = getHandSize(7.5, fighter);
     const is200Purple = fighter.isChannelingPurple && !!(fighter.is200PercentChannel || fighter.purpleUseCount === 1);
+    const skinColor = fighter.skinColor || '#FFE0BD';
+
+    const _drawPixelFist = (hx, hy) => {
+      const P = 2.0;
+      const gridR = Math.max(P * 2, handRadius);
+      const steps = Math.ceil(gridR / P);
+
+      // Outer Dark Shell
+      ctx.fillStyle = '#0E0F14';
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= gridR + P * 0.75) {
+            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Inner Base Skin Tone
+      ctx.fillStyle = skinColor;
+      const innerR = gridR - P * 0.4;
+      for (let gy = -steps; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR) {
+            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Shading
+      ctx.fillStyle = '#D4A882';
+      for (let gy = 0; gy <= steps; gy++) {
+        for (let gx = -steps; gx <= steps; gx++) {
+          const dist = Math.hypot(gx * P, gy * P);
+          if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+            ctx.fillRect(Math.round(hx + gx * P), Math.round(hy + gy * P), P, P);
+          }
+        }
+      }
+
+      // Knuckle Specular Highlight
+      ctx.fillStyle = '#FFF5EB';
+      ctx.fillRect(Math.round(hx + P * 0.5), Math.round(hy - innerR * 0.45), P, P);
+      ctx.fillRect(Math.round(hx + P * 1.5), Math.round(hy - innerR * 0.45), P, P);
+    };
 
     ctx.save();
-    ctx.fillStyle = fighter.skinColor || '#FFE0BD';
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2.5;
+    ctx.imageSmoothingEnabled = false;
 
     // Back hand: drawn on 'back' layer for normal stances, but for 200% Purple both hands render in front on top of body
     if (!is200Purple) {
       if ((layer === 'all' || layer === 'back') && !hideBackHand) {
-        ctx.beginPath();
-        ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        _drawPixelFist(backHandX, backHandY);
       }
     }
 
@@ -558,37 +681,21 @@ export class GojoRenderer {
       if (is200Purple) {
         // Draw both hands on top of the body circle during 200% purple launch preparation
         if (!hideBackHand) {
-          ctx.beginPath();
-          ctx.arc(backHandX, backHandY, handRadius, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.stroke();
+          _drawPixelFist(backHandX, backHandY);
         }
       }
 
       if (!hideFrontHand) {
-        ctx.beginPath();
-        ctx.arc(frontHandX, frontHandY, handRadius, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
+        _drawPixelFist(frontHandX, frontHandY);
       }
 
       // Unlimited Void Hand Sign: crossed fingers near collar during domain channeling
       if (fighter.isChannelingDomainExpansion) {
-        ctx.fillStyle = fighter.skinColor || '#FFE0BD';
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1.8;
-
-        // Index finger
-        ctx.beginPath();
-        ctx.rect(frontHandX - 3, frontHandY - handRadius * 1.5, 4, handRadius * 1.5);
-        ctx.fill();
-        ctx.stroke();
-
-        // Middle finger crossed over
-        ctx.beginPath();
-        ctx.rect(frontHandX - 1, frontHandY - handRadius * 1.6, 4, handRadius * 1.6);
-        ctx.fill();
-        ctx.stroke();
+        const P = 2.0;
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(Math.round(frontHandX - 4), Math.round(frontHandY - handRadius * 1.6), 8, handRadius * 1.6);
+        ctx.fillStyle = skinColor;
+        ctx.fillRect(Math.round(frontHandX - 3), Math.round(frontHandY - handRadius * 1.5), 6, handRadius * 1.5);
       }
     }
     ctx.restore();
@@ -604,315 +711,88 @@ export class GojoRenderer {
 
   static _drawHealingAura(ctx, fighter) {
     const progress = fighter.healingAuraTimer / 180; // Fade out as timer decreases
+    if (progress <= 0) return;
     const time = Date.now();
 
-    // Use source-over to properly layer colors on white background
-    // 'lighter' blending on white background makes colors invisible
+    ctx.save();
+    ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
     ctx.globalCompositeOperation = 'source-over';
 
-    // OPTIMIZED: Replaced 5 expensive per-frame radial gradients with layered alpha circles
-    // which look nearly identical but render exponentially faster.
-    
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-    ctx.globalAlpha = progress;
+    const P = 2.0;
+    const snap = (v) => Math.round(v / P) * P;
+    const r = fighter.r || 25;
 
-    // === LAYER 1: THE DARK OUTER EDGE (Deep Blue Silhouette) ===
-    const outerRadius = fighter.r * 1.8;
-    ctx.beginPath();
-    ctx.arc(0, 0, outerRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(40, 120, 255, 0.4)';
-    ctx.fill();
+    // ── 1. STEPPED PIXEL GLOW RINGS (Concentric Pixel Art Aura) ──
+    const ringRadii = [r * 1.35, r * 1.15, r * 0.95];
+    const ringAlphas = [0.22 * progress, 0.38 * progress, 0.55 * progress];
+    const ringColors = ['rgba(56, 189, 248,', 'rgba(50, 205, 50,', 'rgba(167, 243, 208,'];
 
-    // === LAYER 2: SOFT SMUDGING (Rich Blue Gradient) ===
-    const smokeRadius = fighter.r * 1.6;
-    ctx.beginPath();
-    ctx.arc(0, 0, smokeRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(80, 160, 255, 0.5)';
-    ctx.fill();
-
-    // === LAYER 3: THE BRIGHT CORE (Vibrant Blue) ===
-    const coreRadius = fighter.r * 1.1;
-    ctx.beginPath();
-    ctx.arc(0, 0, coreRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(120, 200, 255, 0.6)';
-    ctx.fill();
-
-    // === LAYER 4: THE HOT CENTER (Bright Emerald Green & Cyan Core) ===
-    const whiteHotRadius = fighter.r * 0.9;
-    ctx.beginPath();
-    ctx.arc(0, 0, whiteHotRadius, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0, 255, 150, 0.7)';
-    ctx.fill();
-    
-    ctx.restore();
-
-    // === LAYER 5: CAST DEEP SHADOWS (Dark Shadows on Back Side) ===
-    // Creates dramatic contrast by placing dark shadows on parts facing away
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
-    // Shadow gradient - darker on the opposite side of the energy source
-    const shadowAngle = Math.atan2(-fighter.vy, -fighter.vx) || 0; // Shadow opposite to movement
-    ctx.rotate(shadowAngle);
-
-    const shadowGrad = ctx.createRadialGradient(0, 0, fighter.r * 0.8, 0, 0, fighter.r * 1.4); // Reduced from 2
-    shadowGrad.addColorStop(0, 'rgba(0, 0, 0, 0)');
-    shadowGrad.addColorStop(0.5, `rgba(40, 120, 200, ${0.9 * progress})`); // Brighter blue shadow
-    shadowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-    // Draw shadow crescent on the back side
-    ctx.beginPath();
-    ctx.arc(0, 0, fighter.r * 2, -Math.PI * 0.3, Math.PI * 0.3);
-    ctx.arc(0, 0, fighter.r * 0.8, Math.PI * 0.3, -Math.PI * 0.3, true);
-    ctx.closePath();
-    ctx.fillStyle = shadowGrad;
-    ctx.fill();
-
-    ctx.restore();
-
-    // === LAYER 6: SHARP OUTLINES (Fine Whipping Wind Lines) ===
-    // Sharp, whipping wind lines showing the direction the energy is flowing
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
-    const windLineCount = 16;
-    for (let i = 0; i < windLineCount; i++) {
-      const baseAngle = (Math.PI * 2 / windLineCount) * i;
-      const wobble = Math.sin(time * 0.008 + i * 0.5) * 0.1;
-      const angle = baseAngle + wobble;
-
-      const startDist = fighter.r * (0.6 + Math.sin(time * 0.01 + i) * 0.1); // Reduced from 0.9
-      const length = fighter.r * (0.5 + Math.sin(time * 0.012 + i * 0.7) * 0.4); // Reduced from 0.8
-
-      const x1 = Math.cos(angle) * startDist;
-      const y1 = Math.sin(angle) * startDist;
-      const x2 = Math.cos(angle) * (startDist + length);
-      const y2 = Math.sin(angle) * (startDist + length);
-
-      // Draw sharp wind line with gradient - bright blue for visibility
-      const windGrad = ctx.createLinearGradient(x1, y1, x2, y2);
-      windGrad.addColorStop(0, `rgba(120, 200, 255, ${0.98 * progress})`);
-      windGrad.addColorStop(0.5, `rgba(100, 180, 255, ${0.9 * progress})`);
-      windGrad.addColorStop(1, 'rgba(80, 160, 255, 0)');
-
-      ctx.beginPath();
-      ctx.moveTo(x1, y1);
-      ctx.lineTo(x2, y2);
-      ctx.strokeStyle = windGrad;
-      ctx.lineWidth = 2.5;
-      ctx.lineCap = 'round';
-      ctx.stroke();
-
-      // Extra sharp tip at the end - bright cyan
-      ctx.beginPath();
-      ctx.arc(x2, y2, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(150, 220, 255, ${1.0 * progress})`;
-      ctx.fill();
+    for (let i = 0; i < ringRadii.length; i++) {
+      const rad = ringRadii[i];
+      const alpha = ringAlphas[i];
+      const col = ringColors[i];
+      const gridR = Math.ceil(rad / P);
+      ctx.fillStyle = `${col} ${alpha.toFixed(2)})`;
+      for (let gy = -gridR; gy <= gridR; gy++) {
+        for (let gx = -gridR; gx <= gridR; gx++) {
+          const dist = Math.sqrt(gx * gx + gy * gy) * P;
+          if (dist <= rad && dist > rad - P * 2) {
+            ctx.fillRect(gx * P - P * 0.5, gy * P - P * 0.5, P, P);
+          }
+        }
+      }
     }
-    ctx.restore();
 
-    // === LAYER 7: FLAME TENDRILS (The Iconic Engulfed-in-Flames Effect) ===
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
+    // ── 2. STEPPED PIXEL FLAME CRESTS (8 Radial Pixel Flames) ──
     const flameCount = 8;
-    for (let i = 0; i < flameCount; i++) {
-      const baseAngle = (Math.PI * 2 / flameCount) * i;
-      const rotation = time * 0.003; // Slow rotation
-      const angle = baseAngle + rotation;
-
-      ctx.save();
-      ctx.rotate(angle);
-
-      // Flame tendril - animated wavy shape
-      const flameLength = fighter.r * (1.0 + Math.sin(time * 0.01 + i) * 0.3); // Reduced from 1.4
-      const flameWidth = fighter.r * 0.3; // Reduced from 0.4
-
-      // Create flame gradient (bright blue for visibility)
-      const flameGrad = ctx.createLinearGradient(fighter.r * 0.6, 0, fighter.r * 0.6 + flameLength, 0);
-      flameGrad.addColorStop(0, `rgba(120, 200, 255, ${1.0 * progress})`); // Bright blue base
-      flameGrad.addColorStop(0.3, `rgba(100, 180, 255, ${0.98 * progress})`); // Vivid blue
-      flameGrad.addColorStop(0.6, `rgba(80, 160, 255, ${0.9 * progress})`); // Medium blue
-      flameGrad.addColorStop(1, 'rgba(60, 140, 255, 0)'); // Fade to blue
-
-      // Draw wavy flame shape
-      ctx.beginPath();
-      ctx.moveTo(fighter.r * 0.6, 0);
-
-      const segments = 10;
-      for (let j = 0; j <= segments; j++) {
-        const t = j / segments;
-        const x = fighter.r * 0.6 + flameLength * t;
-        const waveOffset = Math.sin(time * 0.015 + j * 0.5 + i * 0.8) * flameWidth * (1 - t * 0.5);
-        const width = flameWidth * (1 - t * 0.7);
-
-        ctx.lineTo(x, waveOffset - width * 0.5);
+    for (let f = 0; f < flameCount; f++) {
+      const baseAngle = (Math.PI * 2 / flameCount) * f + time * 0.002;
+      const flameLen = snap(r * (0.35 + Math.sin(time * 0.008 + f * 1.2) * 0.2));
+      const startDist = r * 0.9;
+      const steps = 4;
+      for (let s = 0; s < steps; s++) {
+        const d = startDist + (flameLen / steps) * s;
+        const fx = snap(Math.cos(baseAngle) * d);
+        const fy = snap(Math.sin(baseAngle) * d);
+        const flameAlpha = progress * (1 - (s / steps) * 0.7);
+        ctx.fillStyle = s === steps - 1 
+          ? `rgba(255, 255, 255, ${flameAlpha.toFixed(2)})`
+          : `rgba(56, 189, 248, ${(flameAlpha * 0.8).toFixed(2)})`;
+        ctx.fillRect(fx - P * 0.5, fy - P * 0.5, P, P);
       }
-
-      for (let j = segments; j >= 0; j--) {
-        const t = j / segments;
-        const x = fighter.r * 0.6 + flameLength * t;
-        const waveOffset = Math.sin(time * 0.015 + j * 0.5 + i * 0.8) * flameWidth * (1 - t * 0.5);
-        const width = flameWidth * (1 - t * 0.7);
-
-        ctx.lineTo(x, waveOffset + width * 0.5);
-      }
-
-      ctx.closePath();
-      ctx.fillStyle = flameGrad;
-      ctx.fill();
-
-      // Inner bright core of flame (bright cyan hot streak)
-      ctx.beginPath();
-      ctx.moveTo(fighter.r * 0.7, 0);
-      const innerLength = flameLength * 0.5;
-      for (let j = 0; j <= segments; j++) {
-        const t = j / segments;
-        const x = fighter.r * 0.7 + innerLength * t;
-        const waveOffset = Math.sin(time * 0.02 + j * 0.6 + i) * flameWidth * 0.25 * (1 - t);
-        ctx.lineTo(x, waveOffset);
-      }
-      ctx.strokeStyle = `rgba(150, 220, 255, ${1.0 * progress})`;
-      ctx.lineWidth = 3;
-      ctx.stroke();
-
-      ctx.restore();
     }
+
+    // ── 3. ORBITING / ASCENDING PIXEL CROSSES (+) ──
+    const crossCount = 5;
+    for (let c = 0; c < crossCount; c++) {
+      const angle = time * 0.003 + (c * Math.PI * 2) / crossCount;
+      const orbitR = r * (1.15 + Math.sin(time * 0.005 + c) * 0.2);
+      const px = snap(Math.cos(angle) * orbitR);
+      const py = snap(Math.sin(angle) * orbitR * 0.6 - ((time * 0.035 + c * 14) % (r * 1.6)));
+      const crossAlpha = progress * (0.6 + Math.sin(time * 0.01 + c) * 0.4);
+
+      if (crossAlpha > 0.05) {
+        // White-hot center pixel
+        ctx.fillStyle = `rgba(255, 255, 255, ${crossAlpha.toFixed(2)})`;
+        ctx.fillRect(px - P * 0.5, py - P * 0.5, P, P);
+
+        // 4 cardinal arms
+        ctx.fillStyle = `rgba(0, 255, 102, ${(crossAlpha * 0.85).toFixed(2)})`;
+        ctx.fillRect(px - P * 1.5, py - P * 0.5, P, P);
+        ctx.fillRect(px + P * 0.5, py - P * 0.5, P, P);
+        ctx.fillRect(px - P * 0.5, py - P * 1.5, P, P);
+        ctx.fillRect(px - P * 0.5, py + P * 0.5, P, P);
+      }
+    }
+
     ctx.restore();
 
-    // === LAYER 8: ROTATING ENERGY RINGS (Swirling Domain-like Effect) ===
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
-    const ringRotation = time * 0.004;
-    ctx.rotate(ringRotation);
-
-    const ringRadius = fighter.r * 1.2; // Reduced from 1.6
-
-    // Draw elliptical rings at different angles
-    for (let r = 0; r < 3; r++) {
-      ctx.save();
-      ctx.rotate(r * Math.PI / 3);
-
-      ctx.beginPath();
-      ctx.ellipse(0, 0, ringRadius, ringRadius * (0.18 + r * 0.08), 0, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(100, 180, 255, ${(0.95 - r * 0.2) * progress})`;
-      ctx.lineWidth = 3 - r * 0.5;
-      
-      // OPTIMIZED: Removed shadowBlur. Used an alpha layered stroke for glow effect
-      ctx.stroke();
-      ctx.lineWidth = (3 - r * 0.5) * 2;
-      ctx.strokeStyle = `rgba(80, 160, 255, ${(0.3) * progress})`;
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    // Counter-rotating inner rings (Green RCT Energy Swirls)
-    ctx.rotate(-ringRotation * 2);
-    const innerRingRadius = fighter.r * 0.8;
-
-    for (let r = 0; r < 2; r++) {
-      ctx.save();
-      ctx.rotate(r * Math.PI / 2 + Math.PI / 4);
-
-      ctx.beginPath();
-      ctx.ellipse(0, 0, innerRingRadius, innerRingRadius * 0.15, 0, 0, Math.PI * 2);
-      ctx.strokeStyle = `rgba(0, 255, 136, ${(0.95 - r * 0.15) * progress})`;
-      ctx.lineWidth = 2.5;
-      
-      // OPTIMIZED: Removed shadowBlur. Used an alpha layered stroke for glow effect
-      ctx.stroke();
-      ctx.lineWidth = 5;
-      ctx.strokeStyle = `rgba(0, 255, 136, ${(0.3) * progress})`;
-      ctx.stroke();
-
-      ctx.restore();
-    }
-
-    ctx.shadowBlur = 0;
-    ctx.restore();
-
-    // === LAYER 9: FLOATING CURSED ENERGY PARTICLES ===
-    const particleCount = 20; // Reduced from 30 for performance
-    for (let i = 0; i < particleCount; i++) {
-      const seed = i * 1337.7331;
-      const angle = (time * 0.002) + seed;
-      const baseDist = fighter.r * (0.4 + (seed % 30) / 30); // Reduced from 0.6
-      const wobble = Math.sin(time * 0.008 + seed) * 8; // Reduced from 12
-      const dist = baseDist + wobble;
-
-      const px = fighter.x + Math.cos(angle) * dist;
-      const py = fighter.y + Math.sin(angle) * dist;
-
-      const particleSize = 2 + (seed % 5);
-      const alpha = 0.5 + Math.sin(time * 0.01 + seed) * 0.3;
-
-      // OPTIMIZED: Replaced expensive radial gradient with 2 simple filled circles
-      ctx.beginPath();
-      ctx.arc(px, py, particleSize * 2, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(120, 200, 255, ${alpha * 0.7 * progress})`;
-      ctx.fill();
-
-      ctx.beginPath();
-      ctx.arc(px, py, particleSize, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(180, 230, 255, ${alpha * progress})`;
-      ctx.fill();
-    }
-
-    // === LAYER 10: OUTER FLAME CROWN (Top Flames Rising Up) ===
-    ctx.save();
-    ctx.translate(fighter.x, fighter.y);
-
-    const crownFlameCount = 12;
-    for (let i = 0; i < crownFlameCount; i++) {
-      const angle = (Math.PI * 2 / crownFlameCount) * i - Math.PI / 2; // Start from top
-      const flameHeight = fighter.r * (0.4 + Math.sin(time * 0.012 + i * 0.7) * 0.25); // Reduced from 0.6
-
-      ctx.save();
-      ctx.rotate(angle);
-
-      // Rising flame with bright blue gradient
-      const crownGrad = ctx.createLinearGradient(0, -fighter.r, 0, -fighter.r - flameHeight);
-      crownGrad.addColorStop(0, `rgba(120, 200, 255, ${0.98 * progress})`);
-      crownGrad.addColorStop(0.4, `rgba(100, 180, 255, ${0.9 * progress})`);
-      crownGrad.addColorStop(0.8, `rgba(80, 160, 255, ${0.7 * progress})`);
-      crownGrad.addColorStop(1, 'rgba(60, 140, 255, 0)');
-
-      ctx.beginPath();
-      ctx.moveTo(-7, -fighter.r);
-      ctx.quadraticCurveTo(
-        Math.sin(time * 0.01 + i) * 8, -fighter.r - flameHeight * 0.5,
-        0, -fighter.r - flameHeight
-      );
-      ctx.quadraticCurveTo(
-        Math.sin(time * 0.01 + i + 1) * 8, -fighter.r - flameHeight * 0.5,
-        7, -fighter.r
-      );
-      ctx.closePath();
-      ctx.fillStyle = crownGrad;
-      ctx.fill();
-
-      // Bright cyan hot tip
-      ctx.beginPath();
-      ctx.arc(0, -fighter.r - flameHeight, 2.5, 0, Math.PI * 2);
-      ctx.fillStyle = `rgba(150, 220, 255, ${1.0 * progress})`;
-      ctx.fill();
-
-      ctx.restore();
-    }
-    ctx.restore();
-
-    // Reset composite operation
-    ctx.globalCompositeOperation = 'source-over';
-
-    // Spawn occasional healing particles while aura is active
-    if (Math.random() < 0.4) {
+    // Spawn occasional pixel healing particles while aura is active
+    if (Math.random() < 0.35) {
       const angle = Math.random() * Math.PI * 2;
       const dist = fighter.r * (0.5 + Math.random() * 0.5);
       const px = fighter.x + Math.cos(angle) * dist;
-      const py = fighter.y + Math.sin(angle) * dist;
+      const py = (fighter.y - (fighter.z || 0)) + Math.sin(angle) * dist;
       spawnSparks(px, py, 1, 'healing');
     }
   }

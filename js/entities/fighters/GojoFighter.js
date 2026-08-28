@@ -1650,7 +1650,10 @@ export class GojoFighter extends Fighter {
     }
     if ((this.isMeleeMode && !isBreatherState && !isDomainChanneling && !this.domainActive) || this.hp <= 0 || this.isChannelingPurple) return;
 
-    const barrierRadius = CONFIG.gojo?.infinityRadius ?? (this.r + 30);
+    const barrierRadius = (CONFIG.gojo?.infinityRadius !== undefined) ? (this.r + 30) : (this.r + 30);
+    const slowRange = CONFIG.gojo?.infinitySlowRange || 140;
+    const slowOuterRadius = barrierRadius + slowRange;
+
     const allTargets = [
       ...(state.fighters || []),
       ...(state.illusions || []),
@@ -1686,10 +1689,39 @@ export class GojoFighter extends Fighter {
       const distSq = dx * dx + dy * dy;
       const entRadius = entity.hitRadius || entity.r || 25;
       const minDist = entRadius + barrierRadius;
+      const slowDist = entRadius + slowOuterRadius;
 
       if (distSq < minDist * minDist) {
         if (typeof this.triggerInfinityBlock === 'function') {
           this.triggerInfinityBlock(entity.x, entity.y, entity);
+        }
+      } else if (distSq < slowDist * slowDist) {
+        // Proximity Approach Slow: The closer the enemy gets to the barrier, the slower they move (Limitless Infinity paradox)
+        const dist = Math.sqrt(distSq);
+        const distFromBarrier = Math.max(0, dist - minDist);
+        const proximityRatio = 1.0 - Math.min(1.0, distFromBarrier / slowRange); // 0.0 at outer edge -> 1.0 at barrier edge
+        const minSlowMult = CONFIG.gojo?.infinitySlowMinMultiplier ?? 0.20;
+        const slowMult = Math.max(minSlowMult, 1.0 - proximityRatio * (1.0 - minSlowMult));
+
+        // Apply slow debuff
+        if (typeof entity.applySlow === 'function') {
+          entity.applySlow(3, slowMult, { isInfinitySlow: true });
+        } else if (entity.statusEffects && typeof entity.statusEffects.applySlow === 'function') {
+          entity.statusEffects.applySlow(3, slowMult);
+        } else {
+          entity.slowTimer = Math.max(entity.slowTimer || 0, 3);
+          entity.slowMultiplier = slowMult;
+        }
+
+        // Direct velocity damping for instant, tangible spatial drag
+        if (entity.vx !== undefined && entity.vy !== undefined) {
+          entity.vx *= slowMult;
+          entity.vy *= slowMult;
+        }
+
+        // Subtle spatial distortion particles while slowed near barrier
+        if (Math.random() < 0.15 && typeof spawnSparks === 'function') {
+          spawnSparks(entity.x, entY, 1, '#00E5FF', '#FFFFFF');
         }
       }
     }

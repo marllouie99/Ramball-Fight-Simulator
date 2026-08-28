@@ -445,22 +445,55 @@ function drawHandFist(ctx, x, y, radius, skinColor, fighter) {
     }
   }
 
-  // 2. Fist body
+  // 2. Stepped Pixel-Art Fist Body & Outer Manga Border
   ctx.globalAlpha = 1.0;
-  ctx.fillStyle = inBFState ? '#D88A75' : '#EBBF9E';
-  ctx.beginPath();
-  ctx.arc(x, y, radius, 0, Math.PI * 2);
-  ctx.fill();
+  const P = 2.0;
+  const gridR = Math.max(P * 2, radius);
+  const steps = Math.ceil(gridR / P);
+  const baseSkin = inBFState ? '#D88A75' : '#EBBF9E';
+  const shadowCol = inBFState ? '#A85D4B' : '#C49677';
+  const outlineCol = inBFState ? `rgba(230, 0, 30, ${0.90 * alpha})` : '#0E0F14';
 
-  // 3. Solid black fist outline (or glowing crimson if in BF state)
-  if (inBFState) {
-    ctx.strokeStyle = `rgba(230, 0, 30, ${0.85 * alpha})`;
-    ctx.lineWidth = 2.0;
-  } else {
-    ctx.strokeStyle = '#000000';
-    ctx.lineWidth = 2;
+  // Stepped Dark Outline Shell
+  ctx.fillStyle = outlineCol;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= gridR + P * 0.75) {
+        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
+      }
+    }
   }
-  ctx.stroke();
+
+  // Stepped Inner Base Tone
+  ctx.fillStyle = baseSkin;
+  const innerR = gridR - P * 0.4;
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR) {
+        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // Knuckle Depth Shading
+  ctx.fillStyle = shadowCol;
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const dist = Math.hypot(gx * P, gy * P);
+      if (dist <= innerR && (gy * P > innerR * 0.35 || gx * P < -innerR * 0.45)) {
+        ctx.fillRect(Math.round(x + gx * P), Math.round(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // Knuckle Specular Highlight
+  ctx.fillStyle = inBFState ? '#FFEAE5' : '#FFF3E8';
+  const hx = Math.round(x + P * 0.5);
+  const hy = Math.round(y - innerR * 0.45);
+  ctx.fillRect(hx, hy, P, P);
+  ctx.fillRect(hx + P, hy, P, P);
 
   ctx.restore();
 }
