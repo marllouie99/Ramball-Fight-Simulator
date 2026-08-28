@@ -1338,6 +1338,10 @@ export class SukunaFighter extends Fighter {
     drawSukunaBody(ctx, this);
   }
 
+  drawSkin(ctx) {
+    drawSukunaBody(ctx, this);
+  }
+
   // Override status overlays for Sukuna: keep stun/freeze effects in crimson energy instead of blue rings!
   drawStatusOverlays(ctx, baseRadius) {
     if (this.hitFlashTimer > 0) {

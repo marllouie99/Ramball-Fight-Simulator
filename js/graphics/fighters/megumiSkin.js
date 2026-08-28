@@ -390,13 +390,6 @@ export function drawMegumiSkin(ctx, fighter) {
   ctx.fill();
   ctx.stroke();
 
-  // ── BOLD BLACK BODY CIRCLE OUTLINE (Matches Gojo) ──
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.lineWidth = 3.0;
-  ctx.strokeStyle = '#111111';
-  ctx.stroke();
-
   // ── HAND RENDERING (Rule 20 Guard Compliant) ──
   const shouldHideHands = (typeof state !== 'undefined' && state.showSkinOnly) || fighter.hideHands;
   if (!shouldHideHands) {

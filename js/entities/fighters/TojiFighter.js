@@ -1933,21 +1933,25 @@ export class TojiFighter extends Fighter {
     const isKatanaActiveInHand = isKatanaDrawn || (this.ambushPhase === 'PHANTOM_FLURRY' && !this.ultimateActive);
     const isUltimateFinal = this.ultimateActive && (this.ultimatePhase === 'CRATER_FADEIN' || this.ultimatePhase === 'CRATER' || this.ultimatePhase === 'CRATER_DIVE');
     const isShowoffOrPreview = this._isFaceOff || this._isWinnerReveal || (typeof state !== 'undefined' && (state.gameState === 'countdown' || state._isFaceOffScreenActive));
-
-    if (isKatanaDrawn || isKatanaActiveInHand || isUltimateFinal) {
-      // During active skill execution with Katana in hand, Inverted Spear rests at hip
-      drawRestedInvertedSpearAtHip(ctx, this.x, this.y, baseAngle, this.r, this.chainNodes, '#E8BD9B');
-    } else if (isShowoffOrPreview) {
-      // Dual-wield pose with Katana over shoulder only shown in showoff screen / countdown / preview cards
-      drawRestedKatanaOverShoulder(ctx, this.x, this.y, baseAngle, this.r, '#E8BD9B');
+    const shouldHideWeapons = (typeof state !== 'undefined' && state.showSkinOnly) || this.hideWeapon;
+    if (!shouldHideWeapons) {
+      if (isKatanaDrawn || isKatanaActiveInHand || isUltimateFinal) {
+        // During active skill execution with Katana in hand, Inverted Spear rests at hip
+        drawRestedInvertedSpearAtHip(ctx, this.x, this.y, baseAngle, this.r, this.chainNodes, '#E8BD9B');
+      } else if (isShowoffOrPreview) {
+        // Dual-wield pose with Katana over shoulder only shown in showoff screen / countdown / preview cards
+        drawRestedKatanaOverShoulder(ctx, this.x, this.y, baseAngle, this.r, '#E8BD9B');
+      }
     }
 
     // 2. Draw Toji's signature skin model (Rule 19 & 20 compliant)
     drawTojiSkin(ctx, this);
 
     // 3. Draw physics chain trailing naturally in world space
-    modUpdateChain(this);
-    drawPhysicsChain(ctx, this.chainNodes);
+    if (!shouldHideWeapons) {
+      modUpdateChain(this);
+      drawPhysicsChain(ctx, this.chainNodes);
+    }
 
     // 4. HIGH-IMPACT ANIME SLASH VISUAL EFFECTS (Impact & Recovery Phase)
     const isTojiPausedOrFrozen = this._isFrozenOrPaused();

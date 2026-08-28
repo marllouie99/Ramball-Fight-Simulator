@@ -6,6 +6,7 @@ import { audioSystem } from '../../systems/audioSystem.js';
 import { playSkillEffectSound } from '../../soundEffects/skillEffectSounds.js';
 import { projectileSystem } from '../../systems/projectileSystem.js';
 import { drawMahoragaSword } from '../../graphics/weapons/mahoragaWeaponGraphics.js';
+import { drawMahoragaSkin } from '../../graphics/fighters/mahoragaSkin.js';
 import { getSkillSound } from '../../soundEffects/skillSounds.js';
 import { pushTrailCap } from '../../graphics/particles/visualTrailSystem.js';
 
@@ -1879,6 +1880,14 @@ export class MahoragaFighter extends Fighter {
   drawGun(ctx) {
     if (this.isTargetOfAmbush) return;
     drawMahoragaSword(ctx, this);
+  }
+
+  drawBody(ctx) {
+    drawMahoragaSkin(ctx, this);
+  }
+
+  drawSkin(ctx) {
+    drawMahoragaSkin(ctx, this);
   }
 
   // Store reference to super.draw for the visuals module to call

@@ -1,4 +1,5 @@
 import { CONFIG, getHandSize } from '../../core/config.js';
+import { state } from '../../core/state.js';
 
 /**
  * Visual & Animation Speed Configuration for Toji's Weapons.
@@ -19,24 +20,89 @@ export const TOJI_WEAPON_CONFIG = {
 };
 
 /**
- * Draws natural physics-simulated metal chain links with real hollow centers.
+ * Helper to snap values to standard 2px pixel grid.
+ */
+const P = 2.0;
+function snap(v) {
+  return Math.round(v / P) * P;
+}
+
+/**
+ * Draws Toji's hand/grip in authentic stepped pixel art style.
+ */
+function drawTojiPixelWeaponGrip(ctx, x, y, radius, handColor = '#E8BD9B') {
+  ctx.save();
+  const r = Math.max(P * 2, radius);
+  const steps = Math.ceil(r / P);
+
+  // 1. Manga dark outline shell (#0E0F14)
+  ctx.fillStyle = '#0E0F14';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      if (Math.hypot(gx * P, gy * P) <= r + P * 0.75) {
+        ctx.fillRect(snap(x + gx * P), snap(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // 2. Tan skin body
+  ctx.fillStyle = handColor || '#E8BD9B';
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      if (Math.hypot(gx * P, gy * P) <= r - P * 0.35) {
+        ctx.fillRect(snap(x + gx * P), snap(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // 3. Knuckle shadow blocks
+  ctx.fillStyle = '#C68A65';
+  for (let gy = 0; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      if (Math.hypot(gx * P, gy * P) <= r - P * 0.35 && (gy * P > r * 0.20 || gx * P < -r * 0.35)) {
+        ctx.fillRect(snap(x + gx * P), snap(y + gy * P), P, P);
+      }
+    }
+  }
+
+  // 4. Specular highlight
+  ctx.fillStyle = '#FFE5D0';
+  ctx.fillRect(snap(x + P * 0.5), snap(y - r * 0.45), P, P);
+
+  ctx.restore();
+}
+
+/**
+ * Helper to compute quadratic bezier point.
+ */
+function quadBezierPt(p0, p1, p2, t) {
+  const mt = 1 - t;
+  return {
+    x: mt * mt * p0.x + 2 * mt * t * p1.x + t * t * p2.x,
+    y: mt * mt * p0.y + 2 * mt * t * p1.y + t * t * p2.y
+  };
+}
+
+/**
+ * Draws natural physics-simulated metal chain links in authentic Pixel-Art style.
  */
 export function drawPhysicsChain(ctx, chainNodes) {
+  if (typeof state !== 'undefined' && state.showSkinOnly) return;
   if (!chainNodes || chainNodes.length < 2) return;
 
   ctx.save();
 
-  // 1. Continuous dark metallic spine underlay (guarantees zero gaps between links when bending)
+  // 1. Continuous dark metallic spine underlay with stepped pixel thickness
   ctx.beginPath();
-  ctx.moveTo(chainNodes[0].x, chainNodes[0].y);
+  ctx.moveTo(snap(chainNodes[0].x), snap(chainNodes[0].y));
   for (let i = 1; i < chainNodes.length; i++) {
-    ctx.lineTo(chainNodes[i].x, chainNodes[i].y);
+    ctx.lineTo(snap(chainNodes[i].x), snap(chainNodes[i].y));
   }
-  ctx.strokeStyle = '#1A1E24';
-  ctx.lineWidth = 2.5;
+  ctx.strokeStyle = '#111216';
+  ctx.lineWidth = 3.0;
   ctx.stroke();
 
-  // 2. Interlocking hollow metal links
+  // 2. Interlocking stepped pixel-art metal links
   for (let i = 1; i < chainNodes.length; i++) {
     const ptA = chainNodes[i - 1];
     const ptB = chainNodes[i];
@@ -45,32 +111,34 @@ export function drawPhysicsChain(ctx, chainNodes) {
     const linkAngle = Math.atan2(ptB.y - ptA.y, ptB.x - ptA.x);
 
     ctx.save();
-    ctx.translate(midX, midY);
+    ctx.translate(snap(midX), snap(midY));
     ctx.rotate(linkAngle);
 
     if (i % 2 === 0) {
-      // Face-on hollow link with evenodd fill (real hole!)
-      ctx.beginPath();
-      ctx.roundRect(-5.5, -3.2, 11, 6.4, 2.5);
-      ctx.roundRect(-2.8, -1.4, 5.6, 2.8, 1.2);
+      // Face-on hollow pixel link:
+      // Outer black border
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(-6, -4, 12, 8);
+      // Steel body
       ctx.fillStyle = '#4A5260';
-      ctx.fill('evenodd');
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.2;
-      ctx.stroke();
-    } else {
-      // Side-on connecting metallic link
-      ctx.beginPath();
-      ctx.roundRect(-2, -4.5, 4, 9, 1.2);
-      ctx.fillStyle = '#2A2F38';
-      ctx.fill();
-      ctx.strokeStyle = '#000000';
-      ctx.lineWidth = 1.1;
-      ctx.stroke();
-
-      // Metallic highlight
+      ctx.fillRect(-4, -2, 8, 4);
+      // Specular highlight pixel on upper edge
       ctx.fillStyle = '#8A95A5';
-      ctx.fillRect(-0.6, -3, 1.2, 6);
+      ctx.fillRect(-4, -2, 8, 2);
+      // Real hollow center pixel hole
+      ctx.fillStyle = '#111216';
+      ctx.fillRect(-2, 0, 4, 2);
+    } else {
+      // Side-on connecting metallic link:
+      // Outer black border
+      ctx.fillStyle = '#0E0F14';
+      ctx.fillRect(-3, -5, 6, 10);
+      // Inner steel body
+      ctx.fillStyle = '#2A2F38';
+      ctx.fillRect(-1, -4, 3, 8);
+      // Metallic glint pixel
+      ctx.fillStyle = '#9DA4AC';
+      ctx.fillRect(0, -3, 1.5, 6);
     }
 
     ctx.restore();
@@ -79,7 +147,7 @@ export function drawPhysicsChain(ctx, chainNodes) {
 }
 
 /**
- * Draws Toji's Inverted Spear of Heaven (Accurate to anime reference)
+ * Draws Toji's Inverted Spear of Heaven (Accurate to anime reference in Authentic Pixel Art Style).
  */
 export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null, handColor = '#242722', baseAngle = null) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
@@ -125,193 +193,158 @@ export function drawInvertedSpear(ctx, cx, cy, angle, r = 25, chainNodes = null,
     drawPhysicsChain(ctx, staticNodes);
   }
 
-  // 2. Solid Gold Ring (Butt of the handle at X=0)
-  ctx.beginPath();
-  ctx.arc(0, 0, 7, 0, Math.PI * 2);
+  // 2. Stepped Pixel-Art Solid Gold Ring Butt (X=0, Y=0)
+  // Outer black border
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-8, -8, 16, 16);
+  // Gold Ring Plate
   ctx.fillStyle = '#D4AF37';
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2;
-  ctx.stroke();
+  ctx.fillRect(-6, -6, 12, 12);
+  // Top-Left Gold Shine
+  ctx.fillStyle = '#FFF2A8';
+  ctx.fillRect(-6, -6, 6, 4);
+  // Bottom-Right Shadow
+  ctx.fillStyle = '#99751A';
+  ctx.fillRect(0, 2, 6, 4);
+  // Hollow inner center
+  ctx.fillStyle = '#111216';
+  ctx.fillRect(-3, -3, 6, 6);
 
-  // Inner hole of the ring
-  ctx.beginPath();
-  ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
-  ctx.fillStyle = '#111';
-  ctx.fill();
-
-  // 3. Brown Ribbed Handle (X=7 to X=34)
-  ctx.fillStyle = '#4A2311'; // Dark wood/leather brown
-  ctx.fillRect(7, -4.5, 27, 9);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(7, -4.5, 27, 9);
-
-  // Draw 3D Ribbed Rings on Handle
-  const ribCount = 7;
-  const ribWidth = 27 / ribCount;
-  for (let i = 0; i < ribCount; i++) {
-    const rx = 7 + i * ribWidth;
-    ctx.fillStyle = (i % 2 === 0) ? '#5C2D17' : '#3B1A0C';
-    ctx.beginPath();
-    ctx.roundRect(rx, -5, ribWidth - 0.5, 10, 1);
-    ctx.fill();
+  // 3. Stepped Pixel-Art Ribbed Handle (X=7 to X=34)
+  // Outer black border
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(6, -6, 29, 12);
+  // Base wood/leather brown body
+  ctx.fillStyle = '#4A2311';
+  ctx.fillRect(7, -4, 27, 8);
+  // 3D Ribbed texture segments
+  for (let rx = 8; rx < 34; rx += 4) {
+    ctx.fillStyle = '#5C2D17';
+    ctx.fillRect(rx, -4, 2, 8);
+    ctx.fillStyle = '#3B1A0C';
+    ctx.fillRect(rx + 2, -4, 2, 8);
+    // Highlight glint on top of ribs
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(rx, -4, 2, 2);
   }
 
-  // 3.5. Single hand gripping the dagger handle (Anime accurate 1-handed assassin grip)
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(22, 1, getHandSize(6.0), 0, Math.PI * 2);
-  ctx.fillStyle = handColor || '#E8BD9B';
-  ctx.fill();
-  ctx.strokeStyle = '#0E0E12';
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-  ctx.restore();
+  // 3.5. Single hand gripping the dagger handle (Pixel Art assassin grip)
+  drawTojiPixelWeaponGrip(ctx, 22, 1, getHandSize(6.0), handColor || '#E8BD9B');
 
-  // 4. Golden Collar / Habaki (X=34 to X=38)
+  // 4. Stepped Pixel-Art Golden Collar / Habaki (X=34 to X=38)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(33, -7, 6, 14);
   ctx.fillStyle = '#E5C158';
   ctx.fillRect(34, -6, 4, 12);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5;
-  ctx.strokeRect(34, -6, 4, 12);
+  ctx.fillStyle = '#FFF0A0';
+  ctx.fillRect(34, -6, 2, 6); // Top shine
+  ctx.fillStyle = '#99751A';
+  ctx.fillRect(34, 2, 4, 4);  // Bottom shadow
 
-  // 5. Dark Metal Tsuba / Guard (X=38 to X=44)
+  // 5. Stepped Pixel-Art Dark Metal Tsuba / Guard (X=38 to X=44)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(37, -14, 8, 28);
   ctx.fillStyle = '#303438';
-  ctx.beginPath();
-  ctx.roundRect(38, -13, 6, 26, 2);
-  ctx.fill();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // Highlight on Guard
+  ctx.fillRect(38, -13, 6, 26);
   ctx.fillStyle = '#525860';
-  ctx.fillRect(39, -12, 2, 24);
+  ctx.fillRect(39, -12, 2, 24); // Metallic highlight ridge
 
-  // 6. BLADE RENDERING (X=44 to X=118)
-  // Silver Metallic Gradient colors
-  const mainBladeColor = '#D8DDE2';
-  const shadowColor = '#9DA4AC';
-  const bevelHighlight = '#FFFFFF';
-  const outlineColor = '#000000';
+  // 6. PIXEL-ART BLADE RENDERING (X=44 to X=118)
+  const isohPoly = [
+    { x: 44, y: -7 },
+    { x: 48, y: -7 },
+    { x: 48, y: -9 },
+    { x: 54, y: -9 },
+    { x: 54, y: -7 },
+    { x: 104, y: -7 },
+    { x: 118, y: 1 },  // Tanto point
+    { x: 106, y: 7 },
+    { x: 80, y: 7 },
+    { x: 80, y: 2 },
+    { x: 58, y: 2 },
+    { x: 56, y: 4 },   // U-slot bottom
+    { x: 58, y: 6 },
+    { x: 74, y: 6 },
+    { x: 80, y: 14 },  // Hook prong tip
+    { x: 66, y: 16 },
+    { x: 52, y: 11 },
+    { x: 48, y: 11 },
+    { x: 48, y: 8 },
+    { x: 44, y: 8 }
+  ];
 
-  ctx.fillStyle = mainBladeColor;
-  ctx.strokeStyle = outlineColor;
-  ctx.lineWidth = 1.8;
+  // Pass A: Outer Black Pixel Outline Shell
+  ctx.fillStyle = '#0E0F14';
+  for (let j = 0; j < isohPoly.length; j++) {
+    const p1 = isohPoly[j];
+    const p2 = isohPoly[(j + 1) % isohPoly.length];
+    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const steps = Math.max(2, Math.round(len / P));
+    for (let st = 0; st <= steps; st++) {
+      const rx = p1.x + (p2.x - p1.x) * (st / steps);
+      const ry = p1.y + (p2.y - p1.y) * (st / steps);
+      ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
+    }
+  }
 
-  // Outer path: Straight spine on top (-Y), U-Slot and Short Blade Prong on bottom (+Y)
+  // Pass B: Base Silver Stepped Blade Body
+  ctx.fillStyle = '#D8DDE2';
   ctx.beginPath();
-  ctx.moveTo(44, -7); // Top guard join
-
-  // Stepped shoulder top (-Y)
-  ctx.lineTo(48, -7);
-  ctx.lineTo(48, -9);
-  ctx.lineTo(54, -9);
-  ctx.lineTo(54, -7);
-
-  // Straight Top Spine extending to the tip
-  ctx.lineTo(104, -7);
-
-  // Tanto Front Tip
-  ctx.lineTo(118, 1);  // Sharp front point
-  ctx.lineTo(106, 7);  // Bottom bevel cut
-
-  // Main Blade bottom cutting edge (+Y)
-  ctx.lineTo(80, 7);
-
-  // Entrance to U-Slot (going backwards toward hilt)
-  ctx.lineTo(80, 2);   // Step into slot channel
-  ctx.lineTo(58, 2);   // Slot upper wall
-  ctx.arc(58, 4, 2, -Math.PI / 2, Math.PI / 2, true); // Rounded U-bottom
-  ctx.lineTo(74, 6);   // Slot lower wall (inner edge of short prong)
-
-  // Short Blade / Hook Prong tip (pointing forward)
-  ctx.lineTo(80, 14);  // Sharp tip of short blade
-
-  // Short Blade outer edge (going back to guard)
-  ctx.lineTo(66, 16);  // Outer slanted edge of short blade
-  ctx.lineTo(52, 11);  // Base of short blade
-
-  // Stepped shoulder bottom (+Y)
-  ctx.lineTo(48, 11);
-  ctx.lineTo(48, 8);
-  ctx.lineTo(44, 8);
+  isohPoly.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+    else ctx.lineTo(snap(pt.x), snap(pt.y));
+  });
   ctx.closePath();
-
   ctx.fill();
-  ctx.stroke();
 
-  // 7. Dark Metal Inscription / Talisman Markings on Base (X=45 to X=54)
-  ctx.fillStyle = '#22262A';
-  ctx.fillRect(46, -4, 7, 8);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(46, -4, 7, 8);
-
-  // Tiny rune details
-  ctx.fillStyle = '#888';
-  ctx.fillRect(47, -2, 2, 4);
-  ctx.fillRect(50, -2, 2, 4);
-
-  // 8. Blade Bevel Lines & Shading
-  // Central ridge line along main blade
+  // Pass C: Stepped Blade Bevel & 3D Shading
+  ctx.fillStyle = '#9DA4AC';
   ctx.beginPath();
-  ctx.moveTo(58, 0);
-  ctx.lineTo(116, 0);
-  ctx.strokeStyle = shadowColor;
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Highlight along straight top spine (inset slightly by 0.8px so it sits inside the black outline)
-  ctx.beginPath();
-  ctx.moveTo(54, -6.2);
-  ctx.lineTo(103, -6.2);
-  ctx.lineTo(116.5, 1);
-  ctx.strokeStyle = bevelHighlight;
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // Highlight on short blade prong (inset slightly so it sits inside the black outline)
-  ctx.beginPath();
-  ctx.moveTo(53, 10.2);
-  ctx.lineTo(66, 15);
-  ctx.lineTo(79, 13.2);
-  ctx.strokeStyle = bevelHighlight;
-  ctx.lineWidth = 1.0;
-  ctx.stroke();
-
-  // 9. FINAL OUTER BLACK STROKE (Guaranteed on top of all fills & highlights)
-  ctx.beginPath();
-  ctx.moveTo(44, -7);
-  ctx.lineTo(48, -7);
-  ctx.lineTo(48, -9);
-  ctx.lineTo(54, -9);
-  ctx.lineTo(54, -7);
-  ctx.lineTo(104, -7);
-  ctx.lineTo(118, 1);
-  ctx.lineTo(106, 7);
-  ctx.lineTo(80, 7);
-  ctx.lineTo(80, 2);
-  ctx.lineTo(58, 2);
-  ctx.arc(58, 4, 2, -Math.PI / 2, Math.PI / 2, true);
-  ctx.lineTo(74, 6);
-  ctx.lineTo(80, 14);
-  ctx.lineTo(66, 16);
-  ctx.lineTo(52, 11);
-  ctx.lineTo(48, 11);
-  ctx.lineTo(48, 8);
-  ctx.lineTo(44, 8);
+  ctx.moveTo(snap(58), snap(0));
+  ctx.lineTo(snap(118), snap(1));
+  ctx.lineTo(snap(106), snap(7));
+  ctx.lineTo(snap(80), snap(7));
+  ctx.lineTo(snap(80), snap(2));
+  ctx.lineTo(snap(58), snap(2));
   ctx.closePath();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.0;
+  ctx.fill();
+
+  // Pass D: Dark Talisman Runic Inscription Block (X=46 to X=53)
+  ctx.fillStyle = '#22262A';
+  ctx.fillRect(snap(46), snap(-4), 8, 8);
+  ctx.fillStyle = '#8A95A5';
+  ctx.fillRect(snap(47), snap(-3), 2, 6);
+  ctx.fillRect(snap(50), snap(-2), 2, 4);
+
+  // Pass E: Razor Specular Highlight Pixels along Top Spine & Prong Tip
+  ctx.fillStyle = '#FFFFFF';
+  for (let hx = 54; hx <= 104; hx += 2) {
+    ctx.fillRect(snap(hx), snap(-7), 2, 2);
+  }
+  ctx.fillRect(snap(116), snap(0), 2, 2);
+  ctx.fillRect(snap(118), snap(1), 2, 2);
+  // Prong tip specular
+  for (let px = 66; px <= 80; px += 2) {
+    const py = 16 - (px - 66) * (2 / 14);
+    ctx.fillRect(snap(px), snap(py), 2, 2);
+  }
+
+  // Pass F: Final Crisp Black Perimeter Stroke
+  ctx.beginPath();
+  isohPoly.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+    else ctx.lineTo(snap(pt.x), snap(pt.y));
+  });
+  ctx.closePath();
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 1.6;
   ctx.stroke();
 
   ctx.restore();
 }
 
 /**
- * Draws Toji's Split Soul Katana (Accurate slender curved Katana reference)
+ * Draws Toji's Split Soul Katana (Accurate slender curved Katana reference in Authentic Pixel Art Style).
  */
 export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#242722', baseAngle = null) {
   if (typeof state !== 'undefined' && state.showSkinOnly) return;
@@ -331,51 +364,42 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
   const scale = 0.95; // Increased scale for grand imposing Katana proportions!
   ctx.scale(scale, scale);
 
-  // 1. Red & Silver Pommel Cap (X=0 to X=6)
-  ctx.fillStyle = '#8E1B1B'; // Deep Red
+  // 1. Stepped Pixel-Art Kashira Pommel Cap (X=0 to X=6)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(-1, -4, 8, 8);
+  ctx.fillStyle = '#8E1B1B'; // Deep Crimson
   ctx.fillRect(0, -3, 6, 6);
   ctx.fillStyle = '#CCCCCC'; // Silver End Band
   ctx.fillRect(0, -3, 2, 6);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(0, -3, 6, 6);
+  ctx.fillStyle = '#FFFFFF'; // Highlight pixel
+  ctx.fillRect(0, -3, 2, 2);
 
-  // 2. Slim Dark Wrapped Handle (X=6 to X=40)
-  ctx.fillStyle = '#32342E';
-  ctx.fillRect(6, -2.5, 34, 5);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(6, -2.5, 34, 5);
+  // 2. Stepped Pixel-Art Tsukamaki Wrapped Handle (X=6 to X=40)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(5, -4, 36, 8);
+  ctx.fillStyle = '#32342E'; // Charcoal leather wrap base
+  ctx.fillRect(6, -3, 34, 6);
 
-  // Wrap Texture
-  ctx.strokeStyle = '#111210';
-  ctx.lineWidth = 1.8;
-  for (let i = 9; i < 39; i += 3.5) {
-    ctx.beginPath();
-    ctx.moveTo(i, -2.5);
-    ctx.lineTo(i + 2, 2.5);
-    ctx.stroke();
+  // Diamond wrap hatching pattern
+  for (let wx = 8; wx < 38; wx += 4) {
+    ctx.fillStyle = '#111210';
+    ctx.fillRect(wx, -3, 2, 6);
+    ctx.fillStyle = '#4A4E44'; // Wrap glint
+    ctx.fillRect(wx + 1, -2, 1, 2);
   }
 
-  // Hand gripping Katana handle
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(24, 0, getHandSize(5.8), 0, Math.PI * 2);
-  ctx.fillStyle = handColor || '#E8BD9B';
-  ctx.fill();
-  ctx.strokeStyle = '#0E0E12';
-  ctx.lineWidth = 1.6;
-  ctx.stroke();
-  ctx.restore();
+  // Hand gripping Katana handle (Pixel Art)
+  drawTojiPixelWeaponGrip(ctx, 24, 0, getHandSize(5.8), handColor || '#E8BD9B');
 
   // Dark Metal Habaki / Collar (X=40 to X=44)
+  ctx.fillStyle = '#0E0F14';
+  ctx.fillRect(39, -9, 6, 18);
   ctx.fillStyle = '#4D5159';
   ctx.fillRect(40, -8, 4, 16);
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.5;
-  ctx.strokeRect(40, -8, 4, 16);
+  ctx.fillStyle = '#757B85'; // Metallic collar highlight
+  ctx.fillRect(40, -8, 2, 16);
 
-  // 3. BROAD CURVED BLADE WITH SMOOTH CRESCENT TIP (X=44 to X=164)
+  // 3. BROAD CURVED BLADE WITH SMOOTH CRESCENT TIP (Pixel Art Stepped Mesh)
   const darkSpineColor = '#2A2D34';
   const silverEdgeColor = '#E2E6EC';
   const highlightColor = '#FFFFFF';
@@ -385,7 +409,6 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
   const bWidth = 16;
   const curveY = -35;
 
-  // Key control points for Crescent Blade geometry (Smooth C1 tangent matching)
   const spineStartX = bStart;
   const spineStartY = -bWidth / 2;
   const tipX = bStart + bLen;
@@ -400,59 +423,91 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
   const tipCtrlX = 153.2;
   const tipCtrlY = -21.2;
 
-  // Base Blade Fill (Dark Charcoal)
-  ctx.beginPath();
-  ctx.moveTo(spineStartX, spineStartY);
-  ctx.quadraticCurveTo(bStart + bLen * 0.5, spineStartY, tipX, tipY);
-  ctx.quadraticCurveTo(tipCtrlX, tipCtrlY, bodyEndX, bodyEndY);
-  ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, bodyStartY, bodyStartX, bodyStartY);
-  ctx.closePath();
+  // Generate sampled stepped boundary poly for Katana blade
+  const bladePoly = [];
+  const N = 24;
+
+  // A. Spine curve: (spineStartX, spineStartY) -> (tipX, tipY)
+  const spineMidX = bStart + bLen * 0.5;
+  const spineMidY = spineStartY;
+  for (let i = 0; i <= N; i++) {
+    bladePoly.push(quadBezierPt({ x: spineStartX, y: spineStartY }, { x: spineMidX, y: spineMidY }, { x: tipX, y: tipY }, i / N));
+  }
+
+  // B. Tip crescent return: (tipX, tipY) -> (bodyEndX, bodyEndY)
+  for (let i = 1; i <= N / 2; i++) {
+    bladePoly.push(quadBezierPt({ x: tipX, y: tipY }, { x: tipCtrlX, y: tipCtrlY }, { x: bodyEndX, y: bodyEndY }, i / (N / 2)));
+  }
+
+  // C. Lower cutting edge return: (bodyEndX, bodyEndY) -> (bodyStartX, bodyStartY)
+  const bodyMidX = bStart + (bodyEndX - bStart) * 0.5;
+  const bodyMidY = bodyStartY;
+  for (let i = 1; i <= N; i++) {
+    bladePoly.push(quadBezierPt({ x: bodyEndX, y: bodyEndY }, { x: bodyMidX, y: bodyMidY }, { x: bodyStartX, y: bodyStartY }, i / N));
+  }
+
+  // Pass 1: Outer Dark Pixel Outline Shell
+  ctx.fillStyle = '#0E0F14';
+  for (let j = 0; j < bladePoly.length; j++) {
+    const p1 = bladePoly[j];
+    const p2 = bladePoly[(j + 1) % bladePoly.length];
+    const len = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+    const steps = Math.max(2, Math.round(len / P));
+    for (let st = 0; st <= steps; st++) {
+      const rx = p1.x + (p2.x - p1.x) * (st / steps);
+      const ry = p1.y + (p2.y - p1.y) * (st / steps);
+      ctx.fillRect(snap(rx) - P * 0.5, snap(ry) - P * 0.5, P * 2, P * 2);
+    }
+  }
+
+  // Pass 2: Base Blade Fill (Dark Charcoal)
   ctx.fillStyle = darkSpineColor;
+  ctx.beginPath();
+  bladePoly.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+    else ctx.lineTo(snap(pt.x), snap(pt.y));
+  });
+  ctx.closePath();
   ctx.fill();
 
-  // Draw Silver Cutting Edge & Crescent Tip (Silver Hamon)
+  // Pass 3: Silver Hamon Cutting Edge & Crescent Tip
   const silverWidth = 5.5;
   const hamonStartX = bStart;
   const hamonStartY = bWidth / 2 - silverWidth;
   const hamonBodyEndX = bodyEndX;
   const hamonBodyEndY = bodyEndY - silverWidth * 0.6;
 
-  ctx.beginPath();
-  ctx.moveTo(hamonStartX, hamonStartY);
-  ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, hamonStartY, hamonBodyEndX, hamonBodyEndY);
-  ctx.quadraticCurveTo(tipCtrlX, tipCtrlY - 3, tipX, tipY);
-  ctx.quadraticCurveTo(tipCtrlX, tipCtrlY, bodyEndX, bodyEndY);
-  ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, bodyStartY, bodyStartX, bodyStartY);
-  ctx.closePath();
   ctx.fillStyle = silverEdgeColor;
+  ctx.beginPath();
+  ctx.moveTo(snap(hamonStartX), snap(hamonStartY));
+  ctx.quadraticCurveTo(snap(bStart + (bodyEndX - bStart) * 0.5), snap(hamonStartY), snap(hamonBodyEndX), snap(hamonBodyEndY));
+  ctx.quadraticCurveTo(snap(tipCtrlX), snap(tipCtrlY - 3), snap(tipX), snap(tipY));
+  ctx.quadraticCurveTo(snap(tipCtrlX), snap(tipCtrlY), snap(bodyEndX), snap(bodyEndY));
+  ctx.quadraticCurveTo(snap(bStart + (bodyEndX - bStart) * 0.5), snap(bodyStartY), snap(bodyStartX), snap(bodyStartY));
+  ctx.closePath();
   ctx.fill();
 
-  // Add a bright white shine line following the crescent sweep
+  // Pass 4: Specular White Razor Edge Shine Line
   ctx.beginPath();
-  ctx.moveTo(bStart, bWidth / 4);
-  ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, bWidth / 4, bodyEndX, bodyEndY - 1);
-  ctx.quadraticCurveTo(tipCtrlX, tipCtrlY - 1.5, tipX - 2, tipY + 1.5);
+  ctx.moveTo(snap(bStart), snap(bWidth / 4));
+  ctx.quadraticCurveTo(snap(bStart + (bodyEndX - bStart) * 0.5), snap(bWidth / 4), snap(bodyEndX), snap(bodyEndY - 1));
+  ctx.quadraticCurveTo(snap(tipCtrlX), snap(tipCtrlY - 1.5), snap(tipX - 2), snap(tipY + 1.5));
   ctx.strokeStyle = highlightColor;
-  ctx.lineWidth = 1.5;
+  ctx.lineWidth = 1.6;
   ctx.stroke();
 
-  // 4. FINAL BOLD BLACK OUTER BLADE OUTLINE STROKE
+  // Pass 5: Final Crisp Black Outline
   ctx.beginPath();
-  ctx.moveTo(spineStartX, spineStartY);
-  ctx.quadraticCurveTo(bStart + bLen * 0.5, spineStartY, tipX, tipY);
-  ctx.quadraticCurveTo(tipCtrlX, tipCtrlY, bodyEndX, bodyEndY);
-  ctx.quadraticCurveTo(bStart + (bodyEndX - bStart) * 0.5, bodyStartY, bodyStartX, bodyStartY);
+  bladePoly.forEach((pt, idx) => {
+    if (idx === 0) ctx.moveTo(snap(pt.x), snap(pt.y));
+    else ctx.lineTo(snap(pt.x), snap(pt.y));
+  });
   ctx.closePath();
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 3.2; // Bold crisp anime outline!
+  ctx.strokeStyle = '#0E0F14';
+  ctx.lineWidth = 2.0;
   ctx.stroke();
 
-  // 5. FLOWING WHITE FUR COLLAR (With crisp black outlines)
-  ctx.fillStyle = '#F8F9FB';
-  ctx.strokeStyle = '#000000'; // Black stroke for fur edges!
-  ctx.lineWidth = 1.8;
-
-  // Streamlined fur locks hugging the broader blade base
+  // 4. FLOWING WHITE FUR COLLAR / TASSEL (Authentic Pixel-Art Fur Locks)
   const furLocks = [
     // Top locks
     [{ x: 36, y: -6 }, { x: 48, y: -16 }, { x: 58, y: -13 }, { x: 44, y: -5 }],
@@ -468,12 +523,28 @@ export function drawSplitSoulKatana(ctx, cx, cy, angle, r = 25, handColor = '#24
   ];
 
   furLocks.forEach(pts => {
+    // Stepped pixel outline
+    ctx.fillStyle = '#0E0F14';
     ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    ctx.quadraticCurveTo(pts[1].x, pts[1].y, pts[2].x, pts[2].y);
-    ctx.quadraticCurveTo(pts[3].x, pts[3].y, pts[0].x, pts[0].y);
-    ctx.fill();
+    ctx.moveTo(snap(pts[0].x), snap(pts[0].y));
+    ctx.quadraticCurveTo(snap(pts[1].x), snap(pts[1].y), snap(pts[2].x), snap(pts[2].y));
+    ctx.quadraticCurveTo(snap(pts[3].x), snap(pts[3].y), snap(pts[0].x), snap(pts[0].y));
+    ctx.strokeStyle = '#0E0F14';
+    ctx.lineWidth = 2.4;
     ctx.stroke();
+
+    // White fur body fill
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fill();
+
+    // 3D Fur depth shadow block on underside
+    ctx.fillStyle = '#D4DAE4';
+    ctx.beginPath();
+    ctx.moveTo(snap(pts[0].x), snap(pts[0].y));
+    ctx.lineTo(snap(pts[3].x), snap(pts[3].y));
+    ctx.lineTo(snap(pts[2].x), snap(pts[2].y));
+    ctx.closePath();
+    ctx.fill();
   });
 
   ctx.restore();
@@ -531,3 +602,4 @@ export function drawRestedInvertedSpearAtHip(ctx, cx, cy, angle, r = 25, chainNo
 
   ctx.restore();
 }
+

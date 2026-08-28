@@ -24,13 +24,9 @@ export class MeleeFighter extends Fighter {
   }
 
 
-  /** Gold outline for yellow fighter. */
+  /** Gold outline (removed per global stroke removal standard). */
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#ffd700';
-    ctx.stroke();
+    // Global fighter body outline stroke removed
   }
 
   /** Draw outer spikes rotating around the body instead of a barrel. */

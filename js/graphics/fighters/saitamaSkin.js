@@ -516,18 +516,7 @@ function drawSaitamaPixelBody(ctx, r, isGhost = false) {
   const snap = (v) => Math.round(v / P) * P;
   const steps = Math.ceil((r + P) / P);
 
-  // 1. Dark Manga Ink Outline Shell (#111114)
-  ctx.fillStyle = isGhost ? '#111114' : '#0E0F14';
-  for (let gy = -steps; gy <= steps; gy++) {
-    for (let gx = -steps; gx <= steps; gx++) {
-      const dist = Math.hypot(gx * P, gy * P);
-      if (dist <= r + P * 0.85) {
-        ctx.fillRect(snap(gx * P), snap(gy * P), P, P);
-      }
-    }
-  }
-
-  // 2. Stepped Pixel Fill by Zone
+  // Stepped Pixel Fill by Zone
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const rx = gx * P;
@@ -537,6 +526,13 @@ function drawSaitamaPixelBody(ctx, r, isGhost = false) {
 
       const px = snap(rx);
       const py = snap(ry);
+
+      // Pixelated Black Stroke Border
+      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
 
       // Zone A: Top Bald Head Skin Section (ry < -r * 0.35)
       if (ry < -r * 0.35) {

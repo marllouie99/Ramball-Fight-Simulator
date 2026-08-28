@@ -220,13 +220,6 @@ export function drawTodoSkin(ctx, fighter) {
 
   ctx.restore(); // restore clipping region
 
-  // Outer Body Circle Outline
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
-
   // 2. Pure Black Slicked-Back Hair Cap, Hairline & Topknot Man-Bun (#0A0A0A)
   ctx.fillStyle = '#0A0A0A'; // Pure Black Hair
   

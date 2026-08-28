@@ -497,6 +497,14 @@ export class UryuFighter extends Fighter {
     spawnSparks(startX, startY, '#00E5FF', 3);
   }
 
+  drawBody(ctx) {
+    drawUryuSkin(ctx, this);
+  }
+
+  drawSkin(ctx) {
+    drawUryuSkin(ctx, this);
+  }
+
   draw(ctx, opponent) {
     drawUryuSkin(ctx, this);
   }

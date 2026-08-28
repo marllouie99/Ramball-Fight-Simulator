@@ -426,3 +426,148 @@ export function drawMahoragaChestNecklace(ctx, fighter) {
 
   ctx.restore();
 }
+
+/**
+ * Draws Mahoraga's entire circular body in authentic Pixel Art Style.
+ * Uses discrete stepped pixel grid rasterization matching Saitama, Ichigo, Yuji, Nanami, Gojo, and Mahito.
+ * Features:
+ * - Stepped 1-pixel outer black stroke (#0E0F14)
+ * - Ivory / Bone-White Divine Flesh (#F4F4EC, #EBEBE0)
+ * - Shaded Demonic Brow & Eye-Socket Sockets (where feathered wings emerge)
+ * - Muscular Pectoral & Abdominal Grooves
+ * - Shinto Ritual Chest Markings & Divine Forehead Gem
+ */
+export function drawMahoragaPixelBody(ctx, r, fighter = null) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // ──────────────────────────────────────────
+      // 0. PIXELATED BLACK STROKE BORDER
+      // ──────────────────────────────────────────
+      if (
+        Math.hypot(rx + P, ry) > r ||
+        Math.hypot(rx - P, ry) > r ||
+        Math.hypot(rx, ry + P) > r ||
+        Math.hypot(rx, ry - P) > r
+      ) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // ──────────────────────────────────────────
+      // ZONE 1: HEAD & DEMONIC FACE (-r <= ry < -r * 0.15)
+      // ──────────────────────────────────────────
+      if (ry < -r * 0.15) {
+        // Eye-Socket Wing Sockets
+        const isWingSocketLeft = (rx >= -r * 0.45 && rx <= -r * 0.12 && Math.abs(ry - (-r * 0.46)) <= P * 1.5);
+        const isWingSocketRight = (rx >= r * 0.12 && rx <= r * 0.45 && Math.abs(ry - (-r * 0.46)) <= P * 1.5);
+        const isWingSocketLeftLower = (rx >= -r * 0.40 && rx <= -r * 0.10 && Math.abs(ry - (-r * 0.32)) <= P * 1.2);
+        const isWingSocketRightLower = (rx >= r * 0.10 && rx <= r * 0.40 && Math.abs(ry - (-r * 0.32)) <= P * 1.2);
+
+        // Demonic Brow Ridge
+        const isBrowRidge = (Math.abs(ry - (-r * 0.58)) <= P * 0.8 && Math.abs(rx) <= r * 0.55);
+
+        // Central Forehead Third Eye / Divine Crest Gem
+        const isForeheadGem = (Math.abs(rx) <= P * 1.0 && ry >= -r * 0.78 && ry <= -r * 0.64);
+        const isForeheadGemCore = (Math.abs(rx) <= P * 0.5 && ry >= -r * 0.74 && ry <= -r * 0.68);
+
+        if (isForeheadGemCore) {
+          ctx.fillStyle = '#FFAE33';
+        } else if (isForeheadGem) {
+          ctx.fillStyle = '#C2780A';
+        } else if (isWingSocketLeft || isWingSocketRight || isWingSocketLeftLower || isWingSocketRightLower) {
+          ctx.fillStyle = '#18181A';
+        } else if (isBrowRidge) {
+          ctx.fillStyle = '#C8C8BE';
+        } else {
+          let col = '#F4F4EC';
+          if (ry < -r * 0.72) {
+            col = '#FFFFFF';
+          } else if (Math.abs(rx) > r * 0.70 || ry > -r * 0.25) {
+            col = '#D4D4C8';
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: CHEST & PECTORALS (-r * 0.15 <= ry < r * 0.45)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.45) {
+        const isSternum = (Math.abs(rx) <= P * 0.6 && ry >= -r * 0.15 && ry <= r * 0.45);
+        const isPecLeft = (rx >= -r * 0.65 && rx <= -P * 1.5 && Math.abs(ry - r * 0.22) <= P * 0.8);
+        const isPecRight = (rx >= P * 1.5 && rx <= r * 0.65 && Math.abs(ry - r * 0.22) <= P * 0.8);
+        const isPecHighlight = (ry >= -r * 0.05 && ry <= r * 0.15 && Math.abs(rx) >= r * 0.12 && Math.abs(rx) <= r * 0.50);
+
+        if (isSternum || isPecLeft || isPecRight) {
+          ctx.fillStyle = '#B4B4A8';
+        } else if (isPecHighlight) {
+          ctx.fillStyle = '#FFFFFF';
+        } else {
+          let col = '#EBEBE0';
+          if (Math.abs(rx) > r * 0.72 || ry > r * 0.35) {
+            col = '#D0D0C4';
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 3: ABDOMINALS & LOWER TORSO (ry >= r * 0.45)
+      // ──────────────────────────────────────────
+      else {
+        const isLineaAlba = (Math.abs(rx) <= P * 0.6);
+        const isAbSeam1 = (Math.abs(ry - r * 0.62) <= P * 0.7 && Math.abs(rx) <= r * 0.50);
+        const isAbSeam2 = (Math.abs(ry - r * 0.80) <= P * 0.7 && Math.abs(rx) <= r * 0.40);
+        const isAbPack1 = (ry >= r * 0.48 && ry <= r * 0.58 && Math.abs(rx) >= r * 0.08 && Math.abs(rx) <= r * 0.40);
+        const isAbPack2 = (ry >= r * 0.66 && ry <= r * 0.76 && Math.abs(rx) >= r * 0.08 && Math.abs(rx) <= r * 0.32);
+
+        if (isLineaAlba || isAbSeam1 || isAbSeam2) {
+          ctx.fillStyle = '#A4A498';
+        } else if (isAbPack1 || isAbPack2) {
+          ctx.fillStyle = '#F8F8F2';
+        } else {
+          let col = '#DFDFD4';
+          if (Math.abs(rx) > r * 0.65 || ry > r * 0.85) {
+            col = '#BEBEB2';
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Top-level skin drawer for Mahoraga.
+ */
+export function drawMahoragaSkin(ctx, fighter) {
+  if (!fighter) return;
+  const r = fighter.r || 30;
+  ctx.save();
+  ctx.translate(fighter.x, fighter.y - (fighter.z || 0));
+  const angle = fighter.angle || 0;
+  ctx.rotate(angle);
+  if (Math.abs(angle) > Math.PI / 2) ctx.scale(1, -1);
+
+  drawMahoragaPixelBody(ctx, r, fighter);
+
+  ctx.restore();
+}

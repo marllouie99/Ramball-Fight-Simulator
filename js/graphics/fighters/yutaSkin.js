@@ -407,13 +407,6 @@ export function drawYutaSkin(ctx, fighter) {
 
   ctx.restore(); // Undo Body Circle Clip
 
-  // ── 6. OUTER BODY BORDER OUTLINE ──
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 3.2;
-  ctx.stroke();
-
   // ── 7. STATUS OVERLAYS (Freeze, Paralyze, Stun, RCT) ──
   FighterRenderer.drawStatusOverlays(ctx, fighter);
 

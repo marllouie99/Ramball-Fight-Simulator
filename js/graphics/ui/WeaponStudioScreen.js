@@ -218,55 +218,14 @@ export function drawWeaponStudioScreen() {
   // Viewport Container Panel
   drawPanel(viewportX, viewportY, viewportW, viewportH, 0.94, 8);
 
-  // Background Grid Blueprint inside Viewport
+  // Background inside Viewport (Plain White Review Canvas)
   ctx.save();
   ctx.beginPath();
   drawChamferedRect(ctx, viewportX + 1, viewportY + 1, viewportW - 2, viewportH - 2, 7);
   ctx.clip();
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-  ctx.lineWidth = 1;
-  const gridSize = 28;
-  for (let gx = viewportX; gx < viewportX + viewportW; gx += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(gx, viewportY);
-    ctx.lineTo(gx, viewportY + viewportH);
-    ctx.stroke();
-  }
-  for (let gy = viewportY; gy < viewportY + viewportH; gy += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(viewportX, gy);
-    ctx.lineTo(viewportX + viewportW, gy);
-    ctx.stroke();
-  }
-
-  // Viewport Concentric Calibration Rings & Crosshairs
-  ctx.strokeStyle = 'rgba(245, 158, 11, 0.12)';
-  ctx.beginPath();
-  ctx.arc(heroX, heroY, 60, 0, Math.PI * 2);
-  ctx.arc(heroX, heroY, 130, 0, Math.PI * 2);
-  ctx.arc(heroX, heroY, 190, 0, Math.PI * 2);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(heroX - 220, heroY);
-  ctx.lineTo(heroX + 220, heroY);
-  ctx.moveTo(heroX, heroY - 180);
-  ctx.lineTo(heroX, heroY + 180);
-  ctx.stroke();
-
-  // Signature Radial Glow
-  const glow = ctx.createRadialGradient(heroX, heroY, 0, heroX, heroY, 220);
-  let r = 0, g = 150, b = 255;
-  if (themeColor.startsWith('#') && themeColor.length === 7) {
-    r = parseInt(themeColor.slice(1, 3), 16);
-    g = parseInt(themeColor.slice(3, 5), 16);
-    b = parseInt(themeColor.slice(5, 7), 16);
-  }
-  glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.22)`);
-  glow.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.04)`);
-  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = glow;
+  // Plain White Background Fill
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(viewportX, viewportY, viewportW, viewportH);
 
   // Render Hero Weapon Preview

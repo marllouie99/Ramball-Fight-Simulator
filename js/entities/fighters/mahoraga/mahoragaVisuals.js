@@ -5,9 +5,9 @@
 // ─────────────────────────────────────────────
 import { CONFIG } from '../../../core/config.js';
 import { drawMahoraga3DWheel, drawMahoragaSword, drawMahoragaLeftPunch } from '../../../graphics/weapons/mahoragaWeaponGraphics.js';
-import { drawMahoragaFaceWings, drawMahoragaChestNecklace } from '../../../graphics/fighters/mahoragaSkin.js';
+import { drawMahoragaFaceWings, drawMahoragaChestNecklace, drawMahoragaSkin, drawMahoragaPixelBody } from '../../../graphics/fighters/mahoragaSkin.js';
 import { fastCleanArray } from '../../../graphics/particles/visualTrailSystem.js';
-import { isChampionScreenActive } from '../../../core/state.js';
+import { isChampionScreenActive, state } from '../../../core/state.js';
 
 /**
  * Draw Sakuga Anime Impact Frame (anime speed lines + multi-strike phantom flurry + ink-brush burst)
@@ -411,8 +411,11 @@ export function drawMahoragaFighter(ctx, fighter, opponent) {
 
   ctx.save();
 
-  // 1. Draw base fighter body & wrist blade
-  fighter._superDraw(ctx, opponent);
+  // 1. Draw base fighter pixel art body & wrist blade
+  drawMahoragaSkin(ctx, fighter);
+  if (!fighter.isTargetOfAmbush && !(typeof state !== 'undefined' && state.showSkinOnly)) {
+    fighter.drawGun(ctx);
+  }
 
   // 2. Draw Eye-Socket Face Wings ON TOP OF BODY
   drawMahoragaFaceWings(ctx, fighter);

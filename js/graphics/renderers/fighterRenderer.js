@@ -42,7 +42,7 @@ function _getSketchyCirclePaths(r, seed) {
 }
 
 // Helper to draw wobbly sketched pencil circles (cached path replay)
-export function drawSketchyCircle(ctx, cx, cy, r, seed, color = 'rgba(15,15,18,0.85)', width = 2.5) {
+export function drawSketchyCircle(ctx, cx, cy, r, seed, color = '#000000', width = 2.5) {
   const paths = _getSketchyCirclePaths(r, seed);
   ctx.save();
   ctx.strokeStyle = color;
@@ -64,10 +64,10 @@ export function drawSketchyCircle(ctx, cx, cy, r, seed, color = 'rgba(15,15,18,0
 
 /**
  * Draws a standardized, authentic retro pixel art hand/fist for fighters and weapons.
- * Features a stepped dark ink outline shell (#0E0F14), character color fill,
+ * Features a stepped dark ink outline shell (#000000), character color fill,
  * deep edge/heel shadow, and subtle specular highlight glint pixel.
  */
-export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0BD', outlineColor = '#0E0F14') {
+export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0BD', outlineColor = '#000000') {
   if (radius <= 0) return;
   const P = 2.0; // 2.0px pixel art grid
   const snap = (v) => Math.round(v / P) * P;
@@ -75,7 +75,7 @@ export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0B
 
   ctx.save();
   // 1. Stepped Dark Outer Ink Shell
-  ctx.fillStyle = outlineColor || '#0E0F14';
+  ctx.fillStyle = outlineColor || '#000000';
   for (let gy = -steps; gy <= steps; gy++) {
     for (let gx = -steps; gx <= steps; gx++) {
       const d = Math.hypot(gx * P, gy * P);
@@ -122,6 +122,11 @@ export function drawPixelHand(ctx, cx = 0, cy = 0, radius = 6.0, color = '#FFE0B
 
 export class FighterRenderer {
   static drawBody(ctx, fighter) {
+    if (typeof fighter.drawSkin === 'function') {
+      fighter.drawSkin(ctx);
+      return;
+    }
+
     ctx.save();
     let tremorX = 0;
     let tremorY = 0;
@@ -179,14 +184,7 @@ export class FighterRenderer {
   }
 
   static drawOutline(ctx, fighter) {
-    let seed = 0;
-    const idStr = String(fighter.id || 'fighter');
-    for (let i = 0; i < idStr.length; i++) {
-      seed += idStr.charCodeAt(i);
-    }
-    
-    // Draw sketchy circle instead of solid line
-    drawSketchyCircle(ctx, fighter.x, fighter.y, fighter.r, seed, 'rgba(10, 10, 15, 0.9)', 3);
+    // Global fighter body outline stroke removed
   }
 
   static drawGun(ctx, fighter) {

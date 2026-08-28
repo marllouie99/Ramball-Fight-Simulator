@@ -280,7 +280,7 @@ export class IchigoFighter extends Fighter {
   }
 
   activateHollowMask() {
-    if (this.hollowMaskUsed || this.isDead || this.hp <= 0 || this.isParalyzedOrBeamTrapped()) return;
+    if (this.hollowMaskUsed || this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped()) return;
     // Do not interrupt Bankai Transformation or Bankai Grand Finisher (Final Massive Kuroi Getsuga)
     if (this.isChannelingBankai || this.bankaiBurstTimer > 0) return;
     if (this.isFinalMassiveGetsuga || (this.isChannelingGetsuga && this.isFinalMassiveGetsuga) || this._isFinalGetsugaVoicelinePlaying()) return;
@@ -496,7 +496,7 @@ export class IchigoFighter extends Fighter {
   }
 
   activateBankai() {
-    if (this.isDead || this.hp <= 0 || this.isParalyzedOrBeamTrapped() || this.wallSlamPinnedX !== undefined || this.isWallSlammed) return;
+    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped() || this.wallSlamPinnedX !== undefined || this.isWallSlammed) return;
     if (
       this.isChannelingBankai || 
       this.bankaiActive || 
@@ -803,7 +803,7 @@ export class IchigoFighter extends Fighter {
   }
 
   fireFinalMassiveGetsuga(target = null) {
-    if (this.isDead || this.hp <= 0 || this.isParalyzedOrBeamTrapped()) return;
+    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped()) return;
     if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing) return;
 
     this.slashSwingTimer = 0;
@@ -856,7 +856,7 @@ export class IchigoFighter extends Fighter {
   }
 
   fireGetsuga(target = null, isCombo = false) {
-    if (this.isDead || this.hp <= 0 || this.isParalyzedOrBeamTrapped()) return;
+    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped()) return;
     if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isShunpoDashing || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this._isFinalGetsugaVoicelinePlaying()) return;
     if (this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer <= (CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160)) return;
 
@@ -1129,7 +1129,7 @@ export class IchigoFighter extends Fighter {
   }
 
   performShunpoGetsugaCombo(target) {
-    if (this.isDead || this.hp <= 0 || this.isParalyzedOrBeamTrapped() || this.wallSlamPinnedX !== undefined || this.isWallSlammed) return;
+    if (this.isDead || this.hp <= 0 || this.isTargetOfAmbush || this.isParalyzedOrBeamTrapped() || this.wallSlamPinnedX !== undefined || this.isWallSlammed) return;
     if (this.isChannelingBankai || this.bankaiBurstTimer > 0 || this.shikaiReversionBurstTimer > 0 || this.hollowMaskFormationTimer > 0 || this.hollowBurstTimer > 0 || this.isChannelingGetsuga || this.getsugaRecoveryTimer > 0 || this.isShunpoDashing || this.shunpoComboActive || this._isFinalGetsugaVoicelinePlaying()) return;
     if (this.bankaiActive && !this.bankaiFinalGetsugaTriggered && this.bankaiTimer <= (CONFIG.ichigo?.bankaiFinalGetsugaTriggerTimer || 160)) return;
     if (!target || target.hp <= 0) return;

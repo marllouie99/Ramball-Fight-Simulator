@@ -1880,7 +1880,7 @@ export class Fighter {
   }
 
   drawOutline(ctx) {
-    FighterRenderer.drawOutline(ctx, this);
+    // Global fighter body outline stroke removed
   }
 
   /** Draws standard grey weapon barrel. */

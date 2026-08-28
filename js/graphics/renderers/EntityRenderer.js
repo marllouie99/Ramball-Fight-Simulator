@@ -1389,14 +1389,6 @@ export function drawIllusions() {
       ctx.restore();
     }
 
-    // Draw illusion outline (optional if you still want an outline over the custom skin)
-    let seed = 0;
-    const idStr = String(illusion.id || 'illusion');
-    for (let i = 0; i < idStr.length; i++) {
-      seed += idStr.charCodeAt(i);
-    }
-    drawSketchyCircle(ctx, 0, 0, illusion.r, seed, '#111', 2.5);
-
     // Draw floating minion healthbar above head
     ctx.rotate(-illusion.angle);
     drawMinionHealthBar(ctx, 0, -illusion.r - 14, Math.max(32, illusion.r * 1.4), 6, illusion.hp, illusion.maxHp || 100, illusion.color || '#A855F7');

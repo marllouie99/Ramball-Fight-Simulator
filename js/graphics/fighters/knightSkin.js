@@ -4,7 +4,7 @@ export function drawKnightOutline(ctx, x, y, r) {
   ctx.beginPath();
   ctx.arc(x, y, r, 0, Math.PI * 2);
   ctx.lineWidth = 3;
-  ctx.strokeStyle = '#aaaaaa';
+  ctx.strokeStyle = '#000000';
   ctx.stroke();
 
   // Draw sword range radius

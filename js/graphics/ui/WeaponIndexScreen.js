@@ -652,49 +652,14 @@ function drawWeaponDetailScreen() {
 
   drawPanel(stageX, stageY, stageW, stageH, 0.94, 8);
 
-  // Background Grid inside Stage
+  // Background inside Stage (Plain White Review Canvas)
   ctx.save();
   ctx.beginPath();
   drawChamferedRect(ctx, stageX + 1, stageY + 1, stageW - 2, stageH - 2, 7);
   ctx.clip();
 
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-  ctx.lineWidth = 1;
-  const gridSize = 28;
-  for (let gx = stageX; gx < stageX + stageW; gx += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(gx, stageY);
-    ctx.lineTo(gx, stageY + stageH);
-    ctx.stroke();
-  }
-  for (let gy = stageY; gy < stageY + stageH; gy += gridSize) {
-    ctx.beginPath();
-    ctx.moveTo(stageX, gy);
-    ctx.lineTo(stageX + stageW, gy);
-    ctx.stroke();
-  }
-
-  // Floating Hologram Pedestal Ellipse
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-  ctx.strokeStyle = 'rgba(245, 158, 11, 0.35)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.ellipse(heroX, heroY + 65, 95, 15, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Signature Radial Backlight
-  const glow = ctx.createRadialGradient(heroX, heroY, 0, heroX, heroY, 200);
-  let r = 0, g = 150, b = 255;
-  if (def.color && def.color.startsWith('#') && def.color.length === 7) {
-    r = parseInt(def.color.slice(1,3), 16);
-    g = parseInt(def.color.slice(3,5), 16);
-    b = parseInt(def.color.slice(5,7), 16);
-  }
-  glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.25)`);
-  glow.addColorStop(0.5, `rgba(${r}, ${g}, ${b}, 0.05)`);
-  glow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = glow;
+  // Plain White Background Fill
+  ctx.fillStyle = '#ffffff';
   ctx.fillRect(stageX, stageY, stageW, stageH);
 
   // Animated Hero Weapon Display

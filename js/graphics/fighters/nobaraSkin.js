@@ -413,13 +413,6 @@ export function drawNobaraSkin(ctx, fighter) {
 
   ctx.restore(); // End Body Circle Clip
 
-  // ── BOLD CLEAN BODY OUTLINE ──
-  ctx.strokeStyle = '#111827';
-  ctx.lineWidth = 2.8;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
-
   // Status Overlays (stun, freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
     fighter.drawStatusOverlays(ctx, r);

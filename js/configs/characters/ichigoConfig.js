@@ -99,8 +99,8 @@ export const ichigoConfig = {
   hollowBurstFrames: 36,         // Sky burst eruption duration frames upon Hollow transformation
   hollowSpeedMultiplier: 1.4,    // Speed boost multiplier
   hollowDamageMultiplier: 1.5,   // Damage multiplier boost
-  hollowDamageReduction: 0.30,   // 20% incoming damage mitigation (Hierro) during Hollow Mask
-  hollowLifesteal: 0.50,         // 15% vampiric lifesteal heal on damage dealt during Hollow Mask
+  hollowDamageReduction: 0.10,   // 20% incoming damage mitigation (Hierro) during Hollow Mask
+  hollowLifesteal: 0.10,         // 15% vampiric lifesteal heal on damage dealt during Hollow Mask
   hollowShunpoStrikesMultiplier: 1.5, // Multiplier to increase Shunpo flurry strikes during Hollow form (e.g. 2 -> 3 in Shikai, 6 -> 9 in Bankai)
   hollowSwordCooldownMultiplier: 0.65, // Multiplier reducing melee sword cooldown (e.g. 30 * 0.65 = ~19 frames for faster rapid slashing)
   hollowComboCooldownMultiplier: 0.50, // 25% cooldown reduction multiplier for Shunpo Getsuga Blitz combo during Hollow Mask (e.g. 450 * 0.75 = ~337 frames)

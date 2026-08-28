@@ -399,370 +399,8 @@ export function drawNanamiSkin(ctx, fighter) {
     _drawFist(ctx, backX, backY, handRadius * 0.95, skinColor, fighter, false);
   }
 
-  // ── LAYER 2: BODY CIRCLE (Clipped to Radius r) ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  const nanamiImg = _getNanamiSkinImage();
-  if (nanamiImg && nanamiImg.complete && nanamiImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
-    const modelScale = 1.04;
-    const drawR = r * modelScale;
-    ctx.drawImage(nanamiImg, -drawR, -drawR, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // A. Base Skin Fill (Warm Fair Tone)
-    ctx.fillStyle = skinColor;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // B. Shading Gradient for 3D depth (Zero shadowBlur - Rule 11)
-    const bodyGrad = ctx.createRadialGradient(-r * 0.25, -r * 0.3, r * 0.15, 0, 0, r * 1.05);
-    bodyGrad.addColorStop(0, 'rgba(255, 245, 235, 0.25)');
-    bodyGrad.addColorStop(0.75, 'rgba(200, 140, 100, 0.12)');
-    bodyGrad.addColorStop(1, 'rgba(60, 30, 20, 0.35)');
-    ctx.fillStyle = bodyGrad;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-
-  // C. TORSO & CLOTHING (+Y Bottom Hemisphere — Rule 19)
-  const shirtBlue = '#2B5882';       // Deep Cerulean / Steel Blue Dress Shirt
-  const shirtDark = '#1B3B5B';       // Shirt crease & shadow
-  const leatherBrown = '#733722';    // Reddish-Brown Leather Suspenders
-  const leatherDark = '#4A2114';     // Leather border shadow
-  const leatherHighlight = '#8F4830';// Leather top highlight
-  const tieOlive = '#9A924D';        // Olive-Gold / Khaki Tie Base
-  const tieSpot = '#111315';         // Dense Dark Splotches
-
-  // 1. Deep Blue Button-Down Shirt Base (+Y)
-  ctx.fillStyle = shirtBlue;
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.18);
-  ctx.lineTo(r, r * 0.18);
-  ctx.lineTo(r, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // Subtle shirt folds / shading
-  ctx.strokeStyle = shirtDark;
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.25, r * 0.50);
-  ctx.quadraticCurveTo(-r * 0.15, r * 0.65, -r * 0.20, r * 0.85);
-  ctx.moveTo(r * 0.25, r * 0.50);
-  ctx.quadraticCurveTo(r * 0.15, r * 0.65, r * 0.20, r * 0.85);
-  ctx.stroke();
-
-  // 2. Reddish-Brown Leather Suspenders (Left & Right)
-  // Left Suspender Strap
-  ctx.fillStyle = leatherBrown;
-  ctx.strokeStyle = leatherDark;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.roundRect(-r * 0.66, r * 0.18, r * 0.19, r * 0.84, 1);
-  ctx.fill();
-  ctx.stroke();
-
-  // Left suspender inner highlight
-  ctx.strokeStyle = leatherHighlight;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.61, r * 0.20);
-  ctx.lineTo(-r * 0.61, r * 0.98);
-  ctx.stroke();
-
-  // Right Suspender Strap
-  ctx.fillStyle = leatherBrown;
-  ctx.strokeStyle = leatherDark;
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.roundRect(r * 0.47, r * 0.18, r * 0.19, r * 0.84, 1);
-  ctx.fill();
-  ctx.stroke();
-
-  // Right suspender inner highlight
-  ctx.strokeStyle = leatherHighlight;
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  ctx.moveTo(r * 0.52, r * 0.20);
-  ctx.lineTo(r * 0.52, r * 0.98);
-  ctx.stroke();
-
-  // 3. Open V-Neck Opening & Neck Skin
-  ctx.fillStyle = skinColor;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.18, r * 0.18);
-  ctx.lineTo(r * 0.18, r * 0.18);
-  ctx.lineTo(0, r * 0.42);
-  ctx.closePath();
-  ctx.fill();
-
-  // Neck shadow at the top
-  ctx.fillStyle = 'rgba(180, 100, 70, 0.35)';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.16, r * 0.18);
-  ctx.lineTo(r * 0.16, r * 0.18);
-  ctx.lineTo(0, r * 0.30);
-  ctx.closePath();
-  ctx.fill();
-
-  // 4. Loosened Olive-Gold Necktie with Dense Black Splotches
-  const tieGrad = ctx.createLinearGradient(0, r * 0.28, 0, r * 1.0);
-  tieGrad.addColorStop(0, '#AAA258');
-  tieGrad.addColorStop(0.5, tieOlive);
-  tieGrad.addColorStop(1, '#8A823F');
-
-  ctx.fillStyle = tieGrad;
-  ctx.strokeStyle = '#181A12';
-  ctx.lineWidth = 1.2;
-
-  // Loosened Tie Knot
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.12, r * 0.28);
-  ctx.lineTo(r * 0.12, r * 0.28);
-  ctx.lineTo(r * 0.10, r * 0.44);
-  ctx.lineTo(-r * 0.10, r * 0.44);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Hanging Tie Blade Body
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.09, r * 0.44);
-  ctx.lineTo(r * 0.09, r * 0.44);
-  ctx.lineTo(r * 0.14, r * 0.90);
-  ctx.lineTo(0, r * 1.04); // Pointed tie tip
-  ctx.lineTo(-r * 0.14, r * 0.90);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Dense Organic Black Splotches / Leopard Pattern on Tie
-  ctx.fillStyle = tieSpot;
-  for (let i = 0; i < _TIE_SPLOTCHES.length; i++) {
-    const s = _TIE_SPLOTCHES[i];
-    ctx.beginPath();
-    ctx.ellipse(r * s.x, r * s.y, s.rx, s.ry, 0.2, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // 5. Button-Down Shirt Collar Flaps (Framing the open neck)
-  ctx.fillStyle = '#244B74';
-  ctx.strokeStyle = '#12243A';
-  ctx.lineWidth = 1.3;
-
-  // Left Collar Flap
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.32, r * 0.18);
-  ctx.lineTo(-r * 0.12, r * 0.38);
-  ctx.lineTo(-r * 0.15, r * 0.20);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Left Collar Button Point
-  ctx.fillStyle = '#E2E8F0';
-  ctx.beginPath();
-  ctx.arc(-r * 0.24, r * 0.24, 1.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Right Collar Flap
-  ctx.fillStyle = '#244B74';
-  ctx.beginPath();
-  ctx.moveTo(r * 0.32, r * 0.18);
-  ctx.lineTo(r * 0.12, r * 0.38);
-  ctx.lineTo(r * 0.15, r * 0.20);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Right Collar Button Point
-  ctx.fillStyle = '#E2E8F0';
-  ctx.beginPath();
-  ctx.arc(r * 0.24, r * 0.24, 1.2, 0, Math.PI * 2);
-  ctx.fill();
-
-  // D. SIGNATURE 7:3 GOGGLES (Steel-Grey Frames, Side-Shields & Moss-Green Lenses — Rule 19)
-  const goggleY = -r * 0.03;
-  const leftX = -r * 0.30;
-  const rightX = r * 0.30;
-  const outerR = r * 0.28;
-  const innerR = r * 0.20;
-
-  // 1. Outer Metallic Temple Housings / Side Shields (with dark vent slots)
-  ctx.fillStyle = '#8B9CA6';
-  ctx.strokeStyle = '#222C33';
-  ctx.lineWidth = 1.3;
-
-  // Left Temple Housing
-  ctx.beginPath();
-  ctx.moveTo(leftX, goggleY - outerR * 0.85);
-  ctx.lineTo(-r * 0.70, goggleY - outerR * 0.45);
-  ctx.lineTo(-r * 0.70, goggleY + outerR * 0.55);
-  ctx.lineTo(leftX, goggleY + outerR * 0.85);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Left Temple Vent Slots (2 dark horizontal bars)
-  ctx.fillStyle = '#141C22';
-  ctx.beginPath();
-  ctx.roundRect(-r * 0.65, goggleY - outerR * 0.25, r * 0.14, 2.2, 0.5);
-  ctx.roundRect(-r * 0.65, goggleY + outerR * 0.15, r * 0.14, 2.2, 0.5);
-  ctx.fill();
-
-  // Right Temple Housing
-  ctx.fillStyle = '#8B9CA6';
-  ctx.beginPath();
-  ctx.moveTo(rightX, goggleY - outerR * 0.85);
-  ctx.lineTo(r * 0.70, goggleY - outerR * 0.45);
-  ctx.lineTo(r * 0.70, goggleY + outerR * 0.55);
-  ctx.lineTo(rightX, goggleY + outerR * 0.85);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Right Temple Vent Slots (2 dark horizontal bars)
-  ctx.fillStyle = '#141C22';
-  ctx.beginPath();
-  ctx.roundRect(r * 0.51, goggleY - outerR * 0.25, r * 0.14, 2.2, 0.5);
-  ctx.roundRect(r * 0.51, goggleY + outerR * 0.15, r * 0.14, 2.2, 0.5);
-  ctx.fill();
-
-  // 2. Arched Metallic Center Bridge
-  ctx.strokeStyle = '#323E45';
-  ctx.lineWidth = 3.4;
-  ctx.beginPath();
-  ctx.moveTo(leftX + outerR * 0.65, goggleY);
-  ctx.quadraticCurveTo(0, goggleY + r * 0.05, rightX - outerR * 0.65, goggleY);
-  ctx.stroke();
-
-  ctx.strokeStyle = '#B2C0C7';
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.moveTo(leftX + outerR * 0.65, goggleY);
-  ctx.quadraticCurveTo(0, goggleY + r * 0.05, rightX - outerR * 0.65, goggleY);
-  ctx.stroke();
-
-  // 3. Eyepiece Circular Metallic Rims (Double Bevel) & Moss-Green Lenses
-  const goggleCenters = [leftX, rightX];
-  for (const cx of goggleCenters) {
-    // Outer Beveled Steel Rim
-    const rimGrad = ctx.createLinearGradient(cx - outerR, goggleY - outerR, cx + outerR, goggleY + outerR);
-    rimGrad.addColorStop(0, '#DDE6EA');
-    rimGrad.addColorStop(0.4, '#A0B0B8');
-    rimGrad.addColorStop(1, '#5C6C75');
-
-    ctx.fillStyle = rimGrad;
-    ctx.strokeStyle = '#20292F';
-    ctx.lineWidth = 1.4;
-    ctx.beginPath();
-    ctx.arc(cx, goggleY, outerR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Inner Shadow Ring
-    ctx.strokeStyle = '#435158';
-    ctx.lineWidth = 1.1;
-    ctx.beginPath();
-    ctx.arc(cx, goggleY, outerR * 0.85, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 4. Moss-Green / Chartreuse Tinted Optical Glass Lens
-    const lensGrad = ctx.createLinearGradient(cx - innerR * 0.5, goggleY - innerR * 0.8, cx + innerR * 0.8, goggleY + innerR * 0.8);
-    if (isOvertime) {
-      lensGrad.addColorStop(0, '#E4FF88');
-      lensGrad.addColorStop(0.5, '#A4E03C');
-      lensGrad.addColorStop(1, '#4A8018');
-    } else {
-      lensGrad.addColorStop(0, '#C2E576');
-      lensGrad.addColorStop(0.45, '#7BA638');
-      lensGrad.addColorStop(1, '#2E4815');
-    }
-
-    ctx.fillStyle = lensGrad;
-    ctx.strokeStyle = '#182410';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(cx, goggleY, innerR, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // 5. Curved Glass Reflection Glare (Upper-Right Crescent Glint)
-    ctx.fillStyle = isOvertime ? 'rgba(255, 255, 220, 0.90)' : 'rgba(235, 255, 185, 0.75)';
-    ctx.beginPath();
-    ctx.arc(cx, goggleY, innerR * 0.78, -Math.PI * 0.45, -Math.PI * 0.05);
-    ctx.lineTo(cx + innerR * 0.45, goggleY - innerR * 0.25);
-    ctx.arc(cx, goggleY, innerR * 0.45, -Math.PI * 0.05, -Math.PI * 0.45, true);
-    ctx.closePath();
-    ctx.fill();
-
-    // Secondary subtle bottom-left corner reflection point
-    ctx.fillStyle = 'rgba(210, 245, 150, 0.35)';
-    ctx.beginPath();
-    ctx.arc(cx - innerR * 0.45, goggleY + innerR * 0.45, 1.3, 0, Math.PI * 2);
-    ctx.fill();
-  }
-
-  // E. HAIR — SIGNATURE 7:3 SIDE-PART BLONDE HAIR (-Y Top Hemisphere — Rule 19)
-  const hairBlonde = '#E5B25D';
-  const hairHighlight = '#FDE68A';
-  const hairShadow = '#B47B2A';
-
-  // Hair Base Mesh (Clean side-parting on right at x = r * 0.35, sweeping across forehead)
-  ctx.fillStyle = hairBlonde;
-  ctx.beginPath();
-  ctx.moveTo(-r, -r);
-  ctx.lineTo(r, -r);
-  ctx.lineTo(r, -r * 0.15); // Right side hair lock
-
-  // Curving stylized 7:3 fringe bangs sweeping from right part to left
-  for (let i = 0; i < _BANGS_COORDS.length; i++) {
-    const pt = _BANGS_COORDS[i];
-    ctx.lineTo(r * pt.nx, r * pt.ny);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // Hair Strand Highlights & Texture
-  ctx.strokeStyle = hairHighlight;
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  // Part highlight
-  ctx.moveTo(r * 0.35, -r * 0.90);
-  ctx.quadraticCurveTo(r * 0.15, -r * 0.50, -r * 0.20, -r * 0.25);
-  // Upper sweep highlight
-  ctx.moveTo(r * 0.25, -r * 0.82);
-  ctx.quadraticCurveTo(-r * 0.10, -r * 0.60, -r * 0.55, -r * 0.22);
-  ctx.stroke();
-
-  // Hair Edge Crisp Outline
-  ctx.strokeStyle = '#271A0B';
-  ctx.lineWidth = 1.8;
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(r * _BANGS_COORDS[0].nx, r * _BANGS_COORDS[0].ny);
-  for (let i = 1; i < _BANGS_COORDS.length; i++) {
-    const pt = _BANGS_COORDS[i];
-    ctx.lineTo(r * pt.nx, r * pt.ny);
-  }
-  ctx.stroke();
-  }
-
-  ctx.restore(); // End clipped body circle
-
-  // ── Bold Black Body Outline ──
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 3.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  // ── LAYER 2: BODY CIRCLE (Authentic Procedural Pixel Art) ──
+  drawNanamiPixelBody(ctx, r, isOvertime);
 
   // Status overlays (stun, freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
@@ -785,4 +423,211 @@ export function drawNanamiSkin(ctx, fighter) {
   }
 
   ctx.restore(); // End main transform
+}
+
+/**
+ * Draws Kento Nanami's entire body circle model in authentic Pixel Art Style.
+ * Uses discrete stepped pixel grid rasterization matching Saitama, Ichigo, and Yuji.
+ * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
+ */
+export function drawNanamiPixelBody(ctx, r, isOvertime = false) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // 7:3 Signature Side-Part Hairline calculation
+  function getHairlineY(rx) {
+    const nx = rx / r; // -1 to +1
+    if (nx > 0.35) {
+      return -r * 0.42 + (nx - 0.35) * r * 0.45;
+    } else {
+      const sweep = Math.sin((nx + 0.65) * 1.8) * 0.28;
+      const wave = Math.abs(Math.sin((nx - 0.35) * Math.PI * 2.2)) * 0.12;
+      return -r * 0.42 + (sweep + wave) * r;
+    }
+  }
+
+  // Predefined tie splotch coordinates
+  const tieSpots = [
+    { x: 0.0, y: 0.34, r: 0.035 },
+    { x: -0.04, y: 0.48, r: 0.04 },
+    { x: 0.03, y: 0.58, r: 0.045 },
+    { x: -0.05, y: 0.68, r: 0.04 },
+    { x: 0.04, y: 0.78, r: 0.045 },
+    { x: -0.03, y: 0.88, r: 0.04 }
+  ];
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // Pixelated Black Stroke Border
+      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const hairlineY = getHairlineY(rx);
+
+      // Goggles Geometry (Center Y = -r * 0.04, Left X = -r * 0.30, Right X = +r * 0.30)
+      const goggleY = -r * 0.04;
+      const goggleLeftX = -r * 0.30;
+      const goggleRightX = r * 0.30;
+      const distLeft = Math.hypot(rx - goggleLeftX, ry - goggleY);
+      const distRight = Math.hypot(rx - goggleRightX, ry - goggleY);
+      const outerR = r * 0.26;
+      const innerR = r * 0.18;
+
+      const isLeftLens = distLeft <= innerR;
+      const isRightLens = distRight <= innerR;
+      const isLeftRim = distLeft <= outerR && distLeft > innerR;
+      const isRightRim = distRight <= outerR && distRight > innerR;
+      const isGoggleBridge = (ry >= goggleY - P * 1.5 && ry <= goggleY + P * 1.5 && Math.abs(rx) <= r * 0.16);
+      const isSideShieldLeft = (Math.abs(ry - goggleY) <= outerR * 0.80 && rx <= -r * 0.30 && rx >= -r * 0.68);
+      const isSideShieldRight = (Math.abs(ry - goggleY) <= outerR * 0.80 && rx >= r * 0.30 && rx <= r * 0.68);
+
+      // ──────────────────────────────────────────
+      // 1. GOGGLES OVERLAY (Top Priority Feature)
+      // ──────────────────────────────────────────
+      if (isLeftLens || isRightLens) {
+        // Optical Chartreuse / Moss-Green Glass Lens
+        const cx = isLeftLens ? goggleLeftX : goggleRightX;
+        const dx = (rx - cx) / innerR;
+        const dy = (ry - goggleY) / innerR;
+
+        if (dx > 0.1 && dy < -0.1) {
+          ctx.fillStyle = isOvertime ? '#FFFFFF' : '#E8FFB8';
+        } else if (dx < -0.3 && dy > 0.3) {
+          ctx.fillStyle = isOvertime ? '#A6F542' : '#95CC4E';
+        } else {
+          ctx.fillStyle = isOvertime ? '#82D61E' : '#6A9930';
+        }
+        ctx.fillRect(px, py, P, P);
+      } else if (isLeftRim || isRightRim || isGoggleBridge || isSideShieldLeft || isSideShieldRight) {
+        // Metallic Steel Frames / Temple Shields
+        if (isGoggleBridge) {
+          ctx.fillStyle = (ry < goggleY) ? '#D0DCE2' : '#6A7D88';
+        } else if (Math.abs(rx) > r * 0.50 && Math.abs(ry - goggleY) <= P * 1.2) {
+          ctx.fillStyle = '#1A2328';
+        } else if (ry < goggleY - outerR * 0.5) {
+          ctx.fillStyle = '#E2EBEF';
+        } else if (ry > goggleY + outerR * 0.5) {
+          ctx.fillStyle = '#4A5B64';
+        } else {
+          ctx.fillStyle = '#8B9CA6';
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // 2. 7:3 BLONDE SIDE-PART HAIR (ry < hairlineY)
+      // ──────────────────────────────────────────
+      else if (ry < hairlineY) {
+        let col = '#E5B25D';
+        if (ry < -r * 0.70) {
+          col = '#FDE68A';
+        } else if (Math.abs(rx - r * 0.35) < P * 1.5 && ry < -r * 0.40) {
+          col = '#FFF3B8';
+        } else if (ry > hairlineY - P * 2.2) {
+          col = '#B47B2A';
+        } else if (Math.abs(rx) > r * 0.75) {
+          col = '#C99342';
+        }
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // 3. WARM FAIR FACE SKIN (hairlineY <= ry < r * 0.18)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.18) {
+        let col = '#F3CBB0';
+        if (ry < hairlineY + P * 2.0) {
+          col = '#DEAE90';
+        } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.10) {
+          col = '#E2B294';
+        }
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // 4. SHIRT, SUSPENDERS & NECKTIE (ry >= r * 0.18)
+      // ──────────────────────────────────────────
+      else {
+        // A. Neck Skin & Collar V-Opening
+        const isNeckV = (ry <= r * 0.38 && Math.abs(rx) <= (1 - (ry - r * 0.18) / (r * 0.20)) * (r * 0.18));
+
+        // B. Loosened Olive Necktie
+        const isTieKnot = (ry >= r * 0.26 && ry <= r * 0.42 && Math.abs(rx) <= r * 0.10);
+        const tieBladeHalfW = (r * 0.08 + (ry - r * 0.42) * 0.12);
+        const isTieBlade = (ry >= r * 0.42 && ry <= r * 0.98 && Math.abs(rx) <= tieBladeHalfW);
+
+        // C. Reddish-Brown Leather Suspenders (Left & Right)
+        const isSuspenderLeft = (rx >= -r * 0.65 && rx <= -r * 0.46 && ry >= r * 0.18);
+        const isSuspenderRight = (rx >= r * 0.46 && rx <= r * 0.65 && ry >= r * 0.18);
+
+        // D. Shirt Collar Flaps & Buttons
+        const isCollarLeft = (rx >= -r * 0.32 && rx <= -r * 0.12 && ry >= r * 0.18 && ry <= r * 0.36 && (rx - (-r * 0.32)) * 0.9 > (ry - r * 0.18));
+        const isCollarRight = (rx >= r * 0.12 && rx <= r * 0.32 && ry >= r * 0.18 && ry <= r * 0.36 && (r * 0.32 - rx) * 0.9 > (ry - r * 0.18));
+
+        let isSpot = false;
+        if (isTieKnot || isTieBlade) {
+          for (let s of tieSpots) {
+            if (Math.hypot(rx - r * s.x, ry - r * s.y) <= r * s.r) {
+              isSpot = true;
+              break;
+            }
+          }
+        }
+
+        if (isSpot) {
+          ctx.fillStyle = '#141618';
+        } else if (isTieKnot || isTieBlade) {
+          if (ry < r * 0.30) {
+            ctx.fillStyle = '#BDB564';
+          } else if (Math.abs(rx) > tieBladeHalfW - P * 1.2) {
+            ctx.fillStyle = '#78702E';
+          } else {
+            ctx.fillStyle = '#9A924D';
+          }
+        } else if (isCollarLeft || isCollarRight) {
+          if (Math.hypot(Math.abs(rx) - r * 0.22, ry - r * 0.26) <= P * 1.0) {
+            ctx.fillStyle = '#E8EEF5';
+          } else {
+            ctx.fillStyle = '#244B74';
+          }
+        } else if (isNeckV) {
+          ctx.fillStyle = (ry > r * 0.28) ? '#D49D7E' : '#E8BCA0';
+        } else if (isSuspenderLeft || isSuspenderRight) {
+          const suspX = isSuspenderLeft ? (rx - (-r * 0.55)) : (rx - (r * 0.55));
+          if (Math.abs(suspX) < P * 0.8) {
+            ctx.fillStyle = '#8F4830';
+          } else if (Math.abs(suspX) > r * 0.08) {
+            ctx.fillStyle = '#4A2114';
+          } else {
+            ctx.fillStyle = '#733722';
+          }
+        } else {
+          // Deep Blue Cerulean Dress Shirt
+          let col = '#2B5882';
+          if (Math.abs(rx) > r * 0.72 || ry > r * 0.85) {
+            col = '#1A3957';
+          } else if (ry < r * 0.45 && Math.abs(rx) < r * 0.45) {
+            col = '#346594';
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  ctx.restore();
 }

@@ -42,10 +42,10 @@ function _getIchigoBankaiImage() {
       _ichigoBankaiImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ichigo Bankai pixel image at Assets/model/ICHIGO-BANKAI-PIXEL-SKIN.png', e);
+      console.warn('Failed to load Ichigo Bankai pixel image at Assets/model/ichigo-bankai-skin.png', e);
       _ichigoBankaiImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-BANKAI-PIXEL-SKIN.png?v=1';
+    img.src = 'Assets/model/ichigo-bankai-skin.png?v=1';
     _ichigoBankaiImage = img;
   }
   return _ichigoBankaiImage;
@@ -66,10 +66,10 @@ function _getIchigoShikaiImage() {
       _ichigoShikaiImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ichigo Shikai pixel image at Assets/model/ICHIGO-SHIKAI-PIXEL-SKIN.png', e);
+      console.warn('Failed to load Ichigo Shikai pixel image at Assets/model/ichigo-shikai-skin.png', e);
       _ichigoShikaiImageLoading = false;
     };
-    img.src = 'Assets/model/ICHIGO-SHIKAI-PIXEL-SKIN.png?v=1';
+    img.src = 'Assets/model/ichigo-shikai-skin.png?v=1';
     _ichigoShikaiImage = img;
   }
   return _ichigoShikaiImage;
@@ -752,233 +752,15 @@ export function drawIchigoSkin(ctx, fighter) {
     renderZangetsu();
   }
 
-  // ── 4. Main Body Circle Clip ──
+  // ── 4. Main Body Circle (Procedural Pixel Art for Shikai and Bankai) ──
   ctx.save();
   if (bodyShiftX !== 0) {
     ctx.translate(bodyShiftX, 0);
   }
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
 
-  const modelImg = isBankai ? _getIchigoBankaiImage() : _getIchigoShikaiImage();
-  if (modelImg && modelImg.complete && modelImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-    ctx.drawImage(modelImg, -r, -r, r * 2, r * 2);
-    ctx.restore();
-  } else {
-    // ── Fallback Procedural Bankai & Shikai Aesthetics ──
-    // Peach skin base
-    ctx.fillStyle = '#FFE0BD';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
+  drawIchigoPixelBody(ctx, r, isShikai, facingLeft);
 
-    // Orange hair (Standard spiky)
-    ctx.fillStyle = '#FF7F00';
-    ctx.beginPath();
-    ctx.moveTo(-r, -r);
-    ctx.lineTo(r, -r);
-    ctx.lineTo(r, -r * 0.35);
-    ctx.lineTo(r * 0.85, -r * 0.45);
-    ctx.lineTo(r * 0.88, -r * 0.35);
-    ctx.lineTo(r * 0.72, -r * 0.48);
-    ctx.lineTo(r * 0.62, -r * 0.28);
-    ctx.lineTo(r * 0.5, -r * 0.42);
-    ctx.lineTo(r * 0.45, -r * 0.46);
-    ctx.lineTo(r * 0.4, -r * 0.35);
-    ctx.lineTo(r * 0.35, -r * 0.48);
-    ctx.lineTo(r * 0.2, -r * 0.25);
-    ctx.lineTo(r * 0.15, -r * 0.42);
-    ctx.lineTo(r * 0.05, -r * 0.32);
-    ctx.lineTo(-r * 0.05, -r * 0.45);
-    ctx.lineTo(-r * 0.12, -r * 0.25);
-    ctx.lineTo(-r * 0.25, -r * 0.42);
-    ctx.lineTo(-r * 0.32, -r * 0.35);
-    ctx.lineTo(-r * 0.45, -r * 0.45);
-    ctx.lineTo(-r * 0.52, -r * 0.28);
-    ctx.lineTo(-r * 0.7, -r * 0.42);
-    ctx.lineTo(-r * 0.78, -r * 0.35);
-    ctx.lineTo(-r, -r * 0.35);
-    ctx.closePath();
-    ctx.fill();
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 1.8;
-
-    if (isShikai) {
-      // ── Standard Shikai robes: black robes covering from y = 0.1 ──
-      ctx.fillStyle = '#111111';
-      ctx.fillRect(-r, r * 0.1, r * 2, r * 0.95);
-
-      // White collar inner lining (forming a V-neck)
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.25, r * 0.1);
-      ctx.lineTo(0, r * 0.42);
-      ctx.lineTo(r * 0.25, r * 0.1);
-      ctx.closePath();
-      ctx.fill();
-
-      // Wrap collar fold outlines (black robe wrap lines)
-      const strapSign = facingLeft ? -1 : 1;
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.5;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.25 * strapSign, r * 0.1);
-      ctx.lineTo(0, r * 0.42);
-      ctx.moveTo(r * 0.25 * strapSign, r * 0.1);
-      ctx.lineTo(-r * 0.12 * strapSign, r * 0.49);
-      ctx.stroke();
-
-      // Diagonal Red Ribbon/Chain Strap (for holding Zangetsu on his back)
-      const strapStartX = -r * 0.35 * strapSign;
-      const strapEndX = r * 0.25 * strapSign;
-
-      ctx.save();
-      ctx.strokeStyle = '#700c0f';
-      ctx.lineWidth = 4.5;
-      ctx.beginPath();
-      ctx.moveTo(strapStartX, r * 0.1);
-      ctx.lineTo(strapEndX, r * 0.55);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#E31B23';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(strapStartX, r * 0.1);
-      ctx.lineTo(strapEndX, r * 0.55);
-      ctx.stroke();
-
-      ctx.fillStyle = '#FF4D52';
-      for (let t = 0.05; t <= 0.95; t += 0.16) {
-        const px = strapStartX * (1 - t) + strapEndX * t;
-        const py = r * 0.1 * (1 - t) + (r * 0.55) * t;
-        ctx.beginPath();
-        ctx.arc(px, py, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#3a0002';
-        ctx.lineWidth = 0.5;
-        ctx.stroke();
-      }
-      ctx.restore();
-
-      // Flat white obi sash wrapped around waist
-      ctx.fillStyle = '#FFFFFF';
-      ctx.fillRect(-r * 0.75, r * 0.55, r * 1.5, r * 0.15);
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.0;
-      ctx.strokeRect(-r * 0.75, r * 0.55, r * 1.5, r * 0.15);
-
-      // Central sash tie knot
-      ctx.fillStyle = '#EBEBEB';
-      ctx.beginPath();
-      ctx.roundRect(-r * 0.08, r * 0.53, r * 0.16, r * 0.18, 3);
-      ctx.fill();
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.0;
-      ctx.stroke();
-
-      // Hanging sash ribbons (tied tails hanging down)
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.06, r * 0.68);
-      ctx.lineTo(-r * 0.18, r * 0.95);
-      ctx.lineTo(-r * 0.02, r * 0.95);
-      ctx.lineTo(0, r * 0.68);
-      ctx.closePath();
-      ctx.moveTo(0, r * 0.68);
-      ctx.lineTo(r * 0.02, r * 0.95);
-      ctx.lineTo(r * 0.18, r * 0.95);
-      ctx.lineTo(r * 0.06, r * 0.68);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.06, r * 0.68);
-      ctx.lineTo(-r * 0.18, r * 0.95);
-      ctx.lineTo(-r * 0.02, r * 0.95);
-      ctx.lineTo(0, r * 0.68);
-      ctx.moveTo(0, r * 0.68);
-      ctx.lineTo(r * 0.02, r * 0.95);
-      ctx.lineTo(r * 0.18, r * 0.95);
-      ctx.lineTo(r * 0.06, r * 0.68);
-      ctx.stroke();
-    } else {
-      // ── Current Bankai robes with deep V-neck and split obi coat ──
-      ctx.fillStyle = '#111111';
-      ctx.fillRect(-r, r * 0.1, r * 2, r * 0.95);
-
-      ctx.fillStyle = '#FFE0BD';
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.35, r * 0.1);
-      ctx.lineTo(0, r * 0.45);
-      ctx.lineTo(r * 0.35, r * 0.1);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 3.5;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.32, r * 0.1);
-      ctx.lineTo(0, r * 0.42);
-      ctx.lineTo(r * 0.32, r * 0.1);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.35, r * 0.1);
-      ctx.lineTo(0, r * 0.45);
-      ctx.lineTo(r * 0.35, r * 0.1);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.28, r * 0.1);
-      ctx.lineTo(0, r * 0.39);
-      ctx.lineTo(r * 0.28, r * 0.1);
-      ctx.stroke();
-
-      ctx.fillStyle = '#FFFFFF';
-      ctx.beginPath();
-      ctx.moveTo(0, r * 0.65);
-      ctx.lineTo(-r * 0.28, r);
-      ctx.lineTo(r * 0.28, r);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.strokeStyle = '#D5D5D5';
-      ctx.lineWidth = 1.8;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.12, r * 0.78);
-      ctx.lineTo(r * 0.12, r * 0.78);
-      ctx.moveTo(-r * 0.18, r * 0.88);
-      ctx.lineTo(r * 0.18, r * 0.88);
-      ctx.stroke();
-
-      ctx.fillStyle = '#111111';
-      ctx.fillRect(-r * 0.04, r * 0.72, r * 0.08, r * 0.28);
-
-      ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.28, r);
-      ctx.lineTo(0, r * 0.65);
-      ctx.lineTo(r * 0.28, r);
-      ctx.stroke();
-
-      ctx.strokeStyle = '#111111';
-      ctx.lineWidth = 1.0;
-      ctx.beginPath();
-      ctx.moveTo(-r * 0.28, r);
-      ctx.lineTo(0, r * 0.65);
-      ctx.lineTo(r * 0.28, r);
-      ctx.stroke();
-    }
-  }
-  ctx.restore(); // end main body circle clip
+  ctx.restore(); // end main body circle
 
   // ── 5. Outer Body Stroke, Edge Glow & Unclipped Hollow Mask Overlay ──
   ctx.save();
@@ -989,12 +771,6 @@ export function drawIchigoSkin(ctx, fighter) {
   if (isBankaiChanneling) {
     _drawBankaiBodyEdgeGlow(ctx, r, bankaiProg, now);
   }
-
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
 
   // ── 5.2. Fully Assembled Hollow Mask Overlay (CLIPPED strictly into character body circle) ──
   if (isMask && !isForming) {
@@ -1075,22 +851,8 @@ export function drawIchigoSkin(ctx, fighter) {
     _drawHollowMaskFormationAttached(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
     ctx.restore();
 
-    // 2) Stroke body circle outline on top of attached mask pieces
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // 3) Flying shards, snap flashes, and clutching hand in unclipped space
+    // 2) Flying shards, snap flashes, and clutching hand in unclipped space
     _drawHollowMaskFormationFlying(ctx, r, formationProg, now, fighter, maskImg, destX, destY, destW, destH);
-  } else {
-    // Stroke crisp outer body border
-    ctx.strokeStyle = '#111111';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.stroke();
   }
 
   ctx.restore();
@@ -2617,6 +2379,191 @@ function _drawBankaiActiveFlameWisps(ctx, r, now) {
     const wy = Math.sin(wAng) * wDist - wProg * 22;
 
     _drawPixelDiamond(ctx, wx, wy, 3.5, (w % 2 === 0) ? '#ff2838' : '#dc143c', '#ffffff', pSize);
+  }
+
+  ctx.restore();
+}
+
+/**
+ * Draws Ichigo's entire body circle model in authentic Pixel Art Style.
+ * Uses discrete stepped pixel grid rasterization matching Saitama (Rule #19 compliant).
+ * Minimalist circle brawler aesthetic, upright front POV, faceless.
+ */
+function drawIchigoPixelBody(ctx, r, isShikai = false, facingLeft = false) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // Discrete Spiky Forehead Bangs calculation (7 iconic anime spikes)
+  function getHairlineY(rx) {
+    const nx = rx / r; // -1 to +1
+    const spikeWave = Math.abs(Math.sin(nx * Math.PI * 3.5));
+    const centralLength = (1.0 - Math.abs(nx) * 0.35);
+    const spikeExtension = r * 0.30 * centralLength * Math.pow(spikeWave, 1.15);
+    return -r * 0.36 + spikeExtension;
+  }
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // Pixelated Black Stroke Border
+      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const hairlineY = getHairlineY(rx);
+
+      // ──────────────────────────────────────────
+      // ZONE 1: Spiky Orange Hair (ry < hairlineY)
+      // ──────────────────────────────────────────
+      if (ry < hairlineY) {
+        let col = '#FF7700'; // Base vibrant anime orange
+        if (ry < -r * 0.70) {
+          col = '#FFA534'; // Crown highlight
+        } else if (ry < -r * 0.50 && Math.abs(rx) < r * 0.45) {
+          col = '#FF8C1A'; // Mid hair shine
+        } else if (ry > hairlineY - P * 2.2) {
+          col = '#D95500'; // Bang tip shadow
+        } else if (Math.abs(rx) > r * 0.75) {
+          col = '#E66000'; // Side fringe shadow
+        }
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: Warm Peach Face Skin (hairlineY <= ry < r * 0.10)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.10) {
+        let col = '#FFE0BD'; // Base warm peach
+        if (ry < hairlineY + P * 2.0) {
+          col = '#F2C8A4'; // Forehead hair shadow
+        } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.05) {
+          col = '#F0C29E'; // Cheek / chin shadow
+        }
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 3: SHIHAKUSHO ROBES (ry >= r * 0.10)
+      // ──────────────────────────────────────────
+      else if (isShikai) {
+        // ── SHIKAI ROBE LOGIC ──
+        const strapSign = facingLeft ? -1 : 1;
+
+        // A. Diagonal Red Ribbon / Chain Strap
+        const strapStartX = -r * 0.38 * strapSign;
+        const strapEndX   =  r * 0.28 * strapSign;
+        const strapProg = (ry - r * 0.10) / (r * 0.44);
+        const strapCenterX = strapStartX + (strapEndX - strapStartX) * strapProg;
+        const isStrap = (ry >= r * 0.10 && ry <= r * 0.54 && Math.abs(rx - strapCenterX) <= r * 0.075);
+
+        // B. White Inner Collar V-Neck
+        const collarHalfW = (1 - (ry - r * 0.10) / (r * 0.32)) * (r * 0.28);
+        const isInsideCollarV = (ry <= r * 0.42 && Math.abs(rx) <= Math.max(0, collarHalfW));
+        const isCollarWhiteTrim = (ry <= r * 0.44 && Math.abs(Math.abs(rx) - collarHalfW) <= P * 1.5);
+
+        // C. White Obi Belt & Buckle
+        const isObiBelt = (ry >= r * 0.52 && ry <= r * 0.68 && Math.abs(rx) <= r * 0.78);
+        const isObiKnot = (ry >= r * 0.50 && ry <= r * 0.72 && Math.abs(rx) <= r * 0.10);
+        // D. Hanging Sash Tails
+        const isSashTail = (ry >= r * 0.68 && ry <= r * 0.96 && Math.abs(rx) <= (r * 0.08 + (ry - r * 0.68) * 0.18));
+
+        if (isObiKnot) {
+          ctx.fillStyle = (Math.abs(rx) < P && Math.abs(ry - r * 0.60) < P) ? '#FFFFFF' : '#E0E6EE';
+        } else if (isSashTail) {
+          if (Math.abs(rx) < P * 0.8) {
+            ctx.fillStyle = '#C8D0DC'; // Split shadow
+          } else {
+            ctx.fillStyle = (ry > r * 0.90) ? '#D8DEE8' : '#FFFFFF';
+          }
+        } else if (isObiBelt) {
+          if (ry < r * 0.55) {
+            ctx.fillStyle = '#FFFFFF'; // Top highlight
+          } else if (ry > r * 0.64) {
+            ctx.fillStyle = '#CBD2DE'; // Bottom shadow
+          } else {
+            ctx.fillStyle = '#E8EDF4'; // Main obi
+          }
+        } else if (isStrap) {
+          // Crimson ribbon with golden rivet studs
+          if (Math.abs(rx - strapCenterX) > r * 0.055) {
+            ctx.fillStyle = '#7A0C10';
+          } else if (Math.abs(ry - r * 0.22) < P || Math.abs(ry - r * 0.38) < P) {
+            ctx.fillStyle = '#FFD700'; // Gold stud
+          } else {
+            ctx.fillStyle = (rx - strapCenterX < 0) ? '#FF2A40' : '#CC1025';
+          }
+        } else if (isCollarWhiteTrim || isInsideCollarV) {
+          if (isInsideCollarV && ry < r * 0.36 && Math.abs(rx) < collarHalfW - P * 1.5) {
+            ctx.fillStyle = '#F5D2B8'; // Inner chest skin V
+          } else {
+            ctx.fillStyle = (ry < r * 0.25) ? '#FFFFFF' : '#DDE3ED';
+          }
+        } else {
+          // Black Shihakusho robe
+          let col = '#15161B';
+          if (Math.abs(rx) > r * 0.72 || ry > r * 0.84) {
+            col = '#0C0D10';
+          } else if (ry < r * 0.25 && Math.abs(rx) < r * 0.50) {
+            col = '#22242C';
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      } else {
+        // ── BANKAI ROBE LOGIC ──
+        // Deep Double V-Neck Trenchcoat Collar + Split Coat
+        const outerVHalfW = (1 - (ry - r * 0.10) / (r * 0.40)) * (r * 0.36);
+        const innerVHalfW = (1 - (ry - r * 0.14) / (r * 0.34)) * (r * 0.26);
+
+        const isOuterVWhite = (ry >= r * 0.10 && ry <= r * 0.50 && Math.abs(Math.abs(rx) - outerVHalfW) <= P * 1.2);
+        const isInnerVWhite = (ry >= r * 0.14 && ry <= r * 0.48 && Math.abs(Math.abs(rx) - innerVHalfW) <= P * 1.2);
+        const isBetweenVBlack = (ry >= r * 0.12 && ry <= r * 0.46 && Math.abs(rx) < outerVHalfW && Math.abs(rx) > innerVHalfW);
+        const isChestSkinV = (ry >= r * 0.14 && ry <= r * 0.46 && Math.abs(rx) < innerVHalfW);
+
+        // Lower Split Obi Coat (ry >= r * 0.62)
+        const splitCoatWidth = (ry - r * 0.62) * 0.84;
+        const isCoatSplitWhite = (ry >= r * 0.62 && Math.abs(rx) <= splitCoatWidth);
+        const isCenterCoatSlit = (ry >= r * 0.68 && Math.abs(rx) <= r * 0.05);
+
+        if (isChestSkinV) {
+          ctx.fillStyle = (ry < r * 0.24) ? '#FFE0BD' : '#F0C29E'; // Exposed chest skin
+        } else if (isOuterVWhite || isInnerVWhite) {
+          ctx.fillStyle = (ry < r * 0.28) ? '#FFFFFF' : '#D5DDE8'; // Double white V trim
+        } else if (isBetweenVBlack) {
+          ctx.fillStyle = '#111216'; // Black fold between double V
+        } else if (isCenterCoatSlit) {
+          ctx.fillStyle = '#0B0C0E'; // Dark center coat slit
+        } else if (isCoatSplitWhite) {
+          if (Math.abs(rx) > splitCoatWidth - P * 1.5) {
+            ctx.fillStyle = '#FFFFFF'; // White split coat piping edge
+          } else {
+            ctx.fillStyle = (ry > r * 0.88) ? '#CBD3E0' : '#E0E7F2'; // White undercoat lining
+          }
+        } else {
+          // Bankai Jet-Black Trenchcoat
+          let col = '#111216';
+          if (ry < r * 0.28 && Math.abs(rx) < r * 0.55) {
+            col = '#1E2028'; // Shoulder fabric sheen
+          } else if (Math.abs(rx) > r * 0.72 || ry > r * 0.85) {
+            col = '#0A0A0D'; // Deep outer fold shadow
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
   }
 
   ctx.restore();

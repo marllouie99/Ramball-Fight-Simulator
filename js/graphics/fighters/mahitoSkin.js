@@ -514,64 +514,8 @@ function drawTransformedCarapace(ctx, r, hideElbowBlades = false) {
   ctx.stroke();
   ctx.restore();
 
-  // 4. Main Armored Obsidian Body Base
-  ctx.fillStyle = '#0E1322';
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.strokeStyle = '#D946EF';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // 5. Exoskeleton Plating & Glowing Visor
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  // Torso Rib Plating (Bottom +y)
-  ctx.fillStyle = '#2A1B3D';
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.3);
-  ctx.lineTo(-r * 0.3, r * 0.15);
-  ctx.lineTo(0, r * 0.25);
-  ctx.lineTo(r * 0.3, r * 0.15);
-  ctx.lineTo(r, r * 0.3);
-  ctx.lineTo(r, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // Plating seams
-  ctx.strokeStyle = '#D946EF';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.6, r * 0.5);
-  ctx.lineTo(r * 0.6, r * 0.5);
-  ctx.moveTo(-r * 0.4, r * 0.75);
-  ctx.lineTo(r * 0.4, r * 0.75);
-  ctx.stroke();
-
-  // Glowing Magenta/Violet Horizontal Eye Slits
-  ctx.fillStyle = '#E879F9';
-  // Left eye slit
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.28, -r * 0.15, r * 0.24, r * 0.07, -Math.PI * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-  // Right eye slit
-  ctx.beginPath();
-  ctx.ellipse(r * 0.28, -r * 0.15, r * 0.24, r * 0.07, Math.PI * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Inner white hot core
-  ctx.fillStyle = '#FFFFFF';
-  ctx.beginPath();
-  ctx.ellipse(-r * 0.28, -r * 0.15, r * 0.14, r * 0.035, -Math.PI * 0.08, 0, Math.PI * 2);
-  ctx.ellipse(r * 0.28, -r * 0.15, r * 0.14, r * 0.035, Math.PI * 0.08, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.restore();
+  // 4. Main Armored Obsidian Body Base & Exoskeleton Plating (Authentic Procedural Pixel Art)
+  drawMahitoPixelBody(ctx, r, true);
 }
 
 /**
@@ -582,14 +526,6 @@ function drawTransformedCarapace(ctx, r, hideElbowBlades = false) {
  * - Detailed dark patchwork poncho tunic with stitched square grid pattern
  */
 function drawBaseMahito(ctx, r, fighter) {
-  const skinImg = _getMahitoSkinImage();
-  if (skinImg && skinImg.complete && skinImg.naturalWidth > 0) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-    ctx.drawImage(skinImg, -r, -r, r * 2, r * 2);
-    ctx.restore();
-    return;
-  }
 
   // ── 1. BACK HAIR VOLUME & TIED HAIR BUNDLES (Drawn behind body circle) ──
   ctx.save();
@@ -656,190 +592,8 @@ function drawBaseMahito(ctx, r, fighter) {
 
   ctx.restore();
 
-  // ── 2. PALE CURSED SPIRIT SKIN BASE ──
-  ctx.fillStyle = '#EEF3F7';
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.fill();
-
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  // ── 3. CLOTHING: DARK SLEEVELESS PATCHWORK PONCHO WITH GRID DETAILS ──
-  // Poncho dark base fabric fill
-  ctx.fillStyle = '#181920';
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.26);
-  ctx.lineTo(-r * 0.40, r * 0.22);
-  ctx.lineTo(-r * 0.15, r * 0.36);
-  ctx.lineTo(0, r * 0.38);
-  ctx.lineTo(r * 0.25, r * 0.32);
-  ctx.lineTo(r * 0.55, r * 0.20);
-  ctx.lineTo(r, r * 0.24);
-  ctx.lineTo(r, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // Open Neck Pale Skin Cutout (showing neck and collarbones)
-  ctx.fillStyle = '#EEF3F7';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.35, r * 0.20);
-  ctx.lineTo(-r * 0.15, r * 0.36);
-  ctx.lineTo(0, r * 0.38);
-  ctx.lineTo(r * 0.25, r * 0.32);
-  ctx.lineTo(r * 0.45, r * 0.20);
-  ctx.lineTo(0, r * 0.12);
-  ctx.closePath();
-  ctx.fill();
-
-  // Neck Stitches are now drawn cleanly by drawMahitoFacialStitches
-
-  // Poncho Collar Hem Line
-  ctx.strokeStyle = '#2B2E3C';
-  ctx.lineWidth = 1.6;
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.26);
-  ctx.lineTo(-r * 0.40, r * 0.22);
-  ctx.lineTo(-r * 0.15, r * 0.36);
-  ctx.lineTo(0, r * 0.38);
-  ctx.lineTo(r * 0.25, r * 0.32);
-  ctx.lineTo(r * 0.55, r * 0.20);
-  ctx.lineTo(r, r * 0.24);
-  ctx.stroke();
-
-  // ── DETAILED PATCHWORK GRID & SEAM STITCHES ON PONCHO ──
-  ctx.save();
-  ctx.strokeStyle = '#2E3242';
-  ctx.lineWidth = 1.2;
-
-  // Horizontal Grid Seams
-  const horizLines = [r * 0.48, r * 0.65, r * 0.82, r * 0.96];
-  for (const hy of horizLines) {
-    ctx.beginPath();
-    ctx.moveTo(-r, hy);
-    ctx.lineTo(r, hy);
-    ctx.stroke();
-
-    // Subtle stitch cross-ticks along horizontal seams
-    ctx.save();
-    ctx.strokeStyle = '#3D4255';
-    ctx.lineWidth = 1.0;
-    for (let hx = -r * 0.80; hx <= r * 0.80; hx += r * 0.20) {
-      ctx.beginPath();
-      ctx.moveTo(hx, hy - 1.8);
-      ctx.lineTo(hx, hy + 1.8);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // Vertical Grid Seams
-  const vertCols = [-r * 0.70, -r * 0.45, -r * 0.20, r * 0.05, r * 0.30, r * 0.55, r * 0.80];
-  for (const vx of vertCols) {
-    ctx.beginPath();
-    ctx.moveTo(vx, r * 0.28);
-    ctx.lineTo(vx, r);
-    ctx.stroke();
-
-    // Subtle stitch cross-ticks along vertical seams
-    ctx.save();
-    ctx.strokeStyle = '#3D4255';
-    ctx.lineWidth = 1.0;
-    for (let vy = r * 0.38; vy <= r * 0.95; vy += r * 0.17) {
-      ctx.beginPath();
-      ctx.moveTo(vx - 1.8, vy);
-      ctx.lineTo(vx + 1.8, vy);
-      ctx.stroke();
-    }
-    ctx.restore();
-  }
-
-  // Asymmetrical shoulder sleeve opening detail (right side in reference)
-  ctx.strokeStyle = '#383C4D';
-  ctx.lineWidth = 1.3;
-  ctx.beginPath();
-  ctx.moveTo(r * 0.55, r * 0.20);
-  ctx.lineTo(r * 0.82, r * 0.45);
-  ctx.stroke();
-
-  ctx.restore();
-
-  // ── 4. EXACT FACIAL SURGICAL SUTURES & STITCHES (Anime Reference) ──
-  if (!fighter || !fighter.isDying) {
-    drawMahitoFacialStitches(ctx, r);
-  }
-
-  // ── 5. FLOWING GREY-BLUE HAIR (Anime Fringe with Long Center & Curving Side Locks) ──
-  ctx.fillStyle = '#9EB7C6';
-  ctx.beginPath();
-  ctx.moveTo(-r, -r);
-  ctx.lineTo(r, -r);
-  ctx.lineTo(r, -r * 0.10);
-
-  // ★ RIGHT LONG CURVING SIDE LOCK ★ (Drapes down along right cheek)
-  ctx.quadraticCurveTo(r * 0.95, -r * 0.05, r * 0.78, +r * 0.12);
-  ctx.lineTo(r * 0.75, +r * 0.14);
-  ctx.quadraticCurveTo(r * 0.68, -r * 0.12, r * 0.62, -r * 0.44);
-
-  // Right-center spikes
-  ctx.lineTo(r * 0.48, -r * 0.30);
-  ctx.lineTo(r * 0.38, -r * 0.46);
-  ctx.lineTo(r * 0.25, -r * 0.32);
-  ctx.lineTo(r * 0.12, -r * 0.44);
-
-  // ★ SIGNATURE LONG CENTER HAIR LOCK ★ (Extends far down in the middle)
-  ctx.lineTo(-r * 0.02, -r * 0.08);   // Long center tip hanging down
-  ctx.lineTo(-r * 0.14, -r * 0.44);   // Recess to left
-
-  // Left-center spike
-  ctx.lineTo(-r * 0.28, -r * 0.32);
-  ctx.lineTo(-r * 0.42, -r * 0.54);   // Forehead opening recess (exposing forehead stitches)
-  ctx.lineTo(-r * 0.54, -r * 0.30);
-  ctx.lineTo(-r * 0.62, -r * 0.44);
-
-  // ★ LEFT LONG CURVING SIDE LOCK ★ (Drapes down along left cheek)
-  ctx.quadraticCurveTo(-r * 0.68, -r * 0.12, -r * 0.75, +r * 0.14);
-  ctx.lineTo(-r * 0.78, +r * 0.12);
-  ctx.quadraticCurveTo(-r * 0.95, -r * 0.05, -r, -r * 0.10);
-  ctx.closePath();
-  ctx.fill();
-
-  // Dark Anime Outline
-  ctx.strokeStyle = '#181B24';
-  ctx.lineWidth = 1.8;
-  ctx.stroke();
-
-  // Clean hair strand accent lines & curving highlights
-  ctx.strokeStyle = '#C7DEEC';
-  ctx.lineWidth = 1.2;
-  ctx.beginPath();
-  // Long center lock highlight streak
-  ctx.moveTo(-r * 0.02, -r * 0.78);
-  ctx.lineTo(-r * 0.02, -r * 0.12);
-  // Right curving side lock highlight
-  ctx.moveTo(r * 0.62, -r * 0.65);
-  ctx.quadraticCurveTo(r * 0.78, -r * 0.10, r * 0.74, +r * 0.08);
-  // Left curving side lock highlight
-  ctx.moveTo(-r * 0.62, -r * 0.65);
-  ctx.quadraticCurveTo(-r * 0.78, -r * 0.10, -r * 0.74, +r * 0.08);
-  // Interior spike highlights
-  ctx.moveTo(r * 0.38, -r * 0.32);
-  ctx.lineTo(r * 0.40, -r * 0.70);
-  ctx.moveTo(-r * 0.28, -r * 0.32);
-  ctx.lineTo(-r * 0.26, -r * 0.70);
-  ctx.stroke();
-
-  ctx.restore();
-
-  // ── 6. CRISP DARK BODY OUTLINE ──
-  ctx.strokeStyle = '#181B24';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  // ── 2. PALE CURSED SPIRIT SKIN & PROCEDURAL PIXEL ART BODY ──
+  drawMahitoPixelBody(ctx, r, false);
 }
 
 /**
@@ -1259,4 +1013,193 @@ export function drawMahitoSkin(ctx, fighter) {
   if (!fighter._isWinnerReveal && !isChannelingDomain && fighter.twinScissorAnimTimer > 0) {
     drawMahitoTwinScissor(ctx, fighter, 'front');
   }
+}
+
+/**
+ * Draws Mahito's entire body circle model in authentic Pixel Art Style.
+ * Uses discrete stepped pixel grid rasterization matching Saitama, Ichigo, Yuji, and Nanami.
+ * Minimalist circle brawler aesthetic, upright front POV, faceless with surgical stitches (Rule #19 compliant).
+ */
+export function drawMahitoPixelBody(ctx, r, isTransformed = false) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  if (isTransformed) {
+    // ══════════════════════════════════════════════════════════════
+    // INSTANT SPIRIT OF BODY OF KILLING (ISBOK) TRANSFORMED PIXEL ART
+    // ══════════════════════════════════════════════════════════════
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        const rx = gx * P;
+        const ry = gy * P;
+        const dist = Math.hypot(rx, ry);
+        if (dist > r) continue;
+
+        const px = snap(rx);
+        const py = snap(ry);
+
+        // Pixelated Black Stroke Border
+        if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+          ctx.fillStyle = '#0E0F14';
+          ctx.fillRect(px, py, P, P);
+          continue;
+        }
+
+        // Glowing Magenta Horizontal Eye Slit Visors (ry ~ -r * 0.15)
+        const isEyeLeft = (Math.abs(ry - (-r * 0.15)) <= P * 1.5 && rx >= -r * 0.52 && rx <= -r * 0.08);
+        const isEyeRight = (Math.abs(ry - (-r * 0.15)) <= P * 1.5 && rx >= r * 0.08 && rx <= r * 0.52);
+        const isEyeCoreLeft = (Math.abs(ry - (-r * 0.15)) <= P * 0.6 && rx >= -r * 0.40 && rx <= -r * 0.18);
+        const isEyeCoreRight = (Math.abs(ry - (-r * 0.15)) <= P * 0.6 && rx >= r * 0.18 && rx <= r * 0.40);
+
+        // Exoskeleton Torso Plating (ry >= r * 0.22)
+        const isRibPlating = (ry >= r * 0.22 && (Math.abs(rx) <= r * 0.85));
+        const isPlatingSeam1 = (Math.abs(ry - r * 0.48) <= P * 0.8 && Math.abs(rx) <= r * 0.65);
+        const isPlatingSeam2 = (Math.abs(ry - r * 0.72) <= P * 0.8 && Math.abs(rx) <= r * 0.48);
+
+        if (isEyeCoreLeft || isEyeCoreRight) {
+          ctx.fillStyle = '#FFFFFF';
+        } else if (isEyeLeft || isEyeRight) {
+          ctx.fillStyle = '#E879F9';
+        } else if (isPlatingSeam1 || isPlatingSeam2) {
+          ctx.fillStyle = '#D946EF';
+        } else if (isRibPlating) {
+          ctx.fillStyle = (ry > r * 0.60) ? '#1E122C' : '#2A1B3D';
+        } else {
+          let col = '#0E1322';
+          if (ry < -r * 0.65) col = '#182035';
+          else if (Math.abs(rx) > r * 0.72) col = '#090D18';
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  } else {
+    // ══════════════════════════════════════════════════════════════
+    // BASE FORM MAHITO (Steel-Blue Hair, Surgical Stitches & Patchwork Poncho)
+    // ══════════════════════════════════════════════════════════════
+    function getHairlineY(rx) {
+      const nx = rx / r; // -1 to +1
+      const absX = Math.abs(nx);
+
+      if (absX < 0.09) {
+        return -r * 0.10 + (absX / 0.09) * r * 0.22;
+      } else if (absX > 0.68) {
+        return +r * 0.10 - (1 - (absX - 0.68) / 0.32) * r * 0.20;
+      } else if (nx < -0.20 && nx > -0.48) {
+        return -r * 0.50 + Math.abs(nx + 0.34) * r * 0.55;
+      } else {
+        const wave = Math.abs(Math.sin((nx + 0.1) * Math.PI * 3.2));
+        return -r * 0.36 + wave * r * 0.20;
+      }
+    }
+
+    for (let gy = -steps; gy <= steps; gy++) {
+      for (let gx = -steps; gx <= steps; gx++) {
+        const rx = gx * P;
+        const ry = gy * P;
+        const dist = Math.hypot(rx, ry);
+        if (dist > r) continue;
+
+        const px = snap(rx);
+        const py = snap(ry);
+
+        // Pixelated Black Stroke Border
+        if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+          ctx.fillStyle = '#0E0F14';
+          ctx.fillRect(px, py, P, P);
+          continue;
+        }
+
+        const hairlineY = getHairlineY(rx);
+
+        // ──────────────────────────────────────────
+        // 1. FLOWING STEEL-BLUE HAIR (ry < hairlineY)
+        // ──────────────────────────────────────────
+        if (ry < hairlineY) {
+          let col = '#9EB7C6';
+          if (ry < -r * 0.70) {
+            col = '#C7DEEC';
+          } else if (Math.abs(rx) < r * 0.06 && ry > -r * 0.50) {
+            col = '#B6CEE0';
+          } else if (ry > hairlineY - P * 2.2) {
+            col = '#678696';
+          } else if (Math.abs(rx) > r * 0.75) {
+            col = '#7A99AA';
+          }
+          ctx.fillStyle = col;
+          ctx.fillRect(px, py, P, P);
+        }
+        // ──────────────────────────────────────────
+        // 2. SICKLY PALE SKIN & SURGICAL STITCHES (hairlineY <= ry < r * 0.26)
+        // ──────────────────────────────────────────
+        else if (ry < r * 0.26) {
+          let col = '#EEF3F7';
+          if (ry < hairlineY + P * 2.0) {
+            col = '#D4DEE5';
+          } else if (Math.abs(rx) > r * 0.70 || ry > r * 0.18) {
+            col = '#D6E2EB';
+          }
+
+          // A. Center Horizontal Face Stitch Line
+          const isFaceStitchHoriz = (Math.abs(ry - (-r * 0.02)) <= P * 0.6 && Math.abs(rx) <= r * 0.44);
+          const isFaceStitchTick = (Math.abs(ry - (-r * 0.02)) <= P * 1.8 && Math.abs(rx) <= r * 0.44 && Math.abs(Math.round(rx / (P * 4)) * (P * 4) - rx) <= P * 0.5);
+
+          // B. Left Cheek Diagonal Stitch Line
+          const diagProg = (ry - (r * 0.02)) / (r * 0.20);
+          const diagX = -r * 0.35 + (r * 0.23) * diagProg;
+          const isDiagStitch = (ry >= r * 0.02 && ry <= r * 0.22 && Math.abs(rx - diagX) <= P * 0.6);
+          const isDiagTick = (ry >= r * 0.02 && ry <= r * 0.22 && Math.abs(Math.round(ry / (P * 3)) * (P * 3) - ry) <= P * 0.5 && Math.abs(rx - diagX) <= P * 1.6);
+
+          // C. Forehead Vertical Stitch Line
+          const isForeheadStitch = (Math.abs(rx - (-r * 0.34)) <= P * 0.6 && ry >= -r * 0.46 && ry <= -r * 0.26);
+          const isForeheadTick = (Math.abs(rx - (-r * 0.34)) <= P * 1.8 && Math.abs(Math.round(ry / (P * 3)) * (P * 3) - ry) <= P * 0.5 && ry >= -r * 0.46 && ry <= -r * 0.26);
+
+          if (isFaceStitchHoriz || isFaceStitchTick || isDiagStitch || isDiagTick || isForeheadStitch || isForeheadTick) {
+            ctx.fillStyle = '#222530';
+          } else {
+            ctx.fillStyle = col;
+          }
+          ctx.fillRect(px, py, P, P);
+        }
+        // ──────────────────────────────────────────
+        // 3. DARK PATCHWORK PONCHO TUNIC (ry >= r * 0.26)
+        // ──────────────────────────────────────────
+        else {
+          const neckHalfW = (1 - (ry - r * 0.26) / (r * 0.14)) * (r * 0.22);
+          const isNeckSkin = (ry <= r * 0.40 && Math.abs(rx) <= Math.max(0, neckHalfW));
+
+          const isNeckStitch = (isNeckSkin && Math.abs(ry - r * 0.32) <= P * 0.6 && Math.abs(rx) <= r * 0.16);
+          const isNeckTick = (isNeckSkin && Math.abs(ry - r * 0.32) <= P * 1.8 && Math.abs(rx) <= r * 0.16 && Math.abs(Math.round(rx / (P * 3)) * (P * 3) - rx) <= P * 0.5);
+
+          const isHorizSeam = (Math.abs(ry - r * 0.52) <= P * 0.7 || Math.abs(ry - r * 0.72) <= P * 0.7 || Math.abs(ry - r * 0.88) <= P * 0.7);
+          const isVertSeam = (Math.abs(Math.abs(rx) - r * 0.35) <= P * 0.7 || Math.abs(rx) <= P * 0.7 || Math.abs(Math.abs(rx) - r * 0.65) <= P * 0.7);
+          const isSeamStitchTick = ((isHorizSeam && Math.abs(rx % (r * 0.12)) <= P * 0.7) || (isVertSeam && Math.abs(ry % (r * 0.12)) <= P * 0.7));
+
+          if (isNeckStitch || isNeckTick) {
+            ctx.fillStyle = '#222530';
+          } else if (isNeckSkin) {
+            ctx.fillStyle = (ry > r * 0.32) ? '#CCD7E0' : '#EEF3F7';
+          } else if (isSeamStitchTick) {
+            ctx.fillStyle = '#4A5068';
+          } else if (isHorizSeam || isVertSeam) {
+            ctx.fillStyle = '#282B38';
+          } else {
+            let col = '#181920';
+            if (Math.abs(rx) > r * 0.70 || ry > r * 0.85) {
+              col = '#0F1014';
+            } else if (ry < r * 0.48 && Math.abs(rx) < r * 0.45) {
+              col = '#22242E';
+            }
+            ctx.fillStyle = col;
+          }
+          ctx.fillRect(px, py, P, P);
+        }
+      }
+    }
+  }
+
+  ctx.restore();
 }

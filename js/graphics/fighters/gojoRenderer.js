@@ -702,11 +702,7 @@ export class GojoRenderer {
   }
 
   static drawOutline(ctx, fighter) {
-    ctx.beginPath();
-    ctx.arc(fighter.x, fighter.y, fighter.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = fighter.color;
-    ctx.stroke();
+    // Global fighter body outline stroke removed
   }
 
   static _drawHealingAura(ctx, fighter) {

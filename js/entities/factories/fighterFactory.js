@@ -170,13 +170,8 @@ function wrapFighterDraw(FighterClass) {
     };
     
     ctx.stroke = function() {
-      if (arcCalled && !fighter.suppressSketchyOutline) {
-        let seed = 0;
-        const idStr = String(fighter.id || 'fighter');
-        for (let i = 0; i < idStr.length; i++) {
-          seed += idStr.charCodeAt(i);
-        }
-        drawSketchyCircle(ctx, arcX, arcY, arcR, seed, ctx.strokeStyle, ctx.lineWidth || 2.5);
+      if (arcCalled) {
+        // Global fighter body circle outline stroke removed
         arcCalled = false;
       } else if (handArcCalled) {
         handArcCalled = false;

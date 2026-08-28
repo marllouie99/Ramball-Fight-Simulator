@@ -55,13 +55,9 @@ export class AimbotFighter extends Fighter {
     this._attackSoundConfig = sound;
   }
 
-  /** Custom outline with cyan glow. */
+  /** Custom outline (removed per global stroke removal standard). */
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#00eaff70';
-    ctx.stroke();
+    // Global fighter body outline stroke removed
   }
 
   /** Custom gun for Blue Aimbot. */

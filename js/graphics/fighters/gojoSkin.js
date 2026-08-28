@@ -145,289 +145,9 @@ export function drawGojoBody(ctx, fighter) {
 
 
     // ═══════════════════════════════════════════════════════════════════
-    // RENDER GOJO PNG MODEL OR PIXEL ART FALLBACK
+    // AUTHENTIC 1:1 PROCEDURAL PIXEL ART GOJO SATORU SKIN (Discrete Pixel Grid Engine)
     // ═══════════════════════════════════════════════════════════════════
-    const r = fighter.r;
-    const img = _getGojoImage();
-
-    if (img && img.complete && img.naturalWidth > 0) {
-      ctx.save();
-      ctx.imageSmoothingEnabled = false; // Crisp nearest-neighbor pixel art scaling
-      const modelScale = 1.04;
-      const drawR = r * modelScale;
-      ctx.drawImage(img, -drawR, -drawR, drawR * 2, drawR * 2);
-      ctx.restore();
-
-      // Overlays (stun, poison, etc)
-      if (typeof fighter.drawStatusOverlays === 'function') {
-        fighter.drawStatusOverlays(ctx, fighter.r);
-      }
-      ctx.restore();
-      return;
-    }
-
-    // ═══════════════════════════════════════════════════════════════════
-    // AUTHENTIC 1:1 PIXEL ART GOJO SATORU SKIN (64x64 Grid Engine)
-    // ═══════════════════════════════════════════════════════════════════
-    const P = r / 30; // Pixel grid block unit (60x60 grid spanning circle diameter)
-
-    // Palette Colors matching Reference Image 1
-    const C = {
-      outline: '#0e0f14',        // Deep dark pixel border
-      hairWhite: '#ffffff',      // Pure white hair core
-      hairBlue: '#cad6e8',       // Light ice-blue hair partition line
-      hairShadow: '#8d9eb5',     // Corner hair shadow dither
-      
-      blindfoldTop: '#434757',   // Blindfold top highlight band
-      blindfoldMid: '#252731',   // Blindfold main charcoal body
-      blindfoldCrease: '#13141a',// Blindfold horizontal crease
-      blindfoldCorner: '#363a48',// Blindfold corner dither
-
-      skinBase: '#fedbc0',       // Warm fair skin
-      skinShadow1: '#e9b796',    // Light cheek shadow dither
-      skinShadow2: '#d89f7c',    // Deep cheek shadow dither
-
-      uniformBase: '#262039',    // Deep indigo / midnight purple torso
-      uniformHighlight: '#483c6b',// Collar rim / crease highlight
-      uniformCrease: '#14121d',  // Collar fold / border crease
-      uniformZipper: '#120f1c',  // Central covered zipper placket
-      uniformDither: '#181326',  // Bottom perimeter shadow
-    };
-
-    const px = (gx, gy, fill) => {
-      if (!fill) return;
-      ctx.fillStyle = fill;
-      ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(P), Math.round(P));
-    };
-
-    const pxRect = (gx, gy, gw, gh, fill) => {
-      if (!fill) return;
-      ctx.fillStyle = fill;
-      ctx.fillRect(Math.round(gx * P), Math.round(gy * P), Math.round(gw * P), Math.round(gh * P));
-    };
-
-    // Clip to base circle to maintain exact fighter collision silhouette
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.clip();
-
-    // ── 1. BASE FACE SKIN & CHEEK DITHER ──
-    pxRect(-30, -30, 60, 60, C.skinBase);
-
-    // Left & Right Cheek Shadow Dither Matrix
-    for (let gy = -1; gy <= 14; gy++) {
-      for (let gx = -28; gx <= 28; gx++) {
-        const absX = Math.abs(gx);
-        if (absX >= 18) {
-          const ditherLevel = (absX - 18) / 10; // 0 to 1
-          const isChecker1 = (gx + gy) % 2 === 0;
-          const isChecker2 = (gx + gy) % 4 === 0;
-
-          if (ditherLevel > 0.65) {
-            px(gx, gy, isChecker1 ? C.skinShadow2 : C.skinShadow1);
-          } else if (ditherLevel > 0.3) {
-            if (isChecker1) px(gx, gy, C.skinShadow1);
-          } else if (isChecker2) {
-            px(gx, gy, C.skinShadow1);
-          }
-        }
-      }
-    }
-
-    // ── 2. WHITE HAIR & ICE-BLUE STRANDS (Top) ──
-    pxRect(-30, -30, 60, 20, C.hairWhite);
-
-    // Hair Outer Corner Shadow Dithering
-    for (let gy = -30; gy <= -10; gy++) {
-      for (let gx = -28; gx <= 28; gx++) {
-        const absX = Math.abs(gx);
-        if (absX >= 16) {
-          const hDist = (absX - 16) / 12;
-          if (hDist > 0.6) {
-            if ((gx + gy) % 2 === 0) px(gx, gy, C.hairBlue);
-            else if ((gx + gy) % 4 === 1) px(gx, gy, C.hairShadow);
-          } else if (hDist > 0.25) {
-            if ((gx + gy) % 3 === 0) px(gx, gy, C.hairBlue);
-          }
-        }
-      }
-    }
-
-    // 2 Curved Vertical Hair Partition Lines (terminating at the raised blindfold tab)
-    for (let gy = -26; gy <= -12; gy++) {
-      const prog = (gy + 26) / 14; // 0 (top) to 1 (bottom)
-      const leftX = Math.round(-6 - prog * 4);
-      const rightX = Math.round(6 + prog * 4);
-
-      px(leftX, gy, C.hairBlue);
-      px(leftX + 1, gy, C.hairBlue);
-      px(rightX, gy, C.hairBlue);
-      px(rightX - 1, gy, C.hairBlue);
-    }
-
-    // ── 3. SCULPTED CHARCOAL BLINDFOLD (Exact 1:1 Reference Match) ──
-    // ── 3.1 Raised Top Center Crest Profile (____/‾‾‾‾\____) ──
-    // Center raised tab (gx = -12 to 12, gy = -13 to -10)
-    pxRect(-12, -13, 24, 4, C.blindfoldMid);
-    // Left & Right lower shoulders (gx < -12 and gx > 12, gy = -10 to -8)
-    pxRect(-30, -10, 18, 3, C.blindfoldMid);
-    pxRect(12, -10, 18, 3, C.blindfoldMid);
-
-    // ── Top Border Outline (Stepped crest outline) ──
-    // Center raised top line
-    pxRect(-12, -14, 24, 1, C.outline);
-    // Angled shoulder steps
-    px(-13, -13, C.outline);
-    px(-14, -12, C.outline);
-    px(12, -13, C.outline);
-    px(13, -12, C.outline);
-    // Left & right horizontal top shoulders
-    pxRect(-30, -11, 16, 1, C.outline);
-    pxRect(14, -11, 16, 1, C.outline);
-
-    // ── Topmost Highlight Rim ──
-    pxRect(-12, -13, 24, 1, '#4e5264');
-    px(-13, -12, '#4e5264');
-    px(12, -12, '#4e5264');
-    pxRect(-30, -10, 16, 1, '#4e5264');
-    pxRect(14, -10, 16, 1, '#4e5264');
-
-    // ── 3.2 3-Tier Fabric Shading & Double Horizontal Crease Lines ──
-    // Tier 1 (Upper Fabric Band)
-    pxRect(-12, -12, 24, 4, '#383b4a');
-    pxRect(-30, -9, 18, 2, '#383b4a');
-    pxRect(12, -9, 18, 2, '#383b4a');
-
-    // Crease 1 (Upper Horizontal Seam Line at gy = -7)
-    pxRect(-30, -7, 60, 1, '#181921');
-
-    // Tier 2 (Middle Fabric Band at gy = -6 to -4)
-    pxRect(-30, -6, 60, 3, '#292b36');
-
-    // Crease 2 (Lower Dark Shadow Seam Line at gy = -3)
-    pxRect(-30, -3, 60, 1, '#12131a');
-
-    // Tier 3 (Lower Fabric Shelf Band at gy = -2 to 1)
-    pxRect(-30, -2, 60, 3, '#323544');
-
-    // ── 3.3 Corner Checkerboard Dither Patches (Temples) ──
-    for (let gy = -10; gy <= -1; gy++) {
-      for (let gx = -28; gx <= 28; gx++) {
-        const absX = Math.abs(gx);
-        if (absX >= 18) {
-          if ((gx + gy) % 2 === 0) {
-            px(gx, gy, '#4a4e62');
-          }
-        }
-      }
-    }
-
-    // ── 3.4 Organic Stepped Eye Dips & Nose Arch (Bottom Profile) ──
-    // Left eye dip fill (gx = -18 to -5, gy = -1 to 1)
-    pxRect(-18, -1, 14, 2, '#292b36');
-    pxRect(-16, 0, 10, 2, '#292b36');
-    pxRect(-14, 1, 6, 1, '#323544'); // Lower shelf highlight
-
-    // Right eye dip fill (gx = 5 to 18, gy = -1 to 1)
-    pxRect(4, -1, 14, 2, '#292b36');
-    pxRect(6, 0, 10, 2, '#292b36');
-    pxRect(8, 1, 6, 1, '#323544');
-
-    // ── Stepped Bottom Perimeter Outline ──
-    // Far left outer corner
-    pxRect(-30, -2, 10, 1, C.outline);
-    px(-20, -1, C.outline);
-    // Left eye dip contour
-    px(-19, 0, C.outline);
-    pxRect(-18, 1, 4, 1, C.outline);
-    pxRect(-14, 2, 6, 1, C.outline); // Bottom of left eye dip
-    pxRect(-8, 1, 3, 1, C.outline);
-    px(-5, 0, C.outline);
-    // Center nose bridge arch
-    px(-4, -1, C.outline);
-    pxRect(-3, -2, 6, 1, C.outline); // Top of nose arch
-    px(3, -1, C.outline);
-    // Right eye dip contour
-    px(4, 0, C.outline);
-    pxRect(5, 1, 3, 1, C.outline);
-    pxRect(8, 2, 6, 1, C.outline);  // Bottom of right eye dip
-    pxRect(14, 1, 4, 1, C.outline);
-    px(18, 0, C.outline);
-    px(19, -1, C.outline);
-    // Far right outer corner
-    pxRect(20, -2, 10, 1, C.outline);
-
-    // ── 4. JUJUTSU HIGH HIGH-COLLAR UNIFORM (Bottom: gy >= 7) ──
-    // Torso Base Fill
-    pxRect(-30, 14, 60, 18, C.uniformBase);
-
-    // Tall Upright Collar Box (gx = -14 to 14, gy = 7 to 14)
-    pxRect(-14, 7, 28, 8, C.uniformBase);
-
-    // Outer Slanted Collar Wings (gx = -26 to -14 and 14 to 26)
-    for (let step = 0; step < 12; step++) {
-      const cxL = -14 - step;
-      const cxR = 14 + step;
-      const cy = 7 + Math.round(step * 0.65);
-      pxRect(cxL, cy, 1, 30 - cy, C.uniformBase);
-      pxRect(cxR, cy, 1, 30 - cy, C.uniformBase);
-      px(cxL, cy, C.outline); // Collar outer rim
-      px(cxR, cy, C.outline);
-    }
-
-    // Collar Top Horizontal Rim Outline
-    pxRect(-14, 7, 28, 1, C.outline);
-    pxRect(-14, 8, 28, 1, C.uniformHighlight); // Rim top highlight
-    pxRect(-14, 7, 1, 7, C.outline);
-    pxRect(13, 7, 1, 7, C.outline);
-
-    // ── Horizontal Ribbed Collar Creases ──
-    // Upper Collar Creases (Rib 1)
-    pxRect(-13, 10, 10, 1, C.uniformCrease);
-    pxRect(-13, 9, 10, 1, C.uniformHighlight);
-    pxRect(3, 10, 10, 1, C.uniformCrease);
-    pxRect(3, 9, 10, 1, C.uniformHighlight);
-
-    // Lower Collar Creases (Rib 2)
-    pxRect(-16, 13, 13, 1, C.uniformCrease);
-    pxRect(-16, 12, 13, 1, C.uniformHighlight);
-    pxRect(3, 13, 13, 1, C.uniformCrease);
-    pxRect(3, 12, 13, 1, C.uniformHighlight);
-
-    // Mid-Chest Horizontal Seam Lines
-    pxRect(-24, 17, 21, 1, C.uniformCrease);
-    pxRect(-24, 16, 21, 1, C.uniformHighlight);
-    pxRect(3, 17, 21, 1, C.uniformCrease);
-    pxRect(3, 16, 21, 1, C.uniformHighlight);
-
-    // ── Central Covered Zipper / Button Placket Strip ──
-    pxRect(-2, 7, 4, 24, C.uniformZipper);
-    pxRect(-3, 7, 1, 24, C.outline);
-    pxRect(2, 7, 1, 24, C.outline);
-    pxRect(-2, 8, 1, 22, C.uniformHighlight); // Zipper left specular line
-
-    // ── Uniform Bottom Perimeter Dither Shading ──
-    for (let gy = 20; gy <= 30; gy++) {
-      for (let gx = -28; gx <= 28; gx++) {
-        const uDist = (gy - 20) / 10;
-        if (uDist > 0.4 && (gx + gy) % 2 === 0) {
-          px(gx, gy, C.uniformDither);
-        }
-      }
-    }
-
-    ctx.restore(); // Undo circle clip
-
-    // ── 5. STEPPED CIRCULAR PIXEL BORDER (Exact Circular Outline) ──
-    ctx.save();
-    for (let a = 0; a < 360; a += 1.2) {
-      const rad = (a * Math.PI) / 180;
-      const bx = Math.round(Math.cos(rad) * 29.5);
-      const by = Math.round(Math.sin(rad) * 29.5);
-      pxRect(bx - 1, by - 1, 3, 3, C.outline);
-    }
-    ctx.restore();
+    drawGojoPixelBody(ctx, fighter.r);
 
     // Overlays (stun, poison, etc)
     if (typeof fighter.drawStatusOverlays === 'function') {
@@ -435,4 +155,221 @@ export function drawGojoBody(ctx, fighter) {
     }
 
     ctx.restore();
+}
+
+/**
+ * Authentic 1:1 Procedural Pixel Art Body for Gojo Satoru
+ * Uses discrete stepped rasterization loop with zero subpixel bleed.
+ */
+export function drawGojoPixelBody(ctx, r) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // Palette Colors matching 1:1 Reference
+  const C = {
+    outline: '#0E0F14',        // Deep dark pixel border
+    hairWhite: '#FFFFFF',      // Pure white hair core
+    hairBlue: '#CAD6E8',       // Light ice-blue hair partition line
+    hairShadow: '#8D9EB5',     // Corner hair shadow dither
+
+    blindfoldHighlight: '#4E5264', // Topmost highlight rim
+    blindfoldTop: '#434757',   // Blindfold top highlight band
+    blindfoldMid: '#252731',   // Blindfold main charcoal body
+    blindfoldTier1: '#383B4A', // Upper fabric band
+    blindfoldCrease1: '#181921', // Upper horizontal crease seam
+    blindfoldTier2: '#292B36', // Middle fabric band
+    blindfoldCrease2: '#12131A', // Lower dark shadow seam line
+    blindfoldTier3: '#323544', // Lower fabric shelf band
+    blindfoldCorner: '#4A4E62', // Temple corner dither
+
+    skinBase: '#FEDBC0',       // Warm fair skin
+    skinShadow1: '#E9B796',    // Light cheek shadow dither
+    skinShadow2: '#D89F7C',    // Deep cheek shadow dither
+
+    uniformBase: '#262039',    // Deep indigo / midnight purple torso
+    uniformHighlight: '#483C6B', // Collar rim / crease highlight
+    uniformCrease: '#14121D',  // Collar fold / border crease
+    uniformZipper: '#120F1C',  // Central covered zipper placket
+    uniformDither: '#181326'   // Bottom perimeter shadow
+  };
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // ──────────────────────────────────────────
+      // 0. PIXELATED BLACK STROKE BORDER
+      // ──────────────────────────────────────────
+      if (
+        Math.hypot(rx + P, ry) > r ||
+        Math.hypot(rx - P, ry) > r ||
+        Math.hypot(rx, ry + P) > r ||
+        Math.hypot(rx, ry - P) > r
+      ) {
+        ctx.fillStyle = C.outline;
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      // Normalized coordinates from -1.0 to +1.0
+      const nx = rx / r;
+      const ny = ry / r;
+      const absX = Math.abs(nx);
+
+      // ──────────────────────────────────────────
+      // 1. SCULPTED CHARCOAL BLINDFOLD GEOMETRY
+      // ──────────────────────────────────────────
+      // Top raised crest: center (-0.40 <= nx <= 0.40) rises from -0.34 to -0.44
+      const crestRise = (absX <= 0.40) ? (0.40 - absX) * 0.25 : 0;
+      const blindfoldTopY = -0.34 - crestRise;
+
+      // Bottom profile: eye dips at left/right (-0.60 to -0.15 and 0.15 to 0.60) curving down to +0.06, nose arch in center (-0.12 to 0.12) rising to -0.06
+      let blindfoldBottomY = -0.06;
+      if (absX >= 0.15 && absX <= 0.62) {
+        const dipProg = Math.sin(((absX - 0.15) / 0.47) * Math.PI);
+        blindfoldBottomY = -0.06 + dipProg * 0.13;
+      } else if (absX > 0.62) {
+        blindfoldBottomY = -0.06;
+      }
+
+      // ──────────────────────────────────────────
+      // ZONE A: WHITE HAIR & ICE-BLUE STRANDS (ny < blindfoldTopY)
+      // ──────────────────────────────────────────
+      if (ny < blindfoldTopY) {
+        // Blindfold top outline line
+        if (ny >= blindfoldTopY - P / r) {
+          ctx.fillStyle = C.outline;
+        } else if (ny >= blindfoldTopY - (P * 2) / r) {
+          ctx.fillStyle = C.blindfoldHighlight;
+        } else {
+          let col = C.hairWhite;
+          // Outer corner dither
+          if (absX >= 0.55) {
+            const dLevel = (absX - 0.55) / 0.45;
+            if (dLevel > 0.5) {
+              col = ((gx + gy) % 2 === 0) ? C.hairBlue : C.hairShadow;
+            } else if ((gx + gy) % 3 === 0) {
+              col = C.hairBlue;
+            }
+          }
+          // Curved vertical hair partition lines
+          else if (Math.abs(absX - (0.20 + (ny + 1.0) * 0.12)) <= P / r * 1.2) {
+            col = C.hairBlue;
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE B: SCULPTED CHARCOAL BLINDFOLD (blindfoldTopY <= ny < blindfoldBottomY)
+      // ──────────────────────────────────────────
+      else if (ny < blindfoldBottomY) {
+        let col = C.blindfoldMid;
+
+        // Top highlight band
+        if (ny < blindfoldTopY + 0.08) {
+          col = C.blindfoldTop;
+        }
+        // Crease 1 (Upper horizontal crease seam at ny ~ -0.22)
+        else if (Math.abs(ny - (-0.22)) <= P / r * 0.8) {
+          col = C.blindfoldCrease1;
+        }
+        // Tier 2 (Middle fabric band at -0.20 <= ny < -0.10)
+        else if (ny >= -0.20 && ny < -0.10) {
+          col = C.blindfoldTier2;
+        }
+        // Crease 2 (Lower dark shadow seam line at ny ~ -0.10)
+        else if (Math.abs(ny - (-0.10)) <= P / r * 0.8) {
+          col = C.blindfoldCrease2;
+        }
+        // Tier 3 (Lower fabric shelf band at ny >= -0.10)
+        else if (ny >= -0.10) {
+          col = C.blindfoldTier3;
+        }
+
+        // Temple corner dither
+        if (absX >= 0.60 && (gx + gy) % 2 === 0) {
+          col = C.blindfoldCorner;
+        }
+
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE C: WARM FAIR SKIN & CHEEKS (blindfoldBottomY <= ny < 0.24)
+      // ──────────────────────────────────────────
+      else if (ny < 0.24) {
+        // Blindfold bottom outline
+        if (ny <= blindfoldBottomY + P / r) {
+          ctx.fillStyle = C.outline;
+        } else {
+          let col = C.skinBase;
+          // Left & right cheek shadow dither
+          if (absX >= 0.55) {
+            const dLevel = (absX - 0.55) / 0.45;
+            if (dLevel > 0.6) {
+              col = ((gx + gy) % 2 === 0) ? C.skinShadow2 : C.skinShadow1;
+            } else if ((gx + gy) % 2 === 0) {
+              col = C.skinShadow1;
+            }
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE D: JUJUTSU HIGH UNIFORM (ny >= 0.24)
+      // ──────────────────────────────────────────
+      else {
+        // Center covered zipper placket (-0.06 <= nx <= 0.06)
+        const isZipper = (absX <= 0.07);
+        const isZipperSeam = (Math.abs(absX - 0.07) <= P / r * 0.6);
+        const isZipperHighlight = (nx >= -0.06 && nx <= -0.03 && ny >= 0.28);
+
+        // Collar top horizontal rim (ny ~ 0.24)
+        const isCollarRim = (ny <= 0.27 && absX <= 0.50);
+        const isCollarHighlight = (ny >= 0.27 && ny <= 0.30 && absX <= 0.50);
+
+        // Horizontal ribbed collar creases (ny ~ 0.34 and ny ~ 0.44)
+        const isCrease1 = (Math.abs(ny - 0.35) <= P / r * 0.7 && absX <= 0.55);
+        const isCrease1Hi = (Math.abs(ny - 0.32) <= P / r * 0.7 && absX <= 0.55);
+        const isCrease2 = (Math.abs(ny - 0.46) <= P / r * 0.7 && absX <= 0.65);
+        const isCrease2Hi = (Math.abs(ny - 0.43) <= P / r * 0.7 && absX <= 0.65);
+
+        if (isZipperHighlight) {
+          ctx.fillStyle = C.uniformHighlight;
+        } else if (isZipperSeam) {
+          ctx.fillStyle = C.outline;
+        } else if (isZipper) {
+          ctx.fillStyle = C.uniformZipper;
+        } else if (isCollarRim) {
+          ctx.fillStyle = C.outline;
+        } else if (isCollarHighlight) {
+          ctx.fillStyle = C.uniformHighlight;
+        } else if (isCrease1 || isCrease2) {
+          ctx.fillStyle = C.uniformCrease;
+        } else if (isCrease1Hi || isCrease2Hi) {
+          ctx.fillStyle = C.uniformHighlight;
+        } else {
+          let col = C.uniformBase;
+          if (absX > 0.68 || ny > 0.82) {
+            if ((gx + gy) % 2 === 0) col = C.uniformDither;
+          }
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
+
+  ctx.restore();
 }

@@ -270,438 +270,8 @@ export function drawYujiSkin(ctx, fighter) {
     _drawFist(ctx, backX, backY, handRadius, skinColor, fighter);
   }
 
-  // ── Clip everything inside the circle ──
-  ctx.save();
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.clip();
-
-  const yujiImg = _getYujiSkinImage();
-  if (yujiImg && yujiImg.complete && yujiImg.naturalWidth > 0 && !isSukunaForm) {
-    ctx.save();
-    ctx.imageSmoothingEnabled = false; // Nearest-neighbor scaling for authentic pixel art
-    const modelScale = 1.04;
-    const drawR = r * modelScale;
-    ctx.drawImage(yujiImg, -drawR, -drawR, drawR * 2, drawR * 2);
-    ctx.restore();
-  } else {
-    // 1. Skin base — warm peach (changes to Sukuna's pale crimson-tinged skin when Soul Swap is active/transitioning)
-    ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
-    ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Subtle shading gradient for 3D body volume
-    if (isSukunaForm) {
-      const bodyGrad = ctx.createRadialGradient(-r * 0.2, -r * 0.3, r * 0.1, 0, 0, r * 1.05);
-      bodyGrad.addColorStop(0, 'rgba(255, 235, 225, 0.25)');
-      bodyGrad.addColorStop(0.7, 'rgba(180, 80, 70, 0.15)');
-      bodyGrad.addColorStop(1, 'rgba(60, 10, 10, 0.45)');
-      ctx.fillStyle = bodyGrad;
-      ctx.beginPath();
-      ctx.arc(0, 0, r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
-  // ── 2. HAIR — dusty pink-salmon with jagged spiky fringe ──
-  ctx.fillStyle = '#D9847A';
-  ctx.beginPath();
-  ctx.moveTo(-r, -r);
-  ctx.lineTo(r, -r);
-  ctx.lineTo(r, -r * 0.45);
-  
-  // Draw jagged teeth (asymmetric zig-zag pattern) from right to left along the hairline
-  const hairline = [
-    { x: r, y: -r * 0.45 },
-    { x: r * 0.85, y: -r * 0.38 }, // tip
-    { x: r * 0.70, y: -r * 0.48 }, // valley
-    { x: r * 0.52, y: -r * 0.33 }, // tip (longer)
-    { x: r * 0.35, y: -r * 0.46 }, // valley
-    { x: r * 0.20, y: -r * 0.29 }, // tip (longest, central)
-    { x: r * 0.05, y: -r * 0.50 }, // valley
-    { x: -r * 0.12, y: -r * 0.35 }, // tip (medium)
-    { x: -r * 0.28, y: -r * 0.47 }, // valley
-    { x: -r * 0.48, y: -r * 0.31 }, // tip (longer)
-    { x: -r * 0.62, y: -r * 0.49 }, // valley
-    { x: -r * 0.78, y: -r * 0.36 }, // tip
-    { x: -r, y: -r * 0.45 }
-  ];
-  for (const pt of hairline) {
-    ctx.lineTo(pt.x, pt.y);
-  }
-  ctx.closePath();
-  ctx.fill();
-
-  // Stroke only the jagged bottom hairline edge with a clean black outline
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = Math.max(1.8, r * 0.055);
-  ctx.lineJoin = 'miter';
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(hairline[0].x, hairline[0].y);
-  for (let i = 1; i < hairline.length; i++) {
-    ctx.lineTo(hairline[i].x, hairline[i].y);
-  }
-  ctx.stroke();
-
-  // ── Yuji's facial scars (drawn in the skin region) ──
-  ctx.lineCap = 'round';
-
-  // Scar 1: diagonal slash across the left brow area (his signature scar)
-  ctx.strokeStyle = '#A0614A';
-  ctx.lineWidth = Math.max(1.8, r * 0.065);
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.25, -r * 0.30);
-  ctx.lineTo( r * 0.02, -r * 0.08);
-  ctx.stroke();
-
-  // Scar edge highlight (slightly lighter top edge for depth)
-  ctx.strokeStyle = 'rgba(210, 150, 120, 0.5)';
-  ctx.lineWidth = Math.max(0.8, r * 0.025);
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.24, -r * 0.32);
-  ctx.lineTo( r * 0.03, -r * 0.10);
-  ctx.stroke();
-
-  // Scar 2: small chin mark (second scar from reference image)
-  ctx.strokeStyle = '#A0614A';
-  ctx.lineWidth = Math.max(1.2, r * 0.045);
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.06, r * 0.18);
-  ctx.lineTo( r * 0.08, r * 0.28);
-  ctx.stroke();
-
-  // ── 3. JUJUTSU HIGH UNIFORM & ICONIC RED HOOD / COWL (Anime Reference) ──
-  // A. Neck opening with throat shadow
-  ctx.fillStyle = isSukunaForm ? '#C68A64' : '#DB9B72'; // Darker neck cast shadow
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.32, r * 0.08);
-  ctx.lineTo( r * 0.32, r * 0.08);
-  ctx.lineTo( r * 0.22, r * 0.32);
-  ctx.lineTo( 0, r * 0.35);
-  ctx.lineTo(-r * 0.22, r * 0.32);
-  ctx.closePath();
-  ctx.fill();
-
-  // B. Dark Violet-Navy Uniform Jacket Body (Lower Torso)
-  ctx.fillStyle = '#22263D';
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.40);
-  ctx.lineTo( r, r * 0.40);
-  ctx.lineTo( r, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // Shaded lower jacket sides & folds
-  ctx.fillStyle = '#171A2B';
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.40);
-  ctx.lineTo(-r * 0.50, r * 0.48);
-  ctx.lineTo(-r * 0.45, r);
-  ctx.lineTo(-r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(r, r * 0.40);
-  ctx.lineTo(r * 0.70, r * 0.50);
-  ctx.lineTo(r * 0.65, r);
-  ctx.lineTo(r, r);
-  ctx.closePath();
-  ctx.fill();
-
-  // Asymmetric Diagonal Chest Placket / Lapel (sweeps down-rightward across chest)
-  ctx.save();
-  ctx.fillStyle = '#282D48';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.25, r * 0.52);
-  ctx.lineTo( r * 0.58, r * 0.68);
-  ctx.lineTo( r * 0.54, r * 0.96);
-  ctx.lineTo(-r * 0.15, r * 0.96);
-  ctx.closePath();
-  ctx.fill();
-
-  // Diagonal chest placket seam line
-  ctx.strokeStyle = '#0E101A';
-  ctx.lineWidth = Math.max(1.4, r * 0.055);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.25, r * 0.52);
-  ctx.lineTo( r * 0.58, r * 0.68);
-  ctx.stroke();
-
-  // Diagonal fabric fold crease lines on navy uniform
-  ctx.strokeStyle = '#151828';
-  ctx.lineWidth = Math.max(1.0, r * 0.038);
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.40, r * 0.68);
-  ctx.quadraticCurveTo(-r * 0.10, r * 0.80, r * 0.35, r * 0.82);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.35, r * 0.80);
-  ctx.quadraticCurveTo(-r * 0.05, r * 0.90, r * 0.30, r * 0.92);
-  ctx.stroke();
-
-  // Third Golden Jujutsu Swirl Button on Left Chest Placket Point
-  _drawJJKSwirlButton(ctx, r * 0.46, r * 0.68, Math.max(2.2, r * 0.08));
-  ctx.restore();
-
-  // C. Voluminous Vivid Red Hoodie / Cowl Neck Wrap (Overlapping Layer)
-  // 1. Back/Shoulder Drapery Shadow Layer (Dark Deep Red #6E0D12)
-  ctx.fillStyle = '#6E0D12';
-  ctx.beginPath();
-  // Left shoulder drape
-  ctx.moveTo(-r, r * 0.18);
-  ctx.quadraticCurveTo(-r * 0.55, r * 0.10, -r * 0.20, r * 0.24);
-  ctx.lineTo(-r * 0.22, r * 0.54);
-  ctx.quadraticCurveTo(-r * 0.65, r * 0.56, -r, r * 0.42);
-  ctx.closePath();
-  ctx.fill();
-
-  // Right shoulder drape
-  ctx.beginPath();
-  ctx.moveTo(r * 0.18, r * 0.24);
-  ctx.quadraticCurveTo(r * 0.55, r * 0.10, r, r * 0.18);
-  ctx.lineTo(r, r * 0.42);
-  ctx.quadraticCurveTo(r * 0.60, r * 0.54, r * 0.22, r * 0.54);
-  ctx.closePath();
-  ctx.fill();
-
-  // 2. Main Vivid Red Cowl Body (Bright Crimson #C92A2A)
-  ctx.fillStyle = '#C92A2A';
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.22);
-  ctx.quadraticCurveTo(-r * 0.60, r * 0.12, -r * 0.22, r * 0.26);
-  ctx.lineTo(-r * 0.18, r * 0.50);
-  ctx.quadraticCurveTo(-r * 0.65, r * 0.50, -r, r * 0.38);
-  ctx.closePath();
-  ctx.fill();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.18, r * 0.26);
-  ctx.quadraticCurveTo(r * 0.60, r * 0.12, r, r * 0.22);
-  ctx.lineTo(r, r * 0.38);
-  ctx.quadraticCurveTo(r * 0.60, r * 0.50, r * 0.18, r * 0.50);
-  ctx.closePath();
-  ctx.fill();
-
-  // 3. Red Cowl Fabric Creases & Soft Roll Highlights (Upper Bright Lip #E03131)
-  ctx.strokeStyle = '#E03131';
-  ctx.lineWidth = Math.max(1.6, r * 0.06);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  // Left upper fold lip
-  ctx.moveTo(-r * 0.90, r * 0.22);
-  ctx.quadraticCurveTo(-r * 0.55, r * 0.15, -r * 0.24, r * 0.26);
-  ctx.stroke();
-  // Right upper fold lip
-  ctx.beginPath();
-  ctx.moveTo(r * 0.24, r * 0.26);
-  ctx.quadraticCurveTo(r * 0.55, r * 0.15, r * 0.90, r * 0.22);
-  ctx.stroke();
-
-  // Inner cowl crease shadows
-  ctx.strokeStyle = '#80141A';
-  ctx.lineWidth = Math.max(1.3, r * 0.05);
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.85, r * 0.34);
-  ctx.quadraticCurveTo(-r * 0.50, r * 0.32, -r * 0.22, r * 0.40);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.22, r * 0.40);
-  ctx.quadraticCurveTo(r * 0.50, r * 0.32, r * 0.85, r * 0.34);
-  ctx.stroke();
-
-  // 4. Center-Front Overlapping Collar Flap (Right Flap crossing to Left)
-  // Drop shadow cast under the overlapping flap onto the left drape
-  ctx.fillStyle = '#5C0E13';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.32, r * 0.20);
-  ctx.lineTo(-r * 0.18, r * 0.22);
-  ctx.lineTo(-r * 0.18, r * 0.58);
-  ctx.lineTo(-r * 0.32, r * 0.58);
-  ctx.closePath();
-  ctx.fill();
-
-  // The Overlapping Front Flap Body (#C92A2A with shadow bottom #A61E22)
-  ctx.fillStyle = '#C92A2A';
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.24, r * 0.22);
-  ctx.lineTo( r * 0.42, r * 0.18);
-  ctx.quadraticCurveTo(r * 0.56, r * 0.35, r * 0.45, r * 0.54);
-  ctx.lineTo(-r * 0.22, r * 0.56);
-  ctx.quadraticCurveTo(-r * 0.26, r * 0.38, -r * 0.24, r * 0.22);
-  ctx.closePath();
-  ctx.fill();
-
-  // Flap highlight fold along top edge
-  ctx.strokeStyle = '#EE5253';
-  ctx.lineWidth = Math.max(1.4, r * 0.055);
-  ctx.beginPath();
-  ctx.moveTo(-r * 0.24, r * 0.22);
-  ctx.lineTo( r * 0.42, r * 0.18);
-  ctx.stroke();
-
-  // Crisp Manga Dark Ink Boundary Lines around the red collar
-  ctx.strokeStyle = '#140205';
-  ctx.lineWidth = Math.max(1.3, r * 0.05);
-  ctx.lineCap = 'round';
-  ctx.beginPath();
-  // Flap vertical overlapping edge
-  ctx.moveTo(-r * 0.24, r * 0.22);
-  ctx.quadraticCurveTo(-r * 0.27, r * 0.38, -r * 0.22, r * 0.56);
-  ctx.lineTo(r * 0.45, r * 0.54);
-  ctx.stroke();
-
-  // Outer collar outline
-  ctx.beginPath();
-  ctx.moveTo(-r, r * 0.20);
-  ctx.quadraticCurveTo(-r * 0.55, r * 0.10, -r * 0.24, r * 0.22);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(r * 0.42, r * 0.18);
-  ctx.quadraticCurveTo(r * 0.65, r * 0.10, r, r * 0.20);
-  ctx.stroke();
-
-  // 5. Two Golden Jujutsu Swirl Buttons on the Red Overlapping Collar Flap
-  // Upper Collar Swirl Button (Button 1)
-  _drawJJKSwirlButton(ctx, -r * 0.10, r * 0.32, Math.max(2.3, r * 0.088));
-
-  // Lower Collar Swirl Button (Button 2)
-  _drawJJKSwirlButton(ctx, -r * 0.10, r * 0.46, Math.max(2.3, r * 0.088));
-
-  // 4. Soul Swap — Sukuna face markings (drawn during transition and active state)
-  if (isSukunaForm) {
-    ctx.fillStyle = '#0a0a0d';
-    ctx.strokeStyle = '#0a0a0d';
-
-    // --- A. Top Hairline Spikes (3 downward teeth) ---
-    ctx.beginPath();
-    ctx.moveTo(0, -r * 0.65);
-    ctx.lineTo(-r * 0.12, -r * 0.95);
-    ctx.lineTo(r * 0.12, -r * 0.95);
-    ctx.closePath();
-    ctx.moveTo(-r * 0.28, -r * 0.70);
-    ctx.lineTo(-r * 0.40, -r * 0.95);
-    ctx.lineTo(-r * 0.18, -r * 0.95);
-    ctx.closePath();
-    ctx.moveTo(r * 0.28, -r * 0.70);
-    ctx.lineTo(r * 0.18, -r * 0.95);
-    ctx.lineTo(r * 0.40, -r * 0.95);
-    ctx.closePath();
-    ctx.fill();
-
-    // --- B. Forehead & Nose Bridge Markings (Dot + Chevrons) ---
-    // Central Dot
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.32, r * 0.08, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Left Bracket ┌
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(1.8, r * 0.07);
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'miter';
-    ctx.moveTo(-r * 0.36, -r * 0.46);
-    ctx.lineTo(-r * 0.20, -r * 0.46);
-    ctx.lineTo(-r * 0.18, -r * 0.16);
-    ctx.lineTo(-r * 0.28, -r * 0.14);
-    ctx.stroke();
-
-    // Right Bracket ┐
-    ctx.beginPath();
-    ctx.moveTo(r * 0.36, -r * 0.46);
-    ctx.lineTo(r * 0.20, -r * 0.46);
-    ctx.lineTo(r * 0.18, -r * 0.16);
-    ctx.lineTo(r * 0.28, -r * 0.14);
-    ctx.stroke();
-
-    // --- C. Cheek Jagged Markings & Jawline Wrap (Left & Right) ---
-    // Left Cheek Tattoo Branch
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(2.2, r * 0.08);
-    ctx.moveTo(-r * 0.38, -r * 0.08);
-    ctx.lineTo(-r * 0.52, -r * 0.24);
-    ctx.lineTo(-r * 0.46, -r * 0.32);
-    ctx.lineTo(-r * 0.68, -r * 0.34);
-    ctx.lineTo(-r * 0.60, -r * 0.18);
-    ctx.lineTo(-r * 0.88, -r * 0.12);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(-r * 0.60, -r * 0.18);
-    ctx.lineTo(-r * 0.85, 0);
-    ctx.lineTo(-r * 0.75, r * 0.48);
-    ctx.lineTo(-r * 0.30, r * 0.66);
-    ctx.stroke();
-
-    // Right Cheek Tattoo Branch
-    ctx.beginPath();
-    ctx.moveTo(r * 0.38, -r * 0.08);
-    ctx.lineTo(r * 0.52, -r * 0.24);
-    ctx.lineTo(r * 0.46, -r * 0.32);
-    ctx.lineTo(r * 0.68, -r * 0.34);
-    ctx.lineTo(r * 0.60, -r * 0.18);
-    ctx.lineTo(r * 0.88, -r * 0.12);
-    ctx.stroke();
-
-    ctx.beginPath();
-    ctx.moveTo(r * 0.60, -r * 0.18);
-    ctx.lineTo(r * 0.85, 0);
-    ctx.lineTo(r * 0.75, r * 0.48);
-    ctx.lineTo(r * 0.30, r * 0.66);
-    ctx.stroke();
-
-    // Jaw band connecting left and right lower jawline
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(2.5, r * 0.09);
-    ctx.moveTo(-r * 0.82, r * 0.38);
-    ctx.lineTo(-r * 0.40, r * 0.64);
-    ctx.lineTo(0, r * 0.68);
-    ctx.lineTo(r * 0.40, r * 0.64);
-    ctx.lineTo(r * 0.82, r * 0.38);
-    ctx.stroke();
-
-    // --- E. Smirk Mouth Line ---
-    ctx.beginPath();
-    ctx.lineWidth = Math.max(1.8, r * 0.06);
-    ctx.moveTo(-r * 0.26, r * 0.24);
-    ctx.lineTo(-r * 0.10, r * 0.30);
-    ctx.lineTo(0, r * 0.26);
-    ctx.lineTo(r * 0.10, r * 0.30);
-    ctx.lineTo(r * 0.26, r * 0.24);
-    ctx.stroke();
-
-    // --- F. Chin Markings (3 Upward Triangles) ---
-    ctx.beginPath();
-    ctx.moveTo(0, r * 0.72);
-    ctx.lineTo(-r * 0.08, r * 0.94);
-    ctx.lineTo(r * 0.08, r * 0.94);
-    ctx.closePath();
-    ctx.moveTo(-r * 0.16, r * 0.74);
-    ctx.lineTo(-r * 0.26, r * 0.92);
-    ctx.lineTo(-r * 0.10, r * 0.94);
-    ctx.closePath();
-    ctx.moveTo(r * 0.16, r * 0.74);
-    ctx.lineTo(r * 0.10, r * 0.94);
-    ctx.lineTo(r * 0.26, r * 0.92);
-    ctx.closePath();
-    ctx.fill();
-  }
-  }
-
-  ctx.restore(); // undo clip
-
-  // 5. Bold black outline
-  ctx.strokeStyle = '#111111';
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
+  // ── 2. Body Circle (Authentic Procedural Pixel Art) ──
+  drawYujiPixelBody(ctx, r, isSukunaForm);
 
   // Status overlays (stun, freeze, etc.)
   if (typeof fighter.drawStatusOverlays === 'function') {
@@ -887,6 +457,247 @@ function _drawJJKSwirlButton(ctx, x, y, radius) {
   ctx.beginPath();
   ctx.arc(-radius * 0.32, -radius * 0.32, Math.max(0.6, radius * 0.24), 0, Math.PI * 2);
   ctx.fill();
+
+  ctx.restore();
+}
+
+/**
+ * Draws Yuji Itadori's entire body circle model in authentic Pixel Art Style.
+ * Uses discrete stepped pixel grid rasterization matching Saitama and Ichigo.
+ * Minimalist circle brawler aesthetic, upright front POV, faceless (Rule #19 compliant).
+ */
+export function drawYujiPixelBody(ctx, r, isSukunaForm = false) {
+  ctx.save();
+  ctx.imageSmoothingEnabled = false;
+  const P = 2.0;
+  const snap = (v) => Math.round(v / P) * P;
+  const steps = Math.ceil((r + P) / P);
+
+  // Hairline shape calculation: spiky jagged dusty pink-salmon fringe
+  function getHairlineY(rx) {
+    const nx = rx / r; // -1 to +1
+    // Asymmetric spiky bangs across forehead
+    const spikeWave = Math.abs(Math.sin((nx + 0.12) * Math.PI * 3.4));
+    const centralExtension = (1.0 - Math.abs(nx) * 0.30);
+    const spikeDepth = r * 0.28 * centralExtension * Math.pow(spikeWave, 1.15);
+    return -r * 0.38 + spikeDepth;
+  }
+
+  for (let gy = -steps; gy <= steps; gy++) {
+    for (let gx = -steps; gx <= steps; gx++) {
+      const rx = gx * P;
+      const ry = gy * P;
+      const dist = Math.hypot(rx, ry);
+      if (dist > r) continue;
+
+      const px = snap(rx);
+      const py = snap(ry);
+
+      // Pixelated Black Stroke Border
+      if (Math.hypot(rx + P, ry) > r || Math.hypot(rx - P, ry) > r || Math.hypot(rx, ry + P) > r || Math.hypot(rx, ry - P) > r) {
+        ctx.fillStyle = '#0E0F14';
+        ctx.fillRect(px, py, P, P);
+        continue;
+      }
+
+      const hairlineY = getHairlineY(rx);
+      const nx = rx / r;
+      const absX = Math.abs(nx);
+
+      // ──────────────────────────────────────────
+      // ZONE 1: Spiky Pink-Salmon Hair (ry < hairlineY)
+      // ──────────────────────────────────────────
+      if (ry < hairlineY) {
+        let col = isSukunaForm ? '#C44E58' : '#D9847A'; // Base pink-salmon
+        if (ry < -r * 0.70) {
+          col = isSukunaForm ? '#E86E78' : '#F2A49B'; // Top hair crown highlight
+        } else if (ry < -r * 0.50 && Math.abs(rx) < r * 0.45) {
+          col = isSukunaForm ? '#D45C66' : '#E6938A'; // Mid hair highlight
+        } else if (ry > hairlineY - P * 2.2) {
+          col = isSukunaForm ? '#8E2832' : '#B85E55'; // Bang tip shadow
+        } else if (Math.abs(rx) > r * 0.72) {
+          col = isSukunaForm ? '#9A303A' : '#C26D64'; // Side fringe shadow
+        }
+
+        // Sukuna dark root undertones if transformed
+        if (isSukunaForm && ry > -r * 0.45 && ry < -r * 0.20 && Math.abs(rx) > r * 0.40) {
+          col = '#1A1114'; // Dark Sukuna undercuts
+        }
+
+        ctx.fillStyle = col;
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 2: Warm Peach Face Skin & Scars (hairlineY <= ry < r * 0.08)
+      // ──────────────────────────────────────────
+      else if (ry < r * 0.08) {
+        let col = isSukunaForm ? '#E8B4A2' : '#F0C090';
+        if (ry < hairlineY + P * 2.0) {
+          col = isSukunaForm ? '#D09A88' : '#DBA878'; // Bang shadow
+        } else if (absX > 0.72 || ry > 0) {
+          col = isSukunaForm ? '#CE9684' : '#DCA272'; // Cheek / neck shadow
+        }
+
+        // Signature Brow Scar (diagonal slash)
+        const browProg = (ry - (-r * 0.30)) / (r * 0.22);
+        const browScarX = -r * 0.26 + (r * 0.28) * browProg;
+        const isBrowScar = (ry >= -r * 0.30 && ry <= -r * 0.08 && Math.abs(rx - browScarX) <= P * 0.9);
+        const isBrowScarHighlight = (ry >= -r * 0.30 && ry <= -r * 0.08 && (rx - browScarX) < -P * 0.8 && (rx - browScarX) > -P * 1.8);
+
+        // Signature Chin Scar
+        const chinProg = (ry - (r * 0.04)) / (r * 0.06);
+        const chinScarX = -r * 0.06 + (r * 0.12) * chinProg;
+        const isChinScar = (ry >= r * 0.04 && ry <= r * 0.08 && Math.abs(rx - chinScarX) <= P * 0.8);
+
+        // Sukuna Facial Cursed Markings (Tattoos)
+        let isSukunaMark = false;
+        if (isSukunaForm) {
+          if (ry >= -r * 0.26 && ry <= -r * 0.12 && absX <= 0.06) isSukunaMark = true;
+          if (ry >= -r * 0.10 && ry <= r * 0.06 && (Math.abs(rx - r * 0.44) <= P * 0.9 || Math.abs(rx + r * 0.44) <= P * 0.9)) isSukunaMark = true;
+          if (ry >= -r * 0.18 && ry <= -r * 0.14 && (Math.abs(rx - r * 0.34) <= r * 0.12 || Math.abs(rx + r * 0.34) <= r * 0.12)) isSukunaMark = true;
+        }
+
+        if (isSukunaMark) {
+          ctx.fillStyle = '#1A1116'; // Deep charcoal-black tattoo ink
+        } else if (isBrowScar) {
+          ctx.fillStyle = '#944430'; // Signature dark crimson-brown scar
+        } else if (isBrowScarHighlight) {
+          ctx.fillStyle = '#F5BCA6'; // Scar upper highlight edge
+        } else if (isChinScar) {
+          ctx.fillStyle = '#944430'; // Chin scar
+        } else {
+          ctx.fillStyle = col;
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+      // ──────────────────────────────────────────
+      // ZONE 3: DETAILED RED HOODIE COWL & UNIFORM (ry >= r * 0.08)
+      // ──────────────────────────────────────────
+      else {
+        // Button helper function: Circular metallic gold button with dark outer rim, inner swirl, and white specular glint
+        function getButtonPixel(bx, by, btnCenterX, btnCenterY, btnRadius) {
+          const dist = Math.hypot(bx - btnCenterX, by - btnCenterY);
+          if (dist > btnRadius) return null;
+
+          // Dark outer bronze/black rim
+          if (dist >= btnRadius - P * 0.8) {
+            return '#261204';
+          }
+          // Specular glint (1-2px bright white dot on upper-left)
+          const glintDist = Math.hypot(bx - (btnCenterX - btnRadius * 0.38), by - (btnCenterY - btnRadius * 0.38));
+          if (glintDist <= P * 1.1) {
+            return '#FFFFFF';
+          }
+          // Inner swirl / emblem in center
+          const innerDist = Math.hypot(bx - btnCenterX, by - btnCenterY);
+          if (innerDist <= btnRadius * 0.42 && innerDist >= btnRadius * 0.18) {
+            return '#6B340A';
+          }
+          // Center dot of swirl
+          if (innerDist < btnRadius * 0.18) {
+            return '#261204';
+          }
+          // Upper-left golden highlight body
+          if ((bx - btnCenterX) + (by - btnCenterY) <= 0) {
+            return '#F59E0B'; // Bright Amber Gold
+          }
+          // Lower-right shaded gold body
+          return '#B45309'; // Rich Golden Bronze
+        }
+
+        // Button positions matching Reference Picture 1:
+        // Button 1: Upper button on left vertical placket
+        const b1X = -r * 0.14, b1Y = r * 0.24, b1R = r * 0.125;
+        // Button 2: Lower button on left vertical placket
+        const b2X = -r * 0.14, b2Y = r * 0.42, b2R = r * 0.125;
+        // Button 3: Lower right button on navy jacket
+        const b3X = r * 0.52, b3Y = r * 0.65, b3R = r * 0.125;
+
+        // Priority 1: Check buttons
+        const btn1Col = getButtonPixel(rx, ry, b1X, b1Y, b1R);
+        const btn2Col = getButtonPixel(rx, ry, b2X, b2Y, b2R);
+        const btn3Col = getButtonPixel(rx, ry, b3X, b3Y, b3R);
+
+        if (btn1Col) {
+          ctx.fillStyle = btn1Col;
+          ctx.fillRect(px, py, P, P);
+          continue;
+        }
+        if (btn2Col) {
+          ctx.fillStyle = btn2Col;
+          ctx.fillRect(px, py, P, P);
+          continue;
+        }
+        if (btn3Col) {
+          ctx.fillStyle = btn3Col;
+          ctx.fillRect(px, py, P, P);
+          continue;
+        }
+
+        // Top collar boundary curve: curves down in center from r * 0.08 to r * 0.16
+        const cowlTopY = r * 0.08 + Math.max(0, (1 - Math.pow(absX / 0.45, 2)) * r * 0.08);
+        const isThroatSkin = (ry < cowlTopY);
+
+        // Red Cowl Region: from cowlTopY down to r * 0.54
+        const isRedCowl = (!isThroatSkin && ry <= r * 0.54);
+
+        // Left Overlapping Placket Flap: rx from -r * 0.28 to 0.0, ry from r * 0.14 to r * 0.55
+        const isCowlPlacket = (rx >= -r * 0.28 && rx <= 0.0 && ry >= r * 0.14 && ry <= r * 0.55);
+        const isCowlPlacketBorderL = (Math.abs(rx - (-r * 0.28)) <= P * 0.8 && ry >= r * 0.14 && ry <= r * 0.55);
+        const isCowlPlacketBorderR = (Math.abs(rx - 0.0) <= P * 0.8 && ry >= r * 0.14 && ry <= r * 0.55);
+
+        // Horizontal fold crease across red cowl at ry ~ r * 0.32
+        const isCowlMiddleCrease = (Math.abs(ry - r * 0.32) <= P * 0.8 && !isCowlPlacket);
+        const isCowlTopRim = (Math.abs(ry - cowlTopY) <= P * 0.8);
+        const isCowlBottomSeam = (Math.abs(ry - r * 0.54) <= P * 0.8);
+
+        // Navy Uniform Region (ry > r * 0.54)
+        // Curved fold lines across navy torso
+        const isNavyFold1 = (Math.abs(ry - (r * 0.65 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
+        const isNavyFold1Hi = (Math.abs(ry - (r * 0.63 + rx * 0.08)) <= P * 0.8 && rx <= r * 0.38);
+        const isNavyFold2 = (Math.abs(ry - (r * 0.77 + rx * 0.06)) <= P * 0.8 && rx <= r * 0.42);
+        const isNavyFold2Hi = (Math.abs(ry - (r * 0.75 + rx * 0.06)) <= P * 0.8 && rx <= r * 0.42);
+
+        if (isThroatSkin) {
+          ctx.fillStyle = isSukunaForm ? '#E8B4A2' : '#F0C090';
+        } else if (isRedCowl) {
+          if (isCowlPlacketBorderL || isCowlPlacketBorderR || isCowlTopRim || isCowlBottomSeam) {
+            ctx.fillStyle = '#1A0406'; // Dark black-crimson outline
+          } else if (isCowlMiddleCrease) {
+            ctx.fillStyle = '#6E0E14'; // Dark red middle fold crease
+          } else if (isCowlPlacket) {
+            ctx.fillStyle = '#C81E2B'; // Rich vertical flap red
+          } else if (ry < r * 0.32) {
+            // Upper Cowl Fold: Bright vivid red with top specular highlight
+            let col = '#E52B38';
+            if (ry < cowlTopY + P * 2.5) col = '#F44336';
+            ctx.fillStyle = col;
+          } else {
+            // Lower Cowl Fold: Deep rich crimson
+            let col = '#B71C1C';
+            if (absX > r * 0.70 || ry > r * 0.46) col = '#8A1018';
+            ctx.fillStyle = col;
+          }
+        } else {
+          // Navy Jujutsu High Uniform
+          if (isNavyFold1 || isNavyFold2) {
+            ctx.fillStyle = '#0E1322'; // Deep navy shadow crease
+          } else if (isNavyFold1Hi || isNavyFold2Hi) {
+            ctx.fillStyle = '#334168'; // Lighter denim blue fold highlight
+          } else {
+            let col = '#1D253D'; // Midnight navy base
+            if (absX > r * 0.70 || ry > r * 0.85) {
+              col = '#101524';
+            } else if (ry < r * 0.65 && absX < r * 0.30) {
+              col = '#242E4A';
+            }
+            ctx.fillStyle = col;
+          }
+        }
+        ctx.fillRect(px, py, P, P);
+      }
+    }
+  }
 
   ctx.restore();
 }

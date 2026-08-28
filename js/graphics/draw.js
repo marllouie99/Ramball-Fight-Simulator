@@ -47,6 +47,7 @@ export { drawMegumiShadowBlade, drawMegumiDagger, drawMegumiSlashArc } from './w
 export { drawUryuSkin, drawUryuGhostSkin } from './fighters/uryuSkin.js';
 export { drawUryuBow } from './weapons/uryuWeaponGraphics.js';
 export { drawYutaSkin, drawYutaGhostSkin } from './fighters/yutaSkin.js';
+export { drawSukunaBody, drawSukunaPixelBody } from './fighters/sukunaSkin.js';
 export { spawnGetsugaHitEffect, drawGetsugaImpactEffects, updateGetsugaImpactEffects, clearGetsugaImpactEffects } from './particles/getsugaImpactEffect.js';
 
 

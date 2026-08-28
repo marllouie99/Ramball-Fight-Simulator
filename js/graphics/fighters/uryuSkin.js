@@ -25,10 +25,10 @@ export function _getUryuBodyImage() {
       _uryuBodyImageLoading = false;
     };
     img.onerror = (e) => {
-      console.warn('Failed to load Ishida body model image at Assets/model/ISHIDA.png', e);
+      console.warn('Failed to load Ishida body model image at Assets/model/Uryu-ishida.png', e);
       _uryuBodyImageLoading = false;
     };
-    img.src = 'Assets/model/ISHIDA.png?v=1';
+    img.src = 'Assets/model/Uryu-ishida.png?v=2';
     _uryuBodyImage = img;
   }
   return _uryuBodyImage;
@@ -932,13 +932,6 @@ export function drawUryuSkin(ctx, fighter) {
   } // end of procedural fallback else
 
   ctx.restore(); // End of clipped body circle
-
-  // ── 3. BODY CIRCLE CRISP OUTLINE ──
-  ctx.strokeStyle = '#0F172A';
-  ctx.lineWidth = 2.4;
-  ctx.beginPath();
-  ctx.arc(0, 0, r, 0, Math.PI * 2);
-  ctx.stroke();
 
   // ── LAYER 3: HANDS & WEAPON (On top of body circle) ──
   if (isMeleeChop) {

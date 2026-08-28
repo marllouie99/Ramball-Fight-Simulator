@@ -107,12 +107,6 @@ export class GrenadierFighter extends Fighter {
   }
 
   drawOutline(ctx) {
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
-    ctx.lineWidth = 3;
-    ctx.strokeStyle = '#4dff4d';
-    ctx.stroke();
-
     // Draw attack radius
     ctx.beginPath();
     ctx.arc(this.x, this.y, this.attackRadius, 0, Math.PI * 2);
