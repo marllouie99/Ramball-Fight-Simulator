@@ -966,7 +966,6 @@ canvas {
 
 .arena-dark-mode .health-card__fill,
 .health-card.arena-dark-mode .health-card__fill {
-  background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%) !important;
   box-shadow: none !important;
   filter: none !important;
   opacity: 1 !important;

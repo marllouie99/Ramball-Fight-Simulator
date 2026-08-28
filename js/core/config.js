@@ -1416,6 +1416,7 @@ if (CONFIG.mahoraga && CONFIG.mahoraga.isAvailableInArena) {
     name: 'Mahoraga',
     category: 'Anime',
     color: mahoragaConfig.color || '#F5F5DC', // Beige / Off-White
+    themeColor: mahoragaConfig.themeColor || '#FFD700',
     startX: mahoragaConfig.startX || 300,
     startY: mahoragaConfig.startY || 250,
     startVx: mahoragaConfig.startVx || 1.1,

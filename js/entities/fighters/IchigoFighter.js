@@ -2155,18 +2155,39 @@ export class IchigoFighter extends Fighter {
         ctx.globalAlpha = life * 0.55;
         ctx.translate(ai.x, ai.y);
         ctx.rotate(ai.angle || 0);
+        ctx.imageSmoothingEnabled = false;
 
-        // Afterimage body fill
+        const p = 2.0;
+        const snap = (v) => Math.round(v / p) * p;
+        const radius = ai.r || 25;
+        const maxExtent = Math.ceil(radius / p) + 2;
+
+        // Pixel-art afterimage body silhouette
         ctx.fillStyle = ai.color || 'rgba(12, 4, 10, 0.75)';
-        ctx.beginPath();
-        ctx.arc(0, 0, ai.r, 0, Math.PI * 2);
-        ctx.fill();
+        for (let gy = -maxExtent; gy <= maxExtent; gy++) {
+          for (let gx = -maxExtent; gx <= maxExtent; gx++) {
+            const x = gx * p;
+            const y = gy * p;
+            if (Math.hypot(x, y) <= radius + 0.25) {
+              ctx.fillRect(snap(x), snap(y), p, p);
+            }
+          }
+        }
 
-        // Bankai / Mask glowing crimson outer aura border
+        // Blocky outer aura border for Bankai / Hollow forms
         if (ai.strokeColor || ai.isBankai) {
-          ctx.strokeStyle = ai.strokeColor || 'rgba(220, 20, 20, 0.90)';
-          ctx.lineWidth = 2.0;
-          ctx.stroke();
+          const auraColor = ai.strokeColor || 'rgba(220, 20, 20, 0.90)';
+          ctx.fillStyle = auraColor;
+          for (let gy = -maxExtent - 1; gy <= maxExtent + 1; gy++) {
+            for (let gx = -maxExtent - 1; gx <= maxExtent + 1; gx++) {
+              const x = gx * p;
+              const y = gy * p;
+              const d = Math.hypot(x, y);
+              if (d >= radius - 1.5 && d <= radius + 2.5) {
+                ctx.fillRect(snap(x), snap(y), p, p);
+              }
+            }
+          }
         }
 
         ctx.restore();

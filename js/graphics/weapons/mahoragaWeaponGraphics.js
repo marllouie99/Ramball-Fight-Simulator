@@ -1145,7 +1145,7 @@ export function drawMahoragaLeftPunch(ctx, fighter) {
   const _lP = 2.0;
   const _lSnap = (v) => Math.round(v / _lP) * _lP;
   const _lGridR = Math.ceil(fistRadius / _lP);
-  const fistColor = fighter.color || '#F5F5DC';
+  const fistColor = fighter?.skinColor || fighter?.bodyColor || '#F5F5DC';
   for (let gy = -_lGridR; gy <= _lGridR; gy++) {
     for (let gx = -_lGridR; gx <= _lGridR; gx++) {
       const dist = Math.sqrt(gx * gx + gy * gy) * _lP;

@@ -20,7 +20,9 @@ import { SKILL_REGISTRY } from '../../configs/skills/skillRegistry.js';
 export class MahoragaFighter extends Fighter {
   constructor(def) {
     super(def);
-    
+
+    this.themeColor = (def && def.themeColor) || (def && def.color) || (CONFIG.mahoraga?.themeColor) || '#FFD700';
+    this.skinColor = (def && def.skinColor) || (CONFIG.mahoraga?.skinColor) || '#F5F5DC';
     this.baseSpeed = (def && def.moveSpeed !== undefined) ? def.moveSpeed : (CONFIG.mahoraga?.moveSpeed ?? 6.5);
     this.speed = this.baseSpeed;
     

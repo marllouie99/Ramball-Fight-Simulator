@@ -2264,6 +2264,7 @@ function _drawHollowSkywardSonicPillar(ctx, r, burstProg, alpha, now) {
 
 function _drawHollowChannelingReiatsuAura(ctx, r, formationProg, now, fighter) {
   ctx.save();
+  ctx.imageSmoothingEnabled = false;
   const time = now * 0.003;
   const pSize = 2.0;
 
@@ -2280,21 +2281,26 @@ function _drawHollowChannelingReiatsuAura(ctx, r, formationProg, now, fighter) {
   ctx.ellipse(0, r * 0.35, poolR * 1.25, poolR * 0.70, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // 2. Inward Ghost-White Suction / Gravity Distortion Shock Rings (Condensing spiritual pressure inward toward face)
+  // 2. Inward Ghost-White Suction / Gravity Distortion Shock Rings (pixel-art stepped ring)
   const ringCount = 3;
   for (let i = 0; i < ringCount; i++) {
     const ringPhase = ((time * 1.6 + i * (1.0 / ringCount)) % 1.0);
-    // Inward contracting radius
     const ringR = r * (3.4 - ringPhase * 2.4);
     const ringAlpha = Math.sin(ringPhase * Math.PI) * 0.65 * (0.6 + 0.4 * formationProg);
-    
-    ctx.strokeStyle = (i % 2 === 0) 
-      ? `rgba(248, 248, 255, ${ringAlpha.toFixed(2)})` 
+    const ringColor = (i % 2 === 0)
+      ? `rgba(248, 248, 255, ${ringAlpha.toFixed(2)})`
       : `rgba(200, 218, 240, ${(ringAlpha * 0.9).toFixed(2)})`;
-    ctx.lineWidth = 2.2 * (1.0 - ringPhase * 0.4);
-    ctx.beginPath();
-    ctx.arc(0, -r * 0.2, ringR, 0, Math.PI * 2);
-    ctx.stroke();
+
+    const steps = Math.max(16, Math.ceil((ringR * Math.PI * 2) / 8));
+    ctx.fillStyle = ringColor;
+    for (let s = 0; s < steps; s++) {
+      const ang = (s / steps) * Math.PI * 2;
+      const px = Math.cos(ang) * ringR;
+      const py = Math.sin(ang) * (ringR * 0.72) - r * 0.2;
+      const x = Math.round(px / pSize) * pSize;
+      const y = Math.round(py / pSize) * pSize;
+      ctx.fillRect(x, y, pSize, pSize);
+    }
   }
 
   // 3. Rising Ghost-White Flame Wisps, Spectral Embers & Hollow Mask Shard Motes

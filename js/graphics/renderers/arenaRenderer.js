@@ -1859,7 +1859,8 @@ export function drawFuelPickups() {
     ctx.beginPath();
     roundedRect(ctx, nx - bw, ny - bh, bw * 2, bh * 2, br);
     ctx.stroke();
-    ctx.restore();
+
+    ctx.restore();
   });
 }
 
@@ -2387,7 +2388,7 @@ export function drawBankaiImpactDimScreen() {
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-  // ── 3. Arena Floor Expanding Concentric Reiatsu Shock Rings ──
+  // ── 3. Arena Floor Expanding Concentric Reiatsu Shock Rings (Pixel-Art Stepped Ring) ──
   if (isChanneling || isHollow) {
     const ringCount = 3;
     for (let i = 0; i < ringCount; i++) {
@@ -2395,19 +2396,25 @@ export function drawBankaiImpactDimScreen() {
       const ringR = r * 1.5 + ringP * 280;
       const ringAlpha = (1.0 - ringP) * Math.sin(ringP * Math.PI) * opacity * 0.70;
       if (ringAlpha > 0.01) {
-        if (isHollow) {
-          ctx.strokeStyle = (i % 2 === 0) 
-            ? `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})` 
-            : `rgba(10, 10, 15, ${ringAlpha.toFixed(3)})`;
-        } else {
-          ctx.strokeStyle = (i % 2 === 0) 
-            ? `rgba(220, 20, 20, ${ringAlpha.toFixed(3)})` 
-            : `rgba(255, 45, 20, ${ringAlpha.toFixed(3)})`;
+        const ringColor = isHollow
+          ? ((i % 2 === 0)
+            ? `rgba(255, 255, 255, ${ringAlpha.toFixed(3)})`
+            : `rgba(10, 10, 15, ${ringAlpha.toFixed(3)})`)
+          : ((i % 2 === 0)
+            ? `rgba(220, 20, 20, ${ringAlpha.toFixed(3)})`
+            : `rgba(255, 45, 20, ${ringAlpha.toFixed(3)})`);
+
+        const pxStep = 3;
+        const ringSteps = Math.max(18, Math.ceil((ringR * Math.PI * 2) / pxStep));
+        ctx.fillStyle = ringColor;
+        ctx.imageSmoothingEnabled = false;
+
+        for (let step = 0; step < ringSteps; step++) {
+          const ang = (step / ringSteps) * Math.PI * 2;
+          const px = Math.round((cx + Math.cos(ang) * ringR) / pxStep) * pxStep;
+          const py = Math.round((cy + Math.sin(ang) * ringR) / pxStep) * pxStep;
+          ctx.fillRect(px, py, pxStep, pxStep);
         }
-        ctx.lineWidth = Math.max(1.0, 3.5 * (1.0 - ringP));
-        ctx.beginPath();
-        ctx.arc(cx, cy, ringR, 0, Math.PI * 2);
-        ctx.stroke();
       }
     }
   }

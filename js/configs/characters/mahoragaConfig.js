@@ -8,8 +8,9 @@ export const mahoragaConfig = {
     moveSpeed: 6.5,
     r: 30,
     radius: 30,
-    color: '#F5F5DC', // Beige / Off-White
-    themeColor: '#F5F5DC',
+    color: '#FFD700', // Gold / divine adaptation theme
+    themeColor: '#FFD700',
+    skinColor: '#F5F5DC', // White / pale skin for hands and exposed body tones
     startX: 300,
     startY: 250,
     startVx: 1.1,

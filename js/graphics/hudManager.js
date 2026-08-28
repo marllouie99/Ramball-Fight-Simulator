@@ -1908,7 +1908,8 @@ function updateHealthHud() {
         const percent = Math.min(100, Math.max(0, Math.round(ratio * 100)));
         const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
         const healthyColor = isDarkTheme ? (m.themeColor || m.color || '#15803d') : '#22c55e';
-        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? healthyColor : ratio > 0.25 ? '#eab308' : '#ef4444');
+        const adaptiveHealthColor = isDarkTheme ? (m.themeColor || m.color || healthyColor) : healthyColor;
+        const barColor = isMemberCj ? '#FFFFFF' : (ratio > 0.5 ? adaptiveHealthColor : ratio > 0.25 ? '#eab308' : '#ef4444');
         const cjBarClass = isMemberCj ? ' hud-bar-cj' : '';
         const memberStackHTML = isMemberCj ? generateCjGtaStackHTML(m, titleAlign || 'left') : '';
         const { className } = getGlowStyles(m);
@@ -1959,7 +1960,8 @@ function updateHealthHud() {
       const percent = Math.round(safeRatio * 100);
       const isDarkTheme = (typeof state !== 'undefined' && state.arenaTheme === 'dark');
       const healthyColor = isDarkTheme ? (targetFighter?.themeColor || targetFighter?.color || '#15803d') : '#22c55e';
-      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? healthyColor : safeRatio > 0.25 ? '#eab308' : '#ef4444');
+      const adaptiveHealthColor = isDarkTheme ? (targetFighter?.themeColor || targetFighter?.color || healthyColor) : healthyColor;
+      const barColor = isTargetCj ? '#DC2626' : (safeRatio > 0.5 ? adaptiveHealthColor : safeRatio > 0.25 ? '#eab308' : '#ef4444');
       const cjBarClass = isTargetCj ? ' hud-bar-cj' : '';
       const { className } = getGlowStyles(targetFighter);
       
