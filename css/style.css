@@ -572,7 +572,6 @@ canvas {
   color: #000000 !important;
   text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7) !important;
   -webkit-text-stroke: 0px !important;
-  text-stroke: 0px !important;
   paint-order: normal !important;
   line-height: 1.15 !important;
   margin: 0 0 2px 0 !important;
@@ -965,11 +964,25 @@ canvas {
   border: 1.5px solid #FFFFFF !important;
 }
 
+.arena-dark-mode .health-card__fill,
+.health-card.arena-dark-mode .health-card__fill {
+  background: linear-gradient(90deg, #ef4444 0%, #dc2626 100%) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  opacity: 1 !important;
+}
+
+.arena-dark-mode .health-card__fill::after,
+.health-card.arena-dark-mode .health-card__fill::after {
+  display: none !important;
+  background: none !important;
+}
+
 /* Healthbar Overlay HP Text in Dark Mode: Arcade Font & Crisp White */
 .arena-dark-mode .health-card__bar-text,
 .health-card.arena-dark-mode .health-card__bar-text {
   font-family: 'Silkscreen', 'Press Start 2P', monospace, sans-serif !important;
-  font-size: 8px !important;
+  font-size: 11px !important;
   font-weight: 700 !important;
   letter-spacing: 0.5px !important;
   color: #ffffff !important;
